@@ -1,88 +1,131 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 12 Oct 2012 15:24:06 -0600
-Subject: [PATCH] [ARM] Use AT() in the linker script to create correct
- program headers
-In-Reply-To: <20121010095544.GB2131@linaro.org>
-References: <20121001183543.GC22342@obsidianresearch.com>
- <20121002102346.GB2108@linaro.org>
- <20121002174759.GC23733@obsidianresearch.com>
- <20121003104335.GA2254@linaro.org>
- <20121003184437.GB12231@obsidianresearch.com>
- <20121004113637.GA2117@linaro.org>
- <20121004175907.GB2994@obsidianresearch.com>
- <20121008104649.GD2302@linaro.org>
- <20121009182514.GF4124@obsidianresearch.com>
- <20121010095544.GB2131@linaro.org>
-Message-ID: <20121012212406.GN4124@obsidianresearch.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 12 Oct 2012 23:25:05 +0200
+Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
+In-Reply-To: <CALLhW=5k=tAXo_5ri2WgetRgju9rC_Wm-o9-pfHSNqpe6FU5qQ@mail.gmail.com>
+References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
+ <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
+ <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
+ <CALLhW=5k=tAXo_5ri2WgetRgju9rC_Wm-o9-pfHSNqpe6FU5qQ@mail.gmail.com>
+Message-ID: <CAMP44s3wTYTFgSw7r+77zb0fxMSjo1R69Zx0nyM6Hgy2h=Gggw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 10:55:44AM +0100, Dave Martin wrote:
+On Fri, Oct 12, 2012 at 7:46 PM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
+> On 12 October 2012 02:48, Felipe Contreras <felipe.contreras@gmail.com> wrote:
+>> I already made most of these comments, but here they go again.
+>
+> I replied to all, but here it goes again:
 
-> As a side comment, some things such as MAC addresses can be probed and
-> set from userspace after kernel boot, assuming that you have a way
-> to fetch the device description blob from userspace.  If it's accessible
-> via MTD I'm guessing you may have some chance of doing that.
+Mostly, but not all :)
 
-Yes, there is a whole wack of other data in this structure (serial
-numbers, etc) that are captured and used by userspace, so access is
-always made possible.
+>>> @@ -142,11 +142,10 @@ static int iommu_enable(struct omap_iommu *obj)
+>>>                 }
+>>>         }
+>>>
+>>> -       clk_enable(obj->clk);
+>>> +       pm_runtime_get_sync(obj->dev);
+>>>
+>>>         err = arch_iommu->enable(obj);
+>>>
+>>> -       clk_disable(obj->clk);
+>>
+>> The device will never go to sleep, until iommu_disable is called.
+>> clk_enable -> pm_runtime_get_sync, clk_disable pm_runtime_put.
+>
+> Which is what you want... why would you want your iommu to be disabled
+> if the client of that iommu could request a translation?
 
-Setting the MAC via userspace is interesting, I will bear that in
-mind. However, we have several development-support boot scenarios that
-enable the ethernet before the userspace code to fetch the data
-structure is loaded - one of interest has the kernel's initramfs
-perform a NBD mount of the actual application filesystem. So having
-the kernel tend to this is very convenient.
- 
-> However, I worry that if you have to run hardware-dependent code in
-> order to fetch or generate parts of the DT, then we have a chicken-
-> and-egg problem with no guaranteed solution with the frameworks that
-> exist today -- although I am not familiar with how DT gets used on
-> all other arches, so you might have counterexamples I'm not aware of.
+That's the whole point of *dynamic* pm; _when_ the client wants to
+request a translation, _then_ the device is waken up, which is what I
+believe the code currently does.
 
-Certainly, in some cases, (like what I have done) such kernels are
-non-generic and could only work with the hardware they are intended
-for.
+After your patch, even if I don't use the camera, or the DSP, the
+iommu devices will be enabled, and will be consuming energy *all the
+time*. Which I don't think is what we want.
 
-However, if you assume the bootloader provides a dtb (even an
-incomplete one would do) then fixups/replacements/whatever could be
-run based on tags in the dtb without creating a chicken-and-egg
-problem.
+I'm not saying I have a solution, I'm simply saying that's what's
+going to happen if I'm correct.
 
-> At least in ARM-land, the DT is inherently monolithic and static: the
-> DT is not expected to change once you enter the kernel.
+> Remember that these iommus, sit along of other processors not on the
+> main processor side. So, this code should enable it for the other
+> processor to use, and there is no point where the processor can say
+> "I'm not using it, shut it down" or "I'm using it, turn it on" in the
+> middle of execution, other than suspend/resume and if supported,
+> autosuspend.
 
-Sort of, it is the same on all arches, the DT block is expected to
-remain valid, but all the of_node pointers go directly into the block
-so you can alter values but not the structure without breaking any
-invariants. As an example our DTBs all have mac address blocks, with a
-0 value. The fixup simply overwrites with the correct value before the
-ethernet driver reads from it.
+I understand, but perhaps there should be?
 
-> > I'm not sure there is a great interest in this? What are other folks
-> > working on production embedded stuff doing? I suppose that will be
-> > more clear as device tree is rolled out.
-> 
-> For now, the architecturally simplest solution still seems to me to be
-> to write your own boot shim which customises the DT before booting the 
-> kernel. As discussed, this can continue to look like a simple ELF image
-> from the bootloader's point of view -- but I appreciate that it will
-> involve effort and some duplication of some low-level driver components.
+>>> @@ -288,7 +285,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
+>>>         if (!obj || !obj->nr_tlb_entries || !e)
+>>>                 return -EINVAL;
+>>>
+>>> -       clk_enable(obj->clk);
+>>> +       pm_runtime_get_sync(obj->dev);
+>>>
+>>>         iotlb_lock_get(obj, &l);
+>>>         if (l.base == obj->nr_tlb_entries) {
+>>> @@ -318,7 +315,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
+>>>
+>>>         cr = iotlb_alloc_cr(obj, e);
+>>>         if (IS_ERR(cr)) {
+>>> -               clk_disable(obj->clk);
+>>> +               pm_runtime_put_sync(obj->dev);
+>>>                 return PTR_ERR(cr);
+>>>         }
+>>
+>> If I'm correct, the above pm_runtime_get/put are redundant, because
+>> the count can't possibly reach 0 because of the reason I explained
+>> before.
+>>
+>> The same for all the cases below.
+>
+> You can access this paths through debugfs, some of them doesn't work
+> if the module is not enabled first, but in future if you just want to
+> idle the iommu withouth freeing, these are needed to debug.
+>
+> BTW, the next patch in the series: ARM: OMAP: iommu: pm runtime save
+> and restore context, let's you do a pm_runtime_[enable|put] through
+> save/restore ctx functions, which is just for compatibility on how isp
+> code uses the save and restore code.
 
-I admit, I am a bit conflicted. Viewing from the kernel perspective, I
-definitely think this kind of very low level extremely board specific
-stuff should not be in the kernel. That could be a maintenance
-nightmare. However, as an OEM, I need the smallest, simplest boot
-loader possible so I want to push this into the kernel to lighten my
-development load.
+All right, it has been some time since I've touched pm code, so if you say so.
 
-> Your problem is unlikely to affect people outside the embedded space
-> too much, but it doesn't sound likely to be unique.
+>>> @@ -1009,7 +1001,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
+>>>         release_mem_region(res->start, resource_size(res));
+>>>         iounmap(obj->regbase);
+>>>
+>>> -       clk_put(obj->clk);
+>>> +       pm_runtime_disable(obj->dev);
+>>
+>> This will turn on the device unnecessarily, wasting power, and there's
+>> no need for that, kfree will take care of that without resuming.
+>
+> Left aside the aesthetics of having balanced calls, the device will be
+> enabled if there was a pending resume to be executed, otherwise it
+> won't, kfree won't increment the disable_depth counter and I don't
+> think that freeing the pointer is enough reason to ignore
+> pm_runtime_disable.
 
-Agreed..
+You are doing __pm_runtime_disable(dev, true), kfree will do
+__pm_runtime_disable(dev, false), which is what we want. Both will
+decrement the disable_depth.
 
-This thread has left the original topic, what do you think I should do
-with the linker patch?
+But at least you agree that there's a chance that the device will be waken up.
 
-Jason
+>> Also, I still think that something like this is needed:
+> ...
+>> +static struct clk cam_fck = {
+>> +       .name           = "cam_fck",
+>> +       .ops            = &clkops_omap2_iclk_dflt,
+>> +       .parent         = &l3_ick,
+>> +       .enable_reg     = OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
+>
+> a cam_fck name to enable the ick?
+
+Yeap, according to the TRM. Take a look at 12.3 Camera ISP Integration
+Fig 12-50.
+
+Cheers.
+
+-- 
+Felipe Contreras
