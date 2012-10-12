@@ -1,27 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Oct 2012 10:15:35 +0100
-Subject: [PATCH v2 5/8] clk: don't mark clkdev_add_table as init
-In-Reply-To: <1349813638-4617-6-git-send-email-arnd@arndb.de>
-References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
- <1349813638-4617-6-git-send-email-arnd@arndb.de>
-Message-ID: <20121012091535.GD21164@n2100.arm.linux.org.uk>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 12 Oct 2012 09:17:53 +0000
+Subject: [RFC PATCH v2 08/16] ARM: omap: add hsmmc am33xx specific init
+In-Reply-To: <1349982281-10785-9-git-send-email-mporter@ti.com>
+References: <1349982281-10785-1-git-send-email-mporter@ti.com>
+ <1349982281-10785-9-git-send-email-mporter@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAA6374@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 09, 2012 at 10:13:55PM +0200, Arnd Bergmann wrote:
-> s3c2440_clk_add is a subsys_interface method and calls clkdev_add_table,
-> which means we might be calling it after the __init section is
-> discarded.
-> 
-> Without this patch, building mini2440_defconfig results in:
-> 
-> WARNING: vmlinux.o(.text+0x9848): Section mismatch in reference from the function s3c2440_clk_add() to the function .init.text:clkdev_add_table()
-> The function s3c2440_clk_add() references
-> the function __init clkdev_add_table().
-> This is often because s3c2440_clk_add lacks a __init
-> annotation or the annotation of clkdev_add_table is wrong.
+Matt
 
-I'm not sure this is the right thing to do.  I suspect this comes from the
-stupidly complex samsung code, and that this is actually safe - I suspect
-that s3c2440_clk_add() needs to be appropriately marked, but then you end
-up having to trace its call path through various structures etc.
+On Fri, Oct 12, 2012 at 00:34:33, Porter, Matt wrote:
+> AM33xx requires special handling in hsmmc initialization
+> platform glue.
+
+Since AM335x boots mainly through DT, do we still need this patch.
+This function will be called in case of initializing hsmmc with
+Platform data. 
+
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/mach-omap2/hsmmc.c |    7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+
+..snip..
+..snip..
+
+>  	name = "omap_hsmmc";
+>  	res = snprintf(oh_name, MAX_OMAP_MMC_HWMOD_NAME_LEN,
+> -- 
+> 1.7.9.5
+> 
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> 
+
+
+Regards, 
+Gururaja
