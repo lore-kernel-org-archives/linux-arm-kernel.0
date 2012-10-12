@@ -1,20 +1,31 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 12 Oct 2012 10:18:36 +0100
-Subject: [GIT PULL] Versatile Express clk
-In-Reply-To: <20121011224017.2941.11303@nucleus>
-References: <1348501568.27071.5.camel@hornet>
- <20121011224017.2941.11303@nucleus>
-Message-ID: <1350033516.14780.0.camel@hornet>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 12 Oct 2012 11:23:10 +0200
+Subject: [PATCH 1/1] pinctrl/at91: fix compatible order
+Message-ID: <1350033790-31028-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-11 at 23:40 +0100, Mike Turquette wrote:
-> > Would you be so kind and pull the VE clocking stuff? They are rebased on
-> > top of Linus' Realview patch.
->
-> I've taken these into my new clk-next towards 3.8.  That branch is not
-> yet pushed out publicly but will be after -rc1 is released.
+the sam9x5 is new version of the rm9200 not the invert
 
-Awesome, thanks!
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-at91.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Pawe?
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 9c0fe11..bdb152b 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1331,8 +1331,8 @@ static void __devinit at91_gpio_probe_fixup(void)
+ }
+ 
+ static struct of_device_id at91_gpio_of_match[] __devinitdata = {
+-	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
+ 	{ .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops, },
++	{ .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops },
+ 	{ /* sentinel */ }
+ };
+ 
+-- 
+1.7.10.4
