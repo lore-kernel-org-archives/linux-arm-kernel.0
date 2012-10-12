@@ -1,33 +1,29 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 12 Oct 2012 14:39:14 +0200
-Subject: [RESEND PATCH 1/2] mmc: mmci: Fix incorrect handling of HW flow
- control for SDIO
-In-Reply-To: <20121012123536.GJ21164@n2100.arm.linux.org.uk>
-References: <1349885000-22887-1-git-send-email-ulf.hansson@stericsson.com>
- <20121012091322.GC21164@n2100.arm.linux.org.uk>
- <20121012115448.GH21164@n2100.arm.linux.org.uk>
- <50780BF0.3070907@stericsson.com>
- <20121012123536.GJ21164@n2100.arm.linux.org.uk>
-Message-ID: <CAPDyKFpLfJ87j9HnC2eKVDbPArgnLoTUZy-2wGxUZJ70VF=SUw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 12 Oct 2012 18:20:15 +0530
+Subject: [PATCH] davinci: fix return value check by using IS_ERR in
+ tnetv107x_devices_init()
+In-Reply-To: <CAPgLHd-xYzLwnptYpOV4HrdJyn3AZahx2VGVAVLHiEYvcj-APw@mail.gmail.com>
+References: <CAPgLHd-xYzLwnptYpOV4HrdJyn3AZahx2VGVAVLHiEYvcj-APw@mail.gmail.com>
+Message-ID: <50781207.8060701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2012 14:35, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Oct 12, 2012 at 02:24:16PM +0200, Ulf Hansson wrote:
->> Hi Russell,
->>
->> Our IT department is slow, too slow. :-)
->>
->> As an option, would it be possible for you to "manually" send me a new
->> password? Another option would be to change the mail for my account to
->> ulf.hansson at linaro.org
->
-> Updated the email address; that's easier than trying to generate a new
-> password manually.  Please ask the site for a replacement password using
-> your linaro address and hopefully you should get it.
+Hi Wei,
 
-Thanks a lot for helping out. I got a new pwd now!
+On 9/21/2012 11:42 AM, Wei Yongjun wrote:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> 
+> In case of error, the function clk_get() returns ERR_PTR() not
+> NULL pointer. The NULL test in the error handling should be
+> replaced with IS_ERR().
+> 
+> dpatch engine is used to auto generated this patch.
+> (https://github.com/weiyj/dpatch)
+> 
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Kind regards
-Ulf Hansson
+Queuing this for v3.8. While committing, I added ARM: prefix to the
+subject line as is the norm with all arch/arm/* patches.
+
+Thanks,
+Sekhar
