@@ -1,44 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 12 Oct 2012 10:48:24 +0000
-Subject: [PATCH 1/6] ARM: bcm476x: Add infrastructure
-In-Reply-To: <20121012101252.6c3b7dce@skate>
-References: <20121007015300.828366635@gmail.com>
- <201210120803.54539.arnd@arndb.de> <20121012101252.6c3b7dce@skate>
-Message-ID: <201210121048.24998.arnd@arndb.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 12 Oct 2012 16:18:36 +0530
+Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <CAHp75VffAwZjfQLf=wS+nBhiRoMFOoyPeUCfrzF1G=+Kh7HHTA@mail.gmail.com>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
+ <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
+ <1350030203.10584.139.camel@smile>
+ <CAOh2x=m8OVNfMm5Fn+cr9Gxuh6oyt+8d4n-bkG8Xiw5zGncLiA@mail.gmail.com>
+ <CAHp75VffAwZjfQLf=wS+nBhiRoMFOoyPeUCfrzF1G=+Kh7HHTA@mail.gmail.com>
+Message-ID: <CAKohpok=wSHMNA_ZvjfXxFQxxe4iLS=Jov+3T0N8i18wbfDA2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 12 October 2012, Thomas Petazzoni wrote:
-> On Fri, 12 Oct 2012 08:03:54 +0000, Arnd Bergmann wrote:
-> 
-> > I would certainly like to see this, yes. I had a patch for it ages
-> > ago, but would start over again if I did this now.
-> > 
-> > I don't have time to do the conversion at the moment, but I would
-> > certainly welcome a patch that does it. I can give some details about
-> > the problems with that and how I think they should be solved.
-> 
-> I did start working on such a patch a few weeks ago, but converting all
-> the platforms to use IOMEM() was really boring. But now you did that, I
-> can try to revive my patch, see if it works, and post it if you're
-> interested.
+On 12 October 2012 16:10, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+> On Fri, Oct 12, 2012 at 1:36 PM, viresh kumar <viresh.kumar@linaro.org> wrote:
+>> On Fri, Oct 12, 2012 at 1:53 PM, Andy Shevchenko
+>> <andriy.shevchenko@linux.intel.com> wrote:
+>>> On Fri, 2012-10-12 at 11:14 +0530, Viresh Kumar wrote:
+>>
+>>>> +     while (++i < dw->sd_count) {
+>>>> +             if (!strcmp(dw->sd[i].bus_id, param)) {
+>>>> +                     found = 1;
+>>>> +                     break;
 
-Ok, cool!
+I was just not looking at this place.
 
-The main thing to watch out for are mappings that are not for MMIO,
-such as the call to create_mapping() in map_lowmem() or in
-devicemaps_init().
+>>>> +             }
+>>>> +     }
+>>>> +
+>>>> +     if (!found) {
+>>>> +             last_dw = dw;
+>>>> +             last_bus_id = param;
+>>>> +             return false;
+>>> Because of return here you could eliminate 'found' flag at all.
+>> how?
 
-I would suggest making struct map_desc specific to callers of
-iotable_init() and changing the prototype for create_mapping() to
+And was looking here only.
 
-void __init create_mapping(unsigned long virtual, unsigned long pfn,
-			   size_t length, unsigned int type);
+> while (++i < dw->sd_count) {
+>                if (!strcmp(dw->sd[i].bus_id, param)) {
+>        chan->private = &dw->sd[i];
+>        last_dw = NULL;
+>        last_bus_id = NULL;
+>
+>        return true;
+>                }
+>        }
+>
+>                last_dw = dw;
+>                last_bus_id = param;
+>                return false;
 
-That means we still need to add one type cast in iotable_init(), but
-everything else should become simpler. There are a few instances in
-platform code that use MT_MEMORY rather MT_DEVICE. At least the TCM
-one should not really be __iomem, but I'm not sure about the various
-TI SRAM locations. Probably doesn't matter all that much for those.
-
-	Arnd
+will be done.
