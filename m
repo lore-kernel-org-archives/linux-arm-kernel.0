@@ -1,43 +1,110 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 12 Oct 2012 16:30:20 +0800
-Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
-In-Reply-To: <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
- <20121012075358.GA4962@S2101-09.ap.freescale.net>
- <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20121012083017.GB4962@S2101-09.ap.freescale.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 12 Oct 2012 14:04:02 +0530
+Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <1350030203.10584.139.camel@smile>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
+ <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
+ <1350030203.10584.139.camel@smile>
+Message-ID: <CAKohpon4FZdPXFOXvVqExY=xrwozELYvNbE3_zHoRw2O0nszhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 04:24:24PM +0800, Joseph Lo wrote:
-> On Fri, 2012-10-12 at 15:54 +0800, Shawn Guo wrote:
-> > On Thu, Oct 11, 2012 at 09:48:45AM -0700, Colin Cross wrote:
-> > > As is, coupled cpuidle will work on Tegra30, but it will unnecessarily
-> > > wake up the secondary cpus during the transitions to off and back on
-> > > again.  Those cpus will immediately go back to single-cpu LP2,
-> > 
-> > I'm sure coupled cpuidle will work like that.  We have the following
-> > code at the end of  cpuidle_enter_state_coupled() to wait until all
-> > coupled cpus have exited idle.
-> > 
-> >         while (!cpuidle_coupled_no_cpus_ready(coupled))
-> >                 cpu_relax();
-> > 
-> > The cpu woken up during the transitions will just loop there until all
-> > other 3 cpus exit from idle function.
-> > 
-> 
-> Did this a good idea if the CPU was been woken up from an interrupt but
-> it still needed to wait all other CPUs been woken up then it could
-> handle the interrupt?
-> 
-This is how coupled cpuidle gets implemented right now.  And that's
-why I see RCU stall warning reported on that cpu when I tried coupled
-cpuidle on imx6q (CA9 Quad).
+On 12 October 2012 13:53, Andy Shevchenko
+<andriy.shevchenko@linux.intel.com> wrote:
+> On Fri, 2012-10-12 at 11:14 +0530, Viresh Kumar wrote:
 
-Shawn
+> My few comments are below.
+
+Most welcome :)
+
+>> diff --git a/Documentation/devicetree/bindings/dma/snps-dma.txt b/Documentation/devicetree/bindings/dma/snps-dma.txt
+>> @@ -14,4 +34,28 @@ Example:
+>>               reg = <0xfc000000 0x1000>;
+>>               interrupt-parent = <&vic1>;
+>>               interrupts = <12>;
+>> +
+>> +             nr_channels = <8>;
+>> +             chan_allocation_order = <1>;
+>> +             chan_priority = <1>;
+>> +             block_size = <0xfff>;
+>> +             nr_masters = <2>;
+>> +             data_width = <3 3 0 0>;
+>> +
+>> +             slave_info {
+>> +                     uart0-tx {
+>> +                             bus_id = "uart0-tx";
+>> +                             cfg_hi = <0x4000>;      /* 0x8 << 11 */
+>> +                             cfg_lo = <0>;
+>> +                             src_master = <0>;
+>> +                             dst_master = <1>;
+>> +                     };
+>> +                     spi0-tx {
+>> +                             bus_id = "spi0-tx";
+>> +                             cfg_hi = <0x2000>;      /* 0x4 << 11 */
+>> +                             cfg_lo = <0>;
+>> +                             src_master = <0>;
+>> +                             dst_master = <0>;
+>> +                     };
+>> +             };
+> Why do you locate slave information under DMA controller node? From my
+> point of view the slave info belongs to corresponding device. For
+> example, above sections belong to UART0 and SPI0.
+
+Consider one spi driver is used on 5 different platforms with
+different DMA controllers.
+So, 5 DMA drivers and so 5 DMA platform_data. Wherever we add this node, this
+data can't be processed by spi-driver, as we can't add DT processing routines
+for all DMA drivers in spi.
+
+The best place to process DT nodes is DW_DMAC driver, because it is
+dw_dmac's data.
+That's why i added them under DMA.
+
+>> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+
+>> +     while (++i < dw->sd_count) {
+>> +             if (!strcmp(dw->sd[i].bus_id, param)) {
+>> +                     found = 1;
+>> +                     break;
+>> +             }
+>> +     }
+>> +
+>> +     if (!found) {
+>> +             last_dw = dw;
+>> +             last_bus_id = param;
+>> +             return false;
+> Because of return here you could eliminate 'found' flag at all.
+
+Yeah.
+
+>> +static struct dw_dma_platform_data *
+>> +__devinit dw_dma_parse_dt(struct platform_device *pdev)
+>> +{
+
+>> +     for_each_child_of_node(sn, cn)
+>> +             count++;
+> Is there any other way to get amount of children?
+
+I tried my best to find one, referred to lots of drivers. And found
+this way in most of the places. ex: drivers/pinctrl/***
+
+>> +     return pdata;
+> Here you return NULL or valid pointer
+>> +}
+>> +#else
+>> +static inline int dw_dma_parse_dt(struct platform_device *pdev)
+>> +{
+>> +     return -ENOSYS;
+> ...here you return an error.
+
+Look at prototype of both versions of these routines. Its a bug. Thanks
+for pointing out.
+
+>>       if (!pdata || pdata->nr_channels > DW_DMA_MAX_NR_CHANNELS)
+> ...and here you didn't check for an error.
+
+With above bug fixed, this will be automatically resolved as NULL is treated as
+failure.
+
+--
+viresh
