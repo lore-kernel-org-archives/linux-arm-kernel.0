@@ -1,79 +1,41 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 12 Oct 2012 13:32:34 -0700
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <20121012185426.GS28061@n2100.arm.linux.org.uk> (Russell King's
- message of "Fri, 12 Oct 2012 19:54:26 +0100")
-References: <20120925091228.GI31374@n2100.arm.linux.org.uk>
- <20120925091112.GK9137@arwen.pp.htv.fi>
- <20120925092118.GJ31374@n2100.arm.linux.org.uk>
- <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
- <87ipas2y4h.fsf@deeprootsystems.com>
- <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
- <50784458.9080806@ti.com> <877gqv7imt.fsf@deeprootsystems.com>
- <20121012164202.GQ28061@n2100.arm.linux.org.uk>
- <877gqv4lmt.fsf@deeprootsystems.com>
- <20121012185426.GS28061@n2100.arm.linux.org.uk>
-Message-ID: <87lifbwhwd.fsf@deeprootsystems.com>
+From: ccross@android.com (Colin Cross)
+Date: Fri, 12 Oct 2012 13:46:28 -0700
+Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
+In-Reply-To: <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-8-git-send-email-josephl@nvidia.com>
+ <5074AA0E.2080508@wwwdotorg.org>
+ <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
+ <5076F5CB.4020200@wwwdotorg.org>
+ <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
+ <20121012075358.GA4962@S2101-09.ap.freescale.net>
+ <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <CAMbhsRQ94AAGD-ychSLhBR5bzB4HAj_3rHD_voCJ=hb0-qHD-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-
-> On Fri, Oct 12, 2012 at 10:59:22AM -0700, Kevin Hilman wrote:
->> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
->> 
->> > On Fri, Oct 12, 2012 at 09:35:54AM -0700, Kevin Hilman wrote:
->> >> Sourav <sourav.poddar@ti.com> writes:
->> >> > diff --git a/drivers/tty/serial/omap-serial.c
->> >> > b/drivers/tty/serial/omap-serial.c
->> >> > index 6ede6fd..3fbc7f7 100644
->> >> > --- a/drivers/tty/serial/omap-serial.c
->> >> > +++ b/drivers/tty/serial/omap-serial.c
->> >> > @@ -1414,6 +1414,7 @@ static int __devinit serial_omap_probe(struct
->> >> > platform_device *pdev)
->> >> >         INIT_WORK(&up->qos_work, serial_omap_uart_qos_work);
->> >> >
->> >> >         platform_set_drvdata(pdev, up);
->> >> > +       pm_runtime_set_active(&pdev->dev);
->> >> 
->> >> NAK.
->> >> 
->> >> This will obviously break platforms where the UARTs are not active
->> >> before driver loads.
->> >
->> > I thought I had proposed a solution for this issue, which was this
->> > sequence:
->> >
->> >         omap_device_enable(dev);                                                
->> >         pm_runtime_set_active(dev);                                             
->> >         pm_runtime_enable(dev);                                                 
->> >
->> > Yes, I can understand people not liking the omap_device_enable()
->> > there, but I also notice that the email suggesting that never got a
->> > reply either - not even a "I tried this and it doesn't work" or "it
->> > does work".
->> 
->> Yes, that solution would work (though I didn't actually try it.)
->> 
->> However, we can't use omap_device_enable() in the driver.  We're trying
->> to clean all the drivers of OMAP-specific APIs.  That being said,
->> something similar could be done in the device/board init code to ensure
->> the UART HW is in the state that the driver is expecting it, but again,
->> that would just mask the real problem which is that a (re)init of the
->> console UART on 2420/n800 is causing output to disappear.
+On Fri, Oct 12, 2012 at 1:24 AM, Joseph Lo <josephl@nvidia.com> wrote:
+> On Fri, 2012-10-12 at 15:54 +0800, Shawn Guo wrote:
+>> On Thu, Oct 11, 2012 at 09:48:45AM -0700, Colin Cross wrote:
+>> > As is, coupled cpuidle will work on Tegra30, but it will unnecessarily
+>> > wake up the secondary cpus during the transitions to off and back on
+>> > again.  Those cpus will immediately go back to single-cpu LP2,
+>>
+>> I'm sure coupled cpuidle will work like that.  We have the following
+>> code at the end of  cpuidle_enter_state_coupled() to wait until all
+>> coupled cpus have exited idle.
+>>
+>>         while (!cpuidle_coupled_no_cpus_ready(coupled))
+>>                 cpu_relax();
+>>
+>> The cpu woken up during the transitions will just loop there until all
+>> other 3 cpus exit from idle function.
+>>
 >
-> See my more expansive suggestion just posted.
->
-> Whatever way, this discrepancy between runtime PM state and actual device
-> state is what is biting you, and it is that which needs fixing.  
+> Did this a good idea if the CPU was been woken up from an interrupt but
+> it still needed to wait all other CPUs been woken up then it could
+> handle the interrupt?
 
-I'm not conviced (yet) that a mismatch is the root cause.  Yes, that's
-what the author of $SUBJECT patch assumed and stated, but I'm not
-pursuaded.  
-
-If it's an improperly configured mux issue, then the UART will break
-whenever the device is actually omap_device_enable'd, whether in the
-driver or in the bus layer.
-
-Kevin
+Each cpu enables its local interrupts between when it clears it's
+ready flag and when it enters the loop above, so it will already be
+handling interrupts.
