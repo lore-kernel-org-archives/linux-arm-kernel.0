@@ -1,28 +1,34 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Fri, 12 Oct 2012 16:47:36 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <1350054254.2819.3.camel@bwh-desktop.uk.solarflarecom.com>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
- <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
- <20121012090321.GA21164@n2100.arm.linux.org.uk>
- <yw1xhaq0nefg.fsf@unicorn.mansr.com>
- <20121012110750.GE21164@n2100.arm.linux.org.uk>
- <yw1x8vbcndlb.fsf@unicorn.mansr.com>
- <20121012114443.GG21164@n2100.arm.linux.org.uk>
- <1350043692.21172.11815.camel@edumazet-glaptop>
- <20121012142254.GG5453@kvack.org>
- <1350053300.21172.12319.camel@edumazet-glaptop>
- <1350054254.2819.3.camel@bwh-desktop.uk.solarflarecom.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B7041@saturn3.aculab.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 12 Oct 2012 18:53:14 +0300
+Subject: [PATCH V2 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <CAKohponS+mkj6rN6hzJC1FrbpSS+jWZBii4xQgN+4z2h=zFTWA@mail.gmail.com>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
+ <9688d98010716880c1bbd966ead312c446282204.1350051925.git.viresh.kumar@linaro.org>
+ <1350053897.10584.172.camel@smile>
+ <CAKohponS+mkj6rN6hzJC1FrbpSS+jWZBii4xQgN+4z2h=zFTWA@mail.gmail.com>
+Message-ID: <CAHp75VdNVyWxvnHDFjg_5vC95M_LwJYUDLQb+NmBA6GRVsea9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> AC was so useless that it has now been reallocated to use by SMAP
-> <https://lwn.net/Articles/517251/>.
+On Fri, Oct 12, 2012 at 6:18 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 12 October 2012 20:28, Andy Shevchenko
+> <andriy.shevchenko@linux.intel.com> wrote:
+>> On Fri, 2012-10-12 at 20:01 +0530, Viresh Kumar wrote:
+>
+>>> +     if (last_dw) {
+>>> +             if ((last_bus_id == param) && (last_dw == dw))
+>>> +                     return false;
+>>> +     }
+1. This is an equivalent of
+if (last_dw && (last_bus_id == ... ) && (last_dw == dw))
+ return false;
+2. In case dw is always non-NULL the last_dw == dw is false if last_dw is NULL.
 
-That is a long time coming!
-Wonder when it will appear in any cpus.
+Where am I wrong?
 
-How am I going to get root access when I can't get the kernel
-to execute code at address 0 any more :-)
+> You are already drunk.
+Not yet, but tired.
+
+-- 
+With Best Regards,
+Andy Shevchenko
