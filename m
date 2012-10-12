@@ -1,114 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Oct 2012 12:44:43 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <yw1x8vbcndlb.fsf@unicorn.mansr.com>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
- <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
- <20121012090321.GA21164@n2100.arm.linux.org.uk>
- <yw1xhaq0nefg.fsf@unicorn.mansr.com>
- <20121012110750.GE21164@n2100.arm.linux.org.uk>
- <yw1x8vbcndlb.fsf@unicorn.mansr.com>
-Message-ID: <20121012114443.GG21164@n2100.arm.linux.org.uk>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 12 Oct 2012 07:54:37 -0400
+Subject: [RFC PATCH v2 08/16] ARM: omap: add hsmmc am33xx specific init
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EAA6374@DBDE01.ent.ti.com>
+References: <1349982281-10785-1-git-send-email-mporter@ti.com>
+ <1349982281-10785-9-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAA6374@DBDE01.ent.ti.com>
+Message-ID: <20121012115437.GG13724@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 12:18:08PM +0100, M?ns Rullg?rd wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-> > Well, I get the last word here and it's no.
+On Fri, Oct 12, 2012 at 09:17:53AM +0000, Hebbar, Gururaja wrote:
+> Matt
 > 
-> Sadly, yes.
-
-It's not "sadly" - it's a matter of fact that the kernel does from time
-to time generate misaligned accesses and they are _not_ bugs.  If they
-were bugs, then the code to fix up misaligned accesses would not have
-been developed, and we'd instead take the fault and panic or something
-like that.
-
-> >> >> If all alignment faults in the kernel are caused by broken drivers,
-> >> >> that would at least give us some hope of finding those drivers while
-> >> >> at the same time not causing much overhead in the case where we need
-> >> >> to do the fixup in the meantime.
-> >> >
-> >> > No.  It is my understanding that various IP option processing can also
-> >> > cause the alignment fault handler to be invoked, even when the packet is
-> >> > properly aligned, and then there's jffs2/mtd which also relies upon
-> >> > alignment faults being fixed up.
-> >> 
-> >> As far as I'm concerned, this is all hearsay, and I've only ever heard
-> >> it from you.  Why can't you let those who care fix these bugs instead?
-> >
-> > You know, I'm giving you the benefit of my _knowledge_ which has been
-> > built over the course of the last 20 years.
+> On Fri, Oct 12, 2012 at 00:34:33, Porter, Matt wrote:
+> > AM33xx requires special handling in hsmmc initialization
+> > platform glue.
 > 
-> How proud you sound.  Now could you say something of substance instead?
+> Since AM335x boots mainly through DT, do we still need this patch.
+> This function will be called in case of initializing hsmmc with
+> Platform data. 
 
-You're proving yourself to be idiot?  There, that's substance.
+Yes, thanks, will drop in v3.
 
-> > I've been in these discussions with networking people before.  I ended
-> > up having to develop the alignment fault handler because of those
-> > discussions.  And oh look, Eric confirmed that the networking code
-> > isn't going to get "fixed" as you were demanding, which is exactly
-> > what I said.
-> 
-> Funny, I saw him say the exact opposite:
-> 
->   So if you find an offender, please report a bug, because I can
->   guarantee you we will _fix_ it.
-
-No, let's go back.
-
-- You were demanding that the ipv4 header structure should be packed.
-  I said that wasn't going to happen because the networking people
-  wouldn't allow it, and it seems that's been proven correct.
-- You were demanding that the ipv4 code used the unaligned accessors.
-  I said that networking people wouldn't allow it either, and that's
-  also been proven correct.
-
-Both these points have been proven correct because Eric has said that the
-core networking code is _not_ going to be changed to suit this.
-
-What Eric _has_ said is that networking people consider packets supplied
-to the networking layer where the IPv4 header is not aligned on architectures
-where misaligned accesses are a problem to be a bug in the network driver,
-not the network code, and proposed a solution.
-
-That's entirely different from all your claims that the core networking
-code needs fixing to avoid these misaligned accesses.
-
-> > I've been in discussions with MTD people over these issues before, I've
-> > discussed this with David Woodhouse when it came up in JFFS2.  I *KNOW*
-> > these things.
-> 
-> In the same way you "know" the networking people won't fix their code,
-> despite them _clearly_ stating the opposite?
-
-I'll tell you exactly how I *KNOW* this.  The issue came up because of
-noMMU, which does not have any way to fix up alignment faults.  JFFS2
-passes randomly aligned buffers to the MTD drivers, and the MTD drivers
-assume that they're aligned and they do word accesses on them.
-
-See the thread http://lists.arm.linux.org.uk/lurker/thread/20021204.191632.4473796b.en.html
-
-See: http://lists.arm.linux.org.uk/lurker/message/20020225.195925.02bdbd47.en.html
-and: http://lists.arm.linux.org.uk/lurker/message/20020313.150932.081a7592.en.html
-
-There's several other threads where it's also discussed.
-
-And while you're there, note the date.  There is nothing recent about this
-issue.  It's well known, and well understood by those who have a grasp of
-the issues that alignment faults are a part of normal operation by the
-ARM kernel - and is one of the penalties of being tied into architecture
-independent code.
-
-Compromises have to be sought, and that's the compromise we get to live
-with.
-
-> > You can call it hearsay if you wish, but it seems to be more accurate
-> > than your wild outlandish and pathetic statements.
-> 
-> So you're resorting to name-calling.  Not taking that bait.
-
-Sorry?  So what you're saying is that it's fine for you to call my
-comments hearsay, but I'm not allowed to express a view on your comments.
-How arrogant of you.
+-Matt
