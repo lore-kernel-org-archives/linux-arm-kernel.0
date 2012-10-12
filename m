@@ -1,66 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 12 Oct 2012 12:03:29 -0400
-Subject: [PATCH v2 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <20121012165919.0dd085dd@skate>
-References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121011212629.GA14171@electric-eye.fr.zoreil.com>
- <20121012143131.GP12330@titan.lakedaemon.net>
- <20121012165919.0dd085dd@skate>
-Message-ID: <20121012160329.GQ12330@titan.lakedaemon.net>
+From: bhutchings@solarflare.com (Ben Hutchings)
+Date: Fri, 12 Oct 2012 17:13:27 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B7041@saturn3.aculab.com>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+ <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+ <yw1xhaq0nefg.fsf@unicorn.mansr.com>
+ <20121012110750.GE21164@n2100.arm.linux.org.uk>
+ <yw1x8vbcndlb.fsf@unicorn.mansr.com>
+ <20121012114443.GG21164@n2100.arm.linux.org.uk>
+ <1350043692.21172.11815.camel@edumazet-glaptop>
+ <20121012142254.GG5453@kvack.org>
+ <1350053300.21172.12319.camel@edumazet-glaptop>
+ <1350054254.2819.3.camel@bwh-desktop.uk.solarflarecom.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B7041@saturn3.aculab.com>
+Message-ID: <1350058407.2819.15.camel@bwh-desktop.uk.solarflarecom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 04:59:19PM +0200, Thomas Petazzoni wrote:
-> Jason,
+On Fri, 2012-10-12 at 16:47 +0100, David Laight wrote:
+> > AC was so useless that it has now been reallocated to use by SMAP
+> > <https://lwn.net/Articles/517251/>.
 > 
-> On Fri, 12 Oct 2012 10:31:31 -0400, Jason Cooper wrote:
+> That is a long time coming!
+> Wonder when it will appear in any cpus.
 > 
-> > I agree with Francois on most of these.  I prefer readability over
-> > hard 80 column limits.
-> 
-> Sure, but checkpatch.pl is warning on every line exceeding the 80
-> columns. Not that I think that all checkpatch.pl warnings should
-> necessarily be religiously respected, but if you have gazillions of
-> warnings regarding line exceeding 80 columns, it is very likely that
-> you will miss more important warnings.
+> How am I going to get root access when I can't get the kernel
+> to execute code at address 0 any more :-)
 
-./scripts/checkpatch.pl --ignore LONG_LINE ...
+Moving further off the topic: that is supposed to be prevented by a
+separate feature, SMEP, which I think is available in current Intel CPUs
+(Ivy Bridge).  Also, unprivileged users are generally not permitted to
+mmap() at address 0.
 
-Will yield the 'more important' warnings/errors.  After those are
-cleared, you can run without --ignore to check for over-indentation,
-etc.
+Ben.
 
-> > Although, 80 columns is still sound
-> > guidance.  For example, a majority of the broken lines are due to
-> > long macro and constant names.  I did a 'git grep NETA' and didn't
-> > see anything alarming.  So, above could become
-> > 
-> > 			val |= rx_filled << NETA_RXQ_ADD_NONOCC_SHIFT;
-> 
-> I don't mind, but then I would like to keep things consistent:
-> 
->  * The driver file would be neta.c
-> 
->  * All functions and data structure would be prefixed neta_ and not
->    mvneta_
-> 
->  * The Kconfig option would become CONFIG_NETA. Do we really want such
->    a "simple" Kconfig option name for a driver?
-
-Well, you could do mv_neta.c and CONFIG_MV_NETA, but at the end of the
-day, we were both trying to put lipstick on a pig.  Your last paragraph
-is the most important.
-
-> Maybe the fact that those long macros are making long lines is also due
-> to the code having sometimes a too deep indentation, and I need to fix
-> that by using more auxiliary functions or something like that?
-
-This is the intent of the 80 column warning.  Please review the patch
-for over-indentation, and consider shortening the macros, eg
-MVNETA_RXQ_ADD_NONOCC_SHFT.
-
-thx,
-
-Jason.
+-- 
+Ben Hutchings, Staff Engineer, Solarflare
+Not speaking for my employer; that's the marketing department's job.
+They asked us to note that Solarflare product names are trademarked.
