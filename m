@@ -1,150 +1,111 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 12 Oct 2012 15:40:44 +0800
-Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
-In-Reply-To: <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
-Message-ID: <1350027644.20241.113.camel@jlo-ubuntu-64.nvidia.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Fri, 12 Oct 2012 09:48:33 +0200
+Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
+In-Reply-To: <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
+References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
+ <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
+Message-ID: <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-10-12 at 00:48 +0800, Colin Cross wrote:
-> On Thu, Oct 11, 2012 at 9:37 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> > On 10/11/2012 05:24 AM, Joseph Lo wrote:
-> >> On Wed, 2012-10-10 at 06:49 +0800, Stephen Warren wrote:
-> >>> On 10/08/2012 04:26 AM, Joseph Lo wrote:
-> >>>> The cpuidle LP2 is a power gating idle mode. It support power gating
-> >>>> vdd_cpu rail after all cpu cores in LP2. For Tegra30, the CPU0 must
-> >>>> be last one to go into LP2. We need to take care and make sure whole
-> >>>> secondary CPUs were in LP2 by checking CPU and power gate status.
-> >>>> After that, the CPU0 can go into LP2 safely. Then power gating the
-> >>>> CPU rail.
-> 
-> <snip>
-> 
-> >>>> @@ -85,16 +108,22 @@ static int __cpuinit tegra30_idle_lp2(struct cpuidle_device *dev,
-> >>>>                                   int index)
-> >>>>  {
-> >>>>     bool entered_lp2 = false;
-> >>>> +   bool last_cpu;
-> >>>>
-> >>>>     local_fiq_disable();
-> >>>>
-> >>>> +   last_cpu = tegra_set_cpu_in_lp2(dev->cpu);
-> >>>> +   if (dev->cpu == 0) {
-> >>>> +           if (last_cpu)
-> >>>> +                   entered_lp2 = tegra30_idle_enter_lp2_cpu_0(dev, drv,
-> >>>> +                                                              index);
-> >>>> +           else
-> >>>> +                   cpu_do_idle();
-> >>>> +   } else {
-> >>>>             entered_lp2 = tegra30_idle_enter_lp2_cpu_n(dev, drv, index);
-> >>>> +   }
-> >>>
-> >>> Hmm. That means that if the last CPU to enter LP2 is e.g. CPU1, then
-> >>> even though all CPUs are now in LP2, the complex as a whole doesn't
-> >>> enter LP2. Is there a way to make the cluster as a whole enter LP2 in
-> >>> this case? Isn't that what coupled cpuidle is for?
-> >>
-> >> It may look like the coupled cpuidle can satisfy the usage here. But it
-> >> didn't. Please check the criteria of coupled cpuidle.
-> >
-> > What about the first part of the question. What happens if:
-> >
-> > CPU3 enters LP2
-> > CPU2 enters LP2
-> > CPU0 enters LP2
-> > CPU1 enters LP2
-> >
-> > Since CPU1 is not CPU0, tegra30_idle_enter_lp2_cpu_n() is called, and
-> > hence I think the whole CPU complex is never rail-gated (just each CPU
-> > is power-gated) even though all CPUs are in LP2 and the complex could be
-> > rail-gated. Isn't this missing out on power-savings?
-> >
-> > So, we either need to:
-> >
-> > a) Make tegra30_idle_enter_lp2_cpu_n() rail-gate if the last CPU is
-> > entering LP2, and then I'm not sure the implementation would be any
-> > different to tegra30_idle_enter_lp2_cpu_0, would it?
-> >
-> > b) If CPUn can't trigger rail-gating, then when CPUn is the last to
-> > enter LP2 of the whole complex, it needs to IPI to CPU0 to tell it to
-> > rail-gate, and simply power-gate itself. I believe this IPI interaction
-> > is exactly what coupled cpuidle is about, isn't it?
-> >
-> >> /*
-> >>  * To use coupled cpuidle states, a cpuidle driver must:
-> >>  *
-> >>  *    Set struct cpuidle_device.coupled_cpus to the mask of all
-> >>  *    coupled cpus, usually the same as cpu_possible_mask if all cpus
-> >>  *    are part of the same cluster.  The coupled_cpus mask must be
-> >>  *    set in the struct cpuidle_device for each cpu.
-> >>  *
-> >>  *    Set struct cpuidle_device.safe_state to a state that is not a
-> >>  *    coupled state.  This is usually WFI.
-> >>  *
-> >>  *    Set CPUIDLE_FLAG_COUPLED in struct cpuidle_state.flags for each
-> >>  *    state that affects multiple cpus.
-> >>  *
-> >>  *    Provide a struct cpuidle_state.enter function for each state
-> >>  *    that affects multiple cpus.  This function is guaranteed to be
-> >>  *    called on all cpus at approximately the same time.  The driver
-> >>  *    should ensure that the cpus all abort together if any cpu tries
-> >>  *    to abort once the function is called.  The function should return
-> >>  *    with interrupts still disabled.
-> >>  */
-> >>
-> >> The Tegra30 can support the secondary CPUs go into LP2 (power-gate)
-> >> independently.
-> >
-> > I think that just means that the safe state for CPUn (i.e. not CPU0) can
-> > do better than WFI on Tegra30, even though it can't on Tegra20.
-> 
-> Exactly.
-> 
-> >> The limitation of the CPU0 is the CPU0 must be the last
-> >> one to go into LP2 to shut off CPU rail.
-> >>
-> >> It also no need for every CPU to leave LP2 at the same time. The CPU0
-> >> would be always the first one that woken up from LP2. But all the other
-> >> secondary CPUs can still keep in LP2. One of the secondary CPUs can also
-> >> be woken up alone, if the CPU0 already up.
-> >
-> > That seems like an implementation detail. Perhaps coupled cpuidle needs
-> > to be enhanced to best support Tegra30?
-> 
-> As is, coupled cpuidle will work on Tegra30, but it will unnecessarily
-> wake up the secondary cpus during the transitions to off and back on
-> again.  Those cpus will immediately go back to single-cpu LP2, so it
-> may not be a big deal, but there is a small optimization I've
-> discussed with a few other people that could avoid waking them up.  I
-> suggest adding an extra pre-idle hook to the Tegra30 that is called by
-> coupled cpuidle on the last cpu to go down.  It would return a cpumask
-> of cpus that have been prepared for idle by guaranteeing that they
-> will not wake up from an interrupt, and therefore don't need to be
-> woken up for the transitions.  I haven't worked with a cpu that needs
-> this optimization yet, so I haven't done it.
+On Fri, Oct 12, 2012 at 3:06 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
+> Use runtime PM functionality interfaced with hwmod enable/idle
+> functions, to replace direct clock operations and sysconfig
+> handling.
+>
+> Dues to reset sequence, pm_runtime_put_sync must be used, to avoid
+> possible operations with the module under reset.
 
-Hi Colin,
+I already made most of these comments, but here they go again.
 
-Thanks for your update. I understand what you are talk about. Actually,
-I had tried it in the background for both Tegra20 and Tegra30. But I can
-just ran several times of coupled cpuidle state. Then it dead locked in
-the coupled cpuidle state. It's look like a race condition and dead lock
-by missing IPI. I am sure the GIC was on and the IPI be fired. But
-sometimes the CPU just can't catch the IPI. And I had a WAR for it by
-doing a very short local_irq_enable and local_irq_disable in the coupled
-cpuidle ready waiting loop. Then everything works. Not sure, did you
-meet this before? Any hint about this?
+> @@ -142,11 +142,10 @@ static int iommu_enable(struct omap_iommu *obj)
+>                 }
+>         }
+>
+> -       clk_enable(obj->clk);
+> +       pm_runtime_get_sync(obj->dev);
+>
+>         err = arch_iommu->enable(obj);
+>
+> -       clk_disable(obj->clk);
 
-Very interesting about "guaranteeing that they will not wake up from an
-interrupt", did these CPUs go into power-gete cpuidle mode by wfe? If
-the CPUs not wake up from an interrupt when doing cpuidle, how did them
-be woke up? By sending event to these CPUs?
+The device will never go to sleep, until iommu_disable is called.
+clk_enable -> pm_runtime_get_sync, clk_disable pm_runtime_put.
 
-Thanks,
-Joseph
+> @@ -288,7 +285,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
+>         if (!obj || !obj->nr_tlb_entries || !e)
+>                 return -EINVAL;
+>
+> -       clk_enable(obj->clk);
+> +       pm_runtime_get_sync(obj->dev);
+>
+>         iotlb_lock_get(obj, &l);
+>         if (l.base == obj->nr_tlb_entries) {
+> @@ -318,7 +315,7 @@ static int load_iotlb_entry(struct omap_iommu *obj, struct iotlb_entry *e)
+>
+>         cr = iotlb_alloc_cr(obj, e);
+>         if (IS_ERR(cr)) {
+> -               clk_disable(obj->clk);
+> +               pm_runtime_put_sync(obj->dev);
+>                 return PTR_ERR(cr);
+>         }
+
+If I'm correct, the above pm_runtime_get/put are redundant, because
+the count can't possibly reach 0 because of the reason I explained
+before.
+
+The same for all the cases below.
+
+> @@ -1009,7 +1001,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
+>         release_mem_region(res->start, resource_size(res));
+>         iounmap(obj->regbase);
+>
+> -       clk_put(obj->clk);
+> +       pm_runtime_disable(obj->dev);
+
+This will turn on the device unnecessarily, wasting power, and there's
+no need for that, kfree will take care of that without resuming.
+
+>         dev_info(&pdev->dev, "%s removed\n", obj->name);
+>         kfree(obj);
+>         return 0;
+
+Also, I still think that something like this is needed:
+
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -2222,8 +2222,17 @@ static struct clk cam_mclk = {
+        .recalc         = &followparent_recalc,
+ };
+
++static struct clk cam_fck = {
++       .name           = "cam_fck",
++       .ops            = &clkops_omap2_iclk_dflt,
++       .parent         = &l3_ick,
++       .enable_reg     = OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
++       .enable_bit     = OMAP3430_EN_CAM_SHIFT,
++       .clkdm_name     = "cam_clkdm",
++       .recalc         = &followparent_recalc,
++};
++
+ static struct clk cam_ick = {
+-       /* Handles both L3 and L4 clocks */
+        .name           = "cam_ick",
+        .ops            = &clkops_omap2_iclk_dflt,
+        .parent         = &l4_ick,
+@@ -3394,6 +3403,7 @@ static struct omap_clk omap3xxx_clks[] = {
+        CLK("omapdss_dss",      "ick",          &dss_ick_3430es2,
+ CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+        CLK(NULL,       "dss_ick",              &dss_ick_3430es2,
+ CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+        CLK(NULL,       "cam_mclk",     &cam_mclk,      CK_34XX | CK_36XX),
++       CLK(NULL,       "cam_fck",      &cam_fck,       CK_34XX | CK_36XX),
+        CLK(NULL,       "cam_ick",      &cam_ick,       CK_34XX | CK_36XX),
+        CLK(NULL,       "csi2_96m_fck", &csi2_96m_fck,  CK_34XX | CK_36XX),
+        CLK(NULL,       "usbhost_120m_fck", &usbhost_120m_fck,
+CK_3430ES2PLUS | CK_AM35XX | CK_36XX),
+
+Cheers.
+
+-- 
+Felipe Contreras
