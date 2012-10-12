@@ -1,65 +1,75 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Fri, 12 Oct 2012 17:28:35 +0200
-Subject: [PATCH 4/6] ARM: bcm476x: Add stub clock driver
-In-Reply-To: <20121012145221.2941.35101@nucleus>
-References: <20121007015300.828366635@gmail.com>
- <20121007015407.154476821@gmail.com>
- <20121012145221.2941.35101@nucleus>
-Message-ID: <20121012152835.GA2882@glitch>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 12 Oct 2012 10:08:32 -0400
+Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
+In-Reply-To: <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
+References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
+ <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
+Message-ID: <20121012140832.GO12330@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 07:52:21AM -0700, Mike Turquette wrote:
-> Quoting Domenico Andreoli (2012-10-06 18:53:04)
-> > Index: b/drivers/clk/clk-bcm476x.c
-> > ===================================================================
-> > --- /dev/null
-> > +++ b/drivers/clk/clk-bcm476x.c
-> > @@ -0,0 +1,52 @@
-> > +/*
-> > + * Broadcom BCM476x SoCs clocks
-> > + *
-> > + * Copyright (C) 2011-2012 Domenico Andreoli <domenico.andreoli@linux.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/clk-private.h>
+On Fri, Oct 12, 2012 at 02:26:19PM +0100, Russell King wrote:
+> As suggested by Andrew Morton:
 > 
-> Why clk-private.h?  That is deprecated and should not be used unless
-> absolutely necessary.  It will be removed once Tegra and OMAP stop using
-> it.
+>   This is a pet peeve of mine.  Any time there's a long list of items
+>   (header file inclusions, kconfig entries, array initalisers, etc) and
+>   someone wants to add a new item, they *always* go and stick it at the
+>   end of the list.
 > 
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/clkdev.h>
-> > +#include <linux/clk/bcm476x.h>
-> > +
-> > +/*
-> > + * These are fixed clocks (and device tree doesn't support clk!).
-> > + *
-> > + * They're probably not all root clocks and it may be possible to
-> > + * turn them on and off but until this is mapped out better it's
-> > + * the only way they can be used.
-> > + */
-> > +DEFINE_CLK_FIXED_RATE(sys_pclk,   CLK_IS_ROOT, 312000000, 0);
-> > +DEFINE_CLK_FIXED_RATE(apb_pclk,   CLK_IS_ROOT, 156000000, 0);
-> > +DEFINE_CLK_FIXED_RATE(uart0_pclk, CLK_IS_ROOT, 78000000, 0);
-> > +DEFINE_CLK_FIXED_RATE(uart1_pclk, CLK_IS_ROOT, 78000000, 0);
-> > +DEFINE_CLK_FIXED_RATE(uart2_pclk, CLK_IS_ROOT, 78000000, 0);
-> > +
+>   Guys, don't do this.  Either put the new item into a randomly-chosen
+>   position or, probably better, alphanumerically sort the list.
 > 
-> Can you use clk_register_fixed_rate instead?
+> lets sort all our select statements alphanumerically.  This commit was
+> created by the following perl:
+> 
+> while (<>) {
+>         while (/\\\s*$/) {
+>                 $_ .= <>;
+>         }
+>         undef %selects if /^\s*config\s+/;
+>         if (/^\s+select\s+(\w+).*/) {
+>                 if (defined($selects{$1})) {
+>                         if ($selects{$1} eq $_) {
+>                                 print STDERR "Warning: removing duplicated $1 entry\n";
+>                         } else {
+>                                 print STDERR "Error: $1 differently selected\n".
+>                                         "\tOld: $selects{$1}\n".
+>                                         "\tNew: $_\n";
+>                                 exit 1;
+>                         }
+>                 }
+>                 $selects{$1} = $_;
+>                 next;
+>         }
+>         if (%selects and (/^\s*$/ or /^\s+help/)) {
+>                 foreach $k (sort (keys %selects)) {
+>                         print "$selects{$k}";
+>                 }
+>                 undef %selects;
+>         }
+>         print;
+> }
+> if (%selects) {
+>         foreach $k (sort (keys %selects)) {
+>                 print "$selects{$k}";
+>         }
+> }
+> 
+> It found two duplicates:
+> 
+> Warning: removing duplicated S5P_SETUP_MIPIPHY entry
+> Warning: removing duplicated HARDIRQS_SW_RESEND entry
+> 
+> and they are identical duplicates, hence the shrinkage in the diffstat
+> of two lines.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Stephen already warned me, it'll be fixed in the next post. Thanks.
+For ARCH_DOVE, ARCH_KIRKWOOD, ARCH_MV78XX0, ARCH_ORION5X, PLAT_ORION,
+and PLAT_ORION_LEGACY:
 
-Regards,
-Domenico
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
