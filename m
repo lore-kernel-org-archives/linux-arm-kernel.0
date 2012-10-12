@@ -1,42 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 12 Oct 2012 16:16:06 +0200
-Subject: [PATCH v2 1/4] net: mvneta: driver for Marvell Armada 370/XP
- network unit
-In-Reply-To: <5076E9F1.60200@gmail.com>
-References: <1349969282-12676-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1349969282-12676-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <5076E9F1.60200@gmail.com>
-Message-ID: <20121012161606.4cb97b48@skate>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 12 Oct 2012 16:16:48 +0200
+Subject: [PATCH 2/4] ARM: AT91: Add usart/tc DT clock lookup to AT91RM9200
+In-Reply-To: <1349993126-9519-2-git-send-email-manabian@gmail.com>
+References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
+ <1349993126-9519-2-git-send-email-manabian@gmail.com>
+Message-ID: <20121012141648.GB12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+Hi,
 
-On Thu, 11 Oct 2012 10:46:57 -0500, Rob Herring wrote:
+	You need to rebase your patch over the pinctrl
 
-> > +Required properties:
-> > +- compatible: should be "marvell,neta".
+Best Regards,
+J.
+On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/mach-at91/at91rm9200.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> This should be more specific such as "marvell,armada-xp-neta".
+> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+> index b4f0565..eef3f53 100644
+> --- a/arch/arm/mach-at91/at91rm9200.c
+> +++ b/arch/arm/mach-at91/at91rm9200.c
+> @@ -188,6 +188,19 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91rm9200", &twi_clk),
+> +	/* usart lookup table for DT entries */
+> +	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
+> +	CLKDEV_CON_DEV_ID("usart", "fffc0000.serial", &usart0_clk),
+> +	CLKDEV_CON_DEV_ID("usart", "fffc4000.serial", &usart1_clk),
+> +	CLKDEV_CON_DEV_ID("usart", "fffc8000.serial", &usart2_clk),
+> +	CLKDEV_CON_DEV_ID("usart", "fffcc000.serial", &usart3_clk),
+> +	/* tc lookup table for DT entries */
+> +	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
+> +	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
+> +	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
+> +	CLKDEV_CON_DEV_ID("t0_clk", "fffa4000.timer", &tc3_clk),
+> +	CLKDEV_CON_DEV_ID("t1_clk", "fffa4000.timer", &tc4_clk),
+> +	CLKDEV_CON_DEV_ID("t2_clk", "fffa4000.timer", &tc5_clk),
+>  	/* fake hclk clock */
+>  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+>  	CLKDEV_CON_ID("pioA", &pioA_clk),
+> -- 
+> 1.7.12.2
 > 
-> Or use 370 instead of xp. It should be which ever chip came first.
-
-Is this really useful? The name of this network unit in Marvell is
-simply "neta", and since it is associated with the vendor name Marvell
-in the compatible string, it is actually unique: "marvell,neta".
-
-The thing is that this unit is used in Armada 370, Armada XP, but also
-other SoCs (which I am not sure are announced publicly as of today). So
-if possible, we would prefer to keep the proposed "marvell,neta" name.
-We could also change it to "marvell,ebu-neta" where EBU stands for
-Embedded Business Unit, just like the "ebu" in arch/arm/mach-mvebu/,
-but it sounds more logical to have just "marvell,neta".
-
-Thanks again for your review,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
