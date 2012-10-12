@@ -1,39 +1,29 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 12 Oct 2012 17:42:51 +0800
-Subject: [PATCH v2] i2c: change the id to let the i2c-gpio work
-Message-ID: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Fri, 12 Oct 2012 11:49:38 +0200
+Subject: [PATCH] ARM: EXYNOS: exynos4-dt: Set .smp field of machine descriptor
+Message-ID: <1350035378-31989-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c-gpio driver will turn the platform device ID to busnum.
-When using platfrom device ID as -1, it means dynamically assigned
-the busnum. When writing code, we need to make sure the busnum,
-and call i2c_register_board_info(int busnum, ...) to register device
-if using -1, we do not know the value of busnum. 
+This patch adds missing initializer of .smp field of machine descriptor
+of Exynos 4 DT machine.
 
-In order to solve this issue, set the platform device ID as a fix number
-Here using 0 to match the busnum used in i2c_regsiter_board_info().
-
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
-Change since v1
-  Make the commit message more clear
----
- arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-exynos/mach-exynos4-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 0f24cfb..805ef95 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -389,7 +389,7 @@ static struct i2c_gpio_platform_data pdata = {
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 7222e3c..d6bdcfb 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -119,6 +119,7 @@ static char const *exynos4_dt_compat[] __initdata = {
  
- static struct platform_device at91sam9260_twi_device = {
- 	.name			= "i2c-gpio",
--	.id			= -1,
-+	.id			= 0,
- 	.dev.platform_data	= &pdata,
- };
- 
+ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
+ 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
++	.smp		= smp_ops(exynos_smp_ops),
+ 	.init_irq	= exynos4_init_irq,
+ 	.map_io		= exynos4_dt_map_io,
+ 	.handle_irq	= gic_handle_irq,
 -- 
-1.7.9.5
+1.7.12
