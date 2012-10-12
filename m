@@ -1,86 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 12 Oct 2012 15:48:32 +0100
-Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
-In-Reply-To: <20121012144119.GM28061@n2100.arm.linux.org.uk>
-References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
- <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
- <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
- <20121012144119.GM28061@n2100.arm.linux.org.uk>
-Message-ID: <20121012144832.GN28061@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 12 Oct 2012 16:48:37 +0200
+Subject: [PATCH V2 3/3] ARM: SPEAr13xx: Pass DW DMAC platform data from DT
+In-Reply-To: <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
+ <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
+Message-ID: <20121012144837.GE12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 03:41:20PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Oct 12, 2012 at 04:04:28PM +0200, Linus Walleij wrote:
-> > On Fri, Oct 12, 2012 at 3:26 PM, Russell King
-> > <rmk+kernel@arm.linux.org.uk> wrote:
-> > 
-> > > As suggested by Andrew Morton:
-> > >
-> > >   This is a pet peeve of mine.  Any time there's a long list of items
-> > >   (header file inclusions, kconfig entries, array initalisers, etc) and
-> > >   someone wants to add a new item, they *always* go and stick it at the
-> > >   end of the list.
-> > >
-> > >   Guys, don't do this.  Either put the new item into a randomly-chosen
-> > >   position or, probably better, alphanumerically sort the list.
-> > >
-> > > lets sort all our select statements alphanumerically.  This commit was
-> > > created by the following perl:
-> > 
-> > I applied this and tried to configure the Nomadik defconfig,
-> > and I get this, sadly:
-> 
-> Yes, I've just fixed those.  Unfortunately, the patch is soo large that
-> it trips the mailing list size limit, and has to be manually approved,
-> so I'm not sure I can call on the list maintainers again today to do the
-> approval thing.
+>  
+>  /* others */
+> -#define DMAC0_BASE				UL(0xEA800000)
+> -#define DMAC1_BASE				UL(0xEB000000)
+>  #define MCIF_CF_BASE				UL(0xB2800000)
+>  
+>  /* Devices present in SPEAr1310 */
+> diff --git a/arch/arm/mach-spear13xx/spear1310.c b/arch/arm/mach-spear13xx/spear1310.c
+> index 9fbbfc5..0e60195 100644
+> --- a/arch/arm/mach-spear13xx/spear1310.c
+> +++ b/arch/arm/mach-spear13xx/spear1310.c
+> @@ -36,9 +36,7 @@ static struct pl022_ssp_controller ssp1_plat_data = {
+>  
+>  /* Add SPEAr1310 auxdata to pass platform data */
+>  static struct of_dev_auxdata spear1310_auxdata_lookup[] __initdata = {
+> -	OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, &cf_dma_priv),
+> -	OF_DEV_AUXDATA("snps,dma-spear1340", DMAC0_BASE, NULL, &dmac_plat_data),
+> -	OF_DEV_AUXDATA("snps,dma-spear1340", DMAC1_BASE, NULL, &dmac_plat_data),
+> +	OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, "cf"),
+?/
+>  	OF_DEV_AUXDATA("arm,pl022", SSP_BASE, NULL, &pl022_plat_data),
+>  
+>  	OF_DEV_AUXDATA("arm,pl022", SPEAR1310_SSP1_BASE, NULL, &ssp1_plat_data),
+> diff --git a/arch/arm/mach-spear13xx/spear1340.c b/arch/arm/mach-spear13xx/spear1340.c
+> index 081014f..7301f14 100644
+> --- a/arch/arm/mach-spear13xx/spear1340.c
+> +++ b/arch/arm/mach-spear13xx/spear1340.c
+> @@ -20,7 +20,6 @@
+>  #include <linux/of_platform.h>
+>  #include <asm/hardware/gic.h>
+>  #include <asm/mach/arch.h>
+> -#include <mach/dma.h>
+>  #include <mach/generic.h>
+>  #include <mach/spear.h>
+>  
+> @@ -78,26 +77,10 @@
+>  			(SPEAR1340_MIPHY_OSC_BYPASS_EXT | \
+>  			SPEAR1340_MIPHY_PLL_RATIO_TOP(25))
+>  
 
-Instead, here's the updated script:
-
-8<===
-#!/usr/bin/perl
-while (<>) {
-	while (/\\\s*$/) {
-		$_ .= <>;
-	}
-	undef %selects if /^\s*config\s+/;
-	if (/^\s+select\s+(\w+).*/) {
-		if (defined($selects{$1})) {
-			if ($selects{$1} eq $_) {
-				print STDERR "Warning: removing duplicated $1 entry\n";
-			} else {
-				print STDERR "Error: $1 differently selected\n".
-					"\tOld: $selects{$1}\n".
-					"\tNew: $_\n";
-				exit 1;
-			}
-		}
-		$selects{$1} = $_;
-		next;
-	}
-	if (%selects and (/^\s*$/ or /^\s+help/ or /^\s+---help---/ or
-			  /^endif/ or /^endchoice/)) {
-		foreach $k (sort (keys %selects)) {
-			print "$selects{$k}";
-		}
-		undef %selects;
-	}
-	print;
-}
-if (%selects) {
-	foreach $k (sort (keys %selects)) {
-		print "$selects{$k}";
-	}
-}
-8<===
-
-Run it like this (assuming its saved as sort.pl):
-
-for f in $(find arch/arm -name 'Kconfig*'); do perl sort.pl $f > $f.new \
-	&& mv $f.new $f && git update-index $f; done
-
-Omit the "git update-index" bit if you don't want to commit the result.
-("git update-index" is safer than "git add" for this as "git add" will
-add new files, "git update-index" won't without an additional option.
-That's not a recommendation to use it though.)
+Best Regards,
+J.
