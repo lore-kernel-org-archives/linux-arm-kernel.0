@@ -1,42 +1,31 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Fri, 12 Oct 2012 17:13:27 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B7041@saturn3.aculab.com>
-References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
- <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
- <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
- <20121012090321.GA21164@n2100.arm.linux.org.uk>
- <yw1xhaq0nefg.fsf@unicorn.mansr.com>
- <20121012110750.GE21164@n2100.arm.linux.org.uk>
- <yw1x8vbcndlb.fsf@unicorn.mansr.com>
- <20121012114443.GG21164@n2100.arm.linux.org.uk>
- <1350043692.21172.11815.camel@edumazet-glaptop>
- <20121012142254.GG5453@kvack.org>
- <1350053300.21172.12319.camel@edumazet-glaptop>
- <1350054254.2819.3.camel@bwh-desktop.uk.solarflarecom.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7041@saturn3.aculab.com>
-Message-ID: <1350058407.2819.15.camel@bwh-desktop.uk.solarflarecom.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 12 Oct 2012 18:20:57 +0200
+Subject: [PATCH V2 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <CAKohpomvCkzSuP1GLBXmDTRCHeKXDgGwwXQ+TzU=Jekmozzo=A@mail.gmail.com>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
+ <9688d98010716880c1bbd966ead312c446282204.1350051925.git.viresh.kumar@linaro.org>
+ <20121012145027.GF12801@game.jcrosoft.org>
+ <CAKohpomvCkzSuP1GLBXmDTRCHeKXDgGwwXQ+TzU=Jekmozzo=A@mail.gmail.com>
+Message-ID: <20121012162057.GG12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-10-12 at 16:47 +0100, David Laight wrote:
-> > AC was so useless that it has now been reallocated to use by SMAP
-> > <https://lwn.net/Articles/517251/>.
+On 20:25 Fri 12 Oct     , Viresh Kumar wrote:
+> On 12 October 2012 20:20, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 20:01 Fri 12 Oct     , Viresh Kumar wrote:
+> >> dw_dmac driver already supports device tree but it used to have its platform
+> >> data passed the non-DT way.
+> >>
+> >> This patch does following changes:
+> >> - pass platform data via DT, non-DT way still takes precedence if both are used.
+> > why keep it  all platform are DT
 > 
-> That is a long time coming!
-> Wonder when it will appear in any cpus.
+> I would love to remove that, but not sure if somebody want's the non-DT
+> way too.
 > 
-> How am I going to get root access when I can't get the kernel
-> to execute code at address 0 any more :-)
+> I didn't wanted to get into fixing user SoCs of this driver.
+no drop it at the mailine if do not need it
 
-Moving further off the topic: that is supposed to be prevented by a
-separate feature, SMEP, which I think is available in current Intel CPUs
-(Ivy Bridge).  Also, unprivileged users are generally not permitted to
-mmap() at address 0.
-
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Best Regads,
+J.
