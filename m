@@ -1,53 +1,44 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 12 Oct 2012 16:18:36 +0530
-Subject: [PATCH 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <CAHp75VffAwZjfQLf=wS+nBhiRoMFOoyPeUCfrzF1G=+Kh7HHTA@mail.gmail.com>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350020375.git.viresh.kumar@linaro.org>
- <91e41b4cc972d298f714cbd6f400569a9710304c.1350020375.git.viresh.kumar@linaro.org>
- <1350030203.10584.139.camel@smile>
- <CAOh2x=m8OVNfMm5Fn+cr9Gxuh6oyt+8d4n-bkG8Xiw5zGncLiA@mail.gmail.com>
- <CAHp75VffAwZjfQLf=wS+nBhiRoMFOoyPeUCfrzF1G=+Kh7HHTA@mail.gmail.com>
-Message-ID: <CAKohpok=wSHMNA_ZvjfXxFQxxe4iLS=Jov+3T0N8i18wbfDA2w@mail.gmail.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 12 Oct 2012 12:00:03 +0100
+Subject: alignment faults in 3.6
+In-Reply-To: <20121012090321.GA21164@n2100.arm.linux.org.uk> (Russell King's
+ message of "Fri, 12 Oct 2012 10:03:21 +0100")
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+ <yw1xtxu1nfsn.fsf@unicorn.mansr.com>
+ <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+Message-ID: <yw1xhaq0nefg.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2012 16:10, Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
-> On Fri, Oct 12, 2012 at 1:36 PM, viresh kumar <viresh.kumar@linaro.org> wrote:
->> On Fri, Oct 12, 2012 at 1:53 PM, Andy Shevchenko
->> <andriy.shevchenko@linux.intel.com> wrote:
->>> On Fri, 2012-10-12 at 11:14 +0530, Viresh Kumar wrote:
->>
->>>> +     while (++i < dw->sd_count) {
->>>> +             if (!strcmp(dw->sd[i].bus_id, param)) {
->>>> +                     found = 1;
->>>> +                     break;
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-I was just not looking at this place.
+> On Fri, Oct 12, 2012 at 08:11:42AM +0000, Arnd Bergmann wrote:
+>> On Thursday 11 October 2012, M?ns Rullg?rd wrote:
+>> > > But, the IP header is expected to be aligned.
+>> > 
+>> > Everything tells the compiler the struct is perfectly aligned.  When the
+>> > buggy driver passes a misaligned pointer, bad things happen.
+>> 
+>> Would it be appropriate to add a WARN_ON_ONCE() in the alignment fault path
+>> then?
 
->>>> +             }
->>>> +     }
->>>> +
->>>> +     if (!found) {
->>>> +             last_dw = dw;
->>>> +             last_bus_id = param;
->>>> +             return false;
->>> Because of return here you could eliminate 'found' flag at all.
->> how?
+I think that's an excellent idea.
 
-And was looking here only.
-
-> while (++i < dw->sd_count) {
->                if (!strcmp(dw->sd[i].bus_id, param)) {
->        chan->private = &dw->sd[i];
->        last_dw = NULL;
->        last_bus_id = NULL;
+>> If all alignment faults in the kernel are caused by broken drivers,
+>> that would at least give us some hope of finding those drivers while
+>> at the same time not causing much overhead in the case where we need
+>> to do the fixup in the meantime.
 >
->        return true;
->                }
->        }
->
->                last_dw = dw;
->                last_bus_id = param;
->                return false;
+> No.  It is my understanding that various IP option processing can also
+> cause the alignment fault handler to be invoked, even when the packet is
+> properly aligned, and then there's jffs2/mtd which also relies upon
+> alignment faults being fixed up.
 
-will be done.
+As far as I'm concerned, this is all hearsay, and I've only ever heard
+it from you.  Why can't you let those who care fix these bugs instead?
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
