@@ -1,49 +1,29 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 12 Oct 2012 16:16:48 +0200
-Subject: [PATCH 2/4] ARM: AT91: Add usart/tc DT clock lookup to AT91RM9200
-In-Reply-To: <1349993126-9519-2-git-send-email-manabian@gmail.com>
-References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
- <1349993126-9519-2-git-send-email-manabian@gmail.com>
-Message-ID: <20121012141648.GB12801@game.jcrosoft.org>
+From: bcrl@kvack.org (Benjamin LaHaise)
+Date: Fri, 12 Oct 2012 10:22:54 -0400
+Subject: alignment faults in 3.6
+In-Reply-To: <1350043692.21172.11815.camel@edumazet-glaptop>
+References: <20121005082439.GF4625@n2100.arm.linux.org.uk>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B703E@saturn3.aculab.com>
+ <yw1xtxu1nfsn.fsf@unicorn.mansr.com> <201210120811.43290.arnd@arndb.de>
+ <20121012090321.GA21164@n2100.arm.linux.org.uk>
+ <yw1xhaq0nefg.fsf@unicorn.mansr.com>
+ <20121012110750.GE21164@n2100.arm.linux.org.uk>
+ <yw1x8vbcndlb.fsf@unicorn.mansr.com>
+ <20121012114443.GG21164@n2100.arm.linux.org.uk>
+ <1350043692.21172.11815.camel@edumazet-glaptop>
+Message-ID: <20121012142254.GG5453@kvack.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 12, 2012 at 02:08:12PM +0200, Eric Dumazet wrote:
+> So yes, we built network stack with the prereq that IP headers are
+> aligned, but unfortunately many developers use x86 which doesnt care, so
+> its possible some bugs are added.
 
-	You need to rebase your patch over the pinctrl
+x86 does have an alignment check flag that can be set in the flags register.  
+Somehow, I doubt anyone would be willing to walk through all the noise the 
+faults would likely trigger.
 
-Best Regards,
-J.
-On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  arch/arm/mach-at91/at91rm9200.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> index b4f0565..eef3f53 100644
-> --- a/arch/arm/mach-at91/at91rm9200.c
-> +++ b/arch/arm/mach-at91/at91rm9200.c
-> @@ -188,6 +188,19 @@ static struct clk_lookup periph_clocks_lookups[] = {
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
->  	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
->  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91rm9200", &twi_clk),
-> +	/* usart lookup table for DT entries */
-> +	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
-> +	CLKDEV_CON_DEV_ID("usart", "fffc0000.serial", &usart0_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "fffc4000.serial", &usart1_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "fffc8000.serial", &usart2_clk),
-> +	CLKDEV_CON_DEV_ID("usart", "fffcc000.serial", &usart3_clk),
-> +	/* tc lookup table for DT entries */
-> +	CLKDEV_CON_DEV_ID("t0_clk", "fffa0000.timer", &tc0_clk),
-> +	CLKDEV_CON_DEV_ID("t1_clk", "fffa0000.timer", &tc1_clk),
-> +	CLKDEV_CON_DEV_ID("t2_clk", "fffa0000.timer", &tc2_clk),
-> +	CLKDEV_CON_DEV_ID("t0_clk", "fffa4000.timer", &tc3_clk),
-> +	CLKDEV_CON_DEV_ID("t1_clk", "fffa4000.timer", &tc4_clk),
-> +	CLKDEV_CON_DEV_ID("t2_clk", "fffa4000.timer", &tc5_clk),
->  	/* fake hclk clock */
->  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
->  	CLKDEV_CON_ID("pioA", &pioA_clk),
-> -- 
-> 1.7.12.2
-> 
+		-ben
+-- 
+"Thought is the essence of where you are now."
