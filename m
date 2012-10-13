@@ -1,35 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Oct 2012 21:04:24 -0500
-Subject: [PATCH] arm-dt: Enable DT proc updates.
-In-Reply-To: <1351699069-4661-1-git-send-email-panto@antoniou-consulting.com>
-References: <1351699069-4661-1-git-send-email-panto@antoniou-consulting.com>
-Message-ID: <5091D8A8.9010307@gmail.com>
+From: omycle@gmail.com (Li Haifeng)
+Date: Sat, 13 Oct 2012 00:47:22 -0000
+Subject: When flush all dcache, why the increasing step is 2?
+In-Reply-To: <20121012120946.GB17525@arm.com>
+References: <CAFNq8R7f41O3fHgOu7_XHkrOw44gujjGgVekS3anzdYwVgmZww@mail.gmail.com>
+ <20121012120946.GB17525@arm.com>
+Message-ID: <CAFNq8R41duY51+ZuYDMAv24DPb9DR6Wdbgp6zmAz=-xzG=YRDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 10:57 AM, Pantelis Antoniou wrote:
-> This simple patch enables dynamic changes of the DT tree on runtime
-> to be visible to the device-tree proc interface.
-> 
-> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+2012/10/12 Catalin Marinas <catalin.marinas@arm.com>
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+> On Fri, Oct 12, 2012 at 11:51:07AM +0100, Li Haifeng wrote:
+> > For flush all data cache, the flush action begins from Level 0, then
+> increase
+> > cache level by 1.
+> >
+> > But in function v7_flush_dcache_all, the step is 2. IOW, it will just
+> flush
+> > 0,2,4,6 level cache.
+> > As the following code, the step is stored in r10, and the increase line
+> is "add
+> >     r10, r10, #2".
+>
+> That's because the cache level is written in the CSSELR bits 3:1 (so no
+> bit 0). When the levels of cache is calculated (r3), it is also 2x.
+>
 
-> ---
->  arch/arm/include/asm/prom.h | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-> index aeae9c6..6d65ba2 100644
-> --- a/arch/arm/include/asm/prom.h
-> +++ b/arch/arm/include/asm/prom.h
-> @@ -11,6 +11,8 @@
->  #ifndef __ASMARM_PROM_H
->  #define __ASMARM_PROM_H
->  
-> +#define HAVE_ARCH_DEVTREE_FIXUPS
-> +
->  #ifdef CONFIG_OF
->  
->  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
-> 
+Great, Thanks very much.
+
+
+>
+> --
+> Catalin
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121013/125a1cb6/attachment-0001.html>
