@@ -1,103 +1,28 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 12 Oct 2012 23:17:39 -0700
-Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
-In-Reply-To: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
-References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121013061739.GB10969@core.coreip.homeip.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 13 Oct 2012 08:44:22 +0200
+Subject: [PATCH V2 3/3] ARM: SPEAr13xx: Pass DW DMAC platform data from DT
+In-Reply-To: <CAKohpok5ZOmz9CCJbTGc=_tncxnZYEW7UMh2FcFcs0dB87JAcQ@mail.gmail.com>
+References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
+ <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
+ <20121012144837.GE12801@game.jcrosoft.org>
+ <CAKohpo=vMchmiz70evBB5bPqt4O4DWUocd5M1o9gc8fsY_Fkiw@mail.gmail.com>
+ <20121012162148.GH12801@game.jcrosoft.org>
+ <CAKohpok5ZOmz9CCJbTGc=_tncxnZYEW7UMh2FcFcs0dB87JAcQ@mail.gmail.com>
+Message-ID: <20121013064422.GJ12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Thu, Oct 11, 2012 at 03:15:26PM +0100, Lee Jones wrote:
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
+On 22:42 Fri 12 Oct     , Viresh Kumar wrote:
+> On 12 October 2012 21:51, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> >> >> +     OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL, "cf"),
+> >> > ?/
+> >>
+> >> Sorry. can't get it :(
+> > what is the "cf" as paltfrom data
 > 
-> Disable hardware if active when suspending if the hw can not
-> wake the system from suspend.
-> 
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: linux-input at vger.kernel.org
-> Acked-by: Lee Jones <lee.jones@linaro.org>
+> This is dma bus_id string, which matches with what is passed from dtb.
+so pass if via dtb too
 
-If you are sending the patch then it should be signed-off-by, not
-acked-by, and it should be the very last entry.
-
-> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
-> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
-> Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
-> ---
->  drivers/input/keyboard/gpio_keys.c |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
-> index cbb1add..7947315 100644
-> --- a/drivers/input/keyboard/gpio_keys.c
-> +++ b/drivers/input/keyboard/gpio_keys.c
-> @@ -46,6 +46,8 @@ struct gpio_keys_drvdata {
->  	struct input_dev *input;
->  	struct mutex disable_lock;
->  	unsigned int n_buttons;
-> +	bool enabled;
-> +	bool enable_after_suspend;
->  	int (*enable)(struct device *dev);
->  	void (*disable)(struct device *dev);
->  	struct gpio_button_data data[0];
-> @@ -524,6 +526,7 @@ static int gpio_keys_open(struct input_dev *input)
->  {
->  	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
->  
-> +	ddata->enabled = true;
->  	return ddata->enable ? ddata->enable(input->dev.parent) : 0;
->  }
->  
-> @@ -533,6 +536,7 @@ static void gpio_keys_close(struct input_dev *input)
->  
->  	if (ddata->disable)
->  		ddata->disable(input->dev.parent);
-> +	ddata->enabled = false;
->  }
->  
->  /*
-> @@ -674,6 +678,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
->  	ddata->n_buttons = pdata->nbuttons;
->  	ddata->enable = pdata->enable;
->  	ddata->disable = pdata->disable;
-> +	ddata->enabled = false;
->  	mutex_init(&ddata->disable_lock);
->  
->  	platform_set_drvdata(pdev, ddata);
-> @@ -789,6 +794,10 @@ static int gpio_keys_suspend(struct device *dev)
->  			if (bdata->button->wakeup)
->  				enable_irq_wake(bdata->irq);
->  		}
-> +	} else {
-> +		ddata->enable_after_suspend = ddata->enabled;
-> +		if (ddata->enabled)
-> +			gpio_keys_close(ddata->input);
-
-I think it should take ddata->input->mutex to avoid races with
-open/close and use ddata->input->users to figure out if device shoudl be
-closed and re-opened later.
-
-Thanks.
-
->  	}
->  
->  	return 0;
-> @@ -807,6 +816,10 @@ static int gpio_keys_resume(struct device *dev)
->  		if (gpio_is_valid(bdata->button->gpio))
->  			gpio_keys_gpio_report_event(bdata);
->  	}
-> +
-> +	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
-> +		gpio_keys_open(ddata->input);
-> +
->  	input_sync(ddata->input);
->  
->  	return 0;
-> -- 
-> 1.7.9.5
-> 
-
--- 
-Dmitry
+Best Regards,
+J.
