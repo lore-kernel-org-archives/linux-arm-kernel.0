@@ -1,23 +1,29 @@
-From: nori.sekhar@gmail.com (Sekhar Nori)
-Date: Sat, 13 Oct 2012 20:26:28 +0530
-Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
-In-Reply-To: <20121012144832.GN28061@n2100.arm.linux.org.uk>
-References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
- <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
- <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
- <20121012144119.GM28061@n2100.arm.linux.org.uk>
- <20121012144832.GN28061@n2100.arm.linux.org.uk>
-Message-ID: <CAKG51UAdCWR7zGr4R3wUr4Lr4MauqGBr1j=VkQcpNywhqRvnMw@mail.gmail.com>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Sat, 13 Oct 2012 18:05:12 +0200
+Subject: [PATCH] ARM: imx6q: remove imx_src_prepare_restart() call
+In-Reply-To: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
+References: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20121013180512.24ac6c59@wker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 8:18 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Instead, here's the updated script:
+Hi Shawn,
 
-Tested build and boot on DA850 and DM365. For the DaVinci changes:
+On Fri, 17 Aug 2012 13:11:56 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+> Currently, imx_src_prepare_restart which is called by imx6q_restart
+> assumes that cpu0 must be the running cpu, so it disables all secondary
+> cpus.  However this is not the case, the restart routine could possibly
+> running on cpu1 or any other secondary cores.  In that case, disabling
+> the cpu that runs restart routine will hang up system.
+> 
+> Also it turns out that everything that is done by imx_src_prepare_restart
+> is not really necessary, because the watchdog reset will have those
+> registers reset properly.  So let's remove the imx_src_prepare_restart
+> call completely.
+
+What is the fate of this patch?
 
 Thanks,
-Sekhar
+Anatolij
