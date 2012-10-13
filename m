@@ -1,48 +1,103 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 13 Oct 2012 18:00:30 +1300
-Subject: [PATCH for 3.7] dtb: fix interrupt assignment for ehci/uhci on
- wm8505
-In-Reply-To: <1350101882-6195-1-git-send-email-linux@prisktech.co.nz>
-References: <1350101882-6195-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1350104430.6448.3.camel@gitbox>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 12 Oct 2012 23:17:39 -0700
+Subject: [PATCH 1/2] input: gpio-keys: Disable hardware on suspend
+In-Reply-To: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
+References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121013061739.GB10969@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-10-13 at 17:18 +1300, Tony Prisk wrote:
-> EHCI and UHCI devices in wm8505.dtsi should use IRQ 0 & 1
-> respectively - not 43 as used on newer models.
+Hi Lee,
 
-Oops - should have been IRQ 1 & 0 - fixed locally.
+On Thu, Oct 11, 2012 at 03:15:26PM +0100, Lee Jones wrote:
+> From: Jonas Aaberg <jonas.aberg@stericsson.com>
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> Disable hardware if active when suspending if the hw can not
+> wake the system from suspend.
+> 
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: linux-input at vger.kernel.org
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+
+If you are sending the patch then it should be signed-off-by, not
+acked-by, and it should be the very last entry.
+
+> Signed-off-by: Jonas Aaberg <jonas.aberg@stericsson.com>
+> Signed-off-by: Philippe Langlais <philippe.langlais@linaro.org>
+> Reviewed-by: Bengt Jonsson <bengt.g.jonsson@stericsson.com>
 > ---
->  arch/arm/boot/dts/wm8505.dtsi |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/input/keyboard/gpio_keys.c |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
-> index b459691..330f833 100644
-> --- a/arch/arm/boot/dts/wm8505.dtsi
-> +++ b/arch/arm/boot/dts/wm8505.dtsi
-> @@ -71,13 +71,13 @@
->  		ehci at d8007100 {
->  			compatible = "via,vt8500-ehci";
->  			reg = <0xd8007100 0x200>;
-> -			interrupts = <43>;
-> +			interrupts = <1>;
->  		};
+> diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+> index cbb1add..7947315 100644
+> --- a/drivers/input/keyboard/gpio_keys.c
+> +++ b/drivers/input/keyboard/gpio_keys.c
+> @@ -46,6 +46,8 @@ struct gpio_keys_drvdata {
+>  	struct input_dev *input;
+>  	struct mutex disable_lock;
+>  	unsigned int n_buttons;
+> +	bool enabled;
+> +	bool enable_after_suspend;
+>  	int (*enable)(struct device *dev);
+>  	void (*disable)(struct device *dev);
+>  	struct gpio_button_data data[0];
+> @@ -524,6 +526,7 @@ static int gpio_keys_open(struct input_dev *input)
+>  {
+>  	struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
 >  
->  		uhci at d8007300 {
->  			compatible = "platform-uhci";
->  			reg = <0xd8007300 0x200>;
-> -			interrupts = <43>;
-> +			interrupts = <0>;
->  		};
+> +	ddata->enabled = true;
+>  	return ddata->enable ? ddata->enable(input->dev.parent) : 0;
+>  }
 >  
->  		fb at d8050800 {
+> @@ -533,6 +536,7 @@ static void gpio_keys_close(struct input_dev *input)
+>  
+>  	if (ddata->disable)
+>  		ddata->disable(input->dev.parent);
+> +	ddata->enabled = false;
+>  }
+>  
+>  /*
+> @@ -674,6 +678,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
+>  	ddata->n_buttons = pdata->nbuttons;
+>  	ddata->enable = pdata->enable;
+>  	ddata->disable = pdata->disable;
+> +	ddata->enabled = false;
+>  	mutex_init(&ddata->disable_lock);
+>  
+>  	platform_set_drvdata(pdev, ddata);
+> @@ -789,6 +794,10 @@ static int gpio_keys_suspend(struct device *dev)
+>  			if (bdata->button->wakeup)
+>  				enable_irq_wake(bdata->irq);
+>  		}
+> +	} else {
+> +		ddata->enable_after_suspend = ddata->enabled;
+> +		if (ddata->enabled)
+> +			gpio_keys_close(ddata->input);
 
-I assume the usb subsystem doesn't fault when IRQ's aren't recieved as
-this did give any error messages, it just made the USB extremely slow -
-like it was timing-out between requests.
+I think it should take ddata->input->mutex to avoid races with
+open/close and use ddata->input->users to figure out if device shoudl be
+closed and re-opened later.
 
-Regards
-Tony P
+Thanks.
+
+>  	}
+>  
+>  	return 0;
+> @@ -807,6 +816,10 @@ static int gpio_keys_resume(struct device *dev)
+>  		if (gpio_is_valid(bdata->button->gpio))
+>  			gpio_keys_gpio_report_event(bdata);
+>  	}
+> +
+> +	if (!device_may_wakeup(dev) && ddata->enable_after_suspend)
+> +		gpio_keys_open(ddata->input);
+> +
+>  	input_sync(ddata->input);
+>  
+>  	return 0;
+> -- 
+> 1.7.9.5
+> 
+
+-- 
+Dmitry
