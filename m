@@ -1,39 +1,42 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Sat, 13 Oct 2012 00:47:22 -0000
-Subject: When flush all dcache, why the increasing step is 2?
-In-Reply-To: <20121012120946.GB17525@arm.com>
-References: <CAFNq8R7f41O3fHgOu7_XHkrOw44gujjGgVekS3anzdYwVgmZww@mail.gmail.com>
- <20121012120946.GB17525@arm.com>
-Message-ID: <CAFNq8R41duY51+ZuYDMAv24DPb9DR6Wdbgp6zmAz=-xzG=YRDQ@mail.gmail.com>
+From: tcmichals@yahoo.com (Tim michals)
+Date: Sat, 13 Oct 2012 02:48:13 -0000
+Subject: Testing i2c in 3.6.0-next-20121012 for i.mx233
+Message-ID: <1350096488.12723.YahooMailNeo@web162606.mail.bf1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/12 Catalin Marinas <catalin.marinas@arm.com>
+Using the?3.6.0-next-20121012 ?to test i2c DMA support on a imx233-Olinuxino-micro?board. ?When using the i2cdetect -r 0 to scan a devices on the i2c bus, ?the following message is displayed on the console:
 
-> On Fri, Oct 12, 2012 at 11:51:07AM +0100, Li Haifeng wrote:
-> > For flush all data cache, the flush action begins from Level 0, then
-> increase
-> > cache level by 1.
-> >
-> > But in function v7_flush_dcache_all, the step is 2. IOW, it will just
-> flush
-> > 0,2,4,6 level cache.
-> > As the following code, the step is stored in r10, and the increase line
-> is "add
-> >     r10, r10, #2".
->
-> That's because the cache level is written in the CSSELR bits 3:1 (so no
-> bit 0). When the levels of cache is calculated (r3), it is also 2x.
->
+-- [ ?129.130000] mxs-i2c 80058000.i2c: Failed to get PIO reg. write descriptor.
 
-Great, Thanks very much.
-
-
->
-> --
-> Catalin
->
->
+imx23.dtsi support for i2c:
+i2c0_pins_a: i2c0 at 0 {
+reg = <0>;
+fsl,pinmux-ids = <
+0x1171 /* MX23_PAD_LCD_ENABLE__LCD_ENABLE */
+0x1181 /* MX23_PAD_LCD_HSYNC__LCD_HSYNC */
+>;
+fsl,drive-strength = <1>;
+fsl,voltage = <1>;
+fsl,pull-up = <1>;
+};
+...
+i2c at 80058000 {
+#address-cells = <1>;
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?#size-cells = <0>;
+compatible = "fsl,imx28-i2c";
+reg = <0x80058000 0x2000>;
+interrupts = <27 26>;
+clock-frequency = <400000>;
+fsl,i2c-dma-channel = <3>;
+status = "disabled";
+};
+imx23-olinuxino.dts
+i2c0: i2c at 80058000 {
+ ? ? ?pinctrl-names = "default";
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?pinctrl-0 = <&i2c0_pins_a>;
+? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?status = "okay";
+? ? ? ? ? ? ? ? ? ? ? ?};
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121013/125a1cb6/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121013/8dc310ec/attachment.html>
