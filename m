@@ -1,64 +1,52 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 13 Oct 2012 10:54:15 +0100
-Subject: [PATCH 07/12] staging/iio/lis3l02dq: fix building without
- irq_to_gpio
-In-Reply-To: <201209291503.40519.arnd@arndb.de>
-References: <1348868177-21205-1-git-send-email-arnd@arndb.de>
- <1348868177-21205-8-git-send-email-arnd@arndb.de>
- <5066C71E.9030302@kernel.org> <201209291503.40519.arnd@arndb.de>
-Message-ID: <50793A47.7060705@kernel.org>
+From: mans.rullgard@linaro.org (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 13 Oct 2012 11:50:45 +0100
+Subject: [PATCH] ARM: vfp: fix save and restore when running on pre-VFPv3
+ and CONFIG_VFPv3 set
+In-Reply-To: <20121013090255.GT28061@n2100.arm.linux.org.uk> (Russell King's
+ message of "Sat, 13 Oct 2012 10:02:55 +0100")
+References: <alpine.DEB.2.00.1210130441300.5736@utopia.booyaka.com>
+ <20121013090255.GT28061@n2100.arm.linux.org.uk>
+Message-ID: <yw1xr4p2myre.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/29/2012 04:03 PM, Arnd Bergmann wrote:
-> On Saturday 29 September 2012, Jonathan Cameron wrote:
->> On 09/28/2012 10:36 PM, Arnd Bergmann wrote:
->>> The driver has not been building for some time after the
->>> irq_to_gpio function has been removed from the kernel.
->>>
->>> The only board in the upstream kernel that provides
->>> this device is the "Stargate 2", which is also maintained
->>> by Jonathan Cameron. Rather than working around the problem
->>> by adding new platform data for this driver, this patch
->>> uses the of_gpio framework to get to the gpio number.
->>>
->>> However, the stargate2 code does not (yet) use DT based
->>> probing, so it is still broken, but at least building
->>> allyesconfig works again.
->> Will be optimistic to think anyone will convert a platform
->> that no one still makes (stargate 2 was pretty much intel
->> research only + some they gave to accademics - imote2 has
->> been dropped by memsic for a while now.)  If nothing else
->> there is little chance anyone will bother porting a remotely
->> up to date bootloader to these boards given how few people
->> are still using them for anything.
-> 
-> The way are converting most ARM platforms to DT, we should be
-> able to replace the board files with .dts files once all
-> device drivers have been converted over. This is taking a
-> bit longer for mmp/pxa than for some of the other platforms,
-> Updating the boot loader makes it easier to deploy a DT
-> version, but you can also append a DT blob to the kernel
-> if that's not possible, and we will in the future allow
-> appending multiple DT blobs and let the early boot stages
-> pick the right one based on the board ID.
-Sounds good.
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-> 
->> I'm happy enough with this patch.  Would prefer to
->> take it post merge window as a fix than now given timing.
-> 
-> Ok, fair enough. It has been broken for a while, so there
-> is no hurry now. I just stumbled over it when doing an
-> "allyesconfig" build.
-Added to togreg branch of git://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git
+> On Sat, Oct 13, 2012 at 04:46:18AM +0000, Paul Walmsley wrote:
+>> 
+>> After commit 846a136881b8f73c1f74250bf6acfaa309cab1f2 ("ARM: vfp: fix
+>> saving d16-d31 vfp registers on v6+ kernels"), the OMAP 2430SDP board
+>> started crashing during boot with omap2plus_defconfig:
+>> 
+>> [    3.875122] mmcblk0: mmc0:e624 SD04G 3.69 GiB
+>> [    3.915954]  mmcblk0: p1
+>> [    4.086639] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+>> [    4.093719] Modules linked in:
+>> [    4.096954] CPU: 0    Not tainted  (3.6.0-02232-g759e00b #570)
+>> [    4.103149] PC is at vfp_reload_hw+0x1c/0x44
+>> [    4.107666] LR is at __und_usr_fault_32+0x0/0x8
+>> 
+>> It turns out that the context save/restore fix unmasked a latent bug in 
+>> commit 5aaf254409f8d58229107b59507a8235b715a960 ("ARM: 6203/1: Make VFPv3 
+>> usable on ARMv6").  When CONFIG_VFPv3 is set, but the kernel is booted on 
+>> a pre-VFPv3 core, the code attempts to save and restore the d16-d31 VFP 
+>> registers.  These are only present on non-D16 VFPv3+, so the kernel dies 
+>> with an undefined instruction exception.  The kernel didn't crash before 
+>> commit 846a136 because the save and restore code only touched d0-d15, 
+>> present on all VFP.
+>> 
+>> Fix to save and restore the d16-d31 registers only if they are
+>> present.
+>
+> No.  VFPv3D16 HWCAP means that the VFP supports just 16 double registers
+> - and it communicates this information to userspace.  If this bit is clear,
+> and the VFP only has 16 double registers, then _that_ is a bug.
 
-> 
->> Long run this driver will hopefully get replaced by the
->> unified driver for all the st accelerometers (assuming that
->> ever gets back to this long obsolete part).
-> 
-> Ok.
-> 
-> 	Arnd
-> 
+That bit will be clear on VFPv2 (because it's not v3), and this has only
+16 D registers.  The high D registers are present if (vfpv3 && !vfpv3d16).
+Pre-calculating this to avoid doing it in the context save/restore code
+is probably a good idea.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
