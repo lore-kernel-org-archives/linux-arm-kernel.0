@@ -1,356 +1,107 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 14 Oct 2012 23:46:39 +0200
-Subject: [PATCH 5/5] ARM: AT91: Add AT91RM9200 device tree
-In-Reply-To: <1350251199-28065-1-git-send-email-manabian@gmail.com>
-References: <1350251199-28065-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350251199-28065-6-git-send-email-manabian@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 14 Oct 2012 23:24:49 +0100
+Subject: [git pull] signals pile 3
+In-Reply-To: <20121014202431.GL21164@n2100.arm.linux.org.uk>
+References: <20121013005334.GM2616@ZenIV.linux.org.uk>
+ <507ADBBB.9090209@gmail.com> <20121014202431.GL21164@n2100.arm.linux.org.uk>
+Message-ID: <20121014222449.GN21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/boot/dts/at91rm9200.dtsi | 333 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 333 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91rm9200.dtsi
+Okay, here's the post-mortem diagnosis.
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-new file mode 100644
-index 0000000..5c4f91d
---- /dev/null
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -0,0 +1,333 @@
-+/*
-+ * at91rm9200.dtsi - Device Tree Include file for AT91RM9200 family SoC
-+ *
-+ *  Copyright (C) 2011 Atmel,
-+ *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>,
-+ *                2012 Joachim Eastwood <manabian@gmail.com>
-+ *
-+ * Based on at91sam9260.dtsi
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Atmel AT91RM9200 family SoC";
-+	compatible = "atmel,at91rm9200";
-+	interrupt-parent = <&aic>;
-+
-+	aliases {
-+		serial0 = &dbgu;
-+		serial1 = &usart0;
-+		serial2 = &usart1;
-+		serial3 = &usart2;
-+		serial4 = &usart3;
-+		gpio0 = &pioA;
-+		gpio1 = &pioB;
-+		gpio2 = &pioC;
-+		gpio3 = &pioD;
-+		tcb0 = &tcb0;
-+		tcb1 = &tcb1;
-+	};
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm920t";
-+		};
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x04000000>;
-+	};
-+
-+	ahb {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			aic: interrupt-controller at fffff000 {
-+				#interrupt-cells = <3>;
-+				compatible = "atmel,at91rm9200-aic";
-+				interrupt-controller;
-+				reg = <0xfffff000 0x200>;
-+				atmel,external-irqs = <25 26 27 28 29 30 31>;
-+			};
-+
-+			ramc0: ramc at ffffff00 {
-+				compatible = "atmel,at91rm9200-sdramc";
-+				reg = <0xffffff00 0x100>;
-+			};
-+
-+			pmc: pmc at fffffc00 {
-+				compatible = "atmel,at91rm9200-pmc";
-+				reg = <0xfffffc00 0x100>;
-+			};
-+
-+			st: timer at fffffd00 {
-+				compatible = "atmel,at91rm9200-st";
-+				reg = <0xfffffd00 0x100>;
-+				interrupts = <1 4 7>;
-+			};
-+
-+			tcb0: timer at fffa0000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffa0000 0x100>;
-+				interrupts = <17 4 0 18 4 0 19 4 0>;
-+			};
-+
-+			tcb1: timer at fffa4000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffa4000 0x100>;
-+				interrupts = <20 4 0 21 4 0 22 4 0>;
-+			};
-+
-+			pinctrl at fffff400 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff400 0xfffff400 0x800>;
-+
-+				atmel,mux-mask = <
-+					/*    A         B     */
-+					 0xffffffff 0xffffffff  /* pioA */
-+					 0xffffffff 0x083fffff  /* pioB */
-+					 0xffff3fff 0x00000000  /* pioC */
-+					 0x03ff87ff 0x0fffff80  /* pioD */
-+					>;
-+
-+				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<0 30 0x1 0x0	/* PA30 periph A */
-+							 0 31 0x1 0x1>;	/* PA31 periph with pullup */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<0 17 0x1 0x0	/* PA17 periph A */
-+							 0 18 0x1 0x0>;	/* PA18 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<0 20 0x1 0x0	/* PA20 periph A */
-+							 0 21 0x1 0x0>;	/* PA21 periph A */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<1 20 0x1 0x1	/* PB20 periph A with pullup */
-+							 1 21 0x1 0x0>;	/* PB21 periph A */
-+					};
-+
-+					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
-+						atmel,pins =
-+							<1 24 0x1 0x0	/* PB24 periph A */
-+							 1 26 0x1 0x0>;	/* PB26 periph A */
-+					};
-+
-+					pinctrl_uart1_dtr_dsr: uart1_dtr_dsr-0 {
-+						atmel,pins =
-+							<1 19 0x1 0x0	/* PB19 periph A */
-+							 1 25 0x1 0x0>;	/* PB25 periph A */
-+					};
-+
-+					pinctrl_uart1_dcd: uart1_dcd-0 {
-+						atmel,pins =
-+							<1 23 0x1 0x0>;	/* PB23 periph A */
-+					};
-+
-+					pinctrl_uart1_ri: uart1_ri-0 {
-+						atmel,pins =
-+							<1 18 0x1 0x0>;	/* PB18 periph A */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<0 22 0x1 0x0	/* PA22 periph A */
-+							 0 23 0x1 0x1>;	/* PA23 periph A with pullup */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<0 30 0x2 0x0	/* PA30 periph B */
-+							 0 31 0x2 0x0>;	/* PA31 periph B */
-+					};
-+				};
-+
-+				uart3 {
-+					pinctrl_uart3: uart3-0 {
-+						atmel,pins =
-+							<0 5 0x2 0x1	/* PA5 periph B with pullup */
-+							 0 6 0x2 0x0>;	/* PA6 periph B */
-+					};
-+
-+					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
-+						atmel,pins =
-+							<1 0 0x2 0x0	/* PB0 periph B */
-+							 1 1 0x2 0x0>;	/* PB1 periph B */
-+					};
-+				};
-+
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<2 2 0x0 0x1	/* PC2 gpio RDY pin pull_up */
-+							 1 1 0x0 0x1>;	/* PB1 gpio CD pin pull_up */
-+					};
-+				};
-+
-+				pioA: gpio at fffff400 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioB: gpio at fffff600 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioC: gpio at fffff800 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioD: gpio at fffffa00 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffffa00 0x200>;
-+					interrupts = <5 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffff200 0x200>;
-+				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
-+				status = "disabled";
-+			};
-+
-+			usart0: serial at fffc0000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffc0000 0x200>;
-+				interrupts = <6 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
-+				status = "disabled";
-+			};
-+
-+			usart1: serial at fffc4000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffc4000 0x200>;
-+				interrupts = <7 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
-+				status = "disabled";
-+			};
-+
-+			usart2: serial at fffc8000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffc8000 0x200>;
-+				interrupts = <8 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
-+				status = "disabled";
-+			};
-+
-+			usart3: serial at fffcc000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffcc000 0x200>;
-+				interrupts = <23 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3>;
-+				status = "disabled";
-+			};
-+
-+			usb1: gadget at fffb0000 {
-+				compatible = "atmel,at91rm9200-udc";
-+				reg = <0xfffb0000 0x4000>;
-+				interrupts = <11 4 2>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			compatible = "atmel,at91rm9200-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x40000000 0x10000000>;
-+			atmel,nand-addr-offset = <21>;
-+			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
-+			nand-ecc-mode = "soft";
-+			gpios = <&pioC 2 0
-+				 0
-+				 &pioB 1 0
-+				>;
-+			status = "disabled";
-+		};
-+
-+		usb0: ohci at 00300000 {
-+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-+			reg = <0x00300000 0x100000>;
-+			interrupts = <23 4 2>;
-+			status = "disabled";
-+		};
-+	};
-+
-+	i2c at 0 {
-+		compatible = "i2c-gpio";
-+		gpios = <&pioA 23 0 /* sda */
-+			 &pioA 24 0 /* scl */
-+			>;
-+		i2c-gpio,sda-open-drain;
-+		i2c-gpio,scl-open-drain;
-+		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+};
--- 
-1.7.12.3
+What's happening is as follows (I'm very certain of this.)
+
+We come through the usual init, and issue (see init/main.c):
+
+	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
+
+This creates a new thread, which falls through to the ret_from_fork
+assembly, with r4 set NULL and r5 set to kernel_init.  You can see
+this in your oops dump register set - r5 is 0xc0344555, which is the
+address of kernel_init plus 1 which marks the function as Thumb code.
+
+Now, let's look at this code a little closer - this is what the
+disassembly looks like:
+
+c000d180 <ret_from_fork>:
+c000d180:       f03a fe08       bl      c0047d94 <schedule_tail>
+c000d184:       2d00            cmp     r5, #0
+c000d186:       bf1e            ittt    ne
+c000d188:       4620            movne   r0, r4
+c000d18a:       46fe            movne   lr, pc <-- XXXXXXX
+c000d18c:       46af            movne   pc, r5
+c000d18e:       46e9            mov     r9, sp
+c000d190:       ea4f 3959       mov.w   r9, r9, lsr #13
+c000d194:       ea4f 3949       mov.w   r9, r9, lsl #13
+c000d198:       e7c8            b.n     c000d12c <ret_to_user>
+c000d19a:       bf00            nop
+c000d19c:       f3af 8000       nop.w
+
+I have marked one instruction, and it's the significant one.
+
+Eventually, having had a successful call to kernel_execve(), kernel_init()
+returns zero.
+
+In returning, it uses the value in 'lr' which was set by the instruction
+I marked above.  Unfortunately, this causes lr to contain 0xc000d18e -
+an even address.  This switches the ISA to ARM on return but with a non
+word aligned PC value.
+
+So, what do we end up executing?  Well, not the instructions above - yes
+the opcodes, but they don't mean the same thing in ARM mode.  In ARM mode,
+it looks like this instead:
+
+c000d18c:       46e946af        strbtmi r4, [r9], pc, lsr #13
+c000d190:       3959ea4f        ldmdbcc r9, {r0, r1, r2, r3, r6, r9, fp, sp, lr, pc}^
+c000d194:       3949ea4f        stmdbcc r9, {r0, r1, r2, r3, r6, r9, fp, sp, lr, pc}^
+c000d198:       bf00e7c8        svclt   0x0000e7c8
+c000d19c:       8000f3af        andhi   pc, r0, pc, lsr #7
+c000d1a0:       e88db092        stm     sp, {r1, r4, r7, ip, sp, pc}
+c000d1a4:       46e81fff                        ; <UNDEFINED> instruction: 0x46e81fff
+c000d1a8:       8a00f3ef        bhi     0xc004a16c
+c000d1ac:       0a0cf08a        beq     0xc03493dc
+
+I have included more above, because it's relevant.  The PSR flags which we
+can see in the oops dump are nZCv, so Z and C are set.
+
+All the above ARM instructions are not executed, except for two.  c000d1a0,
+which has no writeback, and writes below the current stack pointer (and
+that data is lost when we take the next exception.)  The other instruction
+which is executed is c000d1ac, which takes us to... 0xc03493dc.  However,
+remember that bit 1 of the PC got set.  So that makes it 0xc03493de.
+
+And that value is the value we find in the oops dump for PC.  What is the
+instruction here when interpreted in ARM mode?
+
+       0:       f71e150c                ; <UNDEFINED> instruction: 0xf71e150c
+
+and there we have our undefined instruction (remember that the 'never'
+condition code, 0xf, has been deprecated and is now always executed.)
+
+So, what we have above is a consistent and sane story for how we ended up
+at such a strange place in the kernel with such an odd register dump - with
+no unanswered questions about what happened to get us there.
+
+In light of this, I'm 100% certain that the patch below will fix the issue
+you're seeing - please test this and get back to me ASAP, thanks.
+
+ arch/arm/kernel/entry-common.S |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 417bac1..3471175 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -88,9 +88,9 @@ ENTRY(ret_from_fork)
+ 	bl	schedule_tail
+ 	cmp	r5, #0
+ 	movne	r0, r4
+-	movne	lr, pc
++	adrne	lr, BSYM(1f)
+ 	movne	pc, r5
+-	get_thread_info tsk
++1:	get_thread_info tsk
+ 	b	ret_slow_syscall
+ ENDPROC(ret_from_fork)
+ 
