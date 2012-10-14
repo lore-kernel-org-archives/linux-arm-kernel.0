@@ -1,63 +1,103 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 14 Oct 2012 16:54:07 +0200
-Subject: [PATCH 3/4] ARM: AT91: Add AT91RM9200 support to DT board
-In-Reply-To: <CAGhQ9VzOQ2V6Cn5tY1REcGzpjjs53Lu6tT7=fNKqJQkBhR8HDA@mail.gmail.com>
-References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
- <1349993126-9519-3-git-send-email-manabian@gmail.com>
- <20121012142251.GC12801@game.jcrosoft.org>
- <50783714.2000702@atmel.com>
- <20121012162706.GI12801@game.jcrosoft.org>
- <CAGhQ9VzOQ2V6Cn5tY1REcGzpjjs53Lu6tT7=fNKqJQkBhR8HDA@mail.gmail.com>
-Message-ID: <20121014145407.GN12801@game.jcrosoft.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sun, 14 Oct 2012 17:35:23 +0200
+Subject: [git pull] signals pile 3
+In-Reply-To: <20121013005334.GM2616@ZenIV.linux.org.uk>
+References: <20121013005334.GM2616@ZenIV.linux.org.uk>
+Message-ID: <507ADBBB.9090209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:08 Fri 12 Oct     , Joachim Eastwood wrote:
-> On Fri, Oct 12, 2012 at 6:27 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 17:28 Fri 12 Oct     , ludovic.desroches wrote:
-> >> Le 10/12/2012 04:22 PM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
-> >> >On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
-> >> >>Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> >> >>---
-> >> >>
-> >> >>Hi,
-> >> >>
-> >> >>This patch has some potential issues.
-> >> >>Before this patch board-dt would fail building when only AT91RM9200 was enabled because at91sam926x_timer symbol would be missing. This patch uses the at91rm9200_timer which
-> >> >>will fail if AT91RM9200 is not enabled.
-> >> >this need work with ot wtihout rm9200
-> 
-> btw, to solve the build issue with board-dt in mainline now we need to
-> add a select CONFIG_SOC_AT91SAM9 to config MACH_AT91SAM_DT.
-> 
-> >> >>
-> >> >>Any thoughts on solving this? As mention above this bug exists in mainline now.
-> >> >duplicate the board-dt with one for rm9200 only
-> >> >as rm9200 ans sam9 are 2 distict familly
-> >>
-> >> Why not adding a new machine descriptor for rm9200 in order to
-> >> prevent file duplication?
-> > because the soc are different and can only be compile if the timer is enable
-> > and I do not want to enable the rm9200 timer on sam9 so instead of a ifdef i
-> > the board-dt create a new board is better as we have a 50 lines file
-> >
-> > with different board_compat and different machine descriptor
-> 
-> I am okey with either approach, but I would like to hear what Nicolas
-> Ferre has to say since he is the on the one that added board-dt. It
-> would be nice to have everything in one board DT file, but I
-> understand your concern with the RM9200 timer.
-> 
-> We will also bump into this again on AT91X40 I guess.
-simple on x40 forget about it the x40 is no MMU only SoC
+Hi Al,
 
-so you can not enable  it by default as the all other at91 are use with MMU
+On 13.10.2012 02:53, Al Viro wrote:
+> The last bits of infrastructure for kernel_thread() et.al., with alpha/arm/x86
+> use of those.  Plus sanitizing the asm glue and do_notify_resume() on alpha,
+> fixing the "disabled irq while running task_work stuff" breakage there.
+> 
+> At that point the rest of kernel_thread/kernel_execve/sys_execve work can
+> be done independently for different architectures.  The only pending bits
+> that do depend on having all architectures converted are restrictred to
+> fs/* and kernel/* - that'll obviously have to wait for the next cycle.
+> I thought we'd have to wait for all of them done before we start eliminating
+> the longjump-style insanity in kernel_execve(), but it turned out there's
+> a very simple way to do that without flagday-style changes.
+> 
+> Please, pull from
+> git://git.kernel.org/pub/scm/linux/kernel/git/viro/signal for-linus
+> 
+> Shortlog:
+> Al Viro (12):
 
-I did the necessary to make the board-dt nearly empty and the same for all the
-sam9 but the board-dt is sam9 only and need to be keeped this way
+[...]
 
-Nico will tell you the same
+>       arm: switch to saner kernel_execve() semantics
 
-Best Regards,
-J.
+[...]
+
+> Diffstat:
+
+[...]
+
+>  arch/arm/include/asm/unistd.h              |    1 -
+>  arch/arm/kernel/entry-common.S             |   29 +--------
+>  arch/arm/kernel/process.c                  |    5 +-
+
+I rebased my ARM development branch and figured that your patch 9fff2fa
+("arm: switch to saner kernel_execve() semantics") breaks the boot on my
+board right after init is invoked via NFS:
+
+[    4.682072] VFS: Mounted root (nfs filesystem) on device 0:12.
+[    4.690744] devtmpfs: mounted
+[    4.694395] Freeing init memory: 172K
+[    5.291417] Internal error: Oops - undefined instruction: 0 [#1] SMP
+THUMB2
+[    5.298734] Modules linked in:
+[    5.301952] CPU: 0    Not tainted  (3.6.0-11053-g56c8535 #128)
+[    5.308071] PC is at cpsw_probe+0x422/0x9ac
+[    5.312459] LR is at trace_hardirqs_on_caller+0x8f/0xfc
+[    5.317934] pc : [<c03493de>]    lr : [<c005e81f>]    psr: 60000113
+[    5.317934] sp : cf055fb0  ip : 00000000  fp : 00000000
+[    5.329944] r10: 00000000  r9 : 00000000  r8 : 00000000
+[    5.335413] r7 : 00000000  r6 : 00000000  r5 : c034458d  r4 : 00000000
+[    5.342244] r3 : cf057a40  r2 : 00000000  r1 : 00000001  r0 : 00000000
+[    5.349078] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM
+Segment user
+[    5.356546] Control: 50c5387d  Table: 8f434019  DAC: 00000015
+[    5.362562] Process init (pid: 1, stack limit = 0xcf054240)
+[    5.368395] Stack: (0xcf055fb0 to 0xcf056000)
+[    5.372961] 5fa0:                                     00000001
+00000000 00000000 00000000
+[    5.381525] 5fc0: cf055fb0 c000d1a8 00000000 00000000 00000000
+00000000 00000000 00000000
+[    5.390091] 5fe0: 00000000 bee83f10 00000000 b6fdedd0 00000010
+00000000 aaaabfaf a8babbaa
+[    5.398664] Code: 2206a010 718ef508 0184f8da f8b1f65d (3070f8d8)
+[    5.405049] ---[ end trace f92e44d0ab15d037 ]---
+[    5.410424] Kernel panic - not syncing: Attempted to kill init!
+exitcode=0x0000000b
+
+
+Looking at the patch, I see it does two things:
+
+ a) kill the special treatment formerly done by ret_from_kernel_thread
+ b) switch over to generic execve for ARM
+
+I know too little about the internals here, but reverting the latter
+part fixes the boot for me. Find attached the patch I used locally for
+that, on top of Linus' current merge tree (4d7127d).
+
+FWIW, the config I'm using is here: http://pastebin.com/JPwAYmrD
+
+I can test patches if you have any for me.
+
+
+Thanks,
+Daniel
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: arm-execve-revert.diff
+Type: text/x-patch
+Size: 1511 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121014/bbce05db/attachment.bin>
