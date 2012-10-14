@@ -1,107 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 14 Oct 2012 23:24:49 +0100
-Subject: [git pull] signals pile 3
-In-Reply-To: <20121014202431.GL21164@n2100.arm.linux.org.uk>
-References: <20121013005334.GM2616@ZenIV.linux.org.uk>
- <507ADBBB.9090209@gmail.com> <20121014202431.GL21164@n2100.arm.linux.org.uk>
-Message-ID: <20121014222449.GN21164@n2100.arm.linux.org.uk>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 15 Oct 2012 11:26:31 +1300
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <1350246895.11504.6.camel@gitbox>
+References: <1350192523.10946.4.camel@gitbox> <1350246895.11504.6.camel@gitbox>
+Message-ID: <1350253591.13440.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, here's the post-mortem diagnosis.
+On Mon, 2012-10-15 at 09:34 +1300, Tony Prisk wrote:
+> On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
+> > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
+> > 11 Oct when I did another pull from linus all of a sudden
+> > dma_alloc_coherent is failing to allocate the framebuffer any longer.
+> > 
+> > I did a quick look back and found this:
+> > 
+> > ARM: add coherent dma ops
+> > 
+> > arch_is_coherent is problematic as it is a global symbol. This
+> > doesn't work for multi-platform kernels or platforms which can support
+> > per device coherent DMA.
+> > 
+> > This adds arm_coherent_dma_ops to be used for devices which connected
+> > coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
+> > are modified at boot when arch_is_coherent is true.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > 
+> > 
+> > This is the only patch lately that I could find (not that I would claim
+> > to be any good at finding things) that is related to the problem. Could
+> > it have caused the allocations to fail?
+> > 
+> > Regards
+> > Tony P
+> 
+> Have done a bit more digging and found the cause - not Rob's patch so
+> apologies.
+> 
+> The cause of the regression is this patch:
+> 
+> From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+> From: Mel Gorman <mgorman@suse.de>
+> Date: Mon, 8 Oct 2012 16:32:36 -0700
+> Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+>  possible
+> 
+> Up until then, the framebuffer allocation with dma_alloc_coherent(...)
+> was fine. From this patch onwards, allocations fail.
+> 
+> I don't know how this patch would effect CMA allocations, but it seems
+> to be causing the issue (or at least, it's caused an error in
+> arch-vt8500 to become visible).
+> 
+> Perhaps someone who understand -mm could explain the best way to
+> troubleshoot the cause of this problem?
+> 
+> 
+> Regards
+> Tony P
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-What's happening is as follows (I'm very certain of this.)
+Have done a bit more testing..
 
-We come through the usual init, and issue (see init/main.c):
+Disabling Memory Compaction makes no difference.
+Disabling CMA fixes/hides the problem. ?!?!?!
 
-	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
-
-This creates a new thread, which falls through to the ret_from_fork
-assembly, with r4 set NULL and r5 set to kernel_init.  You can see
-this in your oops dump register set - r5 is 0xc0344555, which is the
-address of kernel_init plus 1 which marks the function as Thumb code.
-
-Now, let's look at this code a little closer - this is what the
-disassembly looks like:
-
-c000d180 <ret_from_fork>:
-c000d180:       f03a fe08       bl      c0047d94 <schedule_tail>
-c000d184:       2d00            cmp     r5, #0
-c000d186:       bf1e            ittt    ne
-c000d188:       4620            movne   r0, r4
-c000d18a:       46fe            movne   lr, pc <-- XXXXXXX
-c000d18c:       46af            movne   pc, r5
-c000d18e:       46e9            mov     r9, sp
-c000d190:       ea4f 3959       mov.w   r9, r9, lsr #13
-c000d194:       ea4f 3949       mov.w   r9, r9, lsl #13
-c000d198:       e7c8            b.n     c000d12c <ret_to_user>
-c000d19a:       bf00            nop
-c000d19c:       f3af 8000       nop.w
-
-I have marked one instruction, and it's the significant one.
-
-Eventually, having had a successful call to kernel_execve(), kernel_init()
-returns zero.
-
-In returning, it uses the value in 'lr' which was set by the instruction
-I marked above.  Unfortunately, this causes lr to contain 0xc000d18e -
-an even address.  This switches the ISA to ARM on return but with a non
-word aligned PC value.
-
-So, what do we end up executing?  Well, not the instructions above - yes
-the opcodes, but they don't mean the same thing in ARM mode.  In ARM mode,
-it looks like this instead:
-
-c000d18c:       46e946af        strbtmi r4, [r9], pc, lsr #13
-c000d190:       3959ea4f        ldmdbcc r9, {r0, r1, r2, r3, r6, r9, fp, sp, lr, pc}^
-c000d194:       3949ea4f        stmdbcc r9, {r0, r1, r2, r3, r6, r9, fp, sp, lr, pc}^
-c000d198:       bf00e7c8        svclt   0x0000e7c8
-c000d19c:       8000f3af        andhi   pc, r0, pc, lsr #7
-c000d1a0:       e88db092        stm     sp, {r1, r4, r7, ip, sp, pc}
-c000d1a4:       46e81fff                        ; <UNDEFINED> instruction: 0x46e81fff
-c000d1a8:       8a00f3ef        bhi     0xc004a16c
-c000d1ac:       0a0cf08a        beq     0xc03493dc
-
-I have included more above, because it's relevant.  The PSR flags which we
-can see in the oops dump are nZCv, so Z and C are set.
-
-All the above ARM instructions are not executed, except for two.  c000d1a0,
-which has no writeback, and writes below the current stack pointer (and
-that data is lost when we take the next exception.)  The other instruction
-which is executed is c000d1ac, which takes us to... 0xc03493dc.  However,
-remember that bit 1 of the PC got set.  So that makes it 0xc03493de.
-
-And that value is the value we find in the oops dump for PC.  What is the
-instruction here when interpreted in ARM mode?
-
-       0:       f71e150c                ; <UNDEFINED> instruction: 0xf71e150c
-
-and there we have our undefined instruction (remember that the 'never'
-condition code, 0xf, has been deprecated and is now always executed.)
-
-So, what we have above is a consistent and sane story for how we ended up
-at such a strange place in the kernel with such an odd register dump - with
-no unanswered questions about what happened to get us there.
-
-In light of this, I'm 100% certain that the patch below will fix the issue
-you're seeing - please test this and get back to me ASAP, thanks.
-
- arch/arm/kernel/entry-common.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 417bac1..3471175 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -88,9 +88,9 @@ ENTRY(ret_from_fork)
- 	bl	schedule_tail
- 	cmp	r5, #0
- 	movne	r0, r4
--	movne	lr, pc
-+	adrne	lr, BSYM(1f)
- 	movne	pc, r5
--	get_thread_info tsk
-+1:	get_thread_info tsk
- 	b	ret_slow_syscall
- ENDPROC(ret_from_fork)
- 
+Regards
+Tony P
