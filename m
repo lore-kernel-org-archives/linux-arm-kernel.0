@@ -1,79 +1,59 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 14 Oct 2012 21:23:07 +0200
-Subject: [PATCH 3/9] uprobes: allow ignoring of probe hits
+Date: Sun, 14 Oct 2012 21:23:08 +0200
+Subject: [PATCH 4/9] uprobes: allow arch access to xol slot
 In-Reply-To: <1350242593-17761-1-git-send-email-rabin@rab.in>
 References: <1350242593-17761-1-git-send-email-rabin@rab.in>
-Message-ID: <1350242593-17761-3-git-send-email-rabin@rab.in>
+Message-ID: <1350242593-17761-4-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow arches to decided to ignore a probe hit.  ARM will use this to
-only call handlers if the conditions to execute a conditionally executed
-instruction are satisfied.
+Allow arches to customize how the instruction is filled into the xol
+slot.  ARM will use this to insert an undefined instruction after the
+real instruction in order to simulate a single step of the instruction
+without hardware support.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
  include/linux/uprobes.h |    1 +
- kernel/events/uprobes.c |   14 +++++++++++++-
- 2 files changed, 14 insertions(+), 1 deletion(-)
+ kernel/events/uprobes.c |    7 ++++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index ac90704..da21b66 100644
+index da21b66..b4380ad 100644
 --- a/include/linux/uprobes.h
 +++ b/include/linux/uprobes.h
-@@ -128,6 +128,7 @@ extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
- extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+@@ -129,6 +129,7 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
  extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
  extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
+ extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
++extern void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr);
  #else /* !CONFIG_UPROBES */
  struct uprobes_state {
  };
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index db4e3ab..a0e1a38 100644
+index a0e1a38..f7ff3a4 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -1419,6 +1419,11 @@ static void mmf_recalc_uprobes(struct mm_struct *mm)
- 	clear_bit(MMF_HAS_UPROBES, &mm->flags);
+@@ -1211,6 +1211,11 @@ static unsigned long xol_take_insn_slot(struct xol_area *area)
+ 	return slot_addr;
  }
  
-+bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs)
++void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr)
 +{
-+	return false;
++	memcpy(vaddr, auprobe->insn, MAX_UINSN_BYTES);
 +}
 +
- static struct uprobe *find_active_uprobe(unsigned long bp_vaddr, int *is_swbp)
- {
- 	struct mm_struct *mm = current->mm;
-@@ -1469,6 +1474,7 @@ static void handle_swbp(struct pt_regs *regs)
- 	struct uprobe *uprobe;
- 	unsigned long bp_vaddr;
- 	int uninitialized_var(is_swbp);
-+	bool ignored = false;
+ /*
+  * xol_get_insn_slot - If was not allocated a slot, then
+  * allocate a slot.
+@@ -1240,7 +1245,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+ 	current->utask->vaddr = slot_addr;
+ 	offset = current->utask->xol_vaddr & ~PAGE_MASK;
+ 	vaddr = kmap_atomic(area->page);
+-	memcpy(vaddr + offset, uprobe->arch.insn, MAX_UINSN_BYTES);
++	arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
+ 	kunmap_atomic(vaddr);
  
- 	bp_vaddr = uprobe_get_swbp_addr(regs);
- 	uprobe = find_active_uprobe(bp_vaddr, &is_swbp);
-@@ -1499,6 +1505,12 @@ static void handle_swbp(struct pt_regs *regs)
- 			goto cleanup_ret;
- 	}
- 	utask->active_uprobe = uprobe;
-+
-+	if (arch_uprobe_ignore(&uprobe->arch, regs)) {
-+		ignored = true;
-+		goto cleanup_ret;
-+	}
-+
- 	handler_chain(uprobe, regs);
- 	if (uprobe->flags & UPROBE_SKIP_SSTEP && can_skip_sstep(uprobe, regs))
- 		goto cleanup_ret;
-@@ -1514,7 +1526,7 @@ cleanup_ret:
- 		utask->active_uprobe = NULL;
- 		utask->state = UTASK_RUNNING;
- 	}
--	if (!(uprobe->flags & UPROBE_SKIP_SSTEP))
-+	if (!ignored && !(uprobe->flags & UPROBE_SKIP_SSTEP))
- 
- 		/*
- 		 * cannot singlestep; cannot skip instruction;
+ 	return current->utask->xol_vaddr;
 -- 
 1.7.9.5
