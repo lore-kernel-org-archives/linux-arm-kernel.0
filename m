@@ -1,81 +1,82 @@
-From: yanpai.chen@gmail.com (Andrew Yan-Pai Chen)
-Date: Mon, 15 Oct 2012 01:42:22 +0800
-Subject: [RFC PATCH v2] prevent top pte being overwritten before flushing
-Message-ID: <1350236542-96465-1-git-send-email-yanpai.chen@gmail.com>
+From: viro@ZenIV.linux.org.uk (Al Viro)
+Date: Sun, 14 Oct 2012 18:55:41 +0100
+Subject: [revert request for commit 9fff2fa] Re: [git pull] signals pile 3
+In-Reply-To: <20121014172640.GW2616@ZenIV.linux.org.uk>
+References: <20121013005334.GM2616@ZenIV.linux.org.uk>
+ <507ADBBB.9090209@gmail.com>
+ <20121014164020.GV2616@ZenIV.linux.org.uk>
+ <CACTFLAOpcLtHNx-TCHQkUOPNAkTO8EgDhbyZSGQ9ag+Wu_cNRw@mail.gmail.com>
+ <20121014172640.GW2616@ZenIV.linux.org.uk>
+Message-ID: <20121014175541.GX2616@ZenIV.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yan-Pai Chen <ypchen@faraday-tech.com>
+On Sun, Oct 14, 2012 at 06:26:40PM +0100, Al Viro wrote:
+> On Sun, Oct 14, 2012 at 06:44:12PM +0200, Daniel Mack wrote:
+> > On Oct 14, 2012 6:40 PM, "Al Viro" <viro@zeniv.linux.org.uk> wrote:
+> > >
+> > > On Sun, Oct 14, 2012 at 05:35:23PM +0200, Daniel Mack wrote:
+> > >
+> > > > I rebased my ARM development branch and figured that your patch 9fff2fa
+> > > > ("arm: switch to saner kernel_execve() semantics") breaks the boot on my
+> > > > board right after init is invoked via NFS:
+> > >
+> > > OK, revert it is, then.  Nothing in the tree has dependencies on that
+> > sucker
+> > > and while it survives testing here, it's obviously not ready for mainline.
+> > > So, with abject apologies to everyone involved, please revert.
+> > 
+> > Reverting it is not straight forward, and half of this patch doesn't seem
+> > to cause issues.
+> > 
+> > I can resend my patch with an S-o-b if you want me to.
+> 
+> Um...  That's _really_ interesting.  First of all, revert is absolutely
+> straightforward; the only change in Kconfig is "remove the damn select"
+> and it's not hard to resolve.  But I actually wonder what the hell is
+> going on with that breakage - the *only* thing your revert changes is
+> that instead of letting the kernel_thread callback return all the way
+> to returning 0 to ret_from_kernel_thread() on do_execve() success you
+> have it do ret_from_kernel_execve() instead.  Hmm...
+> 
+> Could you try to print current_pt_regs()->ARM_r0 in kernel_execve() before
+> calling ret_from_kernel_execve() with your patch applied?  If that somehow
+> got non-zero, we'd see trouble, all right, but I don't see any places where
+> it could.
+> 
+> Wait a minute...  I think I see what might be going on, but I don't
+> understand it at all.  Look: arm start_thread() is
+> #define start_thread(regs,pc,sp)                                        \
+> ({                                                                      \
+>         unsigned long *stack = (unsigned long *)sp;                     \
+>         memset(regs->uregs, 0, sizeof(regs->uregs));                    \
+>         if (current->personality & ADDR_LIMIT_32BIT)                    \
+>                 regs->ARM_cpsr = USR_MODE;                              \
+>         else                                                            \
+>                 regs->ARM_cpsr = USR26_MODE;                            \
+>         if (elf_hwcap & HWCAP_THUMB && pc & 1)                          \
+>                 regs->ARM_cpsr |= PSR_T_BIT;                            \
+>         regs->ARM_cpsr |= PSR_ENDSTATE;                                 \
+>         regs->ARM_pc = pc & ~1;         /* pc */                        \
+>         regs->ARM_sp = sp;              /* sp */                        \
+>         regs->ARM_r2 = stack[2];        /* r2 (envp) */                 \
+>         regs->ARM_r1 = stack[1];        /* r1 (argv) */                 \
+>         regs->ARM_r0 = stack[0];        /* r0 (argc) */                 \
+>         nommu_start_thread(regs);                                       \
+> })
+> and the last 3 make no sense whatsoever.  Note that on normal execve() we'll
+> be going through the syscall return, so the userland will see 0 in there,
+> no matter what do we do here.  Theoretically, it might've been done for
+> ptrace sake (it will be able to observe the values in those registers before
+> the tracee reaches userland), but there's another oddity involved - "stack"
+> is a userland pointer here.  Granted, it's been recently written to, so
+> we are not likely to hit a pagefault here, but...  What happens if we are
+> under enough memory pressure to swap those pages out?  PF in the kernel
+> mode with no exception table entries for those insns?
 
-Since flush_pfn_alias() is preemptible, it is possible to be
-preempted just after set_top_pte() is done. If the process
-which preempts the previous happened to invoke flush_pfn_alias()
-with the same colour vaddr as that of the previous, the same
-top pte will be overwritten. When switching back to the previous,
-it attempts to flush cache lines with incorrect mapping. Then
-no lines (or wrong lines) will be flushed because of the nature
-of vipt caches.
-
-flush_icache_alias() has the same problem as well. However, as it
-could be called in SMP setups, we prevent concurrent overwrites of
-top pte by having a lock on it.
-
-Signed-off-by: JasonLin <wwlin@faraday-tech.com>
-Signed-off-by: Yan-Pai Chen <ypchen@faraday-tech.com>
----
- arch/arm/mm/flush.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 40ca11e..b6510f4 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -11,6 +11,7 @@
- #include <linux/mm.h>
- #include <linux/pagemap.h>
- #include <linux/highmem.h>
-+#include <linux/spinlock.h>
- 
- #include <asm/cacheflush.h>
- #include <asm/cachetype.h>
-@@ -22,11 +23,15 @@
- 
- #ifdef CONFIG_CPU_CACHE_VIPT
- 
-+static DEFINE_RAW_SPINLOCK(flush_lock);
-+
-+/* Beware that this function is not to be called for SMP setups. */
- static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
- {
- 	unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) << PAGE_SHIFT);
- 	const int zero = 0;
- 
-+	preempt_disable();
- 	set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
- 
- 	asm(	"mcrr	p15, 0, %1, %0, c14\n"
-@@ -34,6 +39,8 @@ static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
- 	    :
- 	    : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
- 	    : "cc");
-+
-+	preempt_enable();
- }
- 
- static void flush_icache_alias(unsigned long pfn, unsigned long vaddr, unsigned long len)
-@@ -42,9 +49,13 @@ static void flush_icache_alias(unsigned long pfn, unsigned long vaddr, unsigned
- 	unsigned long offset = vaddr & (PAGE_SIZE - 1);
- 	unsigned long to;
- 
-+	raw_spin_lock(&flush_lock);
-+
- 	set_top_pte(va, pfn_pte(pfn, PAGE_KERNEL));
- 	to = va + offset;
- 	flush_icache_range(to, to + len);
-+
-+	raw_spin_unlock(&flush_lock);
- }
- 
- void flush_cache_mm(struct mm_struct *mm)
--- 
-1.7.4.1
+FWIW, if you don't mind an experiment, try to take mainline (with that
+commit not reverted) and add
+	strne	r0, [sp, #S_R0]
+right before
+	get_thread_info tsk
+in ret_from_fork().  And see if that changes behaviour.
