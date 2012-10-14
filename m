@@ -1,63 +1,31 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 14 Oct 2012 21:23:09 +0200
-Subject: [PATCH 5/9] uprobes: allow arch-specific initialization
+Date: Sun, 14 Oct 2012 21:23:10 +0200
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
 In-Reply-To: <1350242593-17761-1-git-send-email-rabin@rab.in>
 References: <1350242593-17761-1-git-send-email-rabin@rab.in>
-Message-ID: <1350242593-17761-5-git-send-email-rabin@rab.in>
+Message-ID: <1350242593-17761-6-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a weak function for any architecture-specific initialization.  ARM
-will use this to register the handlers for the undefined instructions it
-uses to implement uprobes.
+Flush the cache so that the instructions written to the XOL area are
+visible.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- include/linux/uprobes.h |    1 +
- kernel/events/uprobes.c |   10 ++++++++++
- 2 files changed, 11 insertions(+)
+ kernel/events/uprobes.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index b4380ad..c3dc5de 100644
---- a/include/linux/uprobes.h
-+++ b/include/linux/uprobes.h
-@@ -130,6 +130,7 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
- extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
- extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
- extern void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr);
-+extern int __weak arch_uprobes_init(void);
- #else /* !CONFIG_UPROBES */
- struct uprobes_state {
- };
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index f7ff3a4..ca000a9 100644
+index ca000a9..8c52f93 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -1634,8 +1634,14 @@ static struct notifier_block uprobe_exception_nb = {
- 	.priority		= INT_MAX-1,	/* notified after kprobes, kgdb */
- };
+@@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+ 	offset = current->utask->xol_vaddr & ~PAGE_MASK;
+ 	vaddr = kmap_atomic(area->page);
+ 	arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
++	flush_dcache_page(area->page);
+ 	kunmap_atomic(vaddr);
  
-+int __weak __init arch_uprobes_init(void)
-+{
-+	return 0;
-+}
-+
- static int __init init_uprobes(void)
- {
-+	int ret;
- 	int i;
- 
- 	for (i = 0; i < UPROBES_HASH_SZ; i++) {
-@@ -1643,6 +1649,10 @@ static int __init init_uprobes(void)
- 		mutex_init(&uprobes_mmap_mutex[i]);
- 	}
- 
-+	ret = arch_uprobes_init();
-+	if (ret)
-+		return ret;
-+
- 	return register_die_notifier(&uprobe_exception_nb);
- }
- module_init(init_uprobes);
+ 	return current->utask->xol_vaddr;
 -- 
 1.7.9.5
