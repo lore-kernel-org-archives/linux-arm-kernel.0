@@ -1,37 +1,24 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 14 Oct 2012 04:32:56 +0200
-Subject: [PATCH 2/2] spi: mxs: Terminate DMA in case of DMA timeout
-In-Reply-To: <1350181976-18233-1-git-send-email-marex@denx.de>
-References: <1350181976-18233-1-git-send-email-marex@denx.de>
-Message-ID: <1350181976-18233-2-git-send-email-marex@denx.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sun, 14 Oct 2012 14:27:07 +0900
+Subject: [PATCH] spi/pl022: Activate resourses before deactivate them in
+ suspend
+In-Reply-To: <CAPDyKFpa8XoEy-kq3nq0dbRtM=a1wJ7cx=OzCOqMY1PmXrXJYw@mail.gmail.com>
+References: <1349423012-18048-1-git-send-email-ulf.hansson@stericsson.com>
+ <CAPDyKFpa8XoEy-kq3nq0dbRtM=a1wJ7cx=OzCOqMY1PmXrXJYw@mail.gmail.com>
+Message-ID: <20121014052705.GA22172@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the SPI DMA times out, the DMA might still be in some kind of
-inconsistent state. Issue dmaengine_terminate_all() on the particular
-channel to kill off all operations before continuing.
+On Fri, Oct 12, 2012 at 04:42:53PM +0200, Ulf Hansson wrote:
+> Hi Mark,
+> 
+> Just a kind remember on this. Do you see any problem merging this?
+> 
+> Kind regards
+> Ulf Hansson
+> 
+> On 5 October 2012 09:43, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Fabio Estevam <fabio.estevam@freescale.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/spi/spi-mxs.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/spi/spi-mxs.c b/drivers/spi/spi-mxs.c
-index 5a63bcd..86dd04d 100644
---- a/drivers/spi/spi-mxs.c
-+++ b/drivers/spi/spi-mxs.c
-@@ -323,6 +323,7 @@ static int mxs_spi_txrx_dma(struct mxs_spi *spi, int cs,
- 	if (!ret) {
- 		dev_err(ssp->dev, "DMA transfer timeout\n");
- 		ret = -ETIMEDOUT;
-+		dmaengine_terminate_all(ssp->dmach);
- 		goto err_vmalloc;
- 	}
- 
--- 
-1.7.10.4
+Don't top post and don't send contentless nags less than a week after
+your original mail, especially not in the merge window when only urgent
+bug fixes should be applied.
