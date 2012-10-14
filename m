@@ -1,35 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 13 Oct 2012 08:48:09 -0000
-Subject: [PATCH V2 3/3] ARM: SPEAr13xx: Pass DW DMAC platform data from DT
-In-Reply-To: <20121013064422.GJ12801@game.jcrosoft.org>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
- <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
- <20121012144837.GE12801@game.jcrosoft.org>
- <CAKohpo=vMchmiz70evBB5bPqt4O4DWUocd5M1o9gc8fsY_Fkiw@mail.gmail.com>
- <20121012162148.GH12801@game.jcrosoft.org>
- <CAKohpok5ZOmz9CCJbTGc=_tncxnZYEW7UMh2FcFcs0dB87JAcQ@mail.gmail.com>
- <20121013064422.GJ12801@game.jcrosoft.org>
-Message-ID: <CAKohpokfei_ryGKMh4wE9D=wyRZCkddc+Da1cq+3facTHradKQ@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sun, 14 Oct 2012 16:44:15 -0000
+Subject: [revert request for commit 9fff2fa] Re: [git pull] signals pile 3
+In-Reply-To: <20121014164020.GV2616@ZenIV.linux.org.uk>
+References: <20121013005334.GM2616@ZenIV.linux.org.uk>
+ <507ADBBB.9090209@gmail.com>
+ <20121014164020.GV2616@ZenIV.linux.org.uk>
+Message-ID: <CACTFLAOpcLtHNx-TCHQkUOPNAkTO8EgDhbyZSGQ9ag+Wu_cNRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 13, 2012 12:16 PM, "Jean-Christophe PLAGNIOL-VILLARD" <
-plagnioj@jcrosoft.com> wrote:
+On Oct 14, 2012 6:40 PM, "Al Viro" <viro@zeniv.linux.org.uk> wrote:
 >
-> On 22:42 Fri 12 Oct     , Viresh Kumar wrote:
-> > On 12 October 2012 21:51, Jean-Christophe PLAGNIOL-VILLARD
-> > <plagnioj@jcrosoft.com> wrote:
-> > >> >> +     OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL,
-"cf"),
-> > >> > ?/
-> > >>
-> > >> Sorry. can't get it :(
-> > > what is the "cf" as paltfrom data
-> >
-> > This is dma bus_id string, which matches with what is passed from dtb.
-> so pass if via dtb too
+> On Sun, Oct 14, 2012 at 05:35:23PM +0200, Daniel Mack wrote:
+>
+> > I rebased my ARM development branch and figured that your patch 9fff2fa
+> > ("arm: switch to saner kernel_execve() semantics") breaks the boot on my
+> > board right after init is invoked via NFS:
+>
+> OK, revert it is, then.  Nothing in the tree has dependencies on that
+sucker
+> and while it survives testing here, it's obviously not ready for mainline.
+> So, with abject apologies to everyone involved, please revert.
 
-Yes. Already passed in 13xx.dtsi.
+Reverting it is not straight forward, and half of this patch doesn't seem
+to cause issues.
+
+I can resend my patch with an S-o-b if you want me to.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121013/03f00db2/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121014/0fc4e6e4/attachment-0001.html>
