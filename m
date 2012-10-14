@@ -1,82 +1,35 @@
-From: viro@ZenIV.linux.org.uk (Al Viro)
-Date: Sun, 14 Oct 2012 18:55:41 +0100
-Subject: [revert request for commit 9fff2fa] Re: [git pull] signals pile 3
-In-Reply-To: <20121014172640.GW2616@ZenIV.linux.org.uk>
-References: <20121013005334.GM2616@ZenIV.linux.org.uk>
- <507ADBBB.9090209@gmail.com>
- <20121014164020.GV2616@ZenIV.linux.org.uk>
- <CACTFLAOpcLtHNx-TCHQkUOPNAkTO8EgDhbyZSGQ9ag+Wu_cNRw@mail.gmail.com>
- <20121014172640.GW2616@ZenIV.linux.org.uk>
-Message-ID: <20121014175541.GX2616@ZenIV.linux.org.uk>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 14 Oct 2012 15:13:10 -0300
+Subject: [PATCH] lib: decompress_unlzo: Change include file name
+Message-ID: <1350238390-1549-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 14, 2012 at 06:26:40PM +0100, Al Viro wrote:
-> On Sun, Oct 14, 2012 at 06:44:12PM +0200, Daniel Mack wrote:
-> > On Oct 14, 2012 6:40 PM, "Al Viro" <viro@zeniv.linux.org.uk> wrote:
-> > >
-> > > On Sun, Oct 14, 2012 at 05:35:23PM +0200, Daniel Mack wrote:
-> > >
-> > > > I rebased my ARM development branch and figured that your patch 9fff2fa
-> > > > ("arm: switch to saner kernel_execve() semantics") breaks the boot on my
-> > > > board right after init is invoked via NFS:
-> > >
-> > > OK, revert it is, then.  Nothing in the tree has dependencies on that
-> > sucker
-> > > and while it survives testing here, it's obviously not ready for mainline.
-> > > So, with abject apologies to everyone involved, please revert.
-> > 
-> > Reverting it is not straight forward, and half of this patch doesn't seem
-> > to cause issues.
-> > 
-> > I can resend my patch with an S-o-b if you want me to.
-> 
-> Um...  That's _really_ interesting.  First of all, revert is absolutely
-> straightforward; the only change in Kconfig is "remove the damn select"
-> and it's not hard to resolve.  But I actually wonder what the hell is
-> going on with that breakage - the *only* thing your revert changes is
-> that instead of letting the kernel_thread callback return all the way
-> to returning 0 to ret_from_kernel_thread() on do_execve() success you
-> have it do ret_from_kernel_execve() instead.  Hmm...
-> 
-> Could you try to print current_pt_regs()->ARM_r0 in kernel_execve() before
-> calling ret_from_kernel_execve() with your patch applied?  If that somehow
-> got non-zero, we'd see trouble, all right, but I don't see any places where
-> it could.
-> 
-> Wait a minute...  I think I see what might be going on, but I don't
-> understand it at all.  Look: arm start_thread() is
-> #define start_thread(regs,pc,sp)                                        \
-> ({                                                                      \
->         unsigned long *stack = (unsigned long *)sp;                     \
->         memset(regs->uregs, 0, sizeof(regs->uregs));                    \
->         if (current->personality & ADDR_LIMIT_32BIT)                    \
->                 regs->ARM_cpsr = USR_MODE;                              \
->         else                                                            \
->                 regs->ARM_cpsr = USR26_MODE;                            \
->         if (elf_hwcap & HWCAP_THUMB && pc & 1)                          \
->                 regs->ARM_cpsr |= PSR_T_BIT;                            \
->         regs->ARM_cpsr |= PSR_ENDSTATE;                                 \
->         regs->ARM_pc = pc & ~1;         /* pc */                        \
->         regs->ARM_sp = sp;              /* sp */                        \
->         regs->ARM_r2 = stack[2];        /* r2 (envp) */                 \
->         regs->ARM_r1 = stack[1];        /* r1 (argv) */                 \
->         regs->ARM_r0 = stack[0];        /* r0 (argc) */                 \
->         nommu_start_thread(regs);                                       \
-> })
-> and the last 3 make no sense whatsoever.  Note that on normal execve() we'll
-> be going through the syscall return, so the userland will see 0 in there,
-> no matter what do we do here.  Theoretically, it might've been done for
-> ptrace sake (it will be able to observe the values in those registers before
-> the tracee reaches userland), but there's another oddity involved - "stack"
-> is a userland pointer here.  Granted, it's been recently written to, so
-> we are not likely to hit a pagefault here, but...  What happens if we are
-> under enough memory pressure to swap those pages out?  PF in the kernel
-> mode with no exception table entries for those insns?
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-FWIW, if you don't mind an experiment, try to take mainline (with that
-commit not reverted) and add
-	strne	r0, [sp, #S_R0]
-right before
-	get_thread_info tsk
-in ret_from_fork().  And see if that changes behaviour.
+Commit 7c979cebc (lib/lzo: Rename lzo1x_decompress.c to lzo1x_decompress_safe.c) 
+renamed lzo1x_decompress.c file, but missed to update lib/decompress_unlzo.c,
+which breaks imx_v6_v7_defconfig build:
+
+arch/arm/boot/compressed/../../../../lib/decompress_unlzo.c:34:34: fatal error: lzo/lzo1x_decompress.c: No such file or directory
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ lib/decompress_unlzo.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/decompress_unlzo.c b/lib/decompress_unlzo.c
+index 4531294..960183d 100644
+--- a/lib/decompress_unlzo.c
++++ b/lib/decompress_unlzo.c
+@@ -31,7 +31,7 @@
+  */
+ 
+ #ifdef STATIC
+-#include "lzo/lzo1x_decompress.c"
++#include "lzo/lzo1x_decompress_safe.c"
+ #else
+ #include <linux/decompress/unlzo.h>
+ #endif
+-- 
+1.7.9.5
