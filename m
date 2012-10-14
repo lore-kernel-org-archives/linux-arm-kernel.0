@@ -1,161 +1,356 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 14 Oct 2012 23:46:38 +0200
-Subject: [PATCH 4/5] ARM: AT91: Add AT91RM9200 DT board
+Date: Sun, 14 Oct 2012 23:46:39 +0200
+Subject: [PATCH 5/5] ARM: AT91: Add AT91RM9200 device tree
 In-Reply-To: <1350251199-28065-1-git-send-email-manabian@gmail.com>
 References: <1350251199-28065-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350251199-28065-5-git-send-email-manabian@gmail.com>
+Message-ID: <1350251199-28065-6-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/mach-at91/Kconfig           |  8 +++++
- arch/arm/mach-at91/Makefile          |  1 +
- arch/arm/mach-at91/board-rm9200-dt.c | 59 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-at91/generic.h         |  1 +
- arch/arm/mach-at91/setup.c           | 14 +++++++++
- 5 files changed, 83 insertions(+)
- create mode 100644 arch/arm/mach-at91/board-rm9200-dt.c
+ arch/arm/boot/dts/at91rm9200.dtsi | 333 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 333 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91rm9200.dtsi
 
-diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index d9b0546..3f45906 100644
---- a/arch/arm/mach-at91/Kconfig
-+++ b/arch/arm/mach-at91/Kconfig
-@@ -505,6 +505,14 @@ endif
- 
- comment "Generic Board Type"
- 
-+config MACH_AT91RM9200_DT
-+	bool "Atmel AT91RM9200 Evaluation Kits with device-tree support"
-+	select SOC_AT91RM9200
-+	select USE_OF
-+	help
-+	  Select this if you want to experiment device-tree with
-+	  an Atmel RM9200 Evaluation Kit.
-+
- config MACH_AT91SAM_DT
- 	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
- 	select SOC_AT91SAM9
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index d6e0d21..75dee683 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -89,6 +89,7 @@ obj-$(CONFIG_MACH_SNAPPER_9260)	+= board-snapper9260.o
- obj-$(CONFIG_MACH_AT91SAM9M10G45EK) += board-sam9m10g45ek.o
- 
- # AT91SAM board with device-tree
-+obj-$(CONFIG_MACH_AT91RM9200_DT) += board-rm9200-dt.o
- obj-$(CONFIG_MACH_AT91SAM_DT) += board-dt.o
- 
- # AT91X40 board-specific support
-diff --git a/arch/arm/mach-at91/board-rm9200-dt.c b/arch/arm/mach-at91/board-rm9200-dt.c
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
 new file mode 100644
-index 0000000..47e91d9
+index 0000000..5c4f91d
 --- /dev/null
-+++ b/arch/arm/mach-at91/board-rm9200-dt.c
-@@ -0,0 +1,59 @@
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -0,0 +1,333 @@
 +/*
-+ *  Setup code for AT91RM9200 Evaluation Kits with Device Tree support
++ * at91rm9200.dtsi - Device Tree Include file for AT91RM9200 family SoC
 + *
 + *  Copyright (C) 2011 Atmel,
-+ *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>,
 + *                2012 Joachim Eastwood <manabian@gmail.com>
++ *
++ * Based on at91sam9260.dtsi
 + *
 + * Licensed under GPLv2 or later.
 + */
 +
-+#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/gpio.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
++/include/ "skeleton.dtsi"
 +
-+#include <mach/board.h>
-+#include <mach/at91_aic.h>
++/ {
++	model = "Atmel AT91RM9200 family SoC";
++	compatible = "atmel,at91rm9200";
++	interrupt-parent = <&aic>;
 +
-+#include <asm/setup.h>
-+#include <asm/irq.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+#include <asm/mach/irq.h>
++	aliases {
++		serial0 = &dbgu;
++		serial1 = &usart0;
++		serial2 = &usart1;
++		serial3 = &usart2;
++		serial4 = &usart3;
++		gpio0 = &pioA;
++		gpio1 = &pioB;
++		gpio2 = &pioC;
++		gpio3 = &pioD;
++		tcb0 = &tcb0;
++		tcb1 = &tcb1;
++	};
++	cpus {
++		cpu at 0 {
++			compatible = "arm,arm920t";
++		};
++	};
 +
-+#include "generic.h"
++	memory {
++		reg = <0x20000000 0x04000000>;
++	};
 +
++	ahb {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+static const struct of_device_id irq_of_match[] __initconst = {
-+	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
-+	{ /*sentinel*/ }
++		apb {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			aic: interrupt-controller at fffff000 {
++				#interrupt-cells = <3>;
++				compatible = "atmel,at91rm9200-aic";
++				interrupt-controller;
++				reg = <0xfffff000 0x200>;
++				atmel,external-irqs = <25 26 27 28 29 30 31>;
++			};
++
++			ramc0: ramc at ffffff00 {
++				compatible = "atmel,at91rm9200-sdramc";
++				reg = <0xffffff00 0x100>;
++			};
++
++			pmc: pmc at fffffc00 {
++				compatible = "atmel,at91rm9200-pmc";
++				reg = <0xfffffc00 0x100>;
++			};
++
++			st: timer at fffffd00 {
++				compatible = "atmel,at91rm9200-st";
++				reg = <0xfffffd00 0x100>;
++				interrupts = <1 4 7>;
++			};
++
++			tcb0: timer at fffa0000 {
++				compatible = "atmel,at91rm9200-tcb";
++				reg = <0xfffa0000 0x100>;
++				interrupts = <17 4 0 18 4 0 19 4 0>;
++			};
++
++			tcb1: timer at fffa4000 {
++				compatible = "atmel,at91rm9200-tcb";
++				reg = <0xfffa4000 0x100>;
++				interrupts = <20 4 0 21 4 0 22 4 0>;
++			};
++
++			pinctrl at fffff400 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
++				ranges = <0xfffff400 0xfffff400 0x800>;
++
++				atmel,mux-mask = <
++					/*    A         B     */
++					 0xffffffff 0xffffffff  /* pioA */
++					 0xffffffff 0x083fffff  /* pioB */
++					 0xffff3fff 0x00000000  /* pioC */
++					 0x03ff87ff 0x0fffff80  /* pioD */
++					>;
++
++				/* shared pinctrl settings */
++				dbgu {
++					pinctrl_dbgu: dbgu-0 {
++						atmel,pins =
++							<0 30 0x1 0x0	/* PA30 periph A */
++							 0 31 0x1 0x1>;	/* PA31 periph with pullup */
++					};
++				};
++
++				uart0 {
++					pinctrl_uart0: uart0-0 {
++						atmel,pins =
++							<0 17 0x1 0x0	/* PA17 periph A */
++							 0 18 0x1 0x0>;	/* PA18 periph A */
++					};
++
++					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
++						atmel,pins =
++							<0 20 0x1 0x0	/* PA20 periph A */
++							 0 21 0x1 0x0>;	/* PA21 periph A */
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1: uart1-0 {
++						atmel,pins =
++							<1 20 0x1 0x1	/* PB20 periph A with pullup */
++							 1 21 0x1 0x0>;	/* PB21 periph A */
++					};
++
++					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
++						atmel,pins =
++							<1 24 0x1 0x0	/* PB24 periph A */
++							 1 26 0x1 0x0>;	/* PB26 periph A */
++					};
++
++					pinctrl_uart1_dtr_dsr: uart1_dtr_dsr-0 {
++						atmel,pins =
++							<1 19 0x1 0x0	/* PB19 periph A */
++							 1 25 0x1 0x0>;	/* PB25 periph A */
++					};
++
++					pinctrl_uart1_dcd: uart1_dcd-0 {
++						atmel,pins =
++							<1 23 0x1 0x0>;	/* PB23 periph A */
++					};
++
++					pinctrl_uart1_ri: uart1_ri-0 {
++						atmel,pins =
++							<1 18 0x1 0x0>;	/* PB18 periph A */
++					};
++				};
++
++				uart2 {
++					pinctrl_uart2: uart2-0 {
++						atmel,pins =
++							<0 22 0x1 0x0	/* PA22 periph A */
++							 0 23 0x1 0x1>;	/* PA23 periph A with pullup */
++					};
++
++					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
++						atmel,pins =
++							<0 30 0x2 0x0	/* PA30 periph B */
++							 0 31 0x2 0x0>;	/* PA31 periph B */
++					};
++				};
++
++				uart3 {
++					pinctrl_uart3: uart3-0 {
++						atmel,pins =
++							<0 5 0x2 0x1	/* PA5 periph B with pullup */
++							 0 6 0x2 0x0>;	/* PA6 periph B */
++					};
++
++					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
++						atmel,pins =
++							<1 0 0x2 0x0	/* PB0 periph B */
++							 1 1 0x2 0x0>;	/* PB1 periph B */
++					};
++				};
++
++				nand {
++					pinctrl_nand: nand-0 {
++						atmel,pins =
++							<2 2 0x0 0x1	/* PC2 gpio RDY pin pull_up */
++							 1 1 0x0 0x1>;	/* PB1 gpio CD pin pull_up */
++					};
++				};
++
++				pioA: gpio at fffff400 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff400 0x200>;
++					interrupts = <2 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				pioB: gpio at fffff600 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff600 0x200>;
++					interrupts = <3 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				pioC: gpio at fffff800 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffff800 0x200>;
++					interrupts = <4 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++
++				pioD: gpio at fffffa00 {
++					compatible = "atmel,at91rm9200-gpio";
++					reg = <0xfffffa00 0x200>;
++					interrupts = <5 4 1>;
++					#gpio-cells = <2>;
++					gpio-controller;
++					interrupt-controller;
++					#interrupt-cells = <2>;
++				};
++			};
++
++			dbgu: serial at fffff200 {
++				compatible = "atmel,at91rm9200-usart";
++				reg = <0xfffff200 0x200>;
++				interrupts = <1 4 7>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_dbgu>;
++				status = "disabled";
++			};
++
++			usart0: serial at fffc0000 {
++				compatible = "atmel,at91rm9200-usart";
++				reg = <0xfffc0000 0x200>;
++				interrupts = <6 4 5>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0>;
++				status = "disabled";
++			};
++
++			usart1: serial at fffc4000 {
++				compatible = "atmel,at91rm9200-usart";
++				reg = <0xfffc4000 0x200>;
++				interrupts = <7 4 5>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart1>;
++				status = "disabled";
++			};
++
++			usart2: serial at fffc8000 {
++				compatible = "atmel,at91rm9200-usart";
++				reg = <0xfffc8000 0x200>;
++				interrupts = <8 4 5>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2>;
++				status = "disabled";
++			};
++
++			usart3: serial at fffcc000 {
++				compatible = "atmel,at91rm9200-usart";
++				reg = <0xfffcc000 0x200>;
++				interrupts = <23 4 5>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart3>;
++				status = "disabled";
++			};
++
++			usb1: gadget at fffb0000 {
++				compatible = "atmel,at91rm9200-udc";
++				reg = <0xfffb0000 0x4000>;
++				interrupts = <11 4 2>;
++				status = "disabled";
++			};
++		};
++
++		nand0: nand at 40000000 {
++			compatible = "atmel,at91rm9200-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x40000000 0x10000000>;
++			atmel,nand-addr-offset = <21>;
++			atmel,nand-cmd-offset = <22>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand>;
++			nand-ecc-mode = "soft";
++			gpios = <&pioC 2 0
++				 0
++				 &pioB 1 0
++				>;
++			status = "disabled";
++		};
++
++		usb0: ohci at 00300000 {
++			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
++			reg = <0x00300000 0x100000>;
++			interrupts = <23 4 2>;
++			status = "disabled";
++		};
++	};
++
++	i2c at 0 {
++		compatible = "i2c-gpio";
++		gpios = <&pioA 23 0 /* sda */
++			 &pioA 24 0 /* scl */
++			>;
++		i2c-gpio,sda-open-drain;
++		i2c-gpio,scl-open-drain;
++		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +};
-+
-+static void __init at91rm9200_dt_init_irq(void)
-+{
-+	of_irq_init(irq_of_match);
-+}
-+
-+static void __init at91rm9200_dt_device_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static const char *at91rm9200_dt_board_compat[] __initdata = {
-+	"atmel,at91rm9200",
-+	NULL
-+};
-+
-+DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
-+	.timer		= &at91rm9200_timer,
-+	.map_io		= at91_map_io,
-+	.handle_irq	= at91_aic_handle_irq,
-+	.init_early	= at91rm9200_dt_initialize,
-+	.init_irq	= at91rm9200_dt_init_irq,
-+	.init_machine	= at91rm9200_dt_device_init,
-+	.dt_compat	= at91rm9200_dt_board_compat,
-+MACHINE_END
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index f496506..9bb5ce5 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -20,6 +20,7 @@ extern void __init at91_init_sram(int bank, unsigned long base,
- extern void __init at91rm9200_set_type(int type);
- extern void __init at91_initialize(unsigned long main_clock);
- extern void __init at91x40_initialize(unsigned long main_clock);
-+extern void __init at91rm9200_dt_initialize(void);
- extern void __init at91_dt_initialize(void);
- 
-  /* Interrupts */
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index 523daa9..e3f1ea4 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -339,6 +339,7 @@ static void at91_dt_rstc(void)
- }
- 
- static struct of_device_id ramc_ids[] = {
-+	{ .compatible = "atmel,at91rm9200-sdramc" },
- 	{ .compatible = "atmel,at91sam9260-sdramc" },
- 	{ .compatible = "atmel,at91sam9g45-ddramc" },
- 	{ /*sentinel*/ }
-@@ -437,6 +438,19 @@ end:
- 	of_node_put(np);
- }
- 
-+void __init at91rm9200_dt_initialize(void)
-+{
-+	at91_dt_ramc();
-+
-+	/* Init clock subsystem */
-+	at91_dt_clock_init();
-+
-+	/* Register the processor-specific clocks */
-+	at91_boot_soc.register_clocks();
-+
-+	at91_boot_soc.init();
-+}
-+
- void __init at91_dt_initialize(void)
- {
- 	at91_dt_rstc();
 -- 
 1.7.12.3
