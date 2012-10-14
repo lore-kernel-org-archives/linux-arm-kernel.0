@@ -1,59 +1,63 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 14 Oct 2012 21:23:08 +0200
-Subject: [PATCH 4/9] uprobes: allow arch access to xol slot
+Date: Sun, 14 Oct 2012 21:23:09 +0200
+Subject: [PATCH 5/9] uprobes: allow arch-specific initialization
 In-Reply-To: <1350242593-17761-1-git-send-email-rabin@rab.in>
 References: <1350242593-17761-1-git-send-email-rabin@rab.in>
-Message-ID: <1350242593-17761-4-git-send-email-rabin@rab.in>
+Message-ID: <1350242593-17761-5-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow arches to customize how the instruction is filled into the xol
-slot.  ARM will use this to insert an undefined instruction after the
-real instruction in order to simulate a single step of the instruction
-without hardware support.
+Add a weak function for any architecture-specific initialization.  ARM
+will use this to register the handlers for the undefined instructions it
+uses to implement uprobes.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
  include/linux/uprobes.h |    1 +
- kernel/events/uprobes.c |    7 ++++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ kernel/events/uprobes.c |   10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
 diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
-index da21b66..b4380ad 100644
+index b4380ad..c3dc5de 100644
 --- a/include/linux/uprobes.h
 +++ b/include/linux/uprobes.h
-@@ -129,6 +129,7 @@ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
- extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+@@ -130,6 +130,7 @@ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned l
  extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
  extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
-+extern void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr);
+ extern void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr);
++extern int __weak arch_uprobes_init(void);
  #else /* !CONFIG_UPROBES */
  struct uprobes_state {
  };
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index a0e1a38..f7ff3a4 100644
+index f7ff3a4..ca000a9 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -1211,6 +1211,11 @@ static unsigned long xol_take_insn_slot(struct xol_area *area)
- 	return slot_addr;
- }
+@@ -1634,8 +1634,14 @@ static struct notifier_block uprobe_exception_nb = {
+ 	.priority		= INT_MAX-1,	/* notified after kprobes, kgdb */
+ };
  
-+void __weak arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr)
++int __weak __init arch_uprobes_init(void)
 +{
-+	memcpy(vaddr, auprobe->insn, MAX_UINSN_BYTES);
++	return 0;
 +}
 +
- /*
-  * xol_get_insn_slot - If was not allocated a slot, then
-  * allocate a slot.
-@@ -1240,7 +1245,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
- 	current->utask->vaddr = slot_addr;
- 	offset = current->utask->xol_vaddr & ~PAGE_MASK;
- 	vaddr = kmap_atomic(area->page);
--	memcpy(vaddr + offset, uprobe->arch.insn, MAX_UINSN_BYTES);
-+	arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
- 	kunmap_atomic(vaddr);
+ static int __init init_uprobes(void)
+ {
++	int ret;
+ 	int i;
  
- 	return current->utask->xol_vaddr;
+ 	for (i = 0; i < UPROBES_HASH_SZ; i++) {
+@@ -1643,6 +1649,10 @@ static int __init init_uprobes(void)
+ 		mutex_init(&uprobes_mmap_mutex[i]);
+ 	}
+ 
++	ret = arch_uprobes_init();
++	if (ret)
++		return ret;
++
+ 	return register_die_notifier(&uprobe_exception_nb);
+ }
+ module_init(init_uprobes);
 -- 
 1.7.9.5
