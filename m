@@ -1,90 +1,63 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sun, 14 Oct 2012 13:13:54 +0200
-Subject: [RFC] Common clock framework for external clock generators
-In-Reply-To: <507A9AF6.4030008@gmail.com>
-References: <4FAB15DB.5050702@googlemail.com> <5076847A.3010705@gmail.com>
- <5076ED22.3060803@gmail.com> <50785EBF.3060508@gmail.com>
- <507A9AF6.4030008@gmail.com>
-Message-ID: <507A9E72.2030800@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 14 Oct 2012 16:54:07 +0200
+Subject: [PATCH 3/4] ARM: AT91: Add AT91RM9200 support to DT board
+In-Reply-To: <CAGhQ9VzOQ2V6Cn5tY1REcGzpjjs53Lu6tT7=fNKqJQkBhR8HDA@mail.gmail.com>
+References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
+ <1349993126-9519-3-git-send-email-manabian@gmail.com>
+ <20121012142251.GC12801@game.jcrosoft.org>
+ <50783714.2000702@atmel.com>
+ <20121012162706.GI12801@game.jcrosoft.org>
+ <CAGhQ9VzOQ2V6Cn5tY1REcGzpjjs53Lu6tT7=fNKqJQkBhR8HDA@mail.gmail.com>
+Message-ID: <20121014145407.GN12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 19:08 Fri 12 Oct     , Joachim Eastwood wrote:
+> On Fri, Oct 12, 2012 at 6:27 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 17:28 Fri 12 Oct     , ludovic.desroches wrote:
+> >> Le 10/12/2012 04:22 PM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+> >> >On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
+> >> >>Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> >> >>---
+> >> >>
+> >> >>Hi,
+> >> >>
+> >> >>This patch has some potential issues.
+> >> >>Before this patch board-dt would fail building when only AT91RM9200 was enabled because at91sam926x_timer symbol would be missing. This patch uses the at91rm9200_timer which
+> >> >>will fail if AT91RM9200 is not enabled.
+> >> >this need work with ot wtihout rm9200
+> 
+> btw, to solve the build issue with board-dt in mainline now we need to
+> add a select CONFIG_SOC_AT91SAM9 to config MACH_AT91SAM_DT.
+> 
+> >> >>
+> >> >>Any thoughts on solving this? As mention above this bug exists in mainline now.
+> >> >duplicate the board-dt with one for rm9200 only
+> >> >as rm9200 ans sam9 are 2 distict familly
+> >>
+> >> Why not adding a new machine descriptor for rm9200 in order to
+> >> prevent file duplication?
+> > because the soc are different and can only be compile if the timer is enable
+> > and I do not want to enable the rm9200 timer on sam9 so instead of a ifdef i
+> > the board-dt create a new board is better as we have a 50 lines file
+> >
+> > with different board_compat and different machine descriptor
+> 
+> I am okey with either approach, but I would like to hear what Nicolas
+> Ferre has to say since he is the on the one that added board-dt. It
+> would be nice to have everything in one board DT file, but I
+> understand your concern with the RM9200 timer.
+> 
+> We will also bump into this again on AT91X40 I guess.
+simple on x40 forget about it the x40 is no MMU only SoC
 
-On 14.10.2012 12:59, Sebastian Hesselbarth wrote:
-> Adding LAKML and devtree as there might be people willing to comment about
-> DT representation of i2c-attached clock generators, too.
-> 
-> On 10/12/2012 08:17 PM, Daniel Mack wrote:
->> On 11.10.2012 18:00, Sebastian Hesselbarth wrote:
->  >> [...]
->>> Does any of you work rely on a working si5351 driver?
->>
->> Yes, it does actually. I can hack around it for now, but at some point,
->> a proper driver is needed. And yours looks quite feature complete, so it
->> would be easiest to finish this one :)
-> 
-> Well, yes it is some kind of feature complete except regmap and DT. Adding
-> regmap to the driver should be quite easy but with DT I am still thinking
-> of the best way to represent the internal connections between OSC, PLLs, and
-> CLKOUTs. In the last version of the driver I had a callback that was
-> board specific to setup these connections but with DT there will be no board
-> specific code anymore.
-> 
-> Maybe one of the common clk maintainers can give a hint how this could be
-> done in a clean way. The question is how to represent a i2c-attached clock
-> generator config in DT where you want to setup clock parents of CLKOUTs and
-> PLLs.
-> 
-> A possible solution would be something like this:
-> 
-> si5351a at 60 {
-> 	compatible = "silabs,si5351a";
-> 	reg = <0x60>;
-> 
-> 	si_osc: osc {
-> 		compatible = "fixed-clock";
-> 		clock-frequency = <270000000>;
-> 	};
-> 
-> 	si_plla: pll at 0 {
-> 		compatible = "silabs,si5351-pll";
-> 		/* hook-up plla to osc input */
-> 		clocks = <&si_osc>;
-> 	};
-> 
-> 	si_clkout0: clkout at 0 {
-> 		compatible = "silabs,si5351-clkout";
-> 		/* hook-up clkout0 to plla */
-> 		clocks = <&si_plla>;
-> 		/* request target frequency */
-> 		clock-frequency = <148500000>;
-> 	};	
-> };
-> 
-> Although this perfectly describes the clock hierarchy I still don't like
-> the sub-node style. Another flat solution would be something like:
+so you can not enable  it by default as the all other at91 are use with MMU
 
-I think the sub-node style above it nicer because it allows referencing
-the individual clocks outputs with a phandle. We use this chip to
-generate base-frequencies for audio clocks, and so we have to switch
-between two freqs for the multiples of 22.5KHz and 24KHz at runtime.
+I did the necessary to make the board-dt nearly empty and the same for all the
+sam9 but the board-dt is sam9 only and need to be keeped this way
 
->> Do you still have access to hardware you wrote the driver for? Let me
->> know if you need any help around here.
-> 
-> Yes, hardware is still available although I only have access to the Si5351a
-> with 3 clkouts. The code should be compatible for Si5351a with 8 clkouts and
-> code skeleton for 5351b (OSC and VXCO input) and 5351c (OSC and CLKIN) is
-> there but untested.
+Nico will tell you the same
 
-The 3 clkout model is the only one I have access to as well.
-
-> I've transferred the current driver version to my repository to work on. As soon
-> as I have regmap done, I will push it online and give you a note.
-
-That's great. Let me know if you want me to test anything.
-
-
-Thanks,
-Daniel
+Best Regards,
+J.
