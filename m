@@ -1,61 +1,49 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sun, 14 Oct 2012 09:12:55 +0200
-Subject: pm: add suspend_mem and suspend_standby support
-In-Reply-To: <20121010094353.GR12801@game.jcrosoft.org>
-References: <20121006161429.GD12462@game.jcrosoft.org>
- <5075210B.3020309@ti.com> <20121010094353.GR12801@game.jcrosoft.org>
-Message-ID: <1833756.N2BBiv5Zzq@vostro.rjw.lan>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 14 Oct 2012 12:01:30 +0200
+Subject: [PATCH V2 3/3] ARM: SPEAr13xx: Pass DW DMAC platform data from DT
+In-Reply-To: <CAKohpokj0Up23YEDTuSOHDgqcCuM3Q21cwnkAz5Ya=JhPKM98A@mail.gmail.com>
+References: <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
+ <20121012144837.GE12801@game.jcrosoft.org>
+ <CAKohpo=vMchmiz70evBB5bPqt4O4DWUocd5M1o9gc8fsY_Fkiw@mail.gmail.com>
+ <20121012162148.GH12801@game.jcrosoft.org>
+ <CAKohpok5ZOmz9CCJbTGc=_tncxnZYEW7UMh2FcFcs0dB87JAcQ@mail.gmail.com>
+ <20121013064422.GJ12801@game.jcrosoft.org>
+ <CAKohpokfei_ryGKMh4wE9D=wyRZCkddc+Da1cq+3facTHradKQ@mail.gmail.com>
+ <20121013122242.GL12801@game.jcrosoft.org>
+ <CAKohpom-P+=QfVNBsypq70+o+z_5J63RD72DA-_CakTM9LDCNA@mail.gmail.com>
+ <CAKohpokj0Up23YEDTuSOHDgqcCuM3Q21cwnkAz5Ya=JhPKM98A@mail.gmail.com>
+Message-ID: <20121014100130.GM12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
-
-> > > I understand that, there is trade-off between power and latency numbers,
-> > > but for certain use-cases latency is more important and it is not
-> > > possible without telling driver about the low-power state.
-> > 
-> > I understand the problem at hand, but the question is who's going to tell
-> > the driver about that.
-> > 
-> > Arguably, the PM core is not the right source of that information, because
-> > if a driver is told "we're going into standby", it will have to ask the
-> > platform about what "standby" actually means.
+On 19:40 Sat 13 Oct     , Viresh Kumar wrote:
+> On 13 October 2012 19:38, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > On 13 October 2012 17:52, Jean-Christophe PLAGNIOL-VILLARD
+> > <plagnioj@jcrosoft.com> wrote:
+> >> On 14:18 Sat 13 Oct     , Viresh Kumar wrote:
+> >>>    On Oct 13, 2012 12:16 PM, "Jean-Christophe PLAGNIOL-VILLARD"
+> >>>    <plagnioj@jcrosoft.com> wrote:
+> >>>    >
+> >>>    > On 22:42 Fri 12 Oct     , Viresh Kumar wrote:
+> >>>    > > On 12 October 2012 21:51, Jean-Christophe PLAGNIOL-VILLARD
+> >>>    > > <plagnioj@jcrosoft.com> wrote:
+> >>>    > > >> >> +     OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL,
+> >>>    "cf"),
+> >>>    > > >> > ?/
+> >>>    > > >>
+> >>>    > > >> Sorry. can't get it :(
+> >>>    > > > what is the "cf" as paltfrom data
+> >>>    > >
+> >>>    > > This is dma bus_id string, which matches with what is passed from dtb.
+> >>>    > so pass if via dtb too
+> >>>
+> >>>    Yes. Already passed in 13xx.dtsi.
 > 
-> who is going to tell the kernel to go to standby and which
-> 
-> the sysfs handle via PM core
-> 
-> so here the one who alwasy have the information is the pm core
+> Probably some confusion here. What i meant to say here is, dmac's
+> DT slave info has a node for cf and cf driver expects this string to come
+> via platform data currently.
 
-The core tells the _platform_ "the user wants us to go into standby" or
-"the user wants us to go into suspend", but it doesn't really know what
-"standby" or "suspend" actually mean. It can't, because these things are
-not universally well defined and there are differences between platforms
-in that area.  Different platforms may require different things to be
-done to devices for "standby" and so drivers should not assume that
-"standby" will always mean the same thing.
+so use a phandle to connect them
 
-For example, if your driver is written for and ARM SoC and then the same
-IP block happens to be used on an x86-based thing, whatever the driver did
-and was specific to ARM is no longer valid.  So if your ARM SoC required
-drivers to do something special during a "suspend" transition which wasn't
-necessary to do during a "standby" transition, it doesn't necessarily mean that
-the new platform will do so as well. The "mem" and "standby" things may have
-different meanings for the new platform and for this reason drivers _have_ _to_
-ask the _platform_ what states to put the devices into _or_, alternatively,
-leave the platform-specific handling of the devices to the platform (that's
-what device drivers on ACPI-based x86 do).  They should not expect the PM core
-to tell them that, simply because the PM core has no idea what that may be.
-
-And by the way, ACPI-based ARM platforms are reportedly in the works and they
-_will_ use the same IP blocks that are already in use on ARM.  On those
-platforms drivers will be supposed to use ACPI for power management and
-the whole design you're proposing will not make sense any more for them.
-
-Thanks,
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Best Regards,
+J.
