@@ -1,34 +1,79 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 14 Oct 2012 21:23:06 +0200
-Subject: [PATCH 2/9] uprobes: check for single step support
+Date: Sun, 14 Oct 2012 21:23:07 +0200
+Subject: [PATCH 3/9] uprobes: allow ignoring of probe hits
 In-Reply-To: <1350242593-17761-1-git-send-email-rabin@rab.in>
 References: <1350242593-17761-1-git-send-email-rabin@rab.in>
-Message-ID: <1350242593-17761-2-git-send-email-rabin@rab.in>
+Message-ID: <1350242593-17761-3-git-send-email-rabin@rab.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for single step support before calling user_enable_single_step(),
-since user_enable_single_step() just BUG()s if support does not exist.
-Needed by ARM.
+Allow arches to decided to ignore a probe hit.  ARM will use this to
+only call handlers if the conditions to execute a conditionally executed
+instruction are satisfied.
 
 Signed-off-by: Rabin Vincent <rabin@rab.in>
 ---
- kernel/events/uprobes.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ include/linux/uprobes.h |    1 +
+ kernel/events/uprobes.c |   14 +++++++++++++-
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
+diff --git a/include/linux/uprobes.h b/include/linux/uprobes.h
+index ac90704..da21b66 100644
+--- a/include/linux/uprobes.h
++++ b/include/linux/uprobes.h
+@@ -128,6 +128,7 @@ extern int  arch_uprobe_post_xol(struct arch_uprobe *aup, struct pt_regs *regs);
+ extern bool arch_uprobe_xol_was_trapped(struct task_struct *tsk);
+ extern int  arch_uprobe_exception_notify(struct notifier_block *self, unsigned long val, void *data);
+ extern void arch_uprobe_abort_xol(struct arch_uprobe *aup, struct pt_regs *regs);
++extern bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
+ #else /* !CONFIG_UPROBES */
+ struct uprobes_state {
+ };
 diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-index 98256bc..db4e3ab 100644
+index db4e3ab..a0e1a38 100644
 --- a/kernel/events/uprobes.c
 +++ b/kernel/events/uprobes.c
-@@ -1450,7 +1450,8 @@ static struct uprobe *find_active_uprobe(unsigned long bp_vaddr, int *is_swbp)
- 
- void __weak arch_uprobe_enable_step(struct arch_uprobe *arch)
- {
--	user_enable_single_step(current);
-+	if (arch_has_single_step())
-+		user_enable_single_step(current);
+@@ -1419,6 +1419,11 @@ static void mmf_recalc_uprobes(struct mm_struct *mm)
+ 	clear_bit(MMF_HAS_UPROBES, &mm->flags);
  }
  
- void __weak arch_uprobe_disable_step(struct arch_uprobe *arch)
++bool __weak arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs)
++{
++	return false;
++}
++
+ static struct uprobe *find_active_uprobe(unsigned long bp_vaddr, int *is_swbp)
+ {
+ 	struct mm_struct *mm = current->mm;
+@@ -1469,6 +1474,7 @@ static void handle_swbp(struct pt_regs *regs)
+ 	struct uprobe *uprobe;
+ 	unsigned long bp_vaddr;
+ 	int uninitialized_var(is_swbp);
++	bool ignored = false;
+ 
+ 	bp_vaddr = uprobe_get_swbp_addr(regs);
+ 	uprobe = find_active_uprobe(bp_vaddr, &is_swbp);
+@@ -1499,6 +1505,12 @@ static void handle_swbp(struct pt_regs *regs)
+ 			goto cleanup_ret;
+ 	}
+ 	utask->active_uprobe = uprobe;
++
++	if (arch_uprobe_ignore(&uprobe->arch, regs)) {
++		ignored = true;
++		goto cleanup_ret;
++	}
++
+ 	handler_chain(uprobe, regs);
+ 	if (uprobe->flags & UPROBE_SKIP_SSTEP && can_skip_sstep(uprobe, regs))
+ 		goto cleanup_ret;
+@@ -1514,7 +1526,7 @@ cleanup_ret:
+ 		utask->active_uprobe = NULL;
+ 		utask->state = UTASK_RUNNING;
+ 	}
+-	if (!(uprobe->flags & UPROBE_SKIP_SSTEP))
++	if (!ignored && !(uprobe->flags & UPROBE_SKIP_SSTEP))
+ 
+ 		/*
+ 		 * cannot singlestep; cannot skip instruction;
 -- 
 1.7.9.5
