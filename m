@@ -1,35 +1,61 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 14 Oct 2012 18:28:43 +1300
-Subject: dma_alloc_coherent fails in framebuffer
-Message-ID: <1350192523.10946.4.camel@gitbox>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 14 Oct 2012 09:12:55 +0200
+Subject: pm: add suspend_mem and suspend_standby support
+In-Reply-To: <20121010094353.GR12801@game.jcrosoft.org>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <5075210B.3020309@ti.com> <20121010094353.GR12801@game.jcrosoft.org>
+Message-ID: <1833756.N2BBiv5Zzq@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
-11 Oct when I did another pull from linus all of a sudden
-dma_alloc_coherent is failing to allocate the framebuffer any longer.
+[...]
 
-I did a quick look back and found this:
+> > > I understand that, there is trade-off between power and latency numbers,
+> > > but for certain use-cases latency is more important and it is not
+> > > possible without telling driver about the low-power state.
+> > 
+> > I understand the problem at hand, but the question is who's going to tell
+> > the driver about that.
+> > 
+> > Arguably, the PM core is not the right source of that information, because
+> > if a driver is told "we're going into standby", it will have to ask the
+> > platform about what "standby" actually means.
+> 
+> who is going to tell the kernel to go to standby and which
+> 
+> the sysfs handle via PM core
+> 
+> so here the one who alwasy have the information is the pm core
 
-ARM: add coherent dma ops
+The core tells the _platform_ "the user wants us to go into standby" or
+"the user wants us to go into suspend", but it doesn't really know what
+"standby" or "suspend" actually mean. It can't, because these things are
+not universally well defined and there are differences between platforms
+in that area.  Different platforms may require different things to be
+done to devices for "standby" and so drivers should not assume that
+"standby" will always mean the same thing.
 
-arch_is_coherent is problematic as it is a global symbol. This
-doesn't work for multi-platform kernels or platforms which can support
-per device coherent DMA.
+For example, if your driver is written for and ARM SoC and then the same
+IP block happens to be used on an x86-based thing, whatever the driver did
+and was specific to ARM is no longer valid.  So if your ARM SoC required
+drivers to do something special during a "suspend" transition which wasn't
+necessary to do during a "standby" transition, it doesn't necessarily mean that
+the new platform will do so as well. The "mem" and "standby" things may have
+different meanings for the new platform and for this reason drivers _have_ _to_
+ask the _platform_ what states to put the devices into _or_, alternatively,
+leave the platform-specific handling of the devices to the platform (that's
+what device drivers on ACPI-based x86 do).  They should not expect the PM core
+to tell them that, simply because the PM core has no idea what that may be.
 
-This adds arm_coherent_dma_ops to be used for devices which connected
-coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
-are modified at boot when arch_is_coherent is true.
+And by the way, ACPI-based ARM platforms are reportedly in the works and they
+_will_ use the same IP blocks that are already in use on ARM.  On those
+platforms drivers will be supposed to use ACPI for power management and
+the whole design you're proposing will not make sense any more for them.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Thanks,
+Rafael
 
 
-This is the only patch lately that I could find (not that I would claim
-to be any good at finding things) that is related to the problem. Could
-it have caused the allocations to fail?
-
-Regards
-Tony P
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
