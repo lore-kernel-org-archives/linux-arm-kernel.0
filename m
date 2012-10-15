@@ -1,103 +1,52 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 15 Oct 2012 13:36:01 +0200
-Subject: [PATCH RESEND] serial/amba-pl011: use devm_* managed resources
-Message-ID: <1350300961-7036-1-git-send-email-linus.walleij@stericsson.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 15 Oct 2012 13:44:55 +0200
+Subject: [PATCH 9/9] ARM: add uprobes support
+In-Reply-To: <20121015111443.GA2006@linaro.org>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-9-git-send-email-rabin@rab.in>
+ <20121015111443.GA2006@linaro.org>
+Message-ID: <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+2012/10/15 Dave Martin <dave.martin@linaro.org>:
+> On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
+>> Add basic uprobes support for ARM.
+>>
+>> perf probe --exec and SystemTap's userspace probing work.  The ARM
+>> kprobes test code has also been run in a userspace harness to test the
+>> uprobe instruction decoding.
+>
+> The assumption that the target code is ARM appears to be buried all over
+> the place.
 
-This switches a bunch of allocation and remapping to use the
-devm_* garbage collected methods and cleans up the error
-path and remove() paths consequently.
+Right, as stated:
 
-devm_ioremap() is only in <linux/io.h> so fix up the
-erroneous <asm/*> include as well.
+>> Caveats:
+>>  - Thumb is not supported
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 25 +++++++++----------------
- 1 file changed, 9 insertions(+), 16 deletions(-)
+> Certainly this code as currently written must depend on !THUMB2_KERNEL.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index d7e1ede..7fca402 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -56,8 +56,7 @@
- #include <linux/of_device.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/sizes.h>
--
--#include <asm/io.h>
-+#include <linux/io.h>
- 
- #define UART_NR			14
- 
-@@ -1973,7 +1972,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto out;
- 	}
- 
--	uap = kzalloc(sizeof(struct uart_amba_port), GFP_KERNEL);
-+	uap = devm_kzalloc(&dev->dev, sizeof(struct uart_amba_port),
-+			   GFP_KERNEL);
- 	if (uap == NULL) {
- 		ret = -ENOMEM;
- 		goto out;
-@@ -1981,16 +1981,17 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 
- 	i = pl011_probe_dt_alias(i, &dev->dev);
- 
--	base = ioremap(dev->res.start, resource_size(&dev->res));
-+	base = devm_ioremap(&dev->dev, dev->res.start,
-+			    resource_size(&dev->res));
- 	if (!base) {
- 		ret = -ENOMEM;
--		goto free;
-+		goto out;
- 	}
- 
- 	uap->pinctrl = devm_pinctrl_get(&dev->dev);
- 	if (IS_ERR(uap->pinctrl)) {
- 		ret = PTR_ERR(uap->pinctrl);
--		goto unmap;
-+		goto out;
- 	}
- 	uap->pins_default = pinctrl_lookup_state(uap->pinctrl,
- 						 PINCTRL_STATE_DEFAULT);
-@@ -2002,10 +2003,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	if (IS_ERR(uap->pins_sleep))
- 		dev_dbg(&dev->dev, "could not get sleep pinstate\n");
- 
--	uap->clk = clk_get(&dev->dev, NULL);
-+	uap->clk = devm_clk_get(&dev->dev, NULL);
- 	if (IS_ERR(uap->clk)) {
- 		ret = PTR_ERR(uap->clk);
--		goto unmap;
-+		goto out;
- 	}
- 
- 	uap->vendor = vendor;
-@@ -2038,11 +2039,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		amba_set_drvdata(dev, NULL);
- 		amba_ports[i] = NULL;
- 		pl011_dma_remove(uap);
--		clk_put(uap->clk);
-- unmap:
--		iounmap(base);
-- free:
--		kfree(uap);
- 	}
-  out:
- 	return ret;
-@@ -2062,9 +2058,6 @@ static int pl011_remove(struct amba_device *dev)
- 			amba_ports[i] = NULL;
- 
- 	pl011_dma_remove(uap);
--	iounmap(uap->port.membase);
--	clk_put(uap->clk);
--	kfree(uap);
- 	return 0;
- }
- 
--- 
-1.7.11.3
+Why?  It currently works for ARM userspace even if the kernel is
+Thumb-2.
+
+> However, there's an underlying problem here which we'd need to solve.
+> The kprobes code can take advantage of the fact that the kernel is all
+> ARM or (almost) all Thumb code.  So there is no support for kprobes
+> supporting ARM and Thumb at the same time.
+>
+> With userspace, we don't have this luxury.  With Debian armhf, Ubuntu
+> and Linaro building Thumb-2 userspaces, it may be an increasingly common
+> configuration independently of whether the kernel is built in Thumb-2
+> or not.
+>
+> Furthermode, there is no such thing as a pure Thumb-2 system in practice:
+> PLTs are always ARM, for example.  For uprobes to work well in userspace,
+> both should be supported together.
+
+Right.  I don't think it's difficult to support both of them together,
+my thought was just to have userspace tell us if they want to probe a
+Thumb instruction via the usual 0th-bit set convention, and then take it
+from there.  I didn't do the Thumb handling currently because I didn't
+really look into modifying the kprobes Thumb instruction decoding and
+the IT handling for uprobes.
