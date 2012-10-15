@@ -1,78 +1,73 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 15 Oct 2012 10:28:36 +0200
-Subject: [PATCH 3/4] ARM: AT91: Add AT91RM9200 support to DT board
-In-Reply-To: <CAGhQ9VyNqsU8pnMaxOEu7bkzv_LizG+d9Vw-ODW72muTPQ9Qtg@mail.gmail.com>
-References: <1349993126-9519-1-git-send-email-manabian@gmail.com>
- <1349993126-9519-3-git-send-email-manabian@gmail.com>
- <20121012142251.GC12801@game.jcrosoft.org> <50783714.2000702@atmel.com>
- <20121012162706.GI12801@game.jcrosoft.org>
- <CAGhQ9VzOQ2V6Cn5tY1REcGzpjjs53Lu6tT7=fNKqJQkBhR8HDA@mail.gmail.com>
- <20121014145407.GN12801@game.jcrosoft.org>
- <CAGhQ9VyNqsU8pnMaxOEu7bkzv_LizG+d9Vw-ODW72muTPQ9Qtg@mail.gmail.com>
-Message-ID: <507BC934.5020908@atmel.com>
+Date: Mon, 15 Oct 2012 10:30:24 +0200
+Subject: [PATCH v2] i2c: change the id to let the i2c-gpio work
+In-Reply-To: <507BC8BC.8000608@atmel.com>
+References: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
+ <CAGhQ9VxRGQ8JAygxJreNDJY=tJ67yt2CM9NHvW3VyhjxooXuig@mail.gmail.com>
+ <507B7066.4060802@atmel.com> <507BC57B.8050607@atmel.com>
+ <507BC8BC.8000608@atmel.com>
+Message-ID: <507BC9A0.3010006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/14/2012 06:39 PM, Joachim Eastwood :
-> On Sun, Oct 14, 2012 at 4:54 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
->> On 19:08 Fri 12 Oct     , Joachim Eastwood wrote:
->>> On Fri, Oct 12, 2012 at 6:27 PM, Jean-Christophe PLAGNIOL-VILLARD
->>> <plagnioj@jcrosoft.com> wrote:
->>>> On 17:28 Fri 12 Oct     , ludovic.desroches wrote:
->>>>> Le 10/12/2012 04:22 PM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
->>>>>> On 00:05 Fri 12 Oct     , Joachim Eastwood wrote:
->>>>>>> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
->>>>>>> ---
->>>>>>>
->>>>>>> Hi,
->>>>>>>
->>>>>>> This patch has some potential issues.
->>>>>>> Before this patch board-dt would fail building when only AT91RM9200 was enabled because at91sam926x_timer symbol would be missing. This patch uses the at91rm9200_timer which
->>>>>>> will fail if AT91RM9200 is not enabled.
->>>>>> this need work with ot wtihout rm9200
->>>
->>> btw, to solve the build issue with board-dt in mainline now we need to
->>> add a select CONFIG_SOC_AT91SAM9 to config MACH_AT91SAM_DT.
->>>
->>>>>>>
->>>>>>> Any thoughts on solving this? As mention above this bug exists in mainline now.
->>>>>> duplicate the board-dt with one for rm9200 only
->>>>>> as rm9200 ans sam9 are 2 distict familly
->>>>>
->>>>> Why not adding a new machine descriptor for rm9200 in order to
->>>>> prevent file duplication?
->>>> because the soc are different and can only be compile if the timer is enable
->>>> and I do not want to enable the rm9200 timer on sam9 so instead of a ifdef i
->>>> the board-dt create a new board is better as we have a 50 lines file
->>>>
->>>> with different board_compat and different machine descriptor
->>>
->>> I am okey with either approach, but I would like to hear what Nicolas
->>> Ferre has to say since he is the on the one that added board-dt. It
->>> would be nice to have everything in one board DT file, but I
->>> understand your concern with the RM9200 timer.
->>>
->>> We will also bump into this again on AT91X40 I guess.
->> simple on x40 forget about it the x40 is no MMU only SoC
->>
->> so you can not enable  it by default as the all other at91 are use with MMU
->>
->> I did the necessary to make the board-dt nearly empty and the same for all the
->> sam9 but the board-dt is sam9 only and need to be keeped this way
->>
->> Nico will tell you the same
+On 10/15/2012 10:26 AM, Bo Shen :
+> Hi Nicolas,
 > 
-> okay. I'll make the necessary changes to the patch set.
+> On 10/15/2012 16:12, Nicolas Ferre wrote:
+>> On 10/15/2012 04:09 AM, Bo Shen :
+>>> Hi Joachim Eastwood,
+>>>
+>>> On 10/13/2012 1:42, Joachim Eastwood wrote:
+>>>> Hi Bo Shen,
+>>>>
+>>>> On Fri, Oct 12, 2012 at 11:42 AM, Bo Shen <voice.shen@atmel.com> wrote:
+>>>>> The i2c-gpio driver will turn the platform device ID to busnum.
+>>>>> When using platfrom device ID as -1, it means dynamically assigned
+>>>>> the busnum. When writing code, we need to make sure the busnum,
+>>>>> and call i2c_register_board_info(int busnum, ...) to register device
+>>>>> if using -1, we do not know the value of busnum.
+>>>>>
+>>>>> In order to solve this issue, set the platform device ID as a fix
+>>>>> number
+>>>>> Here using 0 to match the busnum used in i2c_regsiter_board_info().
+>>>>
+>>>> I have been bitten by this myself on RM9200.
+>>>>
+>>>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>>>> ---
+>>>>> Change since v1
+>>>>>     Make the commit message more clear
+>>>>> ---
+>>>>>    arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+>>>>
+>>>> This pattern exist in at91rm9200_devices.c, at91sam9261_devices.c,
+>>>> at91sam9263_devices.c and at91sam9rl_devices.c you might want to fix
+>>>> them as well.
+>>>
+>>> Thanks for your information.
+>>> After I test these boards, I will send patches to fix them, while not in
+>>> this patch.
+>>
+>> I am in favor of doing a comprehensive patch series that covers all
+>> aspects of this issue:
+>> - each boards
+>> - both i2c-gpio and i2c-at91 cases
+> 
+> May I need to submit this patch as a series? One patch for one board,
+> and cover i2c-gpio and i2c-at91 cases.
+> e.g:
+> [patch 1/x] i2c: change id to let i2c-gpio work on at91rm200ek
+> [patch 2/x] i2c: change id to let i2c-gpio work on at91sam9261ek
+> ...
+> 
+> or
+> 
+> Just one patch, cover all these boards and i2c-gpio and i2c-at91?
 
-Well, even if did not see the advantage of a new board-dt specifically
-for rm9200 (and armv4 and armv5 may share the same zImage in the
-future...), I understand the fact that compiling the rm9200 timer for a
-sam9 machine is a bit surprising.
-
-So I have a pretty mixed feelings about that, but I will not go against
-Jean-Christophe nor you Joachim: so continue in this path, we will be
-able to merge all board-*-dt later if needed anyway...
+Neither of the altenatives ;-)
+I would have done:
+1 for i2c-gpio covering all boards impacted
+1 for i2c-at91 covering all boards impacted...
 
 Bye,
 -- 
