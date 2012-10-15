@@ -1,181 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Oct 2012 10:16:57 +0300
-Subject: [PATCH] i2c: omap: revert "i2c: omap: switch to threaded IRQ
- support"
-In-Reply-To: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
-Message-ID: <20121015071657.GA22818@arwen.pp.htv.fi>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 15 Oct 2012 15:32:20 +0800
+Subject: [PATCH] i2c: i2c-gpio: fix issue when DT node greater than 1
+In-Reply-To: <20121015084920.75d4aa53@endymion.delvare>
+References: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
+ <50588A8F.30203@wwwdotorg.org> <50591C9C.2080809@atmel.com>
+ <5059E484.6090708@wwwdotorg.org> <20120919175433.3841a954@endymion.delvare>
+ <5074E349.30605@atmel.com> <507B7C07.3070702@atmel.com>
+ <20121015084920.75d4aa53@endymion.delvare>
+Message-ID: <507BBC04.9050609@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jean Delvare,
 
-On Mon, Oct 15, 2012 at 01:51:08AM +0000, Paul Walmsley wrote:
-> 
-> Commit 3b2f8f82dad7d1f79cdc8fc05bd1c94baf109bde ("i2c: omap: switch to
-> threaded IRQ support") causes communication with I2C devices to fail
-> after system suspend/resume on all OMAP3 devices:
-> 
-> ...
-> [   40.228576] PM: noirq resume of devices complete after 3.723 msecs
-> [   40.233184] PM: early resume of devices complete after 3.173 msecs
-> [   40.242736] [sched_delayed] sched: RT throttling activated
-> [   41.235046] omap_i2c omap_i2c.1: controller timed out
+On 10/15/2012 14:49, Jean Delvare wrote:
+> On Mon, 15 Oct 2012 10:59:19 +0800, Bo Shen wrote:
+>> On 10/10/2012 10:54, Bo Shen wrote:
+>>> On 9/19/2012 23:54, Jean Delvare wrote:
+>>>> On Wed, 19 Sep 2012 09:28:04 -0600, Stephen Warren wrote:
+>>>>> The problematic code appears to be:
+>>>>>
+>>>>> snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
+>>>>>
+>>>>> Instead, I think that should be something more like:
+>>>>>
+>>>>> adap->name = dev_name(&pdev->dev);
+>>>>
+>>>> strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name))
+>>   >> if anything, as adap->name is a buffer, not a pointer.
+>>>
+>>> I am sorry for late. I have tested with DT, it works.
+>>>
+>>> Please send this patch to fix the issue.
+>>> Thanks.
+>>
+>> Ping?
+>>
+>> Will you send this patch?
+>
+> Which patch, please? On September 18th, you sent a first version.
+> Stephen Warren asked you for a change, but you never sent version two
+> of the patch including the requested change. So don't be surprised if
+> your patch never got applied.
+>
 
-instead of just reverting the patch, I'd rather try to figure out why
-controller times out in that situation.
+I am sorry. I take a long vacation, so, I didnot send out version two.
 
-It should make no difference if you're running an IRQ thread or not.
+>> Or, I send this patch and add your S.O.B, which do you prefer?
+>
+> I prefer that you send patch v2 and let the interested parties review
+> and apply it. Do not add S-o-B for anyone else, ever.
 
-Do you have any extra debugging information which might help figuring
-out what the issue really is ?
+OK. I will send out v2 as soon as possible.
 
-If the thread is actually at fault, then we need to add IRQF_NO_THREAD
-to the IRQ flags, otherwise same issue will appear if we boot with
-"threadirqs" kernel parameter.
+>
+> Note that i2c-gpio is normally handled by Wolfram Sang, not me.
 
-> [   41.235351] twl: i2c_read failed to transfer all messages
-> [   41.235382] omap_hsmmc omap_hsmmc.0: could not set regulator OCR (-110)
-> [   41.396453] mmc0: error -110 during resume (card was removed?)
-> [   42.391754] omap_i2c omap_i2c.1: controller timed out
-> [   42.391876] twl: i2c_write failed to transfer all messages
-> [   42.391906] twl_rtc: Could not write TWLregister F - error -110
-> [   43.391326] omap_i2c omap_i2c.1: controller timed out
-> [   43.391479] twl: i2c_read failed to transfer all messages
-> [   43.391510] twl_rtc: Could not read TWLregister D - error -110
-> [   43.391540] twl_rtc twl_rtc: twl_rtc_read_time: reading CTRL_REG, error -110
-> [   43.392364] PM: resume of devices complete after 3158.935 msecs
-> 
-> When the root filesystem is on MMC, as in the above example, the
-> card's voltage regulator is not re-enabled and the filesystem becomes
-> inaccessible after resume.
+Thanks for your information.
 
-but it fails because I2C times out and I'd like to understand why,
-before just reverting the patch.
-
-> Fix by reverting the conversion to a threaded IRQ handler.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   44 +++++++----------------------------------
->  1 file changed, 7 insertions(+), 37 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index db31eae..e001c2a 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -180,7 +180,6 @@ enum {
->  #define I2C_OMAP_ERRATA_I462		(1 << 1)
->  
->  struct omap_i2c_dev {
-> -	spinlock_t		lock;		/* IRQ synchronization */
->  	struct device		*dev;
->  	void __iomem		*base;		/* virtual */
->  	int			irq;
-> @@ -865,35 +864,13 @@ static int omap_i2c_transmit_data(struct omap_i2c_dev *dev, u8 num_bytes,
->  }
->  
->  static irqreturn_t
-> -omap_i2c_isr(int irq, void *dev_id)
-> +omap_i2c_isr(int this_irq, void *dev_id)
->  {
->  	struct omap_i2c_dev *dev = dev_id;
-> -	irqreturn_t ret = IRQ_HANDLED;
-> -	u16 mask;
-> -	u16 stat;
-> -
-> -	spin_lock(&dev->lock);
-> -	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
-> -	stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-> -
-> -	if (stat & mask)
-> -		ret = IRQ_WAKE_THREAD;
-> -
-> -	spin_unlock(&dev->lock);
-> -
-> -	return ret;
-> -}
-> -
-> -static irqreturn_t
-> -omap_i2c_isr_thread(int this_irq, void *dev_id)
-> -{
-> -	struct omap_i2c_dev *dev = dev_id;
-> -	unsigned long flags;
->  	u16 bits;
->  	u16 stat;
->  	int err = 0, count = 0;
->  
-> -	spin_lock_irqsave(&dev->lock, flags);
->  	do {
->  		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
->  		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
-> @@ -907,7 +884,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
->  
->  		if (!stat) {
->  			/* my work here is done */
-> -			goto out;
-> +			return IRQ_HANDLED;
->  		}
->  
->  		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
-> @@ -1016,8 +993,6 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
->  	omap_i2c_complete_cmd(dev, err);
->  
->  out:
-> -	spin_unlock_irqrestore(&dev->lock, flags);
-> -
->  	return IRQ_HANDLED;
->  }
->  
-> @@ -1062,6 +1037,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  		pdev->dev.platform_data;
->  	struct device_node	*node = pdev->dev.of_node;
->  	const struct of_device_id *match;
-> +	irq_handler_t isr;
->  	int irq;
->  	int r;
->  
-> @@ -1110,8 +1086,6 @@ omap_i2c_probe(struct platform_device *pdev)
->  	dev->dev = &pdev->dev;
->  	dev->irq = irq;
->  
-> -	spin_lock_init(&dev->lock);
-> -
->  	platform_set_drvdata(pdev, dev);
->  	init_completion(&dev->cmd_complete);
->  
-> @@ -1166,14 +1140,10 @@ omap_i2c_probe(struct platform_device *pdev)
->  	/* reset ASAP, clearing any IRQs */
->  	omap_i2c_init(dev);
->  
-> -	if (dev->rev < OMAP_I2C_OMAP1_REV_2)
-> -		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_omap1_isr,
-> -				IRQF_NO_SUSPEND, pdev->name, dev);
-> -	else
-> -		r = devm_request_threaded_irq(&pdev->dev, dev->irq,
-> -				omap_i2c_isr, omap_i2c_isr_thread,
-> -				IRQF_NO_SUSPEND | IRQF_ONESHOT,
-> -				pdev->name, dev);
-> +	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
-> +								   omap_i2c_isr;
-> +	r = devm_request_irq(&pdev->dev, dev->irq, isr, IRQF_NO_SUSPEND,
-> +			     pdev->name, dev);
->  
->  	if (r) {
->  		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
-> -- 
-> 1.7.10.4
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121015/ccf946a3/attachment-0001.sig>
+BRs,
+Bo Shen
