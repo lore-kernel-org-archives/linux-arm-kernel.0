@@ -1,73 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Oct 2012 13:01:44 -0400
-Subject: [PATCH 0/4] Add DT support for Network Space v2 and parents
-In-Reply-To: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
-References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20121015170144.GG20922@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 15 Oct 2012 18:06:00 +0100
+Subject: [revert request for commit 9fff2fa] Re: [git pull] signals pile 3
+In-Reply-To: <20121015162732.GG2616@ZenIV.linux.org.uk>
+References: <20121013005334.GM2616@ZenIV.linux.org.uk>
+ <507ADBBB.9090209@gmail.com>
+ <20121014164020.GV2616@ZenIV.linux.org.uk>
+ <CACTFLAOpcLtHNx-TCHQkUOPNAkTO8EgDhbyZSGQ9ag+Wu_cNRw@mail.gmail.com>
+ <20121014172640.GW2616@ZenIV.linux.org.uk>
+ <20121014192402.GZ2616@ZenIV.linux.org.uk>
+ <20121014195611.GA2616@ZenIV.linux.org.uk>
+ <20121015160710.GC30907@arm.com>
+ <20121015162732.GG2616@ZenIV.linux.org.uk>
+Message-ID: <20121015170600.GD30907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Simon,
-
-On Mon, Oct 15, 2012 at 05:34:51PM +0200, Simon Guinot wrote:
-> This patch series provides DT support for LaCie NAS Network Space v2 and
-> parents. This includes the following machines:
->  - Internet Space v2
->  - Network Space v2
->  - Network Space Max v2
->  - Network Space Lite v2
->  - Network Space Mini v2
+On Mon, Oct 15, 2012 at 05:27:32PM +0100, Al Viro wrote:
+> On Mon, Oct 15, 2012 at 05:07:10PM +0100, Catalin Marinas wrote:
+> > On Sun, Oct 14, 2012 at 08:56:11PM +0100, Al Viro wrote:
+> > > On Sun, Oct 14, 2012 at 08:24:03PM +0100, Al Viro wrote:
+> > > 
+> > > > Russell, could you recall what those had been about?  I'm not sure if that
+> > > > had been oopsable that far back (again, oops scenario is userland stack
+> > > > page getting swapped out before we get to start_thread(), leading to
+> > > > direct read from an absent page in start_thread() by plain ldr, without
+> > > > anything in exception table about that insn), but it looks very odd
+> > > > regardless of that problem.
+> > > 
+> > > BTW, arm64 has copied that logics, so it also seems to be unsafe and very
+> > > odd - there we definitely have only ELF to cope with.  arm64 folks Cc'd...
+> > 
+> > Good point. We don't need this on arm64 and probably neither on arm (at
+> > least since EABI).
+> > 
+> > Setting x0 may cause other issues as well. The dynamic loader simply
+> > ignores the startup registers but for static binaries the _start code in
+> > glibc expects r0 to contain a function pointer to be registered with
+> > atexit() in __libc_start_main() or NULL. Since we pass argc in there,
+> > for static binaries the rtld_fini argument to __libc_start_main() is
+> > neither NULL nor something meaningful.
 > 
-> Note that the three first boards are already supported by the Linux
-> kernel via an "old-fashion" board setup. The two lasts (Lite and Mini)
-> are new boards.
+> The value left there by start_thread() will not reach the userland anyway...
 
-Have you checked building support for the old and new in one kernel?  On
-a quick check, it looks okay, but I only checked that ns2_init() wasn't
-the _init function for the legacy board files.
+Ah, yes. So not causing any user issues (apart from the possible fault
+in the kernel while accessing the user stack).
 
-> Also note that the first patch of the series is related with the LED
-> subsystem. It adds device tree binding to the driver leds-ns2.
-> 
-> Simon Guinot (4):
->   leds: leds-ns2: add device tree binding
->   ARM: kirkwood: DT board setup for Network Space v2 and parents
->   ARM: kirkwood: DT board setup for Network Space Lite v2
->   ARM: kirkwood: DT board setup for Network Space Mini v2
-
-I'm pretty sure this isn't the first version of this patch series ;-)
-No need to resend, but could you attach a version number and changelog?
-
-thx,
-
-Jason.
-
-> 
->  .../devicetree/bindings/gpio/leds-ns2.txt          |   26 ++++++
->  arch/arm/boot/dts/Makefile                         |    5 ++
->  arch/arm/boot/dts/kirkwood-is2.dts                 |   30 +++++++
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   63 ++++++++++++++
->  arch/arm/boot/dts/kirkwood-ns2.dts                 |   30 +++++++
->  arch/arm/boot/dts/kirkwood-ns2lite.dts             |   30 +++++++
->  arch/arm/boot/dts/kirkwood-ns2max.dts              |   49 +++++++++++
->  arch/arm/boot/dts/kirkwood-ns2mini.dts             |   49 +++++++++++
->  arch/arm/mach-kirkwood/Kconfig                     |   36 ++++++++
->  arch/arm/mach-kirkwood/Makefile                    |    5 ++
->  arch/arm/mach-kirkwood/board-dt.c                  |   12 +++
->  arch/arm/mach-kirkwood/board-ns2.c                 |   87 ++++++++++++++++++++
->  arch/arm/mach-kirkwood/common.h                    |   10 +++
->  drivers/leds/Kconfig                               |    4 +-
->  drivers/leds/leds-ns2.c                            |   84 ++++++++++++++++++-
->  15 files changed, 516 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/leds-ns2.txt
->  create mode 100644 arch/arm/boot/dts/kirkwood-is2.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-ns2-common.dtsi
->  create mode 100644 arch/arm/boot/dts/kirkwood-ns2.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-ns2lite.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-ns2max.dts
->  create mode 100644 arch/arm/boot/dts/kirkwood-ns2mini.dts
->  create mode 100644 arch/arm/mach-kirkwood/board-ns2.c
-> 
-> -- 
-> 1.7.10
-> 
+-- 
+Catalin
