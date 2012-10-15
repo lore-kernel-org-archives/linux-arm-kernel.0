@@ -1,59 +1,52 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 15 Oct 2012 10:35:04 +0300
-Subject: [PATCH V2 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <CAKohpo=20mwje+9AVgs7b-_DshyRO2DZ=Nacjm7vFAhed=Wkqg@mail.gmail.com>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
- <9688d98010716880c1bbd966ead312c446282204.1350051925.git.viresh.kumar@linaro.org>
- <1350053897.10584.172.camel@smile>
- <CAKohpo=20mwje+9AVgs7b-_DshyRO2DZ=Nacjm7vFAhed=Wkqg@mail.gmail.com>
-Message-ID: <1350286504.10584.176.camel@smile>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 15 Oct 2012 15:51:17 +0800
+Subject: [PATCH v2] i2c: i2c-gpio: fix name issue when i2c gpio node GT 1
+Message-ID: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-15 at 08:59 +0530, Viresh Kumar wrote: 
-> On 12 October 2012 20:28, Andy Shevchenko
-> <andriy.shevchenko@linux.intel.com> wrote:
-> >> +     if (last_dw) {
-> >> +             if ((last_bus_id == param) && (last_dw == dw))
-> >> +                     return false;
-> >> +     }
-> > Just came to my mind.
-> > dw can't be NULL, can't it?
-> > Then
-> > if (last_dw) {
-> > ...
-> > }
-> > is unneeded.
-> 
-> Fixup for this:
-> 
-> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-> index d72c26f..764c159 100644
-> --- a/drivers/dma/dw_dmac.c
-> +++ b/drivers/dma/dw_dmac.c
-> @@ -1196,11 +1196,8 @@ bool dw_dma_generic_filter(struct dma_chan
-> *chan, void *param)
->          * failure. If dw and param are same, i.e. trying on same dw with
->          * different channel, return false.
->          */
-> -       if (last_dw) {
-> -               if ((last_bus_id == param) && (last_dw == dw))
-> -                       return false;
-> -       }
-> -
-> +       if ((last_dw == dw) && (last_bus_id == param))
-> +               return false;
->         /*
->          * Return true:
->          * - If dw_dma's platform data is not filled with slave info, then all
-Good.
-So, have my 
+When i2c-gpio node number is greater than 1, the name for each is same
+So add the patch to fix it.
 
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com> 
+The adap->name printing information is add by myself
 
-for this patch.
+without this patch the log information is as following
+---<8---
+adap->name = i2c-gpio-1
+i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+adap->name = i2c-gpio-1
+i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
+--->8---
 
+with this patch, the log information is as following
+---<8---
+adap->name = i2c.2
+i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+adap->name = i2c.3
+i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
+--->8---
 
+Signed-off-by: Bo Shen <voice.shen@atmel.com>
+---
+ drivers/i2c/busses/i2c-gpio.c |    6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-gpio.c b/drivers/i2c/busses/i2c-gpio.c
+index e62d2d9..257299a 100644
+--- a/drivers/i2c/busses/i2c-gpio.c
++++ b/drivers/i2c/busses/i2c-gpio.c
+@@ -184,7 +184,11 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
+ 	bit_data->data = pdata;
+ 
+ 	adap->owner = THIS_MODULE;
+-	snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
++	if (pdev->dev.of_node)
++		strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name));
++	else
++		snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
++
+ 	adap->algo_data = bit_data;
+ 	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
+ 	adap->dev.parent = &pdev->dev;
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+1.7.9.5
