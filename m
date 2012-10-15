@@ -1,128 +1,60 @@
-From: hdk@igel.co.jp (Hideki EIRAKU)
-Date: Mon, 15 Oct 2012 17:34:53 +0900
-Subject: [PATCH v4 2/2] ARM: mach-shmobile: sh7372: Add IPMMU device
-In-Reply-To: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
-References: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
-Message-ID: <1350290093-998-3-git-send-email-hdk@igel.co.jp>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 15 Oct 2012 16:48:04 +0800
+Subject: [PATCH] ARM: dts: imx6q-arm2: move NANDF_CS pins out of 'hog'
+Message-ID: <1350290884-26594-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an IPMMU device and notifies the IPMMU driver which
-devices are connected via the IPMMU module.  All devices connected to the main
-memory bus via the IPMMU module MUST be registered when SHMOBILE_IPMMU and
-SHMOBILE_IOMMU are enabled because physical address cannot be used
-while the IPMMU module's MMU function is enabled.
+Commit 9e3c0066 (ARM: dts: imx6q-arm2: add pinctrl for uart and enet)
+defines NANDF_CS pins as gpio in 'hog', assuming these two pins are
+always used by usdhc3 in gpio mode as card-detection and
+write-protection on ARM2 board.  But it's not true.  These pins are
+shared by usdhc3 and gpmi-nand.  We should have the pins functional
+for gpmi-nand when usdhc3 is disabled.
 
-Signed-off-by: Hideki EIRAKU <hdk@igel.co.jp>
+Move the pins out of 'hog', so that pins only work in gpio mode as CD
+and WP when usdhc3 is enabled, and otherwise they are available for
+gpmi-nand.
+
+Reported-by: Huang Shijie <b32955@freescale.com>
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c   |    5 +++++
- arch/arm/mach-shmobile/board-mackerel.c |    5 +++++
- arch/arm/mach-shmobile/setup-sh7372.c   |   26 ++++++++++++++++++++++++++
- 3 files changed, 36 insertions(+), 0 deletions(-)
+Huang,
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 790dc68..7006abb 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -61,6 +61,7 @@
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/sh7372.h>
-+#include <mach/ipmmu.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -1459,6 +1460,10 @@ static void __init ap4evb_init(void)
- 
- 	sh7372_add_standard_devices();
- 
-+	ipmmu_add_device(&lcdc_device.dev);
-+	ipmmu_add_device(&lcdc1_device.dev);
-+	ipmmu_add_device(&ceu_device.dev);
+Please help test the patch to see if it fixes your problem, thanks.
+
+Shawn
+
+ arch/arm/boot/dts/imx6q-arm2.dts |   10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index 15df4c1..5bfa02a 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -37,6 +37,13 @@
+ 					pinctrl_hog: hoggrp {
+ 						fsl,pins = <
+ 							176  0x80000000	/* MX6Q_PAD_EIM_D25__GPIO_3_25 */
++						>;
++					};
++				};
 +
- 	/* HDMI */
- 	gpio_request(GPIO_FN_HDMI_HPD, NULL);
- 	gpio_request(GPIO_FN_HDMI_CEC, NULL);
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 0c27c81..1c34520 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -60,6 +60,7 @@
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/sh7372.h>
-+#include <mach/ipmmu.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
-@@ -1640,6 +1641,10 @@ static void __init mackerel_init(void)
- 
- 	sh7372_add_standard_devices();
- 
-+	ipmmu_add_device(&lcdc_device.dev);
-+	ipmmu_add_device(&hdmi_lcdc_device.dev);
-+	ipmmu_add_device(&ceu_device.dev);
-+
- 	platform_add_devices(mackerel_devices, ARRAY_SIZE(mackerel_devices));
- 
- 	rmobile_add_devices_to_domains(domain_devices,
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index a07954f..aadb769 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -38,6 +38,7 @@
- #include <mach/irqs.h>
- #include <mach/sh7372.h>
- #include <mach/common.h>
-+#include <mach/ipmmu.h>
- #include <asm/mach/map.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -968,6 +969,23 @@ static struct platform_device spu1_device = {
- 	.num_resources	= ARRAY_SIZE(spu1_resources),
- };
- 
-+/* IPMMUI (an IPMMU module for ICB/LMB) */
-+static struct resource ipmmu_resources[] = {
-+	[0] = {
-+		.name	= "IPMMUI",
-+		.start	= 0xfe951000,
-+		.end	= 0xfe9510ff,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
-+
-+static struct platform_device ipmmu_device = {
-+	.name           = "ipmmu",
-+	.id             = -1,
-+	.resource       = ipmmu_resources,
-+	.num_resources  = ARRAY_SIZE(ipmmu_resources),
-+};
-+
- static struct platform_device *sh7372_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -979,6 +997,7 @@ static struct platform_device *sh7372_early_devices[] __initdata = {
- 	&cmt2_device,
- 	&tmu00_device,
- 	&tmu01_device,
-+	&ipmmu_device,
- };
- 
- static struct platform_device *sh7372_late_devices[] __initdata = {
-@@ -1033,6 +1052,13 @@ void __init sh7372_add_standard_devices(void)
- 	platform_add_devices(sh7372_early_devices,
- 			    ARRAY_SIZE(sh7372_early_devices));
- 
-+	ipmmu_add_device(&vpu_device.dev);
-+	ipmmu_add_device(&jpu_device.dev);
-+	ipmmu_add_device(&veu0_device.dev);
-+	ipmmu_add_device(&veu1_device.dev);
-+	ipmmu_add_device(&veu2_device.dev);
-+	ipmmu_add_device(&veu3_device.dev);
-+
- 	platform_add_devices(sh7372_late_devices,
- 			    ARRAY_SIZE(sh7372_late_devices));
++				arm2 {
++					pinctrl_usdhc3_arm2: usdhc3grp-arm2 {
++						fsl,pins = <
+ 							1363 0x80000000	/* MX6Q_PAD_NANDF_CS0__GPIO_6_11 */
+ 							1369 0x80000000 /* MX6Q_PAD_NANDF_CS1__GPIO_6_14 */
+ 						>;
+@@ -58,7 +65,8 @@
+ 				wp-gpios = <&gpio6 14 0>;
+ 				vmmc-supply = <&reg_3p3v>;
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&pinctrl_usdhc3_1>;
++				pinctrl-0 = <&pinctrl_usdhc3_1
++					     &pinctrl_usdhc3_arm2>;
+ 				status = "okay";
+ 			};
  
 -- 
-1.7.0.4
+1.7.9.5
