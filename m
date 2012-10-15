@@ -1,30 +1,72 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 15 Oct 2012 15:47:43 +0300
-Subject: [PATCH] ARM: nomadik: fixup some FSMC merge problems
-In-Reply-To: <1349994182-26116-1-git-send-email-linus.walleij@linaro.org>
-References: <1349994182-26116-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1350305263.4115.3.camel@sauron.fi.intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 15 Oct 2012 14:13:25 +0100
+Subject: [PATCH 1/2] ASoC: Ux500: Dispose of device nodes correctly
+Message-ID: <1350306806-5688-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-10-12 at 00:23 +0200, Linus Walleij wrote:
-> Due to a clash between refactoring and due to loss of a header
-> file that remained in my working tree the Nomadik stopped
-> compiling after switching to the FSMC driver. This patch fixes
-> it up.
-> 
-> Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+When of_parse_phandle() is used to find a device node, its
+reference count is incremented by the helper. Once we're
+finished with them, it's our responsibly to ensure they
+are freed in the correct manor.
 
-Pushed this one to l2-mtd.git as well, thanks!
+Cc: alsa-devel at alsa-project.org
+Cc: Liam Girdwood <lrg@ti.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ sound/soc/ux500/mop500.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
+diff --git a/sound/soc/ux500/mop500.c b/sound/soc/ux500/mop500.c
+index 6f67e6b..651a52a 100644
+--- a/sound/soc/ux500/mop500.c
++++ b/sound/soc/ux500/mop500.c
+@@ -57,6 +57,20 @@ static struct snd_soc_card mop500_card = {
+ 	.num_links = ARRAY_SIZE(mop500_dai_links),
+ };
+ 
++static void mop500_of_node_put(void)
++{
++	int i;
++
++	for (i = 0; i < 2; i++) {
++		if (mop500_dai_links[i].cpu_of_node)
++			of_node_put((struct device_node *)
++				mop500_dai_links[i].cpu_of_node);
++		if (mop500_dai_links[i].codec_of_node)
++			of_node_put((struct device_node *)
++				mop500_dai_links[i].codec_of_node);
++	}
++}
++
+ static int __devinit mop500_of_probe(struct platform_device *pdev,
+ 				struct device_node *np)
+ {
+@@ -69,6 +83,7 @@ static int __devinit mop500_of_probe(struct platform_device *pdev,
+ 
+ 	if (!(msp_np[0] && msp_np[1] && codec_np)) {
+ 		dev_err(&pdev->dev, "Phandle missing or invalid\n");
++		mop500_of_node_put();
+ 		return -EINVAL;
+ 	}
+ 
+@@ -83,6 +98,7 @@ static int __devinit mop500_of_probe(struct platform_device *pdev,
+ 
+ 	return 0;
+ }
++
+ static int __devinit mop500_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -128,6 +144,7 @@ static int __devexit mop500_remove(struct platform_device *pdev)
+ 
+ 	snd_soc_unregister_card(mop500_card);
+ 	mop500_ab8500_remove(mop500_card);
++	mop500_of_node_put();
+ 
+ 	return 0;
+ }
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121015/8838b88e/attachment.sig>
+1.7.9.5
