@@ -1,46 +1,33 @@
-From: mans.rullgard@linaro.org (Mans Rullgard)
-Date: Mon, 15 Oct 2012 03:39:07 +0100
-Subject: [PATCH] ARM: vfp: fix save and restore when running on pre-VFPv3
- and CONFIG_VFPv3 set
-In-Reply-To: <alpine.DEB.2.00.1210150157400.16624@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210130441300.5736@utopia.booyaka.com>
- <20121013090255.GT28061@n2100.arm.linux.org.uk>
- <yw1xr4p2myre.fsf@unicorn.mansr.com>
- <20121013133654.GU28061@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1210150157400.16624@utopia.booyaka.com>
-Message-ID: <CAG5Tg6XqpeRppWbr9-yBmsf+2TobhE5ateMX4crs10grn-tuAA@mail.gmail.com>
+From: voice.shen@gmail.com (Bo Shen)
+Date: Mon, 15 Oct 2012 10:53:55 +0800
+Subject: dts: question about how to configure PIO used as i2c irq
+Message-ID: <507B7AC3.7090904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 October 2012 02:58, Paul Walmsley <paul@pwsan.com> wrote:
->
-> Fix by implementing a request from Russell King to add a new HWCAP
-> flag that affirmatively indicates the presence of the d16-d31
-> registers:
+Hi All,
+   When moving atmel qt1070 linux driver with DT support. The atmel 
+qt1070 is an I2C device. I meet the following questions.
 
-[...]
+   The qt1070 DT node
+   --<--------------
+   qt1070: keyboard@1b {
+         compatible = "atmel,qt1070";
+         reg = <0x1b>;
+         interrupt-parent = <&pioA>;
+         interrupts = <7 0x0>;
+   };
+   -->--------------
 
-> diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-> index f254f65..b1555d0 100644
-> --- a/arch/arm/include/uapi/asm/hwcap.h
-> +++ b/arch/arm/include/uapi/asm/hwcap.h
-> @@ -18,11 +18,12 @@
->  #define HWCAP_THUMBEE  (1 << 11)
->  #define HWCAP_NEON     (1 << 12)
->  #define HWCAP_VFPv3    (1 << 13)
-> -#define HWCAP_VFPv3D16 (1 << 14)
-> +#define HWCAP_VFPv3D16 (1 << 14)       /* also set for VFPv4-D16 */
->  #define HWCAP_TLS      (1 << 15)
->  #define HWCAP_VFPv4    (1 << 16)
->  #define HWCAP_IDIVA    (1 << 17)
->  #define HWCAP_IDIVT    (1 << 18)
-> +#define HWCAP_VFPD16   (1 << 19)       /* set if VFP has 32 regs (not 16) */
->  #define HWCAP_IDIV     (HWCAP_IDIVA | HWCAP_IDIVT)
+   DT will parse this node and map irq, the i2c_client->irq. This can be 
+used directly in atmel qt1070 driver. However, the PIO which used as irq 
+need configure as a PIO input. Now, we can not use irq_to_gpio() 
+function to convert irq to gpio. So, if we can not configure this gpio.
 
-Please consider calling the new flag VFPD32 or so instead.  The D16 suffix
-usually signifies an implementation with 16 registers, i.e. the opposite of
-what this flag does.  Using the same tag to mean both things depending on
-whether there's a 'v3' before it is nothing but confusing.
+   If we configure the pio in board-dt.c, I think this is not a good 
+place. For example, if the kernel image support multiplatform, while on 
+these platform, using different pio for qt1070, so this will cause only 
+one platform can use qt1070.
 
--- 
-Mans Rullgard / mru
+   So, for this question, how should I solve it? Would you please give 
+me some advice?
