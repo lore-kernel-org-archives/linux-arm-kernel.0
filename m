@@ -1,117 +1,235 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 15 Oct 2012 21:16:35 +0200
-Subject: [PATCH 5/5] arm/dts: am33xx: Add cpsw and mdio module nodes for AM33XX
-In-Reply-To: <cover.1350327320.git.richardcochran@gmail.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
-Message-ID: <b4d88ef79fb0dec95bb598aaf1f15f0a7344c435.1350327325.git.richardcochran@gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 15 Oct 2012 21:12:22 +0200
+Subject: [PATCH 1/4] leds: leds-ns2: add device tree binding
+In-Reply-To: <20121015174144.GH20922@titan.lakedaemon.net>
+References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
+ <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
+ <20121015174144.GH20922@titan.lakedaemon.net>
+Message-ID: <20121015191222.GB28384@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mugunthan V N <mugunthanvnm@ti.com>
+On Mon, Oct 15, 2012 at 01:41:44PM -0400, Jason Cooper wrote:
+> On Mon, Oct 15, 2012 at 05:34:52PM +0200, Simon Guinot wrote:
+> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> > ---
+> >  .../devicetree/bindings/gpio/leds-ns2.txt          |   26 ++++++
+> >  drivers/leds/leds-ns2.c                            |   84 +++++++++++++++++++-
+> >  2 files changed, 107 insertions(+), 3 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/gpio/leds-ns2.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/gpio/leds-ns2.txt b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+> > new file mode 100644
+> > index 0000000..1a84969
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+> > @@ -0,0 +1,26 @@
+> > +Binding for dual-GPIO LED found on Network Space v2 (and parents).
+> > +
+> > +Required properties:
+> > +- compatible: "ns2-leds".
+> > +
+> > +Each LED is represented as a sub-node of the ns2-leds device.
+> > +
+> > +Required sub-node properties:
+> > +- cmd-gpio: Command LED GPIO. See OF device-tree GPIO specification.
+> > +- slow-gpio: Slow LED GPIO. See OF device-tree GPIO specification.
+> > +
+> > +Optional sub-node properties:
+> > +- label: Name for this LED. If omitted, the label is taken from the node name.
+> > +- linux,default-trigger: Trigger assigned to the LED.
+> > +
+> > +Example:
+> > +
+> > +ns2-leds {
+> > +	compatible = "ns2-leds";
+> > +
+> > +	blue-sata {
+> > +		label = "ns2:blue:sata";
+> > +		slow-gpio = <&gpio0 29 0>;
+> > +		cmd-gpio = <&gpio0 30 0>;
+> > +	};
+> > +};
+> > diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
+> > index d176ec8..55d199b 100644
+> > --- a/drivers/leds/leds-ns2.c
+> > +++ b/drivers/leds/leds-ns2.c
+> > @@ -30,6 +30,7 @@
+> >  #include <linux/leds.h>
+> >  #include <linux/module.h>
+> >  #include <linux/platform_data/leds-kirkwood-ns2.h>
+> > +#include <linux/of_gpio.h>
+> >  
+> >  /*
+> >   * The Network Space v2 dual-GPIO LED is wired to a CPLD and can blink in
+> > @@ -263,6 +264,68 @@ static void delete_ns2_led(struct ns2_led_data *led_dat)
+> >  	gpio_free(led_dat->slow);
+> >  }
+> >  
+> > +#ifdef CONFIG_OF_GPIO
+> > +/*
+> > + * Translate OpenFirmware node properties into platform_data.
+> > + */
+> > +static int __devinit
+> > +ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
+> > +{
+> > +	struct device_node *np = dev->of_node;
+> > +	struct device_node *child;
+> > +	struct ns2_led *leds;
+> > +	int num_leds = 0;
+> > +	int i = 0;
+> > +
+> > +	num_leds = of_get_child_count(np);
+> > +	if (!num_leds)
+> > +		return -ENODEV;
+> > +
+> > +	leds = devm_kzalloc(dev, num_leds * sizeof(struct ns2_led),
+> > +			    GFP_KERNEL);
+> > +	if (!leds)
+> > +		return -ENOMEM;
+> > +
+> > +	for_each_child_of_node(np, child) {
+> > +		const char *string;
+> > +		int ret;
+> > +
+> > +		ret = of_get_named_gpio(child, "cmd-gpio", 0);
+> > +		if (ret < 0)
+> > +			return ret;
+> 
+> free leds?
 
-Add CPSW and MDIO related device tree data for AM33XX.
-Also enable them into board/evm dts files by providing
-respective phy-id.
+Maybe I missed something but I though it was the purpose of using devres
+function as devm_kzalloc.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
----
- arch/arm/boot/dts/am335x-bone.dts |    8 ++++++
- arch/arm/boot/dts/am335x-evm.dts  |    8 ++++++
- arch/arm/boot/dts/am33xx.dtsi     |   50 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 66 insertions(+), 0 deletions(-)
+> 
+> > +		leds[i].cmd = ret;
+> > +		ret = of_get_named_gpio(child, "slow-gpio", 0);
+> > +		if (ret < 0)
+> > +			return ret;
+> 
+> same here.
+> 
+> > +		leds[i].slow = ret;
+> > +		ret = of_property_read_string(child, "label", &string);
+> > +		leds[i].name = (ret == 0) ? string : child->name;
+> > +		ret = of_property_read_string(child, "linux,default-trigger",
+> > +					      &string);
+> > +		if (ret == 0)
+> > +			leds[i].default_trigger = string;
+> > +
+> > +		i++;
+> > +	}
+> > +
+> > +	pdata->leds = leds;
+> > +	pdata->num_leds = num_leds;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id of_ns2_leds_match[] = {
+> > +	{ .compatible = "ns2-leds", },
+> 
+> Is this LaCie-specific?  eg "lacie,ns2-leds"?
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index c634f87..e233cfa 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -78,3 +78,11 @@
- 		};
- 	};
- };
-+
-+&cpsw_emac0 {
-+	phy_id = "4a101000.mdio:00";
-+};
-+
-+&cpsw_emac1 {
-+	phy_id = "4a101000.mdio:01";
-+};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 185d632..415c3b3 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -118,3 +118,11 @@
- 		};
- 	};
- };
-+
-+&cpsw_emac0 {
-+	phy_id = "4a101000.mdio:00";
-+};
-+
-+&cpsw_emac1 {
-+	phy_id = "4a101000.mdio:01";
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index bb31bff..f6bea04 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -210,5 +210,55 @@
- 			interrupt-parent = <&intc>;
- 			interrupts = <91>;
- 		};
-+
-+		mac: ethernet at 4A100000 {
-+			compatible = "ti,cpsw";
-+			ti,hwmods = "cpgmac0";
-+			cpdma_channels = <8>;
-+			host_port_no = <0>;
-+			cpdma_reg_ofs = <0x800>;
-+			cpdma_sram_ofs = <0xa00>;
-+			ale_reg_ofs = <0xd00>;
-+			ale_entries = <1024>;
-+			host_port_reg_ofs = <0x108>;
-+			hw_stats_reg_ofs = <0x900>;
-+			bd_ram_ofs = <0x2000>;
-+			bd_ram_size = <0x2000>;
-+			no_bd_ram = <0>;
-+			rx_descs = <64>;
-+			mac_control = <0x20>;
-+			slaves = <2>;
-+			reg = <0x4a100000 0x800
-+				0x4a101200 0x100
-+				0x4a101000 0x100>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			interrupt-parent = <&intc>;
-+			/* c0_rx_thresh_pend c0_rx_pend c0_tx_pend c0_misc_pend*/
-+			interrupts = <40 41 42 43>;
-+			ranges;
-+			cpsw_emac0: slave at 0 {
-+				slave_reg_ofs = <0x208>;
-+				sliver_reg_ofs = <0xd80>;
-+				/* Filled in by U-Boot */
-+				mac-address = [ 00 00 00 00 00 00 ];
-+			};
-+			cpsw_emac1: slave at 1 {
-+				slave_reg_ofs = <0x308>;
-+				sliver_reg_ofs = <0xdc0>;
-+				/* Filled in by U-Boot */
-+				mac-address = [ 00 00 00 00 00 00 ];
-+			};
-+
-+			davinci_mdio: mdio at 4a101000 {
-+				compatible = "ti,davinci_mdio";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				ti,hwmods = "davinci_mdio";
-+				bus_freq = <1000000>;
-+				reg = <0x4a101000 0x100>;
-+			};
-+
-+		};
- 	};
- };
--- 
-1.7.2.5
+Yes I think it is LaCie specific.
+
+> 
+> > +	{},
+> > +};
+> > +#else
+> > +static int __devinit
+> > +ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
+> > +{
+> > +	return -ENODEV;
+> > +}
+> > +#endif /* CONFIG_OF_GPIO */
+> 
+> The above doesn't look right to me.  The only time
+> ns2_leds_get_of_pdata() gets called is when OF_GPIO is enabled.  You
+> should be able to remove the #else block.
+
+Yes you are right.
+
+> 
+> > +
+> >  static int __devinit ns2_led_probe(struct platform_device *pdev)
+> >  {
+> >  	struct ns2_led_platform_data *pdata = pdev->dev.platform_data;
+> > @@ -270,11 +333,25 @@ static int __devinit ns2_led_probe(struct platform_device *pdev)
+> >  	int i;
+> >  	int ret;
+> >  
+> > +#ifdef CONFIG_OF_GPIO
+> > +	if (!pdata) {
+> > +		pdata = devm_kzalloc(&pdev->dev,
+> > +				     sizeof(struct ns2_led_platform_data),
+> > +				     GFP_KERNEL);
+> > +		if (!pdata)
+> > +			return -ENOMEM;
+> > +
+> > +		ret = ns2_leds_get_of_pdata(&pdev->dev, pdata);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
+> > +#else
+> >  	if (!pdata)
+> >  		return -EINVAL;
+> > +#endif /* CONFIG_OF_GPIO */
+> >  
+> >  	leds_data = devm_kzalloc(&pdev->dev, sizeof(struct ns2_led_data) *
+> > -			    pdata->num_leds, GFP_KERNEL);
+> > +				 pdata->num_leds, GFP_KERNEL);
+> >  	if (!leds_data)
+> >  		return -ENOMEM;
+> >  
+> > @@ -312,8 +389,9 @@ static struct platform_driver ns2_led_driver = {
+> >  	.probe		= ns2_led_probe,
+> >  	.remove		= __devexit_p(ns2_led_remove),
+> >  	.driver		= {
+> > -		.name	= "leds-ns2",
+> > -		.owner	= THIS_MODULE,
+> > +		.name		= "leds-ns2",
+> > +		.owner		= THIS_MODULE,
+> 
+> nit.  whitespace before '=', above two lines.
+
+Sorry I don't get it. For the two lines before, I used two tabs before
+'='. As a result, this lines are aligned with the next one. I got no
+warnings and no errors from checkpatch.pl.
+
+> 
+> > +		.of_match_table	= of_match_ptr(of_ns2_leds_match),
+> 
+> Have you tried this with OF_GPIO=n?  of_match_ptr() handles CONFIG_OF
+> being enabled/disabled.  Which means the case of CONFIG_OF=y,
+> CONFIG_OF_GPIO=n appears to be unhandled.
+
+Good caught. I guess I have just copied a bug from the driver gpio-fan.
+
+Thank you for the review.
+
+Simon
+
+> 
+> thx,
+> 
+> Jason.
+> 
+> >  	},
+> >  };
+> >  
+> > -- 
+> > 1.7.10
+> > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121015/f4add623/attachment.sig>
