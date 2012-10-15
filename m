@@ -1,55 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 15 Oct 2012 23:02:25 +0900
-Subject: [PATCH] ARM: s3c: mark s3c2440_clk_add as __init_refok
-In-Reply-To: <201210121114.52348.arnd@arndb.de>
-References: <201210121114.52348.arnd@arndb.de>
-Message-ID: <10dc01cdaadd$b4a32ee0$1de98ca0$%kim@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 15 Oct 2012 16:03:50 +0200
+Subject: [RFC 0/2] DMA-mapping & IOMMU - physically contiguous allocations
+Message-ID: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> s3c2440_clk_add is a subsys_interface method and calls clkdev_add_table,
-> which is marked as __init. The modpost script complains about this
-> because we must not call an __init function from a function in the .text
-> section, and we cannot reference an __init function from a
-> subsys_interface
-> pointer.
-> 
-> I have verified that the only code path into s3c2440_clk_add() is
-> from "int __init s3c2440_init(void)", so s3c2440_clk_add can be marked
-> __init_refok instead.
-> 
-> Without this patch, building mini2440_defconfig results in:
-> 
-> WARNING: vmlinux.o(.text+0x9848): Section mismatch in reference from the
-> function s3c2440_clk_add() to the function .init.text:clkdev_add_table()
-> The function s3c2440_clk_add() references
-> the function __init clkdev_add_table().
-> This is often because s3c2440_clk_add lacks a __init
-> annotation or the annotation of clkdev_add_table is wrong.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Hello,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Some devices, which have IOMMU, for some use cases might require to
+allocate a buffers for DMA which is contiguous in physical memory. Such
+use cases appears for example in DRM subsystem when one wants to improve
+performance or use secure buffer protection.
 
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> ---
-> 
-> I'll put this into arm-soc/fixes unless I hear objections. This replaces
-> the
-> earlier "clk: don't mark clkdev_add_table as init" as suggested by
-Russell.
-> 
-Yeah, I read it just now and I agree with this patch.
+I would like to ask if adding a new attribute, as proposed in this RFC
+is a good idea? I feel that it might be an attribute just for a single
+driver, but I would like to know your opinion. Should we look for other
+solution?
 
-Thanks for your fix.
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+Marek Szyprowski (2):
+  common: DMA-mapping: add DMA_ATTR_FORCE_CONTIGUOUS attribute
+  ARM: dma-mapping: add support for DMA_ATTR_FORCE_CONTIGUOUS attribute
+
+ Documentation/DMA-attributes.txt |    9 +++++++++
+ arch/arm/mm/dma-mapping.c        |   41 ++++++++++++++++++++++++++++++--------
+ include/linux/dma-attrs.h        |    1 +
+ 3 files changed, 43 insertions(+), 8 deletions(-)
+
+-- 
+1.7.9.5
