@@ -1,49 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 15 Oct 2012 18:06:00 +0100
-Subject: [revert request for commit 9fff2fa] Re: [git pull] signals pile 3
-In-Reply-To: <20121015162732.GG2616@ZenIV.linux.org.uk>
-References: <20121013005334.GM2616@ZenIV.linux.org.uk>
- <507ADBBB.9090209@gmail.com>
- <20121014164020.GV2616@ZenIV.linux.org.uk>
- <CACTFLAOpcLtHNx-TCHQkUOPNAkTO8EgDhbyZSGQ9ag+Wu_cNRw@mail.gmail.com>
- <20121014172640.GW2616@ZenIV.linux.org.uk>
- <20121014192402.GZ2616@ZenIV.linux.org.uk>
- <20121014195611.GA2616@ZenIV.linux.org.uk>
- <20121015160710.GC30907@arm.com>
- <20121015162732.GG2616@ZenIV.linux.org.uk>
-Message-ID: <20121015170600.GD30907@arm.com>
+From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
+Date: Mon, 15 Oct 2012 22:49:32 +0530
+Subject: [PATCH 1/9] uprobes: move function declarations out of arch
+In-Reply-To: <1350242593-17761-1-git-send-email-rabin@rab.in>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+Message-ID: <20121015171932.GA28723@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 05:27:32PM +0100, Al Viro wrote:
-> On Mon, Oct 15, 2012 at 05:07:10PM +0100, Catalin Marinas wrote:
-> > On Sun, Oct 14, 2012 at 08:56:11PM +0100, Al Viro wrote:
-> > > On Sun, Oct 14, 2012 at 08:24:03PM +0100, Al Viro wrote:
-> > > 
-> > > > Russell, could you recall what those had been about?  I'm not sure if that
-> > > > had been oopsable that far back (again, oops scenario is userland stack
-> > > > page getting swapped out before we get to start_thread(), leading to
-> > > > direct read from an absent page in start_thread() by plain ldr, without
-> > > > anything in exception table about that insn), but it looks very odd
-> > > > regardless of that problem.
-> > > 
-> > > BTW, arm64 has copied that logics, so it also seems to be unsafe and very
-> > > odd - there we definitely have only ELF to cope with.  arm64 folks Cc'd...
-> > 
-> > Good point. We don't need this on arm64 and probably neither on arm (at
-> > least since EABI).
-> > 
-> > Setting x0 may cause other issues as well. The dynamic loader simply
-> > ignores the startup registers but for static binaries the _start code in
-> > glibc expects r0 to contain a function pointer to be registered with
-> > atexit() in __libc_start_main() or NULL. Since we pass argc in there,
-> > for static binaries the rtld_fini argument to __libc_start_main() is
-> > neither NULL nor something meaningful.
-> 
-> The value left there by start_thread() will not reach the userland anyway...
+* Rabin Vincent <rabin@rab.in> [2012-10-14 21:23:05]:
 
-Ah, yes. So not causing any user issues (apart from the possible fault
-in the kernel while accessing the user stack).
+> It seems odd to keep the function declarations in the arch header where
+> they will need to be copy/pasted verbatim across arches.  Move them to
+> the common header.
+> 
+
+
+
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/x86/include/asm/uprobes.h |    6 ------
+>  include/linux/uprobes.h        |    8 ++++++++
+>  2 files changed, 8 insertions(+), 6 deletions(-)
+> 
+
+You need to take care of the powerpc port
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=8b7b80b9ebb46dd88fbb94e918297295cf312b59
+
+Also as Oleg pointed out, He has already posted changes on top of -tip.
+So it probably makes sense to redo these patches on top of those
+patches.
 
 -- 
-Catalin
+Thanks and Regards
+Srikar
