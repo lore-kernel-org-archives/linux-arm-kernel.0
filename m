@@ -1,51 +1,41 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Oct 2012 15:32:17 +0200
-Subject: [PATCH 1/1] pinctrl/at91: fix compatible order
-In-Reply-To: <CACRpkda0_=j3k8sYNjPSbQFU25VKeAxY=95ea81hfWRPUoo4_Q@mail.gmail.com>
-References: <1350033790-31028-1-git-send-email-plagnioj@jcrosoft.com>
- <5078235C.1040204@atmel.com>
- <CACRpkda0_=j3k8sYNjPSbQFU25VKeAxY=95ea81hfWRPUoo4_Q@mail.gmail.com>
-Message-ID: <20121015133217.GW12801@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 15 Oct 2012 21:35:20 +0800
+Subject: [PATCH] ARM: dts: imx6q-arm2: move NANDF_CS pins out of 'hog'
+In-Reply-To: <CAMiH66EdFW7JrCD+NVtJnn-dYan0U_QyhOoRKvsQHV5g0u7pqQ@mail.gmail.com>
+References: <1350290884-26594-1-git-send-email-shawn.guo@linaro.org>
+ <CAMiH66EdFW7JrCD+NVtJnn-dYan0U_QyhOoRKvsQHV5g0u7pqQ@mail.gmail.com>
+Message-ID: <20121015133516.GC24393@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:33 Mon 15 Oct     , Linus Walleij wrote:
-> On Fri, Oct 12, 2012 at 4:04 PM, ludovic.desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > Le 10/12/2012 11:23 AM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
+On Mon, Oct 15, 2012 at 08:45:48AM -0400, Huang Shijie wrote:
+> On Mon, Oct 15, 2012 at 4:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Commit 9e3c0066 (ARM: dts: imx6q-arm2: add pinctrl for uart and enet)
+> > defines NANDF_CS pins as gpio in 'hog', assuming these two pins are
+> > always used by usdhc3 in gpio mode as card-detection and
+> > write-protection on ARM2 board.  But it's not true.  These pins are
+> > shared by usdhc3 and gpmi-nand.  We should have the pins functional
+> > for gpmi-nand when usdhc3 is disabled.
 > >
-> >> the sam9x5 is new version of the rm9200 not the invert
-> >>
-> >> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> ---
-> >>   drivers/pinctrl/pinctrl-at91.c |    2 +-
-> >>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/pinctrl/pinctrl-at91.c
-> >> b/drivers/pinctrl/pinctrl-at91.c
-> >> index 9c0fe11..bdb152b 100644
-> >> --- a/drivers/pinctrl/pinctrl-at91.c
-> >> +++ b/drivers/pinctrl/pinctrl-at91.c
-> >> @@ -1331,8 +1331,8 @@ static void __devinit at91_gpio_probe_fixup(void)
-> >>   }
-> >>
-> >>   static struct of_device_id at91_gpio_of_match[] __devinitdata = {
-> >> -       { .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops
-> >> },
-> >>         { .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops,
-> >> },
-> >> +       { .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops
-> >> },
-> >>         { /* sentinel */ }
-> >>   };
-> >>
+> > Move the pins out of 'hog', so that pins only work in gpio mode as CD
+> > and WP when usdhc3 is enabled, and otherwise they are available for
+> > gpmi-nand.
 > >
-> > Do it also for at91_pinctrl_of_match[], there is the same issue.
+> > Reported-by: Huang Shijie <b32955@freescale.com>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > Huang,
+> >
+> > Please help test the patch to see if it fixes your problem, thanks.
 > 
-> Shall I apply this patch to my at91 branch or will it be updated to
-> cover both cases?
-the one in your tree is ok
+> yes, this patch fixes the problem.
+> thanks a lot.
+> 
+> Tested-by: Huang Shijie <shijie8@gmail.com>
+> 
+Arnd, Olof,
 
-Best Regards,
-J.
+Can you please send it for later -rc, since it fixes a regression
+in -rc1?
+
+Shawn
