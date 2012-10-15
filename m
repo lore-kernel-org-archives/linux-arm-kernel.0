@@ -1,70 +1,118 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Wed, 31 Oct 2012 18:38:12 -0400
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <20121028165711.GG15824@lunn.ch>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <20121028165711.GG15824@lunn.ch>
-Message-ID: <CAMW5UfaqWa-jju=xJ_G-KVGAA8dP4nQkEeYtF1EG5jhjxC89Yw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 15 Oct 2012 16:28:46 -0000
+Subject: Use coupled cpuidle on imx6q
+In-Reply-To: <CAMbhsRRGyPB1DvXqkmNpF=hA-3ya5Y+JLV-KY5BW+FX_RoEc9g@mail.gmail.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-8-git-send-email-josephl@nvidia.com>
+ <5074AA0E.2080508@wwwdotorg.org>
+ <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
+ <5076F5CB.4020200@wwwdotorg.org>
+ <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
+ <20121012075358.GA4962@S2101-09.ap.freescale.net>
+ <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
+ <20121012083017.GB4962@S2101-09.ap.freescale.net>
+ <CAMbhsRRGyPB1DvXqkmNpF=hA-3ya5Y+JLV-KY5BW+FX_RoEc9g@mail.gmail.com>
+Message-ID: <20121015162842.GD24393@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry it took me so long to test on my GoFlex Net.  Working fine.
+Changed subject (was: Re: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2
+driver for CPU0) ...
 
-tested by: Joshua Coombs <josh.coombs@gmail.com>
+On Fri, Oct 12, 2012 at 01:50:35PM -0700, Colin Cross wrote:
+> Current coupled cpuidle requires all cpus to wake up together and go
+> back to the idle governor to select a new state, because that's what
+> all available ARM cpus did when I wrote it.  You should be able to
+> implement coupled idle on a cpu that does not need to wake all the
+> cpus if you wake them anyways,
 
+Can you please elaborate it a little bit?  I do not quite understand
+what you mean.
 
-On Sun, Oct 28, 2012 at 12:57 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+Basically, imx6q has a low-power mode named WAIT.  When all 4 cores
+are in WFI, imx6q will go into WAIT mode, and whenever there is a
+wakeup interrupt, it will exit WAIT mode.  Software can configure
+hardware behavior during WAIT mode, clock gating or power gating for
+ARM core.
 
-> On Wed, Oct 24, 2012 at 04:53:45PM +0200, Andrew Lunn wrote:
-> > This patchset converts all DT kirkwood boards to using pinctrl.
->
-> Thanks for the feedback everybody gave.
->
-> Progress has been made:
->
-> The bug causing the lockups has been found, fixed and passed upstream.
->
-> I factored out the repeated pinmux definitions for sata0, sata1, spi,
-> twsi0, uart0, uart1.
->
-> I fixed a few types reported by testers.
->
-> I found a solution to many of the gpio_request() failures. The ones
-> for controlling power to SATA or USB i've replaced with a regulator in
-> DT. The regulator will grab the GPIO, set it to output, and driver it
-> high/low as required. I just hope we don't have an ordering issue.
-> The regulator framework seems to load quite early and probes all the
-> regulators. This fails, because pinctrl has not yet loaded, so the
-> gpio framework returns EPROBE_DEFER. This is not fatal to the
-> regulator framework, it tries again later. But this later is after
-> most of the rest of the drivers have loaded. So we might get into
-> issues where uboot has not enabled power to USB/SATA, the driver is
-> probed and fails because of the lack of power, and once things of gone
-> wrong, we turn the power on.
->
-> I still expect problems with GPIOs used for power off. I've not yet
-> touched them. Again, a regulator makes sense, but there is no 'out of
-> the box' regulator type or property which adds itself to pm_power_off.
->
-> The last problem is:
->
->         /* Set NAS to turn back on after a power failure */
->         dnskw_gpio_register(37, "dnskw:power:recover", 1);
->
-> I think its a bit of a stretch calling this a regulator.
->
-> Since the current patchset is 18 patches, plus a few other bug fixes
-> and dependencies, i'm not going to post them all here. I think we are
-> still at the smoke/no-smoke stage of testing. Please pull from:
->
-> git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
->
-> and let me know if things work, what typo's need fixing, where the
-> smoke comes out, etc.
->
->       Thanks
->         Andrew
->
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/08091f97/attachment-0001.html>
+I'm trying to implement this low-power mode with coupled cpuidle.
+I initially have the following code as the coupled cpuidle enter
+function for clock gating case.
+
+static int imx6q_enter_wait_coupled(struct cpuidle_device *dev,
+				    struct cpuidle_driver *drv, int index)
+{
+	int cpu = dev->cpu;
+
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+
+	if (atomic_inc_return(&master) == num_online_cpus())
+		imx6q_set_lpm(WAIT_UNCLOCKED);
+
+	cpu_do_idle();
+
+	if (atomic_dec_return(&master) == num_online_cpus() - 1)
+		imx6q_set_lpm(WAIT_CLOCKED);
+
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+	return index;
+}
+
+However I think there are a couple of problems.  The first one is the
+extra wakeups you have mentioned.  When last cpu is in call
+imx6q_set_lpm(), some of the first 3 cpus that are already in WFI may
+exit from there.  The second one is when hardware exits WAIT mode and
+has ARM clock resumed, some cpus may stay in WFI if scheduler has
+nothing to wake them up.  This breaks the requirement of coupled cpuidle
+that all cpus need to exit together.  I can force the function to work
+around the problems by adding cpuidle_coupled_parallel_barrier() just
+above cpu_do_idle() and arch_send_wakeup_ipi_mask(cpu_online_mask)
+right after imx6q_set_lpm(WAIT_CLOCKED).  But I doubt it's appropriate.
+
+So I rewrite the function as below to not use coupled cpuidle, and it
+works fine.
+
+static int imx6q_enter_wait(struct cpuidle_device *dev,
+			    struct cpuidle_driver *drv, int index)
+{
+	int cpu = dev->cpu;
+
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
+
+	if (atomic_inc_return(&master) == num_online_cpus()) {
+		/*
+		 * With this lock, we prevent the other cpu to exit and
+		 * enter this function again and become the master.
+		 */
+		if (!spin_trylock(&master_lock))
+			goto idle;
+
+		imx6q_set_lpm(WAIT_UNCLOCKED);
+		cpu_do_idle();
+		imx6q_set_lpm(WAIT_CLOCKED);
+
+		spin_unlock(&master_lock);
+		goto out;
+	}
+
+idle:
+	cpu_do_idle();
+out:
+	atomic_dec(&master);
+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
+	return index;
+}
+
+For power gating case, it may better fit coupled cpuidle usage model,
+since all the cores will have to run resume routine and thus will not
+be in WFI when hardware exits from WAIT mode.  But we still need to
+work out the extra wakeup issue which will also be seen in this case.
+
+> and then later you can optimize it to
+> avoid the extra wakeups when the extension to coupled cpuidle that I
+> discussed previously gets implemented.
+
+Do you have a pointer to the initial discussion for the extension, or
+you have a draft patch for that already (hopefully:)?
+
+Shawn
