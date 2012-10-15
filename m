@@ -1,61 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Oct 2012 15:05:15 +0000 (UTC)
-Subject: [PATCH] i2c: omap: revert "i2c: omap: switch to threaded IRQ
- support"
-In-Reply-To: <20121015071657.GA22818@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
- <20121015071657.GA22818@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.00.1210151452470.15973@utopia.booyaka.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Oct 2012 17:02:44 +0200
+Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
+In-Reply-To: <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
+References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
+ <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121015150244.GZ12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, 15 Oct 2012, Felipe Balbi wrote:
-
-> On Mon, Oct 15, 2012 at 01:51:08AM +0000, Paul Walmsley wrote:
-> > 
-> > Commit 3b2f8f82dad7d1f79cdc8fc05bd1c94baf109bde ("i2c: omap: switch to
-> > threaded IRQ support") causes communication with I2C devices to fail
-> > after system suspend/resume on all OMAP3 devices:
-> > 
-> > ...
-> > [   40.228576] PM: noirq resume of devices complete after 3.723 msecs
-> > [   40.233184] PM: early resume of devices complete after 3.173 msecs
-> > [   40.242736] [sched_delayed] sched: RT throttling activated
-> > [   41.235046] omap_i2c omap_i2c.1: controller timed out
+On 17:30 Mon 15 Oct     , Bo Shen wrote:
+> The i2c core driver will turn the platform device ID to busnum
+> When using platfrom device ID as -1, it means dynamically assigned
+> the busnum. When writing code, we need to make sure the busnum,
+> and call i2c_register_board_info(int busnum, ...) to register device
+> if using -1, we do not know the value of busnum
+> 	
+> In order to solve this issue, set the platform device ID as a fix number
+> Here using 0 to match the busnum used in i2c_regsiter_board_info()
 > 
-> instead of just reverting the patch, I'd rather try to figure out why
-> controller times out in that situation.
-> 
-> It should make no difference if you're running an IRQ thread or not.
-> 
-> Do you have any extra debugging information which might help figuring
-> out what the issue really is ?
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> ---
 
-As mentioned, the problem can be easily reproduced on OMAP3 is test by 
-running
+can you check when this append for the first time to schedule a patch for stable too
 
-"echo mem > /sys/power/state"
-
-in userspace when rootfs is on MMC.  Then wake up out of suspend, for 
-example, by hitting ENTER on the serial console.
-
-This needs to be part of the testing before any OMAP patches are posted to 
-the lists -- if for no other reason than because Android kernels enter and 
-exit system suspend frequently as part of their standard usage model.
-
-> If the thread is actually at fault, then we need to add IRQF_NO_THREAD
-> to the IRQ flags, otherwise same issue will appear if we boot with
-> "threadirqs" kernel parameter.
-
-...
-
-> but it fails because I2C times out and I'd like to understand why,
-> before just reverting the patch.
-
-It doesn't matter to me how it's fixed as long as it's fixed quickly 
-during the early 3.7-rcs.  
-
-
-- Paul
+Best Regards,
+J.
