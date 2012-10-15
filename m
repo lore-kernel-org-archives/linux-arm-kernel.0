@@ -1,52 +1,88 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Mon, 15 Oct 2012 13:44:55 +0200
-Subject: [PATCH 9/9] ARM: add uprobes support
-In-Reply-To: <20121015111443.GA2006@linaro.org>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-9-git-send-email-rabin@rab.in>
- <20121015111443.GA2006@linaro.org>
-Message-ID: <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 15 Oct 2012 17:44:07 +0530
+Subject: [GIT PULL] OMAP-GPMC cleanup for common zImage
+Message-ID: <1350303247-13495-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/15 Dave Martin <dave.martin@linaro.org>:
-> On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
->> Add basic uprobes support for ARM.
->>
->> perf probe --exec and SystemTap's userspace probing work.  The ARM
->> kprobes test code has also been run in a userspace harness to test the
->> uprobe instruction decoding.
->
-> The assumption that the target code is ARM appears to be buried all over
-> the place.
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-Right, as stated:
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
->> Caveats:
->>  - Thumb is not supported
+are available in the git repository at:
 
-> Certainly this code as currently written must depend on !THUMB2_KERNEL.
+  git at gitorious.org:x0148406-public/linux-kernel.git tags/gpmc-czimage
 
-Why?  It currently works for ARM userspace even if the kernel is
-Thumb-2.
+for you to fetch changes up to 3ef5d0071cf6c8b9a00b559232bb700ad59999d7:
 
-> However, there's an underlying problem here which we'd need to solve.
-> The kprobes code can take advantage of the fact that the kernel is all
-> ARM or (almost) all Thumb code.  So there is no support for kprobes
-> supporting ARM and Thumb at the same time.
->
-> With userspace, we don't have this luxury.  With Debian armhf, Ubuntu
-> and Linaro building Thumb-2 userspaces, it may be an increasingly common
-> configuration independently of whether the kernel is built in Thumb-2
-> or not.
->
-> Furthermode, there is no such thing as a pure Thumb-2 system in practice:
-> PLTs are always ARM, for example.  For uprobes to work well in userspace,
-> both should be supported together.
+  ARM: OMAP2+: gpmc: localize gpmc header (2012-10-15 14:42:15 +0530)
 
-Right.  I don't think it's difficult to support both of them together,
-my thought was just to have userspace tell us if they want to probe a
-Thumb instruction via the usual 0th-bit set convention, and then take it
-from there.  I didn't do the Thumb handling currently because I didn't
-really look into modifying the kprobes Thumb instruction decoding and
-the IT handling for uprobes.
+----------------------------------------------------------------
+gpmc cleanup for common ARM zImage
+
+----------------------------------------------------------------
+Afzal Mohammed (16):
+      ARM: OMAP2+: nand: unify init functions
+      ARM: OMAP2+: onenand: refactor for clarity
+      ARM: OMAP2+: gpmc: remove cs# in sync clk div calc
+      mtd: onenand: omap: cleanup gpmc dependency
+      mtd: nand: omap: free region as per resource size
+      mtd: nand: omap: read nand using register address
+      ARM: OMAP2+: onenand: connected soc info in pdata
+      mtd: onenand: omap: use pdata info instead of cpu_is
+      ARM: OMAP2+: onenand: header cleanup
+      ARM: OMAP2+: nand: header cleanup
+      mtd: nand: omap: bring in gpmc nand macros
+      ARM: OMAP2+: nand: bch capability check
+      ARM: OMAP2+: gpmc: nand register helper bch update
+      mtd: nand: omap: handle gpmc bch[48]
+      ARM: OMAP2+: gpmc: remove exported nand functions
+      ARM: OMAP2+: gpmc: localize gpmc header
+
+Jon Hunter (1):
+      ARM: OMAP2+: GPMC: Remove unused OneNAND get_freq() platform function
+
+ arch/arm/mach-omap2/board-2430sdp.c                |   2 +-
+ arch/arm/mach-omap2/board-3430sdp.c                |   2 +-
+ arch/arm/mach-omap2/board-apollon.c                |   2 +-
+ arch/arm/mach-omap2/board-cm-t35.c                 |   5 +-
+ arch/arm/mach-omap2/board-cm-t3517.c               |   5 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |  10 +-
+ arch/arm/mach-omap2/board-flash.c                  |  50 +--
+ arch/arm/mach-omap2/board-flash.h                  |   8 +-
+ arch/arm/mach-omap2/board-h4.c                     |   2 +-
+ arch/arm/mach-omap2/board-igep0020.c               |   5 +-
+ arch/arm/mach-omap2/board-ldp.c                    |   6 +-
+ arch/arm/mach-omap2/board-n8x0.c                   |   1 +
+ arch/arm/mach-omap2/board-omap3beagle.c            |  10 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |   8 +-
+ arch/arm/mach-omap2/board-omap3logic.c             |   2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c           |   3 +-
+ arch/arm/mach-omap2/board-omap3stalker.c           |   2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c         |  10 +-
+ arch/arm/mach-omap2/board-overo.c                  |   9 +-
+ arch/arm/mach-omap2/board-rm680.c                  |   3 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |   3 +-
+ arch/arm/mach-omap2/board-rx51.c                   |   2 +-
+ arch/arm/mach-omap2/board-zoom-debugboard.c        |   2 +-
+ arch/arm/mach-omap2/board-zoom.c                   |   5 +-
+ arch/arm/mach-omap2/common-board-devices.c         |  46 ---
+ arch/arm/mach-omap2/common-board-devices.h         |   1 -
+ arch/arm/mach-omap2/gpmc-nand.c                    |  85 ++--
+ arch/arm/mach-omap2/gpmc-nand.h                    |  27 ++
+ arch/arm/mach-omap2/gpmc-onenand.c                 | 214 +++++-----
+ arch/arm/mach-omap2/gpmc-onenand.h                 |  24 ++
+ arch/arm/mach-omap2/gpmc-smc91x.c                  |   2 +-
+ arch/arm/mach-omap2/gpmc-smsc911x.c                |   2 +-
+ arch/arm/mach-omap2/gpmc.c                         | 459 +--------------------
+ .../{plat-omap/include/plat => mach-omap2}/gpmc.h  |  61 +--
+ arch/arm/mach-omap2/pm34xx.c                       |   2 +-
+ arch/arm/mach-omap2/usb-tusb6010.c                 |   2 +-
+ drivers/mtd/nand/omap2.c                           | 125 +++++-
+ drivers/mtd/onenand/omap2.c                        |   9 +-
+ include/linux/platform_data/mtd-nand-omap2.h       |  46 ++-
+ include/linux/platform_data/mtd-onenand-omap2.h    |  28 +-
+ 40 files changed, 493 insertions(+), 797 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/gpmc-nand.h
+ create mode 100644 arch/arm/mach-omap2/gpmc-onenand.h
+ rename arch/arm/{plat-omap/include/plat => mach-omap2}/gpmc.h (67%)
