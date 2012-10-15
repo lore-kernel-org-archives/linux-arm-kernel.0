@@ -1,199 +1,86 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Oct 2012 13:41:44 -0400
-Subject: [PATCH 1/4] leds: leds-ns2: add device tree binding
-In-Reply-To: <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
-References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
- <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20121015174144.GH20922@titan.lakedaemon.net>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 15 Oct 2012 18:44:50 +0100
+Subject: [PATCH 9/9] ARM: add uprobes support
+In-Reply-To: <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-9-git-send-email-rabin@rab.in>
+ <20121015111443.GA2006@linaro.org>
+ <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
+Message-ID: <20121015174450.GB18614@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 05:34:52PM +0200, Simon Guinot wrote:
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> ---
->  .../devicetree/bindings/gpio/leds-ns2.txt          |   26 ++++++
->  drivers/leds/leds-ns2.c                            |   84 +++++++++++++++++++-
->  2 files changed, 107 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/leds-ns2.txt
+On Mon, Oct 15, 2012 at 01:44:55PM +0200, Rabin Vincent wrote:
+> 2012/10/15 Dave Martin <dave.martin@linaro.org>:
+> > On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
+> >> Add basic uprobes support for ARM.
+> >>
+> >> perf probe --exec and SystemTap's userspace probing work.  The ARM
+> >> kprobes test code has also been run in a userspace harness to test the
+> >> uprobe instruction decoding.
+> >
+> > The assumption that the target code is ARM appears to be buried all over
+> > the place.
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/leds-ns2.txt b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
-> new file mode 100644
-> index 0000000..1a84969
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
-> @@ -0,0 +1,26 @@
-> +Binding for dual-GPIO LED found on Network Space v2 (and parents).
-> +
-> +Required properties:
-> +- compatible: "ns2-leds".
-> +
-> +Each LED is represented as a sub-node of the ns2-leds device.
-> +
-> +Required sub-node properties:
-> +- cmd-gpio: Command LED GPIO. See OF device-tree GPIO specification.
-> +- slow-gpio: Slow LED GPIO. See OF device-tree GPIO specification.
-> +
-> +Optional sub-node properties:
-> +- label: Name for this LED. If omitted, the label is taken from the node name.
-> +- linux,default-trigger: Trigger assigned to the LED.
-> +
-> +Example:
-> +
-> +ns2-leds {
-> +	compatible = "ns2-leds";
-> +
-> +	blue-sata {
-> +		label = "ns2:blue:sata";
-> +		slow-gpio = <&gpio0 29 0>;
-> +		cmd-gpio = <&gpio0 30 0>;
-> +	};
-> +};
-> diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
-> index d176ec8..55d199b 100644
-> --- a/drivers/leds/leds-ns2.c
-> +++ b/drivers/leds/leds-ns2.c
-> @@ -30,6 +30,7 @@
->  #include <linux/leds.h>
->  #include <linux/module.h>
->  #include <linux/platform_data/leds-kirkwood-ns2.h>
-> +#include <linux/of_gpio.h>
->  
->  /*
->   * The Network Space v2 dual-GPIO LED is wired to a CPLD and can blink in
-> @@ -263,6 +264,68 @@ static void delete_ns2_led(struct ns2_led_data *led_dat)
->  	gpio_free(led_dat->slow);
->  }
->  
-> +#ifdef CONFIG_OF_GPIO
-> +/*
-> + * Translate OpenFirmware node properties into platform_data.
-> + */
-> +static int __devinit
-> +ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
-> +{
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *child;
-> +	struct ns2_led *leds;
-> +	int num_leds = 0;
-> +	int i = 0;
-> +
-> +	num_leds = of_get_child_count(np);
-> +	if (!num_leds)
-> +		return -ENODEV;
-> +
-> +	leds = devm_kzalloc(dev, num_leds * sizeof(struct ns2_led),
-> +			    GFP_KERNEL);
-> +	if (!leds)
-> +		return -ENOMEM;
-> +
-> +	for_each_child_of_node(np, child) {
-> +		const char *string;
-> +		int ret;
-> +
-> +		ret = of_get_named_gpio(child, "cmd-gpio", 0);
-> +		if (ret < 0)
-> +			return ret;
-
-free leds?
-
-> +		leds[i].cmd = ret;
-> +		ret = of_get_named_gpio(child, "slow-gpio", 0);
-> +		if (ret < 0)
-> +			return ret;
-
-same here.
-
-> +		leds[i].slow = ret;
-> +		ret = of_property_read_string(child, "label", &string);
-> +		leds[i].name = (ret == 0) ? string : child->name;
-> +		ret = of_property_read_string(child, "linux,default-trigger",
-> +					      &string);
-> +		if (ret == 0)
-> +			leds[i].default_trigger = string;
-> +
-> +		i++;
-> +	}
-> +
-> +	pdata->leds = leds;
-> +	pdata->num_leds = num_leds;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id of_ns2_leds_match[] = {
-> +	{ .compatible = "ns2-leds", },
-
-Is this LaCie-specific?  eg "lacie,ns2-leds"?
-
-> +	{},
-> +};
-> +#else
-> +static int __devinit
-> +ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
-> +{
-> +	return -ENODEV;
-> +}
-> +#endif /* CONFIG_OF_GPIO */
-
-The above doesn't look right to me.  The only time
-ns2_leds_get_of_pdata() gets called is when OF_GPIO is enabled.  You
-should be able to remove the #else block.
-
-> +
->  static int __devinit ns2_led_probe(struct platform_device *pdev)
->  {
->  	struct ns2_led_platform_data *pdata = pdev->dev.platform_data;
-> @@ -270,11 +333,25 @@ static int __devinit ns2_led_probe(struct platform_device *pdev)
->  	int i;
->  	int ret;
->  
-> +#ifdef CONFIG_OF_GPIO
-> +	if (!pdata) {
-> +		pdata = devm_kzalloc(&pdev->dev,
-> +				     sizeof(struct ns2_led_platform_data),
-> +				     GFP_KERNEL);
-> +		if (!pdata)
-> +			return -ENOMEM;
-> +
-> +		ret = ns2_leds_get_of_pdata(&pdev->dev, pdata);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +#else
->  	if (!pdata)
->  		return -EINVAL;
-> +#endif /* CONFIG_OF_GPIO */
->  
->  	leds_data = devm_kzalloc(&pdev->dev, sizeof(struct ns2_led_data) *
-> -			    pdata->num_leds, GFP_KERNEL);
-> +				 pdata->num_leds, GFP_KERNEL);
->  	if (!leds_data)
->  		return -ENOMEM;
->  
-> @@ -312,8 +389,9 @@ static struct platform_driver ns2_led_driver = {
->  	.probe		= ns2_led_probe,
->  	.remove		= __devexit_p(ns2_led_remove),
->  	.driver		= {
-> -		.name	= "leds-ns2",
-> -		.owner	= THIS_MODULE,
-> +		.name		= "leds-ns2",
-> +		.owner		= THIS_MODULE,
-
-nit.  whitespace before '=', above two lines.
-
-> +		.of_match_table	= of_match_ptr(of_ns2_leds_match),
-
-Have you tried this with OF_GPIO=n?  of_match_ptr() handles CONFIG_OF
-being enabled/disabled.  Which means the case of CONFIG_OF=y,
-CONFIG_OF_GPIO=n appears to be unhandled.
-
-thx,
-
-Jason.
-
->  	},
->  };
->  
-> -- 
-> 1.7.10
+> Right, as stated:
 > 
+> >> Caveats:
+> >>  - Thumb is not supported
+> 
+> > Certainly this code as currently written must depend on !THUMB2_KERNEL.
+> 
+> Why?  It currently works for ARM userspace even if the kernel is
+> Thumb-2.
+
+My bad, I misread what was happening in the Makefile changes.
+
+My concern is about whether we can build the ARM and Thumb-2 kprobes
+code into the same kernel.  If so, no problem, but I believe this is
+not a tested configuration for kprobes itself.
+
+If you've not already done so, it should be possible to test this
+by adding CONFIG_THUMB2_KERNEL=y to your config, providing your
+hardware is Thumb-2 capable.
+
+> > However, there's an underlying problem here which we'd need to solve.
+> > The kprobes code can take advantage of the fact that the kernel is all
+> > ARM or (almost) all Thumb code.  So there is no support for kprobes
+> > supporting ARM and Thumb at the same time.
+> >
+> > With userspace, we don't have this luxury.  With Debian armhf, Ubuntu
+> > and Linaro building Thumb-2 userspaces, it may be an increasingly common
+> > configuration independently of whether the kernel is built in Thumb-2
+> > or not.
+> >
+> > Furthermode, there is no such thing as a pure Thumb-2 system in practice:
+> > PLTs are always ARM, for example.  For uprobes to work well in userspace,
+> > both should be supported together.
+> 
+> Right.  I don't think it's difficult to support both of them together,
+> my thought was just to have userspace tell us if they want to probe a
+> Thumb instruction via the usual 0th-bit set convention, and then take it
+> from there.  I didn't do the Thumb handling currently because I didn't
+> really look into modifying the kprobes Thumb instruction decoding and
+> the IT handling for uprobes.
+
+Having looked at the code a little more closely, it looks more closely
+aligned with this goal than I thought at first.
+
+I agree with your suggestion to require the caller to specify explicitly
+whether they want to insert an ARM or Thumb probe (indeed, I think
+there's no other way to do it, since guessing the target instruction
+set can't be done reliably).  The code for setting a probe can then
+switch trivially on that low bit.
+
+Additional undef_hooks would be needed for the Thumb case, but this
+looks relatively straightforward, as you say.
+
+
+General question which I'm not sure I understand yet: is is possible
+to combine uprobes/kprobes decode more completely?  It's not obvious
+to me whether the uprobes-specific decoding only relates to features
+which architecturally execute differently in user mode versus
+privileged mode.  Some explanation somewhere could be helpful.
+
+Cheers
+---Dave
