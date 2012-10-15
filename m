@@ -1,134 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Oct 2012 11:44:56 +0100
-Subject: [PATCH] MMC: fix sdhci-dove removal
-In-Reply-To: <20121015103725.GQ21164@n2100.arm.linux.org.uk>
-References: <20121015094348.GP21164@n2100.arm.linux.org.uk>
- <20121015103725.GQ21164@n2100.arm.linux.org.uk>
-Message-ID: <20121015104456.GR21164@n2100.arm.linux.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 15 Oct 2012 13:01:44 +0200
+Subject: [PATCH] [media] s5p-csis: Added RAW data format as the supported
+ format.
+In-Reply-To: <1350294483-7417-1-git-send-email-r.solanki@samsung.com>
+References: <1350294483-7417-1-git-send-email-r.solanki@samsung.com>
+Message-ID: <507BED18.3040509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 11:37:25AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Oct 15, 2012 at 10:43:48AM +0100, Russell King - ARM Linux wrote:
-> > 1. Unregister the device _BEFORE_ taking away any resources it may
-> >    be using.
-> > 2. Don't check clks against NULL.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Hi Ritesh,
+
+On 10/15/2012 11:48 AM, Ritesh Kumar Solanki wrote:
+> csis can support jpeg, yuv and raw data format.
 > 
-> Looking at this driver some more, who the hell came up with the sdhci
-> registration interface?  It violates one of the most fundamental
-> principles of kernel driver programming.  You do _NOT_ publish your
-> driver interfaces _UNTIL_ you have finished setting your device up.
-> Otherwise, in a preemptible or SMP kernel, your driver can be used
-> before the initialization has completed.
+> Signed-off-by: Ritesh Kumar Solanki <r.solanki@samsung.com>
+
+Thanks for the patch. I already have a patch adding all three
+raw Bayer formats (SGRBG8/10/12) at the driver and I plan it
+for v3.8. So I'd like to use it instead of your patch.
+I'll post it as soon as I get my development branch cleaned up.
+
+Regards,
+Sylwester
+
+> ---
+>  drivers/media/platform/s5p-fimc/mipi-csis.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> As this driver calls sdhci_pltfm_register() before it has obtained the
-> clock for the interface, and this function does:
-> 	sdhci_pltfm_init
-> 	sdhci_add_host
-> 		mmc_add_host
-> 			mmc_start_host
-> 				mmc_power_up
-> 					mmc_set_ios
-> 						sdhci_set_ios
-> 
-> See, we're trying to power up and clock the card _before_ the dove
-> sdhci driver has even claimed the clock let alone enabled it.  This
-> is total bollocks.  The sdhci platform interface is total crap for
-> creating this broken design in the first place.  This is why MMC has
-> the init + add interfaces, they're there to allow drivers to do stuff
-> the Right(tm) way and avoid shit like the above.
-> 
-> This should have been picked up at review time before the driver went
-> into mainline.  In any case, it needs to be fixed.
-
-Here's an updated patch which just about fixes the sdhci-dove driver.
-I would not be surprised given the idiotic sdhci-pltfm API if many
-other drivers suffered the same bug.
-
-8<====
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: [PATCH] MMC: fix sdhci-dove probe/removal
-
-1. Never ever publish a device in the system before it has been setup
-   to a usable state.
-2. Unregister the device _BEFORE_ taking away any resources it may be
-   using.
-3. Don't check clks against NULL.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/mmc/host/sdhci-dove.c |   36 ++++++++++++++++++------------------
- 1 files changed, 18 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-index a6e53a1..7d3a4e4 100644
---- a/drivers/mmc/host/sdhci-dove.c
-+++ b/drivers/mmc/host/sdhci-dove.c
-@@ -83,30 +83,31 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
- 	struct sdhci_dove_priv *priv;
- 	int ret;
- 
--	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
--	if (ret)
--		goto sdhci_dove_register_fail;
--
- 	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
- 			    GFP_KERNEL);
- 	if (!priv) {
- 		dev_err(&pdev->dev, "unable to allocate private data");
--		ret = -ENOMEM;
--		goto sdhci_dove_allocate_fail;
-+		return -ENOMEM;
- 	}
- 
-+	priv->clk = clk_get(&pdev->dev, NULL);
-+	if (!IS_ERR(priv->clk))
-+		clk_prepare_enable(priv->clk);
-+
-+	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
-+	if (ret)
-+		goto sdhci_dove_register_fail;
-+
- 	host = platform_get_drvdata(pdev);
- 	pltfm_host = sdhci_priv(host);
- 	pltfm_host->priv = priv;
- 
--	priv->clk = clk_get(&pdev->dev, NULL);
--	if (!IS_ERR(priv->clk))
--		clk_prepare_enable(priv->clk);
- 	return 0;
- 
--sdhci_dove_allocate_fail:
--	sdhci_pltfm_unregister(pdev);
- sdhci_dove_register_fail:
-+	clk_unprepare_disable(priv->clk);
-+	clk_put(priv->clk);
-+sdhci_dove_allocate_fail:
- 	return ret;
- }
- 
-@@ -116,14 +117,13 @@ static int __devexit sdhci_dove_remove(struct platform_device *pdev)
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct sdhci_dove_priv *priv = pltfm_host->priv;
- 
--	if (priv->clk) {
--		if (!IS_ERR(priv->clk)) {
--			clk_disable_unprepare(priv->clk);
--			clk_put(priv->clk);
--		}
--		devm_kfree(&pdev->dev, priv->clk);
-+	sdhci_pltfm_unregister(pdev);
-+
-+	if (!IS_ERR(priv->clk)) {
-+		clk_disable_unprepare(priv->clk);
-+		clk_put(priv->clk);
- 	}
--	return sdhci_pltfm_unregister(pdev);
-+	return 0;
- }
- 
- static struct platform_driver sdhci_dove_driver = {
--- 
-1.7.4.4
+> diff --git a/drivers/media/platform/s5p-fimc/mipi-csis.c b/drivers/media/platform/s5p-fimc/mipi-csis.c
+> index 2f73d9e..0205ae4 100644
+> --- a/drivers/media/platform/s5p-fimc/mipi-csis.c
+> +++ b/drivers/media/platform/s5p-fimc/mipi-csis.c
+> @@ -145,6 +145,10 @@ static const struct csis_pix_format s5pcsis_formats[] = {
+>  		.code = V4L2_MBUS_FMT_JPEG_1X8,
+>  		.fmt_reg = S5PCSIS_CFG_FMT_USER(1),
+>  		.data_alignment = 32,
+> +	}, {
+> +		.code = V4L2_MBUS_FMT_SGRBG10_1X10,
+> +		.fmt_reg = S5PCSIS_CFG_FMT_RAW10,
+> +		.data_alignment = 24,
+>  	},
+>  };
