@@ -1,131 +1,386 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Oct 2012 05:24:59 +0000 (UTC)
-Subject: [PATCH v3] ARM: vfp: fix save and restore when running on pre-VFPv3
- and CONFIG_VFPv3 set
-In-Reply-To: <CAG5Tg6XqpeRppWbr9-yBmsf+2TobhE5ateMX4crs10grn-tuAA@mail.gmail.com>
-References: <alpine.DEB.2.00.1210130441300.5736@utopia.booyaka.com>
- <20121013090255.GT28061@n2100.arm.linux.org.uk>
- <yw1xr4p2myre.fsf@unicorn.mansr.com>
- <20121013133654.GU28061@n2100.arm.linux.org.uk>
- <alpine.DEB.2.00.1210150157400.16624@utopia.booyaka.com>
- <CAG5Tg6XqpeRppWbr9-yBmsf+2TobhE5ateMX4crs10grn-tuAA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1210150523190.15973@utopia.booyaka.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 15 Oct 2012 16:35:48 +1100
+Subject: [PATCH RFC 2/6 v3] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <1350069085-13283-3-git-send-email-stigge@antcom.de>
+References: <1350069085-13283-1-git-send-email-stigge@antcom.de>
+ <1350069085-13283-3-git-send-email-stigge@antcom.de>
+Message-ID: <507BA0B4.5030701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13/10/12 06:11, Roland Stigge wrote:
+> This patch adds sysfs support to the block GPIO API.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-After commit 846a136881b8f73c1f74250bf6acfaa309cab1f2 ("ARM: vfp: fix
-saving d16-d31 vfp registers on v6+ kernels"), the OMAP 2430SDP board
-started crashing during boot with omap2plus_defconfig:
+Hi Roland,
 
-[    3.875122] mmcblk0: mmc0:e624 SD04G 3.69 GiB
-[    3.915954]  mmcblk0: p1
-[    4.086639] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
-[    4.093719] Modules linked in:
-[    4.096954] CPU: 0    Not tainted  (3.6.0-02232-g759e00b #570)
-[    4.103149] PC is at vfp_reload_hw+0x1c/0x44
-[    4.107666] LR is at __und_usr_fault_32+0x0/0x8
+Some comments below,
 
-It turns out that the context save/restore fix unmasked a latent bug
-in commit 5aaf254409f8d58229107b59507a8235b715a960 ("ARM: 6203/1: Make
-VFPv3 usable on ARMv6").  When CONFIG_VFPv3 is set, but the kernel is
-booted on a pre-VFPv3 core, the code attempts to save and restore the
-d16-d31 VFP registers.  These are only present on non-D16 VFPv3+, so
-this results in an undefined instruction exception.  The code didn't
-crash before commit 846a136 because the save and restore code was
-only touching d0-d15, present on all VFP.
+~Ryan
 
-Fix by implementing a request from Russell King to add a new HWCAP
-flag that affirmatively indicates the presence of the d16-d31
-registers:
+> 
+> ---
+>  Documentation/ABI/testing/sysfs-gpio |    6 
+>  drivers/gpio/gpiolib.c               |  226 ++++++++++++++++++++++++++++++++++-
+>  include/asm-generic/gpio.h           |   11 +
+>  include/linux/gpio.h                 |   13 ++
+>  4 files changed, 254 insertions(+), 2 deletions(-)
+> 
+> --- linux-2.6.orig/Documentation/ABI/testing/sysfs-gpio
+> +++ linux-2.6/Documentation/ABI/testing/sysfs-gpio
+> @@ -24,4 +24,8 @@ Description:
+>  	    /base ... (r/o) same as N
+>  	    /label ... (r/o) descriptive, not necessarily unique
+>  	    /ngpio ... (r/o) number of GPIOs; numbered N to N + (ngpio - 1)
+> -
+> +	/blockN ... for each GPIO block #N
+> +	    /ngpio ... (r/o) number of GPIOs in this group
+> +	    /exported ... sysfs export state of this group (0, 1)
+> +	    /value ... current value as 32 or 64 bit integer in decimal
+> +                       (only available if /exported is 1)
+> --- linux-2.6.orig/drivers/gpio/gpiolib.c
+> +++ linux-2.6/drivers/gpio/gpiolib.c
+> @@ -974,6 +974,218 @@ static void gpiochip_unexport(struct gpi
+>  				chip->label, status);
+>  }
+>  
+> +static ssize_t gpio_block_ngpio_show(struct device *dev,
+> +				     struct device_attribute *attr, char *buf)
+> +{
+> +	const struct gpio_block	*block = dev_get_drvdata(dev);
+> +
+> +	return sprintf(buf, "%u\n", block->ngpio);
+> +}
+> +static struct device_attribute
+> +dev_attr_block_ngpio = __ATTR(ngpio, 0444, gpio_block_ngpio_show, NULL);
 
-   http://marc.info/?l=linux-arm-kernel&m=135013547905283&w=2
+static DEVICE_ATTR(ngpio, S_IRUGO, gpio_block_ngpio_show, NULL);
 
-and some feedback from M?ns to clarify the name of the HWCAP flag.
+> +
+> +static ssize_t gpio_block_value_show(struct device *dev,
+> +				     struct device_attribute *attr, char *buf)
+> +{
+> +	const struct gpio_block *block = dev_get_drvdata(dev);
+> +
+> +	return sprintf(buf, "%u\n", gpio_block_get(block));
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@linaro.org>
-Cc: M?ns Rullg?rd <mans.rullgard@linaro.org>
----
-Thanks for the suggestion, M?ns; certainly a readability improvement.
+Printing the value of a bunch of pins as a decimal is a bit odd. Hex, or
+a bitmap would be more appropriate.
 
- arch/arm/include/asm/vfpmacros.h  |   12 ++++++------
- arch/arm/include/uapi/asm/hwcap.h |    3 ++-
- arch/arm/vfp/vfpmodule.c          |    9 ++++++---
- 3 files changed, 14 insertions(+), 10 deletions(-)
+> +}
+> +
+> +static bool gpio_block_is_output(struct gpio_block *block)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < block->ngpio; i++)
+> +		if (!test_bit(FLAG_IS_OUT, &gpio_desc[block->gpio[i]].flags))
+> +			return false;
 
-diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
-index 6a6f1e4..301c1db 100644
---- a/arch/arm/include/asm/vfpmacros.h
-+++ b/arch/arm/include/asm/vfpmacros.h
-@@ -27,9 +27,9 @@
- #if __LINUX_ARM_ARCH__ <= 6
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
--	tst	\tmp, #HWCAP_VFPv3D16
--	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
--	addne	\base, \base, #32*4		    @ step over unused register space
-+	tst	\tmp, #HWCAP_VFPD32
-+	ldcnel	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
-@@ -51,9 +51,9 @@
- #if __LINUX_ARM_ARCH__ <= 6
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
--	tst	\tmp, #HWCAP_VFPv3D16
--	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
--	addne	\base, \base, #32*4		    @ step over unused register space
-+	tst	\tmp, #HWCAP_VFPD32
-+	stcnel	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index f254f65..3688fd1 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -18,11 +18,12 @@
- #define HWCAP_THUMBEE	(1 << 11)
- #define HWCAP_NEON	(1 << 12)
- #define HWCAP_VFPv3	(1 << 13)
--#define HWCAP_VFPv3D16	(1 << 14)
-+#define HWCAP_VFPv3D16	(1 << 14)	/* also set for VFPv4-D16 */
- #define HWCAP_TLS	(1 << 15)
- #define HWCAP_VFPv4	(1 << 16)
- #define HWCAP_IDIVA	(1 << 17)
- #define HWCAP_IDIVT	(1 << 18)
-+#define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
- 
- 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index c834b32..3b44e0d 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -701,11 +701,14 @@ static int __init vfp_init(void)
- 			elf_hwcap |= HWCAP_VFPv3;
- 
- 			/*
--			 * Check for VFPv3 D16. CPUs in this configuration
--			 * only have 16 x 64bit registers.
-+			 * Check for VFPv3 D16 and VFPv4 D16.  CPUs in
-+			 * this configuration only have 16 x 64bit
-+			 * registers.
- 			 */
- 			if (((fmrx(MVFR0) & MVFR0_A_SIMD_MASK)) == 1)
--				elf_hwcap |= HWCAP_VFPv3D16;
-+				elf_hwcap |= HWCAP_VFPv3D16; /* also v4-D16 */
-+			else
-+				elf_hwcap |= HWCAP_VFPD32;
- 		}
- #endif
- 		/*
--- 
-1.7.10.4
+Shouldn't a block force all of the pins to be the same direction? Or at
+least have gpio_block_set skip pins which aren't outputs.
+
+> +	return true;
+> +}
+> +
+> +static ssize_t gpio_block_value_store(struct device *dev,
+> +				      struct device_attribute *attr,
+> +				      const char *buf, size_t size)
+> +{
+> +	ssize_t			status;
+> +	struct gpio_block	*block = dev_get_drvdata(dev);
+> +	unsigned long		value;
+> +
+> +	mutex_lock(&sysfs_lock);
+> +
+> +	status = kstrtoul(buf, 0, &value);
+> +	if (status == 0) {
+
+You don't need to do the kstrtoul under the lock:
+
+	err = kstrtoul(buf, 0, &value);
+	if (err)
+		return err;
+
+	mutex_lock(&sysfs_lock);
+	...
+
+Global lock is a bit lame, it serialises all of your bitbanged busses
+against each other. Why is it not part of the gpio_block structure?
+
+
+> +		if (gpio_block_is_output(block)) {
+> +			gpio_block_set(block, value);
+> +			status = size;
+> +		} else {
+> +			status = -EPERM;
+> +		}
+> +	}
+> +
+> +	mutex_unlock(&sysfs_lock);
+> +	return status;
+> +}
+> +
+> +static struct device_attribute
+> +dev_attr_block_value = __ATTR(value, 0644, gpio_block_value_show,
+> +			      gpio_block_value_store);
+
+Use DEVICE_ATTR and S_IWUSR | S_IRUGO permission macros.
+
+> +
+> +static int gpio_block_value_is_exported(struct gpio_block *block)
+> +{
+> +	struct device		*dev;
+> +	struct sysfs_dirent	*sd = NULL;
+> +
+> +	mutex_lock(&sysfs_lock);
+> +	dev = class_find_device(&gpio_class, NULL, block, match_export);
+> +	if (!dev)
+> +		goto out;
+> +
+> +	sd = sysfs_get_dirent(dev->kobj.sd, NULL, "value");
+> +
+> +out:
+> +	mutex_unlock(&sysfs_lock);
+> +	return sd ? 1 : 0;
+
+  return sd;
+
+or:
+
+  return !!sd;
+
+> +}
+> +
+> +static ssize_t gpio_block_exported_show(struct device *dev,
+> +					struct device_attribute *attr,
+> +					char *buf)
+> +{
+> +	struct gpio_block	*block = dev_get_drvdata(dev);
+> +
+> +	return sprintf(buf, "%u\n", gpio_block_value_is_exported(block));
+> +}
+> +
+> +static int gpio_block_value_export(struct gpio_block *block)
+> +{
+> +	struct device	*dev;
+> +	int		status;
+> +	int		i;
+> +
+> +	mutex_lock(&sysfs_lock);
+> +
+> +	for (i = 0; i < block->ngpio; i++) {
+> +		status = gpio_request(block->gpio[i], "sysfs");
+> +		if (status)
+> +			goto out;
+> +	}
+> +
+> +	dev = class_find_device(&gpio_class, NULL, block, match_export);
+> +	if (!dev) {
+> +		status = -ENODEV;
+> +		goto out;
+> +	}
+> +
+> +	status = device_create_file(dev, &dev_attr_block_value);
+> +	if (status)
+> +		goto out;
+> +
+> +	mutex_unlock(&sysfs_lock);
+> +	return 0;
+> +
+> +out:
+> +	while (i > 0) {
+> +		i--;
+> +		gpio_free(block->gpio[i]);
+> +	}
+
+Nitpick:
+
+	while (--i >= 0)
+		gpio_free(block->gpio[i]);
+
+> +
+> +	mutex_unlock(&sysfs_lock);
+> +	return status;
+> +}
+> +
+> +static int gpio_block_value_unexport(struct gpio_block *block)
+> +{
+> +	struct device	*dev;
+> +	int		i;
+> +
+> +	dev = class_find_device(&gpio_class, NULL, block, match_export);
+> +	if (!dev)
+> +		return -ENODEV;
+> +
+> +	for (i = 0; i < block->ngpio; i++)
+> +		gpio_free(block->gpio[i]);
+> +
+> +	device_remove_file(dev, &dev_attr_block_value);
+> +
+> +	return 0;
+> +}
+> +
+> +static ssize_t gpio_block_exported_store(struct device *dev,
+> +					 struct device_attribute *attr,
+> +					 const char *buf, size_t size)
+> +{
+> +	long	value;
+> +	int	status;
+> +	struct	gpio_block *block = dev_get_drvdata(dev);
+> +	int	exported = gpio_block_value_is_exported(block);
+> +
+> +	status = kstrtoul(buf, 0, &value);
+> +	if (status < 0)
+> +		goto err;
+> +
+> +	if (value != exported) {
+> +		if (value)
+> +			status = gpio_block_value_export(block);
+> +		else
+> +			status = gpio_block_value_unexport(block);
+> +		if (!status)
+> +			status = size;
+> +	} else {
+> +		status = size;
+> +	}
+> +err:
+> +	return status;
+> +}
+> +
+> +static DEVICE_ATTR(exported, 0644, gpio_block_exported_show,
+> +		   gpio_block_exported_store);
+> +
+> +static const struct attribute *gpio_block_attrs[] = {
+> +	&dev_attr_block_ngpio.attr,
+> +	&dev_attr_exported.attr,
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group gpio_block_attr_group = {
+> +	.attrs = (struct attribute **) gpio_block_attrs,
+> +};
+> +
+> +int gpio_block_export(struct gpio_block *block)
+> +{
+> +	int		status;
+> +	struct device	*dev;
+> +
+> +	/* can't export until sysfs is available ... */
+> +	if (!gpio_class.p) {
+> +		pr_debug("%s: called too early!\n", __func__);
+> +		return -ENOENT;
+> +	}
+> +
+> +	mutex_lock(&sysfs_lock);
+> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
+> +			    block->name);
+> +	if (!IS_ERR(dev))
+> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
+> +	else
+> +		status = PTR_ERR(dev);
+> +	mutex_unlock(&sysfs_lock);
+> +
+> +	return status;
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_export);
+> +
+> +void gpio_block_unexport(struct gpio_block *block)
+> +{
+> +	struct device *dev;
+> +
+> +	mutex_lock(&sysfs_lock);
+> +	dev = class_find_device(&gpio_class, NULL, block, match_export);
+> +	if (dev)
+> +		device_unregister(dev);
+> +	mutex_unlock(&sysfs_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_unexport);
+> +
+>  static int __init gpiolib_sysfs_init(void)
+>  {
+>  	int		status;
+> @@ -1882,7 +2094,14 @@ int gpio_block_register(struct gpio_bloc
+>  			break;
+>  		}
+>  	}
+> -	return i == NR_GPIO_BLOCKS ? -EBUSY : 0;
+> +	if (i == NR_GPIO_BLOCKS)
+> +		goto err;
+> +
+> +	gpio_block_export(block);
+> +
+> +	return 0;
+> +err:
+> +	return -EBUSY;
+>  }
+>  EXPORT_SYMBOL_GPL(gpio_block_register);
+>  
+> @@ -1896,6 +2115,11 @@ void gpio_block_unregister(struct gpio_b
+>  			break;
+>  		}
+>  	}
+> +
+> +	if (i == NR_GPIO_BLOCKS)
+> +		return;
+> +
+> +	gpio_block_unexport(block);
+>  }
+>  EXPORT_SYMBOL_GPL(gpio_block_unregister);
+>  
+> --- linux-2.6.orig/include/asm-generic/gpio.h
+> +++ linux-2.6/include/asm-generic/gpio.h
+> @@ -210,6 +210,8 @@ extern int gpio_export_link(struct devic
+>  			unsigned gpio);
+>  extern int gpio_sysfs_set_active_low(unsigned gpio, int value);
+>  extern void gpio_unexport(unsigned gpio);
+> +extern int gpio_block_export(struct gpio_block *block);
+> +extern void gpio_block_unexport(struct gpio_block *block);
+>  
+>  #endif	/* CONFIG_GPIO_SYSFS */
+>  
+> @@ -269,6 +271,15 @@ static inline int gpio_sysfs_set_active_
+>  static inline void gpio_unexport(unsigned gpio)
+>  {
+>  }
+> +
+> +static inline int gpio_block_export(struct gpio_block *block)
+> +{
+> +	return -ENOSYS;
+> +}
+> +
+> +static inline void gpio_block_unexport(struct gpio_block *block)
+> +{
+> +}
+>  #endif	/* CONFIG_GPIO_SYSFS */
+>  
+>  #endif /* _ASM_GENERIC_GPIO_H */
+> --- linux-2.6.orig/include/linux/gpio.h
+> +++ linux-2.6/include/linux/gpio.h
+> @@ -278,6 +278,19 @@ static inline void gpio_unexport(unsigne
+>  	WARN_ON(1);
+>  }
+>  
+> +static inline int gpio_block_export(struct gpio_block *block)
+> +{
+> +	/* GPIO block can never have been requested or set as {in,out}put */
+> +	WARN_ON(1);
+> +	return -EINVAL;
+> +}
+> +
+> +static inline void gpio_block_unexport(struct gpio_block *block)
+> +{
+> +	/* GPIO block can never have been exported */
+> +	WARN_ON(1);
+> +}
+> +
+>  static inline int gpio_to_irq(unsigned gpio)
+>  {
+>  	/* GPIO can never have been requested or set as input */
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
