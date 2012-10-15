@@ -1,58 +1,159 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Oct 2012 14:15:59 +0100
-Subject: [PATCH 2/2] mmc: mmci: Make use of new DT capability parsing function
-In-Reply-To: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
-References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1350306959-5843-2-git-send-email-lee.jones@linaro.org>
+Date: Mon, 15 Oct 2012 14:16:59 +0100
+Subject: [PATCH 1/2] regulator: gpio-regulator: Allow use of GPIO controlled
+ regulators though DT
+Message-ID: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of rolling our own parsers for each new capability we
-wish to support, we can make use of a call-once function which
-parses all known capability strings and populates the
-necessary properties for us. All we have to do is remove our
-own cruft and invoke the call.
+Here we provide the GPIO Regulator driver with Device Tree capability, so
+that when a platform is booting with DT instead of platform data we can
+still make full use of it.
 
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-mmc at vger.kernel.org
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   20 +-------------------
- 1 file changed, 1 insertion(+), 19 deletions(-)
+ drivers/regulator/gpio-regulator.c |   94 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index edc3e9b..bc02f05 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1227,25 +1227,7 @@ static void mmci_dt_populate_generic_pdata(struct device_node *np,
- 	if (!pdata->f_max)
- 		pr_warn("%s has no 'max-frequency' property\n", np->full_name);
+diff --git a/drivers/regulator/gpio-regulator.c b/drivers/regulator/gpio-regulator.c
+index 8b5944f..e467d0a 100644
+--- a/drivers/regulator/gpio-regulator.c
++++ b/drivers/regulator/gpio-regulator.c
+@@ -28,9 +28,12 @@
+ #include <linux/platform_device.h>
+ #include <linux/regulator/driver.h>
+ #include <linux/regulator/machine.h>
++#include <linux/regulator/of_regulator.h>
+ #include <linux/regulator/gpio-regulator.h>
+ #include <linux/gpio.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_gpio.h>
  
--	if (of_get_property(np, "mmc-cap-mmc-highspeed", NULL))
--		pdata->capabilities |= MMC_CAP_MMC_HIGHSPEED;
--	if (of_get_property(np, "mmc-cap-sd-highspeed", NULL))
--		pdata->capabilities |= MMC_CAP_SD_HIGHSPEED;
--
--	of_property_read_u32(np, "bus-width", &bus_width);
--	switch (bus_width) {
--	case 0 :
--		/* No bus-width supplied. */
--		break;
--	case 4 :
--		pdata->capabilities |= MMC_CAP_4_BIT_DATA;
--		break;
--	case 8 :
--		pdata->capabilities |= MMC_CAP_8_BIT_DATA;
--		break;
--	default :
--		pr_warn("%s: Unsupported bus width\n", np->full_name);
--	}
-+	mmc_of_populate_caps(np, &pdata->capabilities, &pdata->capabilities2);
+ struct gpio_regulator_data {
+ 	struct regulator_desc desc;
+@@ -129,6 +132,84 @@ static struct regulator_ops gpio_regulator_voltage_ops = {
+ 	.list_voltage = gpio_regulator_list_voltage,
+ };
+ 
++struct gpio_regulator_config *
++of_get_gpio_regulator_config(struct device *dev, struct device_node *np)
++{
++	struct gpio_regulator_config *config;
++	struct property *prop;
++	const char *regtype;
++	int proplen, gpio, i;
++
++	config = devm_kzalloc(dev,
++			sizeof(struct gpio_regulator_config),
++			GFP_KERNEL);
++	if (!config)
++		return ERR_PTR(-ENOMEM);
++
++	config->init_data = of_get_regulator_init_data(dev, np);
++	if (!config->init_data)
++		return ERR_PTR(-EINVAL);
++
++	config->supply_name = config->init_data->constraints.name;
++
++	if (of_property_read_bool(np, "enable-active-high"))
++		config->enable_high = true;
++
++	if (of_property_read_bool(np, "enable-at-boot"))
++		config->enabled_at_boot = true;
++
++	of_property_read_u32(np, "startup-delay-us", &config->startup_delay);
++
++	config->enable_gpio = of_get_named_gpio(np, "enable-gpio", 0);
++
++	/* Fetch GPIOs. */
++	for (i = 0; ; i++)
++		if (of_get_named_gpio(np, "gpios", i) < 0)
++			break;
++	config->nr_gpios = i;
++
++	config->gpios = devm_kzalloc(dev,
++				sizeof(struct gpio) * config->nr_gpios,
++				GFP_KERNEL);
++	if (!config->gpios)
++		return ERR_PTR(-ENOMEM);
++
++	for (i = 0; config->nr_gpios; i++) {
++		gpio = of_get_named_gpio(np, "gpios", i);
++		if (gpio < 0)
++			break;
++		config->gpios[i].gpio = gpio;
++	}
++
++	/* Fetch states. */
++	prop = of_find_property(np, "states", NULL);
++	proplen = prop->length / sizeof(int);
++
++	config->states = devm_kzalloc(dev,
++				sizeof(struct gpio_regulator_state)
++				* (proplen / 2),
++				GFP_KERNEL);
++	if (!config->states)
++		return ERR_PTR(-ENOMEM);
++
++	for (i = 0; i < proplen / 2; i++) {
++		config->states[i].value =
++			be32_to_cpup((int *)prop->value + (i * 2));
++		config->states[i].gpios =
++			be32_to_cpup((int *)prop->value + (i * 2 + 1));
++	}
++	config->nr_states = i;
++
++	of_property_read_string(np, "regulator-type", &regtype);
++
++	if (!strncmp("voltage", regtype, 7))
++		config->type = REGULATOR_VOLTAGE;
++	else if (!strncmp("current", regtype, 7))
++		config->type = REGULATOR_CURRENT;
++
++	return config;
++}
++
+ static struct regulator_ops gpio_regulator_current_ops = {
+ 	.get_current_limit = gpio_regulator_get_value,
+ 	.set_current_limit = gpio_regulator_set_current_limit,
+@@ -137,10 +218,17 @@ static struct regulator_ops gpio_regulator_current_ops = {
+ static int __devinit gpio_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct gpio_regulator_config *config = pdev->dev.platform_data;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct gpio_regulator_data *drvdata;
+ 	struct regulator_config cfg = { };
+ 	int ptr, ret, state;
+ 
++	if (np) {
++		config = of_get_gpio_regulator_config(&pdev->dev, np);
++		if (IS_ERR(config))
++			return PTR_ERR(config);
++	}
++
+ 	drvdata = devm_kzalloc(&pdev->dev, sizeof(struct gpio_regulator_data),
+ 			       GFP_KERNEL);
+ 	if (drvdata == NULL) {
+@@ -270,12 +358,18 @@ static int __devexit gpio_regulator_remove(struct platform_device *pdev)
+ 	return 0;
  }
- #else
- static void mmci_dt_populate_generic_pdata(struct device_node *np,
+ 
++static const struct of_device_id regulator_gpio_of_match[] __devinitconst = {
++	{ .compatible = "regulator-gpio", },
++	{},
++};
++
+ static struct platform_driver gpio_regulator_driver = {
+ 	.probe		= gpio_regulator_probe,
+ 	.remove		= __devexit_p(gpio_regulator_remove),
+ 	.driver		= {
+ 		.name		= "gpio-regulator",
+ 		.owner		= THIS_MODULE,
++		.of_match_table = regulator_gpio_of_match,
+ 	},
+ };
+ 
 -- 
 1.7.9.5
