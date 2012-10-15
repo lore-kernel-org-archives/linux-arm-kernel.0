@@ -1,41 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Oct 2012 22:34:25 +0200
-Subject: [PATCH] gpio: clps711x: delete local <mach/gpio.h> header
-Message-ID: <1350333265-23760-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 15 Oct 2012 22:36:32 +0200
+Subject: [PATCH] gpio: clps711x: localise <mach/gpio.h> header
+In-Reply-To: <20121016000405.94f779c6066ded6289e35baa@mail.ru>
+References: <1350330020-23240-1-git-send-email-linus.walleij@linaro.org>
+ <20121016000405.94f779c6066ded6289e35baa@mail.ru>
+Message-ID: <CACRpkdYxQsS4RfCxk3E4GPa+7GK2FeOVfTCps1ZtPC=gSw2a0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header file is unused and we shall not add new headers
-to the <mach/*> namespace. The macro may be reintroduced when
-there is a user for it.
+On Mon, Oct 15, 2012 at 10:04 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> On Mon, 15 Oct 2012 21:40:20 +0200
+> Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>> The commit adding the CLPS711x driver also added <mach/gpio.h>
+>> to the CLPS711x, and we want to get rid of all <mach/*>
+>> headers for the future. It turns out that the one macro defined
+>> in the file was only used in the GPIO driver itself, so just
+>> delete it and copy the macro into the driver.
+> ...
+>> -/* Simple helper for convert port & pin to GPIO number */
+>> -#define CLPS711X_GPIO(port, bit)     ((port) * 8 + (bit))
+>
+> This macro is not used by driver and was be designed especially for future
+> easy modify existing drivers that use GPIO to gpio-driver.
 
-Cc: Alexander Shiyan <shc_work@mail.ru>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-clps711x/include/mach/gpio.h | 13 -------------
- 1 file changed, 13 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/include/mach/gpio.h
+Then I will delete it for now (see separate patch).
 
-diff --git a/arch/arm/mach-clps711x/include/mach/gpio.h b/arch/arm/mach-clps711x/include/mach/gpio.h
-deleted file mode 100644
-index 8ac6889..0000000
---- a/arch/arm/mach-clps711x/include/mach/gpio.h
-+++ /dev/null
-@@ -1,13 +0,0 @@
--/*
-- *  This file contains the CLPS711X GPIO definitions.
-- *
-- *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--/* Simple helper for convert port & pin to GPIO number */
--#define CLPS711X_GPIO(port, bit)	((port) * 8 + (bit))
--- 
-1.7.11.7
+If we shall have a file with macros used like that it needs
+to atleast be something like
+<linux/platform_data/gpio-clps711x.h>
+
+We don't want to add new files to <mach/*>.
+
+Yours,
+Linus Walleij
