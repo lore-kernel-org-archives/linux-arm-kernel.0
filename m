@@ -1,78 +1,55 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 15 Oct 2012 10:59:19 +0800
-Subject: [PATCH] i2c: i2c-gpio: fix issue when DT node greater than 1
-In-Reply-To: <5074E349.30605@atmel.com>
-References: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
- <50588A8F.30203@wwwdotorg.org> <50591C9C.2080809@atmel.com>
- <5059E484.6090708@wwwdotorg.org> <20120919175433.3841a954@endymion.delvare>
- <5074E349.30605@atmel.com>
-Message-ID: <507B7C07.3070702@atmel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 15 Oct 2012 08:51:29 +0530
+Subject: [PATCH V2 3/3] ARM: SPEAr13xx: Pass DW DMAC platform data from DT
+In-Reply-To: <20121014100130.GM12801@game.jcrosoft.org>
+References: <2039bc164224b0068bc078b6cd8df6218e754fce.1350051925.git.viresh.kumar@linaro.org>
+ <20121012144837.GE12801@game.jcrosoft.org>
+ <CAKohpo=vMchmiz70evBB5bPqt4O4DWUocd5M1o9gc8fsY_Fkiw@mail.gmail.com>
+ <20121012162148.GH12801@game.jcrosoft.org>
+ <CAKohpok5ZOmz9CCJbTGc=_tncxnZYEW7UMh2FcFcs0dB87JAcQ@mail.gmail.com>
+ <20121013064422.GJ12801@game.jcrosoft.org>
+ <CAKohpokfei_ryGKMh4wE9D=wyRZCkddc+Da1cq+3facTHradKQ@mail.gmail.com>
+ <20121013122242.GL12801@game.jcrosoft.org>
+ <CAKohpom-P+=QfVNBsypq70+o+z_5J63RD72DA-_CakTM9LDCNA@mail.gmail.com>
+ <CAKohpokj0Up23YEDTuSOHDgqcCuM3Q21cwnkAz5Ya=JhPKM98A@mail.gmail.com>
+ <20121014100130.GM12801@game.jcrosoft.org>
+Message-ID: <CAKohpo=H4YoHd+c5kuT8dSkGMy0BOoTb=dwdf1=MxStbUZUMRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean Delvare,
-
-On 10/10/2012 10:54, Bo Shen wrote:
->
-> Hi Jean Delvare,
->
-> On 9/19/2012 23:54, Jean Delvare wrote:
->> On Wed, 19 Sep 2012 09:28:04 -0600, Stephen Warren wrote:
->>> On 09/18/2012 07:15 PM, Bo Shen wrote:
->>>> I add the debug info, and it give the following error without this
->>>> patch.
->>>>
->>>> --<8----------------------------------
->>>> adap->name = i2c-gpio-1
->>>> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
->>>> adap->name = i2c-gpio-1
->>>> i2c-gpio: probe of i2c.3 failed with error -16
->>>> -->8----------------------------------
->>>>
->>>> With this patch, it successfully registered.
->>>> --<8----------------------------------
->>>> adap->name = i2c-gpio0
->>>> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
->>>> adap->name = i2c-gpio1
->>>> i2c-gpio i2c.3: using pins 90 (SDA) and 91 (SCL)
->>>> -->8----------------------------------
->>>
->>> Yes, that explains why the registration fails, but not why this patch is
->>> the correct solution to the problem.
->>>
->>> The problematic code appears to be:
->>>
->>> snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
->>>
->>> Instead, I think that should be something more like:
->>>
->>> adap->name = dev_name(&pdev->dev);
+On 14 October 2012 15:31, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 19:40 Sat 13 Oct     , Viresh Kumar wrote:
+>> On 13 October 2012 19:38, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> > On 13 October 2012 17:52, Jean-Christophe PLAGNIOL-VILLARD
+>> > <plagnioj@jcrosoft.com> wrote:
+>> >> On 14:18 Sat 13 Oct     , Viresh Kumar wrote:
+>> >>>    On Oct 13, 2012 12:16 PM, "Jean-Christophe PLAGNIOL-VILLARD"
+>> >>>    <plagnioj@jcrosoft.com> wrote:
+>> >>>    >
+>> >>>    > On 22:42 Fri 12 Oct     , Viresh Kumar wrote:
+>> >>>    > > On 12 October 2012 21:51, Jean-Christophe PLAGNIOL-VILLARD
+>> >>>    > > <plagnioj@jcrosoft.com> wrote:
+>> >>>    > > >> >> +     OF_DEV_AUXDATA("arasan,cf-spear1340", MCIF_CF_BASE, NULL,
+>> >>>    "cf"),
+>> >>>    > > >> > ?/
+>> >>>    > > >>
+>> >>>    > > >> Sorry. can't get it :(
+>> >>>    > > > what is the "cf" as paltfrom data
+>> >>>    > >
+>> >>>    > > This is dma bus_id string, which matches with what is passed from dtb.
+>> >>>    > so pass if via dtb too
+>> >>>
+>> >>>    Yes. Already passed in 13xx.dtsi.
 >>
->> strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name))
- >> if anything, as adap->name is a buffer, not a pointer.
+>> Probably some confusion here. What i meant to say here is, dmac's
+>> DT slave info has a node for cf and cf driver expects this string to come
+>> via platform data currently.
 >
-> I am sorry for late. I have tested with DT, it works.
->
-> Please send this patch to fix the issue.
-> Thanks.
+> so use a phandle to connect them
 
-Ping?
+The purpose of this patchset wasn't to fix how CF driver sends its filter
+routine and its parameter. CF driver would be fixed later by ST guys.
 
-Will you send this patch? Or, I send this patch and add your S.O.B, 
-which do you prefer?
-
-BRs,
-Bo Shen
-
->>
->>> or perhaps:
->>>
->>> if (pdev->dev.of_node)
->>>    /* named will be based on DT node name */
->>>    adap->name = dev_name(&pdev->dev);
->>> else
->>>    snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
->>>
->>> ?
->>
->
+--
+viresh
