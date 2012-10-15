@@ -1,57 +1,63 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 16 Oct 2012 01:31:27 +0200
-Subject: [PATCH RFC 11/11 v4] gpio-pcf857x: Add block GPIO API
-In-Reply-To: <1350343887-7344-1-git-send-email-stigge@antcom.de>
-References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
-Message-ID: <1350343887-7344-12-git-send-email-stigge@antcom.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 15 Oct 2012 16:49:58 -0700
+Subject: [PATCH] ARM: OMAP2: UART: fix console UART mismatched runtime PM
+ status
+Message-ID: <1350344998-16328-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds block GPIO API support to the gpio-pcf857x driver.
+From: Kevin Hilman <khilman@ti.com>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+The runtime PM framework assumes that the hardware state of devices
+when initialized is disabled.  For all omap_devices, we idle/disable
+device by default.  However, the console uart uses a "no idle" option
+during omap_device init in order to allow earlyprintk usage to work
+seamlessly during boot.
 
+Because the hardware is left partially enabled after init (whatever
+the bootloader settings were), the omap_device should later be fully
+initialized (including mux) and the runtime PM framework should be
+told that the device is active, and not disabled so that the hardware
+state is in sync with runtime PM state.
+
+To fix, after the device has been created/registered, call
+omap_device_enable() to finialize init and use pm_runtime_set_active()
+to tell the runtime PM core the device is enabled.
+
+Tested on 2420/n810, 3530/Overo, 3530/Beagle, 3730/OveroSTORM,
+3730/Beagle-xM, 4460/PandaES.
+
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/gpio/gpio-pcf857x.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Applies against v3.7-rc1.
+Fix targetted for v3.7.
 
---- linux-2.6.orig/drivers/gpio/gpio-pcf857x.c
-+++ linux-2.6/drivers/gpio/gpio-pcf857x.c
-@@ -158,6 +158,28 @@ static void pcf857x_set(struct gpio_chip
- 	pcf857x_output(chip, offset, value);
- }
+I'm still not entirely sure why this has worked up to now on OMAP3/4
+but not on OMAP2.  Even so, this fix is needed for all platforms to
+ensure matching hardware state and runtime PM state.
+
+ arch/arm/mach-omap2/serial.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 0405c81..37b5dbe 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -327,6 +327,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 	if ((console_uart_id == bdata->id) && no_console_suspend)
+ 		omap_device_disable_idle_on_suspend(pdev);
  
-+static unsigned long pcf857x_get_block(struct gpio_chip *chip,
-+				       unsigned long mask)
-+{
-+	struct pcf857x	*gpio = container_of(chip, struct pcf857x, chip);
-+	int		value;
++	if (console_uart_id == bdata->id) {
++		omap_device_enable(pdev);
++		pm_runtime_set_active(&pdev->dev);
++	}
 +
-+	value = gpio->read(gpio->client);
-+	return (value < 0) ? 0 : (value & mask);
-+}
-+
-+static void pcf857x_set_block(struct gpio_chip *chip, unsigned long mask,
-+			      unsigned long values)
-+{
-+	struct pcf857x	*gpio = container_of(chip, struct pcf857x, chip);
-+
-+	mutex_lock(&gpio->lock);
-+	gpio->out &= ~mask;
-+	gpio->out |= values & mask;
-+	gpio->write(gpio->client, gpio->out);
-+	mutex_unlock(&gpio->lock);
-+}
-+
- /*-------------------------------------------------------------------------*/
+ 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
  
- static int pcf857x_to_irq(struct gpio_chip *chip, unsigned offset)
-@@ -280,6 +302,8 @@ static int pcf857x_probe(struct i2c_clie
- 	gpio->chip.owner		= THIS_MODULE;
- 	gpio->chip.get			= pcf857x_get;
- 	gpio->chip.set			= pcf857x_set;
-+	gpio->chip.get_block		= pcf857x_get_block;
-+	gpio->chip.set_block		= pcf857x_set_block;
- 	gpio->chip.direction_input	= pcf857x_input;
- 	gpio->chip.direction_output	= pcf857x_output;
- 	gpio->chip.ngpio		= id->driver_data;
+ 	oh->dev_attr = uart;
+-- 
+1.7.9.2
