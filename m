@@ -1,23 +1,40 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Oct 2012 07:58:26 +0200
-Subject: [PATCH 0/5] Add DT support for AT91RM9200
-In-Reply-To: <1350251199-28065-1-git-send-email-manabian@gmail.com>
+Date: Mon, 15 Oct 2012 07:59:41 +0200
+Subject: [PATCH 1/5] ARM: AT91: Fix build failure on board-dt
+In-Reply-To: <1350251199-28065-2-git-send-email-manabian@gmail.com>
 References: <1350251199-28065-1-git-send-email-manabian@gmail.com>
-Message-ID: <20121015055826.GR12801@game.jcrosoft.org>
+ <1350251199-28065-2-git-send-email-manabian@gmail.com>
+Message-ID: <20121015055941.GS12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 23:46 Sun 14 Oct     , Joachim Eastwood wrote:
-> Hi
-> 
-> This patch series add support for devicetree on AT91RM9200. Series is dependent upon at91-pinctrl.
-> 
-> There isn't support for any boards yet, but I am working on one now. I will submit it once I have a couple of more bindings in place.
-> 
-> Patch 1 is a fixfor a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
-> 
+> We need CONFIG_SOC_AT91SAM9 to get the at91sam926x_timer
+> symbol used in board-dt.
+as I said before you can not do a select you need to do a depends
 
-next time put the version number in subject
+as you will have no clock as you select no SoC
 
 Best Regards,
 J.
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/mach-at91/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 0fafb6a..d9b0546 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -507,6 +507,7 @@ comment "Generic Board Type"
+>  
+>  config MACH_AT91SAM_DT
+>  	bool "Atmel AT91SAM Evaluation Kits with device-tree support"
+> +	select SOC_AT91SAM9
+>  	select USE_OF
+>  	help
+>  	  Select this if you want to experiment device-tree with
+> -- 
+> 1.7.12.3
+> 
