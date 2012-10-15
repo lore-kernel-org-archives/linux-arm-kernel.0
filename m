@@ -1,63 +1,39 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 15 Oct 2012 16:49:58 -0700
-Subject: [PATCH] ARM: OMAP2: UART: fix console UART mismatched runtime PM
- status
-Message-ID: <1350344998-16328-1-git-send-email-khilman@deeprootsystems.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 15 Oct 2012 16:57:20 -0700
+Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <1350343887-7344-3-git-send-email-stigge@antcom.de>
+References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
+ <1350343887-7344-3-git-send-email-stigge@antcom.de>
+Message-ID: <20121015235720.GA3132@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@ti.com>
+On Tue, Oct 16, 2012 at 01:31:18AM +0200, Roland Stigge wrote:
+> +int gpio_block_export(struct gpio_block *block)
+> +{
+> +	int		status;
+> +	struct device	*dev;
+> +
+> +	/* can't export until sysfs is available ... */
+> +	if (!gpio_class.p) {
+> +		pr_debug("%s: called too early!\n", __func__);
+> +		return -ENOENT;
+> +	}
+> +
+> +	mutex_lock(&sysfs_lock);
+> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
+> +			    block->name);
+> +	if (!IS_ERR(dev))
+> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
+> +	else
+> +		status = PTR_ERR(dev);
+> +	mutex_unlock(&sysfs_lock);
 
-The runtime PM framework assumes that the hardware state of devices
-when initialized is disabled.  For all omap_devices, we idle/disable
-device by default.  However, the console uart uses a "no idle" option
-during omap_device init in order to allow earlyprintk usage to work
-seamlessly during boot.
+You just raced with userspace telling it that the device was present,
+yet the attributes are not there.  Don't do that, use the default class
+attributes for the class and then the driver core will create them
+automagically without needing to this "by hand" at all.
 
-Because the hardware is left partially enabled after init (whatever
-the bootloader settings were), the omap_device should later be fully
-initialized (including mux) and the runtime PM framework should be
-told that the device is active, and not disabled so that the hardware
-state is in sync with runtime PM state.
+thanks,
 
-To fix, after the device has been created/registered, call
-omap_device_enable() to finialize init and use pm_runtime_set_active()
-to tell the runtime PM core the device is enabled.
-
-Tested on 2420/n810, 3530/Overo, 3530/Beagle, 3730/OveroSTORM,
-3730/Beagle-xM, 4460/PandaES.
-
-Reported-by: Paul Walmsley <paul@pwsan.com>
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
-Applies against v3.7-rc1.
-Fix targetted for v3.7.
-
-I'm still not entirely sure why this has worked up to now on OMAP3/4
-but not on OMAP2.  Even so, this fix is needed for all platforms to
-ensure matching hardware state and runtime PM state.
-
- arch/arm/mach-omap2/serial.c |    5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 0405c81..37b5dbe 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -327,6 +327,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 	if ((console_uart_id == bdata->id) && no_console_suspend)
- 		omap_device_disable_idle_on_suspend(pdev);
- 
-+	if (console_uart_id == bdata->id) {
-+		omap_device_enable(pdev);
-+		pm_runtime_set_active(&pdev->dev);
-+	}
-+
- 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
- 
- 	oh->dev_attr = uart;
--- 
-1.7.9.2
+greg k-h
