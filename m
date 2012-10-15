@@ -1,97 +1,108 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Oct 2012 16:07:04 +0100
-Subject: [PATCH] MMC: fix sdhci-dove removal
-In-Reply-To: <20121015145855.GY12801@game.jcrosoft.org>
-References: <20121015094348.GP21164@n2100.arm.linux.org.uk>
- <20121015103725.GQ21164@n2100.arm.linux.org.uk>
- <20121015104456.GR21164@n2100.arm.linux.org.uk>
- <20121015145855.GY12801@game.jcrosoft.org>
-Message-ID: <20121015150704.GT21164@n2100.arm.linux.org.uk>
+From: yangfei.kernel@gmail.com (Fei Yang)
+Date: Mon, 15 Oct 2012 23:33:08 +0800
+Subject: [PATCH] Re: Hardcoded instruction causes certain features to fail on
+ ARM platfrom due to endianness
+In-Reply-To: <20603.47887.262025.941051@pilspetsen.it.uu.se>
+References: <DA41BE1DDCA941489001C7FBD7A8820E3CB407A4@szxeml549-mbx.china.huawei.com>
+ <20603.47887.262025.941051@pilspetsen.it.uu.se>
+Message-ID: <CAKw8HL154a=K9O7CzPFZ-EqtT+BxYU-uRHodtutdRfYmNpWVww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 04:58:55PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:44 Mon 15 Oct     , Russell King - ARM Linux wrote:
-> > On Mon, Oct 15, 2012 at 11:37:25AM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Oct 15, 2012 at 10:43:48AM +0100, Russell King - ARM Linux wrote:
-> > > > 1. Unregister the device _BEFORE_ taking away any resources it may
-> > > >    be using.
-> > > > 2. Don't check clks against NULL.
-> > > > 
-> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > > 
-> > > Looking at this driver some more, who the hell came up with the sdhci
-> > > registration interface?  It violates one of the most fundamental
-> > > principles of kernel driver programming.  You do _NOT_ publish your
-> > > driver interfaces _UNTIL_ you have finished setting your device up.
-> > > Otherwise, in a preemptible or SMP kernel, your driver can be used
-> > > before the initialization has completed.
-> > > 
-> > > As this driver calls sdhci_pltfm_register() before it has obtained the
-> > > clock for the interface, and this function does:
-> > > 	sdhci_pltfm_init
-> > > 	sdhci_add_host
-> > > 		mmc_add_host
-> > > 			mmc_start_host
-> > > 				mmc_power_up
-> > > 					mmc_set_ios
-> > > 						sdhci_set_ios
-> > > 
-> > > See, we're trying to power up and clock the card _before_ the dove
-> > > sdhci driver has even claimed the clock let alone enabled it.  This
-> > > is total bollocks.  The sdhci platform interface is total crap for
-> > > creating this broken design in the first place.  This is why MMC has
-> > > the init + add interfaces, they're there to allow drivers to do stuff
-> > > the Right(tm) way and avoid shit like the above.
-> > > 
-> > > This should have been picked up at review time before the driver went
-> > > into mainline.  In any case, it needs to be fixed.
-> > 
-> > Here's an updated patch which just about fixes the sdhci-dove driver.
-> > I would not be surprised given the idiotic sdhci-pltfm API if many
-> > other drivers suffered the same bug.
-> > 
-> > 8<====
-> > From: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Subject: [PATCH] MMC: fix sdhci-dove probe/removal
-> > 
-> > 1. Never ever publish a device in the system before it has been setup
-> >    to a usable state.
-> > 2. Unregister the device _BEFORE_ taking away any resources it may be
-> >    using.
-> > 3. Don't check clks against NULL.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/mmc/host/sdhci-dove.c |   36 ++++++++++++++++++------------------
-> >  1 files changed, 18 insertions(+), 18 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-> > index a6e53a1..7d3a4e4 100644
-> > --- a/drivers/mmc/host/sdhci-dove.c
-> > +++ b/drivers/mmc/host/sdhci-dove.c
-> > @@ -83,30 +83,31 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
-> >  	struct sdhci_dove_priv *priv;
-> >  	int ret;
-> >  
-> > -	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
-> > -	if (ret)
-> > -		goto sdhci_dove_register_fail;
-> > -
-> >  	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
-> >  			    GFP_KERNEL);
-> >  	if (!priv) {
-> >  		dev_err(&pdev->dev, "unable to allocate private data");
-> > -		ret = -ENOMEM;
-> > -		goto sdhci_dove_allocate_fail;
-> > +		return -ENOMEM;
-> >  	}
-> >  
-> > +	priv->clk = clk_get(&pdev->dev, NULL);
-> you have devm_clk_get too
-> 
-> maybe you could use it here too
+2012/10/15 Mikael Pettersson <mikpe@it.uu.se>:
+> Yangfei (Felix) writes:
+>  > Hi all,
+>  >
+>  >     I found that hardcoded instruction in inline asm can cause certains certain features fail to work on ARM platform due to endianness.
+>  >     As an example, consider the following code snippet of platform_do_lowpower function from arch/arm/mach-realview/hotplug.c:
+>  >                 / *
+>  >                  * here's the WFI
+>  >                  */
+>  >                 asm(".word      0xe320f003\n"
+>  >                     :
+>  >                     :
+>  >                     : "memory", "cc");
+>  >
+>  >     The instruction generated from this inline asm will not work on big-endian ARM platform, such as ARM BE-8 format. Instead, an exception will be generated.
+>  >
+>  >     Here the code should be:
+>  >                 / *
+>  >                  * here's the WFI
+>  >                  */
+>  >                 asm("WFI\n"
+>  >                     :
+>  >                     :
+>  >                     : "memory", "cc");
+>  >
+>  >     Seems the kernel doesn't support ARM BE-8 well. I don't know why this problem happens.
+>  >     Can anyone tell me who owns this part? I can prepare a patch then.
+>  >     Thanks.
+>
+> Questions regarding the ARM kernel should go to the linux-arm-kernel mailing list
+> (see the MAINTAINERS file), with an optional cc: to the regular LKML.
+>
+> BE-8 is, if I recall correctly, ARMv7's broken format where code and data have
+> different endianess.  GAS supports an ".inst" directive which is like ".word"
+> except the data is assumed to be code.  This matters for disassembly, and may
+> also be required for BE-8.
+>
+> That is, just s/.word/.inst/g above and report back if that works or not.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+>
+>
 
-This isn't a cleanup patch, this is a patch just to fix some stupid bugs
-in this code.  If someone wants to convert that afterwards, it should be
-an entirely separate patch.
+Hi Mikael,
+
+Thanks for the reply. I modified the code as suggested and rebuilt the
+kernel, cpu-hotplug feature now works on big-endian(BE-8) ARM
+platform.
+Since the ARM core can be configured by system software to work in
+big-endian mode, it's necessary to fix this problem. And here is a
+small patch :
+
+diff -urN linux-3.6.2/arch/arm/mach-exynos/hotplug.c
+linux/arch/arm/mach-exynos/hotplug.c
+--- linux-3.6.2/arch/arm/mach-exynos/hotplug.c	2012-10-13
+04:50:59.000000000 +0800
++++ linux/arch/arm/mach-exynos/hotplug.c	2012-10-15 23:05:44.000000000 +0800
+@@ -72,7 +72,7 @@
+ 		/*
+ 		 * here's the WFI
+ 		 */
+-		asm(".word	0xe320f003\n"
++		asm(".inst	0xe320f003\n"
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
+diff -urN linux-3.6.2/arch/arm/mach-realview/hotplug.c
+linux/arch/arm/mach-realview/hotplug.c
+--- linux-3.6.2/arch/arm/mach-realview/hotplug.c	2012-10-13
+04:50:59.000000000 +0800
++++ linux/arch/arm/mach-realview/hotplug.c	2012-10-15 23:05:00.000000000 +0800
+@@ -66,7 +66,7 @@
+ 		/*
+ 		 * here's the WFI
+ 		 */
+-		asm(".word	0xe320f003\n"
++		asm(".inst	0xe320f003\n"
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
+diff -urN linux-3.6.2/arch/arm/mach-shmobile/hotplug.c
+linux/arch/arm/mach-shmobile/hotplug.c
+--- linux-3.6.2/arch/arm/mach-shmobile/hotplug.c	2012-10-13
+04:50:59.000000000 +0800
++++ linux/arch/arm/mach-shmobile/hotplug.c	2012-10-15 23:05:25.000000000 +0800
+@@ -53,7 +53,7 @@
+ 		/*
+ 		 * here's the WFI
+ 		 */
+-		asm(".word	0xe320f003\n"
++		asm(".inst	0xe320f003\n"
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
