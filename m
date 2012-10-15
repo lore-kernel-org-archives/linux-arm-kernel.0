@@ -1,127 +1,75 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Oct 2012 01:58:32 +0000 (UTC)
-Subject: [PATCH] ARM: vfp: fix save and restore when running on pre-VFPv3
- and CONFIG_VFPv3 set
-In-Reply-To: <20121013133654.GU28061@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1210130441300.5736@utopia.booyaka.com>
- <20121013090255.GT28061@n2100.arm.linux.org.uk>
- <yw1xr4p2myre.fsf@unicorn.mansr.com>
- <20121013133654.GU28061@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1210150157400.16624@utopia.booyaka.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Mon, 15 Oct 2012 10:09:42 +0800
+Subject: [PATCH v2] i2c: change the id to let the i2c-gpio work
+In-Reply-To: <CAGhQ9VxRGQ8JAygxJreNDJY=tJ67yt2CM9NHvW3VyhjxooXuig@mail.gmail.com>
+References: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
+ <CAGhQ9VxRGQ8JAygxJreNDJY=tJ67yt2CM9NHvW3VyhjxooXuig@mail.gmail.com>
+Message-ID: <507B7066.4060802@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Joachim Eastwood,
 
-After commit 846a136881b8f73c1f74250bf6acfaa309cab1f2 ("ARM: vfp: fix
-saving d16-d31 vfp registers on v6+ kernels"), the OMAP 2430SDP board
-started crashing during boot with omap2plus_defconfig:
+On 10/13/2012 1:42, Joachim Eastwood wrote:
+> Hi Bo Shen,
+>
+> On Fri, Oct 12, 2012 at 11:42 AM, Bo Shen <voice.shen@atmel.com> wrote:
+>> The i2c-gpio driver will turn the platform device ID to busnum.
+>> When using platfrom device ID as -1, it means dynamically assigned
+>> the busnum. When writing code, we need to make sure the busnum,
+>> and call i2c_register_board_info(int busnum, ...) to register device
+>> if using -1, we do not know the value of busnum.
+>>
+>> In order to solve this issue, set the platform device ID as a fix number
+>> Here using 0 to match the busnum used in i2c_regsiter_board_info().
+>
+> I have been bitten by this myself on RM9200.
+>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
+>> Change since v1
+>>    Make the commit message more clear
+>> ---
+>>   arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+>
+> This pattern exist in at91rm9200_devices.c, at91sam9261_devices.c,
+> at91sam9263_devices.c and at91sam9rl_devices.c you might want to fix
+> them as well.
 
-[    3.875122] mmcblk0: mmc0:e624 SD04G 3.69 GiB
-[    3.915954]  mmcblk0: p1
-[    4.086639] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
-[    4.093719] Modules linked in:
-[    4.096954] CPU: 0    Not tainted  (3.6.0-02232-g759e00b #570)
-[    4.103149] PC is at vfp_reload_hw+0x1c/0x44
-[    4.107666] LR is at __und_usr_fault_32+0x0/0x8
+Thanks for your information.
+After I test these boards, I will send patches to fix them, while not in 
+this patch.
 
-It turns out that the context save/restore fix unmasked a latent bug
-in commit 5aaf254409f8d58229107b59507a8235b715a960 ("ARM: 6203/1: Make
-VFPv3 usable on ARMv6").  When CONFIG_VFPv3 is set, but the kernel is
-booted on a pre-VFPv3 core, the code attempts to save and restore the
-d16-d31 VFP registers.  These are only present on non-D16 VFPv3+, so
-this results in an undefined instruction exception.  The code didn't
-crash before commit 846a136 because the save and restore code was
-only touching d0-d15, present on all VFP.
+>
+> I assume we have the same problem if CONFIG_I2C_AT91 is set?
+> See further down in at91sam9260_devices.c we have another:  ".id = -1,"
 
-Fix by implementing a request from Russell King to add a new HWCAP
-flag that affirmatively indicates the presence of the d16-d31
-registers:
+Maybe Nikolaus Voss will deal with this case.
 
-   http://marc.info/?l=linux-arm-kernel&m=135013547905283&w=2
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@linaro.org>
-Cc: M?ns Rullg?rd <mans.rullgard@linaro.org>
----
-Applies on v3.7-rc1.
-
- arch/arm/include/asm/vfpmacros.h  |   12 ++++++------
- arch/arm/include/uapi/asm/hwcap.h |    3 ++-
- arch/arm/vfp/vfpmodule.c          |    9 ++++++---
- 3 files changed, 14 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm/include/asm/vfpmacros.h b/arch/arm/include/asm/vfpmacros.h
-index 6a6f1e4..77f40ea 100644
---- a/arch/arm/include/asm/vfpmacros.h
-+++ b/arch/arm/include/asm/vfpmacros.h
-@@ -27,9 +27,9 @@
- #if __LINUX_ARM_ARCH__ <= 6
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
--	tst	\tmp, #HWCAP_VFPv3D16
--	ldceql	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
--	addne	\base, \base, #32*4		    @ step over unused register space
-+	tst	\tmp, #HWCAP_VFPD16
-+	ldcnel	p11, cr0, [\base],#32*4		    @ FLDMIAD \base!, {d16-d31}
-+	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
-@@ -51,9 +51,9 @@
- #if __LINUX_ARM_ARCH__ <= 6
- 	ldr	\tmp, =elf_hwcap		    @ may not have MVFR regs
- 	ldr	\tmp, [\tmp, #0]
--	tst	\tmp, #HWCAP_VFPv3D16
--	stceql	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
--	addne	\base, \base, #32*4		    @ step over unused register space
-+	tst	\tmp, #HWCAP_VFPD16
-+	stcnel	p11, cr0, [\base],#32*4		    @ FSTMIAD \base!, {d16-d31}
-+	addeq	\base, \base, #32*4		    @ step over unused register space
- #else
- 	VFPFMRX	\tmp, MVFR0			    @ Media and VFP Feature Register 0
- 	and	\tmp, \tmp, #MVFR0_A_SIMD_MASK	    @ A_SIMD field
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index f254f65..b1555d0 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -18,11 +18,12 @@
- #define HWCAP_THUMBEE	(1 << 11)
- #define HWCAP_NEON	(1 << 12)
- #define HWCAP_VFPv3	(1 << 13)
--#define HWCAP_VFPv3D16	(1 << 14)
-+#define HWCAP_VFPv3D16	(1 << 14)	/* also set for VFPv4-D16 */
- #define HWCAP_TLS	(1 << 15)
- #define HWCAP_VFPv4	(1 << 16)
- #define HWCAP_IDIVA	(1 << 17)
- #define HWCAP_IDIVT	(1 << 18)
-+#define HWCAP_VFPD16	(1 << 19)	/* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
- 
- 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index c834b32..f3e611c 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -701,11 +701,14 @@ static int __init vfp_init(void)
- 			elf_hwcap |= HWCAP_VFPv3;
- 
- 			/*
--			 * Check for VFPv3 D16. CPUs in this configuration
--			 * only have 16 x 64bit registers.
-+			 * Check for VFPv3 D16 and VFPv4 D16.  CPUs in
-+			 * this configuration only have 16 x 64bit
-+			 * registers.
- 			 */
- 			if (((fmrx(MVFR0) & MVFR0_A_SIMD_MASK)) == 1)
--				elf_hwcap |= HWCAP_VFPv3D16;
-+				elf_hwcap |= HWCAP_VFPv3D16; /* also v4-D16 */
-+			else
-+				elf_hwcap |= HWCAP_VFPD16;
- 		}
- #endif
- 		/*
--- 
-1.7.10.4
+>
+> regards
+> Joachim Eastwood
+>
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+>> index 0f24cfb..805ef95 100644
+>> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+>> @@ -389,7 +389,7 @@ static struct i2c_gpio_platform_data pdata = {
+>>
+>>   static struct platform_device at91sam9260_twi_device = {
+>>          .name                   = "i2c-gpio",
+>> -       .id                     = -1,
+>> +       .id                     = 0,
+>>          .dev.platform_data      = &pdata,
+>>   };
+>>
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
