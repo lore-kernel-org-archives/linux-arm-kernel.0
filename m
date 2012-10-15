@@ -1,94 +1,61 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Oct 2012 16:58:55 +0200
-Subject: [PATCH] MMC: fix sdhci-dove removal
-In-Reply-To: <20121015104456.GR21164@n2100.arm.linux.org.uk>
-References: <20121015094348.GP21164@n2100.arm.linux.org.uk>
- <20121015103725.GQ21164@n2100.arm.linux.org.uk>
- <20121015104456.GR21164@n2100.arm.linux.org.uk>
-Message-ID: <20121015145855.GY12801@game.jcrosoft.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 15 Oct 2012 15:05:15 +0000 (UTC)
+Subject: [PATCH] i2c: omap: revert "i2c: omap: switch to threaded IRQ
+ support"
+In-Reply-To: <20121015071657.GA22818@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+ <20121015071657.GA22818@arwen.pp.htv.fi>
+Message-ID: <alpine.DEB.2.00.1210151452470.15973@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:44 Mon 15 Oct     , Russell King - ARM Linux wrote:
-> On Mon, Oct 15, 2012 at 11:37:25AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Oct 15, 2012 at 10:43:48AM +0100, Russell King - ARM Linux wrote:
-> > > 1. Unregister the device _BEFORE_ taking away any resources it may
-> > >    be using.
-> > > 2. Don't check clks against NULL.
-> > > 
-> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > 
-> > Looking at this driver some more, who the hell came up with the sdhci
-> > registration interface?  It violates one of the most fundamental
-> > principles of kernel driver programming.  You do _NOT_ publish your
-> > driver interfaces _UNTIL_ you have finished setting your device up.
-> > Otherwise, in a preemptible or SMP kernel, your driver can be used
-> > before the initialization has completed.
-> > 
-> > As this driver calls sdhci_pltfm_register() before it has obtained the
-> > clock for the interface, and this function does:
-> > 	sdhci_pltfm_init
-> > 	sdhci_add_host
-> > 		mmc_add_host
-> > 			mmc_start_host
-> > 				mmc_power_up
-> > 					mmc_set_ios
-> > 						sdhci_set_ios
-> > 
-> > See, we're trying to power up and clock the card _before_ the dove
-> > sdhci driver has even claimed the clock let alone enabled it.  This
-> > is total bollocks.  The sdhci platform interface is total crap for
-> > creating this broken design in the first place.  This is why MMC has
-> > the init + add interfaces, they're there to allow drivers to do stuff
-> > the Right(tm) way and avoid shit like the above.
-> > 
-> > This should have been picked up at review time before the driver went
-> > into mainline.  In any case, it needs to be fixed.
-> 
-> Here's an updated patch which just about fixes the sdhci-dove driver.
-> I would not be surprised given the idiotic sdhci-pltfm API if many
-> other drivers suffered the same bug.
-> 
-> 8<====
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: [PATCH] MMC: fix sdhci-dove probe/removal
-> 
-> 1. Never ever publish a device in the system before it has been setup
->    to a usable state.
-> 2. Unregister the device _BEFORE_ taking away any resources it may be
->    using.
-> 3. Don't check clks against NULL.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/mmc/host/sdhci-dove.c |   36 ++++++++++++++++++------------------
->  1 files changed, 18 insertions(+), 18 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-> index a6e53a1..7d3a4e4 100644
-> --- a/drivers/mmc/host/sdhci-dove.c
-> +++ b/drivers/mmc/host/sdhci-dove.c
-> @@ -83,30 +83,31 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
->  	struct sdhci_dove_priv *priv;
->  	int ret;
->  
-> -	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
-> -	if (ret)
-> -		goto sdhci_dove_register_fail;
-> -
->  	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
->  			    GFP_KERNEL);
->  	if (!priv) {
->  		dev_err(&pdev->dev, "unable to allocate private data");
-> -		ret = -ENOMEM;
-> -		goto sdhci_dove_allocate_fail;
-> +		return -ENOMEM;
->  	}
->  
-> +	priv->clk = clk_get(&pdev->dev, NULL);
-you have devm_clk_get too
+Hi
 
-maybe you could use it here too
+On Mon, 15 Oct 2012, Felipe Balbi wrote:
 
-Best Regards,
-J.
+> On Mon, Oct 15, 2012 at 01:51:08AM +0000, Paul Walmsley wrote:
+> > 
+> > Commit 3b2f8f82dad7d1f79cdc8fc05bd1c94baf109bde ("i2c: omap: switch to
+> > threaded IRQ support") causes communication with I2C devices to fail
+> > after system suspend/resume on all OMAP3 devices:
+> > 
+> > ...
+> > [   40.228576] PM: noirq resume of devices complete after 3.723 msecs
+> > [   40.233184] PM: early resume of devices complete after 3.173 msecs
+> > [   40.242736] [sched_delayed] sched: RT throttling activated
+> > [   41.235046] omap_i2c omap_i2c.1: controller timed out
+> 
+> instead of just reverting the patch, I'd rather try to figure out why
+> controller times out in that situation.
+> 
+> It should make no difference if you're running an IRQ thread or not.
+> 
+> Do you have any extra debugging information which might help figuring
+> out what the issue really is ?
+
+As mentioned, the problem can be easily reproduced on OMAP3 is test by 
+running
+
+"echo mem > /sys/power/state"
+
+in userspace when rootfs is on MMC.  Then wake up out of suspend, for 
+example, by hitting ENTER on the serial console.
+
+This needs to be part of the testing before any OMAP patches are posted to 
+the lists -- if for no other reason than because Android kernels enter and 
+exit system suspend frequently as part of their standard usage model.
+
+> If the thread is actually at fault, then we need to add IRQF_NO_THREAD
+> to the IRQ flags, otherwise same issue will appear if we boot with
+> "threadirqs" kernel parameter.
+
+...
+
+> but it fails because I2C times out and I'd like to understand why,
+> before just reverting the patch.
+
+It doesn't matter to me how it's fixed as long as it's fixed quickly 
+during the early 3.7-rcs.  
+
+
+- Paul
