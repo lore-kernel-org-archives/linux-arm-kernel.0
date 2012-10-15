@@ -1,50 +1,53 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Mon, 15 Oct 2012 10:33:20 +0200
-Subject: [PATCH 4/6] ARM: S3C2410: I2C driver polling mode support
-In-Reply-To: <1349783332-18467-5-git-send-email-vasanthananthan@gmail.com>
-References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
- <1349783332-18467-5-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <201210151033.20714.heiko@sntech.de>
+From: hdk@igel.co.jp (Hideki EIRAKU)
+Date: Mon, 15 Oct 2012 17:34:51 +0900
+Subject: [PATCH v4 0/2] Renesas IPMMU driver for sh7372
+Message-ID: <1350290093-998-1-git-send-email-hdk@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 9. Oktober 2012, 13:48:50 schrieb Vasanth Ananthan:
-> This patch adds polling mode support for i2c s3c-2410 driver.
-> The I2C_SATAPHY controller lacks an interrupt line but the s3c-2410 driver
-> is interrupt driven. Hence this support is required for functioning
-> of the I2C_SATAPHY controller.
-> 
-> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> ---
->  drivers/i2c/busses/i2c-s3c2410.c |   84
-> +++++++++++++++++++++++++++++--------- 1 files changed, 65 insertions(+),
-> 19 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c
-> b/drivers/i2c/busses/i2c-s3c2410.c index 5ae3b02..699b530 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+This is the Renesas IPMMU driver, IOMMU API implementation and IPMMU
+device support for sh7372 (AP4EVB and Mackerel).
 
-[...]
+The IPMMU module supports the MMU function and the PMB function.  The
+MMU function provides address translation by pagetable compatible with
+ARMv6.  The PMB function provides address translation including
+tile-linear translation.  This is implementation of the MMU function.
 
-> @@ -102,10 +103,14 @@ static struct platform_device_id s3c24xx_driver_ids[]
-> = { };
->  MODULE_DEVICE_TABLE(platform, s3c24xx_driver_ids);
-> 
-> +static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long
-> iicstat); +
->  #ifdef CONFIG_OF
->  static const struct of_device_id s3c24xx_i2c_match[] = {
->  	{ .compatible = "samsung,s3c2410-i2c", .data = (void *)0 },
->  	{ .compatible = "samsung,s3c2440-i2c", .data = (void *)QUIRK_S3C2440 },
-> +	{ .compatible = "samsung,s3c2440-sataphy-i2c",
-> +	  .data = (void *)(QUIRK_S3C2440|QUIRK_SATAPHY|QUIRK_NO_GPIO) },
->  	{ .compatible = "samsung,s3c2440-hdmiphy-i2c",
->  	  .data = (void *)(QUIRK_S3C2440 | QUIRK_HDMIPHY | QUIRK_NO_GPIO) },
->  	{},
+v4:
+- Rebased on 3.7-rc1.
+- Use address space size instead of page table size in config.
+- Use Kconfig default value instead of #ifdef-#define-#endif.
+v3:
+- Rebased on 3.6-rc5.
+- Simplify configs.  SHMOBILE_IPMMU is now selected by setting
+  SHMOBILE_IOMMU.
+- Remove weak symbols.
+- Use drvdata to store private driver data.
+- Make a function for writing to a register of IPMMU.
+- Add a lock to accessing the tlb_enabled member.
+- Make unmap work correctly with size larger than map size.
+- Free L2 page table when 1MiB page is mapped or unmapped.
+- Add VEU devices as IP blocks on the ICB.
+v2:
+- Rebased on v3.6-rc1.
+- Make variable names clear.
+- Page table size can now be selected by config.
 
-Out of curiosity, why is it called s3c2440-sataphy-i2c when it's an exynos 
-specific component?
+Hideki EIRAKU (2):
+  iommu/shmobile: Add iommu driver for Renesas IPMMU modules
+  ARM: mach-shmobile: sh7372: Add IPMMU device
 
-
-Heiko
+ arch/arm/mach-shmobile/Kconfig              |    6 +
+ arch/arm/mach-shmobile/Makefile             |    3 +
+ arch/arm/mach-shmobile/board-ap4evb.c       |    5 +
+ arch/arm/mach-shmobile/board-mackerel.c     |    5 +
+ arch/arm/mach-shmobile/include/mach/ipmmu.h |   16 ++
+ arch/arm/mach-shmobile/ipmmu.c              |  150 ++++++++++++
+ arch/arm/mach-shmobile/setup-sh7372.c       |   26 ++
+ drivers/iommu/Kconfig                       |   56 +++++
+ drivers/iommu/Makefile                      |    1 +
+ drivers/iommu/shmobile-iommu.c              |  352 +++++++++++++++++++++++++++
+ 10 files changed, 620 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-shmobile/include/mach/ipmmu.h
+ create mode 100644 arch/arm/mach-shmobile/ipmmu.c
+ create mode 100644 drivers/iommu/shmobile-iommu.c
