@@ -1,199 +1,38 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Mon, 15 Oct 2012 18:05:39 +0530
-Subject: [PATCH] ARM: dts: Add am335x-evmsk.dts
-Message-ID: <1350304539-14933-1-git-send-email-anilkumar@ti.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 15 Oct 2012 12:41:17 +0000
+Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
+In-Reply-To: <20121011144756.GB12552@atomide.com>
+References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
+ <20121011144756.GB12552@atomide.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add AM335X EVM-SK device tree source (am335x-sk.dts) file to use
-the am33xx.dtsi SoC file, along with the memory node information.
+Hi Tony,
 
-Also adds support for tps65910 regulator and lis331dlh accelerometer.
-Following drivers/functionality were tested on AM335x-EVM-SK.
-* I2C
-* TPS65910 regulators
-* lis331dlh accelerometer
+On Thu, Oct 11, 2012 at 20:17:56, Tony Lindgren wrote:
+> * Mohammed, Afzal <afzal@ti.com> [121011 05:48]:
 
-AM335x EVM Starter Kit details can be accessed from:
-http://www.ti.com/tool/tmdssk3358
+> After -rc1 is out, let's plan on adding the minimal
+> set required for removing plat and mach includes from
+> drivers into a clean-up branch. Afzal, can you maybe
+> do a pull request for that set against -rc1 when it's
+> out? Just the minimal set of patches.
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts |  166 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 166 insertions(+)
- create mode 100644 arch/arm/boot/dts/am335x-evmsk.dts
+Pull request on gpmc cleanup for common ARM zImage has
+been sent.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-new file mode 100644
-index 0000000..6f53879
---- /dev/null
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -0,0 +1,166 @@
-+/*
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/*
-+ * AM335x Starter Kit
-+ * http://www.ti.com/tool/tmdssk3358
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "am33xx.dtsi"
-+
-+/ {
-+	model = "TI AM335x EVM-SK";
-+	compatible = "ti,am335x-evmsk", "ti,am33xx";
-+
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vdd1_reg>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	ocp {
-+		uart1: serial at 44e09000 {
-+			status = "okay";
-+		};
-+
-+		i2c1: i2c at 44e0b000 {
-+			status = "okay";
-+			clock-frequency = <400000>;
-+
-+			tps: tps at 2d {
-+				reg = <0x2d>;
-+			};
-+
-+			lis331dlh: lis331dlh at 18 {
-+				compatible = "st,lis331dlh", "st,lis3lv02d";
-+				reg = <0x18>;
-+				Vdd-supply = <&lis3_reg>;
-+				Vdd_IO-supply = <&lis3_reg>;
-+
-+				st,click-single-x;
-+				st,click-single-y;
-+				st,click-single-z;
-+				st,click-thresh-x = <10>;
-+				st,click-thresh-y = <10>;
-+				st,click-thresh-z = <10>;
-+				st,irq1-click;
-+				st,irq2-click;
-+				st,wakeup-x-lo;
-+				st,wakeup-x-hi;
-+				st,wakeup-y-lo;
-+				st,wakeup-y-hi;
-+				st,wakeup-z-lo;
-+				st,wakeup-z-hi;
-+				st,min-limit-x = <120>;
-+				st,min-limit-y = <120>;
-+				st,min-limit-z = <140>;
-+				st,max-limit-x = <550>;
-+				st,max-limit-y = <550>;
-+				st,max-limit-z = <750>;
-+			};
-+		};
-+	};
-+
-+	vbat: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbat";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-boot-on;
-+	};
-+
-+	lis3_reg: fixedregulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lis3_reg";
-+		regulator-boot-on;
-+	};
-+};
-+
-+/include/ "tps65910.dtsi"
-+
-+&tps {
-+	vcc1-supply = <&vbat>;
-+	vcc2-supply = <&vbat>;
-+	vcc3-supply = <&vbat>;
-+	vcc4-supply = <&vbat>;
-+	vcc5-supply = <&vbat>;
-+	vcc6-supply = <&vbat>;
-+	vcc7-supply = <&vbat>;
-+	vccio-supply = <&vbat>;
-+
-+	regulators {
-+		vrtc_reg: regulator at 0 {
-+			regulator-always-on;
-+		};
-+
-+		vio_reg: regulator at 1 {
-+			regulator-always-on;
-+		};
-+
-+		vdd1_reg: regulator at 2 {
-+			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
-+			regulator-name = "vdd_mpu";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1312500>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd2_reg: regulator at 3 {
-+			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
-+			regulator-name = "vdd_core";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1150000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd3_reg: regulator at 4 {
-+			regulator-always-on;
-+		};
-+
-+		vdig1_reg: regulator at 5 {
-+			regulator-always-on;
-+		};
-+
-+		vdig2_reg: regulator at 6 {
-+			regulator-always-on;
-+		};
-+
-+		vpll_reg: regulator at 7 {
-+			regulator-always-on;
-+		};
-+
-+		vdac_reg: regulator at 8 {
-+			regulator-always-on;
-+		};
-+
-+		vaux1_reg: regulator at 9 {
-+			regulator-always-on;
-+		};
-+
-+		vaux2_reg: regulator at 10 {
-+			regulator-always-on;
-+		};
-+
-+		vaux33_reg: regulator at 11 {
-+			regulator-always-on;
-+		};
-+
-+		vmmc_reg: regulator at 12 {
-+			regulator-always-on;
-+		};
-+	};
-+};
--- 
-1.7.9.5
+> Yes, then please do a second pull request for what's needed
+> to apply the minimal DT bindings. For the DT binding, let's
+> just leave out the timings for now as we can load those from
+> auxdata. Then the binding for the timings can be added
+> later on. So just the minimal binding using standard features
+> for the iorange and interrupt.
+
+Ok, I will keep timings aside for now and proceed with DT
+(avoiding auxdata usage with generic routine looked to me a
+saner approach though, with an initial DT'fy delay)
+
+Regards
+Afzal
