@@ -1,88 +1,81 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 15 Oct 2012 17:44:07 +0530
-Subject: [GIT PULL] OMAP-GPMC cleanup for common zImage
-Message-ID: <1350303247-13495-1-git-send-email-afzal@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 15 Oct 2012 14:18:16 +0200
+Subject: [PATCH V3 0/3]  Add clock framework for armada 370/XP
+Message-ID: <1350303499-30868-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Hello Mike,
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+The v3.7-rc1 was released yesterday. So here it is the updated version
+of my patch set. The rebase was flawless. An I have just fixed a typo
+in the device tree and warnings from checkpatch. I built and test it
+for the Armada 370 and Armada XP evaluation board.
 
-are available in the git repository at:
+The purpose of this patch set is to add support for clock framework
+for Armada 370 and Armada XP SoCs. All the support is done under the
+directory drivers/clk/mvebu/ as the support for other mvebu SoCs was
+in mind during the writing of the code.
 
-  git at gitorious.org:x0148406-public/linux-kernel.git tags/gpmc-czimage
+Two kinds of clocks are added:
 
-for you to fetch changes up to 3ef5d0071cf6c8b9a00b559232bb700ad59999d7:
+- The CPU clocks are only for Armada XP (which is multi-core)
 
-  ARM: OMAP2+: gpmc: localize gpmc header (2012-10-15 14:42:15 +0530)
+- The core clocks are clocks which have their rate fixed during
+  reset.
 
-----------------------------------------------------------------
-gpmc cleanup for common ARM zImage
+Many thanks to Thomas Petazzoni and Sebastian Hesselbarth for their
+review and feedback. The device tree bindings were really improved
+with the advices of Sebastian.
 
-----------------------------------------------------------------
-Afzal Mohammed (16):
-      ARM: OMAP2+: nand: unify init functions
-      ARM: OMAP2+: onenand: refactor for clarity
-      ARM: OMAP2+: gpmc: remove cs# in sync clk div calc
-      mtd: onenand: omap: cleanup gpmc dependency
-      mtd: nand: omap: free region as per resource size
-      mtd: nand: omap: read nand using register address
-      ARM: OMAP2+: onenand: connected soc info in pdata
-      mtd: onenand: omap: use pdata info instead of cpu_is
-      ARM: OMAP2+: onenand: header cleanup
-      ARM: OMAP2+: nand: header cleanup
-      mtd: nand: omap: bring in gpmc nand macros
-      ARM: OMAP2+: nand: bch capability check
-      ARM: OMAP2+: gpmc: nand register helper bch update
-      mtd: nand: omap: handle gpmc bch[48]
-      ARM: OMAP2+: gpmc: remove exported nand functions
-      ARM: OMAP2+: gpmc: localize gpmc header
+Changelog:
+V2 -> V3:
+- Rebased on top of v3.7-rc1
+- Fixed a typo in device trees
+- Fixed warning from checkpatch
 
-Jon Hunter (1):
-      ARM: OMAP2+: GPMC: Remove unused OneNAND get_freq() platform function
+V1 -> V2:
 
- arch/arm/mach-omap2/board-2430sdp.c                |   2 +-
- arch/arm/mach-omap2/board-3430sdp.c                |   2 +-
- arch/arm/mach-omap2/board-apollon.c                |   2 +-
- arch/arm/mach-omap2/board-cm-t35.c                 |   5 +-
- arch/arm/mach-omap2/board-cm-t3517.c               |   5 +-
- arch/arm/mach-omap2/board-devkit8000.c             |  10 +-
- arch/arm/mach-omap2/board-flash.c                  |  50 +--
- arch/arm/mach-omap2/board-flash.h                  |   8 +-
- arch/arm/mach-omap2/board-h4.c                     |   2 +-
- arch/arm/mach-omap2/board-igep0020.c               |   5 +-
- arch/arm/mach-omap2/board-ldp.c                    |   6 +-
- arch/arm/mach-omap2/board-n8x0.c                   |   1 +
- arch/arm/mach-omap2/board-omap3beagle.c            |  10 +-
- arch/arm/mach-omap2/board-omap3evm.c               |   8 +-
- arch/arm/mach-omap2/board-omap3logic.c             |   2 +-
- arch/arm/mach-omap2/board-omap3pandora.c           |   3 +-
- arch/arm/mach-omap2/board-omap3stalker.c           |   2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c         |  10 +-
- arch/arm/mach-omap2/board-overo.c                  |   9 +-
- arch/arm/mach-omap2/board-rm680.c                  |   3 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c       |   3 +-
- arch/arm/mach-omap2/board-rx51.c                   |   2 +-
- arch/arm/mach-omap2/board-zoom-debugboard.c        |   2 +-
- arch/arm/mach-omap2/board-zoom.c                   |   5 +-
- arch/arm/mach-omap2/common-board-devices.c         |  46 ---
- arch/arm/mach-omap2/common-board-devices.h         |   1 -
- arch/arm/mach-omap2/gpmc-nand.c                    |  85 ++--
- arch/arm/mach-omap2/gpmc-nand.h                    |  27 ++
- arch/arm/mach-omap2/gpmc-onenand.c                 | 214 +++++-----
- arch/arm/mach-omap2/gpmc-onenand.h                 |  24 ++
- arch/arm/mach-omap2/gpmc-smc91x.c                  |   2 +-
- arch/arm/mach-omap2/gpmc-smsc911x.c                |   2 +-
- arch/arm/mach-omap2/gpmc.c                         | 459 +--------------------
- .../{plat-omap/include/plat => mach-omap2}/gpmc.h  |  61 +--
- arch/arm/mach-omap2/pm34xx.c                       |   2 +-
- arch/arm/mach-omap2/usb-tusb6010.c                 |   2 +-
- drivers/mtd/nand/omap2.c                           | 125 +++++-
- drivers/mtd/onenand/omap2.c                        |   9 +-
- include/linux/platform_data/mtd-nand-omap2.h       |  46 ++-
- include/linux/platform_data/mtd-onenand-omap2.h    |  28 +-
- 40 files changed, 493 insertions(+), 797 deletions(-)
- create mode 100644 arch/arm/mach-omap2/gpmc-nand.h
- create mode 100644 arch/arm/mach-omap2/gpmc-onenand.h
- rename arch/arm/{plat-omap/include/plat => mach-omap2}/gpmc.h (67%)
+- Improved the spelling and the wording of the documentation and the
+  1st commit log
+- Removed the "end_of_list" name which are unused here.
+- Fix the cpu clock by using of_clk_src_onecell_get in the same way it
+  was used for the core clocks
+
+Regards,
+
+
+Gregory CLEMENT (3):
+  clk: mvebu: add armada-370-xp specific clocks
+  clk: armada-370-xp: add support for clock framework
+  clocksource: time-armada-370-xp converted to clk framework
+
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   40 +++
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 ++
+ arch/arm/boot/dts/armada-370-db.dts                |    4 -
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+ arch/arm/boot/dts/armada-370.dtsi                  |   12 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   48 +++
+ arch/arm/mach-mvebu/Kconfig                        |    5 +
+ arch/arm/mach-mvebu/armada-370-xp.c                |    8 +-
+ arch/arm/mach-mvebu/common.h                       |    1 +
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/mvebu/Makefile                         |    2 +
+ drivers/clk/mvebu/clk-core.c                       |  312 ++++++++++++++++++++
+ drivers/clk/mvebu/clk-core.h                       |   19 ++
+ drivers/clk/mvebu/clk-cpu.c                        |  155 ++++++++++
+ drivers/clk/mvebu/clk-cpu.h                        |   19 ++
+ drivers/clk/mvebu/clk.c                            |   36 +++
+ drivers/clocksource/time-armada-370-xp.c           |   11 +-
+ 17 files changed, 685 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+ create mode 100644 drivers/clk/mvebu/Makefile
+ create mode 100644 drivers/clk/mvebu/clk-core.c
+ create mode 100644 drivers/clk/mvebu/clk-core.h
+ create mode 100644 drivers/clk/mvebu/clk-cpu.c
+ create mode 100644 drivers/clk/mvebu/clk-cpu.h
+ create mode 100644 drivers/clk/mvebu/clk.c
+
+-- 
+1.7.9.5
