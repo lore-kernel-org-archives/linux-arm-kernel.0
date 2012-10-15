@@ -1,47 +1,62 @@
-From: jose.goncalves@inov.pt (=?UTF-8?B?Sm9zw6kgTWlndWVsIEdvbsOnYWx2ZXM=?=)
-Date: Mon, 15 Oct 2012 17:22:29 +0100
-Subject: [PATCH] ARM: SAMSUNG: Add naming of s3c64xx-spi devices
-In-Reply-To: <507C2492.8010408@samsung.com>
-References: <201210021443.54897.heiko@sntech.de> <507C2492.8010408@samsung.com>
-Message-ID: <507C3845.1030003@inov.pt>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 15 Oct 2012 18:52:18 +0200
+Subject: [PATCH 3/9] uprobes: allow ignoring of probe hits
+In-Reply-To: <1350242593-17761-3-git-send-email-rabin@rab.in>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-3-git-send-email-rabin@rab.in>
+Message-ID: <20121015165218.GA10239@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-10-2012 15:58, Sylwester Nawrocki wrote:
-> Hi Heiko,
+On 10/14, Rabin Vincent wrote:
 >
-> On 10/02/2012 02:43 PM, Heiko St?bner wrote:
->> Commit a5238e360b71 (spi: s3c64xx: move controller information into driver
->> data) introduced separate device names for the different subtypes of the
->> spi controller but forgot to set these in the relevant machines.
->>
->> To fix this introduce a s3c64xx_spi_setname function and populate all
->> Samsung arches with the correct names. The function resides in a new
->> header, as the s3c64xx-spi.h contains driver platform data and should
->> therefore at some later point move out of the Samsung include dir.
->>
->> Tested on a s3c2416-based machine.
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> Cc: stable at vger.kernel.org
-> This patch looks good to me. I've tested it on Exynos4412 SoC based
-> board. And it fixes quite serious problem - broken SPI support on
-> a all Samsung machs (non-dt) except s3c64xx in mainline v3.6 kernel.
->
->
-> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> (mach-exynos only)
->
-> Jos? Miguel, can you confirm it solves the problem for you ?
+> Allow arches to decided to ignore a probe hit.  ARM will use this to
+> only call handlers if the conditions to execute a conditionally executed
+> instruction are satisfied.
 
-The driver initialization problem is solved by this patch on my S3C2416 based 
-board. Nevertheless, I didn?t have the time yet to test an actual SPI device 
-connected to the bus.
+Not sure I understand why we shouldn't call handlers in this case,
+but OK, I know nothing about arm.
 
-BTW, I think the two debug messages at the end of the s3c64xx_spi_probe() routine 
-should be promoted from dev_dbg to dev_info in order to be shown on a normal 
-kernel boot.
+>  static struct uprobe *find_active_uprobe(unsigned long bp_vaddr, int *is_swbp)
+>  {
+>  	struct mm_struct *mm = current->mm;
+> @@ -1469,6 +1474,7 @@ static void handle_swbp(struct pt_regs *regs)
+>  	struct uprobe *uprobe;
+>  	unsigned long bp_vaddr;
+>  	int uninitialized_var(is_swbp);
+> +	bool ignored = false;
+>  
+>  	bp_vaddr = uprobe_get_swbp_addr(regs);
+>  	uprobe = find_active_uprobe(bp_vaddr, &is_swbp);
+> @@ -1499,6 +1505,12 @@ static void handle_swbp(struct pt_regs *regs)
+>  			goto cleanup_ret;
+>  	}
+>  	utask->active_uprobe = uprobe;
+> +
+> +	if (arch_uprobe_ignore(&uprobe->arch, regs)) {
+> +		ignored = true;
+> +		goto cleanup_ret;
+> +	}
+> +
+>  	handler_chain(uprobe, regs);
+>  	if (uprobe->flags & UPROBE_SKIP_SSTEP && can_skip_sstep(uprobe, regs))
+>  		goto cleanup_ret;
+> @@ -1514,7 +1526,7 @@ cleanup_ret:
+>  		utask->active_uprobe = NULL;
+>  		utask->state = UTASK_RUNNING;
+>  	}
+> -	if (!(uprobe->flags & UPROBE_SKIP_SSTEP))
+> +	if (!ignored && !(uprobe->flags & UPROBE_SKIP_SSTEP))
+>  
+>  		/*
+>  		 * cannot singlestep; cannot skip instruction;
 
-Best regards,
-Jos? Gon?alves
+This conflicts with other changes in
+
+	git://git.kernel.org/pub/scm/linux/kernel/git/oleg/misc uprobes/core
+
+Could you re-diff?
+
+I'll try to read 1-7 tomorrow.
+
+Oleg.
