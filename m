@@ -1,83 +1,119 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 15 Oct 2012 16:30:15 +0300
-Subject: [PATCH v7] Enable USB peripheral mode on dm365 EVM
-In-Reply-To: <1349973274-24936-1-git-send-email-const@MakeLinux.com>
-References: <1349973274-24936-1-git-send-email-const@MakeLinux.com>
-Message-ID: <20121015133014.GU24333@arwen.pp.htv.fi>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 15 Oct 2012 15:35:31 +0200
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <1350288210.16750.2.camel@gitbox>
+References: <1350192523.10946.4.camel@gitbox> <1350246895.11504.6.camel@gitbox>
+ <1350253591.13440.1.camel@gitbox> <1822826.6oRYLvbneG@flatron>
+ <1350288210.16750.2.camel@gitbox>
+Message-ID: <03be01cdaad9$f57d57f0$e07807d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Thu, Oct 11, 2012 at 06:34:34PM +0200, Constantine Shulyupin wrote:
-> From: Constantine Shulyupin <const@MakeLinux.com>
-> 
-> Sets USB PHY clock source to 24 MHz clock.
-> 
-> Tested with OTG configuration, usb gadget g_zero on DM365 EVM connected to PC.
-> 
-> To active the patch need to call davinci_setup_usb from dm365_evm_init
-> 
-> References:
-> 
-> Definition of USB_PHY_CTRL and PHYCLKFREQ:
-> - http://www.makelinux.com/lib/ti/DM36x_ARM/doc-141
-> 
-> Original patch by miguel.aguilar at ridgerun.com three years ago:
-> - http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
-> 
-> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
-> ---
-> 
-> Note:
-> 
-> Changelog
-> 
-> Changes since v6
-> - moved call to davinci_setup_usb from dm365_evm_init to another patch accordinly request of Sergei
->  
-> Changes since v5 http://www.spinics.net/lists/kernel/msg1413120.html
-> accordingy feedback of nsekhar at ti.com http://www.spinics.net/lists/kernel/msg1414914.html
-> - phy configuration moved to drivers/usb/musb/davinci.c
-> - USB_OTG configuration is submitted in separated patch: http://www.spinics.net/lists/kernel/msg1414964.html
-> - Setting current limit to 1000 mA. Any way the current is limited to 510 mA in davinci_setup_usb.
-> 
-> Changes since v4 http://www.spinics.net/lists/kernel/msg1412995.html
-> - removed fix of dev_info in musb_init_controller
-> 
-> Changes since v3 http://www.spinics.net/lists/kernel/msg1412544.html:
-> - removed optional altering of pr_info
-> 
-> Changes since v1  http://marc.info/?l=linux-kernel&m=130894150803661&w=2:
-> - removed optional code and reordered
-> - removed alternation of GPIO33, which is multiplexed with DRVVBUS, because is not need for peripheral USB
-> 
-> This patch is based on code from projects Arago, Angstom and RidgeRun.
-> 
-> ---
->  drivers/usb/musb/davinci.c              |    3 +++
->  drivers/usb/musb/davinci.h              |    1 +
-> 
-> diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
-> index 472c8b4..af09ebf 100644
-> --- a/drivers/usb/musb/davinci.c
-> +++ b/drivers/usb/musb/davinci.c
-> @@ -428,6 +428,9 @@ static int davinci_musb_init(struct musb *musb)
->  		__raw_writel(deepsleep, DM355_DEEPSLEEP);
->  	}
->  
-> +	if (machine_is_davinci_dm365_evm())
-> +		writel(readl(USB_PHY_CTRL) | USBPHY_CLKFREQ_24MHZ, USB_PHY_CTRL);
+On Monday, October 15, 2012 10:04 AM Tony Prisk wrote:
 
-NAK!!! No machine_is_* in drivers/ directory. You shouldn't control your
-PHY directly, you need a PHY driver.
+> On Mon, 2012-10-15 at 08:42 +0200, Tomasz Figa wrote:
+> > Hi Tony,
+> >
+> > On Monday 15 of October 2012 11:26:31 Tony Prisk wrote:
+> > > On Mon, 2012-10-15 at 09:34 +1300, Tony Prisk wrote:
+> > > > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
+> > > > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on
+> > > > > the
+> > > > > 11 Oct when I did another pull from linus all of a sudden
+> > > > > dma_alloc_coherent is failing to allocate the framebuffer any
+> > > > > longer.
+> > > > >
+> > > > > I did a quick look back and found this:
+> > > > >
+> > > > > ARM: add coherent dma ops
+> > > > >
+> > > > > arch_is_coherent is problematic as it is a global symbol. This
+> > > > > doesn't work for multi-platform kernels or platforms which can
+> > > > > support
+> > > > > per device coherent DMA.
+> > > > >
+> > > > > This adds arm_coherent_dma_ops to be used for devices which
+> > > > > connected
+> > > > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The
+> > > > > arm_dma_ops
+> > > > > are modified at boot when arch_is_coherent is true.
+> > > > >
+> > > > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > > > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > >
+> > > > >
+> > > > > This is the only patch lately that I could find (not that I would
+> > > > > claim
+> > > > > to be any good at finding things) that is related to the problem.
+> > > > > Could
+> > > > > it have caused the allocations to fail?
+> > > > >
+> > > > > Regards
+> > > > > Tony P
+> > > >
+> > > > Have done a bit more digging and found the cause - not Rob's patch so
+> > > > apologies.
+> > > >
+> > > > The cause of the regression is this patch:
+> > > >
+> > > > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+> > > > From: Mel Gorman <mgorman@suse.de>
+> > > > Date: Mon, 8 Oct 2012 16:32:36 -0700
+> > > > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+> > > >
+> > > >  possible
+> > > >
+> > > > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
+> > > > was fine. From this patch onwards, allocations fail.
+> > > >
+> > > > I don't know how this patch would effect CMA allocations, but it seems
+> > > > to be causing the issue (or at least, it's caused an error in
+> > > > arch-vt8500 to become visible).
+> > > >
+> > > > Perhaps someone who understand -mm could explain the best way to
+> > > > troubleshoot the cause of this problem?
+> > > >
+> > > >
+> > > > Regards
+> > > > Tony P
+> > > >
+> > > Have done a bit more testing..
+> > >
+> > > Disabling Memory Compaction makes no difference.
+> > > Disabling CMA fixes/hides the problem. ?!?!?!
+> >
+> > Could you post your kernel log when it isn't working?
+> >
+> > Do you have the default CMA reserved pool in Kconfig set big enough to
+> > serve this allocation?
+> >
+> > I'm not sure what kind of allocation this framebuffer driver does, but if
+> > it needs to allocate memory from atomic context then possibly this patch
+> > series has something to do with it:
+> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/182697/focus=182699
+> >
+> > CC'ing Marek Szyprowski <m.szyprowski@samsung.com>
+>
+> I set CMA to 16MB (and also tried 32MB) in Kconfig, but it made no
+> difference. The framebuffer is only trying to allocate ~1.5MB via
+> dma_alloc_coherent().
+> 
+> I haven't captured a kernel log, but will do.
+> 
+> Thanks for the feedback.
 
+Commit 627260595ca6abcb16d68a3732bac6b547e112d6 "mm: compaction: fix bit ranges in 
+{get,clear,set}_pageblock_skip()" should fix the issues with broken CMA allocations,
+please check if todays v3.7-rc1 works for You.
+
+For more information please check http://thread.gmane.org/gmane.linux.kernel/1365503/ 
+thread.
+
+Best regards
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121015/adf04329/attachment.sig>
+Marek Szyprowski
+Samsung Poland R&D Center
