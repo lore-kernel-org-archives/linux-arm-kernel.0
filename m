@@ -1,48 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Oct 2012 09:01:55 -0700
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
-References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
- <20121011144756.GB12552@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
-Message-ID: <20121015160154.GB15569@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Oct 2012 10:03:11 -0600
+Subject: [PATCH v2] i2c: i2c-gpio: fix name issue when i2c gpio node GT 1
+In-Reply-To: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
+References: <1350287477-30936-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <507C33BF.6020604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mohammed, Afzal <afzal@ti.com> [121015 05:42]:
-> Hi Tony,
+On 10/15/2012 01:51 AM, Bo Shen wrote:
+> When i2c-gpio node number is greater than 1, the name for each is same
+> So add the patch to fix it.
 > 
-> On Thu, Oct 11, 2012 at 20:17:56, Tony Lindgren wrote:
-> > * Mohammed, Afzal <afzal@ti.com> [121011 05:48]:
+> The adap->name printing information is add by myself
 > 
-> > After -rc1 is out, let's plan on adding the minimal
-> > set required for removing plat and mach includes from
-> > drivers into a clean-up branch. Afzal, can you maybe
-> > do a pull request for that set against -rc1 when it's
-> > out? Just the minimal set of patches.
+> without this patch the log information is as following
+> ---<8---
+> adap->name = i2c-gpio-1
+> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+> adap->name = i2c-gpio-1
+> i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
+> --->8---
 > 
-> Pull request on gpmc cleanup for common ARM zImage has
-> been sent.
+> with this patch, the log information is as following
+> ---<8---
+> adap->name = i2c.2
+> i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+> adap->name = i2c.3
+> i2c-gpio i2c.3: using pins 64 (SDA) and 65 (SCL)
+> --->8---
 
-Thanks.
- 
-> > Yes, then please do a second pull request for what's needed
-> > to apply the minimal DT bindings. For the DT binding, let's
-> > just leave out the timings for now as we can load those from
-> > auxdata. Then the binding for the timings can be added
-> > later on. So just the minimal binding using standard features
-> > for the iorange and interrupt.
-> 
-> Ok, I will keep timings aside for now and proceed with DT
-> (avoiding auxdata usage with generic routine looked to me a
-> saner approach though, with an initial DT'fy delay)
+I think this is reasonable, although I imagine this has zero effect on
+the I2C bus number that's assigned to the device, so I'm not sure how it
+interacts with or supports the other Atmel patch series you sent, which
+I didn't really look at in much detail.
 
-Oh well if you think it's easier to do the timings too in
-the DT binding, please go ahead with that. It may take some
-longer discussion on the lists for the binding though. But
-up to you.
-
-Regards,
-
-Tony
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
