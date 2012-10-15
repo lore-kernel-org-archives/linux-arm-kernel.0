@@ -1,54 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 15 Oct 2012 14:10:15 +0000
-Subject: [PATCH 2/2] Documentation: Describe Device Tree bindings for GPIO
- Regulator driver
-In-Reply-To: <1350307020-5910-2-git-send-email-lee.jones@linaro.org>
-References: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
- <1350307020-5910-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <201210151410.16516.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 15 Oct 2012 23:18:23 +0900
+Subject: [PATCH] ARM: dts: exynos4210-trats: Split memory into 4 sections
+In-Reply-To: <1349779199-30665-1-git-send-email-t.figa@samsung.com>
+References: <1349779199-30665-1-git-send-email-t.figa@samsung.com>
+Message-ID: <10e301cdaadf$ef547150$cdfd53f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 October 2012, Lee Jones wrote:
-> diff --git a/Documentation/devicetree/bindings/regulator/gpio-regulator.txt b/Documentation/devicetree/bindings/regulator/gpio-regulator.txt
-> new file mode 100644
-> index 0000000..5f77ee0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/gpio-regulator.txt
-> @@ -0,0 +1,25 @@
-> +GPIO controlled regulators
-> +
-> +Required properties:
-> +- compatible            : Must be "regulator-gpio".
-> +
-> +Optional properties:
-> +- gpio-enable           : GPIO to use to enable/disable the regulator.
-> +- startup-delay-us      : Startup time in microseconds.
-> +- enable-active-high    : Polarity of GPIO is active high (default is low).
-> +
-> +Any property defined as part of the core regulator binding defined in
-> +regulator.txt can also be used.
-> +
-> +Example:
-> +
-> +       mmciv: gpio-regulator {
-> +               compatible = "regulator-gpio";
-> +               regulator-name = "mmci-gpio-supply";
-> +               regulator-min-microvolt = <1800000>;
-> +               regulator-max-microvolt = <2600000>;
-> +               gpio = <&gpio0 24 0x4>;
-> +               startup-delay-us = <100000>;
-> +               enable-active-high;
-> +               regulator-boot-on;
-> +       };
+Tomasz Figa wrote:
+> 
+> Since the maximum section size on mach-exynos is set to 256MiB, boards
+> with memory configuration defined using sections bigger than 256MiB will
+> fail to boot with a kernel panic.
+> 
+I don't think so and it works fine in my side. Probably, the reason of
+kernel panic you said is not a maximum sections size?
 
-The example doesn't match the documentation for the name of the gpio property
-("gpio" vs. "gpio-enable"). I think the convention is to use "gpios".
+> This patch modifies the dts file of Samsung Trats board to define four
+> sections of 256MiB instead of two of 512MiB to fix the boot problem.
+> 
+BTW, if this patch can fix the problem, OK, I will apply this for now.
 
-Shouldn't this property be mandatory? I think there is little point in
-defining a gpio-regulator without a gpio line attached to it.
+Thanks.
 
-Finally, the "enable-active-high" looks redundant, as that is something
-that is normally encoded in the "gpios" property.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-	Arnd
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4210-trats.dts | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
+> b/arch/arm/boot/dts/exynos4210-trats.dts
+> index 73567b8..a21511c 100644
+> --- a/arch/arm/boot/dts/exynos4210-trats.dts
+> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
+> @@ -20,8 +20,10 @@
+>  	compatible = "samsung,trats", "samsung,exynos4210";
+> 
+>  	memory {
+> -		reg =  <0x40000000 0x20000000
+> -			0x60000000 0x20000000>;
+> +		reg =  <0x40000000 0x10000000
+> +			0x50000000 0x10000000
+> +			0x60000000 0x10000000
+> +			0x70000000 0x10000000>;
+>  	};
+> 
+>  	chosen {
+> --
+> 1.7.12
