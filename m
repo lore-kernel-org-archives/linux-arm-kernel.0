@@ -1,37 +1,74 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 15 Oct 2012 15:33:07 -0700
-Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
-In-Reply-To: <507C32E8.1040701@wwwdotorg.org>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <1350025676.20241.82.camel@jlo-ubuntu-64.nvidia.com>
- <507885D4.10604@wwwdotorg.org>
- <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
- <507C32E8.1040701@wwwdotorg.org>
-Message-ID: <CAMbhsRQg3-QwSfvuU1n7mUq1QhtU2Q+yHUpZ7PtRYQot=pijng@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 15 Oct 2012 15:37:17 -0700
+Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
+ suspended.
+In-Reply-To: <20121012215156.GL30339@atomide.com> (Tony Lindgren's message of
+ "Fri, 12 Oct 2012 14:51:56 -0700")
+References: <20120925092118.GJ31374@n2100.arm.linux.org.uk>
+ <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
+ <87ipas2y4h.fsf@deeprootsystems.com>
+ <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
+ <50784458.9080806@ti.com> <877gqv7imt.fsf@deeprootsystems.com>
+ <20121012164202.GQ28061@n2100.arm.linux.org.uk>
+ <877gqv4lmt.fsf@deeprootsystems.com>
+ <20121012185426.GS28061@n2100.arm.linux.org.uk>
+ <87lifbwhwd.fsf@deeprootsystems.com>
+ <20121012215156.GL30339@atomide.com>
+Message-ID: <87391fs6oy.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 8:59 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/15/2012 01:56 AM, Joseph Lo wrote:
->> There is still one thing you should know. Because we are planning to
->> upstream "CPUquiet" framework that is a CPU auto hotplug mechanism. It
->> will auto hotplug the CPUs depends on the system is busy or not. So when
->> system is idle, there will be only one CPU online (i.e, CPU0). The
->> secondary CPUs will all be hot plugged (i.e, offline and power gate). We
->> need to think about do we still need coupled cpuidle on Tegra30 if we
->> are going to use "CPUquiet".
->
-> CPUquiet isn't relevant at all. First, a user may presumably disable
-> CPUquiet's Kconfig option (it had better have one, and the system had
-> better work with it disabled). Second, even if CPUquiet is enabled, I
-> don't imagine there is a 100% guarantee that hot(un)plug will happen
-> before cpuidle kicks in, is there? Finally, is there any guarantee that
-> CPUquiet will actually be accepted upstream?
+Tony Lindgren <tony@atomide.com> writes:
 
-CPUquiet is a glorified hotplug governor, and hotplug governors have
-been widely rejected upstream, so I wouldn't plan on seeing it
-accepted.
+> * Kevin Hilman <khilman@deeprootsystems.com> [121012 13:34]:
+>>
+>> I'm not conviced (yet) that a mismatch is the root cause.  Yes, that's
+>> what the author of $SUBJECT patch assumed and stated, but I'm not
+>> pursuaded.  
+>> 
+>> If it's an improperly configured mux issue, then the UART will break
+>> whenever the device is actually omap_device_enable'd, whether in the
+>> driver or in the bus layer.
+>
+> I tried booting n800 here with CONFIG_OMAP_MUX disabled, and no
+> change. Serial console output stops right when the console initializes.
+
+OK, since it's not mux, and since those who actually maintain this
+driver don't seem to be taking care of this, I did some digging today.
+
+Russell is right.  It's a mismatch between assumed runtime PM state
+(disabled) and actual HW state.
+
+During init, all omap_devices are idled by default, so that they are
+correctly in the state that the runtime PM framework will later expect
+them to be.  That is, all devices *except* the console UART.  For that
+one, we use the special hwmod flag to not idle/reset the UART since that
+will cause problems during earlyprintk usage, and the switch between
+the earlyprintk console and the real console driver.
+
+Since the console uart was left enabled during init, it needs to be
+fully enabled and the runtime PM status set accordingly.
+
+The patch below does this, and works fine on 2420/n810, as well as on
+3530/Overo, 3730/OveroSTORM, 3730/Beagle-XM and 4430/PandaES.
+
+Will send patch with a proper changelog shortly,
+
+Kevin
+
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 0405c81..37b5dbe 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -327,6 +327,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 	if ((console_uart_id == bdata->id) && no_console_suspend)
+ 		omap_device_disable_idle_on_suspend(pdev);
+ 
++	if (console_uart_id == bdata->id) {
++		omap_device_enable(pdev);
++		pm_runtime_set_active(&pdev->dev);
++	}
++
+ 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+ 
+ 	oh->dev_attr = uart;
