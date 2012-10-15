@@ -1,40 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 15 Oct 2012 23:23:22 +0900
-Subject: [PATCH] ARM: dts: exynos4: Enable serial controllers on Origen and
- SMDKV310
-In-Reply-To: <1587144.mixS1B3zoJ@amdc1227>
-References: <1349701968-6675-1-git-send-email-t.figa@samsung.com>
- <1587144.mixS1B3zoJ@amdc1227>
-Message-ID: <10e401cdaae0$a17d44b0$e477ce10$%kim@samsung.com>
+From: markus@oberhumer.com (Markus F.X.J. Oberhumer)
+Date: Mon, 15 Oct 2012 16:32:55 +0200
+Subject: [PATCH] lib: decompress_unlzo: Change include file name
+In-Reply-To: <1350238390-1549-1-git-send-email-festevam@gmail.com>
+References: <1350238390-1549-1-git-send-email-festevam@gmail.com>
+Message-ID: <507C1E97.3020006@oberhumer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Hi Kgene,
-> 
-> On Monday 08 of October 2012 15:12:48 Tomasz Figa wrote:
-> > This patch adds status override of serial nodes to enable used serial
-> > ports on Origen and SMDKV310 board.
-> >
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/exynos4210-origen.dts   | 16 ++++++++++++++++
-> >  arch/arm/boot/dts/exynos4210-smdkv310.dts | 16 ++++++++++++++++
-> >  2 files changed, 32 insertions(+)
-> >
-> 
-> I think you missed this patch when applying Exynos dts reorganization
-> patches. It is needed to enable serial ports on Origen and SMDKV310
-boards.
-> Could you apply it as well?
-> 
-Oops, yeah. I will apply.
+Thanks Fabio,
 
-Thanks.
+that should already be fixed on the "lzo-update" branch at
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+  git://github.com/markus-oberhumer/linux.git lzo-update
+
+Cheers,
+Markus
+
+On 2012-10-14 20:13, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Commit 7c979cebc (lib/lzo: Rename lzo1x_decompress.c to lzo1x_decompress_safe.c) 
+> renamed lzo1x_decompress.c file, but missed to update lib/decompress_unlzo.c,
+> which breaks imx_v6_v7_defconfig build:
+> 
+> arch/arm/boot/compressed/../../../../lib/decompress_unlzo.c:34:34: fatal error: lzo/lzo1x_decompress.c: No such file or directory
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  lib/decompress_unlzo.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/lib/decompress_unlzo.c b/lib/decompress_unlzo.c
+> index 4531294..960183d 100644
+> --- a/lib/decompress_unlzo.c
+> +++ b/lib/decompress_unlzo.c
+> @@ -31,7 +31,7 @@
+>   */
+>  
+>  #ifdef STATIC
+> -#include "lzo/lzo1x_decompress.c"
+> +#include "lzo/lzo1x_decompress_safe.c"
+>  #else
+>  #include <linux/decompress/unlzo.h>
+>  #endif
+
+-- 
+Markus Oberhumer, <markus@oberhumer.com>, http://www.oberhumer.com/
