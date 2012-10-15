@@ -1,103 +1,90 @@
-From: felix.yang@huawei.com (Yangfei (Felix))
-Date: Mon, 15 Oct 2012 10:30:21 -0000
-Subject: =?gb2312?B?tPC4tDogSGFyZGNvZGVkIGluc3RydWN0aW9uIGNhdXNlcyBjZXJ0YWluIGZl?=
- =?gb2312?B?YXR1cmVzIHRvIGZhaWwgb24gQVJNIHBsYXRmcm9tIGR1ZSB0byBlbmRpYW5u?=
- =?gb2312?Q?ess?=
-In-Reply-To: <20603.47887.262025.941051@pilspetsen.it.uu.se>
-References: <DA41BE1DDCA941489001C7FBD7A8820E3CB407A4@szxeml549-mbx.china.huawei.com>
- <20603.47887.262025.941051@pilspetsen.it.uu.se>
-Message-ID: <DA41BE1DDCA941489001C7FBD7A8820E3CB410BF@szxeml549-mbx.china.huawei.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Mon, 15 Oct 2012 12:33:36 -0000
+Subject: [GIT PULL] OMAP-GPMC related cleanup for common zImage
+In-Reply-To: <1350303247-13495-1-git-send-email-afzal@ti.com>
+References: <1350303247-13495-1-git-send-email-afzal@ti.com>
+Message-ID: <1350304405-14762-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikael & Russell,
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-    Thanks for the suggestions. I tried to replace ".word" with ".inst" and the cpu-hotplug feature now works on big-endian (BE-8) ARM platform. And illegal instruction exception disappears.
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
-    And the following is my small patch to fix the problem,
+are available in the git repository at:
 
-diff -urN linux-3.7-rc1/arch/arm/mach-exynos/hotplug.c linux/arch/arm/mach-exynos/hotplug.c
---- linux-3.7-rc1/arch/arm/mach-exynos/hotplug.c	2012-10-15 05:41:04.000000000 +0800
-+++ linux/arch/arm/mach-exynos/hotplug.c	2012-10-15 17:47:28.177103266 +0800
-@@ -72,7 +72,7 @@
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(".inst	0xe320f003\n"
- 		    :
- 		    :
- 		    : "memory", "cc");
-diff -urN linux-3.7-rc1/arch/arm/mach-realview/hotplug.c linux/arch/arm/mach-realview/hotplug.c
---- linux-3.7-rc1/arch/arm/mach-realview/hotplug.c	2012-10-15 05:41:04.000000000 +0800
-+++ linux/arch/arm/mach-realview/hotplug.c	2012-10-15 17:44:55.915942976 +0800
-@@ -64,7 +64,7 @@
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(".inst	0xe320f003\n"
- 		    :
- 		    :
- 		    : "memory", "cc");
-diff -urN linux-3.7-rc1/arch/arm/mach-shmobile/hotplug.c linux/arch/arm/mach-shmobile/hotplug.c
---- linux-3.7-rc1/arch/arm/mach-shmobile/hotplug.c	2012-10-15 05:41:04.000000000 +0800
-+++ linux/arch/arm/mach-shmobile/hotplug.c	2012-10-15 17:45:20.509879863 +0800
-@@ -39,7 +39,7 @@
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(".inst	0xe320f003\n"
- 		    :
- 		    :
- 		    : "memory", "cc");
-    
-    Since ARM processor can be configured to work in BE-8 big-endian, I thinks this patch is necessary. Any suggestions is welcomed. 
-    Thanks
+  git://gitorious.org/x0148406-public/linux-kernel.git tags/gpmc-czimage
 
+for you to fetch changes up to 3ef5d0071cf6c8b9a00b559232bb700ad59999d7:
 
+  ARM: OMAP2+: gpmc: localize gpmc header (2012-10-15 14:42:15 +0530)
 
+----------------------------------------------------------------
+gpmc cleanup for common ARM zImage
 
-Yangfei (Felix) writes:
- > Hi all,
- > 
- >     I found that hardcoded instruction in inline asm can cause certains certain features fail to work on ARM platform due to endianness.
- >     As an example, consider the following code snippet of platform_do_lowpower function from arch/arm/mach-realview/hotplug.c:
- >                 / *
- >                  * here's the WFI
- >                  */
- >                 asm(".word      0xe320f003\n"
- >                     :
- >                     :
- >                     : "memory", "cc");
- > 
- >     The instruction generated from this inline asm will not work on big-endian ARM platform, such as ARM BE-8 format. Instead, an exception will be generated.
- > 
- >     Here the code should be:
- >                 / *
- >                  * here's the WFI
- >                  */
- >                 asm("WFI\n"
- >                     :
- >                     :
- >                     : "memory", "cc");
- > 
- >     Seems the kernel doesn't support ARM BE-8 well. I don't know why this problem happens.
- >     Can anyone tell me who owns this part? I can prepare a patch then. 
- >     Thanks.
+----------------------------------------------------------------
+Afzal Mohammed (16):
+      ARM: OMAP2+: nand: unify init functions
+      ARM: OMAP2+: onenand: refactor for clarity
+      ARM: OMAP2+: gpmc: remove cs# in sync clk div calc
+      mtd: onenand: omap: cleanup gpmc dependency
+      mtd: nand: omap: free region as per resource size
+      mtd: nand: omap: read nand using register address
+      ARM: OMAP2+: onenand: connected soc info in pdata
+      mtd: onenand: omap: use pdata info instead of cpu_is
+      ARM: OMAP2+: onenand: header cleanup
+      ARM: OMAP2+: nand: header cleanup
+      mtd: nand: omap: bring in gpmc nand macros
+      ARM: OMAP2+: nand: bch capability check
+      ARM: OMAP2+: gpmc: nand register helper bch update
+      mtd: nand: omap: handle gpmc bch[48]
+      ARM: OMAP2+: gpmc: remove exported nand functions
+      ARM: OMAP2+: gpmc: localize gpmc header
 
-Questions regarding the ARM kernel should go to the linux-arm-kernel mailing list
-(see the MAINTAINERS file), with an optional cc: to the regular LKML.
+Jon Hunter (1):
+      ARM: OMAP2+: GPMC: Remove unused OneNAND get_freq() platform function
 
-BE-8 is, if I recall correctly, ARMv7's broken format where code and data have
-different endianess.  GAS supports an ".inst" directive which is like ".word"
-except the data is assumed to be code.  This matters for disassembly, and may
-also be required for BE-8.
-
-That is, just s/.word/.inst/g above and report back if that works or not.
---
-To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
-Please read the FAQ at  http://www.tux.org/lkml/
+ arch/arm/mach-omap2/board-2430sdp.c                |   2 +-
+ arch/arm/mach-omap2/board-3430sdp.c                |   2 +-
+ arch/arm/mach-omap2/board-apollon.c                |   2 +-
+ arch/arm/mach-omap2/board-cm-t35.c                 |   5 +-
+ arch/arm/mach-omap2/board-cm-t3517.c               |   5 +-
+ arch/arm/mach-omap2/board-devkit8000.c             |  10 +-
+ arch/arm/mach-omap2/board-flash.c                  |  50 +--
+ arch/arm/mach-omap2/board-flash.h                  |   8 +-
+ arch/arm/mach-omap2/board-h4.c                     |   2 +-
+ arch/arm/mach-omap2/board-igep0020.c               |   5 +-
+ arch/arm/mach-omap2/board-ldp.c                    |   6 +-
+ arch/arm/mach-omap2/board-n8x0.c                   |   1 +
+ arch/arm/mach-omap2/board-omap3beagle.c            |  10 +-
+ arch/arm/mach-omap2/board-omap3evm.c               |   8 +-
+ arch/arm/mach-omap2/board-omap3logic.c             |   2 +-
+ arch/arm/mach-omap2/board-omap3pandora.c           |   3 +-
+ arch/arm/mach-omap2/board-omap3stalker.c           |   2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c         |  10 +-
+ arch/arm/mach-omap2/board-overo.c                  |   9 +-
+ arch/arm/mach-omap2/board-rm680.c                  |   3 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c       |   3 +-
+ arch/arm/mach-omap2/board-rx51.c                   |   2 +-
+ arch/arm/mach-omap2/board-zoom-debugboard.c        |   2 +-
+ arch/arm/mach-omap2/board-zoom.c                   |   5 +-
+ arch/arm/mach-omap2/common-board-devices.c         |  46 ---
+ arch/arm/mach-omap2/common-board-devices.h         |   1 -
+ arch/arm/mach-omap2/gpmc-nand.c                    |  85 ++--
+ arch/arm/mach-omap2/gpmc-nand.h                    |  27 ++
+ arch/arm/mach-omap2/gpmc-onenand.c                 | 214 +++++-----
+ arch/arm/mach-omap2/gpmc-onenand.h                 |  24 ++
+ arch/arm/mach-omap2/gpmc-smc91x.c                  |   2 +-
+ arch/arm/mach-omap2/gpmc-smsc911x.c                |   2 +-
+ arch/arm/mach-omap2/gpmc.c                         | 459 +--------------------
+ .../{plat-omap/include/plat => mach-omap2}/gpmc.h  |  61 +--
+ arch/arm/mach-omap2/pm34xx.c                       |   2 +-
+ arch/arm/mach-omap2/usb-tusb6010.c                 |   2 +-
+ drivers/mtd/nand/omap2.c                           | 125 +++++-
+ drivers/mtd/onenand/omap2.c                        |   9 +-
+ include/linux/platform_data/mtd-nand-omap2.h       |  46 ++-
+ include/linux/platform_data/mtd-onenand-omap2.h    |  28 +-
+ 40 files changed, 493 insertions(+), 797 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/gpmc-nand.h
+ create mode 100644 arch/arm/mach-omap2/gpmc-onenand.h
+ rename arch/arm/{plat-omap/include/plat => mach-omap2}/gpmc.h (67%)
