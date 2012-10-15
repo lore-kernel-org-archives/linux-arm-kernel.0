@@ -1,118 +1,74 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Mon, 15 Oct 2012 10:52:05 -0500
-Subject: [PATCH] Boottime: A tool for automatic measurement of
- kernel/bootloader boot time
-In-Reply-To: <20121012164221.GN12567@gmail.com>
-References: <1349966545-19340-1-git-send-email-lee.jones@linaro.org>
- <20121012134542.GH12567@gmail.com>
- <20121012134813.GK21164@n2100.arm.linux.org.uk>
- <201210121353.16798.arnd@arndb.de> <20121012140149.GJ12567@gmail.com>
- <50784729.4030302@ti.com> <20121012164221.GN12567@gmail.com>
-Message-ID: <507C3125.70702@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Oct 2012 09:59:36 -0600
+Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
+In-Reply-To: <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-8-git-send-email-josephl@nvidia.com>
+ <5074AA0E.2080508@wwwdotorg.org>
+ <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
+ <5076F5CB.4020200@wwwdotorg.org>
+ <1350025676.20241.82.camel@jlo-ubuntu-64.nvidia.com>
+ <507885D4.10604@wwwdotorg.org>
+ <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <507C32E8.1040701@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/12/2012 11:42 AM, Lee Jones wrote:
-> On Fri, 12 Oct 2012, Dan Murphy wrote:
->
->> On 10/12/2012 09:01 AM, Lee Jones wrote:
->>> On Fri, 12 Oct 2012, Arnd Bergmann wrote:
+On 10/15/2012 01:56 AM, Joseph Lo wrote:
+> On Sat, 2012-10-13 at 05:04 +0800, Stephen Warren wrote:
+>> On 10/12/2012 01:07 AM, Joseph Lo wrote:
+>>> On Fri, 2012-10-12 at 00:37 +0800, Stephen Warren wrote:
+>>>> On 10/11/2012 05:24 AM, Joseph Lo wrote:
+>>>>> On Wed, 2012-10-10 at 06:49 +0800, Stephen Warren wrote:
+>>>>>> On 10/08/2012 04:26 AM, Joseph Lo wrote:
+>>>>>>> The cpuidle LP2 is a power gating idle mode. It support power gating
+>>>>>>> vdd_cpu rail after all cpu cores in LP2. For Tegra30, the CPU0 must
+>>>>>>> be last one to go into LP2. We need to take care and make sure whole
+>>>>>>> secondary CPUs were in LP2 by checking CPU and power gate status.
+>>>>>>> After that, the CPU0 can go into LP2 safely. Then power gating the
+>>>>>>> CPU rail.
+>>>>>>
+>>>>>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+>>>> b) If CPUn can't trigger rail-gating, then when CPUn is the last to
+>>>> enter LP2 of the whole complex, it needs to IPI to CPU0 to tell it to
+>>>> rail-gate, and simply power-gate itself. I believe this IPI interaction
+>>>> is exactly what coupled cpuidle is about, isn't it?
 >>>
->>>> On Friday 12 October 2012, Russell King - ARM Linux wrote:
->>>>>> root at ME:/ cat /sys/kernel/debug/boottime/bootgraph
->>>>>> [    0.185254] calling  splash+0x0/0x0
->>>>>> [    2.984335] initcall splash+0x0/0x0 returned 0 after 2799 msecs.
->>>>>> [    2.984335] calling  autoboot_delay+0x0/0x0
->>>>>> [    4.089513] initcall autoboot_delay+0x0/0x0 returned 0 after 1105 msecs.
->>>>>> [    4.089513] calling  load_kernel+0x0/0x0
->>>>>> [    4.239174] initcall load_kernel+0x0/0x0 returned 0 after 149 msecs.
->>>>>> [    4.239174] calling  boot_kernel+0x0/0x0
->>>>>> [    4.276260] initcall boot_kernel+0x0/0x0 returned 0 after 37 msecs.
->>>>>> [    4.276260] calling  uncompress_ll_init+0x0/0x0
->>>>>> [    4.276260] initcall uncompress_ll_init+0x0/0x0 returned 0 after 0 msecs.
->>>>>> [    4.276260] Freeing init memory: 0K
->>>>> Umm, what happened to sysfs not becoming procfs v2?  I thought we had
->>>>> a fairly strict requirement for "one value per file and not nicely
->>>>> formatted" for sysfs?
->>>>>
->>>> I was thinking the same thing at first, but then I noticed it's actually
->>>> debugfs, which has no such rules.
->>> Right. :)
->>>
->> OK I don't see when boottime_activate is called.
+>>> Yes, indeed. Actually, I had tried the coupled cpuidle on Tegra20. I
+>>> knew it a lot. But I met issues when porting it. It looks like a race
+>>> condition and becomes a dead lock caused by IPI missing. Anyway, we can
+>>> talk about it more detail when I try to upstream the coupled cpuidle
+>>> support for Tegra later.
 >>
->> Where would this call actually be made from?
->>
->> I see the call to deactivate but no call to activate.
-> Here perhaps (Jonas, alerted me to the missing patch):
->
-> commit 4c49a18bcfd2d041cbad7f41c6e6b39d90008382 (HEAD, refs/heads/dt-snowball-pre-rc1)
-> Author: Jonas Aaberg<jonas.aberg@stericsson.com>
-> Date:   Wed Sep 14 09:29:20 2011 +0200
->
->      drivers: clocksource: dbx500-prcmu: Add boottime support
->
->      Change-Id: I9b5e3d050131c08c08786ae84cb76619c0525049
->      Signed-off-by: Jonas Aaberg<jonas.aberg@stericsson.com>
->      Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/32055
->
-> diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-> index c26c369..0069cd9 100644
-> --- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-> +++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-> @@ -14,6 +14,7 @@
->    */
->   #include<linux/clockchips.h>
->   #include<linux/clksrc-dbx500-prcmu.h>
-> +#include<linux/boottime.h>
->
->   #include<asm/sched_clock.h>
->
-> @@ -68,6 +69,23 @@ static u32 notrace dbx500_prcmu_sched_clock_read(void)
->
->   #endif
->
-> +#ifdef CONFIG_BOOTTIME
-> +static unsigned long __init boottime_get_time(void)
-> +{
-> +	return div_s64(clocksource_cyc2ns(clocksource_dbx500_prcmu.read(
-> +						&clocksource_dbx500_prcmu),
-> +					  clocksource_dbx500_prcmu.mult,
-> +					  clocksource_dbx500_prcmu.shift),
-> +		       1000);
-> +}
-> +
-> +static struct boottime_timer __initdata boottime_timer = {
-> +	.init     = NULL,
-> +	.get_time = boottime_get_time,
-> +	.finalize = NULL,
-> +};
-> +#endif
-> +
->   void __init clksrc_dbx500_prcmu_init(void __iomem *base)
->   {
->   	clksrc_dbx500_timer_base = base;
-> @@ -90,4 +108,6 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
->   			 32, RATE_32K);
->   #endif
->   	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
-> +
-> +	boottime_activate(&boottime_timer);
->   }
->
+>> Hmm. That sounds a little churny. Why can't we just use coupled cpuidle
+>> right from the start if the plan is to use it eventually anyway? From
+>> other comments, it sounds like you even already have the code basically
+>> working, but just need to iron out a bug or two?
+> 
+> Stephen,
+> 
+> Even though we have plan to use coupled cpuidle, I still prefer to go
+> with the LP2 driver first. Then adding one more patch to support coupled
+> cpuidle based on LP2 driver. This is good for history. And if there is
+> any issue, it's more easy to roll back to the stable one.
 
-OK So has this been validated and tested on any other IC then a ST part?
-This boottime_activate patch seems to be only for the dbx500.  If this 
-is supposed to be a generic solution I would expect
-a generic patch for ARM to enable boot time activation.
+I don't think that implementing it one way and then changing to a
+different way will benefit history at all. It'll make the history more
+complicated. What exactly is the problem with just using coupled cpuidle
+from the start? If we did merge this implementation now, then switch to
+coupled cpuidle later, when do you think the switch would happen?
 
-Have you profiled how much time the boot time logging has added to the 
-over all boot?
-Also the boottime commit message should explain a little more what it is 
-measuring.
-i.e.  This patch enables logging the boot time from point x to point y 
-for the kernel only.  This does not include init.
+> There is still one thing you should know. Because we are planning to
+> upstream "CPUquiet" framework that is a CPU auto hotplug mechanism. It
+> will auto hotplug the CPUs depends on the system is busy or not. So when
+> system is idle, there will be only one CPU online (i.e, CPU0). The
+> secondary CPUs will all be hot plugged (i.e, offline and power gate). We
+> need to think about do we still need coupled cpuidle on Tegra30 if we
+> are going to use "CPUquiet".
 
-What about adding the boot time from the init sequence to init complete?
+CPUquiet isn't relevant at all. First, a user may presumably disable
+CPUquiet's Kconfig option (it had better have one, and the system had
+better work with it disabled). Second, even if CPUquiet is enabled, I
+don't imagine there is a 100% guarantee that hot(un)plug will happen
+before cpuidle kicks in, is there? Finally, is there any guarantee that
+CPUquiet will actually be accepted upstream?
