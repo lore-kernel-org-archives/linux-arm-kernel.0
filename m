@@ -1,46 +1,79 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 15 Oct 2012 08:59:17 +0530
-Subject: [PATCH V2 2/3] dmaengine: dw_dmac: Enhance device tree support
-In-Reply-To: <1350053897.10584.172.camel@smile>
-References: <142ef9170a2c69657d8a05ac127a9970d7b04965.1350051925.git.viresh.kumar@linaro.org>
- <9688d98010716880c1bbd966ead312c446282204.1350051925.git.viresh.kumar@linaro.org>
- <1350053897.10584.172.camel@smile>
-Message-ID: <CAKohpo=20mwje+9AVgs7b-_DshyRO2DZ=Nacjm7vFAhed=Wkqg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 15 Oct 2012 11:29:46 +0800
+Subject: [PATCH] ARM: imx: enable cpufreq for imx6q
+Message-ID: <1350271786-24150-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 October 2012 20:28, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
->> +     if (last_dw) {
->> +             if ((last_bus_id == param) && (last_dw == dw))
->> +                     return false;
->> +     }
-> Just came to my mind.
-> dw can't be NULL, can't it?
-> Then
-> if (last_dw) {
-> ...
-> }
-> is unneeded.
+It enables cpufreq support for imx6q with generic cpufreq-cpu0 driver.
 
-Fixup for this:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/boot/dts/imx6q.dtsi  |   10 +++++++++-
+ arch/arm/mach-imx/Kconfig     |    3 +++
+ arch/arm/mach-imx/clk-imx6q.c |    1 +
+ 3 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index d72c26f..764c159 100644
---- a/drivers/dma/dw_dmac.c
-+++ b/drivers/dma/dw_dmac.c
-@@ -1196,11 +1196,8 @@ bool dw_dma_generic_filter(struct dma_chan
-*chan, void *param)
-         * failure. If dw and param are same, i.e. trying on same dw with
-         * different channel, return false.
-         */
--       if (last_dw) {
--               if ((last_bus_id == param) && (last_dw == dw))
--                       return false;
--       }
--
-+       if ((last_dw == dw) && (last_bus_id == param))
-+               return false;
-        /*
-         * Return true:
-         * - If dw_dma's platform data is not filled with slave info, then all
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index 255f56b..1565aea 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -36,6 +36,14 @@
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
++			operating-points = <
++				/* kHz    uV */
++				792000  1100000
++				396000  950000
++				198000  850000
++			>;
++			clock-latency = <61036>; /* two CLK32 periods */
++			cpu0-supply = <&reg_cpu>;
+ 		};
+ 
+ 		cpu at 1 {
+@@ -447,7 +455,7 @@
+ 					anatop-max-voltage = <2750000>;
+ 				};
+ 
+-				regulator-vddcore at 140 {
++				reg_cpu: regulator-vddcore at 140 {
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "cpu";
+ 					regulator-min-microvolt = <725000>;
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 017296f..e1f78f5 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -829,6 +829,8 @@ config	SOC_IMX53
+ 
+ config SOC_IMX6Q
+ 	bool "i.MX6 Quad support"
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_GIC
+ 	select COMMON_CLK
+@@ -842,6 +844,7 @@ config SOC_IMX6Q
+ 	select MFD_SYSCON
+ 	select PINCTRL
+ 	select PINCTRL_IMX6Q
++	select PM_OPP if PM
+ 
+ 	help
+ 	  This enables support for Freescale i.MX6 Quad processor.
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index e5a82bb..5f9f591 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -406,6 +406,7 @@ int __init mx6q_clocks_init(void)
+ 	clk_register_clkdev(clk[cko1_sel], "cko1_sel", NULL);
+ 	clk_register_clkdev(clk[ahb], "ahb", NULL);
+ 	clk_register_clkdev(clk[cko1], "cko1", NULL);
++	clk_register_clkdev(clk[arm], NULL, "cpu0");
+ 
+ 	/*
+ 	 * The gpmi needs 100MHz frequency in the EDO/Sync mode,
+-- 
+1.7.9.5
