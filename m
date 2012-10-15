@@ -1,170 +1,98 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 15 Oct 2012 15:58:11 -0700
-Subject: Use coupled cpuidle on imx6q
-In-Reply-To: <20121015162842.GD24393@S2101-09.ap.freescale.net>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
- <20121012075358.GA4962@S2101-09.ap.freescale.net>
- <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
- <20121012083017.GB4962@S2101-09.ap.freescale.net>
- <CAMbhsRRGyPB1DvXqkmNpF=hA-3ya5Y+JLV-KY5BW+FX_RoEc9g@mail.gmail.com>
- <20121015162842.GD24393@S2101-09.ap.freescale.net>
-Message-ID: <CAMbhsRTmUCKBoYbjbJxO4-cLr6bdtSKgzvtkKXu2kZJFvFC9Zw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 15 Oct 2012 17:05:38 -0600
+Subject: [PATCH 0/5] ARM: OMAP2+: PRM/CM cleanup series for 3.8
+Message-ID: <20121015224455.18306.89030.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 9:28 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Changed subject (was: Re: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2
-> driver for CPU0) ...
->
-> On Fri, Oct 12, 2012 at 01:50:35PM -0700, Colin Cross wrote:
->> Current coupled cpuidle requires all cpus to wake up together and go
->> back to the idle governor to select a new state, because that's what
->> all available ARM cpus did when I wrote it.  You should be able to
->> implement coupled idle on a cpu that does not need to wake all the
->> cpus if you wake them anyways,
->
-> Can you please elaborate it a little bit?  I do not quite understand
-> what you mean.
+Consolidate and remove some PRM/CM code in preparation for a future move
+into drivers/:
 
-In the current coupled cpuidle implementation, no cpu will return back
-to the scheduler until all cpus have returned from their idle
-function.  That means you need to force each cpu to wake up whenever
-one of them wakes up.  This is a limitation in the current coupled
-cpuidle design due to all existing coupled cpuidle implemenations
-having it as a hardware requirement, but is not a hardware requirement
-for your WAIT mode.  Until somebody fixes that, you have to fake
-wakeups to the other cpus.
+- Remove some obsolete weak functions that allowed old OMAP4 code to
+  reference OMAP2/3 PRM functions
 
-> Basically, imx6q has a low-power mode named WAIT.  When all 4 cores
-> are in WFI, imx6q will go into WAIT mode, and whenever there is a
-> wakeup interrupt, it will exit WAIT mode.  Software can configure
-> hardware behavior during WAIT mode, clock gating or power gating for
-> ARM core.
->
-> I'm trying to implement this low-power mode with coupled cpuidle.
-> I initially have the following code as the coupled cpuidle enter
-> function for clock gating case.
->
-> static int imx6q_enter_wait_coupled(struct cpuidle_device *dev,
->                                     struct cpuidle_driver *drv, int index)
-> {
->         int cpu = dev->cpu;
->
->         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
->
->         if (atomic_inc_return(&master) == num_online_cpus())
->                 imx6q_set_lpm(WAIT_UNCLOCKED);
->
->         cpu_do_idle();
->
->         if (atomic_dec_return(&master) == num_online_cpus() - 1)
->                 imx6q_set_lpm(WAIT_CLOCKED);
->
->         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
->         return index;
-> }
->
-> However I think there are a couple of problems.  The first one is the
-> extra wakeups you have mentioned.  When last cpu is in call
-> imx6q_set_lpm(), some of the first 3 cpus that are already in WFI may
-> exit from there.  The second one is when hardware exits WAIT mode and
-> has ARM clock resumed, some cpus may stay in WFI if scheduler has
-> nothing to wake them up.  This breaks the requirement of coupled cpuidle
-> that all cpus need to exit together.  I can force the function to work
-> around the problems by adding cpuidle_coupled_parallel_barrier() just
-> above cpu_do_idle() and arch_send_wakeup_ipi_mask(cpu_online_mask)
-> right after imx6q_set_lpm(WAIT_CLOCKED).  But I doubt it's appropriate.
+- Split many of the functions in prm2xxx_3xxx.c and cm2xxx_3xxx.c into
+  2xxx- and 3xxx-specific PRM/CM C files
 
-That is the appropriate way of getting it working with today's coupled cpuidle.
+- Move low-level powerdomain and clockdomain register access into the
+  appropriate 2xxx- and 3xxx-specific PRM/CM files, and remove
+  {power,clock}domainXXXX.c
 
-> So I rewrite the function as below to not use coupled cpuidle, and it
-> works fine.
->
-> static int imx6q_enter_wait(struct cpuidle_device *dev,
->                             struct cpuidle_driver *drv, int index)
-> {
->         int cpu = dev->cpu;
->
->         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
->
->         if (atomic_inc_return(&master) == num_online_cpus()) {
->                 /*
->                  * With this lock, we prevent the other cpu to exit and
->                  * enter this function again and become the master.
->                  */
->                 if (!spin_trylock(&master_lock))
->                         goto idle;
->
->                 imx6q_set_lpm(WAIT_UNCLOCKED);
->                 cpu_do_idle();
->                 imx6q_set_lpm(WAIT_CLOCKED);
->
->                 spin_unlock(&master_lock);
->                 goto out;
->         }
->
-> idle:
->         cpu_do_idle();
-> out:
->         atomic_dec(&master);
->         clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
->         return index;
-> }
+This series shouldn't have any functional impact.
 
-Coupled cpuidle provides two features, and you only need one of them
-for your clock gating mode.  The more complex one is sequencing, which
-you don't need since your hardware can check if all cpus are in WFI
-for you.  The other feature is voting, to make sure all cpus can
-accept the exit latency of the deeper idle state.  The
-atomic_inc_return is handling voting in your example, but it can't
-handle one cpu requesting power gating while the other requests clock
-gating.
 
-> For power gating case, it may better fit coupled cpuidle usage model,
-> since all the cores will have to run resume routine and thus will not
-> be in WFI when hardware exits from WAIT mode.  But we still need to
-> work out the extra wakeup issue which will also be seen in this case.
+- Paul
 
-Yes, but using coupled cpuidle for both clock gating and power gating
-will allow you to get into clock gating when one cpu wants clock
-gating and the other wants power gating.
+---
 
->> and then later you can optimize it to
->> avoid the extra wakeups when the extension to coupled cpuidle that I
->> discussed previously gets implemented.
->
-> Do you have a pointer to the initial discussion for the extension, or
-> you have a draft patch for that already (hopefully:)?
+prm_cm_split_cleanup_3.8
+   text	   data	    bss	    dec	    hex	filename
+7515444	 696732	5613932	13826108	 d2f83c	vmlinux.omap2plus_defconfig.orig
+7515308	 696724	5613932	13825964	 d2f7ac	vmlinux.omap2plus_defconfig
 
-I can't find the initial discussion, and I'm not going to have a
-chance to work on it for at least a few weeks.  The basic idea is:
-Add "preidle" and "postidle" function pointers to the coupled cpuidle
-states (better names TBD).
-When all cpus are waiting, and before sending any pokes, call the
-preidle hook on the last cpu to start waiting.  It must only be called
-on one cpu.  The preidle hook is responsible for disabling wakeups on
-secondary cpus so they can't wake up, and returning a mask of the cpus
-it has disabled.
-The coupled core can increment ready count by the number of cpus that
-are disabled and skip poking them.
+Paul Walmsley (5):
+      ARM: OMAP2+: PRM: remove PRM weak functions
+      ARM: OMAP2+: PRM: split PRM functions into OMAP2, OMAP3-specific files
+      ARM: OMAP2+: powerdomain/PRM: move the low-level powerdomain functions into PRM
+      ARM: OMAP2+: CM/hwmod: split CM functions into OMAP2, OMAP3-specific files
+      ARM: OMAP2/3: clockdomain/PRM/CM: move the low-level clockdomain functions into PRM/CM
 
-After coupled idle returns (or when aborting coupled idle), call the
-postidle hook with the mask returned by the pre-idle hook, which
-re-enables wakeups on secondary cpus and returns a mask of cpus that
-are not waking because they are already in a state that can handle
-interrupts (WFI).  The calling cpu will then decrement the ready count
-by the number of cpus that are not waking.
 
-There are some tricky synchronization problems to solve:
-Only one cpu can call the preidle and postidle hooks.  On some
-hardware, they may not even be the same cpu.
-A cpu that is left in the WFI state by the postidle hook is back in
-the "waiting but not ready" state, and the current coupled cpuidle
-code does not support going from waiting->ready->waiting.
-Once the postidle hook has returned, some cpus may be able to
-immediately handle interrupts and return to the scheduler.
+ arch/arm/mach-omap2/Makefile               |  108 +++++----
+ arch/arm/mach-omap2/clkt2xxx_apll.c        |    2 
+ arch/arm/mach-omap2/clkt2xxx_dpll.c        |    2 
+ arch/arm/mach-omap2/clock.c                |    3 
+ arch/arm/mach-omap2/clock2420_data.c       |    2 
+ arch/arm/mach-omap2/clock2430.c            |    2 
+ arch/arm/mach-omap2/clock2430_data.c       |    2 
+ arch/arm/mach-omap2/clock34xx.c            |    2 
+ arch/arm/mach-omap2/clock3517.c            |    2 
+ arch/arm/mach-omap2/clock3xxx_data.c       |    2 
+ arch/arm/mach-omap2/clockdomain2xxx_3xxx.c |  339 ----------------------------
+ arch/arm/mach-omap2/clockdomain33xx.c      |   74 ------
+ arch/arm/mach-omap2/clockdomain44xx.c      |  151 ------------
+ arch/arm/mach-omap2/cm2xxx.c               |  253 +++++++++++++++++++++
+ arch/arm/mach-omap2/cm2xxx.h               |   68 ++++++
+ arch/arm/mach-omap2/cm2xxx_3xxx.h          |  118 +++-------
+ arch/arm/mach-omap2/cm33xx.c               |   56 +++++
+ arch/arm/mach-omap2/cm3xxx.c               |  303 ++++++++++++++-----------
+ arch/arm/mach-omap2/cm3xxx.h               |   86 +------
+ arch/arm/mach-omap2/cminst44xx.c           |  139 +++++++++++
+ arch/arm/mach-omap2/control.c              |    4 
+ arch/arm/mach-omap2/omap_hwmod.c           |   51 +++-
+ arch/arm/mach-omap2/pm24xx.c               |    4 
+ arch/arm/mach-omap2/pm34xx.c               |    5 
+ arch/arm/mach-omap2/powerdomain2xxx_3xxx.c |  242 --------------------
+ arch/arm/mach-omap2/powerdomain33xx.c      |  229 -------------------
+ arch/arm/mach-omap2/powerdomain44xx.c      |  285 ------------------------
+ arch/arm/mach-omap2/prm-regbits-24xx.h     |    2 
+ arch/arm/mach-omap2/prm-regbits-34xx.h     |    2 
+ arch/arm/mach-omap2/prm2xxx.c              |   57 +++++
+ arch/arm/mach-omap2/prm2xxx.h              |  128 +++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.c         |  332 +++++++++------------------
+ arch/arm/mach-omap2/prm2xxx_3xxx.h         |  275 ++++++-----------------
+ arch/arm/mach-omap2/prm33xx.c              |  202 +++++++++++++++++
+ arch/arm/mach-omap2/prm3xxx.c              |  268 ++++++++++------------
+ arch/arm/mach-omap2/prm3xxx.h              |  158 +++++++++++++
+ arch/arm/mach-omap2/prm44xx.c              |  275 ++++++++++++++++++++++-
+ arch/arm/mach-omap2/prm_common.c           |   62 -----
+ arch/arm/mach-omap2/sdrc2xxx.c             |    2 
+ arch/arm/mach-omap2/sleep34xx.S            |    4 
+ arch/arm/mach-omap2/sram242x.S             |    4 
+ arch/arm/mach-omap2/sram243x.S             |    4 
+ arch/arm/mach-omap2/sram34xx.S             |    2 
+ 43 files changed, 1973 insertions(+), 2338 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/clockdomain2xxx_3xxx.c
+ delete mode 100644 arch/arm/mach-omap2/clockdomain33xx.c
+ delete mode 100644 arch/arm/mach-omap2/clockdomain44xx.c
+ create mode 100644 arch/arm/mach-omap2/cm2xxx.c
+ create mode 100644 arch/arm/mach-omap2/cm2xxx.h
+ rename arch/arm/mach-omap2/{cm2xxx_3xxx.c => cm3xxx.c} (72%)
+ copy arch/arm/mach-omap2/{cm2xxx_3xxx.h => cm3xxx.h} (50%)
+ delete mode 100644 arch/arm/mach-omap2/powerdomain2xxx_3xxx.c
+ delete mode 100644 arch/arm/mach-omap2/powerdomain33xx.c
+ delete mode 100644 arch/arm/mach-omap2/powerdomain44xx.c
+ create mode 100644 arch/arm/mach-omap2/prm2xxx.c
+ create mode 100644 arch/arm/mach-omap2/prm2xxx.h
+ copy arch/arm/mach-omap2/{prm2xxx_3xxx.c => prm3xxx.c} (58%)
+ create mode 100644 arch/arm/mach-omap2/prm3xxx.h
