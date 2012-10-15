@@ -1,40 +1,94 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 15 Oct 2012 16:58:26 +0200
-Subject: [PATCH] ARM: SAMSUNG: Add naming of s3c64xx-spi devices
-In-Reply-To: <201210021443.54897.heiko@sntech.de>
-References: <201210021443.54897.heiko@sntech.de>
-Message-ID: <507C2492.8010408@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Oct 2012 16:58:55 +0200
+Subject: [PATCH] MMC: fix sdhci-dove removal
+In-Reply-To: <20121015104456.GR21164@n2100.arm.linux.org.uk>
+References: <20121015094348.GP21164@n2100.arm.linux.org.uk>
+ <20121015103725.GQ21164@n2100.arm.linux.org.uk>
+ <20121015104456.GR21164@n2100.arm.linux.org.uk>
+Message-ID: <20121015145855.GY12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 10/02/2012 02:43 PM, Heiko St?bner wrote:
-> Commit a5238e360b71 (spi: s3c64xx: move controller information into driver
-> data) introduced separate device names for the different subtypes of the
-> spi controller but forgot to set these in the relevant machines.
+On 11:44 Mon 15 Oct     , Russell King - ARM Linux wrote:
+> On Mon, Oct 15, 2012 at 11:37:25AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Oct 15, 2012 at 10:43:48AM +0100, Russell King - ARM Linux wrote:
+> > > 1. Unregister the device _BEFORE_ taking away any resources it may
+> > >    be using.
+> > > 2. Don't check clks against NULL.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > Looking at this driver some more, who the hell came up with the sdhci
+> > registration interface?  It violates one of the most fundamental
+> > principles of kernel driver programming.  You do _NOT_ publish your
+> > driver interfaces _UNTIL_ you have finished setting your device up.
+> > Otherwise, in a preemptible or SMP kernel, your driver can be used
+> > before the initialization has completed.
+> > 
+> > As this driver calls sdhci_pltfm_register() before it has obtained the
+> > clock for the interface, and this function does:
+> > 	sdhci_pltfm_init
+> > 	sdhci_add_host
+> > 		mmc_add_host
+> > 			mmc_start_host
+> > 				mmc_power_up
+> > 					mmc_set_ios
+> > 						sdhci_set_ios
+> > 
+> > See, we're trying to power up and clock the card _before_ the dove
+> > sdhci driver has even claimed the clock let alone enabled it.  This
+> > is total bollocks.  The sdhci platform interface is total crap for
+> > creating this broken design in the first place.  This is why MMC has
+> > the init + add interfaces, they're there to allow drivers to do stuff
+> > the Right(tm) way and avoid shit like the above.
+> > 
+> > This should have been picked up at review time before the driver went
+> > into mainline.  In any case, it needs to be fixed.
 > 
-> To fix this introduce a s3c64xx_spi_setname function and populate all
-> Samsung arches with the correct names. The function resides in a new
-> header, as the s3c64xx-spi.h contains driver platform data and should
-> therefore at some later point move out of the Samsung include dir.
+> Here's an updated patch which just about fixes the sdhci-dove driver.
+> I would not be surprised given the idiotic sdhci-pltfm API if many
+> other drivers suffered the same bug.
 > 
-> Tested on a s3c2416-based machine.
+> 8<====
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
+> Subject: [PATCH] MMC: fix sdhci-dove probe/removal
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Cc: stable at vger.kernel.org
+> 1. Never ever publish a device in the system before it has been setup
+>    to a usable state.
+> 2. Unregister the device _BEFORE_ taking away any resources it may be
+>    using.
+> 3. Don't check clks against NULL.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/mmc/host/sdhci-dove.c |   36 ++++++++++++++++++------------------
+>  1 files changed, 18 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
+> index a6e53a1..7d3a4e4 100644
+> --- a/drivers/mmc/host/sdhci-dove.c
+> +++ b/drivers/mmc/host/sdhci-dove.c
+> @@ -83,30 +83,31 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
+>  	struct sdhci_dove_priv *priv;
+>  	int ret;
+>  
+> -	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
+> -	if (ret)
+> -		goto sdhci_dove_register_fail;
+> -
+>  	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
+>  			    GFP_KERNEL);
+>  	if (!priv) {
+>  		dev_err(&pdev->dev, "unable to allocate private data");
+> -		ret = -ENOMEM;
+> -		goto sdhci_dove_allocate_fail;
+> +		return -ENOMEM;
+>  	}
+>  
+> +	priv->clk = clk_get(&pdev->dev, NULL);
+you have devm_clk_get too
 
-This patch looks good to me. I've tested it on Exynos4412 SoC based
-board. And it fixes quite serious problem - broken SPI support on
-a all Samsung machs (non-dt) except s3c64xx in mainline v3.6 kernel.
+maybe you could use it here too
 
-
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-(mach-exynos only)
-
-Jos? Miguel, can you confirm it solves the problem for you ?
-
---
-Regards,
-Sylwester
+Best Regards,
+J.
