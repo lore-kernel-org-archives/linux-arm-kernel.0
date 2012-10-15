@@ -1,108 +1,170 @@
-From: yangfei.kernel@gmail.com (Fei Yang)
-Date: Mon, 15 Oct 2012 23:33:08 +0800
-Subject: [PATCH] Re: Hardcoded instruction causes certain features to fail on
- ARM platfrom due to endianness
-In-Reply-To: <20603.47887.262025.941051@pilspetsen.it.uu.se>
-References: <DA41BE1DDCA941489001C7FBD7A8820E3CB407A4@szxeml549-mbx.china.huawei.com>
- <20603.47887.262025.941051@pilspetsen.it.uu.se>
-Message-ID: <CAKw8HL154a=K9O7CzPFZ-EqtT+BxYU-uRHodtutdRfYmNpWVww@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Mon, 15 Oct 2012 17:34:52 +0200
+Subject: [PATCH 1/4] leds: leds-ns2: add device tree binding
+In-Reply-To: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
+References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/15 Mikael Pettersson <mikpe@it.uu.se>:
-> Yangfei (Felix) writes:
->  > Hi all,
->  >
->  >     I found that hardcoded instruction in inline asm can cause certains certain features fail to work on ARM platform due to endianness.
->  >     As an example, consider the following code snippet of platform_do_lowpower function from arch/arm/mach-realview/hotplug.c:
->  >                 / *
->  >                  * here's the WFI
->  >                  */
->  >                 asm(".word      0xe320f003\n"
->  >                     :
->  >                     :
->  >                     : "memory", "cc");
->  >
->  >     The instruction generated from this inline asm will not work on big-endian ARM platform, such as ARM BE-8 format. Instead, an exception will be generated.
->  >
->  >     Here the code should be:
->  >                 / *
->  >                  * here's the WFI
->  >                  */
->  >                 asm("WFI\n"
->  >                     :
->  >                     :
->  >                     : "memory", "cc");
->  >
->  >     Seems the kernel doesn't support ARM BE-8 well. I don't know why this problem happens.
->  >     Can anyone tell me who owns this part? I can prepare a patch then.
->  >     Thanks.
->
-> Questions regarding the ARM kernel should go to the linux-arm-kernel mailing list
-> (see the MAINTAINERS file), with an optional cc: to the regular LKML.
->
-> BE-8 is, if I recall correctly, ARMv7's broken format where code and data have
-> different endianess.  GAS supports an ".inst" directive which is like ".word"
-> except the data is assumed to be code.  This matters for disassembly, and may
-> also be required for BE-8.
->
-> That is, just s/.word/.inst/g above and report back if that works or not.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
->
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
+ .../devicetree/bindings/gpio/leds-ns2.txt          |   26 ++++++
+ drivers/leds/leds-ns2.c                            |   84 +++++++++++++++++++-
+ 2 files changed, 107 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/leds-ns2.txt
 
-Hi Mikael,
-
-Thanks for the reply. I modified the code as suggested and rebuilt the
-kernel, cpu-hotplug feature now works on big-endian(BE-8) ARM
-platform.
-Since the ARM core can be configured by system software to work in
-big-endian mode, it's necessary to fix this problem. And here is a
-small patch :
-
-diff -urN linux-3.6.2/arch/arm/mach-exynos/hotplug.c
-linux/arch/arm/mach-exynos/hotplug.c
---- linux-3.6.2/arch/arm/mach-exynos/hotplug.c	2012-10-13
-04:50:59.000000000 +0800
-+++ linux/arch/arm/mach-exynos/hotplug.c	2012-10-15 23:05:44.000000000 +0800
-@@ -72,7 +72,7 @@
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(".inst	0xe320f003\n"
- 		    :
- 		    :
- 		    : "memory", "cc");
-diff -urN linux-3.6.2/arch/arm/mach-realview/hotplug.c
-linux/arch/arm/mach-realview/hotplug.c
---- linux-3.6.2/arch/arm/mach-realview/hotplug.c	2012-10-13
-04:50:59.000000000 +0800
-+++ linux/arch/arm/mach-realview/hotplug.c	2012-10-15 23:05:00.000000000 +0800
-@@ -66,7 +66,7 @@
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(".inst	0xe320f003\n"
- 		    :
- 		    :
- 		    : "memory", "cc");
-diff -urN linux-3.6.2/arch/arm/mach-shmobile/hotplug.c
-linux/arch/arm/mach-shmobile/hotplug.c
---- linux-3.6.2/arch/arm/mach-shmobile/hotplug.c	2012-10-13
-04:50:59.000000000 +0800
-+++ linux/arch/arm/mach-shmobile/hotplug.c	2012-10-15 23:05:25.000000000 +0800
-@@ -53,7 +53,7 @@
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(".inst	0xe320f003\n"
- 		    :
- 		    :
- 		    : "memory", "cc");
+diff --git a/Documentation/devicetree/bindings/gpio/leds-ns2.txt b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+new file mode 100644
+index 0000000..1a84969
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+@@ -0,0 +1,26 @@
++Binding for dual-GPIO LED found on Network Space v2 (and parents).
++
++Required properties:
++- compatible: "ns2-leds".
++
++Each LED is represented as a sub-node of the ns2-leds device.
++
++Required sub-node properties:
++- cmd-gpio: Command LED GPIO. See OF device-tree GPIO specification.
++- slow-gpio: Slow LED GPIO. See OF device-tree GPIO specification.
++
++Optional sub-node properties:
++- label: Name for this LED. If omitted, the label is taken from the node name.
++- linux,default-trigger: Trigger assigned to the LED.
++
++Example:
++
++ns2-leds {
++	compatible = "ns2-leds";
++
++	blue-sata {
++		label = "ns2:blue:sata";
++		slow-gpio = <&gpio0 29 0>;
++		cmd-gpio = <&gpio0 30 0>;
++	};
++};
+diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
+index d176ec8..55d199b 100644
+--- a/drivers/leds/leds-ns2.c
++++ b/drivers/leds/leds-ns2.c
+@@ -30,6 +30,7 @@
+ #include <linux/leds.h>
+ #include <linux/module.h>
+ #include <linux/platform_data/leds-kirkwood-ns2.h>
++#include <linux/of_gpio.h>
+ 
+ /*
+  * The Network Space v2 dual-GPIO LED is wired to a CPLD and can blink in
+@@ -263,6 +264,68 @@ static void delete_ns2_led(struct ns2_led_data *led_dat)
+ 	gpio_free(led_dat->slow);
+ }
+ 
++#ifdef CONFIG_OF_GPIO
++/*
++ * Translate OpenFirmware node properties into platform_data.
++ */
++static int __devinit
++ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
++{
++	struct device_node *np = dev->of_node;
++	struct device_node *child;
++	struct ns2_led *leds;
++	int num_leds = 0;
++	int i = 0;
++
++	num_leds = of_get_child_count(np);
++	if (!num_leds)
++		return -ENODEV;
++
++	leds = devm_kzalloc(dev, num_leds * sizeof(struct ns2_led),
++			    GFP_KERNEL);
++	if (!leds)
++		return -ENOMEM;
++
++	for_each_child_of_node(np, child) {
++		const char *string;
++		int ret;
++
++		ret = of_get_named_gpio(child, "cmd-gpio", 0);
++		if (ret < 0)
++			return ret;
++		leds[i].cmd = ret;
++		ret = of_get_named_gpio(child, "slow-gpio", 0);
++		if (ret < 0)
++			return ret;
++		leds[i].slow = ret;
++		ret = of_property_read_string(child, "label", &string);
++		leds[i].name = (ret == 0) ? string : child->name;
++		ret = of_property_read_string(child, "linux,default-trigger",
++					      &string);
++		if (ret == 0)
++			leds[i].default_trigger = string;
++
++		i++;
++	}
++
++	pdata->leds = leds;
++	pdata->num_leds = num_leds;
++
++	return 0;
++}
++
++static const struct of_device_id of_ns2_leds_match[] = {
++	{ .compatible = "ns2-leds", },
++	{},
++};
++#else
++static int __devinit
++ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
++{
++	return -ENODEV;
++}
++#endif /* CONFIG_OF_GPIO */
++
+ static int __devinit ns2_led_probe(struct platform_device *pdev)
+ {
+ 	struct ns2_led_platform_data *pdata = pdev->dev.platform_data;
+@@ -270,11 +333,25 @@ static int __devinit ns2_led_probe(struct platform_device *pdev)
+ 	int i;
+ 	int ret;
+ 
++#ifdef CONFIG_OF_GPIO
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev,
++				     sizeof(struct ns2_led_platform_data),
++				     GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++
++		ret = ns2_leds_get_of_pdata(&pdev->dev, pdata);
++		if (ret)
++			return ret;
++	}
++#else
+ 	if (!pdata)
+ 		return -EINVAL;
++#endif /* CONFIG_OF_GPIO */
+ 
+ 	leds_data = devm_kzalloc(&pdev->dev, sizeof(struct ns2_led_data) *
+-			    pdata->num_leds, GFP_KERNEL);
++				 pdata->num_leds, GFP_KERNEL);
+ 	if (!leds_data)
+ 		return -ENOMEM;
+ 
+@@ -312,8 +389,9 @@ static struct platform_driver ns2_led_driver = {
+ 	.probe		= ns2_led_probe,
+ 	.remove		= __devexit_p(ns2_led_remove),
+ 	.driver		= {
+-		.name	= "leds-ns2",
+-		.owner	= THIS_MODULE,
++		.name		= "leds-ns2",
++		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(of_ns2_leds_match),
+ 	},
+ };
+ 
+-- 
+1.7.10
