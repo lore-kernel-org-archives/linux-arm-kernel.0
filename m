@@ -1,40 +1,47 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Oct 2012 15:24:15 +0200
-Subject: [PATCH 1/1] MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio
- and ioremap
-In-Reply-To: <507BE8C8.8040901@atmel.com>
-References: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
- <507BE8C8.8040901@atmel.com>
-Message-ID: <20121015132415.GV12801@game.jcrosoft.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 15 Oct 2012 14:30:00 +0100
+Subject: [RFC] Get early_printk() to work on socfpga board
+In-Reply-To: <20121015124852.GA26559@elf.ucw.cz>
+References: <1342637233-13965-1-git-send-email-dinguyen@altera.com>
+ <20121015124852.GA26559@elf.ucw.cz>
+Message-ID: <20121015133000.GA14915@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  		goto err_nand_ioremap;
-> >  	}
-> >+	host->io_phys = (dma_addr_t)mem->start;
-> >  	mtd = &host->mtd;
-> >  	nand_chip = &host->nand_chip;
-> >@@ -1401,7 +1380,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
-> >  	if (pdev->dev.of_node) {
-> >  		res = atmel_of_init_port(host, pdev->dev.of_node);
-> >  		if (res)
-> >-			goto err_ecc_ioremap;
-> >+			goto err_nand_ioremap;
-> >  	} else {
-> >  		memcpy(&host->board, pdev->dev.platform_data,
-> >  		       sizeof(struct atmel_nand_data));
-> >@@ -1420,44 +1399,42 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
-> >  	if (IS_ERR(pinctrl)) {
-> >  		dev_err(host->dev, "Failed to request pinctrl\n");
-> >  		res = PTR_ERR(pinctrl);
+Hi Pavel,
+
+On Mon, Oct 15, 2012 at 02:48:52PM +0200, Pavel Machek wrote:
+> Add ioremap, so that early_printk() works. Add common 8250.S so that
+> code is not duplicated with picoxcell.
+>     
+> Signed-off-by: Pavel Machek <pavel@denx.de>
 > 
-> I cannot apply the patch in latest l2-mtd git tree since above line
-> of code doesn't committed.
-> Seems that code is pinctrl related. Am I missing some patches?
+> diff --git a/arch/arm/include/debug/8250.S b/arch/arm/include/debug/8250.S
+> new file mode 100644
+> index 0000000..8db01ee
+> --- /dev/null
+> +++ b/arch/arm/include/debug/8250.S
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright (c) 2011 Picochip Ltd., Jamie Iles
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Derived from arch/arm/mach-davinci/include/mach/debug-macro.S to use 32-bit
+> + * accesses to the 8250.
+> + */
 
-this is base on linux next
+The APB on picoxcell only supports 32-bit accesses so we have to use 
+32-bit accesses for that platform, but others may need 8-bit accesses, 
+so naming this 8250_32.S may be more appropriate?
 
-and yes with pinctrl
+I did try making 8/32 bit accesses acompile-time configuration and 
+sharing with other platforms before but it looked a bit messy.
 
-Best Regards,
-J.
+Otherwise:
+
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+
+Jamie
