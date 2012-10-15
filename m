@@ -1,71 +1,18 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 15 Oct 2012 18:31:47 +0100
-Subject: [PATCH 9/9] ARM: add uprobes support
-In-Reply-To: <1350242593-17761-9-git-send-email-rabin@rab.in>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-9-git-send-email-rabin@rab.in>
-Message-ID: <20121015173147.GA18614@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Oct 2012 11:39:56 -0600
+Subject: [PATCH] ARM: tegra: update *.dts for regulator-compatible
+ deprecation
+In-Reply-To: <1349204824-21758-1-git-send-email-swarren@wwwdotorg.org>
+References: <1349204824-21758-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <507C4A6C.4050705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
-> Add basic uprobes support for ARM.
+On 10/02/2012 01:07 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> perf probe --exec and SystemTap's userspace probing work.  The ARM
-> kprobes test code has also been run in a userspace harness to test the
-> uprobe instruction decoding.
-> 
-> Caveats:
-> 
->  - Thumb is not supported
->  - XOL abort/trap handling is not implemented
+> Commit 13511de "regulator: deprecate regulator-compatible DT property"
+> now allows for simpler content within the regulators node within a PMIC.
+> Modify all the Tegra device tree files to take advantage of this.
 
-[...]
-
-> diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-> new file mode 100644
-> index 0000000..f25a4af
-> --- /dev/null
-> +++ b/arch/arm/kernel/uprobes.c
-
-[...]
-
-> +bool is_swbp_insn(uprobe_opcode_t *insn)
-> +{
-> +	return (__mem_to_opcode_arm(*insn) & 0x0fffffff) == UPROBE_SWBP_INSN;
-
-You should take care not to match any instruction whose top bits are
-0xF0000000.  That could be some completely different instruction.
-
-[...]
-
-> +static int uprobe_trap_handler(struct pt_regs *regs, unsigned int instr)
-> +{
-> +	unsigned long flags;
-> +
-> +	local_irq_save(flags);
-> +	if ((instr & 0x0fffffff) == UPROBE_SWBP_INSN)
-
-Is the check unnecessary here?  I think the same comparison will
-happen as a result of evaluating the associated undef_hook.
-
-However, as above you must still check for and reject cases where
-(instr & 0xF0000000) == 0xF0000000.
-
-[...]
-
-> +static struct undef_hook uprobes_arm_break_hook = {
-> +	.instr_mask	= 0x0fffffff,
-> +	.instr_val	= UPROBE_SWBP_INSN,
-> +	.cpsr_mask	= MODE_MASK,
-> +	.cpsr_val	= USR_MODE,
-> +	.fn		= uprobe_trap_handler,
-> +};
-> +
-> +static struct undef_hook uprobes_arm_ss_hook = {
-> +	.instr_mask	= 0x0fffffff,
-> +	.instr_val	= UPROBE_SS_INSN,
-> +	.cpsr_mask	= MODE_MASK,
-> +	.cpsr_val	= USR_MODE,
-> +	.fn		= uprobe_trap_handler,
-> +};
+Applied to Tegra's for-3.8/cleanup.
