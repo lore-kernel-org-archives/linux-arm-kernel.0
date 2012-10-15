@@ -1,41 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 15 Oct 2012 17:07:40 +0100
-Subject: [PATCH 1/2] mmc: core: Support all MMC capabilities when booting
- from Device Tree
-In-Reply-To: <201210151420.29930.arnd@arndb.de>
-References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
- <201210151420.29930.arnd@arndb.de>
-Message-ID: <20121015160740.GC7662@gmail.com>
+From: B04825@freescale.com (Tabi Timur-B04825)
+Date: Mon, 15 Oct 2012 16:14:27 +0000
+Subject: [PATCH 15/25] powerpc/fsl_msi: add a const qualifier
+In-Reply-To: <1343034810-3386-16-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1343034810-3386-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1343034810-3386-16-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <6AE080B68D46FC4BA2D2769E68D765B708101268@039-SN2MPN1-023.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Monday 15 October 2012, Lee Jones wrote:
-> > Capabilities are an important part of the MMC subsystem. Much
-> > supported functionality would be lost if we didn't provide the
-> > same level of support when booting Device Tree as we currently
-> > do when the subsystem is passed capabilities via platform data.
-> > This patch supplies this support with one simple call to a
-> > DT parsing function.
-> 
-> We already document all the commonly used properties
-> in Documentation/devicetree/bindings/mmc/mmc.txt
+On Mon, Jul 23, 2012 at 4:13 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> This prepares *of_device_id.data becoming const. Without this change
+> the following warning would occur:
+>
+>         arch/powerpc/sysdev/fsl_msi.c: In function 'fsl_of_msi_probe':
+>         arch/powerpc/sysdev/fsl_msi.c:379:11: error: assignment discards 'const' qualifier from pointer target type [-Werror]
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-<snip>
-
-> and so on. What are you actually missing in the properties that
-> are already there?
-
-MMC_CAP_ERASE
-MMC_CAP_UHS_SDR12
-MMC_CAP_UHS_SDR25
-MMC_CAP_UHS_DDR50
-MMC_CAP_1_8V_DDR
-
-MMC_CAP2_DETECT_ON_ERR
-MMC_CAP2_NO_SLEEP_CMD
+Acked-by: Timur Tabi <timur@freescale.com>
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Timur Tabi
+Linux kernel developer at Freescale
