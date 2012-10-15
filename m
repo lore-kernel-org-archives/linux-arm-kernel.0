@@ -1,48 +1,199 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 15 Oct 2012 14:33:19 +0200
-Subject: [PATCH 1/1] pinctrl/at91: fix compatible order
-In-Reply-To: <5078235C.1040204@atmel.com>
-References: <1350033790-31028-1-git-send-email-plagnioj@jcrosoft.com>
- <5078235C.1040204@atmel.com>
-Message-ID: <CACRpkda0_=j3k8sYNjPSbQFU25VKeAxY=95ea81hfWRPUoo4_Q@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Mon, 15 Oct 2012 18:05:39 +0530
+Subject: [PATCH] ARM: dts: Add am335x-evmsk.dts
+Message-ID: <1350304539-14933-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 4:04 PM, ludovic.desroches
-<ludovic.desroches@atmel.com> wrote:
-> Le 10/12/2012 11:23 AM, Jean-Christophe PLAGNIOL-VILLARD a ?crit :
->
->> the sam9x5 is new version of the rm9200 not the invert
->>
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>   drivers/pinctrl/pinctrl-at91.c |    2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-at91.c
->> b/drivers/pinctrl/pinctrl-at91.c
->> index 9c0fe11..bdb152b 100644
->> --- a/drivers/pinctrl/pinctrl-at91.c
->> +++ b/drivers/pinctrl/pinctrl-at91.c
->> @@ -1331,8 +1331,8 @@ static void __devinit at91_gpio_probe_fixup(void)
->>   }
->>
->>   static struct of_device_id at91_gpio_of_match[] __devinitdata = {
->> -       { .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops
->> },
->>         { .compatible = "atmel,at91sam9x5-gpio", .data = &at91sam9x5_ops,
->> },
->> +       { .compatible = "atmel,at91rm9200-gpio", .data = &at91rm9200_ops
->> },
->>         { /* sentinel */ }
->>   };
->>
->
-> Do it also for at91_pinctrl_of_match[], there is the same issue.
+Add AM335X EVM-SK device tree source (am335x-sk.dts) file to use
+the am33xx.dtsi SoC file, along with the memory node information.
 
-Shall I apply this patch to my at91 branch or will it be updated to
-cover both cases?
+Also adds support for tps65910 regulator and lis331dlh accelerometer.
+Following drivers/functionality were tested on AM335x-EVM-SK.
+* I2C
+* TPS65910 regulators
+* lis331dlh accelerometer
 
-Yours,
-Linus Walleij
+AM335x EVM Starter Kit details can be accessed from:
+http://www.ti.com/tool/tmdssk3358
+
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am335x-evmsk.dts |  166 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 166 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am335x-evmsk.dts
+
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+new file mode 100644
+index 0000000..6f53879
+--- /dev/null
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -0,0 +1,166 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/*
++ * AM335x Starter Kit
++ * http://www.ti.com/tool/tmdssk3358
++ */
++
++/dts-v1/;
++
++/include/ "am33xx.dtsi"
++
++/ {
++	model = "TI AM335x EVM-SK";
++	compatible = "ti,am335x-evmsk", "ti,am33xx";
++
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vdd1_reg>;
++		};
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
++	};
++
++	ocp {
++		uart1: serial at 44e09000 {
++			status = "okay";
++		};
++
++		i2c1: i2c at 44e0b000 {
++			status = "okay";
++			clock-frequency = <400000>;
++
++			tps: tps at 2d {
++				reg = <0x2d>;
++			};
++
++			lis331dlh: lis331dlh at 18 {
++				compatible = "st,lis331dlh", "st,lis3lv02d";
++				reg = <0x18>;
++				Vdd-supply = <&lis3_reg>;
++				Vdd_IO-supply = <&lis3_reg>;
++
++				st,click-single-x;
++				st,click-single-y;
++				st,click-single-z;
++				st,click-thresh-x = <10>;
++				st,click-thresh-y = <10>;
++				st,click-thresh-z = <10>;
++				st,irq1-click;
++				st,irq2-click;
++				st,wakeup-x-lo;
++				st,wakeup-x-hi;
++				st,wakeup-y-lo;
++				st,wakeup-y-hi;
++				st,wakeup-z-lo;
++				st,wakeup-z-hi;
++				st,min-limit-x = <120>;
++				st,min-limit-y = <120>;
++				st,min-limit-z = <140>;
++				st,max-limit-x = <550>;
++				st,max-limit-y = <550>;
++				st,max-limit-z = <750>;
++			};
++		};
++	};
++
++	vbat: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vbat";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++	};
++
++	lis3_reg: fixedregulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "lis3_reg";
++		regulator-boot-on;
++	};
++};
++
++/include/ "tps65910.dtsi"
++
++&tps {
++	vcc1-supply = <&vbat>;
++	vcc2-supply = <&vbat>;
++	vcc3-supply = <&vbat>;
++	vcc4-supply = <&vbat>;
++	vcc5-supply = <&vbat>;
++	vcc6-supply = <&vbat>;
++	vcc7-supply = <&vbat>;
++	vccio-supply = <&vbat>;
++
++	regulators {
++		vrtc_reg: regulator at 0 {
++			regulator-always-on;
++		};
++
++		vio_reg: regulator at 1 {
++			regulator-always-on;
++		};
++
++		vdd1_reg: regulator at 2 {
++			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
++			regulator-name = "vdd_mpu";
++			regulator-min-microvolt = <912500>;
++			regulator-max-microvolt = <1312500>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		vdd2_reg: regulator at 3 {
++			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
++			regulator-name = "vdd_core";
++			regulator-min-microvolt = <912500>;
++			regulator-max-microvolt = <1150000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		vdd3_reg: regulator at 4 {
++			regulator-always-on;
++		};
++
++		vdig1_reg: regulator at 5 {
++			regulator-always-on;
++		};
++
++		vdig2_reg: regulator at 6 {
++			regulator-always-on;
++		};
++
++		vpll_reg: regulator at 7 {
++			regulator-always-on;
++		};
++
++		vdac_reg: regulator at 8 {
++			regulator-always-on;
++		};
++
++		vaux1_reg: regulator at 9 {
++			regulator-always-on;
++		};
++
++		vaux2_reg: regulator at 10 {
++			regulator-always-on;
++		};
++
++		vaux33_reg: regulator at 11 {
++			regulator-always-on;
++		};
++
++		vmmc_reg: regulator at 12 {
++			regulator-always-on;
++		};
++	};
++};
+-- 
+1.7.9.5
