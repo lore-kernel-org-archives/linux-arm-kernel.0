@@ -1,121 +1,56 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 15 Oct 2012 21:03:30 +1300
-Subject: dma_alloc_coherent fails in framebuffer
-In-Reply-To: <1822826.6oRYLvbneG@flatron>
-References: <1350192523.10946.4.camel@gitbox>
- <1350246895.11504.6.camel@gitbox> <1350253591.13440.1.camel@gitbox>
- <1822826.6oRYLvbneG@flatron>
-Message-ID: <1350288210.16750.2.camel@gitbox>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 15 Oct 2012 10:07:37 +0200
+Subject: dts: question about how to configure PIO used as i2c irq
+In-Reply-To: <20121015055720.GQ12801@game.jcrosoft.org>
+References: <507B7AC3.7090904@gmail.com>
+ <20121015055720.GQ12801@game.jcrosoft.org>
+Message-ID: <507BC449.6070203@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-15 at 08:42 +0200, Tomasz Figa wrote:
-> Hi Tony,
-> 
-> On Monday 15 of October 2012 11:26:31 Tony Prisk wrote:
-> > On Mon, 2012-10-15 at 09:34 +1300, Tony Prisk wrote:
-> > > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
-> > > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on
-> > > > the
-> > > > 11 Oct when I did another pull from linus all of a sudden
-> > > > dma_alloc_coherent is failing to allocate the framebuffer any
-> > > > longer.
-> > > > 
-> > > > I did a quick look back and found this:
-> > > > 
-> > > > ARM: add coherent dma ops
-> > > > 
-> > > > arch_is_coherent is problematic as it is a global symbol. This
-> > > > doesn't work for multi-platform kernels or platforms which can
-> > > > support
-> > > > per device coherent DMA.
-> > > > 
-> > > > This adds arm_coherent_dma_ops to be used for devices which
-> > > > connected
-> > > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The
-> > > > arm_dma_ops
-> > > > are modified at boot when arch_is_coherent is true.
-> > > > 
-> > > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > > 
-> > > > 
-> > > > This is the only patch lately that I could find (not that I would
-> > > > claim
-> > > > to be any good at finding things) that is related to the problem.
-> > > > Could
-> > > > it have caused the allocations to fail?
-> > > > 
-> > > > Regards
-> > > > Tony P
-> > > 
-> > > Have done a bit more digging and found the cause - not Rob's patch so
-> > > apologies.
-> > > 
-> > > The cause of the regression is this patch:
-> > > 
-> > > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
-> > > From: Mel Gorman <mgorman@suse.de>
-> > > Date: Mon, 8 Oct 2012 16:32:36 -0700
-> > > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
-> > > 
-> > >  possible
-> > > 
-> > > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
-> > > was fine. From this patch onwards, allocations fail.
-> > > 
-> > > I don't know how this patch would effect CMA allocations, but it seems
-> > > to be causing the issue (or at least, it's caused an error in
-> > > arch-vt8500 to become visible).
-> > > 
-> > > Perhaps someone who understand -mm could explain the best way to
-> > > troubleshoot the cause of this problem?
-> > > 
-> > > 
-> > > Regards
-> > > Tony P
-> > > 
-> > > 
-> > > _______________________________________________
-> > > linux-arm-kernel mailing list
-> > > linux-arm-kernel at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> > Have done a bit more testing..
-> > 
-> > Disabling Memory Compaction makes no difference.
-> > Disabling CMA fixes/hides the problem. ?!?!?!
-> 
-> Could you post your kernel log when it isn't working?
-> 
-> Do you have the default CMA reserved pool in Kconfig set big enough to 
-> serve this allocation?
-> 
-> I'm not sure what kind of allocation this framebuffer driver does, but if 
-> it needs to allocate memory from atomic context then possibly this patch 
-> series has something to do with it: 
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/182697/focus=182699
-> 
-> CC'ing Marek Szyprowski <m.szyprowski@samsung.com>
-> 
-> Best regards,
-> Tomasz Figa
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On 10/15/2012 07:57 AM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 10:53 Mon 15 Oct     , Bo Shen wrote:
+>> Hi All,
+>>   When moving atmel qt1070 linux driver with DT support. The atmel
+>> qt1070 is an I2C device. I meet the following questions.
+>>
+>>   The qt1070 DT node
+>>   --<--------------
+>>   qt1070: keyboard at 1b {
+>>         compatible = "atmel,qt1070";
+>>         reg = <0x1b>;
+>>         interrupt-parent = <&pioA>;
+>>         interrupts = <7 0x0>;
+>>   };
+>>   -->--------------
+>>
+>>   DT will parse this node and map irq, the i2c_client->irq. This can
+>> be used directly in atmel qt1070 driver. However, the PIO which used
+>> as irq need configure as a PIO input. Now, we can not use
+>> irq_to_gpio() function to convert irq to gpio. So, if we can not
+>> configure this gpio.
+>>
+>>   If we configure the pio in board-dt.c, I think this is not a good
+>> place. For example, if the kernel image support multiplatform, while
+>> on these platform, using different pio for qt1070, so this will
+>> cause only one platform can use qt1070.
+>>
+>>   So, for this question, how should I solve it? Would you please
+>> give me some advice?
+> I already reply you in private 4 times
 
-I set CMA to 16MB (and also tried 32MB) in Kconfig, but it made no
-difference. The framebuffer is only trying to allocate ~1.5MB via
-dma_alloc_coherent().
+Yes, but maybe it is because it was not well explained, or not developed
+to the proper extend... So, please do not make these remarks: if the
+conversation was private, it is not necessary to recall that here. Maybe
+Voice is looking for help from someone else?
 
-I haven't captured a kernel log, but will do.
+> you have only 2 choice pass the gpio and manage in c
+> or configure the gpio as input in the xlate or map of the gpio drivers and the
+> mux via pinctrl
 
-Thanks for the feedback.
+Can you please develop a bit more: which xlate? How to tell the gpio
+driver about the map? Can you provide an example?
 
-Regards
-Tony P
+Bye,
+-- 
+Nicolas Ferre
