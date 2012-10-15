@@ -1,402 +1,103 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 15 Oct 2012 12:14:43 +0100
-Subject: [PATCH 9/9] ARM: add uprobes support
-In-Reply-To: <1350242593-17761-9-git-send-email-rabin@rab.in>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-9-git-send-email-rabin@rab.in>
-Message-ID: <20121015111443.GA2006@linaro.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 15 Oct 2012 13:36:01 +0200
+Subject: [PATCH RESEND] serial/amba-pl011: use devm_* managed resources
+Message-ID: <1350300961-7036-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
-> Add basic uprobes support for ARM.
-> 
-> perf probe --exec and SystemTap's userspace probing work.  The ARM
-> kprobes test code has also been run in a userspace harness to test the
-> uprobe instruction decoding.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-The assumption that the target code is ARM appears to be buried all over
-the place.
+This switches a bunch of allocation and remapping to use the
+devm_* garbage collected methods and cleans up the error
+path and remove() paths consequently.
 
-Certainly this code as currently written must depend on !THUMB2_KERNEL.
+devm_ioremap() is only in <linux/io.h> so fix up the
+erroneous <asm/*> include as well.
 
-However, there's an underlying problem here which we'd need to solve.
-The kprobes code can take advantage of the fact that the kernel is all
-ARM or (almost) all Thumb code.  So there is no support for kprobes
-supporting ARM and Thumb at the same time.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/tty/serial/amba-pl011.c | 25 +++++++++----------------
+ 1 file changed, 9 insertions(+), 16 deletions(-)
 
-With userspace, we don't have this luxury.  With Debian armhf, Ubuntu
-and Linaro building Thumb-2 userspaces, it may be an increasingly common
-configuration independently of whether the kernel is built in Thumb-2
-or not.
-
-Furthermode, there is no such thing as a pure Thumb-2 system in practice:
-PLTs are always ARM, for example.  For uprobes to work well in userspace,
-both should be supported together.
-
-I only skimmed the patches fairly quickly, so apologies if you do in fact
-handle this -- but I don't see any evidence of it right now.
-
-Cheers
----Dave
-
-> 
-> Caveats:
-> 
->  - Thumb is not supported
->  - XOL abort/trap handling is not implemented
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/Kconfig                   |    4 +
->  arch/arm/include/asm/ptrace.h      |    6 ++
->  arch/arm/include/asm/thread_info.h |    5 +-
->  arch/arm/include/asm/uprobes.h     |   34 +++++++
->  arch/arm/kernel/Makefile           |    1 +
->  arch/arm/kernel/signal.c           |    4 +
->  arch/arm/kernel/uprobes.c          |  191 ++++++++++++++++++++++++++++++++++++
->  7 files changed, 244 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/include/asm/uprobes.h
->  create mode 100644 arch/arm/kernel/uprobes.c
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 272c3a1..2191b61d 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -168,6 +168,10 @@ config ZONE_DMA
->  config NEED_DMA_MAP_STATE
->         def_bool y
->  
-> +config ARCH_SUPPORTS_UPROBES
-> +	depends on KPROBES
-> +	def_bool y
-> +
->  config ARCH_HAS_DMA_SET_COHERENT_MASK
->  	bool
->  
-> diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-> index 142d6ae..297936a 100644
-> --- a/arch/arm/include/asm/ptrace.h
-> +++ b/arch/arm/include/asm/ptrace.h
-> @@ -197,6 +197,12 @@ static inline long regs_return_value(struct pt_regs *regs)
->  
->  #define instruction_pointer(regs)	(regs)->ARM_pc
->  
-> +static inline void instruction_pointer_set(struct pt_regs *regs,
-> +					   unsigned long val)
-> +{
-> +	instruction_pointer(regs) = val;
-> +}
-> +
->  #ifdef CONFIG_SMP
->  extern unsigned long profile_pc(struct pt_regs *regs);
->  #else
-> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
-> index 8477b4c..7bedaee 100644
-> --- a/arch/arm/include/asm/thread_info.h
-> +++ b/arch/arm/include/asm/thread_info.h
-> @@ -148,6 +148,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
->  #define TIF_SIGPENDING		0
->  #define TIF_NEED_RESCHED	1
->  #define TIF_NOTIFY_RESUME	2	/* callback before returning to user */
-> +#define TIF_UPROBE		7
->  #define TIF_SYSCALL_TRACE	8
->  #define TIF_SYSCALL_AUDIT	9
->  #define TIF_SYSCALL_TRACEPOINT	10
-> @@ -160,6 +161,7 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
->  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
->  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
->  #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
-> +#define _TIF_UPROBE		(1 << TIF_UPROBE)
->  #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
->  #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
->  #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
-> @@ -172,7 +174,8 @@ extern int vfp_restore_user_hwstate(struct user_vfp __user *,
->  /*
->   * Change these and you break ASM code in entry-common.S
->   */
-> -#define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | _TIF_NOTIFY_RESUME)
-> +#define _TIF_WORK_MASK		(_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
-> +				 _TIF_NOTIFY_RESUME | _TIF_UPROBE)
->  
->  #endif /* __KERNEL__ */
->  #endif /* __ASM_ARM_THREAD_INFO_H */
-> diff --git a/arch/arm/include/asm/uprobes.h b/arch/arm/include/asm/uprobes.h
-> new file mode 100644
-> index 0000000..fa4b81e
-> --- /dev/null
-> +++ b/arch/arm/include/asm/uprobes.h
-> @@ -0,0 +1,34 @@
-> +#ifndef _ASM_UPROBES_H
-> +#define _ASM_UPROBES_H
-> +
-> +#include <asm/probes.h>
-> +
-> +typedef u32 uprobe_opcode_t;
-> +
-> +#define MAX_UINSN_BYTES		4
-> +#define UPROBE_XOL_SLOT_BYTES	64
-> +
-> +#define UPROBE_SWBP_INSN	0x07f001f9
-> +#define UPROBE_SS_INSN		0x07f001fa
-> +#define UPROBE_SWBP_INSN_SIZE	4
-> +
-> +struct arch_uprobe_task {
-> +	u32 backup;
-> +};
-> +
-> +struct arch_uprobe {
-> +	u8 insn[MAX_UINSN_BYTES];
-> +	uprobe_opcode_t modinsn;
-> +	uprobe_opcode_t bpinsn;
-> +	bool simulate;
-> +	u32 pcreg;
-> +	void (*prehandler)(struct arch_uprobe *auprobe,
-> +			   struct arch_uprobe_task *autask,
-> +			   struct pt_regs *regs);
-> +	void (*posthandler)(struct arch_uprobe *auprobe,
-> +			    struct arch_uprobe_task *autask,
-> +			    struct pt_regs *regs);
-> +	struct arch_specific_insn asi;
-> +};
-> +
-> +#endif
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 5bbec7b..a39f634 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -40,6 +40,7 @@ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o insn.o
->  obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o insn.o
->  obj-$(CONFIG_JUMP_LABEL)	+= jump_label.o insn.o patch.o
->  obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
-> +obj-$(CONFIG_UPROBES)		+= uprobes.o uprobes-arm.o kprobes-arm.o
->  obj-$(CONFIG_KPROBES)		+= kprobes.o kprobes-common.o patch.o
->  ifdef CONFIG_THUMB2_KERNEL
->  obj-$(CONFIG_KPROBES)		+= kprobes-thumb.o
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 56f72d2..3b1e88e 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -12,6 +12,7 @@
->  #include <linux/personality.h>
->  #include <linux/uaccess.h>
->  #include <linux/tracehook.h>
-> +#include <linux/uprobes.h>
->  
->  #include <asm/elf.h>
->  #include <asm/cacheflush.h>
-> @@ -655,6 +656,9 @@ do_work_pending(struct pt_regs *regs, unsigned int thread_flags, int syscall)
->  					return restart;
->  				}
->  				syscall = 0;
-> +			} else if (thread_flags & _TIF_UPROBE) {
-> +				clear_thread_flag(TIF_UPROBE);
-> +				uprobe_notify_resume(regs);
->  			} else {
->  				clear_thread_flag(TIF_NOTIFY_RESUME);
->  				tracehook_notify_resume(regs);
-> diff --git a/arch/arm/kernel/uprobes.c b/arch/arm/kernel/uprobes.c
-> new file mode 100644
-> index 0000000..f25a4af
-> --- /dev/null
-> +++ b/arch/arm/kernel/uprobes.c
-> @@ -0,0 +1,191 @@
-> +/*
-> + * Copyright (C) 2012 Rabin Vincent <rabin@rab.in>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/sched.h>
-> +#include <linux/uprobes.h>
-> +#include <linux/notifier.h>
-> +#include <linux/kprobes.h>
-> +
-> +#include <asm/opcodes.h>
-> +#include <asm/traps.h>
-> +
-> +#include "kprobes.h"
-> +
-> +bool is_swbp_insn(uprobe_opcode_t *insn)
-> +{
-> +	return (__mem_to_opcode_arm(*insn) & 0x0fffffff) == UPROBE_SWBP_INSN;
-> +}
-> +
-> +bool arch_uprobe_ignore(struct arch_uprobe *auprobe, struct pt_regs *regs)
-> +{
-> +	if (!auprobe->asi.insn_check_cc(regs->ARM_cpsr)) {
-> +		regs->ARM_pc += 4;
-> +		return true;
-> +	}
-> +
-> +	return false;
-> +}
-> +
-> +bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
-> +{
-> +	struct kprobe kp;
-> +
-> +	if (!auprobe->simulate)
-> +		return false;
-> +
-> +	kp.addr = (void *) regs->ARM_pc;
-> +	kp.opcode = __mem_to_opcode_arm(*(unsigned int *) auprobe->insn);
-> +	kp.ainsn.insn_handler = auprobe->asi.insn_handler;
-> +
-> +	auprobe->asi.insn_singlestep(&kp, regs);
-> +
-> +	return true;
-> +}
-> +
-> +int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
-> +			     unsigned long addr)
-> +{
-> +	unsigned int insn;
-> +	unsigned int bpinsn;
-> +	enum kprobe_insn ret;
-> +
-> +	/* Thumb not yet support */
-> +	if (addr & 0x3)
-> +		return -EINVAL;
-> +
-> +	insn = __mem_to_opcode_arm(*(unsigned int *)auprobe->insn);
-> +	auprobe->modinsn = insn;
-> +
-> +	ret = arm_kprobe_decode_insn(insn, &auprobe->asi, true);
-> +	switch (ret) {
-> +	case INSN_REJECTED:
-> +		return -EINVAL;
-> +
-> +	case INSN_GOOD_NO_SLOT:
-> +		auprobe->simulate = true;
-> +		break;
-> +
-> +	case INSN_GOOD:
-> +	default:
-> +		break;
-> +	}
-> +
-> +	bpinsn = UPROBE_SWBP_INSN;
-> +	if (insn >= 0xe0000000)
-> +		bpinsn |= 0xe0000000;  /* Unconditional instruction */
-> +	else
-> +		bpinsn |= insn & 0xf0000000;  /* Copy condition from insn */
-> +
-> +	auprobe->bpinsn = bpinsn;
-> +
-> +	return 0;
-> +}
-> +
-> +void arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
-> +			      uprobe_opcode_t opcode)
-> +{
-> +	unsigned long *addr = vaddr;
-> +
-> +	if (opcode == UPROBE_SWBP_INSN)
-> +		opcode = __opcode_to_mem_arm(auprobe->bpinsn);
-> +
-> +	*addr = opcode;
-> +}
-> +
-> +void arch_uprobe_xol_copy(struct arch_uprobe *auprobe, void *vaddr)
-> +{
-> +	unsigned long *addr = vaddr;
-> +
-> +	addr[0] = __opcode_to_mem_arm(auprobe->modinsn);
-> +	addr[1] = __opcode_to_mem_arm(0xe0000000 | UPROBE_SS_INSN);
-> +}
-> +
-> +int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-> +{
-> +	struct uprobe_task *utask = current->utask;
-> +
-> +	if (auprobe->prehandler)
-> +		auprobe->prehandler(auprobe, &utask->autask, regs);
-> +
-> +	regs->ARM_pc = utask->xol_vaddr;
-> +
-> +	return 0;
-> +}
-> +
-> +int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-> +{
-> +	struct uprobe_task *utask = current->utask;
-> +
-> +	regs->ARM_pc = utask->vaddr + 4;
-> +
-> +	if (auprobe->posthandler)
-> +		auprobe->posthandler(auprobe, &utask->autask, regs);
-> +
-> +	return 0;
-> +}
-> +
-> +bool arch_uprobe_xol_was_trapped(struct task_struct *t)
-> +{
-> +	/* TODO: implement */
-> +	return false;
-> +}
-> +
-> +void arch_uprobe_abort_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
-> +{
-> +	/* TODO: implement */
-> +}
-> +
-> +int arch_uprobe_exception_notify(struct notifier_block *self,
-> +				 unsigned long val, void *data)
-> +{
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static int uprobe_trap_handler(struct pt_regs *regs, unsigned int instr)
-> +{
-> +	unsigned long flags;
-> +
-> +	local_irq_save(flags);
-> +	if ((instr & 0x0fffffff) == UPROBE_SWBP_INSN)
-> +		uprobe_pre_sstep_notifier(regs);
-> +	else
-> +		uprobe_post_sstep_notifier(regs);
-> +	local_irq_restore(flags);
-> +
-> +	return 0;
-> +}
-> +
-> +unsigned long uprobe_get_swbp_addr(struct pt_regs *regs)
-> +{
-> +	return instruction_pointer(regs);
-> +}
-> +
-> +static struct undef_hook uprobes_arm_break_hook = {
-> +	.instr_mask	= 0x0fffffff,
-> +	.instr_val	= UPROBE_SWBP_INSN,
-> +	.cpsr_mask	= MODE_MASK,
-> +	.cpsr_val	= USR_MODE,
-> +	.fn		= uprobe_trap_handler,
-> +};
-> +
-> +static struct undef_hook uprobes_arm_ss_hook = {
-> +	.instr_mask	= 0x0fffffff,
-> +	.instr_val	= UPROBE_SS_INSN,
-> +	.cpsr_mask	= MODE_MASK,
-> +	.cpsr_val	= USR_MODE,
-> +	.fn		= uprobe_trap_handler,
-> +};
-> +
-> +int arch_uprobes_init(void)
-> +{
-> +	register_undef_hook(&uprobes_arm_break_hook);
-> +	register_undef_hook(&uprobes_arm_ss_hook);
-> +
-> +	return 0;
-> +}
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d7e1ede..7fca402 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -56,8 +56,7 @@
+ #include <linux/of_device.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/sizes.h>
+-
+-#include <asm/io.h>
++#include <linux/io.h>
+ 
+ #define UART_NR			14
+ 
+@@ -1973,7 +1972,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		goto out;
+ 	}
+ 
+-	uap = kzalloc(sizeof(struct uart_amba_port), GFP_KERNEL);
++	uap = devm_kzalloc(&dev->dev, sizeof(struct uart_amba_port),
++			   GFP_KERNEL);
+ 	if (uap == NULL) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -1981,16 +1981,17 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 
+ 	i = pl011_probe_dt_alias(i, &dev->dev);
+ 
+-	base = ioremap(dev->res.start, resource_size(&dev->res));
++	base = devm_ioremap(&dev->dev, dev->res.start,
++			    resource_size(&dev->res));
+ 	if (!base) {
+ 		ret = -ENOMEM;
+-		goto free;
++		goto out;
+ 	}
+ 
+ 	uap->pinctrl = devm_pinctrl_get(&dev->dev);
+ 	if (IS_ERR(uap->pinctrl)) {
+ 		ret = PTR_ERR(uap->pinctrl);
+-		goto unmap;
++		goto out;
+ 	}
+ 	uap->pins_default = pinctrl_lookup_state(uap->pinctrl,
+ 						 PINCTRL_STATE_DEFAULT);
+@@ -2002,10 +2003,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 	if (IS_ERR(uap->pins_sleep))
+ 		dev_dbg(&dev->dev, "could not get sleep pinstate\n");
+ 
+-	uap->clk = clk_get(&dev->dev, NULL);
++	uap->clk = devm_clk_get(&dev->dev, NULL);
+ 	if (IS_ERR(uap->clk)) {
+ 		ret = PTR_ERR(uap->clk);
+-		goto unmap;
++		goto out;
+ 	}
+ 
+ 	uap->vendor = vendor;
+@@ -2038,11 +2039,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+ 		amba_set_drvdata(dev, NULL);
+ 		amba_ports[i] = NULL;
+ 		pl011_dma_remove(uap);
+-		clk_put(uap->clk);
+- unmap:
+-		iounmap(base);
+- free:
+-		kfree(uap);
+ 	}
+  out:
+ 	return ret;
+@@ -2062,9 +2058,6 @@ static int pl011_remove(struct amba_device *dev)
+ 			amba_ports[i] = NULL;
+ 
+ 	pl011_dma_remove(uap);
+-	iounmap(uap->port.membase);
+-	clk_put(uap->clk);
+-	kfree(uap);
+ 	return 0;
+ }
+ 
+-- 
+1.7.11.3
