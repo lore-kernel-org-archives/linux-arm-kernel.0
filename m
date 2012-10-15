@@ -1,386 +1,533 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 15 Oct 2012 11:40:51 +0800
-Subject: [GIT PULL] imx multi-platform support
-Message-ID: <20121015034047.GB24393@S2101-09.ap.freescale.net>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 15 Oct 2012 16:20:05 +1100
+Subject: [PATCH RFC 1/6 v3] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <1350069085-13283-2-git-send-email-stigge@antcom.de>
+References: <1350069085-13283-1-git-send-email-stigge@antcom.de>
+ <1350069085-13283-2-git-send-email-stigge@antcom.de>
+Message-ID: <507B9D05.1000204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 13/10/12 06:11, Roland Stigge wrote:
+> The recurring task of providing simultaneous access to GPIO lines (especially
+> for bit banging protocols) needs an appropriate API.
+> 
+> This patch adds a kernel internal "Block GPIO" API that enables simultaneous
+> access to several GPIOs. This is done by abstracting GPIOs to an n-bit word:
+> Once requested, it provides access to a group of GPIOs which can range over
+> multiple GPIO chips.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-Here is the imx multi-platform support [1] that missed 3.7 merge window.
-Please pull it for 3.8 and exposing on linux-next.  As it touches a lot
-of files, I send it early, so that people can base their works off it
-to avoid conflicts.
+Hi Roland,
 
-Sascha, please base your 3.8 branches off this one.
+Some comments below.
 
-Subsystem maintainers,
+~Ryan
 
-We will keep this topic branch stable (non-rebase), so you are free
-to merge it to solve conflicts or dependency if necessary.
+> ---
+> 
+>  Documentation/gpio.txt     |   45 +++++++++
+>  drivers/gpio/gpiolib.c     |  223 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/asm-generic/gpio.h |   14 ++
+>  include/linux/gpio.h       |   61 ++++++++++++
+>  4 files changed, 343 insertions(+)
+> 
+> --- linux-2.6.orig/Documentation/gpio.txt
+> +++ linux-2.6/Documentation/gpio.txt
+> @@ -439,6 +439,51 @@ slower clock delays the rising edge of S
+>  signaling rate accordingly.
+>  
+>  
+> +Block GPIO
+> +----------
+> +
+> +The above described interface concentrates on handling single GPIOs.  However,
+> +in applications where it is critical to set several GPIOs at once, this
+> +interface doesn't work well, e.g. bit-banging protocols via grouped GPIO lines.
+> +Consider a GPIO controller that is connected via a slow I2C line. When
+> +switching two or more GPIOs one after another, there can be considerable time
+> +between those events. This is solved by an interface called Block GPIO:
 
-Shawn
+The emulate behaviour of gpio block switches gpios one after the other.
+Is the problem only solved if the block_get/block_set callbacks can be
+implemented?
 
-[1] http://thread.gmane.org/gmane.linux.alsa.devel/101419
+> +struct gpio_block *gpio_block_create(unsigned int *gpios, size_t size);
+> +
+> +This creates a new block of GPIOs as a list of GPIO numbers with the specified
+> +size which are accessible via the returned struct gpio_block and the accessor
+> +functions described below. Please note that you need to request the GPIOs
+> +separately via gpio_request(). An arbitrary list of globally valid GPIOs can be
+> +specified, even ranging over several gpio_chips. Actual handling of I/O
+> +operations will be done on a best effort base, i.e. simultaneous I/O only where
+> +possible by hardware and implemented in the respective GPIO driver. The number
+> +of GPIOs in one block is limited to 32 on a 32 bit system, and 64 on a 64 bit
+> +system. However, several blocks can be defined at once.
+> +
+> +unsigned gpio_block_get(struct gpio_block *block);
+> +void gpio_block_set(struct gpio_block *block, unsigned value);
+> +
+> +With those accessor functions, setting and getting the GPIO values is possible,
+> +analogous to gpio_get_value() and gpio_set_value(). Each bit in the return
+> +value of gpio_block_get() and in the value argument of gpio_block_set()
+> +corresponds to a bit specified on gpio_block_create(). Block operations in
+> +hardware are only possible where the respective GPIO driver implements it,
+> +falling back to using single GPIO operations where the driver only implements
+> +single GPIO access.
+> +
+> +void gpio_block_free(struct gpio_block *block);
+> +
+> +After the GPIO block isn't used anymore, it should be free'd via
+> +gpio_block_free().
+> +
+> +int gpio_block_register(struct gpio_block *block);
+> +void gpio_block_unregister(struct gpio_block *block);
+> +
+> +These functions can be used to register a GPIO block. Blocks registered this
+> +way will be available via sysfs.
+> +
+> +
+>  What do these conventions omit?
+>  ===============================
+>  One of the biggest things these conventions omit is pin multiplexing, since
+> --- linux-2.6.orig/drivers/gpio/gpiolib.c
+> +++ linux-2.6/drivers/gpio/gpiolib.c
+> @@ -83,6 +83,10 @@ static inline void desc_set_label(struct
+>  #endif
+>  }
+>  
+> +#define NR_GPIO_BLOCKS	16
+> +
+> +static struct gpio_block *gpio_block[NR_GPIO_BLOCKS];
+> +
+>  /* Warn when drivers omit gpio_request() calls -- legal but ill-advised
+>   * when setting direction, and otherwise illegal.  Until board setup code
+>   * and drivers use explicit requests everywhere (which won't happen when
+> @@ -1676,6 +1680,225 @@ void __gpio_set_value(unsigned gpio, int
+>  }
+>  EXPORT_SYMBOL_GPL(__gpio_set_value);
+>  
+> +static inline
 
------
+Nitpick - don't need the inline, the compiler will do so for you.
 
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+> +int gpio_block_chip_index(struct gpio_block *block, struct gpio_chip *gc)
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+Should be static?
 
-are available in the git repository at:
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < block->nchip; i++) {
+> +		if (block->gbc[i].gc == gc)
+> +			return i;
+> +	}
+> +	return -1;
+> +}
+> +
+> +struct gpio_block *gpio_block_create(unsigned *gpios, size_t size,
+> +				     const char *name)
+> +{
+> +	struct gpio_block *block;
+> +	struct gpio_block_chip *gbc;
+> +	struct gpio_remap *remap;
+> +	int i;
+> +
+> +	if (size < 1 || size > sizeof(unsigned) * 8)
+> +		return ERR_PTR(-EINVAL);
+> +
+> +	block = kzalloc(sizeof(struct gpio_block), GFP_KERNEL);
+> +	if (!block)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	block->name = name;
+> +	block->ngpio = size;
+> +	block->gpio = kzalloc(sizeof(*block->gpio) * size, GFP_KERNEL);
+> +	if (!block->gpio)
+> +		goto err1;
+> +
+> +	memcpy(block->gpio, gpios, sizeof(*block->gpio) * size);
+> +
+> +	for (i = 0; i < size; i++)
+> +		if (!gpio_is_valid(gpios[i]))
+> +			goto err2;
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform
+This loop should probably go at the start of the function, so you can
+avoid doing the kzalloc/memcpy if it fails.
 
-for you to fetch changes up to c5a0d4977f00ca18c49d46fdaff4b2cfeaa4eb28:
+This function doesn't call gpio_request. Either it should, or it should
+rely on the caller to have already done so, and call
+gpio_ensure_requested here. There is also an implicit rule that any
+gpios inside a block must not be freed as long as the block exists. The
+code can't easily prevent this since gpios aren't refcounted. The rule
+should be documented.
 
-  ARM: imx: enable multi-platform build (2012-10-15 10:10:15 +0800)
+> +
+> +	for (i = 0; i < size; i++) {
+> +		struct gpio_chip *gc = gpio_to_chip(gpios[i]);
+> +		int bit = gpios[i] - gc->base;
+> +		int index = gpio_block_chip_index(block, gc);
+> +
+> +		if (index < 0) {
+> +			block->nchip++;
+> +			block->gbc = krealloc(block->gbc,
+> +					      sizeof(struct gpio_block_chip) *
+> +					      block->nchip, GFP_KERNEL);
 
-----------------------------------------------------------------
-Shawn Guo (31):
-      ARM: imx: include board headers in the same folder
-      ARM: imx: move iomux drivers and headers into mach-imx
-      ARM: imx: remove unnecessary inclusion from device-imx*.h
-      ARM: imx: move platform device code into mach-imx
-      ARM: imx: merge plat-mxc into mach-imx
-      ARM: imx: include common.h rather than mach/common.h
-      ARM: imx: ARM: imx: include cpuidle.h rather than mach/cpuidle.h
-      ARM: imx: include iim.h rather than mach/iim.h
-      ARM: imx: include iram.h rather than mach/iram.h
-      ARM: imx: include ulpi.h rather than mach/ulpi.h
-      ARM: imx: remove mach/dma-mx1-mx2.h
-      dma: ipu: rename mach/ipu.h to include/linux/dma/ipu-dma.h
-      dma: imx-sdma: remove unneeded mach/hardware.h inclusion
-      ASoC: imx-ssi: remove unneeded mach/hardware.h inclusion
-      usb: ehci-mxc: remove unneeded mach/hardware.h inclusion
-      video: mx3fb: remove unneeded mach/hardware.h inclusion
-      watchdog: imx2_wdt: remove unneeded mach/hardware.h inclusion
-      i2c: imx: remove cpu_is_xxx by using platform_device_id
-      mtd: mxc_nand: remove cpu_is_xxx by using platform_device_id
-      rtc: mxc_rtc: remove cpu_is_xxx by using platform_device_id
-      dma: imx-dma: use devm_kzalloc and devm_request_irq
-      dma: imx-dma: retrieve MEM and IRQ from resources
-      dma: imx-dma: remove cpu_is_xxx by using platform_device_id
-      media: mx2_camera: remove cpu_is_xxx by using platform_device_id
-      mmc: mxcmmc: remove cpu_is_xxx by using platform_device_id
-      video: imxfb: remove cpu_is_xxx by using platform_device_id
-      ARM: imx: move debug macros to include/debug
-      ARM: imx: include hardware.h rather than mach/hardware.h
-      ARM: imx: remove header file mach/irqs.h
-      ARM: imx: call mxc_device_init() in soc specific function
-      ARM: imx: enable multi-platform build
+krealloc is a bit nasty. Can't you add a struct list_head to struct
+gpio_block_chip or something?
 
- .../devicetree/bindings/i2c/fsl-imx-i2c.txt        |    4 +-
- MAINTAINERS                                        |    1 -
- arch/arm/Kconfig                                   |   15 +--
- arch/arm/Kconfig.debug                             |    8 ++
- arch/arm/Makefile                                  |    1 -
- arch/arm/boot/dts/imx27.dtsi                       |    4 +-
- arch/arm/boot/dts/imx51.dtsi                       |    4 +-
- arch/arm/boot/dts/imx53.dtsi                       |    6 +-
- arch/arm/boot/dts/imx6q.dtsi                       |    6 +-
- arch/arm/configs/imx_v4_v5_defconfig               |    5 +-
- arch/arm/configs/imx_v6_v7_defconfig               |    3 +-
- .../mach/debug-macro.S => include/debug/imx.S}     |   33 +++--
- arch/arm/{plat-mxc => mach-imx}/3ds_debugboard.c   |    2 +-
- .../include/mach => mach-imx}/3ds_debugboard.h     |    0
- arch/arm/mach-imx/Kconfig                          |   89 ++++++++++++-
- arch/arm/mach-imx/Makefile                         |   22 ++++
- arch/arm/{plat-mxc => mach-imx}/avic.c             |    5 +-
- .../include/mach => mach-imx}/board-mx31lilly.h    |    0
- .../include/mach => mach-imx}/board-mx31lite.h     |    0
- .../include/mach => mach-imx}/board-mx31moboard.h  |    0
- .../include/mach => mach-imx}/board-pcm038.h       |    0
- arch/arm/mach-imx/clk-imx1.c                       |   17 +--
- arch/arm/mach-imx/clk-imx21.c                      |   18 +--
- arch/arm/mach-imx/clk-imx25.c                      |   26 ++--
- arch/arm/mach-imx/clk-imx27.c                      |   40 +++---
- arch/arm/mach-imx/clk-imx31.c                      |   21 ++-
- arch/arm/mach-imx/clk-imx35.c                      |   13 +-
- arch/arm/mach-imx/clk-imx51-imx53.c                |   15 +--
- arch/arm/mach-imx/clk-imx6q.c                      |    3 +-
- arch/arm/mach-imx/clk-pllv1.c                      |    4 +-
- .../{plat-mxc/include/mach => mach-imx}/common.h   |    1 +
- arch/arm/mach-imx/cpu-imx25.c                      |    5 +-
- arch/arm/mach-imx/cpu-imx27.c                      |    2 +-
- arch/arm/mach-imx/cpu-imx31.c                      |    7 +-
- arch/arm/mach-imx/cpu-imx35.c                      |    5 +-
- arch/arm/mach-imx/cpu-imx5.c                       |    3 +-
- arch/arm/{plat-mxc => mach-imx}/cpu.c              |    3 +-
- arch/arm/mach-imx/cpu_op-mx51.c                    |    3 +-
- arch/arm/{plat-mxc => mach-imx}/cpufreq.c          |    3 +-
- arch/arm/{plat-mxc => mach-imx}/cpuidle.c          |    0
- .../{plat-mxc/include/mach => mach-imx}/cpuidle.h  |    0
- arch/arm/mach-imx/devices-imx1.h                   |    3 +-
- arch/arm/mach-imx/devices-imx21.h                  |    3 +-
- arch/arm/mach-imx/devices-imx25.h                  |    3 +-
- arch/arm/mach-imx/devices-imx27.h                  |    3 +-
- arch/arm/mach-imx/devices-imx31.h                  |    3 +-
- arch/arm/mach-imx/devices-imx35.h                  |    3 +-
- arch/arm/mach-imx/devices-imx50.h                  |    3 +-
- arch/arm/mach-imx/devices-imx51.h                  |    3 +-
- arch/arm/{plat-mxc => mach-imx}/devices/Kconfig    |    0
- arch/arm/{plat-mxc => mach-imx}/devices/Makefile   |    2 +
- .../mach => mach-imx/devices}/devices-common.h     |    9 +-
- arch/arm/{plat-mxc => mach-imx/devices}/devices.c  |    4 +-
- .../devices/platform-ahci-imx.c                    |    5 +-
- .../{plat-mxc => mach-imx}/devices/platform-fec.c  |    5 +-
- .../devices/platform-flexcan.c                     |    4 +-
- .../devices/platform-fsl-usb2-udc.c                |    5 +-
- .../devices/platform-gpio-mxc.c                    |    2 +-
- .../devices/platform-gpio_keys.c                   |    5 +-
- .../devices/platform-imx-dma.c                     |   23 +++-
- .../devices/platform-imx-fb.c                      |   16 ++-
- .../devices/platform-imx-i2c.c                     |   32 ++---
- .../devices/platform-imx-keypad.c                  |    4 +-
- .../devices/platform-imx-ssi.c                     |    4 +-
- .../devices/platform-imx-uart.c                    |    4 +-
- .../devices/platform-imx2-wdt.c                    |    5 +-
- .../devices/platform-imx21-hcd.c                   |    4 +-
- .../devices/platform-imx27-coda.c                  |    4 +-
- .../devices/platform-imx_udc.c                     |    4 +-
- .../devices/platform-imxdi_rtc.c                   |    5 +-
- .../devices/platform-ipu-core.c                    |    5 +-
- .../devices/platform-mx1-camera.c                  |    4 +-
- .../devices/platform-mx2-camera.c                  |   16 ++-
- .../devices/platform-mxc-ehci.c                    |    5 +-
- .../devices/platform-mxc-mmc.c                     |   20 +--
- .../devices/platform-mxc_nand.c                    |   25 ++--
- .../devices/platform-mxc_pwm.c                     |    4 +-
- .../devices/platform-mxc_rnga.c                    |    4 +-
- .../devices/platform-mxc_rtc.c                     |   13 +-
- .../devices/platform-mxc_w1.c                      |    4 +-
- .../devices/platform-pata_imx.c                    |    4 +-
- .../devices/platform-sdhci-esdhc-imx.c             |    5 +-
- .../devices/platform-spi_imx.c                     |    4 +-
- arch/arm/mach-imx/ehci-imx25.c                     |    4 +-
- arch/arm/mach-imx/ehci-imx27.c                     |    4 +-
- arch/arm/mach-imx/ehci-imx31.c                     |    4 +-
- arch/arm/mach-imx/ehci-imx35.c                     |    4 +-
- arch/arm/mach-imx/ehci-imx5.c                      |    4 +-
- arch/arm/{plat-mxc => mach-imx}/epit.c             |    6 +-
- .../include/mach => mach-imx}/eukrea-baseboards.h  |    0
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c       |    7 +-
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    8 +-
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    7 +-
- arch/arm/mach-imx/eukrea_mbimxsd51-baseboard.c     |    7 +-
- .../{plat-mxc/include/mach => mach-imx}/hardware.h |   26 ++--
- arch/arm/mach-imx/hotplug.c                        |    3 +-
- arch/arm/{plat-mxc/include/mach => mach-imx}/iim.h |    0
- arch/arm/mach-imx/imx27-dt.c                       |   11 +-
- arch/arm/mach-imx/imx31-dt.c                       |    5 +-
- arch/arm/mach-imx/imx51-dt.c                       |    9 +-
- arch/arm/mach-imx/include/mach/dma-mx1-mx2.h       |   10 --
- arch/arm/mach-imx/iomux-imx31.c                    |    5 +-
- .../include/mach => mach-imx}/iomux-mx1.h          |    2 +-
- .../include/mach => mach-imx}/iomux-mx21.h         |    4 +-
- .../include/mach => mach-imx}/iomux-mx25.h         |    2 +-
- .../include/mach => mach-imx}/iomux-mx27.h         |    4 +-
- .../include/mach => mach-imx}/iomux-mx2x.h         |    0
- .../include/mach => mach-imx}/iomux-mx3.h          |    0
- .../include/mach => mach-imx}/iomux-mx35.h         |    2 +-
- .../include/mach => mach-imx}/iomux-mx50.h         |    2 +-
- .../include/mach => mach-imx}/iomux-mx51.h         |    2 +-
- arch/arm/{plat-mxc => mach-imx}/iomux-v1.c         |    5 +-
- .../{plat-mxc/include/mach => mach-imx}/iomux-v1.h |    0
- arch/arm/{plat-mxc => mach-imx}/iomux-v3.c         |    5 +-
- .../{plat-mxc/include/mach => mach-imx}/iomux-v3.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/iram.h |    0
- arch/arm/{plat-mxc => mach-imx}/iram_alloc.c       |    3 +-
- arch/arm/{plat-mxc => mach-imx}/irq-common.c       |    0
- arch/arm/{plat-mxc => mach-imx}/irq-common.h       |    3 +
- arch/arm/mach-imx/lluart.c                         |    3 +-
- arch/arm/mach-imx/mach-apf9328.c                   |    7 +-
- arch/arm/mach-imx/mach-armadillo5x0.c              |    9 +-
- arch/arm/mach-imx/mach-bug.c                       |    7 +-
- arch/arm/mach-imx/mach-cpuimx27.c                  |   11 +-
- arch/arm/mach-imx/mach-cpuimx35.c                  |    9 +-
- arch/arm/mach-imx/mach-cpuimx51sd.c                |    9 +-
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c           |   10 +-
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |    6 +-
- arch/arm/mach-imx/mach-imx27ipcam.c                |    6 +-
- arch/arm/mach-imx/mach-imx27lite.c                 |    6 +-
- arch/arm/mach-imx/mach-imx53.c                     |   11 +-
- arch/arm/mach-imx/mach-imx6q.c                     |    6 +-
- arch/arm/mach-imx/mach-kzm_arm11_01.c              |    7 +-
- arch/arm/mach-imx/mach-mx1ads.c                    |    7 +-
- arch/arm/mach-imx/mach-mx21ads.c                   |    6 +-
- arch/arm/mach-imx/mach-mx25_3ds.c                  |    8 +-
- arch/arm/mach-imx/mach-mx27_3ds.c                  |   10 +-
- arch/arm/mach-imx/mach-mx27ads.c                   |    6 +-
- arch/arm/mach-imx/mach-mx31_3ds.c                  |   12 +-
- arch/arm/mach-imx/mach-mx31ads.c                   |    5 +-
- arch/arm/mach-imx/mach-mx31lilly.c                 |   11 +-
- arch/arm/mach-imx/mach-mx31lite.c                  |   11 +-
- arch/arm/mach-imx/mach-mx31moboard.c               |   14 +-
- arch/arm/mach-imx/mach-mx35_3ds.c                  |    8 +-
- arch/arm/mach-imx/mach-mx50_rdp.c                  |    7 +-
- arch/arm/mach-imx/mach-mx51_3ds.c                  |    9 +-
- arch/arm/mach-imx/mach-mx51_babbage.c              |    7 +-
- arch/arm/mach-imx/mach-mxt_td60.c                  |    6 +-
- arch/arm/mach-imx/mach-pca100.c                    |    8 +-
- arch/arm/mach-imx/mach-pcm037.c                    |    8 +-
- arch/arm/mach-imx/mach-pcm037_eet.c                |    5 +-
- arch/arm/mach-imx/mach-pcm038.c                    |   13 +-
- arch/arm/mach-imx/mach-pcm043.c                    |    9 +-
- arch/arm/mach-imx/mach-qong.c                      |    6 +-
- arch/arm/mach-imx/mach-scb9328.c                   |    7 +-
- arch/arm/mach-imx/mach-vpr200.c                    |    7 +-
- arch/arm/mach-imx/mm-imx1.c                        |    9 +-
- arch/arm/mach-imx/mm-imx21.c                       |   14 +-
- arch/arm/mach-imx/mm-imx25.c                       |   12 +-
- arch/arm/mach-imx/mm-imx27.c                       |   14 +-
- arch/arm/mach-imx/mm-imx3.c                        |   13 +-
- arch/arm/mach-imx/mm-imx5.c                        |   12 +-
- arch/arm/{plat-mxc/include/mach => mach-imx}/mx1.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx21.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx25.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx27.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx2x.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx31.h |    0
- arch/arm/mach-imx/mx31lilly-db.c                   |    9 +-
- arch/arm/mach-imx/mx31lite-db.c                    |    9 +-
- arch/arm/mach-imx/mx31moboard-devboard.c           |    9 +-
- arch/arm/mach-imx/mx31moboard-marxbot.c            |    9 +-
- arch/arm/mach-imx/mx31moboard-smartbot.c           |   11 +-
- .../arm/{plat-mxc/include/mach => mach-imx}/mx35.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx3x.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx50.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx51.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx53.h |    0
- .../arm/{plat-mxc/include/mach => mach-imx}/mx6q.h |    0
- arch/arm/{plat-mxc/include/mach => mach-imx}/mxc.h |    0
- arch/arm/mach-imx/pcm970-baseboard.c               |    7 +-
- arch/arm/mach-imx/platsmp.c                        |    5 +-
- arch/arm/mach-imx/pm-imx27.c                       |    3 +-
- arch/arm/mach-imx/pm-imx3.c                        |    7 +-
- arch/arm/mach-imx/pm-imx5.c                        |    7 +-
- arch/arm/mach-imx/pm-imx6q.c                       |    5 +-
- arch/arm/{plat-mxc => mach-imx}/ssi-fiq-ksym.c     |    0
- arch/arm/{plat-mxc => mach-imx}/ssi-fiq.S          |    0
- arch/arm/{plat-mxc => mach-imx}/system.c           |    5 +-
- arch/arm/{plat-mxc => mach-imx}/time.c             |    5 +-
- arch/arm/{plat-mxc => mach-imx}/tzic.c             |    6 +-
- arch/arm/{plat-mxc => mach-imx}/ulpi.c             |    2 +-
- .../arm/{plat-mxc/include/mach => mach-imx}/ulpi.h |    0
- arch/arm/plat-mxc/Kconfig                          |   89 -------------
- arch/arm/plat-mxc/Makefile                         |   24 ----
- arch/arm/plat-mxc/include/mach/irqs.h              |   21 ---
- arch/arm/plat-mxc/include/mach/timex.h             |   22 ----
- arch/arm/plat-mxc/include/mach/uncompress.h        |  132 -------------------
- drivers/dma/imx-dma.c                              |  137 ++++++++++++--------
- drivers/dma/imx-sdma.c                             |    1 -
- drivers/dma/ipu/ipu_idmac.c                        |    3 +-
- drivers/dma/ipu/ipu_irq.c                          |    3 +-
- drivers/i2c/busses/i2c-imx.c                       |   40 +++++-
- drivers/media/platform/soc_camera/mx2_camera.c     |   95 ++++++++++----
- drivers/media/platform/soc_camera/mx3_camera.c     |    2 +-
- drivers/mmc/host/mxcmmc.c                          |   31 ++++-
- drivers/mtd/nand/mxc_nand.c                        |   96 +++++++++-----
- drivers/rtc/rtc-mxc.c                              |   34 ++++-
- drivers/usb/host/ehci-mxc.c                        |    1 -
- drivers/video/imxfb.c                              |   38 +++++-
- drivers/video/mx3fb.c                              |    3 +-
- drivers/watchdog/imx2_wdt.c                        |    1 -
- .../mach/ipu.h => include/linux/dma/ipu-dma.h      |    6 +-
- include/linux/platform_data/asoc-imx-ssi.h         |    2 +
- include/linux/platform_data/dma-imx.h              |    4 +-
- sound/soc/fsl/imx-pcm-fiq.c                        |    1 -
- sound/soc/fsl/imx-ssi.c                            |    1 -
- 217 files changed, 1083 insertions(+), 1012 deletions(-)
- rename arch/arm/{plat-mxc/include/mach/debug-macro.S => include/debug/imx.S} (59%)
- rename arch/arm/{plat-mxc => mach-imx}/3ds_debugboard.c (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/3ds_debugboard.h (100%)
- rename arch/arm/{plat-mxc => mach-imx}/avic.c (98%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-mx31lilly.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-mx31lite.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-mx31moboard.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/board-pcm038.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/common.h (99%)
- rename arch/arm/{plat-mxc => mach-imx}/cpu.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/cpufreq.c (99%)
- rename arch/arm/{plat-mxc => mach-imx}/cpuidle.c (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/cpuidle.h (100%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/Kconfig (100%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/Makefile (98%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx/devices}/devices-common.h (97%)
- rename arch/arm/{plat-mxc => mach-imx/devices}/devices.c (92%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-ahci-imx.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-fec.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-flexcan.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-fsl-usb2-udc.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-gpio-mxc.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-gpio_keys.c (94%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-dma.c (63%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-fb.c (79%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-i2c.c (76%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-keypad.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-ssi.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx-uart.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx2-wdt.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx21-hcd.c (94%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx27-coda.c (93%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imx_udc.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-imxdi_rtc.c (94%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-ipu-core.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx1-camera.c (94%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mx2-camera.c (83%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc-ehci.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc-mmc.c (76%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_nand.c (74%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_pwm.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_rnga.c (95%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_rtc.c (77%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-mxc_w1.c (95%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-pata_imx.c (96%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-sdhci-esdhc-imx.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/devices/platform-spi_imx.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/epit.c (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/eukrea-baseboards.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/hardware.h (94%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iim.h (100%)
- delete mode 100644 arch/arm/mach-imx/include/mach/dma-mx1-mx2.h
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx1.h (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx21.h (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx25.h (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx27.h (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx2x.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx3.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx35.h (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx50.h (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-mx51.h (99%)
- rename arch/arm/{plat-mxc => mach-imx}/iomux-v1.c (98%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-v1.h (100%)
- rename arch/arm/{plat-mxc => mach-imx}/iomux-v3.c (97%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iomux-v3.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/iram.h (100%)
- rename arch/arm/{plat-mxc => mach-imx}/iram_alloc.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/irq-common.c (100%)
- rename arch/arm/{plat-mxc => mach-imx}/irq-common.h (94%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx1.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx21.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx25.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx27.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx2x.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx31.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx35.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx3x.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx50.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx51.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx53.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mx6q.h (100%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/mxc.h (100%)
- rename arch/arm/{plat-mxc => mach-imx}/ssi-fiq-ksym.c (100%)
- rename arch/arm/{plat-mxc => mach-imx}/ssi-fiq.S (100%)
- rename arch/arm/{plat-mxc => mach-imx}/system.c (97%)
- rename arch/arm/{plat-mxc => mach-imx}/time.c (99%)
- rename arch/arm/{plat-mxc => mach-imx}/tzic.c (98%)
- rename arch/arm/{plat-mxc => mach-imx}/ulpi.c (99%)
- rename arch/arm/{plat-mxc/include/mach => mach-imx}/ulpi.h (100%)
- delete mode 100644 arch/arm/plat-mxc/Kconfig
- delete mode 100644 arch/arm/plat-mxc/Makefile
- delete mode 100644 arch/arm/plat-mxc/include/mach/irqs.h
- delete mode 100644 arch/arm/plat-mxc/include/mach/timex.h
- delete mode 100644 arch/arm/plat-mxc/include/mach/uncompress.h
- rename arch/arm/plat-mxc/include/mach/ipu.h => include/linux/dma/ipu-dma.h (97%)
+This also leaks memory if the krealloc fails, since the original pointer
+is lost. You need to use a temporary for the re-allocation.
+
+> +			if (!block->gbc)
+> +				goto err2;
+> +			gbc = &block->gbc[block->nchip - 1];
+> +			gbc->gc = gc;
+> +			gbc->remap = NULL;
+> +			gbc->nremap = 0;
+> +			gbc->mask = 0;
+> +		} else {
+> +			gbc = &block->gbc[index];
+> +		}
+> +		/* represents the mask necessary on calls to the driver's
+> +		 * .get_block() and .set_block()
+> +		 */
+
+  /*
+   * Nitpick - multi-line comment style looks like this.
+   * However, other comments in this file use this style
+   * so maybe keep for consistency.
+   */
+
+> +		gbc->mask |= BIT(bit);
+> +
+> +		/* collect gpios that are specified together, represented by
+> +		 * neighboring bits
+> +		 */
+> +		remap = &gbc->remap[gbc->nremap - 1];
+
+This looks broken. If gbc was re-alloced above (index < 0) then
+gbc->remap == NULL and this will oops?
+
+> +		if (!gbc->nremap || (bit - i != remap->offset)) {
+
+gbc->nremap would have to be non-zero here, otherwise you have:
+
+  gbc->remap[0 - 1]
+
+above.
+
+> +			gbc->nremap++;
+> +			gbc->remap = krealloc(gbc->remap,
+> +					      sizeof(struct gpio_remap) *
+> +					      gbc->nremap, GFP_KERNEL);
+
+Memory leak on failure. Also, is an alternative to krealloc possible.
+Maybe a list?
+
+> +			if (!gbc->remap)
+> +				goto err3;
+> +			remap = &gbc->remap[gbc->nremap - 1];
+> +			remap->offset = bit - i;
+> +			remap->mask = 0;
+> +		}
+> +
+> +		/* represents the mask necessary for bit reordering between
+> +		 * gpio_block (i.e. as specified on gpio_block_get() and
+> +		 * gpio_block_set()) and gpio_chip domain (i.e. as specified on
+> +		 * the driver's .set_block() and .get_block())
+> +		 */
+> +		remap->mask |= BIT(i);
+> +	}
+
+The remap functionality isn't very well explained (and looks like it
+doesn't work properly anyway). Some comments explaining what the remap
+does and how it works would be useful.
+
+> +	return block;
+> +err3:
+> +	for (i = 0; i < block->nchip - 1; i++)
+> +		kfree(block->gbc[i].remap);
+> +	kfree(block->gbc);
+> +err2:
+> +	kfree(block->gpio);
+> +err1:
+> +	kfree(block);
+> +	return ERR_PTR(-ENOMEM);
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_create);
+> +
+> +void gpio_block_free(struct gpio_block *block)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < block->nchip; i++)
+> +		kfree(block->gbc[i].remap);
+> +	kfree(block->gpio);
+> +	kfree(block->gbc);
+> +	kfree(block);
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_free);
+> +
+> +unsigned gpio_block_get(const struct gpio_block *block)
+> +{
+> +	struct gpio_block_chip *gbc;
+> +	int i, j;
+> +	unsigned values = 0;
+> +
+> +	for (i = 0; i < block->nchip; i++) {
+> +		unsigned remapped = 0;
+> +
+> +		gbc = &block->gbc[i];
+> +
+> +		if (gbc->gc->get_block) {
+> +			remapped = gbc->gc->get_block(gbc->gc, gbc->mask);
+> +		} else { /* emulate */
+> +			unsigned bit = 1;
+> +
+> +			for (j = 0; j < sizeof(unsigned) * 8; j++, bit <<= 1) {
+> +				if (gbc->mask & bit)
+
+A proper bitmask might be more ideal for this. It would remove the
+sizeof(unsigned) restriction and allow you to use for_each_set_bit for
+these loops.
+
+> +					remapped |= gbc->gc->get(gbc->gc,
+> +							gbc->gc->base + j) << j;
+> +			}
+> +		}
+> +
+> +		for (j = 0; j < gbc->nremap; j++) {
+> +			struct gpio_remap *gr = &gbc->remap[j];
+> +
+> +			values |= (remapped >> gr->offset) & gr->mask;
+> +		}
+> +	}
+> +
+> +	return values;
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_get);
+> +
+> +void gpio_block_set(struct gpio_block *block, unsigned values)
+> +{
+> +	struct gpio_block_chip *gbc;
+> +	int i, j;
+> +
+> +	for (i = 0; i < block->nchip; i++) {
+> +		unsigned remapped = 0;
+> +
+> +		gbc = &block->gbc[i];
+> +
+> +		for (j = 0; j < gbc->nremap; j++) {
+> +			struct gpio_remap *gr = &gbc->remap[j];
+> +
+> +			remapped |= (values & gr->mask) << gr->offset;
+> +		}
+> +		if (gbc->gc->set_block) {
+> +			gbc->gc->set_block(gbc->gc, gbc->mask, remapped);
+> +		} else { /* emulate */
+
+Nitpick - Put the comment on a line by itself.
+
+> +			unsigned bit = 1;
+> +
+> +			for (j = 0; j < sizeof(unsigned) * 8; j++, bit <<= 1) {
+> +				if (gbc->mask & bit)
+> +					gbc->gc->set(gbc->gc, gbc->gc->base + j,
+> +						     (remapped >> j) & 1);
+> +			}
+
+This doesn't clear pins which are set to zero? If you are using
+gpio_block to bit-bang a bus then you probably want that to happen.
+Probably you want three functions, gpio_block_set (set only),
+gpio_block_clear (clear only) and gpio_block_drive (set/clear).
+
+> +		}
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_set);
+> +
+> +struct gpio_block *gpio_block_find_by_name(const char *name)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < NR_GPIO_BLOCKS; i++) {
+
+A static limit is lame. Make it a list.
+
+> +		if (gpio_block[i] && !strcmp(gpio_block[i]->name, name))
+> +			return gpio_block[i];
+> +	}
+> +	return NULL;
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_find_by_name);
+> +
+> +int gpio_block_register(struct gpio_block *block)
+> +{
+> +	int i;
+> +
+> +	if (gpio_block_find_by_name(block->name))
+> +		return -EBUSY;
+> +
+> +	for (i = 0; i < NR_GPIO_BLOCKS; i++) {
+> +		if (!gpio_block[i]) {
+> +			gpio_block[i] = block;
+> +			break;
+> +		}
+> +	}
+> +	return i == NR_GPIO_BLOCKS ? -EBUSY : 0;
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_register);
+> +
+> +void gpio_block_unregister(struct gpio_block *block)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < NR_GPIO_BLOCKS; i++) {
+> +		if (gpio_block[i] == block) {
+> +			gpio_block[i] = NULL;
+> +			break;
+> +		}
+> +	}
+> +}
+> +EXPORT_SYMBOL_GPL(gpio_block_unregister);
+> +
+>  /**
+>   * __gpio_cansleep() - report whether gpio value access will sleep
+>   * @gpio: gpio in question
+> --- linux-2.6.orig/include/asm-generic/gpio.h
+> +++ linux-2.6/include/asm-generic/gpio.h
+> @@ -43,6 +43,7 @@ static inline bool gpio_is_valid(int num
+>  
+>  struct device;
+>  struct gpio;
+> +struct gpio_block;
+>  struct seq_file;
+>  struct module;
+>  struct device_node;
+> @@ -105,6 +106,8 @@ struct gpio_chip {
+>  						unsigned offset);
+>  	int			(*get)(struct gpio_chip *chip,
+>  						unsigned offset);
+> +	unsigned		(*get_block)(struct gpio_chip *chip,
+> +					     unsigned mask);
+>  	int			(*direction_output)(struct gpio_chip *chip,
+>  						unsigned offset, int value);
+>  	int			(*set_debounce)(struct gpio_chip *chip,
+> @@ -112,6 +115,8 @@ struct gpio_chip {
+>  
+>  	void			(*set)(struct gpio_chip *chip,
+>  						unsigned offset, int value);
+> +	void			(*set_block)(struct gpio_chip *chip,
+> +					     unsigned mask, unsigned values);
+>  
+>  	int			(*to_irq)(struct gpio_chip *chip,
+>  						unsigned offset);
+> @@ -171,6 +176,15 @@ extern void gpio_set_value_cansleep(unsi
+>  extern int __gpio_get_value(unsigned gpio);
+>  extern void __gpio_set_value(unsigned gpio, int value);
+>  
+> +extern struct gpio_block *gpio_block_create(unsigned *gpio, size_t size,
+> +					    const char *name);
+> +extern void gpio_block_free(struct gpio_block *block);
+> +extern unsigned gpio_block_get(const struct gpio_block *block);
+> +extern void gpio_block_set(struct gpio_block *block, unsigned values);
+> +extern struct gpio_block *gpio_block_find_by_name(const char *name);
+> +extern int gpio_block_register(struct gpio_block *block);
+> +extern void gpio_block_unregister(struct gpio_block *block);
+> +
+>  extern int __gpio_cansleep(unsigned gpio);
+>  
+>  extern int __gpio_to_irq(unsigned gpio);
+> --- linux-2.6.orig/include/linux/gpio.h
+> +++ linux-2.6/include/linux/gpio.h
+> @@ -2,6 +2,7 @@
+>  #define __LINUX_GPIO_H
+>  
+>  #include <linux/errno.h>
+> +#include <linux/types.h>
+>  
+>  /* see Documentation/gpio.txt */
+>  
+> @@ -39,6 +40,31 @@ struct gpio {
+>  	const char	*label;
+>  };
+>  
+> +struct gpio_remap {
+> +	int	mask;
+> +	int	offset;
+> +};
+> +
+> +struct gpio_block_chip {
+> +	struct gpio_chip	*gc;
+> +	struct gpio_remap	*remap;
+> +	int			nremap;
+> +	unsigned		mask;
+> +};
+> +
+> +/**
+> + * struct gpio_block - a structure describing a list of GPIOs for simultaneous
+> + *                     operations
+> + */
+> +struct gpio_block {
+> +	struct gpio_block_chip	*gbc;
+> +	size_t			nchip;
+> +	const char		*name;
+> +
+> +	int			ngpio;
+> +	unsigned		*gpio;
+> +};
+> +
+>  #ifdef CONFIG_GENERIC_GPIO
+>  
+>  #ifdef CONFIG_ARCH_HAVE_CUSTOM_GPIO_H
+> @@ -169,6 +195,41 @@ static inline void gpio_set_value(unsign
+>  	WARN_ON(1);
+>  }
+>  
+> +static inline
+> +struct gpio_block *gpio_block_create(unsigned int *gpios, size_t size,
+> +				     const char *name)
+> +{
+> +	WARN_ON(1);
+> +	return NULL;
+> +}
+> +
+> +static inline void gpio_block_free(struct gpio_block *block)
+> +{
+> +	WARN_ON(1);
+> +}
+> +
+> +static inline unsigned gpio_block_get(const struct gpio_block *block)
+> +{
+> +	WARN_ON(1);
+> +	return 0;
+> +}
+> +
+> +static inline void gpio_block_set(struct gpio_block *block, unsigned value)
+> +{
+> +	WARN_ON(1);
+> +}
+> +
+> +static inline int gpio_block_register(struct gpio_block *block)
+> +{
+> +	WARN_ON(1);
+> +	return 0;
+> +}
+> +
+> +static inline void gpio_block_unregister(struct gpio_block *block)
+> +{
+> +	WARN_ON(1);
+> +}
+> +
+>  static inline int gpio_cansleep(unsigned gpio)
+>  {
+>  	/* GPIO can never have been requested or set as {in,out}put */
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
