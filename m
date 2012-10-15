@@ -1,56 +1,78 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 15 Oct 2012 23:18:23 +0900
-Subject: [PATCH] ARM: dts: exynos4210-trats: Split memory into 4 sections
-In-Reply-To: <1349779199-30665-1-git-send-email-t.figa@samsung.com>
-References: <1349779199-30665-1-git-send-email-t.figa@samsung.com>
-Message-ID: <10e301cdaadf$ef547150$cdfd53f0$%kim@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 15 Oct 2012 14:20:29 +0000
+Subject: [PATCH 1/2] mmc: core: Support all MMC capabilities when booting
+ from Device Tree
+In-Reply-To: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
+References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201210151420.29930.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Since the maximum section size on mach-exynos is set to 256MiB, boards
-> with memory configuration defined using sections bigger than 256MiB will
-> fail to boot with a kernel panic.
-> 
-I don't think so and it works fine in my side. Probably, the reason of
-kernel panic you said is not a maximum sections size?
+On Monday 15 October 2012, Lee Jones wrote:
+> Capabilities are an important part of the MMC subsystem. Much
+> supported functionality would be lost if we didn't provide the
+> same level of support when booting Device Tree as we currently
+> do when the subsystem is passed capabilities via platform data.
+> This patch supplies this support with one simple call to a
+> DT parsing function.
 
-> This patch modifies the dts file of Samsung Trats board to define four
-> sections of 256MiB instead of two of 512MiB to fix the boot problem.
-> 
-BTW, if this patch can fix the problem, OK, I will apply this for now.
+We already document all the commonly used properties
+in Documentation/devicetree/bindings/mmc/mmc.txt
 
-Thanks.
+Please don't add any duplicates or those that are not used
+so far.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> +	if(of_property_read_bool(np, "mmc-cap-4-bit-data"))
+> +		*caps |= MMC_CAP_4_BIT_DATA;
 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210-trats.dts | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210-trats.dts
-> b/arch/arm/boot/dts/exynos4210-trats.dts
-> index 73567b8..a21511c 100644
-> --- a/arch/arm/boot/dts/exynos4210-trats.dts
-> +++ b/arch/arm/boot/dts/exynos4210-trats.dts
-> @@ -20,8 +20,10 @@
->  	compatible = "samsung,trats", "samsung,exynos4210";
-> 
->  	memory {
-> -		reg =  <0x40000000 0x20000000
-> -			0x60000000 0x20000000>;
-> +		reg =  <0x40000000 0x10000000
-> +			0x50000000 0x10000000
-> +			0x60000000 0x10000000
-> +			0x70000000 0x10000000>;
->  	};
-> 
->  	chosen {
-> --
-> 1.7.12
+see "bus-width" property.
+
+> +	if(of_property_read_bool(np, "mmc-cap-mmc-highspeed"))
+> +		*caps |= MMC_CAP_MMC_HIGHSPEED;
+> +	if(of_property_read_bool(np, "mmc-cap-sd-highspeed"))
+> +		*caps |= MMC_CAP_SD_HIGHSPEED;
+
+implied by "max-frequency" property.
+
+> +	if(of_property_read_bool(np, "mmc-cap-sdio-irq"))
+> +		*caps |= MMC_CAP_SDIO_IRQ;
+
+implied by presence of SDIO irq property.
+
+> +	if(of_property_read_bool(np, "mmc-cap-spi"))
+> +		*caps |= MMC_CAP_SPI;
+
+Only used by the mmc_spi driver, can be hardcoded there.
+
+> +	if(of_property_read_bool(np, "mmc-cap-needs-poll"))
+> +		*caps |= MMC_CAP_NEEDS_POLL;
+
+implied by absence of irqs property.
+
+> +	if(of_property_read_bool(np, "mmc-cap-8-bit-data"))
+> +		*caps |= MMC_CAP_8_BIT_DATA;
+
+see "bus-width" property.
+
+> +	if(of_property_read_bool(np, "mmc-cap-nonremovable"))
+> +		*caps |= MMC_CAP_NONREMOVABLE;
+
+see "non-removable property.
+
+> +	if(of_property_read_bool(np, "mmc-cap-wait-while-busy"))
+> +		*caps |= MMC_CAP_WAIT_WHILE_BUSY;
+
+This seems to be a linux device driver specific quirk that doesn't
+belong into a hardware description.
+
+> +	if(of_property_read_bool(np, "mmc-cap-erase"))
+> +		*caps |= MMC_CAP_ERASE;
+
+driver specific.
+
+> ...
+
+and so on. What are you actually missing in the properties that
+are already there?
+
+	Arnd
