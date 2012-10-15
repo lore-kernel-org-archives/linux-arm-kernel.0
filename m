@@ -1,66 +1,370 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 15 Oct 2012 15:56:39 +0800
-Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
-In-Reply-To: <507885D4.10604@wwwdotorg.org>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <1350025676.20241.82.camel@jlo-ubuntu-64.nvidia.com>
- <507885D4.10604@wwwdotorg.org>
-Message-ID: <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 15 Oct 2012 09:59:08 +0200
+Subject: [PATCH 1/1] MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio
+ and ioremap
+In-Reply-To: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <507BC24C.9090006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-10-13 at 05:04 +0800, Stephen Warren wrote:
-> On 10/12/2012 01:07 AM, Joseph Lo wrote:
-> > On Fri, 2012-10-12 at 00:37 +0800, Stephen Warren wrote:
-> >> On 10/11/2012 05:24 AM, Joseph Lo wrote:
-> >>> On Wed, 2012-10-10 at 06:49 +0800, Stephen Warren wrote:
-> >>>> On 10/08/2012 04:26 AM, Joseph Lo wrote:
-> >>>>> The cpuidle LP2 is a power gating idle mode. It support power gating
-> >>>>> vdd_cpu rail after all cpu cores in LP2. For Tegra30, the CPU0 must
-> >>>>> be last one to go into LP2. We need to take care and make sure whole
-> >>>>> secondary CPUs were in LP2 by checking CPU and power gate status.
-> >>>>> After that, the CPU0 can go into LP2 safely. Then power gating the
-> >>>>> CPU rail.
-> >>>>
-> >>>>> diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-> >> b) If CPUn can't trigger rail-gating, then when CPUn is the last to
-> >> enter LP2 of the whole complex, it needs to IPI to CPU0 to tell it to
-> >> rail-gate, and simply power-gate itself. I believe this IPI interaction
-> >> is exactly what coupled cpuidle is about, isn't it?
-> > 
-> > Yes, indeed. Actually, I had tried the coupled cpuidle on Tegra20. I
-> > knew it a lot. But I met issues when porting it. It looks like a race
-> > condition and becomes a dead lock caused by IPI missing. Anyway, we can
-> > talk about it more detail when I try to upstream the coupled cpuidle
-> > support for Tegra later.
+On 10/13/2012 02:06 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> this will allow to simply the error and remove path
 > 
-> Hmm. That sounds a little churny. Why can't we just use coupled cpuidle
-> right from the start if the plan is to use it eventually anyway? From
-> other comments, it sounds like you even already have the code basically
-> working, but just need to iron out a bug or two?
+> Cc: linux-mtd at lists.infradead.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Stephen,
+Please also add Josh to the Cc list: he has made a great effort
+supporting this driver and I guess that he is interested by this rework...
 
-Even though we have plan to use coupled cpuidle, I still prefer to go
-with the LP2 driver first. Then adding one more patch to support coupled
-cpuidle based on LP2 driver. This is good for history. And if there is
-any issue, it's more easy to roll back to the stable one.
+> ---
+>  drivers/mtd/nand/atmel_nand.c |  163 ++++++++++++++---------------------------
+>  1 file changed, 54 insertions(+), 109 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 92623ac..2b43656 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -364,43 +364,33 @@ static void __devinit __iomem *pmecc_get_alpha_to(struct atmel_nand_host *host)
+>  			table_size * sizeof(int16_t);
+>  }
+>  
+> -static void pmecc_data_free(struct atmel_nand_host *host)
+> -{
+> -	kfree(host->pmecc_partial_syn);
+> -	kfree(host->pmecc_si);
+> -	kfree(host->pmecc_lmu);
+> -	kfree(host->pmecc_smu);
+> -	kfree(host->pmecc_mu);
+> -	kfree(host->pmecc_dmu);
+> -	kfree(host->pmecc_delta);
+> -}
+> -
+>  static int __devinit pmecc_data_alloc(struct atmel_nand_host *host)
+>  {
+>  	const int cap = host->pmecc_corr_cap;
+> +	int size;
+> +
+> +	size = (2 * cap + 1) * sizeof(int16_t);
+> +	host->pmecc_partial_syn = devm_kzalloc(host->dev, size, GFP_KERNEL);
+> +	host->pmecc_si = devm_kzalloc(host->dev, size, GFP_KERNEL);
+> +	host->pmecc_lmu = devm_kzalloc(host->dev,
+> +			(cap + 1) * sizeof(int16_t), GFP_KERNEL);
+> +	host->pmecc_smu = devm_kzalloc(host->dev,
+> +			(cap + 2) * (2 * cap + 1) * sizeof(int16_t), GFP_KERNEL);
+> +	size = (cap + 1) * sizeof(int);
+> +	host->pmecc_mu = devm_kzalloc(host->dev, size, GFP_KERNEL);
+> +	host->pmecc_dmu = devm_kzalloc(host->dev, size, GFP_KERNEL);
+> +	host->pmecc_delta = devm_kzalloc(host->dev, size, GFP_KERNEL);
+> +
+> +	if (!host->pmecc_partial_syn ||
+> +		!host->pmecc_si ||
+> +		!host->pmecc_lmu ||
+> +		!host->pmecc_smu ||
+> +		!host->pmecc_mu ||
+> +		!host->pmecc_dmu ||
+> +		!host->pmecc_delta)
+> +		return -ENOMEM;
+>  
+> -	host->pmecc_partial_syn = kzalloc((2 * cap + 1) * sizeof(int16_t),
+> -					GFP_KERNEL);
+> -	host->pmecc_si = kzalloc((2 * cap + 1) * sizeof(int16_t), GFP_KERNEL);
+> -	host->pmecc_lmu = kzalloc((cap + 1) * sizeof(int16_t), GFP_KERNEL);
+> -	host->pmecc_smu = kzalloc((cap + 2) * (2 * cap + 1) * sizeof(int16_t),
+> -					GFP_KERNEL);
+> -	host->pmecc_mu = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
+> -	host->pmecc_dmu = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
+> -	host->pmecc_delta = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
+> -
+> -	if (host->pmecc_partial_syn &&
+> -			host->pmecc_si &&
+> -			host->pmecc_lmu &&
+> -			host->pmecc_smu &&
+> -			host->pmecc_mu &&
+> -			host->pmecc_dmu &&
+> -			host->pmecc_delta)
+> -		return 0;
+> -
+> -	/* error happened */
+> -	pmecc_data_free(host);
+> -	return -ENOMEM;
+> +	return 0;
+>  }
+>  
+>  static void pmecc_gen_syndrome(struct mtd_info *mtd, int sector)
+> @@ -923,27 +913,25 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>  		return 0;
+>  	}
+>  
+> -	host->ecc = ioremap(regs->start, resource_size(regs));
+> +	host->ecc = devm_request_and_ioremap(&pdev->dev, regs);
+>  	if (host->ecc == NULL) {
+>  		dev_err(host->dev, "ioremap failed\n");
+>  		err_no = -EIO;
+> -		goto err_pmecc_ioremap;
+> +		goto err;
+>  	}
+>  
+>  	regs_pmerr = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+>  	regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+>  	if (regs_pmerr && regs_rom) {
+> -		host->pmerrloc_base = ioremap(regs_pmerr->start,
+> -			resource_size(regs_pmerr));
+> -		host->pmecc_rom_base = ioremap(regs_rom->start,
+> -			resource_size(regs_rom));
+> +		host->pmerrloc_base = devm_request_and_ioremap(&pdev->dev, regs_pmerr);
+> +		host->pmecc_rom_base = devm_request_and_ioremap(&pdev->dev, regs_rom);
+>  	}
+>  
+>  	if (!host->pmerrloc_base || !host->pmecc_rom_base) {
+>  		dev_err(host->dev,
+>  			"Can not get I/O resource for PMECC ERRLOC controller or ROM!\n");
+>  		err_no = -EIO;
+> -		goto err_pmloc_ioremap;
+> +		goto err;
+>  	}
+>  
+>  	/* ECC is calculated for the whole page (1 step) */
+> @@ -968,7 +956,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>  		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
+>  			dev_err(host->dev, "No room for ECC bytes\n");
+>  			err_no = -EINVAL;
+> -			goto err_no_ecc_room;
+> +			goto err;
+>  		}
+>  		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
+>  					mtd->oobsize,
+> @@ -993,7 +981,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>  	if (err_no) {
+>  		dev_err(host->dev,
+>  				"Cannot allocate memory for PMECC computation!\n");
+> -		goto err_pmecc_data_alloc;
+> +		goto err;
+>  	}
+>  
+>  	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+> @@ -1003,15 +991,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+>  
+>  	return 0;
+>  
+> -err_pmecc_data_alloc:
+> -err_no_ecc_room:
+> -err_pmloc_ioremap:
+> -	iounmap(host->ecc);
+> -	if (host->pmerrloc_base)
+> -		iounmap(host->pmerrloc_base);
+> -	if (host->pmecc_rom_base)
+> -		iounmap(host->pmecc_rom_base);
+> -err_pmecc_ioremap:
+> +err:
+>  	return err_no;
+>  }
+>  
+> @@ -1315,7 +1295,7 @@ static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
+>  		return 0;
+>  	}
+>  
+> -	host->ecc = ioremap(regs->start, resource_size(regs));
+> +	host->ecc = devm_request_and_ioremap(&pdev->dev, regs);
+>  	if (host->ecc == NULL) {
+>  		dev_err(host->dev, "ioremap failed\n");
+>  		return -EIO;
+> @@ -1380,20 +1360,19 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* Allocate memory for the device structure (and zero it) */
+> -	host = kzalloc(sizeof(struct atmel_nand_host), GFP_KERNEL);
+> +	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
+>  	if (!host) {
+>  		printk(KERN_ERR "atmel_nand: failed to allocate device structure.\n");
+>  		return -ENOMEM;
+>  	}
+>  
+> -	host->io_phys = (dma_addr_t)mem->start;
+> -
+> -	host->io_base = ioremap(mem->start, resource_size(mem));
+> +	host->io_base = devm_request_and_ioremap(&pdev->dev, mem);
+>  	if (host->io_base == NULL) {
+>  		printk(KERN_ERR "atmel_nand: ioremap failed\n");
+>  		res = -EIO;
+>  		goto err_nand_ioremap;
+>  	}
+> +	host->io_phys = (dma_addr_t)mem->start;
+>  
+>  	mtd = &host->mtd;
+>  	nand_chip = &host->nand_chip;
+> @@ -1401,7 +1380,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+>  	if (pdev->dev.of_node) {
+>  		res = atmel_of_init_port(host, pdev->dev.of_node);
+>  		if (res)
+> -			goto err_ecc_ioremap;
+> +			goto err_nand_ioremap;
+>  	} else {
+>  		memcpy(&host->board, pdev->dev.platform_data,
+>  		       sizeof(struct atmel_nand_data));
+> @@ -1420,44 +1399,42 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+>  	if (IS_ERR(pinctrl)) {
+>  		dev_err(host->dev, "Failed to request pinctrl\n");
+>  		res = PTR_ERR(pinctrl);
+> -		goto err_ecc_ioremap;
+> +		goto err_nand_ioremap;
+>  	}
+>  
+>  	if (gpio_is_valid(host->board.rdy_pin)) {
+> -		res = gpio_request(host->board.rdy_pin, "nand_rdy");
+> +		res = devm_gpio_request(&pdev->dev,
+> +				host->board.rdy_pin, "nand_rdy");
+>  		if (res < 0) {
+>  			dev_err(&pdev->dev,
+> -				"can't request rdy gpio %d\n",
+> -				host->board.rdy_pin);
+> -			goto err_ecc_ioremap;
+> +				"can't request rdy gpio %d\n", host->board.rdy_pin);
+> +			goto err_nand_ioremap;
+>  		}
+>  
+>  		res = gpio_direction_input(host->board.rdy_pin);
+>  		if (res < 0) {
+>  			dev_err(&pdev->dev,
+> -				"can't request input direction rdy gpio %d\n",
+> -				host->board.rdy_pin);
+> -			goto err_ecc_ioremap;
+> +				"can't request input direction rdy gpio %d\n", host->board.rdy_pin);
 
-There is still one thing you should know. Because we are planning to
-upstream "CPUquiet" framework that is a CPU auto hotplug mechanism. It
-will auto hotplug the CPUs depends on the system is busy or not. So when
-system is idle, there will be only one CPU online (i.e, CPU0). The
-secondary CPUs will all be hot plugged (i.e, offline and power gate). We
-need to think about do we still need coupled cpuidle on Tegra30 if we
-are going to use "CPUquiet".
+Why do you modify the log message presentation: it was okay before?
+Moreover, it is not related to the topic of the patch...
 
-And Yes, I already had a work version on Tegra20 but I need to iron out
-the IPI missing issue first. The LP2 driver of Tegra20 also not yet be
-upstreamed.
 
-Thanks,
-Joseph
+> +			goto err_nand_ioremap;
+>  		}
+>  
+>  		nand_chip->dev_ready = atmel_nand_device_ready;
+>  	}
+>  
+>  	if (gpio_is_valid(host->board.enable_pin)) {
+> -		res = gpio_request(host->board.enable_pin, "nand_enable");
+> +		res = devm_gpio_request(&pdev->dev,
+> +				host->board.enable_pin, "nand_enable");
+>  		if (res < 0) {
+>  			dev_err(&pdev->dev,
+> -				"can't request enable gpio %d\n",
+> -				host->board.enable_pin);
+> -			goto err_ecc_ioremap;
+> +				"can't request enable gpio %d\n", host->board.enable_pin);
+
+Ditto.
+
+> +			goto err_nand_ioremap;
+>  		}
+>  
+>  		res = gpio_direction_output(host->board.enable_pin, 1);
+>  		if (res < 0) {
+>  			dev_err(&pdev->dev,
+> -				"can't request output direction enable gpio %d\n",
+> -				host->board.enable_pin);
+> -			goto err_ecc_ioremap;
+> +				"can't request output direction enable gpio %d\n", host->board.enable_pin);
+
+Ditto.
+
+> +			goto err_nand_ioremap;
+>  		}
+>  	}
+>  
+> @@ -1474,19 +1451,18 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+>  	atmel_nand_enable(host);
+>  
+>  	if (gpio_is_valid(host->board.det_pin)) {
+> -		res = gpio_request(host->board.det_pin, "nand_det");
+> +		res = devm_gpio_request(&pdev->dev,
+> +				host->board.det_pin, "nand_det");
+>  		if (res < 0) {
+>  			dev_err(&pdev->dev,
+> -				"can't request det gpio %d\n",
+> -				host->board.det_pin);
+> +				"can't request det gpio %d\n", host->board.det_pin);
+
+Ditto.
+
+>  			goto err_no_card;
+>  		}
+>  
+>  		res = gpio_direction_input(host->board.det_pin);
+>  		if (res < 0) {
+>  			dev_err(&pdev->dev,
+> -				"can't request input direction det gpio %d\n",
+> -				host->board.det_pin);
+> +				"can't request input direction det gpio %d\n", host->board.det_pin);
+
+Ditto.
+
+>  			goto err_no_card;
+>  		}
+>  
+> @@ -1552,16 +1528,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+>  		return res;
+>  
+>  err_scan_tail:
+> -	if (host->has_pmecc && host->nand_chip.ecc.mode == NAND_ECC_HW) {
+> +	if (host->has_pmecc && host->nand_chip.ecc.mode == NAND_ECC_HW)
+>  		pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+> -		pmecc_data_free(host);
+> -	}
+> -	if (host->ecc)
+> -		iounmap(host->ecc);
+> -	if (host->pmerrloc_base)
+> -		iounmap(host->pmerrloc_base);
+> -	if (host->pmecc_rom_base)
+> -		iounmap(host->pmecc_rom_base);
+>  err_hw_ecc:
+>  err_scan_ident:
+>  err_no_card:
+> @@ -1569,10 +1537,7 @@ err_no_card:
+>  	platform_set_drvdata(pdev, NULL);
+>  	if (host->dma_chan)
+>  		dma_release_channel(host->dma_chan);
+> -err_ecc_ioremap:
+> -	iounmap(host->io_base);
+>  err_nand_ioremap:
+> -	kfree(host);
+>  	return res;
+>  }
+>  
+> @@ -1592,31 +1557,11 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+>  		pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+>  		pmerrloc_writel(host->pmerrloc_base, ELDIS,
+>  				PMERRLOC_DISABLE);
+> -		pmecc_data_free(host);
+>  	}
+>  
+> -	if (gpio_is_valid(host->board.det_pin))
+> -		gpio_free(host->board.det_pin);
+> -
+> -	if (gpio_is_valid(host->board.enable_pin))
+> -		gpio_free(host->board.enable_pin);
+> -
+> -	if (gpio_is_valid(host->board.rdy_pin))
+> -		gpio_free(host->board.rdy_pin);
+> -
+> -	if (host->ecc)
+> -		iounmap(host->ecc);
+> -	if (host->pmecc_rom_base)
+> -		iounmap(host->pmecc_rom_base);
+> -	if (host->pmerrloc_base)
+> -		iounmap(host->pmerrloc_base);
+> -
+>  	if (host->dma_chan)
+>  		dma_release_channel(host->dma_chan);
+>  
+> -	iounmap(host->io_base);
+> -	kfree(host);
+> -
+>  	return 0;
+>  }
+
+Otherwise, looks good.
+
+Bye,
+-- 
+Nicolas Ferre
