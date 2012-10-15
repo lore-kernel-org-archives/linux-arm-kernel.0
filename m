@@ -1,32 +1,47 @@
-From: artem.bityutskiy@linux.intel.com (Artem Bityutskiy)
-Date: Mon, 15 Oct 2012 16:55:39 +0300
-Subject: [GIT PULL] OMAP-GPMC related cleanup for common zImage
-In-Reply-To: <1350304405-14762-1-git-send-email-afzal@ti.com>
-References: <1350303247-13495-1-git-send-email-afzal@ti.com>
- <1350304405-14762-1-git-send-email-afzal@ti.com>
-Message-ID: <1350309339.5769.10.camel@sauron.fi.intel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 15 Oct 2012 22:59:11 +0900
+Subject: [PATCH v2 0/6] ARM: EXYNOS: Add secure firmware support
+In-Reply-To: <20121010161136.GD582@quad.lixom.net>
+References: <1348496913-25422-1-git-send-email-t.figa@samsung.com>
+ <1647638.5fBfDOzz0u@amdc1227>
+ <CAH9JG2V56eLCCX+9id1EWhKfZ-6qW-3O0j0mVpzOjz5S8QGQ7g@mail.gmail.com>
+ <20121010161136.GD582@quad.lixom.net>
+Message-ID: <10db01cdaadd$40bc29a0$c2347ce0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-15 at 18:03 +0530, Afzal Mohammed wrote:
-> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Olof Johansson wrote:
 > 
->   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+> Hi,
 > 
-> are available in the git repository at:
+> On Thu, Oct 11, 2012 at 12:35:54AM +0900, Kyungmin Park wrote:
+> > Hi Arnd or Olof,
+> >
+> > Can you pick up for v3.7?
+> >
+> > To Tomasz,
+> > Can you rebase it on the latest arm-soc tree?
 > 
->   git://gitorious.org/x0148406-public/linux-kernel.git tags/gpmc-czimage
+> This code should have been in arm-soc by the beginning of the merge window
+> (and in linux-next) to be merged for 3.7, but we will be happy to queue
+> it up for 3.8 once 3.7-rc1 is out. I have one outstanding comment on
+> the DT binding but the rest looks OK to me.
+> 
+Yeah, I agree.
 
-FWIW, the mtd changes look OK, and this stuff is very OMAP-specific, so
-merging everything through the OMAP tree makes a lot of sense. Thanks!
+Olof, thanks for your review.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121015/06e4839b/attachment.sig>
+> Tomasz, please rebase and send this to Kukjin so he can queue it up with
+> other
+> Samsung code.
+> 
+OK, let me apply this series in Samsung tree when Tomasz's rebased code
+against on v3.7-rc1 is available.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
