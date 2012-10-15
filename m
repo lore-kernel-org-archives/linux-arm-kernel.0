@@ -1,86 +1,160 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 15 Oct 2012 18:44:50 +0100
-Subject: [PATCH 9/9] ARM: add uprobes support
-In-Reply-To: <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-9-git-send-email-rabin@rab.in>
- <20121015111443.GA2006@linaro.org>
- <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
-Message-ID: <20121015174450.GB18614@linaro.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 15 Oct 2012 12:00:12 -0600
+Subject: [PATCH] ARM: tegra: remove unnecessary includes of <mach/*.h>
+Message-ID: <1350324012-21467-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 01:44:55PM +0200, Rabin Vincent wrote:
-> 2012/10/15 Dave Martin <dave.martin@linaro.org>:
-> > On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
-> >> Add basic uprobes support for ARM.
-> >>
-> >> perf probe --exec and SystemTap's userspace probing work.  The ARM
-> >> kprobes test code has also been run in a userspace harness to test the
-> >> uprobe instruction decoding.
-> >
-> > The assumption that the target code is ARM appears to be buried all over
-> > the place.
-> 
-> Right, as stated:
-> 
-> >> Caveats:
-> >>  - Thumb is not supported
-> 
-> > Certainly this code as currently written must depend on !THUMB2_KERNEL.
-> 
-> Why?  It currently works for ARM userspace even if the kernel is
-> Thumb-2.
+From: Stephen Warren <swarren@nvidia.com>
 
-My bad, I misread what was happening in the Makefile changes.
+This should make it easier to delete or move <mach/*.h>; something that
+is useful for single-zImage.
 
-My concern is about whether we can build the ARM and Thumb-2 kprobes
-code into the same kernel.  If so, no problem, but I believe this is
-not a tested configuration for kprobes itself.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+I thought I'd already posted this for review, but apparently not. Anyway,
+I intend to apply this immediately to Tegra's for-3.8/cleanup branch.
 
-If you've not already done so, it should be possible to test this
-by adding CONFIG_THUMB2_KERNEL=y to your config, providing your
-hardware is Thumb-2 capable.
+ arch/arm/mach-tegra/board-dt-tegra20.c       |    1 -
+ arch/arm/mach-tegra/clock.c                  |    2 --
+ arch/arm/mach-tegra/cpu-tegra.c              |    3 ---
+ arch/arm/mach-tegra/cpuidle.c                |    2 --
+ arch/arm/mach-tegra/include/mach/powergate.h |    2 ++
+ arch/arm/mach-tegra/platsmp.c                |    1 -
+ arch/arm/mach-tegra/sleep-t20.S              |    2 --
+ arch/arm/mach-tegra/sleep-t30.S              |    2 --
+ arch/arm/mach-tegra/tegra20_clocks_data.c    |    2 --
+ arch/arm/mach-tegra/tegra2_emc.c             |    2 --
+ 10 files changed, 2 insertions(+), 17 deletions(-)
 
-> > However, there's an underlying problem here which we'd need to solve.
-> > The kprobes code can take advantage of the fact that the kernel is all
-> > ARM or (almost) all Thumb code.  So there is no support for kprobes
-> > supporting ARM and Thumb at the same time.
-> >
-> > With userspace, we don't have this luxury.  With Debian armhf, Ubuntu
-> > and Linaro building Thumb-2 userspaces, it may be an increasingly common
-> > configuration independently of whether the kernel is built in Thumb-2
-> > or not.
-> >
-> > Furthermode, there is no such thing as a pure Thumb-2 system in practice:
-> > PLTs are always ARM, for example.  For uprobes to work well in userspace,
-> > both should be supported together.
-> 
-> Right.  I don't think it's difficult to support both of them together,
-> my thought was just to have userspace tell us if they want to probe a
-> Thumb instruction via the usual 0th-bit set convention, and then take it
-> from there.  I didn't do the Thumb handling currently because I didn't
-> really look into modifying the kprobes Thumb instruction decoding and
-> the IT handling for uprobes.
-
-Having looked at the code a little more closely, it looks more closely
-aligned with this goal than I thought at first.
-
-I agree with your suggestion to require the caller to specify explicitly
-whether they want to insert an ARM or Thumb probe (indeed, I think
-there's no other way to do it, since guessing the target instruction
-set can't be done reliably).  The code for setting a probe can then
-switch trivially on that low bit.
-
-Additional undef_hooks would be needed for the Thumb case, but this
-looks relatively straightforward, as you say.
-
-
-General question which I'm not sure I understand yet: is is possible
-to combine uprobes/kprobes decode more completely?  It's not obvious
-to me whether the uprobes-specific decoding only relates to features
-which architecturally execute differently in user mode versus
-privileged mode.  Some explanation somewhere could be helpful.
-
-Cheers
----Dave
+diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
+index 57e235f..76497e0 100644
+--- a/arch/arm/mach-tegra/board-dt-tegra20.c
++++ b/arch/arm/mach-tegra/board-dt-tegra20.c
+@@ -41,7 +41,6 @@
+ #include <asm/setup.h>
+ 
+ #include <mach/iomap.h>
+-#include <mach/irqs.h>
+ 
+ #include "board.h"
+ #include "clock.h"
+diff --git a/arch/arm/mach-tegra/clock.c b/arch/arm/mach-tegra/clock.c
+index fd82085..867bf8b 100644
+--- a/arch/arm/mach-tegra/clock.c
++++ b/arch/arm/mach-tegra/clock.c
+@@ -27,8 +27,6 @@
+ #include <linux/seq_file.h>
+ #include <linux/slab.h>
+ 
+-#include <mach/clk.h>
+-
+ #include "board.h"
+ #include "clock.h"
+ #include "tegra_cpu_car.h"
+diff --git a/arch/arm/mach-tegra/cpu-tegra.c b/arch/arm/mach-tegra/cpu-tegra.c
+index 627bf0f..a74d3c7 100644
+--- a/arch/arm/mach-tegra/cpu-tegra.c
++++ b/arch/arm/mach-tegra/cpu-tegra.c
+@@ -30,9 +30,6 @@
+ #include <linux/io.h>
+ #include <linux/suspend.h>
+ 
+-
+-#include <mach/clk.h>
+-
+ /* Frequency table index must be sequential starting at 0 */
+ static struct cpufreq_frequency_table freq_table[] = {
+ 	{ 0, 216000 },
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
+index 566e2f8..9a6f051 100644
+--- a/arch/arm/mach-tegra/cpuidle.c
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -29,8 +29,6 @@
+ 
+ #include <asm/proc-fns.h>
+ 
+-#include <mach/iomap.h>
+-
+ static int tegra_idle_enter_lp3(struct cpuidle_device *dev,
+ 				struct cpuidle_driver *drv, int index);
+ 
+diff --git a/arch/arm/mach-tegra/include/mach/powergate.h b/arch/arm/mach-tegra/include/mach/powergate.h
+index 4752b1a..06763fe 100644
+--- a/arch/arm/mach-tegra/include/mach/powergate.h
++++ b/arch/arm/mach-tegra/include/mach/powergate.h
+@@ -20,6 +20,8 @@
+ #ifndef _MACH_TEGRA_POWERGATE_H_
+ #define _MACH_TEGRA_POWERGATE_H_
+ 
++struct clk;
++
+ #define TEGRA_POWERGATE_CPU	0
+ #define TEGRA_POWERGATE_3D	1
+ #define TEGRA_POWERGATE_VENC	2
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 81cb265..e50870c 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -24,7 +24,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
+ 
+-#include <mach/clk.h>
+ #include <mach/iomap.h>
+ #include <mach/powergate.h>
+ 
+diff --git a/arch/arm/mach-tegra/sleep-t20.S b/arch/arm/mach-tegra/sleep-t20.S
+index a36ae41..72ce709 100644
+--- a/arch/arm/mach-tegra/sleep-t20.S
++++ b/arch/arm/mach-tegra/sleep-t20.S
+@@ -22,8 +22,6 @@
+ 
+ #include <asm/assembler.h>
+ 
+-#include <mach/iomap.h>
+-
+ #include "sleep.h"
+ #include "flowctrl.h"
+ 
+diff --git a/arch/arm/mach-tegra/sleep-t30.S b/arch/arm/mach-tegra/sleep-t30.S
+index 777d9ce..be7614b 100644
+--- a/arch/arm/mach-tegra/sleep-t30.S
++++ b/arch/arm/mach-tegra/sleep-t30.S
+@@ -18,8 +18,6 @@
+ 
+ #include <asm/assembler.h>
+ 
+-#include <mach/iomap.h>
+-
+ #include "sleep.h"
+ #include "flowctrl.h"
+ 
+diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
+index cc9b5fd..d8139b3 100644
+--- a/arch/arm/mach-tegra/tegra20_clocks_data.c
++++ b/arch/arm/mach-tegra/tegra20_clocks_data.c
+@@ -27,8 +27,6 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ 
+-#include <mach/iomap.h>
+-
+ #include "clock.h"
+ #include "fuse.h"
+ #include "tegra2_emc.h"
+diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
+index 5070d83..837c7b9 100644
+--- a/arch/arm/mach-tegra/tegra2_emc.c
++++ b/arch/arm/mach-tegra/tegra2_emc.c
+@@ -25,8 +25,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/tegra_emc.h>
+ 
+-#include <mach/iomap.h>
+-
+ #include "tegra2_emc.h"
+ #include "fuse.h"
+ 
+-- 
+1.7.0.4
