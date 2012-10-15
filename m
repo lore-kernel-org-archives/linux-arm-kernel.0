@@ -1,40 +1,149 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 15 Oct 2012 09:45:08 +0800
-Subject: [PATCH] ARM: imx6q: remove imx_src_prepare_restart() call
-In-Reply-To: <20121013180512.24ac6c59@wker>
-References: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
- <20121013180512.24ac6c59@wker>
-Message-ID: <20121015014503.GA24393@S2101-09.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 15 Oct 2012 01:51:08 +0000 (UTC)
+Subject: [PATCH] i2c: omap: revert "i2c: omap: switch to threaded IRQ support"
+Message-ID: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2012 at 06:05:12PM +0200, Anatolij Gustschin wrote:
-> Hi Shawn,
-> 
-> On Fri, 17 Aug 2012 13:11:56 +0800
-> Shawn Guo <shawn.guo@linaro.org> wrote:
-> 
-> > Currently, imx_src_prepare_restart which is called by imx6q_restart
-> > assumes that cpu0 must be the running cpu, so it disables all secondary
-> > cpus.  However this is not the case, the restart routine could possibly
-> > running on cpu1 or any other secondary cores.  In that case, disabling
-> > the cpu that runs restart routine will hang up system.
-> > 
-> > Also it turns out that everything that is done by imx_src_prepare_restart
-> > is not really necessary, because the watchdog reset will have those
-> > registers reset properly.  So let's remove the imx_src_prepare_restart
-> > call completely.
-> 
-> What is the fate of this patch?
-> 
-Discarded.
 
-Further testing suggests that imx_src_prepare_restart call is needed,
-otherwise secondary cores will fail to come online, though system
-reboot works with core0.
+Commit 3b2f8f82dad7d1f79cdc8fc05bd1c94baf109bde ("i2c: omap: switch to
+threaded IRQ support") causes communication with I2C devices to fail
+after system suspend/resume on all OMAP3 devices:
 
-The issue has been solved at kernel core level by the following patch.
+...
+[   40.228576] PM: noirq resume of devices complete after 3.723 msecs
+[   40.233184] PM: early resume of devices complete after 3.173 msecs
+[   40.242736] [sched_delayed] sched: RT throttling activated
+[   41.235046] omap_i2c omap_i2c.1: controller timed out
+[   41.235351] twl: i2c_read failed to transfer all messages
+[   41.235382] omap_hsmmc omap_hsmmc.0: could not set regulator OCR (-110)
+[   41.396453] mmc0: error -110 during resume (card was removed?)
+[   42.391754] omap_i2c omap_i2c.1: controller timed out
+[   42.391876] twl: i2c_write failed to transfer all messages
+[   42.391906] twl_rtc: Could not write TWLregister F - error -110
+[   43.391326] omap_i2c omap_i2c.1: controller timed out
+[   43.391479] twl: i2c_read failed to transfer all messages
+[   43.391510] twl_rtc: Could not read TWLregister D - error -110
+[   43.391540] twl_rtc twl_rtc: twl_rtc_read_time: reading CTRL_REG, error -110
+[   43.392364] PM: resume of devices complete after 3158.935 msecs
 
-  a985941 kernel/sys.c: call disable_nonboot_cpus() in kernel_restart()
+When the root filesystem is on MMC, as in the above example, the
+card's voltage regulator is not re-enabled and the filesystem becomes
+inaccessible after resume.
 
-Shawn
+Fix by reverting the conversion to a threaded IRQ handler.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Shubhrajyoti D <shubhrajyoti@ti.com>
+Cc: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Ben Dooks <ben-linux@fluff.org>
+---
+ drivers/i2c/busses/i2c-omap.c |   44 +++++++----------------------------------
+ 1 file changed, 7 insertions(+), 37 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index db31eae..e001c2a 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -180,7 +180,6 @@ enum {
+ #define I2C_OMAP_ERRATA_I462		(1 << 1)
+ 
+ struct omap_i2c_dev {
+-	spinlock_t		lock;		/* IRQ synchronization */
+ 	struct device		*dev;
+ 	void __iomem		*base;		/* virtual */
+ 	int			irq;
+@@ -865,35 +864,13 @@ static int omap_i2c_transmit_data(struct omap_i2c_dev *dev, u8 num_bytes,
+ }
+ 
+ static irqreturn_t
+-omap_i2c_isr(int irq, void *dev_id)
++omap_i2c_isr(int this_irq, void *dev_id)
+ {
+ 	struct omap_i2c_dev *dev = dev_id;
+-	irqreturn_t ret = IRQ_HANDLED;
+-	u16 mask;
+-	u16 stat;
+-
+-	spin_lock(&dev->lock);
+-	mask = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+-	stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+-
+-	if (stat & mask)
+-		ret = IRQ_WAKE_THREAD;
+-
+-	spin_unlock(&dev->lock);
+-
+-	return ret;
+-}
+-
+-static irqreturn_t
+-omap_i2c_isr_thread(int this_irq, void *dev_id)
+-{
+-	struct omap_i2c_dev *dev = dev_id;
+-	unsigned long flags;
+ 	u16 bits;
+ 	u16 stat;
+ 	int err = 0, count = 0;
+ 
+-	spin_lock_irqsave(&dev->lock, flags);
+ 	do {
+ 		bits = omap_i2c_read_reg(dev, OMAP_I2C_IE_REG);
+ 		stat = omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG);
+@@ -907,7 +884,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 
+ 		if (!stat) {
+ 			/* my work here is done */
+-			goto out;
++			return IRQ_HANDLED;
+ 		}
+ 
+ 		dev_dbg(dev->dev, "IRQ (ISR = 0x%04x)\n", stat);
+@@ -1016,8 +993,6 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 	omap_i2c_complete_cmd(dev, err);
+ 
+ out:
+-	spin_unlock_irqrestore(&dev->lock, flags);
+-
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1062,6 +1037,7 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		pdev->dev.platform_data;
+ 	struct device_node	*node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
++	irq_handler_t isr;
+ 	int irq;
+ 	int r;
+ 
+@@ -1110,8 +1086,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	dev->dev = &pdev->dev;
+ 	dev->irq = irq;
+ 
+-	spin_lock_init(&dev->lock);
+-
+ 	platform_set_drvdata(pdev, dev);
+ 	init_completion(&dev->cmd_complete);
+ 
+@@ -1166,14 +1140,10 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	/* reset ASAP, clearing any IRQs */
+ 	omap_i2c_init(dev);
+ 
+-	if (dev->rev < OMAP_I2C_OMAP1_REV_2)
+-		r = devm_request_irq(&pdev->dev, dev->irq, omap_i2c_omap1_isr,
+-				IRQF_NO_SUSPEND, pdev->name, dev);
+-	else
+-		r = devm_request_threaded_irq(&pdev->dev, dev->irq,
+-				omap_i2c_isr, omap_i2c_isr_thread,
+-				IRQF_NO_SUSPEND | IRQF_ONESHOT,
+-				pdev->name, dev);
++	isr = (dev->rev < OMAP_I2C_OMAP1_REV_2) ? omap_i2c_omap1_isr :
++								   omap_i2c_isr;
++	r = devm_request_irq(&pdev->dev, dev->irq, isr, IRQF_NO_SUSPEND,
++			     pdev->name, dev);
+ 
+ 	if (r) {
+ 		dev_err(dev->dev, "failure requesting irq %i\n", dev->irq);
+-- 
+1.7.10.4
