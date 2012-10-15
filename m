@@ -1,148 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Oct 2012 00:16:49 +0100
-Subject: [git pull] signals pile 3
-In-Reply-To: <507B3F2C.1090500@gmail.com>
-References: <20121013005334.GM2616@ZenIV.linux.org.uk>
- <507ADBBB.9090209@gmail.com> <20121014202431.GL21164@n2100.arm.linux.org.uk>
- <20121014222449.GN21164@n2100.arm.linux.org.uk> <507B3F2C.1090500@gmail.com>
-Message-ID: <20121014231649.GO21164@n2100.arm.linux.org.uk>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 15 Oct 2012 14:19:01 +1300
+Subject: [PULL REQUEST] ARM: vt8500: Cleanup for 3.8
+Message-ID: <1350263941.3458.1.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 12:39:40AM +0200, Daniel Mack wrote:
-> Tested-by: Daniel Mack <zonque@gmail.com>
-> 
-> Many thanks for the very prompt response!
+The following changes since commit
+ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-Thanks Daniel.
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
-I've also tested this on my OMAP4430 board running in ARM mode, so that
-still works - we've covered the possibilities between us here between
-ARM mode and Thumb mode, so...
+are available in the git repository at:
 
-Linus, could you merge this patch please, thanks.
+  git://server.prisktech.co.nz/git/linuxwmt.git/ tags/cleanup-for-3.8
 
-8<===
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-Subject: [PATCH] ARM: fix oops on initial entry to userspace with Thumb2 kernels
+for you to fetch changes up to 83cc76909622a4ee21f750148e779104d0606e9f:
 
-Daniel Mack reports an oops at boot with the latest kernels:
+  vt8500: Fix header in mach-vt8500/timer.c (2012-10-15 14:04:41 +1300)
 
-[    4.896717] Internal error: Oops - undefined instruction: 0 [#1] SMP THUMB2
-[    4.904034] Modules linked in:
-[    4.907253] CPU: 0    Not tainted  (3.6.0-11057-g584df1d #145)
-[    4.913372] PC is at cpsw_probe+0x45a/0x9ac
-[    4.917760] LR is at trace_hardirqs_on_caller+0x8f/0xfc
-[    4.923235] pc : [<c03493de>]    lr : [<c005e81f>]    psr: 60000113
-[    4.923235] sp : cf055fb0  ip : 00000000  fp : 00000000
-[    4.935246] r10: 00000000  r9 : 00000000  r8 : 00000000
-[    4.940715] r7 : 00000000  r6 : 00000000  r5 : c0344555  r4 : 00000000
-[    4.947548] r3 : cf057a40  r2 : 00000000  r1 : 00000001  r0 : 00000000
-[    4.954383] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM Segment user
-[    4.961853] Control: 50c5387d  Table: 8f3f4019  DAC: 00000015
-[    4.967868] Process init (pid: 1, stack limit = 0xcf054240)
-[    4.973702] Stack: (0xcf055fb0 to 0xcf056000)
-[    4.978269] 5fa0:                                     00000001 00000000 00000000 00000000
-[    4.986836] 5fc0: cf055fb0 c000d1a8 00000000 00000000 00000000 00000000 00000000 00000000
-[    4.995403] 5fe0: 00000000 be9b3f10 00000000 b6f6add0 00000010 00000000 aaaabfaf a8babbaa
+----------------------------------------------------------------
+Cleanup for 3.8
 
-The analysis of this is as follows.  In init/main.c, we issue:
+Removes a few unused headers from include/mach
+Removes unused arm/boot/compressed/head-vt8500.S
+Fixes header text in mach-vt8500/timer.c
 
-	kernel_thread(kernel_init, NULL, CLONE_FS | CLONE_SIGHAND);
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-This creates a new thread, which falls through to the ret_from_fork
-assembly, with r4 set NULL and r5 set to kernel_init.  You can see
-this in your oops dump register set - r5 is 0xc0344555, which is the
-address of kernel_init plus 1 which marks the function as Thumb code.
+----------------------------------------------------------------
+Tony Prisk (3):
+      vt8500: Remove unused headers from include/mach/
+      vt8500: Remove arm/boot/compressed/head-vt8500.S
+      vt8500: Fix header in mach-vt8500/timer.c
 
-Now, let's look at this code a little closer - this is what the
-disassembly looks like:
-
-c000d180 <ret_from_fork>:
-c000d180:       f03a fe08       bl      c0047d94 <schedule_tail>
-c000d184:       2d00            cmp     r5, #0
-c000d186:       bf1e            ittt    ne
-c000d188:       4620            movne   r0, r4
-c000d18a:       46fe            movne   lr, pc <-- XXXXXXX
-c000d18c:       46af            movne   pc, r5
-c000d18e:       46e9            mov     r9, sp
-c000d190:       ea4f 3959       mov.w   r9, r9, lsr #13
-c000d194:       ea4f 3949       mov.w   r9, r9, lsl #13
-c000d198:       e7c8            b.n     c000d12c <ret_to_user>
-c000d19a:       bf00            nop
-c000d19c:       f3af 8000       nop.w
-
-This code was introduced in 9fff2fa0db911 (arm: switch to saner
-kernel_execve() semantics).  I have marked one instruction, and it's
-the significant one - I'll come back to that later.
-
-Eventually, having had a successful call to kernel_execve(), kernel_init()
-returns zero.
-
-In returning, it uses the value in 'lr' which was set by the instruction
-I marked above.  Unfortunately, this causes lr to contain 0xc000d18e -
-an even address.  This switches the ISA to ARM on return but with a non
-word aligned PC value.
-
-So, what do we end up executing?  Well, not the instructions above - yes
-the opcodes, but they don't mean the same thing in ARM mode.  In ARM mode,
-it looks like this instead:
-
-c000d18c:       46e946af        strbtmi r4, [r9], pc, lsr #13
-c000d190:       3959ea4f        ldmdbcc r9, {r0, r1, r2, r3, r6, r9, fp, sp, lr, pc}^
-c000d194:       3949ea4f        stmdbcc r9, {r0, r1, r2, r3, r6, r9, fp, sp, lr, pc}^
-c000d198:       bf00e7c8        svclt   0x0000e7c8
-c000d19c:       8000f3af        andhi   pc, r0, pc, lsr #7
-c000d1a0:       e88db092        stm     sp, {r1, r4, r7, ip, sp, pc}
-c000d1a4:       46e81fff                        ; <UNDEFINED> instruction: 0x46e81fff
-c000d1a8:       8a00f3ef        bhi     0xc004a16c
-c000d1ac:       0a0cf08a        beq     0xc03493dc
-
-I have included more above, because it's relevant.  The PSR flags which we
-can see in the oops dump are nZCv, so Z and C are set.
-
-All the above ARM instructions are not executed, except for two.  c000d1a0,
-which has no writeback, and writes below the current stack pointer (and
-that data is lost when we take the next exception.)  The other instruction
-which is executed is c000d1ac, which takes us to... 0xc03493dc.  However,
-remember that bit 1 of the PC got set.  So that makes the PC value
-0xc03493de.
-
-And that value is the value we find in the oops dump for PC.  What is the
-instruction here when interpreted in ARM mode?
-
-       0:       f71e150c                ; <UNDEFINED> instruction: 0xf71e150c
-
-and there we have our undefined instruction (remember that the 'never'
-condition code, 0xf, has been deprecated and is now always executed as it
-is now being used for additional instructions.)
-
-This path also nicely explains the state of the stack we see in the oops
-dump too.
-
-The above is a consistent and sane story for how we got to the oops dump,
-which all stems from the instruction at 0xc000d18a being wrong.
-
-Reported-by: Daniel Mack <zonque@gmail.com>
-Tested-by: Daniel Mack <zonque@gmail.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/entry-common.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 417bac1..3471175 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -88,9 +88,9 @@ ENTRY(ret_from_fork)
- 	bl	schedule_tail
- 	cmp	r5, #0
- 	movne	r0, r4
--	movne	lr, pc
-+	adrne	lr, BSYM(1f)
- 	movne	pc, r5
--	get_thread_info tsk
-+1:	get_thread_info tsk
- 	b	ret_slow_syscall
- ENDPROC(ret_from_fork)
- 
+ arch/arm/boot/compressed/Makefile            |    4 ---
+ arch/arm/boot/compressed/head-vt8500.S       |   46
+--------------------------
+ arch/arm/mach-vt8500/include/mach/hardware.h |   12 -------
+ arch/arm/mach-vt8500/include/mach/i8042.h    |   18 ----------
+ arch/arm/mach-vt8500/include/mach/restart.h  |   17 ----------
+ arch/arm/mach-vt8500/timer.c                 |    2 +-
+ arch/arm/mach-vt8500/vt8500.c                |    2 --
+ 7 files changed, 1 insertion(+), 100 deletions(-)
+ delete mode 100644 arch/arm/boot/compressed/head-vt8500.S
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/i8042.h
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/restart.h
