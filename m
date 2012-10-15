@@ -1,35 +1,69 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 15 Oct 2012 11:17:43 +0530
-Subject: [PATCH] ARM: OMAP4: hwmod data: gpmc main clk
-Message-ID: <1350280063-27422-1-git-send-email-afzal@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 15 Oct 2012 07:55:30 +0200
+Subject: [PATCH] i2c: i2c-gpio: fix issue when DT node greater than 1
+In-Reply-To: <507B7C07.3070702@atmel.com>
+References: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
+ <50588A8F.30203@wwwdotorg.org> <50591C9C.2080809@atmel.com>
+ <5059E484.6090708@wwwdotorg.org>
+ <20120919175433.3841a954@endymion.delvare>
+ <5074E349.30605@atmel.com> <507B7C07.3070702@atmel.com>
+Message-ID: <20121015055530.GP12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpmc has been converted to a driver. It requests clock with
-con-id "fck", if not available, probe fails. Clock for gpmc
-device with con-id "fck" is created (aliased) along with
-hwmod device, and for that to happen, main_clk needs to be
-specified in hwmod entry, add it for OMAP4.
+On 10:59 Mon 15 Oct     , Bo Shen wrote:
+> Hi Jean Delvare,
+> 
+> On 10/10/2012 10:54, Bo Shen wrote:
+> >
+> >Hi Jean Delvare,
+> >
+> >On 9/19/2012 23:54, Jean Delvare wrote:
+> >>On Wed, 19 Sep 2012 09:28:04 -0600, Stephen Warren wrote:
+> >>>On 09/18/2012 07:15 PM, Bo Shen wrote:
+> >>>>I add the debug info, and it give the following error without this
+> >>>>patch.
+> >>>>
+> >>>>--<8----------------------------------
+> >>>>adap->name = i2c-gpio-1
+> >>>>i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+> >>>>adap->name = i2c-gpio-1
+> >>>>i2c-gpio: probe of i2c.3 failed with error -16
+> >>>>-->8----------------------------------
+> >>>>
+> >>>>With this patch, it successfully registered.
+> >>>>--<8----------------------------------
+> >>>>adap->name = i2c-gpio0
+> >>>>i2c-gpio i2c.2: using pins 30 (SDA) and 31 (SCL)
+> >>>>adap->name = i2c-gpio1
+> >>>>i2c-gpio i2c.3: using pins 90 (SDA) and 91 (SCL)
+> >>>>-->8----------------------------------
+> >>>
+> >>>Yes, that explains why the registration fails, but not why this patch is
+> >>>the correct solution to the problem.
+> >>>
+> >>>The problematic code appears to be:
+> >>>
+> >>>snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
+> >>>
+> >>>Instead, I think that should be something more like:
+> >>>
+> >>>adap->name = dev_name(&pdev->dev);
+> >>
+> >>strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name))
+> >> if anything, as adap->name is a buffer, not a pointer.
+> >
+> >I am sorry for late. I have tested with DT, it works.
+> >
+> >Please send this patch to fix the issue.
+> >Thanks.
+> 
+> Ping?
+> 
+> Will you send this patch? Or, I send this patch and add your S.O.B,
+> which do you prefer?
 
-Note that the corresponding clock is dummy.
+do it
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 652d028..ce04002 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1363,6 +1363,7 @@ static struct omap_hwmod omap44xx_gpmc_hwmod = {
- 	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
- 	.mpu_irqs	= omap44xx_gpmc_irqs,
- 	.sdma_reqs	= omap44xx_gpmc_sdma_reqs,
-+	.main_clk	= "gpmc_ck",
- 	.prcm = {
- 		.omap4 = {
- 			.clkctrl_offs = OMAP4_CM_L3_2_GPMC_CLKCTRL_OFFSET,
--- 
-1.7.12
+Best Regards,
+J.
