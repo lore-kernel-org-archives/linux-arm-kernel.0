@@ -1,48 +1,40 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 15 Oct 2012 14:19:01 +1300
-Subject: [PULL REQUEST] ARM: vt8500: Cleanup for 3.8
-Message-ID: <1350263941.3458.1.camel@gitbox>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 15 Oct 2012 09:45:08 +0800
+Subject: [PATCH] ARM: imx6q: remove imx_src_prepare_restart() call
+In-Reply-To: <20121013180512.24ac6c59@wker>
+References: <1345180316-9209-1-git-send-email-shawn.guo@linaro.org>
+ <20121013180512.24ac6c59@wker>
+Message-ID: <20121015014503.GA24393@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit
-ddffeb8c4d0331609ef2581d84de4d763607bd37:
+On Sat, Oct 13, 2012 at 06:05:12PM +0200, Anatolij Gustschin wrote:
+> Hi Shawn,
+> 
+> On Fri, 17 Aug 2012 13:11:56 +0800
+> Shawn Guo <shawn.guo@linaro.org> wrote:
+> 
+> > Currently, imx_src_prepare_restart which is called by imx6q_restart
+> > assumes that cpu0 must be the running cpu, so it disables all secondary
+> > cpus.  However this is not the case, the restart routine could possibly
+> > running on cpu1 or any other secondary cores.  In that case, disabling
+> > the cpu that runs restart routine will hang up system.
+> > 
+> > Also it turns out that everything that is done by imx_src_prepare_restart
+> > is not really necessary, because the watchdog reset will have those
+> > registers reset properly.  So let's remove the imx_src_prepare_restart
+> > call completely.
+> 
+> What is the fate of this patch?
+> 
+Discarded.
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+Further testing suggests that imx_src_prepare_restart call is needed,
+otherwise secondary cores will fail to come online, though system
+reboot works with core0.
 
-are available in the git repository at:
+The issue has been solved at kernel core level by the following patch.
 
-  git://server.prisktech.co.nz/git/linuxwmt.git/ tags/cleanup-for-3.8
+  a985941 kernel/sys.c: call disable_nonboot_cpus() in kernel_restart()
 
-for you to fetch changes up to 83cc76909622a4ee21f750148e779104d0606e9f:
-
-  vt8500: Fix header in mach-vt8500/timer.c (2012-10-15 14:04:41 +1300)
-
-----------------------------------------------------------------
-Cleanup for 3.8
-
-Removes a few unused headers from include/mach
-Removes unused arm/boot/compressed/head-vt8500.S
-Fixes header text in mach-vt8500/timer.c
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-
-----------------------------------------------------------------
-Tony Prisk (3):
-      vt8500: Remove unused headers from include/mach/
-      vt8500: Remove arm/boot/compressed/head-vt8500.S
-      vt8500: Fix header in mach-vt8500/timer.c
-
- arch/arm/boot/compressed/Makefile            |    4 ---
- arch/arm/boot/compressed/head-vt8500.S       |   46
---------------------------
- arch/arm/mach-vt8500/include/mach/hardware.h |   12 -------
- arch/arm/mach-vt8500/include/mach/i8042.h    |   18 ----------
- arch/arm/mach-vt8500/include/mach/restart.h  |   17 ----------
- arch/arm/mach-vt8500/timer.c                 |    2 +-
- arch/arm/mach-vt8500/vt8500.c                |    2 --
- 7 files changed, 1 insertion(+), 100 deletions(-)
- delete mode 100644 arch/arm/boot/compressed/head-vt8500.S
- delete mode 100644 arch/arm/mach-vt8500/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-vt8500/include/mach/i8042.h
- delete mode 100644 arch/arm/mach-vt8500/include/mach/restart.h
+Shawn
