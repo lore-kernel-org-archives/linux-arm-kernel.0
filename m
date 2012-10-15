@@ -1,33 +1,43 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 15 Oct 2012 17:30:26 +0800
-Subject: [PATCH v3 0/2] i2c: change id to let i2c-gpio work
-Message-ID: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Oct 2012 10:43:48 +0100
+Subject: [PATCH] MMC: fix sdhci-dove removal
+Message-ID: <20121015094348.GP21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c core driver will turn the platform device ID to busnum
-When using platfrom device ID as -1, it means dynamically assigned
-the busnum. When writing code, we need to make sure the busnum,
-and call i2c_register_board_info(int busnum, ...) to register device
-if using -1, we do not know the value of busnum
-	
-In order to solve this issue, set the platform device ID as a fix number
-Here using 0 to match the busnum used in i2c_regsiter_board_info()
+1. Unregister the device _BEFORE_ taking away any resources it may
+   be using.
+2. Don't check clks against NULL.
 
-Bo Shen (2):
-  i2c: change id to let i2c-gpio work
-  i2c: change id to let i2c-at91 work
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+I noticed this while merging v3.6 into Rabeeh's cubox kernel.
 
- arch/arm/mach-at91/at91rm9200.c          |    2 +-
- arch/arm/mach-at91/at91rm9200_devices.c  |    4 ++--
- arch/arm/mach-at91/at91sam9260.c         |    4 ++--
- arch/arm/mach-at91/at91sam9260_devices.c |    4 ++--
- arch/arm/mach-at91/at91sam9261.c         |    4 ++--
- arch/arm/mach-at91/at91sam9261_devices.c |    4 ++--
- arch/arm/mach-at91/at91sam9263.c         |    2 +-
- arch/arm/mach-at91/at91sam9263_devices.c |    4 ++--
- arch/arm/mach-at91/at91sam9rl_devices.c  |    4 ++--
- 9 files changed, 16 insertions(+), 16 deletions(-)
+ drivers/mmc/host/sdhci-dove.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
--- 
-1.7.9.5
+diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
+index 90140eb..c11db64 100644
+--- a/drivers/mmc/host/sdhci-dove.c
++++ b/drivers/mmc/host/sdhci-dove.c
+@@ -117,14 +117,13 @@ static int __devexit sdhci_dove_remove(struct platform_device *pdev)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_dove_priv *priv = pltfm_host->priv;
+ 
+-	if (priv->clk) {
+-		if (!IS_ERR(priv->clk)) {
+-			clk_disable_unprepare(priv->clk);
+-			clk_put(priv->clk);
+-		}
+-		devm_kfree(&pdev->dev, priv->clk);
++	sdhci_pltfm_unregister(pdev);
++
++	if (!IS_ERR(priv->clk)) {
++		clk_disable_unprepare(priv->clk);
++		clk_put(priv->clk);
+ 	}
+-	return sdhci_pltfm_unregister(pdev);
++	return 0;
+ }
+ 
+ static const struct of_device_id sdhci_dove_of_match_table[] __devinitdata = {
