@@ -1,38 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 15 Oct 2012 15:13:07 -0400
-Subject: [PATCH 0/4] Add DT support for Network Space v2 and parents
-In-Reply-To: <20121015185037.GA28384@kw.sim.vm.gnt>
-References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
- <20121015170144.GG20922@titan.lakedaemon.net>
- <20121015185037.GA28384@kw.sim.vm.gnt>
-Message-ID: <20121015191307.GI20922@titan.lakedaemon.net>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 15 Oct 2012 21:16:30 +0200
+Subject: [PATCH 0/5] am335x fixes for 3.7-rc2
+Message-ID: <cover.1350327320.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 08:50:37PM +0200, Simon Guinot wrote:
-> On Mon, Oct 15, 2012 at 01:01:44PM -0400, Jason Cooper wrote:
-> > I'm pretty sure this isn't the first version of this patch series ;-)
-> > No need to resend, but could you attach a version number and changelog?
-> 
-> Yes, you are right. For the second patch, it is the second version.
-> But all the other patches are at their first version. Then the whole
-> patch series is more a v1 than a v2. I am always embarrassed when the
-> patches versions are not the same within a series...
+This series contains patches required to let the kernel run on a TI
+am335x, like the popular BeagleBone. None of these patches are from
+me, yet all of them are essential fixes. For net-next I have prepared
+a cpsw driver extension that enables time stamping and a PTP clock,
+but in order to be useful, the kernel must boot and the MAC driver
+must be working.
 
-Yes, it makes my skin crawl when I send something out like that as well.
+The first patch was supposed to have made -rc1, but it seems to have
+been forgotten. The other four patches are for the cpsw MAC driver,
+which has not worked since the migration to device tree. Actually, I
+am not sure if the cpsw ever did work, but in any case these patches
+let the driver work (again), rather than being a lifeless derelict.
 
-My rule of thumb is that if the patch subject matter is still identical
-to the previous version, then I only increment that patch.  If suggested
-changes cause a reshuffle of the whole series, then I just increment the
-version number across the board.
+Thanks,
+Richard
 
-In this case, incrementing the first patch would have been fine.
 
-> If you agree, I will reply against the second patch in order to
-> underline the changes.
+Mugunthan V N (2):
+  ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio
+  arm/dts: am33xx: Add cpsw and mdio module nodes for AM33XX
 
-Perfect.
+Vaibhav Hiremath (2):
+  net: davinci_mdio: Fix type mistake in calling runtime-pm api
+  net: cpsw: Add parent<->child relation support between cpsw and mdio
 
-thx,
+hvaibhav at ti.com (1):
+  ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
 
-Jason.
+ arch/arm/boot/dts/am335x-bone.dts          |    8 ++++
+ arch/arm/boot/dts/am335x-evm.dts           |    8 ++++
+ arch/arm/boot/dts/am33xx.dtsi              |   50 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/gpmc.c                 |    4 ++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   34 ++++++++++++++++++-
+ drivers/net/ethernet/ti/cpsw.c             |   16 ++++++++-
+ drivers/net/ethernet/ti/davinci_mdio.c     |    2 +-
+ 7 files changed, 117 insertions(+), 5 deletions(-)
+
+-- 
+1.7.2.5
