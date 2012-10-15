@@ -1,189 +1,119 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Mon, 15 Oct 2012 17:34:55 +0200
-Subject: [PATCH 4/4] ARM: kirkwood: DT board setup for Network Space Mini v2
-In-Reply-To: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
-References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <1350315295-14567-5-git-send-email-simon.guinot@sequanux.org>
+From: m-karicheri2@ti.com (Karicheri, Muralidharan)
+Date: Mon, 15 Oct 2012 15:51:53 +0000
+Subject: [PATCH v2 09/13] ARM: davinci - update the dm644x soc code to
+ use common clk drivers
+In-Reply-To: <5077F466.6020707@ti.com>
+References: <1348683037-9705-1-git-send-email-m-karicheri2@ti.com>
+ <1348683037-9705-10-git-send-email-m-karicheri2@ti.com>
+ <5076BAA2.6010404@ti.com>
+ <3E54258959B69E4282D79E01AB1F32B7041FDB5B@DFLE12.ent.ti.com>
+ <5077F466.6020707@ti.com>
+Message-ID: <3E54258959B69E4282D79E01AB1F32B704201DE5@DFLE12.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DT board setup for the LaCie NAS Network Space Mini v2
-(aka SafeBox). The hardware characteristics are very close to those of
-the Network Space Lite v2. The main difference are:
-- A GPIO fan which is only available on the NS2 Mini.
-- A single USB host port is wired on the NS2 Mini. The NS2 Lite provides
-  an additional dual-mode USB port (host/device).
+--Cut----
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- arch/arm/boot/dts/Makefile             |    1 +
- arch/arm/boot/dts/kirkwood-ns2mini.dts |   49 ++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/Kconfig         |    8 ++++++
- arch/arm/mach-kirkwood/Makefile        |    1 +
- arch/arm/mach-kirkwood/board-dt.c      |    4 ++-
- arch/arm/mach-kirkwood/board-ns2.c     |    3 +-
- arch/arm/mach-kirkwood/common.h        |    3 +-
- drivers/leds/Kconfig                   |    2 +-
- 8 files changed, 67 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-ns2mini.dts
+>> Subject: Re: [PATCH v2 09/13] ARM: davinci - update the dm644x soc code to use
+>> common clk drivers
+>> 
+>> >>> You have chosen to keep all clock related data in platform files
+>> >>> while using the common clock framework to provide just the
+>> >>> infrastructure. If you look at how mxs and spear have been migrated, they have
+>> migrated the soc specific clock data to drivers/clk as well.
+>> >>> See "drivers/clk/spear/spear3xx_clock.c" or
+>> >>> "drivers/clk/mxs/clk-imx23.c
+>> >
+>> > I have to disagree on this one. I had investigated these code already
+>> > and came up with a way that we can re-use code across all of the
+>> > davinci platforms as well as other architectures that re-uses the clk hardware IPs.
+>> 
+>> Which code you are talking about here? Even if you introduce clk-dm644x.c, clk-
+>> keystone.c etc in drivers/clk/davinci/ you can reuse the code you introduce in patches 1-
+>> 3. I cant see how that will be prevented.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 42b3e90..f2af858 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -41,6 +41,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
- 	kirkwood-ns2.dtb \
- 	kirkwood-ns2lite.dtb \
- 	kirkwood-ns2max.dtb \
-+	kirkwood-ns2mini.dtb \
- 	kirkwood-ts219-6281.dtb \
- 	kirkwood-ts219-6282.dtb
- dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-new file mode 100644
-index 0000000..b58fd3d
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-@@ -0,0 +1,49 @@
-+/dts-v1/;
-+
-+/include/ "kirkwood-ns2-common.dtsi"
-+
-+/ {
-+	model = "LaCie Network Space Mini v2";
-+	compatible = "lacie,netspace_mini_v2", "marvell,kirkwood-88f6192", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	ocp at f1000000 {
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <1>;
-+		};
-+	};
-+
-+	gpio_fan {
-+		compatible = "gpio-fan";
-+		gpios = <&gpio0 22 1
-+			 &gpio0  7 1
-+			 &gpio1  1 1
-+			 &gpio0 23 1>;
-+		gpio-fan,speed-map =
-+			<   0  0
-+			 3000 15
-+			 3180 14
-+			 4140 13
-+			 4570 12
-+			 6760 11
-+			 7140 10
-+			 7980  9
-+			 9200  8>;
-+		alarm-gpios = <&gpio0 25 1>;
-+	};
-+
-+	ns2-leds {
-+		compatible = "ns2-leds";
-+
-+		blue-sata {
-+			label = "ns2:blue:sata";
-+			slow-gpio = <&gpio0 29 0>;
-+			cmd-gpio = <&gpio0 30 0>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 83df331..757bdb3 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -158,6 +158,14 @@ config MACH_NETSPACE_LITE_V2_DT
- 	  Say 'Y' here if you want your kernel to support the LaCie
- 	  Network Space Lite v2 NAS, using Flattened Device Tree.
- 
-+config MACH_NETSPACE_MINI_V2_DT
-+	bool "LaCie Network Space Mini v2 NAS (Flattened Device Tree)"
-+	select ARCH_KIRKWOOD_DT
-+	help
-+	  Say 'Y' here if you want your kernel to support the LaCie
-+	  Network Space Mini v2 NAS (aka SafeBox), using Flattened
-+	  Device Tree.
-+
- config MACH_TS219
- 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
- 	help
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index 4d4b7d4..3ff4aa1 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -35,3 +35,4 @@ obj-$(CONFIG_MACH_INETSPACE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_MAX_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NETSPACE_LITE_V2_DT)	+= board-ns2.o
-+obj-$(CONFIG_MACH_NETSPACE_MINI_V2_DT)	+= board-ns2.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index ab7595e..c3dd5d2 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -99,7 +99,8 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("lacie,inetspace_v2") ||
- 	    of_machine_is_compatible("lacie,netspace_v2") ||
- 	    of_machine_is_compatible("lacie,netspace_max_v2") ||
--	    of_machine_is_compatible("lacie,netspace_lite_v2"))
-+	    of_machine_is_compatible("lacie,netspace_lite_v2") ||
-+	    of_machine_is_compatible("lacie,netspace_mini_v2"))
- 		ns2_init();
- 
- 	of_platform_populate(NULL, kirkwood_dt_match_table,
-@@ -122,6 +123,7 @@ static const char *kirkwood_dt_board_compat[] = {
- 	"lacie,netspace_max_v2",
- 	"lacie,netspace_v2",
- 	"lacie,netspace_lite_v2",
-+	"lacie,netspace_mini_v2",
- 	NULL
- };
- 
-diff --git a/arch/arm/mach-kirkwood/board-ns2.c b/arch/arm/mach-kirkwood/board-ns2.c
-index da8c4c5..78596c4 100644
---- a/arch/arm/mach-kirkwood/board-ns2.c
-+++ b/arch/arm/mach-kirkwood/board-ns2.c
-@@ -74,7 +74,8 @@ void __init ns2_init(void)
- 	kirkwood_mpp_conf(ns2_mpp_config);
- 
- 	kirkwood_ehci_init();
--	if (of_machine_is_compatible("lacie,netspace_lite_v2"))
-+	if (of_machine_is_compatible("lacie,netspace_lite_v2") ||
-+	    of_machine_is_compatible("lacie,netspace_mini_v2"))
- 		ns2_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
- 	kirkwood_ge00_init(&ns2_ge00_data);
- 
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 6949d81..95eb69b 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -115,7 +115,8 @@ static inline void km_kirkwood_init(void) {};
- #if defined(CONFIG_MACH_INETSPACE_V2_DT) || \
- 	defined(CONFIG_MACH_NETSPACE_V2_DT) || \
- 	defined(CONFIG_MACH_NETSPACE_MAX_V2_DT) || \
--	defined(CONFIG_MACH_NETSPACE_LITE_V2_DT)
-+	defined(CONFIG_MACH_NETSPACE_LITE_V2_DT) || \
-+	defined(CONFIG_MACH_NETSPACE_MINI_V2_DT)
- void ns2_init(void);
- #else
- static inline void ns2_init(void) {};
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index e455c08..b58bc8a 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -381,7 +381,7 @@ config LEDS_NS2
- 	depends on MACH_NETSPACE_V2 || MACH_INETSPACE_V2 || \
- 		   MACH_NETSPACE_MAX_V2 || MACH_D2NET_V2 || \
- 		   MACH_NETSPACE_V2_DT || MACH_INETSPACE_V2_DT || \
--		   MACH_NETSPACE_MAX_V2_DT
-+		   MACH_NETSPACE_MAX_V2_DT || MACH_NETSPACE_MINI_V2_DT
- 	default y
- 	help
- 	  This option enable support for the dual-GPIO LED found on the
--- 
-1.7.10
+I was talking about re-use of davinci_common_clk_init in drivers/clk/davinci/davinci-clock.c.
+This is meant to be re-used across all of the DaVinci devices.
+
+>> 
+>> > spear3xx_clock.c has initialization code for each of the platforms and
+>> > so is the case with imx23.c.
+>> 
+>> By each of the platforms, you mean they all cater to a family of devices? This depends on
+>> how close together the family of devices are.
+>> Otherwise, there would be a file per soc. DM644x also represents a family for that matter.
+>> 
+>> > By using platform_data approach, we are able to define clks for each of the SoC and
+>> then use davinci_common_clk_init() to do initialize the clk drivers based on platform
+>> data.
+>> 
+>> You need to define and register the clocks present on each SoC either which way. I don't
+>> see why just the platform_data approach allows this.
+>> And looking closely, you have defined platform data, but don't actually have a platform
+>> device, making things more confusing.
+>> 
+
+Ok. There are multiple ways to implement this software. We had discussed this
+internally and picked the platform_data approach. The clk drivers are written not
+following the platform driver model. But I don't see why we can't use platform data
+to configure this drivers. Down below, you have made two interesting points, one is
+ARM code reduction. This patch already does this by moving the API that initializes
+the clk drivers (davinci_common_clk_init()) out of ARM to drivers/clk/davinci. So
+this + removal of existing clk driver under arm/mach-davinci/clock.[ch], we have
+achieved this goal. The second point is the moving of SoC specific clk data out of SoC
+code to drive. Are you 100% sure this is the right thing to do for these drivers. If so,
+I can start working on this change right away. As I am working on this as a background
+activity, I want to be double or triple sure before doing the rework of these patches :).
+So please confirm.
+
+>> > Later once we migrate to device tree, davinci_common_clk_init() will
+>> > go way and also the clk structures defined in the SoC file. I have prototyped this on
+>> one of the device that I am working on. davinci_common_clk_init() will be replaced with a
+>> of_davinci_clk_init() that will use device tree to get all of the platform data for the clk
+>> providers and do the initialization based on that. See highbank_clocks_init() in clk-
+>> highbank.c. I have used this model for device tree based clk initialization.
+>> 
+>> I don't think we should wait till DT migration to get rid of clock data from platform code.
+>> For many of the older DaVinci platforms, DT migration is a big if and when. This approach
+>> you gave above might work for newer DT-only platforms, but even if there is one board
+>> that is not migrated to DT, the entire clock data will have to stay. I have very less hope
+>> this will happen for DaVinci (at least in the near term). So, I would rather take the
+>> opportunity of common clock tree migration to move clock data out of mach-davinci.
+>> 
+>> Also, just moving soc-specific clk data to drivers/clk/davinci/* does not impede a future
+>> DT conversion, no?
+>> 
+>> > So it make sense to keep the design the way it is. Otherwise we will
+>> > end up writing dm644x_clk_init(), dm355_clk_init(), etc for each of the platforms and
+>> these code will get thrown away once we migrate to device tree.
+>> 
+>> I still don't see why davinci/keystone cannot follow the same approach taken by multiple
+>> other socs - spear, mxs and ux500. I am unconvinced that we have a significantly
+>> different case.
+>> 
+>> >>> ". I feel the
+>> >>> latter way is better and I also think it will simplify some of the
+>> >>> look-up infrastructure you had to build. This will also help some real code reduction
+>> from arch/arm/mach-davinci/.
+>> >>>
+>> >
+>> > The look-up infrastructure is pretty much re-use of the existing code base in SoC
+>> specific file.
+>> 
+>> Yes, but that's no reason to keep maintaining it.
+>> 
+>> > About code reduction, I can't say I agree, as we need to add platform_specific clock
+>> initialization code if we follow spear3xx_clock.c model and end up probably adding more
+>> code.
+>> > SoC specific file (for example dm644x.c) has only data structures and all of SoC will re-
+>> use davinci_common_clk_init() to do the initialization. So I am not sure how you conclude
+>> we will have code reduction?
+>> 
+>> Is about code reduction from arch/arm/. That's what ARM community is working towards.
+>> 
+>> Thanks,
+>> Sekhar
+>> 
+>> PS: When replying, can you please hit an enter after every 70 or so characters.
+>> Otherwise quoting from your mails is becoming very difficult. I tried manually adjusting it
+>> but finally gave up.
