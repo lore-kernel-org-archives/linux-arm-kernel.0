@@ -1,51 +1,31 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Mon, 15 Oct 2012 08:49:20 +0200
-Subject: [PATCH] i2c: i2c-gpio: fix issue when DT node greater than 1
-In-Reply-To: <507B7C07.3070702@atmel.com>
-References: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
- <50588A8F.30203@wwwdotorg.org> <50591C9C.2080809@atmel.com>
- <5059E484.6090708@wwwdotorg.org>
- <20120919175433.3841a954@endymion.delvare>
- <5074E349.30605@atmel.com> <507B7C07.3070702@atmel.com>
-Message-ID: <20121015084920.75d4aa53@endymion.delvare>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 15 Oct 2012 09:01:15 +0200
+Subject: [PATCH 5/5] ARM: AT91: Add AT91RM9200 device tree
+In-Reply-To: <20121015060302.GT12801@game.jcrosoft.org>
+References: <1350251199-28065-1-git-send-email-manabian@gmail.com>
+ <1350251199-28065-6-git-send-email-manabian@gmail.com>
+ <20121015060302.GT12801@game.jcrosoft.org>
+Message-ID: <CAGhQ9VzON-SSJT+FDmjV8=J838+gWpy_jD4P9AtJDYf7=cW5Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 15 Oct 2012 10:59:19 +0800, Bo Shen wrote:
-> On 10/10/2012 10:54, Bo Shen wrote:
-> > On 9/19/2012 23:54, Jean Delvare wrote:
-> >> On Wed, 19 Sep 2012 09:28:04 -0600, Stephen Warren wrote:
-> >>> The problematic code appears to be:
-> >>>
-> >>> snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
-> >>>
-> >>> Instead, I think that should be something more like:
-> >>>
-> >>> adap->name = dev_name(&pdev->dev);
-> >>
-> >> strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name))
->  >> if anything, as adap->name is a buffer, not a pointer.
-> >
-> > I am sorry for late. I have tested with DT, it works.
-> >
-> > Please send this patch to fix the issue.
-> > Thanks.
-> 
-> Ping?
-> 
-> Will you send this patch?
+On Mon, Oct 15, 2012 at 8:03 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+<snip patch>
+> I do not yet check the pin I'll do it later
+>
+> but look ok
+>
+> please a board so we can test it the rm9200ek at least
 
-Which patch, please? On September 18th, you sent a first version.
-Stephen Warren asked you for a change, but you never sent version two
-of the patch including the requested change. So don't be surprised if
-your patch never got applied.
+I can add it, but I don't have any of the Atmel RM9200 dev kits so I
+can't test it.
 
-> Or, I send this patch and add your S.O.B, which do you prefer?
+The testing I have done so far has been with a custom board which I'll
+add later as noted in the series description.
 
-I prefer that you send patch v2 and let the interested parties review
-and apply it. Do not add S-o-B for anyone else, ever.
+regards
+Joachim Eastwood
 
-Note that i2c-gpio is normally handled by Wolfram Sang, not me.
-
--- 
-Jean Delvare
+> Best Regards,
+> J.
