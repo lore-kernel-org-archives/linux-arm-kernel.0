@@ -1,43 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 15 Oct 2012 10:43:48 +0100
-Subject: [PATCH] MMC: fix sdhci-dove removal
-Message-ID: <20121015094348.GP21164@n2100.arm.linux.org.uk>
+From: mgorman@suse.de (Mel Gorman)
+Date: Mon, 15 Oct 2012 10:45:48 +0100
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <1350246895.11504.6.camel@gitbox>
+References: <1350192523.10946.4.camel@gitbox> <1350246895.11504.6.camel@gitbox>
+Message-ID: <20121015094547.GC29125@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. Unregister the device _BEFORE_ taking away any resources it may
-   be using.
-2. Don't check clks against NULL.
+On Mon, Oct 15, 2012 at 09:34:55AM +1300, Tony Prisk wrote:
+> On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
+> > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
+> > 11 Oct when I did another pull from linus all of a sudden
+> > dma_alloc_coherent is failing to allocate the framebuffer any longer.
+> > 
+> > I did a quick look back and found this:
+> > 
+> > ARM: add coherent dma ops
+> > 
+> > arch_is_coherent is problematic as it is a global symbol. This
+> > doesn't work for multi-platform kernels or platforms which can support
+> > per device coherent DMA.
+> > 
+> > This adds arm_coherent_dma_ops to be used for devices which connected
+> > coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
+> > are modified at boot when arch_is_coherent is true.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > 
+> > 
+> > This is the only patch lately that I could find (not that I would claim
+> > to be any good at finding things) that is related to the problem. Could
+> > it have caused the allocations to fail?
+> > 
+> > Regards
+> > Tony P
+> 
+> Have done a bit more digging and found the cause - not Rob's patch so
+> apologies.
+> 
+> The cause of the regression is this patch:
+> 
+> From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+> From: Mel Gorman <mgorman@suse.de>
+> Date: Mon, 8 Oct 2012 16:32:36 -0700
+> Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+>  possible
+> 
+> Up until then, the framebuffer allocation with dma_alloc_coherent(...)
+> was fine. From this patch onwards, allocations fail.
+> 
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
-I noticed this while merging v3.6 into Rabeeh's cubox kernel.
+Was this found through bisection or some other means?
 
- drivers/mmc/host/sdhci-dove.c |   13 ++++++-------
- 1 files changed, 6 insertions(+), 7 deletions(-)
+There was a bug in that series that broke CMA but it was commit bb13ffeb
+(mm: compaction: cache if a pageblock was scanned and no pages were
+isolated) and it was fixed by 62726059 (mm: compaction: fix bit ranges
+in {get,clear,set}_pageblock_skip()). So it should have been fixed by
+3.7-rc1 and probably was included by the time you pulled in October 11th
+but bisection would be a pain. There were problems with that series during
+development but tests were completing for other people.
 
-diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
-index 90140eb..c11db64 100644
---- a/drivers/mmc/host/sdhci-dove.c
-+++ b/drivers/mmc/host/sdhci-dove.c
-@@ -117,14 +117,13 @@ static int __devexit sdhci_dove_remove(struct platform_device *pdev)
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
- 	struct sdhci_dove_priv *priv = pltfm_host->priv;
- 
--	if (priv->clk) {
--		if (!IS_ERR(priv->clk)) {
--			clk_disable_unprepare(priv->clk);
--			clk_put(priv->clk);
--		}
--		devm_kfree(&pdev->dev, priv->clk);
-+	sdhci_pltfm_unregister(pdev);
-+
-+	if (!IS_ERR(priv->clk)) {
-+		clk_disable_unprepare(priv->clk);
-+		clk_put(priv->clk);
- 	}
--	return sdhci_pltfm_unregister(pdev);
-+	return 0;
- }
- 
- static const struct of_device_id sdhci_dove_of_match_table[] __devinitdata = {
+Just in case, is this still broken in 3.7-rc1?
+
+> I don't know how this patch would effect CMA allocations, but it seems
+> to be causing the issue (or at least, it's caused an error in
+> arch-vt8500 to become visible).
+> 
+> Perhaps someone who understand -mm could explain the best way to
+> troubleshoot the cause of this problem?
+> 
+
+If you are comfortable with ftrace, it can be used to narrow down where
+the exact failure is occurring but if you're not comfortable with that
+then the easiest is a bunch of printks starting in alloc_contig_range()
+to see at what point and why it returns failure.
+
+It's not obvious at the moment why that patch would cause an allocation
+problem. It's the type of patch that if it was wrong it would fail every
+time for everyone, not just for a single driver.
+
+-- 
+Mel Gorman
+SUSE Labs
