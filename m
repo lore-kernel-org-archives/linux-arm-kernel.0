@@ -1,55 +1,112 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 15 Oct 2012 14:05:18 -0000
-Subject: [RFC 1/2] common: DMA-mapping: add DMA_ATTR_FORCE_CONTIGUOUS attribute
+Date: Mon, 15 Oct 2012 14:05:20 -0000
+Subject: [RFC 2/2] ARM: dma-mapping: add support for DMA_ATTR_FORCE_CONTIGUOUS
+ attribute
 In-Reply-To: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
 References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1350309832-18461-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1350309832-18461-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DMA_ATTR_FORCE_CONTIGUOUS attribute to the DMA-mapping
-subsystem.
-
-By default DMA-mapping subsystem is allowed to assemble the buffer
-allocated by dma_alloc_attrs() function from individual pages if it can
-be mapped as contiguous chunk into device dma address space. By
-specifing this attribute the allocated buffer is forced to be contiguous
-also in physical memory.
+This patch adds support for DMA_ATTR_FORCE_CONTIGUOUS attribute for
+dma_alloc_attrs() in IOMMU-aware implementation. For allocating physically
+contiguous buffers Contiguous Memory Allocator is used.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- Documentation/DMA-attributes.txt |    9 +++++++++
- include/linux/dma-attrs.h        |    1 +
- 2 files changed, 10 insertions(+)
+ arch/arm/mm/dma-mapping.c |   41 +++++++++++++++++++++++++++++++++--------
+ 1 file changed, 33 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
-index f503090..e59480d 100644
---- a/Documentation/DMA-attributes.txt
-+++ b/Documentation/DMA-attributes.txt
-@@ -91,3 +91,12 @@ transferred to 'device' domain. This attribute can be also used for
- dma_unmap_{single,page,sg} functions family to force buffer to stay in
- device domain after releasing a mapping for it. Use this attribute with
- care!
-+
-+DMA_ATTR_FORCE_CONTIGUOUS
-+-------------------------
-+
-+By default DMA-mapping subsystem is allowed to assemble the buffer
-+allocated by dma_alloc_attrs() function from individual pages if it can
-+be mapped as contiguous chunk into device dma address space. By
-+specifing this attribute the allocated buffer is forced to be contiguous
-+also in physical memory.
-diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
-index f83f793..c8e1831 100644
---- a/include/linux/dma-attrs.h
-+++ b/include/linux/dma-attrs.h
-@@ -17,6 +17,7 @@ enum dma_attr {
- 	DMA_ATTR_NON_CONSISTENT,
- 	DMA_ATTR_NO_KERNEL_MAPPING,
- 	DMA_ATTR_SKIP_CPU_SYNC,
-+	DMA_ATTR_FORCE_CONTIGUOUS,
- 	DMA_ATTR_MAX,
- };
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 477a2d2..583a302 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1036,7 +1036,8 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+ 	spin_unlock_irqrestore(&mapping->lock, flags);
+ }
  
+-static struct page **__iommu_alloc_buffer(struct device *dev, size_t size, gfp_t gfp)
++static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
++					  gfp_t gfp, struct dma_attrs *attrs)
+ {
+ 	struct page **pages;
+ 	int count = size >> PAGE_SHIFT;
+@@ -1050,6 +1051,23 @@ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size, gfp_t
+ 	if (!pages)
+ 		return NULL;
+ 
++	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs))
++	{
++		unsigned long order = get_order(size);
++		struct page *page;
++
++		page = dma_alloc_from_contiguous(dev, count, order);
++		if (!page)
++			goto error;
++
++		__dma_clear_buffer(page, size);
++
++		for (i = 0; i < count; i++)
++			pages[i] = page + i;
++
++		return pages;
++	}
++
+ 	while (count) {
+ 		int j, order = __fls(count);
+ 
+@@ -1083,14 +1101,21 @@ error:
+ 	return NULL;
+ }
+ 
+-static int __iommu_free_buffer(struct device *dev, struct page **pages, size_t size)
++static int __iommu_free_buffer(struct device *dev, struct page **pages,
++			       size_t size, struct dma_attrs *attrs)
+ {
+ 	int count = size >> PAGE_SHIFT;
+ 	int array_size = count * sizeof(struct page *);
+ 	int i;
+-	for (i = 0; i < count; i++)
+-		if (pages[i])
+-			__free_pages(pages[i], 0);
++
++	if (dma_get_attr(DMA_ATTR_FORCE_CONTIGUOUS, attrs)) {
++		dma_release_from_contiguous(dev, pages[0], count);
++	} else {
++		for (i = 0; i < count; i++)
++			if (pages[i])
++				__free_pages(pages[i], 0);
++	}
++
+ 	if (array_size <= PAGE_SIZE)
+ 		kfree(pages);
+ 	else
+@@ -1252,7 +1277,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	if (gfp & GFP_ATOMIC)
+ 		return __iommu_alloc_atomic(dev, size, handle);
+ 
+-	pages = __iommu_alloc_buffer(dev, size, gfp);
++	pages = __iommu_alloc_buffer(dev, size, gfp, attrs);
+ 	if (!pages)
+ 		return NULL;
+ 
+@@ -1273,7 +1298,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ err_mapping:
+ 	__iommu_remove_mapping(dev, *handle, size);
+ err_buffer:
+-	__iommu_free_buffer(dev, pages, size);
++	__iommu_free_buffer(dev, pages, size, attrs);
+ 	return NULL;
+ }
+ 
+@@ -1329,7 +1354,7 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 	}
+ 
+ 	__iommu_remove_mapping(dev, handle, size);
+-	__iommu_free_buffer(dev, pages, size);
++	__iommu_free_buffer(dev, pages, size, attrs);
+ }
+ 
+ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
 -- 
 1.7.9.5
