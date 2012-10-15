@@ -1,27 +1,97 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 15 Oct 2012 17:02:44 +0200
-Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
-In-Reply-To: <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
-References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
- <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121015150244.GZ12801@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 15 Oct 2012 16:07:04 +0100
+Subject: [PATCH] MMC: fix sdhci-dove removal
+In-Reply-To: <20121015145855.GY12801@game.jcrosoft.org>
+References: <20121015094348.GP21164@n2100.arm.linux.org.uk>
+ <20121015103725.GQ21164@n2100.arm.linux.org.uk>
+ <20121015104456.GR21164@n2100.arm.linux.org.uk>
+ <20121015145855.GY12801@game.jcrosoft.org>
+Message-ID: <20121015150704.GT21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:30 Mon 15 Oct     , Bo Shen wrote:
-> The i2c core driver will turn the platform device ID to busnum
-> When using platfrom device ID as -1, it means dynamically assigned
-> the busnum. When writing code, we need to make sure the busnum,
-> and call i2c_register_board_info(int busnum, ...) to register device
-> if using -1, we do not know the value of busnum
-> 	
-> In order to solve this issue, set the platform device ID as a fix number
-> Here using 0 to match the busnum used in i2c_regsiter_board_info()
+On Mon, Oct 15, 2012 at 04:58:55PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:44 Mon 15 Oct     , Russell King - ARM Linux wrote:
+> > On Mon, Oct 15, 2012 at 11:37:25AM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Oct 15, 2012 at 10:43:48AM +0100, Russell King - ARM Linux wrote:
+> > > > 1. Unregister the device _BEFORE_ taking away any resources it may
+> > > >    be using.
+> > > > 2. Don't check clks against NULL.
+> > > > 
+> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > 
+> > > Looking at this driver some more, who the hell came up with the sdhci
+> > > registration interface?  It violates one of the most fundamental
+> > > principles of kernel driver programming.  You do _NOT_ publish your
+> > > driver interfaces _UNTIL_ you have finished setting your device up.
+> > > Otherwise, in a preemptible or SMP kernel, your driver can be used
+> > > before the initialization has completed.
+> > > 
+> > > As this driver calls sdhci_pltfm_register() before it has obtained the
+> > > clock for the interface, and this function does:
+> > > 	sdhci_pltfm_init
+> > > 	sdhci_add_host
+> > > 		mmc_add_host
+> > > 			mmc_start_host
+> > > 				mmc_power_up
+> > > 					mmc_set_ios
+> > > 						sdhci_set_ios
+> > > 
+> > > See, we're trying to power up and clock the card _before_ the dove
+> > > sdhci driver has even claimed the clock let alone enabled it.  This
+> > > is total bollocks.  The sdhci platform interface is total crap for
+> > > creating this broken design in the first place.  This is why MMC has
+> > > the init + add interfaces, they're there to allow drivers to do stuff
+> > > the Right(tm) way and avoid shit like the above.
+> > > 
+> > > This should have been picked up at review time before the driver went
+> > > into mainline.  In any case, it needs to be fixed.
+> > 
+> > Here's an updated patch which just about fixes the sdhci-dove driver.
+> > I would not be surprised given the idiotic sdhci-pltfm API if many
+> > other drivers suffered the same bug.
+> > 
+> > 8<====
+> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Subject: [PATCH] MMC: fix sdhci-dove probe/removal
+> > 
+> > 1. Never ever publish a device in the system before it has been setup
+> >    to a usable state.
+> > 2. Unregister the device _BEFORE_ taking away any resources it may be
+> >    using.
+> > 3. Don't check clks against NULL.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  drivers/mmc/host/sdhci-dove.c |   36 ++++++++++++++++++------------------
+> >  1 files changed, 18 insertions(+), 18 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
+> > index a6e53a1..7d3a4e4 100644
+> > --- a/drivers/mmc/host/sdhci-dove.c
+> > +++ b/drivers/mmc/host/sdhci-dove.c
+> > @@ -83,30 +83,31 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
+> >  	struct sdhci_dove_priv *priv;
+> >  	int ret;
+> >  
+> > -	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
+> > -	if (ret)
+> > -		goto sdhci_dove_register_fail;
+> > -
+> >  	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
+> >  			    GFP_KERNEL);
+> >  	if (!priv) {
+> >  		dev_err(&pdev->dev, "unable to allocate private data");
+> > -		ret = -ENOMEM;
+> > -		goto sdhci_dove_allocate_fail;
+> > +		return -ENOMEM;
+> >  	}
+> >  
+> > +	priv->clk = clk_get(&pdev->dev, NULL);
+> you have devm_clk_get too
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> ---
+> maybe you could use it here too
 
-can you check when this append for the first time to schedule a patch for stable too
-
-Best Regards,
-J.
+This isn't a cleanup patch, this is a patch just to fix some stupid bugs
+in this code.  If someone wants to convert that afterwards, it should be
+an entirely separate patch.
