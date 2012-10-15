@@ -1,157 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 15 Oct 2012 12:37:29 -0600
-Subject: [PATCH 2/2] ARM: tegra: move irammap.h to mach-tegra
-In-Reply-To: <1350326249-18405-1-git-send-email-swarren@wwwdotorg.org>
-References: <1350326249-18405-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1350326249-18405-2-git-send-email-swarren@wwwdotorg.org>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Mon, 15 Oct 2012 20:56:40 +0200
+Subject: [PATCH 1/4] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <1349274589-11389-2-git-send-email-avinashphilip@ti.com> (Avinash
+ Philip's message of "Wed, 3 Oct 2012 19:59:46 +0530")
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <87obk3va1j.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+>>>>> Philip, Avinash <avinashphilip@ti.com> writes:
 
-Nothing outside mach-tegra uses this file, so there's no need for it to
-be in <mach/>.
+ > Update number of errors using nand ecc strength.
+ > Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
 
-Since uncompress.h and debug-macro.S remain in include/mach, they need
-to include "../../irammap.h" becaue of this change. Both these usages
-will be removed shortly, when Tegra's DEBUG_LL implementation is updated
-not to pass information through IRAM.
+ > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+ > ---
+ > :100644 100644 5b31386... af511a9... M	drivers/mtd/nand/omap2.c
+ >  drivers/mtd/nand/omap2.c |   12 ++++++++----
+ >  1 files changed, 8 insertions(+), 4 deletions(-)
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/mach-tegra/include/mach/debug-macro.S |    2 +-
- arch/arm/mach-tegra/include/mach/irammap.h     |   35 ------------------------
- arch/arm/mach-tegra/include/mach/uncompress.h  |    3 +-
- arch/arm/mach-tegra/irammap.h                  |   35 ++++++++++++++++++++++++
- arch/arm/mach-tegra/reset.c                    |    3 +-
- 5 files changed, 38 insertions(+), 40 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/include/mach/irammap.h
- create mode 100644 arch/arm/mach-tegra/irammap.h
+ > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+ > index 5b31386..af511a9 100644
+ > --- a/drivers/mtd/nand/omap2.c
+ > +++ b/drivers/mtd/nand/omap2.c
+ > @@ -111,6 +111,9 @@
+ >  #define	ECCCLEAR			0x100
+ >  #define	ECC1				0x1
+ 
+ > +#define BCH8_MAX_ERROR		8	/* upto 8 bit coorectable */
+ > +#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
 
-diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
-index 58a7fa8..44ca7b1 100644
---- a/arch/arm/mach-tegra/include/mach/debug-macro.S
-+++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
-@@ -27,7 +27,7 @@
- #include <linux/serial_reg.h>
- 
- #include "../../iomap.h"
--#include <mach/irammap.h>
-+#include "../../irammap.h"
- 
- 		.macro  addruart, rp, rv, tmp
- 		adr	\rp, 99f		@ actual addr of 99f
-diff --git a/arch/arm/mach-tegra/include/mach/irammap.h b/arch/arm/mach-tegra/include/mach/irammap.h
-deleted file mode 100644
-index 0cbe632..0000000
---- a/arch/arm/mach-tegra/include/mach/irammap.h
-+++ /dev/null
-@@ -1,35 +0,0 @@
--/*
-- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#ifndef __MACH_TEGRA_IRAMMAP_H
--#define __MACH_TEGRA_IRAMMAP_H
--
--#include <asm/sizes.h>
--
--/* The first 1K of IRAM is permanently reserved for the CPU reset handler */
--#define TEGRA_IRAM_RESET_HANDLER_OFFSET	0
--#define TEGRA_IRAM_RESET_HANDLER_SIZE	SZ_1K
--
--/*
-- * These locations are written to by uncompress.h, and read by debug-macro.S.
-- * The first word holds the cookie value if the data is valid. The second
-- * word holds the UART physical address.
-- */
--#define TEGRA_IRAM_DEBUG_UART_OFFSET	SZ_1K
--#define TEGRA_IRAM_DEBUG_UART_SIZE	8
--#define TEGRA_IRAM_DEBUG_UART_COOKIE	0x55415254
--
--#endif
-diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-index 095216c..2772575 100644
---- a/arch/arm/mach-tegra/include/mach/uncompress.h
-+++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-@@ -28,9 +28,8 @@
- #include <linux/types.h>
- #include <linux/serial_reg.h>
- 
--#include <mach/irammap.h>
--
- #include "../../iomap.h"
-+#include "../../irammap.h"
- 
- #define BIT(x) (1 << (x))
- #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-diff --git a/arch/arm/mach-tegra/irammap.h b/arch/arm/mach-tegra/irammap.h
-new file mode 100644
-index 0000000..0cbe632
---- /dev/null
-+++ b/arch/arm/mach-tegra/irammap.h
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __MACH_TEGRA_IRAMMAP_H
-+#define __MACH_TEGRA_IRAMMAP_H
-+
-+#include <asm/sizes.h>
-+
-+/* The first 1K of IRAM is permanently reserved for the CPU reset handler */
-+#define TEGRA_IRAM_RESET_HANDLER_OFFSET	0
-+#define TEGRA_IRAM_RESET_HANDLER_SIZE	SZ_1K
-+
-+/*
-+ * These locations are written to by uncompress.h, and read by debug-macro.S.
-+ * The first word holds the cookie value if the data is valid. The second
-+ * word holds the UART physical address.
-+ */
-+#define TEGRA_IRAM_DEBUG_UART_OFFSET	SZ_1K
-+#define TEGRA_IRAM_DEBUG_UART_SIZE	8
-+#define TEGRA_IRAM_DEBUG_UART_COOKIE	0x55415254
-+
-+#endif
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 28e51b7..e05da7d 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -22,9 +22,8 @@
- #include <asm/cacheflush.h>
- #include <asm/hardware/cache-l2x0.h>
- 
--#include <mach/irammap.h>
--
- #include "iomap.h"
-+#include "irammap.h"
- #include "reset.h"
- #include "fuse.h"
- 
+First 'correctable' misspelled.
+
+I don't personally think these defines improve readability very much
+compared to to just using 4/8, though.
+
 -- 
-1.7.0.4
+Bye, Peter Korsgaard
