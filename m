@@ -1,370 +1,121 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 15 Oct 2012 09:59:08 +0200
-Subject: [PATCH 1/1] MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio
- and ioremap
-In-Reply-To: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <507BC24C.9090006@atmel.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 15 Oct 2012 21:03:30 +1300
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <1822826.6oRYLvbneG@flatron>
+References: <1350192523.10946.4.camel@gitbox>
+ <1350246895.11504.6.camel@gitbox> <1350253591.13440.1.camel@gitbox>
+ <1822826.6oRYLvbneG@flatron>
+Message-ID: <1350288210.16750.2.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/13/2012 02:06 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> this will allow to simply the error and remove path
+On Mon, 2012-10-15 at 08:42 +0200, Tomasz Figa wrote:
+> Hi Tony,
 > 
-> Cc: linux-mtd at lists.infradead.org
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-Please also add Josh to the Cc list: he has made a great effort
-supporting this driver and I guess that he is interested by this rework...
-
-> ---
->  drivers/mtd/nand/atmel_nand.c |  163 ++++++++++++++---------------------------
->  1 file changed, 54 insertions(+), 109 deletions(-)
+> On Monday 15 of October 2012 11:26:31 Tony Prisk wrote:
+> > On Mon, 2012-10-15 at 09:34 +1300, Tony Prisk wrote:
+> > > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
+> > > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on
+> > > > the
+> > > > 11 Oct when I did another pull from linus all of a sudden
+> > > > dma_alloc_coherent is failing to allocate the framebuffer any
+> > > > longer.
+> > > > 
+> > > > I did a quick look back and found this:
+> > > > 
+> > > > ARM: add coherent dma ops
+> > > > 
+> > > > arch_is_coherent is problematic as it is a global symbol. This
+> > > > doesn't work for multi-platform kernels or platforms which can
+> > > > support
+> > > > per device coherent DMA.
+> > > > 
+> > > > This adds arm_coherent_dma_ops to be used for devices which
+> > > > connected
+> > > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The
+> > > > arm_dma_ops
+> > > > are modified at boot when arch_is_coherent is true.
+> > > > 
+> > > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > > 
+> > > > 
+> > > > This is the only patch lately that I could find (not that I would
+> > > > claim
+> > > > to be any good at finding things) that is related to the problem.
+> > > > Could
+> > > > it have caused the allocations to fail?
+> > > > 
+> > > > Regards
+> > > > Tony P
+> > > 
+> > > Have done a bit more digging and found the cause - not Rob's patch so
+> > > apologies.
+> > > 
+> > > The cause of the regression is this patch:
+> > > 
+> > > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+> > > From: Mel Gorman <mgorman@suse.de>
+> > > Date: Mon, 8 Oct 2012 16:32:36 -0700
+> > > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+> > > 
+> > >  possible
+> > > 
+> > > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
+> > > was fine. From this patch onwards, allocations fail.
+> > > 
+> > > I don't know how this patch would effect CMA allocations, but it seems
+> > > to be causing the issue (or at least, it's caused an error in
+> > > arch-vt8500 to become visible).
+> > > 
+> > > Perhaps someone who understand -mm could explain the best way to
+> > > troubleshoot the cause of this problem?
+> > > 
+> > > 
+> > > Regards
+> > > Tony P
+> > > 
+> > > 
+> > > _______________________________________________
+> > > linux-arm-kernel mailing list
+> > > linux-arm-kernel at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > Have done a bit more testing..
+> > 
+> > Disabling Memory Compaction makes no difference.
+> > Disabling CMA fixes/hides the problem. ?!?!?!
 > 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index 92623ac..2b43656 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -364,43 +364,33 @@ static void __devinit __iomem *pmecc_get_alpha_to(struct atmel_nand_host *host)
->  			table_size * sizeof(int16_t);
->  }
->  
-> -static void pmecc_data_free(struct atmel_nand_host *host)
-> -{
-> -	kfree(host->pmecc_partial_syn);
-> -	kfree(host->pmecc_si);
-> -	kfree(host->pmecc_lmu);
-> -	kfree(host->pmecc_smu);
-> -	kfree(host->pmecc_mu);
-> -	kfree(host->pmecc_dmu);
-> -	kfree(host->pmecc_delta);
-> -}
-> -
->  static int __devinit pmecc_data_alloc(struct atmel_nand_host *host)
->  {
->  	const int cap = host->pmecc_corr_cap;
-> +	int size;
-> +
-> +	size = (2 * cap + 1) * sizeof(int16_t);
-> +	host->pmecc_partial_syn = devm_kzalloc(host->dev, size, GFP_KERNEL);
-> +	host->pmecc_si = devm_kzalloc(host->dev, size, GFP_KERNEL);
-> +	host->pmecc_lmu = devm_kzalloc(host->dev,
-> +			(cap + 1) * sizeof(int16_t), GFP_KERNEL);
-> +	host->pmecc_smu = devm_kzalloc(host->dev,
-> +			(cap + 2) * (2 * cap + 1) * sizeof(int16_t), GFP_KERNEL);
-> +	size = (cap + 1) * sizeof(int);
-> +	host->pmecc_mu = devm_kzalloc(host->dev, size, GFP_KERNEL);
-> +	host->pmecc_dmu = devm_kzalloc(host->dev, size, GFP_KERNEL);
-> +	host->pmecc_delta = devm_kzalloc(host->dev, size, GFP_KERNEL);
-> +
-> +	if (!host->pmecc_partial_syn ||
-> +		!host->pmecc_si ||
-> +		!host->pmecc_lmu ||
-> +		!host->pmecc_smu ||
-> +		!host->pmecc_mu ||
-> +		!host->pmecc_dmu ||
-> +		!host->pmecc_delta)
-> +		return -ENOMEM;
->  
-> -	host->pmecc_partial_syn = kzalloc((2 * cap + 1) * sizeof(int16_t),
-> -					GFP_KERNEL);
-> -	host->pmecc_si = kzalloc((2 * cap + 1) * sizeof(int16_t), GFP_KERNEL);
-> -	host->pmecc_lmu = kzalloc((cap + 1) * sizeof(int16_t), GFP_KERNEL);
-> -	host->pmecc_smu = kzalloc((cap + 2) * (2 * cap + 1) * sizeof(int16_t),
-> -					GFP_KERNEL);
-> -	host->pmecc_mu = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
-> -	host->pmecc_dmu = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
-> -	host->pmecc_delta = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
-> -
-> -	if (host->pmecc_partial_syn &&
-> -			host->pmecc_si &&
-> -			host->pmecc_lmu &&
-> -			host->pmecc_smu &&
-> -			host->pmecc_mu &&
-> -			host->pmecc_dmu &&
-> -			host->pmecc_delta)
-> -		return 0;
-> -
-> -	/* error happened */
-> -	pmecc_data_free(host);
-> -	return -ENOMEM;
-> +	return 0;
->  }
->  
->  static void pmecc_gen_syndrome(struct mtd_info *mtd, int sector)
-> @@ -923,27 +913,25 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
->  		return 0;
->  	}
->  
-> -	host->ecc = ioremap(regs->start, resource_size(regs));
-> +	host->ecc = devm_request_and_ioremap(&pdev->dev, regs);
->  	if (host->ecc == NULL) {
->  		dev_err(host->dev, "ioremap failed\n");
->  		err_no = -EIO;
-> -		goto err_pmecc_ioremap;
-> +		goto err;
->  	}
->  
->  	regs_pmerr = platform_get_resource(pdev, IORESOURCE_MEM, 2);
->  	regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
->  	if (regs_pmerr && regs_rom) {
-> -		host->pmerrloc_base = ioremap(regs_pmerr->start,
-> -			resource_size(regs_pmerr));
-> -		host->pmecc_rom_base = ioremap(regs_rom->start,
-> -			resource_size(regs_rom));
-> +		host->pmerrloc_base = devm_request_and_ioremap(&pdev->dev, regs_pmerr);
-> +		host->pmecc_rom_base = devm_request_and_ioremap(&pdev->dev, regs_rom);
->  	}
->  
->  	if (!host->pmerrloc_base || !host->pmecc_rom_base) {
->  		dev_err(host->dev,
->  			"Can not get I/O resource for PMECC ERRLOC controller or ROM!\n");
->  		err_no = -EIO;
-> -		goto err_pmloc_ioremap;
-> +		goto err;
->  	}
->  
->  	/* ECC is calculated for the whole page (1 step) */
-> @@ -968,7 +956,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
->  		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
->  			dev_err(host->dev, "No room for ECC bytes\n");
->  			err_no = -EINVAL;
-> -			goto err_no_ecc_room;
-> +			goto err;
->  		}
->  		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
->  					mtd->oobsize,
-> @@ -993,7 +981,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
->  	if (err_no) {
->  		dev_err(host->dev,
->  				"Cannot allocate memory for PMECC computation!\n");
-> -		goto err_pmecc_data_alloc;
-> +		goto err;
->  	}
->  
->  	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
-> @@ -1003,15 +991,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
->  
->  	return 0;
->  
-> -err_pmecc_data_alloc:
-> -err_no_ecc_room:
-> -err_pmloc_ioremap:
-> -	iounmap(host->ecc);
-> -	if (host->pmerrloc_base)
-> -		iounmap(host->pmerrloc_base);
-> -	if (host->pmecc_rom_base)
-> -		iounmap(host->pmecc_rom_base);
-> -err_pmecc_ioremap:
-> +err:
->  	return err_no;
->  }
->  
-> @@ -1315,7 +1295,7 @@ static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
->  		return 0;
->  	}
->  
-> -	host->ecc = ioremap(regs->start, resource_size(regs));
-> +	host->ecc = devm_request_and_ioremap(&pdev->dev, regs);
->  	if (host->ecc == NULL) {
->  		dev_err(host->dev, "ioremap failed\n");
->  		return -EIO;
-> @@ -1380,20 +1360,19 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Allocate memory for the device structure (and zero it) */
-> -	host = kzalloc(sizeof(struct atmel_nand_host), GFP_KERNEL);
-> +	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
->  	if (!host) {
->  		printk(KERN_ERR "atmel_nand: failed to allocate device structure.\n");
->  		return -ENOMEM;
->  	}
->  
-> -	host->io_phys = (dma_addr_t)mem->start;
-> -
-> -	host->io_base = ioremap(mem->start, resource_size(mem));
-> +	host->io_base = devm_request_and_ioremap(&pdev->dev, mem);
->  	if (host->io_base == NULL) {
->  		printk(KERN_ERR "atmel_nand: ioremap failed\n");
->  		res = -EIO;
->  		goto err_nand_ioremap;
->  	}
-> +	host->io_phys = (dma_addr_t)mem->start;
->  
->  	mtd = &host->mtd;
->  	nand_chip = &host->nand_chip;
-> @@ -1401,7 +1380,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->  	if (pdev->dev.of_node) {
->  		res = atmel_of_init_port(host, pdev->dev.of_node);
->  		if (res)
-> -			goto err_ecc_ioremap;
-> +			goto err_nand_ioremap;
->  	} else {
->  		memcpy(&host->board, pdev->dev.platform_data,
->  		       sizeof(struct atmel_nand_data));
-> @@ -1420,44 +1399,42 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->  	if (IS_ERR(pinctrl)) {
->  		dev_err(host->dev, "Failed to request pinctrl\n");
->  		res = PTR_ERR(pinctrl);
-> -		goto err_ecc_ioremap;
-> +		goto err_nand_ioremap;
->  	}
->  
->  	if (gpio_is_valid(host->board.rdy_pin)) {
-> -		res = gpio_request(host->board.rdy_pin, "nand_rdy");
-> +		res = devm_gpio_request(&pdev->dev,
-> +				host->board.rdy_pin, "nand_rdy");
->  		if (res < 0) {
->  			dev_err(&pdev->dev,
-> -				"can't request rdy gpio %d\n",
-> -				host->board.rdy_pin);
-> -			goto err_ecc_ioremap;
-> +				"can't request rdy gpio %d\n", host->board.rdy_pin);
-> +			goto err_nand_ioremap;
->  		}
->  
->  		res = gpio_direction_input(host->board.rdy_pin);
->  		if (res < 0) {
->  			dev_err(&pdev->dev,
-> -				"can't request input direction rdy gpio %d\n",
-> -				host->board.rdy_pin);
-> -			goto err_ecc_ioremap;
-> +				"can't request input direction rdy gpio %d\n", host->board.rdy_pin);
+> Could you post your kernel log when it isn't working?
+> 
+> Do you have the default CMA reserved pool in Kconfig set big enough to 
+> serve this allocation?
+> 
+> I'm not sure what kind of allocation this framebuffer driver does, but if 
+> it needs to allocate memory from atomic context then possibly this patch 
+> series has something to do with it: 
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/182697/focus=182699
+> 
+> CC'ing Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> Best regards,
+> Tomasz Figa
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Why do you modify the log message presentation: it was okay before?
-Moreover, it is not related to the topic of the patch...
+I set CMA to 16MB (and also tried 32MB) in Kconfig, but it made no
+difference. The framebuffer is only trying to allocate ~1.5MB via
+dma_alloc_coherent().
 
+I haven't captured a kernel log, but will do.
 
-> +			goto err_nand_ioremap;
->  		}
->  
->  		nand_chip->dev_ready = atmel_nand_device_ready;
->  	}
->  
->  	if (gpio_is_valid(host->board.enable_pin)) {
-> -		res = gpio_request(host->board.enable_pin, "nand_enable");
-> +		res = devm_gpio_request(&pdev->dev,
-> +				host->board.enable_pin, "nand_enable");
->  		if (res < 0) {
->  			dev_err(&pdev->dev,
-> -				"can't request enable gpio %d\n",
-> -				host->board.enable_pin);
-> -			goto err_ecc_ioremap;
-> +				"can't request enable gpio %d\n", host->board.enable_pin);
+Thanks for the feedback.
 
-Ditto.
-
-> +			goto err_nand_ioremap;
->  		}
->  
->  		res = gpio_direction_output(host->board.enable_pin, 1);
->  		if (res < 0) {
->  			dev_err(&pdev->dev,
-> -				"can't request output direction enable gpio %d\n",
-> -				host->board.enable_pin);
-> -			goto err_ecc_ioremap;
-> +				"can't request output direction enable gpio %d\n", host->board.enable_pin);
-
-Ditto.
-
-> +			goto err_nand_ioremap;
->  		}
->  	}
->  
-> @@ -1474,19 +1451,18 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->  	atmel_nand_enable(host);
->  
->  	if (gpio_is_valid(host->board.det_pin)) {
-> -		res = gpio_request(host->board.det_pin, "nand_det");
-> +		res = devm_gpio_request(&pdev->dev,
-> +				host->board.det_pin, "nand_det");
->  		if (res < 0) {
->  			dev_err(&pdev->dev,
-> -				"can't request det gpio %d\n",
-> -				host->board.det_pin);
-> +				"can't request det gpio %d\n", host->board.det_pin);
-
-Ditto.
-
->  			goto err_no_card;
->  		}
->  
->  		res = gpio_direction_input(host->board.det_pin);
->  		if (res < 0) {
->  			dev_err(&pdev->dev,
-> -				"can't request input direction det gpio %d\n",
-> -				host->board.det_pin);
-> +				"can't request input direction det gpio %d\n", host->board.det_pin);
-
-Ditto.
-
->  			goto err_no_card;
->  		}
->  
-> @@ -1552,16 +1528,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
->  		return res;
->  
->  err_scan_tail:
-> -	if (host->has_pmecc && host->nand_chip.ecc.mode == NAND_ECC_HW) {
-> +	if (host->has_pmecc && host->nand_chip.ecc.mode == NAND_ECC_HW)
->  		pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
-> -		pmecc_data_free(host);
-> -	}
-> -	if (host->ecc)
-> -		iounmap(host->ecc);
-> -	if (host->pmerrloc_base)
-> -		iounmap(host->pmerrloc_base);
-> -	if (host->pmecc_rom_base)
-> -		iounmap(host->pmecc_rom_base);
->  err_hw_ecc:
->  err_scan_ident:
->  err_no_card:
-> @@ -1569,10 +1537,7 @@ err_no_card:
->  	platform_set_drvdata(pdev, NULL);
->  	if (host->dma_chan)
->  		dma_release_channel(host->dma_chan);
-> -err_ecc_ioremap:
-> -	iounmap(host->io_base);
->  err_nand_ioremap:
-> -	kfree(host);
->  	return res;
->  }
->  
-> @@ -1592,31 +1557,11 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
->  		pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
->  		pmerrloc_writel(host->pmerrloc_base, ELDIS,
->  				PMERRLOC_DISABLE);
-> -		pmecc_data_free(host);
->  	}
->  
-> -	if (gpio_is_valid(host->board.det_pin))
-> -		gpio_free(host->board.det_pin);
-> -
-> -	if (gpio_is_valid(host->board.enable_pin))
-> -		gpio_free(host->board.enable_pin);
-> -
-> -	if (gpio_is_valid(host->board.rdy_pin))
-> -		gpio_free(host->board.rdy_pin);
-> -
-> -	if (host->ecc)
-> -		iounmap(host->ecc);
-> -	if (host->pmecc_rom_base)
-> -		iounmap(host->pmecc_rom_base);
-> -	if (host->pmerrloc_base)
-> -		iounmap(host->pmerrloc_base);
-> -
->  	if (host->dma_chan)
->  		dma_release_channel(host->dma_chan);
->  
-> -	iounmap(host->io_base);
-> -	kfree(host);
-> -
->  	return 0;
->  }
-
-Otherwise, looks good.
-
-Bye,
--- 
-Nicolas Ferre
+Regards
+Tony P
