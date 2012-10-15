@@ -1,92 +1,51 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Mon, 15 Oct 2012 08:42:14 +0200
-Subject: [PATCH v2] i2c: change the id to let the i2c-gpio work
-In-Reply-To: <507B7066.4060802@atmel.com>
-References: <1350034971-1050-1-git-send-email-voice.shen@atmel.com>
- <CAGhQ9VxRGQ8JAygxJreNDJY=tJ67yt2CM9NHvW3VyhjxooXuig@mail.gmail.com>
- <507B7066.4060802@atmel.com>
-Message-ID: <507BB046.8010702@atmel.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Mon, 15 Oct 2012 08:49:20 +0200
+Subject: [PATCH] i2c: i2c-gpio: fix issue when DT node greater than 1
+In-Reply-To: <507B7C07.3070702@atmel.com>
+References: <1347958949-5598-1-git-send-email-voice.shen@atmel.com>
+ <50588A8F.30203@wwwdotorg.org> <50591C9C.2080809@atmel.com>
+ <5059E484.6090708@wwwdotorg.org>
+ <20120919175433.3841a954@endymion.delvare>
+ <5074E349.30605@atmel.com> <507B7C07.3070702@atmel.com>
+Message-ID: <20121015084920.75d4aa53@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/15/2012 04:09 AM, Bo Shen a ?crit :
-> Hi Joachim Eastwood,
->
-> On 10/13/2012 1:42, Joachim Eastwood wrote:
->> Hi Bo Shen,
->>
->> On Fri, Oct 12, 2012 at 11:42 AM, Bo Shen <voice.shen@atmel.com> wrote:
->>> The i2c-gpio driver will turn the platform device ID to busnum.
->>> When using platfrom device ID as -1, it means dynamically assigned
->>> the busnum. When writing code, we need to make sure the busnum,
->>> and call i2c_register_board_info(int busnum, ...) to register device
->>> if using -1, we do not know the value of busnum.
->>>
->>> In order to solve this issue, set the platform device ID as a fix number
->>> Here using 0 to match the busnum used in i2c_regsiter_board_info().
->>
->> I have been bitten by this myself on RM9200.
->>
->>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>> ---
->>> Change since v1
->>>    Make the commit message more clear
->>> ---
->>>   arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
->>
->> This pattern exist in at91rm9200_devices.c, at91sam9261_devices.c,
->> at91sam9263_devices.c and at91sam9rl_devices.c you might want to fix
->> them as well.
->
-> Thanks for your information.
-> After I test these boards, I will send patches to fix them, while not in
-> this patch.
->
->>
->> I assume we have the same problem if CONFIG_I2C_AT91 is set?
->> See further down in at91sam9260_devices.c we have another:  ".id = -1,"
->
-> Maybe Nikolaus Voss will deal with this case.
->
+On Mon, 15 Oct 2012 10:59:19 +0800, Bo Shen wrote:
+> On 10/10/2012 10:54, Bo Shen wrote:
+> > On 9/19/2012 23:54, Jean Delvare wrote:
+> >> On Wed, 19 Sep 2012 09:28:04 -0600, Stephen Warren wrote:
+> >>> The problematic code appears to be:
+> >>>
+> >>> snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
+> >>>
+> >>> Instead, I think that should be something more like:
+> >>>
+> >>> adap->name = dev_name(&pdev->dev);
+> >>
+> >> strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name))
+>  >> if anything, as adap->name is a buffer, not a pointer.
+> >
+> > I am sorry for late. I have tested with DT, it works.
+> >
+> > Please send this patch to fix the issue.
+> > Thanks.
+> 
+> Ping?
+> 
+> Will you send this patch?
 
-Yes the problem is the same, I have encountered it and solved it in the 
-same way but I was thinking there was a better way to correct it than 
-removing dynamic id assignment.
-Since setting the id to a fix value is acceptable this change can be 
-done also when using i2c-at91.
+Which patch, please? On September 18th, you sent a first version.
+Stephen Warren asked you for a change, but you never sent version two
+of the patch including the requested change. So don't be surprised if
+your patch never got applied.
 
->>
->> regards
->> Joachim Eastwood
->>
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c
->>> b/arch/arm/mach-at91/at91sam9260_devices.c
->>> index 0f24cfb..805ef95 100644
->>> --- a/arch/arm/mach-at91/at91sam9260_devices.c
->>> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
->>> @@ -389,7 +389,7 @@ static struct i2c_gpio_platform_data pdata = {
->>>
->>>   static struct platform_device at91sam9260_twi_device = {
->>>          .name                   = "i2c-gpio",
->>> -       .id                     = -1,
->>> +       .id                     = 0,
->>>          .dev.platform_data      = &pdata,
->>>   };
->>>
->>> --
->>> 1.7.9.5
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
+> Or, I send this patch and add your S.O.B, which do you prefer?
+
+I prefer that you send patch v2 and let the interested parties review
+and apply it. Do not add S-o-B for anyone else, ever.
+
+Note that i2c-gpio is normally handled by Wolfram Sang, not me.
+
+-- 
+Jean Delvare
