@@ -1,133 +1,55 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 15 Oct 2012 12:49:02 -0000
-Subject: [RFC] Get early_printk() to work on socfpga board
-In-Reply-To: <1342637233-13965-1-git-send-email-dinguyen@altera.com>
-References: <1342637233-13965-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20121015124852.GA26559@elf.ucw.cz>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 15 Oct 2012 14:05:18 -0000
+Subject: [RFC 1/2] common: DMA-mapping: add DMA_ATTR_FORCE_CONTIGUOUS attribute
+In-Reply-To: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1350309832-18461-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ioremap, so that early_printk() works. Add common 8250.S so that
-code is not duplicated with picoxcell.
-    
-Signed-off-by: Pavel Machek <pavel@denx.de>
+This patch adds DMA_ATTR_FORCE_CONTIGUOUS attribute to the DMA-mapping
+subsystem.
 
-diff --git a/arch/arm/include/debug/8250.S b/arch/arm/include/debug/8250.S
-new file mode 100644
-index 0000000..8db01ee
---- /dev/null
-+++ b/arch/arm/include/debug/8250.S
-@@ -0,0 +1,27 @@
-+/*
-+ * Copyright (c) 2011 Picochip Ltd., Jamie Iles
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * Derived from arch/arm/mach-davinci/include/mach/debug-macro.S to use 32-bit
-+ * accesses to the 8250.
-+ */
+By default DMA-mapping subsystem is allowed to assemble the buffer
+allocated by dma_alloc_attrs() function from individual pages if it can
+be mapped as contiguous chunk into device dma address space. By
+specifing this attribute the allocated buffer is forced to be contiguous
+also in physical memory.
+
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ Documentation/DMA-attributes.txt |    9 +++++++++
+ include/linux/dma-attrs.h        |    1 +
+ 2 files changed, 10 insertions(+)
+
+diff --git a/Documentation/DMA-attributes.txt b/Documentation/DMA-attributes.txt
+index f503090..e59480d 100644
+--- a/Documentation/DMA-attributes.txt
++++ b/Documentation/DMA-attributes.txt
+@@ -91,3 +91,12 @@ transferred to 'device' domain. This attribute can be also used for
+ dma_unmap_{single,page,sg} functions family to force buffer to stay in
+ device domain after releasing a mapping for it. Use this attribute with
+ care!
 +
-+#include <linux/serial_reg.h>
++DMA_ATTR_FORCE_CONTIGUOUS
++-------------------------
 +
-+		.macro	senduart,rd,rx
-+		str	\rd, [\rx, #UART_TX << UART_SHIFT]
-+		.endm
-+
-+		.macro	busyuart,rd,rx
-+1002:		ldr	\rd, [\rx, #UART_LSR << UART_SHIFT]
-+		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
-+		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
-+		bne	1002b
-+		.endm
-+
-+		/* The UART's don't have any flow control IO's wired up. */
-+		.macro	waituart,rd,rx
-+		.endm
-diff --git a/arch/arm/include/debug/picoxcell.S b/arch/arm/include/debug/picoxcell.S
-index 7419deb..86d05e9 100644
---- a/arch/arm/include/debug/picoxcell.S
-+++ b/arch/arm/include/debug/picoxcell.S
-@@ -5,10 +5,7 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-  *
-- * Derived from arch/arm/mach-davinci/include/mach/debug-macro.S to use 32-bit
-- * accesses to the 8250.
-  */
--#include <linux/serial_reg.h>
- 
- #define UART_SHIFT 2
- #define PICOXCELL_UART1_BASE		0x80230000
-@@ -19,17 +16,4 @@
- 		ldr	\rp, =PICOXCELL_UART1_BASE
- 		.endm
- 
--		.macro	senduart,rd,rx
--		str	\rd, [\rx, #UART_TX << UART_SHIFT]
--		.endm
--
--		.macro	busyuart,rd,rx
--1002:		ldr	\rd, [\rx, #UART_LSR << UART_SHIFT]
--		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
--		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
--		bne	1002b
--		.endm
--
--		/* The UART's don't have any flow control IO's wired up. */
--		.macro	waituart,rd,rx
--		.endm
-+#include "8250.S"
-diff --git a/arch/arm/include/debug/socfpga.S b/arch/arm/include/debug/socfpga.S
-index d6f26d2..2e1dec8 100644
---- a/arch/arm/include/debug/socfpga.S
-+++ b/arch/arm/include/debug/socfpga.S
-@@ -7,6 +7,9 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#define UART_SHIFT 2
-+#define DEBUG_LL_UART_OFFSET	0x00002000
-+
- 		.macro	addruart, rp, rv, tmp
- 		mov	\rp, #DEBUG_LL_UART_OFFSET
- 		orr	\rp, \rp, #0x00c00000
-@@ -14,3 +17,5 @@
- 		orr	\rp, \rp, #0xff000000	@ physical base
- 		.endm
- 
-+#include "8250.S"
-+
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 17d0ec9..962e01e 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -36,6 +36,13 @@ static struct map_desc scu_io_desc __initdata = {
- 	.type		= MT_DEVICE,
++By default DMA-mapping subsystem is allowed to assemble the buffer
++allocated by dma_alloc_attrs() function from individual pages if it can
++be mapped as contiguous chunk into device dma address space. By
++specifing this attribute the allocated buffer is forced to be contiguous
++also in physical memory.
+diff --git a/include/linux/dma-attrs.h b/include/linux/dma-attrs.h
+index f83f793..c8e1831 100644
+--- a/include/linux/dma-attrs.h
++++ b/include/linux/dma-attrs.h
+@@ -17,6 +17,7 @@ enum dma_attr {
+ 	DMA_ATTR_NON_CONSISTENT,
+ 	DMA_ATTR_NO_KERNEL_MAPPING,
+ 	DMA_ATTR_SKIP_CPU_SYNC,
++	DMA_ATTR_FORCE_CONTIGUOUS,
+ 	DMA_ATTR_MAX,
  };
  
-+static struct map_desc uart_io_desc __initdata = {
-+	.virtual	= 0xfec02000,
-+	.pfn		= __phys_to_pfn(0xffc02000),
-+	.length		= SZ_8K,
-+	.type		= MT_DEVICE,
-+};
-+
- static void __init socfpga_map_io(void)
- {
- 	unsigned long base;
-@@ -45,6 +52,8 @@ static void __init socfpga_map_io(void)
- 
- 	scu_io_desc.pfn = __phys_to_pfn(base);
- 	iotable_init(&scu_io_desc, 1);
-+	iotable_init(&uart_io_desc, 1);
-+	early_printk("Early printk initialized\n");
- }
- 
- const static struct of_device_id irq_match[] = {
-
-
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.7.9.5
