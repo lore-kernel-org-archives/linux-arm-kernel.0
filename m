@@ -1,141 +1,137 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 15 Oct 2012 14:51:34 -0700
-Subject: [PATCH 10/10] ARM: FIQ: Get rid of init_FIQ()
-In-Reply-To: <20121015214954.GA3352@lizard>
-References: <20121015214954.GA3352@lizard>
-Message-ID: <1350337894-9744-10-git-send-email-anton.vorontsov@linaro.org>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 16 Oct 2012 09:05:00 +1100
+Subject: [PATCH RFC 1/6 v3] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <507C45EF.7080203@antcom.de>
+References: <1350069085-13283-1-git-send-email-stigge@antcom.de>
+ <1350069085-13283-2-git-send-email-stigge@antcom.de>
+ <507B9D05.1000204@gmail.com> <507C45EF.7080203@antcom.de>
+Message-ID: <507C888C.7040903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function only saves initial arch-specific "no FIQ" instruction, by
-placing the code into set_fiq_handler() we can:
+On 16/10/12 04:20, Roland Stigge wrote:
+> Hi Ryan,
+> 
+> thank you for your feedback, I will include it, except for some points
+> noted below:
 
-- Have less code and logic in the platform-specific files;
-- Have the code that manages FIQ vector overwriting in one place, i.e.
-  don't spread the logic around.
+>>> +		gbc->mask |= BIT(bit);
+>>> +
+>>> +		/* collect gpios that are specified together, represented by
+>>> +		 * neighboring bits
+>>> +		 */
+>>> +		remap = &gbc->remap[gbc->nremap - 1];
+>>
+>> This looks broken. If gbc was re-alloced above (index < 0) then
+>> gbc->remap == NULL and this will oops?
+> 
+> No, because I took care that even though index can be < 0, the resulting
+> pointer is never dereferenced for -1.
 
-p.s. Also, I noticed that we saved no_fiq_insn w/o bothering about
-!CONFIG_CPU_USE_DOMAINS case, but set_fiq_handler() handles this case
-specifically. I wonder, was that on purpose, e.g. it does not matter for
-init_FIQ(), or it was just overlooked? In the latter case, the patch fixes
-the issue.
+Ah, I see. I think its a bit non-obvious and flaky though, since it
+looks like you are both dereferencing a potentially NULL pointer, and
+indexing an array with -1.
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/include/asm/mach/irq.h |  2 --
- arch/arm/kernel/fiq.c           | 17 ++++++++---------
- arch/arm/mach-rpc/irq.c         |  2 --
- arch/arm/plat-mxc/avic.c        |  3 ---
- arch/arm/plat-mxc/tzic.c        |  3 ---
- arch/arm/plat-s3c24xx/irq.c     |  2 --
- 6 files changed, 8 insertions(+), 21 deletions(-)
+Even changing it to this I think makes it a bit more clear:
 
-diff --git a/arch/arm/include/asm/mach/irq.h b/arch/arm/include/asm/mach/irq.h
-index 8be5ba9..6e70ae3 100644
---- a/arch/arm/include/asm/mach/irq.h
-+++ b/arch/arm/include/asm/mach/irq.h
-@@ -18,10 +18,8 @@ struct seq_file;
-  * This is internal.  Do not use it.
-  */
- #ifdef CONFIG_FIQ
--extern void init_FIQ(void);
- extern void show_fiq_list(struct seq_file *, int);
- #else
--static inline void init_FIQ(void) {}
- static inline void show_fiq_list(struct seq_file *p, int prec) {}
- #endif
- 
-diff --git a/arch/arm/kernel/fiq.c b/arch/arm/kernel/fiq.c
-index 9bf3a60..3602df6 100644
---- a/arch/arm/kernel/fiq.c
-+++ b/arch/arm/kernel/fiq.c
-@@ -49,6 +49,7 @@
- #include <asm/mach/irq.h>
- 
- static unsigned long no_fiq_insn;
-+static int got_no_fiq_insn;
- 
- /* Default reacquire function
-  * - we always relinquish FIQ control
-@@ -78,11 +79,14 @@ void show_fiq_list(struct seq_file *p, int prec)
- 
- void set_fiq_handler(void *start, unsigned int length)
- {
--#if defined(CONFIG_CPU_USE_DOMAINS)
--	memcpy((void *)0xffff001c, start, length);
--#else
--	memcpy(vectors_page + 0x1c, start, length);
-+	unsigned long *addr = (void *)0xffff001c;
-+
-+#ifndef CONFIG_CPU_USE_DOMAINS
-+	addr = vectors_page + 0x1c;
- #endif
-+	if (!cmpxchg(&got_no_fiq_insn, 0, 1))
-+		no_fiq_insn = *addr;
-+	memcpy(addr, start, length);
- 	flush_icache_range(0xffff001c, 0xffff001c + length);
- 	if (!vectors_high())
- 		flush_icache_range(0x1c, 0x1c + length);
-@@ -126,8 +130,3 @@ EXPORT_SYMBOL(__set_fiq_regs);	/* defined in fiqasm.S */
- EXPORT_SYMBOL(__get_fiq_regs);	/* defined in fiqasm.S */
- EXPORT_SYMBOL(claim_fiq);
- EXPORT_SYMBOL(release_fiq);
--
--void __init init_FIQ(void)
--{
--	no_fiq_insn = *(unsigned long *)0xffff001c;
--}
-diff --git a/arch/arm/mach-rpc/irq.c b/arch/arm/mach-rpc/irq.c
-index 07770c8..2d915ba 100644
---- a/arch/arm/mach-rpc/irq.c
-+++ b/arch/arm/mach-rpc/irq.c
-@@ -151,7 +151,5 @@ void __init rpc_init_irq(void)
- 			break;
- 		}
- 	}
--
--	init_FIQ();
- }
- 
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 426980c..b173dc6 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -216,8 +216,5 @@ void __init mxc_init_irq(void __iomem *irqbase)
- 	for (i = 0; i < 8; i++)
- 		__raw_writel(0, avic_base + AVIC_NIPRIORITY(i));
- 
--	/* Initialize FIQ */
--	init_FIQ();
--
- 	printk(KERN_INFO "MXC IRQ initialized\n");
- }
-diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
-index 8a5a633..889267c 100644
---- a/arch/arm/plat-mxc/tzic.c
-+++ b/arch/arm/plat-mxc/tzic.c
-@@ -191,9 +191,6 @@ void __init tzic_init_irq(void __iomem *irqbase)
- 	for (i = 0; i < 4; i++, irq_base += 32)
- 		tzic_init_gc(i, irq_base);
- 
--	/* Initialize FIQ */
--	init_FIQ();
--
- 	pr_info("TrustZone Interrupt Controller (TZIC) initialized\n");
- }
- 
-diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
-index 531d6a4..66b8856 100644
---- a/arch/arm/plat-s3c24xx/irq.c
-+++ b/arch/arm/plat-s3c24xx/irq.c
-@@ -532,8 +532,6 @@ void __init s3c24xx_init_irq(void)
- 	int irqno;
- 	int i;
- 
--	init_FIQ();
--
- 	irqdbf("s3c2410_init_irq: clearing interrupt status flags\n");
- 
- 	/* first, clear all interrupts pending... */
--- 
-1.7.12.3
+	if (gbc->remap == 0 ||
+            bit - i != gbc->remap[gbc->nremap - 1].offset)
+		gbc->nremap++;
+		gbc->remap = krealloc(...);
+		...
+
+If you want to keep your way, at the very least I think it deserves a
+comment, since it is easy to misread.
+
+>> The remap functionality isn't very well explained
+> 
+> Documenting now in gpio.h like this:
+> 
+> /*
+>  * struct gpio_remap - a structure for describing a bit mapping
+>  * @mask:       a bit mask
+>  * @offset:     how many bits to shift to the left (negative: to the
+>  *              right)
+>  *
+>  * When we are mapping bit values from one word to another (here: from
+>  * GPIO block domain to GPIO driver domain), we first mask them out
+>  * with mask and shift them as specified with offset. More complicated
+>  * mappings are done by grouping several of those structs and adding
+>  * the results together.
+>  */
+> struct gpio_remap {
+>         int     mask;
+>         int     offset;
+> };
+
+Looks good. Thanks.
+
+> If you find an issue, please let me know. Works fine for me. Have you
+> tried? :-)
+
+No, I was just looking at the code, and misread it.
+
+>>> +unsigned gpio_block_get(const struct gpio_block *block)
+>>> +{
+>>> +	struct gpio_block_chip *gbc;
+>>> +	int i, j;
+>>> +	unsigned values = 0;
+>>> +
+>>> +	for (i = 0; i < block->nchip; i++) {
+>>> +		unsigned remapped = 0;
+>>> +
+>>> +		gbc = &block->gbc[i];
+>>> +
+>>> +		if (gbc->gc->get_block) {
+>>> +			remapped = gbc->gc->get_block(gbc->gc, gbc->mask);
+>>> +		} else { /* emulate */
+>>> +			unsigned bit = 1;
+>>> +
+>>> +			for (j = 0; j < sizeof(unsigned) * 8; j++, bit <<= 1) {
+>>> +				if (gbc->mask & bit)
+>>
+>> A proper bitmask might be more ideal for this. It would remove the
+>> sizeof(unsigned) restriction and allow you to use for_each_set_bit for
+>> these loops.
+> 
+> In a previous version of these patches, I actually had a generic bit
+> mask which was in turn awkward to handle, especially for the bit
+> remapping. Stijn brought me to the idea that for pragmatic reasons, 32
+> bit access is fully sufficient in most cases.
+> 
+> I also needed userland access (via sysfs), so there was no way of
+> accessing a block except via an int.
+> 
+> When there are GPIO drivers where we seriously need (and can handle
+> simultaneously) more than 32 bits, we can still extend the API. For now,
+> the cases where it is used is typically creating 8/16/32 bit busses with
+> GPIO lines, and on 64bit architectures even 64bit busses.
+> 
+> For this, the current API is working fine, even enabling userland access
+> via sysfs.
+
+Fair enough. I didn't see the first round of patches. You probably can
+still use for_each_set_bit though (maybe convert the mask to unsigned
+long first to match the bitops API):
+
+	for_each_set_bit(j, &gbc->mask, BITS_PER_LONG)
+		...
+
+>>> +			unsigned bit = 1;
+>>> +
+>>> +			for (j = 0; j < sizeof(unsigned) * 8; j++, bit <<= 1) {
+>>> +				if (gbc->mask & bit)
+>>> +					gbc->gc->set(gbc->gc, gbc->gc->base + j,
+>>> +						     (remapped >> j) & 1);
+>>> +			}
+>>
+>> This doesn't clear pins which are set to zero?
+> 
+> It does. gbc->mask only masks which bits to set and clear. remapped
+> contains the actual bit values to set. 0 or 1.
+
+Ugh, for some reason I was thinking that the gpio set function only
+drove bits that were set in the mask (and had an analogous clear
+function). Ignore me :-).
+
+~Ryan
