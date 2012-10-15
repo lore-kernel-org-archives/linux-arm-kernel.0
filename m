@@ -1,76 +1,73 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 16 Oct 2012 10:08:43 +1100
-Subject: new branch for linux-next [Was: [PATCH v6 0/3] Updated
- Cortex-M3 series]
-In-Reply-To: <20121008154325.GF18531@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20121008154325.GF18531@pengutronix.de>
-Message-ID: <20121016100843.c2eba67863ec7b593a489abb@canb.auug.org.au>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 16 Oct 2012 01:31:16 +0200
+Subject: [PATCH RFC 00/11 v4] gpio: Add block GPIO
+Message-ID: <1350343887-7344-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+This set of patches adds:
 
-On Mon, 8 Oct 2012 17:43:25 +0200 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
->
-> I already tried several times to get feedback from Russell King (as you
-> probably know he's the ARM maintainer and busy most of the time) for my
-> series to support Cortex-M3 machines. As I think the outcome will
-> probably (at least) be that it should be included in next for some time
-> first (as for example Arnd Bergmann already suggested), can you please
-> add
-> 
-> 	git://git.pengutronix.de/git/ukl/linux-2.6.git for-next
-> 
-> to your tree? I'd suggest adding it after arm and arm-soc.
-> I intend to use this branch later for efm32 support (which depends on
-> the Cortex-M3 stuff).
-> 
-> Currently the branch is still empty, but I intend to fill it with what I
-> consider to be applyable after I did some more testing. (Mainly to
-> assert it still does what it did when I developed it on an older base.)
-> 
-> @Russell: I hope this is OK for you. If not, I'm sure you'll protest.
+* Block GPIO API to gpiolib
+* Sysfs support for GPIO API, to provide userland access
+* Devicetree support to instantiate GPIO blocks via DT
+* Example implementations in several gpio drivers since they need
+  special accessor functions for block wise GPIO access
 
-Added from today.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+--
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+Changes since v3:
+* Added driver support for pca953x, em, pl061, max732x, pcf857x
+* Coding style improvements
+* Fixed krealloc memory leak in error case
+* sysfs: values in hex
+* Register blocks in a list
+* Narrowing lock scope
+* Use S_IWUSR and S_IRUGO instead of direct octal values
+* Use for_each_set_bit()
+* Change from unsigned to unsigned long for masks and values
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
+Changes since v2:
+* Added sysfs support
+* Added devicetree support
+* Added support for lpc32xx, generic
+* Added functions for GPIO block registration
+* Added more error checking
+* Bit remapping bugfix
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
+Changes since v1:
+* API change to 32/64 bit word, bit masks
 
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
+Plagniol-Villard and Mark Brown for reviewing!
 
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121016/e15a9a13/attachment.sig>
+Roland Stigge (11):
+ gpio: Add a block GPIO API to gpiolib
+ gpio: Add sysfs support to block GPIO API
+ gpio: Add device tree support to block GPIO API
+ gpio-max730x: Add block GPIO API
+ gpio-lpc32xx: Add block GPIO API
+ gpio-generic: Add block GPIO API
+ gpio-pca953x: Add block GPIO API
+ gpio-em: Add block GPIO API
+ gpio-pl061: Add block GPIO API
+ gpio-max732x: Add block GPIO API
+ gpio-pcf857x: Add block GPIO API
+
+ Documentation/ABI/testing/sysfs-gpio                  |    6 
+ Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +
+ Documentation/gpio.txt                                |   45 +
+ drivers/gpio/Makefile                                 |    1 
+ drivers/gpio/gpio-em.c                                |   23 
+ drivers/gpio/gpio-generic.c                           |   56 ++
+ drivers/gpio/gpio-lpc32xx.c                           |   82 +++
+ drivers/gpio/gpio-max730x.c                           |   61 ++
+ drivers/gpio/gpio-max732x.c                           |   59 ++
+ drivers/gpio/gpio-pca953x.c                           |   64 ++
+ drivers/gpio/gpio-pcf857x.c                           |   24 +
+ drivers/gpio/gpio-pl061.c                             |   17 
+ drivers/gpio/gpioblock-of.c                           |   84 +++
+ drivers/gpio/gpiolib.c                                |  428 ++++++++++++++++++
+ include/asm-generic/gpio.h                            |   26 +
+ include/linux/gpio.h                                  |   87 +++
+ 16 files changed, 1098 insertions(+), 1 deletion(-)
