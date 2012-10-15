@@ -1,74 +1,54 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 15 Oct 2012 15:37:17 -0700
-Subject: [RFT/PATCH] serial: omap: prevent resume if device is not
- suspended.
-In-Reply-To: <20121012215156.GL30339@atomide.com> (Tony Lindgren's message of
- "Fri, 12 Oct 2012 14:51:56 -0700")
-References: <20120925092118.GJ31374@n2100.arm.linux.org.uk>
- <CAKdam57bpTJ94Gn=mKVw1Fm-76fVPp3DGjFuNu_HfesybM1hPg@mail.gmail.com>
- <87ipas2y4h.fsf@deeprootsystems.com>
- <alpine.DEB.2.00.1210111748010.5736@utopia.booyaka.com>
- <50784458.9080806@ti.com> <877gqv7imt.fsf@deeprootsystems.com>
- <20121012164202.GQ28061@n2100.arm.linux.org.uk>
- <877gqv4lmt.fsf@deeprootsystems.com>
- <20121012185426.GS28061@n2100.arm.linux.org.uk>
- <87lifbwhwd.fsf@deeprootsystems.com>
- <20121012215156.GL30339@atomide.com>
-Message-ID: <87391fs6oy.fsf@deeprootsystems.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 16 Oct 2012 00:55:20 +0200
+Subject: [PATCH RFC 1/6 v3] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <507C888C.7040903@gmail.com>
+References: <1350069085-13283-1-git-send-email-stigge@antcom.de>
+ <1350069085-13283-2-git-send-email-stigge@antcom.de>
+ <507B9D05.1000204@gmail.com> <507C45EF.7080203@antcom.de>
+ <507C888C.7040903@gmail.com>
+Message-ID: <507C9458.1080803@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Hi!
 
-> * Kevin Hilman <khilman@deeprootsystems.com> [121012 13:34]:
+On 16/10/12 00:05, Ryan Mallon wrote:
+>>> This looks broken. If gbc was re-alloced above (index < 0) then
+>>> gbc->remap == NULL and this will oops?
 >>
->> I'm not conviced (yet) that a mismatch is the root cause.  Yes, that's
->> what the author of $SUBJECT patch assumed and stated, but I'm not
->> pursuaded.  
->> 
->> If it's an improperly configured mux issue, then the UART will break
->> whenever the device is actually omap_device_enable'd, whether in the
->> driver or in the bus layer.
->
-> I tried booting n800 here with CONFIG_OMAP_MUX disabled, and no
-> change. Serial console output stops right when the console initializes.
+>> No, because I took care that even though index can be < 0, the resulting
+>> pointer is never dereferenced for -1.
+> 
+> Ah, I see. I think its a bit non-obvious and flaky though, since it
+> looks like you are both dereferencing a potentially NULL pointer, and
+> indexing an array with -1.
+> 
+> Even changing it to this I think makes it a bit more clear:
+> 
+> 	if (gbc->remap == 0 ||
+>             bit - i != gbc->remap[gbc->nremap - 1].offset)
+> 		gbc->nremap++;
+> 		gbc->remap = krealloc(...);
+> 		...
+> 
+> If you want to keep your way, at the very least I think it deserves a
+> comment, since it is easy to misread.
 
-OK, since it's not mux, and since those who actually maintain this
-driver don't seem to be taking care of this, I did some digging today.
+Yes, commenting it now.
 
-Russell is right.  It's a mismatch between assumed runtime PM state
-(disabled) and actual HW state.
+Note that it's rather out-of-bounds than NULL pointer. (But with similar
+results, though. ;-) )
 
-During init, all omap_devices are idled by default, so that they are
-correctly in the state that the runtime PM framework will later expect
-them to be.  That is, all devices *except* the console UART.  For that
-one, we use the special hwmod flag to not idle/reset the UART since that
-will cause problems during earlyprintk usage, and the switch between
-the earlyprintk console and the real console driver.
+>> For this, the current API is working fine, even enabling userland access
+>> via sysfs.
+> 
+> Fair enough. I didn't see the first round of patches. You probably can
+> still use for_each_set_bit though (maybe convert the mask to unsigned
+> long first to match the bitops API):
+> 
+> 	for_each_set_bit(j, &gbc->mask, BITS_PER_LONG)
+> 		...
 
-Since the console uart was left enabled during init, it needs to be
-fully enabled and the runtime PM status set accordingly.
+Thanks for the hint! Useful.
 
-The patch below does this, and works fine on 2420/n810, as well as on
-3530/Overo, 3730/OveroSTORM, 3730/Beagle-XM and 4430/PandaES.
-
-Will send patch with a proper changelog shortly,
-
-Kevin
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 0405c81..37b5dbe 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -327,6 +327,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 	if ((console_uart_id == bdata->id) && no_console_suspend)
- 		omap_device_disable_idle_on_suspend(pdev);
- 
-+	if (console_uart_id == bdata->id) {
-+		omap_device_enable(pdev);
-+		pm_runtime_set_active(&pdev->dev);
-+	}
-+
- 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
- 
- 	oh->dev_attr = uart;
+Roland
