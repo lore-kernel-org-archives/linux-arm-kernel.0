@@ -1,40 +1,42 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Mon, 15 Oct 2012 20:56:40 +0200
-Subject: [PATCH 1/4] mtd: nand: omap2: Update nerrors using ecc.strength
-In-Reply-To: <1349274589-11389-2-git-send-email-avinashphilip@ti.com> (Avinash
- Philip's message of "Wed, 3 Oct 2012 19:59:46 +0530")
+Date: Mon, 15 Oct 2012 20:48:30 +0200
+Subject: [PATCH 3/4] ARM: OMAP2: gpmc: Add support for BCH ECC scheme
+In-Reply-To: <1349274589-11389-4-git-send-email-avinashphilip@ti.com> (Avinash
+ Philip's message of "Wed, 3 Oct 2012 19:59:48 +0530")
 References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
- <1349274589-11389-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <87obk3va1j.fsf@macbook.be.48ers.dk>
+ <1349274589-11389-4-git-send-email-avinashphilip@ti.com>
+Message-ID: <87vcebvaf5.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 >>>>> Philip, Avinash <avinashphilip@ti.com> writes:
 
- > Update number of errors using nand ecc strength.
- > Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
+ > Add support for BCH ECC scheme to gpmc driver and also enabling multi
+ > sector read/write. This helps in doing single shot NAND page read and
+ > write.
 
- > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
- > ---
- > :100644 100644 5b31386... af511a9... M	drivers/mtd/nand/omap2.c
- >  drivers/mtd/nand/omap2.c |   12 ++++++++----
- >  1 files changed, 8 insertions(+), 4 deletions(-)
+ > ECC engine configurations
+ > BCH 4 bit support
+ > 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
+ > 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
+ > 13 and ecc_size1 as 1.
 
- > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
- > index 5b31386..af511a9 100644
- > --- a/drivers/mtd/nand/omap2.c
- > +++ b/drivers/mtd/nand/omap2.c
- > @@ -111,6 +111,9 @@
- >  #define	ECCCLEAR			0x100
- >  #define	ECC1				0x1
- 
- > +#define BCH8_MAX_ERROR		8	/* upto 8 bit coorectable */
- > +#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
+ > BCH 8 bit support
+ > 1. write => ECC engine configured in wrap mode 6 and with ecc_size0 as 32.
+ > 2. read  => ECC engine configured in wrap mode 1 and with ecc_size0 as
+ > 26 and ecc_size1 as 2.
 
-First 'correctable' misspelled.
+ > Note: For BCH8 ECC bytes set to 14 to make compatible with RBL.
 
-I don't personally think these defines improve readability very much
-compared to to just using 4/8, though.
+On what device? In the am335x TRM (spruh73f.pdf) figure 26-15 (pg 4273)
+the rom code is documented to not use any padding on the ECC bytes
+(E.G. oob 2..53):
+
+http://www.ti.com/litv/pdf/spruh73f
+
+I see the driver in the u-boot-am33x tree (ti81xx_nand.c) seems to use
+4x14 bytes as well though, so perhaps that's a bug in the documentation
+instead?
 
 -- 
 Bye, Peter Korsgaard
