@@ -1,221 +1,44 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 16 Oct 2012 19:50:07 +1300
-Subject: dma_alloc_coherent fails in framebuffer
-In-Reply-To: <1350366893.26424.5.camel@gitbox>
-References: <1350192523.10946.4.camel@gitbox>
- <1350246895.11504.6.camel@gitbox> <20121015094547.GC29125@suse.de>
- <1350325704.31162.16.camel@gitbox>
- <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
- <1350366893.26424.5.camel@gitbox>
-Message-ID: <1350370207.26424.13.camel@gitbox>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Tue, 16 Oct 2012 12:26:13 +0530
+Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
+In-Reply-To: <20121015160154.GB15569@atomide.com>
+References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
+ <20121011144756.GB12552@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
+ <20121015160154.GB15569@atomide.com>
+Message-ID: <507D050D.2090402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-16 at 18:54 +1300, Tony Prisk wrote:
-> On Tue, 2012-10-16 at 10:17 +0800, Bob Liu wrote:
-> > On Tue, Oct 16, 2012 at 2:28 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> > > On Mon, 2012-10-15 at 10:45 +0100, Mel Gorman wrote:
-> > >> On Mon, Oct 15, 2012 at 09:34:55AM +1300, Tony Prisk wrote:
-> > >> > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
-> > >> > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
-> > >> > > 11 Oct when I did another pull from linus all of a sudden
-> > >> > > dma_alloc_coherent is failing to allocate the framebuffer any longer.
-> > >> > >
-> > >> > > I did a quick look back and found this:
-> > >> > >
-> > >> > > ARM: add coherent dma ops
-> > >> > >
-> > >> > > arch_is_coherent is problematic as it is a global symbol. This
-> > >> > > doesn't work for multi-platform kernels or platforms which can support
-> > >> > > per device coherent DMA.
-> > >> > >
-> > >> > > This adds arm_coherent_dma_ops to be used for devices which connected
-> > >> > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
-> > >> > > are modified at boot when arch_is_coherent is true.
-> > >> > >
-> > >> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > >> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > >> > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> > >> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > >> > >
-> > >> > >
-> > >> > > This is the only patch lately that I could find (not that I would claim
-> > >> > > to be any good at finding things) that is related to the problem. Could
-> > >> > > it have caused the allocations to fail?
-> > >> > >
-> > >> > > Regards
-> > >> > > Tony P
-> > >> >
-> > >> > Have done a bit more digging and found the cause - not Rob's patch so
-> > >> > apologies.
-> > >> >
-> > >> > The cause of the regression is this patch:
-> > >> >
-> > >> > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
-> > >> > From: Mel Gorman <mgorman@suse.de>
-> > >> > Date: Mon, 8 Oct 2012 16:32:36 -0700
-> > >> > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
-> > >> >  possible
-> > >> >
-> > >> > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
-> > >> > was fine. From this patch onwards, allocations fail.
-> > >> >
-> > >>
-> > >> Was this found through bisection or some other means?
-> > >>
-> > >> There was a bug in that series that broke CMA but it was commit bb13ffeb
-> > >> (mm: compaction: cache if a pageblock was scanned and no pages were
-> > >> isolated) and it was fixed by 62726059 (mm: compaction: fix bit ranges
-> > >> in {get,clear,set}_pageblock_skip()). So it should have been fixed by
-> > >> 3.7-rc1 and probably was included by the time you pulled in October 11th
-> > >> but bisection would be a pain. There were problems with that series during
-> > >> development but tests were completing for other people.
-> > >>
-> > >> Just in case, is this still broken in 3.7-rc1?
-> > >
-> > > Still broken. Although the printk's might have cleared it up a bit.
-> > >>
-> > >> > I don't know how this patch would effect CMA allocations, but it seems
-> > >> > to be causing the issue (or at least, it's caused an error in
-> > >> > arch-vt8500 to become visible).
-> > >> >
-> > >> > Perhaps someone who understand -mm could explain the best way to
-> > >> > troubleshoot the cause of this problem?
-> > >> >
-> > >>
-> > >> If you are comfortable with ftrace, it can be used to narrow down where
-> > >> the exact failure is occurring but if you're not comfortable with that
-> > >> then the easiest is a bunch of printks starting in alloc_contig_range()
-> > >> to see at what point and why it returns failure.
-> > >>
-> > >> It's not obvious at the moment why that patch would cause an allocation
-> > >> problem. It's the type of patch that if it was wrong it would fail every
-> > >> time for everyone, not just for a single driver.
-> > >>
-> > >
-> > > I added some printk's to see what was happening.
-> > >
-> > > from arch/arm/mm/dma-mapping.c: arm_dma_alloc(..) it calls out to:
-> > > dma_alloc_from_coherent().
-> > >
-> > > This returns 0, because:
-> > > mem = dev->dma_mem
-> > > if (!mem) return 0;
-> > >
-> > > and then arm_dma_alloc() falls back on __dma_alloc(..)
-> > >
-> > >
-> > > I suspect the reason this fault is a bit 'weird' is because its
-> > > effectively not using alloc_from_coherent at all, but falling back on
-> > > __dma_alloc all the time, and sometimes it fails.
-> > >
-> > 
-> > I think you need to declare that memory using
-> > dma_declare_coherent_memory() before
-> > alloc_from_coherent.
-> > 
-> > > Why it caused a problem on that particular commit I don't know - but it
-> > > was reproducible by adding/removing it.
-> > >
-> > >
-> > > Regards
-> > > Tony P
-> > >
-> > > --
-> > > To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> > > the body to majordomo at kvack.org.  For more info on Linux MM,
-> > > see: http://www.linux-mm.org/ .
-> > > Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-> > 
-> 
-> 
-> I finally found the link to this patch which caused the problem - and
-> may still be the cause of my problems :)
-> 
-> > >>>
-> > >>> From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
-> > >>> From: Mel Gorman <mgorman@suse.de>
-> > >>> Date: Mon, 8 Oct 2012 16:32:36 -0700
-> > >>> Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
-> > >>>  possible
-> 
-> In mm/page_alloc.c:alloc_contig_range()
-> 
-> ...
-> 	outer_end = isolate_freepages_range(&cc, outer_start, end);
-> 	if (!outer_end) {
-> 		ret = -EBUSY;
-> 		goto done;
-> 	}
-> ..
-> 
-> It is always returning via the !outer_end test with -EBUSY.
-> 
-> isolate_freepages_range() was one of the functions modified by
-> the above mentioned patch.
-> 
-> Around in a big circle and back to the start :)
-> 
-> Regards
-> Tony P
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Hi Tony,
 
-Found the new code which has produced the problem, but perhaps someone
-with more knowledge can explain why. Commit
-f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e introduced an additional check
-which wasn't previously there.
+On Monday 15 October 2012 09:31 PM, Tony Lindgren wrote:
+> * Mohammed, Afzal<afzal@ti.com>  [121015 05:42]:
+>> On Thu, Oct 11, 2012 at 20:17:56, Tony Lindgren wrote:
 
-+	/*
-+	 * If strict isolation is requested by CMA then check that all the
-+	 * pages requested were isolated. If there were any failures, 0 is
-+	 * returned and CMA will fail.
-+	 */
-+	if (strict && nr_strict_required != total_isolated)
-+		total_isolated = 0;
+>>> Yes, then please do a second pull request for what's needed
+>>> to apply the minimal DT bindings. For the DT binding, let's
+>>> just leave out the timings for now as we can load those from
+>>> auxdata. Then the binding for the timings can be added
+>>> later on. So just the minimal binding using standard features
+>>> for the iorange and interrupt.
 
+>> Ok, I will keep timings aside for now and proceed with DT
+>> (avoiding auxdata usage with generic routine looked to me a
+>> saner approach though, with an initial DT'fy delay)
 
-At the moment, my platform always fails to allocate the framebuffer
-because nr_strict_required != total_isolated.
+> Oh well if you think it's easier to do the timings too in
+> the DT binding, please go ahead with that. It may take some
+> longer discussion on the lists for the binding though. But
+> up to you.
 
-total_isolated will exceed nr_strict_required which causes an error.
-For all the other drivers using dma_alloc_coherent, it seems to keep
-increasing nr_strict_required until it gets a match with total_isolated:
+I certainly don't think it is easier, rather tougher, cleaner
+as well. One thing that worried me was, if we pursue the
+auxdata path (a last resort option) and later if it is
+objected, we would be back to square one.
 
-For the EHCI driver:
-[    4.740000] total_isolated = 512, nr_strict_required=1
-[    4.740000] FINAL! total_isolated = 512, nr_strict_required=1
-[    4.740000] strict && nr_strict_required != total_isolated
-[    4.750000] total_isolated = 512, nr_strict_required=2
-[    4.750000] FINAL! total_isolated = 512, nr_strict_required=2
-[    4.750000] strict && nr_strict_required != total_isolated
-...
-[   13.220000] total_isolated = 512, nr_strict_required=511
-[   13.220000] FINAL! total_isolated = 512, nr_strict_required=511
-[   13.220000] strict && nr_strict_required != total_isolated
-[   13.230000] total_isolated = 512, nr_strict_required=512
-[   13.230000] FINAL! total_isolated = 512, nr_strict_required=512
-
-The framebuffer gives up trying when:
-
-[    0.730000] total_isolated = 1024, nr_strict_required=983
-[    0.730000] FINAL! total_isolated = 1024, nr_strict_required=983
-[    0.730000] strict && nr_strict_required != total_isolated
-[    0.730000] total_isolated = 1024, nr_strict_required=999
-[    0.730000] FINAL! total_isolated = 1024, nr_strict_required=999
-[    0.730000] strict && nr_strict_required != total_isolated
-[    0.740000] total_isolated = 1024, nr_strict_required=1015
-[    0.740000] FINAL! total_isolated = 1024, nr_strict_required=1015
-[    0.740000] strict && nr_strict_required != total_isolated
-
-Given that nr_strict_required + 16 = 1031, I guess it gives up trying
-and fails.
-
-Any suggestions on how to fix this?
+Let me discuss internally and get back.
 
 Regards
-Tony P
+Afzal
