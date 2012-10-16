@@ -1,63 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 11:55:04 +0100
-Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
- ARM_UNWIND
-In-Reply-To: <20121016101201.GA26075@linaro.org>
-References: <1346021216-21979-1-git-send-email-ccross@android.com>
- <1346021216-21979-3-git-send-email-ccross@android.com>
- <20121012090807.GB21164@n2100.arm.linux.org.uk>
- <20121012100242.GA2126@linaro.org>
- <CAMbhsRRpYrOBhaFn5PV5f5J=36Hsj2eZixyD1hXRfRLoyWm1Xg@mail.gmail.com>
- <20121016101201.GA26075@linaro.org>
-Message-ID: <20121016105504.GD21164@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 16 Oct 2012 11:58:03 +0100
+Subject: [PATCH 01/11] SERIAL: core: use local variable uport in
+ uart_set_termios()
+In-Reply-To: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
+References: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
+Message-ID: <E1TO4qZ-0000Vk-6p@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 11:12:01AM +0100, Dave Martin wrote:
-> On Mon, Oct 15, 2012 at 07:15:31PM -0700, Colin Cross wrote:
-> > About half the callers to unwind_frame end up limiting the number of
-> > frames they will follow before giving up, so I wasn't sure if I should
-> > put an arbitrary limit in unwind_frame or just make sure all callers
-> > are bounded.  Your idea of limiting same sp frames instead of total
-> > frames sounds better.  I can send a new patch that adds a new field to
-> > struct stackframe (which will need to be initialized everywhere, the
-> > struct is usually on the stack) and limits the recursion.  Any
-> > suggestion on the recursion limit?  I would never expect to see a real
-> > situation with more than a few, but on the other hand parsing the
-> > frames should be pretty fast so a high number (100?) shouldn't cause
-> > any user visible effect.
-> 
-> Talking to some tools guys about this, it sounds like there really
-> shouldn't be any stackless frame except for the leaf frame.  If there are
-> stackless functions they will probably not be visible in the frame chain
-> at all.  So it might make sense to have a pretty small limit.  Maybe it
-> could even be 1.  Cartainly a small number.
-> 
-> We should also add a check for whether the current and frame and previous
-> frame appear identical and abort if that's the case, if we don't do that
-> already.
+This is to make the following change more clear.
 
-The case that actually worries me is not the "end up looping for ever"
-case, but the effects of having the stack change while the unwinder is
-reading from it - for example:
+Acked-by: Alan Cox <alan@linux.intel.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/tty/serial/serial_core.c |   17 +++++++++--------
+ 1 files changed, 9 insertions(+), 8 deletions(-)
 
-                /* pop R4-R15 according to mask */
-                load_sp = mask & (1 << (13 - 4));
-                while (mask) {
-                        if (mask & 1)
-                                ctrl->vrs[reg] = *vsp++;
-                        mask >>= 1;
-                        reg++;
-                }
-
-Remember that for a running thread, the stack will be changing all the
-time while another CPU tries to read it to do the unwind, and also
-remember that the bottom of stack isn't really known.  All you have is
-the snapshot of the registers when the thread was last stopped by the
-scheduler, and that state probably isn't valid.
-
-So what you're asking is for the unwinder to produce a backtrace from
-a kernel stack which is possibly changing beneath it from an unknown
-current state.
-
-This doesn't sound like a particularly bright thing to be doing...
+diff --git a/drivers/tty/serial/serial_core.c b/drivers/tty/serial/serial_core.c
+index 0fcfd98..bc2065d 100644
+--- a/drivers/tty/serial/serial_core.c
++++ b/drivers/tty/serial/serial_core.c
+@@ -1210,6 +1210,7 @@ static void uart_set_termios(struct tty_struct *tty,
+ 						struct ktermios *old_termios)
+ {
+ 	struct uart_state *state = tty->driver_data;
++	struct uart_port *uport = state->uart_port;
+ 	unsigned long flags;
+ 	unsigned int cflag = tty->termios.c_cflag;
+ 
+@@ -1232,31 +1233,31 @@ static void uart_set_termios(struct tty_struct *tty,
+ 
+ 	/* Handle transition to B0 status */
+ 	if ((old_termios->c_cflag & CBAUD) && !(cflag & CBAUD))
+-		uart_clear_mctrl(state->uart_port, TIOCM_RTS | TIOCM_DTR);
++		uart_clear_mctrl(uport, TIOCM_RTS | TIOCM_DTR);
+ 	/* Handle transition away from B0 status */
+ 	else if (!(old_termios->c_cflag & CBAUD) && (cflag & CBAUD)) {
+ 		unsigned int mask = TIOCM_DTR;
+ 		if (!(cflag & CRTSCTS) ||
+ 		    !test_bit(TTY_THROTTLED, &tty->flags))
+ 			mask |= TIOCM_RTS;
+-		uart_set_mctrl(state->uart_port, mask);
++		uart_set_mctrl(uport, mask);
+ 	}
+ 
+ 	/* Handle turning off CRTSCTS */
+ 	if ((old_termios->c_cflag & CRTSCTS) && !(cflag & CRTSCTS)) {
+-		spin_lock_irqsave(&state->uart_port->lock, flags);
++		spin_lock_irqsave(&uport->lock, flags);
+ 		tty->hw_stopped = 0;
+ 		__uart_start(tty);
+-		spin_unlock_irqrestore(&state->uart_port->lock, flags);
++		spin_unlock_irqrestore(&uport->lock, flags);
+ 	}
+ 	/* Handle turning on CRTSCTS */
+ 	else if (!(old_termios->c_cflag & CRTSCTS) && (cflag & CRTSCTS)) {
+-		spin_lock_irqsave(&state->uart_port->lock, flags);
+-		if (!(state->uart_port->ops->get_mctrl(state->uart_port) & TIOCM_CTS)) {
++		spin_lock_irqsave(&uport->lock, flags);
++		if (!(uport->ops->get_mctrl(uport) & TIOCM_CTS)) {
+ 			tty->hw_stopped = 1;
+-			state->uart_port->ops->stop_tx(state->uart_port);
++			uport->ops->stop_tx(uport);
+ 		}
+-		spin_unlock_irqrestore(&state->uart_port->lock, flags);
++		spin_unlock_irqrestore(&uport->lock, flags);
+ 	}
+ }
+ 
+-- 
+1.7.4.4
