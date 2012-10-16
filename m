@@ -1,98 +1,127 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 15 Oct 2012 19:32:11 -0600
-Subject: [PATCH 3/7] ARM: OMAP1: create read_reset_sources() function (for
- initial use by watchdog)
+Date: Mon, 15 Oct 2012 19:32:09 -0600
+Subject: [PATCH 1/7] ARM: OMAP2+: PRM: prepare for use of prm_ll_data
+ function pointers
 In-Reply-To: <20121016012448.21844.92339.stgit@dusk.lan>
 References: <20121016012448.21844.92339.stgit@dusk.lan>
-Message-ID: <20121016013210.21844.77150.stgit@dusk.lan>
+Message-ID: <20121016013203.21844.65536.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP1, the existing OMAP watchdog driver reads a register directly
-from a non-watchdog IP block.  It also does not convert the register's
-contents into the standard WDIOF_* bits expected from the
-GETBOOTSTATUS ioctl().
+There are several PRM operations which behave similarly across OMAP2+
+SoCs, but which have slight differences in their underlying
+implementations.  For example, to fetch the SoC's last reset sources,
+different registers are read across OMAP2xxx, 3xxx, and 44xx, and
+different bits are used on each SoC.  But the information returned is
+so similar that a single, common interface for drivers is useful.
 
-To move towards fixing these problems, create an function in
-arch/arm/mach-omap1 to return the reset source data.  A subsequent
-patch will provide this function to the watchdog driver via
-platform_data.
+This patch creates the support code for this function pointer
+registration process.  No function pointers are included yet, but a
+subsequent patch will create one for the reset source API.
 
-In the long term, the best approach would be to move this function
-to a new OMAP1 driver that handles access to the OMAP1 Clock
-Generation and Reset Management IP block.  Then no platform_data would
-be needed.
+To illustrate the end goal with the above reset source example, each
+per-SoC driver will use its own low-level implementation function --
+e.g., prm2xxx.c would contain omap2xxx_prm_read_reset_sources().  This
+function would read the appropriate register and remap the register
+bits to a standard set of reset source bits.  When the prm2xxx.c
+driver is loaded, it would register this function with the common PRM
+driver, prm.c.  prm.c would then export a common function,
+omap_prm_read_reset_sources().  Calling it would call through to the
+function pointer for the currently-registered SoC PRM driver.  This
+will allow other drivers to use PRM-provided data and operations
+without needing to know which SoC is currently in use.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap1/common.h |    2 ++
- arch/arm/mach-omap1/reset.c  |   39 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
+ arch/arm/mach-omap2/prm.h        |   11 ++++++++
+ arch/arm/mach-omap2/prm_common.c |   52 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index c2552b2..e83fd70 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -90,4 +90,6 @@ extern int ocpi_enable(void);
- static inline int ocpi_enable(void) { return 0; }
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index 39d5621..3e51c1d 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -52,5 +52,16 @@
+ #define OMAP_POWERSTATE_SHIFT				0
+ #define OMAP_POWERSTATE_MASK				(0x3 << 0)
+ 
++#ifndef __ASSEMBLER__
++
++/**
++ * struct prm_ll_data - fn ptrs to per-SoC PRM function implementations
++ */
++struct prm_ll_data {};
++
++extern int prm_register(struct prm_ll_data *pld);
++extern int prm_unregister(struct prm_ll_data *pld);
++
++#endif
+ 
  #endif
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 0a100d9..8670a3c 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -53,6 +53,13 @@ static struct irq_chip_generic **prcm_irq_chips;
+  */
+ static struct omap_prcm_irq_setup *prcm_irq_setup;
  
-+extern u32 omap1_read_reset_sources(void);
++/*
++ * prm_ll_data: function pointers to SoC-specific implementations of
++ * common PRM functions
++ */
++static struct prm_ll_data null_prm_ll_data;
++static struct prm_ll_data *prm_ll_data = &null_prm_ll_data;
 +
- #endif /* __ARCH_ARM_MACH_OMAP1_COMMON_H */
-diff --git a/arch/arm/mach-omap1/reset.c b/arch/arm/mach-omap1/reset.c
-index b177091..3e894fb 100644
---- a/arch/arm/mach-omap1/reset.c
-+++ b/arch/arm/mach-omap1/reset.c
-@@ -8,8 +8,22 @@
+ /* Private functions */
  
- #include <mach/hardware.h>
- 
-+#include "iomap.h"
- #include "common.h"
- 
-+/* ARM_SYSST bit shifts related to SoC reset sources */
-+#define ARM_SYSST_POR_SHIFT				5
-+#define ARM_SYSST_EXT_RST_SHIFT				4
-+#define ARM_SYSST_ARM_WDRST_SHIFT			2
-+#define ARM_SYSST_GLOB_SWRST_SHIFT			1
-+
-+/* Standardized reset source bits (across all OMAP SoCs) */
-+#define OMAP_GLOBAL_COLD_RST_SRC_ID_SHIFT		0
-+#define OMAP_GLOBAL_WARM_RST_SRC_ID_SHIFT		1
-+#define OMAP_MPU_WD_RST_SRC_ID_SHIFT			3
-+#define OMAP_EXTWARM_RST_SRC_ID_SHIFT			5
-+
-+
- void omap1_restart(char mode, const char *cmd)
- {
- 	/*
-@@ -23,3 +37,28 @@ void omap1_restart(char mode, const char *cmd)
- 
- 	omap_writew(1, ARM_RSTCT1);
+ /*
+@@ -318,3 +325,48 @@ err:
+ 	omap_prcm_irq_cleanup();
+ 	return -ENOMEM;
  }
 +
 +/**
-+ * omap1_read_reset_sources - return the source of the SoC's last reset
++ * prm_register - register per-SoC low-level data with the PRM
++ * @pld: low-level per-SoC OMAP PRM data & function pointers to register
 + *
-+ * Returns bits that represent the last reset source for the SoC.  The
-+ * format is standardized across OMAPs for use by the OMAP watchdog.
++ * Register per-SoC low-level OMAP PRM data and function pointers with
++ * the OMAP PRM common interface.  The caller must keep the data
++ * pointed to by @pld valid until it calls prm_unregister() and
++ * it returns successfully.  Returns 0 upon success, -EINVAL if @pld
++ * is NULL, or -EEXIST if prm_register() has already been called
++ * without an intervening prm_unregister().
 + */
-+u32 omap1_read_reset_sources(void)
++int prm_register(struct prm_ll_data *pld)
 +{
-+	int ret = 0;
-+	u16 rs;
++	if (!pld)
++		return -EINVAL;
 +
-+	rs = __raw_readw(OMAP1_IO_ADDRESS(ARM_SYSST));
++	if (prm_ll_data != &null_prm_ll_data)
++		return -EEXIST;
 +
-+	if (rs & (1 << ARM_SYSST_POR_SHIFT))
-+		ret |= 1 << OMAP_GLOBAL_COLD_RST_SRC_ID_SHIFT;
-+	if (rs & (1 << ARM_SYSST_EXT_RST_SHIFT))
-+		ret |= 1 << OMAP_EXTWARM_RST_SRC_ID_SHIFT;
-+	if (rs & (1 << ARM_SYSST_ARM_WDRST_SHIFT))
-+		ret |= 1 << OMAP_MPU_WD_RST_SRC_ID_SHIFT;
-+	if (rs & (1 << ARM_SYSST_GLOB_SWRST_SHIFT))
-+		ret |= 1 << OMAP_GLOBAL_WARM_RST_SRC_ID_SHIFT;
++	prm_ll_data = pld;
 +
-+	return ret;
++	return 0;
++}
++
++/**
++ * prm_unregister - unregister per-SoC low-level data & function pointers
++ * @pld: low-level per-SoC OMAP PRM data & function pointers to unregister
++ *
++ * Unregister per-SoC low-level OMAP PRM data and function pointers
++ * that were previously registered with prm_register().  The
++ * caller may not destroy any of the data pointed to by @pld until
++ * this function returns successfully.  Returns 0 upon success, or
++ * -EINVAL if @pld is NULL or if @pld does not match the struct
++ * prm_ll_data * previously registered by prm_register().
++ */
++int prm_unregister(struct prm_ll_data *pld)
++{
++	if (!pld || prm_ll_data != pld)
++		return -EINVAL;
++
++	prm_ll_data = &null_prm_ll_data;
++
++	return 0;
 +}
