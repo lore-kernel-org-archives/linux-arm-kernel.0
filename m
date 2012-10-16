@@ -1,154 +1,87 @@
-From: yangfei.kernel@gmail.com (Fei Yang)
-Date: Wed, 17 Oct 2012 00:33:54 +0800
-Subject: [PATCH] Re: Hardcoded instruction causes certain features to fail
- on ARM platfrom due to endianness
-In-Reply-To: <20121016124956.GC26075@linaro.org>
-References: <DA41BE1DDCA941489001C7FBD7A8820E3CB407A4@szxeml549-mbx.china.huawei.com>
- <20603.47887.262025.941051@pilspetsen.it.uu.se>
- <CAKw8HL154a=K9O7CzPFZ-EqtT+BxYU-uRHodtutdRfYmNpWVww@mail.gmail.com>
- <20121016124956.GC26075@linaro.org>
-Message-ID: <CAKw8HL3shtbi0Kk-7ZWO9KhtBVU+Vj_Zunh52GDOGJTZSvt6Gg@mail.gmail.com>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Tue, 16 Oct 2012 16:33:55 +0000
+Subject: [PATCH V2 0/7] support the cpts found on am335x devices
+In-Reply-To: <cover.1350329726.git.richardcochran@gmail.com>
+References: <cover.1350329726.git.richardcochran@gmail.com>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9F82F0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/16 Dave Martin <dave.martin@linaro.org>:
-> On Mon, Oct 15, 2012 at 11:33:08PM +0800, Fei Yang wrote:
->> 2012/10/15 Mikael Pettersson <mikpe@it.uu.se>:
->> > Yangfei (Felix) writes:
->> >  > Hi all,
->> >  >
->> >  >     I found that hardcoded instruction in inline asm can cause certains certain features fail to work on ARM platform due to endianness.
->> >  >     As an example, consider the following code snippet of platform_do_lowpower function from arch/arm/mach-realview/hotplug.c:
->> >  >                 / *
->> >  >                  * here's the WFI
->> >  >                  */
->> >  >                 asm(".word      0xe320f003\n"
->> >  >                     :
->> >  >                     :
->> >  >                     : "memory", "cc");
->> >  >
->> >  >     The instruction generated from this inline asm will not work on big-endian ARM platform, such as ARM BE-8 format. Instead, an exception will be generated.
->> >  >
->> >  >     Here the code should be:
->> >  >                 / *
->> >  >                  * here's the WFI
->> >  >                  */
->> >  >                 asm("WFI\n"
->> >  >                     :
->> >  >                     :
->> >  >                     : "memory", "cc");
->> >  >
->> >  >     Seems the kernel doesn't support ARM BE-8 well. I don't know why this problem happens.
->> >  >     Can anyone tell me who owns this part? I can prepare a patch then.
->> >  >     Thanks.
->> >
->> > Questions regarding the ARM kernel should go to the linux-arm-kernel mailing list
->> > (see the MAINTAINERS file), with an optional cc: to the regular LKML.
->> >
->> > BE-8 is, if I recall correctly, ARMv7's broken format where code and data have
->> > different endianess.  GAS supports an ".inst" directive which is like ".word"
->> > except the data is assumed to be code.  This matters for disassembly, and may
->> > also be required for BE-8.
->> >
->> > That is, just s/.word/.inst/g above and report back if that works or not.
->> > --
->> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> > the body of a message to majordomo at vger.kernel.org
->> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> > Please read the FAQ at  http://www.tux.org/lkml/
->> >
->> >
->>
->> Hi Mikael,
->>
->> Thanks for the reply. I modified the code as suggested and rebuilt the
->> kernel, cpu-hotplug feature now works on big-endian(BE-8) ARM
->> platform.
->> Since the ARM core can be configured by system software to work in
->> big-endian mode, it's necessary to fix this problem. And here is a
->> small patch :
->>
->> diff -urN linux-3.6.2/arch/arm/mach-exynos/hotplug.c
->> linux/arch/arm/mach-exynos/hotplug.c
->> --- linux-3.6.2/arch/arm/mach-exynos/hotplug.c        2012-10-13
->> 04:50:59.000000000 +0800
->> +++ linux/arch/arm/mach-exynos/hotplug.c      2012-10-15 23:05:44.000000000 +0800
->> @@ -72,7 +72,7 @@
->>               /*
->>                * here's the WFI
->>                */
->> -             asm(".word      0xe320f003\n"
->> +             asm(".inst      0xe320f003\n"
->
-> The cleanest fix would simply be to build these files with appropriate
-> modified CFLAGS (-march=armv6k or -march=armv7-a), and use the proper
-> "wfi" mnemonic.
->
-> Failing that, you could use the facilities in <asm/opcodes.h> to
-> declare a wrapper macro for injecting this opcode (see
-> <asm/opcodes-virt.h> for an example).  However, putting custom
-> opcodes into the assembler should only be done if it's really
-> necessary.  Nowadays, I think we can consider tools which don't
-> understand the WFI mnemonic to be obsolete, at least for platforms
-> which only build for v7 and above.
->
-> The relevant board maintainers would need to sign off on such a
-> change, so we don't end up breaking their builds.
->
-> If any of these boards needs to build for v6K, the custom opcode might
-> be worth it -- some people might just possibly be relying on older tools
-> for such platforms.
->
-> Cheers
-> ---Dave
->
->>                   :
->>                   :
->>                   : "memory", "cc");
->> diff -urN linux-3.6.2/arch/arm/mach-realview/hotplug.c
->> linux/arch/arm/mach-realview/hotplug.c
->> --- linux-3.6.2/arch/arm/mach-realview/hotplug.c      2012-10-13
->> 04:50:59.000000000 +0800
->> +++ linux/arch/arm/mach-realview/hotplug.c    2012-10-15 23:05:00.000000000 +0800
->> @@ -66,7 +66,7 @@
->>               /*
->>                * here's the WFI
->>                */
->> -             asm(".word      0xe320f003\n"
->> +             asm(".inst      0xe320f003\n"
->>                   :
->>                   :
->>                   : "memory", "cc");
->> diff -urN linux-3.6.2/arch/arm/mach-shmobile/hotplug.c
->> linux/arch/arm/mach-shmobile/hotplug.c
->> --- linux-3.6.2/arch/arm/mach-shmobile/hotplug.c      2012-10-13
->> 04:50:59.000000000 +0800
->> +++ linux/arch/arm/mach-shmobile/hotplug.c    2012-10-15 23:05:25.000000000 +0800
->> @@ -53,7 +53,7 @@
->>               /*
->>                * here's the WFI
->>                */
->> -             asm(".word      0xe320f003\n"
->> +             asm(".inst      0xe320f003\n"
->>                   :
->>                   :
->>                   : "memory", "cc");
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> -----Original Message-----
+> From: Richard Cochran [mailto:richardcochran at gmail.com]
+> Sent: Tuesday, October 16, 2012 1:18 AM
+> To: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; David Miller; Chemparathy,
+> Cyril; N, Mugunthan V; Govindarajan, Sriramakrishnan
+> Subject: [PATCH V2 0/7] support the cpts found on am335x devices
+> 
+> This patch series, based on linux-3.7-rc1 plus the fixes I posted
+> today, adds support for the Common Platform Time Sync (CPTS) found on
+> the popular BeagleBone. The code enables hardware time stamping and a
+> PTP Hardware Clock.
+> 
+> Changes in V2
+>    - Now uses device tree
+>    - Actually works with vanilla kernel
+> 
+> This work has been tested using the linuxptp PTP stack, and it seems
+> to be working quite well. One limitation of the hardware is that not
+> possible to adjust the clock frequency. Even without with this
+> capability, the driver will be still be useful for 802.1AS
+> applications, since they typically use a free running clock.
+> 
+> There is one open issue with this driver which will hopefully soon be
+> resolved. Time stamping only works on UDP packets. Although Layer 2 is
+> supposed to work according to the TRM, I have not yet figured out
+> how. The UDP only works when setting an undocumented bit, so maybe
+> someone from TI can fill me in on this.
+> 
+> Thanks,
+> Richard
+> 
+> 
+> Richard Cochran (7):
+>   cpsw: rename register banks to match the reference manual
+>   cpsw: add missing fields to the CPSW_SS register bank.
+>   cpsw: correct the CPSW_PORT register bank declaration
+>   cpsw: add a common header file for regsiter declarations
+>   cpts: introduce time stamping code and a PTP hardware clock.
+>   cpsw: add a DT field for the cpts offset
+>   cpsw: use the time stamping capabilities of the cpts
+> 
+>  Documentation/devicetree/bindings/net/cpsw.txt |   11 +-
+>  arch/arm/boot/dts/am33xx.dtsi                  |    5 +-
+>  drivers/net/ethernet/ti/Kconfig                |    8 +
+>  drivers/net/ethernet/ti/Makefile               |    2 +-
+>  drivers/net/ethernet/ti/cpsw.c                 |   84 ++++-
+>  drivers/net/ethernet/ti/cpsw_reg.h             |   81 ++++
+>  drivers/net/ethernet/ti/cpts.c                 |  468
+> ++++++++++++++++++++++++
+>  drivers/net/ethernet/ti/cpts.h                 |  148 ++++++++
+>  include/linux/platform_data/cpsw.h             |    1 +
+>  9 files changed, 788 insertions(+), 20 deletions(-)
+>  create mode 100644 drivers/net/ethernet/ti/cpsw_reg.h
+>  create mode 100644 drivers/net/ethernet/ti/cpts.c
+>  create mode 100644 drivers/net/ethernet/ti/cpts.h
+> 
+> --
+> 1.7.2.5
 
-Thanks for the suggestions. The ".inst" directive here may also bring
-us trouble if some older tools is used.
-In that situation, "wfi" mnemonic will not be recognized either. If we
-cannot suppose that newer tools is used, then how can we determine the
-endianness during the preprocessor/compile phase? Any ideas?
+Richard
 
-BTW: I found this bug on my ARM V7-A Cortex-A9 board and the processor
-is configured to work in big-endian mode at boot stage (word and
-halfword data is interpreted as big-endian, but instruction is still
-little-endian) . The kernel is ported from arch/arm/mach-realview. And
-I think these boards(mach-realview/mach-shmobile/mach-exynos) should
-have the similar problems. ARM arch is Bi-endian since versions 3 and
-above.
+I had seen some issues with the patch series.
+
+* CPTS will hold only LSB 32 bits of 64 bit Timer and the upper 32 bit
+  time value has to be taken care by the software, but the time stamp
+  which is passed to skb or PTP clock consist of only 32 bit time value
+* CPTS interrupts should be utilized to service Half and Full roll over
+  events as it is non sync events with respect to get/set time and PTP
+  pkt Tx/Rx
+* CPTS Time which is obtained from hardware is not actually a nano
+  seconds as the CPTS ref clock is tied to 250MHz for AM335x.
+* CPSW register mapping done in this patch series removes the CPSW
+  driver support for previous version found in TI814x
+* CPSW Time stamping is done only for port 0 and port 1 is not done
+
+Regards
+Mugunthan V N
