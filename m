@@ -1,88 +1,61 @@
-From: anton.vorontsov@linaro.org (Anton Vorontsov)
-Date: Mon, 15 Oct 2012 17:39:56 -0700
-Subject: [PATCH 4/4] ARM: versatile: Make able to use UART ports for KGDB FIQ
- debugger
-In-Reply-To: <20121016003756.GA23146@lizard>
-References: <20121016003756.GA23146@lizard>
-Message-ID: <1350347996-25412-4-git-send-email-anton.vorontsov@linaro.org>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 16 Oct 2012 09:50:16 +0900
+Subject: [RFC 0/2] DMA-mapping & IOMMU - physically contiguous allocations
+In-Reply-To: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If enabled, kernel will able to enter KGDB upon serial line activity on
-UART ports.
+2012/10/15 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Hello,
+>
+> Some devices, which have IOMMU, for some use cases might require to
+> allocate a buffers for DMA which is contiguous in physical memory. Such
+> use cases appears for example in DRM subsystem when one wants to improve
+> performance or use secure buffer protection.
+>
+> I would like to ask if adding a new attribute, as proposed in this RFC
+> is a good idea? I feel that it might be an attribute just for a single
+> driver, but I would like to know your opinion. Should we look for other
+> solution?
+>
 
-Note that even with this patch and CONFIG_KGDB_FIQ is enabled, you still
-need to pass kgdb_fiq.enable=1 kernel command line option, otherwise UART
-will behave in a normal way.
+In addition, currently we have worked dma-mapping-based iommu support
+for exynos drm driver with this patch set so this patch set has been
+tested with iommu enabled exynos drm driver and worked fine. actually,
+this feature is needed for secure mode such as TrustZone. in case of
+Exynos SoC, memory region for secure mode should be physically
+contiguous and also maybe OMAP but now dma-mapping framework doesn't
+guarantee physically continuous memory allocation so this patch set
+would make it possible.
 
-By default UART0 is used, but this can be changed via kgdb_fiq.uart_num
-kernel command line option.
+Tested-by: Inki Dae <inki.dae@samsung.com>
+Reviewed-by: Inki Dae <inki.dae@samsung.com>
 
-Signed-off-by: Anton Vorontsov <anton.vorontsov@linaro.org>
----
- arch/arm/Kconfig                   |  1 +
- arch/arm/mach-versatile/Makefile   |  1 +
- arch/arm/mach-versatile/kgdb_fiq.c | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 33 insertions(+)
- create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+Thanks,
+Inki Dae
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 87eb4f8..879136b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -337,6 +337,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_CLOCK
- 	select PLAT_VERSATILE_FPGA_IRQ
-+	select ARCH_MIGHT_HAVE_KGDB_FIQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
- 
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 81fa3fe..bfd761f 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
- obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-+obj-$(CONFIG_KGDB_FIQ)			+= kgdb_fiq.o
-diff --git a/arch/arm/mach-versatile/kgdb_fiq.c b/arch/arm/mach-versatile/kgdb_fiq.c
-new file mode 100644
-index 0000000..3cdf71d
---- /dev/null
-+++ b/arch/arm/mach-versatile/kgdb_fiq.c
-@@ -0,0 +1,31 @@
-+/*
-+ * KGDB FIQ board support
-+ *
-+ * Copyright 2012 Linaro Ltd.
-+ *		  Anton Vorontsov <anton.vorontsov@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published
-+ * by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/kgdb.h>
-+#include <mach/hardware.h>
-+#include <mach/platform.h>
-+#include <asm/hardware/vic.h>
-+
-+static int kgdb_fiq;
-+module_param_named(uart_num, kgdb_fiq, int, 0600);
-+MODULE_PARM_DESC(uart_num, "UART<number> port to use for KGDB FIQ");
-+
-+static int __init kgdb_fiq_init(void)
-+{
-+	WARN_ON(kgdb_fiq > INT_UARTINT2 - INT_UARTINT0);
-+
-+	return kgdb_register_fiq(INT_UARTINT0 + kgdb_fiq,
-+				 vic_fiq_select,
-+				 vic_is_fiq_rised);
-+}
-+console_initcall(kgdb_fiq_init);
--- 
-1.7.12.3
+> Best regards
+> --
+> Marek Szyprowski
+> Samsung Poland R&D Center
+>
+>
+> Marek Szyprowski (2):
+>   common: DMA-mapping: add DMA_ATTR_FORCE_CONTIGUOUS attribute
+>   ARM: dma-mapping: add support for DMA_ATTR_FORCE_CONTIGUOUS attribute
+>
+>  Documentation/DMA-attributes.txt |    9 +++++++++
+>  arch/arm/mm/dma-mapping.c        |   41 ++++++++++++++++++++++++++++++--------
+>  include/linux/dma-attrs.h        |    1 +
+>  3 files changed, 43 insertions(+), 8 deletions(-)
+>
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
