@@ -1,61 +1,67 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 16 Oct 2012 20:09:00 +0300
-Subject: [RESEND PATCH 2/2] ARM: kexec: Check segment memory addresses
-In-Reply-To: <20121016163226.GG23979@mudshark.cambridge.arm.com>
-References: <1348157018-31059-1-git-send-email-will.deacon@arm.com>
- <1348157018-31059-2-git-send-email-will.deacon@arm.com>
- <20121016161020.GA1613@blackmetal.musicnaut.iki.fi>
- <20121016163226.GG23979@mudshark.cambridge.arm.com>
-Message-ID: <20121016170900.GB1613@blackmetal.musicnaut.iki.fi>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 16 Oct 2012 12:13:22 -0500
+Subject: [PATCH v3] ARM: vfp: fix save and restore when running on
+ pre-VFPv3 and CONFIG_VFPv3 set
+In-Reply-To: <20121015175317.GE15569@atomide.com>
+References: <alpine.DEB.2.00.1210130441300.5736@utopia.booyaka.com>
+ <20121013090255.GT28061@n2100.arm.linux.org.uk>
+ <yw1xr4p2myre.fsf@unicorn.mansr.com>
+ <20121013133654.GU28061@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.00.1210150157400.16624@utopia.booyaka.com>
+ <CAG5Tg6XqpeRppWbr9-yBmsf+2TobhE5ateMX4crs10grn-tuAA@mail.gmail.com>
+ <alpine.DEB.2.00.1210150523190.15973@utopia.booyaka.com>
+ <20121015175317.GE15569@atomide.com>
+Message-ID: <507D95B2.3020506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 05:32:26PM +0100, Will Deacon wrote:
-> On Tue, Oct 16, 2012 at 05:10:21PM +0100, Aaro Koskinen wrote:
-> > On Thu, Sep 20, 2012 at 05:03:38PM +0100, Will Deacon wrote:
-> > > From: Matthew Leach <matthew.leach@arm.com>
-> > > 
-> > > Ensure that the memory regions that are set within the segments
-> > > correspond to physical contiguous memory regions.
-> > 
-> > This patch seems to break kexec for me in 3.7-rc1 (commit
-> > c564df4db85aac8d1d65a56176a0a25f46138064, bisected).
-> > 
-> > kexec -l fails with the following output:
-> > 
-> > kexec_load failed: Invalid argument
-> > entry       = 0x80008000 flags = 280000
-> > nr_segments = 2
-> > segment[0].buf   = 0xc48008
-> > segment[0].bufsz = 230
-> > segment[0].mem   = 0x80001000
-> > segment[0].memsz = 1000
-> > segment[1].buf   = 0xb6a9b008
-> > segment[1].bufsz = 3a4668
-> > segment[1].mem   = 0x80008000
-> > segment[1].memsz = 3a5000
-> > Could not load the kexec kernel: n800-zImage
-> > 
-> > The board is OMAP2420 / Nokia N800.
+
+On 10/15/2012 12:53 PM, Tony Lindgren wrote:
+> * Paul Walmsley <paul@pwsan.com> [121014 22:26]:
+>>
+>> After commit 846a136881b8f73c1f74250bf6acfaa309cab1f2 ("ARM: vfp: fix
+>> saving d16-d31 vfp registers on v6+ kernels"), the OMAP 2430SDP board
+>> started crashing during boot with omap2plus_defconfig:
+>>
+>> [    3.875122] mmcblk0: mmc0:e624 SD04G 3.69 GiB
+>> [    3.915954]  mmcblk0: p1
+>> [    4.086639] Internal error: Oops - undefined instruction: 0 [#1] SMP ARM
+>> [    4.093719] Modules linked in:
+>> [    4.096954] CPU: 0    Not tainted  (3.6.0-02232-g759e00b #570)
+>> [    4.103149] PC is at vfp_reload_hw+0x1c/0x44
+>> [    4.107666] LR is at __und_usr_fault_32+0x0/0x8
+>>
+>> It turns out that the context save/restore fix unmasked a latent bug
+>> in commit 5aaf254409f8d58229107b59507a8235b715a960 ("ARM: 6203/1: Make
+>> VFPv3 usable on ARMv6").  When CONFIG_VFPv3 is set, but the kernel is
+>> booted on a pre-VFPv3 core, the code attempts to save and restore the
+>> d16-d31 VFP registers.  These are only present on non-D16 VFPv3+, so
+>> this results in an undefined instruction exception.  The code didn't
+>> crash before commit 846a136 because the save and restore code was
+>> only touching d0-d15, present on all VFP.
+>>
+>> Fix by implementing a request from Russell King to add a new HWCAP
+>> flag that affirmatively indicates the presence of the d16-d31
+>> registers:
+>>
+>>    http://marc.info/?l=linux-arm-kernel&m=135013547905283&w=2
+>>
+>> and some feedback from M?ns to clarify the name of the HWCAP flag.
+>>
+>> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Dave Martin <dave.martin@linaro.org>
+>> Cc: M?ns Rullg?rd <mans.rullgard@linaro.org>
 > 
-> Interesting, it sounds like kexec thinks that you don't have contiguous
-> memory from 0x80008000 to 0x803ad000. Can you provide some more information
-> about your physical memory map please?
+> This fixes the error above on my 2430sdp:
+> 
+> Tested-by: Tony Lindgren <tony@atomide.com>
 
-Well, I think it's because the patch is wrong. Shouldn't it be:
+Fixes same error on 2420 H4.
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index e29c333..a80192e 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -47,7 +47,7 @@ int machine_kexec_prepare(struct kimage *image)
- 
- 		err = memblock_is_region_memory(current_segment->mem,
- 						current_segment->memsz);
--		if (err)
-+		if (!err)
- 			return - EINVAL;
- 
- 		err = get_user(header, (__be32*)current_segment->buf);
+Tested-by: Jon Hunter <jon-hunter@ti.com>
 
-A.
+Cheers
+Jon
