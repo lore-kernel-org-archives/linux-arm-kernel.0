@@ -1,23 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 10:50:45 -0700
-Subject: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <c048044c10b5712e25d190a0ae1dfee3155f81f7.1350327325.git.richardcochran@gmail.com>
+Date: Tue, 16 Oct 2012 10:51:43 -0700
+Subject: [PATCH 5/5] arm/dts: am33xx: Add cpsw and mdio module nodes
+ for AM33XX
+In-Reply-To: <b4d88ef79fb0dec95bb598aaf1f15f0a7344c435.1350327325.git.richardcochran@gmail.com>
 References: <cover.1350327320.git.richardcochran@gmail.com>
- <c048044c10b5712e25d190a0ae1dfee3155f81f7.1350327325.git.richardcochran@gmail.com>
-Message-ID: <20121016175045.GW15569@atomide.com>
+ <b4d88ef79fb0dec95bb598aaf1f15f0a7344c435.1350327325.git.richardcochran@gmail.com>
+Message-ID: <20121016175143.GX15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Richard Cochran <richardcochran@gmail.com> [121015 12:23]:
 > From: Mugunthan V N <mugunthanvnm@ti.com>
 > 
-> This patch adds minimal hwmod support for davinci mdio driver. This patch
-> requires rework on parent child relation between cpsw and davinci mdio
-> hwmod data to support runtime PM.
+> Add CPSW and MDIO related device tree data for AM33XX.
+> Also enable them into board/evm dts files by providing
+> respective phy-id.
 
-Looks like Paul Walmsley may have missed this one, maybe please resend
-with him and linux-omap cc:d.
+These omap specific .dts changes  should be queued by Benoit Cousson,
+please cc him and linux-omap.
 
 Regards,
 
