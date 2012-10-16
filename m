@@ -1,72 +1,68 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 16 Oct 2012 23:29:39 +0530
-Subject: [RFC PATCH] ARM: kernel: update cpuinfo to print all online CPUs
- features
-In-Reply-To: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <507DA08B.502@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Oct 2012 11:06:01 -0700
+Subject: [PATCH v2 00/14] OMAP-GPMC related cleanup for common zImage
+In-Reply-To: <20121010163840.GA13585@parrot.com>
+References: <cover.1349672877.git.afzal@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9F7B0A@DBDE01.ent.ti.com>
+ <20121010163840.GA13585@parrot.com>
+Message-ID: <20121016180600.GA15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 16 October 2012 09:54 PM, Lorenzo Pieralisi wrote:
-> Currently, reading /proc/cpuinfo provides userspace with CPU ID of
-> the CPU carrying out the read from the file. This is fine as long as all
-> CPUs in the system are the same. With the advent of big.LITTLE and
-> heterogenous ARM systems this approach provides user space with incorrect
-> bits of information since CPU ids in the system might differ from the one
-> provided by the CPU reading the file.
->
-> This patch updates the cpuinfo show function and some internal data
-> structures so that a read from /proc/cpuinfo prints HW information for
-> all online CPUs at once, mirroring x86 behaviour.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->
-> Posting it as a way to get advice on the best way to improve /proc/cpuinfo for
-> heterogenous multi-cluster systems and to provide proper information to
-> userspace without breaking existing semantics, no more than that.
->
-> Comments more than welcome.
->
-> Thanks,
-> Lorenzo
->
->   arch/arm/include/asm/cpu.h |  1 +
->   arch/arm/kernel/setup.c    | 66 +++++++++++++++++++++++-----------------------
->   arch/arm/kernel/smp.c      |  1 +
->   3 files changed, 35 insertions(+), 33 deletions(-)
->
+* Ivan Djelic <ivan.djelic@parrot.com> [121010 09:40]:
+> 
+> I ran several mtd regression tests on a Beagle Board on your gpmc-czimage-v2 tag.
+> All BCH error correcting tests passed successfully.
+> 
+> I occasionally had weird read errors though, especially when reading blank pages:
+> the omap driver returned 512-byte sectors containing something like:
+> 
+> 30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff
+> 30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff
+> 30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff
+> 30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff
+> 30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff
+> 30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ff30ffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> 
+> instead of:
+> 
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+> 
+> I was able to reproduce the problem also on l2-mtd tip, albeit less often.
+> The problem seems to occur quite randomly, it may be a hardware issue on
+> my board...
 
-[...]
+Things like this typically happen in the GPMC timings are not correct.
+Maybe add #define DEBUG to top of gpmc.c and compare the timings
+before and after Afzal's patches? 
 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 8707cff..bf7839d08 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -1054,13 +1054,15 @@ static const char *hwcap_str[] = {
->
->   static int c_show(struct seq_file *m, void *v)
->   {
-> -	int i;
-> +	int i, j;
-> +	u32 cpuid;
->
-> -	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
-> -		   cpu_name, read_cpuid_id() & 15, elf_platform);
-> +	for_each_online_cpu(i) {
-> +		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
-> +		seq_printf(m, "Processor\t: %s rev %d (%s)\n",
-> +			   cpu_name, cpuid & 15, elf_platform);
->
-Not exactly related to the $subject patch, but I remember doing a patch
-to have cat /proc/cpuinfo spitting only online CPUs just like x86 using
-for_each_online_cpu(i).
-At that point Russell mentioned about a possibility of read() syscall
-spreading over the hot-plug operation and hence the above may not
-be safe.
+> Anyway, the ECC handling part looks OK to me.
 
-is that right Russell ?
+Regards,
 
-regards
-Santosh
+Tony
