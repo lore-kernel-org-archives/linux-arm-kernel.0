@@ -1,50 +1,64 @@
-From: matthieu.castet@parrot.com (Matthieu CASTET)
-Date: Tue, 16 Oct 2012 13:17:11 +0200
-Subject: [PATCH] slab : allow SLAB_RED_ZONE and SLAB_STORE_USER to work on arm
-Message-ID: <1350386231-770-1-git-send-email-matthieu.castet@parrot.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Oct 2012 12:20:46 +0100
+Subject: [PATCH 00/11] Minimum set of omap serial patches to fix merge
+ window breakage
+In-Reply-To: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
+References: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
+Message-ID: <20121016112046.GX28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthieu CASTET <castet.matthieu@free.fr>
+On Tue, Oct 16, 2012 at 11:14:58AM +0100, Russell King - ARM Linux wrote:
+> During the merge window, a series of patches from various people went in,
+> allegedly fixing various problems with the OMAP serial driver.
+> 
+> Unfortunately, there was not a full understanding of the issues I brought
+> up here back in April, and so the "fixes", while being individually
+> correct, result in a worse situation with the driver than before.
+> 
+> Specifically, this patch:
+> 
+> commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6
+> Author: Vikram Pandita <vikram.pandita@ti.com>
+> Date:   Thu Sep 6 15:45:37 2012 +0300
+> 
+>     serial: omap: fix software flow control
+> 
+>     Software flow control register bits were not defined correctly.
+> 
+>     Also clarify the IXON and IXOFF logic to reflect what userspace wants.
+> 
+> does what it says on the tin - it fixes the register definitions so that
+> we do end up enabling the right two software flow control bits.
+> 
+> The down side is that there are other bugs in this area which have been
+> exposed.  For example:
+> 
+> 1. the XON/XOFF registers aren't written to; their address is, but we will
+>    not be writing to the right registers because their access rules are not
+>    respected by the driver.  These are by default zero.
+> 
+>    This means that with hardware assisted software flow control enabled,
+>    the port will now transmit an 0x00 byte for XON and XOFF events.
+> 
+> 2. the driver set_termios function is not called for changes in software
+>    flow control settings if not accompanied by some other change.
+> 
+> 3. the there isn't actually a way for the hardware assisted flow control
+>    to be used other than by increasing interrupt latency to cause the
+>    receiver hardware FIFO to fill.  This will cause 0x00 bytes to be
+>    transmitted.
+> 
+> There are two options to resolve this.  The first one is to revert this
+> patch to bring the driver back down to the pre-merge window state.  The
+> other is to apply this series of patches, which frankly I don't think
+> is -rc material, even with the above regressions.
+> 
+> Given that the above regressions were caused by a lack of due care and
+> correct process (I had declared to TI that I had investigated these
+> issues back in April), I believe that the right answer is to revert at
+> least commit 957ee7270d, which should re-hide these other bugs in the
+> driver.
 
-on cortexA8 (omap3) ralign is 64 and __alignof__(unsigned long long) is 8.
-So we always disable debug.
-
-This patch is based on 5c5e3b33b7cb959a401f823707bee006caadd76e, but fix
-case were align < sizeof(unsigned long long).
-
-Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
-CC: Russell King <rmk@arm.linux.org.uk>
-CC: Pekka Enberg <penberg@cs.helsinki.fi>
----
- mm/slab.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
-
-diff --git a/mm/slab.c b/mm/slab.c
-index c685475..8427901 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -2462,9 +2462,6 @@ __kmem_cache_create (const char *name, size_t size, size_t align,
- 	if (ralign < align) {
- 		ralign = align;
- 	}
--	/* disable debug if necessary */
--	if (ralign > __alignof__(unsigned long long))
--		flags &= ~(SLAB_RED_ZONE | SLAB_STORE_USER);
- 	/*
- 	 * 4) Store it.
- 	 */
-@@ -2491,8 +2488,9 @@ __kmem_cache_create (const char *name, size_t size, size_t align,
- 	 */
- 	if (flags & SLAB_RED_ZONE) {
- 		/* add space for red zone words */
--		cachep->obj_offset += sizeof(unsigned long long);
--		size += 2 * sizeof(unsigned long long);
-+		int offset = max(align, sizeof(unsigned long long));
-+		cachep->obj_offset += offset;
-+		size += offset + sizeof(unsigned long long);
- 	}
- 	if (flags & SLAB_STORE_USER) {
- 		/* user store requires one word storage behind the end of
--- 
-1.7.10.4
+Note: these patches are not as well validated as my previous set; I
+haven't even build-tested just this set, but only my full set.  YMMV.
