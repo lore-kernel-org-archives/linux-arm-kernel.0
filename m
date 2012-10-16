@@ -1,122 +1,37 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 16 Oct 2012 10:05:25 +0200
-Subject: [PATCH 1/2] ASoC: atmel-ssc: use devm_xxx() managed function
-In-Reply-To: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
-References: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <507D1545.8020903@atmel.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 16 Oct 2012 11:06:34 +0300
+Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
+In-Reply-To: <507C32E8.1040701@wwwdotorg.org>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-8-git-send-email-josephl@nvidia.com>
+ <5074AA0E.2080508@wwwdotorg.org>
+ <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
+ <5076F5CB.4020200@wwwdotorg.org>
+ <1350025676.20241.82.camel@jlo-ubuntu-64.nvidia.com>
+ <507885D4.10604@wwwdotorg.org>
+ <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
+ <507C32E8.1040701@wwwdotorg.org>
+Message-ID: <20121016080634.GG3196@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2012 05:56 AM, Bo Shen :
-> Using the devm_xxx() managed function to stripdown the error
-> and remove code.
+> > Even though we have plan to use coupled cpuidle, I still prefer to go
+> > with the LP2 driver first. Then adding one more patch to support coupled
+> > cpuidle based on LP2 driver. This is good for history. And if there is
+> > any issue, it's more easy to roll back to the stable one.
 > 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-
-Maybe too late, but:
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->  drivers/misc/atmel-ssc.c |   47 +++++++++++++++-------------------------------
->  1 file changed, 15 insertions(+), 32 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index 5bb1877..23dcb76 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -70,37 +70,33 @@ EXPORT_SYMBOL(ssc_free);
->  
->  static int __init ssc_probe(struct platform_device *pdev)
->  {
-> -	int retval = 0;
->  	struct resource *regs;
->  	struct ssc_device *ssc;
->  
-> -	ssc = kzalloc(sizeof(struct ssc_device), GFP_KERNEL);
-> +	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
->  	if (!ssc) {
->  		dev_dbg(&pdev->dev, "out of memory\n");
-> -		retval = -ENOMEM;
-> -		goto out;
-> +		return -ENOMEM;
->  	}
->  
-> +	ssc->pdev = pdev;
-> +
->  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!regs) {
->  		dev_dbg(&pdev->dev, "no mmio resource defined\n");
-> -		retval = -ENXIO;
-> -		goto out_free;
-> +		return -ENXIO;
->  	}
->  
-> -	ssc->clk = clk_get(&pdev->dev, "pclk");
-> -	if (IS_ERR(ssc->clk)) {
-> -		dev_dbg(&pdev->dev, "no pclk clock defined\n");
-> -		retval = -ENXIO;
-> -		goto out_free;
-> -	}
-> -
-> -	ssc->pdev = pdev;
-> -	ssc->regs = ioremap(regs->start, resource_size(regs));
-> +	ssc->regs = devm_request_and_ioremap(&pdev->dev, regs);
->  	if (!ssc->regs) {
->  		dev_dbg(&pdev->dev, "ioremap failed\n");
-> -		retval = -EINVAL;
-> -		goto out_clk;
-> +		return -EINVAL;
-> +	}
-> +
-> +	ssc->clk = devm_clk_get(&pdev->dev, "pclk");
-> +	if (IS_ERR(ssc->clk)) {
-> +		dev_dbg(&pdev->dev, "no pclk clock defined\n");
-> +		return -ENXIO;
->  	}
->  
->  	/* disable all interrupts */
-> @@ -112,8 +108,7 @@ static int __init ssc_probe(struct platform_device *pdev)
->  	ssc->irq = platform_get_irq(pdev, 0);
->  	if (!ssc->irq) {
->  		dev_dbg(&pdev->dev, "could not get irq\n");
-> -		retval = -ENXIO;
-> -		goto out_unmap;
-> +		return -ENXIO;
->  	}
->  
->  	spin_lock(&user_lock);
-> @@ -125,16 +120,7 @@ static int __init ssc_probe(struct platform_device *pdev)
->  	dev_info(&pdev->dev, "Atmel SSC device at 0x%p (irq %d)\n",
->  			ssc->regs, ssc->irq);
->  
-> -	goto out;
-> -
-> -out_unmap:
-> -	iounmap(ssc->regs);
-> -out_clk:
-> -	clk_put(ssc->clk);
-> -out_free:
-> -	kfree(ssc);
-> -out:
-> -	return retval;
-> +	return 0;
->  }
->  
->  static int __devexit ssc_remove(struct platform_device *pdev)
-> @@ -142,10 +128,7 @@ static int __devexit ssc_remove(struct platform_device *pdev)
->  	struct ssc_device *ssc = platform_get_drvdata(pdev);
->  
->  	spin_lock(&user_lock);
-> -	iounmap(ssc->regs);
-> -	clk_put(ssc->clk);
->  	list_del(&ssc->list);
-> -	kfree(ssc);
->  	spin_unlock(&user_lock);
->  
->  	return 0;
+> I don't think that implementing it one way and then changing to a
+> different way will benefit history at all. It'll make the history more
+> complicated. What exactly is the problem with just using coupled cpuidle
+> from the start? If we did merge this implementation now, then switch to
+> coupled cpuidle later, when do you think the switch would happen?
 > 
 
+Before we consider doing this, I think we should have some idea on how
+frequently we run into the situation where CPU0 is idle but a secondary
+core is not. Depending on that we can then decide how useful coupled cpuidle
+would be for us.
 
--- 
-Nicolas Ferre
+Cheers,
+
+Peter.
