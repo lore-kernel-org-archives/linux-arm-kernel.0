@@ -1,50 +1,38 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 16 Oct 2012 18:25:32 +0800
-Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
-In-Reply-To: <20121016083954.GB12801@game.jcrosoft.org>
-References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
- <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
- <20121015150244.GZ12801@game.jcrosoft.org> <507CD0CA.9010006@atmel.com>
- <20121016083954.GB12801@game.jcrosoft.org>
-Message-ID: <507D361C.6020403@atmel.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 16 Oct 2012 12:27:55 +0200
+Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
+ contiguous allocations
+In-Reply-To: <20121016085928.GV21164@n2100.arm.linux.org.uk>
+References: <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com><20121016090434.7d5e088152a3e0b0606903c8@nvidia.com><20121016085928.GV21164@n2100.arm.linux.org.uk>
+Message-ID: <20121016.132755.661591248175727826.hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J,
+Hi Russell,
 
-On 10/16/2012 16:39, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 11:13 Tue 16 Oct     , Bo Shen wrote:
->> Hi J,
->>
->> On 10/15/2012 23:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>> On 17:30 Mon 15 Oct     , Bo Shen wrote:
->>>> The i2c core driver will turn the platform device ID to busnum
->>>> When using platfrom device ID as -1, it means dynamically assigned
->>>> the busnum. When writing code, we need to make sure the busnum,
->>>> and call i2c_register_board_info(int busnum, ...) to register device
->>>> if using -1, we do not know the value of busnum
->>>> 	
->>>> In order to solve this issue, set the platform device ID as a fix number
->>>> Here using 0 to match the busnum used in i2c_regsiter_board_info()
->>>>
->>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->>>> ---
->>>
->>> can you check when this append for the first time to schedule a patch for stable too
->>
->> OK. I will resend it and add linux stable into the cc list.
-> no this not how it work
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 16 Oct 2012 10:59:28 +0200:
+
+> On Tue, Oct 16, 2012 at 09:04:34AM +0300, Hiroshi Doyu wrote:
+> > In addition to those contiguous/discontiguous page allocation, is
+> > there any way to _import_ anonymous pages allocated by a process to be
+> > used in dma-mapping API later?
+> > 
+> > I'm considering the following scenario, an user process allocates a
+> > buffer by malloc() in advance, and then it asks some driver to convert
+> > that buffer into IOMMU'able/DMA'able ones later. In this case, pages
+> > are discouguous and even they may not be yet allocated at
+> > malloc()/mmap().
+> 
+> That situation is covered.  It's the streaming API you're wanting for that.
+> dma_map_sg() - but you may need additional cache handling via
+> flush_dcache_page() to ensure that your code is safe for all CPU cache
+> architectures.
 >
-> I ask you to check which patch add the regression and then when this is
-> applied in the kernel we will request greg to apply it too to the stable
+> Remember that pages allocated into userspace will be cacheable, so a cache
+> flush is required before they can be DMA'd.  Hence the streaming
+> API.
 
-The code is using id = -1 appear 4 years ago. And after dig, I don't 
-find which patch cause this the regression.
+Is the syscall "cacheflush()" supposed to be the knob for that?
 
-Sorry for that.
-
-> But before do that you MUST foudn the commit responsible
->
-> Best Regards,
-> J.
->
+Or is there any other ones to have more precise control, "clean",
+"invalidate" and "flush", from userland in generic way?
