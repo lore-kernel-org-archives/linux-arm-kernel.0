@@ -1,61 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 16 Oct 2012 09:43:26 -0700
-Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
-In-Reply-To: <507D58D9.2040607@antcom.de>
-References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
- <1350343887-7344-3-git-send-email-stigge@antcom.de>
- <20121015235720.GA3132@kroah.com> <507D58D9.2040607@antcom.de>
-Message-ID: <20121016164326.GA4858@kroah.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 16 Oct 2012 17:46:37 +0100
+Subject: [PATCH 1/4] arm64: Select MODULES_USE_ELF_RELA
+In-Reply-To: <1350406000-30882-1-git-send-email-catalin.marinas@arm.com>
+References: <1350406000-30882-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1350406000-30882-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 02:53:45PM +0200, Roland Stigge wrote:
-> On 10/16/2012 01:57 AM, Greg KH wrote:
-> > On Tue, Oct 16, 2012 at 01:31:18AM +0200, Roland Stigge wrote:
-> >> +int gpio_block_export(struct gpio_block *block)
-> >> +{
-> >> +	int		status;
-> >> +	struct device	*dev;
-> >> +
-> >> +	/* can't export until sysfs is available ... */
-> >> +	if (!gpio_class.p) {
-> >> +		pr_debug("%s: called too early!\n", __func__);
-> >> +		return -ENOENT;
-> >> +	}
-> >> +
-> >> +	mutex_lock(&sysfs_lock);
-> >> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
-> >> +			    block->name);
-> >> +	if (!IS_ERR(dev))
-> >> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
-> >> +	else
-> >> +		status = PTR_ERR(dev);
-> >> +	mutex_unlock(&sysfs_lock);
-> > 
-> > You just raced with userspace telling it that the device was present,
-> > yet the attributes are not there.  Don't do that, use the default class
-> > attributes for the class and then the driver core will create them
-> > automagically without needing to this "by hand" at all.
-> 
-> I guess you mean class attributes like gpio_class_attrs[] of gpio_class?
+With commit 786d35d4 (make most arch asm/module.h files use
+asm-generic/module.h) arm64 needs to enable MODULES_USE_ELF_RELA for
+loadable modules.
 
-Yes.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Aren't class attributes specific to a class only (i.e. only one
-> attribute at the root for all devices)? What I needed above are
-> attributes for the block itself (of which there can be several). So we
-> need device attributes for each block, not class attributes here.
-
-Yes, that is what the dev_attrs field in 'struct class' is for.
-
-> Maybe there's some other kind of locking/atomicity available for this task?
-> 
-> Further, current gpio and gpiochip devices are also doing this way:
-> creating the device and subsequently their attrs, even though there may
-> be a better way but I'm still wondering how this would be.
-
-Then the existing code is broken and should be fixed to use dev_attrs.
-I guess it's time to audit the tree and find all places that get this
-wrong...
-
-greg k-h
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7ff68c9..ef54a59 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -22,6 +22,7 @@ config ARM64
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_SPARSE_IRQ
+ 	select IRQ_DOMAIN
++	select MODULES_USE_ELF_RELA
+ 	select NO_BOOTMEM
+ 	select OF
+ 	select OF_EARLY_FLATTREE
