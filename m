@@ -1,81 +1,67 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Oct 2012 17:09:22 +0300
-Subject: [PATCH] Revert "serial: omap: fix software flow control"
-Message-ID: <1350396562-32579-1-git-send-email-balbi@ti.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Tue, 16 Oct 2012 16:35:22 +0200
+Subject: [Celinux-dev] PDF documentation
+In-Reply-To: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+Message-ID: <20121016143522.086F2204292@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6
-(serial: omap: fix software flow control).
+Dear Constantine Shulyupin,
 
-As Russell has pointed out, that commit isn't fixing
-Software Flow Control at all, and it actually makes
-it even more broken.
+In message <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com> you wrote:
+> 
+> I have some questions and ideas about documentation in PDF format.
+> During embedded SW development I often work with documentation,
+> especially datasheets in PDF format. I have some issues with such
+> documentation. It is not so easy to manage a lot of PDF documents
+> sometimes with strange code in file names.  It is not easy to store
+> and share links to documentation.
 
-It was agreed to revert this commit and use Russell's
-latest UART patches instead.
+PDF has a lot of advantages in many situations, but I agree that it is
+also non-perfect for many other use cases.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+> Questions:
+> - have same issues with PDF documentation and datasheets?
+> - do you think documentation and datasheets in HTML format on a site
+> can be more useful than PDF?
 
-Hi Greg,
+HTML is really useful in a web browser only.
 
-you might prefer to do the revert yourself, in that case just
-revert commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6.
+For documentation of the U-Boot boot loader we use a very different
+approach:  documentation is created, stored and edited in a wiki
+(using FosWiki, see http://foswiki.org/).  This has the advantage that
+you can make it either easily editable to the community, or put
+arbitrary access restrictions to it by using wiki user / group access
+permissions.  In combination with some plugins (like TocPlugin,
+BookmakerPlugin and PublishPlugin) we can then "linearize" the entries
+in the wiki to generate a "book" which can be read both online (as
+HTML) or offline (by publishing the content as a linerarized, single
+HTLP, plain text, PDF and/or PostScript document).
 
-thanks
+To give you a feeling how this works, please see for example 
+	http://www.denx.de/wiki/view/DULG/Manual?stickboard=m28
+	http://www.denx.de/wiki/publish/DULG/DULG-m28.html
+	http://www.denx.de/wiki/publish/DULG/DULG-m28.ps
+and	http://www.denx.de/wiki/publish/DULG/DULG-m28.pdf
 
- arch/arm/plat-omap/include/plat/omap-serial.h |  4 ++--
- drivers/tty/serial/omap-serial.c              | 12 ++++++------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+[Actually this documentation does much more behind the scenes; all
+examples in this documentation come from include files which are
+automatically generated from our regression test suite (DUTS); so the
+procedure is to come up with a new software version, run the test
+suite over it, upload the generated log files to the web server, and
+voila, there is a new version of the documentation matching exactly
+the new software version.]
 
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index f4a4cd0..1957a85 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -40,10 +40,10 @@
- #define OMAP_UART_WER_MOD_WKUP	0X7F
- 
- /* Enable XON/XOFF flow control on output */
--#define OMAP_UART_SW_TX		0x8
-+#define OMAP_UART_SW_TX		0x04
- 
- /* Enable XON/XOFF flow control on input */
--#define OMAP_UART_SW_RX		0x2
-+#define OMAP_UART_SW_RX		0x04
- 
- #define OMAP_UART_SYSC_RESET	0X07
- #define OMAP_UART_TCR_TRIG	0X0F
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 6ede6fd..6d3d26a 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -671,19 +671,19 @@ serial_omap_configure_xonxoff
- 
- 	/*
- 	 * IXON Flag:
--	 * Flow control for OMAP.TX
--	 * OMAP.RX should listen for XON/XOFF
-+	 * Enable XON/XOFF flow control on output.
-+	 * Transmit XON1, XOFF1
- 	 */
- 	if (termios->c_iflag & IXON)
--		up->efr |= OMAP_UART_SW_RX;
-+		up->efr |= OMAP_UART_SW_TX;
- 
- 	/*
- 	 * IXOFF Flag:
--	 * Flow control for OMAP.RX
--	 * OMAP.TX should send XON/XOFF
-+	 * Enable XON/XOFF flow control on input.
-+	 * Receiver compares XON1, XOFF1.
- 	 */
- 	if (termios->c_iflag & IXOFF)
--		up->efr |= OMAP_UART_SW_TX;
-+		up->efr |= OMAP_UART_SW_RX;
- 
- 	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
+And the nice thing is: all this is based on free software only...
+
+Best regards,
+
+Wolfgang Denk
+
 -- 
-1.8.0.rc0
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+One difference between a man and a machine is that a machine is quiet
+when well oiled.
