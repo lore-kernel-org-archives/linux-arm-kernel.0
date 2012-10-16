@@ -1,24 +1,19 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 16 Oct 2012 01:08:57 -0300
-Subject: [PATCH 1/2] ARM: mx27_3ds: Reserve memory for camera usage
-In-Reply-To: <20121010075222.GN27665@pengutronix.de>
-References: <1349839770-13848-1-git-send-email-festevam@gmail.com>
- <20121010075222.GN27665@pengutronix.de>
-Message-ID: <CAOMZO5DqJuernaHk-4KO_v=8vPCnrpqCZ-uZ2nrhtFcKo9xObA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 15 Oct 2012 21:13:40 -0700
+Subject: [PATCH] ARM: dts: compile Integrator device trees
+In-Reply-To: <1350073379-23512-1-git-send-email-linus.walleij@linaro.org>
+References: <1350073379-23512-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121016041340.GA16114@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 4:52 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Wed, Oct 10, 2012 at 12:29:29AM -0300, Fabio Estevam wrote:
->> From: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Reserve dedicated memory block for camera usage.
->
-> Why not use CMA?
+On Fri, Oct 12, 2012 at 10:22:59PM +0200, Linus Walleij wrote:
+> This makes sure that the ARM Integrator device trees get compiled
+> during build.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Sorry, not familiar with CMA. Could you please point to some board
-file/driver that makes use of it?
+Thanks, applied to fixes.
 
-Regards,
 
-Fabio Estevam
+-Olof
