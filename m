@@ -1,54 +1,61 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 16 Oct 2012 10:40:38 -0700
-Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
-In-Reply-To: <CACRpkdYaaSt9uLN2_=KXYDK2b5D5paopsYxgYKqezKCx8cy=vQ@mail.gmail.com>
-References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
- <1350343887-7344-3-git-send-email-stigge@antcom.de>
- <20121015235720.GA3132@kroah.com> <507D58D9.2040607@antcom.de>
- <20121016164326.GA4858@kroah.com>
- <CACRpkdYaaSt9uLN2_=KXYDK2b5D5paopsYxgYKqezKCx8cy=vQ@mail.gmail.com>
-Message-ID: <20121016174038.GA17982@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Oct 2012 10:43:19 -0700
+Subject: [PATCH] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
+In-Reply-To: <20121010143742.GE13724@beef>
+References: <1349773040-8204-1-git-send-email-hvaibhav@ti.com>
+ <20121010140027.GB13724@beef>
+ <79CD15C6BA57404B839C016229A409A83EB3B573@DBDE01.ent.ti.com>
+ <20121010143501.GC13724@beef> <20121010143742.GE13724@beef>
+Message-ID: <20121016174319.GU15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 07:27:15PM +0200, Linus Walleij wrote:
-> On Tue, Oct 16, 2012 at 6:43 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> > On Tue, Oct 16, 2012 at 02:53:45PM +0200, Roland Stigge wrote:
-> >>
-> >> Further, current gpio and gpiochip devices are also doing this way:
-> >> creating the device and subsequently their attrs, even though there may
-> >> be a better way but I'm still wondering how this would be.
-> >
-> > Then the existing code is broken and should be fixed to use dev_attrs.
-> > I guess it's time to audit the tree and find all places that get this
-> > wrong...
+* Matt Porter <mporter@ti.com> [121010 07:38]:
+> On Wed, Oct 10, 2012 at 10:35:01AM -0400, Matt Porter wrote:
+> > On Wed, Oct 10, 2012 at 02:19:40PM +0000, Vaibhav Hiremath wrote:
+> > > On Wed, Oct 10, 2012 at 19:30:27, Porter, Matt wrote:
+> > > > On Tue, Oct 09, 2012 at 02:27:20PM +0530, Vaibhav Hiremath wrote:
+> > > > > With recent changes in omap gpmc driver code, in case of DT
+> > > > > boot mode, where bootloader does not configure gpmc cs space
+> > > > > will result into kernel BUG() inside gpmc_mem_init() function,
+> > > > > as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
+> > > > > gpmc_config7[0].baseaddress is set to '0' on reset.
+> > > > > 
+> > > > > This use-case is applicable for any board/EVM which doesn't have
+> > > > > any peripheral connected to gpmc cs0, for example BeagleXM and
+> > > > > BeagleBone, so DT boot mode fails.
+> > > > > 
+> > > > > This patch adds of_have_populated_dt() check before creating
+> > > > > device, so that for DT boot mode, gpmc probe will not be called
+> > > > > which is expected behavior, as gpmc is not supported yet from DT.
+> > > > > 
+> > > > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > > > > Cc: Afzal Mohammed <afzal@ti.com>
+> > > > > Cc: Tony Lindgren <tony@atomide.com>
+> > > > > Cc Paul Walmsley <paul@pwsan.com>
+> > > > > ---
+> > > > > This should go in for rc1, as this breaks AM33xx boot.
+> > > > 
+> > > > Fixes BeagleBone on mainline.
+> > > > 
+> > > > Tested-by: Matt Porter <mporter@ti.com>
+> > > > 
+> > > 
+> > > Thanks Matt and Afzal,
+> > > 
+> > > Tony can this be picked up for rc1?? I know you have already sent pull 
+> > > request for rc1, but by any chance you are planning to send another request?
+> > 
+> > I also found a separate problem with the mcasp clock data that's needed
+> > for rc1. I just posted a patch for that as I need both this patch and the
+> > clock data fix to boot from current mainline.
 > 
-> The thing is, as I've tried to explain but maybe didn't get across,
-> that these devices don't *have* a parent, and are not part of any
-> tree.
+> Disregard now that you got me pointed to the pull request with this :)
 
-You are passing in a parent device to the device_create() call, where
-did that pointer come from?
+Thanks applying $Subject patch into omap-for-v3.7-rc1/fixes-part2 and
+ignoring the comments about the mcasp clock as it sounds like the mcasp
+is already fixed.
 
-Either way, the attribute creation needs to happen before we announce
-the device to userspace, that's a bug that should be fixed now.
+Regards,
 
-> They are parentless mock devices, created on-the-fly just to get
-> sysfs entries.
-
-That's fine, well, not the "parentless" part, but that should be trivial
-to fix, just pass in the correct pointer and you should be fine.
-
-> What is needed it to get the device model right in the first
-> place.
-
-I thought it was in the device model already?
-
-> Fixing it has been drafted by me and Grant:
-> https://blueprints.launchpad.net/linux-linaro/+spec/gpiochip-to-dev
-> 
-> This is not all-encompassing though :-/
-
-That's a good list to work from, good luck :)
-
-greg k-h
+Tony
