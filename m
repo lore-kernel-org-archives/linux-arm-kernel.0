@@ -1,59 +1,111 @@
 From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 16 Oct 2012 11:56:59 +0800
-Subject: [PATCH 2/2] ASoC: atmel-ssc: use module_platform_driver macro
-In-Reply-To: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
-References: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <1350359819-2461-2-git-send-email-voice.shen@atmel.com>
+Date: Tue, 16 Oct 2012 11:56:58 +0800
+Subject: [PATCH 1/2] ASoC: atmel-ssc: use devm_xxx() managed function
+Message-ID: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes some code duplication by using module_platform_driver
+Using the devm_xxx() managed function to stripdown the error
+and remove code.
 
 Signed-off-by: Bo Shen <voice.shen@atmel.com>
 ---
- drivers/misc/atmel-ssc.c |   18 ++++--------------
- 1 file changed, 4 insertions(+), 14 deletions(-)
+ drivers/misc/atmel-ssc.c |   47 +++++++++++++++-------------------------------
+ 1 file changed, 15 insertions(+), 32 deletions(-)
 
 diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index 23dcb76..ac00f83 100644
+index 5bb1877..23dcb76 100644
 --- a/drivers/misc/atmel-ssc.c
 +++ b/drivers/misc/atmel-ssc.c
-@@ -68,7 +68,7 @@ void ssc_free(struct ssc_device *ssc)
- }
- EXPORT_SYMBOL(ssc_free);
+@@ -70,37 +70,33 @@ EXPORT_SYMBOL(ssc_free);
  
--static int __init ssc_probe(struct platform_device *pdev)
-+static int ssc_probe(struct platform_device *pdev)
+ static int __init ssc_probe(struct platform_device *pdev)
  {
+-	int retval = 0;
  	struct resource *regs;
  	struct ssc_device *ssc;
-@@ -135,24 +135,14 @@ static int __devexit ssc_remove(struct platform_device *pdev)
+ 
+-	ssc = kzalloc(sizeof(struct ssc_device), GFP_KERNEL);
++	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
+ 	if (!ssc) {
+ 		dev_dbg(&pdev->dev, "out of memory\n");
+-		retval = -ENOMEM;
+-		goto out;
++		return -ENOMEM;
+ 	}
+ 
++	ssc->pdev = pdev;
++
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!regs) {
+ 		dev_dbg(&pdev->dev, "no mmio resource defined\n");
+-		retval = -ENXIO;
+-		goto out_free;
++		return -ENXIO;
+ 	}
+ 
+-	ssc->clk = clk_get(&pdev->dev, "pclk");
+-	if (IS_ERR(ssc->clk)) {
+-		dev_dbg(&pdev->dev, "no pclk clock defined\n");
+-		retval = -ENXIO;
+-		goto out_free;
+-	}
+-
+-	ssc->pdev = pdev;
+-	ssc->regs = ioremap(regs->start, resource_size(regs));
++	ssc->regs = devm_request_and_ioremap(&pdev->dev, regs);
+ 	if (!ssc->regs) {
+ 		dev_dbg(&pdev->dev, "ioremap failed\n");
+-		retval = -EINVAL;
+-		goto out_clk;
++		return -EINVAL;
++	}
++
++	ssc->clk = devm_clk_get(&pdev->dev, "pclk");
++	if (IS_ERR(ssc->clk)) {
++		dev_dbg(&pdev->dev, "no pclk clock defined\n");
++		return -ENXIO;
+ 	}
+ 
+ 	/* disable all interrupts */
+@@ -112,8 +108,7 @@ static int __init ssc_probe(struct platform_device *pdev)
+ 	ssc->irq = platform_get_irq(pdev, 0);
+ 	if (!ssc->irq) {
+ 		dev_dbg(&pdev->dev, "could not get irq\n");
+-		retval = -ENXIO;
+-		goto out_unmap;
++		return -ENXIO;
+ 	}
+ 
+ 	spin_lock(&user_lock);
+@@ -125,16 +120,7 @@ static int __init ssc_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "Atmel SSC device at 0x%p (irq %d)\n",
+ 			ssc->regs, ssc->irq);
+ 
+-	goto out;
+-
+-out_unmap:
+-	iounmap(ssc->regs);
+-out_clk:
+-	clk_put(ssc->clk);
+-out_free:
+-	kfree(ssc);
+-out:
+-	return retval;
++	return 0;
  }
  
- static struct platform_driver ssc_driver = {
--	.remove		= __devexit_p(ssc_remove),
- 	.driver		= {
- 		.name		= "ssc",
- 		.owner		= THIS_MODULE,
- 	},
-+	.probe		= ssc_probe,
-+	.remove		= __devexit_p(ssc_remove),
- };
--
--static int __init ssc_init(void)
--{
--	return platform_driver_probe(&ssc_driver, ssc_probe);
--}
--module_init(ssc_init);
--
--static void __exit ssc_exit(void)
--{
--	platform_driver_unregister(&ssc_driver);
--}
--module_exit(ssc_exit);
-+module_platform_driver(ssc_driver);
+ static int __devexit ssc_remove(struct platform_device *pdev)
+@@ -142,10 +128,7 @@ static int __devexit ssc_remove(struct platform_device *pdev)
+ 	struct ssc_device *ssc = platform_get_drvdata(pdev);
  
- MODULE_AUTHOR("Hans-Christian Egtvedt <hcegtvedt@atmel.com>");
- MODULE_DESCRIPTION("SSC driver for Atmel AVR32 and AT91");
+ 	spin_lock(&user_lock);
+-	iounmap(ssc->regs);
+-	clk_put(ssc->clk);
+ 	list_del(&ssc->list);
+-	kfree(ssc);
+ 	spin_unlock(&user_lock);
+ 
+ 	return 0;
 -- 
 1.7.9.5
