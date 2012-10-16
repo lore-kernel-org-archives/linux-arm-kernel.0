@@ -1,35 +1,23 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 10:48:36 -0700
-Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
+Date: Tue, 16 Oct 2012 10:50:45 -0700
+Subject: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <c048044c10b5712e25d190a0ae1dfee3155f81f7.1350327325.git.richardcochran@gmail.com>
 References: <cover.1350327320.git.richardcochran@gmail.com>
- <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
-Message-ID: <20121016174835.GV15569@atomide.com>
+ <c048044c10b5712e25d190a0ae1dfee3155f81f7.1350327325.git.richardcochran@gmail.com>
+Message-ID: <20121016175045.GW15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Richard Cochran <richardcochran@gmail.com> [121015 12:18]:
-> From: hvaibhav at ti.com <hvaibhav@ti.com>
+* Richard Cochran <richardcochran@gmail.com> [121015 12:23]:
+> From: Mugunthan V N <mugunthanvnm@ti.com>
 > 
-> With recent changes in omap gpmc driver code, in case of DT
-> boot mode, where bootloader does not configure gpmc cs space
-> will result into kernel BUG() inside gpmc_mem_init() function,
-> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
-> gpmc_config7[0].baseaddress is set to '0' on reset.
-> 
-> This use-case is applicable for any board/EVM which doesn't have
-> any peripheral connected to gpmc cs0, for example BeagleXM and
-> BeagleBone, so DT boot mode fails.
-> 
-> This patch adds of_have_populated_dt() check before creating
-> device, so that for DT boot mode, gpmc probe will not be called
-> which is expected behavior, as gpmc is not supported yet from DT.
+> This patch adds minimal hwmod support for davinci mdio driver. This patch
+> requires rework on parent child relation between cpsw and davinci mdio
+> hwmod data to support runtime PM.
 
-I'm applying this one into omap-for-v3.7-rc1/fixes-part2.
-
-Next time, please also cc linux-omap at vger.kernel.org for series
-like this. I'm sure the people reading the omap list are interested
-in these.
+Looks like Paul Walmsley may have missed this one, maybe please resend
+with him and linux-omap cc:d.
 
 Regards,
 
