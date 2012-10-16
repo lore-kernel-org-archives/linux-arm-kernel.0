@@ -1,62 +1,122 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Oct 2012 09:02:33 +0100
-Subject: [PATCH 1/1] Documentation: Describe Device Tree bindings for GPIO
- Regulator driver
-Message-ID: <1350374553-12678-1-git-send-email-lee.jones@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 16 Oct 2012 10:05:25 +0200
+Subject: [PATCH 1/2] ASoC: atmel-ssc: use devm_xxx() managed function
+In-Reply-To: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
+References: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <507D1545.8020903@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we specify all non-standard bindings which can be used when
-requesting the use of an GPIO controlled regulator from Device Tree.
+On 10/16/2012 05:56 AM, Bo Shen :
+> Using the devm_xxx() managed function to stripdown the error
+> and remove code.
+> 
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
 
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- .../bindings/regulator/gpio-regulator.txt          |   36 ++++++++++++++++++++
- 1 file changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/gpio-regulator.txt
+Maybe too late, but:
 
-diff --git a/Documentation/devicetree/bindings/regulator/gpio-regulator.txt b/Documentation/devicetree/bindings/regulator/gpio-regulator.txt
-new file mode 100644
-index 0000000..3703be2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/gpio-regulator.txt
-@@ -0,0 +1,36 @@
-+GPIO controlled regulators
-+
-+Required properties:
-+- compatible		: Must be "regulator-gpio".
-+
-+Optional properties:
-+- gpio-enable		: GPIO to use to enable/disable the regulator.
-+- gpios			: GPIO group used to control voltage.
-+- states		: Selection of available voltages and GPIO configs.
-+- startup-delay-us	: Startup time in microseconds.
-+- enable-active-high	: Polarity of GPIO is active high (default is low).
-+
-+Any property defined as part of the core regulator binding defined in
-+regulator.txt can also be used.
-+
-+Example:
-+
-+	mmciv: gpio-regulator {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "mmci-gpio-supply";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <2600000>;
-+		regulator-boot-on;
-+
-+		gpio-enable = <&gpio0 23 0x4>;
-+		gpios = <&gpio0 24 0x4
-+			 &gpio0 25 0x4>;
-+		states = <1800000 0x3
-+			  2200000 0x2
-+			  2600000 0x1
-+			  2900000 0x0>;
-+
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+	};
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  drivers/misc/atmel-ssc.c |   47 +++++++++++++++-------------------------------
+>  1 file changed, 15 insertions(+), 32 deletions(-)
+> 
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index 5bb1877..23dcb76 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -70,37 +70,33 @@ EXPORT_SYMBOL(ssc_free);
+>  
+>  static int __init ssc_probe(struct platform_device *pdev)
+>  {
+> -	int retval = 0;
+>  	struct resource *regs;
+>  	struct ssc_device *ssc;
+>  
+> -	ssc = kzalloc(sizeof(struct ssc_device), GFP_KERNEL);
+> +	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
+>  	if (!ssc) {
+>  		dev_dbg(&pdev->dev, "out of memory\n");
+> -		retval = -ENOMEM;
+> -		goto out;
+> +		return -ENOMEM;
+>  	}
+>  
+> +	ssc->pdev = pdev;
+> +
+>  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	if (!regs) {
+>  		dev_dbg(&pdev->dev, "no mmio resource defined\n");
+> -		retval = -ENXIO;
+> -		goto out_free;
+> +		return -ENXIO;
+>  	}
+>  
+> -	ssc->clk = clk_get(&pdev->dev, "pclk");
+> -	if (IS_ERR(ssc->clk)) {
+> -		dev_dbg(&pdev->dev, "no pclk clock defined\n");
+> -		retval = -ENXIO;
+> -		goto out_free;
+> -	}
+> -
+> -	ssc->pdev = pdev;
+> -	ssc->regs = ioremap(regs->start, resource_size(regs));
+> +	ssc->regs = devm_request_and_ioremap(&pdev->dev, regs);
+>  	if (!ssc->regs) {
+>  		dev_dbg(&pdev->dev, "ioremap failed\n");
+> -		retval = -EINVAL;
+> -		goto out_clk;
+> +		return -EINVAL;
+> +	}
+> +
+> +	ssc->clk = devm_clk_get(&pdev->dev, "pclk");
+> +	if (IS_ERR(ssc->clk)) {
+> +		dev_dbg(&pdev->dev, "no pclk clock defined\n");
+> +		return -ENXIO;
+>  	}
+>  
+>  	/* disable all interrupts */
+> @@ -112,8 +108,7 @@ static int __init ssc_probe(struct platform_device *pdev)
+>  	ssc->irq = platform_get_irq(pdev, 0);
+>  	if (!ssc->irq) {
+>  		dev_dbg(&pdev->dev, "could not get irq\n");
+> -		retval = -ENXIO;
+> -		goto out_unmap;
+> +		return -ENXIO;
+>  	}
+>  
+>  	spin_lock(&user_lock);
+> @@ -125,16 +120,7 @@ static int __init ssc_probe(struct platform_device *pdev)
+>  	dev_info(&pdev->dev, "Atmel SSC device at 0x%p (irq %d)\n",
+>  			ssc->regs, ssc->irq);
+>  
+> -	goto out;
+> -
+> -out_unmap:
+> -	iounmap(ssc->regs);
+> -out_clk:
+> -	clk_put(ssc->clk);
+> -out_free:
+> -	kfree(ssc);
+> -out:
+> -	return retval;
+> +	return 0;
+>  }
+>  
+>  static int __devexit ssc_remove(struct platform_device *pdev)
+> @@ -142,10 +128,7 @@ static int __devexit ssc_remove(struct platform_device *pdev)
+>  	struct ssc_device *ssc = platform_get_drvdata(pdev);
+>  
+>  	spin_lock(&user_lock);
+> -	iounmap(ssc->regs);
+> -	clk_put(ssc->clk);
+>  	list_del(&ssc->list);
+> -	kfree(ssc);
+>  	spin_unlock(&user_lock);
+>  
+>  	return 0;
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
