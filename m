@@ -1,136 +1,142 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon, 15 Oct 2012 20:29:29 -0500
-Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CAMP44s3wTYTFgSw7r+77zb0fxMSjo1R69Zx0nyM6Hgy2h=Gggw@mail.gmail.com>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
- <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
- <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
- <CALLhW=5k=tAXo_5ri2WgetRgju9rC_Wm-o9-pfHSNqpe6FU5qQ@mail.gmail.com>
- <CAMP44s3wTYTFgSw7r+77zb0fxMSjo1R69Zx0nyM6Hgy2h=Gggw@mail.gmail.com>
-Message-ID: <CALLhW=6_0Rnp7-gNhCexUVzxam54KhoqAF6e8eiH5yo-wKBxzQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 15 Oct 2012 19:32:10 -0600
+Subject: [PATCH 2/7] ARM: OMAP2+: CM: prepare for use of cm_ll_data function
+ pointers
+In-Reply-To: <20121016012448.21844.92339.stgit@dusk.lan>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+Message-ID: <20121016013209.21844.99036.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+There are several CM operations which behave similarly across OMAP2+
+SoCs, but which have slight differences in their underlying
+implementations.
 
-On 12 October 2012 16:25, Felipe Contreras <felipe.contreras@gmail.com> wrote:
->>>> @@ -142,11 +142,10 @@ static int iommu_enable(struct omap_iommu *obj)
->>>>                 }
->>>>         }
->>>>
->>>> -       clk_enable(obj->clk);
->>>> +       pm_runtime_get_sync(obj->dev);
->>>>
->>>>         err = arch_iommu->enable(obj);
->>>>
->>>> -       clk_disable(obj->clk);
->>>
->>> The device will never go to sleep, until iommu_disable is called.
->>> clk_enable -> pm_runtime_get_sync, clk_disable pm_runtime_put.
->>
->> Which is what you want... why would you want your iommu to be disabled
->> if the client of that iommu could request a translation?
->
-> That's the whole point of *dynamic* pm; _when_ the client wants to
-> request a translation, _then_ the device is waken up, which is what I
-> believe the code currently does.
+This patch creates the support code for this function pointer
+registration process.  No function pointers are included yet, but a
+subsequent patch will create these for the module IDLEST registers.
 
-No it doesn't, current code is working because the processor and the
-iommu share the same clock, so enabling the processor is implicitly
-guaranteeing that the iommu will be enabled. IMHO, there shouldn't be
-such assumption that you can control both with the same clock.
+This patch allows other code to use CM-provided data and operations
+without needing to know which SoC is currently in use.  A further
+description of the concept is provided in the patch entitled
+"ARM: OMAP2+: PRM: prepare for use of prm_ll_data function pointers".
 
-So, once the remote processor is enabled, any "dynamic pm" from iommu
-with current code has no effect because the clock was already enabled
-for the processor.
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/Makefile    |    2 +
+ arch/arm/mach-omap2/cm.h        |   12 +++++++
+ arch/arm/mach-omap2/cm_common.c |   71 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 84 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-omap2/cm_common.c
 
-> After your patch, even if I don't use the camera, or the DSP, the
-> iommu devices will be enabled, and will be consuming energy *all the
-> time*. Which I don't think is what we want.
-
-Wrong, the iommu device will be enabled by pm_runtime_get_sync once
-you decide to attach with iommu_attach_device, if you do not use
-camera or the dsp, you won't turn ON the iommus.
-
-On probe this patch does pm_runtime_enable, however this doesn't mean
-the device is turned ON or resumed or kept ON all the time.
-
-> I'm not saying I have a solution, I'm simply saying that's what's
-> going to happen if I'm correct.
-
-Ok, but that is not what happens here.
-
->> Remember that these iommus, sit along of other processors not on the
->> main processor side. So, this code should enable it for the other
->> processor to use, and there is no point where the processor can say
->> "I'm not using it, shut it down" or "I'm using it, turn it on" in the
->> middle of execution, other than suspend/resume and if supported,
->> autosuspend.
->
-> I understand, but perhaps there should be?
-
-Autosuspend is a feature missing and should handle the scenario where
-the remote processor can sleep dynamically, this scenario should turn
-off the iommu and the remote processor itself when there is no
-workload but it depends on the remote processor activity not the iommu
-activity.
-
->>>> @@ -1009,7 +1001,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
->>>>         release_mem_region(res->start, resource_size(res));
->>>>         iounmap(obj->regbase);
->>>>
->>>> -       clk_put(obj->clk);
->>>> +       pm_runtime_disable(obj->dev);
->>>
->>> This will turn on the device unnecessarily, wasting power, and there's
->>> no need for that, kfree will take care of that without resuming.
->>
->> Left aside the aesthetics of having balanced calls, the device will be
->> enabled if there was a pending resume to be executed, otherwise it
->> won't, kfree won't increment the disable_depth counter and I don't
->> think that freeing the pointer is enough reason to ignore
->> pm_runtime_disable.
->
-> You are doing __pm_runtime_disable(dev, true), kfree will do
-> __pm_runtime_disable(dev, false), which is what we want. Both will
-> decrement the disable_depth.
-
-I'm quite confused here, could you please point me to the kfree snip
-that does __pm_runtime_disable(dev, false)?
-
-> But at least you agree that there's a chance that the device will be waken up.
-
-Of course, if there is a pending resume to be executed, it must honor
-that resume request and then turn off the device before removing the
-iommu, IMHO.
-
->>> Also, I still think that something like this is needed:
->> ...
->>> +static struct clk cam_fck = {
->>> +       .name           = "cam_fck",
->>> +       .ops            = &clkops_omap2_iclk_dflt,
->>> +       .parent         = &l3_ick,
->>> +       .enable_reg     = OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
->>
->> a cam_fck name to enable the ick?
->
-> Yeap, according to the TRM. Take a look at 12.3 Camera ISP Integration
-> Fig 12-50.
-
-What I meant is that, you are using the CM_ICLKEN to enable a clock
-named "cam_fck" which has l3_ick as a parent. And that is not
-consistent with what that register is meant to do, which is:
-
-4.14.1.10 CAM_CM Registers
-
-CM_ICKLEN_CAM
-0x0: CAM_L3_ICK and CAM_L4_ICLK are disabled
-0x1: CAM_L3_ICK and CAM_L4_ICLK are enabled
-
-So, I'm complaining about the name "cam_fck", for an interface clock
-with parent l3_ick. However I don't know why on section 12.3 they
-refer to CAM_FCK to a l3_ick child clock.
-
-Cheers,
-
-Omar
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 3751d56..f7cf382 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -93,7 +93,7 @@ obj-$(CONFIG_ARCH_OMAP4)                += cpuidle44xx.o
+ endif
+ 
+ # PRCM
+-obj-y					+= prcm.o prm_common.o
++obj-y					+= prcm.o prm_common.o cm_common.o
+ obj-$(CONFIG_ARCH_OMAP2)		+= prm2xxx_3xxx.o prm2xxx.o cm2xxx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= prm2xxx_3xxx.o prm3xxx.o cm3xxx.o
+ obj-$(CONFIG_ARCH_OMAP3)		+= vc3xxx_data.o vp3xxx_data.o
+diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
+index f24e3f7..b3cee91 100644
+--- a/arch/arm/mach-omap2/cm.h
++++ b/arch/arm/mach-omap2/cm.h
+@@ -33,4 +33,16 @@
+  */
+ #define MAX_MODULE_DISABLE_TIME		5000
+ 
++# ifndef __ASSEMBLER__
++
++/**
++ * struct cm_ll_data - fn ptrs to per-SoC CM function implementations
++ */
++struct cm_ll_data {};
++
++extern int cm_register(struct cm_ll_data *cld);
++extern int cm_unregister(struct cm_ll_data *cld);
++
++# endif
++
+ #endif
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+new file mode 100644
+index 0000000..3246cef
+--- /dev/null
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -0,0 +1,71 @@
++/*
++ * OMAP2+ common Clock Management (CM) IP block functions
++ *
++ * Copyright (C) 2012 Texas Instruments, Inc.
++ * Paul Walmsley <paul@pwsan.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * XXX This code should eventually be moved to a CM driver.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "cm2xxx.h"
++#include "cm3xxx.h"
++#include "cm44xx.h"
++
++/*
++ * cm_ll_data: function pointers to SoC-specific implementations of
++ * common CM functions
++ */
++static struct cm_ll_data null_cm_ll_data;
++static struct cm_ll_data *cm_ll_data = &null_cm_ll_data;
++
++/**
++ * cm_register - register per-SoC low-level data with the CM
++ * @cld: low-level per-SoC OMAP CM data & function pointers to register
++ *
++ * Register per-SoC low-level OMAP CM data and function pointers with
++ * the OMAP CM common interface.  The caller must keep the data
++ * pointed to by @cld valid until it calls cm_unregister() and
++ * it returns successfully.  Returns 0 upon success, -EINVAL if @cld
++ * is NULL, or -EEXIST if cm_register() has already been called
++ * without an intervening cm_unregister().
++ */
++int cm_register(struct cm_ll_data *cld)
++{
++	if (!cld)
++		return -EINVAL;
++
++	if (cm_ll_data != &null_cm_ll_data)
++		return -EEXIST;
++
++	cm_ll_data = cld;
++
++	return 0;
++}
++
++/**
++ * cm_unregister - unregister per-SoC low-level data & function pointers
++ * @cld: low-level per-SoC OMAP CM data & function pointers to unregister
++ *
++ * Unregister per-SoC low-level OMAP CM data and function pointers
++ * that were previously registered with cm_register().  The
++ * caller may not destroy any of the data pointed to by @cld until
++ * this function returns successfully.  Returns 0 upon success, or
++ * -EINVAL if @cld is NULL or if @cld does not match the struct
++ * cm_ll_data * previously registered by cm_register().
++ */
++int cm_unregister(struct cm_ll_data *cld)
++{
++	if (!cld || cm_ll_data != cld)
++		return -EINVAL;
++
++	cm_ll_data = &null_cm_ll_data;
++
++	return 0;
++}
