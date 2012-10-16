@@ -1,14 +1,16 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 16 Oct 2012 14:12:24 +0900
-Subject: [PATCH 1/2] ASoC: atmel-ssc: use devm_xxx() managed function
-In-Reply-To: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
-References: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121016051221.GA8670@opensource.wolfsonmicro.com>
+Date: Tue, 16 Oct 2012 14:14:04 +0900
+Subject: [PATCH 1/2] regulator: gpio-regulator: Allow use of GPIO
+ controlled regulators though DT
+In-Reply-To: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
+References: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121016051401.GB8670@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 11:56:58AM +0800, Bo Shen wrote:
-> Using the devm_xxx() managed function to stripdown the error
-> and remove code.
+On Mon, Oct 15, 2012 at 02:16:59PM +0100, Lee Jones wrote:
+> Here we provide the GPIO Regulator driver with Device Tree capability, so
+> that when a platform is booting with DT instead of platform data we can
+> still make full use of it.
 
-Applied both, thanks.
+Not looked at the patch yet but patch 2 doesn't seem to have appeared?
