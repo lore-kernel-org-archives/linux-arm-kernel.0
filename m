@@ -1,13 +1,14 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 16 Oct 2012 00:13:26 -0700
-Subject: [RESEND PATCH v3 1/2] i2c: change id to let i2c-gpio work
-In-Reply-To: <1350364668-21280-1-git-send-email-voice.shen@atmel.com>
+Date: Tue, 16 Oct 2012 00:13:38 -0700
+Subject: [RESEND PATCH v3 2/2] i2c: change id to let i2c-at91 work
+In-Reply-To: <1350364668-21280-2-git-send-email-voice.shen@atmel.com>
 References: <1350364668-21280-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121016071326.GD5172@kroah.com>
+ <1350364668-21280-2-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121016071338.GE5172@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 01:17:47PM +0800, Bo Shen wrote:
+On Tue, Oct 16, 2012 at 01:17:48PM +0800, Bo Shen wrote:
 > From: voice <voice.shen@atmel.com>
 > 
 > The i2c core driver will turn the platform device ID to busnum
@@ -23,10 +24,18 @@ On Tue, Oct 16, 2012 at 01:17:47PM +0800, Bo Shen wrote:
 > ---
 > Resend
 >   Cc linux kernel stable mailing list
-> Change since v2
->   Fix this issue for more boards
-> Change since v1
->   Make the commit message more clear
+> ---
+>  arch/arm/mach-at91/at91rm9200.c          |    2 +-
+>  arch/arm/mach-at91/at91rm9200_devices.c  |    2 +-
+>  arch/arm/mach-at91/at91sam9260.c         |    4 ++--
+>  arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+>  arch/arm/mach-at91/at91sam9261.c         |    4 ++--
+>  arch/arm/mach-at91/at91sam9261_devices.c |    2 +-
+>  arch/arm/mach-at91/at91sam9263.c         |    2 +-
+>  arch/arm/mach-at91/at91sam9263_devices.c |    2 +-
+>  arch/arm/mach-at91/at91sam9rl_devices.c  |    2 +-
+>  9 files changed, 11 insertions(+), 11 deletions(-)
+
 
 <formletter>
 
