@@ -1,23 +1,25 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 16 Oct 2012 14:15:17 -0400
-Subject: [PATCH] ARM: kirkwood: fix buttons on lsxl boards
-In-Reply-To: <201210161921.27831.michael@walle.cc>
-References: <1348782877-857-1-git-send-email-michael@walle.cc>
- <201210161921.27831.michael@walle.cc>
-Message-ID: <20121016181517.GM20922@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 16 Oct 2012 11:17:58 -0700
+Subject: [RFC PATCHv2] ARM: vt8500: Convert arch-vt8500 to multiplatform
+In-Reply-To: <1349942353-14972-1-git-send-email-linux@prisktech.co.nz>
+References: <1349942353-14972-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20121016181758.GA1801@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 07:21:27PM +0200, Michael Walle wrote:
+On Thu, Oct 11, 2012 at 08:59:13PM +1300, Tony Prisk wrote:
+> This patch completes the conversion to ARCH_MULTI_V5 for arch-vt8500.
+> Removed /mach/include/ and remaining unneeded files.
 > 
-> Hi Andrew,
-> 
-> Can you pick this patch?
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-Michael,
+Acked-by: Olof Johansson <olof@lixom.net>
 
-Already in my queue.
+I think it's time to add a defconfig for vt8500 so we get build coverage. Can
+you please do so for 3.8, maybe as a part of the branch this patch goes in?
 
-thx,
 
-Jason.
+Thanks!
+
+
+-Olof
