@@ -1,83 +1,56 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 16 Oct 2012 13:25:17 +0300
-Subject: [PATCH] ARM: OMAP2: UART: fix console UART mismatched runtime PM
- status
-In-Reply-To: <1350344998-16328-1-git-send-email-khilman@deeprootsystems.com>
-References: <1350344998-16328-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20121016102517.GD21801@arwen.pp.htv.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 16 Oct 2012 11:31:09 +0100
+Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
+ contiguous allocations
+In-Reply-To: <CAAQKjZNQFfxpr-7dFb4cgNB2Gkrxxrswds_fSrYgssxXaqRF7g@mail.gmail.com>
+References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+ <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
+ <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
+ <CAAQKjZNQFfxpr-7dFb4cgNB2Gkrxxrswds_fSrYgssxXaqRF7g@mail.gmail.com>
+Message-ID: <20121016103109.GA21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Oct 16, 2012 at 07:12:49PM +0900, Inki Dae wrote:
+> Hi Hiroshi,
+> 
+> I'm not sure I understand what you mean but we had already tried this
+> way and for this, you can refer to below link,
+>                http://www.mail-archive.com/dri-devel at lists.freedesktop.org/msg22555.html
+> 
+> but this way had been pointed out by drm guys because the pages could
+> be used through gem object after that pages had been freed by free()
+> anyway their pointing was reasonable and I'm trying another way, this
+> is the way that the pages to user space has same life time with dma
+> operation. in other word, if dma completed access to that pages then
+> also that pages will be freed. actually drm-based via driver of
+> mainline kernel is using same way
 
-On Mon, Oct 15, 2012 at 04:49:58PM -0700, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@ti.com>
-> 
-> The runtime PM framework assumes that the hardware state of devices
-> when initialized is disabled.  For all omap_devices, we idle/disable
-> device by default.  However, the console uart uses a "no idle" option
-> during omap_device init in order to allow earlyprintk usage to work
-> seamlessly during boot.
-> 
-> Because the hardware is left partially enabled after init (whatever
-> the bootloader settings were), the omap_device should later be fully
-> initialized (including mux) and the runtime PM framework should be
-> told that the device is active, and not disabled so that the hardware
-> state is in sync with runtime PM state.
-> 
-> To fix, after the device has been created/registered, call
-> omap_device_enable() to finialize init and use pm_runtime_set_active()
-> to tell the runtime PM core the device is enabled.
-> 
-> Tested on 2420/n810, 3530/Overo, 3530/Beagle, 3730/OveroSTORM,
-> 3730/Beagle-xM, 4460/PandaES.
-> 
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Applies against v3.7-rc1.
-> Fix targetted for v3.7.
-> 
-> I'm still not entirely sure why this has worked up to now on OMAP3/4
-> but not on OMAP2.  Even so, this fix is needed for all platforms to
-> ensure matching hardware state and runtime PM state.
-> 
->  arch/arm/mach-omap2/serial.c |    5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index 0405c81..37b5dbe 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -327,6 +327,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->  	if ((console_uart_id == bdata->id) && no_console_suspend)
->  		omap_device_disable_idle_on_suspend(pdev);
->  
-> +	if (console_uart_id == bdata->id) {
-> +		omap_device_enable(pdev);
-> +		pm_runtime_set_active(&pdev->dev);
-> +	}
-> +
->  	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
->  
->  	oh->dev_attr = uart;
+I don't know about Hiroshi, but the above "sentence" - and I mean the 7
+line sentence - is very difficult to understand and wears readers out.
 
-looks good to me. Even took care of doing that only for the console
-UART.
+If your GPU hardware has a MMU, then the problem of dealing with userspace
+pages is very easy.  Do it the same way that the i915 driver and the rest
+of DRM does.  Use shmem backed memory.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+I'm doing that for the Dove DRM driver and it works a real treat, and as
+the pages are backed by page cache pages, you can use all the normal
+page refcounting on them to prevent them being freed until your DMA has
+completed.  All my X pixmaps are shmem backed drm objects, except for
+the scanout buffers which are dumb drm objects (because they must be
+contiguous.)
 
-sorry for the issues caused.
+In fact, get_user_pages() will take the reference for you before you pass
+them over to dma_map_sg().  On completion of DMA, you just need to use
+dma_unmap_sg() and release each page.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121016/7f249c3b/attachment.sig>
+If you don't want to use get_user_pages() (which other drivers don't) then
+you need to following the i915 example and get each page out of shmem
+individually.
+
+(My situation on the Dove hardware is a little different, because the
+kernel DRM driver isn't involved with the GPU - it merely provides the
+memory for pixmaps.  The GPU software stack, being a chunk of closed
+source userspace library with open source kernel driver, means that
+things are more complicated; the kernel side GPU driver uses
+get_user_pages() to pin them prior to building the GPU's MMU table.)
