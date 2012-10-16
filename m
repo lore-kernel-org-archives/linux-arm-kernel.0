@@ -1,133 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 12:12:27 +0100
-Subject: [PATCH 10/11] SERIAL: omap: fix MCR TCRTLR bit handling
-In-Reply-To: <E1TO4tW-0000Wl-SY@rmk-PC.arm.linux.org.uk>
-References: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
- <E1TO4tW-0000Wl-SY@rmk-PC.arm.linux.org.uk>
-Message-ID: <20121016111227.GW28061@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 16 Oct 2012 13:10:27 +0200
+Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
+In-Reply-To: <507D361C.6020403@atmel.com>
+References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
+ <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
+ <20121015150244.GZ12801@game.jcrosoft.org>
+ <507CD0CA.9010006@atmel.com>
+ <20121016083954.GB12801@game.jcrosoft.org>
+ <507D361C.6020403@atmel.com>
+Message-ID: <20121016111027.GE12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 12:01:06PM +0100, Russell King wrote:
-> The MCR TCRTLR bit can only be changed when ECB is set in the EFR.
-> Unfortunately, several places were trying to alter this bit while ECB
-> was clear:
+On 18:25 Tue 16 Oct     , Bo Shen wrote:
+> Hi J,
 > 
-> - serial_omap_configure_xonxoff() was attempting to clear the bit after
->   explicitly clearing the ECB bit.
-> - serial_omap_set_termios() was trying the same trick after setting the
->   SCR, and when trying to change the TCR register when hardware flow
->   control was enabled.
+> On 10/16/2012 16:39, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 11:13 Tue 16 Oct     , Bo Shen wrote:
+> >>Hi J,
+> >>
+> >>On 10/15/2012 23:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>>On 17:30 Mon 15 Oct     , Bo Shen wrote:
+> >>>>The i2c core driver will turn the platform device ID to busnum
+> >>>>When using platfrom device ID as -1, it means dynamically assigned
+> >>>>the busnum. When writing code, we need to make sure the busnum,
+> >>>>and call i2c_register_board_info(int busnum, ...) to register device
+> >>>>if using -1, we do not know the value of busnum
+> >>>>	
+> >>>>In order to solve this issue, set the platform device ID as a fix number
+> >>>>Here using 0 to match the busnum used in i2c_regsiter_board_info()
+> >>>>
+> >>>>Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> >>>>---
+> >>>
+> >>>can you check when this append for the first time to schedule a patch for stable too
+> >>
+> >>OK. I will resend it and add linux stable into the cc list.
+> >no this not how it work
+> >
+> >I ask you to check which patch add the regression and then when this is
+> >applied in the kernel we will request greg to apply it too to the stable
 > 
-> Fix this by ensuring that we always have ECB set whenever the TCRTLR bit
-> is changed.
-> 
-> Moreover, we start out by reading the EFR and MCR registers, which may
-> have indeterminent bit settings for the ECB and TCRTLR bits.  Ensure
-> that these bits always start off in a known state.
+> The code is using id = -1 appear 4 years ago. And after dig, I don't
+> find which patch cause this the regression.
+so use git bisect to find the commit responsible
 
-Note - this patch unfortunately exposes some of the bugs in their full
-glory as we now write to the correct registers and actually end up
-programming the hardware correctly.
-
-I've reduced the window as far as possible by putting this one next to
-patch 11 which fixes it, but no amount of reordering can hide some kind
-of breakage along the way.
-
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/tty/serial/omap-serial.c |   32 ++++++++++++++++++--------------
->  1 files changed, 18 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 537829f..7cc151c 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -706,9 +706,10 @@ serial_omap_configure_xonxoff
->  	serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
->  	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
->  	serial_out(up, UART_TI752_TCR, OMAP_UART_TCR_TRIG);
-> -	serial_out(up, UART_EFR, up->efr);
->  	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
->  	serial_out(up, UART_MCR, up->mcr & ~UART_MCR_TCRTLR);
-> +	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-> +	serial_out(up, UART_EFR, up->efr);
->  	serial_out(up, UART_LCR, up->lcr);
->  }
->  
-> @@ -729,7 +730,6 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
->  {
->  	struct uart_omap_port *up = to_uart_omap_port(port);
->  	unsigned char cval = 0;
-> -	unsigned char efr = 0;
->  	unsigned long flags = 0;
->  	unsigned int baud, quot;
->  
-> @@ -839,12 +839,12 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
->  
->  	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
->  
-> -	up->efr = serial_in(up, UART_EFR);
-> +	up->efr = serial_in(up, UART_EFR) & ~UART_EFR_ECB;
->  	up->efr &= ~UART_EFR_SCD;
->  	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
->  
->  	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
-> -	up->mcr = serial_in(up, UART_MCR);
-> +	up->mcr = serial_in(up, UART_MCR) & ~UART_MCR_TCRTLR;
->  	serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
->  	/* FIFO ENABLE, DMA MODE */
->  
-> @@ -863,9 +863,12 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
->  
->  	serial_out(up, UART_OMAP_SCR, up->scr);
->  
-> -	serial_out(up, UART_EFR, up->efr);
-> +	/* Reset UART_MCR_TCRTLR: this must be done with the EFR_ECB bit set */
->  	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
->  	serial_out(up, UART_MCR, up->mcr);
-> +	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-> +	serial_out(up, UART_EFR, up->efr);
-> +	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
->  
->  	/* Protocol, Baud Rate, and Interrupt Settings */
->  
-> @@ -904,20 +907,21 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
->  	/* Hardware Flow Control Configuration */
->  
->  	if (termios->c_cflag & CRTSCTS) {
-> -		efr |= (UART_EFR_CTS | UART_EFR_RTS);
-> -		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
-> -
-> -		up->mcr = serial_in(up, UART_MCR);
-> -		serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
-> -
-> +		/* Enable access to TCR/TLR */
->  		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-> -		up->efr = serial_in(up, UART_EFR);
->  		serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
-> +		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
-> +		serial_out(up, UART_MCR, up->mcr | UART_MCR_TCRTLR);
->  
->  		serial_out(up, UART_TI752_TCR, OMAP_UART_TCR_TRIG);
-> -		serial_out(up, UART_EFR, efr); /* Enable AUTORTS and AUTOCTS */
-> -		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
-> +
-> +		/* Enable AUTORTS and AUTOCTS */
-> +		up->efr |= UART_EFR_CTS | UART_EFR_RTS;
-> +
-> +		/* Disable access to TCR/TLR */
->  		serial_out(up, UART_MCR, up->mcr | UART_MCR_RTS);
-> +		serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
-> +		serial_out(up, UART_EFR, up->efr);
->  		serial_out(up, UART_LCR, cval);
->  	} else {
->  		/* Disable AUTORTS and AUTOCTS */
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best Regards,
+J.
