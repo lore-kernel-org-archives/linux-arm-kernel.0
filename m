@@ -1,73 +1,51 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 15 Oct 2012 19:15:31 -0700
-Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
- ARM_UNWIND
-In-Reply-To: <20121012100242.GA2126@linaro.org>
-References: <1346021216-21979-1-git-send-email-ccross@android.com>
- <1346021216-21979-3-git-send-email-ccross@android.com>
- <20121012090807.GB21164@n2100.arm.linux.org.uk>
- <20121012100242.GA2126@linaro.org>
-Message-ID: <CAMbhsRRpYrOBhaFn5PV5f5J=36Hsj2eZixyD1hXRfRLoyWm1Xg@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 16 Oct 2012 10:15:52 +0800
+Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
+In-Reply-To: <20121012150945.GB30339@atomide.com>
+References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
+ <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
+ <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
+ <20121012144119.GM28061@n2100.arm.linux.org.uk>
+ <20121012150945.GB30339@atomide.com>
+Message-ID: <CAMPhdO_dhRo=DjUQ79sM_+rj1GVkdBeE4vnFhqfCmg-dwy-mWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 3:02 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Fri, Oct 12, 2012 at 10:08:07AM +0100, Russell King - ARM Linux wrote:
->> On Sun, Aug 26, 2012 at 03:46:56PM -0700, Colin Cross wrote:
->> > Unwinding with CONFIG_ARM_UNWIND is much more complicated than
->> > unwinding with CONFIG_FRAME_POINTER, but there are only a few points
->> > that require validation in order to avoid faults or infinite loops.
->> > Avoiding faults is easy by adding checks to verify that all accesses
->> > relative to the frame's stack pointer remain inside the stack.
+On Fri, Oct 12, 2012 at 11:09 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121012 07:44]:
+>> On Fri, Oct 12, 2012 at 04:04:28PM +0200, Linus Walleij wrote:
+>> > On Fri, Oct 12, 2012 at 3:26 PM, Russell King
+>> > <rmk+kernel@arm.linux.org.uk> wrote:
 >> >
->> > When CONFIG_FRAME_POINTER is not set it is possible for two frames to
->> > have the same SP, so there is no way to avoid repeated calls to
->> > unwind_frame continuing forever.
+>> > > As suggested by Andrew Morton:
+>> > >
+>> > >   This is a pet peeve of mine.  Any time there's a long list of items
+>> > >   (header file inclusions, kconfig entries, array initalisers, etc) and
+>> > >   someone wants to add a new item, they *always* go and stick it at the
+>> > >   end of the list.
+>> > >
+>> > >   Guys, don't do this.  Either put the new item into a randomly-chosen
+>> > >   position or, probably better, alphanumerically sort the list.
+>> > >
+>> > > lets sort all our select statements alphanumerically.  This commit was
+>> > > created by the following perl:
+>> >
+>> > I applied this and tried to configure the Nomadik defconfig,
+>> > and I get this, sadly:
 >>
->> So here you admit that this patch can cause the unwinder to loop forever,
->> which would provide no way out of that.  Why do you think this patch is
->> suitable for mainline with such a problem?
+>> Yes, I've just fixed those.  Unfortunately, the patch is soo large that
+>> it trips the mailing list size limit, and has to be manually approved,
+>> so I'm not sure I can call on the list maintainers again today to do the
+>> approval thing.
 >
-> With CONFIG_FRAME_POINTER we have a straightforward definition of
-> progress: the sp must increase per frame, and cannot increase beyond the
-> limit of the tasks stack.  We get this property from the fact that
-> each frame record consumes actual space on the stack.  If we parse a
-> frame record which does not both increase the sp and provide a frame
-> address greater than that sp, we know that frame is garbage and we must
-> stop.
+> After applying these two patches and manually running:
 >
->
-> With CONFIG_ARM_UNWIND, we have no straightforward definition of
-> progress.  However, sp must _normally_ still increase, because compiler-
-> generated non-leaf functions must store the lr somewhere, and the
-> compiler always uses the stack.  Even if lr is stashed in r4, an ABI
-> compliant would then have needed to save r4 on the stack beforehand.
->
-> We can assume that we will never parse a garbage unwind table because of
-> the way the table lookup works (though we may parse a valid table which
-> has nothing whatever to do with the code that was executing in the case
-> of a corrupted stack).  So we only need to worry about what the unwind
-> tables will look like for valid functions.
->
-> Nonetheless, tail-call-optimised and manually-annotated functions may
-> have unusual frames which don't consume any stack.  Stackless tail-
-> call-optimised functions shouldn't be a problem, since their frames
-> are completely missing from the backtrace and won't dump us into a loop.
-> Stackless assembler functions are overwhelmingly likely to be leaf
-> functions, giving us just one stackless frame.
->
->
-> Would it make sense if we place some small sanity limit on the number
-> of frames the unwinder will process with the same sp before giving up?
+> $ git checkout-index -f arch/arm/mach-pxa/Kconfig
+> $ git checkout-index -f arch/arm/mach-footbridge/Kconfig
 
-About half the callers to unwind_frame end up limiting the number of
-frames they will follow before giving up, so I wasn't sure if I should
-put an arbitrary limit in unwind_frame or just make sure all callers
-are bounded.  Your idea of limiting same sp frames instead of total
-frames sounds better.  I can send a new patch that adds a new field to
-struct stackframe (which will need to be initialized everywhere, the
-struct is usually on the stack) and limits the recursion.  Any
-suggestion on the recursion limit?  I would never expect to see a real
-situation with more than a few, but on the other hand parsing the
-frames should be pretty fast so a high number (100?) shouldn't cause
-any user visible effect.
+Tony, why pxa and footbridge here?
+
+>
+> It builds just fine for omaps, so for omaps:
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
