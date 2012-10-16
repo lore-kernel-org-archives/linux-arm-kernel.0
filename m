@@ -1,88 +1,93 @@
-From: daeinki@gmail.com (Inki Dae)
-Date: Wed, 17 Oct 2012 07:54:17 +0900
-Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
- contiguous allocations
-In-Reply-To: <20121016.171338.1300372057637804407.hdoyu@nvidia.com>
-References: <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
- <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
- <CAAQKjZNQFfxpr-7dFb4cgNB2Gkrxxrswds_fSrYgssxXaqRF7g@mail.gmail.com>
- <20121016.171338.1300372057637804407.hdoyu@nvidia.com>
-Message-ID: <A52B7C89-16F2-44A0-A9FF-2EB599F4F074@gmail.com>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Tue, 16 Oct 2012 23:11:29 +0000
+Subject: [PATCH V2 0/7] support the cpts found on am335x devices
+In-Reply-To: <20121016171407.GA2176@netboy.at.omicron.at>
+References: <cover.1350329726.git.richardcochran@gmail.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293E9F82F0@DBDE01.ent.ti.com>
+ <20121016171407.GA2176@netboy.at.omicron.at>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9F86E9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hiroshi,
-
-
-
-2012. 10. 16. ?? 11:13 Hiroshi Doyu <hdoyu@nvidia.com> ??:
-
-> Hi Inki,
+> -----Original Message-----
+> From: Richard Cochran [mailto:richardcochran at gmail.com]
+> Sent: Tuesday, October 16, 2012 10:44 PM
+> To: N, Mugunthan V
+> Cc: netdev at vger.kernel.org; linux-arm-kernel at lists.infradead.org; David
+> Miller; Chemparathy, Cyril; Govindarajan, Sriramakrishnan
+> Subject: Re: [PATCH V2 0/7] support the cpts found on am335x devices
 > 
-> Inki Dae <inki.dae@samsung.com> wrote @ Tue, 16 Oct 2012 12:12:49 +0200:
+> On Tue, Oct 16, 2012 at 04:33:55PM +0000, N, Mugunthan V wrote:
+> > I had seen some issues with the patch series.
 > 
->> Hi Hiroshi,
->> 
->> 2012/10/16 Hiroshi Doyu <hdoyu@nvidia.com>:
->>> Hi Inki/Marek,
->>> 
->>> On Tue, 16 Oct 2012 02:50:16 +0200
->>> Inki Dae <inki.dae@samsung.com> wrote:
->>> 
->>>> 2012/10/15 Marek Szyprowski <m.szyprowski@samsung.com>:
->>>>> Hello,
->>>>> 
->>>>> Some devices, which have IOMMU, for some use cases might require to
->>>>> allocate a buffers for DMA which is contiguous in physical memory. Such
->>>>> use cases appears for example in DRM subsystem when one wants to improve
->>>>> performance or use secure buffer protection.
->>>>> 
->>>>> I would like to ask if adding a new attribute, as proposed in this RFC
->>>>> is a good idea? I feel that it might be an attribute just for a single
->>>>> driver, but I would like to know your opinion. Should we look for other
->>>>> solution?
->>>>> 
->>>> 
->>>> In addition, currently we have worked dma-mapping-based iommu support
->>>> for exynos drm driver with this patch set so this patch set has been
->>>> tested with iommu enabled exynos drm driver and worked fine. actually,
->>>> this feature is needed for secure mode such as TrustZone. in case of
->>>> Exynos SoC, memory region for secure mode should be physically
->>>> contiguous and also maybe OMAP but now dma-mapping framework doesn't
->>>> guarantee physically continuous memory allocation so this patch set
->>>> would make it possible.
->>> 
->>> Agree that the contigous memory allocation is necessary for us too.
->>> 
->>> In addition to those contiguous/discontiguous page allocation, is
->>> there any way to _import_ anonymous pages allocated by a process to be
->>> used in dma-mapping API later?
->>> 
->>> I'm considering the following scenario, an user process allocates a
->>> buffer by malloc() in advance, and then it asks some driver to convert
->>> that buffer into IOMMU'able/DMA'able ones later. In this case, pages
->>> are discouguous and even they may not be yet allocated at
->>> malloc()/mmap().
->>> 
->> 
->> I'm not sure I understand what you mean but we had already tried this
->> way and for this, you can refer to below link,
->>               http://www.mail-archive.com/dri-devel at lists.freedesktop.org/msg22555.html
+> Please take another look. Excepting the last, none of your points
+> holds water.
 > 
-> The above patch doesn't seem to have so much platform/SoC specific
-> code but rather it could common over other SoC as well. Is there any
-> plan to make it more generic, which can be used by other DRM drivers?
+> > * CPTS will hold only LSB 32 bits of 64 bit Timer and the upper 32
+> bit
+> >   time value has to be taken care by the software, but the time stamp
+> >   which is passed to skb or PTP clock consist of only 32 bit time
+> value
 > 
+> The driver handles this already.
 
-Right, the above patch has no any platform/SoC specific code but doesn't use dma-mapping API . Anyway we should refrain from using such thing because gem object could still be used and shared with other processes even if user process freed user region allocated by malloc()
+Yes, I do agree that driver handles it. As Half roll over and Full roll
+over events are not handled in the driver, I am just curious how will
+the misaligned TS would be handled and also in cpts set time, the Lower
+32 bit time is written to CPTS counter
 
-And our new patch in progress would resolve this issue and this way is similar to drm-based via driver of mainline kernel. And this patch isn't considered for common use and is specific to platform/SoC so much. The pages backed can be used only by 2d gpu's dma.
+> 
+> > * CPTS interrupts should be utilized to service Half and Full roll
+> over
+> >   events as it is non sync events with respect to get/set time and
+> PTP
+> >   pkt Tx/Rx
+> 
+> Nope, no need for interrupts, since we already have a better way to
+> handle this.
 
-Thanks,
-Inki Dae
+Since we poll for the 32bit over flow for every HZ * 8 cycle, won't
+there be a system overhead. If the CPTS ref clock is changed according
+to the ptp freq adjust api, how will the timecounter take care of change
+in frequency
 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
+> > * CPTS Time which is obtained from hardware is not actually a nano
+> >   seconds as the CPTS ref clock is tied to 250MHz for AM335x.
+> 
+> Did you even look at the code in my patch?
+
+I had gone through the patch, but the same driver can be used in TI814x
+where the user has the option to change the frequency from 250MHz may to
+1GHz also, I thought of how it will be handled if we fix the multiplication
+factor
+
+> 
+> > * CPSW register mapping done in this patch series removes the CPSW
+> >   driver support for previous version found in TI814x
+> 
+> In which Linux version (or commit) did this driver appear?
+> I never saw it.
+
+The current driver which is in vanilla kernel doesn't use extended slave
+address which are conflict between TI814x CPSW IP version and AM335x CPSW
+IP version. I have just posted my version of CPTS implementation. May be
+we can work together make the driver compatible with both CPSW versions
+
+> 
+> > * CPSW Time stamping is done only for port 0 and port 1 is not done
+> 
+> Yes, you are right, and it is strange that the hardware time stamps on
+> the external ports of the switch, and not at the host port as it
+> should. Of course it does present us with a problem, since we cannot
+> reasonably have both ports time stamping at the same time. I propose
+> simply using a device tree attribute to tell which port to activate.
+
+Since CPSW is a 3port Switch we should not fix time stamping will be enabled
+only for slave 0 or passing slave number through DT. Its better if we
+can configure both the slaves. This can be tested with EVM-sk which has
+both the slave ports pinned out.
+
+> 
+> Thanks,
+> Richard
