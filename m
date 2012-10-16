@@ -1,147 +1,42 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 16 Oct 2012 10:25:09 +0800
-Subject: [PATCH] ARM: mxs: Add support for the Armadeus Systems APF28
- module
-In-Reply-To: <1350149143-9684-1-git-send-email-julien.boibessot@free.fr>
-References: <1350149143-9684-1-git-send-email-julien.boibessot@free.fr>
-Message-ID: <20121016022505.GE24393@S2101-09.ap.freescale.net>
+Date: Tue, 16 Oct 2012 10:43:22 +0800
+Subject: [PATCH V6 2/2] dmaengine: add helper function to request a slave
+ DMA channel
+In-Reply-To: <1348547701.1943.190.camel@vkoul-udesk3>
+References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
+ <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
+ <1347852805.1943.130.camel@vkoul-udesk3>
+ <201209171159.27359.arnd@arndb.de>
+ <20120917223619.GC12445@n2100.arm.linux.org.uk>
+ <1347938035.1943.162.camel@vkoul-udesk3> <5060DDEB.4000600@ti.com>
+ <1348547701.1943.190.camel@vkoul-udesk3>
+Message-ID: <20121016024318.GF24393@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2012 at 07:25:43PM +0200, julien.boibessot at free.fr wrote:
-> From: Julien Boibessot <julien.boibessot@armadeus.com>
+On Tue, Sep 25, 2012 at 10:05:01AM +0530, Vinod Koul wrote:
+> On Mon, 2012-09-24 at 17:25 -0500, Jon Hunter wrote:
+> > > For DT bindings, I think the binding itself shouldn't change based on my
+> > > work but I would like these same bindings to help build the DMA engine
+> > > code mappings.
+> > > 
+> > > Now would it make sense to NOT merge these changes for 3.7 and postpone
+> > > to 3.8. I can host these patches on a topic branch and merge them when
+> > > we are ready. I plan to spend some good amount of time on my work this
+> > > week so we should be ready pretty soon.
+> > > One these changes are merged, users can start moving to this scheme.
+> > 
+> > I just wanted to see how things are progressing your side. Did you
+> > create a topic branch for this? If so let me know where I can find it, I
+> > did not find a branch on your infradead git tree.
+> > 
+> > I wanted to pull in the latest patches for some testing. 
+> Sorry for delay, I had everything ready, but couldn't manage to commit
+> and push. I have pushed to topic/dmaengine_dt, it is pushing out now...
 > 
-> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  arch/arm/boot/dts/imx28-apf28.dts |   79 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/mach-mxs.c      |    7 +++
->  2 files changed, 86 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
+Vinod,
 
-Please add imx28-apf28.dtb target into arch/arm/boot/dts/Makefile.
-
-> 
-> diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
-> new file mode 100644
-> index 0000000..83e37c1
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx28-apf28.dts
-> @@ -0,0 +1,79 @@
-> +/*
-> + * Copyright 2012 Armadeus Systems - <support@armadeus.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx28.dtsi"
-> +
-> +/ {
-> +	model = "Armadeus Systems APF28 module";
-> +	compatible = "armadeus,imx28-apf28", "fsl,imx28";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x08000000>;
-> +	};
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			gpmi-nand at 8000c000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
-> +				status = "okay";
-> +
-> +				partition at 0 {
-> +					label = "u-boot";
-> +					reg = <0x0 0x300000>;
-> +				};
-
-Nit: please put a new line between nodes.
-
-> +				partition at 1 {
-
-partition at 300000
-
-xxx after partition@ should be the first cell of "reg" property.
+Looks it seemed 3.7-rc1.  Does that mean we have to wait for 3.8, or
+will it show on later -rc for 3.7?
 
 Shawn
-
-> +					label = "env";
-> +					reg = <0x300000 0x80000>;
-> +				};
-> +				partition at 2 {
-> +					label = "env2";
-> +					reg = <0x380000 0x80000>;
-> +				};
-> +				partition at 3 {
-> +					label = "dtb";
-> +					reg = <0x400000 0x80000>;
-> +				};
-> +				partition at 4 {
-> +					label = "splash";
-> +					reg = <0x480000 0x80000>;
-> +				};
-> +				partition at 5 {
-> +					label = "kernel";
-> +					reg = <0x500000 0x800000>;
-> +				};
-> +				partition at 6 {
-> +					label = "rootfs";
-> +					reg = <0xd00000 0xf300000>;
-> +				};
-> +			};
-> +		};
-> +
-> +		apbx at 80040000 {
-> +			duart: serial at 80074000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&duart_pins_a>;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ahb at 80080000 {
-> +		mac0: ethernet at 800f0000 {
-> +			phy-mode = "rmii";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mac0_pins_a>;
-> +			phy-reset-gpios = <&gpio4 13 0>;
-> +			status = "okay";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index caf11db..93bc53d 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -357,6 +357,11 @@ static void __init tx28_post_init(void)
->  	pinctrl_put(pctl);
->  }
->  
-> +static void __init apf28_init(void)
-> +{
-> +	enable_clk_enet_out();
-> +}
-> +
->  static void __init mxs_machine_init(void)
->  {
->  	if (of_machine_is_compatible("fsl,imx28-evk"))
-> @@ -367,6 +372,8 @@ static void __init mxs_machine_init(void)
->  		m28evk_init();
->  	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
->  		apx4devkit_init();
-> +	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
-> +		apf28_init();
->  
->  	of_platform_populate(NULL, of_default_bus_match_table,
->  			     mxs_auxdata_lookup, NULL);
-> -- 
-> 1.7.5.4
-> 
