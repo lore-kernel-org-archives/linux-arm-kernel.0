@@ -1,27 +1,42 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Tue, 16 Oct 2012 07:41:41 -0700
-Subject: dma_alloc_coherent fails in framebuffer
-In-Reply-To: <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
-References: <1350192523.10946.4.camel@gitbox>
- <1350246895.11504.6.camel@gitbox> <20121015094547.GC29125@suse.de>
- <1350325704.31162.16.camel@gitbox>
- <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
-Message-ID: <1350398501.2532.12.camel@dabdike>
+From: mikpe@it.uu.se (Mikael Pettersson)
+Date: Tue, 16 Oct 2012 16:45:27 +0200
+Subject: PDF documentation
+In-Reply-To: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+Message-ID: <20605.29447.913638.942019@pilspetsen.it.uu.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-16 at 10:17 +0800, Bob Liu wrote:
-> I think you need to declare that memory using
-> dma_declare_coherent_memory() before
-> alloc_from_coherent.
+On Tue, 16 Oct 2012 15:22:52 +0200, Constantine Shulyupin <const@makelinux.com> wrote:
+> Hi,
+> 
+> I have some questions and ideas about documentation in PDF format.
+> During embedded SW development I often work with documentation,
+> especially datasheets in PDF format. I have some issues with such
+> documentation. It is not so easy to manage a lot of PDF documents
+> sometimes with strange code in file names.  It is not easy to store
+> and share links to documentation.
+> It is possible to reference to a PDF page in this way
+> http://www.ti.com/lit/ds/symlink/omap4430.pdf#page=3D100 , but it slow
+> and doesn't work in all cases.
+> Sometimes it is more easy just to copy paste and send by email part of
+> documentation instead of using hyperlinks.
+> I found, that it is more easy work (and work collaboratively) with
+> documentation in HTML format. Sometimes it is possible just to convert
+> PDF to HTML.
+> 
+> Questions:
+> - have same issues with PDF documentation and datasheets?
 
-This isn't true.  Almost every platform has a mechanism for
-manufacturing coherent memory (in the worst case, they just turn off the
-CPU cache on a page and hand it out).  The purpose of
-dma_declare_coherent_memory() is to allow a per device declaration of
-preferred regions ... usually because they reside either on the fast
-path to the device or sometimes on the device itself.  There are only a
-handful of devices which need it, so in the ordinary course of events,
-dma_alloc_coherent() is used without any memory declaration.
+No. They work just fine.
 
-James
+> - do you think documentation and datasheets in HTML format on a site
+> can be more useful than PDF?
+
+Fore brief overviews, html will do, but for actual technical documentation
+PDF is *infinitely* better than html.
+
+> - what PDF documentation do you use? (You can just drop a link to PDF,
+> for example http://www.ti.com/lit/ds/symlink/omap4430.pdf)
+
+CPU manuals and errata updates, ISA manuals, ABI manuals.
