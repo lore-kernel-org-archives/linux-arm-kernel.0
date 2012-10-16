@@ -1,26 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 08:13:59 -0700
-Subject: [PATCH] Revert "serial: omap: fix software flow control"
-In-Reply-To: <1350396562-32579-1-git-send-email-balbi@ti.com>
-References: <1350396562-32579-1-git-send-email-balbi@ti.com>
-Message-ID: <20121016151357.GN15569@atomide.com>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Tue, 16 Oct 2012 17:30:40 +0200
+Subject: [PATCH] OMAP4: devices: fixup OMAP4 DMIC platform device error message
+Message-ID: <1350401440-9620-1-git-send-email-s-guiriec@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121016 07:16]:
-> This reverts commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6
-> (serial: omap: fix software flow control).
-> 
-> As Russell has pointed out, that commit isn't fixing
-> Software Flow Control at all, and it actually makes
-> it even more broken.
-> 
-> It was agreed to revert this commit and use Russell's
-> latest UART patches instead.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+Correct DMIC hwmod lockup error message and replace printk() by
+pr_err().
 
-This seems like the best way to go for the -rc series:
+Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+---
+ arch/arm/mach-omap2/devices.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index c8c2117..cba60e0 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -341,7 +341,7 @@ static void __init omap_init_dmic(void)
+ 
+ 	oh = omap_hwmod_lookup("dmic");
+ 	if (!oh) {
+-		printk(KERN_ERR "Could not look up mcpdm hw_mod\n");
++		pr_err("Could not look up dmic hw_mod\n");
+ 		return;
+ 	}
+ 
+-- 
+1.7.10.4
