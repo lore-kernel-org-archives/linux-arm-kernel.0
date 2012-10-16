@@ -1,37 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 16 Oct 2012 11:04:29 +0100
-Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
- contiguous allocations
-In-Reply-To: <20121016085928.GV21164@n2100.arm.linux.org.uk>
-References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
- <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
- <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
- <20121016085928.GV21164@n2100.arm.linux.org.uk>
-Message-ID: <CAHkRjk52DH9_QPQwGF0HUcjsH3+WTRCF41uDKJW7LyxD65pJdw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 16 Oct 2012 12:05:12 +0200
+Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
+In-Reply-To: <1350371685.5769.45.camel@sauron.fi.intel.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+ <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
+ <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
+ <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
+ <507794B6.2000107@st.com>
+ <1350307104.4115.23.camel@sauron.fi.intel.com>
+ <CAN8TOE-7d=YUSYsHFw9X5vnz8cpSJYv5uZfvBpDyhg+-F_LDiQ@mail.gmail.com>
+ <CACRpkdao_9TkH7=ia7kXB-KsQhNZQ7EfSS5B1X0wFPgg5OsuHA@mail.gmail.com>
+ <1350371685.5769.45.camel@sauron.fi.intel.com>
+Message-ID: <CACRpkdY2=PLS_MT1h_nQJj+2ju26yXtt-aXSi=t9uUQ5+WJasA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2012 09:59, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Oct 16, 2012 at 09:04:34AM +0300, Hiroshi Doyu wrote:
->> In addition to those contiguous/discontiguous page allocation, is
->> there any way to _import_ anonymous pages allocated by a process to be
->> used in dma-mapping API later?
+On Tue, Oct 16, 2012 at 9:14 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> On Mon, 2012-10-15 at 21:51 +0200, Linus Walleij wrote:
+>> On Mon, Oct 15, 2012 at 6:27 PM, Brian Norris
+>> <computersforpeace@gmail.com> wrote:
 >>
->> I'm considering the following scenario, an user process allocates a
->> buffer by malloc() in advance, and then it asks some driver to convert
->> that buffer into IOMMU'able/DMA'able ones later. In this case, pages
->> are discouguous and even they may not be yet allocated at
->> malloc()/mmap().
+>> > I would prefer not building a solution that hopes kmalloc() can get a
+>> > large contiguous buffer (remember, eraseblock sizes come as large as
+>> > 2MB these days). A real solution like CMA or scatter-gather seems like
+>> > a better idea.
+>>
+>> +1 on that, and as I think I illustrated the MMC subsystem is using
+>> the block layer helpers to form scatter-gather lists for it's requests.
+>> I don't see why the MTD subsystem need to be very different?
 >
-> That situation is covered.  It's the streaming API you're wanting for that.
-> dma_map_sg() - but you may need additional cache handling via
-> flush_dcache_page() to ensure that your code is safe for all CPU cache
-> architectures.
+> This is good idea, the problem is that it is a bit more work than
+> hacking the driver, so most people prefer the latter. By removing all
+> kmalloc()'s I basically wish to force people to go this way.
+>
+> What are the SC functions names you refer?
 
-For user-allocated pages you first need get_user_pages() to make sure
-they are in memory (and will stay there). This function also calls
-flush_dcache_page(). Then you can build the sg list for dma_map_sg().
+I'm mainly thinking of blk_rq_map_sg()
+from block/blk-merge.c
 
--- 
-Catalin
+Yours,
+Linus Walleij
