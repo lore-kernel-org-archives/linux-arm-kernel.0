@@ -1,60 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 11:14:58 +0100
-Subject: [PATCH 00/11] Minimum set of omap serial patches to fix merge
- window breakage
-Message-ID: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 16 Oct 2012 18:25:32 +0800
+Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
+In-Reply-To: <20121016083954.GB12801@game.jcrosoft.org>
+References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
+ <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
+ <20121015150244.GZ12801@game.jcrosoft.org> <507CD0CA.9010006@atmel.com>
+ <20121016083954.GB12801@game.jcrosoft.org>
+Message-ID: <507D361C.6020403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi J,
 
-During the merge window, a series of patches from various people went in,
-allegedly fixing various problems with the OMAP serial driver.
+On 10/16/2012 16:39, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 11:13 Tue 16 Oct     , Bo Shen wrote:
+>> Hi J,
+>>
+>> On 10/15/2012 23:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 17:30 Mon 15 Oct     , Bo Shen wrote:
+>>>> The i2c core driver will turn the platform device ID to busnum
+>>>> When using platfrom device ID as -1, it means dynamically assigned
+>>>> the busnum. When writing code, we need to make sure the busnum,
+>>>> and call i2c_register_board_info(int busnum, ...) to register device
+>>>> if using -1, we do not know the value of busnum
+>>>> 	
+>>>> In order to solve this issue, set the platform device ID as a fix number
+>>>> Here using 0 to match the busnum used in i2c_regsiter_board_info()
+>>>>
+>>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>>> ---
+>>>
+>>> can you check when this append for the first time to schedule a patch for stable too
+>>
+>> OK. I will resend it and add linux stable into the cc list.
+> no this not how it work
+>
+> I ask you to check which patch add the regression and then when this is
+> applied in the kernel we will request greg to apply it too to the stable
 
-Unfortunately, there was not a full understanding of the issues I brought
-up here back in April, and so the "fixes", while being individually
-correct, result in a worse situation with the driver than before.
+The code is using id = -1 appear 4 years ago. And after dig, I don't 
+find which patch cause this the regression.
 
-Specifically, this patch:
+Sorry for that.
 
-commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6
-Author: Vikram Pandita <vikram.pandita@ti.com>
-Date:   Thu Sep 6 15:45:37 2012 +0300
-
-    serial: omap: fix software flow control
-
-    Software flow control register bits were not defined correctly.
-
-    Also clarify the IXON and IXOFF logic to reflect what userspace wants.
-
-does what it says on the tin - it fixes the register definitions so that
-we do end up enabling the right two software flow control bits.
-
-The down side is that there are other bugs in this area which have been
-exposed.  For example:
-
-1. the XON/XOFF registers aren't written to; their address is, but we will
-   not be writing to the right registers because their access rules are not
-   respected by the driver.  These are by default zero.
-
-   This means that with hardware assisted software flow control enabled,
-   the port will now transmit an 0x00 byte for XON and XOFF events.
-
-2. the driver set_termios function is not called for changes in software
-   flow control settings if not accompanied by some other change.
-
-3. the there isn't actually a way for the hardware assisted flow control
-   to be used other than by increasing interrupt latency to cause the
-   receiver hardware FIFO to fill.  This will cause 0x00 bytes to be
-   transmitted.
-
-There are two options to resolve this.  The first one is to revert this
-patch to bring the driver back down to the pre-merge window state.  The
-other is to apply this series of patches, which frankly I don't think
-is -rc material, even with the above regressions.
-
-Given that the above regressions were caused by a lack of due care and
-correct process (I had declared to TI that I had investigated these
-issues back in April), I believe that the right answer is to revert at
-least commit 957ee7270d, which should re-hide these other bugs in the
-driver.
+> But before do that you MUST foudn the commit responsible
+>
+> Best Regards,
+> J.
+>
