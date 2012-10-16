@@ -1,45 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 10:59:10 -0700
-Subject: [PATCH] ARM: OMAP2+: hwmod data: Fix wrong lostcontext_mask
- for OMAP4 l4_abe
-In-Reply-To: <507D20F2.9060007@ti.com>
-References: <507D20F2.9060007@ti.com>
-Message-ID: <20121016175909.GZ15569@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 16 Oct 2012 23:29:39 +0530
+Subject: [RFC PATCH] ARM: kernel: update cpuinfo to print all online CPUs
+ features
+In-Reply-To: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <507DA08B.502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [121016 01:56]:
-> The following commit added the support for the lostcontext_mask
-> along with the usage of the flag for l4_abe.
-> 
->  commit ce80979aedfce937926a8dd40a1f92fd4bc2fd53
->  Author: Tero Kristo <t-kristo@ti.com>
->  Date:   Sun Sep 23 17:28:19 2012 -0600
-> 
->     ARM: OMAP4: hwmod data: add support for lostcontext_mask
-> 
-> Unfortunately, the l4_abe does not contain this memory and thus
-> cannot contain that flag.
-> 
-> Remove the flag from the l4_abe hwmod.
-> 
-> Change as well the mask for omap44xx_aess_hwmod to avoid missing
-> the status in case LOSTMEM_AESSMEM is set. The AESS logic does
-> not support retention and thus only the memory state is useful.
-> It is even mandatory to avoid a crash in the case of the AESS
-> resume.
-> 
-> TBD: Ideally each hwmod should contain an extra entry for memory
-> context attached to it. The AESS does contain only one, but some
-> IP like the IVAHD does have three memories with dedicated status.
-> The granularity is never used, but at least one global information
-> for all the memory banks is useful.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
+On Tuesday 16 October 2012 09:54 PM, Lorenzo Pieralisi wrote:
+> Currently, reading /proc/cpuinfo provides userspace with CPU ID of
+> the CPU carrying out the read from the file. This is fine as long as all
+> CPUs in the system are the same. With the advent of big.LITTLE and
+> heterogenous ARM systems this approach provides user space with incorrect
+> bits of information since CPU ids in the system might differ from the one
+> provided by the CPU reading the file.
+>
+> This patch updates the cpuinfo show function and some internal data
+> structures so that a read from /proc/cpuinfo prints HW information for
+> all online CPUs at once, mirroring x86 behaviour.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>
+> Posting it as a way to get advice on the best way to improve /proc/cpuinfo for
+> heterogenous multi-cluster systems and to provide proper information to
+> userspace without breaking existing semantics, no more than that.
+>
+> Comments more than welcome.
+>
+> Thanks,
+> Lorenzo
+>
+>   arch/arm/include/asm/cpu.h |  1 +
+>   arch/arm/kernel/setup.c    | 66 +++++++++++++++++++++++-----------------------
+>   arch/arm/kernel/smp.c      |  1 +
+>   3 files changed, 35 insertions(+), 33 deletions(-)
+>
 
-Thanks applying into omap-for-v3.7-rc1/fixes-part2.
+[...]
 
-Regards,
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 8707cff..bf7839d08 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -1054,13 +1054,15 @@ static const char *hwcap_str[] = {
+>
+>   static int c_show(struct seq_file *m, void *v)
+>   {
+> -	int i;
+> +	int i, j;
+> +	u32 cpuid;
+>
+> -	seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+> -		   cpu_name, read_cpuid_id() & 15, elf_platform);
+> +	for_each_online_cpu(i) {
+> +		cpuid = is_smp() ? per_cpu(cpu_data, i).cpuid : read_cpuid_id();
+> +		seq_printf(m, "Processor\t: %s rev %d (%s)\n",
+> +			   cpu_name, cpuid & 15, elf_platform);
+>
+Not exactly related to the $subject patch, but I remember doing a patch
+to have cat /proc/cpuinfo spitting only online CPUs just like x86 using
+for_each_online_cpu(i).
+At that point Russell mentioned about a possibility of read() syscall
+spreading over the hot-plug operation and hence the above may not
+be safe.
 
-Tony
+is that right Russell ?
+
+regards
+Santosh
