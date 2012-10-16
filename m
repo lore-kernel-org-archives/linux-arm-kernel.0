@@ -1,127 +1,147 @@
-From: lliubbo@gmail.com (Bob Liu)
-Date: Tue, 16 Oct 2012 10:17:24 +0800
-Subject: dma_alloc_coherent fails in framebuffer
-In-Reply-To: <1350325704.31162.16.camel@gitbox>
-References: <1350192523.10946.4.camel@gitbox> <1350246895.11504.6.camel@gitbox>
- <20121015094547.GC29125@suse.de> <1350325704.31162.16.camel@gitbox>
-Message-ID: <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 16 Oct 2012 10:25:09 +0800
+Subject: [PATCH] ARM: mxs: Add support for the Armadeus Systems APF28
+ module
+In-Reply-To: <1350149143-9684-1-git-send-email-julien.boibessot@free.fr>
+References: <1350149143-9684-1-git-send-email-julien.boibessot@free.fr>
+Message-ID: <20121016022505.GE24393@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 2:28 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
-> On Mon, 2012-10-15 at 10:45 +0100, Mel Gorman wrote:
->> On Mon, Oct 15, 2012 at 09:34:55AM +1300, Tony Prisk wrote:
->> > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
->> > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
->> > > 11 Oct when I did another pull from linus all of a sudden
->> > > dma_alloc_coherent is failing to allocate the framebuffer any longer.
->> > >
->> > > I did a quick look back and found this:
->> > >
->> > > ARM: add coherent dma ops
->> > >
->> > > arch_is_coherent is problematic as it is a global symbol. This
->> > > doesn't work for multi-platform kernels or platforms which can support
->> > > per device coherent DMA.
->> > >
->> > > This adds arm_coherent_dma_ops to be used for devices which connected
->> > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
->> > > are modified at boot when arch_is_coherent is true.
->> > >
->> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> > > Cc: Russell King <linux@arm.linux.org.uk>
->> > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> > >
->> > >
->> > > This is the only patch lately that I could find (not that I would claim
->> > > to be any good at finding things) that is related to the problem. Could
->> > > it have caused the allocations to fail?
->> > >
->> > > Regards
->> > > Tony P
->> >
->> > Have done a bit more digging and found the cause - not Rob's patch so
->> > apologies.
->> >
->> > The cause of the regression is this patch:
->> >
->> > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
->> > From: Mel Gorman <mgorman@suse.de>
->> > Date: Mon, 8 Oct 2012 16:32:36 -0700
->> > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
->> >  possible
->> >
->> > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
->> > was fine. From this patch onwards, allocations fail.
->> >
->>
->> Was this found through bisection or some other means?
->>
->> There was a bug in that series that broke CMA but it was commit bb13ffeb
->> (mm: compaction: cache if a pageblock was scanned and no pages were
->> isolated) and it was fixed by 62726059 (mm: compaction: fix bit ranges
->> in {get,clear,set}_pageblock_skip()). So it should have been fixed by
->> 3.7-rc1 and probably was included by the time you pulled in October 11th
->> but bisection would be a pain. There were problems with that series during
->> development but tests were completing for other people.
->>
->> Just in case, is this still broken in 3.7-rc1?
->
-> Still broken. Although the printk's might have cleared it up a bit.
->>
->> > I don't know how this patch would effect CMA allocations, but it seems
->> > to be causing the issue (or at least, it's caused an error in
->> > arch-vt8500 to become visible).
->> >
->> > Perhaps someone who understand -mm could explain the best way to
->> > troubleshoot the cause of this problem?
->> >
->>
->> If you are comfortable with ftrace, it can be used to narrow down where
->> the exact failure is occurring but if you're not comfortable with that
->> then the easiest is a bunch of printks starting in alloc_contig_range()
->> to see at what point and why it returns failure.
->>
->> It's not obvious at the moment why that patch would cause an allocation
->> problem. It's the type of patch that if it was wrong it would fail every
->> time for everyone, not just for a single driver.
->>
->
-> I added some printk's to see what was happening.
->
-> from arch/arm/mm/dma-mapping.c: arm_dma_alloc(..) it calls out to:
-> dma_alloc_from_coherent().
->
-> This returns 0, because:
-> mem = dev->dma_mem
-> if (!mem) return 0;
->
-> and then arm_dma_alloc() falls back on __dma_alloc(..)
->
->
-> I suspect the reason this fault is a bit 'weird' is because its
-> effectively not using alloc_from_coherent at all, but falling back on
-> __dma_alloc all the time, and sometimes it fails.
->
+On Sat, Oct 13, 2012 at 07:25:43PM +0200, julien.boibessot at free.fr wrote:
+> From: Julien Boibessot <julien.boibessot@armadeus.com>
+> 
+> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+>  arch/arm/boot/dts/imx28-apf28.dts |   79 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/mach-mxs.c      |    7 +++
+>  2 files changed, 86 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
 
-I think you need to declare that memory using
-dma_declare_coherent_memory() before
-alloc_from_coherent.
+Please add imx28-apf28.dtb target into arch/arm/boot/dts/Makefile.
 
-> Why it caused a problem on that particular commit I don't know - but it
-> was reproducible by adding/removing it.
->
->
-> Regards
-> Tony P
->
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> 
+> diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
+> new file mode 100644
+> index 0000000..83e37c1
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-apf28.dts
+> @@ -0,0 +1,79 @@
+> +/*
+> + * Copyright 2012 Armadeus Systems - <support@armadeus.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx28.dtsi"
+> +
+> +/ {
+> +	model = "Armadeus Systems APF28 module";
+> +	compatible = "armadeus,imx28-apf28", "fsl,imx28";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;
+> +	};
+> +
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			gpmi-nand at 8000c000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+> +				status = "okay";
+> +
+> +				partition at 0 {
+> +					label = "u-boot";
+> +					reg = <0x0 0x300000>;
+> +				};
 
--- 
-Regards,
---Bob
+Nit: please put a new line between nodes.
+
+> +				partition at 1 {
+
+partition at 300000
+
+xxx after partition@ should be the first cell of "reg" property.
+
+Shawn
+
+> +					label = "env";
+> +					reg = <0x300000 0x80000>;
+> +				};
+> +				partition at 2 {
+> +					label = "env2";
+> +					reg = <0x380000 0x80000>;
+> +				};
+> +				partition at 3 {
+> +					label = "dtb";
+> +					reg = <0x400000 0x80000>;
+> +				};
+> +				partition at 4 {
+> +					label = "splash";
+> +					reg = <0x480000 0x80000>;
+> +				};
+> +				partition at 5 {
+> +					label = "kernel";
+> +					reg = <0x500000 0x800000>;
+> +				};
+> +				partition at 6 {
+> +					label = "rootfs";
+> +					reg = <0xd00000 0xf300000>;
+> +				};
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			duart: serial at 80074000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&duart_pins_a>;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		mac0: ethernet at 800f0000 {
+> +			phy-mode = "rmii";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&mac0_pins_a>;
+> +			phy-reset-gpios = <&gpio4 13 0>;
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index caf11db..93bc53d 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -357,6 +357,11 @@ static void __init tx28_post_init(void)
+>  	pinctrl_put(pctl);
+>  }
+>  
+> +static void __init apf28_init(void)
+> +{
+> +	enable_clk_enet_out();
+> +}
+> +
+>  static void __init mxs_machine_init(void)
+>  {
+>  	if (of_machine_is_compatible("fsl,imx28-evk"))
+> @@ -367,6 +372,8 @@ static void __init mxs_machine_init(void)
+>  		m28evk_init();
+>  	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
+>  		apx4devkit_init();
+> +	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
+> +		apf28_init();
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+>  			     mxs_auxdata_lookup, NULL);
+> -- 
+> 1.7.5.4
+> 
