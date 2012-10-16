@@ -1,50 +1,43 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 16 Oct 2012 19:14:08 +0200
-Subject: [PATCH V2 0/7] support the cpts found on am335x devices
-In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9F82F0@DBDE01.ent.ti.com>
-References: <cover.1350329726.git.richardcochran@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9F82F0@DBDE01.ent.ti.com>
-Message-ID: <20121016171407.GA2176@netboy.at.omicron.at>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Oct 2012 18:16:01 +0100
+Subject: [RESEND PATCH 2/2] ARM: kexec: Check segment memory addresses
+In-Reply-To: <20121016170900.GB1613@blackmetal.musicnaut.iki.fi>
+References: <1348157018-31059-1-git-send-email-will.deacon@arm.com>
+ <1348157018-31059-2-git-send-email-will.deacon@arm.com>
+ <20121016161020.GA1613@blackmetal.musicnaut.iki.fi>
+ <20121016163226.GG23979@mudshark.cambridge.arm.com>
+ <20121016170900.GB1613@blackmetal.musicnaut.iki.fi>
+Message-ID: <20121016171601.GL23979@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 04:33:55PM +0000, N, Mugunthan V wrote:
-> I had seen some issues with the patch series.
+On Tue, Oct 16, 2012 at 06:09:00PM +0100, Aaro Koskinen wrote:
+> On Tue, Oct 16, 2012 at 05:32:26PM +0100, Will Deacon wrote:
+> > Interesting, it sounds like kexec thinks that you don't have contiguous
+> > memory from 0x80008000 to 0x803ad000. Can you provide some more information
+> > about your physical memory map please?
+> 
+> Well, I think it's because the patch is wrong. Shouldn't it be:
+> 
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index e29c333..a80192e 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -47,7 +47,7 @@ int machine_kexec_prepare(struct kimage *image)
+>  
+>  		err = memblock_is_region_memory(current_segment->mem,
+>  						current_segment->memsz);
+> -		if (err)
+> +		if (!err)
+>  			return - EINVAL;
+>  
+>  		err = get_user(header, (__be32*)current_segment->buf);
 
-Please take another look. Excepting the last, none of your points
-holds water.
- 
-> * CPTS will hold only LSB 32 bits of 64 bit Timer and the upper 32 bit
->   time value has to be taken care by the software, but the time stamp
->   which is passed to skb or PTP clock consist of only 32 bit time value
+Oops, that's a howler! Thanks for spotting it. We should probably reflow the
+code a bit because !err sounds like everything should be ok.
 
-The driver handles this already.
+Fancy reworking the patch or do you want me to take care of this?
 
-> * CPTS interrupts should be utilized to service Half and Full roll over
->   events as it is non sync events with respect to get/set time and PTP
->   pkt Tx/Rx
+Cheers,
 
-Nope, no need for interrupts, since we already have a better way to
-handle this.
-
-> * CPTS Time which is obtained from hardware is not actually a nano
->   seconds as the CPTS ref clock is tied to 250MHz for AM335x.
-
-Did you even look at the code in my patch?
-
-> * CPSW register mapping done in this patch series removes the CPSW
->   driver support for previous version found in TI814x
-
-In which Linux version (or commit) did this driver appear?
-I never saw it.
-
-> * CPSW Time stamping is done only for port 0 and port 1 is not done
-
-Yes, you are right, and it is strange that the hardware time stamps on
-the external ports of the switch, and not at the host port as it
-should. Of course it does present us with a problem, since we cannot
-reasonably have both ports time stamping at the same time. I propose
-simply using a device tree attribute to tell which port to activate.
-
-Thanks,
-Richard
+Will
