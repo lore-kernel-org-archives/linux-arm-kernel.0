@@ -1,49 +1,154 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Oct 2012 17:32:26 +0100
-Subject: [RESEND PATCH 2/2] ARM: kexec: Check segment memory addresses
-In-Reply-To: <20121016161020.GA1613@blackmetal.musicnaut.iki.fi>
-References: <1348157018-31059-1-git-send-email-will.deacon@arm.com>
- <1348157018-31059-2-git-send-email-will.deacon@arm.com>
- <20121016161020.GA1613@blackmetal.musicnaut.iki.fi>
-Message-ID: <20121016163226.GG23979@mudshark.cambridge.arm.com>
+From: yangfei.kernel@gmail.com (Fei Yang)
+Date: Wed, 17 Oct 2012 00:33:54 +0800
+Subject: [PATCH] Re: Hardcoded instruction causes certain features to fail
+ on ARM platfrom due to endianness
+In-Reply-To: <20121016124956.GC26075@linaro.org>
+References: <DA41BE1DDCA941489001C7FBD7A8820E3CB407A4@szxeml549-mbx.china.huawei.com>
+ <20603.47887.262025.941051@pilspetsen.it.uu.se>
+ <CAKw8HL154a=K9O7CzPFZ-EqtT+BxYU-uRHodtutdRfYmNpWVww@mail.gmail.com>
+ <20121016124956.GC26075@linaro.org>
+Message-ID: <CAKw8HL3shtbi0Kk-7ZWO9KhtBVU+Vj_Zunh52GDOGJTZSvt6Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 05:10:21PM +0100, Aaro Koskinen wrote:
-> Hi,
+2012/10/16 Dave Martin <dave.martin@linaro.org>:
+> On Mon, Oct 15, 2012 at 11:33:08PM +0800, Fei Yang wrote:
+>> 2012/10/15 Mikael Pettersson <mikpe@it.uu.se>:
+>> > Yangfei (Felix) writes:
+>> >  > Hi all,
+>> >  >
+>> >  >     I found that hardcoded instruction in inline asm can cause certains certain features fail to work on ARM platform due to endianness.
+>> >  >     As an example, consider the following code snippet of platform_do_lowpower function from arch/arm/mach-realview/hotplug.c:
+>> >  >                 / *
+>> >  >                  * here's the WFI
+>> >  >                  */
+>> >  >                 asm(".word      0xe320f003\n"
+>> >  >                     :
+>> >  >                     :
+>> >  >                     : "memory", "cc");
+>> >  >
+>> >  >     The instruction generated from this inline asm will not work on big-endian ARM platform, such as ARM BE-8 format. Instead, an exception will be generated.
+>> >  >
+>> >  >     Here the code should be:
+>> >  >                 / *
+>> >  >                  * here's the WFI
+>> >  >                  */
+>> >  >                 asm("WFI\n"
+>> >  >                     :
+>> >  >                     :
+>> >  >                     : "memory", "cc");
+>> >  >
+>> >  >     Seems the kernel doesn't support ARM BE-8 well. I don't know why this problem happens.
+>> >  >     Can anyone tell me who owns this part? I can prepare a patch then.
+>> >  >     Thanks.
+>> >
+>> > Questions regarding the ARM kernel should go to the linux-arm-kernel mailing list
+>> > (see the MAINTAINERS file), with an optional cc: to the regular LKML.
+>> >
+>> > BE-8 is, if I recall correctly, ARMv7's broken format where code and data have
+>> > different endianess.  GAS supports an ".inst" directive which is like ".word"
+>> > except the data is assumed to be code.  This matters for disassembly, and may
+>> > also be required for BE-8.
+>> >
+>> > That is, just s/.word/.inst/g above and report back if that works or not.
+>> > --
+>> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> > the body of a message to majordomo at vger.kernel.org
+>> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> > Please read the FAQ at  http://www.tux.org/lkml/
+>> >
+>> >
+>>
+>> Hi Mikael,
+>>
+>> Thanks for the reply. I modified the code as suggested and rebuilt the
+>> kernel, cpu-hotplug feature now works on big-endian(BE-8) ARM
+>> platform.
+>> Since the ARM core can be configured by system software to work in
+>> big-endian mode, it's necessary to fix this problem. And here is a
+>> small patch :
+>>
+>> diff -urN linux-3.6.2/arch/arm/mach-exynos/hotplug.c
+>> linux/arch/arm/mach-exynos/hotplug.c
+>> --- linux-3.6.2/arch/arm/mach-exynos/hotplug.c        2012-10-13
+>> 04:50:59.000000000 +0800
+>> +++ linux/arch/arm/mach-exynos/hotplug.c      2012-10-15 23:05:44.000000000 +0800
+>> @@ -72,7 +72,7 @@
+>>               /*
+>>                * here's the WFI
+>>                */
+>> -             asm(".word      0xe320f003\n"
+>> +             asm(".inst      0xe320f003\n"
+>
+> The cleanest fix would simply be to build these files with appropriate
+> modified CFLAGS (-march=armv6k or -march=armv7-a), and use the proper
+> "wfi" mnemonic.
+>
+> Failing that, you could use the facilities in <asm/opcodes.h> to
+> declare a wrapper macro for injecting this opcode (see
+> <asm/opcodes-virt.h> for an example).  However, putting custom
+> opcodes into the assembler should only be done if it's really
+> necessary.  Nowadays, I think we can consider tools which don't
+> understand the WFI mnemonic to be obsolete, at least for platforms
+> which only build for v7 and above.
+>
+> The relevant board maintainers would need to sign off on such a
+> change, so we don't end up breaking their builds.
+>
+> If any of these boards needs to build for v6K, the custom opcode might
+> be worth it -- some people might just possibly be relying on older tools
+> for such platforms.
+>
+> Cheers
+> ---Dave
+>
+>>                   :
+>>                   :
+>>                   : "memory", "cc");
+>> diff -urN linux-3.6.2/arch/arm/mach-realview/hotplug.c
+>> linux/arch/arm/mach-realview/hotplug.c
+>> --- linux-3.6.2/arch/arm/mach-realview/hotplug.c      2012-10-13
+>> 04:50:59.000000000 +0800
+>> +++ linux/arch/arm/mach-realview/hotplug.c    2012-10-15 23:05:00.000000000 +0800
+>> @@ -66,7 +66,7 @@
+>>               /*
+>>                * here's the WFI
+>>                */
+>> -             asm(".word      0xe320f003\n"
+>> +             asm(".inst      0xe320f003\n"
+>>                   :
+>>                   :
+>>                   : "memory", "cc");
+>> diff -urN linux-3.6.2/arch/arm/mach-shmobile/hotplug.c
+>> linux/arch/arm/mach-shmobile/hotplug.c
+>> --- linux-3.6.2/arch/arm/mach-shmobile/hotplug.c      2012-10-13
+>> 04:50:59.000000000 +0800
+>> +++ linux/arch/arm/mach-shmobile/hotplug.c    2012-10-15 23:05:25.000000000 +0800
+>> @@ -53,7 +53,7 @@
+>>               /*
+>>                * here's the WFI
+>>                */
+>> -             asm(".word      0xe320f003\n"
+>> +             asm(".inst      0xe320f003\n"
+>>                   :
+>>                   :
+>>                   : "memory", "cc");
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Hi Aaro,
+Thanks for the suggestions. The ".inst" directive here may also bring
+us trouble if some older tools is used.
+In that situation, "wfi" mnemonic will not be recognized either. If we
+cannot suppose that newer tools is used, then how can we determine the
+endianness during the preprocessor/compile phase? Any ideas?
 
-> On Thu, Sep 20, 2012 at 05:03:38PM +0100, Will Deacon wrote:
-> > From: Matthew Leach <matthew.leach@arm.com>
-> > 
-> > Ensure that the memory regions that are set within the segments
-> > correspond to physical contiguous memory regions.
-> 
-> This patch seems to break kexec for me in 3.7-rc1 (commit
-> c564df4db85aac8d1d65a56176a0a25f46138064, bisected).
-> 
-> kexec -l fails with the following output:
-> 
-> kexec_load failed: Invalid argument
-> entry       = 0x80008000 flags = 280000
-> nr_segments = 2
-> segment[0].buf   = 0xc48008
-> segment[0].bufsz = 230
-> segment[0].mem   = 0x80001000
-> segment[0].memsz = 1000
-> segment[1].buf   = 0xb6a9b008
-> segment[1].bufsz = 3a4668
-> segment[1].mem   = 0x80008000
-> segment[1].memsz = 3a5000
-> Could not load the kexec kernel: n800-zImage
-> 
-> The board is OMAP2420 / Nokia N800.
-
-Interesting, it sounds like kexec thinks that you don't have contiguous
-memory from 0x80008000 to 0x803ad000. Can you provide some more information
-about your physical memory map please?
-
-Cheers,
-
-Will
+BTW: I found this bug on my ARM V7-A Cortex-A9 board and the processor
+is configured to work in big-endian mode at boot stage (word and
+halfword data is interpreted as big-endian, but instruction is still
+little-endian) . The kernel is ported from arch/arm/mach-realview. And
+I think these boards(mach-realview/mach-shmobile/mach-exynos) should
+have the similar problems. ARM arch is Bi-endian since versions 3 and
+above.
