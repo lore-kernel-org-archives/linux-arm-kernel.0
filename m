@@ -1,88 +1,81 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 16 Oct 2012 12:01:27 +0100
-Subject: [PATCH 11/11] SERIAL: omap: fix hardware assisted flow control
-In-Reply-To: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
-References: <20121016101458.GZ21164@n2100.arm.linux.org.uk>
-Message-ID: <E1TO4tr-0000Wp-Bf@rmk-PC.arm.linux.org.uk>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 16 Oct 2012 20:11:40 +0900
+Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
+ contiguous allocations
+In-Reply-To: <20121016103109.GA21164@n2100.arm.linux.org.uk>
+References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+ <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
+ <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
+ <CAAQKjZNQFfxpr-7dFb4cgNB2Gkrxxrswds_fSrYgssxXaqRF7g@mail.gmail.com>
+ <20121016103109.GA21164@n2100.arm.linux.org.uk>
+Message-ID: <CAAQKjZPf5RYJ75Zsqo=+gadXH1Jx9BFuFUuDCrsrhLKO1_frfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the UART device has hardware flow control enabled, it ignores the
-MCR RTS bit in the MCR register, and keeps RTS asserted as long as we
-continue to read characters from the UART receiver FIFO.  This means
-that when the TTY buffers become full, the UART doesn't tell the remote
-end to stop sending, which causes the TTY layer to start dropping
-characters.
+Hi Russell,
 
-A similar problem exists with software flow control.  We need the FIFO
-register to fill when software flow control is enabled to provoke the
-UART to send the XOFF character.
+2012/10/16 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Tue, Oct 16, 2012 at 07:12:49PM +0900, Inki Dae wrote:
+>> Hi Hiroshi,
+>>
+>> I'm not sure I understand what you mean but we had already tried this
+>> way and for this, you can refer to below link,
+>>                http://www.mail-archive.com/dri-devel at lists.freedesktop.org/msg22555.html
+>>
+>> but this way had been pointed out by drm guys because the pages could
+>> be used through gem object after that pages had been freed by free()
+>> anyway their pointing was reasonable and I'm trying another way, this
+>> is the way that the pages to user space has same life time with dma
+>> operation. in other word, if dma completed access to that pages then
+>> also that pages will be freed. actually drm-based via driver of
+>> mainline kernel is using same way
+>
+> I don't know about Hiroshi, but the above "sentence" - and I mean the 7
+> line sentence - is very difficult to understand and wears readers out.
+>
 
-Fix this by implementing the throttle/unthrottle callbacks, and use
-these to disable receiver interrupts.  This in turn means that the UART
-FIFO will fill, which will then cause the UART's hardware to deassert
-the RTS signal and/or send the XOFF character, stopping the remote end.
+Sorry for this. Please see below comments.
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/tty/serial/omap-serial.c |   31 +++++++++++++++++++++++++++++++
- 1 files changed, 31 insertions(+), 0 deletions(-)
+> If your GPU hardware has a MMU, then the problem of dealing with userspace
+> pages is very easy.  Do it the same way that the i915 driver and the rest
+> of DRM does.  Use shmem backed memory.
+>
+> I'm doing that for the Dove DRM driver and it works a real treat, and as
+> the pages are backed by page cache pages, you can use all the normal
+> page refcounting on them to prevent them being freed until your DMA has
+> completed.  All my X pixmaps are shmem backed drm objects, except for
+> the scanout buffers which are dumb drm objects (because they must be
+> contiguous.)
+>
+> In fact, get_user_pages() will take the reference for you before you pass
+> them over to dma_map_sg().  On completion of DMA, you just need to use
+> dma_unmap_sg() and release each page.
+>
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 7cc151c..aabc94d 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -303,6 +303,34 @@ static void serial_omap_start_tx(struct uart_port *port)
- 	pm_runtime_put_autosuspend(up->dev);
- }
- 
-+static void serial_omap_throttle(struct uart_port *port)
-+{
-+	struct uart_omap_port *up = to_uart_omap_port(port);
-+	unsigned long flags;
-+
-+	pm_runtime_get_sync(up->dev);
-+	spin_lock_irqsave(&up->port.lock, flags);
-+	up->ier &= ~(UART_IER_RLSI | UART_IER_RDI);
-+	serial_out(up, UART_IER, up->ier);
-+	spin_unlock_irqrestore(&up->port.lock, flags);
-+	pm_runtime_mark_last_busy(up->dev);
-+	pm_runtime_put_autosuspend(up->dev);
-+}
-+
-+static void serial_omap_unthrottle(struct uart_port *port)
-+{
-+	struct uart_omap_port *up = to_uart_omap_port(port);
-+	unsigned long flags;
-+
-+	pm_runtime_get_sync(up->dev);
-+	spin_lock_irqsave(&up->port.lock, flags);
-+	up->ier |= UART_IER_RLSI | UART_IER_RDI;
-+	serial_out(up, UART_IER, up->ier);
-+	spin_unlock_irqrestore(&up->port.lock, flags);
-+	pm_runtime_mark_last_busy(up->dev);
-+	pm_runtime_put_autosuspend(up->dev);
-+}
-+
- static unsigned int check_modem_status(struct uart_omap_port *up)
- {
- 	unsigned int status;
-@@ -1000,6 +1028,7 @@ static void serial_omap_config_port(struct uart_port *port, int flags)
- 	dev_dbg(up->port.dev, "serial_omap_config_port+%d\n",
- 							up->port.line);
- 	up->port.type = PORT_OMAP;
-+	up->port.flags |= UPF_SOFT_FLOW | UPF_HARD_FLOW;
- }
- 
- static int
-@@ -1203,6 +1232,8 @@ static struct uart_ops serial_omap_pops = {
- 	.get_mctrl	= serial_omap_get_mctrl,
- 	.stop_tx	= serial_omap_stop_tx,
- 	.start_tx	= serial_omap_start_tx,
-+	.throttle	= serial_omap_throttle,
-+	.unthrottle	= serial_omap_unthrottle,
- 	.stop_rx	= serial_omap_stop_rx,
- 	.enable_ms	= serial_omap_enable_ms,
- 	.break_ctl	= serial_omap_break_ctl,
--- 
-1.7.4.4
+It's exactly same as ours. Besides, I know get_user_pages() takes 2
+reference counts if the user process has never accessed user region
+allocated by malloc(). Then, if the user calls free(), the page
+reference count becomes 1 and becomes 0 with put_page() call. And the
+reverse holds as well. This means how the pages backed are used by dma
+and freed. dma_map_sg() just does cache operation properly and maps
+these pages with iommu table. There may be my missing point.
+
+Thanks,
+Inki Dae
+
+> If you don't want to use get_user_pages() (which other drivers don't) then
+> you need to following the i915 example and get each page out of shmem
+> individually.
+>
+> (My situation on the Dove hardware is a little different, because the
+> kernel DRM driver isn't involved with the GPU - it merely provides the
+> memory for pixmaps.  The GPU software stack, being a chunk of closed
+> source userspace library with open source kernel driver, means that
+> things are more complicated; the kernel side GPU driver uses
+> get_user_pages() to pin them prior to building the GPU's MMU table.)
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
