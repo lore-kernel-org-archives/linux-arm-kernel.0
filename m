@@ -1,55 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 11:07:55 -0700
-Subject: [PATCH] ARM: OMAP: resolve sparse warning concerning
- debug_card_init()
-In-Reply-To: <50751D36.9020001@compulab.co.il>
-References: <alpine.DEB.2.00.1210092028080.5736@utopia.booyaka.com>
- <50751D36.9020001@compulab.co.il>
-Message-ID: <20121016180754.GB15569@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 16 Oct 2012 11:09:02 -0700
+Subject: [GIT PULL] imx multi-platform support
+In-Reply-To: <20121015034047.GB24393@S2101-09.ap.freescale.net>
+References: <20121015034047.GB24393@S2101-09.ap.freescale.net>
+Message-ID: <CAOesGMiJhst7wnG-uBNbOH8dXELBzUsP1eXsm0iDU6p3_+07Pg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [121010 00:02]:
-> On 10/09/12 22:29, Paul Walmsley wrote:
-> > 
-> > Commit 801475ccb2b2c1928b22aec4b9e5285d9e347602 ("ARM: OMAP: move
-> > debug_card_init() function") results in the following new sparse
-> > warning:
-> > 
-> > arch/arm/plat-omap/debug-devices.c:71:12: warning: symbol 'debug_card_init' was not declared. Should it be static?
-> > 
-> > Fix by implementing Tony's suggestion to add a "sideways include" to the
-> > new location of the debug-devices.h file in arch/arm/mach-omap2/.
-> > 
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > Cc: Igor Grinberg <grinberg@compulab.co.il>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> 
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Hi,
 
-Thanks, applying into omap-for-v3.7-rc1/fixes-part2.
+On Sun, Oct 14, 2012 at 8:40 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Arnd, Olof,
+>
+> Here is the imx multi-platform support [1] that missed 3.7 merge window.
+> Please pull it for 3.8 and exposing on linux-next.  As it touches a lot
+> of files, I send it early, so that people can base their works off it
+> to avoid conflicts.
 
-Regards,
+Thanks! I've pulled this into arm-soc under the next/cleanup branch,
+since all but the last commit really is cleanup (moving around header
+files) and I didn't see a need to split out the last commit in a
+separate branch.
 
-Tony
- 
-> > ---
-> >  arch/arm/plat-omap/debug-devices.c |    1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/plat-omap/debug-devices.c b/arch/arm/plat-omap/debug-devices.c
-> > index c7a4c09..5a4678e 100644
-> > --- a/arch/arm/plat-omap/debug-devices.c
-> > +++ b/arch/arm/plat-omap/debug-devices.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/smc91x.h>
-> >  
-> >  #include <mach/hardware.h>
-> > +#include "../mach-omap2/debug-devices.h"
-> >  
-> >  /* Many OMAP development platforms reuse the same "debug board"; these
-> >   * platforms include H2, H3, H4, and Perseus2.
-> 
-> -- 
-> Regards,
-> Igor.
+> Sascha, please base your 3.8 branches off this one.
+>
+> Subsystem maintainers,
+>
+> We will keep this topic branch stable (non-rebase), so you are free
+> to merge it to solve conflicts or dependency if necessary.
+
+As a note and reminder to others: please base your changes on the
+imx/multiplatform branch in arm-soc, or on Shawn's own branch, not on
+next/cleanup or the for-next branch of arm-soc.
+
+
+Thanks!
+
+-Olof
