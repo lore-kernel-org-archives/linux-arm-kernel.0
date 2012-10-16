@@ -1,46 +1,39 @@
-From: vinod.koul@linux.intel.com (Vinod Koul)
-Date: Tue, 16 Oct 2012 08:09:04 +0530
-Subject: [PATCH V6 2/2] dmaengine: add helper function to request a
- slave DMA channel
-In-Reply-To: <20121016024318.GF24393@S2101-09.ap.freescale.net>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
- <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
- <20120917223619.GC12445@n2100.arm.linux.org.uk>
- <1347938035.1943.162.camel@vkoul-udesk3> <5060DDEB.4000600@ti.com>
- <1348547701.1943.190.camel@vkoul-udesk3>
- <20121016024318.GF24393@S2101-09.ap.freescale.net>
-Message-ID: <1350355144.1648.5259.camel@vkoul-udesk3>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 16 Oct 2012 11:13:14 +0800
+Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
+In-Reply-To: <20121015150244.GZ12801@game.jcrosoft.org>
+References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
+ <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
+ <20121015150244.GZ12801@game.jcrosoft.org>
+Message-ID: <507CD0CA.9010006@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-16 at 10:43 +0800, Shawn Guo wrote:
-> On Tue, Sep 25, 2012 at 10:05:01AM +0530, Vinod Koul wrote:
-> > On Mon, 2012-09-24 at 17:25 -0500, Jon Hunter wrote:
-> > > > For DT bindings, I think the binding itself shouldn't change based on my
-> > > > work but I would like these same bindings to help build the DMA engine
-> > > > code mappings.
-> > > > 
-> > > > Now would it make sense to NOT merge these changes for 3.7 and postpone
-> > > > to 3.8. I can host these patches on a topic branch and merge them when
-> > > > we are ready. I plan to spend some good amount of time on my work this
-> > > > week so we should be ready pretty soon.
-> > > > One these changes are merged, users can start moving to this scheme.
-> > > 
-> > > I just wanted to see how things are progressing your side. Did you
-> > > create a topic branch for this? If so let me know where I can find it, I
-> > > did not find a branch on your infradead git tree.
-> > > 
-> > > I wanted to pull in the latest patches for some testing. 
-> > Sorry for delay, I had everything ready, but couldn't manage to commit
-> > and push. I have pushed to topic/dmaengine_dt, it is pushing out now...
-> > 
-> Vinod,
-> 
-> Looks it seemed 3.7-rc1.  Does that mean we have to wait for 3.8, or
-> will it show on later -rc for 3.7?
-Yes this will be merged once we work out the common interface, otherwise
-we will end up redoing interfaces for all drivers.
+Hi J,
 
--- 
-~Vinod
+On 10/15/2012 23:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 17:30 Mon 15 Oct     , Bo Shen wrote:
+>> The i2c core driver will turn the platform device ID to busnum
+>> When using platfrom device ID as -1, it means dynamically assigned
+>> the busnum. When writing code, we need to make sure the busnum,
+>> and call i2c_register_board_info(int busnum, ...) to register device
+>> if using -1, we do not know the value of busnum
+>> 	
+>> In order to solve this issue, set the platform device ID as a fix number
+>> Here using 0 to match the busnum used in i2c_regsiter_board_info()
+>>
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> ---
+>
+> can you check when this append for the first time to schedule a patch for stable too
+
+OK. I will resend it and add linux stable into the cc list.
+
+Thanks.
+
+BRs,
+Bo Shen
+
+> Best Regards,
+> J.
+>
