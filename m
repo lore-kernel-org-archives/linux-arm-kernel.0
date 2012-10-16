@@ -1,81 +1,158 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 16 Oct 2012 11:21:21 +0530
-Subject: [PATCH v2 09/13] ARM: davinci - update the dm644x soc code to
- use common clk drivers
-In-Reply-To: <3E54258959B69E4282D79E01AB1F32B704201DE5@DFLE12.ent.ti.com>
-References: <1348683037-9705-1-git-send-email-m-karicheri2@ti.com>
- <1348683037-9705-10-git-send-email-m-karicheri2@ti.com>
- <5076BAA2.6010404@ti.com>
- <3E54258959B69E4282D79E01AB1F32B7041FDB5B@DFLE12.ent.ti.com>
- <5077F466.6020707@ti.com>
- <3E54258959B69E4282D79E01AB1F32B704201DE5@DFLE12.ent.ti.com>
-Message-ID: <507CF5D9.2050605@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 16 Oct 2012 18:54:53 +1300
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
+References: <1350192523.10946.4.camel@gitbox>
+ <1350246895.11504.6.camel@gitbox> <20121015094547.GC29125@suse.de>
+ <1350325704.31162.16.camel@gitbox>
+ <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
+Message-ID: <1350366893.26424.5.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
-
-On 10/15/2012 9:21 PM, Karicheri, Muralidharan wrote:
-> --Cut----
+On Tue, 2012-10-16 at 10:17 +0800, Bob Liu wrote:
+> On Tue, Oct 16, 2012 at 2:28 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> > On Mon, 2012-10-15 at 10:45 +0100, Mel Gorman wrote:
+> >> On Mon, Oct 15, 2012 at 09:34:55AM +1300, Tony Prisk wrote:
+> >> > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
+> >> > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
+> >> > > 11 Oct when I did another pull from linus all of a sudden
+> >> > > dma_alloc_coherent is failing to allocate the framebuffer any longer.
+> >> > >
+> >> > > I did a quick look back and found this:
+> >> > >
+> >> > > ARM: add coherent dma ops
+> >> > >
+> >> > > arch_is_coherent is problematic as it is a global symbol. This
+> >> > > doesn't work for multi-platform kernels or platforms which can support
+> >> > > per device coherent DMA.
+> >> > >
+> >> > > This adds arm_coherent_dma_ops to be used for devices which connected
+> >> > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
+> >> > > are modified at boot when arch_is_coherent is true.
+> >> > >
+> >> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> >> > > Cc: Russell King <linux@arm.linux.org.uk>
+> >> > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> > >
+> >> > >
+> >> > > This is the only patch lately that I could find (not that I would claim
+> >> > > to be any good at finding things) that is related to the problem. Could
+> >> > > it have caused the allocations to fail?
+> >> > >
+> >> > > Regards
+> >> > > Tony P
+> >> >
+> >> > Have done a bit more digging and found the cause - not Rob's patch so
+> >> > apologies.
+> >> >
+> >> > The cause of the regression is this patch:
+> >> >
+> >> > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+> >> > From: Mel Gorman <mgorman@suse.de>
+> >> > Date: Mon, 8 Oct 2012 16:32:36 -0700
+> >> > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+> >> >  possible
+> >> >
+> >> > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
+> >> > was fine. From this patch onwards, allocations fail.
+> >> >
+> >>
+> >> Was this found through bisection or some other means?
+> >>
+> >> There was a bug in that series that broke CMA but it was commit bb13ffeb
+> >> (mm: compaction: cache if a pageblock was scanned and no pages were
+> >> isolated) and it was fixed by 62726059 (mm: compaction: fix bit ranges
+> >> in {get,clear,set}_pageblock_skip()). So it should have been fixed by
+> >> 3.7-rc1 and probably was included by the time you pulled in October 11th
+> >> but bisection would be a pain. There were problems with that series during
+> >> development but tests were completing for other people.
+> >>
+> >> Just in case, is this still broken in 3.7-rc1?
+> >
+> > Still broken. Although the printk's might have cleared it up a bit.
+> >>
+> >> > I don't know how this patch would effect CMA allocations, but it seems
+> >> > to be causing the issue (or at least, it's caused an error in
+> >> > arch-vt8500 to become visible).
+> >> >
+> >> > Perhaps someone who understand -mm could explain the best way to
+> >> > troubleshoot the cause of this problem?
+> >> >
+> >>
+> >> If you are comfortable with ftrace, it can be used to narrow down where
+> >> the exact failure is occurring but if you're not comfortable with that
+> >> then the easiest is a bunch of printks starting in alloc_contig_range()
+> >> to see at what point and why it returns failure.
+> >>
+> >> It's not obvious at the moment why that patch would cause an allocation
+> >> problem. It's the type of patch that if it was wrong it would fail every
+> >> time for everyone, not just for a single driver.
+> >>
+> >
+> > I added some printk's to see what was happening.
+> >
+> > from arch/arm/mm/dma-mapping.c: arm_dma_alloc(..) it calls out to:
+> > dma_alloc_from_coherent().
+> >
+> > This returns 0, because:
+> > mem = dev->dma_mem
+> > if (!mem) return 0;
+> >
+> > and then arm_dma_alloc() falls back on __dma_alloc(..)
+> >
+> >
+> > I suspect the reason this fault is a bit 'weird' is because its
+> > effectively not using alloc_from_coherent at all, but falling back on
+> > __dma_alloc all the time, and sometimes it fails.
+> >
 > 
->>> Subject: Re: [PATCH v2 09/13] ARM: davinci - update the dm644x soc code to use
->>> common clk drivers
->>>
->>>>>> You have chosen to keep all clock related data in platform files
->>>>>> while using the common clock framework to provide just the
->>>>>> infrastructure. If you look at how mxs and spear have been migrated, they have
->>> migrated the soc specific clock data to drivers/clk as well.
->>>>>> See "drivers/clk/spear/spear3xx_clock.c" or
->>>>>> "drivers/clk/mxs/clk-imx23.c
->>>>
->>>> I have to disagree on this one. I had investigated these code already
->>>> and came up with a way that we can re-use code across all of the
->>>> davinci platforms as well as other architectures that re-uses the clk hardware IPs.
->>>
->>> Which code you are talking about here? Even if you introduce clk-dm644x.c, clk-
->>> keystone.c etc in drivers/clk/davinci/ you can reuse the code you introduce in patches 1-
->>> 3. I cant see how that will be prevented.
+> I think you need to declare that memory using
+> dma_declare_coherent_memory() before
+> alloc_from_coherent.
 > 
-> I was talking about re-use of davinci_common_clk_init in drivers/clk/davinci/davinci-clock.c.
-> This is meant to be re-used across all of the DaVinci devices.
+> > Why it caused a problem on that particular commit I don't know - but it
+> > was reproducible by adding/removing it.
+> >
+> >
+> > Regards
+> > Tony P
+> >
+> > --
+> > To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> > the body to majordomo at kvack.org.  For more info on Linux MM,
+> > see: http://www.linux-mm.org/ .
+> > Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
 > 
->>>
->>>> spear3xx_clock.c has initialization code for each of the platforms and
->>>> so is the case with imx23.c.
->>>
->>> By each of the platforms, you mean they all cater to a family of devices? This depends on
->>> how close together the family of devices are.
->>> Otherwise, there would be a file per soc. DM644x also represents a family for that matter.
->>>
->>>> By using platform_data approach, we are able to define clks for each of the SoC and
->>> then use davinci_common_clk_init() to do initialize the clk drivers based on platform
->>> data.
->>>
->>> You need to define and register the clocks present on each SoC either which way. I don't
->>> see why just the platform_data approach allows this.
->>> And looking closely, you have defined platform data, but don't actually have a platform
->>> device, making things more confusing.
->>>
-> 
-> Ok. There are multiple ways to implement this software. We had discussed this
-> internally and picked the platform_data approach. The clk drivers are written not
-> following the platform driver model. But I don't see why we can't use platform data
-> to configure this drivers. Down below, you have made two interesting points, one is
-> ARM code reduction. This patch already does this by moving the API that initializes
-> the clk drivers (davinci_common_clk_init()) out of ARM to drivers/clk/davinci. So
-> this + removal of existing clk driver under arm/mach-davinci/clock.[ch], we have
-> achieved this goal. The second point is the moving of SoC specific clk data out of SoC
-> code to drive. Are you 100% sure this is the right thing to do for these drivers. If so,
-> I can start working on this change right away. As I am working on this as a background
-> activity, I want to be double or triple sure before doing the rework of these patches :).
-> So please confirm.
 
-Yes, this is the right way to go. And I don't see it as something
-breaking new ground since there are already multiple SoCs in mainline
-which are following this same approach. May be to start with just
-convert one SoC and send for review.
 
-Thanks for taking this up and helping clean-up mach-davinci.
+I finally found the link to this patch which caused the problem - and
+may still be the cause of my problems :)
 
-Regards,
-Sekhar
+> >>>
+> >>> From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+> >>> From: Mel Gorman <mgorman@suse.de>
+> >>> Date: Mon, 8 Oct 2012 16:32:36 -0700
+> >>> Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+> >>>  possible
+
+In mm/page_alloc.c:alloc_contig_range()
+
+...
+	outer_end = isolate_freepages_range(&cc, outer_start, end);
+	if (!outer_end) {
+		ret = -EBUSY;
+		goto done;
+	}
+..
+
+It is always returning via the !outer_end test with -EBUSY.
+
+isolate_freepages_range() was one of the functions modified by
+the above mentioned patch.
+
+Around in a big circle and back to the start :)
+
+Regards
+Tony P
