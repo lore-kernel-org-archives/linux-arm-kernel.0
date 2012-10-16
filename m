@@ -1,44 +1,74 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Tue, 16 Oct 2012 12:26:13 +0530
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <20121015160154.GB15569@atomide.com>
-References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
- <20121011144756.GB12552@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
- <20121015160154.GB15569@atomide.com>
-Message-ID: <507D050D.2090402@ti.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Tue, 16 Oct 2012 10:11:51 +0300
+Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
+In-Reply-To: <CAN8TOE-7d=YUSYsHFw9X5vnz8cpSJYv5uZfvBpDyhg+-F_LDiQ@mail.gmail.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+ <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
+ <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
+ <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
+ <507794B6.2000107@st.com> <1350307104.4115.23.camel@sauron.fi.intel.com>
+ <CAN8TOE-7d=YUSYsHFw9X5vnz8cpSJYv5uZfvBpDyhg+-F_LDiQ@mail.gmail.com>
+Message-ID: <1350371511.5769.43.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Mon, 2012-10-15 at 09:27 -0700, Brian Norris wrote:
+> > I'd really prefer to just switch to kmalloc() everywhere instead of
+> > adding hacks like this to the drivers. Then if this is a problem for
+> > someone, he can fix it by either switching to smaller buffers (possible
+> > in many places), or by improving memory fragmentation issues on his
+> > system, or by just using CMA.
+> 
+> I think I can suggest that this is already a problem on real systems.
+> In bringing up a board on v3.3 kernel, I experienced a kernel memory
+> allocation error when trying to memdup_user() in eraseblock-size
+> regions. I believe I would experience more of these if all
+> eraseblock-sized buffers were kmalloc()'d.
+> 
+> See the commit description for the following commit in mtd-utils.git:
+> 
+>     commit 71c76e74661492b4f68f670514866cfc85f47089
+>     libmtd: fix mtd_write() issues for large data-only writes
 
-On Monday 15 October 2012 09:31 PM, Tony Lindgren wrote:
-> * Mohammed, Afzal<afzal@ti.com>  [121015 05:42]:
->> On Thu, Oct 11, 2012 at 20:17:56, Tony Lindgren wrote:
+Well, this is another work-around. The better way to fix this would be
+to change kernel's 'mtdchar_write_ioctl()' to be iterative and avoid
+calling 'memdup_user(len)' for arbitrary 'len' passed from user-space.
 
->>> Yes, then please do a second pull request for what's needed
->>> to apply the minimal DT bindings. For the DT binding, let's
->>> just leave out the timings for now as we can load those from
->>> auxdata. Then the binding for the timings can be added
->>> later on. So just the minimal binding using standard features
->>> for the iorange and interrupt.
+> I would prefer not building a solution that hopes kmalloc() can get a
+> large contiguous buffer (remember, eraseblock sizes come as large as
+> 2MB these days). A real solution like CMA or scatter-gather seems like
+> a better idea.
 
->> Ok, I will keep timings aside for now and proceed with DT
->> (avoiding auxdata usage with generic routine looked to me a
->> saner approach though, with an initial DT'fy delay)
+Me too. But this does not happen. People bring this up for years. Of
+course it is easier to hack drivers, and very understandable. So what
+I would like to do is somehow force people to fix this issue.
 
-> Oh well if you think it's easier to do the timings too in
-> the DT binding, please go ahead with that. It may take some
-> longer discussion on the lists for the binding though. But
-> up to you.
+So I thought about something like introducing an mtd_alloc() which
+would:
+   a. Try doing CMA allocation: dma_alloc_from_contiguous()
+   b. If it fails, use kmalloc().
 
-I certainly don't think it is easier, rather tougher, cleaner
-as well. One thing that worried me was, if we pursue the
-auxdata path (a last resort option) and later if it is
-objected, we would be back to square one.
+This function would probably need a cookie which it returns and which
+the mtd_free() function would use to call either kfree() or
+dma_release_from_contiguous()...
 
-Let me discuss internally and get back.
+If both fail - bad luck. Go look at the code and switch to S-G lists
+instead of allocating contiguous regions. As I said, in many places it
+is easy to do, and there are few places when you would need to spend a
+bit more time.
 
-Regards
-Afzal
+How does this sound to you?
+
+-- 
+Best Regards,
+Artem Bityutskiy
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121016/04d3c8f5/attachment.sig>
