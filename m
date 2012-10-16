@@ -1,111 +1,24 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 16 Oct 2012 11:56:58 +0800
-Subject: [PATCH 1/2] ASoC: atmel-ssc: use devm_xxx() managed function
-Message-ID: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 16 Oct 2012 01:08:57 -0300
+Subject: [PATCH 1/2] ARM: mx27_3ds: Reserve memory for camera usage
+In-Reply-To: <20121010075222.GN27665@pengutronix.de>
+References: <1349839770-13848-1-git-send-email-festevam@gmail.com>
+ <20121010075222.GN27665@pengutronix.de>
+Message-ID: <CAOMZO5DqJuernaHk-4KO_v=8vPCnrpqCZ-uZ2nrhtFcKo9xObA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the devm_xxx() managed function to stripdown the error
-and remove code.
+On Wed, Oct 10, 2012 at 4:52 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Wed, Oct 10, 2012 at 12:29:29AM -0300, Fabio Estevam wrote:
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Reserve dedicated memory block for camera usage.
+>
+> Why not use CMA?
 
-Signed-off-by: Bo Shen <voice.shen@atmel.com>
----
- drivers/misc/atmel-ssc.c |   47 +++++++++++++++-------------------------------
- 1 file changed, 15 insertions(+), 32 deletions(-)
+Sorry, not familiar with CMA. Could you please point to some board
+file/driver that makes use of it?
 
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index 5bb1877..23dcb76 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -70,37 +70,33 @@ EXPORT_SYMBOL(ssc_free);
- 
- static int __init ssc_probe(struct platform_device *pdev)
- {
--	int retval = 0;
- 	struct resource *regs;
- 	struct ssc_device *ssc;
- 
--	ssc = kzalloc(sizeof(struct ssc_device), GFP_KERNEL);
-+	ssc = devm_kzalloc(&pdev->dev, sizeof(struct ssc_device), GFP_KERNEL);
- 	if (!ssc) {
- 		dev_dbg(&pdev->dev, "out of memory\n");
--		retval = -ENOMEM;
--		goto out;
-+		return -ENOMEM;
- 	}
- 
-+	ssc->pdev = pdev;
-+
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!regs) {
- 		dev_dbg(&pdev->dev, "no mmio resource defined\n");
--		retval = -ENXIO;
--		goto out_free;
-+		return -ENXIO;
- 	}
- 
--	ssc->clk = clk_get(&pdev->dev, "pclk");
--	if (IS_ERR(ssc->clk)) {
--		dev_dbg(&pdev->dev, "no pclk clock defined\n");
--		retval = -ENXIO;
--		goto out_free;
--	}
--
--	ssc->pdev = pdev;
--	ssc->regs = ioremap(regs->start, resource_size(regs));
-+	ssc->regs = devm_request_and_ioremap(&pdev->dev, regs);
- 	if (!ssc->regs) {
- 		dev_dbg(&pdev->dev, "ioremap failed\n");
--		retval = -EINVAL;
--		goto out_clk;
-+		return -EINVAL;
-+	}
-+
-+	ssc->clk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(ssc->clk)) {
-+		dev_dbg(&pdev->dev, "no pclk clock defined\n");
-+		return -ENXIO;
- 	}
- 
- 	/* disable all interrupts */
-@@ -112,8 +108,7 @@ static int __init ssc_probe(struct platform_device *pdev)
- 	ssc->irq = platform_get_irq(pdev, 0);
- 	if (!ssc->irq) {
- 		dev_dbg(&pdev->dev, "could not get irq\n");
--		retval = -ENXIO;
--		goto out_unmap;
-+		return -ENXIO;
- 	}
- 
- 	spin_lock(&user_lock);
-@@ -125,16 +120,7 @@ static int __init ssc_probe(struct platform_device *pdev)
- 	dev_info(&pdev->dev, "Atmel SSC device at 0x%p (irq %d)\n",
- 			ssc->regs, ssc->irq);
- 
--	goto out;
--
--out_unmap:
--	iounmap(ssc->regs);
--out_clk:
--	clk_put(ssc->clk);
--out_free:
--	kfree(ssc);
--out:
--	return retval;
-+	return 0;
- }
- 
- static int __devexit ssc_remove(struct platform_device *pdev)
-@@ -142,10 +128,7 @@ static int __devexit ssc_remove(struct platform_device *pdev)
- 	struct ssc_device *ssc = platform_get_drvdata(pdev);
- 
- 	spin_lock(&user_lock);
--	iounmap(ssc->regs);
--	clk_put(ssc->clk);
- 	list_del(&ssc->list);
--	kfree(ssc);
- 	spin_unlock(&user_lock);
- 
- 	return 0;
--- 
-1.7.9.5
+Regards,
+
+Fabio Estevam
