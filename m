@@ -1,88 +1,74 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 16 Oct 2012 11:12:01 +0100
-Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
- ARM_UNWIND
-In-Reply-To: <CAMbhsRRpYrOBhaFn5PV5f5J=36Hsj2eZixyD1hXRfRLoyWm1Xg@mail.gmail.com>
-References: <1346021216-21979-1-git-send-email-ccross@android.com>
- <1346021216-21979-3-git-send-email-ccross@android.com>
- <20121012090807.GB21164@n2100.arm.linux.org.uk>
- <20121012100242.GA2126@linaro.org>
- <CAMbhsRRpYrOBhaFn5PV5f5J=36Hsj2eZixyD1hXRfRLoyWm1Xg@mail.gmail.com>
-Message-ID: <20121016101201.GA26075@linaro.org>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 16 Oct 2012 19:12:49 +0900
+Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
+ contiguous allocations
+In-Reply-To: <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
+References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+ <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
+ <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
+Message-ID: <CAAQKjZNQFfxpr-7dFb4cgNB2Gkrxxrswds_fSrYgssxXaqRF7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 07:15:31PM -0700, Colin Cross wrote:
-> On Fri, Oct 12, 2012 at 3:02 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> > On Fri, Oct 12, 2012 at 10:08:07AM +0100, Russell King - ARM Linux wrote:
-> >> On Sun, Aug 26, 2012 at 03:46:56PM -0700, Colin Cross wrote:
-> >> > Unwinding with CONFIG_ARM_UNWIND is much more complicated than
-> >> > unwinding with CONFIG_FRAME_POINTER, but there are only a few points
-> >> > that require validation in order to avoid faults or infinite loops.
-> >> > Avoiding faults is easy by adding checks to verify that all accesses
-> >> > relative to the frame's stack pointer remain inside the stack.
-> >> >
-> >> > When CONFIG_FRAME_POINTER is not set it is possible for two frames to
-> >> > have the same SP, so there is no way to avoid repeated calls to
-> >> > unwind_frame continuing forever.
-> >>
-> >> So here you admit that this patch can cause the unwinder to loop forever,
-> >> which would provide no way out of that.  Why do you think this patch is
-> >> suitable for mainline with such a problem?
-> >
-> > With CONFIG_FRAME_POINTER we have a straightforward definition of
-> > progress: the sp must increase per frame, and cannot increase beyond the
-> > limit of the tasks stack.  We get this property from the fact that
-> > each frame record consumes actual space on the stack.  If we parse a
-> > frame record which does not both increase the sp and provide a frame
-> > address greater than that sp, we know that frame is garbage and we must
-> > stop.
-> >
-> >
-> > With CONFIG_ARM_UNWIND, we have no straightforward definition of
-> > progress.  However, sp must _normally_ still increase, because compiler-
-> > generated non-leaf functions must store the lr somewhere, and the
-> > compiler always uses the stack.  Even if lr is stashed in r4, an ABI
-> > compliant would then have needed to save r4 on the stack beforehand.
-> >
-> > We can assume that we will never parse a garbage unwind table because of
-> > the way the table lookup works (though we may parse a valid table which
-> > has nothing whatever to do with the code that was executing in the case
-> > of a corrupted stack).  So we only need to worry about what the unwind
-> > tables will look like for valid functions.
-> >
-> > Nonetheless, tail-call-optimised and manually-annotated functions may
-> > have unusual frames which don't consume any stack.  Stackless tail-
-> > call-optimised functions shouldn't be a problem, since their frames
-> > are completely missing from the backtrace and won't dump us into a loop.
-> > Stackless assembler functions are overwhelmingly likely to be leaf
-> > functions, giving us just one stackless frame.
-> >
-> >
-> > Would it make sense if we place some small sanity limit on the number
-> > of frames the unwinder will process with the same sp before giving up?
-> 
-> About half the callers to unwind_frame end up limiting the number of
-> frames they will follow before giving up, so I wasn't sure if I should
-> put an arbitrary limit in unwind_frame or just make sure all callers
-> are bounded.  Your idea of limiting same sp frames instead of total
-> frames sounds better.  I can send a new patch that adds a new field to
-> struct stackframe (which will need to be initialized everywhere, the
-> struct is usually on the stack) and limits the recursion.  Any
-> suggestion on the recursion limit?  I would never expect to see a real
-> situation with more than a few, but on the other hand parsing the
-> frames should be pretty fast so a high number (100?) shouldn't cause
-> any user visible effect.
+Hi Hiroshi,
 
-Talking to some tools guys about this, it sounds like there really
-shouldn't be any stackless frame except for the leaf frame.  If there are
-stackless functions they will probably not be visible in the frame chain
-at all.  So it might make sense to have a pretty small limit.  Maybe it
-could even be 1.  Cartainly a small number.
+2012/10/16 Hiroshi Doyu <hdoyu@nvidia.com>:
+> Hi Inki/Marek,
+>
+> On Tue, 16 Oct 2012 02:50:16 +0200
+> Inki Dae <inki.dae@samsung.com> wrote:
+>
+>> 2012/10/15 Marek Szyprowski <m.szyprowski@samsung.com>:
+>> > Hello,
+>> >
+>> > Some devices, which have IOMMU, for some use cases might require to
+>> > allocate a buffers for DMA which is contiguous in physical memory. Such
+>> > use cases appears for example in DRM subsystem when one wants to improve
+>> > performance or use secure buffer protection.
+>> >
+>> > I would like to ask if adding a new attribute, as proposed in this RFC
+>> > is a good idea? I feel that it might be an attribute just for a single
+>> > driver, but I would like to know your opinion. Should we look for other
+>> > solution?
+>> >
+>>
+>> In addition, currently we have worked dma-mapping-based iommu support
+>> for exynos drm driver with this patch set so this patch set has been
+>> tested with iommu enabled exynos drm driver and worked fine. actually,
+>> this feature is needed for secure mode such as TrustZone. in case of
+>> Exynos SoC, memory region for secure mode should be physically
+>> contiguous and also maybe OMAP but now dma-mapping framework doesn't
+>> guarantee physically continuous memory allocation so this patch set
+>> would make it possible.
+>
+> Agree that the contigous memory allocation is necessary for us too.
+>
+> In addition to those contiguous/discontiguous page allocation, is
+> there any way to _import_ anonymous pages allocated by a process to be
+> used in dma-mapping API later?
+>
+> I'm considering the following scenario, an user process allocates a
+> buffer by malloc() in advance, and then it asks some driver to convert
+> that buffer into IOMMU'able/DMA'able ones later. In this case, pages
+> are discouguous and even they may not be yet allocated at
+> malloc()/mmap().
+>
 
-We should also add a check for whether the current and frame and previous
-frame appear identical and abort if that's the case, if we don't do that
-already.
+I'm not sure I understand what you mean but we had already tried this
+way and for this, you can refer to below link,
+               http://www.mail-archive.com/dri-devel at lists.freedesktop.org/msg22555.html
 
-Cheers
----Dave
+but this way had been pointed out by drm guys because the pages could
+be used through gem object after that pages had been freed by free()
+anyway their pointing was reasonable and I'm trying another way, this
+is the way that the pages to user space has same life time with dma
+operation. in other word, if dma completed access to that pages then
+also that pages will be freed. actually drm-based via driver of
+mainline kernel is using same way
+
+
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
