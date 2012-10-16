@@ -1,24 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 10:07:48 +0100
-Subject: [PATCH 2/2] ASoC: atmel-ssc: use module_platform_driver macro
-In-Reply-To: <20121016084947.GD12801@game.jcrosoft.org>
-References: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
- <1350359819-2461-2-git-send-email-voice.shen@atmel.com>
- <507D15C2.7000606@atmel.com> <20121016084947.GD12801@game.jcrosoft.org>
-Message-ID: <20121016090748.GX21164@n2100.arm.linux.org.uk>
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Tue, 16 Oct 2012 11:30:14 +0200
+Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
+ contiguous allocations
+In-Reply-To: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAKMK7uEuwYG8F=OL6rOrYWWjdmDhA2UZSFTYO7xETi=4DJigLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 10:49:47AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 10:07 Tue 16 Oct     , Nicolas Ferre wrote:
-> > On 10/16/2012 05:56 AM, Bo Shen :
-> > > -static int __init ssc_probe(struct platform_device *pdev)
-> > > +static int ssc_probe(struct platform_device *pdev)
-> > 
-> > Here you remove the __init altogether, maybe converting to __devinit is
-> > the proper replacement for this? I do not know myself but if anybody knows?
-> yes __devinit is mandatory
+On Mon, Oct 15, 2012 at 4:03 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Some devices, which have IOMMU, for some use cases might require to
+> allocate a buffers for DMA which is contiguous in physical memory. Such
+> use cases appears for example in DRM subsystem when one wants to improve
+> performance or use secure buffer protection.
+>
+> I would like to ask if adding a new attribute, as proposed in this RFC
+> is a good idea? I feel that it might be an attribute just for a single
+> driver, but I would like to know your opinion. Should we look for other
+> solution?
 
-No it isn't.  __init is plain buggy.  __devinit is better, but there's
-plans to remove all __devinit from the kernel.  Having nothing there
-will make GregKH's life a lot easier when he does come to remove __devinit.
+One thing to consider is that up to know all allocation constraints
+have been stored somewhere in struct device, either in the dma
+attributes (for the more generic stuff) or somewhere in platform
+specific data (e.g. for special cma pools). The design of dma_buf
+relies on this: The exporter/buffer allocator only sees all the struct
+device *devs that want to take part in sharing a given buffer. With
+this proposal some of these allocation constraints get moved to alloc
+time and aren't visible in the struct device any more. Now I that
+dma_buf isn't really there yet and no one has yet implemented a
+generic exporter that would allocate the dma_buf at the right spot for
+all cases, but I think we should consider this to not draw ourselves
+into an ugly api corner.
+
+Cheers, Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
