@@ -1,169 +1,137 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 16 Oct 2012 14:21:45 +0100
-Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
+Date: Tue, 16 Oct 2012 14:21:48 +0100
+Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
+ interfaces
 In-Reply-To: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting through a device tree, the kernel cpu logical id map can be
-initialized using device tree data passed by FW or through an embedded blob.
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-This patch adds a function that parses device tree "cpu" nodes and
-retrieves the corresponding CPUs hardware identifiers (MPIDR).
-It sets the possible cpus and the cpu logical map values according to
-the number of CPUs defined in the device tree and respective properties.
+The GIC interface numbering does not necessarily follow the logical
+CPU numbering, especially for complex topologies such as multi-cluster
+systems.
 
-The primary CPU is assigned cpu logical number 0 to keep the current
-convention valid.
+Fortunately we can easily probe the GIC to create a mapping as the
+Interrupt Processor Targets Registers for the first 32 interrupts are
+read-only, and each field returns a value that always corresponds to
+the processor reading the register.
 
-Current bindings documentation is included in the patch:
+Initially all mappings target all CPUs in case an IPI is required to
+boot secondary CPUs.  It is refined as those CPUs discover what their
+actual mapping is.
 
-Documentation/devicetree/bindings/arm/cpus.txt
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/cpus.txt | 42 +++++++++++++++++++++++
- arch/arm/include/asm/prom.h                    |  2 ++
- arch/arm/kernel/devtree.c                      | 47 ++++++++++++++++++++++++++
- 3 files changed, 91 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+ arch/arm/common/gic.c | 42 ++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 34 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-new file mode 100644
-index 0000000..897f3b4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -0,0 +1,42 @@
-+* ARM CPUs binding description
-+
-+The device tree allows to describe the layout of CPUs in a system through
-+the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
-+defining properties for every cpu.
-+
-+Bindings for CPU nodes follow the ePAPR standard, available from:
-+
-+http://devicetree.org
-+
-+For the ARM architecture every CPU node must contain the following property:
-+
-+- reg : property defining the CPU MPIDR[23:0] register bits
-+
-+Every cpu node is required to set its device_type to "cpu".
-+
-+Example:
-+
-+	cpus {
-+		#size-cells = <0>;
-+		#address-cells = <1>;
-+
-+		CPU0: cpu at 0 {
-+			device_type = "cpu";
-+			reg = <0x0>;
-+		};
-+
-+		CPU1: cpu at 1 {
-+			device_type = "cpu";
-+			reg = <0x1>;
-+		};
-+
-+		CPU2: cpu at 100 {
-+			device_type = "cpu";
-+			reg = <0x100>;
-+		};
-+
-+		CPU3: cpu at 101 {
-+			device_type = "cpu";
-+			reg = <0x101>;
-+		};
-+	};
-diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
-index aeae9c6..8dd51dc 100644
---- a/arch/arm/include/asm/prom.h
-+++ b/arch/arm/include/asm/prom.h
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index aa52699..1338a55 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -70,6 +70,13 @@ struct gic_chip_data {
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
  
- extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
- extern void arm_dt_memblock_reserve(void);
-+extern void __init arm_dt_init_cpu_maps(void);
- 
- #else /* CONFIG_OF */
- 
-@@ -24,6 +25,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
- }
- 
- static inline void arm_dt_memblock_reserve(void) { }
-+static inline void arm_dt_init_cpu_maps(void) { }
- 
- #endif /* CONFIG_OF */
- #endif /* ASMARM_PROM_H */
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index bee7f9d..c86e414 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -19,8 +19,10 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- 
-+#include <asm/cputype.h>
- #include <asm/setup.h>
- #include <asm/page.h>
-+#include <asm/smp_plat.h>
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
- 
-@@ -61,6 +63,51 @@ void __init arm_dt_memblock_reserve(void)
- 	}
- }
- 
-+/*
-+ * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
-+ * and builds the cpu logical map array containing MPIDR values related to
-+ * logical cpus
-+ *
-+ * Updates the cpu possible mask with the number of parsed cpu nodes
+ /*
++ * The GIC mapping of CPU interfaces does not necessarily match
++ * the logical CPU numbering.  Let's use a mapping as returned
++ * by the GIC itself.
 + */
-+void __init arm_dt_init_cpu_maps(void)
-+{
-+	struct device_node *dn = NULL;
-+	int i, cpu = 1;
++static u8 gic_cpu_map[8] __read_mostly;
 +
-+	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
-+		const u32 *hwid;
-+		int len;
++/*
+  * Supported arch specific GIC irq extension.
+  * Default make them NULL.
+  */
+@@ -242,7 +249,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 		return -EINVAL;
+ 
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu_logical_map(cpu) + shift);
++	bit = gic_cpu_map[cpu] << shift;
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+@@ -349,11 +356,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	u32 cpumask;
+ 	unsigned int gic_irqs = gic->gic_irqs;
+ 	void __iomem *base = gic_data_dist_base(gic);
+-	u32 cpu = cpu_logical_map(smp_processor_id());
+-
+-	cpumask = 1 << cpu;
+-	cpumask |= cpumask << 8;
+-	cpumask |= cpumask << 16;
+ 
+ 	writel_relaxed(0, base + GIC_DIST_CTRL);
+ 
+@@ -366,6 +368,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	/*
+ 	 * Set all global interrupts to this CPU only.
+ 	 */
++	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
+ 	for (i = 32; i < gic_irqs; i += 4)
+ 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+ 
+@@ -389,9 +392,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+ {
+ 	void __iomem *dist_base = gic_data_dist_base(gic);
+ 	void __iomem *base = gic_data_cpu_base(gic);
++	unsigned int cpu_mask, cpu = smp_processor_id();
+ 	int i;
+ 
+ 	/*
++	 * Get what the GIC says our CPU mask is.
++	 */
++	BUG_ON(cpu >= 8);
++	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
++	gic_cpu_map[cpu] = cpu_mask;
 +
-+		pr_debug("  * %s...\n", dn->full_name);
++	/*
++	 * Clear our mask from the other map entries in case they're
++	 * still undefined.
++	 */
++	for (i = 0; i < 8; i++)
++		if (i != cpu)
++			gic_cpu_map[i] &= ~cpu_mask;
 +
-+		hwid = of_get_property(dn, "reg", &len);
++	/*
+ 	 * Deal with the banked PPI and SGI interrupts - disable all
+ 	 * PPI interrupts, ensure all SGI interrupts are enabled.
+ 	 */
+@@ -646,7 +665,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ {
+ 	irq_hw_number_t hwirq_base;
+ 	struct gic_chip_data *gic;
+-	int gic_irqs, irq_base;
++	int gic_irqs, irq_base, i;
+ 
+ 	BUG_ON(gic_nr >= MAX_GIC_NR);
+ 
+@@ -683,6 +702,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	}
+ 
+ 	/*
++	 * Initialize the CPU interface map to all CPUs.
++	 * It will be refined as each CPU probes its ID.
++	 */
++	for (i = 0; i < 8; i++)
++		gic_cpu_map[i] = 0xff;
 +
-+		if (!hwid || len != 4) {
-+			pr_err("  * %s missing reg property\n", dn->full_name);
-+			continue;
-+		}
-+		/*
-+		 * We want to assign the boot CPU logical id 0.
-+		 * Boot CPU checks its own MPIDR and if matches the current
-+		 * cpu node "reg" value it sets the logical cpu index to 0
-+		 * and stores the physical id accordingly.
-+		 * If MPIDR does not match, assign sequential cpu logical
-+		 * id (starting from 1) and increments it.
-+		 */
-+		i = (be32_to_cpup(hwid) == (read_cpuid_mpidr() & 0xffffff))
-+							? 0 : cpu++;
-+
-+		if (!i)
-+			printk(KERN_INFO "Booting Linux on CPU HWID 0x%x\n",
-+					be32_to_cpup(hwid));
-+
-+		cpu_logical_map(i) = be32_to_cpup(hwid);
-+
-+		set_cpu_possible(i, true);
-+	}
-+}
-+
- /**
-  * setup_machine_fdt - Machine setup when an dtb was passed to the kernel
-  * @dt_phys: physical address of dt blob
++	/*
+ 	 * For primary GICs, skip over SGIs.
+ 	 * For secondary GICs, skip over PPIs, too.
+ 	 */
+@@ -737,7 +763,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+-		map |= 1 << cpu_logical_map(cpu);
++		map |= gic_cpu_map[cpu];
+ 
+ 	/*
+ 	 * Ensure that stores to Normal memory are visible to the
 -- 
 1.7.12
