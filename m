@@ -1,32 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 22:47:52 +0100
-Subject: [RFC PATCH] ARM: kernel: update cpuinfo to print all online
- CPUs features
-In-Reply-To: <507DA08B.502@ti.com>
-References: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
- <507DA08B.502@ti.com>
-Message-ID: <20121016214752.GH21164@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 16 Oct 2012 14:50:44 -0700
+Subject: [RFC][PATCH v4? 0/7] Adaptive Body-Bias for OMAP
+In-Reply-To: <20121016170620.21731.52746@nucleus> (Mike Turquette's message of
+ "Tue, 16 Oct 2012 10:06:20 -0700")
+References: <1349313974-5473-1-git-send-email-mturquette@ti.com>
+ <20121011133304.GA19170@kahuna> <20121011222107.2941.62545@nucleus>
+ <20121016163225.GQ15569@atomide.com>
+ <20121016170620.21731.52746@nucleus>
+Message-ID: <87a9vmnl1n.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 11:29:39PM +0530, Santosh Shilimkar wrote:
-> Not exactly related to the $subject patch, but I remember doing a patch
-> to have cat /proc/cpuinfo spitting only online CPUs just like x86 using
-> for_each_online_cpu(i).
-> At that point Russell mentioned about a possibility of read() syscall
-> spreading over the hot-plug operation and hence the above may not
-> be safe.
+Mike Turquette <mturquette@ti.com> writes:
+
+> Quoting Tony Lindgren (2012-10-16 09:32:25)
+>> * Mike Turquette <mturquette@ti.com> [121011 15:27]:
+>> > Quoting Nishanth Menon (2012-10-11 06:33:04)
+>> > > On 18:26-20121003, Mike Turquette wrote:
+>> > > > From: Mike Turquette <mturquette@linaro.org>
+>> > > [...]
+>> > > > 
+>> > > >  arch/arm/mach-omap2/Makefile                  |    8 +-
+>> > > >  arch/arm/mach-omap2/abb.c                     |  322 +++++++++++++++++++++++++
+>> > > >  arch/arm/mach-omap2/abb.h                     |   94 ++++++++
+>> > > [...]
+>> > > >  arch/arm/plat-omap/include/plat/voltage.h     |    1 +
+>> > > >  18 files changed, 699 insertions(+), 37 deletions(-)
+>> > > >  create mode 100644 arch/arm/mach-omap2/abb.c
+>> > > >  create mode 100644 arch/arm/mach-omap2/abb.h
+>> > > >  create mode 100644 arch/arm/mach-omap2/abb36xx_data.c
+>> > > >  create mode 100644 arch/arm/mach-omap2/abb44xx_data.c
+>> > > 
+>> > > dumb question: with the request to move everything out of mach-omap2
+>> > > directory, do we still want to add more files into mach-omap2?
+>> > > 
+>> > 
+>> > Not a dumb question at all.  I approached this problem by modeling it
+>> > after existing voltage layer code (in particular the vp and vc drivers).
+>> > 
+>> > My hope is to get it merged as-is and then bundle the abb code up with
+>> > the vp/vc migration to drivers/* when that happens some day.  People
+>> > using omap36xx and above need this code now, so it seems prudent to take
+>> > this approach today.
+>> 
+>> This is needed, but makes moving the vc code to drivers a bit
+>> more complex.
+>> 
+>> So we also need a plan to move this all to drivers in the follow
+>> up patches. And we need a maintainer for the code. Who is going to
+>> be doing all that?
+>> 
 >
-> is that right Russell ?
+> Is there already somebody committed to moving vp/vc code out to drivers?
 
-That is correct, but you will notice that the code now uses the online
-cpus rather than the present, inspite of my objections.  I gave up
-fighting the case, so now people get to live with the consequences of
-this.
+Yes, VC/VP is part of the bigger PRM/CM move in progress.
 
-This will be fun with dynamic hotplugging with big.LITTLE when people
-come to read any of these files which change their output with the
-online CPUs.  Oh what fun we're in for there.
+For now, I'm ok with adding a little more VC/VP stuff since it's already
+well isolated in the prmXXXX.c files (though it might need a rebase on
+Paul's recent PRM/CM cleanup stuff.)
 
-I guess the only way to convince people is to let them make their
-mistakes in the kernel.
+> If so then I can take responsibility for moving the abb code and
+> coordinate with that person.  
+
+Thanks,
+
+Kevin
