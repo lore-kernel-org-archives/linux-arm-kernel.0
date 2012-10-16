@@ -1,26 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 15 Oct 2012 21:14:27 -0700
-Subject: [PATCH for 3.7] dtb: fix interrupt assignment for ehci/uhci on
- wm8505
-In-Reply-To: <1350104430.6448.3.camel@gitbox>
-References: <1350101882-6195-1-git-send-email-linux@prisktech.co.nz>
- <1350104430.6448.3.camel@gitbox>
-Message-ID: <20121016041427.GB16114@quad.lixom.net>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 16 Oct 2012 08:17:17 +0400
+Subject: [PATCH] gpio: clps711x: localise <mach/gpio.h> header
+In-Reply-To: <201210152136.27074.arnd@arndb.de>
+References: <1350330020-23240-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdYxQsS4RfCxk3E4GPa+7GK2FeOVfTCps1ZtPC=gSw2a0g@mail.gmail.com>
+ <20121016004741.485430a1c243795488fbc69b@mail.ru>
+ <201210152136.27074.arnd@arndb.de>
+Message-ID: <20121016081717.450825249e718ec963500e0b@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 13, 2012 at 06:00:30PM +1300, Tony Prisk wrote:
-> On Sat, 2012-10-13 at 17:18 +1300, Tony Prisk wrote:
-> > EHCI and UHCI devices in wm8505.dtsi should use IRQ 0 & 1
-> > respectively - not 43 as used on newer models.
+On Mon, 15 Oct 2012 21:36:26 +0000
+Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Monday 15 October 2012, Alexander Shiyan wrote:
+> > OK, but since it will be used only in board code, I reintroduce it
+> > in arch/arm/mach-clps711x/common.h. On my opinion is no reason to
+> > overload include/linux/*.
 > 
-> Oops - should have been IRQ 1 & 0 - fixed locally.
-> > 
-> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> Can't the board files just call the gpio functions?
 
-Applied to fixes with the commit message edited as above.
+Yes we can. And we will do so.
+Macro is a helper and used only to get the desired GPIO-number.
 
-
-Thanks,
-
--Olof
+-- 
+Alexander Shiyan <shc_work@mail.ru>
