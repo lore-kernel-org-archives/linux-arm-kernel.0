@@ -1,35 +1,19 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Tue, 16 Oct 2012 22:29:12 +0200
-Subject: [PATCH 6/9] uprobes: flush cache after xol write
-In-Reply-To: <20121015165756.GA11737@redhat.com>
+Date: Tue, 16 Oct 2012 22:30:41 +0200
+Subject: [PATCH 1/9] uprobes: move function declarations out of arch
+In-Reply-To: <20121015171932.GA28723@linux.vnet.ibm.com>
 References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-6-git-send-email-rabin@rab.in>
- <20121015165756.GA11737@redhat.com>
-Message-ID: <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121015171932.GA28723@linux.vnet.ibm.com>
+Message-ID: <CAH+eYFAO8T2-S0DRBwGrwsLHoNY37oVhY=PWG_zweD=evQR+_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/15 Oleg Nesterov <oleg@redhat.com>:
-> On 10/14, Rabin Vincent wrote:
->> Flush the cache so that the instructions written to the XOL area are
->> visible.
->>
->> Signed-off-by: Rabin Vincent <rabin@rab.in>
->> ---
->>  kernel/events/uprobes.c |    1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
->> index ca000a9..8c52f93 100644
->> --- a/kernel/events/uprobes.c
->> +++ b/kernel/events/uprobes.c
->> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
->>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
->>       vaddr = kmap_atomic(area->page);
->>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
->> +     flush_dcache_page(area->page);
->>       kunmap_atomic(vaddr);
+2012/10/15 Srikar Dronamraju <srikar@linux.vnet.ibm.com>:
+> You need to take care of the powerpc port
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=8b7b80b9ebb46dd88fbb94e918297295cf312b59
 >
-> I agree... but why under kmap_atomic?
+> Also as Oleg pointed out, He has already posted changes on top of -tip.
+> So it probably makes sense to redo these patches on top of those
+> patches.
 
-No real reason; I'll move it to after the unmap.
+OK, will look into it.
