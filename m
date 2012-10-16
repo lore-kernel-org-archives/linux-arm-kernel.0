@@ -1,70 +1,109 @@
-From: pistol@cs.duke.edu (Valentin Pistol)
-Date: Tue, 16 Oct 2012 00:26:29 -0400
-Subject: ARM: hw_breakpoint: silent EPERM when setting ARM_DSCR_MDBGEN on
- ARM_DEBUG_ARCH_V7_ECP14
-In-Reply-To: <CAPfQmK+zLLR59FtuxdV82AhcoVV8tNTqGdL2bCh1Nn7YSpLHjg@mail.gmail.com>
-References: <CAPfQmK+jYnVybyrBcnNkbm=Ta+7hjPNh5TqiL2tAFY8YBTyLEw@mail.gmail.com>
- <20120913214102.GB11399@mudshark.cambridge.arm.com>
- <CAPfQmKJ2CJ4=yguXNa+acng0++sLYoJ1oRiEbqRjYha_N3rU6Q@mail.gmail.com>
- <20120918100438.GC32204@mudshark.cambridge.arm.com>
- <CAPfQmKJAvd2R8Je-uRdKkkhgQRodZFxP1N_QzbjKm8q7q1HgaQ@mail.gmail.com>
- <20121009210802.GA31615@mudshark.cambridge.arm.com>
- <CAPfQmK+zLLR59FtuxdV82AhcoVV8tNTqGdL2bCh1Nn7YSpLHjg@mail.gmail.com>
-Message-ID: <CAPfQmK+XnndKPsAeo3M1V75hhNnkMT9Bp1dtuyTuYvRz1pmi+g@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Tue, 16 Oct 2012 06:34:30 +0200
+Subject: [PATCH RESEND] serial/amba-pl011: use devm_* managed resources
+In-Reply-To: <1350300961-7036-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350300961-7036-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121016043430.GA24258@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Fri, Oct 12, 2012 at 7:26 AM, Dietmar Eggemann
-> <dietmar.eggemann@arm.com> wrote:
->> I'm running Linaro 12.08 on Pandaboard (Rev A1) and on this board
->> DBGAUTHSTATUS.NSNE and DBGAUTHSTATUS.NSE are set.
->>
->> With additional logs in enable_monitor_mode()
->> [arch/arm/kernel/hw_breakpoint.c]:
->>
->> root at linaro-nano:~# dmesg | grep hw-break
->> [    0.321380] hw-breakpoint: arch_hw_breakpoint_init cpu0 debug_arch=3
->> [    0.321441] hw-breakpoint: enable_monitor_mode cpu1 DBGDSCR=03070002
->> [    0.321441] hw-breakpoint: enable_monitor_mode cpu1
->> DBGAUTHSTATUS=000000af
->> [    0.321502] hw-breakpoint: enable_monitor_mode cpu0 DBGDSCR=03070002
->> [    0.321533] hw-breakpoint: enable_monitor_mode cpu0
->> DBGAUTHSTATUS=000000af
->> [    0.321533] hw-breakpoint: found 5 (+1 reserved) breakpoint and 1
->> watchpoint registers.
->> [    0.321563] hw-breakpoint: maximum watchpoint size is 4 bytes.
->
-> Dietmar,
->
-> That looks great! Did you flash the prebuilt images from Linaro 12.08
-> and replaced the kernel with those extra debug messages on top of
-> kernel at git://android.git.linaro.org/kernel/panda? Or are you using
-> Will's branch?
-> I am using a newer Pandaboard ES (Rev B1) and hope this is not the problem.
-> Could you please provide a few instructions to reproduce your setup?
->
+On Mon, Oct 15, 2012 at 01:36:01PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This switches a bunch of allocation and remapping to use the
+> devm_* garbage collected methods and cleans up the error
+> path and remove() paths consequently.
+> 
+> devm_ioremap() is only in <linux/io.h> so fix up the
+> erroneous <asm/*> include as well.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 25 +++++++++----------------
+>  1 file changed, 9 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index d7e1ede..7fca402 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -56,8 +56,7 @@
+>  #include <linux/of_device.h>
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/sizes.h>
+> -
+> -#include <asm/io.h>
+> +#include <linux/io.h>
+>  
+>  #define UART_NR			14
+>  
+> @@ -1973,7 +1972,8 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  		goto out;
+>  	}
+>  
+> -	uap = kzalloc(sizeof(struct uart_amba_port), GFP_KERNEL);
+> +	uap = devm_kzalloc(&dev->dev, sizeof(struct uart_amba_port),
+> +			   GFP_KERNEL);
+>  	if (uap == NULL) {
+>  		ret = -ENOMEM;
+>  		goto out;
+> @@ -1981,16 +1981,17 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  
+>  	i = pl011_probe_dt_alias(i, &dev->dev);
+>  
+> -	base = ioremap(dev->res.start, resource_size(&dev->res));
+> +	base = devm_ioremap(&dev->dev, dev->res.start,
+> +			    resource_size(&dev->res));
+>  	if (!base) {
+>  		ret = -ENOMEM;
+> -		goto free;
+> +		goto out;
+>  	}
+>  
+>  	uap->pinctrl = devm_pinctrl_get(&dev->dev);
+>  	if (IS_ERR(uap->pinctrl)) {
+>  		ret = PTR_ERR(uap->pinctrl);
+> -		goto unmap;
+> +		goto out;
+>  	}
+>  	uap->pins_default = pinctrl_lookup_state(uap->pinctrl,
+>  						 PINCTRL_STATE_DEFAULT);
+> @@ -2002,10 +2003,10 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  	if (IS_ERR(uap->pins_sleep))
+>  		dev_dbg(&dev->dev, "could not get sleep pinstate\n");
+>  
+> -	uap->clk = clk_get(&dev->dev, NULL);
+> +	uap->clk = devm_clk_get(&dev->dev, NULL);
+>  	if (IS_ERR(uap->clk)) {
+>  		ret = PTR_ERR(uap->clk);
+> -		goto unmap;
+> +		goto out;
+>  	}
+>  
+>  	uap->vendor = vendor;
+> @@ -2038,11 +2039,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
+>  		amba_set_drvdata(dev, NULL);
+>  		amba_ports[i] = NULL;
+>  		pl011_dma_remove(uap);
+> -		clk_put(uap->clk);
+> - unmap:
+> -		iounmap(base);
+> - free:
+> -		kfree(uap);
+>  	}
+>   out:
+>  	return ret;
+> @@ -2062,9 +2058,6 @@ static int pl011_remove(struct amba_device *dev)
+>  			amba_ports[i] = NULL;
+>  
+>  	pl011_dma_remove(uap);
+> -	iounmap(uap->port.membase);
+> -	clk_put(uap->clk);
+> -	kfree(uap);
+>  	return 0;
+>  }
+>  
 
-I just tried the kernel over at
-git://android.git.linaro.org/kernel/panda and used the same branch in
-the prebuilt Linaro 12.08:
-linaro-tilt-android-tracking e78449e OMAPFB: Asynchronous vsync notification
-I used android_omap4_defconfig but CONFIG_HW_HAVE_BREAKPOINT were not
-persistent in the .config so I had to manually add HW_HAVE_BREAKPOINT
-to arch/arm/Kconfig under ARCH_OMAP and also add PERF_EVENTS
-dependency.
-Similar to Dietmar I added additional info to
-arch/arm/kernel/hw_breakpoint.c and now I can confirm I see the proper
-value of DSCR = 0x3078002 and DBGAUTHSTATUS = 0xaf !
-Flashing this 3.2 Kernel works without a problem but I am still
-interested in getting Will's branch and 3.7 Kernel working.
-I tried the above on Will's branch (copy over the
-android_omap4_defconfig and edit Kconfig) but the kernel is still
-stuck at trying to boot.
+Tested-by: Domenico Andreoli <domenico.andreoli@linux.com>
 
-I am wondering if I can use all 4 watchpoints available in OMAP4460.
-Normally the kernel just reports 1 watchpoint available due to what I
-believe is a lack of information on what watchpoint triggered. Would
-it be possible to enable all 4 and have a workaround to determine
-which WP triggers?
-
-Valentin
+Thanks,
+Domenido
