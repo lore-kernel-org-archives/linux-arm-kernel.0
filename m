@@ -1,39 +1,115 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Tue, 16 Oct 2012 11:13:14 +0800
-Subject: [PATCH v3 2/2] i2c: change id to let i2c-at91 work
-In-Reply-To: <20121015150244.GZ12801@game.jcrosoft.org>
-References: <1350293428-24551-1-git-send-email-voice.shen@atmel.com>
- <1350293428-24551-3-git-send-email-voice.shen@atmel.com>
- <20121015150244.GZ12801@game.jcrosoft.org>
-Message-ID: <507CD0CA.9010006@atmel.com>
+From: felipe.contreras@gmail.com (Felipe Contreras)
+Date: Tue, 16 Oct 2012 05:23:01 +0200
+Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
+In-Reply-To: <CALLhW=6_0Rnp7-gNhCexUVzxam54KhoqAF6e8eiH5yo-wKBxzQ@mail.gmail.com>
+References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
+ <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
+ <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
+ <CALLhW=5k=tAXo_5ri2WgetRgju9rC_Wm-o9-pfHSNqpe6FU5qQ@mail.gmail.com>
+ <CAMP44s3wTYTFgSw7r+77zb0fxMSjo1R69Zx0nyM6Hgy2h=Gggw@mail.gmail.com>
+ <CALLhW=6_0Rnp7-gNhCexUVzxam54KhoqAF6e8eiH5yo-wKBxzQ@mail.gmail.com>
+Message-ID: <CAMP44s0LSJhyG89mwJERHW0SsQrU+J4CC6=xhMUR=MSw0dxj-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J,
+Hi,
 
-On 10/15/2012 23:02, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 17:30 Mon 15 Oct     , Bo Shen wrote:
->> The i2c core driver will turn the platform device ID to busnum
->> When using platfrom device ID as -1, it means dynamically assigned
->> the busnum. When writing code, we need to make sure the busnum,
->> and call i2c_register_board_info(int busnum, ...) to register device
->> if using -1, we do not know the value of busnum
->> 	
->> In order to solve this issue, set the platform device ID as a fix number
->> Here using 0 to match the busnum used in i2c_regsiter_board_info()
+On Tue, Oct 16, 2012 at 3:29 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
+
+>> After your patch, even if I don't use the camera, or the DSP, the
+>> iommu devices will be enabled, and will be consuming energy *all the
+>> time*. Which I don't think is what we want.
+>
+> Wrong, the iommu device will be enabled by pm_runtime_get_sync once
+> you decide to attach with iommu_attach_device, if you do not use
+> camera or the dsp, you won't turn ON the iommus.
+
+I see, somehow I conflated the two functions.
+
+> On probe this patch does pm_runtime_enable, however this doesn't mean
+> the device is turned ON or resumed or kept ON all the time.
+
+In fact it's the other way around; pm_runtime_enable turns off the
+power (if it's ON).
+
+>>>>> @@ -1009,7 +1001,8 @@ static int __devexit omap_iommu_remove(struct platform_device *pdev)
+>>>>>         release_mem_region(res->start, resource_size(res));
+>>>>>         iounmap(obj->regbase);
+>>>>>
+>>>>> -       clk_put(obj->clk);
+>>>>> +       pm_runtime_disable(obj->dev);
+>>>>
+>>>> This will turn on the device unnecessarily, wasting power, and there's
+>>>> no need for that, kfree will take care of that without resuming.
+>>>
+>>> Left aside the aesthetics of having balanced calls, the device will be
+>>> enabled if there was a pending resume to be executed, otherwise it
+>>> won't, kfree won't increment the disable_depth counter and I don't
+>>> think that freeing the pointer is enough reason to ignore
+>>> pm_runtime_disable.
 >>
->> Signed-off-by: Bo Shen <voice.shen@atmel.com>
->> ---
+>> You are doing __pm_runtime_disable(dev, true), kfree will do
+>> __pm_runtime_disable(dev, false), which is what we want. Both will
+>> decrement the disable_depth.
 >
-> can you check when this append for the first time to schedule a patch for stable too
+> I'm quite confused here, could you please point me to the kfree snip
+> that does __pm_runtime_disable(dev, false)?
 
-OK. I will resend it and add linux stable into the cc list.
+Sorry, not kfree, but the device removal process:
 
-Thanks.
+device_del
+ device_pm_remove
+  pm_runtime_remove
+   __pm_runtime_disable <- HERE
+ bus_remove_device
+  device_release_driver
+   __device_release_driver
+    .remove => platform_drv_remove
+     .remove => omap_iommu_remove
 
-BRs,
-Bo Shen
+Actually, it seems the pm is disabled _before_ omap_iommu_remove is
+even called, so it's a no-op.
 
-> Best Regards,
-> J.
+>> But at least you agree that there's a chance that the device will be waken up.
 >
+> Of course, if there is a pending resume to be executed, it must honor
+> that resume request and then turn off the device before removing the
+> iommu, IMHO.
+
+Who will turn off the device afterwards?
+
+>>>> Also, I still think that something like this is needed:
+>>> ...
+>>>> +static struct clk cam_fck = {
+>>>> +       .name           = "cam_fck",
+>>>> +       .ops            = &clkops_omap2_iclk_dflt,
+>>>> +       .parent         = &l3_ick,
+>>>> +       .enable_reg     = OMAP_CM_REGADDR(OMAP3430_CAM_MOD, CM_ICLKEN),
+>>>
+>>> a cam_fck name to enable the ick?
+>>
+>> Yeap, according to the TRM. Take a look at 12.3 Camera ISP Integration
+>> Fig 12-50.
+>
+> What I meant is that, you are using the CM_ICLKEN to enable a clock
+> named "cam_fck" which has l3_ick as a parent. And that is not
+> consistent with what that register is meant to do, which is:
+>
+> 4.14.1.10 CAM_CM Registers
+>
+> CM_ICKLEN_CAM
+> 0x0: CAM_L3_ICK and CAM_L4_ICLK are disabled
+> 0x1: CAM_L3_ICK and CAM_L4_ICLK are enabled
+>
+> So, I'm complaining about the name "cam_fck", for an interface clock
+> with parent l3_ick. However I don't know why on section 12.3 they
+> refer to CAM_FCK to a l3_ick child clock.
+
+Because it's also used as a functional clock.  Anyway, I don't care
+much about the name of the clock, what is clear is that there's a link
+missing to the l3_ick.
+
+Cheers.
+
+-- 
+Felipe Contreras
