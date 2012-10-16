@@ -1,41 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 16 Oct 2012 13:02:39 +0000
-Subject: [PATCH 1/4] leds: leds-ns2: add device tree binding
-In-Reply-To: <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
-References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
- <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <201210161302.39302.arnd@arndb.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 16 Oct 2012 15:06:26 +0200
+Subject: [PATCH] ARM: VIC: use irq_domain_add_simple()
+Message-ID: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 15 October 2012, Simon Guinot wrote:
-> diff --git a/Documentation/devicetree/bindings/gpio/leds-ns2.txt b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
-> new file mode 100644
-> index 0000000..1a84969
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
-> @@ -0,0 +1,26 @@
-> +Binding for dual-GPIO LED found on Network Space v2 (and parents).
-> +
-> +Required properties:
-> +- compatible: "ns2-leds".
-> +
-> +Each LED is represented as a sub-node of the ns2-leds device.
-> +
-> +Required sub-node properties:
-> +- cmd-gpio: Command LED GPIO. See OF device-tree GPIO specification.
-> +- slow-gpio: Slow LED GPIO. See OF device-tree GPIO specification.
-> +
-> +Optional sub-node properties:
-> +- label: Name for this LED. If omitted, the label is taken from the node name.
-> +- linux,default-trigger: Trigger assigned to the LED.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hi Simon,
+Instead of allocating descriptors on-the-fly for the device tree
+initialization case, use irq_domain_add_simple() which will take
+care of this if you pass negative as the first_irq.
 
-I'm not overly familiar with the LED subsystem, but isn't this something
-that could be done with the generic gpio-led driver?
+Alter the signature of __vic_init() to pass the first_irq as
+signed so this works as expected.
 
-If not, is it possible to extend that driver in a way to make it possible
-and remove the leds-ns2 driver?
+Switching the VIC to use irq_domain_add_simple() also has the
+upside of displaying the same WARNING when you boot with
+pre-allocated descriptors on systems using SPARSE_IRQ but
+yet not using device tree.
 
-	Arnd
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/common/vic.c               | 18 ++++++------------
+ arch/arm/include/asm/hardware/vic.h |  2 +-
+ 2 files changed, 7 insertions(+), 13 deletions(-)
+
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index e0d5388..4fd5d98 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -218,7 +218,7 @@ static void __init vic_register(void __iomem *base, unsigned int irq,
+ 	v->resume_sources = resume_sources;
+ 	v->irq = irq;
+ 	vic_id++;
+-	v->domain = irq_domain_add_legacy(node, fls(valid_sources), irq, 0,
++	v->domain = irq_domain_add_simple(node, fls(valid_sources), irq,
+ 					  &vic_irqdomain_ops, v);
+ }
+ 
+@@ -350,7 +350,7 @@ static void __init vic_init_st(void __iomem *base, unsigned int irq_start,
+ 	vic_register(base, irq_start, vic_sources, 0, node);
+ }
+ 
+-void __init __vic_init(void __iomem *base, unsigned int irq_start,
++void __init __vic_init(void __iomem *base, int irq_start,
+ 			      u32 vic_sources, u32 resume_sources,
+ 			      struct device_node *node)
+ {
+@@ -416,18 +416,12 @@ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ 	if (WARN_ON(!regs))
+ 		return -EIO;
+ 
+-	irq_base = irq_alloc_descs(-1, 0, 32, numa_node_id());
+-	if (WARN_ON(irq_base < 0))
+-		goto out_unmap;
+-
+-	__vic_init(regs, irq_base, ~0, ~0, node);
++	/*
++	 * Passing -1 as first IRQ makes the simple domain allocate descriptors
++	 */
++	__vic_init(regs, -1, ~0, ~0, node);
+ 
+ 	return 0;
+-
+- out_unmap:
+-	iounmap(regs);
+-
+-	return -EIO;
+ }
+ #endif /* CONFIG OF */
+ 
+diff --git a/arch/arm/include/asm/hardware/vic.h b/arch/arm/include/asm/hardware/vic.h
+index e14af1a..2bebad3 100644
+--- a/arch/arm/include/asm/hardware/vic.h
++++ b/arch/arm/include/asm/hardware/vic.h
+@@ -47,7 +47,7 @@
+ struct device_node;
+ struct pt_regs;
+ 
+-void __vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources,
++void __vic_init(void __iomem *base, int irq_start, u32 vic_sources,
+ 		u32 resume_sources, struct device_node *node);
+ void vic_init(void __iomem *base, unsigned int irq_start, u32 vic_sources, u32 resume_sources);
+ int vic_of_init(struct device_node *node, struct device_node *parent);
+-- 
+1.7.11.3
