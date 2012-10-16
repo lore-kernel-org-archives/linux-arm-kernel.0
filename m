@@ -1,65 +1,182 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 10:22:59 -0700
-Subject: [PATCH v3 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
-In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <20121016172258.GT15569@atomide.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 16 Oct 2012 18:25:15 +0100
+Subject: [PATCH] Re: Hardcoded instruction causes certain features to
+ fail on ARM platfrom due to endianness
+In-Reply-To: <CAKw8HL3shtbi0Kk-7ZWO9KhtBVU+Vj_Zunh52GDOGJTZSvt6Gg@mail.gmail.com>
+References: <DA41BE1DDCA941489001C7FBD7A8820E3CB407A4@szxeml549-mbx.china.huawei.com>
+ <20603.47887.262025.941051@pilspetsen.it.uu.se>
+ <CAKw8HL154a=K9O7CzPFZ-EqtT+BxYU-uRHodtutdRfYmNpWVww@mail.gmail.com>
+ <20121016124956.GC26075@linaro.org>
+ <CAKw8HL3shtbi0Kk-7ZWO9KhtBVU+Vj_Zunh52GDOGJTZSvt6Gg@mail.gmail.com>
+Message-ID: <20121016172515.GD26075@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Omar Ramirez Luna <omar.luna@linaro.org> [121011 18:07]:
-> These patches are needed for remoteproc to work on OMAP4.
+On Wed, Oct 17, 2012 at 12:33:54AM +0800, Fei Yang wrote:
+> 2012/10/16 Dave Martin <dave.martin@linaro.org>:
+> > On Mon, Oct 15, 2012 at 11:33:08PM +0800, Fei Yang wrote:
+> >> 2012/10/15 Mikael Pettersson <mikpe@it.uu.se>:
+> >> > Yangfei (Felix) writes:
+> >> >  > Hi all,
+> >> >  >
+> >> >  >     I found that hardcoded instruction in inline asm can cause certains certain features fail to work on ARM platform due to endianness.
+> >> >  >     As an example, consider the following code snippet of platform_do_lowpower function from arch/arm/mach-realview/hotplug.c:
+> >> >  >                 / *
+> >> >  >                  * here's the WFI
+> >> >  >                  */
+> >> >  >                 asm(".word      0xe320f003\n"
+> >> >  >                     :
+> >> >  >                     :
+> >> >  >                     : "memory", "cc");
+> >> >  >
+> >> >  >     The instruction generated from this inline asm will not work on big-endian ARM platform, such as ARM BE-8 format. Instead, an exception will be generated.
+> >> >  >
+> >> >  >     Here the code should be:
+> >> >  >                 / *
+> >> >  >                  * here's the WFI
+> >> >  >                  */
+> >> >  >                 asm("WFI\n"
+> >> >  >                     :
+> >> >  >                     :
+> >> >  >                     : "memory", "cc");
+> >> >  >
+> >> >  >     Seems the kernel doesn't support ARM BE-8 well. I don't know why this problem happens.
+> >> >  >     Can anyone tell me who owns this part? I can prepare a patch then.
+> >> >  >     Thanks.
+> >> >
+> >> > Questions regarding the ARM kernel should go to the linux-arm-kernel mailing list
+> >> > (see the MAINTAINERS file), with an optional cc: to the regular LKML.
+> >> >
+> >> > BE-8 is, if I recall correctly, ARMv7's broken format where code and data have
+> >> > different endianess.  GAS supports an ".inst" directive which is like ".word"
+> >> > except the data is assumed to be code.  This matters for disassembly, and may
+> >> > also be required for BE-8.
+> >> >
+> >> > That is, just s/.word/.inst/g above and report back if that works or not.
+> >> > --
+> >> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> >> > the body of a message to majordomo at vger.kernel.org
+> >> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >> > Please read the FAQ at  http://www.tux.org/lkml/
+> >> >
+> >> >
+> >>
+> >> Hi Mikael,
+> >>
+> >> Thanks for the reply. I modified the code as suggested and rebuilt the
+> >> kernel, cpu-hotplug feature now works on big-endian(BE-8) ARM
+> >> platform.
+> >> Since the ARM core can be configured by system software to work in
+> >> big-endian mode, it's necessary to fix this problem. And here is a
+> >> small patch :
+> >>
+> >> diff -urN linux-3.6.2/arch/arm/mach-exynos/hotplug.c
+> >> linux/arch/arm/mach-exynos/hotplug.c
+> >> --- linux-3.6.2/arch/arm/mach-exynos/hotplug.c        2012-10-13
+> >> 04:50:59.000000000 +0800
+> >> +++ linux/arch/arm/mach-exynos/hotplug.c      2012-10-15 23:05:44.000000000 +0800
+> >> @@ -72,7 +72,7 @@
+> >>               /*
+> >>                * here's the WFI
+> >>                */
+> >> -             asm(".word      0xe320f003\n"
+> >> +             asm(".inst      0xe320f003\n"
+> >
+> > The cleanest fix would simply be to build these files with appropriate
+> > modified CFLAGS (-march=armv6k or -march=armv7-a), and use the proper
+> > "wfi" mnemonic.
+> >
+> > Failing that, you could use the facilities in <asm/opcodes.h> to
+> > declare a wrapper macro for injecting this opcode (see
+> > <asm/opcodes-virt.h> for an example).  However, putting custom
+> > opcodes into the assembler should only be done if it's really
+> > necessary.  Nowadays, I think we can consider tools which don't
+> > understand the WFI mnemonic to be obsolete, at least for platforms
+> > which only build for v7 and above.
+> >
+> > The relevant board maintainers would need to sign off on such a
+> > change, so we don't end up breaking their builds.
+> >
+> > If any of these boards needs to build for v6K, the custom opcode might
+> > be worth it -- some people might just possibly be relying on older tools
+> > for such platforms.
+> >
+> > Cheers
+> > ---Dave
+> >
+> >>                   :
+> >>                   :
+> >>                   : "memory", "cc");
+> >> diff -urN linux-3.6.2/arch/arm/mach-realview/hotplug.c
+> >> linux/arch/arm/mach-realview/hotplug.c
+> >> --- linux-3.6.2/arch/arm/mach-realview/hotplug.c      2012-10-13
+> >> 04:50:59.000000000 +0800
+> >> +++ linux/arch/arm/mach-realview/hotplug.c    2012-10-15 23:05:00.000000000 +0800
+> >> @@ -66,7 +66,7 @@
+> >>               /*
+> >>                * here's the WFI
+> >>                */
+> >> -             asm(".word      0xe320f003\n"
+> >> +             asm(".inst      0xe320f003\n"
+> >>                   :
+> >>                   :
+> >>                   : "memory", "cc");
+> >> diff -urN linux-3.6.2/arch/arm/mach-shmobile/hotplug.c
+> >> linux/arch/arm/mach-shmobile/hotplug.c
+> >> --- linux-3.6.2/arch/arm/mach-shmobile/hotplug.c      2012-10-13
+> >> 04:50:59.000000000 +0800
+> >> +++ linux/arch/arm/mach-shmobile/hotplug.c    2012-10-15 23:05:25.000000000 +0800
+> >> @@ -53,7 +53,7 @@
+> >>               /*
+> >>                * here's the WFI
+> >>                */
+> >> -             asm(".word      0xe320f003\n"
+> >> +             asm(".inst      0xe320f003\n"
+> >>                   :
+> >>                   :
+> >>                   : "memory", "cc");
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> Introduced iommu hwmod support for OMAP3 (iva, isp) and
-> OMAP4 (ipu, dsp), along with the corresponding runtime PM
-> and routines to deassert reset lines, enable/disable clocks
-> and configure sysc registers.
-> 
-> Although IOMMU hwmod patches were already submitted in the past,
-> this series adds few more changes, like:
-> - New reset handling.
-> - Save and restore context code rework.
-> - Device tree bindings for OMAP3 and OMAP4.
-> 
-> For this series I just dropped the patches already included in
-> mainline.
+> Thanks for the suggestions. The ".inst" directive here may also bring
+> us trouble if some older tools is used.
+> In that situation, "wfi" mnemonic will not be recognized either. If we
+> cannot suppose that newer tools is used, then how can we determine the
+> endianness during the preprocessor/compile phase? Any ideas?
 
-These will need to be rebased on omap-for-v3.8/cleanup-headers-iommu
-when I have that pushed out as that removes plat/*iommu*.h files.
+The endianness is controlled by the build-time configuration of the
+kernel.  A single kernel image cannot be bi-endian.
 
-Regards,
+The __inst_*() macros in <asm/opcodes.h> take care of this based on which
+CONFIG_CPU_ENDIAN_* option is selected by the board in the kernel config.
+For compatibility with old tools, this is done instead of using the
+".inst" directive.
 
-Tony
- 
-> Previous work can be found at:
-> [v2]
->   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg75701.html
-> [v1]
->   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70447.html
-> 
-> [old iteration without reset, save/restore and device tree]
->   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60133.html
-> 
-> Omar Ramirez Luna (6):
->   ARM: OMAP3/4: iommu: migrate to hwmod framework
->   ARM: OMAP3/4: iommu: adapt to runtime pm
->   ARM: OMAP: iommu: pm runtime save and restore context
->   ARM: OMAP: iommu: optimize save and restore routines
->   ARM: OMAP: iommu: add device tree support
->   arm/dts: OMAP3/4: Add iommu nodes
-> 
->  .../devicetree/bindings/arm/omap/iommu.txt         |   10 ++
->  arch/arm/boot/dts/omap3.dtsi                       |   12 +-
->  arch/arm/boot/dts/omap4.dtsi                       |   17 +-
->  arch/arm/mach-omap2/devices.c                      |    2 +-
->  arch/arm/mach-omap2/iommu2.c                       |   74 ++------
->  arch/arm/mach-omap2/omap-iommu.c                   |  176 +++++---------------
->  arch/arm/plat-omap/include/plat/iommu.h            |   20 ++-
->  arch/arm/plat-omap/include/plat/iommu2.h           |    4 -
->  drivers/iommu/omap-iommu.c                         |  163 ++++++++++++++----
->  9 files changed, 245 insertions(+), 233 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/omap/iommu.txt
-> 
-> -- 
-> 1.7.9.5
-> 
+> BTW: I found this bug on my ARM V7-A Cortex-A9 board and the processor
+> is configured to work in big-endian mode at boot stage (word and
+> halfword data is interpreted as big-endian, but instruction is still
+> little-endian) . The kernel is ported from arch/arm/mach-realview. And
+> I think these boards(mach-realview/mach-shmobile/mach-exynos) should
+> have the similar problems. ARM arch is Bi-endian since versions 3 and
+> above.
+
+I believe that shmobile and exynos are v7-only, so it may be better to
+just use "wfi" and override the CFLAGS for those files.  As you can
+see, those were just created by copy-pasting the code from mach-realview.
+
+realview itself can be used with ARMv6 based core-tiles, so there may be
+an argument for a custom opcode in this case:
+
+#include <asm/opcodes.h>
+#define __WFI __inst_arm_thumb16(0xE320F003, 0xBF30)
+
+Not handling the Thumb case is a definite bug for any file which may
+run on v7, since the kernel could be built in Thumb for that case.
+For example, the existing code is mach-realview/hotplug.c is broken
+when building an SMP Thumb-2 kernel for the Realview PBX-A9.
+
+Cheers
+---Dave
