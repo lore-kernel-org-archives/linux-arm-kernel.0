@@ -1,90 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 16 Oct 2012 18:36:39 +0100
-Subject: [PATCH] ARM: smp: switch away from the idmap before updating
- init_mm.mm_count
-Message-ID: <1350408999-15317-1-git-send-email-will.deacon@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 16 Oct 2012 10:40:38 -0700
+Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <CACRpkdYaaSt9uLN2_=KXYDK2b5D5paopsYxgYKqezKCx8cy=vQ@mail.gmail.com>
+References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
+ <1350343887-7344-3-git-send-email-stigge@antcom.de>
+ <20121015235720.GA3132@kroah.com> <507D58D9.2040607@antcom.de>
+ <20121016164326.GA4858@kroah.com>
+ <CACRpkdYaaSt9uLN2_=KXYDK2b5D5paopsYxgYKqezKCx8cy=vQ@mail.gmail.com>
+Message-ID: <20121016174038.GA17982@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting a secondary CPU, the primary CPU hands two sets of page
-tables via the secondary_data struct:
+On Tue, Oct 16, 2012 at 07:27:15PM +0200, Linus Walleij wrote:
+> On Tue, Oct 16, 2012 at 6:43 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> > On Tue, Oct 16, 2012 at 02:53:45PM +0200, Roland Stigge wrote:
+> >>
+> >> Further, current gpio and gpiochip devices are also doing this way:
+> >> creating the device and subsequently their attrs, even though there may
+> >> be a better way but I'm still wondering how this would be.
+> >
+> > Then the existing code is broken and should be fixed to use dev_attrs.
+> > I guess it's time to audit the tree and find all places that get this
+> > wrong...
+> 
+> The thing is, as I've tried to explain but maybe didn't get across,
+> that these devices don't *have* a parent, and are not part of any
+> tree.
 
-	(1) swapper_pg_dir: a normal, cacheable, shared (if SMP) mapping
-	    of the kernel image (i.e. the tables used by init_mm).
+You are passing in a parent device to the device_create() call, where
+did that pointer come from?
 
-	(2) idmap_pgd: an uncached mapping of the .idmap.text ELF
-	    section.
+Either way, the attribute creation needs to happen before we announce
+the device to userspace, that's a bug that should be fixed now.
 
-The idmap is generally used when enabling and disabling the MMU, which
-includes early CPU boot. In this case, the secondary CPU switches to
-swapper as soon as it enters C code:
+> They are parentless mock devices, created on-the-fly just to get
+> sysfs entries.
 
-	struct mm_struct *mm = &init_mm;
-	unsigned int cpu = smp_processor_id();
+That's fine, well, not the "parentless" part, but that should be trivial
+to fix, just pass in the correct pointer and you should be fine.
 
-	/*
-	 * All kernel threads share the same mm context; grab a
-	 * reference and switch to it.
-	 */
-	atomic_inc(&mm->mm_count);
-	current->active_mm = mm;
-	cpumask_set_cpu(cpu, mm_cpumask(mm));
-	cpu_switch_mm(mm->pgd, mm);
+> What is needed it to get the device model right in the first
+> place.
 
-This causes a problem on ARMv7, where the identity mapping is treated as
-strongly-ordered leading to architecturally UNPREDICTABLE behaviour of
-exclusive accesses, such as those used by atomic_inc.
+I thought it was in the device model already?
 
-This patch re-orders the secondary_start_kernel function so that we
-switch to swapper before performing any exclusive accesses.
+> Fixing it has been drafted by me and Grant:
+> https://blueprints.launchpad.net/linux-linaro/+spec/gpiochip-to-dev
+> 
+> This is not all-encompassing though :-/
 
-Cc: David McKay <david.mckay@st.com>
-Reported-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+That's a good list to work from, good luck :)
 
-The only potentially viable alternative to this patch that I can think
-of is using swapper instead of idmap_pgd when VA == PA. However, that
-has the unpleasant side-effect of making the identity mapping cacheable,
-which I'm not comfortable with for things like CPU suspend.
-
-Will
-
- arch/arm/kernel/smp.c |   14 ++++++++++----
- 1 files changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 8e20754d..fbc8b26 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -294,18 +294,24 @@ static void percpu_timer_setup(void);
- asmlinkage void __cpuinit secondary_start_kernel(void)
- {
- 	struct mm_struct *mm = &init_mm;
--	unsigned int cpu = smp_processor_id();
-+	unsigned int cpu;
-+
-+	/*
-+	 * The identity mapping is uncached (strongly ordered), so
-+	 * switch away from it before attempting any exclusive accesses.
-+	 */
-+	cpu_switch_mm(mm->pgd, mm);
-+	enter_lazy_tlb(mm, current);
-+	local_flush_tlb_all();
- 
- 	/*
- 	 * All kernel threads share the same mm context; grab a
- 	 * reference and switch to it.
- 	 */
-+	cpu = smp_processor_id();
- 	atomic_inc(&mm->mm_count);
- 	current->active_mm = mm;
- 	cpumask_set_cpu(cpu, mm_cpumask(mm));
--	cpu_switch_mm(mm->pgd, mm);
--	enter_lazy_tlb(mm, current);
--	local_flush_tlb_all();
- 
- 	printk("CPU%u: Booted secondary processor\n", cpu);
- 
--- 
-1.7.4.1
+greg k-h
