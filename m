@@ -1,50 +1,55 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 16 Oct 2012 09:04:34 +0300
-Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
- contiguous allocations
-In-Reply-To: <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
-References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
- <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
-Message-ID: <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
+From: vasanthananthan@gmail.com (Vasanth Ananthan)
+Date: Tue, 16 Oct 2012 12:03:47 +0530
+Subject: [PATCH 6/6] ARM: EXYNOS5: SATA PHY controller driver
+In-Reply-To: <10179968.slaZyPIETn@flatron>
+References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
+ <1349783332-18467-7-git-send-email-vasanthananthan@gmail.com>
+ <10179968.slaZyPIETn@flatron>
+Message-ID: <CAK1UHiw8+ebzGyjV53Y9efpMFPbCL9RR_o9ZSw=NTuRw_9gRwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Inki/Marek,
+Hi Tomasz,
 
-On Tue, 16 Oct 2012 02:50:16 +0200
-Inki Dae <inki.dae@samsung.com> wrote:
+On Sat, Oct 13, 2012 at 4:20 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi,
+>
+> On Tuesday 09 of October 2012 17:18:52 Vasanth Ananthan wrote:
+>> This patch adds a platform driver and I2C client driver for SATA PHY
+>> controller
+>>
+>> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+>> ---
+>>  drivers/ata/Makefile          |    2 +-
+>>  drivers/ata/sata_exynos_phy.c |  303
+>> +++++++++++++++++++++++++++++++++++++++++ 2 files changed, 304
+>> insertions(+), 1 deletions(-)
+>>  create mode 100644 drivers/ata/sata_exynos_phy.c
+>>
+[ ... ]
+>> +
+>> +     phy->init = sataphy_init;
+>> +     phy->shutdown = sataphy_shutdown;
+>> +     phy->priv_data = (void *)sataphy;
+>> +     phy->dev = &pdev->dev;
+>> +
+>> +     ret = sata_add_phy(phy, SATA_PHY_GENERATION3);
+>> +     if (ret < 0)
+>> +             goto err4;
+>
+> Do you have any warranties that phy callbacks won't get called before i2c
+> device probes and sets i2c_client?
+>
+>> +
+>> +     ret = i2c_add_driver(&sataphy_i2c_driver);
+>> +     if (ret < 0)
+>> +             goto err5;
+>> +
+>> +     platform_set_drvdata(pdev, phy);
 
-> 2012/10/15 Marek Szyprowski <m.szyprowski@samsung.com>:
-> > Hello,
-> >
-> > Some devices, which have IOMMU, for some use cases might require to
-> > allocate a buffers for DMA which is contiguous in physical memory. Such
-> > use cases appears for example in DRM subsystem when one wants to improve
-> > performance or use secure buffer protection.
-> >
-> > I would like to ask if adding a new attribute, as proposed in this RFC
-> > is a good idea? I feel that it might be an attribute just for a single
-> > driver, but I would like to know your opinion. Should we look for other
-> > solution?
-> >
-> 
-> In addition, currently we have worked dma-mapping-based iommu support
-> for exynos drm driver with this patch set so this patch set has been
-> tested with iommu enabled exynos drm driver and worked fine. actually,
-> this feature is needed for secure mode such as TrustZone. in case of
-> Exynos SoC, memory region for secure mode should be physically
-> contiguous and also maybe OMAP but now dma-mapping framework doesn't
-> guarantee physically continuous memory allocation so this patch set
-> would make it possible.
+I shall register my i2c client driver before assigning the SATA PHY
+call backs. Would that guarantee the calling of phy callbacks after
+the i2c device probes?
 
-Agree that the contigous memory allocation is necessary for us too.
-
-In addition to those contiguous/discontiguous page allocation, is
-there any way to _import_ anonymous pages allocated by a process to be
-used in dma-mapping API later?
-
-I'm considering the following scenario, an user process allocates a
-buffer by malloc() in advance, and then it asks some driver to convert
-that buffer into IOMMU'able/DMA'able ones later. In this case, pages
-are discouguous and even they may not be yet allocated at
-malloc()/mmap().
+--
+Vasanth Ananthan
