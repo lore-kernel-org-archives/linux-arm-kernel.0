@@ -1,67 +1,27 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Tue, 16 Oct 2012 16:35:22 +0200
-Subject: [Celinux-dev] PDF documentation
-In-Reply-To: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
-Message-ID: <20121016143522.086F2204292@gemini.denx.de>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Tue, 16 Oct 2012 07:41:41 -0700
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
+References: <1350192523.10946.4.camel@gitbox>
+ <1350246895.11504.6.camel@gitbox> <20121015094547.GC29125@suse.de>
+ <1350325704.31162.16.camel@gitbox>
+ <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
+Message-ID: <1350398501.2532.12.camel@dabdike>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Constantine Shulyupin,
+On Tue, 2012-10-16 at 10:17 +0800, Bob Liu wrote:
+> I think you need to declare that memory using
+> dma_declare_coherent_memory() before
+> alloc_from_coherent.
 
-In message <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com> you wrote:
-> 
-> I have some questions and ideas about documentation in PDF format.
-> During embedded SW development I often work with documentation,
-> especially datasheets in PDF format. I have some issues with such
-> documentation. It is not so easy to manage a lot of PDF documents
-> sometimes with strange code in file names.  It is not easy to store
-> and share links to documentation.
+This isn't true.  Almost every platform has a mechanism for
+manufacturing coherent memory (in the worst case, they just turn off the
+CPU cache on a page and hand it out).  The purpose of
+dma_declare_coherent_memory() is to allow a per device declaration of
+preferred regions ... usually because they reside either on the fast
+path to the device or sometimes on the device itself.  There are only a
+handful of devices which need it, so in the ordinary course of events,
+dma_alloc_coherent() is used without any memory declaration.
 
-PDF has a lot of advantages in many situations, but I agree that it is
-also non-perfect for many other use cases.
-
-> Questions:
-> - have same issues with PDF documentation and datasheets?
-> - do you think documentation and datasheets in HTML format on a site
-> can be more useful than PDF?
-
-HTML is really useful in a web browser only.
-
-For documentation of the U-Boot boot loader we use a very different
-approach:  documentation is created, stored and edited in a wiki
-(using FosWiki, see http://foswiki.org/).  This has the advantage that
-you can make it either easily editable to the community, or put
-arbitrary access restrictions to it by using wiki user / group access
-permissions.  In combination with some plugins (like TocPlugin,
-BookmakerPlugin and PublishPlugin) we can then "linearize" the entries
-in the wiki to generate a "book" which can be read both online (as
-HTML) or offline (by publishing the content as a linerarized, single
-HTLP, plain text, PDF and/or PostScript document).
-
-To give you a feeling how this works, please see for example 
-	http://www.denx.de/wiki/view/DULG/Manual?stickboard=m28
-	http://www.denx.de/wiki/publish/DULG/DULG-m28.html
-	http://www.denx.de/wiki/publish/DULG/DULG-m28.ps
-and	http://www.denx.de/wiki/publish/DULG/DULG-m28.pdf
-
-[Actually this documentation does much more behind the scenes; all
-examples in this documentation come from include files which are
-automatically generated from our regression test suite (DUTS); so the
-procedure is to come up with a new software version, run the test
-suite over it, upload the generated log files to the web server, and
-voila, there is a new version of the documentation matching exactly
-the new software version.]
-
-And the nice thing is: all this is based on free software only...
-
-Best regards,
-
-Wolfgang Denk
-
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-One difference between a man and a machine is that a machine is quiet
-when well oiled.
+James
