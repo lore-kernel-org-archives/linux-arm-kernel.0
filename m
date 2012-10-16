@@ -1,110 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 16 Oct 2012 08:34:28 +0100
-Subject: [PATCH] Boottime: A tool for automatic measurement of
- kernel/bootloader boot time
-In-Reply-To: <507C3125.70702@ti.com>
-References: <1349966545-19340-1-git-send-email-lee.jones@linaro.org>
- <20121012134542.GH12567@gmail.com>
- <20121012134813.GK21164@n2100.arm.linux.org.uk>
- <201210121353.16798.arnd@arndb.de>
- <20121012140149.GJ12567@gmail.com> <50784729.4030302@ti.com>
- <20121012164221.GN12567@gmail.com> <507C3125.70702@ti.com>
-Message-ID: <20121016073428.GG7662@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 16 Oct 2012 16:46:46 +0900
+Subject: [PATCH 1/2] regulator: gpio-regulator: Allow use of GPIO
+ controlled regulators though DT
+In-Reply-To: <20121016072956.GF7662@gmail.com>
+References: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
+ <20121016051401.GB8670@opensource.wolfsonmicro.com>
+ <20121016072956.GF7662@gmail.com>
+Message-ID: <20121016074643.GA10323@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>>>>root at ME:/ cat /sys/kernel/debug/boottime/bootgraph
-> >>>>>>[    0.185254] calling  splash+0x0/0x0
-> >>>>>>[    2.984335] initcall splash+0x0/0x0 returned 0 after 2799 msecs.
-> >>>>>>[    2.984335] calling  autoboot_delay+0x0/0x0
-> >>>>>>[    4.089513] initcall autoboot_delay+0x0/0x0 returned 0 after 1105 msecs.
-> >>>>>>[    4.089513] calling  load_kernel+0x0/0x0
-> >>>>>>[    4.239174] initcall load_kernel+0x0/0x0 returned 0 after 149 msecs.
-> >>>>>>[    4.239174] calling  boot_kernel+0x0/0x0
-> >>>>>>[    4.276260] initcall boot_kernel+0x0/0x0 returned 0 after 37 msecs.
-> >>>>>>[    4.276260] calling  uncompress_ll_init+0x0/0x0
-> >>>>>>[    4.276260] initcall uncompress_ll_init+0x0/0x0 returned 0 after 0 msecs.
-> >>>>>>[    4.276260] Freeing init memory: 0K
+On Tue, Oct 16, 2012 at 08:29:56AM +0100, Lee Jones wrote:
+> On Tue, 16 Oct 2012, Mark Brown wrote:
 
-> >commit 4c49a18bcfd2d041cbad7f41c6e6b39d90008382 (HEAD, refs/heads/dt-snowball-pre-rc1)
-> >Author: Jonas Aaberg<jonas.aberg@stericsson.com>
-> >Date:   Wed Sep 14 09:29:20 2011 +0200
-> >
-> >     drivers: clocksource: dbx500-prcmu: Add boottime support
-> >
-> >     Change-Id: I9b5e3d050131c08c08786ae84cb76619c0525049
-> >     Signed-off-by: Jonas Aaberg<jonas.aberg@stericsson.com>
-> >     Reviewed-on: http://gerrit.lud.stericsson.com/gerrit/32055
-> >
-> >diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-> >index c26c369..0069cd9 100644
-> >--- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-> >+++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-> >@@ -14,6 +14,7 @@
-> >   */
-> >  #include<linux/clockchips.h>
-> >  #include<linux/clksrc-dbx500-prcmu.h>
-> >+#include<linux/boottime.h>
-> >
-> >  #include<asm/sched_clock.h>
-> >
-> >@@ -68,6 +69,23 @@ static u32 notrace dbx500_prcmu_sched_clock_read(void)
-> >
-> >  #endif
-> >
-> >+#ifdef CONFIG_BOOTTIME
-> >+static unsigned long __init boottime_get_time(void)
-> >+{
-> >+	return div_s64(clocksource_cyc2ns(clocksource_dbx500_prcmu.read(
-> >+						&clocksource_dbx500_prcmu),
-> >+					  clocksource_dbx500_prcmu.mult,
-> >+					  clocksource_dbx500_prcmu.shift),
-> >+		       1000);
-> >+}
-> >+
-> >+static struct boottime_timer __initdata boottime_timer = {
-> >+	.init     = NULL,
-> >+	.get_time = boottime_get_time,
-> >+	.finalize = NULL,
-> >+};
-> >+#endif
-> >+
-> >  void __init clksrc_dbx500_prcmu_init(void __iomem *base)
-> >  {
-> >  	clksrc_dbx500_timer_base = base;
-> >@@ -90,4 +108,6 @@ void __init clksrc_dbx500_prcmu_init(void __iomem *base)
-> >  			 32, RATE_32K);
-> >  #endif
-> >  	clocksource_register_hz(&clocksource_dbx500_prcmu, RATE_32K);
-> >+
-> >+	boottime_activate(&boottime_timer);
-> >  }
-> >
-> 
-> OK So has this been validated and tested on any other IC then a ST part?
-> This boottime_activate patch seems to be only for the dbx500.  If
-> this is supposed to be a generic solution I would expect
-> a generic patch for ARM to enable boot time activation.
+> > Not looked at the patch yet but patch 2 doesn't seem to have appeared?
 
-No, this is essentially an STE patch. We don't have access to any other
-hardware, so we'd be reliant on kindhearted soles to test on their h/w.
-I guess something like Beagleboard and/or Panda would be ideal. Know
-anyone? ;)
+> Has it arrived yet?
 
-> Have you profiled how much time the boot time logging has added to
-> the over all boot?
-> Also the boottime commit message should explain a little more what
-> it is measuring.
-> i.e.  This patch enables logging the boot time from point x to point
-> y for the kernel only.  This does not include init.
-> 
-> What about adding the boot time from the init sequence to init complete?
+> Arnd responded to it, so it hit the list.
 
-I don't know the answers to these questions, but I'll endeavour to find
-out and get back to you posthaste.
+> Since Arnd's comments I've also fired v2 up - do you see it/them?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Not in my inbox, I'm not looking at the list right now.
