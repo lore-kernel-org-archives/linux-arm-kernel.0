@@ -1,56 +1,65 @@
-From: michael@walle.cc (Michael Walle)
-Date: Tue, 16 Oct 2012 19:21:27 +0200
-Subject: [PATCH] ARM: kirkwood: fix buttons on lsxl boards
-In-Reply-To: <1348782877-857-1-git-send-email-michael@walle.cc>
-References: <1348782877-857-1-git-send-email-michael@walle.cc>
-Message-ID: <201210161921.27831.michael@walle.cc>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 16 Oct 2012 10:22:59 -0700
+Subject: [PATCH v3 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
+In-Reply-To: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
+References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
+Message-ID: <20121016172258.GT15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi Andrew,
-
-Can you pick this patch?
-
-
-Am Donnerstag 27 September 2012, 23:54:37 schrieb Michael Walle:
-> Change event type to switch for the power and autopower switches.
-> Additionally, this patch aligns the keycodes with the other linkstation
-> boards already supported by linux.
+* Omar Ramirez Luna <omar.luna@linaro.org> [121011 18:07]:
+> These patches are needed for remoteproc to work on OMAP4.
 > 
-> Signed-off-by: Michael Walle <michael@walle.cc>
-> ---
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi |    8 +++++---
->  1 files changed, 5 insertions(+), 3 deletions(-)
+> Introduced iommu hwmod support for OMAP3 (iva, isp) and
+> OMAP4 (ipu, dsp), along with the corresponding runtime PM
+> and routines to deassert reset lines, enable/disable clocks
+> and configure sysc registers.
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> b/arch/arm/boot/dts/kirkwood-lsxl.dtsi index a1dd36d..8fea375 100644
-> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> @@ -48,17 +48,19 @@
->  		#size-cells = <0>;
->  		button at 1 {
->  			label = "Function Button";
-> -			linux,code = <132>;
-> +			linux,code = <357>;
->  			gpios = <&gpio1 9 1>;
->  		};
->  		button at 2 {
->  			label = "Power-on Switch";
-> -			linux,code = <116>;
-> +			linux,code = <0>;
-> +			linux,input-type = <5>;
->  			gpios = <&gpio1 10 1>;
->  		};
->  		button at 3 {
->  			label = "Power-auto Switch";
-> -			linux,code = <142>;
-> +			linux,code = <1>;
-> +			linux,input-type = <5>;
->  			gpios = <&gpio1 11 1>;
->  		};
->  	};
+> Although IOMMU hwmod patches were already submitted in the past,
+> this series adds few more changes, like:
+> - New reset handling.
+> - Save and restore context code rework.
+> - Device tree bindings for OMAP3 and OMAP4.
+> 
+> For this series I just dropped the patches already included in
+> mainline.
 
+These will need to be rebased on omap-for-v3.8/cleanup-headers-iommu
+when I have that pushed out as that removes plat/*iommu*.h files.
 
--- 
-Michael
+Regards,
+
+Tony
+ 
+> Previous work can be found at:
+> [v2]
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg75701.html
+> [v1]
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg70447.html
+> 
+> [old iteration without reset, save/restore and device tree]
+>   http://www.mail-archive.com/linux-omap at vger.kernel.org/msg60133.html
+> 
+> Omar Ramirez Luna (6):
+>   ARM: OMAP3/4: iommu: migrate to hwmod framework
+>   ARM: OMAP3/4: iommu: adapt to runtime pm
+>   ARM: OMAP: iommu: pm runtime save and restore context
+>   ARM: OMAP: iommu: optimize save and restore routines
+>   ARM: OMAP: iommu: add device tree support
+>   arm/dts: OMAP3/4: Add iommu nodes
+> 
+>  .../devicetree/bindings/arm/omap/iommu.txt         |   10 ++
+>  arch/arm/boot/dts/omap3.dtsi                       |   12 +-
+>  arch/arm/boot/dts/omap4.dtsi                       |   17 +-
+>  arch/arm/mach-omap2/devices.c                      |    2 +-
+>  arch/arm/mach-omap2/iommu2.c                       |   74 ++------
+>  arch/arm/mach-omap2/omap-iommu.c                   |  176 +++++---------------
+>  arch/arm/plat-omap/include/plat/iommu.h            |   20 ++-
+>  arch/arm/plat-omap/include/plat/iommu2.h           |    4 -
+>  drivers/iommu/omap-iommu.c                         |  163 ++++++++++++++----
+>  9 files changed, 245 insertions(+), 233 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/omap/iommu.txt
+> 
+> -- 
+> 1.7.9.5
+> 
