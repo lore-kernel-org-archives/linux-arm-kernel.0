@@ -1,57 +1,63 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 11:37:02 +0100
-Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
- contiguous allocations
-In-Reply-To: <20121016.132755.661591248175727826.hdoyu@nvidia.com>
-References: <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
- <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
- <20121016085928.GV21164@n2100.arm.linux.org.uk>
- <20121016.132755.661591248175727826.hdoyu@nvidia.com>
-Message-ID: <20121016103702.GB21164@n2100.arm.linux.org.uk>
+Date: Tue, 16 Oct 2012 11:55:04 +0100
+Subject: [PATCH 2/2] ARM: unwind: enable dumping stacks for SMP &&
+ ARM_UNWIND
+In-Reply-To: <20121016101201.GA26075@linaro.org>
+References: <1346021216-21979-1-git-send-email-ccross@android.com>
+ <1346021216-21979-3-git-send-email-ccross@android.com>
+ <20121012090807.GB21164@n2100.arm.linux.org.uk>
+ <20121012100242.GA2126@linaro.org>
+ <CAMbhsRRpYrOBhaFn5PV5f5J=36Hsj2eZixyD1hXRfRLoyWm1Xg@mail.gmail.com>
+ <20121016101201.GA26075@linaro.org>
+Message-ID: <20121016105504.GD21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 12:27:55PM +0200, Hiroshi Doyu wrote:
-> Hi Russell,
+On Tue, Oct 16, 2012 at 11:12:01AM +0100, Dave Martin wrote:
+> On Mon, Oct 15, 2012 at 07:15:31PM -0700, Colin Cross wrote:
+> > About half the callers to unwind_frame end up limiting the number of
+> > frames they will follow before giving up, so I wasn't sure if I should
+> > put an arbitrary limit in unwind_frame or just make sure all callers
+> > are bounded.  Your idea of limiting same sp frames instead of total
+> > frames sounds better.  I can send a new patch that adds a new field to
+> > struct stackframe (which will need to be initialized everywhere, the
+> > struct is usually on the stack) and limits the recursion.  Any
+> > suggestion on the recursion limit?  I would never expect to see a real
+> > situation with more than a few, but on the other hand parsing the
+> > frames should be pretty fast so a high number (100?) shouldn't cause
+> > any user visible effect.
 > 
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote @ Tue, 16 Oct 2012 10:59:28 +0200:
+> Talking to some tools guys about this, it sounds like there really
+> shouldn't be any stackless frame except for the leaf frame.  If there are
+> stackless functions they will probably not be visible in the frame chain
+> at all.  So it might make sense to have a pretty small limit.  Maybe it
+> could even be 1.  Cartainly a small number.
 > 
-> > On Tue, Oct 16, 2012 at 09:04:34AM +0300, Hiroshi Doyu wrote:
-> > > In addition to those contiguous/discontiguous page allocation, is
-> > > there any way to _import_ anonymous pages allocated by a process to be
-> > > used in dma-mapping API later?
-> > > 
-> > > I'm considering the following scenario, an user process allocates a
-> > > buffer by malloc() in advance, and then it asks some driver to convert
-> > > that buffer into IOMMU'able/DMA'able ones later. In this case, pages
-> > > are discouguous and even they may not be yet allocated at
-> > > malloc()/mmap().
-> > 
-> > That situation is covered.  It's the streaming API you're wanting for that.
-> > dma_map_sg() - but you may need additional cache handling via
-> > flush_dcache_page() to ensure that your code is safe for all CPU cache
-> > architectures.
-> >
-> > Remember that pages allocated into userspace will be cacheable, so a cache
-> > flush is required before they can be DMA'd.  Hence the streaming
-> > API.
-> 
-> Is the syscall "cacheflush()" supposed to be the knob for that?
-> 
-> Or is there any other ones to have more precise control, "clean",
-> "invalidate" and "flush", from userland in generic way?
+> We should also add a check for whether the current and frame and previous
+> frame appear identical and abort if that's the case, if we don't do that
+> already.
 
-No other syscalls are required - this sequence will do everything you
-need to perform DMA on pages mapped into userspace:
+The case that actually worries me is not the "end up looping for ever"
+case, but the effects of having the stack change while the unwinder is
+reading from it - for example:
 
-	get_user_pages()
-	convert array of struct page * to scatterlist
-	dma_map_sg()
-	perform DMA
-	dma_unmap_sg()
-	for each page in sg()
-		page_cache_release(page);
+                /* pop R4-R15 according to mask */
+                load_sp = mask & (1 << (13 - 4));
+                while (mask) {
+                        if (mask & 1)
+                                ctrl->vrs[reg] = *vsp++;
+                        mask >>= 1;
+                        reg++;
+                }
 
-If you get the list of pages some other way (eg, via shmem_read_mapping_page_gfp)
-then additional maintanence may be required (though that may be a bug in
-shmem - remember this stuff hasn't been well tested on ARM before.)
+Remember that for a running thread, the stack will be changing all the
+time while another CPU tries to read it to do the unwind, and also
+remember that the bottom of stack isn't really known.  All you have is
+the snapshot of the registers when the thread was last stopped by the
+scheduler, and that state probably isn't valid.
+
+So what you're asking is for the unwinder to produce a backtrace from
+a kernel stack which is possibly changing beneath it from an unknown
+current state.
+
+This doesn't sound like a particularly bright thing to be doing...
