@@ -1,21 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 09:50:43 -0700
-Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
-In-Reply-To: <1349675983-23803-2-git-send-email-kishon@ti.com>
-References: <1349675983-23803-1-git-send-email-kishon@ti.com>
- <1349675983-23803-2-git-send-email-kishon@ti.com>
-Message-ID: <20121016165043.GS15569@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Oct 2012 17:53:02 +0100
+Subject: [PATCH 1/4] arm64: Select MODULES_USE_ELF_RELA
+In-Reply-To: <1350406000-30882-2-git-send-email-catalin.marinas@arm.com>
+References: <1350406000-30882-1-git-send-email-catalin.marinas@arm.com>
+ <1350406000-30882-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20121016165302.GJ23979@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [121007 23:01]:
-> ocp2scp was not having pdata support which makes *musb* fail for non-dt
-> boot in OMAP platform. The pdata will have information about the devices
-> that is connected to ocp2scp. ocp2scp driver will now make use of this
-> information to create the devices that is attached to ocp2scp.
+On Tue, Oct 16, 2012 at 05:46:37PM +0100, Catalin Marinas wrote:
+> With commit 786d35d4 (make most arch asm/module.h files use
+> asm-generic/module.h) arm64 needs to enable MODULES_USE_ELF_RELA for
+> loadable modules.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7ff68c9..ef54a59 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -22,6 +22,7 @@ config ARM64
+>  	select HAVE_PERF_EVENTS
+>  	select HAVE_SPARSE_IRQ
+>  	select IRQ_DOMAIN
+> +	select MODULES_USE_ELF_RELA
+>  	select NO_BOOTMEM
+>  	select OF
+>  	select OF_EARLY_FLATTREE
 
-This fixes the regression on my panda es for musb port:
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Will
