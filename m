@@ -1,108 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 15 Oct 2012 17:11:08 -0700
-Subject: [PATCH 08/16] ARM: OMAP2: Move plat/menelaus.h to
- linux/mfd/menelaus.h
-In-Reply-To: <20121004220451.26676.62349.stgit@muffinssi.local>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <20121004220451.26676.62349.stgit@muffinssi.local>
-Message-ID: <20121016001107.GI15569@atomide.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 16 Oct 2012 11:18:15 +1100
+Subject: [PATCH RFC 01/11 v4] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <1350343887-7344-2-git-send-email-stigge@antcom.de>
+References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
+ <1350343887-7344-2-git-send-email-stigge@antcom.de>
+Message-ID: <507CA7C7.6060405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121004 15:09]:
-> We can move menelaus.h to live with other mfd headers to
-> get it out of plat for ARM common zImage support.
+On 16/10/12 10:31, Roland Stigge wrote:
+> The recurring task of providing simultaneous access to GPIO lines (especially
+> for bit banging protocols) needs an appropriate API.
 > 
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Samuel, want to ack this one if this looks OK to you?
-
-I'm planning apply this into omap-for-v3.8/cleanup-headers-menelaus
-branch that you can pull in too if needed.
-
-Regards,
-
-Tony
-
+> This patch adds a kernel internal "Block GPIO" API that enables simultaneous
+> access to several GPIOs. This is done by abstracting GPIOs to an n-bit word:
+> Once requested, it provides access to a group of GPIOs which can range over
+> multiple GPIO chips.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 > ---
->  arch/arm/mach-omap2/board-h4.c             |    2 +-
->  arch/arm/mach-omap2/board-n8x0.c           |    2 +-
->  drivers/mfd/menelaus.c                     |    2 +-
->  include/linux/mfd/menelaus.h               |    2 --
->  4 files changed, 3 insertions(+), 5 deletions(-)
->  rename arch/arm/plat-omap/include/plat/menelaus.h => include/linux/mfd/menelaus.h (96%)
-> 
-> diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
-> index 8d04bf8..3977a02 100644
-> --- a/arch/arm/mach-omap2/board-h4.c
-> +++ b/arch/arm/mach-omap2/board-h4.c
-> @@ -26,12 +26,12 @@
->  #include <linux/clk.h>
->  #include <linux/io.h>
->  #include <linux/input/matrix_keypad.h>
-> +#include <linux/mfd/menelaus.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  
-> -#include <plat/menelaus.h>
->  #include <plat/dma.h>
->  #include <plat/gpmc.h>
->  #include "debug-devices.h"
-> diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
-> index d95f727..e3e8325 100644
-> --- a/arch/arm/mach-omap2/board-n8x0.c
-> +++ b/arch/arm/mach-omap2/board-n8x0.c
-> @@ -22,13 +22,13 @@
->  #include <linux/usb/musb.h>
->  #include <linux/platform_data/spi-omap2-mcspi.h>
->  #include <linux/platform_data/mtd-onenand-omap2.h>
-> +#include <linux/mfd/menelaus.h>
->  #include <sound/tlv320aic3x.h>
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
->  
->  #include "common.h"
-> -#include <plat/menelaus.h>
->  #include <plat/mmc.h>
->  
->  #include "mux.h"
-> diff --git a/drivers/mfd/menelaus.c b/drivers/mfd/menelaus.c
-> index 55d5899..998ce8c 100644
-> --- a/drivers/mfd/menelaus.c
-> +++ b/drivers/mfd/menelaus.c
-> @@ -41,11 +41,11 @@
->  #include <linux/rtc.h>
->  #include <linux/bcd.h>
->  #include <linux/slab.h>
-> +#include <linux/mfd/menelaus.h>
->  
->  #include <asm/mach/irq.h>
->  
->  #include <asm/gpio.h>
-> -#include <plat/menelaus.h>
->  
->  #define DRIVER_NAME			"menelaus"
->  
-> diff --git a/arch/arm/plat-omap/include/plat/menelaus.h b/include/linux/mfd/menelaus.h
-> similarity index 96%
-> rename from arch/arm/plat-omap/include/plat/menelaus.h
-> rename to include/linux/mfd/menelaus.h
-> index 4a970ec..f097e89 100644
-> --- a/arch/arm/plat-omap/include/plat/menelaus.h
-> +++ b/include/linux/mfd/menelaus.h
-> @@ -1,6 +1,4 @@
->  /*
-> - * arch/arm/plat-omap/include/mach/menelaus.h
-> - *
->   * Functions to access Menelaus power management chip
->   */
->  
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+<snip>
+
+> +This creates a new block of GPIOs as a list of GPIO numbers with the specified
+> +size which are accessible via the returned struct gpio_block and the accessor
+> +functions described below. Please note that you need to request the GPIOs
+> +separately via gpio_request(). An arbitrary list of globally valid GPIOs can be
+> +specified, even ranging over several gpio_chips. Actual handling of I/O
+> +operations will be done on a best effort base, i.e. simultaneous I/O only where
+> +possible by hardware and implemented in the respective GPIO driver. The number
+> +of GPIOs in one block is limited to 32 on a 32 bit system, and 64 on a 64 bit
+> +system. However, several blocks can be defined at once.
+
+This should probably say that the number of gpios in a block is limited
+to sizeof(unsigned long) or BITS_PER_LONG. I think sizeof(unsigned long)
+== 8 on some 32 bit architectures.
+
+~Ryan
