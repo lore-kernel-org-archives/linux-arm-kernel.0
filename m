@@ -1,51 +1,127 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 16 Oct 2012 10:15:52 +0800
-Subject: [PATCH 1/2] ARM: config: sort select statements alphanumerically
-In-Reply-To: <20121012150945.GB30339@atomide.com>
-References: <20121012132553.GK28061@n2100.arm.linux.org.uk>
- <E1TMfFr-0001Kt-W5@rmk-PC.arm.linux.org.uk>
- <CACRpkdba1q52bEDcWsd47QwXA-DNhq6PENf2M-tvZ6znYu+5yw@mail.gmail.com>
- <20121012144119.GM28061@n2100.arm.linux.org.uk>
- <20121012150945.GB30339@atomide.com>
-Message-ID: <CAMPhdO_dhRo=DjUQ79sM_+rj1GVkdBeE4vnFhqfCmg-dwy-mWw@mail.gmail.com>
+From: lliubbo@gmail.com (Bob Liu)
+Date: Tue, 16 Oct 2012 10:17:24 +0800
+Subject: dma_alloc_coherent fails in framebuffer
+In-Reply-To: <1350325704.31162.16.camel@gitbox>
+References: <1350192523.10946.4.camel@gitbox> <1350246895.11504.6.camel@gitbox>
+ <20121015094547.GC29125@suse.de> <1350325704.31162.16.camel@gitbox>
+Message-ID: <CAA_GA1cPE+m8N1LQA2iOym4jbFwcHG+K2p-3iBovPWuf1N1q+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 12, 2012 at 11:09 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121012 07:44]:
->> On Fri, Oct 12, 2012 at 04:04:28PM +0200, Linus Walleij wrote:
->> > On Fri, Oct 12, 2012 at 3:26 PM, Russell King
->> > <rmk+kernel@arm.linux.org.uk> wrote:
+On Tue, Oct 16, 2012 at 2:28 AM, Tony Prisk <linux@prisktech.co.nz> wrote:
+> On Mon, 2012-10-15 at 10:45 +0100, Mel Gorman wrote:
+>> On Mon, Oct 15, 2012 at 09:34:55AM +1300, Tony Prisk wrote:
+>> > On Sun, 2012-10-14 at 18:28 +1300, Tony Prisk wrote:
+>> > > Up until 07 Oct, drivers/video/wm8505-fb.c was working fine, but on the
+>> > > 11 Oct when I did another pull from linus all of a sudden
+>> > > dma_alloc_coherent is failing to allocate the framebuffer any longer.
+>> > >
+>> > > I did a quick look back and found this:
+>> > >
+>> > > ARM: add coherent dma ops
+>> > >
+>> > > arch_is_coherent is problematic as it is a global symbol. This
+>> > > doesn't work for multi-platform kernels or platforms which can support
+>> > > per device coherent DMA.
+>> > >
+>> > > This adds arm_coherent_dma_ops to be used for devices which connected
+>> > > coherently (i.e. to the ACP port on Cortex-A9 or A15). The arm_dma_ops
+>> > > are modified at boot when arch_is_coherent is true.
+>> > >
+>> > > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> > > Cc: Russell King <linux@arm.linux.org.uk>
+>> > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> > >
+>> > >
+>> > > This is the only patch lately that I could find (not that I would claim
+>> > > to be any good at finding things) that is related to the problem. Could
+>> > > it have caused the allocations to fail?
+>> > >
+>> > > Regards
+>> > > Tony P
 >> >
->> > > As suggested by Andrew Morton:
->> > >
->> > >   This is a pet peeve of mine.  Any time there's a long list of items
->> > >   (header file inclusions, kconfig entries, array initalisers, etc) and
->> > >   someone wants to add a new item, they *always* go and stick it at the
->> > >   end of the list.
->> > >
->> > >   Guys, don't do this.  Either put the new item into a randomly-chosen
->> > >   position or, probably better, alphanumerically sort the list.
->> > >
->> > > lets sort all our select statements alphanumerically.  This commit was
->> > > created by the following perl:
+>> > Have done a bit more digging and found the cause - not Rob's patch so
+>> > apologies.
 >> >
->> > I applied this and tried to configure the Nomadik defconfig,
->> > and I get this, sadly:
+>> > The cause of the regression is this patch:
+>> >
+>> > From f40d1e42bb988d2a26e8e111ea4c4c7bac819b7e Mon Sep 17 00:00:00 2001
+>> > From: Mel Gorman <mgorman@suse.de>
+>> > Date: Mon, 8 Oct 2012 16:32:36 -0700
+>> > Subject: [PATCH 2/3] mm: compaction: acquire the zone->lock as late as
+>> >  possible
+>> >
+>> > Up until then, the framebuffer allocation with dma_alloc_coherent(...)
+>> > was fine. From this patch onwards, allocations fail.
+>> >
 >>
->> Yes, I've just fixed those.  Unfortunately, the patch is soo large that
->> it trips the mailing list size limit, and has to be manually approved,
->> so I'm not sure I can call on the list maintainers again today to do the
->> approval thing.
+>> Was this found through bisection or some other means?
+>>
+>> There was a bug in that series that broke CMA but it was commit bb13ffeb
+>> (mm: compaction: cache if a pageblock was scanned and no pages were
+>> isolated) and it was fixed by 62726059 (mm: compaction: fix bit ranges
+>> in {get,clear,set}_pageblock_skip()). So it should have been fixed by
+>> 3.7-rc1 and probably was included by the time you pulled in October 11th
+>> but bisection would be a pain. There were problems with that series during
+>> development but tests were completing for other people.
+>>
+>> Just in case, is this still broken in 3.7-rc1?
 >
-> After applying these two patches and manually running:
+> Still broken. Although the printk's might have cleared it up a bit.
+>>
+>> > I don't know how this patch would effect CMA allocations, but it seems
+>> > to be causing the issue (or at least, it's caused an error in
+>> > arch-vt8500 to become visible).
+>> >
+>> > Perhaps someone who understand -mm could explain the best way to
+>> > troubleshoot the cause of this problem?
+>> >
+>>
+>> If you are comfortable with ftrace, it can be used to narrow down where
+>> the exact failure is occurring but if you're not comfortable with that
+>> then the easiest is a bunch of printks starting in alloc_contig_range()
+>> to see at what point and why it returns failure.
+>>
+>> It's not obvious at the moment why that patch would cause an allocation
+>> problem. It's the type of patch that if it was wrong it would fail every
+>> time for everyone, not just for a single driver.
+>>
 >
-> $ git checkout-index -f arch/arm/mach-pxa/Kconfig
-> $ git checkout-index -f arch/arm/mach-footbridge/Kconfig
+> I added some printk's to see what was happening.
+>
+> from arch/arm/mm/dma-mapping.c: arm_dma_alloc(..) it calls out to:
+> dma_alloc_from_coherent().
+>
+> This returns 0, because:
+> mem = dev->dma_mem
+> if (!mem) return 0;
+>
+> and then arm_dma_alloc() falls back on __dma_alloc(..)
+>
+>
+> I suspect the reason this fault is a bit 'weird' is because its
+> effectively not using alloc_from_coherent at all, but falling back on
+> __dma_alloc all the time, and sometimes it fails.
+>
 
-Tony, why pxa and footbridge here?
+I think you need to declare that memory using
+dma_declare_coherent_memory() before
+alloc_from_coherent.
 
+> Why it caused a problem on that particular commit I don't know - but it
+> was reproducible by adding/removing it.
 >
-> It builds just fine for omaps, so for omaps:
 >
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> Regards
+> Tony P
+>
+> --
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org.  For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+
+-- 
+Regards,
+--Bob
