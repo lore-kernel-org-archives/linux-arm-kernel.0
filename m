@@ -1,21 +1,90 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 16 Oct 2012 11:30:08 -0600
-Subject: [PATCH 0/2] ARM: tegra: bring back tegra_timer clock
-In-Reply-To: <1350382116-18024-1-git-send-email-sivaramn@nvidia.com>
-References: <1350382116-18024-1-git-send-email-sivaramn@nvidia.com>
-Message-ID: <507D99A0.1030701@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 16 Oct 2012 18:36:39 +0100
+Subject: [PATCH] ARM: smp: switch away from the idmap before updating
+ init_mm.mm_count
+Message-ID: <1350408999-15317-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2012 04:08 AM, Sivaram Nair wrote:
-> This patchset fixes a bug introduced by commit
-> 20f4665831cec65d6e5d33587bba28ffa536b91d by bringing back the
-> tegra_timer clock.  The above commit caused tegra_init_timer() failing
-> to get the clk reference.
-> 
-> The first patch renames the existing tegra_timer object to
-> tegra_sys_timer and the second patch adds previously-removed tegra_timer
-> clock object.
+When booting a secondary CPU, the primary CPU hands two sets of page
+tables via the secondary_data struct:
 
-Thanks. The series applied to Tegra's for-3.7/fixes-for-rc2 branch.
-Sorry for the regression.
+	(1) swapper_pg_dir: a normal, cacheable, shared (if SMP) mapping
+	    of the kernel image (i.e. the tables used by init_mm).
+
+	(2) idmap_pgd: an uncached mapping of the .idmap.text ELF
+	    section.
+
+The idmap is generally used when enabling and disabling the MMU, which
+includes early CPU boot. In this case, the secondary CPU switches to
+swapper as soon as it enters C code:
+
+	struct mm_struct *mm = &init_mm;
+	unsigned int cpu = smp_processor_id();
+
+	/*
+	 * All kernel threads share the same mm context; grab a
+	 * reference and switch to it.
+	 */
+	atomic_inc(&mm->mm_count);
+	current->active_mm = mm;
+	cpumask_set_cpu(cpu, mm_cpumask(mm));
+	cpu_switch_mm(mm->pgd, mm);
+
+This causes a problem on ARMv7, where the identity mapping is treated as
+strongly-ordered leading to architecturally UNPREDICTABLE behaviour of
+exclusive accesses, such as those used by atomic_inc.
+
+This patch re-orders the secondary_start_kernel function so that we
+switch to swapper before performing any exclusive accesses.
+
+Cc: David McKay <david.mckay@st.com>
+Reported-by: Gilles Chanteperdrix <gilles.chanteperdrix@xenomai.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+The only potentially viable alternative to this patch that I can think
+of is using swapper instead of idmap_pgd when VA == PA. However, that
+has the unpleasant side-effect of making the identity mapping cacheable,
+which I'm not comfortable with for things like CPU suspend.
+
+Will
+
+ arch/arm/kernel/smp.c |   14 ++++++++++----
+ 1 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 8e20754d..fbc8b26 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -294,18 +294,24 @@ static void percpu_timer_setup(void);
+ asmlinkage void __cpuinit secondary_start_kernel(void)
+ {
+ 	struct mm_struct *mm = &init_mm;
+-	unsigned int cpu = smp_processor_id();
++	unsigned int cpu;
++
++	/*
++	 * The identity mapping is uncached (strongly ordered), so
++	 * switch away from it before attempting any exclusive accesses.
++	 */
++	cpu_switch_mm(mm->pgd, mm);
++	enter_lazy_tlb(mm, current);
++	local_flush_tlb_all();
+ 
+ 	/*
+ 	 * All kernel threads share the same mm context; grab a
+ 	 * reference and switch to it.
+ 	 */
++	cpu = smp_processor_id();
+ 	atomic_inc(&mm->mm_count);
+ 	current->active_mm = mm;
+ 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+-	cpu_switch_mm(mm->pgd, mm);
+-	enter_lazy_tlb(mm, current);
+-	local_flush_tlb_all();
+ 
+ 	printk("CPU%u: Booted secondary processor\n", cpu);
+ 
+-- 
+1.7.4.1
