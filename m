@@ -1,26 +1,55 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Tue, 16 Oct 2012 08:52:03 -0400
-Subject: [PATCH] mm: compaction: Correct the nr_strict_isolated check
- for CMA
-In-Reply-To: <20121016083927.GG29125@suse.de>
-References: <20121016083927.GG29125@suse.de>
-Message-ID: <507D5873.6010106@redhat.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Tue, 16 Oct 2012 14:53:45 +0200
+Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <20121015235720.GA3132@kroah.com>
+References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
+ <1350343887-7344-3-git-send-email-stigge@antcom.de>
+ <20121015235720.GA3132@kroah.com>
+Message-ID: <507D58D9.2040607@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2012 04:39 AM, Mel Gorman wrote:
-> Thierry reported that the "iron out" patch for isolate_freepages_block()
-> had problems due to the strict check being too strict with "mm: compaction:
-> Iron out isolate_freepages_block() and isolate_freepages_range() -fix1".
-> It's possible that more pages than necessary are isolated but the check
-> still fails and I missed that this fix was not picked up before RC1. This
-> same problem has been identified in 3.7-RC1 by Tony Prisk and should be
-> addressed by the following patch.
->
-> Signed-off-by: Mel Gorman <mgorman@suse.de>
-> Tested-by: Tony Prisk <linux@prisktech.co.nz>
+On 10/16/2012 01:57 AM, Greg KH wrote:
+> On Tue, Oct 16, 2012 at 01:31:18AM +0200, Roland Stigge wrote:
+>> +int gpio_block_export(struct gpio_block *block)
+>> +{
+>> +	int		status;
+>> +	struct device	*dev;
+>> +
+>> +	/* can't export until sysfs is available ... */
+>> +	if (!gpio_class.p) {
+>> +		pr_debug("%s: called too early!\n", __func__);
+>> +		return -ENOENT;
+>> +	}
+>> +
+>> +	mutex_lock(&sysfs_lock);
+>> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
+>> +			    block->name);
+>> +	if (!IS_ERR(dev))
+>> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
+>> +	else
+>> +		status = PTR_ERR(dev);
+>> +	mutex_unlock(&sysfs_lock);
+> 
+> You just raced with userspace telling it that the device was present,
+> yet the attributes are not there.  Don't do that, use the default class
+> attributes for the class and then the driver core will create them
+> automagically without needing to this "by hand" at all.
 
-Acked-by: Rik van Riel <riel@redhat.com>
+I guess you mean class attributes like gpio_class_attrs[] of gpio_class?
+Aren't class attributes specific to a class only (i.e. only one
+attribute at the root for all devices)? What I needed above are
+attributes for the block itself (of which there can be several). So we
+need device attributes for each block, not class attributes here.
 
--- 
-All rights reversed
+Maybe there's some other kind of locking/atomicity available for this task?
+
+Further, current gpio and gpiochip devices are also doing this way:
+creating the device and subsequently their attrs, even though there may
+be a better way but I'm still wondering how this would be.
+
+Any hint appreciated.
+
+Thanks in advance,
+
+Roland
