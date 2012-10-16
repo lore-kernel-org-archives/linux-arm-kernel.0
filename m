@@ -1,19 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 10:58:17 -0700
-Subject: [PATCH] OMAP4: devices: fixup OMAP4 DMIC platform device error
- message
-In-Reply-To: <1350401440-9620-1-git-send-email-s-guiriec@ti.com>
-References: <1350401440-9620-1-git-send-email-s-guiriec@ti.com>
-Message-ID: <20121016175817.GY15569@atomide.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 16 Oct 2012 20:57:24 +0300
+Subject: [PATCH] ARM: kexec: fix segment memory addresses check
+Message-ID: <1350410244-12240-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastien Guiriec <s-guiriec@ti.com> [121016 08:32]:
-> Correct DMIC hwmod lockup error message and replace printk() by
-> pr_err().
+Commit c564df4db85aac8d1d65a56176a0a25f46138064 (ARM: 7540/1: kexec:
+Check segment memory addresses) added a safety check with accidentally
+reversed condition, and broke kexec functionality on ARM. Fix this.
 
-Thanks applying into omap-for-v3.7-rc1/fixes-part2.
+Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+---
+ arch/arm/kernel/machine_kexec.c |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index e29c333..8ef8c93 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -45,10 +45,9 @@ int machine_kexec_prepare(struct kimage *image)
+ 	for (i = 0; i < image->nr_segments; i++) {
+ 		current_segment = &image->segment[i];
+ 
+-		err = memblock_is_region_memory(current_segment->mem,
+-						current_segment->memsz);
+-		if (err)
+-			return - EINVAL;
++		if (!memblock_is_region_memory(current_segment->mem,
++					       current_segment->memsz))
++			return -EINVAL;
+ 
+ 		err = get_user(header, (__be32*)current_segment->buf);
+ 		if (err)
+-- 
+1.7.2.5
