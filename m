@@ -1,86 +1,111 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 16 Oct 2012 22:41:33 +0200
-Subject: [PATCH 2/4] ARM: kirkwood: DT board setup for Network Space v2
- and parents
-In-Reply-To: <507C6AE4.1020406@gmail.com>
-References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
- <1350315295-14567-3-git-send-email-simon.guinot@sequanux.org>
- <507C6AE4.1020406@gmail.com>
-Message-ID: <20121016204133.GF28384@kw.sim.vm.gnt>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 16 Oct 2012 15:58:53 -0500
+Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
+In-Reply-To: <20121016174835.GV15569@atomide.com>
+References: <cover.1350327320.git.richardcochran@gmail.com>
+ <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
+ <20121016174835.GV15569@atomide.com>
+Message-ID: <507DCA8D.7060309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 02:58:28PM -0500, Rob Herring wrote:
-> On 10/15/2012 10:34 AM, Simon Guinot wrote:
-> > This patch adds DT board setup for LaCie Network Space v2 and parents,
-> > based on the Marvell Kirkwood 6281 SoC. This includes Network Space v2
-> > (Max) and Internet Space v2.
-> > 
-> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > ---
-> >  arch/arm/boot/dts/Makefile                 |    3 +
-> >  arch/arm/boot/dts/kirkwood-is2.dts         |   30 ++++++++++
-> >  arch/arm/boot/dts/kirkwood-ns2-common.dtsi |   63 +++++++++++++++++++++
-> >  arch/arm/boot/dts/kirkwood-ns2.dts         |   30 ++++++++++
-> >  arch/arm/boot/dts/kirkwood-ns2max.dts      |   49 ++++++++++++++++
-> >  arch/arm/mach-kirkwood/Kconfig             |   21 +++++++
-> >  arch/arm/mach-kirkwood/Makefile            |    3 +
-> >  arch/arm/mach-kirkwood/board-dt.c          |    8 +++
-> >  arch/arm/mach-kirkwood/board-ns2.c         |   83 ++++++++++++++++++++++++++++
-> >  arch/arm/mach-kirkwood/common.h            |    8 +++
-> >  drivers/leds/Kconfig                       |    4 +-
-> >  11 files changed, 301 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-is2.dts
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-ns2-common.dtsi
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-ns2.dts
-> >  create mode 100644 arch/arm/boot/dts/kirkwood-ns2max.dts
-> >  create mode 100644 arch/arm/mach-kirkwood/board-ns2.c
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index c1ce813..e6201b6 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -34,9 +34,12 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
-> >  	kirkwood-ib62x0.dtb \
-> >  	kirkwood-iconnect.dtb \
-> >  	kirkwood-iomega_ix2_200.dtb \
-> > +	kirkwood-is2.dtb \
-> >  	kirkwood-km_kirkwood.dtb \
-> >  	kirkwood-lschlv2.dtb \
-> >  	kirkwood-lsxhl.dtb \
-> > +	kirkwood-ns2.dtb \
-> > +	kirkwood-ns2max.dtb \
-> >  	kirkwood-ts219-6281.dtb \
-> >  	kirkwood-ts219-6282.dtb
-> >  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
-> > diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
-> > new file mode 100644
-> > index 0000000..7bc4677
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/kirkwood-is2.dts
-> > @@ -0,0 +1,30 @@
-> > +/dts-v1/;
-> > +
-> > +/include/ "kirkwood-ns2-common.dtsi"
-> > +
-> > +/ {
-> > +	model = "LaCie Internet Space v2";
-> > +	compatible = "lacie,inetspace_v2", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+Hi Tony,
+
+On 10/16/2012 12:48 PM, Tony Lindgren wrote:
+> * Richard Cochran <richardcochran@gmail.com> [121015 12:18]:
+>> From: hvaibhav at ti.com <hvaibhav@ti.com>
+>>
+>> With recent changes in omap gpmc driver code, in case of DT
+>> boot mode, where bootloader does not configure gpmc cs space
+>> will result into kernel BUG() inside gpmc_mem_init() function,
+>> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
+>> gpmc_config7[0].baseaddress is set to '0' on reset.
+>>
+>> This use-case is applicable for any board/EVM which doesn't have
+>> any peripheral connected to gpmc cs0, for example BeagleXM and
+>> BeagleBone, so DT boot mode fails.
+>>
+>> This patch adds of_have_populated_dt() check before creating
+>> device, so that for DT boot mode, gpmc probe will not be called
+>> which is expected behavior, as gpmc is not supported yet from DT.
 > 
-> Compatible strings must be documented.
+> I'm applying this one into omap-for-v3.7-rc1/fixes-part2.
+> 
+> Next time, please also cc linux-omap at vger.kernel.org for series
+> like this. I'm sure the people reading the omap list are interested
+> in these.
 
-Hi Rob,
+This patch appears to be masking an underlying issue. How about 
+something like the following ...
 
-I have sent a patch to document the compatible strings used with the
-Marvell Kirkwood SoCs. Do you also want me to document the compatible
-strings for the LaCie machines ? Looking at the devicetree/bindings/arm
-directory, it doesn't seems to be a common practice.
+Cheers
+Jon
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121016/0c50619b/attachment.sig>
+>From 753a4928bf6f7baa4c001bdca3d15a85e999db4c Mon Sep 17 00:00:00 2001
+From: Jon Hunter <jon-hunter@ti.com>
+Date: Tue, 16 Oct 2012 15:22:58 -0500
+Subject: [PATCH] ARM: OMAP2+: Allow kernel to boot even if GPMC fails to
+ reserve memory
+
+Currently, if the GPMC driver fails to reserve memory when probed we will
+call BUG() and the kernel will not boot. Instead of calling BUG(), return
+an error from probe and allow kernel to boot.
+
+Tested on AM335x beagle bone board.
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/gpmc.c |   18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 5ac5cf3..8f0d3c8 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -868,9 +868,9 @@ static void __devexit gpmc_mem_exit(void)
+ 
+ }
+ 
+-static void __devinit gpmc_mem_init(void)
++static int __devinit gpmc_mem_init(void)
+ {
+-	int cs;
++	int cs, rc;
+ 	unsigned long boot_rom_space = 0;
+ 
+ 	/* never allocate the first page, to facilitate bug detection;
+@@ -890,13 +890,17 @@ static void __devinit gpmc_mem_init(void)
+ 		if (!gpmc_cs_mem_enabled(cs))
+ 			continue;
+ 		gpmc_cs_get_memconf(cs, &base, &size);
+-		if (gpmc_cs_insert_mem(cs, base, size) < 0)
+-			BUG();
++		rc = gpmc_cs_insert_mem(cs, base, size);
++		if (IS_ERR_VALUE(rc))
++			return rc;
+ 	}
++
++	return 0;
+ }
+ 
+ static __devinit int gpmc_probe(struct platform_device *pdev)
+ {
++	int rc;
+ 	u32 l;
+ 	struct resource *res;
+ 
+@@ -936,7 +940,11 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
+ 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
+ 		 GPMC_REVISION_MINOR(l));
+ 
+-	gpmc_mem_init();
++	rc = gpmc_mem_init();
++	if (IS_ERR_VALUE(rc)) {
++		dev_err(gpmc_dev, "failed to reserve memory\n");
++		return rc;
++	}
+ 
+ 	if (IS_ERR_VALUE(gpmc_setup_irq()))
+ 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
+-- 
+1.7.9.5
