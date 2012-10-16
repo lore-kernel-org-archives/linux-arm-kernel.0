@@ -1,87 +1,61 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Tue, 16 Oct 2012 16:33:55 +0000
-Subject: [PATCH V2 0/7] support the cpts found on am335x devices
-In-Reply-To: <cover.1350329726.git.richardcochran@gmail.com>
-References: <cover.1350329726.git.richardcochran@gmail.com>
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293E9F82F0@DBDE01.ent.ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 16 Oct 2012 09:43:26 -0700
+Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <507D58D9.2040607@antcom.de>
+References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
+ <1350343887-7344-3-git-send-email-stigge@antcom.de>
+ <20121015235720.GA3132@kroah.com> <507D58D9.2040607@antcom.de>
+Message-ID: <20121016164326.GA4858@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Richard Cochran [mailto:richardcochran at gmail.com]
-> Sent: Tuesday, October 16, 2012 1:18 AM
-> To: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; David Miller; Chemparathy,
-> Cyril; N, Mugunthan V; Govindarajan, Sriramakrishnan
-> Subject: [PATCH V2 0/7] support the cpts found on am335x devices
+On Tue, Oct 16, 2012 at 02:53:45PM +0200, Roland Stigge wrote:
+> On 10/16/2012 01:57 AM, Greg KH wrote:
+> > On Tue, Oct 16, 2012 at 01:31:18AM +0200, Roland Stigge wrote:
+> >> +int gpio_block_export(struct gpio_block *block)
+> >> +{
+> >> +	int		status;
+> >> +	struct device	*dev;
+> >> +
+> >> +	/* can't export until sysfs is available ... */
+> >> +	if (!gpio_class.p) {
+> >> +		pr_debug("%s: called too early!\n", __func__);
+> >> +		return -ENOENT;
+> >> +	}
+> >> +
+> >> +	mutex_lock(&sysfs_lock);
+> >> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
+> >> +			    block->name);
+> >> +	if (!IS_ERR(dev))
+> >> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
+> >> +	else
+> >> +		status = PTR_ERR(dev);
+> >> +	mutex_unlock(&sysfs_lock);
+> > 
+> > You just raced with userspace telling it that the device was present,
+> > yet the attributes are not there.  Don't do that, use the default class
+> > attributes for the class and then the driver core will create them
+> > automagically without needing to this "by hand" at all.
 > 
-> This patch series, based on linux-3.7-rc1 plus the fixes I posted
-> today, adds support for the Common Platform Time Sync (CPTS) found on
-> the popular BeagleBone. The code enables hardware time stamping and a
-> PTP Hardware Clock.
-> 
-> Changes in V2
->    - Now uses device tree
->    - Actually works with vanilla kernel
-> 
-> This work has been tested using the linuxptp PTP stack, and it seems
-> to be working quite well. One limitation of the hardware is that not
-> possible to adjust the clock frequency. Even without with this
-> capability, the driver will be still be useful for 802.1AS
-> applications, since they typically use a free running clock.
-> 
-> There is one open issue with this driver which will hopefully soon be
-> resolved. Time stamping only works on UDP packets. Although Layer 2 is
-> supposed to work according to the TRM, I have not yet figured out
-> how. The UDP only works when setting an undocumented bit, so maybe
-> someone from TI can fill me in on this.
-> 
-> Thanks,
-> Richard
-> 
-> 
-> Richard Cochran (7):
->   cpsw: rename register banks to match the reference manual
->   cpsw: add missing fields to the CPSW_SS register bank.
->   cpsw: correct the CPSW_PORT register bank declaration
->   cpsw: add a common header file for regsiter declarations
->   cpts: introduce time stamping code and a PTP hardware clock.
->   cpsw: add a DT field for the cpts offset
->   cpsw: use the time stamping capabilities of the cpts
-> 
->  Documentation/devicetree/bindings/net/cpsw.txt |   11 +-
->  arch/arm/boot/dts/am33xx.dtsi                  |    5 +-
->  drivers/net/ethernet/ti/Kconfig                |    8 +
->  drivers/net/ethernet/ti/Makefile               |    2 +-
->  drivers/net/ethernet/ti/cpsw.c                 |   84 ++++-
->  drivers/net/ethernet/ti/cpsw_reg.h             |   81 ++++
->  drivers/net/ethernet/ti/cpts.c                 |  468
-> ++++++++++++++++++++++++
->  drivers/net/ethernet/ti/cpts.h                 |  148 ++++++++
->  include/linux/platform_data/cpsw.h             |    1 +
->  9 files changed, 788 insertions(+), 20 deletions(-)
->  create mode 100644 drivers/net/ethernet/ti/cpsw_reg.h
->  create mode 100644 drivers/net/ethernet/ti/cpts.c
->  create mode 100644 drivers/net/ethernet/ti/cpts.h
-> 
-> --
-> 1.7.2.5
+> I guess you mean class attributes like gpio_class_attrs[] of gpio_class?
 
-Richard
+Yes.
 
-I had seen some issues with the patch series.
+> Aren't class attributes specific to a class only (i.e. only one
+> attribute at the root for all devices)? What I needed above are
+> attributes for the block itself (of which there can be several). So we
+> need device attributes for each block, not class attributes here.
 
-* CPTS will hold only LSB 32 bits of 64 bit Timer and the upper 32 bit
-  time value has to be taken care by the software, but the time stamp
-  which is passed to skb or PTP clock consist of only 32 bit time value
-* CPTS interrupts should be utilized to service Half and Full roll over
-  events as it is non sync events with respect to get/set time and PTP
-  pkt Tx/Rx
-* CPTS Time which is obtained from hardware is not actually a nano
-  seconds as the CPTS ref clock is tied to 250MHz for AM335x.
-* CPSW register mapping done in this patch series removes the CPSW
-  driver support for previous version found in TI814x
-* CPSW Time stamping is done only for port 0 and port 1 is not done
+Yes, that is what the dev_attrs field in 'struct class' is for.
 
-Regards
-Mugunthan V N
+> Maybe there's some other kind of locking/atomicity available for this task?
+> 
+> Further, current gpio and gpiochip devices are also doing this way:
+> creating the device and subsequently their attrs, even though there may
+> be a better way but I'm still wondering how this would be.
+
+Then the existing code is broken and should be fixed to use dev_attrs.
+I guess it's time to audit the tree and find all places that get this
+wrong...
+
+greg k-h
