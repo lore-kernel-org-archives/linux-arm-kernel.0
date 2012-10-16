@@ -1,60 +1,35 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 16 Oct 2012 22:22:04 +0200
-Subject: [PATCH] ARM: mach-kirkwood: add documentation for device tree bindings
-In-Reply-To: <507C6AE4.1020406@gmail.com>
-References: <507C6AE4.1020406@gmail.com>
-Message-ID: <1350418924-6253-1-git-send-email-simon.guinot@sequanux.org>
+From: rabin@rab.in (Rabin Vincent)
+Date: Tue, 16 Oct 2012 22:29:12 +0200
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121015165756.GA11737@redhat.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+Message-ID: <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
----
- Documentation/devicetree/bindings/arm/kirkwood.txt |   37 ++++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/kirkwood.txt
+2012/10/15 Oleg Nesterov <oleg@redhat.com>:
+> On 10/14, Rabin Vincent wrote:
+>> Flush the cache so that the instructions written to the XOL area are
+>> visible.
+>>
+>> Signed-off-by: Rabin Vincent <rabin@rab.in>
+>> ---
+>>  kernel/events/uprobes.c |    1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+>> index ca000a9..8c52f93 100644
+>> --- a/kernel/events/uprobes.c
+>> +++ b/kernel/events/uprobes.c
+>> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+>>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
+>>       vaddr = kmap_atomic(area->page);
+>>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
+>> +     flush_dcache_page(area->page);
+>>       kunmap_atomic(vaddr);
+>
+> I agree... but why under kmap_atomic?
 
-diff --git a/Documentation/devicetree/bindings/arm/kirkwood.txt b/Documentation/devicetree/bindings/arm/kirkwood.txt
-new file mode 100644
-index 0000000..14fb6b9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/kirkwood.txt
-@@ -0,0 +1,37 @@
-+Marvell Kirkwood Platforms Device Tree Bindings
-+-----------------------------------------------
-+
-+Boards with a SoC of the Marvell Kirkwood family shall have the
-+following property:
-+Required root node property:
-+compatible: must contain "marvell,kirkwood"
-+
-+In addition, boards with a Kirkwood SoC 88F6192 shall have the
-+following property:
-+Required root node property:
-+compatible: must contain "marvell,kirkwood-88f6192"
-+
-+In addition, boards with a Kirkwood SoC 88F6281 shall have the
-+following property:
-+Required root node property:
-+compatible: must contain "marvell,kirkwood-88f6281"
-+
-+In addition, boards with a Kirkwood SoC 88F6702 shall have the
-+following property:
-+Required root node property:
-+compatible: must contain "marvell,kirkwood-88f6702"
-+
-+Board with a SoC of the Marvell Armada 300 family (Kirkwood compatible)
-+shall have the following property:
-+Required root node property:
-+compatible: must contain "marvell,armada300", "marvell,kirkwood"
-+
-+In addition, boards with an Armada 300 SoC 88F6282 shall have the
-+following property:
-+Required root node property:
-+compatible: must contain "marvell,armada300-88f6282"
-+
-+In addition, boards with an Armada 300 SoC 88F6283 shall have the
-+following property:
-+Required root node property:
-+compatible: must contain "marvell,armada300-88f6283"
--- 
-1.7.10
+No real reason; I'll move it to after the unmap.
