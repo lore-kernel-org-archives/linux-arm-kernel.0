@@ -1,30 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 16 Oct 2012 09:59:28 +0100
-Subject: [Linaro-mm-sig] [RFC 0/2] DMA-mapping & IOMMU - physically
- contiguous allocations
-In-Reply-To: <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
-References: <1350309832-18461-1-git-send-email-m.szyprowski@samsung.com>
- <CAAQKjZMYFNMEnb2ue2aR+6AEbOixnQFyggbXrThBCW5VOznePg@mail.gmail.com>
- <20121016090434.7d5e088152a3e0b0606903c8@nvidia.com>
-Message-ID: <20121016085928.GV21164@n2100.arm.linux.org.uk>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Tue, 16 Oct 2012 16:59:42 +0800
+Subject: [PATCH 2/2] ASoC: atmel-ssc: use module_platform_driver macro
+In-Reply-To: <20121016084947.GD12801@game.jcrosoft.org>
+References: <1350359819-2461-1-git-send-email-voice.shen@atmel.com>
+ <1350359819-2461-2-git-send-email-voice.shen@atmel.com>
+ <507D15C2.7000606@atmel.com> <20121016084947.GD12801@game.jcrosoft.org>
+Message-ID: <507D21FE.1050402@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 09:04:34AM +0300, Hiroshi Doyu wrote:
-> In addition to those contiguous/discontiguous page allocation, is
-> there any way to _import_ anonymous pages allocated by a process to be
-> used in dma-mapping API later?
-> 
-> I'm considering the following scenario, an user process allocates a
-> buffer by malloc() in advance, and then it asks some driver to convert
-> that buffer into IOMMU'able/DMA'able ones later. In this case, pages
-> are discouguous and even they may not be yet allocated at
-> malloc()/mmap().
+On 10/16/2012 16:49, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:07 Tue 16 Oct     , Nicolas Ferre wrote:
+>> On 10/16/2012 05:56 AM, Bo Shen :
+>>> This patch removes some code duplication by using module_platform_driver
+>>>
+>>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>>
+>> Very good simplification but...
+>>
+>>> ---
+>>>   drivers/misc/atmel-ssc.c |   18 ++++--------------
+>>>   1 file changed, 4 insertions(+), 14 deletions(-)
+>>>
+>>> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+>>> index 23dcb76..ac00f83 100644
+>>> --- a/drivers/misc/atmel-ssc.c
+>>> +++ b/drivers/misc/atmel-ssc.c
+>>> @@ -68,7 +68,7 @@ void ssc_free(struct ssc_device *ssc)
+>>>   }
+>>>   EXPORT_SYMBOL(ssc_free);
+>>>
+>>> -static int __init ssc_probe(struct platform_device *pdev)
+>>> +static int ssc_probe(struct platform_device *pdev)
+>>
+>> Here you remove the __init altogether, maybe converting to __devinit is
+>> the proper replacement for this? I do not know myself but if anybody knows?
+> yes __devinit is mandatory
 
-That situation is covered.  It's the streaming API you're wanting for that.
-dma_map_sg() - but you may need additional cache handling via
-flush_dcache_page() to ensure that your code is safe for all CPU cache
-architectures.
+I will add a small patch to fix this.
 
-Remember that pages allocated into userspace will be cacheable, so a cache
-flush is required before they can be DMA'd.  Hence the streaming API.
+Thanks.
+
+BRs,
+Bo Shen
+
+>
+> Best Regards,
+> J.
+>
