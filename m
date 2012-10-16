@@ -1,95 +1,41 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 16 Oct 2012 18:28:13 +0530
-Subject: [PATCH] i2c: omap: revert "i2c: omap: switch to threaded IRQ
- support"
-In-Reply-To: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
-Message-ID: <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 16 Oct 2012 13:02:39 +0000
+Subject: [PATCH 1/4] leds: leds-ns2: add device tree binding
+In-Reply-To: <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
+References: <1350315295-14567-1-git-send-email-simon.guinot@sequanux.org>
+ <1350315295-14567-2-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <201210161302.39302.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 7:21 AM, Paul Walmsley <paul@pwsan.com> wrote:
->
-> Commit 3b2f8f82dad7d1f79cdc8fc05bd1c94baf109bde ("i2c: omap: switch to
-> threaded IRQ support") causes communication with I2C devices to fail
-> after system suspend/resume on all OMAP3 devices:
->
-Could you tell me which  omap3 platform
+On Monday 15 October 2012, Simon Guinot wrote:
+> diff --git a/Documentation/devicetree/bindings/gpio/leds-ns2.txt b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+> new file mode 100644
+> index 0000000..1a84969
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+> @@ -0,0 +1,26 @@
+> +Binding for dual-GPIO LED found on Network Space v2 (and parents).
+> +
+> +Required properties:
+> +- compatible: "ns2-leds".
+> +
+> +Each LED is represented as a sub-node of the ns2-leds device.
+> +
+> +Required sub-node properties:
+> +- cmd-gpio: Command LED GPIO. See OF device-tree GPIO specification.
+> +- slow-gpio: Slow LED GPIO. See OF device-tree GPIO specification.
+> +
+> +Optional sub-node properties:
+> +- label: Name for this LED. If omitted, the label is taken from the node name.
+> +- linux,default-trigger: Trigger assigned to the LED.
 
-On Beagle Xm
-after
-mount /dev/mmcblk  /mmcfs
+Hi Simon,
 
+I'm not overly familiar with the LED subsystem, but isn't this something
+that could be done with the generic gpio-led driver?
 
-# mount /dev/mmcblk0p2 /mmcfs/
-[  412.480041] kjournald starting.  Commit interval 5 seconds
-[  412.490020] EXT3-fs (mmcblk0p2): using internal journal
-[  412.495605] EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
-#
+If not, is it possible to extend that driver in a way to make it possible
+and remove the leds-ns2 driver?
 
-
-# cd /mmcfs/
-#
-#
-# ls
-bin                   omap3_usb_prcm.sh     usb_prcm.sh
-dev                   omap3_usbhs_off.sh    usb_uhh_show.sh
-etc                   omap3_usbhs_on.sh     usb_uhh_tll.sh
-init                  proc                  usbhs_clk_disable.sh
-lib                   readmem.dat           usbhs_clk_enable.sh
-lost+found            root                  usbhs_set_sm.sh
-mnt                   sbin                  usbhs_show.sh
-modules               sys                   usr
-msc                   tmp                   var
-omap3_ehcidump.sh     usb_omap3.sh
-#
-#
-# echo mem > /sys/power/state
-[  464.785461] PM: Syncing filesystems ... done.
-[  464.791442] PM: Preparing system for mem sleep
-[  464.798034] Freezing user space processes ... (elapsed 0.02 seconds) done.
-[  464.827301] Freezing remaining freezable tasks ... (elapsed 0.02
-seconds) done.
-[  464.858703] PM: Entering mem sleep
-[  464.862304] Suspending console(s) (use no_console_suspend to debug)
-[  464.994415] PM: suspend of devices complete after 121.002 msecs
-[  464.998107] PM: late suspend of devices complete after 3.662 msecs
-[  465.003173] PM: noirq suspend of devices complete after 5.004 msecs
-[  465.003173] Disabling non-boot CPUs ...
-[  466.225585] Successfully put all powerdomains to target state
-[  466.228942] PM: noirq resume of devices complete after 3.051 msecs
-[  466.232421] PM: early resume of devices complete after 2.349 msecs
-[  467.492645] PM: resume of devices complete after 1260.131 msecs
-[  467.546936] PM: Finishing wakeup.
-[  467.550415] Restarting tasks ... done.
-#
-#
-# cat /debug/pm_debug/count | grep per_pwrdm
-per_pwrdm (ON),OFF:7,RET:0,INA:0,ON:8,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-per_clkdm->per_pwrdm (17)
-# echo mem > /sys/power/state
-[ 1492.225311] PM: Syncing filesystems ... done.
-[ 1492.232177] PM: Preparing system for mem sleep
-[ 1492.238830] Freezing user space processes ... (elapsed 0.02 seconds) done.
-[ 1492.268188] Freezing remaining freezable tasks ... (elapsed 0.02
-seconds) done.
-[ 1492.299804] PM: Entering mem sleep
-[ 1492.303375] Suspending console(s) (use no_console_suspend to debug)
-[ 1492.435333] PM: suspend of devices complete after 120.880 msecs
-[ 1492.439025] PM: late suspend of devices complete after 3.692 msecs
-[ 1492.444091] PM: noirq suspend of devices complete after 5.004 msecs
-[ 1492.444091] Disabling non-boot CPUs ...
-[ 1493.745544] Successfully put all powerdomains to target state
-[ 1493.748901] PM: noirq resume of devices complete after 3.051 msecs
-[ 1493.752319] PM: early resume of devices complete after 2.319 msecs
-[ 1494.794067] PM: resume of devices complete after 1041.625 msecs
-[ 1494.848388] PM: Finishing wakeup.
-[ 1494.851867] Restarting tasks ... done.
-#
-#
-# cat /debug/pm_debug/count | grep per_pwrdm
-per_pwrdm (ON),OFF:8,RET:0,INA:0,ON:9,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
-per_clkdm->per_pwrdm (17)
-#
-
-Anyways will retry with fs on mmc.
+	Arnd
