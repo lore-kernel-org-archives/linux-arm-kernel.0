@@ -1,55 +1,95 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Tue, 16 Oct 2012 14:53:45 +0200
-Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
-In-Reply-To: <20121015235720.GA3132@kroah.com>
-References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
- <1350343887-7344-3-git-send-email-stigge@antcom.de>
- <20121015235720.GA3132@kroah.com>
-Message-ID: <507D58D9.2040607@antcom.de>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Tue, 16 Oct 2012 18:28:13 +0530
+Subject: [PATCH] i2c: omap: revert "i2c: omap: switch to threaded IRQ
+ support"
+In-Reply-To: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+Message-ID: <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2012 01:57 AM, Greg KH wrote:
-> On Tue, Oct 16, 2012 at 01:31:18AM +0200, Roland Stigge wrote:
->> +int gpio_block_export(struct gpio_block *block)
->> +{
->> +	int		status;
->> +	struct device	*dev;
->> +
->> +	/* can't export until sysfs is available ... */
->> +	if (!gpio_class.p) {
->> +		pr_debug("%s: called too early!\n", __func__);
->> +		return -ENOENT;
->> +	}
->> +
->> +	mutex_lock(&sysfs_lock);
->> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
->> +			    block->name);
->> +	if (!IS_ERR(dev))
->> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
->> +	else
->> +		status = PTR_ERR(dev);
->> +	mutex_unlock(&sysfs_lock);
-> 
-> You just raced with userspace telling it that the device was present,
-> yet the attributes are not there.  Don't do that, use the default class
-> attributes for the class and then the driver core will create them
-> automagically without needing to this "by hand" at all.
+On Mon, Oct 15, 2012 at 7:21 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>
+> Commit 3b2f8f82dad7d1f79cdc8fc05bd1c94baf109bde ("i2c: omap: switch to
+> threaded IRQ support") causes communication with I2C devices to fail
+> after system suspend/resume on all OMAP3 devices:
+>
+Could you tell me which  omap3 platform
 
-I guess you mean class attributes like gpio_class_attrs[] of gpio_class?
-Aren't class attributes specific to a class only (i.e. only one
-attribute at the root for all devices)? What I needed above are
-attributes for the block itself (of which there can be several). So we
-need device attributes for each block, not class attributes here.
+On Beagle Xm
+after
+mount /dev/mmcblk  /mmcfs
 
-Maybe there's some other kind of locking/atomicity available for this task?
 
-Further, current gpio and gpiochip devices are also doing this way:
-creating the device and subsequently their attrs, even though there may
-be a better way but I'm still wondering how this would be.
+# mount /dev/mmcblk0p2 /mmcfs/
+[  412.480041] kjournald starting.  Commit interval 5 seconds
+[  412.490020] EXT3-fs (mmcblk0p2): using internal journal
+[  412.495605] EXT3-fs (mmcblk0p2): mounted filesystem with ordered data mode
+#
 
-Any hint appreciated.
 
-Thanks in advance,
+# cd /mmcfs/
+#
+#
+# ls
+bin                   omap3_usb_prcm.sh     usb_prcm.sh
+dev                   omap3_usbhs_off.sh    usb_uhh_show.sh
+etc                   omap3_usbhs_on.sh     usb_uhh_tll.sh
+init                  proc                  usbhs_clk_disable.sh
+lib                   readmem.dat           usbhs_clk_enable.sh
+lost+found            root                  usbhs_set_sm.sh
+mnt                   sbin                  usbhs_show.sh
+modules               sys                   usr
+msc                   tmp                   var
+omap3_ehcidump.sh     usb_omap3.sh
+#
+#
+# echo mem > /sys/power/state
+[  464.785461] PM: Syncing filesystems ... done.
+[  464.791442] PM: Preparing system for mem sleep
+[  464.798034] Freezing user space processes ... (elapsed 0.02 seconds) done.
+[  464.827301] Freezing remaining freezable tasks ... (elapsed 0.02
+seconds) done.
+[  464.858703] PM: Entering mem sleep
+[  464.862304] Suspending console(s) (use no_console_suspend to debug)
+[  464.994415] PM: suspend of devices complete after 121.002 msecs
+[  464.998107] PM: late suspend of devices complete after 3.662 msecs
+[  465.003173] PM: noirq suspend of devices complete after 5.004 msecs
+[  465.003173] Disabling non-boot CPUs ...
+[  466.225585] Successfully put all powerdomains to target state
+[  466.228942] PM: noirq resume of devices complete after 3.051 msecs
+[  466.232421] PM: early resume of devices complete after 2.349 msecs
+[  467.492645] PM: resume of devices complete after 1260.131 msecs
+[  467.546936] PM: Finishing wakeup.
+[  467.550415] Restarting tasks ... done.
+#
+#
+# cat /debug/pm_debug/count | grep per_pwrdm
+per_pwrdm (ON),OFF:7,RET:0,INA:0,ON:8,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+per_clkdm->per_pwrdm (17)
+# echo mem > /sys/power/state
+[ 1492.225311] PM: Syncing filesystems ... done.
+[ 1492.232177] PM: Preparing system for mem sleep
+[ 1492.238830] Freezing user space processes ... (elapsed 0.02 seconds) done.
+[ 1492.268188] Freezing remaining freezable tasks ... (elapsed 0.02
+seconds) done.
+[ 1492.299804] PM: Entering mem sleep
+[ 1492.303375] Suspending console(s) (use no_console_suspend to debug)
+[ 1492.435333] PM: suspend of devices complete after 120.880 msecs
+[ 1492.439025] PM: late suspend of devices complete after 3.692 msecs
+[ 1492.444091] PM: noirq suspend of devices complete after 5.004 msecs
+[ 1492.444091] Disabling non-boot CPUs ...
+[ 1493.745544] Successfully put all powerdomains to target state
+[ 1493.748901] PM: noirq resume of devices complete after 3.051 msecs
+[ 1493.752319] PM: early resume of devices complete after 2.319 msecs
+[ 1494.794067] PM: resume of devices complete after 1041.625 msecs
+[ 1494.848388] PM: Finishing wakeup.
+[ 1494.851867] Restarting tasks ... done.
+#
+#
+# cat /debug/pm_debug/count | grep per_pwrdm
+per_pwrdm (ON),OFF:8,RET:0,INA:0,ON:9,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0
+per_clkdm->per_pwrdm (17)
+#
 
-Roland
+Anyways will retry with fs on mmc.
