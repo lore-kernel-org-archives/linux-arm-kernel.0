@@ -1,36 +1,34 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Wed, 17 Oct 2012 19:02:11 +0200
-Subject: [PATCH 2/9] uprobes: check for single step support
-In-Reply-To: <20121017164059.GF11096@linux.vnet.ibm.com>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-2-git-send-email-rabin@rab.in>
- <20121017164059.GF11096@linux.vnet.ibm.com>
-Message-ID: <20121017170211.GA10864@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 17 Oct 2012 10:26:24 -0700
+Subject: [PATCH] ARM: U300: bump IRQs to offset 32
+In-Reply-To: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAOesGMjk_97+zhsQTczYLJ0ztL2vHxsGp5cNOef2ArBR=zTc5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17, Srikar Dronamraju wrote:
->
-> * Rabin Vincent <rabin@rab.in> [2012-10-14 21:23:06]:
->
-> >  void __weak arch_uprobe_enable_step(struct arch_uprobe *arch)
-> >  {
-> > -	user_enable_single_step(current);
-> > +	if (arch_has_single_step())
-> > +		user_enable_single_step(current);
-> >  }
-> >
-> >  void __weak arch_uprobe_disable_step(struct arch_uprobe *arch)
->
-> This change is fine. But I am wondering if should have a dummy
-> arch_uprobe_enable_step / arch_uprobe_disable_step in uprobes ARM.
+Hi,
 
-Or, better, we can kill it. We wertr going to do this anyway, we were
-waiting for powerpc port.
+On Wed, Oct 17, 2012 at 9:34 AM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
 
-Just I do not know how this change should be routed, it should update
-both x86/powerpc.
+[..]
+> -#define IRQ_U300_INTCON0_START         1
+> -#define IRQ_U300_INTCON1_START         33
+> +#define IRQ_U300_INTCON0_START         32
+> +#define IRQ_U300_INTCON1_START         64
+[...]
+> +#define IRQ_U300_IRQ0_EXT              32
+> +#define IRQ_U300_IRQ1_EXT              33
 
-Or do you think arch_uprobe_enable_step() still makes any sense?
+Since you're touching these lines anyway, it might be nice to just
+have them as a (base + offset) define instead (if you already had
+that, this patch would have been a three-liner).
 
-Oleg.
+But if you truly think this is the last time you're touching these
+lines to renumber them all, then:
+
+Acked-by: Olof Johansson <olof@lixom.net>
+
+
+-Olof
