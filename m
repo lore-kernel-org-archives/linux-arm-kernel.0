@@ -1,92 +1,44 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Oct 2012 14:41:42 -0000
-Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
- revert "i2c: omap: switch to threaded IRQ support")
-In-Reply-To: <20121017140002.GI11394@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
- <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
- <20121016133356.GG21801@arwen.pp.htv.fi>
- <87ipaanljt.fsf_-_@deeprootsystems.com>
- <20121017140002.GI11394@arwen.pp.htv.fi>
-Message-ID: <20121017143534.GJ11394@arwen.pp.htv.fi>
+Date: Wed, 17 Oct 2012 15:39:54 -0000
+Subject: [RFC/NOT FOR MERGING 4/5] i2c: omap: don't re-enable IRQs after
+ masking them
+In-Reply-To: <1350488043-5053-1-git-send-email-balbi@ti.com>
+References: <1350488043-5053-1-git-send-email-balbi@ti.com>
+Message-ID: <1350488043-5053-5-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+OMAP I2C driver will re-enable IRQs right after
+masking them during suspend.
 
-On Wed, Oct 17, 2012 at 05:00:02PM +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Oct 16, 2012 at 02:39:50PM -0700, Kevin Hilman wrote:
-> > + peterz, tglx
-> > 
-> > Felipe Balbi <balbi@ti.com> writes:
-> > 
-> > [...]
-> > 
-> > > The problem I see is that even though we properly return IRQ_WAKE_THREAD
-> > > and wake_up_process() manages to wakeup the IRQ thread (it returns 1),
-> > > the thread is never scheduled. To make things even worse, ouw irq thread
-> > > runs once, but doesn't run on a consecutive call. Here's some (rather
-> > > nasty) debug prints showing the problem:
-> > 
-> > [...]
-> > 
-> > >> [   88.721923] try_to_wake_up 1411
-> > >> [   88.725189] ===> irq_wake_thread 139: IRQ 72 wake_up_process 0
-> > >> [   88.731292] [sched_delayed] sched: RT throttling activated
-> > 
-> > This throttling message is the key one.
-> > 
-> > With RT throttling activated, the IRQ thread will not be run (it
-> > eventually will be allowed much later on, but by then, the I2C xfers
-> > have timed out.)
-> > 
-> > As a quick hack, the throttling can be disabled by seeting the
-> > sched_rt_runtime to RUNTIME_INF:
-> > 
-> >         # sysctl -w kernel.sched_rt_runtime_us=-1
-> > 
-> > and a quick test shows that things go back to working as expected.  But
-> > we still need to figure out why the throttling is hapenning...
-> > 
-> > So I started digging into why the RT runtime was so high, and noticed
-> > that time spent in suspend was being counted as RT runtime!
-> > 
-> > So spending time in suspend anywhere near sched_rt_runtime (0.95s) will
-> > cause the RT throttling to always be triggered, and thus prevent IRQ
-> > threads from running in the resume path.  Ouch.
-> > 
-> > I think I'm already in over my head in the RT runtime stuff, but
-> > counting the time spent in suspend as RT runtime smells like a bug to
-> > me. no?
-> > 
-> > Peter? Thomas?
-> 
-> it looks like removing console output completely (echo 0 >
-> /proc/sysrq-trigger) I don't see the issue anymore. Let me just run for
-> a few more iterations to make sure what I'm saying is correct.
+That's not what we want. We want to keep IRQs
+masked until our resume method is called.
 
-Yeah, really looks like removing console output makes the problem go
-away. Ran a few iterations and it always worked fine. Full logs attached
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-BTW, In the meantime I think I might have found some problems with
-omap_device's PM implementation. I'll test the patchset a little longer
-and send an RFC.
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index db31eae..7eeae11 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1247,14 +1247,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 
+ 	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+ 
+-	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
+-		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
+-	} else {
+-		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
+-
+-		/* Flush posted write */
+-		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+-	}
++	/* Flush posted write */
++	omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+ 
+ 	return 0;
+ }
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: minicom.cap
-Type: application/vnd.tcpdump.pcap
-Size: 278902 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/d10ab2e6/attachment-0001.cap>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/d10ab2e6/attachment-0001.sig>
+1.8.0.rc0
