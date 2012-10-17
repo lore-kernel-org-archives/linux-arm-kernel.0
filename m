@@ -1,222 +1,508 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Oct 2012 16:33:41 +0100
-Subject: [PATCH 4/7] ARM: perf: check ARMv7 counter validity on a per-pmu basis
+Date: Wed, 17 Oct 2012 16:33:39 +0100
+Subject: [PATCH 2/7] ARM: perf: allocate CPU PMU dynamically at probe time
 In-Reply-To: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
 References: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1350488024-3224-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1350488024-3224-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 
-Multi-cluster ARMv7 systems may have CPU PMUs with different number of
-counters.
+Supporting multiple, heterogeneous CPU PMUs requires us to allocate the
+arm_pmu structures dynamically as the devices are probed.
 
-This patch updates armv7_pmnc_counter_valid so that it takes a pmu
-argument and checks the counter validity against that. We also remove a
-number of redundant counter checks whether the current PMU is not easily
-retrievable.
+This patch removes the static structure definitions for each CPU PMU
+type and instead passes pointers to the PMU-specific init functions.
 
 Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_v7.c |   94 ++++++++++++--------------------------
- 1 files changed, 30 insertions(+), 64 deletions(-)
+ arch/arm/kernel/perf_event_cpu.c    |   47 ++++++++++------
+ arch/arm/kernel/perf_event_v6.c     |   72 +++++++++++------------
+ arch/arm/kernel/perf_event_v7.c     |  106 ++++++++++++++++++-----------------
+ arch/arm/kernel/perf_event_xscale.c |   72 +++++++++++------------
+ 4 files changed, 153 insertions(+), 144 deletions(-)
 
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 8d7d8d4..3863fd4 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -23,6 +23,7 @@
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/slab.h>
+ #include <linux/spinlock.h>
+ 
+ #include <asm/cputype.h>
+@@ -195,13 +196,13 @@ static struct platform_device_id __devinitdata cpu_pmu_plat_device_ids[] = {
+ /*
+  * CPU PMU identification and probing.
+  */
+-static struct arm_pmu *__devinit probe_current_pmu(void)
++static int __devinit probe_current_pmu(struct arm_pmu *pmu)
+ {
+-	struct arm_pmu *pmu = NULL;
+ 	int cpu = get_cpu();
+ 	unsigned long cpuid = read_cpuid_id();
+ 	unsigned long implementor = (cpuid & 0xFF000000) >> 24;
+ 	unsigned long part_number = (cpuid & 0xFFF0);
++	int ret = -ENODEV;
+ 
+ 	pr_info("probing PMU on CPU %d\n", cpu);
+ 
+@@ -211,25 +212,25 @@ static struct arm_pmu *__devinit probe_current_pmu(void)
+ 		case 0xB360:	/* ARM1136 */
+ 		case 0xB560:	/* ARM1156 */
+ 		case 0xB760:	/* ARM1176 */
+-			pmu = armv6pmu_init();
++			ret = armv6pmu_init(pmu);
+ 			break;
+ 		case 0xB020:	/* ARM11mpcore */
+-			pmu = armv6mpcore_pmu_init();
++			ret = armv6mpcore_pmu_init(pmu);
+ 			break;
+ 		case 0xC080:	/* Cortex-A8 */
+-			pmu = armv7_a8_pmu_init();
++			ret = armv7_a8_pmu_init(pmu);
+ 			break;
+ 		case 0xC090:	/* Cortex-A9 */
+-			pmu = armv7_a9_pmu_init();
++			ret = armv7_a9_pmu_init(pmu);
+ 			break;
+ 		case 0xC050:	/* Cortex-A5 */
+-			pmu = armv7_a5_pmu_init();
++			ret = armv7_a5_pmu_init(pmu);
+ 			break;
+ 		case 0xC0F0:	/* Cortex-A15 */
+-			pmu = armv7_a15_pmu_init();
++			ret = armv7_a15_pmu_init(pmu);
+ 			break;
+ 		case 0xC070:	/* Cortex-A7 */
+-			pmu = armv7_a7_pmu_init();
++			ret = armv7_a7_pmu_init(pmu);
+ 			break;
+ 		}
+ 	/* Intel CPUs [xscale]. */
+@@ -237,39 +238,51 @@ static struct arm_pmu *__devinit probe_current_pmu(void)
+ 		part_number = (cpuid >> 13) & 0x7;
+ 		switch (part_number) {
+ 		case 1:
+-			pmu = xscale1pmu_init();
++			ret = xscale1pmu_init(pmu);
+ 			break;
+ 		case 2:
+-			pmu = xscale2pmu_init();
++			ret = xscale2pmu_init(pmu);
+ 			break;
+ 		}
+ 	}
+ 
+ 	put_cpu();
+-	return pmu;
++	return ret;
+ }
+ 
+ static int __devinit cpu_pmu_device_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id;
+-	struct arm_pmu *(*init_fn)(void);
++	int (*init_fn)(struct arm_pmu *);
+ 	struct device_node *node = pdev->dev.of_node;
++	struct arm_pmu *pmu;
++	int ret = -ENODEV;
+ 
+ 	if (cpu_pmu) {
+ 		pr_info("attempt to register multiple PMU devices!");
+ 		return -ENOSPC;
+ 	}
+ 
++	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
++	if (!pmu) {
++		pr_info("failed to allocate PMU device!");
++		return -ENOMEM;
++	}
++
+ 	if (node && (of_id = of_match_node(cpu_pmu_of_device_ids, pdev->dev.of_node))) {
+ 		init_fn = of_id->data;
+-		cpu_pmu = init_fn();
++		ret = init_fn(pmu);
+ 	} else {
+-		cpu_pmu = probe_current_pmu();
++		ret = probe_current_pmu(pmu);
+ 	}
+ 
+-	if (!cpu_pmu)
+-		return -ENODEV;
++	if (ret) {
++		pr_info("failed to register PMU devices!");
++		kfree(pmu);
++		return ret;
++	}
+ 
++	cpu_pmu = pmu;
+ 	cpu_pmu->plat_device = pdev;
+ 	cpu_pmu_init(cpu_pmu);
+ 	register_cpu_notifier(&cpu_pmu_hotplug_notifier);
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 6ccc079..3908cb4 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -649,24 +649,22 @@ static int armv6_map_event(struct perf_event *event)
+ 				&armv6_perf_cache_map, 0xFF);
+ }
+ 
+-static struct arm_pmu armv6pmu = {
+-	.name			= "v6",
+-	.handle_irq		= armv6pmu_handle_irq,
+-	.enable			= armv6pmu_enable_event,
+-	.disable		= armv6pmu_disable_event,
+-	.read_counter		= armv6pmu_read_counter,
+-	.write_counter		= armv6pmu_write_counter,
+-	.get_event_idx		= armv6pmu_get_event_idx,
+-	.start			= armv6pmu_start,
+-	.stop			= armv6pmu_stop,
+-	.map_event		= armv6_map_event,
+-	.num_events		= 3,
+-	.max_period		= (1LLU << 32) - 1,
+-};
+-
+-static struct arm_pmu *__devinit armv6pmu_init(void)
++static int __devinit armv6pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return &armv6pmu;
++	cpu_pmu->name		= "v6";
++	cpu_pmu->handle_irq	= armv6pmu_handle_irq;
++	cpu_pmu->enable		= armv6pmu_enable_event;
++	cpu_pmu->disable	= armv6pmu_disable_event;
++	cpu_pmu->read_counter	= armv6pmu_read_counter;
++	cpu_pmu->write_counter	= armv6pmu_write_counter;
++	cpu_pmu->get_event_idx	= armv6pmu_get_event_idx;
++	cpu_pmu->start		= armv6pmu_start;
++	cpu_pmu->stop		= armv6pmu_stop;
++	cpu_pmu->map_event	= armv6_map_event;
++	cpu_pmu->num_events	= 3;
++	cpu_pmu->max_period	= (1LLU << 32) - 1;
++
++	return 0;
+ }
+ 
+ /*
+@@ -683,33 +681,31 @@ static int armv6mpcore_map_event(struct perf_event *event)
+ 				&armv6mpcore_perf_cache_map, 0xFF);
+ }
+ 
+-static struct arm_pmu armv6mpcore_pmu = {
+-	.name			= "v6mpcore",
+-	.handle_irq		= armv6pmu_handle_irq,
+-	.enable			= armv6pmu_enable_event,
+-	.disable		= armv6mpcore_pmu_disable_event,
+-	.read_counter		= armv6pmu_read_counter,
+-	.write_counter		= armv6pmu_write_counter,
+-	.get_event_idx		= armv6pmu_get_event_idx,
+-	.start			= armv6pmu_start,
+-	.stop			= armv6pmu_stop,
+-	.map_event		= armv6mpcore_map_event,
+-	.num_events		= 3,
+-	.max_period		= (1LLU << 32) - 1,
+-};
+-
+-static struct arm_pmu *__devinit armv6mpcore_pmu_init(void)
++static int __devinit armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return &armv6mpcore_pmu;
++	cpu_pmu->name		= "v6mpcore";
++	cpu_pmu->handle_irq	= armv6pmu_handle_irq;
++	cpu_pmu->enable		= armv6pmu_enable_event;
++	cpu_pmu->disable	= armv6mpcore_pmu_disable_event;
++	cpu_pmu->read_counter	= armv6pmu_read_counter;
++	cpu_pmu->write_counter	= armv6pmu_write_counter;
++	cpu_pmu->get_event_idx	= armv6pmu_get_event_idx;
++	cpu_pmu->start		= armv6pmu_start;
++	cpu_pmu->stop		= armv6pmu_stop;
++	cpu_pmu->map_event	= armv6mpcore_map_event;
++	cpu_pmu->num_events	= 3;
++	cpu_pmu->max_period	= (1LLU << 32) - 1;
++
++	return 0;
+ }
+ #else
+-static struct arm_pmu *__devinit armv6pmu_init(void)
++static int armv6pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ 
+-static struct arm_pmu *__devinit armv6mpcore_pmu_init(void)
++static int armv6mpcore_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ #endif	/* CONFIG_CPU_V6 || CONFIG_CPU_V6K */
 diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 1183c81..7d0cce8 100644
+index bd4b090..b189403 100644
 --- a/arch/arm/kernel/perf_event_v7.c
 +++ b/arch/arm/kernel/perf_event_v7.c
-@@ -736,7 +736,8 @@ static const unsigned armv7_a7_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-  */
- #define	ARMV7_IDX_CYCLE_COUNTER	0
- #define	ARMV7_IDX_COUNTER0	1
--#define	ARMV7_IDX_COUNTER_LAST	(ARMV7_IDX_CYCLE_COUNTER + cpu_pmu->num_events - 1)
-+#define	ARMV7_IDX_COUNTER_LAST(cpu_pmu) \
-+	(ARMV7_IDX_CYCLE_COUNTER + cpu_pmu->num_events - 1)
+@@ -18,8 +18,6 @@
  
- #define	ARMV7_MAX_COUNTERS	32
- #define	ARMV7_COUNTER_MASK	(ARMV7_MAX_COUNTERS - 1)
-@@ -802,38 +803,20 @@ static inline int armv7_pmnc_has_overflowed(u32 pmnc)
- 	return pmnc & ARMV7_OVERFLOWED_MASK;
- }
+ #ifdef CONFIG_CPU_V7
  
--static inline int armv7_pmnc_counter_valid(int idx)
-+static inline int armv7_pmnc_counter_valid(struct arm_pmu *cpu_pmu, int idx)
- {
--	return idx >= ARMV7_IDX_CYCLE_COUNTER && idx <= ARMV7_IDX_COUNTER_LAST;
-+	return idx >= ARMV7_IDX_CYCLE_COUNTER &&
-+		idx <= ARMV7_IDX_COUNTER_LAST(cpu_pmu);
- }
- 
- static inline int armv7_pmnc_counter_has_overflowed(u32 pmnc, int idx)
- {
--	int ret = 0;
--	u32 counter;
+-static struct arm_pmu armv7pmu;
 -
--	if (!armv7_pmnc_counter_valid(idx)) {
--		pr_err("CPU%u checking wrong counter %d overflow status\n",
--			smp_processor_id(), idx);
--	} else {
--		counter = ARMV7_IDX_TO_COUNTER(idx);
--		ret = pmnc & BIT(counter);
--	}
--
--	return ret;
-+	return pmnc & BIT(ARMV7_IDX_TO_COUNTER(idx));
- }
- 
- static inline int armv7_pmnc_select_counter(int idx)
- {
--	u32 counter;
--
--	if (!armv7_pmnc_counter_valid(idx)) {
--		pr_err("CPU%u selecting wrong PMNC counter %d\n",
--			smp_processor_id(), idx);
--		return -EINVAL;
--	}
--
--	counter = ARMV7_IDX_TO_COUNTER(idx);
-+	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
- 	asm volatile("mcr p15, 0, %0, c9, c12, 5" : : "r" (counter));
- 	isb();
- 
-@@ -842,11 +825,12 @@ static inline int armv7_pmnc_select_counter(int idx)
- 
- static inline u32 armv7pmu_read_counter(struct perf_event *event)
- {
-+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
- 	int idx = hwc->idx;
- 	u32 value = 0;
- 
--	if (!armv7_pmnc_counter_valid(idx))
-+	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
- 		pr_err("CPU%u reading wrong counter %d\n",
- 			smp_processor_id(), idx);
- 	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
-@@ -859,10 +843,11 @@ static inline u32 armv7pmu_read_counter(struct perf_event *event)
- 
- static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
- {
-+	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
- 	struct hw_perf_event *hwc = &event->hw;
- 	int idx = hwc->idx;
- 
--	if (!armv7_pmnc_counter_valid(idx))
-+	if (!armv7_pmnc_counter_valid(cpu_pmu, idx))
- 		pr_err("CPU%u writing wrong counter %d\n",
- 			smp_processor_id(), idx);
- 	else if (idx == ARMV7_IDX_CYCLE_COUNTER)
-@@ -881,60 +866,28 @@ static inline void armv7_pmnc_write_evtsel(int idx, u32 val)
- 
- static inline int armv7_pmnc_enable_counter(int idx)
- {
--	u32 counter;
--
--	if (!armv7_pmnc_counter_valid(idx)) {
--		pr_err("CPU%u enabling wrong PMNC counter %d\n",
--			smp_processor_id(), idx);
--		return -EINVAL;
--	}
--
--	counter = ARMV7_IDX_TO_COUNTER(idx);
-+	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
- 	asm volatile("mcr p15, 0, %0, c9, c12, 1" : : "r" (BIT(counter)));
- 	return idx;
- }
- 
- static inline int armv7_pmnc_disable_counter(int idx)
- {
--	u32 counter;
--
--	if (!armv7_pmnc_counter_valid(idx)) {
--		pr_err("CPU%u disabling wrong PMNC counter %d\n",
--			smp_processor_id(), idx);
--		return -EINVAL;
--	}
--
--	counter = ARMV7_IDX_TO_COUNTER(idx);
-+	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
- 	asm volatile("mcr p15, 0, %0, c9, c12, 2" : : "r" (BIT(counter)));
- 	return idx;
- }
- 
- static inline int armv7_pmnc_enable_intens(int idx)
- {
--	u32 counter;
--
--	if (!armv7_pmnc_counter_valid(idx)) {
--		pr_err("CPU%u enabling wrong PMNC counter IRQ enable %d\n",
--			smp_processor_id(), idx);
--		return -EINVAL;
--	}
--
--	counter = ARMV7_IDX_TO_COUNTER(idx);
-+	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
- 	asm volatile("mcr p15, 0, %0, c9, c14, 1" : : "r" (BIT(counter)));
- 	return idx;
- }
- 
- static inline int armv7_pmnc_disable_intens(int idx)
- {
--	u32 counter;
--
--	if (!armv7_pmnc_counter_valid(idx)) {
--		pr_err("CPU%u disabling wrong PMNC counter IRQ enable %d\n",
--			smp_processor_id(), idx);
--		return -EINVAL;
--	}
--
--	counter = ARMV7_IDX_TO_COUNTER(idx);
-+	u32 counter = ARMV7_IDX_TO_COUNTER(idx);
- 	asm volatile("mcr p15, 0, %0, c9, c14, 2" : : "r" (BIT(counter)));
- 	isb();
- 	/* Clear the overflow flag in case an interrupt is pending. */
-@@ -959,7 +912,7 @@ static inline u32 armv7_pmnc_getreset_flags(void)
- }
- 
- #ifdef DEBUG
--static void armv7_pmnc_dump_regs(void)
-+static void armv7_pmnc_dump_regs(struct arm_pmu *cpu_pmu)
- {
- 	u32 val;
- 	unsigned int cnt;
-@@ -984,7 +937,8 @@ static void armv7_pmnc_dump_regs(void)
- 	asm volatile("mrc p15, 0, %0, c9, c13, 0" : "=r" (val));
- 	printk(KERN_INFO "CCNT  =0x%08x\n", val);
- 
--	for (cnt = ARMV7_IDX_COUNTER0; cnt <= ARMV7_IDX_COUNTER_LAST; cnt++) {
-+	for (cnt = ARMV7_IDX_COUNTER0;
-+			cnt <= ARMV7_IDX_COUNTER_LAST(cpu_pmu); cnt++) {
- 		armv7_pmnc_select_counter(cnt);
- 		asm volatile("mrc p15, 0, %0, c9, c13, 2" : "=r" (val));
- 		printk(KERN_INFO "CNT[%d] count =0x%08x\n",
-@@ -1004,6 +958,12 @@ static void armv7pmu_enable_event(struct perf_event *event)
- 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
- 	int idx = hwc->idx;
- 
-+	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
-+		pr_err("CPU%u enabling wrong PMNC counter IRQ enable %d\n",
-+			smp_processor_id(), idx);
-+		return;
-+	}
-+
- 	/*
- 	 * Enable counter and interrupt, and set the counter to count
- 	 * the event that we're interested in.
-@@ -1044,6 +1004,12 @@ static void armv7pmu_disable_event(struct perf_event *event)
- 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
- 	int idx = hwc->idx;
- 
-+	if (!armv7_pmnc_counter_valid(cpu_pmu, idx)) {
-+		pr_err("CPU%u disabling wrong PMNC counter IRQ enable %d\n",
-+			smp_processor_id(), idx);
-+		return;
-+	}
-+
- 	/*
- 	 * Disable counter and interrupt
+ /*
+  * Common ARMv7 event types
+  *
+@@ -1014,7 +1012,7 @@ static void armv7pmu_enable_event(struct hw_perf_event *hwc, int idx)
+ 	 * We only need to set the event for the cycle counter if we
+ 	 * have the ability to perform event filtering.
  	 */
+-	if (armv7pmu.set_event_filter || idx != ARMV7_IDX_CYCLE_COUNTER)
++	if (cpu_pmu->set_event_filter || idx != ARMV7_IDX_CYCLE_COUNTER)
+ 		armv7_pmnc_write_evtsel(idx, hwc->config_base);
+ 
+ 	/*
+@@ -1232,17 +1230,18 @@ static int armv7_a7_map_event(struct perf_event *event)
+ 				&armv7_a7_perf_cache_map, 0xFF);
+ }
+ 
+-static struct arm_pmu armv7pmu = {
+-	.handle_irq		= armv7pmu_handle_irq,
+-	.enable			= armv7pmu_enable_event,
+-	.disable		= armv7pmu_disable_event,
+-	.read_counter		= armv7pmu_read_counter,
+-	.write_counter		= armv7pmu_write_counter,
+-	.get_event_idx		= armv7pmu_get_event_idx,
+-	.start			= armv7pmu_start,
+-	.stop			= armv7pmu_stop,
+-	.reset			= armv7pmu_reset,
+-	.max_period		= (1LLU << 32) - 1,
++static void armv7pmu_init(struct arm_pmu *cpu_pmu)
++{
++	cpu_pmu->handle_irq	= armv7pmu_handle_irq;
++	cpu_pmu->enable		= armv7pmu_enable_event;
++	cpu_pmu->disable	= armv7pmu_disable_event;
++	cpu_pmu->read_counter	= armv7pmu_read_counter;
++	cpu_pmu->write_counter	= armv7pmu_write_counter;
++	cpu_pmu->get_event_idx	= armv7pmu_get_event_idx;
++	cpu_pmu->start		= armv7pmu_start;
++	cpu_pmu->stop		= armv7pmu_stop;
++	cpu_pmu->reset		= armv7pmu_reset;
++	cpu_pmu->max_period	= (1LLU << 32) - 1;
+ };
+ 
+ static u32 __devinit armv7_read_num_pmnc_events(void)
+@@ -1256,70 +1255,75 @@ static u32 __devinit armv7_read_num_pmnc_events(void)
+ 	return nb_cnt + 1;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a8_pmu_init(void)
++static int __devinit armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv7pmu.name		= "ARMv7 Cortex-A8";
+-	armv7pmu.map_event	= armv7_a8_map_event;
+-	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+-	return &armv7pmu;
++	armv7pmu_init(cpu_pmu);
++	cpu_pmu->name		= "ARMv7 Cortex-A8";
++	cpu_pmu->map_event	= armv7_a8_map_event;
++	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
++	return 0;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a9_pmu_init(void)
++static int __devinit armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv7pmu.name		= "ARMv7 Cortex-A9";
+-	armv7pmu.map_event	= armv7_a9_map_event;
+-	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+-	return &armv7pmu;
++	armv7pmu_init(cpu_pmu);
++	cpu_pmu->name		= "ARMv7 Cortex-A9";
++	cpu_pmu->map_event	= armv7_a9_map_event;
++	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
++	return 0;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a5_pmu_init(void)
++static int __devinit armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv7pmu.name		= "ARMv7 Cortex-A5";
+-	armv7pmu.map_event	= armv7_a5_map_event;
+-	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+-	return &armv7pmu;
++	armv7pmu_init(cpu_pmu);
++	cpu_pmu->name		= "ARMv7 Cortex-A5";
++	cpu_pmu->map_event	= armv7_a5_map_event;
++	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
++	return 0;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a15_pmu_init(void)
++static int __devinit armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv7pmu.name		= "ARMv7 Cortex-A15";
+-	armv7pmu.map_event	= armv7_a15_map_event;
+-	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+-	armv7pmu.set_event_filter = armv7pmu_set_event_filter;
+-	return &armv7pmu;
++	armv7pmu_init(cpu_pmu);
++	cpu_pmu->name		= "ARMv7 Cortex-A15";
++	cpu_pmu->map_event	= armv7_a15_map_event;
++	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
++	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
++	return 0;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a7_pmu_init(void)
++static int __devinit armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	armv7pmu.name		= "ARMv7 Cortex-A7";
+-	armv7pmu.map_event	= armv7_a7_map_event;
+-	armv7pmu.num_events	= armv7_read_num_pmnc_events();
+-	armv7pmu.set_event_filter = armv7pmu_set_event_filter;
+-	return &armv7pmu;
++	armv7pmu_init(cpu_pmu);
++	cpu_pmu->name		= "ARMv7 Cortex-A7";
++	cpu_pmu->map_event	= armv7_a7_map_event;
++	cpu_pmu->num_events	= armv7_read_num_pmnc_events();
++	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
++	return 0;
+ }
+ #else
+-static struct arm_pmu *__devinit armv7_a8_pmu_init(void)
++static inline int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a9_pmu_init(void)
++static inline int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a5_pmu_init(void)
++static inline int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a15_pmu_init(void)
++static inline int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ 
+-static struct arm_pmu *__devinit armv7_a7_pmu_init(void)
++static inline int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ #endif	/* CONFIG_CPU_V7 */
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 426e19f..131ede6 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -434,24 +434,22 @@ static int xscale_map_event(struct perf_event *event)
+ 				&xscale_perf_cache_map, 0xFF);
+ }
+ 
+-static struct arm_pmu xscale1pmu = {
+-	.name		= "xscale1",
+-	.handle_irq	= xscale1pmu_handle_irq,
+-	.enable		= xscale1pmu_enable_event,
+-	.disable	= xscale1pmu_disable_event,
+-	.read_counter	= xscale1pmu_read_counter,
+-	.write_counter	= xscale1pmu_write_counter,
+-	.get_event_idx	= xscale1pmu_get_event_idx,
+-	.start		= xscale1pmu_start,
+-	.stop		= xscale1pmu_stop,
+-	.map_event	= xscale_map_event,
+-	.num_events	= 3,
+-	.max_period	= (1LLU << 32) - 1,
+-};
+-
+-static struct arm_pmu *__devinit xscale1pmu_init(void)
++static int __devinit xscale1pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return &xscale1pmu;
++	cpu_pmu->name		= "xscale1";
++	cpu_pmu->handle_irq	= xscale1pmu_handle_irq;
++	cpu_pmu->enable		= xscale1pmu_enable_event;
++	cpu_pmu->disable	= xscale1pmu_disable_event;
++	cpu_pmu->read_counter	= xscale1pmu_read_counter;
++	cpu_pmu->write_counter	= xscale1pmu_write_counter;
++	cpu_pmu->get_event_idx	= xscale1pmu_get_event_idx;
++	cpu_pmu->start		= xscale1pmu_start;
++	cpu_pmu->stop		= xscale1pmu_stop;
++	cpu_pmu->map_event	= xscale_map_event;
++	cpu_pmu->num_events	= 3;
++	cpu_pmu->max_period	= (1LLU << 32) - 1;
++
++	return 0;
+ }
+ 
+ #define XSCALE2_OVERFLOWED_MASK	0x01f
+@@ -801,33 +799,31 @@ xscale2pmu_write_counter(int counter, u32 val)
+ 	}
+ }
+ 
+-static struct arm_pmu xscale2pmu = {
+-	.name		= "xscale2",
+-	.handle_irq	= xscale2pmu_handle_irq,
+-	.enable		= xscale2pmu_enable_event,
+-	.disable	= xscale2pmu_disable_event,
+-	.read_counter	= xscale2pmu_read_counter,
+-	.write_counter	= xscale2pmu_write_counter,
+-	.get_event_idx	= xscale2pmu_get_event_idx,
+-	.start		= xscale2pmu_start,
+-	.stop		= xscale2pmu_stop,
+-	.map_event	= xscale_map_event,
+-	.num_events	= 5,
+-	.max_period	= (1LLU << 32) - 1,
+-};
+-
+-static struct arm_pmu *__devinit xscale2pmu_init(void)
++static int __devinit xscale2pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return &xscale2pmu;
++	cpu_pmu->name		= "xscale2";
++	cpu_pmu->handle_irq	= xscale2pmu_handle_irq;
++	cpu_pmu->enable		= xscale2pmu_enable_event;
++	cpu_pmu->disable	= xscale2pmu_disable_event;
++	cpu_pmu->read_counter	= xscale2pmu_read_counter;
++	cpu_pmu->write_counter	= xscale2pmu_write_counter;
++	cpu_pmu->get_event_idx	= xscale2pmu_get_event_idx;
++	cpu_pmu->start		= xscale2pmu_start;
++	cpu_pmu->stop		= xscale2pmu_stop;
++	cpu_pmu->map_event	= xscale_map_event;
++	cpu_pmu->num_events	= 5;
++	cpu_pmu->max_period	= (1LLU << 32) - 1;
++
++	return 0;
+ }
+ #else
+-static struct arm_pmu *__devinit xscale1pmu_init(void)
++static inline int xscale1pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ 
+-static struct arm_pmu *__devinit xscale2pmu_init(void)
++static inline int xscale2pmu_init(struct arm_pmu *cpu_pmu)
+ {
+-	return NULL;
++	return -ENODEV;
+ }
+ #endif	/* CONFIG_CPU_XSCALE */
 -- 
 1.7.4.1
