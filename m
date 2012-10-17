@@ -1,84 +1,65 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 17 Oct 2012 13:33:23 -0500
-Subject: [PATCH 2/2] ARM: OMAP2+: Add device-tree support for 32kHz counter
-In-Reply-To: <1350498803-22150-1-git-send-email-jon-hunter@ti.com>
-References: <1350498803-22150-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1350498803-22150-3-git-send-email-jon-hunter@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 17 Oct 2012 20:53:00 +0200
+Subject: [PATCH 1/2] mmc: core: Support all MMC capabilities when booting
+ from Device Tree
+In-Reply-To: <201210171338.01011.arnd@arndb.de>
+References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
+ <201210151420.29930.arnd@arndb.de>
+ <20121015160740.GC7662@gmail.com>
+ <201210171338.01011.arnd@arndb.de>
+Message-ID: <CAPDyKFq6YfpjCs-3Wh=RPGc-4ukUinuhVWaZ0=+WCLsc0JBWbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For OMAP devices, the 32kHz counter is the default clock-source for the kernel.
-However, this is not the only possible clock-source the kernel can use for OMAP
-devices.
+On 17 October 2012 15:38, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 15 October 2012, Lee Jones wrote:
+>> > and so on. What are you actually missing in the properties that
+>> > are already there?
+>>
+>> MMC_CAP_ERASE
+>
+> This one seems to be set unconditionally on some controllers but
+> not on others. Why would it need to be configurable?
+>
+>> MMC_CAP_UHS_SDR12
+>> MMC_CAP_UHS_SDR25
+>> MMC_CAP_UHS_DDR50
+>
+> Could this be derived from max-frequency?
 
-When booting with device-tree, if the 32kHz counter is the desired clock-source
-for the kernel, then parse the device-tree blob to ensure that the counter is
-present and if so map memory for the counter using the device-tree of_iomap()
-function so we are no longer reliant on the OMAP HWMOD framework to do this for
-us.
+No, this is likely depending on what the hw controller supports. Not
+connected to the freq.
+UHS also means 1.8 V I/O voltage.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/timer.c |   28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+>
+>> MMC_CAP_1_8V_DDR
+>
+> Right, I suppose we need this. Should we have a minimum and maximum
+> voltage added to the common properties for this?
+>
+>> MMC_CAP2_DETECT_ON_ERR
+>> MMC_CAP2_NO_SLEEP_CMD
+>
+> I don't see these ones being set anywhere, but they were both
+> added by Ulf. Maybe he can comment on if or why they are needed
+> in devicetree, rather than being set by the driver unconditionally
+> or for specific versions of the host controller.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index d064afd..a67688f 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -159,6 +159,11 @@ static struct of_device_id omap_timer_match[] __initdata = {
- 	{ }
- };
- 
-+static struct of_device_id omap_counter_match[] __initdata = {
-+	{ .compatible = "ti,omap-counter32k", },
-+	{ }
-+};
-+
- /**
-  * omap_get_timer_dt - get a timer using device-tree
-  * @match	- device-tree match structure for matching a device type
-@@ -378,11 +383,26 @@ static u32 notrace dmtimer_read_sched_clock(void)
- static int __init omap2_sync32k_clocksource_init(void)
- {
- 	int ret;
-+	struct device_node *np = NULL;
- 	struct omap_hwmod *oh;
- 	void __iomem *vbase;
- 	const char *oh_name = "counter_32k";
- 
- 	/*
-+	 * If device-tree is present, then search the DT blob
-+	 * to see if the 32kHz counter is supported.
-+	 */
-+	if (of_have_populated_dt()) {
-+		np = omap_get_timer_dt(omap_counter_match, NULL);
-+		if (!np)
-+			return -ENODEV;
-+
-+		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-+		if (!oh_name)
-+			return -ENODEV;
-+	}
-+
-+	/*
- 	 * First check hwmod data is available for sync32k counter
- 	 */
- 	oh = omap_hwmod_lookup(oh_name);
-@@ -391,7 +411,13 @@ static int __init omap2_sync32k_clocksource_init(void)
- 
- 	omap_hwmod_setup_one(oh_name);
- 
--	vbase = omap_hwmod_get_mpu_rt_va(oh);
-+	if (of_have_populated_dt()) {
-+		vbase = of_iomap(np, 0);
-+		of_node_put(np);
-+	} else {
-+		vbase = omap_hwmod_get_mpu_rt_va(oh);
-+	}
-+
- 	if (!vbase) {
- 		pr_warn("%s: failed to get counter_32k resource\n", __func__);
- 		return -ENXIO;
--- 
-1.7.9.5
+>From ux500 perspective there are patches not been up-streamed yet
+which are using these host caps, for whatever it is worth for you to
+know and consider.
+
+Actually, I think quite a few of the host caps in mmc could be debated
+whether those should exist at all.
+Some are directly mapped to what the host controller hw support, some
+are purely what the host driver (sw) support, but then there are
+others kind of "mmc/sd/sdio software support configuration" which are
+kind of strange host caps to me. For example MMC_CAP2_DETECT_ON_ERR
+which I invented. :-). I think it especially these "software support
+configuration" caps that might be causing this dt issues.
+
+Would be very interesting to hear if someone is sharing my thoughts
+around the host caps. Or if I am totally wrong here.
+
+Kind regards
+Ulf Hansson
