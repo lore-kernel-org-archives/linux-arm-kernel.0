@@ -1,46 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:40:11 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7
-In-Reply-To: <1350448585-26403-1-git-send-email-horms@verge.net.au>
-References: <1350448585-26403-1-git-send-email-horms@verge.net.au>
-Message-ID: <20121017044011.GA27684@verge.net.au>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Wed, 17 Oct 2012 10:59:47 +0530
+Subject: [PATCH v2 00/14] OMAP-GPMC related cleanup for common zImage
+In-Reply-To: <20121016180600.GA15569@atomide.com>
+References: <cover.1349672877.git.afzal@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9F7B0A@DBDE01.ent.ti.com>
+ <20121010163840.GA13585@parrot.com> <20121016180600.GA15569@atomide.com>
+Message-ID: <507E424B.8040706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 01:36:23PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> please consider the following fix for the KZM-A9-GT board for 3.6.
+Hi Ivan,
 
-Sorry, cut-and paste error. The line above should read:
+On Tuesday 16 October 2012 11:36 PM, Tony Lindgren wrote:
+> * Ivan Djelic<ivan.djelic@parrot.com>  [121010 09:40]:
 
-please consider the following fixes for 3.7.
+>> I ran several mtd regression tests on a Beagle Board on your gpmc-czimage-v2 tag.
+>> All BCH error correcting tests passed successfully.
 
-> They both resolve fallout from recent IOMEM() changes.
-> 
-> ----------------------------------------------------------------
-> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-> 
->   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
-> 
-> for you to fetch changes up to 11f93576b0b50bf391ffafa544b85e541f5e59a5:
-> 
->   ARM: shmobile: r8a7779: use __iomem pointers for MMIO (2012-10-16 08:58:56 +0900)
-> 
-> ----------------------------------------------------------------
-> Kuninori Morimoto (2):
->       ARM: shmobile: armadillo800eva: __io abuse cleanup
->       ARM: shmobile: r8a7779: use __iomem pointers for MMIO
-> 
->  arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +-
->  arch/arm/mach-shmobile/clock-r8a7779.c         |   22 +++++++++++-----------
->  2 files changed, 12 insertions(+), 12 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>> I occasionally had weird read errors though, especially when reading blank pages:
+>> the omap driver returned 512-byte sectors containing something like:
+
+>> I was able to reproduce the problem also on l2-mtd tip, albeit less often.
+>> The problem seems to occur quite randomly, it may be a hardware issue on
+>> my board...
+
+> Things like this typically happen in the GPMC timings are not correct.
+> Maybe add #define DEBUG to top of gpmc.c and compare the timings
+> before and after Afzal's patches?
+
+Latest series for gpmc related cleanup for common zImage removed
+dependency on minor timing cleanups (this series was dependent on
+on another series that did minor timing cleanups).
+
+A pull request for the new series on gpmc cleanup for common zImage
+that does not contain timing related changes and without dependency
+on timing related changes has been sent to Tony (forwarded to you now).
+He has pulled those changes onto l-o in
+"omap-for-v3.8/cleanup-headers-gpmc"
+
+As there are no changes w.r.t timing's in the new series, behaviour
+should be same as without.
+
+>> Anyway, the ECC handling part looks OK to me.
+
+Regards
+Afzal
