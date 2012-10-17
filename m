@@ -1,48 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 15:11:32 -0000
-Subject: [RFC 01/11] ARM: Kirkwood: Allow use of pinctrl
-In-Reply-To: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
-References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1350745663-5277-2-git-send-email-andrew@lunn.ch>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 17 Oct 2012 15:39:53 -0000
+Subject: [RFC/NOT FOR MERGING 1/5] arm: omap: fix up _od_suspend_noirq and
+ _od_resume_noirq
+In-Reply-To: <1350488043-5053-1-git-send-email-balbi@ti.com>
+References: <1350488043-5053-1-git-send-email-balbi@ti.com>
+Message-ID: <1350488043-5053-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a pinctrl driver for arch-mvebu. It supports kirkwood out
-of the box. Allow ARCH_KIRKWOOD to select it, and make ARCH_KIRKWOOD
-select it. This then allows the convertion of board-*.c files away
-from MPP to pinctrl in DT, before they get moved over into mach-mvebu.
+current implementation doesn't take care about
+drivers which don't provide *_noirq methods and we
+could fall into a situation where we would suspend/resume
+devices even though they haven't asked for it.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+One such case happened with the I2C driver which
+was getting suspended during suspend_noirq() just
+to be resume right after by any other device doing
+an I2C transfer on its suspend method.
+
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/Kconfig        |    2 ++
- drivers/pinctrl/Kconfig |    2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/plat-omap/omap_device.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 73067ef..160cd40 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -548,6 +548,8 @@ config ARCH_KIRKWOOD
- 	select GENERIC_CLOCKEVENTS
- 	select PCI
- 	select PLAT_ORION_LEGACY
-+	select PINCTRL
-+	select PINCTRL_KIRKWOOD
- 	help
- 	  Support for the following Marvell Kirkwood series SoCs:
- 	  88F6180, 88F6192 and 88F6281.
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 7bf914d..5682c96 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -188,7 +188,7 @@ config PINCTRL_EXYNOS4
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 7a7d1f2..935f416 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -804,8 +804,12 @@ static int _od_suspend_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_device *od = to_omap_device(pdev);
++	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
+ 	int ret;
  
- config PINCTRL_MVEBU
- 	bool
--	depends on ARCH_MVEBU
-+	depends on ARCH_MVEBU || ARCH_KIRKWOOD
- 	select PINMUX
- 	select PINCONF
++	if (!pm || !pm->suspend_noirq)
++		return 0;
++
+ 	/* Don't attempt late suspend on a driver that is not bound */
+ 	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
+ 		return 0;
+@@ -827,6 +831,10 @@ static int _od_resume_noirq(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct omap_device *od = to_omap_device(pdev);
++	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
++
++	if (!pm || !pm->resume_noirq)
++		return 0;
  
+ 	if ((od->flags & OMAP_DEVICE_SUSPENDED) &&
+ 	    !pm_runtime_status_suspended(dev)) {
 -- 
-1.7.10.4
+1.8.0.rc0
