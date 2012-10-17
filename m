@@ -1,55 +1,53 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:39:11 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC boards for v3.8
-Message-ID: <1350448761-27346-1-git-send-email-horms@verge.net.au>
+Date: Wed, 17 Oct 2012 13:39:13 +0900
+Subject: [PATCH 02/10] ARM: shmobile: kzm9g: enable magnetometer ak8975.
+In-Reply-To: <1350448761-27346-1-git-send-email-horms@verge.net.au>
+References: <1350448761-27346-1-git-send-email-horms@verge.net.au>
+Message-ID: <1350448761-27346-3-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-please consider the following board enhancements for 3.8.
+This patch enables magnetometer ak8975.
+I checked ak8975_probe() returns successfully.
 
-----------------------------------------------------------------
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/kzm9g_defconfig     |    2 ++
+ arch/arm/mach-shmobile/board-kzm9g.c |    6 +++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
-
-for you to fetch changes up to 5f9f3d29d35cdf6907272e407b4fcf7eabe6b88a:
-
-  ARM: shmobile: marzen: add HSPI support (2012-10-15 09:56:42 +0900)
-
-----------------------------------------------------------------
-Bastian Hecht (1):
-      ARM: mach-shmobile: add FLCTL DMA slave definitions for sh7372
-
-Kuninori Morimoto (5):
-      ARM: shmobile: armadillo800eva: enable restart
-      ARM: shmobile: r8a7779: add HSPI clock support
-      ARM: shmobile: r8a7779: add I2C clock support
-      ARM: shmobile: r8a7779: add I2C driver support
-      ARM: shmobile: marzen: add HSPI support
-
-Nobuhiro Iwamatsu (1):
-      ARM: shmobile: r8a7740: Enable PMU
-
-Tetsuyuki Kobayashi (3):
-      ARM: shmobile: kzm9g: enable magnetometer ak8975.
-      ARM: shmobile: kzm9g: enable three-axis digital accelerometer ADXL345
-      ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and SDHI2
-
- arch/arm/configs/armadillo800eva_defconfig     |    1 +
- arch/arm/configs/kzm9g_defconfig               |    4 ++
- arch/arm/configs/marzen_defconfig              |    4 ++
- arch/arm/mach-shmobile/board-armadillo800eva.c |    8 +++
- arch/arm/mach-shmobile/board-kzm9g.c           |   14 ++++-
- arch/arm/mach-shmobile/board-marzen.c          |   25 ++++++++
- arch/arm/mach-shmobile/clock-r8a7779.c         |   16 ++++-
- arch/arm/mach-shmobile/include/mach/sh7372.h   |    4 ++
- arch/arm/mach-shmobile/setup-r8a7740.c         |   16 +++++
- arch/arm/mach-shmobile/setup-r8a7779.c         |   77 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/setup-sh7372.c          |   20 ++++++
- 11 files changed, 187 insertions(+), 2 deletions(-)
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index c88b578..1404b04 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -119,6 +119,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_ASYNC_TX_DMA=y
+ CONFIG_STAGING=y
++CONFIG_SENSORS_AK8975=y
++CONFIG_IIO=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_INOTIFY_USER=y
+ CONFIG_VFAT_FS=y
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 0a43f31..a37da78 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -557,7 +557,11 @@ static struct i2c_board_info i2c0_devices[] = {
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("r2025sd", 0x32),
+-	}
++	},
++	{
++		I2C_BOARD_INFO("ak8975", 0x0c),
++		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
++	},
+ };
+ 
+ static struct i2c_board_info i2c1_devices[] = {
+-- 
+1.7.10.4
