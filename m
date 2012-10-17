@@ -1,50 +1,93 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 17 Oct 2012 15:45:28 +0200
-Subject: [PATCH 1/1] arm: at91: drop duplicated config SOC_AT91SAM9 entry
-In-Reply-To: <1350481291-32579-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1350481291-32579-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <507EB678.4050703@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Oct 2012 14:03:27 +0000
+Subject: [PATCH V2 3/3] ARM: tegra: move debug-macro.S to include/debug
+In-Reply-To: <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
+References: <1350328024-30485-1-git-send-email-swarren@wwwdotorg.org>
+ <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <201210171403.27535.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2012 03:41 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->  arch/arm/mach-at91/Kconfig |   10 ++--------
->  1 file changed, 2 insertions(+), 8 deletions(-)
+On Monday 15 October 2012, Stephen Warren wrote:
+> Rob, Arnd, Olof, I'd particularly like feedback on whether the following:
 > 
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index b142071..0436242 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -21,19 +21,13 @@ config SOC_AT91SAM9
->  	bool
->  	select CPU_ARM926T
->  	select GENERIC_CLOCKEVENTS
-> +	select MULTI_IRQ_HANDLER
-> +	select SPARSE_IRQ
->  
->  menu "Atmel AT91 System-on-Chip"
->  
->  comment "Atmel AT91 Processor"
->  
-> -config SOC_AT91SAM9
-> -	bool
-> -	select AT91_SAM9_SMC
-> -	select AT91_SAM9_TIME
-> -	select CPU_ARM926T
-> -	select MULTI_IRQ_HANDLER
-> -	select SPARSE_IRQ
-> -
->  config SOC_AT91RM9200
->  	bool "AT91RM9200"
->  	select CPU_ARM920T
+> #include "../../mach-tegra/iomap.h"
 > 
+> in arch/arm/include/debug/tegra.S is acceptable. I'd really like to
+> continue to #include a header to share the defines to Tegra physical
+> memory layout and virtual based addresses with Tegra's io.c's struct
+> map_desc entries, so they can't get out of sync. So, the include can
+> either use the relative path as quoted above (which I don't think will
+> cause any significant maintenance issue), or Tegra's iomap.h would have
+> to be moved somewhere public so e.g. <tegra-iomap.h> could be included.
+
+I don't have a good answer for this unfortunately. I wouldn't want relative
+include paths to take over because they can paper over a lot of other
+problems when people get lazy.
+
+> Second, is the Kconfig.debug change reasonable? I guess I could remove
+> the second choice menu I added, and just put all the options in the main
+> "Kernel low-level debugging port" choice. However, that would make the
+> "if" statements in "config DEBUG_LL_INCLUDE" rather more unwieldy.
+
+It looks ok to me in principle, but you could also solve this by making
+DEBUG_TEGRA_UART a silent option like this:
+
+@@ -345,6 +345,46 @@ choice
+                  Say Y here if you want kernel low-level debugging support
+                  on SOCFPGA based platforms.
+
++       config DEBUG_TEGRA_UARTA
++               depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++               bool "Use Tegra UARTA for low-level debug"
++               help
++                 Say Y here if you want kernel low-level debugging support
++                 on Tegra based platforms.
++
++       config DEBUG_TEGRA_UARTB
++               depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++               bool "Use Tegra UARTB for low-level debug"
++               help
++                 Say Y here if you want kernel low-level debugging support
++                 on Tegra based platforms.
++
++       config DEBUG_TEGRA_UARTC
++               depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++               bool "Use Tegra UARTC for low-level debug"
++               help
++                 Say Y here if you want kernel low-level debugging support
++                 on Tegra based platforms.
++
++       config DEBUG_TEGRA_UARTD
++               depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++               bool "Use Tegra UARTD for low-level debug"
++               help
++                 Say Y here if you want kernel low-level debugging support
++                 on Tegra based platforms.
++
++       config DEBUG_TEGRA_UARTE
++               depends on ARCH_TEGRA
++		select DEBUG_TEGRA_UART
++               bool "Use Tegra UARTE for low-level debug"
++               help
++                 Say Y here if you want kernel low-level debugging support
++                 on Tegra based platforms.
++
+        config DEBUG_VEXPRESS_UART0_DETECT
+                bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+                depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -409,6 +416,36 @@ choice
+ 
+ endchoice
+ 
++config DEBUG_TEGRA_UART
++	bool
 
 
--- 
-Nicolas Ferre
+I don't have a strong preference either way.
+
+	ARnd
