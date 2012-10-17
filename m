@@ -1,79 +1,62 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Thu, 18 Oct 2012 00:01:17 +0200
-Subject: [PULL REQ] IXP4xx changes for Linux 3.7
-In-Reply-To: <201210142002.55841.arnd@arndb.de> (Arnd Bergmann's message of
- "Sun, 14 Oct 2012 20:02:55 +0000")
-References: <m3bog6m5iz.fsf@intrepid.localdomain>
- <201210142002.55841.arnd@arndb.de>
-Message-ID: <m3a9vkahci.fsf@intrepid.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Oct 2012 15:02:49 -0700
+Subject: [GIT PULL] omap fixes ready to go for v3.7-rc1
+Message-ID: <20121017220248.GA15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd & Olof,
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Here are the fixes ready to pull, there's at least one more fix in works
+but it still requires minor changes. The two top commits are recent as
+Jon Hunter noticed an issue freeing resources in his fix and I did a
+new branch to swap in the fixed patch.
 
-> as mentioned before, all arch/arm/mach-* patches should go through the
-> arm-soc tree or get an Ack from the arm-soc maintainers. The same thing
-> is true for the char-misc and the crypto trees.
+Regards,
 
-You've seen the changes. They were trivial fixes, touched only
-IXP4xx-related areas, there was nothing related to char or crypto
-subsystems there, except file location (well, IXP4xx drivers have to be
-located somewhere).
+Tony
 
-The patches have been posted to linux-arm-kernel and you knew about
-them. That they were obviously correct and clean is probably not
-that important.
 
-Nobody bothered to comment the patches.
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-> Also, never rebase your tree immediately before sending a pull
-> request.
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
-I did not, of course. My mail stated:
-"Build-tested for now. This is based on your current tree tip because it
-depends on commits following 3.6 release."
+are available in the git repository at:
 
-Normally I wouldn't rebase, but had to (as you well knew) - because you
-commited a conflicting patch to this very IXP4xx arch. Using your logic,
-you were supposed to get an Ack from me (or from Imre) for this patch.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc1/fixes-take5-signed
 
-Actually it wasn't a problem for me, I simply had to rebase.
+for you to fetch changes up to 8119024ef7363591fd958ec89ebfaee7c18209e3:
 
-> Finally when sending bug fixes, please annotate any patches with
-> 'Cc: stable at vger.kernel.org' if they address bugs that are already
-> present in older kernels, so that the stable and longterm maintainers
-> can easily backport the fixes.
+  ARM: OMAP2+: Allow kernel to boot even if GPMC fails to reserve memory (2012-10-17 09:01:14 -0700)
 
-I do that when I think it makes sense. In this case (two patches for
-Goramo MultiLink platform) practically all such devices use kernels
-prepared by me, and I think Greg (and others) have more efficient ways
-to spend their time than handling almost unused patches. Also, I have
-much more efficient ways to spend time. Anyway, if I can't have my
-patches upstream, why should they end up in stable?
+----------------------------------------------------------------
+A boot problem fix for am33xx beaglebone caused by GPMC,
+a regression fix for local timer, and a clockdomain locking fix.
+Also few minor fixes for boot time and sparse warnings.
 
-> Almost all of the platform patches in your tree seem to be bug fixes,
-> so they are still good for inclusion in v3.7 if you submit them to
-> arm-soc soon, but please make sure you separate bug fixes from other
-> changes so we can group them appropriately when forwarding them to
-> Linus.
+----------------------------------------------------------------
+Benoit Cousson (1):
+      ARM: OMAP2+: clock data: Add dev-id for the omap-gpmc dummy fck
 
-Unfortunately, as I already explained to you in
-https://lkml.org/lkml/2012/9/29/37, my resources for IXP4xx are very
-limited (and this isn't a paid job) and I'm in no way able to do what
-you require. This, coupled with my inability to make the patches end up
-upstream any other way, will make me post relevant MAINTAINERS changes
-shortly.
+Jon Hunter (1):
+      ARM: OMAP2+: Allow kernel to boot even if GPMC fails to reserve memory
 
-Don't get me wrong. If I had time for this it could be different.
-Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
-this point. Given the raised barriers to participate, probably aimed at
-paid maintainers, I have to quit doing this.
+Paul Walmsley (1):
+      ARM: OMAP: resolve sparse warning concerning debug_card_init()
 
-BTW since Imre has probably even much less time, it would be a good time
-to find someone to maintain IXP4xx code. I will be publishing (from time
-to time) my tree (I'm using the hw myself), so even simple
-cherry-picking would probably make some sense.
--- 
-Krzysztof Halasa
+Sebastien Guiriec (1):
+      ARM: OMAP4: devices: fixup OMAP4 DMIC platform device error message
+
+Tero Kristo (1):
+      ARM: OMAP: clockdomain: Fix locking on _clkdm_clk_hwmod_enable / disable
+
+Tony Lindgren (1):
+      ARM: OMAP4: Fix twd_local_timer_register regression
+
+ arch/arm/mach-omap2/clock44xx_data.c |    2 +-
+ arch/arm/mach-omap2/clockdomain.c    |   15 +++++++++++----
+ arch/arm/mach-omap2/devices.c        |    2 +-
+ arch/arm/mach-omap2/gpmc.c           |   24 +++++++++++++++++++-----
+ arch/arm/mach-omap2/timer.c          |    2 +-
+ arch/arm/plat-omap/debug-devices.c   |    1 +
+ 6 files changed, 34 insertions(+), 12 deletions(-)
