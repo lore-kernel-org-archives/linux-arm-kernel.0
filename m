@@ -1,32 +1,40 @@
-From: shiraz.linux.kernel@gmail.com (shiraz hashim)
-Date: Wed, 17 Oct 2012 19:06:07 +0530
-Subject: [Celinux-dev] PDF documentation
-In-Reply-To: <20121017101244.71A572029CB@gemini.denx.de>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
- <20121016143522.086F2204292@gemini.denx.de>
- <507DA84A.2080904@am.sony.com>
- <20121017101244.71A572029CB@gemini.denx.de>
-Message-ID: <CAPub14-_3tkfCwU9wMmyuYxUKrjThetGRdF0LCR8tTLrbNHYPw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 17 Oct 2012 13:38:00 +0000
+Subject: [PATCH 1/2] mmc: core: Support all MMC capabilities when booting
+ from Device Tree
+In-Reply-To: <20121015160740.GC7662@gmail.com>
+References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
+ <201210151420.29930.arnd@arndb.de> <20121015160740.GC7662@gmail.com>
+Message-ID: <201210171338.01011.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Wolfgang,
+On Monday 15 October 2012, Lee Jones wrote:
+> > and so on. What are you actually missing in the properties that
+> > are already there?
+> 
+> MMC_CAP_ERASE
 
-On Wed, Oct 17, 2012 at 3:42 PM, Wolfgang Denk <wd@denx.de> wrote:
-> We use Foswiki for capabilities like this.  Note that I definitely
-> don't want to start a "my wiki is better than your wiki" religous war
-> here ;-)
+This one seems to be set unconditionally on some controllers but
+not on others. Why would it need to be configurable?
 
-I like documentation maintained on denx site. However, have you tried
-light markup language like asciidoc for documentation.
+> MMC_CAP_UHS_SDR12
+> MMC_CAP_UHS_SDR25
+> MMC_CAP_UHS_DDR50
 
-The good thing is that it is powerful enough to convert into docbook and
-then onto pdf, html or other formats, at the same time clean enough to
-be readable in txt format itself.
+Could this be derived from max-frequency?
 
-The text base provides an opportunity to use git or other version tools and
-apply same worklow as that of code development.
+> MMC_CAP_1_8V_DDR
 
--- 
-regards
-Shiraz Hashim
+Right, I suppose we need this. Should we have a minimum and maximum
+voltage added to the common properties for this?
+
+> MMC_CAP2_DETECT_ON_ERR
+> MMC_CAP2_NO_SLEEP_CMD
+
+I don't see these ones being set anywhere, but they were both
+added by Ulf. Maybe he can comment on if or why they are needed
+in devicetree, rather than being set by the driver unconditionally
+or for specific versions of the host controller.
+
+	Arnd
