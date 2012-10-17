@@ -1,62 +1,173 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 17 Oct 2012 11:20:15 +0100
-Subject: [RFC PATCH] ARM: kernel: update cpuinfo to print all online CPUs
- features
-In-Reply-To: <20121016214752.GH21164@n2100.arm.linux.org.uk>
-References: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
- <507DA08B.502@ti.com>
- <20121016214752.GH21164@n2100.arm.linux.org.uk>
-Message-ID: <20121017102015.GA13189@e102568-lin.cambridge.arm.com>
+Date: Wed, 17 Oct 2012 11:48:41 +0100
+Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
+In-Reply-To: <507DC6C3.6090403@gmail.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <507DC6C3.6090403@gmail.com>
+Message-ID: <20121017104841.GB13189@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 10:47:52PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 16, 2012 at 11:29:39PM +0530, Santosh Shilimkar wrote:
-> > Not exactly related to the $subject patch, but I remember doing a patch
-> > to have cat /proc/cpuinfo spitting only online CPUs just like x86 using
-> > for_each_online_cpu(i).
-> > At that point Russell mentioned about a possibility of read() syscall
-> > spreading over the hot-plug operation and hence the above may not
-> > be safe.
-> >
-> > is that right Russell ?
+Hi Rob,
+
+thanks for having a look.
+
+On Tue, Oct 16, 2012 at 09:42:43PM +0100, Rob Herring wrote:
+> On 10/16/2012 08:21 AM, Lorenzo Pieralisi wrote:
+> > When booting through a device tree, the kernel cpu logical id map can be
+> > initialized using device tree data passed by FW or through an embedded blob.
+> > 
+> > This patch adds a function that parses device tree "cpu" nodes and
+> > retrieves the corresponding CPUs hardware identifiers (MPIDR).
+> > It sets the possible cpus and the cpu logical map values according to
+> > the number of CPUs defined in the device tree and respective properties.
+> > 
+> > The primary CPU is assigned cpu logical number 0 to keep the current
+> > convention valid.
+> > 
+> > Current bindings documentation is included in the patch:
+> > 
+> > Documentation/devicetree/bindings/arm/cpus.txt
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/cpus.txt | 42 +++++++++++++++++++++++
+> >  arch/arm/include/asm/prom.h                    |  2 ++
+> >  arch/arm/kernel/devtree.c                      | 47 ++++++++++++++++++++++++++
+> >  3 files changed, 91 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> > new file mode 100644
+> > index 0000000..897f3b4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> > @@ -0,0 +1,42 @@
+> > +* ARM CPUs binding description
+> > +
+> > +The device tree allows to describe the layout of CPUs in a system through
+> > +the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
+> > +defining properties for every cpu.
+> > +
+> > +Bindings for CPU nodes follow the ePAPR standard, available from:
+> > +
+> > +http://devicetree.org
+> > +
+> > +For the ARM architecture every CPU node must contain the following property:
+> > +
+> > +- reg : property defining the CPU MPIDR[23:0] register bits
 > 
-> That is correct, but you will notice that the code now uses the online
-> cpus rather than the present, inspite of my objections.  I gave up
-> fighting the case, so now people get to live with the consequences of
-> this.
+> defining or matching the MPIDR?
+
+I would say matching, otherwise it reads as if the MPIDR were writable.
+
+> > +
+> > +Every cpu node is required to set its device_type to "cpu".
 > 
-> This will be fun with dynamic hotplugging with big.LITTLE when people
-> come to read any of these files which change their output with the
-> online CPUs.  Oh what fun we're in for there.
+> This is a bit questionable as device_type is deprecated for FDT.
+> However, since the ePAPR defines using it
+> 
+> You should add a compatible property for the cpu model.
 
-I had a look at how glibc currently detects cpus in __get_nprocs() and all
-methods end up relying on online CPUs:
+Ok, I will.
 
-- /sys/devices/system/cpu/online
-- /proc/stat
-- /proc/cpuinfo
+> > +
+> > +Example:
+> > +
+> > +	cpus {
+> > +		#size-cells = <0>;
+> > +		#address-cells = <1>;
+> > +
+> > +		CPU0: cpu at 0 {
+> > +			device_type = "cpu";
+> > +			reg = <0x0>;
+> > +		};
+> > +
+> > +		CPU1: cpu at 1 {
+> > +			device_type = "cpu";
+> > +			reg = <0x1>;
+> > +		};
+> > +
+> > +		CPU2: cpu at 100 {
+> > +			device_type = "cpu";
+> > +			reg = <0x100>;
+> > +		};
+> > +
+> > +		CPU3: cpu at 101 {
+> > +			device_type = "cpu";
+> > +			reg = <0x101>;
+> > +		};
+> > +	};
+> > diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> > index aeae9c6..8dd51dc 100644
+> > --- a/arch/arm/include/asm/prom.h
+> > +++ b/arch/arm/include/asm/prom.h
+> > @@ -15,6 +15,7 @@
+> >  
+> >  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
+> >  extern void arm_dt_memblock_reserve(void);
+> > +extern void __init arm_dt_init_cpu_maps(void);
+> >  
+> >  #else /* CONFIG_OF */
+> >  
+> > @@ -24,6 +25,7 @@ static inline struct machine_desc *setup_machine_fdt(unsigned int dt_phys)
+> >  }
+> >  
+> >  static inline void arm_dt_memblock_reserve(void) { }
+> > +static inline void arm_dt_init_cpu_maps(void) { }
+> >  
+> >  #endif /* CONFIG_OF */
+> >  #endif /* ASMARM_PROM_H */
+> > diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> > index bee7f9d..c86e414 100644
+> > --- a/arch/arm/kernel/devtree.c
+> > +++ b/arch/arm/kernel/devtree.c
+> > @@ -19,8 +19,10 @@
+> >  #include <linux/of_irq.h>
+> >  #include <linux/of_platform.h>
+> >  
+> > +#include <asm/cputype.h>
+> >  #include <asm/setup.h>
+> >  #include <asm/page.h>
+> > +#include <asm/smp_plat.h>
+> >  #include <asm/mach/arch.h>
+> >  #include <asm/mach-types.h>
+> >  
+> > @@ -61,6 +63,51 @@ void __init arm_dt_memblock_reserve(void)
+> >  	}
+> >  }
+> >  
+> > +/*
+> > + * arm_dt_init_cpu_maps - Function retrieves cpu nodes from the device tree
+> > + * and builds the cpu logical map array containing MPIDR values related to
+> > + * logical cpus
+> > + *
+> > + * Updates the cpu possible mask with the number of parsed cpu nodes
+> > + */
+> > +void __init arm_dt_init_cpu_maps(void)
+> > +{
+> > +	struct device_node *dn = NULL;
+> > +	int i, cpu = 1;
+> > +
+> > +	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
+> 
+> I think all /cpu nodes would have the right type. You could use
+> for_each_child_of_node here.
 
-Given the thread:
+Starting from /cpus, looked-up by path, right ?
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/054081.html
+> > +		const u32 *hwid;
+> > +		int len;
+> > +
+> > +		pr_debug("  * %s...\n", dn->full_name);
+> > +
+> > +		hwid = of_get_property(dn, "reg", &len);
+> > +
+> 
+> Use of_property_read_u32.
 
-I do not think there is room to change the current behaviour of /proc/cpuinfo
-as far as the online vs. present argument goes, and I certainly did not try.
+Ok.
 
-I posted this code just to understand if it makes sense to expose all CPU ids
-in /proc/cpuinfo the way I did (the same way x86 does, even though the code is
-slightly different).
-
-> I guess the only way to convince people is to let them make their
-> mistakes in the kernel.
-
-That's what I wanted to prevent by posting this code, namely getting
-feedback on the best way to improve /proc/cpuinfo for systems where CPU
-ids are not homogeneous.
-
-The "online vs. present" issue is already there as Russell pointed out.
-
-Thank you very much for the review, any further feedback appreciated.
-
+Thanks,
 Lorenzo
