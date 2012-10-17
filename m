@@ -1,58 +1,49 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 17 Oct 2012 14:31:41 +0200
-Subject: [PATCH RFC 09/15 v5] gpio-em: Add block GPIO API
+Date: Wed, 17 Oct 2012 14:31:42 +0200
+Subject: [PATCH RFC 10/15 v5] gpio-pl061: Add block GPIO API
 In-Reply-To: <1350477107-26512-1-git-send-email-stigge@antcom.de>
 References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
-Message-ID: <1350477107-26512-10-git-send-email-stigge@antcom.de>
+Message-ID: <1350477107-26512-11-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds block GPIO API support to the gpio-em driver.
+This patch adds block GPIO API support to the gpio-pl061 driver.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-
 ---
- drivers/gpio/gpio-em.c |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/gpio/gpio-pl061.c |   17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
---- linux-2.6.orig/drivers/gpio/gpio-em.c
-+++ linux-2.6/drivers/gpio/gpio-em.c
-@@ -203,6 +203,27 @@ static void em_gio_set(struct gpio_chip
- 		__em_gio_set(chip, GIO_OH, offset - 16, value);
+--- linux-2.6.orig/drivers/gpio/gpio-pl061.c
++++ linux-2.6/drivers/gpio/gpio-pl061.c
+@@ -123,6 +123,21 @@ static void pl061_set_value(struct gpio_
+ 	writeb(!!value << offset, chip->base + (1 << (offset + 2)));
  }
  
-+static unsigned long em_gio_get_block(struct gpio_chip *chip,
-+				      unsigned long mask)
++static unsigned long pl061_get_block(struct gpio_chip *gc, unsigned long mask)
 +{
-+	return (int)(em_gio_read(gpio_to_priv(chip), GIO_I) & mask);
++	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
++
++	return !!readb(chip->base + (mask << 2));
 +}
 +
-+static void em_gio_set_block(struct gpio_chip *chip, unsigned long mask,
-+			     unsigned long values)
++static void pl061_set_block(struct gpio_chip *gc, unsigned long mask,
++			    unsigned long values)
 +{
-+	unsigned long mask_ol = mask & 0xFFFF;
-+	unsigned long mask_oh = mask >> 16;
++	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
 +
-+	unsigned long values_ol = values & mask_ol;
-+	unsigned long values_oh = (values >> 16) & mask_oh;
-+
-+	em_gio_write(gpio_to_priv(chip), GIO_OL,
-+		     mask_ol << 16 | values_ol);
-+	em_gio_write(gpio_to_priv(chip), GIO_OH,
-+		     mask_oh << 16 | values_oh);
++	writeb(values & mask, chip->base + (mask << 2));
 +}
 +
- static int em_gio_direction_output(struct gpio_chip *chip, unsigned offset,
- 				   int value)
+ static int pl061_to_irq(struct gpio_chip *gc, unsigned offset)
  {
-@@ -317,8 +338,10 @@ static int __devinit em_gio_probe(struct
- 	gpio_chip = &p->gpio_chip;
- 	gpio_chip->direction_input = em_gio_direction_input;
- 	gpio_chip->get = em_gio_get;
-+	gpio_chip->get_block = em_gio_get_block;
- 	gpio_chip->direction_output = em_gio_direction_output;
- 	gpio_chip->set = em_gio_set;
-+	gpio_chip->set_block = em_gio_set_block;
- 	gpio_chip->to_irq = em_gio_to_irq;
- 	gpio_chip->label = name;
- 	gpio_chip->owner = THIS_MODULE;
+ 	struct pl061_gpio *chip = container_of(gc, struct pl061_gpio, gc);
+@@ -256,6 +271,8 @@ static int pl061_probe(struct amba_devic
+ 	chip->gc.direction_output = pl061_direction_output;
+ 	chip->gc.get = pl061_get_value;
+ 	chip->gc.set = pl061_set_value;
++	chip->gc.get_block = pl061_get_block;
++	chip->gc.set_block = pl061_set_block;
+ 	chip->gc.to_irq = pl061_to_irq;
+ 	chip->gc.ngpio = PL061_GPIO_NR;
+ 	chip->gc.label = dev_name(&dev->dev);
