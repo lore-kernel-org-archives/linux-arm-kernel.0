@@ -1,28 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Oct 2012 10:38:37 -0700
-Subject: [PATCH] ARM: OMAP: move plat-omap/include/plat/sdrc.h into
- mach-omap2/sdrc.h
-In-Reply-To: <alpine.DEB.2.00.1210170038200.9767@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210170038200.9767@utopia.booyaka.com>
-Message-ID: <20121017173837.GU15569@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Oct 2012 18:48:05 +0100
+Subject: [RFC PATCH] ARM: SMP: consolidate holding pen
+In-Reply-To: <1350487967-2555-1-git-send-email-marc.zyngier@arm.com>
+References: <1350487967-2555-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20121017174804.GK21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121016 17:48]:
+On Wed, Oct 17, 2012 at 04:32:47PM +0100, Marc Zyngier wrote:
+> As with other bits of the SMP code, platforms have duplicated a lot
+> of the RealView implementation. As an effort to slightly reduce
+> the clutter, make the plat-versatile version of the holding pen
+> a standard part of the SMP framework.
 > 
-> Remove arch/arm/plat-omap/include/plat/sdrc.h by folding its contents
-> into arch/arm/mach-omap2/sdrc.h.  The objective is to assist Tony in
-> cleaning out arch/arm/plat-omap/, as his upstreams request.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> ---
-> 
-> This has a dependency on Tomi's "OMAP: VRFB: convert to platform device" 
-> series.
+> Platforms can still provide their own, but those who carried an exact
+> duplicate of the Realview code are switched to the common implementation.
 
-Thanks applying this into omap-for-v3.8/cleanup-headers-dss.
-
-Regards,
-
-Tony
+My position on this hasn't changed.
