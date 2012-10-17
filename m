@@ -1,50 +1,58 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 17 Oct 2012 17:57:34 +0200
-Subject: [PATCH 1/8] [media] s5p-fimc: Use clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <CAK9yfHymckQLOp=xavQ1sj5uJKRg7tFMXgvo68Dp8GL6N9g0JQ@mail.gmail.com>
-References: <1350472311-9748-1-git-send-email-sachin.kamat@linaro.org>
- <507EC1BF.6040107@samsung.com>
- <CAK9yfHymckQLOp=xavQ1sj5uJKRg7tFMXgvo68Dp8GL6N9g0JQ@mail.gmail.com>
-Message-ID: <507ED56E.1000406@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Oct 2012 09:13:48 -0700
+Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
+In-Reply-To: <507EC395.7060409@ti.com>
+References: <cover.1350327320.git.richardcochran@gmail.com>
+ <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
+ <20121016174835.GV15569@atomide.com> <507DCA8D.7060309@ti.com>
+ <20121016212647.GM15569@atomide.com> <507EC395.7060409@ti.com>
+Message-ID: <20121017161348.GT15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2012 05:35 PM, Sachin Kamat wrote:
->> Most of the s5p-* drivers have already added support for clk_(un)prepare.
->> Thus most of your changes in this patch are not needed. I seem to have only
->> missed fimc-mdevice.c, other modules are already reworked
+* Jon Hunter <jon-hunter@ti.com> [121017 07:43]:
 > 
-> I did not find these changes in your tree. Please let me know the
-> branch where these changes are available.
-
-Are in Linus' tree, for quite long already, commits:
-
-11a37c709797cc56f48905e68a3099b79cf08850
-[media] s5p-g2d: Added support for clk_prepare
-
-bd7d8888e99d67f778f4ee272346322c0b9cb378
-[media] s5p-fimc: convert to clk_prepare()/clk_unprepare()
-
-eb732518e0db585376f95256b18b2149240e3ad3
-[media] s5p-mfc: Added support for clk_prepare
-
-Please note there was the media drivers reorganization recently, e.g.
-drivers/media/video/s5p-* changed to drivers/media/platform/s5p-*.
-
->> $ git grep -5  clk_prepare  -- drivers/media/platform/s5p-fimc
->> drivers/media/platform/s5p-fimc/fimc-core.c-
->> drivers/media/platform/s5p-fimc/fimc-core.c-    for (i = 0; i < MAX_FIMC_CLOCKS; i++) {
->> drivers/media/platform/s5p-fimc/fimc-core.c-            fimc->clock[i] = clk_get(&fimc->pdev->dev, fimc_clocks[i]);
->> drivers/media/platform/s5p-fimc/fimc-core.c-            if (IS_ERR(fimc->clock[i]))
+> On 10/16/2012 04:26 PM, Tony Lindgren wrote:
+> > * Jon Hunter <jon-hunter@ti.com> [121016 14:00]:
+> >> Hi Tony,
+> >>
+> >> On 10/16/2012 12:48 PM, Tony Lindgren wrote:
+> >>> * Richard Cochran <richardcochran@gmail.com> [121015 12:18]:
+> >>>> From: hvaibhav at ti.com <hvaibhav@ti.com>
+> >>>>
+> >>>> With recent changes in omap gpmc driver code, in case of DT
+> >>>> boot mode, where bootloader does not configure gpmc cs space
+> >>>> will result into kernel BUG() inside gpmc_mem_init() function,
+> >>>> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
+> >>>> gpmc_config7[0].baseaddress is set to '0' on reset.
+> >>>>
+> >>>> This use-case is applicable for any board/EVM which doesn't have
+> >>>> any peripheral connected to gpmc cs0, for example BeagleXM and
+> >>>> BeagleBone, so DT boot mode fails.
+> >>>>
+> >>>> This patch adds of_have_populated_dt() check before creating
+> >>>> device, so that for DT boot mode, gpmc probe will not be called
+> >>>> which is expected behavior, as gpmc is not supported yet from DT.
+> >>>
+> >>> I'm applying this one into omap-for-v3.7-rc1/fixes-part2.
+> >>>
+> >>> Next time, please also cc linux-omap at vger.kernel.org for series
+> >>> like this. I'm sure the people reading the omap list are interested
+> >>> in these.
+> >>
+> >> This patch appears to be masking an underlying issue. How about 
+> >> something like the following ...
+> > 
+> > OK that looks good to me. I'll drop the earlier fix and use
+> > yours instead.
 > 
->>> I would prefer you have added the required changes at fimc_md_get_clocks()
->> and fimc_md_put_clocks() functions.
-> 
-> Ok. I will check this.
+> Hi Tony, sorry but I realised now that in my patch that I need to
+> take care of releasing and memory and clocks that were acquired 
+> during the probe. Here is a V2. If you prefer I can create a delta
+> patch also with the previous. 
 
-Thanks.
+OK thanks I'll update it.
 
---
 Regards,
-Sylwester
+
+Tony
