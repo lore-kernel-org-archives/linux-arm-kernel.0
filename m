@@ -1,47 +1,94 @@
-From: const@makelinux.com (Constantine Shulyupin)
-Date: Wed, 17 Oct 2012 21:26:59 +0200
-Subject: PDF documentation
-In-Reply-To: <20121017165125.12301.qmail@stuge.se>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
- <20121016140555.12139.qmail@stuge.se>
- <CAE7jHC8ru3TVaRXWvn5p6795LTk-WkVZZRJxB1-vJag+=H62jw@mail.gmail.com>
- <20121017165125.12301.qmail@stuge.se>
-Message-ID: <CAE7jHC_PL_C-4eY6LaKsfqdYhT2AR-djo3Swn6dmYZYPKJOX3w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Oct 2012 20:41:57 +0100
+Subject: IS_ERR_OR_NULL - please STOP telling people to use this on a whim
+Message-ID: <20121017194157.GM21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 6:51 PM, Peter Stuge <peter@stuge.se> wrote:
-> Constantine Shulyupin wrote:
->> Peter, can you please just send me some links to most frequently
->> used online PDF?
->
-> I don't have a particular PDF that is used more frequently than
-> others. Here's one I used recently, for a common flash chip:
->
-> http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/DBACA1C90564EBB248257639003A563A/$File/MX29GL128E,%203V%20(VI-O),%20128Mb,%20v1.5.pdf
->
->> I would like to convert them to html and see how usable it is.
+People,
 
-I've converted you pdf and uploaded to a site:
-http://makelinux.net/lib/macronix/MX29GL128E/
+This is not aimed at anyone specifically - but it is aimed at everyone
+who reviews patches to make them aware of this issue, and to modify their
+behaviour.
 
-It can't even approach to replase PDF,  but it adds possibility to
-send in a e-mail link to a specific page:
-COMMON FLASH MEMORY INTERFACE (CFI) MODE:
-http://makelinux.net/lib/macronix/MX29GL128E/doc-34
-http://makelinux.net/lib/macronix/MX29GL128E/doc-35
+I'm geting sick and tired of telling people about this.  I've just
+floated the idea of removing IS_ERR_OR_NULL from the kernel tree because
+it's one of the most incorrectly used and abused macros we have in the
+source tree.
 
-Here is jet another document, huge 5K pages DS of OMAP4460:
-http://makelinux.net/lib/ti/OMAP4460/
-http://makelinux.net/lib/ti/OMAP4460/doc-outline
-OMAP4460 USBPHY Registers: http://makelinux.net/lib/ti/OMAP4460/doc-5464
-Debug Modules Memory Mapping: http://makelinux.net/lib/ti/OMAP4460/doc-5845
+It would be one thing if this was only being done by people who are
+submitting new code, but it's far worse than that.  Reviewers who should
+know better are telling people to use it _incorrectly_.
 
-How it looks?
-Can it be useful?
+Reviewers really need to think about your review comments.  Looking
+through the kernel tree today, I see lots of uses of IS_ERR_OR_NULL(),
+many of them are *buggy*.
 
--- 
-Constantine Shulyupin
-http://www.MakeLinux.com/
-Embedded Linux Systems,
-Device Drivers, TI DaVinci
+Take a moment to think about this:
+
+int error_value(struct device *dev, void *foo)
+{
+	if (IS_ERR_OR_NULL(foo))
+		return PTR_ERR(foo);
+	return 0;
+}
+
+Consider the value this function returns for three arguments:
+
+1. an errno encoded pointer
+2. a NULL pointer.
+3. a valid pointer.
+
+If you can't see the problem, then *do* *not* tell anyone to use
+IS_ERR_OR_NULL(), because you do *not* have the understanding necessary
+to make that judgement yourself - you're probably telling people to
+create buggy code.
+
+Here's the list so far of what looks like buggy uses specific to ARM.
+There _are_ others elsewhere in the kernel.
+
+drivers/media/video/s5p-mfc/s5p_mfc.c:  if (IS_ERR_OR_NULL(dev->alloc_ctx[0])) {
+drivers/media/video/s5p-mfc/s5p_mfc.c-          ret = PTR_ERR(dev->alloc_ctx[0]);
+drivers/media/video/s5p-mfc/s5p_mfc.c-          goto err_res;
+drivers/media/video/s5p-mfc/s5p_mfc.c-  }
+--
+drivers/media/video/s5p-mfc/s5p_mfc.c:  if (IS_ERR_OR_NULL(dev->alloc_ctx[1])) {
+drivers/media/video/s5p-mfc/s5p_mfc.c-          ret = PTR_ERR(dev->alloc_ctx[1]);
+drivers/media/video/s5p-mfc/s5p_mfc.c-          goto err_mem_init_ctx_1;
+drivers/media/video/s5p-mfc/s5p_mfc.c-  }
+--
+drivers/staging/omapdrm/omap_dmm_tiler.c:       if (IS_ERR_OR_NULL(txn))
+drivers/staging/omapdrm/omap_dmm_tiler.c-               return PTR_ERR(txn);
+drivers/staging/omapdrm/omap_dmm_tiler.c-
+drivers/staging/omapdrm/omap_dmm_tiler.c-       tcm_for_each_slice(slice, *area, area_s) {
+--
+drivers/staging/omap-thermal/omap-bandgap.c:    if (IS_ERR_OR_NULL(bg_ptr)) {
+drivers/staging/omap-thermal/omap-bandgap.c-            dev_err(&pdev->dev, "failed to fetch platform data\n");
+drivers/staging/omap-thermal/omap-bandgap.c-            return PTR_ERR(bg_ptr);
+drivers/staging/omap-thermal/omap-bandgap.c-    }
+--
+drivers/staging/omap-thermal/omap-thermal-common.c:     if (IS_ERR_OR_NULL(data->omap_thermal)) {
+drivers/staging/omap-thermal/omap-thermal-common.c-             dev_err(bg_ptr->dev, "thermal zone device is NULL\n");
+drivers/staging/omap-thermal/omap-thermal-common.c-             return PTR_ERR(data->omap_thermal);
+drivers/staging/omap-thermal/omap-thermal-common.c-     }
+--
+drivers/staging/omap-thermal/omap-thermal-common.c:     if (IS_ERR_OR_NULL(freq_table)) {
+drivers/staging/omap-thermal/omap-thermal-common.c-             dev_err(bg_ptr->dev,
+drivers/staging/omap-thermal/omap-thermal-common.c-                     "%s: failed to get cpufreq table (%p)\n",
+drivers/staging/omap-thermal/omap-thermal-common.c-                     __func__, freq_table);
+--
+drivers/staging/omap-thermal/omap-thermal-common.c:     if (IS_ERR_OR_NULL(data->cool_dev)) {
+drivers/staging/omap-thermal/omap-thermal-common.c-             dev_err(bg_ptr->dev,
+drivers/staging/omap-thermal/omap-thermal-common.c-                     "Failed to register cpufreq cooling device\n");
+drivers/staging/omap-thermal/omap-thermal-common.c-             return PTR_ERR(data->cool_dev);
+--
+drivers/gpu/drm/exynos/exynos_drm_dmabuf.c:     if (IS_ERR_OR_NULL(sgt)) {
+drivers/gpu/drm/exynos/exynos_drm_dmabuf.c-             ret = PTR_ERR(sgt);
+drivers/gpu/drm/exynos/exynos_drm_dmabuf.c-             goto err_buf_detach;
+drivers/gpu/drm/exynos/exynos_drm_dmabuf.c-     }
+--
+drivers/gpu/drm/exynos/exynos_drm_fbdev.c:      if (IS_ERR_OR_NULL(helper->fb)) {
+drivers/gpu/drm/exynos/exynos_drm_fbdev.c-              DRM_ERROR("failed to create drm framebuffer.\n");
+drivers/gpu/drm/exynos/exynos_drm_fbdev.c-              ret = PTR_ERR(helper->fb);
+drivers/gpu/drm/exynos/exynos_drm_fbdev.c-              goto out;
+--
