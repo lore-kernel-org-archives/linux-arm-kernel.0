@@ -1,64 +1,157 @@
-From: peter@stuge.se (Peter Stuge)
-Date: Wed, 17 Oct 2012 18:51:25 +0200
-Subject: PDF documentation
-In-Reply-To: <CAE7jHC8ru3TVaRXWvn5p6795LTk-WkVZZRJxB1-vJag+=H62jw@mail.gmail.com>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
- <20121016140555.12139.qmail@stuge.se>
- <CAE7jHC8ru3TVaRXWvn5p6795LTk-WkVZZRJxB1-vJag+=H62jw@mail.gmail.com>
-Message-ID: <20121017165125.12301.qmail@stuge.se>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Wed, 17 Oct 2012 18:53:52 +0200
+Subject: [PATCH v2] ARM: mxs: Add support for the Armadeus Systems APF28 module
+Message-ID: <1350492832-7044-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Constantine Shulyupin wrote:
-> >> - what PDF documentation do you use? (You can just drop a link to PDF,
-> >> for example http://www.ti.com/lit/ds/symlink/omap4430.pdf)
-> >
-> > I don't understand what you want to know. I have thousands of data
-> > sheets for parts that I have used, use, or plan to use.
-> 
-> Peter, can you please just send me some links to most frequently
-> used online PDF?
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-I don't have a particular PDF that is used more frequently than
-others. Here's one I used recently, for a common flash chip:
+The APF28 is a small SOM built around an i.MX28 processor with 128MBytes DDR2,
+256MBytes NAND Flash and an Ethernet PHY.
 
-http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/DBACA1C90564EBB248257639003A563A/$File/MX29GL128E,%203V%20(VI-O),%20128Mb,%20v1.5.pdf
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ Changes since v1 (as advised by Shawn Guo):
+ * add imx28-apf28.dtb to arch/arm/boot/dts/Makefile
+ * fix partitions declaration for gpmi-nand in imx28-apf28.dts
 
+ arch/arm/boot/dts/Makefile        |    3 +-
+ arch/arm/boot/dts/imx28-apf28.dts |   85 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c      |    7 +++
+ 3 files changed, 94 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
 
-> I would like to convert them to html and see how usable it is.
-
-As others also mention I think that is backwards. If you want to do
-something good for documentation then look for workflows where a
-single source format allows to perfectly generate a variety of output
-formats.
-
-Perfectly matters. Anyone can cobble up a script to render characters
-on a PDF page. It will look awful, which distracts readers, which
-generates more support inquiries.
-
-PDF is a digital sheet media. HTML comes nowhere near the tools
-PDF offers for typesetting and typography. PDFs can be made beautiful
-without a lot of effort.
-
-Creating beautiful HTML is, let's say, uneconomical. Let's not talk
-about how it limits the designer. (That's what really good web
-designers do - know those limits yet still create working UX.)
-
-Check out PostScript and then check out HTML. The similarities may be
-comparable to those of a magnificent fil?t knife and a wooden spoon.
-
-One can of course prepare food with both.
-
-
-As I mentioned before, I still find HTML superior for discovery and
-early selection of new products. It is unneccessarily and
-unpleasantly time-consuming to deal with PDF documents if there is a
-particular requirement which needs to be checked against a large
-number of available products. I was looking for a low-profile SMD
-pushbutton recently, and in order to find the information I needed I
-had to view a lot of PDFs at many manufacturers. One manufacturer
-however had the information *right there* on the product family web
-page. That saved me a lot of time, and I chose one of their products.
-
-
-//Peter
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index c1ce813..5baf5a0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -59,7 +59,8 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx28-cfa10049.dtb \
+ 	imx28-evk.dtb \
+ 	imx28-m28evk.dtb \
+-	imx28-tx28.dtb
++	imx28-tx28.dtb \
++	imx28-apf28.dtb
+ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
+diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
+new file mode 100644
+index 0000000..7eb0758
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-apf28.dts
+@@ -0,0 +1,85 @@
++/*
++ * Copyright 2012 Armadeus Systems - <support@armadeus.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx28.dtsi"
++
++/ {
++	model = "Armadeus Systems APF28 module";
++	compatible = "armadeus,imx28-apf28", "fsl,imx28";
++
++	memory {
++		reg = <0x40000000 0x08000000>;
++	};
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			gpmi-nand at 8000c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
++				status = "okay";
++
++				partition at 0 {
++					label = "u-boot";
++					reg = <0x0 0x300000>;
++				};
++
++				partition at 300000 {
++					label = "env";
++					reg = <0x300000 0x80000>;
++				};
++
++				partition at 380000 {
++					label = "env2";
++					reg = <0x380000 0x80000>;
++				};
++
++				partition at 400000 {
++					label = "dtb";
++					reg = <0x400000 0x80000>;
++				};
++
++				partition at 480000 {
++					label = "splash";
++					reg = <0x480000 0x80000>;
++				};
++
++				partition at 500000 {
++					label = "kernel";
++					reg = <0x500000 0x800000>;
++				};
++
++				partition at d00000 {
++					label = "rootfs";
++					reg = <0xd00000 0xf300000>;
++				};
++			};
++		};
++
++		apbx at 80040000 {
++			duart: serial at 80074000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&duart_pins_a>;
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		mac0: ethernet at 800f0000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac0_pins_a>;
++			phy-reset-gpios = <&gpio4 13 0>;
++			status = "okay";
++		};
++	};
++};
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index b8c452a..9cfb25c 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -367,6 +367,11 @@ static void __init cfa10049_init(void)
+ 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+ }
+ 
++static void __init apf28_init(void)
++{
++	enable_clk_enet_out();
++}
++
+ static void __init mxs_machine_init(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+@@ -379,6 +384,8 @@ static void __init mxs_machine_init(void)
+ 		apx4devkit_init();
+ 	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
+ 		cfa10049_init();
++	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
++		apf28_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     mxs_auxdata_lookup, NULL);
+-- 
+1.7.5.4
