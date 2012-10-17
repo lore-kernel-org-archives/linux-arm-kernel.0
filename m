@@ -1,90 +1,92 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 15 Oct 2012 12:33:36 -0000
-Subject: [GIT PULL] OMAP-GPMC related cleanup for common zImage
-In-Reply-To: <1350303247-13495-1-git-send-email-afzal@ti.com>
-References: <1350303247-13495-1-git-send-email-afzal@ti.com>
-Message-ID: <1350304405-14762-1-git-send-email-afzal@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 17 Oct 2012 14:41:42 -0000
+Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
+ revert "i2c: omap: switch to threaded IRQ support")
+In-Reply-To: <20121017140002.GI11394@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+ <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
+ <20121016133356.GG21801@arwen.pp.htv.fi>
+ <87ipaanljt.fsf_-_@deeprootsystems.com>
+ <20121017140002.GI11394@arwen.pp.htv.fi>
+Message-ID: <20121017143534.GJ11394@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Hi,
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+On Wed, Oct 17, 2012 at 05:00:02PM +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Oct 16, 2012 at 02:39:50PM -0700, Kevin Hilman wrote:
+> > + peterz, tglx
+> > 
+> > Felipe Balbi <balbi@ti.com> writes:
+> > 
+> > [...]
+> > 
+> > > The problem I see is that even though we properly return IRQ_WAKE_THREAD
+> > > and wake_up_process() manages to wakeup the IRQ thread (it returns 1),
+> > > the thread is never scheduled. To make things even worse, ouw irq thread
+> > > runs once, but doesn't run on a consecutive call. Here's some (rather
+> > > nasty) debug prints showing the problem:
+> > 
+> > [...]
+> > 
+> > >> [   88.721923] try_to_wake_up 1411
+> > >> [   88.725189] ===> irq_wake_thread 139: IRQ 72 wake_up_process 0
+> > >> [   88.731292] [sched_delayed] sched: RT throttling activated
+> > 
+> > This throttling message is the key one.
+> > 
+> > With RT throttling activated, the IRQ thread will not be run (it
+> > eventually will be allowed much later on, but by then, the I2C xfers
+> > have timed out.)
+> > 
+> > As a quick hack, the throttling can be disabled by seeting the
+> > sched_rt_runtime to RUNTIME_INF:
+> > 
+> >         # sysctl -w kernel.sched_rt_runtime_us=-1
+> > 
+> > and a quick test shows that things go back to working as expected.  But
+> > we still need to figure out why the throttling is hapenning...
+> > 
+> > So I started digging into why the RT runtime was so high, and noticed
+> > that time spent in suspend was being counted as RT runtime!
+> > 
+> > So spending time in suspend anywhere near sched_rt_runtime (0.95s) will
+> > cause the RT throttling to always be triggered, and thus prevent IRQ
+> > threads from running in the resume path.  Ouch.
+> > 
+> > I think I'm already in over my head in the RT runtime stuff, but
+> > counting the time spent in suspend as RT runtime smells like a bug to
+> > me. no?
+> > 
+> > Peter? Thomas?
+> 
+> it looks like removing console output completely (echo 0 >
+> /proc/sysrq-trigger) I don't see the issue anymore. Let me just run for
+> a few more iterations to make sure what I'm saying is correct.
 
-are available in the git repository at:
+Yeah, really looks like removing console output makes the problem go
+away. Ran a few iterations and it always worked fine. Full logs attached
 
-  git://gitorious.org/x0148406-public/linux-kernel.git tags/gpmc-czimage
+BTW, In the meantime I think I might have found some problems with
+omap_device's PM implementation. I'll test the patchset a little longer
+and send an RFC.
 
-for you to fetch changes up to 3ef5d0071cf6c8b9a00b559232bb700ad59999d7:
-
-  ARM: OMAP2+: gpmc: localize gpmc header (2012-10-15 14:42:15 +0530)
-
-----------------------------------------------------------------
-gpmc cleanup for common ARM zImage
-
-----------------------------------------------------------------
-Afzal Mohammed (16):
-      ARM: OMAP2+: nand: unify init functions
-      ARM: OMAP2+: onenand: refactor for clarity
-      ARM: OMAP2+: gpmc: remove cs# in sync clk div calc
-      mtd: onenand: omap: cleanup gpmc dependency
-      mtd: nand: omap: free region as per resource size
-      mtd: nand: omap: read nand using register address
-      ARM: OMAP2+: onenand: connected soc info in pdata
-      mtd: onenand: omap: use pdata info instead of cpu_is
-      ARM: OMAP2+: onenand: header cleanup
-      ARM: OMAP2+: nand: header cleanup
-      mtd: nand: omap: bring in gpmc nand macros
-      ARM: OMAP2+: nand: bch capability check
-      ARM: OMAP2+: gpmc: nand register helper bch update
-      mtd: nand: omap: handle gpmc bch[48]
-      ARM: OMAP2+: gpmc: remove exported nand functions
-      ARM: OMAP2+: gpmc: localize gpmc header
-
-Jon Hunter (1):
-      ARM: OMAP2+: GPMC: Remove unused OneNAND get_freq() platform function
-
- arch/arm/mach-omap2/board-2430sdp.c                |   2 +-
- arch/arm/mach-omap2/board-3430sdp.c                |   2 +-
- arch/arm/mach-omap2/board-apollon.c                |   2 +-
- arch/arm/mach-omap2/board-cm-t35.c                 |   5 +-
- arch/arm/mach-omap2/board-cm-t3517.c               |   5 +-
- arch/arm/mach-omap2/board-devkit8000.c             |  10 +-
- arch/arm/mach-omap2/board-flash.c                  |  50 +--
- arch/arm/mach-omap2/board-flash.h                  |   8 +-
- arch/arm/mach-omap2/board-h4.c                     |   2 +-
- arch/arm/mach-omap2/board-igep0020.c               |   5 +-
- arch/arm/mach-omap2/board-ldp.c                    |   6 +-
- arch/arm/mach-omap2/board-n8x0.c                   |   1 +
- arch/arm/mach-omap2/board-omap3beagle.c            |  10 +-
- arch/arm/mach-omap2/board-omap3evm.c               |   8 +-
- arch/arm/mach-omap2/board-omap3logic.c             |   2 +-
- arch/arm/mach-omap2/board-omap3pandora.c           |   3 +-
- arch/arm/mach-omap2/board-omap3stalker.c           |   2 +-
- arch/arm/mach-omap2/board-omap3touchbook.c         |  10 +-
- arch/arm/mach-omap2/board-overo.c                  |   9 +-
- arch/arm/mach-omap2/board-rm680.c                  |   3 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c       |   3 +-
- arch/arm/mach-omap2/board-rx51.c                   |   2 +-
- arch/arm/mach-omap2/board-zoom-debugboard.c        |   2 +-
- arch/arm/mach-omap2/board-zoom.c                   |   5 +-
- arch/arm/mach-omap2/common-board-devices.c         |  46 ---
- arch/arm/mach-omap2/common-board-devices.h         |   1 -
- arch/arm/mach-omap2/gpmc-nand.c                    |  85 ++--
- arch/arm/mach-omap2/gpmc-nand.h                    |  27 ++
- arch/arm/mach-omap2/gpmc-onenand.c                 | 214 +++++-----
- arch/arm/mach-omap2/gpmc-onenand.h                 |  24 ++
- arch/arm/mach-omap2/gpmc-smc91x.c                  |   2 +-
- arch/arm/mach-omap2/gpmc-smsc911x.c                |   2 +-
- arch/arm/mach-omap2/gpmc.c                         | 459 +--------------------
- .../{plat-omap/include/plat => mach-omap2}/gpmc.h  |  61 +--
- arch/arm/mach-omap2/pm34xx.c                       |   2 +-
- arch/arm/mach-omap2/usb-tusb6010.c                 |   2 +-
- drivers/mtd/nand/omap2.c                           | 125 +++++-
- drivers/mtd/onenand/omap2.c                        |   9 +-
- include/linux/platform_data/mtd-nand-omap2.h       |  46 ++-
- include/linux/platform_data/mtd-onenand-omap2.h    |  28 +-
- 40 files changed, 493 insertions(+), 797 deletions(-)
- create mode 100644 arch/arm/mach-omap2/gpmc-nand.h
- create mode 100644 arch/arm/mach-omap2/gpmc-onenand.h
- rename arch/arm/{plat-omap/include/plat => mach-omap2}/gpmc.h (67%)
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: minicom.cap
+Type: application/vnd.tcpdump.pcap
+Size: 278902 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/d10ab2e6/attachment-0001.cap>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/d10ab2e6/attachment-0001.sig>
