@@ -1,95 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Oct 2012 13:27:22 +0000
-Subject: [PATCH v2 v2 v2 8/8] spi/s3c64xx: use correct
- dma_transfer_direction type
-In-Reply-To: <003a01cdac3f$08fe40d0$1afac270$%kim@samsung.com>
-References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
- <1349813638-4617-9-git-send-email-arnd@arndb.de>
- <003a01cdac3f$08fe40d0$1afac270$%kim@samsung.com>
-Message-ID: <201210171327.23182.arnd@arndb.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 17 Oct 2012 22:27:41 +0900
+Subject: [PATCH 1/1] Documentation: Describe Device Tree bindings for
+ GPIO Regulator driver
+In-Reply-To: <1350374553-12678-1-git-send-email-lee.jones@linaro.org>
+References: <1350374553-12678-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20121017132740.GS14199@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 October 2012, Kukjin Kim wrote:
-> BTW, don't we need following accordingly?
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index 1a81c90..a0bb55e 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -1067,11 +1067,11 @@ static int __devinit s3c64xx_spi_get_dmares(
-> 
->         if (tx) {
->                 dma_data = &sdd->tx_dma;
-> -               dma_data->direction = DMA_TO_DEVICE;
-> +               dma_data->direction = DMA_MEM_TO_DEV;
->                 chan_str = "tx";
->         } else {
->                 dma_data = &sdd->rx_dma;
-> -               dma_data->direction = DMA_FROM_DEVICE;
-> +               dma_data->direction = DMA_DEV_TO_MEM;
->                 chan_str = "rx";
->         }
-> 
+On Tue, Oct 16, 2012 at 09:02:33AM +0100, Lee Jones wrote:
+> Here we specify all non-standard bindings which can be used when
+> requesting the use of an GPIO controlled regulator from Device Tree.
 
-Yes, you are absolutely right, sorry for not seeing that earlier.
-New version below.
+Applied both patches squashed together, thanks.  Please don't split
+documentation from the code like this where the code is just a single
+change - it's sensible where the code is a big series but for single
+patch it's not helpful.
 
-	Arnd
-
->From c10356b9846b13651a8a24c3a31e029ffe6eafd9 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 30 Apr 2012 16:31:27 +0000
-Subject: [PATCH] spi/s3c64xx: use correct dma_transfer_direction type
-
-There is a subtle difference between dma_transfer_direction and
-dma_data_direction: the former is used by the dmaengine framework,
-while the latter is used by the dma-mapping API. Although the
-purpose is comparable, the actual values are different and must
-not be mixed. In this case, the driver just wants to use
-dma_transfer_direction.
-
-Without this patch, building s3c6400_defconfig results in:
-
-drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_dmacb':
-drivers/spi/spi-s3c64xx.c:239:21: warning: comparison between
-	'enum dma_data_direction' and 'enum dma_transfer_direction' [-Wenum-compare]
-
-As pointed out by Kukjin Kim, this also changes the use of constants
-from DMA_FROM_DEVICE/DMA_TO_DEVICE to DMA_DEV_TO_MEM/DMA_MEM_TO_DEV.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: spi-devel-general at lists.sourceforge.net
-
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index d1c8441f..cd43b4b 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -132,7 +132,7 @@
- 
- struct s3c64xx_spi_dma_data {
- 	unsigned		ch;
--	enum dma_data_direction direction;
-+	enum dma_transfer_direction direction;
- 	enum dma_ch	dmach;
- 	struct property		*dma_prop;
- };
-@@ -1065,11 +1065,11 @@ static int __devinit s3c64xx_spi_get_dmares(
- 
- 	if (tx) {
- 		dma_data = &sdd->tx_dma;
--		dma_data->direction = DMA_TO_DEVICE;
-+		dma_data->direction = DMA_MEM_TO_DEV;
- 		chan_str = "tx";
- 	} else {
- 		dma_data = &sdd->rx_dma;
--		dma_data->direction = DMA_FROM_DEVICE;
-+		dma_data->direction = DMA_DEV_TO_MEM;
- 		chan_str = "rx";
- 	}
- 
+Given the subject line I'd be extremely likely to delete this patch
+unread, Documentation: says "this isn't relevant".
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/7cb1b9e3/attachment-0001.sig>
