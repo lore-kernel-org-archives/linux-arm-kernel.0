@@ -1,205 +1,113 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Oct 2012 15:39:53 -0000
-Subject: [RFC/NOT FOR MERGING 3/5] arm: omap: introduce other PM methods
+Date: Wed, 17 Oct 2012 15:39:54 -0000
+Subject: [RFC/NOT FOR MERGING 5/5] i2c: omap: introduce suspend/resume methods
 In-Reply-To: <1350488043-5053-1-git-send-email-balbi@ti.com>
 References: <1350488043-5053-1-git-send-email-balbi@ti.com>
-Message-ID: <1350488043-5053-4-git-send-email-balbi@ti.com>
+Message-ID: <1350488043-5053-6-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-current omap_device PM implementation defines
-omap-specific *_noirq methods but uses the
-generic versions for all other PM methods.
+during system-wide (static) suspend, we also
+want to save our context and restore it when
+waking up.
 
-As it turns out, if a device decides to implement
-non-runtime PM callbacks, we might fall into a
-situation where the hwmod is still idled which
-will generate an abort exception when we try
-to access device's address space while clocks
-are still gated.
-
-In order to solve that, we implement all other
-methods taking into account that devices might
-not implement those, in which case we return
-early.
+Let's introduce new suspend/resume methods so
+that we can survive a suspend-to-ram transition.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
+ drivers/i2c/busses/i2c-omap.c | 60 +++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 50 insertions(+), 10 deletions(-)
 
-notice here that it would be far better to avoid the code duplication
-and have another function (e.g. _od_generic_suspend/resume) which would
-receive pm_message_t and omap_device as arguments so it can decide
-what to do.
-
-That can be done on a later version, though.
-
- arch/arm/plat-omap/omap_device.c | 145 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 144 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index cd84eac..60ce750 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -843,16 +843,159 @@ static int _od_resume_noirq(struct device *dev)
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 7eeae11..ceab138 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1236,13 +1236,8 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ }
  
- 	return pm_generic_resume_noirq(dev);
+ #ifdef CONFIG_PM
+-#ifdef CONFIG_PM_RUNTIME
+-static int omap_i2c_runtime_suspend(struct device *dev)
++static int omap_i2c_low_level_suspend(struct omap_i2c_dev *_dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+-	u16 iv;
+-
+ 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+ 
+ 	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+@@ -1253,11 +1248,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int omap_i2c_runtime_resume(struct device *dev)
++static int omap_i2c_low_level_resume(struct omap_i2c_dev *_dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
+-
+ 	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+ 		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+ 		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
+@@ -1278,9 +1270,57 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 
+ 	return 0;
  }
 +
-+static int _od_suspend(struct device *dev)
++static int omap_i2c_suspend(struct device *dev)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od = to_omap_device(pdev);
-+	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-+	int ret;
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
 +
-+	if (!pm || !pm->suspend)
++	if (pm_runtime_suspended(dev))
 +		return 0;
 +
-+	/* Don't attempt suspend on a driver that is not bound */
-+	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
-+		return 0;
++	return omap_i2c_low_level_suspend(_dev);
++}
 +
-+	ret = pm_generic_suspend(dev);
-+	if (ret)
-+		return ret;
++static int omap_i2c_resume(struct device *dev)
++{
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
++	int r;
 +
-+	if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+		omap_device_idle(pdev);
-+	od->flags |= OMAP_DEVICE_SUSPENDED;
++	r = omap_i2c_low_level_resume(_dev);
++	if (r)
++		return r;
++
++	pm_runtime_disable(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++	pm_runtime_mark_last_busy(dev);
++	pm_runtime_put_autosuspend(dev);
 +
 +	return 0;
 +}
 +
-+static int _od_resume(struct device *dev)
++#ifdef CONFIG_PM_RUNTIME
++static int omap_i2c_runtime_suspend(struct device *dev)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od = to_omap_device(pdev);
-+	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
 +
-+	if (!pm || !pm->resume)
-+		return 0;
-+
-+	if (od->flags & OMAP_DEVICE_SUSPENDED) {
-+		od->flags &= ~OMAP_DEVICE_SUSPENDED;
-+
-+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+			omap_device_enable(pdev);
-+	}
-+
-+	return pm_generic_resume(dev);
++	return omap_i2c_low_level_suspend(_dev);
 +}
 +
-+static int _od_freeze(struct device *dev)
++static int omap_i2c_runtime_resume(struct device *dev)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od = to_omap_device(pdev);
-+	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-+	int ret;
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
 +
-+	if (!pm || !pm->freeze)
-+		return 0;
-+
-+	/* Don't attempt late suspend on a driver that is not bound */
-+	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
-+		return 0;
-+
-+	ret = pm_generic_freeze(dev);
-+	if (ret)
-+		return ret;
-+
-+	if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+		omap_device_idle(pdev);
-+	od->flags |= OMAP_DEVICE_SUSPENDED;
-+
-+	return 0;
++	return omap_i2c_low_level_resume(_dev);
 +}
-+
-+static int _od_thaw(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od = to_omap_device(pdev);
-+	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-+
-+	if (!pm || !pm->thaw)
-+		return 0;
-+
-+	if (od->flags & OMAP_DEVICE_SUSPENDED) {
-+		od->flags &= ~OMAP_DEVICE_SUSPENDED;
-+
-+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+			omap_device_enable(pdev);
-+	}
-+
-+	return pm_generic_thaw(dev);
-+}
-+
-+static int _od_poweroff(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od = to_omap_device(pdev);
-+	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-+	int ret;
-+
-+	if (!pm || !pm->poweroff)
-+		return 0;
-+
-+	/* Don't attempt late suspend on a driver that is not bound */
-+	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
-+		return 0;
-+
-+	ret = pm_generic_poweroff(dev);
-+	if (ret)
-+		return ret;
-+
-+	if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+		omap_device_idle(pdev);
-+	od->flags |= OMAP_DEVICE_SUSPENDED;
-+
-+	return 0;
-+}
-+
-+static int _od_restore(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_device *od = to_omap_device(pdev);
-+	const struct dev_pm_ops *pm = dev->driver ? dev->driver->pm : NULL;
-+
-+	if (!pm || !pm->restore)
-+		return 0;
-+
-+	if (od->flags & OMAP_DEVICE_SUSPENDED) {
-+		od->flags &= ~OMAP_DEVICE_SUSPENDED;
-+
-+		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
-+			omap_device_enable(pdev);
-+	}
-+
-+	return pm_generic_restore(dev);
-+}
- #else
- #define _od_suspend_noirq NULL
- #define _od_resume_noirq NULL
-+#define _od_suspend NULL
-+#define _od_resume NULL
-+#define _od_freeze NULL
-+#define _od_thaw NULL
-+#define _od_poweroff NULL
-+#define _od_restore NULL
- #endif
++#else
++#define omap_i2c_runtime_suspend NULL
++#define omap_i2c_runtime_resume NULL
+ #endif /* CONFIG_PM_RUNTIME */
  
- struct dev_pm_domain omap_device_pm_domain = {
- 	.ops = {
- 		SET_RUNTIME_PM_OPS(_od_runtime_suspend, _od_runtime_resume,
- 				   _od_runtime_idle)
--		USE_PLATFORM_PM_SLEEP_OPS
-+		.suspend = _od_suspend,
-+		.resume = _od_resume,
-+		.freeze = _od_freeze,
-+		.thaw = _od_thaw,
-+		.poweroff = _od_poweroff,
-+		.restore = _od_restore,
- 		.suspend_noirq = _od_suspend_noirq,
- 		.resume_noirq = _od_resume_noirq,
- 	}
+ static struct dev_pm_ops omap_i2c_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend,
++			omap_i2c_resume)
+ 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+ 			   omap_i2c_runtime_resume, NULL)
+ };
 -- 
 1.8.0.rc0
