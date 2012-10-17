@@ -1,21 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 Oct 2012 19:31:29 +0200
-Subject: [PATCH] ARM: U300: bump IRQs to offset 32
-In-Reply-To: <CAOesGMjk_97+zhsQTczYLJ0ztL2vHxsGp5cNOef2ArBR=zTc5w@mail.gmail.com>
-References: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
- <CAOesGMjk_97+zhsQTczYLJ0ztL2vHxsGp5cNOef2ArBR=zTc5w@mail.gmail.com>
-Message-ID: <CACRpkdYGC8s-PEiWaBfbheSbSmBPCRWDn+=x6o4kBTBmHgr55A@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 17 Oct 2012 19:35:10 +0200
+Subject: [PATCH 3/9] uprobes: allow ignoring of probe hits
+In-Reply-To: <CAH+eYFBHXAWTinnVO8vEnEhFDQLibwo+BtxYJJYdPcG9__n5OQ@mail.gmail.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-3-git-send-email-rabin@rab.in>
+ <20121015165218.GA10239@redhat.com>
+ <CAH+eYFBHXAWTinnVO8vEnEhFDQLibwo+BtxYJJYdPcG9__n5OQ@mail.gmail.com>
+Message-ID: <20121017173510.GA11019@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 7:26 PM, Olof Johansson <olof@lixom.net> wrote:
-
-> But if you truly think this is the last time you're touching these
-> lines to renumber them all, then:
+On 10/16, Rabin Vincent wrote:
 >
-> Acked-by: Olof Johansson <olof@lixom.net>
+> 2012/10/15 Oleg Nesterov <oleg@redhat.com>:
+> >
+> > Not sure I understand why we shouldn't call handlers in this case,
+> > but OK, I know nothing about arm.
+>
+> This old discussion about kprobes should be useful:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-March/045755.html
 
-I think so, I'm prepping the move to device tree...
+Thanks... Not sure I understand this discussion...
 
-Yours,
-Linus Walleij
+And, to clarify, I am not arguing. Just curious.
+
+So, is this like cmov on x86? And this patch allows to not report if
+the condition is not true? Or there are other issues on arm?
+
+Oleg.
