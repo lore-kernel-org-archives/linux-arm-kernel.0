@@ -1,130 +1,46 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:39:20 +0900
-Subject: [PATCH 09/10] ARM: shmobile: r8a7779: add I2C driver support
-In-Reply-To: <1350448761-27346-1-git-send-email-horms@verge.net.au>
-References: <1350448761-27346-1-git-send-email-horms@verge.net.au>
-Message-ID: <1350448761-27346-10-git-send-email-horms@verge.net.au>
+Date: Wed, 17 Oct 2012 13:40:11 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7
+In-Reply-To: <1350448585-26403-1-git-send-email-horms@verge.net.au>
+References: <1350448585-26403-1-git-send-email-horms@verge.net.au>
+Message-ID: <20121017044011.GA27684@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Wed, Oct 17, 2012 at 01:36:23PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
+> 
+> please consider the following fix for the KZM-A9-GT board for 3.6.
 
-This patch enable R-Car I2C driver
+Sorry, cut-and paste error. The line above should read:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/configs/marzen_defconfig      |    2 +
- arch/arm/mach-shmobile/setup-r8a7779.c |   77 ++++++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
+please consider the following fixes for 3.7.
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 53382b6..f79b55c 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -69,6 +69,8 @@ CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=6
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_RCAR=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 2917668..63de5cb 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -229,6 +229,79 @@ static struct platform_device tmu01_device = {
- 	.num_resources	= ARRAY_SIZE(tmu01_resources),
- };
- 
-+/* I2C */
-+static struct resource rcar_i2c0_res[] = {
-+	{
-+		.start  = 0xffc70000,
-+		.end    = 0xffc70fff,
-+		.flags  = IORESOURCE_MEM,
-+	}, {
-+		.start  = gic_spi(79),
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device i2c0_device = {
-+	.name		= "i2c-rcar",
-+	.id		= 0,
-+	.resource	= rcar_i2c0_res,
-+	.num_resources	= ARRAY_SIZE(rcar_i2c0_res),
-+};
-+
-+static struct resource rcar_i2c1_res[] = {
-+	{
-+		.start  = 0xffc71000,
-+		.end    = 0xffc71fff,
-+		.flags  = IORESOURCE_MEM,
-+	}, {
-+		.start  = gic_spi(82),
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device i2c1_device = {
-+	.name		= "i2c-rcar",
-+	.id		= 1,
-+	.resource	= rcar_i2c1_res,
-+	.num_resources	= ARRAY_SIZE(rcar_i2c1_res),
-+};
-+
-+static struct resource rcar_i2c2_res[] = {
-+	{
-+		.start  = 0xffc72000,
-+		.end    = 0xffc72fff,
-+		.flags  = IORESOURCE_MEM,
-+	}, {
-+		.start  = gic_spi(80),
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device i2c2_device = {
-+	.name		= "i2c-rcar",
-+	.id		= 2,
-+	.resource	= rcar_i2c2_res,
-+	.num_resources	= ARRAY_SIZE(rcar_i2c2_res),
-+};
-+
-+static struct resource rcar_i2c3_res[] = {
-+	{
-+		.start  = 0xffc73000,
-+		.end    = 0xffc73fff,
-+		.flags  = IORESOURCE_MEM,
-+	}, {
-+		.start  = gic_spi(81),
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device i2c3_device = {
-+	.name		= "i2c-rcar",
-+	.id		= 3,
-+	.resource	= rcar_i2c3_res,
-+	.num_resources	= ARRAY_SIZE(rcar_i2c3_res),
-+};
-+
- static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -238,6 +311,10 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
- 	&scif5_device,
- 	&tmu00_device,
- 	&tmu01_device,
-+	&i2c0_device,
-+	&i2c1_device,
-+	&i2c2_device,
-+	&i2c3_device,
- };
- 
- static struct platform_device *r8a7779_late_devices[] __initdata = {
--- 
-1.7.10.4
+> They both resolve fallout from recent IOMEM() changes.
+> 
+> ----------------------------------------------------------------
+> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+> 
+>   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
+> 
+> for you to fetch changes up to 11f93576b0b50bf391ffafa544b85e541f5e59a5:
+> 
+>   ARM: shmobile: r8a7779: use __iomem pointers for MMIO (2012-10-16 08:58:56 +0900)
+> 
+> ----------------------------------------------------------------
+> Kuninori Morimoto (2):
+>       ARM: shmobile: armadillo800eva: __io abuse cleanup
+>       ARM: shmobile: r8a7779: use __iomem pointers for MMIO
+> 
+>  arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +-
+>  arch/arm/mach-shmobile/clock-r8a7779.c         |   22 +++++++++++-----------
+>  2 files changed, 12 insertions(+), 12 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
