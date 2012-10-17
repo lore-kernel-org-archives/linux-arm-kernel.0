@@ -1,25 +1,35 @@
-From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
-Date: Wed, 17 Oct 2012 22:47:03 +0530
-Subject: [PATCH 4/9] uprobes: allow arch access to xol slot
-In-Reply-To: <1350242593-17761-4-git-send-email-rabin@rab.in>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-4-git-send-email-rabin@rab.in>
-Message-ID: <20121017171703.GH11096@linux.vnet.ibm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 17 Oct 2012 19:22:46 +0200
+Subject: [PATCH] ARM: U300: bump IRQs to offset 32
+In-Reply-To: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CACRpkdbvYGb8b_4Lg-cXm5o+iXQZOQ48ffyW6vhkiPtgL6Vt1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rabin Vincent <rabin@rab.in> [2012-10-14 21:23:08]:
+On Wed, Oct 17, 2012 at 6:34 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
 
-> Allow arches to customize how the instruction is filled into the xol
-> slot.  ARM will use this to insert an undefined instruction after the
-> real instruction in order to simulate a single step of the instruction
-> without hardware support.
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> The U300 IRQs were bumped once to offset to 1 (in order to avoid
+> using IRQ 0 which is now NO_IRQ). This was OK as we were still
+> passing the number of irqs in the .nr_irqs field of the machine,
+> with descriptors allocated at boot time.
+>
+> However .nr_irqs should be 0, leading the system to reserve the
+> first 16 IRQs. Then the VIC driver will complain that IRQs 1
+> thru 15 are pre-allocated, so to avoid this and use free
+> descriptors, move all IRQs up to offset 32.
+>
+> This will all be done away with as we migrate to device tree,
+> so it is an interim solution.
+>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-The rest of the patches 4,5,6,7 look good. 
+Oooups, requsting an ACK from the ARM SoC maintainers to
+take this in through the pinctrl tree. Later patches also touch this
+file so to avoid unnecessary conflicts it's better to bring it in there.
 
--- 
-Thanks and Regards
-Srikar
+Yours,
+Linus Walleij
