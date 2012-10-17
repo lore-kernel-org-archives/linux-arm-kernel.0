@@ -1,58 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Oct 2012 16:33:42 +0100
-Subject: [PATCH 5/7] ARM: perf: register cpu_notifier at driver init
-In-Reply-To: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
-References: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1350488024-3224-6-git-send-email-will.deacon@arm.com>
+Date: Wed, 17 Oct 2012 16:33:37 +0100
+Subject: [PATCH 0/7] ARM: perf: updates for 3.8
+Message-ID: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <Mark.Rutland@arm.com>
+Hello,
 
-The current practice of registering the cpu hotplug notifier at PMU
-registration time won't be safe with multiple PMUs, as we'll repeatedly
-attempt to register the notifier. This has the unfortunate effect of
-silently corrupting the notifier list, leading to boot stalling.
+Here are the ARM perf patches I currently plan to send via Russell for
+3.8. It's mostly continued cleanup and more work on the multi-cluster
+support but there's also an exciting patch from Marc in anticipation of
+KVM.
 
-Instead, register the notifier at init time. Its sanity checks will
-prevent anything bad from happening if the notifier is called before we
-have any PMUs registered.
+All feedback welcome,
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/perf_event_cpu.c |   13 +++++++++++--
- 1 files changed, 11 insertions(+), 2 deletions(-)
+Will
 
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index 02244fa..71c824c 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -285,7 +285,6 @@ static int __devinit cpu_pmu_device_probe(struct platform_device *pdev)
- 	cpu_pmu = pmu;
- 	cpu_pmu->plat_device = pdev;
- 	cpu_pmu_init(cpu_pmu);
--	register_cpu_notifier(&cpu_pmu_hotplug_notifier);
- 	armpmu_register(cpu_pmu, cpu_pmu->name, PERF_TYPE_RAW);
- 
- 	return 0;
-@@ -303,6 +302,16 @@ static struct platform_driver cpu_pmu_driver = {
- 
- static int __init register_pmu_driver(void)
- {
--	return platform_driver_register(&cpu_pmu_driver);
-+	int err;
-+
-+	err = register_cpu_notifier(&cpu_pmu_hotplug_notifier);
-+	if (err)
-+		return err;
-+
-+	err = platform_driver_register(&cpu_pmu_driver);
-+	if (err)
-+		unregister_cpu_notifier(&cpu_pmu_hotplug_notifier);
-+
-+	return err;
- }
- device_initcall(register_pmu_driver);
+
+Marc Zyngier (1):
+  ARM: perf: add guest vs host discrimination
+
+Mark Rutland (1):
+  ARM: perf: register cpu_notifier at driver init
+
+Sudeep KarkadaNagesha (3):
+  ARM: perf: allocate CPU PMU dynamically at probe time
+  ARM: perf: consistently use struct perf_event in arm_pmu functions
+  ARM: perf: check ARMv7 counter validity on a per-pmu basis
+
+Will Deacon (2):
+  ARM: perf: return NOTIFY_DONE from cpu notifier when no available PMU
+  ARM: perf: consistently use arm_pmu->name for PMU name
+
+ arch/arm/include/asm/perf_event.h   |    5 +
+ arch/arm/include/asm/pmu.h          |   28 ++---
+ arch/arm/kernel/perf_event.c        |   84 ++++++++----
+ arch/arm/kernel/perf_event_cpu.c    |   74 +++++++----
+ arch/arm/kernel/perf_event_v6.c     |  126 +++++++++---------
+ arch/arm/kernel/perf_event_v7.c     |  246 ++++++++++++++++------------------
+ arch/arm/kernel/perf_event_xscale.c |  157 ++++++++++++-----------
+ 7 files changed, 384 insertions(+), 336 deletions(-)
+
 -- 
 1.7.4.1
