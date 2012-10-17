@@ -1,64 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 17 Oct 2012 11:18:44 -0400
-Subject: [PATCH 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
-In-Reply-To: <20120926234941.GA6567@quad.lixom.net>
-References: <1346491586-23480-1-git-send-email-andrew@lunn.ch>
- <CAOesGMh1x8QMNBi_xKEfZ0druiAZbafVuXEQkktwVbQODDmR8w@mail.gmail.com>
- <20120924071353.GA27099@lunn.ch>
- <20120926234941.GA6567@quad.lixom.net>
-Message-ID: <20121017151844.GQ20922@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Oct 2012 16:31:38 +0100
+Subject: [PATCH 4/7] ARM: hw_breakpoint: don't try to clear v6 debug registers
+ during boot
+In-Reply-To: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
+References: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1350487901-3108-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 04:49:41PM -0700, Olof Johansson wrote:
-> On Mon, Sep 24, 2012 at 09:13:53AM +0200, Andrew Lunn wrote:
-> > > > +Required properties:
-> > > > +- compatible: must be "marvell,orion-ehci"
-> > > > +- reg: physical base address of the controller and length of memory mapped
-> > > > +  region.
-> > > > +- interrupts: The EHCI interrupt
-> > > > +- phy-version: Can be one of:
-> > > > +  "NA" - Don't touch the phy, something else has already configured it.
-> > > > +  "orion5x" - PHY setup as specified by the Orion5x Errata
-> > > > +
-> > > > +Example:
-> > > > +
-> > > > +       ehci at 50000 {
-> > > > +               compatible = "marvell,orion-ehci";
-> > > > +               reg = <0x50000 0x1000>;
-> > > > +               interrupts = <19>;
-> > > > +               phy-version = "NA";
-> > > > +       };
-> > > 
-> > > This isn't an appropriate binding for phy. I know, it maps straight
-> > > over from the platform data, but it doesn't focus on what the actual
-> > > hardware is.
-> > > 
-> > > A couple of options. What probably makes most sense depending on how
-> > > other phy bindings are moving ahead is to add a phy node under the
-> > > ehci controller for the "orion5x" case, and have an appropriate
-> > > compatible value there. No node means the same as "NA" in the above
-> > > binding. Alternatively, have a phy phandle that points to the phy
-> > > device if it sits on an i2c bus, etc.
-> > 
-> > I Olaf
-> > 
-> > Could i suggest a third option:
-> > 
-> > I just drop USB phy configuration all together.  Only mach-orion5x
-> > needs this and nobody has shown any interest in moving mach-orion5x to
-> > DT. So i would just hard code it to "NA".
-> > 
-> > If anybody does show interest in DT for orion5x, we can add a phy node
-> > under ehci as a pure extension which does not affect backward
-> > compatibility.
-> 
-> Yeah, that works too.
+v6 cores do not provide a way to clear the debug registers without first
+enabling monitor mode, meaning that we could take spurious debug
+exceptions. Instead, rely on the registers being in a sane state when we
+boot as they are defined to be disabled out of reset anyway.
 
-Andrew,
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Did I miss the update of this series/patch?
-
-thx,
-
-Jason.
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index e76cf1a..b6f4aec 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -912,8 +912,8 @@ static void reset_ctrl_regs(void *unused)
+ 	switch (debug_arch) {
+ 	case ARM_DEBUG_ARCH_V6:
+ 	case ARM_DEBUG_ARCH_V6_1:
+-		/* ARMv6 cores just need to reset the registers. */
+-		goto reset_regs;
++		/* ARMv6 cores clear the registers out of reset. */
++		goto out_mdbgen;
+ 	case ARM_DEBUG_ARCH_V7_ECP14:
+ 		/*
+ 		 * Ensure sticky power-down is clear (i.e. debug logic is
+@@ -966,7 +966,6 @@ clear_vcr:
+ 		return;
+ 	}
+ 
+-reset_regs:
+ 	/*
+ 	 * The control/value register pairs are UNKNOWN out of reset so
+ 	 * clear them to avoid spurious debug events.
+@@ -991,6 +990,7 @@ reset_regs:
+ 	 * Have a crack at enabling monitor mode. We don't actually need
+ 	 * it yet, but reporting an error early is useful if it fails.
+ 	 */
++out_mdbgen:
+ 	if (enable_monitor_mode())
+ 		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
+ }
+-- 
+1.7.4.1
