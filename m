@@ -1,89 +1,78 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 16:38:33 +0900
-Subject: [PATCH 2/8] ARM: S3C64XX: Update hookup for Arizona class devices
+Date: Wed, 17 Oct 2012 16:38:34 +0900
+Subject: [PATCH 3/8] ARM: S3C64XX: Provide platform data for Tomatin/Balblair
+ on Cragganmore
 In-Reply-To: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
  <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1350459519-20462-3-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1350459519-20462-4-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Renumber to use SPI /CS 1 instead of 0 to allow coexistance with DSPs.
-Also add additional supplies for the devices while we're at it.
+This is required for operation of the WM0010 on the boards.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |    2 +-
- arch/arm/mach-s3c64xx/mach-crag6410.c        |   23 ++++++++++++++++++++++-
- 2 files changed, 23 insertions(+), 2 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 3364fab..89f5e7d 100644
+index 89f5e7d..32b82c0 100644
 --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
 +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -202,7 +202,7 @@ static struct spi_board_info wm5102_spi_devs[] = {
- 		.modalias	= "wm5102",
- 		.max_speed_hz	= 10 * 1000 * 1000,
+@@ -20,6 +20,7 @@
+ 
+ #include <linux/regulator/machine.h>
+ 
++#include <sound/wm0010.h>
+ #include <sound/wm5100.h>
+ #include <sound/wm8996.h>
+ #include <sound/wm8962.h>
+@@ -33,14 +34,34 @@ static struct s3c64xx_spi_csinfo wm0010_spi_csinfo = {
+ 	.line = S3C64XX_GPC(3),
+ };
+ 
++static struct wm0010_pdata wm0010_pdata = {
++	.gpio_reset = S3C64XX_GPN(6),
++	.reset_active_high = 1, /* Active high for Glenfarclas Rev 2 */
++};
++
+ static struct spi_board_info wm1253_devs[] = {
+ 	[0] = {
+ 		.modalias	= "wm0010",
++		.max_speed_hz	= 26 * 1000 * 1000,
++		.bus_num	= 0,
++		.chip_select	= 0,
++		.mode		= SPI_MODE_0,
++		.irq		= S3C_EINT(5),
++		.controller_data = &wm0010_spi_csinfo,
++		.platform_data = &wm0010_pdata,
++	},
++};
++
++static struct spi_board_info balblair_devs[] = {
++	[0] = {
++		.modalias	= "wm0010",
++		.max_speed_hz	= 26 * 1000 * 1000,
  		.bus_num	= 0,
--		.chip_select	= 0,
-+		.chip_select	= 1,
+ 		.chip_select	= 0,
  		.mode		= SPI_MODE_0,
- 		.irq		= GLENFARCLAS_PMIC_IRQ_BASE +
- 				  WM831X_IRQ_GPIO_2,
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 13b7eaa..6d5b2c6 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -304,6 +304,13 @@ static struct regulator_consumer_supply wallvdd_consumers[] = {
- 	REGULATOR_SUPPLY("SPKVDDL", "1-001a"),
- 	REGULATOR_SUPPLY("SPKVDDR", "1-001a"),
- 
-+	REGULATOR_SUPPLY("SPKVDDL", "spi0.1"),
-+	REGULATOR_SUPPLY("SPKVDDR", "spi0.1"),
-+	REGULATOR_SUPPLY("SPKVDDL", "wm5102-codec"),
-+	REGULATOR_SUPPLY("SPKVDDR", "wm5102-codec"),
-+	REGULATOR_SUPPLY("SPKVDDL", "wm5110-codec"),
-+	REGULATOR_SUPPLY("SPKVDDR", "wm5110-codec"),
-+
- 	REGULATOR_SUPPLY("DC1VDD", "0-0034"),
- 	REGULATOR_SUPPLY("DC2VDD", "0-0034"),
- 	REGULATOR_SUPPLY("DC3VDD", "0-0034"),
-@@ -597,6 +604,7 @@ static struct s3c2410_platform_i2c i2c0_pdata = {
- static struct regulator_consumer_supply pvdd_1v2_consumers[] __devinitdata = {
- 	REGULATOR_SUPPLY("DCVDD", "spi0.0"),
- 	REGULATOR_SUPPLY("AVDD", "spi0.0"),
-+	REGULATOR_SUPPLY("AVDD", "spi0.1"),
+ 		.irq		= S3C_EINT(5),
+ 		.controller_data = &wm0010_spi_csinfo,
++		.platform_data = &wm0010_pdata,
+ 	},
  };
  
- static struct regulator_init_data pvdd_1v2 __devinitdata = {
-@@ -621,6 +629,19 @@ static struct regulator_consumer_supply pvdd_1v8_consumers[] __devinitdata = {
- 	REGULATOR_SUPPLY("DCVDD", "1-001a"),
- 	REGULATOR_SUPPLY("AVDD", "1-001a"),
- 	REGULATOR_SUPPLY("DBVDD", "spi0.0"),
-+	REGULATOR_SUPPLY("DBVDD1", "spi0.1"),
-+	REGULATOR_SUPPLY("DBVDD2", "spi0.1"),
-+	REGULATOR_SUPPLY("DBVDD3", "spi0.1"),
-+	REGULATOR_SUPPLY("LDOVDD", "spi0.1"),
-+	REGULATOR_SUPPLY("CPVDD", "spi0.1"),
-+
-+	REGULATOR_SUPPLY("DBVDD2", "wm5102-codec"),
-+	REGULATOR_SUPPLY("DBVDD3", "wm5102-codec"),
-+	REGULATOR_SUPPLY("CPVDD", "wm5102-codec"),
-+
-+	REGULATOR_SUPPLY("DBVDD2", "wm5110-codec"),
-+	REGULATOR_SUPPLY("DBVDD3", "wm5110-codec"),
-+	REGULATOR_SUPPLY("CPVDD", "wm5110-codec"),
- };
- 
- static struct regulator_init_data pvdd_1v8 __devinitdata = {
-@@ -810,7 +831,7 @@ static void __init crag6410_machine_init(void)
- 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
- 
- 	samsung_keypad_set_platdata(&crag6410_keypad_data);
--	s3c64xx_spi0_set_platdata(NULL, 0, 1);
-+	s3c64xx_spi0_set_platdata(NULL, 0, 2);
- 
- 	platform_add_devices(crag6410_devices, ARRAY_SIZE(crag6410_devices));
- 
+@@ -244,7 +265,9 @@ static __devinitdata const struct {
+ 	  .spi_devs = wm1253_devs, .num_spi_devs = ARRAY_SIZE(wm1253_devs) },
+ 	{ .id = 0x32, .name = "XXXX-EV1 Caol Illa" },
+ 	{ .id = 0x33, .name = "XXXX-EV1 Oban" },
+-	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair" },
++	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair",
++	  .spi_devs = balblair_devs,
++	  .num_spi_devs = ARRAY_SIZE(balblair_devs) },
+ 	{ .id = 0x39, .name = "1254-EV1 Dallas Dhu",
+ 	  .i2c_devs = wm1254_devs, .num_i2c_devs = ARRAY_SIZE(wm1254_devs) },
+ 	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
 -- 
 1.7.10.4
