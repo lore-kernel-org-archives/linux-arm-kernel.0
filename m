@@ -1,43 +1,43 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 17 Oct 2012 13:03:16 -0500
-Subject: [PATCH V3 0/5] ARM: OMAP2+: Add device-tree support for timers
-In-Reply-To: <1350496873-21337-1-git-send-email-jon-hunter@ti.com>
-References: <1350496873-21337-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <507EF2E4.3050509@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 17 Oct 2012 11:13:31 -0700
+Subject: [PATCH 1/2] ARM: OMAP: Trivial driver changes to remove
+ include plat/cpu.h
+In-Reply-To: <20121016000722.GH15569@atomide.com>
+References: <20121008173452.10603.53886.stgit@muffinssi>
+ <20121008173557.10603.18539.stgit@muffinssi>
+ <5073E84E.4090408@ti.com> <20121010001943.GK12552@atomide.com>
+ <20121016000722.GH15569@atomide.com>
+Message-ID: <20121017181330.GV15569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/17/2012 01:01 PM, Jon Hunter wrote:
-> This series adds device-tree support for the timers on OMAP2+ devices
-> including AM33xx.
+* Tony Lindgren <tony@atomide.com> [121015 17:09]:
+> * Tony Lindgren <tony@atomide.com> [121009 17:21]:
+> > * P?ter Ujfalusi <peter.ujfalusi@ti.com> [121009 02:03]:
+> > > On 10/08/2012 07:35 PM, Tony Lindgren wrote:
+> > > 
+> > > > - omap-dma.c and omap-pcm.c can test the arch locally as
+> > > >   omap1 and omap2 cannot be compiled together because of
+> > > >   conflicting compiler flags
+> > > 
+> > > >  sound/soc/omap/omap-pcm.c         |    9 +++++++--
+> > > 
+> > > Tony: is this going to be included in 3.7?
+> > 
+> > Hmm I guess we could try to get this out of the way
+> > to cut down the dependencies. Let's if maintainers
+> > of the other affected drivers this is OK for the
+> > -rc series.
 > 
-> Testing:
-> 1. I have booted tested this series on OMAP2420 H4, OMAP3430 Beagle, OMAP4430
->    Panda and AM335x Beagle Bone with/without ...
->    a). device-tree present
->    b). CONFIG_OMAP_32K_TIMER set
->    c). kernel boot parameter "clocksource=gp_timer" present
-> 2. I have tested the all the timers (not used by the kernel as sys-timers) on
->    OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda with/without device-tree with
->    this series. The testing includes ...
->    a. Configuring, starting a timer and checking the counter value is
->       incrementing.
->    b. Testing timer overflow interrupt when timer expires.
->    c. Using different clock sources to operate the timer with.
+> It seems that nobody needs these until for v3.8, so I'll
+> be applying this into omap-for-v3.8/cleanup-headers-prepare
+> branch soon.
 > 
-> V3 changes:
-> - Removed definition "TIMER_PROP_ALWON" per Rob Herring's feedback
-> - Updated OMAP system timer (clock-events and clock-source) code so that
->   HWMOD is NOT used for getting resource (memory and interrupt) information
->   when device-tree is present.
-> 
-> V2 changes:
-> - Remove use of device-tree alias property
-> - Migrate OMAP timers to request timers by property instead of device ID
-> - Include OMAP2 support
+> Anybody else care to ack?
 
-Forgot to mention that this is based on top of v3.7-rc1.
+OK pushed out now with just that patch in the branch in case
+driver branches need to merge it in too to avoid conflicts.
 
-Cheers
-Jon
+Regards,
+
+Tony
