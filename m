@@ -1,27 +1,137 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 17 Oct 2012 18:20:43 +0100
-Subject: [RFC PATCH] ARM: SMP: consolidate holding pen
-In-Reply-To: <1350487967-2555-1-git-send-email-marc.zyngier@arm.com>
-References: <1350487967-2555-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1350494443.1242.76.camel@hornet>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 17 Oct 2012 19:19:45 +0200
+Subject: [PATCH 2/3] pinctrl/coh901: convert to use managed resources
+Message-ID: <1350494385-16058-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-17 at 16:32 +0100, Marc Zyngier wrote:
-> As with other bits of the SMP code, platforms have duplicated a lot
-> of the RealView implementation. As an effort to slightly reduce
-> the clutter, make the plat-versatile version of the holding pen
-> a standard part of the SMP framework.
-> 
-> Platforms can still provide their own, but those who carried an exact
-> duplicate of the Realview code are switched to the common implementation.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-This bit:
+This switches the COH 901 pin controller to use managed
+resources (devm_*) for memory remaps, clocks, etc.
 
->  arch/arm/mach-vexpress/platsmp.c               |  2 +-
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-coh901.c | 62 ++++++++++++----------------------------
+ 1 file changed, 19 insertions(+), 43 deletions(-)
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-
-Cheers!
-
-Pawel
+diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+index 152efae..5c7daf9 100644
+--- a/drivers/pinctrl/pinctrl-coh901.c
++++ b/drivers/pinctrl/pinctrl-coh901.c
+@@ -65,7 +65,6 @@ struct u300_gpio {
+ 	struct gpio_chip chip;
+ 	struct list_head port_list;
+ 	struct clk *clk;
+-	struct resource *memres;
+ 	void __iomem *base;
+ 	struct device *dev;
+ 	u32 stride;
+@@ -663,17 +662,16 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+ {
+ 	struct u300_gpio_platform *plat = dev_get_platdata(&pdev->dev);
+ 	struct u300_gpio *gpio;
++	struct resource *memres;
+ 	int err = 0;
+ 	int portno;
+ 	u32 val;
+ 	u32 ifr;
+ 	int i;
+ 
+-	gpio = kzalloc(sizeof(struct u300_gpio), GFP_KERNEL);
+-	if (gpio == NULL) {
+-		dev_err(&pdev->dev, "failed to allocate memory\n");
++	gpio = devm_kzalloc(&pdev->dev, sizeof(struct u300_gpio), GFP_KERNEL);
++	if (gpio == NULL)
+ 		return -ENOMEM;
+-	}
+ 
+ 	gpio->chip = u300_gpio_chip;
+ 	gpio->chip.ngpio = plat->ports * U300_GPIO_PINS_PER_PORT;
+@@ -681,37 +679,29 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+ 	gpio->chip.base = plat->gpio_base;
+ 	gpio->dev = &pdev->dev;
+ 
+-	/* Get GPIO clock */
+-	gpio->clk = clk_get(gpio->dev, NULL);
++	memres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!memres) {
++		dev_err(gpio->dev, "could not get GPIO memory resource\n");
++		return -ENODEV;
++	}
++
++	gpio->base = devm_request_and_ioremap(&pdev->dev, memres);
++	if (!gpio->base) {
++		dev_err(gpio->dev, "could not get remap memory\n");
++		return -ENOMEM;
++	}
++
++	gpio->clk = devm_clk_get(gpio->dev, NULL);
+ 	if (IS_ERR(gpio->clk)) {
+ 		err = PTR_ERR(gpio->clk);
+ 		dev_err(gpio->dev, "could not get GPIO clock\n");
+-		goto err_no_clk;
++		return err;
+ 	}
++
+ 	err = clk_prepare_enable(gpio->clk);
+ 	if (err) {
+ 		dev_err(gpio->dev, "could not enable GPIO clock\n");
+-		goto err_no_clk_enable;
+-	}
+-
+-	gpio->memres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!gpio->memres) {
+-		dev_err(gpio->dev, "could not get GPIO memory resource\n");
+-		err = -ENODEV;
+-		goto err_no_resource;
+-	}
+-
+-	if (!request_mem_region(gpio->memres->start,
+-				resource_size(gpio->memres),
+-				"GPIO Controller")) {
+-		err = -ENODEV;
+-		goto err_no_ioregion;
+-	}
+-
+-	gpio->base = ioremap(gpio->memres->start, resource_size(gpio->memres));
+-	if (!gpio->base) {
+-		err = -ENOMEM;
+-		goto err_no_ioremap;
++		return err;
+ 	}
+ 
+ 	dev_info(gpio->dev,
+@@ -810,16 +800,7 @@ err_no_chip:
+ err_no_domain:
+ err_no_port:
+ 	u300_gpio_free_ports(gpio);
+-	iounmap(gpio->base);
+-err_no_ioremap:
+-	release_mem_region(gpio->memres->start, resource_size(gpio->memres));
+-err_no_ioregion:
+-err_no_resource:
+ 	clk_disable_unprepare(gpio->clk);
+-err_no_clk_enable:
+-	clk_put(gpio->clk);
+-err_no_clk:
+-	kfree(gpio);
+ 	dev_info(&pdev->dev, "module ERROR:%d\n", err);
+ 	return err;
+ }
+@@ -838,13 +819,8 @@ static int __exit u300_gpio_remove(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 	u300_gpio_free_ports(gpio);
+-	iounmap(gpio->base);
+-	release_mem_region(gpio->memres->start,
+-			   resource_size(gpio->memres));
+ 	clk_disable_unprepare(gpio->clk);
+-	clk_put(gpio->clk);
+ 	platform_set_drvdata(pdev, NULL);
+-	kfree(gpio);
+ 	return 0;
+ }
+ 
+-- 
+1.7.11.3
