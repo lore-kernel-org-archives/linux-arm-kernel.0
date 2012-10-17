@@ -1,57 +1,55 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 17 Oct 2012 14:31:46 +0200
-Subject: [PATCH RFC 14/15 v5] gpio-vt8500: Add block GPIO API
+Date: Wed, 17 Oct 2012 14:31:47 +0200
+Subject: [PATCH RFC 15/15 v5] gpio-ucb1400: Add block GPIO API
 In-Reply-To: <1350477107-26512-1-git-send-email-stigge@antcom.de>
 References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
-Message-ID: <1350477107-26512-15-git-send-email-stigge@antcom.de>
+Message-ID: <1350477107-26512-16-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds block GPIO API support to the gpio-vt8500 driver.
+This patch adds block GPIO API support to the gpio-ucb1400 driver.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
-
 ---
- drivers/gpio/gpio-vt8500.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/gpio/gpio-ucb1400.c |   23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
---- linux-2.6.orig/drivers/gpio/gpio-vt8500.c
-+++ linux-2.6/drivers/gpio/gpio-vt8500.c
-@@ -209,6 +209,28 @@ static void vt8500_gpio_set_value(struct
- 	writel_relaxed(val, vt8500_chip->base + vt8500_chip->regs->data_out);
+--- linux-2.6.orig/drivers/gpio/gpio-ucb1400.c
++++ linux-2.6/drivers/gpio/gpio-ucb1400.c
+@@ -45,6 +45,27 @@ static void ucb1400_gpio_set(struct gpio
+ 	ucb1400_gpio_set_value(gpio->ac97, off, val);
  }
  
-+static unsigned long vt8500_gpio_get_block(struct gpio_chip *chip,
-+					   unsigned long mask)
++static unsigned long ucb1400_gpio_get_block(struct gpio_chip *gc,
++					    unsigned long mask)
 +{
-+	struct vt8500_gpio_chip *vt8500_chip = to_vt8500(chip);
-+
-+	return readl_relaxed(vt8500_chip->base + vt8500_chip->regs->data_in) &
-+								mask;
++	struct ucb1400_gpio *gpio;
++	gpio = container_of(gc, struct ucb1400_gpio, gc);
++	return ucb1400_reg_read(gpio->ac97, UCB_IO_DATA) & mask;
 +}
 +
-+static void vt8500_gpio_set_block(struct gpio_chip *chip, unsigned long mask,
-+				  unsigned long  values)
++static void ucb1400_gpio_set_block(struct gpio_chip *gc, unsigned long mask,
++				   unsigned long values)
 +{
-+	struct vt8500_gpio_chip *vt8500_chip = to_vt8500(chip);
++	struct ucb1400_gpio *gpio;
++	u16 tmp;
++	gpio = container_of(gc, struct ucb1400_gpio, gc);
 +
-+	u32 val = readl_relaxed(vt8500_chip->base +
-+				vt8500_chip->regs->data_out);
-+	val &= ~mask;
-+	val |= values & mask;
++	tmp = ucb1400_reg_read(gpio->ac97, UCB_IO_DATA) & ~mask;
++	tmp |= values & mask;
 +
-+	writel_relaxed(val, vt8500_chip->base + vt8500_chip->regs->data_out);
++	ucb1400_reg_write(gpio->ac97, UCB_IO_DATA, tmp);
 +}
 +
- static int vt8500_of_xlate(struct gpio_chip *gc,
- 			    const struct of_phandle_args *gpiospec, u32 *flags)
+ static int ucb1400_gpio_probe(struct platform_device *dev)
  {
-@@ -251,6 +273,8 @@ static int vt8500_add_chips(struct platf
- 		chip->direction_output = vt8500_gpio_direction_output;
- 		chip->get = vt8500_gpio_get_value;
- 		chip->set = vt8500_gpio_set_value;
-+		chip->get_block = vt8500_gpio_get_block;
-+		chip->set_block = vt8500_gpio_set_block;
- 		chip->can_sleep = 0;
- 		chip->base = pin_cnt;
- 		chip->ngpio = data->banks[i].ngpio;
+ 	struct ucb1400_gpio *ucb = dev->dev.platform_data;
+@@ -66,6 +87,8 @@ static int ucb1400_gpio_probe(struct pla
+ 	ucb->gc.direction_output = ucb1400_gpio_dir_out;
+ 	ucb->gc.get = ucb1400_gpio_get;
+ 	ucb->gc.set = ucb1400_gpio_set;
++	ucb->gc.get_block = ucb1400_gpio_get_block;
++	ucb->gc.set_block = ucb1400_gpio_set_block;
+ 	ucb->gc.can_sleep = 1;
+ 
+ 	err = gpiochip_add(&ucb->gc);
