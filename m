@@ -1,33 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Oct 2012 10:57:57 +0100
-Subject: [RFC PATCH v2] prevent top pte being overwritten before flushing
-In-Reply-To: <CAGCDX1mKn8nJpJ=Sicq8yi1hfW-m0fA+Uyx=Oikhq43Z85muCw@mail.gmail.com>
-References: <1350236542-96465-1-git-send-email-yanpai.chen@gmail.com>
- <CANj_sbCbdfvgkKXJjk4L_5Rk-4mQ-zqDqMErry-AzHddDb8WYA@mail.gmail.com>
- <20121017093916.GA5973@mudshark.cambridge.arm.com>
- <CAGCDX1mKn8nJpJ=Sicq8yi1hfW-m0fA+Uyx=Oikhq43Z85muCw@mail.gmail.com>
-Message-ID: <20121017095757.GB5973@mudshark.cambridge.arm.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 17 Oct 2012 12:09:02 +0200
+Subject: [PATCH v2 0/4] Add DT support for Network Space v2 and parents
+Message-ID: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 10:54:53AM +0100, Jason Lin wrote:
-> 2012/10/17 Will Deacon <will.deacon@arm.com>:
-> > On Wed, Oct 17, 2012 at 09:42:19AM +0100, Andrew Yan-Pai Chen wrote:
-> >> On Mon, Oct 15, 2012 at 1:42 AM, Andrew Yan-Pai Chen
-> >>
-> >> Any ideas?
-> >
-> > I wonder if we could use different ptes for each CPU (by hacking
-> > pte_offset_kernel) and then get away with just disabling preemption in both
-> > cases?
-> >
-> > Will
-> 
-> Single core processor will also cause this issue in flush_pfn_alias().
-> So it should use different ptes for each task.
-> Will it be so complicated?
+This patch series provides DT support for LaCie NAS Network Space v2 and
+parents. This includes the following machines:
+ - Internet Space v2
+ - Network Space v2
+ - Network Space Max v2
+ - Network Space Lite v2
+ - Network Space Mini v2
 
-You can just disable preemption in that case -- it's the spin_lock that I'd
-like to avoid.
+Note that the three first boards are already supported by the Linux
+kernel via an "old-fashion" board setup. The two lasts (Lite and Mini)
+are new boards.
 
-Will
+Also note that the first patch of the series is related with the LED
+subsystem. It adds device tree binding to the driver leds-ns2.
+
+Changes for v2:
+ - Fix version for patch (update to v3):
+   "ARM: kirkwood: DT board setup for Network Space v2 and parents"
+ - Fix compatibility string for driver leds-ns2. Use "lacie,ns2-leds".
+ - leds-ns2: Remove useless #else #endif statement.
+
+Simon Guinot (4):
+  leds: leds-ns2: add device tree binding
+  ARM: kirkwood: DT board setup for Network Space v2 and parents
+  ARM: kirkwood: DT board setup for Network Space Lite v2
+  ARM: kirkwood: DT board setup for Network Space Mini v2
+
+ .../devicetree/bindings/gpio/leds-ns2.txt          |   26 ++++++
+ arch/arm/boot/dts/Makefile                         |    5 ++
+ arch/arm/boot/dts/kirkwood-is2.dts                 |   30 +++++++
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   63 ++++++++++++++
+ arch/arm/boot/dts/kirkwood-ns2.dts                 |   30 +++++++
+ arch/arm/boot/dts/kirkwood-ns2lite.dts             |   30 +++++++
+ arch/arm/boot/dts/kirkwood-ns2max.dts              |   49 +++++++++++
+ arch/arm/boot/dts/kirkwood-ns2mini.dts             |   49 +++++++++++
+ arch/arm/mach-kirkwood/Kconfig                     |   36 ++++++++
+ arch/arm/mach-kirkwood/Makefile                    |    5 ++
+ arch/arm/mach-kirkwood/board-dt.c                  |   12 +++
+ arch/arm/mach-kirkwood/board-ns2.c                 |   87 ++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.h                    |   10 +++
+ drivers/leds/Kconfig                               |    4 +-
+ drivers/leds/leds-ns2.c                            |   78 +++++++++++++++++-
+ 15 files changed, 510 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/leds-ns2.txt
+ create mode 100644 arch/arm/boot/dts/kirkwood-is2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2lite.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2max.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-ns2mini.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-ns2.c
+
+-- 
+1.7.10
