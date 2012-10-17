@@ -1,108 +1,221 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 17 Oct 2012 18:17:26 -0500
-Subject: [PATCH V2 3/3] ARM: tegra: move debug-macro.S to include/debug
-In-Reply-To: <507EDB37.1060102@wwwdotorg.org>
-References: <1350328024-30485-1-git-send-email-swarren@wwwdotorg.org>
- <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
- <507EC303.1080000@gmail.com> <507EDB37.1060102@wwwdotorg.org>
-Message-ID: <507F3C86.8040800@gmail.com>
+Date: Wed, 17 Oct 2012 18:30:36 -0500
+Subject: [PATCHv1] arm:socfpga: Enable SMP for socfpga
+In-Reply-To: <20121017230216.GA25651@elf.ucw.cz>
+References: <1350501498-23601-1-git-send-email-dinguyen@altera.com>
+ <507F01FD.6070403@gmail.com> <20121017230216.GA25651@elf.ucw.cz>
+Message-ID: <507F3F9C.7040704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2012 11:22 AM, Stephen Warren wrote:
-> On 10/17/2012 08:38 AM, Rob Herring wrote:
->> On 10/15/2012 02:07 PM, Stephen Warren wrote:
->>> From: Stephen Warren <swarren@nvidia.com>
->>>
->>> Move Tegra's debug-macro.S over to the common debug macro directory.
->>>
->>> Move Tegra's debug UART selection menu into ARM's Kconfig.debug, so that
->>> all related options are selected in the same place.
->>>
->>> Tegra's uncompress.h is left in mach-tegra/include/mach; it will be
->>> removed whenever Tegra is converted to multi-platform.
->>>
->>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>> ---
->>> Rob, Arnd, Olof, I'd particularly like feedback on whether the following:
->>>
->>> #include "../../mach-tegra/iomap.h"
->>>
->>> in arch/arm/include/debug/tegra.S is acceptable. I'd really like to
->>> continue to #include a header to share the defines to Tegra physical
->>> memory layout and virtual based addresses with Tegra's io.c's struct
->>> map_desc entries, so they can't get out of sync. So, the include can
->>> either use the relative path as quoted above (which I don't think will
->>> cause any significant maintenance issue), or Tegra's iomap.h would have
->>> to be moved somewhere public so e.g. <tegra-iomap.h> could be included.
+On 10/17/2012 06:02 PM, Pavel Machek wrote:
+> Hi!
+> 
+>>>  arch/arm/mach-socfpga/Kconfig             |    1 +
+>>>  arch/arm/mach-socfpga/Makefile            |    3 +
+>>>  arch/arm/mach-socfpga/headsmp.S           |   64 +++++++++++
+>>>  arch/arm/mach-socfpga/include/mach/core.h |   33 ++++++
 >>
->> We already have a way to get the phys and virt addresses at runtime with
->> addruart macro.
+>> Move core.h to mach-socfpga.
 > 
-> So this discussion is mainly about the implementation of addruart.
+>>> +ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+>>> +
+>>
+>> This can be removed if core.h is moved.
 > 
->> Couldn't we wrap this with a proper function and setup
->> the mapping at runtime. This would move it out of the platforms.
+> Ok, makes code nicer. Sorry for copying picoxcell too much.
 > 
-> So, the mapping already is set up at run-time at least during early
-> boot; __create_page_tables() in arch/arm/kernel/head.S calls addruart
-> and sets up an entry for it.
+>>> +	__INIT
+>>> +
+>>> +#define CPU1_START_ADDR 	        0xffd08010
+>>> +
+>>> +ENTRY(secondary_trampoline)
+>>
+>> This appears to be your reset code at phys addr 0. How does core 0 boot
+>> if you are copying this to 0?
 > 
-> I suppose the implication here is that the virtual address that addruart
-> returns doesn't have to match anything that the machine later sets up
-> using iotable_init().
+> Yes, this is reset code, goes at zero. Core 0 has already booted by
+> the time we are trying to boot Core 1 (we don't support CPU hotplug,
+> yet). Is that a problem?
+
+It would be better to do both at the same time as the code is
+intertwined. More below on this...
+
+>>> +static void __cpuinit socfpga_secondary_init(unsigned int cpu)
+>>> +{
+>>> +	/*
+>>> +	 * if any interrupts are already enabled for the primary
+>>> +	 * core (e.g. timer irq), then they will not have been enabled
+>>> +	 * for us: do so
+>>> +	 */
+>>> +	gic_secondary_init(0);
+>>> +
+>>> +	/*
+>>> +	 * let the primary processor know we're out of the
+>>> +	 * pen, then head off into the C entry point
+>>> +	 */
+>>> +	pen_release = -1;
+>>> +	smp_wmb();
+>>> +
+>>> +	/*
+>>> +	 * Synchronise with the boot thread.
+>>> +	 */
+>>> +	spin_lock(&boot_lock);
+>>> +	spin_unlock(&boot_lock);
+>>> +}
+>>> +
+>>> +static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>>> +{
+>>> +	unsigned long timeout;
+>>> +	extern char secondary_trampoline, secondary_trampoline_end;
+>>> +
+>>> +	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+>>> +
+>>> +	/*
+>>> +	 * Set synchronisation state between this boot processor
+>>> +	 * and the secondary one
+>>> +	 */
+>>> +	spin_lock(&boot_lock);
+>>> +
+>>> +	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+>>> +
+>>> +	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
+>>> +
+>>> +	pen_release = 0;
+>>> +	flush_cache_all();
+>>> +	smp_wmb();
+>>> +	outer_clean_range(0, trampoline_size);
+>>> +
+>>> +	/* This will release CPU #1 out of reset.*/
+>>> +	__raw_writel(0, rst_manager_base_addr + 0x10);
+>>> +
+>>> +	timeout = jiffies + (1 * HZ);
+>>> +	while (time_before(jiffies, timeout)) {
+>>> +		smp_rmb();
+>>> +		if (pen_release == -1)
+>>> +			break;
+>>> +
+>>> +		udelay(10);
+>>> +	}
+>>> +
+>>> +	/*
+>>> +	 * now the secondary core is starting up let it run its
+>>> +	 * calibrations, then wait for it to finish
+>>> +	 */
+>>> +	spin_unlock(&boot_lock);
+>>> +	return pen_release != -1 ? -ENOSYS : 0;
+>>
+>> You don't need any of this if you can reset secondary cores on
+>> hotplug.
 > 
-> If that's true, then Tegra's debug-macro.S only needs to know the UART
-> physical address, and can make up almost any arbitrary virtual address
-> (perhaps even driven by the logic you mention in your next paragraph
-> below) and hence need not rely on Tegra's iomap.h. That said, we'd still
-> have to manually remember not to create conflicting virtual address
-> setups in the two places, which would still be easier with a shared header.
-
-The virtual address has to remain the same.
-
-A non-platform specific header for a fixed virtual address define would
-be cleaner than relative includes.
-
+> What exactly is unneccessary? I'd like to wait for secondary to come
+> up so we can raise an error if it does not...?
 > 
-> However, I then have two questions:
-> 
-> 1) How long do the page tables set up by __create_page_tables() last; do
-> they stick around forever, or at least as long as the macros from
-> debug-macro.S are used, or are they replaced sometime, on the assumption
-> that the machine's .map_io() will call iotable_init() and end up setting
-> up the same mapping?
 
-It works to...
+Look at the highbank code.
 
-[    0.000000] Booting Linux on physical CPU 0
-[    0.000000] Linux version 3.5.4+ (rob at rob-laptop) (gcc version 4.7.2
-(Ubuntu/Linaro 4.7.2-1ubuntu1) ) #280 SMP Wed Oct 17 18:00:29 CDT 2012 ()
-[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7),
-cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
-instruction cache
-[    0.000000] Machine: Highbank, model: Calxeda Highbank
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] cma: CMA: reserved 16 MiB at 2e800000
-[    0.000000] Memory policy: ECC disabled, Data cache writealloc
+If hotplug will cause a reset of the core, then none of this pen code is
+needed. If hotplug just does a wfi and returns from the wfi when
+onlining the core like Versatile Express, then you need this pen code.
+There's been several prior discussions about this on the list.
 
-...here with no iotable mapping.
-
-> 
-> 2) If the virtual address returned by addruart on Tegra is different
-> than any virtual addresses set up by Tegra's .map_io(), and Tegra's
-> .map_io() sets up a very broad mapping that covers all peripherals
-> including the UART, and hence the UART physical registers get mapped
-> into two virtual addresses, will this cause any problems? IIRC,
-> duplicate mappings can cause some issues on ARM, but perhaps that only
-> applies to memory-like mappings, and not completely uncached IO mappings?
-
-The virt address has to match. It can initially be a 1MB section and
-then replaced with a 4K entry, but the same DEBUG_LL macros are used
-throughout the boot process as the mapping is updated.
-
-Duplicate mappings of different memory types is the problem. Multiple
-mapping of the same type are fine and common (the zero page for example).
+If you will never support hotplug (and therefore suspend), then you
+don't need this pen code either.
 
 Rob
+
+> Thanks,
+> 									Pavel
+> 
+> PS: I have this so far...
+> 
+> diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+> index 659fd27..a0fc372 100644
+> --- a/arch/arm/mach-socfpga/Makefile
+> +++ b/arch/arm/mach-socfpga/Makefile
+> @@ -2,7 +2,5 @@
+>  # Makefile for the linux kernel.
+>  #
+>  
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+> -
+>  obj-y			:= socfpga.o
+>  obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o hotplug.o
+> diff --git a/arch/arm/mach-socfpga/include/mach/core.h b/arch/arm/mach-socfpga/core.h
+> similarity index 100%
+> rename from arch/arm/mach-socfpga/include/mach/core.h
+> rename to arch/arm/mach-socfpga/core.h
+> diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+> index 9597ff7..081b4d1 100644
+> --- a/arch/arm/mach-socfpga/headsmp.S
+> +++ b/arch/arm/mach-socfpga/headsmp.S
+> @@ -20,42 +20,6 @@
+>  #define CONFIG_CPU1_START_ADDR 	        (CONFIG_SYSTEM_MANAGER + 0x10)
+>  
+>  ENTRY(secondary_trampoline)
+> -	/* From u-boot: start.S */
+> -	mrs     r0, cpsr
+> -	bic     r0, r0, #0x1f
+> -	orr     r0, r0, #0xd3
+> -	msr     cpsr,r0
+> -
+> -/*************************************************************************
+> - *
+> - * cpu_init_cp15
+> - *
+> - * Setup CP15 registers (cache, MMU, TLBs). The I-cache is turned on unless
+> - * CONFIG_SYS_ICACHE_OFF is defined.
+> - *
+> - *************************************************************************/
+> -ENTRY(cpu_init_cp15)
+> -	/*
+> -	 * Invalidate L1 I/D
+> -	 */
+> -	mov	r0, #0			@ set up for MCR
+> -	mcr	p15, 0, r0, c8, c7, 0	@ invalidate TLBs
+> -	mcr	p15, 0, r0, c7, c5, 0	@ invalidate icache
+> -	mcr	p15, 0, r0, c7, c5, 6	@ invalidate BP array
+> -	mcr     p15, 0, r0, c7, c10, 4	@ DSB
+> -	mcr     p15, 0, r0, c7, c5, 4	@ ISB
+> -
+> -	/*
+> -	 * disable MMU stuff and caches
+> -	 */
+> -	mrc	p15, 0, r0, c1, c0, 0
+> -	bic	r0, r0, #0x00002000	@ clear bits 13 (--V-)
+> -	bic	r0, r0, #0x00000007	@ clear bits 2:0 (-CAM)
+> -	orr	r0, r0, #0x00000002	@ set bit 1 (--A-) Align
+> -	orr	r0, r0, #0x00000800	@ set bit 11 (Z---) BTB
+> -	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-cache
+> -	mcr	p15, 0, r0, c1, c0, 0
+> -
+>  	movw	r0, #:lower16:CONFIG_CPU1_START_ADDR
+>  	movt    r0, #:upper16:CONFIG_CPU1_START_ADDR
+>  
+> diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+> index 34440aa..60c2b4a 100644
+> --- a/arch/arm/mach-socfpga/platsmp.c
+> +++ b/arch/arm/mach-socfpga/platsmp.c
+> @@ -26,7 +26,7 @@
+>  #include <asm/smp_scu.h>
+>  #include <asm/smp_plat.h>
+>  
+> -#include <mach/core.h>
+> +#include "core.h"
+>  
+>  static void __iomem *sys_manager_base_addr;
+>  static void __iomem *rst_manager_base_addr;
+> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+> index 68d32cd..741b9ba 100644
+> --- a/arch/arm/mach-socfpga/socfpga.c
+> +++ b/arch/arm/mach-socfpga/socfpga.c
+> @@ -23,7 +23,7 @@
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+>  
+> -#include <mach/core.h>
+> +#include "core.h"
+>  
+>  void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
+>  void __iomem *rst_manager_base_addr = ((void __iomem *)(SOCFPGA_RST_MANAGER_VIRT_BASE));
+> 
