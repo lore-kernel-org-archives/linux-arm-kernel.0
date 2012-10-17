@@ -1,133 +1,89 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 17 Oct 2012 09:41:25 -0500
-Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <20121016212647.GM15569@atomide.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
- <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
- <20121016174835.GV15569@atomide.com> <507DCA8D.7060309@ti.com>
- <20121016212647.GM15569@atomide.com>
-Message-ID: <507EC395.7060409@ti.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 17 Oct 2012 15:50:48 +0100
+Subject: [PATCH 9/9] ARM: add uprobes support
+In-Reply-To: <20121015174450.GB18614@linaro.org>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-9-git-send-email-rabin@rab.in>
+ <20121015111443.GA2006@linaro.org>
+ <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
+ <20121015174450.GB18614@linaro.org>
+Message-ID: <1350485448.3206.146.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/16/2012 04:26 PM, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [121016 14:00]:
->> Hi Tony,
->>
->> On 10/16/2012 12:48 PM, Tony Lindgren wrote:
->>> * Richard Cochran <richardcochran@gmail.com> [121015 12:18]:
->>>> From: hvaibhav at ti.com <hvaibhav@ti.com>
->>>>
->>>> With recent changes in omap gpmc driver code, in case of DT
->>>> boot mode, where bootloader does not configure gpmc cs space
->>>> will result into kernel BUG() inside gpmc_mem_init() function,
->>>> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
->>>> gpmc_config7[0].baseaddress is set to '0' on reset.
->>>>
->>>> This use-case is applicable for any board/EVM which doesn't have
->>>> any peripheral connected to gpmc cs0, for example BeagleXM and
->>>> BeagleBone, so DT boot mode fails.
->>>>
->>>> This patch adds of_have_populated_dt() check before creating
->>>> device, so that for DT boot mode, gpmc probe will not be called
->>>> which is expected behavior, as gpmc is not supported yet from DT.
->>>
->>> I'm applying this one into omap-for-v3.7-rc1/fixes-part2.
->>>
->>> Next time, please also cc linux-omap at vger.kernel.org for series
->>> like this. I'm sure the people reading the omap list are interested
->>> in these.
->>
->> This patch appears to be masking an underlying issue. How about 
->> something like the following ...
+On Mon, 2012-10-15 at 18:44 +0100, Dave Martin wrote:
+> On Mon, Oct 15, 2012 at 01:44:55PM +0200, Rabin Vincent wrote:
+> > 2012/10/15 Dave Martin <dave.martin@linaro.org>:
+> > > On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
+> > >> Add basic uprobes support for ARM.
+> > >>
+> > >> perf probe --exec and SystemTap's userspace probing work.  The ARM
+> > >> kprobes test code has also been run in a userspace harness to test the
+> > >> uprobe instruction decoding.
+> > >
+> > > The assumption that the target code is ARM appears to be buried all over
+> > > the place.
+> > 
+> > Right, as stated:
+> > 
+> > >> Caveats:
+> > >>  - Thumb is not supported
+> > 
+> > > Certainly this code as currently written must depend on !THUMB2_KERNEL.
+> > 
+> > Why?  It currently works for ARM userspace even if the kernel is
+> > Thumb-2.
 > 
-> OK that looks good to me. I'll drop the earlier fix and use
-> yours instead.
+> My bad, I misread what was happening in the Makefile changes.
+> 
+> My concern is about whether we can build the ARM and Thumb-2 kprobes
+> code into the same kernel.  If so, no problem, but I believe this is
+> not a tested configuration for kprobes itself.
 
-Hi Tony, sorry but I realised now that in my patch that I need to
-take care of releasing and memory and clocks that were acquired 
-during the probe. Here is a V2. If you prefer I can create a delta
-patch also with the previous. 
+When reworking kprobes I originally started by having ARM instruction
+support in Thumb kernels (with all test cases working) and, if I
+remember correct, this got dropped because we had difficulty in coming
+up with a robust way of specifying whether a probe pointer was in Thumb
+code or not. (Different methods of getting pointers to Thumb code didn't
+always set bit 0 so we 'solved' this by ignoring bit 0 and assuming all
+code in Thumb kernels was Thumb.)
 
-Cheers
-Jon
+<snip>
+> General question which I'm not sure I understand yet: is is possible
+> to combine uprobes/kprobes decode more completely?  It's not obvious
+> to me whether the uprobes-specific decoding only relates to features
+> which architecturally execute differently in user mode versus
+> privileged mode.  Some explanation somewhere could be helpful.
 
->From 91f5234d567c07ce1579b50e52de1a1e06ce5c68 Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Tue, 16 Oct 2012 15:22:58 -0500
-Subject: [PATCH V2] ARM: OMAP2+: Allow kernel to boot even if GPMC fails to
- reserve memory
+I just been looking at the decoding changes in patch 8 and had similar
+thoughts. The patch as it stands looks rather bolted on the side and
+makes the resulting code rather messy. My initial thoughts are that
+either:
 
-Currently, if the GPMC driver fails to reserve memory when probed we will
-call BUG() and the kernel will not boot. Instead of calling BUG(), return
-an error from probe and allow kernel to boot.
+a) uprobes is similar enough to kprobes that the existing code can be
+morphed into something that cleanly supports both, or
 
-Boot tested on AM335x beagle bone board and OMAP4430 Panda board.
+b) the similarities aren't close enough and that we should factor out
+the similarities into a more generalised decoding base, which the
+{u,k}probe code can then build on.
 
-V2 changes:
-- Ensure that clock and memory resources are released on error.
+c) some mix of a) and b)
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/gpmc.c |   24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+I can't help but think of the various calls over the past year or so for
+a general ARM/Thumb instruction decoding framework (the last one only a
+few weeks ago on the linux-arm-kernel list). Perhaps b) would be a small
+step towards that.
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 5ac5cf3..92b5718 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -868,9 +868,9 @@ static void __devexit gpmc_mem_exit(void)
- 
- }
- 
--static void __devinit gpmc_mem_init(void)
-+static int __devinit gpmc_mem_init(void)
- {
--	int cs;
-+	int cs, rc;
- 	unsigned long boot_rom_space = 0;
- 
- 	/* never allocate the first page, to facilitate bug detection;
-@@ -890,13 +890,21 @@ static void __devinit gpmc_mem_init(void)
- 		if (!gpmc_cs_mem_enabled(cs))
- 			continue;
- 		gpmc_cs_get_memconf(cs, &base, &size);
--		if (gpmc_cs_insert_mem(cs, base, size) < 0)
--			BUG();
-+		rc = gpmc_cs_insert_mem(cs, base, size);
-+		if (IS_ERR_VALUE(rc)) {
-+			while (--cs >= 0)
-+				if (gpmc_cs_mem_enabled(cs))
-+					gpmc_cs_delete_mem(cs);
-+			return rc;
-+		}
- 	}
-+
-+	return 0;
- }
- 
- static __devinit int gpmc_probe(struct platform_device *pdev)
- {
-+	int rc;
- 	u32 l;
- 	struct resource *res;
- 
-@@ -936,7 +944,13 @@ static __devinit int gpmc_probe(struct platform_device *pdev)
- 	dev_info(gpmc_dev, "GPMC revision %d.%d\n", GPMC_REVISION_MAJOR(l),
- 		 GPMC_REVISION_MINOR(l));
- 
--	gpmc_mem_init();
-+	rc = gpmc_mem_init();
-+	if (IS_ERR_VALUE(rc)) {
-+		clk_disable_unprepare(gpmc_l3_clk);
-+		clk_put(gpmc_l3_clk);
-+		dev_err(gpmc_dev, "failed to reserve memory\n");
-+		return rc;
-+	}
- 
- 	if (IS_ERR_VALUE(gpmc_setup_irq()))
- 		dev_warn(gpmc_dev, "gpmc_setup_irq failed\n");
+I hope to find some time to understand the uprobe patches in more
+detail, so I can try and come up with some sensible suggestions on a
+cleaner solution; because I feel that as they stand they aren't really
+suitable for inclusion in the kernel.
+
+Rabin, what tree/commit are your patches based on? (They don't seem to
+apply cleanly to 3.6 or 3.7-rc1.) I want to apply them locally so I can
+use my favourite visualisation tool and to play with them.
+
+Thanks
+
 -- 
-1.7.9.5
- 
+Tixy
