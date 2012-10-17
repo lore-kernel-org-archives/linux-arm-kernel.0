@@ -1,55 +1,29 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 17 Oct 2012 14:31:47 +0200
-Subject: [PATCH RFC 15/15 v5] gpio-ucb1400: Add block GPIO API
-In-Reply-To: <1350477107-26512-1-git-send-email-stigge@antcom.de>
-References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
-Message-ID: <1350477107-26512-16-git-send-email-stigge@antcom.de>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 17 Oct 2012 15:47:46 +0300
+Subject: [PATCH 06/11] fsmc/nand: Modify the wait to uninterruptible
+In-Reply-To: <3dcb002d0ad03dde9a91e8128dbaa320b8a264a9.1349778821.git.vipin.kumar@st.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <3dcb002d0ad03dde9a91e8128dbaa320b8a264a9.1349778821.git.vipin.kumar@st.com>
+Message-ID: <1350478066.5769.149.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds block GPIO API support to the gpio-ucb1400 driver.
+On Tue, 2012-10-09 at 16:14 +0530, Vipin Kumar wrote:
+> Interruptible wait caused trouble in fsmc hardware state machine if the
+> application was killed abruptly. To make fsmc operation safe turn wait in to
+> un-interruptible.
+> 
+> Signed-off-by: Vipin Kumar <vipin.kumar@st.com>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- drivers/gpio/gpio-ucb1400.c |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Pushed this one to l2-mtd.git, thanks!
 
---- linux-2.6.orig/drivers/gpio/gpio-ucb1400.c
-+++ linux-2.6/drivers/gpio/gpio-ucb1400.c
-@@ -45,6 +45,27 @@ static void ucb1400_gpio_set(struct gpio
- 	ucb1400_gpio_set_value(gpio->ac97, off, val);
- }
- 
-+static unsigned long ucb1400_gpio_get_block(struct gpio_chip *gc,
-+					    unsigned long mask)
-+{
-+	struct ucb1400_gpio *gpio;
-+	gpio = container_of(gc, struct ucb1400_gpio, gc);
-+	return ucb1400_reg_read(gpio->ac97, UCB_IO_DATA) & mask;
-+}
-+
-+static void ucb1400_gpio_set_block(struct gpio_chip *gc, unsigned long mask,
-+				   unsigned long values)
-+{
-+	struct ucb1400_gpio *gpio;
-+	u16 tmp;
-+	gpio = container_of(gc, struct ucb1400_gpio, gc);
-+
-+	tmp = ucb1400_reg_read(gpio->ac97, UCB_IO_DATA) & ~mask;
-+	tmp |= values & mask;
-+
-+	ucb1400_reg_write(gpio->ac97, UCB_IO_DATA, tmp);
-+}
-+
- static int ucb1400_gpio_probe(struct platform_device *dev)
- {
- 	struct ucb1400_gpio *ucb = dev->dev.platform_data;
-@@ -66,6 +87,8 @@ static int ucb1400_gpio_probe(struct pla
- 	ucb->gc.direction_output = ucb1400_gpio_dir_out;
- 	ucb->gc.get = ucb1400_gpio_get;
- 	ucb->gc.set = ucb1400_gpio_set;
-+	ucb->gc.get_block = ucb1400_gpio_get_block;
-+	ucb->gc.set_block = ucb1400_gpio_set_block;
- 	ucb->gc.can_sleep = 1;
- 
- 	err = gpiochip_add(&ucb->gc);
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/59249ec7/attachment-0001.sig>
