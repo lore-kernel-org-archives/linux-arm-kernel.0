@@ -1,73 +1,45 @@
-From: kernel.jason@gmail.com (Jason Lin)
-Date: Wed, 17 Oct 2012 17:54:53 +0800
-Subject: [RFC PATCH v2] prevent top pte being overwritten before flushing
-In-Reply-To: <20121017093916.GA5973@mudshark.cambridge.arm.com>
-References: <1350236542-96465-1-git-send-email-yanpai.chen@gmail.com>
- <CANj_sbCbdfvgkKXJjk4L_5Rk-4mQ-zqDqMErry-AzHddDb8WYA@mail.gmail.com>
- <20121017093916.GA5973@mudshark.cambridge.arm.com>
-Message-ID: <CAGCDX1mKn8nJpJ=Sicq8yi1hfW-m0fA+Uyx=Oikhq43Z85muCw@mail.gmail.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 17 Oct 2012 10:56:27 +0100
+Subject: [GIT PULL] Versatile Express updates for v3.8
+In-Reply-To: <20121016183451.GA2799@quad.lixom.net>
+References: <1350404650.1242.20.camel@hornet>
+ <20121016183451.GA2799@quad.lixom.net>
+Message-ID: <1350467787.1242.49.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/17 Will Deacon <will.deacon@arm.com>:
-> On Wed, Oct 17, 2012 at 09:42:19AM +0100, Andrew Yan-Pai Chen wrote:
->> On Mon, Oct 15, 2012 at 1:42 AM, Andrew Yan-Pai Chen
->> <yanpai.chen@gmail.com> wrote:
->> > +static DEFINE_RAW_SPINLOCK(flush_lock);
->> > +
->> > +/* Beware that this function is not to be called for SMP setups. */
->> >  static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
->> >  {
->> >         unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) <<
->> > PAGE_SHIFT);
->> >         const int zero = 0;
->> >
->> > +       preempt_disable();
->> >         set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
->> >
->> >         asm(    "mcrr   p15, 0, %1, %0, c14\n"
->> > @@ -34,6 +39,8 @@ static void flush_pfn_alias(unsigned long pfn, unsigned
->> > long vaddr)
->> >             :
->> >             : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
->> >             : "cc");
->> > +
->> > +       preempt_enable();
->> >  }
->> >
->> >  static void flush_icache_alias(unsigned long pfn, unsigned long vaddr,
->> > unsigned long len)
->> > @@ -42,9 +49,13 @@ static void flush_icache_alias(unsigned long pfn,
->> > unsigned long vaddr, unsigned
->> >         unsigned long offset = vaddr & (PAGE_SIZE - 1);
->> >         unsigned long to;
->> >
->> > +       raw_spin_lock(&flush_lock);
->> > +
->> >         set_top_pte(va, pfn_pte(pfn, PAGE_KERNEL));
->> >         to = va + offset;
->> >         flush_icache_range(to, to + len);
->> > +
->> > +       raw_spin_unlock(&flush_lock);
->> >  }
->> >
->> >  void flush_cache_mm(struct mm_struct *mm)
->> > --
->> > 1.7.4.1
->> >
->>
->> Hi all,
->>
->> Any ideas?
->
-> I wonder if we could use different ptes for each CPU (by hacking
-> pte_offset_kernel) and then get away with just disabling preemption in both
-> cases?
->
-> Will
+On Tue, 2012-10-16 at 19:34 +0100, Olof Johansson wrote:
+> Hi Pawel,
 
-Single core processor will also cause this issue in flush_pfn_alias().
-So it should use different ptes for each task.
-Will it be so complicated?
+> The branch contents looks good, but I wonder if you would mind splitting it up
+> across the same kind of topics that we tend to organize arm-soc in?
 
-Jason
+Sure, no problem.
+
+> Suggestions below.
+
+I can make those two a "drivers" branch indeed:
+
+> > Pawel Moll (8):
+> >       hwmon: Versatile Express hwmon driver
+> >       ARM: vexpress: Reset driver
+
+I can also split this one into "fixes":
+
+>       ARM: vexpress: Make the debug UART detection more specific
+
+But this series constitutes one logical change and must be applied in
+order (the sysreg driver is an essential part), so I'll keep them
+together on a "soc" branch:
+
+> >       mfd: Versatile Express config infrastructure
+> >       mfd: Versatile Express system registers driver
+> >       ARM: vexpress: Add config bus components and clocks to DTs
+> >       ARM: vexpress: Start using new Versatile Express infrastructure
+> >       ARM: vexpress: Remove motherboard dependencies in the DTS files
+
+If this makes sense, I'll send three pull requests soon.
+
+Cheers!
+
+Pawe?
