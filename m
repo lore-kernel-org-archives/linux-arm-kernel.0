@@ -1,57 +1,130 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:39:19 +0900
-Subject: [PATCH 08/10] ARM: shmobile: r8a7779: add I2C clock support
+Date: Wed, 17 Oct 2012 13:39:20 +0900
+Subject: [PATCH 09/10] ARM: shmobile: r8a7779: add I2C driver support
 In-Reply-To: <1350448761-27346-1-git-send-email-horms@verge.net.au>
 References: <1350448761-27346-1-git-send-email-horms@verge.net.au>
-Message-ID: <1350448761-27346-9-git-send-email-horms@verge.net.au>
+Message-ID: <1350448761-27346-10-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch is required from R-Car I2C driver
+This patch enable R-Car I2C driver
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/configs/marzen_defconfig      |    2 +
+ arch/arm/mach-shmobile/setup-r8a7779.c |   77 ++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 90d717b..24f5a84 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -87,7 +87,8 @@ static struct clk div4_clks[DIV4_NR] = {
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 53382b6..f79b55c 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -69,6 +69,8 @@ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_RCAR=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 2917668..63de5cb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -229,6 +229,79 @@ static struct platform_device tmu01_device = {
+ 	.num_resources	= ARRAY_SIZE(tmu01_resources),
  };
  
- enum { MSTP323, MSTP322, MSTP321, MSTP320,
--	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-+	MSTP030,
-+	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015, MSTP014,
- 	MSTP007,
- 	MSTP_NR };
-@@ -97,6 +98,10 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP322] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
-+	[MSTP030] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 30, 0), /* I2C0 */
-+	[MSTP029] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 29, 0), /* I2C1 */
-+	[MSTP028] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 28, 0), /* I2C2 */
-+	[MSTP027] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 27, 0), /* I2C3 */
- 	[MSTP026] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 24, 0), /* SCIF2 */
-@@ -150,6 +155,10 @@ static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-+	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
-+	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
-+	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
-+	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
++/* I2C */
++static struct resource rcar_i2c0_res[] = {
++	{
++		.start  = 0xffc70000,
++		.end    = 0xffc70fff,
++		.flags  = IORESOURCE_MEM,
++	}, {
++		.start  = gic_spi(79),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c0_device = {
++	.name		= "i2c-rcar",
++	.id		= 0,
++	.resource	= rcar_i2c0_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c0_res),
++};
++
++static struct resource rcar_i2c1_res[] = {
++	{
++		.start  = 0xffc71000,
++		.end    = 0xffc71fff,
++		.flags  = IORESOURCE_MEM,
++	}, {
++		.start  = gic_spi(82),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c1_device = {
++	.name		= "i2c-rcar",
++	.id		= 1,
++	.resource	= rcar_i2c1_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c1_res),
++};
++
++static struct resource rcar_i2c2_res[] = {
++	{
++		.start  = 0xffc72000,
++		.end    = 0xffc72fff,
++		.flags  = IORESOURCE_MEM,
++	}, {
++		.start  = gic_spi(80),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c2_device = {
++	.name		= "i2c-rcar",
++	.id		= 2,
++	.resource	= rcar_i2c2_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c2_res),
++};
++
++static struct resource rcar_i2c3_res[] = {
++	{
++		.start  = 0xffc73000,
++		.end    = 0xffc73fff,
++		.flags  = IORESOURCE_MEM,
++	}, {
++		.start  = gic_spi(81),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c3_device = {
++	.name		= "i2c-rcar",
++	.id		= 3,
++	.resource	= rcar_i2c3_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c3_res),
++};
++
+ static struct platform_device *r8a7779_early_devices[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -238,6 +311,10 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
+ 	&scif5_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
++	&i2c0_device,
++	&i2c1_device,
++	&i2c2_device,
++	&i2c3_device,
+ };
+ 
+ static struct platform_device *r8a7779_late_devices[] __initdata = {
 -- 
 1.7.10.4
