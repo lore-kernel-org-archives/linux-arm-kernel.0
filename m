@@ -1,48 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 17 Oct 2012 10:14:10 +0200
-Subject: [PATCH v6 0/3] Updated Cortex-M3 series
-In-Reply-To: <20120926192759.GC19685@pengutronix.de>
-References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20120816202932.GY2232@pengutronix.de>
- <20120921190002.GU5525@pengutronix.de> <5061C3FE.7050400@arm.com>
- <20120925150026.GG21730@pengutronix.de>
- <20120926180349.GF15578@mudshark.cambridge.arm.com>
- <20120926192759.GC19685@pengutronix.de>
-Message-ID: <20121017081410.GU639@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 17 Oct 2012 17:23:21 +0900
+Subject: [PATCH] ARM: SAMSUNG: Add naming of s3c64xx-spi devices
+In-Reply-To: <507C3845.1030003@inov.pt>
+References: <201210021443.54897.heiko@sntech.de> <507C2492.8010408@samsung.com>
+ <507C3845.1030003@inov.pt>
+Message-ID: <003b01cdac40$acec1590$06c440b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Jos? Miguel Gon?alves wrote:
+> 
+> On 15-10-2012 15:58, Sylwester Nawrocki wrote:
+> > Hi Heiko,
+> >
+> > On 10/02/2012 02:43 PM, Heiko St?bner wrote:
+> >> Commit a5238e360b71 (spi: s3c64xx: move controller information into
+> driver
+> >> data) introduced separate device names for the different subtypes of
+> the
+> >> spi controller but forgot to set these in the relevant machines.
+> >>
+> >> To fix this introduce a s3c64xx_spi_setname function and populate all
+> >> Samsung arches with the correct names. The function resides in a new
+> >> header, as the s3c64xx-spi.h contains driver platform data and should
+> >> therefore at some later point move out of the Samsung include dir.
+> >>
+> >> Tested on a s3c2416-based machine.
+> >>
+> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> >> Cc: stable at vger.kernel.org
+> > This patch looks good to me. I've tested it on Exynos4412 SoC based
+> > board. And it fixes quite serious problem - broken SPI support on
+> > a all Samsung machs (non-dt) except s3c64xx in mainline v3.6 kernel.
+> >
+> >
+> > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > (mach-exynos only)
+> >
+> > Jos? Miguel, can you confirm it solves the problem for you ?
+> 
+> The driver initialization problem is solved by this patch on my S3C2416
+> based
+> board. Nevertheless, I didn?t have the time yet to test an actual SPI
+> device
+> connected to the bus.
+> 
+> BTW, I think the two debug messages at the end of the s3c64xx_spi_probe()
+> routine
+> should be promoted from dev_dbg to dev_info in order to be shown on a
+> normal
+> kernel boot.
+> 
+You guys, thanks for fixing and testing.
 
-On Wed, Sep 26, 2012 at 09:27:59PM +0200, Uwe Kleine-K?nig wrote:
-> On Wed, Sep 26, 2012 at 07:03:49PM +0100, Will Deacon wrote:
-> > On Tue, Sep 25, 2012 at 04:00:26PM +0100, Uwe Kleine-K?nig wrote:
-> > > On Tue, Sep 25, 2012 at 03:47:26PM +0100, Jonathan Austin wrote:
-> > > > Looking at the patch series at a very superficial level, I wonder why
-> > > > you've chosen not to include any Kconfig/NVIC support at this stage,
-> > > > especially as you've posted some before and there appears to be
-> > > > something (presumably) working in your efm32 branch...
-> > > >
-> > > > It would be a shame to spend time on merging the basic support if there
-> > > > are issues that mean the interrupt support won't follow.
-> > > I plan to expand common/gic.c for interrupt support. Currently I don't
-> > > do much though because getting feedback and the changes into mainline is
-> > > quite hard and I don't want to spend time now and hear later that I did
-> > > it wrong or something. So I put my efforts on hold and only ping from
-> > > time to time.  :-(
-> > 
-> > My personal view is that merging the code without support for interrupts is
-> > fairly pointless, so the nvic code should certainly be included. I
-> > wouldn't worry too much about merging it with gic.c initially. That can come
-> That would be ok for me, too.
-I thought about that again, and I think merging with hacked irq support
-isn't good. Note that even when the irq support goes in you still need
-several patches to support an M3 platform. So one more patch in the
-private queue doesn't hurt IMHO.
+Looks good to me, applied.
 
-Best regards
-Uwe
+Thanks.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
