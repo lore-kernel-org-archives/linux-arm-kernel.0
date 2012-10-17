@@ -1,60 +1,73 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 17 Oct 2012 18:48:21 +0900
-Subject: [PATCH 0/8] Cragganmore updates
-In-Reply-To: <20121017073813.GI14199@opensource.wolfsonmicro.com>
-References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
-Message-ID: <005001cdac4c$8afe8380$a0fb8a80$%kim@samsung.com>
+From: kernel.jason@gmail.com (Jason Lin)
+Date: Wed, 17 Oct 2012 17:54:53 +0800
+Subject: [RFC PATCH v2] prevent top pte being overwritten before flushing
+In-Reply-To: <20121017093916.GA5973@mudshark.cambridge.arm.com>
+References: <1350236542-96465-1-git-send-email-yanpai.chen@gmail.com>
+ <CANj_sbCbdfvgkKXJjk4L_5Rk-4mQ-zqDqMErry-AzHddDb8WYA@mail.gmail.com>
+ <20121017093916.GA5973@mudshark.cambridge.arm.com>
+Message-ID: <CAGCDX1mKn8nJpJ=Sicq8yi1hfW-m0fA+Uyx=Oikhq43Z85muCw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
-> 
-> The following changes since commit
-> ddffeb8c4d0331609ef2581d84de4d763607bd37:
-> 
->   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git
-> tags/crag6410
-> 
-> for you to fetch changes up to c8a825563eae03e657b191c2b4948f7613ae91b6:
-> 
->   ARM: S3C64XX: Add handset module to probed Glenfarclas modules (2012-10-
-> 16 14:09:01 +0900)
-> 
-> ----------------------------------------------------------------
-> ARM: S3C64XX: Cragganmore updates
-> 
-> There's a bunch of things in here (some have been posted before I
-> believe), the main thing is the update to support muliple board
-> revisions but there's also some new modules added.
-> 
-> ----------------------------------------------------------------
-> Mark Brown (8):
->       ARM: S3C64XX: Add more Glenfarclas module ID strings
->       ARM: S3C64XX: Update hookup for Arizona class devices
->       ARM: S3C64XX: Provide platform data for Tomatin/Balblair on
-> Cragganmore
->       ARM: S3C64XX: Handle revision-specific differences in Cragganmore
-> modules
->       ARM: S3C64XX: Handle new Amrut modules on Cragganmore
->       ARM: S3C64XX: Add hookup for Deanston module on Cragganmore
->       ARM: S3C64XX: Add WM2200 module for Cragganmore
->       ARM: S3C64XX: Add handset module to probed Glenfarclas modules
-> 
->  arch/arm/mach-s3c64xx/mach-crag6410-module.c |  141
-> +++++++++++++++++++++-----
->  arch/arm/mach-s3c64xx/mach-crag6410.c        |   29 +++++-
->  2 files changed, 144 insertions(+), 26 deletions(-)
+2012/10/17 Will Deacon <will.deacon@arm.com>:
+> On Wed, Oct 17, 2012 at 09:42:19AM +0100, Andrew Yan-Pai Chen wrote:
+>> On Mon, Oct 15, 2012 at 1:42 AM, Andrew Yan-Pai Chen
+>> <yanpai.chen@gmail.com> wrote:
+>> > +static DEFINE_RAW_SPINLOCK(flush_lock);
+>> > +
+>> > +/* Beware that this function is not to be called for SMP setups. */
+>> >  static void flush_pfn_alias(unsigned long pfn, unsigned long vaddr)
+>> >  {
+>> >         unsigned long to = FLUSH_ALIAS_START + (CACHE_COLOUR(vaddr) <<
+>> > PAGE_SHIFT);
+>> >         const int zero = 0;
+>> >
+>> > +       preempt_disable();
+>> >         set_top_pte(to, pfn_pte(pfn, PAGE_KERNEL));
+>> >
+>> >         asm(    "mcrr   p15, 0, %1, %0, c14\n"
+>> > @@ -34,6 +39,8 @@ static void flush_pfn_alias(unsigned long pfn, unsigned
+>> > long vaddr)
+>> >             :
+>> >             : "r" (to), "r" (to + PAGE_SIZE - L1_CACHE_BYTES), "r" (zero)
+>> >             : "cc");
+>> > +
+>> > +       preempt_enable();
+>> >  }
+>> >
+>> >  static void flush_icache_alias(unsigned long pfn, unsigned long vaddr,
+>> > unsigned long len)
+>> > @@ -42,9 +49,13 @@ static void flush_icache_alias(unsigned long pfn,
+>> > unsigned long vaddr, unsigned
+>> >         unsigned long offset = vaddr & (PAGE_SIZE - 1);
+>> >         unsigned long to;
+>> >
+>> > +       raw_spin_lock(&flush_lock);
+>> > +
+>> >         set_top_pte(va, pfn_pte(pfn, PAGE_KERNEL));
+>> >         to = va + offset;
+>> >         flush_icache_range(to, to + len);
+>> > +
+>> > +       raw_spin_unlock(&flush_lock);
+>> >  }
+>> >
+>> >  void flush_cache_mm(struct mm_struct *mm)
+>> > --
+>> > 1.7.4.1
+>> >
+>>
+>> Hi all,
+>>
+>> Any ideas?
+>
+> I wonder if we could use different ptes for each CPU (by hacking
+> pte_offset_kernel) and then get away with just disabling preemption in both
+> cases?
+>
+> Will
 
-Looks OK to me, applied this whole series.
+Single core processor will also cause this issue in flush_pfn_alias().
+So it should use different ptes for each task.
+Will it be so complicated?
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Jason
