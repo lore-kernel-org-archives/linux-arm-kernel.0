@@ -1,61 +1,168 @@
 From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Wed, 17 Oct 2012 12:09:02 +0200
-Subject: [PATCH v2 0/4] Add DT support for Network Space v2 and parents
-Message-ID: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
+Date: Wed, 17 Oct 2012 12:09:03 +0200
+Subject: [PATCH v2 1/4] leds: leds-ns2: add device tree binding
+In-Reply-To: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
+References: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <1350468546-25901-2-git-send-email-simon.guinot@sequanux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series provides DT support for LaCie NAS Network Space v2 and
-parents. This includes the following machines:
- - Internet Space v2
- - Network Space v2
- - Network Space Max v2
- - Network Space Lite v2
- - Network Space Mini v2
-
-Note that the three first boards are already supported by the Linux
-kernel via an "old-fashion" board setup. The two lasts (Lite and Mini)
-are new boards.
-
-Also note that the first patch of the series is related with the LED
-subsystem. It adds device tree binding to the driver leds-ns2.
-
+Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+---
 Changes for v2:
- - Fix version for patch (update to v3):
-   "ARM: kirkwood: DT board setup for Network Space v2 and parents"
- - Fix compatibility string for driver leds-ns2. Use "lacie,ns2-leds".
- - leds-ns2: Remove useless #else #endif statement.
+ - Fix compatibility string. Use "lacie,ns2-leds".
+ - Remove useless #else #endif statement.
 
-Simon Guinot (4):
-  leds: leds-ns2: add device tree binding
-  ARM: kirkwood: DT board setup for Network Space v2 and parents
-  ARM: kirkwood: DT board setup for Network Space Lite v2
-  ARM: kirkwood: DT board setup for Network Space Mini v2
-
- .../devicetree/bindings/gpio/leds-ns2.txt          |   26 ++++++
- arch/arm/boot/dts/Makefile                         |    5 ++
- arch/arm/boot/dts/kirkwood-is2.dts                 |   30 +++++++
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   63 ++++++++++++++
- arch/arm/boot/dts/kirkwood-ns2.dts                 |   30 +++++++
- arch/arm/boot/dts/kirkwood-ns2lite.dts             |   30 +++++++
- arch/arm/boot/dts/kirkwood-ns2max.dts              |   49 +++++++++++
- arch/arm/boot/dts/kirkwood-ns2mini.dts             |   49 +++++++++++
- arch/arm/mach-kirkwood/Kconfig                     |   36 ++++++++
- arch/arm/mach-kirkwood/Makefile                    |    5 ++
- arch/arm/mach-kirkwood/board-dt.c                  |   12 +++
- arch/arm/mach-kirkwood/board-ns2.c                 |   87 ++++++++++++++++++++
- arch/arm/mach-kirkwood/common.h                    |   10 +++
- drivers/leds/Kconfig                               |    4 +-
- drivers/leds/leds-ns2.c                            |   78 +++++++++++++++++-
- 15 files changed, 510 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/gpio/leds-ns2.txt          |   26 +++++++
+ drivers/leds/leds-ns2.c                            |   78 +++++++++++++++++++-
+ 2 files changed, 101 insertions(+), 3 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/gpio/leds-ns2.txt
- create mode 100644 arch/arm/boot/dts/kirkwood-is2.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ns2-common.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-ns2.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ns2lite.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ns2max.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-ns2mini.dts
- create mode 100644 arch/arm/mach-kirkwood/board-ns2.c
 
+diff --git a/Documentation/devicetree/bindings/gpio/leds-ns2.txt b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+new file mode 100644
+index 0000000..aef3aca
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/leds-ns2.txt
+@@ -0,0 +1,26 @@
++Binding for dual-GPIO LED found on Network Space v2 (and parents).
++
++Required properties:
++- compatible: "lacie,ns2-leds".
++
++Each LED is represented as a sub-node of the ns2-leds device.
++
++Required sub-node properties:
++- cmd-gpio: Command LED GPIO. See OF device-tree GPIO specification.
++- slow-gpio: Slow LED GPIO. See OF device-tree GPIO specification.
++
++Optional sub-node properties:
++- label: Name for this LED. If omitted, the label is taken from the node name.
++- linux,default-trigger: Trigger assigned to the LED.
++
++Example:
++
++ns2-leds {
++	compatible = "lacie,ns2-leds";
++
++	blue-sata {
++		label = "ns2:blue:sata";
++		slow-gpio = <&gpio0 29 0>;
++		cmd-gpio = <&gpio0 30 0>;
++	};
++};
+diff --git a/drivers/leds/leds-ns2.c b/drivers/leds/leds-ns2.c
+index d176ec8..d64cc22 100644
+--- a/drivers/leds/leds-ns2.c
++++ b/drivers/leds/leds-ns2.c
+@@ -30,6 +30,7 @@
+ #include <linux/leds.h>
+ #include <linux/module.h>
+ #include <linux/platform_data/leds-kirkwood-ns2.h>
++#include <linux/of_gpio.h>
+ 
+ /*
+  * The Network Space v2 dual-GPIO LED is wired to a CPLD and can blink in
+@@ -263,6 +264,62 @@ static void delete_ns2_led(struct ns2_led_data *led_dat)
+ 	gpio_free(led_dat->slow);
+ }
+ 
++#ifdef CONFIG_OF_GPIO
++/*
++ * Translate OpenFirmware node properties into platform_data.
++ */
++static int __devinit
++ns2_leds_get_of_pdata(struct device *dev, struct ns2_led_platform_data *pdata)
++{
++	struct device_node *np = dev->of_node;
++	struct device_node *child;
++	struct ns2_led *leds;
++	int num_leds = 0;
++	int i = 0;
++
++	num_leds = of_get_child_count(np);
++	if (!num_leds)
++		return -ENODEV;
++
++	leds = devm_kzalloc(dev, num_leds * sizeof(struct ns2_led),
++			    GFP_KERNEL);
++	if (!leds)
++		return -ENOMEM;
++
++	for_each_child_of_node(np, child) {
++		const char *string;
++		int ret;
++
++		ret = of_get_named_gpio(child, "cmd-gpio", 0);
++		if (ret < 0)
++			return ret;
++		leds[i].cmd = ret;
++		ret = of_get_named_gpio(child, "slow-gpio", 0);
++		if (ret < 0)
++			return ret;
++		leds[i].slow = ret;
++		ret = of_property_read_string(child, "label", &string);
++		leds[i].name = (ret == 0) ? string : child->name;
++		ret = of_property_read_string(child, "linux,default-trigger",
++					      &string);
++		if (ret == 0)
++			leds[i].default_trigger = string;
++
++		i++;
++	}
++
++	pdata->leds = leds;
++	pdata->num_leds = num_leds;
++
++	return 0;
++}
++
++static const struct of_device_id of_ns2_leds_match[] = {
++	{ .compatible = "lacie,ns2-leds", },
++	{},
++};
++#endif /* CONFIG_OF_GPIO */
++
+ static int __devinit ns2_led_probe(struct platform_device *pdev)
+ {
+ 	struct ns2_led_platform_data *pdata = pdev->dev.platform_data;
+@@ -270,11 +327,25 @@ static int __devinit ns2_led_probe(struct platform_device *pdev)
+ 	int i;
+ 	int ret;
+ 
++#ifdef CONFIG_OF_GPIO
++	if (!pdata) {
++		pdata = devm_kzalloc(&pdev->dev,
++				     sizeof(struct ns2_led_platform_data),
++				     GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++
++		ret = ns2_leds_get_of_pdata(&pdev->dev, pdata);
++		if (ret)
++			return ret;
++	}
++#else
+ 	if (!pdata)
+ 		return -EINVAL;
++#endif /* CONFIG_OF_GPIO */
+ 
+ 	leds_data = devm_kzalloc(&pdev->dev, sizeof(struct ns2_led_data) *
+-			    pdata->num_leds, GFP_KERNEL);
++				 pdata->num_leds, GFP_KERNEL);
+ 	if (!leds_data)
+ 		return -ENOMEM;
+ 
+@@ -312,8 +383,9 @@ static struct platform_driver ns2_led_driver = {
+ 	.probe		= ns2_led_probe,
+ 	.remove		= __devexit_p(ns2_led_remove),
+ 	.driver		= {
+-		.name	= "leds-ns2",
+-		.owner	= THIS_MODULE,
++		.name		= "leds-ns2",
++		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(of_ns2_leds_match),
+ 	},
+ };
+ 
 -- 
 1.7.10
