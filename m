@@ -1,65 +1,43 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 17 Oct 2012 20:53:00 +0200
-Subject: [PATCH 1/2] mmc: core: Support all MMC capabilities when booting
- from Device Tree
-In-Reply-To: <201210171338.01011.arnd@arndb.de>
-References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
- <201210151420.29930.arnd@arndb.de>
- <20121015160740.GC7662@gmail.com>
- <201210171338.01011.arnd@arndb.de>
-Message-ID: <CAPDyKFq6YfpjCs-3Wh=RPGc-4ukUinuhVWaZ0=+WCLsc0JBWbQ@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 17 Oct 2012 13:55:55 -0500
+Subject: [PATCH] ARM: AM33XX: Fix configuration of dmtimer parent clock by
+ dmtimer driver
+Message-ID: <1350500155-22525-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 October 2012 15:38, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 15 October 2012, Lee Jones wrote:
->> > and so on. What are you actually missing in the properties that
->> > are already there?
->>
->> MMC_CAP_ERASE
->
-> This one seems to be set unconditionally on some controllers but
-> not on others. Why would it need to be configurable?
->
->> MMC_CAP_UHS_SDR12
->> MMC_CAP_UHS_SDR25
->> MMC_CAP_UHS_DDR50
->
-> Could this be derived from max-frequency?
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
-No, this is likely depending on what the hw controller supports. Not
-connected to the freq.
-UHS also means 1.8 V I/O voltage.
+Add dmtimer clock aliases for AM33XX devices so that the parent clock for
+the dmtimer can be set correctly by the dmtimer driver. Without these clock
+aliases the dmtimer driver will fail to find the parent clocks for the dmtimer.
 
->
->> MMC_CAP_1_8V_DDR
->
-> Right, I suppose we need this. Should we have a minimum and maximum
-> voltage added to the common properties for this?
->
->> MMC_CAP2_DETECT_ON_ERR
->> MMC_CAP2_NO_SLEEP_CMD
->
-> I don't see these ones being set anywhere, but they were both
-> added by Ulf. Maybe he can comment on if or why they are needed
-> in devicetree, rather than being set by the driver unconditionally
-> or for specific versions of the host controller.
+Verified that DMTIMERs can be successfully requested on AM335x beagle bone.
 
->From ux500 perspective there are patches not been up-streamed yet
-which are using these host caps, for whatever it is worth for you to
-know and consider.
+Original patch was provided by Vaibhav Hiremath [1]. Changelog and
+additional verification performed by Jon Hunter.
 
-Actually, I think quite a few of the host caps in mmc could be debated
-whether those should exist at all.
-Some are directly mapped to what the host controller hw support, some
-are purely what the host driver (sw) support, but then there are
-others kind of "mmc/sd/sdio software support configuration" which are
-kind of strange host caps to me. For example MMC_CAP2_DETECT_ON_ERR
-which I invented. :-). I think it especially these "software support
-configuration" caps that might be causing this dt issues.
+[1] http://marc.info/?l=linux-omap&m=134693631608018&w=2
 
-Would be very interesting to hear if someone is sharing my thoughts
-around the host caps. Or if I am totally wrong here.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Tested-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/clock33xx_data.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Kind regards
-Ulf Hansson
+diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+index 114ab4b..1a45d6b 100644
+--- a/arch/arm/mach-omap2/clock33xx_data.c
++++ b/arch/arm/mach-omap2/clock33xx_data.c
+@@ -1073,6 +1073,8 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"gfx_fck_div_ck",	&gfx_fck_div_ck,	CK_AM33XX),
+ 	CLK(NULL,	"sysclkout_pre_ck",	&sysclkout_pre_ck,	CK_AM33XX),
+ 	CLK(NULL,	"clkout2_ck",		&clkout2_ck,	CK_AM33XX),
++	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
++	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
+ };
+ 
+ int __init am33xx_clk_init(void)
+-- 
+1.7.9.5
