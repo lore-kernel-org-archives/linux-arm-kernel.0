@@ -1,43 +1,84 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 17 Oct 2012 13:55:55 -0500
-Subject: [PATCH] ARM: AM33XX: Fix configuration of dmtimer parent clock by
- dmtimer driver
-Message-ID: <1350500155-22525-1-git-send-email-jon-hunter@ti.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 17 Oct 2012 12:05:20 -0700
+Subject: [PATCH RFC 02/15 v5] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <1350477107-26512-3-git-send-email-stigge@antcom.de>
+References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
+ <1350477107-26512-3-git-send-email-stigge@antcom.de>
+Message-ID: <20121017190520.GC25996@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+On Wed, Oct 17, 2012 at 02:31:34PM +0200, Roland Stigge wrote:
+> This patch adds sysfs support to the block GPIO API.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+>  Documentation/ABI/testing/sysfs-gpio |    6 
+>  drivers/gpio/gpiolib.c               |  214 +++++++++++++++++++++++++++++++++++
+>  include/asm-generic/gpio.h           |   11 +
+>  include/linux/gpio.h                 |   13 ++
+>  4 files changed, 243 insertions(+), 1 deletion(-)
+> 
+> --- linux-2.6.orig/Documentation/ABI/testing/sysfs-gpio
+> +++ linux-2.6/Documentation/ABI/testing/sysfs-gpio
+> @@ -24,4 +24,8 @@ Description:
+>  	    /base ... (r/o) same as N
+>  	    /label ... (r/o) descriptive, not necessarily unique
+>  	    /ngpio ... (r/o) number of GPIOs; numbered N to N + (ngpio - 1)
+> -
+> +	/blockN ... for each GPIO block #N
+> +	    /ngpio ... (r/o) number of GPIOs in this group
+> +	    /exported ... sysfs export state of this group (0, 1)
+> +	    /value ... current value as 32 or 64 bit integer in decimal
+> +                       (only available if /exported is 1)
 
-Add dmtimer clock aliases for AM33XX devices so that the parent clock for
-the dmtimer can be set correctly by the dmtimer driver. Without these clock
-aliases the dmtimer driver will fail to find the parent clocks for the dmtimer.
+I think you need some more documentation here, as I just noticed
+something "odd":
 
-Verified that DMTIMERs can be successfully requested on AM335x beagle bone.
+> +static int gpio_block_value_unexport(struct gpio_block *block)
+> +{
+> +	struct device	*dev;
+> +	int		i;
+> +
+> +	dev = class_find_device(&gpio_block_class, NULL, block, match_export);
+> +	if (!dev)
+> +		return -ENODEV;
+> +
+> +	for (i = 0; i < block->ngpio; i++)
+> +		gpio_free(block->gpio[i]);
+> +
+> +	device_remove_file(dev, &dev_attr_block_value);
+> +
+> +	return 0;
+> +}
 
-Original patch was provided by Vaibhav Hiremath [1]. Changelog and
-additional verification performed by Jon Hunter.
+Wait, what?  You are removing a sysfs file in this function, from within
+a sysfs write:
 
-[1] http://marc.info/?l=linux-omap&m=134693631608018&w=2
+> +static ssize_t gpio_block_exported_store(struct device *dev,
+> +					 struct device_attribute *attr,
+> +					 const char *buf, size_t size)
+> +{
+> +	long	value;
+> +	int	status;
+> +	struct	gpio_block *block = dev_get_drvdata(dev);
+> +	int	exported = gpio_block_value_is_exported(block);
+> +
+> +	status = kstrtoul(buf, 0, &value);
+> +	if (status < 0)
+> +		goto err;
+> +
+> +	if (value != exported) {
+> +		if (value)
+> +			status = gpio_block_value_export(block);
+> +		else
+> +			status = gpio_block_value_unexport(block);
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Tested-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/clock33xx_data.c |    2 ++
- 1 file changed, 2 insertions(+)
+That looks like a recipie for disaster.  Why do you allow userspace to
+do this?
 
-diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
-index 114ab4b..1a45d6b 100644
---- a/arch/arm/mach-omap2/clock33xx_data.c
-+++ b/arch/arm/mach-omap2/clock33xx_data.c
-@@ -1073,6 +1073,8 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"gfx_fck_div_ck",	&gfx_fck_div_ck,	CK_AM33XX),
- 	CLK(NULL,	"sysclkout_pre_ck",	&sysclkout_pre_ck,	CK_AM33XX),
- 	CLK(NULL,	"clkout2_ck",		&clkout2_ck,	CK_AM33XX),
-+	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
-+	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
- };
- 
- int __init am33xx_clk_init(void)
--- 
-1.7.9.5
+Anyway, the other fixups for how you create/destroy the attribute files
+looks great, thanks for making those changes.
+
+greg k-h
