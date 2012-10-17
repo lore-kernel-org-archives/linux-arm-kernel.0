@@ -1,229 +1,126 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 18 Oct 2012 01:02:16 +0200
-Subject: [PATCHv1] arm:socfpga: Enable SMP for socfpga
-In-Reply-To: <507F01FD.6070403@gmail.com>
-References: <1350501498-23601-1-git-send-email-dinguyen@altera.com>
- <507F01FD.6070403@gmail.com>
-Message-ID: <20121017230216.GA25651@elf.ucw.cz>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 17 Oct 2012 16:06:54 -0700
+Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
+ revert "i2c: omap: switch to threaded IRQ support")
+In-Reply-To: <20121017143534.GJ11394@arwen.pp.htv.fi> (Felipe Balbi's message
+ of "Wed, 17 Oct 2012 17:35:34 +0300")
+References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+ <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
+ <20121016133356.GG21801@arwen.pp.htv.fi>
+ <87ipaanljt.fsf_-_@deeprootsystems.com>
+ <20121017140002.GI11394@arwen.pp.htv.fi>
+ <20121017143534.GJ11394@arwen.pp.htv.fi>
+Message-ID: <87txtsitpt.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Felipe Balbi <balbi@ti.com> writes:
 
-> >  arch/arm/mach-socfpga/Kconfig             |    1 +
-> >  arch/arm/mach-socfpga/Makefile            |    3 +
-> >  arch/arm/mach-socfpga/headsmp.S           |   64 +++++++++++
-> >  arch/arm/mach-socfpga/include/mach/core.h |   33 ++++++
-> 
-> Move core.h to mach-socfpga.
+> On Wed, Oct 17, 2012 at 05:00:02PM +0300, Felipe Balbi wrote:
+>> 
+>> On Tue, Oct 16, 2012 at 02:39:50PM -0700, Kevin Hilman wrote:
+>> > + peterz, tglx
+>> > 
+>> > Felipe Balbi <balbi@ti.com> writes:
+>> > 
+>> > [...]
+>> > 
+>> > > The problem I see is that even though we properly return IRQ_WAKE_THREAD
+>> > > and wake_up_process() manages to wakeup the IRQ thread (it returns 1),
+>> > > the thread is never scheduled. To make things even worse, ouw irq thread
+>> > > runs once, but doesn't run on a consecutive call. Here's some (rather
+>> > > nasty) debug prints showing the problem:
+>> > 
+>> > [...]
+>> > 
+>> > >> [   88.721923] try_to_wake_up 1411
+>> > >> [   88.725189] ===> irq_wake_thread 139: IRQ 72 wake_up_process 0
+>> > >> [   88.731292] [sched_delayed] sched: RT throttling activated
+>> > 
+>> > This throttling message is the key one.
+>> > 
+>> > With RT throttling activated, the IRQ thread will not be run (it
+>> > eventually will be allowed much later on, but by then, the I2C xfers
+>> > have timed out.)
+>> > 
+>> > As a quick hack, the throttling can be disabled by seeting the
+>> > sched_rt_runtime to RUNTIME_INF:
+>> > 
+>> >         # sysctl -w kernel.sched_rt_runtime_us=-1
+>> > 
+>> > and a quick test shows that things go back to working as expected.  But
+>> > we still need to figure out why the throttling is hapenning...
+>> > 
+>> > So I started digging into why the RT runtime was so high, and noticed
+>> > that time spent in suspend was being counted as RT runtime!
+>> > 
+>> > So spending time in suspend anywhere near sched_rt_runtime (0.95s) will
+>> > cause the RT throttling to always be triggered, and thus prevent IRQ
+>> > threads from running in the resume path.  Ouch.
+>> > 
+>> > I think I'm already in over my head in the RT runtime stuff, but
+>> > counting the time spent in suspend as RT runtime smells like a bug to
+>> > me. no?
+>> > 
+>> > Peter? Thomas?
+>> 
+>> it looks like removing console output completely (echo 0 >
+>> /proc/sysrq-trigger) I don't see the issue anymore. Let me just run for
+>> a few more iterations to make sure what I'm saying is correct.
+>
+> Yeah, really looks like removing console output makes the problem go
+> away. Ran a few iterations and it always worked fine. Full logs attached
 
-> > +ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
-> > +
-> 
-> This can be removed if core.h is moved.
+Removing console output during resume is going to significantly change
+the timing of what is happening during suspend/resume, so I suspect that
+combined with all your other debug prints is somehow masking the
+problem.  How log are you letting the system stay in suspend?
 
-Ok, makes code nicer. Sorry for copying picoxcell too much.
+That being said, I can still easily reproduce the problem, even with
+console output disabled.
 
-> > +	__INIT
-> > +
-> > +#define CPU1_START_ADDR 	        0xffd08010
-> > +
-> > +ENTRY(secondary_trampoline)
-> 
-> This appears to be your reset code at phys addr 0. How does core 0 boot
-> if you are copying this to 0?
+With vanilla v3.7-rc1 + the debug patch below[1], with and without
+console output, I see RT throttling kicking in on resume, and the RT
+runtime on resume corresponds to the time spent in suspend.  Here's an
+example of debug output of my patch below after ~3 sec in suspend:
 
-Yes, this is reset code, goes at zero. Core 0 has already booted by
-the time we are trying to boot Core 1 (we don't support CPU hotplug,
-yet). Is that a problem?
- 
-> > +	/* From u-boot: start.S */
-> > +	mrs     r0, cpsr
-> > +	bic     r0, r0, #0x1f
-> > +	orr     r0, r0, #0xd3
-> > +	msr     cpsr,r0
-...
-> > +	 * disable MMU stuff and caches
-> > +	 */
-> > +	mrc	p15, 0, r0, c1, c0, 0
-> > +	bic	r0, r0, #0x00002000	@ clear bits 13 (--V-)
-> > +	bic	r0, r0, #0x00000007	@ clear bits 2:0 (-CAM)
-> > +	orr	r0, r0, #0x00000002	@ set bit 1 (--A-) Align
-> > +	orr	r0, r0, #0x00000800	@ set bit 11 (Z---) BTB
-> > +	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-cache
-> 
-> All this should get done by v7_setup.
+[   43.198028] sched_rt_runtime_exceeded: rt_time 2671752930 > runtime 950000000
+[   43.198028] update_curr_rt: RT runtime exceeded: irq/72-omap_i2c
+[   43.198059] update_curr_rt: RT runtime exceeded: irq/72-omap_i2c
+[   43.203704] [sched_delayed] sched: RT throttling activated
 
-It seems it is, as (emulated) system still boots with that code
-disabled.
+I see this rather consistently, and the rt_time value is always roughly the
+time I spent in suspend.
 
-> > +static DEFINE_SPINLOCK(boot_lock);
-> > +
-> > +static void __cpuinit socfpga_secondary_init(unsigned int cpu)
-> > +{
-> > +	/*
-> > +	 * if any interrupts are already enabled for the primary
-> > +	 * core (e.g. timer irq), then they will not have been enabled
-> > +	 * for us: do so
-> > +	 */
-> > +	gic_secondary_init(0);
-> > +
-> > +	/*
-> > +	 * let the primary processor know we're out of the
-> > +	 * pen, then head off into the C entry point
-> > +	 */
-> > +	pen_release = -1;
-> > +	smp_wmb();
-> > +
-> > +	/*
-> > +	 * Synchronise with the boot thread.
-> > +	 */
-> > +	spin_lock(&boot_lock);
-> > +	spin_unlock(&boot_lock);
-> > +}
-> > +
-> > +static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> > +{
-> > +	unsigned long timeout;
-> > +	extern char secondary_trampoline, secondary_trampoline_end;
-> > +
-> > +	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
-> > +
-> > +	/*
-> > +	 * Set synchronisation state between this boot processor
-> > +	 * and the secondary one
-> > +	 */
-> > +	spin_lock(&boot_lock);
-> > +
-> > +	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
-> > +
-> > +	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
-> > +
-> > +	pen_release = 0;
-> > +	flush_cache_all();
-> > +	smp_wmb();
-> > +	outer_clean_range(0, trampoline_size);
-> > +
-> > +	/* This will release CPU #1 out of reset.*/
-> > +	__raw_writel(0, rst_manager_base_addr + 0x10);
-> > +
-> > +	timeout = jiffies + (1 * HZ);
-> > +	while (time_before(jiffies, timeout)) {
-> > +		smp_rmb();
-> > +		if (pen_release == -1)
-> > +			break;
-> > +
-> > +		udelay(10);
-> > +	}
-> > +
-> > +	/*
-> > +	 * now the secondary core is starting up let it run its
-> > +	 * calibrations, then wait for it to finish
-> > +	 */
-> > +	spin_unlock(&boot_lock);
-> > +	return pen_release != -1 ? -ENOSYS : 0;
-> 
-> You don't need any of this if you can reset secondary cores on
-> hotplug.
+So the primary question remains: is RT runtime supposed to include the
+time spent suspended?  I suspect not. 
 
-What exactly is unneccessary? I'd like to wait for secondary to come
-up so we can raise an error if it does not...?
+Kevin
 
-Thanks,
-									Pavel
-
-PS: I have this so far...
-
-diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
-index 659fd27..a0fc372 100644
---- a/arch/arm/mach-socfpga/Makefile
-+++ b/arch/arm/mach-socfpga/Makefile
-@@ -2,7 +2,5 @@
- # Makefile for the linux kernel.
- #
- 
--ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
--
- obj-y			:= socfpga.o
- obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o hotplug.o
-diff --git a/arch/arm/mach-socfpga/include/mach/core.h b/arch/arm/mach-socfpga/core.h
-similarity index 100%
-rename from arch/arm/mach-socfpga/include/mach/core.h
-rename to arch/arm/mach-socfpga/core.h
-diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
-index 9597ff7..081b4d1 100644
---- a/arch/arm/mach-socfpga/headsmp.S
-+++ b/arch/arm/mach-socfpga/headsmp.S
-@@ -20,42 +20,6 @@
- #define CONFIG_CPU1_START_ADDR 	        (CONFIG_SYSTEM_MANAGER + 0x10)
- 
- ENTRY(secondary_trampoline)
--	/* From u-boot: start.S */
--	mrs     r0, cpsr
--	bic     r0, r0, #0x1f
--	orr     r0, r0, #0xd3
--	msr     cpsr,r0
--
--/*************************************************************************
-- *
-- * cpu_init_cp15
-- *
-- * Setup CP15 registers (cache, MMU, TLBs). The I-cache is turned on unless
-- * CONFIG_SYS_ICACHE_OFF is defined.
-- *
-- *************************************************************************/
--ENTRY(cpu_init_cp15)
--	/*
--	 * Invalidate L1 I/D
--	 */
--	mov	r0, #0			@ set up for MCR
--	mcr	p15, 0, r0, c8, c7, 0	@ invalidate TLBs
--	mcr	p15, 0, r0, c7, c5, 0	@ invalidate icache
--	mcr	p15, 0, r0, c7, c5, 6	@ invalidate BP array
--	mcr     p15, 0, r0, c7, c10, 4	@ DSB
--	mcr     p15, 0, r0, c7, c5, 4	@ ISB
--
--	/*
--	 * disable MMU stuff and caches
--	 */
--	mrc	p15, 0, r0, c1, c0, 0
--	bic	r0, r0, #0x00002000	@ clear bits 13 (--V-)
--	bic	r0, r0, #0x00000007	@ clear bits 2:0 (-CAM)
--	orr	r0, r0, #0x00000002	@ set bit 1 (--A-) Align
--	orr	r0, r0, #0x00000800	@ set bit 11 (Z---) BTB
--	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-cache
--	mcr	p15, 0, r0, c1, c0, 0
--
- 	movw	r0, #:lower16:CONFIG_CPU1_START_ADDR
- 	movt    r0, #:upper16:CONFIG_CPU1_START_ADDR
- 
-diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
-index 34440aa..60c2b4a 100644
---- a/arch/arm/mach-socfpga/platsmp.c
-+++ b/arch/arm/mach-socfpga/platsmp.c
-@@ -26,7 +26,7 @@
- #include <asm/smp_scu.h>
- #include <asm/smp_plat.h>
- 
--#include <mach/core.h>
-+#include "core.h"
- 
- static void __iomem *sys_manager_base_addr;
- static void __iomem *rst_manager_base_addr;
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 68d32cd..741b9ba 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -23,7 +23,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#include <mach/core.h>
-+#include "core.h"
- 
- void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
- void __iomem *rst_manager_base_addr = ((void __iomem *)(SOCFPGA_RST_MANAGER_VIRT_BASE));
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+[1]
+diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
+index 418feb0..39de750 100644
+--- a/kernel/sched/rt.c
++++ b/kernel/sched/rt.c
+@@ -891,6 +891,8 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
+ 			if (!once) {
+ 				once = true;
+ 				printk_sched("sched: RT throttling activated\n");
++				pr_warn("%s: rt_time %llu > runtime %llu\n",
++					__func__, rt_rq->rt_time, runtime);
+ 			}
+ 		} else {
+ 			/*
+@@ -948,8 +950,11 @@ static void update_curr_rt(struct rq *rq)
+ 		if (sched_rt_runtime(rt_rq) != RUNTIME_INF) {
+ 			raw_spin_lock(&rt_rq->rt_runtime_lock);
+ 			rt_rq->rt_time += delta_exec;
+-			if (sched_rt_runtime_exceeded(rt_rq))
++			if (sched_rt_runtime_exceeded(rt_rq)) {
++				pr_warn("%s: RT runtime exceeded: %s\n",
++					__func__, curr->comm);
+ 				resched_task(curr);
++			}
+ 			raw_spin_unlock(&rt_rq->rt_runtime_lock);
+ 		}
+ 	}
