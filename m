@@ -1,51 +1,51 @@
-From: prakity@nvidia.com (Philip Rakity)
-Date: Wed, 17 Oct 2012 21:56:32 +0200
-Subject: [PATCH 1/2] mmc: core: Support all MMC capabilities when
- booting from Device Tree
-In-Reply-To: <201210171338.01011.arnd@arndb.de>
-References: <1350306959-5843-1-git-send-email-lee.jones@linaro.org>
- <201210151420.29930.arnd@arndb.de> <20121015160740.GC7662@gmail.com>
- <201210171338.01011.arnd@arndb.de>
-Message-ID: <1B3089FB-EDBE-4145-83A6-1DFA4B0A2FDF@nvidia.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 17 Oct 2012 15:12:22 -0500
+Subject: [PATCH] ARM: OMAP2+: Only write the sysconfig on idle when necessary
+Message-ID: <1350504742-19995-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently, whenever we idle a device _idle_sysc() is called and writes to the
+devices SYSCONFIG register to set the idle mode. A lot devices are using the
+smart-idle mode and so the write to the SYSCONFIG register is programming the
+same value that is already stored in the register.
 
-On 17 Oct 2012, at 14:38, Arnd Bergmann <arnd@arndb.de> wrote:
+Writes to the devices SYSCONFIG register can be slow, for example, writing to
+the DMTIMER SYSCONFIG register takes 3 interface clock cycles and 3 functional
+clock cycles. If the DMTIMER is using the slow 32kHz functional clock this can
+take ~100us.
 
-> On Monday 15 October 2012, Lee Jones wrote:
->>> and so on. What are you actually missing in the properties that
->>> are already there?
->> 
->> MMC_CAP_ERASE
-> 
-> This one seems to be set unconditionally on some controllers but
-> not on others. Why would it need to be configurable?
-> 
->> MMC_CAP_UHS_SDR12
->> MMC_CAP_UHS_SDR25
->> MMC_CAP_UHS_DDR50
-> 
-> Could this be derived from max-frequency?
+Furthermore, during boot on an OMAP4430 panda board, I see that there are 100
+calls to _idle_sysc(), however, only 3 out of the 100 calls actually write
+the SYSCONFIG register with a new value.
 
-The problem is the controller may signal it supports DDR but the host cannot.  For example no voltage at correct level.
-Same issue with 8 bit support.  Controller could say supports it but board has only 4 "wires"
-> 
->> MMC_CAP_1_8V_DDR
-> 
-> Right, I suppose we need this. Should we have a minimum and maximum
-> voltage added to the common properties for this?
-> 
->> MMC_CAP2_DETECT_ON_ERR
->> MMC_CAP2_NO_SLEEP_CMD
-> 
-> I don't see these ones being set anywhere, but they were both
-> added by Ulf. Maybe he can comment on if or why they are needed
-> in devicetree, rather than being set by the driver unconditionally
-> or for specific versions of the host controller.
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Therefore, to avoid unnecessary writes to device SYSCONFIG registers when
+idling the device, only write the value if the value has changed. It should be
+safe to do this on idle as the context of the register will never be lost while
+the device is active.
+
+Verified that suspend, CORE off and retention states are working with this
+change on OMAP3430 Beagle board.
+
+Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |    4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index b969ab1..962773b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1389,6 +1389,10 @@ static void _idle_sysc(struct omap_hwmod *oh)
+ 	if ((sf & SYSC_HAS_SIDLEMODE) && !(oh->flags & HWMOD_SWSUP_SIDLE))
+ 		_enable_wakeup(oh, &v);
+ 
++	/* If the cached value is the same as the new value, skip the write */
++	if (oh->_sysc_cache == v)
++		return;
++
+ 	_write_sysconfig(v, oh);
+ }
+ 
+-- 
+1.7.9.5
