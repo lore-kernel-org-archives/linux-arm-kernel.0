@@ -1,52 +1,84 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 17 Oct 2012 21:10:44 +1300
-Subject: [PATCH] ARM: multiplatform: Add a defconfig for multi_v5
-Message-ID: <1350461444-22832-1-git-send-email-linux@prisktech.co.nz>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 17 Oct 2012 17:11:39 +0900
+Subject: [PATCH v2 v2 v2 8/8] spi/s3c64xx: use correct
+ dma_transfer_direction type
+In-Reply-To: <1349813638-4617-9-git-send-email-arnd@arndb.de>
+References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
+ <1349813638-4617-9-git-send-email-arnd@arndb.de>
+Message-ID: <003a01cdac3f$08fe40d0$1afac270$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a simple multi_v5_defconfig for arch-vt8500
-multiplatform.
+Arnd Bergmann wrote:
+> 
+> There is a subtle difference between dma_transfer_direction and
+> dma_data_direction: the former is used by the dmaengine framework,
+> while the latter is used by the dma-mapping API. Although the
+> purpose is comparable, the actual values are different and must
+> not be mixed. In this case, the driver just wants to use
+> dma_transfer_direction.
+> 
+> Without this patch, building s3c6400_defconfig results in:
+> 
+> drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_dmacb':
+> drivers/spi/spi-s3c64xx.c:239:21: warning: comparison between
+> 	'enum dma_data_direction' and 'enum dma_transfer_direction' [-
+> Wenum-compare]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-I expect there will be a bit of comment regarding this as others will
-need to add their requirements as well, and it seems overly basic.
+BTW, don't we need following accordingly?
 
- arch/arm/configs/multi_v5_defconfig |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 arch/arm/configs/multi_v5_defconfig
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 1a81c90..a0bb55e 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1067,11 +1067,11 @@ static int __devinit s3c64xx_spi_get_dmares(
 
-diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-new file mode 100644
-index 0000000..b4a36a7
---- /dev/null
-+++ b/arch/arm/configs/multi_v5_defconfig
-@@ -0,0 +1,24 @@
-+CONFIG_ARCH_MULTI_V7=n
-+CONFIG_ARCH_MULTI_V5=y
-+CONFIG_EXPERIMENTAL=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_ARCH_VT8500=y
-+CONFIG_ARM_ARCH_TIMER=y
-+CONFIG_AEABI=y
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_VFP=y
-+CONFIG_NET=y
-+CONFIG_SERIAL_VT8500=y
-+CONFIG_SERIAL_VT8500_CONSOLE=y
-+CONFIG_GPIOLIB=y
-+CONFIG_GPIO_VT8500=y
-+CONFIG_FB=y
-+CONFIG_FRAMEBUFFER_CONSOLE=y
-+CONFIG_FB_VT8500=y
-+CONFIG_FB_WM8505=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_UHCI_HCD=y
-+CONFIG_USB_UHCI_PLATFORM=y
-+CONFIG_PWM_VT8500=y
-+CONFIG_RTC_DRV_VT8500=y
--- 
-1.7.9.5
+ 	if (tx) {
+ 		dma_data = &sdd->tx_dma;
+-		dma_data->direction = DMA_TO_DEVICE;
++		dma_data->direction = DMA_MEM_TO_DEV;
+ 		chan_str = "tx";
+ 	} else {
+ 		dma_data = &sdd->rx_dma;
+-		dma_data->direction = DMA_FROM_DEVICE;
++		dma_data->direction = DMA_DEV_TO_MEM;
+ 		chan_str = "rx";
+ 	}
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: spi-devel-general at lists.sourceforge.net
+> ---
+>  drivers/spi/spi-s3c64xx.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+> index d1c8441f..2e44dd6 100644
+> --- a/drivers/spi/spi-s3c64xx.c
+> +++ b/drivers/spi/spi-s3c64xx.c
+> @@ -132,7 +132,7 @@
+> 
+>  struct s3c64xx_spi_dma_data {
+>  	unsigned		ch;
+> -	enum dma_data_direction direction;
+> +	enum dma_transfer_direction direction;
+>  	enum dma_ch	dmach;
+>  	struct property		*dma_prop;
+>  };
+> --
+> 1.7.10
