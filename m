@@ -1,63 +1,42 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 17 Oct 2012 22:25:25 +0300
-Subject: [PATCH] Nokia N9/N900/N950 -- mention product names
-In-Reply-To: <20121017183307.GA12560@elf.ucw.cz>
-References: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
- <20120501104801.GA23559@elf.ucw.cz>
- <20120504181105.GL5613@atomide.com>
- <20121017183307.GA12560@elf.ucw.cz>
-Message-ID: <20121017192525.GD1613@blackmetal.musicnaut.iki.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 17 Oct 2012 19:25:20 +0000
+Subject: [GIT PULL 1/3] ARM: Dove: fixes for v3.7
+In-Reply-To: <pull-1350501943-114231>
+Message-ID: <mailman.23.1350501958.1458.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-Some minor comments:
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
-On Wed, Oct 17, 2012 at 08:33:08PM +0200, Pavel Machek wrote:
-> This adds product names (that most users know) to Kconfig and board
-> comments.
+are available in the git repository at:
 
-Good idea. :-)
+  git://git.infradead.org/users/jcooper/linux.git tags/mvebu_dove_late_fixes_for_v3.7
 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 346fd26..da08226 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -263,14 +263,14 @@ config MACH_NOKIA_N8X0
->  	select MACH_NOKIA_N810_WIMAX
->  
->  config MACH_NOKIA_RM680
-> -	bool "Nokia RM-680/696 board"
-> +	bool "Nokia N9/N950 (RM-680/696) phones"
+for you to fetch changes up to a458926e16a37ef41a4fbf45957cb9faaeb6a6ef:
 
-This should be "N950/N9 (RM-680/RM-696)" or perhaps for clarity
-"N950 (RM-680) / N9 (RM-696)".
+  ARM: dove: Add crypto engine to DT (2012-10-17 17:20:01 +0000)
 
->  	depends on ARCH_OMAP3
->  	default y
->  	select OMAP_PACKAGE_CBB
->  	select MACH_NOKIA_RM696
->  
->  config MACH_NOKIA_RX51
-> -	bool "Nokia RX-51 board"
-> +	bool "Nokia N900 phone (RX-51)"
->  	depends on ARCH_OMAP3
->  	default y
->  	select OMAP_PACKAGE_CBB
-> diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
-> index 0ad1bb3b..26965f3 100644
-> --- a/arch/arm/mach-omap2/board-rm680.c
-> +++ b/arch/arm/mach-omap2/board-rm680.c
-> @@ -1,5 +1,5 @@
->  /*
-> - * Board support file for Nokia RM-680/696.
-> + * Board support file for Nokia N9/N950 (aka RM-680/696).
+----------------------------------------------------------------
+Depends:
+ - Based against v3.7-rc1
+ - Latest changes to arch/arm/mm/cache-tauros2.c
+    c2b7e05 ARM: cache: add dt support for tauros2 cache
 
-Same here.
+Misc. fixes for latest changes to mach-dove/
+Fixes build breakage for mach-dove
 
-Thanks,
+----------------------------------------------------------------
+Sebastian Hesselbarth (6):
+      ARM: dove: Add pcie clock support
+      ARM: dove: Fix tauros2 device tree init
+      ARM: dove: Fix clock names of sata and gbe
+      ARM: dove: Restructure SoC device tree descriptor
+      ARM: dove: Remove watchdog from DT
+      ARM: dove: Add crypto engine to DT
 
-A.
+ arch/arm/boot/dts/dove.dtsi | 49 +++++++++++++++++++++++++++++----------------
+ arch/arm/mach-dove/common.c |  8 ++++----
+ arch/arm/mach-dove/pcie.c   |  5 +++++
+ 3 files changed, 41 insertions(+), 21 deletions(-)
