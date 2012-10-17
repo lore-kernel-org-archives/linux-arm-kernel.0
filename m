@@ -1,112 +1,113 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 17 Oct 2012 20:13:56 +0200
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-Message-ID: <20121017181354.GA2412@netboy.at.omicron.at>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 17 Oct 2012 20:16:48 +0200
+Subject: [PATCH] Fix socfpga compilation with early_printk() enabled
+In-Reply-To: <20120701184110.GA30680@elf.ucw.cz>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <20120627180516.GA17393@elf.ucw.cz> <20120627204018.0bfef362@skate>
+ <201206302104.37937.arnd@arndb.de>
+ <20120701184110.GA30680@elf.ucw.cz>
+Message-ID: <20121017181648.GA12120@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+Hi!
 
-Would you please take this bugfix for 3.7-rc2? The suggestion to mail
-you came from Toni Lindgren. The context where it came from is here:
+This fixes early_printk() compilation for
+socfpga. (senduart/busyuart/waituart were missing). It does that by
+making Picochip code generic.
 
-http://lists.arm.linux.org.uk/lurker/message/20121015.191630.bdae3c50.en.html
+Signed-off-by: Pavel Machek <pavel@denx.de>
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com 
 
-Thanks,
-Richard
-
------ Forwarded message from Richard Cochran <richardcochran@gmail.com> -----
-
-Date: Mon, 15 Oct 2012 21:16:32 +0200
-From: Richard Cochran <richardcochran@gmail.com>
-To: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org, Arnd Bergmann <arnd@arndb.de>,
-	David Miller <davem@davemloft.net>,
-	Russell King <linux@arm.linux.org.uk>,
-	Mugunthan V N <mugunthanvnm@ti.com>
-Subject: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio
-X-Mailer: git-send-email 1.7.2.5
-
-From: Mugunthan V N <mugunthanvnm@ti.com>
-
-This patch adds minimal hwmod support for davinci mdio driver. This patch
-requires rework on parent child relation between cpsw and davinci mdio
-hwmod data to support runtime PM.
-
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   34 ++++++++++++++++++++++++++-
- 1 files changed, 32 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 59d5c1c..f96bbc0 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -650,8 +650,7 @@ static struct omap_hwmod_class_sysconfig am33xx_cpgmac_sysc = {
- 	.rev_offs	= 0x0,
- 	.sysc_offs	= 0x8,
- 	.syss_offs	= 0x4,
--	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE |
--			   SYSS_HAS_RESET_STATUS),
-+	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_MIDLEMODE),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | MSTANDBY_FORCE |
- 			   MSTANDBY_NO),
- 	.sysc_fields	= &omap_hwmod_sysc_type3,
-@@ -682,6 +681,8 @@ static struct omap_hwmod am33xx_cpgmac0_hwmod = {
- 			.modulemode	= MODULEMODE_SWCTRL,
- 		},
- 	},
-+	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY |
-+			   HWMOD_INIT_NO_RESET | HWMOD_INIT_NO_IDLE),
- };
+diff --git a/arch/arm/include/debug/8250_32.S b/arch/arm/include/debug/8250_32.S
+new file mode 100644
+index 0000000..8db01ee
+--- /dev/null
++++ b/arch/arm/include/debug/8250_32.S
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2011 Picochip Ltd., Jamie Iles
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Derived from arch/arm/mach-davinci/include/mach/debug-macro.S to use 32-bit
++ * accesses to the 8250.
++ */
++
++#include <linux/serial_reg.h>
++
++		.macro	senduart,rd,rx
++		str	\rd, [\rx, #UART_TX << UART_SHIFT]
++		.endm
++
++		.macro	busyuart,rd,rx
++1002:		ldr	\rd, [\rx, #UART_LSR << UART_SHIFT]
++		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
++		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
++		bne	1002b
++		.endm
++
++		/* The UART's don't have any flow control IO's wired up. */
++		.macro	waituart,rd,rx
++		.endm
+diff --git a/arch/arm/include/debug/picoxcell.S b/arch/arm/include/debug/picoxcell.S
+index 7419deb..bc1f07c 100644
+--- a/arch/arm/include/debug/picoxcell.S
++++ b/arch/arm/include/debug/picoxcell.S
+@@ -5,10 +5,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  *
+- * Derived from arch/arm/mach-davinci/include/mach/debug-macro.S to use 32-bit
+- * accesses to the 8250.
+  */
+-#include <linux/serial_reg.h>
  
- /*
-@@ -2510,6 +2511,34 @@ static struct omap_hwmod_addr_space am33xx_elm_addr_space[] = {
- 	{ }
- };
+ #define UART_SHIFT 2
+ #define PICOXCELL_UART1_BASE		0x80230000
+@@ -19,17 +16,4 @@
+ 		ldr	\rp, =PICOXCELL_UART1_BASE
+ 		.endm
  
-+/* mdio class */
-+static struct omap_hwmod_class am33xx_mdio_hwmod_class = {
-+	.name		= "davinci_mdio",
-+};
-+
-+struct omap_hwmod_addr_space am33xx_mdio_addr_space[] = {
-+	{
-+		.pa_start	= 0x4A101000,
-+		.pa_end		= 0x4A101000 + SZ_256 - 1,
-+		.flags		= ADDR_MAP_ON_INIT,
-+	},
-+	{ }
-+};
-+
-+static struct omap_hwmod am33xx_mdio_hwmod = {
-+	.name		= "davinci_mdio",
-+	.class		= &am33xx_mdio_hwmod_class,
-+	.clkdm_name	= "cpsw_125mhz_clkdm",
-+	.main_clk	= "cpsw_125mhz_gclk",
-+};
-+
-+struct omap_hwmod_ocp_if am33xx_cpgmac0__mdio = {
-+	.master		= &am33xx_cpgmac0_hwmod,
-+	.slave		= &am33xx_mdio_hwmod,
-+	.addr		= am33xx_mdio_addr_space,
-+	.user		= OCP_USER_MPU,
-+};
-+
- static struct omap_hwmod_ocp_if am33xx_l4_ls__elm = {
- 	.master		= &am33xx_l4_ls_hwmod,
- 	.slave		= &am33xx_elm_hwmod,
-@@ -3371,6 +3400,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_l3_main__tptc2,
- 	&am33xx_l3_s__usbss,
- 	&am33xx_l4_hs__cpgmac0,
-+	&am33xx_cpgmac0__mdio,
- 	NULL,
- };
+-		.macro	senduart,rd,rx
+-		str	\rd, [\rx, #UART_TX << UART_SHIFT]
+-		.endm
+-
+-		.macro	busyuart,rd,rx
+-1002:		ldr	\rd, [\rx, #UART_LSR << UART_SHIFT]
+-		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
+-		teq	\rd, #UART_LSR_TEMT | UART_LSR_THRE
+-		bne	1002b
+-		.endm
+-
+-		/* The UART's don't have any flow control IO's wired up. */
+-		.macro	waituart,rd,rx
+-		.endm
++#include "8250_32.S"
+diff --git a/arch/arm/include/debug/socfpga.S b/arch/arm/include/debug/socfpga.S
+index d6f26d2..966b2f9 100644
+--- a/arch/arm/include/debug/socfpga.S
++++ b/arch/arm/include/debug/socfpga.S
+@@ -7,6 +7,9 @@
+  * published by the Free Software Foundation.
+  */
  
++#define UART_SHIFT 2
++#define DEBUG_LL_UART_OFFSET	0x00002000
++
+ 		.macro	addruart, rp, rv, tmp
+ 		mov	\rp, #DEBUG_LL_UART_OFFSET
+ 		orr	\rp, \rp, #0x00c00000
+@@ -14,3 +17,5 @@
+ 		orr	\rp, \rp, #0xff000000	@ physical base
+ 		.endm
+ 
++#include "8250_32.S"
++
+
 -- 
-1.7.2.5
-
-
------ End forwarded message -----
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
