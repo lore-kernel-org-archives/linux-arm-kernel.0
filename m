@@ -1,290 +1,81 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 17 Oct 2012 14:23:50 +0300
-Subject: [PATCH v2 0/2] Add DMA and device tree support to the flash
- controller FLCTL
-In-Reply-To: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
-References: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
-Message-ID: <1350473030.5769.137.camel@sauron.fi.intel.com>
+From: preeti@linux.vnet.ibm.com (preeti)
+Date: Wed, 17 Oct 2012 17:50:50 +0530
+Subject: [RFC PATCH 0/2] sched: Load Balancing using Per-entity-Load-tracking
+In-Reply-To: <20121012044618.18271.88332.stgit@preeti.in.ibm.com>
+References: <20121012044618.18271.88332.stgit@preeti.in.ibm.com>
+Message-ID: <507EA2A2.60708@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-09 at 11:58 +0200, Bastian Hecht wrote:
-> changelog v2: 	- cosmetic fixes in patch 1
-> 		- added dmas and dma-names field in patch 2
+Hi Guys,
 
-Hi, I used to be able to compile MTD stuff for mackerel board with the
-defconfig attached, but now it fails with 3.7-rc1 with as error:
+Can you please have a look at the below patchset? Your review comments
+are very necessary and valuable.Thanks in advance.
 
-/tmp/cc2Nr7AN.s: Error: bad immediate value for 8-bit offset (1024)
-
-It fails for dogc4.c, but if I disable DOCG4, it fails for other drivers
-with a similar error.
-
-I've tried (arm) gcc 4.6.3 and the latest Linaro 4.7 build.
-
-Any idea? I did not dig this, is this a known issue? Could you try to
-reproduce this in your setup?
-
-
-CONFIG_EXPERIMENTAL=y
-CONFIG_SYSVIPC=y
-CONFIG_IKCONFIG=y
-CONFIG_IKCONFIG_PROC=y
-CONFIG_LOG_BUF_SHIFT=16
-# CONFIG_UTS_NS is not set
-# CONFIG_IPC_NS is not set
-# CONFIG_PID_NS is not set
-CONFIG_SLAB=y
-CONFIG_MODULES=y
-CONFIG_MODULE_UNLOAD=y
-# CONFIG_BLK_DEV_BSG is not set
-# CONFIG_IOSCHED_DEADLINE is not set
-# CONFIG_IOSCHED_CFQ is not set
-CONFIG_ARCH_SHMOBILE=y
-CONFIG_ARCH_SH7372=y
-CONFIG_MACH_MACKEREL=y
-CONFIG_AEABI=y
-# CONFIG_OABI_COMPAT is not set
-CONFIG_FORCE_MAX_ZONEORDER=15
-CONFIG_ZBOOT_ROM_TEXT=0x0
-CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m"
-CONFIG_KEXEC=y
-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-CONFIG_PM_RUNTIME=y
-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-# CONFIG_FIRMWARE_IN_KERNEL is not set
-CONFIG_MTD=y
-CONFIG_MTD_TESTS=m
-CONFIG_MTD_REDBOOT_PARTS=m
-CONFIG_MTD_REDBOOT_PARTS_READONLY=y
-CONFIG_MTD_CMDLINE_PARTS=y
-CONFIG_MTD_AFS_PARTS=m
-CONFIG_MTD_AR7_PARTS=m
-CONFIG_MTD_CHAR=y
-CONFIG_MTD_BLOCK=y
-CONFIG_FTL=m
-CONFIG_NFTL=m
-CONFIG_NFTL_RW=y
-CONFIG_INFTL=m
-CONFIG_RFD_FTL=m
-CONFIG_SSFDC=m
-CONFIG_SM_FTL=m
-CONFIG_MTD_OOPS=y
-CONFIG_MTD_SWAP=m
-CONFIG_MTD_CFI=y
-CONFIG_MTD_JEDECPROBE=m
-CONFIG_MTD_CFI_ADV_OPTIONS=y
-CONFIG_MTD_OTP=y
-CONFIG_MTD_CFI_INTELEXT=y
-CONFIG_MTD_CFI_AMDSTD=m
-CONFIG_MTD_CFI_STAA=m
-CONFIG_MTD_ROM=y
-CONFIG_MTD_ABSENT=y
-CONFIG_MTD_COMPLEX_MAPPINGS=y
-CONFIG_MTD_PHYSMAP=y
-CONFIG_MTD_PHYSMAP_COMPAT=y
-CONFIG_MTD_IMPA7=m
-CONFIG_MTD_GPIO_ADDR=y
-CONFIG_MTD_PLATRAM=y
-CONFIG_MTD_LATCH_ADDR=m
-CONFIG_MTD_DATAFLASH=y
-CONFIG_MTD_M25P80=y
-# CONFIG_M25PXX_USE_FAST_READ is not set
-CONFIG_MTD_SST25L=y
-CONFIG_MTD_SLRAM=y
-CONFIG_MTD_PHRAM=y
-CONFIG_MTD_MTDRAM=m
-CONFIG_MTD_BLOCK2MTD=y
-CONFIG_MTD_DOC2000=m
-CONFIG_MTD_DOC2001=m
-CONFIG_MTD_DOC2001PLUS=y
-CONFIG_MTD_DOCG3=m
-CONFIG_MTD_DOCPROBE_ADVANCED=y
-CONFIG_MTD_NAND_ECC_SMC=y
-CONFIG_MTD_NAND=y
-CONFIG_MTD_NAND_ECC_BCH=y
-CONFIG_MTD_NAND_MUSEUM_IDS=y
-CONFIG_MTD_NAND_DENALI=m
-CONFIG_MTD_NAND_DENALI_DT=m
-CONFIG_MTD_NAND_GPIO=m
-CONFIG_MTD_NAND_DISKONCHIP=y
-CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
-CONFIG_MTD_NAND_DOCG4=m
-CONFIG_MTD_NAND_NANDSIM=y
-CONFIG_MTD_NAND_PLATFORM=y
-CONFIG_MTD_NAND_SH_FLCTL=y
-CONFIG_MTD_ONENAND=y
-CONFIG_MTD_ONENAND_VERIFY_WRITE=y
-CONFIG_MTD_ONENAND_GENERIC=m
-CONFIG_MTD_ONENAND_SIM=y
-CONFIG_MTD_LPDDR=m
-CONFIG_MTD_UBI=m
-CONFIG_MTD_UBI_FASTMAP=y
-# CONFIG_BLK_DEV is not set
-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-# CONFIG_INPUT_KEYBOARD is not set
-# CONFIG_INPUT_MOUSE is not set
-# CONFIG_SERIO is not set
-# CONFIG_LEGACY_PTYS is not set
-# CONFIG_DEVKMEM is not set
-CONFIG_SERIAL_SH_SCI=y
-CONFIG_SERIAL_SH_SCI_NR_UARTS=8
-CONFIG_SERIAL_SH_SCI_CONSOLE=y
-# CONFIG_HW_RANDOM is not set
-CONFIG_SPI=y
-# CONFIG_HWMON is not set
-# CONFIG_USB_SUPPORT is not set
-# CONFIG_DNOTIFY is not set
-# CONFIG_INOTIFY_USER is not set
-CONFIG_JFFS2_FS=m
-CONFIG_JFFS2_COMPRESSION_OPTIONS=y
-# CONFIG_JFFS2_ZLIB is not set
-CONFIG_JFFS2_LZO=y
-# CONFIG_JFFS2_RTIME is not set
-CONFIG_JFFS2_RUBIN=y
-CONFIG_UBIFS_FS=m
-# CONFIG_ENABLE_WARN_DEPRECATED is not set
-# CONFIG_ENABLE_MUST_CHECK is not set
-# CONFIG_ARM_UNWIND is not set
-CONFIG_KEYS=y
-CONFIG_CRYPTO=y
-CONFIG_CRYPTO_ANSI_CPRNG=y
-# CONFIG_CRYPTO_HW is not set
-
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-CONFIG_EXPERIMENTAL=y
-CONFIG_SYSVIPC=y
-CONFIG_IKCONFIG=y
-CONFIG_IKCONFIG_PROC=y
-CONFIG_LOG_BUF_SHIFT=16
-# CONFIG_UTS_NS is not set
-# CONFIG_IPC_NS is not set
-# CONFIG_PID_NS is not set
-CONFIG_SLAB=y
-CONFIG_MODULES=y
-CONFIG_MODULE_UNLOAD=y
-# CONFIG_BLK_DEV_BSG is not set
-# CONFIG_IOSCHED_DEADLINE is not set
-# CONFIG_IOSCHED_CFQ is not set
-CONFIG_ARCH_SHMOBILE=y
-CONFIG_ARCH_SH7372=y
-CONFIG_MACH_MACKEREL=y
-CONFIG_AEABI=y
-# CONFIG_OABI_COMPAT is not set
-CONFIG_FORCE_MAX_ZONEORDER=15
-CONFIG_ZBOOT_ROM_TEXT=0x0
-CONFIG_ZBOOT_ROM_BSS=0x0
-CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m"
-CONFIG_KEXEC=y
-# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-CONFIG_PM_RUNTIME=y
-CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-# CONFIG_FIRMWARE_IN_KERNEL is not set
-CONFIG_MTD=y
-CONFIG_MTD_TESTS=m
-CONFIG_MTD_REDBOOT_PARTS=m
-CONFIG_MTD_REDBOOT_PARTS_READONLY=y
-CONFIG_MTD_CMDLINE_PARTS=y
-CONFIG_MTD_AFS_PARTS=m
-CONFIG_MTD_AR7_PARTS=m
-CONFIG_MTD_CHAR=y
-CONFIG_MTD_BLOCK=y
-CONFIG_FTL=m
-CONFIG_NFTL=m
-CONFIG_NFTL_RW=y
-CONFIG_INFTL=m
-CONFIG_RFD_FTL=m
-CONFIG_SSFDC=m
-CONFIG_SM_FTL=m
-CONFIG_MTD_OOPS=y
-CONFIG_MTD_SWAP=m
-CONFIG_MTD_CFI=y
-CONFIG_MTD_JEDECPROBE=m
-CONFIG_MTD_CFI_ADV_OPTIONS=y
-CONFIG_MTD_OTP=y
-CONFIG_MTD_CFI_INTELEXT=y
-CONFIG_MTD_CFI_AMDSTD=m
-CONFIG_MTD_CFI_STAA=m
-CONFIG_MTD_ROM=y
-CONFIG_MTD_ABSENT=y
-CONFIG_MTD_COMPLEX_MAPPINGS=y
-CONFIG_MTD_PHYSMAP=y
-CONFIG_MTD_PHYSMAP_COMPAT=y
-CONFIG_MTD_IMPA7=m
-CONFIG_MTD_GPIO_ADDR=y
-CONFIG_MTD_PLATRAM=y
-CONFIG_MTD_LATCH_ADDR=m
-CONFIG_MTD_DATAFLASH=y
-CONFIG_MTD_M25P80=y
-# CONFIG_M25PXX_USE_FAST_READ is not set
-CONFIG_MTD_SST25L=y
-CONFIG_MTD_SLRAM=y
-CONFIG_MTD_PHRAM=y
-CONFIG_MTD_MTDRAM=m
-CONFIG_MTD_BLOCK2MTD=y
-CONFIG_MTD_DOC2000=m
-CONFIG_MTD_DOC2001=m
-CONFIG_MTD_DOC2001PLUS=y
-CONFIG_MTD_DOCG3=m
-CONFIG_MTD_DOCPROBE_ADVANCED=y
-CONFIG_MTD_NAND_ECC_SMC=y
-CONFIG_MTD_NAND=y
-CONFIG_MTD_NAND_ECC_BCH=y
-CONFIG_MTD_NAND_MUSEUM_IDS=y
-CONFIG_MTD_NAND_DENALI=m
-CONFIG_MTD_NAND_DENALI_DT=m
-CONFIG_MTD_NAND_GPIO=m
-CONFIG_MTD_NAND_DISKONCHIP=y
-CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
-CONFIG_MTD_NAND_DOCG4=m
-CONFIG_MTD_NAND_NANDSIM=y
-CONFIG_MTD_NAND_PLATFORM=y
-CONFIG_MTD_NAND_SH_FLCTL=y
-CONFIG_MTD_ONENAND=y
-CONFIG_MTD_ONENAND_VERIFY_WRITE=y
-CONFIG_MTD_ONENAND_GENERIC=m
-CONFIG_MTD_ONENAND_SIM=y
-CONFIG_MTD_LPDDR=m
-CONFIG_MTD_UBI=m
-CONFIG_MTD_UBI_FASTMAP=y
-# CONFIG_BLK_DEV is not set
-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-# CONFIG_INPUT_KEYBOARD is not set
-# CONFIG_INPUT_MOUSE is not set
-# CONFIG_SERIO is not set
-# CONFIG_LEGACY_PTYS is not set
-# CONFIG_DEVKMEM is not set
-CONFIG_SERIAL_SH_SCI=y
-CONFIG_SERIAL_SH_SCI_NR_UARTS=8
-CONFIG_SERIAL_SH_SCI_CONSOLE=y
-# CONFIG_HW_RANDOM is not set
-CONFIG_SPI=y
-# CONFIG_HWMON is not set
-# CONFIG_USB_SUPPORT is not set
-# CONFIG_DNOTIFY is not set
-# CONFIG_INOTIFY_USER is not set
-CONFIG_JFFS2_FS=m
-CONFIG_JFFS2_COMPRESSION_OPTIONS=y
-# CONFIG_JFFS2_ZLIB is not set
-CONFIG_JFFS2_LZO=y
-# CONFIG_JFFS2_RTIME is not set
-CONFIG_JFFS2_RUBIN=y
-CONFIG_UBIFS_FS=m
-# CONFIG_ENABLE_WARN_DEPRECATED is not set
-# CONFIG_ENABLE_MUST_CHECK is not set
-# CONFIG_ARM_UNWIND is not set
-CONFIG_KEYS=y
-CONFIG_CRYPTO=y
-CONFIG_CRYPTO_ANSI_CPRNG=y
-# CONFIG_CRYPTO_HW is not set
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/2fcc1b34/attachment-0001.sig>
+> This patchset uses the per-entity-load-tracking patchset which will soon be
+> available in the kernel.It is based on the tip/master tree and the first 8
+> latest patches of sched:per-entity-load-tracking alone have been imported to
+> the tree to avoid the complexities of task groups and to hold back the
+> optimizations of this patch for now.
+> 
+> This patchset is an attempt to begin the integration of Per-entity-load-
+> metric for the cfs_rq,henceforth referred to as PJT's metric,with the load
+> balancer in a step wise fashion,and progress based on the consequences.
+> 
+> The following issues have been considered towards this:
+> [NOTE:an x% task referred to in the logs and below is calculated over a
+> duty cycle of 10ms.]
+> 
+> 1.Consider a scenario,where there are two 10% tasks running on a cpu.The
+>   present code will consider the load on this queue to be 2048,while
+>   using PJT's metric the load is calculated to be <1000,rarely exceeding this
+>   limit.Although the tasks are not contributing much to the cpu load,they are
+>   decided to be moved by the scheduler.
+> 
+>   But one could argue that 'not moving one of these tasks could throttle
+>   them.If there was an idle cpu,perhaps we could have moved them'.While the
+>   power save mode would have been fine with not moving the task,the
+>   performance mode would prefer not to throttle the tasks.We could strive
+>   to strike a balance by making this decision tunable with certain parameters.
+>   This patchset includes such tunables.This issue is addressed in Patch[1/2].
+> 
+> 2.We need to be able to do this cautiously,as the scheduler code is too
+>   complex.This patchset is an attempt to begin the integration of PJT's
+>   metric with the load balancer in a step wise fashion,and progress based on
+>   the consequences.
+>   I dont intend to vary the parameters used by the load balancer.Some
+>   parameters are however included anew to make decisions about including a
+>   sched group as a candidate for load balancing.
+> 
+>   This patchset therefore has two primary aims.
+>          Patch[1/2]: This patch aims at detecting short running tasks and
+> 	 prevent their movement.In update_sg_lb_stats,dismiss a sched group
+> 	 as a candidate for load balancing,if load calculated by PJT's metric
+> 	 says that the average load on the sched_group <= 1024+(.15*1024).
+> 	 This is a tunable,which can be varied after sufficient experiments.
+> 
+>          Patch[2/2]:In the current scheduler greater load would be analogous
+>          to more number of tasks.Therefore when the busiest group is picked
+>          from the sched domain in update_sd_lb_stats,only the loads of the
+>          groups are compared between them.If we were to use PJT's metric,a
+>          higher load does not necessarily mean more number of tasks.This
+> 	 patch addresses this issue.
+> 
+> 3.The next step towards integration should be in using the PJT's metric for
+>   comparison between the loads of the busy sched group and the sched
+>   group which has to pull the tasks,which happens in find_busiest_group.
+> ---
+> 
+> Preeti U Murthy (2):
+>       sched:Prevent movement of short running tasks during load balancing
+>       sched:Pick the apt busy sched group during load balancing
+> 
+> 
+>  kernel/sched/fair.c |   38 +++++++++++++++++++++++++++++++++++---
+>  1 file changed, 35 insertions(+), 3 deletions(-)
+> 
+> --
+The links to PATCH[1/2] https://lkml.org/lkml/2012/10/12/13
+             PATCH[2/2] https://lkml.org/lkml/2012/10/12/11
+Regards
+Preeti U Murthy
