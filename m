@@ -1,35 +1,31 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 16:38:31 +0900
-Subject: [PATCH 1/8] ARM: S3C64XX: Add more Glenfarclas module ID strings
-In-Reply-To: <20121017073813.GI14199@opensource.wolfsonmicro.com>
+Date: Wed, 17 Oct 2012 16:38:32 +0900
+Subject: [PATCH] mfd: wm5102: Mark some more status registers as volatile
+In-Reply-To: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
-Message-ID: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1350459519-20462-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No bindings for the devices yet, just names.
-
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/mfd/wm5102-tables.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 4e3fe57..3364fab 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -227,6 +227,12 @@ static __devinitdata const struct {
- 	{ .id = 0x01, .name = "1250-EV1 Springbank" },
- 	{ .id = 0x02, .name = "1251-EV1 Jura" },
- 	{ .id = 0x03, .name = "1252-EV1 Glenlivet" },
-+	{ .id = 0x06, .name = "WM8997-6721-CS96-EV1 Lapraoig" },
-+	{ .id = 0x07, .name = "WM5110-6271 Deanston" },
-+	{ .id = 0x08, .name = "WM8903-6102 Tamdhu" },
-+	{ .id = 0x09, .name = "WM1811A-6305 Adelphi" },
-+	{ .id = 0x0a, .name = "WM8996-6272 Blackadder" },
-+	{ .id = 0x0b, .name = "WM8994-6235 Benromach" },
- 	{ .id = 0x11, .name = "6249-EV2 Glenfarclas", },
- 	{ .id = 0x14, .name = "6271-EV1 Lochnagar" },
- 	{ .id = 0x15, .name = "6320-EV1 Bells",
+diff --git a/drivers/mfd/wm5102-tables.c b/drivers/mfd/wm5102-tables.c
+index 14490cc..e1dc022 100644
+--- a/drivers/mfd/wm5102-tables.c
++++ b/drivers/mfd/wm5102-tables.c
+@@ -1814,6 +1814,9 @@ static bool wm5102_volatile_register(struct device *dev, unsigned int reg)
+ 	case ARIZONA_SOFTWARE_RESET:
+ 	case ARIZONA_DEVICE_REVISION:
+ 	case ARIZONA_OUTPUT_STATUS_1:
++	case ARIZONA_RAW_OUTPUT_STATUS_1:
++	case ARIZONA_SLIMBUS_RX_PORT_STATUS:
++	case ARIZONA_SLIMBUS_TX_PORT_STATUS:
+ 	case ARIZONA_SAMPLE_RATE_1_STATUS:
+ 	case ARIZONA_SAMPLE_RATE_2_STATUS:
+ 	case ARIZONA_SAMPLE_RATE_3_STATUS:
 -- 
 1.7.10.4
