@@ -1,78 +1,120 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 16 Oct 2012 10:02:30 -0000
-Subject: [PATCH 6/6] ARM: EXYNOS5: SATA PHY controller driver
-In-Reply-To: <CAK1UHiw8+ebzGyjV53Y9efpMFPbCL9RR_o9ZSw=NTuRw_9gRwg@mail.gmail.com>
-References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
- <10179968.slaZyPIETn@flatron>
- <CAK1UHiw8+ebzGyjV53Y9efpMFPbCL9RR_o9ZSw=NTuRw_9gRwg@mail.gmail.com>
-Message-ID: <2178134.oExSl5aWTm@amdc1227>
+From: yangfei.kernel@gmail.com (Fei Yang)
+Date: Wed, 17 Oct 2012 12:00:56 -0000
+Subject: [RFC PATCH v2] Hardcoded instruction causes cpu-hotplug fail on
+ be8 big-endian ARM platfrom
+Message-ID: <CAKw8HL3+=4JXTQ+nphM5XjN_yaVUy55fzytGX=83P+P2n=qvnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vasanth,
+<cut>
 
-On Tuesday 16 of October 2012 12:03:47 Vasanth Ananthan wrote:
-> Hi Tomasz,
-> 
-> On Sat, Oct 13, 2012 at 4:20 AM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > Hi,
-> > 
-> > On Tuesday 09 of October 2012 17:18:52 Vasanth Ananthan wrote:
-> >> This patch adds a platform driver and I2C client driver for SATA PHY
-> >> controller
-> >> 
-> >> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> >> ---
-> >> 
-> >>  drivers/ata/Makefile          |    2 +-
-> >>  drivers/ata/sata_exynos_phy.c |  303
-> >> 
-> >> +++++++++++++++++++++++++++++++++++++++++ 2 files changed, 304
-> >> insertions(+), 1 deletions(-)
-> >> 
-> >>  create mode 100644 drivers/ata/sata_exynos_phy.c
-> 
-> [ ... ]
-> 
-> >> +
-> >> +     phy->init = sataphy_init;
-> >> +     phy->shutdown = sataphy_shutdown;
-> >> +     phy->priv_data = (void *)sataphy;
-> >> +     phy->dev = &pdev->dev;
-> >> +
-> >> +     ret = sata_add_phy(phy, SATA_PHY_GENERATION3);
-> >> +     if (ret < 0)
-> >> +             goto err4;
-> > 
-> > Do you have any warranties that phy callbacks won't get called before
-> > i2c device probes and sets i2c_client?
-> > 
-> >> +
-> >> +     ret = i2c_add_driver(&sataphy_i2c_driver);
-> >> +     if (ret < 0)
-> >> +             goto err5;
-> >> +
-> >> +     platform_set_drvdata(pdev, phy);
-> 
-> I shall register my i2c client driver before assigning the SATA PHY
-> call backs. Would that guarantee the calling of phy callbacks after
-> the i2c device probes?
+> Not handling the Thumb case is a definite bug for any file which may
+> run on v7, since the kernel could be built in Thumb for that case.
+> For example, the existing code is mach-realview/hotplug.c is broken
+> when building an SMP Thumb-2 kernel for the Realview PBX-A9.
+>
+> Cheers
+> ---Dave
 
-No. You might still not have the sata phy i2c controller registered at 
-that time and so the i2c driver will not be probed.
+Thanks for pointing this out. I think we just cannot make any
+assumption about the versions of the tools used. Based on this, I have
+made a v2 of the patch against linux-3.7-rc1. I am not touching the
+CFLAGS in the patch as I am not familiar with the three ARM boards
+here.
+Can the respective board maintainers
+(mach-exynos/mach-realveiw/mach-shmobile) give any comments about v2
+of the patch?
 
-The only definitive solution for this would be to register both platform 
-and i2c drivers in module init (instead of using module_platform_driver) 
-and defer the probe of platform driver until i2c device gets registered. 
+Thanks.
+---Fei
 
-You can defer the probe by returning -EPROBE_DEFER after checking that 
-i2c_client is still NULL.
+v2: Define opcode of the ARM "WFI" instruction in the right way.
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121016/36672b49/attachment-0001.html>
+Signed-off-by: Fei Yang<yangfei.kernel@gmail.com>
+
+diff -urN linux-3.7-rc1/arch/arm/mach-exynos/hotplug.c
+linux/arch/arm/mach-exynos/hotplug.c
+--- linux-3.7-rc1/arch/arm/mach-exynos/hotplug.c	2012-10-15
+05:41:04.000000000 +0800
++++ linux/arch/arm/mach-exynos/hotplug.c	2012-10-17 19:25:49.000000000 +0800
+@@ -18,11 +18,17 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
++#include <asm/opcodes.h>
+
+ #include <mach/regs-pmu.h>
+
+ #include "common.h"
+
++/*
++ * Define opcode of the WFI instruction.
++ */
++#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
++
+ static inline void cpu_enter_lowpower(void)
+ {
+ 	unsigned int v;
+@@ -72,7 +78,7 @@
+ 		/*
+ 		 * here's the WFI
+ 		 */
+-		asm(".word	0xe320f003\n"
++		asm(__WFI
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
+diff -urN linux-3.7-rc1/arch/arm/mach-realview/hotplug.c
+linux/arch/arm/mach-realview/hotplug.c
+--- linux-3.7-rc1/arch/arm/mach-realview/hotplug.c	2012-10-15
+05:41:04.000000000 +0800
++++ linux/arch/arm/mach-realview/hotplug.c	2012-10-17 19:25:20.000000000 +0800
+@@ -15,6 +15,12 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
+ #include <asm/smp_plat.h>
++#include <asm/opcodes.h>
++
++/*
++ * Define opcode of the WFI instruction.
++ */
++#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
+
+ static inline void cpu_enter_lowpower(void)
+ {
+@@ -64,7 +70,7 @@
+ 		/*
+ 		 * here's the WFI
+ 		 */
+-		asm(".word	0xe320f003\n"
++		asm(__WFI
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
+diff -urN linux-3.7-rc1/arch/arm/mach-shmobile/hotplug.c
+linux/arch/arm/mach-shmobile/hotplug.c
+--- linux-3.7-rc1/arch/arm/mach-shmobile/hotplug.c	2012-10-15
+05:41:04.000000000 +0800
++++ linux/arch/arm/mach-shmobile/hotplug.c	2012-10-17 19:25:34.000000000 +0800
+@@ -20,6 +20,12 @@
+ #include <mach/emev2.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mach-types.h>
++#include <asm/opcodes.h>
++
++/*
++ * Define opcode of the WFI instruction.
++ */
++#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
+
+ static cpumask_t dead_cpus;
+
+@@ -39,7 +45,7 @@
+ 		/*
+ 		 * here's the WFI
+ 		 */
+-		asm(".word	0xe320f003\n"
++		asm(__WFI
+ 		    :
+ 		    :
+ 		    : "memory", "cc");
