@@ -1,65 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 17 Oct 2012 17:23:21 +0900
-Subject: [PATCH] ARM: SAMSUNG: Add naming of s3c64xx-spi devices
-In-Reply-To: <507C3845.1030003@inov.pt>
-References: <201210021443.54897.heiko@sntech.de> <507C2492.8010408@samsung.com>
- <507C3845.1030003@inov.pt>
-Message-ID: <003b01cdac40$acec1590$06c440b0$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 17 Oct 2012 09:28:18 +0100
+Subject: [PATCH] ARM: OMAP2: UART: fix console UART mismatched runtime
+ PM status
+In-Reply-To: <1350344998-16328-1-git-send-email-khilman@deeprootsystems.com>
+References: <1350344998-16328-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <20121017082818.GZ28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jos? Miguel Gon?alves wrote:
+On Mon, Oct 15, 2012 at 04:49:58PM -0700, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@ti.com>
 > 
-> On 15-10-2012 15:58, Sylwester Nawrocki wrote:
-> > Hi Heiko,
-> >
-> > On 10/02/2012 02:43 PM, Heiko St?bner wrote:
-> >> Commit a5238e360b71 (spi: s3c64xx: move controller information into
-> driver
-> >> data) introduced separate device names for the different subtypes of
-> the
-> >> spi controller but forgot to set these in the relevant machines.
-> >>
-> >> To fix this introduce a s3c64xx_spi_setname function and populate all
-> >> Samsung arches with the correct names. The function resides in a new
-> >> header, as the s3c64xx-spi.h contains driver platform data and should
-> >> therefore at some later point move out of the Samsung include dir.
-> >>
-> >> Tested on a s3c2416-based machine.
-> >>
-> >> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> >> Cc: stable at vger.kernel.org
-> > This patch looks good to me. I've tested it on Exynos4412 SoC based
-> > board. And it fixes quite serious problem - broken SPI support on
-> > a all Samsung machs (non-dt) except s3c64xx in mainline v3.6 kernel.
-> >
-> >
-> > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > (mach-exynos only)
-> >
-> > Jos? Miguel, can you confirm it solves the problem for you ?
+> The runtime PM framework assumes that the hardware state of devices
+> when initialized is disabled.  For all omap_devices, we idle/disable
+> device by default.  However, the console uart uses a "no idle" option
+> during omap_device init in order to allow earlyprintk usage to work
+> seamlessly during boot.
 > 
-> The driver initialization problem is solved by this patch on my S3C2416
-> based
-> board. Nevertheless, I didn?t have the time yet to test an actual SPI
-> device
-> connected to the bus.
+> Because the hardware is left partially enabled after init (whatever
+> the bootloader settings were), the omap_device should later be fully
+> initialized (including mux) and the runtime PM framework should be
+> told that the device is active, and not disabled so that the hardware
+> state is in sync with runtime PM state.
 > 
-> BTW, I think the two debug messages at the end of the s3c64xx_spi_probe()
-> routine
-> should be promoted from dev_dbg to dev_info in order to be shown on a
-> normal
-> kernel boot.
-> 
-You guys, thanks for fixing and testing.
+> To fix, after the device has been created/registered, call
+> omap_device_enable() to finialize init and use pm_runtime_set_active()
+> to tell the runtime PM core the device is enabled.
 
-Looks good to me, applied.
+I still believe you're better off with the approach I gave.  Why?
+Because every driver you have contains virtually the same sequence of
+runtime PM "initialization" which is to runtime PM enable the device
+and then do a get on it.
 
-Thanks.
+Why not do that in bus code if all your drivers are doing the same
+thing, and kill off a bunch of code in the drivers?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+It's fairly easy to do with the BUS_NOTIFY_BIND_DRIVER / BUS_NOTIFY_UNBIND_DRIVER
+bus level notifies, and you've already hooked the notifier list for
+these callbacks in omap_device.c
