@@ -1,31 +1,89 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 16:38:32 +0900
-Subject: [PATCH] mfd: wm5102: Mark some more status registers as volatile
+Date: Wed, 17 Oct 2012 16:38:33 +0900
+Subject: [PATCH 2/8] ARM: S3C64XX: Update hookup for Arizona class devices
 In-Reply-To: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
  <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1350459519-20462-2-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1350459519-20462-3-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Renumber to use SPI /CS 1 instead of 0 to allow coexistance with DSPs.
+Also add additional supplies for the devices while we're at it.
+
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- drivers/mfd/wm5102-tables.c |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c        |   23 ++++++++++++++++++++++-
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/wm5102-tables.c b/drivers/mfd/wm5102-tables.c
-index 14490cc..e1dc022 100644
---- a/drivers/mfd/wm5102-tables.c
-+++ b/drivers/mfd/wm5102-tables.c
-@@ -1814,6 +1814,9 @@ static bool wm5102_volatile_register(struct device *dev, unsigned int reg)
- 	case ARIZONA_SOFTWARE_RESET:
- 	case ARIZONA_DEVICE_REVISION:
- 	case ARIZONA_OUTPUT_STATUS_1:
-+	case ARIZONA_RAW_OUTPUT_STATUS_1:
-+	case ARIZONA_SLIMBUS_RX_PORT_STATUS:
-+	case ARIZONA_SLIMBUS_TX_PORT_STATUS:
- 	case ARIZONA_SAMPLE_RATE_1_STATUS:
- 	case ARIZONA_SAMPLE_RATE_2_STATUS:
- 	case ARIZONA_SAMPLE_RATE_3_STATUS:
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+index 3364fab..89f5e7d 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
+@@ -202,7 +202,7 @@ static struct spi_board_info wm5102_spi_devs[] = {
+ 		.modalias	= "wm5102",
+ 		.max_speed_hz	= 10 * 1000 * 1000,
+ 		.bus_num	= 0,
+-		.chip_select	= 0,
++		.chip_select	= 1,
+ 		.mode		= SPI_MODE_0,
+ 		.irq		= GLENFARCLAS_PMIC_IRQ_BASE +
+ 				  WM831X_IRQ_GPIO_2,
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 13b7eaa..6d5b2c6 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -304,6 +304,13 @@ static struct regulator_consumer_supply wallvdd_consumers[] = {
+ 	REGULATOR_SUPPLY("SPKVDDL", "1-001a"),
+ 	REGULATOR_SUPPLY("SPKVDDR", "1-001a"),
+ 
++	REGULATOR_SUPPLY("SPKVDDL", "spi0.1"),
++	REGULATOR_SUPPLY("SPKVDDR", "spi0.1"),
++	REGULATOR_SUPPLY("SPKVDDL", "wm5102-codec"),
++	REGULATOR_SUPPLY("SPKVDDR", "wm5102-codec"),
++	REGULATOR_SUPPLY("SPKVDDL", "wm5110-codec"),
++	REGULATOR_SUPPLY("SPKVDDR", "wm5110-codec"),
++
+ 	REGULATOR_SUPPLY("DC1VDD", "0-0034"),
+ 	REGULATOR_SUPPLY("DC2VDD", "0-0034"),
+ 	REGULATOR_SUPPLY("DC3VDD", "0-0034"),
+@@ -597,6 +604,7 @@ static struct s3c2410_platform_i2c i2c0_pdata = {
+ static struct regulator_consumer_supply pvdd_1v2_consumers[] __devinitdata = {
+ 	REGULATOR_SUPPLY("DCVDD", "spi0.0"),
+ 	REGULATOR_SUPPLY("AVDD", "spi0.0"),
++	REGULATOR_SUPPLY("AVDD", "spi0.1"),
+ };
+ 
+ static struct regulator_init_data pvdd_1v2 __devinitdata = {
+@@ -621,6 +629,19 @@ static struct regulator_consumer_supply pvdd_1v8_consumers[] __devinitdata = {
+ 	REGULATOR_SUPPLY("DCVDD", "1-001a"),
+ 	REGULATOR_SUPPLY("AVDD", "1-001a"),
+ 	REGULATOR_SUPPLY("DBVDD", "spi0.0"),
++	REGULATOR_SUPPLY("DBVDD1", "spi0.1"),
++	REGULATOR_SUPPLY("DBVDD2", "spi0.1"),
++	REGULATOR_SUPPLY("DBVDD3", "spi0.1"),
++	REGULATOR_SUPPLY("LDOVDD", "spi0.1"),
++	REGULATOR_SUPPLY("CPVDD", "spi0.1"),
++
++	REGULATOR_SUPPLY("DBVDD2", "wm5102-codec"),
++	REGULATOR_SUPPLY("DBVDD3", "wm5102-codec"),
++	REGULATOR_SUPPLY("CPVDD", "wm5102-codec"),
++
++	REGULATOR_SUPPLY("DBVDD2", "wm5110-codec"),
++	REGULATOR_SUPPLY("DBVDD3", "wm5110-codec"),
++	REGULATOR_SUPPLY("CPVDD", "wm5110-codec"),
+ };
+ 
+ static struct regulator_init_data pvdd_1v8 __devinitdata = {
+@@ -810,7 +831,7 @@ static void __init crag6410_machine_init(void)
+ 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
+ 
+ 	samsung_keypad_set_platdata(&crag6410_keypad_data);
+-	s3c64xx_spi0_set_platdata(NULL, 0, 1);
++	s3c64xx_spi0_set_platdata(NULL, 0, 2);
+ 
+ 	platform_add_devices(crag6410_devices, ARRAY_SIZE(crag6410_devices));
+ 
 -- 
 1.7.10.4
