@@ -1,25 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 17 Oct 2012 13:42:29 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <1350448698-26985-1-git-send-email-horms@verge.net.au>
-References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
-Message-ID: <201210171342.29635.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 17 Oct 2012 15:41:31 +0200
+Subject: [PATCH 1/1] arm: at91: drop duplicated config SOC_AT91SAM9 entry
+Message-ID: <1350481291-32579-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 17 October 2012, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> please consider the following defconfig enhancements for 3.8.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/mach-at91/Kconfig |   10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-These look good to me, but I wonder what happened to the plan to reduce
-the number of defconfig files we discussed before. Since you can build
-a combined kernel that runs on all (or most) of the supported boards,
-can you add a combined shmobile_defconfig that is able to work on
-a wide variety of hardware and drop some of the less common defconfig
-files?
-
-Most of the modern platforms nowadays have just one defconfig that
-covers everything.
-
-	Arnd
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index b142071..0436242 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -21,19 +21,13 @@ config SOC_AT91SAM9
+ 	bool
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
+ 
+ menu "Atmel AT91 System-on-Chip"
+ 
+ comment "Atmel AT91 Processor"
+ 
+-config SOC_AT91SAM9
+-	bool
+-	select AT91_SAM9_SMC
+-	select AT91_SAM9_TIME
+-	select CPU_ARM926T
+-	select MULTI_IRQ_HANDLER
+-	select SPARSE_IRQ
+-
+ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select CPU_ARM920T
+-- 
+1.7.10.4
