@@ -1,176 +1,49 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 17 Oct 2012 18:34:39 +0200
-Subject: [PATCH] ARM: U300: bump IRQs to offset 32
-Message-ID: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
+From: srikar@linux.vnet.ibm.com (Srikar Dronamraju)
+Date: Wed, 17 Oct 2012 22:10:59 +0530
+Subject: [PATCH 2/9] uprobes: check for single step support
+In-Reply-To: <1350242593-17761-2-git-send-email-rabin@rab.in>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-2-git-send-email-rabin@rab.in>
+Message-ID: <20121017164059.GF11096@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+* Rabin Vincent <rabin@rab.in> [2012-10-14 21:23:06]:
 
-The U300 IRQs were bumped once to offset to 1 (in order to avoid
-using IRQ 0 which is now NO_IRQ). This was OK as we were still
-passing the number of irqs in the .nr_irqs field of the machine,
-with descriptors allocated at boot time.
+> Check for single step support before calling user_enable_single_step(),
+> since user_enable_single_step() just BUG()s if support does not exist.
+> Needed by ARM.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  kernel/events/uprobes.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+> index 98256bc..db4e3ab 100644
+> --- a/kernel/events/uprobes.c
+> +++ b/kernel/events/uprobes.c
+> @@ -1450,7 +1450,8 @@ static struct uprobe *find_active_uprobe(unsigned long bp_vaddr, int *is_swbp)
+> 
+>  void __weak arch_uprobe_enable_step(struct arch_uprobe *arch)
+>  {
+> -	user_enable_single_step(current);
+> +	if (arch_has_single_step())
+> +		user_enable_single_step(current);
+>  }
+> 
+>  void __weak arch_uprobe_disable_step(struct arch_uprobe *arch)
 
-However .nr_irqs should be 0, leading the system to reserve the
-first 16 IRQs. Then the VIC driver will complain that IRQs 1
-thru 15 are pre-allocated, so to avoid this and use free
-descriptors, move all IRQs up to offset 32.
+This change is fine. But I am wondering if should have a dummy
+arch_uprobe_enable_step / arch_uprobe_disable_step in uprobes ARM.
 
-This will all be done away with as we migrate to device tree,
-so it is an interim solution.
+If arch_uprobe_enable_step() wasnt a weak function, then the fix you
+suggested would have been the only way to go.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-u300/core.c              |   2 +-
- arch/arm/mach-u300/include/mach/irqs.h | 116 ++++++++++++++++-----------------
- 2 files changed, 59 insertions(+), 59 deletions(-)
+Again, I am not against this change. But I am hoping that we get
+feedback on which option is prefered, having this check or having a
+dummy function in archs like ARM.
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index b8efac4..603c08e 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -1804,7 +1804,7 @@ MACHINE_START(U300, "Ericsson AB U335 S335/B335 Prototype Board")
- 	/* Maintainer: Linus Walleij <linus.walleij@stericsson.com> */
- 	.atag_offset	= 0x100,
- 	.map_io		= u300_map_io,
--	.nr_irqs	= NR_IRQS_U300,
-+	.nr_irqs	= 0,
- 	.init_irq	= u300_init_irq,
- 	.handle_irq	= vic_handle_irq,
- 	.timer		= &u300_timer,
-diff --git a/arch/arm/mach-u300/include/mach/irqs.h b/arch/arm/mach-u300/include/mach/irqs.h
-index e27425a..e85ec38 100644
---- a/arch/arm/mach-u300/include/mach/irqs.h
-+++ b/arch/arm/mach-u300/include/mach/irqs.h
-@@ -12,70 +12,70 @@
- #ifndef __MACH_IRQS_H
- #define __MACH_IRQS_H
- 
--#define IRQ_U300_INTCON0_START		1
--#define IRQ_U300_INTCON1_START		33
-+#define IRQ_U300_INTCON0_START		32
-+#define IRQ_U300_INTCON1_START		64
- /* These are on INTCON0 - 30 lines */
--#define IRQ_U300_IRQ0_EXT		1
--#define IRQ_U300_IRQ1_EXT		2
--#define IRQ_U300_DMA			3
--#define IRQ_U300_VIDEO_ENC_0		4
--#define IRQ_U300_VIDEO_ENC_1		5
--#define IRQ_U300_AAIF_RX		6
--#define IRQ_U300_AAIF_TX		7
--#define IRQ_U300_AAIF_VGPIO		8
--#define IRQ_U300_AAIF_WAKEUP		9
--#define IRQ_U300_PCM_I2S0_FRAME		10
--#define IRQ_U300_PCM_I2S0_FIFO		11
--#define IRQ_U300_PCM_I2S1_FRAME		12
--#define IRQ_U300_PCM_I2S1_FIFO		13
--#define IRQ_U300_XGAM_GAMCON		14
--#define IRQ_U300_XGAM_CDI		15
--#define IRQ_U300_XGAM_CDICON		16
--#define IRQ_U300_XGAM_PDI		18
--#define IRQ_U300_XGAM_PDICON		19
--#define IRQ_U300_XGAM_GAMEACC		20
--#define IRQ_U300_XGAM_MCIDCT		21
--#define IRQ_U300_APEX			22
--#define IRQ_U300_UART0			23
--#define IRQ_U300_SPI			24
--#define IRQ_U300_TIMER_APP_OS		25
--#define IRQ_U300_TIMER_APP_DD		26
--#define IRQ_U300_TIMER_APP_GP1		27
--#define IRQ_U300_TIMER_APP_GP2		28
--#define IRQ_U300_TIMER_OS		29
--#define IRQ_U300_TIMER_MS		30
--#define IRQ_U300_KEYPAD_KEYBF		31
--#define IRQ_U300_KEYPAD_KEYBR		32
-+#define IRQ_U300_IRQ0_EXT		32
-+#define IRQ_U300_IRQ1_EXT		33
-+#define IRQ_U300_DMA			34
-+#define IRQ_U300_VIDEO_ENC_0		35
-+#define IRQ_U300_VIDEO_ENC_1		36
-+#define IRQ_U300_AAIF_RX		37
-+#define IRQ_U300_AAIF_TX		38
-+#define IRQ_U300_AAIF_VGPIO		39
-+#define IRQ_U300_AAIF_WAKEUP		40
-+#define IRQ_U300_PCM_I2S0_FRAME		41
-+#define IRQ_U300_PCM_I2S0_FIFO		42
-+#define IRQ_U300_PCM_I2S1_FRAME		43
-+#define IRQ_U300_PCM_I2S1_FIFO		44
-+#define IRQ_U300_XGAM_GAMCON		45
-+#define IRQ_U300_XGAM_CDI		46
-+#define IRQ_U300_XGAM_CDICON		47
-+#define IRQ_U300_XGAM_PDI		49
-+#define IRQ_U300_XGAM_PDICON		50
-+#define IRQ_U300_XGAM_GAMEACC		51
-+#define IRQ_U300_XGAM_MCIDCT		52
-+#define IRQ_U300_APEX			53
-+#define IRQ_U300_UART0			54
-+#define IRQ_U300_SPI			55
-+#define IRQ_U300_TIMER_APP_OS		56
-+#define IRQ_U300_TIMER_APP_DD		57
-+#define IRQ_U300_TIMER_APP_GP1		58
-+#define IRQ_U300_TIMER_APP_GP2		59
-+#define IRQ_U300_TIMER_OS		60
-+#define IRQ_U300_TIMER_MS		61
-+#define IRQ_U300_KEYPAD_KEYBF		62
-+#define IRQ_U300_KEYPAD_KEYBR		63
- /* These are on INTCON1 - 32 lines */
--#define IRQ_U300_GPIO_PORT0		33
--#define IRQ_U300_GPIO_PORT1		34
--#define IRQ_U300_GPIO_PORT2		35
-+#define IRQ_U300_GPIO_PORT0		64
-+#define IRQ_U300_GPIO_PORT1		65
-+#define IRQ_U300_GPIO_PORT2		66
- 
- /* These are for DB3150, DB3200 and DB3350 */
--#define IRQ_U300_WDOG			36
--#define IRQ_U300_EVHIST			37
--#define IRQ_U300_MSPRO			38
--#define IRQ_U300_MMCSD_MCIINTR0		39
--#define IRQ_U300_MMCSD_MCIINTR1		40
--#define IRQ_U300_I2C0			41
--#define IRQ_U300_I2C1			42
--#define IRQ_U300_RTC			43
--#define IRQ_U300_NFIF			44
--#define IRQ_U300_NFIF2			45
-+#define IRQ_U300_WDOG			67
-+#define IRQ_U300_EVHIST			68
-+#define IRQ_U300_MSPRO			69
-+#define IRQ_U300_MMCSD_MCIINTR0		70
-+#define IRQ_U300_MMCSD_MCIINTR1		71
-+#define IRQ_U300_I2C0			72
-+#define IRQ_U300_I2C1			73
-+#define IRQ_U300_RTC			74
-+#define IRQ_U300_NFIF			75
-+#define IRQ_U300_NFIF2			76
- 
- /* The DB3350-specific interrupt lines */
--#define IRQ_U300_ISP_F0			46
--#define IRQ_U300_ISP_F1			47
--#define IRQ_U300_ISP_F2			48
--#define IRQ_U300_ISP_F3			49
--#define IRQ_U300_ISP_F4			50
--#define IRQ_U300_GPIO_PORT3		51
--#define IRQ_U300_SYSCON_PLL_LOCK	52
--#define IRQ_U300_UART1			53
--#define IRQ_U300_GPIO_PORT4		54
--#define IRQ_U300_GPIO_PORT5		55
--#define IRQ_U300_GPIO_PORT6		56
--#define U300_VIC_IRQS_END		57
-+#define IRQ_U300_ISP_F0			77
-+#define IRQ_U300_ISP_F1			78
-+#define IRQ_U300_ISP_F2			79
-+#define IRQ_U300_ISP_F3			80
-+#define IRQ_U300_ISP_F4			81
-+#define IRQ_U300_GPIO_PORT3		82
-+#define IRQ_U300_SYSCON_PLL_LOCK	83
-+#define IRQ_U300_UART1			84
-+#define IRQ_U300_GPIO_PORT4		85
-+#define IRQ_U300_GPIO_PORT5		86
-+#define IRQ_U300_GPIO_PORT6		87
-+#define U300_VIC_IRQS_END		88
- 
- /* Maximum 8*7 GPIO lines */
- #ifdef CONFIG_PINCTRL_COH901
 -- 
-1.7.11.3
+Thanks and Regards
+Srikar
