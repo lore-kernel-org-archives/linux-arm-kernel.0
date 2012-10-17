@@ -1,469 +1,824 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 17 Oct 2012 16:32:47 +0100
-Subject: [RFC PATCH] ARM: SMP: consolidate holding pen
-Message-ID: <1350487967-2555-1-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 17 Oct 2012 16:33:40 +0100
+Subject: [PATCH 3/7] ARM: perf: consistently use struct perf_event in arm_pmu
+ functions
+In-Reply-To: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
+References: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1350488024-3224-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As with other bits of the SMP code, platforms have duplicated a lot
-of the RealView implementation. As an effort to slightly reduce
-the clutter, make the plat-versatile version of the holding pen
-a standard part of the SMP framework.
+From: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
 
-Platforms can still provide their own, but those who carried an exact
-duplicate of the Realview code are switched to the common implementation.
+The arm_pmu functions have wildly varied parameters which can often be
+derived from struct perf_event.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This patch changes the arm_pmu function prototypes so that struct
+perf_event pointers are passed in preference to fields that can be
+derived from the event.
+
+Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/smp.h                     |  2 ++
- arch/arm/kernel/Makefile                       |  2 +-
- arch/arm/kernel/smp_pen.S                      | 41 ++++++++++++++++++++++++
- arch/arm/mach-exynos/Makefile                  |  2 +-
- arch/arm/mach-exynos/headsmp.S                 | 43 --------------------------
- arch/arm/mach-exynos/platsmp.c                 |  6 ++--
- arch/arm/mach-msm/Makefile                     |  2 +-
- arch/arm/mach-msm/headsmp.S                    | 41 ------------------------
- arch/arm/mach-msm/platsmp.c                    |  4 +--
- arch/arm/mach-realview/platsmp.c               |  2 +-
- arch/arm/mach-ux500/Makefile                   |  2 +-
- arch/arm/mach-ux500/headsmp.S                  | 39 -----------------------
- arch/arm/mach-ux500/platsmp.c                  |  5 +--
- arch/arm/mach-vexpress/platsmp.c               |  2 +-
- arch/arm/plat-versatile/Makefile               |  2 +-
- arch/arm/plat-versatile/headsmp.S              | 41 ------------------------
- arch/arm/plat-versatile/include/plat/platsmp.h |  1 -
- 17 files changed, 54 insertions(+), 183 deletions(-)
- create mode 100644 arch/arm/kernel/smp_pen.S
- delete mode 100644 arch/arm/mach-exynos/headsmp.S
- delete mode 100644 arch/arm/mach-msm/headsmp.S
- delete mode 100644 arch/arm/mach-ux500/headsmp.S
- delete mode 100644 arch/arm/plat-versatile/headsmp.S
+ arch/arm/include/asm/pmu.h          |   26 +++++------
+ arch/arm/kernel/perf_event.c        |   44 ++++++++----------
+ arch/arm/kernel/perf_event_cpu.c    |    8 ++--
+ arch/arm/kernel/perf_event_v6.c     |   54 ++++++++++++----------
+ arch/arm/kernel/perf_event_v7.c     |   46 +++++++++++++------
+ arch/arm/kernel/perf_event_xscale.c |   85 ++++++++++++++++++++---------------
+ 6 files changed, 142 insertions(+), 121 deletions(-)
 
-diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
-index 2e3be16..538a3ea 100644
---- a/arch/arm/include/asm/smp.h
-+++ b/arch/arm/include/asm/smp.h
-@@ -72,6 +72,8 @@ struct secondary_data {
- extern struct secondary_data secondary_data;
- extern volatile int pen_release;
+diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+index a26170d..a209a38 100644
+--- a/arch/arm/include/asm/pmu.h
++++ b/arch/arm/include/asm/pmu.h
+@@ -67,19 +67,19 @@ struct arm_pmu {
+ 	cpumask_t	active_irqs;
+ 	char		*name;
+ 	irqreturn_t	(*handle_irq)(int irq_num, void *dev);
+-	void		(*enable)(struct hw_perf_event *evt, int idx);
+-	void		(*disable)(struct hw_perf_event *evt, int idx);
++	void		(*enable)(struct perf_event *event);
++	void		(*disable)(struct perf_event *event);
+ 	int		(*get_event_idx)(struct pmu_hw_events *hw_events,
+-					 struct hw_perf_event *hwc);
++					 struct perf_event *event);
+ 	int		(*set_event_filter)(struct hw_perf_event *evt,
+ 					    struct perf_event_attr *attr);
+-	u32		(*read_counter)(int idx);
+-	void		(*write_counter)(int idx, u32 val);
+-	void		(*start)(void);
+-	void		(*stop)(void);
++	u32		(*read_counter)(struct perf_event *event);
++	void		(*write_counter)(struct perf_event *event, u32 val);
++	void		(*start)(struct arm_pmu *);
++	void		(*stop)(struct arm_pmu *);
+ 	void		(*reset)(void *);
+-	int		(*request_irq)(irq_handler_t handler);
+-	void		(*free_irq)(void);
++	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
++	void		(*free_irq)(struct arm_pmu *);
+ 	int		(*map_event)(struct perf_event *event);
+ 	int		num_events;
+ 	atomic_t	active_events;
+@@ -95,13 +95,9 @@ extern const struct dev_pm_ops armpmu_dev_pm_ops;
  
-+extern void smp_pen_secondary_startup(void);
-+
- extern int __cpu_disable(void);
+ int armpmu_register(struct arm_pmu *armpmu, char *name, int type);
  
- extern void __cpu_die(unsigned int cpu);
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5bbec7b..505cfc7 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -32,7 +32,7 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
--obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o
-+obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o smp_pen.o
- obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
- obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
- obj-$(CONFIG_ARM_ARCH_TIMER)	+= arch_timer.o
-diff --git a/arch/arm/kernel/smp_pen.S b/arch/arm/kernel/smp_pen.S
-new file mode 100644
-index 0000000..6c81238
---- /dev/null
-+++ b/arch/arm/kernel/smp_pen.S
-@@ -0,0 +1,41 @@
-+/*
-+ *  linux/arch/arm/kernel/smp_pen.S
-+ *
-+ *  Copyright (c) 2003 ARM Limited
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+	__CPUINIT
-+
-+/*
-+ * Generic specific entry point for secondary CPUs.
-+ * This provides a "holding pen" into which all secondary cores are held
-+ * until we're ready for them to initialise.
-+ */
-+ENTRY(smp_pen_secondary_startup)
-+	mrc	p15, 0, r0, c0, c0, 5
-+	and	r0, r0, #15
-+	adr	r4, 1f
-+	ldmia	r4, {r5, r6}
-+	sub	r4, r4, r5
-+	add	r6, r6, r4
-+pen:	ldr	r7, [r6]
-+	cmp	r7, r0
-+	bne	pen
-+
-+	/*
-+	 * we've been released from the holding pen: secondary_stack
-+	 * should now contain the SVC stack for this core
-+	 */
-+	b	secondary_startup
-+
-+	.align
-+1:	.long	.
-+	.long	pen_release
-+ENDPROC(smp_pen_secondary_startup)
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 9b58024..fc19fb9 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -24,7 +24,7 @@ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+-u64 armpmu_event_update(struct perf_event *event,
+-			struct hw_perf_event *hwc,
+-			int idx);
++u64 armpmu_event_update(struct perf_event *event);
  
- obj-$(CONFIG_ARCH_EXYNOS)	+= pmu.o
+-int armpmu_event_set_period(struct perf_event *event,
+-			    struct hw_perf_event *hwc,
+-			    int idx);
++int armpmu_event_set_period(struct perf_event *event);
  
--obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
- 
- obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
- 
-diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-deleted file mode 100644
-index 5364d4b..0000000
---- a/arch/arm/mach-exynos/headsmp.S
-+++ /dev/null
-@@ -1,43 +0,0 @@
--/*
-- *  linux/arch/arm/mach-exynos4/headsmp.S
-- *
-- *  Cloned from linux/arch/arm/mach-realview/headsmp.S
-- *
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--	__CPUINIT
--
--/*
-- * exynos4 specific entry point for secondary CPUs.  This provides
-- * a "holding pen" into which all secondary cores are held until we're
-- * ready for them to initialise.
-- */
--ENTRY(exynos4_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--ENDPROC(exynos4_secondary_startup)
--
--	.align 2
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index f93d820..bb758b2 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -34,8 +34,6 @@
- 
- #include "common.h"
- 
--extern void exynos4_secondary_startup(void);
--
- #define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
- 				S5P_INFORM5 : S5P_VA_SYSRAM)
- 
-@@ -132,7 +130,7 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
- 	while (time_before(jiffies, timeout)) {
- 		smp_rmb();
- 
--		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+		__raw_writel(virt_to_phys(smp_pen_secondary_startup),
- 			CPU1_BOOT_REG);
- 		gic_raise_softirq(cpumask_of(cpu), 0);
- 
-@@ -190,7 +188,7 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+	__raw_writel(virt_to_phys(smp_pen_secondary_startup),
- 			CPU1_BOOT_REG);
+ int armpmu_map_event(struct perf_event *event,
+ 		     const unsigned (*event_map)[PERF_COUNT_HW_MAX],
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 27413aa..710c65c 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -86,12 +86,10 @@ armpmu_map_event(struct perf_event *event,
+ 	return -ENOENT;
  }
  
-diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
-index 17519fa..4f1c61f 100644
---- a/arch/arm/mach-msm/Makefile
-+++ b/arch/arm/mach-msm/Makefile
-@@ -18,7 +18,7 @@ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
- CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
- 
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
--obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-+obj-$(CONFIG_SMP) += platsmp.o
- 
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
- obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
-diff --git a/arch/arm/mach-msm/headsmp.S b/arch/arm/mach-msm/headsmp.S
-deleted file mode 100644
-index bcd5af2..0000000
---- a/arch/arm/mach-msm/headsmp.S
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- *  linux/arch/arm/mach-realview/headsmp.S
-- *
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--	__CPUINIT
--
--/*
-- * MSM specific entry point for secondary CPUs.  This provides
-- * a "holding pen" into which all secondary cores are held until we're
-- * ready for them to initialise.
-- */
--ENTRY(msm_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--ENDPROC(msm_secondary_startup)
--
--	.align
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
-index 7ed69b69..b58a0ed 100644
---- a/arch/arm/mach-msm/platsmp.c
-+++ b/arch/arm/mach-msm/platsmp.c
-@@ -29,8 +29,6 @@
- #define SCSS_CPU1CORE_RESET 0xD80
- #define SCSS_DBG_STATUS_CORE_PWRDUP 0xE64
- 
--extern void msm_secondary_startup(void);
--
- static DEFINE_SPINLOCK(boot_lock);
- 
- static inline int get_core_count(void)
-@@ -65,7 +63,7 @@ static void __cpuinit msm_secondary_init(unsigned int cpu)
- static __cpuinit void prepare_cold_cpu(unsigned int cpu)
+-int
+-armpmu_event_set_period(struct perf_event *event,
+-			struct hw_perf_event *hwc,
+-			int idx)
++int armpmu_event_set_period(struct perf_event *event)
  {
- 	int ret;
--	ret = scm_set_boot_addr(virt_to_phys(msm_secondary_startup),
-+	ret = scm_set_boot_addr(virt_to_phys(smp_pen_secondary_startup),
- 				SCM_FLAG_COLDBOOT_CPU1);
- 	if (ret == 0) {
- 		void __iomem *sc1_base_ptr;
-diff --git a/arch/arm/mach-realview/platsmp.c b/arch/arm/mach-realview/platsmp.c
-index 300f706..43a8e76 100644
---- a/arch/arm/mach-realview/platsmp.c
-+++ b/arch/arm/mach-realview/platsmp.c
-@@ -74,7 +74,7 @@ static void __init realview_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(virt_to_phys(versatile_secondary_startup),
-+	__raw_writel(virt_to_phys(smp_pen_secondary_startup),
- 		     __io_address(REALVIEW_SYS_FLAGSSET));
+ 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	s64 left = local64_read(&hwc->period_left);
+ 	s64 period = hwc->sample_period;
+ 	int ret = 0;
+@@ -115,24 +113,22 @@ armpmu_event_set_period(struct perf_event *event,
+ 
+ 	local64_set(&hwc->prev_count, (u64)-left);
+ 
+-	armpmu->write_counter(idx, (u64)(-left) & 0xffffffff);
++	armpmu->write_counter(event, (u64)(-left) & 0xffffffff);
+ 
+ 	perf_event_update_userpage(event);
+ 
+ 	return ret;
  }
  
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index f24710d..7fb617b 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -13,5 +13,5 @@ obj-$(CONFIG_MACH_MOP500)	+= board-mop500.o board-mop500-sdi.o \
- 				board-mop500-u8500uib.o \
- 				board-mop500-pins.o \
- 				board-mop500-audio.o
--obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
-diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
-deleted file mode 100644
-index 08da5589..0000000
---- a/arch/arm/mach-ux500/headsmp.S
-+++ /dev/null
-@@ -1,39 +0,0 @@
--/*
-- *  Copyright (c) 2009 ST-Ericsson
-- *	This file is based  ARM Realview platform
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--	__INIT
--
--/*
-- * U8500 specific entry point for secondary CPUs.
-- */
--ENTRY(u8500_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--ENDPROC(u8500_secondary_startup)
--
--	.align 2
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 3db7782..3d946a6 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -24,9 +24,6 @@
- #include <mach/hardware.h>
- #include <mach/setup.h>
+-u64
+-armpmu_event_update(struct perf_event *event,
+-		    struct hw_perf_event *hwc,
+-		    int idx)
++u64 armpmu_event_update(struct perf_event *event)
+ {
+ 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	u64 delta, prev_raw_count, new_raw_count;
  
--/* This is called from headsmp.S to wakeup the secondary core */
--extern void u8500_secondary_startup(void);
--
+ again:
+ 	prev_raw_count = local64_read(&hwc->prev_count);
+-	new_raw_count = armpmu->read_counter(idx);
++	new_raw_count = armpmu->read_counter(event);
+ 
+ 	if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
+ 			     new_raw_count) != prev_raw_count)
+@@ -155,7 +151,7 @@ armpmu_read(struct perf_event *event)
+ 	if (hwc->idx < 0)
+ 		return;
+ 
+-	armpmu_event_update(event, hwc, hwc->idx);
++	armpmu_event_update(event);
+ }
+ 
+ static void
+@@ -169,14 +165,13 @@ armpmu_stop(struct perf_event *event, int flags)
+ 	 * PERF_EF_UPDATE, see comments in armpmu_start().
+ 	 */
+ 	if (!(hwc->state & PERF_HES_STOPPED)) {
+-		armpmu->disable(hwc, hwc->idx);
+-		armpmu_event_update(event, hwc, hwc->idx);
++		armpmu->disable(event);
++		armpmu_event_update(event);
+ 		hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
+ 	}
+ }
+ 
+-static void
+-armpmu_start(struct perf_event *event, int flags)
++static void armpmu_start(struct perf_event *event, int flags)
+ {
+ 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+ 	struct hw_perf_event *hwc = &event->hw;
+@@ -196,8 +191,8 @@ armpmu_start(struct perf_event *event, int flags)
+ 	 * get an interrupt too soon or *way* too late if the overflow has
+ 	 * happened since disabling.
+ 	 */
+-	armpmu_event_set_period(event, hwc, hwc->idx);
+-	armpmu->enable(hwc, hwc->idx);
++	armpmu_event_set_period(event);
++	armpmu->enable(event);
+ }
+ 
+ static void
+@@ -229,7 +224,7 @@ armpmu_add(struct perf_event *event, int flags)
+ 	perf_pmu_disable(event->pmu);
+ 
+ 	/* If we don't have a space for the counter then finish early. */
+-	idx = armpmu->get_event_idx(hw_events, hwc);
++	idx = armpmu->get_event_idx(hw_events, event);
+ 	if (idx < 0) {
+ 		err = idx;
+ 		goto out;
+@@ -240,7 +235,7 @@ armpmu_add(struct perf_event *event, int flags)
+ 	 * sure it is disabled.
+ 	 */
+ 	event->hw.idx = idx;
+-	armpmu->disable(hwc, idx);
++	armpmu->disable(event);
+ 	hw_events->events[idx] = event;
+ 
+ 	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
+@@ -260,13 +255,12 @@ validate_event(struct pmu_hw_events *hw_events,
+ 	       struct perf_event *event)
+ {
+ 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+-	struct hw_perf_event fake_event = event->hw;
+ 	struct pmu *leader_pmu = event->group_leader->pmu;
+ 
+ 	if (event->pmu != leader_pmu || event->state <= PERF_EVENT_STATE_OFF)
+ 		return 1;
+ 
+-	return armpmu->get_event_idx(hw_events, &fake_event) >= 0;
++	return armpmu->get_event_idx(hw_events, event) >= 0;
+ }
+ 
+ static int
+@@ -312,7 +306,7 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+ static void
+ armpmu_release_hardware(struct arm_pmu *armpmu)
+ {
+-	armpmu->free_irq();
++	armpmu->free_irq(armpmu);
+ 	pm_runtime_put_sync(&armpmu->plat_device->dev);
+ }
+ 
+@@ -326,7 +320,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
+ 		return -ENODEV;
+ 
+ 	pm_runtime_get_sync(&pmu_device->dev);
+-	err = armpmu->request_irq(armpmu_dispatch_irq);
++	err = armpmu->request_irq(armpmu, armpmu_dispatch_irq);
+ 	if (err) {
+ 		armpmu_release_hardware(armpmu);
+ 		return err;
+@@ -461,13 +455,13 @@ static void armpmu_enable(struct pmu *pmu)
+ 	int enabled = bitmap_weight(hw_events->used_mask, armpmu->num_events);
+ 
+ 	if (enabled)
+-		armpmu->start();
++		armpmu->start(armpmu);
+ }
+ 
+ static void armpmu_disable(struct pmu *pmu)
+ {
+ 	struct arm_pmu *armpmu = to_arm_pmu(pmu);
+-	armpmu->stop();
++	armpmu->stop(armpmu);
+ }
+ 
+ #ifdef CONFIG_PM_RUNTIME
+diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
+index 3863fd4..02244fa 100644
+--- a/arch/arm/kernel/perf_event_cpu.c
++++ b/arch/arm/kernel/perf_event_cpu.c
+@@ -71,7 +71,7 @@ static struct pmu_hw_events *cpu_pmu_get_cpu_events(void)
+ 	return &__get_cpu_var(cpu_hw_events);
+ }
+ 
+-static void cpu_pmu_free_irq(void)
++static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
+ {
+ 	int i, irq, irqs;
+ 	struct platform_device *pmu_device = cpu_pmu->plat_device;
+@@ -87,7 +87,7 @@ static void cpu_pmu_free_irq(void)
+ 	}
+ }
+ 
+-static int cpu_pmu_request_irq(irq_handler_t handler)
++static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
+ {
+ 	int i, err, irq, irqs;
+ 	struct platform_device *pmu_device = cpu_pmu->plat_device;
+@@ -148,7 +148,7 @@ static void __devinit cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ 
+ 	/* Ensure the PMU has sane values out of reset. */
+ 	if (cpu_pmu && cpu_pmu->reset)
+-		on_each_cpu(cpu_pmu->reset, NULL, 1);
++		on_each_cpu(cpu_pmu->reset, cpu_pmu, 1);
+ }
+ 
  /*
-  * Write pen_release in a way that is guaranteed to be visible to all
-  * observers, irrespective of whether they're taking part in coherency
-@@ -124,7 +121,7 @@ static void __init wakeup_secondary(void)
- 	 * is waiting for. This would wake up the secondary core from WFE
- 	 */
- #define UX500_CPU1_JUMPADDR_OFFSET 0x1FF4
--	__raw_writel(virt_to_phys(u8500_secondary_startup),
-+	__raw_writel(virt_to_phys(smp_pen_secondary_startup),
- 		     backupram + UX500_CPU1_JUMPADDR_OFFSET);
+@@ -164,7 +164,7 @@ static int __cpuinit cpu_pmu_notify(struct notifier_block *b,
+ 		return NOTIFY_DONE;
  
- #define UX500_CPU1_WAKEMAGIC_OFFSET 0x1FF0
-diff --git a/arch/arm/mach-vexpress/platsmp.c b/arch/arm/mach-vexpress/platsmp.c
-index 7db27c8..d1b99a7 100644
---- a/arch/arm/mach-vexpress/platsmp.c
-+++ b/arch/arm/mach-vexpress/platsmp.c
-@@ -193,7 +193,7 @@ static void __init vexpress_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	v2m_flags_set(virt_to_phys(versatile_secondary_startup));
-+	v2m_flags_set(virt_to_phys(smp_pen_secondary_startup));
+ 	if (cpu_pmu && cpu_pmu->reset)
+-		cpu_pmu->reset(NULL);
++		cpu_pmu->reset(cpu_pmu);
+ 
+ 	return NOTIFY_OK;
+ }
+diff --git a/arch/arm/kernel/perf_event_v6.c b/arch/arm/kernel/perf_event_v6.c
+index 3908cb4..f3e22ff 100644
+--- a/arch/arm/kernel/perf_event_v6.c
++++ b/arch/arm/kernel/perf_event_v6.c
+@@ -401,9 +401,10 @@ armv6_pmcr_counter_has_overflowed(unsigned long pmcr,
+ 	return ret;
  }
  
- struct smp_operations __initdata vexpress_smp_ops = {
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 74cfd94..a0f987e 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -5,4 +5,4 @@ obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
- obj-$(CONFIG_PLAT_VERSATILE_FPGA_IRQ) += fpga-irq.o
- obj-$(CONFIG_PLAT_VERSATILE_LEDS) += leds.o
- obj-$(CONFIG_PLAT_VERSATILE_SCHED_CLOCK) += sched-clock.o
--obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-+obj-$(CONFIG_SMP) += platsmp.o
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-deleted file mode 100644
-index dd703ef..0000000
---- a/arch/arm/plat-versatile/headsmp.S
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/*
-- *  linux/arch/arm/plat-versatile/headsmp.S
-- *
-- *  Copyright (c) 2003 ARM Limited
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/linkage.h>
--#include <linux/init.h>
--
--	__INIT
--
--/*
-- * Realview/Versatile Express specific entry point for secondary CPUs.
-- * This provides a "holding pen" into which all secondary cores are held
-- * until we're ready for them to initialise.
-- */
--ENTRY(versatile_secondary_startup)
--	mrc	p15, 0, r0, c0, c0, 5
--	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
--pen:	ldr	r7, [r6]
--	cmp	r7, r0
--	bne	pen
--
--	/*
--	 * we've been released from the holding pen: secondary_stack
--	 * should now contain the SVC stack for this core
--	 */
--	b	secondary_startup
--
--	.align
--1:	.long	.
--	.long	pen_release
--ENDPROC(versatile_secondary_startup)
-diff --git a/arch/arm/plat-versatile/include/plat/platsmp.h b/arch/arm/plat-versatile/include/plat/platsmp.h
-index 50fb830..cb893c2 100644
---- a/arch/arm/plat-versatile/include/plat/platsmp.h
-+++ b/arch/arm/plat-versatile/include/plat/platsmp.h
-@@ -9,6 +9,5 @@
-  * published by the Free Software Foundation.
-  */
+-static inline u32
+-armv6pmu_read_counter(int counter)
++static inline u32 armv6pmu_read_counter(struct perf_event *event)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int counter = hwc->idx;
+ 	unsigned long value = 0;
  
--extern void versatile_secondary_startup(void);
- extern void versatile_secondary_init(unsigned int cpu);
- extern int  versatile_boot_secondary(unsigned int cpu, struct task_struct *idle);
+ 	if (ARMV6_CYCLE_COUNTER == counter)
+@@ -418,10 +419,11 @@ armv6pmu_read_counter(int counter)
+ 	return value;
+ }
+ 
+-static inline void
+-armv6pmu_write_counter(int counter,
+-		       u32 value)
++static inline void armv6pmu_write_counter(struct perf_event *event, u32 value)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int counter = hwc->idx;
++
+ 	if (ARMV6_CYCLE_COUNTER == counter)
+ 		asm volatile("mcr   p15, 0, %0, c15, c12, 1" : : "r"(value));
+ 	else if (ARMV6_COUNTER0 == counter)
+@@ -432,12 +434,13 @@ armv6pmu_write_counter(int counter,
+ 		WARN_ONCE(1, "invalid counter number (%d)\n", counter);
+ }
+ 
+-static void
+-armv6pmu_enable_event(struct hw_perf_event *hwc,
+-		      int idx)
++static void armv6pmu_enable_event(struct perf_event *event)
+ {
+ 	unsigned long val, mask, evt, flags;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	if (ARMV6_CYCLE_COUNTER == idx) {
+ 		mask	= 0;
+@@ -473,7 +476,8 @@ armv6pmu_handle_irq(int irq_num,
+ {
+ 	unsigned long pmcr = armv6_pmcr_read();
+ 	struct perf_sample_data data;
+-	struct pmu_hw_events *cpuc;
++	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
++	struct pmu_hw_events *cpuc = cpu_pmu->get_hw_events();
+ 	struct pt_regs *regs;
+ 	int idx;
+ 
+@@ -489,7 +493,6 @@ armv6pmu_handle_irq(int irq_num,
+ 	 */
+ 	armv6_pmcr_write(pmcr);
+ 
+-	cpuc = &__get_cpu_var(cpu_hw_events);
+ 	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+@@ -506,13 +509,13 @@ armv6pmu_handle_irq(int irq_num,
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event);
+ 		perf_sample_data_init(&data, 0, hwc->last_period);
+-		if (!armpmu_event_set_period(event, hwc, idx))
++		if (!armpmu_event_set_period(event))
+ 			continue;
+ 
+ 		if (perf_event_overflow(event, &data, regs))
+-			cpu_pmu->disable(hwc, idx);
++			cpu_pmu->disable(event);
+ 	}
+ 
+ 	/*
+@@ -527,8 +530,7 @@ armv6pmu_handle_irq(int irq_num,
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void
+-armv6pmu_start(void)
++static void armv6pmu_start(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags, val;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -540,8 +542,7 @@ armv6pmu_start(void)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void
+-armv6pmu_stop(void)
++static void armv6pmu_stop(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags, val;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -555,10 +556,11 @@ armv6pmu_stop(void)
+ 
+ static int
+ armv6pmu_get_event_idx(struct pmu_hw_events *cpuc,
+-		       struct hw_perf_event *event)
++				struct perf_event *event)
+ {
++	struct hw_perf_event *hwc = &event->hw;
+ 	/* Always place a cycle counter into the cycle counter. */
+-	if (ARMV6_PERFCTR_CPU_CYCLES == event->config_base) {
++	if (ARMV6_PERFCTR_CPU_CYCLES == hwc->config_base) {
+ 		if (test_and_set_bit(ARMV6_CYCLE_COUNTER, cpuc->used_mask))
+ 			return -EAGAIN;
+ 
+@@ -579,12 +581,13 @@ armv6pmu_get_event_idx(struct pmu_hw_events *cpuc,
+ 	}
+ }
+ 
+-static void
+-armv6pmu_disable_event(struct hw_perf_event *hwc,
+-		       int idx)
++static void armv6pmu_disable_event(struct perf_event *event)
+ {
+ 	unsigned long val, mask, evt, flags;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	if (ARMV6_CYCLE_COUNTER == idx) {
+ 		mask	= ARMV6_PMCR_CCOUNT_IEN;
+@@ -613,12 +616,13 @@ armv6pmu_disable_event(struct hw_perf_event *hwc,
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void
+-armv6mpcore_pmu_disable_event(struct hw_perf_event *hwc,
+-			      int idx)
++static void armv6mpcore_pmu_disable_event(struct perf_event *event)
+ {
+ 	unsigned long val, mask, flags, evt = 0;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	if (ARMV6_CYCLE_COUNTER == idx) {
+ 		mask	= ARMV6_PMCR_CCOUNT_IEN;
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index b189403..1183c81 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -840,8 +840,10 @@ static inline int armv7_pmnc_select_counter(int idx)
+ 	return idx;
+ }
+ 
+-static inline u32 armv7pmu_read_counter(int idx)
++static inline u32 armv7pmu_read_counter(struct perf_event *event)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int idx = hwc->idx;
+ 	u32 value = 0;
+ 
+ 	if (!armv7_pmnc_counter_valid(idx))
+@@ -855,8 +857,11 @@ static inline u32 armv7pmu_read_counter(int idx)
+ 	return value;
+ }
+ 
+-static inline void armv7pmu_write_counter(int idx, u32 value)
++static inline void armv7pmu_write_counter(struct perf_event *event, u32 value)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int idx = hwc->idx;
++
+ 	if (!armv7_pmnc_counter_valid(idx))
+ 		pr_err("CPU%u writing wrong counter %d\n",
+ 			smp_processor_id(), idx);
+@@ -991,10 +996,13 @@ static void armv7_pmnc_dump_regs(void)
+ }
+ #endif
+ 
+-static void armv7pmu_enable_event(struct hw_perf_event *hwc, int idx)
++static void armv7pmu_enable_event(struct perf_event *event)
+ {
+ 	unsigned long flags;
++	struct hw_perf_event *hwc = &event->hw;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	/*
+ 	 * Enable counter and interrupt, and set the counter to count
+@@ -1028,10 +1036,13 @@ static void armv7pmu_enable_event(struct hw_perf_event *hwc, int idx)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void armv7pmu_disable_event(struct hw_perf_event *hwc, int idx)
++static void armv7pmu_disable_event(struct perf_event *event)
+ {
+ 	unsigned long flags;
++	struct hw_perf_event *hwc = &event->hw;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	/*
+ 	 * Disable counter and interrupt
+@@ -1055,7 +1066,8 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ {
+ 	u32 pmnc;
+ 	struct perf_sample_data data;
+-	struct pmu_hw_events *cpuc;
++	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
++	struct pmu_hw_events *cpuc = cpu_pmu->get_hw_events();
+ 	struct pt_regs *regs;
+ 	int idx;
+ 
+@@ -1075,7 +1087,6 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 	 */
+ 	regs = get_irq_regs();
+ 
+-	cpuc = &__get_cpu_var(cpu_hw_events);
+ 	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+@@ -1092,13 +1103,13 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event);
+ 		perf_sample_data_init(&data, 0, hwc->last_period);
+-		if (!armpmu_event_set_period(event, hwc, idx))
++		if (!armpmu_event_set_period(event))
+ 			continue;
+ 
+ 		if (perf_event_overflow(event, &data, regs))
+-			cpu_pmu->disable(hwc, idx);
++			cpu_pmu->disable(event);
+ 	}
+ 
+ 	/*
+@@ -1113,7 +1124,7 @@ static irqreturn_t armv7pmu_handle_irq(int irq_num, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void armv7pmu_start(void)
++static void armv7pmu_start(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -1124,7 +1135,7 @@ static void armv7pmu_start(void)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void armv7pmu_stop(void)
++static void armv7pmu_stop(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -1136,10 +1147,12 @@ static void armv7pmu_stop(void)
+ }
+ 
+ static int armv7pmu_get_event_idx(struct pmu_hw_events *cpuc,
+-				  struct hw_perf_event *event)
++				  struct perf_event *event)
+ {
+ 	int idx;
+-	unsigned long evtype = event->config_base & ARMV7_EVTYPE_EVENT;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
++	unsigned long evtype = hwc->config_base & ARMV7_EVTYPE_EVENT;
+ 
+ 	/* Always place a cycle counter into the cycle counter. */
+ 	if (evtype == ARMV7_PERFCTR_CPU_CYCLES) {
+@@ -1190,11 +1203,14 @@ static int armv7pmu_set_event_filter(struct hw_perf_event *event,
+ 
+ static void armv7pmu_reset(void *info)
+ {
++	struct arm_pmu *cpu_pmu = (struct arm_pmu *)info;
+ 	u32 idx, nb_cnt = cpu_pmu->num_events;
+ 
+ 	/* The counter and interrupt enable registers are unknown at reset. */
+-	for (idx = ARMV7_IDX_CYCLE_COUNTER; idx < nb_cnt; ++idx)
+-		armv7pmu_disable_event(NULL, idx);
++	for (idx = ARMV7_IDX_CYCLE_COUNTER; idx < nb_cnt; ++idx) {
++		armv7_pmnc_disable_counter(idx);
++		armv7_pmnc_disable_intens(idx);
++	}
+ 
+ 	/* Initialize & Reset PMNC: C and P bits */
+ 	armv7_pmnc_write(ARMV7_PMNC_P | ARMV7_PMNC_C);
+diff --git a/arch/arm/kernel/perf_event_xscale.c b/arch/arm/kernel/perf_event_xscale.c
+index 131ede6..0c8265e 100644
+--- a/arch/arm/kernel/perf_event_xscale.c
++++ b/arch/arm/kernel/perf_event_xscale.c
+@@ -224,7 +224,8 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ {
+ 	unsigned long pmnc;
+ 	struct perf_sample_data data;
+-	struct pmu_hw_events *cpuc;
++	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
++	struct pmu_hw_events *cpuc = cpu_pmu->get_hw_events();
+ 	struct pt_regs *regs;
+ 	int idx;
+ 
+@@ -248,7 +249,6 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 
+ 	regs = get_irq_regs();
+ 
+-	cpuc = &__get_cpu_var(cpu_hw_events);
+ 	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+@@ -260,13 +260,13 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event);
+ 		perf_sample_data_init(&data, 0, hwc->last_period);
+-		if (!armpmu_event_set_period(event, hwc, idx))
++		if (!armpmu_event_set_period(event))
+ 			continue;
+ 
+ 		if (perf_event_overflow(event, &data, regs))
+-			cpu_pmu->disable(hwc, idx);
++			cpu_pmu->disable(event);
+ 	}
+ 
+ 	irq_work_run();
+@@ -280,11 +280,13 @@ xscale1pmu_handle_irq(int irq_num, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void
+-xscale1pmu_enable_event(struct hw_perf_event *hwc, int idx)
++static void xscale1pmu_enable_event(struct perf_event *event)
+ {
+ 	unsigned long val, mask, evt, flags;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	switch (idx) {
+ 	case XSCALE_CYCLE_COUNTER:
+@@ -314,11 +316,13 @@ xscale1pmu_enable_event(struct hw_perf_event *hwc, int idx)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void
+-xscale1pmu_disable_event(struct hw_perf_event *hwc, int idx)
++static void xscale1pmu_disable_event(struct perf_event *event)
+ {
+ 	unsigned long val, mask, evt, flags;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	switch (idx) {
+ 	case XSCALE_CYCLE_COUNTER:
+@@ -348,9 +352,10 @@ xscale1pmu_disable_event(struct hw_perf_event *hwc, int idx)
+ 
+ static int
+ xscale1pmu_get_event_idx(struct pmu_hw_events *cpuc,
+-			struct hw_perf_event *event)
++				struct perf_event *event)
+ {
+-	if (XSCALE_PERFCTR_CCNT == event->config_base) {
++	struct hw_perf_event *hwc = &event->hw;
++	if (XSCALE_PERFCTR_CCNT == hwc->config_base) {
+ 		if (test_and_set_bit(XSCALE_CYCLE_COUNTER, cpuc->used_mask))
+ 			return -EAGAIN;
+ 
+@@ -366,8 +371,7 @@ xscale1pmu_get_event_idx(struct pmu_hw_events *cpuc,
+ 	}
+ }
+ 
+-static void
+-xscale1pmu_start(void)
++static void xscale1pmu_start(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags, val;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -379,8 +383,7 @@ xscale1pmu_start(void)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void
+-xscale1pmu_stop(void)
++static void xscale1pmu_stop(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags, val;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -392,9 +395,10 @@ xscale1pmu_stop(void)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static inline u32
+-xscale1pmu_read_counter(int counter)
++static inline u32 xscale1pmu_read_counter(struct perf_event *event)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int counter = hwc->idx;
+ 	u32 val = 0;
+ 
+ 	switch (counter) {
+@@ -412,9 +416,11 @@ xscale1pmu_read_counter(int counter)
+ 	return val;
+ }
+ 
+-static inline void
+-xscale1pmu_write_counter(int counter, u32 val)
++static inline void xscale1pmu_write_counter(struct perf_event *event, u32 val)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int counter = hwc->idx;
++
+ 	switch (counter) {
+ 	case XSCALE_CYCLE_COUNTER:
+ 		asm volatile("mcr p14, 0, %0, c1, c0, 0" : : "r" (val));
+@@ -565,7 +571,8 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ {
+ 	unsigned long pmnc, of_flags;
+ 	struct perf_sample_data data;
+-	struct pmu_hw_events *cpuc;
++	struct arm_pmu *cpu_pmu = (struct arm_pmu *)dev;
++	struct pmu_hw_events *cpuc = cpu_pmu->get_hw_events();
+ 	struct pt_regs *regs;
+ 	int idx;
+ 
+@@ -583,7 +590,6 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 
+ 	regs = get_irq_regs();
+ 
+-	cpuc = &__get_cpu_var(cpu_hw_events);
+ 	for (idx = 0; idx < cpu_pmu->num_events; ++idx) {
+ 		struct perf_event *event = cpuc->events[idx];
+ 		struct hw_perf_event *hwc;
+@@ -595,13 +601,13 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 			continue;
+ 
+ 		hwc = &event->hw;
+-		armpmu_event_update(event, hwc, idx);
++		armpmu_event_update(event);
+ 		perf_sample_data_init(&data, 0, hwc->last_period);
+-		if (!armpmu_event_set_period(event, hwc, idx))
++		if (!armpmu_event_set_period(event))
+ 			continue;
+ 
+ 		if (perf_event_overflow(event, &data, regs))
+-			cpu_pmu->disable(hwc, idx);
++			cpu_pmu->disable(event);
+ 	}
+ 
+ 	irq_work_run();
+@@ -615,11 +621,13 @@ xscale2pmu_handle_irq(int irq_num, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void
+-xscale2pmu_enable_event(struct hw_perf_event *hwc, int idx)
++static void xscale2pmu_enable_event(struct perf_event *event)
+ {
+ 	unsigned long flags, ien, evtsel;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	ien = xscale2pmu_read_int_enable();
+ 	evtsel = xscale2pmu_read_event_select();
+@@ -659,11 +667,13 @@ xscale2pmu_enable_event(struct hw_perf_event *hwc, int idx)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void
+-xscale2pmu_disable_event(struct hw_perf_event *hwc, int idx)
++static void xscale2pmu_disable_event(struct perf_event *event)
+ {
+ 	unsigned long flags, ien, evtsel, of_flags;
++	struct arm_pmu *cpu_pmu = to_arm_pmu(event->pmu);
++	struct hw_perf_event *hwc = &event->hw;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
++	int idx = hwc->idx;
+ 
+ 	ien = xscale2pmu_read_int_enable();
+ 	evtsel = xscale2pmu_read_event_select();
+@@ -711,7 +721,7 @@ xscale2pmu_disable_event(struct hw_perf_event *hwc, int idx)
+ 
+ static int
+ xscale2pmu_get_event_idx(struct pmu_hw_events *cpuc,
+-			struct hw_perf_event *event)
++				struct perf_event *event)
+ {
+ 	int idx = xscale1pmu_get_event_idx(cpuc, event);
+ 	if (idx >= 0)
+@@ -725,8 +735,7 @@ out:
+ 	return idx;
+ }
+ 
+-static void
+-xscale2pmu_start(void)
++static void xscale2pmu_start(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags, val;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -738,8 +747,7 @@ xscale2pmu_start(void)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static void
+-xscale2pmu_stop(void)
++static void xscale2pmu_stop(struct arm_pmu *cpu_pmu)
+ {
+ 	unsigned long flags, val;
+ 	struct pmu_hw_events *events = cpu_pmu->get_hw_events();
+@@ -751,9 +759,10 @@ xscale2pmu_stop(void)
+ 	raw_spin_unlock_irqrestore(&events->pmu_lock, flags);
+ }
+ 
+-static inline u32
+-xscale2pmu_read_counter(int counter)
++static inline u32 xscale2pmu_read_counter(struct perf_event *event)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int counter = hwc->idx;
+ 	u32 val = 0;
+ 
+ 	switch (counter) {
+@@ -777,9 +786,11 @@ xscale2pmu_read_counter(int counter)
+ 	return val;
+ }
+ 
+-static inline void
+-xscale2pmu_write_counter(int counter, u32 val)
++static inline void xscale2pmu_write_counter(struct perf_event *event, u32 val)
+ {
++	struct hw_perf_event *hwc = &event->hw;
++	int counter = hwc->idx;
++
+ 	switch (counter) {
+ 	case XSCALE_CYCLE_COUNTER:
+ 		asm volatile("mcr p14, 0, %0, c1, c1, 0" : : "r" (val));
 -- 
-1.7.12
+1.7.4.1
