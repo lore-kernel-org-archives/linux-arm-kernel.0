@@ -1,35 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 17 Oct 2012 19:22:46 +0200
-Subject: [PATCH] ARM: U300: bump IRQs to offset 32
-In-Reply-To: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
-References: <1350491679-32685-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdbvYGb8b_4Lg-cXm5o+iXQZOQ48ffyW6vhkiPtgL6Vt1w@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Wed, 17 Oct 2012 19:02:11 +0200
+Subject: [PATCH 2/9] uprobes: check for single step support
+In-Reply-To: <20121017164059.GF11096@linux.vnet.ibm.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-2-git-send-email-rabin@rab.in>
+ <20121017164059.GF11096@linux.vnet.ibm.com>
+Message-ID: <20121017170211.GA10864@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 6:34 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
+On 10/17, Srikar Dronamraju wrote:
+>
+> * Rabin Vincent <rabin@rab.in> [2012-10-14 21:23:06]:
+>
+> >  void __weak arch_uprobe_enable_step(struct arch_uprobe *arch)
+> >  {
+> > -	user_enable_single_step(current);
+> > +	if (arch_has_single_step())
+> > +		user_enable_single_step(current);
+> >  }
+> >
+> >  void __weak arch_uprobe_disable_step(struct arch_uprobe *arch)
+>
+> This change is fine. But I am wondering if should have a dummy
+> arch_uprobe_enable_step / arch_uprobe_disable_step in uprobes ARM.
 
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> The U300 IRQs were bumped once to offset to 1 (in order to avoid
-> using IRQ 0 which is now NO_IRQ). This was OK as we were still
-> passing the number of irqs in the .nr_irqs field of the machine,
-> with descriptors allocated at boot time.
->
-> However .nr_irqs should be 0, leading the system to reserve the
-> first 16 IRQs. Then the VIC driver will complain that IRQs 1
-> thru 15 are pre-allocated, so to avoid this and use free
-> descriptors, move all IRQs up to offset 32.
->
-> This will all be done away with as we migrate to device tree,
-> so it is an interim solution.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Or, better, we can kill it. We wertr going to do this anyway, we were
+waiting for powerpc port.
 
-Oooups, requsting an ACK from the ARM SoC maintainers to
-take this in through the pinctrl tree. Later patches also touch this
-file so to avoid unnecessary conflicts it's better to bring it in there.
+Just I do not know how this change should be routed, it should update
+both x86/powerpc.
 
-Yours,
-Linus Walleij
+Or do you think arch_uprobe_enable_step() still makes any sense?
+
+Oleg.
