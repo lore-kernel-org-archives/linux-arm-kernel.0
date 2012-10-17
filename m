@@ -1,53 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Oct 2012 16:31:38 +0100
-Subject: [PATCH 4/7] ARM: hw_breakpoint: don't try to clear v6 debug registers
- during boot
+Date: Wed, 17 Oct 2012 16:31:35 +0100
+Subject: [PATCH 1/7] ARM: hw_breakpoint: only clear OS lock when implemented
+ on v7
 In-Reply-To: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
 References: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1350487901-3108-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1350487901-3108-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v6 cores do not provide a way to clear the debug registers without first
-enabling monitor mode, meaning that we could take spurious debug
-exceptions. Instead, rely on the registers being in a sane state when we
-boot as they are defined to be disabled out of reset anyway.
+The OS save and restore register are optional in debug architecture v7,
+so check the status register before attempting to clear the OS lock.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |   10 +++++++++-
+ 1 files changed, 9 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index e76cf1a..b6f4aec 100644
+index 281bf33..ec16ada 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -912,8 +912,8 @@ static void reset_ctrl_regs(void *unused)
- 	switch (debug_arch) {
- 	case ARM_DEBUG_ARCH_V6:
- 	case ARM_DEBUG_ARCH_V6_1:
--		/* ARMv6 cores just need to reset the registers. */
--		goto reset_regs;
-+		/* ARMv6 cores clear the registers out of reset. */
-+		goto out_mdbgen;
- 	case ARM_DEBUG_ARCH_V7_ECP14:
+@@ -929,6 +929,13 @@ static void reset_ctrl_regs(void *unused)
+ 		asm volatile("mrc p14, 0, %0, c1, c5, 4" : "=r" (dbg_power));
+ 		if ((dbg_power & 0x1) == 0)
+ 			err = -EPERM;
++
++		/*
++		 * Check whether we implement OS save and restore.
++		 */
++		asm volatile("mrc p14, 0, %0, c1, c1, 4" : "=r" (dbg_power));
++		if ((dbg_power & 0x9) == 0)
++			goto clear_vcr;
+ 		break;
+ 	case ARM_DEBUG_ARCH_V7_1:
  		/*
- 		 * Ensure sticky power-down is clear (i.e. debug logic is
-@@ -966,7 +966,6 @@ clear_vcr:
- 		return;
+@@ -947,7 +954,7 @@ static void reset_ctrl_regs(void *unused)
  	}
  
--reset_regs:
  	/*
- 	 * The control/value register pairs are UNKNOWN out of reset so
- 	 * clear them to avoid spurious debug events.
-@@ -991,6 +990,7 @@ reset_regs:
- 	 * Have a crack at enabling monitor mode. We don't actually need
- 	 * it yet, but reporting an error early is useful if it fails.
+-	 * Unconditionally clear the lock by writing a value
++	 * Unconditionally clear the OS lock by writing a value
+ 	 * other than 0xC5ACCE55 to the access register.
  	 */
-+out_mdbgen:
- 	if (enable_monitor_mode())
- 		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
- }
+ 	asm volatile("mcr p14, 0, %0, c1, c0, 4" : : "r" (0));
+@@ -957,6 +964,7 @@ static void reset_ctrl_regs(void *unused)
+ 	 * Clear any configured vector-catch events before
+ 	 * enabling monitor mode.
+ 	 */
++clear_vcr:
+ 	asm volatile("mcr p14, 0, %0, c0, c7, 0" : : "r" (0));
+ 	isb();
+ 
 -- 
 1.7.4.1
