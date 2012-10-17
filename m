@@ -1,33 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:36:23 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7
-Message-ID: <1350448585-26403-1-git-send-email-horms@verge.net.au>
+Date: Wed, 17 Oct 2012 13:36:24 +0900
+Subject: [PATCH 1/2] ARM: shmobile: armadillo800eva: __io abuse cleanup
+In-Reply-To: <1350448585-26403-1-git-send-email-horms@verge.net.au>
+References: <1350448585-26403-1-git-send-email-horms@verge.net.au>
+Message-ID: <1350448585-26403-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider the following fix for the KZM-A9-GT board for 3.6.
-They both resolve fallout from recent IOMEM() changes.
+a2a47ca36642e3995e982957bc42678cf11ca6ac
+(ARM: __io abuse cleanup) cleanuped __io() -> IOMEM(),
+but armadillo800eva was a outside of a target,
+since "merge window" timing issue.
+This patch cleanup it.
 
-----------------------------------------------------------------
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
-
-for you to fetch changes up to 11f93576b0b50bf391ffafa544b85e541f5e59a5:
-
-  ARM: shmobile: r8a7779: use __iomem pointers for MMIO (2012-10-16 08:58:56 +0900)
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: armadillo800eva: __io abuse cleanup
-      ARM: shmobile: r8a7779: use __iomem pointers for MMIO
-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
  arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +-
- arch/arm/mach-shmobile/clock-r8a7779.c         |   22 +++++++++++-----------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 2912eab..3cc8b1c 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1196,7 +1196,7 @@ static void __init eva_init(void)
+ 
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Early BRESP enable, Shared attribute override enable, 32K*8way */
+-	l2x0_init(__io(0xf0002000), 0x40440000, 0x82000fff);
++	l2x0_init(IOMEM(0xf0002000), 0x40440000, 0x82000fff);
+ #endif
+ 
+ 	i2c_register_board_info(0, i2c0_devices, ARRAY_SIZE(i2c0_devices));
+-- 
+1.7.10.4
