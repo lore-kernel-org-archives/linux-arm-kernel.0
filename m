@@ -1,88 +1,107 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 17 Oct 2012 14:31:32 +0200
-Subject: [PATCH RFC 00/15 v5] gpio: Add block GPIO
-Message-ID: <1350477107-26512-1-git-send-email-stigge@antcom.de>
+Date: Wed, 17 Oct 2012 14:31:37 +0200
+Subject: [PATCH RFC 05/15 v5] gpio-max730x: Add block GPIO API
+In-Reply-To: <1350477107-26512-1-git-send-email-stigge@antcom.de>
+References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
+Message-ID: <1350477107-26512-6-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches adds:
+This patch adds block GPIO API support to the MAX730x driver.
 
-* Block GPIO API to gpiolib
-* Sysfs support for GPIO API, to provide userland access
-* Devicetree support to instantiate GPIO blocks via DT
-* Example implementations in several gpio drivers since they need
-  special accessor functions for block wise GPIO access
-* Fix for race condition in gpiolib on device creation
+Due to hardware constraints in this chip, simultaneous access to GPIO lines can
+only be done in groups of 8: GPIOs 0-7, 8-15, 16-23, 24-27. However, setting
+and clearing will be done at once.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
---
 
-Changes since v4:
-* Documented word width
-* Bugfix: export/unexport on register/unregister
-* Using default dev_attrs for gpio_block_class
-* Fix gpiolib: race condition on device creation
-* Added driver support for ucb14500, vt8500, xilinx
+---
+ drivers/gpio/gpio-max730x.c |   61 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-Changes since v3:
-* Added driver support for pca953x, em, pl061, max732x, pcf857x
-* Coding style improvements
-* Fixed krealloc memory leak in error case
-* sysfs: values in hex
-* Register blocks in a list
-* Narrowing lock scope
-* Use S_IWUSR and S_IRUGO instead of direct octal values
-* Use for_each_set_bit()
-* Change from unsigned to unsigned long for masks and values
-
-Changes since v2:
-* Added sysfs support
-* Added devicetree support
-* Added support for lpc32xx, generic
-* Added functions for GPIO block registration
-* Added more error checking
-* Bit remapping bugfix
-
-Changes since v1:
-* API change to 32/64 bit word, bit masks
-
-Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
-Plagniol-Villard, Mark Brown and Greg Kroah-Hartman for reviewing!
-
-Roland Stigge (15):
- gpio: Add a block GPIO API to gpiolib
- gpio: Add sysfs support to block GPIO API
- gpiolib: Fix default attributes for class
- gpio: Add device tree support to block GPIO API
- gpio-max730x: Add block GPIO API
- gpio-lpc32xx: Add block GPIO API
- gpio-generic: Add block GPIO API
- gpio-pca953x: Add block GPIO API
- gpio-em: Add block GPIO API
- gpio-pl061: Add block GPIO API
- gpio-max732x: Add block GPIO API
- gpio-pcf857x: Add block GPIO API
- gpio-xilinx: Add block GPIO API
- gpio-vt8500: Add block GPIO API
- gpio-ucb1400: Add block GPIO API
-
- Documentation/ABI/testing/sysfs-gpio                  |    6 
- Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +
- Documentation/gpio.txt                                |   47 +
- drivers/gpio/Makefile                                 |    1 
- drivers/gpio/gpio-em.c                                |   23 
- drivers/gpio/gpio-generic.c                           |   56 +
- drivers/gpio/gpio-lpc32xx.c                           |   82 ++
- drivers/gpio/gpio-max730x.c                           |   61 ++
- drivers/gpio/gpio-max732x.c                           |   59 ++
- drivers/gpio/gpio-pca953x.c                           |   64 ++
- drivers/gpio/gpio-pcf857x.c                           |   24 
- drivers/gpio/gpio-pl061.c                             |   17 
- drivers/gpio/gpio-ucb1400.c                           |   23 
- drivers/gpio/gpio-vt8500.c                            |   24 
- drivers/gpio/gpio-xilinx.c                            |   44 +
- drivers/gpio/gpioblock-of.c                           |   84 ++
- drivers/gpio/gpiolib.c                                |  510 ++++++++++++++++--
- include/asm-generic/gpio.h                            |   26 
- include/linux/gpio.h                                  |   87 +++
- 19 files changed, 1228 insertions(+), 46 deletions(-)
+--- linux-2.6.orig/drivers/gpio/gpio-max730x.c
++++ linux-2.6/drivers/gpio/gpio-max730x.c
+@@ -146,6 +146,44 @@ static int max7301_get(struct gpio_chip
+ 	return level;
+ }
+ 
++static unsigned long max7301_get_block(struct gpio_chip *chip,
++				       unsigned long mask)
++{
++	struct max7301 *ts = container_of(chip, struct max7301, chip);
++	int i, j;
++	unsigned long result = 0;
++
++	for (i = 0; i < 4; i++) {
++		if ((mask >> (i * 8)) & 0xFF) { /* i/o only if necessary */
++			u8 in_level = ts->read(ts->dev, 0x44 + i * 8);
++			u8 in_mask = 0;
++			u8 out_level = (ts->out_level >> (i * 8 + 4)) & 0xFF;
++			u8 out_mask = 0;
++
++			for (j = 0; j < 8; j++) {
++				int offset = 4 + i * 8 + j;
++				int config = (ts->port_config[offset >> 2] >>
++					      ((offset & 3) << 1)) &
++					PIN_CONFIG_MASK;
++
++				switch (config) {
++				case PIN_CONFIG_OUT:
++					out_mask |= BIT(j);
++					break;
++				case PIN_CONFIG_IN_WO_PULLUP:
++				case PIN_CONFIG_IN_PULLUP:
++					in_mask |= BIT(j);
++				}
++			}
++
++			result |= ((unsigned long)(in_level & in_mask) |
++				   (out_level & out_mask)) << (i * 8);
++		}
++	}
++
++	return result & mask;
++}
++
+ static void max7301_set(struct gpio_chip *chip, unsigned offset, int value)
+ {
+ 	struct max7301 *ts = container_of(chip, struct max7301, chip);
+@@ -160,6 +198,27 @@ static void max7301_set(struct gpio_chip
+ 	mutex_unlock(&ts->lock);
+ }
+ 
++static void max7301_set_block(struct gpio_chip *chip, unsigned long mask,
++			      unsigned long values)
++{
++	struct max7301 *ts = container_of(chip, struct max7301, chip);
++	unsigned long changes;
++	int i;
++
++	mutex_lock(&ts->lock);
++
++	changes = (ts->out_level ^ (values << 4)) & (mask << 4);
++	ts->out_level ^= changes;
++
++	for (i = 0; i < 4; i++) {
++		if ((changes >> (i * 8 + 4)) & 0xFF) /* i/o only on change */
++			ts->write(ts->dev, 0x44 + i * 8,
++				  (ts->out_level >> (i * 8 + 4)) & 0xFF);
++	}
++
++	mutex_unlock(&ts->lock);
++}
++
+ int __devinit __max730x_probe(struct max7301 *ts)
+ {
+ 	struct device *dev = ts->dev;
+@@ -183,8 +242,10 @@ int __devinit __max730x_probe(struct max
+ 
+ 	ts->chip.direction_input = max7301_direction_input;
+ 	ts->chip.get = max7301_get;
++	ts->chip.get_block = max7301_get_block;
+ 	ts->chip.direction_output = max7301_direction_output;
+ 	ts->chip.set = max7301_set;
++	ts->chip.set_block = max7301_set_block;
+ 
+ 	ts->chip.base = pdata->base;
+ 	ts->chip.ngpio = PIN_NUMBER;
