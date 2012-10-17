@@ -1,54 +1,68 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:39:14 +0900
-Subject: [PATCH 03/10] ARM: shmobile: kzm9g: enable three-axis digital
- accelerometer ADXL345
+Date: Wed, 17 Oct 2012 13:39:12 +0900
+Subject: [PATCH 01/10] ARM: shmobile: r8a7740: Enable PMU
 In-Reply-To: <1350448761-27346-1-git-send-email-horms@verge.net.au>
 References: <1350448761-27346-1-git-send-email-horms@verge.net.au>
-Message-ID: <1350448761-27346-4-git-send-email-horms@verge.net.au>
+Message-ID: <1350448761-27346-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
-This patch enables three-axis digital accelerometer ADXL345.
-Test:
-  sudo cat /dev/input/event2
-then tip up the board. You get something from /dev/input/event2.
+This patch enables PMU for r8a7740.
 
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/kzm9g_defconfig     |    2 ++
- arch/arm/mach-shmobile/board-kzm9g.c |    4 ++++
- 2 files changed, 6 insertions(+)
+ arch/arm/configs/armadillo800eva_defconfig |    1 +
+ arch/arm/mach-shmobile/setup-r8a7740.c     |   16 ++++++++++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index 1404b04..ce99e3e 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -74,6 +74,8 @@ CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ST1232=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_ADXL34X=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=9
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index a37da78..1a46422 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -562,6 +562,10 @@ static struct i2c_board_info i2c0_devices[] = {
- 		I2C_BOARD_INFO("ak8975", 0x0c),
- 		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
- 	},
-+	{
-+		I2C_BOARD_INFO("adxl34x", 0x1d),
-+		.irq = intcs_evt2irq(0x3340), /* IRQ26 */
-+	},
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index f78d259..3d76407 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -7,6 +7,7 @@ CONFIG_LOG_BUF_SHIFT=16
+ # CONFIG_IPC_NS is not set
+ # CONFIG_PID_NS is not set
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 11bb1d9..1e032cb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -590,6 +590,21 @@ static struct platform_device i2c1_device = {
+ 	.num_resources	= ARRAY_SIZE(i2c1_resources),
  };
  
- static struct i2c_board_info i2c1_devices[] = {
++static struct resource pmu_resources[] = {
++	[0] = {
++		.start	= evt2irq(0x19a0),
++		.end	= evt2irq(0x19a0),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device pmu_device = {
++	.name	= "arm-pmu",
++	.id		= -1,
++	.num_resources = ARRAY_SIZE(pmu_resources),
++	.resource = pmu_resources,
++};
++
+ static struct platform_device *r8a7740_late_devices[] __initdata = {
+ 	&i2c0_device,
+ 	&i2c1_device,
+@@ -597,6 +612,7 @@ static struct platform_device *r8a7740_late_devices[] __initdata = {
+ 	&dma1_device,
+ 	&dma2_device,
+ 	&usb_dma_device,
++	&pmu_device,
+ };
+ 
+ /*
 -- 
 1.7.10.4
