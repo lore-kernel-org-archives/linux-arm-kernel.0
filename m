@@ -1,235 +1,95 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 17 Oct 2012 19:19:38 +0200
-Subject: [PATCH 1/3] pinctrl/coh901: use irqdomain, allocate irqdescs
-Message-ID: <1350494378-16023-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 17 Oct 2012 19:19:51 +0200
+Subject: [PATCH 3/3] pinctrl/u300: use managed resources
+Message-ID: <1350494391-16093-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This switches the COH 901 pinctrl driver to allocate its GPIO
-IRQs dynamically, and start to use a linear irqdomain to map
-from the hardware IRQs.
-
-This way we can cut away the complex allocation of IRQ numbers
-from the <mach/irqs.h> file.
+This converts the U300 pin controller to use managed resources
+(devm_*) for it's memory region.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-u300/core.c                    |  1 -
- arch/arm/mach-u300/include/mach/irqs.h       | 10 -----
- drivers/pinctrl/pinctrl-coh901.c             | 60 +++++++++++++++++++++-------
- include/linux/platform_data/pinctrl-coh901.h |  2 -
- 4 files changed, 46 insertions(+), 27 deletions(-)
+ drivers/pinctrl/pinctrl-u300.c | 32 ++++----------------------------
+ 1 file changed, 4 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 603c08e..ce2de0d 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -1445,7 +1445,6 @@ static struct platform_device pinctrl_device = {
- static struct u300_gpio_platform u300_gpio_plat = {
- 	.ports = 7,
- 	.gpio_base = 0,
--	.gpio_irq_base = IRQ_U300_GPIO_BASE,
- 	.pinctrl_device = &pinctrl_device,
- };
- 
-diff --git a/arch/arm/mach-u300/include/mach/irqs.h b/arch/arm/mach-u300/include/mach/irqs.h
-index e85ec38..21d5e76 100644
---- a/arch/arm/mach-u300/include/mach/irqs.h
-+++ b/arch/arm/mach-u300/include/mach/irqs.h
-@@ -77,14 +77,4 @@
- #define IRQ_U300_GPIO_PORT6		87
- #define U300_VIC_IRQS_END		88
- 
--/* Maximum 8*7 GPIO lines */
--#ifdef CONFIG_PINCTRL_COH901
--#define IRQ_U300_GPIO_BASE		(U300_VIC_IRQS_END)
--#define IRQ_U300_GPIO_END		(IRQ_U300_GPIO_BASE + 56)
--#else
--#define IRQ_U300_GPIO_END		(U300_VIC_IRQS_END)
--#endif
--
--#define NR_IRQS_U300			(IRQ_U300_GPIO_END - IRQ_U300_INTCON0_START)
--
- #endif
-diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-index b446c96..152efae 100644
---- a/drivers/pinctrl/pinctrl-coh901.c
-+++ b/drivers/pinctrl/pinctrl-coh901.c
-@@ -13,6 +13,7 @@
- #include <linux/delay.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#include <linux/irqdomain.h>
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-@@ -67,7 +68,6 @@ struct u300_gpio {
- 	struct resource *memres;
- 	void __iomem *base;
+diff --git a/drivers/pinctrl/pinctrl-u300.c b/drivers/pinctrl/pinctrl-u300.c
+index 309f5b9..2e9825e 100644
+--- a/drivers/pinctrl/pinctrl-u300.c
++++ b/drivers/pinctrl/pinctrl-u300.c
+@@ -663,8 +663,6 @@ static const struct pinctrl_pin_desc u300_pads[] = {
+ struct u300_pmx {
  	struct device *dev;
--	int irq_base;
- 	u32 stride;
- 	/* Register offsets */
- 	u32 pcr;
-@@ -83,6 +83,7 @@ struct u300_gpio_port {
- 	struct list_head node;
- 	struct u300_gpio *gpio;
- 	char name[8];
-+	struct irq_domain *domain;
- 	int irq;
- 	int number;
- 	u8 toggle_edge_mode;
-@@ -314,10 +315,30 @@ static int u300_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
- static int u300_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- {
- 	struct u300_gpio *gpio = to_u300_gpio(chip);
--	int retirq = gpio->irq_base + offset;
-+	int portno = offset >> 3;
-+	struct u300_gpio_port *port = NULL;
-+	struct list_head *p;
-+	int retirq;
- 
--	dev_dbg(gpio->dev, "request IRQ for GPIO %d, return %d\n", offset,
--		retirq);
-+	list_for_each(p, &gpio->port_list) {
-+		port = list_entry(p, struct u300_gpio_port, node);
-+		if (port->number == portno)
-+			break;
-+	}
-+	if (port == NULL) {
-+		dev_err(gpio->dev, "could not locate port for GPIO %d IRQ\n",
-+			offset);
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * The local hwirqs on the port are the lower three bits, there
-+	 * are exactly 8 IRQs per port since they are 8-bit
-+	 */
-+	retirq = irq_find_mapping(port->domain, (offset & 0x7));
-+
-+	dev_dbg(gpio->dev, "request IRQ for GPIO %d, return %d from port %d\n",
-+		offset, retirq, port->number);
- 	return retirq;
- }
- 
-@@ -467,7 +488,7 @@ static int u300_gpio_irq_type(struct irq_data *d, unsigned trigger)
- {
- 	struct u300_gpio_port *port = irq_data_get_irq_chip_data(d);
- 	struct u300_gpio *gpio = port->gpio;
--	int offset = d->irq - gpio->irq_base;
-+	int offset = (port->number << 3) + d->hwirq;
- 	u32 val;
- 
- 	if ((trigger & IRQF_TRIGGER_RISING) &&
-@@ -503,10 +524,12 @@ static void u300_gpio_irq_enable(struct irq_data *d)
- {
- 	struct u300_gpio_port *port = irq_data_get_irq_chip_data(d);
- 	struct u300_gpio *gpio = port->gpio;
--	int offset = d->irq - gpio->irq_base;
-+	int offset = (port->number << 3) + d->hwirq;
- 	u32 val;
- 	unsigned long flags;
- 
-+	dev_dbg(gpio->dev, "enable IRQ for hwirq %lu on port %s, offset %d\n",
-+		 d->hwirq, port->name, offset);
- 	local_irq_save(flags);
- 	val = readl(U300_PIN_REG(offset, ien));
- 	writel(val | U300_PIN_BIT(offset), U300_PIN_REG(offset, ien));
-@@ -517,7 +540,7 @@ static void u300_gpio_irq_disable(struct irq_data *d)
- {
- 	struct u300_gpio_port *port = irq_data_get_irq_chip_data(d);
- 	struct u300_gpio *gpio = port->gpio;
--	int offset = d->irq - gpio->irq_base;
-+	int offset = (port->number << 3) + d->hwirq;
- 	u32 val;
- 	unsigned long flags;
- 
-@@ -555,8 +578,7 @@ static void u300_gpio_irq_handler(unsigned irq, struct irq_desc *desc)
- 		int irqoffset;
- 
- 		for_each_set_bit(irqoffset, &val, U300_GPIO_PINS_PER_PORT) {
--			int pin_irq = gpio->irq_base + (port->number << 3)
--				+ irqoffset;
-+			int pin_irq = irq_find_mapping(port->domain, irqoffset);
- 			int offset = pinoffset + irqoffset;
- 
- 			dev_dbg(gpio->dev, "GPIO IRQ %d on pin %d\n",
-@@ -631,6 +653,8 @@ static inline void u300_gpio_free_ports(struct u300_gpio *gpio)
- 	list_for_each_safe(p, n, &gpio->port_list) {
- 		port = list_entry(p, struct u300_gpio_port, node);
- 		list_del(&port->node);
-+		if (port->domain)
-+			irq_domain_remove(port->domain);
- 		kfree(port);
- 	}
- }
-@@ -653,7 +677,6 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 
- 	gpio->chip = u300_gpio_chip;
- 	gpio->chip.ngpio = plat->ports * U300_GPIO_PINS_PER_PORT;
--	gpio->irq_base = plat->gpio_irq_base;
- 	gpio->chip.dev = &pdev->dev;
- 	gpio->chip.base = plat->gpio_base;
- 	gpio->dev = &pdev->dev;
-@@ -732,18 +755,26 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 		port->irq = platform_get_irq_byname(pdev,
- 						    port->name);
- 
--		dev_dbg(gpio->dev, "register IRQ %d for %s\n", port->irq,
-+		dev_dbg(gpio->dev, "register IRQ %d for port %s\n", port->irq,
- 			port->name);
- 
-+		port->domain = irq_domain_add_linear(pdev->dev.of_node,
-+						     U300_GPIO_PINS_PER_PORT,
-+						     &irq_domain_simple_ops,
-+						     port);
-+		if (!port->domain)
-+			goto err_no_domain;
-+
- 		irq_set_chained_handler(port->irq, u300_gpio_irq_handler);
- 		irq_set_handler_data(port->irq, port);
- 
- 		/* For each GPIO pin set the unique IRQ handler */
- 		for (i = 0; i < U300_GPIO_PINS_PER_PORT; i++) {
--			int irqno = gpio->irq_base + (portno << 3) + i;
-+			int irqno = irq_create_mapping(port->domain, i);
- 
--			dev_dbg(gpio->dev, "handler for IRQ %d on %s\n",
--				irqno, port->name);
-+			dev_dbg(gpio->dev, "GPIO%d on port %s gets IRQ %d\n",
-+				gpio->chip.base + (port->number << 3) + i,
-+				port->name, irqno);
- 			irq_set_chip_and_handler(irqno, &u300_gpio_irqchip,
- 						 handle_simple_irq);
- 			set_irq_flags(irqno, IRQF_VALID);
-@@ -776,6 +807,7 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- err_no_pinctrl:
- 	err = gpiochip_remove(&gpio->chip);
- err_no_chip:
-+err_no_domain:
- err_no_port:
- 	u300_gpio_free_ports(gpio);
- 	iounmap(gpio->base);
-diff --git a/include/linux/platform_data/pinctrl-coh901.h b/include/linux/platform_data/pinctrl-coh901.h
-index 30dea25..27a23b3 100644
---- a/include/linux/platform_data/pinctrl-coh901.h
-+++ b/include/linux/platform_data/pinctrl-coh901.h
-@@ -13,13 +13,11 @@
-  * struct u300_gpio_platform - U300 GPIO platform data
-  * @ports: number of GPIO block ports
-  * @gpio_base: first GPIO number for this block (use a free range)
-- * @gpio_irq_base: first GPIO IRQ number for this block (use a free range)
-  * @pinctrl_device: pin control device to spawn as child
-  */
- struct u300_gpio_platform {
- 	u8 ports;
- 	int gpio_base;
--	int gpio_irq_base;
- 	struct platform_device *pinctrl_device;
+ 	struct pinctrl_dev *pctl;
+-	u32 phybase;
+-	u32 physize;
+ 	void __iomem *virtbase;
  };
  
+@@ -1110,7 +1108,6 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
+ 	struct u300_pmx *upmx;
+ 	struct resource *res;
+ 	struct gpio_chip *gpio_chip = dev_get_platdata(&pdev->dev);
+-	int ret;
+ 	int i;
+ 
+ 	/* Create state holders etc for this driver */
+@@ -1123,26 +1120,15 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res)
+ 		return -ENOENT;
+-	upmx->phybase = res->start;
+-	upmx->physize = resource_size(res);
+-
+-	if (request_mem_region(upmx->phybase, upmx->physize,
+-			       DRIVER_NAME) == NULL) {
+-		ret = -ENOMEM;
+-		goto out_no_memregion;
+-	}
+ 
+-	upmx->virtbase = ioremap(upmx->phybase, upmx->physize);
+-	if (!upmx->virtbase) {
+-		ret = -ENOMEM;
+-		goto out_no_remap;
+-	}
++	upmx->virtbase = devm_request_and_ioremap(&pdev->dev, res);
++	if (!upmx->virtbase)
++		return -ENOMEM;
+ 
+ 	upmx->pctl = pinctrl_register(&u300_pmx_desc, &pdev->dev, upmx);
+ 	if (!upmx->pctl) {
+ 		dev_err(&pdev->dev, "could not register U300 pinmux driver\n");
+-		ret = -EINVAL;
+-		goto out_no_pmx;
++		return -EINVAL;
+ 	}
+ 
+ 	/* We will handle a range of GPIO pins */
+@@ -1156,14 +1142,6 @@ static int __devinit u300_pmx_probe(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "initialized U300 pin control driver\n");
+ 
+ 	return 0;
+-
+-out_no_pmx:
+-	iounmap(upmx->virtbase);
+-out_no_remap:
+-	platform_set_drvdata(pdev, NULL);
+-out_no_memregion:
+-	release_mem_region(upmx->phybase, upmx->physize);
+-	return ret;
+ }
+ 
+ static int __devexit u300_pmx_remove(struct platform_device *pdev)
+@@ -1171,8 +1149,6 @@ static int __devexit u300_pmx_remove(struct platform_device *pdev)
+ 	struct u300_pmx *upmx = platform_get_drvdata(pdev);
+ 
+ 	pinctrl_unregister(upmx->pctl);
+-	iounmap(upmx->virtbase);
+-	release_mem_region(upmx->phybase, upmx->physize);
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	return 0;
 -- 
 1.7.11.3
