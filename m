@@ -1,58 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 17 Oct 2012 09:13:48 -0700
-Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <507EC395.7060409@ti.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
- <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
- <20121016174835.GV15569@atomide.com> <507DCA8D.7060309@ti.com>
- <20121016212647.GM15569@atomide.com> <507EC395.7060409@ti.com>
-Message-ID: <20121017161348.GT15569@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 17 Oct 2012 10:22:15 -0600
+Subject: [PATCH V2 3/3] ARM: tegra: move debug-macro.S to include/debug
+In-Reply-To: <507EC303.1080000@gmail.com>
+References: <1350328024-30485-1-git-send-email-swarren@wwwdotorg.org>
+ <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
+ <507EC303.1080000@gmail.com>
+Message-ID: <507EDB37.1060102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121017 07:43]:
+On 10/17/2012 08:38 AM, Rob Herring wrote:
+> On 10/15/2012 02:07 PM, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Move Tegra's debug-macro.S over to the common debug macro directory.
+>>
+>> Move Tegra's debug UART selection menu into ARM's Kconfig.debug, so that
+>> all related options are selected in the same place.
+>>
+>> Tegra's uncompress.h is left in mach-tegra/include/mach; it will be
+>> removed whenever Tegra is converted to multi-platform.
+>>
+>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+>> ---
+>> Rob, Arnd, Olof, I'd particularly like feedback on whether the following:
+>>
+>> #include "../../mach-tegra/iomap.h"
+>>
+>> in arch/arm/include/debug/tegra.S is acceptable. I'd really like to
+>> continue to #include a header to share the defines to Tegra physical
+>> memory layout and virtual based addresses with Tegra's io.c's struct
+>> map_desc entries, so they can't get out of sync. So, the include can
+>> either use the relative path as quoted above (which I don't think will
+>> cause any significant maintenance issue), or Tegra's iomap.h would have
+>> to be moved somewhere public so e.g. <tegra-iomap.h> could be included.
 > 
-> On 10/16/2012 04:26 PM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [121016 14:00]:
-> >> Hi Tony,
-> >>
-> >> On 10/16/2012 12:48 PM, Tony Lindgren wrote:
-> >>> * Richard Cochran <richardcochran@gmail.com> [121015 12:18]:
-> >>>> From: hvaibhav at ti.com <hvaibhav@ti.com>
-> >>>>
-> >>>> With recent changes in omap gpmc driver code, in case of DT
-> >>>> boot mode, where bootloader does not configure gpmc cs space
-> >>>> will result into kernel BUG() inside gpmc_mem_init() function,
-> >>>> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
-> >>>> gpmc_config7[0].baseaddress is set to '0' on reset.
-> >>>>
-> >>>> This use-case is applicable for any board/EVM which doesn't have
-> >>>> any peripheral connected to gpmc cs0, for example BeagleXM and
-> >>>> BeagleBone, so DT boot mode fails.
-> >>>>
-> >>>> This patch adds of_have_populated_dt() check before creating
-> >>>> device, so that for DT boot mode, gpmc probe will not be called
-> >>>> which is expected behavior, as gpmc is not supported yet from DT.
-> >>>
-> >>> I'm applying this one into omap-for-v3.7-rc1/fixes-part2.
-> >>>
-> >>> Next time, please also cc linux-omap at vger.kernel.org for series
-> >>> like this. I'm sure the people reading the omap list are interested
-> >>> in these.
-> >>
-> >> This patch appears to be masking an underlying issue. How about 
-> >> something like the following ...
-> > 
-> > OK that looks good to me. I'll drop the earlier fix and use
-> > yours instead.
-> 
-> Hi Tony, sorry but I realised now that in my patch that I need to
-> take care of releasing and memory and clocks that were acquired 
-> during the probe. Here is a V2. If you prefer I can create a delta
-> patch also with the previous. 
+> We already have a way to get the phys and virt addresses at runtime with
+> addruart macro.
 
-OK thanks I'll update it.
+So this discussion is mainly about the implementation of addruart.
 
-Regards,
+> Couldn't we wrap this with a proper function and setup
+> the mapping at runtime. This would move it out of the platforms.
 
-Tony
+So, the mapping already is set up at run-time at least during early
+boot; __create_page_tables() in arch/arm/kernel/head.S calls addruart
+and sets up an entry for it.
+
+I suppose the implication here is that the virtual address that addruart
+returns doesn't have to match anything that the machine later sets up
+using iotable_init().
+
+If that's true, then Tegra's debug-macro.S only needs to know the UART
+physical address, and can make up almost any arbitrary virtual address
+(perhaps even driven by the logic you mention in your next paragraph
+below) and hence need not rely on Tegra's iomap.h. That said, we'd still
+have to manually remember not to create conflicting virtual address
+setups in the two places, which would still be easier with a shared header.
+
+However, I then have two questions:
+
+1) How long do the page tables set up by __create_page_tables() last; do
+they stick around forever, or at least as long as the macros from
+debug-macro.S are used, or are they replaced sometime, on the assumption
+that the machine's .map_io() will call iotable_init() and end up setting
+up the same mapping?
+
+2) If the virtual address returned by addruart on Tegra is different
+than any virtual addresses set up by Tegra's .map_io(), and Tegra's
+.map_io() sets up a very broad mapping that covers all peripherals
+including the UART, and hence the UART physical registers get mapped
+into two virtual addresses, will this cause any problems? IIRC,
+duplicate mappings can cause some issues on ARM, but perhaps that only
+applies to memory-like mappings, and not completely uncached IO mappings?
+
+> I'd also like to make the virtual address the same on all platforms (but
+> different offsets within a 1MB section) and make the phys address a
+> kconfig option. This would also eliminate the need for the platform
+> include and potentially addruart for that matter.
