@@ -1,78 +1,106 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 16:38:34 +0900
-Subject: [PATCH 3/8] ARM: S3C64XX: Provide platform data for Tomatin/Balblair
- on Cragganmore
+Date: Wed, 17 Oct 2012 16:38:35 +0900
+Subject: [PATCH 4/8] ARM: S3C64XX: Handle revision-specific differences in
+ Cragganmore modules
 In-Reply-To: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
  <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1350459519-20462-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1350459519-20462-5-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required for operation of the WM0010 on the boards.
+Allow us to supply different configurations depending on the board
+revision, catering for changes that are visible to software.
 
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+ arch/arm/mach-s3c64xx/mach-crag6410-module.c |   52 +++++++++++++-------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
 
 diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 89f5e7d..32b82c0 100644
+index 32b82c0..15e0c13 100644
 --- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
 +++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -20,6 +20,7 @@
+@@ -239,45 +239,46 @@ static const struct i2c_board_info wm6230_i2c_devs[] = {
  
- #include <linux/regulator/machine.h>
- 
-+#include <sound/wm0010.h>
- #include <sound/wm5100.h>
- #include <sound/wm8996.h>
- #include <sound/wm8962.h>
-@@ -33,14 +34,34 @@ static struct s3c64xx_spi_csinfo wm0010_spi_csinfo = {
- 	.line = S3C64XX_GPC(3),
- };
- 
-+static struct wm0010_pdata wm0010_pdata = {
-+	.gpio_reset = S3C64XX_GPN(6),
-+	.reset_active_high = 1, /* Active high for Glenfarclas Rev 2 */
-+};
-+
- static struct spi_board_info wm1253_devs[] = {
- 	[0] = {
- 		.modalias	= "wm0010",
-+		.max_speed_hz	= 26 * 1000 * 1000,
-+		.bus_num	= 0,
-+		.chip_select	= 0,
-+		.mode		= SPI_MODE_0,
-+		.irq		= S3C_EINT(5),
-+		.controller_data = &wm0010_spi_csinfo,
-+		.platform_data = &wm0010_pdata,
-+	},
-+};
-+
-+static struct spi_board_info balblair_devs[] = {
-+	[0] = {
-+		.modalias	= "wm0010",
-+		.max_speed_hz	= 26 * 1000 * 1000,
- 		.bus_num	= 0,
- 		.chip_select	= 0,
- 		.mode		= SPI_MODE_0,
- 		.irq		= S3C_EINT(5),
- 		.controller_data = &wm0010_spi_csinfo,
-+		.platform_data = &wm0010_pdata,
- 	},
- };
- 
-@@ -244,7 +265,9 @@ static __devinitdata const struct {
+ static __devinitdata const struct {
+ 	u8 id;
++	u8 rev;
+ 	const char *name;
+ 	const struct i2c_board_info *i2c_devs;
+ 	int num_i2c_devs;
+ 	const struct spi_board_info *spi_devs;
+ 	int num_spi_devs;
+ } gf_mods[] = {
+-	{ .id = 0x01, .name = "1250-EV1 Springbank" },
+-	{ .id = 0x02, .name = "1251-EV1 Jura" },
+-	{ .id = 0x03, .name = "1252-EV1 Glenlivet" },
+-	{ .id = 0x06, .name = "WM8997-6721-CS96-EV1 Lapraoig" },
+-	{ .id = 0x07, .name = "WM5110-6271 Deanston" },
+-	{ .id = 0x08, .name = "WM8903-6102 Tamdhu" },
+-	{ .id = 0x09, .name = "WM1811A-6305 Adelphi" },
+-	{ .id = 0x0a, .name = "WM8996-6272 Blackadder" },
+-	{ .id = 0x0b, .name = "WM8994-6235 Benromach" },
+-	{ .id = 0x11, .name = "6249-EV2 Glenfarclas", },
+-	{ .id = 0x14, .name = "6271-EV1 Lochnagar" },
+-	{ .id = 0x15, .name = "6320-EV1 Bells",
++	{ .id = 0x01, .rev = 0xff, .name = "1250-EV1 Springbank" },
++	{ .id = 0x02, .rev = 0xff, .name = "1251-EV1 Jura" },
++	{ .id = 0x03, .rev = 0xff, .name = "1252-EV1 Glenlivet" },
++	{ .id = 0x06, .rev = 0xff, .name = "WM8997-6721-CS96-EV1 Lapraoig" },
++	{ .id = 0x07, .rev = 0xff, .name = "WM5110-6271 Deanston" },
++	{ .id = 0x08, .rev = 0xff, .name = "WM8903-6102 Tamdhu" },
++	{ .id = 0x09, .rev = 0xff, .name = "WM1811A-6305 Adelphi" },
++	{ .id = 0x0a, .rev = 0xff, .name = "WM8996-6272 Blackadder" },
++	{ .id = 0x0b, .rev = 0xff, .name = "WM8994-6235 Benromach" },
++	{ .id = 0x11, .rev = 0xff, .name = "6249-EV2 Glenfarclas", },
++	{ .id = 0x14, .rev = 0xff, .name = "6271-EV1 Lochnagar" },
++	{ .id = 0x15, .rev = 0xff, .name = "6320-EV1 Bells",
+ 	  .i2c_devs = wm6230_i2c_devs,
+ 	  .num_i2c_devs = ARRAY_SIZE(wm6230_i2c_devs) },
+-	{ .id = 0x21, .name = "1275-EV1 Mortlach" },
+-	{ .id = 0x25, .name = "1274-EV1 Glencadam" },
+-	{ .id = 0x31, .name = "1253-EV1 Tomatin",
++	{ .id = 0x21, .rev = 0xff, .name = "1275-EV1 Mortlach" },
++	{ .id = 0x25, .rev = 0xff, .name = "1274-EV1 Glencadam" },
++	{ .id = 0x31, .rev = 0xff, .name = "1253-EV1 Tomatin",
  	  .spi_devs = wm1253_devs, .num_spi_devs = ARRAY_SIZE(wm1253_devs) },
- 	{ .id = 0x32, .name = "XXXX-EV1 Caol Illa" },
- 	{ .id = 0x33, .name = "XXXX-EV1 Oban" },
--	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair" },
-+	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair",
-+	  .spi_devs = balblair_devs,
-+	  .num_spi_devs = ARRAY_SIZE(balblair_devs) },
- 	{ .id = 0x39, .name = "1254-EV1 Dallas Dhu",
+-	{ .id = 0x32, .name = "XXXX-EV1 Caol Illa" },
+-	{ .id = 0x33, .name = "XXXX-EV1 Oban" },
+-	{ .id = 0x34, .name = "WM0010-6320-CS42 Balblair",
++	{ .id = 0x32, .rev = 0xff, .name = "XXXX-EV1 Caol Illa" },
++	{ .id = 0x33, .rev = 0xff, .name = "XXXX-EV1 Oban" },
++	{ .id = 0x34, .rev = 0xff, .name = "WM0010-6320-CS42 Balblair",
+ 	  .spi_devs = balblair_devs,
+ 	  .num_spi_devs = ARRAY_SIZE(balblair_devs) },
+-	{ .id = 0x39, .name = "1254-EV1 Dallas Dhu",
++	{ .id = 0x39, .rev = 0xff, .name = "1254-EV1 Dallas Dhu",
  	  .i2c_devs = wm1254_devs, .num_i2c_devs = ARRAY_SIZE(wm1254_devs) },
- 	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
+-	{ .id = 0x3a, .name = "1259-EV1 Tobermory",
++	{ .id = 0x3a, .rev = 0xff, .name = "1259-EV1 Tobermory",
+ 	  .i2c_devs = wm1259_devs, .num_i2c_devs = ARRAY_SIZE(wm1259_devs) },
+-	{ .id = 0x3b, .name = "1255-EV1 Kilchoman",
++	{ .id = 0x3b, .rev = 0xff, .name = "1255-EV1 Kilchoman",
+ 	  .i2c_devs = wm1255_devs, .num_i2c_devs = ARRAY_SIZE(wm1255_devs) },
+-	{ .id = 0x3c, .name = "1273-EV1 Longmorn" },
+-	{ .id = 0x3d, .name = "1277-EV1 Littlemill",
++	{ .id = 0x3c, .rev = 0xff, .name = "1273-EV1 Longmorn" },
++	{ .id = 0x3d, .rev = 0xff, .name = "1277-EV1 Littlemill",
+ 	  .i2c_devs = wm1277_devs, .num_i2c_devs = ARRAY_SIZE(wm1277_devs) },
+-	{ .id = 0x3e, .name = "WM5102-6271-EV1-CS127 Amrut",
++	{ .id = 0x3e, .rev = -1, .name = "WM5102-6271-EV1-CS127 Amrut",
+ 	  .spi_devs = wm5102_spi_devs,
+ 	  .num_spi_devs = ARRAY_SIZE(wm5102_spi_devs) },
+ };
+@@ -296,7 +297,8 @@ static __devinit int wlf_gf_module_probe(struct i2c_client *i2c,
+ 	id = (ret & 0xfe) >> 2;
+ 	rev = ret & 0x3;
+ 	for (i = 0; i < ARRAY_SIZE(gf_mods); i++)
+-		if (id == gf_mods[i].id)
++		if (id == gf_mods[i].id && (gf_mods[i].rev == 0xff ||
++					    rev == gf_mods[i].rev))
+ 			break;
+ 
+ 	if (i < ARRAY_SIZE(gf_mods)) {
 -- 
 1.7.10.4
