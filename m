@@ -1,65 +1,79 @@
-From: tim.bird@am.sony.com (Tim Bird)
-Date: Wed, 17 Oct 2012 15:04:29 -0700
-Subject: [Celinux-dev] PDF documentation
-In-Reply-To: <CAE7jHC_PL_C-4eY6LaKsfqdYhT2AR-djo3Swn6dmYZYPKJOX3w@mail.gmail.com>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
- <20121016140555.12139.qmail@stuge.se>
- <CAE7jHC8ru3TVaRXWvn5p6795LTk-WkVZZRJxB1-vJag+=H62jw@mail.gmail.com>
- <20121017165125.12301.qmail@stuge.se>
- <CAE7jHC_PL_C-4eY6LaKsfqdYhT2AR-djo3Swn6dmYZYPKJOX3w@mail.gmail.com>
-Message-ID: <507F2B6D.9070607@am.sony.com>
+From: khc@pm.waw.pl (Krzysztof Halasa)
+Date: Thu, 18 Oct 2012 00:01:17 +0200
+Subject: [PULL REQ] IXP4xx changes for Linux 3.7
+In-Reply-To: <201210142002.55841.arnd@arndb.de> (Arnd Bergmann's message of
+ "Sun, 14 Oct 2012 20:02:55 +0000")
+References: <m3bog6m5iz.fsf@intrepid.localdomain>
+ <201210142002.55841.arnd@arndb.de>
+Message-ID: <m3a9vkahci.fsf@intrepid.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2012 12:26 PM, Constantine Shulyupin wrote:
-> On Wed, Oct 17, 2012 at 6:51 PM, Peter Stuge <peter@stuge.se> wrote:
->> Constantine Shulyupin wrote:
->>> Peter, can you please just send me some links to most frequently
->>> used online PDF?
->>
->> I don't have a particular PDF that is used more frequently than
->> others. Here's one I used recently, for a common flash chip:
->>
->> http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/DBACA1C90564EBB248257639003A563A/$File/MX29GL128E,%203V%20(VI-O),%20128Mb,%20v1.5.pdf
->>
->>> I would like to convert them to html and see how usable it is.
-> 
-> I've converted you pdf and uploaded to a site:
-> http://makelinux.net/lib/macronix/MX29GL128E/
-> 
-> It can't even approach to replase PDF,  but it adds possibility to
-> send in a e-mail link to a specific page:
-> COMMON FLASH MEMORY INTERFACE (CFI) MODE:
-> http://makelinux.net/lib/macronix/MX29GL128E/doc-34
-> http://makelinux.net/lib/macronix/MX29GL128E/doc-35
+Hi,
 
-Being able to reference an individual page, table or section of a PDF
-with a click would indeed be a nice feature.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Being able to identify a page of an existing online PDF is already
-possible with URLs.  See
-http://stackoverflow.com/questions/125632/is-it-possible-to-link-to-a-bookmark-within-a-pdf-using-url-parameters
+> as mentioned before, all arch/arm/mach-* patches should go through the
+> arm-soc tree or get an Ack from the arm-soc maintainers. The same thing
+> is true for the char-misc and the crypto trees.
 
-So, the following would get you to page 34, in the original PDF:
-http://www.macronix.com/QuickPlace/hq/PageLibrary4825740B00298A3B.nsf/h_Index/DBACA1C90564EBB248257639003A563A/$File/MX29GL128E,%203V%20(VI-O),%20128Mb,%20v1.5.pdf#page=34
+You've seen the changes. They were trivial fixes, touched only
+IXP4xx-related areas, there was nothing related to char or crypto
+subsystems there, except file location (well, IXP4xx drivers have to be
+located somewhere).
 
-> Here is jet another document, huge 5K pages DS of OMAP4460:
-> http://makelinux.net/lib/ti/OMAP4460/
-> http://makelinux.net/lib/ti/OMAP4460/doc-outline
-> OMAP4460 USBPHY Registers: http://makelinux.net/lib/ti/OMAP4460/doc-5464
-> Debug Modules Memory Mapping: http://makelinux.net/lib/ti/OMAP4460/doc-5845
-> 
-> How it looks?
-> Can it be useful?
+The patches have been posted to linux-arm-kernel and you knew about
+them. That they were obviously correct and clean is probably not
+that important.
 
-Careful there.  These documents are copyright.  Even though the OMAP4460 document
-says it is "public", I'm not sure it's legal to post verbatim contents to a web site.
+Nobody bothered to comment the patches.
 
-So - useful or not, I'm worried it's not legal.
- -- Tim
+> Also, never rebase your tree immediately before sending a pull
+> request.
 
-=============================
-Tim Bird
-Architecture Group Chair, CE Workgroup of the Linux Foundation
-Senior Staff Engineer, Sony Network Entertainment
-=============================
+I did not, of course. My mail stated:
+"Build-tested for now. This is based on your current tree tip because it
+depends on commits following 3.6 release."
+
+Normally I wouldn't rebase, but had to (as you well knew) - because you
+commited a conflicting patch to this very IXP4xx arch. Using your logic,
+you were supposed to get an Ack from me (or from Imre) for this patch.
+
+Actually it wasn't a problem for me, I simply had to rebase.
+
+> Finally when sending bug fixes, please annotate any patches with
+> 'Cc: stable at vger.kernel.org' if they address bugs that are already
+> present in older kernels, so that the stable and longterm maintainers
+> can easily backport the fixes.
+
+I do that when I think it makes sense. In this case (two patches for
+Goramo MultiLink platform) practically all such devices use kernels
+prepared by me, and I think Greg (and others) have more efficient ways
+to spend their time than handling almost unused patches. Also, I have
+much more efficient ways to spend time. Anyway, if I can't have my
+patches upstream, why should they end up in stable?
+
+> Almost all of the platform patches in your tree seem to be bug fixes,
+> so they are still good for inclusion in v3.7 if you submit them to
+> arm-soc soon, but please make sure you separate bug fixes from other
+> changes so we can group them appropriately when forwarding them to
+> Linus.
+
+Unfortunately, as I already explained to you in
+https://lkml.org/lkml/2012/9/29/37, my resources for IXP4xx are very
+limited (and this isn't a paid job) and I'm in no way able to do what
+you require. This, coupled with my inability to make the patches end up
+upstream any other way, will make me post relevant MAINTAINERS changes
+shortly.
+
+Don't get me wrong. If I had time for this it could be different.
+Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
+this point. Given the raised barriers to participate, probably aimed at
+paid maintainers, I have to quit doing this.
+
+BTW since Imre has probably even much less time, it would be a good time
+to find someone to maintain IXP4xx code. I will be publishing (from time
+to time) my tree (I'm using the hw myself), so even simple
+cherry-picking would probably make some sense.
+-- 
+Krzysztof Halasa
