@@ -1,31 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 16 Oct 2012 19:41:10 -0700
-Subject: [PATCHv6 01/11] ARM: OMAP: clockdomain: Fix locking on
- _clkdm_clk_hwmod_enable / disable
-In-Reply-To: <alpine.DEB.2.00.1210170224570.9767@utopia.booyaka.com>
-References: <1348589142-11983-1-git-send-email-t-kristo@ti.com>
- <1348589142-11983-2-git-send-email-t-kristo@ti.com>
- <alpine.DEB.2.00.1210170224570.9767@utopia.booyaka.com>
-Message-ID: <20121017024109.GR15569@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 17 Oct 2012 13:36:23 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7
+Message-ID: <1350448585-26403-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121016 19:26]:
-> On Tue, 25 Sep 2012, Tero Kristo wrote:
-> 
-> > Previously the code only acquired spinlock after increasing / decreasing
-> > the usecount value, which is wrong. This leaves a small window where
-> > a task switch may occur between the check of the usecount and the actual
-> > wakeup / sleep of the domain. Fixed by moving the spinlock locking before
-> > the usecount access. Left the usecount as atomic_t if someone wants an
-> > easy access to the parameter through atomic_read.
-> > 
-> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
+Hi Olof, Hi Arnd,
 
-OK I'll apply this into omap-for-v3.7-rc1/fixes-take4.
+please consider the following fix for the KZM-A9-GT board for 3.6.
+They both resolve fallout from recent IOMEM() changes.
 
-Regards,
+----------------------------------------------------------------
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-Tony
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
+
+for you to fetch changes up to 11f93576b0b50bf391ffafa544b85e541f5e59a5:
+
+  ARM: shmobile: r8a7779: use __iomem pointers for MMIO (2012-10-16 08:58:56 +0900)
+
+----------------------------------------------------------------
+Kuninori Morimoto (2):
+      ARM: shmobile: armadillo800eva: __io abuse cleanup
+      ARM: shmobile: r8a7779: use __iomem pointers for MMIO
+
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    2 +-
+ arch/arm/mach-shmobile/clock-r8a7779.c         |   22 +++++++++++-----------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
