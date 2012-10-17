@@ -1,35 +1,36 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 17 Oct 2012 11:07:12 -0400
-Subject: [PATCH v4] Add basic address decoding support for Marvell 370/XP
-In-Reply-To: <20120921210438.0e485888@skate>
-References: <1347366450-26644-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20120921131441.GB14266@lunn.ch> <20120921210438.0e485888@skate>
-Message-ID: <20121017150712.GP20922@titan.lakedaemon.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 17 Oct 2012 08:08:47 -0700
+Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7
+In-Reply-To: <20121017044011.GA27684@verge.net.au>
+References: <1350448585-26403-1-git-send-email-horms@verge.net.au>
+ <20121017044011.GA27684@verge.net.au>
+Message-ID: <CAOesGMj2Cfmruk=MD3RaL5XjiDzK7KJjUHiM_DBrBuPBBi7Tfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Sep 21, 2012 at 09:04:38PM +0200, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Fri, 21 Sep 2012 15:14:41 +0200, Andrew Lunn wrote:
-> 
-> > I boot tested it on a kirkwood and an orion5x. No obvious smoke, the
-> > ethernet interfaces still work, etc....
-> > 
-> > Tested-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Excellent, thanks!
-> 
-> I'll be posting early next week the DT binding documentation that Arnd
-> has rightfully requested. I was waiting for other comments, but it
-> looks like it is the only that I have received on this series, so I'll
-> got ahead and sent just a separate DT binding documentation patch.
-> 
+On Tue, Oct 16, 2012 at 9:40 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Wed, Oct 17, 2012 at 01:36:23PM +0900, Simon Horman wrote:
+>> Hi Olof, Hi Arnd,
+>>
+>> please consider the following fix for the KZM-A9-GT board for 3.6.
+>
+> Sorry, cut-and paste error. The line above should read:
+>
+> please consider the following fixes for 3.7.
+>
+>> They both resolve fallout from recent IOMEM() changes.
+>>
+>> ----------------------------------------------------------------
+>> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+>>
+>>   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
 
-Thomas,
+Pulled into fixes, thanks!
 
-What is the status of this?
 
-thx,
 
-Jason.
+-Olof
