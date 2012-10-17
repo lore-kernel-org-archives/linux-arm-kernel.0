@@ -1,271 +1,290 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 17 Oct 2012 20:00:00 +0900
-Subject: [PATCH] usb: phy: samsung: Introducing usb phy driver for hsotg
-In-Reply-To: <1350036934-6051-1-git-send-email-p.paneri@samsung.com>
-References: <1349256393-11741-1-git-send-email-p.paneri@samsung.com>
- <1350036934-6051-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <005801cdac56$8da0c120$a8e24360$%kim@samsung.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 17 Oct 2012 14:23:50 +0300
+Subject: [PATCH v2 0/2] Add DMA and device tree support to the flash
+ controller FLCTL
+In-Reply-To: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
+References: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
+Message-ID: <1350473030.5769.137.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Praveen Paneri wrote:
-> 
-> platform_set_drvdata() required for driver's remove function, so adding
-> it back.
-> 
-> From v6:
-> Added TODO for phy bindings with controller
-> Dropped platform_set_drvdata() from driver probe
-> 
-> This driver uses usb_phy interface to interact with s3c-hsotg. Supports
-> phy_init and phy_shutdown functions to enable/disable phy. Tested with
-> smdk6410 and smdkv310. More SoCs can be brought under later.
-> 
-> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  .../devicetree/bindings/usb/samsung-usbphy.txt     |   11 +
->  drivers/usb/phy/Kconfig                            |    8 +
->  drivers/usb/phy/Makefile                           |    1 +
->  drivers/usb/phy/samsung-usbphy.c                   |  357
-++++++++++++++++++++
->  include/linux/platform_data/samsung-usbphy.h       |   27 ++
->  5 files changed, 404 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/samsung-
-> usbphy.txt
->  create mode 100644 drivers/usb/phy/samsung-usbphy.c
->  create mode 100644 include/linux/platform_data/samsung-usbphy.h
-> 
-> diff --git a/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
-> b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
-> new file mode 100644
-> index 0000000..7b26e2d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/samsung-usbphy.txt
-> @@ -0,0 +1,11 @@
-> +* Samsung's usb phy transceiver
-> +
-> +The Samsung's phy transceiver is used for controlling usb otg phy for
-> +s3c-hsotg usb device controller.
-> +TODO: Adding the PHY binding with controller(s) according to the under
-> +developement generic PHY driver.
-> +
-> +Required properties:
-> +- compatible : should be "samsung,exynos4210-usbphy"
-> +- reg : base physical address of the phy registers and length of memory
-> mapped
-> +	region.
-> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> index 63c339b..313685f 100644
-> --- a/drivers/usb/phy/Kconfig
-> +++ b/drivers/usb/phy/Kconfig
-> @@ -32,3 +32,11 @@ config MV_U3D_PHY
->  	help
->  	  Enable this to support Marvell USB 3.0 phy controller for Marvell
->  	  SoC.
-> +
-> +config SAMSUNG_USBPHY
-> +	bool "Samsung USB PHY controller Driver"
-> +	depends on USB_S3C_HSOTG
-> +	select USB_OTG_UTILS
-> +	help
-> +	  Enable this to support Samsung USB phy controller for samsung
-> +	  SoCs.
-> diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> index b069f29..55dcfc1 100644
-> --- a/drivers/usb/phy/Makefile
-> +++ b/drivers/usb/phy/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_OMAP_USB2)			+=
-omap-usb2.o
->  obj-$(CONFIG_USB_ISP1301)		+= isp1301.o
->  obj-$(CONFIG_MV_U3D_PHY)		+= mv_u3d_phy.o
->  obj-$(CONFIG_USB_EHCI_TEGRA)	+= tegra_usb_phy.o
-> +obj-$(CONFIG_SAMSUNG_USBPHY)		+= samsung-usbphy.o
-> diff --git a/drivers/usb/phy/samsung-usbphy.c b/drivers/usb/phy/samsung-
-> usbphy.c
-> new file mode 100644
-> index 0000000..14c182f
-> --- /dev/null
-> +++ b/drivers/usb/phy/samsung-usbphy.c
+On Tue, 2012-10-09 at 11:58 +0200, Bastian Hecht wrote:
+> changelog v2: 	- cosmetic fixes in patch 1
+> 		- added dmas and dma-names field in patch 2
 
-Hi,
+Hi, I used to be able to compile MTD stuff for mackerel board with the
+defconfig attached, but now it fails with 3.7-rc1 with as error:
 
-Basically I agree and this is a good approach to support usb phy for Samsung
-stuff...but there are some comments ;)
+/tmp/cc2Nr7AN.s: Error: bad immediate value for 8-bit offset (1024)
 
-> @@ -0,0 +1,357 @@
-> +/* linux/drivers/usb/phy/samsung-usbphy.c
-> + *
-> + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
-> + *              http://www.samsung.com
-> + *
-> + * Author: Praveen Paneri <p.paneri@samsung.com>
-> + *
-> + * Samsung USB2.0 High-speed OTG transceiver, talks to S3C HS OTG
-> controller
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/usb/otg.h>
-> +#include <linux/platform_data/samsung-usbphy.h>
-> +
-> +/* Register definitions */
-> +
-> +#define S3C_PHYPWR				(0x00)
-> +
-IMHO, according to the file name, samsung-usbphy, SAMSUNG_ is better here?
+It fails for dogc4.c, but if I disable DOCG4, it fails for other drivers
+with a similar error.
+
+I've tried (arm) gcc 4.6.3 and the latest Linaro 4.7 build.
+
+Any idea? I did not dig this, is this a known issue? Could you try to
+reproduce this in your setup?
 
 
-> +#define S3C_PHYPWR_NORMAL_MASK			(0x19 << 0)
-> +#define S3C_PHYPWR_OTG_DISABLE			(1 << 4)
-> +#define S3C_PHYPWR_ANALOG_POWERDOWN		(1 << 3)
-> +#define S3C_PHYPWR_FORCE_SUSPEND		(1 << 1)
-> +/* For Exynos4 */
-> +#define EXYNOS4_PHYPWR_NORMAL_MASK		(0x39 << 0)
+CONFIG_EXPERIMENTAL=y
+CONFIG_SYSVIPC=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+CONFIG_LOG_BUF_SHIFT=16
+# CONFIG_UTS_NS is not set
+# CONFIG_IPC_NS is not set
+# CONFIG_PID_NS is not set
+CONFIG_SLAB=y
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+# CONFIG_BLK_DEV_BSG is not set
+# CONFIG_IOSCHED_DEADLINE is not set
+# CONFIG_IOSCHED_CFQ is not set
+CONFIG_ARCH_SHMOBILE=y
+CONFIG_ARCH_SH7372=y
+CONFIG_MACH_MACKEREL=y
+CONFIG_AEABI=y
+# CONFIG_OABI_COMPAT is not set
+CONFIG_FORCE_MAX_ZONEORDER=15
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m"
+CONFIG_KEXEC=y
+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+CONFIG_PM_RUNTIME=y
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+# CONFIG_FIRMWARE_IN_KERNEL is not set
+CONFIG_MTD=y
+CONFIG_MTD_TESTS=m
+CONFIG_MTD_REDBOOT_PARTS=m
+CONFIG_MTD_REDBOOT_PARTS_READONLY=y
+CONFIG_MTD_CMDLINE_PARTS=y
+CONFIG_MTD_AFS_PARTS=m
+CONFIG_MTD_AR7_PARTS=m
+CONFIG_MTD_CHAR=y
+CONFIG_MTD_BLOCK=y
+CONFIG_FTL=m
+CONFIG_NFTL=m
+CONFIG_NFTL_RW=y
+CONFIG_INFTL=m
+CONFIG_RFD_FTL=m
+CONFIG_SSFDC=m
+CONFIG_SM_FTL=m
+CONFIG_MTD_OOPS=y
+CONFIG_MTD_SWAP=m
+CONFIG_MTD_CFI=y
+CONFIG_MTD_JEDECPROBE=m
+CONFIG_MTD_CFI_ADV_OPTIONS=y
+CONFIG_MTD_OTP=y
+CONFIG_MTD_CFI_INTELEXT=y
+CONFIG_MTD_CFI_AMDSTD=m
+CONFIG_MTD_CFI_STAA=m
+CONFIG_MTD_ROM=y
+CONFIG_MTD_ABSENT=y
+CONFIG_MTD_COMPLEX_MAPPINGS=y
+CONFIG_MTD_PHYSMAP=y
+CONFIG_MTD_PHYSMAP_COMPAT=y
+CONFIG_MTD_IMPA7=m
+CONFIG_MTD_GPIO_ADDR=y
+CONFIG_MTD_PLATRAM=y
+CONFIG_MTD_LATCH_ADDR=m
+CONFIG_MTD_DATAFLASH=y
+CONFIG_MTD_M25P80=y
+# CONFIG_M25PXX_USE_FAST_READ is not set
+CONFIG_MTD_SST25L=y
+CONFIG_MTD_SLRAM=y
+CONFIG_MTD_PHRAM=y
+CONFIG_MTD_MTDRAM=m
+CONFIG_MTD_BLOCK2MTD=y
+CONFIG_MTD_DOC2000=m
+CONFIG_MTD_DOC2001=m
+CONFIG_MTD_DOC2001PLUS=y
+CONFIG_MTD_DOCG3=m
+CONFIG_MTD_DOCPROBE_ADVANCED=y
+CONFIG_MTD_NAND_ECC_SMC=y
+CONFIG_MTD_NAND=y
+CONFIG_MTD_NAND_ECC_BCH=y
+CONFIG_MTD_NAND_MUSEUM_IDS=y
+CONFIG_MTD_NAND_DENALI=m
+CONFIG_MTD_NAND_DENALI_DT=m
+CONFIG_MTD_NAND_GPIO=m
+CONFIG_MTD_NAND_DISKONCHIP=y
+CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
+CONFIG_MTD_NAND_DOCG4=m
+CONFIG_MTD_NAND_NANDSIM=y
+CONFIG_MTD_NAND_PLATFORM=y
+CONFIG_MTD_NAND_SH_FLCTL=y
+CONFIG_MTD_ONENAND=y
+CONFIG_MTD_ONENAND_VERIFY_WRITE=y
+CONFIG_MTD_ONENAND_GENERIC=m
+CONFIG_MTD_ONENAND_SIM=y
+CONFIG_MTD_LPDDR=m
+CONFIG_MTD_UBI=m
+CONFIG_MTD_UBI_FASTMAP=y
+# CONFIG_BLK_DEV is not set
+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+# CONFIG_SERIO is not set
+# CONFIG_LEGACY_PTYS is not set
+# CONFIG_DEVKMEM is not set
+CONFIG_SERIAL_SH_SCI=y
+CONFIG_SERIAL_SH_SCI_NR_UARTS=8
+CONFIG_SERIAL_SH_SCI_CONSOLE=y
+# CONFIG_HW_RANDOM is not set
+CONFIG_SPI=y
+# CONFIG_HWMON is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_DNOTIFY is not set
+# CONFIG_INOTIFY_USER is not set
+CONFIG_JFFS2_FS=m
+CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+# CONFIG_JFFS2_ZLIB is not set
+CONFIG_JFFS2_LZO=y
+# CONFIG_JFFS2_RTIME is not set
+CONFIG_JFFS2_RUBIN=y
+CONFIG_UBIFS_FS=m
+# CONFIG_ENABLE_WARN_DEPRECATED is not set
+# CONFIG_ENABLE_MUST_CHECK is not set
+# CONFIG_ARM_UNWIND is not set
+CONFIG_KEYS=y
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_ANSI_CPRNG=y
+# CONFIG_CRYPTO_HW is not set
 
-Hmm...is this right? If so, need to use exact name for the definition.
-
-See arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-
-> +#define EXYNOS4_PHYPWR_SLEEP			(1 << 5)
-
-Ditto.
-
-> +
-> +#define S3C_PHYCLK				(0x04)
-> +
-> +#define S3C_PHYCLK_MODE_SERIAL			(1 << 6)
-
-MODE_USB11?
-
-> +#define S3C_PHYCLK_EXT_OSC			(1 << 5)
-> +#define S3C_PHYCLK_COMMON_ON_N			(1 << 4)
-
-There are Samsung SoCs which is having two PHYs, so I think, we need to
-design this with considering it.
-
-> +#define S3C_PHYCLK_ID_PULL			(1 << 2)
-> +#define S3C_PHYCLK_CLKSEL_MASK			(0x3 << 0)
-> +#define S3C_PHYCLK_CLKSEL_SHIFT			(0)
-> +#define S3C_PHYCLK_CLKSEL_48M			(0x0 << 0)
-> +#define S3C_PHYCLK_CLKSEL_12M			(0x2 << 0)
-> +#define S3C_PHYCLK_CLKSEL_24M			(0x3 << 0)
-
-As you know, the values for CLKSEL are different on each Samsung SoCs...if
-we use this patch, we need to implement for other SoCs many things. In
-addition, this patch says can support EXYNOS4210 but not actually...
-
-> +
-> +#define S3C_RSTCON				(0x08)
-> +
-> +#define S3C_RSTCON_PHYCLK			(1 << 2)
-> +#define S3C_RSTCON_HCLK				(1 << 1)
-> +#define S3C_RSTCON_PHY				(1 << 0)
-> +
-> +#ifndef MHZ
-> +#define MHZ (1000*1000)
-> +#endif
-> +
-> +enum samsung_cpu_type {
-> +	TYPE_S3C64XX,
-> +	TYPE_EXYNOS4210,
-> +};
-> +
-> +/*
-> + * struct samsung_usbphy - transceiver driver state
-> + * @phy: transceiver structure
-> + * @plat: platform data
-> + * @dev: The parent device supplied to the probe function
-> + * @clk: usb phy clock
-> + * @regs: usb phy register memory base
-> + * @ref_clk_freq: reference clock frequency selection
-> + * @cpu_type: machine identifier
-> + */
-> +struct samsung_usbphy {
-> +	struct usb_phy	phy;
-> +	struct samsung_usbphy_data *plat;
-> +	struct device	*dev;
-> +	struct clk	*clk;
-> +	void __iomem	*regs;
-> +	int		ref_clk_freq;
-> +	int		cpu_type;
-> +};
-> +
-> +#define phy_to_sphy(x)		container_of((x), struct
-samsung_usbphy,
-> phy)
-> +
-> +/*
-> + * Returns reference clock frequency selection value
-> + */
-> +static int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
-> +{
-> +	struct clk *ref_clk;
-> +	int refclk_freq = 0;
-> +
-> +	ref_clk = clk_get(sphy->dev, "xusbxti");
-> +	if (IS_ERR(ref_clk)) {
-
-IS_ERR_OR_NULL(ref_clk)?
-
-> +		dev_err(sphy->dev, "Failed to get reference clock\n");
-> +		return PTR_ERR(ref_clk);
-> +	}
-> +
-> +	switch (clk_get_rate(ref_clk)) {
-> +	case 12 * MHZ:
-> +		refclk_freq |= S3C_PHYCLK_CLKSEL_12M;
-
-Just,
-
-+		refclk_freq = S3C_PHYCLK_CLKSEL_12M;
-
-because its defalut value is 0...BTW, how do you think to support other SoCs
-such as EXYNOS4210, EXYNOS4X12?
-
-> +		break;
-> +	case 24 * MHZ:
-> +		refclk_freq |= S3C_PHYCLK_CLKSEL_24M;
-
-Ditto.
-
-> +		break;
-> +	default:
-> +	case 48 * MHZ:
-> +		/* default reference clock */
-> +		refclk_freq |= S3C_PHYCLK_CLKSEL_48M;
-
-Ditto...and default refernec clock for EXYNOS4 is 24MHz...
-
-> +		break;
-> +	}
-> +	clk_put(ref_clk);
-> +
-> +	return refclk_freq;
-> +}
-> +
-
-Hmm...I need more time to look at this again...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+CONFIG_EXPERIMENTAL=y
+CONFIG_SYSVIPC=y
+CONFIG_IKCONFIG=y
+CONFIG_IKCONFIG_PROC=y
+CONFIG_LOG_BUF_SHIFT=16
+# CONFIG_UTS_NS is not set
+# CONFIG_IPC_NS is not set
+# CONFIG_PID_NS is not set
+CONFIG_SLAB=y
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+# CONFIG_BLK_DEV_BSG is not set
+# CONFIG_IOSCHED_DEADLINE is not set
+# CONFIG_IOSCHED_CFQ is not set
+CONFIG_ARCH_SHMOBILE=y
+CONFIG_ARCH_SH7372=y
+CONFIG_MACH_MACKEREL=y
+CONFIG_AEABI=y
+# CONFIG_OABI_COMPAT is not set
+CONFIG_FORCE_MAX_ZONEORDER=15
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
+CONFIG_CMDLINE="console=tty0, console=ttySC0,115200 earlyprintk=sh-sci.0,115200 root=/dev/nfs nfsroot=,tcp,v3 ip=dhcp memchunk.vpu=64m memchunk.veu0=8m memchunk.spu0=2m mem=240m"
+CONFIG_KEXEC=y
+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+CONFIG_PM_RUNTIME=y
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+# CONFIG_FIRMWARE_IN_KERNEL is not set
+CONFIG_MTD=y
+CONFIG_MTD_TESTS=m
+CONFIG_MTD_REDBOOT_PARTS=m
+CONFIG_MTD_REDBOOT_PARTS_READONLY=y
+CONFIG_MTD_CMDLINE_PARTS=y
+CONFIG_MTD_AFS_PARTS=m
+CONFIG_MTD_AR7_PARTS=m
+CONFIG_MTD_CHAR=y
+CONFIG_MTD_BLOCK=y
+CONFIG_FTL=m
+CONFIG_NFTL=m
+CONFIG_NFTL_RW=y
+CONFIG_INFTL=m
+CONFIG_RFD_FTL=m
+CONFIG_SSFDC=m
+CONFIG_SM_FTL=m
+CONFIG_MTD_OOPS=y
+CONFIG_MTD_SWAP=m
+CONFIG_MTD_CFI=y
+CONFIG_MTD_JEDECPROBE=m
+CONFIG_MTD_CFI_ADV_OPTIONS=y
+CONFIG_MTD_OTP=y
+CONFIG_MTD_CFI_INTELEXT=y
+CONFIG_MTD_CFI_AMDSTD=m
+CONFIG_MTD_CFI_STAA=m
+CONFIG_MTD_ROM=y
+CONFIG_MTD_ABSENT=y
+CONFIG_MTD_COMPLEX_MAPPINGS=y
+CONFIG_MTD_PHYSMAP=y
+CONFIG_MTD_PHYSMAP_COMPAT=y
+CONFIG_MTD_IMPA7=m
+CONFIG_MTD_GPIO_ADDR=y
+CONFIG_MTD_PLATRAM=y
+CONFIG_MTD_LATCH_ADDR=m
+CONFIG_MTD_DATAFLASH=y
+CONFIG_MTD_M25P80=y
+# CONFIG_M25PXX_USE_FAST_READ is not set
+CONFIG_MTD_SST25L=y
+CONFIG_MTD_SLRAM=y
+CONFIG_MTD_PHRAM=y
+CONFIG_MTD_MTDRAM=m
+CONFIG_MTD_BLOCK2MTD=y
+CONFIG_MTD_DOC2000=m
+CONFIG_MTD_DOC2001=m
+CONFIG_MTD_DOC2001PLUS=y
+CONFIG_MTD_DOCG3=m
+CONFIG_MTD_DOCPROBE_ADVANCED=y
+CONFIG_MTD_NAND_ECC_SMC=y
+CONFIG_MTD_NAND=y
+CONFIG_MTD_NAND_ECC_BCH=y
+CONFIG_MTD_NAND_MUSEUM_IDS=y
+CONFIG_MTD_NAND_DENALI=m
+CONFIG_MTD_NAND_DENALI_DT=m
+CONFIG_MTD_NAND_GPIO=m
+CONFIG_MTD_NAND_DISKONCHIP=y
+CONFIG_MTD_NAND_DISKONCHIP_BBTWRITE=y
+CONFIG_MTD_NAND_DOCG4=m
+CONFIG_MTD_NAND_NANDSIM=y
+CONFIG_MTD_NAND_PLATFORM=y
+CONFIG_MTD_NAND_SH_FLCTL=y
+CONFIG_MTD_ONENAND=y
+CONFIG_MTD_ONENAND_VERIFY_WRITE=y
+CONFIG_MTD_ONENAND_GENERIC=m
+CONFIG_MTD_ONENAND_SIM=y
+CONFIG_MTD_LPDDR=m
+CONFIG_MTD_UBI=m
+CONFIG_MTD_UBI_FASTMAP=y
+# CONFIG_BLK_DEV is not set
+# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+# CONFIG_SERIO is not set
+# CONFIG_LEGACY_PTYS is not set
+# CONFIG_DEVKMEM is not set
+CONFIG_SERIAL_SH_SCI=y
+CONFIG_SERIAL_SH_SCI_NR_UARTS=8
+CONFIG_SERIAL_SH_SCI_CONSOLE=y
+# CONFIG_HW_RANDOM is not set
+CONFIG_SPI=y
+# CONFIG_HWMON is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_DNOTIFY is not set
+# CONFIG_INOTIFY_USER is not set
+CONFIG_JFFS2_FS=m
+CONFIG_JFFS2_COMPRESSION_OPTIONS=y
+# CONFIG_JFFS2_ZLIB is not set
+CONFIG_JFFS2_LZO=y
+# CONFIG_JFFS2_RTIME is not set
+CONFIG_JFFS2_RUBIN=y
+CONFIG_UBIFS_FS=m
+# CONFIG_ENABLE_WARN_DEPRECATED is not set
+# CONFIG_ENABLE_MUST_CHECK is not set
+# CONFIG_ARM_UNWIND is not set
+CONFIG_KEYS=y
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_ANSI_CPRNG=y
+# CONFIG_CRYPTO_HW is not set
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/2fcc1b34/attachment-0001.sig>
