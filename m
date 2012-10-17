@@ -1,94 +1,57 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 17 Oct 2012 14:31:43 +0200
-Subject: [PATCH RFC 11/15 v5] gpio-max732x: Add block GPIO API
+Date: Wed, 17 Oct 2012 14:31:44 +0200
+Subject: [PATCH RFC 12/15 v5] gpio-pcf857x: Add block GPIO API
 In-Reply-To: <1350477107-26512-1-git-send-email-stigge@antcom.de>
 References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
-Message-ID: <1350477107-26512-12-git-send-email-stigge@antcom.de>
+Message-ID: <1350477107-26512-13-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds block GPIO API support to the gpio-max732x driver.
+This patch adds block GPIO API support to the gpio-pcf857x driver.
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
 
 ---
- drivers/gpio/gpio-max732x.c |   59 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ drivers/gpio/gpio-pcf857x.c |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
---- linux-2.6.orig/drivers/gpio/gpio-max732x.c
-+++ linux-2.6/drivers/gpio/gpio-max732x.c
-@@ -219,6 +219,63 @@ out:
- 	mutex_unlock(&chip->lock);
+--- linux-2.6.orig/drivers/gpio/gpio-pcf857x.c
++++ linux-2.6/drivers/gpio/gpio-pcf857x.c
+@@ -158,6 +158,28 @@ static void pcf857x_set(struct gpio_chip
+ 	pcf857x_output(chip, offset, value);
  }
  
-+static unsigned long max732x_gpio_get_block(struct gpio_chip *gc,
-+					    unsigned long mask)
++static unsigned long pcf857x_get_block(struct gpio_chip *chip,
++				       unsigned long mask)
 +{
-+	struct max732x_chip *chip;
-+	uint8_t lo = 0;
-+	uint8_t hi = 0;
-+	int ret;
++	struct pcf857x	*gpio = container_of(chip, struct pcf857x, chip);
++	int		value;
 +
-+	chip = container_of(gc, struct max732x_chip, gpio_chip);
-+
-+	if (mask & 0xFF) {
-+		ret = max732x_readb(chip, is_group_a(chip, 0), &lo);
-+		if (ret < 0)
-+			return 0;
-+	}
-+	if (mask & 0xFF00) {
-+		ret = max732x_readb(chip, is_group_a(chip, 8), &hi);
-+		if (ret < 0)
-+			return 0;
-+	}
-+
-+	return (((unsigned long)hi << 8) | lo) & mask;
++	value = gpio->read(gpio->client);
++	return (value < 0) ? 0 : (value & mask);
 +}
 +
-+static void max732x_gpio_set_block(struct gpio_chip *gc, unsigned long mask,
-+				   unsigned long values)
++static void pcf857x_set_block(struct gpio_chip *chip, unsigned long mask,
++			      unsigned long values)
 +{
-+	struct max732x_chip *chip;
-+	uint8_t reg_out;
-+	uint8_t lo_mask = mask & 0xFF;
-+	uint8_t hi_mask = (mask >> 8) & 0xFF;
-+	int ret;
++	struct pcf857x	*gpio = container_of(chip, struct pcf857x, chip);
 +
-+	chip = container_of(gc, struct max732x_chip, gpio_chip);
-+
-+	mutex_lock(&chip->lock);
-+
-+	if (lo_mask) {
-+		reg_out = (chip->reg_out[0] & ~lo_mask) | (values & lo_mask);
-+		ret = max732x_writeb(chip, is_group_a(chip, 0), reg_out);
-+		if (ret < 0)
-+			goto out;
-+		chip->reg_out[0] = reg_out;
-+	}
-+	if (hi_mask) {
-+		reg_out = (chip->reg_out[1] & ~hi_mask) |
-+			((values >> 8) & hi_mask);
-+		ret = max732x_writeb(chip, is_group_a(chip, 8), reg_out);
-+		if (ret < 0)
-+			goto out;
-+		chip->reg_out[1] = reg_out;
-+	}
-+
-+out:
-+	mutex_unlock(&chip->lock);
++	mutex_lock(&gpio->lock);
++	gpio->out &= ~mask;
++	gpio->out |= values & mask;
++	gpio->write(gpio->client, gpio->out);
++	mutex_unlock(&gpio->lock);
 +}
 +
- static int max732x_gpio_direction_input(struct gpio_chip *gc, unsigned off)
- {
- 	struct max732x_chip *chip;
-@@ -562,8 +619,10 @@ static int __devinit max732x_setup_gpio(
- 	if (chip->dir_output) {
- 		gc->direction_output = max732x_gpio_direction_output;
- 		gc->set = max732x_gpio_set_value;
-+		gc->set_block = max732x_gpio_set_block;
- 	}
- 	gc->get = max732x_gpio_get_value;
-+	gc->get_block = max732x_gpio_get_block;
- 	gc->can_sleep = 1;
+ /*-------------------------------------------------------------------------*/
  
- 	gc->base = gpio_start;
+ static int pcf857x_to_irq(struct gpio_chip *chip, unsigned offset)
+@@ -280,6 +302,8 @@ static int pcf857x_probe(struct i2c_clie
+ 	gpio->chip.owner		= THIS_MODULE;
+ 	gpio->chip.get			= pcf857x_get;
+ 	gpio->chip.set			= pcf857x_set;
++	gpio->chip.get_block		= pcf857x_get_block;
++	gpio->chip.set_block		= pcf857x_set_block;
+ 	gpio->chip.direction_input	= pcf857x_input;
+ 	gpio->chip.direction_output	= pcf857x_output;
+ 	gpio->chip.ngpio		= id->driver_data;
