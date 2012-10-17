@@ -1,74 +1,28 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 16:38:38 +0900
-Subject: [PATCH 7/8] ARM: S3C64XX: Add WM2200 module for Cragganmore
-In-Reply-To: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
- <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1350459519-20462-8-git-send-email-broonie@opensource.wolfsonmicro.com>
+Date: Wed, 17 Oct 2012 16:41:03 +0900
+Subject: [PATCH 1/2] regulator: gpio-regulator: Allow use of GPIO
+ controlled regulators though DT
+In-Reply-To: <20121016080109.GH7662@gmail.com>
+References: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
+ <20121016051401.GB8670@opensource.wolfsonmicro.com>
+ <20121016072956.GF7662@gmail.com>
+ <20121016074643.GA10323@opensource.wolfsonmicro.com>
+ <20121016080109.GH7662@gmail.com>
+Message-ID: <20121017074102.GJ14199@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   15 +++++++++++++++
- arch/arm/mach-s3c64xx/mach-crag6410.c        |    5 +++++
- 2 files changed, 20 insertions(+)
+On Tue, Oct 16, 2012 at 09:01:09AM +0100, Lee Jones wrote:
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index fc758b1..4744c42 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -21,6 +21,7 @@
- #include <linux/regulator/machine.h>
- 
- #include <sound/wm0010.h>
-+#include <sound/wm2200.h>
- #include <sound/wm5100.h>
- #include <sound/wm8996.h>
- #include <sound/wm8962.h>
-@@ -277,6 +278,18 @@ static const struct i2c_board_info wm6230_i2c_devs[] = {
- 	  .platform_data = &wm9081_pdata, },
- };
- 
-+static struct wm2200_pdata wm2200_pdata = {
-+	.ldo_ena = S3C64XX_GPN(7),
-+	.gpio_defaults = {
-+		[2] = 0x0005,  /* GPIO3 24.576MHz output clock */
-+	},
-+};
-+
-+static const struct i2c_board_info wm2200_i2c[] = {
-+	{ I2C_BOARD_INFO("wm2200", 0x3a),
-+	  .platform_data = &wm2200_pdata, },
-+};
-+
- static __devinitdata const struct {
- 	u8 id;
- 	u8 rev;
-@@ -326,6 +339,8 @@ static __devinitdata const struct {
- 	{ .id = 0x3e, .rev = -1, .name = "WM5102-6271-EV1-CS127 Amrut",
- 	  .spi_devs = wm5102_spi_devs,
- 	  .num_spi_devs = ARRAY_SIZE(wm5102_spi_devs) },
-+	{ .id = 0x3f, .rev = -1, .name = "WM2200-6271-CS90-M-REV1",
-+	  .i2c_devs = wm2200_i2c, .num_i2c_devs = ARRAY_SIZE(wm2200_i2c) },
- };
- 
- static __devinit int wlf_gf_module_probe(struct i2c_client *i2c,
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
-index 6d5b2c6..7e35523 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
-@@ -629,6 +629,11 @@ static struct regulator_consumer_supply pvdd_1v8_consumers[] __devinitdata = {
- 	REGULATOR_SUPPLY("DCVDD", "1-001a"),
- 	REGULATOR_SUPPLY("AVDD", "1-001a"),
- 	REGULATOR_SUPPLY("DBVDD", "spi0.0"),
-+
-+	REGULATOR_SUPPLY("DBVDD", "1-003a"),
-+	REGULATOR_SUPPLY("LDOVDD", "1-003a"),
-+	REGULATOR_SUPPLY("CPVDD", "1-003a"),
-+	REGULATOR_SUPPLY("AVDD", "1-003a"),
- 	REGULATOR_SUPPLY("DBVDD1", "spi0.1"),
- 	REGULATOR_SUPPLY("DBVDD2", "spi0.1"),
- 	REGULATOR_SUPPLY("DBVDD3", "spi0.1"),
--- 
-1.7.10.4
+> I'm assuming it's just the documentation patch you're missing.
+
+> Let me resend it as a single patch.
+
+This should really be part of the patch adding the bindings...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/1d91450f/attachment.sig>
