@@ -1,9 +1,9 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 17 Oct 2012 13:39:18 +0900
-Subject: [PATCH 07/10] ARM: shmobile: r8a7779: add HSPI clock support
+Date: Wed, 17 Oct 2012 13:39:21 +0900
+Subject: [PATCH 10/10] ARM: shmobile: marzen: add HSPI support
 In-Reply-To: <1350448761-27346-1-git-send-email-horms@verge.net.au>
 References: <1350448761-27346-1-git-send-email-horms@verge.net.au>
-Message-ID: <1350448761-27346-8-git-send-email-horms@verge.net.au>
+Message-ID: <1350448761-27346-11-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,38 +12,76 @@ From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/marzen_defconfig     |    2 ++
+ arch/arm/mach-shmobile/board-marzen.c |   25 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 3cafb6a..90d717b 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -89,6 +89,7 @@ static struct clk div4_clks[DIV4_NR] = {
- enum { MSTP323, MSTP322, MSTP321, MSTP320,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015, MSTP014,
-+	MSTP007,
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-@@ -105,6 +106,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP016] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 16, 0), /* TMU0 */
- 	[MSTP015] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 15, 0), /* TMU1 */
- 	[MSTP014] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 14, 0), /* TMU2 */
-+	[MSTP007] = SH_CLK_MSTP32(&div4_clks[DIV4_S], MSTPCR0,  7, 0), /* HSPI */
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index f79b55c..5b8215f 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -71,6 +71,8 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_RCAR=y
++CONFIG_SPI=y
++CONFIG_SPI_SH_HSPI=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index b8a7525..69f7f46 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -30,6 +30,8 @@
+ #include <linux/regulator/fixed.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/smsc911x.h>
++#include <linux/spi/spi.h>
++#include <linux/spi/sh_hspi.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
+ #include <mach/hardware.h>
+@@ -126,10 +128,27 @@ static struct platform_device thermal_device = {
+ 	.num_resources	= ARRAY_SIZE(thermal_resources),
  };
  
- static unsigned long mul4_recalc(struct clk *clk)
-@@ -154,6 +156,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[MSTP023]), /* SCIF3 */
- 	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[MSTP022]), /* SCIF4 */
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP021]), /* SCIF6 */
-+	CLKDEV_DEV_ID("sh-hspi.0", &mstp_clks[MSTP007]), /* HSPI0 */
-+	CLKDEV_DEV_ID("sh-hspi.1", &mstp_clks[MSTP007]), /* HSPI1 */
-+	CLKDEV_DEV_ID("sh-hspi.2", &mstp_clks[MSTP007]), /* HSPI2 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
++/* HSPI */
++static struct resource hspi_resources[] = {
++	[0] = {
++		.start		= 0xFFFC7000,
++		.end		= 0xFFFC7018 - 1,
++		.flags		= IORESOURCE_MEM,
++	},
++};
++
++static struct platform_device hspi_device = {
++	.name	= "sh-hspi",
++	.id	= 0,
++	.resource	= hspi_resources,
++	.num_resources	= ARRAY_SIZE(hspi_resources),
++};
++
+ static struct platform_device *marzen_devices[] __initdata = {
+ 	&eth_device,
+ 	&sdhi0_device,
+ 	&thermal_device,
++	&hspi_device,
+ };
+ 
+ static void __init marzen_init(void)
+@@ -163,6 +182,12 @@ static void __init marzen_init(void)
+ 	gpio_request(GPIO_FN_SD0_CD, NULL);
+ 	gpio_request(GPIO_FN_SD0_WP, NULL);
+ 
++	/* HSPI 0 */
++	gpio_request(GPIO_FN_HSPI_CLK0,	NULL);
++	gpio_request(GPIO_FN_HSPI_CS0,	NULL);
++	gpio_request(GPIO_FN_HSPI_TX0,	NULL);
++	gpio_request(GPIO_FN_HSPI_RX0,	NULL);
++
+ 	r8a7779_add_standard_devices();
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
 -- 
 1.7.10.4
