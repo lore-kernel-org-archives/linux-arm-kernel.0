@@ -1,28 +1,89 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 22:27:41 +0900
-Subject: [PATCH 1/1] Documentation: Describe Device Tree bindings for
- GPIO Regulator driver
-In-Reply-To: <1350374553-12678-1-git-send-email-lee.jones@linaro.org>
-References: <1350374553-12678-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121017132740.GS14199@opensource.wolfsonmicro.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 17 Oct 2012 18:58:39 +0530
+Subject: [PATCH] drivers: bus: omap_interconnect: Fix rand-config build warning
+Message-ID: <1350480519-1890-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 09:02:33AM +0100, Lee Jones wrote:
-> Here we specify all non-standard bindings which can be used when
-> requesting the use of an GPIO controlled regulator from Device Tree.
+When building omap_l3_noc/smx drivers as modules, the following
+warning appears:
 
-Applied both patches squashed together, thanks.  Please don't split
-documentation from the code like this where the code is just a single
-change - it's sensible where the code is a big series but for single
-patch it's not helpful.
+CC [M]  drivers/bus/omap_l3_smx.o
+drivers/bus/omap_l3_smx.c:291: warning: data definition has no type or storage class
+drivers/bus/omap_l3_smx.c:291: warning: type defaults to 'int' in declaration of 'postcore_initcall_sync'
+drivers/bus/omap_l3_smx.c:291: warning: parameter names (without types) in function declaration
+drivers/bus/omap_l3_smx.c:287: warning: 'omap3_l3_init' defined but not used
+CC [M]  drivers/bus/omap_l3_noc.o
+drivers/bus/omap_l3_noc.c:260: warning: data definition has no type or storage class
+drivers/bus/omap_l3_noc.c:260: warning: type defaults to 'int' in declaration of 'arch_initcall_sync'
+drivers/bus/omap_l3_noc.c:260: warning: parameter names (without types) in function declaration
+drivers/bus/omap_l3_noc.c:256: warning: 'omap4_l3_init' defined but not used
 
-Given the subject line I'd be extremely likely to delete this patch
-unread, Documentation: says "this isn't relevant".
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/7cb1b9e3/attachment-0001.sig>
+Adding module_init() and macros in omap_l3_noc/smx drivers when building
+as modules to remove the above warning.
+
+Reported-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ drivers/bus/omap_l3_noc.c |    9 +++++++++
+ drivers/bus/omap_l3_smx.c |   10 ++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/bus/omap_l3_noc.c b/drivers/bus/omap_l3_noc.c
+index d15225f..8222a33 100644
+--- a/drivers/bus/omap_l3_noc.c
++++ b/drivers/bus/omap_l3_noc.c
+@@ -257,10 +257,19 @@ static int __init omap4_l3_init(void)
+ {
+ 	return platform_driver_register(&omap4_l3_driver);
+ }
++#ifndef CONFIG_OMAP_INTERCONNECT_MODULE
+ postcore_initcall_sync(omap4_l3_init);
++#else
++module_init(omap4_l3_init);
++#endif
+ 
+ static void __exit omap4_l3_exit(void)
+ {
+ 	platform_driver_unregister(&omap4_l3_driver);
+ }
+ module_exit(omap4_l3_exit);
++
++MODULE_ALIAS("platform: omap_l3_noc");
++MODULE_AUTHOR("Texas Instruments Inc.");
++MODULE_DESCRIPTION("OMAP4XXX L3 Interconnect Driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/bus/omap_l3_smx.c b/drivers/bus/omap_l3_smx.c
+index acc2164..00f712d 100644
+--- a/drivers/bus/omap_l3_smx.c
++++ b/drivers/bus/omap_l3_smx.c
+@@ -22,6 +22,7 @@
+  * USA
+  */
+ 
++#include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/slab.h>
+ #include <linux/platform_device.h>
+@@ -288,10 +289,19 @@ static int __init omap3_l3_init(void)
+ {
+ 	return platform_driver_probe(&omap3_l3_driver, omap3_l3_probe);
+ }
++#ifndef CONFIG_OMAP_INTERCONNECT_MODULE
+ postcore_initcall_sync(omap3_l3_init);
++#else
++module_init(omap3_l3_init);
++#endif
+ 
+ static void __exit omap3_l3_exit(void)
+ {
+ 	platform_driver_unregister(&omap3_l3_driver);
+ }
+ module_exit(omap3_l3_exit);
++
++MODULE_ALIAS("platform: omap_l3_smx");
++MODULE_AUTHOR("Texas Instruments Inc.");
++MODULE_DESCRIPTION("OMAP3XXX L3 Interconnect Driver");
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.10.4
