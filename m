@@ -1,77 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 17 Oct 2012 16:33:44 +0100
-Subject: [PATCH 7/7] ARM: perf: consistently use arm_pmu->name for PMU name
-In-Reply-To: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
-References: <1350488024-3224-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1350488024-3224-8-git-send-email-will.deacon@arm.com>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Wed, 17 Oct 2012 21:05:01 +0530
+Subject: [PATCH 1/8] [media] s5p-fimc: Use clk_prepare_enable and
+ clk_disable_unprepare
+In-Reply-To: <507EC1BF.6040107@samsung.com>
+References: <1350472311-9748-1-git-send-email-sachin.kamat@linaro.org>
+ <507EC1BF.6040107@samsung.com>
+Message-ID: <CAK9yfHymckQLOp=xavQ1sj5uJKRg7tFMXgvo68Dp8GL6N9g0JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Perf has three ways to name a PMU: either by passing an explicit char *,
-reading arm_pmu->name or accessing arm_pmu->pmu.name.
+Hi Sylwester,
 
-Just use arm_pmu->name consistently in the ARM backend.
+Thanks for the review.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/pmu.h       |    2 +-
- arch/arm/kernel/perf_event.c     |    4 ++--
- arch/arm/kernel/perf_event_cpu.c |    4 ++--
- 3 files changed, 5 insertions(+), 5 deletions(-)
+On 17 October 2012 20:03, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
+> Hi Sachin,
+>
+> On 10/17/2012 01:11 PM, Sachin Kamat wrote:
+>> Replace clk_enable/clk_disable with clk_prepare_enable/clk_disable_unprepare
+>> as required by the common clock framework.
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index a209a38..f24edad 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -93,7 +93,7 @@ struct arm_pmu {
- 
- extern const struct dev_pm_ops armpmu_dev_pm_ops;
- 
--int armpmu_register(struct arm_pmu *armpmu, char *name, int type);
-+int armpmu_register(struct arm_pmu *armpmu, int type);
- 
- u64 armpmu_event_update(struct perf_event *event);
- 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 710c65c..1f7166f 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -507,12 +507,12 @@ static void __init armpmu_init(struct arm_pmu *armpmu)
- 	};
- }
- 
--int armpmu_register(struct arm_pmu *armpmu, char *name, int type)
-+int armpmu_register(struct arm_pmu *armpmu, int type)
- {
- 	armpmu_init(armpmu);
- 	pr_info("enabled with %s PMU driver, %d counters available\n",
- 			armpmu->name, armpmu->num_events);
--	return perf_pmu_register(&armpmu->pmu, name, type);
-+	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
- }
- 
- /*
-diff --git a/arch/arm/kernel/perf_event_cpu.c b/arch/arm/kernel/perf_event_cpu.c
-index db9c6b5..9a4f630 100644
---- a/arch/arm/kernel/perf_event_cpu.c
-+++ b/arch/arm/kernel/perf_event_cpu.c
-@@ -46,7 +46,7 @@ const char *perf_pmu_name(void)
- 	if (!cpu_pmu)
- 		return NULL;
- 
--	return cpu_pmu->pmu.name;
-+	return cpu_pmu->name;
- }
- EXPORT_SYMBOL_GPL(perf_pmu_name);
- 
-@@ -287,7 +287,7 @@ static int __devinit cpu_pmu_device_probe(struct platform_device *pdev)
- 	cpu_pmu = pmu;
- 	cpu_pmu->plat_device = pdev;
- 	cpu_pmu_init(cpu_pmu);
--	armpmu_register(cpu_pmu, cpu_pmu->name, PERF_TYPE_RAW);
-+	armpmu_register(cpu_pmu, PERF_TYPE_RAW);
- 
- 	return 0;
- }
+>
+> You need to be careful with those replacements, since the clk *_(un)prepare
+> functions may sleep, i.e. they must not be called from atomic context.
+
+OK.
+
+>
+> Most of the s5p-* drivers have already added support for clk_(un)prepare.
+> Thus most of your changes in this patch are not needed. I seem to have only
+> missed fimc-mdevice.c, other modules are already reworked
+
+I did not find these changes in your tree. Please let me know the
+branch where these changes are available.
+
+>
+> $ git grep -5  clk_prepare  -- drivers/media/platform/s5p-fimc
+> drivers/media/platform/s5p-fimc/fimc-core.c-
+> drivers/media/platform/s5p-fimc/fimc-core.c-    for (i = 0; i < MAX_FIMC_CLOCKS; i++) {
+> drivers/media/platform/s5p-fimc/fimc-core.c-            fimc->clock[i] = clk_get(&fimc->pdev->dev, fimc_clocks[i]);
+> drivers/media/platform/s5p-fimc/fimc-core.c-            if (IS_ERR(fimc->clock[i]))
+
+>> I would prefer you have added the required changes at fimc_md_get_clocks()
+> and fimc_md_put_clocks() functions.
+
+Ok. I will check this.
+>
+
 -- 
-1.7.4.1
+With warm regards,
+Sachin
