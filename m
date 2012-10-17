@@ -1,84 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 17 Oct 2012 17:11:39 +0900
-Subject: [PATCH v2 v2 v2 8/8] spi/s3c64xx: use correct
- dma_transfer_direction type
-In-Reply-To: <1349813638-4617-9-git-send-email-arnd@arndb.de>
-References: <1349813638-4617-1-git-send-email-arnd@arndb.de>
- <1349813638-4617-9-git-send-email-arnd@arndb.de>
-Message-ID: <003a01cdac3f$08fe40d0$1afac270$%kim@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 17 Oct 2012 10:14:10 +0200
+Subject: [PATCH v6 0/3] Updated Cortex-M3 series
+In-Reply-To: <20120926192759.GC19685@pengutronix.de>
+References: <1343988614-5508-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20120816202932.GY2232@pengutronix.de>
+ <20120921190002.GU5525@pengutronix.de> <5061C3FE.7050400@arm.com>
+ <20120925150026.GG21730@pengutronix.de>
+ <20120926180349.GF15578@mudshark.cambridge.arm.com>
+ <20120926192759.GC19685@pengutronix.de>
+Message-ID: <20121017081410.GU639@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> There is a subtle difference between dma_transfer_direction and
-> dma_data_direction: the former is used by the dmaengine framework,
-> while the latter is used by the dma-mapping API. Although the
-> purpose is comparable, the actual values are different and must
-> not be mixed. In this case, the driver just wants to use
-> dma_transfer_direction.
-> 
-> Without this patch, building s3c6400_defconfig results in:
-> 
-> drivers/spi/spi-s3c64xx.c: In function 's3c64xx_spi_dmacb':
-> drivers/spi/spi-s3c64xx.c:239:21: warning: comparison between
-> 	'enum dma_data_direction' and 'enum dma_transfer_direction' [-
-> Wenum-compare]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ben Dooks <ben-linux@fluff.org>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Hello,
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+On Wed, Sep 26, 2012 at 09:27:59PM +0200, Uwe Kleine-K?nig wrote:
+> On Wed, Sep 26, 2012 at 07:03:49PM +0100, Will Deacon wrote:
+> > On Tue, Sep 25, 2012 at 04:00:26PM +0100, Uwe Kleine-K?nig wrote:
+> > > On Tue, Sep 25, 2012 at 03:47:26PM +0100, Jonathan Austin wrote:
+> > > > Looking at the patch series at a very superficial level, I wonder why
+> > > > you've chosen not to include any Kconfig/NVIC support at this stage,
+> > > > especially as you've posted some before and there appears to be
+> > > > something (presumably) working in your efm32 branch...
+> > > >
+> > > > It would be a shame to spend time on merging the basic support if there
+> > > > are issues that mean the interrupt support won't follow.
+> > > I plan to expand common/gic.c for interrupt support. Currently I don't
+> > > do much though because getting feedback and the changes into mainline is
+> > > quite hard and I don't want to spend time now and hear later that I did
+> > > it wrong or something. So I put my efforts on hold and only ping from
+> > > time to time.  :-(
+> > 
+> > My personal view is that merging the code without support for interrupts is
+> > fairly pointless, so the nvic code should certainly be included. I
+> > wouldn't worry too much about merging it with gic.c initially. That can come
+> That would be ok for me, too.
+I thought about that again, and I think merging with hacked irq support
+isn't good. Note that even when the irq support goes in you still need
+several patches to support an M3 platform. So one more patch in the
+private queue doesn't hurt IMHO.
 
-BTW, don't we need following accordingly?
+Best regards
+Uwe
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 1a81c90..a0bb55e 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1067,11 +1067,11 @@ static int __devinit s3c64xx_spi_get_dmares(
-
- 	if (tx) {
- 		dma_data = &sdd->tx_dma;
--		dma_data->direction = DMA_TO_DEVICE;
-+		dma_data->direction = DMA_MEM_TO_DEV;
- 		chan_str = "tx";
- 	} else {
- 		dma_data = &sdd->rx_dma;
--		dma_data->direction = DMA_FROM_DEVICE;
-+		dma_data->direction = DMA_DEV_TO_MEM;
- 		chan_str = "rx";
- 	}
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
-
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: spi-devel-general at lists.sourceforge.net
-> ---
->  drivers/spi/spi-s3c64xx.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-> index d1c8441f..2e44dd6 100644
-> --- a/drivers/spi/spi-s3c64xx.c
-> +++ b/drivers/spi/spi-s3c64xx.c
-> @@ -132,7 +132,7 @@
-> 
->  struct s3c64xx_spi_dma_data {
->  	unsigned		ch;
-> -	enum dma_data_direction direction;
-> +	enum dma_transfer_direction direction;
->  	enum dma_ch	dmach;
->  	struct property		*dma_prop;
->  };
-> --
-> 1.7.10
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
