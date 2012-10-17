@@ -1,43 +1,62 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Wed, 17 Oct 2012 12:12:44 +0200
-Subject: [Celinux-dev] PDF documentation
-In-Reply-To: <507DA84A.2080904@am.sony.com>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
- <20121016143522.086F2204292@gemini.denx.de> <507DA84A.2080904@am.sony.com>
-Message-ID: <20121017101244.71A572029CB@gemini.denx.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 17 Oct 2012 11:20:15 +0100
+Subject: [RFC PATCH] ARM: kernel: update cpuinfo to print all online CPUs
+ features
+In-Reply-To: <20121016214752.GH21164@n2100.arm.linux.org.uk>
+References: <1350404684-6883-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <507DA08B.502@ti.com>
+ <20121016214752.GH21164@n2100.arm.linux.org.uk>
+Message-ID: <20121017102015.GA13189@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Tim,
+On Tue, Oct 16, 2012 at 10:47:52PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 16, 2012 at 11:29:39PM +0530, Santosh Shilimkar wrote:
+> > Not exactly related to the $subject patch, but I remember doing a patch
+> > to have cat /proc/cpuinfo spitting only online CPUs just like x86 using
+> > for_each_online_cpu(i).
+> > At that point Russell mentioned about a possibility of read() syscall
+> > spreading over the hot-plug operation and hence the above may not
+> > be safe.
+> >
+> > is that right Russell ?
+> 
+> That is correct, but you will notice that the code now uses the online
+> cpus rather than the present, inspite of my objections.  I gave up
+> fighting the case, so now people get to live with the consequences of
+> this.
+> 
+> This will be fun with dynamic hotplugging with big.LITTLE when people
+> come to read any of these files which change their output with the
+> online CPUs.  Oh what fun we're in for there.
 
-In message <507DA84A.2080904@am.sony.com> you wrote:
->
-> Several years ago, CELF tried to add a similar capability to
-> MoinMoin (the ability to take arbitrary page lists, and
-> automatically publish them to PDF).  Unfortunately, it didn't
-> work very well.  The tools to produce PDF were pretty bad back then.
+I had a look at how glibc currently detects cpus in __get_nprocs() and all
+methods end up relying on online CPUs:
 
-We use Foswiki for capabilities like this.  Note that I definitely
-don't want to start a "my wiki is better than your wiki" religous war
-here ;-)
+- /sys/devices/system/cpu/online
+- /proc/stat
+- /proc/cpuinfo
 
-> It sounds like the tools have improved since we did this, and
-> maybe we should look again and see if there's something similar
-> we could add to the elinux wiki.
+Given the thread:
 
-You are using mediawiki - there appear to be such solutions as well,
-see for example
-http://www.blue-spice.org/de/produkte/packages/bookmaker/
-Sorry, this is in German only, and no free software.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/054081.html
 
-Best regards,
+I do not think there is room to change the current behaviour of /proc/cpuinfo
+as far as the online vs. present argument goes, and I certainly did not try.
 
-Wolfgang Denk
+I posted this code just to understand if it makes sense to expose all CPU ids
+in /proc/cpuinfo the way I did (the same way x86 does, even though the code is
+slightly different).
 
--- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-"He only drinks when he gets depressed." "Why does he get depressed?"
-"Sometimes it's because he hasn't had a drink."
-                                     - Terry Pratchett, _Men at Arms_
+> I guess the only way to convince people is to let them make their
+> mistakes in the kernel.
+
+That's what I wanted to prevent by posting this code, namely getting
+feedback on the best way to improve /proc/cpuinfo for systems where CPU
+ids are not homogeneous.
+
+The "online vs. present" issue is already there as Russell pointed out.
+
+Thank you very much for the review, any further feedback appreciated.
+
+Lorenzo
