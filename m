@@ -1,90 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 17 Oct 2012 16:38:36 +0900
-Subject: [PATCH 5/8] ARM: S3C64XX: Handle new Amrut modules on Cragganmore
+Date: Wed, 17 Oct 2012 16:38:39 +0900
+Subject: [PATCH 8/8] ARM: S3C64XX: Add handset module to probed Glenfarclas
+ modules
 In-Reply-To: <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20121017073813.GI14199@opensource.wolfsonmicro.com>
  <1350459519-20462-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1350459519-20462-6-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1350459519-20462-9-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These use a different GPIO for the jack polarity selection.
-
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- arch/arm/mach-s3c64xx/mach-crag6410-module.c |   35 +++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
+ arch/arm/mach-s3c64xx/mach-crag6410.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-s3c64xx/mach-crag6410-module.c b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-index 15e0c13..a6c156d 100644
---- a/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-+++ b/arch/arm/mach-s3c64xx/mach-crag6410-module.c
-@@ -187,12 +187,13 @@ static struct regulator_init_data wm8994_ldo2 = {
+diff --git a/arch/arm/mach-s3c64xx/mach-crag6410.c b/arch/arm/mach-s3c64xx/mach-crag6410.c
+index 7e35523..2abe95d 100644
+--- a/arch/arm/mach-s3c64xx/mach-crag6410.c
++++ b/arch/arm/mach-s3c64xx/mach-crag6410.c
+@@ -711,6 +711,7 @@ static struct i2c_board_info i2c_devs1[] __devinitdata = {
+ 	  .irq = S3C_EINT(0),
+ 	  .platform_data = &glenfarclas_pmic_pdata },
  
- static struct wm8994_pdata wm8994_pdata = {
- 	.gpio_base = CODEC_GPIO_BASE,
-+	.micb2_delay = 150,
- 	.gpio_defaults = {
- 		0x3,          /* IRQ out, active high, CMOS */
- 	},
- 	.ldo = {
--		 { .init_data = &wm8994_ldo1, },
--		 { .init_data = &wm8994_ldo2, },
-+		 { .enable = S3C64XX_GPN(6), .init_data = &wm8994_ldo1, },
-+		 { .enable = S3C64XX_GPN(4), .init_data = &wm8994_ldo2, },
- 	},
- };
- 
-@@ -203,7 +204,7 @@ static const struct i2c_board_info wm1277_devs[] = {
- 	},
- };
- 
--static struct arizona_pdata wm5102_pdata = {
-+static struct arizona_pdata wm5102_reva_pdata = {
- 	.ldoena = S3C64XX_GPN(7),
- 	.gpio_base = CODEC_GPIO_BASE,
- 	.irq_active_high = true,
-@@ -218,6 +219,31 @@ static struct s3c64xx_spi_csinfo wm5102_spi_csinfo = {
- 	.line = S3C64XX_GPN(5),
- };
- 
-+static struct spi_board_info wm5102_reva_spi_devs[] = {
-+	[0] = {
-+		.modalias	= "wm5102",
-+		.max_speed_hz	= 10 * 1000 * 1000,
-+		.bus_num	= 0,
-+		.chip_select	= 1,
-+		.mode		= SPI_MODE_0,
-+		.irq		= GLENFARCLAS_PMIC_IRQ_BASE +
-+				  WM831X_IRQ_GPIO_2,
-+		.controller_data = &wm5102_spi_csinfo,
-+		.platform_data = &wm5102_reva_pdata,
-+	},
-+};
-+
-+static struct arizona_pdata wm5102_pdata = {
-+	.ldoena = S3C64XX_GPN(7),
-+	.gpio_base = CODEC_GPIO_BASE,
-+	.irq_active_high = true,
-+	.micd_pol_gpio = CODEC_GPIO_BASE + 2,
-+	.gpio_defaults = {
-+		[2] = 0x10000, /* AIF3TXLRCLK */
-+		[3] = 0x4,     /* OPCLK */
-+	},
-+};
-+
- static struct spi_board_info wm5102_spi_devs[] = {
- 	[0] = {
- 		.modalias	= "wm5102",
-@@ -278,6 +304,9 @@ static __devinitdata const struct {
- 	{ .id = 0x3c, .rev = 0xff, .name = "1273-EV1 Longmorn" },
- 	{ .id = 0x3d, .rev = 0xff, .name = "1277-EV1 Littlemill",
- 	  .i2c_devs = wm1277_devs, .num_i2c_devs = ARRAY_SIZE(wm1277_devs) },
-+	{ .id = 0x3e, .rev = 0, .name = "WM5102-6271-EV1-CS127 Amrut",
-+	  .spi_devs = wm5102_reva_spi_devs,
-+	  .num_spi_devs = ARRAY_SIZE(wm5102_reva_spi_devs) },
- 	{ .id = 0x3e, .rev = -1, .name = "WM5102-6271-EV1-CS127 Amrut",
- 	  .spi_devs = wm5102_spi_devs,
- 	  .num_spi_devs = ARRAY_SIZE(wm5102_spi_devs) },
++	{ I2C_BOARD_INFO("wlf-gf-module", 0x20) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x22) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x24) },
+ 	{ I2C_BOARD_INFO("wlf-gf-module", 0x25) },
 -- 
 1.7.10.4
