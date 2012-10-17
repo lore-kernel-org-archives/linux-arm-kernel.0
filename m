@@ -1,44 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 17 Oct 2012 09:38:29 +0100
-Subject: [PATCH] i2c: at91: add dma support
-In-Reply-To: <1349876587-31182-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1349876587-31182-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20121017083828.GJ21164@n2100.arm.linux.org.uk>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 17 Oct 2012 10:39:25 +0200
+Subject: [PATCH RFC 02/11 v4] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <20121016164326.GA4858@kroah.com>
+References: <1350343887-7344-1-git-send-email-stigge@antcom.de>
+ <1350343887-7344-3-git-send-email-stigge@antcom.de>
+ <20121015235720.GA3132@kroah.com> <507D58D9.2040607@antcom.de>
+ <20121016164326.GA4858@kroah.com>
+Message-ID: <507E6EBD.6040101@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 03:43:07PM +0200, ludovic.desroches at atmel.com wrote:
-> +	txdesc = chan_tx->device->device_prep_slave_sg(chan_tx, &dma->sg,
-> +		1, DMA_TO_DEVICE, DMA_PREP_INTERRUPT | DMA_CTRL_ACK, NULL);
+On 10/16/2012 06:43 PM, Greg KH wrote:
+> On Tue, Oct 16, 2012 at 02:53:45PM +0200, Roland Stigge wrote:
+>> On 10/16/2012 01:57 AM, Greg KH wrote:
+>>> On Tue, Oct 16, 2012 at 01:31:18AM +0200, Roland Stigge wrote:
+>>>> +int gpio_block_export(struct gpio_block *block)
+>>>> +{
+>>>> +	int		status;
+>>>> +	struct device	*dev;
+>>>> +
+>>>> +	/* can't export until sysfs is available ... */
+>>>> +	if (!gpio_class.p) {
+>>>> +		pr_debug("%s: called too early!\n", __func__);
+>>>> +		return -ENOENT;
+>>>> +	}
+>>>> +
+>>>> +	mutex_lock(&sysfs_lock);
+>>>> +	dev = device_create(&gpio_class, NULL, MKDEV(0, 0), block,
+>>>> +			    block->name);
+>>>> +	if (!IS_ERR(dev))
+>>>> +		status = sysfs_create_group(&dev->kobj, &gpio_block_attr_group);
+>>>> +	else
+>>>> +		status = PTR_ERR(dev);
+>>>> +	mutex_unlock(&sysfs_lock);
+>>>
+>>> You just raced with userspace telling it that the device was present,
+>>> yet the attributes are not there.  Don't do that, use the default class
+>>> attributes for the class and then the driver core will create them
+>>> automagically without needing to this "by hand" at all.
+>>
+>> I guess you mean class attributes like gpio_class_attrs[] of gpio_class?
+> 
+> Yes.
+> 
+>> Aren't class attributes specific to a class only (i.e. only one
+>> attribute at the root for all devices)? What I needed above are
+>> attributes for the block itself (of which there can be several). So we
+>> need device attributes for each block, not class attributes here.
+> 
+> Yes, that is what the dev_attrs field in 'struct class' is for.
 
-No, a while back the DMA engine API changed.  It no longer takes
-DMA_TO_DEVICE/DMA_FROM_DEVICE but DMA_MEM_TO_DEV and DMA_DEV_TO_MEM.
+That's what I was missing. Will update.
 
-> +	/* Keep in mind that we won't use dma to read the last two bytes */
-> +	at91_twi_irq_save(dev);
-> +	dma_addr = dma_map_single(dev->dev, dev->buf, dev->buf_len - 2,
-> +				  DMA_FROM_DEVICE);
+Thanks,
 
-Ditto.
-
-> +	dma->xfer_in_progress = true;
-> +	cookie = rxdesc->tx_submit(rxdesc);
-> +	if (dma_submit_error(cookie)) {
-
-tx_submit never errors (anymore.)
-
-> +	slave_config.direction = DMA_TO_DEVICE;
-
-Same comment as for the other directions.  Note that DMA engine drivers
-really should ignore this parameter now, and DMA engine users should phase
-it out.
-
-> +	if (dmaengine_slave_config(dma->chan_tx, &slave_config)) {
-> +		dev_err(dev->dev, "failed to configure tx channel\n");
-> +		ret = -EINVAL;
-> +		goto error;
-> +	}
-> +
-> +	slave_config.direction = DMA_FROM_DEVICE;
-
-Ditto.
+Roland
