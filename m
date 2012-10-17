@@ -1,45 +1,65 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Wed, 17 Oct 2012 20:27:15 +0200
-Subject: [PATCH V2 0/7] support the cpts found on am335x devices
-In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293E9F86E9@DBDE01.ent.ti.com>
-References: <cover.1350329726.git.richardcochran@gmail.com>
- <EB1619762EAF8B4E97A227FB77B7E0293E9F82F0@DBDE01.ent.ti.com>
- <20121016171407.GA2176@netboy.at.omicron.at>
- <EB1619762EAF8B4E97A227FB77B7E0293E9F86E9@DBDE01.ent.ti.com>
-Message-ID: <20121017182714.GC2412@netboy.at.omicron.at>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 17 Oct 2012 20:33:08 +0200
+Subject: [PATCH] Nokia N9/N900/N950 -- mention product names
+In-Reply-To: <20120504181105.GL5613@atomide.com>
+References: <1330967337-9634-1-git-send-email-aaro.koskinen@nokia.com>
+ <20120501104801.GA23559@elf.ucw.cz>
+ <20120504181105.GL5613@atomide.com>
+Message-ID: <20121017183307.GA12560@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 11:11:29PM +0000, N, Mugunthan V wrote:
-> 
-> Yes, I do agree that driver handles it. As Half roll over and Full roll
-> over events are not handled in the driver, I am just curious how will
-> the misaligned TS would be handled and also in cpts set time, the Lower
-> 32 bit time is written to CPTS counter
+Hi!
 
-#include <linux/clocksource.h>
+This adds product names (that most users know) to Kconfig and board
+comments.
 
-> Since we poll for the 32bit over flow for every HZ * 8 cycle, won't
-> there be a system overhead. If the CPTS ref clock is changed according
-> to the ptp freq adjust api, how will the timecounter take care of change
-> in frequency
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-There is nothing to do here. What are you asking?
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 346fd26..da08226 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -263,14 +263,14 @@ config MACH_NOKIA_N8X0
+ 	select MACH_NOKIA_N810_WIMAX
+ 
+ config MACH_NOKIA_RM680
+-	bool "Nokia RM-680/696 board"
++	bool "Nokia N9/N950 (RM-680/696) phones"
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBB
+ 	select MACH_NOKIA_RM696
+ 
+ config MACH_NOKIA_RX51
+-	bool "Nokia RX-51 board"
++	bool "Nokia N900 phone (RX-51)"
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CBB
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index 0ad1bb3b..26965f3 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -1,5 +1,5 @@
+ /*
+- * Board support file for Nokia RM-680/696.
++ * Board support file for Nokia N9/N950 (aka RM-680/696).
+  *
+  * Copyright (C) 2010 Nokia
+  *
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 345dd93..b60ca9d 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -1,5 +1,5 @@
+ /*
+- * linux/arch/arm/mach-omap2/board-rx51.c
++ * Board support file for Nokia N900 (aka RX-51).
+  *
+  * Copyright (C) 2007, 2008 Nokia
+  *
 
-> The current driver which is in vanilla kernel doesn't use extended slave
-> address which are conflict between TI814x CPSW IP version and AM335x CPSW
-> IP version. I have just posted my version of CPTS implementation. May be
-> we can work together make the driver compatible with both CPSW versions
-
-Okay.
-
-> Since CPSW is a 3port Switch we should not fix time stamping will be enabled
-> only for slave 0 or passing slave number through DT. Its better if we
-> can configure both the slaves. This can be tested with EVM-sk which has
-> both the slave ports pinned out.
-
-I hope that you meant, "better if we can configure _either_ slave."
-Considering how SO_TIMESTAMPING works, you can't use both at once.
-
-Thanks,
-Richard
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
