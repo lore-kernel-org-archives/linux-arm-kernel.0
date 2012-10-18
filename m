@@ -1,32 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Oct 2012 10:53:28 +0100
-Subject: [PATCH V2 3/3] ARM: tegra: move debug-macro.S to include/debug
-In-Reply-To: <507F1F31.2060503@wwwdotorg.org>
-References: <1350328024-30485-1-git-send-email-swarren@wwwdotorg.org>
- <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
- <507EC303.1080000@gmail.com> <507EDB37.1060102@wwwdotorg.org>
- <507F1F31.2060503@wwwdotorg.org>
-Message-ID: <20121018095328.GS21164@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 18 Oct 2012 12:00:12 +0200
+Subject: [PATCH] ARM/dts: omap3: Fix mcbsp2/3 hwmods to be able to probe
+ the drivers for audio
+In-Reply-To: <1350552307-10226-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1350552307-10226-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <507FD32C.7010108@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 03:12:17PM -0600, Stephen Warren wrote:
-> That implies we really do need to keep the two pieces of code completely
-> in sync, so a shared header is the right way to go. It also implies that
-> having duplicate mappings of the same physical address doesn't cause any
-> immediate obvious catastrophic problems.
+On 10/18/2012 11:25 AM, Peter Ujfalusi wrote:
+> Fixes the following errors:
+> [    2.318084] omap-mcbsp 49022000.mcbsp: invalid rx DMA channel
+> [    2.324432] omap-mcbsp 49024000.mcbsp: invalid rx DMA channel
 > 
-> Ways we might avoid files in arch/arm/include/debug having to use
-> relative include paths to pick up that header are:
+> Which is because we failed to link the sidetone hwmod for McBSP2/3. The
+> missing sidetone hwmod link will prevent omap_device_alloc() to append the
+> DMA resources since we - accidentally - end up having the same number of
+> resources provided from DT (IO/IRQ) as we have in hwmod for the McBSP ports
+> without the ST resources.
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Why not take the opposite approach.  Treat the platform as setting up the
-addresses for the UART.  Then arrange for the debug macros to match that.
-Or we define a common virtual address for debug UARTs (which platforms
-would not be able to use).
+Acked-by: Benoit Cousson <b-cousson@ti.com>
 
-> b) Rework debug-macro.S so that it isn't an include file, but rather a
-> regular top-level file.
+Regards,
+Benoit
 
-No, that won't work.  It's used in two places - the kernel and the
-decompressor.  Hence why it is an include file (it's not an include
-file just for the fun of it.)
+> ---
+> 
+> Hi Tony, Benoit,
+> 
+> Can you please take this patch for 3.7 since if we boot with DT audio will not
+> work on BeagleBoard and on boards which uses McBSP2 or 3 for audio.
+> 
+> Thank you,
+> Peter
+> 
+>  arch/arm/boot/dts/omap3.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+> index f38ea87..696e929 100644
+> --- a/arch/arm/boot/dts/omap3.dtsi
+> +++ b/arch/arm/boot/dts/omap3.dtsi
+> @@ -257,7 +257,7 @@
+>  			interrupt-names = "common", "tx", "rx", "sidetone";
+>  			interrupt-parent = <&intc>;
+>  			ti,buffer-size = <1280>;
+> -			ti,hwmods = "mcbsp2";
+> +			ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
+>  		};
+>  
+>  		mcbsp3: mcbsp at 49024000 {
+> @@ -272,7 +272,7 @@
+>  			interrupt-names = "common", "tx", "rx", "sidetone";
+>  			interrupt-parent = <&intc>;
+>  			ti,buffer-size = <128>;
+> -			ti,hwmods = "mcbsp3";
+> +			ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
+>  		};
+>  
+>  		mcbsp4: mcbsp at 49026000 {
+> 
