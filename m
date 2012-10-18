@@ -1,89 +1,105 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Thu, 18 Oct 2012 21:42:55 +0530
-Subject: [PATCH 2/3] RTC: omap-rtc: enable pm_runtime
-In-Reply-To: <1350575631-15523-2-git-send-email-zonque@gmail.com>
-References: <1350575631-15523-1-git-send-email-zonque@gmail.com>
- <1350575631-15523-2-git-send-email-zonque@gmail.com>
-Message-ID: <50802A87.9010409@ti.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 18 Oct 2012 16:13:30 +0000
+Subject: [PATCH 4/5] net: cpsw: Add parent<->child relation support
+ between cpsw and mdio
+In-Reply-To: <9a4368fa1264f573072544a34169a3f0f8797989.1350327325.git.richardcochran@gmail.com>
+References: <cover.1350327320.git.richardcochran@gmail.com>
+ <9a4368fa1264f573072544a34169a3f0f8797989.1350327325.git.richardcochran@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB43AE0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/18/2012 9:23 PM, Daniel Mack wrote:
-> This is needed as preparation for platforms where using pm runtime usage
-> is mandatory.
+On Tue, Oct 16, 2012 at 00:46:34, Richard Cochran wrote:
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> CPGMAC SubSystem consist of various sub-modules, like, mdio, cpdma,
+> cpsw, etc... These sub-modules are also used in some of Davinci family
+> of devices. Now based on requirement, use-case and available technology
+> nodes the integration of these sub-modules varies across devices.
+> 
+> So coming back to Linux net driver, currently separate and independent
+> platform devices & drivers for CPSW and MDIO is implemented. In case of
+> Davinci they both has separate control, from resources perspective,
+> like clock.
+> 
+> In case of AM33XX, the resources are shared and only one register
+> bit-field is provided to control module/clock enable/disable, makes it
+> difficult to handle common resource.
+> 
+> So the solution here implemented in this patch is,
+> 
+> Create parent<->child relationship between both the drivers, making
+> CPSW as a parent and MDIO as its child and enumerate all the child nodes
+> under cpsw module.
+> Both the drivers will function exactly the way it was operating before,
+> including runtime-pm functionality. No change is required in MDIO driver
+> (for that matter to any child driver).
+> 
+> As this is only supported during DT boot, the parent<->child relationship
+> is created and populated in DT execution flow. The only required change
+> is inside DTS file, making MDIO as a child to CPSW node.
+> 
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+> ---
+>  drivers/net/ethernet/ti/cpsw.c |   16 ++++++++++++++--
+>  1 files changed, 14 insertions(+), 2 deletions(-)
+> 
 
-It looks like, you just duplicated effort here.
-RTC patches have been already submitted quite some time back for AM33xx,
-probably you missed to do google before spending time on this.
-
-Patch Series -
-http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg23253.html
-
-
-Denial,
-It would be really helpful if you could test these patches and ack them.
-
-Just FYI, we have bunch of parallel activities going inside team to
-upstream all the patches/module/drivers/features, so to avoid such
-duplication of effort, I suggest you to google for the patches or ping
-on mailing list.
+Thanks for stepping ahead and submitting patches from my tree.
 
 Thanks,
 Vaibhav
 
-> ---
->  drivers/rtc/rtc-omap.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index 0b614e3..baa876e 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -17,6 +17,7 @@
->  #include <linux/module.h>
->  #include <linux/ioport.h>
->  #include <linux/delay.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/rtc.h>
->  #include <linux/bcd.h>
->  #include <linux/platform_device.h>
-> @@ -322,6 +323,9 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
->  		goto fail;
+> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+> index df55e24..fb1a692 100644
+> --- a/drivers/net/ethernet/ti/cpsw.c
+> +++ b/drivers/net/ethernet/ti/cpsw.c
+> @@ -827,7 +827,7 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+>  	}
+>  	data->mac_control = prop;
+>  
+> -	for_each_child_of_node(node, slave_node) {
+> +	for_each_node_by_name(slave_node, "slave") {
+>  		struct cpsw_slave_data *slave_data = data->slave_data + i;
+>  		const char *phy_id = NULL;
+>  		const void *mac_addr = NULL;
+> @@ -862,6 +862,14 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+>  		i++;
 >  	}
 >  
+> +	/*
+> +	 * Populate all the child nodes here...
+> +	 */
+> +	ret = of_platform_populate(node, NULL, NULL, &pdev->dev);
+> +	/* We do not want to force this, as in some cases may not have child */
+> +	if (ret)
+> +		pr_warn("Doesn't have any child node\n");
+> +
+>  	return 0;
+>  
+>  error_ret:
+> @@ -895,6 +903,11 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
+>  	priv->msg_enable = netif_msg_init(debug_level, CPSW_DEBUG);
+>  	priv->rx_packet_max = max(rx_packet_max, 128);
+>  
+> +	/*
+> +	 * This may be required here for child devices.
+> +	 */
 > +	pm_runtime_enable(&pdev->dev);
-> +	pm_runtime_get_sync(&pdev->dev);
 > +
->  	rtc = rtc_device_register(pdev->name, &pdev->dev,
->  			&omap_rtc_ops, THIS_MODULE);
->  	if (IS_ERR(rtc)) {
-> @@ -420,6 +424,8 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
->  		free_irq(omap_rtc_alarm, rtc);
+>  	if (cpsw_probe_dt(&priv->data, pdev)) {
+>  		pr_err("cpsw: platform data missing\n");
+>  		ret = -ENODEV;
+> @@ -921,7 +934,6 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
+>  	for (i = 0; i < data->slaves; i++)
+>  		priv->slaves[i].slave_num = i;
 >  
->  	rtc_device_unregister(rtc);
-> +	pm_runtime_put_sync(&pdev->dev);
-> +	pm_runtime_disable(&pdev->dev);
->  	iounmap(rtc_base);
->  	release_mem_region(mem->start, resource_size(mem));
->  	return 0;
-> @@ -442,11 +448,15 @@ static int omap_rtc_suspend(struct platform_device *pdev, pm_message_t state)
->  	else
->  		rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
->  
-> +	pm_runtime_put_sync(&pdev->dev);
-> +
->  	return 0;
->  }
->  
->  static int omap_rtc_resume(struct platform_device *pdev)
->  {
-> +	pm_runtime_get_sync(&pdev->dev);
-> +
->  	if (device_may_wakeup(&pdev->dev))
->  		disable_irq_wake(omap_rtc_alarm);
->  	else
+> -	pm_runtime_enable(&pdev->dev);
+>  	priv->clk = clk_get(&pdev->dev, "fck");
+>  	if (IS_ERR(priv->clk)) {
+>  		dev_err(&pdev->dev, "fck is not found\n");
+> -- 
+> 1.7.2.5
+> 
 > 
