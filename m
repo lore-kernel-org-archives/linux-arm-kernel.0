@@ -1,130 +1,27 @@
-From: mporter@ti.com (Matt Porter)
-Date: Thu, 18 Oct 2012 09:26:55 -0400
-Subject: [RFC PATCH v3 16/16] ARM: dts: add AM33XX SPI support
-In-Reply-To: <1350566815-409-1-git-send-email-mporter@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
-Message-ID: <1350566815-409-17-git-send-email-mporter@ti.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 18 Oct 2012 15:27:06 +0200
+Subject: PDF documentation
+In-Reply-To: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+Message-ID: <508003AA.8010409@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds AM33XX SPI support for am335x-bone and am335x-evm.
+Am 16.10.2012 15:22, schrieb Constantine Shulyupin:
 
-Signed-off-by: Matt Porter <mporter@ti.com>
----
- arch/arm/boot/dts/am335x-bone.dts |   17 +++++++++++++++
- arch/arm/boot/dts/am335x-evm.dts  |    9 ++++++++
- arch/arm/boot/dts/am33xx.dtsi     |   43 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 69 insertions(+)
+> Questions:
+> - have same issues with PDF documentation and datasheets?
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 5510979..23edfd8 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -18,6 +18,17 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
- 
-+	am3358_pinmux: pinmux at 44e10800 {
-+		spi1_pins: pinmux_spi1_pins {
-+			pinctrl-single,pins = <
-+				0x190 0x13	/* mcasp0_aclkx.spi1_sclk, OUTPUT_PULLUP | MODE3 */
-+				0x194 0x33	/* mcasp0_fsx.spi1_d0, INPUT_PULLUP | MODE3 */
-+				0x198 0x13	/* mcasp0_axr0.spi1_d1, OUTPUT_PULLUP | MODE3 */
-+				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
-+			>;
-+		};
-+	};
-+
- 	ocp {
- 		uart1: serial at 44e09000 {
- 			status = "okay";
-@@ -84,3 +95,9 @@
- &mmc1 {
- 	vmmc-supply = <&ldo3_reg>;
- };
-+
-+&spi1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi1_pins>;
-+};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index d63fce8..8d5f660 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -124,3 +124,12 @@
- &mmc1 {
- 	vmmc-supply = <&vmmc_reg>;
- };
-+
-+&spi0 {
-+	status = "okay";
-+	spi-flash at 0 {
-+		compatible = "spansion,s25fl064k", "m25p80";
-+		spi-max-frequency = <24000000>;
-+		reg = <0>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 26a6af7..063ecea 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -40,6 +40,15 @@
- 		};
- 	};
- 
-+	am3358_pinmux: pinmux at 44e10800 {
-+		compatible = "pinctrl-single";
-+		reg = <0x44e10800 0x0238>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-single,register-width = <32>;
-+		pinctrl-single,function-mask = <0x7f>;
-+	};
-+
- 	/*
- 	 * XXX: Use a flat representation of the AM33XX interconnect.
- 	 * The real AM33XX interconnect network is quite complex.Since
-@@ -261,6 +270,40 @@
- 			status = "disabled";
- 		};
- 
-+		spi0: spi at 48030000 {
-+			compatible = "ti,omap4-mcspi";
-+			ti,hwmods = "spi0";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x48030000 0x400>;
-+			interrupt-parent = <&intc>;
-+			interrupt = <65>;
-+			dmas = <&edma 16
-+				&edma 17
-+				&edma 18
-+				&edma 19>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
-+			ti,spi-num-cs = <2>;
-+			status = "disabled";
-+		};
-+
-+		spi1: spi at 481a0000 {
-+			compatible = "ti,omap4-mcspi";
-+			ti,hwmods = "spi1";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x481a0000 0x400>;
-+			interrupt-parent = <&intc>;
-+			interrupt = <125>;
-+			dmas = <&edma 42
-+				&edma 43
-+				&edma 44
-+				&edma 45>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
-+			ti,spi-num-cs = <2>;
-+			status = "disabled";
-+		};
-+
- 		wdt2: wdt at 44e35000 {
- 			compatible = "ti,omap3-wdt";
- 			ti,hwmods = "wd_timer2";
--- 
-1.7.9.5
+No.
+
+> - do you think documentation and datasheets in HTML format on a site
+> can be more useful than PDF?
+
+I would prefer if the source for the (PDF-)documentation would be
+available in some open, free and widely used meta-language, e.g. LaTeX
+(or XML or txt2tags or ..., but I'm oldschool and prefer LaTeX ;) ). So
+everyone could build it's copy in whatever format he prefers or needs.
+
+Regards,
+
+Alexander
