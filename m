@@ -1,33 +1,54 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 18 Oct 2012 18:08:45 +0100
-Subject: [GIT PULL] vexpress: fixes for v3.8
-Message-ID: <1350580125.4984.23.camel@hornet>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 18 Oct 2012 10:10:06 -0700
+Subject: [RFC/NOT FOR MERGING 4/5] i2c: omap: don't re-enable IRQs after
+ masking them
+In-Reply-To: <1350488043-5053-5-git-send-email-balbi@ti.com> (Felipe Balbi's
+ message of "Wed, 17 Oct 2012 18:34:02 +0300")
+References: <1350488043-5053-1-git-send-email-balbi@ti.com>
+ <1350488043-5053-5-git-send-email-balbi@ti.com>
+Message-ID: <874nlrg101.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Felipe Balbi <balbi@ti.com> writes:
 
-Could you, please, pull this small Versatile Express fix for 3.8?
+> OMAP I2C driver will re-enable IRQs right after
+> masking them during suspend.
+>
+> That's not what we want. We want to keep IRQs
+> masked until our resume method is called.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 10 ++--------
+>  1 file changed, 2 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index db31eae..7eeae11 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1247,14 +1247,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+>  
+>  	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
+>  
+> -	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
+> -		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
+> -	} else {
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
+> -
+> -		/* Flush posted write */
+> -		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+> -	}
 
-Thanks!
+Are you sure this re-enables the interrupt?  It looks to me like
+it's meant to clear the interrupt.    
 
-Pawel
+> +	/* Flush posted write */
+> +	omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
 
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Assuming the above is correct, should this be IE_REG?
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+>  	return 0;
+>  }
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-fixes
-
-for you to fetch changes up to 852663d94f0cc44199c31c0e42d4801302f41705:
-
-  ARM: vexpress: Make the debug UART detection more specific (2012-10-18 17:56:16 +0100)
-
-----------------------------------------------------------------
-Pawel Moll (1):
-      ARM: vexpress: Make the debug UART detection more specific
-
- arch/arm/include/debug/vexpress.S |   10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+Kevin
