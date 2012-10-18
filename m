@@ -1,63 +1,44 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Fri, 19 Oct 2012 02:18:29 +0530
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <20121018184443.GD2350@netboy.at.omicron.at>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
- <20121017235045.GB30550@atomide.com>
- <20121018030654.GE2867@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
- <20121018184443.GD2350@netboy.at.omicron.at>
-Message-ID: <50806B1D.9040504@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 18 Oct 2012 15:52:09 -0500
+Subject: [PATCHv1] arm:socfpga: Enable SMP for socfpga
+In-Reply-To: <CADhT+wcJmwRMeNugWdgY+aU4EGE-y48R6OePTq==TjZajuxfeA@mail.gmail.com>
+References: <1350501498-23601-1-git-send-email-dinguyen@altera.com>
+ <507F01FD.6070403@gmail.com>
+ <CADhT+wcJmwRMeNugWdgY+aU4EGE-y48R6OePTq==TjZajuxfeA@mail.gmail.com>
+Message-ID: <50806BF9.9050103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/19/2012 12:14 AM, Richard Cochran wrote:
-> On Thu, Oct 18, 2012 at 03:46:15AM +0000, Paul Walmsley wrote:
+On 10/17/2012 10:34 PM, Dinh Nguyen wrote:
+> Hi Rob,
+> 
+> On Wed, Oct 17, 2012 at 2:07 PM, Rob Herring <robherring2@gmail.com> wrote:
 >>
->> Probably the driver was submitted before any SoC integration support was 
->> available.  Grepping for 'cpsw' under arch/ turns up only AM33xx.  AM335x 
->> didn't have device enumeration support in the mainline kernel until 3.7, 
->> via commit a2cfc509bc4eeef9f5c4607b1203f17f22ea2a36 ("ARM: OMAP3+: hwmod: 
->> Add AM33XX HWMOD data").  So I don't see how it could have worked with 
->> mainline.
+>> On 10/17/2012 02:18 PM, dinguyen at altera.com wrote:
+>>> From: Dinh Nguyen <dinguyen@altera.com>
+>>>
+>>> Enable SMP for the SOCFPGA platform.
+>>>
+>>> Signed-off-by: Pavel Machek <pavel@denx.de>
+>>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+>>> ---
+>>>  arch/arm/boot/dts/socfpga.dtsi            |   10 ++
+>>>  arch/arm/configs/socfpga_defconfig        |    9 +-
+>>
+>> Does the multi_v7_defconfig not work for you?
 > 
-> ...
-> 
->> But it seems that the CPSW has never worked in the mainline kernel.  So 
->> this particular patch is not fixing a regression.  Therefore we shouldn't 
->> send it upstream during the -rc time period.  Instead we'll schedule it to 
->> be sent a few weeks later, during the 3.8 merge window.
-> 
-> Let's think about this some more:
-> 
-> The driver's commit is from March and is included in v3.4-rc1.
-> 
-> You say it will be working in 3.8, after 3.7 comes out, in about
-> December.
-> 
-> So how long does it take between merging code and actually getting it
-> working?
-> 
-> Sorry to harp on this so much, but I try out my patches with the tip
-> of the appropriate tree before sending them, or when I cannot, at
-> least I put into the log "compile tested only" or something like that.
-> 
+> It does. Are you planning to remove the defconfigs the platforms that
+> are part of
+> multi_v7_defconfig soon? socfpga_defconfig is broken with SMP enabled because
+> it needs +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set.
 
-Another important point is, this driver is also required and used for
-Davinci family of devices (arch/mach/mach-davinci/).
+I don't plan to remove them. I'll leave it up to the platform
+maintainers as the new multi_v7 config is not exactly the same selections.
 
-Thanks,
-Vaibhav
+That's strange that you care about the errata setting. I think it should
+work either way. We do need to scrub the errata list and enable all the
+ones which have no runtime impact and are conditioned on the core
+revision. I'm not sure what we'll do with the ones that could have a
+negative impact on performance of rev's without an errata.
 
-> Thanks,
-> Richard
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Rob
