@@ -1,206 +1,116 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 18 Oct 2012 15:44:59 +0200
-Subject: [PATCH 3/4] ARM: OMAP2+: Move iommu/iovmm headers to platform_data
-In-Reply-To: <20121016003640.19701.51749.stgit@muffinssi.local>
-References: <20121016003513.19701.71718.stgit@muffinssi.local>
- <20121016003640.19701.51749.stgit@muffinssi.local>
-Message-ID: <1418726.Yza1yb71Ul@avalon>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 18 Oct 2012 08:47:56 -0500
+Subject: [PATCH V2 3/3] ARM: tegra: move debug-macro.S to include/debug
+In-Reply-To: <507F1F31.2060503@wwwdotorg.org>
+References: <1350328024-30485-1-git-send-email-swarren@wwwdotorg.org>
+ <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
+ <507EC303.1080000@gmail.com> <507EDB37.1060102@wwwdotorg.org>
+ <507F1F31.2060503@wwwdotorg.org>
+Message-ID: <5080088C.9090607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 10/17/2012 04:12 PM, Stephen Warren wrote:
+> On 10/17/2012 10:22 AM, Stephen Warren wrote:
 
-On Monday 15 October 2012 17:36:40 Tony Lindgren wrote:
-> From: Ido Yariv <ido@wizery.com>
-> 
-> Move iommu/iovmm headers from plat/ to platform_data/ as part of the
-> single zImage work.
+snip
 
-Is that really where those headers belong ? iommu-omap.h contains far more 
-than platform data, and iovmm-omap.h contains no platform data at all.
+> That implies we really do need to keep the two pieces of code completely
+> in sync, so a shared header is the right way to go. It also implies that
+> having duplicate mappings of the same physical address doesn't cause any
+> immediate obvious catastrophic problems.
+> 
+> Ways we might avoid files in arch/arm/include/debug having to use
+> relative include paths to pick up that header are:
+> 
+> a) Move mach-${mach}/include/mach/iomap.h to iomap-${mach}.h in some
+> standard include path.
+> 
 
-> Cc: Joerg Roedel <joerg.roedel@amd.com>
-> Cc: Ohad Ben-Cohen <ohad@wizery.com>
-> Signed-off-by: Ido Yariv <ido@wizery.com>
-> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/devices.c              |    2 +-
->  arch/arm/mach-omap2/iommu2.c               |    2 +-
->  arch/arm/mach-omap2/omap-iommu.c           |    2 +-
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
->  drivers/iommu/omap-iommu-debug.c           |    4 ++--
->  drivers/iommu/omap-iommu.c                 |    2 +-
->  drivers/iommu/omap-iovmm.c                 |    4 ++--
->  drivers/media/platform/omap3isp/isp.h      |    5 +++--
->  drivers/media/platform/omap3isp/ispvideo.c |    5 ++---
->  include/linux/platform_data/iommu-omap.h   |    0
->  include/linux/platform_data/iovmm-omap.h   |    0
->  12 files changed, 15 insertions(+), 15 deletions(-)
->  rename arch/arm/plat-omap/include/plat/iommu.h =>
-> include/linux/platform_data/iommu-omap.h (100%) rename
-> arch/arm/plat-omap/include/plat/iovmm.h =>
-> include/linux/platform_data/iovmm-omap.h (100%)
-> 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index c8c2117..6cd0c2a 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -126,7 +126,7 @@ static struct platform_device omap2cam_device = {
-> 
->  #if defined(CONFIG_IOMMU_API)
-> 
-> -#include <plat/iommu.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> 
->  static struct resource omap3isp_resources[] = {
->  	{
-> diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
-> index c986880..82f9174 100644
-> --- a/arch/arm/mach-omap2/iommu2.c
-> +++ b/arch/arm/mach-omap2/iommu2.c
-> @@ -18,7 +18,7 @@
->  #include <linux/slab.h>
->  #include <linux/stringify.h>
-> 
-> -#include <plat/iommu.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> 
->  /*
->   * omap2 architecture specific register bit definitions
-> diff --git a/arch/arm/mach-omap2/omap-iommu.c
-> b/arch/arm/mach-omap2/omap-iommu.c index df298d4..a6a4ff8 100644
-> --- a/arch/arm/mach-omap2/omap-iommu.c
-> +++ b/arch/arm/mach-omap2/omap-iommu.c
-> @@ -13,7 +13,7 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
-> 
-> -#include <plat/iommu.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> 
->  #include "soc.h"
->  #include "common.h"
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c index f67b7ee..621bc71 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-> @@ -26,8 +26,8 @@
->  #include <plat/mmc.h>
->  #include <linux/platform_data/asoc-ti-mcbsp.h>
->  #include <linux/platform_data/spi-omap2-mcspi.h>
-> +#include <linux/platform_data/iommu-omap.h>
->  #include <plat/dmtimer.h>
-> -#include <plat/iommu.h>
-> 
->  #include "am35xx.h"
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c index 652d028..5850b3e 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-> @@ -27,10 +27,10 @@
->  #include <plat/dma.h>
->  #include <linux/platform_data/spi-omap2-mcspi.h>
->  #include <linux/platform_data/asoc-ti-mcbsp.h>
-> +#include <linux/platform_data/iommu-omap.h>
->  #include <plat/mmc.h>
->  #include <plat/dmtimer.h>
->  #include <plat/common.h>
-> -#include <plat/iommu.h>
-> 
->  #include "omap_hwmod_common_data.h"
->  #include "cm1_44xx.h"
-> diff --git a/drivers/iommu/omap-iommu-debug.c
-> b/drivers/iommu/omap-iommu-debug.c index a0b0309..8c1e30b 100644
-> --- a/drivers/iommu/omap-iommu-debug.c
-> +++ b/drivers/iommu/omap-iommu-debug.c
-> @@ -19,8 +19,8 @@
->  #include <linux/platform_device.h>
->  #include <linux/debugfs.h>
-> 
-> -#include <plat/iommu.h>
-> -#include <plat/iovmm.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> +#include <linux/platform_data/iovmm-omap.h>
-> 
->  #include <plat/iopgtable.h>
-> 
-> diff --git a/drivers/iommu/omap-iommu.c b/drivers/iommu/omap-iommu.c
-> index 80844b3..6100334 100644
-> --- a/drivers/iommu/omap-iommu.c
-> +++ b/drivers/iommu/omap-iommu.c
-> @@ -24,7 +24,7 @@
-> 
->  #include <asm/cacheflush.h>
-> 
-> -#include <plat/iommu.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> 
->  #include <plat/iopgtable.h>
-> 
-> diff --git a/drivers/iommu/omap-iovmm.c b/drivers/iommu/omap-iovmm.c
-> index b362fb5..b5ac2cd 100644
-> --- a/drivers/iommu/omap-iovmm.c
-> +++ b/drivers/iommu/omap-iovmm.c
-> @@ -21,8 +21,8 @@
->  #include <asm/cacheflush.h>
->  #include <asm/mach/map.h>
-> 
-> -#include <plat/iommu.h>
-> -#include <plat/iovmm.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> +#include <linux/platform_data/iovmm-omap.h>
-> 
->  #include <plat/iopgtable.h>
-> 
-> diff --git a/drivers/media/platform/omap3isp/isp.h
-> b/drivers/media/platform/omap3isp/isp.h index 8be7487..62c76f9 100644
-> --- a/drivers/media/platform/omap3isp/isp.h
-> +++ b/drivers/media/platform/omap3isp/isp.h
-> @@ -34,8 +34,9 @@
->  #include <linux/platform_device.h>
->  #include <linux/wait.h>
->  #include <linux/iommu.h>
-> -#include <plat/iommu.h>
-> -#include <plat/iovmm.h>
-> +
-> +#include <linux/platform_data/iommu-omap.h>
-> +#include <linux/platform_data/iovmm-omap.h>
-> 
->  #include "ispstat.h"
->  #include "ispccdc.h"
-> diff --git a/drivers/media/platform/omap3isp/ispvideo.c
-> b/drivers/media/platform/omap3isp/ispvideo.c index a0b737fe..75ecfc8 100644
-> --- a/drivers/media/platform/omap3isp/ispvideo.c
-> +++ b/drivers/media/platform/omap3isp/ispvideo.c
-> @@ -34,9 +34,8 @@
->  #include <linux/vmalloc.h>
->  #include <media/v4l2-dev.h>
->  #include <media/v4l2-ioctl.h>
-> -#include <plat/iommu.h>
-> -#include <plat/iovmm.h>
-> -#include <plat/omap-pm.h>
-> +#include <linux/platform_data/iommu-omap.h>
-> +#include <linux/platform_data/iovmm-omap.h>
-> 
->  #include "ispvideo.h"
->  #include "isp.h"
-> diff --git a/arch/arm/plat-omap/include/plat/iommu.h
-> b/include/linux/platform_data/iommu-omap.h similarity index 100%
-> rename from arch/arm/plat-omap/include/plat/iommu.h
-> rename to include/linux/platform_data/iommu-omap.h
-> diff --git a/arch/arm/plat-omap/include/plat/iovmm.h
-> b/include/linux/platform_data/iovmm-omap.h similarity index 100%
-> rename from arch/arm/plat-omap/include/plat/iovmm.h
-> rename to include/linux/platform_data/iovmm-omap.h
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--- 
-Regards,
+Your goal should be to get rid of iomap.h though...
 
-Laurent Pinchart
+> b) Rework debug-macro.S so that it isn't an include file, but rather a
+> regular top-level file. In other words, rather than compiling
+> arch/arm/kernel/debug.S, and having that #include DEBUG_LL_INCLUDE,
+> instead compile DEBUG_LL_SOURCE (i.e. arch/arm/mach-${mach}/debug.S by
+> default), and have that #include any common parts (e.g. implementation
+> of printhex8). This has benefits of:
+> 
+> b1) arch/arm/mach-${mach}/debug.S is in the mach directory that owns it,
+> rather than having them all dumped into a common location.
+> 
+> b2) Can use #include "iomap.h", a non-relative include, to pick up the
+> shared header
+> 
+> b3) Perhaps we can simplify the current debug.S e.g. have a common
+> debug-semihosting.S that contains the semihosting stuff, and only
+> include that from mach-*/debug.S if that machine uses semihosting, or
+> similar?
+> 
+> (b) seems like a lot of work. I don't see any advantage of (a) over just
+> using the relative include.
+
+Agreed.
+
+Here is what I mentioned previously. This removes the static mapping from 
+the platforms. This is untested and probably breaks on different DEBUG_LL 
+options. For now, platforms call debug_ll_io_init, but once all platforms 
+are converted, this can be called from devicemaps_init.
+
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 195ac2f..2ece92c 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -40,6 +40,9 @@ extern void iotable_init(struct map_desc *, int);
+ extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 				  void *caller);
+ 
++extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
++extern void debug_ll_io_init(void);
++
+ struct mem_type;
+ extern const struct mem_type *get_mem_type(unsigned int type);
+ /*
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index 66f711b..93883ed 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -100,6 +100,13 @@ ENTRY(printch)
+ 		b	1b
+ ENDPROC(printch)
+ 
++ENTRY(debug_ll_addr)
++		addruart r2, r3, ip
++		str	r2, [r0]
++		str	r3, [r1]
++		mov	pc, lr
++ENDPROC(debug_ll_addr)
++
+ #else
+ 
+ ENTRY(printascii)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 941dfb9..1c8c7be 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -876,6 +876,20 @@ static void __init pci_reserve_io(void)
+ #define pci_reserve_io() do { } while (0)
+ #endif
+ 
++void __init debug_ll_io_init(void)
++{
++	struct map_desc map;
++
++	if (!IS_ENABLED(CONFIG_DEBUG_LL))
++		return;
++
++	debug_ll_addr(&map.pfn, &map.virtual);
++	map.pfn = __phys_to_pfn(map.pfn);
++	map.length = PAGE_SIZE;
++	map.type = MT_DEVICE;
++	create_mapping(&map);
++}
++
+ static void * __initdata vmalloc_min =
+ 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+ 
