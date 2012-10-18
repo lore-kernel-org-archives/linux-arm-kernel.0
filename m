@@ -1,28 +1,55 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 18 Oct 2012 16:26:30 +0530
-Subject: [PATCH 0/5] ARM: tegra: Enable SLINK controller driver
-Message-ID: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
+Date: Thu, 18 Oct 2012 16:26:31 +0530
+Subject: [PATCH 1/5] ARM: tegra: Add slink controller base address
+In-Reply-To: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
+References: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1350557795-31487-2-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series modify the dts file to add the slink addresses,
-make entry of slink in clock tables, defines SLINK addressed,
-enable slink controller in Tegra30 based platform cardhu.
+Add base address of all slink controller of Tegra20
+and tegra30.
 
-Laxman Dewangan (5):
-  ARM: tegra: Add slink controller base address
-  ARM: tegra: dts: add slink controller dt entry
-  ARM: tegra: fix clock entry of slink controller
-  ARM: tegra: dts: cardhu: enable SLINK4
-  ARM: tegra: config: enable spi driver for Tegra SLINK controller
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+ arch/arm/mach-tegra/include/mach/iomap.h |   22 ++++++++++++++--------
+ 1 files changed, 14 insertions(+), 8 deletions(-)
 
- arch/arm/boot/dts/tegra20.dtsi            |   40 +++++++++++++++++++
- arch/arm/boot/dts/tegra30-cardhu.dtsi     |    5 ++
- arch/arm/boot/dts/tegra30.dtsi            |   60 +++++++++++++++++++++++++++++
- arch/arm/configs/tegra_defconfig          |    2 +-
- arch/arm/mach-tegra/board-dt-tegra20.c    |    8 ++++
- arch/arm/mach-tegra/board-dt-tegra30.c    |   12 ++++++
- arch/arm/mach-tegra/include/mach/iomap.h  |   22 +++++++----
- arch/arm/mach-tegra/tegra20_clocks_data.c |   16 ++++----
- arch/arm/mach-tegra/tegra30_clocks_data.c |   36 +++++++++---------
- 9 files changed, 166 insertions(+), 35 deletions(-)
+diff --git a/arch/arm/mach-tegra/include/mach/iomap.h b/arch/arm/mach-tegra/include/mach/iomap.h
+index fee3a94..0f46765 100644
+--- a/arch/arm/mach-tegra/include/mach/iomap.h
++++ b/arch/arm/mach-tegra/include/mach/iomap.h
+@@ -206,17 +206,23 @@
+ #define TEGRA_DVC_BASE			0x7000D000
+ #define TEGRA_DVC_SIZE			SZ_512
+ 
+-#define TEGRA_SPI1_BASE			0x7000D400
+-#define TEGRA_SPI1_SIZE			SZ_512
++#define TEGRA_SLINK1_BASE		0x7000D400
++#define TEGRA_SLINK1_SIZE		SZ_512
+ 
+-#define TEGRA_SPI2_BASE			0x7000D600
+-#define TEGRA_SPI2_SIZE			SZ_512
++#define TEGRA_SLINK2_BASE		0x7000D600
++#define TEGRA_SLINK2_SIZE		SZ_512
+ 
+-#define TEGRA_SPI3_BASE			0x7000D800
+-#define TEGRA_SPI3_SIZE			SZ_512
++#define TEGRA_SLINK3_BASE		0x7000D800
++#define TEGRA_SLINK3_SIZE		SZ_512
+ 
+-#define TEGRA_SPI4_BASE			0x7000DA00
+-#define TEGRA_SPI4_SIZE			SZ_512
++#define TEGRA_SLINK4_BASE		0x7000DA00
++#define TEGRA_SLINK4_SIZE		SZ_512
++
++#define TEGRA_SLINK5_BASE		0x7000DC00
++#define TEGRA_SLINK5_SIZE		SZ_512
++
++#define TEGRA_SLINK6_BASE		0x7000DE00
++#define TEGRA_SLINK6_SIZE		SZ_512
+ 
+ #define TEGRA_RTC_BASE			0x7000E000
+ #define TEGRA_RTC_SIZE			SZ_256
+-- 
+1.7.1.1
