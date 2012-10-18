@@ -1,46 +1,61 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 18 Oct 2012 09:26:50 -0400
-Subject: [RFC PATCH v3 11/16] mmc: omap_hsmmc: limit max_segs with the EDMA
- DMAC
+Date: Thu, 18 Oct 2012 09:26:51 -0400
+Subject: [RFC PATCH v3 12/16] mmc: omap_hsmmc: add generic DMA request support
+ to the DT binding
 In-Reply-To: <1350566815-409-1-git-send-email-mporter@ti.com>
 References: <1350566815-409-1-git-send-email-mporter@ti.com>
-Message-ID: <1350566815-409-12-git-send-email-mporter@ti.com>
+Message-ID: <1350566815-409-13-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EDMA DMAC has a hardware limitation that prevents supporting
-scatter gather lists with any number of segments. Since the EDMA
-DMA Engine driver sets the maximum segments to 16, we do the
-same.
-
-TODO: this will be replaced once the DMA Engine API supports an
-API to query the DMAC's segment size limit.
+The binding definition is based on the generic DMA request binding.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   25 +++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index b327cd0..52bab01 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1828,6 +1828,16 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
- 	 * as we want. */
- 	mmc->max_segs = 1024;
- 
-+	/* Eventually we should get our max_segs limitation for EDMA by
-+	 * querying the dmaengine API */
-+	if (pdev->dev.of_node) {
-+		struct device_node *parent = pdev->dev.of_node->parent;
-+		struct device_node *node;
-+		node = of_find_node_by_name(parent, "edma");
-+		if (node)
-+			mmc->max_segs = 16;
-+	}
+diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+index be76a23..d1b8932 100644
+--- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
++++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+@@ -19,8 +19,28 @@ ti,dual-volt: boolean, supports dual voltage cards
+ "supply-name" examples are "vmmc", "vmmc_aux" etc
+ ti,non-removable: non-removable slot (like eMMC)
+ ti,needs-special-reset: Requires a special softreset sequence
++dmas: DMA controller phandle and DMA request value ordered pair
++One tx and one rx pair is required.
++dma-names: DMA request names. These strings correspond 1:1 with
++the ordered pairs in dmas. The RX request must be "rx" and the
++TX request must be "tx".
 +
- 	mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
- 	mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
- 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
++Examples:
++
++[hwmod populated DMA resources]
++
++	mmc1: mmc at 0x4809c000 {
++		compatible = "ti,omap4-hsmmc";
++		reg = <0x4809c000 0x400>;
++		ti,hwmods = "mmc1";
++		ti,dual-volt;
++		bus-width = <4>;
++		vmmc-supply = <&vmmc>; /* phandle to regulator node */
++		ti,non-removable;
++	};
++
++[generic DMA request binding]
+ 
+-Example:
+ 	mmc1: mmc at 0x4809c000 {
+ 		compatible = "ti,omap4-hsmmc";
+ 		reg = <0x4809c000 0x400>;
+@@ -29,4 +49,7 @@ Example:
+ 		bus-width = <4>;
+ 		vmmc-supply = <&vmmc>; /* phandle to regulator node */
+ 		ti,non-removable;
++		dmas = <&edma 24
++			&edma 25>;
++		dma-names = "tx", "rx";
+ 	};
 -- 
 1.7.9.5
