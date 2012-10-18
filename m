@@ -1,17 +1,26 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 18 Oct 2012 16:18:19 -0600
-Subject: [PATCH 01/10] pinctrl: use postcore_initcall
-In-Reply-To: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+Date: Thu, 18 Oct 2012 16:20:59 -0600
+Subject: [PATCH 03/10] tty: pxa: configure pin
+In-Reply-To: <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
 References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <5080802B.3000209@wwwdotorg.org>
+ <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <508080CB.5010904@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/18/2012 03:06 AM, Haojian Zhuang wrote:
-> Since pins are configured in device driver, pinctrl driver should be
-> loaded by those device driver. module_platform_driver() only declares
-> pinctrl driver is in module_initcall privilege. Use postcore_initcall
-> privilege instead.
+> Configure pins by pinctrl driver.
 
-I'm not convinced this is needed; doesn't deferred probe sort out the
-dependencies correctly?
+In general, it seems better to use pinctrl "hogs" if the driver is only
+going to statically set up one pinctrl state and never change it. The
+alternative is make every single driver execute these pinctrl calls,
+which could be tedious.
+
+However, that does raise one question: If all the pinctrl setup is done
+by hogs, then how do we ensure that the pinctrl driver is probed first,
+and hence sets up the pins before any driver relies on them being set
+up? If a driver explicitly enables a pinctrl state (as in this patch),
+then deferred probe ensures that, but without any explicit pinctrl
+action, it'll only work by luck.
+
+LinusW, what are your thoughts on that?
