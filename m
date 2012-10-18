@@ -1,27 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 Oct 2012 15:59:26 +0200
-Subject: [RESEND][PATCH 0/2] Add spidev to the CFA-10049
-Message-ID: <1350568768-4374-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu, 18 Oct 2012 15:59:28 +0200
+Subject: [PATCH 2/2] ARM: dts: cfa10049: Add spidev to drive the DAC on SSP3
+In-Reply-To: <1350568768-4374-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1350568768-4374-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1350568768-4374-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
-
-This patchset probes spidev on the SSP3 bus where on the CFA-10049 there is
-a DAC.
-
-It first adds the dt bindings for the spidev driver, and the proper node in
-the CFA-10049 device tree file.
-
-Maxime
-
-Maxime Ripard (2):
-  spi: spidev: Add device tree bindings
-  ARM: dts: cfa10049: Add spidev to drive the DAC on SSP3
-
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
  arch/arm/boot/dts/imx28-cfa10049.dts |    6 ++++++
- drivers/spi/spidev.c                 |   10 ++++++++++
- 2 files changed, 16 insertions(+)
+ 1 file changed, 6 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index 05c892e..d91d16c 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -29,6 +29,7 @@
+ 						0x01c1 /* MX28_PAD_GPMI_RESETN__SSP3_CMD */
+ 						0x0111 /* MX28_PAD_GPMI_CE1N__SSP3_D3 */
+ 						0x01a2 /* MX28_PAD_GPMI_ALE__SSP3_D4 */
++						0x01b2 /* MX28_PAD_GPMI_CLE__SSP3_D5 */
+ 					>;
+ 					fsl,drive-strength = <1>;
+ 					fsl,voltage = <1>;
+@@ -60,6 +61,11 @@
+ 					spi-max-frequency = <100000>;
+ 				};
+ 
++				spidev: spidev at 2 {
++					compatible = "linux,spidev";
++					reg = <2>;
++					spi-max-frequency = <100000>;
++				};
+ 			};
+ 		};
+ 
 -- 
 1.7.9.5
