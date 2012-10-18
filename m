@@ -1,32 +1,28 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 18 Oct 2012 12:51:14 +0200
-Subject: [PATCH] dma: add new DMA control commands
-In-Reply-To: <507FC827.40601@freescale.com>
-References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
- <201210181049.21556.marex@denx.de> <507FC827.40601@freescale.com>
-Message-ID: <201210181251.15116.marex@denx.de>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Thu, 18 Oct 2012 16:26:30 +0530
+Subject: [PATCH 0/5] ARM: tegra: Enable SLINK controller driver
+Message-ID: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Huang Shijie,
+This series modify the dts file to add the slink addresses,
+make entry of slink in clock tables, defines SLINK addressed,
+enable slink controller in Tegra30 based platform cardhu.
 
-> ? 2012?10?18? 16:49, Marek Vasut ??:
-> > Dear Huang Shijie,
-> > 
-> >> ? 2012?10?18? 16:16, Marek Vasut ??:
-> >>> So we can't stream data from the chip? About time to adjust the MTD
-> >>> framework to allow that. Maybe implement a command queue?
-> >> 
-> >> IMHO, it's not possible. Because the READ-PAGE(00h-30h) command needs to
-> >> check the busy status
-> >> which means we have to stop in the middle, so we can not chain the all
-> >> the read-pages DMA commands.
-> > 
-> > Can the DMA not branch?
-> 
-> it's too complicated to the MTD layer, as well as the gpmi driver.
+Laxman Dewangan (5):
+  ARM: tegra: Add slink controller base address
+  ARM: tegra: dts: add slink controller dt entry
+  ARM: tegra: fix clock entry of slink controller
+  ARM: tegra: dts: cardhu: enable SLINK4
+  ARM: tegra: config: enable spi driver for Tegra SLINK controller
 
-Can you please elaborate ?
-
-Best regards,
-Marek Vasut
+ arch/arm/boot/dts/tegra20.dtsi            |   40 +++++++++++++++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi     |    5 ++
+ arch/arm/boot/dts/tegra30.dtsi            |   60 +++++++++++++++++++++++++++++
+ arch/arm/configs/tegra_defconfig          |    2 +-
+ arch/arm/mach-tegra/board-dt-tegra20.c    |    8 ++++
+ arch/arm/mach-tegra/board-dt-tegra30.c    |   12 ++++++
+ arch/arm/mach-tegra/include/mach/iomap.h  |   22 +++++++----
+ arch/arm/mach-tegra/tegra20_clocks_data.c |   16 ++++----
+ arch/arm/mach-tegra/tegra30_clocks_data.c |   36 +++++++++---------
+ 9 files changed, 166 insertions(+), 35 deletions(-)
