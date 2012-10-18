@@ -1,53 +1,68 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 18 Oct 2012 11:02:01 -0500
-Subject: [GIT PULL] DeviceTree fixes for 3.7
-Message-ID: <508027F9.3060908@gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 18 Oct 2012 18:06:09 +0200
+Subject: [PATCH 2/2] rtc-imxdi: Add devicetree support
+In-Reply-To: <1350576370-29098-1-git-send-email-stigge@antcom.de>
+References: <1350576370-29098-1-git-send-email-stigge@antcom.de>
+Message-ID: <1350576370-29098-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+This patch adds device tree support to the rtc-imxdi driver.
 
-Please pull DeviceTree fixes for 3.7.
+Signed-off-by: Roland Stigge <stigge@antcom.de>
+---
+ Documentation/devicetree/bindings/rtc/imxdi-rtc.txt |   17 +++++++++++++++++
+ drivers/rtc/rtc-imxdi.c                             |   11 +++++++++++
+ 2 files changed, 28 insertions(+)
 
-Rob
-
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-
-are available in the git repository at:
-
-  git://sources.calxeda.com/kernel/linux.git tags/dt-fixes-for-3.7
-
-for you to fetch changes up to 205a8eb7ce713c7f1722297dd97d19dcea6f266c:
-
-  dtc: fix for_each_*() to skip first object if deleted (2012-10-17 15:53:04 -0500)
-
-----------------------------------------------------------------
-DeviceTree fixes for 3.7
-
-A handful of fixes:
-- a fix for dtc from upstream
-- sparse fixes in DeviceTree code
-- stub of_get_child_by_name for !OF builds
-
-----------------------------------------------------------------
-Kim Phillips (3):
-      of/address: sparse fixes
-      of/irq: sparse fixes
-      of/platform: sparse fix
-
-Olof Johansson (1):
-      of: add stub of_get_child_by_name for non-OF builds
-
-Stephen Warren (1):
-      dtc: fix for_each_*() to skip first object if deleted
-
- drivers/of/address.c       |   24 ++++++++++++------------
- drivers/of/irq.c           |    8 +++++---
- drivers/of/platform.c      |    2 +-
- include/linux/of.h         |    7 +++++++
- include/linux/of_address.h |    4 ++--
- include/linux/of_irq.h     |    4 ++--
- scripts/dtc/dtc.h          |   44 ++++++++++----------------------------------
- 7 files changed, 39 insertions(+), 54 deletions(-)
+--- /dev/null
++++ linux-2.6/Documentation/devicetree/bindings/rtc/imxdi-rtc.txt
+@@ -0,0 +1,17 @@
++* i.MX25 Real Time Clock controller
++
++This binding supports the following chips: i.MX25, i.MX53
++
++Required properties:
++- compatible: should be: "fsl,imx25-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: rtc alarm interrupt
++
++Example:
++
++rtc at 80056000 {
++	compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
++	reg = <0x80056000 2000>;
++	interrupts = <29>;
++};
+--- linux-2.6.orig/drivers/rtc/rtc-imxdi.c
++++ linux-2.6/drivers/rtc/rtc-imxdi.c
+@@ -37,6 +37,7 @@
+ #include <linux/rtc.h>
+ #include <linux/sched.h>
+ #include <linux/workqueue.h>
++#include <linux/of.h>
+ 
+ /* DryIce Register Definitions */
+ 
+@@ -493,10 +494,20 @@ static int __devexit dryice_rtc_remove(s
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id dryice_dt_ids[] = {
++	{ .compatible = "fsl,imx25-rtc" },
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(of, dryice_dt_ids);
++#endif
++
+ static struct platform_driver dryice_rtc_driver = {
+ 	.driver = {
+ 		   .name = "imxdi_rtc",
+ 		   .owner = THIS_MODULE,
++		   .of_match_table = of_match_ptr(dryice_dt_ids),
+ 		   },
+ 	.remove = __devexit_p(dryice_rtc_remove),
+ };
