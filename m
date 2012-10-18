@@ -1,23 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Oct 2012 20:30:55 +0200
-Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
-In-Reply-To: <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CACRpkda0QLkdKns3CXNOijYBjaDtW1QyhNYjTqDvRH-in8pvZQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 18 Oct 2012 14:37:02 -0400
+Subject: [PATCH] ARM: kirkwood: fix LEDs names for lsxl boards
+In-Reply-To: <1348519742-20126-1-git-send-email-michael@walle.cc>
+References: <1348519742-20126-1-git-send-email-michael@walle.cc>
+Message-ID: <20121018183702.GA14395@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 11:07 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
+On Mon, Sep 24, 2012 at 10:49:02PM +0200, Michael Walle wrote:
+> Don't use the specific board name in a the common device tree include file.
+> Instead use the common name 'lsxl'.
+> 
+> Signed-off-by: Michael Walle <michael@walle.cc>
+> ---
+>  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
 
-> Add pinconf generic support with POWER SOURCE, BIAS PULL.
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+Applied to:
 
-I really like the looks of this, good job Haojian!
+git://git.infradead.org/users/jcooper/linux.git kirkwood/fixes
 
-Now we just need to hear what Tony says about it...
+thx,
 
-Yours,
-Linus Walleij
+Jason.
