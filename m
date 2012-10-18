@@ -1,54 +1,99 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 18 Oct 2012 10:10:06 -0700
-Subject: [RFC/NOT FOR MERGING 4/5] i2c: omap: don't re-enable IRQs after
- masking them
-In-Reply-To: <1350488043-5053-5-git-send-email-balbi@ti.com> (Felipe Balbi's
- message of "Wed, 17 Oct 2012 18:34:02 +0300")
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 18 Oct 2012 20:05:50 +0300
+Subject: [RFC/NOT FOR MERGING 2/5] arm: omap: don't forcefully runtime
+ suspend a device
+In-Reply-To: <87fw5bg1f7.fsf@deeprootsystems.com>
 References: <1350488043-5053-1-git-send-email-balbi@ti.com>
- <1350488043-5053-5-git-send-email-balbi@ti.com>
-Message-ID: <874nlrg101.fsf@deeprootsystems.com>
+ <1350488043-5053-3-git-send-email-balbi@ti.com>
+ <87fw5bg1f7.fsf@deeprootsystems.com>
+Message-ID: <20121018170550.GA6641@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Felipe Balbi <balbi@ti.com> writes:
+Hi,
 
-> OMAP I2C driver will re-enable IRQs right after
-> masking them during suspend.
->
-> That's not what we want. We want to keep IRQs
-> masked until our resume method is called.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c | 10 ++--------
->  1 file changed, 2 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index db31eae..7eeae11 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1247,14 +1247,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
->  
->  	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
->  
-> -	if (_dev->rev < OMAP_I2C_OMAP1_REV_2) {
-> -		iv = omap_i2c_read_reg(_dev, OMAP_I2C_IV_REG); /* Read clears */
-> -	} else {
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_STAT_REG, _dev->iestate);
-> -
-> -		/* Flush posted write */
-> -		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
-> -	}
+On Thu, Oct 18, 2012 at 10:01:00AM -0700, Kevin Hilman wrote:
+> Felipe Balbi <balbi@ti.com> writes:
+> 
+> > device drivers should be smart enough to provide
+> > ->suspend/->resume callbacks when needed and they
+> > should take care of doing whatever needs to be
+> > done in order to allow a device to be suspended.
+> >
+> > Calling pm_runtime_* from system suspend isn't
+> > the right way to achieve that, as it creates a
+> > situation where OMAP's PM has different requirements
+> > and semantics than all other architectures.
+> >
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> NAK
+> 
+> This support is required to handle some restrictions placed on runtime
+> PM and system PM interactions.   Basically, runtime PM transitions are
+> disabled part way through system PM (that itself was a much debated
+> topic last year, but that's how it works today.)
+> 
+> Because of this limitation, drivers that are active during the suspend
+> phase (commonly becasue they are used by [late] suspend methods of other
+> devices) may have multiple runtime PM transitions during static
+> suspend/resume.  These drivers have the problem that after runtime PM
+> has been disabled, even when they pm_runtime_put*, they will not
+> actually be transitioned (and their runtime PM callbacks will not be
+> called.)
+> 
+> So these devices are in a "ready to runtime suspend" state, but they
+> will not transition because runtime PM is disabled.
+> 
+> After your patch, they will still be idled (omap_device_idle), but the
+> driver will have no notification that this has happened because you
+> removed the calling of the runtime PM callbacks.
 
-Are you sure this re-enables the interrupt?  It looks to me like
-it's meant to clear the interrupt.    
+to me this only seems like the driver misses some static PM callbacks
+and some pm_runtime_disable; pm_runtime_set_active; pm_runtime_enable;
+on their system resume methods.
 
-> +	/* Flush posted write */
-> +	omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+> In the changelog, you seem to be implying that anything the driver
+> should be doing should be done in its suspend/resume callbacks instead
+> of the runtime suspend/resume callbacks (but don't give your reasoning.)
 
-Assuming the above is correct, should this be IE_REG?
+that's not what I implied at all. What I imply is that if driver needs
+to do something during system suspend/resume, then it needs to implement
+those methods. Calling runtime_* methods from system PM looks like a
+workaround for incomplete drivers.
 
->  	return 0;
->  }
+> Using the current approach (which was actually suggested by Rafael), it
+> means many transiactional drivers (like I2C) can be implemented as
+> runtime PM only, and don't need to provide suspend/resume callbacks at
 
-Kevin
+to me that sounds bogus :-s what's the problem of using the same
+function for system suspend and runtime suspend ? (see the last patch of
+the series where I implement I2C system suspend and resume)
+
+> all.  It also means they can be used throughout the suspend/resume path
+> (well until noirq methods.)
+
+fair enough...
+
+> The approach in $SUBJECT patch would mean that drivers should not be
+> used after their suspend method has been called.  That places some
+> severe limitations on drivers like I2C, SPI, HSI, UART etc. that are
+> often used by the suspend/resume methods of other drivers.
+
+I can't see the limitation you talk about. Let's use I2C as an example.
+In order to suspend RTC we need I2C resume, but driver core guarantees
+that parent will only suspend after all children are suspended. If
+that's as far as _noirq, then I2C needs to implement _noirq callbacks.
+
+I don't see the issue because RTC is a child of I2C and will suspend
+before its parent. No ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121018/30dddd42/attachment-0001.sig>
