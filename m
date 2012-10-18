@@ -1,68 +1,66 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 18 Oct 2012 15:49:41 +0800
-Subject: [PATCH] dma: add new DMA control commands
-In-Reply-To: <201210180914.58527.marex@denx.de>
-References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
- <1350541111.5263.3.camel@vkoul-udesk3> <507FA595.4020507@freescale.com>
- <201210180914.58527.marex@denx.de>
-Message-ID: <507FB495.7050104@freescale.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 18 Oct 2012 10:08:30 +0200
+Subject: [PATCH] ARM: dts: AM33XX: Add tsl2550 ambient light sensor DT data
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA53C2B@DBDE01.ent.ti.com>
+References: <1348242551-21293-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA53C2B@DBDE01.ent.ti.com>
+Message-ID: <507FB8FE.6010003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?10?18? 15:14, Marek Vasut ??:
-> Dear Huang Shijie,
->
-> Why such massive CC ?
->
->> ? 2012?10?18? 14:18, Vinod Koul ??:
->>> Why cant you do start (prepare clock etc) when you submit the descriptor
->>> to dmaengine. Can be done in tx_submit callback.
->>> Similarly remove the clock when dma transaction gets completed.
->> I ever thought this method too.
+Hi Anil,
+
+On 10/18/2012 07:46 AM, AnilKumar, Chimata wrote:
+> On Fri, Sep 21, 2012 at 21:19:11, AnilKumar, Chimata wrote:
+>> Add tsl2550 ambient light sensor DT data to am335x-evm.dts. In AM335x
+>> EVM tsl2550 ambient light sensor is connected to I2C2 bus. So this patch
+>> adds child node inside i2c2 node with i2c slave address.
 >>
->> But it will become low efficient in the following case:
+>> TAOS tsl2550 sensor with two-wire SMBus serial interface. This patch
+>> also reduces I2C2 clock frequency to 100KHz from 400KHz because the
+>> maximum clock frequency of SMBus is 100KHz.
 >>
->>     Assuming the gpmi-nand driver has to read out 1024 pages in one
->> _SINGLE_ read operation.
->> The gpmi-nand will submit the descriptor to dmaengine per page.
-> It will? Then GPMI NAND is flat our broken ... again.
-yes.
-
-Please read the NAND chip spec about the comand READ PAGE(00h-30h) and 
-the code
-nand_do_read_ops(). The nand chip limits us only read one page out one time.
-So the driver will submit the descriptor to dmaengine per page.
-
-
-
->> So with
->> your method,
->> the system will repeat the enable/disable dma clock 1024 time.
-> Yes, it is the driver that's wrong.
-not the driver.
->> At every
->> enable/disable dma clock,
->> the system has to enable the clock chain and it's parents ...
+>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>> ---
+>>  arch/arm/boot/dts/am335x-evm.dts |    7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
 >>
->> But with this patch, we only need to enable/disable dma clock one time,
->> just at we select the nand chip.
-> You are fixing a driver problem at a framework level, wrong.
->
-> So, check how the MXS SPI driver handles descriptor chaining. Indeed, the
-> Sigmatel screwed the DMA stuff good. But if you analyze the SPI driver, you'll
-> notice a few important points that might come handy when you fix the GPMI NAND
-> driver properly.
->
-> The direction to take here is:
-> 1) Implement DMA chaining into the GPMI NAND driver
-How can i implement the DMA chain if the nand chip READ-PAGE command 
-gives us the one page limit?
+>> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+>> index 3b1f313..d99aa0f 100644
+>> --- a/arch/arm/boot/dts/am335x-evm.dts
+>> +++ b/arch/arm/boot/dts/am335x-evm.dts
+>> @@ -49,7 +49,7 @@
+>>  
+>>  		i2c2: i2c at 4802a000 {
+>>  			status = "okay";
+>> -			clock-frequency = <400000>;
+>> +			clock-frequency = <100000>;
+>>  
+>>  			lis331dlh: lis331dlh at 18 {
+>>  				compatible = "st,lis331dlh", "st,lis3lv02d";
+>> @@ -79,6 +79,11 @@
+>>  				st,max-limit-z = <750>;
+>>  			};
+>>  
+>> +			tsl2550: tsl2550 at 39 {
+>> +				compatible = "taos,tsl2550";
+>> +				reg = <0x39>;
+>> +			};
+>> +
+>>  			tmp275: tmp275 at 48 {
+>>  				compatible = "ti,tmp275";
+>>  				reg = <0x48>;
+> 
+> Hi Tony/Benoit,
+> 
+> If there are no comments in this patch could you please take this in?
 
-thanks
-Huang Shijie
+Have you updated the binding documentation to list the device?
 
+It should be in:
+Documentation/devicetree/bindings/i2c/trivial-devices.txt
 
-> 2) You might need to do one PIO transfer to reconfigure the IP registers between
-> each segment of the DMA chain (just as MXS SPI does it)
-> 3) You might run out of DMA descriptors when doing too long chains -- so you
-> might need to fix that part of the mxs DMA driver.
+Please Cc as well the DT ml.
+
+Regards,
+Benoit
