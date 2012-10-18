@@ -1,66 +1,68 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Thu, 18 Oct 2012 20:14:44 +0530
-Subject: [PATCH 1/8] [media] s5p-fimc: Use clk_prepare_enable and
- clk_disable_unprepare
-In-Reply-To: <507ED56E.1000406@samsung.com>
-References: <1350472311-9748-1-git-send-email-sachin.kamat@linaro.org>
- <507EC1BF.6040107@samsung.com>
- <CAK9yfHymckQLOp=xavQ1sj5uJKRg7tFMXgvo68Dp8GL6N9g0JQ@mail.gmail.com>
- <507ED56E.1000406@samsung.com>
-Message-ID: <CAK9yfHwovfqv=P-dMFgUNq67-NiZUC5CeD5biukk_B60boPEjQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 18 Oct 2012 17:41:44 +0300
+Subject: [PATCHv9 8/8] ARM: OMAP4: USB: power down MUSB PHY if not used
+In-Reply-To: <1350571199.2143.53.camel@sokoban>
+References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
+ <1350552010-28760-9-git-send-email-t-kristo@ti.com>
+ <20121018103334.GA1449@arwen.pp.htv.fi>
+ <1350562684.2143.52.camel@sokoban>
+ <20121018135352.GC2739@arwen.pp.htv.fi>
+ <1350571199.2143.53.camel@sokoban>
+Message-ID: <20121018144144.GF2739@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 October 2012 21:27, Sylwester Nawrocki <s.nawrocki@samsung.com> wrote:
-> On 10/17/2012 05:35 PM, Sachin Kamat wrote:
->>> Most of the s5p-* drivers have already added support for clk_(un)prepare.
->>> Thus most of your changes in this patch are not needed. I seem to have only
->>> missed fimc-mdevice.c, other modules are already reworked
->>
->> I did not find these changes in your tree. Please let me know the
->> branch where these changes are available.
->
-> Are in Linus' tree, for quite long already, commits:
->
-> 11a37c709797cc56f48905e68a3099b79cf08850
-> [media] s5p-g2d: Added support for clk_prepare
->
-> bd7d8888e99d67f778f4ee272346322c0b9cb378
-> [media] s5p-fimc: convert to clk_prepare()/clk_unprepare()
->
-> eb732518e0db585376f95256b18b2149240e3ad3
-> [media] s5p-mfc: Added support for clk_prepare
+On Thu, Oct 18, 2012 at 05:39:59PM +0300, Tero Kristo wrote:
+> On Thu, 2012-10-18 at 16:53 +0300, Felipe Balbi wrote:
+> > hi,
+> > 
+> > On Thu, Oct 18, 2012 at 03:18:04PM +0300, Tero Kristo wrote:
+> > > > > +static int __init omap4430_phy_power_down(void)
+> > > > > +{
+> > > > > +	void __iomem *ctrl_base;
+> > > > > +
+> > > > > +	if (!cpu_is_omap44xx())
+> > > > > +		return 0;
+> > > > > +
+> > > > > +	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
+> > > > > +	if (!ctrl_base) {
+> > > > > +		pr_err("control module ioremap failed\n");
+> > > > > +		return -ENOMEM;
+> > > > > +	}
+> > > > > +
+> > > > > +	/* Power down the phy */
+> > > > > +	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
+> > > > > +
+> > > > > +	iounmap(ctrl_base);
+> > > > > +
+> > > > > +	return 0;
+> > > > > +}
+> > > > > +early_initcall(omap4430_phy_power_down);
+> > > > > +#endif
+> > > > 
+> > > > I think you could do it even if the driver is enabled.
+> > > 
+> > > Actually not at least now, it looks like the driver is not controlling
+> > > this bit at all, so the driver would fail if we do this.
+> > 
+> > then we can consider that a bug in the driver. Kishon, I thought you had
+> > added SCM address space to PHY driver for this particular reason until
+> > we get SCM driver, wasn't it ??
+> 
+> Yes, I would say its a bug in the driver. However we need this disable
+> mechanism for the case where we don't have the driver also (which is the
+> default config for omap.)
 
-Oh I see.. I dunno how i missed to notice this..
-
-
->
-> Please note there was the media drivers reorganization recently, e.g.
-> drivers/media/video/s5p-* changed to drivers/media/platform/s5p-*.
-
-Right. I am aware of that.
-
->
->>> $ git grep -5  clk_prepare  -- drivers/media/platform/s5p-fimc
->>> drivers/media/platform/s5p-fimc/fimc-core.c-
->>> drivers/media/platform/s5p-fimc/fimc-core.c-    for (i = 0; i < MAX_FIMC_CLOCKS; i++) {
->>> drivers/media/platform/s5p-fimc/fimc-core.c-            fimc->clock[i] = clk_get(&fimc->pdev->dev, fimc_clocks[i]);
->>> drivers/media/platform/s5p-fimc/fimc-core.c-            if (IS_ERR(fimc->clock[i]))
->>
->>>> I would prefer you have added the required changes at fimc_md_get_clocks()
->>> and fimc_md_put_clocks() functions.
->>
->> Ok. I will check this.
->
-> Thanks.
->
-> --
-> Regards,
-> Sylwester
-
-Thanks Sylwester.
-
+sure, of course. But I'd like to see it unconditionally done, meaning
+that there needs to be a counterpart in the driver to make sure you can
+run this unconditionally during early phases of boot up ;-)
 
 -- 
-With warm regards,
-Sachin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121018/e5a68533/attachment.sig>
