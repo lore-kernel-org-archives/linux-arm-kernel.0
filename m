@@ -1,56 +1,56 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 18 Oct 2012 11:25:07 +0200
-Subject: [PATCH] ARM/dts: omap3: Fix mcbsp2/3 hwmods to be able to probe the
- drivers for audio
-Message-ID: <1350552307-10226-1-git-send-email-peter.ujfalusi@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 18 Oct 2012 22:26:53 +1300
+Subject: [PATCH] CLK: vt8500: Fix SDMMC clk special cases
+Message-ID: <1350552413-24452-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the following errors:
-[    2.318084] omap-mcbsp 49022000.mcbsp: invalid rx DMA channel
-[    2.324432] omap-mcbsp 49024000.mcbsp: invalid rx DMA channel
+This patch adds some additional handling for the SDMMC special case
+in round_rate and set_rate which results in invalid divisor messages
+at boot time.
 
-Which is because we failed to link the sidetone hwmod for McBSP2/3. The
-missing sidetone hwmod link will prevent omap_device_alloc() to append the
-DMA resources since we - accidentally - end up having the same number of
-resources provided from DT (IO/IRQ) as we have in hwmod for the McBSP ports
-without the ST resources.
-
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
+ drivers/clk/clk-vt8500.c |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Hi Tony, Benoit,
-
-Can you please take this patch for 3.7 since if we boot with DT audio will not
-work on BeagleBoard and on boards which uses McBSP2 or 3 for audio.
-
-Thank you,
-Peter
-
- arch/arm/boot/dts/omap3.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index f38ea87..696e929 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -257,7 +257,7 @@
- 			interrupt-names = "common", "tx", "rx", "sidetone";
- 			interrupt-parent = <&intc>;
- 			ti,buffer-size = <1280>;
--			ti,hwmods = "mcbsp2";
-+			ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
- 		};
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index a885600..fe25570 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -120,8 +120,17 @@ static unsigned long vt8500_dclk_recalc_rate(struct clk_hw *hw,
+ static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long *prate)
+ {
++	struct clk_device *cdev = to_clk_device(hw);
+ 	u32 divisor = *prate / rate;
  
- 		mcbsp3: mcbsp at 49024000 {
-@@ -272,7 +272,7 @@
- 			interrupt-names = "common", "tx", "rx", "sidetone";
- 			interrupt-parent = <&intc>;
- 			ti,buffer-size = <128>;
--			ti,hwmods = "mcbsp3";
-+			ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
- 		};
++	/*
++	 * If this is a request for SDMMC we have to adjust the divisor
++	 * when >31 to use the fixed predivisor
++	 */
++	if ((cdev->div_mask == 0x3F) && (divisor > 31)) {
++		divisor = 64 * ((divisor / 64) + 1);
++	}
++
+ 	return *prate / divisor;
+ }
  
- 		mcbsp4: mcbsp at 49026000 {
+@@ -135,6 +144,15 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (divisor == cdev->div_mask + 1)
+ 		divisor = 0;
+ 
++	/* SDMMC mask may need to be corrected before testing if its valid */
++	if ((cdev->div_mask == 0x3F) && (divisor > 31)) {
++		/*
++		 * Bit 5 is a fixed /64 predivisor. If the requested divisor
++		 * is >31 then correct for the fixed divisor being required.
++		 */
++		divisor = 0x20 + (divisor / 64);
++	}
++
+ 	if (divisor > cdev->div_mask) {
+ 		pr_err("%s: invalid divisor for clock\n", __func__);
+ 		return -EINVAL;
 -- 
-1.7.12.3
+1.7.9.5
