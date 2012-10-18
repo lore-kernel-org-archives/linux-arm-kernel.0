@@ -1,73 +1,40 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 18 Oct 2012 17:07:04 +0800
-Subject: [PATCH 10/10] document: devicetree: bind pinconf in pinctrl single
-In-Reply-To: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1350551224-12857-10-git-send-email-haojian.zhuang@gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 18 Oct 2012 17:10:46 +0800
+Subject: [PATCH] dma: add new DMA control commands
+In-Reply-To: <20121018085208.GR21164@n2100.arm.linux.org.uk>
+References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
+ <1350541111.5263.3.camel@vkoul-udesk3> <507FA595.4020507@freescale.com>
+ <20121018085208.GR21164@n2100.arm.linux.org.uk>
+Message-ID: <507FC796.7060401@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add comments with pinconf & gpio range in the document of
-pinctrl-single.
+? 2012?10?18? 16:52, Russell King - ARM Linux ??:
+> On Thu, Oct 18, 2012 at 02:45:41PM +0800, Huang Shijie wrote:
+>> ? 2012?10?18? 14:18, Vinod Koul ??:
+>>> Why cant you do start (prepare clock etc) when you submit the descriptor
+>>> to dmaengine. Can be done in tx_submit callback.
+>>> Similarly remove the clock when dma transaction gets completed.
+>> I ever thought this method too.
+>>
+>> But it will become low efficient in the following case:
+>>
+>>    Assuming the gpmi-nand driver has to read out 1024 pages in one
+>> _SINGLE_ read operation.
+>> The gpmi-nand will submit the descriptor to dmaengine per page. So with
+>> your method,
+>> the system will repeat the enable/disable dma clock 1024 time. At every
+>> enable/disable dma clock,
+>> the system has to enable the clock chain and it's parents ...
+> And what if you stop using clk_prepare_enable(), and prepare the clock
+> when the channel is requested and only use clk_enable() in the tx_submit
+yes. it's a little better.
+There is nearly no difference between the clk_prepare_enable() and 
+clk_enable() in actually.
+the clk_gate2_ops does not have any @->prepare.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- .../devicetree/bindings/pinctrl/pinctrl-single.txt |   43 ++++++++++++++++++++
- 1 files changed, 43 insertions(+), 0 deletions(-)
+thanks
+Huang Shijie
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-index 5187f0d..b0e5059 100644
---- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-@@ -15,6 +15,49 @@ Optional properties:
-   available and same for all registers; if not specified, disabling of
-   pin functions is ignored
- 
-+- pinctrl-single,gpio-mask : mask of enabling gpio function register
-+
-+- pinctrl-single,gpio-ranges : gpio range list
-+
-+- pinctrl-single,gpio : array with gpio range start, size & register
-+  offset
-+
-+- pinctrl-single,gpio-enable : value of enabling gpio function
-+
-+- pinctrl-single,gpio-disable : value of disabling gpio function
-+
-+- pinctrl-single,power-source-mask : mask of setting power source in
-+  the pinmux register
-+
-+- pinctrl-single,power-source-shift : shift of power source field in
-+  the pinmux register
-+
-+- pinctrl-single,power-source : value of setting power source field
-+  in the pinmux register
-+
-+- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
-+  register
-+
-+- pinctrl-single,bias-shift : shift of setting bias value in the
-+  pinmux register
-+
-+- pinctrl-single,bias-disable : value of disabling bias in the pinmux
-+  register
-+
-+- pinctrl-single,bias-pull-down : value of setting bias pull down in
-+  the pinmux register
-+
-+- pinctrl-single,bias-pull-up : value of setting bias pull up in the
-+  pinmux register
-+
-+- pinctrl-single,bias : value of setting bias in the pinmux register
-+
-+- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
-+  in the pinmux register
-+
-+- pinctrl-single,input-schmitt-shift : shift of setting input schmitt
-+  in the pinmux register
-+
- This driver assumes that there is only one register for each pin,
- and uses the common pinctrl bindings as specified in the pinctrl-bindings.txt
- document in this directory.
--- 
-1.7.0.4
+> method?
+>
