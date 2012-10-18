@@ -1,105 +1,86 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Sun, 21 Oct 2012 21:15:37 -0500
-Subject: [PATCH v4 5/5] zynq: move static peripheral mappings
+Date: Wed, 17 Oct 2012 19:46:49 -0500
+Subject: [PATCH v4 1/5] zynq: use GIC device tree bindings
 In-Reply-To: <cover.1351466765.git.josh.cartwright@ni.com>
 References: <cover.1351466765.git.josh.cartwright@ni.com>
-Message-ID: <7a663040dc05b79262d7bd8bf8224ca49eb00162.1351466765.git.josh.cartwright@ni.com>
+Message-ID: <94010fc0a0094ef29dc87fbdb77507e379c5fe76.1351466765.git.josh.cartwright@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shifting them up into the vmalloc region prevents the following warning,
-when booting a zynq qemu target with more than 512mb of RAM:
-
-  BUG: mapping for 0xe0000000 at 0xe0000000 out of vmalloc space
-
-In addition, it allows for reuse of these mappings when the proper
-drivers issue requests via ioremap().
-
-There are currently unknown issues with the early uart mapping.  For
-now, the uart will be mapped to a known working address.
+The Zynq uses the cortex-a9-gic.  This eliminates the need to hardcode
+register addresses.
 
 Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 Cc: John Linn <john.linn@xilinx.com>
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-zynq/common.c                |  6 +++---
- arch/arm/mach-zynq/include/mach/zynq_soc.h | 25 +++++++++++++++----------
- 2 files changed, 18 insertions(+), 13 deletions(-)
+ arch/arm/boot/dts/zynq-ep107.dts           | 10 ++++++----
+ arch/arm/mach-zynq/common.c                |  7 ++++++-
+ arch/arm/mach-zynq/include/mach/zynq_soc.h |  2 --
+ 3 files changed, 12 insertions(+), 7 deletions(-)
 
+diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-ep107.dts
+index 37ca192..f914090 100644
+--- a/arch/arm/boot/dts/zynq-ep107.dts
++++ b/arch/arm/boot/dts/zynq-ep107.dts
+@@ -36,16 +36,18 @@
+ 		ranges;
+ 
+ 		intc: interrupt-controller at f8f01000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
+ 			interrupt-controller;
+-			compatible = "arm,gic";
+-			reg = <0xF8F01000 0x1000>;
+-			#interrupt-cells = <2>;
++			reg = <0xF8F01000 0x1000>,
++			      <0xF8F00100 0x100>;
+ 		};
+ 
+ 		uart0: uart at e0000000 {
+ 			compatible = "xlnx,xuartps";
+ 			reg = <0xE0000000 0x1000>;
+-			interrupts = <59 0>;
++			interrupts = <0 27 4>;
+ 			clock = <50000000>;
+ 		};
+ 	};
 diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index ba48f06..ba8d14f 100644
+index ab5cfdd..d73963b 100644
 --- a/arch/arm/mach-zynq/common.c
 +++ b/arch/arm/mach-zynq/common.c
-@@ -73,12 +73,12 @@ static struct map_desc io_desc[] __initdata = {
- 	{
- 		.virtual	= TTC0_VIRT,
- 		.pfn		= __phys_to_pfn(TTC0_PHYS),
--		.length		= SZ_4K,
-+		.length		= TTC0_SIZE,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= SCU_PERIPH_VIRT,
- 		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
--		.length		= SZ_8K,
-+		.length		= SCU_PERIPH_SIZE,
- 		.type		= MT_DEVICE,
- 	},
+@@ -55,12 +55,17 @@ static void __init xilinx_init_machine(void)
+ 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+ }
  
-@@ -86,7 +86,7 @@ static struct map_desc io_desc[] __initdata = {
- 	{
- 		.virtual	= UART0_VIRT,
- 		.pfn		= __phys_to_pfn(UART0_PHYS),
--		.length		= SZ_4K,
-+		.length		= UART0_SIZE,
- 		.type		= MT_DEVICE,
- 	},
- #endif
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ }
++};
++
+ /**
+  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
+  */
+ static void __init xilinx_irq_init(void)
+ {
+-	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
++	of_irq_init(irq_match);
+ }
+ 
+ /* The minimum devices needed to be mapped before the VM system is up and
 diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index 218283a..1b8bf0e 100644
+index d0d3f8f..3d1c6a6 100644
 --- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
 +++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -15,27 +15,32 @@
- #ifndef __MACH_XILINX_SOC_H__
- #define __MACH_XILINX_SOC_H__
- 
-+#include <asm/pgtable.h>
-+
- #define PERIPHERAL_CLOCK_RATE		2500000
- 
--/* For now, all mappings are flat (physical = virtual)
-+/* Static peripheral mappings are mapped at the top of the vmalloc region.  The
-+ * early uart mapping causes intermediate problems/failure at certain
-+ * addresses, including the very top of the vmalloc region.  Map it at an
-+ * address that is known to work.
-  */
--#define UART0_PHYS			0xE0000000
--#define UART0_VIRT			UART0_PHYS
-+#define UART0_PHYS		0xE0000000
-+#define UART0_SIZE		SZ_4K
-+#define UART0_VIRT		0xF0001000
- 
--#define TTC0_PHYS			0xF8001000
--#define TTC0_VIRT			TTC0_PHYS
-+#define TTC0_PHYS		0xF8001000
-+#define TTC0_SIZE		SZ_4K
-+#define TTC0_VIRT		(VMALLOC_END - TTC0_SIZE)
- 
--#define SCU_PERIPH_PHYS			0xF8F00000
--#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
-+#define SCU_PERIPH_PHYS		0xF8F00000
-+#define SCU_PERIPH_SIZE		SZ_8K
-+#define SCU_PERIPH_VIRT		(TTC0_VIRT - SCU_PERIPH_SIZE)
- 
- /* The following are intended for the devices that are mapped early */
+@@ -35,8 +35,6 @@
  
  #define TTC0_BASE			IOMEM(TTC0_VIRT)
  #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+-#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
+-#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
+ #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
  
--/*
-- * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
-- */
- #define LL_UART_PADDR	UART0_PHYS
- #define LL_UART_VADDR	UART0_VIRT
- 
+ /*
 -- 
 1.8.0
