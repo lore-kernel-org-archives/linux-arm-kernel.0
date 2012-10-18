@@ -1,151 +1,65 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 18 Oct 2012 12:20:08 +0300
-Subject: [PATCHv9 6/8] ARM: OMAP4: retrigger localtimers after re-enabling gic
+Date: Thu, 18 Oct 2012 12:20:10 +0300
+Subject: [PATCHv9 8/8] ARM: OMAP4: USB: power down MUSB PHY if not used
 In-Reply-To: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
 References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1350552010-28760-7-git-send-email-t-kristo@ti.com>
+Message-ID: <1350552010-28760-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+Commit c9e4412ab8eb8ef82d645d8749c4ce96ad490007 removed all of the USB
+PHY functions for OMAP4, but this causes a problem with core retention
+as the MUSB module remains enabled if omap-usb2 phy driver is not used.
+This keeps the USB DPLL enabled and prevents l3_init pwrdm from idling.
 
-'Workaround for ROM bug because of CA9 r2pX gic control'
-register change disables the gic distributor while the secondary
-cpu is being booted.  If a localtimer interrupt on the primary cpu
-occurs when the distributor is turned off, the interrupt is lost,
-and the localtimer never fires again.
+Fixed by adding a minimal function back that disables the USB PHY in
+case omap-usb2 driver is not used.
 
-Make the primary cpu wait for the secondary cpu to reenable the
-gic distributor (with interrupts off for safety), and then
-check if the pending bit is set in the localtimer but not the
-gic.  If so, ack it in the localtimer, and reset the timer with
-the minimum timeout to trigger a new timer interrupt.
-
-Signed-off-by: Colin Cross <ccross@android.com>
-[s-jan at ti.com: adapted to k3.4 + validated functionality]
-Signed-off-by: Sebastien Jan <s-jan@ti.com>
-[t-kristo at ti.com: dropped generic ARM kernel exports from the code, rebased
- to mainline]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/common.h       |    2 ++
- arch/arm/mach-omap2/omap-smp.c     |   13 ++++++++++++-
- arch/arm/mach-omap2/omap4-common.c |   34 ++++++++++++++++++++++++++++++++++
- 3 files changed, 48 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/omap_phy_internal.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 70993a9..d29dbaa 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -276,6 +276,8 @@ static inline void __iomem *omap4_get_scu_base(void)
+diff --git a/arch/arm/mach-omap2/omap_phy_internal.c b/arch/arm/mach-omap2/omap_phy_internal.c
+index d992db8..6a4b9cf 100644
+--- a/arch/arm/mach-omap2/omap_phy_internal.c
++++ b/arch/arm/mach-omap2/omap_phy_internal.c
+@@ -33,6 +33,33 @@
+ #include "soc.h"
+ #include "control.h"
  
- extern void __init gic_init_irq(void);
- extern void gic_dist_disable(void);
-+extern bool gic_dist_disabled(void);
-+extern void gic_timer_retrigger(void);
- extern void omap_smc1(u32 fn, u32 arg);
- extern void __iomem *omap4_get_sar_ram_base(void);
- extern void omap_do_wfi(void);
-diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
-index 7d9c0e3..49a08df 100644
---- a/arch/arm/mach-omap2/omap-smp.c
-+++ b/arch/arm/mach-omap2/omap-smp.c
-@@ -134,11 +134,22 @@ static int __cpuinit omap4_boot_secondary(unsigned int cpu, struct task_struct *
- 		 * 2) CPU1 must re-enable the GIC distributor on
- 		 * it's wakeup path.
- 		 */
--		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD))
-+		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD)) {
-+			local_irq_disable();
- 			gic_dist_disable();
-+		}
- 
- 		clkdm_wakeup(cpu1_clkdm);
- 		clkdm_allow_idle(cpu1_clkdm);
++#define CONTROL_DEV_CONF		0x300
++#define PHY_PD				0x1
 +
-+		if (IS_PM44XX_ERRATUM(PM_OMAP4_ROM_SMP_BOOT_ERRATUM_GICD)) {
-+			while (gic_dist_disabled()) {
-+				udelay(1);
-+				cpu_relax();
-+			}
-+			gic_timer_retrigger();
-+			local_irq_enable();
-+		}
- 	} else {
- 		dsb_sev();
- 		booted = true;
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 72cf396..6f94b4e 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -14,6 +14,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/memblock.h>
- #include <linux/of_irq.h>
-@@ -24,6 +25,7 @@
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/map.h>
- #include <asm/memblock.h>
-+#include <asm/smp_twd.h>
- 
- #include <plat/sram.h>
- #include <plat/omap-secure.h>
-@@ -42,6 +44,9 @@ static void __iomem *l2cache_base;
- 
- static void __iomem *sar_ram_base;
- static void __iomem *gic_dist_base_addr;
-+static void __iomem *twd_base;
-+
-+#define IRQ_LOCALTIMER		29
- 
- #ifdef CONFIG_OMAP4_ERRATA_I688
- /* Used to implement memory barrier on DRAM path */
-@@ -101,6 +106,9 @@ void __init gic_init_irq(void)
- 	gic_dist_base_addr = ioremap(OMAP44XX_GIC_DIST_BASE, SZ_4K);
- 	BUG_ON(!gic_dist_base_addr);
- 
-+	twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_4K);
-+	BUG_ON(!twd_base);
-+
- 	/* Static mapping, never released */
- 	omap_irq_base = ioremap(OMAP44XX_GIC_CPU_BASE, SZ_512);
- 	BUG_ON(!omap_irq_base);
-@@ -116,6 +124,32 @@ void gic_dist_disable(void)
- 		__raw_writel(0x0, gic_dist_base_addr + GIC_DIST_CTRL);
- }
- 
-+bool gic_dist_disabled(void)
++#ifndef CONFIG_OMAP_USB2
++static int __init omap4430_phy_power_down(void)
 +{
-+	return !(__raw_readl(gic_dist_base_addr + GIC_DIST_CTRL) & 0x1);
-+}
++	void __iomem *ctrl_base;
 +
-+void gic_timer_retrigger(void)
-+{
-+	u32 twd_int = __raw_readl(twd_base + TWD_TIMER_INTSTAT);
-+	u32 gic_int = __raw_readl(gic_dist_base_addr + GIC_DIST_PENDING_SET);
-+	u32 twd_ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++	if (!cpu_is_omap44xx())
++		return 0;
 +
-+	if (twd_int && !(gic_int & BIT(IRQ_LOCALTIMER))) {
-+		/*
-+		 * The local timer interrupt got lost while the distributor was
-+		 * disabled.  Ack the pending interrupt, and retrigger it.
-+		 */
-+		pr_warn("%s: lost localtimer interrupt\n", __func__);
-+		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
-+		if (!(twd_ctrl & TWD_TIMER_CONTROL_PERIODIC)) {
-+			__raw_writel(1, twd_base + TWD_TIMER_COUNTER);
-+			twd_ctrl |= TWD_TIMER_CONTROL_ENABLE;
-+			__raw_writel(twd_ctrl, twd_base + TWD_TIMER_CONTROL);
-+		}
++	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
++	if (!ctrl_base) {
++		pr_err("control module ioremap failed\n");
++		return -ENOMEM;
 +	}
-+}
 +
- #ifdef CONFIG_CACHE_L2X0
- 
- void __iomem *omap4_get_l2cache_base(void)
++	/* Power down the phy */
++	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
++
++	iounmap(ctrl_base);
++
++	return 0;
++}
++early_initcall(omap4430_phy_power_down);
++#endif
++
+ void am35x_musb_reset(void)
+ {
+ 	u32	regval;
 -- 
 1.7.4.1
