@@ -1,71 +1,63 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 18 Oct 2012 09:27:30 -0500
-Subject: [PATCH 1/2] ARM: dts: OMAP: Add counter-32k nodes
-In-Reply-To: <508010E1.6010102@ti.com>
-References: <1350498803-22150-1-git-send-email-jon-hunter@ti.com>
- <1350498803-22150-2-git-send-email-jon-hunter@ti.com>
- <508010E1.6010102@ti.com>
-Message-ID: <508011D2.30806@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 18 Oct 2012 17:39:59 +0300
+Subject: [PATCHv9 8/8] ARM: OMAP4: USB: power down MUSB PHY if not used
+In-Reply-To: <20121018135352.GC2739@arwen.pp.htv.fi>
+References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
+ <1350552010-28760-9-git-send-email-t-kristo@ti.com>
+ <20121018103334.GA1449@arwen.pp.htv.fi> <1350562684.2143.52.camel@sokoban>
+ <20121018135352.GC2739@arwen.pp.htv.fi>
+Message-ID: <1350571199.2143.53.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2012-10-18 at 16:53 +0300, Felipe Balbi wrote:
+> hi,
+> 
+> On Thu, Oct 18, 2012 at 03:18:04PM +0300, Tero Kristo wrote:
+> > > > +static int __init omap4430_phy_power_down(void)
+> > > > +{
+> > > > +	void __iomem *ctrl_base;
+> > > > +
+> > > > +	if (!cpu_is_omap44xx())
+> > > > +		return 0;
+> > > > +
+> > > > +	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
+> > > > +	if (!ctrl_base) {
+> > > > +		pr_err("control module ioremap failed\n");
+> > > > +		return -ENOMEM;
+> > > > +	}
+> > > > +
+> > > > +	/* Power down the phy */
+> > > > +	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
+> > > > +
+> > > > +	iounmap(ctrl_base);
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > > +early_initcall(omap4430_phy_power_down);
+> > > > +#endif
+> > > 
+> > > I think you could do it even if the driver is enabled.
+> > 
+> > Actually not at least now, it looks like the driver is not controlling
+> > this bit at all, so the driver would fail if we do this.
+> 
+> then we can consider that a bug in the driver. Kishon, I thought you had
+> added SCM address space to PHY driver for this particular reason until
+> we get SCM driver, wasn't it ??
 
-On 10/18/2012 09:23 AM, Benoit Cousson wrote:
-> Hi Jon,
-> 
-> This looks good to me, I just have a minor nit comment.
-> 
-> On 10/17/2012 08:33 PM, Jon Hunter wrote:
->> Adds the counter-32k timers nodes present in OMAP2/3/4 devices and
->> device-tree binding documentation for OMAP counter-32k.
->>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> ---
->>  .../devicetree/bindings/arm/omap/counter32k.txt    |   15 +++++++++++++++
->>  arch/arm/boot/dts/omap2420.dtsi                    |    6 ++++++
->>  arch/arm/boot/dts/omap2430.dtsi                    |    6 ++++++
->>  arch/arm/boot/dts/omap3.dtsi                       |    6 ++++++
->>  arch/arm/boot/dts/omap4.dtsi                       |    6 ++++++
->>  5 files changed, 39 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/omap/counter32k.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/counter32k.txt b/Documentation/devicetree/bindings/arm/omap/counter32k.txt
->> new file mode 100644
->> index 0000000..1983fae
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/omap/counter32k.txt
->> @@ -0,0 +1,15 @@
->> +OMAP Counter-32K bindings
->> +
->> +Required properties:
->> +- compatible:	Must be "ti,omap-counter32k" for OMAP controllers
->> +- reg:		Contains timer register address range (base address and length)
->> +- ti,hwmods:	Name of the hwmod associated to the counter, which is typically
->> +		"counter_32k"
->> +
->> +Example:
->> +
->> +counter32k: counter32k at 4a304000 {
->> +	compatible = "ti,omap-counter32k";
->> +	reg = <0x4a304000 0x001f>;
->> +	ti,hwmods = "counter_32k";
->> +};
->> diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
->> index 5f68a70..082193f 100644
->> --- a/arch/arm/boot/dts/omap2420.dtsi
->> +++ b/arch/arm/boot/dts/omap2420.dtsi
->> @@ -14,6 +14,12 @@
->>  	compatible = "ti,omap2420", "ti,omap2";
->>  
->>  	ocp {
->> +		counter32k: counter32k at 48004000 {
-> 
-> I'd rather use "counter" as generic type to be consistent with the timer
-> type we are already using.
-> 
-> +		counter32k: counter at 48004000 {
+Yes, I would say its a bug in the driver. However we need this disable
+mechanism for the case where we don't have the driver also (which is the
+default config for omap.)
 
-Sounds good. Will update.
+-Tero
 
-Cheers
-Jon
+> > > Just to make sure I understand the issue right: is the PHY enabled by
+> > > default or did bootloader left this enabled ?
+> > 
+> > The reset value for the register is zero (at least according to TRM), so
+> > it is enabled from boot. Also, I couldn't find any code from the u-boot
+> > that would touch this bit with a quick look.
+> 
+> ok, so it looks like we must do this anyway, thanks ;-)
+> 
