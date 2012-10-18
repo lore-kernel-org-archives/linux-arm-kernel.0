@@ -1,34 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 17 Oct 2012 17:04:30 -0700
-Subject: [GIT PULL] ARM: tegra: fixes for 3.7-rc2
-In-Reply-To: <1350515426-31517-1-git-send-email-swarren@wwwdotorg.org>
-References: <1350515426-31517-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAOesGMgZwhZrLeGnK0LdgOFE9yjy2HO==6BWX1pxUmvxM62Waw@mail.gmail.com>
+Date: Wed, 17 Oct 2012 17:06:56 -0700
+Subject: [GIT PULL] omap fixes ready to go for v3.7-rc1
+In-Reply-To: <20121017220248.GA15569@atomide.com>
+References: <20121017220248.GA15569@atomide.com>
+Message-ID: <CAOesGMiuaA7pEJREkkLWMVurXgpHjVNBv7yzG=OLQH=8JDexxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 4:10 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> This branch contains a couple small fixes for Tegra for 3.7.
+On Wed, Oct 17, 2012 at 3:02 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi Arnd & Olof,
 >
-> * A fix for another clock rate calculation overflow
-> * A revert of a change that removed the "timer" clock on Tegra, coupled
->   with a fix for the confusing symbol name clash that triggered it.
+> Here are the fixes ready to pull, there's at least one more fix in works
+> but it still requires minor changes. The two top commits are recent as
+> Jon Hunter noticed an issue freeing resources in his fix and I did a
+> new branch to swap in the fixed patch.
 >
-> ----------------------------------------------------------------
+> Regards,
 >
-> BTW, I signed this tag with my swarren at nvidia.com key; it's a different key
-> to the one I used before, but has the same signatures and should show up on
-> all the same keyservers.
+> Tony
+>
 >
 > The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 >
->   Linux 3.7-rc1
+>   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-fixes-for-rc2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc1/fixes-take5-signed
 
-Pulled into fixes. Thanks!
+Pulled into fixes, thanks.
 
 
 -Olof
