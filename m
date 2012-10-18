@@ -1,37 +1,99 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Thu, 18 Oct 2012 10:56:13 +0530
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <507ECB31.8030006@gmail.com>
-References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
- <20121011144756.GB12552@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
- <20121015160154.GB15569@atomide.com> <507D050D.2090402@ti.com>
- <507E455F.7060703@ti.com> <507ECB31.8030006@gmail.com>
-Message-ID: <507F92F5.6080906@ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 18 Oct 2012 05:31:11 +0000
+Subject: discrepancy while save and restore of debounce registers
+In-Reply-To: <507F1F21.8040206@ti.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EAA9A7C@DBDE01.ent.ti.com>
+ <507F1F21.8040206@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAAA89B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Jon,
 
-On Wednesday 17 October 2012 08:43 PM, Daniel Mack wrote:
-> On 17.10.2012 07:42, Afzal Mohammed wrote:
+On Thu, Oct 18, 2012 at 02:42:01, Hunter, Jon wrote:
+> Hi Gururaja,
+> 
+> On 10/17/2012 01:13 AM, Hebbar, Gururaja wrote:
+> > Hi,
+> > 
+> > I came across a peculiar issue while updating GPIO debounce registers on
+> > OMAP platform.
+> > 
+> > According to mainline commit ae547354a8ed59f19b57f7e1de9c7816edfc3537
+> > 
+> > gpio/omap: save and restore debounce registers
+> > 
+> > GPIO debounce registers need to be saved and restored for proper functioning
+> > of driver.
+> > 
+> > ...
+> > @@ -1363,6 +1369,12 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+> >         __raw_writel(bank->context.fallingdetect,
+> >                                 bank->base + bank->regs->fallingdetect);
+> >         __raw_writel(bank->context.dataout, bank->base + bank->regs->dataout);
+> > +       if (bank->dbck_enable_mask) {
+> > +               __raw_writel(bank->context.debounce, bank->base +
+> > +                                       bank->regs->debounce);
+> > +               __raw_writel(bank->context.debounce_en,
+> > +                                       bank->base + bank->regs->debounce_en);
+> > +       }
+> >  }
+> > 
+> > 
+> > Due to copy/paste of this commit into my local tree, I missed the check for 
+> > bank->dbck_enable_mask, and directly restored the saved value from context.
+> > 
+> > After this, I saw random crashes when accessing different registers (sometimes
+> > its OE register and sometime its DATAOUT register). 
+> > 
+> > These crashes were seen across 2nd and subsequent suspend/resume.
+> > 
+> > My doubt/questions are
+> > 1. Why should debounce registers be updated only when it's accessed previously?
+> 
+> If debounce is not being used by any of the gpios, then there is no need
+> to restore them as there are no bits set. So this makes sense and saves
+> a couple register writes.
 
->> I doubt whether auxdata would help here, it seems using
->> compatible field alone would help in deciding relevant
->> custom timing routine. Whether we want this kind of
->> peripheral knowledge in gpmc driver instead of using
->> generic timing routine has to be decided though.
+What I want to know is that other than saving register writes, is there any
+other important stuff that specifies this requirement.
 
-> Another thing that might be worth thinking about is that apart from the
-> GPMC host controller and the peripherals, there could be other
-> components like level shifters or series resistors on the board that
-> limit the maximum speed of transactions. So in fact we might be better
-> off storing all that timing details in the DT, as they are in fact
-> highly application specific.
+> 
+> > 2. What is the relation between updating debounce registers and crash seen on
+> > others registers? 
+> 
+> This I am not sure about. I gave this a quick try on my omap3430 beagle
+> board, but I did not see any side-effects from doing this. However, if
+> you are always restoring the debounce context regardless of whether
+> debounce is being used, then you could be writing bad values to the
+> debounce registers as the context variables bank->context.debouce and
+> bank->context.debouce_en may not initialised. So that is bad. However,
+> that said I am still not sure how this could cause a crash.
+> 
+> Can you share more details on ...
 
-Yes, making it future proof for these kind of scenarios was one
-of the reason's that initially triggered generic timing path.
+Sorry for missing below details in first post.
 
-Regards
-Afzal
+> 1. The OMAP platform you are using?
+
+I was trying this on TI AM335x platform (repo below). On AM335x EVM board
+
+http://arago-project.org/git/projects/?p=linux-am33x.git;a=shortlog;
+h=refs/heads/v3.2-staging
+
+> 2. What linux distro/environment you are using?
+
+Arago AM335x PSP release (linux 3.2 + am335x patch-set)
+
+> 3. If there are any specific steps to reproduce this 100% of the time?
+
+On top of this tree, try suspend/resume using "echo mem > /syspower/state"
+
+> 
+> Cheers
+> Jon
+> 
+
+
+Regards, 
+Gururaja
