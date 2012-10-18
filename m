@@ -1,23 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Oct 2012 20:29:51 +0200
-Subject: [PATCH 07/10] pinctrl: remove mutex lock in groups show
-In-Reply-To: <1350551224-12857-7-git-send-email-haojian.zhuang@gmail.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-7-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CACRpkdYDe1ODiXbV8JSmzwqVHTasY1TfkWZ0GFYQqORog4x52A@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 18 Oct 2012 13:30:31 -0500
+Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB43D0F@DBDE01.ent.ti.com>
+References: <cover.1350327320.git.richardcochran@gmail.com>
+ <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
+ <507DB9EC.9060407@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB43B17@DBDE01.ent.ti.com>
+ <5080315F.8090802@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB43D0F@DBDE01.ent.ti.com>
+Message-ID: <50804AC7.3000309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 11:07 AM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
 
-> Mutex is locked duplicatly by pinconf_groups_show() and
-> pin_config_group_get(). It results dead lock. So avoid to lock mutex
-> in pinconf_groups_show().
->
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+On 10/18/2012 01:04 PM, Hiremath, Vaibhav wrote:
+> On Thu, Oct 18, 2012 at 22:12:07, Hunter, Jon wrote:
 
-Thanks! Applied to my fixes branch with a Cc: stable tag.
+...
 
-Yours,
-Linus Walleij
+>> Yes, but do you also see the bug that is hiding in gpmc_mem_init()?
+>>
+>> My point is to highlight this and not hide it, so that we can fix it
+>> now. Otherwise if we wait until we enable the gpmc driver with DT and
+>> this could hinder the DT migration later.
+>>
+> 
+> As I already mentioned in my previous response, your patch is required 
+> irrespective of this patch. I would consider your patch as a cleanup patch.
+> 
+> 
+> Both the patches are independent, your patch is handling the error path 
+> properly, whereas, my patch makes sure that you don't unnecessarily probe 
+> GPMC if you are booting from DT and GPMC node is not present, as described 
+> above.
+
+Your patch hides a bug. That's my point. How do you expect am335x ever
+to support gpmc devices if this bug is not addressed?
+
+So I think that you are over-simplifying it when you say that my patch
+is just a clean-up patch. I agree that it is adding appropriate error
+handling, but it also highlights the presence of a bug by allowing the
+probe to fail.
+
+Anyway, I don't care to debate this any further, we just need to fix
+gpmc_mem_init().
+
+Jon
