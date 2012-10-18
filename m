@@ -1,26 +1,26 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 18 Oct 2012 17:13:11 +0800
-Subject: [PATCH] dma: add new DMA control commands
-In-Reply-To: <201210181049.21556.marex@denx.de>
-References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
- <201210181016.06782.marex@denx.de> <507FC290.10205@freescale.com>
- <201210181049.21556.marex@denx.de>
-Message-ID: <507FC827.40601@freescale.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 18 Oct 2012 17:12:06 +0800
+Subject: [RESEND] [PATCH 3.6.0- 3/6] ARM/pxa: use module_platform_driver
+ macro
+In-Reply-To: <507D3E16.2050901@compulab.co.il>
+References: <1350025880-30551-1-git-send-email-srinivas.kandagatla@st.com>
+ <507D3E16.2050901@compulab.co.il>
+Message-ID: <CAN1soZznEjzCmz95gpdQ53ZfqQZeJRtWGXXqdc_bRWZVrsPuFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?10?18? 16:49, Marek Vasut ??:
-> Dear Huang Shijie,
+On Tue, Oct 16, 2012 at 6:59 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> On 10/12/12 09:11, Srinivas KANDAGATLA wrote:
+>> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>
+>> This patch removes some code duplication by using
+>> module_platform_driver.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 >
->> ? 2012?10?18? 16:16, Marek Vasut ??:
->>> So we can't stream data from the chip? About time to adjust the MTD
->>> framework to allow that. Maybe implement a command queue?
->> IMHO, it's not possible. Because the READ-PAGE(00h-30h) command needs to
->> check the busy status
->> which means we have to stop in the middle, so we can not chain the all
->> the read-pages DMA commands.
-> Can the DMA not branch?
-it's too complicated to the MTD layer, as well as the gpmi driver.
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+>
+Applied
 
-Best Regards
-Huang Shijie
+Thanks
+Haojian
