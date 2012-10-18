@@ -1,61 +1,51 @@
 From: mporter@ti.com (Matt Porter)
-Date: Thu, 18 Oct 2012 09:26:47 -0400
-Subject: [RFC PATCH v3 08/16] ARM: dts: add AM33XX EDMA support
+Date: Thu, 18 Oct 2012 09:26:49 -0400
+Subject: [RFC PATCH v3 10/16] mmc: omap_hsmmc: convert to
+ dma_request_slave_channel_compat()
 In-Reply-To: <1350566815-409-1-git-send-email-mporter@ti.com>
 References: <1350566815-409-1-git-send-email-mporter@ti.com>
-Message-ID: <1350566815-409-9-git-send-email-mporter@ti.com>
+Message-ID: <1350566815-409-11-git-send-email-mporter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds AM33XX EDMA support to the am33xx.dtsi as documented in
-Documentation/devicetree/bindings/dma/ti-edma.txt
+Convert dmaengine channel requests to use
+dma_request_slave_channel_compat(). This supports the DT case of
+platforms requiring channel selection from either the OMAP DMA or
+the EDMA engine. AM33xx only boots from DT and is the only user
+implementing EDMA so in the !DT case we can default to the OMAP DMA
+filter.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi |   31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/mmc/host/omap_hsmmc.c |   10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index bb31bff..ab9c78f 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -62,6 +62,37 @@
- 			reg = <0x48200000 0x1000>;
- 		};
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 54bfd0c..b327cd0 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -1866,14 +1866,20 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
  
-+		edma: edma at 49000000 {
-+			compatible = "ti,edma3";
-+			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
-+			reg =	<0x49000000 0x10000>,
-+				<0x44e10f90 0x10>;
-+			interrupt-parent = <&intc>;
-+			interrupts = <12 13 14>;
-+			#dma-cells = <1>;
-+			dma-channels = <64>;
-+			ti,edma-regions = <4>;
-+			ti,edma-slots = <256>;
-+			ti,edma-reserved-channels = <0  2
-+						     14 2
-+						     26 6
-+						     48 4
-+						     56 8>;
-+			ti,edma-reserved-slots = <0  2
-+						  14 2
-+						  26 6
-+						  48 4
-+						  56 8
-+						  64 127>;
-+			ti,edma-queue-tc-map = <0 0
-+						1 1
-+						2 2>;
-+			ti,edma-queue-priority-map = <0 0
-+						      1 1
-+						      2 2>;
-+			ti,edma-default-queue = <0>;
-+		};
+-	host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
++	host->rx_chan =
++		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
++						 &rx_req, &pdev->dev, "rx");
 +
- 		gpio1: gpio at 44e07000 {
- 			compatible = "ti,omap4-gpio";
- 			ti,hwmods = "gpio1";
+ 	if (!host->rx_chan) {
+ 		dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+ 		ret = -ENXIO;
+ 		goto err_irq;
+ 	}
+ 
+-	host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
++	host->tx_chan =
++		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
++						 &tx_req, &pdev->dev, "tx");
++
+ 	if (!host->tx_chan) {
+ 		dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+ 		ret = -ENXIO;
 -- 
 1.7.9.5
