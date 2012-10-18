@@ -1,60 +1,82 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 18 Oct 2012 17:13:10 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <4502243.v9vY3prCgE@wuerfel>
-References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
- <201210171342.29635.arnd@arndb.de>
- <20121018005811.GA4325@verge.net.au> <4502243.v9vY3prCgE@wuerfel>
-Message-ID: <20121018081310.GA27117@verge.net.au>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 18 Oct 2012 10:16:06 +0200
+Subject: [PATCH] dma: add new DMA control commands
+In-Reply-To: <507FB495.7050104@freescale.com>
+References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
+ <201210180914.58527.marex@denx.de> <507FB495.7050104@freescale.com>
+Message-ID: <201210181016.06782.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 07:29:30AM +0000, Arnd Bergmann wrote:
-> On Thursday 18 October 2012 09:58:11 Simon Horman wrote:
-> > On Wed, Oct 17, 2012 at 01:42:29PM +0000, Arnd Bergmann wrote:
-> > > On Wednesday 17 October 2012, Simon Horman wrote:
-> > > > Hi Olof, Hi Arnd,
-> > > > 
-> > > > please consider the following defconfig enhancements for 3.8.
-> > > 
-> > > These look good to me, but I wonder what happened to the plan to reduce
-> > > the number of defconfig files we discussed before. Since you can build
-> > > a combined kernel that runs on all (or most) of the supported boards,
-> > > can you add a combined shmobile_defconfig that is able to work on
-> > > a wide variety of hardware and drop some of the less common defconfig
-> > > files?
-> > > 
-> > > Most of the modern platforms nowadays have just one defconfig that
-> > > covers everything.
+Dear Huang Shijie,
+
+> ? 2012?10?18? 15:14, Marek Vasut ??:
+> > Dear Huang Shijie,
 > > 
-> > Hi Arnd,
+> > Why such massive CC ?
 > > 
-> > I wonder if such consolidation only makes sense for boards that
-> > make use of DT. If so, I can see that we may be able to come
-> > up with a single configuration for the Armadillo800eva, KZM9G
-> > and KZM9D boards. But not for older boards such as the Mackerel which
-> > have not been converted to use DT.
+> >> ? 2012?10?18? 14:18, Vinod Koul ??:
+> >>> Why cant you do start (prepare clock etc) when you submit the
+> >>> descriptor to dmaengine. Can be done in tx_submit callback.
+> >>> Similarly remove the clock when dma transaction gets completed.
+> >> 
+> >> I ever thought this method too.
+> >> 
+> >> But it will become low efficient in the following case:
+> >>     Assuming the gpmi-nand driver has to read out 1024 pages in one
+> >> 
+> >> _SINGLE_ read operation.
+> >> The gpmi-nand will submit the descriptor to dmaengine per page.
+> > 
+> > It will? Then GPMI NAND is flat our broken ... again.
 > 
-> Usually you should just be able to enable any boards together,
-> independent of whether they are using DT or not. It's possible
-> that shmobile does something different from the other platforms
-> that I'm not aware of, of course. If you look at e.g.
-> omap2plus_defconfig or imx_v6_v7_defconfig, they both enable
-> all the available boards.
-
-Thanks, I'll see what I can do within the scope of the boards
-that I have access to.
-
-> > I am also wondering if more of the drivers that SH Mobile uses need to
-> > become DT aware before a consolidated configuration can work.  In
-> > particular, I am thinking about the SCI serial driver and the location of
-> > the serial port that can be used for serial console and early printk - this
-> > features in the kernel command line of the per-board defconfigs and is
-> > relied on by developers.
+> yes.
 > 
-> Device drivers that don't use DT should get their configuration from
-> platform_data. The command line can be used to override those, but it's
-> also normally passed by the boot loader, which also has to configure
-> e.g. how much memory is present or which uart to use.
+> Please read the NAND chip spec about the comand READ PAGE(00h-30h) and
+> the code
+> nand_do_read_ops(). The nand chip limits us only read one page out one
+> time. So the driver will submit the descriptor to dmaengine per page.
 
-Understood.
+So we can't stream data from the chip? About time to adjust the MTD framework to 
+allow that. Maybe implement a command queue?
+
+> >> So with
+> >> your method,
+> >> the system will repeat the enable/disable dma clock 1024 time.
+> > 
+> > Yes, it is the driver that's wrong.
+> 
+> not the driver.
+> 
+> >> At every
+> >> enable/disable dma clock,
+> >> the system has to enable the clock chain and it's parents ...
+> >> 
+> >> But with this patch, we only need to enable/disable dma clock one time,
+> >> just at we select the nand chip.
+> > 
+> > You are fixing a driver problem at a framework level, wrong.
+> > 
+> > So, check how the MXS SPI driver handles descriptor chaining. Indeed, the
+> > Sigmatel screwed the DMA stuff good. But if you analyze the SPI driver,
+> > you'll notice a few important points that might come handy when you fix
+> > the GPMI NAND driver properly.
+> > 
+> > The direction to take here is:
+> > 1) Implement DMA chaining into the GPMI NAND driver
+> 
+> How can i implement the DMA chain if the nand chip READ-PAGE command
+> gives us the one page limit?
+
+This smells like a time to extend the MTD api ?
+
+> thanks
+> Huang Shijie
+> 
+> > 2) You might need to do one PIO transfer to reconfigure the IP registers
+> > between each segment of the DMA chain (just as MXS SPI does it)
+> > 3) You might run out of DMA descriptors when doing too long chains -- so
+> > you might need to fix that part of the mxs DMA driver.
+
+Best regards,
+Marek Vasut
