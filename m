@@ -1,44 +1,62 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 18 Oct 2012 15:52:09 -0500
-Subject: [PATCHv1] arm:socfpga: Enable SMP for socfpga
-In-Reply-To: <CADhT+wcJmwRMeNugWdgY+aU4EGE-y48R6OePTq==TjZajuxfeA@mail.gmail.com>
-References: <1350501498-23601-1-git-send-email-dinguyen@altera.com>
- <507F01FD.6070403@gmail.com>
- <CADhT+wcJmwRMeNugWdgY+aU4EGE-y48R6OePTq==TjZajuxfeA@mail.gmail.com>
-Message-ID: <50806BF9.9050103@gmail.com>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Thu, 18 Oct 2012 17:56:59 -0300
+Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
+ include/linux/omap-iommu.h
+In-Reply-To: <20121018202842.11834.14375.stgit@muffinssi.local>
+References: <20121018202707.11834.1438.stgit@muffinssi.local>
+ <20121018202842.11834.14375.stgit@muffinssi.local>
+Message-ID: <20121018175659.431fe0b1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/2012 10:34 PM, Dinh Nguyen wrote:
-> Hi Rob,
+Tony,
+
+Em Thu, 18 Oct 2012 13:28:42 -0700
+Tony Lindgren <tony@atomide.com> escreveu:
+
+> Looks like the iommu framework does not have generic functions
+> exported for all the needs yet. The hardware specific functions
+> are defined in files like intel-iommu.h and amd-iommu.h. Follow
+> the same standard for omap-iommu.h.
 > 
-> On Wed, Oct 17, 2012 at 2:07 PM, Rob Herring <robherring2@gmail.com> wrote:
->>
->> On 10/17/2012 02:18 PM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> Enable SMP for the SOCFPGA platform.
->>>
->>> Signed-off-by: Pavel Machek <pavel@denx.de>
->>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->>> ---
->>>  arch/arm/boot/dts/socfpga.dtsi            |   10 ++
->>>  arch/arm/configs/socfpga_defconfig        |    9 +-
->>
->> Does the multi_v7_defconfig not work for you?
+> This is needed because we are removing plat and mach includes
+> for ARM common zImage support. Further work should continue
+> in the iommu framework context as only pure platform data will
+> be communicated from arch/arm/*omap*/* code to the iommu
+> framework.
 > 
-> It does. Are you planning to remove the defconfigs the platforms that
-> are part of
-> multi_v7_defconfig soon? socfpga_defconfig is broken with SMP enabled because
-> it needs +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set.
+> Cc: Joerg Roedel <joerg.roedel@amd.com>
+> Cc: Ohad Ben-Cohen <ohad@wizery.com>
+> Cc: Ido Yariv <ido@wizery.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+> Cc: Omar Ramirez Luna <omar.luna@linaro.org>
+> Cc: linux-media at vger.kernel.org
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/iommu2.c               |    1 
+>  arch/arm/plat-omap/include/plat/iommu.h    |   10 +--
+>  arch/arm/plat-omap/include/plat/iovmm.h    |   89 ----------------------------
+>  drivers/iommu/omap-iommu-debug.c           |    2 -
+>  drivers/iommu/omap-iommu.c                 |    1 
+>  drivers/iommu/omap-iovmm.c                 |   46 ++++++++++++++
+>  drivers/media/platform/omap3isp/isp.c      |    1 
+>  drivers/media/platform/omap3isp/isp.h      |    2 -
+>  drivers/media/platform/omap3isp/ispccdc.c  |    1 
+>  drivers/media/platform/omap3isp/ispstat.c  |    1 
+>  drivers/media/platform/omap3isp/ispvideo.c |    2 -
 
-I don't plan to remove them. I'll leave it up to the platform
-maintainers as the new multi_v7 config is not exactly the same selections.
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-That's strange that you care about the errata setting. I think it should
-work either way. We do need to scrub the errata list and enable all the
-ones which have no runtime impact and are conditioned on the core
-revision. I'm not sure what we'll do with the ones that could have a
-negative impact on performance of rev's without an errata.
+It is better if you send this entire series through the ARM tree, keeping
+this hole series altogether (and avoiding the risk of breaking bisectability
+if it goes through separate trees). So, you can add my ack for those header
+moves for drivers/media/platform/*.
 
-Rob
+Regards,
+Mauro
+
+-- 
+
+Cheers,
+Mauro
