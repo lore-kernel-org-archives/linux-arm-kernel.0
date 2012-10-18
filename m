@@ -1,126 +1,55 @@
-From: eunki_kim@samsung.com (Eunki Kim)
-Date: Thu, 18 Oct 2012 16:28:32 +0900
-Subject: [PATCH] ARM: SAMSUNG: use devm_ functions for ADC driver
-Message-ID: <001701cdad02$2d511200$87f33600$@com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 18 Oct 2012 07:29:30 +0000
+Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
+In-Reply-To: <20121018005811.GA4325@verge.net.au>
+References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
+ <201210171342.29635.arnd@arndb.de> <20121018005811.GA4325@verge.net.au>
+Message-ID: <4502243.v9vY3prCgE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses devm_* functions for probe function in ADC driver.
-It reduces code size and simplifies the code.
+On Thursday 18 October 2012 09:58:11 Simon Horman wrote:
+> On Wed, Oct 17, 2012 at 01:42:29PM +0000, Arnd Bergmann wrote:
+> > On Wednesday 17 October 2012, Simon Horman wrote:
+> > > Hi Olof, Hi Arnd,
+> > > 
+> > > please consider the following defconfig enhancements for 3.8.
+> > 
+> > These look good to me, but I wonder what happened to the plan to reduce
+> > the number of defconfig files we discussed before. Since you can build
+> > a combined kernel that runs on all (or most) of the supported boards,
+> > can you add a combined shmobile_defconfig that is able to work on
+> > a wide variety of hardware and drop some of the less common defconfig
+> > files?
+> > 
+> > Most of the modern platforms nowadays have just one defconfig that
+> > covers everything.
+> 
+> Hi Arnd,
+> 
+> I wonder if such consolidation only makes sense for boards that
+> make use of DT. If so, I can see that we may be able to come
+> up with a single configuration for the Armadillo800eva, KZM9G
+> and KZM9D boards. But not for older boards such as the Mackerel which
+> have not been converted to use DT.
 
-Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
----
- arch/arm/plat-samsung/adc.c |   48 +++++++++++-------------------------------
- 1 files changed, 13 insertions(+), 35 deletions(-)
+Usually you should just be able to enable any boards together,
+independent of whether they are using DT or not. It's possible
+that shmobile does something different from the other platforms
+that I'm not aware of, of course. If you look at e.g.
+omap2plus_defconfig or imx_v6_v7_defconfig, they both enable
+all the available boards.
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index b1e05cc..37542c2 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -344,7 +344,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	int ret;
- 	unsigned tmp;
- 
--	adc = kzalloc(sizeof(struct adc_device), GFP_KERNEL);
-+	adc = devm_kzalloc(dev, sizeof(struct adc_device), GFP_KERNEL);
- 	if (adc == NULL) {
- 		dev_err(dev, "failed to allocate adc_device\n");
- 		return -ENOMEM;
-@@ -355,50 +355,46 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	adc->pdev = pdev;
- 	adc->prescale = S3C2410_ADCCON_PRSCVL(49);
- 
--	adc->vdd = regulator_get(dev, "vdd");
-+	adc->vdd = devm_regulator_get(dev, "vdd");
- 	if (IS_ERR(adc->vdd)) {
- 		dev_err(dev, "operating without regulator \"vdd\" .\n");
--		ret = PTR_ERR(adc->vdd);
--		goto err_alloc;
-+		return PTR_ERR(adc->vdd);
- 	}
- 
- 	adc->irq = platform_get_irq(pdev, 1);
- 	if (adc->irq <= 0) {
- 		dev_err(dev, "failed to get adc irq\n");
--		ret = -ENOENT;
--		goto err_reg;
-+		return -ENOENT;
- 	}
- 
--	ret = request_irq(adc->irq, s3c_adc_irq, 0, dev_name(dev), adc);
-+	ret = devm_request_irq(dev, adc->irq, s3c_adc_irq, 0, dev_name(dev),
-+				adc);
- 	if (ret < 0) {
- 		dev_err(dev, "failed to attach adc irq\n");
--		goto err_reg;
-+		return ret;
- 	}
- 
--	adc->clk = clk_get(dev, "adc");
-+	adc->clk = devm_clk_get(dev, "adc");
- 	if (IS_ERR(adc->clk)) {
- 		dev_err(dev, "failed to get adc clock\n");
--		ret = PTR_ERR(adc->clk);
--		goto err_irq;
-+		return PTR_ERR(adc->clk);
- 	}
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!regs) {
- 		dev_err(dev, "failed to find registers\n");
--		ret = -ENXIO;
--		goto err_clk;
-+		return -ENXIO;
- 	}
- 
--	adc->regs = ioremap(regs->start, resource_size(regs));
-+	adc->regs = devm_request_and_ioremap(dev, regs);
- 	if (!adc->regs) {
- 		dev_err(dev, "failed to map registers\n");
--		ret = -ENXIO;
--		goto err_clk;
-+		return -ENXIO;
- 	}
- 
- 	ret = regulator_enable(adc->vdd);
- 	if (ret)
--		goto err_ioremap;
-+		return ret;
- 
- 	clk_enable(adc->clk);
- 
-@@ -418,32 +414,14 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	adc_dev = adc;
- 
- 	return 0;
--
-- err_ioremap:
--	iounmap(adc->regs);
-- err_clk:
--	clk_put(adc->clk);
--
-- err_irq:
--	free_irq(adc->irq, adc);
-- err_reg:
--	regulator_put(adc->vdd);
-- err_alloc:
--	kfree(adc);
--	return ret;
- }
- 
- static int __devexit s3c_adc_remove(struct platform_device *pdev)
- {
- 	struct adc_device *adc = platform_get_drvdata(pdev);
- 
--	iounmap(adc->regs);
--	free_irq(adc->irq, adc);
- 	clk_disable(adc->clk);
- 	regulator_disable(adc->vdd);
--	regulator_put(adc->vdd);
--	clk_put(adc->clk);
--	kfree(adc);
- 
- 	return 0;
- }
--- 
-1.7.1
+> I am also wondering if more of the drivers that SH Mobile uses need to
+> become DT aware before a consolidated configuration can work.  In
+> particular, I am thinking about the SCI serial driver and the location of
+> the serial port that can be used for serial console and early printk - this
+> features in the kernel command line of the per-board defconfigs and is
+> relied on by developers.
+
+Device drivers that don't use DT should get their configuration from
+platform_data. The command line can be used to override those, but it's
+also normally passed by the boot loader, which also has to configure
+e.g. how much memory is present or which uart to use.
+
+	Arnd
