@@ -1,479 +1,382 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 18 Oct 2012 11:20:39 +0800
-Subject: [PATCH 2/3] serial: mxs-auart: add the DMA support for mx28
-In-Reply-To: <1350367386-7742-3-git-send-email-b32955@freescale.com>
-References: <1350367386-7742-1-git-send-email-b32955@freescale.com>
- <1350367386-7742-3-git-send-email-b32955@freescale.com>
-Message-ID: <20121018032022.GB4378@S2101-09.ap.freescale.net>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 17 Oct 2012 22:34:03 -0500
+Subject: [PATCHv1] arm:socfpga: Enable SMP for socfpga
+In-Reply-To: <507F01FD.6070403@gmail.com>
+References: <1350501498-23601-1-git-send-email-dinguyen@altera.com>
+ <507F01FD.6070403@gmail.com>
+Message-ID: <CADhT+wcJmwRMeNugWdgY+aU4EGE-y48R6OePTq==TjZajuxfeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 02:03:05PM +0800, Huang Shijie wrote:
-> Only we meet the following conditions, we can enable the DMA support for
-> auart:
-> 
->   (1) We enable the DMA support in the dts file, such as
->       arch/arm/boot/dts/imx28.dtsi.
-> 
->   (2) We enable the hardware flow control.
-> 
->   (3) We use the mx28, not the mx23. Due to hardware bug(see errata: 2836),
->       we can not add the DMA support to mx23.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  .../bindings/tty/serial/fsl-mxs-auart.txt          |    7 +
->  drivers/tty/serial/mxs-auart.c                     |  307 +++++++++++++++++++-
->  2 files changed, 311 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> index a154bf1..67e54b4 100644
-> --- a/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-mxs-auart.txt
-> @@ -6,11 +6,18 @@ Required properties:
->  - reg : Address and length of the register set for the device
->  - interrupts : Should contain the auart interrupt numbers
->  
-> +Optional properties:
-> +- fsl,auart-dma-channel : The DMA channels, the first is for RX, the other
-> +			is for TX.
-> +- fsl,auart-enable-dma : Enable the DMA support for the auart.
-> +
+Hi Rob,
 
-If we want to have it decided by device tree, can we drop the property
-and simply check if "fsl,auart-dma-channel" presents?
+On Wed, Oct 17, 2012 at 2:07 PM, Rob Herring <robherring2@gmail.com> wrote:
+>
+> On 10/17/2012 02:18 PM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> >
+> > Enable SMP for the SOCFPGA platform.
+> >
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > ---
+> >  arch/arm/boot/dts/socfpga.dtsi            |   10 ++
+> >  arch/arm/configs/socfpga_defconfig        |    9 +-
+>
+> Does the multi_v7_defconfig not work for you?
 
->  Example:
->  auart0: serial at 8006a000 {
->  	compatible = "fsl,imx28-auart";
->  	reg = <0x8006a000 0x2000>;
->  	interrupts = <112 70 71>;
-> +	fsl,auart-dma-channel = <8 9>;
-> +	fsl,auart-enable-dma;
->  };
->  
->  Note: Each auart port should have an alias correctly numbered in "aliases"
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index cd9ec1d..2271330 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -34,6 +34,8 @@
->  #include <linux/io.h>
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/of_device.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/fsl/mxs-dma.h>
->  
->  #include <asm/cacheflush.h>
->  
-> @@ -76,7 +78,15 @@
->  
->  #define AUART_CTRL0_SFTRST			(1 << 31)
->  #define AUART_CTRL0_CLKGATE			(1 << 30)
-> +#define AUART_CTRL0_RXTO_ENABLE			(1 << 27)
-> +#define AUART_CTRL0_RXTIMEOUT(v)		(((v) & 0x7ff) << 16)
-> +#define AUART_CTRL0_XFER_COUNT(v)		((v) & 0xffff)
->  
-> +#define AUART_CTRL1_XFER_COUNT(v)		((v) & 0xffff)
-> +
-> +#define AUART_CTRL2_DMAONERR			(1 << 26)
-> +#define AUART_CTRL2_TXDMAE			(1 << 25)
-> +#define AUART_CTRL2_RXDMAE			(1 << 24)
->  #define AUART_CTRL2_CTSEN			(1 << 15)
->  #define AUART_CTRL2_RTSEN			(1 << 14)
->  #define AUART_CTRL2_RTS				(1 << 11)
-> @@ -116,12 +126,15 @@
->  #define AUART_STAT_BERR				(1 << 18)
->  #define AUART_STAT_PERR				(1 << 17)
->  #define AUART_STAT_FERR				(1 << 16)
-> +#define AUART_STAT_RXCOUNT_MASK			0xffff
->  
->  static struct uart_driver auart_driver;
->  
->  struct mxs_auart_port {
->  	struct uart_port port;
->  
-> +#define MXS_AUART_DMA_CONFIG	0x1
-> +#define MXS_AUART_DMA_ENABLED	0x2
->  	unsigned int flags;
->  	unsigned int ctrl;
->  
-> @@ -130,16 +143,116 @@ struct mxs_auart_port {
->  	struct clk *clk;
->  	struct device *dev;
->  	struct platform_device *pdev;
-> +
-> +	/* for DMA */
-> +	struct mxs_dma_data dma_data;
-> +	int dma_channel_rx, dma_channel_tx;
-> +	int dma_irq_rx, dma_irq_tx;
-> +	int dma_channel;
-> +
-> +	struct scatterlist tx_sgl;
-> +	struct dma_chan	*tx_dma_chan;
-> +	void *tx_dma_buf;
-> +
-> +	struct scatterlist rx_sgl;
-> +	struct dma_chan	*rx_dma_chan;
-> +	void *rx_dma_buf;
->  };
->  
-> +static inline bool auart_dma_enabled(struct mxs_auart_port *s)
-> +{
-> +	return s->flags & MXS_AUART_DMA_ENABLED;
-> +}
-> +
->  static void mxs_auart_stop_tx(struct uart_port *u);
->  
->  #define to_auart_port(u) container_of(u, struct mxs_auart_port, port)
->  
-> +static inline void mxs_auart_tx_chars(struct mxs_auart_port *s);
-> +
-> +static void dma_tx_callback(void *param)
-> +{
-> +	struct mxs_auart_port *s = param;
-> +	struct circ_buf *xmit = &s->port.state->xmit;
-> +
-> +	dma_unmap_sg(s->dev, &s->tx_sgl, 1, DMA_TO_DEVICE);
-> +
-> +	/* wake up the possible processes. */
-> +	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-> +		uart_write_wakeup(&s->port);
-> +
-> +	mxs_auart_tx_chars(s);
-> +}
-> +
-> +static int mxs_auart_dma_tx(struct mxs_auart_port *s, int size)
-> +{
-> +	struct dma_async_tx_descriptor *desc;
-> +	struct scatterlist *sgl = &s->tx_sgl;
-> +	struct dma_chan *channel = s->tx_dma_chan;
-> +	u32 pio[1];
+It does. Are you planning to remove the defconfigs the platforms that
+are part of
+multi_v7_defconfig soon? socfpga_defconfig is broken with SMP enabled because
+it needs +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set.
 
-One element array looks strange to me.
+>
+> >  arch/arm/mach-socfpga/Kconfig             |    1 +
+> >  arch/arm/mach-socfpga/Makefile            |    3 +
+> >  arch/arm/mach-socfpga/headsmp.S           |   64 +++++++++++
+> >  arch/arm/mach-socfpga/include/mach/core.h |   33 ++++++
+>
+> Move core.h to mach-socfpga.
 
-> +
-> +	/* [1] : send PIO. Note, the first pio word is CTRL1. */
-> +	pio[0] = AUART_CTRL1_XFER_COUNT(size);
-> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)pio,
-> +					1, DMA_TRANS_NONE, 0);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 1 error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* [2] : set DMA buffer. */
-> +	sg_init_one(sgl, s->tx_dma_buf, size);
-> +	dma_map_sg(s->dev, sgl, 1, DMA_TO_DEVICE);
-> +	desc = dmaengine_prep_slave_sg(channel, sgl,
-> +			1, DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 2 error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* [3] : submit the DMA */
-> +	desc->callback = dma_tx_callback;
-> +	desc->callback_param = s;
-> +	dmaengine_submit(desc);
-> +	dma_async_issue_pending(channel);
-> +	return 0;
-> +}
-> +
->  static inline void mxs_auart_tx_chars(struct mxs_auart_port *s)
+Will do.
 
-I'm not sure why this function is inline from the beginning.  It
-becomes even more inappropriate after you add more codes below.
+>
+> >  arch/arm/mach-socfpga/platsmp.c           |  166
+> > +++++++++++++++++++++++++++++
+> >  arch/arm/mach-socfpga/socfpga.c           |   33 +++++-
+> >  8 files changed, 315 insertions(+), 4 deletions(-)
+> >  create mode 100644 arch/arm/mach-socfpga/headsmp.S
+> >  create mode 100644 arch/arm/mach-socfpga/include/mach/core.h
+> >  create mode 100644 arch/arm/mach-socfpga/platsmp.c
+> >
+> > diff --git a/arch/arm/boot/dts/socfpga.dtsi
+> > b/arch/arm/boot/dts/socfpga.dtsi
+> > index 0772f57..19aec42 100644
+> > --- a/arch/arm/boot/dts/socfpga.dtsi
+> > +++ b/arch/arm/boot/dts/socfpga.dtsi
+> > @@ -143,5 +143,15 @@
+> >                       reg-shift = <2>;
+> >                       reg-io-width = <4>;
+> >               };
+> > +
+> > +             rstmgr at ffd05000 {
+> > +                             compatible = "altr,rst-mgr";
+> > +                             reg = <0xffd05000 0x1000>;
+> > +                     };
+> > +
+> > +             sysmgr at ffd08000 {
+> > +                             compatible = "altr,sys-mgr";
+> > +                             reg = <0xffd08000 0x4000>;
+> > +                     };
+>
+> Bindings need documentation.
 
-Shawn
+Will add..
 
->  {
->  	struct circ_buf *xmit = &s->port.state->xmit;
->  
-> +	if (auart_dma_enabled(s)) {
-> +		int i = 0;
-> +		int size;
-> +		void *buffer = s->tx_dma_buf;
-> +		enum dma_status status;
-> +
-> +		/* Check whether there is pending DMA operations. */
-> +		status = dmaengine_tx_status(s->tx_dma_chan, 0, NULL);
-> +		if (status != DMA_SUCCESS)
-> +			return;
-> +
-> +		while (!uart_circ_empty(xmit) && !uart_tx_stopped(&s->port)) {
-> +			size = min_t(u32, UART_XMIT_SIZE - i,
-> +				     CIRC_CNT_TO_END(xmit->head,
-> +						     xmit->tail,
-> +						     UART_XMIT_SIZE));
-> +			memcpy(buffer + i, xmit->buf + xmit->tail, size);
-> +			xmit->tail = (xmit->tail + size) & (UART_XMIT_SIZE - 1);
-> +
-> +			i += size;
-> +			if (i >= UART_XMIT_SIZE)
-> +				break;
-> +		}
-> +
-> +		if (uart_tx_stopped(&s->port))
-> +			mxs_auart_stop_tx(&s->port);
-> +		if (i)
-> +			mxs_auart_dma_tx(s, i);
-> +		return;
-> +	}
-> +
->  	while (!(readl(s->port.membase + AUART_STAT) &
->  		 AUART_STAT_TXFF)) {
->  		if (s->port.x_char) {
-> @@ -293,10 +406,155 @@ static u32 mxs_auart_get_mctrl(struct uart_port *u)
->  	return mctrl;
->  }
->  
-> +static bool mxs_auart_dma_filter(struct dma_chan *chan, void *param)
-> +{
-> +	struct mxs_auart_port *s = param;
-> +
-> +	if (!mxs_dma_is_apbx(chan))
-> +		return false;
-> +
-> +	if (s->dma_channel == chan->chan_id) {
-> +		chan->private = &s->dma_data;
-> +		return true;
-> +	}
-> +	return false;
-> +}
-> +
-> +static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s);
-> +static void dma_rx_callback(void *arg)
-> +{
-> +	struct mxs_auart_port *s = (struct mxs_auart_port *) arg;
-> +	struct tty_struct *tty = s->port.state->port.tty;
-> +	int count;
-> +	u32 stat;
-> +
-> +	stat = readl(s->port.membase + AUART_STAT);
-> +	stat &= ~(AUART_STAT_OERR | AUART_STAT_BERR |
-> +			AUART_STAT_PERR | AUART_STAT_FERR);
-> +
-> +	count = stat & AUART_STAT_RXCOUNT_MASK;
-> +	tty_insert_flip_string(tty, s->rx_dma_buf, count);
-> +
-> +	writel(stat, s->port.membase + AUART_STAT);
-> +	tty_flip_buffer_push(tty);
-> +
-> +	/* start the next DMA for RX. */
-> +	mxs_auart_dma_prep_rx(s);
-> +}
-> +
-> +static int mxs_auart_dma_prep_rx(struct mxs_auart_port *s)
-> +{
-> +	struct dma_async_tx_descriptor *desc;
-> +	struct scatterlist *sgl = &s->rx_sgl;
-> +	struct dma_chan *channel = s->rx_dma_chan;
-> +	u32 pio[1];
-> +
-> +	/* [1] : send PIO */
-> +	pio[0] = AUART_CTRL0_RXTO_ENABLE
-> +		| AUART_CTRL0_RXTIMEOUT(0x80)
-> +		| AUART_CTRL0_XFER_COUNT(UART_XMIT_SIZE);
-> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)pio,
-> +					1, DMA_TRANS_NONE, 0);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 1 error\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* [2] : send DMA request */
-> +	sg_init_one(sgl, s->rx_dma_buf, UART_XMIT_SIZE);
-> +	dma_map_sg(s->dev, sgl, 1, DMA_FROM_DEVICE);
-> +	desc = dmaengine_prep_slave_sg(channel, sgl, 1, DMA_DEV_TO_MEM,
-> +					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +	if (!desc) {
-> +		dev_err(s->dev, "step 2 error\n");
-> +		return -1;
-> +	}
-> +
-> +	/* [3] : submit the DMA, but do not issue it. */
-> +	desc->callback = dma_rx_callback;
-> +	desc->callback_param = s;
-> +	dmaengine_submit(desc);
-> +	dma_async_issue_pending(channel);
-> +	return 0;
-> +}
-> +
-> +static void mxs_auart_dma_exit_channel(struct mxs_auart_port *s)
-> +{
-> +	if (s->tx_dma_chan) {
-> +		dma_release_channel(s->tx_dma_chan);
-> +		s->tx_dma_chan = NULL;
-> +	}
-> +	if (s->rx_dma_chan) {
-> +		dma_release_channel(s->rx_dma_chan);
-> +		s->rx_dma_chan = NULL;
-> +	}
-> +
-> +	kfree(s->tx_dma_buf);
-> +	kfree(s->rx_dma_buf);
-> +	s->tx_dma_buf = NULL;
-> +	s->rx_dma_buf = NULL;
-> +}
-> +
-> +static void mxs_auart_dma_exit(struct mxs_auart_port *s)
-> +{
-> +
-> +	writel(AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE | AUART_CTRL2_DMAONERR,
-> +		s->port.membase + AUART_CTRL2_CLR);
-> +
-> +	mxs_auart_dma_exit_channel(s);
-> +	s->flags &= ~MXS_AUART_DMA_ENABLED;
-> +}
-> +
-> +static int mxs_auart_dma_init(struct mxs_auart_port *s)
-> +{
-> +	dma_cap_mask_t mask;
-> +
-> +	if (auart_dma_enabled(s))
-> +		return 0;
-> +
-> +	/* We do not get the right DMA channels. */
-> +	if (s->dma_channel_rx == -1 || s->dma_channel_rx == -1)
-> +		return -EINVAL;
-> +
-> +	/* init for RX */
-> +	dma_cap_zero(mask);
-> +	dma_cap_set(DMA_SLAVE, mask);
-> +	s->dma_channel = s->dma_channel_rx;
-> +	s->dma_data.chan_irq = s->dma_irq_rx;
-> +	s->rx_dma_chan = dma_request_channel(mask, mxs_auart_dma_filter, s);
-> +	if (!s->rx_dma_chan)
-> +		goto err_out;
-> +	s->rx_dma_buf = kzalloc(UART_XMIT_SIZE, GFP_KERNEL | GFP_DMA);
-> +	if (!s->rx_dma_buf)
-> +		goto err_out;
-> +
-> +	/* init for TX */
-> +	s->dma_channel = s->dma_channel_tx;
-> +	s->dma_data.chan_irq = s->dma_irq_tx;
-> +	s->tx_dma_chan = dma_request_channel(mask, mxs_auart_dma_filter, s);
-> +	if (!s->tx_dma_chan)
-> +		goto err_out;
-> +	s->tx_dma_buf = kzalloc(UART_XMIT_SIZE, GFP_KERNEL | GFP_DMA);
-> +	if (!s->tx_dma_buf)
-> +		goto err_out;
-> +
-> +	/* set the flags */
-> +	s->flags |= MXS_AUART_DMA_ENABLED;
-> +	dev_dbg(s->dev, "enabled the DMA support.");
-> +
-> +	return 0;
-> +
-> +err_out:
-> +	mxs_auart_dma_exit_channel(s);
-> +	return -EINVAL;
-> +
-> +}
-> +
->  static void mxs_auart_settermios(struct uart_port *u,
->  				 struct ktermios *termios,
->  				 struct ktermios *old)
->  {
-> +	struct mxs_auart_port *s = to_auart_port(u);
->  	u32 bm, ctrl, ctrl2, div;
->  	unsigned int cflag, baud;
->  
-> @@ -368,10 +626,23 @@ static void mxs_auart_settermios(struct uart_port *u,
->  		ctrl |= AUART_LINECTRL_STP2;
->  
->  	/* figure out the hardware flow control settings */
-> -	if (cflag & CRTSCTS)
-> +	if (cflag & CRTSCTS) {
-> +		/*
-> +		 * The DMA has a bug(see errata:2836) in mx23.
-> +		 * So we can not implement the DMA for auart in mx23,
-> +		 * we can only implement the DMA support for auart
-> +		 * in mx28.
-> +		 */
-> +		if (!AUART_IS_MX23(s) && (s->flags & MXS_AUART_DMA_CONFIG)) {
-> +			if (!mxs_auart_dma_init(s))
-> +				/* enable DMA tranfer */
-> +				ctrl2 |= AUART_CTRL2_TXDMAE | AUART_CTRL2_RXDMAE
-> +				       | AUART_CTRL2_DMAONERR;
-> +		}
->  		ctrl2 |= AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN;
-> -	else
-> +	} else {
->  		ctrl2 &= ~(AUART_CTRL2_CTSEN | AUART_CTRL2_RTSEN);
-> +	}
->  
->  	/* set baud rate */
->  	baud = uart_get_baud_rate(u, termios, old, 0, u->uartclk);
-> @@ -383,6 +654,17 @@ static void mxs_auart_settermios(struct uart_port *u,
->  	writel(ctrl2, u->membase + AUART_CTRL2);
->  
->  	uart_update_timeout(u, termios->c_cflag, baud);
-> +
-> +	/* prepare for the DMA RX. */
-> +	if (auart_dma_enabled(s)) {
-> +		if (!mxs_auart_dma_prep_rx(s)) {
-> +			/* Disable the normal RX interrupt. */
-> +			writel(AUART_INTR_RXIEN, u->membase + AUART_INTR_CLR);
-> +		} else {
-> +			mxs_auart_dma_exit(s);
-> +			dev_err(s->dev, "We can not start up the DMA.\n");
-> +		}
-> +	}
->  }
->  
->  static irqreturn_t mxs_auart_irq_handle(int irq, void *context)
-> @@ -461,6 +743,9 @@ static void mxs_auart_shutdown(struct uart_port *u)
->  {
->  	struct mxs_auart_port *s = to_auart_port(u);
->  
-> +	if (auart_dma_enabled(s))
-> +		mxs_auart_dma_exit(s);
-> +
->  	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
->  
->  	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
-> @@ -707,6 +992,7 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->  		struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> +	u32 dma_channel[2];
->  	int ret;
->  
->  	if (!np)
-> @@ -722,6 +1008,22 @@ static int serial_mxs_probe_dt(struct mxs_auart_port *s,
->  
->  	pdev->id_entry = of_match_device(mxs_auart_dt_ids, &pdev->dev)->data;
->  
-> +	ret = of_property_read_u32_array(np, "fsl,auart-dma-channel",
-> +					dma_channel, 2);
-> +	if (ret == 0) {
-> +		s->dma_channel_rx = dma_channel[0];
-> +		s->dma_channel_tx = dma_channel[1];
-> +	} else {
-> +		s->dma_channel_rx = -1;
-> +		s->dma_channel_tx = -1;
-> +	}
-> +
-> +	s->dma_irq_rx = platform_get_irq(pdev, 1);
-> +	s->dma_irq_tx = platform_get_irq(pdev, 2);
-> +
-> +	if (of_property_read_bool(np, "fsl,auart-enable-dma"))
-> +		s->flags |= MXS_AUART_DMA_CONFIG;
-> +
->  	return 0;
->  }
->  
-> @@ -772,7 +1074,6 @@ static int __devinit mxs_auart_probe(struct platform_device *pdev)
->  	s->port.type = PORT_IMX;
->  	s->port.dev = s->dev = get_device(&pdev->dev);
->  
-> -	s->flags = 0;
->  	s->ctrl = 0;
->  	s->pdev = pdev;
->  
-> -- 
-> 1.7.0.4
-> 
-> 
+>
+> >       };
+> >  };
+> > diff --git a/arch/arm/configs/socfpga_defconfig
+> > b/arch/arm/configs/socfpga_defconfig
+> > index 0ac1293..349ac22 100644
+> > --- a/arch/arm/configs/socfpga_defconfig
+> > +++ b/arch/arm/configs/socfpga_defconfig
+> > @@ -1,5 +1,5 @@
+> >  CONFIG_EXPERIMENTAL=y
+> > -CONFIG_SYSVIPC=y
+> > +CONFIG_NO_HZ=y
+> >  CONFIG_IKCONFIG=y
+> >  CONFIG_IKCONFIG_PROC=y
+> >  CONFIG_LOG_BUF_SHIFT=14
+> > @@ -16,10 +16,13 @@ CONFIG_MODULE_UNLOAD=y
+> >  # CONFIG_IOSCHED_DEADLINE is not set
+> >  # CONFIG_IOSCHED_CFQ is not set
+> >  CONFIG_ARCH_SOCFPGA=y
+> > -CONFIG_MACH_SOCFPGA_CYCLONE5=y
+> > -CONFIG_ARM_THUMBEE=y
+> > +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+> >  # CONFIG_CACHE_L2X0 is not set
+> >  CONFIG_HIGH_RES_TIMERS=y
+> > +CONFIG_SMP=y
+> > +CONFIG_ARM_ARCH_TIMER=y
+> > +CONFIG_HIGHMEM=y
+> > +CONFIG_HIGHPTE=y
+> >  CONFIG_VMSPLIT_2G=y
+> >  CONFIG_NR_CPUS=2
+> >  CONFIG_AEABI=y
+> > diff --git a/arch/arm/mach-socfpga/Kconfig
+> > b/arch/arm/mach-socfpga/Kconfig
+> > index 803a328..566e804 100644
+> > --- a/arch/arm/mach-socfpga/Kconfig
+> > +++ b/arch/arm/mach-socfpga/Kconfig
+> > @@ -12,5 +12,6 @@ config ARCH_SOCFPGA
+> >       select GENERIC_CLOCKEVENTS
+> >       select GPIO_PL061 if GPIOLIB
+> >       select HAVE_ARM_SCU
+> > +     select HAVE_SMP
+> >       select SPARSE_IRQ
+> >       select USE_OF
+> > diff --git a/arch/arm/mach-socfpga/Makefile
+> > b/arch/arm/mach-socfpga/Makefile
+> > index 4fb9324..61b1266 100644
+> > --- a/arch/arm/mach-socfpga/Makefile
+> > +++ b/arch/arm/mach-socfpga/Makefile
+> > @@ -2,4 +2,7 @@
+> >  # Makefile for the linux kernel.
+> >  #
+> >
+> > +ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+> > +
+>
+> This can be removed if core.h is moved.
+>
+> >  obj-y                                        := socfpga.o
+> > +obj-$(CONFIG_SMP)    += headsmp.o platsmp.o
+> > diff --git a/arch/arm/mach-socfpga/headsmp.S
+> > b/arch/arm/mach-socfpga/headsmp.S
+> > new file mode 100644
+> > index 0000000..b3a24db
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/headsmp.S
+> > @@ -0,0 +1,64 @@
+> > +/*
+> > + *  Copyright (c) 2003 ARM Limited
+> > + *  Copyright (c) u-boot contributors
+> > + *  Copyright (c) 2012 Pavel Machek <pavel@denx.de>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +#include <linux/linkage.h>
+> > +#include <linux/init.h>
+> > +
+> > +     __INIT
+> > +
+> > +#define CPU1_START_ADDR              0xffd08010
+> > +
+> > +ENTRY(secondary_trampoline)
+>
+> This appears to be your reset code at phys addr 0. How does core 0 boot
+> if you are copying this to 0?
+>
+> > +     /* From u-boot: start.S */
+> > +     mrs     r0, cpsr
+> > +     bic     r0, r0, #0x1f
+> > +     orr     r0, r0, #0xd3
+> > +     msr     cpsr,r0
+> > +
+> >
+> > +/*************************************************************************
+> > + *
+> > + * cpu_init_cp15
+> > + **  Copyright (c) u-boot contributors
+> > + * Setup CP15 registers (cache, MMU, TLBs). The I-cache is turned on
+> > unless
+> > + * CONFIG_SYS_ICACHE_OFF is defined.
+> > + *
+> > +
+> > *************************************************************************/
+> > +ENTRY(cpu_init_cp15)
+> > +     /*
+> > +      * Invalidate L1 I/D
+> > +      */
+> > +     mov     r0, #0                  @ set up for MCR
+> > +     mcr     p15, 0, r0, c8, c7, 0   @ invalidate TLBs
+> > +     mcr     p15, 0, r0, c7, c5, 0   @ invalidate icache
+> > +     mcr     p15, 0, r0, c7, c5, 6   @ invalidate BP array
+> > +     mcr   p15, 0, r0, c7, c10, 4    @ DSB
+> > +     mcr   p15, 0, r0, c7, c5, 4     @ ISB
+> > +
+> > +     /*
+> > +      * disable MMU stuff and caches
+> > +      */
+> > +     mrc     p15, 0, r0, c1, c0, 0
+> > +     bic     r0, r0, #0x00002000     @ clear bits 13 (--V-)
+> > +     bic     r0, r0, #0x00000007     @ clear bits 2:0 (-CAM)
+> > +     orr     r0, r0, #0x00000002     @ set bit 1 (--A-) Align
+> > +     orr     r0, r0, #0x00000800     @ set bit 11 (Z---) BTB
+> > +     orr     r0, r0, #0x00001000     @ set bit 12 (I) I-cache
+>
+> All this should get done by v7_setup.
+>
+> > +     mcr     p15, 0, r0, c1, c0, 0
+> > +
+> > +     movw    r0, #:lower16:CPU1_START_ADDR
+> > +     movt  r0, #:upper16:CPU1_START_ADDR
+> > +
+> > +     ldr     r1, [r0]
+> > +     bx      r1
+> > +
+> > +ENTRY(secondary_trampoline_end)
+> > +
+> > +     .align
+> > +     .long   pen_release
+> > +
+> > diff --git a/arch/arm/mach-socfpga/include/mach/core.h
+> > b/arch/arm/mach-socfpga/include/mach/core.h
+> > new file mode 100644
+> > index 0000000..74a4949
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/include/mach/core.h
+> > @@ -0,0 +1,33 @@
+> > +/*
+> > + * Copyright 2012 Pavel Machek <pavel@denx.de>
+> > + * Copyright (C) 2012 Altera Corporation
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
+> > USA
+> > + */
+> > +
+> > +#ifndef __MACH_CORE_H
+> > +#define __MACH_CORE_H
+> > +
+> > +extern void secondary_startup(void);
+> > +extern void __iomem *socfpga_scu_base_addr;
+> > +
+> > +extern void socfpga_init_clocks(void);
+> > +extern void socfpga_sysmgr_init(void);
+> > +
+> > +extern struct smp_operations socfpga_smp_ops;
+> > +
+> > +#define SOCFPGA_SCU_VIRT_BASE   0xfffec000
+> > +
+> > +#endif
+> > diff --git a/arch/arm/mach-socfpga/platsmp.c
+> > b/arch/arm/mach-socfpga/platsmp.c
+> > new file mode 100644
+> > index 0000000..59d7069
+> > --- /dev/null
+> > +++ b/arch/arm/mach-socfpga/platsmp.c
+> > @@ -0,0 +1,166 @@
+> > +/*
+> > + * Copyright 2010-2011 Calxeda, Inc.
+> > + * Copyright 2012 Pavel Machek <pavel@denx.de>
+> > + * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
+> > + * Copyright (C) 2012 Altera Corporation
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > it
+> > + * under the terms and conditions of the GNU General Public License,
+> > + * version 2, as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope it will be useful, but
+> > WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> > or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+> > License for
+> > + * more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > along with
+> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
+> > +#include <linux/delay.h>
+> > +#include <linux/init.h>
+> > +#include <linux/smp.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +
+> > +#include <asm/cacheflush.h>
+> > +#include <asm/hardware/gic.h>
+> > +#include <asm/smp_scu.h>
+> > +#include <asm/smp_plat.h>
+> > +
+> > +#include <mach/core.h>
+> > +
+> > +static void __iomem *sys_manager_base_addr;
+> > +static void __iomem *rst_manager_base_addr;
+> > +
+> > +static DEFINE_SPINLOCK(boot_lock);
+> > +
+> > +static void __cpuinit socfpga_secondary_init(unsigned int cpu)
+> > +{
+> > +     /*
+> > +      * if any interrupts are already enabled for the primary
+> > +      * core (e.g. timer irq), then they will not have been enabled
+> > +      * for us: do so
+> > +      */
+> > +     gic_secondary_init(0);
+> > +
+> > +     /*
+> > +      * let the primary processor know we're out of the
+> > +      * pen, then head off into the C entry point
+> > +      */
+> > +     pen_release = -1;
+> > +     smp_wmb();
+> > +
+> > +     /*
+> > +      * Synchronise with the boot thread.
+> > +      */
+> > +     spin_lock(&boot_lock);
+> > +     spin_unlock(&boot_lock);
+> > +}
+> > +
+> > +static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct
+> > task_struct *idle)
+> > +{
+> > +     unsigned long timeout;
+> > +     extern char secondary_trampoline, secondary_trampoline_end;
+> > +
+> > +     int trampoline_size = &secondary_trampoline_end -
+> > &secondary_trampoline;
+> > +
+> > +     /*
+> > +      * Set synchronisation state between this boot processor
+> > +      * and the secondary one
+> > +      */
+> > +     spin_lock(&boot_lock);
+> > +
+> > +     memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+> > +
+> > +     __raw_writel(virt_to_phys(secondary_startup),
+> > (sys_manager_base_addr+0x10));
+> > +
+> > +     pen_release = 0;
+> > +     flush_cache_all();
+> > +     smp_wmb();
+> > +     outer_clean_range(0, trampoline_size);
+> > +
+> > +     /* This will release CPU #1 out of reset.*/
+> > +     __raw_writel(0, rst_manager_base_addr + 0x10);
+> > +
+> > +     timeout = jiffies + (1 * HZ);
+> > +     while (time_before(jiffies, timeout)) {
+> > +             smp_rmb();
+> > +             if (pen_release == -1)
+> > +                     break;
+> > +
+> > +             udelay(10);
+> > +     }
+> > +
+> > +     /*
+> > +      * now the secondary core is starting up let it run its
+> > +      * calibrations, then wait for it to finish
+> > +      */
+> > +     spin_unlock(&boot_lock);
+> > +     return pen_release != -1 ? -ENOSYS : 0;
+>
+> You don't need any of this if you can reset secondary cores on hotplug.
+
+Will investigate with your latest comments.
+
+Thanks for the quick turnaround on the review.
+
+Dinh
+>
+> Rob
+>
