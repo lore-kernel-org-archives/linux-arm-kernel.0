@@ -1,76 +1,414 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 18 Oct 2012 16:33:13 +0000
-Subject: [PATCH 2/3] RTC: omap-rtc: enable pm_runtime
-In-Reply-To: <50802C20.9040408@gmail.com>
-References: <1350575631-15523-1-git-send-email-zonque@gmail.com>
- <1350575631-15523-2-git-send-email-zonque@gmail.com>
- <50802A87.9010409@ti.com> <50802C20.9040408@gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB43BD9@DBDE01.ent.ti.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 18 Oct 2012 11:32:47 -0600
+Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
+Message-ID: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 21:49:44, Daniel Mack wrote:
-> On 18.10.2012 18:12, Vaibhav Hiremath wrote:
-> > 
-> > 
-> > On 10/18/2012 9:23 PM, Daniel Mack wrote:
-> >> This is needed as preparation for platforms where using pm runtime usage
-> >> is mandatory.
-> >>
-> >> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> > 
-> > It looks like, you just duplicated effort here.
-> > RTC patches have been already submitted quite some time back for AM33xx,
-> > probably you missed to do google before spending time on this.
-> > 
-> > Patch Series -
-> > http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg23253.html
-> 
-> Heh, damn :) I would have thought that so shortly after the merge
-> window, that code either went in already or is yet missing. Oh well.
-> 
-> > Denial,
-> > It would be really helpful if you could test these patches and ack them.
-> 
-> Ok, will do tomorrow. What's missing there is support for writing to the
-> OMAP_RTC_OSC_REG (path 3/3 in my series). Would like me to rebase the
-> functionality? I need thatkind of setup for my board ...
-> 
-> 
+From: Dinh Nguyen <dinguyen@altera.com>
 
-This is bit tricky and required more discussion before merging it, 
-let me reopen the old discussion which I had started some time back -
+Enable SMP for the SOCFPGA platform.
 
+Signed-off-by: Pavel Machek <pavel@denx.de>
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+v2:
+-Remove pen_release code
+-Remove code that was already done by v7_setup
+-Add bindings document for reset and system manager
+-Move socfpga_sysmgr_init from platsmp.c to socfpga.c, because
+we will need to use the reset and system manager for more than SMP.
+-Move core.h to mach-socfpga from mach-socfpga/include/mach
+---
+ .../bindings/arm/altera/socfpga-reset.txt          |   11 ++
+ .../bindings/arm/altera/socfpga-system.txt         |   11 ++
+ arch/arm/boot/dts/socfpga.dtsi                     |   10 ++
+ arch/arm/configs/socfpga_defconfig                 |    9 +-
+ arch/arm/mach-socfpga/Kconfig                      |    1 +
+ arch/arm/mach-socfpga/Makefile                     |    1 +
+ arch/arm/mach-socfpga/core.h                       |   34 ++++++
+ arch/arm/mach-socfpga/headsmp.S                    |   24 ++++
+ arch/arm/mach-socfpga/platsmp.c                    |  117 ++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c                    |   45 +++++++-
+ 10 files changed, 259 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+ create mode 100644 arch/arm/mach-socfpga/core.h
+ create mode 100644 arch/arm/mach-socfpga/headsmp.S
+ create mode 100644 arch/arm/mach-socfpga/platsmp.c
 
-RTC OSC clock is required to configure clocksource systemtimer for the 
-kernel, and it is important when you get into PM related features.
-
-Please refer the below commit for more reference,
-
-http://marc.info/?l=u-boot&m=135057734713796&w=2
-
-
-> > Just FYI, we have bunch of parallel activities going inside team to
-> > upstream all the patches/module/drivers/features, so to avoid such
-> > duplication of effort, I suggest you to google for the patches or ping
-> > on mailing list.
-> 
-> Yes, it's more difficult to participate in the AM33xx code than in other
-> platforms. I'm not complaining about other doing all the hard work
-> though, it's just a little different.
-> 
-
-No its not. Its good that we have so many developers contributing, so now 
-its just working together. Recommend you to ping once before spending time, 
-so that we can collaboratively work together, even I wouldn't mind you to 
-pick/own on-going development and submit it.
-
-
-Thanks,
-Vaibhav
-> Anyway - thanks for the heads-up!
-> 
-> 
-> Daniel
-> 
-> 
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+new file mode 100644
+index 0000000..ecdb57d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-reset.txt
+@@ -0,0 +1,11 @@
++Altera SOCFPGA Reset Manager
++
++Required properties:
++- compatible : "altr,rst-mgr"
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++	 rstmgr at ffd05000 {
++		compatible = "altr,rst-mgr";
++		reg = <0xffd05000 0x1000>;
++	};
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+new file mode 100644
+index 0000000..07c65e3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-system.txt
+@@ -0,0 +1,11 @@
++Altera SOCFPGA System Manager
++
++Required properties:
++- compatible : "altr,sys-mgr"
++- reg : Should contain 1 register ranges(address and length)
++
++Example:
++	 sysmgr at ffd08000 {
++		compatible = "altr,sys-mgr";
++		reg = <0xffd08000 0x1000>;
++	};
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 0772f57..19aec42 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -143,5 +143,15 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 		};
++
++		rstmgr at ffd05000 {
++				compatible = "altr,rst-mgr";
++				reg = <0xffd05000 0x1000>;
++			};
++
++		sysmgr at ffd08000 {
++				compatible = "altr,sys-mgr";
++				reg = <0xffd08000 0x4000>;
++			};
+ 	};
+ };
+diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+index 0ac1293..349ac22 100644
+--- a/arch/arm/configs/socfpga_defconfig
++++ b/arch/arm/configs/socfpga_defconfig
+@@ -1,5 +1,5 @@
+ CONFIG_EXPERIMENTAL=y
+-CONFIG_SYSVIPC=y
++CONFIG_NO_HZ=y
+ CONFIG_IKCONFIG=y
+ CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=14
+@@ -16,10 +16,13 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_SOCFPGA=y
+-CONFIG_MACH_SOCFPGA_CYCLONE5=y
+-CONFIG_ARM_THUMBEE=y
++# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+ # CONFIG_CACHE_L2X0 is not set
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_SMP=y
++CONFIG_ARM_ARCH_TIMER=y
++CONFIG_HIGHMEM=y
++CONFIG_HIGHPTE=y
+ CONFIG_VMSPLIT_2G=y
+ CONFIG_NR_CPUS=2
+ CONFIG_AEABI=y
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 803a328..566e804 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -12,5 +12,6 @@ config ARCH_SOCFPGA
+ 	select GENERIC_CLOCKEVENTS
+ 	select GPIO_PL061 if GPIOLIB
+ 	select HAVE_ARM_SCU
++	select HAVE_SMP
+ 	select SPARSE_IRQ
+ 	select USE_OF
+diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+index 4fb9324..6dd7a93 100644
+--- a/arch/arm/mach-socfpga/Makefile
++++ b/arch/arm/mach-socfpga/Makefile
+@@ -3,3 +3,4 @@
+ #
+ 
+ obj-y					:= socfpga.o
++obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+new file mode 100644
+index 0000000..9941caa
+--- /dev/null
++++ b/arch/arm/mach-socfpga/core.h
+@@ -0,0 +1,34 @@
++/*
++ * Copyright 2012 Pavel Machek <pavel@denx.de>
++ * Copyright (C) 2012 Altera Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ */
++
++#ifndef __MACH_CORE_H
++#define __MACH_CORE_H
++
++extern void secondary_startup(void);
++extern void __iomem *socfpga_scu_base_addr;
++
++extern void socfpga_init_clocks(void);
++extern void socfpga_sysmgr_init(void);
++
++extern struct smp_operations socfpga_smp_ops;
++extern char secondary_trampoline, secondary_trampoline_end;
++
++#define SOCFPGA_SCU_VIRT_BASE   0xfffec000
++
++#endif
+diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+new file mode 100644
+index 0000000..17d6eaf
+--- /dev/null
++++ b/arch/arm/mach-socfpga/headsmp.S
+@@ -0,0 +1,24 @@
++/*
++ *  Copyright (c) 2003 ARM Limited
++ *  Copyright (c) u-boot contributors
++ *  Copyright (c) 2012 Pavel Machek <pavel@denx.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/linkage.h>
++#include <linux/init.h>
++
++	__INIT
++
++#define CPU1_START_ADDR 	        0xffd08010
++
++ENTRY(secondary_trampoline)
++	movw	r0, #:lower16:CPU1_START_ADDR
++	movt  r0, #:upper16:CPU1_START_ADDR
++
++	ldr	r1, [r0]
++	bx	r1
++
++ENTRY(secondary_trampoline_end)
+diff --git a/arch/arm/mach-socfpga/platsmp.c b/arch/arm/mach-socfpga/platsmp.c
+new file mode 100644
+index 0000000..7fce9a3
+--- /dev/null
++++ b/arch/arm/mach-socfpga/platsmp.c
+@@ -0,0 +1,117 @@
++/*
++ * Copyright 2010-2011 Calxeda, Inc.
++ * Copyright 2012 Pavel Machek <pavel@denx.de>
++ * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
++ * Copyright (C) 2012 Altera Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/smp.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++
++#include <asm/cacheflush.h>
++#include <asm/hardware/gic.h>
++#include <asm/smp_scu.h>
++#include <asm/smp_plat.h>
++
++#include "core.h"
++
++extern void __iomem *sys_manager_base_addr;
++extern void __iomem *rst_manager_base_addr;
++
++static void __cpuinit socfpga_secondary_init(unsigned int cpu)
++{
++	/*
++	 * if any interrupts are already enabled for the primary
++	 * core (e.g. timer irq), then they will not have been enabled
++	 * for us: do so
++	 */
++	gic_secondary_init(0);
++}
++
++static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
++
++	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
++
++	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
++
++	pen_release = 0;
++	flush_cache_all();
++	smp_wmb();
++	outer_clean_range(0, trampoline_size);
++
++	/* This will release CPU #1 out of reset.*/
++	__raw_writel(0, rst_manager_base_addr + 0x10);
++
++	return 0;
++}
++
++/*
++ * Initialise the CPU possible map early - this describes the CPUs
++ * which may be present or become present in the system.
++ */
++static void __init socfpga_smp_init_cpus(void)
++{
++	unsigned int i, ncores;
++
++	ncores = scu_get_core_count(socfpga_scu_base_addr);
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	/* sanity check */
++	if (ncores > num_possible_cpus()) {
++		pr_warn("socfpga: no. of cores (%d) greater than configured"
++			"maximum of %d - clipping\n", ncores, num_possible_cpus());
++		ncores = num_possible_cpus();
++	}
++
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++
++	set_smp_cross_call(gic_raise_softirq);
++}
++
++static void __init socfpga_smp_prepare_cpus(unsigned int max_cpus)
++{
++	scu_enable(socfpga_scu_base_addr);
++}
++
++/*
++ * platform-specific code to shutdown a CPU
++ *
++ * Called with IRQs disabled
++ */
++static void socfpga_cpu_die(unsigned int cpu)
++{
++	cpu_do_idle();
++
++	/* We should have never returned from idle */
++	panic("cpu %d unexpectedly exit from shutdown\n", cpu);
++}
++
++struct smp_operations socfpga_smp_ops __initdata = {
++	.smp_init_cpus		= socfpga_smp_init_cpus,
++	.smp_prepare_cpus	= socfpga_smp_prepare_cpus,
++	.smp_secondary_init	= socfpga_secondary_init,
++	.smp_boot_secondary	= socfpga_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= socfpga_cpu_die,
++#endif
++};
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index f01e1eb..ab81ea9 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -15,23 +15,64 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ #include <linux/dw_apb_timer.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ 
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ 
+-extern void socfpga_init_clocks(void);
++#include "core.h"
++
++void __iomem *socfpga_scu_base_addr = ((void __iomem *)(SOCFPGA_SCU_VIRT_BASE));
++void __iomem *sys_manager_base_addr;
++void __iomem *rst_manager_base_addr;
++
++static struct map_desc scu_io_desc __initdata = {
++	.virtual	= SOCFPGA_SCU_VIRT_BASE,
++	.pfn		= 0, /* run-time */
++	.length		= SZ_8K,
++	.type		= MT_DEVICE,
++};
++
++static void __init socfpga_scu_map_io(void)
++{
++	unsigned long base;
++
++	/* Get SCU base */
++	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
++
++	scu_io_desc.pfn = __phys_to_pfn(base);
++	iotable_init(&scu_io_desc, 1);
++}
++
++static void __init socfpga_map_io(void)
++{
++	socfpga_scu_map_io();
++}
+ 
+ const static struct of_device_id irq_match[] = {
+ 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+ 	{}
+ };
+ 
++void __init socfpga_sysmgr_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "altr,sys-mgr");
++	sys_manager_base_addr = of_iomap(np, 0);
++
++	np = of_find_compatible_node(NULL, NULL, "altr,rst-mgr");
++	rst_manager_base_addr = of_iomap(np, 0);
++}
++
+ static void __init gic_init_irq(void)
+ {
+ 	of_irq_init(irq_match);
++	socfpga_sysmgr_init();
+ }
+ 
+ static void socfpga_cyclone5_restart(char mode, const char *cmd)
+@@ -53,6 +94,8 @@ static const char *altera_dt_match[] = {
+ };
+ 
+ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
++	.smp		= smp_ops(socfpga_smp_ops),
++	.map_io		= socfpga_map_io,
+ 	.init_irq	= gic_init_irq,
+ 	.handle_irq     = gic_handle_irq,
+ 	.timer		= &dw_apb_timer,
+-- 
+1.7.9.5
