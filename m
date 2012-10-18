@@ -1,665 +1,768 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 18 Oct 2012 19:18:59 +0200
-Subject: [PATCH 4/8] ARM: plat-nomadik: move DMA40 header to
- <linux/platform_data>
-Message-ID: <1350580739-8446-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 18 Oct 2012 19:19:08 +0200
+Subject: [PATCH 5/8] ARM: plat-nomadik: move MTU, kill plat-nomadik
+Message-ID: <1350580748-8481-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This moves the DMA40 platform data header from <plat/ste_dma40.h>
-to <linux/platform_data/dma-ste-dma40.h> where is belongs.
+This moves the MTU timer driver from arch/arm/plat-nomadik
+to drivers/clocksource and moves the header file to the
+platform_data directory.
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Ola Lilja <ola.o.lilja@stericsson.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: Andreas Westin <andreas.westin@stericsson.com>
+As this moves the last file being compiled to an object out
+of arch/arm/plat-nomadik, we have to "turn off the light"
+and delete the plat-nomadik directory, because it is not
+allowed to have an empty Makefile in a plat-* directory.
+This is probably also a desired side effect of depopulating
+the arch/arm directory of drivers. Luckily we have just
+deleted all the <plat/*> include files prior to this so
+by moving the last one we may delete the directory.
+
+After this all the Ux500 and Nomadik device drivers live
+outside of the arch/arm hierarchy.
+
+Cc: Alessandro Rubini <rubini@unipv.it>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-audio.c       |   3 +-
- arch/arm/mach-ux500/board-mop500-sdi.c         |   2 +-
- arch/arm/mach-ux500/board-mop500.c             |   3 +-
- arch/arm/mach-ux500/devices-db8500.c           |   3 +-
- arch/arm/mach-ux500/include/mach/msp.h         |   2 +-
- arch/arm/mach-ux500/usb.c                      |   4 +-
- arch/arm/plat-nomadik/include/plat/ste_dma40.h | 223 -------------------------
- drivers/crypto/ux500/cryp/cryp_core.c          |   3 +-
- drivers/dma/ste_dma40.c                        |   3 +-
- drivers/dma/ste_dma40_ll.c                     |   2 +-
- include/linux/platform_data/crypto-ux500.h     |   2 +-
- include/linux/platform_data/dma-ste-dma40.h    | 223 +++++++++++++++++++++++++
- sound/soc/ux500/ux500_pcm.c                    |   3 +-
- 13 files changed, 235 insertions(+), 241 deletions(-)
- delete mode 100644 arch/arm/plat-nomadik/include/plat/ste_dma40.h
- create mode 100644 include/linux/platform_data/dma-ste-dma40.h
+ arch/arm/Kconfig                                   |   1 -
+ arch/arm/Makefile                                  |   1 -
+ arch/arm/mach-nomadik/Kconfig                      |   2 +-
+ arch/arm/mach-nomadik/board-nhk8815.c              |   6 +-
+ arch/arm/mach-ux500/Kconfig                        |   2 +-
+ arch/arm/mach-ux500/timer.c                        |   3 +-
+ arch/arm/plat-nomadik/Kconfig                      |  29 ---
+ arch/arm/plat-nomadik/Makefile                     |   5 -
+ arch/arm/plat-nomadik/include/plat/mtu.h           |   9 -
+ arch/arm/plat-nomadik/timer.c                      | 224 ---------------------
+ drivers/char/hw_random/Kconfig                     |   2 +-
+ drivers/clocksource/Kconfig                        |  17 +-
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/nomadik-mtu.c                  | 224 +++++++++++++++++++++
+ drivers/input/keyboard/Kconfig                     |   2 +-
+ drivers/mtd/nand/Kconfig                           |   2 +-
+ .../linux/platform_data/clocksource-nomadik-mtu.h  |   9 +
+ 17 files changed, 258 insertions(+), 281 deletions(-)
+ delete mode 100644 arch/arm/plat-nomadik/Kconfig
+ delete mode 100644 arch/arm/plat-nomadik/Makefile
+ delete mode 100644 arch/arm/plat-nomadik/include/plat/mtu.h
+ delete mode 100644 arch/arm/plat-nomadik/timer.c
+ create mode 100644 drivers/clocksource/nomadik-mtu.c
+ create mode 100644 include/linux/platform_data/clocksource-nomadik-mtu.h
 
-diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-index 33631c9..71a2ca7 100644
---- a/arch/arm/mach-ux500/board-mop500-audio.c
-+++ b/arch/arm/mach-ux500/board-mop500-audio.c
-@@ -8,8 +8,7 @@
- #include <linux/init.h>
- #include <linux/gpio.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 73067ef..c5f2c18 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1065,7 +1065,6 @@ source "arch/arm/mach-mxs/Kconfig"
+ source "arch/arm/mach-netx/Kconfig"
+ 
+ source "arch/arm/mach-nomadik/Kconfig"
+-source "arch/arm/plat-nomadik/Kconfig"
+ 
+ source "arch/arm/plat-omap/Kconfig"
+ 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index f023e3a..ed6a304 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -200,7 +200,6 @@ plat-$(CONFIG_ARCH_OMAP)	+= omap
+ plat-$(CONFIG_ARCH_S3C64XX)	+= samsung
+ plat-$(CONFIG_ARCH_ZYNQ)	+= versatile
+ plat-$(CONFIG_PLAT_IOP)		+= iop
+-plat-$(CONFIG_PLAT_NOMADIK)	+= nomadik
+ plat-$(CONFIG_PLAT_ORION)	+= orion
+ plat-$(CONFIG_PLAT_PXA)		+= pxa
+ plat-$(CONFIG_PLAT_S3C24XX)	+= s3c24xx samsung
+diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+index c744946..706dc57 100644
+--- a/arch/arm/mach-nomadik/Kconfig
++++ b/arch/arm/mach-nomadik/Kconfig
+@@ -4,7 +4,7 @@ menu "Nomadik boards"
+ 
+ config MACH_NOMADIK_8815NHK
+ 	bool "ST 8815 Nomadik Hardware Kit (evaluation board)"
+-	select HAS_MTU
++	select CLKSRC_NOMADIK_MTU
+ 	select NOMADIK_8815
+ 
+ endmenu
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 16f10e0..5ccdf53 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -25,16 +25,14 @@
+ #include <linux/io.h>
+ #include <linux/pinctrl/machine.h>
  #include <linux/platform_data/pinctrl-nomadik.h>
--
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
- #include <mach/devices.h>
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index 9c8e4a9..051b62c 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -11,9 +11,9 @@
- #include <linux/amba/mmci.h>
- #include <linux/mmc/host.h>
- #include <linux/platform_device.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
- #include <asm/mach-types.h>
--#include <plat/ste_dma40.h>
- #include <mach/devices.h>
- #include <mach/hardware.h>
- 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 0a3dd60..0213e89 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -38,13 +38,12 @@
- #include <linux/leds.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/platform_data/pinctrl-nomadik.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
++#include <linux/platform_data/clocksource-nomadik-mtu.h>
++#include <linux/platform_data/mtd-nomadik-nand.h>
+ #include <asm/hardware/vic.h>
+ #include <asm/sizes.h>
  #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
- 
--#include <plat/ste_dma40.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/time.h>
 -
- #include <mach/hardware.h>
- #include <mach/setup.h>
- #include <mach/devices.h>
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index 91754a8..bdc963c 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -12,8 +12,7 @@
- #include <linux/gpio.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/pl022.h>
+-#include <plat/mtu.h>
 -
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
+-#include <linux/platform_data/mtd-nomadik-nand.h>
+ #include <mach/fsmc.h>
+ #include <mach/irqs.h>
  
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index e8c3f0d..5dea906 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -7,8 +7,8 @@ config UX500_SOC_COMMON
+ 	select ARM_ERRATA_764369 if SMP
+ 	select ARM_GIC
+ 	select CACHE_L2X0
++	select CLKSRC_NOMADIK_MTU
+ 	select COMMON_CLK
+-	select HAS_MTU
+ 	select PINCTRL
+ 	select PINCTRL_NOMADIK
+ 	select PL310_ERRATA_753970 if CACHE_PL310
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index 20d02fa..875309a 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -9,11 +9,10 @@
+ #include <linux/clksrc-dbx500-prcmu.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/platform_data/clocksource-nomadik-mtu.h>
+ 
+ #include <asm/smp_twd.h>
+ 
+-#include <plat/mtu.h>
+-
  #include <mach/setup.h>
-diff --git a/arch/arm/mach-ux500/include/mach/msp.h b/arch/arm/mach-ux500/include/mach/msp.h
-index 3cc7142..9991aea 100644
---- a/arch/arm/mach-ux500/include/mach/msp.h
-+++ b/arch/arm/mach-ux500/include/mach/msp.h
-@@ -8,7 +8,7 @@
- #ifndef __MSP_H
- #define __MSP_H
- 
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
- enum msp_i2s_id {
- 	MSP_I2S_0 = 0,
-diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
-index 145482e..78ac65f 100644
---- a/arch/arm/mach-ux500/usb.c
-+++ b/arch/arm/mach-ux500/usb.c
-@@ -7,10 +7,10 @@
- #include <linux/platform_device.h>
- #include <linux/usb/musb.h>
- #include <linux/dma-mapping.h>
-+#include <linux/platform_data/usb-musb-ux500.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
--#include <plat/ste_dma40.h>
  #include <mach/hardware.h>
--#include <linux/platform_data/usb-musb-ux500.h>
- 
- #define MUSB_DMA40_RX_CH { \
- 		.mode = STEDMA40_MODE_LOGICAL, \
-diff --git a/arch/arm/plat-nomadik/include/plat/ste_dma40.h b/arch/arm/plat-nomadik/include/plat/ste_dma40.h
+ #include <mach/irqs.h>
+diff --git a/arch/arm/plat-nomadik/Kconfig b/arch/arm/plat-nomadik/Kconfig
 deleted file mode 100644
-index 9ff93b0..0000000
---- a/arch/arm/plat-nomadik/include/plat/ste_dma40.h
+index 19f55ca..0000000
+--- a/arch/arm/plat-nomadik/Kconfig
 +++ /dev/null
-@@ -1,223 +0,0 @@
+@@ -1,29 +0,0 @@
+-# We keep common IP's here for Nomadik and other similar
+-# familiy of processors from ST-Ericsson. At the moment we have
+-# just MTU, others to follow soon.
+-
+-config PLAT_NOMADIK
+-	bool
+-	depends on ARCH_NOMADIK || ARCH_U8500
+-	default y
+-	select CLKSRC_MMIO
+-	help
+-	  Common platform code for Nomadik and other ST-Ericsson
+-	  platforms.
+-
+-if PLAT_NOMADIK
+-
+-config HAS_MTU
+-	bool
+-	help
+-	  Support for Multi Timer Unit. MTU provides access
+-	  to multiple interrupt generating programmable
+-	  32-bit free running decrementing counters.
+-
+-config NOMADIK_MTU_SCHED_CLOCK
+-	bool
+-	depends on HAS_MTU
+-	help
+-	  Use the Multi Timer Unit as the sched_clock.
+-
+-endif
+diff --git a/arch/arm/plat-nomadik/Makefile b/arch/arm/plat-nomadik/Makefile
+deleted file mode 100644
+index 37c7cdd..0000000
+--- a/arch/arm/plat-nomadik/Makefile
++++ /dev/null
+@@ -1,5 +0,0 @@
+-# arch/arm/plat-nomadik/Makefile
+-# Copyright 2009 ST-Ericsson
+-# Licensed under GPLv2
+-
+-obj-$(CONFIG_HAS_MTU)	+= timer.o
+diff --git a/arch/arm/plat-nomadik/include/plat/mtu.h b/arch/arm/plat-nomadik/include/plat/mtu.h
+deleted file mode 100644
+index 8008897..0000000
+--- a/arch/arm/plat-nomadik/include/plat/mtu.h
++++ /dev/null
+@@ -1,9 +0,0 @@
+-#ifndef __PLAT_MTU_H
+-#define __PLAT_MTU_H
+-
+-void nmdk_timer_init(void __iomem *base, int irq);
+-void nmdk_clkevt_reset(void);
+-void nmdk_clksrc_reset(void);
+-
+-#endif /* __PLAT_MTU_H */
+-
+diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+deleted file mode 100644
+index f911430..0000000
+--- a/arch/arm/plat-nomadik/timer.c
++++ /dev/null
+@@ -1,224 +0,0 @@
 -/*
-- * Copyright (C) ST-Ericsson SA 2007-2010
-- * Author: Per Forlin <per.forlin@stericsson.com> for ST-Ericsson
-- * Author: Jonas Aaberg <jonas.aberg@stericsson.com> for ST-Ericsson
-- * License terms: GNU General Public License (GPL) version 2
+- *  linux/arch/arm/plat-nomadik/timer.c
+- *
+- * Copyright (C) 2008 STMicroelectronics
+- * Copyright (C) 2010 Alessandro Rubini
+- * Copyright (C) 2010 Linus Walleij for ST-Ericsson
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2, as
+- * published by the Free Software Foundation.
 - */
--
--
--#ifndef STE_DMA40_H
--#define STE_DMA40_H
--
--#include <linux/dmaengine.h>
--#include <linux/scatterlist.h>
--#include <linux/workqueue.h>
+-#include <linux/init.h>
 -#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/io.h>
+-#include <linux/clockchips.h>
+-#include <linux/clk.h>
+-#include <linux/jiffies.h>
+-#include <linux/err.h>
+-#include <asm/mach/time.h>
+-#include <asm/sched_clock.h>
 -
 -/*
-- * Maxium size for a single dma descriptor
-- * Size is limited to 16 bits.
-- * Size is in the units of addr-widths (1,2,4,8 bytes)
-- * Larger transfers will be split up to multiple linked desc
+- * The MTU device hosts four different counters, with 4 set of
+- * registers. These are register names.
 - */
--#define STEDMA40_MAX_SEG_SIZE 0xFFFF
 -
--/* dev types for memcpy */
--#define STEDMA40_DEV_DST_MEMORY (-1)
--#define	STEDMA40_DEV_SRC_MEMORY (-1)
+-#define MTU_IMSC	0x00	/* Interrupt mask set/clear */
+-#define MTU_RIS		0x04	/* Raw interrupt status */
+-#define MTU_MIS		0x08	/* Masked interrupt status */
+-#define MTU_ICR		0x0C	/* Interrupt clear register */
 -
--enum stedma40_mode {
--	STEDMA40_MODE_LOGICAL = 0,
--	STEDMA40_MODE_PHYSICAL,
--	STEDMA40_MODE_OPERATION,
--};
+-/* per-timer registers take 0..3 as argument */
+-#define MTU_LR(x)	(0x10 + 0x10 * (x) + 0x00)	/* Load value */
+-#define MTU_VAL(x)	(0x10 + 0x10 * (x) + 0x04)	/* Current value */
+-#define MTU_CR(x)	(0x10 + 0x10 * (x) + 0x08)	/* Control reg */
+-#define MTU_BGLR(x)	(0x10 + 0x10 * (x) + 0x0c)	/* At next overflow */
 -
--enum stedma40_mode_opt {
--	STEDMA40_PCHAN_BASIC_MODE = 0,
--	STEDMA40_LCHAN_SRC_LOG_DST_LOG = 0,
--	STEDMA40_PCHAN_MODULO_MODE,
--	STEDMA40_PCHAN_DOUBLE_DST_MODE,
--	STEDMA40_LCHAN_SRC_PHY_DST_LOG,
--	STEDMA40_LCHAN_SRC_LOG_DST_PHY,
--};
+-/* bits for the control register */
+-#define MTU_CRn_ENA		0x80
+-#define MTU_CRn_PERIODIC	0x40	/* if 0 = free-running */
+-#define MTU_CRn_PRESCALE_MASK	0x0c
+-#define MTU_CRn_PRESCALE_1		0x00
+-#define MTU_CRn_PRESCALE_16		0x04
+-#define MTU_CRn_PRESCALE_256		0x08
+-#define MTU_CRn_32BITS		0x02
+-#define MTU_CRn_ONESHOT		0x01	/* if 0 = wraps reloading from BGLR*/
 -
--#define STEDMA40_ESIZE_8_BIT  0x0
--#define STEDMA40_ESIZE_16_BIT 0x1
--#define STEDMA40_ESIZE_32_BIT 0x2
--#define STEDMA40_ESIZE_64_BIT 0x3
+-/* Other registers are usual amba/primecell registers, currently not used */
+-#define MTU_ITCR	0xff0
+-#define MTU_ITOP	0xff4
 -
--/* The value 4 indicates that PEN-reg shall be set to 0 */
--#define STEDMA40_PSIZE_PHY_1  0x4
--#define STEDMA40_PSIZE_PHY_2  0x0
--#define STEDMA40_PSIZE_PHY_4  0x1
--#define STEDMA40_PSIZE_PHY_8  0x2
--#define STEDMA40_PSIZE_PHY_16 0x3
+-#define MTU_PERIPH_ID0	0xfe0
+-#define MTU_PERIPH_ID1	0xfe4
+-#define MTU_PERIPH_ID2	0xfe8
+-#define MTU_PERIPH_ID3	0xfeC
 -
+-#define MTU_PCELL0	0xff0
+-#define MTU_PCELL1	0xff4
+-#define MTU_PCELL2	0xff8
+-#define MTU_PCELL3	0xffC
+-
+-static void __iomem *mtu_base;
+-static bool clkevt_periodic;
+-static u32 clk_prescale;
+-static u32 nmdk_cycle;		/* write-once */
+-
+-#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
 -/*
-- * The number of elements differ in logical and
-- * physical mode
+- * Override the global weak sched_clock symbol with this
+- * local implementation which uses the clocksource to get some
+- * better resolution when scheduling the kernel.
 - */
--#define STEDMA40_PSIZE_LOG_1  STEDMA40_PSIZE_PHY_2
--#define STEDMA40_PSIZE_LOG_4  STEDMA40_PSIZE_PHY_4
--#define STEDMA40_PSIZE_LOG_8  STEDMA40_PSIZE_PHY_8
--#define STEDMA40_PSIZE_LOG_16 STEDMA40_PSIZE_PHY_16
--
--/* Maximum number of possible physical channels */
--#define STEDMA40_MAX_PHYS 32
--
--enum stedma40_flow_ctrl {
--	STEDMA40_NO_FLOW_CTRL,
--	STEDMA40_FLOW_CTRL,
--};
--
--enum stedma40_periph_data_width {
--	STEDMA40_BYTE_WIDTH = STEDMA40_ESIZE_8_BIT,
--	STEDMA40_HALFWORD_WIDTH = STEDMA40_ESIZE_16_BIT,
--	STEDMA40_WORD_WIDTH = STEDMA40_ESIZE_32_BIT,
--	STEDMA40_DOUBLEWORD_WIDTH = STEDMA40_ESIZE_64_BIT
--};
--
--enum stedma40_xfer_dir {
--	STEDMA40_MEM_TO_MEM = 1,
--	STEDMA40_MEM_TO_PERIPH,
--	STEDMA40_PERIPH_TO_MEM,
--	STEDMA40_PERIPH_TO_PERIPH
--};
--
--
--/**
-- * struct stedma40_chan_cfg - dst/src channel configuration
-- *
-- * @big_endian: true if the src/dst should be read as big endian
-- * @data_width: Data width of the src/dst hardware
-- * @p_size: Burst size
-- * @flow_ctrl: Flow control on/off.
-- */
--struct stedma40_half_channel_info {
--	bool big_endian;
--	enum stedma40_periph_data_width data_width;
--	int psize;
--	enum stedma40_flow_ctrl flow_ctrl;
--};
--
--/**
-- * struct stedma40_chan_cfg - Structure to be filled by client drivers.
-- *
-- * @dir: MEM 2 MEM, PERIPH 2 MEM , MEM 2 PERIPH, PERIPH 2 PERIPH
-- * @high_priority: true if high-priority
-- * @realtime: true if realtime mode is to be enabled.  Only available on DMA40
-- * version 3+, i.e DB8500v2+
-- * @mode: channel mode: physical, logical, or operation
-- * @mode_opt: options for the chosen channel mode
-- * @src_dev_type: Src device type
-- * @dst_dev_type: Dst device type
-- * @src_info: Parameters for dst half channel
-- * @dst_info: Parameters for dst half channel
-- * @use_fixed_channel: if true, use physical channel specified by phy_channel
-- * @phy_channel: physical channel to use, only if use_fixed_channel is true
-- *
-- * This structure has to be filled by the client drivers.
-- * It is recommended to do all dma configurations for clients in the machine.
-- *
-- */
--struct stedma40_chan_cfg {
--	enum stedma40_xfer_dir			 dir;
--	bool					 high_priority;
--	bool					 realtime;
--	enum stedma40_mode			 mode;
--	enum stedma40_mode_opt			 mode_opt;
--	int					 src_dev_type;
--	int					 dst_dev_type;
--	struct stedma40_half_channel_info	 src_info;
--	struct stedma40_half_channel_info	 dst_info;
--
--	bool					 use_fixed_channel;
--	int					 phy_channel;
--};
--
--/**
-- * struct stedma40_platform_data - Configuration struct for the dma device.
-- *
-- * @dev_len: length of dev_tx and dev_rx
-- * @dev_tx: mapping between destination event line and io address
-- * @dev_rx: mapping between source event line and io address
-- * @memcpy: list of memcpy event lines
-- * @memcpy_len: length of memcpy
-- * @memcpy_conf_phy: default configuration of physical channel memcpy
-- * @memcpy_conf_log: default configuration of logical channel memcpy
-- * @disabled_channels: A vector, ending with -1, that marks physical channels
-- * that are for different reasons not available for the driver.
-- */
--struct stedma40_platform_data {
--	u32				 dev_len;
--	const dma_addr_t		*dev_tx;
--	const dma_addr_t		*dev_rx;
--	int				*memcpy;
--	u32				 memcpy_len;
--	struct stedma40_chan_cfg	*memcpy_conf_phy;
--	struct stedma40_chan_cfg	*memcpy_conf_log;
--	int				 disabled_channels[STEDMA40_MAX_PHYS];
--	bool				 use_esram_lcla;
--};
--
--#ifdef CONFIG_STE_DMA40
--
--/**
-- * stedma40_filter() - Provides stedma40_chan_cfg to the
-- * ste_dma40 dma driver via the dmaengine framework.
-- * does some checking of what's provided.
-- *
-- * Never directly called by client. It used by dmaengine.
-- * @chan: dmaengine handle.
-- * @data: Must be of type: struct stedma40_chan_cfg and is
-- * the configuration of the framework.
-- *
-- *
-- */
--
--bool stedma40_filter(struct dma_chan *chan, void *data);
--
--/**
-- * stedma40_slave_mem() - Transfers a raw data buffer to or from a slave
-- * (=device)
-- *
-- * @chan: dmaengine handle
-- * @addr: source or destination physicall address.
-- * @size: bytes to transfer
-- * @direction: direction of transfer
-- * @flags: is actually enum dma_ctrl_flags. See dmaengine.h
-- */
--
--static inline struct
--dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
--					    dma_addr_t addr,
--					    unsigned int size,
--					    enum dma_transfer_direction direction,
--					    unsigned long flags)
+-static u32 notrace nomadik_read_sched_clock(void)
 -{
--	struct scatterlist sg;
--	sg_init_table(&sg, 1);
--	sg.dma_address = addr;
--	sg.length = size;
+-	if (unlikely(!mtu_base))
+-		return 0;
 -
--	return dmaengine_prep_slave_sg(chan, &sg, 1, direction, flags);
--}
--
--#else
--static inline bool stedma40_filter(struct dma_chan *chan, void *data)
--{
--	return false;
--}
--
--static inline struct
--dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
--					    dma_addr_t addr,
--					    unsigned int size,
--					    enum dma_transfer_direction direction,
--					    unsigned long flags)
--{
--	return NULL;
+-	return -readl(mtu_base + MTU_VAL(0));
 -}
 -#endif
 -
+-/* Clockevent device: use one-shot mode */
+-static int nmdk_clkevt_next(unsigned long evt, struct clock_event_device *ev)
+-{
+-	writel(1 << 1, mtu_base + MTU_IMSC);
+-	writel(evt, mtu_base + MTU_LR(1));
+-	/* Load highest value, enable device, enable interrupts */
+-	writel(MTU_CRn_ONESHOT | clk_prescale |
+-	       MTU_CRn_32BITS | MTU_CRn_ENA,
+-	       mtu_base + MTU_CR(1));
+-
+-	return 0;
+-}
+-
+-void nmdk_clkevt_reset(void)
+-{
+-	if (clkevt_periodic) {
+-		/* Timer: configure load and background-load, and fire it up */
+-		writel(nmdk_cycle, mtu_base + MTU_LR(1));
+-		writel(nmdk_cycle, mtu_base + MTU_BGLR(1));
+-
+-		writel(MTU_CRn_PERIODIC | clk_prescale |
+-		       MTU_CRn_32BITS | MTU_CRn_ENA,
+-		       mtu_base + MTU_CR(1));
+-		writel(1 << 1, mtu_base + MTU_IMSC);
+-	} else {
+-		/* Generate an interrupt to start the clockevent again */
+-		(void) nmdk_clkevt_next(nmdk_cycle, NULL);
+-	}
+-}
+-
+-static void nmdk_clkevt_mode(enum clock_event_mode mode,
+-			     struct clock_event_device *dev)
+-{
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		clkevt_periodic = true;
+-		nmdk_clkevt_reset();
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		clkevt_periodic = false;
+-		break;
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	case CLOCK_EVT_MODE_UNUSED:
+-		writel(0, mtu_base + MTU_IMSC);
+-		/* disable timer */
+-		writel(0, mtu_base + MTU_CR(1));
+-		/* load some high default value */
+-		writel(0xffffffff, mtu_base + MTU_LR(1));
+-		break;
+-	case CLOCK_EVT_MODE_RESUME:
+-		break;
+-	}
+-}
+-
+-static struct clock_event_device nmdk_clkevt = {
+-	.name		= "mtu_1",
+-	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+-	.rating		= 200,
+-	.set_mode	= nmdk_clkevt_mode,
+-	.set_next_event	= nmdk_clkevt_next,
+-};
+-
+-/*
+- * IRQ Handler for timer 1 of the MTU block.
+- */
+-static irqreturn_t nmdk_timer_interrupt(int irq, void *dev_id)
+-{
+-	struct clock_event_device *evdev = dev_id;
+-
+-	writel(1 << 1, mtu_base + MTU_ICR); /* Interrupt clear reg */
+-	evdev->event_handler(evdev);
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction nmdk_timer_irq = {
+-	.name		= "Nomadik Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER,
+-	.handler	= nmdk_timer_interrupt,
+-	.dev_id		= &nmdk_clkevt,
+-};
+-
+-void nmdk_clksrc_reset(void)
+-{
+-	/* Disable */
+-	writel(0, mtu_base + MTU_CR(0));
+-
+-	/* ClockSource: configure load and background-load, and fire it up */
+-	writel(nmdk_cycle, mtu_base + MTU_LR(0));
+-	writel(nmdk_cycle, mtu_base + MTU_BGLR(0));
+-
+-	writel(clk_prescale | MTU_CRn_32BITS | MTU_CRn_ENA,
+-	       mtu_base + MTU_CR(0));
+-}
+-
+-void __init nmdk_timer_init(void __iomem *base, int irq)
+-{
+-	unsigned long rate;
+-	struct clk *clk0;
+-
+-	mtu_base = base;
+-	clk0 = clk_get_sys("mtu0", NULL);
+-	BUG_ON(IS_ERR(clk0));
+-	BUG_ON(clk_prepare(clk0) < 0);
+-	BUG_ON(clk_enable(clk0) < 0);
+-
+-	/*
+-	 * Tick rate is 2.4MHz for Nomadik and 2.4Mhz, 100MHz or 133 MHz
+-	 * for ux500.
+-	 * Use a divide-by-16 counter if the tick rate is more than 32MHz.
+-	 * At 32 MHz, the timer (with 32 bit counter) can be programmed
+-	 * to wake-up@a max 127s a head in time. Dividing a 2.4 MHz timer
+-	 * with 16 gives too low timer resolution.
+-	 */
+-	rate = clk_get_rate(clk0);
+-	if (rate > 32000000) {
+-		rate /= 16;
+-		clk_prescale = MTU_CRn_PRESCALE_16;
+-	} else {
+-		clk_prescale = MTU_CRn_PRESCALE_1;
+-	}
+-
+-	/* Cycles for periodic mode */
+-	nmdk_cycle = DIV_ROUND_CLOSEST(rate, HZ);
+-
+-
+-	/* Timer 0 is the free running clocksource */
+-	nmdk_clksrc_reset();
+-
+-	if (clocksource_mmio_init(mtu_base + MTU_VAL(0), "mtu_0",
+-			rate, 200, 32, clocksource_mmio_readl_down))
+-		pr_err("timer: failed to initialize clock source %s\n",
+-		       "mtu_0");
+-
+-#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
+-	setup_sched_clock(nomadik_read_sched_clock, 32, rate);
 -#endif
-diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
-index bc615cc..8bc5fef 100644
---- a/drivers/crypto/ux500/cryp/cryp_core.c
-+++ b/drivers/crypto/ux500/cryp/cryp_core.c
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/regulator/consumer.h>
- #include <linux/semaphore.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
- #include <crypto/aes.h>
- #include <crypto/algapi.h>
-@@ -30,8 +31,6 @@
- #include <crypto/des.h>
- #include <crypto/scatterwalk.h>
- 
--#include <plat/ste_dma40.h>
 -
- #include <linux/platform_data/crypto-ux500.h>
- #include <mach/hardware.h>
+-	/* Timer 1 is used for events, register irq and clockevents */
+-	setup_irq(irq, &nmdk_timer_irq);
+-	nmdk_clkevt.cpumask = cpumask_of(0);
+-	clockevents_config_and_register(&nmdk_clkevt, rate, 2, 0xffffffffU);
+-}
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index fbd9b2b..5bc09ee 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -216,7 +216,7 @@ config HW_RANDOM_MXC_RNGA
  
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index ae55091..23c5573 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -19,8 +19,7 @@
- #include <linux/err.h>
- #include <linux/amba/bus.h>
- #include <linux/regulator/consumer.h>
--
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
+ config HW_RANDOM_NOMADIK
+ 	tristate "ST-Ericsson Nomadik Random Number Generator support"
+-	depends on HW_RANDOM && PLAT_NOMADIK
++	depends on HW_RANDOM && ARCH_NOMADIK
+ 	---help---
+ 	  This driver provides kernel-side support for the Random Number
+ 	  Generator hardware found on ST-Ericsson SoCs (8815 and 8500).
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 6a78073..c9f67de 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -22,6 +22,21 @@ config DW_APB_TIMER_OF
+ config ARMADA_370_XP_TIMER
+ 	bool
  
- #include "dmaengine.h"
- #include "ste_dma40_ll.h"
-diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
-index cad9e1d..851ad56 100644
---- a/drivers/dma/ste_dma40_ll.c
-+++ b/drivers/dma/ste_dma40_ll.c
-@@ -6,7 +6,7 @@
-  */
++config CLKSRC_NOMADIK_MTU
++	bool
++	depends on (ARCH_NOMADIK || ARCH_U8500)
++	select CLKSRC_MMIO
++	help
++	  Support for Multi Timer Unit. MTU provides access
++	  to multiple interrupt generating programmable
++	  32-bit free running decrementing counters.
++
++config CLKSRC_NOMADIK_MTU_SCHED_CLOCK
++	bool
++	depends on CLKSRC_NOMADIK_MTU
++	help
++	  Use the Multi Timer Unit as the sched_clock.
++
+ config CLKSRC_DBX500_PRCMU
+ 	bool "Clocksource PRCMU Timer"
+ 	depends on UX500_SOC_DB8500
+@@ -31,7 +46,7 @@ config CLKSRC_DBX500_PRCMU
  
- #include <linux/kernel.h>
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
- #include "ste_dma40_ll.h"
- 
-diff --git a/include/linux/platform_data/crypto-ux500.h b/include/linux/platform_data/crypto-ux500.h
-index 5b2d081..94df96d 100644
---- a/include/linux/platform_data/crypto-ux500.h
-+++ b/include/linux/platform_data/crypto-ux500.h
-@@ -7,7 +7,7 @@
- #ifndef _CRYPTO_UX500_H
- #define _CRYPTO_UX500_H
- #include <linux/dmaengine.h>
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
- 
- struct hash_platform_data {
- 	void *mem_to_engine;
-diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
+ config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+ 	bool "Clocksource PRCMU Timer sched_clock"
+-	depends on (CLKSRC_DBX500_PRCMU && !NOMADIK_MTU_SCHED_CLOCK)
++	depends on (CLKSRC_DBX500_PRCMU && !CLKSRC_NOMADIK_MTU_SCHED_CLOCK)
+ 	default y
+ 	help
+ 	  Use the always on PRCMU Timer as sched_clock
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 603be36..24fb888 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+ obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
+ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
++obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
+diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
 new file mode 100644
-index 0000000..9ff93b0
+index 0000000..23c780b
 --- /dev/null
-+++ b/include/linux/platform_data/dma-ste-dma40.h
-@@ -0,0 +1,223 @@
++++ b/drivers/clocksource/nomadik-mtu.c
+@@ -0,0 +1,224 @@
 +/*
-+ * Copyright (C) ST-Ericsson SA 2007-2010
-+ * Author: Per Forlin <per.forlin@stericsson.com> for ST-Ericsson
-+ * Author: Jonas Aaberg <jonas.aberg@stericsson.com> for ST-Ericsson
-+ * License terms: GNU General Public License (GPL) version 2
++ * Copyright (C) 2008 STMicroelectronics
++ * Copyright (C) 2010 Alessandro Rubini
++ * Copyright (C) 2010 Linus Walleij for ST-Ericsson
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2, as
++ * published by the Free Software Foundation.
 + */
-+
-+
-+#ifndef STE_DMA40_H
-+#define STE_DMA40_H
-+
-+#include <linux/dmaengine.h>
-+#include <linux/scatterlist.h>
-+#include <linux/workqueue.h>
++#include <linux/init.h>
 +#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/clk.h>
++#include <linux/jiffies.h>
++#include <linux/err.h>
++#include <linux/platform_data/clocksource-nomadik-mtu.h>
++#include <asm/mach/time.h>
++#include <asm/sched_clock.h>
 +
 +/*
-+ * Maxium size for a single dma descriptor
-+ * Size is limited to 16 bits.
-+ * Size is in the units of addr-widths (1,2,4,8 bytes)
-+ * Larger transfers will be split up to multiple linked desc
++ * The MTU device hosts four different counters, with 4 set of
++ * registers. These are register names.
 + */
-+#define STEDMA40_MAX_SEG_SIZE 0xFFFF
 +
-+/* dev types for memcpy */
-+#define STEDMA40_DEV_DST_MEMORY (-1)
-+#define	STEDMA40_DEV_SRC_MEMORY (-1)
++#define MTU_IMSC	0x00	/* Interrupt mask set/clear */
++#define MTU_RIS		0x04	/* Raw interrupt status */
++#define MTU_MIS		0x08	/* Masked interrupt status */
++#define MTU_ICR		0x0C	/* Interrupt clear register */
 +
-+enum stedma40_mode {
-+	STEDMA40_MODE_LOGICAL = 0,
-+	STEDMA40_MODE_PHYSICAL,
-+	STEDMA40_MODE_OPERATION,
-+};
++/* per-timer registers take 0..3 as argument */
++#define MTU_LR(x)	(0x10 + 0x10 * (x) + 0x00)	/* Load value */
++#define MTU_VAL(x)	(0x10 + 0x10 * (x) + 0x04)	/* Current value */
++#define MTU_CR(x)	(0x10 + 0x10 * (x) + 0x08)	/* Control reg */
++#define MTU_BGLR(x)	(0x10 + 0x10 * (x) + 0x0c)	/* At next overflow */
 +
-+enum stedma40_mode_opt {
-+	STEDMA40_PCHAN_BASIC_MODE = 0,
-+	STEDMA40_LCHAN_SRC_LOG_DST_LOG = 0,
-+	STEDMA40_PCHAN_MODULO_MODE,
-+	STEDMA40_PCHAN_DOUBLE_DST_MODE,
-+	STEDMA40_LCHAN_SRC_PHY_DST_LOG,
-+	STEDMA40_LCHAN_SRC_LOG_DST_PHY,
-+};
++/* bits for the control register */
++#define MTU_CRn_ENA		0x80
++#define MTU_CRn_PERIODIC	0x40	/* if 0 = free-running */
++#define MTU_CRn_PRESCALE_MASK	0x0c
++#define MTU_CRn_PRESCALE_1		0x00
++#define MTU_CRn_PRESCALE_16		0x04
++#define MTU_CRn_PRESCALE_256		0x08
++#define MTU_CRn_32BITS		0x02
++#define MTU_CRn_ONESHOT		0x01	/* if 0 = wraps reloading from BGLR*/
 +
-+#define STEDMA40_ESIZE_8_BIT  0x0
-+#define STEDMA40_ESIZE_16_BIT 0x1
-+#define STEDMA40_ESIZE_32_BIT 0x2
-+#define STEDMA40_ESIZE_64_BIT 0x3
++/* Other registers are usual amba/primecell registers, currently not used */
++#define MTU_ITCR	0xff0
++#define MTU_ITOP	0xff4
 +
-+/* The value 4 indicates that PEN-reg shall be set to 0 */
-+#define STEDMA40_PSIZE_PHY_1  0x4
-+#define STEDMA40_PSIZE_PHY_2  0x0
-+#define STEDMA40_PSIZE_PHY_4  0x1
-+#define STEDMA40_PSIZE_PHY_8  0x2
-+#define STEDMA40_PSIZE_PHY_16 0x3
++#define MTU_PERIPH_ID0	0xfe0
++#define MTU_PERIPH_ID1	0xfe4
++#define MTU_PERIPH_ID2	0xfe8
++#define MTU_PERIPH_ID3	0xfeC
 +
++#define MTU_PCELL0	0xff0
++#define MTU_PCELL1	0xff4
++#define MTU_PCELL2	0xff8
++#define MTU_PCELL3	0xffC
++
++static void __iomem *mtu_base;
++static bool clkevt_periodic;
++static u32 clk_prescale;
++static u32 nmdk_cycle;		/* write-once */
++
++#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
 +/*
-+ * The number of elements differ in logical and
-+ * physical mode
++ * Override the global weak sched_clock symbol with this
++ * local implementation which uses the clocksource to get some
++ * better resolution when scheduling the kernel.
 + */
-+#define STEDMA40_PSIZE_LOG_1  STEDMA40_PSIZE_PHY_2
-+#define STEDMA40_PSIZE_LOG_4  STEDMA40_PSIZE_PHY_4
-+#define STEDMA40_PSIZE_LOG_8  STEDMA40_PSIZE_PHY_8
-+#define STEDMA40_PSIZE_LOG_16 STEDMA40_PSIZE_PHY_16
-+
-+/* Maximum number of possible physical channels */
-+#define STEDMA40_MAX_PHYS 32
-+
-+enum stedma40_flow_ctrl {
-+	STEDMA40_NO_FLOW_CTRL,
-+	STEDMA40_FLOW_CTRL,
-+};
-+
-+enum stedma40_periph_data_width {
-+	STEDMA40_BYTE_WIDTH = STEDMA40_ESIZE_8_BIT,
-+	STEDMA40_HALFWORD_WIDTH = STEDMA40_ESIZE_16_BIT,
-+	STEDMA40_WORD_WIDTH = STEDMA40_ESIZE_32_BIT,
-+	STEDMA40_DOUBLEWORD_WIDTH = STEDMA40_ESIZE_64_BIT
-+};
-+
-+enum stedma40_xfer_dir {
-+	STEDMA40_MEM_TO_MEM = 1,
-+	STEDMA40_MEM_TO_PERIPH,
-+	STEDMA40_PERIPH_TO_MEM,
-+	STEDMA40_PERIPH_TO_PERIPH
-+};
-+
-+
-+/**
-+ * struct stedma40_chan_cfg - dst/src channel configuration
-+ *
-+ * @big_endian: true if the src/dst should be read as big endian
-+ * @data_width: Data width of the src/dst hardware
-+ * @p_size: Burst size
-+ * @flow_ctrl: Flow control on/off.
-+ */
-+struct stedma40_half_channel_info {
-+	bool big_endian;
-+	enum stedma40_periph_data_width data_width;
-+	int psize;
-+	enum stedma40_flow_ctrl flow_ctrl;
-+};
-+
-+/**
-+ * struct stedma40_chan_cfg - Structure to be filled by client drivers.
-+ *
-+ * @dir: MEM 2 MEM, PERIPH 2 MEM , MEM 2 PERIPH, PERIPH 2 PERIPH
-+ * @high_priority: true if high-priority
-+ * @realtime: true if realtime mode is to be enabled.  Only available on DMA40
-+ * version 3+, i.e DB8500v2+
-+ * @mode: channel mode: physical, logical, or operation
-+ * @mode_opt: options for the chosen channel mode
-+ * @src_dev_type: Src device type
-+ * @dst_dev_type: Dst device type
-+ * @src_info: Parameters for dst half channel
-+ * @dst_info: Parameters for dst half channel
-+ * @use_fixed_channel: if true, use physical channel specified by phy_channel
-+ * @phy_channel: physical channel to use, only if use_fixed_channel is true
-+ *
-+ * This structure has to be filled by the client drivers.
-+ * It is recommended to do all dma configurations for clients in the machine.
-+ *
-+ */
-+struct stedma40_chan_cfg {
-+	enum stedma40_xfer_dir			 dir;
-+	bool					 high_priority;
-+	bool					 realtime;
-+	enum stedma40_mode			 mode;
-+	enum stedma40_mode_opt			 mode_opt;
-+	int					 src_dev_type;
-+	int					 dst_dev_type;
-+	struct stedma40_half_channel_info	 src_info;
-+	struct stedma40_half_channel_info	 dst_info;
-+
-+	bool					 use_fixed_channel;
-+	int					 phy_channel;
-+};
-+
-+/**
-+ * struct stedma40_platform_data - Configuration struct for the dma device.
-+ *
-+ * @dev_len: length of dev_tx and dev_rx
-+ * @dev_tx: mapping between destination event line and io address
-+ * @dev_rx: mapping between source event line and io address
-+ * @memcpy: list of memcpy event lines
-+ * @memcpy_len: length of memcpy
-+ * @memcpy_conf_phy: default configuration of physical channel memcpy
-+ * @memcpy_conf_log: default configuration of logical channel memcpy
-+ * @disabled_channels: A vector, ending with -1, that marks physical channels
-+ * that are for different reasons not available for the driver.
-+ */
-+struct stedma40_platform_data {
-+	u32				 dev_len;
-+	const dma_addr_t		*dev_tx;
-+	const dma_addr_t		*dev_rx;
-+	int				*memcpy;
-+	u32				 memcpy_len;
-+	struct stedma40_chan_cfg	*memcpy_conf_phy;
-+	struct stedma40_chan_cfg	*memcpy_conf_log;
-+	int				 disabled_channels[STEDMA40_MAX_PHYS];
-+	bool				 use_esram_lcla;
-+};
-+
-+#ifdef CONFIG_STE_DMA40
-+
-+/**
-+ * stedma40_filter() - Provides stedma40_chan_cfg to the
-+ * ste_dma40 dma driver via the dmaengine framework.
-+ * does some checking of what's provided.
-+ *
-+ * Never directly called by client. It used by dmaengine.
-+ * @chan: dmaengine handle.
-+ * @data: Must be of type: struct stedma40_chan_cfg and is
-+ * the configuration of the framework.
-+ *
-+ *
-+ */
-+
-+bool stedma40_filter(struct dma_chan *chan, void *data);
-+
-+/**
-+ * stedma40_slave_mem() - Transfers a raw data buffer to or from a slave
-+ * (=device)
-+ *
-+ * @chan: dmaengine handle
-+ * @addr: source or destination physicall address.
-+ * @size: bytes to transfer
-+ * @direction: direction of transfer
-+ * @flags: is actually enum dma_ctrl_flags. See dmaengine.h
-+ */
-+
-+static inline struct
-+dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
-+					    dma_addr_t addr,
-+					    unsigned int size,
-+					    enum dma_transfer_direction direction,
-+					    unsigned long flags)
++static u32 notrace nomadik_read_sched_clock(void)
 +{
-+	struct scatterlist sg;
-+	sg_init_table(&sg, 1);
-+	sg.dma_address = addr;
-+	sg.length = size;
++	if (unlikely(!mtu_base))
++		return 0;
 +
-+	return dmaengine_prep_slave_sg(chan, &sg, 1, direction, flags);
-+}
-+
-+#else
-+static inline bool stedma40_filter(struct dma_chan *chan, void *data)
-+{
-+	return false;
-+}
-+
-+static inline struct
-+dma_async_tx_descriptor *stedma40_slave_mem(struct dma_chan *chan,
-+					    dma_addr_t addr,
-+					    unsigned int size,
-+					    enum dma_transfer_direction direction,
-+					    unsigned long flags)
-+{
-+	return NULL;
++	return -readl(mtu_base + MTU_VAL(0));
 +}
 +#endif
 +
++/* Clockevent device: use one-shot mode */
++static int nmdk_clkevt_next(unsigned long evt, struct clock_event_device *ev)
++{
++	writel(1 << 1, mtu_base + MTU_IMSC);
++	writel(evt, mtu_base + MTU_LR(1));
++	/* Load highest value, enable device, enable interrupts */
++	writel(MTU_CRn_ONESHOT | clk_prescale |
++	       MTU_CRn_32BITS | MTU_CRn_ENA,
++	       mtu_base + MTU_CR(1));
++
++	return 0;
++}
++
++void nmdk_clkevt_reset(void)
++{
++	if (clkevt_periodic) {
++		/* Timer: configure load and background-load, and fire it up */
++		writel(nmdk_cycle, mtu_base + MTU_LR(1));
++		writel(nmdk_cycle, mtu_base + MTU_BGLR(1));
++
++		writel(MTU_CRn_PERIODIC | clk_prescale |
++		       MTU_CRn_32BITS | MTU_CRn_ENA,
++		       mtu_base + MTU_CR(1));
++		writel(1 << 1, mtu_base + MTU_IMSC);
++	} else {
++		/* Generate an interrupt to start the clockevent again */
++		(void) nmdk_clkevt_next(nmdk_cycle, NULL);
++	}
++}
++
++static void nmdk_clkevt_mode(enum clock_event_mode mode,
++			     struct clock_event_device *dev)
++{
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		clkevt_periodic = true;
++		nmdk_clkevt_reset();
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		clkevt_periodic = false;
++		break;
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++		writel(0, mtu_base + MTU_IMSC);
++		/* disable timer */
++		writel(0, mtu_base + MTU_CR(1));
++		/* load some high default value */
++		writel(0xffffffff, mtu_base + MTU_LR(1));
++		break;
++	case CLOCK_EVT_MODE_RESUME:
++		break;
++	}
++}
++
++static struct clock_event_device nmdk_clkevt = {
++	.name		= "mtu_1",
++	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
++	.rating		= 200,
++	.set_mode	= nmdk_clkevt_mode,
++	.set_next_event	= nmdk_clkevt_next,
++};
++
++/*
++ * IRQ Handler for timer 1 of the MTU block.
++ */
++static irqreturn_t nmdk_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evdev = dev_id;
++
++	writel(1 << 1, mtu_base + MTU_ICR); /* Interrupt clear reg */
++	evdev->event_handler(evdev);
++	return IRQ_HANDLED;
++}
++
++static struct irqaction nmdk_timer_irq = {
++	.name		= "Nomadik Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER,
++	.handler	= nmdk_timer_interrupt,
++	.dev_id		= &nmdk_clkevt,
++};
++
++void nmdk_clksrc_reset(void)
++{
++	/* Disable */
++	writel(0, mtu_base + MTU_CR(0));
++
++	/* ClockSource: configure load and background-load, and fire it up */
++	writel(nmdk_cycle, mtu_base + MTU_LR(0));
++	writel(nmdk_cycle, mtu_base + MTU_BGLR(0));
++
++	writel(clk_prescale | MTU_CRn_32BITS | MTU_CRn_ENA,
++	       mtu_base + MTU_CR(0));
++}
++
++void __init nmdk_timer_init(void __iomem *base, int irq)
++{
++	unsigned long rate;
++	struct clk *clk0;
++
++	mtu_base = base;
++	clk0 = clk_get_sys("mtu0", NULL);
++	BUG_ON(IS_ERR(clk0));
++	BUG_ON(clk_prepare(clk0) < 0);
++	BUG_ON(clk_enable(clk0) < 0);
++
++	/*
++	 * Tick rate is 2.4MHz for Nomadik and 2.4Mhz, 100MHz or 133 MHz
++	 * for ux500.
++	 * Use a divide-by-16 counter if the tick rate is more than 32MHz.
++	 * At 32 MHz, the timer (with 32 bit counter) can be programmed
++	 * to wake-up@a max 127s a head in time. Dividing a 2.4 MHz timer
++	 * with 16 gives too low timer resolution.
++	 */
++	rate = clk_get_rate(clk0);
++	if (rate > 32000000) {
++		rate /= 16;
++		clk_prescale = MTU_CRn_PRESCALE_16;
++	} else {
++		clk_prescale = MTU_CRn_PRESCALE_1;
++	}
++
++	/* Cycles for periodic mode */
++	nmdk_cycle = DIV_ROUND_CLOSEST(rate, HZ);
++
++
++	/* Timer 0 is the free running clocksource */
++	nmdk_clksrc_reset();
++
++	if (clocksource_mmio_init(mtu_base + MTU_VAL(0), "mtu_0",
++			rate, 200, 32, clocksource_mmio_readl_down))
++		pr_err("timer: failed to initialize clock source %s\n",
++		       "mtu_0");
++
++#ifdef CONFIG_NOMADIK_MTU_SCHED_CLOCK
++	setup_sched_clock(nomadik_read_sched_clock, 32, rate);
 +#endif
-diff --git a/sound/soc/ux500/ux500_pcm.c b/sound/soc/ux500/ux500_pcm.c
-index 1a04e24..b55b79f 100644
---- a/sound/soc/ux500/ux500_pcm.c
-+++ b/sound/soc/ux500/ux500_pcm.c
-@@ -18,8 +18,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
- #include <linux/slab.h>
--
--#include <plat/ste_dma40.h>
-+#include <linux/platform_data/dma-ste-dma40.h>
++
++	/* Timer 1 is used for events, register irq and clockevents */
++	setup_irq(irq, &nmdk_timer_irq);
++	nmdk_clkevt.cpumask = cpumask_of(0);
++	clockevents_config_and_register(&nmdk_clkevt, rate, 2, 0xffffffffU);
++}
+diff --git a/drivers/input/keyboard/Kconfig b/drivers/input/keyboard/Kconfig
+index b4b65af..855fc52 100644
+--- a/drivers/input/keyboard/Kconfig
++++ b/drivers/input/keyboard/Kconfig
+@@ -408,7 +408,7 @@ config KEYBOARD_NEWTON
  
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
+ config KEYBOARD_NOMADIK
+ 	tristate "ST-Ericsson Nomadik SKE keyboard"
+-	depends on PLAT_NOMADIK
++	depends on (ARCH_NOMADIK || ARCH_U8500)
+ 	select INPUT_MATRIXKMAP
+ 	help
+ 	  Say Y here if you want to use a keypad provided on the SKE controller
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 4883139..e4f5748 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -559,7 +559,7 @@ config MTD_NAND_JZ4740
+ 
+ config MTD_NAND_FSMC
+ 	tristate "Support for NAND on ST Micros FSMC"
+-	depends on PLAT_SPEAR || PLAT_NOMADIK || MACH_U300
++	depends on PLAT_SPEAR || ARCH_NOMADIK || ARCH_U8500 || MACH_U300
+ 	help
+ 	  Enables support for NAND Flash chips on the ST Microelectronics
+ 	  Flexible Static Memory Controller (FSMC)
+diff --git a/include/linux/platform_data/clocksource-nomadik-mtu.h b/include/linux/platform_data/clocksource-nomadik-mtu.h
+new file mode 100644
+index 0000000..8008897
+--- /dev/null
++++ b/include/linux/platform_data/clocksource-nomadik-mtu.h
+@@ -0,0 +1,9 @@
++#ifndef __PLAT_MTU_H
++#define __PLAT_MTU_H
++
++void nmdk_timer_init(void __iomem *base, int irq);
++void nmdk_clkevt_reset(void);
++void nmdk_clksrc_reset(void);
++
++#endif /* __PLAT_MTU_H */
++
 -- 
 1.7.11.3
