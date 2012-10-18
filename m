@@ -1,114 +1,96 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 18 Oct 2012 16:16:48 +0000
-Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <507DB9EC.9060407@ti.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
- <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
- <507DB9EC.9060407@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB43B17@DBDE01.ent.ti.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Thu, 18 Oct 2012 17:15:36 +0100
+Subject: [RFC PATCH 0/6] ARM: mm: HugeTLB + THP support.
+Message-ID: <1350576942-25299-1-git-send-email-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 01:17:56, Hunter, Jon wrote:
-> 
-> On 10/15/2012 02:16 PM, Richard Cochran wrote:
-> > From: hvaibhav at ti.com <hvaibhav@ti.com>
-> > 
-> > With recent changes in omap gpmc driver code, in case of DT
-> > boot mode, where bootloader does not configure gpmc cs space
-> > will result into kernel BUG() inside gpmc_mem_init() function,
-> > as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
-> > gpmc_config7[0].baseaddress is set to '0' on reset.
-> 
-> I am not sure I completely follow the logic here.
-> 
-> Won't this problem occur if the bootloader does not configure the gpmc
-> cs space AND we are not using DT?
-> 
+Hello,
+The following patches bring both HugeTLB support and Transparent HugePage (THP)
+support to ARM.
 
-That's what exactly the above comment describes.
+Both short descriptors (non-LPAE) and long descriptors (LPAE) are supported.
 
-> Is the csvalid bit set because we are booting from the internal ROM?
-> 
+The non-LPAE HugeTLB code is based on patches by Bill Carson [1], but instead of
+allocating extra memory to store "Linux PTEs", it re-purposes the domain bits
+of section descriptors and constructs huge Linux PTEs on demand.
 
-As per TRM, the reset value of the CS0_valis bit is set to 0. I have pasted 
-TRM statement below -
+As PMDs are walked directly by the kernel THP functions (there are no
+huge_pmd_offset style functions), any "linux PMD"/"hardware PMD" distinction
+would require some re-working of the ARM PMD/PTE code. Use of the domain bits
+allows for a more straightforward THP implementation.
 
-"Chip-select enable (reset value is 1 for CS[0] and 0 for CS[1-5])."
+Some general HugeTLB code relating to huge page migration on memory failure
+(CONFIG_MEMORY_FAILURE) de-references huge pte_t *s directly rather than use
+the huge_ptep_get and set_huge_pte_at functions. Thus this config option is
+incompatible with non-LPAE hugepages. At the moment I can only see x86 using
+CONFIG_MEMORY_FAILURE though.
 
-And same applies to OMAP3 family of devices.
+For non-LPAE, I make an assumption about how the memory type is mapped between
+linux PTE and section descriptor. Ideally I would like to look this information
+up, possibly from get_mem_types(MT_MEMORY). Comments on an elegant way of
+achieving this are welcome.
 
-> I guess I don't see why csvalid bit being set and a base-address of 0x0
-> should not be allowed. That should be a valid combination.
-> 
+Non-LPAE code was tested on a Versatile Express (V2P-CA15_A7 Cortex A15 tile),
+Tegra 2 TrimSlice and RealView ARM11MPCore.
 
-Yes, agreed.
+The LPAE code manipulates the hardware page tables directly as the long
+descriptors are wide enough to contain all the Linux PTE information.
 
-> One problem I see with gpmc_mem_init() is that it assumes that
-> BOOT_ROM_SPACE is 1MB for all devices starting at 0x0 apart from the
-> apollon board. For newer devices such as OMAP4, there is only 48KB of
-> internal ROM and only mapped to 0x0 when booting from internal ROM. So
-> this needs to be fixed.
-> 
-> How much internal ROM does the AM335x have and where is it mapped?
-> 
+The LPAE code has been tested on a Versatile Express: V2F-2XV6 Cortex A15 and
+V2P-CA15_A7 Cortex A15 tiles.
 
-AM33xx memory map is something like,
+This patch set requires the following to be applied on top of 3.7-rc1:
+"ARM: mm: introduce L_PTE_VALID for page table entries"
+  (PROT_NONE series, posted by Will on linux-arm-kernel)
+  - http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/126130.html
 
-Boot ROM  0x4000_0000 0x4001_FFFF 128KB
-          0x4002_0000 0x4002_BFFF 48KB    32-bit Ex/R(1) - Public
-Reserved  0x4002_C000 0x400F_FFFF 848KB   Reserved
-Reserved  0x4010_0000 0x401F_FFFF 1MB     Reserved
-Reserved  0x4020_0000 0x402E_FFFF 960KB   Reserved
-Reserved  0x402f_0000 0x4020_03FF 64KB    Reserved
-SRAM internal 0x402F_0400 0x402F_FFFF    32-bit Ex/R/W(1)
+"mm: thp: Set the accessed flag for old pages on access fault."
+  (posted by Will on linux-mm)
+   - http://marc.info/?l=linux-kernel&m=135048927416117&w=2
 
+Cheers,
+-- 
+Steve
 
-> > This use-case is applicable for any board/EVM which doesn't have
-> > any peripheral connected to gpmc cs0, for example BeagleXM and
-> > BeagleBone, so DT boot mode fails.
-> > 
-> > This patch adds of_have_populated_dt() check before creating
-> > device, so that for DT boot mode, gpmc probe will not be called
-> > which is expected behavior, as gpmc is not supported yet from DT.
-> 
-> Yes, but we do actually still allow some platform devices to be probed
-> (such as dmtimers) when booting with DT that don't support DT yet. So
-> this change prevents us from using the gpmc on boards when booting with DT.
-> 
+[1] - http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084359.html
 
-The idea here was,
+Catalin Marinas (2):
+  ARM: mm: HugeTLB support for LPAE systems.
+  ARM: mm: Transparent huge page support for LPAE systems.
 
-In order to use GPMC in meaningful way, where some peripheral is connected 
-to the GPMC, you must create platform_device for the probe to happen 
-properly. Now all the devices I know so far, we have gpmc_smsc911x_init(), 
-omap_nand_flash_init(), etc...
-These api's are getting called only through machine_desc.init_xxx callbacks,
-And in case of DT, we have centralized machine_desc definition for all 
-platforms (board-generic.c). So even though you want to use GPMC for DT boot
-mode, you can not make use of peripheral without changing board-files to 
-change to create platform_device.
+Steve Capper (4):
+  ARM: mm: correct pte_same behaviour for LPAE.
+  ARM: mm: Add support for flushing HugeTLB pages.
+  ARM: mm: HugeTLB support for non-LPAE systems.
+  ARM: mm: Transparent huge page support for non-LPAE systems.
 
-Does it make sense?
+ arch/arm/Kconfig                            |    8 ++
+ arch/arm/include/asm/hugetlb-2level.h       |   71 ++++++++++
+ arch/arm/include/asm/hugetlb-3level.h       |   61 +++++++++
+ arch/arm/include/asm/hugetlb.h              |   87 ++++++++++++
+ arch/arm/include/asm/pgtable-2level.h       |  152 ++++++++++++++++++++-
+ arch/arm/include/asm/pgtable-3level-hwdef.h |    2 +
+ arch/arm/include/asm/pgtable-3level.h       |   77 +++++++++++
+ arch/arm/include/asm/pgtable.h              |   34 ++++-
+ arch/arm/include/asm/tlb.h                  |   16 ++-
+ arch/arm/include/asm/tlbflush.h             |    2 +
+ arch/arm/kernel/head.S                      |   10 +-
+ arch/arm/mm/Makefile                        |    6 +
+ arch/arm/mm/dma-mapping.c                   |    2 +-
+ arch/arm/mm/fault.c                         |    6 +-
+ arch/arm/mm/flush.c                         |   25 ++--
+ arch/arm/mm/fsr-3level.c                    |    2 +-
+ arch/arm/mm/hugetlbpage-2level.c            |  115 ++++++++++++++++
+ arch/arm/mm/hugetlbpage-3level.c            |  190 +++++++++++++++++++++++++++
+ arch/arm/mm/hugetlbpage.c                   |   65 +++++++++
+ 19 files changed, 909 insertions(+), 22 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-2level.h
+ create mode 100644 arch/arm/include/asm/hugetlb-3level.h
+ create mode 100644 arch/arm/include/asm/hugetlb.h
+ create mode 100644 arch/arm/mm/hugetlbpage-2level.c
+ create mode 100644 arch/arm/mm/hugetlbpage-3level.c
+ create mode 100644 arch/arm/mm/hugetlbpage.c
 
-> I am not convinced that this is addressing the underlying problem with
-> gpmc_mem_init().
-> 
-
-The patch you submitted is cleanup patch and is required irrespective of 
-this patch. I believe this patch is just makes sure that, if you are booting 
-from DT and you do not have meaningful DT node for GPMC and peripheral 
-interfaced to it, no point in probing it. 
-
-Does it make any sense???
-
-
-On other hand, Your patch is anyway required, as that I would consider as 
-cleanup of existing code (in error handling).
-
-Thanks,
-Vaibhav
-
-> Cheers
-> Jon
-> 
+-- 
+1.7.9.5
