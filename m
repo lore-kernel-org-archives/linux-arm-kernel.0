@@ -1,15 +1,13 @@
 From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 18 Oct 2012 18:07:14 +0100
-Subject: [GIT PULL] vexpress: drivers for v3.8
-Message-ID: <1350580034.4984.21.camel@hornet>
+Date: Thu, 18 Oct 2012 18:08:45 +0100
+Subject: [GIT PULL] vexpress: fixes for v3.8
+Message-ID: <1350580125.4984.23.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Could you, please, pull new Versatile Express related drivers for 3.8?
-The hwmon driver is acked by the subsystem maintainer who asked to get
-it merged through arm-soc.
+Could you, please, pull this small Versatile Express fix for 3.8?
 
 Thanks!
 
@@ -21,25 +19,15 @@ The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
 are available in the git repository at:
 
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-drivers
+  git://git.linaro.org/people/pawelmoll/linux.git vexpress-fixes
 
-for you to fetch changes up to 790440bc90fa800ff2a4b8b5046227a2ca32c1b1:
+for you to fetch changes up to 852663d94f0cc44199c31c0e42d4801302f41705:
 
-  ARM: vexpress: Reset driver (2012-10-18 17:58:47 +0100)
+  ARM: vexpress: Make the debug UART detection more specific (2012-10-18 17:56:16 +0100)
 
 ----------------------------------------------------------------
-Pawel Moll (2):
-      hwmon: Versatile Express hwmon driver
-      ARM: vexpress: Reset driver
+Pawel Moll (1):
+      ARM: vexpress: Make the debug UART detection more specific
 
- .../devicetree/bindings/hwmon/vexpress.txt         |   23 ++
- Documentation/hwmon/vexpress                       |   34 +++
- arch/arm/mach-vexpress/reset.c                     |  141 ++++++++++++
- drivers/hwmon/Kconfig                              |    8 +
- drivers/hwmon/Makefile                             |    1 +
- drivers/hwmon/vexpress.c                           |  229 ++++++++++++++++++++
- 6 files changed, 436 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/vexpress.txt
- create mode 100644 Documentation/hwmon/vexpress
- create mode 100644 arch/arm/mach-vexpress/reset.c
- create mode 100644 drivers/hwmon/vexpress.c
+ arch/arm/include/debug/vexpress.S |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
