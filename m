@@ -1,158 +1,32 @@
-From: julien.boibessot@free.fr (julien.boibessot at free.fr)
-Date: Thu, 18 Oct 2012 11:50:26 +0200
-Subject: [PATCH v3] ARM: mxs: Add support for the Armadeus Systems APF28 module
-Message-ID: <1350553826-28057-1-git-send-email-julien.boibessot@free.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 18 Oct 2012 10:53:28 +0100
+Subject: [PATCH V2 3/3] ARM: tegra: move debug-macro.S to include/debug
+In-Reply-To: <507F1F31.2060503@wwwdotorg.org>
+References: <1350328024-30485-1-git-send-email-swarren@wwwdotorg.org>
+ <1350328024-30485-3-git-send-email-swarren@wwwdotorg.org>
+ <507EC303.1080000@gmail.com> <507EDB37.1060102@wwwdotorg.org>
+ <507F1F31.2060503@wwwdotorg.org>
+Message-ID: <20121018095328.GS21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Boibessot <julien.boibessot@armadeus.com>
+On Wed, Oct 17, 2012 at 03:12:17PM -0600, Stephen Warren wrote:
+> That implies we really do need to keep the two pieces of code completely
+> in sync, so a shared header is the right way to go. It also implies that
+> having duplicate mappings of the same physical address doesn't cause any
+> immediate obvious catastrophic problems.
+> 
+> Ways we might avoid files in arch/arm/include/debug having to use
+> relative include paths to pick up that header are:
 
-The APF28 is a small SOM built around an i.MX28 processor with 128MBytes DDR2,
-256MBytes NAND Flash and an Ethernet PHY.
+Why not take the opposite approach.  Treat the platform as setting up the
+addresses for the UART.  Then arrange for the debug macros to match that.
+Or we define a common virtual address for debug UARTs (which platforms
+would not be able to use).
 
-Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- Changes since v2 (as advised by Shawn Guo):
- * respect alphabetic order in arch/arm/boot/dts/Makefile
+> b) Rework debug-macro.S so that it isn't an include file, but rather a
+> regular top-level file.
 
- Changes since v1 (as advised by Shawn Guo):
- * add imx28-apf28.dtb to arch/arm/boot/dts/Makefile
- * fix partitions declaration for gpmi-nand in imx28-apf28.dts
-
- arch/arm/boot/dts/Makefile        |    1 +
- arch/arm/boot/dts/imx28-apf28.dts |   85 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c      |    7 +++
- 3 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c1ce813..9bca96f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -54,6 +54,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
- dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx23-olinuxino.dtb \
- 	imx23-stmp378x_devb.dtb \
-+	imx28-apf28.dtb \
- 	imx28-apx4devkit.dtb \
- 	imx28-cfa10036.dtb \
- 	imx28-cfa10049.dtb \
-diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
-new file mode 100644
-index 0000000..7eb0758
---- /dev/null
-+++ b/arch/arm/boot/dts/imx28-apf28.dts
-@@ -0,0 +1,85 @@
-+/*
-+ * Copyright 2012 Armadeus Systems - <support@armadeus.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "imx28.dtsi"
-+
-+/ {
-+	model = "Armadeus Systems APF28 module";
-+	compatible = "armadeus,imx28-apf28", "fsl,imx28";
-+
-+	memory {
-+		reg = <0x40000000 0x08000000>;
-+	};
-+
-+	apb at 80000000 {
-+		apbh at 80000000 {
-+			gpmi-nand at 8000c000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
-+				status = "okay";
-+
-+				partition at 0 {
-+					label = "u-boot";
-+					reg = <0x0 0x300000>;
-+				};
-+
-+				partition at 300000 {
-+					label = "env";
-+					reg = <0x300000 0x80000>;
-+				};
-+
-+				partition at 380000 {
-+					label = "env2";
-+					reg = <0x380000 0x80000>;
-+				};
-+
-+				partition at 400000 {
-+					label = "dtb";
-+					reg = <0x400000 0x80000>;
-+				};
-+
-+				partition at 480000 {
-+					label = "splash";
-+					reg = <0x480000 0x80000>;
-+				};
-+
-+				partition at 500000 {
-+					label = "kernel";
-+					reg = <0x500000 0x800000>;
-+				};
-+
-+				partition at d00000 {
-+					label = "rootfs";
-+					reg = <0xd00000 0xf300000>;
-+				};
-+			};
-+		};
-+
-+		apbx at 80040000 {
-+			duart: serial at 80074000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&duart_pins_a>;
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ahb at 80080000 {
-+		mac0: ethernet at 800f0000 {
-+			phy-mode = "rmii";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mac0_pins_a>;
-+			phy-reset-gpios = <&gpio4 13 0>;
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index b8c452a..9cfb25c 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -367,6 +367,11 @@ static void __init cfa10049_init(void)
- 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
- }
- 
-+static void __init apf28_init(void)
-+{
-+	enable_clk_enet_out();
-+}
-+
- static void __init mxs_machine_init(void)
- {
- 	if (of_machine_is_compatible("fsl,imx28-evk"))
-@@ -379,6 +384,8 @@ static void __init mxs_machine_init(void)
- 		apx4devkit_init();
- 	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
- 		cfa10049_init();
-+	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
-+		apf28_init();
- 
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     mxs_auxdata_lookup, NULL);
--- 
-1.7.5.4
+No, that won't work.  It's used in two places - the kernel and the
+decompressor.  Hence why it is an include file (it's not an include
+file just for the fun of it.)
