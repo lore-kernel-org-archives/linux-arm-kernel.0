@@ -1,54 +1,78 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 18 Oct 2012 16:13:43 +0000
-Subject: [PATCH 3/5] net: davinci_mdio: Fix type mistake in calling
- runtime-pm api
-In-Reply-To: <62191bdcb85ab48f5ea16fe69c2f92aa9e9a0a8b.1350327325.git.richardcochran@gmail.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
- <62191bdcb85ab48f5ea16fe69c2f92aa9e9a0a8b.1350327325.git.richardcochran@gmail.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB43AE5@DBDE01.ent.ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 18 Oct 2012 11:14:56 -0500
+Subject: discrepancy while save and restore of debounce registers
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EAAA89B@DBDE01.ent.ti.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EAA9A7C@DBDE01.ent.ti.com>
+ <507F1F21.8040206@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAAA89B@DBDE01.ent.ti.com>
+Message-ID: <50802B00.6090907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 00:46:33, Richard Cochran wrote:
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> By mistake (most likely a copy-paste), instead of pm_runtime_get_sync()
-> api, driver is calling pm_runtime_put_sync() api in resume callback
-> function. The bug was introduced by commit id (ae2c07aaf74:
-> davinci_mdio: runtime PM support).
-> 
-> Now, the reason why it didn't impact functionality is, the patch has
-> been tested on AM335x-EVM and BeagleBone platform while submitting;
-> and in case of AM335x the MDIO driver doesn't control the module
-> enable/disable part, which is handled by CPSW driver.
-> 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+Hi Gururaja,
 
+On 10/18/2012 12:31 AM, Hebbar, Gururaja wrote:
+> Jon,
+> 
+> On Thu, Oct 18, 2012 at 02:42:01, Hunter, Jon wrote:
 
-Thanks for submitting the patches, I couldn't able to do it for almost 2 
-weeks now. I really appreciate it.
+[snip]
 
-Thanks,
-Vaibhav
-> ---
->  drivers/net/ethernet/ti/davinci_mdio.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+>>> My doubt/questions are
+>>> 1. Why should debounce registers be updated only when it's accessed previously?
+>>
+>> If debounce is not being used by any of the gpios, then there is no need
+>> to restore them as there are no bits set. So this makes sense and saves
+>> a couple register writes.
 > 
-> diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-> index 51a96db..ae74280 100644
-> --- a/drivers/net/ethernet/ti/davinci_mdio.c
-> +++ b/drivers/net/ethernet/ti/davinci_mdio.c
-> @@ -465,7 +465,7 @@ static int davinci_mdio_resume(struct device *dev)
->  	u32 ctrl;
->  
->  	spin_lock(&data->lock);
-> -	pm_runtime_put_sync(data->dev);
-> +	pm_runtime_get_sync(data->dev);
->  
->  	/* restart the scan state machine */
->  	ctrl = __raw_readl(&data->regs->control);
-> -- 
-> 1.7.2.5
+> What I want to know is that other than saving register writes, is there any
+> other important stuff that specifies this requirement.
+
+>From a HW perspective, none that I can see.
+
+>From a SW perspective, yes, as I mentioned if you restore these
+registers without first initialising the context variables where these
+registers are stored, then you may be restoring unknown values to the
+registers and that is bad.
+
+>>> 2. What is the relation between updating debounce registers and crash seen on
+>>> others registers? 
+>>
+>> This I am not sure about. I gave this a quick try on my omap3430 beagle
+>> board, but I did not see any side-effects from doing this. However, if
+>> you are always restoring the debounce context regardless of whether
+>> debounce is being used, then you could be writing bad values to the
+>> debounce registers as the context variables bank->context.debouce and
+>> bank->context.debouce_en may not initialised. So that is bad. However,
+>> that said I am still not sure how this could cause a crash.
+>>
+>> Can you share more details on ...
 > 
+> Sorry for missing below details in first post.
 > 
+>> 1. The OMAP platform you are using?
+> 
+> I was trying this on TI AM335x platform (repo below). On AM335x EVM board
+> 
+> http://arago-project.org/git/projects/?p=linux-am33x.git;a=shortlog;
+> h=refs/heads/v3.2-staging
+> 
+>> 2. What linux distro/environment you are using?
+> 
+> Arago AM335x PSP release (linux 3.2 + am335x patch-set)
+> 
+>> 3. If there are any specific steps to reproduce this 100% of the time?
+> 
+> On top of this tree, try suspend/resume using "echo mem > /syspower/state"
+
+I have a beagle-bone but unfortunately, suspend does not appear to be
+supported in the mainline kernel yet so I am unable to test this on the
+am335x on the mainline.
+
+Have you compared the gpio driver from your v3.2 branch with the current
+mainline to see how different this code is? Ideally, it would be good to
+test on the mainline kernel for another data point to see if this is
+local to your branch.
+
+Cheers
+Jon
