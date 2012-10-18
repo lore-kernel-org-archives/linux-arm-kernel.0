@@ -1,30 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 18 Oct 2012 09:52:08 +0100
-Subject: [PATCH] dma: add new DMA control commands
-In-Reply-To: <507FA595.4020507@freescale.com>
-References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
- <1350541111.5263.3.camel@vkoul-udesk3> <507FA595.4020507@freescale.com>
-Message-ID: <20121018085208.GR21164@n2100.arm.linux.org.uk>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 18 Oct 2012 17:06:55 +0800
+Subject: [PATCH 01/10] pinctrl: use postcore_initcall
+Message-ID: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 02:45:41PM +0800, Huang Shijie wrote:
-> ? 2012?10?18? 14:18, Vinod Koul ??:
->> Why cant you do start (prepare clock etc) when you submit the descriptor
->> to dmaengine. Can be done in tx_submit callback.
->> Similarly remove the clock when dma transaction gets completed.
-> I ever thought this method too.
->
-> But it will become low efficient in the following case:
->
->   Assuming the gpmi-nand driver has to read out 1024 pages in one  
-> _SINGLE_ read operation.
-> The gpmi-nand will submit the descriptor to dmaengine per page. So with  
-> your method,
-> the system will repeat the enable/disable dma clock 1024 time. At every  
-> enable/disable dma clock,
-> the system has to enable the clock chain and it's parents ...
+Since pins are configured in device driver, pinctrl driver should be
+loaded by those device driver. module_platform_driver() only declares
+pinctrl driver is in module_initcall privilege. Use postcore_initcall
+privilege instead.
 
-And what if you stop using clk_prepare_enable(), and prepare the clock
-when the channel is requested and only use clk_enable() in the tx_submit
-method?
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ drivers/pinctrl/pinctrl-single.c |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 76a4260..64d109a 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -980,7 +980,17 @@ static struct platform_driver pcs_driver = {
+ 	},
+ };
+ 
+-module_platform_driver(pcs_driver);
++static int __init pcs_driver_init(void)
++{
++	return platform_driver_register(&pcs_driver);
++}
++postcore_initcall(pcs_driver_init);
++
++static void __exit pcs_driver_exit(void)
++{
++	platform_driver_unregister(&pcs_driver);
++}
++module_exit(pcs_driver_exit);
+ 
+ MODULE_AUTHOR("Tony Lindgren <tony@atomide.com>");
+ MODULE_DESCRIPTION("One-register-per-pin type device tree based pinctrl driver");
+-- 
+1.7.0.4
