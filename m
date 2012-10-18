@@ -1,9 +1,9 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 17 Oct 2012 17:16:58 -0700
-Subject: [GIT PULL 1/3] ARM: Dove: fixes for v3.7
-In-Reply-To: <E1TOZFe-0003sB-2E@merlin.infradead.org>
-References: <E1TOZFe-0003sB-2E@merlin.infradead.org>
-Message-ID: <CAOesGMgBy=W7N9hHG43GzsN+LO-BpjFMK7u-kcXno_RfrtjchQ@mail.gmail.com>
+Date: Wed, 17 Oct 2012 17:17:56 -0700
+Subject: [GIT PULL 2/3] ARM: mvebu: fix for v3.7
+In-Reply-To: <E1TOZGE-0003zX-D8@merlin.infradead.org>
+References: <E1TOZGE-0003zX-D8@merlin.infradead.org>
+Message-ID: <CAOesGMg5baZ9_z6UEP68f0tVoeyMdGqi-55cVnGNsV_KSHsv_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,9 +14,12 @@ On Wed, Oct 17, 2012 at 12:25 PM, Jason Cooper <jason@lakedaemon.net> wrote:
 >
 > are available in the git repository at:
 >
->   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_dove_late_fixes_for_v3.7
+>   git://git.infradead.org/users/jcooper/linux.git tags/mvebu_gpio_fixes_for_v3.7
 
-Pulled into fixes. Thanks.
+
+Pulled into fixes. As mentioned on IRC, you could have done a combined
+branch with all patches here, splitting them up is a little overkill.
+But either way is alright.
 
 
 -Olof
