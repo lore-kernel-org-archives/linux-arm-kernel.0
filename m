@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Oct 2012 20:21:52 +0200
-Subject: [PATCH 03/10] tty: pxa: configure pin
-In-Reply-To: <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+Date: Thu, 18 Oct 2012 20:22:16 +0200
+Subject: [PATCH 04/10] i2c: pxa: configure pins
+In-Reply-To: <1350551224-12857-4-git-send-email-haojian.zhuang@gmail.com>
 References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CACRpkdYdutBG6-35v6zmO=wJZ2aKSdf7oZpJhDm4LMTk6hwtHg@mail.gmail.com>
+ <1350551224-12857-4-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <CACRpkdbz=jk2RS0OZ2nrk1k5Bmg=xmSYFtiDXhUGyiYum510jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
