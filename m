@@ -1,178 +1,51 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Thu, 18 Oct 2012 17:15:42 +0100
-Subject: [RFC PATCH 6/6] ARM: mm: Transparent huge page support for non-LPAE
- systems.
-In-Reply-To: <1350576942-25299-1-git-send-email-steve.capper@arm.com>
-References: <1350576942-25299-1-git-send-email-steve.capper@arm.com>
-Message-ID: <1350576942-25299-7-git-send-email-steve.capper@arm.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 18 Oct 2012 18:19:44 +0200
+Subject: [PATCH 2/3] RTC: omap-rtc: enable pm_runtime
+In-Reply-To: <50802A87.9010409@ti.com>
+References: <1350575631-15523-1-git-send-email-zonque@gmail.com>
+ <1350575631-15523-2-git-send-email-zonque@gmail.com>
+ <50802A87.9010409@ti.com>
+Message-ID: <50802C20.9040408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Much of the required code for THP has been implemented in the earlier non-LPAE
-HugeTLB patch.
+On 18.10.2012 18:12, Vaibhav Hiremath wrote:
+> 
+> 
+> On 10/18/2012 9:23 PM, Daniel Mack wrote:
+>> This is needed as preparation for platforms where using pm runtime usage
+>> is mandatory.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> 
+> It looks like, you just duplicated effort here.
+> RTC patches have been already submitted quite some time back for AM33xx,
+> probably you missed to do google before spending time on this.
+> 
+> Patch Series -
+> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg23253.html
 
-One more domain bits is used (to store whether or not the THP is splitting).
+Heh, damn :) I would have thought that so shortly after the merge
+window, that code either went in already or is yet missing. Oh well.
 
-Some THP helper functions are defined; and we have to re-define pmd_page such
-that it distinguishes between page tables and sections.
+> Denial,
+> It would be really helpful if you could test these patches and ack them.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
----
- arch/arm/Kconfig                      |    2 +-
- arch/arm/include/asm/pgtable-2level.h |   68 ++++++++++++++++++++++++++++++++-
- arch/arm/include/asm/pgtable-3level.h |    2 +
- arch/arm/include/asm/pgtable.h        |    7 +++-
- 4 files changed, 75 insertions(+), 4 deletions(-)
+Ok, will do tomorrow. What's missing there is support for writing to the
+OMAP_RTC_OSC_REG (path 3/3 in my series). Would like me to rebase the
+functionality? I need thatkind of setup for my board ...
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9621d5f..d459673 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1773,7 +1773,7 @@ config SYS_SUPPORTS_HUGETLBFS
- 
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
-        def_bool y
--       depends on ARM_LPAE
-+       depends on SYS_SUPPORTS_HUGETLBFS
- 
- source "mm/Kconfig"
- 
-diff --git a/arch/arm/include/asm/pgtable-2level.h b/arch/arm/include/asm/pgtable-2level.h
-index 34f4775..67eabb4 100644
---- a/arch/arm/include/asm/pgtable-2level.h
-+++ b/arch/arm/include/asm/pgtable-2level.h
-@@ -179,6 +179,13 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- 		clean_pmd_entry(pmdp);	\
- 	} while (0)
- 
-+
-+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-+#define _PMD_HUGE(pmd) ((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
-+#else
-+#define _PMD_HUGE(pmd) (0)
-+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
-+
- /* we don't need complex calculations here as the pmd is folded into the pgd */
- #define pmd_addr_end(addr,end) (end)
- 
-@@ -197,7 +204,6 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- 
- #define HPAGE_SHIFT             PMD_SHIFT
- #define HPAGE_SIZE              (_AC(1, UL) << HPAGE_SHIFT)
--#define HPAGE_MASK              (~(HPAGE_SIZE - 1))
- #define HUGETLB_PAGE_ORDER      (HPAGE_SHIFT - PAGE_SHIFT)
- 
- #define HUGE_LINUX_PTE_COUNT       (PAGE_OFFSET >> HPAGE_SHIFT)
-@@ -209,6 +215,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
-  */
- #define PMD_DSECT_DIRTY		(_AT(pmdval_t, 1) << 5)
- #define PMD_DSECT_AF		(_AT(pmdval_t, 1) << 6)
-+#define PMD_DSECT_SPLITTING	(_AT(pmdval_t, 1) << 7)
- 
- #define PMD_BIT_FUNC(fn,op) \
- static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
-@@ -261,8 +268,67 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
- 	return __pmd(pmdval);
- }
- 
-+#else
-+#define	HPAGE_SIZE	0
- #endif /* CONFIG_SYS_SUPPORTS_HUGETLBFS */
- 
-+#define HPAGE_MASK              (~(HPAGE_SIZE - 1))
-+
-+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-+#define pmd_mkhuge(pmd)		(__pmd((pmd_val(pmd) & ~PMD_TYPE_MASK) | PMD_TYPE_SECT))
-+
-+PMD_BIT_FUNC(mkold, &= ~PMD_DSECT_AF);
-+PMD_BIT_FUNC(mksplitting, |= PMD_DSECT_SPLITTING);
-+PMD_BIT_FUNC(mkdirty, |= PMD_DSECT_DIRTY);
-+PMD_BIT_FUNC(mkyoung, |= PMD_DSECT_AF);
-+PMD_BIT_FUNC(mkwrite, |= PMD_SECT_AP_WRITE);
-+PMD_BIT_FUNC(mknotpresent, &= ~PMD_TYPE_MASK);
-+
-+#define pmd_trans_splitting(pmd)	(pmd_val(pmd) & PMD_DSECT_SPLITTING)
-+#define pmd_young(pmd)			(pmd_val(pmd) & PMD_DSECT_AF)
-+#define pmd_write(pmd)			(pmd_val(pmd) & PMD_SECT_AP_WRITE)
-+#define pmd_trans_huge(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
-+
-+static inline unsigned long pmd_pfn(pmd_t pmd)
-+{
-+	/*
-+	 * for a section, we need to mask off more of the pmd
-+	 * before looking up the pfn
-+	 */
-+	if ((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
-+		return __phys_to_pfn(pmd_val(pmd) & HPAGE_MASK);
-+	else
-+		return __phys_to_pfn(pmd_val(pmd) & PHYS_MASK);
-+}
-+
-+static inline pmd_t pfn_pmd(unsigned long pfn, pgprot_t prot)
-+{
-+	pmd_t pmd = __pmd(__pfn_to_phys(pfn) | PMD_SECT_AP_READ | PMD_SECT_nG);
-+
-+	return pmd_modify(pmd, prot);
-+}
-+
-+#define mk_pmd(page,prot) pfn_pmd(page_to_pfn(page),prot);
-+
-+static inline int has_transparent_hugepage(void)
-+{
-+	return 1;
-+}
-+
-+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
-+
-+static inline struct page *pmd_page(pmd_t pmd)
-+{
-+	/*
-+	 * for a section, we need to mask off more of the pmd
-+	 * before looking up the page as it is a section descriptor.
-+	 */
-+	if (_PMD_HUGE(pmd))
-+		return phys_to_page(pmd_val(pmd) & HPAGE_MASK);
-+
-+	return phys_to_page(pmd_val(pmd) & PHYS_MASK);
-+}
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* _ASM_PGTABLE_2LEVEL_H */
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 31c071f..8360814 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -197,6 +197,8 @@ PMD_BIT_FUNC(mknotpresent, &= ~PMD_TYPE_MASK);
- #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
- #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
- 
-+#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
-+
- static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
- {
- 	const pmdval_t mask = PMD_SECT_USER | PMD_SECT_XN | PMD_SECT_RDONLY;
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 767aa7c..2d96381 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -169,11 +169,14 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
- 
- static inline pte_t *pmd_page_vaddr(pmd_t pmd)
- {
-+#ifdef SYS_SUPPORTS_HUGETLBFS
-+	if ((pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT)
-+		return __va(pmd_val(pmd) & HPAGE_MASK);
-+#endif
-+
- 	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
- }
- 
--#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
--
- #ifndef CONFIG_HIGHPTE
- #define __pte_map(pmd)		pmd_page_vaddr(*(pmd))
- #define __pte_unmap(pte)	do { } while (0)
--- 
-1.7.9.5
+
+> Just FYI, we have bunch of parallel activities going inside team to
+> upstream all the patches/module/drivers/features, so to avoid such
+> duplication of effort, I suggest you to google for the patches or ping
+> on mailing list.
+
+Yes, it's more difficult to participate in the AM33xx code than in other
+platforms. I'm not complaining about other doing all the hard work
+though, it's just a little different.
+
+Anyway - thanks for the heads-up!
+
+
+Daniel
