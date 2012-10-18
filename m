@@ -1,51 +1,41 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 18 Oct 2012 18:19:44 +0200
-Subject: [PATCH 2/3] RTC: omap-rtc: enable pm_runtime
-In-Reply-To: <50802A87.9010409@ti.com>
-References: <1350575631-15523-1-git-send-email-zonque@gmail.com>
- <1350575631-15523-2-git-send-email-zonque@gmail.com>
- <50802A87.9010409@ti.com>
-Message-ID: <50802C20.9040408@gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Thu, 18 Oct 2012 21:49:34 +0530
+Subject: 3.7-rc-1 Release Causing application failure for compilation
+Message-ID: <CA+V-a8uj4wSz60Ov8S3MpSrUe-D5+OcpVsFjURzSEcE6VdvGGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.10.2012 18:12, Vaibhav Hiremath wrote:
-> 
-> 
-> On 10/18/2012 9:23 PM, Daniel Mack wrote:
->> This is needed as preparation for platforms where using pm runtime usage
->> is mandatory.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> 
-> It looks like, you just duplicated effort here.
-> RTC patches have been already submitted quite some time back for AM33xx,
-> probably you missed to do google before spending time on this.
-> 
-> Patch Series -
-> http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg23253.html
+Hi All,
 
-Heh, damn :) I would have thought that so shortly after the merge
-window, that code either went in already or is yet missing. Oh well.
+I have updated to 3.7-rc1 kernel version with latest head with
+commit-id 43c422eda99b894f18d1cca17bcd2401efaf7bd0
+but when I try to cross compile the Application I am getting following errors.
 
-> Denial,
-> It would be really helpful if you could test these patches and ack them.
+/home/plad/ti/linus/linus/include/linux/types.h:14:26: error:
+conflicting types for 'fd_set'
+/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/select.h:78:5:
+note: previous declaration of 'fd_set' was here
+/home/plad/ti/linus/linus/include/linux/types.h:15:25: error:
+conflicting types for 'dev_t'
+/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/types.h:61:17:
+note: previous declaration of 'dev_t' was here
+/home/plad/ti/linus/linus/include/linux/types.h:17:26: error:
+conflicting types for 'mode_t'
+/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/types.h:71:18:
+note: previous declaration of 'mode_t' was here
+/home/plad/ti/linus/linus/include/linux/types.h:25:26: error:
+conflicting types for 'timer_t'
+/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/time.h:104:19:
+note: previous declaration of 'timer_t' was here
+/home/plad/ti/linus/linus/include/linux/types.h:134:23: error:
+conflicting types for 'blkcnt_t'
+/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/types.h:236:20:
+note: previous declaration of 'blkcnt_t' was here
 
-Ok, will do tomorrow. What's missing there is support for writing to the
-OMAP_RTC_OSC_REG (path 3/3 in my series). Would like me to rebase the
-functionality? I need thatkind of setup for my board ...
+I use the codesourcery toolchain for cross compiling the applications
+for ARM. The same compiler is used to  build the uImage for ARM, but
+when I try building the apps I see this issue. Can any help me out in
+fixing this.
 
-
-> Just FYI, we have bunch of parallel activities going inside team to
-> upstream all the patches/module/drivers/features, so to avoid such
-> duplication of effort, I suggest you to google for the patches or ping
-> on mailing list.
-
-Yes, it's more difficult to participate in the AM33xx code than in other
-platforms. I'm not complaining about other doing all the hard work
-though, it's just a little different.
-
-Anyway - thanks for the heads-up!
-
-
-Daniel
+Regards,
+--Prabhakar Lad
