@@ -1,36 +1,34 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Wed, 17 Oct 2012 18:52:37 -0500
-Subject: [PATCH v3 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
-In-Reply-To: <20121016172258.GT15569@atomide.com>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
- <20121016172258.GT15569@atomide.com>
-Message-ID: <CALLhW=5Fmjhd+w57Dmm2BLmBoHuC7_jprJndkw1dHoVzVu4TOg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 17 Oct 2012 17:04:30 -0700
+Subject: [GIT PULL] ARM: tegra: fixes for 3.7-rc2
+In-Reply-To: <1350515426-31517-1-git-send-email-swarren@wwwdotorg.org>
+References: <1350515426-31517-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAOesGMgZwhZrLeGnK0LdgOFE9yjy2HO==6BWX1pxUmvxM62Waw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 October 2012 12:22, Tony Lindgren <tony@atomide.com> wrote:
-> * Omar Ramirez Luna <omar.luna@linaro.org> [121011 18:07]:
->> These patches are needed for remoteproc to work on OMAP4.
->>
->> Introduced iommu hwmod support for OMAP3 (iva, isp) and
->> OMAP4 (ipu, dsp), along with the corresponding runtime PM
->> and routines to deassert reset lines, enable/disable clocks
->> and configure sysc registers.
->>
->> Although IOMMU hwmod patches were already submitted in the past,
->> this series adds few more changes, like:
->> - New reset handling.
->> - Save and restore context code rework.
->> - Device tree bindings for OMAP3 and OMAP4.
->>
->> For this series I just dropped the patches already included in
->> mainline.
+On Wed, Oct 17, 2012 at 4:10 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> This branch contains a couple small fixes for Tegra for 3.7.
 >
-> These will need to be rebased on omap-for-v3.8/cleanup-headers-iommu
-> when I have that pushed out as that removes plat/*iommu*.h files.
+> * A fix for another clock rate calculation overflow
+> * A revert of a change that removed the "timer" clock on Tegra, coupled
+>   with a fix for the confusing symbol name clash that triggered it.
+>
+> ----------------------------------------------------------------
+>
+> BTW, I signed this tag with my swarren at nvidia.com key; it's a different key
+> to the one I used before, but has the same signatures and should show up on
+> all the same keyservers.
+>
+> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+>
+>   Linux 3.7-rc1
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-fixes-for-rc2
 
-Ok, will wait and rebase on top of it.
+Pulled into fixes. Thanks!
 
-Thanks,
 
-Omar
+-Olof
