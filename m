@@ -1,122 +1,167 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 18 Oct 2012 05:20:46 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc1
-Message-ID: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 18 Oct 2012 13:26:30 +0800
+Subject: [PATCH v2] ARM: mxs: Add support for the Armadeus Systems APF28
+ module
+In-Reply-To: <1350492832-7044-1-git-send-email-julien.boibessot@free.fr>
+References: <1350492832-7044-1-git-send-email-julien.boibessot@free.fr>
+Message-ID: <20121018052626.GD4378@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 17, 2012 at 06:53:52PM +0200, julien.boibessot at free.fr wrote:
+> From: Julien Boibessot <julien.boibessot@armadeus.com>
+> 
+> The APF28 is a small SOM built around an i.MX28 processor with 128MBytes DDR2,
+> 256MBytes NAND Flash and an Ethernet PHY.
+> 
+> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+>  Changes since v1 (as advised by Shawn Guo):
+>  * add imx28-apf28.dtb to arch/arm/boot/dts/Makefile
+>  * fix partitions declaration for gpmi-nand in imx28-apf28.dts
+> 
+>  arch/arm/boot/dts/Makefile        |    3 +-
+>  arch/arm/boot/dts/imx28-apf28.dts |   85 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mxs/mach-mxs.c      |    7 +++
+>  3 files changed, 94 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index c1ce813..5baf5a0 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -59,7 +59,8 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+>  	imx28-cfa10049.dtb \
+>  	imx28-evk.dtb \
+>  	imx28-m28evk.dtb \
+> -	imx28-tx28.dtb
+> +	imx28-tx28.dtb \
+> +	imx28-apf28.dtb
 
-Here are some basic OMAP test results for Linux v3.7-rc1.
-Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+Please maintain the alphabet order on the list.
 
+Shawn
 
-Changes from previous tests
----------------------------
-
-Kernel configs have been reorganized and updated.  AM335x Beaglebone and
-OMAP4460 Pandaboard-ES boards have been added to the testbed.
-
-
-Passing tests
--------------
-
-Boot to userspace: 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-                   4430es2panda, 5912osk, am335xbone
-
-PM ret/off, suspend + dynamic idle: (none)
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-Boot tests:
-
-* 2430sdp: vfp_reload_hw oops during MMC initialization
-  - Kernel attempts to save FP registers that don't exist; fix posted:
-    - http://www.spinics.net/lists/arm-kernel/msg200646.html
-
-Other:
-
-* 2420N800: powers down 30 seconds after boot
-  - Presumably due to missing CBUS patches for watchdog control
-  - http://lkml.org/lkml/2012/9/3/265
-
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* 2420n800: boot hangs during UART initialization
-  - http://lkml.org/lkml/2012/9/11/454
-  - Various attempts at fixes posted; etiology known; issue still unresolved
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-
-* CM-T3517: boot hangs with MMC boot
-  - Due to missing MMC setup in board file
-
-PM tests:
-
-* 3530es3beagle, 37xxevm, 3730beaglexm: I2C fails during resume from suspend
-  - Causes MMC to become unusable since regulators are not reenabled
-  - Can be worked around by reverting the I2C driver conversion to
-    threaded IRQs:
-    - http://marc.info/?l=linux-i2c&m=135026587102887&w=2
-  - Appears to be due to an accounting problem; under discussion:
-    - http://marc.info/?l=linux-arm-kernel&m=135042360725821&w=2
-
-* 3530es3beagle: hangs during off-mode dynamic idle test
-  - Unknown cause; not investigated
-
-* 37xx EVM: CORE not entering dynamic off-idle
-  - Cause unknown; dynamic retention-idle seems to work; system suspend to 
-    off works
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock gate ("debug ignore_loglevel")
-  - Not shown in the current test logs; cause unknown
-
-
-Kernel size/memory differences
-------------------------------
-
-vmlinux object size
-(delta in bytes from test_v3.6 (a0d271cbfed1dd50278c6b06bead3d00ba0a88f9)):
-   text     data      bss    total  kernel
-+118682   -66688    +2280   +54274  am33xx_only
- +57789   -88928    +2148   -28991  n800_multi_omap2xxx
- +58669   -86432    +2180   -25583  n800_only_a
- +54196    +4616     -136   +58676  omap1_defconfig
- +53420    +3096     -104   +56412  omap1_defconfig_1510innovator_only
- +54384    +3112     -168   +57328  omap1_defconfig_5912osk_only
-+128332   -67728    +2144   +62748  omap2plus_defconfig
-+106894   -83664    +1992   +25222  omap2plus_defconfig_2430sdp_only
-+128296   -67744    +2080   +62632  omap2plus_defconfig_cpupm
-+130151   -67552    +1824   +64423  omap2plus_defconfig_no_pm
-+107810   -88848    +1952   +20914  omap2plus_defconfig_omap2_4_only
-+107293   -88232    +2016   +21077  omap2plus_defconfig_omap3_4_only
-+113921   -66976    +2348   +49293  rmk_omap3430_ldp_oldconfig
-+106849   -47216    +2760   +62393  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v3.6 (a0d271cbfed1dd50278c6b06bead3d00ba0a88f9))
-  avail  rsrvd   high  freed  board          kconfig
-    20k   -20k      .  -152k  2420n800       omap2plus_defconfig
-   -60k    60k      .     4k  2430sdp        omap2plus_defconfig
-   -60k    60k      .     4k  3517evm        omap2plus_defconfig
-   -60k    60k      .     4k  3530es3beagle  omap2plus_defconfig
-   -60k    60k      .     4k  3730beaglexm   omap2plus_defconfig
-   -60k    60k      .     4k  37xxevm        omap2plus_defconfig
-   -60k    60k      .     4k  4430es2panda   omap2plus_defconfig
-   -52k    52k      .      .  5912osk        omap2plus_defconfig
-   -60k    60k      .      .  cmt3517        omap2plus_defconfig
-
-
-- Paul
+>  dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>  	omap3-beagle-xm.dtb \
+>  	omap3-evm.dtb \
+> diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
+> new file mode 100644
+> index 0000000..7eb0758
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-apf28.dts
+> @@ -0,0 +1,85 @@
+> +/*
+> + * Copyright 2012 Armadeus Systems - <support@armadeus.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "imx28.dtsi"
+> +
+> +/ {
+> +	model = "Armadeus Systems APF28 module";
+> +	compatible = "armadeus,imx28-apf28", "fsl,imx28";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;
+> +	};
+> +
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			gpmi-nand at 8000c000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
+> +				status = "okay";
+> +
+> +				partition at 0 {
+> +					label = "u-boot";
+> +					reg = <0x0 0x300000>;
+> +				};
+> +
+> +				partition at 300000 {
+> +					label = "env";
+> +					reg = <0x300000 0x80000>;
+> +				};
+> +
+> +				partition at 380000 {
+> +					label = "env2";
+> +					reg = <0x380000 0x80000>;
+> +				};
+> +
+> +				partition at 400000 {
+> +					label = "dtb";
+> +					reg = <0x400000 0x80000>;
+> +				};
+> +
+> +				partition at 480000 {
+> +					label = "splash";
+> +					reg = <0x480000 0x80000>;
+> +				};
+> +
+> +				partition at 500000 {
+> +					label = "kernel";
+> +					reg = <0x500000 0x800000>;
+> +				};
+> +
+> +				partition at d00000 {
+> +					label = "rootfs";
+> +					reg = <0xd00000 0xf300000>;
+> +				};
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			duart: serial at 80074000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&duart_pins_a>;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	ahb at 80080000 {
+> +		mac0: ethernet at 800f0000 {
+> +			phy-mode = "rmii";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&mac0_pins_a>;
+> +			phy-reset-gpios = <&gpio4 13 0>;
+> +			status = "okay";
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+> index b8c452a..9cfb25c 100644
+> --- a/arch/arm/mach-mxs/mach-mxs.c
+> +++ b/arch/arm/mach-mxs/mach-mxs.c
+> @@ -367,6 +367,11 @@ static void __init cfa10049_init(void)
+>  	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+>  }
+>  
+> +static void __init apf28_init(void)
+> +{
+> +	enable_clk_enet_out();
+> +}
+> +
+>  static void __init mxs_machine_init(void)
+>  {
+>  	if (of_machine_is_compatible("fsl,imx28-evk"))
+> @@ -379,6 +384,8 @@ static void __init mxs_machine_init(void)
+>  		apx4devkit_init();
+>  	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
+>  		cfa10049_init();
+> +	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
+> +		apf28_init();
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table,
+>  			     mxs_auxdata_lookup, NULL);
+> -- 
+> 1.7.5.4
+> 
