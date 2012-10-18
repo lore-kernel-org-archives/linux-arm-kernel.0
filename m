@@ -1,70 +1,41 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Thu, 18 Oct 2012 18:39:09 +0000
-Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <50804AC7.3000309@ti.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
- <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
- <507DB9EC.9060407@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB43B17@DBDE01.ent.ti.com>
- <5080315F.8090802@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB43D0F@DBDE01.ent.ti.com>
- <50804AC7.3000309@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB43DBA@DBDE01.ent.ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 18 Oct 2012 20:39:30 +0200
+Subject: 3.7-rc-1 Release Causing application failure for compilation
+In-Reply-To: <CA+V-a8uj4wSz60Ov8S3MpSrUe-D5+OcpVsFjURzSEcE6VdvGGQ@mail.gmail.com>
+References: <CA+V-a8uj4wSz60Ov8S3MpSrUe-D5+OcpVsFjURzSEcE6VdvGGQ@mail.gmail.com>
+Message-ID: <20121018183930.GA4048@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 00:00:31, Hunter, Jon wrote:
-> 
-> On 10/18/2012 01:04 PM, Hiremath, Vaibhav wrote:
-> > On Thu, Oct 18, 2012 at 22:12:07, Hunter, Jon wrote:
-> 
-> ...
-> 
-> >> Yes, but do you also see the bug that is hiding in gpmc_mem_init()?
-> >>
-> >> My point is to highlight this and not hide it, so that we can fix it
-> >> now. Otherwise if we wait until we enable the gpmc driver with DT and
-> >> this could hinder the DT migration later.
-> >>
-> > 
-> > As I already mentioned in my previous response, your patch is required 
-> > irrespective of this patch. I would consider your patch as a cleanup patch.
-> > 
-> > 
-> > Both the patches are independent, your patch is handling the error path 
-> > properly, whereas, my patch makes sure that you don't unnecessarily probe 
-> > GPMC if you are booting from DT and GPMC node is not present, as described 
-> > above.
-> 
-> Your patch hides a bug. That's my point. How do you expect am335x ever
-> to support gpmc devices if this bug is not addressed?
-> 
+Hello Prabhakar Lad,
 
-Jon,
-May be my commit description was mis-leading to you.
-I am not commenting anything on your bug-fix, but do not agree that it is 
-anything to do with hiding a bug.
-
-I only agree with you on one point, if someone wants to change the board-
-file to use GPMC with DT boot mode, then he will not be able to use it.
-
-> So I think that you are over-simplifying it when you say that my patch
-> is just a clean-up patch. I agree that it is adding appropriate error
-> handling, but it also highlights the presence of a bug by allowing the
-> probe to fail.
+On Thu, Oct 18, 2012 at 09:49:34PM +0530, Prabhakar Lad wrote:
+> I have updated to 3.7-rc1 kernel version with latest head with
+> commit-id 43c422eda99b894f18d1cca17bcd2401efaf7bd0
+> but when I try to cross compile the Application I am getting following errors.
 > 
-> Anyway, I don't care to debate this any further, 
+> /home/plad/ti/linus/linus/include/linux/types.h:14:26: error:
+> conflicting types for 'fd_set'
+> /home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/select.h:78:5:
+> note: previous declaration of 'fd_set' was here
+> /home/plad/ti/linus/linus/include/linux/types.h:15:25: error:
 
-Me neither...
+[snip]
 
-> we just need to fix
-> gpmc_mem_init().
-> 
+> I use the codesourcery toolchain for cross compiling the applications
+> for ARM. The same compiler is used to  build the uImage for ARM, but
+> when I try building the apps I see this issue. Can any help me out in
+> fixing this.
 
-Agreed, and that's what your patch rightly doing it.
+It seems that you are including kernel headers directly in your userspace 
+code. Don't do that. Types defined in kernel headers conflict with types 
+defined in your toolchain's kernel headers. Instead, just use the headers that 
+are part of your toolchain, which in turn include kernel headers that your 
+toolchain was built with.
 
-Thanks,
-Vaibhav
+baruch
 
-> Jon
-> 
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
