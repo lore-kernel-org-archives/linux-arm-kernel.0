@@ -1,35 +1,18 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 18 Oct 2012 16:43:56 -0600
-Subject: [PATCH 3/5] ARM: tegra: fix clock entry of slink controller
-In-Reply-To: <1350557795-31487-4-git-send-email-ldewangan@nvidia.com>
-References: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
- <1350557795-31487-4-git-send-email-ldewangan@nvidia.com>
-Message-ID: <5080862C.9030203@wwwdotorg.org>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Thu, 18 Oct 2012 15:46:35 -0700
+Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
+In-Reply-To: <20121018222046.GA28541@animalcreek.com>
+References: <20121018222046.GA28541@animalcreek.com>
+Message-ID: <20121018224635.GA28751@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2012 04:56 AM, Laxman Dewangan wrote:
-> Fix the driver name, connection name and clock name
-> for slink controller clocks in clock table of
-> Tegra20 and Tegra30.
+On Thu, Oct 18, 2012 at 03:20:46PM -0700, Mark A. Greer wrote:
 
-The patch subject isn't entirely accurate here; this patch isn't just
-about fixing clock entries.
-
-> diff --git a/arch/arm/mach-tegra/board-dt-tegra20.c b/arch/arm/mach-tegra/board-dt-tegra20.c
-
-> @@ -90,6 +90,10 @@ struct of_dev_auxdata tegra20_auxdata_lookup[] __initdata = {
->  		       &tegra_ehci3_pdata),
->  	OF_DEV_AUXDATA("nvidia,tegra20-apbdma", TEGRA_APB_DMA_BASE, "tegra-apbdma", NULL),
->  	OF_DEV_AUXDATA("nvidia,tegra20-pwm", TEGRA_PWFM_BASE, "tegra-pwm", NULL),
-> +	OF_DEV_AUXDATA("nvidia,tegra20-slink", TEGRA_SLINK1_BASE, "spi-tegra-slink.0", NULL),
-
-Here, can't we just use the existing device names in the clock files...
-
-So we can completely drop the changes to these two files:
-
-> diff --git a/arch/arm/mach-tegra/tegra20_clocks_data.c b/arch/arm/mach-tegra/tegra20_clocks_data.c
-> diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
-
-The device names will hopefully be irrelevant once we're able to use
-DT-based clock lookups.
+> This patch seems fairly stable but I've only tested omap-sham (crypto)
+> and omap_hsmmc (mmc) on an am37x EVM.  I also enabled burst mode but
+> that made the system unstable when exercising either omap-sham or
+> omap_hsmmc.  I'm unaware of any errata that would make this an unwanted
+> modification but I haven't checked all of the SoCs.  Are there other
+> reasons that this should be applied??
+                          ^not
