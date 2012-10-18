@@ -1,217 +1,96 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 18 Oct 2012 12:01:27 +0200
-Subject: [PATCH] pinctrl: reserve pins when states are activated
-Message-ID: <1350554487-7914-1-git-send-email-linus.walleij@stericsson.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 18 Oct 2012 12:07:39 +0200
+Subject: [PATCH RFC 02/15 v5] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <20121017190520.GC25996@kroah.com>
+References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
+ <1350477107-26512-3-git-send-email-stigge@antcom.de>
+ <20121017190520.GC25996@kroah.com>
+Message-ID: <507FD4EB.1080204@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 10/17/2012 09:05 PM, Greg KH wrote:
+>> +static int gpio_block_value_unexport(struct gpio_block *block)
+>> +{
+>> +	struct device	*dev;
+>> +	int		i;
+>> +
+>> +	dev = class_find_device(&gpio_block_class, NULL, block, match_export);
+>> +	if (!dev)
+>> +		return -ENODEV;
+>> +
+>> +	for (i = 0; i < block->ngpio; i++)
+>> +		gpio_free(block->gpio[i]);
+>> +
+>> +	device_remove_file(dev, &dev_attr_block_value);
+>> +
+>> +	return 0;
+>> +}
+> 
+> Wait, what?  You are removing a sysfs file in this function, from within
+> a sysfs write:
 
-This switches the way that pins are reserved for multiplexing:
+Yes, exactly:
 
-We used to do this when the map was parsed, at the creation of
-the settings inside the pinctrl handle, in pinmux_map_to_setting().
+>> +static ssize_t gpio_block_exported_store(struct device *dev,
+>> +					 struct device_attribute *attr,
+>> +					 const char *buf, size_t size)
+>> +{
+>> +	long	value;
+>> +	int	status;
+>> +	struct	gpio_block *block = dev_get_drvdata(dev);
+>> +	int	exported = gpio_block_value_is_exported(block);
+>> +
+>> +	status = kstrtoul(buf, 0, &value);
+>> +	if (status < 0)
+>> +		goto err;
+>> +
+>> +	if (value != exported) {
+>> +		if (value)
+>> +			status = gpio_block_value_export(block);
+>> +		else
+>> +			status = gpio_block_value_unexport(block);
+> 
+> That looks like a recipie for disaster.  Why do you allow userspace to
+> do this?
 
-However this does not work for us, because we want to use the
-same set of pins with different devices at different times: the
-current code assumes that the pin groups in a pinmux state will
-only be used with one single device, albeit different groups can
-be active at different times. For example if a single I2C driver
-block is used to drive two different busses located on two
-pin groups A and B, then the pins for all possible states of a
-function are reserved when fetching the pinctrl handle: the
-I2C bus can choose either set A or set B by a mux state at
-runtime, but all pins in both group A and B (the superset) are
-effectively reserved for that I2C function and mapped to the
-device. Another device can never get in and use the pins in
-group A, even if the device/function is using group B at the
-moment.
+Exporting for gpio blocks is done as follows: writing "1" to the
+"exported" _device_ attribute of the gpio block creates the "values"
+attribute and at the same time requests the whole block (including all
+of its gpios) as "sysfs".
 
-Instead: let use reserve the pins when the state is activated
-and drop them when the state is disabled, i.e. when we move to
-another state. This way different devices/functions can use the
-same pins at different times.
+This admittedly deviates from the exporting of gpios (with the "export"
+and "unexport" _class_ attributes) because blocks are not numbered. In
+contrast, they are registered in a list (as was requested). Now, I
+already had the idea of also having an "export" and "unexport" _class_
+attribute for blocks also, but from a userspace perspective you only see
+the presence and name of the gpio block if it is already being in sysfs
+(even if not exported yet). If it wouldn't be this way, a user couldn't
+guess how the required gpio block is called (or numbered), wouldn't even
+know about its presence.
 
-We know that this is an odd way of doing things, but we really
-need to switch e.g. an SD-card slot to become a tracing output
-sink at runtime: we plug in a special "tracing card" then mux
-the pins that used to be an SD slot around to the tracing
-unit and push out tracing data there instead of SD-card
-traffic.
+Just for understanding your strong desire for the device attribute
+("value") being always present (in contrast to being created and removed
+dynamically) - can you please give me any hint how the dynamic approach
+would lead to disaster?
 
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Jean Nicolas Graux <jean-nicolas.graux@stericsson.com>
-Cc: Loic Pallardy <loic.pallardy@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/pinctrl.txt |  4 ++-
- drivers/pinctrl/core.c    |  2 ++
- drivers/pinctrl/core.h    |  2 ++
- drivers/pinctrl/pinmux.c  | 70 +++++++++++++++++------------------------------
- 4 files changed, 32 insertions(+), 46 deletions(-)
+One possibility would be to always have "value" as a default device
+attribute, but then it wouldn't be so obvious that it's useless until
+"exported" is "1".
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index 3b4ee53..a1cd2f9 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -1193,4 +1193,6 @@ foo_switch()
- 	...
- }
- 
--The above has to be done from process context.
-+The above has to be done from process context. The reservation of the pins
-+will be done when the state is activated, so in effect one specific pin
-+can be used by different functions at different times on a running system.
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 0f1ec9e..5c6dff2 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -563,6 +563,8 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
- 		return -EPROBE_DEFER;
- 	}
- 
-+	setting->dev_name = map->dev_name;
-+
- 	switch (map->type) {
- 	case PIN_MAP_TYPE_MUX_GROUP:
- 		ret = pinmux_map_to_setting(map, setting);
-diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-index 1f40ff6..12f5694 100644
---- a/drivers/pinctrl/core.h
-+++ b/drivers/pinctrl/core.h
-@@ -105,12 +105,14 @@ struct pinctrl_setting_configs {
-  * @type: the type of setting
-  * @pctldev: pin control device handling to be programmed. Not used for
-  *   PIN_MAP_TYPE_DUMMY_STATE.
-+ * @dev_name: the name of the device using this state
-  * @data: Data specific to the setting type
-  */
- struct pinctrl_setting {
- 	struct list_head node;
- 	enum pinctrl_map_type type;
- 	struct pinctrl_dev *pctldev;
-+	const char *dev_name;
- 	union {
- 		struct pinctrl_setting_mux mux;
- 		struct pinctrl_setting_configs configs;
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 9301a7a..dadc891 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -314,14 +314,11 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
- {
- 	struct pinctrl_dev *pctldev = setting->pctldev;
- 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
--	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
- 	char const * const *groups;
- 	unsigned num_groups;
- 	int ret;
- 	const char *group;
- 	int i;
--	const unsigned *pins;
--	unsigned num_pins;
- 
- 	if (!pmxops) {
- 		dev_err(pctldev->dev, "does not support mux function\n");
-@@ -376,53 +373,15 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
- 	}
- 	setting->data.mux.group = ret;
- 
--	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group, &pins,
--				      &num_pins);
--	if (ret) {
--		dev_err(pctldev->dev,
--			"could not get pins for device %s group selector %d\n",
--			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
--			return -ENODEV;
--	}
--
--	/* Try to allocate all pins in this group, one by one */
--	for (i = 0; i < num_pins; i++) {
--		ret = pin_request(pctldev, pins[i], map->dev_name, NULL);
--		if (ret) {
--			dev_err(pctldev->dev,
--				"could not request pin %d on device %s\n",
--				pins[i], pinctrl_dev_get_name(pctldev));
--			/* On error release all taken pins */
--			i--; /* this pin just failed */
--			for (; i >= 0; i--)
--				pin_free(pctldev, pins[i], NULL);
--			return -ENODEV;
--		}
--	}
--
- 	return 0;
- }
- 
- void pinmux_free_setting(struct pinctrl_setting const *setting)
- {
--	struct pinctrl_dev *pctldev = setting->pctldev;
--	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
--	const unsigned *pins;
--	unsigned num_pins;
--	int ret;
--	int i;
--
--	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
--				      &pins, &num_pins);
--	if (ret) {
--		dev_err(pctldev->dev,
--			"could not get pins for device %s group selector %d\n",
--			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
--		return;
--	}
--
--	for (i = 0; i < num_pins; i++)
--		pin_free(pctldev, pins[i], NULL);
-+	/*
-+	 * If a setting is active, disable it so that all pins are released
-+	 */
-+	pinmux_disable_setting(setting);
- }
- 
- int pinmux_enable_setting(struct pinctrl_setting const *setting)
-@@ -446,6 +405,22 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
- 		num_pins = 0;
- 	}
- 
-+	/* Try to allocate all pins in this group, one by one */
-+	for (i = 0; i < num_pins; i++) {
-+		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
-+		if (ret) {
-+			dev_err(pctldev->dev,
-+				"could not request pin %d on device %s\n",
-+				pins[i], pinctrl_dev_get_name(pctldev));
-+			/* On error release all taken pins */
-+			i--; /* this pin just failed */
-+			for (; i >= 0; i--)
-+				pin_free(pctldev, pins[i], NULL);
-+			return -ENODEV;
-+		}
-+	}
-+
-+	/* Now that we have acquired the pins, encode the mux setting */
- 	for (i = 0; i < num_pins; i++) {
- 		desc = pin_desc_get(pctldev, pins[i]);
- 		if (desc == NULL) {
-@@ -482,6 +457,7 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
- 		num_pins = 0;
- 	}
- 
-+	/* Flag the descs that no setting is active */
- 	for (i = 0; i < num_pins; i++) {
- 		desc = pin_desc_get(pctldev, pins[i]);
- 		if (desc == NULL) {
-@@ -493,6 +469,10 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
- 		desc->mux_setting = NULL;
- 	}
- 
-+	/* And release the pins */
-+	for (i = 0; i < num_pins; i++)
-+		pin_free(pctldev, pins[i], NULL);
-+
- 	if (ops->disable)
- 		ops->disable(pctldev, setting->data.mux.func, setting->data.mux.group);
- }
--- 
-1.7.11.3
+What do you think?
+
+For now, I would elaborate about my terse "only available if /exported
+is 1" like this:
+
+"
+Block GPIO devices are visible in sysfs as soon as they are registered
+(e.g. via devicetree definition). For actual I/O use, their "exported"
+boolean attribute must be set to "1". Then, the attribute "values" is
+created and at the same time, the GPIOs in the block are requested for
+exclusive use by sysfs.
+"
+
+Thanks in advance,
+
+Roland
