@@ -1,32 +1,34 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 18 Oct 2012 19:27:22 +0000 (UTC)
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <20121018184443.GD2350@netboy.at.omicron.at>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
- <20121017235045.GB30550@atomide.com>
- <20121018030654.GE2867@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
- <20121018184443.GD2350@netboy.at.omicron.at>
-Message-ID: <alpine.DEB.2.00.1210181924490.16473@utopia.booyaka.com>
+From: jj@chaosbits.net (Jesper Juhl)
+Date: Thu, 18 Oct 2012 21:28:10 +0200 (CEST)
+Subject: [PATCH] [media] s5p-tv: don't include linux/version.h in mixer_video.c
+Message-ID: <alpine.LNX.2.00.1210182125380.17217@swampdragon.chaosbits.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Oct 2012, Richard Cochran wrote:
+The header is not needed, so remove it.
 
-> You say it will be working in 3.8, after 3.7 comes out, in about
-> December.
+Signed-off-by: Jesper Juhl <jj@chaosbits.net>
+---
+ drivers/media/platform/s5p-tv/mixer_video.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-I wrote that we'll schedule the SoC integration patch for sending upstream 
-for 3.8.  This does not necessarily mean that our upstreams will take it, 
-or that it will result in a working CPSW.
+diff --git a/drivers/media/platform/s5p-tv/mixer_video.c b/drivers/media/platform/s5p-tv/mixer_video.c
+index 0c1cd89..9b52f3a 100644
+--- a/drivers/media/platform/s5p-tv/mixer_video.c
++++ b/drivers/media/platform/s5p-tv/mixer_video.c
+@@ -19,7 +19,6 @@
+ #include <linux/videodev2.h>
+ #include <linux/mm.h>
+ #include <linux/module.h>
+-#include <linux/version.h>
+ #include <linux/timer.h>
+ #include <media/videobuf2-dma-contig.h>
+ 
+-- 
+1.7.1
 
-> Sorry to harp on this so much, but I try out my patches with the tip of 
-> the appropriate tree before sending them, or when I cannot, at least I 
-> put into the log "compile tested only" or something like that.
 
-Great!
-
-
-- Paul
+-- 
+Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
+Don't top-post http://www.catb.org/jargon/html/T/top-post.html
+Plain text mails only, please.
