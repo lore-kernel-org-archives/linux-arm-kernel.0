@@ -1,41 +1,43 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 18 Oct 2012 20:39:30 +0200
-Subject: 3.7-rc-1 Release Causing application failure for compilation
-In-Reply-To: <CA+V-a8uj4wSz60Ov8S3MpSrUe-D5+OcpVsFjURzSEcE6VdvGGQ@mail.gmail.com>
-References: <CA+V-a8uj4wSz60Ov8S3MpSrUe-D5+OcpVsFjURzSEcE6VdvGGQ@mail.gmail.com>
-Message-ID: <20121018183930.GA4048@tarshish>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 18 Oct 2012 20:39:57 +0200
+Subject: [GIT PULL] first set of ux500 for ARM SoC for v3.8
+Message-ID: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Prabhakar Lad,
+Hi ARM SoC folks,
 
-On Thu, Oct 18, 2012 at 09:49:34PM +0530, Prabhakar Lad wrote:
-> I have updated to 3.7-rc1 kernel version with latest head with
-> commit-id 43c422eda99b894f18d1cca17bcd2401efaf7bd0
-> but when I try to cross compile the Application I am getting following errors.
-> 
-> /home/plad/ti/linus/linus/include/linux/types.h:14:26: error:
-> conflicting types for 'fd_set'
-> /home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/select.h:78:5:
-> note: previous declaration of 'fd_set' was here
-> /home/plad/ti/linus/linus/include/linux/types.h:15:25: error:
+here are two small commits for v3.8 that I'd like to make sure
+land in ARM SoC before I begin with all the other stuff.
 
-[snip]
+Please pull them in!
 
-> I use the codesourcery toolchain for cross compiling the applications
-> for ARM. The same compiler is used to  build the uImage for ARM, but
-> when I try building the apps I see this issue. Can any help me out in
-> fixing this.
+Yours,
+Linus Walleij
 
-It seems that you are including kernel headers directly in your userspace 
-code. Don't do that. Types defined in kernel headers conflict with types 
-defined in your toolchain's kernel headers. Instead, just use the headers that 
-are part of your toolchain, which in turn include kernel headers that your 
-toolchain was built with.
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-baruch
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+ux500-core
+
+for you to fetch changes up to 4040d10a3d44023703f81083bb90a3eb45a39eee:
+
+  ARM: ux500: add DB serial number to entropy pool (2012-10-15 13:53:55 +0200)
+
+----------------------------------------------------------------
+A first set of Ux500 core patches for v3.8:
+- Support the HREF520 board
+- Add the device serial number to the entropy pool
+
+----------------------------------------------------------------
+Linus Walleij (2):
+      ARM: ux500: support the HREFP520 board variant
+      ARM: ux500: add DB serial number to entropy pool
+
+ arch/arm/mach-ux500/board-mop500.c | 13 +++++++++++--
+ arch/arm/mach-ux500/cpu-db8500.c   |  5 ++++-
+ 2 files changed, 15 insertions(+), 3 deletions(-)
