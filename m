@@ -1,38 +1,36 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Thu, 18 Oct 2012 14:59:10 +0530
-Subject: [PATCH] dma: add new DMA control commands
-In-Reply-To: <507FA595.4020507@freescale.com>
-References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
- <1350541111.5263.3.camel@vkoul-udesk3>
- <507FA595.4020507@freescale.com>
-Message-ID: <CAJe_ZhfarH-HpJkEOpH=jY1Gc-UPEyuA4bJ4LSQES7Uyea2BQw@mail.gmail.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 18 Oct 2012 12:36:38 +0300
+Subject: [PATCH 1/1] MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio
+ and ioremap
+In-Reply-To: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1350552998.5769.306.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 October 2012 12:15, Huang Shijie <b32955@freescale.com> wrote:
-> ? 2012?10?18? 14:18, Vinod Koul ??:
->
->> Why cant you do start (prepare clock etc) when you submit the descriptor
->> to dmaengine. Can be done in tx_submit callback.
->> Similarly remove the clock when dma transaction gets completed.
->
-> I ever thought this method too.
->
-> But it will become low efficient in the following case:
->
->   Assuming the gpmi-nand driver has to read out 1024 pages in one _SINGLE_
-> read operation.
-> The gpmi-nand will submit the descriptor to dmaengine per page. So with your
-> method,
-> the system will repeat the enable/disable dma clock 1024 time. At every
-> enable/disable dma clock,
-> the system has to enable the clock chain and it's parents ...
->
-> But with this patch, we only need to enable/disable dma clock one time, just
-> at we select the nand chip.
->
-If the clock is the dmac's property (not channels'), the toggling
-seems too aggressive.
-You could try using runtime_suspend/resume for clock
-disabling/enabling. How about employing autosuspend with a few ms
-delay?
+On Sat, 2012-10-13 at 14:06 +0200, Jean-Christophe PLAGNIOL-VILLARD
+wrote:
+> this will allow to simply the error and remove path
+> 
+> Cc: linux-mtd at lists.infradead.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+$:~/git/l2-mtd$ git apply --check ~/tmp/jc.mbox
+error: patch failed: drivers/mtd/nand/atmel_nand.c:1420
+error: drivers/mtd/nand/atmel_nand.c: patch does not apply
+
+Please, send an l2-mtd.git-based version.
+
+git://git.infradead.org/users/dedekind/l2-mtd-2.6.git
+
+-- 
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121018/eb936f5a/attachment.sig>
