@@ -1,118 +1,106 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 15 Oct 2012 16:28:46 -0000
-Subject: Use coupled cpuidle on imx6q
-In-Reply-To: <CAMbhsRRGyPB1DvXqkmNpF=hA-3ya5Y+JLV-KY5BW+FX_RoEc9g@mail.gmail.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-8-git-send-email-josephl@nvidia.com>
- <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <CAMbhsRScnEaEeyqGz6tfYQMHXaZva4UeHtFY4C9Vvu1MrKXPNg@mail.gmail.com>
- <20121012075358.GA4962@S2101-09.ap.freescale.net>
- <1350030264.15495.14.camel@jlo-ubuntu-64.nvidia.com>
- <20121012083017.GB4962@S2101-09.ap.freescale.net>
- <CAMbhsRRGyPB1DvXqkmNpF=hA-3ya5Y+JLV-KY5BW+FX_RoEc9g@mail.gmail.com>
-Message-ID: <20121015162842.GD24393@S2101-09.ap.freescale.net>
+From: motumboe@gmail.com (Marco Lazzaroni)
+Date: Thu, 18 Oct 2012 18:29:45 -0000
+Subject: SD Card: how to change data bits on the clock falling edge?
+Message-ID: <CAATj9i7ODws6MWkk=Kn52fQ5L3rQ3y2ab85jvtLYD6eu6i-DkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changed subject (was: Re: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2
-driver for CPU0) ...
+Hello,
+  I'm using kernel 3.6 on a i.MX23 processor.
+I was able to enable and use a second SD Card by using interface SSP2 (I
+boot from a SD Card on SSP1).
+The short story is, I need to keep BM_SSP_CTRL1_POLARITY bit in
+HW_SSP_CTRL1 register to a 1 value, while now it is initialized at 1, but
+after that it changes to 0.
+How do I accomplish this?
 
-On Fri, Oct 12, 2012 at 01:50:35PM -0700, Colin Cross wrote:
-> Current coupled cpuidle requires all cpus to wake up together and go
-> back to the idle governor to select a new state, because that's what
-> all available ARM cpus did when I wrote it.  You should be able to
-> implement coupled idle on a cpu that does not need to wake all the
-> cpus if you wake them anyways,
+Here I explain why I need this behaviour.
+The SD Card is correctly recognised, (kern.log tells that I have a 1.84GB
+card in it is correct), but then I'm having some communication errors
 
-Can you please elaborate it a little bit?  I do not quite understand
-what you mean.
+[...]
+Oct 18 19:19:30 debian kernel: [  527.800000] mmcblk1: error -84
+transferring data, sector 0, nr 8, cmd response 0x900, card status 0x800b00
+Oct 18 19:19:30 debian kernel: [  527.810000] mmcblk1: retrying using
+single block read
+Oct 18 19:19:30 debian kernel: [  527.820000] mmcblk1: error -84
+transferring data, sector 0, nr 8, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.830000] end_request: I/O error, dev
+mmcblk1, sector 0
+Oct 18 19:19:30 debian kernel: [  527.840000] mmcblk1: error -84
+transferring data, sector 1, nr 7, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.840000] end_request: I/O error, dev
+mmcblk1, sector 1
+Oct 18 19:19:30 debian kernel: [  527.850000] mmcblk1: error -84
+transferring data, sector 2, nr 6, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.860000] end_request: I/O error, dev
+mmcblk1, sector 2
+Oct 18 19:19:30 debian kernel: [  527.870000] mmcblk1: error -84
+transferring data, sector 3, nr 5, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.880000] end_request: I/O error, dev
+mmcblk1, sector 3
+Oct 18 19:19:30 debian kernel: [  527.900000] mmcblk1: error -84
+transferring data, sector 4, nr 4, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.910000] end_request: I/O error, dev
+mmcblk1, sector 4
+Oct 18 19:19:30 debian kernel: [  527.940000] mmcblk1: error -84
+transferring data, sector 5, nr 3, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.950000] end_request: I/O error, dev
+mmcblk1, sector 5
+Oct 18 19:19:30 debian kernel: [  527.960000] mmcblk1: error -84
+transferring data, sector 6, nr 2, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.960000] end_request: I/O error, dev
+mmcblk1, sector 6
+Oct 18 19:19:30 debian kernel: [  527.980000] mmcblk1: error -84
+transferring data, sector 7, nr 1, cmd response 0x900, card status 0x0
+Oct 18 19:19:30 debian kernel: [  527.990000] end_request: I/O error, dev
+mmcblk1, sector 7
+Oct 18 19:19:30 debian kernel: [  527.990000] quiet_error: 13 callbacks
+suppressed
+Oct 18 19:19:30 debian kernel: [  528.000000] Buffer I/O error on device
+mmcblk1, logical block 0
+Oct 18 19:19:30 debian kernel: [  528.020000] mmcblk1: error -110 sending
+stop command, original cmd response 0x900, card status 0x800b00
+[...]
 
-Basically, imx6q has a low-power mode named WAIT.  When all 4 cores
-are in WFI, imx6q will go into WAIT mode, and whenever there is a
-wakeup interrupt, it will exit WAIT mode.  Software can configure
-hardware behavior during WAIT mode, clock gating or power gating for
-ARM core.
+Here is some facts:
+- if I'm right, SD standard says that data bits are sampled on the rising
+edge of the clock signal, and must be valid for at least 2.5ns after that.
+- in mxs-mmc.c, I see that BM_SSP_CTRL1_POLARITY bit in HW_SSP_CTRL1
+register is set in function mxs_mmc_reset -> this means data changes after
+falling edge (this information is contained in the imx23 datasheet p1042 ->
+http://www.freescale.com/files/dsp/doc/ref_manual/IMX23RM.pdf )
+- with an oscilloscope I see that data bits correctly change after falling
+in edge during the first communications (the phase at 400 kHz clock)
+- I see also that after this, when clock switches to high speed (default is
+50MHz, but I slowed down because of hardware problems to 1 MHz), data bits
+change after rising edge
+- in fact if I printk out HW_SSP_CTRL1, I see that BM_SSP_CTRL1_POLARITY is
+reset (-> data changes after rising edge).
 
-I'm trying to implement this low-power mode with coupled cpuidle.
-I initially have the following code as the coupled cpuidle enter
-function for clock gating case.
+The outcome is that even if I slow down to 1 MHz, I can't correctly read
+the content of the SD card. Looking at the oscilloscope if I measure
+signals near the SD Card I see that the clock rising edge is a little late,
+so the SD Card sees that bits changing when they're sampled.
+I think that doing changes after the rising edge while in high speed is the
+correct thing, so there's enough time for data bits to settle.
+Anyway, because of my hardware problems (SD Card is 50 cm away from the
+CPU), slowing down the card to 1MHz does not improve things because data
+are changed so close to the time at which they're sampled. Signals and good
+and squared, with no ringings, but that little time shift throws me in
+trouble).
 
-static int imx6q_enter_wait_coupled(struct cpuidle_device *dev,
-				    struct cpuidle_driver *drv, int index)
-{
-	int cpu = dev->cpu;
+I would need to keep the  BM_SSP_CTRL1_POLARITY bit to 1 even in high
+speed, so data bits change on the falling edge; data bits have all the time
+to settle before the arriving of the rising edge since the clock is as slow
+as 1MHz.
+But I don't know how to keep this bit at 1.
+There's only a reference in mxs-mmc.c to BM_SSP_CTRL1_POLARITY, when it is
+set to 1, so I can't figure where it gets changed and set to 0.
 
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-
-	if (atomic_inc_return(&master) == num_online_cpus())
-		imx6q_set_lpm(WAIT_UNCLOCKED);
-
-	cpu_do_idle();
-
-	if (atomic_dec_return(&master) == num_online_cpus() - 1)
-		imx6q_set_lpm(WAIT_CLOCKED);
-
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-	return index;
-}
-
-However I think there are a couple of problems.  The first one is the
-extra wakeups you have mentioned.  When last cpu is in call
-imx6q_set_lpm(), some of the first 3 cpus that are already in WFI may
-exit from there.  The second one is when hardware exits WAIT mode and
-has ARM clock resumed, some cpus may stay in WFI if scheduler has
-nothing to wake them up.  This breaks the requirement of coupled cpuidle
-that all cpus need to exit together.  I can force the function to work
-around the problems by adding cpuidle_coupled_parallel_barrier() just
-above cpu_do_idle() and arch_send_wakeup_ipi_mask(cpu_online_mask)
-right after imx6q_set_lpm(WAIT_CLOCKED).  But I doubt it's appropriate.
-
-So I rewrite the function as below to not use coupled cpuidle, and it
-works fine.
-
-static int imx6q_enter_wait(struct cpuidle_device *dev,
-			    struct cpuidle_driver *drv, int index)
-{
-	int cpu = dev->cpu;
-
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-
-	if (atomic_inc_return(&master) == num_online_cpus()) {
-		/*
-		 * With this lock, we prevent the other cpu to exit and
-		 * enter this function again and become the master.
-		 */
-		if (!spin_trylock(&master_lock))
-			goto idle;
-
-		imx6q_set_lpm(WAIT_UNCLOCKED);
-		cpu_do_idle();
-		imx6q_set_lpm(WAIT_CLOCKED);
-
-		spin_unlock(&master_lock);
-		goto out;
-	}
-
-idle:
-	cpu_do_idle();
-out:
-	atomic_dec(&master);
-	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-	return index;
-}
-
-For power gating case, it may better fit coupled cpuidle usage model,
-since all the cores will have to run resume routine and thus will not
-be in WFI when hardware exits from WAIT mode.  But we still need to
-work out the extra wakeup issue which will also be seen in this case.
-
-> and then later you can optimize it to
-> avoid the extra wakeups when the extension to coupled cpuidle that I
-> discussed previously gets implemented.
-
-Do you have a pointer to the initial discussion for the extension, or
-you have a draft patch for that already (hopefully:)?
-
-Shawn
+Any help is appreciated. Thank you very much in advance.
+Best regards,
+  Marco Lazzaroni
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121018/e565c534/attachment-0001.html>
