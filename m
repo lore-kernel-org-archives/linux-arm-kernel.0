@@ -1,56 +1,38 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 18 Oct 2012 22:26:53 +1300
-Subject: [PATCH] CLK: vt8500: Fix SDMMC clk special cases
-Message-ID: <1350552413-24452-1-git-send-email-linux@prisktech.co.nz>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Thu, 18 Oct 2012 14:59:10 +0530
+Subject: [PATCH] dma: add new DMA control commands
+In-Reply-To: <507FA595.4020507@freescale.com>
+References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
+ <1350541111.5263.3.camel@vkoul-udesk3>
+ <507FA595.4020507@freescale.com>
+Message-ID: <CAJe_ZhfarH-HpJkEOpH=jY1Gc-UPEyuA4bJ4LSQES7Uyea2BQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds some additional handling for the SDMMC special case
-in round_rate and set_rate which results in invalid divisor messages
-at boot time.
-
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/clk/clk-vt8500.c |   18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
-index a885600..fe25570 100644
---- a/drivers/clk/clk-vt8500.c
-+++ b/drivers/clk/clk-vt8500.c
-@@ -120,8 +120,17 @@ static unsigned long vt8500_dclk_recalc_rate(struct clk_hw *hw,
- static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
- 				unsigned long *prate)
- {
-+	struct clk_device *cdev = to_clk_device(hw);
- 	u32 divisor = *prate / rate;
- 
-+	/*
-+	 * If this is a request for SDMMC we have to adjust the divisor
-+	 * when >31 to use the fixed predivisor
-+	 */
-+	if ((cdev->div_mask == 0x3F) && (divisor > 31)) {
-+		divisor = 64 * ((divisor / 64) + 1);
-+	}
-+
- 	return *prate / divisor;
- }
- 
-@@ -135,6 +144,15 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (divisor == cdev->div_mask + 1)
- 		divisor = 0;
- 
-+	/* SDMMC mask may need to be corrected before testing if its valid */
-+	if ((cdev->div_mask == 0x3F) && (divisor > 31)) {
-+		/*
-+		 * Bit 5 is a fixed /64 predivisor. If the requested divisor
-+		 * is >31 then correct for the fixed divisor being required.
-+		 */
-+		divisor = 0x20 + (divisor / 64);
-+	}
-+
- 	if (divisor > cdev->div_mask) {
- 		pr_err("%s: invalid divisor for clock\n", __func__);
- 		return -EINVAL;
--- 
-1.7.9.5
+On 18 October 2012 12:15, Huang Shijie <b32955@freescale.com> wrote:
+> ? 2012?10?18? 14:18, Vinod Koul ??:
+>
+>> Why cant you do start (prepare clock etc) when you submit the descriptor
+>> to dmaengine. Can be done in tx_submit callback.
+>> Similarly remove the clock when dma transaction gets completed.
+>
+> I ever thought this method too.
+>
+> But it will become low efficient in the following case:
+>
+>   Assuming the gpmi-nand driver has to read out 1024 pages in one _SINGLE_
+> read operation.
+> The gpmi-nand will submit the descriptor to dmaengine per page. So with your
+> method,
+> the system will repeat the enable/disable dma clock 1024 time. At every
+> enable/disable dma clock,
+> the system has to enable the clock chain and it's parents ...
+>
+> But with this patch, we only need to enable/disable dma clock one time, just
+> at we select the nand chip.
+>
+If the clock is the dmac's property (not channels'), the toggling
+seems too aggressive.
+You could try using runtime_suspend/resume for clock
+disabling/enabling. How about employing autosuspend with a few ms
+delay?
