@@ -1,70 +1,28 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 18 Oct 2012 15:04:30 -0300
-Subject: [PATCH v3] ARM: mach-imx: Fix selection of ARCH_MXC
-Message-ID: <1350583470-15500-1-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 18 Oct 2012 15:06:42 -0300
+Subject: [PATCH] ARM: multi_v7_defconfig: Add ARCH_MXC
+Message-ID: <1350583602-15560-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit c5a0d497(ARM: imx: enable multi-platform build),
-ARCH_MXC is selected by the following logic:
-
-config ARCH_MXC
-        def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
-
-, which causes build error on vexpress_defconfig:
-
-arch/arm/mach-imx/hotplug.c:49: undefined reference to `imx_enable_cpu'
-arch/arm/mach-imx/platsmp.c:57: undefined reference to `imx_set_cpu_jump'
-arch/arm/mach-imx/platsmp.c:58: undefined reference to `imx_enable_cpu'
-
-Make ARCH_MXC a user selectable option, so that it does not get built
-by default on other defconfigs that select ARCH_MULTI_V4_V5 or ARCH_MULTI_V6_V7.
+Let ARCH_MXC be covered by multi_v7_defconfig.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
-Changes since v2:
-- Make ARCH_MXC a user selectable option
-Changes since v1:
-- Fix typo in commit message and improve it a bit
- arch/arm/configs/imx_v4_v5_defconfig |    1 +
- arch/arm/configs/imx_v6_v7_defconfig |    1 +
- arch/arm/mach-imx/Kconfig            |    2 +-
- 3 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/configs/multi_v7_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index bd01244..f71302c 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -17,6 +17,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 159f75f..c8cbd6a 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -5,6 +5,7 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
 +CONFIG_ARCH_MXC=y
- CONFIG_ARCH_MULTI_V4T=y
- CONFIG_ARCH_MULTI_V5=y
- # CONFIG_ARCH_MULTI_V7 is not set
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index a4965f3..5dfadfb 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -16,6 +16,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
-+CONFIG_ARCH_MXC=y
- CONFIG_ARCH_MULTI_V6=y
- CONFIG_ARCH_MULTI_V7=y
- CONFIG_MACH_MX31LILLY=y
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 856482d..cbbef1a 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -1,5 +1,5 @@
- config ARCH_MXC
--	def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
-+	bool "Freescale i.MX family" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_PATCH_PHYS_VIRT
- 	select AUTO_ZRELADDR if !ZBOOT_ROM
+ CONFIG_ARCH_SOCFPGA=y
+ # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+ CONFIG_ARM_ERRATA_754322=y
 -- 
 1.7.9.5
