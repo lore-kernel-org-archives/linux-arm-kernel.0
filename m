@@ -1,48 +1,24 @@
-From: felipe.contreras@gmail.com (Felipe Contreras)
-Date: Thu, 18 Oct 2012 06:03:16 +0200
-Subject: [PATCH 2/6] ARM: OMAP3/4: iommu: adapt to runtime pm
-In-Reply-To: <CALLhW=5W2Tkv0sHhsabV9d4hFqQw57f=55HvcPBfAoG1eqLrqA@mail.gmail.com>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
- <1350003977-32744-5-git-send-email-omar.luna@linaro.org>
- <CAMP44s2LTGPnXQuetVLV1tA8w90gUtoJ5coucBUZsbqb3vFnng@mail.gmail.com>
- <CALLhW=5k=tAXo_5ri2WgetRgju9rC_Wm-o9-pfHSNqpe6FU5qQ@mail.gmail.com>
- <CAMP44s3wTYTFgSw7r+77zb0fxMSjo1R69Zx0nyM6Hgy2h=Gggw@mail.gmail.com>
- <CALLhW=6_0Rnp7-gNhCexUVzxam54KhoqAF6e8eiH5yo-wKBxzQ@mail.gmail.com>
- <CAMP44s0LSJhyG89mwJERHW0SsQrU+J4CC6=xhMUR=MSw0dxj-A@mail.gmail.com>
- <CALLhW=5W2Tkv0sHhsabV9d4hFqQw57f=55HvcPBfAoG1eqLrqA@mail.gmail.com>
-Message-ID: <CAMP44s1TGky2zxC4vb4CFHD-uuKu=vSFZccoQz2JFAShxbiuRA@mail.gmail.com>
+From: vipin.kumar@st.com (Vipin Kumar)
+Date: Thu, 18 Oct 2012 09:43:44 +0530
+Subject: [PATCH 00/11] mtd/nand: fsmc driver updates
+In-Reply-To: <1350478116.5769.150.camel@sauron.fi.intel.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <1350478116.5769.150.camel@sauron.fi.intel.com>
+Message-ID: <507F81F8.9030107@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 1:51 AM, Omar Ramirez Luna <omar.luna@linaro.org> wrote:
-> On 15 October 2012 22:23, Felipe Contreras <felipe.contreras@gmail.com> wrote:
->>> On probe this patch does pm_runtime_enable, however this doesn't mean
->>> the device is turned ON or resumed or kept ON all the time.
->>
->> In fact it's the other way around; pm_runtime_enable turns off the
->> power (if it's ON).
+On 10/17/2012 6:18 PM, Artem Bityutskiy wrote:
+> On Tue, 2012-10-09 at 16:14 +0530, Vipin Kumar wrote:
+>> This patch-set contains several fixes and a few enhancements in fsmc driver.
+>> Modifications include
 >
-> pm_runtime_enable just decrements the disable_depth counter. Doesn't
-> turn off anything by itself.
-
-pm_runtime_enable turns on power management, without it the device
-remains in whatever state it booted.
-
->> device_del
->>  device_pm_remove
->>   pm_runtime_remove
->>    __pm_runtime_disable <- HERE
+> OK, picked some patches from your series, some do not apply. Please,
+> send v2 against the l2-mtd.git tree:
 >
-> I'm not entirely convinced _iommu_ follows this path, it doesn't
-> create any devices nor register them... whereas mailbox does create
-> devices and mailbox does follow this path for the devices created
-> which are child devices.
+> git://git.infradead.org/users/dedekind/l2-mtd.git
 >
-> So this path won't take care of the omap-iommu device pm_runtime_disable.
 
-Are you sure? What code-path calls omap_iommu_remove then?
+Sure, I would do that soon. Thanks
 
-Anyway, it was just an observation. I've seen other code do this.
-
--- 
-Felipe Contreras
+-Vipin
