@@ -1,29 +1,32 @@
-From: grant.b.edwards@gmail.com (Grant Edwards)
-Date: Thu, 18 Oct 2012 14:00:46 +0000 (UTC)
-Subject: PDF documentation
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
- <508003AA.8010409@ahsoftware.de> <E1TOqZc-0005Wc-Oj@jdl.com>
-Message-ID: <k5p22e$7d1$1@ger.gmane.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 18 Oct 2012 16:13:41 +0200
+Subject: [PATCHv4 0/2] ARM: I2C: Add device tree bindings to i2c-mux-gpio
+Message-ID: <1350569623-4699-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-10-18, Jon Loeliger <jdl@jdl.com> wrote:
->> 
->> I would prefer if the source for the (PDF-)documentation would be
->> available in some open, free and widely used meta-language, e.g. LaTeX
->> (or XML or txt2tags or ..., but I'm oldschool and prefer LaTeX ;) ). So
->> everyone could build it's copy in whatever format he prefers or needs.
->
-> Perhaps DocBook?  It is readily rendered as PDF or HTML.
+Hi everyone,
 
-Unfortunately DocBook can't be read/edited by a human.  IMO, Docbook
-is only suitable as a machine-generated intermediate format.
+This patchset adds the device tree entry to the CFA-10049 board of its i2c
+muxer. This muxer controls sub-buses that contains three Nuvoton NAU7802
+ADCs and a NXP PCA955 GPIO expander. Support for these will be added
+eventually.
 
-I'd recommend one of the lightweight markup languages like asciidoc or
-reStructuredText.  They're easy to read/write, perfectly usable in the
-source form and can be rendered into PDF, HTML, ODT, DocBook, whatever.
+Thanks,
+Maxime
+
+Changes from v3:
+  - Rebased on top of 3.7-rc1
+
+Maxime Ripard (2):
+  i2c: mux: Add dt support to i2c-mux-gpio driver
+  ARM: dts: cfa10049: Add the i2c muxer buses to the CFA-10049
+
+ .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   81 ++++++++++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |   24 +++
+ drivers/i2c/muxes/i2c-mux-gpio.c                   |  169 +++++++++++++++-----
+ 3 files changed, 235 insertions(+), 39 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
 
 -- 
-Grant Edwards               grant.b.edwards        Yow! Don't SANFORIZE me!!
-                                  at               
-                              gmail.com            
+1.7.9.5
