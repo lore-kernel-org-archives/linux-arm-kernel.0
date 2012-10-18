@@ -1,50 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 Oct 2012 15:59:27 +0200
-Subject: [PATCH 1/2] spi: spidev: Add device tree bindings
-In-Reply-To: <1350568768-4374-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1350568768-4374-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1350568768-4374-2-git-send-email-maxime.ripard@free-electrons.com>
+From: grant.b.edwards@gmail.com (Grant Edwards)
+Date: Thu, 18 Oct 2012 14:00:46 +0000 (UTC)
+Subject: PDF documentation
+References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
+ <508003AA.8010409@ahsoftware.de> <E1TOqZc-0005Wc-Oj@jdl.com>
+Message-ID: <k5p22e$7d1$1@ger.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow to probe spidev from device tree
+On 2012-10-18, Jon Loeliger <jdl@jdl.com> wrote:
+>> 
+>> I would prefer if the source for the (PDF-)documentation would be
+>> available in some open, free and widely used meta-language, e.g. LaTeX
+>> (or XML or txt2tags or ..., but I'm oldschool and prefer LaTeX ;) ). So
+>> everyone could build it's copy in whatever format he prefers or needs.
+>
+> Perhaps DocBook?  It is readily rendered as PDF or HTML.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/spi/spidev.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Unfortunately DocBook can't be read/edited by a human.  IMO, Docbook
+is only suitable as a machine-generated intermediate format.
 
-diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
-index 830adbe..8ae0660 100644
---- a/drivers/spi/spidev.c
-+++ b/drivers/spi/spidev.c
-@@ -31,6 +31,8 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- #include <linux/compat.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
- 
- #include <linux/spi/spi.h>
- #include <linux/spi/spidev.h>
-@@ -642,10 +644,18 @@ static int __devexit spidev_remove(struct spi_device *spi)
- 	return 0;
- }
- 
-+static const struct of_device_id spidev_dt_ids[] = {
-+	{ .compatible = "linux,spidev" },
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, spidev_dt_ids);
-+
- static struct spi_driver spidev_spi_driver = {
- 	.driver = {
- 		.name =		"spidev",
- 		.owner =	THIS_MODULE,
-+		.of_match_table = of_match_ptr(spidev_dt_ids),
- 	},
- 	.probe =	spidev_probe,
- 	.remove =	__devexit_p(spidev_remove),
+I'd recommend one of the lightweight markup languages like asciidoc or
+reStructuredText.  They're easy to read/write, perfectly usable in the
+source form and can be rendered into PDF, HTML, ODT, DocBook, whatever.
+
 -- 
-1.7.9.5
+Grant Edwards               grant.b.edwards        Yow! Don't SANFORIZE me!!
+                                  at               
+                              gmail.com            
