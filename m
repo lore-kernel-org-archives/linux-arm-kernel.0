@@ -1,33 +1,158 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 18 Oct 2012 11:41:49 +0200
-Subject: [PATCH 1/1] MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio
- and ioremap
-In-Reply-To: <1350552998.5769.306.camel@sauron.fi.intel.com>
-References: <1350129982-12106-1-git-send-email-plagnioj@jcrosoft.com>
- <1350552998.5769.306.camel@sauron.fi.intel.com>
-Message-ID: <20121018094149.GF12801@game.jcrosoft.org>
+From: julien.boibessot@free.fr (julien.boibessot at free.fr)
+Date: Thu, 18 Oct 2012 11:50:26 +0200
+Subject: [PATCH v3] ARM: mxs: Add support for the Armadeus Systems APF28 module
+Message-ID: <1350553826-28057-1-git-send-email-julien.boibessot@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:36 Thu 18 Oct     , Artem Bityutskiy wrote:
-> On Sat, 2012-10-13 at 14:06 +0200, Jean-Christophe PLAGNIOL-VILLARD
-> wrote:
-> > this will allow to simply the error and remove path
-> > 
-> > Cc: linux-mtd at lists.infradead.org
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> $:~/git/l2-mtd$ git apply --check ~/tmp/jc.mbox
-> error: patch failed: drivers/mtd/nand/atmel_nand.c:1420
-> error: drivers/mtd/nand/atmel_nand.c: patch does not apply
-> 
-> Please, send an l2-mtd.git-based version.
-> 
-> git://git.infradead.org/users/dedekind/l2-mtd-2.6.git
-this will have to be merge after pinctrl
+From: Julien Boibessot <julien.boibessot@armadeus.com>
 
-it's ok I'll push it via at91
+The APF28 is a small SOM built around an i.MX28 processor with 128MBytes DDR2,
+256MBytes NAND Flash and an Ethernet PHY.
 
-Best Regards,
-J.
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ Changes since v2 (as advised by Shawn Guo):
+ * respect alphabetic order in arch/arm/boot/dts/Makefile
+
+ Changes since v1 (as advised by Shawn Guo):
+ * add imx28-apf28.dtb to arch/arm/boot/dts/Makefile
+ * fix partitions declaration for gpmi-nand in imx28-apf28.dts
+
+ arch/arm/boot/dts/Makefile        |    1 +
+ arch/arm/boot/dts/imx28-apf28.dts |   85 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mxs/mach-mxs.c      |    7 +++
+ 3 files changed, 93 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index c1ce813..9bca96f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -54,6 +54,7 @@ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+ 	imx23-stmp378x_devb.dtb \
++	imx28-apf28.dtb \
+ 	imx28-apx4devkit.dtb \
+ 	imx28-cfa10036.dtb \
+ 	imx28-cfa10049.dtb \
+diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
+new file mode 100644
+index 0000000..7eb0758
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-apf28.dts
+@@ -0,0 +1,85 @@
++/*
++ * Copyright 2012 Armadeus Systems - <support@armadeus.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx28.dtsi"
++
++/ {
++	model = "Armadeus Systems APF28 module";
++	compatible = "armadeus,imx28-apf28", "fsl,imx28";
++
++	memory {
++		reg = <0x40000000 0x08000000>;
++	};
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			gpmi-nand at 8000c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
++				status = "okay";
++
++				partition at 0 {
++					label = "u-boot";
++					reg = <0x0 0x300000>;
++				};
++
++				partition at 300000 {
++					label = "env";
++					reg = <0x300000 0x80000>;
++				};
++
++				partition at 380000 {
++					label = "env2";
++					reg = <0x380000 0x80000>;
++				};
++
++				partition at 400000 {
++					label = "dtb";
++					reg = <0x400000 0x80000>;
++				};
++
++				partition at 480000 {
++					label = "splash";
++					reg = <0x480000 0x80000>;
++				};
++
++				partition at 500000 {
++					label = "kernel";
++					reg = <0x500000 0x800000>;
++				};
++
++				partition at d00000 {
++					label = "rootfs";
++					reg = <0xd00000 0xf300000>;
++				};
++			};
++		};
++
++		apbx at 80040000 {
++			duart: serial at 80074000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&duart_pins_a>;
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		mac0: ethernet at 800f0000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac0_pins_a>;
++			phy-reset-gpios = <&gpio4 13 0>;
++			status = "okay";
++		};
++	};
++};
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index b8c452a..9cfb25c 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -367,6 +367,11 @@ static void __init cfa10049_init(void)
+ 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+ }
+ 
++static void __init apf28_init(void)
++{
++	enable_clk_enet_out();
++}
++
+ static void __init mxs_machine_init(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+@@ -379,6 +384,8 @@ static void __init mxs_machine_init(void)
+ 		apx4devkit_init();
+ 	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
+ 		cfa10049_init();
++	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
++		apf28_init();
+ 
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     mxs_auxdata_lookup, NULL);
+-- 
+1.7.5.4
