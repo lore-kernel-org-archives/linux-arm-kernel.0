@@ -1,31 +1,31 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 17 Oct 2012 23:36:46 -0700
-Subject: [PATCH 11/11] nand: Increase the ecc placement locations to 640
-In-Reply-To: <67e0aae3b23f37feb30789f5c6cb342b5684911a.1349778821.git.vipin.kumar@st.com>
-References: <cover.1349778820.git.vipin.kumar@st.com>
- <67e0aae3b23f37feb30789f5c6cb342b5684911a.1349778821.git.vipin.kumar@st.com>
-Message-ID: <CAN8TOE_FcjZs3=Q+36S68D9xKmk_m2j+UxqoJSu+p_fgo4cG6Q@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 18 Oct 2012 14:45:41 +0800
+Subject: [PATCH] dma: add new DMA control commands
+In-Reply-To: <1350541111.5263.3.camel@vkoul-udesk3>
+References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
+ <1350541111.5263.3.camel@vkoul-udesk3>
+Message-ID: <507FA595.4020507@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 9, 2012 at 3:44 AM, Vipin Kumar <vipin.kumar@st.com> wrote:
-> Few devices like H27UBG8T2CTR have a writesize/oobsize of 8KB/640B.
-> This means that the maximum oobsize has gone up to 640 bytes and consequently
-> the maximum ecc placement locations have also gone up to 640.
+? 2012?10?18? 14:18, Vinod Koul ??:
+> Why cant you do start (prepare clock etc) when you submit the descriptor
+> to dmaengine. Can be done in tx_submit callback.
+> Similarly remove the clock when dma transaction gets completed.
+I ever thought this method too.
 
-We really need to change the nand_ecclayout struct sometime. Each one
-takes something like 4+4?640+4+32?8 = 2824 bytes now, and we have 4 of
-them statically declared in nand_base.c. And most drivers just declare
-their own anyway. (fsl_{elbc,ifc}_nand.c have 4 and 5 of them each)
+But it will become low efficient in the following case:
 
-I've thought about dynamically allocating and/or changing its layout
-so that we can do eccpos ranges, similar to the oobfree entries. But
-this gets harder, with the old ioctl(ECCGETLAYOUT) still hanging
-around, a few platform uses of nand_ecclayout, and probably some other
-complications.
+   Assuming the gpmi-nand driver has to read out 1024 pages in one 
+_SINGLE_ read operation.
+The gpmi-nand will submit the descriptor to dmaengine per page. So with 
+your method,
+the system will repeat the enable/disable dma clock 1024 time. At every 
+enable/disable dma clock,
+the system has to enable the clock chain and it's parents ...
 
-Anyway, this comes off as basically a complaint, while in fact, I
-wanted to see if anyone else agreed and/or had any suggestions. Or,
-maybe somebody could convince me not to care...
+But with this patch, we only need to enable/disable dma clock one time, 
+just at we select the nand chip.
 
-Brian
+thanks
+Huang Shijie
