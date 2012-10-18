@@ -1,40 +1,101 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 18 Oct 2012 19:18:32 +0200
-Subject: [PATCH 1/8] clk/ux500: explicitly include register header
-Message-ID: <1350580712-8338-1-git-send-email-linus.walleij@stericsson.com>
+Date: Thu, 18 Oct 2012 19:18:41 +0200
+Subject: [PATCH 2/8] ARM: plat-nomadik: pass IRQ to timer driver
+Message-ID: <1350580721-8373-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The ux500 clock driver file named u8500_clk.c does not compile
-if it loose implicit dependencies to <mach/db8500-regs.h>
-(I have no clue what files will include this) which manifests
-itself as I'm experimenting with SPARSE_IRQ so make the
-dependency explicit.
+In order to convert the MTU timer to work with sparse IRQ we need
+to pass the IRQ used when initializing instead of just letting
+it rely on a special name being used in the IRQ header file.
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Alessandro Rubini <rubini@unipv.it>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Mike, if you don't take this in as a fix to the v3.7-rc:s
-I request an ACK so I can merge this series together.
----
- drivers/clk/ux500/u8500_clk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-nomadik/board-nhk8815.c    | 4 ++--
+ arch/arm/mach-ux500/timer.c              | 2 +-
+ arch/arm/plat-nomadik/include/plat/mtu.h | 2 +-
+ arch/arm/plat-nomadik/timer.c            | 4 ++--
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index ca4a25e..ab30ce8 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -12,7 +12,7 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/dbx500-prcmu.h>
- #include <linux/platform_data/clk-ux500.h>
--
-+#include <mach/db8500-regs.h>
- #include "clk.h"
+diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
+index 22ef8a1..16f10e0 100644
+--- a/arch/arm/mach-nomadik/board-nhk8815.c
++++ b/arch/arm/mach-nomadik/board-nhk8815.c
+@@ -29,7 +29,6 @@
+ #include <asm/sizes.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+-#include <asm/mach/irq.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/time.h>
  
- void u8500_clk_init(void)
+@@ -37,6 +36,7 @@
+ 
+ #include <linux/platform_data/mtd-nomadik-nand.h>
+ #include <mach/fsmc.h>
++#include <mach/irqs.h>
+ 
+ #include "cpu-8815.h"
+ 
+@@ -260,7 +260,7 @@ static void __init nomadik_timer_init(void)
+ 	src_cr |= SRC_CR_INIT_VAL;
+ 	writel(src_cr, io_p2v(NOMADIK_SRC_BASE));
+ 
+-	nmdk_timer_init(io_p2v(NOMADIK_MTU0_BASE));
++	nmdk_timer_init(io_p2v(NOMADIK_MTU0_BASE), IRQ_MTU0);
+ }
+ 
+ static struct sys_timer nomadik_timer = {
+diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
+index 6f39731..20d02fa 100644
+--- a/arch/arm/mach-ux500/timer.c
++++ b/arch/arm/mach-ux500/timer.c
+@@ -96,7 +96,7 @@ dt_fail:
+ 	 *
+ 	 */
+ 
+-	nmdk_timer_init(mtu_timer_base);
++	nmdk_timer_init(mtu_timer_base, IRQ_MTU0);
+ 	clksrc_dbx500_prcmu_init(prcmu_timer_base);
+ 	ux500_twd_init();
+ }
+diff --git a/arch/arm/plat-nomadik/include/plat/mtu.h b/arch/arm/plat-nomadik/include/plat/mtu.h
+index 582641f..8008897 100644
+--- a/arch/arm/plat-nomadik/include/plat/mtu.h
++++ b/arch/arm/plat-nomadik/include/plat/mtu.h
+@@ -1,7 +1,7 @@
+ #ifndef __PLAT_MTU_H
+ #define __PLAT_MTU_H
+ 
+-void nmdk_timer_init(void __iomem *base);
++void nmdk_timer_init(void __iomem *base, int irq);
+ void nmdk_clkevt_reset(void);
+ void nmdk_clksrc_reset(void);
+ 
+diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
+index 9222e55..0ae2b06 100644
+--- a/arch/arm/plat-nomadik/timer.c
++++ b/arch/arm/plat-nomadik/timer.c
+@@ -174,7 +174,7 @@ void nmdk_clksrc_reset(void)
+ 	       mtu_base + MTU_CR(0));
+ }
+ 
+-void __init nmdk_timer_init(void __iomem *base)
++void __init nmdk_timer_init(void __iomem *base, int irq)
+ {
+ 	unsigned long rate;
+ 	struct clk *clk0;
+@@ -217,7 +217,7 @@ void __init nmdk_timer_init(void __iomem *base)
+ #endif
+ 
+ 	/* Timer 1 is used for events, register irq and clockevents */
+-	setup_irq(IRQ_MTU0, &nmdk_timer_irq);
++	setup_irq(irq, &nmdk_timer_irq);
+ 	nmdk_clkevt.cpumask = cpumask_of(0);
+ 	clockevents_config_and_register(&nmdk_clkevt, rate, 2, 0xffffffffU);
+ }
 -- 
 1.7.11.3
