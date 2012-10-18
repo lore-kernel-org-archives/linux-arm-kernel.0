@@ -1,79 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 18 Oct 2012 17:11:29 +0200
-Subject: [PATCH 1/2] video: Add support for the Solomon SSD1307 OLED
- Controller
-In-Reply-To: <50761BB0.3080507@gmx.de>
-References: <1348158800-23039-1-git-send-email-maxime.ripard@free-electrons.com>
- <1348158800-23039-2-git-send-email-maxime.ripard@free-electrons.com>
- <505C73D1.7030800@free-electrons.com> <50618242.2070302@free-electrons.com>
- <50761BB0.3080507@gmx.de>
-Message-ID: <50801C21.2060207@free-electrons.com>
+From: shijie8@gmail.com (Huang Shijie)
+Date: Thu, 18 Oct 2012 11:18:53 -0400
+Subject: [PATCH] dma: add new DMA control commands
+In-Reply-To: <CAJe_ZhfarH-HpJkEOpH=jY1Gc-UPEyuA4bJ4LSQES7Uyea2BQw@mail.gmail.com>
+References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
+ <1350541111.5263.3.camel@vkoul-udesk3>
+ <507FA595.4020507@freescale.com>
+ <CAJe_ZhfarH-HpJkEOpH=jY1Gc-UPEyuA4bJ4LSQES7Uyea2BQw@mail.gmail.com>
+Message-ID: <CAMiH66H=VMEgHFMdEhCTqA5AtVw6iN97-cbwUd86Ghd77OLcWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-Le 11/10/2012 03:06, Florian Tobias Schandinat a ?crit :
-> Hi Maxime,
-> 
-> On 09/25/2012 10:06 AM, Maxime Ripard wrote:
->> Hello Florian,
+On Thu, Oct 18, 2012 at 5:29 AM, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> On 18 October 2012 12:15, Huang Shijie <b32955@freescale.com> wrote:
+>> ? 2012?10?18? 14:18, Vinod Koul ??:
 >>
->> Le 21/09/2012 16:04, Maxime Ripard a ?crit :
->>> Le 20/09/2012 18:33, Maxime Ripard a ?crit :
->>>> This patch adds support for the Solomon SSD1307 OLED
->>>> controller found on the Crystalfontz CFA10036 board.
->>>>
->>>> This controller can drive a display with a resolution up
->>>> to 128x39 and can operate over I2C or SPI.
->>>>
->>>> The current driver has only been tested on the CFA-10036,
->>>> that is using this controller over I2C to driver a 96x16
->>>> OLED screen.
->>>>
->>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>> Cc: Brian Lilly <brian@crystalfontz.com>
->>>
->>> Would you consider merging this patch or review it?
->>> It has been around for quite some time now and has not received any
->>> comments for at least the 2 last versions, so I guess there is not much
->>> left holding it back (unless, of course, if you have some comments to
->>> address), and I really would like to have it in 3.7.
+>>> Why cant you do start (prepare clock etc) when you submit the descriptor
+>>> to dmaengine. Can be done in tx_submit callback.
+>>> Similarly remove the clock when dma transaction gets completed.
 >>
->> I guess we missed the 3.7 merge here. That's no big deal, but I sent the
->> patch series on a regular basis, starting 07/17 (sent new versions on
->> 07/31, 08/23, 09/05 and 09/20), addressed all the issues that were
->> raised, and never got any feedback from you, either positive or
->> negative. The patches affecting the MX28 device trees have already been
->> merged by Shawn Guo into its tree, so only the driver and the bindings
->> remain to be merged. So I'm kind of lost on what should I do here?
+>> I ever thought this method too.
 >>
->> Is it because I have an obviously broken driver or you don't have enough
->> time, or you don't want to merge drivers for such type of low resolution
->> controllers, or any other reason?
-> 
-> I don't see any reason to not support low resolutions, might be a nice
-> status monitor for embedded devices.
-> It's not your fault. It's just that for the past two months writing my
-> thesis reduced my free time (and hence the time that I could potentially
-> use for reviewing patches) to approximately zero. While I managed to get
-> some smaller patches done, there really wasn't any time to process the
-> 3-4 completely new things pending and some scarier patches which touch
-> the core infrastructure.
-> I think that it should be better soon, at least my thesis is now done,
-> but I also have to fix up the rest of my life that was neglected while
-> writing, including my paid jobs.
+>> But it will become low efficient in the following case:
+>>
+>>   Assuming the gpmi-nand driver has to read out 1024 pages in one _SINGLE_
+>> read operation.
+>> The gpmi-nand will submit the descriptor to dmaengine per page. So with your
+>> method,
+>> the system will repeat the enable/disable dma clock 1024 time. At every
+>> enable/disable dma clock,
+>> the system has to enable the clock chain and it's parents ...
+>>
+>> But with this patch, we only need to enable/disable dma clock one time, just
+>> at we select the nand chip.
+>>
+> If the clock is the dmac's property (not channels'), the toggling
+> seems too aggressive.
+> You could try using runtime_suspend/resume for clock
+> disabling/enabling. How about employing autosuspend with a few ms
+> delay?
 
-Ok, that's fine :)
+Yes, employing the autosuspend is workable method too.o
+But it's a little more complicated then this patch. You have to create
+a thread or workqueue to
+do the job.
 
-How do you want to proceed? To you want me to resend the patchset, or
-you will review this one when you will have some time?
+What's more, I think other DMA engine may also meets the same issue as
+the mxs-dma, such as the imx-sdma.
+It's somehow a common issue to disable the clocks when no one use the
+DMA engine.
+Do you also suggest employing the autosuspend? Why not use a simple
+way to handle this issue?
+When the dma device want to use a DMA engine, it just needs to issue a
+DMA_START command.
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+thanks
+Huang Shijie
+Huang Shijie
