@@ -1,9 +1,9 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 18 Oct 2012 17:06:57 +0800
-Subject: [PATCH 03/10] tty: pxa: configure pin
+Date: Thu, 18 Oct 2012 17:06:58 +0800
+Subject: [PATCH 04/10] i2c: pxa: configure pins
 In-Reply-To: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1350551224-12857-4-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,41 +11,38 @@ Configure pins by pinctrl driver.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- drivers/tty/serial/pxa.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index 5847a4b..ee6118a 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -37,6 +37,7 @@
- #include <linux/delay.h>
- #include <linux/interrupt.h>
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index 1034d93..cd66ec2 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -32,6 +32,7 @@
  #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_i2c.h>
 +#include <linux/pinctrl/consumer.h>
  #include <linux/platform_device.h>
- #include <linux/tty.h>
- #include <linux/tty_flip.h>
-@@ -795,6 +796,7 @@ static int serial_pxa_probe_dt(struct platform_device *pdev,
- 			       struct uart_pxa_port *sport)
+ #include <linux/err.h>
+ #include <linux/clk.h>
+@@ -1051,6 +1052,7 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
+ 			    enum pxa_i2c_types *i2c_types)
  {
  	struct device_node *np = pdev->dev.of_node;
 +	struct pinctrl *pinctrl;
+ 	const struct of_device_id *of_id =
+ 			of_match_device(i2c_pxa_dt_ids, &pdev->dev);
  	int ret;
- 
- 	if (!np)
-@@ -805,6 +807,12 @@ static int serial_pxa_probe_dt(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
+@@ -1063,6 +1065,9 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
  		return ret;
  	}
+ 	pdev->id = ret;
 +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		ret = PTR_ERR(pinctrl);
-+		return ret;
-+	}
-+
- 	sport->port.line = ret;
- 	return 0;
- }
++	if (IS_ERR(pinctrl))
++		return 1;
+ 	if (of_get_property(np, "mrvl,i2c-polling", NULL))
+ 		i2c->use_pio = 1;
+ 	if (of_get_property(np, "mrvl,i2c-fast-mode", NULL))
 -- 
 1.7.0.4
