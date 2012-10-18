@@ -1,167 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 18 Oct 2012 13:26:30 +0800
-Subject: [PATCH v2] ARM: mxs: Add support for the Armadeus Systems APF28
- module
-In-Reply-To: <1350492832-7044-1-git-send-email-julien.boibessot@free.fr>
-References: <1350492832-7044-1-git-send-email-julien.boibessot@free.fr>
-Message-ID: <20121018052626.GD4378@S2101-09.ap.freescale.net>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Thu, 18 Oct 2012 10:56:13 +0530
+Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
+In-Reply-To: <507ECB31.8030006@gmail.com>
+References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9FBC41@DBDE01.ent.ti.com>
+ <20121011144756.GB12552@atomide.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93E9FCEC9@DBDE01.ent.ti.com>
+ <20121015160154.GB15569@atomide.com> <507D050D.2090402@ti.com>
+ <507E455F.7060703@ti.com> <507ECB31.8030006@gmail.com>
+Message-ID: <507F92F5.6080906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 06:53:52PM +0200, julien.boibessot at free.fr wrote:
-> From: Julien Boibessot <julien.boibessot@armadeus.com>
-> 
-> The APF28 is a small SOM built around an i.MX28 processor with 128MBytes DDR2,
-> 256MBytes NAND Flash and an Ethernet PHY.
-> 
-> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
->  Changes since v1 (as advised by Shawn Guo):
->  * add imx28-apf28.dtb to arch/arm/boot/dts/Makefile
->  * fix partitions declaration for gpmi-nand in imx28-apf28.dts
-> 
->  arch/arm/boot/dts/Makefile        |    3 +-
->  arch/arm/boot/dts/imx28-apf28.dts |   85 +++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mxs/mach-mxs.c      |    7 +++
->  3 files changed, 94 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx28-apf28.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c1ce813..5baf5a0 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -59,7 +59,8 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
->  	imx28-cfa10049.dtb \
->  	imx28-evk.dtb \
->  	imx28-m28evk.dtb \
-> -	imx28-tx28.dtb
-> +	imx28-tx28.dtb \
-> +	imx28-apf28.dtb
+Hi Daniel,
 
-Please maintain the alphabet order on the list.
+On Wednesday 17 October 2012 08:43 PM, Daniel Mack wrote:
+> On 17.10.2012 07:42, Afzal Mohammed wrote:
 
-Shawn
+>> I doubt whether auxdata would help here, it seems using
+>> compatible field alone would help in deciding relevant
+>> custom timing routine. Whether we want this kind of
+>> peripheral knowledge in gpmc driver instead of using
+>> generic timing routine has to be decided though.
 
->  dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->  	omap3-beagle-xm.dtb \
->  	omap3-evm.dtb \
-> diff --git a/arch/arm/boot/dts/imx28-apf28.dts b/arch/arm/boot/dts/imx28-apf28.dts
-> new file mode 100644
-> index 0000000..7eb0758
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx28-apf28.dts
-> @@ -0,0 +1,85 @@
-> +/*
-> + * Copyright 2012 Armadeus Systems - <support@armadeus.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "imx28.dtsi"
-> +
-> +/ {
-> +	model = "Armadeus Systems APF28 module";
-> +	compatible = "armadeus,imx28-apf28", "fsl,imx28";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x08000000>;
-> +	};
-> +
-> +	apb at 80000000 {
-> +		apbh at 80000000 {
-> +			gpmi-nand at 8000c000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg>;
-> +				status = "okay";
-> +
-> +				partition at 0 {
-> +					label = "u-boot";
-> +					reg = <0x0 0x300000>;
-> +				};
-> +
-> +				partition at 300000 {
-> +					label = "env";
-> +					reg = <0x300000 0x80000>;
-> +				};
-> +
-> +				partition at 380000 {
-> +					label = "env2";
-> +					reg = <0x380000 0x80000>;
-> +				};
-> +
-> +				partition at 400000 {
-> +					label = "dtb";
-> +					reg = <0x400000 0x80000>;
-> +				};
-> +
-> +				partition at 480000 {
-> +					label = "splash";
-> +					reg = <0x480000 0x80000>;
-> +				};
-> +
-> +				partition at 500000 {
-> +					label = "kernel";
-> +					reg = <0x500000 0x800000>;
-> +				};
-> +
-> +				partition at d00000 {
-> +					label = "rootfs";
-> +					reg = <0xd00000 0xf300000>;
-> +				};
-> +			};
-> +		};
-> +
-> +		apbx at 80040000 {
-> +			duart: serial at 80074000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&duart_pins_a>;
-> +				status = "okay";
-> +			};
-> +		};
-> +	};
-> +
-> +	ahb at 80080000 {
-> +		mac0: ethernet at 800f0000 {
-> +			phy-mode = "rmii";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&mac0_pins_a>;
-> +			phy-reset-gpios = <&gpio4 13 0>;
-> +			status = "okay";
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index b8c452a..9cfb25c 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -367,6 +367,11 @@ static void __init cfa10049_init(void)
->  	update_fec_mac_prop(OUI_CRYSTALFONTZ);
->  }
->  
-> +static void __init apf28_init(void)
-> +{
-> +	enable_clk_enet_out();
-> +}
-> +
->  static void __init mxs_machine_init(void)
->  {
->  	if (of_machine_is_compatible("fsl,imx28-evk"))
-> @@ -379,6 +384,8 @@ static void __init mxs_machine_init(void)
->  		apx4devkit_init();
->  	else if (of_machine_is_compatible("crystalfontz,cfa10049"))
->  		cfa10049_init();
-> +	else if (of_machine_is_compatible("armadeus,imx28-apf28"))
-> +		apf28_init();
->  
->  	of_platform_populate(NULL, of_default_bus_match_table,
->  			     mxs_auxdata_lookup, NULL);
-> -- 
-> 1.7.5.4
-> 
+> Another thing that might be worth thinking about is that apart from the
+> GPMC host controller and the peripherals, there could be other
+> components like level shifters or series resistors on the board that
+> limit the maximum speed of transactions. So in fact we might be better
+> off storing all that timing details in the DT, as they are in fact
+> highly application specific.
+
+Yes, making it future proof for these kind of scenarios was one
+of the reason's that initially triggered generic timing path.
+
+Regards
+Afzal
