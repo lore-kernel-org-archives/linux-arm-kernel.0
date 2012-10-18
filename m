@@ -1,100 +1,182 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Thu, 18 Oct 2012 17:47:31 +0200
-Subject: [PATCH v2 1/5] ARM: bcm476x: Add platform infrastructure
-In-Reply-To: <201210181348.02110.arnd@arndb.de>
-References: <20121014221450.866288977@gmail.com>
- <20121014223023.611069832@gmail.com>
- <201210181348.02110.arnd@arndb.de>
-Message-ID: <20121018154731.GA9344@glitch>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 18 Oct 2012 17:53:51 +0200
+Subject: [PATCH 3/3] RTC: omap-rtc: add DT bindings
+In-Reply-To: <1350575631-15523-1-git-send-email-zonque@gmail.com>
+References: <1350575631-15523-1-git-send-email-zonque@gmail.com>
+Message-ID: <1350575631-15523-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 01:48:01PM +0000, Arnd Bergmann wrote:
-> On Sunday 14 October 2012, Domenico Andreoli wrote:
-> > From: Domenico Andreoli <domenico.andreoli@linux.com>
-> > 
-> > Platform infrastructure for the Broadcom BCM476x ARMv6 SoCs.
-> 
-> Hi Domenico,
+This adds bindings for the OMAP RTC driver.
 
-Hi Arnd,
+There are currently two compatible string it matches, "ti,omap-rtc" and
+"ti,am33xx-rtc". This is done because the AM33xx needs extra registers
+to be written in order to unlock the register set.
 
-> All your patches look good to me now, except for one thing throughout
-> the bindings:
-> 
-> > Index: b/Documentation/devicetree/bindings/arm/bcm476x.txt
-> > ===================================================================
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/bcm476x.txt
-> > @@ -0,0 +1,15 @@
-> > +Broadcom BCM4760 and BCM4761 SoCs device tree bindings
-> > +------------------------------------------------------
-> > +
-> > +Boards with the BCM4760 SoC shall have the following properties:
-> > +
-> > +Required root node property:
-> > +
-> > +compatible = "brcm,bcm4760";
-> > +
-> > +
-> > +Boards with the BCM4761 SoC shall have the following properties:
-> > +
-> > +Required root node property:
-> > +
-> > +compatible = "brcm,bcm4761";
-> 
-> I probably wasn't clear enough with my request to have specific
-> chip identifiers in the device tree "compatible" nodes. The idea
-> generally is that for completely identical hardware blocks, you
-> just need to put the first known variant into the driver, e.g.
-> "brcm,bcm4760-system-timer", and in case of a later chip that
-> is compatible with it, you list both "brcm,bcm4760-system-timer"
-> and "brcm,bcm4761-system-timer" in the compatible property of the
-> device tree. The way you did it is also correct and works, but
-> is a bit less common.
-> 
-> How do you want to merge your patches? The preferred way from
-> our side is to get a pull request from you sent to arm at kernel.org
-> with Cc to the linux-arm-kernel mailing list, but we can also
-> pick up the patches separately if necessary.
+Also, the OMAP_RTC_OSC_REG can be set up via DT, in particular two bits:
 
-so the above becomes:
+	32KCLK_EN  - Selects external clock source, namely
+		     rtc_32k_clk_rtc_32k_clk that is from the
+		     32-kHz oscillator
 
-Index: b/Documentation/devicetree/bindings/arm/bcm476x.txt
-===================================================================
+	32KCLK_SEL - 32-kHz clock enable post clock mux of
+		     rtc_32k_clk_rtc_32k_aux_clk and
+		     rtc_32k_clk_rtc_32k_clk
+
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ Documentation/devicetree/bindings/rtc/omap-rtc.txt | 25 +++++++
+ drivers/rtc/rtc-omap.c                             | 78 ++++++++++++++++++++++
+ 2 files changed, 103 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/omap-rtc.txt
+
+diff --git a/Documentation/devicetree/bindings/rtc/omap-rtc.txt b/Documentation/devicetree/bindings/rtc/omap-rtc.txt
+new file mode 100644
+index 0000000..a2abc9c
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm476x.txt
-@@ -0,0 +1,15 @@
-+Broadcom BCM4760 and BCM4761 SoCs device tree bindings
-+------------------------------------------------------
++++ b/Documentation/devicetree/bindings/rtc/omap-rtc.txt
+@@ -0,0 +1,25 @@
++* OMAP RTC
 +
-+Boards with the BCM4760 SoC shall have the following properties:
-+
-+Required root node property:
-+
-+compatible = "brcm,bcm4760";
++Required properties:
++- compatible : Should be "ti,omap-rtc" or "ti,am33xx-rtc"
 +
 +
-+Boards with the BCM4761 SoC shall have the following properties:
++Optional properties for AM33xx
++- ti,rtc-external-osc - Selects external clock source, namely
++			rtc_32k_clk_rtc_32k_clk that is from the
++			32-kHz oscillator
 +
-+Required root node property:
++- ti,rtc-32clk-enable - 32-kHz clock enable post clock mux of
++			rtc_32k_clk_rtc_32k_aux_clk and
++			rtc_32k_clk_rtc_32k_clk
 +
-+compatible = "brcm,bcm4760", "brcm,bcm4761";
-
-and the dt_mach in the board file is left only with "brcm,bcm4760" until
-required otherwise. The same applies to drivers.
-
-Does the order matter? 
-
-> For the patches that go into different directories like the clk
-> and the clocksource drivers, please Cc the respective subsystem
-> maintainers and ask them for an Ack. It certainly makes sense
-> for a new platform port to get merged through the arm-soc tree,
-> but any future improvements should normally just go through the
-> subsystem trees.
-
-I'd prefer patches but only because I've not any public git repository. If
-the git pull is much more preferred, I surely can manage it.
-
-Thanks,
-Domenico
++Example for AM33xx:
++
++rtc at 44e3e000 {
++	compatible = "marvell,am33xx-rtc";
++	reg = <0x44e3e000 0x1000>;
++	interrupts = <75 76>;
++	ti,hwmods = "rtc";
++	ti,rtc-32clk-enable;
++	ti,rtc-external-osc;
++};
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index baa876e..5529719 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -21,6 +21,8 @@
+ #include <linux/rtc.h>
+ #include <linux/bcd.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ #include <asm/io.h>
+ 
+@@ -65,6 +67,9 @@
+ #define OMAP_RTC_COMP_MSB_REG		0x50
+ #define OMAP_RTC_OSC_REG		0x54
+ 
++#define AM33XX_RTC_KICK0R_REG		0x6c
++#define AM33XX_RTC_KICK1R_REG		0x70
++
+ /* OMAP_RTC_CTRL_REG bit fields: */
+ #define OMAP_RTC_CTRL_SPLIT		(1<<7)
+ #define OMAP_RTC_CTRL_DISABLE		(1<<6)
+@@ -286,6 +291,76 @@ static struct rtc_class_ops omap_rtc_ops = {
+ static int omap_rtc_alarm;
+ static int omap_rtc_timer;
+ 
++enum {
++	OMAP_RTC_HW_OMAP = 0,
++	OMAP_RTC_HW_AM33XX,
++};
++
++#ifdef CONFIG_OF
++static const struct of_device_id of_omap_rtc_match[] = {
++	{
++		.compatible	= "ti,omap-rtc",
++		.data		= (void *) OMAP_RTC_HW_OMAP,
++	},
++	{
++		.compatible	= "ti,am33xx-rtc",
++		.data		= (void *) OMAP_RTC_HW_AM33XX,
++	},
++	{ }
++};
++
++static int omap_rtc_probe_dt(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match;
++	int hw_type;
++	u32 val;
++
++	match = of_match_device(of_omap_rtc_match, &pdev->dev);
++
++	if (!match)
++		return 0;
++
++	hw_type = (int) match->data;
++
++	if (hw_type == OMAP_RTC_HW_AM33XX) {
++		/*
++		 * From the datasheet:
++		 *
++		 * The kick registers (KICKnR) are used to enable and disable
++		 * write protection on the RTC registers. Out of reset, the RTC
++		 * registers are write-protected. To disable write protection,
++		 * correct keys must be written to the KICKnR registers. The
++		 * Kick0 register allows writing to unlock the kick0 data.
++		 */
++		__raw_writel(0x83e70b13, rtc_base + AM33XX_RTC_KICK0R_REG);
++		__raw_writel(0x95a4f1e0, rtc_base + AM33XX_RTC_KICK1R_REG);
++
++		/* Set RTC_OSC_REG */
++		val = __raw_readl(rtc_base + OMAP_RTC_OSC_REG);
++		if (of_get_property(np, "ti,rtc-32clk-enable", NULL))
++			val |= (1 << 6);
++		else
++			val &= ~(1 << 6);
++
++		if (of_get_property(np, "ti,rtc-external-osc", NULL))
++			val |= (1 << 3);
++		else
++			val &= ~(1 << 3);
++
++		__raw_writel(val, rtc_base + OMAP_RTC_OSC_REG);
++	}
++
++	return 0;
++}
++
++#else
++static int omap_rtc_probe_dt(struct platform_device *pdev)
++{
++	return 0;
++}
++#endif
++
+ static int __init omap_rtc_probe(struct platform_device *pdev)
+ {
+ 	struct resource		*res, *mem;
+@@ -326,6 +401,8 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 	pm_runtime_enable(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
++	omap_rtc_probe_dt(pdev);
++
+ 	rtc = rtc_device_register(pdev->name, &pdev->dev,
+ 			&omap_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(rtc)) {
+@@ -483,6 +560,7 @@ static struct platform_driver omap_rtc_driver = {
+ 	.driver		= {
+ 		.name	= "omap_rtc",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = of_match_ptr(of_omap_rtc_match),
+ 	},
+ };
+ 
+-- 
+1.7.11.7
