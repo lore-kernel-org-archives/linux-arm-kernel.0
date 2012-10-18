@@ -1,113 +1,32 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 17 Oct 2012 15:39:54 -0000
-Subject: [RFC/NOT FOR MERGING 5/5] i2c: omap: introduce suspend/resume methods
-In-Reply-To: <1350488043-5053-1-git-send-email-balbi@ti.com>
-References: <1350488043-5053-1-git-send-email-balbi@ti.com>
-Message-ID: <1350488043-5053-6-git-send-email-balbi@ti.com>
+From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
+Date: Thu, 18 Oct 2012 09:28:14 -0000
+Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
+ conditions.
+In-Reply-To: <CAHod+Gd=aLbntWsX_S_26_XSUtG9DQYkki1Y+drq0+8GdnHfaw@mail.gmail.com>
+References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
+ <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
+ <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
+ <CAMPhdO8duNqisVL+FLc_0zgFTP+13r83XtRD0YbpdkzMuJov3Q@mail.gmail.com>
+ <CAHod+Gd=aLbntWsX_S_26_XSUtG9DQYkki1Y+drq0+8GdnHfaw@mail.gmail.com>
+Message-ID: <CAHod+GcwNr6r_ZQFq-btPJ3E_keWKJhkCb2jP4CES6JTSyn8ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-during system-wide (static) suspend, we also
-want to save our context and restore it when
-waking up.
+> Almost there, but I guess we could do this better and less confusing by having
+> another array, e.g. tosa_gpio18_config[], which is tosa specific, and only
+> initialize that MFP setting in the tosa path.
+>
+>>
+>> I also looked at the original sharp kernel sources.
+>> Only tosa used the RDY signal for it's tc6393tx chip, other machines simply
+>> configured gpio18 as output in their suspend routines.
 
-Let's introduce new suspend/resume methods so
-that we can survive a suspend-to-ram transition.
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/i2c/busses/i2c-omap.c | 60 +++++++++++++++++++++++++++++++++++--------
- 1 file changed, 50 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 7eeae11..ceab138 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1236,13 +1236,8 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
- }
- 
- #ifdef CONFIG_PM
--#ifdef CONFIG_PM_RUNTIME
--static int omap_i2c_runtime_suspend(struct device *dev)
-+static int omap_i2c_low_level_suspend(struct omap_i2c_dev *_dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
--	u16 iv;
--
- 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
- 
- 	omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, 0);
-@@ -1253,11 +1248,8 @@ static int omap_i2c_runtime_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int omap_i2c_runtime_resume(struct device *dev)
-+static int omap_i2c_low_level_resume(struct omap_i2c_dev *_dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
--
- 	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
- 		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
- 		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
-@@ -1278,9 +1270,57 @@ static int omap_i2c_runtime_resume(struct device *dev)
- 
- 	return 0;
- }
-+
-+static int omap_i2c_suspend(struct device *dev)
-+{
-+	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
-+
-+	if (pm_runtime_suspended(dev))
-+		return 0;
-+
-+	return omap_i2c_low_level_suspend(_dev);
-+}
-+
-+static int omap_i2c_resume(struct device *dev)
-+{
-+	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
-+	int r;
-+
-+	r = omap_i2c_low_level_resume(_dev);
-+	if (r)
-+		return r;
-+
-+	pm_runtime_disable(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_PM_RUNTIME
-+static int omap_i2c_runtime_suspend(struct device *dev)
-+{
-+	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
-+
-+	return omap_i2c_low_level_suspend(_dev);
-+}
-+
-+static int omap_i2c_runtime_resume(struct device *dev)
-+{
-+	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
-+
-+	return omap_i2c_low_level_resume(_dev);
-+}
-+#else
-+#define omap_i2c_runtime_suspend NULL
-+#define omap_i2c_runtime_resume NULL
- #endif /* CONFIG_PM_RUNTIME */
- 
- static struct dev_pm_ops omap_i2c_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend,
-+			omap_i2c_resume)
- 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
- 			   omap_i2c_runtime_resume, NULL)
- };
--- 
-1.8.0.rc0
+Actually, tosa doesn't use sharpsl_pm. Tosa uses the pda-power framework.
+I said that only tosa uses the RDY signal to point out that we
+probably don't need
+the mfp-config line in postsuspend. That being said, i still think
+that the array ordering
+fix is adequate. Maybe later we may remove the mfp-config line from
+postsuspend when
+we're absolutely sure it isn't necessary for devices that use spitz_pm.c.
