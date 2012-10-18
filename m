@@ -1,66 +1,60 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 18 Oct 2012 10:08:30 +0200
-Subject: [PATCH] ARM: dts: AM33XX: Add tsl2550 ambient light sensor DT data
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA53C2B@DBDE01.ent.ti.com>
-References: <1348242551-21293-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA53C2B@DBDE01.ent.ti.com>
-Message-ID: <507FB8FE.6010003@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 18 Oct 2012 17:13:10 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
+In-Reply-To: <4502243.v9vY3prCgE@wuerfel>
+References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
+ <201210171342.29635.arnd@arndb.de>
+ <20121018005811.GA4325@verge.net.au> <4502243.v9vY3prCgE@wuerfel>
+Message-ID: <20121018081310.GA27117@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
-
-On 10/18/2012 07:46 AM, AnilKumar, Chimata wrote:
-> On Fri, Sep 21, 2012 at 21:19:11, AnilKumar, Chimata wrote:
->> Add tsl2550 ambient light sensor DT data to am335x-evm.dts. In AM335x
->> EVM tsl2550 ambient light sensor is connected to I2C2 bus. So this patch
->> adds child node inside i2c2 node with i2c slave address.
->>
->> TAOS tsl2550 sensor with two-wire SMBus serial interface. This patch
->> also reduces I2C2 clock frequency to 100KHz from 400KHz because the
->> maximum clock frequency of SMBus is 100KHz.
->>
->> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->> ---
->>  arch/arm/boot/dts/am335x-evm.dts |    7 ++++++-
->>  1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
->> index 3b1f313..d99aa0f 100644
->> --- a/arch/arm/boot/dts/am335x-evm.dts
->> +++ b/arch/arm/boot/dts/am335x-evm.dts
->> @@ -49,7 +49,7 @@
->>  
->>  		i2c2: i2c at 4802a000 {
->>  			status = "okay";
->> -			clock-frequency = <400000>;
->> +			clock-frequency = <100000>;
->>  
->>  			lis331dlh: lis331dlh at 18 {
->>  				compatible = "st,lis331dlh", "st,lis3lv02d";
->> @@ -79,6 +79,11 @@
->>  				st,max-limit-z = <750>;
->>  			};
->>  
->> +			tsl2550: tsl2550 at 39 {
->> +				compatible = "taos,tsl2550";
->> +				reg = <0x39>;
->> +			};
->> +
->>  			tmp275: tmp275 at 48 {
->>  				compatible = "ti,tmp275";
->>  				reg = <0x48>;
+On Thu, Oct 18, 2012 at 07:29:30AM +0000, Arnd Bergmann wrote:
+> On Thursday 18 October 2012 09:58:11 Simon Horman wrote:
+> > On Wed, Oct 17, 2012 at 01:42:29PM +0000, Arnd Bergmann wrote:
+> > > On Wednesday 17 October 2012, Simon Horman wrote:
+> > > > Hi Olof, Hi Arnd,
+> > > > 
+> > > > please consider the following defconfig enhancements for 3.8.
+> > > 
+> > > These look good to me, but I wonder what happened to the plan to reduce
+> > > the number of defconfig files we discussed before. Since you can build
+> > > a combined kernel that runs on all (or most) of the supported boards,
+> > > can you add a combined shmobile_defconfig that is able to work on
+> > > a wide variety of hardware and drop some of the less common defconfig
+> > > files?
+> > > 
+> > > Most of the modern platforms nowadays have just one defconfig that
+> > > covers everything.
+> > 
+> > Hi Arnd,
+> > 
+> > I wonder if such consolidation only makes sense for boards that
+> > make use of DT. If so, I can see that we may be able to come
+> > up with a single configuration for the Armadillo800eva, KZM9G
+> > and KZM9D boards. But not for older boards such as the Mackerel which
+> > have not been converted to use DT.
 > 
-> Hi Tony/Benoit,
+> Usually you should just be able to enable any boards together,
+> independent of whether they are using DT or not. It's possible
+> that shmobile does something different from the other platforms
+> that I'm not aware of, of course. If you look at e.g.
+> omap2plus_defconfig or imx_v6_v7_defconfig, they both enable
+> all the available boards.
+
+Thanks, I'll see what I can do within the scope of the boards
+that I have access to.
+
+> > I am also wondering if more of the drivers that SH Mobile uses need to
+> > become DT aware before a consolidated configuration can work.  In
+> > particular, I am thinking about the SCI serial driver and the location of
+> > the serial port that can be used for serial console and early printk - this
+> > features in the kernel command line of the per-board defconfigs and is
+> > relied on by developers.
 > 
-> If there are no comments in this patch could you please take this in?
+> Device drivers that don't use DT should get their configuration from
+> platform_data. The command line can be used to override those, but it's
+> also normally passed by the boot loader, which also has to configure
+> e.g. how much memory is present or which uart to use.
 
-Have you updated the binding documentation to list the device?
-
-It should be in:
-Documentation/devicetree/bindings/i2c/trivial-devices.txt
-
-Please Cc as well the DT ml.
-
-Regards,
-Benoit
+Understood.
