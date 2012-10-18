@@ -1,27 +1,53 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 18 Oct 2012 15:27:06 +0200
-Subject: PDF documentation
-In-Reply-To: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
-References: <CAE7jHC83biZy7TNYSr+-X85tpenqtAHuwSO47Q-6+XRF0fUxLA@mail.gmail.com>
-Message-ID: <508003AA.8010409@ahsoftware.de>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 18 Oct 2012 15:39:05 +0200
+Subject: [PATCH] ARM: OMAP2+: clockdomain: Fix OMAP4 ISS clk domain to support
+ only SWSUP
+Message-ID: <50800679.2030202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.10.2012 15:22, schrieb Constantine Shulyupin:
+From: Miguel Vadillo <vadillo@ti.com>
 
-> Questions:
-> - have same issues with PDF documentation and datasheets?
+Since CAM domain (ISS) has no module wake-up dependency
+with any other clock domain of the device and the dynamic
+dependency from L3_main_2 is always disabled, the domain
+needs to be in force wakeup in order to be able to access
+it for configure (sysconfig) it or use it.
 
-No.
+Also since there is no clock in the domain managed automatically
+by the hardware, there is no use to configure automatic
+clock domain transition. SW should keep the SW_WKUP domain
+transition as long as a module in the domain is required to
+be functional.
 
-> - do you think documentation and datasheets in HTML format on a site
-> can be more useful than PDF?
+Signed-off-by: Miguel Vadillo <vadillo@ti.com>
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+---
 
-I would prefer if the source for the (PDF-)documentation would be
-available in some open, free and widely used meta-language, e.g. LaTeX
-(or XML or txt2tags or ..., but I'm oldschool and prefer LaTeX ;) ). So
-everyone could build it's copy in whatever format he prefers or needs.
+Hi Tony,
+
+Here is a fix that Miguel sent me some time back and that I forgot until
+I face the crash again while trying to enable the ISS for test.
 
 Regards,
+Benoit
 
-Alexander
+ arch/arm/mach-omap2/clockdomains44xx_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c
+b/arch/arm/mach-omap2/clockdomains44xx_data.c
+index b56d06b..95192a0 100644
+--- a/arch/arm/mach-omap2/clockdomains44xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
+@@ -359,7 +359,7 @@ static struct clockdomain iss_44xx_clkdm = {
+ 	.clkdm_offs	  = OMAP4430_CM2_CAM_CAM_CDOFFS,
+ 	.wkdep_srcs	  = iss_wkup_sleep_deps,
+ 	.sleepdep_srcs	  = iss_wkup_sleep_deps,
+-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
++	.flags		  = CLKDM_CAN_SWSUP,
+ };
+
+ static struct clockdomain l3_dss_44xx_clkdm = {
+-- 
+1.7.0.4
