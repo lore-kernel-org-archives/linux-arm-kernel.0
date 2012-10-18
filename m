@@ -1,130 +1,96 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 18 Oct 2012 11:42:07 -0500
-Subject: [PATCH 1/5] ARM: OMAP2+: gpmc: Fix kernel BUG for DT boot mode
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB43B17@DBDE01.ent.ti.com>
-References: <cover.1350327320.git.richardcochran@gmail.com>
- <41d66042625157d089e9c9532030a6831e79c641.1350327324.git.richardcochran@gmail.com>
- <507DB9EC.9060407@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB43B17@DBDE01.ent.ti.com>
-Message-ID: <5080315F.8090802@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 18 Oct 2012 10:01:00 -0700
+Subject: [RFC/NOT FOR MERGING 2/5] arm: omap: don't forcefully runtime
+ suspend a device
+In-Reply-To: <1350488043-5053-3-git-send-email-balbi@ti.com> (Felipe Balbi's
+ message of "Wed, 17 Oct 2012 18:34:00 +0300")
+References: <1350488043-5053-1-git-send-email-balbi@ti.com>
+ <1350488043-5053-3-git-send-email-balbi@ti.com>
+Message-ID: <87fw5bg1f7.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Felipe Balbi <balbi@ti.com> writes:
 
-On 10/18/2012 11:16 AM, Hiremath, Vaibhav wrote:
-> On Wed, Oct 17, 2012 at 01:17:56, Hunter, Jon wrote:
->>
->> On 10/15/2012 02:16 PM, Richard Cochran wrote:
->>> From: hvaibhav at ti.com <hvaibhav@ti.com>
->>>
->>> With recent changes in omap gpmc driver code, in case of DT
->>> boot mode, where bootloader does not configure gpmc cs space
->>> will result into kernel BUG() inside gpmc_mem_init() function,
->>> as gpmc cs0 gpmc_config7[0].csvalid bit is set to '1' and
->>> gpmc_config7[0].baseaddress is set to '0' on reset.
->>
->> I am not sure I completely follow the logic here.
->>
->> Won't this problem occur if the bootloader does not configure the gpmc
->> cs space AND we are not using DT?
->>
-> 
-> That's what exactly the above comment describes.
+> device drivers should be smart enough to provide
+> ->suspend/->resume callbacks when needed and they
+> should take care of doing whatever needs to be
+> done in order to allow a device to be suspended.
+>
+> Calling pm_runtime_* from system suspend isn't
+> the right way to achieve that, as it creates a
+> situation where OMAP's PM has different requirements
+> and semantics than all other architectures.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Hmm ... you said "in the case of DT", but I am saying even "in the case
-WITHOUT DT" this can happen. So I think the subject is mis-leading.
+NAK
 
->> Is the csvalid bit set because we are booting from the internal ROM?
->>
-> 
-> As per TRM, the reset value of the CS0_valis bit is set to 0. I have pasted 
-> TRM statement below -
-> 
-> "Chip-select enable (reset value is 1 for CS[0] and 0 for CS[1-5])."
+This support is required to handle some restrictions placed on runtime
+PM and system PM interactions.   Basically, runtime PM transitions are
+disabled part way through system PM (that itself was a much debated
+topic last year, but that's how it works today.)
 
-The above two sentences don't see to agree ...
+Because of this limitation, drivers that are active during the suspend
+phase (commonly becasue they are used by [late] suspend methods of other
+devices) may have multiple runtime PM transitions during static
+suspend/resume.  These drivers have the problem that after runtime PM
+has been disabled, even when they pm_runtime_put*, they will not
+actually be transitioned (and their runtime PM callbacks will not be
+called.)
 
-> And same applies to OMAP3 family of devices.
+So these devices are in a "ready to runtime suspend" state, but they
+will not transition because runtime PM is disabled.
 
-For which boot-modes? All or just the gpmc boot-modes?
+After your patch, they will still be idled (omap_device_idle), but the
+driver will have no notification that this has happened because you
+removed the calling of the runtime PM callbacks.
 
-My omap3430 beagle has been booting with DT fine for some time and I
-have not encountered this problem even on the latest kernel with the
-gpmc driver present.
+In the changelog, you seem to be implying that anything the driver
+should be doing should be done in its suspend/resume callbacks instead
+of the runtime suspend/resume callbacks (but don't give your reasoning.)
 
->> I guess I don't see why csvalid bit being set and a base-address of 0x0
->> should not be allowed. That should be a valid combination.
->>
-> 
-> Yes, agreed.
-> 
->> One problem I see with gpmc_mem_init() is that it assumes that
->> BOOT_ROM_SPACE is 1MB for all devices starting at 0x0 apart from the
->> apollon board. For newer devices such as OMAP4, there is only 48KB of
->> internal ROM and only mapped to 0x0 when booting from internal ROM. So
->> this needs to be fixed.
->>
->> How much internal ROM does the AM335x have and where is it mapped?
->>
-> 
-> AM33xx memory map is something like,
-> 
-> Boot ROM  0x4000_0000 0x4001_FFFF 128KB
->           0x4002_0000 0x4002_BFFF 48KB    32-bit Ex/R(1) - Public
-> Reserved  0x4002_C000 0x400F_FFFF 848KB   Reserved
-> Reserved  0x4010_0000 0x401F_FFFF 1MB     Reserved
-> Reserved  0x4020_0000 0x402E_FFFF 960KB   Reserved
-> Reserved  0x402f_0000 0x4020_03FF 64KB    Reserved
-> SRAM internal 0x402F_0400 0x402F_FFFF    32-bit Ex/R/W(1)
+Using the current approach (which was actually suggested by Rafael), it
+means many transiactional drivers (like I2C) can be implemented as
+runtime PM only, and don't need to provide suspend/resume callbacks at
+all.  It also means they can be used throughout the suspend/resume path
+(well until noirq methods.)
 
-Does the boot ROM get mapped to 0x0, when booting from ROM?
+The approach in $SUBJECT patch would mean that drivers should not be
+used after their suspend method has been called.  That places some
+severe limitations on drivers like I2C, SPI, HSI, UART etc. that are
+often used by the suspend/resume methods of other drivers.
 
->>> This use-case is applicable for any board/EVM which doesn't have
->>> any peripheral connected to gpmc cs0, for example BeagleXM and
->>> BeagleBone, so DT boot mode fails.
->>>
->>> This patch adds of_have_populated_dt() check before creating
->>> device, so that for DT boot mode, gpmc probe will not be called
->>> which is expected behavior, as gpmc is not supported yet from DT.
->>
->> Yes, but we do actually still allow some platform devices to be probed
->> (such as dmtimers) when booting with DT that don't support DT yet. So
->> this change prevents us from using the gpmc on boards when booting with DT.
->>
-> 
-> The idea here was,
-> 
-> In order to use GPMC in meaningful way, where some peripheral is connected 
-> to the GPMC, you must create platform_device for the probe to happen 
-> properly. Now all the devices I know so far, we have gpmc_smsc911x_init(), 
-> omap_nand_flash_init(), etc...
-> These api's are getting called only through machine_desc.init_xxx callbacks,
-> And in case of DT, we have centralized machine_desc definition for all 
-> platforms (board-generic.c). So even though you want to use GPMC for DT boot
-> mode, you can not make use of peripheral without changing board-files to 
-> change to create platform_device.
-> 
-> Does it make sense?
+Kevin
 
-Sure, if you are using one of the generic machine configurations for DT.
-However, while this migration happens people may create their own custom
-machine configurations for DT for testing things like smsc911x.
-
->> I am not convinced that this is addressing the underlying problem with
->> gpmc_mem_init().
->>
-> 
-> The patch you submitted is cleanup patch and is required irrespective of 
-> this patch. I believe this patch is just makes sure that, if you are booting 
-> from DT and you do not have meaningful DT node for GPMC and peripheral 
-> interfaced to it, no point in probing it. 
-> 
-> Does it make any sense???
-
-Yes, but do you also see the bug that is hiding in gpmc_mem_init()?
-
-My point is to highlight this and not hide it, so that we can fix it
-now. Otherwise if we wait until we enable the gpmc driver with DT and
-this could hinder the DT migration later.
-
-Jon
+> ---
+>  arch/arm/plat-omap/omap_device.c | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 935f416..cd84eac 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -817,11 +817,9 @@ static int _od_suspend_noirq(struct device *dev)
+>  	ret = pm_generic_suspend_noirq(dev);
+>  
+>  	if (!ret && !pm_runtime_status_suspended(dev)) {
+> -		if (pm_generic_runtime_suspend(dev) == 0) {
+> -			if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+> -				omap_device_idle(pdev);
+> -			od->flags |= OMAP_DEVICE_SUSPENDED;
+> -		}
+> +		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+> +			omap_device_idle(pdev);
+> +		od->flags |= OMAP_DEVICE_SUSPENDED;
+>  	}
+>
+>  	return ret;
+> @@ -841,7 +839,6 @@ static int _od_resume_noirq(struct device *dev)
+>  		od->flags &= ~OMAP_DEVICE_SUSPENDED;
+>  		if (!(od->flags & OMAP_DEVICE_NO_IDLE_ON_SUSPEND))
+>  			omap_device_enable(pdev);
+> -		pm_generic_runtime_resume(dev);
+>  	}
+>  
+>  	return pm_generic_resume_noirq(dev);
