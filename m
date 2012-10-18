@@ -1,39 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Oct 2012 13:30:29 -0700
-Subject: [PATCH 3/4] ARM: OMAP2+: Move iommu/iovmm headers to platform_data
-In-Reply-To: <20121018162512.GD30550@atomide.com>
-References: <20121016003513.19701.71718.stgit@muffinssi.local>
- <20121016003640.19701.51749.stgit@muffinssi.local>
- <1418726.Yza1yb71Ul@avalon> <20121018162512.GD30550@atomide.com>
-Message-ID: <20121018203028.GE30550@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 18 Oct 2012 13:47:59 -0700
+Subject: [RFC/NOT FOR MERGING 1/5] arm: omap: fix up _od_suspend_noirq and
+ _od_resume_noirq
+In-Reply-To: <20121018193440.GA8609@arwen.pp.htv.fi> (Felipe Balbi's message
+ of "Thu, 18 Oct 2012 22:34:40 +0300")
+References: <1350488043-5053-1-git-send-email-balbi@ti.com>
+ <1350488043-5053-2-git-send-email-balbi@ti.com>
+ <871ugvivso.fsf@deeprootsystems.com>
+ <20121018165525.GA6385@arwen.pp.htv.fi>
+ <87ipa7d6cy.fsf@deeprootsystems.com>
+ <20121018175027.GA7917@arwen.pp.htv.fi>
+ <87vce77hba.fsf@deeprootsystems.com>
+ <20121018193440.GA8609@arwen.pp.htv.fi>
+Message-ID: <874nlr5wxs.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121018 09:27]:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121018 06:45]:
-> > Hi,
-> > 
-> > On Monday 15 October 2012 17:36:40 Tony Lindgren wrote:
-> > > From: Ido Yariv <ido@wizery.com>
-> > > 
-> > > Move iommu/iovmm headers from plat/ to platform_data/ as part of the
-> > > single zImage work.
-> > 
-> > Is that really where those headers belong ? iommu-omap.h contains far more 
-> > than platform data, and iovmm-omap.h contains no platform data at all.
-> 
-> Hmm I though that was already fixed by Ido but looks like there are
-> non-platform data things still remaining there.
-> 
-> Looking at arch/arm/mach-omap2/iommu2.c it seems that it should moved to
-> drivers/iommu/omap-iommu2.c and that way most of the header can be local
-> in drivers/iommu/omap-iommu.h. I'll do some patches for that and repost.
+Felipe Balbi <balbi@ti.com> writes:
 
-I ended up solving the iovmm-omap.h issue by adding include/linux/omap-iommu.h
-like intel and amd have.
+[...]
 
-Reposted the series as "[PATCH v3 0/6] omap iommu changes to remove plat includes".
+> if the device implements none of the suspend methods, then you
+> shouldn't suspend it at all, because you'd be masking a bug in the
+> driver, IMHO.
 
-Regards,
+OK, let's start over here, because here's the fundamental difference.  I
+don't think missing suspend methods means a bug in the driver at all.
 
-Tony
+For a moment, let's ignore the limitations/restrictions that exist today
+betwen system PM and runtime PM and assume runtime PM can be used
+anytime, including anywhere in the suspend/resume path.
+
+In that ideal world, many drivers would not need system suspend methods
+at all.  They would just runtime PM to enable/disable themselves based
+on driver/device activity.
+
+Stated differently, since the driver is using runtime PM, when system
+suspend happens, the device is already idle, and runtime suspended, so
+there is nothing for the system PM methods to do.  Therefore, no system
+PM callbacks are needed.  No bug in driver.
+
+(yes, this is oversimplified to illustrate the goal/point.  Some drivers
+may want to have a ->suspend callback to wait/stop any current
+processing, but that is just so runtime PM can kick in.)
+
+This is the "runtime PM centric" view of things that we have been
+driving towards with OMAP drivers (we've been doing this with aggressive
+clock gating even before runtime PM framework.)  
+
+In other words, if drivers are written with this "runtime PM centric"
+view, there should be almost nothing to do in the suspend method, except
+quiesce the hardware so runtime PM kicks in.
+
+This runtime PM centric view is the mindset/philosophy behind the PM
+domain implementation, and driver PM adaptations that we've been doing
+for some time.
+
+In converting/reviewing/testing *many* drivers that have been PM adapted
+(for system PM and runtime PM), most folks do not get this right.
+Therfore, if driver writers can concentrate on runtime PM, and just use
+system PM as a "quiesce HW, let runtime PM take over" method, that is
+where I want to go.
+
+Kevin
