@@ -1,16 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 18 Oct 2012 20:20:38 +0200
-Subject: [PATCH 01/10] pinctrl: use postcore_initcall
-In-Reply-To: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+Date: Thu, 18 Oct 2012 20:29:51 +0200
+Subject: [PATCH 07/10] pinctrl: remove mutex lock in groups show
+In-Reply-To: <1350551224-12857-7-git-send-email-haojian.zhuang@gmail.com>
 References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <CACRpkdZ6jS-sgj9=WQ72Jbcb_mRAdZMcknp8V3oFS6WBgXTi2Q@mail.gmail.com>
+ <1350551224-12857-7-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <CACRpkdYDe1ODiXbV8JSmzwqVHTasY1TfkWZ0GFYQqORog4x52A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch has the wrong subject, should be pinctrl: single: or
-pinctrl/single: ...
+On Thu, Oct 18, 2012 at 11:07 AM, Haojian Zhuang
+<haojian.zhuang@gmail.com> wrote:
 
-Anyway, I need Tony to ACK them before merging.
+> Mutex is locked duplicatly by pinconf_groups_show() and
+> pin_config_group_get(). It results dead lock. So avoid to lock mutex
+> in pinconf_groups_show().
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+
+Thanks! Applied to my fixes branch with a Cc: stable tag.
 
 Yours,
 Linus Walleij
