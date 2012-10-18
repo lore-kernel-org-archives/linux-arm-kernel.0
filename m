@@ -1,41 +1,33 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Thu, 18 Oct 2012 21:49:34 +0530
-Subject: 3.7-rc-1 Release Causing application failure for compilation
-Message-ID: <CA+V-a8uj4wSz60Ov8S3MpSrUe-D5+OcpVsFjURzSEcE6VdvGGQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Oct 2012 09:25:12 -0700
+Subject: [PATCH 3/4] ARM: OMAP2+: Move iommu/iovmm headers to platform_data
+In-Reply-To: <1418726.Yza1yb71Ul@avalon>
+References: <20121016003513.19701.71718.stgit@muffinssi.local>
+ <20121016003640.19701.51749.stgit@muffinssi.local>
+ <1418726.Yza1yb71Ul@avalon>
+Message-ID: <20121018162512.GD30550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121018 06:45]:
+> Hi,
+> 
+> On Monday 15 October 2012 17:36:40 Tony Lindgren wrote:
+> > From: Ido Yariv <ido@wizery.com>
+> > 
+> > Move iommu/iovmm headers from plat/ to platform_data/ as part of the
+> > single zImage work.
+> 
+> Is that really where those headers belong ? iommu-omap.h contains far more 
+> than platform data, and iovmm-omap.h contains no platform data at all.
 
-I have updated to 3.7-rc1 kernel version with latest head with
-commit-id 43c422eda99b894f18d1cca17bcd2401efaf7bd0
-but when I try to cross compile the Application I am getting following errors.
+Hmm I though that was already fixed by Ido but looks like there are
+non-platform data things still remaining there.
 
-/home/plad/ti/linus/linus/include/linux/types.h:14:26: error:
-conflicting types for 'fd_set'
-/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/select.h:78:5:
-note: previous declaration of 'fd_set' was here
-/home/plad/ti/linus/linus/include/linux/types.h:15:25: error:
-conflicting types for 'dev_t'
-/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/types.h:61:17:
-note: previous declaration of 'dev_t' was here
-/home/plad/ti/linus/linus/include/linux/types.h:17:26: error:
-conflicting types for 'mode_t'
-/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/types.h:71:18:
-note: previous declaration of 'mode_t' was here
-/home/plad/ti/linus/linus/include/linux/types.h:25:26: error:
-conflicting types for 'timer_t'
-/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/time.h:104:19:
-note: previous declaration of 'timer_t' was here
-/home/plad/ti/linus/linus/include/linux/types.h:134:23: error:
-conflicting types for 'blkcnt_t'
-/home/plad/CodeSourcery/Sourcery_G++_Lite/bin/../arm-none-linux-gnueabi/libc/usr/include/sys/types.h:236:20:
-note: previous declaration of 'blkcnt_t' was here
+Looking at arch/arm/mach-omap2/iommu2.c it seems that it should moved to
+drivers/iommu/omap-iommu2.c and that way most of the header can be local
+in drivers/iommu/omap-iommu.h. I'll do some patches for that and repost.
 
-I use the codesourcery toolchain for cross compiling the applications
-for ARM. The same compiler is used to  build the uImage for ARM, but
-when I try building the apps I see this issue. Can any help me out in
-fixing this.
+Thanks,
 
-Regards,
---Prabhakar Lad
+Tony
