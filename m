@@ -1,49 +1,75 @@
-From: mporter@ti.com (Matt Porter)
-Date: Fri, 19 Oct 2012 12:32:37 -0400
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <20121019160041.GB4730@atomide.com>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
- <20121017235045.GB30550@atomide.com>
- <20121018030654.GE2867@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
- <20121018184443.GD2350@netboy.at.omicron.at>
- <50806B1D.9040504@ti.com>
- <20121019061630.GB2983@netboy.at.omicron.at>
- <20121019160041.GB4730@atomide.com>
-Message-ID: <20121019163237.GG25164@beef>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 19 Oct 2012 19:30:27 +0300
+Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
+ revert "i2c: omap: switch to threaded IRQ support")
+In-Reply-To: <1350655227.2768.11.camel@twins>
+References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+ <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
+ <20121016133356.GG21801@arwen.pp.htv.fi>
+ <87ipaanljt.fsf_-_@deeprootsystems.com>
+ <20121017140002.GI11394@arwen.pp.htv.fi>
+ <20121017143534.GJ11394@arwen.pp.htv.fi>
+ <87txtsitpt.fsf@deeprootsystems.com>
+ <20121018055136.GF11137@arwen.pp.htv.fi>
+ <1350655227.2768.11.camel@twins>
+Message-ID: <20121019163027.GD1493@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 09:00:41AM -0700, Tony Lindgren wrote:
-> * Richard Cochran <richardcochran@gmail.com> [121018 23:18]:
-> > On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
-> > > 
-> > > Another important point is, this driver is also required and used for
-> > > Davinci family of devices (arch/mach/mach-davinci/).
+Hi,
+
+On Fri, Oct 19, 2012 at 04:00:27PM +0200, Peter Zijlstra wrote:
+> On Thu, 2012-10-18 at 08:51 +0300, Felipe Balbi wrote:
+> > > So the primary question remains: is RT runtime supposed to include the
+> > > time spent suspended?  I suspect not. 
 > > 
-> > That is really beside the point. If the code isn't ready yet, then
-> > don't merge it.
-> > 
-> > When I asked about the beaglebone, I was given the impression that it
-> > will be ready for v3.7-rc1.  But, as I know realize, at the current
-> > rate, it might not even be ready for v3.8.
-> > 
-> > I don't mind waiting, but please make sure that whatever lands into a
-> > release is really, truly working.
+> > you might be right there, though we need Thomas or Peter to answer :-s 
 > 
-> Indeed. This has been a problem with many of the TI patches in
-> general. People are working on separate product trees and then produce
-> patches for the mainline kernel that are poorly tested.
+> re, sorry both tglx and I have been traveling, he still is, I'm trying
+> to play catch-up :-)
 > 
-> The requirement should be: Do your patch on an omap board then send the
-> patch from your omap board after booting your board with the patch :)
+> Anyway, yeah I'm somewhat surprised the clock is 'running' when the
+> machine isn't. From what I could gather, this is !x86 hardware, right?
+> 
+> x86 explicitly makes sure our clocks are 'stopped' during suspend, see
+> commit cd7240c0b900eb6d690ccee088a6c9b46dae815a.
+> 
+> Can you do something similar for ARM? A quick look at
+> arch/arm/kernel/sched_clock.c shows there's already suspend/resume
+> hooks, do they do the wrong thing?
 
-s/should be/is/
+if I understand correctly, then below should be enough. I did't test it
+though:
 
-I fixed that for you. :) That's always been the requirement for the
-kernel, period. There's also a lot of dead/unused code in the davinci
-driver world too...so omap isn't alone with this phenomenon.
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index 87ba8dd..c9260e6 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -116,7 +116,7 @@ int __init omap_init_clocksource_32k(void __iomem *vbase)
+ 		return ret;
+ 	}
+ 
+-	setup_sched_clock(omap_32k_read_sched_clock, 32, 32768);
++	setup_sched_clock_needs_suspend(omap_32k_read_sched_clock, 32, 32768);
+ 	register_persistent_clock(NULL, omap_read_persistent_clock);
+ 	pr_info("OMAP clocksource: 32k_counter at 32768 Hz\n");
+ 
 
--Matt
+Russell, would you have any comments here ? Should we make sure all ARMs
+call setup_sched_clock_needs_suspend() and 'stop' counting during
+suspend ?
+
+I will test the above diff tomorrow, unless you have any other (better)
+idea on how to deal with the problem.
+
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121019/df3b447e/attachment.sig>
