@@ -1,5 +1,5 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 19 Oct 2012 16:28:16 -0700
+Date: Fri, 19 Oct 2012 16:54:55 -0700
 Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
  revert "i2c: omap: switch to threaded IRQ support")
 In-Reply-To: <1350655227.2768.11.camel@twins> (Peter Zijlstra's message of
@@ -13,7 +13,7 @@ References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
  <87txtsitpt.fsf@deeprootsystems.com>
  <20121018055136.GF11137@arwen.pp.htv.fi>
  <1350655227.2768.11.camel@twins>
-Message-ID: <87a9vijb3j.fsf@deeprootsystems.com>
+Message-ID: <87391ahvao.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,24 +27,24 @@ Peter Zijlstra <peterz@infradead.org> writes:
 >
 > re, sorry both tglx and I have been traveling, he still is, I'm trying
 > to play catch-up :-)
-
-No worries, thanks for the help.
-
+>
 > Anyway, yeah I'm somewhat surprised the clock is 'running' when the
 > machine isn't. From what I could gather, this is !x86 hardware, right?
 >
 > x86 explicitly makes sure our clocks are 'stopped' during suspend, see
 > commit cd7240c0b900eb6d690ccee088a6c9b46dae815a.
 >
-> Can you do something similar for ARM? A quick look at
-> arch/arm/kernel/sched_clock.c shows there's already suspend/resume
-> hooks, do they do the wrong thing?
+> Can you do something similar for ARM?
 
-No, they do the right thing, but only if they're asked by the
-SoC-specific code that registers a sched_clock.  Changing the SoC
-specific code to use the 'needs_suspend' API gets things working
-perfectly.
+So I did the same thing for my ARM SoC, and it definitley stops the RT
+throttling.  
 
-Thanks,
+However, it has the undesriable (IMO) side effect of making timed printk
+output rather unhelpful for debugging suspend/resume since printk time
+stays constant throughout suspend/resume no matter how long you
+sleep. :(
+
+So does that mean we have to choose between useful printk times during
+suspend/resume or functioning IRQ threads during suspend/resume ?
 
 Kevin
