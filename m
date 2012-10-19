@@ -1,178 +1,58 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 19 Oct 2012 10:01:40 +0200
-Subject: [PATCH] ARM: imx6q: let users input debug uart port number
-In-Reply-To: <1349676394-25704-1-git-send-email-shawn.guo@linaro.org>
-References: <1349676394-25704-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <508108E4.4030607@de.bosch.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 19 Oct 2012 16:18:16 +0800
+Subject: Question about move atmel audio part to DT support
+In-Reply-To: <5080F54F.4000600@atmel.com>
+References: <5080F54F.4000600@atmel.com>
+Message-ID: <50810CC8.4050009@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.10.2012 08:06, Shawn Guo wrote:
-> imx6q gets 5 uart ports in total.  Different board design may choose
-> different port as debug uart.  For example, imx6q-sabresd uses UART1,
-> imx6q-sabrelite uses UART2 and imx6q-arm2 uses UART4.  Rather than
-> bloating DEBUG_LL choice list with all these uart ports, the patch
-> introduces DEBUG_IMX6Q_UART_PORT for users to input uart port number
-> when DEBUG_IMX6Q_UART is selected inside DEBUG_LL choice.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc:
+    linux-arm-kernel mailing list
+    devicetree-discuss mailing list
+    alsa-devel mailing list
+    linux-sound mailing list
 
-Sounds like a good idea :)
 
-Thanks
-
-Dirk
-
-> ---
->  arch/arm/Kconfig.debug       |   26 +++++++++++++-------------
->  arch/arm/include/debug/imx.S |   20 ++++++++++++++++----
->  arch/arm/mach-imx/lluart.c   |   28 ++++++++++++++++++----------
->  arch/arm/mach-imx/mx6q.h     |    4 ----
->  4 files changed, 47 insertions(+), 31 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 5566520..5dc7109 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -209,20 +209,12 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on i.MX50 or i.MX53.
->  
-> -	config DEBUG_IMX6Q_UART2
-> -		bool "i.MX6Q Debug UART2"
-> +	config DEBUG_IMX6Q_UART
-> +		bool "i.MX6Q Debug UART"
->  		depends on SOC_IMX6Q
->  		help
->  		  Say Y here if you want kernel low-level debugging support
-> -		  on i.MX6Q UART2. This is correct for e.g. the SabreLite
-> -                  board.
-> -
-> -	config DEBUG_IMX6Q_UART4
-> -		bool "i.MX6Q Debug UART4"
-> -		depends on SOC_IMX6Q
-> -		help
-> -		  Say Y here if you want kernel low-level debugging support
-> -		  on i.MX6Q UART4.
-> +		  on i.MX6Q.
->  
->  	config DEBUG_MMP_UART2
->  		bool "Kernel low-level debugging message via MMP UART2"
-> @@ -409,6 +401,15 @@ choice
->  
->  endchoice
->  
-> +config DEBUG_IMX6Q_UART_PORT
-> +	int "i.MX6Q Debug UART Port (1-5)" if DEBUG_IMX6Q_UART
-> +	range 1 5
-> +	default 1
-> +	depends on SOC_IMX6Q
-> +	help
-> +	  Choose UART port on which kernel low-level debug messages
-> +	  should be output.
-> +
->  config DEBUG_LL_INCLUDE
->  	string
->  	default "debug/icedcc.S" if DEBUG_ICEDCC
-> @@ -418,8 +419,7 @@ config DEBUG_LL_INCLUDE
->  				 DEBUG_IMX31_IMX35_UART || \
->  				 DEBUG_IMX51_UART || \
->  				 DEBUG_IMX50_IMX53_UART ||\
-> -				 DEBUG_IMX6Q_UART2 || \
-> -				 DEBUG_IMX6Q_UART4
-> +				 DEBUG_IMX6Q_UART
->  	default "debug/highbank.S" if DEBUG_HIGHBANK_UART
->  	default "debug/mvebu.S" if DEBUG_MVEBU_UART
->  	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
-> diff --git a/arch/arm/include/debug/imx.S b/arch/arm/include/debug/imx.S
-> index 0b65d79..0c4e17d 100644
-> --- a/arch/arm/include/debug/imx.S
-> +++ b/arch/arm/include/debug/imx.S
-> @@ -10,6 +10,20 @@
->   * published by the Free Software Foundation.
->   *
->   */
-> +#define IMX6Q_UART1_BASE_ADDR	0x02020000
-> +#define IMX6Q_UART2_BASE_ADDR	0x021e8000
-> +#define IMX6Q_UART3_BASE_ADDR	0x021ec000
-> +#define IMX6Q_UART4_BASE_ADDR	0x021f0000
-> +#define IMX6Q_UART5_BASE_ADDR	0x021f4000
-> +
-> +/*
-> + * IMX6Q_UART_BASE_ADDR is put in the middle to force the expansion
-> + * of IMX6Q_UART##n##_BASE_ADDR.
-> + */
-> +#define IMX6Q_UART_BASE_ADDR(n)	IMX6Q_UART##n##_BASE_ADDR
-> +#define IMX6Q_UART_BASE(n)	IMX6Q_UART_BASE_ADDR(n)
-> +#define IMX6Q_DEBUG_UART_BASE	IMX6Q_UART_BASE(CONFIG_DEBUG_IMX6Q_UART_PORT)
-> +
->  #ifdef CONFIG_DEBUG_IMX1_UART
->  #define UART_PADDR	0x00206000
->  #elif defined (CONFIG_DEBUG_IMX25_UART)
-> @@ -22,10 +36,8 @@
->  #define UART_PADDR	0x73fbc000
->  #elif defined (CONFIG_DEBUG_IMX50_IMX53_UART)
->  #define UART_PADDR	0x53fbc000
-> -#elif defined (CONFIG_DEBUG_IMX6Q_UART2)
-> -#define UART_PADDR	0x021e8000
-> -#elif defined (CONFIG_DEBUG_IMX6Q_UART4)
-> -#define UART_PADDR	0x021f0000
-> +#elif defined (CONFIG_DEBUG_IMX6Q_UART)
-> +#define UART_PADDR	IMX6Q_DEBUG_UART_BASE
->  #endif
->  
->  /*
-> diff --git a/arch/arm/mach-imx/lluart.c b/arch/arm/mach-imx/lluart.c
-> index 5f15103..2fdc9bf 100644
-> --- a/arch/arm/mach-imx/lluart.c
-> +++ b/arch/arm/mach-imx/lluart.c
-> @@ -17,17 +17,25 @@
->  
->  #include "hardware.h"
->  
-> +#define IMX6Q_UART1_BASE_ADDR	0x02020000
-> +#define IMX6Q_UART2_BASE_ADDR	0x021e8000
-> +#define IMX6Q_UART3_BASE_ADDR	0x021ec000
-> +#define IMX6Q_UART4_BASE_ADDR	0x021f0000
-> +#define IMX6Q_UART5_BASE_ADDR	0x021f4000
-> +
-> +/*
-> + * IMX6Q_UART_BASE_ADDR is put in the middle to force the expansion
-> + * of IMX6Q_UART##n##_BASE_ADDR.
-> + */
-> +#define IMX6Q_UART_BASE_ADDR(n)	IMX6Q_UART##n##_BASE_ADDR
-> +#define IMX6Q_UART_BASE(n)	IMX6Q_UART_BASE_ADDR(n)
-> +#define IMX6Q_DEBUG_UART_BASE	IMX6Q_UART_BASE(CONFIG_DEBUG_IMX6Q_UART_PORT)
-> +
->  static struct map_desc imx_lluart_desc = {
-> -#ifdef CONFIG_DEBUG_IMX6Q_UART2
-> -	.virtual	= MX6Q_IO_P2V(MX6Q_UART2_BASE_ADDR),
-> -	.pfn		= __phys_to_pfn(MX6Q_UART2_BASE_ADDR),
-> -	.length		= MX6Q_UART2_SIZE,
-> -	.type		= MT_DEVICE,
-> -#endif
-> -#ifdef CONFIG_DEBUG_IMX6Q_UART4
-> -	.virtual	= MX6Q_IO_P2V(MX6Q_UART4_BASE_ADDR),
-> -	.pfn		= __phys_to_pfn(MX6Q_UART4_BASE_ADDR),
-> -	.length		= MX6Q_UART4_SIZE,
-> +#ifdef CONFIG_DEBUG_IMX6Q_UART
-> +	.virtual	= IMX_IO_P2V(IMX6Q_DEBUG_UART_BASE),
-> +	.pfn		= __phys_to_pfn(IMX6Q_DEBUG_UART_BASE),
-> +	.length		= 0x4000,
->  	.type		= MT_DEVICE,
->  #endif
->  };
-> diff --git a/arch/arm/mach-imx/mx6q.h b/arch/arm/mach-imx/mx6q.h
-> index f7e7dba..19d3f54 100644
-> --- a/arch/arm/mach-imx/mx6q.h
-> +++ b/arch/arm/mach-imx/mx6q.h
-> @@ -27,9 +27,5 @@
->  #define MX6Q_CCM_SIZE			0x4000
->  #define MX6Q_ANATOP_BASE_ADDR		0x020c8000
->  #define MX6Q_ANATOP_SIZE		0x1000
-> -#define MX6Q_UART2_BASE_ADDR		0x021e8000
-> -#define MX6Q_UART2_SIZE			0x4000
-> -#define MX6Q_UART4_BASE_ADDR		0x021f0000
-> -#define MX6Q_UART4_SIZE			0x4000
->  
->  #endif	/* __MACH_MX6Q_H__ */
+On 10/19/2012 14:38, Bo Shen wrote:
+> Hi Mark Brown,
+>    Now, I am trying to move atmel audio part to DT support. I meet the
+> following issue.
+>
+>    Atmel audio part has three platform device:
+>      -> atmel ssc: ssc library (different SOC has different number)
+>      -> atmel ssc dai: dai for audio
+>      -> atmel pcm: for pdc or dma transfer (now only support pdc, dma
+> support will add soon)
+>
+>   In DT support kernel, I don't find any similar case. So, if I want to
+> keep ssc as library, and use dai to register pcm. Then the dts file will
+> like:
+> ---<8---
+> ssc0: ssc at fffbc000 {
+>                  status = "okay";
+> };
+>
+> dai0: dai {
+>                  compatible = "atmel,atmel-ssc-dai";
+>          };
+>
+> sound {
+>                  compatible = "atmel,at91sam9g20-audio";
+>                  atmel,model = "wm8731 @ sam9g20ek";
+>
+>                  atmel,audio-routing =
+>                          "Ext Spk", "LHPOUT",
+>                          "Int Mic", "MICIN";
+>
+>                  atmel,audio-codec = <&wm8731>;
+>                  atmel,dai = <&dai>;
+> };
+> --->8---
+>
+>    Would this be OK?
+>    If not, may I add some code for ssc which dedicate for audio into
+> sound/soc/atmel (using audio-ssc and ssc to distiguish which dedicate
+> for audio, which used for ssc library)? This will broken the exist code
+> for audio (only sam9g20-wm8731).
+>    Any suggestion?
