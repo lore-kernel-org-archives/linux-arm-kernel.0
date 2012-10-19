@@ -1,256 +1,124 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 19 Oct 2012 15:05:08 +0200
-Subject: [PATCH v2] pinctrl: reserve pins when states are activated
-Message-ID: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 19 Oct 2012 15:25:15 +0200
+Subject: [RFC] media: mx3: Add support for missing video formats
+In-Reply-To: <1556117578.7042626.1350477684664.JavaMail.root@advansee.com>
+References: <1556117578.7042626.1350477684664.JavaMail.root@advansee.com>
+Message-ID: <4395759.IItbMJZE6z@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi Beno?t,
 
-This switches the way that pins are reserved for multiplexing:
+On Wednesday 17 October 2012 14:41:24 Beno?t Th?baudeau wrote:
+> Hi all,
+> 
+> This is an RFC for a patch completing full video capture support on i.MX3x.
+> 
+> It adds missing video formats and automatic format associations according to
+> the underlying sensor capabilities.
+> 
+> It also fixes a spurious IPU interrupt issue that I have encountered on
+> i.MX31 with earlier kernel versions. This might already have been fixed by
+> some of the changes that occurred in the IPU driver since then, but I still
+> have to test if my fix is still useful or not. Anyway, this should of
+> course be split away to a separate patch.
+> 
+> This patch has been successfully tested with i.MX35 and MT9M131, as well as
+> some not yet mainline OmniVision sensor drivers, using all
+> sensor-and-SoC-supported formats.
+> 
+> This patch still has to be rebased against the latest kernel and refactored
+> in the following way:
+>  1. Media formats.
+>  2. IPU formats.
+>  3. IPU spurious interrupt fix (if still required).
+>  4. mx3_camera formats.
+> 
+> Comments are welcome, especially regarding possible conflicts with other IPU
+> users.
+> 
+> Best regards,
+> Beno?t
+> 
+> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+> Cc: <linux-media@vger.kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Beno?t Th?baudeau <benoit.thebaudeau@advansee.com>
+> ---
+>  .../arch/arm/plat-mxc/include/mach/ipu.h           |   16 +-
+>  .../drivers/dma/ipu/ipu_idmac.c                    |  241 ++++++++++++++---
+>  .../drivers/media/video/mx3_camera.c               |  264 +++++++++++------
+>  .../drivers/media/video/soc_mediabus.c             |  276 ++++++++++++-----
+>  .../include/linux/v4l2-mediabus.h                  |   11 +-
+>  .../include/media/soc_mediabus.h                   |   30 ++-
 
-We used to do this when the map was parsed, at the creation of
-the settings inside the pinctrl handle, in pinmux_map_to_setting().
+Could you please split this patch in 3 patches ? The first one should add the 
+missing formats in include/linux/v4l2-mediabus.h, the second one in 
+drivers/media/video/soc_mediabus.c and include/media/soc_mediabus.h, and the 
+third one would include the mx3 changes. That will make review easier.
 
-However this does not work for us, because we want to use the
-same set of pins with different devices at different times: the
-current code assumes that the pin groups in a pinmux state will
-only be used with one single device, albeit different groups can
-be active at different times. For example if a single I2C driver
-block is used to drive two different busses located on two
-pin groups A and B, then the pins for all possible states of a
-function are reserved when fetching the pinctrl handle: the
-I2C bus can choose either set A or set B by a mux state at
-runtime, but all pins in both group A and B (the superset) are
-effectively reserved for that I2C function and mapped to the
-device. Another device can never get in and use the pins in
-group A, even if the device/function is using group B at the
-moment.
+Please also update Documentation/DocBook/media/v4l/subdev-formats.xml with a 
+description of the new media bus formats.
 
-Instead: let use reserve the pins when the state is activated
-and drop them when the state is disabled, i.e. when we move to
-another state. This way different devices/functions can use the
-same pins at different times.
+>  6 files changed, 626 insertions(+), 212 deletions(-)
 
-We know that this is an odd way of doing things, but we really
-need to switch e.g. an SD-card slot to become a tracing output
-sink at runtime: we plug in a special "tracing card" then mux
-the pins that used to be an SD slot around to the tracing
-unit and push out tracing data there instead of SD-card
-traffic.
+[snip]
 
-As a side effect pinmux_free_setting() is unused and gets
-deleted.
+> diff --git linux-3.4.5.orig/include/linux/v4l2-mediabus.h
+> linux-3.4.5/include/linux/v4l2-mediabus.h index 5ea7f75..57a9fc9 100644
+> --- linux-3.4.5.orig/include/linux/v4l2-mediabus.h
+> +++ linux-3.4.5/include/linux/v4l2-mediabus.h
+> @@ -37,7 +37,8 @@
+>  enum v4l2_mbus_pixelcode {
+>  	V4L2_MBUS_FMT_FIXED = 0x0001,
+> 
+> -	/* RGB - next is 0x1009 */
+> +	/* RGB - next is 0x100c */
+> +	V4L2_MBUS_FMT_RGB332_1X8 = 0x1009,
+>  	V4L2_MBUS_FMT_RGB444_2X8_PADHI_BE = 0x1001,
+>  	V4L2_MBUS_FMT_RGB444_2X8_PADHI_LE = 0x1002,
+>  	V4L2_MBUS_FMT_RGB555_2X8_PADHI_BE = 0x1003,
+> @@ -46,8 +47,10 @@ enum v4l2_mbus_pixelcode {
+>  	V4L2_MBUS_FMT_BGR565_2X8_LE = 0x1006,
+>  	V4L2_MBUS_FMT_RGB565_2X8_BE = 0x1007,
+>  	V4L2_MBUS_FMT_RGB565_2X8_LE = 0x1008,
+> +	V4L2_MBUS_FMT_RGB24_3X8_BE = 0x100a,
+> +	V4L2_MBUS_FMT_RGB24_3X8_LE = 0x100b,
 
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Jean Nicolas Graux <jean-nicolas.graux@stericsson.com>
-Cc: Loic Pallardy <loic.pallardy@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- The code was already accounting for the case where the setting
-  was not active and called pinmux_disable_setting()
-  from the core, so skip this and delete the now empty
-  pinmux_free_setting() altogether.
----
- Documentation/pinctrl.txt |  4 ++-
- drivers/pinctrl/core.c    |  3 +-
- drivers/pinctrl/core.h    |  2 ++
- drivers/pinctrl/pinmux.c  | 70 ++++++++++++++---------------------------------
- drivers/pinctrl/pinmux.h  |  5 ----
- 5 files changed, 28 insertions(+), 56 deletions(-)
+I think I would call those V4L2_MBUS_FMT_RGB24_3X8 and V4L2_MBUS_FMT_BGR24_3X8 
+instead.
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index 3b4ee53..a1cd2f9 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -1193,4 +1193,6 @@ foo_switch()
- 	...
- }
- 
--The above has to be done from process context.
-+The above has to be done from process context. The reservation of the pins
-+will be done when the state is activated, so in effect one specific pin
-+can be used by different functions at different times on a running system.
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 0f1ec9e..bbd930e 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -563,6 +563,8 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
- 		return -EPROBE_DEFER;
- 	}
- 
-+	setting->dev_name = map->dev_name;
-+
- 	switch (map->type) {
- 	case PIN_MAP_TYPE_MUX_GROUP:
- 		ret = pinmux_map_to_setting(map, setting);
-@@ -689,7 +691,6 @@ static void pinctrl_put_locked(struct pinctrl *p, bool inlist)
- 			case PIN_MAP_TYPE_MUX_GROUP:
- 				if (state == p->state)
- 					pinmux_disable_setting(setting);
--				pinmux_free_setting(setting);
- 				break;
- 			case PIN_MAP_TYPE_CONFIGS_PIN:
- 			case PIN_MAP_TYPE_CONFIGS_GROUP:
-diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-index 1f40ff6..12f5694 100644
---- a/drivers/pinctrl/core.h
-+++ b/drivers/pinctrl/core.h
-@@ -105,12 +105,14 @@ struct pinctrl_setting_configs {
-  * @type: the type of setting
-  * @pctldev: pin control device handling to be programmed. Not used for
-  *   PIN_MAP_TYPE_DUMMY_STATE.
-+ * @dev_name: the name of the device using this state
-  * @data: Data specific to the setting type
-  */
- struct pinctrl_setting {
- 	struct list_head node;
- 	enum pinctrl_map_type type;
- 	struct pinctrl_dev *pctldev;
-+	const char *dev_name;
- 	union {
- 		struct pinctrl_setting_mux mux;
- 		struct pinctrl_setting_configs configs;
-diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-index 9301a7a..0ecdf54 100644
---- a/drivers/pinctrl/pinmux.c
-+++ b/drivers/pinctrl/pinmux.c
-@@ -314,14 +314,11 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
- {
- 	struct pinctrl_dev *pctldev = setting->pctldev;
- 	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
--	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
- 	char const * const *groups;
- 	unsigned num_groups;
- 	int ret;
- 	const char *group;
- 	int i;
--	const unsigned *pins;
--	unsigned num_pins;
- 
- 	if (!pmxops) {
- 		dev_err(pctldev->dev, "does not support mux function\n");
-@@ -376,55 +373,9 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
- 	}
- 	setting->data.mux.group = ret;
- 
--	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group, &pins,
--				      &num_pins);
--	if (ret) {
--		dev_err(pctldev->dev,
--			"could not get pins for device %s group selector %d\n",
--			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
--			return -ENODEV;
--	}
--
--	/* Try to allocate all pins in this group, one by one */
--	for (i = 0; i < num_pins; i++) {
--		ret = pin_request(pctldev, pins[i], map->dev_name, NULL);
--		if (ret) {
--			dev_err(pctldev->dev,
--				"could not request pin %d on device %s\n",
--				pins[i], pinctrl_dev_get_name(pctldev));
--			/* On error release all taken pins */
--			i--; /* this pin just failed */
--			for (; i >= 0; i--)
--				pin_free(pctldev, pins[i], NULL);
--			return -ENODEV;
--		}
--	}
--
- 	return 0;
- }
- 
--void pinmux_free_setting(struct pinctrl_setting const *setting)
--{
--	struct pinctrl_dev *pctldev = setting->pctldev;
--	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
--	const unsigned *pins;
--	unsigned num_pins;
--	int ret;
--	int i;
--
--	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
--				      &pins, &num_pins);
--	if (ret) {
--		dev_err(pctldev->dev,
--			"could not get pins for device %s group selector %d\n",
--			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
--		return;
--	}
--
--	for (i = 0; i < num_pins; i++)
--		pin_free(pctldev, pins[i], NULL);
--}
--
- int pinmux_enable_setting(struct pinctrl_setting const *setting)
- {
- 	struct pinctrl_dev *pctldev = setting->pctldev;
-@@ -446,6 +397,22 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
- 		num_pins = 0;
- 	}
- 
-+	/* Try to allocate all pins in this group, one by one */
-+	for (i = 0; i < num_pins; i++) {
-+		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
-+		if (ret) {
-+			dev_err(pctldev->dev,
-+				"could not request pin %d on device %s\n",
-+				pins[i], pinctrl_dev_get_name(pctldev));
-+			/* On error release all taken pins */
-+			i--; /* this pin just failed */
-+			for (; i >= 0; i--)
-+				pin_free(pctldev, pins[i], NULL);
-+			return -ENODEV;
-+		}
-+	}
-+
-+	/* Now that we have acquired the pins, encode the mux setting */
- 	for (i = 0; i < num_pins; i++) {
- 		desc = pin_desc_get(pctldev, pins[i]);
- 		if (desc == NULL) {
-@@ -482,6 +449,7 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
- 		num_pins = 0;
- 	}
- 
-+	/* Flag the descs that no setting is active */
- 	for (i = 0; i < num_pins; i++) {
- 		desc = pin_desc_get(pctldev, pins[i]);
- 		if (desc == NULL) {
-@@ -493,6 +461,10 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
- 		desc->mux_setting = NULL;
- 	}
- 
-+	/* And release the pins */
-+	for (i = 0; i < num_pins; i++)
-+		pin_free(pctldev, pins[i], NULL);
-+
- 	if (ops->disable)
- 		ops->disable(pctldev, setting->data.mux.func, setting->data.mux.group);
- }
-diff --git a/drivers/pinctrl/pinmux.h b/drivers/pinctrl/pinmux.h
-index d1a98b1..3c2aafa 100644
---- a/drivers/pinctrl/pinmux.h
-+++ b/drivers/pinctrl/pinmux.h
-@@ -27,7 +27,6 @@ int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
- 
- int pinmux_map_to_setting(struct pinctrl_map const *map,
- 			  struct pinctrl_setting *setting);
--void pinmux_free_setting(struct pinctrl_setting const *setting);
- int pinmux_enable_setting(struct pinctrl_setting const *setting);
- void pinmux_disable_setting(struct pinctrl_setting const *setting);
- 
-@@ -69,10 +68,6 @@ static inline int pinmux_map_to_setting(struct pinctrl_map const *map,
- 	return 0;
- }
- 
--static inline void pinmux_free_setting(struct pinctrl_setting const *setting)
--{
--}
--
- static inline int pinmux_enable_setting(struct pinctrl_setting const *setting)
- {
- 	return 0;
+> -	/* YUV (including grey) - next is 0x2014 */
+> +	/* YUV (including grey) - next is 0x2015 */
+>  	V4L2_MBUS_FMT_Y8_1X8 = 0x2001,
+>  	V4L2_MBUS_FMT_UYVY8_1_5X8 = 0x2002,
+>  	V4L2_MBUS_FMT_VYUY8_1_5X8 = 0x2003,
+> @@ -65,10 +68,11 @@ enum v4l2_mbus_pixelcode {
+>  	V4L2_MBUS_FMT_VYUY8_1X16 = 0x2010,
+>  	V4L2_MBUS_FMT_YUYV8_1X16 = 0x2011,
+>  	V4L2_MBUS_FMT_YVYU8_1X16 = 0x2012,
+> +	V4L2_MBUS_FMT_Y16_1X16 = 0x2014,
+>  	V4L2_MBUS_FMT_YUYV10_1X20 = 0x200d,
+>  	V4L2_MBUS_FMT_YVYU10_1X20 = 0x200e,
+> 
+> -	/* Bayer - next is 0x3015 */
+> +	/* Bayer - next is 0x3016 */
+>  	V4L2_MBUS_FMT_SBGGR8_1X8 = 0x3001,
+>  	V4L2_MBUS_FMT_SGBRG8_1X8 = 0x3013,
+>  	V4L2_MBUS_FMT_SGRBG8_1X8 = 0x3002,
+> @@ -89,6 +93,7 @@ enum v4l2_mbus_pixelcode {
+>  	V4L2_MBUS_FMT_SGBRG12_1X12 = 0x3010,
+>  	V4L2_MBUS_FMT_SGRBG12_1X12 = 0x3011,
+>  	V4L2_MBUS_FMT_SRGGB12_1X12 = 0x3012,
+> +	V4L2_MBUS_FMT_SBGGR16_1X16 = 0x3015,
+
+What about the other 3 Bayer patterns ?
+
+>  	/* JPEG compressed formats - next is 0x4002 */
+>  	V4L2_MBUS_FMT_JPEG_1X8 = 0x4001,
+
 -- 
-1.7.11.3
+Regards,
+
+Laurent Pinchart
