@@ -1,316 +1,94 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Oct 2012 16:41:45 -0600
-Subject: [PATCH V3 3/5] ARM: tegra: decouple uncompress.h and debug-macro.S
+Date: Fri, 19 Oct 2012 16:41:46 -0600
+Subject: [PATCH V3 4/5] ARM: tegra: don't include iomap.h from debug-macro.S
 In-Reply-To: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
 References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1350686507-3022-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1350686507-3022-4-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Prior to this change, Tegra's debug-macro.S relied on uncompress.h having
-determined which UART to use, and whether it was safe to use the UART
-(i.e. is it not in reset, and is clocked). This determination was
-communicated from uncompress.h to debug-macro.S using a few bytes of
-Tegra's IRAM (an on-SoC RAM). This had the disadvantage that uncompress.h
-was a required part of the kernel boot process; booting a non-compressed
-kernel would not allow earlyprintk to operate.
+In order to move Tegra's debug-macro.S to a common location for single
+zImage, it must not rely on any machine-specific header files such as
+<mach/iomap.h>. Duplicate the few physical address definitions that
+debug-macro.S relies upon directly into the file.
 
-This change duplicates the UART selection and validation logic into
-debug-macro.S so that the reliance on uncompress.h is removed.
-
-This also helps out with single-zImage work, since there is currently no
-support for using any uncompress.h with single-zImage.
+To avoid tegra_io_desc[] requiring shared knowledge of the UART
+mapping's virtual address, use a virtual address outside the ranges
+in tegra_io_desc[]. Call debug_ll_io_init() to propagate the mapping
+beyond the early pages tables.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v3: No change.
+v3: New patch.
 ---
- arch/arm/mach-tegra/common.c                   |    4 +-
- arch/arm/mach-tegra/include/mach/debug-macro.S |  151 ++++++++++++++++++++---
- arch/arm/mach-tegra/include/mach/uncompress.h  |   13 --
- arch/arm/mach-tegra/irammap.h                  |    9 --
- 4 files changed, 134 insertions(+), 43 deletions(-)
+ arch/arm/mach-tegra/include/mach/debug-macro.S |   24 +++++++++++++++++++-----
+ arch/arm/mach-tegra/io.c                       |    1 +
+ 2 files changed, 20 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index b493d64..a57dd7a 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -44,13 +44,15 @@
-  * kernel is loaded. The data is declared here rather than debug-macro.S so
-  * that multiple inclusions of debug-macro.S point at the same data.
-  */
--u32 tegra_uart_config[3] = {
-+u32 tegra_uart_config[4] = {
- 	/* Debug UART initialization required */
- 	1,
- 	/* Debug UART physical address */
- 	0,
- 	/* Debug UART virtual address */
- 	0,
-+	/* Scratch space for debug macro */
-+	0,
- };
- 
- #ifdef CONFIG_OF
 diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
-index 44ca7b1..d4c23d6 100644
+index d4c23d6..f67fd6d 100644
 --- a/arch/arm/mach-tegra/include/mach/debug-macro.S
 +++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
-@@ -27,7 +27,42 @@
+@@ -26,10 +26,18 @@
+ 
  #include <linux/serial_reg.h>
  
- #include "../../iomap.h"
--#include "../../irammap.h"
-+
-+#define UART_SHIFT 2
-+
-+#define TEGRA_CLK_RST_DEVICES_L		(TEGRA_CLK_RESET_BASE + 0x04)
-+#define TEGRA_CLK_RST_DEVICES_H		(TEGRA_CLK_RESET_BASE + 0x08)
-+#define TEGRA_CLK_RST_DEVICES_U		(TEGRA_CLK_RESET_BASE + 0x0c)
-+#define TEGRA_CLK_OUT_ENB_L		(TEGRA_CLK_RESET_BASE + 0x10)
-+#define TEGRA_CLK_OUT_ENB_H		(TEGRA_CLK_RESET_BASE + 0x14)
-+#define TEGRA_CLK_OUT_ENB_U		(TEGRA_CLK_RESET_BASE + 0x18)
-+#define TEGRA_PMC_SCRATCH20		(TEGRA_PMC_BASE + 0xa0)
-+#define TEGRA_APB_MISC_GP_HIDREV	(TEGRA_APB_MISC_BASE + 0x804)
-+
-+#define checkuart(rp, rv, lhu, bit, uart) \
-+		/* Load address of CLK_RST register */ \
-+		movw	rp, #TEGRA_CLK_RST_DEVICES_##lhu & 0xffff ; \
-+		movt	rp, #TEGRA_CLK_RST_DEVICES_##lhu >> 16 ; \
-+		/* Load value from CLK_RST register */ \
-+		ldr	rp, [rp, #0] ; \
-+		/* Test UART's reset bit */ \
-+		tst	rp, #(1 << bit) ; \
-+		/* If set, can't use UART; jump to save no UART */ \
-+		bne	90f ; \
-+		/* Load address of CLK_OUT_ENB register */ \
-+		movw	rp, #TEGRA_CLK_OUT_ENB_##lhu & 0xffff ; \
-+		movt	rp, #TEGRA_CLK_OUT_ENB_##lhu >> 16 ; \
-+		/* Load value from CLK_OUT_ENB register */ \
-+		ldr	rp, [rp, #0] ; \
-+		/* Test UART's clock enable bit */ \
-+		tst	rp, #(1 << bit) ; \
-+		/* If clear, can't use UART; jump to save no UART */ \
-+		beq	90f ; \
-+		/* Passed all tests, load address of UART registers */ \
-+		movw	rp, #TEGRA_UART##uart##_BASE & 0xffff ; \
-+		movt	rp, #TEGRA_UART##uart##_BASE >> 16 ; \
-+		/* Jump to save UART address */ \
-+		b 91f
+-#include "../../iomap.h"
+-
+ #define UART_SHIFT 2
  
- 		.macro  addruart, rp, rv, tmp
- 		adr	\rp, 99f		@ actual addr of 99f
-@@ -36,22 +71,101 @@
- 		ldr	\rp, [\rp, #4]		@ linked tegra_uart_config
- 		sub	\tmp, \rp, \rv		@ actual tegra_uart_config
- 		ldr	\rp, [\tmp]		@ Load tegra_uart_config
--		cmp	\rp, #1			@ needs intitialization?
-+		cmp	\rp, #1			@ needs initialization?
- 		bne	100f			@ no; go load the addresses
- 		mov	\rv, #0			@ yes; record init is done
- 		str	\rv, [\tmp]
--		mov	\rp, #TEGRA_IRAM_BASE	@ See if cookie is in IRAM
--		ldr	\rv, [\rp, #TEGRA_IRAM_DEBUG_UART_OFFSET]
--		movw	\rp, #TEGRA_IRAM_DEBUG_UART_COOKIE & 0xffff
--		movt	\rp, #TEGRA_IRAM_DEBUG_UART_COOKIE >> 16
--		cmp	\rv, \rp		@ Cookie present?
--		bne	100f			@ No, use default UART
--		mov	\rp, #TEGRA_IRAM_BASE	@ Load UART address from IRAM
--		ldr	\rv, [\rp, #TEGRA_IRAM_DEBUG_UART_OFFSET + 4]
--		str	\rv, [\tmp, #4]		@ Store in tegra_uart_phys
--		sub	\rv, \rv, #IO_APB_PHYS	@ Calculate virt address
++/* Physical addresses */
++#define TEGRA_CLK_RESET_BASE		0x60006000
++#define TEGRA_APB_MISC_BASE		0x70000000
++#define TEGRA_UARTA_BASE		0x70006000
++#define TEGRA_UARTB_BASE		0x70006040
++#define TEGRA_UARTC_BASE		0x70006200
++#define TEGRA_UARTD_BASE		0x70006300
++#define TEGRA_UARTE_BASE		0x70006400
++#define TEGRA_PMC_BASE			0x7000e400
 +
-+#ifdef CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA
-+		/* Check ODMDATA */
-+10:		movw	\rp, #TEGRA_PMC_SCRATCH20 & 0xffff
-+		movt	\rp, #TEGRA_PMC_SCRATCH20 >> 16
-+		ldr	\rp, [\rp, #0]		@ Load PMC_SCRATCH20
-+		ubfx	\rv, \rp, #18, #2	@ 19:18 are console type
-+		cmp	\rv, #2			@ 2 and 3 mean DCC, UART
-+		beq	11f			@ some boards swap the meaning
-+		cmp	\rv, #3			@ so accept either
-+		bne	90f
-+11:		ubfx	\rv, \rp, #15, #3	@ 17:15 are UART ID
-+		cmp	\rv, #0			@ UART 0?
-+		beq	20f
-+		cmp	\rv, #1			@ UART 1?
-+		beq	21f
-+		cmp	\rv, #2			@ UART 2?
-+		beq	22f
-+		cmp	\rv, #3			@ UART 3?
-+		beq	23f
-+		cmp	\rv, #4			@ UART 4?
-+		beq	24f
-+		b	90f			@ invalid
-+#endif
+ #define TEGRA_CLK_RST_DEVICES_L		(TEGRA_CLK_RESET_BASE + 0x04)
+ #define TEGRA_CLK_RST_DEVICES_H		(TEGRA_CLK_RESET_BASE + 0x08)
+ #define TEGRA_CLK_RST_DEVICES_U		(TEGRA_CLK_RESET_BASE + 0x0c)
+@@ -39,6 +47,12 @@
+ #define TEGRA_PMC_SCRATCH20		(TEGRA_PMC_BASE + 0xa0)
+ #define TEGRA_APB_MISC_GP_HIDREV	(TEGRA_APB_MISC_BASE + 0x804)
+ 
++/*
++ * Must be 1MB-aligned since a 1MB mapping is used early on.
++ * Must not overlap with regions in mach-tegra/io.c:tegra_io_desc[].
++ */
++#define UART_VIRTUAL_BASE		0xfe100000
 +
-+#if defined(CONFIG_TEGRA_DEBUG_UARTA) || \
-+    defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
-+		/* Check UART A validity */
-+20:		checkuart(\rp, \rv, L, 6, A)
-+#endif
-+
-+#if defined(CONFIG_TEGRA_DEBUG_UARTB) || \
-+    defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
-+		/* Check UART B validity */
-+21:		checkuart(\rp, \rv, L, 7, B)
-+#endif
-+
-+#if defined(CONFIG_TEGRA_DEBUG_UARTC) || \
-+    defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
-+		/* Check UART C validity */
-+22:		checkuart(\rp, \rv, H, 23, C)
-+#endif
-+
-+#if defined(CONFIG_TEGRA_DEBUG_UARTD) || \
-+    defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
-+		/* Check UART D validity */
-+23:		checkuart(\rp, \rv, U, 1, D)
-+#endif
-+
-+#if defined(CONFIG_TEGRA_DEBUG_UARTE) || \
-+    defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
-+		/* Check UART E validity */
-+24:
-+		checkuart(\rp, \rv, U, 2, E)
-+#endif
-+
-+		/* No valid UART found */
-+90:		mov	\rp, #0
-+		/* fall through */
-+
-+		/* Record whichever UART we chose */
-+91:		str	\rp, [\tmp, #4]		@ Store in tegra_uart_phys
-+		cmp	\rp, #0			@ Valid UART address?
-+		bne	92f			@ Yes, go process it
-+		str	\rp, [\tmp, #8]		@ Store 0 in tegra_uart_phys
-+		b	100f			@ Done
-+92:		sub	\rv, \rp, #IO_APB_PHYS	@ Calculate virt address
- 		add	\rv, \rv, #IO_APB_VIRT
+ #define checkuart(rp, rv, lhu, bit, uart) \
+ 		/* Load address of CLK_RST register */ \
+ 		movw	rp, #TEGRA_CLK_RST_DEVICES_##lhu & 0xffff ; \
+@@ -139,10 +153,10 @@
+ 91:		str	\rp, [\tmp, #4]		@ Store in tegra_uart_phys
+ 		cmp	\rp, #0			@ Valid UART address?
+ 		bne	92f			@ Yes, go process it
+-		str	\rp, [\tmp, #8]		@ Store 0 in tegra_uart_phys
++		str	\rp, [\tmp, #8]		@ Store 0 in tegra_uart_virt
+ 		b	100f			@ Done
+-92:		sub	\rv, \rp, #IO_APB_PHYS	@ Calculate virt address
+-		add	\rv, \rv, #IO_APB_VIRT
++92:		and	\rv, \rp, #0xffffff	@ offset within 1MB section
++		add	\rv, \rv, #UART_VIRTUAL_BASE
  		str	\rv, [\tmp, #8]		@ Store in tegra_uart_virt
-+		movw	\rv, #TEGRA_APB_MISC_GP_HIDREV & 0xffff
-+		movt	\rv, #TEGRA_APB_MISC_GP_HIDREV >> 16
-+		ldr	\rv, [\rv, #0]		@ Load HIDREV
-+		ubfx	\rv, \rv, #8, #8	@ 15:8 are SoC version
-+		cmp	\rv, #0x20		@ Tegra20?
-+		moveq	\rv, #0x75		@ Tegra20 divisor
-+		movne	\rv, #0xdd		@ Tegra30 divisor
-+		str	\rv, [\tmp, #12]	@ Save divisor to scratch
-+		/* uart[UART_LCR] = UART_LCR_WLEN8 | UART_LCR_DLAB; */
-+		mov	\rv, #UART_LCR_WLEN8 | UART_LCR_DLAB
-+		str	\rv, [\rp, #UART_LCR << UART_SHIFT]
-+		/* uart[UART_DLL] = div & 0xff; */
-+		ldr	\rv, [\tmp, #12]
-+		and	\rv, \rv, #0xff
-+		str	\rv, [\rp, #UART_DLL << UART_SHIFT]
-+		/* uart[UART_DLM] = div >> 8; */
-+		ldr	\rv, [\tmp, #12]
-+		lsr	\rv, \rv, #8
-+		str	\rv, [\rp, #UART_DLM << UART_SHIFT]
-+		/* uart[UART_LCR] = UART_LCR_WLEN8; */
-+		mov	\rv, #UART_LCR_WLEN8
-+		str	\rv, [\rp, #UART_LCR << UART_SHIFT]
- 		b	100f
+ 		movw	\rv, #TEGRA_APB_MISC_GP_HIDREV & 0xffff
+ 		movt	\rv, #TEGRA_APB_MISC_GP_HIDREV >> 16
+diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
+index 7d09f30..bb9c9c2 100644
+--- a/arch/arm/mach-tegra/io.c
++++ b/arch/arm/mach-tegra/io.c
+@@ -59,5 +59,6 @@ static struct map_desc tegra_io_desc[] __initdata = {
  
- 		.align
-@@ -59,27 +173,24 @@
- 		.word	tegra_uart_config
- 		.ltorg
- 
-+		/* Load previously selected UART address */
- 100:		ldr	\rp, [\tmp, #4]		@ Load tegra_uart_phys
- 		ldr	\rv, [\tmp, #8]		@ Load tegra_uart_virt
- 		.endm
- 
--#define UART_SHIFT 2
--
- /*
-  * Code below is swiped from <asm/hardware/debug-8250.S>, but add an extra
-- * check to make sure that we aren't in the CONFIG_TEGRA_DEBUG_UART_NONE case.
-- * We use the fact that all 5 valid UART addresses all have something in the
-- * 2nd-to-lowest byte.
-+ * check to make sure that the UART address is actually valid.
-  */
- 
- 		.macro	senduart, rd, rx
--		tst	\rx, #0x0000ff00
-+		cmp	\rx, #0
- 		strneb	\rd, [\rx, #UART_TX << UART_SHIFT]
- 1001:
- 		.endm
- 
- 		.macro	busyuart, rd, rx
--		tst	\rx, #0x0000ff00
-+		cmp	\rx, #0
- 		beq	1002f
- 1001:		ldrb	\rd, [\rx, #UART_LSR << UART_SHIFT]
- 		and	\rd, \rd, #UART_LSR_TEMT | UART_LSR_THRE
-@@ -90,7 +201,7 @@
- 
- 		.macro	waituart, rd, rx
- #ifdef FLOW_CONTROL
--		tst	\rx, #0x0000ff00
-+		cmp	\rx, #0
- 		beq	1002f
- 1001:		ldrb	\rd, [\rx, #UART_MSR << UART_SHIFT]
- 		tst	\rd, #UART_MSR_CTS
-diff --git a/arch/arm/mach-tegra/include/mach/uncompress.h b/arch/arm/mach-tegra/include/mach/uncompress.h
-index 4150c71..485003f 100644
---- a/arch/arm/mach-tegra/include/mach/uncompress.h
-+++ b/arch/arm/mach-tegra/include/mach/uncompress.h
-@@ -29,7 +29,6 @@
- #include <linux/serial_reg.h>
- 
- #include "../../iomap.h"
--#include "../../irammap.h"
- 
- #define BIT(x) (1 << (x))
- #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-@@ -52,17 +51,6 @@ static inline void flush(void)
+ void __init tegra_map_common_io(void)
  {
++	debug_ll_io_init();
+ 	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
  }
- 
--static inline void save_uart_address(void)
--{
--	u32 *buf = (u32 *)(TEGRA_IRAM_BASE + TEGRA_IRAM_DEBUG_UART_OFFSET);
--
--	if (uart) {
--		buf[0] = TEGRA_IRAM_DEBUG_UART_COOKIE;
--		buf[1] = (u32)uart;
--	} else
--		buf[0] = 0;
--}
--
- static const struct {
- 	u32 base;
- 	u32 reset_reg;
-@@ -169,7 +157,6 @@ static inline void arch_decomp_setup(void)
- 	else
- 		uart = (volatile u8 *)uarts[uart_id].base;
- 
--	save_uart_address();
- 	if (uart == NULL)
- 		return;
- 
-diff --git a/arch/arm/mach-tegra/irammap.h b/arch/arm/mach-tegra/irammap.h
-index 0cbe632..501952a 100644
---- a/arch/arm/mach-tegra/irammap.h
-+++ b/arch/arm/mach-tegra/irammap.h
-@@ -23,13 +23,4 @@
- #define TEGRA_IRAM_RESET_HANDLER_OFFSET	0
- #define TEGRA_IRAM_RESET_HANDLER_SIZE	SZ_1K
- 
--/*
-- * These locations are written to by uncompress.h, and read by debug-macro.S.
-- * The first word holds the cookie value if the data is valid. The second
-- * word holds the UART physical address.
-- */
--#define TEGRA_IRAM_DEBUG_UART_OFFSET	SZ_1K
--#define TEGRA_IRAM_DEBUG_UART_SIZE	8
--#define TEGRA_IRAM_DEBUG_UART_COOKIE	0x55415254
--
- #endif
 -- 
 1.7.0.4
