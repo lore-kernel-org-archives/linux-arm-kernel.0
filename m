@@ -1,86 +1,74 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 19 Oct 2012 10:01:39 +0000
-Subject: [PATCH v2] arm/dts: AM33XX: Add SPI device tree data
-In-Reply-To: <50810E2F.5@ti.com>
-References: <1347946228-25874-1-git-send-email-avinashphilip@ti.com>
- <50810E2F.5@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9D18C6@DBDE01.ent.ti.com>
+From: hechtb@googlemail.com (Bastian Hecht)
+Date: Fri, 19 Oct 2012 12:05:09 +0200
+Subject: [PATCH v2 0/2] Add DMA and device tree support to the flash
+ controller FLCTL
+In-Reply-To: <1350626232.5769.318.camel@sauron.fi.intel.com>
+References: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
+ <1350473030.5769.137.camel@sauron.fi.intel.com>
+ <CABYn4szACuH3LQ193VJj6E=J4q4Ye4E4O6cUgjB8jmQK6RRmpA@mail.gmail.com>
+ <1350626232.5769.318.camel@sauron.fi.intel.com>
+Message-ID: <CABYn4swnc5xT=gOCHk5wzQTHWe8TNOE5_o2A36xEgPSnDosSBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 13:54:15, Cousson, Benoit wrote:
-> Hi Avinash,
-> 
-> This look good to me except the: status = "disabled".
+Hey Artem,
 
-status = "disabled" in soc .dtsi  file to make sure that IP driver
-won't loaded unless if IP used. 
-So from board .dts file status = "okay" should be set if IP being used.
+>> I can reproduce the error with the following output:
+>> /tmp/ccYAbker.s: Assembler messages:
+>> /tmp/ccYAbker.s: Error: bad immediate value for 8-bit offset (2048)
+>> make[3]: *** [drivers/mtd/nand/docg4.o] Error 1
+>>
+>> The compiler version is: gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+>> I usually use: gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) and
+>> can compile things without problems.
+>
+> Yeah, a bug report would be great. I've switched to 4.4.1 and checked
+> your patches with aiaiai:
 
-Follows the uart1 case in AM33xx dtsi.
+Ok I'll file one.
 
-uart1 also sets status = "disabled"; in am33xx.dtsi & set status = "okay";
-in am335x-evm.dts.
+I've added a cleanup patch 1/3 and tackled the problems below as follows:
 
-Thanks
-Avinash
+> --------------------------------------------------------------------------------
+>
+> Successfully built configuration "arm-mackerel_defconfig,arm,arm-none-linux-gnueabi-", results:
+>
+> --- before_patching.log
+> +++ after_patching.log
+> @@ @@
+> +drivers/mtd/nand/sh_flctl.c:1142 flctl_probe() warn: 'irq' was not released on error [smatch]
+> +drivers/mtd/nand/sh_flctl.c:1142:2-8: ERROR: missing iounmap; ioremap on line 1117 and execution via conditional on line 1140 [coccinelle]
 
-> 
-> The "disabled" should be reserved for variant that does not contain the IP.
-> Is it the case here?
-> 
-> Regards,
-> Benoit
-> 
-> On 09/18/2012 07:30 AM, Philip, Avinash wrote:
-> > Add McSPI data node to AM33XX device tree file. The McSPI module (and so
-> > as the driver) is reused from OMAP4.
-> > 
-> > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-> > Tested-by: Matt Porter <mporter@ti.com>
-> > ---
-> > Changes since v1:
-> >         - Corrected reg offset in reg DT entry.
-> > 
-> > :100644 100644 ff3badb... 065fd54... M	arch/arm/boot/dts/am33xx.dtsi
-> >  arch/arm/boot/dts/am33xx.dtsi |   25 +++++++++++++++++++++++++
-> >  1 files changed, 25 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> > index ff3badb..065fd54 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -219,5 +219,30 @@
-> >  			interrupt-parent = <&intc>;
-> >  			interrupts = <91>;
-> >  		};
-> > +
-> > +		spi0: spi at 48030000 {
-> > +			compatible = "ti,omap4-mcspi";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <0x48030000 0x400>;
-> > +			interrupt-parent = <&intc>;
-> > +			interrupt = <65>;
-> > +			ti,spi-num-cs = <2>;
-> > +			ti,hwmods = "spi0";
-> > +			status = "disabled";
-> > +
-> > +		};
-> > +
-> > +		spi1: spi at 481a0000 {
-> > +			compatible = "ti,omap4-mcspi";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <0x481a0000 0x400>;
-> > +			interrupt-parent = <&intc>;
-> > +			interrupt = <125>;
-> > +			ti,spi-num-cs = <2>;
-> > +			ti,hwmods = "spi1";
-> > +			status = "disabled";
-> > +		};
-> >  	};
-> >  };
-> > 
-> 
-> 
+Oh yes, my bad. Fixed in patch 3 (formerly 2).
+
+> +drivers/mtd/nand/sh_flctl.c:164:25: warning: cast removes address space of expression [sparse]
+> +drivers/mtd/nand/sh_flctl.c:181:25: warning: cast removes address space of expression [sparse]
+
+Here I have no idea how to fix it. dma_addr_t is a typedef to u32. How
+could I possibly not loose the address space?
+
+> -drivers/mtd/nand/sh_flctl.c:311 write_fiforeg() Error invalid range 4096 to -1 [smatch]
+
+Here my smatch (git head version) doesn't complain. Still I switched
+to unsigned int for indexing an array member and hope this solves the
+problem. Done in new patch 1/3.
+
+> -drivers/mtd/nand/sh_flctl.c:317:17: warning: incorrect type in argument 2 (different address spaces) [sparse]
+> -drivers/mtd/nand/sh_flctl.c:317:17:    expected void volatile [noderef] <asn:2>*addr [sparse]
+> -drivers/mtd/nand/sh_flctl.c:317:17:    got void *fifo_addr [sparse]
+
+Fixed in new patch 1/3.
+
+> +drivers/mtd/nand/sh_flctl.c:469 write_fiforeg() Error invalid range 4096 to -1 [smatch]
+
+Same as above. Unclear how to solve.
+
+> +drivers/mtd/nand/sh_flctl.c:485:17: warning: incorrect type in argument 2 (different address spaces) [sparse]
+> +drivers/mtd/nand/sh_flctl.c:485:17:    expected void volatile [noderef] <asn:2>*addr [sparse]
+> +drivers/mtd/nand/sh_flctl.c:485:17:    got void *fifo_addr [sparse]
+
+Fixed in patch 1/3.
+
+Thanks for checking, I'll send out the new patch series in a moment,
+
+Bastian
