@@ -1,77 +1,64 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Fri, 19 Oct 2012 13:15:30 +0100
-Subject: [PATCH v2 RESEND] ARM: pxa: hx4700: Fix backlight PWM device number
-Message-ID: <mailman.28.1350648941.1458.linux-arm-kernel@lists.infradead.org>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 19 Oct 2012 14:36:57 +0200
+Subject: [PATCH] ARM: ux500: Introduce cpu_is_u8580()
+Message-ID: <1350650217-25528-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent changes to PXA PWM support changed the PXA27X PWM device
-numbering scheme.
+From: Maxime Coquelin <maxime.coquelin@stericsson.com>
 
-The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
-the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
-numbering scheme:
+Detect the subrevision v1 of U8540 and U8580.
 
-Address		Hardware	3.5 pwm_id	3.6-rc1 pwm_id
-0x40b00000	PWM0		0		0
-0x40b00010	PWM2		2		1
-0x40c00000	PWM1		1		2
-0x40c00010	PWM3		3		3
+DB8580 is the FDSOI variant of DB8540. Some differences
+with DB8540 related to clocks will need to be checked with
+a cpu_is_u8580() function.
 
-The hx4700 backlight uses PWM1 at 0x40c00000. Consequently the pwm_id
-must be changed from 1 to 2.
-
-This patch fixes the backlight PWM device number and at the same time
-moves from the legacy PWM API (pwm_id) to the new PWM API (pwm_lookup).
-
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-Cc: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Maxime Coquelin <maxime.coquelin@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ arch/arm/mach-ux500/include/mach/id.h | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
 
-V2: Switch from legacy PWM API to new PWM API.
-
- arch/arm/mach-pxa/hx4700.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-index e631198..d66f9f9 100644
---- a/arch/arm/mach-pxa/hx4700.c
-+++ b/arch/arm/mach-pxa/hx4700.c
-@@ -28,6 +28,7 @@
- #include <linux/mfd/asic3.h>
- #include <linux/mtd/physmap.h>
- #include <linux/pda_power.h>
-+#include <linux/pwm.h>
- #include <linux/pwm_backlight.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/gpio-regulator.h>
-@@ -556,7 +557,7 @@ static struct platform_device hx4700_lcd = {
-  */
+diff --git a/arch/arm/mach-ux500/include/mach/id.h b/arch/arm/mach-ux500/include/mach/id.h
+index 9c42642..bcc58a8 100644
+--- a/arch/arm/mach-ux500/include/mach/id.h
++++ b/arch/arm/mach-ux500/include/mach/id.h
+@@ -61,9 +61,14 @@ static inline bool __attribute_const__ cpu_is_u8540(void)
+ 	return dbx500_partnumber() == 0x8540;
+ }
  
- static struct platform_pwm_backlight_data backlight_data = {
--	.pwm_id         = 1,
-+	.pwm_id         = -1,	/* Superseded by pwm_lookup */
- 	.max_brightness = 200,
- 	.dft_brightness = 100,
- 	.pwm_period_ns  = 30923,
-@@ -571,6 +572,10 @@ static struct platform_device backlight = {
- 	},
- };
- 
-+static struct pwm_lookup hx4700_pwm_lookup[] = {
-+	PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL),
-+};
++static inline bool __attribute_const__ cpu_is_u8580(void)
++{
++	return dbx500_partnumber() == 0x8580;
++}
 +
+ static inline bool cpu_is_ux540_family(void)
+ {
+-	return cpu_is_u9540() || cpu_is_u8540();
++	return cpu_is_u9540() || cpu_is_u8540() || cpu_is_u8580();
+ }
+ 
  /*
-  * USB "Transceiver"
-  */
-@@ -872,6 +877,7 @@ static void __init hx4700_init(void)
- 	pxa_set_stuart_info(NULL);
+@@ -115,6 +120,20 @@ static inline bool cpu_is_u8500v20_or_later(void)
+ 	return (cpu_is_u8500() && !cpu_is_u8500v10() && !cpu_is_u8500v11());
+ }
  
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-+	pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
- 
- 	pxa_set_ficp_info(&ficp_info);
- 	pxa27x_set_i2c_power_info(NULL);
++/*
++ * 8540 revisions
++ */
++
++static inline bool __attribute_const__ cpu_is_u8540v10(void)
++{
++	return cpu_is_u8540() && dbx500_revision() == 0xA0;
++}
++
++static inline bool __attribute_const__ cpu_is_u8580v10(void)
++{
++	return cpu_is_u8580() && dbx500_revision() == 0xA0;
++}
++
+ static inline bool ux500_is_svp(void)
+ {
+ 	return false;
 -- 
-1.7.8.6
+1.7.11.3
