@@ -1,117 +1,111 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 19 Oct 2012 12:58:07 +0800
-Subject: Do we need to fix below dump during cpu hot plug operation?
-In-Reply-To: <20121019015621.GA17360@nchen-desktop>
-References: <20121019015621.GA17360@nchen-desktop>
-Message-ID: <20121019045802.GA21078@S2101-09.ap.freescale.net>
+From: preeti@linux.vnet.ibm.com (preeti)
+Date: Fri, 19 Oct 2012 10:27:39 +0530
+Subject: [RFC PATCH 0/2] sched: Load Balancing using
+ Per-entity-Load-tracking
+In-Reply-To: <5080D451.5090409@linux.vnet.ibm.com>
+References: <20121012044618.18271.88332.stgit@preeti.in.ibm.com>
+ <20121018172609.GA14473@e103034-lin> <5080D451.5090409@linux.vnet.ibm.com>
+Message-ID: <5080DDC3.9070008@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 09:56:22AM +0800, Peter Chen wrote:
-> Hi all,
+Sorry guys this mail had problems getting sent.hence the repost.
+
+Hi Morten,
+Thank you very much for your review.
+
+>> 1.Consider a scenario,where there are two 10% tasks running on a cpu.The
+>>   present code will consider the load on this queue to be 2048,while
+>>   using PJT's metric the load is calculated to be <1000,rarely exceeding this
+>>   limit.Although the tasks are not contributing much to the cpu load,they are
+>>   decided to be moved by the scheduler.
+>
+> I guess that you assume, for now, that all tasks have default (nice 0)
+> priority? Both the old load and the PJT metric (tracked load) depends on
+> priority.
+
+Thats right.I have assumed default priority of the tasks.
+>>
+>>   But one could argue that 'not moving one of these tasks could throttle
+>>   them.If there was an idle cpu,perhaps we could have moved them'.While the
+>>   power save mode would have been fine with not moving the task,the
+>>   performance mode would prefer not to throttle the tasks.We could strive
+>>   to strike a balance by making this decision tunable with certain parameters.
+>>   This patchset includes such tunables.This issue is addressed in Patch[1/2].
+>>
+>
+> One could also argue that long as there are spare cpu cycles in each
+> schedule period then all tasks have received the cpu time they needed.
+> So from that point of view performance isn't affected by not balancing
+> the tasks as long as the cpu is not fully utilized. If we look at the
+> problem from a latency point of view then packing tasks on a single cpu
+> will increase latency but the increase will be bounded by the schedule
+> period.
+>
+Assume that at the end of one scheduling period,there are a few spare
+cycles on the cpu.this is fine from both the performance and latency
+point of view at *this* point.nobody is waiting for the cpu.
+
+The issue arises if it is detected that these spare cycles are due to
+*sleeping tasks* and not due to no tasks.
+
+At this point a decision needs to be made as to: if a scenario arises
+where all these tasks wake up at the same time in the future,and wait on
+the cpu,then are we ok with them waiting.Both performance and latency
+views could be against this,as this also means less throughput.But
+performance view could go slightly easy on this to argue,that its ok if
+2-3 tasks wait,if more,then there is a need to move them.
+
+>>   This patchset therefore has two primary aims.
+>>          Patch[1/2]: This patch aims at detecting short running tasks and
+>> 	 prevent their movement.In update_sg_lb_stats,dismiss a sched group
+>> 	 as a candidate for load balancing,if load calculated by PJT's metric
+>> 	 says that the average load on the sched_group <= 1024+(.15*1024).
+>> 	 This is a tunable,which can be varied after sufficient experiments.
+>
+> Your current threshold implies that there must be at least two (nice 0)
+> tasks running breach the threshold and they need to be quite busy. This
+> makes sense to me. When you have more tasks they are more likely to be
+> waiting on the runqueue even if it is only 10% tasks. Let's say you have
+> five 10% tasks and they all become runnable at the same instant. In that
+> case some of the tasks would have a tracked load which is much higher
+> than if we only had two 10% tasks running. So if I'm not mistaken, it
+> would be possible to breach the threshold even though the overall cpu
+> utilization is only 50% and it would have been safe not to load-balance
+> that cpu.
+>
+> Do you think it would make sense to let the threshold depend on the
+> number of task on the cpu somehow? 
 > 
-> When doing system suspend/resume or CPU hot plug at SMP platform (like 
-> Freescale i.mx6Q sabrelite board), if local time is enabled, 
-> there is a clk_get_rate at twd_timer_setup during the atomic context.
-> So, if mutex_lock debug is enabled, there will be below dump message.
-> Although it will not affect future system use, it is boring message.
-> 
-Thanks for reporting, Peter.
+You are right,Morten.In fact I have included this viewpoint in both my
+first and second patch enclosed by this. So lets take up the above
+scenario.if there are 5 10% tasks running,they will surely cross the
+threshold,but the cpu might have spare cycles at the end of a scheduling
+period.Now that is your concern.
 
-We should fix the warning.  Having not turned on those warning options
-in imx defconfig might be the reason that we had not noticed it.
+Again we have two different viewpoints.This threshold is like a tuning
+knob.we could increase it if we feel that this threshold gets reached
+very quickly with as few tasks as 5, although the cpu utilization is
+poor.we prefer not to wake up another cpu unless the present cpu is
+aptly loaded.we could call this the power saving view.
 
-Since the driver is able to update the twd_timer_rate whenever clock
-rate changes after system boots up, the clk_get_rate call in
-twd_timer_setup should be only needed when we get a valid twd_clk at
-the first time.  So let's move clk_get_rate call into if (!twd_clk)
-block just after twd_get_clock().
+Else we could say that,we are not intending to affect the throughput of
+tasks,so we prefer the knob be at this value,so that we qualify such a
+load as a candidate for load balancing.we could call this the
+performance view.
 
-Linus, Russell,
+> Alternative, the decision could be based on the cpu idle time over the
+> last schedule period. A cpu with no or very few spare cycles in the last
+> schedule period would be a good candidate for load-balancing. Latency
+> would be affected as mentioned earlier.
+>
+Exactly.idle_time == spare_cpu_cycles == less cpu_utilization.I hope i
+am not wrong in drawing this equivalence.if thats the case then the same
+explanation as above holds good here too.
 
-Does it seem to be a valid fix?
+> Morten
 
-Shawn
+Thank you
 
-8<---
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index e1f9069..c1f54a1 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -273,13 +273,13 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
-        struct clock_event_device **this_cpu_clk;
-
--       if (!twd_clk)
-+       if (!twd_clk) {
-                twd_clk = twd_get_clock();
--
--       if (!IS_ERR_OR_NULL(twd_clk))
--               twd_timer_rate = clk_get_rate(twd_clk);
--       else
-+               if (!IS_ERR_OR_NULL(twd_clk))
-+                       twd_timer_rate = clk_get_rate(twd_clk);
-+       } else {
-                twd_calibrate_rate();
-+       }
-
-        __raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-
-
-> BUG: sleeping function called from invalid context at /home/b29397/work/code/git/linus/linux-2.6/kernel/mutex.c:269
-> no locks held by swapper/1/0.
-> irq event stamp: 279320
-> hardirqs last  enabled at (279319): [<80052bd0>] idle_task_exit+0x16c/0x1a0
-> hardirqs last disabled at (279320): [<8051a470>] cpu_die+0x28/0x98
-> softirqs last  enabled at (279304): [<8002ae3c>] _local_bh_enable+0x14/0x18
-> softirqs last disabled at (279303): [<8002aea8>] irq_enter+0x68/0x78
-> Backtrace: 
-> [<8001284c>] (dump_backtrace+0x0/0x10c) from [<8052b614>] (dump_stack+0x18/0x1c)
->  r7:8062b070 r6:0000010d r5:00000000 r4:bf88c000
-> [<8052b5fc>] (dump_stack+0x0/0x1c) from [<80050bb4>] (__might_sleep+0x1ec/0x238)
-> [<800509c8>] (__might_sleep+0x0/0x238) from [<8052cf60>] (mutex_lock_nested+0x38/0x3bc)
->  r7:00000000 r6:bf88c000 r5:808b19e0 r4:808a5360
-> [<8052cf28>] (mutex_lock_nested+0x0/0x3bc) from [<803e2108>] (clk_get_rate+0x1c/0x84)
-> [<803e20ec>] (clk_get_rate+0x0/0x84) from [<8052900c>] (twd_timer_setup+0x28c/0x2e0)
->  r5:808b19e0 r4:817c0200
-> [<80528d80>] (twd_timer_setup+0x0/0x2e0) from [<805288b8>] (percpu_timer_setup+0x6c/0xdc)
->  r9:412fc09a r8:1000406a r7:808b19d8 r6:bf88c000 r5:80879c14
-> r4:817c0200
-> [<8052884c>] (percpu_timer_setup+0x0/0xdc) from [<80528a68>] (secondary_start_kernel+0x140/0x19c)
->  r5:80879c14 r4:00000001
-> [<80528928>] (secondary_start_kernel+0x0/0x19c) from [<10528248>] (0x10528248)
->  r7:808b19d8 r6:10c03c7d r5:0000001f r4:4f87806a
-> BUG: scheduling while atomic: swapper/1/0/0x40000002
-> no locks held by swapper/1/0.
-> Modules linked in:
-> irq event stamp: 279320
-> hardirqs last  enabled at (279319): [<80052bd0>] idle_task_exit+0x16c/0x1a0
-> hardirqs last disabled at (279320): [<8051a470>] cpu_die+0x28/0x98
-> softirqs last  enabled at (279304): [<8002ae3c>] _local_bh_enable+0x14/0x18
-> softirqs last disabled at (279303): [<8002aea8>] irq_enter+0x68/0x78
-> Backtrace: 
-> [<8001284c>] (dump_backtrace+0x0/0x10c) from [<8052b614>] (dump_stack+0x18/0x1c)
->  r7:00000001 r6:bf88c000 r5:bf890000 r4:bf890000
-> [<8052b5fc>] (dump_stack+0x0/0x1c) from [<800539b4>] (__schedule_bug+0x5c/0x7c)
-> [<80053958>] (__schedule_bug+0x0/0x7c) from [<8052e1a8>] (__schedule+0x620/0x6e0)
->  r5:bf890000 r4:819215c0
-> [<8052db88>] (__schedule+0x0/0x6e0) from [<8052e320>] (_cond_resched+0x44/0x58)
-> [<8052e2dc>] (_cond_resched+0x0/0x58) from [<8052cf64>] (mutex_lock_nested+0x3c/0x3bc)
->  r5:808b19e0 r4:808a5360
-> [<8052cf28>] (mutex_lock_nested+0x0/0x3bc) from [<803e2108>] (clk_get_rate+0x1c/0x84)
-> [<803e20ec>] (clk_get_rate+0x0/0x84) from [<8052900c>] (twd_timer_setup+0x28c/0x2e0)
->  r5:808b19e0 r4:817c0200
-> [<80528d80>] (twd_timer_setup+0x0/0x2e0) from [<805288b8>] (percpu_timer_setup+0x6c/0xdc)
->  r9:412fc09a r8:1000406a r7:808b19d8 r6:bf88c000 r5:80879c14
-> r4:817c0200
-> [<8052884c>] (percpu_timer_setup+0x0/0xdc) from [<80528a68>] (secondary_start_kernel+0x140/0x19c)
->  r5:80879c14 r4:00000001
-> [<80528928>] (secondary_start_kernel+0x0/0x19c) from [<10528248>] (0x10528248)
->  r7:808b19d8 r6:10c03c7d r5:0000001f r4:4f87806a
-> 
-> -- 
-> 
-> Best Regards,
-> Peter Chen
-> 
+Regards
+Preeti
