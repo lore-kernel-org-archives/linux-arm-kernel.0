@@ -1,84 +1,33 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 19 Oct 2012 10:05:51 -0500
-Subject: [PATCH V2 2/2] ARM: OMAP2+: Add device-tree support for 32kHz counter
-In-Reply-To: <1350659151-13898-1-git-send-email-jon-hunter@ti.com>
-References: <1350659151-13898-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1350659151-13898-3-git-send-email-jon-hunter@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 19 Oct 2012 23:05:54 +0800
+Subject: [PATCH v3] ARM: mach-imx: Fix selection of ARCH_MXC
+In-Reply-To: <1350583470-15500-1-git-send-email-fabio.estevam@freescale.com>
+References: <1350583470-15500-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121019150544.GD21078@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For OMAP devices, the 32kHz counter is the default clock-source for the kernel.
-However, this is not the only possible clock-source the kernel can use for OMAP
-devices.
+On Thu, Oct 18, 2012 at 03:04:30PM -0300, Fabio Estevam wrote:
+> Since commit c5a0d497(ARM: imx: enable multi-platform build),
+> ARCH_MXC is selected by the following logic:
+> 
+> config ARCH_MXC
+>         def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+> 
+> , which causes build error on vexpress_defconfig:
+> 
+> arch/arm/mach-imx/hotplug.c:49: undefined reference to `imx_enable_cpu'
+> arch/arm/mach-imx/platsmp.c:57: undefined reference to `imx_set_cpu_jump'
+> arch/arm/mach-imx/platsmp.c:58: undefined reference to `imx_enable_cpu'
+> 
+> Make ARCH_MXC a user selectable option, so that it does not get built
+> by default on other defconfigs that select ARCH_MULTI_V4_V5 or ARCH_MULTI_V6_V7.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-When booting with device-tree, if the 32kHz counter is the desired clock-source
-for the kernel, then parse the device-tree blob to ensure that the counter is
-present and if so map memory for the counter using the device-tree of_iomap()
-function so we are no longer reliant on the OMAP HWMOD framework to do this for
-us.
+Arnd, Olof,
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/timer.c |   28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+I just applied this patch on my imx/multi-platform.  Can you please
+pull it to update the branch in arm-soc?  Thanks.
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 9a47f3d..6375dfa 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -159,6 +159,11 @@ static struct of_device_id omap_timer_match[] __initdata = {
- 	{ }
- };
- 
-+static struct of_device_id omap_counter_match[] __initdata = {
-+	{ .compatible = "ti,omap-counter32k", },
-+	{ }
-+};
-+
- /**
-  * omap_get_timer_dt - get a timer using device-tree
-  * @match	- device-tree match structure for matching a device type
-@@ -377,11 +382,26 @@ static u32 notrace dmtimer_read_sched_clock(void)
- static int __init omap2_sync32k_clocksource_init(void)
- {
- 	int ret;
-+	struct device_node *np = NULL;
- 	struct omap_hwmod *oh;
- 	void __iomem *vbase;
- 	const char *oh_name = "counter_32k";
- 
- 	/*
-+	 * If device-tree is present, then search the DT blob
-+	 * to see if the 32kHz counter is supported.
-+	 */
-+	if (of_have_populated_dt()) {
-+		np = omap_get_timer_dt(omap_counter_match, NULL);
-+		if (!np)
-+			return -ENODEV;
-+
-+		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-+		if (!oh_name)
-+			return -ENODEV;
-+	}
-+
-+	/*
- 	 * First check hwmod data is available for sync32k counter
- 	 */
- 	oh = omap_hwmod_lookup(oh_name);
-@@ -390,7 +410,13 @@ static int __init omap2_sync32k_clocksource_init(void)
- 
- 	omap_hwmod_setup_one(oh_name);
- 
--	vbase = omap_hwmod_get_mpu_rt_va(oh);
-+	if (np) {
-+		vbase = of_iomap(np, 0);
-+		of_node_put(np);
-+	} else {
-+		vbase = omap_hwmod_get_mpu_rt_va(oh);
-+	}
-+
- 	if (!vbase) {
- 		pr_warn("%s: failed to get counter_32k resource\n", __func__);
- 		return -ENXIO;
--- 
-1.7.9.5
+Shawn
