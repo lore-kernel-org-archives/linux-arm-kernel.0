@@ -1,44 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 19 Oct 2012 12:25:08 -0400
-Subject: [PULL REQ] IXP4xx changes for Linux 3.7
-In-Reply-To: <m3a9vkahci.fsf@intrepid.localdomain>
-References: <m3bog6m5iz.fsf@intrepid.localdomain>
- <201210142002.55841.arnd@arndb.de>
- <m3a9vkahci.fsf@intrepid.localdomain>
-Message-ID: <20121019162508.GJ14395@titan.lakedaemon.net>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 19 Oct 2012 12:32:37 -0400
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <20121019160041.GB4730@atomide.com>
+References: <20121017181354.GA2412@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
+ <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at>
+ <50806B1D.9040504@ti.com>
+ <20121019061630.GB2983@netboy.at.omicron.at>
+ <20121019160041.GB4730@atomide.com>
+Message-ID: <20121019163237.GG25164@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 12:01:17AM +0200, Krzysztof Halasa wrote:
-...
-> Unfortunately, as I already explained to you in
-> https://lkml.org/lkml/2012/9/29/37, my resources for IXP4xx are very
-> limited (and this isn't a paid job) and I'm in no way able to do what
-> you require. This, coupled with my inability to make the patches end
-> up upstream any other way, will make me post relevant MAINTAINERS
-> changes shortly.
+On Fri, Oct 19, 2012 at 09:00:41AM -0700, Tony Lindgren wrote:
+> * Richard Cochran <richardcochran@gmail.com> [121018 23:18]:
+> > On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
+> > > 
+> > > Another important point is, this driver is also required and used for
+> > > Davinci family of devices (arch/mach/mach-davinci/).
+> > 
+> > That is really beside the point. If the code isn't ready yet, then
+> > don't merge it.
+> > 
+> > When I asked about the beaglebone, I was given the impression that it
+> > will be ready for v3.7-rc1.  But, as I know realize, at the current
+> > rate, it might not even be ready for v3.8.
+> > 
+> > I don't mind waiting, but please make sure that whatever lands into a
+> > release is really, truly working.
 > 
-> Don't get me wrong. If I had time for this it could be different.
-> Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby
-> at this point. Given the raised barriers to participate, probably
-> aimed at paid maintainers, I have to quit doing this.
+> Indeed. This has been a problem with many of the TI patches in
+> general. People are working on separate product trees and then produce
+> patches for the mainline kernel that are poorly tested.
+> 
+> The requirement should be: Do your patch on an omap board then send the
+> patch from your omap board after booting your board with the patch :)
 
-Krzysztof, please reconsider.  I'm also a hobbyist maintainer
-(kirkwood,orion5x,mv78xx0,dove,mvebu).  I'd hate to see the community
-lose a valuable maintainer because arch/arm/ has grown so much.
+s/should be/is/
 
-If you would like, I could pull your patches through my tree and send
-them on to arm-soc.  I'm already familiar with arm-soc process, and I'll
-admit I have a soft spot for mach-ixp4xx.  It was my first experience
-with embedded Linux (nslu2, gateworks boards).
+I fixed that for you. :) That's always been the requirement for the
+kernel, period. There's also a lot of dead/unused code in the davinci
+driver world too...so omap isn't alone with this phenomenon.
 
-This way, you could see the process first hand without having to do the
-labor.
-
-We could do this for a few release cycles so you can see how it goes.
-After that, we can reassess things.  If you still don't wish to lend
-your experience, so be it.  But I hope we can change your mind.
-
-thx,
-
-Jason.
+-Matt
