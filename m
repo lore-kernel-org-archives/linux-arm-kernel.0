@@ -1,105 +1,24 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 19 Oct 2012 11:02:32 -0700
-Subject: [PATCH RFC 02/15 v5] gpio: Add sysfs support to block GPIO API
-In-Reply-To: <507FD4EB.1080204@antcom.de>
-References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
- <1350477107-26512-3-git-send-email-stigge@antcom.de>
- <20121017190520.GC25996@kroah.com> <507FD4EB.1080204@antcom.de>
-Message-ID: <20121019180232.GD3375@kroah.com>
+From: rick@efn.org (Rick Bronson)
+Date: Fri, 19 Oct 2012 11:07:14 -0700
+Subject: imx-sdma.c broken on imx53 for sound
+Message-ID: <39c8a3f022e86d3eae0fb7b6e48049f1.squirrel@webmail.efn.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 12:07:39PM +0200, Roland Stigge wrote:
-> On 10/17/2012 09:05 PM, Greg KH wrote:
-> >> +static int gpio_block_value_unexport(struct gpio_block *block)
-> >> +{
-> >> +	struct device	*dev;
-> >> +	int		i;
-> >> +
-> >> +	dev = class_find_device(&gpio_block_class, NULL, block, match_export);
-> >> +	if (!dev)
-> >> +		return -ENODEV;
-> >> +
-> >> +	for (i = 0; i < block->ngpio; i++)
-> >> +		gpio_free(block->gpio[i]);
-> >> +
-> >> +	device_remove_file(dev, &dev_attr_block_value);
-> >> +
-> >> +	return 0;
-> >> +}
-> > 
-> > Wait, what?  You are removing a sysfs file in this function, from within
-> > a sysfs write:
-> 
-> Yes, exactly:
-> 
-> >> +static ssize_t gpio_block_exported_store(struct device *dev,
-> >> +					 struct device_attribute *attr,
-> >> +					 const char *buf, size_t size)
-> >> +{
-> >> +	long	value;
-> >> +	int	status;
-> >> +	struct	gpio_block *block = dev_get_drvdata(dev);
-> >> +	int	exported = gpio_block_value_is_exported(block);
-> >> +
-> >> +	status = kstrtoul(buf, 0, &value);
-> >> +	if (status < 0)
-> >> +		goto err;
-> >> +
-> >> +	if (value != exported) {
-> >> +		if (value)
-> >> +			status = gpio_block_value_export(block);
-> >> +		else
-> >> +			status = gpio_block_value_unexport(block);
-> > 
-> > That looks like a recipie for disaster.  Why do you allow userspace to
-> > do this?
-> 
-> Exporting for gpio blocks is done as follows: writing "1" to the
-> "exported" _device_ attribute of the gpio block creates the "values"
-> attribute and at the same time requests the whole block (including all
-> of its gpios) as "sysfs".
-> 
-> This admittedly deviates from the exporting of gpios (with the "export"
-> and "unexport" _class_ attributes) because blocks are not numbered. In
-> contrast, they are registered in a list (as was requested). Now, I
-> already had the idea of also having an "export" and "unexport" _class_
-> attribute for blocks also, but from a userspace perspective you only see
-> the presence and name of the gpio block if it is already being in sysfs
-> (even if not exported yet). If it wouldn't be this way, a user couldn't
-> guess how the required gpio block is called (or numbered), wouldn't even
-> know about its presence.
-> 
-> Just for understanding your strong desire for the device attribute
-> ("value") being always present (in contrast to being created and removed
-> dynamically) - can you please give me any hint how the dynamic approach
-> would lead to disaster?
-> 
-> One possibility would be to always have "value" as a default device
-> attribute, but then it wouldn't be so obvious that it's useless until
-> "exported" is "1".
-> 
-> What do you think?
-> 
-> For now, I would elaborate about my terse "only available if /exported
-> is 1" like this:
-> 
-> "
-> Block GPIO devices are visible in sysfs as soon as they are registered
-> (e.g. via devicetree definition). For actual I/O use, their "exported"
-> boolean attribute must be set to "1". Then, the attribute "values" is
-> created and at the same time, the GPIOs in the block are requested for
-> exclusive use by sysfs.
-> "
+Hi,
 
-Yes, that explanation makes it more obvious as to what is going on, it
-caught me by supprise.
+  On the iMX53, the sound chip sgtl5000 seems to get SDMA channel 0, but
+this code in drivers/dma/imx-sdma.c:
 
-We used to have problems with attributes removing/adding devices or
-attributes from their callbacks, but that has been fixed up now, and the
-fact that the other gpio code works this way is good enough precedence
-to keep me from objecting to it.
+	/* not interested in channel 0 interrupts */
+	if (sdmac->channel == 0)
+		return;
 
-thanks,
+ causes the DMA to be ignored.  If I comment out the above, I still get no
+sound...
 
-greg k-h
+  Anyone have any ideas?
+
+  Thanks much for any help.
+
+  Rick
