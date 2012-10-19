@@ -1,104 +1,226 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 19 Oct 2012 11:45:55 +0900
-Subject: [PATCH 1/7] ARM: EXYNOS: add support for EXYNOS5440 SoC
+Date: Fri, 19 Oct 2012 11:45:56 +0900
+Subject: [PATCH 4/7] ARM: dts: add initial dts file for EXYNOS5440, SSDK5440
 In-Reply-To: <1350614759-1852-1-git-send-email-kgene.kim@samsung.com>
 References: <1350614759-1852-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1350614759-1852-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1350614759-1852-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock controller configuration support based on common
-clock framework for Samsung EXYNOS5440.
+This patch adds initial dts file for EXYNOS5440 SoC and adds the
+dts file for SSDK5440 board which is a kind of reference board.
+More properties will be added later.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/clk/samsung/Makefile         |    1 +
- drivers/clk/samsung/clk-exynos5440.c |   66 ++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clk/samsung/clk-exynos5440.c
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |   49 ++++++++++
+ arch/arm/boot/dts/exynos5440.dtsi         |  142 +++++++++++++++++++++++++++++
+ 2 files changed, 191 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5440-ssdk5440.dts
+ create mode 100644 arch/arm/boot/dts/exynos5440.dtsi
 
-diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-index 69487f7..27aab2c 100644
---- a/drivers/clk/samsung/Makefile
-+++ b/drivers/clk/samsung/Makefile
-@@ -4,3 +4,4 @@
- 
- obj-$(CONFIG_PLAT_SAMSUNG)	+= clk.o
- obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
-+obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
-diff --git a/drivers/clk/samsung/clk-exynos5440.c b/drivers/clk/samsung/clk-exynos5440.c
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
 new file mode 100644
-index 0000000..da3b918
+index 0000000..82960f0
 --- /dev/null
-+++ b/drivers/clk/samsung/clk-exynos5440.c
-@@ -0,0 +1,66 @@
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -0,0 +1,49 @@
 +/*
++ * SAMSUNG SSDK5440 board device tree source
++ *
 + * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 +*/
 +
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
++/dts-v1/;
++/include/ "exynos5440.dtsi"
 +
-+#include "clk.h"
++/ {
++	model = "SAMSUNG SSDK5440 board based on EXYNOS5440";
++	compatible = "samsung,ssdk5440", "samsung,exynos5440";
 +
-+static void __iomem *clk_base;
++	memory {
++		reg = <0x80000000 0x80000000>;
++	};
 +
-+/* register a fixed factor clock type instantiated from device tree */
-+void __init samsung_of_clk_register_fixed_factor(struct device_node *np)
-+{
-+	struct clk *clk;
-+	const char *clk_name = np->name;
-+	const char *parent_name;
-+	u32 mul = 1, div = 1;
++	chosen {
++		bootargs = "root=/dev/ram0 rw ramdisk=8192 initrd=0x81000000,8M console=ttySAC2,115200 init=/linuxrc";
++	};
 +
-+	of_property_read_string(np, "clock-output-names", &clk_name);
-+	parent_name = of_clk_get_parent_name(np, 0);
-+	of_property_read_u32(np, "clock-fixed-factor-mul", &mul);
-+	of_property_read_u32(np, "clock-fixed-factor-div", &div);
++	spi {
++		status = "disabled";
++	};
 +
-+	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
-+					mul, div);
-+	if (clk)
-+		of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
++	i2c at F0000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-max-bus-freq = <20000>;
++		gpios = <&gpb3 0 2 3 0>,
++			<&gpb3 1 2 3 0>;
++	};
 +
-+static const __initconst struct of_device_id clk_match[] = {
-+	{ .compatible = "fixed-clock",
-+		.data = of_fixed_clk_setup, },
-+	{ .compatible = "samsung,clock-gate",
-+		.data = samsung_of_clk_register_gate, },
-+	{ .compatible = "samsung,fixed-factor-clock",
-+		.data = samsung_of_clk_register_fixed_factor, },
-+	{},
++	i2c at 100000 {
++		status = "disabled";
++	};
++
++	watchdog {
++		status = "disabled";
++	};
++
++	rtc {
++		status = "disabled";
++	};
 +};
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+new file mode 100644
+index 0000000..380a89a
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -0,0 +1,142 @@
++/*
++ * SAMSUNG EXYNOS5440 SoC device tree source
++ *
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+void __init exynos5440_of_clk_init(void)
-+{
-+	struct device_node *np;
++/include/ "skeleton.dtsi"
 +
-+	np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-xmu");
-+	if (!np) {
-+		pr_err("%s: clock controller node not found\n", __func__);
-+		return;
-+	}
++/ {
++	compatible = "samsung,exynos5440";
 +
-+	clk_base = of_iomap(np, 0);
-+	WARN(!clk_base, "unable to map clocks registers\n");
++	interrupt-parent = <&gic>;
 +
-+	samsung_clk_set_ctrl_base(clk_base);
-+	of_clk_init(clk_match);
-+}
++	gic:interrupt-controller at 2E0000 {
++		compatible = "arm,cortex-a15-gic";
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		reg = <0x2E0000 0x1000>, <0x2E1000 0x1000>;
++	};
 +
-+arch_initcall(exynos5440_of_clk_init);
++	cpus {
++		cpu at 0 {
++			compatible = "arm,cortex-a15";
++			timer {
++				compatible = "arm,armv7-timer";
++				interrupts = <? ? ?>;
++				clock-frequency = <1000000>;
++			};
++		};
++		cpu at 1 {
++			compatible = "arm,cortex-a15";
++			timer {
++				compatible = "arm,armv7-timer";
++				interrupts = <1 14 0x308>;
++				clock-frequency = <1000000>;
++			};
++		};
++		cpu at 2 {
++			compatible = "arm,cortex-a15";
++			timer {
++				compatible = "arm,armv7-timer";
++				interrupts = <1 14 0x308>;
++				clock-frequency = <1000000>;
++			};
++		};
++		cpu at 3 {
++			compatible = "arm,cortex-a15";
++			timer {
++				compatible = "arm,armv7-timer";
++				interrupts = <1 14 0x308>;
++				clock-frequency = <1000000>;
++			};
++		};
++	};
++
++	common {
++		compatible = "samsung,exynos5440";
++
++	};
++
++	serial at B0000 {
++		compatible = "samsung,exynos4210-uart";
++		reg = <0xB0000 0x1000>;
++		interrupts = <0 2 0>;
++	};
++
++	serial at C0000 {
++		compatible = "samsung,exynos4210-uart";
++		reg = <0xC0000 0x1000>;
++		interrupts = <0 3 0>;
++	};
++
++	spi {
++		compatible = "samsung,exynos4210-spi";
++		reg = <0xD0000 0x1000>;
++		interrupts = <0 4 0>;
++		tx-dma-channel = <&pdma0 5>; /* preliminary */
++		rx-dma-channel = <&pdma0 4>; /* preliminary */
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	pinctrl {
++		compatible = "samsung,pinctrl-exynos5440";
++		reg = <0xE0000 0x1000>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	i2c at F0000 {
++		compatible = "samsung,s3c2440-i2c";
++		reg = <0xF0000 0x1000>;
++		interrupts = <0 5 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	i2c at 100000 {
++		compatible = "samsung,s3c2440-i2c";
++		reg = <0x100000 0x1000>;
++		interrupts = <0 6 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	watchdog {
++		compatible = "samsung,s3c2410-wdt";
++		reg = <0x110000 0x1000>;
++		interrupts = <0 1 0>;
++	};
++
++	amba {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "arm,amba-bus";
++		interrupt-parent = <&gic>;
++		ranges;
++
++		pdma0: pdma at 121A0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x120000 0x1000>;
++			interrupts = <0 34 0>;
++		};
++
++		pdma1: pdma at 121B0000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x121000 0x1000>;
++			interrupts = <0 35 0>;
++		};
++	};
++
++	rtc {
++		compatible = "samsung,s3c6410-rtc";
++		reg = <0x130000 0x1000>;
++		interrupts = <0 16 0>, <0 17 0>;
++	};
++};
 -- 
 1.7.4.4
