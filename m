@@ -1,117 +1,105 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 19 Oct 2012 17:56:48 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <20121019170149.GG1493@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
- <20121019170149.GG1493@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.00.1210191752210.14522@utopia.booyaka.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 19 Oct 2012 11:02:32 -0700
+Subject: [PATCH RFC 02/15 v5] gpio: Add sysfs support to block GPIO API
+In-Reply-To: <507FD4EB.1080204@antcom.de>
+References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
+ <1350477107-26512-3-git-send-email-stigge@antcom.de>
+ <20121017190520.GC25996@kroah.com> <507FD4EB.1080204@antcom.de>
+Message-ID: <20121019180232.GD3375@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On Fri, 19 Oct 2012, Felipe Balbi wrote:
-
-> On Fri, Oct 19, 2012 at 04:55:38PM +0000, Paul Walmsley wrote:
-> > On Thu, 18 Oct 2012, Paul Walmsley wrote:
+On Thu, Oct 18, 2012 at 12:07:39PM +0200, Roland Stigge wrote:
+> On 10/17/2012 09:05 PM, Greg KH wrote:
+> >> +static int gpio_block_value_unexport(struct gpio_block *block)
+> >> +{
+> >> +	struct device	*dev;
+> >> +	int		i;
+> >> +
+> >> +	dev = class_find_device(&gpio_block_class, NULL, block, match_export);
+> >> +	if (!dev)
+> >> +		return -ENODEV;
+> >> +
+> >> +	for (i = 0; i < block->ngpio; i++)
+> >> +		gpio_free(block->gpio[i]);
+> >> +
+> >> +	device_remove_file(dev, &dev_attr_block_value);
+> >> +
+> >> +	return 0;
+> >> +}
 > > 
-> > > Here are some basic OMAP test results for Linux v3.7-rc1.
-> > > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+> > Wait, what?  You are removing a sysfs file in this function, from within
+> > a sysfs write:
+> 
+> Yes, exactly:
+> 
+> >> +static ssize_t gpio_block_exported_store(struct device *dev,
+> >> +					 struct device_attribute *attr,
+> >> +					 const char *buf, size_t size)
+> >> +{
+> >> +	long	value;
+> >> +	int	status;
+> >> +	struct	gpio_block *block = dev_get_drvdata(dev);
+> >> +	int	exported = gpio_block_value_is_exported(block);
+> >> +
+> >> +	status = kstrtoul(buf, 0, &value);
+> >> +	if (status < 0)
+> >> +		goto err;
+> >> +
+> >> +	if (value != exported) {
+> >> +		if (value)
+> >> +			status = gpio_block_value_export(block);
+> >> +		else
+> >> +			status = gpio_block_value_unexport(block);
 > > 
-> > > Failing tests: needing investigation
-> > > ------------------------------------
-> > >
-> > > Boot tests:
-> > 
-> > * 3530ES3 Beagle: I2C timeouts during userspace init
-> >   - May be related to the threaded IRQ conversion of the I2C driver
-> >   - Unknown cause
+> > That looks like a recipie for disaster.  Why do you allow userspace to
+> > do this?
 > 
-> Doesn't seem like it's related to threaded IRQ. It says:
+> Exporting for gpio blocks is done as follows: writing "1" to the
+> "exported" _device_ attribute of the gpio block creates the "values"
+> attribute and at the same time requests the whole block (including all
+> of its gpios) as "sysfs".
 > 
-> [   23.673858] omap_i2c omap_i2c.1: timeout waiting for bus ready
+> This admittedly deviates from the exporting of gpios (with the "export"
+> and "unexport" _class_ attributes) because blocks are not numbered. In
+> contrast, they are registered in a list (as was requested). Now, I
+> already had the idea of also having an "export" and "unexport" _class_
+> attribute for blocks also, but from a userspace perspective you only see
+> the presence and name of the gpio block if it is already being in sysfs
+> (even if not exported yet). If it wouldn't be this way, a user couldn't
+> guess how the required gpio block is called (or numbered), wouldn't even
+> know about its presence.
 > 
-> at that time we didn't even program the transfer yet, meaning we're not
-> even on wait_for_completion_timeout() inside omap_i2c_xfer_msg(). This
-> happens before:
+> Just for understanding your strong desire for the device attribute
+> ("value") being always present (in contrast to being created and removed
+> dynamically) - can you please give me any hint how the dynamic approach
+> would lead to disaster?
 > 
-> > static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
-> > {
-> > 	unsigned long timeout;
-> > 
-> > 	timeout = jiffies + OMAP_I2C_TIMEOUT;
-> > 	while (omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG) & OMAP_I2C_STAT_BB) {
-> > 		if (time_after(jiffies, timeout)) {
-> > 			dev_warn(dev->dev, "timeout waiting for bus ready\n");
+> One possibility would be to always have "value" as a default device
+> attribute, but then it wouldn't be so obvious that it's useless until
+> "exported" is "1".
 > 
-> it' stopping here. And that's called...
+> What do you think?
 > 
-> > 			return -ETIMEDOUT;
-> > 		}
-> > 		msleep(1);
-> > 	}
-> > 
-> > 	return 0;
-> > }
+> For now, I would elaborate about my terse "only available if /exported
+> is 1" like this:
 > 
-> [...]
-> 
-> > static int
-> > omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
-> > {
-> > 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
-> > 	int i;
-> > 	int r;
-> > 
-> > 	r = pm_runtime_get_sync(dev->dev);
-> > 	if (IS_ERR_VALUE(r))
-> > 		goto out;
-> > 
-> > 	r = omap_i2c_wait_for_bb(dev);
-> 
-> right here. For whatever reason, the bus is kept busy (or at least the
-> driver thinks so).
-> 
-> Looking closely at the logs I see that definitely I2C was working during
-> early boot (we managed to mount file system on SD card and twl got
-> initialized properly). But then we have a long time where I2C isn't
-> used, so it probably suspended in between.
-> 
-> Then RTC wanted to read a register, I2C woke up, restored context, but
-> bus was kept busy, for whatever reason.
-> 
-> Does it happen all the time on multiple boots or is it ramdom ?
+> "
+> Block GPIO devices are visible in sysfs as soon as they are registered
+> (e.g. via devicetree definition). For actual I/O use, their "exported"
+> boolean attribute must be set to "1". Then, the attribute "values" is
+> created and at the same time, the GPIOs in the block are requested for
+> exclusive use by sysfs.
+> "
 
-Just ran six boot tests here; it occurred in five of them.  Then tried 
-five boot tests on v3.6 and the error didn't show up in any of them.  
-Abbreviated log at the bottom.
+Yes, that explanation makes it more obvious as to what is going on, it
+caught me by supprise.
 
-Would be happy to send along a copy of the userspace that was used if it 
-would be useful to you.
+We used to have problems with attributes removing/adding devices or
+attributes from their callbacks, but that has been fixed up now, and the
+fact that the other gpio code works this way is good enough precedence
+to keep me from objecting to it.
 
+thanks,
 
-- Paul
-
-paul at nozomi:~$ egrep '(version 3\.|timeout waiting)' 3530es3beagle_log.txt 
-[    0.000000] Linux version 3.7.0-rc1 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:58:00 MDT 2012
-[    0.000000] Linux version 3.7.0-rc1 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:58:00 MDT 2012
-[   22.710418] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   23.726074] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    0.000000] Linux version 3.7.0-rc1 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:58:00 MDT 2012
-[   22.804351] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   23.819976] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    0.000000] Linux version 3.7.0-rc1 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:58:00 MDT 2012
-[   22.805419] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   23.821044] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    0.000000] Linux version 3.7.0-rc1 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:58:00 MDT 2012
-[   22.820648] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   23.836273] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    0.000000] Linux version 3.7.0-rc1 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:58:00 MDT 2012
-[   22.858978] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   23.874603] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[    0.000000] Linux version 3.6.0 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:42:23 MDT 2012
-[    0.000000] Linux version 3.6.0 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:42:23 MDT 2012
-[    0.000000] Linux version 3.6.0 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:42:23 MDT 2012
-[    0.000000] Linux version 3.6.0 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:42:23 MDT 2012
-[    0.000000] Linux version 3.6.0 (paul at nozomi) (gcc version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Wed Oct 17 20:42:23 MDT 2012
+greg k-h
