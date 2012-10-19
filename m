@@ -1,91 +1,86 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 19 Oct 2012 15:29:50 +0530
-Subject: [PATCH v4 5/5] rtc: omap: Add runtime pm support
-In-Reply-To: <cover.1350633036.git.afzal@ti.com>
-References: <cover.1350633036.git.afzal@ti.com>
-Message-ID: <85f1737925191eb340f294e1564aa9fe996dfb31.1350633036.git.afzal@ti.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Fri, 19 Oct 2012 10:01:39 +0000
+Subject: [PATCH v2] arm/dts: AM33XX: Add SPI device tree data
+In-Reply-To: <50810E2F.5@ti.com>
+References: <1347946228-25874-1-git-send-email-avinashphilip@ti.com>
+ <50810E2F.5@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9D18C6@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+On Fri, Oct 19, 2012 at 13:54:15, Cousson, Benoit wrote:
+> Hi Avinash,
+> 
+> This look good to me except the: status = "disabled".
 
-OMAP1 RTC driver is used in multiple devices like,
-OMAPL138 and AM33XX. Driver currently doesn't handle any clocks,
-which may be right for OMAP1 architecture but in case of AM33XX,
-the clock/module needs to be enabled in order to access the registers.
+status = "disabled" in soc .dtsi  file to make sure that IP driver
+won't loaded unless if IP used. 
+So from board .dts file status = "okay" should be set if IP being used.
 
-So covert this driver to runtime pm, which internally handles rest.
+Follows the uart1 case in AM33xx dtsi.
 
-afzal at ti.com: handle error path
+uart1 also sets status = "disabled"; in am33xx.dtsi & set status = "okay";
+in am335x-evm.dts.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
-Acked-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/rtc/rtc-omap.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Thanks
+Avinash
 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index dff9ff4..6009714 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -22,6 +22,7 @@
- #include <linux/platform_device.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/pm_runtime.h>
- 
- #include <asm/io.h>
- 
-@@ -364,6 +365,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
- 
-+	/* Enable the clock/module so that we can access the registers */
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
-+
- 	id_entry = platform_get_device_id(pdev);
- 	if (id_entry && (id_entry->driver_data & OMAP_RTC_HAS_KICKER)) {
- 		rtc_writel(KICK0_VALUE, OMAP_RTC_KICK0_REG);
-@@ -448,6 +453,8 @@ fail1:
- fail0:
- 	if (id_entry && (id_entry->driver_data & OMAP_RTC_HAS_KICKER))
- 		rtc_writel(0, OMAP_RTC_KICK0_REG);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	iounmap(rtc_base);
- fail:
- 	release_mem_region(mem->start, resource_size(mem));
-@@ -474,6 +481,11 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
- 	rtc_device_unregister(rtc);
- 	if (id_entry && (id_entry->driver_data & OMAP_RTC_HAS_KICKER))
- 		rtc_writel(0, OMAP_RTC_KICK0_REG);
-+
-+	/* Disable the clock/module */
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
- 	iounmap(rtc_base);
- 	release_mem_region(mem->start, resource_size(mem));
- 	return 0;
-@@ -496,11 +508,17 @@ static int omap_rtc_suspend(struct platform_device *pdev, pm_message_t state)
- 	else
- 		rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
- 
-+	/* Disable the clock/module */
-+	pm_runtime_put_sync(&pdev->dev);
-+
- 	return 0;
- }
- 
- static int omap_rtc_resume(struct platform_device *pdev)
- {
-+	/* Enable the clock/module so that we can access the registers */
-+	pm_runtime_get_sync(&pdev->dev);
-+
- 	if (device_may_wakeup(&pdev->dev))
- 		disable_irq_wake(omap_rtc_alarm);
- 	else
--- 
-1.7.12
+> 
+> The "disabled" should be reserved for variant that does not contain the IP.
+> Is it the case here?
+> 
+> Regards,
+> Benoit
+> 
+> On 09/18/2012 07:30 AM, Philip, Avinash wrote:
+> > Add McSPI data node to AM33XX device tree file. The McSPI module (and so
+> > as the driver) is reused from OMAP4.
+> > 
+> > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+> > Tested-by: Matt Porter <mporter@ti.com>
+> > ---
+> > Changes since v1:
+> >         - Corrected reg offset in reg DT entry.
+> > 
+> > :100644 100644 ff3badb... 065fd54... M	arch/arm/boot/dts/am33xx.dtsi
+> >  arch/arm/boot/dts/am33xx.dtsi |   25 +++++++++++++++++++++++++
+> >  1 files changed, 25 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> > index ff3badb..065fd54 100644
+> > --- a/arch/arm/boot/dts/am33xx.dtsi
+> > +++ b/arch/arm/boot/dts/am33xx.dtsi
+> > @@ -219,5 +219,30 @@
+> >  			interrupt-parent = <&intc>;
+> >  			interrupts = <91>;
+> >  		};
+> > +
+> > +		spi0: spi at 48030000 {
+> > +			compatible = "ti,omap4-mcspi";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x48030000 0x400>;
+> > +			interrupt-parent = <&intc>;
+> > +			interrupt = <65>;
+> > +			ti,spi-num-cs = <2>;
+> > +			ti,hwmods = "spi0";
+> > +			status = "disabled";
+> > +
+> > +		};
+> > +
+> > +		spi1: spi at 481a0000 {
+> > +			compatible = "ti,omap4-mcspi";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x481a0000 0x400>;
+> > +			interrupt-parent = <&intc>;
+> > +			interrupt = <125>;
+> > +			ti,spi-num-cs = <2>;
+> > +			ti,hwmods = "spi1";
+> > +			status = "disabled";
+> > +		};
+> >  	};
+> >  };
+> > 
+> 
+> 
