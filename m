@@ -1,50 +1,59 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Sat, 20 Oct 2012 00:11:29 +0200
-Subject: [PATCH 1/2] cpufreq: return early from __cpufreq_driver_getavg()
-In-Reply-To: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
-References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
-Message-ID: <2737823.2JYE7UmLRN@vostro.rjw.lan>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 19 Oct 2012 15:24:30 -0700
+Subject: [PATCH v2] ARM: OMAP2: UART: fix console UART mismatched runtime PM
+ status
+Message-ID: <1350685470-3634-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 20 of October 2012 01:42:05 Viresh Kumar wrote:
-> There is no need to do cpufreq_get_cpu() and cpufreq_put_cpu() for drivers that
-> don't support getavg() routine.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+From: Kevin Hilman <khilman@ti.com>
 
-The patch doesn't seem to follow the changelog or the other way around.
+The runtime PM framework assumes that the hardware state of devices
+when initialized is disabled.  For all omap_devices, we idle/disable
+device by default.  However, the console uart uses a "no idle" option
+during omap_device init in order to allow earlyprintk usage to work
+seamlessly during boot.
 
-Thanks,
-Rafael
+Because the hardware is left partially enabled after init (whatever
+the bootloader settings were), the omap_device should later be fully
+initialized (including mux) and the runtime PM framework should be
+told that the device is active, and not disabled so that the hardware
+state is in sync with runtime PM state.
 
+To fix, after the device has been created/registered, call
+omap_device_enable() to finialize init and use pm_runtime_set_active()
+to tell the runtime PM core the device is enabled.
 
-> ---
->  drivers/cpufreq/cpufreq.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> index 85df538..f552d5f 100644
-> --- a/drivers/cpufreq/cpufreq.c
-> +++ b/drivers/cpufreq/cpufreq.c
-> @@ -1511,12 +1511,14 @@ int __cpufreq_driver_getavg(struct cpufreq_policy *policy, unsigned int cpu)
->  {
->  	int ret = 0;
->  
-> +	if (!(cpu_online(cpu) && cpufreq_driver->getavg))
-> +		return 0;
-> +
->  	policy = cpufreq_cpu_get(policy->cpu);
->  	if (!policy)
->  		return -EINVAL;
->  
-> -	if (cpu_online(cpu) && cpufreq_driver->getavg)
-> -		ret = cpufreq_driver->getavg(policy, cpu);
-> +	ret = cpufreq_driver->getavg(policy, cpu);
->  
->  	cpufreq_cpu_put(policy);
->  	return ret;
-> 
+Tested on 2420/n810, 3530/Overo, 3530/Beagle, 3730/OveroSTORM,
+3730/Beagle-xM, 4460/PandaES.
+
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Applies to v3.7-rc1.
+v2: call omap_device_enable() only after oh->mux has been initialized
+    otherwise, IO ring wakeups not properly enabled.
+
+ arch/arm/mach-omap2/serial.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 0405c81..a507cd6 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -329,6 +329,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 
+ 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+ 
++	if (console_uart_id == bdata->id) {
++		omap_device_enable(pdev);
++		pm_runtime_set_active(&pdev->dev);
++	}
++
+ 	oh->dev_attr = uart;
+ 
+ 	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+1.7.9.2
