@@ -1,118 +1,226 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Oct 2012 16:48:45 +0800
-Subject: [PATCH V2 6/7] ARM: tegra30: flowctrl: add cpu_suspend_exter/exit
- function
+Date: Fri, 19 Oct 2012 16:48:44 +0800
+Subject: [PATCH V2 5/7] ARM: tegra30: clocks: add CPU low-power function into
+ tegra_cpu_car_ops
 In-Reply-To: <1350636526-25920-1-git-send-email-josephl@nvidia.com>
 References: <1350636526-25920-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1350636526-25920-7-git-send-email-josephl@nvidia.com>
+Message-ID: <1350636526-25920-6-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flow controller can help CPU to go into suspend mode (deep power
-saving mode). When CPU go into deep power saving mode, it needs some
-careful settings before getting into and after leaving. The enter and
-exit functions do that by configuring appropriate mode for flow
-controller.
+Add suspend, resume and rail_off_ready API into tegra_cpu_car_ops. These
+functions were used for CPU low-power state maintenance (e.g., LP2). One
+thing needs to notice the rail_off_ready API only availalbe for cpu_g
+cluster not cpu_lp cluster.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
 * same with V1
 
- arch/arm/mach-tegra/flowctrl.c |   47 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/flowctrl.h |    8 ++++++
- 2 files changed, 55 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/tegra30_clocks.c |  107 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/tegra_cpu_car.h  |   37 ++++++++++++
+ 2 files changed, 144 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/flowctrl.c b/arch/arm/mach-tegra/flowctrl.c
-index f07488e..5967b08 100644
---- a/arch/arm/mach-tegra/flowctrl.c
-+++ b/arch/arm/mach-tegra/flowctrl.c
-@@ -21,6 +21,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- #include <linux/io.h>
-+#include <linux/cpumask.h>
+diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
+index 875744f..552ce89 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks.c
++++ b/arch/arm/mach-tegra/tegra30_clocks.c
+@@ -32,6 +32,7 @@
+ #include <asm/clkdev.h>
  
  #include <mach/iomap.h>
++#include <mach/powergate.h>
  
-@@ -51,6 +52,14 @@ static void flowctrl_update(u8 offset, u32 value)
- 	readl_relaxed(addr);
+ #include "clock.h"
+ #include "fuse.h"
+@@ -310,6 +311,31 @@
+ #define CPU_CLOCK(cpu)	(0x1 << (8 + cpu))
+ #define CPU_RESET(cpu)	(0x1111ul << (cpu))
+ 
++#define CLK_RESET_CCLK_BURST	0x20
++#define CLK_RESET_CCLK_DIVIDER  0x24
++#define CLK_RESET_PLLX_BASE	0xe0
++#define CLK_RESET_PLLX_MISC	0xe4
++
++#define CLK_RESET_SOURCE_CSITE	0x1d4
++
++#define CLK_RESET_CCLK_BURST_POLICY_SHIFT	28
++#define CLK_RESET_CCLK_RUN_POLICY_SHIFT		4
++#define CLK_RESET_CCLK_IDLE_POLICY_SHIFT	0
++#define CLK_RESET_CCLK_IDLE_POLICY		1
++#define CLK_RESET_CCLK_RUN_POLICY		2
++#define CLK_RESET_CCLK_BURST_POLICY_PLLX	8
++
++#ifdef CONFIG_PM_SLEEP
++static struct cpu_clk_suspend_context {
++	u32 pllx_misc;
++	u32 pllx_base;
++
++	u32 cpu_burst;
++	u32 clk_csite_src;
++	u32 cclk_divider;
++} tegra30_cpu_clk_sctx;
++#endif
++
+ /**
+ * Structure defining the fields for USB UTMI clocks Parameters.
+ */
+@@ -2387,12 +2413,93 @@ static void tegra30_disable_cpu_clock(u32 cpu)
+ 	       reg_clk_base + TEGRA_CLK_RST_CONTROLLER_CLK_CPU_CMPLX);
  }
  
-+u32 flowctrl_read_cpu_csr(unsigned int cpuid)
++#ifdef CONFIG_PM_SLEEP
++static bool tegra30_cpu_rail_off_ready(void)
 +{
-+	u8 offset = flowctrl_offset_cpu_csr[cpuid];
-+	void __iomem *addr = IO_ADDRESS(TEGRA_FLOW_CTRL_BASE) + offset;
++	unsigned int cpu_rst_status;
++	int cpu_pwr_status;
 +
-+	return readl(addr);
++	cpu_rst_status = readl(reg_clk_base +
++			       TEGRA30_CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
++	cpu_pwr_status = tegra_powergate_is_powered(TEGRA_POWERGATE_CPU1) ||
++			 tegra_powergate_is_powered(TEGRA_POWERGATE_CPU2) ||
++			 tegra_powergate_is_powered(TEGRA_POWERGATE_CPU3);
++
++	if (((cpu_rst_status & 0xE) != 0xE) || cpu_pwr_status)
++		return false;
++
++	return true;
 +}
 +
- void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value)
- {
- 	return flowctrl_update(flowctrl_offset_cpu_csr[cpuid], value);
-@@ -60,3 +69,41 @@ void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value)
- {
- 	return flowctrl_update(flowctrl_offset_halt_cpu[cpuid], value);
- }
-+
-+void flowctrl_cpu_suspend_enter(unsigned int cpuid)
++static void tegra30_cpu_clock_suspend(void)
 +{
-+	unsigned int reg;
-+	int i;
++	/* switch coresite to clk_m, save off original source */
++	tegra30_cpu_clk_sctx.clk_csite_src =
++				readl(reg_clk_base + CLK_RESET_SOURCE_CSITE);
++	writel(3<<30, reg_clk_base + CLK_RESET_SOURCE_CSITE);
 +
-+	reg = flowctrl_read_cpu_csr(cpuid);
-+	reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
-+	reg &= ~TEGRA30_FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
-+	reg |= FLOW_CTRL_CSR_INTR_FLAG;			/* clear intr flag */
-+	reg |= FLOW_CTRL_CSR_EVENT_FLAG;		/* clear event flag */
-+	reg |= TEGRA30_FLOW_CTRL_CSR_WFI_CPU0 << cpuid;	/* pwr gating on wfi */
-+	reg |= FLOW_CTRL_CSR_ENABLE;			/* pwr gating */
-+	flowctrl_write_cpu_csr(cpuid, reg);
++	tegra30_cpu_clk_sctx.cpu_burst =
++				readl(reg_clk_base + CLK_RESET_CCLK_BURST);
++	tegra30_cpu_clk_sctx.pllx_base =
++				readl(reg_clk_base + CLK_RESET_PLLX_BASE);
++	tegra30_cpu_clk_sctx.pllx_misc =
++				readl(reg_clk_base + CLK_RESET_PLLX_MISC);
++	tegra30_cpu_clk_sctx.cclk_divider =
++				readl(reg_clk_base + CLK_RESET_CCLK_DIVIDER);
++}
 +
-+	for (i = 0; i < num_possible_cpus(); i++) {
-+		if (i == cpuid)
-+			continue;
-+		reg = flowctrl_read_cpu_csr(i);
-+		reg |= FLOW_CTRL_CSR_EVENT_FLAG;
-+		reg |= FLOW_CTRL_CSR_INTR_FLAG;
-+		flowctrl_write_cpu_csr(i, reg);
++static void tegra30_cpu_clock_resume(void)
++{
++	unsigned int reg, policy;
++
++	/* Is CPU complex already running on PLLX? */
++	reg = readl(reg_clk_base + CLK_RESET_CCLK_BURST);
++	policy = (reg >> CLK_RESET_CCLK_BURST_POLICY_SHIFT) & 0xF;
++
++	if (policy == CLK_RESET_CCLK_IDLE_POLICY)
++		reg = (reg >> CLK_RESET_CCLK_IDLE_POLICY_SHIFT) & 0xF;
++	else if (policy == CLK_RESET_CCLK_RUN_POLICY)
++		reg = (reg >> CLK_RESET_CCLK_RUN_POLICY_SHIFT) & 0xF;
++	else
++		BUG();
++
++	if (reg != CLK_RESET_CCLK_BURST_POLICY_PLLX) {
++		/* restore PLLX settings if CPU is on different PLL */
++		writel(tegra30_cpu_clk_sctx.pllx_misc,
++					reg_clk_base + CLK_RESET_PLLX_MISC);
++		writel(tegra30_cpu_clk_sctx.pllx_base,
++					reg_clk_base + CLK_RESET_PLLX_BASE);
++
++		/* wait for PLL stabilization if PLLX was enabled */
++		if (tegra30_cpu_clk_sctx.pllx_base & (1 << 30))
++			udelay(300);
 +	}
-+}
 +
-+void flowctrl_cpu_suspend_exit(unsigned int cpuid)
++	/*
++	 * Restore original burst policy setting for calls resulting from CPU
++	 * LP2 in idle or system suspend.
++	 */
++	writel(tegra30_cpu_clk_sctx.cclk_divider,
++					reg_clk_base + CLK_RESET_CCLK_DIVIDER);
++	writel(tegra30_cpu_clk_sctx.cpu_burst,
++					reg_clk_base + CLK_RESET_CCLK_BURST);
++
++	writel(tegra30_cpu_clk_sctx.clk_csite_src,
++					reg_clk_base + CLK_RESET_SOURCE_CSITE);
++}
++#endif
++
+ static struct tegra_cpu_car_ops tegra30_cpu_car_ops = {
+ 	.wait_for_reset	= tegra30_wait_cpu_in_reset,
+ 	.put_in_reset	= tegra30_put_cpu_in_reset,
+ 	.out_of_reset	= tegra30_cpu_out_of_reset,
+ 	.enable_clock	= tegra30_enable_cpu_clock,
+ 	.disable_clock	= tegra30_disable_cpu_clock,
++#ifdef CONFIG_PM_SLEEP
++	.rail_off_ready	= tegra30_cpu_rail_off_ready,
++	.suspend	= tegra30_cpu_clock_suspend,
++	.resume		= tegra30_cpu_clock_resume,
++#endif
+ };
+ 
+ void __init tegra30_cpu_car_ops_init(void)
+diff --git a/arch/arm/mach-tegra/tegra_cpu_car.h b/arch/arm/mach-tegra/tegra_cpu_car.h
+index 30d063a..9764d31 100644
+--- a/arch/arm/mach-tegra/tegra_cpu_car.h
++++ b/arch/arm/mach-tegra/tegra_cpu_car.h
+@@ -30,6 +30,12 @@
+  *	CPU clock un-gate
+  * disable_clock:
+  *	CPU clock gate
++ * rail_off_ready:
++ *	CPU is ready for rail off
++ * suspend:
++ *	save the clock settings when CPU go into low-power state
++ * resume:
++ *	restore the clock settings when CPU exit low-power state
+  */
+ struct tegra_cpu_car_ops {
+ 	void (*wait_for_reset)(u32 cpu);
+@@ -37,6 +43,11 @@ struct tegra_cpu_car_ops {
+ 	void (*out_of_reset)(u32 cpu);
+ 	void (*enable_clock)(u32 cpu);
+ 	void (*disable_clock)(u32 cpu);
++#ifdef CONFIG_PM_SLEEP
++	bool (*rail_off_ready)(void);
++	void (*suspend)(void);
++	void (*resume)(void);
++#endif
+ };
+ 
+ extern struct tegra_cpu_car_ops *tegra_cpu_car_ops;
+@@ -81,6 +92,32 @@ static inline void tegra_disable_cpu_clock(u32 cpu)
+ 	tegra_cpu_car_ops->disable_clock(cpu);
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static inline bool tegra_cpu_rail_off_ready(void)
 +{
-+	unsigned int reg;
++	if (WARN_ON(!tegra_cpu_car_ops->rail_off_ready))
++		return false;
 +
-+	/* Disable powergating via flow controller for CPU0 */
-+	reg = flowctrl_read_cpu_csr(cpuid);
-+	reg &= ~TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP;	/* clear wfe bitmap */
-+	reg &= ~TEGRA30_FLOW_CTRL_CSR_WFI_BITMAP;	/* clear wfi bitmap */
-+	reg &= ~FLOW_CTRL_CSR_ENABLE;			/* clear enable */
-+	reg |= FLOW_CTRL_CSR_INTR_FLAG;			/* clear intr */
-+	reg |= FLOW_CTRL_CSR_EVENT_FLAG;		/* clear event */
-+	flowctrl_write_cpu_csr(cpuid, reg);
++	return tegra_cpu_car_ops->rail_off_ready();
 +}
-diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
-index 1942817..0798dec 100644
---- a/arch/arm/mach-tegra/flowctrl.h
-+++ b/arch/arm/mach-tegra/flowctrl.h
-@@ -34,9 +34,17 @@
- #define FLOW_CTRL_HALT_CPU1_EVENTS	0x14
- #define FLOW_CTRL_CPU1_CSR		0x18
- 
-+#define TEGRA30_FLOW_CTRL_CSR_WFI_CPU0		(1 << 8)
-+#define TEGRA30_FLOW_CTRL_CSR_WFE_BITMAP	(0xF << 4)
-+#define TEGRA30_FLOW_CTRL_CSR_WFI_BITMAP	(0xF << 8)
 +
- #ifndef __ASSEMBLY__
-+u32 flowctrl_read_cpu_csr(unsigned int cpuid);
- void flowctrl_write_cpu_csr(unsigned int cpuid, u32 value);
- void flowctrl_write_cpu_halt(unsigned int cpuid, u32 value);
++static inline void tegra_cpu_clock_suspend(void)
++{
++	if (WARN_ON(!tegra_cpu_car_ops->suspend))
++		return;
 +
-+void flowctrl_cpu_suspend_enter(unsigned int cpuid);
-+void flowctrl_cpu_suspend_exit(unsigned int cpuid);
- #endif
++	tegra_cpu_car_ops->suspend();
++}
++
++static inline void tegra_cpu_clock_resume(void)
++{
++	if (WARN_ON(!tegra_cpu_car_ops->resume))
++		return;
++
++	tegra_cpu_car_ops->resume();
++}
++#endif
++
+ void tegra20_cpu_car_ops_init(void);
+ void tegra30_cpu_car_ops_init(void);
  
- #endif
 -- 
 1.7.0.4
