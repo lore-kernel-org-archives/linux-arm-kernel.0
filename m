@@ -1,23 +1,19 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 19 Oct 2012 09:16:59 +0800
-Subject: [PATCH 05/10] i2c: pxa: use devm_kzalloc
-In-Reply-To: <5080826D.6040108@wwwdotorg.org>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-5-git-send-email-haojian.zhuang@gmail.com>
- <5080826D.6040108@wwwdotorg.org>
-Message-ID: <CAN1soZw-r2Jb=dRfinNJBB1_yo1zuQD9AEF-F-qchSboFd1WNQ@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 19 Oct 2012 02:30:43 +0100
+Subject: [PATCH v2 2/2] mfd: Kconfig: Let MFD_SYSCON select REGMAP
+In-Reply-To: <1350605046-21358-2-git-send-email-festevam@gmail.com>
+References: <1350605046-21358-1-git-send-email-festevam@gmail.com>
+ <1350605046-21358-2-git-send-email-festevam@gmail.com>
+Message-ID: <20121019013043.GB2353@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 6:27 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/18/2012 03:06 AM, Haojian Zhuang wrote:
->> Use devm_kzalloc & add checking in probe() function.
->
-> This patch seems unrelated to this series. In fact, the series touches a
-> bunch of different subsystems; would you expect all these patches to be
-> merged through a single tree? If so, which?
+On Thu, Oct 18, 2012 at 09:04:06PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Building multi_v7_defconfig for mx6 causes the following build error:
 
-Yes, I expect all these patches could be merged by pinctrl subtree.
+> Fix it by selecting REGMAP option.
 
-Regards
-Haojian
+No, this is silly - selecting MMIO ought to do the right thing.  There's
+a patch queued for Linus which will resolve this.
