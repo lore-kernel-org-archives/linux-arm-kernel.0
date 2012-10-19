@@ -1,70 +1,43 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 19 Oct 2012 09:56:22 +0800
-Subject: Do we need to fix below dump during cpu hot plug operation?
-Message-ID: <20121019015621.GA17360@nchen-desktop>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 19 Oct 2012 10:16:12 +0800
+Subject: [PATCH 01/10] pinctrl: use postcore_initcall
+In-Reply-To: <20121018222802.GG30550@atomide.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <5080802B.3000209@wwwdotorg.org>
+ <20121018222802.GG30550@atomide.com>
+Message-ID: <CAN1soZy17wO2s7WoRSRod8k5Zh7fuUc1gxhQiHEb0=zwLhyj6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Oct 19, 2012 at 6:28 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Stephen Warren <swarren@wwwdotorg.org> [121018 15:20]:
+>> On 10/18/2012 03:06 AM, Haojian Zhuang wrote:
+>> > Since pins are configured in device driver, pinctrl driver should be
+>> > loaded by those device driver. module_platform_driver() only declares
+>> > pinctrl driver is in module_initcall privilege. Use postcore_initcall
+>> > privilege instead.
+>>
+>> I'm not convinced this is needed; doesn't deferred probe sort out the
+>> dependencies correctly?
+>
+> I'm a bit concerned about this need too as the trend is towards
+> initializing things later than earlier. The drivers/Makefile order
+> and deferred probe should be already enough?
+>
+> Specifically could you decribe the cases where this issue happens?
+> Also check if one of your client drivers has some early initcall
+> that's no longer needed.
+>
+> Regards,
+>
+> Tony
 
-When doing system suspend/resume or CPU hot plug at SMP platform (like 
-Freescale i.mx6Q sabrelite board), if local time is enabled, 
-there is a clk_get_rate at twd_timer_setup during the atomic context.
-So, if mutex_lock debug is enabled, there will be below dump message.
-Although it will not affect future system use, it is boring message.
+Yes, the special case is PMIC. Most of PMIC are based on I2C/SPI bus.
+It means that I2C/SPI bus driver should be initialized firstly. For example,
+we could find that PMIC mfd driver are initialized in subsys init call level.
+It means that pinctrl should be initialized earlier than I2C/SPI bus driver.
+Otherwise, pins of I2C bus may not be configured as I2C function since
+pinctrl driver is module init call level.
 
-BUG: sleeping function called from invalid context at /home/b29397/work/code/git/linus/linux-2.6/kernel/mutex.c:269
-no locks held by swapper/1/0.
-irq event stamp: 279320
-hardirqs last  enabled at (279319): [<80052bd0>] idle_task_exit+0x16c/0x1a0
-hardirqs last disabled at (279320): [<8051a470>] cpu_die+0x28/0x98
-softirqs last  enabled at (279304): [<8002ae3c>] _local_bh_enable+0x14/0x18
-softirqs last disabled at (279303): [<8002aea8>] irq_enter+0x68/0x78
-Backtrace: 
-[<8001284c>] (dump_backtrace+0x0/0x10c) from [<8052b614>] (dump_stack+0x18/0x1c)
- r7:8062b070 r6:0000010d r5:00000000 r4:bf88c000
-[<8052b5fc>] (dump_stack+0x0/0x1c) from [<80050bb4>] (__might_sleep+0x1ec/0x238)
-[<800509c8>] (__might_sleep+0x0/0x238) from [<8052cf60>] (mutex_lock_nested+0x38/0x3bc)
- r7:00000000 r6:bf88c000 r5:808b19e0 r4:808a5360
-[<8052cf28>] (mutex_lock_nested+0x0/0x3bc) from [<803e2108>] (clk_get_rate+0x1c/0x84)
-[<803e20ec>] (clk_get_rate+0x0/0x84) from [<8052900c>] (twd_timer_setup+0x28c/0x2e0)
- r5:808b19e0 r4:817c0200
-[<80528d80>] (twd_timer_setup+0x0/0x2e0) from [<805288b8>] (percpu_timer_setup+0x6c/0xdc)
- r9:412fc09a r8:1000406a r7:808b19d8 r6:bf88c000 r5:80879c14
-r4:817c0200
-[<8052884c>] (percpu_timer_setup+0x0/0xdc) from [<80528a68>] (secondary_start_kernel+0x140/0x19c)
- r5:80879c14 r4:00000001
-[<80528928>] (secondary_start_kernel+0x0/0x19c) from [<10528248>] (0x10528248)
- r7:808b19d8 r6:10c03c7d r5:0000001f r4:4f87806a
-BUG: scheduling while atomic: swapper/1/0/0x40000002
-no locks held by swapper/1/0.
-Modules linked in:
-irq event stamp: 279320
-hardirqs last  enabled at (279319): [<80052bd0>] idle_task_exit+0x16c/0x1a0
-hardirqs last disabled at (279320): [<8051a470>] cpu_die+0x28/0x98
-softirqs last  enabled at (279304): [<8002ae3c>] _local_bh_enable+0x14/0x18
-softirqs last disabled at (279303): [<8002aea8>] irq_enter+0x68/0x78
-Backtrace: 
-[<8001284c>] (dump_backtrace+0x0/0x10c) from [<8052b614>] (dump_stack+0x18/0x1c)
- r7:00000001 r6:bf88c000 r5:bf890000 r4:bf890000
-[<8052b5fc>] (dump_stack+0x0/0x1c) from [<800539b4>] (__schedule_bug+0x5c/0x7c)
-[<80053958>] (__schedule_bug+0x0/0x7c) from [<8052e1a8>] (__schedule+0x620/0x6e0)
- r5:bf890000 r4:819215c0
-[<8052db88>] (__schedule+0x0/0x6e0) from [<8052e320>] (_cond_resched+0x44/0x58)
-[<8052e2dc>] (_cond_resched+0x0/0x58) from [<8052cf64>] (mutex_lock_nested+0x3c/0x3bc)
- r5:808b19e0 r4:808a5360
-[<8052cf28>] (mutex_lock_nested+0x0/0x3bc) from [<803e2108>] (clk_get_rate+0x1c/0x84)
-[<803e20ec>] (clk_get_rate+0x0/0x84) from [<8052900c>] (twd_timer_setup+0x28c/0x2e0)
- r5:808b19e0 r4:817c0200
-[<80528d80>] (twd_timer_setup+0x0/0x2e0) from [<805288b8>] (percpu_timer_setup+0x6c/0xdc)
- r9:412fc09a r8:1000406a r7:808b19d8 r6:bf88c000 r5:80879c14
-r4:817c0200
-[<8052884c>] (percpu_timer_setup+0x0/0xdc) from [<80528a68>] (secondary_start_kernel+0x140/0x19c)
- r5:80879c14 r4:00000001
-[<80528928>] (secondary_start_kernel+0x0/0x19c) from [<10528248>] (0x10528248)
- r7:808b19d8 r6:10c03c7d r5:0000001f r4:4f87806a
-
--- 
-
-Best Regards,
-Peter Chen
+Regards
+Haojian
