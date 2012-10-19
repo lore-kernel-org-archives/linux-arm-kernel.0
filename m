@@ -1,227 +1,142 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Oct 2012 16:48:40 +0800
-Subject: [PATCH V2 1/7] ARM: tegra: cpuidle: separate cpuidle driver for
- different chips
+Date: Fri, 19 Oct 2012 16:48:41 +0800
+Subject: [PATCH V2 2/7] ARM: tegra: cpuidle: add LP2 resume function
 In-Reply-To: <1350636526-25920-1-git-send-email-josephl@nvidia.com>
 References: <1350636526-25920-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1350636526-25920-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1350636526-25920-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The different Tegra chips may have different CPU idle states and data.
-Individual CPU idle driver make it more easy to maintain.
+LP2 is one of the Tegra low power states that supports power gating both
+CPU cores and GICs. Adding a resume function for taking care the CPUs that
+resume from LP2. This function was been hooked to reset handler. We take
+care everything here before go into kernel.
+
+Based on the work by:
+Scott Williams <scwilliams@nvidia.com>
+Colin Cross <ccross@android.com>
+Gary King <gking@nvidia.com>
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* only remove the line of file name and path in the (c) header
+* moving the code that only for Tegra30 inside the ifdef in the tegra_resume
 
- arch/arm/mach-tegra/Makefile                       |    6 +++
- .../mach-tegra/{cpuidle.c => cpuidle-tegra20.c}    |    7 +--
- .../mach-tegra/{cpuidle.c => cpuidle-tegra30.c}    |    7 +--
- arch/arm/mach-tegra/cpuidle.c                      |   47 +++++--------------
- arch/arm/mach-tegra/cpuidle.h                      |   32 +++++++++++++
- 5 files changed, 55 insertions(+), 44 deletions(-)
- copy arch/arm/mach-tegra/{cpuidle.c => cpuidle-tegra20.c} (91%)
- copy arch/arm/mach-tegra/{cpuidle.c => cpuidle-tegra30.c} (91%)
- create mode 100644 arch/arm/mach-tegra/cpuidle.h
+ arch/arm/mach-tegra/headsmp.S |   58 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/reset.c   |    6 ++++
+ arch/arm/mach-tegra/sleep.h   |    1 +
+ 3 files changed, 65 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index e6929c6..9b80c1e 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -14,9 +14,15 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks_data.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= sleep-tegra20.o
-+ifeq ($(CONFIG_CPU_IDLE),y)
-+obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= cpuidle-tegra20.o
-+endif
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= tegra30_clocks_data.o
- obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= sleep-tegra30.o
-+ifeq ($(CONFIG_CPU_IDLE),y)
-+obj-$(CONFIG_ARCH_TEGRA_3x_SOC)		+= cpuidle-tegra30.o
-+endif
- obj-$(CONFIG_SMP)			+= platsmp.o headsmp.o
- obj-$(CONFIG_SMP)                       += reset.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-similarity index 91%
-copy from arch/arm/mach-tegra/cpuidle.c
-copy to arch/arm/mach-tegra/cpuidle-tegra20.c
-index 4e0b07c..d32e8b0 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -1,6 +1,4 @@
- /*
-- * arch/arm/mach-tegra/cpuidle.c
-- *
-  * CPU idle driver for Tegra CPUs
-  *
-  * Copyright (c) 2010-2012, NVIDIA Corporation.
-@@ -27,7 +25,7 @@
+diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+index 6addc78..36066f2 100644
+--- a/arch/arm/mach-tegra/headsmp.S
++++ b/arch/arm/mach-tegra/headsmp.S
+@@ -69,6 +69,53 @@ ENTRY(tegra_secondary_startup)
+         b       secondary_startup
+ ENDPROC(tegra_secondary_startup)
  
- #include <asm/cpuidle.h>
- 
--struct cpuidle_driver tegra_idle_driver = {
-+static struct cpuidle_driver tegra_idle_driver = {
- 	.name = "tegra_idle",
- 	.owner = THIS_MODULE,
- 	.en_core_tk_irqen = 1,
-@@ -39,7 +37,7 @@ struct cpuidle_driver tegra_idle_driver = {
- 
- static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
- 
--static int __init tegra_cpuidle_init(void)
-+int __init tegra20_cpuidle_init(void)
- {
- 	int ret;
- 	unsigned int cpu;
-@@ -66,4 +64,3 @@ static int __init tegra_cpuidle_init(void)
- 	}
- 	return 0;
- }
--device_initcall(tegra_cpuidle_init);
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-similarity index 91%
-copy from arch/arm/mach-tegra/cpuidle.c
-copy to arch/arm/mach-tegra/cpuidle-tegra30.c
-index 4e0b07c..37e7551 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -1,6 +1,4 @@
- /*
-- * arch/arm/mach-tegra/cpuidle.c
-- *
-  * CPU idle driver for Tegra CPUs
-  *
-  * Copyright (c) 2010-2012, NVIDIA Corporation.
-@@ -27,7 +25,7 @@
- 
- #include <asm/cpuidle.h>
- 
--struct cpuidle_driver tegra_idle_driver = {
-+static struct cpuidle_driver tegra_idle_driver = {
- 	.name = "tegra_idle",
- 	.owner = THIS_MODULE,
- 	.en_core_tk_irqen = 1,
-@@ -39,7 +37,7 @@ struct cpuidle_driver tegra_idle_driver = {
- 
- static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
- 
--static int __init tegra_cpuidle_init(void)
-+int __init tegra30_cpuidle_init(void)
- {
- 	int ret;
- 	unsigned int cpu;
-@@ -66,4 +64,3 @@ static int __init tegra_cpuidle_init(void)
- 	}
- 	return 0;
- }
--device_initcall(tegra_cpuidle_init);
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index 4e0b07c..d065139 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -23,47 +23,26 @@
- 
- #include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/cpuidle.h>
- 
--#include <asm/cpuidle.h>
--
--struct cpuidle_driver tegra_idle_driver = {
--	.name = "tegra_idle",
--	.owner = THIS_MODULE,
--	.en_core_tk_irqen = 1,
--	.state_count = 1,
--	.states = {
--		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
--	},
--};
--
--static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
-+#include "fuse.h"
-+#include "cpuidle.h"
- 
- static int __init tegra_cpuidle_init(void)
- {
- 	int ret;
--	unsigned int cpu;
--	struct cpuidle_device *dev;
--	struct cpuidle_driver *drv = &tegra_idle_driver;
- 
--	ret = cpuidle_register_driver(&tegra_idle_driver);
--	if (ret) {
--		pr_err("CPUidle driver registration failed\n");
--		return ret;
-+	switch (tegra_chip_id) {
-+	case TEGRA20:
-+		ret = tegra20_cpuidle_init();
-+		break;
-+	case TEGRA30:
-+		ret = tegra30_cpuidle_init();
-+		break;
-+	default:
-+		ret = -ENODEV;
-+		break;
- 	}
- 
--	for_each_possible_cpu(cpu) {
--		dev = &per_cpu(tegra_idle_device, cpu);
--		dev->cpu = cpu;
--
--		dev->state_count = drv->state_count;
--		ret = cpuidle_register_device(dev);
--		if (ret) {
--			pr_err("CPU%u: CPUidle device registration failed\n",
--				cpu);
--			return ret;
--		}
--	}
--	return 0;
-+	return ret;
- }
- device_initcall(tegra_cpuidle_init);
-diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
-new file mode 100644
-index 0000000..496204d
---- /dev/null
-+++ b/arch/arm/mach-tegra/cpuidle.h
-@@ -0,0 +1,32 @@
++#ifdef CONFIG_PM_SLEEP
 +/*
-+ * Copyright (c) 2012, NVIDIA Corporation. All rights reserved.
++ *	tegra_resume
 + *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *	  CPU boot vector when restarting the a CPU following
++ *	  an LP2 transition. Also branched to by LP0 and LP1 resume after
++ *	  re-enabling sdram.
 + */
++ENTRY(tegra_resume)
++	bl	v7_invalidate_l1
++	/* Enable coresight */
++	mov32	r0, 0xC5ACCE55
++	mcr	p14, 0, r0, c7, c12, 6
 +
-+#ifndef __MACH_TEGRA_CPUIDLE_H
-+#define __MACH_TEGRA_CPUIDLE_H
-+
-+#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-+int tegra20_cpuidle_init(void);
-+#else
-+static inline int tegra20_cpuidle_init(void) { return -ENODEV; }
-+#endif
++	cpu_id	r0
++	cmp	r0, #0				@ CPU0?
++	bne	cpu_resume			@ no
 +
 +#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+int tegra30_cpuidle_init(void);
-+#else
-+static inline int tegra30_cpuidle_init(void) { return -ENODEV; }
++	/* Are we on Tegra20? */
++	mov32	r6, TEGRA_APB_MISC_BASE
++	ldr	r0, [r6, #APB_MISC_GP_HIDREV]
++	and	r0, r0, #0xff00
++	cmp	r0, #(0x20 << 8)
++	beq	1f				@ Yes
++	/* Clear the flow controller flags for this CPU. */
++	mov32	r2, TEGRA_FLOW_CTRL_BASE + FLOW_CTRL_CPU0_CSR	@ CPU0 CSR
++	ldr	r1, [r2]
++	/* Clear event & intr flag */
++	orr	r1, r1, \
++		#FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
++	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
++	bic	r1, r1, r0
++	str	r1, [r2]
++1:
 +#endif
 +
++	/* enable SCU */
++	mov32	r0, TEGRA_ARM_PERIF_BASE
++	ldr	r1, [r0]
++	orr	r1, r1, #1
++	str	r1, [r0]
++
++	b	cpu_resume
++ENDPROC(tegra_resume)
 +#endif
++
+ 	.align L1_CACHE_SHIFT
+ ENTRY(__tegra_cpu_reset_handler_start)
+ 
+@@ -122,6 +169,17 @@ ENTRY(__tegra_cpu_reset_handler)
+ 1:
+ #endif
+ 
++	/* Waking up from LP2? */
++	ldr	r9, [r12, #RESET_DATA(MASK_LP2)]
++	tst	r9, r11				@ if in_lp2
++	beq	__is_not_lp2
++	ldr	lr, [r12, #RESET_DATA(STARTUP_LP2)]
++	cmp	lr, #0
++	bleq	__die				@ no LP2 startup handler
++	bx	lr
++
++__is_not_lp2:
++
+ #ifdef CONFIG_SMP
+ 	/*
+ 	 * Can only be secondary boot (initial or hotplug) but CPU 0
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 5beb7eb..c48548f 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -26,6 +26,7 @@
+ #include <mach/irammap.h>
+ 
+ #include "reset.h"
++#include "sleep.h"
+ #include "fuse.h"
+ 
+ #define TEGRA_IRAM_RESET_BASE (TEGRA_IRAM_BASE + \
+@@ -80,5 +81,10 @@ void __init tegra_cpu_reset_handler_init(void)
+ 		virt_to_phys((void *)tegra_secondary_startup);
+ #endif
+ 
++#ifdef CONFIG_PM_SLEEP
++	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP2] =
++		virt_to_phys((void *)tegra_resume);
++#endif
++
+ 	tegra_cpu_reset_handler_enable();
+ }
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index e25a7cd..c9dec37 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -72,6 +72,7 @@
+ 	dsb
+ .endm
+ #else
++void tegra_resume(void);
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+ void tegra20_hotplug_init(void);
 -- 
 1.7.0.4
