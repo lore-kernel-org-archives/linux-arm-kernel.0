@@ -1,34 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 19 Oct 2012 10:55:42 +0200
-Subject: [PATCH 1/2] i2c: mux: Add dt support to i2c-mux-gpio driver
-In-Reply-To: <50808481.6040501@wwwdotorg.org>
-References: <1350569623-4699-1-git-send-email-maxime.ripard@free-electrons.com>
- <1350569623-4699-2-git-send-email-maxime.ripard@free-electrons.com>
- <50808481.6040501@wwwdotorg.org>
-Message-ID: <5081158E.4040308@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 19 Oct 2012 09:03:37 +0000
+Subject: [PATCH v2 1/5] ARM: bcm476x: Add platform infrastructure
+In-Reply-To: <20121018154731.GA9344@glitch>
+References: <20121014221450.866288977@gmail.com>
+ <201210181348.02110.arnd@arndb.de> <20121018154731.GA9344@glitch>
+Message-ID: <201210190903.38142.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/10/2012 00:36, Stephen Warren a ?crit :
-> On 10/18/2012 08:13 AM, Maxime Ripard wrote:
->> Allow the i2c-mux-gpio to be used by a device tree enabled device. The
->> bindings are inspired by the one found in the i2c-mux-pinctrl driver.
+On Thursday 18 October 2012, Domenico Andreoli wrote:
+> On Thu, Oct 18, 2012 at 01:48:01PM +0000, Arnd Bergmann wrote:
+> > On Sunday 14 October 2012, Domenico Andreoli wrote:
+> +
+> +Boards with the BCM4760 SoC shall have the following properties:
+> +
+> +Required root node property:
+> +
+> +compatible = "brcm,bcm4760";
+> +
+> +
+> +Boards with the BCM4761 SoC shall have the following properties:
+> +
+> +Required root node property:
+> +
+> +compatible = "brcm,bcm4760", "brcm,bcm4761";
 > 
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+> and the dt_mach in the board file is left only with "brcm,bcm4760" until
+> required otherwise. The same applies to drivers.
+
+Right.
+
+> Does the order matter? 
+
+Yes, you have to have the most specific one first, and the most generic
+one last, as documented in Documentation/devicetree/booting-without-of.txt.
+
+If one chip has a functionality that the other one doesn't but is otherwise
+completely compatible, then the less capable one should be put last.
+
+For the root node, you might actually want to keep both "compatible" strings
+separate as you have in the version you posted, at least if the chips are
+not completely backwards compatible. For the other devices inside of the
+soc, just use one.
+
+> > For the patches that go into different directories like the clk
+> > and the clocksource drivers, please Cc the respective subsystem
+> > maintainers and ask them for an Ack. It certainly makes sense
+> > for a new platform port to get merged through the arm-soc tree,
+> > but any future improvements should normally just go through the
+> > subsystem trees.
 > 
->> +Optional properties:
->> +- idle-state: value to set to the muxer when idle. When no value is
->> +  given, it defaults to the first value in the array.
-> 
-> That's inconsistent with the following text that appears later (and
-> describes what the driver actually does):
+> I'd prefer patches but only because I've not any public git repository. If
+> the git pull is much more preferred, I surely can manage it.
 
-Ah, right, sorry
+Ok, no problem. In the long run, it can be useful for you to set up 
+your own git tree, for for now, we can manage with patches just fine.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
