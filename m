@@ -1,111 +1,73 @@
-From: preeti@linux.vnet.ibm.com (preeti)
-Date: Fri, 19 Oct 2012 10:27:39 +0530
-Subject: [RFC PATCH 0/2] sched: Load Balancing using
- Per-entity-Load-tracking
-In-Reply-To: <5080D451.5090409@linux.vnet.ibm.com>
-References: <20121012044618.18271.88332.stgit@preeti.in.ibm.com>
- <20121018172609.GA14473@e103034-lin> <5080D451.5090409@linux.vnet.ibm.com>
-Message-ID: <5080DDC3.9070008@linux.vnet.ibm.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Fri, 19 Oct 2012 08:57:12 +0300
+Subject: [PATCH v2 0/2] Add DMA and device tree support to the flash
+ controller FLCTL
+In-Reply-To: <CABYn4szACuH3LQ193VJj6E=J4q4Ye4E4O6cUgjB8jmQK6RRmpA@mail.gmail.com>
+References: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
+ <1350473030.5769.137.camel@sauron.fi.intel.com>
+ <CABYn4szACuH3LQ193VJj6E=J4q4Ye4E4O6cUgjB8jmQK6RRmpA@mail.gmail.com>
+Message-ID: <1350626232.5769.318.camel@sauron.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry guys this mail had problems getting sent.hence the repost.
-
-Hi Morten,
-Thank you very much for your review.
-
->> 1.Consider a scenario,where there are two 10% tasks running on a cpu.The
->>   present code will consider the load on this queue to be 2048,while
->>   using PJT's metric the load is calculated to be <1000,rarely exceeding this
->>   limit.Although the tasks are not contributing much to the cpu load,they are
->>   decided to be moved by the scheduler.
->
-> I guess that you assume, for now, that all tasks have default (nice 0)
-> priority? Both the old load and the PJT metric (tracked load) depends on
-> priority.
-
-Thats right.I have assumed default priority of the tasks.
->>
->>   But one could argue that 'not moving one of these tasks could throttle
->>   them.If there was an idle cpu,perhaps we could have moved them'.While the
->>   power save mode would have been fine with not moving the task,the
->>   performance mode would prefer not to throttle the tasks.We could strive
->>   to strike a balance by making this decision tunable with certain parameters.
->>   This patchset includes such tunables.This issue is addressed in Patch[1/2].
->>
->
-> One could also argue that long as there are spare cpu cycles in each
-> schedule period then all tasks have received the cpu time they needed.
-> So from that point of view performance isn't affected by not balancing
-> the tasks as long as the cpu is not fully utilized. If we look at the
-> problem from a latency point of view then packing tasks on a single cpu
-> will increase latency but the increase will be bounded by the schedule
-> period.
->
-Assume that at the end of one scheduling period,there are a few spare
-cycles on the cpu.this is fine from both the performance and latency
-point of view at *this* point.nobody is waiting for the cpu.
-
-The issue arises if it is detected that these spare cycles are due to
-*sleeping tasks* and not due to no tasks.
-
-At this point a decision needs to be made as to: if a scenario arises
-where all these tasks wake up at the same time in the future,and wait on
-the cpu,then are we ok with them waiting.Both performance and latency
-views could be against this,as this also means less throughput.But
-performance view could go slightly easy on this to argue,that its ok if
-2-3 tasks wait,if more,then there is a need to move them.
-
->>   This patchset therefore has two primary aims.
->>          Patch[1/2]: This patch aims at detecting short running tasks and
->> 	 prevent their movement.In update_sg_lb_stats,dismiss a sched group
->> 	 as a candidate for load balancing,if load calculated by PJT's metric
->> 	 says that the average load on the sched_group <= 1024+(.15*1024).
->> 	 This is a tunable,which can be varied after sufficient experiments.
->
-> Your current threshold implies that there must be at least two (nice 0)
-> tasks running breach the threshold and they need to be quite busy. This
-> makes sense to me. When you have more tasks they are more likely to be
-> waiting on the runqueue even if it is only 10% tasks. Let's say you have
-> five 10% tasks and they all become runnable at the same instant. In that
-> case some of the tasks would have a tracked load which is much higher
-> than if we only had two 10% tasks running. So if I'm not mistaken, it
-> would be possible to breach the threshold even though the overall cpu
-> utilization is only 50% and it would have been safe not to load-balance
-> that cpu.
->
-> Do you think it would make sense to let the threshold depend on the
-> number of task on the cpu somehow? 
+On Wed, 2012-10-17 at 15:05 +0200, Bastian Hecht wrote:
+> Hi Artem,
 > 
-You are right,Morten.In fact I have included this viewpoint in both my
-first and second patch enclosed by this. So lets take up the above
-scenario.if there are 5 10% tasks running,they will surely cross the
-threshold,but the cpu might have spare cycles at the end of a scheduling
-period.Now that is your concern.
+> > Hi, I used to be able to compile MTD stuff for mackerel board with the
+> > defconfig attached, but now it fails with 3.7-rc1 with as error:
+> >
+> > /tmp/cc2Nr7AN.s: Error: bad immediate value for 8-bit offset (1024)
+> >
+> > It fails for dogc4.c, but if I disable DOCG4, it fails for other drivers
+> > with a similar error.
+> >
+> > I've tried (arm) gcc 4.6.3 and the latest Linaro 4.7 build.
+> >
+> > Any idea? I did not dig this, is this a known issue? Could you try to
+> > reproduce this in your setup?
+> >
+> 
+> I can reproduce the error with the following output:
+> /tmp/ccYAbker.s: Assembler messages:
+> /tmp/ccYAbker.s: Error: bad immediate value for 8-bit offset (2048)
+> make[3]: *** [drivers/mtd/nand/docg4.o] Error 1
+> 
+> The compiler version is: gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+> I usually use: gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) and
+> can compile things without problems.
 
-Again we have two different viewpoints.This threshold is like a tuning
-knob.we could increase it if we feel that this threshold gets reached
-very quickly with as few tasks as 5, although the cpu utilization is
-poor.we prefer not to wake up another cpu unless the present cpu is
-aptly loaded.we could call this the power saving view.
+Yeah, a bug report would be great. I've switched to 4.4.1 and checked
+your patches with aiaiai:
 
-Else we could say that,we are not intending to affect the throughput of
-tasks,so we prefer the knob be at this value,so that we qualify such a
-load as a candidate for load balancing.we could call this the
-performance view.
+--------------------------------------------------------------------------------
 
-> Alternative, the decision could be based on the cpu idle time over the
-> last schedule period. A cpu with no or very few spare cycles in the last
-> schedule period would be a good candidate for load-balancing. Latency
-> would be affected as mentioned earlier.
->
-Exactly.idle_time == spare_cpu_cycles == less cpu_utilization.I hope i
-am not wrong in drawing this equivalence.if thats the case then the same
-explanation as above holds good here too.
+Successfully built configuration "arm-mackerel_defconfig,arm,arm-none-linux-gnueabi-", results:
 
-> Morten
+--- before_patching.log
++++ after_patching.log
+@@ @@
++drivers/mtd/nand/sh_flctl.c:1142 flctl_probe() warn: 'irq' was not released on error [smatch]
++drivers/mtd/nand/sh_flctl.c:1142:2-8: ERROR: missing iounmap; ioremap on line 1117 and execution via conditional on line 1140 [coccinelle]
++drivers/mtd/nand/sh_flctl.c:164:25: warning: cast removes address space of expression [sparse]
++drivers/mtd/nand/sh_flctl.c:181:25: warning: cast removes address space of expression [sparse]
+-drivers/mtd/nand/sh_flctl.c:311 write_fiforeg() Error invalid range 4096 to -1 [smatch]
+-drivers/mtd/nand/sh_flctl.c:317:17: warning: incorrect type in argument 2 (different address spaces) [sparse]
+-drivers/mtd/nand/sh_flctl.c:317:17:    expected void volatile [noderef] <asn:2>*addr [sparse]
+-drivers/mtd/nand/sh_flctl.c:317:17:    got void *fifo_addr [sparse]
++drivers/mtd/nand/sh_flctl.c:469 write_fiforeg() Error invalid range 4096 to -1 [smatch]
++drivers/mtd/nand/sh_flctl.c:485:17: warning: incorrect type in argument 2 (different address spaces) [sparse]
++drivers/mtd/nand/sh_flctl.c:485:17:    expected void volatile [noderef] <asn:2>*addr [sparse]
++drivers/mtd/nand/sh_flctl.c:485:17:    got void *fifo_addr [sparse]
 
-Thank you
+--------------------------------------------------------------------------------
 
-Regards
-Preeti
+
+Best Regards,
+Artem Bityutskiy
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121019/e8f29d12/attachment.sig>
