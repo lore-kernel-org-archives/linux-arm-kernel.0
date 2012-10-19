@@ -1,74 +1,62 @@
 From: hechtb@googlemail.com (Bastian Hecht)
-Date: Fri, 19 Oct 2012 12:05:09 +0200
-Subject: [PATCH v2 0/2] Add DMA and device tree support to the flash
+Date: Fri, 19 Oct 2012 12:15:33 +0200
+Subject: [PATCH v3 0/3] Add DMA and device tree support to the flash
  controller FLCTL
-In-Reply-To: <1350626232.5769.318.camel@sauron.fi.intel.com>
-References: <1349776729-9311-1-git-send-email-hechtb@gmail.com>
- <1350473030.5769.137.camel@sauron.fi.intel.com>
- <CABYn4szACuH3LQ193VJj6E=J4q4Ye4E4O6cUgjB8jmQK6RRmpA@mail.gmail.com>
- <1350626232.5769.318.camel@sauron.fi.intel.com>
-Message-ID: <CABYn4swnc5xT=gOCHk5wzQTHWe8TNOE5_o2A36xEgPSnDosSBQ@mail.gmail.com>
+Message-ID: <1350641736-18192-1-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Artem,
+changelog v3:	- due to shame on me by letting aiaiai complain, I've added
+		  a third patch (1/3) that cleans up some parts of the driver
+		  and added a correct error path to probe() in patch 3 (formerly 2/2).
+		  I found no way to fix this though:
++drivers/mtd/nand/sh_flctl.c:181:25: warning: cast removes address space of expression [sparse]
+		
+changelog v2: 	- cosmetic fixes in patch 1
+		- added dmas and dma-names field in patch 2
 
->> I can reproduce the error with the following output:
->> /tmp/ccYAbker.s: Assembler messages:
->> /tmp/ccYAbker.s: Error: bad immediate value for 8-bit offset (2048)
->> make[3]: *** [drivers/mtd/nand/docg4.o] Error 1
->>
->> The compiler version is: gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
->> I usually use: gcc version 4.4.1 (Sourcery G++ Lite 2010q1-202) and
->> can compile things without problems.
->
-> Yeah, a bug report would be great. I've switched to 4.4.1 and checked
-> your patches with aiaiai:
+This mini-series consists of 2 separately posted patch-sets that shrunk
+to one patch each. It adds DMA support for the data part (not ECC) as
+well as device tree support to the FLCTL flash controller.
+As the 2nd patch is based on the 1st, I've decided to
+collect them here to avoid any confusion.
 
-Ok I'll file one.
+The first set contained
+[PATCH 1/2] mtd: sh_flctl: Setup and release DMA channels
+[PATCH 2/2] mtd: sh_flctl: Use DMA for data fifo FLTDFIFO when available
+and was merged after 2 reviews to
+[PATCH] mtd: sh_flctl: Add DMA capabilty (same patch as in here)
 
-I've added a cleanup patch 1/3 and tackled the problems below as follows:
+The second set contained
+[PATCH 1/3] mtd: sh_flctl: Probe SNAND_E flag from NAND chip
+[PATCH 2/3] mtd: sh_flctl: Add device tree support
+[PATCH 3/3] mtd: sh_flctl: Add sh7372 device tree config
+and is merged here to
+mtd: sh_flctl: Add device tree support
 
-> --------------------------------------------------------------------------------
->
-> Successfully built configuration "arm-mackerel_defconfig,arm,arm-none-linux-gnueabi-", results:
->
-> --- before_patching.log
-> +++ after_patching.log
-> @@ @@
-> +drivers/mtd/nand/sh_flctl.c:1142 flctl_probe() warn: 'irq' was not released on error [smatch]
-> +drivers/mtd/nand/sh_flctl.c:1142:2-8: ERROR: missing iounmap; ioremap on line 1117 and execution via conditional on line 1140 [coccinelle]
+Patch 1 can be omitted as SNAND_E is handled in the FLCTL source anyway
+correctly in set_cmd_regs() and the flag can be removed from existing board
+codes without this patch.
+Patch 2 without patch 3 may be confusing so I merged them too. Documentation
+is added as well.
 
-Oh yes, my bad. Fixed in patch 3 (formerly 2).
+I've added linux-arm-kernel at lists.infradead.org as recipient for the
+device tree part.
 
-> +drivers/mtd/nand/sh_flctl.c:164:25: warning: cast removes address space of expression [sparse]
-> +drivers/mtd/nand/sh_flctl.c:181:25: warning: cast removes address space of expression [sparse]
+The patchset is based on
+l2-mtd	git://git.infradead.org/users/dedekind/l2-mtd.git
+with reverted commit e26c113b4130aefa1d8446602bb5b05cfd646bfe.
 
-Here I have no idea how to fix it. dma_addr_t is a typedef to u32. How
-could I possibly not loose the address space?
 
-> -drivers/mtd/nand/sh_flctl.c:311 write_fiforeg() Error invalid range 4096 to -1 [smatch]
+Bastian Hecht (2):
+  mtd: sh_flctl: Add DMA capabilty
+  mtd: sh_flctl: Add device tree support
 
-Here my smatch (git head version) doesn't complain. Still I switched
-to unsigned int for indexing an array member and hope this solves the
-problem. Done in new patch 1/3.
+ .../devicetree/bindings/mtd/flctl-nand.txt         |   37 +++
+ drivers/mtd/nand/sh_flctl.c                        |  266 +++++++++++++++++++-
+ include/linux/mtd/sh_flctl.h                       |   12 +
+ 3 files changed, 305 insertions(+), 10 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/flctl-nand.txt
 
-> -drivers/mtd/nand/sh_flctl.c:317:17: warning: incorrect type in argument 2 (different address spaces) [sparse]
-> -drivers/mtd/nand/sh_flctl.c:317:17:    expected void volatile [noderef] <asn:2>*addr [sparse]
-> -drivers/mtd/nand/sh_flctl.c:317:17:    got void *fifo_addr [sparse]
-
-Fixed in new patch 1/3.
-
-> +drivers/mtd/nand/sh_flctl.c:469 write_fiforeg() Error invalid range 4096 to -1 [smatch]
-
-Same as above. Unclear how to solve.
-
-> +drivers/mtd/nand/sh_flctl.c:485:17: warning: incorrect type in argument 2 (different address spaces) [sparse]
-> +drivers/mtd/nand/sh_flctl.c:485:17:    expected void volatile [noderef] <asn:2>*addr [sparse]
-> +drivers/mtd/nand/sh_flctl.c:485:17:    got void *fifo_addr [sparse]
-
-Fixed in patch 1/3.
-
-Thanks for checking, I'll send out the new patch series in a moment,
-
-Bastian
+-- 
+1.7.5.4
