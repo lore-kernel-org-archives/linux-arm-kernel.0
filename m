@@ -1,60 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 19 Oct 2012 11:53:48 -0700
-Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
-In-Reply-To: <CAN1soZzsruhWt7VFgf5Fi79npcjLiMSUEVwnE3hR5iWEh+9GRw@mail.gmail.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
- <CACRpkda0QLkdKns3CXNOijYBjaDtW1QyhNYjTqDvRH-in8pvZQ@mail.gmail.com>
- <20121018222907.GH30550@atomide.com>
- <CAN1soZzsruhWt7VFgf5Fi79npcjLiMSUEVwnE3hR5iWEh+9GRw@mail.gmail.com>
-Message-ID: <20121019185348.GS4730@atomide.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Fri, 19 Oct 2012 22:03:58 +0300
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+Message-ID: <20121019190358.GI1613@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121018 19:25]:
+Hi,
+
+On Fri, Oct 19, 2012 at 04:55:38PM +0000, Paul Walmsley wrote:
+> On Thu, 18 Oct 2012, Paul Walmsley wrote:
 > 
-> I wonder whether gpio function in OMAP is also configured in the pinmux
-> register. For example, the function is 3bit field in pinmux register
-> of Marvell's
-> PXA/MMP silicon. GPIO function is the one of function.
+> > Here are some basic OMAP test results for Linux v3.7-rc1.
+> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+> 
+> And here's two more.
 
-For omaps, the mux registers in padconf area just control
-the routing of the signal, pulls and wake-up events. So
-gpio mode is a number in the mode bits [2:0]. It's mode 3
-for some omaps and mode 4 for some omaps. All the other GPIO
-related registers are elsewhere.
+[...]
 
-Sounds like this is different from what you are describing,
-but if you want to compare it, the register bits in the
-legacy mach-omap2/mux.h are:
+> * 3530ES3 Beagle: I2C timeouts during userspace init
+>   - May be related to the threaded IRQ conversion of the I2C driver
+>   - Unknown cause
 
-/* 34xx mux mode options for each pin. See TRM for options */
-#define OMAP_MUX_MODE0      0
-#define OMAP_MUX_MODE1      1
-#define OMAP_MUX_MODE2      2
-#define OMAP_MUX_MODE3      3
-#define OMAP_MUX_MODE4      4
-#define OMAP_MUX_MODE5      5
-#define OMAP_MUX_MODE6      6
-#define OMAP_MUX_MODE7      7
-               
-/* 24xx/34xx mux bit defines */
-#define OMAP_PULL_ENA                   (1 << 3)
-#define OMAP_PULL_UP                    (1 << 4)
-#define OMAP_ALTELECTRICALSEL           (1 << 5)
-               
-/* 34xx specific mux bit defines */
-#define OMAP_INPUT_EN                   (1 << 8)
-#define OMAP_OFF_EN                     (1 << 9)
-#define OMAP_OFFOUT_EN                  (1 << 10)
-#define OMAP_OFFOUT_VAL                 (1 << 11)
-#define OMAP_OFF_PULL_EN                (1 << 12)
-#define OMAP_OFF_PULL_UP                (1 << 13)
-#define OMAP_WAKEUP_EN                  (1 << 14)
-       
-/* 44xx specific mux bit defines */
-#define OMAP_WAKEUP_EVENT               (1 << 15)
+FYI, I saw I2C hangs also on Nokia N900 with v3.7-rc1 (omap_i2c
+omap_i2c.1: timeout waiting for bus ready). After several reboots they
+disappered (kernel binary was the same), and I have been unable to
+reproduce them since.
 
-Regards,
-
-Tony
+A.
