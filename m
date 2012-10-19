@@ -1,61 +1,30 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 19 Oct 2012 14:56:51 +0800
-Subject: dts: question about how to configure PIO used as i2c irq
-In-Reply-To: <507BC449.6070203@atmel.com>
-References: <507B7AC3.7090904@gmail.com>
- <20121015055720.GQ12801@game.jcrosoft.org> <507BC449.6070203@atmel.com>
-Message-ID: <5080F9B3.5090708@atmel.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Fri, 19 Oct 2012 12:28:56 +0530
+Subject: [PATCH] Documentation: dt: i2c: Update trivial-devices list
+Message-ID: <1350629936-13397-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi J,
+Update i2c trivial-devices list by adding the description for
+ti,tmp275 temperature sensor and taos,tsl2550 ambient light
+sensor.
 
-On 10/15/2012 16:07, Nicolas Ferre wrote:
-> On 10/15/2012 07:57 AM, Jean-Christophe PLAGNIOL-VILLARD :
->> On 10:53 Mon 15 Oct     , Bo Shen wrote:
->>> Hi All,
->>>    When moving atmel qt1070 linux driver with DT support. The atmel
->>> qt1070 is an I2C device. I meet the following questions.
->>>
->>>    The qt1070 DT node
->>>    --<--------------
->>>    qt1070: keyboard at 1b {
->>>          compatible = "atmel,qt1070";
->>>          reg = <0x1b>;
->>>          interrupt-parent = <&pioA>;
->>>          interrupts = <7 0x0>;
->>>    };
->>>    -->--------------
->>>
->>>    DT will parse this node and map irq, the i2c_client->irq. This can
->>> be used directly in atmel qt1070 driver. However, the PIO which used
->>> as irq need configure as a PIO input. Now, we can not use
->>> irq_to_gpio() function to convert irq to gpio. So, if we can not
->>> configure this gpio.
->>>
->>>    If we configure the pio in board-dt.c, I think this is not a good
->>> place. For example, if the kernel image support multiplatform, while
->>> on these platform, using different pio for qt1070, so this will
->>> cause only one platform can use qt1070.
->>>
->>>    So, for this question, how should I solve it? Would you please
->>> give me some advice?
->> I already reply you in private 4 times
->
-> Yes, but maybe it is because it was not well explained, or not developed
-> to the proper extend... So, please do not make these remarks: if the
-> conversation was private, it is not necessary to recall that here. Maybe
-> Voice is looking for help from someone else?
->
->> you have only 2 choice pass the gpio and manage in c
->> or configure the gpio as input in the xlate or map of the gpio drivers and the
->> mux via pinctrl
->
-> Can you please develop a bit more: which xlate? How to tell the gpio
-> driver about the map? Can you provide an example?
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ .../devicetree/bindings/i2c/trivial-devices.txt    |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Any information for this? Search with google, I don't find any useful 
-information.
-
-> Bye,
->
+diff --git a/Documentation/devicetree/bindings/i2c/trivial-devices.txt b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+index 2f5322b..446859f 100644
+--- a/Documentation/devicetree/bindings/i2c/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/i2c/trivial-devices.txt
+@@ -55,5 +55,7 @@ st-micro,24c256		i2c serial eeprom  (24cxx)
+ stm,m41t00		Serial Access TIMEKEEPER
+ stm,m41t62		Serial real-time clock (RTC) with alarm
+ stm,m41t80		M41T80 - SERIAL ACCESS RTC WITH ALARMS
++taos,tsl2550		Ambient Light Sensor with SMBUS/Two Wire Serial Interface
+ ti,tsc2003		I2C Touch-Screen Controller
+ ti,tmp102		Low Power Digital Temperature Sensor with SMBUS/Two Wire Serial Interface
++ti,tmp275		Digital Temperature Sensor
+-- 
+1.7.9.5
