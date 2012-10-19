@@ -1,46 +1,91 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 19 Oct 2012 15:29:43 +0530
-Subject: [PATCH v4 4/5] rtc: omap: depend on am33xx
+Date: Fri, 19 Oct 2012 15:29:50 +0530
+Subject: [PATCH v4 5/5] rtc: omap: Add runtime pm support
 In-Reply-To: <cover.1350633036.git.afzal@ti.com>
 References: <cover.1350633036.git.afzal@ti.com>
-Message-ID: <461eeca5902e383a3d26149700cde751d5450951.1350633036.git.afzal@ti.com>
+Message-ID: <85f1737925191eb340f294e1564aa9fe996dfb31.1350633036.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rtc-omap driver can be reused for AM33xx RTC.
-Provide dependency in Kconfig.
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
+OMAP1 RTC driver is used in multiple devices like,
+OMAPL138 and AM33XX. Driver currently doesn't handle any clocks,
+which may be right for OMAP1 architecture but in case of AM33XX,
+the clock/module needs to be enabled in order to access the registers.
+
+So covert this driver to runtime pm, which internally handles rest.
+
+afzal at ti.com: handle error path
+
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 Acked-by: Sekhar Nori <nsekhar@ti.com>
 ---
+ drivers/rtc/rtc-omap.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-v2:
- Modify Kconfig help, resolve checkpatch warning
-
- drivers/rtc/Kconfig | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index 19c03ab..4f7ecb6 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -777,11 +777,13 @@ config RTC_DRV_IMXDI
+diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+index dff9ff4..6009714 100644
+--- a/drivers/rtc/rtc-omap.c
++++ b/drivers/rtc/rtc-omap.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/pm_runtime.h>
  
- config RTC_DRV_OMAP
- 	tristate "TI OMAP1"
--	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX
-+	depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
- 	help
--	  Say "yes" here to support the real time clock on TI OMAP1 and
--	  DA8xx/OMAP-L13x chips.  This driver can also be built as a
--	  module called rtc-omap.
-+	  Say "yes" here to support the on chip real time clock
-+	  present on TI OMAP1, AM33xx and DA8xx/OMAP-L13x.
+ #include <asm/io.h>
+ 
+@@ -364,6 +365,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+ 		goto fail;
+ 	}
+ 
++	/* Enable the clock/module so that we can access the registers */
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
 +
-+	  This driver can also be built as a module, if so, module
-+	  will be called rtc-omap.
+ 	id_entry = platform_get_device_id(pdev);
+ 	if (id_entry && (id_entry->driver_data & OMAP_RTC_HAS_KICKER)) {
+ 		rtc_writel(KICK0_VALUE, OMAP_RTC_KICK0_REG);
+@@ -448,6 +453,8 @@ fail1:
+ fail0:
+ 	if (id_entry && (id_entry->driver_data & OMAP_RTC_HAS_KICKER))
+ 		rtc_writel(0, OMAP_RTC_KICK0_REG);
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
+ 	iounmap(rtc_base);
+ fail:
+ 	release_mem_region(mem->start, resource_size(mem));
+@@ -474,6 +481,11 @@ static int __exit omap_rtc_remove(struct platform_device *pdev)
+ 	rtc_device_unregister(rtc);
+ 	if (id_entry && (id_entry->driver_data & OMAP_RTC_HAS_KICKER))
+ 		rtc_writel(0, OMAP_RTC_KICK0_REG);
++
++	/* Disable the clock/module */
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++
+ 	iounmap(rtc_base);
+ 	release_mem_region(mem->start, resource_size(mem));
+ 	return 0;
+@@ -496,11 +508,17 @@ static int omap_rtc_suspend(struct platform_device *pdev, pm_message_t state)
+ 	else
+ 		rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
  
- config HAVE_S3C_RTC
- 	bool
++	/* Disable the clock/module */
++	pm_runtime_put_sync(&pdev->dev);
++
+ 	return 0;
+ }
+ 
+ static int omap_rtc_resume(struct platform_device *pdev)
+ {
++	/* Enable the clock/module so that we can access the registers */
++	pm_runtime_get_sync(&pdev->dev);
++
+ 	if (device_may_wakeup(&pdev->dev))
+ 		disable_irq_wake(omap_rtc_alarm);
+ 	else
 -- 
 1.7.12
