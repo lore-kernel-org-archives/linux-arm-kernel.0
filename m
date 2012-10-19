@@ -1,46 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 19 Oct 2012 17:12:27 +0200
-Subject: [PATCH 0/8] Convert Ux500 to SPARSE_IRQ
-In-Reply-To: <201210190742.58900.arnd@arndb.de>
-References: <1350580695-8303-1-git-send-email-linus.walleij@stericsson.com>
- <201210190742.58900.arnd@arndb.de>
-Message-ID: <CACRpkdbd67pHDV2GQUp6KCrw7OO7LX6UsjBQNb2VZudisGCK8Q@mail.gmail.com>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Fri, 19 Oct 2012 21:04:31 +0530
+Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
+In-Reply-To: <5076B166.2020006@gmail.com>
+References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
+Message-ID: <50817307.50509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 9:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 18 October 2012, Linus Walleij wrote:
+Hi Daniel,
 
->> After this series I tried turning on multiplatform for ux500
->> but there are still headers in <mach/*> creating problems
->> so we are still just halfway.
->
-> Which ones are still left? This is the list of inclusions I saw
-> in the 3.6-rc1 version of my multiplatform branch being included
-> from outside of the mach-ux500 directory.
->
-> I should probably redo that branch to see which ones are gone now,
-> but you would also catch most of these with a simple defconfig build.
->
->       3 include <mach-ux500/board-mop500-msp.h>
->       2 include <mach-ux500/crypto-ux500.h>
->       1 include <mach-ux500/db8500-regs.h>
->       1 include <mach-ux500/gpio.h>
->       8 include <mach-ux500/hardware.h>
+On Thursday 11 October 2012 05:15 PM, Daniel Mack wrote:
 
-This is the one causing the build to fail.
+> Could you tell me which patches I need on top of soon-to-be-3.7-rc1? I
+> would like to augment this to make GPMC attached NAND probable in DT, in
+> case this is still an open topic.
 
->       3 include <mach-ux500/id.h>
+In case you can help on making gpmc nand dt probable, please
+proceed. I would be on vacation next week, may be we can
+discuss after I am back.
 
-I'm working on a patch for this one.
+am335x based boards like beagle bone should be booting on
+l-o master and it has gpmc header cleanup changes with
+minimal driver support.
 
->       3 include <mach-ux500/irqs.h>
->       1 include <mach-ux500/setup.h>
->       1 include <mach-ux500/usb.h>
+As I don't have the sufficient time to explain in detail, some
+pointers. Discussion between us [1] hopefully explains it in brief.
+It would be like peripherals connected to gpmc being represented
+as child nodes in dt. gpmc driver probably in probe would have to
+invoke of_platform_populate to create child nodes (for devices like
+nand). And driver would have to be enhanced to configure gpmc
+based on information passed through dt for each child nodes.
+Or roughly have a dt equivalent of driver as in [2].
 
-Basically I think it's pretty easy to hack something that builds
-multiplatform on top of the SPARSE_IRQ patch set.
-I just need to do it :-) (famous last words...)
+One issue would be the memory resource creation by gpmc
+driver and which has to be provided to client resource data.
+And a decision has to be taken whether a generic routine is
+going to be used or initially a custom routine invocation
+based on child compatible fields would be sufficient.
 
-Yours,
-Linus Walleij
+Regards
+Afzal
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg74397.html
+[2] git://gitorious.org/x0148406-public/linux-kernel tags/gpmc-drv-v6
