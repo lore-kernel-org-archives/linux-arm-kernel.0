@@ -1,33 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Oct 2012 19:40:13 -0700
-Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
-In-Reply-To: <CAN1soZzsruhWt7VFgf5Fi79npcjLiMSUEVwnE3hR5iWEh+9GRw@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 19 Oct 2012 10:53:07 +0800
+Subject: [PATCH 01/10] pinctrl: use postcore_initcall
+In-Reply-To: <20121019023818.GO30550@atomide.com>
 References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
- <CACRpkda0QLkdKns3CXNOijYBjaDtW1QyhNYjTqDvRH-in8pvZQ@mail.gmail.com>
- <20121018222907.GH30550@atomide.com>
- <CAN1soZzsruhWt7VFgf5Fi79npcjLiMSUEVwnE3hR5iWEh+9GRw@mail.gmail.com>
-Message-ID: <20121019024012.GP30550@atomide.com>
+ <5080802B.3000209@wwwdotorg.org>
+ <20121018222802.GG30550@atomide.com>
+ <CAN1soZy17wO2s7WoRSRod8k5Zh7fuUc1gxhQiHEb0=zwLhyj6A@mail.gmail.com>
+ <20121019023818.GO30550@atomide.com>
+Message-ID: <CAN1soZw+EzFjEcxDJfi50BEhuQqDUwsB4DMGEXg+oyU-6gO_Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121018 19:25]:
-> 
-> I wonder whether gpio function in OMAP is also configured in the pinmux
-> register. For example, the function is 3bit field in pinmux register
-> of Marvell's
-> PXA/MMP silicon. GPIO function is the one of function.
-> 
-> If the usage case is same in OMAP silicon, I can merge
-> "pinctrl-single,gpio-mask"
-> with "pinctrl-single,function-mask".
-> 
-> Do we need "pinctrl-single,gpio-disable" at here? I want to remove it,
-> but I don't
-> know whether it's necessary in OMAP case.
+On Fri, Oct 19, 2012 at 10:38 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Haojian Zhuang <haojian.zhuang@gmail.com> [121018 19:17]:
+>> On Fri, Oct 19, 2012 at 6:28 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> >
+>> > Specifically could you decribe the cases where this issue happens?
+>> > Also check if one of your client drivers has some early initcall
+>> > that's no longer needed.
+>>
+>> Yes, the special case is PMIC. Most of PMIC are based on I2C/SPI bus.
+>> It means that I2C/SPI bus driver should be initialized firstly. For example,
+>> we could find that PMIC mfd driver are initialized in subsys init call level.
+>> It means that pinctrl should be initialized earlier than I2C/SPI bus driver.
+>> Otherwise, pins of I2C bus may not be configured as I2C function since
+>> pinctrl driver is module init call level.
+>
+> Hmm, the order in drivers/Makefile is already:
+>
+> pinctrl/
+> i2c/
+>
+> Maybe check that your i2c drivers don't have non-standard initcalls?
+>
+> Also the i2c drivers may need to return -EPROBE_DEFER?
+>
+> Regards,
+>
+> Tony
 
-Maybe.. I'll take a look at at that tomorrow.
+OK. I'll support -EPROBE_DEFER if failed to get pin from pinctrl system.
+This solution could also resolve the issue.
 
-Regards,
-
-Tony
+Regards
+Haojian
