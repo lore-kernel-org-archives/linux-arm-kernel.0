@@ -1,51 +1,33 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Fri, 19 Oct 2012 15:30:26 +0200
-Subject: [PATCH 1/2] ASoC: Ux500: Fixup complile errors due to merge
-Message-ID: <1350653427-28611-1-git-send-email-ulf.hansson@stericsson.com>
+Date: Fri, 19 Oct 2012 15:30:27 +0200
+Subject: [PATCH 2/2] ASoC: Ux500: Fixup compile error
+In-Reply-To: <1350653427-28611-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1350653427-28611-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1350653427-28611-2-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Likely during merge of the below commits ended up breaking compilation:
-ASoC: Ux500: Enable ux500 MSP driver for Device Tree
+The below commit introduced a compile error for a missing include file.
 ASoC: ux500_msp_i2s: better use devm functions and fix error return code
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- sound/soc/ux500/ux500_msp_i2s.c |   18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
+ sound/soc/ux500/ux500_msp_i2s.c |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
-index b7c996e..e6ff328 100644
+index e6ff328..ba15351 100644
 --- a/sound/soc/ux500/ux500_msp_i2s.c
 +++ b/sound/soc/ux500/ux500_msp_i2s.c
-@@ -692,19 +692,15 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
- 	if (!msp)
- 		return -ENOMEM;
+@@ -18,6 +18,7 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/delay.h>
+ #include <linux/slab.h>
++#include <linux/io.h>
+ #include <linux/of.h>
  
--	if (np) {
--		if (!platform_data) {
--			platform_data = devm_kzalloc(&pdev->dev,
--				sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
--			if (!platform_data)
--				ret = -ENOMEM;
--		}
--	} else
-+	if (np && !platform_data) {
-+		platform_data = devm_kzalloc(&pdev->dev,
-+			sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
- 		if (!platform_data)
--			ret = -EINVAL;
-+			return -ENOMEM;
-+	}
- 
--	if (ret)
--		goto err_res;
-+	if (!platform_data)
-+		return -EINVAL;
- 
- 	dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
- 		pdev->name, platform_data->id);
+ #include <mach/hardware.h>
 -- 
 1.7.10
