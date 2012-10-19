@@ -1,38 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Oct 2012 08:18:50 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <20121019030917.GA6644@verge.net.au>
-References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
- <20121018081310.GA27117@verge.net.au> <20121019030917.GA6644@verge.net.au>
-Message-ID: <201210190818.51359.arnd@arndb.de>
+Date: Fri, 19 Oct 2012 07:42:58 +0000
+Subject: [PATCH 0/8] Convert Ux500 to SPARSE_IRQ
+In-Reply-To: <1350580695-8303-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350580695-8303-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201210190742.58900.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 October 2012, Simon Horman wrote:
-> On Thu, Oct 18, 2012 at 05:13:10PM +0900, Simon Horman wrote:
-> I have made a limited amount of progress on this trying to create a
-> defconfig that will work on both the Marzen and Armadillo 800 EVA boards.
+On Thursday 18 October 2012, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> * Serial console appears to work, although for the Marzen at
->   least enabling earlyprintk seems to require the bootloader to specify
->   e.g.  console=ttySC2,115200 earlyprintk
-> 
->   This is done by fully specifying bootargs in U-Boot.
->   The boodloaders on the Marzen board has an ampty bootargs by default.
->
->   I guess I can live without earlyprink by default,
->   though it does seem to be a regression in the user experience.
+> This patch series fixes the prerequisites and then converts Ux500
+> to SPARSE_IRQ.
 
-Right. So who is using the defconfig for these boards? Usually most
-people using it actually have their own configuration files that are
-tuned for their needs, and you often also need to change the command
-line in order to configure the root partition etc.
+Great stuff! In case any patches end up going through other trees,
+please add my
 
-> * A more significant problem seems to be the use of CONFIG_MEMORY_START
->   to define PLAT_PHYS_OFFSET in arch/arm/mach-shmobile/include/mach/memory.h
-> 
->   I'm not sure that I see an easy way to get around this one.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-ARM_PATCH_PHYS_VIRT should take care of this, have you tried it?
+> After this series I tried turning on multiplatform for ux500
+> but there are still headers in <mach/*> creating problems
+> so we are still just halfway.
+
+Which ones are still left? This is the list of inclusions I saw
+in the 3.6-rc1 version of my multiplatform branch being included
+from outside of the mach-ux500 directory.
+
+I should probably redo that branch to see which ones are gone now,
+but you would also catch most of these with a simple defconfig build.
+
+      3 include <mach-ux500/board-mop500-msp.h>
+      2 include <mach-ux500/crypto-ux500.h>
+      1 include <mach-ux500/db8500-regs.h>
+      1 include <mach-ux500/gpio.h>
+      8 include <mach-ux500/hardware.h>
+      3 include <mach-ux500/id.h>
+      3 include <mach-ux500/irqs.h>
+      1 include <mach-ux500/setup.h>
+      1 include <mach-ux500/usb.h>
 
 	Arnd
