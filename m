@@ -1,259 +1,65 @@
-From: jean-nicolas.graux@stericsson.com (Jean-Nicolas GRAUX)
-Date: Fri, 19 Oct 2012 16:51:20 +0200
-Subject: [PATCH v2] pinctrl: reserve pins when states are activated
-In-Reply-To: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
-References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <508168E8.7040803@stericsson.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Fri, 19 Oct 2012 09:58:59 -0500
+Subject: [PATCH V4 0/5] ARM: OMAP2+: Add device-tree support for timers
+Message-ID: <1350658744-13509-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Jean Nicolas Graux <jean-nicolas.graux@stericsson.com>
+This series adds device-tree support for the timers on OMAP2+ devices
+including AM33xx. Based upon v3.7-rc1.
 
-Le 10/19/2012 03:05 PM, Linus WALLEIJ a ?crit :
-> From: Linus Walleij<linus.walleij@linaro.org>
->
-> This switches the way that pins are reserved for multiplexing:
->
-> We used to do this when the map was parsed, at the creation of
-> the settings inside the pinctrl handle, in pinmux_map_to_setting().
->
-> However this does not work for us, because we want to use the
-> same set of pins with different devices at different times: the
-> current code assumes that the pin groups in a pinmux state will
-> only be used with one single device, albeit different groups can
-> be active at different times. For example if a single I2C driver
-> block is used to drive two different busses located on two
-> pin groups A and B, then the pins for all possible states of a
-> function are reserved when fetching the pinctrl handle: the
-> I2C bus can choose either set A or set B by a mux state at
-> runtime, but all pins in both group A and B (the superset) are
-> effectively reserved for that I2C function and mapped to the
-> device. Another device can never get in and use the pins in
-> group A, even if the device/function is using group B at the
-> moment.
->
-> Instead: let use reserve the pins when the state is activated
-> and drop them when the state is disabled, i.e. when we move to
-> another state. This way different devices/functions can use the
-> same pins at different times.
->
-> We know that this is an odd way of doing things, but we really
-> need to switch e.g. an SD-card slot to become a tracing output
-> sink at runtime: we plug in a special "tracing card" then mux
-> the pins that used to be an SD slot around to the tracing
-> unit and push out tracing data there instead of SD-card
-> traffic.
->
-> As a side effect pinmux_free_setting() is unused and gets
-> deleted.
->
-> Cc: Patrice Chotard<patrice.chotard@st.com>
-> Cc: Jean Nicolas Graux<jean-nicolas.graux@stericsson.com>
-> Cc: Loic Pallardy<loic.pallardy@st.com>
-> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - The code was already accounting for the case where the setting
->    was not active and called pinmux_disable_setting()
->    from the core, so skip this and delete the now empty
->    pinmux_free_setting() altogether.
-> ---
->   Documentation/pinctrl.txt |  4 ++-
->   drivers/pinctrl/core.c    |  3 +-
->   drivers/pinctrl/core.h    |  2 ++
->   drivers/pinctrl/pinmux.c  | 70 ++++++++++++++---------------------------------
->   drivers/pinctrl/pinmux.h  |  5 ----
->   5 files changed, 28 insertions(+), 56 deletions(-)
->
-> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-> index 3b4ee53..a1cd2f9 100644
-> --- a/Documentation/pinctrl.txt
-> +++ b/Documentation/pinctrl.txt
-> @@ -1193,4 +1193,6 @@ foo_switch()
->   	...
->   }
->   
-> -The above has to be done from process context.
-> +The above has to be done from process context. The reservation of the pins
-> +will be done when the state is activated, so in effect one specific pin
-> +can be used by different functions at different times on a running system.
-> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-> index 0f1ec9e..bbd930e 100644
-> --- a/drivers/pinctrl/core.c
-> +++ b/drivers/pinctrl/core.c
-> @@ -563,6 +563,8 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
->   		return -EPROBE_DEFER;
->   	}
->   
-> +	setting->dev_name = map->dev_name;
-> +
->   	switch (map->type) {
->   	case PIN_MAP_TYPE_MUX_GROUP:
->   		ret = pinmux_map_to_setting(map, setting);
-> @@ -689,7 +691,6 @@ static void pinctrl_put_locked(struct pinctrl *p, bool inlist)
->   			case PIN_MAP_TYPE_MUX_GROUP:
->   				if (state == p->state)
->   					pinmux_disable_setting(setting);
-> -				pinmux_free_setting(setting);
->   				break;
->   			case PIN_MAP_TYPE_CONFIGS_PIN:
->   			case PIN_MAP_TYPE_CONFIGS_GROUP:
-> diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
-> index 1f40ff6..12f5694 100644
-> --- a/drivers/pinctrl/core.h
-> +++ b/drivers/pinctrl/core.h
-> @@ -105,12 +105,14 @@ struct pinctrl_setting_configs {
->    * @type: the type of setting
->    * @pctldev: pin control device handling to be programmed. Not used for
->    *   PIN_MAP_TYPE_DUMMY_STATE.
-> + * @dev_name: the name of the device using this state
->    * @data: Data specific to the setting type
->    */
->   struct pinctrl_setting {
->   	struct list_head node;
->   	enum pinctrl_map_type type;
->   	struct pinctrl_dev *pctldev;
-> +	const char *dev_name;
->   	union {
->   		struct pinctrl_setting_mux mux;
->   		struct pinctrl_setting_configs configs;
-> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
-> index 9301a7a..0ecdf54 100644
-> --- a/drivers/pinctrl/pinmux.c
-> +++ b/drivers/pinctrl/pinmux.c
-> @@ -314,14 +314,11 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
->   {
->   	struct pinctrl_dev *pctldev = setting->pctldev;
->   	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
-> -	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
->   	char const * const *groups;
->   	unsigned num_groups;
->   	int ret;
->   	const char *group;
->   	int i;
-> -	const unsigned *pins;
-> -	unsigned num_pins;
->   
->   	if (!pmxops) {
->   		dev_err(pctldev->dev, "does not support mux function\n");
-> @@ -376,55 +373,9 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
->   	}
->   	setting->data.mux.group = ret;
->   
-> -	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group, &pins,
-> -				      &num_pins);
-> -	if (ret) {
-> -		dev_err(pctldev->dev,
-> -			"could not get pins for device %s group selector %d\n",
-> -			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
-> -			return -ENODEV;
-> -	}
-> -
-> -	/* Try to allocate all pins in this group, one by one */
-> -	for (i = 0; i < num_pins; i++) {
-> -		ret = pin_request(pctldev, pins[i], map->dev_name, NULL);
-> -		if (ret) {
-> -			dev_err(pctldev->dev,
-> -				"could not request pin %d on device %s\n",
-> -				pins[i], pinctrl_dev_get_name(pctldev));
-> -			/* On error release all taken pins */
-> -			i--; /* this pin just failed */
-> -			for (; i >= 0; i--)
-> -				pin_free(pctldev, pins[i], NULL);
-> -			return -ENODEV;
-> -		}
-> -	}
-> -
->   	return 0;
->   }
->   
-> -void pinmux_free_setting(struct pinctrl_setting const *setting)
-> -{
-> -	struct pinctrl_dev *pctldev = setting->pctldev;
-> -	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
-> -	const unsigned *pins;
-> -	unsigned num_pins;
-> -	int ret;
-> -	int i;
-> -
-> -	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
-> -				      &pins, &num_pins);
-> -	if (ret) {
-> -		dev_err(pctldev->dev,
-> -			"could not get pins for device %s group selector %d\n",
-> -			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
-> -		return;
-> -	}
-> -
-> -	for (i = 0; i < num_pins; i++)
-> -		pin_free(pctldev, pins[i], NULL);
-> -}
-> -
->   int pinmux_enable_setting(struct pinctrl_setting const *setting)
->   {
->   	struct pinctrl_dev *pctldev = setting->pctldev;
-> @@ -446,6 +397,22 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
->   		num_pins = 0;
->   	}
->   
-> +	/* Try to allocate all pins in this group, one by one */
-> +	for (i = 0; i < num_pins; i++) {
-> +		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
-> +		if (ret) {
-> +			dev_err(pctldev->dev,
-> +				"could not request pin %d on device %s\n",
-> +				pins[i], pinctrl_dev_get_name(pctldev));
-> +			/* On error release all taken pins */
-> +			i--; /* this pin just failed */
-> +			for (; i >= 0; i--)
-> +				pin_free(pctldev, pins[i], NULL);
-> +			return -ENODEV;
-> +		}
-> +	}
-> +
-> +	/* Now that we have acquired the pins, encode the mux setting */
->   	for (i = 0; i < num_pins; i++) {
->   		desc = pin_desc_get(pctldev, pins[i]);
->   		if (desc == NULL) {
-> @@ -482,6 +449,7 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
->   		num_pins = 0;
->   	}
->   
-> +	/* Flag the descs that no setting is active */
->   	for (i = 0; i < num_pins; i++) {
->   		desc = pin_desc_get(pctldev, pins[i]);
->   		if (desc == NULL) {
-> @@ -493,6 +461,10 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
->   		desc->mux_setting = NULL;
->   	}
->   
-> +	/* And release the pins */
-> +	for (i = 0; i < num_pins; i++)
-> +		pin_free(pctldev, pins[i], NULL);
-> +
->   	if (ops->disable)
->   		ops->disable(pctldev, setting->data.mux.func, setting->data.mux.group);
->   }
-> diff --git a/drivers/pinctrl/pinmux.h b/drivers/pinctrl/pinmux.h
-> index d1a98b1..3c2aafa 100644
-> --- a/drivers/pinctrl/pinmux.h
-> +++ b/drivers/pinctrl/pinmux.h
-> @@ -27,7 +27,6 @@ int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
->   
->   int pinmux_map_to_setting(struct pinctrl_map const *map,
->   			  struct pinctrl_setting *setting);
-> -void pinmux_free_setting(struct pinctrl_setting const *setting);
->   int pinmux_enable_setting(struct pinctrl_setting const *setting);
->   void pinmux_disable_setting(struct pinctrl_setting const *setting);
->   
-> @@ -69,10 +68,6 @@ static inline int pinmux_map_to_setting(struct pinctrl_map const *map,
->   	return 0;
->   }
->   
-> -static inline void pinmux_free_setting(struct pinctrl_setting const *setting)
-> -{
-> -}
-> -
->   static inline int pinmux_enable_setting(struct pinctrl_setting const *setting)
->   {
->   	return 0;
+Testing:
+1. I have booted tested this series on OMAP2420 H4, OMAP3430 Beagle, OMAP4430
+   Panda and AM335x Beagle Bone with/without ...
+   a). device-tree present
+   b). CONFIG_OMAP_32K_TIMER set
+   c). kernel boot parameter "clocksource=gp_timer" present
+2. I have tested the all the timers (not used by the kernel as sys-timers) on
+   OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda with/without device-tree with
+   this series. The testing includes ...
+   a. Configuring, starting a timer and checking the counter value is
+      incrementing.
+   b. Testing timer overflow interrupt when timer expires.
+   c. Using different clock sources to operate the timer with.
+
+V4 changes:
+- Update timer binding to make "interrupt-parent" a required property. After
+  reviewing the of_irq_find_parent() function it became apparent that it is
+  much more efficient, in terms of parsing the DT blob, to have the interrupt
+  parent defined in the timer binding than globally.
+
+V3 changes:
+- Removed definition "TIMER_PROP_ALWON" per Rob Herring's feedback
+- Updated OMAP system timer (clock-events and clock-source) code so that
+  HWMOD is NOT used for getting resource (memory and interrupt) information
+  when device-tree is present.
+
+V2 changes:
+- Remove use of device-tree alias property
+- Migrate OMAP timers to request timers by property instead of device ID
+- Include OMAP2 support
+
+Jon Hunter (5):
+  ARM: dts: OMAP: Add timer nodes
+  ARM: OMAP3: Dynamically disable secure timer nodes for secure devices
+  ARM: OMAP: Add function to request a timer by capability
+  ARM: OMAP3: Add generic machine descriptor for boards with OMAP3 GP
+    devices
+  ARM: OMAP: Add DT support for timer driver
+
+ .../devicetree/bindings/arm/omap/timer.txt         |   34 ++++
+ arch/arm/boot/dts/am33xx.dtsi                      |   61 +++++++
+ arch/arm/boot/dts/omap2.dtsi                       |   96 +++++++++++
+ arch/arm/boot/dts/omap2420.dtsi                    |    9 +
+ arch/arm/boot/dts/omap2430.dtsi                    |    9 +
+ arch/arm/boot/dts/omap3.dtsi                       |  107 ++++++++++++
+ arch/arm/boot/dts/omap4.dtsi                       |   97 +++++++++++
+ arch/arm/mach-omap2/board-generic.c                |   17 ++
+ arch/arm/mach-omap2/timer.c                        |  175 ++++++++++++++++----
+ arch/arm/plat-omap/dmtimer.c                       |   93 ++++++++++-
+ arch/arm/plat-omap/include/plat/dmtimer.h          |    1 +
+ 11 files changed, 661 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/omap/timer.txt
+
+-- 
+1.7.9.5
