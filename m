@@ -1,35 +1,82 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 19 Oct 2012 16:00:27 +0200
-Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
- revert "i2c: omap: switch to threaded IRQ support")
-In-Reply-To: <20121018055136.GF11137@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
- <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
- <20121016133356.GG21801@arwen.pp.htv.fi>
- <87ipaanljt.fsf_-_@deeprootsystems.com>
- <20121017140002.GI11394@arwen.pp.htv.fi>
- <20121017143534.GJ11394@arwen.pp.htv.fi>
- <87txtsitpt.fsf@deeprootsystems.com>
- <20121018055136.GF11137@arwen.pp.htv.fi>
-Message-ID: <1350655227.2768.11.camel@twins>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 19 Oct 2012 09:07:01 -0500
+Subject: [PATCH v2 1/2] ARM: multi_v7_defconfig: Add ARCH_MXC
+In-Reply-To: <1350605046-21358-1-git-send-email-festevam@gmail.com>
+References: <1350605046-21358-1-git-send-email-festevam@gmail.com>
+Message-ID: <50815E85.8080600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-18 at 08:51 +0300, Felipe Balbi wrote:
-> > So the primary question remains: is RT runtime supposed to include the
-> > time spent suspended?  I suspect not. 
+Adding Arnd and Olof.
+
+On 10/18/2012 07:04 PM, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> you might be right there, though we need Thomas or Peter to answer :-s 
+> Let ARCH_MXC be covered by multi_v7_defconfig.
+> 
+> Allow booting mx6 via NFS.
 
-re, sorry both tglx and I have been traveling, he still is, I'm trying
-to play catch-up :-)
+Now we can start debating what should or shouldn't be in shared
+defconfigs. :)
 
-Anyway, yeah I'm somewhat surprised the clock is 'running' when the
-machine isn't. From what I could gather, this is !x86 hardware, right?
+My intent with this defconfig was to only enable required options and
+all drivers for platforms and leave features to their defaults. I don't
+feel that strongly about it. We should have some general guideline here
+so it's not a free for all. You can still have a defconfig for your
+platform as well.
 
-x86 explicitly makes sure our clocks are 'stopped' during suspend, see
-commit cd7240c0b900eb6d690ccee088a6c9b46dae815a.
+Rob
 
-Can you do something similar for ARM? A quick look at
-arch/arm/kernel/sched_clock.c shows there's already suspend/resume
-hooks, do they do the wrong thing?
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Provide a more complete config that allows booting mx6 via NFS
+> 
+>  arch/arm/configs/multi_v7_defconfig |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 159f75f..df1e563 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -5,6 +5,8 @@ CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_ARMADA_370=y
+>  CONFIG_MACH_ARMADA_XP=y
+>  CONFIG_ARCH_HIGHBANK=y
+> +CONFIG_ARCH_MXC=y
+> +CONFIG_SOC_IMX6Q=y
+>  CONFIG_ARCH_SOCFPGA=y
+>  # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+>  CONFIG_ARM_ERRATA_754322=y
+> @@ -17,18 +19,29 @@ CONFIG_ARM_APPENDED_DTB=y
+>  CONFIG_VFP=y
+>  CONFIG_NEON=y
+>  CONFIG_NET=y
+> +CONFIG_PACKET=y
+> +CONFIG_UNIX=y
+> +CONFIG_INET=y
+> +CONFIG_IP_PNP=y
+> +CONFIG_IP_PNP_DHCP=y
+>  CONFIG_ATA=y
+>  CONFIG_SATA_HIGHBANK=y
+>  CONFIG_NETDEVICES=y
+>  CONFIG_NET_CALXEDA_XGMAC=y
+>  CONFIG_SMSC911X=y
+>  CONFIG_STMMAC_ETH=y
+> +CONFIG_NFS_FS=y
+> +CONFIG_NFS_V3_ACL=y
+> +CONFIG_NFS_V4=y
+> +CONFIG_ROOT_NFS=y
+>  CONFIG_SERIO_AMBAKMI=y
+>  CONFIG_SERIAL_8250=y
+>  CONFIG_SERIAL_8250_CONSOLE=y
+>  CONFIG_SERIAL_8250_DW=y
+>  CONFIG_SERIAL_AMBA_PL011=y
+>  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+> +CONFIG_SERIAL_IMX=y
+> +CONFIG_SERIAL_IMX_CONSOLE=y
+>  CONFIG_SERIAL_OF_PLATFORM=y
+>  CONFIG_IPMI_HANDLER=y
+>  CONFIG_IPMI_SI=y
+> 
