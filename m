@@ -1,24 +1,35 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 19 Oct 2012 17:47:09 +0800
-Subject: [PATCH 1/1] arm: KGDB support for PXA
-In-Reply-To: <CAHod+Gf9t6uhLvVc+yJR4vVjJA1pRq-htm1Pd_Rbb+kFkO43jw@mail.gmail.com>
-References: <1346145124-23384-1-git-send-email-den@openvz.org>
- <CAN1soZwXSrpJCCCok=weJwRtWJHXz5zPQ6jB88UTr1HePU84gw@mail.gmail.com>
- <CAHod+Gf9t6uhLvVc+yJR4vVjJA1pRq-htm1Pd_Rbb+kFkO43jw@mail.gmail.com>
-Message-ID: <CAN1soZwZ9fNrtJ8VFy7Y3XZVtF=6=0iRXhS7m3OCmHUtk07kWg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Oct 2012 11:47:07 +0200
+Subject: [PATCH 1/2] ARM: SMP_TWD: use DIV_ROUND_CLOSEST() for periodic mode
+Message-ID: <1350640027-26216-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 5:38 PM, Marko Kati? <dromede@gmail.com> wrote:
-> I'm still not seeing this patch in arch-pxa, tty or mainline trees.
-> Has it been forgotten again? Is there a problem with this patch that
-> needs to be fixed?
+The periodic mode is currently calculated by a simple division
+but we should pay more attention to our integer arithmetics.
+Also delete a comment that does not make any sense.
 
-Applied into arch-pxa now.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/smp_twd.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Greg,
-
-If you have any comment, please let me know.
-
-Regards
-Haojian
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index e1f9069..b22d700 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -42,10 +42,10 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		/* timer load already set up */
+ 		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+ 			| TWD_TIMER_CONTROL_PERIODIC;
+-		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
++		__raw_writel(DIV_ROUND_CLOSEST(twd_timer_rate, HZ),
++			twd_base + TWD_TIMER_LOAD);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		/* period set, and timer enabled in 'next_event' hook */
+-- 
+1.7.11.7
