@@ -1,111 +1,29 @@
-From: markz@nvidia.com (Mark Zhang)
-Date: Fri, 19 Oct 2012 13:58:31 +0800
-Subject: [PATCH] ARM: dt: tegra: ventana: define pinmux for ddc
-Message-ID: <1350626311-18131-1-git-send-email-markz@nvidia.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 19 Oct 2012 08:08:56 +0200
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <alpine.DEB.2.00.1210181924490.16473@utopia.booyaka.com>
+References: <20121017181354.GA2412@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
+ <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210181924490.16473@utopia.booyaka.com>
+Message-ID: <20121019060856.GA2983@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define pinmux for DDC. The DDC pinmux in Ventana is 2 pins in I2C2.
+On Thu, Oct 18, 2012 at 07:27:22PM +0000, Paul Walmsley wrote:
+> I wrote that we'll schedule the SoC integration patch for sending upstream 
+> for 3.8.  This does not necessarily mean that our upstreams will take it, 
+> or that it will result in a working CPSW.
 
-Signed-off-by: Mark Zhang <markz@nvidia.com>
----
- arch/arm/boot/dts/tegra20-ventana.dts |   70 ++++++++++++++++++++++++++++++---
- 1 file changed, 65 insertions(+), 5 deletions(-)
+Forgive me for barking up the wrong tree at you, Paul. This is
+directed toward the omap people:
 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index bec8bb2..b6b3af4 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -64,11 +64,6 @@
- 				nvidia,pins = "dap4";
- 				nvidia,function = "dap4";
- 			};
--			ddc {
--				nvidia,pins = "ddc", "owc", "spdi", "spdo",
--					"uac";
--				nvidia,function = "rsvd2";
--			};
- 			dta {
- 				nvidia,pins = "dta", "dtb", "dtc", "dtd", "dte";
- 				nvidia,function = "vi";
-@@ -248,6 +243,39 @@
- 				nvidia,slew-rate-falling = <3>;
- 			};
- 		};
-+
-+		state_i2cmux_ddc: pinmux_i2cmux_ddc {
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "i2c2";
-+			};
-+			pta {
-+				nvidia,pins = "pta";
-+				nvidia,function = "rsvd4";
-+			};
-+		};
-+
-+		state_i2cmux_pta: pinmux_i2cmux_pta {
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "rsvd4";
-+			};
-+			pta {
-+				nvidia,pins = "pta";
-+				nvidia,function = "i2c2";
-+			};
-+		};
-+
-+		state_i2cmux_idle: pinmux_i2cmux_idle {
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "rsvd4";
-+			};
-+			pta {
-+				nvidia,pins = "pta";
-+				nvidia,function = "rsvd4";
-+			};
-+		};
- 	};
- 
- 	i2s at 70002800 {
-@@ -291,6 +319,38 @@
- 		clock-frequency = <400000>;
- 	};
- 
-+	i2cmux {
-+		compatible = "i2c-mux-pinctrl";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c-parent = <&{/i2c@7000c400}>;
-+
-+		pinctrl-names = "ddc", "pta", "idle";
-+		pinctrl-0 = <&state_i2cmux_ddc>;
-+		pinctrl-1 = <&state_i2cmux_pta>;
-+		pinctrl-2 = <&state_i2cmux_idle>;
-+
-+		i2c at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			smart-battery at b {
-+				compatible = "ti,bq24617", "smart-battery-1.1";
-+				reg = <0xb>;
-+				ti,i2c-retry-count = <2>;
-+				ti,poll-retry-count = <10>;
-+			};
-+		};
-+	};
-+
- 	i2c at 7000c500 {
- 		status = "okay";
- 		clock-frequency = <400000>;
--- 
-1.7.9.5
+Please, PLEASE, make sure that the mainline code is working.
+It is easy to verify. Just compile the code and boot it.
+
+Thanks,
+Richard
