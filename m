@@ -1,44 +1,46 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 19 Oct 2012 17:09:35 +0200
-Subject: [PATCH] pinctrl/nomadik: use irq_create_mapping()
-Message-ID: <1350659375-7335-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Oct 2012 17:12:27 +0200
+Subject: [PATCH 0/8] Convert Ux500 to SPARSE_IRQ
+In-Reply-To: <201210190742.58900.arnd@arndb.de>
+References: <1350580695-8303-1-git-send-email-linus.walleij@stericsson.com>
+ <201210190742.58900.arnd@arndb.de>
+Message-ID: <CACRpkdbd67pHDV2GQUp6KCrw7OO7LX6UsjBQNb2VZudisGCK8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Oct 19, 2012 at 9:42 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 18 October 2012, Linus Walleij wrote:
 
-Since in the DT case, the linear domain path will not allocate
-descriptors for the IRQs, we need to use irq_create_mapping()
-for mapping hwirqs to Linux IRQs, so these descriptors get
-created on-the-fly in this case.
+>> After this series I tried turning on multiplatform for ux500
+>> but there are still headers in <mach/*> creating problems
+>> so we are still just halfway.
+>
+> Which ones are still left? This is the list of inclusions I saw
+> in the 3.6-rc1 version of my multiplatform branch being included
+> from outside of the mach-ux500 directory.
+>
+> I should probably redo that branch to see which ones are gone now,
+> but you would also catch most of these with a simple defconfig build.
+>
+>       3 include <mach-ux500/board-mop500-msp.h>
+>       2 include <mach-ux500/crypto-ux500.h>
+>       1 include <mach-ux500/db8500-regs.h>
+>       1 include <mach-ux500/gpio.h>
+>       8 include <mach-ux500/hardware.h>
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This is the one causing the build to fail.
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index 01aea1c..d1d3cb9 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -931,7 +931,7 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
- 	while (status) {
- 		int bit = __ffs(status);
- 
--		generic_handle_irq(irq_find_mapping(nmk_chip->domain, bit));
-+		generic_handle_irq(irq_create_mapping(nmk_chip->domain, bit));
- 		status &= ~BIT(bit);
- 	}
- 
-@@ -1056,7 +1056,7 @@ static int nmk_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
- 	struct nmk_gpio_chip *nmk_chip =
- 		container_of(chip, struct nmk_gpio_chip, chip);
- 
--	return irq_find_mapping(nmk_chip->domain, offset);
-+	return irq_create_mapping(nmk_chip->domain, offset);
- }
- 
- #ifdef CONFIG_DEBUG_FS
--- 
-1.7.11.3
+>       3 include <mach-ux500/id.h>
+
+I'm working on a patch for this one.
+
+>       3 include <mach-ux500/irqs.h>
+>       1 include <mach-ux500/setup.h>
+>       1 include <mach-ux500/usb.h>
+
+Basically I think it's pretty easy to hack something that builds
+multiplatform on top of the SPARSE_IRQ patch set.
+I just need to do it :-) (famous last words...)
+
+Yours,
+Linus Walleij
