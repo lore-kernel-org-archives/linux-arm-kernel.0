@@ -1,82 +1,259 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 19 Oct 2012 09:07:01 -0500
-Subject: [PATCH v2 1/2] ARM: multi_v7_defconfig: Add ARCH_MXC
-In-Reply-To: <1350605046-21358-1-git-send-email-festevam@gmail.com>
-References: <1350605046-21358-1-git-send-email-festevam@gmail.com>
-Message-ID: <50815E85.8080600@gmail.com>
+From: jean-nicolas.graux@stericsson.com (Jean-Nicolas GRAUX)
+Date: Fri, 19 Oct 2012 16:51:20 +0200
+Subject: [PATCH v2] pinctrl: reserve pins when states are activated
+In-Reply-To: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <508168E8.7040803@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Arnd and Olof.
+Tested-by: Jean Nicolas Graux <jean-nicolas.graux@stericsson.com>
 
-On 10/18/2012 07:04 PM, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Let ARCH_MXC be covered by multi_v7_defconfig.
-> 
-> Allow booting mx6 via NFS.
-
-Now we can start debating what should or shouldn't be in shared
-defconfigs. :)
-
-My intent with this defconfig was to only enable required options and
-all drivers for platforms and leave features to their defaults. I don't
-feel that strongly about it. We should have some general guideline here
-so it's not a free for all. You can still have a defconfig for your
-platform as well.
-
-Rob
-
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Le 10/19/2012 03:05 PM, Linus WALLEIJ a ?crit :
+> From: Linus Walleij<linus.walleij@linaro.org>
+>
+> This switches the way that pins are reserved for multiplexing:
+>
+> We used to do this when the map was parsed, at the creation of
+> the settings inside the pinctrl handle, in pinmux_map_to_setting().
+>
+> However this does not work for us, because we want to use the
+> same set of pins with different devices at different times: the
+> current code assumes that the pin groups in a pinmux state will
+> only be used with one single device, albeit different groups can
+> be active at different times. For example if a single I2C driver
+> block is used to drive two different busses located on two
+> pin groups A and B, then the pins for all possible states of a
+> function are reserved when fetching the pinctrl handle: the
+> I2C bus can choose either set A or set B by a mux state at
+> runtime, but all pins in both group A and B (the superset) are
+> effectively reserved for that I2C function and mapped to the
+> device. Another device can never get in and use the pins in
+> group A, even if the device/function is using group B at the
+> moment.
+>
+> Instead: let use reserve the pins when the state is activated
+> and drop them when the state is disabled, i.e. when we move to
+> another state. This way different devices/functions can use the
+> same pins at different times.
+>
+> We know that this is an odd way of doing things, but we really
+> need to switch e.g. an SD-card slot to become a tracing output
+> sink at runtime: we plug in a special "tracing card" then mux
+> the pins that used to be an SD slot around to the tracing
+> unit and push out tracing data there instead of SD-card
+> traffic.
+>
+> As a side effect pinmux_free_setting() is unused and gets
+> deleted.
+>
+> Cc: Patrice Chotard<patrice.chotard@st.com>
+> Cc: Jean Nicolas Graux<jean-nicolas.graux@stericsson.com>
+> Cc: Loic Pallardy<loic.pallardy@st.com>
+> Signed-off-by: Linus Walleij<linus.walleij@linaro.org>
 > ---
-> Changes since v1:
-> - Provide a more complete config that allows booting mx6 via NFS
-> 
->  arch/arm/configs/multi_v7_defconfig |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 159f75f..df1e563 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -5,6 +5,8 @@ CONFIG_ARCH_MVEBU=y
->  CONFIG_MACH_ARMADA_370=y
->  CONFIG_MACH_ARMADA_XP=y
->  CONFIG_ARCH_HIGHBANK=y
-> +CONFIG_ARCH_MXC=y
-> +CONFIG_SOC_IMX6Q=y
->  CONFIG_ARCH_SOCFPGA=y
->  # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
->  CONFIG_ARM_ERRATA_754322=y
-> @@ -17,18 +19,29 @@ CONFIG_ARM_APPENDED_DTB=y
->  CONFIG_VFP=y
->  CONFIG_NEON=y
->  CONFIG_NET=y
-> +CONFIG_PACKET=y
-> +CONFIG_UNIX=y
-> +CONFIG_INET=y
-> +CONFIG_IP_PNP=y
-> +CONFIG_IP_PNP_DHCP=y
->  CONFIG_ATA=y
->  CONFIG_SATA_HIGHBANK=y
->  CONFIG_NETDEVICES=y
->  CONFIG_NET_CALXEDA_XGMAC=y
->  CONFIG_SMSC911X=y
->  CONFIG_STMMAC_ETH=y
-> +CONFIG_NFS_FS=y
-> +CONFIG_NFS_V3_ACL=y
-> +CONFIG_NFS_V4=y
-> +CONFIG_ROOT_NFS=y
->  CONFIG_SERIO_AMBAKMI=y
->  CONFIG_SERIAL_8250=y
->  CONFIG_SERIAL_8250_CONSOLE=y
->  CONFIG_SERIAL_8250_DW=y
->  CONFIG_SERIAL_AMBA_PL011=y
->  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-> +CONFIG_SERIAL_IMX=y
-> +CONFIG_SERIAL_IMX_CONSOLE=y
->  CONFIG_SERIAL_OF_PLATFORM=y
->  CONFIG_IPMI_HANDLER=y
->  CONFIG_IPMI_SI=y
-> 
+> ChangeLog v1->v2:
+> - The code was already accounting for the case where the setting
+>    was not active and called pinmux_disable_setting()
+>    from the core, so skip this and delete the now empty
+>    pinmux_free_setting() altogether.
+> ---
+>   Documentation/pinctrl.txt |  4 ++-
+>   drivers/pinctrl/core.c    |  3 +-
+>   drivers/pinctrl/core.h    |  2 ++
+>   drivers/pinctrl/pinmux.c  | 70 ++++++++++++++---------------------------------
+>   drivers/pinctrl/pinmux.h  |  5 ----
+>   5 files changed, 28 insertions(+), 56 deletions(-)
+>
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+> index 3b4ee53..a1cd2f9 100644
+> --- a/Documentation/pinctrl.txt
+> +++ b/Documentation/pinctrl.txt
+> @@ -1193,4 +1193,6 @@ foo_switch()
+>   	...
+>   }
+>   
+> -The above has to be done from process context.
+> +The above has to be done from process context. The reservation of the pins
+> +will be done when the state is activated, so in effect one specific pin
+> +can be used by different functions at different times on a running system.
+> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+> index 0f1ec9e..bbd930e 100644
+> --- a/drivers/pinctrl/core.c
+> +++ b/drivers/pinctrl/core.c
+> @@ -563,6 +563,8 @@ static int add_setting(struct pinctrl *p, struct pinctrl_map const *map)
+>   		return -EPROBE_DEFER;
+>   	}
+>   
+> +	setting->dev_name = map->dev_name;
+> +
+>   	switch (map->type) {
+>   	case PIN_MAP_TYPE_MUX_GROUP:
+>   		ret = pinmux_map_to_setting(map, setting);
+> @@ -689,7 +691,6 @@ static void pinctrl_put_locked(struct pinctrl *p, bool inlist)
+>   			case PIN_MAP_TYPE_MUX_GROUP:
+>   				if (state == p->state)
+>   					pinmux_disable_setting(setting);
+> -				pinmux_free_setting(setting);
+>   				break;
+>   			case PIN_MAP_TYPE_CONFIGS_PIN:
+>   			case PIN_MAP_TYPE_CONFIGS_GROUP:
+> diff --git a/drivers/pinctrl/core.h b/drivers/pinctrl/core.h
+> index 1f40ff6..12f5694 100644
+> --- a/drivers/pinctrl/core.h
+> +++ b/drivers/pinctrl/core.h
+> @@ -105,12 +105,14 @@ struct pinctrl_setting_configs {
+>    * @type: the type of setting
+>    * @pctldev: pin control device handling to be programmed. Not used for
+>    *   PIN_MAP_TYPE_DUMMY_STATE.
+> + * @dev_name: the name of the device using this state
+>    * @data: Data specific to the setting type
+>    */
+>   struct pinctrl_setting {
+>   	struct list_head node;
+>   	enum pinctrl_map_type type;
+>   	struct pinctrl_dev *pctldev;
+> +	const char *dev_name;
+>   	union {
+>   		struct pinctrl_setting_mux mux;
+>   		struct pinctrl_setting_configs configs;
+> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+> index 9301a7a..0ecdf54 100644
+> --- a/drivers/pinctrl/pinmux.c
+> +++ b/drivers/pinctrl/pinmux.c
+> @@ -314,14 +314,11 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
+>   {
+>   	struct pinctrl_dev *pctldev = setting->pctldev;
+>   	const struct pinmux_ops *pmxops = pctldev->desc->pmxops;
+> -	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
+>   	char const * const *groups;
+>   	unsigned num_groups;
+>   	int ret;
+>   	const char *group;
+>   	int i;
+> -	const unsigned *pins;
+> -	unsigned num_pins;
+>   
+>   	if (!pmxops) {
+>   		dev_err(pctldev->dev, "does not support mux function\n");
+> @@ -376,55 +373,9 @@ int pinmux_map_to_setting(struct pinctrl_map const *map,
+>   	}
+>   	setting->data.mux.group = ret;
+>   
+> -	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group, &pins,
+> -				      &num_pins);
+> -	if (ret) {
+> -		dev_err(pctldev->dev,
+> -			"could not get pins for device %s group selector %d\n",
+> -			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
+> -			return -ENODEV;
+> -	}
+> -
+> -	/* Try to allocate all pins in this group, one by one */
+> -	for (i = 0; i < num_pins; i++) {
+> -		ret = pin_request(pctldev, pins[i], map->dev_name, NULL);
+> -		if (ret) {
+> -			dev_err(pctldev->dev,
+> -				"could not request pin %d on device %s\n",
+> -				pins[i], pinctrl_dev_get_name(pctldev));
+> -			/* On error release all taken pins */
+> -			i--; /* this pin just failed */
+> -			for (; i >= 0; i--)
+> -				pin_free(pctldev, pins[i], NULL);
+> -			return -ENODEV;
+> -		}
+> -	}
+> -
+>   	return 0;
+>   }
+>   
+> -void pinmux_free_setting(struct pinctrl_setting const *setting)
+> -{
+> -	struct pinctrl_dev *pctldev = setting->pctldev;
+> -	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
+> -	const unsigned *pins;
+> -	unsigned num_pins;
+> -	int ret;
+> -	int i;
+> -
+> -	ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
+> -				      &pins, &num_pins);
+> -	if (ret) {
+> -		dev_err(pctldev->dev,
+> -			"could not get pins for device %s group selector %d\n",
+> -			pinctrl_dev_get_name(pctldev), setting->data.mux.group);
+> -		return;
+> -	}
+> -
+> -	for (i = 0; i < num_pins; i++)
+> -		pin_free(pctldev, pins[i], NULL);
+> -}
+> -
+>   int pinmux_enable_setting(struct pinctrl_setting const *setting)
+>   {
+>   	struct pinctrl_dev *pctldev = setting->pctldev;
+> @@ -446,6 +397,22 @@ int pinmux_enable_setting(struct pinctrl_setting const *setting)
+>   		num_pins = 0;
+>   	}
+>   
+> +	/* Try to allocate all pins in this group, one by one */
+> +	for (i = 0; i < num_pins; i++) {
+> +		ret = pin_request(pctldev, pins[i], setting->dev_name, NULL);
+> +		if (ret) {
+> +			dev_err(pctldev->dev,
+> +				"could not request pin %d on device %s\n",
+> +				pins[i], pinctrl_dev_get_name(pctldev));
+> +			/* On error release all taken pins */
+> +			i--; /* this pin just failed */
+> +			for (; i >= 0; i--)
+> +				pin_free(pctldev, pins[i], NULL);
+> +			return -ENODEV;
+> +		}
+> +	}
+> +
+> +	/* Now that we have acquired the pins, encode the mux setting */
+>   	for (i = 0; i < num_pins; i++) {
+>   		desc = pin_desc_get(pctldev, pins[i]);
+>   		if (desc == NULL) {
+> @@ -482,6 +449,7 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
+>   		num_pins = 0;
+>   	}
+>   
+> +	/* Flag the descs that no setting is active */
+>   	for (i = 0; i < num_pins; i++) {
+>   		desc = pin_desc_get(pctldev, pins[i]);
+>   		if (desc == NULL) {
+> @@ -493,6 +461,10 @@ void pinmux_disable_setting(struct pinctrl_setting const *setting)
+>   		desc->mux_setting = NULL;
+>   	}
+>   
+> +	/* And release the pins */
+> +	for (i = 0; i < num_pins; i++)
+> +		pin_free(pctldev, pins[i], NULL);
+> +
+>   	if (ops->disable)
+>   		ops->disable(pctldev, setting->data.mux.func, setting->data.mux.group);
+>   }
+> diff --git a/drivers/pinctrl/pinmux.h b/drivers/pinctrl/pinmux.h
+> index d1a98b1..3c2aafa 100644
+> --- a/drivers/pinctrl/pinmux.h
+> +++ b/drivers/pinctrl/pinmux.h
+> @@ -27,7 +27,6 @@ int pinmux_gpio_direction(struct pinctrl_dev *pctldev,
+>   
+>   int pinmux_map_to_setting(struct pinctrl_map const *map,
+>   			  struct pinctrl_setting *setting);
+> -void pinmux_free_setting(struct pinctrl_setting const *setting);
+>   int pinmux_enable_setting(struct pinctrl_setting const *setting);
+>   void pinmux_disable_setting(struct pinctrl_setting const *setting);
+>   
+> @@ -69,10 +68,6 @@ static inline int pinmux_map_to_setting(struct pinctrl_map const *map,
+>   	return 0;
+>   }
+>   
+> -static inline void pinmux_free_setting(struct pinctrl_setting const *setting)
+> -{
+> -}
+> -
+>   static inline int pinmux_enable_setting(struct pinctrl_setting const *setting)
+>   {
+>   	return 0;
