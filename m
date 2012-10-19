@@ -1,94 +1,150 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Oct 2012 16:41:46 -0600
-Subject: [PATCH V3 4/5] ARM: tegra: don't include iomap.h from debug-macro.S
+Date: Fri, 19 Oct 2012 16:41:47 -0600
+Subject: [PATCH V3 5/5] ARM: tegra: move debug-macro.S to include/debug
 In-Reply-To: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
 References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1350686507-3022-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1350686507-3022-5-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-In order to move Tegra's debug-macro.S to a common location for single
-zImage, it must not rely on any machine-specific header files such as
-<mach/iomap.h>. Duplicate the few physical address definitions that
-debug-macro.S relies upon directly into the file.
+Move Tegra's debug-macro.S over to the common debug macro directory.
 
-To avoid tegra_io_desc[] requiring shared knowledge of the UART
-mapping's virtual address, use a virtual address outside the ranges
-in tegra_io_desc[]. Call debug_ll_io_init() to propagate the mapping
-beyond the early pages tables.
+Move Tegra's debug UART selection menu into ARM's Kconfig.debug, so that
+all related options are selected in the same place.
+
+Tegra's uncompress.h is left in mach-tegra/include/mach; it will be
+removed whenever Tegra is converted to multi-platform.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-v3: New patch.
+v3: No change; just rebased on updated earlier patches.
+v2: Remove redundant default selection in Kconfig.debug, fix indentation
+    there.
 ---
- arch/arm/mach-tegra/include/mach/debug-macro.S |   24 +++++++++++++++++++-----
- arch/arm/mach-tegra/io.c                       |    1 +
- 2 files changed, 20 insertions(+), 5 deletions(-)
+ arch/arm/Kconfig.debug                             |   38 ++++++++++++++++++++
+ .../mach/debug-macro.S => include/debug/tegra.S}   |    2 -
+ arch/arm/mach-tegra/Kconfig                        |   29 ---------------
+ 3 files changed, 38 insertions(+), 31 deletions(-)
+ rename arch/arm/{mach-tegra/include/mach/debug-macro.S => include/debug/tegra.S} (99%)
 
-diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/mach-tegra/include/mach/debug-macro.S
-index d4c23d6..f67fd6d 100644
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857..96b9425 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -345,6 +345,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  on SOCFPGA based platforms.
+ 
++	config DEBUG_TEGRA_UART
++		depends on ARCH_TEGRA
++		bool "Use Tegra UART for low-level debug"
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  on Tegra based platforms.
++
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -409,6 +416,36 @@ choice
+ 
+ endchoice
+ 
++choice
++	prompt "Low-level debug console UART"
++	depends on DEBUG_LL && DEBUG_TEGRA_UART
++
++	config TEGRA_DEBUG_UART_AUTO_ODMDATA
++	bool "Via ODMDATA"
++	help
++	  Automatically determines which UART to use for low-level debug based
++	  on the ODMDATA value. This value is part of the BCT, and is written
++	  to the boot memory device using nvflash, or other flashing tool.
++	  When bits 19:18 are 3, then bits 17:15 indicate which UART to use;
++	  0/1/2/3/4 are UART A/B/C/D/E.
++
++	config TEGRA_DEBUG_UARTA
++		bool "UART A"
++
++	config TEGRA_DEBUG_UARTB
++		bool "UART B"
++
++	config TEGRA_DEBUG_UARTC
++		bool "UART C"
++
++	config TEGRA_DEBUG_UARTD
++		bool "UART D"
++
++	config TEGRA_DEBUG_UARTE
++		bool "UART E"
++
++endchoice
++
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/icedcc.S" if DEBUG_ICEDCC
+@@ -418,6 +455,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
++	default "debug/tegra.S" if DEBUG_TEGRA_UART
+ 	default "mach/debug-macro.S"
+ 
+ config EARLY_PRINTK
+diff --git a/arch/arm/mach-tegra/include/mach/debug-macro.S b/arch/arm/include/debug/tegra.S
+similarity index 99%
+rename from arch/arm/mach-tegra/include/mach/debug-macro.S
+rename to arch/arm/include/debug/tegra.S
+index f67fd6d..883d7c2 100644
 --- a/arch/arm/mach-tegra/include/mach/debug-macro.S
-+++ b/arch/arm/mach-tegra/include/mach/debug-macro.S
-@@ -26,10 +26,18 @@
++++ b/arch/arm/include/debug/tegra.S
+@@ -1,6 +1,4 @@
+ /*
+- * arch/arm/mach-tegra/include/mach/debug-macro.S
+- *
+  * Copyright (C) 2010,2011 Google, Inc.
+  * Copyright (C) 2011-2012 NVIDIA CORPORATION. All Rights Reserved.
+  *
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 97fcd16..e426d1b 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -57,35 +57,6 @@ config TEGRA_AHB
+ 	  which controls AHB bus master arbitration and some
+ 	  perfomance parameters(priority, prefech size).
  
- #include <linux/serial_reg.h>
- 
--#include "../../iomap.h"
+-choice
+-        prompt "Low-level debug console UART"
 -
- #define UART_SHIFT 2
+-config TEGRA_DEBUG_UART_AUTO_ODMDATA
+-	bool "Via ODMDATA"
+-	help
+-	  Automatically determines which UART to use for low-level debug based
+-	  on the ODMDATA value. This value is part of the BCT, and is written
+-	  to the boot memory device using nvflash, or other flashing tool.
+-	  When bits 19:18 are 3, then bits 17:15 indicate which UART to use;
+-	  0/1/2/3/4 are UART A/B/C/D/E.
+-
+-config TEGRA_DEBUG_UARTA
+-        bool "UART-A"
+-
+-config TEGRA_DEBUG_UARTB
+-        bool "UART-B"
+-
+-config TEGRA_DEBUG_UARTC
+-        bool "UART-C"
+-
+-config TEGRA_DEBUG_UARTD
+-        bool "UART-D"
+-
+-config TEGRA_DEBUG_UARTE
+-        bool "UART-E"
+-
+-endchoice
+-
+ config TEGRA_EMC_SCALING_ENABLE
+ 	bool "Enable scaling the memory frequency"
  
-+/* Physical addresses */
-+#define TEGRA_CLK_RESET_BASE		0x60006000
-+#define TEGRA_APB_MISC_BASE		0x70000000
-+#define TEGRA_UARTA_BASE		0x70006000
-+#define TEGRA_UARTB_BASE		0x70006040
-+#define TEGRA_UARTC_BASE		0x70006200
-+#define TEGRA_UARTD_BASE		0x70006300
-+#define TEGRA_UARTE_BASE		0x70006400
-+#define TEGRA_PMC_BASE			0x7000e400
-+
- #define TEGRA_CLK_RST_DEVICES_L		(TEGRA_CLK_RESET_BASE + 0x04)
- #define TEGRA_CLK_RST_DEVICES_H		(TEGRA_CLK_RESET_BASE + 0x08)
- #define TEGRA_CLK_RST_DEVICES_U		(TEGRA_CLK_RESET_BASE + 0x0c)
-@@ -39,6 +47,12 @@
- #define TEGRA_PMC_SCRATCH20		(TEGRA_PMC_BASE + 0xa0)
- #define TEGRA_APB_MISC_GP_HIDREV	(TEGRA_APB_MISC_BASE + 0x804)
- 
-+/*
-+ * Must be 1MB-aligned since a 1MB mapping is used early on.
-+ * Must not overlap with regions in mach-tegra/io.c:tegra_io_desc[].
-+ */
-+#define UART_VIRTUAL_BASE		0xfe100000
-+
- #define checkuart(rp, rv, lhu, bit, uart) \
- 		/* Load address of CLK_RST register */ \
- 		movw	rp, #TEGRA_CLK_RST_DEVICES_##lhu & 0xffff ; \
-@@ -139,10 +153,10 @@
- 91:		str	\rp, [\tmp, #4]		@ Store in tegra_uart_phys
- 		cmp	\rp, #0			@ Valid UART address?
- 		bne	92f			@ Yes, go process it
--		str	\rp, [\tmp, #8]		@ Store 0 in tegra_uart_phys
-+		str	\rp, [\tmp, #8]		@ Store 0 in tegra_uart_virt
- 		b	100f			@ Done
--92:		sub	\rv, \rp, #IO_APB_PHYS	@ Calculate virt address
--		add	\rv, \rv, #IO_APB_VIRT
-+92:		and	\rv, \rp, #0xffffff	@ offset within 1MB section
-+		add	\rv, \rv, #UART_VIRTUAL_BASE
- 		str	\rv, [\tmp, #8]		@ Store in tegra_uart_virt
- 		movw	\rv, #TEGRA_APB_MISC_GP_HIDREV & 0xffff
- 		movt	\rv, #TEGRA_APB_MISC_GP_HIDREV >> 16
-diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
-index 7d09f30..bb9c9c2 100644
---- a/arch/arm/mach-tegra/io.c
-+++ b/arch/arm/mach-tegra/io.c
-@@ -59,5 +59,6 @@ static struct map_desc tegra_io_desc[] __initdata = {
- 
- void __init tegra_map_common_io(void)
- {
-+	debug_ll_io_init();
- 	iotable_init(tegra_io_desc, ARRAY_SIZE(tegra_io_desc));
- }
 -- 
 1.7.0.4
