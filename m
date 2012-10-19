@@ -1,100 +1,46 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 19 Oct 2012 14:40:58 +0200
-Subject: [PATCH v2] arm/dts: AM33XX: Add SPI device tree data
-In-Reply-To: <20121019113016.GE25164@beef>
-References: <1347946228-25874-1-git-send-email-avinashphilip@ti.com>
- <50810E2F.5@ti.com> <20121019113016.GE25164@beef>
-Message-ID: <50814A5A.8070206@ti.com>
+From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
+Date: Fri, 19 Oct 2012 14:45:55 +0200
+Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
+In-Reply-To: <20121018233335.GC28061@n2100.arm.linux.org.uk>
+References: <20121018222046.GA28541@animalcreek.com>
+ <20121018225540.GB28061@n2100.arm.linux.org.uk>
+ <20121018232405.GA29064@animalcreek.com>
+ <20121018233335.GC28061@n2100.arm.linux.org.uk>
+Message-ID: <50814B83.7090203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+Hi,
 
-On 10/19/2012 01:30 PM, Matt Porter wrote:
-> On Fri, Oct 19, 2012 at 10:24:15AM +0200, Benoit Cousson wrote:
->> Hi Avinash,
->>
->> This look good to me except the: status = "disabled".
->>
->> The "disabled" should be reserved for variant that does not contain the IP.
->> Is it the case here?
+On 10/19/2012 01:33 AM, Russell King - ARM Linux wrote:
+> I would suggest getting some feedback from the ASoC people first, before
+> trying to invent new APIs to work around this stuff.  If they can live
+> with having prefetch enabled on OMAP then there isn't an issue here.  If
+> not, we need a solution to this.
 > 
-> http://comments.gmane.org/gmane.linux.drivers.devicetree/18968 is what
-> I've been going by with the DTS support in the EDMA dmaengine series. It
-> does make the most sense to only enable what you need in the
-> <board>.dts.
+> I do not believe that precisely stopping and starting playback across a
+> suspend/resume event is really necessary (it's desirable but the world
+> doesn't collapse if you miss a few samples.)  It could be more of an
+> issue for pause/resume though, but as I say, that's for ASoC people to
+> comment on.
 
-Thanks, I missed that thread. That being said, there is no real rational
-:-)
-It seems to be a preference more than anything else.
-I'm curious now, why powerpc was not really using that approach?
+There is another issue with the prefetch in audio:
+we tend to like to know the position of the DMA and also to know how much data
+we have stored in buffers, FIFOs. This information is used by userspace to do
+echo cancellation and also used by PA for example to do runtime mixing
+directly in the audio buffer. We have means to extract this information from
+McBSP for example (and from tlv320dac33 codec) but AFAIK this information can
+not be retrieved from sDMA.
+We could assume that the sDMA FIFO is kept full and report that as a 'delay'
+or do not account this information.
 
-I'd rather explicitly disable an IP than assuming than it is disabled by
-default and then enabling it in the board file. But again it is just a
-different view point, since at the end it will have the same effect.
+For now I think the cyclic mode should not set the prefetch. If I recall right
+the cyclic mode is only used by audio at the moment.
 
-If we really want the disabled state to be the default state, why is it
-not disabled in the DT fmwk by default?
+> I'm merely pointing out here that we need their feedback here before
+> deciding if there's anything further that needs to happen.
 
-Regards,
-Benoit
+Thanks Russell, I'll take a look at the implication of the prefetch for audio.
 
-> 
-> -Matt
-> 
->> On 09/18/2012 07:30 AM, Philip, Avinash wrote:
->>> Add McSPI data node to AM33XX device tree file. The McSPI module (and so
->>> as the driver) is reused from OMAP4.
->>>
->>> Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
->>> Tested-by: Matt Porter <mporter@ti.com>
->>> ---
->>> Changes since v1:
->>>         - Corrected reg offset in reg DT entry.
->>>
->>> :100644 100644 ff3badb... 065fd54... M	arch/arm/boot/dts/am33xx.dtsi
->>>  arch/arm/boot/dts/am33xx.dtsi |   25 +++++++++++++++++++++++++
->>>  1 files changed, 25 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->>> index ff3badb..065fd54 100644
->>> --- a/arch/arm/boot/dts/am33xx.dtsi
->>> +++ b/arch/arm/boot/dts/am33xx.dtsi
->>> @@ -219,5 +219,30 @@
->>>  			interrupt-parent = <&intc>;
->>>  			interrupts = <91>;
->>>  		};
->>> +
->>> +		spi0: spi at 48030000 {
->>> +			compatible = "ti,omap4-mcspi";
->>> +			#address-cells = <1>;
->>> +			#size-cells = <0>;
->>> +			reg = <0x48030000 0x400>;
->>> +			interrupt-parent = <&intc>;
->>> +			interrupt = <65>;
->>> +			ti,spi-num-cs = <2>;
->>> +			ti,hwmods = "spi0";
->>> +			status = "disabled";
->>> +
->>> +		};
->>> +
->>> +		spi1: spi at 481a0000 {
->>> +			compatible = "ti,omap4-mcspi";
->>> +			#address-cells = <1>;
->>> +			#size-cells = <0>;
->>> +			reg = <0x481a0000 0x400>;
->>> +			interrupt-parent = <&intc>;
->>> +			interrupt = <125>;
->>> +			ti,spi-num-cs = <2>;
->>> +			ti,hwmods = "spi1";
->>> +			status = "disabled";
->>> +		};
->>>  	};
->>>  };
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> Please read the FAQ at  http://www.tux.org/lkml/
+-- 
+P?ter
