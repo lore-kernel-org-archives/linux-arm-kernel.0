@@ -1,43 +1,61 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 19 Oct 2012 15:50:08 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7 #2
-In-Reply-To: <1350629360-27438-1-git-send-email-horms@verge.net.au>
-References: <1350629360-27438-1-git-send-email-horms@verge.net.au>
-Message-ID: <20121019065008.GA27867@verge.net.au>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 19 Oct 2012 14:56:51 +0800
+Subject: dts: question about how to configure PIO used as i2c irq
+In-Reply-To: <507BC449.6070203@atmel.com>
+References: <507B7AC3.7090904@gmail.com>
+ <20121015055720.GQ12801@game.jcrosoft.org> <507BC449.6070203@atmel.com>
+Message-ID: <5080F9B3.5090708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 03:49:19PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> please consider the following fix for the r8a7779 SoC for 3.6.
+Hi J,
 
-Same typo as last time: s/3.6/3.7/
+On 10/15/2012 16:07, Nicolas Ferre wrote:
+> On 10/15/2012 07:57 AM, Jean-Christophe PLAGNIOL-VILLARD :
+>> On 10:53 Mon 15 Oct     , Bo Shen wrote:
+>>> Hi All,
+>>>    When moving atmel qt1070 linux driver with DT support. The atmel
+>>> qt1070 is an I2C device. I meet the following questions.
+>>>
+>>>    The qt1070 DT node
+>>>    --<--------------
+>>>    qt1070: keyboard at 1b {
+>>>          compatible = "atmel,qt1070";
+>>>          reg = <0x1b>;
+>>>          interrupt-parent = <&pioA>;
+>>>          interrupts = <7 0x0>;
+>>>    };
+>>>    -->--------------
+>>>
+>>>    DT will parse this node and map irq, the i2c_client->irq. This can
+>>> be used directly in atmel qt1070 driver. However, the PIO which used
+>>> as irq need configure as a PIO input. Now, we can not use
+>>> irq_to_gpio() function to convert irq to gpio. So, if we can not
+>>> configure this gpio.
+>>>
+>>>    If we configure the pio in board-dt.c, I think this is not a good
+>>> place. For example, if the kernel image support multiplatform, while
+>>> on these platform, using different pio for qt1070, so this will
+>>> cause only one platform can use qt1070.
+>>>
+>>>    So, for this question, how should I solve it? Would you please
+>>> give me some advice?
+>> I already reply you in private 4 times
+>
+> Yes, but maybe it is because it was not well explained, or not developed
+> to the proper extend... So, please do not make these remarks: if the
+> conversation was private, it is not necessary to recall that here. Maybe
+> Voice is looking for help from someone else?
+>
+>> you have only 2 choice pass the gpio and manage in c
+>> or configure the gpio as input in the xlate or map of the gpio drivers and the
+>> mux via pinctrl
+>
+> Can you please develop a bit more: which xlate? How to tell the gpio
+> driver about the map? Can you provide an example?
 
-> It resolves some more fallout from recent IOMEM() changes.
-> 
-> ----------------------------------------------------------------
-> The following changes since commit 11f93576b0b50bf391ffafa544b85e541f5e59a5:
-> 
->   ARM: shmobile: r8a7779: use __iomem pointers for MMIO (2012-10-16 08:58:56 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git fixes
-> 
-> for you to fetch changes up to ed7d132a634e7e4c3fa657363df5df39e7f768e4:
-> 
->   ARM: shmobile: r8a7779: I/O address abuse cleanup (2012-10-19 15:39:38 +0900)
-> 
-> ----------------------------------------------------------------
-> Kuninori Morimoto (1):
->       ARM: shmobile: r8a7779: I/O address abuse cleanup
-> 
->  arch/arm/mach-shmobile/setup-r8a7779.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Any information for this? Search with google, I don't find any useful 
+information.
+
+> Bye,
+>
