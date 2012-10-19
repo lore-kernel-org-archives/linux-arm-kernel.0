@@ -1,65 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 19 Oct 2012 09:55:00 +0300
-Subject: [PATCH v2] arm: omap: move OMAP USB platform data to
- <linux/platform_data/omap-usb.h>
-In-Reply-To: <20121019014917.GL30550@atomide.com>
-References: <20121016230040.GP15569@atomide.com>
- <1350488838-6289-1-git-send-email-balbi@ti.com>
- <20121017203404.GY15569@atomide.com>
- <20121018054934.GE11137@arwen.pp.htv.fi>
- <20121019014917.GL30550@atomide.com>
-Message-ID: <20121019065500.GD12235@arwen.pp.htv.fi>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Fri, 19 Oct 2012 09:04:14 +0200
+Subject: [PATCH net-next 00/21] treewide: Use consistent api style for
+ address testing
+In-Reply-To: <cover.1350618006.git.joe@perches.com>
+References: <cover.1350618006.git.joe@perches.com>
+Message-ID: <1350630254.2293.183.camel@edumazet-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Oct 18, 2012 at 06:49:17PM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [121017 22:56]:
-> > Hi,
-> > 
-> > On Wed, Oct 17, 2012 at 01:34:04PM -0700, Tony Lindgren wrote:
-> > > * Felipe Balbi <balbi@ti.com> [121017 08:54]:
-> > > > In order to make single zImage work for ARM architecture,
-> > > > we need to make sure we don't depend on private headers.
-> > > > 
-> > > > Move USB platform_data to <linux/platform_data/omap-usb.h>
-> > > > and keep only internal functions in <plat/usb.h>.
-> > > 
-> > > Thanks, looks like I can't make this apply against v3.7-rc1:
-> > > 
-> > > patching file arch/arm/plat-omap/include/plat/usb.h
-> > > Hunk #1 FAILED at 1.
-> > > Hunk #2 FAILED at 26.
-> > > Hunk #3 FAILED at 44.
-> > > Hunk #4 FAILED at 65.
-> > > Hunk #5 FAILED at 81.
-> > > Hunk #6 succeeded at 28 with fuzz 2 (offset -128 lines).
-> > > 5 out of 6 hunks FAILED -- rejects in file arch/arm/plat-omap/include/plat/usb.h
-> > > 
-> > > Can you please check it?
-> > 
-> > Are you sure you have a clean v3.7-rc1 ?
+On Thu, 2012-10-18 at 20:55 -0700, Joe Perches wrote:
+> ethernet, ipv4, and ipv6 address testing uses 3 different api naming styles.
 > 
-> Yes. Figured it out, it fails to apply with quilt, but applies
-> with git.
+> ethernet uses:	is_<foo>_ether_addr
+> ipv4 uses:	ipv4_is_<foo>
+> ipv6 uses:	ipv6_addr_<foo>
+> 
+> Standardize on the ipv6 style of <prefix>_addr_<type> to reduce
+> the number of styles to remember.
+> 
+> The new consistent styles are:
+> 
+> eth_addr_<foo>(const u8 *)
+> ipv4_addr_<foo>(__be32)
+> ipv6_addr_<foo>(const struct in6_addr *)
+> 
+> Add temporary backward compatibility #defines for the old names too.
+> 
+> Joe Perches (21):
+>   etherdevice: Rename is_<foo>_ether_addr tests to eth_addr_<foo>
+>   net: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   arch: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   wireless: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   drivers: net: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   staging: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   infiniband: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   scsi: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   of: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   s390: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   usb: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   uwb: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   Documentation: networking: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   llc_if.h: Convert is_<foo>_ether_addr uses to eth_addr_<foo>
+>   in.h: Rename ipv4_is_<foo> functions to ipv4_addr_<foo>
+>   net: Convert ipv4_is_<foo> uses to ipv4_addr_<foo>
+>   infiniband: Convert ipv4_is_<foo> uses to ipv4_addr_<foo>
+>   ath6kl: Convert ipv4_is_<foo> uses to ipv4_addr_<foo>
+>   parisc: Convert ipv4_is_<foo> uses to ipv4_addr_<foo>
+>   lockd: Convert ipv4_is_<foo> uses to ipv4_addr_<foo>
+>   sctp: Convert ipv4_is_<foo> uses to ipv4_addr_<foo>
 
-probably because of file rename.
+Yes they are some names discrepancies, thats a big deal.
 
-> But it does not compile with all configs though, and does
-> not remove plat/usb.h. Thanks anyways. I'll post a proper
-> series shortly with your patch fixed up.
+And we have alloc_skb() / kfree_skb() / skb_clone() 
 
-ok... I'll check it out. I kept the non-static functions in plat/usb.h
-because they didn't belong on platform_data/usb-omap.h. What should be
-done with those, then ? move to mach/ ?
+Why not skb_alloc() / skb_free() / skb_clone() ?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121019/fc967dd3/attachment.sig>
+Some people actually know current code by name of functions, they dont
+want to change their mind and having to grep include files and git log
+to learn the new names of an old function, especially when traveling and
+using a laptop.
+
+Sure, when we want to use eth_random_addr(), a grep into include files
+to check if its still the right name (old one was random_ether_addr())
+is OK because we dont use this one often.
+
+If you think about it, eth_random_addr() was not the perfect name.
+
+Think about all the documentation you can find outside of kernel tree,
+RFC and things like that, copy/pasting some linux kernel code.
+
+This kind of changes make our life more difficult, when we have to
+backport patches or rebase code, or even perform some searches to find
+prior issues/discussions.
+
+Life of a kernel developer is not only dealing with latest Linus (or
+-next) tree, and using automatic 'tools'.
+
+Thats a real pain for me at least.
