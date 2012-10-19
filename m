@@ -1,38 +1,33 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Oct 2012 09:56:16 -0600
-Subject: [PATCH 2/5] ARM: tegra: dts: add slink controller dt entry
-In-Reply-To: <5081190D.50200@nvidia.com>
+Date: Fri, 19 Oct 2012 09:59:05 -0600
+Subject: [PATCH 3/5] ARM: tegra: fix clock entry of slink controller
+In-Reply-To: <508119CE.9070408@nvidia.com>
 References: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
- <1350557795-31487-3-git-send-email-ldewangan@nvidia.com>
- <50808595.8070505@wwwdotorg.org> <5081190D.50200@nvidia.com>
-Message-ID: <50817820.6010301@wwwdotorg.org>
+ <1350557795-31487-4-git-send-email-ldewangan@nvidia.com>
+ <5080862C.9030203@wwwdotorg.org> <508119CE.9070408@nvidia.com>
+Message-ID: <508178C9.9090504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2012 03:10 AM, Laxman Dewangan wrote:
-> On Friday 19 October 2012 04:11 AM, Stephen Warren wrote:
->> On 10/18/2012 04:56 AM, Laxman Dewangan wrote:
->>> Add slink controller details in the dts file of
->>> Tegra20 and Tegra30.
->>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
->>> b/arch/arm/boot/dts/tegra20.dtsi
->>> +    slink at 7000d400 {
->>> +        compatible = "nvidia,tegra20-slink";
->>> +        reg =<0x7000d400 0x200>;
->>> +        interrupts =<0 59 0x04>;
->>> +        nvidia,dma-req-sel =<15>;
+On 10/19/2012 03:13 AM, Laxman Dewangan wrote:
+> On Friday 19 October 2012 04:13 AM, Stephen Warren wrote:
+
+>>> +    OF_DEV_AUXDATA("nvidia,tegra20-slink", TEGRA_SLINK1_BASE,
+>>> "spi-tegra-slink.0", NULL),
+>> Here, can't we just use the existing device names in the clock files...
+>>
+>> So we can completely drop the changes to these two files:
 >
+> I want to name the driver as spi-tegra-slink. When we add the sflash spi
+> driver for tegra20, the driver name will be spi-tegra-sflash.
+> Also current name is "spi_tegra" I do not want to name with "_". So it
+> is require to convert as "-".
 
-(Oh, you need a space before and after the = in all the lines above)
+The driver name is whatever you put into the driver file. The AUXDATA
+only affects the device name. There should be no conflict with the
+"sflash" driver, since that clock is set up to expect driver name "spi"
+which doesn't conflict with "spi_tegra.*".
 
->> I thought the common DT DMA bindings were going to be in 3.7, and hence
->> we could just use them here rather than inventing another custom
->> property for this purpose?
->
-> Adding Vinod here.
-> 
-> I looked the dma devicetree bingind document and did not found the
-> generic binding name. Howvere, for arm-pl330.txt, it is explained as ...
-
-That's not the generic bindings. I guess they didn't get merged then. I
-guess we can continue with custom bindings until they are.
+So, there's really no point in churning the clock names any more,
+especially since it's temporary. If you feel strongly about this, the
+best thing to do is help push Tegra's support of DT clock bindings forward.
