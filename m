@@ -1,33 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 19 Oct 2012 09:59:05 -0600
-Subject: [PATCH 3/5] ARM: tegra: fix clock entry of slink controller
-In-Reply-To: <508119CE.9070408@nvidia.com>
-References: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
- <1350557795-31487-4-git-send-email-ldewangan@nvidia.com>
- <5080862C.9030203@wwwdotorg.org> <508119CE.9070408@nvidia.com>
-Message-ID: <508178C9.9090504@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 19 Oct 2012 09:00:41 -0700
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <20121019061630.GB2983@netboy.at.omicron.at>
+References: <20121017181354.GA2412@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
+ <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at>
+ <50806B1D.9040504@ti.com>
+ <20121019061630.GB2983@netboy.at.omicron.at>
+Message-ID: <20121019160041.GB4730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2012 03:13 AM, Laxman Dewangan wrote:
-> On Friday 19 October 2012 04:13 AM, Stephen Warren wrote:
+* Richard Cochran <richardcochran@gmail.com> [121018 23:18]:
+> On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
+> > 
+> > Another important point is, this driver is also required and used for
+> > Davinci family of devices (arch/mach/mach-davinci/).
+> 
+> That is really beside the point. If the code isn't ready yet, then
+> don't merge it.
+> 
+> When I asked about the beaglebone, I was given the impression that it
+> will be ready for v3.7-rc1.  But, as I know realize, at the current
+> rate, it might not even be ready for v3.8.
+> 
+> I don't mind waiting, but please make sure that whatever lands into a
+> release is really, truly working.
 
->>> +    OF_DEV_AUXDATA("nvidia,tegra20-slink", TEGRA_SLINK1_BASE,
->>> "spi-tegra-slink.0", NULL),
->> Here, can't we just use the existing device names in the clock files...
->>
->> So we can completely drop the changes to these two files:
->
-> I want to name the driver as spi-tegra-slink. When we add the sflash spi
-> driver for tegra20, the driver name will be spi-tegra-sflash.
-> Also current name is "spi_tegra" I do not want to name with "_". So it
-> is require to convert as "-".
+Indeed. This has been a problem with many of the TI patches in
+general. People are working on separate product trees and then produce
+patches for the mainline kernel that are poorly tested.
 
-The driver name is whatever you put into the driver file. The AUXDATA
-only affects the device name. There should be no conflict with the
-"sflash" driver, since that clock is set up to expect driver name "spi"
-which doesn't conflict with "spi_tegra.*".
+The requirement should be: Do your patch on an omap board then send the
+patch from your omap board after booting your board with the patch :)
 
-So, there's really no point in churning the clock names any more,
-especially since it's temporary. If you feel strongly about this, the
-best thing to do is help push Tegra's support of DT clock bindings forward.
+Regards,
+
+Tony
