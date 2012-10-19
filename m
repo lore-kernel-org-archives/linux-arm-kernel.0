@@ -1,33 +1,227 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 19 Oct 2012 08:16:30 +0200
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <50806B1D.9040504@ti.com>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
- <20121017235045.GB30550@atomide.com>
- <20121018030654.GE2867@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
- <20121018184443.GD2350@netboy.at.omicron.at>
- <50806B1D.9040504@ti.com>
-Message-ID: <20121019061630.GB2983@netboy.at.omicron.at>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 19 Oct 2012 14:38:13 +0800
+Subject: [PATCH] ARM: tegra30: clocks: add AHB and APB clocks
+Message-ID: <1350628693-1190-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
-> 
-> Another important point is, this driver is also required and used for
-> Davinci family of devices (arch/mach/mach-davinci/).
+Adding the AHB and APB bus clock control interface for Tegra30.
 
-That is really beside the point. If the code isn't ready yet, then
-don't merge it.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/common.c              |    4 +
+ arch/arm/mach-tegra/tegra30_clocks.c      |  106 +++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/tegra30_clocks.h      |    1 +
+ arch/arm/mach-tegra/tegra30_clocks_data.c |   46 +++++++++++++
+ 4 files changed, 157 insertions(+), 0 deletions(-)
 
-When I asked about the beaglebone, I was given the impression that it
-will be ready for v3.7-rc1.  But, as I know realize, at the current
-rate, it might not even be ready for v3.8.
-
-I don't mind waiting, but please make sure that whatever lands into a
-release is really, truly working.
-
-Thanks,
-Richard
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 0b0a5f5..177f164 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -104,6 +104,10 @@ static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
+ 	{ "clk_m",	NULL,		0,		true },
+ 	{ "pll_p",	"clk_m",	408000000,	true },
+ 	{ "pll_p_out1",	"pll_p",	9600000,	true },
++	{ "pll_p_out4",	"pll_p",	102000000,	true },
++	{ "sclk",	"pll_p_out4",	102000000,	true },
++	{ "hclk",	"sclk",		102000000,	true },
++	{ "pclk",	"hclk",		51000000,	true },
+ 	{ NULL,		NULL,		0,		0},
+ };
+ #endif
+diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
+index e9de5df..875744f 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks.c
++++ b/arch/arm/mach-tegra/tegra30_clocks.c
+@@ -792,6 +792,112 @@ struct clk_ops tegra30_twd_ops = {
+ 	.recalc_rate = tegra30_twd_clk_recalc_rate,
+ };
+ 
++/* bus clock functions */
++static int tegra30_bus_clk_is_enabled(struct clk_hw *hw)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val = clk_readl(c->reg);
++
++	c->state = ((val >> c->reg_shift) & BUS_CLK_DISABLE) ? OFF : ON;
++	return c->state;
++}
++
++static int tegra30_bus_clk_enable(struct clk_hw *hw)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val;
++
++	val = clk_readl(c->reg);
++	val &= ~(BUS_CLK_DISABLE << c->reg_shift);
++	clk_writel(val, c->reg);
++
++	return 0;
++}
++
++static void tegra30_bus_clk_disable(struct clk_hw *hw)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val;
++
++	val = clk_readl(c->reg);
++	val |= BUS_CLK_DISABLE << c->reg_shift;
++	clk_writel(val, c->reg);
++}
++
++static unsigned long tegra30_bus_clk_recalc_rate(struct clk_hw *hw,
++			unsigned long prate)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val = clk_readl(c->reg);
++	u64 rate = prate;
++
++	c->div = ((val >> c->reg_shift) & BUS_CLK_DIV_MASK) + 1;
++	c->mul = 1;
++
++	if (c->mul != 0 && c->div != 0) {
++		rate *= c->mul;
++		rate += c->div - 1; /* round up */
++		do_div(rate, c->div);
++	}
++	return rate;
++}
++
++static int tegra30_bus_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long parent_rate)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	int ret = -EINVAL;
++	u32 val;
++	int i;
++
++	val = clk_readl(c->reg);
++	for (i = 1; i <= 4; i++) {
++		if (rate == parent_rate / i) {
++			val &= ~(BUS_CLK_DIV_MASK << c->reg_shift);
++			val |= (i - 1) << c->reg_shift;
++			clk_writel(val, c->reg);
++			c->div = i;
++			c->mul = 1;
++			ret = 0;
++			break;
++		}
++	}
++
++	return ret;
++}
++
++static long tegra30_bus_clk_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
++{
++	unsigned long parent_rate = *prate;
++	s64 divider;
++
++	if (rate >= parent_rate)
++		return rate;
++
++	divider = parent_rate;
++	divider += rate - 1;
++	do_div(divider, rate);
++
++	if (divider < 0)
++		return divider;
++
++	if (divider > 4)
++		divider = 4;
++	do_div(parent_rate, divider);
++
++	return parent_rate;
++}
++
++struct clk_ops tegra30_bus_ops = {
++	.is_enabled = tegra30_bus_clk_is_enabled,
++	.enable = tegra30_bus_clk_enable,
++	.disable = tegra30_bus_clk_disable,
++	.set_rate = tegra30_bus_clk_set_rate,
++	.round_rate = tegra30_bus_clk_round_rate,
++	.recalc_rate = tegra30_bus_clk_recalc_rate,
++};
++
+ /* Blink output functions */
+ static int tegra30_blink_clk_is_enabled(struct clk_hw *hw)
+ {
+diff --git a/arch/arm/mach-tegra/tegra30_clocks.h b/arch/arm/mach-tegra/tegra30_clocks.h
+index f2f88fe..7a34adb 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks.h
++++ b/arch/arm/mach-tegra/tegra30_clocks.h
+@@ -34,6 +34,7 @@ extern struct clk_ops tegra_clk_out_ops;
+ extern struct clk_ops tegra30_super_ops;
+ extern struct clk_ops tegra30_blink_clk_ops;
+ extern struct clk_ops tegra30_twd_ops;
++extern struct clk_ops tegra30_bus_ops;
+ extern struct clk_ops tegra30_periph_clk_ops;
+ extern struct clk_ops tegra30_dsib_clk_ops;
+ extern struct clk_ops tegra_nand_clk_ops;
+diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
+index 3d2e553..7bc8b1d 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks_data.c
++++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
+@@ -711,6 +711,50 @@ static struct clk tegra_clk_sclk = {
+ 	.num_parents = ARRAY_SIZE(mux_sclk),
+ };
+ 
++static const char *tegra_hclk_parent_names[] = {
++	"tegra_sclk",
++};
++
++static struct clk *tegra_hclk_parents[] = {
++	&tegra_clk_sclk,
++};
++
++static struct clk tegra_hclk;
++static struct clk_tegra tegra_hclk_hw = {
++	.hw = {
++		.clk = &tegra_hclk,
++	},
++	.flags = DIV_BUS,
++	.reg = 0x30,
++	.reg_shift = 4,
++	.max_rate = 378000000,
++	.min_rate = 12000000,
++};
++DEFINE_CLK_TEGRA(hclk, 0, &tegra30_bus_ops, 0, tegra_hclk_parent_names,
++		tegra_hclk_parents, &tegra_clk_sclk);
++
++static const char *tegra_pclk_parent_names[] = {
++	"tegra_hclk",
++};
++
++static struct clk *tegra_pclk_parents[] = {
++	&tegra_hclk,
++};
++
++static struct clk tegra_pclk;
++static struct clk_tegra tegra_pclk_hw = {
++	.hw = {
++		.clk = &tegra_pclk,
++	},
++	.flags = DIV_BUS,
++	.reg = 0x30,
++	.reg_shift = 0,
++	.max_rate = 167000000,
++	.min_rate = 12000000,
++};
++DEFINE_CLK_TEGRA(pclk, 0, &tegra30_bus_ops, 0, tegra_pclk_parent_names,
++		tegra_pclk_parents, &tegra_hclk);
++
+ static const char *mux_blink[] = {
+ 	"clk_32k",
+ };
+@@ -1325,6 +1369,8 @@ struct clk *tegra_ptr_clks[] = {
+ 	&tegra_cml1,
+ 	&tegra_pciex,
+ 	&tegra_clk_sclk,
++	&tegra_hclk,
++	&tegra_pclk,
+ 	&tegra_clk_blink,
+ 	&tegra30_clk_twd,
+ };
+-- 
+1.7.0.4
