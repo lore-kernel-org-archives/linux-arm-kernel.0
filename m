@@ -1,46 +1,50 @@
-From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
-Date: Fri, 19 Oct 2012 14:45:55 +0200
-Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
-In-Reply-To: <20121018233335.GC28061@n2100.arm.linux.org.uk>
-References: <20121018222046.GA28541@animalcreek.com>
- <20121018225540.GB28061@n2100.arm.linux.org.uk>
- <20121018232405.GA29064@animalcreek.com>
- <20121018233335.GC28061@n2100.arm.linux.org.uk>
-Message-ID: <50814B83.7090203@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 19 Oct 2012 14:51:21 +0200
+Subject: [PATCH] pinctrl: reserve pins when states are activated
+In-Reply-To: <508091C4.9080008@wwwdotorg.org>
+References: <1350554487-7914-1-git-send-email-linus.walleij@stericsson.com>
+ <508091C4.9080008@wwwdotorg.org>
+Message-ID: <CACRpkdbHLpkqGx4bGPxYN43QiQRedirRnf+tQ7avbQmd6k1kQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 19, 2012 at 1:33 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/18/2012 04:01 AM, Linus Walleij wrote:
+>> This switches the way that pins are reserved for multiplexing:
+>
+> The conceptual change makes perfect sense to me.
 
-On 10/19/2012 01:33 AM, Russell King - ARM Linux wrote:
-> I would suggest getting some feedback from the ASoC people first, before
-> trying to invent new APIs to work around this stuff.  If they can live
-> with having prefetch enabled on OMAP then there isn't an issue here.  If
-> not, we need a solution to this.
-> 
-> I do not believe that precisely stopping and starting playback across a
-> suspend/resume event is really necessary (it's desirable but the world
-> doesn't collapse if you miss a few samples.)  It could be more of an
-> issue for pause/resume though, but as I say, that's for ASoC people to
-> comment on.
+Thanks...
 
-There is another issue with the prefetch in audio:
-we tend to like to know the position of the DMA and also to know how much data
-we have stored in buffers, FIFOs. This information is used by userspace to do
-echo cancellation and also used by PA for example to do runtime mixing
-directly in the audio buffer. We have means to extract this information from
-McBSP for example (and from tlv320dac33 codec) but AFAIK this information can
-not be retrieved from sDMA.
-We could assume that the sDMA FIFO is kept full and report that as a 'delay'
-or do not account this information.
+>> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+>
+>>  void pinmux_free_setting(struct pinctrl_setting const *setting)
+> ...
+>> +     /*
+>> +      * If a setting is active, disable it so that all pins are released
+>> +      */
+>> +     pinmux_disable_setting(setting);
+>
+> "*If* a setting is active ..." implies there should be a C if statement
+> here to check if the setting is actually active before trying to disable it?
 
-For now I think the cyclic mode should not set the prefetch. If I recall right
-the cyclic mode is only used by audio at the moment.
+Spot on.
 
-> I'm merely pointing out here that we need their feedback here before
-> deciding if there's anything further that needs to happen.
+Actually in core.c we're already checking this:
 
-Thanks Russell, I'll take a look at the implication of the prefetch for audio.
+	case PIN_MAP_TYPE_MUX_GROUP:
+		if (state == p->state)
+			pinmux_disable_setting(setting);
+		pinmux_free_setting(setting);
+		break;
 
--- 
-P?ter
+So this is just buggy driving the refcount down to negative.
+(I think Jean-Nicolas noticed this phenomenon...)
+
+I should just delete pinmux_free_setting().
+
+Yours,
+Linus Walleij
+
+Yours,
+Linus Walleij
