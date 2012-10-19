@@ -1,50 +1,56 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 19 Oct 2012 16:54:55 -0700
-Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
- revert "i2c: omap: switch to threaded IRQ support")
-In-Reply-To: <1350655227.2768.11.camel@twins> (Peter Zijlstra's message of
- "Fri, 19 Oct 2012 16:00:27 +0200")
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
- <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
- <20121016133356.GG21801@arwen.pp.htv.fi>
- <87ipaanljt.fsf_-_@deeprootsystems.com>
- <20121017140002.GI11394@arwen.pp.htv.fi>
- <20121017143534.GJ11394@arwen.pp.htv.fi>
- <87txtsitpt.fsf@deeprootsystems.com>
- <20121018055136.GF11137@arwen.pp.htv.fi>
- <1350655227.2768.11.camel@twins>
-Message-ID: <87391ahvao.fsf@deeprootsystems.com>
+Date: Fri, 19 Oct 2012 16:58:36 -0700
+Subject: [RFC] ARM: sched_clock: update epoch_cyc on resume
+In-Reply-To: <CAGsJ_4z_tF3LKy-vygr=kwah7q7U03Y2K2XKAkZTB1QC2pSYmw@mail.gmail.com>
+ (Barry Song's message of "Tue, 24 Jul 2012 14:43:28 +0800")
+References: <1342567672-29071-1-git-send-email-ccross@android.com>
+ <CAGsJ_4z_tF3LKy-vygr=kwah7q7U03Y2K2XKAkZTB1QC2pSYmw@mail.gmail.com>
+Message-ID: <87r4ouggk3.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Zijlstra <peterz@infradead.org> writes:
+Barry Song <21cnbao@gmail.com> writes:
 
-> On Thu, 2012-10-18 at 08:51 +0300, Felipe Balbi wrote:
->> > So the primary question remains: is RT runtime supposed to include the
->> > time spent suspended?  I suspect not. 
->> 
->> you might be right there, though we need Thomas or Peter to answer :-s 
+> 2012/7/18 Colin Cross <ccross@android.com>:
+>> Many clocks that are used to provide sched_clock will reset during
+>> suspend.  If read_sched_clock returns 0 after suspend, sched_clock will
+>> appear to jump forward.  This patch resets cd.epoch_cyc to the current
+>> value of read_sched_clock during resume, which causes sched_clock() just
+>> after suspend to return the same value as sched_clock() just before
+>> suspend.
+>>
+>> In addition, during the window where epoch_ns has been updated before
+>> suspend, but epoch_cyc has not been updated after suspend, it is unknown
+>> whether the clock has reset or not, and sched_clock() could return a
+>> bogus value.  Add a suspended flag, and return the pre-suspend epoch_ns
+>> value during this period.
 >
-> re, sorry both tglx and I have been traveling, he still is, I'm trying
-> to play catch-up :-)
+> Acked-by: Barry Song <21cnbao@gmail.com>
 >
-> Anyway, yeah I'm somewhat surprised the clock is 'running' when the
-> machine isn't. From what I could gather, this is !x86 hardware, right?
+> this patch should also fix the issue that:
+> 1. launch some rt threads, rt threads sleep before suspend
+> 2. repeat to suspend/resume
+> 3. after resuming, waking up rt threads
 >
-> x86 explicitly makes sure our clocks are 'stopped' during suspend, see
-> commit cd7240c0b900eb6d690ccee088a6c9b46dae815a.
->
-> Can you do something similar for ARM?
+> repeat 1-3 again and again, sometimes all rt threads will hang after
+> resuming due to wrong sched_clock will make sched_rt think rt_time is
+> much more than rt_runtime (default 950ms in 1s). then rt threads will
+> lost cpu timeslot to run since the 95% threshold is there.
 
-So I did the same thing for my ARM SoC, and it definitley stops the RT
-throttling.  
+Re-visiting this in light of a related problem.
 
-However, it has the undesriable (IMO) side effect of making timed printk
-output rather unhelpful for debugging suspend/resume since printk time
-stays constant throughout suspend/resume no matter how long you
-sleep. :(
+I've run into a similar issue where IRQ threads are prevented from
+running during resume becase the RT throttling kicks because RT
+runtime is accumulated during suspend.  Using the 'needs_suspend'
+version fixes this problem too.
 
-So does that mean we have to choose between useful printk times during
-suspend/resume or functioning IRQ threads during suspend/resume ?
+However, because of the RT throttling issue, it seems like *all*
+platforms should be using the 'needs_suspend' version always.  But, as
+already pointed out, that makes the timed printk output during
+suspend/resume rather unhelpful.
+
+Having to choose between useful printk times during suspend/resume and
+functioning IRQ threads during suspend/resume isn't a choice I want to
+make.   I'd rather have both.  Any ideas?
 
 Kevin
