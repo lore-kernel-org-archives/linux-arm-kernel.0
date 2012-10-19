@@ -1,63 +1,117 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Fri, 19 Oct 2012 10:58:56 +0000
-Subject: [PATCH 2/3] RTC: omap-rtc: enable pm_runtime
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB43BD9@DBDE01.ent.ti.com>
-References: <1350575631-15523-1-git-send-email-zonque@gmail.com>
- <1350575631-15523-2-git-send-email-zonque@gmail.com>
- <50802A87.9010409@ti.com> <50802C20.9040408@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EB43BD9@DBDE01.ent.ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EA00B18@DBDE01.ent.ti.com>
+From: mporter@ti.com (Matt Porter)
+Date: Fri, 19 Oct 2012 07:15:58 -0400
+Subject: [RFC PATCH v3 00/16] DMA Engine support for AM33XX
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBD29FC@DBDE01.ent.ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBD29FC@DBDE01.ent.ti.com>
+Message-ID: <20121019111558.GD25164@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Thu, Oct 18, 2012 at 22:03:13, Hiremath, Vaibhav wrote:
-> On Thu, Oct 18, 2012 at 21:49:44, Daniel Mack wrote:
-> > On 18.10.2012 18:12, Vaibhav Hiremath wrote:
-
-> > > It would be really helpful if you could test these patches and ack them.
-
-> > Ok, will do tomorrow. What's missing there is support for writing to the
-> > OMAP_RTC_OSC_REG (path 3/3 in my series). Would like me to rebase the
-> > functionality? I need thatkind of setup for my board ...
-
-> This is bit tricky and required more discussion before merging it, 
-> let me reopen the old discussion which I had started some time back -
+On Fri, Oct 19, 2012 at 10:26:20AM +0000, Bedia, Vaibhav wrote:
+> Hi Matt,
 > 
+> On Thu, Oct 18, 2012 at 18:56:39, Porter, Matt wrote:
+> > Changes since v2:
+> > 	- Rebased on 3.7-rc1
+> > 	- Fixed bug in DT/pdata parsing first found by Gururaja
+> > 	  that turned out to be masked by some toolchains
+> > 	- Dropped unused mach-omap2/devices.c hsmmc patch
+> > 	- Added AM33XX crossbar DMA event mux support
+> > 	- Added am335x-evm support
+> > 
+> > Changes since v1:
+> > 	- Rebased on top of mainline from 12250d8
+> > 	- Dropped the feature removal schedule patch
+> > 	- Implemented dma_request_slave_channel_compat() and
+> > 	  converted the mmc and spi drivers to use it
+> > 	- Dropped unneeded #address-cells and #size-cells from
+> > 	  EDMA DT support
+> > 	- Moved private EDMA header to linux/platform_data/ and
+> > 	  removed some unneeded definitions
+> > 	- Fixed parsing of optional properties
+> > 
+> > TODO:
+> > 	- Add dmaengine support for per-channel caps so the
+> > 	  hack to set the maximum segments can be replaced with
+> > 	  a query to the dmaengine driver
+> > 
+> > This series adds DMA Engine support for AM33xx, which uses
+> > an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> > a private API implementation (much like the situation with OMAP
+> > DMA) found on the DaVinci family of SoCs.
+> > 
+> > The series applies on top of 3.7-rc1 and the following patches:
+> > 
+> > 	- GPMC fails to reserve memory fix:
+> > 	  http://www.spinics.net/lists/linux-omap/msg79675.html
+> > 	- TPS65910 regulator fix:
+> > 	  https://patchwork.kernel.org/patch/1593651/
+> > 	- dmaengine DT support from Vinod's dmaengine_dt branch in
+> > 	  git://git.infradead.org/users/vkoul/slave-dma.git since
+> > 	  027478851791df751176398be02a3b1c5f6aa824
+> > 
+> > The approach taken is similar to how OMAP DMA is being converted to
+> > DMA Engine support. With the functional EDMA private API already
+> > existing in mach-davinci/dma.c, we first move that to an ARM common
+> > area so it can be shared. Adding DT and runtime PM support to the
+> > private EDMA API implementation allows it to run on AM33xx. AM33xx
+> > *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> > register EDMA DMAC with the of_dma framework and then add support
+> > for calling the dma_request_slave_channel() API to both the mmc
+> > and spi drivers.
+> > 
+> > With this series both BeagleBone and the AM335x EVM have working
+> > MMC and SPI support.
+> > 
+> > This is tested on BeagleBone with a SPI framebuffer driver and MMC
+> > rootfs. A trivial gpio DMA event misc driver was used to test the
+> > crossbar DMA event support. It is also tested on the AM335x EVM
+> > with the onboard SPI flash and MMC rootfs. The branch at
+> > https://github.com/ohporter/linux/tree/edma-dmaengine-v3 has the
+> > complete series, dependencies, and some test drivers/defconfigs.
+> > 
 > 
-> RTC OSC clock is required to configure clocksource systemtimer for the 
-> kernel, and it is important when you get into PM related features.
+> I didn't see all the patches that you posted on edma-dmaengine-v3
+> but I do seem them on edma-dmaengine-am33xx-v3 branch.
+
+I see I referenced the wrong branch in the cover letter. Thanks for
+testing and noticing this. Sorry to make you hunt for the correct
+branch in that repo. ;) 
+
+https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v3
+is indeed the correct branch for those wanting to pull this in or
+grab some of the not-to-be-merged drivers I used for testing.
+
+> I added a couple of patches to enable earlyprintk and build the DTB
+> appended kernel image uImage-dtb.am335x-evm
 > 
-> Please refer the below commit for more reference,
+> Here's what i see
 > 
-> http://marc.info/?l=u-boot&m=135057734713796&w=2
+> [...]
 
-Newer version (v4) of omap rtc patches for am335x has been
-posted, "rtc: omap dt support (for am33xx)".
-In case you can test, please do it over the new series.
+<snip>
 
-You would need also need DT patch that adds DT node to
-test (it has been separated from the series as it is
-felt that it should not be part of same series),
-"arm/dts: am33xx rtc node"
+> [    0.175354] edma: probe of 49000000.edma failed with error -16
 
-If you are using mainline uboot, you would need the fix as
-mentioned by Vaibhav H (as in the link he provided above),
-expecting it to reach uboot mainline soon.
+I missed an uninitialized pdata case in the bug fixes mentioned in
+the changelog and the folks previously failing the same way didn't
+hit the case I suspect you are hitting. Can you try this and let me
+know how it works?
 
-If the above is being attempted to achieve in Kernel it
-would cause 2-3 seconds delay in boot time (else it had
-to be made a module), please refer link provided by
-Vaibhav H for more details.
+Thanks,
+Matt
 
-else you can do in current mainline uboot,
-
-mw.l 0x44e3e06c 0x83e70b13
-mw.l 0x44e3e070 0x95a4f1e0
-mw.b 0x44e3e054 0x48
-
-and then boot kernel.
-
-Regards
-Afzal
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index b761b7a..b43b327 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -1619,7 +1619,7 @@ static int __init edma_probe(struct platform_device *pdev)
+ 
+ 	if (node) {
+ 		pdata = devm_kzalloc(dev,
+-				     sizeof(struct edma_soc_info),
++				     EDMA_MAX_CC*sizeof(struct edma_soc_info),
+ 				     GFP_KERNEL);
+ 		edma_of_parse_dt(dev, node, pdata);
+ 		info = &pdata;
