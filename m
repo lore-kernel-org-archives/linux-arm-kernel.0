@@ -1,43 +1,78 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Fri, 19 Oct 2012 10:16:12 +0800
-Subject: [PATCH 01/10] pinctrl: use postcore_initcall
-In-Reply-To: <20121018222802.GG30550@atomide.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <5080802B.3000209@wwwdotorg.org>
- <20121018222802.GG30550@atomide.com>
-Message-ID: <CAN1soZy17wO2s7WoRSRod8k5Zh7fuUc1gxhQiHEb0=zwLhyj6A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 18 Oct 2012 19:20:01 -0700
+Subject: [PATCH 0/2] omap plat/usb.h removal for v3.8 merge window
+Message-ID: <20121019021816.6693.65985.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 6:28 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Stephen Warren <swarren@wwwdotorg.org> [121018 15:20]:
->> On 10/18/2012 03:06 AM, Haojian Zhuang wrote:
->> > Since pins are configured in device driver, pinctrl driver should be
->> > loaded by those device driver. module_platform_driver() only declares
->> > pinctrl driver is in module_initcall privilege. Use postcore_initcall
->> > privilege instead.
->>
->> I'm not convinced this is needed; doesn't deferred probe sort out the
->> dependencies correctly?
->
-> I'm a bit concerned about this need too as the trend is towards
-> initializing things later than earlier. The drivers/Makefile order
-> and deferred probe should be already enough?
->
-> Specifically could you decribe the cases where this issue happens?
-> Also check if one of your client drivers has some early initcall
-> that's no longer needed.
->
-> Regards,
->
-> Tony
+Hi all,
 
-Yes, the special case is PMIC. Most of PMIC are based on I2C/SPI bus.
-It means that I2C/SPI bus driver should be initialized firstly. For example,
-we could find that PMIC mfd driver are initialized in subsys init call level.
-It means that pinctrl should be initialized earlier than I2C/SPI bus driver.
-Otherwise, pins of I2C bus may not be configured as I2C function since
-pinctrl driver is module init call level.
+Here are two patches against v3.7-rc1 to remove
+plat/usb.h.
 
-Regards
-Haojian
+Once people are happy with these, I'll apply these
+into omap-for-v3.8/cleanup-headers-usb branch so
+usb and mfd trees can also pull these in if needed.
+
+Regards,
+
+Tony
+
+---
+
+Felipe Balbi (1):
+      ARM: OMAP: move OMAP USB platform data to <linux/platform_data/omap-usb.h>
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Introduce local usb.h
+
+
+ arch/arm/mach-omap1/clock.c                  |    1 
+ arch/arm/mach-omap2/board-2430sdp.c          |    1 
+ arch/arm/mach-omap2/board-3430sdp.c          |    1 
+ arch/arm/mach-omap2/board-3630sdp.c          |    1 
+ arch/arm/mach-omap2/board-4430sdp.c          |    2 
+ arch/arm/mach-omap2/board-am3517crane.c      |    1 
+ arch/arm/mach-omap2/board-am3517evm.c        |    2 
+ arch/arm/mach-omap2/board-cm-t35.c           |    1 
+ arch/arm/mach-omap2/board-cm-t3517.c         |    1 
+ arch/arm/mach-omap2/board-devkit8000.c       |    1 
+ arch/arm/mach-omap2/board-igep0020.c         |    1 
+ arch/arm/mach-omap2/board-ldp.c              |    1 
+ arch/arm/mach-omap2/board-omap3beagle.c      |    1 
+ arch/arm/mach-omap2/board-omap3evm.c         |    2 
+ arch/arm/mach-omap2/board-omap3logic.c       |    1 
+ arch/arm/mach-omap2/board-omap3pandora.c     |    1 
+ arch/arm/mach-omap2/board-omap3stalker.c     |    1 
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    1 
+ arch/arm/mach-omap2/board-omap4panda.c       |    2 
+ arch/arm/mach-omap2/board-overo.c            |    1 
+ arch/arm/mach-omap2/board-rm680.c            |    1 
+ arch/arm/mach-omap2/board-rx51.c             |    2 
+ arch/arm/mach-omap2/board-ti8168evm.c        |    3 
+ arch/arm/mach-omap2/board-zoom-peripherals.c |    1 
+ arch/arm/mach-omap2/board-zoom.c             |    1 
+ arch/arm/mach-omap2/common.h                 |    2 
+ arch/arm/mach-omap2/omap_phy_internal.c      |    4 -
+ arch/arm/mach-omap2/twl-common.c             |    1 
+ arch/arm/mach-omap2/usb-host.c               |    2 
+ arch/arm/mach-omap2/usb-musb.c               |    2 
+ arch/arm/mach-omap2/usb-tusb6010.c           |    1 
+ arch/arm/mach-omap2/usb.h                    |   82 ++++++++++++
+ arch/arm/plat-omap/include/plat/usb.h        |  179 --------------------------
+ drivers/mfd/omap-usb-host.c                  |    5 +
+ drivers/mfd/omap-usb-tll.c                   |    2 
+ drivers/mfd/omap-usb.h                       |    2 
+ drivers/usb/host/ehci-omap.c                 |    3 
+ drivers/usb/host/ohci-omap3.c                |    1 
+ drivers/usb/musb/am35x.c                     |    3 
+ drivers/usb/musb/musb_dsps.c                 |    3 
+ drivers/usb/musb/omap2430.h                  |    2 
+ include/linux/platform_data/usb-omap.h       |   80 ++++++++++++
+ 42 files changed, 188 insertions(+), 218 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/usb.h
+ delete mode 100644 arch/arm/plat-omap/include/plat/usb.h
+ create mode 100644 drivers/mfd/omap-usb.h
+ create mode 100644 include/linux/platform_data/usb-omap.h
+
+-- 
