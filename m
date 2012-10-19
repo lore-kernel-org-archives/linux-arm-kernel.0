@@ -1,45 +1,57 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Fri, 19 Oct 2012 21:04:31 +0530
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <5076B166.2020006@gmail.com>
-References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
-Message-ID: <50817307.50509@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 19 Oct 2012 09:48:56 -0600
+Subject: [PATCH] ARM: dt: tegra: ventana: define pinmux for ddc
+In-Reply-To: <1350626311-18131-1-git-send-email-markz@nvidia.com>
+References: <1350626311-18131-1-git-send-email-markz@nvidia.com>
+Message-ID: <50817668.6020709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 10/18/2012 11:58 PM, Mark Zhang wrote:
+> Define pinmux for DDC. The DDC pinmux in Ventana is 2 pins in I2C2.
 
-On Thursday 11 October 2012 05:15 PM, Daniel Mack wrote:
+> +++ b/arch/arm/boot/dts/tegra20-ventana.dts
 
-> Could you tell me which patches I need on top of soon-to-be-3.7-rc1? I
-> would like to augment this to make GPMC attached NAND probable in DT, in
-> case this is still an open topic.
+> -			ddc {
+> -				nvidia,pins = "ddc", "owc", "spdi", "spdo",
+> -					"uac";
+> -				nvidia,function = "rsvd2";
+> -			};
 
-In case you can help on making gpmc nand dt probable, please
-proceed. I would be on vacation next week, may be we can
-discuss after I am back.
+So that removes the entries for 5 pin groups, yet below, entries are
+only added for the ddc and pta pingroups, so the other 4 pin groups
+become unconfigured.
 
-am335x based boards like beagle bone should be booting on
-l-o master and it has gpmc header cleanup changes with
-minimal driver support.
+> +
+> +		state_i2cmux_ddc: pinmux_i2cmux_ddc {
+> +			ddc {
+> +				nvidia,pins = "ddc";
+> +				nvidia,function = "i2c2";
+> +			};
+> +			pta {
+> +				nvidia,pins = "pta";
+> +				nvidia,function = "rsvd4";
+> +			};
 
-As I don't have the sufficient time to explain in detail, some
-pointers. Discussion between us [1] hopefully explains it in brief.
-It would be like peripherals connected to gpmc being represented
-as child nodes in dt. gpmc driver probably in probe would have to
-invoke of_platform_populate to create child nodes (for devices like
-nand). And driver would have to be enhanced to configure gpmc
-based on information passed through dt for each child nodes.
-Or roughly have a dt equivalent of driver as in [2].
+Does this actually work? The pta pingroup is configured by the "hog"
+pinctrl state of the pinctrl node itself, so this state should fail to
+be applied since it attempts to touch the same pingroup.
 
-One issue would be the memory resource creation by gpmc
-driver and which has to be provided to client resource data.
-And a decision has to be taken whether a generic routine is
-going to be used or initially a custom routine invocation
-based on child compatible fields would be sufficient.
+> +	i2cmux {
+...
+> +		i2c at 1 {
+> +			reg = <1>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			smart-battery at b {
+> +				compatible = "ti,bq24617", "smart-battery-1.1";
+> +				reg = <0xb>;
+> +				ti,i2c-retry-count = <2>;
+> +				ti,poll-retry-count = <10>;
+> +			};
 
-Regards
-Afzal
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg74397.html
-[2] git://gitorious.org/x0148406-public/linux-kernel tags/gpmc-drv-v6
+That wasn't there before. Does that device actually exist on Ventana?
+Adding it should be a separate patch if so, since this one is just about
+introducing the I2C mux, not adding an SBS device. Was this all just
+cut/paste from Seaboard without validation?
