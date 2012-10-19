@@ -1,48 +1,60 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 19 Oct 2012 13:51:12 +0200
-Subject: [PATCH RFC 02/15 v5] gpio: Add sysfs support to block GPIO API
-In-Reply-To: <CACRpkda35jKs9YVNDAo96=0QzdMi+jkvJAzM=nX+HCK-d5+e9Q@mail.gmail.com>
-References: <1350477107-26512-1-git-send-email-stigge@antcom.de>
- <1350477107-26512-3-git-send-email-stigge@antcom.de>
- <20121017190520.GC25996@kroah.com> <507FD4EB.1080204@antcom.de>
- <CACRpkda35jKs9YVNDAo96=0QzdMi+jkvJAzM=nX+HCK-d5+e9Q@mail.gmail.com>
-Message-ID: <50813EB0.9040102@antcom.de>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Fri, 19 Oct 2012 12:02:42 +0000
+Subject: [RFC PATCH v3 00/16] DMA Engine support for AM33XX
+In-Reply-To: <20121019111558.GD25164@beef>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBD29FC@DBDE01.ent.ti.com>
+ <20121019111558.GD25164@beef>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EBD2CE1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2012 12:35 PM, Linus Walleij wrote:
-> On Thu, Oct 18, 2012 at 12:07 PM, Roland Stigge <stigge@antcom.de> wrote:
->> On 10/17/2012 09:05 PM, Greg KH wrote:
->>>>
->>>> +    if (value != exported) {
->>>> +            if (value)
->>>> +                    status = gpio_block_value_export(block);
->>>> +            else
->>>> +                    status = gpio_block_value_unexport(block);
->>>
->>> That looks like a recipie for disaster.  Why do you allow userspace to
->>> do this?
->>
->> Exporting for gpio blocks is done as follows: writing "1" to the
->> "exported" _device_ attribute of the gpio block creates the "values"
->> attribute and at the same time requests the whole block (including all
->> of its gpios) as "sysfs".
+On Fri, Oct 19, 2012 at 16:45:58, Porter, Matt wrote:
+> On Fri, Oct 19, 2012 at 10:26:20AM +0000, Bedia, Vaibhav wrote:
+[...]
+> > 
+> > I didn't see all the patches that you posted on edma-dmaengine-v3
+> > but I do seem them on edma-dmaengine-am33xx-v3 branch.
 > 
-> To me it reads like Greg's comment is basically pinpointing a flaw
-> in Brownell's initial design of gpio sysfs: that new sysfs files are
-> created and destroyed by writing into sysfs */export files from
-> userspace?
+> I see I referenced the wrong branch in the cover letter. Thanks for
+> testing and noticing this. Sorry to make you hunt for the correct
+> branch in that repo. ;) 
 > 
-> See commit: d8f388d8dc8d4f36539dd37c1fff62cc404ea0fc
+
+No problem.
+
+> https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v3
+> is indeed the correct branch for those wanting to pull this in or
+> grab some of the not-to-be-merged drivers I used for testing.
 > 
-> The block GPIO stuff is just following that design pattern.
+> > I added a couple of patches to enable earlyprintk and build the DTB
+> > appended kernel image uImage-dtb.am335x-evm
+> > 
+> > Here's what i see
+> > 
+> > [...]
+> 
+> <snip>
+> 
+> > [    0.175354] edma: probe of 49000000.edma failed with error -16
+> 
+> I missed an uninitialized pdata case in the bug fixes mentioned in
+> the changelog and the folks previously failing the same way didn't
+> hit the case I suspect you are hitting. Can you try this and let me
+> know how it works?
+> 
 
-So what do you think about my just proposed idea of always having the
-"value" argument present, but only useable when "exported" is "1"? Now
-only talking about the block gpios, but later maybe also for gpios?
+That doesn't help :(
 
-But I would only do this if you and Greg consider it reasonable.
+Looking at the original crash log, I suspect something is not correct
+with the irq portion, probably in the DT or the driver. 
 
-Thanks in advance,
+"genirq: Flags mismatch irq 28. 00000000 (edma) vs. 00000000 (edma)"
 
-Roland
+The warning below that is coming due to fail case in edma_probe not tracking
+the request_irq status properly and but IMO that's a separate issue.
+
+BTW, I am trying this on the EVM.
+
+Regards,
+Vaibhav
