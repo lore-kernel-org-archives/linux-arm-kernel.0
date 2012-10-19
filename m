@@ -1,182 +1,108 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 18 Oct 2012 20:55:34 -0700
-Subject: [PATCH net-next 03/21] arch: Convert is_<foo>_ether_addr uses to
- eth_addr_<foo>
-In-Reply-To: <cover.1350618006.git.joe@perches.com>
-References: <cover.1350618006.git.joe@perches.com>
-Message-ID: <58e119fbf38f7559473930089a642ed57d118459.1350618009.git.joe@perches.com>
+From: preeti@linux.vnet.ibm.com (preeti)
+Date: Fri, 19 Oct 2012 09:47:21 +0530
+Subject: [RFC PATCH 0/2] sched: Load Balancing using
+ Per-entity-Load-tracking
+In-Reply-To: <20121018172609.GA14473@e103034-lin>
+References: <20121012044618.18271.88332.stgit@preeti.in.ibm.com>
+ <20121018172609.GA14473@e103034-lin>
+Message-ID: <5080D451.5090409@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the old ether_addr tests to eth_addr_<foo>.
-Adds api consistency.
+Hi Morten,
+Thank you very much for your review.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/mach-davinci/board-mityomapl138.c |    2 +-
- arch/arm/mach-pxa/colibri-pxa3xx.c         |    2 +-
- arch/avr32/boards/atngw100/setup.c         |    2 +-
- arch/avr32/boards/atstk1000/atstk1002.c    |    2 +-
- arch/avr32/boards/favr-32/setup.c          |    2 +-
- arch/avr32/boards/hammerhead/setup.c       |    2 +-
- arch/avr32/boards/merisc/setup.c           |    2 +-
- arch/avr32/boards/mimc200/setup.c          |    2 +-
- arch/mips/alchemy/common/platform.c        |    4 ++--
- arch/um/drivers/net_kern.c                 |    6 +++---
- 10 files changed, 13 insertions(+), 13 deletions(-)
+>> 1.Consider a scenario,where there are two 10% tasks running on a cpu.The
+>>   present code will consider the load on this queue to be 2048,while
+>>   using PJT's metric the load is calculated to be <1000,rarely exceeding this
+>>   limit.Although the tasks are not contributing much to the cpu load,they are
+>>   decided to be moved by the scheduler.
+> 
+> I guess that you assume, for now, that all tasks have default (nice 0)
+> priority? Both the old load and the PJT metric (tracked load) depends on
+> priority.
+Thats right.I have assumed default priority of the tasks.
+> 
+>>
+>>   But one could argue that 'not moving one of these tasks could throttle
+>>   them.If there was an idle cpu,perhaps we could have moved them'.While the
+>>   power save mode would have been fine with not moving the task,the
+>>   performance mode would prefer not to throttle the tasks.We could strive
+>>   to strike a balance by making this decision tunable with certain parameters.
+>>   This patchset includes such tunables.This issue is addressed in Patch[1/2].
+>>
+> 
+> One could also argue that long as there are spare cpu cycles in each
+> schedule period then all tasks have received the cpu time they needed.
+> So from that point of view performance isn't affected by not balancing
+> the tasks as long as the cpu is not fully utilized. If we look at the
+> problem from a latency point of view then packing tasks on a single cpu
+> will increase latency but the increase will be bounded by the schedule
+> period.
+> 
+Assume that at the end of one scheduling period,there are a few spare
+cycles on the cpu.this is fine from both the performance and latency
+point of view at *this* point.nobody is waiting for the cpu.
 
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 43e4a0d..df45c9c 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -138,7 +138,7 @@ static void read_factory_config(struct memory_accessor *a, void *context)
- 	}
- 
- 	pr_info("MityOMAPL138: Found MAC = %pM\n", factory_config.mac);
--	if (is_valid_ether_addr(factory_config.mac))
-+	if (eth_addr_valid(factory_config.mac))
- 		memcpy(soc_info->emac_pdata->mac_addr,
- 			factory_config.mac, ETH_ALEN);
- 	else
-diff --git a/arch/arm/mach-pxa/colibri-pxa3xx.c b/arch/arm/mach-pxa/colibri-pxa3xx.c
-index 8240291..839040c 100644
---- a/arch/arm/mach-pxa/colibri-pxa3xx.c
-+++ b/arch/arm/mach-pxa/colibri-pxa3xx.c
-@@ -52,7 +52,7 @@ void __init colibri_pxa3xx_init_eth(struct ax_plat_data *plat_data)
- 		serial >>= 8;
- 	}
- 
--	if (is_valid_ether_addr(ether_mac_addr)) {
-+	if (eth_addr_valid(ether_mac_addr)) {
- 		plat_data->flags |= AXFLG_MAC_FROMPLATFORM;
- 		plat_data->mac_addr = ether_mac_addr;
- 		printk(KERN_INFO "%s(): taking MAC from serial boot tag\n",
-diff --git a/arch/avr32/boards/atngw100/setup.c b/arch/avr32/boards/atngw100/setup.c
-index afeae89..5f7d86d 100644
---- a/arch/avr32/boards/atngw100/setup.c
-+++ b/arch/avr32/boards/atngw100/setup.c
-@@ -175,7 +175,7 @@ static void __init set_hw_addr(struct platform_device *pdev)
- 		return;
- 
- 	addr = hw_addr[pdev->id].addr;
--	if (!is_valid_ether_addr(addr))
-+	if (!eth_addr_valid(addr))
- 		return;
- 
- 	/*
-diff --git a/arch/avr32/boards/atstk1000/atstk1002.c b/arch/avr32/boards/atstk1000/atstk1002.c
-index 6c80aba..7334686 100644
---- a/arch/avr32/boards/atstk1000/atstk1002.c
-+++ b/arch/avr32/boards/atstk1000/atstk1002.c
-@@ -189,7 +189,7 @@ static void __init set_hw_addr(struct platform_device *pdev)
- 		return;
- 
- 	addr = hw_addr[pdev->id].addr;
--	if (!is_valid_ether_addr(addr))
-+	if (!eth_addr_valid(addr))
- 		return;
- 
- 	/*
-diff --git a/arch/avr32/boards/favr-32/setup.c b/arch/avr32/boards/favr-32/setup.c
-index 27bd6fb..0b76aa7 100644
---- a/arch/avr32/boards/favr-32/setup.c
-+++ b/arch/avr32/boards/favr-32/setup.c
-@@ -196,7 +196,7 @@ static void __init set_hw_addr(struct platform_device *pdev)
- 		return;
- 
- 	addr = hw_addr[pdev->id].addr;
--	if (!is_valid_ether_addr(addr))
-+	if (!eth_addr_valid(addr))
- 		return;
- 
- 	/*
-diff --git a/arch/avr32/boards/hammerhead/setup.c b/arch/avr32/boards/hammerhead/setup.c
-index 9d1efd1..d64fa9f 100644
---- a/arch/avr32/boards/hammerhead/setup.c
-+++ b/arch/avr32/boards/hammerhead/setup.c
-@@ -139,7 +139,7 @@ static void __init set_hw_addr(struct platform_device *pdev)
- 
- 	addr = hw_addr[pdev->id].addr;
- 
--	if (!is_valid_ether_addr(addr))
-+	if (!eth_addr_valid(addr))
- 		return;
- 
- 	/*
-diff --git a/arch/avr32/boards/merisc/setup.c b/arch/avr32/boards/merisc/setup.c
-index ed137e3..817d2d8 100644
---- a/arch/avr32/boards/merisc/setup.c
-+++ b/arch/avr32/boards/merisc/setup.c
-@@ -129,7 +129,7 @@ static void __init set_hw_addr(struct platform_device *pdev)
- 		return;
- 
- 	addr = hw_addr[pdev->id].addr;
--	if (!is_valid_ether_addr(addr))
-+	if (!eth_addr_valid(addr))
- 		return;
- 
- 	regs = (void __iomem __force *)res->start;
-diff --git a/arch/avr32/boards/mimc200/setup.c b/arch/avr32/boards/mimc200/setup.c
-index 05358aa..31cd87e 100644
---- a/arch/avr32/boards/mimc200/setup.c
-+++ b/arch/avr32/boards/mimc200/setup.c
-@@ -152,7 +152,7 @@ static void __init set_hw_addr(struct platform_device *pdev)
- 		return;
- 
- 	addr = hw_addr[pdev->id].addr;
--	if (!is_valid_ether_addr(addr))
-+	if (!eth_addr_valid(addr))
- 		return;
- 
- 	/*
-diff --git a/arch/mips/alchemy/common/platform.c b/arch/mips/alchemy/common/platform.c
-index c0f3ce6..5f07da3 100644
---- a/arch/mips/alchemy/common/platform.c
-+++ b/arch/mips/alchemy/common/platform.c
-@@ -343,7 +343,7 @@ static void __init alchemy_setup_macs(int ctype)
- 	au1xxx_eth0_device.resource = macres;
- 
- 	i = prom_get_ethernet_addr(ethaddr);
--	if (!i && !is_valid_ether_addr(au1xxx_eth0_platform_data.mac))
-+	if (!i && !eth_addr_valid(au1xxx_eth0_platform_data.mac))
- 		memcpy(au1xxx_eth0_platform_data.mac, ethaddr, 6);
- 
- 	ret = platform_device_register(&au1xxx_eth0_device);
-@@ -364,7 +364,7 @@ static void __init alchemy_setup_macs(int ctype)
- 	au1xxx_eth1_device.resource = macres;
- 
- 	ethaddr[5] += 1;	/* next addr for 2nd MAC */
--	if (!i && !is_valid_ether_addr(au1xxx_eth1_platform_data.mac))
-+	if (!i && !eth_addr_valid(au1xxx_eth1_platform_data.mac))
- 		memcpy(au1xxx_eth1_platform_data.mac, ethaddr, 6);
- 
- 	/* Register second MAC if enabled in pinfunc */
-diff --git a/arch/um/drivers/net_kern.c b/arch/um/drivers/net_kern.c
-index b1314eb..47e11e7 100644
---- a/arch/um/drivers/net_kern.c
-+++ b/arch/um/drivers/net_kern.c
-@@ -312,19 +312,19 @@ static int setup_etheraddr(char *str, unsigned char *addr, char *name)
- 		}
- 		str = end + 1;
- 	}
--	if (is_multicast_ether_addr(addr)) {
-+	if (eth_addr_multicast(addr)) {
- 		printk(KERN_ERR
- 		       "Attempt to assign a multicast ethernet address to a "
- 		       "device disallowed\n");
- 		goto random;
- 	}
--	if (!is_valid_ether_addr(addr)) {
-+	if (!eth_addr_valid(addr)) {
- 		printk(KERN_ERR
- 		       "Attempt to assign an invalid ethernet address to a "
- 		       "device disallowed\n");
- 		goto random;
- 	}
--	if (!is_local_ether_addr(addr)) {
-+	if (!eth_addr_local(addr)) {
- 		printk(KERN_WARNING
- 		       "Warning: Assigning a globally valid ethernet "
- 		       "address to a device\n");
--- 
-1.7.8.111.gad25c.dirty
+The issue arises if it is detected that these spare cycles are due to
+*sleeping tasks* and not due to no tasks.
+
+At this point a decision needs to be made as to: if a scenario arises
+where all these tasks wake up at the same time in the future,and wait on
+the cpu,then are we ok with them waiting.Both performance and latency
+views could be against this,as this also means less throughput.But
+performance view could go slightly easy on this to argue,that its ok if
+2-3 tasks wait,if more,then there is a need to move them.
+>>   This patchset therefore has two primary aims.
+>>          Patch[1/2]: This patch aims at detecting short running tasks and
+>> 	 prevent their movement.In update_sg_lb_stats,dismiss a sched group
+>> 	 as a candidate for load balancing,if load calculated by PJT's metric
+>> 	 says that the average load on the sched_group <= 1024+(.15*1024).
+>> 	 This is a tunable,which can be varied after sufficient experiments.
+> 
+> Your current threshold implies that there must be at least two (nice 0)
+> tasks running breach the threshold and they need to be quite busy. This
+> makes sense to me. When you have more tasks they are more likely to be
+> waiting on the runqueue even if it is only 10% tasks. Let's say you have
+> five 10% tasks and they all become runnable at the same instant. In that
+> case some of the tasks would have a tracked load which is much higher
+> than if we only had two 10% tasks running. So if I'm not mistaken, it
+> would be possible to breach the threshold even though the overall cpu
+> utilization is only 50% and it would have been safe not to load-balance
+> that cpu.
+> 
+> Do you think it would make sense to let the threshold depend on the
+> number of task on the cpu somehow? 
+
+You are right,Morten.In fact I have included this viewpoint in both my
+first and second patch enclosed by this. So lets take up the above
+scenario.if there are 5 10% tasks running,they will surely cross the
+threshold,but the cpu might have spare cycles at the end of a scheduling
+period.Now that is your concern.
+
+Again we have two different viewpoints.This threshold is like a tuning
+knob.we could increase it if we feel that this threshold gets reached
+very quickly with as few tasks as 5, although the cpu utilization is
+poor.we prefer not to wake up another cpu unless the present cpu is
+aptly loaded.we could call this the power saving view.
+
+Else we could say that,we are not intending to affect the throughput of
+tasks,so we prefer the knob be at this value,so that we qualify such a
+load as a candidate for load balancing.we could call this the
+performance view.
+> 
+> Alternative, the decision could be based on the cpu idle time over the
+> last schedule period. A cpu with no or very few spare cycles in the last
+> schedule period would be a good candidate for load-balancing. Latency
+> would be affected as mentioned earlier.
+> 
+Exactly.idle_time == spare_cpu_cycles == less cpu_utilization.I hope i
+am not wrong in drawing this equivalence.if thats the case then the same
+explanation as above holds good here too.
+> 
+> Morten
+
+Thank you
+
+Regards
+Preeti
