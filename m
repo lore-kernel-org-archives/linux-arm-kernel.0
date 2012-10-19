@@ -1,32 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 18 Oct 2012 16:52:46 -0700
-Subject: [PATCH v3 0/6] OMAP: iommu: hwmod, reset handling and runtime PM
-In-Reply-To: <CALLhW=5Fmjhd+w57Dmm2BLmBoHuC7_jprJndkw1dHoVzVu4TOg@mail.gmail.com>
-References: <1350003977-32744-1-git-send-email-omar.luna@linaro.org>
- <20121016172258.GT15569@atomide.com>
- <CALLhW=5Fmjhd+w57Dmm2BLmBoHuC7_jprJndkw1dHoVzVu4TOg@mail.gmail.com>
-Message-ID: <20121018235246.GK30550@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 18 Oct 2012 21:04:05 -0300
+Subject: [PATCH v2 1/2] ARM: multi_v7_defconfig: Add ARCH_MXC
+Message-ID: <1350605046-21358-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Omar,
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-* Omar Ramirez Luna <omar.luna@linaro.org> [121017 16:54]:
-> On 16 October 2012 12:22, Tony Lindgren <tony@atomide.com> wrote:
->
-> > These will need to be rebased on omap-for-v3.8/cleanup-headers-iommu
-> > when I have that pushed out as that removes plat/*iommu*.h files.
-> 
-> Ok, will wait and rebase on top of it.
+Let ARCH_MXC be covered by multi_v7_defconfig.
 
-Thanks, the related patches are now posted in thread
-"[PATCH v3 0/6] omap iommu changes to remove plat includes".
+Allow booting mx6 via NFS.
 
-Also, can you please take a look at the "Updated status of the removal
-of plat headers" thread?
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Provide a more complete config that allows booting mx6 via NFS
 
-I've tagged you to remove the omap plat/mailbox.h :) 
+ arch/arm/configs/multi_v7_defconfig |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 159f75f..df1e563 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -5,6 +5,8 @@ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_IMX6Q=y
+ CONFIG_ARCH_SOCFPGA=y
+ # CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+ CONFIG_ARM_ERRATA_754322=y
+@@ -17,18 +19,29 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
+ CONFIG_ATA=y
+ CONFIG_SATA_HIGHBANK=y
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_SMSC911X=y
+ CONFIG_STMMAC_ETH=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
+ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++CONFIG_SERIAL_IMX=y
++CONFIG_SERIAL_IMX_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_IPMI_HANDLER=y
+ CONFIG_IPMI_SI=y
+-- 
+1.7.9.5
