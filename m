@@ -1,227 +1,95 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 19 Oct 2012 14:38:13 +0800
-Subject: [PATCH] ARM: tegra30: clocks: add AHB and APB clocks
-Message-ID: <1350628693-1190-1-git-send-email-josephl@nvidia.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Fri, 19 Oct 2012 14:42:09 +0800
+Subject: [PATCH v2] ARM: pxa: hx4700: Fix backlight PWM device number
+In-Reply-To: <20120927182951.GA4639@avionic-0098.mockup.avionic-design.de>
+References: <50631868.3000205@yahoo.com>
+ <20120927182951.GA4639@avionic-0098.mockup.avionic-design.de>
+Message-ID: <CAN1soZyqSYPX-L22UknrfXQ20LCeBgBfaiqcTGFp1xTj+SHvvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the AHB and APB bus clock control interface for Tegra30.
+On Fri, Sep 28, 2012 at 2:29 AM, Thierry Reding
+<thierry.reding@avionic-design.de> wrote:
+> On Wed, Sep 26, 2012 at 03:59:52PM +0100, Paul Parsons wrote:
+>> Recent changes to PXA PWM support changed the PXA27X PWM device
+>> numbering scheme.
+>>
+>> The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
+>> the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
+>> numbering scheme:
+>>
+>> Address               Hardware        3.5 pwm_id      3.6-rc1 pwm_id
+>> 0x40b00000    PWM0            0               0
+>> 0x40b00010    PWM2            2               1
+>> 0x40c00000    PWM1            1               2
+>> 0x40c00010    PWM3            3               3
+>>
+>> The hx4700 backlight uses PWM1 at 0x40c00000. Consequently the pwm_id
+>> must be changed from 1 to 2.
+>>
+>> This patch fixes the backlight PWM device number and at the same time
+>> moves from the legacy PWM API (pwm_id) to the new PWM API (pwm_lookup).
+>>
+>> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+>> Cc: Thierry Reding <thierry.reding@avionic-design.de>
+>> ---
+>>
+>> V2: Switch from legacy PWM API to new PWM API.
+>>
+>>  arch/arm/mach-pxa/hx4700.c |    8 +++++++-
+>>  1 files changed, 7 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+>> index e631198..d66f9f9 100644
+>> --- a/arch/arm/mach-pxa/hx4700.c
+>> +++ b/arch/arm/mach-pxa/hx4700.c
+>> @@ -28,6 +28,7 @@
+>>  #include <linux/mfd/asic3.h>
+>>  #include <linux/mtd/physmap.h>
+>>  #include <linux/pda_power.h>
+>> +#include <linux/pwm.h>
+>>  #include <linux/pwm_backlight.h>
+>>  #include <linux/regulator/driver.h>
+>>  #include <linux/regulator/gpio-regulator.h>
+>> @@ -556,7 +557,7 @@ static struct platform_device hx4700_lcd = {
+>>   */
+>>
+>>  static struct platform_pwm_backlight_data backlight_data = {
+>> -     .pwm_id         = 1,
+>> +     .pwm_id         = -1,   /* Superseded by pwm_lookup */
+>
+> It doesn't actually matter what this is set to, but -1 is probably a
+> good marker that the field is invalid.
+>
+>>       .max_brightness = 200,
+>>       .dft_brightness = 100,
+>>       .pwm_period_ns  = 30923,
+>> @@ -571,6 +572,10 @@ static struct platform_device backlight = {
+>>       },
+>>  };
+>>
+>> +static struct pwm_lookup hx4700_pwm_lookup[] = {
+>> +     PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL),
+>> +};
+>> +
+>>  /*
+>>   * USB "Transceiver"
+>>   */
+>> @@ -872,6 +877,7 @@ static void __init hx4700_init(void)
+>>       pxa_set_stuart_info(NULL);
+>>
+>>       platform_add_devices(devices, ARRAY_SIZE(devices));
+>> +     pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
+>>
+>>       pxa_set_ficp_info(&ficp_info);
+>>       pxa27x_set_i2c_power_info(NULL);
+>
+> Reviewed-by: Thierry Reding <thierry.reding@avionic-design.de>
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/common.c              |    4 +
- arch/arm/mach-tegra/tegra30_clocks.c      |  106 +++++++++++++++++++++++++++++
- arch/arm/mach-tegra/tegra30_clocks.h      |    1 +
- arch/arm/mach-tegra/tegra30_clocks_data.c |   46 +++++++++++++
- 4 files changed, 157 insertions(+), 0 deletions(-)
+Paul,
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 0b0a5f5..177f164 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -104,6 +104,10 @@ static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
- 	{ "clk_m",	NULL,		0,		true },
- 	{ "pll_p",	"clk_m",	408000000,	true },
- 	{ "pll_p_out1",	"pll_p",	9600000,	true },
-+	{ "pll_p_out4",	"pll_p",	102000000,	true },
-+	{ "sclk",	"pll_p_out4",	102000000,	true },
-+	{ "hclk",	"sclk",		102000000,	true },
-+	{ "pclk",	"hclk",		51000000,	true },
- 	{ NULL,		NULL,		0,		0},
- };
- #endif
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
-index e9de5df..875744f 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks.c
-@@ -792,6 +792,112 @@ struct clk_ops tegra30_twd_ops = {
- 	.recalc_rate = tegra30_twd_clk_recalc_rate,
- };
- 
-+/* bus clock functions */
-+static int tegra30_bus_clk_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_tegra *c = to_clk_tegra(hw);
-+	u32 val = clk_readl(c->reg);
-+
-+	c->state = ((val >> c->reg_shift) & BUS_CLK_DISABLE) ? OFF : ON;
-+	return c->state;
-+}
-+
-+static int tegra30_bus_clk_enable(struct clk_hw *hw)
-+{
-+	struct clk_tegra *c = to_clk_tegra(hw);
-+	u32 val;
-+
-+	val = clk_readl(c->reg);
-+	val &= ~(BUS_CLK_DISABLE << c->reg_shift);
-+	clk_writel(val, c->reg);
-+
-+	return 0;
-+}
-+
-+static void tegra30_bus_clk_disable(struct clk_hw *hw)
-+{
-+	struct clk_tegra *c = to_clk_tegra(hw);
-+	u32 val;
-+
-+	val = clk_readl(c->reg);
-+	val |= BUS_CLK_DISABLE << c->reg_shift;
-+	clk_writel(val, c->reg);
-+}
-+
-+static unsigned long tegra30_bus_clk_recalc_rate(struct clk_hw *hw,
-+			unsigned long prate)
-+{
-+	struct clk_tegra *c = to_clk_tegra(hw);
-+	u32 val = clk_readl(c->reg);
-+	u64 rate = prate;
-+
-+	c->div = ((val >> c->reg_shift) & BUS_CLK_DIV_MASK) + 1;
-+	c->mul = 1;
-+
-+	if (c->mul != 0 && c->div != 0) {
-+		rate *= c->mul;
-+		rate += c->div - 1; /* round up */
-+		do_div(rate, c->div);
-+	}
-+	return rate;
-+}
-+
-+static int tegra30_bus_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-+		unsigned long parent_rate)
-+{
-+	struct clk_tegra *c = to_clk_tegra(hw);
-+	int ret = -EINVAL;
-+	u32 val;
-+	int i;
-+
-+	val = clk_readl(c->reg);
-+	for (i = 1; i <= 4; i++) {
-+		if (rate == parent_rate / i) {
-+			val &= ~(BUS_CLK_DIV_MASK << c->reg_shift);
-+			val |= (i - 1) << c->reg_shift;
-+			clk_writel(val, c->reg);
-+			c->div = i;
-+			c->mul = 1;
-+			ret = 0;
-+			break;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
-+static long tegra30_bus_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
-+{
-+	unsigned long parent_rate = *prate;
-+	s64 divider;
-+
-+	if (rate >= parent_rate)
-+		return rate;
-+
-+	divider = parent_rate;
-+	divider += rate - 1;
-+	do_div(divider, rate);
-+
-+	if (divider < 0)
-+		return divider;
-+
-+	if (divider > 4)
-+		divider = 4;
-+	do_div(parent_rate, divider);
-+
-+	return parent_rate;
-+}
-+
-+struct clk_ops tegra30_bus_ops = {
-+	.is_enabled = tegra30_bus_clk_is_enabled,
-+	.enable = tegra30_bus_clk_enable,
-+	.disable = tegra30_bus_clk_disable,
-+	.set_rate = tegra30_bus_clk_set_rate,
-+	.round_rate = tegra30_bus_clk_round_rate,
-+	.recalc_rate = tegra30_bus_clk_recalc_rate,
-+};
-+
- /* Blink output functions */
- static int tegra30_blink_clk_is_enabled(struct clk_hw *hw)
- {
-diff --git a/arch/arm/mach-tegra/tegra30_clocks.h b/arch/arm/mach-tegra/tegra30_clocks.h
-index f2f88fe..7a34adb 100644
---- a/arch/arm/mach-tegra/tegra30_clocks.h
-+++ b/arch/arm/mach-tegra/tegra30_clocks.h
-@@ -34,6 +34,7 @@ extern struct clk_ops tegra_clk_out_ops;
- extern struct clk_ops tegra30_super_ops;
- extern struct clk_ops tegra30_blink_clk_ops;
- extern struct clk_ops tegra30_twd_ops;
-+extern struct clk_ops tegra30_bus_ops;
- extern struct clk_ops tegra30_periph_clk_ops;
- extern struct clk_ops tegra30_dsib_clk_ops;
- extern struct clk_ops tegra_nand_clk_ops;
-diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
-index 3d2e553..7bc8b1d 100644
---- a/arch/arm/mach-tegra/tegra30_clocks_data.c
-+++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
-@@ -711,6 +711,50 @@ static struct clk tegra_clk_sclk = {
- 	.num_parents = ARRAY_SIZE(mux_sclk),
- };
- 
-+static const char *tegra_hclk_parent_names[] = {
-+	"tegra_sclk",
-+};
-+
-+static struct clk *tegra_hclk_parents[] = {
-+	&tegra_clk_sclk,
-+};
-+
-+static struct clk tegra_hclk;
-+static struct clk_tegra tegra_hclk_hw = {
-+	.hw = {
-+		.clk = &tegra_hclk,
-+	},
-+	.flags = DIV_BUS,
-+	.reg = 0x30,
-+	.reg_shift = 4,
-+	.max_rate = 378000000,
-+	.min_rate = 12000000,
-+};
-+DEFINE_CLK_TEGRA(hclk, 0, &tegra30_bus_ops, 0, tegra_hclk_parent_names,
-+		tegra_hclk_parents, &tegra_clk_sclk);
-+
-+static const char *tegra_pclk_parent_names[] = {
-+	"tegra_hclk",
-+};
-+
-+static struct clk *tegra_pclk_parents[] = {
-+	&tegra_hclk,
-+};
-+
-+static struct clk tegra_pclk;
-+static struct clk_tegra tegra_pclk_hw = {
-+	.hw = {
-+		.clk = &tegra_pclk,
-+	},
-+	.flags = DIV_BUS,
-+	.reg = 0x30,
-+	.reg_shift = 0,
-+	.max_rate = 167000000,
-+	.min_rate = 12000000,
-+};
-+DEFINE_CLK_TEGRA(pclk, 0, &tegra30_bus_ops, 0, tegra_pclk_parent_names,
-+		tegra_pclk_parents, &tegra_hclk);
-+
- static const char *mux_blink[] = {
- 	"clk_32k",
- };
-@@ -1325,6 +1369,8 @@ struct clk *tegra_ptr_clks[] = {
- 	&tegra_cml1,
- 	&tegra_pciex,
- 	&tegra_clk_sclk,
-+	&tegra_hclk,
-+	&tegra_pclk,
- 	&tegra_clk_blink,
- 	&tegra30_clk_twd,
- };
--- 
-1.7.0.4
+I failed to apply this patch on v3.7-rc1. Could you help to format the
+patch again?
+
+Regards
+Haojian
