@@ -1,62 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 19 Oct 2012 21:49:34 +0000
-Subject: [GIT PULL v3] ARM architecture fixes for 3.7
-Message-ID: <201210192149.34864.arnd@arndb.de>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 19 Oct 2012 14:53:53 -0700
+Subject: [PATCH 0/7] crypto: omap-sham updates
+Message-ID: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-you never replied to the second version of the pull request, and it hasn't
-shown up in linux-next or your git tree so far. I assume you've been busy
-otherwise and missed it, so here is a friendly reminder.
+This series updates the crypto omap-sham driver and supporting
+infrastructure.
 
-The contents are still identical to what we had before after I fixed up
-the changeset comment for the Xen patch.
+Notes:
 
-	Arnd
+a) Based on current k.o. c9623de (Merge branch 'v4l_for_linus'
+   of git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-media)
 
----
-The following changes since commit 0e51793e162ca432fc5f04178cf82b80a92c2659:
+b) These have only been tested on an omap2420 h4 and an am37x evm.  If you
+   have different hardware available and a few minutes, please test them.
+   A quick and easy test is to enable tcrypt as a module
+   (CONFIG_CRYPTO_TEST=m), boot, then run 'modprobe tcrypt sec=2 mode=403'.
+   'CONFIG_CRYPTO_SHA1' and 'CONFIG_CRYPTO_DEV_OMAP_SHAM' also have to be
+   enabled.  A quick 'grep omap-sham /proc/interrupts' will tell you if
+   the omap-sham driver was really used.
 
-  Merge branch 'for-linus' of git://git.linaro.org/people/rmk/linux-arm (2012-10-07 21:20:57 +0900)
+c) To test these patches, you will likely need...
+   i) The patch included here:
+	   http://marc.info/?l=kernel-janitors&m=134910841909057&w=2
+   ii) This patch from linux-omap/master:
+	   27615a9 (ARM: OMAP: Trivial driver changes to remove include
+			   plat/cpu.h)
+   iii) This patch from Paul Walmsley:
+	   http://www.spinics.net/lists/linux-omap/msg79436.html
 
-are available in the git repository at:
+d) If you prefer, a version you can test is available at
+   git at github.com:mgreeraz/linux-mag.git mag/wip/crypto-test
 
+e) There is a reduction in DMA performance after switching to dmaengine
+   (see http://www.spinics.net/lists/linux-omap/msg79855.html)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-rmk
+f) Many thanks to Jon Hunter for testing on his omap2420 h4.
 
-for you to fetch changes up to 8e7fc18b5eacc37b6e6fcf486ec4eafbfef91738:
+Mark A. Greer (7):
+  ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
+  ARM: OMAP2xxx: hwmod: Add DMA information for SHAM module
+  ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
+  ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
+  crypto: omap-sham: Convert to use pm_runtime API
+  crypto: omap-sham: Add code to use dmaengine API
+  crypto: omap_sham: Remove usage of private DMA API
 
-  ARM: warnings in arch/arm/include/asm/uaccess.h (2012-10-09 20:29:07 +0200)
+ arch/arm/mach-omap2/clock2420_data.c               |   1 +
+ arch/arm/mach-omap2/clock2430_data.c               |   1 +
+ arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
+ arch/arm/mach-omap2/devices.c                      |  81 +++------
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
+ .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  43 +++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  60 +++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
+ drivers/crypto/omap-sham.c                         | 192 +++++++++++----------
+ 11 files changed, 250 insertions(+), 151 deletions(-)
 
-----------------------------------------------------------------
-These bug fixes all address problems found with automated build testing.
-Some of them have been around for a long time, other bugs are
-regressions since the merge window.
-
-----------------------------------------------------------------
-Arnd Bergmann (9):
-      ARM: kprobes: make more tests conditional
-      ARM: export set_irq_flags
-      ARM: Fix another build warning in arch/arm/mm/alignment.c
-      ARM: export default read_current_timer
-      ARM: Xen: fix initial build problems
-      ARM: pass -marm to gcc by default for both C and assembler
-      ARM: be really quiet when building with 'make -s'
-      ARM: binfmt_flat: unused variable 'persistent'
-      ARM: warnings in arch/arm/include/asm/uaccess.h
-
- arch/arm/Kconfig                   |    1 +
- arch/arm/Makefile                  |   13 +++++++------
- arch/arm/boot/Makefile             |   10 +++++-----
- arch/arm/include/asm/flat.h        |    2 +-
- arch/arm/include/asm/uaccess.h     |    4 ++--
- arch/arm/kernel/irq.c              |    2 ++
- arch/arm/kernel/kprobes-test-arm.c |    4 ++++
- arch/arm/lib/delay.c               |    1 +
- arch/arm/mm/alignment.c            |    4 +++-
- arch/arm/tools/Makefile            |    2 +-
- drivers/xen/Kconfig                |    2 ++
- drivers/xen/sys-hypervisor.c       |    1 +
- 12 files changed, 30 insertions(+), 16 deletions(-)
+-- 
+1.7.12
