@@ -1,58 +1,111 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 21 Oct 2012 11:20:20 +1300
-Subject: [PATCH 1/2] USB: Update EHCI-platform driver to devicetree.
-In-Reply-To: <Pine.LNX.4.44L0.1210201027280.24222-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1210201027280.24222-100000@netrider.rowland.org>
-Message-ID: <1350771620.10819.3.camel@gitbox>
+From: michael@walle.cc (Michael Walle)
+Date: Sun, 21 Oct 2012 01:34:54 +0200
+Subject: [PATCH 2/2] ARM: kirkwood: use gpio-fan DT binding on lsxl
+In-Reply-To: <1350776094-16778-1-git-send-email-michael@walle.cc>
+References: <1350776094-16778-1-git-send-email-michael@walle.cc>
+Message-ID: <1350776094-16778-2-git-send-email-michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-10-20 at 10:31 -0400, Alan Stern wrote:
-> On Sat, 20 Oct 2012, Florian Fainelli wrote:
-> 
-> > Hi Tony,
-> > 
-> > On Saturday 20 October 2012 16:17:32 Tony Prisk wrote:
-> > > This patch adds devicetree support to the EHCI-platform driver,
-> > > and removes the now unneeded ehci-vt8500.c
-> > > 
-> > > Existing platform properties are maintained, with the exception
-> > > the power_(on/off) and suspend function pointers.
-> > 
-> > Ok, so I have recently sent a bit patchset to remove most OHCI/EHCI drivers
-> > that could be converted to the generic variants, series starts here:
-> > 1349701906-16481-1-git-send-email-florian at openwrt.org
-> > 
-> > in this patchset I added a new property to the EHCI platform data:
-> > need_io_watchdog, which needs to be handled too from DT ideally.
-> 
-> Actually the new property is "no_io_watchdog".  See
-> 
-> 	http://marc.info/?l=linux-usb&m=134970247511140&w=2
-> 
-> > Adding device tree bindings is on my TODO after having a generic way
-> > to pass clocks to the ehci/ohci platform drivers, so you are right on time :)
-> 
-> At some point we'll need a way to handle the power_{on,off,suspend} 
-> callbacks.  I don't know how that should be done.
-> 
-> Alan Stern
+Remove board specific gpio-fan driver registration. Moved into device tree.
 
-I actually included a comment in the patch regarding the missing
-functions:
+Signed-off-by: Michael Walle <michael@walle.cc>
+---
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi |   11 ++++++++
+ arch/arm/mach-kirkwood/board-lsxl.c  |   47 ----------------------------------
+ 2 files changed, 11 insertions(+), 47 deletions(-)
 
-> +                * No platform data is being passed, so initalize
-> pdata.
-> +                * Limitation: we can't support power_on, power_off or
-> +                * power_suspend function pointers from DT.
-> +                * TODO: The missing functions could be replaced with
-> +                * power sequence handlers.
-> +                */
-
-I don't know anything about the power sequence code, but have seen some
-patches for pwm backlight using it. I don't know if it would allow
-everything that's needed, but it seems to have support for voltage
-regulators and gpios (among other things).
-
-Regards
-Tony P
+diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+index 8fea375..798e60e 100644
+--- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
++++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+@@ -94,4 +94,15 @@
+ 			gpios = <&gpio1 16 1>;
+ 		};
+ 	};
++
++	gpio_fan {
++		compatible = "gpio-fan";
++		gpios = <&gpio0 19 1
++		         &gpio0 18 1>;
++		gpio-fan,speed-map = <0    3
++		                      1500 2
++		                      3250 1
++		                      5000 0>;
++		alarm-gpios = <&gpio1 8 0>;
++	};
+ };
+diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
+index 64e5cc6..7e18cad 100644
+--- a/arch/arm/mach-kirkwood/board-lsxl.c
++++ b/arch/arm/mach-kirkwood/board-lsxl.c
+@@ -16,7 +16,6 @@
+ #include <linux/platform_device.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+-#include <linux/gpio-fan.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+@@ -45,51 +44,6 @@ static unsigned int lsxl_mpp_config[] __initdata = {
+ 	0
+ };
+ 
+-#define LSXL_GPIO_FAN_HIGH	18
+-#define LSXL_GPIO_FAN_LOW	19
+-#define LSXL_GPIO_FAN_LOCK	40
+-
+-static struct gpio_fan_alarm lsxl_alarm = {
+-	.gpio = LSXL_GPIO_FAN_LOCK,
+-};
+-
+-static struct gpio_fan_speed lsxl_speeds[] = {
+-	{
+-		.rpm = 0,
+-		.ctrl_val = 3,
+-	}, {
+-		.rpm = 1500,
+-		.ctrl_val = 1,
+-	}, {
+-		.rpm = 3250,
+-		.ctrl_val = 2,
+-	}, {
+-		.rpm = 5000,
+-		.ctrl_val = 0,
+-	}
+-};
+-
+-static int lsxl_gpio_list[] = {
+-	LSXL_GPIO_FAN_HIGH, LSXL_GPIO_FAN_LOW,
+-};
+-
+-static struct gpio_fan_platform_data lsxl_fan_data = {
+-	.num_ctrl = ARRAY_SIZE(lsxl_gpio_list),
+-	.ctrl = lsxl_gpio_list,
+-	.alarm = &lsxl_alarm,
+-	.num_speed = ARRAY_SIZE(lsxl_speeds),
+-	.speed = lsxl_speeds,
+-};
+-
+-static struct platform_device lsxl_fan_device = {
+-	.name = "gpio-fan",
+-	.id = -1,
+-	.num_resources = 0,
+-	.dev = {
+-		.platform_data = &lsxl_fan_data,
+-	},
+-};
+-
+ /*
+  * On the LS-XHL/LS-CHLv2, the shutdown process is following:
+  * - Userland monitors key events until the power switch goes to off position
+@@ -120,7 +74,6 @@ void __init lsxl_init(void)
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&lsxl_ge00_data);
+ 	kirkwood_ge01_init(&lsxl_ge01_data);
+-	platform_device_register(&lsxl_fan_device);
+ 
+ 	/* register power-off method */
+ 	pm_power_off = lsxl_power_off;
+-- 
+1.7.2.5
