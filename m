@@ -1,45 +1,52 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 21 Oct 2012 11:10:30 +1300
-Subject: [PATCH v2 0/2] Update ehci-platform driver to support devicetree
-Message-ID: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
+Date: Sun, 21 Oct 2012 11:10:32 +1300
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
+References: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1350771032-11527-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset updates the ehci-platform.c driver to allow device tree probing.
-I have dropped support for the three function pointers (power_on, power_off
-and power_suspend). If someone has knowledge of the power sequence functions
-that are being implemented, these functions could be replaced (Sorry, I don't
-know anything about implementing it).
+Add a binding document for ehci-platform driver.
 
-port_power_(on_off) properties are not supported in DT as Alan Stern indicated
-they are going to be removed.
-
-v2:
-* Add error checking for pdata memory allocation, and memory freeing in remove()
-
-* Add no_io_watchdog field to usb_ehci_pdata as required by Florian Fainelli's
-upcoming patchset and DT parsing for the field. This means we don't need to
-patch this driver again after applying Florian's patchset, but will create a
-minor merge-conflict.
-
-* Changed compatible string to 'linux,ehci-platform' as a lot of the DT
-properties are linux-specific.
-
-* Changed properties to match those expected in usb-ehci binding.
-
-
-Tony Prisk (2):
-  USB: Update EHCI-platform driver to devicetree.
-  USB: doc: Binding document for ehci-platform driver
-
- .../devicetree/bindings/usb/ehci-platform.txt      |   27 ++++
- drivers/usb/host/ehci-hcd.c                        |    5 -
- drivers/usb/host/ehci-platform.c                   |   61 ++++++-
- drivers/usb/host/ehci-vt8500.c                     |  171 --------------------
- include/linux/usb/ehci_pdriver.h                   |    1 +
- 5 files changed, 88 insertions(+), 177 deletions(-)
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ .../devicetree/bindings/usb/ehci-platform.txt      |   27 ++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/ehci-platform.txt
- delete mode 100644 drivers/usb/host/ehci-vt8500.c
 
+diff --git a/Documentation/devicetree/bindings/usb/ehci-platform.txt b/Documentation/devicetree/bindings/usb/ehci-platform.txt
+new file mode 100644
+index 0000000..930b19e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ehci-platform.txt
+@@ -0,0 +1,27 @@
++Generic Platform EHCI Controller
++-----------------------------------------------------
++
++Required properties:
++- compatible : "linux,ehci-platform"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : EHCI controller interrupt
++
++Optional properties:
++- caps-offset : offset to the capabilities register (default = 0)
++- has-tt : controller has transaction translator(s).
++- has-synopsys-hc-bug : controller has the synopsys hc bug
++- no-io-watchdog : controller does not need io watchdog
++
++- big-endian : descriptors and registers are both big endian. This
++  is the equivalent of specifying big-endian-desc and big-endian-regs.
++OR
++- big-endian-desc : descriptors are in big-endian format
++- big-endian-regs : mmio is in big-endian format
++
++Example:
++	ehci at d8007c00 {
++		compatible = "ehci-platform";
++		reg = <0xd8007c00 0x200>;
++		interrupts = <43>;
++		has-tt;
++	};
 -- 
 1.7.9.5
