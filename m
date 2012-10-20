@@ -1,142 +1,25 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 13:23:15 +0200
-Subject: [PATCH v2 2/3] ARM: Kirkwood: Fix sparse warnings.
-In-Reply-To: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
-References: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1350732196-26781-2-git-send-email-andrew@lunn.ch>
+Date: Sat, 20 Oct 2012 13:38:00 +0200
+Subject: Which kirkwood does your DT board use?
+Message-ID: <20121020113800.GC21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mostly missing statics, but also missing include files
-and void parameters.
+Hi Folks
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-kirkwood/board-dt.c        |    2 +-
- arch/arm/mach-kirkwood/common.c          |    2 +-
- arch/arm/mach-kirkwood/irq.c             |    1 +
- arch/arm/mach-kirkwood/lacie_v2-common.c |    1 +
- arch/arm/mach-kirkwood/t5325-setup.c     |    6 +++---
- arch/arm/mach-kirkwood/tsx1x-common.c    |    7 ++++---
- 6 files changed, 11 insertions(+), 8 deletions(-)
+All of you in the To: have contributed a DT based Kirkwood board port.
+Nearly all the DT files we have declare the CPU to be
+marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
+mpp code, we need to know the exact kirkwood being used. It should be
+one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 70c5a28..2d840da 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -26,7 +26,7 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
- 	{ }
- };
- 
--struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
-+static struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
- 	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
- 		       NULL),
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 3991077..f694ba8 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -425,7 +425,7 @@ void __init kirkwood_sdio_init(struct mvsdio_platform_data *mvsdio_data)
- /*****************************************************************************
-  * SPI
-  ****************************************************************************/
--void __init kirkwood_spi_init()
-+void __init kirkwood_spi_init(void)
- {
- 	orion_spi_init(SPI_PHYS_BASE);
- }
-diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
-index 8847035..2a97a2e 100644
---- a/arch/arm/mach-kirkwood/irq.c
-+++ b/arch/arm/mach-kirkwood/irq.c
-@@ -14,6 +14,7 @@
- #include <mach/bridge-regs.h>
- #include <plat/orion-gpio.h>
- #include <plat/irq.h>
-+#include "common.h"
- 
- static int __initdata gpio0_irqs[4] = {
- 	IRQ_KIRKWOOD_GPIO_LOW_0_7,
-diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.c b/arch/arm/mach-kirkwood/lacie_v2-common.c
-index 285edab..4894959 100644
---- a/arch/arm/mach-kirkwood/lacie_v2-common.c
-+++ b/arch/arm/mach-kirkwood/lacie_v2-common.c
-@@ -19,6 +19,7 @@
- #include <mach/irqs.h>
- #include <plat/time.h>
- #include "common.h"
-+#include "lacie_v2-common.h"
- 
- /*****************************************************************************
-  * 512KB SPI Flash on Boot Device (MACRONIX MX25L4005)
-diff --git a/arch/arm/mach-kirkwood/t5325-setup.c b/arch/arm/mach-kirkwood/t5325-setup.c
-index bad738e..f2daf71 100644
---- a/arch/arm/mach-kirkwood/t5325-setup.c
-+++ b/arch/arm/mach-kirkwood/t5325-setup.c
-@@ -29,7 +29,7 @@
- #include "common.h"
- #include "mpp.h"
- 
--struct mtd_partition hp_t5325_partitions[] = {
-+static struct mtd_partition hp_t5325_partitions[] = {
- 	{
- 		.name		= "u-boot env",
- 		.size		= SZ_64K,
-@@ -59,14 +59,14 @@ struct mtd_partition hp_t5325_partitions[] = {
- 	},
- };
- 
--const struct flash_platform_data hp_t5325_flash = {
-+static const struct flash_platform_data hp_t5325_flash = {
- 	.type		= "mx25l8005",
- 	.name		= "spi_flash",
- 	.parts		= hp_t5325_partitions,
- 	.nr_parts	= ARRAY_SIZE(hp_t5325_partitions),
- };
- 
--struct spi_board_info __initdata hp_t5325_spi_slave_info[] = {
-+static struct spi_board_info __initdata hp_t5325_spi_slave_info[] = {
- 	{
- 		.modalias	= "m25p80",
- 		.platform_data	= &hp_t5325_flash,
-diff --git a/arch/arm/mach-kirkwood/tsx1x-common.c b/arch/arm/mach-kirkwood/tsx1x-common.c
-index 8943ede..cec87ce 100644
---- a/arch/arm/mach-kirkwood/tsx1x-common.c
-+++ b/arch/arm/mach-kirkwood/tsx1x-common.c
-@@ -7,6 +7,7 @@
- #include <linux/serial_reg.h>
- #include <mach/kirkwood.h>
- #include "common.h"
-+#include "tsx1x-common.h"
- 
- /*
-  * QNAP TS-x1x Boards flash
-@@ -29,7 +30,7 @@
-  *
-  ***************************************************************************/
- 
--struct mtd_partition qnap_tsx1x_partitions[] = {
-+static struct mtd_partition qnap_tsx1x_partitions[] = {
- 	{
- 		.name		= "U-Boot",
- 		.size		= 0x00080000,
-@@ -58,14 +59,14 @@ struct mtd_partition qnap_tsx1x_partitions[] = {
- 	},
- };
- 
--const struct flash_platform_data qnap_tsx1x_flash = {
-+static const struct flash_platform_data qnap_tsx1x_flash = {
- 	.type		= "m25p128",
- 	.name		= "spi_flash",
- 	.parts		= qnap_tsx1x_partitions,
- 	.nr_parts	= ARRAY_SIZE(qnap_tsx1x_partitions),
- };
- 
--struct spi_board_info __initdata qnap_tsx1x_spi_slave_info[] = {
-+static struct spi_board_info __initdata qnap_tsx1x_spi_slave_info[] = {
- 	{
- 		.modalias	= "m25p80",
- 		.platform_data	= &qnap_tsx1x_flash,
--- 
-1.7.10.4
+You can see what your hardware has a boot time:
+
+Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
+
+Please could you check your hardware and let me know what the correct
+CPU is. I can then fix the .dts files and prepare a first attempt at
+converting boards to pinctrl.
+
+Thanks
+	Andrew
