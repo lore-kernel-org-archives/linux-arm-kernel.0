@@ -1,44 +1,87 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Sat, 20 Oct 2012 13:11:39 +0100 (BST)
-Subject: Which kirkwood does your DT board use?
-In-Reply-To: <20121020113800.GC21046@lunn.ch>
-References: <20121020113800.GC21046@lunn.ch>
-Message-ID: <alpine.DEB.2.00.1210201305070.10589@marmot.wormnet.eu>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Sat, 20 Oct 2012 15:01:18 +0200
+Subject: [PATCH 1/2] USB: Update EHCI-platform driver to devicetree.
+In-Reply-To: <1350703053-4661-2-git-send-email-linux@prisktech.co.nz>
+References: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
+ <1350703053-4661-2-git-send-email-linux@prisktech.co.nz>
+Message-ID: <2209384.BKaXW2gI8I@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Oct 2012, Andrew Lunn wrote:
+Hi Tony,
 
-> Hi Folks
->
-> All of you in the To: have contributed a DT based Kirkwood board port.
-> Nearly all the DT files we have declare the CPU to be
-> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
-> mpp code, we need to know the exact kirkwood being used. It should be
-> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
->
-> You can see what your hardware has a boot time:
->
-> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
+On Saturday 20 October 2012 16:17:32 Tony Prisk wrote:
+> This patch adds devicetree support to the EHCI-platform driver,
+> and removes the now unneeded ehci-vt8500.c
+> 
+> Existing platform properties are maintained, with the exception
+> the power_(on/off) and suspend function pointers.
 
-DNS-320:-
-Kirkwood: MV88F6281-A1, TCLK=166666667
+Ok, so I have recently sent a bit patchset to remove most OHCI/EHCI drivers
+that could be converted to the generic variants, series starts here:
+1349701906-16481-1-git-send-email-florian at openwrt.org
 
-DNS-325:-
-Kirkwood: MV88F6281-A1, TCLK=200000000
+in this patchset I added a new property to the EHCI platform data:
+need_io_watchdog, which needs to be handled too from DT ideally.
 
-"compatible" currently says "marvell,kirkwood-88f6281" for both. Is this 
-the right string to use or should it be 88f6281-a1?
+Adding device tree bindings is on my TODO after having a generic way
+to pass clocks to the ehci/ohci platform drivers, so you are right on time :)
 
-> Please could you check your hardware and let me know what the correct
-> CPU is. I can then fix the .dts files and prepare a first attempt at
-> converting boards to pinctrl.
+[snip]
 
-Let me know if I can be useful.
+> +	if (np) {
+> +		/*
+> +		 * No platform data is being passed, so initalize pdata.
+> +		 * Limitation: we can't support power_on, power_off or
+> +		 * power_suspend function pointers from DT.
+> +		 * TODO: The missing functions could be replaced with
+> +		 * power sequence handlers.
+> +		 */
+> +		pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
 
-> Thanks
-> 	Andrew
->
+Missing allocation failure handling here. And you should free this in
+ehci_platform_remove() accordingly.
 
+> +		dev->dev.platform_data = pdata;
+> +
+> +		/* Read the optional properties from DT node */
+> +		of_property_read_u32(np, "caps-offset", &pdata->caps_offset);
+> +		if (of_property_read_bool(np, "has-tt"))
+> +			pdata->has_tt = 1;
+> +		if (of_property_read_bool(np, "has-synopsys-hc-bug"))
+> +			pdata->has_synopsys_hc_bug = 1;
+> +		if (of_property_read_bool(np, "big-endian-desc"))
+> +			pdata->big_endian_desc = 1;
+> +		if (of_property_read_bool(np, "big-endian-mmio"))
+> +			pdata->big_endian_mmio = 1;
+
+I would rather we remain compatible with ehci-ppc-of, by handling the 
+big-endian property you set big_endian_mmiod and big_endian_desc to 1, and
+by setting them individually, you get what you expect.
+
+> +
+> +		/* Right now device-tree probed devices don't get dma_mask set.
+> +		 * Since shared usb code relies on it, set it here for now.
+> +		 * Once we have dma capability bindings this can go away.
+> +		 */
+> +		if (!dev->dev.dma_mask)
+> +			dev->dev.dma_mask = &ehci_dma_mask;
+> +	}
+> +
+>  	if (!pdata) {
+>  		WARN_ON(1);
+>  		return -ENODEV;
+> @@ -215,6 +250,16 @@ static const struct platform_device_id ehci_platform_table[] = {
+>  	{ "ehci-platform", 0 },
+>  	{ }
+>  };
+> +
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id ehci_platform_ids[] = {
+> +	{ .compatible = "ehci-platform", },
+> +	{}
+
+ehci-platform is very linux-specific, so this should either be:
+"linux,ehci-platform", or "usb-ehci", pretty much like the ppc-of ehci driver.
 -- 
-Jamie Lentin
+Florian
