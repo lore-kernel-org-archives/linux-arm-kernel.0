@@ -1,34 +1,47 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 20 Oct 2012 16:17:31 +1300
-Subject: [RFC PATCH 0/2] Update ehci-platform driver to support devicetree
-Message-ID: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
+Date: Sat, 20 Oct 2012 16:17:33 +1300
+Subject: [PATCH 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
+References: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1350703053-4661-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset updates the ehci-platform.c driver to allow device tree probing.
-I have dropped support for the three function pointers (power_on, power_off
-and power_suspend). If someone has knowledge of the power sequence functions
-that are being implemented, these functions could be replaced (Sorry, I don't
-know anything about implementing it).
+Add a binding document for ehci-platform driver.
 
-port_power_(on_off) properties are not supported in DT as Alan Stern indicated
-they are going to be removed.
-
-I have included a binding document, but must admit most of the descriptions
-for the properties are guessed. Quite likely some of these descriptions are
-incorrect and/or need to be clarified.
-
-Tony Prisk (2):
-  USB: Update EHCI-platform driver to devicetree.
-  USB: doc: Binding document for ehci-platform driver
-
- .../devicetree/bindings/usb/ehci-platform.txt      |   22 +++
- drivers/usb/host/ehci-hcd.c                        |    5 -
- drivers/usb/host/ehci-platform.c                   |   46 ++++++
- drivers/usb/host/ehci-vt8500.c                     |  171 --------------------
- 4 files changed, 68 insertions(+), 176 deletions(-)
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ .../devicetree/bindings/usb/ehci-platform.txt      |   22 ++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/usb/ehci-platform.txt
- delete mode 100644 drivers/usb/host/ehci-vt8500.c
 
+diff --git a/Documentation/devicetree/bindings/usb/ehci-platform.txt b/Documentation/devicetree/bindings/usb/ehci-platform.txt
+new file mode 100644
+index 0000000..faeffe4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ehci-platform.txt
+@@ -0,0 +1,22 @@
++Generic Platform EHCI Controller
++-----------------------------------------------------
++
++Required properties:
++- compatible : "ehci-platform"
++- reg : Should contain 1 register ranges(address and length)
++- interrupts : EHCI controller interrupt
++
++Optional properties:
++- caps-offset : offset to the capabilities register (default = 0)
++- has-tt : controller has transaction translator(s).
++- big-endian-desc : descriptors are in big-endian format
++- big-endian-mmio : mmio is in big-endian format
++- has-synopsys-hc-bug : controller has the synopsys hc bug
++
++Example:
++	ehci at d8007c00 {
++		compatible = "ehci-platform";
++		reg = <0xd8007c00 0x200>;
++		interrupts = <43>;
++		has-tt;
++	};
 -- 
 1.7.9.5
