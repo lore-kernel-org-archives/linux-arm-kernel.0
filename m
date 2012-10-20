@@ -1,61 +1,33 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 20 Oct 2012 16:27:19 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <20121020141136.GA6433@netboy.at.omicron.at>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <20121020141136.GA6433@netboy.at.omicron.at>
-Message-ID: <alpine.DEB.2.00.1210201615170.24497@utopia.booyaka.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Sat, 20 Oct 2012 18:34:25 +0200
+Subject: Which kirkwood does your DT board use?
+In-Reply-To: <20121020113800.GC21046@lunn.ch>
+References: <20121020113800.GC21046@lunn.ch>
+Message-ID: <5082D291.9040306@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard
+Am 20.10.2012 13:38, schrieb Andrew Lunn:
+> Hi Folks
+>
+> All of you in the To: have contributed a DT based Kirkwood board port.
+> Nearly all the DT files we have declare the CPU to be
+> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
+> mpp code, we need to know the exact kirkwood being used. It should be
+> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
+>
+> You can see what your hardware has a boot time:
+>
+> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
+>
+> Please could you check your hardware and let me know what the correct
+> CPU is. I can then fix the .dts files and prepare a first attempt at
+> converting boards to pinctrl.
 
-On Sat, 20 Oct 2012, Richard Cochran wrote:
+The Dockstars are using this one:
 
-> On Thu, Oct 18, 2012 at 05:20:46AM +0000, Paul Walmsley wrote:
-> > 
-> > Here are some basic OMAP test results for Linux v3.7-rc1.
-> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+Kirkwood: MV88F6281-A0, TCLK=200000000.
 
-...
+Regards,
 
-> > Passing tests
-> > -------------
-> > 
-> > Boot to userspace: 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
-> >                    4430es2panda, 5912osk, am335xbone
-
-...
-
-> BeagleBone Rev. A6 does not boot v3.7-rc1, at least not for me.
-> I recently posted the missing patches needed to make it work (but the
-> patches are not by me).
-
-Those are the patches at:
-
-http://lists.arm.linux.org.uk/lurker/message/20121015.191630.bdae3c50.en.html
-
-?
-
-> Below I include the console log.
-
-Thanks for the report.  Are you using the stock v3.7-rc1 DTS file in 
-arch/arm/boot/dts/am335x-bone.dts ?  Also are you using 
-omap2plus_defconfig?
-
-...
-
-Here's the console log from the boot test here:
-
-http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/boot/am335xbone/am335xbone_log.txt
-
-And here's the kernel config and uImage+DTB from the boot test here:
-
-http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/build/am33xx_only/
-
-In terms of differences from your setup, looks like we have different 
-X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
-configs too.
-
-
-- Paul
+Alexander
