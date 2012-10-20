@@ -1,87 +1,40 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Sat, 20 Oct 2012 15:01:18 +0200
-Subject: [PATCH 1/2] USB: Update EHCI-platform driver to devicetree.
-In-Reply-To: <1350703053-4661-2-git-send-email-linux@prisktech.co.nz>
-References: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
- <1350703053-4661-2-git-send-email-linux@prisktech.co.nz>
-Message-ID: <2209384.BKaXW2gI8I@bender>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Sat, 20 Oct 2012 19:01:40 +0530
+Subject: [PATCH] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
+ V4L2_OUT_CAP_DV_TIMINGS
+Message-ID: <1350739900-25065-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-On Saturday 20 October 2012 16:17:32 Tony Prisk wrote:
-> This patch adds devicetree support to the EHCI-platform driver,
-> and removes the now unneeded ehci-vt8500.c
-> 
-> Existing platform properties are maintained, with the exception
-> the power_(on/off) and suspend function pointers.
+This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
+V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
+out.
 
-Ok, so I have recently sent a bit patchset to remove most OHCI/EHCI drivers
-that could be converted to the generic variants, series starts here:
-1349701906-16481-1-git-send-email-florian at openwrt.org
+Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+---
+ This patch is based on the following patch series,
+ ARM: davinci: dm365 EVM: add support for VPBE display
+ (https://patchwork.kernel.org/patch/1295071/)
 
-in this patchset I added a new property to the EHCI platform data:
-need_io_watchdog, which needs to be handled too from DT ideally.
+ arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Adding device tree bindings is on my TODO after having a generic way
-to pass clocks to the ehci/ohci platform drivers, so you are right on time :)
-
-[snip]
-
-> +	if (np) {
-> +		/*
-> +		 * No platform data is being passed, so initalize pdata.
-> +		 * Limitation: we can't support power_on, power_off or
-> +		 * power_suspend function pointers from DT.
-> +		 * TODO: The missing functions could be replaced with
-> +		 * power sequence handlers.
-> +		 */
-> +		pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
-
-Missing allocation failure handling here. And you should free this in
-ehci_platform_remove() accordingly.
-
-> +		dev->dev.platform_data = pdata;
-> +
-> +		/* Read the optional properties from DT node */
-> +		of_property_read_u32(np, "caps-offset", &pdata->caps_offset);
-> +		if (of_property_read_bool(np, "has-tt"))
-> +			pdata->has_tt = 1;
-> +		if (of_property_read_bool(np, "has-synopsys-hc-bug"))
-> +			pdata->has_synopsys_hc_bug = 1;
-> +		if (of_property_read_bool(np, "big-endian-desc"))
-> +			pdata->big_endian_desc = 1;
-> +		if (of_property_read_bool(np, "big-endian-mmio"))
-> +			pdata->big_endian_mmio = 1;
-
-I would rather we remain compatible with ehci-ppc-of, by handling the 
-big-endian property you set big_endian_mmiod and big_endian_desc to 1, and
-by setting them individually, you get what you expect.
-
-> +
-> +		/* Right now device-tree probed devices don't get dma_mask set.
-> +		 * Since shared usb code relies on it, set it here for now.
-> +		 * Once we have dma capability bindings this can go away.
-> +		 */
-> +		if (!dev->dev.dma_mask)
-> +			dev->dev.dma_mask = &ehci_dma_mask;
-> +	}
-> +
->  	if (!pdata) {
->  		WARN_ON(1);
->  		return -ENODEV;
-> @@ -215,6 +250,16 @@ static const struct platform_device_id ehci_platform_table[] = {
->  	{ "ehci-platform", 0 },
->  	{ }
->  };
-> +
-> +#ifdef CONFIG_OF
-> +static const struct of_device_id ehci_platform_ids[] = {
-> +	{ .compatible = "ehci-platform", },
-> +	{}
-
-ehci-platform is very linux-specific, so this should either be:
-"linux,ehci-platform", or "usb-ehci", pretty much like the ppc-of ehci driver.
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 2924d61..771abb5 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -514,7 +514,7 @@ static struct vpbe_output dm365evm_vpbe_outputs[] = {
+ 			.index		= 1,
+ 			.name		= "Component",
+ 			.type		= V4L2_OUTPUT_TYPE_ANALOG,
+-			.capabilities	= V4L2_OUT_CAP_CUSTOM_TIMINGS,
++			.capabilities	=  V4L2_OUT_CAP_DV_TIMINGS,
+ 		},
+ 		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
+ 		.default_mode	= "480p59_94",
 -- 
-Florian
+1.7.4.1
