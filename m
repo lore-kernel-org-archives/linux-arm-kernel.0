@@ -1,279 +1,39 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 12:42:16 +0200
-Subject: [PATCH 3/3] ARM: Kirkwood: checkpatch cleanups
-In-Reply-To: <1350729736-14539-1-git-send-email-andrew@lunn.ch>
-References: <1350729736-14539-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1350729736-14539-3-git-send-email-andrew@lunn.ch>
+Date: Sat, 20 Oct 2012 13:09:59 +0200
+Subject: [PATCH v2 0/2] DT EHCI support for Kirkwood.
+Message-ID: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mostly printk to pr_{err|info} changes and a few strings split over
-multiple lines are combined.
+These two patches add DT support to ehci-orion and convert all
+existing Kirkwood DT boards to using DT to instantiate the USB host.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/mach-kirkwood/board-dt.c          |    2 +-
- arch/arm/mach-kirkwood/common.c            |    9 ++++-----
- arch/arm/mach-kirkwood/common.h            |    3 ++-
- arch/arm/mach-kirkwood/cpuidle.c           |    3 +--
- arch/arm/mach-kirkwood/dockstar-setup.c    |    2 +-
- arch/arm/mach-kirkwood/mpp.c               |    4 ++--
- arch/arm/mach-kirkwood/netspace_v2-setup.c |    4 ++--
- arch/arm/mach-kirkwood/openrd-setup.c      |   14 +++++---------
- arch/arm/mach-kirkwood/pcie.c              |   13 +++++++------
- arch/arm/mach-kirkwood/sheevaplug-setup.c  |    2 +-
- arch/arm/mach-kirkwood/ts41x-setup.c       |    3 +--
- 11 files changed, 27 insertions(+), 32 deletions(-)
+v1->v2: Remove the phy property from DT. The previous implementation
+was not compatible with the new ideas of a USB phy node. Only orion5x
+needs it anyway, and currently converting orion5x to DT is low
+priority. Adding a phy node later will also not affect backwards
+compatibility.
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index 2d840da..d699bd0 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -100,7 +100,7 @@ static void __init kirkwood_dt_init(void)
- 			     kirkwood_auxdata_lookup, NULL);
- }
- 
--static const char *kirkwood_dt_board_compat[] = {
-+static const char * const kirkwood_dt_board_compat[] = {
- 	"globalscale,dreamplug",
- 	"dlink,dns-320",
- 	"dlink,dns-325",
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index f694ba8..a46f90f 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -18,10 +18,10 @@
- #include <linux/clk-provider.h>
- #include <linux/spinlock.h>
- #include <linux/mv643xx_i2c.h>
-+#include <linux/timex.h>
-+#include <linux/kexec.h>
- #include <net/dsa.h>
- #include <asm/page.h>
--#include <asm/timex.h>
--#include <asm/kexec.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <mach/kirkwood.h>
-@@ -644,8 +644,7 @@ void __init kirkwood_l2_init(void)
- 
- void __init kirkwood_init(void)
- {
--	printk(KERN_INFO "Kirkwood: %s, TCLK=%d.\n",
--		kirkwood_id(), kirkwood_tclk);
-+	pr_info("Kirkwood: %s, TCLK=%d.\n", kirkwood_id(), kirkwood_tclk);
- 
- 	/*
- 	 * Disable propagation of mbus errors to the CPU local bus,
-@@ -671,7 +670,7 @@ void __init kirkwood_init(void)
- 	kirkwood_xor1_init();
- 	kirkwood_crypto_init();
- 
--#ifdef CONFIG_KEXEC 
-+#ifdef CONFIG_KEXEC
- 	kexec_reinit = kirkwood_enable_pcie;
- #endif
- }
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index bcffd7c..6088e92 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -47,7 +47,8 @@ void kirkwood_i2c_init(void);
- void kirkwood_uart0_init(void);
- void kirkwood_uart1_init(void);
- void kirkwood_nand_init(struct mtd_partition *parts, int nr_parts, int delay);
--void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts, int (*dev_ready)(struct mtd_info *));
-+void kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
-+			    int (*dev_ready)(struct mtd_info *));
- void kirkwood_audio_init(void);
- void kirkwood_restart(char, const char *);
- void kirkwood_clk_init(void);
-diff --git a/arch/arm/mach-kirkwood/cpuidle.c b/arch/arm/mach-kirkwood/cpuidle.c
-index 0f17109..4174602 100644
---- a/arch/arm/mach-kirkwood/cpuidle.c
-+++ b/arch/arm/mach-kirkwood/cpuidle.c
-@@ -20,7 +20,6 @@
- #include <linux/io.h>
- #include <linux/export.h>
- #include <asm/proc-fns.h>
--#include <asm/cpuidle.h>
- #include <mach/kirkwood.h>
- 
- #define KIRKWOOD_MAX_STATES	2
-@@ -64,7 +63,7 @@ static int kirkwood_init_cpuidle(void)
- 
- 	cpuidle_register_driver(&kirkwood_idle_driver);
- 	if (cpuidle_register_device(device)) {
--		printk(KERN_ERR "kirkwood_init_cpuidle: Failed registering\n");
-+		pr_err("kirkwood_init_cpuidle: Failed registering\n");
- 		return -EIO;
- 	}
- 	return 0;
-diff --git a/arch/arm/mach-kirkwood/dockstar-setup.c b/arch/arm/mach-kirkwood/dockstar-setup.c
-index 23dcb19..791a98f 100644
---- a/arch/arm/mach-kirkwood/dockstar-setup.c
-+++ b/arch/arm/mach-kirkwood/dockstar-setup.c
-@@ -93,7 +93,7 @@ static void __init dockstar_init(void)
- 
- 	if (gpio_request(29, "USB Power Enable") != 0 ||
- 	    gpio_direction_output(29, 1) != 0)
--		printk(KERN_ERR "can't set up GPIO 29 (USB Power Enable)\n");
-+		pr_err("can't set up GPIO 29 (USB Power Enable)\n");
- 	kirkwood_ehci_init();
- 
- 	kirkwood_ge00_init(&dockstar_ge00_data);
-diff --git a/arch/arm/mach-kirkwood/mpp.c b/arch/arm/mach-kirkwood/mpp.c
-index 0c6ad63..827cde4 100644
---- a/arch/arm/mach-kirkwood/mpp.c
-+++ b/arch/arm/mach-kirkwood/mpp.c
-@@ -30,8 +30,8 @@ static unsigned int __init kirkwood_variant(void)
- 	if (dev == MV88F6180_DEV_ID)
- 		return MPP_F6180_MASK;
- 
--	printk(KERN_ERR "MPP setup: unknown kirkwood variant "
--			"(dev %#x rev %#x)\n", dev, rev);
-+	pr_err("MPP setup: unknown kirkwood variant (dev %#x rev %#x)\n",
-+	       dev, rev);
- 	return 0;
- }
- 
-diff --git a/arch/arm/mach-kirkwood/netspace_v2-setup.c b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-index 88b0788..728e86d 100644
---- a/arch/arm/mach-kirkwood/netspace_v2-setup.c
-+++ b/arch/arm/mach-kirkwood/netspace_v2-setup.c
-@@ -79,7 +79,7 @@ static struct platform_device netspace_v2_gpio_buttons = {
- 	.name		= "gpio-keys",
- 	.id		= -1,
- 	.dev		= {
--		.platform_data 	= &netspace_v2_button_data,
-+		.platform_data	= &netspace_v2_button_data,
- 	},
- };
- 
-@@ -211,7 +211,7 @@ static unsigned int netspace_v2_mpp_config[] __initdata = {
- 	MPP29_GPIO,		/* Blue led (slow register) */
- 	MPP30_GPIO,		/* Blue led (command register) */
- 	MPP31_GPIO,		/* Board power off */
--	MPP32_GPIO, 		/* Power button (0 = Released, 1 = Pushed) */
-+	MPP32_GPIO,		/* Power button (0 = Released, 1 = Pushed) */
- 	MPP33_GPO,		/* Fan speed (bit 2) */
- 	0
- };
-diff --git a/arch/arm/mach-kirkwood/openrd-setup.c b/arch/arm/mach-kirkwood/openrd-setup.c
-index 134ef50..7e81e9b 100644
---- a/arch/arm/mach-kirkwood/openrd-setup.c
-+++ b/arch/arm/mach-kirkwood/openrd-setup.c
-@@ -121,14 +121,12 @@ static int __init uart1_mpp_config(void)
- 	kirkwood_mpp_conf(openrd_uart1_mpp_config);
- 
- 	if (gpio_request(34, "SD_UART1_SEL")) {
--		printk(KERN_ERR "GPIO request failed for SD/UART1 selection"
--				", gpio: 34\n");
-+		pr_err("GPIO request 34 failed for SD/UART1 selection\n");
- 		return -EIO;
- 	}
- 
- 	if (gpio_request(28, "RS232_RS485_SEL")) {
--		printk(KERN_ERR "GPIO request failed for RS232/RS485 selection"
--				", gpio# 28\n");
-+		pr_err("GPIO request 28 failed for RS232/RS485 selection\n");
- 		gpio_free(34);
- 		return -EIO;
- 	}
-@@ -185,15 +183,13 @@ static void __init openrd_init(void)
- 
- 	if (uart1 <= 0) {
- 		if (uart1 < 0)
--			printk(KERN_ERR "Invalid kernel parameter to select "
--				"UART1. Defaulting to SD. ERROR CODE: %d\n",
--				uart1);
-+			pr_err("Invalid kernel parameter to select UART1. Defaulting to SD. ERROR CODE: %d\n",
-+			       uart1);
- 
- 		/* Select SD
- 		 * Pin # 34: 0 => UART1, 1 => SD */
- 		if (gpio_request(34, "SD_UART1_SEL")) {
--			printk(KERN_ERR "GPIO request failed for SD/UART1 "
--					"selection, gpio: 34\n");
-+			pr_err("GPIO request 34 failed for SD/UART1 selection\n");
- 		} else {
- 
- 			gpio_direction_output(34, 1);
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index ec54491..2585811 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -26,7 +26,7 @@ static void kirkwood_enable_pcie_clk(const char *port)
- 
- 	clk = clk_get_sys("pcie", port);
- 	if (IS_ERR(clk)) {
--		printk(KERN_ERR "PCIE clock %s missing\n", port);
-+		pr_err("PCIE clock %s missing\n", port);
- 		return;
- 	}
- 	clk_prepare_enable(clk);
-@@ -168,7 +168,7 @@ static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
- 		return 0;
- 
- 	index = pcie_port_map[nr];
--	printk(KERN_INFO "PCI: bus%d uses PCIe port %d\n", sys->busnr, index);
-+	pr_info("PCI: bus%d uses PCIe port %d\n", sys->busnr, index);
- 
- 	pp = kzalloc(sizeof(*pp), GFP_KERNEL);
- 	if (!pp)
-@@ -186,7 +186,8 @@ static int __init kirkwood_pcie_setup(int nr, struct pci_sys_data *sys)
- 	case 1:
- 		kirkwood_enable_pcie_clk("1");
- 		pcie1_ioresources_init(pp);
--		pci_ioremap_io(SZ_64K * sys->busnr, KIRKWOOD_PCIE1_IO_PHYS_BASE);
-+		pci_ioremap_io(SZ_64K * sys->busnr,
-+			       KIRKWOOD_PCIE1_IO_PHYS_BASE);
- 		break;
- 	default:
- 		panic("PCIe setup: invalid controller %d", index);
-@@ -257,13 +258,13 @@ static struct hw_pci kirkwood_pci __initdata = {
- 
- static void __init add_pcie_port(int index, void __iomem *base)
- {
--	printk(KERN_INFO "Kirkwood PCIe port %d: ", index);
-+	pr_info("Kirkwood PCIe port %d: ", index);
- 
- 	if (orion_pcie_link_up(base)) {
--		printk(KERN_INFO "link up\n");
-+		pr_info("link up\n");
- 		pcie_port_map[num_pcie_ports++] = index;
- 	} else
--		printk(KERN_INFO "link down, ignoring\n");
-+		pr_info("link down, ignoring\n");
- }
- 
- void __init kirkwood_pcie_init(unsigned int portmask)
-diff --git a/arch/arm/mach-kirkwood/sheevaplug-setup.c b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-index 28d0aba..8a17594 100644
---- a/arch/arm/mach-kirkwood/sheevaplug-setup.c
-+++ b/arch/arm/mach-kirkwood/sheevaplug-setup.c
-@@ -117,7 +117,7 @@ static void __init sheevaplug_init(void)
- 
- 	if (gpio_request(29, "USB Power Enable") != 0 ||
- 	    gpio_direction_output(29, 1) != 0)
--		printk(KERN_ERR "can't set up GPIO 29 (USB Power Enable)\n");
-+		pr_err("can't set up GPIO 29 (USB Power Enable)\n");
- 	kirkwood_ehci_init();
- 
- 	kirkwood_ge00_init(&sheevaplug_ge00_data);
-diff --git a/arch/arm/mach-kirkwood/ts41x-setup.c b/arch/arm/mach-kirkwood/ts41x-setup.c
-index 367a940..e4c6127 100644
---- a/arch/arm/mach-kirkwood/ts41x-setup.c
-+++ b/arch/arm/mach-kirkwood/ts41x-setup.c
-@@ -170,8 +170,7 @@ static int __init ts41x_pci_init(void)
- 		else
- 			kirkwood_pcie_init(KW_PCIE0);
- 	}
--
--   return 0;
-+	return 0;
- }
- subsys_initcall(ts41x_pci_init);
- 
+Andrew Lunn (2):
+  ARM: Kirkwood: ehci-orion: Add device tree binding
+  ARM: Kirkwood: Convert all DT boards to EHCI via DT.
+
+ .../devicetree/bindings/usb/ehci-orion.txt         |   15 ++++++++
+ arch/arm/boot/dts/kirkwood.dtsi                    |    7 ++++
+ arch/arm/mach-kirkwood/board-dnskw.c               |    1 -
+ arch/arm/mach-kirkwood/board-dockstar.c            |    1 -
+ arch/arm/mach-kirkwood/board-dreamplug.c           |    1 -
+ arch/arm/mach-kirkwood/board-dt.c                  |    1 +
+ arch/arm/mach-kirkwood/board-goflexnet.c           |    1 -
+ arch/arm/mach-kirkwood/board-ib62x0.c              |    1 -
+ arch/arm/mach-kirkwood/board-iconnect.c            |    1 -
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |    2 --
+ arch/arm/mach-kirkwood/board-km_kirkwood.c         |    1 -
+ arch/arm/mach-kirkwood/board-lsxl.c                |    1 -
+ arch/arm/mach-kirkwood/board-ts219.c               |    1 -
+ drivers/usb/host/ehci-orion.c                      |   38 ++++++++++++++++++--
+ 14 files changed, 58 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
+
 -- 
 1.7.10.4
