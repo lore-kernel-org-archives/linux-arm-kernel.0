@@ -1,34 +1,40 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 20 Oct 2012 21:19:19 +0200
-Subject: [PATCH] usb: phy: samsung: Introducing usb phy driver for hsotg
-In-Reply-To: <20121015132836.GT24333@arwen.pp.htv.fi>
-References: <1349256393-11741-1-git-send-email-p.paneri@samsung.com>
- <1350036934-6051-1-git-send-email-p.paneri@samsung.com>
- <20121015132836.GT24333@arwen.pp.htv.fi>
-Message-ID: <20121020191919.GA555@elf.ucw.cz>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 20 Oct 2012 19:34:51 +0000 (UTC)
+Subject: [PATCH 0/7] crypto: omap-sham updates
+In-Reply-To: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
+References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1210201930440.27264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Fri, 19 Oct 2012, Mark A. Greer wrote:
 
-> > +#define S3C_PHYPWR				(0x00)
-...
-> > +#define S3C_PHYCLK				(0x04)
-> > +
-> > +#define S3C_PHYCLK_MODE_SERIAL			(1 << 6)
-> > +#define S3C_PHYCLK_EXT_OSC			(1 << 5)
-> > +#define S3C_PHYCLK_COMMON_ON_N			(1 << 4)
-> > +#define S3C_PHYCLK_ID_PULL			(1 << 2)
-> > +#define S3C_PHYCLK_CLKSEL_MASK			(0x3 << 0)
-> > +#define S3C_PHYCLK_CLKSEL_SHIFT			(0)
-> > +#define S3C_PHYCLK_CLKSEL_48M			(0x0 << 0)
-> > +#define S3C_PHYCLK_CLKSEL_12M			(0x2 << 0)
-> > +#define S3C_PHYCLK_CLKSEL_24M			(0x3 << 0)
+> From: "Mark A. Greer" <mgreer@animalcreek.com>
+> 
+> This series updates the crypto omap-sham driver and supporting
+> infrastructure.
 
-I believe these 0x 's should be removed. Ouch and << 0 is interesting,
-too, just remove it.
+Looks pretty good; this will make it easier for us to migrate the 
+omap_hwmod code to a LDM bus.  Will reply to the original patches with a 
+few comments and questions.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+One general comment - for us to merge these through the OMAP tree, we'll 
+need acks from the hardware crypto folks.  AFAIK they are:
+
+CRYPTO API
+M:      Herbert Xu <herbert@gondor.apana.org.au>
+M:      "David S. Miller" <davem@davemloft.net>
+L:      linux-crypto at vger.kernel.org
+T:      git git://git.kernel.org/pub/scm/linux/kernel/git/herbert/crypto-2.6.git
+S:      Maintained
+F:      Documentation/crypto/
+F:      arch/*/crypto/
+F:      crypto/
+F:      drivers/crypto/
+F:      include/crypto/
+
+So it would be helpful if you could send those patches along to those 
+people and lists too, and ask them for acks.
+
+
+- Paul
