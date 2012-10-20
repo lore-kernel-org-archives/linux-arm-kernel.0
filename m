@@ -1,50 +1,26 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 20 Oct 2012 18:12:35 +0000 (UTC)
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 20 Oct 2012 20:37:24 +0200
 Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <20121020180123.GA2630@netboy.at.omicron.at>
+In-Reply-To: <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
 References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
  <20121020141136.GA6433@netboy.at.omicron.at>
  <alpine.DEB.2.00.1210201615170.24497@utopia.booyaka.com>
  <20121020180123.GA2630@netboy.at.omicron.at>
-Message-ID: <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
+Message-ID: <20121020183724.GA9984@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Oct 2012, Richard Cochran wrote:
-
-> On Sat, Oct 20, 2012 at 04:27:19PM +0000, Paul Walmsley wrote:
-> > > BeagleBone Rev. A6 does not boot v3.7-rc1, at least not for me.
-> > > I recently posted the missing patches needed to make it work (but the
-> > > patches are not by me).
-> > 
-> > Those are the patches at:
-> > 
-> > http://lists.arm.linux.org.uk/lurker/message/20121015.191630.bdae3c50.en.html
-> > 
-> > ?
+On Sat, Oct 20, 2012 at 06:12:35PM +0000, Paul Walmsley wrote:
+> Just tried omap2plus_defconfig here and the board didn't boot, confirming 
+> your result.  Will add a section to the testlog README.txt about that.
 > 
-> Yes, that is right. Only the first patch is absoutely required for booting.
+> > > In terms of differences from your setup, looks like we have different 
+> > > X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
+> > > configs too.
 
-OK thanks.
+I tried both omap2plus_defconfig and your am33xx_only config, and
+neither one work with my (recent) u-boot version.
 
-> > Also are you using omap2plus_defconfig?
-> 
-> Yes, but I de-selected a few items. I will try it again without
-> changing anything.
-
-Just tried omap2plus_defconfig here and the board didn't boot, confirming 
-your result.  Will add a section to the testlog README.txt about that.
-
-> > In terms of differences from your setup, looks like we have different 
-> > X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
-> > configs too.
-> 
-> What is X-Loader?
-
-It's the "MLO" file on the SD card.  The on-chip ROM code boots that.  
-Then X-Loader boots U-Boot.  Am not sure if it should still be called 
-X-Loader - in your log it seems to be identifying itself as "U-Boot SPL" - 
-so maybe that's not the old "X-Loader" code any more.
-
-
-- Paul
+Thanks,
+Richard
