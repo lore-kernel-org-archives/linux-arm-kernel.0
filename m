@@ -1,39 +1,139 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 13:09:59 +0200
-Subject: [PATCH v2 0/2] DT EHCI support for Kirkwood.
-Message-ID: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
+Date: Sat, 20 Oct 2012 13:10:00 +0200
+Subject: [PATCH v2 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
+In-Reply-To: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
+References: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1350731401-21442-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two patches add DT support to ehci-orion and convert all
-existing Kirkwood DT boards to using DT to instantiate the USB host.
+Based on previous work by Michael Walle and Jason Cooper.
 
-v1->v2: Remove the phy property from DT. The previous implementation
-was not compatible with the new ideas of a USB phy node. Only orion5x
-needs it anyway, and currently converting orion5x to DT is low
-priority. Adding a phy node later will also not affect backwards
-compatibility.
+Made their work actually work, which required added interrupt from DT
+and auxdata, along with setting the dma_mask, which DT does not
+currently do.
 
-Andrew Lunn (2):
-  ARM: Kirkwood: ehci-orion: Add device tree binding
-  ARM: Kirkwood: Convert all DT boards to EHCI via DT.
-
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
+---
  .../devicetree/bindings/usb/ehci-orion.txt         |   15 ++++++++
- arch/arm/boot/dts/kirkwood.dtsi                    |    7 ++++
- arch/arm/mach-kirkwood/board-dnskw.c               |    1 -
- arch/arm/mach-kirkwood/board-dockstar.c            |    1 -
- arch/arm/mach-kirkwood/board-dreamplug.c           |    1 -
- arch/arm/mach-kirkwood/board-dt.c                  |    1 +
- arch/arm/mach-kirkwood/board-goflexnet.c           |    1 -
- arch/arm/mach-kirkwood/board-ib62x0.c              |    1 -
- arch/arm/mach-kirkwood/board-iconnect.c            |    1 -
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |    2 --
- arch/arm/mach-kirkwood/board-km_kirkwood.c         |    1 -
- arch/arm/mach-kirkwood/board-lsxl.c                |    1 -
- arch/arm/mach-kirkwood/board-ts219.c               |    1 -
  drivers/usb/host/ehci-orion.c                      |   38 ++++++++++++++++++--
- 14 files changed, 58 insertions(+), 14 deletions(-)
+ 2 files changed, 50 insertions(+), 3 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
 
+diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
+new file mode 100644
+index 0000000..6bc09ec
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
+@@ -0,0 +1,15 @@
++* EHCI controller, Orion Marvell variants
++
++Required properties:
++- compatible: must be "marvell,orion-ehci"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: The EHCI interrupt
++
++Example:
++
++	ehci at 50000 {
++		compatible = "marvell,orion-ehci";
++		reg = <0x50000 0x1000>;
++		interrupts = <19>;
++	};
+diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
+index 8e7eca6..dda0dbf 100644
+--- a/drivers/usb/host/ehci-orion.c
++++ b/drivers/usb/host/ehci-orion.c
+@@ -14,6 +14,9 @@
+ #include <linux/mbus.h>
+ #include <linux/clk.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_irq.h>
+ 
+ #define rdl(off)	__raw_readl(hcd->regs + (off))
+ #define wrl(off, val)	__raw_writel((val), hcd->regs + (off))
+@@ -181,6 +184,8 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
+ 	}
+ }
+ 
++static u64 ehci_orion_dma_mask = DMA_BIT_MASK(32);
++
+ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
+ {
+ 	struct orion_ehci_data *pd = pdev->dev.platform_data;
+@@ -191,13 +196,17 @@ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
+ 	struct clk *clk;
+ 	void __iomem *regs;
+ 	int irq, err;
++	enum orion_ehci_phy_ver phy_version;
+ 
+ 	if (usb_disabled())
+ 		return -ENODEV;
+ 
+ 	pr_debug("Initializing Orion-SoC USB Host Controller\n");
+ 
+-	irq = platform_get_irq(pdev, 0);
++	if (pdev->dev.of_node)
++		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
++	else
++		irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+ 		dev_err(&pdev->dev,
+ 			"Found HC with no IRQ. Check %s setup!\n",
+@@ -215,6 +224,14 @@ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
+ 		goto err1;
+ 	}
+ 
++	/*
++	 * Right now device-tree probed devices don't get dma_mask
++	 * set. Since shared usb code relies on it, set it here for
++	 * now. Once we have dma capability bindings this can go away.
++	 */
++	if (!pdev->dev.dma_mask)
++		pdev->dev.dma_mask = &ehci_orion_dma_mask;
++
+ 	if (!request_mem_region(res->start, resource_size(res),
+ 				ehci_orion_hc_driver.description)) {
+ 		dev_dbg(&pdev->dev, "controller already in use\n");
+@@ -262,7 +279,12 @@ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
+ 	/*
+ 	 * setup Orion USB controller.
+ 	 */
+-	switch (pd->phy_version) {
++	if (pdev->dev.of_node)
++		phy_version = EHCI_PHY_NA;
++	else
++		phy_version = pd->phy_version;
++
++	switch (phy_version) {
+ 	case EHCI_PHY_NA:	/* dont change USB phy settings */
+ 		break;
+ 	case EHCI_PHY_ORION:
+@@ -317,9 +339,19 @@ static int __exit ehci_orion_drv_remove(struct platform_device *pdev)
+ 
+ MODULE_ALIAS("platform:orion-ehci");
+ 
++static const struct of_device_id ehci_orion_dt_ids[] __devinitdata = {
++	{ .compatible = "marvell,orion-ehci", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
++
+ static struct platform_driver ehci_orion_driver = {
+ 	.probe		= ehci_orion_drv_probe,
+ 	.remove		= __exit_p(ehci_orion_drv_remove),
+ 	.shutdown	= usb_hcd_platform_shutdown,
+-	.driver.name	= "orion-ehci",
++	.driver = {
++		.name	= "orion-ehci",
++		.owner  = THIS_MODULE,
++		.of_match_table = of_match_ptr(ehci_orion_dt_ids),
++	},
+ };
 -- 
 1.7.10.4
