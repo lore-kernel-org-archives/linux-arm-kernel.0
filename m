@@ -1,32 +1,91 @@
-From: dromede@gmail.com (=?UTF-8?B?TWFya28gS2F0acSH?=)
-Date: Thu, 18 Oct 2012 09:28:14 -0000
-Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
- conditions.
-In-Reply-To: <CAHod+Gd=aLbntWsX_S_26_XSUtG9DQYkki1Y+drq0+8GdnHfaw@mail.gmail.com>
-References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
- <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
- <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
- <CAMPhdO8duNqisVL+FLc_0zgFTP+13r83XtRD0YbpdkzMuJov3Q@mail.gmail.com>
- <CAHod+Gd=aLbntWsX_S_26_XSUtG9DQYkki1Y+drq0+8GdnHfaw@mail.gmail.com>
-Message-ID: <CAHod+GcwNr6r_ZQFq-btPJ3E_keWKJhkCb2jP4CES6JTSyn8ow@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Oct 2012 15:11:24 -0000
+Subject: [RFC 07/11] ARM: Kirkwood: Convert dreamplug to pinctrl.
+In-Reply-To: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
+References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1350745663-5277-8-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Almost there, but I guess we could do this better and less confusing by having
-> another array, e.g. tosa_gpio18_config[], which is tosa specific, and only
-> initialize that MFP setting in the tosa path.
->
->>
->> I also looked at the original sharp kernel sources.
->> Only tosa used the RDY signal for it's tc6393tx chip, other machines simply
->> configured gpio18 as output in their suspend routines.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood-dreamplug.dts |   26 ++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-dreamplug.c |   14 --------------
+ 2 files changed, 26 insertions(+), 14 deletions(-)
 
-
-Actually, tosa doesn't use sharpsl_pm. Tosa uses the pda-power framework.
-I said that only tosa uses the RDY signal to point out that we
-probably don't need
-the mfp-config line in postsuspend. That being said, i still think
-that the array ordering
-fix is adequate. Maybe later we may remove the mfp-config line from
-postsuspend when
-we're absolutely sure it isn't necessary for devices that use spitz_pm.c.
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 26e281f..4d1ef46 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -16,6 +16,32 @@
+ 	};
+ 
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			compatible = "marvell,88f6281-pinctrl";
++			reg = <0x10000 0x20>;
++
++			pinctrl-0 = < &pmx_spi
++				      &pmx_led_bluetooth &pmx_led_wifi
++				      &pmx_led_wifi_ap >;
++			pinctrl-names = "default";
++
++			pmx_spi: pmx-spi {
++				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
++				marvell,function = "spi";
++			};
++			pmx_led_bluetooth: pmx-led-bluetooth {
++				marvell,pins = "mpp47";
++				marvell,function = "gpio";
++			};
++			pmx_led_wifi: pmx-led-wifi {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++			pmx_led_wifi_ap: pmx-led-wifi-ap {
++				marvell,pins = "mpp49";
++				marvell,function = "gpio";
++			};
++		};
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+ 			status = "ok";
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index 20af53a..db0c280 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -32,7 +32,6 @@
+ #include <mach/bridge-regs.h>
+ #include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+-#include "mpp.h"
+ 
+ static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+@@ -46,24 +45,11 @@ static struct mvsdio_platform_data dreamplug_mvsdio_data = {
+ 	/* unfortunately the CD signal has not been connected */
+ };
+ 
+-static unsigned int dreamplug_mpp_config[] __initdata = {
+-	MPP0_SPI_SCn,
+-	MPP1_SPI_MOSI,
+-	MPP2_SPI_SCK,
+-	MPP3_SPI_MISO,
+-	MPP47_GPIO,	/* Bluetooth LED */
+-	MPP48_GPIO,	/* Wifi LED */
+-	MPP49_GPIO,	/* Wifi AP LED */
+-	0
+-};
+-
+ void __init dreamplug_init(void)
+ {
+ 	/*
+ 	 * Basic setup. Needs to be called early.
+ 	 */
+-	kirkwood_mpp_conf(dreamplug_mpp_config);
+-
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&dreamplug_ge00_data);
+ 	kirkwood_ge01_init(&dreamplug_ge01_data);
+-- 
+1.7.10.4
