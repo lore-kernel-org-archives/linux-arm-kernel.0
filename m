@@ -1,40 +1,122 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Sat, 20 Oct 2012 19:01:40 +0530
-Subject: [PATCH] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
- V4L2_OUT_CAP_DV_TIMINGS
-Message-ID: <1350739900-25065-1-git-send-email-prabhakar.lad@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 20 Oct 2012 08:36:51 -0500
+Subject: [PATCH V3 1/5] ARM: implement debug_ll_io_init()
+In-Reply-To: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
+References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <5082A8F3.6070403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.lad@ti.com>
+On 10/19/2012 05:41 PM, Stephen Warren wrote:
+> From: Rob Herring <robherring2@gmail.com>
+> 
+> When using DEBUG_LL, the UART's (or other HW's) registers are mapped
+> into early page tables based on the results of assembly macro addruart.
+> Later, when the page tables are replaced, the same virtual address must
+> remain valid. Historically, this has been ensured by using defines from
+> <mach/iomap.h> in both the implementation of addruart, and the machine's
+> .map_io() function. However, with the move to single zImage, we wish to
+> remove <mach/iomap.h>. To enable this, the macro addruart may be used
+> when constructing the late page tables too; addruart is exposed as a
+> C function debug_ll_addr(), and used to set up the required mapping in
+> debug_ll_io_init(), which may called on an opt-in basis from a machine's
+> .map_io() function.
+> 
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> [swarren: Mask map.virtual with PAGE_MASK. Checked for NULL results from
+>  debug_ll_addr (e.g. when selected UART isn't valid). Fixed compile when
+>  either !CONFIG_DEBUG_LL or CONFIG_DEBUG_SEMIHOSTING.]
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> I assume this first patch should actually go into some arm-soc branch so
+> that if others want to take advantage of it this kernel cycle, they can.
+> 
+> v3: New patch.
+> ---
+>  arch/arm/include/asm/mach/map.h |    7 +++++++
+>  arch/arm/kernel/debug.S         |   13 +++++++++++++
+>  arch/arm/mm/mmu.c               |   16 ++++++++++++++++
+>  3 files changed, 36 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+> index 195ac2f..2fe141f 100644
+> --- a/arch/arm/include/asm/mach/map.h
+> +++ b/arch/arm/include/asm/mach/map.h
+> @@ -40,6 +40,13 @@ extern void iotable_init(struct map_desc *, int);
+>  extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
+>  				  void *caller);
+>  
+> +#ifdef CONFIG_DEBUG_LL
+> +extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
+> +extern void debug_ll_io_init(void);
+> +#else
+> +static inline void debug_ll_io_init(void) {}
+> +#endif
+> +
+>  struct mem_type;
+>  extern const struct mem_type *get_mem_type(unsigned int type);
+>  /*
+> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+> index 66f711b..7525ce4 100644
+> --- a/arch/arm/kernel/debug.S
+> +++ b/arch/arm/kernel/debug.S
+> @@ -100,6 +100,13 @@ ENTRY(printch)
+>  		b	1b
+>  ENDPROC(printch)
+>  
+> +ENTRY(debug_ll_addr)
+> +		addruart r2, r3, ip
+> +		str	r2, [r0]
+> +		str	r3, [r1]
+> +		mov	pc, lr
+> +ENDPROC(debug_ll_addr)
+> +
+>  #else
+>  
+>  ENTRY(printascii)
+> @@ -119,4 +126,10 @@ ENTRY(printch)
+>  		mov	pc, lr
+>  ENDPROC(printch)
+>  
+> +ENTRY(debug_ll_addr)
+> +		mov	r2, #0
+> +		mov	r3, #0
 
-This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
-V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
-out.
+Don't you want:
 
-Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
----
- This patch is based on the following patch series,
- ARM: davinci: dm365 EVM: add support for VPBE display
- (https://patchwork.kernel.org/patch/1295071/)
+mov r2, #0
+str r2, [r0]
+str r2, [r1]
 
- arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 2924d61..771abb5 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -514,7 +514,7 @@ static struct vpbe_output dm365evm_vpbe_outputs[] = {
- 			.index		= 1,
- 			.name		= "Component",
- 			.type		= V4L2_OUTPUT_TYPE_ANALOG,
--			.capabilities	= V4L2_OUT_CAP_CUSTOM_TIMINGS,
-+			.capabilities	=  V4L2_OUT_CAP_DV_TIMINGS,
- 		},
- 		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
- 		.default_mode	= "480p59_94",
--- 
-1.7.4.1
+> +		mov	pc, lr
+> +ENDPROC(debug_ll_addr)
+> +
+>  #endif
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 941dfb9..39719bb 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -876,6 +876,22 @@ static void __init pci_reserve_io(void)
+>  #define pci_reserve_io() do { } while (0)
+>  #endif
+>  
+> +#ifdef CONFIG_DEBUG_LL
+> +void __init debug_ll_io_init(void)
+> +{
+> +	struct map_desc map;
+> +
+> +	debug_ll_addr(&map.pfn, &map.virtual);
+> +	if (!map.pfn || !map.virtual)
+> +		return;
+> +	map.pfn = __phys_to_pfn(map.pfn);
+> +	map.virtual &= PAGE_MASK;
+> +	map.length = PAGE_SIZE;
+> +	map.type = MT_DEVICE;
+> +	create_mapping(&map);
+> +}
+> +#endif
+> +
+>  static void * __initdata vmalloc_min =
+>  	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+>  
+> 
