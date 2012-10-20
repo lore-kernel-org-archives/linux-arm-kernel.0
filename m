@@ -1,52 +1,35 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 20 Oct 2012 17:20:43 +0000 (UTC)
+Date: Sat, 20 Oct 2012 17:30:43 +0000 (UTC)
 Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+In-Reply-To: <507FC254.8030500@ti.com>
 References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1210201628420.24497@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210180644170.15666@utopia.booyaka.com>
+ <1350549436.2143.47.camel@sokoban> <507FC254.8030500@ti.com>
+Message-ID: <alpine.DEB.2.00.1210201730120.27264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Venkatraman,
+On Thu, 18 Oct 2012, Santosh Shilimkar wrote:
 
-On Thu, 18 Oct 2012, Paul Walmsley wrote:
+> On Thursday 18 October 2012 02:07 PM, Tero Kristo wrote:
+> > On Thu, 2012-10-18 at 06:48 +0000, Paul Walmsley wrote:
+> > > 
+> > > * 4430es2panda: clockevents problems early in boot
+> > >    - boots with dummy_timer
+> > >    - no one-shot mode so no-HZ is likely to fail
+> > 
+> > I have a fix for this problem, however I am seeing this on omap4460
+> > panda. The root cause seems to be that local timer init for OMAP is
+> > using wrong interrupt number. It adds a wrong offset to the interrupt
+> > (OMAP_INTC_START) which should be omitted. Will send a patch soon along
+> > with a new version of core ret set.
+> > 
+> This one is already fixed by [1] and Tony has sent pull request[1] to
+> arm-soc maintainers for 3.7-rc1 which includes the fix.
 
-> Here are some basic OMAP test results for Linux v3.7-rc1.
-> Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+Thanks, I've updated
 
-...
-
-> Failing tests: needing investigation
-> ------------------------------------
-
-...
-
-> PM tests:
-> 
-> * 3530es3beagle: hangs during off-mode dynamic idle test
->   - Unknown cause; not investigated
-
-Looks like this commit is causing some of our power management tests to 
-fail on v3.7-rc1:
-
-commit 6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c
-Author: Venkatraman S <svenkatr@ti.com>
-Date:   Wed Aug 8 14:26:52 2012 +0530
-
-    mmc: omap_hsmmc: remove access to SYSCONFIG register
-
-...
-
-The failure can be seen in the following test log:
-
-http://www.pwsan.com/omap/transcripts/20121020-3530es3beagle-off-mode-fail-pre-revert.txt
-
-and with commit 6c31b215 reverted, the test succeeds:
-
-http://www.pwsan.com/omap/transcripts/20121020-3530es3beagle-off-mode-fail-post-revert.txt
-
-
-Could you please take a look and fix the problem?
+http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/README.txt
 
 
 - Paul
