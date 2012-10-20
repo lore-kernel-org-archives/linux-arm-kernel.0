@@ -1,23 +1,23 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 15:11:37 -0000
-Subject: [RFC 08/11] ARM: Kirkwood: Convert GoFlex Net to pinctrl.
+Date: Sat, 20 Oct 2012 15:11:39 -0000
+Subject: [RFC 09/11] ARM: Kirkwood: Convert ib62x0 to pinctrl.
 In-Reply-To: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
 References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1350745663-5277-9-git-send-email-andrew@lunn.ch>
+Message-ID: <1350745663-5277-10-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-goflexnet.dts |   57 ++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-goflexnet.c |   18 ----------
- 2 files changed, 57 insertions(+), 18 deletions(-)
+ arch/arm/boot/dts/kirkwood-ib62x0.dts |   41 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-ib62x0.c |   21 -----------------
+ 2 files changed, 41 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-index 7c8238f..46d16a2 100644
---- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
-+++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
-@@ -16,6 +16,63 @@
+diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+index 66794ed..713b39b 100644
+--- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
++++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
+@@ -16,6 +16,47 @@
  	};
  
  	ocp at f1000000 {
@@ -25,100 +25,91 @@ index 7c8238f..46d16a2 100644
 +			compatible = "marvell,88f6281-pinctrl";
 +			reg = <0x10000 0x20>;
 +
-+			pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
-+				      &pmx_led_left_cap_0 &pmx_led_left_cap_1
-+				      &pmx_led_left_cap_2 &pmx_led_left_cap_3
-+				      &pmx_led_right_cap_0 &pmx_led_right_cap_1
-+				      &pmx_led_right_cap_2 &pmx_led_right_cap_3
-+				    >;
++			pinctrl-0 = < &pmx_nand
++				      &pmx_led_os_red &pmx_power_off
++				      &pmx_led_os_green &pmx_led_usb_transfer
++				      &pmx_button_reset &pmx_button_usb_copy >;
 +			pinctrl-names = "default";
 +
-+			pmx_usb_power_enable: pmx-usb-power-enable {
++			pmx_nand: pmx-nand {
++				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3",
++					       "mpp04", "mpp5", "mpp18",
++					       "mpp19";
++				marvell,function = "nand";
++			};
++			pmx_led_os_red: pmx-led-os-red {
++				marvell,pins = "mpp22";
++				marvell,function = "gpio";
++			};
++			pmx_power_off: pmx-power-off {
++				marvell,pins = "mpp24";
++				marvell,function = "gpio";
++			};
++			pmx_led_os_green: pmx-led-os-green {
++				marvell,pins = "mpp25";
++				marvell,function = "gpio";
++			};
++			pmx_led_usb_transfer: pmx-led-usb-transfer {
++				marvell,pins = "mpp27";
++				marvell,function = "gpio";
++			};
++			pmx_button_reset: pmx-button-reset {
++				marvell,pins = "mpp28";
++				marvell,function = "gpio";
++			};
++			pmx_button_usb_copy: pmx-button-usb-copy {
 +				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_right_cap_0: pmx-led_right_cap_0 {
-+				marvell,pins = "mpp38";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_right_cap_1: pmx-led_right_cap_1 {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_right_cap_2: pmx-led_right_cap_2 {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_right_cap_3: pmx-led_right_cap_3 {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_left_cap_0: pmx-led_left_cap_0 {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_left_cap_1: pmx-led_left_cap_1 {
-+				marvell,pins = "mpp43";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_left_cap_2: pmx-led_left_cap_2 {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_left_cap_3: pmx-led_left_cap_3 {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_green: pmx-led_green {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_orange: pmx-led_orange {
-+				marvell,pins = "mpp47";
 +				marvell,function = "gpio";
 +			};
 +		};
  		serial at 12000 {
  			clock-frequency = <200000000>;
- 			status = "ok";
-diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
-index 001ca8c..9643f4b 100644
---- a/arch/arm/mach-kirkwood/board-goflexnet.c
-+++ b/arch/arm/mach-kirkwood/board-goflexnet.c
-@@ -34,34 +34,16 @@
- #include <mach/bridge-regs.h>
- #include <linux/platform_data/mmc-mvsdio.h>
+ 			status = "okay";
+diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
+index cfc47f8..1b2a4a4 100644
+--- a/arch/arm/mach-kirkwood/board-ib62x0.c
++++ b/arch/arm/mach-kirkwood/board-ib62x0.c
+@@ -23,7 +23,6 @@
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ #define IB62X0_GPIO_POWER_OFF	24
+ 
+@@ -31,24 +30,6 @@ static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
  };
  
--static unsigned int goflexnet_mpp_config[] __initdata = {
--	MPP29_GPIO,	/* USB Power Enable */
--	MPP47_GPIO,	/* LED Orange */
--	MPP46_GPIO,	/* LED Green */
--	MPP45_GPIO,	/* LED Left Capacity 3 */
--	MPP44_GPIO,	/* LED Left Capacity 2 */
--	MPP43_GPIO,	/* LED Left Capacity 1 */
--	MPP42_GPIO,	/* LED Left Capacity 0 */
--	MPP41_GPIO,	/* LED Right Capacity 3 */
--	MPP40_GPIO,	/* LED Right Capacity 2 */
--	MPP39_GPIO,	/* LED Right Capacity 1 */
--	MPP38_GPIO,	/* LED Right Capacity 0 */
+-static unsigned int ib62x0_mpp_config[] __initdata = {
+-	MPP0_NF_IO2,
+-	MPP1_NF_IO3,
+-	MPP2_NF_IO4,
+-	MPP3_NF_IO5,
+-	MPP4_NF_IO6,
+-	MPP5_NF_IO7,
+-	MPP18_NF_IO0,
+-	MPP19_NF_IO1,
+-	MPP22_GPIO,	/* OS LED red */
+-	MPP24_GPIO,	/* Power off device */
+-	MPP25_GPIO,	/* OS LED green */
+-	MPP27_GPIO,	/* USB transfer LED */
+-	MPP28_GPIO,	/* Reset button */
+-	MPP29_GPIO,	/* USB Copy button */
 -	0
 -};
 -
- void __init goflexnet_init(void)
+ static void ib62x0_power_off(void)
  {
+ 	gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
+@@ -59,8 +40,6 @@ void __init ib62x0_init(void)
  	/*
  	 * Basic setup. Needs to be called early.
  	 */
--	kirkwood_mpp_conf(goflexnet_mpp_config);
+-	kirkwood_mpp_conf(ib62x0_mpp_config);
 -
- 	if (gpio_request(29, "USB Power Enable") != 0 ||
- 	    gpio_direction_output(29, 1) != 0)
- 		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&ib62x0_ge00_data);
+ 	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
 -- 
 1.7.10.4
