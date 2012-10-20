@@ -1,196 +1,142 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 12:42:14 +0200
-Subject: [PATCH 1/3] ARM: Kirkwood: Remove unused includes
-Message-ID: <1350729736-14539-1-git-send-email-andrew@lunn.ch>
+Date: Sat, 20 Oct 2012 12:42:15 +0200
+Subject: [PATCH 2/3] ARM: Kirkwood: Fix sparse warnings.
+In-Reply-To: <1350729736-14539-1-git-send-email-andrew@lunn.ch>
+References: <1350729736-14539-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1350729736-14539-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the gradual conversion of C code to DT, there are a number of
-include files which are no longer needed. Remove them.
+Mostly missing statics, but also missing include files
+and void parameters.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-kirkwood/board-dockstar.c       |   13 -------------
- arch/arm/mach-kirkwood/board-dreamplug.c      |   15 ---------------
- arch/arm/mach-kirkwood/board-goflexnet.c      |   13 -------------
- arch/arm/mach-kirkwood/board-ib62x0.c         |    6 ------
- arch/arm/mach-kirkwood/board-iconnect.c       |    8 --------
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
- arch/arm/mach-kirkwood/board-lsxl.c           |    8 --------
- arch/arm/mach-kirkwood/board-ts219.c          |    3 ---
- 8 files changed, 68 deletions(-)
+ arch/arm/mach-kirkwood/board-dt.c        |    2 +-
+ arch/arm/mach-kirkwood/common.c          |    2 +-
+ arch/arm/mach-kirkwood/irq.c             |    1 +
+ arch/arm/mach-kirkwood/lacie_v2-common.c |    1 +
+ arch/arm/mach-kirkwood/t5325-setup.c     |    6 +++---
+ arch/arm/mach-kirkwood/tsx1x-common.c    |    7 ++++---
+ 6 files changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
-index f2fbb02..6912882 100644
---- a/arch/arm/mach-kirkwood/board-dockstar.c
-+++ b/arch/arm/mach-kirkwood/board-dockstar.c
-@@ -16,21 +16,8 @@
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 70c5a28..2d840da 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -26,7 +26,7 @@ static struct of_device_id kirkwood_dt_match_table[] __initdata = {
+ 	{ }
+ };
  
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_fdt.h>
--#include <linux/of_irq.h>
--#include <linux/of_platform.h>
- #include <linux/gpio.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <mach/kirkwood.h>
--#include <mach/bridge-regs.h>
--#include <linux/platform_data/mmc-mvsdio.h>
+-struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
++static struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("marvell,orion-spi", 0xf1010600, "orion_spi.0", NULL),
+ 	OF_DEV_AUXDATA("marvell,mv64xxx-i2c", 0xf1011000, "mv64xxx_i2c.0",
+ 		       NULL),
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 3991077..f694ba8 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -425,7 +425,7 @@ void __init kirkwood_sdio_init(struct mvsdio_platform_data *mvsdio_data)
+ /*****************************************************************************
+  * SPI
+  ****************************************************************************/
+-void __init kirkwood_spi_init()
++void __init kirkwood_spi_init(void)
+ {
+ 	orion_spi_init(SPI_PHYS_BASE);
+ }
+diff --git a/arch/arm/mach-kirkwood/irq.c b/arch/arm/mach-kirkwood/irq.c
+index 8847035..2a97a2e 100644
+--- a/arch/arm/mach-kirkwood/irq.c
++++ b/arch/arm/mach-kirkwood/irq.c
+@@ -14,6 +14,7 @@
+ #include <mach/bridge-regs.h>
+ #include <plat/orion-gpio.h>
+ #include <plat/irq.h>
++#include "common.h"
+ 
+ static int __initdata gpio0_irqs[4] = {
+ 	IRQ_KIRKWOOD_GPIO_LOW_0_7,
+diff --git a/arch/arm/mach-kirkwood/lacie_v2-common.c b/arch/arm/mach-kirkwood/lacie_v2-common.c
+index 285edab..4894959 100644
+--- a/arch/arm/mach-kirkwood/lacie_v2-common.c
++++ b/arch/arm/mach-kirkwood/lacie_v2-common.c
+@@ -19,6 +19,7 @@
+ #include <mach/irqs.h>
+ #include <plat/time.h>
+ #include "common.h"
++#include "lacie_v2-common.h"
+ 
+ /*****************************************************************************
+  * 512KB SPI Flash on Boot Device (MACRONIX MX25L4005)
+diff --git a/arch/arm/mach-kirkwood/t5325-setup.c b/arch/arm/mach-kirkwood/t5325-setup.c
+index bad738e..f2daf71 100644
+--- a/arch/arm/mach-kirkwood/t5325-setup.c
++++ b/arch/arm/mach-kirkwood/t5325-setup.c
+@@ -29,7 +29,7 @@
  #include "common.h"
  #include "mpp.h"
  
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-index 20af53a..8a8ebe0 100644
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ b/arch/arm/mach-kirkwood/board-dreamplug.c
-@@ -13,23 +13,8 @@
+-struct mtd_partition hp_t5325_partitions[] = {
++static struct mtd_partition hp_t5325_partitions[] = {
+ 	{
+ 		.name		= "u-boot env",
+ 		.size		= SZ_64K,
+@@ -59,14 +59,14 @@ struct mtd_partition hp_t5325_partitions[] = {
+ 	},
+ };
  
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_fdt.h>
--#include <linux/of_irq.h>
--#include <linux/of_platform.h>
- #include <linux/gpio.h>
--#include <linux/mtd/physmap.h>
--#include <linux/spi/flash.h>
--#include <linux/spi/spi.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <mach/kirkwood.h>
--#include <mach/bridge-regs.h>
- #include <linux/platform_data/mmc-mvsdio.h>
- #include "common.h"
- #include "mpp.h"
-diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
-index 001ca8c..5dcd0d6 100644
---- a/arch/arm/mach-kirkwood/board-goflexnet.c
-+++ b/arch/arm/mach-kirkwood/board-goflexnet.c
-@@ -18,21 +18,8 @@
+-const struct flash_platform_data hp_t5325_flash = {
++static const struct flash_platform_data hp_t5325_flash = {
+ 	.type		= "mx25l8005",
+ 	.name		= "spi_flash",
+ 	.parts		= hp_t5325_partitions,
+ 	.nr_parts	= ARRAY_SIZE(hp_t5325_partitions),
+ };
  
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
--#include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_fdt.h>
--#include <linux/of_irq.h>
--#include <linux/of_platform.h>
- #include <linux/gpio.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <mach/kirkwood.h>
--#include <mach/bridge-regs.h>
--#include <linux/platform_data/mmc-mvsdio.h>
- #include "common.h"
- #include "mpp.h"
- 
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-index cfc47f8..6d3a564 100644
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ b/arch/arm/mach-kirkwood/board-ib62x0.c
-@@ -13,15 +13,9 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
--#include <linux/mtd/partitions.h>
--#include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include <linux/input.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <mach/kirkwood.h>
- #include "common.h"
- #include "mpp.h"
- 
-diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
-index d084b1e..24f5aa7 100644
---- a/arch/arm/mach-kirkwood/board-iconnect.c
-+++ b/arch/arm/mach-kirkwood/board-iconnect.c
-@@ -10,16 +10,8 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
- #include <linux/of.h>
--#include <linux/of_address.h>
--#include <linux/of_fdt.h>
--#include <linux/of_irq.h>
--#include <linux/of_platform.h>
- #include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
--#include <asm/mach/arch.h>
--#include <mach/kirkwood.h>
- #include "common.h"
- #include "mpp.h"
- 
-diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-index 158fb97..e4ed62c 100644
---- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-+++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
-@@ -10,10 +10,8 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/platform_device.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/ethtool.h>
--#include <mach/kirkwood.h>
- #include "common.h"
- #include "mpp.h"
- 
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-index 83d8975..64e5cc6 100644
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ b/arch/arm/mach-kirkwood/board-lsxl.c
-@@ -14,17 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/mtd/partitions.h>
--#include <linux/ata_platform.h>
--#include <linux/spi/flash.h>
--#include <linux/spi/spi.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include <linux/gpio-fan.h>
--#include <linux/input.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <mach/kirkwood.h>
- #include "common.h"
- #include "mpp.h"
- 
-diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
-index 1750e68..f3bfeda 100644
---- a/arch/arm/mach-kirkwood/board-ts219.c
-+++ b/arch/arm/mach-kirkwood/board-ts219.c
-@@ -19,9 +19,6 @@
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/mv643xx_eth.h>
--#include <linux/ata_platform.h>
--#include <linux/gpio_keys.h>
--#include <linux/input.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+-struct spi_board_info __initdata hp_t5325_spi_slave_info[] = {
++static struct spi_board_info __initdata hp_t5325_spi_slave_info[] = {
+ 	{
+ 		.modalias	= "m25p80",
+ 		.platform_data	= &hp_t5325_flash,
+diff --git a/arch/arm/mach-kirkwood/tsx1x-common.c b/arch/arm/mach-kirkwood/tsx1x-common.c
+index 8943ede..cec87ce 100644
+--- a/arch/arm/mach-kirkwood/tsx1x-common.c
++++ b/arch/arm/mach-kirkwood/tsx1x-common.c
+@@ -7,6 +7,7 @@
+ #include <linux/serial_reg.h>
  #include <mach/kirkwood.h>
+ #include "common.h"
++#include "tsx1x-common.h"
+ 
+ /*
+  * QNAP TS-x1x Boards flash
+@@ -29,7 +30,7 @@
+  *
+  ***************************************************************************/
+ 
+-struct mtd_partition qnap_tsx1x_partitions[] = {
++static struct mtd_partition qnap_tsx1x_partitions[] = {
+ 	{
+ 		.name		= "U-Boot",
+ 		.size		= 0x00080000,
+@@ -58,14 +59,14 @@ struct mtd_partition qnap_tsx1x_partitions[] = {
+ 	},
+ };
+ 
+-const struct flash_platform_data qnap_tsx1x_flash = {
++static const struct flash_platform_data qnap_tsx1x_flash = {
+ 	.type		= "m25p128",
+ 	.name		= "spi_flash",
+ 	.parts		= qnap_tsx1x_partitions,
+ 	.nr_parts	= ARRAY_SIZE(qnap_tsx1x_partitions),
+ };
+ 
+-struct spi_board_info __initdata qnap_tsx1x_spi_slave_info[] = {
++static struct spi_board_info __initdata qnap_tsx1x_spi_slave_info[] = {
+ 	{
+ 		.modalias	= "m25p80",
+ 		.platform_data	= &qnap_tsx1x_flash,
 -- 
 1.7.10.4
