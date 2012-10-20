@@ -1,224 +1,107 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 15:11:29 -0000
-Subject: [RFC 05/11] ARM: Kirkwood: Convert dnskw to pinctrl
+Date: Sat, 20 Oct 2012 15:11:30 -0000
+Subject: [RFC 02/11] ARM: Kirkwood: Allow use of MVEBU GPIO driver.
 In-Reply-To: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
 References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1350745663-5277-6-git-send-email-andrew@lunn.ch>
+Message-ID: <1350745663-5277-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This GPIO driver is generic to all Marvel Orion/XP/370 SoCs. Allow
+Kirkwood to enable and use it. Fix the kirkwood DT to pass the
+expected properties and remove the old gpio probing code.
+
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-dnskw.dtsi |  136 +++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   37 ---------
- 2 files changed, 136 insertions(+), 37 deletions(-)
+ arch/arm/Kconfig                |    1 +
+ arch/arm/boot/dts/kirkwood.dtsi |   11 +++++++++--
+ arch/arm/plat-orion/irq.c       |    5 +----
+ drivers/gpio/Kconfig            |    2 +-
+ 4 files changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 9b32d02..5d8cf93 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -36,6 +36,142 @@
- 	};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 160cd40..063aac2 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -550,6 +550,7 @@ config ARCH_KIRKWOOD
+ 	select PLAT_ORION_LEGACY
+ 	select PINCTRL
+ 	select PINCTRL_KIRKWOOD
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	help
+ 	  Support for the following Marvell Kirkwood series SoCs:
+ 	  88F6180, 88F6192 and 88F6281.
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 4e5b815..5bc7a8b 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -4,6 +4,11 @@
+ 	compatible = "marvell,kirkwood";
+ 	interrupt-parent = <&intc>;
  
- 	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			compatible = "marvell,88f6281-pinctrl";
-+			reg = <0x10000 0x20>;
++	aliases {
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++	};
 +
-+			pinctrl-0 = < &pmx_uart1 &pmx_sata1
-+				      &pmx_gpio_24 &pmx_gpio_25
-+				      &pmx_led_power &pmx_led_power
-+				      &pmx_led_red_right_hdd
-+				      &pmx_led_red_left_hdd
-+				      &pmx_led_red_usb_325
-+				      &pmx_gpio_30 &pmx_gpio_31
-+				      &pmx_gpio_32 &pmx_gpio_33
-+				      &pmx_button_power
-+				      &pmx_led_red_usb_320
-+				      &pmx_power_off &pmx_power_back_on
-+				      &pmx_power_sata0 &pmx_power_sata1
-+				      &pmx_present_sata0 &pmx_present_sata1
-+				      &pmx_led_white_usb &pmx_fan_tacho
-+				      &pmx_fan_high_speed &pmx_fan_low_speed
-+				      &pmx_button_unmount &pmx_button_reset
-+				      &pmx_temp_alarm >;
-+			pinctrl-names = "default";
-+
-+			pmx_uart1: pmx-uart1 {
-+				marvell,pins = "mpp13", "mpp14";
-+				marvell,function = "uart1";
-+			};
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins = "mpp4", "mpp20", "mpp22";
-+				marvell,function = "sata1";
-+			};
-+			pmx_gpio_24: pmx-gpio-24 {
-+				marvell,pins = "mpp24";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_25: pmx-gpio-25 {
-+				marvell,pins = "mpp25";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_power: pmx-led-power {
-+				marvell,pins = "mpp26";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_right_hdd: pmx-led-red-right-hdd {
-+				marvell,pins = "mpp27";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_left_hdd: pmx-led-red-left-hdd {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_usb_325: pmx-led-red-usb-325 {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_30: pmx-gpio-30 {
-+				marvell,pins = "mpp30";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_31: pmx-gpio-31 {
-+				marvell,pins = "mpp31";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_32: pmx-gpio-32 {
-+				marvell,pins = "mpp32";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_33: pmx-gpio-33 {
-+				marvell,pins = "mpp33";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_power: pmx-button-power {
-+				marvell,pins = "mpp34";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_usb_320: pmx-led-red-usb-320 {
-+				marvell,pins = "mpp35";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_off: pmx-power-off {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_back_on: pmx-power-back-on {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_38: pmx-gpio-38 {
-+				marvell,pins = "mpp38";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_sata0: pmx-power-sata0 {
-+				marvell,pins = "mpp39";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_sata1: pmx-power-sata1 {
-+				marvell,pins = "mpp40";
-+				marvell,function = "gpio";
-+			};
-+			pmx_present_sata0: pmx-present-sata0 {
-+				marvell,pins = "mpp41";
-+				marvell,function = "gpio";
-+			};
-+			pmx_present_sata1: pmx-present-sata1 {
-+				marvell,pins = "mpp42";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_white_usb: pmx-led-white-usb {
-+				marvell,pins = "mpp43";
-+				marvell,function = "gpio";
-+			};
-+			pmx_fan_tacho: pmx-fan-tacho {
-+				marvell,pins = "mpp44";
-+				marvell,function = "gpio";
-+			};
-+			pmx_fan_high_speed: pmx-fan-high-speed {
-+				marvell,pins = "mpp45";
-+				marvell,function = "gpio";
-+			};
-+			pmx_fan_low_speed: pmx-fan-low-speed {
-+				marvell,pins = "mpp46";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_unmount: pmx-button-unmount {
-+				marvell,pins = "mpp47";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_reset: pmx-button-reset {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+			pmx_temp_alarm: pmx-temp-alarm {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
-+		};
- 		sata at 80000 {
- 			status = "okay";
- 			nr-ports = <2>;
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 43d16d6..ed93c09 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -17,46 +17,11 @@
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include "common.h"
--#include "mpp.h"
+ 	intc: interrupt-controller {
+ 		compatible = "marvell,orion-intc", "marvell,intc";
+ 		interrupt-controller;
+@@ -24,7 +29,8 @@
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+ 			reg = <0x10100 0x40>;
+-			ngpio = <32>;
++			ngpios = <32>;
++			interrupt-controller;
+ 			interrupts = <35>, <36>, <37>, <38>;
+ 		};
  
- static struct mv643xx_eth_platform_data dnskw_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
+@@ -33,7 +39,8 @@
+ 			#gpio-cells = <2>;
+ 			gpio-controller;
+ 			reg = <0x10140 0x40>;
+-			ngpio = <18>;
++			ngpios = <18>;
++			interrupt-controller;
+ 			interrupts = <39>, <40>, <41>;
+ 		};
  
--static unsigned int dnskw_mpp_config[] __initdata = {
--	MPP13_UART1_TXD,	/* Custom ... */
--	MPP14_UART1_RXD,	/* ... Controller (DNS-320 only) */
--	MPP20_SATA1_ACTn,	/* LED: White Right HDD */
--	MPP21_SATA0_ACTn,	/* LED: White Left HDD */
--	MPP24_GPIO,
--	MPP25_GPIO,
--	MPP26_GPIO,	/* LED: Power */
--	MPP27_GPIO,	/* LED: Red Right HDD */
--	MPP28_GPIO,	/* LED: Red Left HDD */
--	MPP29_GPIO,	/* LED: Red USB (DNS-325 only) */
--	MPP30_GPIO,
--	MPP31_GPIO,
--	MPP32_GPIO,
--	MPP33_GPO,
--	MPP34_GPIO,	/* Button: Front power */
--	MPP35_GPIO,	/* LED: Red USB (DNS-320 only) */
--	MPP36_GPIO,	/* Power: Turn off board */
--	MPP37_GPIO,	/* Power: Turn back on after power failure */
--	MPP38_GPIO,
--	MPP39_GPIO,	/* Power: SATA0 */
--	MPP40_GPIO,	/* Power: SATA1 */
--	MPP41_GPIO,	/* SATA0 present */
--	MPP42_GPIO,	/* SATA1 present */
--	MPP43_GPIO,	/* LED: White USB */
--	MPP44_GPIO,	/* Fan: Tachometer Pin */
--	MPP45_GPIO,	/* Fan: high speed */
--	MPP46_GPIO,	/* Fan: low speed */
--	MPP47_GPIO,	/* Button: Back unmount */
--	MPP48_GPIO,	/* Button: Back reset */
--	MPP49_GPIO,	/* Temp Alarm (DNS-325) Pin of U5 (DNS-320) */
--	0
--};
--
- static void dnskw_power_off(void)
+diff --git a/arch/arm/plat-orion/irq.c b/arch/arm/plat-orion/irq.c
+index 1867944..eec296a 100644
+--- a/arch/arm/plat-orion/irq.c
++++ b/arch/arm/plat-orion/irq.c
+@@ -41,7 +41,7 @@ void __init orion_irq_init(unsigned int irq_start, void __iomem *maskaddr)
+ static int __init orion_add_irq_domain(struct device_node *np,
+ 				       struct device_node *interrupt_parent)
  {
- 	gpio_set_value(36, 1);
-@@ -76,8 +41,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
+-	int i = 0, irq_gpio;
++	int i = 0;
+ 	void __iomem *base;
  
- void __init dnskw_init(void)
- {
--	kirkwood_mpp_conf(dnskw_mpp_config);
+ 	do {
+@@ -55,9 +55,6 @@ static int __init orion_add_irq_domain(struct device_node *np,
+ 	irq_domain_add_legacy(np, i * 32, 0, 0,
+ 			      &irq_domain_simple_ops, NULL);
+ 
+-	irq_gpio = i * 32;
+-	orion_gpio_of_init(irq_gpio);
 -
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d055cee..2155aef 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -152,7 +152,7 @@ config GPIO_MSM_V2
+ 
+ config GPIO_MVEBU
+ 	def_bool y
+-	depends on ARCH_MVEBU
++	depends on ARCH_MVEBU || ARCH_KIRKWOOD
+ 	select GPIO_GENERIC
+ 	select GENERIC_IRQ_CHIP
  
 -- 
 1.7.10.4
