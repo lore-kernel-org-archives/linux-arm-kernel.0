@@ -1,37 +1,36 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Sat, 20 Oct 2012 20:47:50 +0200
-Subject: Which kirkwood does your DT board use?
-In-Reply-To: <20121020113800.GC21046@lunn.ch>
-References: <20121020113800.GC21046@lunn.ch>
-Message-ID: <20121020184750.GA19620@schnuecks.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 20 Oct 2012 18:58:10 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <20121020183724.GA9984@netboy.at.omicron.at>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <20121020141136.GA6433@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210201615170.24497@utopia.booyaka.com>
+ <20121020180123.GA2630@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
+ <20121020183724.GA9984@netboy.at.omicron.at>
+Message-ID: <alpine.DEB.2.00.1210201856020.27264@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Sat, 20 Oct 2012, Richard Cochran wrote:
 
-On Sat, Oct 20, 2012 at 01:38:00PM +0200, Andrew Lunn wrote:
-> Hi Folks
+> On Sat, Oct 20, 2012 at 06:12:35PM +0000, Paul Walmsley wrote:
+> > Just tried omap2plus_defconfig here and the board didn't boot, confirming 
+> > your result.  Will add a section to the testlog README.txt about that.
+> > 
+> > > > In terms of differences from your setup, looks like we have different 
+> > > > X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
+> > > > configs too.
 > 
-> All of you in the To: have contributed a DT based Kirkwood board port.
-> Nearly all the DT files we have declare the CPU to be
-> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
-> mpp code, we need to know the exact kirkwood being used. It should be
-> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
-> 
-> You can see what your hardware has a boot time:
-> 
-> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
-> 
-> Please could you check your hardware and let me know what the correct
-> CPU is. I can then fix the .dts files and prepare a first attempt at
-> converting boards to pinctrl.
-> 
+> I tried both omap2plus_defconfig and your am33xx_only config, and
+> neither one work with my (recent) u-boot version.
 
-My IB-NAS6210 says:
+Just sent you the MLO and u-boot.img from here via private E-mail.  Those 
+were the files that came with the BeagleBone SD card here.
 
-Kirkwood: MV88F6281-A1, TCLK=200000000.
+TI also has a u-boot tree for the AM33xx; might be worth trying:
 
-I don't have a 6220, but I suppose it is the same since they seem to
-use the same board internally.
+git://arago-project.org/git/projects/u-boot-am33x.git
 
-- Simon
+
+- Paul
