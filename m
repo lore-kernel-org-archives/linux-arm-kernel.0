@@ -1,122 +1,115 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 20 Oct 2012 08:36:51 -0500
-Subject: [PATCH V3 1/5] ARM: implement debug_ll_io_init()
-In-Reply-To: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
-References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5082A8F3.6070403@gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 20 Oct 2012 16:11:36 +0200
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+Message-ID: <20121020141136.GA6433@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2012 05:41 PM, Stephen Warren wrote:
-> From: Rob Herring <robherring2@gmail.com>
+On Thu, Oct 18, 2012 at 05:20:46AM +0000, Paul Walmsley wrote:
 > 
-> When using DEBUG_LL, the UART's (or other HW's) registers are mapped
-> into early page tables based on the results of assembly macro addruart.
-> Later, when the page tables are replaced, the same virtual address must
-> remain valid. Historically, this has been ensured by using defines from
-> <mach/iomap.h> in both the implementation of addruart, and the machine's
-> .map_io() function. However, with the move to single zImage, we wish to
-> remove <mach/iomap.h>. To enable this, the macro addruart may be used
-> when constructing the late page tables too; addruart is exposed as a
-> C function debug_ll_addr(), and used to set up the required mapping in
-> debug_ll_io_init(), which may called on an opt-in basis from a machine's
-> .map_io() function.
+> Here are some basic OMAP test results for Linux v3.7-rc1.
+> Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> [swarren: Mask map.virtual with PAGE_MASK. Checked for NULL results from
->  debug_ll_addr (e.g. when selected UART isn't valid). Fixed compile when
->  either !CONFIG_DEBUG_LL or CONFIG_DEBUG_SEMIHOSTING.]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> I assume this first patch should actually go into some arm-soc branch so
-> that if others want to take advantage of it this kernel cycle, they can.
 > 
-> v3: New patch.
-> ---
->  arch/arm/include/asm/mach/map.h |    7 +++++++
->  arch/arm/kernel/debug.S         |   13 +++++++++++++
->  arch/arm/mm/mmu.c               |   16 ++++++++++++++++
->  3 files changed, 36 insertions(+), 0 deletions(-)
+> Changes from previous tests
+> ---------------------------
 > 
-> diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-> index 195ac2f..2fe141f 100644
-> --- a/arch/arm/include/asm/mach/map.h
-> +++ b/arch/arm/include/asm/mach/map.h
-> @@ -40,6 +40,13 @@ extern void iotable_init(struct map_desc *, int);
->  extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
->  				  void *caller);
->  
-> +#ifdef CONFIG_DEBUG_LL
-> +extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
-> +extern void debug_ll_io_init(void);
-> +#else
-> +static inline void debug_ll_io_init(void) {}
-> +#endif
-> +
->  struct mem_type;
->  extern const struct mem_type *get_mem_type(unsigned int type);
->  /*
-> diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-> index 66f711b..7525ce4 100644
-> --- a/arch/arm/kernel/debug.S
-> +++ b/arch/arm/kernel/debug.S
-> @@ -100,6 +100,13 @@ ENTRY(printch)
->  		b	1b
->  ENDPROC(printch)
->  
-> +ENTRY(debug_ll_addr)
-> +		addruart r2, r3, ip
-> +		str	r2, [r0]
-> +		str	r3, [r1]
-> +		mov	pc, lr
-> +ENDPROC(debug_ll_addr)
-> +
->  #else
->  
->  ENTRY(printascii)
-> @@ -119,4 +126,10 @@ ENTRY(printch)
->  		mov	pc, lr
->  ENDPROC(printch)
->  
-> +ENTRY(debug_ll_addr)
-> +		mov	r2, #0
-> +		mov	r3, #0
+> Kernel configs have been reorganized and updated.  AM335x Beaglebone and
+> OMAP4460 Pandaboard-ES boards have been added to the testbed.
+> 
+> 
+> Passing tests
+> -------------
+> 
+> Boot to userspace: 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+>                    4430es2panda, 5912osk, am335xbone
+> 
+> PM ret/off, suspend + dynamic idle: (none)
 
-Don't you want:
+BeagleBone Rev. A6 does not boot v3.7-rc1, at least not for me.
+I recently posted the missing patches needed to make it work (but the
+patches are not by me).
 
-mov r2, #0
-str r2, [r0]
-str r2, [r1]
+Below I include the console log.
 
-> +		mov	pc, lr
-> +ENDPROC(debug_ll_addr)
-> +
->  #endif
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 941dfb9..39719bb 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -876,6 +876,22 @@ static void __init pci_reserve_io(void)
->  #define pci_reserve_io() do { } while (0)
->  #endif
->  
-> +#ifdef CONFIG_DEBUG_LL
-> +void __init debug_ll_io_init(void)
-> +{
-> +	struct map_desc map;
-> +
-> +	debug_ll_addr(&map.pfn, &map.virtual);
-> +	if (!map.pfn || !map.virtual)
-> +		return;
-> +	map.pfn = __phys_to_pfn(map.pfn);
-> +	map.virtual &= PAGE_MASK;
-> +	map.length = PAGE_SIZE;
-> +	map.type = MT_DEVICE;
-> +	create_mapping(&map);
-> +}
-> +#endif
-> +
->  static void * __initdata vmalloc_min =
->  	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
->  
-> 
+Thanks,
+Richard
+
+
+U-Boot SPL 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
+OMAP SD/MMC: 0
+reading u-boot.img
+reading u-boot.img
+
+
+U-Boot 2012.10-rc1-00148-g4668a08 (Sep 30 2012 - 09:35:20)
+
+I2C:   ready
+DRAM:  256 MiB
+WARNING: Caches not enabled
+MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
+Using default environment
+
+Net:   cpsw
+Hit any key to stop autoboot:  3  0 
+U-Boot# tftp 81000000 uImage
+link up on port 0, speed 100, full duplex
+Using cpsw device
+TFTP from server 192.168.0.12; our IP address is 192.168.0.77
+Filename 'uImage'.
+Load address: 0x81000000
+Loading: #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 ################################
+done
+Bytes transferred = 3822248 (3a52a8 hex)
+U-Boot#    tftp 82000000 beaglebone-initrd.gz
+link up on port 0, speed 100, full duplex
+Using cpsw device
+TFTP from server 192.168.0.12; our IP address is 192.168.0.77
+Filename 'beaglebone-initrd.gz'.
+Load address: 0x82000000
+Loading: #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 #############
+done
+Bytes transferred = 2059309 (1f6c2d hex)
+U-Boot#    tftp 80000000 am335x-bone.dtb
+link up on port 0, speed 100, full duplex
+Using cpsw device
+TFTP from server 192.168.0.12; our IP address is 192.168.0.77
+Filename 'am335x-bone.dtb'.
+Load address: 0x80000000
+Loading: #
+done
+Bytes transferred = 4391 (1127 hex)
+U-Boot#    bootm 81000000 - 80000000
+## Booting kernel from Legacy Image at 81000000 ...
+   Image Name:   Linux-3.7.0-rc1
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    3822184 Bytes = 3.6 MiB
+   Load Address: 80008000
+   Entry Point:  80008000
+   Verifying Checksum ... OK
+## Flattened Device Tree blob at 80000000
+   Booting using the fdt blob at 0x80000000
+   Loading Kernel Image ... OK
+OK
+   Loading Device Tree to 8fe66000, end 8fe6a126 ... OK
+
+Starting kernel ...
