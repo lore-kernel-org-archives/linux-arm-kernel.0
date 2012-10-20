@@ -1,139 +1,181 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 20 Oct 2012 13:10:00 +0200
-Subject: [PATCH v2 1/2] ARM: Kirkwood: ehci-orion: Add device tree binding
+Date: Sat, 20 Oct 2012 13:10:01 +0200
+Subject: [PATCH v2 2/2] ARM: Kirkwood: Convert all DT boards to EHCI via DT.
 In-Reply-To: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
 References: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1350731401-21442-2-git-send-email-andrew@lunn.ch>
+Message-ID: <1350731401-21442-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on previous work by Michael Walle and Jason Cooper.
-
-Made their work actually work, which required added interrupt from DT
-and auxdata, along with setting the dma_mask, which DT does not
-currently do.
+Now that the EHCI driver has DT support, drop old style configuration
+of it and add DT in its place. Since all the boards enable the EHCI,
+enable it by default in kirkwood.dtsi. Any new boards which don't have
+USB can specifically disable it.
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
- .../devicetree/bindings/usb/ehci-orion.txt         |   15 ++++++++
- drivers/usb/host/ehci-orion.c                      |   38 ++++++++++++++++++--
- 2 files changed, 50 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
+ arch/arm/boot/dts/kirkwood.dtsi               |    7 +++++++
+ arch/arm/mach-kirkwood/board-dnskw.c          |    1 -
+ arch/arm/mach-kirkwood/board-dockstar.c       |    1 -
+ arch/arm/mach-kirkwood/board-dreamplug.c      |    1 -
+ arch/arm/mach-kirkwood/board-dt.c             |    1 +
+ arch/arm/mach-kirkwood/board-goflexnet.c      |    1 -
+ arch/arm/mach-kirkwood/board-ib62x0.c         |    1 -
+ arch/arm/mach-kirkwood/board-iconnect.c       |    1 -
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
+ arch/arm/mach-kirkwood/board-km_kirkwood.c    |    1 -
+ arch/arm/mach-kirkwood/board-lsxl.c           |    1 -
+ arch/arm/mach-kirkwood/board-ts219.c          |    1 -
+ 12 files changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/ehci-orion.txt b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-new file mode 100644
-index 0000000..6bc09ec
---- /dev/null
-+++ b/Documentation/devicetree/bindings/usb/ehci-orion.txt
-@@ -0,0 +1,15 @@
-+* EHCI controller, Orion Marvell variants
-+
-+Required properties:
-+- compatible: must be "marvell,orion-ehci"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: The EHCI interrupt
-+
-+Example:
-+
-+	ehci at 50000 {
-+		compatible = "marvell,orion-ehci";
-+		reg = <0x50000 0x1000>;
-+		interrupts = <19>;
-+	};
-diff --git a/drivers/usb/host/ehci-orion.c b/drivers/usb/host/ehci-orion.c
-index 8e7eca6..dda0dbf 100644
---- a/drivers/usb/host/ehci-orion.c
-+++ b/drivers/usb/host/ehci-orion.c
-@@ -14,6 +14,9 @@
- #include <linux/mbus.h>
- #include <linux/clk.h>
- #include <linux/platform_data/usb-ehci-orion.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_irq.h>
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 4e5b815..4fc7a8e 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -77,6 +77,13 @@
+ 			status = "okay";
+ 		};
  
- #define rdl(off)	__raw_readl(hcd->regs + (off))
- #define wrl(off, val)	__raw_writel((val), hcd->regs + (off))
-@@ -181,6 +184,8 @@ ehci_orion_conf_mbus_windows(struct usb_hcd *hcd,
- 	}
++		ehci at 50000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0x50000 0x1000>;
++			interrupts = <19>;
++			status = "okay";
++		};
++
+ 		sata at 80000 {
+ 			compatible = "marvell,orion-sata";
+ 			reg = <0x80000 0x5000>;
+diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+index 43d16d6..2ac6c60 100644
+--- a/arch/arm/mach-kirkwood/board-dnskw.c
++++ b/arch/arm/mach-kirkwood/board-dnskw.c
+@@ -78,7 +78,6 @@ void __init dnskw_init(void)
+ {
+ 	kirkwood_mpp_conf(dnskw_mpp_config);
+ 
+-	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&dnskw_ge00_data);
+ 
+ 	/* Register power-off GPIO. */
+diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
+index f2fbb02..e94782d 100644
+--- a/arch/arm/mach-kirkwood/board-dockstar.c
++++ b/arch/arm/mach-kirkwood/board-dockstar.c
+@@ -55,7 +55,6 @@ void __init dockstar_dt_init(void)
+ 	if (gpio_request(29, "USB Power Enable") != 0 ||
+ 	    gpio_direction_output(29, 1) != 0)
+ 		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
+-	kirkwood_ehci_init();
+ 
+ 	kirkwood_ge00_init(&dockstar_ge00_data);
+ }
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index 20af53a..acdc04a 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -64,7 +64,6 @@ void __init dreamplug_init(void)
+ 	 */
+ 	kirkwood_mpp_conf(dreamplug_mpp_config);
+ 
+-	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&dreamplug_ge00_data);
+ 	kirkwood_ge01_init(&dreamplug_ge01_data);
+ 	kirkwood_sdio_init(&dreamplug_mvsdio_data);
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 70c5a28..ccb91b8 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -34,6 +34,7 @@ struct of_dev_auxdata kirkwood_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("marvell,orion-sata", 0xf1080000, "sata_mv.0", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-nand", 0xf4000000, "orion_nand", NULL),
+ 	OF_DEV_AUXDATA("marvell,orion-crypto", 0xf1030000, "mv_crypto", NULL),
++	OF_DEV_AUXDATA("marvell,orion-ehci", 0xf1050000, "orion-ehci.0", NULL),
+ 	{},
+ };
+ 
+diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
+index 001ca8c..d388bea 100644
+--- a/arch/arm/mach-kirkwood/board-goflexnet.c
++++ b/arch/arm/mach-kirkwood/board-goflexnet.c
+@@ -65,7 +65,6 @@ void __init goflexnet_init(void)
+ 	if (gpio_request(29, "USB Power Enable") != 0 ||
+ 	    gpio_direction_output(29, 1) != 0)
+ 		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
+-	kirkwood_ehci_init();
+ 
+ 	kirkwood_ge00_init(&goflexnet_ge00_data);
+ }
+diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
+index cfc47f8..db08e37 100644
+--- a/arch/arm/mach-kirkwood/board-ib62x0.c
++++ b/arch/arm/mach-kirkwood/board-ib62x0.c
+@@ -61,7 +61,6 @@ void __init ib62x0_init(void)
+ 	 */
+ 	kirkwood_mpp_conf(ib62x0_mpp_config);
+ 
+-	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&ib62x0_ge00_data);
+ 	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
+ 	    gpio_direction_output(IB62X0_GPIO_POWER_OFF, 0) == 0)
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index d084b1e..8275fb0 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -45,7 +45,6 @@ void __init iconnect_init(void)
+ {
+ 	kirkwood_mpp_conf(iconnect_mpp_config);
+ 
+-	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&iconnect_ge00_data);
  }
  
-+static u64 ehci_orion_dma_mask = DMA_BIT_MASK(32);
-+
- static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
- {
- 	struct orion_ehci_data *pd = pdev->dev.platform_data;
-@@ -191,13 +196,17 @@ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
- 	struct clk *clk;
- 	void __iomem *regs;
- 	int irq, err;
-+	enum orion_ehci_phy_ver phy_version;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
- 
- 	pr_debug("Initializing Orion-SoC USB Host Controller\n");
- 
--	irq = platform_get_irq(pdev, 0);
-+	if (pdev->dev.of_node)
-+		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-+	else
-+		irq = platform_get_irq(pdev, 0);
- 	if (irq <= 0) {
- 		dev_err(&pdev->dev,
- 			"Found HC with no IRQ. Check %s setup!\n",
-@@ -215,6 +224,14 @@ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
- 		goto err1;
- 	}
- 
-+	/*
-+	 * Right now device-tree probed devices don't get dma_mask
-+	 * set. Since shared usb code relies on it, set it here for
-+	 * now. Once we have dma capability bindings this can go away.
-+	 */
-+	if (!pdev->dev.dma_mask)
-+		pdev->dev.dma_mask = &ehci_orion_dma_mask;
-+
- 	if (!request_mem_region(res->start, resource_size(res),
- 				ehci_orion_hc_driver.description)) {
- 		dev_dbg(&pdev->dev, "controller already in use\n");
-@@ -262,7 +279,12 @@ static int __devinit ehci_orion_drv_probe(struct platform_device *pdev)
- 	/*
- 	 * setup Orion USB controller.
+diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+index 158fb97..a6f3d29 100644
+--- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
++++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+@@ -51,7 +51,5 @@ void __init iomega_ix2_200_init(void)
  	 */
--	switch (pd->phy_version) {
-+	if (pdev->dev.of_node)
-+		phy_version = EHCI_PHY_NA;
-+	else
-+		phy_version = pd->phy_version;
-+
-+	switch (phy_version) {
- 	case EHCI_PHY_NA:	/* dont change USB phy settings */
- 		break;
- 	case EHCI_PHY_ORION:
-@@ -317,9 +339,19 @@ static int __exit ehci_orion_drv_remove(struct platform_device *pdev)
+ 	kirkwood_mpp_conf(iomega_ix2_200_mpp_config);
  
- MODULE_ALIAS("platform:orion-ehci");
+-	kirkwood_ehci_init();
+-
+ 	kirkwood_ge01_init(&iomega_ix2_200_ge00_data);
+ }
+diff --git a/arch/arm/mach-kirkwood/board-km_kirkwood.c b/arch/arm/mach-kirkwood/board-km_kirkwood.c
+index f7d3283..1e9ac4b 100644
+--- a/arch/arm/mach-kirkwood/board-km_kirkwood.c
++++ b/arch/arm/mach-kirkwood/board-km_kirkwood.c
+@@ -52,6 +52,5 @@ void __init km_kirkwood_init(void)
+ 	if (!IS_ERR(sata_clk))
+ 		sata_clk->flags |= CLK_IGNORE_UNUSED;
  
-+static const struct of_device_id ehci_orion_dt_ids[] __devinitdata = {
-+	{ .compatible = "marvell,orion-ehci", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, ehci_orion_dt_ids);
-+
- static struct platform_driver ehci_orion_driver = {
- 	.probe		= ehci_orion_drv_probe,
- 	.remove		= __exit_p(ehci_orion_drv_remove),
- 	.shutdown	= usb_hcd_platform_shutdown,
--	.driver.name	= "orion-ehci",
-+	.driver = {
-+		.name	= "orion-ehci",
-+		.owner  = THIS_MODULE,
-+		.of_match_table = of_match_ptr(ehci_orion_dt_ids),
-+	},
- };
+-	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&km_kirkwood_ge00_data);
+ }
+diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
+index 83d8975..68e64b2 100644
+--- a/arch/arm/mach-kirkwood/board-lsxl.c
++++ b/arch/arm/mach-kirkwood/board-lsxl.c
+@@ -125,7 +125,6 @@ void __init lsxl_init(void)
+ 	gpio_set_value(LSXL_GPIO_USB_POWER, 1);
+ 	gpio_set_value(LSXL_GPIO_HDD_POWER, 1);
+ 
+-	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&lsxl_ge00_data);
+ 	kirkwood_ge01_init(&lsxl_ge01_data);
+ 	platform_device_register(&lsxl_fan_device);
+diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
+index 1750e68..5a031b9 100644
+--- a/arch/arm/mach-kirkwood/board-ts219.c
++++ b/arch/arm/mach-kirkwood/board-ts219.c
+@@ -66,7 +66,6 @@ void __init qnap_dt_ts219_init(void)
+ 		qnap_ts219_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
+ 
+ 	kirkwood_ge00_init(&qnap_ts219_ge00_data);
+-	kirkwood_ehci_init();
+ 
+ 	pm_power_off = qnap_tsx1x_power_off;
+ }
 -- 
 1.7.10.4
