@@ -1,185 +1,196 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 20 Oct 2012 07:22:26 -0400
-Subject: [PATCH] ARM: Kirkwood: new board USI Topkick
-In-Reply-To: <20121020085834.GY21046@lunn.ch>
-References: <1350679752-11931-1-git-send-email-jason@lakedaemon.net>
- <20121020085834.GY21046@lunn.ch>
-Message-ID: <20121020112226.GA25828@titan.lakedaemon.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Oct 2012 13:23:14 +0200
+Subject: [PATCH v2 1/3] ARM: Kirkwood: Remove unused includes
+Message-ID: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2012 at 10:58:34AM +0200, Andrew Lunn wrote:
-> > +++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-> > @@ -0,0 +1,85 @@
-> > +/dts-v1/;
-> > +
-> > +/include/ "kirkwood.dtsi"
-> > +
-> > +/ {
-> > +	model = "Univeral Scientific Industrial Co. Topkick-1281P2";
-> > +	compatible = "usi,topkick-1281P2", "usi,topkick", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-> 
-> Hi Jason
-> 
-> Nice to see the correct Kirkwood variant in DT. This is going to be an
-> issue for pinctrl sometime soon.
-> 
-> > +
-> > +		sata at 80000 {
-> > +			status = "okay";
-> > +			nr-ports = <2>;
-> 
-> Could nr-ports be 1? It saves a little bit of memory. There only seems
-> to be one SATA interface available, no external SATA port. However, if
-> the one used is the second SATA, then 2 is required.
+With the gradual conversion of C code to DT, there are a number of
+include files which are no longer needed. Remove them.
 
-Yes, I caught this right after <send>, and mentioned it on irc for v2.
-It was part of my, "did they wire it up to sata1, instead?" effort.
-Sebastian was a huge help getting sata and the leds working.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-kirkwood/board-dockstar.c       |   13 -------------
+ arch/arm/mach-kirkwood/board-dreamplug.c      |   15 ---------------
+ arch/arm/mach-kirkwood/board-goflexnet.c      |   13 -------------
+ arch/arm/mach-kirkwood/board-ib62x0.c         |    6 ------
+ arch/arm/mach-kirkwood/board-iconnect.c       |    8 --------
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
+ arch/arm/mach-kirkwood/board-lsxl.c           |    8 --------
+ arch/arm/mach-kirkwood/board-ts219.c          |    3 ---
+ 8 files changed, 68 deletions(-)
 
-> 
-> > diff --git a/arch/arm/mach-kirkwood/board-usi_topkick.c b/arch/arm/mach-kirkwood/board-usi_topkick.c
-> > new file mode 100644
-> > index 0000000..02ba4aa
-> > --- /dev/null
-> > +++ b/arch/arm/mach-kirkwood/board-usi_topkick.c
-> > @@ -0,0 +1,93 @@
-> > +/*
-> > + * Copyright 2012 (C), Jason Cooper <jason@lakedaemon.net>
-> > + *
-> > + * arch/arm/mach-kirkwood/board-dreamplug.c
-> > + *
-> > + * Marvell DreamPlug Reference Board Init for drivers not converted to
-> > + * flattened device tree yet.
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public
-> > + * License version 2.  This program is licensed "as is" without any
-> > + * warranty of any kind, whether express or implied.
-> > + */
-> > +
-> > +#include <linux/kernel.h>
-> > +#include <linux/init.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/ata_platform.h>
-> > +#include <linux/mv643xx_eth.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_fdt.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/gpio.h>
-> > +#include <linux/mtd/physmap.h>
-> > +#include <linux/spi/flash.h>
-> > +#include <linux/spi/spi.h>
-> > +#include <asm/mach-types.h>
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/mach/map.h>
-> > +#include <mach/kirkwood.h>
-> > +#include <mach/bridge-regs.h>
-> > +#include <linux/platform_data/mmc-mvsdio.h>
-> > +#include "common.h"
-> > +#include "mpp.h"
-> 
-> A lot of these header files are not needed. Please could you remove
-> the unused ones.
-
-Sure, and I'll go back and double check dreamplug. ;-)
-
-> 
-> > +
-> > +static struct mv643xx_eth_platform_data topkick_ge00_data = {
-> > +	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-> > +};
-> > +
-> > +/*
-> > + * GPIO LED layout
-> > + *
-> > + *       /-SYS_LED(2)
-> > + *       |
-> > + *       |   /-DISK_LED
-> > + *       |   |
-> > + *       |   |   /-WLAN_LED(2)
-> > + *       |   |   |
-> > + * [SW] [*] [*] [*]
-> > + */
-> > +
-> > +/*
-> > + * Switch positions
-> > + *
-> > + *     /-SW_LEFT
-> > + *     |
-> > + *     |   /-SW_IDLE
-> > + *     |   |
-> > + *     |   |   /-SW_RIGHT
-> > + *     |   |   |
-> > + * PS [L] [I] [R] LEDS
-> > + */
-> > +
-> > +static unsigned int topkick_mpp_config[] __initdata = {
-> > +	MPP21_GPIO,	/* DISK_LED           (low active) - yellow */
-> > +	MPP36_GPIO,	/* SATA0 power enable (high active) */
-> > +	MPP37_GPIO,	/* SYS_LED2           (low active) - red */
-> > +	MPP38_GPIO,	/* SYS_LED            (low active) - blue */
-> > +	MPP39_GPIO,	/* WLAN_LED           (low active) - green */
-> > +	MPP43_GPIO,	/* SW_LEFT            (low active) */
-> > +	MPP44_GPIO,     /* SW_RIGHT           (low active) */
-> > +	MPP45_GPIO,	/* SW_IDLE            (low active) */
-> > +	MPP46_GPIO,     /* SW_LEFT            (low active) */
-> > +	MPP48_GPIO,	/* WLAN_LED2          (low active) - yellow */
-> > +	0
-> 
-> This assumes the boot loader is configuring all the other pins as
-> needed.  It would be safer to explicitly configure the SATA pins,
-> Ethernet pins etc. However, maybe that should wait until we have
-> pinctrl, which makes it a lot easier.
-
-I agree.
-
-> 
-> > +};
-> > +
-> > +#define TOPKICK_SATA0_PWR_ENABLE 36
-> > +
-> > +void __init usi_topkick_init(void)
-> > +{
-> > +	/*
-> > +	 * Basic setup. Needs to be called early.
-> > +	 */
-> > +	kirkwood_mpp_conf(topkick_mpp_config);
-> > +
-> > +	/* SATA0 power enable */
-> > +	gpio_set_value(TOPKICK_SATA0_PWR_ENABLE, 1);
-> 
-> It would be nice to be able to do that in DT. Does such a binding
-> already exist? Its something we need quite often in kirkwood, and i
-> guess other machines architectures as well.
-
-I was thinking about that and how to handle it once we are down to
-board-dt.c.  At the very least, we can expose the pin in sysfs and have
-an initrd enable it for booting from HDD.
-
-The ideal solution would be something similar to gpio-leds, where you
-can set default-state = "on".  This may already exist for gpios, I
-haven't looked yet.
-
-> 
-> > +
-> > +	kirkwood_ehci_init();
-> > +	kirkwood_ge00_init(&topkick_ge00_data);
-> > +}
-> 
-> How is the wifi device instantiated? Is it a PCIe device so it
-> auto-probed? Or is some explicit instantiation required, say if its an
-> SPI device?
-
-I dunno, I don't usually enable wifi on my dreamplug, so I admit I
-forgot to look.
-
-> 
-> It would be good to add this board to kirkwood_defconfig as well.
-
-Yes, already planned for v2.
-
-Thanks for the review.
-
-Jason.
+diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
+index f2fbb02..6912882 100644
+--- a/arch/arm/mach-kirkwood/board-dockstar.c
++++ b/arch/arm/mach-kirkwood/board-dockstar.c
+@@ -16,21 +16,8 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_fdt.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_platform.h>
+ #include <linux/gpio.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <mach/kirkwood.h>
+-#include <mach/bridge-regs.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
+index 20af53a..8a8ebe0 100644
+--- a/arch/arm/mach-kirkwood/board-dreamplug.c
++++ b/arch/arm/mach-kirkwood/board-dreamplug.c
+@@ -13,23 +13,8 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_fdt.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_platform.h>
+ #include <linux/gpio.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/spi/flash.h>
+-#include <linux/spi/spi.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <mach/kirkwood.h>
+-#include <mach/bridge-regs.h>
+ #include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
+index 001ca8c..5dcd0d6 100644
+--- a/arch/arm/mach-kirkwood/board-goflexnet.c
++++ b/arch/arm/mach-kirkwood/board-goflexnet.c
+@@ -18,21 +18,8 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_fdt.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_platform.h>
+ #include <linux/gpio.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <mach/kirkwood.h>
+-#include <mach/bridge-regs.h>
+-#include <linux/platform_data/mmc-mvsdio.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
+index cfc47f8..6d3a564 100644
+--- a/arch/arm/mach-kirkwood/board-ib62x0.c
++++ b/arch/arm/mach-kirkwood/board-ib62x0.c
+@@ -13,15 +13,9 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/ata_platform.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/input.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index d084b1e..24f5aa7 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -10,16 +10,8 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+ #include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/of_fdt.h>
+-#include <linux/of_irq.h>
+-#include <linux/of_platform.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/gpio.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+index 158fb97..e4ed62c 100644
+--- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
++++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+@@ -10,10 +10,8 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+-#include <linux/platform_device.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/ethtool.h>
+-#include <mach/kirkwood.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
+index 83d8975..64e5cc6 100644
+--- a/arch/arm/mach-kirkwood/board-lsxl.c
++++ b/arch/arm/mach-kirkwood/board-lsxl.c
+@@ -14,17 +14,9 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/ata_platform.h>
+-#include <linux/spi/flash.h>
+-#include <linux/spi/spi.h>
+ #include <linux/mv643xx_eth.h>
+ #include <linux/gpio.h>
+ #include <linux/gpio-fan.h>
+-#include <linux/input.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <mach/kirkwood.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
+index 1750e68..f3bfeda 100644
+--- a/arch/arm/mach-kirkwood/board-ts219.c
++++ b/arch/arm/mach-kirkwood/board-ts219.c
+@@ -19,9 +19,6 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/mv643xx_eth.h>
+-#include <linux/ata_platform.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/input.h>
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+-- 
+1.7.10.4
