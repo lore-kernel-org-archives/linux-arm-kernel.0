@@ -1,345 +1,58 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 21 Oct 2012 11:10:31 +1300
-Subject: [PATCH v2 1/2] USB: Update EHCI-platform driver to devicetree.
-In-Reply-To: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
-References: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <1350771032-11527-2-git-send-email-linux@prisktech.co.nz>
+Date: Sun, 21 Oct 2012 11:20:20 +1300
+Subject: [PATCH 1/2] USB: Update EHCI-platform driver to devicetree.
+In-Reply-To: <Pine.LNX.4.44L0.1210201027280.24222-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1210201027280.24222-100000@netrider.rowland.org>
+Message-ID: <1350771620.10819.3.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds devicetree support to the EHCI-platform driver,
-and removes the now unneeded ehci-vt8500.c
+On Sat, 2012-10-20 at 10:31 -0400, Alan Stern wrote:
+> On Sat, 20 Oct 2012, Florian Fainelli wrote:
+> 
+> > Hi Tony,
+> > 
+> > On Saturday 20 October 2012 16:17:32 Tony Prisk wrote:
+> > > This patch adds devicetree support to the EHCI-platform driver,
+> > > and removes the now unneeded ehci-vt8500.c
+> > > 
+> > > Existing platform properties are maintained, with the exception
+> > > the power_(on/off) and suspend function pointers.
+> > 
+> > Ok, so I have recently sent a bit patchset to remove most OHCI/EHCI drivers
+> > that could be converted to the generic variants, series starts here:
+> > 1349701906-16481-1-git-send-email-florian at openwrt.org
+> > 
+> > in this patchset I added a new property to the EHCI platform data:
+> > need_io_watchdog, which needs to be handled too from DT ideally.
+> 
+> Actually the new property is "no_io_watchdog".  See
+> 
+> 	http://marc.info/?l=linux-usb&m=134970247511140&w=2
+> 
+> > Adding device tree bindings is on my TODO after having a generic way
+> > to pass clocks to the ehci/ohci platform drivers, so you are right on time :)
+> 
+> At some point we'll need a way to handle the power_{on,off,suspend} 
+> callbacks.  I don't know how that should be done.
+> 
+> Alan Stern
 
-Existing platform properties are maintained, with the exception
-the power_(on/off) and suspend function pointers.
+I actually included a comment in the patch regarding the missing
+functions:
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- drivers/usb/host/ehci-hcd.c      |    5 --
- drivers/usb/host/ehci-platform.c |   61 +++++++++++++-
- drivers/usb/host/ehci-vt8500.c   |  171 --------------------------------------
- include/linux/usb/ehci_pdriver.h |    1 +
- 4 files changed, 61 insertions(+), 177 deletions(-)
- delete mode 100644 drivers/usb/host/ehci-vt8500.c
+> +                * No platform data is being passed, so initalize
+> pdata.
+> +                * Limitation: we can't support power_on, power_off or
+> +                * power_suspend function pointers from DT.
+> +                * TODO: The missing functions could be replaced with
+> +                * power sequence handlers.
+> +                */
 
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index 6bf6c42..42c8e84 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -1274,11 +1274,6 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		cns3xxx_ehci_driver
- #endif
- 
--#ifdef CONFIG_ARCH_VT8500
--#include "ehci-vt8500.c"
--#define	PLATFORM_DRIVER		vt8500_ehci_driver
--#endif
--
- #ifdef CONFIG_PLAT_SPEAR
- #include "ehci-spear.c"
- #define PLATFORM_DRIVER		spear_ehci_hcd_driver
-diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
-index 764e010..f44fc6a 100644
---- a/drivers/usb/host/ehci-platform.c
-+++ b/drivers/usb/host/ehci-platform.c
-@@ -19,6 +19,7 @@
-  * Licensed under the GNU/GPL. See COPYING for details.
-  */
- #include <linux/platform_device.h>
-+#include <linux/of.h>
- #include <linux/usb/ehci_pdriver.h>
- 
- static int ehci_platform_reset(struct usb_hcd *hcd)
-@@ -78,14 +79,60 @@ static const struct hc_driver ehci_platform_hc_driver = {
- 	.clear_tt_buffer_complete = ehci_clear_tt_buffer_complete,
- };
- 
-+static u64 ehci_dma_mask = DMA_BIT_MASK(32);
-+
- static int __devinit ehci_platform_probe(struct platform_device *dev)
- {
- 	struct usb_hcd *hcd;
- 	struct resource *res_mem;
- 	struct usb_ehci_pdata *pdata = dev->dev.platform_data;
-+	struct device_node *np = dev->dev.of_node;
- 	int irq;
- 	int err = -ENOMEM;
- 
-+	/* Are we being initialized from a DT-probed device? */
-+	if (np) {
-+		/*
-+		 * No platform data is being passed, so initalize pdata.
-+		 * Limitation: we can't support power_on, power_off or
-+		 * power_suspend function pointers from DT.
-+		 * TODO: The missing functions could be replaced with
-+		 * power sequence handlers.
-+		 */
-+		pdata = devm_kzalloc(&dev->dev, sizeof(*pdata), GFP_KERNEL);
-+		dev->dev.platform_data = pdata;
-+
-+		if (!pdata) {
-+			pr_err("device tree platform data allocation failed\n");
-+			return -ENOMEM;
-+		}
-+
-+		/* Read the optional properties from DT node */
-+		of_property_read_u32(np, "caps-offset", &pdata->caps_offset);
-+		if (of_property_read_bool(np, "no_io_watchdog"))
-+			pdata->no_io_watchdog = 1;
-+		if (of_property_read_bool(np, "has-tt"))
-+			pdata->has_tt = 1;
-+		if (of_property_read_bool(np, "has-synopsys-hc-bug"))
-+			pdata->has_synopsys_hc_bug = 1;
-+
-+		if (of_property_read_bool(np, "big-endian")) {
-+			pdata->big_endian_desc = 1;
-+			pdata->big_endian_mmio = 1;
-+		} else {
-+			if (of_property_read_bool(np, "big-endian-desc"))
-+				pdata->big_endian_desc = 1;
-+			if (of_property_read_bool(np, "big-endian-regs"))
-+				pdata->big_endian_mmio = 1;
-+		}
-+		/* Right now device-tree probed devices don't get dma_mask set.
-+		 * Since shared usb code relies on it, set it here for now.
-+		 * Once we have dma capability bindings this can go away.
-+		 */
-+		if (!dev->dev.dma_mask)
-+			dev->dev.dma_mask = &ehci_dma_mask;
-+	}
-+
- 	if (!pdata) {
- 		WARN_ON(1);
- 		return -ENODEV;
-@@ -101,7 +148,7 @@ static int __devinit ehci_platform_probe(struct platform_device *dev)
- 	}
- 	res_mem = platform_get_resource(dev, IORESOURCE_MEM, 0);
- 	if (!res_mem) {
--		pr_err("no memory recourse provided");
-+		pr_err("no memory resource provided");
- 		return -ENXIO;
- 	}
- 
-@@ -163,6 +210,7 @@ static int __devexit ehci_platform_remove(struct platform_device *dev)
- 	release_mem_region(hcd->rsrc_start, hcd->rsrc_len);
- 	usb_put_hcd(hcd);
- 	platform_set_drvdata(dev, NULL);
-+	devm_kfree(&dev->dev, pdata);
- 
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
-@@ -215,6 +263,16 @@ static const struct platform_device_id ehci_platform_table[] = {
- 	{ "ehci-platform", 0 },
- 	{ }
- };
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id ehci_platform_ids[] = {
-+	{ .compatible = "linux,ehci-platform", },
-+	{}
-+};
-+
-+MODULE_DEVICE_TABLE(of, ehci_platform_ids);
-+#endif
-+
- MODULE_DEVICE_TABLE(platform, ehci_platform_table);
- 
- static const struct dev_pm_ops ehci_platform_pm_ops = {
-@@ -231,5 +289,6 @@ static struct platform_driver ehci_platform_driver = {
- 		.owner	= THIS_MODULE,
- 		.name	= "ehci-platform",
- 		.pm	= &ehci_platform_pm_ops,
-+		.of_match_table = of_match_ptr(ehci_platform_ids),
- 	}
- };
-diff --git a/drivers/usb/host/ehci-vt8500.c b/drivers/usb/host/ehci-vt8500.c
-deleted file mode 100644
-index d3c9a3e..0000000
---- a/drivers/usb/host/ehci-vt8500.c
-+++ /dev/null
-@@ -1,171 +0,0 @@
--/*
-- * drivers/usb/host/ehci-vt8500.c
-- *
-- * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-- *
-- * Based on ehci-au1xxx.c
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#include <linux/of.h>
--#include <linux/platform_device.h>
--
--static int ehci_update_device(struct usb_hcd *hcd, struct usb_device *udev)
--{
--	struct ehci_hcd *ehci = hcd_to_ehci(hcd);
--	int rc = 0;
--
--	if (!udev->parent) /* udev is root hub itself, impossible */
--		rc = -1;
--	/* we only support lpm device connected to root hub yet */
--	if (ehci->has_lpm && !udev->parent->parent) {
--		rc = ehci_lpm_set_da(ehci, udev->devnum, udev->portnum);
--		if (!rc)
--			rc = ehci_lpm_check(ehci, udev->portnum);
--	}
--	return rc;
--}
--
--static const struct hc_driver vt8500_ehci_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "VT8500 EHCI",
--	.hcd_priv_size		= sizeof(struct ehci_hcd),
--
--	/*
--	 * generic hardware linkage
--	 */
--	.irq			= ehci_irq,
--	.flags			= HCD_MEMORY | HCD_USB2,
--
--	/*
--	 * basic lifecycle operations
--	 */
--	.reset			= ehci_setup,
--	.start			= ehci_run,
--	.stop			= ehci_stop,
--	.shutdown		= ehci_shutdown,
--
--	/*
--	 * managing i/o requests and associated device resources
--	 */
--	.urb_enqueue		= ehci_urb_enqueue,
--	.urb_dequeue		= ehci_urb_dequeue,
--	.endpoint_disable	= ehci_endpoint_disable,
--	.endpoint_reset		= ehci_endpoint_reset,
--
--	/*
--	 * scheduling support
--	 */
--	.get_frame_number	= ehci_get_frame,
--
--	/*
--	 * root hub support
--	 */
--	.hub_status_data	= ehci_hub_status_data,
--	.hub_control		= ehci_hub_control,
--	.bus_suspend		= ehci_bus_suspend,
--	.bus_resume		= ehci_bus_resume,
--	.relinquish_port	= ehci_relinquish_port,
--	.port_handed_over	= ehci_port_handed_over,
--
--	/*
--	 * call back when device connected and addressed
--	 */
--	.update_device =	ehci_update_device,
--
--	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
--};
--
--static u64 vt8500_ehci_dma_mask = DMA_BIT_MASK(32);
--
--static int vt8500_ehci_drv_probe(struct platform_device *pdev)
--{
--	struct usb_hcd *hcd;
--	struct ehci_hcd *ehci;
--	struct resource *res;
--	int ret;
--
--	if (usb_disabled())
--		return -ENODEV;
--
--	/*
--	 * Right now device-tree probed devices don't get dma_mask set.
--	 * Since shared usb code relies on it, set it here for now.
--	 * Once we have dma capability bindings this can go away.
--	 */
--	if (!pdev->dev.dma_mask)
--		pdev->dev.dma_mask = &vt8500_ehci_dma_mask;
--
--	if (pdev->resource[1].flags != IORESOURCE_IRQ) {
--		pr_debug("resource[1] is not IORESOURCE_IRQ");
--		return -ENOMEM;
--	}
--	hcd = usb_create_hcd(&vt8500_ehci_hc_driver, &pdev->dev, "VT8500");
--	if (!hcd)
--		return -ENOMEM;
--
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	hcd->rsrc_start = res->start;
--	hcd->rsrc_len = resource_size(res);
--
--	hcd->regs = devm_request_and_ioremap(&pdev->dev, res);
--	if (!hcd->regs) {
--		pr_debug("ioremap failed");
--		ret = -ENOMEM;
--		goto err1;
--	}
--
--	ehci = hcd_to_ehci(hcd);
--	ehci->caps = hcd->regs;
--
--	ret = usb_add_hcd(hcd, pdev->resource[1].start,
--			  IRQF_SHARED);
--	if (ret == 0) {
--		platform_set_drvdata(pdev, hcd);
--		return ret;
--	}
--
--err1:
--	usb_put_hcd(hcd);
--	return ret;
--}
--
--static int vt8500_ehci_drv_remove(struct platform_device *pdev)
--{
--	struct usb_hcd *hcd = platform_get_drvdata(pdev);
--
--	usb_remove_hcd(hcd);
--	usb_put_hcd(hcd);
--	platform_set_drvdata(pdev, NULL);
--
--	return 0;
--}
--
--static const struct of_device_id vt8500_ehci_ids[] = {
--	{ .compatible = "via,vt8500-ehci", },
--	{ .compatible = "wm,prizm-ehci", },
--	{}
--};
--
--static struct platform_driver vt8500_ehci_driver = {
--	.probe		= vt8500_ehci_drv_probe,
--	.remove		= vt8500_ehci_drv_remove,
--	.shutdown	= usb_hcd_platform_shutdown,
--	.driver = {
--		.name	= "vt8500-ehci",
--		.owner	= THIS_MODULE,
--		.of_match_table = of_match_ptr(vt8500_ehci_ids),
--	}
--};
--
--MODULE_ALIAS("platform:vt8500-ehci");
--MODULE_DEVICE_TABLE(of, vt8500_ehci_ids);
-diff --git a/include/linux/usb/ehci_pdriver.h b/include/linux/usb/ehci_pdriver.h
-index c9d09f8..e9f74fa 100644
---- a/include/linux/usb/ehci_pdriver.h
-+++ b/include/linux/usb/ehci_pdriver.h
-@@ -41,6 +41,7 @@ struct usb_ehci_pdata {
- 	unsigned	big_endian_mmio:1;
- 	unsigned	port_power_on:1;
- 	unsigned	port_power_off:1;
-+	unsigned	no_io_watchdog:1;
- 
- 	/* Turn on all power and clocks */
- 	int (*power_on)(struct platform_device *pdev);
--- 
-1.7.9.5
+I don't know anything about the power sequence code, but have seen some
+patches for pwm backlight using it. I don't know if it would allow
+everything that's needed, but it seems to have support for voltage
+regulators and gpios (among other things).
+
+Regards
+Tony P
