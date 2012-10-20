@@ -1,33 +1,69 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 20 Oct 2012 10:34:47 -0400 (EDT)
-Subject: [RFC PATCH 0/2] Update ehci-platform driver to support devicetree
-In-Reply-To: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <Pine.LNX.4.44L0.1210201032160.24222-100000@netrider.rowland.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 20 Oct 2012 17:07:32 +0200
+Subject: [RFC 00/11] Convert Kirkwood to pinctrl
+Message-ID: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Oct 2012, Tony Prisk wrote:
+This patchset converts all kirkwood DT boards to pinctrl.
+It is an RFC for a number of reasons:
 
-> This patchset updates the ehci-platform.c driver to allow device tree probing.
-> I have dropped support for the three function pointers (power_on, power_off
-> and power_suspend). If someone has knowledge of the power sequence functions
-> that are being implemented, these functions could be replaced (Sorry, I don't
-> know anything about implementing it).
-> 
-> port_power_(on_off) properties are not supported in DT as Alan Stern indicated
-> they are going to be removed.
-> 
-> I have included a binding document, but must admit most of the descriptions
-> for the properties are guessed. Quite likely some of these descriptions are
-> incorrect and/or need to be clarified.
+Do we want to enable the use of mvebu GPIO driver
+outside of mach-mvebu?
 
-They look okay to me.  Over time we may need to add a few more entries, 
-as more drivers are converted over to ehci-platform.
+Do we want to enable the use of mvebu pinctrl driver
+outside of mach-mvebu?
 
-> Tony Prisk (2):
->   USB: Update EHCI-platform driver to devicetree.
->   USB: doc: Binding document for ehci-platform driver
+The old MPP code would probe the hardware to determine what kirkwood
+variant it was running on. The new pinctrl driver does not do this, it
+uses a DT compatibility string. We are only part way through checking
+what CPU each board has, and probably some of the DT compatibility strings
+are wrong.
 
-This is very good; thanks for doing the work.
+board-kw_kirkwood is an oddball. The SoC on this board is a Marvell
+Ethernet switch with an embedded kirkwood. The pinctrl-kirkwood.c
+sub-driver does not yet support this kirkwood variant, so the board
+file has not been converted yet. It is possible that the second patch
+in this series breaks this board.
 
-Alan Stern
+Andrew Lunn (11):
+  ARM: Kirkwood: Allow use of pinctrl
+  ARM: Kirkwood: Allow use of MVEBU GPIO driver.
+  ARM: Kirkwood: Convert TS219 to pinctrl.
+  ARM: Kirkwood: Convert iConnect to pinctrl.
+  ARM: Kirkwood: Convert dnskw to pinctrl
+  ARM: Kirkwood: Convert dockstar to pinctrl.
+  ARM: Kirkwood: Convert dreamplug to pinctrl.
+  ARM: Kirkwood: Convert GoFlex Net to pinctrl.
+  ARM: Kirkwood: Convert ib62x0 to pinctrl.
+  ARM: Kirkwood: Convert lsxl boards to pinctrl.
+  ARM: Kirkwood: Convert IX2-200 to pinctrl.
+
+ arch/arm/Kconfig                              |    3 +
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi         |  136 +++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-dockstar.dts       |   21 ++++
+ arch/arm/boot/dts/kirkwood-dreamplug.dts      |   26 +++++
+ arch/arm/boot/dts/kirkwood-goflexnet.dts      |   57 +++++++++++
+ arch/arm/boot/dts/kirkwood-ib62x0.dts         |   41 ++++++++
+ arch/arm/boot/dts/kirkwood-iconnect.dts       |   52 ++++++++++
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   90 ++++++++++++++++
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi          |   67 ++++++++++++
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts     |   56 ++++++++++
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts     |   56 ++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi               |   11 +-
+ arch/arm/mach-kirkwood/board-dnskw.c          |   37 -------
+ arch/arm/mach-kirkwood/board-dockstar.c       |   10 --
+ arch/arm/mach-kirkwood/board-dreamplug.c      |   14 ---
+ arch/arm/mach-kirkwood/board-goflexnet.c      |   18 ----
+ arch/arm/mach-kirkwood/board-ib62x0.c         |   21 ----
+ arch/arm/mach-kirkwood/board-iconnect.c       |   17 ----
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   24 -----
+ arch/arm/mach-kirkwood/board-lsxl.c           |   19 ----
+ arch/arm/mach-kirkwood/board-ts219.c          |   25 -----
+ arch/arm/plat-orion/irq.c                     |    5 +-
+ drivers/gpio/Kconfig                          |    2 +-
+ drivers/pinctrl/Kconfig                       |    2 +-
+ 24 files changed, 617 insertions(+), 193 deletions(-)
+
+-- 
+1.7.10.4
