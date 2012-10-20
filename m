@@ -1,78 +1,65 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 17 Oct 2012 15:42:46 -0000
-Subject: [PATCH 6/6] ARM: EXYNOS5: SATA PHY controller driver
-In-Reply-To: <CAK1UHiw8+ebzGyjV53Y9efpMFPbCL9RR_o9ZSw=NTuRw_9gRwg@mail.gmail.com>
-References: <1349783332-18467-1-git-send-email-vasanthananthan@gmail.com>
- <10179968.slaZyPIETn@flatron>
- <CAK1UHiw8+ebzGyjV53Y9efpMFPbCL9RR_o9ZSw=NTuRw_9gRwg@mail.gmail.com>
-Message-ID: <1536414.tLHsaDcjWh@amdc1227>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 20 Oct 2012 04:42:12 -0000
+Subject: [PATCH 1/2] cpufreq: return early from __cpufreq_driver_getavg()
+In-Reply-To: <2737823.2JYE7UmLRN@vostro.rjw.lan>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <2737823.2JYE7UmLRN@vostro.rjw.lan>
+Message-ID: <CAKohponGwhC_zmk1Whq56vmZMvjcxXKiSpdvMk4ZU8z0Wa2TBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vasanth,
+On Oct 20, 2012 3:37 AM, "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
+>
+> On Saturday 20 of October 2012 01:42:05 Viresh Kumar wrote:
+> > There is no need to do cpufreq_get_cpu() and cpufreq_put_cpu() for
+drivers that
+> > don't support getavg() routine.
+> >
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> The patch doesn't seem to follow the changelog or the other way around.
 
-On Tuesday 16 of October 2012 12:03:47 Vasanth Ananthan wrote:
-> Hi Tomasz,
-> 
-> On Sat, Oct 13, 2012 at 4:20 AM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > Hi,
-> > 
-> > On Tuesday 09 of October 2012 17:18:52 Vasanth Ananthan wrote:
-> >> This patch adds a platform driver and I2C client driver for SATA PHY
-> >> controller
-> >> 
-> >> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> >> ---
-> >> 
-> >>  drivers/ata/Makefile          |    2 +-
-> >>  drivers/ata/sata_exynos_phy.c |  303
-> >> 
-> >> +++++++++++++++++++++++++++++++++++++++++ 2 files changed, 304
-> >> insertions(+), 1 deletions(-)
-> >> 
-> >>  create mode 100644 drivers/ata/sata_exynos_phy.c
-> 
-> [ ... ]
-> 
-> >> +
-> >> +     phy->init = sataphy_init;
-> >> +     phy->shutdown = sataphy_shutdown;
-> >> +     phy->priv_data = (void *)sataphy;
-> >> +     phy->dev = &pdev->dev;
-> >> +
-> >> +     ret = sata_add_phy(phy, SATA_PHY_GENERATION3);
-> >> +     if (ret < 0)
-> >> +             goto err4;
-> > 
-> > Do you have any warranties that phy callbacks won't get called before
-> > i2c device probes and sets i2c_client?
-> > 
-> >> +
-> >> +     ret = i2c_add_driver(&sataphy_i2c_driver);
-> >> +     if (ret < 0)
-> >> +             goto err5;
-> >> +
-> >> +     platform_set_drvdata(pdev, phy);
-> 
-> I shall register my i2c client driver before assigning the SATA PHY
-> call backs. Would that guarantee the calling of phy callbacks after
-> the i2c device probes?
+Sorry if my log isn't clear enough.
+But i could still see it matching the code :)
 
-No. You might still not have the sata phy i2c controller registered at 
-that time and so the i2c driver will not be probed.
+I have moved the check for drivers capabilities at the top
+of routine, so that there is no need to call mentioned routines.
 
-The only definitive solution for this would be to register both platform 
-and i2c drivers in module init (instead of using module_platform_driver) 
-and defer the probe of platform driver until i2c device gets registered. 
-
-You can defer the probe by returning -EPROBE_DEFER after checking that 
-i2c_client is still NULL.
-
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
+>
+> Thanks,
+> Rafael
+>
+>
+> > ---
+> >  drivers/cpufreq/cpufreq.c | 6 ++++--
+> >  1 file changed, 4 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> > index 85df538..f552d5f 100644
+> > --- a/drivers/cpufreq/cpufreq.c
+> > +++ b/drivers/cpufreq/cpufreq.c
+> > @@ -1511,12 +1511,14 @@ int __cpufreq_driver_getavg(struct
+cpufreq_policy *policy, unsigned int cpu)
+> >  {
+> >       int ret = 0;
+> >
+> > +     if (!(cpu_online(cpu) && cpufreq_driver->getavg))
+> > +             return 0;
+> > +
+> >       policy = cpufreq_cpu_get(policy->cpu);
+> >       if (!policy)
+> >               return -EINVAL;
+> >
+> > -     if (cpu_online(cpu) && cpufreq_driver->getavg)
+> > -             ret = cpufreq_driver->getavg(policy, cpu);
+> > +     ret = cpufreq_driver->getavg(policy, cpu);
+> >
+> >       cpufreq_cpu_put(policy);
+> >       return ret;
+> >
+> --
+> I speak only for myself.
+> Rafael J. Wysocki, Intel Open Source Technology Center.
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121017/ff347413/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121020/6db37aed/attachment-0001.html>
