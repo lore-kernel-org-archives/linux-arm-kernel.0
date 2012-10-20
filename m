@@ -1,37 +1,33 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 20 Oct 2012 10:31:02 -0400 (EDT)
-Subject: [PATCH 1/2] USB: Update EHCI-platform driver to devicetree.
-In-Reply-To: <2209384.BKaXW2gI8I@bender>
-Message-ID: <Pine.LNX.4.44L0.1210201027280.24222-100000@netrider.rowland.org>
+Date: Sat, 20 Oct 2012 10:34:47 -0400 (EDT)
+Subject: [RFC PATCH 0/2] Update ehci-platform driver to support devicetree
+In-Reply-To: <1350703053-4661-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <Pine.LNX.4.44L0.1210201032160.24222-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Oct 2012, Florian Fainelli wrote:
+On Sat, 20 Oct 2012, Tony Prisk wrote:
 
-> Hi Tony,
+> This patchset updates the ehci-platform.c driver to allow device tree probing.
+> I have dropped support for the three function pointers (power_on, power_off
+> and power_suspend). If someone has knowledge of the power sequence functions
+> that are being implemented, these functions could be replaced (Sorry, I don't
+> know anything about implementing it).
 > 
-> On Saturday 20 October 2012 16:17:32 Tony Prisk wrote:
-> > This patch adds devicetree support to the EHCI-platform driver,
-> > and removes the now unneeded ehci-vt8500.c
-> > 
-> > Existing platform properties are maintained, with the exception
-> > the power_(on/off) and suspend function pointers.
+> port_power_(on_off) properties are not supported in DT as Alan Stern indicated
+> they are going to be removed.
 > 
-> Ok, so I have recently sent a bit patchset to remove most OHCI/EHCI drivers
-> that could be converted to the generic variants, series starts here:
-> 1349701906-16481-1-git-send-email-florian at openwrt.org
-> 
-> in this patchset I added a new property to the EHCI platform data:
-> need_io_watchdog, which needs to be handled too from DT ideally.
+> I have included a binding document, but must admit most of the descriptions
+> for the properties are guessed. Quite likely some of these descriptions are
+> incorrect and/or need to be clarified.
 
-Actually the new property is "no_io_watchdog".  See
+They look okay to me.  Over time we may need to add a few more entries, 
+as more drivers are converted over to ehci-platform.
 
-	http://marc.info/?l=linux-usb&m=134970247511140&w=2
+> Tony Prisk (2):
+>   USB: Update EHCI-platform driver to devicetree.
+>   USB: doc: Binding document for ehci-platform driver
 
-> Adding device tree bindings is on my TODO after having a generic way
-> to pass clocks to the ehci/ohci platform drivers, so you are right on time :)
-
-At some point we'll need a way to handle the power_{on,off,suspend} 
-callbacks.  I don't know how that should be done.
+This is very good; thanks for doing the work.
 
 Alan Stern
