@@ -1,30 +1,24 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 20 Oct 2012 21:05:04 -0400
-Subject: [PATCH v2 0/4] Add DT support for Network Space v2 and parents
-In-Reply-To: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
-References: <1350468546-25901-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20121021010504.GB25828@titan.lakedaemon.net>
+Date: Sat, 20 Oct 2012 21:08:24 -0400
+Subject: [PATCH] [ARM] Enable the second I2C bus on Marvell Kirkwood
+In-Reply-To: <20121001235932.GA678@obsidianresearch.com>
+References: <20121001235932.GA678@obsidianresearch.com>
+Message-ID: <20121021010824.GC25828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 12:09:02PM +0200, Simon Guinot wrote:
-> This patch series provides DT support for LaCie NAS Network Space v2 and
-> parents. This includes the following machines:
->  - Internet Space v2
->  - Network Space v2
->  - Network Space Max v2
->  - Network Space Lite v2
->  - Network Space Mini v2
+On Mon, Oct 01, 2012 at 05:59:32PM -0600, Jason Gunthorpe wrote:
+> mv64xxx_of_config requires that the tclk frequency be found
+> through the clk stuff rather than through device tree, so add
+> another override for the 2nd controller.
 > 
-> Note that the three first boards are already supported by the Linux
-> kernel via an "old-fashion" board setup. The two lasts (Lite and Mini)
-> are new boards.
-> 
-> Also note that the first patch of the series is related with the LED
-> subsystem. It adds device tree binding to the driver leds-ns2.
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
+I made one small change, changed subject to:
 
-Series applied to:
+ARM: Kirkwood: Enable the second I2C bus
+
+Applied to:
 
 git://git.infradead.org/users/jcooper/linux.git kirkwood/boards
 
