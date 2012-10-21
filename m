@@ -1,46 +1,45 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 21 Oct 2012 16:23:09 +0200
-Subject: [PATCH 2/5] net/at91_ether: select MACB in Kconfig
+Date: Sun, 21 Oct 2012 16:23:08 +0200
+Subject: [PATCH 1/5] net/cadence: get rid of HAVE_NET_MACB
 In-Reply-To: <1350829392-3812-1-git-send-email-manabian@gmail.com>
 References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350829392-3812-3-git-send-email-manabian@gmail.com>
+Message-ID: <1350829392-3812-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that HAVE_NET_MACB is gone let's just select MACB to
-satisfy the dependecies in at91_ether.
-
-PHYLIB will then by selected by MACB.
+macb is a platform driver and there is nothing that prevents
+this driver from being built on non-ARM/AVR32 platforms.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/net/ethernet/cadence/Kconfig  | 2 +-
- drivers/net/ethernet/cadence/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/cadence/Kconfig | 5 -----
+ 1 file changed, 5 deletions(-)
 
 diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
-index 5d1ea30..f6d0956 100644
+index 57f78abe..5d1ea30 100644
 --- a/drivers/net/ethernet/cadence/Kconfig
 +++ b/drivers/net/ethernet/cadence/Kconfig
-@@ -23,7 +23,7 @@ config ARM_AT91_ETHER
- 	tristate "AT91RM9200 Ethernet support"
- 	depends on ARM && ARCH_AT91RM9200
- 	select NET_CORE
--	select PHYLIB
-+	select MACB
- 	---help---
- 	  If you wish to compile a kernel for the AT91RM9200 and enable
- 	  ethernet support, then you should always answer Y to this.
-diff --git a/drivers/net/ethernet/cadence/Makefile b/drivers/net/ethernet/cadence/Makefile
-index 798b1e0..9068b83 100644
---- a/drivers/net/ethernet/cadence/Makefile
-+++ b/drivers/net/ethernet/cadence/Makefile
-@@ -2,5 +2,5 @@
- # Makefile for the Atmel network device drivers.
+@@ -2,13 +2,9 @@
+ # Atmel device configuration
  #
  
--obj-$(CONFIG_ARM_AT91_ETHER) += at91_ether.o macb.o
-+obj-$(CONFIG_ARM_AT91_ETHER) += at91_ether.o
- obj-$(CONFIG_MACB) += macb.o
+-config HAVE_NET_MACB
+-	bool
+-
+ config NET_CADENCE
+ 	bool "Cadence devices"
+ 	default y
+-	depends on HAVE_NET_MACB || (ARM && ARCH_AT91RM9200)
+ 	---help---
+ 	  If you have a network (Ethernet) card belonging to this class, say Y.
+ 	  Make sure you know the name of your card. Read the Ethernet-HOWTO,
+@@ -34,7 +30,6 @@ config ARM_AT91_ETHER
+ 
+ config MACB
+ 	tristate "Cadence MACB/GEM support"
+-	depends on HAVE_NET_MACB
+ 	select PHYLIB
+ 	---help---
+ 	  The Cadence MACB ethernet interface is found on many Atmel AT32 and
 -- 
 1.7.12.4
