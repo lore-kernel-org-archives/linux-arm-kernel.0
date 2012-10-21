@@ -1,37 +1,55 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 21 Oct 2012 16:23:07 +0200
-Subject: [PATCH 0/5] make cadence ethernet drivers build on any architecture
-Message-ID: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+Date: Sun, 21 Oct 2012 16:23:11 +0200
+Subject: [PATCH 4/5] ARM: AT91: Remove HAVE_NET_MACB
+In-Reply-To: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+Message-ID: <1350829392-3812-5-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series makes the at91_ether and macb driver build-able on any architecture.
+HAVE_NET_MACB has already been removed from the driver itself
+so removed it from mach Kconfig as well.
 
-Patch 1 removes the HAVE_NET_MACB from the cadence Kconfig and this allow macb to be built on any architecture. The macb driver requires no other modifications.
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ arch/arm/mach-at91/Kconfig | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Patch 3 moves a bootloader quirk for CSB337 from at91_ether into CSB337 board setup. This allow us to remove the last mach include and build this driver on any architecture. It also make it easier to share the address setup between at91_ether and macb.
-
-Patch 4-5 removes the now unused HAVE_NET_MACB config symbol from AT91/AVR32 Kconfig.
-
-
-Note that patch 3 is not tested on a real CSB337 board. I only tested it on an other AT91RM9200 board to verify the logic that reverses the address byte order works.
-
-The next series will make the at91_ether driver use address setting and statistics from macb. There is also a clean up of print outs plus some comment/style fixes.
-
-Joachim Eastwood (5):
-  net/cadence: get rid of HAVE_NET_MACB
-  net/at91_ether: select MACB in Kconfig
-  net/at91_ether: move eth addr quirk into csb337 board setup
-  ARM: AT91: Remove HAVE_NET_MACB
-  AVR32: Remove HAVE_NET_MACB
-
- arch/arm/mach-at91/Kconfig                |  4 ----
- arch/arm/mach-at91/board-csb337.c         | 35 +++++++++++++++++++++++++++++++
- arch/avr32/Kconfig                        |  1 -
- drivers/net/ethernet/cadence/Kconfig      |  8 +------
- drivers/net/ethernet/cadence/Makefile     |  2 +-
- drivers/net/ethernet/cadence/at91_ether.c | 26 ++++++-----------------
- 6 files changed, 43 insertions(+), 33 deletions(-)
-
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index d846b6e..72020fb 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -45,7 +45,6 @@ config SOC_AT91RM9200
+ config SOC_AT91SAM9260
+ 	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
+ 	select HAVE_AT91_DBGU0
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9260, AT91SAM9XE
+@@ -63,7 +62,6 @@ config SOC_AT91SAM9263
+ 	bool "AT91SAM9263"
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 
+ config SOC_AT91SAM9RL
+@@ -76,7 +74,6 @@ config SOC_AT91SAM9G45
+ 	bool "AT91SAM9G45 or AT91SAM9M10 families"
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
+@@ -86,7 +83,6 @@ config SOC_AT91SAM9X5
+ 	bool "AT91SAM9x5 family"
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
 -- 
 1.7.12.4
