@@ -1,41 +1,75 @@
-From: mporter@ti.com (Matt Porter)
-Date: Sun, 21 Oct 2012 09:51:43 -0400
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <alpine.DEB.2.00.1210201856020.27264@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <20121020141136.GA6433@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210201615170.24497@utopia.booyaka.com>
- <20121020180123.GA2630@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
- <20121020183724.GA9984@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210201856020.27264@utopia.booyaka.com>
-Message-ID: <20121021135143.GA1855@beef>
+From: michael@walle.cc (Michael Walle)
+Date: Sun, 21 Oct 2012 15:59:38 +0200
+Subject: [PATCH 2/2] ARM: kirkwood: use gpio-fan DT binding on lsxl
+In-Reply-To: <20121021065552.GH21046@lunn.ch>
+References: <1350776094-16778-1-git-send-email-michael@walle.cc>
+ <1350776094-16778-2-git-send-email-michael@walle.cc>
+ <20121021065552.GH21046@lunn.ch>
+Message-ID: <201210211559.38628.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2012 at 06:58:10PM +0000, Paul Walmsley wrote:
-> On Sat, 20 Oct 2012, Richard Cochran wrote:
-> 
-> > On Sat, Oct 20, 2012 at 06:12:35PM +0000, Paul Walmsley wrote:
-> > > Just tried omap2plus_defconfig here and the board didn't boot, confirming 
-> > > your result.  Will add a section to the testlog README.txt about that.
-> > > 
-> > > > > In terms of differences from your setup, looks like we have different 
-> > > > > X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
-> > > > > configs too.
+Am Sonntag 21 Oktober 2012, 08:55:52 schrieb Andrew Lunn:
+> On Sun, Oct 21, 2012 at 01:34:54AM +0200, Michael Walle wrote:
+> > Remove board specific gpio-fan driver registration. Moved into device
+> > tree.
 > > 
-> > I tried both omap2plus_defconfig and your am33xx_only config, and
-> > neither one work with my (recent) u-boot version.
+> > Signed-off-by: Michael Walle <michael@walle.cc>
+> > ---
+> > 
+> >  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   11 ++++++++
+> >  arch/arm/mach-kirkwood/board-lsxl.c  |   47
+> >  ---------------------------------- 2 files changed, 11 insertions(+),
+> >  47 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> > b/arch/arm/boot/dts/kirkwood-lsxl.dtsi index 8fea375..798e60e 100644
+> > --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> > +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> > @@ -94,4 +94,15 @@
+> > 
+> >  			gpios = <&gpio1 16 1>;
+> >  		
+> >  		};
+> >  	
+> >  	};
+> > 
+> > +
+> > +	gpio_fan {
+> > +		compatible = "gpio-fan";
+> > +		gpios = <&gpio0 19 1
+> > +		         &gpio0 18 1>;
+> > +		gpio-fan,speed-map = <0    3
+> > +		                      1500 2
+> > +		                      3250 1
+> > +		                      5000 0>;
+> > +		alarm-gpios = <&gpio1 8 0>;
+> > +	};
+> > 
+> >  };
+> > 
+> > diff --git a/arch/arm/mach-kirkwood/board-lsxl.c
+> > b/arch/arm/mach-kirkwood/board-lsxl.c index 64e5cc6..7e18cad 100644
+> > --- a/arch/arm/mach-kirkwood/board-lsxl.c
+> > +++ b/arch/arm/mach-kirkwood/board-lsxl.c
+> > @@ -16,7 +16,6 @@
+> > 
+> >  #include <linux/platform_device.h>
+> >  #include <linux/mv643xx_eth.h>
+> >  #include <linux/gpio.h>
+> > 
+> > -#include <linux/gpio-fan.h>
+> > 
+> >  #include "common.h"
+> >  #include "mpp.h"
 > 
-> Just sent you the MLO and u-boot.img from here via private E-mail.  Those 
-> were the files that came with the BeagleBone SD card here.
+> Hi Michael
 > 
-> TI also has a u-boot tree for the AM33xx; might be worth trying:
-> 
-> git://arago-project.org/git/projects/u-boot-am33x.git
+> You might also be able to remove platform_device.h.
 
-Use of the vendor tree should be discouraged. The best thing to use
-is current ToT U-Boot mainline or the v2012.10 stable U-Boot release.
-X-Loader is deprecated by U-Boot SPL.
+Mh, pm_power_off, although defined in linux/pm.h, is somehow pulled with this 
+include. So either we leave it that way (looking at other boards only a few 
+has included pm.h) or i'll post a third patch which replaces that include.
 
--Matt
+-- 
+Michael
