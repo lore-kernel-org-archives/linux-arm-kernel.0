@@ -1,46 +1,51 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 20 Oct 2012 21:24:20 -0400
-Subject: [PATCH v2 0/2] DT EHCI support for Kirkwood.
-In-Reply-To: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
-References: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20121021012420.GD25828@titan.lakedaemon.net>
+Date: Sat, 20 Oct 2012 21:52:34 -0400
+Subject: [PATCH v3 0/7] mv643xx.c: Add basic device tree support.
+In-Reply-To: <1347343411.2603.42.camel@pasglop>
+References: <1344350092-24050-1-git-send-email-ian.molton@codethink.co.uk>
+ <5028D040.60604@codethink.co.uk> <502D201E.9030304@codethink.co.uk>
+ <201209101422.13875.arnd@arndb.de>
+ <1347343411.2603.42.camel@pasglop>
+Message-ID: <20121021015234.GE25828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2012 at 01:09:59PM +0200, Andrew Lunn wrote:
-> These two patches add DT support to ehci-orion and convert all
-> existing Kirkwood DT boards to using DT to instantiate the USB host.
-> 
-> v1->v2: Remove the phy property from DT. The previous implementation
-> was not compatible with the new ideas of a USB phy node. Only orion5x
-> needs it anyway, and currently converting orion5x to DT is low
-> priority. Adding a phy node later will also not affect backwards
-> compatibility.
-> 
-> Andrew Lunn (2):
->   ARM: Kirkwood: ehci-orion: Add device tree binding
->   ARM: Kirkwood: Convert all DT boards to EHCI via DT.
-> 
->  .../devicetree/bindings/usb/ehci-orion.txt         |   15 ++++++++
->  arch/arm/boot/dts/kirkwood.dtsi                    |    7 ++++
->  arch/arm/mach-kirkwood/board-dnskw.c               |    1 -
->  arch/arm/mach-kirkwood/board-dockstar.c            |    1 -
->  arch/arm/mach-kirkwood/board-dreamplug.c           |    1 -
->  arch/arm/mach-kirkwood/board-dt.c                  |    1 +
->  arch/arm/mach-kirkwood/board-goflexnet.c           |    1 -
->  arch/arm/mach-kirkwood/board-ib62x0.c              |    1 -
->  arch/arm/mach-kirkwood/board-iconnect.c            |    1 -
->  arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |    2 --
->  arch/arm/mach-kirkwood/board-km_kirkwood.c         |    1 -
->  arch/arm/mach-kirkwood/board-lsxl.c                |    1 -
->  arch/arm/mach-kirkwood/board-ts219.c               |    1 -
->  drivers/usb/host/ehci-orion.c                      |   38 ++++++++++++++++++--
->  14 files changed, 58 insertions(+), 14 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
+Pong.  ;-)
 
-Applied to:
+On Tue, Sep 11, 2012 at 04:03:31PM +1000, Benjamin Herrenschmidt wrote:
+> On Mon, 2012-09-10 at 14:22 +0000, Arnd Bergmann wrote:
+> > Following up on the old discussion, I talked briefly about this
+> > issue with BenH at the kernel summit. The outcome basically is that
+> > it's a bit sad to have incompatible bindings, but it's not the end
+> > of the world,and it's more important to do it right this time.
+> > 
+> > Just make sure that you use different values for the 'compatible'
+> > strings and then do what you need to get the ARM hardware working.
+> > 
+> > Ideally, the new binding should be written in a way that powerpc
+> > machines can use the same one, but the existing ones all use
+> > an version of Open Firmware that is not going to get updated
+> > and it's also not too likely that we are going to see new
+> > powerpc machines based on this chip.
+> 
+> Right, mostly these machines where the Pegasos. Those came with a fairly
+> busted variant of Open Firmware which generated a pretty gross
+> device-tree.
+> 
+> For some reason, the manufacturer of those things was never willing to
+> fix anything in their firmware (despite the distributor providing
+> patches etc...), seemingly on the assumption that whatever they were
+> doing was perfect and operating system people like us didn't matter one
+> little bit :-)
+> 
+> So I don't care much about it. It would be nice to keep them working
+> since people in the community still have them but if it goes through
+> some "compat" code that detects old/broken device-trees and eventually
+> disappears when we finally drop support, then so be it.
 
-git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
+Ian,
+
+What is the status of this work?
 
 thx,
 
