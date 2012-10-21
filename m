@@ -1,58 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 21 Oct 2012 08:55:52 +0200
-Subject: [PATCH 2/2] ARM: kirkwood: use gpio-fan DT binding on lsxl
-In-Reply-To: <1350776094-16778-2-git-send-email-michael@walle.cc>
-References: <1350776094-16778-1-git-send-email-michael@walle.cc>
- <1350776094-16778-2-git-send-email-michael@walle.cc>
-Message-ID: <20121021065552.GH21046@lunn.ch>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Sun, 21 Oct 2012 09:16:19 +0200
+Subject: [PATCH] usb: phy: samsung: Introducing usb phy driver for hsotg
+In-Reply-To: <20121017191300.GL21164@n2100.arm.linux.org.uk>
+References: <1349256393-11741-1-git-send-email-p.paneri@samsung.com>
+ <1350036934-6051-1-git-send-email-p.paneri@samsung.com>
+ <005801cdac56$8da0c120$a8e24360$%kim@samsung.com>
+ <20121017191300.GL21164@n2100.arm.linux.org.uk>
+Message-ID: <20121021071619.GA1676@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2012 at 01:34:54AM +0200, Michael Walle wrote:
-> Remove board specific gpio-fan driver registration. Moved into device tree.
+On Wed, Oct 17, 2012 at 08:13:01PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Oct 17, 2012 at 08:00:00PM +0900, Kukjin Kim wrote:
+> > > +static int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
+> > > +{
+> > > +	struct clk *ref_clk;
+> > > +	int refclk_freq = 0;
+> > > +
+> > > +	ref_clk = clk_get(sphy->dev, "xusbxti");
+> > > +	if (IS_ERR(ref_clk)) {
+> > 
+> > IS_ERR_OR_NULL(ref_clk)?
 > 
-> Signed-off-by: Michael Walle <michael@walle.cc>
-> ---
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   11 ++++++++
->  arch/arm/mach-kirkwood/board-lsxl.c  |   47 ----------------------------------
->  2 files changed, 11 insertions(+), 47 deletions(-)
+> For the N'th time, NO.  IS_ERR is correct here.
 > 
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> index 8fea375..798e60e 100644
-> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> @@ -94,4 +94,15 @@
->  			gpios = <&gpio1 16 1>;
->  		};
->  	};
-> +
-> +	gpio_fan {
-> +		compatible = "gpio-fan";
-> +		gpios = <&gpio0 19 1
-> +		         &gpio0 18 1>;
-> +		gpio-fan,speed-map = <0    3
-> +		                      1500 2
-> +		                      3250 1
-> +		                      5000 0>;
-> +		alarm-gpios = <&gpio1 8 0>;
-> +	};
->  };
-> diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-> index 64e5cc6..7e18cad 100644
-> --- a/arch/arm/mach-kirkwood/board-lsxl.c
-> +++ b/arch/arm/mach-kirkwood/board-lsxl.c
-> @@ -16,7 +16,6 @@
->  #include <linux/platform_device.h>
->  #include <linux/mv643xx_eth.h>
->  #include <linux/gpio.h>
-> -#include <linux/gpio-fan.h>
->  #include "common.h"
->  #include "mpp.h"
+> > > +		dev_err(sphy->dev, "Failed to get reference clock\n");
+> > > +		return PTR_ERR(ref_clk);
+> 
+> Look, it's the ABI.  Not only that but it's also TOTALLY AND UTTERLY WRONG
+> to use IS_ERR_OR_NULL(foo) and then follow it with return PTR_ERR(foo).
+> You end up returning ZERO.
+> 
+> Stop telling people to use IS_ERR_OR_NULL without properly thinking about
+> it first.  Virtually every single one of these done this way is a BUG.
+> 
+> Are we clear on this?
 
-Hi Michael
+Wouldn't be much easier to define PTR_ERR() to return -Esomething when
+its argument is NULL?
 
-You might also be able to remove platform_device.h.
+This would end the whole issue of "should I use IS_ERR*/PTR_ERR or look into
+the pointer myself?" story.  One could simply always use IS_ERR*/PTR_ERR
+and have the right thing done in whatever case.
 
-Otherwise, it looks good.
-
-	   Andrew
+Regards,
+Domenico
