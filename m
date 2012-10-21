@@ -1,32 +1,62 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 21 Oct 2012 17:06:27 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1210211704170.26128@utopia.booyaka.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Sun, 21 Oct 2012 19:34:07 +0200
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <1350771032-11527-3-git-send-email-linux@prisktech.co.nz>
+References: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
+ <1350771032-11527-3-git-send-email-linux@prisktech.co.nz>
+Message-ID: <201210211934.07427.florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 20 Oct 2012, Paul Walmsley wrote:
-
-> Here are some basic OMAP test results for Linux v3.7-rc2.
-> Logs and other details at:
+Le dimanche 21 octobre 2012 00:10:32, Tony Prisk a ?crit :
+> Add a binding document for ehci-platform driver.
 > 
->     http://www.pwsan.com/omap/testlogs/test_v3.7-rc2/20121020134755/
-
-...
-
-> Failing tests: needing investigation
-> ------------------------------------
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>  .../devicetree/bindings/usb/ehci-platform.txt      |   27
+> ++++++++++++++++++++ 1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ehci-platform.txt
 > 
-> PM tests:
-> 
-> * 37xx EVM: CORE not entering dynamic off-idle
->   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
->     off works
+> diff --git a/Documentation/devicetree/bindings/usb/ehci-platform.txt
+> b/Documentation/devicetree/bindings/usb/ehci-platform.txt new file mode
+> 100644
+> index 0000000..930b19e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/ehci-platform.txt
+> @@ -0,0 +1,27 @@
+> +Generic Platform EHCI Controller
+> +-----------------------------------------------------
+> +
+> +Required properties:
+> +- compatible : "linux,ehci-platform"
 
-Just confirmed that this longstanding bug affects both MMC root and NFS 
-root.
+Here you changed to linux,ehci-platform, which is good, but in the example you 
+forgot to update it.
 
+Otherwise, this is ok with me.
 
-- Paul
+> +- reg : Should contain 1 register ranges(address and length)
+> +- interrupts : EHCI controller interrupt
+> +
+> +Optional properties:
+> +- caps-offset : offset to the capabilities register (default = 0)
+> +- has-tt : controller has transaction translator(s).
+> +- has-synopsys-hc-bug : controller has the synopsys hc bug
+> +- no-io-watchdog : controller does not need io watchdog
+> +
+> +- big-endian : descriptors and registers are both big endian. This
+> +  is the equivalent of specifying big-endian-desc and big-endian-regs.
+> +OR
+> +- big-endian-desc : descriptors are in big-endian format
+> +- big-endian-regs : mmio is in big-endian format
+> +
+> +Example:
+> +	ehci at d8007c00 {
+> +		compatible = "ehci-platform";
+> +		reg = <0xd8007c00 0x200>;
+> +		interrupts = <43>;
+> +		has-tt;
+> +	};
+
+-- 
+Florian
