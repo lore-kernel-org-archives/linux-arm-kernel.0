@@ -1,62 +1,35 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 21 Oct 2012 19:34:07 +0200
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <1350771032-11527-3-git-send-email-linux@prisktech.co.nz>
-References: <1350771032-11527-1-git-send-email-linux@prisktech.co.nz>
- <1350771032-11527-3-git-send-email-linux@prisktech.co.nz>
-Message-ID: <201210211934.07427.florian@openwrt.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 21 Oct 2012 19:57:44 +0200
+Subject: [RFC 00/11] Convert Kirkwood to pinctrl
+In-Reply-To: <20121021115716.GA22437@schnuecks.de>
+References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
+ <20121021115716.GA22437@schnuecks.de>
+Message-ID: <20121021175744.GJ21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le dimanche 21 octobre 2012 00:10:32, Tony Prisk a ?crit :
-> Add a binding document for ehci-platform driver.
+On Sun, Oct 21, 2012 at 01:57:16PM +0200, Simon Baatz wrote:
+> Hi Andrew,
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
->  .../devicetree/bindings/usb/ehci-platform.txt      |   27
-> ++++++++++++++++++++ 1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/ehci-platform.txt
+> On Sat, Oct 20, 2012 at 05:07:32PM +0200, Andrew Lunn wrote:
+> > This patchset converts all kirkwood DT boards to pinctrl.
+> > It is an RFC for a number of reasons:
+> > 
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/ehci-platform.txt
-> b/Documentation/devicetree/bindings/usb/ehci-platform.txt new file mode
-> 100644
-> index 0000000..930b19e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/ehci-platform.txt
-> @@ -0,0 +1,27 @@
-> +Generic Platform EHCI Controller
-> +-----------------------------------------------------
-> +
-> +Required properties:
-> +- compatible : "linux,ehci-platform"
+> 
+> It seems that the mails with the actual patches somehow got lost.  If
+> it is not too much work, could you provide these patches also via
+> your git repository on github?
 
-Here you changed to linux,ehci-platform, which is good, but in the example you 
-forgot to update it.
+Hi Simon
 
-Otherwise, this is ok with me.
+Yes, the list server did not like them for some reason. Seams to work
+sometimes, not others.
 
-> +- reg : Should contain 1 register ranges(address and length)
-> +- interrupts : EHCI controller interrupt
-> +
-> +Optional properties:
-> +- caps-offset : offset to the capabilities register (default = 0)
-> +- has-tt : controller has transaction translator(s).
-> +- has-synopsys-hc-bug : controller has the synopsys hc bug
-> +- no-io-watchdog : controller does not need io watchdog
-> +
-> +- big-endian : descriptors and registers are both big endian. This
-> +  is the equivalent of specifying big-endian-desc and big-endian-regs.
-> +OR
-> +- big-endian-desc : descriptors are in big-endian format
-> +- big-endian-regs : mmio is in big-endian format
-> +
-> +Example:
-> +	ehci at d8007c00 {
-> +		compatible = "ehci-platform";
-> +		reg = <0xd8007c00 0x200>;
-> +		interrupts = <43>;
-> +		has-tt;
-> +	};
+Anyway:
 
--- 
-Florian
+git://github.com/lunn/linux.git v3.7-rc1-pinctrl 
+
+Once i have all the CPU variants, i will repost the patchset.
+
+     Andrew
