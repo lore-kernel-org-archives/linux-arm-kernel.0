@@ -1,31 +1,37 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 21 Oct 2012 16:23:12 +0200
-Subject: [PATCH 5/5] AVR32: Remove HAVE_NET_MACB
-In-Reply-To: <1350829392-3812-1-git-send-email-manabian@gmail.com>
-References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350829392-3812-6-git-send-email-manabian@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 21 Oct 2012 09:22:55 -0700 (PDT)
+Subject: [PATCH] ARM: EXYNOS: exynos4-dt: Set .smp field of machine
+ descriptor
+In-Reply-To: <1350035378-31989-1-git-send-email-t.figa@samsung.com>
+References: <1350035378-31989-1-git-send-email-t.figa@samsung.com>
+Message-ID: <2064474.beoN9hr7Vi@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HAVE_NET_MACB has already been removed from the driver itself
-so removed it from arch Kconfig as well.
+On Friday 12 of October 2012 11:49:38 Tomasz Figa wrote:
+> This patch adds missing initializer of .smp field of machine descriptor
+> of Exynos 4 DT machine.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  arch/arm/mach-exynos/mach-exynos4-dt.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c
+> b/arch/arm/mach-exynos/mach-exynos4-dt.c index 7222e3c..d6bdcfb 100644
+> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+> @@ -119,6 +119,7 @@ static char const *exynos4_dt_compat[] __initdata =
+> {
+> 
+>  DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device
+> Tree)") /* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
+> +	.smp		= smp_ops(exynos_smp_ops),
+>  	.init_irq	= exynos4_init_irq,
+>  	.map_io		= exynos4_dt_map_io,
+>  	.handle_irq	= gic_handle_irq,
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/avr32/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Ping. I think this should be considered a fix.
 
-diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
-index 06e73bf..09f9fa8 100644
---- a/arch/avr32/Kconfig
-+++ b/arch/avr32/Kconfig
-@@ -80,7 +80,6 @@ config PLATFORM_AT32AP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select GENERIC_ALLOCATOR
- 	select HAVE_FB_ATMEL
--	select HAVE_NET_MACB
- 
- #
- # CPU types
--- 
-1.7.12.4
+Best regards,
+Tomasz Figa
