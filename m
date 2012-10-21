@@ -1,26 +1,46 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 20 Oct 2012 21:08:24 -0400
-Subject: [PATCH] [ARM] Enable the second I2C bus on Marvell Kirkwood
-In-Reply-To: <20121001235932.GA678@obsidianresearch.com>
-References: <20121001235932.GA678@obsidianresearch.com>
-Message-ID: <20121021010824.GC25828@titan.lakedaemon.net>
+Date: Sat, 20 Oct 2012 21:24:20 -0400
+Subject: [PATCH v2 0/2] DT EHCI support for Kirkwood.
+In-Reply-To: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
+References: <1350731401-21442-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20121021012420.GD25828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 01, 2012 at 05:59:32PM -0600, Jason Gunthorpe wrote:
-> mv64xxx_of_config requires that the tclk frequency be found
-> through the clk stuff rather than through device tree, so add
-> another override for the 2nd controller.
+On Sat, Oct 20, 2012 at 01:09:59PM +0200, Andrew Lunn wrote:
+> These two patches add DT support to ehci-orion and convert all
+> existing Kirkwood DT boards to using DT to instantiate the USB host.
 > 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-
-I made one small change, changed subject to:
-
-ARM: Kirkwood: Enable the second I2C bus
+> v1->v2: Remove the phy property from DT. The previous implementation
+> was not compatible with the new ideas of a USB phy node. Only orion5x
+> needs it anyway, and currently converting orion5x to DT is low
+> priority. Adding a phy node later will also not affect backwards
+> compatibility.
+> 
+> Andrew Lunn (2):
+>   ARM: Kirkwood: ehci-orion: Add device tree binding
+>   ARM: Kirkwood: Convert all DT boards to EHCI via DT.
+> 
+>  .../devicetree/bindings/usb/ehci-orion.txt         |   15 ++++++++
+>  arch/arm/boot/dts/kirkwood.dtsi                    |    7 ++++
+>  arch/arm/mach-kirkwood/board-dnskw.c               |    1 -
+>  arch/arm/mach-kirkwood/board-dockstar.c            |    1 -
+>  arch/arm/mach-kirkwood/board-dreamplug.c           |    1 -
+>  arch/arm/mach-kirkwood/board-dt.c                  |    1 +
+>  arch/arm/mach-kirkwood/board-goflexnet.c           |    1 -
+>  arch/arm/mach-kirkwood/board-ib62x0.c              |    1 -
+>  arch/arm/mach-kirkwood/board-iconnect.c            |    1 -
+>  arch/arm/mach-kirkwood/board-iomega_ix2_200.c      |    2 --
+>  arch/arm/mach-kirkwood/board-km_kirkwood.c         |    1 -
+>  arch/arm/mach-kirkwood/board-lsxl.c                |    1 -
+>  arch/arm/mach-kirkwood/board-ts219.c               |    1 -
+>  drivers/usb/host/ehci-orion.c                      |   38 ++++++++++++++++++--
+>  14 files changed, 58 insertions(+), 14 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/usb/ehci-orion.txt
 
 Applied to:
 
-git://git.infradead.org/users/jcooper/linux.git kirkwood/boards
+git://git.infradead.org/users/jcooper/linux.git kirkwood/dt
 
 thx,
 
