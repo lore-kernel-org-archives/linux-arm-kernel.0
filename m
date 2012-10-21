@@ -1,31 +1,41 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sun, 21 Oct 2012 14:36:52 +0200
+From: mporter@ti.com (Matt Porter)
+Date: Sun, 21 Oct 2012 09:51:43 -0400
 Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EA012D8@DBDE01.ent.ti.com>
+In-Reply-To: <alpine.DEB.2.00.1210201856020.27264@utopia.booyaka.com>
 References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
  <20121020141136.GA6433@netboy.at.omicron.at>
  <alpine.DEB.2.00.1210201615170.24497@utopia.booyaka.com>
- <20121021073551.GA4735@netboy.at.omicron.at>
- <C8443D0743D26F4388EA172BF4E2A7A93EA012D8@DBDE01.ent.ti.com>
-Message-ID: <20121021123652.GA15421@netboy.at.omicron.at>
+ <20121020180123.GA2630@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
+ <20121020183724.GA9984@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210201856020.27264@utopia.booyaka.com>
+Message-ID: <20121021135143.GA1855@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2012 at 12:29:26PM +0000, Mohammed, Afzal wrote:
-> Hi Richard,
+On Sat, Oct 20, 2012 at 06:58:10PM +0000, Paul Walmsley wrote:
+> On Sat, 20 Oct 2012, Richard Cochran wrote:
 > 
-> * Richard Cochran, October 21, 2012 1:05 PM:
+> > On Sat, Oct 20, 2012 at 06:12:35PM +0000, Paul Walmsley wrote:
+> > > Just tried omap2plus_defconfig here and the board didn't boot, confirming 
+> > > your result.  Will add a section to the testlog README.txt about that.
+> > > 
+> > > > > In terms of differences from your setup, looks like we have different 
+> > > > > X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
+> > > > > configs too.
+> > 
+> > I tried both omap2plus_defconfig and your am33xx_only config, and
+> > neither one work with my (recent) u-boot version.
 > 
-> > People keep saying, the beaglebone works fine with v3.7-rc1, but it
-> > isn't true. Now v3.7-rc2 is out, and the gpmc issue still has not been
-> > fixed, and no one is doing anything about it either.
+> Just sent you the MLO and u-boot.img from here via private E-mail.  Those 
+> were the files that came with the BeagleBone SD card here.
 > 
-> A fix to resolve the gpmc issue has been merged recently, so I am
-> expecting beagle bone to boot on -rc2 (I don't have hardware to test,
-> on vacation now), can you please try with -rc2.
+> TI also has a u-boot tree for the AM33xx; might be worth trying:
+> 
+> git://arago-project.org/git/projects/u-boot-am33x.git
 
-I am happy to report that v3.7-rc2 boots via the modern DT method,
-using Paul's am33xx_only config and U-Boot 2012.10-rc1-00148-g4668a08.
+Use of the vendor tree should be discouraged. The best thing to use
+is current ToT U-Boot mainline or the v2012.10 stable U-Boot release.
+X-Loader is deprecated by U-Boot SPL.
 
-Thanks, and have a nice vacation,
-Richard
+-Matt
