@@ -1,27 +1,53 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 21 Oct 2012 20:27:56 +0200
-Subject: [PATCH 9/9] ARM: add uprobes support
-In-Reply-To: <20121015173147.GA18614@linaro.org>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-9-git-send-email-rabin@rab.in>
- <20121015173147.GA18614@linaro.org>
-Message-ID: <20121021182742.GB4840@ubuntu>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 21 Oct 2012 20:30:05 +0200
+Subject: [PATCH 1/5] net/cadence: get rid of HAVE_NET_MACB
+In-Reply-To: <1350829392-3812-2-git-send-email-manabian@gmail.com>
+References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+ <1350829392-3812-2-git-send-email-manabian@gmail.com>
+Message-ID: <20121021183005.GA18964@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 06:31:47PM +0100, Dave Martin wrote:
-> On Sun, Oct 14, 2012 at 09:23:13PM +0200, Rabin Vincent wrote:
-> > +static int uprobe_trap_handler(struct pt_regs *regs, unsigned int instr)
-> > +{
-> > +	unsigned long flags;
-> > +
-> > +	local_irq_save(flags);
-> > +	if ((instr & 0x0fffffff) == UPROBE_SWBP_INSN)
-> 
-> Is the check unnecessary here?  I think the same comparison will
-> happen as a result of evaluating the associated undef_hook.
+On 16:23 Sun 21 Oct     , Joachim Eastwood wrote:
+> macb is a platform driver and there is nothing that prevents
+> this driver from being built on non-ARM/AVR32 platforms.
+if you want to drop the HAVE_NET_MACB you need to drop it everywher in one
+patch
 
-The check is there because this uprobe_trap_handler() is registered for
-two different undefined instructions: UPROBE_SWBP_INSN (the one which is
-used to insert the probe) and UPROBE_SS_INSN (the one placed in the XOL
-area for simulating single-stepping).
+Best Regards,
+J.
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  drivers/net/ethernet/cadence/Kconfig | 5 -----
+>  1 file changed, 5 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
+> index 57f78abe..5d1ea30 100644
+> --- a/drivers/net/ethernet/cadence/Kconfig
+> +++ b/drivers/net/ethernet/cadence/Kconfig
+> @@ -2,13 +2,9 @@
+>  # Atmel device configuration
+>  #
+>  
+> -config HAVE_NET_MACB
+> -	bool
+> -
+>  config NET_CADENCE
+>  	bool "Cadence devices"
+>  	default y
+> -	depends on HAVE_NET_MACB || (ARM && ARCH_AT91RM9200)
+>  	---help---
+>  	  If you have a network (Ethernet) card belonging to this class, say Y.
+>  	  Make sure you know the name of your card. Read the Ethernet-HOWTO,
+> @@ -34,7 +30,6 @@ config ARM_AT91_ETHER
+>  
+>  config MACB
+>  	tristate "Cadence MACB/GEM support"
+> -	depends on HAVE_NET_MACB
+>  	select PHYLIB
+>  	---help---
+>  	  The Cadence MACB ethernet interface is found on many Atmel AT32 and
+> -- 
+> 1.7.12.4
+> 
