@@ -1,42 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 21 Oct 2012 23:11:43 +0200
-Subject: [RFC 00/11] Convert Kirkwood to pinctrl
-In-Reply-To: <20121021191634.GL21046@lunn.ch>
-References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
- <20121021210902.4dbd3e09@skate> <20121021191634.GL21046@lunn.ch>
-Message-ID: <5084650F.9050208@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 21 Oct 2012 23:57:02 +0200
+Subject: [PATCH v2 2/3] net/at91_ether: select MACB in Kconfig
+In-Reply-To: <1350856623-9819-1-git-send-email-manabian@gmail.com>
+References: <1350856623-9819-1-git-send-email-manabian@gmail.com>
+Message-ID: <1350856623-9819-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/21/2012 09:16 PM, Andrew Lunn wrote:
->>> Do we want to enable the use of mvebu GPIO driver
->>> outside of mach-mvebu?
->>
->> Yes.
->>
->>> Do we want to enable the use of mvebu pinctrl driver
->>> outside of mach-mvebu?
->>
->> Yes.
->>
->> Generally speaking, I think it is a good idea for
->> mach-{mvebu,kirkwood,dove,mv78xx0,orion5x} to share as much
->> infrastructure code as possible.
->
-> Definitely.
->
-> However, i _think_ Sebastian had a different opinion to your two
-> yes's. Maybe its just for Dove?
->
-> I hope Sebastian will comment soon.
+Now that HAVE_NET_MACB is gone let's just select MACB to
+satisfy the dependecies in at91_ether.
 
-Andrew, Thomas,
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ drivers/net/ethernet/cadence/Kconfig  | 2 +-
+ drivers/net/ethernet/cadence/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-we had long discussions about this some time ago. I agree to both
-of Thomas' "yes" above as you convinced me that this is the best
-way of merging plat-orion and mach-mvebu.
-
-Do you want to add dove pinctrl to your patch set? If yes, when
-do you want to post v1 of this RFC?
-
-Sebastian
+diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
+index 5d1ea30..f6d0956 100644
+--- a/drivers/net/ethernet/cadence/Kconfig
++++ b/drivers/net/ethernet/cadence/Kconfig
+@@ -23,7 +23,7 @@ config ARM_AT91_ETHER
+ 	tristate "AT91RM9200 Ethernet support"
+ 	depends on ARM && ARCH_AT91RM9200
+ 	select NET_CORE
+-	select PHYLIB
++	select MACB
+ 	---help---
+ 	  If you wish to compile a kernel for the AT91RM9200 and enable
+ 	  ethernet support, then you should always answer Y to this.
+diff --git a/drivers/net/ethernet/cadence/Makefile b/drivers/net/ethernet/cadence/Makefile
+index 798b1e0..9068b83 100644
+--- a/drivers/net/ethernet/cadence/Makefile
++++ b/drivers/net/ethernet/cadence/Makefile
+@@ -2,5 +2,5 @@
+ # Makefile for the Atmel network device drivers.
+ #
+ 
+-obj-$(CONFIG_ARM_AT91_ETHER) += at91_ether.o macb.o
++obj-$(CONFIG_ARM_AT91_ETHER) += at91_ether.o
+ obj-$(CONFIG_MACB) += macb.o
+-- 
+1.7.12.4
