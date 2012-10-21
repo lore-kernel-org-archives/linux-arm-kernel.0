@@ -1,33 +1,42 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 21 Oct 2012 22:39:48 +0200
-Subject: [PATCH 3/5] net/at91_ether: move eth addr quirk into csb337 board
- setup
-In-Reply-To: <20121021182551.GH12801@game.jcrosoft.org>
-References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
- <1350829392-3812-4-git-send-email-manabian@gmail.com>
- <20121021182551.GH12801@game.jcrosoft.org>
-Message-ID: <CAGhQ9VzHAy3vy5-rz5E1UeRx8nrwYtkjWFEBJBt+uL=QL1FUUw@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 21 Oct 2012 23:11:43 +0200
+Subject: [RFC 00/11] Convert Kirkwood to pinctrl
+In-Reply-To: <20121021191634.GL21046@lunn.ch>
+References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
+ <20121021210902.4dbd3e09@skate> <20121021191634.GL21046@lunn.ch>
+Message-ID: <5084650F.9050208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2012 at 8:25 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 16:23 Sun 21 Oct     , Joachim Eastwood wrote:
->> Move Ethernet address byte order fix for csb337 into it's board
->> setup.
+On 10/21/2012 09:16 PM, Andrew Lunn wrote:
+>>> Do we want to enable the use of mvebu GPIO driver
+>>> outside of mach-mvebu?
 >>
->> This will allow us to remove the last mach include from at91_ether
->> and also to share the address setup with the macb driver.
-> no the at91rm9200 move to DT this is not compatible with it
+>> Yes.
+>>
+>>> Do we want to enable the use of mvebu pinctrl driver
+>>> outside of mach-mvebu?
+>>
+>> Yes.
+>>
+>> Generally speaking, I think it is a good idea for
+>> mach-{mvebu,kirkwood,dove,mv78xx0,orion5x} to share as much
+>> infrastructure code as possible.
 >
-> you need to pass ths in info via platform_data
+> Definitely.
 >
-> and do not touch driver code related stuff in boards
+> However, i _think_ Sebastian had a different opinion to your two
+> yes's. Maybe its just for Dove?
+>
+> I hope Sebastian will comment soon.
 
-I know the board code is a bit nasty.
-If it's unacceptable I'll cook up a flag and pass it by platform_data,
-something like "reverse_eth_addr". Still it will only ever be used on
-the csb337 board.
+Andrew, Thomas,
 
-regards
-Joachim Eastwood
+we had long discussions about this some time ago. I agree to both
+of Thomas' "yes" above as you convinced me that this is the best
+way of merging plat-orion and mach-mvebu.
+
+Do you want to add dove pinctrl to your patch set? If yes, when
+do you want to post v1 of this RFC?
+
+Sebastian
