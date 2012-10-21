@@ -1,55 +1,43 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun, 21 Oct 2012 20:59:08 +0200
-Subject: [PATCH 9/9] ARM: add uprobes support
-In-Reply-To: <20121015174450.GB18614@linaro.org>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-9-git-send-email-rabin@rab.in>
- <20121015111443.GA2006@linaro.org>
- <CAH+eYFC1fr0vpK2T4hz9LK=Nz5bzQBQ4O-o0f9tsnj-_D9ZEJg@mail.gmail.com>
- <20121015174450.GB18614@linaro.org>
-Message-ID: <20121021185908.GD4840@ubuntu>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 21 Oct 2012 21:09:02 +0200
+Subject: [RFC 00/11] Convert Kirkwood to pinctrl
+In-Reply-To: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
+References: <1350745663-5277-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20121021210902.4dbd3e09@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 06:44:50PM +0100, Dave Martin wrote:
-> On Mon, Oct 15, 2012 at 01:44:55PM +0200, Rabin Vincent wrote:
-> > Why?  It currently works for ARM userspace even if the kernel is
-> > Thumb-2.
-> 
-> My bad, I misread what was happening in the Makefile changes.
-> 
-> My concern is about whether we can build the ARM and Thumb-2 kprobes
-> code into the same kernel.  If so, no problem, but I believe this is
-> not a tested configuration for kprobes itself.
-> 
-> If you've not already done so, it should be possible to test this
-> by adding CONFIG_THUMB2_KERNEL=y to your config, providing your
-> hardware is Thumb-2 capable.
+Dear Andrew Lunn,
 
-I've tested this before.  With a Thumb-2 kernel, both the kprobes test
-(Thumb) and the uprobes test (ARM) run fine.
+On Sat, 20 Oct 2012 17:07:32 +0200, Andrew Lunn wrote:
 
-> General question which I'm not sure I understand yet: is is possible
-> to combine uprobes/kprobes decode more completely?  It's not obvious
-> to me whether the uprobes-specific decoding only relates to features
-> which architecturally execute differently in user mode versus
-> privileged mode.  Some explanation somewhere could be helpful.
+> This patchset converts all kirkwood DT boards to pinctrl.
+> It is an RFC for a number of reasons:
 
-What we change is not the decoding itself but the handling of the
-instructions:
+Thanks for doing this work!
 
-  (1) Load and stores are executed from the xol area by user space so
-  the instructions need to be rewritten when they touch the PC.  Kprobes
-  code rewrites the instructions directly and executes them or in some
-  cases simulates them.
+> Do we want to enable the use of mvebu GPIO driver
+> outside of mach-mvebu?
 
-  (2) All other non-simulated instructions are also executed from the
-  XOL area in userspace.  Because of this, the ALU instructions which
-  use the PC also need to be rewritten to not use the PC.  Perhaps we
-  can actually get rid of this and just execute these instruction from
-  kernel space like it is done for uprobes.
+Yes.
 
-  So the uprobes code is uses the decoding tables just to know if the
-  instruction is using the PC or not, but if we make the ALU
-  instructions execute from kernel space we could actually use the
-  emulate_*() functions like kprobes does.
+> Do we want to enable the use of mvebu pinctrl driver
+> outside of mach-mvebu?
+
+Yes.
+
+Generally speaking, I think it is a good idea for
+mach-{mvebu,kirkwood,dove,mv78xx0,orion5x} to share as much
+infrastructure code as possible. A first step is obviously to migrate
+everybody to use the drivers/gpio mvebu driver and the drivers/pinctrl
+mvebu driver, and get rid of plat-orion/{gpio,mpp}.c once this work is
+done.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
