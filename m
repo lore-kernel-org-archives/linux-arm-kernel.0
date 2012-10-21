@@ -1,75 +1,46 @@
-From: michael@walle.cc (Michael Walle)
-Date: Sun, 21 Oct 2012 15:59:38 +0200
-Subject: [PATCH 2/2] ARM: kirkwood: use gpio-fan DT binding on lsxl
-In-Reply-To: <20121021065552.GH21046@lunn.ch>
-References: <1350776094-16778-1-git-send-email-michael@walle.cc>
- <1350776094-16778-2-git-send-email-michael@walle.cc>
- <20121021065552.GH21046@lunn.ch>
-Message-ID: <201210211559.38628.michael@walle.cc>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 21 Oct 2012 16:23:09 +0200
+Subject: [PATCH 2/5] net/at91_ether: select MACB in Kconfig
+In-Reply-To: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+Message-ID: <1350829392-3812-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag 21 Oktober 2012, 08:55:52 schrieb Andrew Lunn:
-> On Sun, Oct 21, 2012 at 01:34:54AM +0200, Michael Walle wrote:
-> > Remove board specific gpio-fan driver registration. Moved into device
-> > tree.
-> > 
-> > Signed-off-by: Michael Walle <michael@walle.cc>
-> > ---
-> > 
-> >  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   11 ++++++++
-> >  arch/arm/mach-kirkwood/board-lsxl.c  |   47
-> >  ---------------------------------- 2 files changed, 11 insertions(+),
-> >  47 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> > b/arch/arm/boot/dts/kirkwood-lsxl.dtsi index 8fea375..798e60e 100644
-> > --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> > +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> > @@ -94,4 +94,15 @@
-> > 
-> >  			gpios = <&gpio1 16 1>;
-> >  		
-> >  		};
-> >  	
-> >  	};
-> > 
-> > +
-> > +	gpio_fan {
-> > +		compatible = "gpio-fan";
-> > +		gpios = <&gpio0 19 1
-> > +		         &gpio0 18 1>;
-> > +		gpio-fan,speed-map = <0    3
-> > +		                      1500 2
-> > +		                      3250 1
-> > +		                      5000 0>;
-> > +		alarm-gpios = <&gpio1 8 0>;
-> > +	};
-> > 
-> >  };
-> > 
-> > diff --git a/arch/arm/mach-kirkwood/board-lsxl.c
-> > b/arch/arm/mach-kirkwood/board-lsxl.c index 64e5cc6..7e18cad 100644
-> > --- a/arch/arm/mach-kirkwood/board-lsxl.c
-> > +++ b/arch/arm/mach-kirkwood/board-lsxl.c
-> > @@ -16,7 +16,6 @@
-> > 
-> >  #include <linux/platform_device.h>
-> >  #include <linux/mv643xx_eth.h>
-> >  #include <linux/gpio.h>
-> > 
-> > -#include <linux/gpio-fan.h>
-> > 
-> >  #include "common.h"
-> >  #include "mpp.h"
-> 
-> Hi Michael
-> 
-> You might also be able to remove platform_device.h.
+Now that HAVE_NET_MACB is gone let's just select MACB to
+satisfy the dependecies in at91_ether.
 
-Mh, pm_power_off, although defined in linux/pm.h, is somehow pulled with this 
-include. So either we leave it that way (looking at other boards only a few 
-has included pm.h) or i'll post a third patch which replaces that include.
+PHYLIB will then by selected by MACB.
 
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ drivers/net/ethernet/cadence/Kconfig  | 2 +-
+ drivers/net/ethernet/cadence/Makefile | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
+index 5d1ea30..f6d0956 100644
+--- a/drivers/net/ethernet/cadence/Kconfig
++++ b/drivers/net/ethernet/cadence/Kconfig
+@@ -23,7 +23,7 @@ config ARM_AT91_ETHER
+ 	tristate "AT91RM9200 Ethernet support"
+ 	depends on ARM && ARCH_AT91RM9200
+ 	select NET_CORE
+-	select PHYLIB
++	select MACB
+ 	---help---
+ 	  If you wish to compile a kernel for the AT91RM9200 and enable
+ 	  ethernet support, then you should always answer Y to this.
+diff --git a/drivers/net/ethernet/cadence/Makefile b/drivers/net/ethernet/cadence/Makefile
+index 798b1e0..9068b83 100644
+--- a/drivers/net/ethernet/cadence/Makefile
++++ b/drivers/net/ethernet/cadence/Makefile
+@@ -2,5 +2,5 @@
+ # Makefile for the Atmel network device drivers.
+ #
+ 
+-obj-$(CONFIG_ARM_AT91_ETHER) += at91_ether.o macb.o
++obj-$(CONFIG_ARM_AT91_ETHER) += at91_ether.o
+ obj-$(CONFIG_MACB) += macb.o
 -- 
-Michael
+1.7.12.4
