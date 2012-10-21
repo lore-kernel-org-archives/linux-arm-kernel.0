@@ -1,11 +1,11 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 21 Oct 2012 20:34:18 +0200
+Date: Sun, 21 Oct 2012 20:25:51 +0200
 Subject: [PATCH 3/5] net/at91_ether: move eth addr quirk into csb337
  board setup
 In-Reply-To: <1350829392-3812-4-git-send-email-manabian@gmail.com>
 References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
  <1350829392-3812-4-git-send-email-manabian@gmail.com>
-Message-ID: <20121021183418.GC18964@game.jcrosoft.org>
+Message-ID: <20121021182551.GH12801@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,11 +15,11 @@ On 16:23 Sun 21 Oct     , Joachim Eastwood wrote:
 > 
 > This will allow us to remove the last mach include from at91_ether
 > and also to share the address setup with the macb driver.
-no the current drivers expect mach/board.h, mach/at91rm9200_emac.h, asm/gpio.h
+no the at91rm9200 move to DT this is not compatible with it
 
-waht you did will not even compile on non at91 platform
+you need to pass ths in info via platform_data
 
-Did you even compile it on non at91?
+and do not touch driver code related stuff in boards
 
 Best Regards,
 J.
