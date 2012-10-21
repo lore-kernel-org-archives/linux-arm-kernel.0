@@ -1,47 +1,58 @@
-From: cavokz@gmail.com (Domenico Andreoli)
-Date: Sun, 21 Oct 2012 09:16:19 +0200
-Subject: [PATCH] usb: phy: samsung: Introducing usb phy driver for hsotg
-In-Reply-To: <20121017191300.GL21164@n2100.arm.linux.org.uk>
-References: <1349256393-11741-1-git-send-email-p.paneri@samsung.com>
- <1350036934-6051-1-git-send-email-p.paneri@samsung.com>
- <005801cdac56$8da0c120$a8e24360$%kim@samsung.com>
- <20121017191300.GL21164@n2100.arm.linux.org.uk>
-Message-ID: <20121021071619.GA1676@glitch>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Sun, 21 Oct 2012 00:21:18 -0700
+Subject: [PATCH 07/11] fsmc/nand: Provide contiguous buffers to dma
+In-Reply-To: <1350371511.5769.43.camel@sauron.fi.intel.com>
+References: <cover.1349778820.git.vipin.kumar@st.com>
+ <2b88c853b3691338fae037f569917fc300cd6032.1349778821.git.vipin.kumar@st.com>
+ <CACRpkdb6ArMUQ6MAsue+Gh15UfOUrWNAc9wrxd6awc0BTwOGiw@mail.gmail.com>
+ <CAOh2x=ksMr7VRCnpF-rK+Mesg1p4Td++SQ-t=ShrguRRVWSSSQ@mail.gmail.com>
+ <CACRpkdYjA8QUh4HqvE1rsnXcGA4WafTkMq_wLNJ__gXEnEYrow@mail.gmail.com>
+ <507794B6.2000107@st.com>
+ <1350307104.4115.23.camel@sauron.fi.intel.com>
+ <CAN8TOE-7d=YUSYsHFw9X5vnz8cpSJYv5uZfvBpDyhg+-F_LDiQ@mail.gmail.com>
+ <1350371511.5769.43.camel@sauron.fi.intel.com>
+Message-ID: <CAN8TOE9tDbW5QoRnY0wAOPJZqXEO=kdtVkS=BHYAUjebrPq=GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2012 at 08:13:01PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Oct 17, 2012 at 08:00:00PM +0900, Kukjin Kim wrote:
-> > > +static int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
-> > > +{
-> > > +	struct clk *ref_clk;
-> > > +	int refclk_freq = 0;
-> > > +
-> > > +	ref_clk = clk_get(sphy->dev, "xusbxti");
-> > > +	if (IS_ERR(ref_clk)) {
-> > 
-> > IS_ERR_OR_NULL(ref_clk)?
-> 
-> For the N'th time, NO.  IS_ERR is correct here.
-> 
-> > > +		dev_err(sphy->dev, "Failed to get reference clock\n");
-> > > +		return PTR_ERR(ref_clk);
-> 
-> Look, it's the ABI.  Not only that but it's also TOTALLY AND UTTERLY WRONG
-> to use IS_ERR_OR_NULL(foo) and then follow it with return PTR_ERR(foo).
-> You end up returning ZERO.
-> 
-> Stop telling people to use IS_ERR_OR_NULL without properly thinking about
-> it first.  Virtually every single one of these done this way is a BUG.
-> 
-> Are we clear on this?
+On Tue, Oct 16, 2012 at 12:11 AM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
+> On Mon, 2012-10-15 at 09:27 -0700, Brian Norris wrote:
+>> See the commit description for the following commit in mtd-utils.git:
+>>
+>>     commit 71c76e74661492b4f68f670514866cfc85f47089
+>>     libmtd: fix mtd_write() issues for large data-only writes
+>
+> Well, this is another work-around.
 
-Wouldn't be much easier to define PTR_ERR() to return -Esomething when
-its argument is NULL?
+Yeah, I know it was a workaround. It's another issue of balancing time
+and the "best" solution. Of course, the solutions actually don't seem
+that difficult now, so I probably should have just fixed the ioctl()
+in the first place... But I was simply pointing this out as evidence
+of a real memory-fragmentation issue.
 
-This would end the whole issue of "should I use IS_ERR*/PTR_ERR or look into
-the pointer myself?" story.  One could simply always use IS_ERR*/PTR_ERR
-and have the right thing done in whatever case.
+> The better way to fix this would be
+> to change kernel's 'mtdchar_write_ioctl()' to be iterative and avoid
+> calling 'memdup_user(len)' for arbitrary 'len' passed from user-space.
 
-Regards,
-Domenico
+That's one way, but it would require specifying some arbitrary
+iteration length, right? Like some multiple of writesize?
+
+Instead, how about modelling it more closely after mtdchar_write(),
+using mtd_kmalloc_up_to(), then iteratively call copy_from_user()?
+
+> So I thought about something like introducing an mtd_alloc() which
+> would:
+>    a. Try doing CMA allocation: dma_alloc_from_contiguous()
+>    b. If it fails, use kmalloc().
+...
+> If both fail - bad luck. Go look at the code and switch to S-G lists
+> instead of allocating contiguous regions. As I said, in many places it
+> is easy to do, and there are few places when you would need to spend a
+> bit more time.
+>
+> How does this sound to you?
+
+It sounds OK, but that depends on the success rate of
+dma_alloc_from_contiguous(). I'm not familiar with it.
+
+Brian
