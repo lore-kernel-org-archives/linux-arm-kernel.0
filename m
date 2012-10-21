@@ -1,84 +1,139 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 21 Oct 2012 23:57:03 +0200
-Subject: [PATCH v2 3/3] net/at91_ether: add pdata flag for reverse Eth addr
-In-Reply-To: <1350856623-9819-1-git-send-email-manabian@gmail.com>
-References: <1350856623-9819-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350856623-9819-4-git-send-email-manabian@gmail.com>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Mon, 22 Oct 2012 01:15:00 +0200
+Subject: [PATCH v4 1/7] uio: uio_pruss: replace private SRAM API with
+ genalloc
+In-Reply-To: <20121018145338.GA25164@beef>
+References: <1349456686-22736-1-git-send-email-mporter@ti.com>
+ <1349456686-22736-2-git-send-email-mporter@ti.com>
+ <20121018145338.GA25164@beef>
+Message-ID: <20121021231500.GB7208@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow us to remove the last mach include from at91_ether
-and also make it easier to share address setup with macb.
+On Thu, Oct 18, 2012 at 10:53:38AM -0400, Matt Porter wrote:
+> On Fri, Oct 05, 2012 at 01:04:40PM -0400, Matt Porter wrote:
+> > Remove the use of the private DaVinci SRAM API in favor
+> > of genalloc. The pool to be used is provided by platform
+> > data.
+> > 
+> > Signed-off-by: Matt Porter <mporter@ti.com>
+> 
+> Hans,
+> 
+> Any additional concerns on this patch?
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/mach-at91/board-csb337.c         | 2 ++
- drivers/net/ethernet/cadence/Kconfig      | 1 -
- drivers/net/ethernet/cadence/at91_ether.c | 5 ++---
- include/linux/platform_data/macb.h        | 1 +
- 4 files changed, 5 insertions(+), 4 deletions(-)
+Not from my side. I was waiting for your discussion to calm down.
 
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index 3e37437..aa9b320 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -53,6 +53,8 @@ static void __init csb337_init_early(void)
- static struct macb_platform_data __initdata csb337_eth_data = {
- 	.phy_irq_pin	= AT91_PIN_PC2,
- 	.is_rmii	= 0,
-+	/* The CSB337 bootloader stores the MAC the wrong-way around */
-+	.rev_eth_addr	= 1,
- };
- 
- static struct at91_usbh_data __initdata csb337_usbh_data = {
-diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
-index f6d0956..40172d1 100644
---- a/drivers/net/ethernet/cadence/Kconfig
-+++ b/drivers/net/ethernet/cadence/Kconfig
-@@ -21,7 +21,6 @@ if NET_CADENCE
- 
- config ARM_AT91_ETHER
- 	tristate "AT91RM9200 Ethernet support"
--	depends on ARM && ARCH_AT91RM9200
- 	select NET_CORE
- 	select MACB
- 	---help---
-diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-index 375d272..b92815a 100644
---- a/drivers/net/ethernet/cadence/at91_ether.c
-+++ b/drivers/net/ethernet/cadence/at91_ether.c
-@@ -32,8 +32,6 @@
- #include <linux/phy.h>
- #include <linux/io.h>
- 
--#include <asm/mach-types.h>
--
- #include "macb.h"
- 
- #define DRV_NAME	"at91_ether"
-@@ -61,9 +59,10 @@
- 
- static short __init unpack_mac_address(struct net_device *dev, unsigned int hi, unsigned int lo)
- {
-+	struct macb *lp = netdev_priv(dev);
- 	char addr[6];
- 
--	if (machine_is_csb337()) {
-+	if (lp->board_data.rev_eth_addr) {
- 		addr[5] = (lo & 0xff);			/* The CSB337 bootloader stores the MAC the wrong-way around */
- 		addr[4] = (lo & 0xff00) >> 8;
- 		addr[3] = (lo & 0xff0000) >> 16;
-diff --git a/include/linux/platform_data/macb.h b/include/linux/platform_data/macb.h
-index b081c72..044a124 100644
---- a/include/linux/platform_data/macb.h
-+++ b/include/linux/platform_data/macb.h
-@@ -12,6 +12,7 @@ struct macb_platform_data {
- 	u32		phy_mask;
- 	int		phy_irq_pin;	/* PHY IRQ */
- 	u8		is_rmii;	/* using RMII interface? */
-+	u8		rev_eth_addr;	/* reverse Ethernet address byte order */
- };
- 
- #endif /* __MACB_PDATA_H__ */
--- 
-1.7.12.4
+> Sekhar is holding off on applying
+> parts 4,5,7 for davinci until this is accepted.
+
+You can add my
+
+Signed-off-by: "Hans J. Koch" <hjk@hansjkoch.de>
+
+Thanks,
+Hans
+
+> 
+> Thanks,
+> Matt
+> 
+> > ---
+> >  drivers/uio/Kconfig                     |    1 +
+> >  drivers/uio/uio_pruss.c                 |   24 +++++++++++++++++-------
+> >  include/linux/platform_data/uio_pruss.h |    3 ++-
+> >  3 files changed, 20 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/drivers/uio/Kconfig b/drivers/uio/Kconfig
+> > index 6f3ea9b..c48b938 100644
+> > --- a/drivers/uio/Kconfig
+> > +++ b/drivers/uio/Kconfig
+> > @@ -97,6 +97,7 @@ config UIO_NETX
+> >  config UIO_PRUSS
+> >  	tristate "Texas Instruments PRUSS driver"
+> >  	depends on ARCH_DAVINCI_DA850
+> > +	select GENERIC_ALLOCATOR
+> >  	help
+> >  	  PRUSS driver for OMAPL138/DA850/AM18XX devices
+> >  	  PRUSS driver requires user space components, examples and user space
+> > diff --git a/drivers/uio/uio_pruss.c b/drivers/uio/uio_pruss.c
+> > index 33a7a27..f8738de 100644
+> > --- a/drivers/uio/uio_pruss.c
+> > +++ b/drivers/uio/uio_pruss.c
+> > @@ -25,7 +25,7 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/dma-mapping.h>
+> >  #include <linux/slab.h>
+> > -#include <mach/sram.h>
+> > +#include <linux/genalloc.h>
+> >  
+> >  #define DRV_NAME "pruss_uio"
+> >  #define DRV_VERSION "1.0"
+> > @@ -65,10 +65,11 @@ struct uio_pruss_dev {
+> >  	dma_addr_t sram_paddr;
+> >  	dma_addr_t ddr_paddr;
+> >  	void __iomem *prussio_vaddr;
+> > -	void *sram_vaddr;
+> > +	unsigned long sram_vaddr;
+> >  	void *ddr_vaddr;
+> >  	unsigned int hostirq_start;
+> >  	unsigned int pintc_base;
+> > +	struct gen_pool *sram_pool;
+> >  };
+> >  
+> >  static irqreturn_t pruss_handler(int irq, struct uio_info *info)
+> > @@ -106,7 +107,9 @@ static void pruss_cleanup(struct platform_device *dev,
+> >  			gdev->ddr_paddr);
+> >  	}
+> >  	if (gdev->sram_vaddr)
+> > -		sram_free(gdev->sram_vaddr, sram_pool_sz);
+> > +		gen_pool_free(gdev->sram_pool,
+> > +			      gdev->sram_vaddr,
+> > +			      sram_pool_sz);
+> >  	kfree(gdev->info);
+> >  	clk_put(gdev->pruss_clk);
+> >  	kfree(gdev);
+> > @@ -152,10 +155,17 @@ static int __devinit pruss_probe(struct platform_device *dev)
+> >  		goto out_free;
+> >  	}
+> >  
+> > -	gdev->sram_vaddr = sram_alloc(sram_pool_sz, &(gdev->sram_paddr));
+> > -	if (!gdev->sram_vaddr) {
+> > -		dev_err(&dev->dev, "Could not allocate SRAM pool\n");
+> > -		goto out_free;
+> > +	if (pdata->sram_pool) {
+> > +		gdev->sram_pool = pdata->sram_pool;
+> > +		gdev->sram_vaddr =
+> > +			gen_pool_alloc(gdev->sram_pool, sram_pool_sz);
+> > +		if (!gdev->sram_vaddr) {
+> > +			dev_err(&dev->dev, "Could not allocate SRAM pool\n");
+> > +			goto out_free;
+> > +		}
+> > +		gdev->sram_paddr =
+> > +			gen_pool_virt_to_phys(gdev->sram_pool,
+> > +					      gdev->sram_vaddr);
+> >  	}
+> >  
+> >  	gdev->ddr_vaddr = dma_alloc_coherent(&dev->dev, extram_pool_sz,
+> > diff --git a/include/linux/platform_data/uio_pruss.h b/include/linux/platform_data/uio_pruss.h
+> > index f39140a..3d47d21 100644
+> > --- a/include/linux/platform_data/uio_pruss.h
+> > +++ b/include/linux/platform_data/uio_pruss.h
+> > @@ -20,6 +20,7 @@
+> >  
+> >  /* To configure the PRUSS INTC base offset for UIO driver */
+> >  struct uio_pruss_pdata {
+> > -	u32	pintc_base;
+> > +	u32		pintc_base;
+> > +	struct gen_pool *sram_pool;
+> >  };
+> >  #endif /* _UIO_PRUSS_H_ */
+> > -- 
+> > 1.7.9.5
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
