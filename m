@@ -1,39 +1,34 @@
-From: michael@walle.cc (Michael Walle)
-Date: Sun, 21 Oct 2012 01:34:53 +0200
-Subject: [PATCH 1/2] ARM: kirkwood: cleanup lsxl board includes
-Message-ID: <1350776094-16778-1-git-send-email-michael@walle.cc>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sat, 20 Oct 2012 20:08:20 -0400
+Subject: Which kirkwood does your DT board use?
+In-Reply-To: <20121020113800.GC21046@lunn.ch>
+References: <20121020113800.GC21046@lunn.ch>
+Message-ID: <CAMW5UfYJv0BAP00wcUd2-mSQo_zv8ibTRZDJ6NqtHQSYAEH7ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unneeded includes. These are leftovers from platform device
-registrations.
+On Sat, Oct 20, 2012 at 7:38 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> Hi Folks
+>
+> All of you in the To: have contributed a DT based Kirkwood board port.
+> Nearly all the DT files we have declare the CPU to be
+> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
+> mpp code, we need to know the exact kirkwood being used. It should be
+> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
+>
+> You can see what your hardware has a boot time:
+>
+> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
+>
+> Please could you check your hardware and let me know what the correct
+> CPU is. I can then fix the .dts files and prepare a first attempt at
+> converting boards to pinctrl.
+>
+> Thanks
+>         Andrew
 
-Signed-off-by: Michael Walle <michael@walle.cc>
----
- arch/arm/mach-kirkwood/board-lsxl.c |    8 --------
- 1 files changed, 0 insertions(+), 8 deletions(-)
+Seagate GoFlexNet
+[jcoombs at alarm ~]$ dmesg | grep -i tclk
+[    5.851008] Kirkwood: MV88F6281-A0, TCLK=200000000.
 
-diff --git a/arch/arm/mach-kirkwood/board-lsxl.c b/arch/arm/mach-kirkwood/board-lsxl.c
-index 83d8975..64e5cc6 100644
---- a/arch/arm/mach-kirkwood/board-lsxl.c
-+++ b/arch/arm/mach-kirkwood/board-lsxl.c
-@@ -14,17 +14,9 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
--#include <linux/mtd/partitions.h>
--#include <linux/ata_platform.h>
--#include <linux/spi/flash.h>
--#include <linux/spi/spi.h>
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
- #include <linux/gpio-fan.h>
--#include <linux/input.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <mach/kirkwood.h>
- #include "common.h"
- #include "mpp.h"
- 
--- 
-1.7.2.5
+Joshua Coombs
