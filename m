@@ -1,30 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 22 Oct 2012 16:07:18 +0200
-Subject: [PATCH 2/2] ASoC: Ux500: Control apb clock
-In-Reply-To: <20121022133200.GG4477@opensource.wolfsonmicro.com>
-References: <1350909125-20189-1-git-send-email-ulf.hansson@stericsson.com>
- <1350909125-20189-2-git-send-email-ulf.hansson@stericsson.com>
- <20121022133200.GG4477@opensource.wolfsonmicro.com>
-Message-ID: <CAPDyKFpUTjkc3rm4iDCioiiB9=EWbtqv+UQFsJRzBBv+SV7A_g@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 22 Oct 2012 22:32:45 +0800
+Subject: [PATCH v4] ARM: SMP_TWD: make setup()/stop() reentrant
+In-Reply-To: <1350911721-3184-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350911721-3184-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121022143244.GA2180@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2012 15:32, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Oct 22, 2012 at 02:32:05PM +0200, Ulf Hansson wrote:
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> When switching to common clock driver for ux500 this clock needs to
->> be handled as well. Before this clock was internally managed by the
->> clock driver itself.
->
-> Applied but why isn't this a deficiency in the common clock
-> implementation for the platform?
+On Mon, Oct 22, 2012 at 03:15:21PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> It has been brought to my knowledge that the .setup()/.stop()
+> function pair in the SMP TWD is going to be called from atomic
+> contexts for CPUs coming and going, and then the
+> clk_prepare()/clk_unprepare() calls cannot be called
+> on subsequent .setup()/.stop() iterations. This is however
+> just the tip of an iceberg as the function pair is not
+> designed to be reentrant at all.
+> 
+> This change makes the SMP_TWD clock .setup()/.stop() pair reentrant
+> by splitting the .setup() function in three parts:
+> 
+> - One COMMON part that is executed the first time the first CPU
+>   in the TWD cluster is initialized. This will fetch the TWD
+>   clk for the cluster and prepare+enable it. If no clk is
+>   available it will calibrate the rate instead.
+> 
+> - One part that is executed the FIRST TIME a certain CPU is
+>   brought on-line. This initializes and sets up the clock event
+>   for a certain CPU.
+> 
+> - One part that is executed on every subsequent .setup() call.
+>   This will re-initialize the clock event. This is augmented
+>   to call the clk_enable()/clk_disable() pair properly.
+> 
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Reported-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Good question. :-) Patches have just been sent to Mike Turquette clk
-tree for adding the clock lookups.
-First, I thought I might wanted to group them all in a series but
-decided that splitting them are probably easier to handle.
-
-Kind regards
-Ulf Hansson
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
