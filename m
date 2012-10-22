@@ -1,69 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 10:09:18 -0700
-Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
-In-Reply-To: <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
- <20121019191333.GT4730@atomide.com>
- <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
-Message-ID: <20121022170917.GB4730@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Oct 2012 11:14:23 -0600
+Subject: [PATCH] ARM: dt: tegra: ventana: define pinmux for ddc
+In-Reply-To: <5084F5D1.7050005@nvidia.com>
+References: <1350626311-18131-1-git-send-email-markz@nvidia.com>
+ <50817668.6020709@wwwdotorg.org> <5084F5D1.7050005@nvidia.com>
+Message-ID: <50857EEF.2070707@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121022 03:11]:
-> On Sat, Oct 20, 2012 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Haojian Zhuang <haojian.zhuang@gmail.com> [121018 02:08]:
-> >> Add pinconf generic support with POWER SOURCE, BIAS PULL.
-> > ...
-> >
-> >> +     case PIN_CONFIG_POWER_SOURCE:
-> >> +             if (pcs->psmask == PCS_OFF_DISABLED
-> >> +                     || pcs->psshift == PCS_OFF_DISABLED)
-> >> +                     return -ENOTSUPP;
-> >> +             data &= pcs->psmask;
-> >> +             data = data >> pcs->psshift;
-> >> +             *config = data;
-> >> +             return 0;
-> >> +             break;
-> >
-> > Hmm, only slightly related to this patch, mostly a generic
-> > question to others: Do others have any mux registers with
-> > status bits for things like PIN_CONFIG_POWER_SOURCE?
-> >
-> > I could use PIN_CONFIG_POWER_SOURCE for controlling the PBIAS
-> > for omap MMC. But there's also a status bit that needs to be
-> > checked for that. I think there was some other similar mux
-> > register for USB PHY that has a status register.
-> >
-> > So I'm wondering should the checking for status bit be handled
-> > in the pinctrl consume driver? Or should we have some bindings
-> > for that?
-> >
+On 10/22/2012 01:29 AM, Mark Zhang wrote:
+> On 10/19/2012 11:48 PM, Stephen Warren wrote:
+>> On 10/18/2012 11:58 PM, Mark Zhang wrote:
+>>> Define pinmux for DDC. The DDC pinmux in Ventana is 2 pins in I2C2.
+>>
+>>> +++ b/arch/arm/boot/dts/tegra20-ventana.dts
+>>
+>>> -            ddc {
+>>> -                nvidia,pins = "ddc", "owc", "spdi", "spdo",
+>>> -                    "uac";
+>>> -                nvidia,function = "rsvd2";
+>>> -            };
+>>
+>> So that removes the entries for 5 pin groups, yet below, entries are
+>> only added for the ddc and pta pingroups, so the other 4 pin groups
+>> become unconfigured.
+>>
 > 
-> Do you mean that the status register only exists in USB PHY controller or
-> MMC controller?
+> Right. So I think it should be changed to:
+> 
+>         owc {
+>             nvidia,pins = "owc", "spdi", "spdo", "uac";
+>             nvidia,function = "rsvd2";
+>         };
+> 
+> Is this right?
 
-The status register is in the MMC PBIAS register that is mux
-related otherwise. From OMAP4470_ES1.0_PUBLIC_TRM_vE.pdf,
-Table 19-599. CONTROL_PBIASLITE:
+Looks correct, yes.
 
-Bits
-26	MMC1_PWDNZ
-25	MMC1_PBIASLITE_HIZ_MODE
-24	MMC1_PBIASLITE_SUPPLY_HI_OUT
-23	MMC1_PBIASLITE_VMODE_ERROR	then this bit needs to clear..
-22	MMC1_PBIASLITE_PWRDNZ
-21	MMC1_PBIASLITE_VMODE		..after VMODE bit is set to 3V
- 
-> If so, could we use regulator framework in USB PHY or MMC driver?
+>>> +
+>>> +        state_i2cmux_ddc: pinmux_i2cmux_ddc {
+>>> +            ddc {
+>>> +                nvidia,pins = "ddc";
+>>> +                nvidia,function = "i2c2";
+>>> +            };
+>>> +            pta {
+>>> +                nvidia,pins = "pta";
+>>> +                nvidia,function = "rsvd4";
+>>> +            };
+>>
+>> Does this actually work? The pta pingroup is configured by the "hog"
+>> pinctrl state of the pinctrl node itself, so this state should fail to
+>> be applied since it attempts to touch the same pingroup.
+> 
+> I know little about kernel pinctrl subsystem. After reading some docs
+> and codes, I think what you mean is, in Ventana's pinmux configuration,
+> pta pingroup has been defined as "hdmi" function and this can't be
+> changed(non-dynamic pinmuxing).
+> So I want to know why we have defined pta pingroup as hdmi function?
+> Can we remove this definition to make the i2cmux above working?
 
-Yes we could use regulator framework for that that. Or just read the
-status in the MMC driver for that bit if nobody else has mixed
-mux-regulator needs like this.
-
-The sequence is MMC specific, so from that point of view it would
-make sense to have the logic in the MMC driver.
-
-Regards,
-
-Tony
+I don't recall why pta was defined to be HDMI. The issue isn't that this
+patch changes the pinmux selection for the pta pingroup, but simply that
+both the pinctrl node's state definition, and the new I2C mux node's
+state definition both attempt to configure pingroup pta. The solution is
+most likely to simply remove the pta configuration from the main pinctrl
+node.
