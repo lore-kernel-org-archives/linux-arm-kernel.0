@@ -1,33 +1,32 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 22 Oct 2012 09:36:41 -0400
-Subject: Which kirkwood does your DT board use?
-In-Reply-To: <20121020113800.GC21046@lunn.ch>
-References: <20121020113800.GC21046@lunn.ch>
-Message-ID: <20121022133641.GK25828@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Oct 2012 14:50:24 +0100
+Subject: [PATCH] clk: Make the generic clock API available by default
+In-Reply-To: <20121022132711.GE4477@opensource.wolfsonmicro.com>
+References: <1350910970-9095-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+ <20121022130556.GM21164@n2100.arm.linux.org.uk>
+ <20121022132711.GE4477@opensource.wolfsonmicro.com>
+Message-ID: <20121022135024.GN21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2012 at 01:38:00PM +0200, Andrew Lunn wrote:
-> Hi Folks
+On Mon, Oct 22, 2012 at 02:27:11PM +0100, Mark Brown wrote:
+> On Mon, Oct 22, 2012 at 02:05:57PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Oct 22, 2012 at 02:02:50PM +0100, Mark Brown wrote:
+> > > @@ -327,6 +328,7 @@ config ARCH_AT91
+> > >  	select ARCH_REQUIRE_GPIOLIB
+> > >  	select CLKDEV_LOOKUP
+> > >  	select HAVE_CLK
+> > > +	select HAVE_CUSTOM_CLK
 > 
-> All of you in the To: have contributed a DT based Kirkwood board port.
-> Nearly all the DT files we have declare the CPU to be
-> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
-> mpp code, we need to know the exact kirkwood being used. It should be
-> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
+> > This is silly.  If you select "HAVE_CUSTOM_CLK" then isn't it true that
+> > "HAVE_CLK" should also be selected?  If so, why not have "HAVE_CUSTOM_CLK"
+> > do that selection and remove it from all these entries?
 > 
-> You can see what your hardware has a boot time:
-> 
-> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
-> 
-> Please could you check your hardware and let me know what the correct
-> CPU is. I can then fix the .dts files and prepare a first attempt at
-> converting boards to pinctrl.
+> If we're worrying about that there's the larger point that the effect of
+> this patch is to make HAVE_CLK meaningless as there will be no platform
+> for which it's not true.  I was just leaving HAVE_CLK alone for now
+> ready to circle around on it if we ever manage to get the enabling bit
+> sorted.
 
-Dreamplug:
-
-Kirkwood: MV88F6281-A1, TCLK=200000000.
-
-hth,
-
-Jason.
+Are you sure that all architectures are fine with having that permanently
+enabled?  What about nommu architectures?
