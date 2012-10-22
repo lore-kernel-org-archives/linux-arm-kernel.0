@@ -1,60 +1,64 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Mon, 22 Oct 2012 14:07:06 +0200
-Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <201210221150.22004.arnd@arndb.de>
-References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
- <1350888712.3592.11.camel@gitbox>
- <20121022071118.GA30026@avionic-0098.mockup.avionic-design.de>
- <201210221150.22004.arnd@arndb.de>
-Message-ID: <20121022120706.GA19467@avionic-0098.mockup.avionic-design.de>
+From: sourav.poddar@ti.com (Sourav)
+Date: Mon, 22 Oct 2012 17:43:41 +0530
+Subject: [PATCH v2] ARM: OMAP2: UART: fix console UART mismatched runtime
+ PM status
+In-Reply-To: <1350685470-3634-1-git-send-email-khilman@deeprootsystems.com>
+References: <1350685470-3634-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <50853875.6020109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 11:50:21AM +0000, Arnd Bergmann wrote:
-> On Monday 22 October 2012, Thierry Reding wrote:
-> > On Mon, Oct 22, 2012 at 07:51:52PM +1300, Tony Prisk wrote:
-> > > Replies to your comments inline:
-> > > 
-> > > On Mon, 2012-10-22 at 08:34 +0200, Thierry Reding wrote:
-> > > ...
-> > > > > -static int __devinit pwm_probe(struct platform_device *pdev)
-> > > > > +static const struct of_device_id vt8500_pwm_dt_ids[] = {
-> > > > > + { .compatible = "via,vt8500-pwm", },
-> > > > > + { /* Sentinel */ }
-> > > > > +};
-> > > > > +
-> > > > > +static int __devinit vt8500_pwm_probe(struct platform_device *pdev)
-> > > > 
-> > > > Since you're changing this line anyway, maybe you should drop __devinit
-> > > > (and __devexit for the .remove() callback). HOTPLUG is always enabled
-> > > > nowadays and will go away eventually, in which case these will need to
-> > > > be removed anyway.
-> > > 
-> > > Will do. I must say the inconstancy among comments is rather
-> > > frustrating. In another patch I sent out a few days ago (completely
-> > > unrelated to this), I told to add __devexit to a remove() function :\
-> > 
-> > This is a rather recent development, so maybe not everyone knows about
-> > it yet. You can look at the following commit for the details:
-> > 
-> >         45f035ab9b8f45aaf1eb2213218b7e9c14af3fc2
-> > 
-> > It's been in linux-next for about 6 weeks and has also gone into
-> > 3.7-rc1.
-> 
-> As long as we get build warnings for leaving out the __devinit/__devexit
-> annotations, I would generally recommend putting them in. If we do a
-> patch to remove all of them, a couple extra instances will not cause
-> any more troubles than we already have.
+Hi,
+On Saturday 20 October 2012 03:54 AM, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@ti.com>
+>
+> The runtime PM framework assumes that the hardware state of devices
+> when initialized is disabled.  For all omap_devices, we idle/disable
+> device by default.  However, the console uart uses a "no idle" option
+> during omap_device init in order to allow earlyprintk usage to work
+> seamlessly during boot.
+>
+> Because the hardware is left partially enabled after init (whatever
+> the bootloader settings were), the omap_device should later be fully
+> initialized (including mux) and the runtime PM framework should be
+> told that the device is active, and not disabled so that the hardware
+> state is in sync with runtime PM state.
+>
+> To fix, after the device has been created/registered, call
+> omap_device_enable() to finialize init and use pm_runtime_set_active()
+> to tell the runtime PM core the device is enabled.
+>
+> Tested on 2420/n810, 3530/Overo, 3530/Beagle, 3730/OveroSTORM,
+> 3730/Beagle-xM, 4460/PandaES.
+>
+> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Applies to v3.7-rc1.
+> v2: call omap_device_enable() only after oh->mux has been initialized
+>      otherwise, IO ring wakeups not properly enabled.
+>
+>   arch/arm/mach-omap2/serial.c |    5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+> index 0405c81..a507cd6 100644
+> --- a/arch/arm/mach-omap2/serial.c
+> +++ b/arch/arm/mach-omap2/serial.c
+> @@ -329,6 +329,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>   
+>   	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
+>   
+> +	if (console_uart_id == bdata->id) {
+> +		omap_device_enable(pdev);
+> +		pm_runtime_set_active(&pdev->dev);
+> +	}
+> +
+>   	oh->dev_attr = uart;
+>   
+>   	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
+Tested on 3630/Beagle-xm, 4430/Panda, 4430/Sdp, 5430/Evm.
 
-I've never seen any build warnings for leaving __devinit/__devexit out.
-Where does that happen?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/1edd4237/attachment.sig>
+  Tested-by: Sourav Poddar <sourav.poddar@ti.com>
