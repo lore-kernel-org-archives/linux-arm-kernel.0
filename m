@@ -1,50 +1,78 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 22 Oct 2012 14:56:32 -0700
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <20121021135143.GA1855@beef> (Matt Porter's message of "Sun, 21
- Oct 2012 09:51:43 -0400")
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <20121020141136.GA6433@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210201615170.24497@utopia.booyaka.com>
- <20121020180123.GA2630@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210201807170.27264@utopia.booyaka.com>
- <20121020183724.GA9984@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210201856020.27264@utopia.booyaka.com>
- <20121021135143.GA1855@beef>
-Message-ID: <87sj96dvcf.fsf@deeprootsystems.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Oct 2012 16:10:56 -0600
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <Pine.LNX.4.44L0.1210221443580.1724-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1210221443580.1724-100000@iolanthe.rowland.org>
+Message-ID: <5085C470.4040707@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Porter <mporter@ti.com> writes:
+On 10/22/2012 01:00 PM, Alan Stern wrote:
+> On Mon, 22 Oct 2012, Stephen Warren wrote:
+> 
+>>>>> +- has-tt : controller has transaction translator(s).
+>>>>> +- has-synopsys-hc-bug : controller has the synopsys hc bug
+>>>>
+>>>> That would normally be determined by the driver based on the particular
+>>>> compatible value that is in device tree.
+>>>
+>>> I don't understand this comment.  Isn't "has-synopsys-hc-bug" the 
+>>> compatible value in question?
+>>
+>> "compatible value" in this context means that value of the property
+>> named "compatible".
+> 
+> I see.  But why would it be done this way instead having a separate 
+> property?
 
-> On Sat, Oct 20, 2012 at 06:58:10PM +0000, Paul Walmsley wrote:
->> On Sat, 20 Oct 2012, Richard Cochran wrote:
->> 
->> > On Sat, Oct 20, 2012 at 06:12:35PM +0000, Paul Walmsley wrote:
->> > > Just tried omap2plus_defconfig here and the board didn't boot, confirming 
->> > > your result.  Will add a section to the testlog README.txt about that.
->> > > 
->> > > > > In terms of differences from your setup, looks like we have different 
->> > > > > X-Loader and u-boot; it wouldn't surprise me if we have different kernel 
->> > > > > configs too.
->> > 
->> > I tried both omap2plus_defconfig and your am33xx_only config, and
->> > neither one work with my (recent) u-boot version.
->> 
->> Just sent you the MLO and u-boot.img from here via private E-mail.  Those 
->> were the files that came with the BeagleBone SD card here.
->> 
->> TI also has a u-boot tree for the AM33xx; might be worth trying:
->> 
->> git://arago-project.org/git/projects/u-boot-am33x.git
->
-> Use of the vendor tree should be discouraged. The best thing to use
-> is current ToT U-Boot mainline or the v2012.10 stable U-Boot release.
-> X-Loader is deprecated by U-Boot SPL.
+Well, I did say normally:-)
 
-Just FYI for anyone else having an older BeagleBone.
+I can certainly see an argument for representing these differences using
+custom properties, rather than deriving the information from the
+compatible value. It's probably be OK to do so for something generic
+like this; it's just perhaps not always the default choice.
 
-On my Rev A2, using u-boot mainline, neither HEAD or v2012.10 result in
-a working network interface, so you can't netboot/dhcp.
+Do note that even though this binding document dictates a particular
+value for the compatible property, every device tree should additionally
+add a separate value alongside it to indicate the specific HW model
+that's actually present, so that if some device-specific bug-fix or
+workaround needs to be applied, the model can be identified anyway.
 
-Kevin
+So, rather than:
+
+compatible = "usb-ehci";
+
+You should always have e.g.:
+
+compatible = "nvidia,tegra20-ehci", "usb-ehci";
+
+Given that, there is then always enough information in the device tree
+for the driver to be able to derive the other values from the compatible
+value.
+
+Whether you want to derive the information, or whether you want to
+explicitly represent it via properties, is a decision to make based on
+the trade-offs.
+
+Oh, and I note that quite a few device trees already use compatible
+value "usb-ehci" in their device-trees. Care needs to be taken not to
+usurp that value from any existing device drivers if that was to be
+picked as the compatible value required by this binding.
+
+> And doesn't the same reasoning apply to has-tt?  Doesn't that mean the 
+> driver would have to match four different hardware types?  What happens 
+> if a third characteristic like these comes around; would the driver 
+> then have to check against eight different types?
+
+No, the compatible value represents the model, so you'd have a table like:
+
+compatible          -> bugX has_tt
+nvidia,tegra20-ehci -> 0    1
+vendor1,foo-ehci    -> 0    1
+vendor2,bar-ehci    -> 1    1
+vendor3,baz-ehci    -> 0    1
+vendor4,qux-ehci    -> 0    1
+...
+
+So the table size isn't related to the number of options. The table size
+is probably bigger than subset of options combinations that make sense.
