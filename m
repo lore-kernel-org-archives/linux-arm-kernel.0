@@ -1,75 +1,84 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Mon, 22 Oct 2012 10:37:22 -0500
-Subject: [PATCH 2/4] zynq: use GIC device tree bindings
-Message-ID: <20121022153722.GB502@beefymiracle.amer.corp.natinst.com>
+Date: Mon, 22 Oct 2012 10:37:35 -0500
+Subject: [PATCH 3/4] zynq: remove use of CLKDEV_LOOKUP
+Message-ID: <20121022153735.GC502@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq uses the cortex-a9-gic.  This eliminates the need to hardcode
-register addresses.
+The Zynq support in mainline does not (yet) make use of any of the
+generic clk or clk lookup functionality.  Remove what is upstream for
+now, until the out-of-tree implementation is in suitable form for
+merging.
 
 Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 ---
- arch/arm/boot/dts/zynq-ep107.dts           | 8 +++++---
- arch/arm/mach-zynq/common.c                | 7 ++++++-
- arch/arm/mach-zynq/include/mach/zynq_soc.h | 2 --
- 3 files changed, 11 insertions(+), 6 deletions(-)
+ arch/arm/Kconfig                         |  1 -
+ arch/arm/mach-zynq/common.c              |  1 -
+ arch/arm/mach-zynq/include/mach/clkdev.h | 32 --------------------------------
+ 3 files changed, 34 deletions(-)
+ delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
 
-diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-ep107.dts
-index 37ca192..7bfff4a 100644
---- a/arch/arm/boot/dts/zynq-ep107.dts
-+++ b/arch/arm/boot/dts/zynq-ep107.dts
-@@ -36,10 +36,12 @@
- 		ranges;
- 
- 		intc: interrupt-controller at f8f01000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <1>;
- 			interrupt-controller;
--			compatible = "arm,gic";
--			reg = <0xF8F01000 0x1000>;
--			#interrupt-cells = <2>;
-+			reg = <0xF8F01000 0x1000>,
-+			      <0xF8F00100 0x100>;
- 		};
- 
- 		uart0: uart at e0000000 {
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 73067ef..e37bea3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -959,7 +959,6 @@ config ARCH_ZYNQ
+ 	bool "Xilinx Zynq ARM Cortex A9 Platform"
+ 	select ARM_AMBA
+ 	select ARM_GIC
+-	select CLKDEV_LOOKUP
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
+ 	select ICST
 diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index ab5cfdd..d73963b 100644
+index d73963b..6ea86cf 100644
 --- a/arch/arm/mach-zynq/common.c
 +++ b/arch/arm/mach-zynq/common.c
-@@ -55,12 +55,17 @@ static void __init xilinx_init_machine(void)
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
- }
+@@ -31,7 +31,6 @@
+ #include <asm/hardware/cache-l2x0.h>
  
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ }
-+};
-+
- /**
-  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
-  */
- static void __init xilinx_irq_init(void)
- {
--	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-+	of_irq_init(irq_match);
- }
+ #include <mach/zynq_soc.h>
+-#include <mach/clkdev.h>
+ #include "common.h"
  
- /* The minimum devices needed to be mapped before the VM system is up and
-diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index d0d3f8f..3d1c6a6 100644
---- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-+++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -35,8 +35,6 @@
- 
- #define TTC0_BASE			IOMEM(TTC0_VIRT)
- #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
--#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
--#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
- #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
- 
- /*
+ static struct of_device_id zynq_of_bus_ids[] __initdata = {
+diff --git a/arch/arm/mach-zynq/include/mach/clkdev.h b/arch/arm/mach-zynq/include/mach/clkdev.h
+deleted file mode 100644
+index c6e73d8..0000000
+--- a/arch/arm/mach-zynq/include/mach/clkdev.h
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * arch/arm/mach-zynq/include/mach/clkdev.h
+- *
+- *  Copyright (C) 2011 Xilinx, Inc.
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- */
+-
+-#ifndef __MACH_CLKDEV_H__
+-#define __MACH_CLKDEV_H__
+-
+-#include <plat/clock.h>
+-
+-struct clk {
+-	unsigned long		rate;
+-	const struct clk_ops	*ops;
+-	const struct icst_params *params;
+-	void __iomem		*vcoreg;
+-};
+-
+-#define __clk_get(clk) ({ 1; })
+-#define __clk_put(clk) do { } while (0)
+-
+-#endif
 -- 
 1.8.0
