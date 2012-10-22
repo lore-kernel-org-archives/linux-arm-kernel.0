@@ -1,64 +1,42 @@
-From: sourav.poddar@ti.com (Sourav)
-Date: Mon, 22 Oct 2012 17:43:41 +0530
-Subject: [PATCH v2] ARM: OMAP2: UART: fix console UART mismatched runtime
- PM status
-In-Reply-To: <1350685470-3634-1-git-send-email-khilman@deeprootsystems.com>
-References: <1350685470-3634-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <50853875.6020109@ti.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Mon, 22 Oct 2012 17:42:52 +0530
+Subject: [PATCH RESEND] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
+ V4L2_OUT_CAP_DV_TIMINGS
+Message-ID: <1350907972-11256-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Saturday 20 October 2012 03:54 AM, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@ti.com>
->
-> The runtime PM framework assumes that the hardware state of devices
-> when initialized is disabled.  For all omap_devices, we idle/disable
-> device by default.  However, the console uart uses a "no idle" option
-> during omap_device init in order to allow earlyprintk usage to work
-> seamlessly during boot.
->
-> Because the hardware is left partially enabled after init (whatever
-> the bootloader settings were), the omap_device should later be fully
-> initialized (including mux) and the runtime PM framework should be
-> told that the device is active, and not disabled so that the hardware
-> state is in sync with runtime PM state.
->
-> To fix, after the device has been created/registered, call
-> omap_device_enable() to finialize init and use pm_runtime_set_active()
-> to tell the runtime PM core the device is enabled.
->
-> Tested on 2420/n810, 3530/Overo, 3530/Beagle, 3730/OveroSTORM,
-> 3730/Beagle-xM, 4460/PandaES.
->
-> Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> ---
-> Applies to v3.7-rc1.
-> v2: call omap_device_enable() only after oh->mux has been initialized
->      otherwise, IO ring wakeups not properly enabled.
->
->   arch/arm/mach-omap2/serial.c |    5 +++++
->   1 file changed, 5 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-> index 0405c81..a507cd6 100644
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -329,6 +329,11 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->   
->   	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
->   
-> +	if (console_uart_id == bdata->id) {
-> +		omap_device_enable(pdev);
-> +		pm_runtime_set_active(&pdev->dev);
-> +	}
-> +
->   	oh->dev_attr = uart;
->   
->   	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads)
-Tested on 3630/Beagle-xm, 4430/Panda, 4430/Sdp, 5430/Evm.
+From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-  Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
+V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
+out.
+
+Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+---
+ Resending the patch since, it didn't reach the DLOS mailing list.
+
+ This patch is based on the following patch series,
+ ARM: davinci: dm365 EVM: add support for VPBE display
+ (https://patchwork.kernel.org/patch/1295071/)
+
+ arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 2924d61..771abb5 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -514,7 +514,7 @@ static struct vpbe_output dm365evm_vpbe_outputs[] = {
+ 			.index		= 1,
+ 			.name		= "Component",
+ 			.type		= V4L2_OUTPUT_TYPE_ANALOG,
+-			.capabilities	= V4L2_OUT_CAP_CUSTOM_TIMINGS,
++			.capabilities	=  V4L2_OUT_CAP_DV_TIMINGS,
+ 		},
+ 		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
+ 		.default_mode	= "480p59_94",
+-- 
+1.7.4.1
