@@ -1,104 +1,61 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:51:29 -0400
-Subject: [PATCH v3 02/13] ARM: KVM: Keep track of currently running vcpus
-In-Reply-To: <20121022065104.18672.52989.stgit@ubuntu>
-References: <20121022065104.18672.52989.stgit@ubuntu>
-Message-ID: <20121022065129.18672.37237.stgit@ubuntu>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 22 Oct 2012 12:21:16 +0530
+Subject: [PATCH v2] ARM: SMP_TWD: make setup()/stop() reentrant
+In-Reply-To: <20121022051319.GA19107@S2101-09.ap.freescale.net>
+References: <1350640589-31821-1-git-send-email-linus.walleij@linaro.org>
+ <20121022051319.GA19107@S2101-09.ap.freescale.net>
+Message-ID: <5084ECE4.5020608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Linus,
 
-When an interrupt occurs for the guest, it is sometimes necessary
-to find out which vcpu was running at that point.
+On Monday 22 October 2012 10:43 AM, Shawn Guo wrote:
+> On Fri, Oct 19, 2012 at 11:56:29AM +0200, Linus Walleij wrote:
+>> This makes the SMP_TWD clock .setup()/.stop() pair reentrant by
+>> not re-fetching the clk and re-registering the clock event every
+>> time .setup() is called. We also make sure to call the
+>> clk_enable()/clk_disable() pair on subsequent calls.
+>>
+>> As it has been brought to my knowledge that this pair is going
+>> to be called from atomic contexts for CPU clusters coming and
+>> going, the clk_prepare()/clk_unprepare() calls cannot be called
+>> on subsequent .setup()/.stop() iterations.
+>>
+>> The patch assumes that the code will make sure that
+>> twd_set_mode() is called through .set_mode() on the clock
+>> event *after* the .setup() call, so that the timer registers
+>> are fully re-programmed after a new .setup() cycle.
+>>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Reported-by: Peter Chen <peter.chen@freescale.com>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Peter/Shawn: can you please respond with a Tested-by from your
+>> system(s) to indicate if this works as expected?
+>
+> I have seen two problems with the patch.
+>
+> 1. twd_timer_setup() is called on per-cpu path, and initial_setup_called
+>     should be a per-cpu variable.
+>
+> 2. When secondary cores get off-line, the clockevent devices for
+>     the cores will be released.  So when they become online, the
+>     clockevent devices should be registered again.
+>
+> I can only have my system work as expected with the following changes.
+>
 
-Keep track of which vcpu is being tun in kvm_arch_vcpu_ioctl_run(),
-and allow the data to be retrived using either:
-- kvm_arm_get_running_vcpu(): returns the vcpu running at this point
-  on the current CPU. Can only be used in a non-preemptable context.
-- kvm_arm_get_running_vcpus(): returns the per-CPU variable holding
-  the the running vcpus, useable for per-CPU interrupts.
+How about moving twd_get_clock() outside setup and do that in onetime
+init code like register etc. Its is pointless to keep doing
+re-registration, clock_enable/disable() since you can not really
+disable this clock. Remember we added this clock node for CPUFREQ
+and it is just CPU clock with an additional fixed divider.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/include/asm/kvm_host.h |   10 ++++++++++
- arch/arm/kvm/arm.c              |   30 ++++++++++++++++++++++++++++++
- 2 files changed, 40 insertions(+)
+With above, you neither see the sleep while atomic warning nor
+there is any need to fiddle with clock node after boot.
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 2eddd96..c6f1102 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -156,4 +156,14 @@ static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
- {
- 	return 0;
- }
-+
-+struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
-+struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-+
-+int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-+unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-+struct kvm_one_reg;
-+int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-+int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c192399..828b5af 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -53,11 +53,38 @@ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
- static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
- static unsigned long hyp_default_vectors;
- 
-+/* Per-CPU variable containing the currently running vcpu. */
-+static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
-+
- /* The VMID used in the VTTBR */
- static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
- static u8 kvm_next_vmid;
- static DEFINE_SPINLOCK(kvm_vmid_lock);
- 
-+static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
-+{
-+	BUG_ON(preemptible());
-+	__get_cpu_var(kvm_arm_running_vcpu) = vcpu;
-+}
-+
-+/**
-+ * kvm_arm_get_running_vcpu - get the vcpu running on the current CPU.
-+ * Must be called from non-preemptible context
-+ */
-+struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
-+{
-+	BUG_ON(preemptible());
-+	return __get_cpu_var(kvm_arm_running_vcpu);
-+}
-+
-+/**
-+ * kvm_arm_get_running_vcpus - get the per-CPU array on currently running vcpus.
-+ */
-+struct kvm_vcpu __percpu **kvm_get_running_vcpus(void)
-+{
-+	return &kvm_arm_running_vcpu;
-+}
-+
- int kvm_arch_hardware_enable(void *garbage)
- {
- 	return 0;
-@@ -299,10 +326,13 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 		cpumask_clear_cpu(cpu, &vcpu->arch.require_dcache_flush);
- 		flush_cache_all(); /* We'd really want v7_flush_dcache_all() */
- 	}
-+
-+	kvm_arm_set_running_vcpu(vcpu);
- }
- 
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- {
-+	kvm_arm_set_running_vcpu(NULL);
- }
- 
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+Let me know if I have missed any other consideration here.
+
+Regards,
+Santosh
