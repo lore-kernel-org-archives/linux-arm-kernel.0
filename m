@@ -1,30 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Oct 2012 00:28:32 +0200
-Subject: [PATCH] arm: sched: stop sched_clock() during suspend
-In-Reply-To: <873916h1yi.fsf@deeprootsystems.com>
-References: <1350906877-19410-1-git-send-email-balbi@ti.com>
- <873916h1yi.fsf@deeprootsystems.com>
-Message-ID: <CACRpkdY6ox+iJAGdSD=e7Yj55TzDWqOmLqu2fSRXvKJxqwfkhQ@mail.gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 22 Oct 2012 15:40:27 -0700
+Subject: 3.7-rc2 fails to build exynos target
+In-Reply-To: <D9D88B79-F5F0-4C63-9E23-B1A919C7142A@suse.de>
+References: <D9D88B79-F5F0-4C63-9E23-B1A919C7142A@suse.de>
+Message-ID: <20121022224027.GA9431@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 7:05 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
+On Tue, Oct 23, 2012 at 12:11:02AM +0200, Alexander Graf wrote:
+> Howdy,
+> 
+> While updating to 3.7-rc2, I stumbled over a few compile issues with the exynos target. I won't get around to fix them, but wanted to give you a heads up and would like to see them resolved before 3.7 gets released :).
+> 
+> Config: http://csgraf.de/arm/exynos
+> 
+> Alex
+> 
+> [  674s] ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+> [  674s] ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+> [  675s] ERROR: "read_current_timer" [drivers/video/udlfb.ko] undefined!
+> [  675s] ERROR: "cpufreq_cooling_register" [drivers/thermal/exynos_thermal.ko] undefined!
+> [  675s] ERROR: "cpufreq_cooling_unregister" [drivers/thermal/exynos_thermal.ko] undefined!
+> [  677s] ERROR: "s5p_csis_phy_enable" [drivers/media/platform/s5p-fimc/s5p-csis.ko] undefined!
+> [  678s] ERROR: "read_current_timer" [drivers/gpu/drm/udl/udl.ko] undefined!
+> [  678s] ERROR: "set_irq_flags" [drivers/gpio/gpio-adnp.ko] undefined!
+> [  678s] make[3]: *** [__modpost] Error 1
+> [  678s] make[2]: *** [modules] Error 2
+> [  678s] make[1]: *** [sub-make] Error 2
+> [  678s] make: *** [all] Error 2
+> [  678s] + test 2 -eq 0
+> [  678s] + test 00 -gt 0
+> [  678s] + exit 1
+> [  678s] error: Bad exit status from /var/tmp/rpm-tmp.qIAujD (%build)
 
-> However, in light of RT throttling, this a correctness issue for process
-> accounting, so I agree that this should be done for all platforms
-> instead of providing an optional 'needs suspend' version of the API,
-> even though it means printk times no longer reflect time spent
-> suspended.
+FYI,
 
-Maybe we should get printk() to use the best clocksource
-instead.
+	https://patchwork.kernel.org/patch/1540031/
 
-The reason AFAICT that printk() is using sched_clock() is that
-it's supposed to be fast. But now it seems that it's not going
-to return what printk() needs anymore.
+I really hope its fixed before 3.7 too :)
 
-(Dragging Stultz & Gleixner into this...)
-
-Yours,
-Linus Walleij
+Mark
+--
