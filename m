@@ -1,177 +1,104 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:51:22 -0400
-Subject: [PATCH v3 01/13] KVM: ARM: Introduce KVM_SET_DEVICE_ADDRESS ioctl
+Date: Mon, 22 Oct 2012 02:51:29 -0400
+Subject: [PATCH v3 02/13] ARM: KVM: Keep track of currently running vcpus
 In-Reply-To: <20121022065104.18672.52989.stgit@ubuntu>
 References: <20121022065104.18672.52989.stgit@ubuntu>
-Message-ID: <20121022065122.18672.86203.stgit@ubuntu>
+Message-ID: <20121022065129.18672.37237.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM (and possibly other architectures) some bits are specific to the
-model being emulated for the guest and user space needs a way to tell
-the kernel about those bits.  An example is mmio device base addresses,
-where KVM must know the base address for a given device to properly
-emulate mmio accesses within a certain address range or directly map a
-device with virtualiation extensions into the guest address space.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-We try to make this API slightly more generic than for our specific use,
-but so far only the VGIC uses this feature.
+When an interrupt occurs for the guest, it is sometimes necessary
+to find out which vcpu was running at that point.
 
+Keep track of which vcpu is being tun in kvm_arch_vcpu_ioctl_run(),
+and allow the data to be retrived using either:
+- kvm_arm_get_running_vcpu(): returns the vcpu running at this point
+  on the current CPU. Can only be used in a non-preemptable context.
+- kvm_arm_get_running_vcpus(): returns the per-CPU variable holding
+  the the running vcpus, useable for per-CPU interrupts.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- Documentation/virtual/kvm/api.txt |   37 +++++++++++++++++++++++++++++++++++++
- arch/arm/include/uapi/asm/kvm.h   |   13 +++++++++++++
- arch/arm/kvm/arm.c                |   24 +++++++++++++++++++++++-
- include/uapi/linux/kvm.h          |    8 ++++++++
- 4 files changed, 81 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_host.h |   10 ++++++++++
+ arch/arm/kvm/arm.c              |   30 ++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 764c5df..428b625 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2191,6 +2191,43 @@ This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
- 
- 
-+4.80 KVM_SET_DEVICE_ADDRESS
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 2eddd96..c6f1102 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -156,4 +156,14 @@ static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
+ {
+ 	return 0;
+ }
 +
-+Capability: KVM_CAP_SET_DEVICE_ADDRESS
-+Architectures: arm
-+Type: vm ioctl
-+Parameters: struct kvm_device_address (in)
-+Returns: 0 on success, -1 on error
-+Errors:
-+  ENODEV: The device id is unknown
-+  ENXIO:  Device not supported on current system
-+  EEXIST: Address already set
-+  E2BIG:  Address outside guest physical address space
++struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
++struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
 +
-+struct kvm_device_address {
-+	__u32 id;
-+	__u64 addr;
-+};
++int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
++unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
++struct kvm_one_reg;
++int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
++int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
 +
-+Specify a device address in the guest's physical address space where guests
-+can access emulated or directly exposed devices, which the host kernel needs
-+to know about. The id field is an architecture specific identifier for a
-+specific device.
-+
-+ARM divides the id field into two parts, a device id and an address type id
-+specific to the individual device.
-+
-+ ?bits:  | 31    ...    16 | 15    ...    0 |
-+  field: |     device id   |  addr type id  |
-+
-+ARM currently only require this when using the in-kernel GIC support for the
-+hardware vGIC features, using KVM_ARM_DEVICE_VGIC_V2 as the device id.  When
-+setting the base address for the guest's mapping of the vGIC virtual CPU
-+and distributor interface, the ioctl must be called after calling
-+KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
-+this ioctl twice for any of the base addresses will return -EEXIST.
-+
-+
- 5. The kvm_run structure
- ------------------------
- 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index fb41608..a7ae073 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -42,6 +42,19 @@ struct kvm_regs {
- #define KVM_ARM_TARGET_CORTEX_A15	0
- #define KVM_ARM_NUM_TARGETS		1
- 
-+/* KVM_SET_DEVICE_ADDRESS ioctl id encoding */
-+#define KVM_DEVICE_TYPE_SHIFT		0
-+#define KVM_DEVICE_TYPE_MASK		(0xffff << KVM_DEVICE_TYPE_SHIFT)
-+#define KVM_DEVICE_ID_SHIFT		16
-+#define KVM_DEVICE_ID_MASK		(0xffff << KVM_DEVICE_ID_SHIFT)
-+
-+/* Supported device IDs */
-+#define KVM_ARM_DEVICE_VGIC_V2		0
-+
-+/* Supported VGIC address types  */
-+#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
-+#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
-+
- struct kvm_vcpu_init {
- 	__u32 target;
- 	__u32 features[7];
+ #endif /* __ARM_KVM_HOST_H__ */
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index acdfa63..c192399 100644
+index c192399..828b5af 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -164,6 +164,9 @@ int kvm_dev_ioctl_check_extension(long ext)
- 	case KVM_CAP_COALESCED_MMIO:
- 		r = KVM_COALESCED_MMIO_PAGE_OFFSET;
- 		break;
-+	case KVM_CAP_SET_DEVICE_ADDR:
-+		r = 1;
-+		break;
- 	default:
- 		r = 0;
- 		break;
-@@ -776,10 +779,29 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
- 	return -EINVAL;
- }
+@@ -53,11 +53,38 @@ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+ static struct vfp_hard_struct __percpu *kvm_host_vfp_state;
+ static unsigned long hyp_default_vectors;
  
-+static int kvm_vm_ioctl_set_device_address(struct kvm *kvm,
-+					   struct kvm_device_address *dev_addr)
++/* Per-CPU variable containing the currently running vcpu. */
++static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
++
+ /* The VMID used in the VTTBR */
+ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u8 kvm_next_vmid;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
+ 
++static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
 +{
-+	return -ENODEV;
++	BUG_ON(preemptible());
++	__get_cpu_var(kvm_arm_running_vcpu) = vcpu;
 +}
 +
- long kvm_arch_vm_ioctl(struct file *filp,
- 		       unsigned int ioctl, unsigned long arg)
++/**
++ * kvm_arm_get_running_vcpu - get the vcpu running on the current CPU.
++ * Must be called from non-preemptible context
++ */
++struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
++{
++	BUG_ON(preemptible());
++	return __get_cpu_var(kvm_arm_running_vcpu);
++}
++
++/**
++ * kvm_arm_get_running_vcpus - get the per-CPU array on currently running vcpus.
++ */
++struct kvm_vcpu __percpu **kvm_get_running_vcpus(void)
++{
++	return &kvm_arm_running_vcpu;
++}
++
+ int kvm_arch_hardware_enable(void *garbage)
  {
--	return -EINVAL;
-+	struct kvm *kvm = filp->private_data;
-+	void __user *argp = (void __user *)arg;
+ 	return 0;
+@@ -299,10 +326,13 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ 		cpumask_clear_cpu(cpu, &vcpu->arch.require_dcache_flush);
+ 		flush_cache_all(); /* We'd really want v7_flush_dcache_all() */
+ 	}
 +
-+	switch (ioctl) {
-+	case KVM_SET_DEVICE_ADDRESS: {
-+		struct kvm_device_address dev_addr;
-+
-+		if (copy_from_user(&dev_addr, argp, sizeof(dev_addr)))
-+			return -EFAULT;
-+		return kvm_vm_ioctl_set_device_address(kvm, &dev_addr);
-+	}
-+	default:
-+		return -EINVAL;
-+	}
++	kvm_arm_set_running_vcpu(vcpu);
  }
  
- static void cpu_init_hyp_mode(void *vector)
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 72f018b..1aaa15e 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -631,6 +631,7 @@ struct kvm_ppc_smmu_info {
- #endif
- #define KVM_CAP_IRQFD_RESAMPLE 82
- #define KVM_CAP_PPC_BOOKE_WATCHDOG 83
-+#define KVM_CAP_SET_DEVICE_ADDR 84
+ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+ {
++	kvm_arm_set_running_vcpu(NULL);
+ }
  
- #ifdef KVM_CAP_IRQ_ROUTING
- 
-@@ -778,6 +779,11 @@ struct kvm_msi {
- 	__u8  pad[16];
- };
- 
-+struct kvm_device_address {
-+	__u32 id;
-+	__u64 addr;
-+};
-+
- /*
-  * ioctls for VM fds
-  */
-@@ -861,6 +867,8 @@ struct kvm_s390_ucas_mapping {
- #define KVM_CREATE_SPAPR_TCE	  _IOW(KVMIO,  0xa8, struct kvm_create_spapr_tce)
- /* Available with KVM_CAP_RMA */
- #define KVM_ALLOCATE_RMA	  _IOR(KVMIO,  0xa9, struct kvm_allocate_rma)
-+/* Available with KVM_CAP_SET_DEVICE_ADDR */
-+#define KVM_SET_DEVICE_ADDRESS	  _IOW(KVMIO,  0xaa, struct kvm_device_address)
- 
- /*
-  * ioctls for vcpu fds
+ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
