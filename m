@@ -1,71 +1,103 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 22 Oct 2012 09:52:06 +0200
-Subject: [PATCH] MMCI: fetch pinctrl handle and set default state
-Message-ID: <1350892326-5125-1-git-send-email-linus.walleij@stericsson.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Mon, 22 Oct 2012 10:04:14 +0200
+Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <1350891382.3592.22.camel@gitbox>
+References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
+ <1350643135-13197-2-git-send-email-linux@prisktech.co.nz>
+ <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
+ <1350888712.3592.11.camel@gitbox> <1350889747.3592.17.camel@gitbox>
+ <20121022072448.GB30026@avionic-0098.mockup.avionic-design.de>
+ <1350891382.3592.22.camel@gitbox>
+Message-ID: <20121022080414.GB4931@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Oct 22, 2012 at 08:36:22PM +1300, Tony Prisk wrote:
+> On Mon, 2012-10-22 at 09:24 +0200, Thierry Reding wrote:
+> > On Mon, Oct 22, 2012 at 08:09:07PM +1300, Tony Prisk wrote:
+> > > On Mon, 2012-10-22 at 19:51 +1300, Tony Prisk wrote:
+> > > > > 
+> > > > > >  	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
+> > > > > >  	if (chip == NULL) {
+> > > > > >  		dev_err(&pdev->dev, "failed to allocate memory\n");
+> > > > > > @@ -123,26 +144,32 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+> > > > > >  	chip->chip.ops = &vt8500_pwm_ops;
+> > > > > >  	chip->chip.base = -1;
+> > > > > >  	chip->chip.npwm = VT8500_NR_PWMS;
+> > > > > > +	chip->clk = of_clk_get(np, 0);
+> > > > > 
+> > > > > I thought this was supposed to work transparently across OF and !OF
+> > > > > configurations by using just clk_get() or devm_clk_get()? I guess that
+> > > > > if the driver depends on OF, then this would be moot, but we should
+> > > > > probably stick to the standard usage anyway.
+> > > > > 
+> > > > > Furthermore, of_clk_get() doesn't seem to be managed, so you'd need to
+> > > > > add explicit clk_put() in the error cleanup paths. One more argument in
+> > > > > favour of using devm_clk_get() instead.
+> > > > 
+> > > > Hmm good point. I stuck with of_ functions because its an OF only driver
+> > > > and it seemed 'backward' to mix old code with new. It does pose the
+> > > > question of 'why have of_clk_get() if existing functions work better'.
+> > > 
+> > > Was about to fix this but noticed why it wasn't like this to start
+> > > with :)
+> > > 
+> > > struct clk *devm_clk_get(struct device *dev, const char *id);
+> > > struct clk *of_clk_get(struct device_node *np, int index);
+> > > 
+> > > devm_clk_get requires me to 'get' the clock by name. arch-vt8500 (and I
+> > > believe a lot of other arch's) don't enforce names for clocks defined in
+> > > devicetree, therefore there is no way for me to know what name the clk
+> > > has unless I include in the binding that the clock must be named 'xxx'.
+> > 
+> > I thought clk_get() was supposed to return the first clock specified in
+> > DT if you pass NULL as the consumer name. I haven't tested this though.
+> > And I haven't looked at the code.
+> > 
+> > > of_clk_get retrieves it by the dt-node + index, so it doesn't care as
+> > > long as its the 1st clock listed.
+> > 
+> > So the usual way to do this, I believe, is:
+> > 
+> > 	clocks = <&clk_foo>;
+> > 	clock-names = "foo";
+> > 
+> > Then use:
+> > 
+> > 	clk = devm_clk_get(&pdev->dev, "foo");
+> > 
+> > And as I said above, I was under the impression that the default would
+> > be to use the first clock if NULL was specified instead of "foo".
+> > 
+> > Thierry
+> 
+> clock-names is an optional property (as defined in
+> bindings/clock/clock-bindings.txt) so relying on it is .. well,
+> unreliable.
+> 
+> What you say makes sense, but it means the binding document has to make
+> an optional property into a required property simply to use an 'old'
+> function when a new function would 'work' (granted not as well, as you
+> pointed out) without requiring the optional property.
 
-This fetches the pinctrl resource for the MMCI driver, and if
-a "default" state is found, it is activated.
+Okay, I've just checked the core clock code, and indeed if you run
+clk_get() with con_id set to NULL, you'll eventually call of_clk_get()
+with index == 0. That's exactly what you want, right? The only setup
+where this won't work out is if you need to handle multiple clocks, in
+which case I think it would make sense to make the clock-names property
+mandatory. But for this driver that won't be necessary, since it will
+never use a second clock, right?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mmc/host/mmci.c | 18 ++++++++++++++++++
- drivers/mmc/host/mmci.h |  4 ++++
- 2 files changed, 22 insertions(+)
+> Your subsystem - your rules. Let me know if I've managed to sway you or
+> not :)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index edc3e9b..269566d 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -33,6 +33,7 @@
- #include <linux/amba/mmci.h>
- #include <linux/pm_runtime.h>
- #include <linux/types.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include <asm/div64.h>
- #include <asm/io.h>
-@@ -1360,6 +1361,23 @@ static int __devinit mmci_probe(struct amba_device *dev,
- 		mmc->f_max = min(host->mclk, fmax);
- 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
- 
-+	host->pinctrl = devm_pinctrl_get(&dev->dev);
-+	if (IS_ERR(host->pinctrl)) {
-+		ret = PTR_ERR(host->pinctrl);
-+		goto clk_disable;
-+	}
-+
-+	host->pins_default = pinctrl_lookup_state(host->pinctrl,
-+			PINCTRL_STATE_DEFAULT);
-+
-+	/* enable pins to be muxed in and configured */
-+	if (!IS_ERR(host->pins_default)) {
-+		ret = pinctrl_select_state(host->pinctrl, host->pins_default);
-+		if (ret)
-+			dev_err(&dev->dev, "could not set default pins\n");
-+	} else
-+		dev_err(&dev->dev, "could not get default pinstate\n");
-+
- #ifdef CONFIG_REGULATOR
- 	/* If we're using the regulator framework, try to fetch a regulator */
- 	host->vcc = regulator_get(&dev->dev, "vmmc");
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index d437ccf..d34d8c0 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -195,6 +195,10 @@ struct mmci_host {
- 	unsigned int		size;
- 	struct regulator	*vcc;
- 
-+	/* pinctrl handles */
-+	struct pinctrl		*pinctrl;
-+	struct pinctrl_state	*pins_default;
-+
- #ifdef CONFIG_DMA_ENGINE
- 	/* DMA stuff */
- 	struct dma_chan		*dma_current;
--- 
-1.7.11.3
+I'd rather persuade you than force the issue. =)
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/8b102301/attachment.sig>
