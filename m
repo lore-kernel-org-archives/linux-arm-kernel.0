@@ -1,79 +1,71 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 22 Oct 2012 09:45:31 +0200
-Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
-In-Reply-To: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
-References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <5084F99B.1030709@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 22 Oct 2012 09:52:06 +0200
+Subject: [PATCH] MMCI: fetch pinctrl handle and set default state
+Message-ID: <1350892326-5125-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sourav,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On 10/22/2012 09:29 AM, Sourav Poddar wrote:
-> Currently, omap4 keypad mux settings are done in the board file.
-> Populate the mux settings in the dts file for the keypad to
-> work via dt.
+This fetches the pinctrl resource for the MMCI driver, and if
+a "default" state is found, it is activated.
 
-Have you changed the driver to handle properly the dependency with the
-pinctrl and thus return EPROBE_DEFER if this is not ready?
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mmc/host/mmci.c | 18 ++++++++++++++++++
+ drivers/mmc/host/mmci.h |  4 ++++
+ 2 files changed, 22 insertions(+)
 
-Seb Guiriec has just sent a patch to do that for the omap-i2c driver
-([PATCH] i2c: omap: adopt pinctrl support).
-
-> Cc: Felipe Balbi <balbi@ti.com>
-> Tested on omap4430 sdp with 3.7-rc1.
-> 
-> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-> ---
->  arch/arm/boot/dts/omap4-sdp.dts |   26 ++++++++++++++++++++++++++
->  1 files changed, 26 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-> index 5b7e04f..5efb059 100644
-> --- a/arch/arm/boot/dts/omap4-sdp.dts
-> +++ b/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -194,6 +194,27 @@
->  			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
->  		>;
->  	};
-> +
-> +	keypad_pins: pinmux_keypad_pins {
-> +		pinctrl-single,pins = <
-> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-
-Alway use lower case for hexa value.
-
-> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +		>;
-> +	};
->  };
->  
->  &i2c1 {
-> @@ -406,3 +427,8 @@
->  &mcbsp3 {
->  	status = "disabled";
->  };
-> +
-> +&keypad {
-> +        pinctrl-names = "default";
-> +        pinctrl-0 = <&keypad_pins>;
-> +};
-
-Otherwise that looks good.
-
-Thanks,
-Benoit
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index edc3e9b..269566d 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -33,6 +33,7 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include <asm/div64.h>
+ #include <asm/io.h>
+@@ -1360,6 +1361,23 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 		mmc->f_max = min(host->mclk, fmax);
+ 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+ 
++	host->pinctrl = devm_pinctrl_get(&dev->dev);
++	if (IS_ERR(host->pinctrl)) {
++		ret = PTR_ERR(host->pinctrl);
++		goto clk_disable;
++	}
++
++	host->pins_default = pinctrl_lookup_state(host->pinctrl,
++			PINCTRL_STATE_DEFAULT);
++
++	/* enable pins to be muxed in and configured */
++	if (!IS_ERR(host->pins_default)) {
++		ret = pinctrl_select_state(host->pinctrl, host->pins_default);
++		if (ret)
++			dev_err(&dev->dev, "could not set default pins\n");
++	} else
++		dev_err(&dev->dev, "could not get default pinstate\n");
++
+ #ifdef CONFIG_REGULATOR
+ 	/* If we're using the regulator framework, try to fetch a regulator */
+ 	host->vcc = regulator_get(&dev->dev, "vmmc");
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index d437ccf..d34d8c0 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -195,6 +195,10 @@ struct mmci_host {
+ 	unsigned int		size;
+ 	struct regulator	*vcc;
+ 
++	/* pinctrl handles */
++	struct pinctrl		*pinctrl;
++	struct pinctrl_state	*pins_default;
++
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
+ 	struct dma_chan		*dma_current;
+-- 
+1.7.11.3
