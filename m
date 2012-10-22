@@ -1,46 +1,79 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 12:46:51 +0300
-Subject: [PATCH 1/8] i2c: omap: no need to access platform_device
+Date: Mon, 22 Oct 2012 12:46:52 +0300
+Subject: [PATCH 2/8] i2c: omap: reorder exit path of omap_i2c_xfer_msg()
 In-Reply-To: <1350899218-13624-1-git-send-email-balbi@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
-Message-ID: <1350899218-13624-2-git-send-email-balbi@ti.com>
+Message-ID: <1350899218-13624-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PM callbacks pass our device pointer as argument
-and we don't need to access the platform_device
-just to dereference that down to dev->drvdata.
-
-instead, just use dev_get_drvdata() directly.
+just a cleanup patch trying to make exit path
+more straightforward. No changes otherwise.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++++++---------
+ 1 file changed, 17 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index db31eae..c07d9c4 100644
+index c07d9c4..bea0277 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1239,8 +1239,7 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
- #ifdef CONFIG_PM_RUNTIME
- static int omap_i2c_runtime_suspend(struct device *dev)
+@@ -505,6 +505,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
  {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-+	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
- 	u16 iv;
+ 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+ 	unsigned long timeout;
++	int ret;
+ 	u16 w;
  
- 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
-@@ -1261,8 +1260,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+@@ -582,31 +583,38 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	dev->buf_len = 0;
+ 	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+-		omap_i2c_init(dev);
+-		return -ETIMEDOUT;
++		ret = -ETIMEDOUT;
++		goto err_i2c_init;
+ 	}
  
- static int omap_i2c_runtime_resume(struct device *dev)
- {
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-+	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+-	if (likely(!dev->cmd_err))
+-		return 0;
+-
+ 	/* We have an error */
+ 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+ 			    OMAP_I2C_STAT_XUDF)) {
+-		omap_i2c_init(dev);
+-		return -EIO;
++		ret = -EIO;
++		goto err_i2c_init;
+ 	}
  
- 	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
- 		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+ 	if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
+ 		if (msg->flags & I2C_M_IGNORE_NAK)
+ 			return 0;
++
+ 		if (stop) {
+ 			w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+ 			w |= OMAP_I2C_CON_STP;
+ 			omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+ 		}
+-		return -EREMOTEIO;
++
++		ret = -EREMOTEIO;
++		goto err;
+ 	}
+-	return -EIO;
++
++	return 0;
++
++err_i2c_init:
++	omap_i2c_init(dev);
++
++err:
++	return ret;
+ }
+ 
+ 
 -- 
 1.8.0.rc0
