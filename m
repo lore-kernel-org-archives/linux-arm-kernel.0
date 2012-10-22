@@ -1,42 +1,35 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 22 Oct 2012 08:50:01 +0900
+Date: Mon, 22 Oct 2012 09:29:00 +0900
 Subject: [PATCH] ARM: EXYNOS: exynos4-dt: Set .smp field of machine
  descriptor
-In-Reply-To: <1350035378-31989-1-git-send-email-t.figa@samsung.com>
+In-Reply-To: <CAH9JG2W-Tg5ZwzwuXg3-56KhiLwQS3rGktweRG8XwdVMda=HBg@mail.gmail.com>
 References: <1350035378-31989-1-git-send-email-t.figa@samsung.com>
-Message-ID: <04c801cdafe6$c96e2470$5c4a6d50$%kim@samsung.com>
+ <2064474.beoN9hr7Vi@flatron>
+ <CAH9JG2W-Tg5ZwzwuXg3-56KhiLwQS3rGktweRG8XwdVMda=HBg@mail.gmail.com>
+Message-ID: <000001cdafec$3ce4c260$b6ae4720$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
+Kyungmin Park wrote:
 > 
-> This patch adds missing initializer of .smp field of machine descriptor
-> of Exynos 4 DT machine.
+> + Arnd, Olof,
 > 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  arch/arm/mach-exynos/mach-exynos4-dt.c | 1 +
->  1 file changed, 1 insertion(+)
+> Tomasz,
+> I think it's better to add arm-soc maintainers at CC when send the
+patches.
+> Samsung patches doesn't handled or merged with proper time.
 > 
-> diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-
-> exynos/mach-exynos4-dt.c
-> index 7222e3c..d6bdcfb 100644
-> --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
-> @@ -119,6 +119,7 @@ static char const *exynos4_dt_compat[] __initdata = {
-> 
->  DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device
-Tree)")
->  	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
-> +	.smp		= smp_ops(exynos_smp_ops),
->  	.init_irq	= exynos4_init_irq,
->  	.map_io		= exynos4_dt_map_io,
->  	.handle_irq	= gic_handle_irq,
-> --
-> 1.7.12
 
-Yes, right. Applied.
-Thanks.
+I did just now. Sorry for late.
+
+[...]
+
+> > Ping. I think this should be considered a fix.
+> >
+Tomasz, yes I applied this in my -fix. Note this will be sent to upstream
+with other Samsung fixes during 3.7-rc, probably in a couple of days.
+
+Thanks for your reminder.
 
 Best regards,
 Kgene.
