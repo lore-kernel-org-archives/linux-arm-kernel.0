@@ -1,70 +1,51 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 22 Oct 2012 15:00:22 -0400 (EDT)
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <508586ED.1010106@wwwdotorg.org>
-Message-ID: <Pine.LNX.4.44L0.1210221443580.1724-100000@iolanthe.rowland.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 22 Oct 2012 21:07:34 +0200
+Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
+In-Reply-To: <20121022173028.GM21046@lunn.ch>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
+ <20121022173028.GM21046@lunn.ch>
+Message-ID: <50859976.6080601@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2012, Stephen Warren wrote:
-
-> >>> +- has-tt : controller has transaction translator(s).
-> >>> +- has-synopsys-hc-bug : controller has the synopsys hc bug
-> >>
-> >> That would normally be determined by the driver based on the particular
-> >> compatible value that is in device tree.
-> > 
-> > I don't understand this comment.  Isn't "has-synopsys-hc-bug" the 
-> > compatible value in question?
+On 10/22/2012 07:30 PM, Andrew Lunn wrote:
+> On Mon, Oct 22, 2012 at 07:02:45PM +0200, Gregory CLEMENT wrote:
+>> From: Yehuda Yitschak <yehuday@marvell.com>
+>>
+>> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
+>>  arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
+>>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
+>>  3 files changed, 97 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+>> index f521ed8..531619f 100644
+>> --- a/arch/arm/boot/dts/armada-xp.dtsi
+>> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+>> @@ -24,7 +24,7 @@
+>>  
+>>  	mpic: interrupt-controller at d0020000 {
+>>  	      reg = <0xd0020a00 0x1d0>,
+>> -		    <0xd0021870 0x58>;
+>> +		    <0xd0021070 0x58>;
+>>  	};
 > 
-> "compatible value" in this context means that value of the property
-> named "compatible".
-
-I see.  But why would it be done this way instead having a separate 
-property?
-
-And doesn't the same reasoning apply to has-tt?  Doesn't that mean the 
-driver would have to match four different hardware types?  What happens 
-if a third characteristic like these comes around; would the driver 
-then have to check against eight different types?
-
-> >>> +- big-endian : descriptors and registers are both big endian. This
-> >>> +  is the equivalent of specifying big-endian-desc and big-endian-regs.
-> >>> +OR
-> >>> +- big-endian-desc : descriptors are in big-endian format
-> >>> +- big-endian-regs : mmio is in big-endian format
-> >>
-> >> Hmmm. That looks odd. Presumably if those properties aren't specified,
-> >> the default is little-endian? Shouldn't this be a tri-state: big,
-> >> little, native, with default native? I don't know what the EHCI
-> >> specification mandates here (and if it does mandate something, the
-> >> default should match the specification). Isn't this something that
-> >> readl/writel would take care of, or are there cases where the register
-> >> endianness of just this one HW block mismatches all other HW blocks?
-> > 
-> > The EHCI spec assumes a PCI implementation; it doesn't consider other
-> > sorts.  And it doesn't say anything about the endianness of multi-byte
-> > descriptors in memory.
+> Hi Gregory
 > 
-> OK, so does this binding default to assuming little-endian (which I
-> assume matches PCI), unless the big-endian properties are given?
+> Is this a bug fix needed for 3.7?
+> 
+>    Andrew
+> 
+I don't think so.
+We extended the reg map to be able to use registers only used for SMP.
+When we didn't have SMP support the mapping was correct, and now by
+introducing SMP we extend it.
 
-Yes, that is the intention.  The ehci-hcd driver works the same way; it 
-assumes little-endian unless USB_EHCI_BIG_ENDIAN_DESC or 
-USB_EHCI_BIG_ENDIAN_MMIO is set.  (That will have to change in the 
-future, though.)
-
->  Is the
-> case of little-endian EHCI registers on a big-endian CPU a common enough
-> thing that adding a third state native-endian wouldn't be useful?
-
-I'm not sure how to answer.  Little-endian EHCI registers are very
-common, even among big-endian CPUs (they are probably the majority, in
-fact).  I don't see how adding native-endian would help; the readl() 
-function always assumes the values it reads are little-endian, so in 
-that sense little-endian _is_ the native state.
-
-Also, as far as I know there aren't any examples of big-endian EHCI
-registers on systems with little-endian CPUs.
-
-Alan Stern
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
