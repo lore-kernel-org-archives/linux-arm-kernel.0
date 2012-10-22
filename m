@@ -1,38 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 Oct 2012 19:30:28 +0200
-Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
-In-Reply-To: <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
- <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121022173028.GM21046@lunn.ch>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 22 Oct 2012 13:34:43 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <50856F41.7000205@wwwdotorg.org>
+Message-ID: <Pine.LNX.4.44L0.1210221324580.1724-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 07:02:45PM +0200, Gregory CLEMENT wrote:
-> From: Yehuda Yitschak <yehuday@marvell.com>
+On Mon, 22 Oct 2012, Stephen Warren wrote:
+
+> On 10/20/2012 04:10 PM, Tony Prisk wrote:
+> > Add a binding document for ehci-platform driver.
+
+> > +Optional properties:
+> > +- caps-offset : offset to the capabilities register (default = 0)
+> > +- has-tt : controller has transaction translator(s).
+> > +- has-synopsys-hc-bug : controller has the synopsys hc bug
 > 
-> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
->  arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
->  arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
->  3 files changed, 97 insertions(+), 7 deletions(-)
+> That would normally be determined by the driver based on the particular
+> compatible value that is in device tree.
+
+I don't understand this comment.  Isn't "has-synopsys-hc-bug" the 
+compatible value in question?
+
+> > +- big-endian : descriptors and registers are both big endian. This
+> > +  is the equivalent of specifying big-endian-desc and big-endian-regs.
+> > +OR
+> > +- big-endian-desc : descriptors are in big-endian format
+> > +- big-endian-regs : mmio is in big-endian format
 > 
-> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> index f521ed8..531619f 100644
-> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> @@ -24,7 +24,7 @@
->  
->  	mpic: interrupt-controller at d0020000 {
->  	      reg = <0xd0020a00 0x1d0>,
-> -		    <0xd0021870 0x58>;
-> +		    <0xd0021070 0x58>;
->  	};
+> Hmmm. That looks odd. Presumably if those properties aren't specified,
+> the default is little-endian? Shouldn't this be a tri-state: big,
+> little, native, with default native? I don't know what the EHCI
+> specification mandates here (and if it does mandate something, the
+> default should match the specification). Isn't this something that
+> readl/writel would take care of, or are there cases where the register
+> endianness of just this one HW block mismatches all other HW blocks?
 
-Hi Gregory
+The EHCI spec assumes a PCI implementation; it doesn't consider other
+sorts.  And it doesn't say anything about the endianness of multi-byte
+descriptors in memory.
 
-Is this a bug fix needed for 3.7?
+Yes, there are cases where one HW block has an endianness that doesn't
+match other HW blocks.  Or to be more accurate, it doesn't match what
+the other HW blocks expect.  For example, on ARM readl and writel
+expect to do byte-swapping but some particular EHCI blocks don't need
+it.
 
-   Andrew
+Alan Stern
