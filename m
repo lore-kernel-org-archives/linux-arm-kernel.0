@@ -1,60 +1,68 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 22 Oct 2012 19:13:55 +0300
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <alpine.DEB.2.00.1210201628420.24497@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210201628420.24497@utopia.booyaka.com>
-Message-ID: <1350922435.2143.66.camel@sokoban>
+Date: Mon, 22 Oct 2012 19:15:32 +0300
+Subject: [RFC] ARM: OMAP: hwmod: wait for sysreset complete after enabling
+ hwmod
+Message-ID: <1350922532-26338-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-10-20 at 17:20 +0000, Paul Walmsley wrote:
-> Hello Venkatraman,
-> 
-> On Thu, 18 Oct 2012, Paul Walmsley wrote:
-> 
-> > Here are some basic OMAP test results for Linux v3.7-rc1.
-> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
-> 
-> ...
-> 
-> > Failing tests: needing investigation
-> > ------------------------------------
-> 
-> ...
-> 
-> > PM tests:
-> > 
-> > * 3530es3beagle: hangs during off-mode dynamic idle test
-> >   - Unknown cause; not investigated
-> 
-> Looks like this commit is causing some of our power management tests to 
-> fail on v3.7-rc1:
-> 
-> commit 6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c
-> Author: Venkatraman S <svenkatr@ti.com>
-> Date:   Wed Aug 8 14:26:52 2012 +0530
-> 
->     mmc: omap_hsmmc: remove access to SYSCONFIG register
-> 
-> ...
-> 
-> The failure can be seen in the following test log:
-> 
-> http://www.pwsan.com/omap/transcripts/20121020-3530es3beagle-off-mode-fail-pre-revert.txt
-> 
-> and with commit 6c31b215 reverted, the test succeeds:
-> 
-> http://www.pwsan.com/omap/transcripts/20121020-3530es3beagle-off-mode-fail-post-revert.txt
-> 
-> 
-> Could you please take a look and fix the problem?
+When waking up from off-mode, some IP blocks are reset automatically by
+hardware. For this reason, software must wait until the reset has
+completed before attempting to access the IP block.
 
-Root cause for this issue is that the MMC IP is reset during off-mode,
-but the driver doesn't expect this in its current form. There are a
-couple of alternative ways to fix this. Either add a reset timeout to
-the MMC driver code (which was removed by the bisected patch), or
-alternatively add a global reset check to the hwmod code. I'll send a
-patch for the global reset purpose in a bit for commenting.
+This patch fixes for example the bug introduced by commit
+6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c ("mmc: omap_hsmmc: remove access
+to SYSCONFIG register"), in which the MMC IP block is reset during
+off-mode entry, but the code expects the module to be already available
+during the execution of context restore.
 
--Tero
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Venkatraman S <svenkatr@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c |   22 ++++++++++++++++++++++
+ 1 files changed, 22 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index b969ab1..523729b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1278,6 +1278,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
+ 	u8 idlemode, sf;
+ 	u32 v;
+ 	bool clkdm_act;
++	int c;
+ 
+ 	if (!oh->class->sysc)
+ 		return;
+@@ -1338,6 +1339,27 @@ static void _enable_sysc(struct omap_hwmod *oh)
+ 		_set_module_autoidle(oh, idlemode, &v);
+ 		_write_sysconfig(v, oh);
+ 	}
++
++	/*
++	 * Wait until reset has completed, this is needed as the IP
++	 * block is reset automatically by hardware in some cases
++	 * (off-mode for example), and the drivers require the
++	 * IP to be ready when they access it
++	 */
++	if (sf & SYSS_HAS_RESET_STATUS)
++		omap_test_timeout((omap_hwmod_read(oh,
++						   oh->class->sysc->syss_offs)
++				   & SYSS_RESETDONE_MASK),
++				  MAX_MODULE_SOFTRESET_WAIT, c);
++
++	if (sf & SYSC_HAS_RESET_STATUS) {
++		u32 softrst_mask =
++			(0x1 << oh->class->sysc->sysc_fields->srst_shift);
++		omap_test_timeout(!(omap_hwmod_read(oh,
++						    oh->class->sysc->sysc_offs)
++				   & softrst_mask),
++				  MAX_MODULE_SOFTRESET_WAIT, c);
++	}
+ }
+ 
+ /**
+-- 
+1.7.4.1
