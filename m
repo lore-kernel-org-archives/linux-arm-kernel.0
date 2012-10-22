@@ -1,135 +1,151 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 22 Oct 2012 19:51:52 +1300
-Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
-References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
- <1350643135-13197-2-git-send-email-linux@prisktech.co.nz>
- <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1350888712.3592.11.camel@gitbox>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 22 Oct 2012 02:52:23 -0400
+Subject: [PATCH v3 10/13] ARM: KVM: VGIC control interface world switch
+In-Reply-To: <20121022065104.18672.52989.stgit@ubuntu>
+References: <20121022065104.18672.52989.stgit@ubuntu>
+Message-ID: <20121022065223.18672.6274.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replies to your comments inline:
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-On Mon, 2012-10-22 at 08:34 +0200, Thierry Reding wrote:
-...
-> > -static int __devinit pwm_probe(struct platform_device *pdev)
-> > +static const struct of_device_id vt8500_pwm_dt_ids[] = {
-> > +	{ .compatible = "via,vt8500-pwm", },
-> > +	{ /* Sentinel */ }
-> > +};
-> > +
-> > +static int __devinit vt8500_pwm_probe(struct platform_device *pdev)
-> 
-> Since you're changing this line anyway, maybe you should drop __devinit
-> (and __devexit for the .remove() callback). HOTPLUG is always enabled
-> nowadays and will go away eventually, in which case these will need to
-> be removed anyway.
+Enable the VGIC control interface to be save-restored on world switch.
 
-Will do. I must say the inconstancy among comments is rather
-frustrating. In another patch I sent out a few days ago (completely
-unrelated to this), I told to add __devexit to a remove() function :\
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+---
+ arch/arm/include/asm/kvm_arm.h |   12 +++++++
+ arch/arm/kernel/asm-offsets.c  |   12 +++++++
+ arch/arm/kvm/interrupts_head.S |   68 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
 
-> >  {
-> >  	struct vt8500_chip *chip;
-> > -	struct resource *r;
-> > +	struct device_node *np = pdev->dev.of_node;
-> >  	int ret;
-> >  
-> > +	if (!np) {
-> > +		dev_err(&pdev->dev, "invalid devicetree node\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> 
-> This effectively makes DT support mandatory. Shouldn't you be adding a
-> "depends on OF" into the Kconfig section in that case?
-This driver depends on ARCH_VT8500, which only supports DT so a
-dependency on OF seemed redundant. If you think its still necessary, let
-me know and I'll add it anyway.
-> 
-> >  	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-> >  	if (chip == NULL) {
-> >  		dev_err(&pdev->dev, "failed to allocate memory\n");
-> > @@ -123,26 +144,32 @@ static int __devinit pwm_probe(struct platform_device *pdev)
-> >  	chip->chip.ops = &vt8500_pwm_ops;
-> >  	chip->chip.base = -1;
-> >  	chip->chip.npwm = VT8500_NR_PWMS;
-> > +	chip->clk = of_clk_get(np, 0);
-> 
-> I thought this was supposed to work transparently across OF and !OF
-> configurations by using just clk_get() or devm_clk_get()? I guess that
-> if the driver depends on OF, then this would be moot, but we should
-> probably stick to the standard usage anyway.
-> 
-> Furthermore, of_clk_get() doesn't seem to be managed, so you'd need to
-> add explicit clk_put() in the error cleanup paths. One more argument in
-> favour of using devm_clk_get() instead.
-
-Hmm good point. I stuck with of_ functions because its an OF only driver
-and it seemed 'backward' to mix old code with new. It does pose the
-question of 'why have of_clk_get() if existing functions work better'.
-> 
-> > -	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > -	if (r == NULL) {
-> > -		dev_err(&pdev->dev, "no memory resource defined\n");
-> > -		return -ENODEV;
-> > +	if (!chip->clk) {
-> > +		dev_err(&pdev->dev, "clock source not specified\n");
-> > +		return -EINVAL;
-> >  	}
-> >  
-> > -	chip->base = devm_request_and_ioremap(&pdev->dev, r);
-> > -	if (chip->base == NULL)
-> > +	chip->base = of_iomap(np, 0);
-> 
-> No need to change this. It should work with the standard calls as well.
-Again, this was a conversion of use of_ functions rather than the 'old'
-style.
-
-> 
-> > +	if (!chip->base) {
-> > +		dev_err(&pdev->dev, "memory resource not available\n");
-> >  		return -EADDRNOTAVAIL;
-> > +	}
-> > +
-> > +	clk_prepare_enable(chip->clk);
-> 
-> Why does the clock need to be enabled here? Shouldn't it be postponed to
-> the last possible moment to save power?
-I didn't consider that - but the use case for everyone at present is
-that they only need the PWM driver to control the backlight, and it's
-going to be enabled at boot anyway - so one PWM will always be active.
-
-Futureproofing is always good so I'll fix this.
-
-...
-
-> >  
-> > -MODULE_LICENSE("GPL");
-> > +MODULE_DESCRIPTION("VT8500 PWM Driver");
-> > +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-> > +MODULE_LICENSE("GPL v2");
-> 
-> IANAL, but I think you need the approval of all authors of this code
-> before changing the license. But I see that the file header actually
-> says that this code is GPL v2, so maybe this change could be considered
-> a bugfix. =)
-
-This is something I've already discussed with Alexey in regards to all
-the existing drivers he has in mainline. Since I have taken over as
-maintainer on this platform I have corrected the licenses as patch's
-have gone through. As you pointed out, it was already GPLv2 in the
-header, this is just a 'bugfix'.
-> 
-> > +MODULE_DEVICE_TABLE(of, vt8500_pwm_dt_ids);
-> 
-> I think it is customary to put this right after the device table
-> definition.
-Didn't know that - will fix.
-> 
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
-> > 
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index 4f1bb01..e1e39d6 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -188,4 +188,16 @@
+ #define HSR_EC_DABT	(0x24)
+ #define HSR_EC_DABT_HYP	(0x25)
+ 
++/* GICH offsets */
++#define GICH_HCR	0x0
++#define GICH_VTR	0x4
++#define GICH_VMCR	0x8
++#define GICH_MISR	0x10
++#define GICH_EISR0 	0x20
++#define GICH_EISR1 	0x24
++#define GICH_ELRSR0 	0x30
++#define GICH_ELRSR1 	0x34
++#define GICH_APR	0xf0
++#define GICH_LR0	0x100
++
+ #endif /* __ARM_KVM_ARM_H__ */
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index cf97d92..fba332b 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -167,6 +167,18 @@ int main(void)
+   DEFINE(VCPU_HxFAR,		offsetof(struct kvm_vcpu, arch.hxfar));
+   DEFINE(VCPU_HPFAR,		offsetof(struct kvm_vcpu, arch.hpfar));
+   DEFINE(VCPU_HYP_PC,		offsetof(struct kvm_vcpu, arch.hyp_pc));
++#ifdef CONFIG_KVM_ARM_VGIC
++  DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
++  DEFINE(VGIC_CPU_HCR,		offsetof(struct vgic_cpu, vgic_hcr));
++  DEFINE(VGIC_CPU_VMCR,		offsetof(struct vgic_cpu, vgic_vmcr));
++  DEFINE(VGIC_CPU_MISR,		offsetof(struct vgic_cpu, vgic_misr));
++  DEFINE(VGIC_CPU_EISR,		offsetof(struct vgic_cpu, vgic_eisr));
++  DEFINE(VGIC_CPU_ELRSR,	offsetof(struct vgic_cpu, vgic_elrsr));
++  DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
++  DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
++  DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
++  DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
++#endif
+   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
+ #endif
+   return 0; 
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 2ac8b4a..c2423d8 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -341,6 +341,45 @@
+  * @vcpup: Register pointing to VCPU struct
+  */
+ .macro save_vgic_state	vcpup
++#ifdef CONFIG_KVM_ARM_VGIC
++	/* Get VGIC VCTRL base into r2 */
++	ldr	r2, [\vcpup, #VCPU_KVM]
++	ldr	r2, [r2, #KVM_VGIC_VCTRL]
++	cmp	r2, #0
++	beq	2f
++
++	/* Compute the address of struct vgic_cpu */
++	add	r11, \vcpup, #VCPU_VGIC_CPU
++
++	/* Save all interesting registers */
++	ldr	r3, [r2, #GICH_HCR]
++	ldr	r4, [r2, #GICH_VMCR]
++	ldr	r5, [r2, #GICH_MISR]
++	ldr	r6, [r2, #GICH_EISR0]
++	ldr	r7, [r2, #GICH_EISR1]
++	ldr	r8, [r2, #GICH_ELRSR0]
++	ldr	r9, [r2, #GICH_ELRSR1]
++	ldr	r10, [r2, #GICH_APR]
++
++	str	r3, [r11, #VGIC_CPU_HCR]
++	str	r4, [r11, #VGIC_CPU_VMCR]
++	str	r5, [r11, #VGIC_CPU_MISR]
++	str	r6, [r11, #VGIC_CPU_EISR]
++	str	r7, [r11, #(VGIC_CPU_EISR + 4)]
++	str	r8, [r11, #VGIC_CPU_ELRSR]
++	str	r9, [r11, #(VGIC_CPU_ELRSR + 4)]
++	str	r10, [r11, #VGIC_CPU_APR]
++
++	/* Save list registers */
++	add	r2, r2, #GICH_LR0
++	add	r3, r11, #VGIC_CPU_LR
++	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++1:	ldr	r6, [r2], #4
++	str	r6, [r3], #4
++	subs	r4, r4, #1
++	bne	1b
++2:
++#endif
+ .endm
+ 
+ /*
+@@ -348,6 +387,35 @@
+  * @vcpup: Register pointing to VCPU struct
+  */
+ .macro restore_vgic_state	vcpup
++#ifdef CONFIG_KVM_ARM_VGIC
++	/* Get VGIC VCTRL base into r2 */
++	ldr	r2, [\vcpup, #VCPU_KVM]
++	ldr	r2, [r2, #KVM_VGIC_VCTRL]
++	cmp	r2, #0
++	beq	2f
++
++	/* Compute the address of struct vgic_cpu */
++	add	r11, \vcpup, #VCPU_VGIC_CPU
++
++	/* We only restore a minimal set of registers */
++	ldr	r3, [r11, #VGIC_CPU_HCR]
++	ldr	r4, [r11, #VGIC_CPU_VMCR]
++	ldr	r8, [r11, #VGIC_CPU_APR]
++
++	str	r3, [r2, #GICH_HCR]
++	str	r4, [r2, #GICH_VMCR]
++	str	r8, [r2, #GICH_APR]
++
++	/* Restore list registers */
++	add	r2, r2, #GICH_LR0
++	add	r3, r11, #VGIC_CPU_LR
++	ldr	r4, [r11, #VGIC_CPU_NR_LR]
++1:	ldr	r6, [r3], #4
++	str	r6, [r2], #4
++	subs	r4, r4, #1
++	bne	1b
++2:
++#endif
+ .endm
+ 
+ /* Configures the HSTR (Hyp System Trap Register) on entry/return
