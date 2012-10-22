@@ -1,59 +1,48 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 22 Oct 2012 21:55:55 +0200
-Subject: [PATCH 1/4] mtd: omap-nand: pass device_node in platform data
-In-Reply-To: <1350935758-9215-1-git-send-email-zonque@gmail.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
-Message-ID: <1350935758-9215-2-git-send-email-zonque@gmail.com>
+Date: Mon, 22 Oct 2012 21:55:54 +0200
+Subject: [PATCH 0/4] RFC: OMAP GPMC bindings
+Message-ID: <1350935758-9215-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pass an optional device_node pointer in the platform data, which in turn
-will be put into a mtd_part_parser_data. This way, code that sets up the
-platform devices can pass along the node from DT so that the partitions
-can be parsed.
+This is a series of patches to support GPMC peripherals on OMAP boards.
 
-For non-DT boards, this change has no effect.
+Depends on Linus' master +
+omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- drivers/mtd/nand/omap2.c                     | 4 +++-
- include/linux/platform_data/mtd-nand-omap2.h | 2 ++
- 2 files changed, 5 insertions(+), 1 deletion(-)
+The only supported peripheral for now is NAND, but other types would be
+easy to add.
 
-diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-index 3282b15..a733f15 100644
---- a/drivers/mtd/nand/omap2.c
-+++ b/drivers/mtd/nand/omap2.c
-@@ -1331,6 +1331,7 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 	dma_cap_mask_t mask;
- 	unsigned sig;
- 	struct resource			*res;
-+	struct mtd_part_parser_data	ppdata = {};
- 
- 	pdata = pdev->dev.platform_data;
- 	if (pdata == NULL) {
-@@ -1556,7 +1557,8 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
- 		goto out_release_mem_region;
- 	}
- 
--	mtd_device_parse_register(&info->mtd, NULL, NULL, pdata->parts,
-+	ppdata.of_node = pdata->of_node;
-+	mtd_device_parse_register(&info->mtd, NULL, &ppdata, pdata->parts,
- 				  pdata->nr_parts);
- 
- 	platform_set_drvdata(pdev, &info->mtd);
-diff --git a/include/linux/platform_data/mtd-nand-omap2.h b/include/linux/platform_data/mtd-nand-omap2.h
-index 24d32ca..5217d6e 100644
---- a/include/linux/platform_data/mtd-nand-omap2.h
-+++ b/include/linux/platform_data/mtd-nand-omap2.h
-@@ -60,6 +60,8 @@ struct omap_nand_platform_data {
- 	int			devsize;
- 	enum omap_ecc           ecc_opt;
- 	struct gpmc_nand_regs	reg;
-+	/* for passing the partitions */
-+	struct device_node	*of_node;
- };
- 
- #endif
+In order to make the gpmc driver the 'hub' for all sub-nodes, I had to
+add some includes. I'm not particularily happy about the fact that there
+are mutual references from gpmc.c to gpmc-nand.c now, but that was the
+easiest way.
+
+I successfully tested these patches on an AM33xx board to make NAND
+work.
+
+Comments welcome!
+
+
+Thanks,
+Daniel
+
+
+Daniel Mack (4):
+  mtd: omap-nand: pass device_node in platform data
+  ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+  ARM: OMAP: gpmc: don't create devices from initcall on DT
+  OMAP: mtd: gpmc: add DT bindings for GPMC timings and NAND
+
+ Documentation/devicetree/bindings/bus/gpmc.txt     |  59 +++++++++
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |  65 +++++++++
+ arch/arm/mach-omap2/gpmc-nand.c                    |   2 +-
+ arch/arm/mach-omap2/gpmc.c                         | 146 +++++++++++++++++++++
+ drivers/mtd/nand/omap2.c                           |   4 +-
+ include/linux/platform_data/mtd-nand-omap2.h       |   2 +
+ 6 files changed, 276 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/gpmc.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+
 -- 
 1.7.11.7
