@@ -1,127 +1,58 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 16:27:08 +0300
-Subject: [RFC/PATCH] mmc: omap_hsmmc: introduce omap_hsmmc_prepare/complete
-In-Reply-To: <1350910768-8522-1-git-send-email-balbi@ti.com>
-References: <1350910768-8522-1-git-send-email-balbi@ti.com>
-Message-ID: <20121022132708.GA14033@arwen.pp.htv.fi>
+Date: Mon, 22 Oct 2012 16:30:23 +0300
+Subject: [PATCH 0/8] I2C patches for v3.8 merge window
+In-Reply-To: <1350899218-13624-1-git-send-email-balbi@ti.com>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+Message-ID: <20121022133023.GC14033@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 03:59:28PM +0300, Felipe Balbi wrote:
-> prepare() is supposed to prevent new children from
-> being registered. On the MMC subsystem, children
-> (new cards) registration starts with the card
-> detect IRQ.
-> 
-> Move card detect IRQ disabling to prepare() so that
-> no new cards will be registered while we're trying
-> to suspend.
-> 
-> Likewise, move card detect IRQ enabling to complete()
-> so we only try to register new children after our MMC
-> IP is back up.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> Venkat, do you think the patch below makes sense ?
+Hi,
 
-btw, just checked suspend to ram with beagle and panda. We still have
-our filesystem after waking up.
+On Mon, Oct 22, 2012 at 12:46:50PM +0300, Felipe Balbi wrote:
+> Hi guys,
+> 
+> here's another series for OMAP I2C driver. There are a few cleanups
+> and one very nice new feature: we can now report how many bytes
+> we transferred until NACK.
+> 
+> Note that the implemementation for OMAP-I2C turned out to be a
+> little more complex then I expected, mainly because of the way
+> I2C_CNT register behaves and because of the very buggy register
+> usage on that driver.
+> 
+> I have boot tested all patches on beagle xM (3630) and pandaboard
+> rev A3 (4430), will send boot-logs if anyone wants to see.
+> 
+> All patches are available at [1] if anyone wants an easy way to
+> test the patches.
+> 
+> [1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-transferred-bytes-on-NACK
 
-ps: you will [1] to test it:
+forgot to mention, with [1] I could veridy suspend to ram with boards
+mentioned above.
 
 [1] http://marc.info/?l=linux-arm-kernel&m=135090724817604&w=2
 
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 54bfd0c..4c8b41e 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -2022,6 +2022,26 @@ static int __devexit omap_hsmmc_remove(struct platform_device *pdev)
->  }
->  
->  #ifdef CONFIG_PM
-> +static int omap_hsmmc_prepare(struct device *dev)
-> +{
-> +	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
-> +
-> +	if (host->pdata->suspend)
-> +		return host->pdata->suspend(dev, host->slot_id);
-> +
-> +	return 0;
-> +}
-> +
-> +static int omap_hsmmc_complete(struct device *dev)
-> +{
-> +	struct omap_hsmmc_host *host = dev_get_drvdata(dev);
-> +
-> +	if (host->pdata->resume)
-> +		return host->pdata->resume(dev, host->slot_id);
-> +
-> +	return 0;
-> +}
-> +
->  static int omap_hsmmc_suspend(struct device *dev)
->  {
->  	int ret = 0;
-> @@ -2035,23 +2055,10 @@ static int omap_hsmmc_suspend(struct device *dev)
->  
->  	pm_runtime_get_sync(host->dev);
->  	host->suspended = 1;
-> -	if (host->pdata->suspend) {
-> -		ret = host->pdata->suspend(dev, host->slot_id);
-> -		if (ret) {
-> -			dev_dbg(dev, "Unable to handle MMC board"
-> -					" level suspend\n");
-> -			host->suspended = 0;
-> -			return ret;
-> -		}
-> -	}
->  	ret = mmc_suspend_host(host->mmc);
->  
->  	if (ret) {
->  		host->suspended = 0;
-> -		if (host->pdata->resume) {
-> -			if (host->pdata->resume(dev, host->slot_id))
-> -				dev_dbg(dev, "Unmask interrupt failed\n");
-> -		}
->  		goto err;
->  	}
->  
-> @@ -2088,12 +2095,6 @@ static int omap_hsmmc_resume(struct device *dev)
->  	if (!(host->mmc->pm_flags & MMC_PM_KEEP_POWER))
->  		omap_hsmmc_conf_bus_power(host);
->  
-> -	if (host->pdata->resume) {
-> -		ret = host->pdata->resume(dev, host->slot_id);
-> -		if (ret)
-> -			dev_dbg(dev, "Unmask interrupt failed\n");
-> -	}
-> -
->  	omap_hsmmc_protect_card(host);
->  
->  	/* Notify the core to resume the host */
-> @@ -2109,8 +2110,10 @@ static int omap_hsmmc_resume(struct device *dev)
->  }
->  
->  #else
-> +#define omap_hsmmc_prepare	NULL
-> +#define omap_hsmmc_complete	NULL
->  #define omap_hsmmc_suspend	NULL
-> -#define omap_hsmmc_resume		NULL
-> +#define omap_hsmmc_resume	NULL
->  #endif
->  
->  static int omap_hsmmc_runtime_suspend(struct device *dev)
-> @@ -2138,6 +2141,8 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
->  static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
->  	.suspend	= omap_hsmmc_suspend,
->  	.resume		= omap_hsmmc_resume,
-> +	.prepare	= omap_hsmmc_prepare,
-> +	.complete	= omap_hsmmc_complete,
->  	.runtime_suspend = omap_hsmmc_runtime_suspend,
->  	.runtime_resume = omap_hsmmc_runtime_resume,
->  };
+> Felipe Balbi (7):
+>   i2c: omap: no need to access platform_device
+>   i2c: omap: reorder exit path of omap_i2c_xfer_msg()
+>   i2c: omap: fix error checking
+>   i2c: omap: also complete() when stat becomes zero
+>   i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
+>   i2c: omap: wait for transfer completion before sending STP bit
+>   i2c: omap: implement handling for 'transferred' bytes
+> 
+> Shubhrajyoti D (1):
+>   i2c: add 'transferred' field to struct i2c_msg
+> 
+>  arch/arm/mach-omap2/i2c.c                  |   3 +-
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +-
+>  drivers/i2c/busses/i2c-omap.c              | 156 ++++++++++++++++-------------
+>  include/linux/i2c-omap.h                   |   1 +
+>  include/uapi/linux/i2c.h                   |   1 +
+>  5 files changed, 89 insertions(+), 74 deletions(-)
+> 
 > -- 
 > 1.8.0.rc0
 > 
@@ -134,4 +65,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/88dfd0e5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/c344c2db/attachment.sig>
