@@ -1,62 +1,25 @@
-From: sourav.poddar@ti.com (Sourav Poddar)
-Date: Mon, 22 Oct 2012 12:59:15 +0530
-Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
-Message-ID: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 22 Oct 2012 09:31:48 +0200
+Subject: [PATCH V3] ARM: Kirkwood: new board USI Topkick
+In-Reply-To: <20121022050148.GB27355@lunn.ch>
+References: <1350679752-11931-1-git-send-email-jason@lakedaemon.net>
+ <1350872135-5204-1-git-send-email-jason@lakedaemon.net>
+ <20121022050148.GB27355@lunn.ch>
+Message-ID: <5084F664.10702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, omap4 keypad mux settings are done in the board file.
-Populate the mux settings in the dts file for the keypad to
-work via dt.
+On 10/22/2012 07:01 AM, Andrew Lunn wrote:
+> On Mon, Oct 22, 2012 at 02:15:35AM +0000, Jason Cooper wrote:
+>> This is a new kirkwood box made by Universal Scientific Industrial, Inc.
+>> The product description is here:
+>
+> It would be nice if somebody could add a
 
-Cc: Felipe Balbi <balbi@ti.com>
-Tested on omap4430 sdp with 3.7-rc1.
+Tested-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
----
- arch/arm/boot/dts/omap4-sdp.dts |   26 ++++++++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
+As I still have no rootfs on neither NAND, nor SATA the Tested-by
+is up to where kernel wants it's rootfs. But both NAND and SATA
+get detected correctly.
 
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 5b7e04f..5efb059 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -194,6 +194,27 @@
- 			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
- 		>;
- 	};
-+
-+	keypad_pins: pinmux_keypad_pins {
-+		pinctrl-single,pins = <
-+			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-+			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-+		>;
-+	};
- };
- 
- &i2c1 {
-@@ -406,3 +427,8 @@
- &mcbsp3 {
- 	status = "disabled";
- };
-+
-+&keypad {
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&keypad_pins>;
-+};
--- 
-1.7.1
+Sebastian
