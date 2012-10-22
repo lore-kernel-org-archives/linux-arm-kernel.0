@@ -1,120 +1,71 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 22 Oct 2012 15:57:57 +0200
-Subject: [PATCH 1/5] clk: ux500: Register i2c clock lookups for u8500
-In-Reply-To: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1350914281-1332-2-git-send-email-ulf.hansson@stericsson.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Mon, 22 Oct 2012 19:36:31 +0530
+Subject: [PATCH 0/8] I2C patches for v3.8 merge window
+In-Reply-To: <20121022133023.GC14033@arwen.pp.htv.fi>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <20121022133023.GC14033@arwen.pp.htv.fi>
+Message-ID: <CAM=Q2ctS3hxngk5efcvScAdv-2GtH2pHRZoxRhRTiOWmQA-AXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Mon, Oct 22, 2012 at 7:00 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Mon, Oct 22, 2012 at 12:46:50PM +0300, Felipe Balbi wrote:
+>> Hi guys,
+>>
+>> here's another series for OMAP I2C driver. There are a few cleanups
+>> and one very nice new feature: we can now report how many bytes
+>> we transferred until NACK.
+>>
+>> Note that the implemementation for OMAP-I2C turned out to be a
+>> little more complex then I expected, mainly because of the way
+>> I2C_CNT register behaves and because of the very buggy register
+>> usage on that driver.
+>>
+>> I have boot tested all patches on beagle xM (3630) and pandaboard
+>> rev A3 (4430), will send boot-logs if anyone wants to see.
 
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/clk/ux500/u8500_clk.c |   19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+tested the below branch on omap4430sdp , panda , omap3430sdp.
 
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index ca4a25e..7ad01aa 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -228,6 +228,8 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_pclk("p1_pclk2", "per1clk", U8500_CLKRST1_BASE,
- 				BIT(2), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.1");
-+
- 	clk = clk_reg_prcc_pclk("p1_pclk3", "per1clk", U8500_CLKRST1_BASE,
- 				BIT(3), 0);
- 	clk = clk_reg_prcc_pclk("p1_pclk4", "per1clk", U8500_CLKRST1_BASE,
-@@ -239,6 +241,7 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_pclk("p1_pclk6", "per1clk", U8500_CLKRST1_BASE,
- 				BIT(6), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.2");
- 
- 	clk = clk_reg_prcc_pclk("p1_pclk7", "per1clk", U8500_CLKRST1_BASE,
- 				BIT(7), 0);
-@@ -255,11 +258,14 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_pclk("p1_pclk10", "per1clk", U8500_CLKRST1_BASE,
- 				BIT(10), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.4");
-+
- 	clk = clk_reg_prcc_pclk("p1_pclk11", "per1clk", U8500_CLKRST1_BASE,
- 				BIT(11), 0);
- 
- 	clk = clk_reg_prcc_pclk("p2_pclk0", "per2clk", U8500_CLKRST2_BASE,
- 				BIT(0), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.3");
- 
- 	clk = clk_reg_prcc_pclk("p2_pclk1", "per2clk", U8500_CLKRST2_BASE,
- 				BIT(1), 0);
-@@ -284,7 +290,6 @@ void u8500_clk_init(void)
- 				BIT(6), 0);
- 	clk_register_clkdev(clk, "apb_pclk", "sdi1");
- 
--
- 	clk = clk_reg_prcc_pclk("p2_pclk7", "per2clk", U8500_CLKRST2_BASE,
- 				BIT(7), 0);
- 	clk_register_clkdev(clk, "apb_pclk", "sdi3");
-@@ -318,8 +323,10 @@ void u8500_clk_init(void)
- 				BIT(1), 0);
- 	clk = clk_reg_prcc_pclk("p3_pclk2", "per3clk", U8500_CLKRST3_BASE,
- 				BIT(2), 0);
-+
- 	clk = clk_reg_prcc_pclk("p3_pclk3", "per3clk", U8500_CLKRST3_BASE,
- 				BIT(3), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.0");
- 
- 	clk = clk_reg_prcc_pclk("p3_pclk4", "per3clk", U8500_CLKRST3_BASE,
- 				BIT(4), 0);
-@@ -401,6 +408,8 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_kclk("p1_i2c1_kclk", "i2cclk",
- 			U8500_CLKRST1_BASE, BIT(2), CLK_SET_RATE_GATE);
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.1");
-+
- 	clk = clk_reg_prcc_kclk("p1_msp0_kclk", "msp02clk",
- 			U8500_CLKRST1_BASE, BIT(3), CLK_SET_RATE_GATE);
- 	clk = clk_reg_prcc_kclk("p1_msp1_kclk", "msp1clk",
-@@ -412,17 +421,23 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_kclk("p1_i2c2_kclk", "i2cclk",
- 			U8500_CLKRST1_BASE, BIT(6), CLK_SET_RATE_GATE);
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.2");
-+
- 	clk = clk_reg_prcc_kclk("p1_slimbus0_kclk", "slimclk",
- 			U8500_CLKRST1_BASE, BIT(3), CLK_SET_RATE_GATE);
- 	/* FIXME: Redefinition of BIT(3). */
-+
- 	clk = clk_reg_prcc_kclk("p1_i2c4_kclk", "i2cclk",
- 			U8500_CLKRST1_BASE, BIT(9), CLK_SET_RATE_GATE);
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.4");
-+
- 	clk = clk_reg_prcc_kclk("p1_msp3_kclk", "msp1clk",
- 			U8500_CLKRST1_BASE, BIT(10), CLK_SET_RATE_GATE);
- 
- 	/* Periph2 */
- 	clk = clk_reg_prcc_kclk("p2_i2c3_kclk", "i2cclk",
- 			U8500_CLKRST2_BASE, BIT(0), CLK_SET_RATE_GATE);
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.3");
- 
- 	clk = clk_reg_prcc_kclk("p2_sdi4_kclk", "sdmmcclk",
- 			U8500_CLKRST2_BASE, BIT(2), CLK_SET_RATE_GATE);
-@@ -452,8 +467,10 @@ void u8500_clk_init(void)
- 			U8500_CLKRST3_BASE, BIT(1), CLK_SET_RATE_GATE);
- 	clk = clk_reg_prcc_kclk("p3_ssp1_kclk", "sspclk",
- 			U8500_CLKRST3_BASE, BIT(2), CLK_SET_RATE_GATE);
-+
- 	clk = clk_reg_prcc_kclk("p3_i2c0_kclk", "i2cclk",
- 			U8500_CLKRST3_BASE, BIT(3), CLK_SET_RATE_GATE);
-+	clk_register_clkdev(clk, NULL, "nmk-i2c.0");
- 
- 	clk = clk_reg_prcc_kclk("p3_sdi2_kclk", "sdmmcclk",
- 			U8500_CLKRST3_BASE, BIT(4), CLK_SET_RATE_GATE);
--- 
-1.7.10
+Doing simple i2ctools
+.
+
+Tested-by : Shubhrajyoti D <shubhrajyoti@ti.com>
+
+>>
+>> All patches are available at [1] if anyone wants an easy way to
+>> test the patches.
+>>
+>> [1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-transferred-bytes-on-NACK
+>
+> forgot to mention, with [1] I could veridy suspend to ram with boards
+> mentioned above.
+>
+> [1] http://marc.info/?l=linux-arm-kernel&m=135090724817604&w=2
+>
+>> Felipe Balbi (7):
+>>   i2c: omap: no need to access platform_device
+>>   i2c: omap: reorder exit path of omap_i2c_xfer_msg()
+>>   i2c: omap: fix error checking
+>>   i2c: omap: also complete() when stat becomes zero
+>>   i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
+>>   i2c: omap: wait for transfer completion before sending STP bit
+>>   i2c: omap: implement handling for 'transferred' bytes
+>>
+>> Shubhrajyoti D (1):
+>>   i2c: add 'transferred' field to struct i2c_msg
+>>
+>>  arch/arm/mach-omap2/i2c.c                  |   3 +-
+>>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +-
+>>  drivers/i2c/busses/i2c-omap.c              | 156 ++++++++++++++++-------------
+>>  include/linux/i2c-omap.h                   |   1 +
+>>  include/uapi/linux/i2c.h                   |   1 +
+>>  5 files changed, 89 insertions(+), 74 deletions(-)
+>>
+>> --
+>> 1.8.0.rc0
+>>
+>
+> --
+> balbi
