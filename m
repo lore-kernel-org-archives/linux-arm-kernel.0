@@ -1,44 +1,61 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 22 Oct 2012 12:38:29 -0700
-Subject: [PATCH 0/7] crypto: omap-sham updates
-In-Reply-To: <alpine.DEB.2.00.1210201930440.27264@utopia.booyaka.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Oct 2012 19:49:47 +0000 (UTC)
+Subject: [PATCH 1/7] ARM: OMAP2xxx: hwmod: Convert SHAM crypto device
+ data to hwmod
+In-Reply-To: <20121022193336.GA1708@animalcreek.com>
 References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1210201930440.27264@utopia.booyaka.com>
-Message-ID: <20121022193829.GC1708@animalcreek.com>
+ <1350683640-15044-2-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1210201934550.27264@utopia.booyaka.com>
+ <20121022193336.GA1708@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1210221935320.13464@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2012 at 07:34:51PM +0000, Paul Walmsley wrote:
-> On Fri, 19 Oct 2012, Mark A. Greer wrote:
-> 
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+On Mon, 22 Oct 2012, Mark A. Greer wrote:
+
+> On Sat, Oct 20, 2012 at 07:40:19PM +0000, Paul Walmsley wrote:
+>
+> > >  static void omap_init_sham(void)
+> > >  {
+> > > -	if (cpu_is_omap24xx()) {
+> > > -		sham_device.resource = omap2_sham_resources;
+> > > -		sham_device.num_resources = omap2_sham_resources_sz;
+> > > +	if (cpu_is_omap24xx() &&
+> > > +	    (omap2_cm_read_mod_reg(CORE_MOD, OMAP24XX_CM_IDLEST4) &
+> > > +						 OMAP24XX_ST_SHA_MASK)) {
 > > 
-> > This series updates the crypto omap-sham driver and supporting
-> > infrastructure.
+> > Hmm.  Not sure I understand the purpose of this CM read.  Don't we want to 
+> > initialize this device unconditionally?
 > 
-> Looks pretty good; this will make it easier for us to migrate the 
-> omap_hwmod code to a LDM bus.  Will reply to the original patches with a 
-> few comments and questions.
-> 
-> One general comment - for us to merge these through the OMAP tree, we'll 
-> need acks from the hardware crypto folks.  AFAIK they are:
-> 
-> CRYPTO API
-> M:      Herbert Xu <herbert@gondor.apana.org.au>
-> M:      "David S. Miller" <davem@davemloft.net>
-> L:      linux-crypto at vger.kernel.org
-> T:      git git://git.kernel.org/pub/scm/linux/kernel/git/herbert/crypto-2.6.git
-> S:      Maintained
-> F:      Documentation/crypto/
-> F:      arch/*/crypto/
-> F:      crypto/
-> F:      drivers/crypto/
-> F:      include/crypto/
-> 
-> So it would be helpful if you could send those patches along to those 
-> people and lists too, and ask them for acks.
+> No, the device doesn't exist on all parts.
 
-I will do that.  Thanks for your feedback.
+It should exist on all OMAP2xxx, AFAIK.  (Whether some bootloader 
+firewalled it off is another matter, of course.)
 
-Mark
---
+>  This is the only way to tell if its there (AFAIK).
+
+Hmm.  I don't think the CM_IDLEST bits work that way, in the general case.  
+They just indicate whether the PRCM considers that IP block to be 
+currently accessible.  So for example if the clocks are disabled to an IP 
+block, the CM_IDLEST bit would indicate that it's not accessible.  The 
+software could then enable the clocks, and the CM_IDLEST bit would 
+indicate that it is accessible.  We use this in the clock framework and 
+hwmod code after enabling clocks to wait until the system considers the IP 
+block accessible.  See for example
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/clock.c;h=961ac8f7e13d8c84a1cbb4587255ea685520bd18;hb=HEAD#l80
+
+...
+
+Now it's possible that on some TI chips, the CM_IDLEST bit is tied to the 
+SIdleAck signal originating from the IP block.  (I've been told that on 
+other OMAPs, CM_IDLEST is actually tied to the SIdleReq signal originating 
+from the PRCM, which is not terribly useful...)  So if it's tied to the 
+SIdleAck signal, and the PRCM clocks are enabled, then it might provide an 
+indication of whether the IP block exists on that chip.  But ultimately 
+the IP block might still be firewalled off even if it appears to exist to 
+the PRCM.  So for 3xxx, I'd suggest just adding it to the appropriate 
+GP-specific hwmod init lists, such as omap3xxx_gp_hwmod_ocp_ifs.
+
+
+- Paul
