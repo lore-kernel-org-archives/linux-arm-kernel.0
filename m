@@ -1,224 +1,64 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 23 Oct 2012 07:10:24 +1300
-Subject: [PATCH v3] pwm: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <20121022084000.GB29790@avionic-0098.mockup.avionic-design.de>
-References: <20121022084000.GB29790@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1350929425-17516-1-git-send-email-linux@prisktech.co.nz>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Oct 2012 18:35:05 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <50857444.9080308@ti.com>
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <50857444.9080308@ti.com>
+Message-ID: <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates pwm-vt8500.c to support devicetree probing and
-make use of the common clock subsystem.
+(including the lists in my reply this time, oops; also adding some more 
+detail)
 
-A binding document describing the PWM controller found on
-arch-vt8500 is also included.
+On Mon, 22 Oct 2012, Jon Hunter wrote:
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 ++++
- drivers/pwm/pwm-vt8500.c                           |   83 ++++++++++++++------
- 2 files changed, 77 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+> On 10/20/2012 04:26 PM, Paul Walmsley wrote:
+>
+> > Failing tests: fixed by posted patches
+> > --------------------------------------
+> > 
+> > Boot tests:
+> > 
+> > * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+> >   - due to a GPMC bug
+> >   - Apparently fixed by http://www.spinics.net/lists/arm-kernel/msg200787.html
+> 
+> This is now addressed and I have verified it is booting on v3.7-rc2. The
+> following patch address this boot problem ...
+> 
+> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8119024ef7363591fd958ec89ebfaee7c18209e3
 
-diff --git a/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-new file mode 100644
-index 0000000..bcc6367
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-@@ -0,0 +1,17 @@
-+VIA/Wondermedia VT8500/WM8xxx series SoC PWM controller
-+
-+Required properties:
-+- compatible: should be "via,vt8500-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-+  of the PWM to use and the second cell is the period in nanoseconds.
-+- clocks: phandle to the PWM source clock
-+
-+Example:
-+
-+pwm1: pwm at d8220000 {
-+	#pwm-cells = <2>;
-+	compatible = "via,vt8500-pwm";
-+	reg = <0xd8220000 0x1000>;
-+	clocks = <&clkpwm>;
-+};
-diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-index ad14389..ebbc41c 100644
---- a/drivers/pwm/pwm-vt8500.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -1,7 +1,8 @@
- /*
-  * drivers/pwm/pwm-vt8500.c
-  *
-- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -21,14 +22,24 @@
- #include <linux/io.h>
- #include <linux/pwm.h>
- #include <linux/delay.h>
-+#include <linux/clk.h>
- 
- #include <asm/div64.h>
- 
--#define VT8500_NR_PWMS 4
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+
-+/*
-+ * SoC architecture allocates register space for 4 PWMs but only
-+ * 2 are currently implemented.
-+ */
-+#define VT8500_NR_PWMS	2
- 
- struct vt8500_chip {
- 	struct pwm_chip chip;
- 	void __iomem *base;
-+	struct clk *clk;
- };
- 
- #define to_vt8500_chip(chip)	container_of(chip, struct vt8500_chip, chip)
-@@ -52,7 +63,7 @@ static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	unsigned long long c;
- 	unsigned long period_cycles, prescale, pv, dc;
- 
--	c = 25000000/2; /* wild guess --- need to implement clocks */
-+	c = clk_get_rate(vt8500->clk);
- 	c = c * period_ns;
- 	do_div(c, 1000000000);
- 	period_cycles = c;
-@@ -87,6 +98,11 @@ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
- 
-+	if (!clk_enable(vt8500->clk)) {
-+		dev_err(chip->dev, "failed to enable clock\n");
-+		return -EBUSY;
-+	};
-+
- 	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
- 	writel(5, vt8500->base + (pwm->hwpwm << 4));
- 	return 0;
-@@ -98,6 +114,8 @@ static void vt8500_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
- 	writel(0, vt8500->base + (pwm->hwpwm << 4));
-+
-+	clk_disable(vt8500->clk);
- }
- 
- static struct pwm_ops vt8500_pwm_ops = {
-@@ -107,12 +125,24 @@ static struct pwm_ops vt8500_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
--static int __devinit pwm_probe(struct platform_device *pdev)
-+static const struct of_device_id vt8500_pwm_dt_ids[] = {
-+	{ .compatible = "via,vt8500-pwm", },
-+	{ /* Sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, vt8500_pwm_dt_ids);
-+
-+static int vt8500_pwm_probe(struct platform_device *pdev)
- {
- 	struct vt8500_chip *chip;
- 	struct resource *r;
-+	struct device_node *np = pdev->dev.of_node;
- 	int ret;
- 
-+	if (!np) {
-+		dev_err(&pdev->dev, "invalid devicetree node\n");
-+		return -EINVAL;
-+	}
-+
- 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
- 	if (chip == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
-@@ -123,6 +153,12 @@ static int __devinit pwm_probe(struct platform_device *pdev)
- 	chip->chip.ops = &vt8500_pwm_ops;
- 	chip->chip.base = -1;
- 	chip->chip.npwm = VT8500_NR_PWMS;
-+	chip->clk = devm_clk_get(&pdev->dev, NULL);
-+
-+	if (IS_ERR_OR_NULL(chip->clk)) {
-+		dev_err(&pdev->dev, "clock source not specified\n");
-+		return PTR_ERR(chip->clk);
-+	}
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
-@@ -131,18 +167,25 @@ static int __devinit pwm_probe(struct platform_device *pdev)
- 	}
- 
- 	chip->base = devm_request_and_ioremap(&pdev->dev, r);
--	if (chip->base == NULL)
-+	if (!chip->base)
- 		return -EADDRNOTAVAIL;
- 
-+	if (!clk_prepare(chip->clk)) {
-+		dev_err(&pdev->dev, "failed to prepare clock\n");
-+		return -EBUSY;
-+	}
-+
- 	ret = pwmchip_add(&chip->chip);
--	if (ret < 0)
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add pwmchip\n");
- 		return ret;
-+	}
- 
- 	platform_set_drvdata(pdev, chip);
- 	return ret;
- }
- 
--static int __devexit pwm_remove(struct platform_device *pdev)
-+static int vt8500_pwm_remove(struct platform_device *pdev)
- {
- 	struct vt8500_chip *chip;
- 
-@@ -150,28 +193,22 @@ static int __devexit pwm_remove(struct platform_device *pdev)
- 	if (chip == NULL)
- 		return -ENODEV;
- 
-+	clk_unprepare(chip->clk);
-+
- 	return pwmchip_remove(&chip->chip);
- }
- 
--static struct platform_driver pwm_driver = {
-+static struct platform_driver vt8500_pwm_driver = {
-+	.probe		= vt8500_pwm_probe,
-+	.remove		= vt8500_pwm_remove,
- 	.driver		= {
- 		.name	= "vt8500-pwm",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = vt8500_pwm_dt_ids,
- 	},
--	.probe		= pwm_probe,
--	.remove		= __devexit_p(pwm_remove),
- };
-+module_platform_driver(vt8500_pwm_driver);
- 
--static int __init pwm_init(void)
--{
--	return platform_driver_register(&pwm_driver);
--}
--arch_initcall(pwm_init);
--
--static void __exit pwm_exit(void)
--{
--	platform_driver_unregister(&pwm_driver);
--}
--module_exit(pwm_exit);
--
--MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("VT8500 PWM Driver");
-+MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+Great, thanks, will update the README.  Did you also enable 
+CONFIG_ARM_APPENDED_DTB and CONFIG_ARM_ATAG_DTB_COMPAT, or were you able 
+to pass the DTB from the bootloader?
+
+> > * 4460pandaes: boot fails early
+> >   - Appears to be timer-related
+> 
+> I tried v3.7-rc2 on my pandaES and it is booting fine for me.
+> 
+> I have an OMAP4460 ES1.1 and u-boot release 2012.10.
+
+Tony's reporting the same thing so maybe this is a bootloader problem.  
+Just sent you the bootloader/MLO from my board here, maybe you can give it 
+a quick test if you have a moment.  Probably the kernel is implicitly 
+assuming that the bootloader has enabled something.
+
+> I don't wish to create more work for you, but it could be good to add
+> silicon revision, u-boot release (if applicable)
+
+These can be found by clicking through the link at the top of the message.  
+In this case:
+
+http://www.pwsan.com/omap/testlogs/test_v3.7-rc2/20121020134755/
+
+Click on 'boot' and '4460pandaes'
+
+> and toolchain used for any failures.
+
+This would indeed be useful and will try to figure out a good way to add 
+that information.
+
+
+- Paul
