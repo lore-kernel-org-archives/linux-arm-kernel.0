@@ -1,188 +1,72 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 22 Oct 2012 23:07:29 +0200 (CEST)
-Subject: =?UTF-8?q?=5BPATCH=20v3=202/2=5D=20=5Bmedia=5D=3A=20mx2=5Fcamera=3A=20Fix=20regression=20caused=20by=20clock=20conversion?=
-In-Reply-To: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
-References: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <Pine.LNX.4.64.1210222301100.32591@axis700.grange>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 22 Oct 2012 23:11:02 +0200
+Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
+In-Reply-To: <20121022200708.GO21046@lunn.ch>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
+ <20121022173028.GM21046@lunn.ch> <50859976.6080601@free-electrons.com>
+ <20121022200708.GO21046@lunn.ch>
+Message-ID: <5085B666.1040500@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio
-
-On Tue, 9 Oct 2012, Fabio Estevam wrote:
-
-> Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
-> to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
+On 10/22/2012 10:07 PM, Andrew Lunn wrote:
+> On Mon, Oct 22, 2012 at 09:07:34PM +0200, Gregory CLEMENT wrote:
+>> On 10/22/2012 07:30 PM, Andrew Lunn wrote:
+>>> On Mon, Oct 22, 2012 at 07:02:45PM +0200, Gregory CLEMENT wrote:
+>>>> From: Yehuda Yitschak <yehuday@marvell.com>
+>>>>
+>>>> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+>>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
+>>>>  arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
+>>>>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
+>>>>  3 files changed, 97 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+>>>> index f521ed8..531619f 100644
+>>>> --- a/arch/arm/boot/dts/armada-xp.dtsi
+>>>> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+>>>> @@ -24,7 +24,7 @@
+>>>>  
+>>>>  	mpic: interrupt-controller at d0020000 {
+>>>>  	      reg = <0xd0020a00 0x1d0>,
+>>>> -		    <0xd0021870 0x58>;
+>>>> +		    <0xd0021070 0x58>;
+>>>>  	};
+>>>
+>>> Hi Gregory
+>>>
+>>> Is this a bug fix needed for 3.7?
+>>>
+>>>    Andrew
+>>>
+>> I don't think so.
+>> We extended the reg map to be able to use registers only used for SMP.
+>> When we didn't have SMP support the mapping was correct, and now by
+>> introducing SMP we extend it.
 > 
-> By not doing so the camera sensor does not probe correctly:
-> 
-> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
-> mx2-camera mx2-camera.0: Camera driver attached to camera 0
-> ov2640 0-0030: Product ID error fb:fb
-> mx2-camera mx2-camera.0: Camera driver detached from camera 0
-> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
-> 
-> Adapt the mx2_camera driver to the new clock framework and make it functional
-> again.
-> 
-> Tested-by: Ga?tan Carlier <gcembed@gmail.com>
-> Tested-by: Javier Martin <javier.martin@vista-silicon.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-
-I've got a question to this your patch: could you explain to me, which 
-clock is obtained by
-
-> +	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
-
-? I don't find a clock named "per" and associated with "mx2-camera.0" in 
-arch/arm/mach-imx/clk-imx27.c. I only find it in clk-imx25.c. Does this 
-mean, that this your patch is for i.MX25? But you're saying it's for 
-i.MX27. Confused...
-
-Thanks
-Guennadi
-
-
-> ---
-> Changes since v2:
-> - Fix clock error handling code as pointed out by Russell King
-> Changes since v1:
-> - Rebased against linux-next 20121008.
->  drivers/media/platform/soc_camera/mx2_camera.c |   50 ++++++++++++++++++------
->  1 file changed, 38 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
-> index 403d7f1..382b305 100644
-> --- a/drivers/media/platform/soc_camera/mx2_camera.c
-> +++ b/drivers/media/platform/soc_camera/mx2_camera.c
-> @@ -272,7 +272,8 @@ struct mx2_camera_dev {
->  	struct device		*dev;
->  	struct soc_camera_host	soc_host;
->  	struct soc_camera_device *icd;
-> -	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
-> +	struct clk		*clk_emma_ahb, *clk_emma_ipg;
-> +	struct clk		*clk_csi_ahb, *clk_csi_per;
->  
->  	void __iomem		*base_csi, *base_emma;
->  
-> @@ -432,7 +433,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
->  {
->  	unsigned long flags;
->  
-> -	clk_disable_unprepare(pcdev->clk_csi);
-> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
-> +	clk_disable_unprepare(pcdev->clk_csi_per);
->  	writel(0, pcdev->base_csi + CSICR1);
->  	if (cpu_is_mx27()) {
->  		writel(0, pcdev->base_emma + PRP_CNTL);
-> @@ -460,10 +462,14 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
->  	if (pcdev->icd)
->  		return -EBUSY;
->  
-> -	ret = clk_prepare_enable(pcdev->clk_csi);
-> +	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
->  	if (ret < 0)
->  		return ret;
->  
-> +	ret = clk_prepare_enable(pcdev->clk_csi_per);
-> +	if (ret < 0)
-> +		goto exit_csi_ahb;
-> +
->  	csicr1 = CSICR1_MCLKEN;
->  
->  	if (cpu_is_mx27())
-> @@ -480,6 +486,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
->  		 icd->devnum);
->  
->  	return 0;
-> +
-> +exit_csi_ahb:
-> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
-> +
-> +	return ret;
->  }
->  
->  static void mx2_camera_remove_device(struct soc_camera_device *icd)
-> @@ -1725,27 +1736,35 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
->  		goto exit;
->  	}
->  
-> -	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
-> -	if (IS_ERR(pcdev->clk_csi)) {
-> -		dev_err(&pdev->dev, "Could not get csi clock\n");
-> -		err = PTR_ERR(pcdev->clk_csi);
-> +	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
-> +	if (IS_ERR(pcdev->clk_csi_ahb)) {
-> +		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
-> +		err = PTR_ERR(pcdev->clk_csi_ahb);
->  		goto exit;
->  	}
->  
-> +	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
-> +	if (IS_ERR(pcdev->clk_csi_per)) {
-> +		dev_err(&pdev->dev, "Could not get csi per clock\n");
-> +		err = PTR_ERR(pcdev->clk_csi_per);
-> +		goto exit_csi_ahb;
-> +	}
-> +
->  	pcdev->pdata = pdev->dev.platform_data;
->  	if (pcdev->pdata) {
->  		long rate;
->  
->  		pcdev->platform_flags = pcdev->pdata->flags;
->  
-> -		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
-> +		rate = clk_round_rate(pcdev->clk_csi_per,
-> +						pcdev->pdata->clk * 2);
->  		if (rate <= 0) {
->  			err = -ENODEV;
-> -			goto exit;
-> +			goto exit_csi_per;
->  		}
-> -		err = clk_set_rate(pcdev->clk_csi, rate);
-> +		err = clk_set_rate(pcdev->clk_csi_per, rate);
->  		if (err < 0)
-> -			goto exit;
-> +			goto exit_csi_per;
->  	}
->  
->  	INIT_LIST_HEAD(&pcdev->capture);
-> @@ -1801,7 +1820,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
->  		goto exit_free_emma;
->  
->  	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
-> -			clk_get_rate(pcdev->clk_csi));
-> +			clk_get_rate(pcdev->clk_csi_per));
->  
->  	return 0;
->  
-> @@ -1812,6 +1831,10 @@ eallocctx:
->  		clk_disable_unprepare(pcdev->clk_emma_ipg);
->  		clk_disable_unprepare(pcdev->clk_emma_ahb);
->  	}
-> +exit_csi_per:
-> +	clk_disable_unprepare(pcdev->clk_csi_per);
-> +exit_csi_ahb:
-> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
->  exit:
->  	return err;
->  }
-> @@ -1831,6 +1854,9 @@ static int __devexit mx2_camera_remove(struct platform_device *pdev)
->  		clk_disable_unprepare(pcdev->clk_emma_ahb);
->  	}
->  
-> +	clk_disable_unprepare(pcdev->clk_csi_per);
-> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
-> +
->  	dev_info(&pdev->dev, "MX2 Camera driver unloaded\n");
->  
->  	return 0;
-> -- 
-> 1.7.9.5
-> 
+> The length has stayed the same, so its not extended. Its now 0x800
+> bytes earlier in the address space.
 > 
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Right!
+I didn't check it, sorry.
+
+The correct explanation is that the offset +21070 is a CPU virtual offset.
+That means that depending of the CPU core which will access to this register,
+the controller will internally change the offset automagically to point the
+correct offset.
+
+I should have added an explanation in the commit log. I will do it for V2.
+
+>       Andrew
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
