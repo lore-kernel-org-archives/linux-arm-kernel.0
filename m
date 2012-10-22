@@ -1,43 +1,87 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Oct 2012 10:21:19 +0200
-Subject: [PATCH v2] pinctrl: reserve pins when states are activated
-In-Reply-To: <20121019181019.GP4730@atomide.com>
-References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
- <20121019181019.GP4730@atomide.com>
-Message-ID: <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
+From: sourav.poddar@ti.com (Sourav)
+Date: Mon, 22 Oct 2012 13:53:53 +0530
+Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
+In-Reply-To: <5084F99B.1030709@ti.com>
+References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+ <5084F99B.1030709@ti.com>
+Message-ID: <50850299.7070405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 8:10 PM, Tony Lindgren <tony@atomide.com> wrote:
-> [Me]
->> Instead: let use reserve the pins when the state is activated
->> and drop them when the state is disabled, i.e. when we move to
->> another state. This way different devices/functions can use the
->> same pins at different times.
+Hi Benoit,
+On Monday 22 October 2012 01:15 PM, Benoit Cousson wrote:
+> Hi Sourav,
 >
-> Hmm doesn't this mean that we are now doing lots of extra
-> reserving and dropping of pins? Performance is important from
-> latency point of view for cases where we need to remux pins
-> constantly runtime PM.
+> On 10/22/2012 09:29 AM, Sourav Poddar wrote:
+>> Currently, omap4 keypad mux settings are done in the board file.
+>> Populate the mux settings in the dts file for the keypad to
+>> work via dt.
+> Have you changed the driver to handle properly the dependency with the
+> pinctrl and thus return EPROBE_DEFER if this is not ready?
+I have send a patch[1] to the mailing list on the driver changes.
+http://www.spinics.net/lists/linux-omap/msg79985.html.
 
-It is only done in case the pinmux state is switched in runtime
-suspend/resume, so it's e.g. possible to just alter the pin config.
-
-But in general what you say is true.
-
-We used to to the same thing by having drivers call
-pinctrl_get()/pinctrl_put() in this case instead, but that went
-away with the introduction of states, so we cannot encode
-different pin sets with say
-pinctrl_get(dev, "foo")/pinctrl_get(dev, "bar")
-anymore since there is only one pinctrl handle per device,
-but multiple states.
-
-If this turns out to be a severe performance bottleneck, I
-suggest to add some additional constraint API, like
-pinctrl_set_pinmux_homegeneous_pinsets(true) that will
-at runtime select whether the pin allocation is done when
-getting the pinctrl handle instead.
-
-Yours,
-Linus Walleij
+Though, I see I have missed the following EPROBE_DEFER check..
++               if (PTR_ERR(dev->pins) == -EPROBE_DEFER)
++                       return -EPROBE_DEFER;
+Will add for the above patch.
+> Seb Guiriec has just sent a patch to do that for the omap-i2c driver
+> ([PATCH] i2c: omap: adopt pinctrl support).
+>
+>> Cc: Felipe Balbi <balbi@ti.com>
+>> Tested on omap4430 sdp with 3.7-rc1.
+>>
+>> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+>> ---
+>>   arch/arm/boot/dts/omap4-sdp.dts |   26 ++++++++++++++++++++++++++
+>>   1 files changed, 26 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+>> index 5b7e04f..5efb059 100644
+>> --- a/arch/arm/boot/dts/omap4-sdp.dts
+>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+>> @@ -194,6 +194,27 @@
+>>   			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
+>>   		>;
+>>   	};
+>> +
+>> +	keypad_pins: pinmux_keypad_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> Alway use lower case for hexa value.
+Ok. Will fix and send a new version.
+>> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +		>;
+>> +	};
+>>   };
+>>   
+>>   &i2c1 {
+>> @@ -406,3 +427,8 @@
+>>   &mcbsp3 {
+>>   	status = "disabled";
+>>   };
+>> +
+>> +&keypad {
+>> +        pinctrl-names = "default";
+>> +        pinctrl-0 = <&keypad_pins>;
+>> +};
+> Otherwise that looks good.
+>
+> Thanks,
+> Benoit
+Thanks,
+Sourav
