@@ -1,129 +1,29 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:53:35 -0400
-Subject: [PATCH v3 4/5] ARM: KVM: arch_timers: Add timer world switch
-In-Reply-To: <20121022065301.18883.35308.stgit@ubuntu>
-References: <20121022065301.18883.35308.stgit@ubuntu>
-Message-ID: <20121022065335.18883.82505.stgit@ubuntu>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 22 Oct 2012 08:59:17 +0200
+Subject: [PATCH 1/5] net/cadence: get rid of HAVE_NET_MACB
+In-Reply-To: <20121021.192707.1747557282711878897.davem@davemloft.net>
+References: <1350829392-3812-1-git-send-email-manabian@gmail.com>
+ <1350829392-3812-2-git-send-email-manabian@gmail.com>
+ <20121021.192707.1747557282711878897.davem@davemloft.net>
+Message-ID: <CAGhQ9VyPNDKWwGCZ2Mghm7dOcyTqTgL=ahv+1EQaXtz-Hd7OMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, Oct 22, 2012 at 1:27 AM, David Miller <davem@davemloft.net> wrote:
+>
+> You do know that this is going to generate warnings on 64-bit
+> platforms?
+>
+> I was hoping you would have noticed and corrected this before
+> enabling the driver everywhere, I guess my expectations were
+> way too high :-/
 
-Do the necessary save/restore dance for the timers in the world
-switch code. In the process, allow the guest to read the physical
-counter, which is useful for its own clock_event_device.
+ah, sorry.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/kernel/asm-offsets.c  |    8 ++++++++
- arch/arm/kvm/arm.c             |    3 +++
- arch/arm/kvm/interrupts_head.S |   41 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 52 insertions(+)
+Yes, macb seem to generate some integer overflows on ~0UL on 64-bit. I
+have a patch that turns ~0UL into -1.
 
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index fba332b..813d386 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -177,6 +177,14 @@ int main(void)
-   DEFINE(VGIC_CPU_APR,		offsetof(struct vgic_cpu, vgic_apr));
-   DEFINE(VGIC_CPU_LR,		offsetof(struct vgic_cpu, vgic_lr));
-   DEFINE(VGIC_CPU_NR_LR,	offsetof(struct vgic_cpu, nr_lr));
-+#ifdef CONFIG_KVM_ARM_TIMER
-+  DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-+  DEFINE(VCPU_TIMER_CNTV_CVALH,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval32.high));
-+  DEFINE(VCPU_TIMER_CNTV_CVALL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval32.low));
-+  DEFINE(KVM_TIMER_CNTVOFF_H,	offsetof(struct kvm, arch.timer.cntvoff32.high));
-+  DEFINE(KVM_TIMER_CNTVOFF_L,	offsetof(struct kvm, arch.timer.cntvoff32.low));
-+  DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
-+#endif
-   DEFINE(KVM_VGIC_VCTRL,	offsetof(struct kvm, arch.vgic.vctrl_base));
- #endif
-   DEFINE(KVM_VTTBR,		offsetof(struct kvm, arch.vttbr));
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index cab9cb7..09b7072 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -660,6 +660,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		update_vttbr(vcpu->kvm);
- 
- 		kvm_vgic_sync_to_cpu(vcpu);
-+		kvm_timer_sync_to_cpu(vcpu);
- 
- 		local_irq_disable();
- 
-@@ -673,6 +674,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
- 			local_irq_enable();
-+			kvm_timer_sync_from_cpu(vcpu);
- 			kvm_vgic_sync_from_cpu(vcpu);
- 			continue;
- 		}
-@@ -712,6 +714,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 * Back from guest
- 		 *************************************************************/
- 
-+		kvm_timer_sync_from_cpu(vcpu);
- 		kvm_vgic_sync_from_cpu(vcpu);
- 
- 		ret = handle_exit(vcpu, run, ret);
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 0003aab..ece84d1 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -422,6 +422,25 @@
- #define CNTHCTL_PL1PCEN		(1 << 1)
- 
- .macro save_timer_state	vcpup
-+#ifdef CONFIG_KVM_ARM_TIMER
-+	ldr	r4, [\vcpup, #VCPU_KVM]
-+	ldr	r2, [r4, #KVM_TIMER_ENABLED]
-+	cmp	r2, #0
-+	beq	1f
-+
-+	mrc	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
-+	and	r2, #3
-+	str	r2, [\vcpup, #VCPU_TIMER_CNTV_CTL]
-+	bic	r2, #1			@ Clear ENABLE
-+	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
-+	isb
-+
-+	mrrc	p15, 3, r2, r3, c14	@ CNTV_CVAL
-+	str	r3, [\vcpup, #VCPU_TIMER_CNTV_CVALH]
-+	str	r2, [\vcpup, #VCPU_TIMER_CNTV_CVALL]
-+
-+1:
-+#endif
- 	@ Allow physical timer/counter access for the host
- 	mrc	p15, 4, r2, c14, c1, 0	@ CNTHCTL
- 	orr	r2, r2, #(CNTHCTL_PL1PCEN | CNTHCTL_PL1PCTEN)
-@@ -435,6 +454,28 @@
- 	orr	r2, r2, #CNTHCTL_PL1PCTEN
- 	bic	r2, r2, #CNTHCTL_PL1PCEN
- 	mcr	p15, 4, r2, c14, c1, 0	@ CNTHCTL
-+
-+#ifdef CONFIG_KVM_ARM_TIMER
-+	ldr	r4, [\vcpup, #VCPU_KVM]
-+	ldr	r2, [r4, #KVM_TIMER_ENABLED]
-+	cmp	r2, #0
-+	beq	1f
-+
-+	ldr	r3, [r4, #KVM_TIMER_CNTVOFF_H]
-+	ldr	r2, [r4, #KVM_TIMER_CNTVOFF_L]
-+	mcrr	p15, 4, r2, r3, c14	@ CNTVOFF
-+	isb
-+
-+	ldr	r3, [\vcpup, #VCPU_TIMER_CNTV_CVALH]
-+	ldr	r2, [\vcpup, #VCPU_TIMER_CNTV_CVALL]
-+	mcrr	p15, 3, r2, r3, c14	@ CNTV_CVAL
-+
-+	ldr	r2, [\vcpup, #VCPU_TIMER_CNTV_CTL]
-+	and	r2, #3
-+	mcr	p15, 0, r2, c14, c3, 1	@ CNTV_CTL
-+	isb
-+1:
-+#endif
- .endm
- 
- /* Configures the HSTR (Hyp System Trap Register) on entry/return
+I can repost the series with fix included. Do you want me to do that?
+
+regards
+Joachim Eastwood
