@@ -1,33 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Oct 2012 14:08:42 -0600
-Subject: [PATCH] pinctrl/nomadik: use irq_create_mapping()
-In-Reply-To: <CACRpkdbcTT_Mfa67Vw_6Y3RvqOE3CMA7kNXLG5oja0uTNn1FoA@mail.gmail.com>
-References: <1350659375-7335-1-git-send-email-linus.walleij@stericsson.com>
- <50817E43.8000804@wwwdotorg.org>
- <CACRpkdbcTT_Mfa67Vw_6Y3RvqOE3CMA7kNXLG5oja0uTNn1FoA@mail.gmail.com>
-Message-ID: <5085A7CA.3070001@wwwdotorg.org>
+Date: Mon, 22 Oct 2012 14:11:47 -0600
+Subject: [PATCH] pinctrl: reserve pins when states are activated
+In-Reply-To: <1350893718-12336-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350893718-12336-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <5085A883.9010803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2012 02:14 AM, Linus Walleij wrote:
-> On Fri, Oct 19, 2012 at 6:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 10/19/2012 09:09 AM, Linus Walleij wrote:
->>> From: Linus Walleij <linus.walleij@linaro.org>
->>
->>> @@ -931,7 +931,7 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
->>>       while (status) {
->>>               int bit = __ffs(status);
->>>
->>> -             generic_handle_irq(irq_find_mapping(nmk_chip->domain, bit));
->>> +             generic_handle_irq(irq_create_mapping(nmk_chip->domain, bit));
->>
->> Surely this one can remain as irq_find_mapping() since isn't
->> nmk_gpio_to_irq() guaranteed to have been called first for this GPIO/IRQ?
+On 10/22/2012 02:15 AM, Linus Walleij wrote:
+> This switches the way that pins are reserved for multiplexing:
 > 
-> It's an IRQ handler so it should be robust to spurious IRQs due to
-> transient hardware states etc I believe.
+> We used to do this when the map was parsed, at the creation of
+> the settings inside the pinctrl handle, in pinmux_map_to_setting().
 > 
-> So if there is a transient IRQ before gpio_to_irq() is called -> boom.
+> However this does not work for us, because we want to use the
+> same set of pins with different devices at different times: the
 
-I wonder though (a) why it would be unmasked in HW, and (b) why the
-software would even look at the status bit if no handler were registered?
+> diff --git a/drivers/pinctrl/pinmux.c b/drivers/pinctrl/pinmux.c
+
+>  void pinmux_free_setting(struct pinctrl_setting const *setting)
+...
+> +	/* This function is currently unused */
+
+Being picky: It's not unused; it is used by pinctrl_put_locked(), but
+just doesn't have to do anything given the implementation of
+pinmux_map_to_setting().
