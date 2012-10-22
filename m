@@ -1,68 +1,52 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 22 Oct 2012 19:15:32 +0300
-Subject: [RFC] ARM: OMAP: hwmod: wait for sysreset complete after enabling
- hwmod
-Message-ID: <1350922532-26338-1-git-send-email-t-kristo@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Oct 2012 09:19:10 -0700
+Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
+In-Reply-To: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20121022161909.GY4730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When waking up from off-mode, some IP blocks are reset automatically by
-hardware. For this reason, software must wait until the reset has
-completed before attempting to access the IP block.
+* Sourav Poddar <sourav.poddar@ti.com> [121022 00:30]:
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -194,6 +194,27 @@
+>  			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
+>  		>;
+>  	};
+> +
+> +	keypad_pins: pinmux_keypad_pins {
+> +		pinctrl-single,pins = <
+> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +		>;
+> +	};
+>  };
 
-This patch fixes for example the bug introduced by commit
-6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c ("mmc: omap_hsmmc: remove access
-to SYSCONFIG register"), in which the MMC IP block is reset during
-off-mode entry, but the code expects the module to be already available
-during the execution of context restore.
+Please shorten these to leave out OMAP_:
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Venkatraman S <svenkatr@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+		pinctrl-single,pins = <
+			0x24 0x4119   /* gpmc_a18.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
+			0x26 0x4119   /* gpmc_a19.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
+			...
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index b969ab1..523729b 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1278,6 +1278,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	u8 idlemode, sf;
- 	u32 v;
- 	bool clkdm_act;
-+	int c;
- 
- 	if (!oh->class->sysc)
- 		return;
-@@ -1338,6 +1339,27 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 		_set_module_autoidle(oh, idlemode, &v);
- 		_write_sysconfig(v, oh);
- 	}
-+
-+	/*
-+	 * Wait until reset has completed, this is needed as the IP
-+	 * block is reset automatically by hardware in some cases
-+	 * (off-mode for example), and the drivers require the
-+	 * IP to be ready when they access it
-+	 */
-+	if (sf & SYSS_HAS_RESET_STATUS)
-+		omap_test_timeout((omap_hwmod_read(oh,
-+						   oh->class->sysc->syss_offs)
-+				   & SYSS_RESETDONE_MASK),
-+				  MAX_MODULE_SOFTRESET_WAIT, c);
-+
-+	if (sf & SYSC_HAS_RESET_STATUS) {
-+		u32 softrst_mask =
-+			(0x1 << oh->class->sysc->sysc_fields->srst_shift);
-+		omap_test_timeout(!(omap_hwmod_read(oh,
-+						    oh->class->sysc->sysc_offs)
-+				   & softrst_mask),
-+				  MAX_MODULE_SOFTRESET_WAIT, c);
-+	}
- }
- 
- /**
--- 
-1.7.4.1
+When we convert them over to use the preprocessor, we can still
+easily replace them.
+
+Regards,
+
+Tony
