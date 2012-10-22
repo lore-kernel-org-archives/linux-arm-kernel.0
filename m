@@ -1,111 +1,101 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Oct 2012 16:44:15 -0600
-Subject: [PATCH v2 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
- <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <5085CC3F.30708@wwwdotorg.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 22 Oct 2012 15:58:39 -0700
+Subject: [PATCH] ARM: OMAP3: Beagle: fix OPP customization and initcall
+ ordering
+Message-ID: <1350946719-9583-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2012 10:08 AM, Haojian Zhuang wrote:
-> Add comments with pinconf & gpio range in the document of
-> pinctrl-single.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  .../devicetree/bindings/pinctrl/pinctrl-single.txt |   52 ++++++++++++++++++++
->  arch/arm/boot/dts/pxa910.dtsi                      |    1 -
->  2 files changed, 52 insertions(+), 1 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-> index 2c81e45..6da2f13 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-> @@ -17,6 +17,36 @@ Optional properties:
->  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
->    more than one pin
->  
-> +- pinctrl-single,gpio-ranges : gpio range list
-> +
-> +- pinctrl-single,gpio : array with gpio range start, size & register
-> +  offset
-> +
-> +- pinctrl-single,gpio-func : gpio function value in the pinmux register
+From: Kevin Hilman <khilman@ti.com>
 
-Some more explanation is needed here; some questions/comments:
+After commit 24d7b40a60cf19008334bcbcbd98da374d4d9c64 (ARM: OMAP2+:
+PM: MPU DVFS: use generic CPU device for MPU-SS), OPPs are registered
+using an existing CPU device, not the omap_device for MPU-SS.
 
-1) Looking at the example, pinctrl-single,gpio-ranges is a property
-within the main pinctrl node, whereas pinctrl-single,gpio and
-pinctrl-single,gpio-func are properties within some other node. There's
-no explanation of this in the binding description itself, only in the
-example. Related to this, the documentation for
-pinctrl-single,gpio-ranges doesn't say what it's a list of; it needs to
-say that it's a list of phandles.
+First, fix the board file to use get_cpu_device() as required by the
+above commit, otherwise custom OPPs will be added to the wrong device.
 
-2) pinctrl-single,gpio is listed as optional. Presumably it's not; every
-GPIO range node must have this property?
+Second, the board files OPP init is called from the its init_machine
+method, and the generic CPU devices are not yet created when
+init_machine is run.  Therefore OPP initialization will fail.  To fix,
+use a device_initcall() for the board file's OPP customization, and
+make the device_initcall board-specific by using a machine_is check.
 
-3) Why is pinctrl-single,gpio-func optional? Presumably you always need
-to program the pinmux HW to select the GPIO function. Yet, the driver
-code in an earlier patch seems to deliberately do nothing if this
-property is missing. Shouldn't the DT parsing return an error instead?
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+v2: add machine_is* check to the device_initcall.
 
-4) I'm a little confused re: the data model. Is the idea that if
-pinctrl-single,gpio-ranges is specified, then the node describes a
-combined pin controller and GPIO HW? Are the pin IDs of the pin
-controller expected to match the pin IDs of the GPIO HW? I'm left
-wondering exactly which numbering space the values in
-pinctrl-single,gpio are; do they describe the pin controller IDs that
-this GPIO range describes, or do they describe the GPIO IDs that this
-range describes and attempt to map them back to pin controller IDs?
-Similarly, I'm not sure why there's a register offset here rather than
-say a pin controller pin ID number. Shouldn't the property be a list of
-<pin-controller-pin-ID GPIO-controller-GPIO-ID number-of-GPIOs>
+ arch/arm/mach-omap2/board-omap3beagle.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-> +- pinctrl-single,power-source-mask : mask of setting power source in
-> +  the pinmux register
-> +
-> +- pinctrl-single,power-source : value of setting power source field
-> +  in the pinmux register
-> +
-> +- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
-> +  register
-> +
-> +- pinctrl-single,bias-disable : value of disabling bias in the pinmux
-> +  register
-> +
-> +- pinctrl-single,bias-pull-down : value of setting bias pull down in
-> +  the pinmux register
-> +
-> +- pinctrl-single,bias-pull-up : value of setting bias pull up in the
-> +  pinmux register
-> +
-> +- pinctrl-single,bias : value of setting bias in the pinmux register
-> +
-> +- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
-> +  in the pinmux register
-
-I suppose it's OK that a generic pin controller binding would use the
-generic pin configuration config options. I'm still not convinced that
-the semantics of generic pin control make sense. Maybe if they're just
-arbitrary names for SoC-specific things it's fine though.
-
-Do these patches expose /all/ generic pin configuration options? It
-doesn't seem worth exposing only some of them and ignoring others.
-
-> +/* third controller instance for pins in gpio domain */
-> +pmx_gpio: pinmux at d401e000 {
-> +	compatible = "pinctrl-single";
-> +	reg = <0xd401e000 0x0330>;
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-
-#gpio-cells would be needed here for a GPIO controller.
-
-> diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
-
-> -				pinctrl-single,gpio-mask = <7>;
-
-I assume that's a mistake; the line shouldn't be removed in this
-documentation patch?
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 388c431..60729bf 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -24,6 +24,7 @@
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/opp.h>
++#include <linux/cpu.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -444,12 +445,16 @@ static struct omap_board_mux board_mux[] __initdata = {
+ };
+ #endif
+ 
+-static void __init beagle_opp_init(void)
++static int __init beagle_opp_init(void)
+ {
+ 	int r = 0;
+ 
+-	/* Initialize the omap3 opp table */
+-	if (omap3_opp_init()) {
++	if (!machine_is_omap3_beagle())
++		return 0;
++
++	/* Initialize the omap3 opp table if not already created. */
++	r = omap3_opp_init();
++	if (IS_ERR_VALUE(r) && (r != -EEXIST)) {
+ 		pr_err("%s: opp default init failed\n", __func__);
+ 		return;
+ 	}
+@@ -458,13 +463,13 @@ static void __init beagle_opp_init(void)
+ 	if (cpu_is_omap3630()) {
+ 		struct device *mpu_dev, *iva_dev;
+ 
+-		mpu_dev = omap_device_get_by_hwmod_name("mpu");
++		mpu_dev = get_cpu_device(0);
+ 		iva_dev = omap_device_get_by_hwmod_name("iva");
+ 
+ 		if (IS_ERR(mpu_dev) || IS_ERR(iva_dev)) {
+ 			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
+ 				__func__, mpu_dev, iva_dev);
+-			return;
++			return -ENODEV;
+ 		}
+ 		/* Enable MPU 1GHz and lower opps */
+ 		r = opp_enable(mpu_dev, 800000000);
+@@ -484,8 +489,9 @@ static void __init beagle_opp_init(void)
+ 			opp_disable(iva_dev, 660000000);
+ 		}
+ 	}
+-	return;
++	return 0;
+ }
++device_initcall(beagle_opp_init);
+ 
+ static void __init omap3_beagle_init(void)
+ {
+@@ -522,8 +528,6 @@ static void __init omap3_beagle_init(void)
+ 	/* Ensure SDRC pins are mux'd for self-refresh */
+ 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+-
+-	beagle_opp_init();
+ }
+ 
+ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+-- 
+1.8.0
