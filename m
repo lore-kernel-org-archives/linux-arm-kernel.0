@@ -1,91 +1,130 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 15:28:53 +0300
-Subject: [PATCH 5/8] i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
-In-Reply-To: <50853BA8.8000200@ti.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-6-git-send-email-balbi@ti.com>
- <50853BA8.8000200@ti.com>
-Message-ID: <20121022122853.GW14033@arwen.pp.htv.fi>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 22 Oct 2012 18:06:51 +0530
+Subject: [PATCH v3] ARM: SMP_TWD: make setup()/stop() reentrant
+In-Reply-To: <1350900649-25369-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350900649-25369-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50853DE3.7050204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Linus,
 
-On Mon, Oct 22, 2012 at 02:27:20PM +0200, Benoit Cousson wrote:
-> Hi Felipe,
-> 
-> On 10/22/2012 11:46 AM, Felipe Balbi wrote:
-> > on OMAP4+ we want to read IRQSTATUS_RAW register,
-> > instead of IRQSTATUS. The reason being that IRQSTATUS
-> > will only contain the bits which were enabled on
-> > IRQENABLE_SET and that will break when we need to
-> > poll for a certain bit which wasn't enabled as an
-> > IRQ source.
-> > 
-> > One such case is after we finish converting to
-> > deferred stop bit, we will have to poll for ARDY
-> > bit before returning control for the client driver
-> > in order to prevent us from trying to start a
-> > transfer on a bus which is already busy.
-> > 
-> > Note, however, that omap-i2c.c needs a big rework
-> > on register definition and register access. Such
-> > work will be done in a separate series of patches.
-> 
-> Do you need OMAP_I2C_IP_VERSION_3 for OMAP4?
-> 
-> OMAP_I2C_IP_VERSION_2 was already introduced to detect OMAP3630 vs
-> omap4430 because they were sharing the same IP version..
-> 
-> /* I2C controller revisions present on specific hardware */
-> #define OMAP_I2C_REV_ON_2430            0x36
-> #define OMAP_I2C_REV_ON_3430_3530       0x3C
-> #define OMAP_I2C_REV_ON_3630_4430       0x40
-> 
-> So in theory you should not need an extra version.
+On Monday 22 October 2012 03:40 PM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> It has been brought to my knowledge that the .setup()/.stop()
+> function pair in the SMP TWD is going to be called from atomic
+> contexts for CPUs coming and going, and then the
+> clk_prepare()/clk_unprepare() calls cannot be called
+> on subsequent .setup()/.stop() iterations. This is however
+> just the tip of an iceberg as the function pair is not
+> designed to be reentrant at all.
+>
+> This change makes the SMP_TWD clock .setup()/.stop() pair reentrant
+> by splitting the .setup() function in three parts:
+>
+> - One COMMON part that is executed the first time the first CPU
+>    in the TWD cluster is initialized. This will fetch the TWD
+>    clk for the cluster and prepare+enable it. If no clk is
+>    available it will calibrate the rate instead.
+>
+> - One part that is executed the FIRST TIME a certain CPU is
+>    brought on-line. This initializes and sets up the clock event
+>    for a certain CPU.
+>
+> - One part that is executed on every subsequent .setup() call.
+>    This will re-initialize the clock event. This is augmented
+>    to call the clk_enable()/clk_disable() pair properly.
+>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Reported-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v2->v3:
+> - Split setup() in three parts
+> - re-register the clock event on every setup()
+> ---
+Patch largely looks good to me. Few comments
 
-are you sure that's how they're used ? Looking at the code where we
-choose reg_map_ip_v1 and reg_map_ip_v2:
+>   arch/arm/kernel/smp_twd.c | 45 ++++++++++++++++++++++++++++++++++++++++-----
+>   1 file changed, 40 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index b92d524..73e25e2 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -31,6 +31,8 @@ static void __iomem *twd_base;
+>
+>   static struct clk *twd_clk;
+>   static unsigned long twd_timer_rate;
+> +static bool common_setup_called;
+> +static DEFINE_PER_CPU(bool, percpu_setup_called);
+>
+>   static struct clock_event_device __percpu **twd_evt;
+>   static int twd_ppi;
+> @@ -93,6 +95,8 @@ static void twd_timer_stop(struct clock_event_device *clk)
+>   {
+>   	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+>   	disable_percpu_irq(clk->irq);
+> +	if (!IS_ERR(twd_clk))
+> +		clk_disable(twd_clk);
+Is this really needed? This clock disable is bogus since it
+can not really disable the clock.
 
-1120         if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
-1121                 dev->regs = (u8 *)reg_map_ip_v2;
-1122         else
-1123                 dev->regs = (u8 *)reg_map_ip_v1;
+>   }
+>
+>   #ifdef CONFIG_COMMON_CLK
+> @@ -264,15 +268,46 @@ static struct clk *twd_get_clock(void)
+>   static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>   {
+>   	struct clock_event_device **this_cpu_clk;
+> +	int cpu = smp_processor_id();
+>
+> -	if (!twd_clk)
+> +	/*
+> +	 * If the basic setup for this CPU has been done before don't
+> +	 * bother with the below.
+> +	 */
+> +	if (per_cpu(percpu_setup_called, cpu)) {
+> +		if (!IS_ERR(twd_clk))
+> +			clk_enable(twd_clk);
+> +		__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+> +		clockevents_register_device(*__this_cpu_ptr(twd_evt));
+> +		enable_percpu_irq(clk->irq, 0);
+> +		return 0;
+> +	}
+> +	per_cpu(percpu_setup_called, cpu) = true;
+> +
+> +	/*
+> +	 * This stuff only need to be done once for the entire TWD cluster
+> +	 * during the runtime of the system.
+> +	 */
+> +	if (!common_setup_called) {
+>   		twd_clk = twd_get_clock();
+>
+Moving the 'common_setup_called' code under one helper
+might be cleaner. No strong preference though.
 
-And looking at reg_map_ip_v1:
+> -	if (!IS_ERR_OR_NULL(twd_clk))
+> -		twd_timer_rate = clk_get_rate(twd_clk);
+> -	else
+> -		twd_calibrate_rate();
+> +		/*
+> +		 * We use IS_ERR_OR_NULL() here, because if the clock stubs
+> +		 * are active we will get a valid clk reference which is
+> +		 * however NULL and will return the rate 0. In that case we
+> +		 * need to calibrate the rate instead.
+> +		 */
+> +		if (!IS_ERR_OR_NULL(twd_clk))
+> +			twd_timer_rate = clk_get_rate(twd_clk);
+> +		else
+> +			twd_calibrate_rate();
+> +	}
+> +	common_setup_called = true;
+>
+So "common_setup_called" will get updated every time the
+twd_timer_setup() gets called. You can move this inside
+the if loop.
 
- 218 static const u8 reg_map_ip_v1[] = {
- 219         [OMAP_I2C_REV_REG] = 0x00,
- 220         [OMAP_I2C_IE_REG] = 0x01,
- 221         [OMAP_I2C_STAT_REG] = 0x02,
- 222         [OMAP_I2C_IV_REG] = 0x03,
- 223         [OMAP_I2C_WE_REG] = 0x03,
- 224         [OMAP_I2C_SYSS_REG] = 0x04,
- 225         [OMAP_I2C_BUF_REG] = 0x05,
- 226         [OMAP_I2C_CNT_REG] = 0x06,
- 227         [OMAP_I2C_DATA_REG] = 0x07,
- 228         [OMAP_I2C_SYSC_REG] = 0x08,
- 229         [OMAP_I2C_CON_REG] = 0x09,
- 230         [OMAP_I2C_OA_REG] = 0x0a,
- 231         [OMAP_I2C_SA_REG] = 0x0b,
- 232         [OMAP_I2C_PSC_REG] = 0x0c,
- 233         [OMAP_I2C_SCLL_REG] = 0x0d,
- 234         [OMAP_I2C_SCLH_REG] = 0x0e,
- 235         [OMAP_I2C_SYSTEST_REG] = 0x0f,
- 236         [OMAP_I2C_BUFSTAT_REG] = 0x10,
- 237 };
-
-that's really not the register map on OMAP3. That only looks valid for
-OMAP1.
-
--ECONFUSED
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/d5deb0e8/attachment.sig>
+regards
+Santosh
