@@ -1,26 +1,58 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 22 Oct 2012 20:17:02 -0200
-Subject: [PATCH v3 2/2] [media]: mx2_camera: Fix regression caused by
- clock conversion
-In-Reply-To: <Pine.LNX.4.64.1210222301100.32591@axis700.grange>
-References: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
- <Pine.LNX.4.64.1210222301100.32591@axis700.grange>
-Message-ID: <CAOMZO5BpJAEdwKRVE47D+7wggLsvCXtPcv272UPYsZV6v3vKMg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Oct 2012 15:27:44 -0700
+Subject: [PATCH v2 9/9] pinctrl: single: dump pinmux register value
+In-Reply-To: <1350922139-3693-10-git-send-email-haojian.zhuang@gmail.com>
+References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350922139-3693-10-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121022222744.GM4730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121022 09:13]:
+> Dump pinmux register value, not only function part in the pinmux
+> register.
 
-On Mon, Oct 22, 2012 at 7:07 PM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> ? I don't find a clock named "per" and associated with "mx2-camera.0" in
-> arch/arm/mach-imx/clk-imx27.c. I only find it in clk-imx25.c. Does this
-> mean, that this your patch is for i.MX25? But you're saying it's for
-> i.MX27. Confused...
+This makes sense, but should be done using pcs_read, not pcs_readl,
+see below.
 
-I provide this mx27 clock in the first patch of the series:
-http://patchwork.linuxtv.org/patch/14915/
+> Also fix the issue on caluclating pin offset. The last parameter
+> should be pin number, not register offset.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-single.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index a20da78..6ba2a5d 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -284,15 +284,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
+>  
+>  static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
+>  					struct seq_file *s,
+> -					unsigned offset)
+> +					unsigned pin)
+>  {
+>  	struct pcs_device *pcs;
+> -	unsigned val;
+> +	unsigned val, mux_bytes;
+>  
+>  	pcs = pinctrl_dev_get_drvdata(pctldev);
+>  
+> -	val = pcs->read(pcs->base + offset);
+> -	val &= pcs->fmask;
+> +	mux_bytes = pcs->width / BITS_PER_BYTE;
+> +	val = pcs_readl(pcs->base + pin * mux_bytes);
+>  
+>  	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
+>  }
+
+You should not use pcs_readl here directly as the register
+width can vary. Can you please update the patch for that and
+make it independent from the rest of the series? That way we
+can merge the fix for v3.7-rc series.
 
 Regards,
 
-Fabio Estevam
+Tony
