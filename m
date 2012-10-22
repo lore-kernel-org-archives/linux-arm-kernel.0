@@ -1,30 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Oct 2012 18:36:59 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
- <50857444.9080308@ti.com>
- <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1210221835520.13464@utopia.booyaka.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 22 Oct 2012 20:45:37 +0200
+Subject: [PATCH 5/5] arm: mvebu: Added SMP support for Armada XP
+In-Reply-To: <1350925368-24243-6-git-send-email-gregory.clement@free-electrons.com>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121022184537.GN21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2012, Paul Walmsley wrote:
+Hi Gregory
 
-> On Mon, 22 Oct 2012, Jon Hunter wrote:
-> 
-> > and toolchain used for any failures.
-> 
-> This would indeed be useful and will try to figure out a good way to add 
-> that information.
+> +void __init set_secondary_cpus_clock(void)
+> +{
+> +	int cpu;
+> +	unsigned long rate;
+> +	struct clk *cpu_clk = NULL;
+> +	struct device_node *np = NULL;
+> +
+> +	cpu = smp_processor_id();
+> +	np = of_find_node_by_type(np, "cpu");
+> +	np = NULL;
+> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+> +		const u32 *reg;
+> +		int len;
+> +		reg = of_get_property(np, "reg", &len);
+> +		if (!reg || len != 4) {
+> +			pr_err("%s missing reg property\n", np->full_name);
+> +			continue;
+> +		}
+> +		if (be32_to_cpup(reg) == cpu) {
+> +			cpu_clk = of_clk_get(np, 0);
+> +			break;
+> +		}
+> +	}
+> +	WARN_ON(IS_ERR(cpu_clk));
+> +	rate = clk_get_rate(cpu_clk);
+> +
+> +	/* set all the other CPU clk to the same rate than the boot CPU */
+> +	np = NULL;
+> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+> +		const u32 *reg;
+> +		int len;
+> +		reg = of_get_property(np, "reg", &len);
+> +		if (!reg || len != 4) {
+> +			pr_err("%s missing reg property\n", np->full_name);
+> +			continue;
+> +		}
+> +		if (be32_to_cpup(reg) != cpu) {
+> +			cpu_clk = of_clk_get(np, 0);
+> +			clk_set_rate(cpu_clk, rate);
+> +		}
 
-Just realized that some of this appears in the beginning of the bootlogs:
+Maybe its hiding somewhere, but where is the clk_prepare_enable() for
+this cpu_clk clock?
 
-[    0.000000] Linux version 3.7.0-rc2-00331-g6f0c058 (paul at nozomi) (gcc 
-version 4.5.1 (Sourcery G++ Lite 2010.09-50) ) #1 SMP Sat Oct 20 14:04:56 
-MDT 2012
-
-Not the easiest information to find, but maybe it serves your needs?
-
-
-- Paul
+     Andrew
