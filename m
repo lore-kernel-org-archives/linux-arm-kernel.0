@@ -1,62 +1,25 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 22 Oct 2012 13:44:23 -0700
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <87objufl68.fsf@deeprootsystems.com> (Kevin Hilman's message of
- "Mon, 22 Oct 2012 10:53:19 -0700")
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
- <alpine.DEB.2.00.1210200614390.9865@utopia.booyaka.com>
- <87objufl68.fsf@deeprootsystems.com>
-Message-ID: <87bofufd94.fsf@deeprootsystems.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 22 Oct 2012 13:53:15 -0700
+Subject: [PATCH 6/7] crypto: omap-sham: Add code to use dmaengine API
+In-Reply-To: <CALLzPKbacnyQ=ZTzT+XMVcsxy4m_EdZgv7sZaWJFUwym4AndpA@mail.gmail.com>
+References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
+ <1350683640-15044-7-git-send-email-mgreer@animalcreek.com>
+ <CALLzPKbacnyQ=ZTzT+XMVcsxy4m_EdZgv7sZaWJFUwym4AndpA@mail.gmail.com>
+Message-ID: <20121022205315.GB6851@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@deeprootsystems.com> writes:
+On Sun, Oct 21, 2012 at 02:52:13PM +0300, Kasatkin, Dmitry wrote:
+> Hello,
+> 
+> I got only 3 patches out of 7.
+> Can you please re-submit them also to linux-crypto at vger.kernel.org
+> That is a list where crypto drivers are discussed.
 
-> Paul Walmsley <paul@pwsan.com> writes:
->
->> Hi Kevin
->>
->> On Fri, 19 Oct 2012, Paul Walmsley wrote:
->>
->>> On Thu, 18 Oct 2012, Paul Walmsley wrote:
->>> 
->>> > Here are some basic OMAP test results for Linux v3.7-rc1.
->>> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
->>
->> ...
->>
->>> > Failing tests: needing investigation
->>> > ------------------------------------
->>> > 
->>
->> ...
->>
->>> > PM tests:
->>>
->>> * 3730 Beagle XM: OPPs do not initialize
->>>   - Several "find_device_opp: Invalid parameters" messages appear on boot; 
->>>     related warnings follow
->>>   - Cause unknown
->>
->> This one seems to be caused by this commit:
->>
->> commit 24d7b40a60cf19008334bcbcbd98da374d4d9c64
->> Author: Kevin Hilman <khilman@ti.com>
->> Date:   Thu Sep 6 14:03:08 2012 -0700
->>
->>     ARM: OMAP2+: PM: MPU DVFS: use generic CPU device for MPU-SS
->>     
->> Care to take a look at it and fix it?
->>
->
-> Yup, will fix.  Looks like this exposed some initcall ordering issues in
-> the Beagle board file when adding OPPs.
+Okay, I will CC you and the linux-crypto on the entire series when
+I submit v2.
 
-Here's the fix:
+Sorry about that.
 
-http://marc.info/?l=linux-omap&m=135093801330065&w=2
-
-I'll be adding this to my PM-related fixes queue for v3.7-rc3.
-
-Kevin
+Mark
+--
