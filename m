@@ -1,122 +1,203 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 12:46:55 +0300
-Subject: [PATCH 5/8] i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
+Date: Mon, 22 Oct 2012 12:46:56 +0300
+Subject: [PATCH 6/8] i2c: omap: wait for transfer completion before sending
+ STP bit
 In-Reply-To: <1350899218-13624-1-git-send-email-balbi@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
-Message-ID: <1350899218-13624-6-git-send-email-balbi@ti.com>
+Message-ID: <1350899218-13624-7-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on OMAP4+ we want to read IRQSTATUS_RAW register,
-instead of IRQSTATUS. The reason being that IRQSTATUS
-will only contain the bits which were enabled on
-IRQENABLE_SET and that will break when we need to
-poll for a certain bit which wasn't enabled as an
-IRQ source.
+Later patches will come adding support for
+reporting amount of bytes transferred so that
+client drivers can count how many bytes are
+left to transfer.
 
-One such case is after we finish converting to
-deferred stop bit, we will have to poll for ARDY
-bit before returning control for the client driver
-in order to prevent us from trying to start a
-transfer on a bus which is already busy.
+This is useful mostly in case of NACKs when
+client driver wants to know exactly which
+byte got NACKed so it doesn't have to resend
+all bytes again.
 
-Note, however, that omap-i2c.c needs a big rework
-on register definition and register access. Such
-work will be done in a separate series of patches.
+In order to make that work with OMAP's I2C
+controller, we need to prevent sending STP
+bit until message is transferred. The reason
+behind that is because OMAP_I2C_CNT_REG gets
+reset to original value after STP bit is
+shifted through I2C_SDA line and that would
+prevent us from reading the correct number of
+bytes left to transfer.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
+The full programming model suggested by IP
+owner was the following:
+
+- start I2C transfer (without STP bit)
+- upon completion or NACK, read I2C_CNT register
+- write STP bit to I2C_CON register
+- wait for ARDY bit
+
+With this patch we're implementing all steps
+except step #2 which will come in a later
+patch adding such support.
+
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/i2c.c                  |  3 ++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |  2 +-
- drivers/i2c/busses/i2c-omap.c              | 26 ++++++++++++++++++++++----
- include/linux/i2c-omap.h                   |  1 +
- 4 files changed, 26 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 101 ++++++++++++++++--------------------------
+ 1 file changed, 39 insertions(+), 62 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
-index fc57e67..e871928 100644
---- a/arch/arm/mach-omap2/i2c.c
-+++ b/arch/arm/mach-omap2/i2c.c
-@@ -66,7 +66,8 @@ int omap_i2c_reset(struct omap_hwmod *oh)
- 	u16 i2c_con;
- 	int c = 0;
- 
--	if (oh->class->rev == OMAP_I2C_IP_VERSION_2) {
-+	if ((oh->class->rev == OMAP_I2C_IP_VERSION_2) ||
-+			(oh->class->rev == OMAP_I2C_IP_VERSION_3)) {
- 		i2c_con = OMAP4_I2C_CON_OFFSET;
- 	} else if (oh->class->rev == OMAP_I2C_IP_VERSION_1) {
- 		i2c_con = OMAP2_I2C_CON_OFFSET;
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 652d028..ae9c023 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1521,7 +1521,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_i2c_sysc = {
- static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
- 	.name	= "i2c",
- 	.sysc	= &omap44xx_i2c_sysc,
--	.rev	= OMAP_I2C_IP_VERSION_2,
-+	.rev	= OMAP_I2C_IP_VERSION_3,
- 	.reset	= &omap_i2c_reset,
- };
- 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 6219522..c65d526 100644
+index c65d526..8104aa2 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -271,8 +271,18 @@ static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
+@@ -438,9 +438,9 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
  
- static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
- {
--	return __raw_readw(i2c_dev->base +
-+	/* if we are OMAP_I2C_IP_VERSION_3, we need to read from
-+	 * IRQSTATUS_RAW, but write to IRQSTATUS
-+	 */
-+	if ((i2c_dev->dtrev == OMAP_I2C_IP_VERSION_3) &&
-+			(reg == OMAP_I2C_STAT_REG)) {
-+		return __raw_readw(i2c_dev->base +
-+				((i2c_dev->regs[reg] - 0x04)
-+				 << i2c_dev->reg_shift));
-+	} else {
-+		return __raw_readw(i2c_dev->base +
- 				(i2c_dev->regs[reg] << i2c_dev->reg_shift));
-+	}
+ 	/* Enable interrupts */
+ 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+-			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
+-			OMAP_I2C_IE_AL)  | ((dev->fifo_size) ?
+-				(OMAP_I2C_IE_RDR | OMAP_I2C_IE_XDR) : 0);
++			OMAP_I2C_IE_NACK | OMAP_I2C_IE_AL)  |
++			((dev->fifo_size) ? (OMAP_I2C_IE_RDR |
++				OMAP_I2C_IE_XDR) : 0);
+ 	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+ 	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+ 		dev->pscstate = psc;
+@@ -470,6 +476,22 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
+ 	return 0;
  }
  
- static int omap_i2c_init(struct omap_i2c_dev *dev)
-@@ -1124,10 +1134,18 @@ omap_i2c_probe(struct platform_device *pdev)
++static int omap_i2c_wait_for_ardy(struct omap_i2c_dev *dev)
++{
++	unsigned long timeout;
++
++	timeout = jiffies + OMAP_I2C_TIMEOUT;
++	while (!(omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG) & OMAP_I2C_STAT_ARDY)) {
++		if (time_after(jiffies, timeout)) {
++			dev_warn(dev->dev, "timeout waiting for access ready\n");
++			return -ETIMEDOUT;
++		}
++		usleep_range(800, 1200);
++	}
++
++	return 0;
++}
++
+ static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
+ {
+ 	u16		buf;
+@@ -515,7 +537,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ {
+ 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+ 	unsigned long timeout;
+-	int ret;
++	int ret = 0;
+ 	u16 w;
  
- 	dev->reg_shift = (dev->flags >> OMAP_I2C_FLAG_BUS_SHIFT__SHIFT) & 3;
+ 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+@@ -556,35 +578,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	if (!(msg->flags & I2C_M_RD))
+ 		w |= OMAP_I2C_CON_TRX;
  
--	if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
--		dev->regs = (u8 *)reg_map_ip_v2;
--	else
-+	switch (dev->dtrev) {
-+	case OMAP_I2C_IP_VERSION_1:
- 		dev->regs = (u8 *)reg_map_ip_v1;
-+		break;
-+	case OMAP_I2C_IP_VERSION_2:
-+		/* FALLTHROUGH */
-+	case OMAP_I2C_IP_VERSION_3:
-+		/* FALLTHROUGH */
-+	default:
-+		dev->regs = (u8 *)reg_map_ip_v2;
-+		break;
+-	if (!dev->b_hw && stop)
+-		w |= OMAP_I2C_CON_STP;
+-
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+ 
+ 	/*
+-	 * Don't write stt and stp together on some hardware.
+-	 */
+-	if (dev->b_hw && stop) {
+-		unsigned long delay = jiffies + OMAP_I2C_TIMEOUT;
+-		u16 con = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+-		while (con & OMAP_I2C_CON_STT) {
+-			con = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+-
+-			/* Let the user know if i2c is in a bad state */
+-			if (time_after(jiffies, delay)) {
+-				dev_err(dev->dev, "controller timed out "
+-				"waiting for start condition to finish\n");
+-				return -ETIMEDOUT;
+-			}
+-			cpu_relax();
+-		}
+-
+-		w |= OMAP_I2C_CON_STP;
+-		w &= ~OMAP_I2C_CON_STT;
+-		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+-	}
+-
+-	/*
+ 	 * REVISIT: We should abort the transfer on signals, but the bus goes
+ 	 * into arbitration and we're currently unable to recover from it.
+ 	 */
+@@ -594,36 +590,36 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		ret = -ETIMEDOUT;
+-		goto err_i2c_init;
++		omap_i2c_init(dev);
++		goto out;
+ 	}
+ 
+ 	if ((dev->cmd_err & OMAP_I2C_STAT_AL)
+ 			|| (dev->cmd_err & OMAP_I2C_STAT_ROVR)
+ 			|| (dev->cmd_err & OMAP_I2C_STAT_XUDF)) {
+ 		ret = -EIO;
+-		goto err_i2c_init;
++		omap_i2c_init(dev);
++		goto out;
+ 	}
+ 
+ 	if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
+ 		if (msg->flags & I2C_M_IGNORE_NAK)
+ 			return 0;
+ 
+-		if (stop) {
+-			w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+-			w |= OMAP_I2C_CON_STP;
+-			omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+-		}
+-
+ 		ret = -EREMOTEIO;
+-		goto err;
++		omap_i2c_init(dev);
+ 	}
+ 
+-	return 0;
++out:
+ 
+-err_i2c_init:
+-	omap_i2c_init(dev);
++	if (stop) {
++		w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
++		w |= OMAP_I2C_CON_STP;
++		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
++
++		ret = omap_i2c_wait_for_ardy(dev);
 +	}
  
- 	pm_runtime_enable(dev->dev);
- 	pm_runtime_set_autosuspend_delay(dev->dev, OMAP_I2C_PM_TIMEOUT);
-diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-index df804ba..84f7355 100644
---- a/include/linux/i2c-omap.h
-+++ b/include/linux/i2c-omap.h
-@@ -14,6 +14,7 @@
+-err:
+ 	return ret;
+ }
  
- #define OMAP_I2C_IP_VERSION_1 1
- #define OMAP_I2C_IP_VERSION_2 2
-+#define OMAP_I2C_IP_VERSION_3 3
+@@ -947,19 +937,6 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 			break;
+ 		}
  
- /* struct omap_i2c_bus_platform_data .flags meanings */
+-		/*
+-		 * ProDB0017052: Clear ARDY bit twice
+-		 */
+-		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
+-					OMAP_I2C_STAT_AL)) {
+-			omap_i2c_ack_stat(dev, (OMAP_I2C_STAT_RRDY |
+-						OMAP_I2C_STAT_RDR |
+-						OMAP_I2C_STAT_XRDY |
+-						OMAP_I2C_STAT_XDR |
+-						OMAP_I2C_STAT_ARDY));
+-			break;
+-		}
+-
+ 		if (stat & OMAP_I2C_STAT_RDR) {
+ 			u8 num_bytes = 1;
  
 -- 
 1.8.0.rc0
