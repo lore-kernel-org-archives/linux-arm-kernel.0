@@ -1,37 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 13:38:01 -0700
-Subject: [PATCH] ARM/dts: omap3: Fix mcbsp2/3 hwmods to be able to
- probe the drivers for audio
-In-Reply-To: <508530CE.9000703@ti.com>
-References: <1350552307-10226-1-git-send-email-peter.ujfalusi@ti.com>
- <507FD32C.7010108@ti.com> <508530CE.9000703@ti.com>
-Message-ID: <20121022203800.GH4730@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 22 Oct 2012 13:33:29 -0700
+Subject: [PATCH] ARM: OMAP3: Beagle: fix OPP customization and initcall
+ ordering
+Message-ID: <1350938009-22716-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* P?ter Ujfalusi <peter.ujfalusi@ti.com> [121022 04:42]:
-> Hi Tony,
-> 
-> On 10/18/2012 12:00 PM, Benoit Cousson wrote:
-> > On 10/18/2012 11:25 AM, Peter Ujfalusi wrote:
-> >> Fixes the following errors:
-> >> [    2.318084] omap-mcbsp 49022000.mcbsp: invalid rx DMA channel
-> >> [    2.324432] omap-mcbsp 49024000.mcbsp: invalid rx DMA channel
-> >>
-> >> Which is because we failed to link the sidetone hwmod for McBSP2/3. The
-> >> missing sidetone hwmod link will prevent omap_device_alloc() to append the
-> >> DMA resources since we - accidentally - end up having the same number of
-> >> resources provided from DT (IO/IRQ) as we have in hwmod for the McBSP ports
-> >> without the ST resources.
-> >>
-> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > 
-> > Acked-by: Benoit Cousson <b-cousson@ti.com>
-> 
-> Can you take this patch for -rc3?
+From: Kevin Hilman <khilman@ti.com>
 
-Thanks will apply into omap-for-v3.7-rc2/fixes.
+After commit 24d7b40a60cf19008334bcbcbd98da374d4d9c64 (ARM: OMAP2+:
+PM: MPU DVFS: use generic CPU device for MPU-SS), OPPs are registered
+using an existing CPU device, not the omap_device for MPU-SS.
 
-Regards,
+First, fix the board file to use get_cpu_device() as required by the
+above commit, otherwise custom OPPs will be added to the wrong device.
 
-Tony
+Second, the board files OPP init is called from the its init_machine
+method, and the generic CPU devices are not yet created when
+init_machine is run.  Therefore OPP initialization will fail.  To fix,
+use a device_initcall() for the board file's OPP customization.
+
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Tony, unless there are objections, I'll add this to a series of 
+PM related fixes I have left for v3.7-rc.
+
+ arch/arm/mach-omap2/board-omap3beagle.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 388c431..befad2a 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -24,6 +24,7 @@
+ #include <linux/input.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/opp.h>
++#include <linux/cpu.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/partitions.h>
+@@ -444,12 +445,13 @@ static struct omap_board_mux board_mux[] __initdata = {
+ };
+ #endif
+ 
+-static void __init beagle_opp_init(void)
++static int __init beagle_opp_init(void)
+ {
+ 	int r = 0;
+ 
+-	/* Initialize the omap3 opp table */
+-	if (omap3_opp_init()) {
++	/* Initialize the omap3 opp table if not already created. */
++	r = omap3_opp_init();
++	if (IS_ERR_VALUE(r) && (r != -EEXIST)) {
+ 		pr_err("%s: opp default init failed\n", __func__);
+ 		return;
+ 	}
+@@ -458,13 +460,13 @@ static void __init beagle_opp_init(void)
+ 	if (cpu_is_omap3630()) {
+ 		struct device *mpu_dev, *iva_dev;
+ 
+-		mpu_dev = omap_device_get_by_hwmod_name("mpu");
++		mpu_dev = get_cpu_device(0);
+ 		iva_dev = omap_device_get_by_hwmod_name("iva");
+ 
+ 		if (IS_ERR(mpu_dev) || IS_ERR(iva_dev)) {
+ 			pr_err("%s: Aiee.. no mpu/dsp devices? %p %p\n",
+ 				__func__, mpu_dev, iva_dev);
+-			return;
++			return -ENODEV;
+ 		}
+ 		/* Enable MPU 1GHz and lower opps */
+ 		r = opp_enable(mpu_dev, 800000000);
+@@ -484,8 +486,9 @@ static void __init beagle_opp_init(void)
+ 			opp_disable(iva_dev, 660000000);
+ 		}
+ 	}
+-	return;
++	return 0;
+ }
++device_initcall(beagle_opp_init);
+ 
+ static void __init omap3_beagle_init(void)
+ {
+@@ -522,8 +525,6 @@ static void __init omap3_beagle_init(void)
+ 	/* Ensure SDRC pins are mux'd for self-refresh */
+ 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+-
+-	beagle_opp_init();
+ }
+ 
+ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+-- 
+1.8.0
