@@ -1,9 +1,9 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 22 Oct 2012 19:02:46 +0200
-Subject: [PATCH 4/5] arm: mm: Added support for PJ4B cpu and init routines
+Date: Mon, 22 Oct 2012 19:02:45 +0200
+Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
 In-Reply-To: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1350925368-24243-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,99 +12,194 @@ From: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/Kconfig |    2 +-
- arch/arm/mm/Kconfig         |    4 ++++
- arch/arm/mm/proc-v7.S       |   43 +++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 48 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
+ arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
+ arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
+ 3 files changed, 97 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 17d246b..9bfaa0c 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -22,7 +22,7 @@ config MVEBU_CLK_CPU
- config MACH_ARMADA_370_XP
- 	bool
- 	select ARMADA_370_XP_TIMER
--	select CPU_V7
-+	select CPU_PJ4B
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index f521ed8..531619f 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -24,7 +24,7 @@
  
- config MACH_ARMADA_370
- 	bool "Marvell Armada 370 boards"
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 94186b6..3fd629d 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -352,6 +352,10 @@ config CPU_PJ4
- 	select ARM_THUMBEE
- 	select CPU_V7
+ 	mpic: interrupt-controller at d0020000 {
+ 	      reg = <0xd0020a00 0x1d0>,
+-		    <0xd0021870 0x58>;
++		    <0xd0021070 0x58>;
+ 	};
  
-+config CPU_PJ4B
-+	bool
-+	select CPU_V7
+ 	armada-370-xp-pmsu at d0022000 {
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
+index aac9beb..dce590d 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.h
++++ b/arch/arm/mach-mvebu/armada-370-xp.h
+@@ -19,4 +19,14 @@
+ #define ARMADA_370_XP_REGS_VIRT_BASE	IOMEM(0xfeb00000)
+ #define ARMADA_370_XP_REGS_SIZE		SZ_1M
+ 
++#ifndef __ASSEMBLY__
 +
- # ARMv6
- config CPU_V6
- 	bool "Support ARM V6 processor" if ARCH_INTEGRATOR || MACH_REALVIEW_EB || MACH_REALVIEW_PBX
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 846d279..1a373c2 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -169,6 +169,39 @@ __v7_ca15mp_setup:
- 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
- 	mcreq	p15, 0, r0, c1, c0, 1
- #endif
++#ifdef CONFIG_SMP
++#include <linux/cpumask.h>
 +
-+__v7_pj4b_setup:
-+#ifdef CONFIG_CPU_PJ4B
-+	/* Auxiliary Debug Modes Control 1 Register */
-+	mrc	p15, 1,	r0, c15, c1, 1
-+	orr	r0, r0, #(1 << 16)     @ Disable data transfer for clean line.
-+	orr	r0, r0, #(1 << 5)      @ Enable the back off of STREX instr
-+	orr	r0, r0, #(1 << 8)      @ Disable Internal Parity Handling
-+	bic	r0, r0, #(1 << 2)      @ Disable Static BP
-+	mcr	p15, 1,	r0, c15, c1, 1
++void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
++void armada_xp_mpic_smp_cpu_init(void);
++#endif
++#endif
 +
-+	/* Auxiliary Debug Modes Control 2 Register */
-+	mrc	p15, 1,	r0, c15, c1, 2
-+	bic	r0, r0, #(1 << 23)   @ Enable fast LDR.
-+	orr	r0, r0, #(1 << 25)   @ Dont interleave write and snoop data.
-+	orr	r0, r0, #(1 << 27)   @ Disable Critical Word First feature.
-+	orr	r0, r0, #(1 << 29)   @ Disable outstanding non cacheable request
-+	orr	r0, r0, #(1 << 30)   @ L1 replacement - Strict round robin
-+	mcr	p15, 1,	r0, c15, c1, 2
+ #endif /* __MACH_ARMADA_370_XP_H */
+diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+index 5f5f939..549b684 100644
+--- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
++++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
+@@ -24,6 +24,7 @@
+ #include <linux/irqdomain.h>
+ #include <asm/mach/arch.h>
+ #include <asm/exception.h>
++#include <asm/smp_plat.h>
+ 
+ /* Interrupt Controller Registers Map */
+ #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+@@ -35,6 +36,12 @@
+ 
+ #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
+ 
++#define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
++#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
++#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
 +
-+	/* Auxiliary Functional Modes Control Register 0 */
-+	mrc	p15, 1,	r0, c15, c2, 0
-+	orr	r0, r0, #(1 << 2)     @ Support L1 parity checking
-+	orr	r0, r0, #(1 << 8)     @ Broadcast Cache and TLB maintenance
-+	mcr	p15, 1,	r0, c15, c2, 0
++#define ACTIVE_DOORBELLS			(8)
 +
-+	/* Auxiliary Debug Modes Control 0 Register */
-+	mrc	p15, 1,	r0, c15, c1, 0
-+	orr	r0, r0, #(1 << 22)   @ WFI/WFE - serve the DVM and back to idle
-+	mcr	p15, 1,	r0, c15, c1, 0
+ static void __iomem *per_cpu_int_base;
+ static void __iomem *main_int_base;
+ static struct irq_domain *armada_370_xp_mpic_domain;
+@@ -51,11 +58,22 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
+ 	       per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
+ }
+ 
++#ifdef CONFIG_SMP
++static int armada_xp_set_affinity(struct irq_data *d,
++				  const struct cpumask *mask_val, bool force)
++{
++	return 0;
++}
++#endif
 +
-+#endif /* CONFIG_CPU_PJ4B */
+ static struct irq_chip armada_370_xp_irq_chip = {
+ 	.name		= "armada_370_xp_irq",
+ 	.irq_mask       = armada_370_xp_irq_mask,
+ 	.irq_mask_ack   = armada_370_xp_irq_mask,
+ 	.irq_unmask     = armada_370_xp_irq_unmask,
++#ifdef CONFIG_SMP
++	.irq_set_affinity = armada_xp_set_affinity,
++#endif
+ };
+ 
+ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+@@ -72,6 +90,41 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_SMP
++void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq)
++{
++	int cpu;
++	unsigned long map = 0;
 +
- __v7_setup:
- 	adr	r12, __v7_setup_stack		@ the local stack
- 	stmia	r12, {r0-r5, r7, r9, r11, lr}
-@@ -342,6 +375,16 @@ __v7_ca9mp_proc_info:
- 	.long	0xff0ffff0
- 	__v7_proc __v7_ca9mp_setup
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
++	/* Convert our logical CPU mask into a physical one. */
++	for_each_cpu(cpu, mask)
++		map |= 1 << cpu_logical_map(cpu);
 +
 +	/*
-+	 * Marvell PJ4B processor.
++	 * Ensure that stores to Normal memory are visible to the
++	 * other CPUs before issuing the IPI.
 +	 */
-+	.type   __v7_pj4b_proc_info, #object
-+__v7_pj4b_proc_info:
-+	.long	0x562f5842
-+	.long	0xffffffff
-+	__v7_proc __v7_pj4b_setup
-+	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
- #endif	/* CONFIG_ARM_LPAE */
++	dsb();
++
++	/* submit softirq */
++	writel((map << 8) | irq, main_int_base +
++		ARMADA_370_XP_SW_TRIG_INT_OFFS);
++}
++
++void armada_xp_mpic_smp_cpu_init(void)
++{
++	/* Clear pending IPIs */
++	writel(0, per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
++
++	/* Enable first 8 IPIs */
++	writel((1 << ACTIVE_DOORBELLS) - 1, per_cpu_int_base +
++		ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
++
++	/* Unmask IPI interrupt */
++	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
++}
++#endif /* CONFIG_SMP */
++
+ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
+ 	.map = armada_370_xp_mpic_irq_map,
+ 	.xlate = irq_domain_xlate_onecell,
+@@ -91,13 +144,18 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
  
- 	/*
+ 	armada_370_xp_mpic_domain =
+-	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+-				  &armada_370_xp_mpic_irq_ops, NULL);
++		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
++				&armada_370_xp_mpic_irq_ops, NULL);
+ 
+ 	if (!armada_370_xp_mpic_domain)
+ 		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
+ 
+ 	irq_set_default_host(armada_370_xp_mpic_domain);
++
++#ifdef CONFIG_SMP
++	armada_xp_mpic_smp_cpu_init();
++#endif
++
+ 	return 0;
+ }
+ 
+@@ -111,14 +169,36 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
+ 					ARMADA_370_XP_CPU_INTACK_OFFS);
+ 		irqnr = irqstat & 0x3FF;
+ 
+-		if (irqnr < 1023) {
+-			irqnr =
+-			    irq_find_mapping(armada_370_xp_mpic_domain, irqnr);
++		if (irqnr > 1022)
++			break;
++
++		if (irqnr >= 8) {
++			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
++					irqnr);
+ 			handle_IRQ(irqnr, regs);
+ 			continue;
+ 		}
++#ifdef CONFIG_SMP
++		/* IPI Handling */
++		if (irqnr == 0) {
++			u32 ipimask, ipinr;
++
++			ipimask = readl_relaxed(per_cpu_int_base +
++						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
++				& 0xFF;
++
++			writel(0x0, per_cpu_int_base +
++				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
++
++			/* Handle all pending doorbells */
++			for (ipinr = 0; ipinr < ACTIVE_DOORBELLS; ipinr++) {
++				if (ipimask & (0x1 << ipinr))
++					handle_IPI(ipinr, regs);
++			}
++			continue;
++		}
++#endif
+ 
+-		break;
+ 	} while (1);
+ }
+ 
 -- 
 1.7.9.5
