@@ -1,42 +1,43 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 22 Oct 2012 11:18:30 +0300
-Subject: [PATCH V3 3/5] ARM: tegra: decouple uncompress.h and debug-macro.S
-In-Reply-To: <1350686507-3022-3-git-send-email-swarren@wwwdotorg.org>
-References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
- <1350686507-3022-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20121022081830.GH3196@tbergstrom-lnx.Nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 Oct 2012 10:21:19 +0200
+Subject: [PATCH v2] pinctrl: reserve pins when states are activated
+In-Reply-To: <20121019181019.GP4730@atomide.com>
+References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
+ <20121019181019.GP4730@atomide.com>
+Message-ID: <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +
-> +#define checkuart(rp, rv, lhu, bit, uart) \
-> +               /* Load address of CLK_RST register */ \
-> +               movw    rp, #TEGRA_CLK_RST_DEVICES_##lhu & 0xffff ; \
-> +               movt    rp, #TEGRA_CLK_RST_DEVICES_##lhu >> 16 ; \
-> +               /* Load value from CLK_RST register */ \
-> +               ldr     rp, [rp, #0] ; \
-> +               /* Test UART's reset bit */ \
-> +               tst     rp, #(1 << bit) ; \
-> +               /* If set, can't use UART; jump to save no UART */ \
-> +               bne     90f ; \
-> +               /* Load address of CLK_OUT_ENB register */ \
-> +               movw    rp, #TEGRA_CLK_OUT_ENB_##lhu & 0xffff ; \
-> +               movt    rp, #TEGRA_CLK_OUT_ENB_##lhu >> 16 ; \
-> +               /* Load value from CLK_OUT_ENB register */ \
-> +               ldr     rp, [rp, #0] ; \
-> +               /* Test UART's clock enable bit */ \
-> +               tst     rp, #(1 << bit) ; \
-> +               /* If clear, can't use UART; jump to save no UART */ \
-> +               beq     90f ; \
-> +               /* Passed all tests, load address of UART registers */ \
-> +               movw    rp, #TEGRA_UART##uart##_BASE & 0xffff ; \
-> +               movt    rp, #TEGRA_UART##uart##_BASE >> 16 ; \
-> +               /* Jump to save UART address */ \
-> +               b 91f
-> 
+On Fri, Oct 19, 2012 at 8:10 PM, Tony Lindgren <tony@atomide.com> wrote:
+> [Me]
+>> Instead: let use reserve the pins when the state is activated
+>> and drop them when the state is disabled, i.e. when we move to
+>> another state. This way different devices/functions can use the
+>> same pins at different times.
+>
+> Hmm doesn't this mean that we are now doing lots of extra
+> reserving and dropping of pins? Performance is important from
+> latency point of view for cases where we need to remux pins
+> constantly runtime PM.
 
-Maybe make this a subroutine?
+It is only done in case the pinmux state is switched in runtime
+suspend/resume, so it's e.g. possible to just alter the pin config.
 
-Cheers,
+But in general what you say is true.
 
-Peter.
+We used to to the same thing by having drivers call
+pinctrl_get()/pinctrl_put() in this case instead, but that went
+away with the introduction of states, so we cannot encode
+different pin sets with say
+pinctrl_get(dev, "foo")/pinctrl_get(dev, "bar")
+anymore since there is only one pinctrl handle per device,
+but multiple states.
+
+If this turns out to be a severe performance bottleneck, I
+suggest to add some additional constraint API, like
+pinctrl_set_pinmux_homegeneous_pinsets(true) that will
+at runtime select whether the pin allocation is done when
+getting the pinctrl handle instead.
+
+Yours,
+Linus Walleij
