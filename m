@@ -1,55 +1,95 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 22 Oct 2012 20:45:31 +0200
-Subject: [PATCH v3 1/4] net/macb: fix truncate warnings
+Date: Mon, 22 Oct 2012 20:45:32 +0200
+Subject: [PATCH v3 2/4] net/cadence: get rid of HAVE_NET_MACB
 In-Reply-To: <1350931534-8416-1-git-send-email-manabian@gmail.com>
 References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350931534-8416-2-git-send-email-manabian@gmail.com>
+Message-ID: <1350931534-8416-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building macb on x86_64 the following warnings show up:
-  drivers/net/ethernet/cadence/macb.c: In function macb_interrupt:
-  drivers/net/ethernet/cadence/macb.c:556:4: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-  drivers/net/ethernet/cadence/macb.c: In function macb_reset_hw:
-  drivers/net/ethernet/cadence/macb.c:792:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-  drivers/net/ethernet/cadence/macb.c:793:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-  drivers/net/ethernet/cadence/macb.c:796:2: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-
-Use -1 insted of ~0UL, as done in other places in the driver,
-to silence these warnings.
+macb is a platform driver and there is nothing that prevents
+this driver from being built on non-ARM/AVR32 platforms.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- drivers/net/ethernet/cadence/macb.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-at91/Kconfig           | 4 ----
+ arch/avr32/Kconfig                   | 1 -
+ drivers/net/ethernet/cadence/Kconfig | 5 -----
+ 3 files changed, 10 deletions(-)
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 6c84a11..6a4f499 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -553,7 +553,7 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
- 	while (status) {
- 		/* close possible race with dev_close */
- 		if (unlikely(!netif_running(dev))) {
--			macb_writel(bp, IDR, ~0UL);
-+			macb_writel(bp, IDR, -1);
- 			break;
- 		}
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index d846b6e..72020fb 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -45,7 +45,6 @@ config SOC_AT91RM9200
+ config SOC_AT91SAM9260
+ 	bool "AT91SAM9260, AT91SAM9XE or AT91SAM9G20"
+ 	select HAVE_AT91_DBGU0
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9260, AT91SAM9XE
+@@ -63,7 +62,6 @@ config SOC_AT91SAM9263
+ 	bool "AT91SAM9263"
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
  
-@@ -789,11 +789,11 @@ static void macb_reset_hw(struct macb *bp)
- 	macb_writel(bp, NCR, MACB_BIT(CLRSTAT));
+ config SOC_AT91SAM9RL
+@@ -76,7 +74,6 @@ config SOC_AT91SAM9G45
+ 	bool "AT91SAM9G45 or AT91SAM9M10 families"
+ 	select HAVE_AT91_DBGU1
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
+@@ -86,7 +83,6 @@ config SOC_AT91SAM9X5
+ 	bool "AT91SAM9x5 family"
+ 	select HAVE_AT91_DBGU0
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
+ 	select SOC_AT91SAM9
+ 	help
+ 	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index 06e73bf..09f9fa8 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -80,7 +80,6 @@ config PLATFORM_AT32AP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select GENERIC_ALLOCATOR
+ 	select HAVE_FB_ATMEL
+-	select HAVE_NET_MACB
  
- 	/* Clear all status flags */
--	macb_writel(bp, TSR, ~0UL);
--	macb_writel(bp, RSR, ~0UL);
-+	macb_writel(bp, TSR, -1);
-+	macb_writel(bp, RSR, -1);
+ #
+ # CPU types
+diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
+index 57f78abe..5d1ea30 100644
+--- a/drivers/net/ethernet/cadence/Kconfig
++++ b/drivers/net/ethernet/cadence/Kconfig
+@@ -2,13 +2,9 @@
+ # Atmel device configuration
+ #
  
- 	/* Disable all interrupts */
--	macb_writel(bp, IDR, ~0UL);
-+	macb_writel(bp, IDR, -1);
- 	macb_readl(bp, ISR);
- }
+-config HAVE_NET_MACB
+-	bool
+-
+ config NET_CADENCE
+ 	bool "Cadence devices"
+ 	default y
+-	depends on HAVE_NET_MACB || (ARM && ARCH_AT91RM9200)
+ 	---help---
+ 	  If you have a network (Ethernet) card belonging to this class, say Y.
+ 	  Make sure you know the name of your card. Read the Ethernet-HOWTO,
+@@ -34,7 +30,6 @@ config ARM_AT91_ETHER
  
+ config MACB
+ 	tristate "Cadence MACB/GEM support"
+-	depends on HAVE_NET_MACB
+ 	select PHYLIB
+ 	---help---
+ 	  The Cadence MACB ethernet interface is found on many Atmel AT32 and
 -- 
 1.7.12.4
