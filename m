@@ -1,65 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 22 Oct 2012 14:12:19 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <20121022015126.GA10587@verge.net.au>
-References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
- <20121022003350.GL2509@verge.net.au> <20121022015126.GA10587@verge.net.au>
-Message-ID: <201210221412.19486.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 22 Oct 2012 17:06:58 +0300
+Subject: [PATCH 0/8] I2C patches for v3.8 merge window
+In-Reply-To: <CAM=Q2ctS3hxngk5efcvScAdv-2GtH2pHRZoxRhRTiOWmQA-AXw@mail.gmail.com>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <20121022133023.GC14033@arwen.pp.htv.fi>
+ <CAM=Q2ctS3hxngk5efcvScAdv-2GtH2pHRZoxRhRTiOWmQA-AXw@mail.gmail.com>
+Message-ID: <20121022140658.GA18993@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding Nico, who did a lot of the work to get rid of PLAT_PHYS_OFFSET)
+Hi,
 
-On Monday 22 October 2012, Simon Horman wrote:
-> On Mon, Oct 22, 2012 at 09:33:51AM +0900, Simon Horman wrote:
-> > On Fri, Oct 19, 2012 at 08:18:50AM +0000, Arnd Bergmann wrote:
-> > > On Friday 19 October 2012, Simon Horman wrote:
-> > > > * A more significant problem seems to be the use of CONFIG_MEMORY_START
-> > > >   to define PLAT_PHYS_OFFSET in arch/arm/mach-shmobile/include/mach/memory.h
-> > > > 
-> > > >   I'm not sure that I see an easy way to get around this one.
-> > > 
-> > > ARM_PATCH_PHYS_VIRT should take care of this, have you tried it?
+On Mon, Oct 22, 2012 at 07:36:31PM +0530, Shubhrajyoti Datta wrote:
+> On Mon, Oct 22, 2012 at 7:00 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Mon, Oct 22, 2012 at 12:46:50PM +0300, Felipe Balbi wrote:
+> >> Hi guys,
+> >>
+> >> here's another series for OMAP I2C driver. There are a few cleanups
+> >> and one very nice new feature: we can now report how many bytes
+> >> we transferred until NACK.
+> >>
+> >> Note that the implemementation for OMAP-I2C turned out to be a
+> >> little more complex then I expected, mainly because of the way
+> >> I2C_CNT register behaves and because of the very buggy register
+> >> usage on that driver.
+> >>
+> >> I have boot tested all patches on beagle xM (3630) and pandaboard
+> >> rev A3 (4430), will send boot-logs if anyone wants to see.
 > 
-> I believe that this leaves mach-shmobile with three areas
-> where CONFIG_MEMORY_START/PLAT_PHYS_OFFSET is used.
+> tested the below branch on omap4430sdp , panda , omap3430sdp.
+> 
+> Doing simple i2ctools
+> .
+> 
+> Tested-by : Shubhrajyoti D <shubhrajyoti@ti.com>
+> 
 
-Hmm, I just noticed that in fact shmobile is the only remaining
-platform that uses CONFIG_MEMORY_START with a per-board or per-soc
-setting.
+can you also check if echo mem > /sys/power/state works ? Don't forget
+to enable UART wakeups with:
 
-> * arch/arm/mach-shmobile/headsmp.S
-> 
->   This uses PLAT_PHYS_OFFSET.
-> 
->   I believe this can be replaced with a run-time calculation. Though I
->   haven't thought about the details yet.
-> 
-> * arch/arm/boot/compressed/head-shmobile.S
-> 
->   This makes use of CONFIG_MEMORY_START.
-> 
->   This is only used if CONFIG_ZBOOT_ROM is set.
-> 
->   I'm unsure if this can be replaced with a run-time calculation or not.
->   But regardless it is only used if CONFIG_ZBOOT_ROM is set, which is not
->   the default at this time.
+echo enabled > /sys/devices/platform/omap_uart.2/power/wakeup
+echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
 
-Right, you can probably make CONFIG_ZBOOT_ROM_MMCIF and
-CONFIG_ZBOOT_ROM_SH_MOBILE_SDHI depend on !ARM_PATCH_PHYS_VIRT
+before trying to suspend. Another cool test is rtctest (since our RTC is
+part of TWL). It worked fine on my two platforms. Attached you will find
+the sourcecode for rtctest.
 
-> * arch/arm/mach-shmobile/Makefile.boot
-> 
->  This makes use of CONFIG_MEMORY_START to set zreladdr.
-> 
->  I believe that the solution to this is to make use of CONFIG_AUTO_ZRELADDR.
->  However, it is not yet clear to me how that can be used in conjunction
->  with a uImage.  As I understand it the boot loader on many of our boards,
->  including the Marzen board which is my first target for this work, boot
->  uImage imagess.
+> >> All patches are available at [1] if anyone wants an easy way to
+> >> test the patches.
+> >>
+> >> [1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-transferred-bytes-on-NACK
+> >
+> > forgot to mention, with [1] I could veridy suspend to ram with boards
+> > mentioned above.
+> >
+> > [1] http://marc.info/?l=linux-arm-kernel&m=135090724817604&w=2
+> >
+> >> Felipe Balbi (7):
+> >>   i2c: omap: no need to access platform_device
+> >>   i2c: omap: reorder exit path of omap_i2c_xfer_msg()
+> >>   i2c: omap: fix error checking
+> >>   i2c: omap: also complete() when stat becomes zero
+> >>   i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
+> >>   i2c: omap: wait for transfer completion before sending STP bit
+> >>   i2c: omap: implement handling for 'transferred' bytes
+> >>
+> >> Shubhrajyoti D (1):
+> >>   i2c: add 'transferred' field to struct i2c_msg
+> >>
+> >>  arch/arm/mach-omap2/i2c.c                  |   3 +-
+> >>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +-
+> >>  drivers/i2c/busses/i2c-omap.c              | 156 ++++++++++++++++-------------
+> >>  include/linux/i2c-omap.h                   |   1 +
+> >>  include/uapi/linux/i2c.h                   |   1 +
+> >>  5 files changed, 89 insertions(+), 74 deletions(-)
+> >>
+> >> --
+> >> 1.8.0.rc0
+> >>
+> >
+> > --
+> > balbi
 
-If this doesn't work, we probably also need to find a solution to
-build multiple uImage files from the same vmlinux when building a
-multiplatform kernel.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: rtctest.c
+Type: text/x-csrc
+Size: 5768 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/d3212336/attachment-0001.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/d3212336/attachment-0001.sig>
