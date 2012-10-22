@@ -1,76 +1,169 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Mon, 22 Oct 2012 16:12:41 -0500
-Subject: [PATCH v2 3/4] zynq: use GIC device tree bindings
-In-Reply-To: <20121022211040.GA31538@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121022211241.GD31538@beefymiracle.amer.corp.natinst.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 22 Oct 2012 14:17:33 -0700
+Subject: [RFC PATCH 2/2] ARM: OMAP4: clock: use omap4_clks_register API
+In-Reply-To: <902E09E6452B0E43903E4F2D568737AB2CA620@DNCE04.ent.ti.com>
+References: <1350578297-22572-1-git-send-email-grygorii.strashko@ti.com>
+ <1350578297-22572-3-git-send-email-grygorii.strashko@ti.com>,
+ <20121018175312.21731.22864@nucleus>
+ <902E09E6452B0E43903E4F2D568737AB2CA620@DNCE04.ent.ti.com>
+Message-ID: <20121022211733.21731.98489@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq uses the cortex-a9-gic.  This eliminates the need to hardcode
-register addresses.
+Quoting Strashko, Grygorii (2012-10-19 03:34:19)
+> Hi Mike,
+> 
+> > In addition to removing CK_443X/CK_446X you could also get rid of struct
+> > omap_clk completely (arch/arm/plat-omap/include/plat/clkdev_omap.h) and
+> > the CLK macro by changing the clk array to be of type struct clk_lookup
+> > and using the CLKDEV_INIT macro.
+> Yes. It may be done. As I understand, this approach is applicable for you, if so i can continue working on it. right?
+> 
+> > I wonder if splitting the tables would make initdata any easier.  It
+> OMAP5,4,2 - there are no so much differences between SOcs, so it looks good and simple.
+> OMAP3 - it is a little bit more complex.
+> > would be nice to get more functional changes out of this series
+> > alongside the data reorganization.
+> Could you provide more details, pls?
+> 
 
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
----
- arch/arm/boot/dts/zynq-ep107.dts           | 8 +++++---
- arch/arm/mach-zynq/common.c                | 7 ++++++-
- arch/arm/mach-zynq/include/mach/zynq_soc.h | 2 --
- 3 files changed, 11 insertions(+), 6 deletions(-)
+What I mean to say is that this patch doesn't change any functionality.
+It just reorganizes data to make things prettier.  In order to justify
+getting this change upstream (and to combat accusations of "needless
+churn") it would be good if this series did more than just shuffle the
+data around.  Two examples I have already mentioned are getting rid of
+the macros in ckdev_omap.h (and maybe getting rid of that entire file)
+and also marking data as initdata.  Both are functional changes that
+make the world a better place.
 
-diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-ep107.dts
-index 37ca192..7bfff4a 100644
---- a/arch/arm/boot/dts/zynq-ep107.dts
-+++ b/arch/arm/boot/dts/zynq-ep107.dts
-@@ -36,10 +36,12 @@
- 		ranges;
- 
- 		intc: interrupt-controller at f8f01000 {
-+			compatible = "arm,cortex-a9-gic";
-+			#interrupt-cells = <3>;
-+			#address-cells = <1>;
- 			interrupt-controller;
--			compatible = "arm,gic";
--			reg = <0xF8F01000 0x1000>;
--			#interrupt-cells = <2>;
-+			reg = <0xF8F01000 0x1000>,
-+			      <0xF8F00100 0x100>;
- 		};
- 
- 		uart0: uart at e0000000 {
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index b33f12f..e4e422b 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -55,12 +55,17 @@ static void __init xilinx_init_machine(void)
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
- }
- 
-+static struct of_device_id irq_match[] __initdata = {
-+	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
-+	{ }
-+};
-+
- /**
-  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
-  */
- static void __init xilinx_irq_init(void)
- {
--	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-+	of_irq_init(irq_match);
- }
- 
- /* The minimum devices needed to be mapped before the VM system is up and
-diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index ae3b236..9156914 100644
---- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-+++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -42,8 +42,6 @@
- 
- #define TTC0_BASE		IOMEM(TTC0_VIRT)
- #define SCU_PERIPH_BASE		IOMEM(SCU_PERIPH_VIRT)
--#define SCU_GIC_CPU_BASE	(SCU_PERIPH_BASE + 0x100)
--#define SCU_GIC_DIST_BASE	(SCU_PERIPH_BASE + 0x1000)
- #define PL310_L2CC_BASE		IOMEM(PL310_L2CC_VIRT)
- 
- #define LL_UART_PADDR	UART0_PHYS
--- 
-1.8.0
+Regards,
+Mike
+
+> > Also have you looked at splitting the tables for OMAP2/3?
+> Yes. I think, it can be done.
+> 
+> Best regards,
+> Grygorii Strashko | GlobalLogic
+> 
+> ________________________________________
+> From: Mike Turquette [mturquette at linaro.org]
+> Sent: Thursday, October 18, 2012 8:53 PM
+> To: Strashko, Grygorii; Paul Walmsley
+> Cc: Hilman, Kevin; Tony Lindgren; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Strashko, Grygorii
+> Subject: Re: [RFC PATCH 2/2] ARM: OMAP4: clock: use omap4_clks_register API
+> 
+> Quoting Grygorii Strashko (2012-10-18 09:38:17)
+> > Remove OMAP443x and OMAP446x specific clocks from omap44xx_clks
+> > array and add corresponding set of clocks per each SoC:
+> >  - struct omap_clk omap44xx_clks[]; - common clocks set for all OMAP4
+> >  - struct omap_clk omap443x_clks[]; - specific clocks set for OMAP443x
+> >  - struct omap_clk omap446x_clks[]; - specific clocks set for OMAP446x
+> >    and don't rely on platform specific flags any more.
+> >
+> > Use omap4_clks_register() API to register and init OMAP4 set of
+> > clocks.
+> >
+> > With this change, we can now safely remove CK_443X/CK_446X etc macro
+> > usage. It has not been done in this patch, but if the approach is OK,
+> > then, it is possible to do the same.
+> >
+> 
+> In addition to removing CK_443X/CK_446X you could also get rid of struct
+> omap_clk completely (arch/arm/plat-omap/include/plat/clkdev_omap.h) and
+> the CLK macro by changing the clk array to be of type struct clk_lookup
+> and using the CLKDEV_INIT macro.
+> 
+> > One additional benefit seen is that the match logic can entirely be
+> > skipped.
+> >
+> 
+> I wonder if splitting the tables would make initdata any easier.  It
+> would be nice to get more functional changes out of this series
+> alongside the data reorganization.
+> 
+> Also have you looked at splitting the tables for OMAP2/3?
+> 
+> Regards,
+> Mike
+> 
+> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/clock44xx_data.c |   40 ++++++++++++++++++----------------
+> >  1 file changed, 21 insertions(+), 19 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-omap2/clock44xx_data.c b/arch/arm/mach-omap2/clock44xx_data.c
+> > index 6efc30c..4060c9c 100644
+> > --- a/arch/arm/mach-omap2/clock44xx_data.c
+> > +++ b/arch/arm/mach-omap2/clock44xx_data.c
+> > @@ -3145,10 +3145,7 @@ static struct omap_clk omap44xx_clks[] = {
+> >         CLK(NULL,       "aes1_fck",                     &aes1_fck,      CK_443X),
+> >         CLK(NULL,       "aes2_fck",                     &aes2_fck,      CK_443X),
+> >         CLK(NULL,       "aess_fck",                     &aess_fck,      CK_443X),
+> > -       CLK(NULL,       "bandgap_fclk",                 &bandgap_fclk,  CK_443X),
+> > -       CLK(NULL,       "bandgap_ts_fclk",              &bandgap_ts_fclk,       CK_446X),
+> >         CLK(NULL,       "des3des_fck",                  &des3des_fck,   CK_443X),
+> > -       CLK(NULL,       "div_ts_ck",                    &div_ts_ck,     CK_446X),
+> >         CLK(NULL,       "dmic_sync_mux_ck",             &dmic_sync_mux_ck,      CK_443X),
+> >         CLK(NULL,       "dmic_fck",                     &dmic_fck,      CK_443X),
+> >         CLK(NULL,       "dsp_fck",                      &dsp_fck,       CK_443X),
+> > @@ -3346,19 +3343,27 @@ static struct omap_clk omap44xx_clks[] = {
+> >         CLK("4903c000.timer",   "timer_sys_ck", &syc_clk_div_ck,        CK_443X),
+> >         CLK("4903e000.timer",   "timer_sys_ck", &syc_clk_div_ck,        CK_443X),
+> >         CLK(NULL,       "cpufreq_ck",   &dpll_mpu_ck,   CK_443X),
+> > +       CLK(NULL,       NULL,           NULL,                   CK_443X),
+> > +};
+> > +
+> > +static struct omap_clk omap443x_clks[] = {
+> > +       CLK(NULL,       "bandgap_fclk",         &bandgap_fclk,          CK_443X),
+> > +       CLK(NULL,       NULL,           NULL,                   CK_443X),
+> > +};
+> > +
+> > +
+> > +static struct omap_clk omap446x_clks[] = {
+> > +       CLK(NULL,       "div_ts_ck",            &div_ts_ck,             CK_446X),
+> > +       CLK(NULL,       "bandgap_ts_fclk",      &bandgap_ts_fclk,       CK_446X),
+> > +       CLK(NULL,       NULL,           NULL,           CK_446X),
+> >  };
+> >
+> >  int __init omap4xxx_clk_init(void)
+> >  {
+> > -       struct omap_clk *c;
+> > -       u32 cpu_clkflg;
+> > -
+> >         if (cpu_is_omap443x()) {
+> >                 cpu_mask = RATE_IN_4430;
+> > -               cpu_clkflg = CK_443X;
+> >         } else if (cpu_is_omap446x() || cpu_is_omap447x()) {
+> >                 cpu_mask = RATE_IN_4460 | RATE_IN_4430;
+> > -               cpu_clkflg = CK_446X | CK_443X;
+> >
+> >                 if (cpu_is_omap447x())
+> >                         pr_warn("WARNING: OMAP4470 clock data incomplete!\n");
+> > @@ -3375,17 +3380,14 @@ int __init omap4xxx_clk_init(void)
+> >          * omap2_clk_disable_clkdm_control();
+> >          */
+> >
+> > -       for (c = omap44xx_clks; c < omap44xx_clks + ARRAY_SIZE(omap44xx_clks);
+> > -                                                                         c++)
+> > -               clk_preinit(c->lk.clk);
+> > -
+> > -       for (c = omap44xx_clks; c < omap44xx_clks + ARRAY_SIZE(omap44xx_clks);
+> > -                                                                         c++)
+> > -               if (c->cpu & cpu_clkflg) {
+> > -                       clkdev_add(&c->lk);
+> > -                       clk_register(c->lk.clk);
+> > -                       omap2_init_clk_clkdm(c->lk.clk);
+> > -               }
+> > +       omap2_clks_register(omap44xx_clks);
+> > +
+> > +       if (cpu_is_omap443x())
+> > +               omap2_clks_register(omap443x_clks);
+> > +       else if (cpu_is_omap446x() || cpu_is_omap447x())
+> > +               omap2_clks_register(omap446x_clks);
+> > +       else
+> > +               return 0;
+> >
+> >         /* Disable autoidle on all clocks; let the PM code enable it later */
+> >         omap_clk_disable_autoidle_all();
+> > --
+> > 1.7.9.5
