@@ -1,40 +1,41 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 12:46:54 +0300
-Subject: [PATCH 4/8] i2c: omap: also complete() when stat becomes zero
+Date: Mon, 22 Oct 2012 12:46:53 +0300
+Subject: [PATCH 3/8] i2c: omap: fix error checking
 In-Reply-To: <1350899218-13624-1-git-send-email-balbi@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
-Message-ID: <1350899218-13624-5-git-send-email-balbi@ti.com>
+Message-ID: <1350899218-13624-4-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case we loop on IRQ handler until stat is
-finally zero, we would end up in a situation
-where all I2C transfers would misteriously
-timeout because we were not calling complete()
-in that situation.
+It's impossible to have Arbitration Lost,
+Read Overflow, and Tranmist Underflow all
+asserted at the same time.
 
-Fix the issue by moving omap_i2c_complete_cmd()
-call inside the 'out' label.
+Those error conditions are mutually exclusive
+so what the code should be doing, instead, is
+check each error flag separataly.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index e0eab38..6219522 100644
+index bea0277..e0eab38 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1021,9 +1021,8 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 		}
- 	} while (stat);
+@@ -587,9 +587,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 		goto err_i2c_init;
+ 	}
  
--	omap_i2c_complete_cmd(dev, err);
--
- out:
-+	omap_i2c_complete_cmd(dev, err);
- 	spin_unlock_irqrestore(&dev->lock, flags);
- 
- 	return IRQ_HANDLED;
+-	/* We have an error */
+-	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+-			    OMAP_I2C_STAT_XUDF)) {
++	if ((dev->cmd_err & OMAP_I2C_STAT_AL)
++			|| (dev->cmd_err & OMAP_I2C_STAT_ROVR)
++			|| (dev->cmd_err & OMAP_I2C_STAT_XUDF)) {
+ 		ret = -EIO;
+ 		goto err_i2c_init;
+ 	}
 -- 
 1.8.0.rc0
