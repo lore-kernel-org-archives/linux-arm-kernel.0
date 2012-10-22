@@ -1,118 +1,19 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 22 Oct 2012 15:05:20 +0200
-Subject: [PATCH 5/8] i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
-In-Reply-To: <20121022122853.GW14033@arwen.pp.htv.fi>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-6-git-send-email-balbi@ti.com> <50853BA8.8000200@ti.com>
- <20121022122853.GW14033@arwen.pp.htv.fi>
-Message-ID: <50854490.4060306@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Oct 2012 14:05:57 +0100
+Subject: [PATCH] clk: Make the generic clock API available by default
+In-Reply-To: <1350910970-9095-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1350910970-9095-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <20121022130556.GM21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2012 02:28 PM, Felipe Balbi wrote:
-> Hi,
-> 
-> On Mon, Oct 22, 2012 at 02:27:20PM +0200, Benoit Cousson wrote:
->> Hi Felipe,
->>
->> On 10/22/2012 11:46 AM, Felipe Balbi wrote:
->>> on OMAP4+ we want to read IRQSTATUS_RAW register,
->>> instead of IRQSTATUS. The reason being that IRQSTATUS
->>> will only contain the bits which were enabled on
->>> IRQENABLE_SET and that will break when we need to
->>> poll for a certain bit which wasn't enabled as an
->>> IRQ source.
->>>
->>> One such case is after we finish converting to
->>> deferred stop bit, we will have to poll for ARDY
->>> bit before returning control for the client driver
->>> in order to prevent us from trying to start a
->>> transfer on a bus which is already busy.
->>>
->>> Note, however, that omap-i2c.c needs a big rework
->>> on register definition and register access. Such
->>> work will be done in a separate series of patches.
->>
->> Do you need OMAP_I2C_IP_VERSION_3 for OMAP4?
->>
->> OMAP_I2C_IP_VERSION_2 was already introduced to detect OMAP3630 vs
->> omap4430 because they were sharing the same IP version..
->>
->> /* I2C controller revisions present on specific hardware */
->> #define OMAP_I2C_REV_ON_2430            0x36
->> #define OMAP_I2C_REV_ON_3430_3530       0x3C
->> #define OMAP_I2C_REV_ON_3630_4430       0x40
->>
->> So in theory you should not need an extra version.
-> 
-> are you sure that's how they're used ? Looking at the code where we
-> choose reg_map_ip_v1 and reg_map_ip_v2:
-> 
-> 1120         if (dev->dtrev == OMAP_I2C_IP_VERSION_2)
-> 1121                 dev->regs = (u8 *)reg_map_ip_v2;
-> 1122         else
-> 1123                 dev->regs = (u8 *)reg_map_ip_v1;
-> 
-> And looking at reg_map_ip_v1:
-> 
->  218 static const u8 reg_map_ip_v1[] = {
->  219         [OMAP_I2C_REV_REG] = 0x00,
->  220         [OMAP_I2C_IE_REG] = 0x01,
->  221         [OMAP_I2C_STAT_REG] = 0x02,
->  222         [OMAP_I2C_IV_REG] = 0x03,
->  223         [OMAP_I2C_WE_REG] = 0x03,
->  224         [OMAP_I2C_SYSS_REG] = 0x04,
->  225         [OMAP_I2C_BUF_REG] = 0x05,
->  226         [OMAP_I2C_CNT_REG] = 0x06,
->  227         [OMAP_I2C_DATA_REG] = 0x07,
->  228         [OMAP_I2C_SYSC_REG] = 0x08,
->  229         [OMAP_I2C_CON_REG] = 0x09,
->  230         [OMAP_I2C_OA_REG] = 0x0a,
->  231         [OMAP_I2C_SA_REG] = 0x0b,
->  232         [OMAP_I2C_PSC_REG] = 0x0c,
->  233         [OMAP_I2C_SCLL_REG] = 0x0d,
->  234         [OMAP_I2C_SCLH_REG] = 0x0e,
->  235         [OMAP_I2C_SYSTEST_REG] = 0x0f,
->  236         [OMAP_I2C_BUFSTAT_REG] = 0x10,
->  237 };
-> 
-> that's really not the register map on OMAP3. That only looks valid for
-> OMAP1.
+On Mon, Oct 22, 2012 at 02:02:50PM +0100, Mark Brown wrote:
+> @@ -327,6 +328,7 @@ config ARCH_AT91
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CLKDEV_LOOKUP
+>  	select HAVE_CLK
+> +	select HAVE_CUSTOM_CLK
 
-No that should be valid as well for OMAP2&3 thanks to the
-OMAP_I2C_FLAG_BUS_SHIFT_2.
-
-It was introduced during DT adaptation:
-
-#ifdef CONFIG_OF
-static struct omap_i2c_bus_platform_data omap3_pdata = {
-        .rev = OMAP_I2C_IP_VERSION_1,
-        .flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
-                 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
-                 OMAP_I2C_FLAG_BUS_SHIFT_2,
-};
-
-static struct omap_i2c_bus_platform_data omap4_pdata = {
-        .rev = OMAP_I2C_IP_VERSION_2,
-};
-
-static const struct of_device_id omap_i2c_of_match[] = {
-        {
-                .compatible = "ti,omap4-i2c",
-                .data = &omap4_pdata,
-        },
-        {
-                .compatible = "ti,omap3-i2c",
-                .data = &omap3_pdata,
-        },
-        { },
-};
-MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
-#endif
-
-
-> -ECONFUSED
-
-Well, it is confusing...
-
-Benoit
+This is silly.  If you select "HAVE_CUSTOM_CLK" then isn't it true that
+"HAVE_CLK" should also be selected?  If so, why not have "HAVE_CUSTOM_CLK"
+do that selection and remove it from all these entries?
