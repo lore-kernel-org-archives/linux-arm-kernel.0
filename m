@@ -1,112 +1,74 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Mon, 22 Oct 2012 10:37:49 -0500
-Subject: [PATCH 4/4] zynq: move static peripheral mappings
-Message-ID: <20121022153749.GD502@beefymiracle.amer.corp.natinst.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 22 Oct 2012 08:50:28 -0700
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <20121022155028.GA13791@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shifting them up into the vmalloc region prevents the following warning,
-when booting a zynq qemu target with more than 512mb of RAM:
+Hi Sourav,
 
-  BUG: mapping for 0xe0000000 at 0xe0000000 out of vmalloc space
+On Mon, Oct 22, 2012 at 06:43:00PM +0530, Sourav Poddar wrote:
+> Adapt keypad to use pinctrl framework.
+> 
+> Tested on omap4430 sdp with 3.7-rc1 kernel.
 
-In addition, it allows for reuse of these mappings when the proper
-drivers issue requests via ioremap().
+I do not see anything in the driver that would directly use pinctrl. Is
+there a better place to select default pin configuration; maybe when
+instantiating platform device?
 
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
----
- arch/arm/mach-zynq/common.c                |  8 +++----
- arch/arm/mach-zynq/include/mach/zynq_soc.h | 34 +++++++++++++++++-------------
- 2 files changed, 23 insertions(+), 19 deletions(-)
+Thanks.
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 6ea86cf..e10268c 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -75,17 +75,17 @@ static struct map_desc io_desc[] __initdata = {
- 	{
- 		.virtual	= TTC0_VIRT,
- 		.pfn		= __phys_to_pfn(TTC0_PHYS),
--		.length		= SZ_4K,
-+		.length		= TTC0_SIZE,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= SCU_PERIPH_VIRT,
- 		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
--		.length		= SZ_8K,
-+		.length		= SCU_PERIPH_SIZE,
- 		.type		= MT_DEVICE,
- 	}, {
- 		.virtual	= PL310_L2CC_VIRT,
- 		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
--		.length		= SZ_4K,
-+		.length		= PL310_L2CC_SIZE,
- 		.type		= MT_DEVICE,
- 	},
- 
-@@ -93,7 +93,7 @@ static struct map_desc io_desc[] __initdata = {
- 	{
- 		.virtual	= UART0_VIRT,
- 		.pfn		= __phys_to_pfn(UART0_PHYS),
--		.length		= SZ_4K,
-+		.length		= UART0_SIZE,
- 		.type		= MT_DEVICE,
- 	},
- #endif
-diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index 3d1c6a6..9156914 100644
---- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-+++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -15,31 +15,35 @@
- #ifndef __MACH_XILINX_SOC_H__
- #define __MACH_XILINX_SOC_H__
- 
-+#include <asm/pgtable.h>
-+
- #define PERIPHERAL_CLOCK_RATE		2500000
- 
--/* For now, all mappings are flat (physical = virtual)
-+/* Static peripheral mappings are mapped at the top of the
-+ * vmalloc region
-  */
--#define UART0_PHYS			0xE0000000
--#define UART0_VIRT			UART0_PHYS
-+#define UART0_PHYS		0xE0000000
-+#define UART0_SIZE		SZ_4K
-+#define UART0_VIRT		(VMALLOC_END - UART0_SIZE)
- 
--#define TTC0_PHYS			0xF8001000
--#define TTC0_VIRT			TTC0_PHYS
-+#define TTC0_PHYS		0xF8001000
-+#define TTC0_SIZE		SZ_4K
-+#define TTC0_VIRT		(UART0_VIRT - TTC0_SIZE)
- 
--#define PL310_L2CC_PHYS			0xF8F02000
--#define PL310_L2CC_VIRT			PL310_L2CC_PHYS
-+#define PL310_L2CC_PHYS		0xF8F02000
-+#define PL310_L2CC_SIZE		SZ_4K
-+#define PL310_L2CC_VIRT		(TTC0_VIRT - PL310_L2CC_SIZE)
- 
--#define SCU_PERIPH_PHYS			0xF8F00000
--#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
-+#define SCU_PERIPH_PHYS		0xF8F00000
-+#define SCU_PERIPH_SIZE		SZ_8K
-+#define SCU_PERIPH_VIRT		(PL310_L2CC_VIRT - SCU_PERIPH_SIZE)
- 
- /* The following are intended for the devices that are mapped early */
- 
--#define TTC0_BASE			IOMEM(TTC0_VIRT)
--#define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
--#define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
-+#define TTC0_BASE		IOMEM(TTC0_VIRT)
-+#define SCU_PERIPH_BASE		IOMEM(SCU_PERIPH_VIRT)
-+#define PL310_L2CC_BASE		IOMEM(PL310_L2CC_VIRT)
- 
--/*
-- * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
-- */
- #define LL_UART_PADDR	UART0_PHYS
- #define LL_UART_VADDR	UART0_VIRT
- 
+> 
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+> v1->v2
+> - Added "PROBE_DEFER" check 
+>  drivers/input/keyboard/omap4-keypad.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+> index c05f98c..502b832 100644
+> --- a/drivers/input/keyboard/omap4-keypad.c
+> +++ b/drivers/input/keyboard/omap4-keypad.c
+> @@ -31,6 +31,7 @@
+>  #include <linux/input.h>
+>  #include <linux/slab.h>
+>  #include <linux/pm_runtime.h>
+> +#include <linux/pinctrl/consumer.h>
+>  
+>  #include <linux/platform_data/omap4-keypad.h>
+>  
+> @@ -76,6 +77,7 @@ enum {
+>  
+>  struct omap4_keypad {
+>  	struct input_dev *input;
+> +	struct pinctrl	*pins;
+>  
+>  	void __iomem *base;
+>  	unsigned int irq;
+> @@ -298,6 +300,15 @@ static int __devinit omap4_keypad_probe(struct platform_device *pdev)
+>  		goto err_release_mem;
+>  	}
+>  
+> +	keypad_data->pins = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(keypad_data->pins)) {
+> +		if (PTR_ERR(keypad_data->pins) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +
+> +		dev_warn(&pdev->dev, "did not get pins for keypad error: %li\n",
+> +					PTR_ERR(keypad_data->pins));
+> +		keypad_data->pins = NULL;
+> +	}
+>  
+>  	/*
+>  	 * Enable clocks for the keypad module so that we can read
+> -- 
+> 1.7.1
+> 
+
 -- 
-1.8.0
+Dmitry
