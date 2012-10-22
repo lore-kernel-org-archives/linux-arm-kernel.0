@@ -1,44 +1,38 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 22 Oct 2012 21:51:41 +0200
-Subject: [PATCH 0/4] OMAP-GPMC generic timing migration
-In-Reply-To: <50817307.50509@ti.com>
-References: <cover.1349450723.git.afzal@ti.com> <5076B166.2020006@gmail.com>
- <50817307.50509@ti.com>
-Message-ID: <5085A3CD.7020700@gmail.com>
+From: spang@chromium.org (Michael Spang)
+Date: Mon, 22 Oct 2012 15:51:54 -0400
+Subject: [PATCH] ARM: Only initialize max_mapnr when using flatmem
+Message-ID: <1350935514-27422-1-git-send-email-spang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19.10.2012 17:34, Afzal Mohammed wrote:
-> Hi Daniel,
-> 
-> On Thursday 11 October 2012 05:15 PM, Daniel Mack wrote:
-> 
->> Could you tell me which patches I need on top of soon-to-be-3.7-rc1? I
->> would like to augment this to make GPMC attached NAND probable in DT, in
->> case this is still an open topic.
-> 
-> In case you can help on making gpmc nand dt probable, please
-> proceed. I would be on vacation next week, may be we can
-> discuss after I am back.
+The expression used to initialize max_mapnr is not appropriate for
+sparsemem, since mem_map is NULL and pfn_to_page() only works on valid
+pages. This patch leaves max_mapnr uninitialized for sparsemem.
 
-Enjoy your vacation :)
+For flatmem, the expression simplifies to copying max_pfn.
 
-> am335x based boards like beagle bone should be booting on
-> l-o master and it has gpmc header cleanup changes with
-> minimal driver support.
-> 
-> As I don't have the sufficient time to explain in detail, some
-> pointers. Discussion between us [1] hopefully explains it in brief.
-> It would be like peripherals connected to gpmc being represented
-> as child nodes in dt. gpmc driver probably in probe would have to
-> invoke of_platform_populate to create child nodes (for devices like
-> nand). And driver would have to be enhanced to configure gpmc
-> based on information passed through dt for each child nodes.
-> Or roughly have a dt equivalent of driver as in [2].
+Signed-off-by: Michael Spang <spang@chromium.org>
+---
+ arch/arm/mm/init.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-Hmm, not sure if I follow all your thought here, but I cooked up
-something that is straight-forward and works well for me. I'll post them
-now, so we at least have a base for discussions ...
+I'm not sure we need this variable it all - it looks like there are no
+users.
 
-
-Daniel
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index c21d06c..9b72e6f 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -600,7 +600,9 @@ void __init mem_init(void)
+ 	extern u32 itcm_end;
+ #endif
+ 
+-	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
++#ifdef CONFIG_FLATMEM
++	max_mapnr = max_pfn;
++#endif
+ 
+ 	/* this will put all unused low memory onto the freelists */
+ 	free_unused_memmap(&meminfo);
+-- 
+1.7.7.3
