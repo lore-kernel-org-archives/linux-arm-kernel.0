@@ -1,90 +1,90 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 22 Oct 2012 14:14:23 +0200
-Subject: [PATCH 0/7] ARM: OMAP: second set of PRM/CM/CGRM cleanup patches
- for 3.8
-In-Reply-To: <20121016012448.21844.92339.stgit@dusk.lan>
-References: <20121016012448.21844.92339.stgit@dusk.lan>
-Message-ID: <5085389F.6070106@ti.com>
+From: sourav.poddar@ti.com (Sourav)
+Date: Mon, 22 Oct 2012 17:57:00 +0530
+Subject: [PATCH 3/4] ARM/dts: omap5: Update UART with address space and
+ interrupts
+In-Reply-To: <508536EA.4020808@ti.com>
+References: <1350901328-3525-1-git-send-email-s-guiriec@ti.com>
+ <1350901328-3525-4-git-send-email-s-guiriec@ti.com> <50852AF9.10703@ti.com>
+ <5085348C.60105@ti.com> <508536EA.4020808@ti.com>
+Message-ID: <50853B94.4060308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Benoit,
+On Monday 22 October 2012 05:37 PM, Benoit Cousson wrote:
+> On 10/22/2012 01:57 PM, Benoit Cousson wrote:
+>> Hi Sourav,
+>>
+>> On 10/22/2012 01:16 PM, Sourav wrote:
+>>> Hi Sebastien,
+>>> On Monday 22 October 2012 03:52 PM, Sebastien Guiriec wrote:
+>>>> Add base address and interrupt line inside Device Tree data for
+>>> Incomplete sentence!
+>>>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>>>> ---
+>>>>    arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++--
+>>>>    1 file changed, 14 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>>>> index 6c22e1b..413df94 100644
+>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>> @@ -237,36 +237,48 @@
+>>>>              uart1: serial at 4806a000 {
+>>>>                compatible = "ti,omap4-uart";
+>>>> +            reg = <0x4806a000 0x100>;
+>>>> +            interrupts = <0 72 0x4>;
+>>>>                ti,hwmods = "uart1";
+>>>>                clock-frequency = <48000000>;
+>>>>            };
+>>>>              uart2: serial at 4806c000 {
+>>>>                compatible = "ti,omap4-uart";
+>>>> +            reg = <0x4806c000 0x100>;
+>>>> +            interrupts = <0 73 0x4>;
+>>>>                ti,hwmods = "uart2";
+>>>>                clock-frequency = <48000000>;
+>>>>            };
+>>>>              uart3: serial at 48020000 {
+>>>>                compatible = "ti,omap4-uart";
+>>>> +            reg = <0x48020000 0x100>;
+>>>> +            interrupts = <0 74 0x4>;
+>>>>                ti,hwmods = "uart3";
+>>>>                clock-frequency = <48000000>;
+>>>>            };
+>>>>              uart4: serial at 4806e000 {
+>>>>                compatible = "ti,omap4-uart";
+>>>> +            reg = <0x4806e000 0x100>;
+>>>> +            interrupts = <0 70 0x4>;
+>>>>                ti,hwmods = "uart4";
+>>>>                clock-frequency = <48000000>;
+>>>>            };
+>>>>              uart5: serial at 48066000 {
+>>>> -            compatible = "ti,omap5-uart";
+>>>> +            compatible = "ti,omap4-uart";
+>>>> +            reg = <0x48066000 0x100>;
+>>>> +            interrupts = <0 105 0x4>;
+>>> In Omap5 TRM, the interrupt number mentioned for uart5 is 138. How is
+>>> 105 coming?
+>> It is from hwmod and thus from the HW spec. It looks like the TRM is
+>> wrong... or the HW spec :-)
+>>
+>>>>                ti,hwmods = "uart5";
+>>>>                clock-frequency = <48000000>;
+>>>>            };
+>>>>              uart6: serial at 48068000 {
+>>>> -            compatible = "ti,omap6-uart";
+>>>> +            compatible = "ti,omap4-uart";
+>>>> +            reg = <0x48068000 0x100>;
+>>>> +            interrupts = <0 106 0x4>;
+>>> Same here, TRM shows this number to be 139 ?
+> In fact, even the TRM (ES1.0 NDA vM) is aligned with these data.
+> Where did you see 138 and 139?
+I looked at Page 6300 of the above TRM, Figure 24-60. Is this place not 
+correct to look
+up for these data?
 
-Hi Paul,
-
-What is CGRM? Is it a typo?
-
-Regards,
-Benoit
-
-
-On 10/16/2012 03:32 AM, Paul Walmsley wrote:
-> This series removes the omap_prcm_get_reset_sources() function.  This
-> was exported from arch/arm/mach-omap2/prcm.c for use by the OMAP
-> watchdog driver to report the "boot reason".  This series reimplements
-> this using a platform_data function pointer for the time being, but
-> after the upcoming PRM/CM drivers are merged, the watchdog driver can be
-> patched to use an exported function from the drivers.
-> 
-> This series will also be used as a base for other PRM/CM cleanup during the
-> 3.8 time frame, since it adds the prm_register() and prm_unregister() functions.
-> These are called by SoC-specific PRM IP block drivers to register function
-> pointers with the PRM subsystem.
-> 
-> This series changes the format of the watchdog's boot reason data to conform
-> with the watchdog subsystem standard (the WDIOF_* flags).  If users need
-> more detail than that interface provides, either the watchdog interface can
-> be patched, or those users can get that information from the upcoming PRM
-> drivers.
-> 
-> 
-> - Paul
-> 
-> ---
-> 
-> prcm_cleanup_b_3.8
->    text	   data	    bss	    dec	    hex	filename
-> 7519295	 696796	5613996	13830087	 d307c7	vmlinux.omap2plus_defconfig.orig
-> 7520203	 696868	5613996	13831067	 d30b9b	vmlinux.omap2plus_defconfig
-> 
-> Paul Walmsley (7):
->       ARM: OMAP2+: PRM: prepare for use of prm_ll_data function pointers
->       ARM: OMAP2+: CM: prepare for use of cm_ll_data function pointers
->       ARM: OMAP1: create read_reset_sources() function (for initial use by watchdog)
->       ARM: OMAP2+: PRM: create PRM reset source API for the watchdog timer driver
->       ARM: OMAP2+: WDT: move init; add read_reset_sources pdata function pointer
->       watchdog: OMAP: use standard GETBOOTSTATUS interface; use platform_data fn ptr
->       ARM: OMAP2+: PRCM: remove omap_prcm_get_reset_sources()
-> 
-> 
->  arch/arm/mach-omap1/common.h                |    2 +
->  arch/arm/mach-omap1/devices.c               |   21 ++++++-
->  arch/arm/mach-omap1/reset.c                 |   39 +++++++++++++
->  arch/arm/mach-omap2/Makefile                |    2 -
->  arch/arm/mach-omap2/cm.h                    |   12 ++++
->  arch/arm/mach-omap2/cm_common.c             |   71 +++++++++++++++++++++++
->  arch/arm/mach-omap2/devices.c               |   26 --------
->  arch/arm/mach-omap2/prcm.c                  |   12 ----
->  arch/arm/mach-omap2/prm-regbits-24xx.h      |    4 +
->  arch/arm/mach-omap2/prm-regbits-34xx.h      |   10 +++
->  arch/arm/mach-omap2/prm.h                   |   53 +++++++++++++++++
->  arch/arm/mach-omap2/prm2xxx.c               |   68 ++++++++++++++++++++++
->  arch/arm/mach-omap2/prm2xxx.h               |    4 +
->  arch/arm/mach-omap2/prm2xxx_3xxx.h          |    2 +
->  arch/arm/mach-omap2/prm3xxx.c               |   65 +++++++++++++++++++++
->  arch/arm/mach-omap2/prm3xxx.h               |    2 +
->  arch/arm/mach-omap2/prm44xx.c               |   83 ++++++++++++++++++++++++++-
->  arch/arm/mach-omap2/prm44xx.h               |    2 +
->  arch/arm/mach-omap2/prm_common.c            |   78 +++++++++++++++++++++++++
->  arch/arm/mach-omap2/wd_timer.c              |   33 +++++++++++
->  arch/arm/plat-omap/include/plat/prcm.h      |    1 
->  drivers/watchdog/omap_wdt.c                 |   26 ++++----
->  include/linux/platform_data/omap-wd-timer.h |   38 ++++++++++++
->  23 files changed, 594 insertions(+), 60 deletions(-)
->  create mode 100644 arch/arm/mach-omap2/cm_common.c
->  create mode 100644 include/linux/platform_data/omap-wd-timer.h
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Regards,
+> Benoit
+>
+>
+>
