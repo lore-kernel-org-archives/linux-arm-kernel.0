@@ -1,32 +1,49 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 21 Oct 2012 23:09:01 -0400
-Subject: [PATCH v2 1/3] ARM: Kirkwood: Remove unused includes
-In-Reply-To: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
-References: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
-Message-ID: <20121022030901.GJ25828@titan.lakedaemon.net>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Mon, 22 Oct 2012 10:08:20 +0530
+Subject: [PATCH] ARM: tegra30: clocks: add AHB and APB clocks
+In-Reply-To: <1350628693-1190-1-git-send-email-josephl@nvidia.com>
+References: <1350628693-1190-1-git-send-email-josephl@nvidia.com>
+Message-ID: <5084CDBC.2010106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2012 at 01:23:14PM +0200, Andrew Lunn wrote:
-> With the gradual conversion of C code to DT, there are a number of
-> include files which are no longer needed. Remove them.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On Friday 19 October 2012 12:08 PM, Joseph Lo wrote:
+> Adding the AHB and APB bus clock control interface for Tegra30.
+>
+> Signed-off-by: Joseph Lo<josephl@nvidia.com>
 > ---
->  arch/arm/mach-kirkwood/board-dockstar.c       |   13 -------------
->  arch/arm/mach-kirkwood/board-dreamplug.c      |   15 ---------------
->  arch/arm/mach-kirkwood/board-goflexnet.c      |   13 -------------
->  arch/arm/mach-kirkwood/board-ib62x0.c         |    6 ------
->  arch/arm/mach-kirkwood/board-iconnect.c       |    8 --------
->  arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
->  arch/arm/mach-kirkwood/board-lsxl.c           |    8 --------
->  arch/arm/mach-kirkwood/board-ts219.c          |    3 ---
->  8 files changed, 68 deletions(-)
+>   arch/arm/mach-tegra/common.c              |    4 +
+>   arch/arm/mach-tegra/tegra30_clocks.c      |  106 +++++++++++++++++++++++++++++
+>   arch/arm/mach-tegra/tegra30_clocks.h      |    1 +
+>   arch/arm/mach-tegra/tegra30_clocks_data.c |   46 +++++++++++++
+>   4 files changed, 157 insertions(+), 0 deletions(-)
 
-Whole series applied to:
+<snip>
 
-git://git.infradead.org/users/jcooper/linux.git kirkwood/cleanup
+> +
+> +static long tegra30_bus_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				unsigned long *prate)
+> +{
+> +	unsigned long parent_rate = *prate;
+> +	s64 divider;
+> +
+> +	if (rate>= parent_rate)
+> +		return rate;
+> +
 
-thx,
+return parent_rate?
 
-Jason.
+> +	divider = parent_rate;
+> +	divider += rate - 1;
+> +	do_div(divider, rate);
+> +
+> +	if (divider<  0)
+> +		return divider;
+> +
+> +	if (divider>  4)
+> +		divider = 4;
+> +	do_div(parent_rate, divider);
+> +
+> +	return parent_rate;
+> +}
+>
