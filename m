@@ -1,53 +1,73 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 22 Oct 2012 09:47:06 -0700
-Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
- revert "i2c: omap: switch to threaded IRQ support")
-In-Reply-To: <1350899541.2768.82.camel@twins> (Peter Zijlstra's message of
- "Mon, 22 Oct 2012 11:52:21 +0200")
-References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
- <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
- <20121016133356.GG21801@arwen.pp.htv.fi>
- <87ipaanljt.fsf_-_@deeprootsystems.com>
- <20121017140002.GI11394@arwen.pp.htv.fi>
- <20121017143534.GJ11394@arwen.pp.htv.fi>
- <87txtsitpt.fsf@deeprootsystems.com>
- <20121018055136.GF11137@arwen.pp.htv.fi>
- <1350655227.2768.11.camel@twins> <87391ahvao.fsf@deeprootsystems.com>
- <1350899541.2768.82.camel@twins>
-Message-ID: <87ehkqihdh.fsf@deeprootsystems.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 22 Oct 2012 19:02:42 +0200
+Subject: [PATCH 0/5] SMP support for Armada XP
+Message-ID: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Zijlstra <peterz@infradead.org> writes:
+Hello,
 
-> On Fri, 2012-10-19 at 16:54 -0700, Kevin Hilman wrote:
->
->> So I did the same thing for my ARM SoC, and it definitley stops the RT
->> throttling.  
->> 
->> However, it has the undesriable (IMO) side effect of making timed printk
->> output rather unhelpful for debugging suspend/resume since printk time
->> stays constant throughout suspend/resume no matter how long you
->> sleep. :(
->> 
->> So does that mean we have to choose between useful printk times during
->> suspend/resume or functioning IRQ threads during suspend/resume ?
->
-> Urgh.. this was not something I considered. This being primarily the
-> sched_clock infrastructure and such.
->
-> So what exactly is the problem with the suspend resume thing (its not
-> something I've ever debugged), is all you need a clean break between pre
-> and post suspend, or do you need the actual time the machine was gone?
+The purpose of this patch set is to add the SMP support for the Armada
+XP SoCs. Beside the SMP support itself brought by the last 3 patches,
+this patch set also adds the support for the coherency fabric unit and
+the power management service unit.
 
-I think it's more a question of what people are used to.  I think folks
-used to debugging suspend/resume (at least on ARM) are used to having
-the printk timestamps reflect the amount of time the machine was gone.
+The coherency fabric is responsible for ensuring hardware coherency
+between all CPUs and between CPUs and I/O masters. This unit is also
+available for Armada 370 and will be used in an incoming patch set
+for hardware I/O cache coherency.
 
-With a sched_clock() that counts during suspend, that feature doesn't
-work anymore.  I'm not sure that this feature is a deal breaker, but it
-has been convenient.  I see that on x86, it's already normal that
-printk times don't reflect time spent in suspend, so I guess ARM needs
-to adapt.  
+The power management service unit is responsible for powering down and
+waking up CPUs and other SOC units.
 
-Kevin
+The original code is from Yehuda Yitschak, it was reworked by myself
+and reviewed by Yehuda.
+
+This patch set is based on 3.7-rc2 and depends one the framework clock
+support (the last version was posted last week:
+http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
+called ArmadaXP-SMP-for-3.8 is also available at
+https://github.com/MISL-EBU-System-SW/mainline-public.git.
+
+Regards,
+
+Yehuda Yitschak (5):
+  arm: mvebu: Added support for coherency fabric in mach-mvebu
+  arm: mvebu: Added initial support for power managmement service unit
+  arm: mvebu: Added IPI support via doorbells
+  arm: mm: Added support for PJ4B cpu and init routines
+  arm: mvebu: Added SMP support for Armada XP
+
+ .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |   20 ++++
+ .../devicetree/bindings/arm/coherency-fabric.txt   |   16 +++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    5 +
+ arch/arm/boot/dts/armada-xp.dtsi                   |   12 +-
+ arch/arm/configs/mvebu_defconfig                   |    3 +
+ arch/arm/mach-mvebu/Kconfig                        |    3 +-
+ arch/arm/mach-mvebu/Makefile                       |    4 +-
+ arch/arm/mach-mvebu/armada-370-xp.c                |    1 +
+ arch/arm/mach-mvebu/armada-370-xp.h                |   10 ++
+ arch/arm/mach-mvebu/coherency.c                    |   92 +++++++++++++++
+ arch/arm/mach-mvebu/coherency.h                    |   20 ++++
+ arch/arm/mach-mvebu/common.h                       |    6 +
+ arch/arm/mach-mvebu/headsmp.S                      |   65 +++++++++++
+ arch/arm/mach-mvebu/hotplug.c                      |   30 +++++
+ arch/arm/mach-mvebu/irq-armada-370-xp.c            |   92 ++++++++++++++-
+ arch/arm/mach-mvebu/platsmp.c                      |  123 ++++++++++++++++++++
+ arch/arm/mach-mvebu/pmsu.c                         |   78 +++++++++++++
+ arch/arm/mach-mvebu/pmsu.h                         |   16 +++
+ arch/arm/mm/Kconfig                                |    4 +
+ arch/arm/mm/proc-v7.S                              |   46 ++++++++
+ 20 files changed, 637 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
+ create mode 100644 arch/arm/mach-mvebu/coherency.c
+ create mode 100644 arch/arm/mach-mvebu/coherency.h
+ create mode 100644 arch/arm/mach-mvebu/headsmp.S
+ create mode 100644 arch/arm/mach-mvebu/hotplug.c
+ create mode 100644 arch/arm/mach-mvebu/platsmp.c
+ create mode 100644 arch/arm/mach-mvebu/pmsu.c
+ create mode 100644 arch/arm/mach-mvebu/pmsu.h
+
+-- 
+1.7.9.5
