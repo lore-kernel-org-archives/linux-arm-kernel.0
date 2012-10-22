@@ -1,37 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 14:26:56 -0700
-Subject: [PATCH] ARM: OMAP3: Beagle: fix OPP customization and initcall
- ordering
-In-Reply-To: <1350938009-22716-1-git-send-email-khilman@deeprootsystems.com>
-References: <1350938009-22716-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20121022212656.GK4730@atomide.com>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Mon, 22 Oct 2012 22:27:48 +0100
+Subject: Which kirkwood does your DT board use?
+In-Reply-To: <20121020113800.GC21046@lunn.ch>
+References: <20121020113800.GC21046@lunn.ch>
+Message-ID: <5085BA54.6050006@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [121022 13:35]:
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -24,6 +24,7 @@
->  #include <linux/input.h>
->  #include <linux/gpio_keys.h>
->  #include <linux/opp.h>
-> +#include <linux/cpu.h>
->  
->  #include <linux/mtd/mtd.h>
->  #include <linux/mtd/partitions.h>
-> @@ -444,12 +445,13 @@ static struct omap_board_mux board_mux[] __initdata = {
->  };
->  #endif
->  
-> -static void __init beagle_opp_init(void)
-> +static int __init beagle_opp_init(void)
->  {
->  	int r = 0;
+On 20/10/12 12:38, Andrew Lunn wrote:
+> Hi Folks
+>
+> All of you in the To: have contributed a DT based Kirkwood board port.
+> Nearly all the DT files we have declare the CPU to be
+> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
+> mpp code, we need to know the exact kirkwood being used. It should be
+> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
+>
+> You can see what your hardware has a boot time:
+>
+> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
+>
+> Please could you check your hardware and let me know what the correct
+> CPU is. I can then fix the .dts files and prepare a first attempt at
+> converting boards to pinctrl.
+>
 
-Don't you need to add some check here for machine_is
-to prevent this from running on other boards if you now
-make this into an initcall?
+Hi,
 
-Regards,
+I've not seen a reply from Arnaud yet so I'll offer
 
-Tony
+Iomega Iconnect
+Kirkwood: MV88F6281-A0, TCLK=200000000.
+
+Regards
+
+Adam
