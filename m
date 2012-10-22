@@ -1,49 +1,45 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 22 Oct 2012 10:08:20 +0530
-Subject: [PATCH] ARM: tegra30: clocks: add AHB and APB clocks
-In-Reply-To: <1350628693-1190-1-git-send-email-josephl@nvidia.com>
-References: <1350628693-1190-1-git-send-email-josephl@nvidia.com>
-Message-ID: <5084CDBC.2010106@nvidia.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Mon, 22 Oct 2012 12:46:19 +0800
+Subject: [PATCH] ARM: PCI: fix missing unlock on error
+Message-ID: <CAPgLHd-Hw-RQZnqb-Usiuq4xhY250kObCGK40cXoDE8f59Cr8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 October 2012 12:08 PM, Joseph Lo wrote:
-> Adding the AHB and APB bus clock control interface for Tegra30.
->
-> Signed-off-by: Joseph Lo<josephl@nvidia.com>
-> ---
->   arch/arm/mach-tegra/common.c              |    4 +
->   arch/arm/mach-tegra/tegra30_clocks.c      |  106 +++++++++++++++++++++++++++++
->   arch/arm/mach-tegra/tegra30_clocks.h      |    1 +
->   arch/arm/mach-tegra/tegra30_clocks_data.c |   46 +++++++++++++
->   4 files changed, 157 insertions(+), 0 deletions(-)
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-<snip>
+Add the missing unlock on the error handle path in function
+nanoengine_read_config() and nanoengine_write_config().
 
-> +
-> +static long tegra30_bus_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-> +				unsigned long *prate)
-> +{
-> +	unsigned long parent_rate = *prate;
-> +	s64 divider;
-> +
-> +	if (rate>= parent_rate)
-> +		return rate;
-> +
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-sa1100/pci-nanoengine.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-return parent_rate?
-
-> +	divider = parent_rate;
-> +	divider += rate - 1;
-> +	do_div(divider, rate);
-> +
-> +	if (divider<  0)
-> +		return divider;
-> +
-> +	if (divider>  4)
-> +		divider = 4;
-> +	do_div(parent_rate, divider);
-> +
-> +	return parent_rate;
-> +}
->
+diff --git a/arch/arm/mach-sa1100/pci-nanoengine.c b/arch/arm/mach-sa1100/pci-nanoengine.c
+index ff02e2d..6ff07d7 100644
+--- a/arch/arm/mach-sa1100/pci-nanoengine.c
++++ b/arch/arm/mach-sa1100/pci-nanoengine.c
+@@ -67,8 +67,10 @@ static int nanoengine_read_config(struct pci_bus *bus, unsigned int devfn, int w
+ 	spin_lock_irqsave(&nano_lock, flags);
+ 
+ 	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
+-	if (ret != PCIBIOS_SUCCESSFUL)
++	if (ret != PCIBIOS_SUCCESSFUL) {
++		spin_unlock_irqrestore(&nano_lock, flags);
+ 		return ret;
++	}
+ 	v = __raw_readl(address);
+ 
+ 	spin_unlock_irqrestore(&nano_lock, flags);
+@@ -95,8 +97,10 @@ static int nanoengine_write_config(struct pci_bus *bus, unsigned int devfn, int
+ 	spin_lock_irqsave(&nano_lock, flags);
+ 
+ 	ret = nanoengine_get_pci_address(bus, devfn, where, &address);
+-	if (ret != PCIBIOS_SUCCESSFUL)
++	if (ret != PCIBIOS_SUCCESSFUL) {
++		spin_unlock_irqrestore(&nano_lock, flags);
+ 		return ret;
++	}
+ 	v = __raw_readl(address);
+ 	switch (size) {
+ 	case 1:
