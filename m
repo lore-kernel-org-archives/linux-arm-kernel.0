@@ -1,214 +1,135 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:52:16 -0400
-Subject: [PATCH v3 09/13] ARM: KVM: VGIC interrupt injection
-In-Reply-To: <20121022065104.18672.52989.stgit@ubuntu>
-References: <20121022065104.18672.52989.stgit@ubuntu>
-Message-ID: <20121022065216.18672.36662.stgit@ubuntu>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 22 Oct 2012 19:51:52 +1300
+Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
+References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
+ <1350643135-13197-2-git-send-email-linux@prisktech.co.nz>
+ <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
+Message-ID: <1350888712.3592.11.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+Replies to your comments inline:
 
-Plug the interrupt injection code. Interrupts can now be generated
-from user space.
+On Mon, 2012-10-22 at 08:34 +0200, Thierry Reding wrote:
+...
+> > -static int __devinit pwm_probe(struct platform_device *pdev)
+> > +static const struct of_device_id vt8500_pwm_dt_ids[] = {
+> > +	{ .compatible = "via,vt8500-pwm", },
+> > +	{ /* Sentinel */ }
+> > +};
+> > +
+> > +static int __devinit vt8500_pwm_probe(struct platform_device *pdev)
+> 
+> Since you're changing this line anyway, maybe you should drop __devinit
+> (and __devexit for the .remove() callback). HOTPLUG is always enabled
+> nowadays and will go away eventually, in which case these will need to
+> be removed anyway.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
----
- arch/arm/include/asm/kvm_vgic.h |    8 +++
- arch/arm/kvm/arm.c              |   29 +++++++++++++
- arch/arm/kvm/vgic.c             |   90 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 127 insertions(+)
+Will do. I must say the inconstancy among comments is rather
+frustrating. In another patch I sent out a few days ago (completely
+unrelated to this), I told to add __devexit to a remove() function :\
 
-diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-index 7229324..6e3d303 100644
---- a/arch/arm/include/asm/kvm_vgic.h
-+++ b/arch/arm/include/asm/kvm_vgic.h
-@@ -241,6 +241,8 @@ struct kvm_exit_mmio;
- int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
- void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu);
- void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu);
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-+			bool level);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		      struct kvm_exit_mmio *mmio);
-@@ -271,6 +273,12 @@ static inline void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu) {}
- static inline void kvm_vgic_sync_to_cpu(struct kvm_vcpu *vcpu) {}
- static inline void kvm_vgic_sync_from_cpu(struct kvm_vcpu *vcpu) {}
- 
-+static inline int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid,
-+				      const struct kvm_irq_level *irq)
-+{
-+	return 0;
-+}
-+
- static inline int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- {
- 	return 0;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index f92b4ec..877e285 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -763,10 +763,31 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level)
- 
- 	switch (irq_type) {
- 	case KVM_ARM_IRQ_TYPE_CPU:
-+		if (irqchip_in_kernel(kvm))
-+			return -ENXIO;
-+
- 		if (irq_num > KVM_ARM_IRQ_CPU_FIQ)
- 			return -EINVAL;
- 
- 		return vcpu_interrupt_line(vcpu, irq_num, level);
-+#ifdef CONFIG_KVM_ARM_VGIC
-+	case KVM_ARM_IRQ_TYPE_PPI:
-+		if (!irqchip_in_kernel(kvm))
-+			return -ENXIO;
-+
-+		if (irq_num < 16 || irq_num > 31)
-+			return -EINVAL;
-+
-+		return kvm_vgic_inject_irq(kvm, vcpu->vcpu_id, irq_num, level);
-+	case KVM_ARM_IRQ_TYPE_SPI:
-+		if (!irqchip_in_kernel(kvm))
-+			return -ENXIO;
-+
-+		if (irq_num < 32 || irq_num > KVM_ARM_IRQ_GIC_MAX)
-+			return -EINVAL;
-+
-+		return kvm_vgic_inject_irq(kvm, 0, irq_num, level);
-+#endif
- 	}
- 
- 	return -EINVAL;
-@@ -848,6 +869,14 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 	void __user *argp = (void __user *)arg;
- 
- 	switch (ioctl) {
-+#ifdef CONFIG_KVM_ARM_VGIC
-+	case KVM_CREATE_IRQCHIP: {
-+		if (vgic_present)
-+			return kvm_vgic_create(kvm);
-+		else
-+			return -EINVAL;
-+	}
-+#endif
- 	case KVM_SET_DEVICE_ADDRESS: {
- 		struct kvm_device_address dev_addr;
- 
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index dda5623..70040bb 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -75,6 +75,7 @@
- #define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
- 
- static void vgic_update_state(struct kvm *kvm);
-+static void vgic_kick_vcpus(struct kvm *kvm);
- static void vgic_dispatch_sgi(struct kvm_vcpu *vcpu, u32 reg);
- 
- static inline int vgic_irq_is_edge(struct vgic_dist *dist, int irq)
-@@ -542,6 +543,9 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exi
- 	kvm_prepare_mmio(run, mmio);
- 	kvm_handle_mmio_return(vcpu, run);
- 
-+	if (updated_state)
-+		vgic_kick_vcpus(vcpu->kvm);
-+
- 	return true;
- }
- 
-@@ -867,6 +871,92 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- 	return test_bit(vcpu->vcpu_id, &dist->irq_pending_on_cpu);
- }
- 
-+static void vgic_kick_vcpus(struct kvm *kvm)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int c;
-+
-+	/*
-+	 * We've injected an interrupt, time to find out who deserves
-+	 * a good kick...
-+	 */
-+	kvm_for_each_vcpu(c, vcpu, kvm) {
-+		if (kvm_vgic_vcpu_pending_irq(vcpu))
-+			kvm_vcpu_kick(vcpu);
-+	}
-+}
-+
-+static bool vgic_update_irq_state(struct kvm *kvm, int cpuid,
-+				  unsigned int irq_num, bool level)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct kvm_vcpu *vcpu;
-+	int is_edge, is_level, state;
-+	int enabled;
-+	bool ret = true;
-+
-+	spin_lock(&dist->lock);
-+
-+	is_edge = vgic_irq_is_edge(dist, irq_num);
-+	is_level = !is_edge;
-+	state = vgic_bitmap_get_irq_val(&dist->irq_state, cpuid, irq_num);
-+
-+	/*
-+	 * Only inject an interrupt if:
-+	 * - level triggered and we change level
-+	 * - edge triggered and we have a rising edge
-+	 */
-+	if ((is_level && !(state ^ level)) || (is_edge && (state || !level))) {
-+		ret = false;
-+		goto out;
-+	}
-+
-+	vgic_bitmap_set_irq_val(&dist->irq_state, cpuid, irq_num, level);
-+
-+	enabled = vgic_bitmap_get_irq_val(&dist->irq_enabled, cpuid, irq_num);
-+
-+	if (!enabled) {
-+		ret = false;
-+		goto out;
-+	}
-+
-+	if (is_level && vgic_bitmap_get_irq_val(&dist->irq_active,
-+						cpuid, irq_num)) {
-+		/*
-+		 * Level interrupt in progress, will be picked up
-+		 * when EOId.
-+		 */
-+		ret = false;
-+		goto out;
-+	}
-+
-+	if (irq_num >= 32)
-+		cpuid = dist->irq_spi_cpu[irq_num - 32];
-+
-+	kvm_debug("Inject IRQ%d level %d CPU%d\n", irq_num, level, cpuid);
-+
-+	vcpu = kvm_get_vcpu(kvm, cpuid);
-+
-+	if (level) {
-+		set_bit(irq_num, vcpu->arch.vgic_cpu.pending);
-+		set_bit(cpuid, &dist->irq_pending_on_cpu);
-+	}
-+
-+out:
-+	spin_unlock(&dist->lock);
-+
-+	return ret;
-+}
-+
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-+			bool level)
-+{
-+	if (vgic_update_irq_state(kvm, cpuid, irq_num, level))
-+		vgic_kick_vcpus(kvm);
-+
-+	return 0;
-+}
-+
- static bool vgic_ioaddr_overlap(struct kvm *kvm)
- {
- 	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
+> >  {
+> >  	struct vt8500_chip *chip;
+> > -	struct resource *r;
+> > +	struct device_node *np = pdev->dev.of_node;
+> >  	int ret;
+> >  
+> > +	if (!np) {
+> > +		dev_err(&pdev->dev, "invalid devicetree node\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> 
+> This effectively makes DT support mandatory. Shouldn't you be adding a
+> "depends on OF" into the Kconfig section in that case?
+This driver depends on ARCH_VT8500, which only supports DT so a
+dependency on OF seemed redundant. If you think its still necessary, let
+me know and I'll add it anyway.
+> 
+> >  	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
+> >  	if (chip == NULL) {
+> >  		dev_err(&pdev->dev, "failed to allocate memory\n");
+> > @@ -123,26 +144,32 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+> >  	chip->chip.ops = &vt8500_pwm_ops;
+> >  	chip->chip.base = -1;
+> >  	chip->chip.npwm = VT8500_NR_PWMS;
+> > +	chip->clk = of_clk_get(np, 0);
+> 
+> I thought this was supposed to work transparently across OF and !OF
+> configurations by using just clk_get() or devm_clk_get()? I guess that
+> if the driver depends on OF, then this would be moot, but we should
+> probably stick to the standard usage anyway.
+> 
+> Furthermore, of_clk_get() doesn't seem to be managed, so you'd need to
+> add explicit clk_put() in the error cleanup paths. One more argument in
+> favour of using devm_clk_get() instead.
+
+Hmm good point. I stuck with of_ functions because its an OF only driver
+and it seemed 'backward' to mix old code with new. It does pose the
+question of 'why have of_clk_get() if existing functions work better'.
+> 
+> > -	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > -	if (r == NULL) {
+> > -		dev_err(&pdev->dev, "no memory resource defined\n");
+> > -		return -ENODEV;
+> > +	if (!chip->clk) {
+> > +		dev_err(&pdev->dev, "clock source not specified\n");
+> > +		return -EINVAL;
+> >  	}
+> >  
+> > -	chip->base = devm_request_and_ioremap(&pdev->dev, r);
+> > -	if (chip->base == NULL)
+> > +	chip->base = of_iomap(np, 0);
+> 
+> No need to change this. It should work with the standard calls as well.
+Again, this was a conversion of use of_ functions rather than the 'old'
+style.
+
+> 
+> > +	if (!chip->base) {
+> > +		dev_err(&pdev->dev, "memory resource not available\n");
+> >  		return -EADDRNOTAVAIL;
+> > +	}
+> > +
+> > +	clk_prepare_enable(chip->clk);
+> 
+> Why does the clock need to be enabled here? Shouldn't it be postponed to
+> the last possible moment to save power?
+I didn't consider that - but the use case for everyone at present is
+that they only need the PWM driver to control the backlight, and it's
+going to be enabled at boot anyway - so one PWM will always be active.
+
+Futureproofing is always good so I'll fix this.
+
+...
+
+> >  
+> > -MODULE_LICENSE("GPL");
+> > +MODULE_DESCRIPTION("VT8500 PWM Driver");
+> > +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> IANAL, but I think you need the approval of all authors of this code
+> before changing the license. But I see that the file header actually
+> says that this code is GPL v2, so maybe this change could be considered
+> a bugfix. =)
+
+This is something I've already discussed with Alexey in regards to all
+the existing drivers he has in mainline. Since I have taken over as
+maintainer on this platform I have corrected the licenses as patch's
+have gone through. As you pointed out, it was already GPLv2 in the
+header, this is just a 'bugfix'.
+> 
+> > +MODULE_DEVICE_TABLE(of, vt8500_pwm_dt_ids);
+> 
+> I think it is customary to put this right after the device table
+> definition.
+Didn't know that - will fix.
+> 
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
+> > 
