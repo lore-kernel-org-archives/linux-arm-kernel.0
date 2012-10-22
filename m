@@ -1,49 +1,21 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 22 Oct 2012 10:05:25 -0700
-Subject: [PATCH] arm: sched: stop sched_clock() during suspend
-In-Reply-To: <1350906877-19410-1-git-send-email-balbi@ti.com> (Felipe Balbi's
- message of "Mon, 22 Oct 2012 14:54:37 +0300")
-References: <1350906877-19410-1-git-send-email-balbi@ti.com>
-Message-ID: <873916h1yi.fsf@deeprootsystems.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Oct 2012 17:06:54 +0000 (UTC)
+Subject: [PATCH 0/7] ARM: OMAP: second set of PRM/CM/CGRM cleanup patches
+ for 3.8
+In-Reply-To: <5085389F.6070106@ti.com>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+ <5085389F.6070106@ti.com>
+Message-ID: <alpine.DEB.2.00.1210221641310.13464@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Colin Cross, Barry Song also
+On Mon, 22 Oct 2012, Benoit Cousson wrote:
 
-Felipe Balbi <balbi@ti.com> writes:
+> What is CGRM? Is it a typo?
 
-> The scheduler imposes a requirement to sched_clock()
-> which is to stop the clock during suspend, if we don't
-> do that IRQ threads will be rescheduled in the future
-> which might cause transfers to timeout depending on
-> how driver is written.
+That's the OMAP1 Clock Generation and Reset Module that contains the 
+ARM_SYSST register:
 
-It's not just about IRQ threads, it's about RT throttling.  IOW, not
-just IRQ threads will be postponed, but all RT tasks will be throttled
-temporarily as well.
+http://www.ti.com/lit/ug/spru678a/spru678a.pdf
 
-The changelog should also mention that this has an inconvenient side
-effect of stopping the printk times during suspend.  Based on the
-original thread where this feature was discussed and introduced, some
-platforms wanted to opt out of this behavior[1], so the optional API was
-added.
-
-However, in light of RT throttling, this a correctness issue for process
-accounting, so I agree that this should be done for all platforms
-instead of providing an optional 'needs suspend' version of the API,
-even though it means printk times no longer reflect time spent
-suspended.
-
-After a discussion with peterz on this topic, it seems that x86
-already ensures that sched_clock stops during suspend for similar
-reasons[2].
-
-The question then is whether this is a fix that belongs in v3.7.
-Technically, it is not a regression, so I think this should probably be
-v3.8 material.  If that's the decision, then the threaded IRQ support
-for the OMAP I2C driver needs to be reverted for v3.7 until this fix is merged.
-
-Kevin
-
-[1] http://marc.info/?l=linux-arm-kernel&m=134307004508708&w=2
-[2] http://marc.info/?l=linux-arm-kernel&m=135065529907297&w=2
+- Paul
