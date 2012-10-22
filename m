@@ -1,50 +1,48 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:53:15 -0400
-Subject: [PATCH v3 1/5] ARM: arch_timers: switch to physical timers if HYP
- mode is available
-In-Reply-To: <20121022065301.18883.35308.stgit@ubuntu>
-References: <20121022065301.18883.35308.stgit@ubuntu>
-Message-ID: <20121022065315.18883.10095.stgit@ubuntu>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 22 Oct 2012 19:53:25 +1300
+Subject: [PATCH 3/3] DOC: PWM: Adding binding document for via,vt8500-pwm
+In-Reply-To: <20121022063558.GB17181@avionic-0098.mockup.avionic-design.de>
+References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
+ <1350643135-13197-3-git-send-email-linux@prisktech.co.nz>
+ <20121022063558.GB17181@avionic-0098.mockup.avionic-design.de>
+Message-ID: <1350888805.3592.12.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, 2012-10-22 at 08:35 +0200, Thierry Reding wrote:
+> On Fri, Oct 19, 2012 at 11:38:55PM +1300, Tony Prisk wrote:
+> > Add a binding document describing the PWM controller found
+> > on arch-vt8500 supported SoCs.
+> > 
+> > Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> > ---
+> >  .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 +++++++++++++++++
+> >  1 file changed, 17 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+> 
+> I think this can be folded into the previous patch. One other comment
+> below.
+> 
+> > diff --git a/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+> > new file mode 100644
+> > index 0000000..e8ba133
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+> > @@ -0,0 +1,17 @@
+> > +VIA/Wondermedia VT8500/WM8xxx series SoC PWM controller
+> > +
+> > +Required properties:
+> > +- compatible: should be "via,vt8500-pwm"
+> > +- reg: physical base address and length of the controller's registers
+> > +- #pwm-cells: should be 2.  The first cell specifies the per-chip index
+> > +  of the PWM to use and the second cell is the period in nanoseconds.
+> > +- clocks: pHandle to the PWM source clock
+> 
+> I think the common spelling is "phandle".
+> 
+> Thierry
 
-If we're booted in HYP mode, it is possible that we'll run some
-kind of virtualized environment. In this case, it is a better to
-switch to the physical timers, and leave the virtual timers to
-guests.
+Will fix the capitalisation and merge this with patch 2.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/arch_timer.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index c8ef207..8adcd04 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -26,6 +26,7 @@
- #include <asm/arch_timer.h>
- #include <asm/system_info.h>
- #include <asm/sched_clock.h>
-+#include <asm/virt.h>
- 
- static unsigned long arch_timer_rate;
- 
-@@ -489,10 +490,14 @@ int __init arch_timer_of_register(void)
- 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
- 
- 	/*
-+	 * If HYP mode is available, we know that the physical timer
-+	 * has been configured to be accessible from PL1. Use it, so
-+	 * that a guest can use the virtual timer instead.
-+	 *
- 	 * If no interrupt provided for virtual timer, we'll have to
- 	 * stick to the physical timer. It'd better be accessible...
- 	 */
--	if (!arch_timer_ppi[VIRT_PPI]) {
-+	if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
- 		arch_timer_use_virtual = false;
- 
- 		if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
+Regards
+Tony P
