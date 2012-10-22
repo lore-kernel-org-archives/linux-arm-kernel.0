@@ -1,75 +1,48 @@
-From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
-Date: Mon, 22 Oct 2012 13:41:02 +0200
-Subject: [PATCH] ARM/dts: omap3: Fix mcbsp2/3 hwmods to be able to probe
- the drivers for audio
-In-Reply-To: <507FD32C.7010108@ti.com>
-References: <1350552307-10226-1-git-send-email-peter.ujfalusi@ti.com>
- <507FD32C.7010108@ti.com>
-Message-ID: <508530CE.9000703@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 22 Oct 2012 11:50:21 +0000
+Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <20121022071118.GA30026@avionic-0098.mockup.avionic-design.de>
+References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
+ <1350888712.3592.11.camel@gitbox>
+ <20121022071118.GA30026@avionic-0098.mockup.avionic-design.de>
+Message-ID: <201210221150.22004.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-On 10/18/2012 12:00 PM, Benoit Cousson wrote:
-> On 10/18/2012 11:25 AM, Peter Ujfalusi wrote:
->> Fixes the following errors:
->> [    2.318084] omap-mcbsp 49022000.mcbsp: invalid rx DMA channel
->> [    2.324432] omap-mcbsp 49024000.mcbsp: invalid rx DMA channel
->>
->> Which is because we failed to link the sidetone hwmod for McBSP2/3. The
->> missing sidetone hwmod link will prevent omap_device_alloc() to append the
->> DMA resources since we - accidentally - end up having the same number of
->> resources provided from DT (IO/IRQ) as we have in hwmod for the McBSP ports
->> without the ST resources.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+On Monday 22 October 2012, Thierry Reding wrote:
+> On Mon, Oct 22, 2012 at 07:51:52PM +1300, Tony Prisk wrote:
+> > Replies to your comments inline:
+> > 
+> > On Mon, 2012-10-22 at 08:34 +0200, Thierry Reding wrote:
+> > ...
+> > > > -static int __devinit pwm_probe(struct platform_device *pdev)
+> > > > +static const struct of_device_id vt8500_pwm_dt_ids[] = {
+> > > > + { .compatible = "via,vt8500-pwm", },
+> > > > + { /* Sentinel */ }
+> > > > +};
+> > > > +
+> > > > +static int __devinit vt8500_pwm_probe(struct platform_device *pdev)
+> > > 
+> > > Since you're changing this line anyway, maybe you should drop __devinit
+> > > (and __devexit for the .remove() callback). HOTPLUG is always enabled
+> > > nowadays and will go away eventually, in which case these will need to
+> > > be removed anyway.
+> > 
+> > Will do. I must say the inconstancy among comments is rather
+> > frustrating. In another patch I sent out a few days ago (completely
+> > unrelated to this), I told to add __devexit to a remove() function :\
 > 
-> Acked-by: Benoit Cousson <b-cousson@ti.com>
-
-Can you take this patch for -rc3?
-
-Thanks,
-P?ter
-
+> This is a rather recent development, so maybe not everyone knows about
+> it yet. You can look at the following commit for the details:
 > 
-> Regards,
-> Benoit
+>         45f035ab9b8f45aaf1eb2213218b7e9c14af3fc2
 > 
->> ---
->>
->> Hi Tony, Benoit,
->>
->> Can you please take this patch for 3.7 since if we boot with DT audio will not
->> work on BeagleBoard and on boards which uses McBSP2 or 3 for audio.
->>
->> Thank you,
->> Peter
->>
->>  arch/arm/boot/dts/omap3.dtsi | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
->> index f38ea87..696e929 100644
->> --- a/arch/arm/boot/dts/omap3.dtsi
->> +++ b/arch/arm/boot/dts/omap3.dtsi
->> @@ -257,7 +257,7 @@
->>  			interrupt-names = "common", "tx", "rx", "sidetone";
->>  			interrupt-parent = <&intc>;
->>  			ti,buffer-size = <1280>;
->> -			ti,hwmods = "mcbsp2";
->> +			ti,hwmods = "mcbsp2", "mcbsp2_sidetone";
->>  		};
->>  
->>  		mcbsp3: mcbsp at 49024000 {
->> @@ -272,7 +272,7 @@
->>  			interrupt-names = "common", "tx", "rx", "sidetone";
->>  			interrupt-parent = <&intc>;
->>  			ti,buffer-size = <128>;
->> -			ti,hwmods = "mcbsp3";
->> +			ti,hwmods = "mcbsp3", "mcbsp3_sidetone";
->>  		};
->>  
->>  		mcbsp4: mcbsp at 49026000 {
->>
-> 
+> It's been in linux-next for about 6 weeks and has also gone into
+> 3.7-rc1.
+
+As long as we get build warnings for leaving out the __devinit/__devexit
+annotations, I would generally recommend putting them in. If we do a
+patch to remove all of them, a couple extra instances will not cause
+any more troubles than we already have.
+
+	Arnd
