@@ -1,25 +1,31 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 21 Oct 2012 23:07:48 -0400
-Subject: [PATCH 2/2] ARM: kirkwood: use gpio-fan DT binding on lsxl
-In-Reply-To: <1350776094-16778-2-git-send-email-michael@walle.cc>
-References: <1350776094-16778-1-git-send-email-michael@walle.cc>
- <1350776094-16778-2-git-send-email-michael@walle.cc>
-Message-ID: <20121022030748.GI25828@titan.lakedaemon.net>
+Date: Sun, 21 Oct 2012 23:09:01 -0400
+Subject: [PATCH v2 1/3] ARM: Kirkwood: Remove unused includes
+In-Reply-To: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
+References: <1350732196-26781-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20121022030901.GJ25828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2012 at 01:34:54AM +0200, Michael Walle wrote:
-> Remove board specific gpio-fan driver registration. Moved into device tree.
+On Sat, Oct 20, 2012 at 01:23:14PM +0200, Andrew Lunn wrote:
+> With the gradual conversion of C code to DT, there are a number of
+> include files which are no longer needed. Remove them.
 > 
-> Signed-off-by: Michael Walle <michael@walle.cc>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   11 ++++++++
->  arch/arm/mach-kirkwood/board-lsxl.c  |   47 ----------------------------------
->  2 files changed, 11 insertions(+), 47 deletions(-)
+>  arch/arm/mach-kirkwood/board-dockstar.c       |   13 -------------
+>  arch/arm/mach-kirkwood/board-dreamplug.c      |   15 ---------------
+>  arch/arm/mach-kirkwood/board-goflexnet.c      |   13 -------------
+>  arch/arm/mach-kirkwood/board-ib62x0.c         |    6 ------
+>  arch/arm/mach-kirkwood/board-iconnect.c       |    8 --------
+>  arch/arm/mach-kirkwood/board-iomega_ix2_200.c |    2 --
+>  arch/arm/mach-kirkwood/board-lsxl.c           |    8 --------
+>  arch/arm/mach-kirkwood/board-ts219.c          |    3 ---
+>  8 files changed, 68 deletions(-)
 
-Applied to:
+Whole series applied to:
 
-git://git.infradead.org/users/jcooper/linux.git kirkwood/boards
+git://git.infradead.org/users/jcooper/linux.git kirkwood/cleanup
 
 thx,
 
