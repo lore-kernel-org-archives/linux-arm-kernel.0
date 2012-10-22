@@ -1,49 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 13:34:11 -0700
-Subject: [PATCH 2/2] ARM: OMAP3: Fix 3430 legacy mux names for ssi1 signals.
-In-Reply-To: <20121022203324.22746.54210.stgit@muffinssi.local>
-References: <20121022203324.22746.54210.stgit@muffinssi.local>
-Message-ID: <20121022203411.22746.29979.stgit@muffinssi.local>
+Date: Mon, 22 Oct 2012 13:38:01 -0700
+Subject: [PATCH] ARM/dts: omap3: Fix mcbsp2/3 hwmods to be able to
+ probe the drivers for audio
+In-Reply-To: <508530CE.9000703@ti.com>
+References: <1350552307-10226-1-git-send-email-peter.ujfalusi@ti.com>
+ <507FD32C.7010108@ti.com> <508530CE.9000703@ti.com>
+Message-ID: <20121022203800.GH4730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On n900 uart1 pins are not not used for uart, instead they are
-used to connect to a cell modem over ssi. Looks like we're
-currently missing these signal names for 3430 for some reason,
-and only have some of them listed for 3630. Obviously the signals
-are there for 3430 if n900 is using them and they are documented
-in some TRMs.
+* P?ter Ujfalusi <peter.ujfalusi@ti.com> [121022 04:42]:
+> Hi Tony,
+> 
+> On 10/18/2012 12:00 PM, Benoit Cousson wrote:
+> > On 10/18/2012 11:25 AM, Peter Ujfalusi wrote:
+> >> Fixes the following errors:
+> >> [    2.318084] omap-mcbsp 49022000.mcbsp: invalid rx DMA channel
+> >> [    2.324432] omap-mcbsp 49024000.mcbsp: invalid rx DMA channel
+> >>
+> >> Which is because we failed to link the sidetone hwmod for McBSP2/3. The
+> >> missing sidetone hwmod link will prevent omap_device_alloc() to append the
+> >> DMA resources since we - accidentally - end up having the same number of
+> >> resources provided from DT (IO/IRQ) as we have in hwmod for the McBSP ports
+> >> without the ST resources.
+> >>
+> >> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > 
+> > Acked-by: Benoit Cousson <b-cousson@ti.com>
+> 
+> Can you take this patch for -rc3?
 
-Note that these will eventually be replaced by device tree
-based pinctrl-single.c driver. But for now these are needed
-to verify the SSI pins for devices like Nokia N900.
+Thanks will apply into omap-for-v3.7-rc2/fixes.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- 0 files changed
+Regards,
 
-diff --git a/arch/arm/mach-omap2/mux34xx.c b/arch/arm/mach-omap2/mux34xx.c
-index 17f80e4..c47140b 100644
---- a/arch/arm/mach-omap2/mux34xx.c
-+++ b/arch/arm/mach-omap2/mux34xx.c
-@@ -614,16 +614,16 @@ static struct omap_mux __initdata omap3_muxmodes[] = {
- 		"sys_off_mode", NULL, NULL, NULL,
- 		"gpio_9", NULL, NULL, "safe_mode"),
- 	_OMAP3_MUXENTRY(UART1_CTS, 150,
--		"uart1_cts", NULL, NULL, NULL,
-+		"uart1_cts", "ssi1_rdy_tx", NULL, NULL,
- 		"gpio_150", "hsusb3_tll_clk", NULL, "safe_mode"),
- 	_OMAP3_MUXENTRY(UART1_RTS, 149,
--		"uart1_rts", NULL, NULL, NULL,
-+		"uart1_rts", "ssi1_flag_tx", NULL, NULL,
- 		"gpio_149", NULL, NULL, "safe_mode"),
- 	_OMAP3_MUXENTRY(UART1_RX, 151,
--		"uart1_rx", NULL, "mcbsp1_clkr", "mcspi4_clk",
-+		"uart1_rx", "ss1_wake_tx", "mcbsp1_clkr", "mcspi4_clk",
- 		"gpio_151", NULL, NULL, "safe_mode"),
- 	_OMAP3_MUXENTRY(UART1_TX, 148,
--		"uart1_tx", NULL, NULL, NULL,
-+		"uart1_tx", "ssi1_dat_tx", NULL, NULL,
- 		"gpio_148", NULL, NULL, "safe_mode"),
- 	_OMAP3_MUXENTRY(UART2_CTS, 144,
- 		"uart2_cts", "mcbsp3_dx", "gpt9_pwm_evt", NULL,
+Tony
