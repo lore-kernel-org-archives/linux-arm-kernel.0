@@ -1,21 +1,69 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Oct 2012 17:06:54 +0000 (UTC)
-Subject: [PATCH 0/7] ARM: OMAP: second set of PRM/CM/CGRM cleanup patches
- for 3.8
-In-Reply-To: <5085389F.6070106@ti.com>
-References: <20121016012448.21844.92339.stgit@dusk.lan>
- <5085389F.6070106@ti.com>
-Message-ID: <alpine.DEB.2.00.1210221641310.13464@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Oct 2012 10:09:18 -0700
+Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
+In-Reply-To: <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
+ <20121019191333.GT4730@atomide.com>
+ <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
+Message-ID: <20121022170917.GB4730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2012, Benoit Cousson wrote:
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121022 03:11]:
+> On Sat, Oct 20, 2012 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Haojian Zhuang <haojian.zhuang@gmail.com> [121018 02:08]:
+> >> Add pinconf generic support with POWER SOURCE, BIAS PULL.
+> > ...
+> >
+> >> +     case PIN_CONFIG_POWER_SOURCE:
+> >> +             if (pcs->psmask == PCS_OFF_DISABLED
+> >> +                     || pcs->psshift == PCS_OFF_DISABLED)
+> >> +                     return -ENOTSUPP;
+> >> +             data &= pcs->psmask;
+> >> +             data = data >> pcs->psshift;
+> >> +             *config = data;
+> >> +             return 0;
+> >> +             break;
+> >
+> > Hmm, only slightly related to this patch, mostly a generic
+> > question to others: Do others have any mux registers with
+> > status bits for things like PIN_CONFIG_POWER_SOURCE?
+> >
+> > I could use PIN_CONFIG_POWER_SOURCE for controlling the PBIAS
+> > for omap MMC. But there's also a status bit that needs to be
+> > checked for that. I think there was some other similar mux
+> > register for USB PHY that has a status register.
+> >
+> > So I'm wondering should the checking for status bit be handled
+> > in the pinctrl consume driver? Or should we have some bindings
+> > for that?
+> >
+> 
+> Do you mean that the status register only exists in USB PHY controller or
+> MMC controller?
 
-> What is CGRM? Is it a typo?
+The status register is in the MMC PBIAS register that is mux
+related otherwise. From OMAP4470_ES1.0_PUBLIC_TRM_vE.pdf,
+Table 19-599. CONTROL_PBIASLITE:
 
-That's the OMAP1 Clock Generation and Reset Module that contains the 
-ARM_SYSST register:
+Bits
+26	MMC1_PWDNZ
+25	MMC1_PBIASLITE_HIZ_MODE
+24	MMC1_PBIASLITE_SUPPLY_HI_OUT
+23	MMC1_PBIASLITE_VMODE_ERROR	then this bit needs to clear..
+22	MMC1_PBIASLITE_PWRDNZ
+21	MMC1_PBIASLITE_VMODE		..after VMODE bit is set to 3V
+ 
+> If so, could we use regulator framework in USB PHY or MMC driver?
 
-http://www.ti.com/lit/ug/spru678a/spru678a.pdf
+Yes we could use regulator framework for that that. Or just read the
+status in the MMC driver for that bit if nobody else has mixed
+mux-regulator needs like this.
 
-- Paul
+The sequence is MMC specific, so from that point of view it would
+make sense to have the logic in the MMC driver.
+
+Regards,
+
+Tony
