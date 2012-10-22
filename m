@@ -1,7 +1,7 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon, 22 Oct 2012 12:46:19 +0800
+Date: Mon, 22 Oct 2012 12:53:27 +0800
 Subject: [PATCH] ARM: PCI: fix missing unlock on error
-Message-ID: <CAPgLHd-Hw-RQZnqb-Usiuq4xhY250kObCGK40cXoDE8f59Cr8A@mail.gmail.com>
+Message-ID: <CAPgLHd9Y99XNvGfDxRGMpos_K=_GGv=Djrb=9HhGdj=8=xrBPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
