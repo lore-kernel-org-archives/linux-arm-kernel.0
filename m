@@ -1,73 +1,46 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Mon, 22 Oct 2012 18:12:06 +0200
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
- <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
-Message-ID: <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 23 Oct 2012 00:08:59 +0800
+Subject: [PATCH v2 9/9] pinctrl: single: dump pinmux register value
+In-Reply-To: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1350922139-3693-10-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dump pinmux register value, not only function part in the pinmux
+register.
 
-On Sat, Oct 20, 2012 at 8:14 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> Hi Jean
->
-> On Fri, 19 Oct 2012, Paul Walmsley wrote:
->
->> On Thu, 18 Oct 2012, Paul Walmsley wrote:
->>
->> > Here are some basic OMAP test results for Linux v3.7-rc1.
->> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
->
-> ...
->
->> > Failing tests: needing investigation
->> > ------------------------------------
->> >
->> > Boot tests:
->>
->> * 3530ES3 Beagle: I2C timeouts during userspace init
->>   - May be related to the threaded IRQ conversion of the I2C driver
->>   - Unknown cause
->
-> This one turned out to be caused by:
->
-> commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc
-> Author: Jean Pihet <jean.pihet@newoldbits.com>
-> Date:   Thu Sep 20 18:08:03 2012 +0200
->
->     ARM: OMAP: convert I2C driver to PM QoS for MPU latency constraints
->
->
-> Reverting this commit causes the problem to go away, but since the OMAP PM
-> constraint code was removed as well, it's unlikely that a simple revert is
-> the right thing to do.
->
-> Jean could you please investigate and fix this?
-I tried the latest l-o with omap2plus defconfig on my Beagleboard B5
-(ES2.1) and could not reproduce the problem.
-I do not have the I2C error messages at boot, nor at user space start
-up. I tried to read/write the TWL RTC, successfully.
+Also fix the issue on caluclating pin offset. The last parameter
+should be pin number, not register offset.
 
-Another difference is the bootloader images. I have the following:
-- Texas Instruments X-Loader 1.4.2 (Feb  3 2009 - 15:34:17)
-- U-Boot 2009.01-dirty (Feb 19 2009 - 12:22:31)
-Could you send your bootloader images?
+Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+---
+ drivers/pinctrl/pinctrl-single.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-I noticed you have I2C error messages in U-Boot, could that be the
-cause of the I2C lock-up?
-
-On the PM QoS side the commit 3db11fef moves the I2C code from the
-OMAP PM no-op layer to the PM QoS for CPU and DMA latency, which
-influences the cpuidle states. However CPU_IDLE is not set in
-omap2plus_defconfig so there should not be any effect.
-Do you have CPU_IDLE enabled?
-
->
->
-> - Paul
-
-Regards,
-Jean
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index a20da78..6ba2a5d 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -284,15 +284,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
+ 
+ static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
+ 					struct seq_file *s,
+-					unsigned offset)
++					unsigned pin)
+ {
+ 	struct pcs_device *pcs;
+-	unsigned val;
++	unsigned val, mux_bytes;
+ 
+ 	pcs = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	val = pcs->read(pcs->base + offset);
+-	val &= pcs->fmask;
++	mux_bytes = pcs->width / BITS_PER_BYTE;
++	val = pcs_readl(pcs->base + pin * mux_bytes);
+ 
+ 	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
+ }
+-- 
+1.7.0.4
