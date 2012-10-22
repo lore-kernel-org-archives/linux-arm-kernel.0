@@ -1,50 +1,82 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 22 Oct 2012 18:51:29 +0530
-Subject: [PATCH v4] ARM: SMP_TWD: make setup()/stop() reentrant
-In-Reply-To: <1350911721-3184-1-git-send-email-linus.walleij@stericsson.com>
-References: <1350911721-3184-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <50854859.50301@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 22 Oct 2012 15:23:20 +0200
+Subject: [PATCH] MMCI: fetch pinctrl handle and set default state
+In-Reply-To: <1350892326-5125-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350892326-5125-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAPDyKFqRjM4deK0YJdd=8uzmzqLYY7EENb110a5uv9CZU=Y_CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 October 2012 06:45 PM, Linus Walleij wrote:
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+
+On 22 October 2012 09:52, Linus Walleij <linus.walleij@stericsson.com> wrote:
 > From: Linus Walleij <linus.walleij@linaro.org>
 >
-> It has been brought to my knowledge that the .setup()/.stop()
-> function pair in the SMP TWD is going to be called from atomic
-> contexts for CPUs coming and going, and then the
-> clk_prepare()/clk_unprepare() calls cannot be called
-> on subsequent .setup()/.stop() iterations. This is however
-> just the tip of an iceberg as the function pair is not
-> designed to be reentrant at all.
+> This fetches the pinctrl resource for the MMCI driver, and if
+> a "default" state is found, it is activated.
 >
-> This change makes the SMP_TWD clock .setup()/.stop() pair reentrant
-> by splitting the .setup() function in three parts:
->
-> - One COMMON part that is executed the first time the first CPU
->    in the TWD cluster is initialized. This will fetch the TWD
->    clk for the cluster and prepare+enable it. If no clk is
->    available it will calibrate the rate instead.
->
-> - One part that is executed the FIRST TIME a certain CPU is
->    brought on-line. This initializes and sets up the clock event
->    for a certain CPU.
->
-> - One part that is executed on every subsequent .setup() call.
->    This will re-initialize the clock event. This is augmented
->    to call the clk_enable()/clk_disable() pair properly.
->
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Reported-by: Peter Chen <peter.chen@freescale.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> ChangeLog v3->v4:
-> - Skip clk_enable()/clk_disable() in subsequent call after common
->    initialization - there is no way we can turn off the clock that
->    is running us anyway.
-> - Move common_setup_called variable assignment into the if-clause
-> ---
-
-Looks good now. Thanks for the update.
-
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>  drivers/mmc/host/mmci.c | 18 ++++++++++++++++++
+>  drivers/mmc/host/mmci.h |  4 ++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index edc3e9b..269566d 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -33,6 +33,7 @@
+>  #include <linux/amba/mmci.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/types.h>
+> +#include <linux/pinctrl/consumer.h>
+>
+>  #include <asm/div64.h>
+>  #include <asm/io.h>
+> @@ -1360,6 +1361,23 @@ static int __devinit mmci_probe(struct amba_device *dev,
+>                 mmc->f_max = min(host->mclk, fmax);
+>         dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+>
+> +       host->pinctrl = devm_pinctrl_get(&dev->dev);
+> +       if (IS_ERR(host->pinctrl)) {
+> +               ret = PTR_ERR(host->pinctrl);
+> +               goto clk_disable;
+> +       }
+> +
+> +       host->pins_default = pinctrl_lookup_state(host->pinctrl,
+> +                       PINCTRL_STATE_DEFAULT);
+> +
+> +       /* enable pins to be muxed in and configured */
+> +       if (!IS_ERR(host->pins_default)) {
+> +               ret = pinctrl_select_state(host->pinctrl, host->pins_default);
+> +               if (ret)
+> +                       dev_err(&dev->dev, "could not set default pins\n");
+> +       } else
+> +               dev_err(&dev->dev, "could not get default pinstate\n");
+> +
+>  #ifdef CONFIG_REGULATOR
+>         /* If we're using the regulator framework, try to fetch a regulator */
+>         host->vcc = regulator_get(&dev->dev, "vmmc");
+> diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+> index d437ccf..d34d8c0 100644
+> --- a/drivers/mmc/host/mmci.h
+> +++ b/drivers/mmc/host/mmci.h
+> @@ -195,6 +195,10 @@ struct mmci_host {
+>         unsigned int            size;
+>         struct regulator        *vcc;
+>
+> +       /* pinctrl handles */
+> +       struct pinctrl          *pinctrl;
+> +       struct pinctrl_state    *pins_default;
+> +
+>  #ifdef CONFIG_DMA_ENGINE
+>         /* DMA stuff */
+>         struct dma_chan         *dma_current;
+> --
+> 1.7.11.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
