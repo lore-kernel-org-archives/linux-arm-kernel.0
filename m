@@ -1,52 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 22 Oct 2012 22:07:08 +0200
-Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
-In-Reply-To: <50859976.6080601@free-electrons.com>
-References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
- <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
- <20121022173028.GM21046@lunn.ch>
- <50859976.6080601@free-electrons.com>
-Message-ID: <20121022200708.GO21046@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Oct 2012 14:08:42 -0600
+Subject: [PATCH] pinctrl/nomadik: use irq_create_mapping()
+In-Reply-To: <CACRpkdbcTT_Mfa67Vw_6Y3RvqOE3CMA7kNXLG5oja0uTNn1FoA@mail.gmail.com>
+References: <1350659375-7335-1-git-send-email-linus.walleij@stericsson.com>
+ <50817E43.8000804@wwwdotorg.org>
+ <CACRpkdbcTT_Mfa67Vw_6Y3RvqOE3CMA7kNXLG5oja0uTNn1FoA@mail.gmail.com>
+Message-ID: <5085A7CA.3070001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 09:07:34PM +0200, Gregory CLEMENT wrote:
-> On 10/22/2012 07:30 PM, Andrew Lunn wrote:
-> > On Mon, Oct 22, 2012 at 07:02:45PM +0200, Gregory CLEMENT wrote:
-> >> From: Yehuda Yitschak <yehuday@marvell.com>
-> >>
-> >> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> >> ---
-> >>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
-> >>  arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
-> >>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
-> >>  3 files changed, 97 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-> >> index f521ed8..531619f 100644
-> >> --- a/arch/arm/boot/dts/armada-xp.dtsi
-> >> +++ b/arch/arm/boot/dts/armada-xp.dtsi
-> >> @@ -24,7 +24,7 @@
-> >>  
-> >>  	mpic: interrupt-controller at d0020000 {
-> >>  	      reg = <0xd0020a00 0x1d0>,
-> >> -		    <0xd0021870 0x58>;
-> >> +		    <0xd0021070 0x58>;
-> >>  	};
-> > 
-> > Hi Gregory
-> > 
-> > Is this a bug fix needed for 3.7?
-> > 
-> >    Andrew
-> > 
-> I don't think so.
-> We extended the reg map to be able to use registers only used for SMP.
-> When we didn't have SMP support the mapping was correct, and now by
-> introducing SMP we extend it.
+On 10/22/2012 02:14 AM, Linus Walleij wrote:
+> On Fri, Oct 19, 2012 at 6:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 10/19/2012 09:09 AM, Linus Walleij wrote:
+>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>>> @@ -931,7 +931,7 @@ static void __nmk_gpio_irq_handler(unsigned int irq, struct irq_desc *desc,
+>>>       while (status) {
+>>>               int bit = __ffs(status);
+>>>
+>>> -             generic_handle_irq(irq_find_mapping(nmk_chip->domain, bit));
+>>> +             generic_handle_irq(irq_create_mapping(nmk_chip->domain, bit));
+>>
+>> Surely this one can remain as irq_find_mapping() since isn't
+>> nmk_gpio_to_irq() guaranteed to have been called first for this GPIO/IRQ?
+> 
+> It's an IRQ handler so it should be robust to spurious IRQs due to
+> transient hardware states etc I believe.
+> 
+> So if there is a transient IRQ before gpio_to_irq() is called -> boom.
 
-The length has stayed the same, so its not extended. Its now 0x800
-bytes earlier in the address space.
-
-      Andrew
+I wonder though (a) why it would be unmasked in HW, and (b) why the
+software would even look at the status bit if no handler were registered?
