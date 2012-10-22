@@ -1,101 +1,283 @@
-From: sourav.poddar@ti.com (Sourav)
-Date: Mon, 22 Oct 2012 18:26:19 +0530
-Subject: [PATCH 3/4] ARM/dts: omap5: Update UART with address space and
- interrupts
-In-Reply-To: <508540FC.4090107@ti.com>
-References: <1350901328-3525-1-git-send-email-s-guiriec@ti.com>
- <1350901328-3525-4-git-send-email-s-guiriec@ti.com> <50852AF9.10703@ti.com>
- <5085348C.60105@ti.com> <508536EA.4020808@ti.com> <50853B94.4060308@ti.com>
- <508540FC.4090107@ti.com>
-Message-ID: <50854273.5080504@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 22 Oct 2012 14:02:50 +0100
+Subject: [PATCH] clk: Make the generic clock API available by default
+Message-ID: <1350910970-9095-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 22 October 2012 06:20 PM, Benoit Cousson wrote:
-> On 10/22/2012 02:27 PM, Sourav wrote:
->> Hi Benoit,
->> On Monday 22 October 2012 05:37 PM, Benoit Cousson wrote:
->>> On 10/22/2012 01:57 PM, Benoit Cousson wrote:
->>>> Hi Sourav,
->>>>
->>>> On 10/22/2012 01:16 PM, Sourav wrote:
->>>>> Hi Sebastien,
->>>>> On Monday 22 October 2012 03:52 PM, Sebastien Guiriec wrote:
->>>>>> Add base address and interrupt line inside Device Tree data for
->>>>> Incomplete sentence!
->>>>>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
->>>>>> ---
->>>>>>     arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++--
->>>>>>     1 file changed, 14 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi
->>>>>> b/arch/arm/boot/dts/omap5.dtsi
->>>>>> index 6c22e1b..413df94 100644
->>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
->>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
->>>>>> @@ -237,36 +237,48 @@
->>>>>>               uart1: serial at 4806a000 {
->>>>>>                 compatible = "ti,omap4-uart";
->>>>>> +            reg = <0x4806a000 0x100>;
->>>>>> +            interrupts = <0 72 0x4>;
->>>>>>                 ti,hwmods = "uart1";
->>>>>>                 clock-frequency = <48000000>;
->>>>>>             };
->>>>>>               uart2: serial at 4806c000 {
->>>>>>                 compatible = "ti,omap4-uart";
->>>>>> +            reg = <0x4806c000 0x100>;
->>>>>> +            interrupts = <0 73 0x4>;
->>>>>>                 ti,hwmods = "uart2";
->>>>>>                 clock-frequency = <48000000>;
->>>>>>             };
->>>>>>               uart3: serial at 48020000 {
->>>>>>                 compatible = "ti,omap4-uart";
->>>>>> +            reg = <0x48020000 0x100>;
->>>>>> +            interrupts = <0 74 0x4>;
->>>>>>                 ti,hwmods = "uart3";
->>>>>>                 clock-frequency = <48000000>;
->>>>>>             };
->>>>>>               uart4: serial at 4806e000 {
->>>>>>                 compatible = "ti,omap4-uart";
->>>>>> +            reg = <0x4806e000 0x100>;
->>>>>> +            interrupts = <0 70 0x4>;
->>>>>>                 ti,hwmods = "uart4";
->>>>>>                 clock-frequency = <48000000>;
->>>>>>             };
->>>>>>               uart5: serial at 48066000 {
->>>>>> -            compatible = "ti,omap5-uart";
->>>>>> +            compatible = "ti,omap4-uart";
->>>>>> +            reg = <0x48066000 0x100>;
->>>>>> +            interrupts = <0 105 0x4>;
->>>>> In Omap5 TRM, the interrupt number mentioned for uart5 is 138. How is
->>>>> 105 coming?
->>>> It is from hwmod and thus from the HW spec. It looks like the TRM is
->>>> wrong... or the HW spec :-)
->>>>
->>>>>>                 ti,hwmods = "uart5";
->>>>>>                 clock-frequency = <48000000>;
->>>>>>             };
->>>>>>               uart6: serial at 48068000 {
->>>>>> -            compatible = "ti,omap6-uart";
->>>>>> +            compatible = "ti,omap4-uart";
->>>>>> +            reg = <0x48068000 0x100>;
->>>>>> +            interrupts = <0 106 0x4>;
->>>>> Same here, TRM shows this number to be 139 ?
->>> In fact, even the TRM (ES1.0 NDA vM) is aligned with these data.
->>> Where did you see 138 and 139?
->> I looked at Page 6300 of the above TRM, Figure 24-60. Is this place not
->> correct to look
->> up for these data?
-> Nope. Well it should be accurate but since it is a diagram, it does not
-> necessarily reflect the latest integration data like IRQ line.
->
-> You'd better use the table that list all the IRQ per CPU:
->
-> 18.3.2 Interrupt Requests to INTC_MPU
-Ahh. True. The table does show the numbers to be 105 and 106.
-Thanks for the pointer.
+Rather than requiring platforms to select the generic clock API to make
+it available make the API available as a user selectable option unless the
+user either selects HAVE_CUSTOM_CLK (if they have their own implementation)
+or selects COMMON_CLK (if they depend on the generic implementation).
 
-~Sourav
-> Regards,
-> Benoit
->
+All current architectures that HAVE_CLK but don't use the common clock
+framework have selects of HAVE_CUSTOM_CLK added.
+
+This allows drivers to use the generic API on platforms which have no need
+for the clock API at platform level.
+
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+---
+
+Mike, the patch to provide a defualt clkdev.h went in during the merge
+window so it should now be safe to merge this.
+
+ arch/arm/Kconfig            |   13 +++++++++++++
+ arch/avr32/Kconfig          |    1 +
+ arch/mips/Kconfig           |    4 ++++
+ arch/mips/loongson/Kconfig  |    1 +
+ arch/mips/loongson1/Kconfig |    1 +
+ arch/mips/txx9/Kconfig      |    1 +
+ arch/powerpc/Kconfig        |    1 +
+ arch/unicore32/Kconfig      |    1 +
+ drivers/clk/Kconfig         |   13 ++++++++++---
+ 9 files changed, 33 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index fe90e60..2248940 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -314,6 +314,7 @@ config ARCH_VERSATILE
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_MACH_CLKDEV
++	select HAVE_CUSTOM_CLK
+ 	select ICST
+ 	select PLAT_VERSATILE
+ 	select PLAT_VERSATILE_CLCD
+@@ -327,6 +328,7 @@ config ARCH_AT91
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select IRQ_DOMAIN
+ 	select NEED_MACH_GPIO_H
+ 	select NEED_MACH_IO_H if PCCARD
+@@ -632,6 +634,7 @@ config ARCH_TEGRA
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	select SPARSE_IRQ
+@@ -666,6 +669,7 @@ config ARCH_MSM
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	help
+ 	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+ 	  apps processor of the MSM/QSD and depends on a shared memory
+@@ -678,6 +682,7 @@ config ARCH_SHMOBILE
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_MACH_CLKDEV
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
+@@ -728,10 +733,12 @@ config ARCH_SA1100
+ config ARCH_S3C24XX
+ 	bool "Samsung S3C24XX SoCs"
+ 	select ARCH_HAS_CPUFREQ
++	select CLKDEV_LOOKUP
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+@@ -752,6 +759,7 @@ config ARCH_S3C64XX
+ 	select CLKDEV_LOOKUP
+ 	select CPU_V6
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_TCM
+@@ -775,6 +783,7 @@ config ARCH_S5P64X0
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+@@ -790,6 +799,7 @@ config ARCH_S5PC100
+ 	select CPU_V7
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+@@ -808,6 +818,7 @@ config ARCH_S5PV210
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+@@ -826,6 +837,7 @@ config ARCH_EXYNOS
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_GPIO
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+@@ -928,6 +940,7 @@ config ARCH_OMAP
+ 	select CLKSRC_MMIO
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select NEED_MACH_GPIO_H
+ 	help
+ 	  Support for TI's OMAP platform (OMAP1/2/3/4).
+diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
+index 06e73bf..bfeb9cc 100644
+--- a/arch/avr32/Kconfig
++++ b/arch/avr32/Kconfig
+@@ -4,6 +4,7 @@ config AVR32
+ 	# that we usually don't need on AVR32.
+ 	select EXPERT
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HAVE_OPROFILE
+ 	select HAVE_KPROBES
+ 	select HAVE_GENERIC_HARDIRQS
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index ce6c9a6..e0be02f 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -85,6 +85,7 @@ config AR7
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select VLYNQ
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	help
+ 	  Support for the Texas Instruments AR7 System-on-a-Chip
+ 	  family: TNETD7100, 7200 and 7300.
+@@ -97,6 +98,7 @@ config ATH79
+ 	select CSRC_R4K
+ 	select DMA_NONCOHERENT
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select IRQ_CPU
+ 	select MIPS_MACHINE
+ 	select SYS_HAS_CPU_MIPS32_R2
+@@ -134,6 +136,7 @@ config BCM63XX
+ 	select SWAP_IO_SPACE
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	help
+ 	 Support for BCM63XX based boards
+ 
+@@ -229,6 +232,7 @@ config MACH_JZ4740
+ 	select SYS_HAS_EARLY_PRINTK
+ 	select HAVE_PWM
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select GENERIC_IRQ_CHIP
+ 
+ config LANTIQ
+diff --git a/arch/mips/loongson/Kconfig b/arch/mips/loongson/Kconfig
+index 263beb9..ed42be1 100644
+--- a/arch/mips/loongson/Kconfig
++++ b/arch/mips/loongson/Kconfig
+@@ -42,6 +42,7 @@ config LEMOTE_MACH2F
+ 	select DMA_NONCOHERENT
+ 	select GENERIC_ISA_DMA_SUPPORT_BROKEN
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select HW_HAS_PCI
+ 	select I8259
+ 	select IRQ_CPU
+diff --git a/arch/mips/loongson1/Kconfig b/arch/mips/loongson1/Kconfig
+index a9a14d6..ddaa7d0 100644
+--- a/arch/mips/loongson1/Kconfig
++++ b/arch/mips/loongson1/Kconfig
+@@ -16,6 +16,7 @@ config LOONGSON1_LS1B
+ 	select SYS_SUPPORTS_HIGHMEM
+ 	select SYS_HAS_EARLY_PRINTK
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 
+ endchoice
+ 
+diff --git a/arch/mips/txx9/Kconfig b/arch/mips/txx9/Kconfig
+index 6d40bc7..04e3cdb 100644
+--- a/arch/mips/txx9/Kconfig
++++ b/arch/mips/txx9/Kconfig
+@@ -21,6 +21,7 @@ config MACH_TXX9
+ 	select SYS_SUPPORTS_LITTLE_ENDIAN
+ 	select SYS_SUPPORTS_BIG_ENDIAN
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 
+ config TOSHIBA_JMR3927
+ 	bool "Toshiba JMR-TX3927 board"
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index 5af5aa7..da4ea6c 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -1028,6 +1028,7 @@ config PPC_CLOCK
+ 	bool
+ 	default n
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 
+ config PPC_LIB_RHEAP
+ 	bool
+diff --git a/arch/unicore32/Kconfig b/arch/unicore32/Kconfig
+index fda37c9..8247d69 100644
+--- a/arch/unicore32/Kconfig
++++ b/arch/unicore32/Kconfig
+@@ -89,6 +89,7 @@ config ARCH_PUV3
+ 	select CPU_UCV2
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
++	select HAVE_CUSTOM_CLK
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_HAS_CPUFREQ
+ 
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index bace9e9..8dc8391 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -9,16 +9,23 @@ config HAVE_CLK_PREPARE
+ config HAVE_MACH_CLKDEV
+ 	bool
+ 
+-config COMMON_CLK
++config HAVE_CUSTOM_CLK
+ 	bool
++	---help---
++	  Architectures which provide a custom clk API should select
++	  this to disable the common clock API.
++
++config COMMON_CLK
++	bool "Common clock framework"
++	depends on !HAVE_CUSTOM_CLK
+ 	select HAVE_CLK_PREPARE
+ 	select CLKDEV_LOOKUP
+ 	---help---
+ 	  The common clock framework is a single definition of struct
+ 	  clk, useful across many platforms, as well as an
+ 	  implementation of the clock API in include/linux/clk.h.
+-	  Architectures utilizing the common struct clk should select
+-	  this option.
++	  This provides a generic way for drivers to provide and use
++	  clocks without hard coded relationships in the drivers.
+ 
+ menu "Common Clock Framework"
+ 	depends on COMMON_CLK
+-- 
+1.7.10.4
