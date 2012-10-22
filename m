@@ -1,38 +1,40 @@
-From: spang@chromium.org (Michael Spang)
-Date: Mon, 22 Oct 2012 15:51:54 -0400
-Subject: [PATCH] ARM: Only initialize max_mapnr when using flatmem
-Message-ID: <1350935514-27422-1-git-send-email-spang@chromium.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 22 Oct 2012 19:53:06 +0000 (UTC)
+Subject: [PATCH 2/7] ARM: OMAP2xxx: hwmod: Add DMA information for SHAM
+ module
+In-Reply-To: <20121022193714.GB1708@animalcreek.com>
+References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
+ <1350683640-15044-3-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1210201940260.27264@utopia.booyaka.com>
+ <20121022193714.GB1708@animalcreek.com>
+Message-ID: <alpine.DEB.2.00.1210221950330.13464@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The expression used to initialize max_mapnr is not appropriate for
-sparsemem, since mem_map is NULL and pfn_to_page() only works on valid
-pages. This patch leaves max_mapnr uninitialized for sparsemem.
+On Mon, 22 Oct 2012, Mark A. Greer wrote:
 
-For flatmem, the expression simplifies to copying max_pfn.
+> On Sat, Oct 20, 2012 at 07:40:44PM +0000, Paul Walmsley wrote:
+> > On Fri, 19 Oct 2012, Mark A. Greer wrote:
+> > 
+> > > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > > 
+> > > Add the DMA information for the OMAP2 SHA module.
+> > > 
+> > > CC: Paul Walmsley <paul@pwsan.com>
+> > > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> > 
+> > This can probably be combined with the first patch.
+> 
+> I made it a separate patch because the original omap2xxx code didn't
+> support DMA and I wanted to keep the first patch an apples-apples
+> conversion and _add_ functionality in this, separate, patch.
+> 
+> I prefer 2 patches but if you still want me to combine them, let me know.
 
-Signed-off-by: Michael Spang <spang@chromium.org>
----
- arch/arm/mm/init.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+OK, I see.  That's fine, then.  Maybe add a sentence about that into the 
+patch description of #2, that this effectively enables a code path in 
+the driver that wasn't being used before, and therefore should be in a 
+separate patch for ease of bisecting?
 
-I'm not sure we need this variable it all - it looks like there are no
-users.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index c21d06c..9b72e6f 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -600,7 +600,9 @@ void __init mem_init(void)
- 	extern u32 itcm_end;
- #endif
- 
--	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
-+#ifdef CONFIG_FLATMEM
-+	max_mapnr = max_pfn;
-+#endif
- 
- 	/* this will put all unused low memory onto the freelists */
- 	free_unused_memmap(&meminfo);
--- 
-1.7.7.3
+- Paul
