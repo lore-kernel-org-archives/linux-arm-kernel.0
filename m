@@ -1,102 +1,25 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 17:06:58 +0300
-Subject: [PATCH 0/8] I2C patches for v3.8 merge window
-In-Reply-To: <CAM=Q2ctS3hxngk5efcvScAdv-2GtH2pHRZoxRhRTiOWmQA-AXw@mail.gmail.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <20121022133023.GC14033@arwen.pp.htv.fi>
- <CAM=Q2ctS3hxngk5efcvScAdv-2GtH2pHRZoxRhRTiOWmQA-AXw@mail.gmail.com>
-Message-ID: <20121022140658.GA18993@arwen.pp.htv.fi>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 22 Oct 2012 22:14:51 +0800
+Subject: [PATCH v2] ARM: SMP_TWD: make setup()/stop() reentrant
+In-Reply-To: <CACRpkdbpDQQKm2=3zued=Kf2ykiVpb9wQDrSZf7=k8h1ryLAgA@mail.gmail.com>
+References: <1350640589-31821-1-git-send-email-linus.walleij@linaro.org>
+ <20121022051319.GA19107@S2101-09.ap.freescale.net>
+ <CACRpkdbpDQQKm2=3zued=Kf2ykiVpb9wQDrSZf7=k8h1ryLAgA@mail.gmail.com>
+Message-ID: <20121022141446.GB19107@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Oct 22, 2012 at 07:36:31PM +0530, Shubhrajyoti Datta wrote:
-> On Mon, Oct 22, 2012 at 7:00 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Mon, Oct 22, 2012 at 12:46:50PM +0300, Felipe Balbi wrote:
-> >> Hi guys,
-> >>
-> >> here's another series for OMAP I2C driver. There are a few cleanups
-> >> and one very nice new feature: we can now report how many bytes
-> >> we transferred until NACK.
-> >>
-> >> Note that the implemementation for OMAP-I2C turned out to be a
-> >> little more complex then I expected, mainly because of the way
-> >> I2C_CNT register behaves and because of the very buggy register
-> >> usage on that driver.
-> >>
-> >> I have boot tested all patches on beagle xM (3630) and pandaboard
-> >> rev A3 (4430), will send boot-logs if anyone wants to see.
+On Mon, Oct 22, 2012 at 12:14:03PM +0200, Linus Walleij wrote:
+> > 2. When secondary cores get off-line, the clockevent devices for
+> >    the cores will be released.  So when they become online, the
+> >    clockevent devices should be registered again.
 > 
-> tested the below branch on omap4430sdp , panda , omap3430sdp.
+> So that is how it happens. Where is the code releasing all
+> clock events? I was thinking this would more properly be done
+> in the .stop() path of the SMP TWD driver?
 > 
-> Doing simple i2ctools
-> .
-> 
-> Tested-by : Shubhrajyoti D <shubhrajyoti@ti.com>
-> 
+tick_notify() will receive CLOCK_EVT_NOTIFY_CPU_DEAD when a cpu goes
+away.  It results in tick_shutdown() invoking which will release the
+clockevent device for the cpu.
 
-can you also check if echo mem > /sys/power/state works ? Don't forget
-to enable UART wakeups with:
-
-echo enabled > /sys/devices/platform/omap_uart.2/power/wakeup
-echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
-
-before trying to suspend. Another cool test is rtctest (since our RTC is
-part of TWL). It worked fine on my two platforms. Attached you will find
-the sourcecode for rtctest.
-
-> >> All patches are available at [1] if anyone wants an easy way to
-> >> test the patches.
-> >>
-> >> [1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-transferred-bytes-on-NACK
-> >
-> > forgot to mention, with [1] I could veridy suspend to ram with boards
-> > mentioned above.
-> >
-> > [1] http://marc.info/?l=linux-arm-kernel&m=135090724817604&w=2
-> >
-> >> Felipe Balbi (7):
-> >>   i2c: omap: no need to access platform_device
-> >>   i2c: omap: reorder exit path of omap_i2c_xfer_msg()
-> >>   i2c: omap: fix error checking
-> >>   i2c: omap: also complete() when stat becomes zero
-> >>   i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
-> >>   i2c: omap: wait for transfer completion before sending STP bit
-> >>   i2c: omap: implement handling for 'transferred' bytes
-> >>
-> >> Shubhrajyoti D (1):
-> >>   i2c: add 'transferred' field to struct i2c_msg
-> >>
-> >>  arch/arm/mach-omap2/i2c.c                  |   3 +-
-> >>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +-
-> >>  drivers/i2c/busses/i2c-omap.c              | 156 ++++++++++++++++-------------
-> >>  include/linux/i2c-omap.h                   |   1 +
-> >>  include/uapi/linux/i2c.h                   |   1 +
-> >>  5 files changed, 89 insertions(+), 74 deletions(-)
-> >>
-> >> --
-> >> 1.8.0.rc0
-> >>
-> >
-> > --
-> > balbi
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: rtctest.c
-Type: text/x-csrc
-Size: 5768 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/d3212336/attachment-0001.bin>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/d3212336/attachment-0001.sig>
+Shawn
