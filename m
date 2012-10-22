@@ -1,40 +1,29 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 22 Oct 2012 19:53:06 +0000 (UTC)
-Subject: [PATCH 2/7] ARM: OMAP2xxx: hwmod: Add DMA information for SHAM
- module
-In-Reply-To: <20121022193714.GB1708@animalcreek.com>
-References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
- <1350683640-15044-3-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1210201940260.27264@utopia.booyaka.com>
- <20121022193714.GB1708@animalcreek.com>
-Message-ID: <alpine.DEB.2.00.1210221950330.13464@utopia.booyaka.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 22 Oct 2012 21:55:56 +0200
+Subject: [PATCH 2/4] ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+In-Reply-To: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+Message-ID: <1350935758-9215-3-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2012, Mark A. Greer wrote:
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ arch/arm/mach-omap2/gpmc-nand.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> On Sat, Oct 20, 2012 at 07:40:44PM +0000, Paul Walmsley wrote:
-> > On Fri, 19 Oct 2012, Mark A. Greer wrote:
-> > 
-> > > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > > 
-> > > Add the DMA information for the OMAP2 SHA module.
-> > > 
-> > > CC: Paul Walmsley <paul@pwsan.com>
-> > > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> > 
-> > This can probably be combined with the first patch.
-> 
-> I made it a separate patch because the original omap2xxx code didn't
-> support DMA and I wanted to keep the first patch an apples-apples
-> conversion and _add_ functionality in this, separate, patch.
-> 
-> I prefer 2 patches but if you still want me to combine them, let me know.
-
-OK, I see.  That's fine, then.  Maybe add a sentence about that into the 
-patch description of #2, that this effectively enables a code path in 
-the driver that wasn't being used before, and therefore should be in a 
-separate patch for ease of bisecting?
-
-
-- Paul
+diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+index 8607735..c3616c6 100644
+--- a/arch/arm/mach-omap2/gpmc-nand.c
++++ b/arch/arm/mach-omap2/gpmc-nand.c
+@@ -92,7 +92,7 @@ static int omap2_nand_gpmc_retime(
+ static bool __init gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+ {
+ 	/* support only OMAP3 class */
+-	if (!cpu_is_omap34xx()) {
++	if (!cpu_is_omap34xx() && !soc_is_am33xx()) {
+ 		pr_err("BCH ecc is not supported on this CPU\n");
+ 		return 0;
+ 	}
+-- 
+1.7.11.7
