@@ -1,61 +1,193 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 22 Oct 2012 12:21:16 +0530
-Subject: [PATCH v2] ARM: SMP_TWD: make setup()/stop() reentrant
-In-Reply-To: <20121022051319.GA19107@S2101-09.ap.freescale.net>
-References: <1350640589-31821-1-git-send-email-linus.walleij@linaro.org>
- <20121022051319.GA19107@S2101-09.ap.freescale.net>
-Message-ID: <5084ECE4.5020608@ti.com>
+From: c.dall@virtualopensystems.com (Christoffer Dall)
+Date: Mon, 22 Oct 2012 02:51:42 -0400
+Subject: [PATCH v3 04/13] ARM: KVM: Initial VGIC MMIO support code
+In-Reply-To: <20121022065104.18672.52989.stgit@ubuntu>
+References: <20121022065104.18672.52989.stgit@ubuntu>
+Message-ID: <20121022065142.18672.75805.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-On Monday 22 October 2012 10:43 AM, Shawn Guo wrote:
-> On Fri, Oct 19, 2012 at 11:56:29AM +0200, Linus Walleij wrote:
->> This makes the SMP_TWD clock .setup()/.stop() pair reentrant by
->> not re-fetching the clk and re-registering the clock event every
->> time .setup() is called. We also make sure to call the
->> clk_enable()/clk_disable() pair on subsequent calls.
->>
->> As it has been brought to my knowledge that this pair is going
->> to be called from atomic contexts for CPU clusters coming and
->> going, the clk_prepare()/clk_unprepare() calls cannot be called
->> on subsequent .setup()/.stop() iterations.
->>
->> The patch assumes that the code will make sure that
->> twd_set_mode() is called through .set_mode() on the clock
->> event *after* the .setup() call, so that the timer registers
->> are fully re-programmed after a new .setup() cycle.
->>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Reported-by: Peter Chen <peter.chen@freescale.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> Peter/Shawn: can you please respond with a Tested-by from your
->> system(s) to indicate if this works as expected?
->
-> I have seen two problems with the patch.
->
-> 1. twd_timer_setup() is called on per-cpu path, and initial_setup_called
->     should be a per-cpu variable.
->
-> 2. When secondary cores get off-line, the clockevent devices for
->     the cores will be released.  So when they become online, the
->     clockevent devices should be registered again.
->
-> I can only have my system work as expected with the following changes.
->
+Wire the initial in-kernel MMIO support code for the VGIC, used
+for the distributor emulation.
 
-How about moving twd_get_clock() outside setup and do that in onetime
-init code like register etc. Its is pointless to keep doing
-re-registration, clock_enable/disable() since you can not really
-disable this clock. Remember we added this clock node for CPUFREQ
-and it is just CPU clock with an additional fixed divider.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+---
+ arch/arm/include/asm/kvm_vgic.h |    6 +-
+ arch/arm/kvm/Makefile           |    1 
+ arch/arm/kvm/vgic.c             |  138 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 144 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/kvm/vgic.c
 
-With above, you neither see the sleep while atomic warning nor
-there is any need to fiddle with clock node after boot.
-
-Let me know if I have missed any other consideration here.
-
-Regards,
-Santosh
+diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
+index d75540a..b444ecf 100644
+--- a/arch/arm/include/asm/kvm_vgic.h
++++ b/arch/arm/include/asm/kvm_vgic.h
+@@ -30,7 +30,11 @@ struct kvm_vcpu;
+ struct kvm_run;
+ struct kvm_exit_mmio;
+ 
+-#ifndef CONFIG_KVM_ARM_VGIC
++#ifdef CONFIG_KVM_ARM_VGIC
++bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		      struct kvm_exit_mmio *mmio);
++
++#else
+ static inline int kvm_vgic_hyp_init(void)
+ {
+ 	return 0;
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 574c67c..3370c09 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -20,3 +20,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesc
+ 
+ obj-$(CONFIG_KVM_ARM_HOST) += arm.o guest.o mmu.o emulate.o reset.o
+ obj-$(CONFIG_KVM_ARM_HOST) += coproc.o coproc_a15.o mmio.o
++obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
+diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+new file mode 100644
+index 0000000..26ada3b
+--- /dev/null
++++ b/arch/arm/kvm/vgic.c
+@@ -0,0 +1,138 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <asm/kvm_emulate.h>
++
++#define ACCESS_READ_VALUE	(1 << 0)
++#define ACCESS_READ_RAZ		(0 << 0)
++#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
++#define ACCESS_WRITE_IGNORED	(0 << 1)
++#define ACCESS_WRITE_SETBIT	(1 << 1)
++#define ACCESS_WRITE_CLEARBIT	(2 << 1)
++#define ACCESS_WRITE_VALUE	(3 << 1)
++#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
++
++/**
++ * vgic_reg_access - access vgic register
++ * @mmio:   pointer to the data describing the mmio access
++ * @reg:    pointer to the virtual backing of the vgic distributor struct
++ * @offset: least significant 2 bits used for word offset
++ * @mode:   ACCESS_ mode (see defines above)
++ *
++ * Helper to make vgic register access easier using one of the access
++ * modes defined for vgic register access
++ * (read,raz,write-ignored,setbit,clearbit,write)
++ */
++static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
++			    u32 offset, int mode)
++{
++	int word_offset = offset & 3;
++	int shift = word_offset * 8;
++	u32 mask;
++	u32 regval;
++
++	/*
++	 * Any alignment fault should have been delivered to the guest
++	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
++	 */
++
++	mask = (~0U) >> (word_offset * 8);
++	if (reg)
++		regval = *reg;
++	else {
++		BUG_ON(mode != (ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED));
++		regval = 0;
++	}
++
++	if (mmio->is_write) {
++		u32 data = (*((u32 *)mmio->data) & mask) << shift;
++		switch (ACCESS_WRITE_MASK(mode)) {
++		case ACCESS_WRITE_IGNORED:
++			return;
++
++		case ACCESS_WRITE_SETBIT:
++			regval |= data;
++			break;
++
++		case ACCESS_WRITE_CLEARBIT:
++			regval &= ~data;
++			break;
++
++		case ACCESS_WRITE_VALUE:
++			regval = (regval & ~(mask << shift)) | data;
++			break;
++		}
++		*reg = regval;
++	} else {
++		switch (ACCESS_READ_MASK(mode)) {
++		case ACCESS_READ_RAZ:
++			regval = 0;
++			/* fall through */
++
++		case ACCESS_READ_VALUE:
++			*((u32 *)mmio->data) = (regval >> shift) & mask;
++		}
++	}
++}
++
++/* All this should be handled by kvm_bus_io_*()... FIXME!!! */
++struct mmio_range {
++	unsigned long base;
++	unsigned long len;
++	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
++			    u32 offset);
++};
++
++static const struct mmio_range vgic_ranges[] = {
++	{}
++};
++
++static const
++struct mmio_range *find_matching_range(const struct mmio_range *ranges,
++				       struct kvm_exit_mmio *mmio,
++				       unsigned long base)
++{
++	const struct mmio_range *r = ranges;
++	unsigned long addr = mmio->phys_addr - base;
++
++	while (r->len) {
++		if (addr >= r->base &&
++		    (addr + mmio->len) <= (r->base + r->len))
++			return r;
++		r++;
++	}
++
++	return NULL;
++}
++
++/**
++ * vgic_handle_mmio - handle an in-kernel MMIO access
++ * @vcpu:	pointer to the vcpu performing the access
++ * @mmio:	pointer to the data describing the access
++ *
++ * returns true if the MMIO access has been performed in kernel space,
++ * and false if it needs to be emulated in user space.
++ */
++bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exit_mmio *mmio)
++{
++	return KVM_EXIT_MMIO;
++}
