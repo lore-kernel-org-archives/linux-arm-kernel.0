@@ -1,58 +1,78 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 23 Oct 2012 00:08:56 +0800
-Subject: [PATCH v2 6/9] tty: pxa: configure pin
+Date: Tue, 23 Oct 2012 00:08:57 +0800
+Subject: [PATCH v2 7/9] i2c: pxa: use devm_kzalloc
 In-Reply-To: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1350922139-3693-7-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1350922139-3693-8-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure pins by pinctrl driver.
+Use devm_kzalloc & add checking in probe() function.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- drivers/tty/serial/pxa.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ drivers/i2c/busses/i2c-pxa.c |   26 ++++++++++----------------
+ 1 files changed, 10 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/tty/serial/pxa.c b/drivers/tty/serial/pxa.c
-index 9033fc6..02dc771 100644
---- a/drivers/tty/serial/pxa.c
-+++ b/drivers/tty/serial/pxa.c
-@@ -37,6 +37,7 @@
- #include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/of.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/platform_device.h>
- #include <linux/tty.h>
- #include <linux/tty_flip.h>
-@@ -809,6 +810,7 @@ static int serial_pxa_probe_dt(struct platform_device *pdev,
- 			       struct uart_pxa_port *sport)
- {
- 	struct device_node *np = pdev->dev.of_node;
-+	struct pinctrl *pinctrl;
- 	int ret;
+diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
+index 1034d93..7c8b5d0 100644
+--- a/drivers/i2c/busses/i2c-pxa.c
++++ b/drivers/i2c/busses/i2c-pxa.c
+@@ -1078,6 +1078,8 @@ static int i2c_pxa_probe_pdata(struct platform_device *pdev,
+ 	struct i2c_pxa_platform_data *plat = pdev->dev.platform_data;
+ 	const struct platform_device_id *id = platform_get_device_id(pdev);
  
- 	if (!np)
-@@ -819,6 +821,10 @@ static int serial_pxa_probe_dt(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "failed to get alias id, errno %d\n", ret);
- 		return ret;
- 	}
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		return -EPROBE_DEFER;
-+
- 	sport->port.line = ret;
- 	return 0;
- }
-@@ -857,7 +863,7 @@ static int serial_pxa_probe(struct platform_device *dev)
- 	ret = serial_pxa_probe_dt(dev, sport);
++	if (!id)
++		return -EINVAL;
+ 	*i2c_types = id->driver_data;
+ 	if (plat) {
+ 		i2c->use_pio = plat->use_pio;
+@@ -1094,29 +1096,23 @@ static int i2c_pxa_probe(struct platform_device *dev)
+ 	struct resource *res = NULL;
+ 	int ret, irq;
+ 
+-	i2c = kzalloc(sizeof(struct pxa_i2c), GFP_KERNEL);
+-	if (!i2c) {
+-		ret = -ENOMEM;
+-		goto emalloc;
+-	}
++	i2c = devm_kzalloc(&dev->dev, sizeof(struct pxa_i2c), GFP_KERNEL);
++	if (!i2c)
++		return -ENOMEM;
+ 
+ 	ret = i2c_pxa_probe_dt(dev, i2c, &i2c_type);
  	if (ret > 0)
- 		sport->port.line = dev->id;
--	else if (ret < 0)
-+	if (ret < 0)
- 		goto err_clk;
- 	snprintf(sport->name, PXA_NAME_LEN - 1, "UART%d", sport->port.line + 1);
+ 		ret = i2c_pxa_probe_pdata(dev, i2c, &i2c_type);
+ 	if (ret < 0)
+-		goto eclk;
++		return ret;
  
+ 	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+ 	irq = platform_get_irq(dev, 0);
+-	if (res == NULL || irq < 0) {
+-		ret = -ENODEV;
+-		goto eclk;
+-	}
++	if (res == NULL || irq < 0)
++		return -ENODEV;
+ 
+-	if (!request_mem_region(res->start, resource_size(res), res->name)) {
+-		ret = -ENOMEM;
+-		goto eclk;
+-	}
++	if (!request_mem_region(res->start, resource_size(res), res->name))
++		return -ENOMEM;
+ 
+ 	i2c->adap.owner   = THIS_MODULE;
+ 	i2c->adap.retries = 5;
+@@ -1209,8 +1205,6 @@ ereqirq:
+ eremap:
+ 	clk_put(i2c->clk);
+ eclk:
+-	kfree(i2c);
+-emalloc:
+ 	release_mem_region(res->start, resource_size(res));
+ 	return ret;
+ }
 -- 
 1.7.0.4
