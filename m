@@ -1,78 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Oct 2012 16:10:56 -0600
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210221443580.1724-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1210221443580.1724-100000@iolanthe.rowland.org>
-Message-ID: <5085C470.4040707@wwwdotorg.org>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 23 Oct 2012 00:11:02 +0200
+Subject: 3.7-rc2 fails to build exynos target
+Message-ID: <D9D88B79-F5F0-4C63-9E23-B1A919C7142A@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2012 01:00 PM, Alan Stern wrote:
-> On Mon, 22 Oct 2012, Stephen Warren wrote:
-> 
->>>>> +- has-tt : controller has transaction translator(s).
->>>>> +- has-synopsys-hc-bug : controller has the synopsys hc bug
->>>>
->>>> That would normally be determined by the driver based on the particular
->>>> compatible value that is in device tree.
->>>
->>> I don't understand this comment.  Isn't "has-synopsys-hc-bug" the 
->>> compatible value in question?
->>
->> "compatible value" in this context means that value of the property
->> named "compatible".
-> 
-> I see.  But why would it be done this way instead having a separate 
-> property?
+Howdy,
 
-Well, I did say normally:-)
+While updating to 3.7-rc2, I stumbled over a few compile issues with the exynos target. I won't get around to fix them, but wanted to give you a heads up and would like to see them resolved before 3.7 gets released :).
 
-I can certainly see an argument for representing these differences using
-custom properties, rather than deriving the information from the
-compatible value. It's probably be OK to do so for something generic
-like this; it's just perhaps not always the default choice.
+Config: http://csgraf.de/arm/exynos
 
-Do note that even though this binding document dictates a particular
-value for the compatible property, every device tree should additionally
-add a separate value alongside it to indicate the specific HW model
-that's actually present, so that if some device-specific bug-fix or
-workaround needs to be applied, the model can be identified anyway.
+Alex
 
-So, rather than:
-
-compatible = "usb-ehci";
-
-You should always have e.g.:
-
-compatible = "nvidia,tegra20-ehci", "usb-ehci";
-
-Given that, there is then always enough information in the device tree
-for the driver to be able to derive the other values from the compatible
-value.
-
-Whether you want to derive the information, or whether you want to
-explicitly represent it via properties, is a decision to make based on
-the trade-offs.
-
-Oh, and I note that quite a few device trees already use compatible
-value "usb-ehci" in their device-trees. Care needs to be taken not to
-usurp that value from any existing device drivers if that was to be
-picked as the compatible value required by this binding.
-
-> And doesn't the same reasoning apply to has-tt?  Doesn't that mean the 
-> driver would have to match four different hardware types?  What happens 
-> if a third characteristic like these comes around; would the driver 
-> then have to check against eight different types?
-
-No, the compatible value represents the model, so you'd have a table like:
-
-compatible          -> bugX has_tt
-nvidia,tegra20-ehci -> 0    1
-vendor1,foo-ehci    -> 0    1
-vendor2,bar-ehci    -> 1    1
-vendor3,baz-ehci    -> 0    1
-vendor4,qux-ehci    -> 0    1
-...
-
-So the table size isn't related to the number of options. The table size
-is probably bigger than subset of options combinations that make sense.
+[  674s] ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+[  674s] ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+[  675s] ERROR: "read_current_timer" [drivers/video/udlfb.ko] undefined!
+[  675s] ERROR: "cpufreq_cooling_register" [drivers/thermal/exynos_thermal.ko] undefined!
+[  675s] ERROR: "cpufreq_cooling_unregister" [drivers/thermal/exynos_thermal.ko] undefined!
+[  677s] ERROR: "s5p_csis_phy_enable" [drivers/media/platform/s5p-fimc/s5p-csis.ko] undefined!
+[  678s] ERROR: "read_current_timer" [drivers/gpu/drm/udl/udl.ko] undefined!
+[  678s] ERROR: "set_irq_flags" [drivers/gpio/gpio-adnp.ko] undefined!
+[  678s] make[3]: *** [__modpost] Error 1
+[  678s] make[2]: *** [modules] Error 2
+[  678s] make[1]: *** [sub-make] Error 2
+[  678s] make: *** [all] Error 2
+[  678s] + test 2 -eq 0
+[  678s] + test 00 -gt 0
+[  678s] + exit 1
+[  678s] error: Bad exit status from /var/tmp/rpm-tmp.qIAujD (%build)
