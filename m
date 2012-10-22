@@ -1,25 +1,50 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 22 Oct 2012 13:53:15 -0700
-Subject: [PATCH 6/7] crypto: omap-sham: Add code to use dmaengine API
-In-Reply-To: <CALLzPKbacnyQ=ZTzT+XMVcsxy4m_EdZgv7sZaWJFUwym4AndpA@mail.gmail.com>
-References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
- <1350683640-15044-7-git-send-email-mgreer@animalcreek.com>
- <CALLzPKbacnyQ=ZTzT+XMVcsxy4m_EdZgv7sZaWJFUwym4AndpA@mail.gmail.com>
-Message-ID: <20121022205315.GB6851@animalcreek.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Oct 2012 15:00:21 -0600
+Subject: [PATCH] ARM: imx: allow support to be disabled
+Message-ID: <1350939621-2892-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 21, 2012 at 02:52:13PM +0300, Kasatkin, Dmitry wrote:
-> Hello,
-> 
-> I got only 3 patches out of 7.
-> Can you please re-submit them also to linux-crypto at vger.kernel.org
-> That is a list where crypto drivers are discussed.
+From: Stephen Warren <swarren@nvidia.com>
 
-Okay, I will CC you and the linux-crypto on the entire series when
-I submit v2.
+Since ARCH_MXC's Kconfig option has no string name, the user is never
+presented with an option to enable/disable this setting. Rather, it is
+automatically enabled based on the conditions in the def_bool entry.
 
-Sorry about that.
+Add a string, so that the user gets to choose whether to enable ARCH_MXC,
+and rename the i.MX options menu so that it doesn't clash. Also, change
+from "def_bool y" to "bool" to be more consistent with other machines.
 
-Mark
---
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Note that if Tegra and i.MX support are enabled at the same time, then
+the build will fail since both Tegra's and i.MX's head.S define symbol
+v7_invalidate_l1. shmobile appears to have the same conflict. Note that
+patches to port Tegra to ARCH_MULTI aren't yet in linux-next, but I can
+point anyone who's interested at my github tree.
+---
+ arch/arm/mach-imx/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 892631f..5cc2417 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_MXC
+-	def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
++	bool "Freescale i.MX support" if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR if !ZBOOT_ROM
+@@ -13,7 +13,7 @@ config ARCH_MXC
+ 	help
+ 	  Support for Freescale MXC/iMX-based family of processors
+ 
+-menu "Freescale i.MX support"
++menu "Freescale i.MX options"
+ 	depends on ARCH_MXC
+ 
+ config MXC_IRQ_PRIOR
+-- 
+1.7.0.4
