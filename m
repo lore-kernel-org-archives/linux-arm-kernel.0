@@ -1,69 +1,126 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Oct 2012 14:26:46 -0600
-Subject: [PATCH 03/10] tty: pxa: configure pin
-In-Reply-To: <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
- <508080CB.5010904@wwwdotorg.org>
- <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
-Message-ID: <5085AC06.8070508@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 22 Oct 2012 13:28:07 -0700
+Subject: [PATCH v2 2/9] pinctrl: single: support gpio request and free
+In-Reply-To: <1350922139-3693-3-git-send-email-haojian.zhuang@gmail.com>
+References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350922139-3693-3-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121022202805.GG4730@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2012 02:45 AM, Linus Walleij wrote:
-> On Fri, Oct 19, 2012 at 12:20 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121022 09:11]:
+> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
+> Each pin binds to one register. A lot of pins could be configured
+> as gpio.
 > 
->> On 10/18/2012 03:06 AM, Haojian Zhuang wrote:
->>> Configure pins by pinctrl driver.
->>
->> In general, it seems better to use pinctrl "hogs" if the driver is only
->> going to statically set up one pinctrl state and never change it. The
->> alternative is make every single driver execute these pinctrl calls,
->> which could be tedious.
+> Now add three properties in below.
+> pinctrl-single,gpio-ranges: gpio range array
+> pinctrl-single,gpio: <gpio base, npins in range, pin base in range>
+> pinctrl-single,gpio-func: <gpio function value in mux>
 > 
-> True. And each platform has to choose how to go ahead with this.
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-single.c |   94 +++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 92 insertions(+), 2 deletions(-)
 > 
-> I always imagined that any system of the "power socket in wall"
-> type would just use hogs to configure its pins and be done with
-> it, and there appear to be some platforms like that. (e.g. MIPS and
-> various power-inaware references come to mind).
-> 
-> For the Ux500 drivers we have found that all of those that have pin
-> resources actually have to be handled by the driver. The reason is
-> that all of them have idle and/or sleep states that need to be
-> handled at runtime.
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index 726a729..6a0b24b 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -28,8 +28,10 @@
+>  #define DRIVER_NAME			"pinctrl-single"
+>  #define PCS_MUX_PINS_NAME		"pinctrl-single,pins"
+>  #define PCS_MUX_BITS_NAME		"pinctrl-single,bits"
+> +#define PCS_GPIO_FUNC_NAME		"pinctrl-single,gpio-func"
 
-Well, presumably the pinctrl driver itself could have both default/idle
-states, and system sleep could engage the appropriate system-wide setting.
+I think we can now get rid of these defines, I initially added
+them as we had a bit hard time finding a suitable name for the
+driver. These are only used in one location, so let's not add
+new ones here.
 
-> As an additional complication our drivers are used also by
-> the Versatile and SPEAr family of platforms, so the control
-> need to be tolerant (accept missing pinctrl handles and states)
-> as well. (I can see that other drivers take shortcuts by being less
-> elaborate since there is a 1:1 driver<->platform mapping.)
+>  static int pcs_request_gpio(struct pinctrl_dev *pctldev,
+> -			struct pinctrl_gpio_range *range, unsigned offset)
+> +			    struct pinctrl_gpio_range *range, unsigned pin)
+>  {
+> -	return -ENOTSUPP;
+> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+> +	struct pcs_gpio_range *gpio = NULL;
+> +	int end, mux_bytes;
+> +	unsigned data;
+> +
+> +	gpio = container_of(range, struct pcs_gpio_range, range);
+> +	if (!gpio->func_en)
+> +		return 0;
+> +	end = range->pin_base + range->npins - 1;
+> +	if (pin < range->pin_base || pin > end) {
+> +		dev_err(pctldev->dev, "pin %d isn't in the range of "
+> +			"%d to %d\n", pin, range->pin_base, end);
+> +		return -EINVAL;
+> +	}
+> +	mux_bytes = pcs->width / BITS_PER_BYTE;
+> +	data = pcs_readl(pcs->base + pin * mux_bytes) & ~pcs->fmask;
+> +	data |= gpio->gpio_func;
+> +	pcs_writel(data, pcs->base + pin * mux_bytes);
+> +	return 0;
+>  }
 
-Isn't the driver (or DT binding) supposed to define what pinctrl states
-must exist, and those state must always exist? There's no requirement
-for a pinctrl state definition to always actually contain content that
-changes the state. That's exactly why PIN_MAP_TYPE_DUMMY_STATE exists.
+I think I already commented on this one.. Is this safe if you don't
+have GPIOs configured? Or should you return -ENODEV in that case?
 
-> An alternative to embedding the pin handling code into
-> the drivers is to use bus notifiers as is done with the
-> shmobile clocking by drivers/base/power/clock_ops.c
-> I could easily imagine pinctrl_ops.c like that for some
-> platforms. This mandates still binding the pin table entries
-> to a device but avoids adding any code to the drivers.
-> 
-> However this latter approach does not work for us (Ux500) -
-> the three resources we have: clocks, pins and power domains
-> are dependent on state switch ordering (sometimes you need
-> to switch off the clock then set pin state, sometimes the
-> other way around) and it is not even
-> the same for all drivers - the notifier approach mandates
-> that all drivers do the clock, power domain and pin handling
-> uniformly.
+> +static int __devinit pcs_add_gpio_range(struct device_node *node,
+> +					struct pcs_device *pcs)
+> +{
+> +	struct pcs_gpio_range *gpio;
+> +	struct device_node *np;
+> +	const __be32 *list;
+> +	const char list_name[] = "pinctrl-single,gpio-ranges";
+> +	const char name[] = "pinctrl-single";
+> +	u32 gpiores[PCS_MAX_GPIO_VALUES];
+> +	int ret, size, i, mux_bytes = 0;
+> +
+> +	list = of_get_property(node, list_name, &size);
+> +	if (!list)
+> +		return -ENOENT;
 
-That certainly does imply that individual drivers do need to handle this
-explicitly. Although I still think that only specific drivers actually
-affected by this should end up actively managing pinctrl; shouldn't
-anything that can get away with relying on system hogs do so?
+Here you should return 0 if not found, otherwise things go bad for
+me at least as I don't have GPIOs configured. See more below.
+
+> +		gpio->range.name = kmemdup(name, sizeof(name), GFP_KERNEL);
+> +		pinctrl_add_gpio_range(pcs->pctl, &gpio->range);
+
+Just checking.. These get released with pinctrl_unregister() when
+unloading, right? And nothing else to free in pinctrl-single.c
+either?
+
+> @@ -975,6 +1061,10 @@ static int __devinit pcs_probe(struct platform_device *pdev)
+>  		goto free;
+>  	}
+>  
+> +	ret = pcs_add_gpio_range(np, pcs);
+> +	if (ret < 0)
+> +		return ret;
+> +
+
+Here you need to goto free on error. Maybe just fold in the
+attached fix if that looks OK to you:
+
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -930,7 +930,7 @@ static int __devinit pcs_add_gpio_range(struct device_node *node,
+ 
+ 	list = of_get_property(node, list_name, &size);
+ 	if (!list)
+-		return -ENOENT;
++		return 0;
+ 	size = size / sizeof(*list);
+ 	for (i = 0; i < size; i++) {
+ 		np = of_parse_phandle(node, list_name, i);
+@@ -1065,7 +1065,7 @@ static int __devinit pcs_probe(struct platform_device *pdev)
+ 
+ 	ret = pcs_add_gpio_range(np, pcs);
+ 	if (ret < 0)
+-		return ret;
++		goto free;
+ 
+ 	dev_info(pcs->dev, "%i pins at pa %p size %u\n",
+ 		 pcs->desc.npins, pcs->base, pcs->size);
