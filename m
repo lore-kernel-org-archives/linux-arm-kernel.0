@@ -1,84 +1,45 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 22 Oct 2012 20:45:34 +0200
-Subject: [PATCH v3 4/4] net/at91_ether: add pdata flag for reverse Eth addr
-In-Reply-To: <1350931534-8416-1-git-send-email-manabian@gmail.com>
-References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
-Message-ID: <1350931534-8416-5-git-send-email-manabian@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 22 Oct 2012 13:48:37 -0500
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <50857444.9080308@ti.com>
+ <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
+Message-ID: <50859505.5010306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow us to remove the last mach include from at91_ether
-and also make it easier to share address setup with macb.
 
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
- arch/arm/mach-at91/board-csb337.c         | 2 ++
- drivers/net/ethernet/cadence/Kconfig      | 1 -
- drivers/net/ethernet/cadence/at91_ether.c | 5 ++---
- include/linux/platform_data/macb.h        | 1 +
- 4 files changed, 5 insertions(+), 4 deletions(-)
+On 10/22/2012 01:35 PM, Paul Walmsley wrote:
+> (including the lists in my reply this time, oops; also adding some more 
+> detail)
+> 
+> On Mon, 22 Oct 2012, Jon Hunter wrote:
+> 
+>> On 10/20/2012 04:26 PM, Paul Walmsley wrote:
+>>
+>>> Failing tests: fixed by posted patches
+>>> --------------------------------------
+>>>
+>>> Boot tests:
+>>>
+>>> * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+>>>   - due to a GPMC bug
+>>>   - Apparently fixed by http://www.spinics.net/lists/arm-kernel/msg200787.html
+>>
+>> This is now addressed and I have verified it is booting on v3.7-rc2. The
+>> following patch address this boot problem ...
+>>
+>> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8119024ef7363591fd958ec89ebfaee7c18209e3
+> 
+> Great, thanks, will update the README.  Did you also enable 
+> CONFIG_ARM_APPENDED_DTB and CONFIG_ARM_ATAG_DTB_COMPAT, or were you able 
+> to pass the DTB from the bootloader?
 
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index 3e37437..aa9b320 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -53,6 +53,8 @@ static void __init csb337_init_early(void)
- static struct macb_platform_data __initdata csb337_eth_data = {
- 	.phy_irq_pin	= AT91_PIN_PC2,
- 	.is_rmii	= 0,
-+	/* The CSB337 bootloader stores the MAC the wrong-way around */
-+	.rev_eth_addr	= 1,
- };
- 
- static struct at91_usbh_data __initdata csb337_usbh_data = {
-diff --git a/drivers/net/ethernet/cadence/Kconfig b/drivers/net/ethernet/cadence/Kconfig
-index f6d0956..40172d1 100644
---- a/drivers/net/ethernet/cadence/Kconfig
-+++ b/drivers/net/ethernet/cadence/Kconfig
-@@ -21,7 +21,6 @@ if NET_CADENCE
- 
- config ARM_AT91_ETHER
- 	tristate "AT91RM9200 Ethernet support"
--	depends on ARM && ARCH_AT91RM9200
- 	select NET_CORE
- 	select MACB
- 	---help---
-diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-index 375d272..b92815a 100644
---- a/drivers/net/ethernet/cadence/at91_ether.c
-+++ b/drivers/net/ethernet/cadence/at91_ether.c
-@@ -32,8 +32,6 @@
- #include <linux/phy.h>
- #include <linux/io.h>
- 
--#include <asm/mach-types.h>
--
- #include "macb.h"
- 
- #define DRV_NAME	"at91_ether"
-@@ -61,9 +59,10 @@
- 
- static short __init unpack_mac_address(struct net_device *dev, unsigned int hi, unsigned int lo)
- {
-+	struct macb *lp = netdev_priv(dev);
- 	char addr[6];
- 
--	if (machine_is_csb337()) {
-+	if (lp->board_data.rev_eth_addr) {
- 		addr[5] = (lo & 0xff);			/* The CSB337 bootloader stores the MAC the wrong-way around */
- 		addr[4] = (lo & 0xff00) >> 8;
- 		addr[3] = (lo & 0xff0000) >> 16;
-diff --git a/include/linux/platform_data/macb.h b/include/linux/platform_data/macb.h
-index b081c72..044a124 100644
---- a/include/linux/platform_data/macb.h
-+++ b/include/linux/platform_data/macb.h
-@@ -12,6 +12,7 @@ struct macb_platform_data {
- 	u32		phy_mask;
- 	int		phy_irq_pin;	/* PHY IRQ */
- 	u8		is_rmii;	/* using RMII interface? */
-+	u8		rev_eth_addr;	/* reverse Ethernet address byte order */
- };
- 
- #endif /* __MACB_PDATA_H__ */
--- 
-1.7.12.4
+Actually, I built u-boot release 2012.10 for the am335x-evm and that
+worked for the bone board too. So that is what I used. I have not
+checked with Vaibhav and team if that is what they are using. So with
+this u-boot I just passed the dtb to the kernel and did not append.
+
+Cheers
+Jon
