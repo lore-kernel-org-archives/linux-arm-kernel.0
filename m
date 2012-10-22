@@ -1,126 +1,53 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 13:28:07 -0700
-Subject: [PATCH v2 2/9] pinctrl: single: support gpio request and free
-In-Reply-To: <1350922139-3693-3-git-send-email-haojian.zhuang@gmail.com>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
- <1350922139-3693-3-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20121022202805.GG4730@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Oct 2012 14:30:05 -0600
+Subject: [PATCH v2] pinctrl: reserve pins when states are activated
+In-Reply-To: <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
+References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
+ <20121019181019.GP4730@atomide.com>
+ <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
+Message-ID: <5085ACCD.3040203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121022 09:11]:
-> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
-> Each pin binds to one register. A lot of pins could be configured
-> as gpio.
+On 10/22/2012 02:21 AM, Linus Walleij wrote:
+> On Fri, Oct 19, 2012 at 8:10 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> [Me]
+>>> Instead: let use reserve the pins when the state is activated
+>>> and drop them when the state is disabled, i.e. when we move to
+>>> another state. This way different devices/functions can use the
+>>> same pins at different times.
+>>
+>> Hmm doesn't this mean that we are now doing lots of extra
+>> reserving and dropping of pins? Performance is important from
+>> latency point of view for cases where we need to remux pins
+>> constantly runtime PM.
 > 
-> Now add three properties in below.
-> pinctrl-single,gpio-ranges: gpio range array
-> pinctrl-single,gpio: <gpio base, npins in range, pin base in range>
-> pinctrl-single,gpio-func: <gpio function value in mux>
+> It is only done in case the pinmux state is switched in runtime
+> suspend/resume, so it's e.g. possible to just alter the pin config.
 > 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  drivers/pinctrl/pinctrl-single.c |   94 +++++++++++++++++++++++++++++++++++++-
->  1 files changed, 92 insertions(+), 2 deletions(-)
+> But in general what you say is true.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index 726a729..6a0b24b 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -28,8 +28,10 @@
->  #define DRIVER_NAME			"pinctrl-single"
->  #define PCS_MUX_PINS_NAME		"pinctrl-single,pins"
->  #define PCS_MUX_BITS_NAME		"pinctrl-single,bits"
-> +#define PCS_GPIO_FUNC_NAME		"pinctrl-single,gpio-func"
+> We used to to the same thing by having drivers call
+> pinctrl_get()/pinctrl_put() in this case instead, but that went
+> away with the introduction of states, so we cannot encode
+> different pin sets with say
+> pinctrl_get(dev, "foo")/pinctrl_get(dev, "bar")
+> anymore since there is only one pinctrl handle per device,
+> but multiple states.
+> 
+> If this turns out to be a severe performance bottleneck, I
+> suggest to add some additional constraint API, like
+> pinctrl_set_pinmux_homegeneous_pinsets(true) that will
+> at runtime select whether the pin allocation is done when
+> getting the pinctrl handle instead.
 
-I think we can now get rid of these defines, I initially added
-them as we had a bit hard time finding a suitable name for the
-driver. These are only used in one location, so let's not add
-new ones here.
+That API sounds like something system-wide, which seems like it would be
+rather presumptuous (CPU/SoC support code couldn't execute it, since
+that would presume a facet of all board designs that could change in the
+future). Even a driver shouldn't be assuming this; it can't know what
+boards it gets used in ahead of time.
 
->  static int pcs_request_gpio(struct pinctrl_dev *pctldev,
-> -			struct pinctrl_gpio_range *range, unsigned offset)
-> +			    struct pinctrl_gpio_range *range, unsigned pin)
->  {
-> -	return -ENOTSUPP;
-> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-> +	struct pcs_gpio_range *gpio = NULL;
-> +	int end, mux_bytes;
-> +	unsigned data;
-> +
-> +	gpio = container_of(range, struct pcs_gpio_range, range);
-> +	if (!gpio->func_en)
-> +		return 0;
-> +	end = range->pin_base + range->npins - 1;
-> +	if (pin < range->pin_base || pin > end) {
-> +		dev_err(pctldev->dev, "pin %d isn't in the range of "
-> +			"%d to %d\n", pin, range->pin_base, end);
-> +		return -EINVAL;
-> +	}
-> +	mux_bytes = pcs->width / BITS_PER_BYTE;
-> +	data = pcs_readl(pcs->base + pin * mux_bytes) & ~pcs->fmask;
-> +	data |= gpio->gpio_func;
-> +	pcs_writel(data, pcs->base + pin * mux_bytes);
-> +	return 0;
->  }
-
-I think I already commented on this one.. Is this safe if you don't
-have GPIOs configured? Or should you return -ENODEV in that case?
-
-> +static int __devinit pcs_add_gpio_range(struct device_node *node,
-> +					struct pcs_device *pcs)
-> +{
-> +	struct pcs_gpio_range *gpio;
-> +	struct device_node *np;
-> +	const __be32 *list;
-> +	const char list_name[] = "pinctrl-single,gpio-ranges";
-> +	const char name[] = "pinctrl-single";
-> +	u32 gpiores[PCS_MAX_GPIO_VALUES];
-> +	int ret, size, i, mux_bytes = 0;
-> +
-> +	list = of_get_property(node, list_name, &size);
-> +	if (!list)
-> +		return -ENOENT;
-
-Here you should return 0 if not found, otherwise things go bad for
-me at least as I don't have GPIOs configured. See more below.
-
-> +		gpio->range.name = kmemdup(name, sizeof(name), GFP_KERNEL);
-> +		pinctrl_add_gpio_range(pcs->pctl, &gpio->range);
-
-Just checking.. These get released with pinctrl_unregister() when
-unloading, right? And nothing else to free in pinctrl-single.c
-either?
-
-> @@ -975,6 +1061,10 @@ static int __devinit pcs_probe(struct platform_device *pdev)
->  		goto free;
->  	}
->  
-> +	ret = pcs_add_gpio_range(np, pcs);
-> +	if (ret < 0)
-> +		return ret;
-> +
-
-Here you need to goto free on error. Maybe just fold in the
-attached fix if that looks OK to you:
-
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -930,7 +930,7 @@ static int __devinit pcs_add_gpio_range(struct device_node *node,
- 
- 	list = of_get_property(node, list_name, &size);
- 	if (!list)
--		return -ENOENT;
-+		return 0;
- 	size = size / sizeof(*list);
- 	for (i = 0; i < size; i++) {
- 		np = of_parse_phandle(node, list_name, i);
-@@ -1065,7 +1065,7 @@ static int __devinit pcs_probe(struct platform_device *pdev)
- 
- 	ret = pcs_add_gpio_range(np, pcs);
- 	if (ret < 0)
--		return ret;
-+		goto free;
- 
- 	dev_info(pcs->dev, "%i pins at pa %p size %u\n",
- 		 pcs->desc.npins, pcs->base, pcs->size);
+Instead, it seems like the map registration code could easily look at
+all states defined for a device, and determine if the set of pins/groups
+used by those states was identical, and switch between up-front or
+dynamic registration as needed by the specific map entries.
