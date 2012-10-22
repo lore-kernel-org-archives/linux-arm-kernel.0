@@ -1,84 +1,112 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Mon, 22 Oct 2012 10:37:35 -0500
-Subject: [PATCH 3/4] zynq: remove use of CLKDEV_LOOKUP
-Message-ID: <20121022153735.GC502@beefymiracle.amer.corp.natinst.com>
+Date: Mon, 22 Oct 2012 10:37:49 -0500
+Subject: [PATCH 4/4] zynq: move static peripheral mappings
+Message-ID: <20121022153749.GD502@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq support in mainline does not (yet) make use of any of the
-generic clk or clk lookup functionality.  Remove what is upstream for
-now, until the out-of-tree implementation is in suitable form for
-merging.
+Shifting them up into the vmalloc region prevents the following warning,
+when booting a zynq qemu target with more than 512mb of RAM:
+
+  BUG: mapping for 0xe0000000 at 0xe0000000 out of vmalloc space
+
+In addition, it allows for reuse of these mappings when the proper
+drivers issue requests via ioremap().
 
 Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 ---
- arch/arm/Kconfig                         |  1 -
- arch/arm/mach-zynq/common.c              |  1 -
- arch/arm/mach-zynq/include/mach/clkdev.h | 32 --------------------------------
- 3 files changed, 34 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
+ arch/arm/mach-zynq/common.c                |  8 +++----
+ arch/arm/mach-zynq/include/mach/zynq_soc.h | 34 +++++++++++++++++-------------
+ 2 files changed, 23 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 73067ef..e37bea3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -959,7 +959,6 @@ config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform"
- 	select ARM_AMBA
- 	select ARM_GIC
--	select CLKDEV_LOOKUP
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select ICST
 diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index d73963b..6ea86cf 100644
+index 6ea86cf..e10268c 100644
 --- a/arch/arm/mach-zynq/common.c
 +++ b/arch/arm/mach-zynq/common.c
-@@ -31,7 +31,6 @@
- #include <asm/hardware/cache-l2x0.h>
+@@ -75,17 +75,17 @@ static struct map_desc io_desc[] __initdata = {
+ 	{
+ 		.virtual	= TTC0_VIRT,
+ 		.pfn		= __phys_to_pfn(TTC0_PHYS),
+-		.length		= SZ_4K,
++		.length		= TTC0_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= SCU_PERIPH_VIRT,
+ 		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
+-		.length		= SZ_8K,
++		.length		= SCU_PERIPH_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= PL310_L2CC_VIRT,
+ 		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
+-		.length		= SZ_4K,
++		.length		= PL310_L2CC_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
  
- #include <mach/zynq_soc.h>
--#include <mach/clkdev.h>
- #include "common.h"
+@@ -93,7 +93,7 @@ static struct map_desc io_desc[] __initdata = {
+ 	{
+ 		.virtual	= UART0_VIRT,
+ 		.pfn		= __phys_to_pfn(UART0_PHYS),
+-		.length		= SZ_4K,
++		.length		= UART0_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
+ #endif
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index 3d1c6a6..9156914 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -15,31 +15,35 @@
+ #ifndef __MACH_XILINX_SOC_H__
+ #define __MACH_XILINX_SOC_H__
  
- static struct of_device_id zynq_of_bus_ids[] __initdata = {
-diff --git a/arch/arm/mach-zynq/include/mach/clkdev.h b/arch/arm/mach-zynq/include/mach/clkdev.h
-deleted file mode 100644
-index c6e73d8..0000000
---- a/arch/arm/mach-zynq/include/mach/clkdev.h
-+++ /dev/null
-@@ -1,32 +0,0 @@
++#include <asm/pgtable.h>
++
+ #define PERIPHERAL_CLOCK_RATE		2500000
+ 
+-/* For now, all mappings are flat (physical = virtual)
++/* Static peripheral mappings are mapped at the top of the
++ * vmalloc region
+  */
+-#define UART0_PHYS			0xE0000000
+-#define UART0_VIRT			UART0_PHYS
++#define UART0_PHYS		0xE0000000
++#define UART0_SIZE		SZ_4K
++#define UART0_VIRT		(VMALLOC_END - UART0_SIZE)
+ 
+-#define TTC0_PHYS			0xF8001000
+-#define TTC0_VIRT			TTC0_PHYS
++#define TTC0_PHYS		0xF8001000
++#define TTC0_SIZE		SZ_4K
++#define TTC0_VIRT		(UART0_VIRT - TTC0_SIZE)
+ 
+-#define PL310_L2CC_PHYS			0xF8F02000
+-#define PL310_L2CC_VIRT			PL310_L2CC_PHYS
++#define PL310_L2CC_PHYS		0xF8F02000
++#define PL310_L2CC_SIZE		SZ_4K
++#define PL310_L2CC_VIRT		(TTC0_VIRT - PL310_L2CC_SIZE)
+ 
+-#define SCU_PERIPH_PHYS			0xF8F00000
+-#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
++#define SCU_PERIPH_PHYS		0xF8F00000
++#define SCU_PERIPH_SIZE		SZ_8K
++#define SCU_PERIPH_VIRT		(PL310_L2CC_VIRT - SCU_PERIPH_SIZE)
+ 
+ /* The following are intended for the devices that are mapped early */
+ 
+-#define TTC0_BASE			IOMEM(TTC0_VIRT)
+-#define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+-#define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
++#define TTC0_BASE		IOMEM(TTC0_VIRT)
++#define SCU_PERIPH_BASE		IOMEM(SCU_PERIPH_VIRT)
++#define PL310_L2CC_BASE		IOMEM(PL310_L2CC_VIRT)
+ 
 -/*
-- * arch/arm/mach-zynq/include/mach/clkdev.h
-- *
-- *  Copyright (C) 2011 Xilinx, Inc.
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
+- * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
 - */
--
--#ifndef __MACH_CLKDEV_H__
--#define __MACH_CLKDEV_H__
--
--#include <plat/clock.h>
--
--struct clk {
--	unsigned long		rate;
--	const struct clk_ops	*ops;
--	const struct icst_params *params;
--	void __iomem		*vcoreg;
--};
--
--#define __clk_get(clk) ({ 1; })
--#define __clk_put(clk) do { } while (0)
--
--#endif
+ #define LL_UART_PADDR	UART0_PHYS
+ #define LL_UART_VADDR	UART0_VIRT
+ 
 -- 
 1.8.0
