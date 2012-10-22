@@ -1,31 +1,37 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 22 Oct 2012 10:44:56 +0100
-Subject: [PATCH 1/2] regulator: gpio-regulator: Allow use of GPIO
- controlled regulators though DT
-In-Reply-To: <20121022091355.GE3785@gmail.com>
-References: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
- <20121016051401.GB8670@opensource.wolfsonmicro.com>
- <20121016072956.GF7662@gmail.com>
- <20121016074643.GA10323@opensource.wolfsonmicro.com>
- <20121016080109.GH7662@gmail.com>
- <20121017074102.GJ14199@opensource.wolfsonmicro.com>
- <20121022091355.GE3785@gmail.com>
-Message-ID: <20121022094455.GA4477@opensource.wolfsonmicro.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 22 Oct 2012 11:52:21 +0200
+Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
+ revert "i2c: omap: switch to threaded IRQ support")
+In-Reply-To: <87391ahvao.fsf@deeprootsystems.com>
+References: <alpine.DEB.2.00.1210150148080.16624@utopia.booyaka.com>
+ <CAM=Q2csHTbR4rBe1HNr5-M3sG5wgdCv6dCnGLmNQEwo1gjCSGg@mail.gmail.com>
+ <20121016133356.GG21801@arwen.pp.htv.fi>
+ <87ipaanljt.fsf_-_@deeprootsystems.com>
+ <20121017140002.GI11394@arwen.pp.htv.fi>
+ <20121017143534.GJ11394@arwen.pp.htv.fi>
+ <87txtsitpt.fsf@deeprootsystems.com>
+ <20121018055136.GF11137@arwen.pp.htv.fi> <1350655227.2768.11.camel@twins>
+ <87391ahvao.fsf@deeprootsystems.com>
+Message-ID: <1350899541.2768.82.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 10:13:55AM +0100, Lee Jones wrote:
-> On Wed, 17 Oct 2012, Mark Brown wrote:
+On Fri, 2012-10-19 at 16:54 -0700, Kevin Hilman wrote:
 
-> > This should really be part of the patch adding the bindings...
+> So I did the same thing for my ARM SoC, and it definitley stops the RT
+> throttling.  
+> 
+> However, it has the undesriable (IMO) side effect of making timed printk
+> output rather unhelpful for debugging suspend/resume since printk time
+> stays constant throughout suspend/resume no matter how long you
+> sleep. :(
+> 
+> So does that mean we have to choose between useful printk times during
+> suspend/resume or functioning IRQ threads during suspend/resume ?
 
-> Would you like me to send the patch-set again?
+Urgh.. this was not something I considered. This being primarily the
+sched_clock infrastructure and such.
 
-When I said I'd applied the patch that was what I meant.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/f75a7fe2/attachment.sig>
+So what exactly is the problem with the suspend resume thing (its not
+something I've ever debugged), is all you need a clean break between pre
+and post suspend, or do you need the actual time the machine was gone?
