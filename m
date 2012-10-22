@@ -1,68 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 16:30:23 +0300
-Subject: [PATCH 0/8] I2C patches for v3.8 merge window
-In-Reply-To: <1350899218-13624-1-git-send-email-balbi@ti.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
-Message-ID: <20121022133023.GC14033@arwen.pp.htv.fi>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 22 Oct 2012 09:36:41 -0400
+Subject: Which kirkwood does your DT board use?
+In-Reply-To: <20121020113800.GC21046@lunn.ch>
+References: <20121020113800.GC21046@lunn.ch>
+Message-ID: <20121022133641.GK25828@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Oct 20, 2012 at 01:38:00PM +0200, Andrew Lunn wrote:
+> Hi Folks
+> 
+> All of you in the To: have contributed a DT based Kirkwood board port.
+> Nearly all the DT files we have declare the CPU to be
+> marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
+> mpp code, we need to know the exact kirkwood being used. It should be
+> one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
+> 
+> You can see what your hardware has a boot time:
+> 
+> Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
+> 
+> Please could you check your hardware and let me know what the correct
+> CPU is. I can then fix the .dts files and prepare a first attempt at
+> converting boards to pinctrl.
 
-On Mon, Oct 22, 2012 at 12:46:50PM +0300, Felipe Balbi wrote:
-> Hi guys,
-> 
-> here's another series for OMAP I2C driver. There are a few cleanups
-> and one very nice new feature: we can now report how many bytes
-> we transferred until NACK.
-> 
-> Note that the implemementation for OMAP-I2C turned out to be a
-> little more complex then I expected, mainly because of the way
-> I2C_CNT register behaves and because of the very buggy register
-> usage on that driver.
-> 
-> I have boot tested all patches on beagle xM (3630) and pandaboard
-> rev A3 (4430), will send boot-logs if anyone wants to see.
-> 
-> All patches are available at [1] if anyone wants an easy way to
-> test the patches.
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git i2c-transferred-bytes-on-NACK
+Dreamplug:
 
-forgot to mention, with [1] I could veridy suspend to ram with boards
-mentioned above.
+Kirkwood: MV88F6281-A1, TCLK=200000000.
 
-[1] http://marc.info/?l=linux-arm-kernel&m=135090724817604&w=2
+hth,
 
-> Felipe Balbi (7):
->   i2c: omap: no need to access platform_device
->   i2c: omap: reorder exit path of omap_i2c_xfer_msg()
->   i2c: omap: fix error checking
->   i2c: omap: also complete() when stat becomes zero
->   i2c: omap: introduce and use OMAP_I2C_IP_VERSION_3
->   i2c: omap: wait for transfer completion before sending STP bit
->   i2c: omap: implement handling for 'transferred' bytes
-> 
-> Shubhrajyoti D (1):
->   i2c: add 'transferred' field to struct i2c_msg
-> 
->  arch/arm/mach-omap2/i2c.c                  |   3 +-
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   2 +-
->  drivers/i2c/busses/i2c-omap.c              | 156 ++++++++++++++++-------------
->  include/linux/i2c-omap.h                   |   1 +
->  include/uapi/linux/i2c.h                   |   1 +
->  5 files changed, 89 insertions(+), 74 deletions(-)
-> 
-> -- 
-> 1.8.0.rc0
-> 
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121022/c344c2db/attachment.sig>
+Jason.
