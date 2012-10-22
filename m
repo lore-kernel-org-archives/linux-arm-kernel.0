@@ -1,85 +1,79 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 22 Oct 2012 20:36:22 +1300
-Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <20121022072448.GB30026@avionic-0098.mockup.avionic-design.de>
-References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
- <1350643135-13197-2-git-send-email-linux@prisktech.co.nz>
- <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
- <1350888712.3592.11.camel@gitbox> <1350889747.3592.17.camel@gitbox>
- <20121022072448.GB30026@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1350891382.3592.22.camel@gitbox>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 22 Oct 2012 09:45:31 +0200
+Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
+In-Reply-To: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+Message-ID: <5084F99B.1030709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-22 at 09:24 +0200, Thierry Reding wrote:
-> On Mon, Oct 22, 2012 at 08:09:07PM +1300, Tony Prisk wrote:
-> > On Mon, 2012-10-22 at 19:51 +1300, Tony Prisk wrote:
-> > > > 
-> > > > >  	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-> > > > >  	if (chip == NULL) {
-> > > > >  		dev_err(&pdev->dev, "failed to allocate memory\n");
-> > > > > @@ -123,26 +144,32 @@ static int __devinit pwm_probe(struct platform_device *pdev)
-> > > > >  	chip->chip.ops = &vt8500_pwm_ops;
-> > > > >  	chip->chip.base = -1;
-> > > > >  	chip->chip.npwm = VT8500_NR_PWMS;
-> > > > > +	chip->clk = of_clk_get(np, 0);
-> > > > 
-> > > > I thought this was supposed to work transparently across OF and !OF
-> > > > configurations by using just clk_get() or devm_clk_get()? I guess that
-> > > > if the driver depends on OF, then this would be moot, but we should
-> > > > probably stick to the standard usage anyway.
-> > > > 
-> > > > Furthermore, of_clk_get() doesn't seem to be managed, so you'd need to
-> > > > add explicit clk_put() in the error cleanup paths. One more argument in
-> > > > favour of using devm_clk_get() instead.
-> > > 
-> > > Hmm good point. I stuck with of_ functions because its an OF only driver
-> > > and it seemed 'backward' to mix old code with new. It does pose the
-> > > question of 'why have of_clk_get() if existing functions work better'.
-> > 
-> > Was about to fix this but noticed why it wasn't like this to start
-> > with :)
-> > 
-> > struct clk *devm_clk_get(struct device *dev, const char *id);
-> > struct clk *of_clk_get(struct device_node *np, int index);
-> > 
-> > devm_clk_get requires me to 'get' the clock by name. arch-vt8500 (and I
-> > believe a lot of other arch's) don't enforce names for clocks defined in
-> > devicetree, therefore there is no way for me to know what name the clk
-> > has unless I include in the binding that the clock must be named 'xxx'.
-> 
-> I thought clk_get() was supposed to return the first clock specified in
-> DT if you pass NULL as the consumer name. I haven't tested this though.
-> And I haven't looked at the code.
-> 
-> > of_clk_get retrieves it by the dt-node + index, so it doesn't care as
-> > long as its the 1st clock listed.
-> 
-> So the usual way to do this, I believe, is:
-> 
-> 	clocks = <&clk_foo>;
-> 	clock-names = "foo";
-> 
-> Then use:
-> 
-> 	clk = devm_clk_get(&pdev->dev, "foo");
-> 
-> And as I said above, I was under the impression that the default would
-> be to use the first clock if NULL was specified instead of "foo".
-> 
-> Thierry
+Hi Sourav,
 
-clock-names is an optional property (as defined in
-bindings/clock/clock-bindings.txt) so relying on it is .. well,
-unreliable.
+On 10/22/2012 09:29 AM, Sourav Poddar wrote:
+> Currently, omap4 keypad mux settings are done in the board file.
+> Populate the mux settings in the dts file for the keypad to
+> work via dt.
 
-What you say makes sense, but it means the binding document has to make
-an optional property into a required property simply to use an 'old'
-function when a new function would 'work' (granted not as well, as you
-pointed out) without requiring the optional property.
+Have you changed the driver to handle properly the dependency with the
+pinctrl and thus return EPROBE_DEFER if this is not ready?
 
-Your subsystem - your rules. Let me know if I've managed to sway you or
-not :)
+Seb Guiriec has just sent a patch to do that for the omap-i2c driver
+([PATCH] i2c: omap: adopt pinctrl support).
 
-Regards
-Tony P
+> Cc: Felipe Balbi <balbi@ti.com>
+> Tested on omap4430 sdp with 3.7-rc1.
+> 
+> Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+> ---
+>  arch/arm/boot/dts/omap4-sdp.dts |   26 ++++++++++++++++++++++++++
+>  1 files changed, 26 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+> index 5b7e04f..5efb059 100644
+> --- a/arch/arm/boot/dts/omap4-sdp.dts
+> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+> @@ -194,6 +194,27 @@
+>  			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
+>  		>;
+>  	};
+> +
+> +	keypad_pins: pinmux_keypad_pins {
+> +		pinctrl-single,pins = <
+> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+
+Alway use lower case for hexa value.
+
+> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+> +		>;
+> +	};
+>  };
+>  
+>  &i2c1 {
+> @@ -406,3 +427,8 @@
+>  &mcbsp3 {
+>  	status = "disabled";
+>  };
+> +
+> +&keypad {
+> +        pinctrl-names = "default";
+> +        pinctrl-0 = <&keypad_pins>;
+> +};
+
+Otherwise that looks good.
+
+Thanks,
+Benoit
