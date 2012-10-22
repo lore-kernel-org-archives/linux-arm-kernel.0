@@ -1,52 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 09:19:10 -0700
-Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
-In-Reply-To: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
-References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
-Message-ID: <20121022161909.GY4730@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 22 Oct 2012 10:24:32 -0600
+Subject: [PATCH V3 3/5] ARM: tegra: decouple uncompress.h and debug-macro.S
+In-Reply-To: <20121022081830.GH3196@tbergstrom-lnx.Nvidia.com>
+References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
+ <1350686507-3022-3-git-send-email-swarren@wwwdotorg.org>
+ <20121022081830.GH3196@tbergstrom-lnx.Nvidia.com>
+Message-ID: <50857340.4010403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sourav Poddar <sourav.poddar@ti.com> [121022 00:30]:
-> --- a/arch/arm/boot/dts/omap4-sdp.dts
-> +++ b/arch/arm/boot/dts/omap4-sdp.dts
-> @@ -194,6 +194,27 @@
->  			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
->  		>;
->  	};
-> +
-> +	keypad_pins: pinmux_keypad_pins {
-> +		pinctrl-single,pins = <
-> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
-> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
-> +		>;
-> +	};
->  };
+On 10/22/2012 02:18 AM, Peter De Schrijver wrote:
+>> +
+>> +#define checkuart(rp, rv, lhu, bit, uart) \
+>> +               /* Load address of CLK_RST register */ \
+>> +               movw    rp, #TEGRA_CLK_RST_DEVICES_##lhu & 0xffff ; \
+>> +               movt    rp, #TEGRA_CLK_RST_DEVICES_##lhu >> 16 ; \
+>> +               /* Load value from CLK_RST register */ \
+>> +               ldr     rp, [rp, #0] ; \
+>> +               /* Test UART's reset bit */ \
+>> +               tst     rp, #(1 << bit) ; \
+>> +               /* If set, can't use UART; jump to save no UART */ \
+>> +               bne     90f ; \
+>> +               /* Load address of CLK_OUT_ENB register */ \
+>> +               movw    rp, #TEGRA_CLK_OUT_ENB_##lhu & 0xffff ; \
+>> +               movt    rp, #TEGRA_CLK_OUT_ENB_##lhu >> 16 ; \
+>> +               /* Load value from CLK_OUT_ENB register */ \
+>> +               ldr     rp, [rp, #0] ; \
+>> +               /* Test UART's clock enable bit */ \
+>> +               tst     rp, #(1 << bit) ; \
+>> +               /* If clear, can't use UART; jump to save no UART */ \
+>> +               beq     90f ; \
+>> +               /* Passed all tests, load address of UART registers */ \
+>> +               movw    rp, #TEGRA_UART##uart##_BASE & 0xffff ; \
+>> +               movt    rp, #TEGRA_UART##uart##_BASE >> 16 ; \
+>> +               /* Jump to save UART address */ \
+>> +               b 91f
+>>
+> 
+> Maybe make this a subroutine?
 
-Please shorten these to leave out OMAP_:
-
-		pinctrl-single,pins = <
-			0x24 0x4119   /* gpmc_a18.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
-			0x26 0x4119   /* gpmc_a19.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
-			...
-
-When we convert them over to use the preprocessor, we can still
-easily replace them.
-
-Regards,
-
-Tony
+The addruart macro (which in turn uses the checkuart macro) is only
+allowed to use 3 registers; rp, rv, rtmp. I'm also not 100% sure if the
+stack is guaranteed to be set up when addruart is called either. So, I
+don't think making this a function is possible.
