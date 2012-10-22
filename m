@@ -1,193 +1,181 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:51:42 -0400
-Subject: [PATCH v3 04/13] ARM: KVM: Initial VGIC MMIO support code
+Date: Mon, 22 Oct 2012 02:51:49 -0400
+Subject: [PATCH v3 05/13] ARM: KVM: VGIC accept vcpu and dist base addresses
+ from user space
 In-Reply-To: <20121022065104.18672.52989.stgit@ubuntu>
 References: <20121022065104.18672.52989.stgit@ubuntu>
-Message-ID: <20121022065142.18672.75805.stgit@ubuntu>
+Message-ID: <20121022065149.18672.42872.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+User space defines the model to emulate to a guest and should therefore
+decide which addresses are used for both the virtual CPU interface
+directly mapped in the guest physical address space and for the emulated
+distributor interface, which is mapped in software by the in-kernel VGIC
+support.
 
-Wire the initial in-kernel MMIO support code for the VGIC, used
-for the distributor emulation.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- arch/arm/include/asm/kvm_vgic.h |    6 +-
- arch/arm/kvm/Makefile           |    1 
- arch/arm/kvm/vgic.c             |  138 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 144 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/kvm/vgic.c
+ arch/arm/include/asm/kvm_mmu.h  |    2 +
+ arch/arm/include/asm/kvm_vgic.h |    9 ++++++
+ arch/arm/kvm/arm.c              |   16 ++++++++++
+ arch/arm/kvm/vgic.c             |   61 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 87 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 9bd0508..0800531 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -26,6 +26,8 @@
+  * To save a bit of memory and to avoid alignment issues we assume 39-bit IPA
+  * for now, but remember that the level-1 table must be aligned to its size.
+  */
++#define KVM_PHYS_SHIFT	(38)
++#define KVM_PHYS_MASK	((1ULL << KVM_PHYS_SHIFT) - 1)
+ #define PTRS_PER_PGD2	512
+ #define PGD2_ORDER	get_order(PTRS_PER_PGD2 * sizeof(pgd_t))
+ 
 diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-index d75540a..b444ecf 100644
+index b444ecf..9ca8d21 100644
 --- a/arch/arm/include/asm/kvm_vgic.h
 +++ b/arch/arm/include/asm/kvm_vgic.h
-@@ -30,7 +30,11 @@ struct kvm_vcpu;
- struct kvm_run;
+@@ -20,6 +20,9 @@
+ #define __ASM_ARM_KVM_VGIC_H
+ 
+ struct vgic_dist {
++	/* Distributor and vcpu interface mapping in the guest */
++	phys_addr_t		vgic_dist_base;
++	phys_addr_t		vgic_cpu_base;
+ };
+ 
+ struct vgic_cpu {
+@@ -31,6 +34,7 @@ struct kvm_run;
  struct kvm_exit_mmio;
  
--#ifndef CONFIG_KVM_ARM_VGIC
-+#ifdef CONFIG_KVM_ARM_VGIC
-+bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-+		      struct kvm_exit_mmio *mmio);
+ #ifdef CONFIG_KVM_ARM_VGIC
++int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
+ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		      struct kvm_exit_mmio *mmio);
+ 
+@@ -40,6 +44,11 @@ static inline int kvm_vgic_hyp_init(void)
+ 	return 0;
+ }
+ 
++static inline int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
++{
++	return 0;
++}
 +
-+#else
- static inline int kvm_vgic_hyp_init(void)
+ static inline int kvm_vgic_init(struct kvm *kvm)
  {
  	return 0;
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 574c67c..3370c09 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -20,3 +20,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesc
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index a57b107..f92b4ec 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -61,6 +61,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+ static u8 kvm_next_vmid;
+ static DEFINE_SPINLOCK(kvm_vmid_lock);
  
- obj-$(CONFIG_KVM_ARM_HOST) += arm.o guest.o mmu.o emulate.o reset.o
- obj-$(CONFIG_KVM_ARM_HOST) += coproc.o coproc_a15.o mmio.o
-+obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
++static bool vgic_present;
++
+ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	BUG_ON(preemptible());
+@@ -824,7 +826,19 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
+ static int kvm_vm_ioctl_set_device_address(struct kvm *kvm,
+ 					   struct kvm_device_address *dev_addr)
+ {
+-	return -ENODEV;
++	unsigned long dev_id, type;
++
++	dev_id = (dev_addr->id & KVM_DEVICE_ID_MASK) >> KVM_DEVICE_ID_SHIFT;
++	type = (dev_addr->id & KVM_DEVICE_TYPE_MASK) >> KVM_DEVICE_TYPE_SHIFT;
++
++	switch (dev_id) {
++	case KVM_ARM_DEVICE_VGIC_V2:
++		if (!vgic_present)
++			return -ENXIO;
++		return kvm_vgic_set_addr(kvm, type, dev_addr->addr);
++	default:
++		return -ENODEV;
++	}
+ }
+ 
+ long kvm_arch_vm_ioctl(struct file *filp,
 diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-new file mode 100644
-index 0000000..26ada3b
---- /dev/null
+index 26ada3b..f85b275 100644
+--- a/arch/arm/kvm/vgic.c
 +++ b/arch/arm/kvm/vgic.c
-@@ -0,0 +1,138 @@
-+/*
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
+@@ -22,6 +22,13 @@
+ #include <linux/io.h>
+ #include <asm/kvm_emulate.h>
+ 
++#define VGIC_ADDR_UNDEF		(-1)
++#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == (typeof(_x))VGIC_ADDR_UNDEF)
 +
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <asm/kvm_emulate.h>
++#define VGIC_DIST_SIZE		0x1000
++#define VGIC_CPU_SIZE		0x2000
 +
-+#define ACCESS_READ_VALUE	(1 << 0)
-+#define ACCESS_READ_RAZ		(0 << 0)
-+#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
-+#define ACCESS_WRITE_IGNORED	(0 << 1)
-+#define ACCESS_WRITE_SETBIT	(1 << 1)
-+#define ACCESS_WRITE_CLEARBIT	(2 << 1)
-+#define ACCESS_WRITE_VALUE	(3 << 1)
-+#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
 +
-+/**
-+ * vgic_reg_access - access vgic register
-+ * @mmio:   pointer to the data describing the mmio access
-+ * @reg:    pointer to the virtual backing of the vgic distributor struct
-+ * @offset: least significant 2 bits used for word offset
-+ * @mode:   ACCESS_ mode (see defines above)
-+ *
-+ * Helper to make vgic register access easier using one of the access
-+ * modes defined for vgic register access
-+ * (read,raz,write-ignored,setbit,clearbit,write)
-+ */
-+static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
-+			    u32 offset, int mode)
+ #define ACCESS_READ_VALUE	(1 << 0)
+ #define ACCESS_READ_RAZ		(0 << 0)
+ #define ACCESS_READ_MASK(x)	((x) & (1 << 0))
+@@ -136,3 +143,57 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exi
+ {
+ 	return KVM_EXIT_MMIO;
+ }
++
++static bool vgic_ioaddr_overlap(struct kvm *kvm)
 +{
-+	int word_offset = offset & 3;
-+	int shift = word_offset * 8;
-+	u32 mask;
-+	u32 regval;
++	phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
++	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
 +
-+	/*
-+	 * Any alignment fault should have been delivered to the guest
-+	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
-+	 */
-+
-+	mask = (~0U) >> (word_offset * 8);
-+	if (reg)
-+		regval = *reg;
-+	else {
-+		BUG_ON(mode != (ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED));
-+		regval = 0;
-+	}
-+
-+	if (mmio->is_write) {
-+		u32 data = (*((u32 *)mmio->data) & mask) << shift;
-+		switch (ACCESS_WRITE_MASK(mode)) {
-+		case ACCESS_WRITE_IGNORED:
-+			return;
-+
-+		case ACCESS_WRITE_SETBIT:
-+			regval |= data;
-+			break;
-+
-+		case ACCESS_WRITE_CLEARBIT:
-+			regval &= ~data;
-+			break;
-+
-+		case ACCESS_WRITE_VALUE:
-+			regval = (regval & ~(mask << shift)) | data;
-+			break;
-+		}
-+		*reg = regval;
-+	} else {
-+		switch (ACCESS_READ_MASK(mode)) {
-+		case ACCESS_READ_RAZ:
-+			regval = 0;
-+			/* fall through */
-+
-+		case ACCESS_READ_VALUE:
-+			*((u32 *)mmio->data) = (regval >> shift) & mask;
-+		}
-+	}
++	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
++		return false;
++	if ((dist <= cpu && dist + VGIC_DIST_SIZE > cpu) ||
++	    (cpu <= dist && cpu + VGIC_CPU_SIZE > dist))
++		return true;
++	return false;
 +}
 +
-+/* All this should be handled by kvm_bus_io_*()... FIXME!!! */
-+struct mmio_range {
-+	unsigned long base;
-+	unsigned long len;
-+	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
-+			    u32 offset);
-+};
-+
-+static const struct mmio_range vgic_ranges[] = {
-+	{}
-+};
-+
-+static const
-+struct mmio_range *find_matching_range(const struct mmio_range *ranges,
-+				       struct kvm_exit_mmio *mmio,
-+				       unsigned long base)
++int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
 +{
-+	const struct mmio_range *r = ranges;
-+	unsigned long addr = mmio->phys_addr - base;
++	int r = 0;
++	struct vgic_dist *vgic = &kvm->arch.vgic;
 +
-+	while (r->len) {
-+		if (addr >= r->base &&
-+		    (addr + mmio->len) <= (r->base + r->len))
-+			return r;
-+		r++;
++	if (addr & ~KVM_PHYS_MASK)
++		return -E2BIG;
++
++	if (addr & ~PAGE_MASK)
++		return -EINVAL;
++
++	mutex_lock(&kvm->lock);
++	switch (type) {
++	case KVM_VGIC_V2_ADDR_TYPE_DIST:
++		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_dist_base))
++			return -EEXIST;
++		if (addr + VGIC_DIST_SIZE < addr)
++			return -EINVAL;
++		kvm->arch.vgic.vgic_dist_base = addr;
++		break;
++	case KVM_VGIC_V2_ADDR_TYPE_CPU:
++		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_cpu_base))
++			return -EEXIST;
++		if (addr + VGIC_CPU_SIZE < addr)
++			return -EINVAL;
++		kvm->arch.vgic.vgic_cpu_base = addr;
++		break;
++	default:
++		r = -ENODEV;
 +	}
 +
-+	return NULL;
-+}
++	if (vgic_ioaddr_overlap(kvm)) {
++		kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
++		kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
++		return -EINVAL;
++	}
 +
-+/**
-+ * vgic_handle_mmio - handle an in-kernel MMIO access
-+ * @vcpu:	pointer to the vcpu performing the access
-+ * @mmio:	pointer to the data describing the access
-+ *
-+ * returns true if the MMIO access has been performed in kernel space,
-+ * and false if it needs to be emulated in user space.
-+ */
-+bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exit_mmio *mmio)
-+{
-+	return KVM_EXIT_MMIO;
++	mutex_unlock(&kvm->lock);
++	return r;
 +}
