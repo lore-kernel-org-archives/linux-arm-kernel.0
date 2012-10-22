@@ -1,91 +1,84 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 22 Oct 2012 14:54:37 +0300
-Subject: [PATCH] arm: sched: stop sched_clock() during suspend
-Message-ID: <1350906877-19410-1-git-send-email-balbi@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 22 Oct 2012 14:07:06 +0200
+Subject: [PATCH 3/4] ARM/dts: omap5: Update UART with address space and
+ interrupts
+In-Reply-To: <5085348C.60105@ti.com>
+References: <1350901328-3525-1-git-send-email-s-guiriec@ti.com>
+ <1350901328-3525-4-git-send-email-s-guiriec@ti.com> <50852AF9.10703@ti.com>
+ <5085348C.60105@ti.com>
+Message-ID: <508536EA.4020808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The scheduler imposes a requirement to sched_clock()
-which is to stop the clock during suspend, if we don't
-do that IRQ threads will be rescheduled in the future
-which might cause transfers to timeout depending on
-how driver is written.
+On 10/22/2012 01:57 PM, Benoit Cousson wrote:
+> Hi Sourav,
+> 
+> On 10/22/2012 01:16 PM, Sourav wrote:
+>> Hi Sebastien,
+>> On Monday 22 October 2012 03:52 PM, Sebastien Guiriec wrote:
+>>> Add base address and interrupt line inside Device Tree data for
+>> Incomplete sentence!
+>>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>>> ---
+>>>   arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++--
+>>>   1 file changed, 14 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>>> index 6c22e1b..413df94 100644
+>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>> @@ -237,36 +237,48 @@
+>>>             uart1: serial at 4806a000 {
+>>>               compatible = "ti,omap4-uart";
+>>> +            reg = <0x4806a000 0x100>;
+>>> +            interrupts = <0 72 0x4>;
+>>>               ti,hwmods = "uart1";
+>>>               clock-frequency = <48000000>;
+>>>           };
+>>>             uart2: serial at 4806c000 {
+>>>               compatible = "ti,omap4-uart";
+>>> +            reg = <0x4806c000 0x100>;
+>>> +            interrupts = <0 73 0x4>;
+>>>               ti,hwmods = "uart2";
+>>>               clock-frequency = <48000000>;
+>>>           };
+>>>             uart3: serial at 48020000 {
+>>>               compatible = "ti,omap4-uart";
+>>> +            reg = <0x48020000 0x100>;
+>>> +            interrupts = <0 74 0x4>;
+>>>               ti,hwmods = "uart3";
+>>>               clock-frequency = <48000000>;
+>>>           };
+>>>             uart4: serial at 4806e000 {
+>>>               compatible = "ti,omap4-uart";
+>>> +            reg = <0x4806e000 0x100>;
+>>> +            interrupts = <0 70 0x4>;
+>>>               ti,hwmods = "uart4";
+>>>               clock-frequency = <48000000>;
+>>>           };
+>>>             uart5: serial at 48066000 {
+>>> -            compatible = "ti,omap5-uart";
+>>> +            compatible = "ti,omap4-uart";
+>>> +            reg = <0x48066000 0x100>;
+>>> +            interrupts = <0 105 0x4>;
+>> In Omap5 TRM, the interrupt number mentioned for uart5 is 138. How is
+>> 105 coming?
+> 
+> It is from hwmod and thus from the HW spec. It looks like the TRM is
+> wrong... or the HW spec :-)
+> 
+>>>               ti,hwmods = "uart5";
+>>>               clock-frequency = <48000000>;
+>>>           };
+>>>             uart6: serial at 48068000 {
+>>> -            compatible = "ti,omap6-uart";
+>>> +            compatible = "ti,omap4-uart";
+>>> +            reg = <0x48068000 0x100>;
+>>> +            interrupts = <0 106 0x4>;
+>> Same here, TRM shows this number to be 139 ?
 
-This became an issue on OMAP when we converted omap-i2c.c
-to use threaded IRQs, it turned out that depending on how
-much time we spent on suspend, the I2C IRQ thread would
-end up being rescheduled so far in the future that I2C
-transfers would timeout and, because omap_hsmmc depends
-on an I2C-connected device to detect if an MMC card is
-inserted in the slot, our rootfs would just vanish.
+In fact, even the TRM (ES1.0 NDA vM) is aligned with these data.
+Where did you see 138 and 139?
 
-arch/arm/kernel/sched_clock.c already had an optional
-implementation (sched_clock_needs_suspend()) which would
-handle scheduler's requirement properly, what this patch
-does is simply to make that implementation non-optional.
-
-This has been tested with beagleboard XM (OMAP3630) and
-pandaboard rev A3 (OMAP4430). Suspend to RAM is now working
-after this patch.
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- arch/arm/include/asm/sched_clock.h |  2 --
- arch/arm/kernel/sched_clock.c      | 18 ++++--------------
- 2 files changed, 4 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-index 05b8e82..e3f7572 100644
---- a/arch/arm/include/asm/sched_clock.h
-+++ b/arch/arm/include/asm/sched_clock.h
-@@ -10,7 +10,5 @@
- 
- extern void sched_clock_postinit(void);
- extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
--extern void setup_sched_clock_needs_suspend(u32 (*read)(void), int bits,
--		unsigned long rate);
- 
- #endif
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index e21bac2..fc6692e 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -107,13 +107,6 @@ static void sched_clock_poll(unsigned long wrap_ticks)
- 	update_sched_clock();
- }
- 
--void __init setup_sched_clock_needs_suspend(u32 (*read)(void), int bits,
--		unsigned long rate)
--{
--	setup_sched_clock(read, bits, rate);
--	cd.needs_suspend = true;
--}
--
- void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- {
- 	unsigned long r, w;
-@@ -189,18 +182,15 @@ void __init sched_clock_postinit(void)
- static int sched_clock_suspend(void)
- {
- 	sched_clock_poll(sched_clock_timer.data);
--	if (cd.needs_suspend)
--		cd.suspended = true;
-+	cd.suspended = true;
- 	return 0;
- }
- 
- static void sched_clock_resume(void)
- {
--	if (cd.needs_suspend) {
--		cd.epoch_cyc = read_sched_clock();
--		cd.epoch_cyc_copy = cd.epoch_cyc;
--		cd.suspended = false;
--	}
-+	cd.epoch_cyc = read_sched_clock();
-+	cd.epoch_cyc_copy = cd.epoch_cyc;
-+	cd.suspended = false;
- }
- 
- static struct syscore_ops sched_clock_ops = {
--- 
-1.8.0.rc0
+Regards,
+Benoit
