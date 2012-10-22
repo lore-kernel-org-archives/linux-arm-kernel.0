@@ -1,9 +1,10 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 22 Oct 2012 19:02:45 +0200
-Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
+Date: Mon, 22 Oct 2012 19:02:44 +0200
+Subject: [PATCH 2/5] arm: mvebu: Added initial support for power managmement
+ service unit
 In-Reply-To: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1350925368-24243-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,194 +13,185 @@ From: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
- arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
- arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
- 3 files changed, 97 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |   20 +++++
+ arch/arm/boot/dts/armada-xp.dtsi                   |    6 ++
+ arch/arm/mach-mvebu/Makefile                       |    2 +-
+ arch/arm/mach-mvebu/common.h                       |    1 +
+ arch/arm/mach-mvebu/pmsu.c                         |   78 ++++++++++++++++++++
+ arch/arm/mach-mvebu/pmsu.h                         |   16 ++++
+ 6 files changed, 122 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+ create mode 100644 arch/arm/mach-mvebu/pmsu.c
+ create mode 100644 arch/arm/mach-mvebu/pmsu.h
 
+diff --git a/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+new file mode 100644
+index 0000000..926b4d6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+@@ -0,0 +1,20 @@
++Power Management Service Unit(PMSU)
++-----------------------------------
++Available on Marvell SOCs: Armada 370 and Armada XP
++
++Required properties:
++
++- compatible: "marvell,armada-370-xp-pmsu"
++
++- reg: Should contain PMSU registers location and length. First pair
++  for the per-CPU SW Reset Control registers, second pair for the
++  Power Management Service Unit.
++
++Example:
++
++armada-370-xp-pmsu at d0022000 {
++	compatible = "marvell,armada-370-xp-pmsu";
++	reg = <0xd0022100 0x430>,
++	      <0xd0020800 0x20>;
++};
++
 diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index f521ed8..531619f 100644
+index a564b52..f521ed8 100644
 --- a/arch/arm/boot/dts/armada-xp.dtsi
 +++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -24,7 +24,7 @@
- 
- 	mpic: interrupt-controller at d0020000 {
- 	      reg = <0xd0020a00 0x1d0>,
--		    <0xd0021870 0x58>;
-+		    <0xd0021070 0x58>;
+@@ -27,6 +27,12 @@
+ 		    <0xd0021870 0x58>;
  	};
  
- 	armada-370-xp-pmsu at d0022000 {
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index aac9beb..dce590d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -19,4 +19,14 @@
- #define ARMADA_370_XP_REGS_VIRT_BASE	IOMEM(0xfeb00000)
- #define ARMADA_370_XP_REGS_SIZE		SZ_1M
++	armada-370-xp-pmsu at d0022000 {
++		compatible = "marvell,armada-370-xp-pmsu";
++		reg = <0xd0022100 0x430>,
++		      <0xd0020800 0x20>;
++	};
++
+ 	cpus {
+ 	    #address-cells = <1>;
+ 	    #size-cells = <0>;
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index abd6d3b..8e6e50b 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-orion/include
  
-+#ifndef __ASSEMBLY__
+ obj-y += system-controller.o
+-obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o
++obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o pmsu.o
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index ea08919..74ee0b2 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -23,4 +23,5 @@ void armada_370_xp_handle_irq(struct pt_regs *regs);
+ 
+ 
+ int armada_370_xp_coherency_init(void);
++int armada_370_xp_pmsu_init(void);
+ #endif
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+new file mode 100644
+index 0000000..cee020b
+--- /dev/null
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -0,0 +1,78 @@
++/*
++ * Power Management Service Unit(PMSU) support for Armada 370/XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Yehuda Yitschak <yehuday@marvell.com>
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada 370 and Armada XP SOCs have a power management service
++ * unit which is responsible for powering down and waking up CPUs and
++ * other SOC units
++ */
 +
-+#ifdef CONFIG_SMP
-+#include <linux/cpumask.h>
-+
-+void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq);
-+void armada_xp_mpic_smp_cpu_init(void);
-+#endif
-+#endif
-+
- #endif /* __MACH_ARMADA_370_XP_H */
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-index 5f5f939..549b684 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/irq-armada-370-xp.c
-@@ -24,6 +24,7 @@
- #include <linux/irqdomain.h>
- #include <asm/mach/arch.h>
- #include <asm/exception.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/smp.h>
 +#include <asm/smp_plat.h>
- 
- /* Interrupt Controller Registers Map */
- #define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-@@ -35,6 +36,12 @@
- 
- #define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
- 
-+#define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
-+#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
-+#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
 +
-+#define ACTIVE_DOORBELLS			(8)
++static void __iomem *pmsu_mp_base;
++static void __iomem *pmsu_reset_base;
 +
- static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
-@@ -51,11 +58,22 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
- 	       per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
- }
- 
++#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
++#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
++
++static struct of_device_id of_pmsu_table[] = {
++	{.compatible = "marvell,armada-370-xp-pmsu"},
++	{ /* end of list */ },
++};
++
 +#ifdef CONFIG_SMP
-+static int armada_xp_set_affinity(struct irq_data *d,
-+				  const struct cpumask *mask_val, bool force)
++int armada_xp_boot_cpu(unsigned int cpu_id, void __iomem *boot_addr)
 +{
++	int reg, hw_cpu;
++
++	if (!pmsu_mp_base || !pmsu_reset_base) {
++		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
++		return 1;
++	}
++
++	hw_cpu = cpu_logical_map(cpu_id);
++
++	writel(virt_to_phys(boot_addr), pmsu_mp_base +
++			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
++
++	/* Make sure value hits memory before reset */
++	dsb();
++
++	/* Release CPU from reset by clearing reset bit*/
++	reg = readl(pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
++	reg &= (~0x1);
++	writel(reg, pmsu_reset_base + PMSU_RESET_CTL_OFFSET(hw_cpu));
++
 +	return 0;
 +}
 +#endif
 +
- static struct irq_chip armada_370_xp_irq_chip = {
- 	.name		= "armada_370_xp_irq",
- 	.irq_mask       = armada_370_xp_irq_mask,
- 	.irq_mask_ack   = armada_370_xp_irq_mask,
- 	.irq_unmask     = armada_370_xp_irq_unmask,
-+#ifdef CONFIG_SMP
-+	.irq_set_affinity = armada_xp_set_affinity,
-+#endif
- };
- 
- static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
-@@ -72,6 +90,41 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
- 	return 0;
- }
- 
-+#ifdef CONFIG_SMP
-+void armada_mpic_send_doorbell(const struct cpumask *mask, unsigned int irq)
++int __init armada_370_xp_pmsu_init(void)
 +{
-+	int cpu;
-+	unsigned long map = 0;
++	struct device_node *np;
 +
-+	/* Convert our logical CPU mask into a physical one. */
-+	for_each_cpu(cpu, mask)
-+		map |= 1 << cpu_logical_map(cpu);
++	np = of_find_matching_node(NULL, of_pmsu_table);
++	if (np) {
++		pr_info("Initializing Power Management Service Unit\n");
++		pmsu_mp_base = of_iomap(np, 0);
++		pmsu_reset_base = of_iomap(np, 1);
++	}
 +
-+	/*
-+	 * Ensure that stores to Normal memory are visible to the
-+	 * other CPUs before issuing the IPI.
-+	 */
-+	dsb();
-+
-+	/* submit softirq */
-+	writel((map << 8) | irq, main_int_base +
-+		ARMADA_370_XP_SW_TRIG_INT_OFFS);
++	return 0;
 +}
 +
-+void armada_xp_mpic_smp_cpu_init(void)
-+{
-+	/* Clear pending IPIs */
-+	writel(0, per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
++early_initcall(armada_370_xp_pmsu_init);
+diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
+new file mode 100644
+index 0000000..bafac8e
+--- /dev/null
++++ b/arch/arm/mach-mvebu/pmsu.h
+@@ -0,0 +1,16 @@
++/*
++ * Power Management Service Unit (PMSU) support for Armada 370/XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+	/* Enable first 8 IPIs */
-+	writel((1 << ACTIVE_DOORBELLS) - 1, per_cpu_int_base +
-+		ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
++#ifndef __MACH_MVEBU_PMSU_H
++#define __MACH_MVEBU_PMSU_H
 +
-+	/* Unmask IPI interrupt */
-+	writel(0, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-+}
-+#endif /* CONFIG_SMP */
++int armada_xp_boot_cpu(unsigned int cpu_id, void __iomem *phys_addr);
 +
- static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
- 	.map = armada_370_xp_mpic_irq_map,
- 	.xlate = irq_domain_xlate_onecell,
-@@ -91,13 +144,18 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
- 
- 	armada_370_xp_mpic_domain =
--	    irq_domain_add_linear(node, (control >> 2) & 0x3ff,
--				  &armada_370_xp_mpic_irq_ops, NULL);
-+		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
-+				&armada_370_xp_mpic_irq_ops, NULL);
- 
- 	if (!armada_370_xp_mpic_domain)
- 		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
- 
- 	irq_set_default_host(armada_370_xp_mpic_domain);
-+
-+#ifdef CONFIG_SMP
-+	armada_xp_mpic_smp_cpu_init();
-+#endif
-+
- 	return 0;
- }
- 
-@@ -111,14 +169,36 @@ asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
- 					ARMADA_370_XP_CPU_INTACK_OFFS);
- 		irqnr = irqstat & 0x3FF;
- 
--		if (irqnr < 1023) {
--			irqnr =
--			    irq_find_mapping(armada_370_xp_mpic_domain, irqnr);
-+		if (irqnr > 1022)
-+			break;
-+
-+		if (irqnr >= 8) {
-+			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
-+					irqnr);
- 			handle_IRQ(irqnr, regs);
- 			continue;
- 		}
-+#ifdef CONFIG_SMP
-+		/* IPI Handling */
-+		if (irqnr == 0) {
-+			u32 ipimask, ipinr;
-+
-+			ipimask = readl_relaxed(per_cpu_int_base +
-+						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
-+				& 0xFF;
-+
-+			writel(0x0, per_cpu_int_base +
-+				ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
-+
-+			/* Handle all pending doorbells */
-+			for (ipinr = 0; ipinr < ACTIVE_DOORBELLS; ipinr++) {
-+				if (ipimask & (0x1 << ipinr))
-+					handle_IPI(ipinr, regs);
-+			}
-+			continue;
-+		}
-+#endif
- 
--		break;
- 	} while (1);
- }
- 
++#endif	/* __MACH_370_XP_PMSU_H */
 -- 
 1.7.9.5
