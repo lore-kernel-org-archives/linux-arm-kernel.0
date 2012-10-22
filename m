@@ -1,31 +1,75 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Mon, 22 Oct 2012 10:37:00 -0500
-Subject: [PATCH 1/4] ARM: annotate VMALLOC_END definition with _AC
-Message-ID: <20121022153700.GA502@beefymiracle.amer.corp.natinst.com>
+Date: Mon, 22 Oct 2012 10:37:22 -0500
+Subject: [PATCH 2/4] zynq: use GIC device tree bindings
+Message-ID: <20121022153722.GB502@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes the definition of VMALLOC_END suitable for use within
-assembly code.  This is necessary to allow the use of VMALLOC_END in
-defining where the early uart is mapped for use with DEBUG_LL.
+The Zynq uses the cortex-a9-gic.  This eliminates the need to hardcode
+register addresses.
 
 Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 ---
- arch/arm/include/asm/pgtable.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/zynq-ep107.dts           | 8 +++++---
+ arch/arm/mach-zynq/common.c                | 7 ++++++-
+ arch/arm/mach-zynq/include/mach/zynq_soc.h | 2 --
+ 3 files changed, 11 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 08c1231..72904a2 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -40,7 +40,7 @@
+diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-ep107.dts
+index 37ca192..7bfff4a 100644
+--- a/arch/arm/boot/dts/zynq-ep107.dts
++++ b/arch/arm/boot/dts/zynq-ep107.dts
+@@ -36,10 +36,12 @@
+ 		ranges;
+ 
+ 		intc: interrupt-controller at f8f01000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
+ 			interrupt-controller;
+-			compatible = "arm,gic";
+-			reg = <0xF8F01000 0x1000>;
+-			#interrupt-cells = <2>;
++			reg = <0xF8F01000 0x1000>,
++			      <0xF8F00100 0x100>;
+ 		};
+ 
+ 		uart0: uart at e0000000 {
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ab5cfdd..d73963b 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -55,12 +55,17 @@ static void __init xilinx_init_machine(void)
+ 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+ }
+ 
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ }
++};
++
+ /**
+  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
   */
- #define VMALLOC_OFFSET		(8*1024*1024)
- #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
--#define VMALLOC_END		0xff000000UL
-+#define VMALLOC_END		_AC(0xff000000,UL)
+ static void __init xilinx_irq_init(void)
+ {
+-	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
++	of_irq_init(irq_match);
+ }
  
- #define LIBRARY_TEXT_START	0x0c000000
+ /* The minimum devices needed to be mapped before the VM system is up and
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index d0d3f8f..3d1c6a6 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -35,8 +35,6 @@
  
+ #define TTC0_BASE			IOMEM(TTC0_VIRT)
+ #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+-#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
+-#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
+ #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
+ 
+ /*
 -- 
 1.8.0
