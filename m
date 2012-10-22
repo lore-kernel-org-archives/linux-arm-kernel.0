@@ -1,31 +1,51 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 23 Oct 2012 00:11:02 +0200
-Subject: 3.7-rc2 fails to build exynos target
-Message-ID: <D9D88B79-F5F0-4C63-9E23-B1A919C7142A@suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 22 Oct 2012 23:13:07 +0100
+Subject: [PATCH V3 3/5] ARM: tegra: decouple uncompress.h and debug-macro.S
+In-Reply-To: <50857340.4010403@wwwdotorg.org>
+References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
+ <1350686507-3022-3-git-send-email-swarren@wwwdotorg.org>
+ <20121022081830.GH3196@tbergstrom-lnx.Nvidia.com>
+ <50857340.4010403@wwwdotorg.org>
+Message-ID: <20121022221307.GO21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Howdy,
+On Mon, Oct 22, 2012 at 10:24:32AM -0600, Stephen Warren wrote:
+> On 10/22/2012 02:18 AM, Peter De Schrijver wrote:
+> >> +
+> >> +#define checkuart(rp, rv, lhu, bit, uart) \
+> >> +               /* Load address of CLK_RST register */ \
+> >> +               movw    rp, #TEGRA_CLK_RST_DEVICES_##lhu & 0xffff ; \
+> >> +               movt    rp, #TEGRA_CLK_RST_DEVICES_##lhu >> 16 ; \
+> >> +               /* Load value from CLK_RST register */ \
+> >> +               ldr     rp, [rp, #0] ; \
+> >> +               /* Test UART's reset bit */ \
+> >> +               tst     rp, #(1 << bit) ; \
+> >> +               /* If set, can't use UART; jump to save no UART */ \
+> >> +               bne     90f ; \
+> >> +               /* Load address of CLK_OUT_ENB register */ \
+> >> +               movw    rp, #TEGRA_CLK_OUT_ENB_##lhu & 0xffff ; \
+> >> +               movt    rp, #TEGRA_CLK_OUT_ENB_##lhu >> 16 ; \
+> >> +               /* Load value from CLK_OUT_ENB register */ \
+> >> +               ldr     rp, [rp, #0] ; \
+> >> +               /* Test UART's clock enable bit */ \
+> >> +               tst     rp, #(1 << bit) ; \
+> >> +               /* If clear, can't use UART; jump to save no UART */ \
+> >> +               beq     90f ; \
+> >> +               /* Passed all tests, load address of UART registers */ \
+> >> +               movw    rp, #TEGRA_UART##uart##_BASE & 0xffff ; \
+> >> +               movt    rp, #TEGRA_UART##uart##_BASE >> 16 ; \
+> >> +               /* Jump to save UART address */ \
+> >> +               b 91f
+> >>
+> > 
+> > Maybe make this a subroutine?
+> 
+> The addruart macro (which in turn uses the checkuart macro) is only
+> allowed to use 3 registers; rp, rv, rtmp. I'm also not 100% sure if the
+> stack is guaranteed to be set up when addruart is called either. So, I
+> don't think making this a function is possible.
 
-While updating to 3.7-rc2, I stumbled over a few compile issues with the exynos target. I won't get around to fix them, but wanted to give you a heads up and would like to see them resolved before 3.7 gets released :).
-
-Config: http://csgraf.de/arm/exynos
-
-Alex
-
-[  674s] ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
-[  674s] ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
-[  675s] ERROR: "read_current_timer" [drivers/video/udlfb.ko] undefined!
-[  675s] ERROR: "cpufreq_cooling_register" [drivers/thermal/exynos_thermal.ko] undefined!
-[  675s] ERROR: "cpufreq_cooling_unregister" [drivers/thermal/exynos_thermal.ko] undefined!
-[  677s] ERROR: "s5p_csis_phy_enable" [drivers/media/platform/s5p-fimc/s5p-csis.ko] undefined!
-[  678s] ERROR: "read_current_timer" [drivers/gpu/drm/udl/udl.ko] undefined!
-[  678s] ERROR: "set_irq_flags" [drivers/gpio/gpio-adnp.ko] undefined!
-[  678s] make[3]: *** [__modpost] Error 1
-[  678s] make[2]: *** [modules] Error 2
-[  678s] make[1]: *** [sub-make] Error 2
-[  678s] make: *** [all] Error 2
-[  678s] + test 2 -eq 0
-[  678s] + test 00 -gt 0
-[  678s] + exit 1
-[  678s] error: Bad exit status from /var/tmp/rpm-tmp.qIAujD (%build)
+There's no stack.  Remember, this stuff can be inserted as early as the
+front of the kernel assembly code, where there is _nothing_ - the MMU
+is off so virtual addresses are meaningless.  etc.
