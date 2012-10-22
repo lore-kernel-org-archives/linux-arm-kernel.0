@@ -1,551 +1,283 @@
 From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Mon, 22 Oct 2012 02:50:08 -0400
-Subject: [PATCH v3 10/14] KVM: ARM: User space API for getting/setting co-proc
- registers
+Date: Mon, 22 Oct 2012 02:50:15 -0400
+Subject: [PATCH v3 11/14] KVM: ARM: Demux CCSIDR in the userspace API
 In-Reply-To: <20121022064831.18444.73273.stgit@ubuntu>
 References: <20121022064831.18444.73273.stgit@ubuntu>
-Message-ID: <20121022065008.18444.89929.stgit@ubuntu>
+Message-ID: <20121022065015.18444.28460.stgit@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following three ioctls are implemented:
- -  KVM_GET_REG_LIST
- -  KVM_GET_ONE_REG
- -  KVM_SET_ONE_REG
+The Cache Size Selection Register (CSSELR) selects the current Cache
+Size ID Register (CCSIDR).  You write which cache you are interested
+in to CSSELR, and read the information out of CCSIDR.
 
-Now we have a table for all the cp15 registers, we can drive a generic
-API.
+Which cache numbers are valid is known by reading the Cache Level ID
+Register (CLIDR).
 
-The register IDs carry the following encoding:
-
-ARM registers are mapped using the lower 32 bits.  The upper 16 of that
-is the register group type, or coprocessor number:
-
-ARM 32-bit CP15 registers have the following id bit patterns:
-  0x4002 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
-
-ARM 64-bit CP15 registers have the following id bit patterns:
-  0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
-
-For futureproofing, we need to tell QEMU about the CP15 registers the
-host lets the guest access.
-
-It will need this information to restore a current guest on a future
-CPU or perhaps a future KVM which allow some of these to be changed.
-
-We use a separate table for these, as they're only for the userspace API.
+To export this state to userspace, we add a KVM_REG_ARM_DEMUX
+numberspace (17), which uses 8 bits to represent which register is
+being demultiplexed (0 for CCSIDR), and the lower 8 bits to represent
+this demultiplexing (in our case, the CSSELR value, which is 4 bits).
 
 Reviewed-by: Marcelo Tosatti <mtosatti@redhat.com>
 Signed-off-by: Rusty Russell <rusty.russell@linaro.org>
-Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
 ---
- Documentation/virtual/kvm/api.txt |   44 +++++
- arch/arm/include/asm/kvm_coproc.h |    9 +
- arch/arm/include/asm/kvm_host.h   |    4 
- arch/arm/kvm/coproc.c             |  327 +++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/guest.c              |    9 +
- 5 files changed, 389 insertions(+), 4 deletions(-)
+ Documentation/virtual/kvm/api.txt |    2 
+ arch/arm/include/uapi/asm/kvm.h   |    9 ++
+ arch/arm/kvm/coproc.c             |  163 ++++++++++++++++++++++++++++++++++++-
+ 3 files changed, 171 insertions(+), 3 deletions(-)
 
 diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 4514292..242ff3e 100644
+index 242ff3e..6f87d61 100644
 --- a/Documentation/virtual/kvm/api.txt
 +++ b/Documentation/virtual/kvm/api.txt
-@@ -1798,6 +1798,11 @@ is the register group type, or coprocessor number:
- ARM core registers have the following id bit patterns:
-   0x4002 0000 0010 <index into the kvm_regs struct:16>
+@@ -1804,6 +1804,8 @@ ARM 32-bit CP15 registers have the following id bit patterns:
+ ARM 64-bit CP15 registers have the following id bit patterns:
+   0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
  
-+ARM 32-bit CP15 registers have the following id bit patterns:
-+  0x4002 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
-+
-+ARM 64-bit CP15 registers have the following id bit patterns:
-+  0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
- 
++ARM CCSIDR registers are demultiplexed by CSSELR value:
++  0x4002 0000 0011 00 <csselr:8>
  
  4.69 KVM_GET_ONE_REG
-@@ -2139,6 +2144,45 @@ This ioctl returns the guest registers that are supported for the
- KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
  
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 138a588c..d79d064 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -81,6 +81,15 @@ struct kvm_arch_memory_slot {
+ #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+ #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
  
-+4.77 KVM_ARM_VCPU_INIT
-+
-+Capability: basic
-+Architectures: arm
-+Type: vcpu ioctl
-+Parameters: struct struct kvm_vcpu_init (in)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?EINVAL: ???the target is unknown, or the combination of features is invalid.
-+ ?ENOENT: ???a features bit specified is unknown.
-+
-+This tells KVM what type of CPU to present to the guest, and what
-+optional features it should have. ?This will cause a reset of the cpu
-+registers to their initial values. ?If this is not called, KVM_RUN will
-+return ENOEXEC for that vcpu.
-+
-+Note that because some registers reflect machine topology, all vcpus
-+should be created before this ioctl is invoked.
-+
-+4.78 KVM_GET_REG_LIST
-+
-+Capability: basic
-+Architectures: arm
-+Type: vcpu ioctl
-+Parameters: struct kvm_reg_list (in/out)
-+Returns: 0 on success; -1 on error
-+Errors:
-+ ?E2BIG: ????the reg index list is too big to fit in the array specified by
-+ ????????????the user (the number required will be written into n).
-+
-+struct kvm_reg_list {
-+	__u64 n; /* number of registers in reg[] */
-+	__u64 reg[0];
-+};
-+
-+This ioctl returns the guest registers that are supported for the
-+KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
++/* Some registers need more space to represent values. */
++#define KVM_REG_ARM_DEMUX		(0x0011 << KVM_REG_ARM_COPROC_SHIFT)
++#define KVM_REG_ARM_DEMUX_ID_MASK	0x000000000000FF00
++#define KVM_REG_ARM_DEMUX_ID_SHIFT	8
++#define KVM_REG_ARM_DEMUX_ID_CCSIDR	(0x00 << KVM_REG_ARM_DEMUX_ID_SHIFT)
++#define KVM_REG_ARM_DEMUX_VAL_MASK	0x00000000000000FF
++#define KVM_REG_ARM_DEMUX_VAL_SHIFT	0
 +
 +
- 5. The kvm_run structure
- ------------------------
- 
-diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
-index bd1ace0..4917c2f 100644
---- a/arch/arm/include/asm/kvm_coproc.h
-+++ b/arch/arm/include/asm/kvm_coproc.h
-@@ -34,5 +34,14 @@ int kvm_handle_cp14_load_store(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp14_access(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+
-+unsigned long kvm_arm_num_guest_msrs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_msrindices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- void kvm_coproc_table_init(void);
-+
-+struct kvm_one_reg;
-+int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
-+int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-+int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-+unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
- #endif /* __ARM_KVM_COPROC_H__ */
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 2ce654c..606e21a 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -27,6 +27,7 @@
- #define KVM_MEMORY_SLOTS 32
- #define KVM_PRIVATE_MEM_SLOTS 4
- #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
-+#define KVM_HAVE_ONE_REG
- 
- #define KVM_VCPU_MAX_FEATURES 0
- 
-@@ -139,6 +140,9 @@ int kvm_unmap_hva_range(struct kvm *kvm,
- 			unsigned long start, unsigned long end);
- void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
- 
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
-+
- /* We do not have shadow page tables, hence the empty hooks */
- static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
- {
+ /* KVM_IRQ_LINE irq field index values */
+ #define KVM_ARM_IRQ_TYPE_SHIFT		24
+ #define KVM_ARM_IRQ_TYPE_MASK		0xff
 diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 722efe3..95a0f5e 100644
+index 95a0f5e..9ce5861 100644
 --- a/arch/arm/kvm/coproc.c
 +++ b/arch/arm/kvm/coproc.c
-@@ -18,6 +18,7 @@
-  */
- #include <linux/mm.h>
- #include <linux/kvm_host.h>
-+#include <linux/uaccess.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_host.h>
- #include <asm/kvm_emulate.h>
-@@ -347,6 +348,328 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return emulate_cp15(vcpu, &params);
+@@ -35,6 +35,12 @@
+  * Co-processor emulation
+  *****************************************************************************/
+ 
++/* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
++static u32 cache_levels;
++
++/* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
++#define CSSELR_MAX 12
++
+ int kvm_handle_cp10_id(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	kvm_inject_undefined(vcpu);
+@@ -548,11 +554,112 @@ static int set_invariant_cp15(u64 id, void __user *uaddr)
+ 	return 0;
  }
  
-+/******************************************************************************
-+ * Userspace API
-+ *****************************************************************************/
-+
-+static bool index_to_params(u64 id, struct coproc_params *params)
++static bool is_valid_cache(u32 val)
 +{
-+	switch (id & KVM_REG_SIZE_MASK) {
-+	case KVM_REG_SIZE_U32:
-+		/* Any unused index bits means it's not valid. */
-+		if (id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK
-+			   | KVM_REG_ARM_COPROC_MASK
-+			   | KVM_REG_ARM_32_CRN_MASK
-+			   | KVM_REG_ARM_CRM_MASK
-+			   | KVM_REG_ARM_OPC1_MASK
-+			   | KVM_REG_ARM_32_OPC2_MASK))
-+			return false;
++	u32 level, ctype;
 +
-+		params->is_64bit = false;
-+		params->CRn = ((id & KVM_REG_ARM_32_CRN_MASK)
-+			       >> KVM_REG_ARM_32_CRN_SHIFT);
-+		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
-+			       >> KVM_REG_ARM_CRM_SHIFT);
-+		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
-+			       >> KVM_REG_ARM_OPC1_SHIFT);
-+		params->Op2 = ((id & KVM_REG_ARM_32_OPC2_MASK)
-+			       >> KVM_REG_ARM_32_OPC2_SHIFT);
++	if (val >= CSSELR_MAX)
++		return -ENOENT;
++
++	/* Bottom bit is Instruction or Data bit.  Next 3 bits are level. */
++        level = (val >> 1);
++        ctype = (cache_levels >> (level * 3)) & 7;
++
++	switch (ctype) {
++	case 0: /* No cache */
++		return false;
++	case 1: /* Instruction cache only */
++		return (val & 1);
++	case 2: /* Data cache only */
++	case 4: /* Unified cache */
++		return !(val & 1);
++	case 3: /* Separate instruction and data caches */
 +		return true;
-+	case KVM_REG_SIZE_U64:
-+		/* Any unused index bits means it's not valid. */
-+		if (id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK
-+			      | KVM_REG_ARM_COPROC_MASK
-+			      | KVM_REG_ARM_CRM_MASK
-+			      | KVM_REG_ARM_OPC1_MASK))
-+			return false;
-+		params->is_64bit = true;
-+		params->CRm = ((id & KVM_REG_ARM_CRM_MASK)
-+			       >> KVM_REG_ARM_CRM_SHIFT);
-+		params->Op1 = ((id & KVM_REG_ARM_OPC1_MASK)
-+			       >> KVM_REG_ARM_OPC1_SHIFT);
-+		params->Op2 = 0;
-+		params->CRn = 0;
-+		return true;
++	default: /* Reserved: we can't know instruction or data. */
++		return false;
++	}
++}
++
++/* Which cache CCSIDR represents depends on CSSELR value. */
++static u32 get_ccsidr(u32 csselr)
++{
++	u32 ccsidr;
++
++	/* Make sure noone else changes CSSELR during this! */
++	local_irq_disable();
++	/* Put value into CSSELR */
++	asm volatile("mcr p15, 2, %0, c0, c0, 0" : : "r" (csselr));
++	/* Read result out of CCSIDR */
++	asm volatile("mrc p15, 1, %0, c0, c0, 0" : "=r" (ccsidr));
++	local_irq_enable();
++
++	return ccsidr;
++}
++
++static int demux_c15_get(u64 id, void __user *uaddr)
++{
++	u32 val;
++	u32 __user *uval = uaddr;
++
++	/* Fail if we have unknown bits set. */
++	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
++		   | ((1 << KVM_REG_ARM_COPROC_SHIFT)-1)))
++		return -ENOENT;
++
++	switch (id & KVM_REG_ARM_DEMUX_ID_MASK) {
++	case KVM_REG_ARM_DEMUX_ID_CCSIDR:
++		if (KVM_REG_SIZE(id) != 4)
++			return -ENOENT;
++		val = (id & KVM_REG_ARM_DEMUX_VAL_MASK)
++			>> KVM_REG_ARM_DEMUX_VAL_SHIFT;
++		if (!is_valid_cache(val))
++			return -ENOENT;
++
++		return put_user(get_ccsidr(val), uval);
 +	default:
-+		return false;
++		return -ENOENT;
 +	}
 +}
 +
-+/* Decode an index value, and find the cp15 coproc_reg entry. */
-+static const struct coproc_reg *index_to_coproc_reg(struct kvm_vcpu *vcpu,
-+						    u64 id)
++static int demux_c15_set(u64 id, void __user *uaddr)
 +{
-+	size_t num;
-+	const struct coproc_reg *table, *r;
-+	struct coproc_params params;
++	u32 val, newval;
++	u32 __user *uval = uaddr;
 +
-+	/* We only do cp15 for now. */
-+	if ((id & KVM_REG_ARM_COPROC_MASK) >> KVM_REG_ARM_COPROC_SHIFT != 15)
-+		return NULL;
++	/* Fail if we have unknown bits set. */
++	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
++		   | ((1 << KVM_REG_ARM_COPROC_SHIFT)-1)))
++		return -ENOENT;
 +
-+	if (!index_to_params(id, &params))
-+		return NULL;
++	switch (id & KVM_REG_ARM_DEMUX_ID_MASK) {
++	case KVM_REG_ARM_DEMUX_ID_CCSIDR:
++		if (KVM_REG_SIZE(id) != 4)
++			return -ENOENT;
++		val = (id & KVM_REG_ARM_DEMUX_VAL_MASK)
++			>> KVM_REG_ARM_DEMUX_VAL_SHIFT;
++		if (!is_valid_cache(val))
++			return -ENOENT;
 +
-+	table = get_target_table(vcpu->arch.target, &num);
-+	r = find_reg(&params, table, num);
-+	if (!r)
-+		r = find_reg(&params, cp15_regs, ARRAY_SIZE(cp15_regs));
++		if (get_user(newval, uval))
++			return -EFAULT;
 +
-+	/* Not saved in the cp15 array? */
-+	if (r && !r->reg)
-+		r = NULL;
-+
-+	return r;
-+}
-+
-+/*
-+ * These are the invariant cp15 registers: we let the guest see the host
-+ * versions of these, so they're part of the guest state.
-+ *
-+ * A future CPU may provide a mechanism to present different values to
-+ * the guest, or a future kvm may trap them.
-+ */
-+/* Unfortunately, there's no register-argument for mrc, so generate. */
-+#define FUNCTION_FOR32(crn, crm, op1, op2, name)			\
-+	static void get_##name(struct kvm_vcpu *v,			\
-+			       const struct coproc_reg *r)		\
-+	{								\
-+		u32 val;						\
-+									\
-+		asm volatile("mrc p15, " __stringify(op1)		\
-+			     ", %0, c" __stringify(crn)			\
-+			     ", c" __stringify(crm)			\
-+			     ", " __stringify(op2) "\n" : "=r" (val));	\
-+		((struct coproc_reg *)r)->val = val;			\
++		/* This is also invariant: you can't change it. */
++		if (newval != get_ccsidr(val))
++			return -EINVAL;
++		return 0;
++	default:
++		return -ENOENT;
 +	}
-+
-+FUNCTION_FOR32(0, 0, 0, 0, MIDR)
-+FUNCTION_FOR32(0, 0, 0, 1, CTR)
-+FUNCTION_FOR32(0, 0, 0, 2, TCMTR)
-+FUNCTION_FOR32(0, 0, 0, 3, TLBTR)
-+FUNCTION_FOR32(0, 0, 0, 6, REVIDR)
-+FUNCTION_FOR32(0, 1, 0, 0, ID_PFR0)
-+FUNCTION_FOR32(0, 1, 0, 1, ID_PFR1)
-+FUNCTION_FOR32(0, 1, 0, 2, ID_DFR0)
-+FUNCTION_FOR32(0, 1, 0, 3, ID_AFR0)
-+FUNCTION_FOR32(0, 1, 0, 4, ID_MMFR0)
-+FUNCTION_FOR32(0, 1, 0, 5, ID_MMFR1)
-+FUNCTION_FOR32(0, 1, 0, 6, ID_MMFR2)
-+FUNCTION_FOR32(0, 1, 0, 7, ID_MMFR3)
-+FUNCTION_FOR32(0, 2, 0, 0, ID_ISAR0)
-+FUNCTION_FOR32(0, 2, 0, 1, ID_ISAR1)
-+FUNCTION_FOR32(0, 2, 0, 2, ID_ISAR2)
-+FUNCTION_FOR32(0, 2, 0, 3, ID_ISAR3)
-+FUNCTION_FOR32(0, 2, 0, 4, ID_ISAR4)
-+FUNCTION_FOR32(0, 2, 0, 5, ID_ISAR5)
-+FUNCTION_FOR32(0, 0, 1, 1, CLIDR)
-+FUNCTION_FOR32(0, 0, 1, 7, AIDR)
-+
-+/* ->val is filled in by kvm_invariant_coproc_table_init() */
-+static struct coproc_reg invariant_cp15[] = {
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 0), is32, NULL, get_MIDR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 1), is32, NULL, get_CTR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 2), is32, NULL, get_TCMTR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 3), is32, NULL, get_TLBTR },
-+	{ CRn( 0), CRm( 0), Op1( 0), Op2( 6), is32, NULL, get_REVIDR },
-+
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 0), is32, NULL, get_ID_PFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 1), is32, NULL, get_ID_PFR1 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 2), is32, NULL, get_ID_DFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 3), is32, NULL, get_ID_AFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 4), is32, NULL, get_ID_MMFR0 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 5), is32, NULL, get_ID_MMFR1 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 6), is32, NULL, get_ID_MMFR2 },
-+	{ CRn( 0), CRm( 1), Op1( 0), Op2( 7), is32, NULL, get_ID_MMFR3 },
-+
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 0), is32, NULL, get_ID_ISAR0 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 1), is32, NULL, get_ID_ISAR1 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 2), is32, NULL, get_ID_ISAR2 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 3), is32, NULL, get_ID_ISAR3 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 4), is32, NULL, get_ID_ISAR4 },
-+	{ CRn( 0), CRm( 2), Op1( 0), Op2( 5), is32, NULL, get_ID_ISAR5 },
-+
-+	{ CRn( 0), CRm( 0), Op1( 1), Op2( 1), is32, NULL, get_CLIDR },
-+	{ CRn( 0), CRm( 0), Op1( 1), Op2( 7), is32, NULL, get_AIDR },
-+};
-+
-+static int reg_from_user(void *val, const void __user *uaddr, u64 id)
-+{
-+	/* This Just Works because we are little endian. */
-+	if (copy_from_user(val, uaddr, KVM_REG_SIZE(id)) != 0)
-+		return -EFAULT;
-+	return 0;
 +}
 +
-+static int reg_to_user(void __user *uaddr, const void *val, u64 id)
+ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct coproc_reg *r;
+ 	void __user *uaddr = (void __user *)(long)reg->addr;
+ 
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
++		return demux_c15_get(reg->id, uaddr);
++
+ 	r = index_to_coproc_reg(vcpu, reg->id);
+ 	if (!r)
+ 		return get_invariant_cp15(reg->id, uaddr);
+@@ -566,6 +673,9 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	const struct coproc_reg *r;
+ 	void __user *uaddr = (void __user *)(long)reg->addr;
+ 
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
++		return demux_c15_set(reg->id, uaddr);
++
+ 	r = index_to_coproc_reg(vcpu, reg->id);
+ 	if (!r)
+ 		return set_invariant_cp15(reg->id, uaddr);
+@@ -574,6 +684,33 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
+ }
+ 
++static unsigned int num_demux_regs(void)
 +{
-+	/* This Just Works because we are little endian. */
-+	if (copy_to_user(uaddr, val, KVM_REG_SIZE(id)) != 0)
-+		return -EFAULT;
-+	return 0;
++	unsigned int i, count = 0;
++
++	for (i = 0; i < CSSELR_MAX; i++)
++		if (is_valid_cache(i))
++			count++;
++
++	return count;
 +}
 +
-+static int get_invariant_cp15(u64 id, void __user *uaddr)
++static int write_demux_regids(u64 __user *uindices)
 +{
-+	struct coproc_params params;
-+	const struct coproc_reg *r;
-+
-+	if (!index_to_params(id, &params))
-+		return -ENOENT;
-+
-+	r = find_reg(&params, invariant_cp15, ARRAY_SIZE(invariant_cp15));
-+	if (!r)
-+		return -ENOENT;
-+
-+	return reg_to_user(uaddr, &r->val, id);
-+}
-+
-+static int set_invariant_cp15(u64 id, void __user *uaddr)
-+{
-+	struct coproc_params params;
-+	const struct coproc_reg *r;
-+	int err;
-+	u64 val = 0; /* Make sure high bits are 0 for 32-bit regs */
-+
-+	if (!index_to_params(id, &params))
-+		return -ENOENT;
-+	r = find_reg(&params, invariant_cp15, ARRAY_SIZE(invariant_cp15));
-+	if (!r)
-+		return -ENOENT;
-+
-+	err = reg_from_user(&val, uaddr, id);
-+	if (err)
-+		return err;
-+
-+	/* This is what we mean by invariant: you can't change it. */
-+	if (r->val != val)
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+
-+int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	const struct coproc_reg *r;
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+
-+	r = index_to_coproc_reg(vcpu, reg->id);
-+	if (!r)
-+		return get_invariant_cp15(reg->id, uaddr);
-+
-+	/* Note: copies two regs if size is 64 bit. */
-+	return reg_to_user(uaddr, &vcpu->arch.cp15[r->reg], reg->id);
-+}
-+
-+int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	const struct coproc_reg *r;
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+
-+	r = index_to_coproc_reg(vcpu, reg->id);
-+	if (!r)
-+		return set_invariant_cp15(reg->id, uaddr);
-+
-+	/* Note: copies two regs if size is 64 bit */
-+	return reg_from_user(&vcpu->arch.cp15[r->reg], uaddr, reg->id);
-+}
-+
-+static u64 cp15_to_index(const struct coproc_reg *reg)
-+{
-+	u64 val = KVM_REG_ARM | (15 << KVM_REG_ARM_COPROC_SHIFT);
-+	if (reg->is_64) {
-+		val |= KVM_REG_SIZE_U64;
-+		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
-+		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
-+	} else {
-+		val |= KVM_REG_SIZE_U32;
-+		val |= (reg->Op1 << KVM_REG_ARM_OPC1_SHIFT);
-+		val |= (reg->Op2 << KVM_REG_ARM_32_OPC2_SHIFT);
-+		val |= (reg->CRm << KVM_REG_ARM_CRM_SHIFT);
-+		val |= (reg->CRn << KVM_REG_ARM_32_CRN_SHIFT);
-+	}
-+	return val;
-+}
-+
-+static bool copy_reg_to_user(const struct coproc_reg *reg, u64 __user **uind)
-+{
-+	if (!*uind)
-+		return true;
-+
-+	if (put_user(cp15_to_index(reg), *uind))
-+		return false;
-+
-+	(*uind)++;
-+	return true;
-+}
-+
-+/* Assumed ordered tables, see kvm_coproc_table_init. */
-+static int walk_cp15(struct kvm_vcpu *vcpu, u64 __user *uind)
-+{
-+	const struct coproc_reg *i1, *i2, *end1, *end2;
-+	unsigned int total = 0;
-+	size_t num;
-+
-+	/* We check for duplicates here, to allow arch-specific overrides. */
-+	i1 = get_target_table(vcpu->arch.target, &num);
-+	end1 = i1 + num;
-+	i2 = cp15_regs;
-+	end2 = cp15_regs + ARRAY_SIZE(cp15_regs);
-+
-+	BUG_ON(i1 == end1 || i2 == end2);
-+
-+	/* Walk carefully, as both tables may refer to the same register. */
-+	while (i1 || i2) {
-+		int cmp = cmp_reg(i1, i2);
-+		/* target-specific overrides generic entry. */
-+		if (cmp <= 0) {
-+			/* Ignore registers we trap but don't save. */
-+			if (i1->reg) {
-+				if (!copy_reg_to_user(i1, &uind))
-+					return -EFAULT;
-+				total++;
-+			}
-+		} else {
-+			/* Ignore registers we trap but don't save. */
-+			if (i2->reg) {
-+				if (!copy_reg_to_user(i2, &uind))
-+					return -EFAULT;
-+				total++;
-+			}
-+		}
-+
-+		if (cmp <= 0 && ++i1 == end1)
-+			i1 = NULL;
-+		if (cmp >= 0 && ++i2 == end2)
-+			i2 = NULL;
-+	}
-+	return total;
-+}
-+
-+unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu)
-+{
-+	return ARRAY_SIZE(invariant_cp15)
-+		+ walk_cp15(vcpu, (u64 __user *)NULL);
-+}
-+
-+int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
++	u64 val = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
 +	unsigned int i;
-+	int err;
 +
-+	/* Then give them all the invariant registers' indices. */
-+	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++) {
-+		if (put_user(cp15_to_index(&invariant_cp15[i]), uindices))
++	val |= KVM_REG_ARM_DEMUX_ID_CCSIDR;
++	for (i = 0; i < CSSELR_MAX; i++) {
++		if (!is_valid_cache(i))
++			continue;
++		if (put_user(val | i, uindices))
 +			return -EFAULT;
 +		uindices++;
 +	}
-+
-+	err = walk_cp15(vcpu, uindices);
-+	if (err > 0)
-+		err = 0;
-+	return err;
++	return 0;
 +}
 +
- void kvm_coproc_table_init(void)
+ static u64 cp15_to_index(const struct coproc_reg *reg)
  {
- 	unsigned int i;
-@@ -354,6 +677,10 @@ void kvm_coproc_table_init(void)
- 	/* Make sure tables are unique and in order. */
- 	for (i = 1; i < ARRAY_SIZE(cp15_regs); i++)
- 		BUG_ON(cmp_reg(&cp15_regs[i-1], &cp15_regs[i]) >= 0);
-+
-+	/* We abuse the reset function to overwrite the table itself. */
-+	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
-+		invariant_cp15[i].reset(NULL, &invariant_cp15[i]);
+ 	u64 val = KVM_REG_ARM | (15 << KVM_REG_ARM_COPROC_SHIFT);
+@@ -649,6 +786,7 @@ static int walk_cp15(struct kvm_vcpu *vcpu, u64 __user *uind)
+ unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu)
+ {
+ 	return ARRAY_SIZE(invariant_cp15)
++		+ num_demux_regs()
+ 		+ walk_cp15(vcpu, (u64 __user *)NULL);
  }
  
- /**
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 4fd0467..de05c557c 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -26,6 +26,7 @@
- #include <asm/kvm.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
- 
- #define VM_STAT(x) { #x, offsetof(struct kvm, stat.x), KVM_STAT_VM }
- #define VCPU_STAT(x) { #x, offsetof(struct kvm_vcpu, stat.x), KVM_STAT_VCPU }
-@@ -119,7 +120,7 @@ static unsigned long num_core_regs(void)
-  */
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
--	return num_core_regs();
-+	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu);
- }
- 
- /**
-@@ -138,7 +139,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
+@@ -665,9 +803,11 @@ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
  	}
  
--	return 0;
-+	return kvm_arm_copy_coproc_indices(vcpu, uindices);
+ 	err = walk_cp15(vcpu, uindices);
+-	if (err > 0)
+-		err = 0;
+-	return err;
++	if (err < 0)
++		return err;
++	uindices += err;
++
++	return write_demux_regids(uindices);
  }
  
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-@@ -151,7 +152,7 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
--	return -EINVAL;
-+	return kvm_arm_coproc_get_reg(vcpu, reg);
+ void kvm_coproc_table_init(void)
+@@ -681,6 +821,23 @@ void kvm_coproc_table_init(void)
+ 	/* We abuse the reset function to overwrite the table itself. */
+ 	for (i = 0; i < ARRAY_SIZE(invariant_cp15); i++)
+ 		invariant_cp15[i].reset(NULL, &invariant_cp15[i]);
++
++	/*
++	 * CLIDR format is awkward, so clean it up.  See ARM B4.1.20:
++	 *
++	 *   If software reads the Cache Type fields from Ctype1
++	 *   upwards, once it has seen a value of 0b000, no caches
++	 *   exist@further-out levels of the hierarchy. So, for
++	 *   example, if Ctype3 is the first Cache Type field with a
++	 *   value of 0b000, the values of Ctype4 to Ctype7 must be
++	 *   ignored.
++	 */
++	asm volatile("mrc p15, 1, %0, c0, c0, 1" : "=r" (cache_levels));
++	for (i = 0; i < 7; i++)
++		if (((cache_levels >> (i*3)) & 7) == 0)
++			break;
++	/* Clear all higher bits. */
++	cache_levels &= (1 << (i*3))-1;
  }
  
- int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-@@ -164,7 +165,7 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
--	return -EINVAL;
-+	return kvm_arm_coproc_set_reg(vcpu, reg);
- }
- 
- int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+ /**
