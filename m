@@ -1,117 +1,51 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 22 Oct 2012 11:42:54 -0600
-Subject: [PATCH V4] ARM: implement debug_ll_io_init()
-Message-ID: <1350927774-14020-1-git-send-email-swarren@wwwdotorg.org>
+Date: Mon, 22 Oct 2012 11:48:29 -0600
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <Pine.LNX.4.44L0.1210221324580.1724-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1210221324580.1724-100000@iolanthe.rowland.org>
+Message-ID: <508586ED.1010106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <robherring2@gmail.com>
+On 10/22/2012 11:34 AM, Alan Stern wrote:
+> On Mon, 22 Oct 2012, Stephen Warren wrote:
+> 
+>> On 10/20/2012 04:10 PM, Tony Prisk wrote:
+>>> Add a binding document for ehci-platform driver.
+> 
+>>> +Optional properties:
+>>> +- caps-offset : offset to the capabilities register (default = 0)
+>>> +- has-tt : controller has transaction translator(s).
+>>> +- has-synopsys-hc-bug : controller has the synopsys hc bug
+>>
+>> That would normally be determined by the driver based on the particular
+>> compatible value that is in device tree.
+> 
+> I don't understand this comment.  Isn't "has-synopsys-hc-bug" the 
+> compatible value in question?
 
-When using DEBUG_LL, the UART's (or other HW's) registers are mapped
-into early page tables based on the results of assembly macro addruart.
-Later, when the page tables are replaced, the same virtual address must
-remain valid. Historically, this has been ensured by using defines from
-<mach/iomap.h> in both the implementation of addruart, and the machine's
-.map_io() function. However, with the move to single zImage, we wish to
-remove <mach/iomap.h>. To enable this, the macro addruart may be used
-when constructing the late page tables too; addruart is exposed as a
-C function debug_ll_addr(), and used to set up the required mapping in
-debug_ll_io_init(), which may called on an opt-in basis from a machine's
-.map_io() function.
+"compatible value" in this context means that value of the property
+named "compatible".
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-[swarren: Mask map.virtual with PAGE_MASK. Checked for NULL results from
- debug_ll_addr (e.g. when selected UART isn't valid). Fixed compile when
- either !CONFIG_DEBUG_LL or CONFIG_DEBUG_SEMIHOSTING.]
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-This patch is a dependency for the Tegra debug-macro.S rework. I assume it
-should go into some arm-soc branch so that if others want to take advantage
-of it this kernel cycle, they can.
+>>> +- big-endian : descriptors and registers are both big endian. This
+>>> +  is the equivalent of specifying big-endian-desc and big-endian-regs.
+>>> +OR
+>>> +- big-endian-desc : descriptors are in big-endian format
+>>> +- big-endian-regs : mmio is in big-endian format
+>>
+>> Hmmm. That looks odd. Presumably if those properties aren't specified,
+>> the default is little-endian? Shouldn't this be a tri-state: big,
+>> little, native, with default native? I don't know what the EHCI
+>> specification mandates here (and if it does mandate something, the
+>> default should match the specification). Isn't this something that
+>> readl/writel would take care of, or are there cases where the register
+>> endianness of just this one HW block mismatches all other HW blocks?
+> 
+> The EHCI spec assumes a PCI implementation; it doesn't consider other
+> sorts.  And it doesn't say anything about the endianness of multi-byte
+> descriptors in memory.
 
-v4: Fix DEBUG_SEMIHOSTING's debug_ll_addr to actually fill in the "out"
-    parameters.
-v3: New patch.
----
- arch/arm/include/asm/mach/map.h |    7 +++++++
- arch/arm/kernel/debug.S         |   14 ++++++++++++++
- arch/arm/mm/mmu.c               |   16 ++++++++++++++++
- 3 files changed, 37 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
-index 195ac2f..2fe141f 100644
---- a/arch/arm/include/asm/mach/map.h
-+++ b/arch/arm/include/asm/mach/map.h
-@@ -40,6 +40,13 @@ extern void iotable_init(struct map_desc *, int);
- extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
- 				  void *caller);
- 
-+#ifdef CONFIG_DEBUG_LL
-+extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
-+extern void debug_ll_io_init(void);
-+#else
-+static inline void debug_ll_io_init(void) {}
-+#endif
-+
- struct mem_type;
- extern const struct mem_type *get_mem_type(unsigned int type);
- /*
-diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
-index 66f711b..6809200 100644
---- a/arch/arm/kernel/debug.S
-+++ b/arch/arm/kernel/debug.S
-@@ -100,6 +100,13 @@ ENTRY(printch)
- 		b	1b
- ENDPROC(printch)
- 
-+ENTRY(debug_ll_addr)
-+		addruart r2, r3, ip
-+		str	r2, [r0]
-+		str	r3, [r1]
-+		mov	pc, lr
-+ENDPROC(debug_ll_addr)
-+
- #else
- 
- ENTRY(printascii)
-@@ -119,4 +126,11 @@ ENTRY(printch)
- 		mov	pc, lr
- ENDPROC(printch)
- 
-+ENTRY(debug_ll_addr)
-+		mov	r2, #0
-+		str	r2, [r0]
-+		str	r2, [r1]
-+		mov	pc, lr
-+ENDPROC(debug_ll_addr)
-+
- #endif
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 941dfb9..39719bb 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -876,6 +876,22 @@ static void __init pci_reserve_io(void)
- #define pci_reserve_io() do { } while (0)
- #endif
- 
-+#ifdef CONFIG_DEBUG_LL
-+void __init debug_ll_io_init(void)
-+{
-+	struct map_desc map;
-+
-+	debug_ll_addr(&map.pfn, &map.virtual);
-+	if (!map.pfn || !map.virtual)
-+		return;
-+	map.pfn = __phys_to_pfn(map.pfn);
-+	map.virtual &= PAGE_MASK;
-+	map.length = PAGE_SIZE;
-+	map.type = MT_DEVICE;
-+	create_mapping(&map);
-+}
-+#endif
-+
- static void * __initdata vmalloc_min =
- 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
- 
--- 
-1.7.0.4
+OK, so does this binding default to assuming little-endian (which I
+assume matches PCI), unless the big-endian properties are given? Is the
+case of little-endian EHCI registers on a big-endian CPU a common enough
+thing that adding a third state native-endian wouldn't be useful?
