@@ -1,24 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 22 Oct 2012 15:20:21 +0200
-Subject: [PATCH 2/2] ASoC: Ux500: Control apb clock
-In-Reply-To: <1350909125-20189-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1350909125-20189-1-git-send-email-ulf.hansson@stericsson.com>
- <1350909125-20189-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdZMujAko6sBTD=dv_4uOdfE33WYv6fFgqY5xsKJw=Eu7Q@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 22 Oct 2012 18:51:29 +0530
+Subject: [PATCH v4] ARM: SMP_TWD: make setup()/stop() reentrant
+In-Reply-To: <1350911721-3184-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350911721-3184-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <50854859.50301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 2:32 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+On Monday 22 October 2012 06:45 PM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 >
-> When switching to common clock driver for ux500 this clock needs to
-> be handled as well. Before this clock was internally managed by the
-> clock driver itself.
+> It has been brought to my knowledge that the .setup()/.stop()
+> function pair in the SMP TWD is going to be called from atomic
+> contexts for CPUs coming and going, and then the
+> clk_prepare()/clk_unprepare() calls cannot be called
+> on subsequent .setup()/.stop() iterations. This is however
+> just the tip of an iceberg as the function pair is not
+> designed to be reentrant at all.
 >
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> This change makes the SMP_TWD clock .setup()/.stop() pair reentrant
+> by splitting the .setup() function in three parts:
+>
+> - One COMMON part that is executed the first time the first CPU
+>    in the TWD cluster is initialized. This will fetch the TWD
+>    clk for the cluster and prepare+enable it. If no clk is
+>    available it will calibrate the rate instead.
+>
+> - One part that is executed the FIRST TIME a certain CPU is
+>    brought on-line. This initializes and sets up the clock event
+>    for a certain CPU.
+>
+> - One part that is executed on every subsequent .setup() call.
+>    This will re-initialize the clock event. This is augmented
+>    to call the clk_enable()/clk_disable() pair properly.
+>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Reported-by: Peter Chen <peter.chen@freescale.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v3->v4:
+> - Skip clk_enable()/clk_disable() in subsequent call after common
+>    initialization - there is no way we can turn off the clock that
+>    is running us anyway.
+> - Move common_setup_called variable assignment into the if-clause
+> ---
 
-Looks correct, Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Looks good now. Thanks for the update.
 
-Yours,
-Linus Walleij
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
