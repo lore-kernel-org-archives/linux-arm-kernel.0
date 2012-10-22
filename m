@@ -1,44 +1,52 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 22 Oct 2012 13:01:03 -0700
-Subject: [PATCH 2/7] ARM: OMAP2xxx: hwmod: Add DMA information for SHAM
- module
-In-Reply-To: <alpine.DEB.2.00.1210221950330.13464@utopia.booyaka.com>
-References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
- <1350683640-15044-3-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1210201940260.27264@utopia.booyaka.com>
- <20121022193714.GB1708@animalcreek.com>
- <alpine.DEB.2.00.1210221950330.13464@utopia.booyaka.com>
-Message-ID: <20121022200103.GE1708@animalcreek.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 22 Oct 2012 22:07:08 +0200
+Subject: [PATCH 3/5] arm: mvebu: Added IPI support via doorbells
+In-Reply-To: <50859976.6080601@free-electrons.com>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-4-git-send-email-gregory.clement@free-electrons.com>
+ <20121022173028.GM21046@lunn.ch>
+ <50859976.6080601@free-electrons.com>
+Message-ID: <20121022200708.GO21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 07:53:06PM +0000, Paul Walmsley wrote:
-> On Mon, 22 Oct 2012, Mark A. Greer wrote:
-> 
-> > On Sat, Oct 20, 2012 at 07:40:44PM +0000, Paul Walmsley wrote:
-> > > On Fri, 19 Oct 2012, Mark A. Greer wrote:
-> > > 
-> > > > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> > > > 
-> > > > Add the DMA information for the OMAP2 SHA module.
-> > > > 
-> > > > CC: Paul Walmsley <paul@pwsan.com>
-> > > > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> > > 
-> > > This can probably be combined with the first patch.
+On Mon, Oct 22, 2012 at 09:07:34PM +0200, Gregory CLEMENT wrote:
+> On 10/22/2012 07:30 PM, Andrew Lunn wrote:
+> > On Mon, Oct 22, 2012 at 07:02:45PM +0200, Gregory CLEMENT wrote:
+> >> From: Yehuda Yitschak <yehuday@marvell.com>
+> >>
+> >> Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> >> ---
+> >>  arch/arm/boot/dts/armada-xp.dtsi        |    2 +-
+> >>  arch/arm/mach-mvebu/armada-370-xp.h     |   10 ++++
+> >>  arch/arm/mach-mvebu/irq-armada-370-xp.c |   92 +++++++++++++++++++++++++++++--
+> >>  3 files changed, 97 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> >> index f521ed8..531619f 100644
+> >> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> >> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> >> @@ -24,7 +24,7 @@
+> >>  
+> >>  	mpic: interrupt-controller at d0020000 {
+> >>  	      reg = <0xd0020a00 0x1d0>,
+> >> -		    <0xd0021870 0x58>;
+> >> +		    <0xd0021070 0x58>;
+> >>  	};
 > > 
-> > I made it a separate patch because the original omap2xxx code didn't
-> > support DMA and I wanted to keep the first patch an apples-apples
-> > conversion and _add_ functionality in this, separate, patch.
+> > Hi Gregory
 > > 
-> > I prefer 2 patches but if you still want me to combine them, let me know.
-> 
-> OK, I see.  That's fine, then.  Maybe add a sentence about that into the 
-> patch description of #2, that this effectively enables a code path in 
-> the driver that wasn't being used before, and therefore should be in a 
-> separate patch for ease of bisecting?
+> > Is this a bug fix needed for 3.7?
+> > 
+> >    Andrew
+> > 
+> I don't think so.
+> We extended the reg map to be able to use registers only used for SMP.
+> When we didn't have SMP support the mapping was correct, and now by
+> introducing SMP we extend it.
 
-Sure.  After your comment I realized my description was insufficient.
+The length has stayed the same, so its not extended. Its now 0x800
+bytes earlier in the address space.
 
-Mark
---
+      Andrew
