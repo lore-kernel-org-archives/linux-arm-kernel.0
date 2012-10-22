@@ -1,51 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 22 Oct 2012 12:07:45 -0700
-Subject: [PATCH v2] pinctrl: reserve pins when states are activated
-In-Reply-To: <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
-References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
- <20121019181019.GP4730@atomide.com>
- <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
-Message-ID: <20121022190743.GE4730@atomide.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 22 Oct 2012 13:01:03 -0700
+Subject: [PATCH 2/7] ARM: OMAP2xxx: hwmod: Add DMA information for SHAM
+ module
+In-Reply-To: <alpine.DEB.2.00.1210221950330.13464@utopia.booyaka.com>
+References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
+ <1350683640-15044-3-git-send-email-mgreer@animalcreek.com>
+ <alpine.DEB.2.00.1210201940260.27264@utopia.booyaka.com>
+ <20121022193714.GB1708@animalcreek.com>
+ <alpine.DEB.2.00.1210221950330.13464@utopia.booyaka.com>
+Message-ID: <20121022200103.GE1708@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [121022 01:22]:
-> On Fri, Oct 19, 2012 at 8:10 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > [Me]
-> >> Instead: let use reserve the pins when the state is activated
-> >> and drop them when the state is disabled, i.e. when we move to
-> >> another state. This way different devices/functions can use the
-> >> same pins at different times.
-> >
-> > Hmm doesn't this mean that we are now doing lots of extra
-> > reserving and dropping of pins? Performance is important from
-> > latency point of view for cases where we need to remux pins
-> > constantly runtime PM.
+On Mon, Oct 22, 2012 at 07:53:06PM +0000, Paul Walmsley wrote:
+> On Mon, 22 Oct 2012, Mark A. Greer wrote:
 > 
-> It is only done in case the pinmux state is switched in runtime
-> suspend/resume, so it's e.g. possible to just alter the pin config.
+> > On Sat, Oct 20, 2012 at 07:40:44PM +0000, Paul Walmsley wrote:
+> > > On Fri, 19 Oct 2012, Mark A. Greer wrote:
+> > > 
+> > > > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> > > > 
+> > > > Add the DMA information for the OMAP2 SHA module.
+> > > > 
+> > > > CC: Paul Walmsley <paul@pwsan.com>
+> > > > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> > > 
+> > > This can probably be combined with the first patch.
+> > 
+> > I made it a separate patch because the original omap2xxx code didn't
+> > support DMA and I wanted to keep the first patch an apples-apples
+> > conversion and _add_ functionality in this, separate, patch.
+> > 
+> > I prefer 2 patches but if you still want me to combine them, let me know.
 > 
-> But in general what you say is true.
-> 
-> We used to to the same thing by having drivers call
-> pinctrl_get()/pinctrl_put() in this case instead, but that went
-> away with the introduction of states, so we cannot encode
-> different pin sets with say
-> pinctrl_get(dev, "foo")/pinctrl_get(dev, "bar")
-> anymore since there is only one pinctrl handle per device,
-> but multiple states.
+> OK, I see.  That's fine, then.  Maybe add a sentence about that into the 
+> patch description of #2, that this effectively enables a code path in 
+> the driver that wasn't being used before, and therefore should be in a 
+> separate patch for ease of bisecting?
 
-OK
- 
-> If this turns out to be a severe performance bottleneck, I
-> suggest to add some additional constraint API, like
-> pinctrl_set_pinmux_homegeneous_pinsets(true) that will
-> at runtime select whether the pin allocation is done when
-> getting the pinctrl handle instead.
+Sure.  After your comment I realized my description was insufficient.
 
-Or maybe you could release + reserve the pins only if the
-pins change?
-
-Regards,
-
-Tony
+Mark
+--
