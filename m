@@ -1,48 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 22 Oct 2012 14:16:43 +0530
-Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
-In-Reply-To: <98478a02ae69afc01b3c7860e42a4d763b2045e8.1350677395.git.viresh.kumar@linaro.org>
-References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
- <98478a02ae69afc01b3c7860e42a4d763b2045e8.1350677395.git.viresh.kumar@linaro.org>
-Message-ID: <CAKohpo=Jsy9az4PgJ-mkq_U49EOpHGES+-DaROanCOTn-L2s3Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 22 Oct 2012 10:53:01 +0200
+Subject: [PATCH 07/10] pinctrl: remove mutex lock in groups show
+In-Reply-To: <50808200.3080207@wwwdotorg.org>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-7-git-send-email-haojian.zhuang@gmail.com>
+ <50808200.3080207@wwwdotorg.org>
+Message-ID: <CACRpkdYV=xr8j_7E_mMTQ3m7SS_X0P4=NbO_QCWYZX+n1dRMww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 October 2012 01:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> Initially ondemand governor was written and then using its code conservative
-> governor is written. It used a lot of code from ondemand governor, but copy of
-> code was created instead of using the same routines from both governors. Which
-> increased code redundancy, which is difficult to manage.
+On Fri, Oct 19, 2012 at 12:26 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/18/2012 03:07 AM, Haojian Zhuang wrote:
+>> Mutex is locked duplicatly by pinconf_groups_show() and
+>> pin_config_group_get(). It results dead lock. So avoid to lock mutex
+>> in pinconf_groups_show().
 >
-> This patch is an attempt to move common part of both the governors to
-> cpufreq_governor.c file to come over above mentioned issues.
->
-> This shouldn't change anything from functionality point of view.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->
-> Hi Rafael,
->
-> This patch is *NOT TESTED*... (only compiled)
-> Out of office now, so can't test it on board.
->
-> Floated it, so that i can get some early comments if possible.
+> With this outer lock removed, how do we ensure that the pinctrl driver
+> that is being called into remains loaded? Does the existence of the
+> debugfs file ensure this, such that if it's open, the pinctrl driver
+> can't be removed?
 
-Didn't crashed :)
-Tested both ondemand and conservative governors and they are working
-fine.
+No, don't think so, dangling debugfs files is a common problem.
 
->  drivers/cpufreq/Makefile               |   4 +-
->  drivers/cpufreq/cpufreq_conservative.c | 558 +++++++------------------
->  drivers/cpufreq/cpufreq_governor.c     | 314 ++++++++++++++
->  drivers/cpufreq/cpufreq_governor.h     | 177 ++++++++
->  drivers/cpufreq/cpufreq_ondemand.c     | 728 ++++++++++-----------------------
->  include/linux/cpufreq.h                |   2 +-
->  6 files changed, 864 insertions(+), 919 deletions(-)
+> Related, I wonder if much of the variable setup at the start of the
+> function shouldn't happen inside the lock instead of outside:
+>
+> static int pinconf_groups_show(struct seq_file *s, void *what)
+> {
+>         struct pinctrl_dev *pctldev = s->private;
+>         const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
+>         const struct pinconf_ops *ops = pctldev->desc->confops;
+>         unsigned ngroups = pctlops->get_groups_count(pctldev);
+>
+> since what if s->private is unregistered/destroyed while this function
+> is running?
 
-diffstat might not look awesome, but considering two new files with
-file headers, #includes, etc added.. this looks reasonable :)
+The debugfs code is fragile by nature I think, that's why we are
+usually a bit relaxed here and it's also why it should be disabled
+on production systems.
 
---
-viresh
+But any hardening patches are welcome, however we need to
+get around the deadlock Haojian was seeing, maybe we should
+introduce a separate debugfs mutex?
+
+/me is slightly confused though...
+
+Yours,
+Linus Walleij
