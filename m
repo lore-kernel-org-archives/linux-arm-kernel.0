@@ -1,46 +1,60 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 23 Oct 2012 00:08:59 +0800
-Subject: [PATCH v2 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1350922139-3693-10-git-send-email-haojian.zhuang@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 22 Oct 2012 19:13:55 +0300
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210201628420.24497@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210201628420.24497@utopia.booyaka.com>
+Message-ID: <1350922435.2143.66.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dump pinmux register value, not only function part in the pinmux
-register.
+On Sat, 2012-10-20 at 17:20 +0000, Paul Walmsley wrote:
+> Hello Venkatraman,
+> 
+> On Thu, 18 Oct 2012, Paul Walmsley wrote:
+> 
+> > Here are some basic OMAP test results for Linux v3.7-rc1.
+> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+> 
+> ...
+> 
+> > Failing tests: needing investigation
+> > ------------------------------------
+> 
+> ...
+> 
+> > PM tests:
+> > 
+> > * 3530es3beagle: hangs during off-mode dynamic idle test
+> >   - Unknown cause; not investigated
+> 
+> Looks like this commit is causing some of our power management tests to 
+> fail on v3.7-rc1:
+> 
+> commit 6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c
+> Author: Venkatraman S <svenkatr@ti.com>
+> Date:   Wed Aug 8 14:26:52 2012 +0530
+> 
+>     mmc: omap_hsmmc: remove access to SYSCONFIG register
+> 
+> ...
+> 
+> The failure can be seen in the following test log:
+> 
+> http://www.pwsan.com/omap/transcripts/20121020-3530es3beagle-off-mode-fail-pre-revert.txt
+> 
+> and with commit 6c31b215 reverted, the test succeeds:
+> 
+> http://www.pwsan.com/omap/transcripts/20121020-3530es3beagle-off-mode-fail-post-revert.txt
+> 
+> 
+> Could you please take a look and fix the problem?
 
-Also fix the issue on caluclating pin offset. The last parameter
-should be pin number, not register offset.
+Root cause for this issue is that the MMC IP is reset during off-mode,
+but the driver doesn't expect this in its current form. There are a
+couple of alternative ways to fix this. Either add a reset timeout to
+the MMC driver code (which was removed by the bisected patch), or
+alternatively add a global reset check to the hwmod code. I'll send a
+patch for the global reset purpose in a bit for commenting.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/pinctrl/pinctrl-single.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index a20da78..6ba2a5d 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -284,15 +284,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
- 
- static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
- 					struct seq_file *s,
--					unsigned offset)
-+					unsigned pin)
- {
- 	struct pcs_device *pcs;
--	unsigned val;
-+	unsigned val, mux_bytes;
- 
- 	pcs = pinctrl_dev_get_drvdata(pctldev);
- 
--	val = pcs->read(pcs->base + offset);
--	val &= pcs->fmask;
-+	mux_bytes = pcs->width / BITS_PER_BYTE;
-+	val = pcs_readl(pcs->base + pin * mux_bytes);
- 
- 	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
- }
--- 
-1.7.0.4
+-Tero
