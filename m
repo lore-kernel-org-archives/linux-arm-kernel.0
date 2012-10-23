@@ -1,50 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Oct 2012 20:22:10 +0900
-Subject: [PATCH v2] ASoC: Samsung: Update Kconfig for Exynos5250 and
- Exynos4412
-In-Reply-To: <50658325.8050704@linaro.org>
-References: <1348741777-29569-1-git-send-email-padma.v@samsung.com>
- <003401cd9d5f$179495c0$46bdc140$@samsung.com> <50658325.8050704@linaro.org>
-Message-ID: <01ca01cdb110$a48783b0$ed968b10$%kim@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 23 Oct 2012 13:39:05 +0200
+Subject: [PATCH] ARM: dma-mapping: support debug_dma_mapping_error
+In-Reply-To: <1350909843-5273-1-git-send-email-ming.lei@canonical.com>
+References: <1350909843-5273-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <508681D9.7060305@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
-> 
-> On 09/28/2012 03:23 PM, Sangsu Park wrote:
-> >
-> > On Thu, Sep 27, 2012 at 07:30 PM, Padmavathi Venna wrote:
-> >
+Hello,
 
-[...]
+On 10/22/2012 2:44 PM, Ming Lei wrote:
 
-> >> @@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
-> >>
-> >>  config SND_SOC_SAMSUNG_SMDK_WM8994
-> >>  	tristate "SoC I2S Audio support for WM8994 on SMDK"
-> >> -	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
-> >> MACH_SMDK4212)
-> >> +	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
-> >> MACH_SMDK4212 || MACH_SMDK4412 || MACH_EXYNOS5_DT)
-> >>  	depends on I2C=y && GENERIC_HARDIRQS
-> >>  	select MFD_WM8994
-> >>  	select SND_SOC_WM8994
-> >
-> > I'm not sure about this since MACH_EXYNOS5_DT can have others instead of
-> SMDK.
-> >
-> 
-> But there is no other way we can differentiate between two EXYNOS5_DT
-> based boards in the kernel. So, support for all possible codecs and
-> sound-cards should be enabled in the kernel. The instantiation of the
-> drivers should depend on the device-tree entries.
-> 
-Hmm...any idea on this?
+> Without the patch, kind of below warning will be dumped if DMA-API
+> debug is enabled:
+>
+> [   11.069763] ------------[ cut here ]------------
+> [   11.074645] WARNING: at lib/dma-debug.c:948 check_unmap+0x770/0x860()
+> [   11.081420] ehci-omap ehci-omap.0: DMA-API: device driver failed to
+> check map error[device address=0x0000000
+> 0adb78e80] [size=8 bytes] [mapped as single]
+> [   11.095611] Modules linked in:
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
 
-Thanks.
+Thanks for the patch, I've applied it to my kernel tree.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> ...
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
