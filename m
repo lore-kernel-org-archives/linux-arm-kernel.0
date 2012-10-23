@@ -1,121 +1,34 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Oct 2012 21:42:04 +0900
-Subject: [PATCH 3/4] ARM: EXYNOS: Kconfig: Group EXYNOS{4212,4412} into
- EXYNOS4X12
-In-Reply-To: <1349701345-2681-4-git-send-email-t.figa@samsung.com>
-References: <1349701345-2681-1-git-send-email-t.figa@samsung.com>
- <1349701345-2681-4-git-send-email-t.figa@samsung.com>
-Message-ID: <01d501cdb11b$ce824690$6b86d3b0$%kim@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Oct 2012 14:42:49 +0200
+Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
+In-Reply-To: <20121023114130.GW4477@opensource.wolfsonmicro.com>
+References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
+ <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
+ <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
+ <20121023111019.GV4477@opensource.wolfsonmicro.com>
+ <20121023111656.GT21164@n2100.arm.linux.org.uk>
+ <20121023114130.GW4477@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdZxradXJ5BfKZw8880=dnDLOkWWq4ZhZSkmudiuh=HZXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> This patch adds CONFIG_EXYNOS4X12, which is automatically selected
-> whenever there is at least one SoC from Exynos4x12 line enabled. All the
-> shared dependencies of EXYNOS{4212,4412} are moved to this new
-> option.
-> 
-> This fixes build with Exynos4412 enabled and Exynos4212 and Exynos4210
-> disabled and also allows to simplify conditional compilation in several
-> places.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig  | 15 +++++++++------
->  arch/arm/mach-exynos/Makefile |  2 +-
->  arch/arm/mach-exynos/common.h |  2 +-
->  drivers/cpufreq/Kconfig.arm   |  2 +-
->  4 files changed, 12 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 9f91892..6ea95f0 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -38,22 +38,25 @@ config SOC_EXYNOS4210
->  	help
->  	  Enable EXYNOS4210 CPU support
-> 
-> -config SOC_EXYNOS4212
-> -	bool "SAMSUNG EXYNOS4212"
-> -	default y
-> +config SOC_EXYNOS4X12
-> +	def_bool n
->  	select ARCH_EXYNOS4
->  	select SAMSUNG_DMADEV
-> +	select ARM_CPU_SUSPEND if PM
->  	select S5P_PM if PM
->  	select S5P_SLEEP if PM
-> +
-> +config SOC_EXYNOS4212
-> +	bool "SAMSUNG EXYNOS4212"
-> +	select SOC_EXYNOS4X12
-> +	default y
->  	help
->  	  Enable EXYNOS4212 SoC support
-> 
->  config SOC_EXYNOS4412
->  	bool "SAMSUNG EXYNOS4412"
-> -	select ARCH_EXYNOS4
-> +	select SOC_EXYNOS4X12
->  	default y
-> -	depends on ARCH_EXYNOS4
-> -	select SAMSUNG_DMADEV
->  	help
->  	  Enable EXYNOS4412 SoC support
-> 
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index ceeb8c9..f88fcb6 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -16,7 +16,7 @@ obj-$(CONFIG_ARCH_EXYNOS)	+= common.o
->  obj-$(CONFIG_ARCH_EXYNOS4)	+= clock-exynos4.o
->  obj-$(CONFIG_ARCH_EXYNOS5)	+= clock-exynos5.o
->  obj-$(CONFIG_SOC_EXYNOS4210)	+= clock-exynos4210.o
-> -obj-$(CONFIG_SOC_EXYNOS4212)	+= clock-exynos4212.o
-> +obj-$(CONFIG_SOC_EXYNOS4X12)	+= clock-exynos4212.o
-> 
->  obj-$(CONFIG_PM)		+= pm.o
->  obj-$(CONFIG_PM_GENERIC_DOMAINS) += pm_domains.o
-> diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-> index 054c786..a8cb3e6 100644
-> --- a/arch/arm/mach-exynos/common.h
-> +++ b/arch/arm/mach-exynos/common.h
-> @@ -52,7 +52,7 @@ void exynos4210_register_clocks(void);
->  #define exynos4210_register_clocks()
->  #endif
-> 
-> -#ifdef CONFIG_SOC_EXYNOS4212
-> +#ifdef CONFIG_SOC_EXYNOS4X12
->  void exynos4212_register_clocks(void);
-> 
->  #else
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index ca4ede3..d0ff91a 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -66,7 +66,7 @@ config ARM_EXYNOS4210_CPUFREQ
->  	  SoC (S5PV310 or S5PC210).
-> 
->  config ARM_EXYNOS4X12_CPUFREQ
-> -	def_bool (SOC_EXYNOS4212 || SOC_EXYNOS4412)
-> +	def_bool SOC_EXYNOS4X12
->  	help
->  	  This adds the CPUFreq driver for Samsung EXYNOS4X12
->  	  SoC (EXYNOS4212 or EXYNOS4412).
-> --
-> 1.7.12
+On Tue, Oct 23, 2012 at 1:41 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-Well, do we _really_ need to define CONFIG_SOC_EXYNOS4X12 for supporting
-common part of exynos4212 and exynos4412? In my opinion, it will cause
-confusion rather than reducing code size. Let's just use its own name for
-SoC.
+> I have to say I had been under the impression that Linus' series that I
+> applied the other day dealt with all the outstanding stuff here; the
+> issues with this have been the awful changelogs and the overalapping
+> sets of patches.
 
-Thanks.
+It did I think it was patch [1/4] (same subject as this thread),
+http://sourceforge.net/mailarchive/forum.php?thread_name=1350476818-13056-1-git-send-email-linus.walleij%40stericsson.com&forum_name=spi-devel-general
+to which you replied:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> This was already applied, applied the rest thanks.
+
+So it probably wasn't and it's just some mishap so
+that 2,3,4 /4 were applied while 1/4 was actually needed
+to.
+
+Yours,
+Linus Walleij
