@@ -1,67 +1,50 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 23 Oct 2012 11:11:53 +0200
-Subject: [PATCH 5/5] arm: mvebu: Added SMP support for Armada XP
-In-Reply-To: <20121022184537.GN21046@lunn.ch>
-References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
- <1350925368-24243-6-git-send-email-gregory.clement@free-electrons.com>
- <20121022184537.GN21046@lunn.ch>
-Message-ID: <50865F59.8000507@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Oct 2012 11:13:05 +0200
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121022155028.GA13791@core.coreip.homeip.net>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121022155028.GA13791@core.coreip.homeip.net>
+Message-ID: <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2012 08:45 PM, Andrew Lunn wrote:
-> Hi Gregory
-> 
->> +void __init set_secondary_cpus_clock(void)
->> +{
->> +	int cpu;
->> +	unsigned long rate;
->> +	struct clk *cpu_clk = NULL;
->> +	struct device_node *np = NULL;
->> +
->> +	cpu = smp_processor_id();
->> +	np = of_find_node_by_type(np, "cpu");
->> +	np = NULL;
->> +	while ((np = of_find_node_by_type(np, "cpu"))) {
->> +		const u32 *reg;
->> +		int len;
->> +		reg = of_get_property(np, "reg", &len);
->> +		if (!reg || len != 4) {
->> +			pr_err("%s missing reg property\n", np->full_name);
->> +			continue;
->> +		}
->> +		if (be32_to_cpup(reg) == cpu) {
->> +			cpu_clk = of_clk_get(np, 0);
->> +			break;
->> +		}
->> +	}
->> +	WARN_ON(IS_ERR(cpu_clk));
->> +	rate = clk_get_rate(cpu_clk);
->> +
->> +	/* set all the other CPU clk to the same rate than the boot CPU */
->> +	np = NULL;
->> +	while ((np = of_find_node_by_type(np, "cpu"))) {
->> +		const u32 *reg;
->> +		int len;
->> +		reg = of_get_property(np, "reg", &len);
->> +		if (!reg || len != 4) {
->> +			pr_err("%s missing reg property\n", np->full_name);
->> +			continue;
->> +		}
->> +		if (be32_to_cpup(reg) != cpu) {
->> +			cpu_clk = of_clk_get(np, 0);
->> +			clk_set_rate(cpu_clk, rate);
->> +		}
-> 
-> Maybe its hiding somewhere, but where is the clk_prepare_enable() for
-> this cpu_clk clock?
-> 
+On Mon, Oct 22, 2012 at 5:50 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> Hi Sourav,
+>
+> On Mon, Oct 22, 2012 at 06:43:00PM +0530, Sourav Poddar wrote:
+>> Adapt keypad to use pinctrl framework.
+>>
+>> Tested on omap4430 sdp with 3.7-rc1 kernel.
+>
+> I do not see anything in the driver that would directly use pinctrl. Is
+> there a better place to select default pin configuration; maybe when
+> instantiating platform device?
 
-Well the clocks are always enable. In the clock framework, the cpu clocks
-don't provide an enable function.
-But maybe it is cleaner to call clk_prepare_enable() even if it does
-nothing except update the usage count.
+The option is to use pinctrl hogs. Then the pins will be taken,
+muxed and configured by the pin controller itself.
 
-Thanks,
+Another option (not implemented) is to use bus notifiers.
 
-Gregory
+(I wrote about this in some other thread but can't find it now.)
+
+Each approach above come with its own set of problems.
+
+If the driver need to handle multiple states like default/idle/sleep
+it is IMO better to put the handling into the driver, so if that
+is what is going to happen also to this driver it could be a good
+idea to actually implement that code upfront and include in
+this submission so as to show that this driver is really going
+to exercise its pins.
+
+But it's also a question of conformity: if other drivers in the
+system is using different states and this is the only one
+using a single "default" state, then it doesn't make sense
+to have just one driver get its pins using hogs, it's just
+inconsistent.
+
+So Sourav, please tell us a bit about your plans for this
+and other drivers!
+
+Yours,
+Linus Walleij
