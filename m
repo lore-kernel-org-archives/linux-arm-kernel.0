@@ -1,40 +1,46 @@
-From: pt@netconsequence.de (Peter Turczak)
-Date: Tue, 23 Oct 2012 10:48:32 +0200
-Subject: i.MX28 die temperature
-In-Reply-To: <201206271400.11727.marex@denx.de>
-References: <330B740BA662BF4E8386F534DF556ED819731A@AEDCEXC09.aei.com>
- <201206262102.15698.marek.vasut@gmail.com> <4FEAB48B.4010108@cam.ac.uk>
- <201206271400.11727.marex@denx.de>
-Message-ID: <6E339FB7-3B7F-4D90-A472-D375F36755F1@netconsequence.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Oct 2012 10:58:03 +0200
+Subject: [PATCH v2] pinctrl: reserve pins when states are activated
+In-Reply-To: <20121022190743.GE4730@atomide.com>
+References: <1350651909-5337-1-git-send-email-linus.walleij@stericsson.com>
+ <20121019181019.GP4730@atomide.com>
+ <CACRpkdZazjMoSzkr5t15-GeCnQKCJDsZyvT=KVMyw5XhjDybGQ@mail.gmail.com>
+ <20121022190743.GE4730@atomide.com>
+Message-ID: <CACRpkdYYp+2ZVUd+wxYwDdBC+Bxiv2_N-1JRrbXSjV3WxuF8+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-hi Jonathan,
+On Mon, Oct 22, 2012 at 9:07 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [121022 01:22]:
 
-while trying to implement a battery charger driver for the mx28 platform I came across your posts. Sorry to stir up an old thread but it was running the same way.
+>> If this turns out to be a severe performance bottleneck, I
+>> suggest to add some additional constraint API, like
+>> pinctrl_set_pinmux_homegeneous_pinsets(true) that will
+>> at runtime select whether the pin allocation is done when
+>> getting the pinctrl handle instead.
+>
+> Or maybe you could release + reserve the pins only if the
+> pins change?
 
-On Jun 27, 2012, at 2:00 PM, Marek Vasut wrote:
-Dear Jonathan Cameron,
-> 
->> On 6/26/2012 8:02 PM, Marek Vasut wrote:
->>> Dear Juergen Beisert,
->>>> I tried a little bit with your driver. The disadvantage I see is, its
->>>> claims all the free AD channels. But a few of them can also act as a
->>>> touchscreen controller. Shouldn't be the driver handle the channel usage
->>>> dynamically?
->>> 
->>> I wonder, I'd rather see this driver behave as a composite driver, what
->>> do you think?
->> 
->> Alternative (though it's still in development) would be to use IIO
->> as the ADC layer and sit the other parts on top.
-I am currently trying to go this route, the idea is to use the consumer api to get the required battery management data to the battery driver. As a foundation I used the driver provided by Freescale which uses the lradc directly which I found rather bad in the system context.
+Umm... not quite following but show me the code :-D
 
-Maybe one could map all the driver muxing and use specific parameters in explicitly named iio channels? But this could lead to permanent reconfiguring of the LRADC and maybe quite difficult handling of the measurements that arrive asynchronously.
+In the code as it stands currently we only detect
+if a state changes and then it assumes the old state need
+to be deactivated before activating a new one.
 
-Also I don't seem to quite get the usage of iio_map_array_register() which seems to enable the consumer api access to the device. I found only one use of it in an example in 
-max1363.c which confused me even more. How do I correctly provide the iio_map struct? What is the consumer_dev_name used for and which "namespace" should used there, is it the name used in a platform_driver struct or the instances name (given there can only be one internal mxs battery charger at a time)?
+I think that in order to do that for a state A->B transition
+we need to:
 
-Best regards,
-  Peter
+1. Get the pins for mux setting A
+2. Get the pins for mux setting B
+3. Loop over the pin array and compare
+4. If all are the same, goto 7
+5. Release pins for setting A
+6. Acquire pins for setting B
+7. Update all pin descs to point to setting B
+8. Done
+
+Hm, I can see a patch like that...
+
+Yours,
+Linus Walleij
