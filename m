@@ -1,103 +1,54 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Oct 2012 08:57:34 +0300
-Subject: [PATCH v2] arm: sched: stop sched_clock() during suspend
-In-Reply-To: <873916h1yi.fsf@deeprootsystems.com>
-References: <873916h1yi.fsf@deeprootsystems.com>
-Message-ID: <1350971854-9161-1-git-send-email-balbi@ti.com>
+From: sourav.poddar@ti.com (Sourav)
+Date: Tue, 23 Oct 2012 11:54:08 +0530
+Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
+In-Reply-To: <20121022161909.GY4730@atomide.com>
+References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
+ <20121022161909.GY4730@atomide.com>
+Message-ID: <50863808.3010305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The scheduler imposes a requirement to sched_clock()
-which is to stop the clock during suspend, if we don't
-do that any RT thread will be rescheduled in the future
-which might cause any sort of problems.
-
-This became an issue on OMAP when we converted omap-i2c.c
-to use threaded IRQs, it turned out that depending on how
-much time we spent on suspend, the I2C IRQ thread would
-end up being rescheduled so far in the future that I2C
-transfers would timeout and, because omap_hsmmc depends
-on an I2C-connected device to detect if an MMC card is
-inserted in the slot, our rootfs would just vanish.
-
-arch/arm/kernel/sched_clock.c already had an optional
-implementation (sched_clock_needs_suspend()) which would
-handle scheduler's requirement properly, what this patch
-does is simply to make that implementation non-optional.
-
-Note that this has the side-effect that printk timings
-won't reflect the actual time spent on suspend so other
-methods to measure that will have to be used.
-
-This has been tested with beagleboard XM (OMAP3630) and
-pandaboard rev A3 (OMAP4430). Suspend to RAM is now working
-after this patch.
-
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
-
-Changes since v1:
-	- changed commit log to mention that all RT threads will be
-	  rescheduled to the future.
-	- changed commit log to mention the side effect on printk
-	  timings
-
- arch/arm/include/asm/sched_clock.h |  2 --
- arch/arm/kernel/sched_clock.c      | 18 ++++--------------
- 2 files changed, 4 insertions(+), 16 deletions(-)
-
-diff --git a/arch/arm/include/asm/sched_clock.h b/arch/arm/include/asm/sched_clock.h
-index 05b8e82..e3f7572 100644
---- a/arch/arm/include/asm/sched_clock.h
-+++ b/arch/arm/include/asm/sched_clock.h
-@@ -10,7 +10,5 @@
- 
- extern void sched_clock_postinit(void);
- extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
--extern void setup_sched_clock_needs_suspend(u32 (*read)(void), int bits,
--		unsigned long rate);
- 
- #endif
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index e21bac2..fc6692e 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -107,13 +107,6 @@ static void sched_clock_poll(unsigned long wrap_ticks)
- 	update_sched_clock();
- }
- 
--void __init setup_sched_clock_needs_suspend(u32 (*read)(void), int bits,
--		unsigned long rate)
--{
--	setup_sched_clock(read, bits, rate);
--	cd.needs_suspend = true;
--}
--
- void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- {
- 	unsigned long r, w;
-@@ -189,18 +182,15 @@ void __init sched_clock_postinit(void)
- static int sched_clock_suspend(void)
- {
- 	sched_clock_poll(sched_clock_timer.data);
--	if (cd.needs_suspend)
--		cd.suspended = true;
-+	cd.suspended = true;
- 	return 0;
- }
- 
- static void sched_clock_resume(void)
- {
--	if (cd.needs_suspend) {
--		cd.epoch_cyc = read_sched_clock();
--		cd.epoch_cyc_copy = cd.epoch_cyc;
--		cd.suspended = false;
--	}
-+	cd.epoch_cyc = read_sched_clock();
-+	cd.epoch_cyc_copy = cd.epoch_cyc;
-+	cd.suspended = false;
- }
- 
- static struct syscore_ops sched_clock_ops = {
--- 
-1.8.0.rc0
+Hi Tony,
+On Monday 22 October 2012 09:49 PM, Tony Lindgren wrote:
+> * Sourav Poddar <sourav.poddar@ti.com> [121022 00:30]:
+>> --- a/arch/arm/boot/dts/omap4-sdp.dts
+>> +++ b/arch/arm/boot/dts/omap4-sdp.dts
+>> @@ -194,6 +194,27 @@
+>>   			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
+>>   		>;
+>>   	};
+>> +
+>> +	keypad_pins: pinmux_keypad_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
+>> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
+>> +		>;
+>> +	};
+>>   };
+> Please shorten these to leave out OMAP_:
+Ok. Will update and send a new version.
+> 		pinctrl-single,pins = <
+> 			0x24 0x4119   /* gpmc_a18.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
+> 			0x26 0x4119   /* gpmc_a19.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
+> 			...
+>
+> When we convert them over to use the preprocessor, we can still
+> easily replace them.
+>
+> Regards,
+>
+> Tony
