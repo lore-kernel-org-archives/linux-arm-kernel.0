@@ -1,181 +1,135 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Oct 2012 23:22:55 +0800
-Subject: [PATCH 06/10] ARM: imx6q: prepare imx6q_set_lpm for cpudile support
+Date: Tue, 23 Oct 2012 23:22:56 +0800
+Subject: [PATCH 07/10] ARM: imx6q: get v7_cpu_resume ready for cpuidle
 In-Reply-To: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
 References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1351005779-30347-7-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1351005779-30347-8-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WAIT_UNCLOCKED and WAIT_UNCLOCKED_POWER_OFF will be used to implement
-cpuidle.  Get function imx6q_set_lpm for that.  The unused mode
-STOP_POWER_ON is removed from there.
+To get v7_cpu_resume ready for cpuidle power gating case, we need the
+following changes.
+
+* L2X0_POWER_CTRL register needs to be restored.
+
+* Enable SCU inside v7_cpu_resume.  As the result, function
+  imx_smp_prepare gets eliminated.
+
+* Remove v7_invalidate_l1 invoking from v7_cpu_resume.  It turns out
+  that v7_invalidate_l1 only needs to be called for secondary cores
+  startup.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/clk-imx6q.c |   32 +++++++++++++++++++++++++++-----
- arch/arm/mach-imx/common.h    |    3 +++
- arch/arm/mach-imx/gpc.c       |   11 +++++------
- arch/arm/mach-imx/platsmp.c   |   14 ++++++++++++++
- 4 files changed, 49 insertions(+), 11 deletions(-)
+ arch/arm/mach-imx/common.h   |    2 --
+ arch/arm/mach-imx/headsmp.S  |   25 ++++++++++++++++++++++---
+ arch/arm/mach-imx/platsmp.c  |    7 +------
+ arch/arm/mach-imx/pm-imx6q.c |    1 -
+ 4 files changed, 23 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 5f9f591..5ac10a0 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -23,6 +23,10 @@
- #include "clk.h"
- #include "common.h"
- 
-+#define CCSR				0x0c
-+#define BM_CCSR_PLL1_SW_CLK_SEL		(0x1 << 2)
-+#define BM_CCSR_STEP_SEL		(0x1 << 8)
-+
- #define CCGR0				0x68
- #define CCGR1				0x6c
- #define CCGR2				0x70
-@@ -60,22 +64,27 @@ void __init imx6q_clock_map_io(void) { }
- 
- int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- {
-+	static enum mxc_cpu_pwr_mode last_mode;
-+	static u32 ccsr;
- 	u32 val = readl_relaxed(ccm_base + CLPCR);
- 
- 	val &= ~BM_CLPCR_LPM;
- 	switch (mode) {
- 	case WAIT_CLOCKED:
-+		/* Restore CCSR changed by WAIT_UNCLOCKED */
-+		if (last_mode == WAIT_UNCLOCKED)
-+			writel_relaxed(ccsr, ccm_base + CCSR);
- 		break;
- 	case WAIT_UNCLOCKED:
- 		val |= 0x1 << BP_CLPCR_LPM;
--		break;
--	case STOP_POWER_ON:
--		val |= 0x2 << BP_CLPCR_LPM;
-+		val |= BM_CLPCR_ARM_CLK_DIS_ON_LPM;
-+		/* Source arm clock from 24 MHz OSC */
-+		ccsr = readl_relaxed(ccm_base + CCSR);
-+		writel_relaxed((ccsr | BM_CCSR_PLL1_SW_CLK_SEL) &
-+			       ~BM_CCSR_STEP_SEL, ccm_base + CCSR);
- 		break;
- 	case WAIT_UNCLOCKED_POWER_OFF:
- 		val |= 0x1 << BP_CLPCR_LPM;
--		val &= ~BM_CLPCR_VSTBY;
--		val &= ~BM_CLPCR_SBYOS;
- 		break;
- 	case STOP_POWER_OFF:
- 		val |= 0x2 << BP_CLPCR_LPM;
-@@ -88,6 +97,19 @@ int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode)
- 	}
- 
- 	writel_relaxed(val, ccm_base + CLPCR);
-+	last_mode = mode;
-+
-+	/* Need to enable SCU standby for entering WAIT modes */
-+	if (mode == WAIT_UNCLOCKED || mode == WAIT_UNCLOCKED_POWER_OFF)
-+		imx_scu_standby_enable(true);
-+	else
-+		imx_scu_standby_enable(false);
-+
-+	/* Tell GPC whether to power off ARM core */
-+	if (mode == WAIT_UNCLOCKED_POWER_OFF || mode == STOP_POWER_OFF)
-+		imx_gpc_cpu_pdn(true);
-+	else
-+		imx_gpc_cpu_pdn(false);
- 
- 	return 0;
- }
 diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index ef8db6b..9ff0776 100644
+index 9ff0776..ea11bbc 100644
 --- a/arch/arm/mach-imx/common.h
 +++ b/arch/arm/mach-imx/common.h
-@@ -126,9 +126,11 @@ extern u32 *pl310_get_save_ptr(void);
+@@ -125,11 +125,9 @@ extern u32 *pl310_get_save_ptr(void);
+ #ifdef CONFIG_SMP
  extern void v7_secondary_startup(void);
  extern void imx_scu_map_io(void);
- extern void imx_smp_prepare(void);
-+extern void imx_scu_standby_enable(bool enable);
+-extern void imx_smp_prepare(void);
+ extern void imx_scu_standby_enable(bool enable);
  #else
  static inline void imx_scu_map_io(void) {}
- static inline void imx_smp_prepare(void) {}
-+static inline void imx_scu_standby_enable(bool enable) {}
+-static inline void imx_smp_prepare(void) {}
+ static inline void imx_scu_standby_enable(bool enable) {}
  #endif
  extern void imx_enable_cpu(int cpu, bool enable);
- extern void imx_set_cpu_jump(int cpu, void *jump_addr);
-@@ -137,6 +139,7 @@ extern void imx_src_prepare_restart(void);
- extern void imx_gpc_init(void);
- extern void imx_gpc_pre_suspend(void);
- extern void imx_gpc_post_resume(void);
-+extern void imx_gpc_cpu_pdn(bool);
- extern int imx6q_set_lpm(enum mxc_cpu_pwr_mode mode);
- extern void imx6q_clock_map_io(void);
+diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+index 7e49deb..ac8a967 100644
+--- a/arch/arm/mach-imx/headsmp.S
++++ b/arch/arm/mach-imx/headsmp.S
+@@ -27,8 +27,7 @@
+  * clean + invalidate, before jumping into the kernel.
+  *
+  * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
+- * to be called for both secondary cores startup and primary core resume
+- * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
++ * to be called for secondary cores startup.
+  */
+ ENTRY(v7_invalidate_l1)
+ 	mov	r0, #0
+@@ -84,10 +83,16 @@ ENDPROC(v7_secondary_startup)
+ 	.macro	pl310_resume
+ 	ldr	r2, phys_l2x0_saved_regs
+ 	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
++	ldr	r1, [r0, #L2X0_CTRL]		@ check if already enabled
++	tst	r1, #1
++	bne	1f
+ 	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
+ 	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
++	ldr	r1, [r2, #L2X0_R_PWR_CTRL]
++	str	r1, [r0, #L2X0_POWER_CTRL]
+ 	mov	r1, #0x1
+ 	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
++1:
+ 	.endm
  
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index be9a6cb..897a5af 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -27,14 +27,16 @@ static void __iomem *gpc_base;
- static u32 gpc_wake_irqs[IMR_NUM];
- static u32 gpc_saved_imrs[IMR_NUM];
+ 	.globl	phys_l2x0_saved_regs
+@@ -98,9 +103,23 @@ phys_l2x0_saved_regs:
+ 	.endm
+ #endif
  
-+void imx_gpc_cpu_pdn(bool pdn)
-+{
-+	writel_relaxed(pdn ? 0x1 : 0x0, gpc_base + GPC_PGC_CPU_PDN);
-+}
++#ifdef CONFIG_SMP
++	.macro	_scu_enable
++	/* Enable SCU */
++	mrc	p15, 4, r0, c15, c0, 0		@ r0 = scu physical base
++	ldr	r1, [r0]			@ r1 = scu control register
++	tst	r1, #0x1			@ check if already enabled
++	orreq	r1, r1, #0x1
++	streq	r1, [r0]
++	.endm
++#else
++	.macro	_scu_enable
++	.endm
++#endif
 +
- void imx_gpc_pre_suspend(void)
- {
- 	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
- 	int i;
- 
--	/* Tell GPC to power off ARM core when suspend */
--	writel_relaxed(0x1, gpc_base + GPC_PGC_CPU_PDN);
--
- 	for (i = 0; i < IMR_NUM; i++) {
- 		gpc_saved_imrs[i] = readl_relaxed(reg_imr1 + i * 4);
- 		writel_relaxed(~gpc_wake_irqs[i], reg_imr1 + i * 4);
-@@ -46,9 +48,6 @@ void imx_gpc_post_resume(void)
- 	void __iomem *reg_imr1 = gpc_base + GPC_IMR1;
- 	int i;
- 
--	/* Keep ARM core powered on for other low-power modes */
--	writel_relaxed(0x0, gpc_base + GPC_PGC_CPU_PDN);
--
- 	for (i = 0; i < IMR_NUM; i++)
- 		writel_relaxed(gpc_saved_imrs[i], reg_imr1 + i * 4);
- }
+ ENTRY(v7_cpu_resume)
+-	bl	v7_invalidate_l1
+ 	pl310_resume
++	_scu_enable
+ 	b	cpu_resume
+ ENDPROC(v7_cpu_resume)
+ #endif
 diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index 3777b80..c739a8a 100644
+index c739a8a..fc25062 100644
 --- a/arch/arm/mach-imx/platsmp.c
 +++ b/arch/arm/mach-imx/platsmp.c
-@@ -20,6 +20,8 @@
- #include "common.h"
- #include "hardware.h"
- 
-+#define SCU_STANDBY_ENABLE	(1 << 5)
-+
- static void __iomem *scu_base;
- 
- static struct map_desc scu_io_desc __initdata = {
-@@ -42,6 +44,18 @@ void __init imx_scu_map_io(void)
- 	scu_base = IMX_IO_ADDRESS(base);
+@@ -89,14 +89,9 @@ static void __init imx_smp_init_cpus(void)
+ 	set_smp_cross_call(gic_raise_softirq);
  }
  
-+void imx_scu_standby_enable(bool enable)
-+{
-+	u32 val = readl_relaxed(scu_base);
-+
-+	if (enable)
-+		val |= SCU_STANDBY_ENABLE;
-+	else
-+		val &= ~SCU_STANDBY_ENABLE;
-+
-+	writel_relaxed(val, scu_base);
-+}
-+
- static void __cpuinit imx_secondary_init(unsigned int cpu)
+-void imx_smp_prepare(void)
+-{
+-	scu_enable(scu_base);
+-}
+-
+ static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
  {
- 	/*
+-	imx_smp_prepare();
++	scu_enable(scu_base);
+ }
+ 
+ struct smp_operations  imx_smp_ops __initdata = {
+diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
+index a17543d..7c4347b 100644
+--- a/arch/arm/mach-imx/pm-imx6q.c
++++ b/arch/arm/mach-imx/pm-imx6q.c
+@@ -39,7 +39,6 @@ static int imx6q_pm_enter(suspend_state_t state)
+ 		imx_set_cpu_jump(0, v7_cpu_resume);
+ 		/* Zzz ... */
+ 		cpu_suspend(0, imx6q_suspend_finish);
+-		imx_smp_prepare();
+ 		imx_gpc_post_resume();
+ 		break;
+ 	default:
 -- 
 1.7.9.5
