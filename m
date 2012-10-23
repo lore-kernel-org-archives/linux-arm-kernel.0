@@ -1,63 +1,92 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 23 Oct 2012 15:06:46 -0500
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210231522230.1635-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1210231522230.1635-100000@iolanthe.rowland.org>
-Message-ID: <5086F8D6.5050605@gmail.com>
+Date: Tue, 23 Oct 2012 15:09:23 -0500
+Subject: [PATCH v2 2/4] zynq: move static peripheral mappings
+In-Reply-To: <201210231450.11540.arnd@arndb.de>
+References: <20121022211219.GC31538@beefymiracle.amer.corp.natinst.com>
+ <201210231450.11540.arnd@arndb.de>
+Message-ID: <5086F973.6050309@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 02:33 PM, Alan Stern wrote:
-> On Tue, 23 Oct 2012, Stephen Warren wrote:
+On 10/23/2012 09:50 AM, Arnd Bergmann wrote:
+> On Monday 22 October 2012, Josh Cartwright wrote:
+>> Shifting them up into the vmalloc region prevents the following warning,
+>> when booting a zynq qemu target with more than 512mb of RAM:
+>>
+>>   BUG: mapping for 0xe0000000 at 0xe0000000 out of vmalloc space
+>>
+>> In addition, it allows for reuse of these mappings when the proper
+>> drivers issue requests via ioremap().
+>>
+>> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 > 
->>> Nothing intrinsically distinguishes this class of hardware.  The only
->>> thing these devices have in common is that they can be managed by
->>> Linux's ehci-platform driver.
->>
->> I don't agree. They're all EHCI USB controllers (or all EHCI USB
->> controllers that don't require custom drivers due to quirks), which is a
->> much more general statement than anything related to which driver Linux
->> uses for them.
+> This looks like a bug fix that should be backported to older kernels,
+> so it would be good to add 'Cc: stable at vger.kernel.org' below your
+> Signed-off-by.
 > 
-> That's true, but it doesn't distinguish these devices.  There are other
-> EHCI controllers with no quirks that nevertheless can't be handled by
-> ehci-platform because they have requirements (_not_ quirks) that
-> ehci-platform is unable to deal with currently -- clocks or power
-> supplies or special register settings or PHYs or etc.
-
-But what if the h/w has quirks you haven't yet discovered? You need the
-compatible property to be specific now, so if there are any future
-driver changes needed the DT does not have to change (as it may be in
-firmware which you can't change).
-
->>> In essense, we're trying to say that the HW is compatible with a 
->>> particular driver rather than with some other type of HW.
->>
->> Using a compatible value in order to pick a specific driver in Linux is
->> explicitly against the device tree design principles; DT is supposed to
->> represent just the hardware.
->>
->>> Maybe DT
->>> wasn't intended to provide this kind of information, but it seems like 
->>> a logical thing to do.  Unless DT already offers some other way to 
->>> accomplish the same thing?
->>
->> The typical way is for the Linux driver to declare that is supports a
->> variety of different HW models.
->>
->> Admittedly this is annoying when there are many HW models that otherwise
->> wouldn't need any driver changes, hence the desire to (additionally)
->> include some generic value in the compatible field, but again, what that
->> generic value is should be driven by the HW itself, not the SW that's
->> using it.
 > 
-> Okay, fine.  But then what should the binding documentation specify for
-> the compatible value?  A list of all the HW models that the driver
-> currently supports?
+>> diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+>> index d0d3f8f..ae3b236 100644
+>> --- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
+>> +++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+>> @@ -15,33 +15,37 @@
+>>  #ifndef __MACH_XILINX_SOC_H__
+>>  #define __MACH_XILINX_SOC_H__
+>>  
+>> +#include <asm/pgtable.h>
+>> +
+>>  #define PERIPHERAL_CLOCK_RATE		2500000
+>>  
+>> -/* For now, all mappings are flat (physical = virtual)
+>> +/* Static peripheral mappings are mapped at the top of the
+>> + * vmalloc region
+>>   */
+>> -#define UART0_PHYS			0xE0000000
+>> -#define UART0_VIRT			UART0_PHYS
+>> +#define UART0_PHYS		0xE0000000
+>> +#define UART0_SIZE		SZ_4K
+>> +#define UART0_VIRT		(VMALLOC_END - UART0_SIZE)
+> 
+> There are plans to move the uart location into a fixed virtual
+> address in the future, but it hasn't been decided yet.
+> It will still need a fixed mapping though, just to a different
+> address.
+> 
+>> -#define TTC0_PHYS			0xF8001000
+>> -#define TTC0_VIRT			TTC0_PHYS
+>> +#define TTC0_PHYS		0xF8001000
+>> +#define TTC0_SIZE		SZ_4K
+>> +#define TTC0_VIRT		(UART0_VIRT - TTC0_SIZE)
+> 
+> It's quite likely that this does not have to be a fixed mapping
+> any more. Just have a look at how drivers/clocksource/dw_apb_timer_of.c
+> calls of_iomap() to get the address.
+> 
+>> -#define PL310_L2CC_PHYS			0xF8F02000
+>> -#define PL310_L2CC_VIRT			PL310_L2CC_PHYS
+>> +#define PL310_L2CC_PHYS		0xF8F02000
+>> +#define PL310_L2CC_SIZE		SZ_4K
+>> +#define PL310_L2CC_VIRT		(TTC0_VIRT - PL310_L2CC_SIZE)
+> 
+> This address would not need a fixed mapping by calling l2x0_of_init
+> rather than l2x0_init.
+> 
+>> -#define SCU_PERIPH_PHYS			0xF8F00000
+>> -#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
+>> +#define SCU_PERIPH_PHYS		0xF8F00000
+>> +#define SCU_PERIPH_SIZE		SZ_8K
+>> +#define SCU_PERIPH_VIRT		(PL310_L2CC_VIRT - SCU_PERIPH_SIZE)
+> 
+> And your patch 3 already obsoletes this mapping.
 
-The binding docs should be independent of the driver. There may be
-fields the driver ignores. So you need to document all defined
-compatible strings. It is fine if the driver only has "usb-ehci", but it
-is not fine for the DT to only have that.
+Actually, it's probably still needed. The smp platform code typically
+reads the number of cores from the SCU and the mapping has to be in
+place before ioremap is up. I don't think there is an architected way to
+get the number of cores, but it would be nice to avoid this early SCU
+access. We could also mandate getting the core count from DT instead.
+
+Also, the physical address can be read with this on A9's:
+
+        asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
 
 Rob
