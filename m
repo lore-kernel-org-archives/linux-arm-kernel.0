@@ -1,20 +1,34 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 23 Oct 2012 10:45:36 +0100
-Subject: [PATCH 2/2] Documentation: Describe Device Tree bindings for
- GPIO Regulator driver
-In-Reply-To: <1350307020-5910-2-git-send-email-lee.jones@linaro.org>
-References: <1350307020-5910-1-git-send-email-lee.jones@linaro.org>
- <1350307020-5910-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121023094536.GA6576@sirena.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 23 Oct 2012 11:46:59 +0200
+Subject: [PATCH] pinctrl/nomadik: pass DT node to the irqdomain
+Message-ID: <1350985619-17408-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 15, 2012 at 02:17:00PM +0100, Lee Jones wrote:
-> Here we specify all non-standard bindings which can be used when
-> requesting the use of an GPIO controlled regulator from Device Tree.
-> 
-> Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+From: Linus Walleij <linus.walleij@linaro.org>
 
-The reason I didn't get this patch is that you didn't CC me on it...
-notice what you've done above.
+When creating the simple irqdomain, pass the DT node pointer along,
+as is apropriate.
+
+Cc: Lee Jones <lee.jones@linaro.org>
+Reported-by: Gabriel Fernandez <gabriel.fernandez@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+index 8bfbad6..cf82d9c 100644
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@ -1387,7 +1387,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
+ 
+ 	if (!np)
+ 		irq_start = NOMADIK_GPIO_TO_IRQ(pdata->first_gpio);
+-	nmk_chip->domain = irq_domain_add_simple(NULL,
++	nmk_chip->domain = irq_domain_add_simple(np,
+ 				NMK_GPIO_PER_CHIP, irq_start,
+ 				&nmk_gpio_irq_simple_ops, nmk_chip);
+ 	if (!nmk_chip->domain) {
+-- 
+1.7.11.3
