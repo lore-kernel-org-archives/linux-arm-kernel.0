@@ -1,35 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 23 Oct 2012 13:39:05 +0200
-Subject: [PATCH] ARM: dma-mapping: support debug_dma_mapping_error
-In-Reply-To: <1350909843-5273-1-git-send-email-ming.lei@canonical.com>
-References: <1350909843-5273-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <508681D9.7060305@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 23 Oct 2012 12:41:31 +0100
+Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
+In-Reply-To: <20121023111656.GT21164@n2100.arm.linux.org.uk>
+References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
+ <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
+ <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
+ <20121023111019.GV4477@opensource.wolfsonmicro.com>
+ <20121023111656.GT21164@n2100.arm.linux.org.uk>
+Message-ID: <20121023114130.GW4477@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Oct 23, 2012 at 12:16:56PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Oct 23, 2012 at 12:10:19PM +0100, Mark Brown wrote:
 
-On 10/22/2012 2:44 PM, Ming Lei wrote:
+> > I *really* should not need to remind you to:
 
-> Without the patch, kind of below warning will be dumped if DMA-API
-> debug is enabled:
->
-> [   11.069763] ------------[ cut here ]------------
-> [   11.074645] WARNING: at lib/dma-debug.c:948 check_unmap+0x770/0x860()
-> [   11.081420] ehci-omap ehci-omap.0: DMA-API: device driver failed to
-> check map error[device address=0x0000000
-> 0adb78e80] [size=8 bytes] [mapped as single]
-> [   11.095611] Modules linked in:
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+> >  - Not top post
+> >  - Send patches in a form which can be applied if you want them applying
 
-Thanks for the patch, I've applied it to my kernel tree.
+> How about actually applying the damned patch from the two-part patch set,
+> rather than only the first, both of which has been around for almost a
+> month now, and fixes what should never have gone into mainline in the
+> first place?
 
-> ...
+Well, the reason for the second point is that I don't have a copy of the
+patch any more, I need a copy of it before I can do anything.  Half the
+reason these contentless top posts are annoying is that even if there's
+something to do it's not actionable.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+I have to say I had been under the impression that Linus' series that I
+applied the other day dealt with all the outstanding stuff here; the
+issues with this have been the awful changelogs and the overalapping
+sets of patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/160443fc/attachment-0001.sig>
