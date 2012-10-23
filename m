@@ -1,85 +1,79 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Oct 2012 22:09:14 +0300
-Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
- mask on disable
-In-Reply-To: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
-References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <20121023190914.GA853@arwen.pp.htv.fi>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 23 Oct 2012 12:17:23 -0700
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ (Jean Pihet's message of "Mon, 22 Oct 2012 18:12:06 +0200")
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+Message-ID: <87fw5580cc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Jean Pihet <jean.pihet@newoldbits.com> writes:
 
-On Tue, Oct 23, 2012 at 11:09:31AM -0700, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@ti.com>
-> 
-> When debounce clocks are disabled, ensure that the banks
-> dbck_enable_mask is cleared also.  Otherwise, context restore on
-> subsequent off-mode transition will restore previous value from the
-> shadow copies (bank->context.debounce*) leading to mismatch state
-> between driver state and hardware state.
-> 
-> This was discovered when board code was doing
-> 
->   gpio_request_one()
->   gpio_set_debounce()
->   gpio_free()
-> 
-> which was leaving the GPIO debounce settings in a confused state.
-> Then, enabling off mode causing bogus state to be restored, leaving
-> GPIO debounce enabled which then prevented the CORE powerdomain from
-> transitioning.
-> 
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> Hi,
+>
+> On Sat, Oct 20, 2012 at 8:14 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>> Hi Jean
+>>
+>> On Fri, 19 Oct 2012, Paul Walmsley wrote:
+>>
+>>> On Thu, 18 Oct 2012, Paul Walmsley wrote:
+>>>
+>>> > Here are some basic OMAP test results for Linux v3.7-rc1.
+>>> > Logs and other details at http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/
+>>
+>> ...
+>>
+>>> > Failing tests: needing investigation
+>>> > ------------------------------------
+>>> >
+>>> > Boot tests:
+>>>
+>>> * 3530ES3 Beagle: I2C timeouts during userspace init
+>>>   - May be related to the threaded IRQ conversion of the I2C driver
+>>>   - Unknown cause
+>>
+>> This one turned out to be caused by:
+>>
+>> commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc
+>> Author: Jean Pihet <jean.pihet@newoldbits.com>
+>> Date:   Thu Sep 20 18:08:03 2012 +0200
+>>
+>>     ARM: OMAP: convert I2C driver to PM QoS for MPU latency constraints
+>>
+>>
+>> Reverting this commit causes the problem to go away, but since the OMAP PM
+>> constraint code was removed as well, it's unlikely that a simple revert is
+>> the right thing to do.
+>>
+>> Jean could you please investigate and fix this?
+> I tried the latest l-o with omap2plus defconfig on my Beagleboard B5
+> (ES2.1) and could not reproduce the problem.
+> I do not have the I2C error messages at boot, nor at user space start
+> up. I tried to read/write the TWL RTC, successfully.
+>
+> Another difference is the bootloader images. I have the following:
+> - Texas Instruments X-Loader 1.4.2 (Feb  3 2009 - 15:34:17)
+> - U-Boot 2009.01-dirty (Feb 19 2009 - 12:22:31)
+> Could you send your bootloader images?
+>
+> I noticed you have I2C error messages in U-Boot, could that be the
+> cause of the I2C lock-up?
 
-looks like this deserves a Cc: stable at vger.kernel.org tag.
+FWIW, I have a relatively recent mainline u-boot+SPL:
 
-> ---
-> Applies on v3.7-rc2, targetted for v3.7.
-> 
->  drivers/gpio/gpio-omap.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 94cbc84..dee2856 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -187,6 +187,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
->  		 * to detect events and generate interrupts at least on OMAP3.
->  		 */
->  		__raw_writel(0, bank->base + bank->regs->debounce_en);
-> +		bank->dbck_enable_mask = 0;
+U-Boot SPL 2012.04.01 (Jul 03 2012 - 07:07:04)
+U-Boot 2012.04.01 (Jul 03 2012 - 07:07:04)
 
-shouldn't omap_gpio_restore_context() check for dbck_enabled instead of
-the mask ? I mean:
+And I see I2C error messages from u-boot too:
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 94cbc84..b3a39a7 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1371,7 +1371,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- 				bank->base + bank->regs->dataout);
- 	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
- 
--	if (bank->dbck_enable_mask) {
-+	if (bank->dbck_enabled) {
- 		__raw_writel(bank->context.debounce, bank->base +
- 					bank->regs->debounce);
- 		__raw_writel(bank->context.debounce_en,
+timed out in wait_for_pin: I2C_STAT=0
+I2C read: I/O error
 
-the outcome would be the same, so it doesn't really matter. Just that,
-at least to me, it would look better.
+I think these are normal/expected since u-boot may be looking for
+expansion cards.
 
-No strong feelings though.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/607d8ee1/attachment.sig>
+Kevin
