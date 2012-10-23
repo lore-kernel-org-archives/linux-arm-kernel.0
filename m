@@ -1,61 +1,103 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Oct 2012 13:29:03 +0300
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdb+f44jw1vTYvJT0bnMOP8XQe8ztDUHiwtS2JHtPWAGXw@mail.gmail.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
- <508664CA.7000601@ti.com>
- <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
- <20121023100333.GA24418@arwen.pp.htv.fi>
- <20121023122312.56b23e1c@skate>
- <CACRpkdb+f44jw1vTYvJT0bnMOP8XQe8ztDUHiwtS2JHtPWAGXw@mail.gmail.com>
-Message-ID: <20121023102903.GA24820@arwen.pp.htv.fi>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 23 Oct 2012 12:43:08 +0200
+Subject: [PATCH 5/5] arm: mvebu: Added SMP support for Armada XP
+In-Reply-To: <20121023093029.GY11837@lunn.ch>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-6-git-send-email-gregory.clement@free-electrons.com>
+ <20121022184537.GN21046@lunn.ch> <50865F59.8000507@free-electrons.com>
+ <20121023093029.GY11837@lunn.ch>
+Message-ID: <508674BC.2070301@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Oct 23, 2012 at 12:29:28PM +0200, Linus Walleij wrote:
-> On Tue, Oct 23, 2012 at 12:23 PM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> >
-> > On Tue, 23 Oct 2012 13:03:33 +0300, Felipe Balbi wrote:
-> >
-> >> > But it appears that shmobile prefer to get all resources using
-> >> > bus notifiers.
-> >> >
-> >> > So we need to form some kind of consensus ... or live with
-> >> > the fact that different systems do it different ways. Which will
-> >> > explode the day we need to use a driver on two systems,
-> >> > each using the other approach :-)
-> >>
-> >> I much prefer having drivers explicitly manage all their resources,
-> >> which would mean that pinctrl calls need to be done on probe() and, if
-> >> necessary, during suspend()/resume().
-> >>
-> >> Using bus notifiers for that is quite a hack IMHO.
-> >
-> > Agreed. Just like drivers do their ioremap, request_irq and others,
-> > they should also request their pin resources using the pinctrl API.
-> > Hiding this behind a bus notifier is not nice.
+On 10/23/2012 11:30 AM, Andrew Lunn wrote:
+> On Tue, Oct 23, 2012 at 11:11:53AM +0200, Gregory CLEMENT wrote:
+>> On 10/22/2012 08:45 PM, Andrew Lunn wrote:
+>>> Hi Gregory
+>>>
+>>>> +void __init set_secondary_cpus_clock(void)
+>>>> +{
+>>>> +	int cpu;
+>>>> +	unsigned long rate;
+>>>> +	struct clk *cpu_clk = NULL;
+>>>> +	struct device_node *np = NULL;
+>>>> +
+>>>> +	cpu = smp_processor_id();
+>>>> +	np = of_find_node_by_type(np, "cpu");
+>>>> +	np = NULL;
+>>>> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+>>>> +		const u32 *reg;
+>>>> +		int len;
+>>>> +		reg = of_get_property(np, "reg", &len);
+>>>> +		if (!reg || len != 4) {
+>>>> +			pr_err("%s missing reg property\n", np->full_name);
+>>>> +			continue;
+>>>> +		}
+>>>> +		if (be32_to_cpup(reg) == cpu) {
+>>>> +			cpu_clk = of_clk_get(np, 0);
+>>>> +			break;
+>>>> +		}
+>>>> +	}
+>>>> +	WARN_ON(IS_ERR(cpu_clk));
+>>>> +	rate = clk_get_rate(cpu_clk);
+>>>> +
+>>>> +	/* set all the other CPU clk to the same rate than the boot CPU */
+>>>> +	np = NULL;
+>>>> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+>>>> +		const u32 *reg;
+>>>> +		int len;
+>>>> +		reg = of_get_property(np, "reg", &len);
+>>>> +		if (!reg || len != 4) {
+>>>> +			pr_err("%s missing reg property\n", np->full_name);
+>>>> +			continue;
+>>>> +		}
+>>>> +		if (be32_to_cpup(reg) != cpu) {
+>>>> +			cpu_clk = of_clk_get(np, 0);
+>>>> +			clk_set_rate(cpu_clk, rate);
+>>>> +		}
+>>>
+>>> Maybe its hiding somewhere, but where is the clk_prepare_enable() for
+>>> this cpu_clk clock?
+>>>
+>>
+>> Well the clocks are always enable. In the clock framework, the cpu clocks
+>> don't provide an enable function.
 > 
-> So the biggest implementation of the notifier approach to resource
-> handling is the SH clock thing:
-> drivers/base/power/clock_ops.c
+> Is it possible in the hardware to disable them? Turning them off might
+> save some power. If these chips end up in some data center server, it
+> might be that CPU hotplugging is used.
 
-that's different right ? It's just creating the list of clocks, device
-drivers still have to call pm_clk_add().
+Well I didn't find anything about it. You can power off a CPU using the
+PMSU but not the clock itself. I guess that once you have power off the
+CPU the clock will be turned off as well.
 
-That's ok, I guess, otherwise all struct device would allocate memory
-which hardly ever used (so far).
+> 
+>> But maybe it is cleaner to call clk_prepare_enable() even if it does
+>> nothing except update the usage count.
+> 
+> You also have to watch out for the late_initcall which will disable
+> all clocks which are running but nobody has claimed. This will become
+> an issue if you do have enable/disable function in later versions of
+> the clock functions.
+
+I don't think there will be enable/disable functions for the family
+clock currently used (armada-xp-cpu-clockctrl). But in future if a new
+version of mvebu SoC will use a new clock family which will have these
+functions, then it will be an issue. So to be future proof I will ad
+this call in the next version of the patch set.
+
+> 
+> 	Andrew
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/73258827/attachment.sig>
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
