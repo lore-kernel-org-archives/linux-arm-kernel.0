@@ -1,33 +1,27 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 10:01:54 +0100
-Subject: [PATCH V6 3/6] arm: cache-l2x0: add support for Aurora L2
- cache ctrl
-In-Reply-To: <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
-References: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
- <1348738523-28609-1-git-send-email-gregory.clement@free-electrons.com>
- <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121023090154.GP21164@n2100.arm.linux.org.uk>
+Date: Tue, 23 Oct 2012 10:08:05 +0100
+Subject: IMX breaking Versatile Express build
+Message-ID: <20121023090805.GQ21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Sep 27, 2012 at 11:35:23AM +0200, Gregory CLEMENT wrote:
-> Aurora Cache Controller was designed to be compatible with the ARM L2
-> Cache Controller. It comes with some difference or improvement such
-> as:
-> - no cache id part number available through hardware (need to get it
->   by the DT).
-> - always write through mode available.
-> - two flavors of the controller outer cache and system cache (meaning
->   maintenance operations on L1 are broadcasted to the L2 and L2
->   performs the same operation).
-> - in outer cache mode, the cache maintenance operations are improved and
->   can be done on a range inside a page and are not limited to a cache
->   line.
+The latest Versatile Express specific build is failing due to:
 
-This adds new build warnings:
+arch/arm/mach-imx/built-in.o: In function `imx_cpu_die':
+platform-imx-dma.c:(.text+0x1624): undefined reference to `imx_enable_cpu'
+arch/arm/mach-imx/built-in.o: In function `imx_boot_secondary':
+platform-imx-dma.c:(.cpuinit.text+0x14): undefined reference to `imx_set_cpu_jump'
+platform-imx-dma.c:(.cpuinit.text+0x20): undefined reference to `imx_enable_cpu'
 
-arch/arm/mm/cache-l2x0.c:328:13: warning: 'aurora_inv_range' defined but not used
-arch/arm/mm/cache-l2x0.c:347:13: warning: 'aurora_clean_range' defined but not used
-arch/arm/mm/cache-l2x0.c:365:13: warning: 'aurora_flush_range' defined but not used
+Config:
 
-to the realview build (non-DT).  Please investigate, thanks.
+http://www.home.arm.linux.org.uk/developer/build/file.php?type=config&idx=2464
+
+This does not seem to have any IMX support selected.
+
+Thanks to the reduced default configuration files, Kconfig is deciding to
+select the new MULTI_* options on these target specific Kconfigs, which
+may have some reason as to the above.
+
+However, even so, we should _not_ be seeing such build failures.  It looks
+to me like platform-imx-dma is missing some kind of dependency.
