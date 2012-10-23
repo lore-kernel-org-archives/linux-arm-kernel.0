@@ -1,360 +1,93 @@
-From: B18647@freescale.com (Lee Robert-B18647)
-Date: Tue, 23 Oct 2012 16:09:08 +0000
-Subject: [PATCH 10/10] ARM: imx6q: implement WAIT mode with coupled cpuidle
-In-Reply-To: <1351005779-30347-11-git-send-email-shawn.guo@linaro.org>
-References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
- <1351005779-30347-11-git-send-email-shawn.guo@linaro.org>
-Message-ID: <D9DA41B75289BC488A38AE7992B7866301261C4A@039-SN2MPN1-022.039d.mgd.msft.net>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Tue, 23 Oct 2012 18:15:24 +0200
+Subject: [PATCH v2 1/4] ARM: dts: omap5: Update GPIO with address space
+ and interrupts
+In-Reply-To: <5086C0C3.1060305@ti.com>
+References: <1350981432-6750-1-git-send-email-s-guiriec@ti.com>
+ <1350981432-6750-2-git-send-email-s-guiriec@ti.com> <5086AE8E.60106@ti.com>
+ <5086B316.6000001@ti.com> <5086BECA.9070502@ti.com> <5086C0C3.1060305@ti.com>
+Message-ID: <5086C29C.5000209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Shawn,
+Hi Benoit and John,
 
-For your SRPG implementation, a couple of weeks ago an issue was found that affects all i.MX6 SRPG functionality that requires a work around for 100% reliable operation.  It's my understanding that the workaround is almost but not yet finalized.  Ranjani is most familiar with this issue so you and her can discuss further.
+On 10/23/2012 06:07 PM, Benoit Cousson wrote:
+> On 10/23/2012 05:59 PM, Jon Hunter wrote:
+>>
+>> On 10/23/2012 10:09 AM, Benoit Cousson wrote:
+>>> On 10/23/2012 04:49 PM, Jon Hunter wrote:
+>>>> Hi Seb,
+>>>>
+>>>> On 10/23/2012 03:37 AM, Sebastien Guiriec wrote:
+>>>>> Add base address and interrupt line inside Device Tree data for
+>>>>> OMAP5
+>>>>>
+>>>>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>>>>> ---
+>>>>>   arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++++
+>>>>>   1 file changed, 16 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>>>>> index 42c78be..9e39f9f 100644
+>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>>> @@ -104,6 +104,8 @@
+>>>>>
+>>>>>   		gpio1: gpio at 4ae10000 {
+>>>>>   			compatible = "ti,omap4-gpio";
+>>>>> +			reg = <0x4ae10000 0x200>;
+>>>>> +			interrupts = <0 29 0x4>;
+>>>>>   			ti,hwmods = "gpio1";
+>>>>>   			gpio-controller;
+>>>>>   			#gpio-cells = <2>;
+>>>>
+>>>> I am wondering if we should add the "interrupt-parent" property to add
+>>>> nodes in the device-tree source. I know that today the interrupt-parent
+>>>> is being defined globally, but when device-tree maps an interrupt for a
+>>>> device it searches for the interrupt-parent starting the current device
+>>>> node.
+>>>>
+>>>> So in other words, for gpio1 it will search the gpio1 binding for
+>>>> "interrupt-parent" and if not found move up a level and search again. It
+>>>> will keep doing this until it finds the "interrupt-parent".
+>>>>
+>>>> Therefore, I believe it will improve search time and hence, boot time if
+>>>> we have interrupt-parent defined in each node.
+>>>
+>>> Mmm, I'm not that sure. it will increase the size of the blob, so
+>>> increase the time to load it and then to parse it. Where in the current
+>>> case, it is just going up to the parent node using the already
+>>> un-flatten tree in memory and thus that should not take that much time.
+>>
+>> Yes it will definitely increase the size, so that could slow things down.
+>>
+>>> That being said, it might be interesting to benchmark that to see what
+>>> is the real impact.
+>>
+>> Right, I wonder what the key functions are we need to benchmark to get
+>> an overall feel for what is best? Right now I am seeing some people add
+>> the interrupt-parent for device nodes and others not. Ideally we should
+>> be consistent, but at the same time it is probably something that we can
+>> easily sort out later. So not a big deal either way.
+>
+> For consistency, I'd rather not add it at all for the moment.
+> Later, when we will only support DT boot, people will start complaining
+> about the boot time increase and then we will start optimizing a little
+> bit :-)
 
-Best Regards,
-Rob
+I just do it like that to be consistent with what is inside OMAP4 dtsi 
+for those IPs (GPIO/UART/MMC/I2C). Now after checking Peter already add 
+the interrupt-parent for all audio IPs (OMAP3/4/5). But here we need 
+also interrupts name. So here we should try to be consistent.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: Tuesday, October 23, 2012 10:23 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Sascha Hauer; Lee Robert-B18647; Shawn Guo
-> Subject: [PATCH 10/10] ARM: imx6q: implement WAIT mode with coupled
-> cpuidle
-> 
-> The imx6q has a low power mode named WAIT.  When all cores are in WFI,
-> imx6q will go into WAIT mode, and whenever there is a wakeup interrupt,
-> it will exit WAIT mode.  Software can configure hardware behavior
-> during WAIT mode, clock gating or power gating for ARM core.
-> 
-> This patch adds two more cpuidle states, wait and srpg, implementing
-> the ARM clock gating and power gating in WAIT mode respectively.  They
-> are added as coupled cpuidle states.  Though imx6q hardware already
-> handles sequencing, the voting provided by coupled cpuidle is still
-> quite useful, which will allow the system to at least get into clock
-> gating when one cpu wants clock gating and the other wants power
-> gating.
-> 
-> As WAIT mode is broken on TO1.0 silicon, the feature is only provided
-> for revision later than TO1.0.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/Kconfig         |    1 +
->  arch/arm/mach-imx/common.h        |    1 +
->  arch/arm/mach-imx/cpuidle-imx6q.c |  155
-> ++++++++++++++++++++++++++++++++++++-
->  arch/arm/mach-imx/cpuidle.c       |    3 +
->  arch/arm/mach-imx/headsmp.S       |   56 ++++++++++++++
->  arch/arm/mach-imx/mach-imx6q.c    |    7 +-
->  arch/arm/mach-imx/platsmp.c       |    5 ++
->  7 files changed, 225 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 3ce2771..08435a6 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -831,6 +831,7 @@ config SOC_IMX6Q
->  	bool "i.MX6 Quad support"
->  	select ARCH_HAS_CPUFREQ
->  	select ARCH_HAS_OPP
-> +	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
->  	select ARM_CPU_SUSPEND if PM
->  	select ARM_ERRATA_743622
->  	select ARM_ERRATA_751472
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index ea11bbc..a3fe18b 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -121,6 +121,7 @@ extern void imx_lluart_map_io(void);  static inline
-> void imx_lluart_map_io(void) {}  #endif  extern void
-> v7_cpu_resume(void);
-> +extern int v7_suspend_finish(unsigned long val);
->  extern u32 *pl310_get_save_ptr(void);
->  #ifdef CONFIG_SMP
->  extern void v7_secondary_startup(void); diff --git a/arch/arm/mach-
-> imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-> index 83facc9..3acd6ce 100644
-> --- a/arch/arm/mach-imx/cpuidle-imx6q.c
-> +++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-> @@ -6,21 +6,172 @@
->   * published by the Free Software Foundation.
->   */
-> 
-> +#include <linux/clockchips.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/cpuidle.h>
->  #include <linux/module.h>
->  #include <asm/cpuidle.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/suspend.h>
-> 
-> +#include "common.h"
->  #include "cpuidle.h"
-> 
-> +static atomic_t master = ATOMIC_INIT(0); static u32 g_diag_reg;
-> +
-> +/*
-> + * The diagnostic register holds the ARM core errata bits,
-> + * which need to be saved and restored.
-> + */
-> +static inline void save_cpu_arch_register(void) {
-> +	asm("mrc p15, 0, %0, c15, c0, 1" : "=r"(g_diag_reg) : : "cc"); }
-> +
-> +static inline void restore_cpu_arch_register(void) {
-> +	asm("mcr p15, 0, %0, c15, c0, 1" : : "r"(g_diag_reg) : "cc"); }
-> +
-> +#ifdef CONFIG_SMP
-> +static inline void imx6q_wakeup_other_cpus(int cpu) {
-> +	struct cpumask online = *cpu_online_mask;
-> +	const struct cpumask *others;
-> +
-> +	cpumask_clear_cpu(cpu, &online);
-> +	others = &online;
-> +	arch_send_wakeup_ipi_mask(others);
-> +}
-> +#else
-> +static inline void imx6q_wakeup_other_cpus(int cpu) { } #endif
-> +
-> +static int imx6q_enter_wait(struct cpuidle_device *dev,
-> +			    struct cpuidle_driver *drv, int index) {
-> +	int cpu = dev->cpu;
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-> +
-> +	if (atomic_inc_return(&master) == num_online_cpus()) {
-> +		imx6q_set_lpm(WAIT_UNCLOCKED);
-> +		cpu_do_idle();
-> +		imx6q_set_lpm(WAIT_CLOCKED);
-> +	} else {
-> +		cpu_do_idle();
-> +	}
-> +
-> +	atomic_dec(&master);
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-> +
-> +	/*
-> +	 * The coupled cpuidle requires all cores exit together.
-> +	 * Wake up other cores which could still be in idle.
-> +	 */
-> +	imx6q_wakeup_other_cpus(cpu);
-> +
-> +	return index;
-> +}
-> +
-> +static inline int imx6q_do_srpg(int cpu) {
-> +	imx_set_cpu_jump(cpu, v7_cpu_resume);
-> +	return cpu_suspend(cpu, v7_suspend_finish); }
-> +
-> +static int imx6q_enter_srpg(struct cpuidle_device *dev,
-> +			    struct cpuidle_driver *drv, int index) {
-> +	int cpu = dev->cpu;
-> +	int ret;
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
-> +
-> +	cpu_pm_enter();
-> +
-> +	if (atomic_inc_return(&master) == num_online_cpus()) {
-> +		cpu_cluster_pm_enter();
-> +		imx6q_set_lpm(WAIT_UNCLOCKED_POWER_OFF);
-> +	}
-> +
-> +	save_cpu_arch_register();
-> +	ret = imx6q_do_srpg(cpu);
-> +	/*
-> +	 * The ret is 0 if it returns from a successful SRPG,
-> +	 * otherwise it just aborts from there.
-> +	 */
-> +	if (!ret) {
-> +		restore_cpu_arch_register();
-> +		cpu_pm_exit();
-> +	}
-> +
-> +	if (atomic_dec_return(&master) == num_online_cpus() - 1) {
-> +		imx6q_set_lpm(WAIT_CLOCKED);
-> +		if (!ret)
-> +			cpu_cluster_pm_exit();
-> +		else
-> +			/*
-> +			 * It just aborts from SRPG, so wake up other cores
-> +			 * to return exit together.
-> +			 */
-> +			imx6q_wakeup_other_cpus(cpu);
-> +	}
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &cpu);
-> +
-> +	return ret ? -EBUSY : index;
-> +}
-> +
-> +/*
-> + * For each cpu, setup the broadcast timer because local timer
-> + * stops for the states other than WFI.
-> + */
-> +static void imx6q_setup_broadcast_timer(void *arg) {
-> +	int cpu = smp_processor_id();
-> +
-> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu); }
-> +
->  static struct cpuidle_driver imx6q_cpuidle_driver = {
->  	.name = "imx6q_cpuidle",
->  	.owner = THIS_MODULE,
->  	.en_core_tk_irqen = 1,
-> -	.states[0] = ARM_CPUIDLE_WFI_STATE,
-> -	.state_count = 1,
-> +	.states = {
-> +		/* WFI */
-> +		ARM_CPUIDLE_WFI_STATE,
-> +		/* WAIT */
-> +		{
-> +			.exit_latency = 50,
-> +			.target_residency = 75,
-> +			.flags = CPUIDLE_FLAG_TIME_VALID |
-> CPUIDLE_FLAG_COUPLED,
-> +			.enter = imx6q_enter_wait,
-> +			.name = "WAIT",
-> +			.desc = "Clock off",
-> +		},
-> +		/* SRPG */
-> +		{
-> +			.exit_latency = 1000,
-> +			.target_residency = 1200,
-> +			.flags = CPUIDLE_FLAG_TIME_VALID |
-> CPUIDLE_FLAG_COUPLED,
-> +			.enter = imx6q_enter_srpg,
-> +			.name = "SRPG",
-> +			.desc = "Power off",
-> +		},
-> +	},
-> +	.state_count = 3,
-> +	.safe_state_index = 0,
->  };
-> 
->  int __init imx6q_cpuidle_init(void)
->  {
-> +	/* Set initial power mode */
-> +	imx6q_set_lpm(WAIT_CLOCKED);
-> +
-> +	/* Configure the broadcast timer on each cpu */
-> +	on_each_cpu(imx6q_setup_broadcast_timer, NULL, 1);
-> +
->  	return imx_cpuidle_init(&imx6q_cpuidle_driver);
->  }
-> diff --git a/arch/arm/mach-imx/cpuidle.c b/arch/arm/mach-imx/cpuidle.c
-> index d4cb511..05a537f 100644
-> --- a/arch/arm/mach-imx/cpuidle.c
-> +++ b/arch/arm/mach-imx/cpuidle.c
-> @@ -60,6 +60,9 @@ int __init imx_cpuidle_init(struct cpuidle_driver
-> *drv)
->  		dev = per_cpu_ptr(imx_cpuidle_devices, cpu_id);
->  		dev->cpu = cpu_id;
->  		dev->state_count = drv->state_count;
-> +#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-> +		dev->coupled_cpus = *cpu_online_mask; #endif
-> 
->  		ret = cpuidle_register_device(dev);
->  		if (ret) {
-> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> index ac8a967..f920962 100644
-> --- a/arch/arm/mach-imx/headsmp.S
-> +++ b/arch/arm/mach-imx/headsmp.S
-> @@ -71,6 +71,62 @@ ENDPROC(v7_secondary_startup)  #endif
-> 
->  #ifdef CONFIG_PM
-> +ENTRY(v7_suspend_finish)
-> +	stmfd	sp!, {r4-r12, lr}
-> +
-> +	/* Disable D-cache */
-> +	mrc	p15, 0, r0, c1, c0, 0
-> +	bic	r0, r0, #(1 << 2)		@ clear SCTRL.C
-> +	mcr	p15, 0, r0, c1, c0, 0
-> +	isb
-> +
-> +	/* Flush D-cache */
-> +	bl	v7_flush_dcache_louis
-> +
-> +#ifdef CONFIG_SMP
-> +	/* Exit coherency */
-> +	mrc	p15, 0, r0, c1, c0, 1
-> +	bic	r0, r0, #(1 << 6)		@ clear ACTLR.SMP
-> +	mcr	p15, 0, r0, c1, c0, 1
-> +	isb
-> +
-> +	/* Invalidate SCU tag RAM for the cpu */
-> +	bl	imx_get_scu_base		@ r0 = scu base
-> +	mrc	p15, 0, r2, c0, c0, 5 		@ r2 = cpu id
-> +	and	r2, r2, #0xf
-> +	mov	r2, r2, lsl #2
-> +	mov	r1, #0xf
-> +	mov	r1, r1, lsl r2
-> +	str	r1, [r0, #0xc]
-> +	dsb
-> +#endif
-> +
-> +	/*
-> +	 * CPU can speculatively prefetch instructions, so add 16 NOPs
-> +	 * after WFI per Cortex-A9 pipeline.
-> +	 */
-> +	wfi
-> +	.rept 16
-> +	nop
-> +	.endr
-> +
-> +	/* Enable D-cache */
-> +	mrc	p15, 0, r0, c1, c0, 0
-> +	orr	r0, r0, #(1 << 2)		@ set SCTRL.C
-> +	mcr	p15, 0, r0, c1, c0, 0
-> +	isb
-> +
-> +#ifdef CONFIG_SMP
-> +	/* Enter coherency */
-> +	mrc	p15, 0, r0, c1, c0, 1
-> +	orr	r0, r0, #(1 << 6) 		@ set ACTLR.SMP
-> +	mcr	p15, 0, r0, c1, c0, 1
-> +	isb
-> +#endif
-> +
-> +	ldmfd	sp!, {r4-r12, pc}
-> +ENDPROC(v7_suspend_finish)
-> +
->  /*
->   * The following code is located into the .data section.  This is to
->   * allow phys_l2x0_saved_regs to be accessed with a relative load diff
-> --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 8ecdeb5..9c9dbf8 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -182,7 +182,12 @@ static void __init imx6q_init_machine(void)
-> 
->  static void __init imx6q_init_late(void)  {
-> -	imx6q_cpuidle_init();
-> +	/*
-> +	 * WAIT mode is broken on TO1.0, so there is no point to
-> +	 * have cpuidle running on it.
-> +	 */
-> +	if (imx6q_revision() > IMX_CHIP_REVISION_1_0)
-> +		imx6q_cpuidle_init();
->  }
-> 
->  static void __init imx6q_map_io(void)
-> diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-> index fc25062..dcd590b 100644
-> --- a/arch/arm/mach-imx/platsmp.c
-> +++ b/arch/arm/mach-imx/platsmp.c
-> @@ -24,6 +24,11 @@
-> 
->  static void __iomem *scu_base;
-> 
-> +void __iomem *imx_get_scu_base(void)
-> +{
-> +	return scu_base;
-> +}
-> +
->  static struct map_desc scu_io_desc __initdata = {
->  	/* .virtual and .pfn are run-time assigned */
->  	.length		= SZ_4K,
-> --
-> 1.7.9.5
-> 
+So I can send back the series for OMAP5 and update the OMAP4 with
+   interrupts-parent = <&gic>
+
+As of today we are not consistent.
+
+>
+> Regards,
+> Benoit
+>
+>
