@@ -1,54 +1,20 @@
-From: sourav.poddar@ti.com (Sourav)
-Date: Tue, 23 Oct 2012 11:54:08 +0530
-Subject: [PATCH] arm: dts: omap4-sdp: pinmux configuration for keypad
-In-Reply-To: <20121022161909.GY4730@atomide.com>
-References: <1350890955-29553-1-git-send-email-sourav.poddar@ti.com>
- <20121022161909.GY4730@atomide.com>
-Message-ID: <50863808.3010305@ti.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 23 Oct 2012 02:40:44 -0400 (EDT)
+Subject: [PATCH v3 0/4] make cadence ethernet drivers build on any
+ architecture
+In-Reply-To: <1350931534-8416-1-git-send-email-manabian@gmail.com>
+References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
+Message-ID: <20121023.024044.1356362357417321521.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-On Monday 22 October 2012 09:49 PM, Tony Lindgren wrote:
-> * Sourav Poddar <sourav.poddar@ti.com> [121022 00:30]:
->> --- a/arch/arm/boot/dts/omap4-sdp.dts
->> +++ b/arch/arm/boot/dts/omap4-sdp.dts
->> @@ -194,6 +194,27 @@
->>   			0xbc 0x100	/* abe_mcbsp2_fsx.abe_mcbsp2_fsx INPUT | MODE0 */
->>   		>;
->>   	};
->> +
->> +	keypad_pins: pinmux_keypad_pins {
->> +		pinctrl-single,pins = <
->> +			0x24 0x4119   /* gpmc_a18.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x26 0x4119   /* gpmc_a19.kpd_row6 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x2c 0x4001   /* gpmc_a22.kpd_col6 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x2e 0x4001   /* gpmc_a23.kpd_col7 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x13c 0x4001  /* kpd_col0.kpd_col0 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x13e 0x4001  /* kpd_col1.kpd_col1 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x140 0x4001  /* kpd_col2.kpd_col2 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x142 0x10F   /* kpd_col3.kpd_col3 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x144 0x4001  /* kpd_col4.kpd_col4 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x146 0x4001  /* kpd_col5.kpd_col5 OMAP_WAKEUP_EN | OMAP_MUX_MODE1 */
->> +			0x148 0xc119  /* kpd_row0.kpd_row0 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x14a 0x4119  /* kpd_row1.kpd_row1 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x14c 0x4119  /* kpd_row2.kpd_row2 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x14e 0x4119  /* kpd_row3.kpd_row3 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x150 0x4119  /* kpd_row4.kpd_row4 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +			0x152 0x4119  /* kpd_row5.kpd_row5 OMAP_PULL_ENA | OMAP_PULL_UP | OMAP_WAKEUP_EN | OMAP_MUX_MODE1 | OMAP_INPUT_EN */
->> +		>;
->> +	};
->>   };
-> Please shorten these to leave out OMAP_:
-Ok. Will update and send a new version.
-> 		pinctrl-single,pins = <
-> 			0x24 0x4119   /* gpmc_a18.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
-> 			0x26 0x4119   /* gpmc_a19.kpd_row6 PULL_ENA | PULL_UP | WAKEUP_EN | MUX_MODE1 | INPUT_EN */
-> 			...
->
-> When we convert them over to use the preprocessor, we can still
-> easily replace them.
->
-> Regards,
->
-> Tony
+From: Joachim Eastwood <manabian@gmail.com>
+Date: Mon, 22 Oct 2012 20:45:30 +0200
+
+> Joachim Eastwood (4):
+>   net/macb: fix truncate warnings
+>   net/cadence: get rid of HAVE_NET_MACB
+>   net/at91_ether: select MACB in Kconfig
+>   net/at91_ether: add pdata flag for reverse Eth addr
+
+All applied to net-next, thanks a lot.
