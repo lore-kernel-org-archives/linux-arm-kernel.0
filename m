@@ -1,60 +1,57 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 23 Oct 2012 17:09:10 +0200
-Subject: [PATCH v2 1/4] ARM: dts: omap5: Update GPIO with address space
- and interrupts
-In-Reply-To: <5086AE8E.60106@ti.com>
-References: <1350981432-6750-1-git-send-email-s-guiriec@ti.com>
- <1350981432-6750-2-git-send-email-s-guiriec@ti.com> <5086AE8E.60106@ti.com>
-Message-ID: <5086B316.6000001@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 23 Oct 2012 23:22:49 +0800
+Subject: [PATCH 00/10] Support imx6q WAIT mode with coupled cpuidle
+Message-ID: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 04:49 PM, Jon Hunter wrote:
-> Hi Seb,
-> 
-> On 10/23/2012 03:37 AM, Sebastien Guiriec wrote:
->> Add base address and interrupt line inside Device Tree data for
->> OMAP5
->>
->> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
->> ---
->>  arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
->> index 42c78be..9e39f9f 100644
->> --- a/arch/arm/boot/dts/omap5.dtsi
->> +++ b/arch/arm/boot/dts/omap5.dtsi
->> @@ -104,6 +104,8 @@
->>  
->>  		gpio1: gpio at 4ae10000 {
->>  			compatible = "ti,omap4-gpio";
->> +			reg = <0x4ae10000 0x200>;
->> +			interrupts = <0 29 0x4>;
->>  			ti,hwmods = "gpio1";
->>  			gpio-controller;
->>  			#gpio-cells = <2>;
-> 
-> I am wondering if we should add the "interrupt-parent" property to add
-> nodes in the device-tree source. I know that today the interrupt-parent
-> is being defined globally, but when device-tree maps an interrupt for a
-> device it searches for the interrupt-parent starting the current device
-> node.
-> 
-> So in other words, for gpio1 it will search the gpio1 binding for
-> "interrupt-parent" and if not found move up a level and search again. It
-> will keep doing this until it finds the "interrupt-parent".
-> 
-> Therefore, I believe it will improve search time and hence, boot time if
-> we have interrupt-parent defined in each node.
+The imx6q has a low power mode named WAIT.  When all cores are in WFI,
+imx6q will go into WAIT mode, and whenever there is a wakeup interrupt,
+it will exit WAIT mode.  Software can configure hardware behavior during
+WAIT mode, clock gating or power gating for ARM core.
 
-Mmm, I'm not that sure. it will increase the size of the blob, so
-increase the time to load it and then to parse it. Where in the current
-case, it is just going up to the parent node using the already
-un-flatten tree in memory and thus that should not take that much time.
+The series implements ARM clock gating and power gating in WAIT mode
+as two coupled cpuidle states, wait and srpg.  Though imx6q hardware
+already handles sequencing, the voting provided by coupled cpuidle is
+still quite useful, which will allow the system to at least get into
+clock gating when one cpu wants clock gating and the other wants power
+gating.
 
-That being said, it might be interesting to benchmark that to see what
-is the real impact.
+Patches 1 ~ 9 make necessary code changes to prepare for WAIT mode
+enabling, and the last patch enables the feature eventually.
 
-Regards,
-Benoit
+As WAIT mode is broken on TO1.0 silicon, the feature is only provided
+for revisions later than TO1.0.
+
+Shawn Guo (10):
+  ARM: imx6q: print silicon version on boot
+  ARM: imx: allow timer counter to roll over
+  ARM: imx6q: select ARM and PL310 errata
+  ARM: imx: initialize cpu power up counters
+  ARM: imx: mask gpc interrupts initially
+  ARM: imx6q: prepare imx6q_set_lpm for cpudile support
+  ARM: imx6q: get v7_cpu_resume ready for cpuidle
+  ARM: imx: move imx6q_cpuidle_driver into a separate file
+  ARM: SMP: add function arch_send_wakeup_ipi_mask()
+  ARM: imx6q: implement WAIT mode with coupled cpuidle
+
+ arch/arm/include/asm/smp.h        |    1 +
+ arch/arm/kernel/smp.c             |    5 ++
+ arch/arm/mach-imx/Kconfig         |    9 ++
+ arch/arm/mach-imx/Makefile        |    6 +-
+ arch/arm/mach-imx/clk-imx6q.c     |   32 +++++--
+ arch/arm/mach-imx/common.h        |    6 +-
+ arch/arm/mach-imx/cpuidle-imx6q.c |  177 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/cpuidle.c       |    3 +
+ arch/arm/mach-imx/cpuidle.h       |    5 ++
+ arch/arm/mach-imx/gpc.c           |   20 +++--
+ arch/arm/mach-imx/headsmp.S       |   81 ++++++++++++++++-
+ arch/arm/mach-imx/mach-imx6q.c    |   45 +++++++---
+ arch/arm/mach-imx/platsmp.c       |   26 ++++--
+ arch/arm/mach-imx/pm-imx6q.c      |    1 -
+ arch/arm/mach-imx/time.c          |    6 +-
+ 15 files changed, 384 insertions(+), 39 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
+
+-- 
+1.7.9.5
