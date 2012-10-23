@@ -1,90 +1,57 @@
-From: prakity@nvidia.com (Philip Rakity)
-Date: Tue, 23 Oct 2012 15:21:58 +0200
-Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
-In-Reply-To: <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
-References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
- <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
-Message-ID: <4F1DF342-A2C4-434A-B878-A11374089E6E@nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Oct 2012 22:27:41 +0900
+Subject: [PATCH 4/4] ARM: EXYNOS: Kconfig: Remove dependencies on
+ particular SoCs from DT machines
+In-Reply-To: <1349701345-2681-5-git-send-email-t.figa@samsung.com>
+References: <1349701345-2681-1-git-send-email-t.figa@samsung.com>
+ <1349701345-2681-5-git-send-email-t.figa@samsung.com>
+Message-ID: <020a01cdb122$2d888ae0$8899a0a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 23 Oct 2012, at 09:19, Pavan Kunapuli <pkunapuli@nvidia.com> wrote:
-
-> vmmc and vqmmc regulators control the voltage to
-> the host and device. Defer the probe if either of
-> them is not registered.
+Tomasz Figa wrote:
 > 
-> Signed-off-by: Pavan Kunapuli <pkunapuli@nvidia.com>
+> MACH_EXYNOS{4,5}_DT are used for whole SoC lines, so they should depend
+> on ARCH_EXYNOS{4,5} rather than on particular SoCs.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> drivers/mmc/host/sdhci.c |   25 ++++++++++++++++++++++---
-> 1 files changed, 22 insertions(+), 3 deletions(-)
+>  arch/arm/mach-exynos/Kconfig | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 7922adb..925c403 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -2844,11 +2844,17 @@ int sdhci_add_host(struct sdhci_host *host)
-> 	    !(host->mmc->caps & MMC_CAP_NONREMOVABLE))
-> 		mmc->caps |= MMC_CAP_NEEDS_POLL;
-> 
-> -	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
-> +	/*
-> +	 * If vqmmc regulator and no 1.8V signalling, then there's no UHS.
-> +	 * vqmmc regulator should be present. If it's not present,
-> +	 * assume the regulator driver registration is not yet done and
-> +	 * defer the probe.
-> +	 */
-> 	host->vqmmc = regulator_get(mmc_dev(mmc), "vqmmc");
-> 	if (IS_ERR(host->vqmmc)) {
-> -		pr_info("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
-> +		pr_err("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
-> 		host->vqmmc = NULL;
-> +		return -EPROBE_DEFER;
-
-Some systems exist where vmmc regulator exists and vqmmc regulator does not.  The vmmc regular is fixed at 3.3v.  
-Deferring the probe will cause issues.
-
-> 	}
-> 	else if (regulator_is_supported_voltage(host->vqmmc, 1800000, 1800000))
-> 		regulator_enable(host->vqmmc);
-> @@ -2903,10 +2909,17 @@ int sdhci_add_host(struct sdhci_host *host)
-> 
-> 	ocr_avail = 0;
-> 
-> +	/*
-> +	 * vmmc regulator should be present. If it's not present,
-> +	 * assume the regulator driver registration is not yet done
-> +	 * and defer the probe.
-> +	 */
-> 	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
-> 	if (IS_ERR(host->vmmc)) {
-> -		pr_info("%s: no vmmc regulator found\n", mmc_hostname(mmc));
-> +		pr_err("%s: no vmmc regulator found\n", mmc_hostname(mmc));
-> 		host->vmmc = NULL;
-> +		ret = -EPROBE_DEFER;
-> +		goto vmmc_err;
-> 	} else
-> 		regulator_enable(host->vmmc);
-> 
-> @@ -3121,7 +3134,13 @@ reset:
-> untasklet:
-> 	tasklet_kill(&host->card_tasklet);
-> 	tasklet_kill(&host->finish_tasklet);
-> +vmmc_err:
-> +	if (host->vqmmc) {
-> +		if (regulator_is_enabled(host->vqmmc))
-> +			regulator_disable(host->vqmmc);
-> 
-> +		regulator_put(host->vqmmc);
-> +	}
-> 	return ret;
-> }
-> 
-> -- 
-> 1.7.1.1
-> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 6ea95f0..2e82ce7 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -404,7 +404,6 @@ comment "Flattened Device Tree based board for EXYNOS
+> SoCs"
+>  config MACH_EXYNOS4_DT
+>  	bool "Samsung Exynos4 Machine using device tree"
+>  	depends on ARCH_EXYNOS4
+> -	select SOC_EXYNOS4210
+>  	select USE_OF
+>  	select ARM_AMBA
+>  	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
+> @@ -419,7 +418,6 @@ config MACH_EXYNOS4_DT
+>  config MACH_EXYNOS5_DT
+>  	bool "SAMSUNG EXYNOS5 Machine using device tree"
+>  	depends on ARCH_EXYNOS5
+> -	select SOC_EXYNOS5250
+>  	select USE_OF
+>  	select ARM_AMBA
+>  	help
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 1.7.12
+
+Hmm...your comment is correct, but we need to think again its selecting
+order, between ARCH name, SoC and board. In addition, in case of MACH_XXX_DT
+depending on SoC is rather to be supposed...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
