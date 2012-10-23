@@ -1,50 +1,41 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Oct 2012 13:03:33 +0300
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
- <508664CA.7000601@ti.com>
- <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
-Message-ID: <20121023100333.GA24418@arwen.pp.htv.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Oct 2012 12:11:21 +0200
+Subject: [PATCH] arm: sched: stop sched_clock() during suspend
+In-Reply-To: <1350906877-19410-1-git-send-email-balbi@ti.com>
+References: <1350906877-19410-1-git-send-email-balbi@ti.com>
+Message-ID: <CACRpkdYiMtriTaKG=nT=7Jg2g0wUN3+JeN90V3jRke0bP2EHrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Oct 22, 2012 at 1:54 PM, Felipe Balbi <balbi@ti.com> wrote:
 
-On Tue, Oct 23, 2012 at 12:04:01PM +0200, Linus Walleij wrote:
-> On Tue, Oct 23, 2012 at 11:35 AM, Benoit Cousson <b-cousson@ti.com> wrote:
-> > On 10/23/2012 11:13 AM, Linus Walleij wrote:
-> 
-> >> So Sourav, please tell us a bit about your plans for this
-> >> and other drivers!
-> >
-> > Yeah, this idea is to handle pinctrl from all the drivers, and
-> > potentially change the mode during suspend when it is relevant.
-> 
-> I'm leaning toward the same approach for ux500.
-> 
-> But it appears that shmobile prefer to get all resources using
-> bus notifiers.
-> 
-> So we need to form some kind of consensus ... or live with
-> the fact that different systems do it different ways. Which will
-> explode the day we need to use a driver on two systems,
-> each using the other approach :-)
+> The scheduler imposes a requirement to sched_clock()
+> which is to stop the clock during suspend, if we don't
+> do that IRQ threads will be rescheduled in the future
+> which might cause transfers to timeout depending on
+> how driver is written.
+>
+> This became an issue on OMAP when we converted omap-i2c.c
+> to use threaded IRQs, it turned out that depending on how
+> much time we spent on suspend, the I2C IRQ thread would
+> end up being rescheduled so far in the future that I2C
+> transfers would timeout and, because omap_hsmmc depends
+> on an I2C-connected device to detect if an MMC card is
+> inserted in the slot, our rootfs would just vanish.
+>
+> arch/arm/kernel/sched_clock.c already had an optional
+> implementation (sched_clock_needs_suspend()) which would
+> handle scheduler's requirement properly, what this patch
+> does is simply to make that implementation non-optional.
+>
+> This has been tested with beagleboard XM (OMAP3630) and
+> pandaboard rev A3 (OMAP4430). Suspend to RAM is now working
+> after this patch.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-I much prefer having drivers explicitly manage all their resources,
-which would mean that pinctrl calls need to be done on probe() and, if
-necessary, during suspend()/resume().
+After Russell explains so I get it:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Using bus notifiers for that is quite a hack IMHO.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/339bb2ed/attachment.sig>
+Yours,
+Linus Walleij
