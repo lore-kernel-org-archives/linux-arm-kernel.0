@@ -1,39 +1,42 @@
-From: rpjday@crashcourse.ca (Robert P. J. Day)
-Date: Tue, 23 Oct 2012 10:12:39 -0400 (EDT)
-Subject: [PATCH] ARM: Remove obsolete reference to subsystem_init().
-Message-ID: <alpine.DEB.2.02.1210231009300.5104@oneiric>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 23 Oct 2012 07:14:48 -0700
+Subject: [PATCH v2] arm: sched: stop sched_clock() during suspend
+In-Reply-To: <1350971854-9161-1-git-send-email-balbi@ti.com> (Felipe Balbi's
+ message of "Tue, 23 Oct 2012 08:57:34 +0300")
+References: <873916h1yi.fsf@deeprootsystems.com>
+ <1350971854-9161-1-git-send-email-balbi@ti.com>
+Message-ID: <87mwzdcm1z.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Felipe Balbi <balbi@ti.com> writes:
 
-Since subsystem_init() doesn't exist anymore, reword the comment to
-reflect the more general subsys_initcalls.
+> The scheduler imposes a requirement to sched_clock()
+> which is to stop the clock during suspend, if we don't
+> do that any RT thread will be rescheduled in the future
+> which might cause any sort of problems.
+>
+> This became an issue on OMAP when we converted omap-i2c.c
+> to use threaded IRQs, it turned out that depending on how
+> much time we spent on suspend, the I2C IRQ thread would
+> end up being rescheduled so far in the future that I2C
+> transfers would timeout and, because omap_hsmmc depends
+> on an I2C-connected device to detect if an MMC card is
+> inserted in the slot, our rootfs would just vanish.
+>
+> arch/arm/kernel/sched_clock.c already had an optional
+> implementation (sched_clock_needs_suspend()) which would
+> handle scheduler's requirement properly, what this patch
+> does is simply to make that implementation non-optional.
+>
+> Note that this has the side-effect that printk timings
+> won't reflect the actual time spent on suspend so other
+> methods to measure that will have to be used.
+>
+> This has been tested with beagleboard XM (OMAP3630) and
+> pandaboard rev A3 (OMAP4430). Suspend to RAM is now working
+> after this patch.
+>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-Signed-off-by: Robert P. J. Day <rpjday@crashcourse.ca>
-
----
-
-  obviously, just a pedantic documentation tweak.
-
-diff --git a/arch/arm/plat-versatile/leds.c b/arch/arm/plat-versatile/leds.c
-index d2490d0..536c69a 100644
---- a/arch/arm/plat-versatile/leds.c
-+++ b/arch/arm/plat-versatile/leds.c
-@@ -98,6 +98,6 @@ static int __init versatile_leds_init(void)
-
- /*
-  * Since we may have triggers on any subsystem, defer registration
-- * until after subsystem_init.
-+ * until after the subsys_initcalls.
-  */
- fs_initcall(versatile_leds_init);
-
--- 
-
-========================================================================
-Robert P. J. Day                                 Ottawa, Ontario, CANADA
-                        http://crashcourse.ca
-
-Twitter:                                       http://twitter.com/rpjday
-LinkedIn:                               http://ca.linkedin.com/in/rpjday
-========================================================================
+Acked-by: Kevin Hilman <khilman@ti.com>
