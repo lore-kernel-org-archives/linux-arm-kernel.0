@@ -1,43 +1,33 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 23 Oct 2012 11:10:43 +0800
-Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
- conditions.
-In-Reply-To: <CAHod+GfycPnugk0UF6aqFUb4UJwZRM_PHPiSDpGSbF3OXSwMLw@mail.gmail.com>
-References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
- <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
- <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
- <CAMPhdO8duNqisVL+FLc_0zgFTP+13r83XtRD0YbpdkzMuJov3Q@mail.gmail.com>
- <CAHod+Gd=aLbntWsX_S_26_XSUtG9DQYkki1Y+drq0+8GdnHfaw@mail.gmail.com>
- <CAHod+GcwNr6r_ZQFq-btPJ3E_keWKJhkCb2jP4CES6JTSyn8ow@mail.gmail.com>
- <CAHod+GfycPnugk0UF6aqFUb4UJwZRM_PHPiSDpGSbF3OXSwMLw@mail.gmail.com>
-Message-ID: <CAMPhdO9PFfHDWL6sx+4O4LYtTBXoT7QRTQq=t6YhQ+C7GT8UBQ@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 23 Oct 2012 03:15:44 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <20121023015346.GB1855@beef>
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <50857444.9080308@ti.com>
+ <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
+ <50859505.5010306@ti.com> <20121023015346.GB1855@beef>
+Message-ID: <alpine.DEB.2.00.1210230311490.31118@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 7:37 PM, Marko Kati? <dromede@gmail.com> wrote:
-> On Thu, Oct 18, 2012 at 11:28 AM, Marko Kati? <dromede@gmail.com> wrote:
->>> Almost there, but I guess we could do this better and less confusing by having
->>> another array, e.g. tosa_gpio18_config[], which is tosa specific, and only
->>> initialize that MFP setting in the tosa path.
->>>
->>>>
->>>> I also looked at the original sharp kernel sources.
->>>> Only tosa used the RDY signal for it's tc6393tx chip, other machines simply
->>>> configured gpio18 as output in their suspend routines.
->>
->>
->> Actually, tosa doesn't use sharpsl_pm. Tosa uses the pda-power framework.
->> I said that only tosa uses the RDY signal to point out that we
->> probably don't need
->> the mfp-config line in postsuspend. That being said, i still think
->> that the array ordering
->> fix is adequate. Maybe later we may remove the mfp-config line from
->> postsuspend when
->> we're absolutely sure it isn't necessary for devices that use spitz_pm.c.
->
-> So Eric what do you think, is the simple gpio array reordering patch
-> an adequate fix for this bug?
+On Mon, 22 Oct 2012, Matt Porter wrote:
 
-Sorry for late reply. That simple reordering still looks a bit confusing
-to me, i.e. the same pin firstly configured as GPIO then RDY. Do we
-have a less confusing way to fix this?
+> I've mentioned this a few times in various threads...no need to use
+> appended DTB on a current U-Boot. Some of us are indeed booting this way
+> with the DTB properly passed separately from the bootloader and chosen
+> filled out by the bootloader. And yes, am335x_evm_config applies to all
+> AM33xx TI EVMs and the BeagleBone board. There's an EEPROM onboard all
+> that is used to determine what board is present so a single
+> MLO/u-boot.img can be used.
+
+As Kevin mentioned earlier, this is unfortunately not true for those of us 
+with earlier BeagleBoards:
+
+   http://marc.info/?l=linux-omap&m=135094296931913&w=2
+
+Do you know what the minimum board revision is that you all are 
+supporting in U-boot?
+
+
+
+- Paul
