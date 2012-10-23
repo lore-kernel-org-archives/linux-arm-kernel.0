@@ -1,41 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Oct 2012 12:11:21 +0200
-Subject: [PATCH] arm: sched: stop sched_clock() during suspend
-In-Reply-To: <1350906877-19410-1-git-send-email-balbi@ti.com>
-References: <1350906877-19410-1-git-send-email-balbi@ti.com>
-Message-ID: <CACRpkdYiMtriTaKG=nT=7Jg2g0wUN3+JeN90V3jRke0bP2EHrA@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 23 Oct 2012 10:12:29 +0000
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <20121019061630.GB2983@netboy.at.omicron.at>
+References: <20121017181354.GA2412@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
+ <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at> <50806B1D.9040504@ti.com>
+ <20121019061630.GB2983@netboy.at.omicron.at>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB48592@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 1:54 PM, Felipe Balbi <balbi@ti.com> wrote:
+On Fri, Oct 19, 2012 at 11:46:30, Richard Cochran wrote:
+> On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
+> > 
+> > Another important point is, this driver is also required and used for
+> > Davinci family of devices (arch/mach/mach-davinci/).
+> 
+> That is really beside the point. If the code isn't ready yet, then
+> don't merge it.
+> 
 
-> The scheduler imposes a requirement to sched_clock()
-> which is to stop the clock during suspend, if we don't
-> do that IRQ threads will be rescheduled in the future
-> which might cause transfers to timeout depending on
-> how driver is written.
->
-> This became an issue on OMAP when we converted omap-i2c.c
-> to use threaded IRQs, it turned out that depending on how
-> much time we spent on suspend, the I2C IRQ thread would
-> end up being rescheduled so far in the future that I2C
-> transfers would timeout and, because omap_hsmmc depends
-> on an I2C-connected device to detect if an MMC card is
-> inserted in the slot, our rootfs would just vanish.
->
-> arch/arm/kernel/sched_clock.c already had an optional
-> implementation (sched_clock_needs_suspend()) which would
-> handle scheduler's requirement properly, what this patch
-> does is simply to make that implementation non-optional.
->
-> This has been tested with beagleboard XM (OMAP3630) and
-> pandaboard rev A3 (OMAP4430). Suspend to RAM is now working
-> after this patch.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+With respect to AM33xx the driver may not be ready, but that doesn't mean 
+driver itself is not ready. As I mentioned before, driver is used on davinci 
+platform and it could be functional there. 
 
-After Russell explains so I get it:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+In case of AM33xx, where DT only boot mode is supported, you are forced to 
+migrate driver to DT, which is addition to the driver.
 
-Yours,
-Linus Walleij
+Note that, all the patches you have posted recently are AM33xx SoC 
+integration specific patches.
+
+> When I asked about the beaglebone, I was given the impression that it
+> will be ready for v3.7-rc1.  But, as I know realize, at the current
+> rate, it might not even be ready for v3.8.
+> 
+
+I understand, and as you mentioned we are not fully there at v3.7-rc1 with 
+all the drivers/module support, due to all known reasons. Its good that with 
+v3.7-rc2, Beaglebone boots up out of box from mainline. 
+
+
+Thanks,
+Vaibhav
+> I don't mind waiting, but please make sure that whatever lands into a
+> release is really, truly working.
+> 
+> Thanks,
+> Richard
+> 
+> 
+> 
