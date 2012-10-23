@@ -1,51 +1,83 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 23 Oct 2012 23:34:38 +0530
-Subject: [PATCH] i2c: omap: re-factor omap_i2c_init function
-In-Reply-To: <20121023175706.GC32517@arwen.pp.htv.fi>
-References: <1351006039-24332-1-git-send-email-shubhrajyoti@ti.com>
- <20121023171840.GA32167@arwen.pp.htv.fi>
- <CAM=Q2cs-+O_BFrZFX4fuBooogEZiQO2Zxbm8W40vN9hmampLCA@mail.gmail.com>
- <20121023175706.GC32517@arwen.pp.htv.fi>
-Message-ID: <CAM=Q2ct7h=AXQBR=Qwr1QeWoEerXuDykUFmk9vRF85cb9b80JA@mail.gmail.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 23 Oct 2012 20:07:59 +0200
+Subject: [PATCH 1/2] ARM: dt: tegra: Add sdhci regulators
+In-Reply-To: <1350976740-19284-2-git-send-email-pkunapuli@nvidia.com>
+References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
+ <1350976740-19284-2-git-send-email-pkunapuli@nvidia.com>
+Message-ID: <4346406.Jy2o1pWcOR@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 11:27 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Tue, Oct 23, 2012 at 11:26:15PM +0530, Shubhrajyoti Datta wrote:
->> >> @@ -1268,23 +1271,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
->> >>  {
->> >>       struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
->> >>
->> >> -     if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
->> >> -     }
->> >> -
->> >> -     /*
->> >> -      * Don't write to this register if the IE state is 0 as it can
->> >> -      * cause deadlock.
->> >> -      */
->> >> -     if (_dev->iestate)
->> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
->> >
->> > this part is not on __omap_i2c_init() so you're potentially causing a
->> > regression here.
->>
->> iestate is set at init so cannot be zero. so the check was removed.
->
-> so you never read it back ? Then you need to add a note for that in
-> changelog, since this is a behavior change ;-)
+Pavan,
 
-Indeed will do.
->
->
-> --
-> balbi
+On Tuesday 23 October 2012 12:48:59 Pavan Kunapuli wrote:
+> Adding vmmc and vmmcq supplies for sdhci nodes
+> in tegra dt files.
+
+<...>
+
+> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+> b/arch/arm/boot/dts/tegra20-paz00.dts index 6a93d14..e161b65 100644
+> --- a/arch/arm/boot/dts/tegra20-paz00.dts
+> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
+> @@ -422,13 +422,17 @@
+>  		status = "okay";
+>  		cd-gpios = <&gpio 173 0>; /* gpio PV5 */
+>  		wp-gpios = <&gpio 57 0>;  /* gpio PH1 */
+> -		power-gpios = <&gpio 169 0>; /* gpio PV1 */
+>  		bus-width = <4>;
+> +		vmmc-supply = <&vddio_sd_reg>;
+> +		vqmmc-supply = <&vddio_sd_reg>;
+>  	};
+> 
+>  	sdhci at c8000600 {
+>  		status = "okay";
+>  		bus-width = <8>;
+> +		vmmc-supply = <&vddio_sdmmc_reg>;
+> +		vqmmc-supply = <&vddio_sdmmc_reg>;
+
+to make it better, this should be:
+
+vmmc-supply = <&vcore_mmc_reg>; and
+vqmmc-supply = <&vddio_nand_reg>;
+
+with vcore_mmc_reg is ldo5 and vddio_nand_reg is the fixed regulator below.
+
+By doing so, I get "sdhci-tegra sdhci-tegra.3: could not set regulator OCR 
+(-1)". MMC subsys wants to set ldo5 to 3.3V but it is fixed. I guess that's 
+harmless for now. 
+
+>  	};
+> 
+>  	gpio-keys {
+> @@ -465,6 +469,24 @@
+>  			regulator-max-microvolt = <5000000>;
+>  			regulator-always-on;
+>  		};
+> +
+> +		vddio_sd_reg: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "vddio_sd";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			enable-active-high;
+> +			gpio = <&gpio 169 0>; /* gpio PV1 */
+> +		};
+> +
+> +		vddio_sdmmc_reg: regulator at 2 {
+
+       ^^ vddio_nand_reg acording to schematics
+
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name  = "vddio_sdmmc";
+
+also here
+
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+>  	};
+> 
+>  	sound {
