@@ -1,57 +1,57 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 23 Oct 2012 11:35:06 +0200
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
-Message-ID: <508664CA.7000601@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 23 Oct 2012 10:37:12 +0100
+Subject: [PATCH 03/10] tty: pxa: configure pin
+In-Reply-To: <CACRpkdY-XyagxGU_ya_FZirzbqStTirOC5nuBBwwFY3f4bBTYA@mail.gmail.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+ <508080CB.5010904@wwwdotorg.org>
+ <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
+ <5085AC06.8070508@wwwdotorg.org>
+ <CACRpkdY-XyagxGU_ya_FZirzbqStTirOC5nuBBwwFY3f4bBTYA@mail.gmail.com>
+Message-ID: <20121023093711.GS4477@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Oct 23, 2012 at 11:26:40AM +0200, Linus Walleij wrote:
 
-On 10/23/2012 11:13 AM, Linus Walleij wrote:
-> On Mon, Oct 22, 2012 at 5:50 PM, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com> wrote:
->> Hi Sourav,
->>
->> On Mon, Oct 22, 2012 at 06:43:00PM +0530, Sourav Poddar wrote:
->>> Adapt keypad to use pinctrl framework.
->>>
->>> Tested on omap4430 sdp with 3.7-rc1 kernel.
->>
->> I do not see anything in the driver that would directly use pinctrl. Is
->> there a better place to select default pin configuration; maybe when
->> instantiating platform device?
-> 
-> The option is to use pinctrl hogs. Then the pins will be taken,
-> muxed and configured by the pin controller itself.
-> 
-> Another option (not implemented) is to use bus notifiers.
-> 
-> (I wrote about this in some other thread but can't find it now.)
-> 
-> Each approach above come with its own set of problems.
-> 
-> If the driver need to handle multiple states like default/idle/sleep
-> it is IMO better to put the handling into the driver, so if that
-> is what is going to happen also to this driver it could be a good
-> idea to actually implement that code upfront and include in
-> this submission so as to show that this driver is really going
-> to exercise its pins.
-> 
-> But it's also a question of conformity: if other drivers in the
-> system is using different states and this is the only one
-> using a single "default" state, then it doesn't make sense
-> to have just one driver get its pins using hogs, it's just
-> inconsistent.
-> 
-> So Sourav, please tell us a bit about your plans for this
-> and other drivers!
+> I thought about that, but it does not allow us to control the
+> resource activation/deactivation order.
 
-Yeah, this idea is to handle pinctrl from all the drivers, and
-potentially change the mode during suspend when it is relevant.
+> In some drivers the suspend() path could be:
 
-Regards,
-Benoit
+> - pins to sleep
+> - clk_disable
+> - disable external regulator
+> - release power domain
+
+> In others:
+
+> - clk_disable()
+> - disable external regulator
+> - pins to sleep()
+> - release power domain
+
+> Ulf Hansson ran into this a while back.
+
+> Just like with the notifier approach, this approach assumes that either
+> the ordering above doesn't matter, or that it is the same for all drivers.
+
+Can we handle this with power domains - if different devices require
+different orderings they can be placed in power domains which implement
+the appropriate orderings for them?
+
+> We don't have hogs, bus notifiers and the like for regulators,
+> and IIRC Mark disliked the idea. Basically I think it's better if
+> all resources are atleast handled the same way.
+
+It'd be OK to have something that was manually activated for specific
+regulators but it's not sane to try and do something generic as you'll
+end up powering off all your wakeup sources which tends not to work so
+well.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/18171929/attachment.sig>
