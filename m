@@ -1,63 +1,111 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 12:48:42 +0100
-Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
-In-Reply-To: <20121023114723.GU21164@n2100.arm.linux.org.uk>
-References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
- <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
- <20121023111019.GV4477@opensource.wolfsonmicro.com>
- <20121023111656.GT21164@n2100.arm.linux.org.uk>
- <20121023114130.GW4477@opensource.wolfsonmicro.com>
- <20121023114723.GU21164@n2100.arm.linux.org.uk>
-Message-ID: <20121023114842.GA4293@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Oct 2012 20:57:33 +0900
+Subject: [PATCH v2] ARM: EXYNOS: Add support for secondary CPU bring-up on
+ Exynos4412
+In-Reply-To: <1393767.3tjq8gL245@amdc1227>
+References: <1393767.3tjq8gL245@amdc1227>
+Message-ID: <01d101cdb115$965b0730$c3111590$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 12:47:23PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Oct 23, 2012 at 12:41:31PM +0100, Mark Brown wrote:
-> > On Tue, Oct 23, 2012 at 12:16:56PM +0100, Russell King - ARM Linux wrote:
-> > > On Tue, Oct 23, 2012 at 12:10:19PM +0100, Mark Brown wrote:
-> > 
-> > > > I *really* should not need to remind you to:
-> > 
-> > > >  - Not top post
-> > > >  - Send patches in a form which can be applied if you want them applying
-> > 
-> > > How about actually applying the damned patch from the two-part patch set,
-> > > rather than only the first, both of which has been around for almost a
-> > > month now, and fixes what should never have gone into mainline in the
-> > > first place?
-> > 
-> > Well, the reason for the second point is that I don't have a copy of the
-> > patch any more, I need a copy of it before I can do anything.  Half the
-> > reason these contentless top posts are annoying is that even if there's
-> > something to do it's not actionable.
-> > 
-> > I have to say I had been under the impression that Linus' series that I
-> > applied the other day dealt with all the outstanding stuff here; the
-> > issues with this have been the awful changelogs and the overalapping
-> > sets of patches.
+Tomasz Figa wrote:
 > 
-> Given that Linus is the one who introduced the fuckups in the first place,
-> and afaics Linus' series has not been posted anywhere I can see, and I
-> have been through the issues and worked with Ulf to get them fixed, I find
-> that to be down right insulting by you.
+> Exynos4412 uses different information register for each core. This patch
+> adjusts the bring-up code to take that into account.
 > 
-> You received *BOTH* of Ulf's patches on the 5th October.  Both needed
-> to be applied *TOGETHER* to reduce the window where things got worse
-> before they got better.  But for some goddamned unknown reason you decided
-> to only take the first but totally and utterly ignored the second.
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/platsmp.c | 27 +++++++++++++++++++++------
+>  1 file changed, 21 insertions(+), 6 deletions(-)
 > 
-> Well done, you've probably crapped this driver up again.  Way to go Mark.
-> Now, tell us _exactly_ what patches you've applied to this driver.  Post
-> them to this mailing list so we can see them, and see what state this
-> driver is now in.
+> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-
+> exynos/platsmp.c
+> index 36c3984..816a27d 100644
+> --- a/arch/arm/mach-exynos/platsmp.c
+> +++ b/arch/arm/mach-exynos/platsmp.c
+> @@ -34,8 +34,19 @@
 > 
-> IMHO, you're being a terrible "maintainer" here - and this is being shown
-> by the need to get you to post all the patches you've currently queued up
-> for this.
+>  extern void exynos4_secondary_startup(void);
+> 
+> -#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1
+? \
+> -				S5P_INFORM5 : S5P_VA_SYSRAM)
+> +static inline void __iomem *cpu_boot_reg_base(void)
+> +{
+> +	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
+> +		return S5P_INFORM5;
+> +	return S5P_VA_SYSRAM;
+> +}
+> +
+> +static inline void __iomem *cpu_boot_reg(int cpu)
+> +{
+> +	if (soc_is_exynos4412())
+> +		return cpu_boot_reg_base() + 4*cpu;
+> +	return cpu_boot_reg_base();
+> +}
+> 
+>  /*
+>   * control for which core is the next to come out of the secondary
+> @@ -89,6 +100,7 @@ void __cpuinit platform_secondary_init(unsigned int
+cpu)
+>  int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  {
+>  	unsigned long timeout;
+> +	unsigned long phys_cpu = cpu_logical_map(cpu);
+> 
+>  	/*
+>  	 * Set synchronisation state between this boot processor
+> @@ -104,7 +116,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
+> task_struct *idle)
+>  	 * Note that "pen_release" is the hardware CPU ID, whereas
+>  	 * "cpu" is Linux's internal ID.
+>  	 */
+> -	write_pen_release(cpu_logical_map(cpu));
+> +	write_pen_release(phys_cpu);
+> 
+>  	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
+>  		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+> @@ -138,7 +150,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
+> task_struct *idle)
+>  		smp_rmb();
+> 
+>  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> -			CPU1_BOOT_REG);
+> +
+cpu_boot_reg(phys_cpu));
+>  		gic_raise_softirq(cpumask_of(cpu), 1);
+> 
+>  		if (pen_release == -1)
+> @@ -186,6 +198,8 @@ void __init smp_init_cpus(void)
+> 
+>  void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>  {
+> +	int i;
+> +
+>  	if (!soc_is_exynos5250())
+>  		scu_enable(scu_base_addr());
+> 
+> @@ -195,6 +209,7 @@ void __init platform_smp_prepare_cpus(unsigned int
+> max_cpus)
+>  	 * until it receives a soft interrupt, and then the
+>  	 * secondary CPU branches to this address.
+>  	 */
+> -	__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> -			CPU1_BOOT_REG);
+> +	for (i = 1; i < max_cpus; ++i)
+> +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
+> +					cpu_boot_reg(cpu_logical_map(i)));
+>  }
+> --
+> 1.7.12
 
-Oh, and if you're unwilling to do that, then I'm taking both of Ulf's
-patches, committing them to my fixes branch, and sending them off to
-Linus tonight - because they are _NEEDED_ for the -rc series to fix
-this driver.
+Looks ok to me, applied.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
