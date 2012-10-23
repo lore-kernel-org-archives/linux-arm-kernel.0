@@ -1,40 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Oct 2012 10:45:34 +0200
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <20121023084241.GV11837@lunn.ch>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121023084241.GV11837@lunn.ch>
-Message-ID: <20121023104534.1d4ff689@skate>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 23 Oct 2012 04:48:29 -0400 (EDT)
+Subject: [PATCH v3 1/4] net/macb: fix truncate warnings
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B705B@saturn3.aculab.com>
+References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
+ <1350931534-8416-2-git-send-email-manabian@gmail.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B705B@saturn3.aculab.com>
+Message-ID: <20121023.044829.1915412359769438159.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+From: "David Laight" <David.Laight@ACULAB.COM>
+Date: Tue, 23 Oct 2012 09:21:11 +0100
 
-On Tue, 23 Oct 2012 10:42:41 +0200, Andrew Lunn wrote:
-> > diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> > index 49d7915..cd2717b 100644
-> > --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> > +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> > @@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
-> >  static const char * const armada_370_xp_dt_board_dt_compat[] = {
-> >  	"marvell,a370-db",
-> >  	"marvell,axp-db",
-> > +	"plathome,openblocks-ax3",
-> >  	NULL,
-> >  };
+>> When building macb on x86_64 the following warnings show up:
+>>   drivers/net/ethernet/cadence/macb.c: In function macb_interrupt:
+>>   drivers/net/ethernet/cadence/macb.c:556:4: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+> ...
+>> -			macb_writel(bp, IDR, ~0UL);
+>> +			macb_writel(bp, IDR, -1);
 > 
-> Hi Thomas
-> 
-> You will get less merge conflicts with new boards if you keep this
-> list sorted.
+> Seems wrong to fix an error with an unsigned value
+> by using -1.
 
-Hum, right, but isn't "plathome" after "marvell" when sorted
-alphabetically? Or maybe I don't get which kind of sorting you are
-referring to?
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-1 is equally an unsigned value of all 1's and completely legitimate.
+The correction being made here is one of size not signedness.
