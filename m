@@ -1,57 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Oct 2012 22:27:41 +0900
-Subject: [PATCH 4/4] ARM: EXYNOS: Kconfig: Remove dependencies on
- particular SoCs from DT machines
-In-Reply-To: <1349701345-2681-5-git-send-email-t.figa@samsung.com>
-References: <1349701345-2681-1-git-send-email-t.figa@samsung.com>
- <1349701345-2681-5-git-send-email-t.figa@samsung.com>
-Message-ID: <020a01cdb122$2d888ae0$8899a0a0$%kim@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 23 Oct 2012 15:29:02 +0200
+Subject: [PATCH 2/2] input: gpio_keys: add pinctrl consumer
+In-Reply-To: <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121023131627.GE18964@game.jcrosoft.org>
+ <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1350998942-713-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> MACH_EXYNOS{4,5}_DT are used for whole SoC lines, so they should depend
-> on ARCH_EXYNOS{4,5} rather than on particular SoCs.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 6ea95f0..2e82ce7 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -404,7 +404,6 @@ comment "Flattened Device Tree based board for EXYNOS
-> SoCs"
->  config MACH_EXYNOS4_DT
->  	bool "Samsung Exynos4 Machine using device tree"
->  	depends on ARCH_EXYNOS4
-> -	select SOC_EXYNOS4210
->  	select USE_OF
->  	select ARM_AMBA
->  	select HAVE_SAMSUNG_KEYPAD if INPUT_KEYBOARD
-> @@ -419,7 +418,6 @@ config MACH_EXYNOS4_DT
->  config MACH_EXYNOS5_DT
->  	bool "SAMSUNG EXYNOS5 Machine using device tree"
->  	depends on ARCH_EXYNOS5
-> -	select SOC_EXYNOS5250
->  	select USE_OF
->  	select ARM_AMBA
->  	help
-> --
-> 1.7.12
+If no pinctrl available just report a warning as some architecture may not
+need to do anything.
 
-Hmm...your comment is correct, but we need to think again its selecting
-order, between ARCH name, SoC and board. In addition, in case of MACH_XXX_DT
-depending on SoC is rather to be supposed...
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-input at vger.kernel.org
+---
+ drivers/input/keyboard/gpio_keys.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
+index 6a68041..c0432fe 100644
+--- a/drivers/input/keyboard/gpio_keys.c
++++ b/drivers/input/keyboard/gpio_keys.c
+@@ -29,6 +29,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/of_gpio.h>
+ #include <linux/spinlock.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ struct gpio_button_data {
+ 	const struct gpio_keys_button *button;
+@@ -666,6 +667,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
+ 	struct input_dev *input;
+ 	int i, error;
+ 	int wakeup = 0;
++	struct pinctrl *pinctrl;
+ 
+ 	if (!pdata) {
+ 		pdata = gpio_keys_get_devtree_pdata(dev);
+@@ -673,6 +675,15 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
+ 			return PTR_ERR(pdata);
+ 	}
+ 
++	pinctrl = devm_pinctrl_get_select_default(dev);
++	if (IS_ERR(pinctrl)) {
++		error = PTR_ERR(pinctrl);
++		if (error == -EPROBE_DEFER)
++			return error;
++
++		dev_warn(dev, "No pinctrl provided\n");
++	}
++
+ 	ddata = kzalloc(sizeof(struct gpio_keys_drvdata) +
+ 			pdata->nbuttons * sizeof(struct gpio_button_data),
+ 			GFP_KERNEL);
+-- 
+1.7.10.4
