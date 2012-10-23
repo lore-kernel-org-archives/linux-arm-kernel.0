@@ -1,142 +1,99 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Tue, 23 Oct 2012 11:22:47 +0200
-Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <1350981706.20938.7.camel@gitbox>
-References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
- <1350643135-13197-2-git-send-email-linux@prisktech.co.nz>
- <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
- <1350888712.3592.11.camel@gitbox> <1350889747.3592.17.camel@gitbox>
- <20121022072448.GB30026@avionic-0098.mockup.avionic-design.de>
- <1350891382.3592.22.camel@gitbox>
- <20121022080414.GB4931@avionic-0098.mockup.avionic-design.de>
- <1350981706.20938.7.camel@gitbox>
-Message-ID: <20121023092247.GA13220@avionic-0098.mockup.avionic-design.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Oct 2012 11:26:40 +0200
+Subject: [PATCH 03/10] tty: pxa: configure pin
+In-Reply-To: <5085AC06.8070508@wwwdotorg.org>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+ <508080CB.5010904@wwwdotorg.org>
+ <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
+ <5085AC06.8070508@wwwdotorg.org>
+Message-ID: <CACRpkdY-XyagxGU_ya_FZirzbqStTirOC5nuBBwwFY3f4bBTYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 09:41:46PM +1300, Tony Prisk wrote:
-> On Mon, 2012-10-22 at 10:04 +0200, Thierry Reding wrote:
-> > On Mon, Oct 22, 2012 at 08:36:22PM +1300, Tony Prisk wrote:
-> > > On Mon, 2012-10-22 at 09:24 +0200, Thierry Reding wrote:
-> > > > On Mon, Oct 22, 2012 at 08:09:07PM +1300, Tony Prisk wrote:
-> > > > > On Mon, 2012-10-22 at 19:51 +1300, Tony Prisk wrote:
-> > > > > > > 
-> > > > > > > >  	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-> > > > > > > >  	if (chip == NULL) {
-> > > > > > > >  		dev_err(&pdev->dev, "failed to allocate memory\n");
-> > > > > > > > @@ -123,26 +144,32 @@ static int __devinit pwm_probe(struct platform_device *pdev)
-> > > > > > > >  	chip->chip.ops = &vt8500_pwm_ops;
-> > > > > > > >  	chip->chip.base = -1;
-> > > > > > > >  	chip->chip.npwm = VT8500_NR_PWMS;
-> > > > > > > > +	chip->clk = of_clk_get(np, 0);
-> > > > > > > 
-> > > > > > > I thought this was supposed to work transparently across OF and !OF
-> > > > > > > configurations by using just clk_get() or devm_clk_get()? I guess that
-> > > > > > > if the driver depends on OF, then this would be moot, but we should
-> > > > > > > probably stick to the standard usage anyway.
-> > > > > > > 
-> > > > > > > Furthermore, of_clk_get() doesn't seem to be managed, so you'd need to
-> > > > > > > add explicit clk_put() in the error cleanup paths. One more argument in
-> > > > > > > favour of using devm_clk_get() instead.
-> > > > > > 
-> > > > > > Hmm good point. I stuck with of_ functions because its an OF only driver
-> > > > > > and it seemed 'backward' to mix old code with new. It does pose the
-> > > > > > question of 'why have of_clk_get() if existing functions work better'.
-> > > > > 
-> > > > > Was about to fix this but noticed why it wasn't like this to start
-> > > > > with :)
-> > > > > 
-> > > > > struct clk *devm_clk_get(struct device *dev, const char *id);
-> > > > > struct clk *of_clk_get(struct device_node *np, int index);
-> > > > > 
-> > > > > devm_clk_get requires me to 'get' the clock by name. arch-vt8500 (and I
-> > > > > believe a lot of other arch's) don't enforce names for clocks defined in
-> > > > > devicetree, therefore there is no way for me to know what name the clk
-> > > > > has unless I include in the binding that the clock must be named 'xxx'.
-> > > > 
-> > > > I thought clk_get() was supposed to return the first clock specified in
-> > > > DT if you pass NULL as the consumer name. I haven't tested this though.
-> > > > And I haven't looked at the code.
-> > > > 
-> > > > > of_clk_get retrieves it by the dt-node + index, so it doesn't care as
-> > > > > long as its the 1st clock listed.
-> > > > 
-> > > > So the usual way to do this, I believe, is:
-> > > > 
-> > > > 	clocks = <&clk_foo>;
-> > > > 	clock-names = "foo";
-> > > > 
-> > > > Then use:
-> > > > 
-> > > > 	clk = devm_clk_get(&pdev->dev, "foo");
-> > > > 
-> > > > And as I said above, I was under the impression that the default would
-> > > > be to use the first clock if NULL was specified instead of "foo".
-> > > > 
-> > > > Thierry
-> > > 
-> > > clock-names is an optional property (as defined in
-> > > bindings/clock/clock-bindings.txt) so relying on it is .. well,
-> > > unreliable.
-> > > 
-> > > What you say makes sense, but it means the binding document has to make
-> > > an optional property into a required property simply to use an 'old'
-> > > function when a new function would 'work' (granted not as well, as you
-> > > pointed out) without requiring the optional property.
-> > 
-> > Okay, I've just checked the core clock code, and indeed if you run
-> > clk_get() with con_id set to NULL, you'll eventually call of_clk_get()
-> > with index == 0. That's exactly what you want, right? The only setup
-> > where this won't work out is if you need to handle multiple clocks, in
-> > which case I think it would make sense to make the clock-names property
-> > mandatory. But for this driver that won't be necessary, since it will
-> > never use a second clock, right?
-> > 
-> > > Your subsystem - your rules. Let me know if I've managed to sway you or
-> > > not :)
-> > 
-> > I'd rather persuade you than force the issue. =)
-> > 
-> > Thierry
-> 
-> Further to the discussion, my preference is still for of_clk_get()
-> (although I've changed the patch anyway as you saw because it makes no
-> difference in this case) :)
-> 
-> clk_get(x, NULL) and devm_clk_get(x, NULL) both seems like 'hacks' to
-> allow platforms to convert to DT without having to update all their
-> drivers first. It only allows the first (default) clock, as your pointed
-> out. Getting a 2nd... clock relies on an optional property in DT (which
-> again, seems like it is there to support 'old' drivers) which allows you
-> to request clocks by name.
-> 
-> of_clk_get() on the other hand seems like a properly native DT function.
-> You don't need to know anything about the clock, as long as the correct
-> clock is specified in the correct order as documented by the binding.
-> Relying on 'pre-OF' code for a OF-only driver also seems
-> counter-intuitive.
+On Mon, Oct 22, 2012 at 10:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/22/2012 02:45 AM, Linus Walleij wrote:
 
-I do agree with those arguments. What I was saying is that for drivers
-which aren't DT only, of_clk_get() is not an option and that maybe
-others would be encouraged by the example to not use the generic APIs
-even if their driver could be used in non-DT setups. But maybe I'm
-worrying needlessly.
+>> For the Ux500 drivers we have found that all of those that have pin
+>> resources actually have to be handled by the driver. The reason is
+>> that all of them have idle and/or sleep states that need to be
+>> handled at runtime.
+>
+> Well, presumably the pinctrl driver itself could have both default/idle
+> states, and system sleep could engage the appropriate system-wide setting.
 
-That said, maybe somebody with a broader view of things like Arnd
-(Cc'ed) could share his thoughts.
+I thought about that, but it does not allow us to control the
+resource activation/deactivation order.
 
-> Granted of_clk_get() doesn't provide the 'garbage-collection' of
-> devm_get_clk() but I think that is just an arguement to needing
-> of_devm_clk_get().
+In some drivers the suspend() path could be:
 
-That can be remedied by adding a corresponding function, so the argument
-doesn't really count.
+- pins to sleep
+- clk_disable
+- disable external regulator
+- release power domain
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/cecc2bf5/attachment-0001.sig>
+In others:
+
+- clk_disable()
+- disable external regulator
+- pins to sleep()
+- release power domain
+
+Ulf Hansson ran into this a while back.
+
+Just like with the notifier approach, this approach assumes that either
+the ordering above doesn't matter, or that it is the same for all drivers.
+
+>> As an additional complication our drivers are used also by
+>> the Versatile and SPEAr family of platforms, so the control
+>> need to be tolerant (accept missing pinctrl handles and states)
+>> as well. (I can see that other drivers take shortcuts by being less
+>> elaborate since there is a 1:1 driver<->platform mapping.)
+>
+> Isn't the driver (or DT binding) supposed to define what pinctrl states
+> must exist, and those state must always exist? There's no requirement
+> for a pinctrl state definition to always actually contain content that
+> changes the state. That's exactly why PIN_MAP_TYPE_DUMMY_STATE exists.
+
+Well, it could also define that e.g. the "sleep" state is optional.
+
+I'm sort of scared about imposing too strict usage patterns as
+it may cause more problems than it solves even if the code
+does look simpler.
+
+>> An alternative to embedding the pin handling code into
+>> the drivers is to use bus notifiers as is done with the
+>> shmobile clocking by drivers/base/power/clock_ops.c
+>> I could easily imagine pinctrl_ops.c like that for some
+>> platforms. This mandates still binding the pin table entries
+>> to a device but avoids adding any code to the drivers.
+>>
+>> However this latter approach does not work for us (Ux500) -
+>> the three resources we have: clocks, pins and power domains
+>> are dependent on state switch ordering (sometimes you need
+>> to switch off the clock then set pin state, sometimes the
+>> other way around) and it is not even
+>> the same for all drivers - the notifier approach mandates
+>> that all drivers do the clock, power domain and pin handling
+>> uniformly.
+>
+> That certainly does imply that individual drivers do need to handle this
+> explicitly. Although I still think that only specific drivers actually
+> affected by this should end up actively managing pinctrl; shouldn't
+> anything that can get away with relying on system hogs do so?
+
+I don't know. Having say regulator, clock and pin handling in the
+driver itself also gives a nice encapsulated view and sense of
+control when just reading that one driver.
+
+As one developer put it he does not really like that bus notifiers
+are doing things behind his back. The debugging of the
+driver can become very hairy, as you trace through bus
+notifiers etc to find out what is wrong with your pins/clock/voltage.
+
+We don't have hogs, bus notifiers and the like for regulators,
+and IIRC Mark disliked the idea. Basically I think it's better if
+all resources are atleast handled the same way.
+
+Yours,
+Linus Walleij
