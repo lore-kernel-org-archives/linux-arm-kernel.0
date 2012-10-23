@@ -1,147 +1,66 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Oct 2012 22:58:47 +0900
-Subject: [PATCH v4 2/5] ARM: EXYNOS: Correct combined IRQs for exynos4
-In-Reply-To: <1349662630-11607-3-git-send-email-chanho61.park@samsung.com>
-References: <1349662630-11607-1-git-send-email-chanho61.park@samsung.com>
- <1349662630-11607-3-git-send-email-chanho61.park@samsung.com>
-Message-ID: <020c01cdb126$85c9c940$915d5bc0$%kim@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 23 Oct 2012 15:56:41 +0200
+Subject: [PATCH 1/1] gpio/at91: auto request and configure the pio as input
+ when the interrupt is used via DT
+Message-ID: <1351000601-3141-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanho Park wrote:
-> 
-> This patch corrects combined IRQs for exynos4 series platform. The
-> exynos4412
-> has four extra combined irq group and the exynos4212 has two more combined
-> irqs
-> than exynos4210. Each irq is mapped to IRQ_SPI(xx). Unfortunately, extra 4
-> combined IRQs isn't sequential. So, we need to map the irqs manually.
-> 
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/common.c            |   42
-+++++++++++++++++++++++++----
-> -
->  arch/arm/mach-exynos/include/mach/irqs.h |    4 ++-
->  2 files changed, 39 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 709245e..fdd582a 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -560,23 +560,50 @@ static struct irq_domain_ops combiner_irq_domain_ops
-> = {
->  	.map	= combiner_irq_domain_map,
->  };
-> 
-> +static unsigned int combiner_extra_irq(int group)
+If we do this
 
-This is only for exynos4212 and exynos4412 so how about to use
-exynos4x12_combiner_extra_irq()?
+	interrupt-parent = <&pioA>;
+	interrupts = <7 0x0>;
 
-> +{
-> +	switch (group) {
-> +	case 16:
-> +		return IRQ_SPI(107);
-> +	case 17:
-> +		return IRQ_SPI(108);
-> +	case 18:
-> +		return IRQ_SPI(48);
-> +	case 19:
-> +		return IRQ_SPI(42);
-> +	default:
-> +		return 0;
-> +	}
-> +}
-> +
-> +static unsigned int max_combiner_nr(void)
-> +{
-> +	if (soc_is_exynos5250())
-> +		return EXYNOS5_MAX_COMBINER_NR;
-> +	else if (soc_is_exynos4412())
-> +		return EXYNOS4_MAX_COMBINER_NR;
+The current core map the irq correctly but the gpio is not configured as input.
+The pinctrl configure the pin as gpio with the correct mux parameter but is
+not responsible to configure it as input.
 
-EXYNOS4412_MAX_COMBINER_NR is more clear?
+So do it during the xlate
 
-> +	else if (soc_is_exynos4212())
-> +		return EXYNOS4212_MAX_COMBINER_NR;
-> +	else
-> +		return EXYNOS4210_MAX_COMBINER_NR;
-> +}
-> +
->  static void __init combiner_init(void __iomem *combiner_base,
->  				 struct device_node *np)
->  {
->  	int i, irq, irq_base;
->  	unsigned int max_nr, nr_irq;
-> 
-> +	max_nr = max_combiner_nr();
-> +
->  	if (np) {
->  		if (of_property_read_u32(np, "samsung,combiner-nr",
-&max_nr))
-> {
->  			pr_warning("%s: number of combiners not specified, "
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ drivers/pinctrl/pinctrl-at91.c |   26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-Hmm...the message should be changed, because it is just defined by checking
-SoC with this changes not property of device tree...So how about just using
-pr_info() with proper message?
-
->  				"setting default as %d.\n",
-> -				__func__, EXYNOS4_MAX_COMBINER_NR);
-> -			max_nr = EXYNOS4_MAX_COMBINER_NR;
-> +				__func__, max_nr);
->  		}
-> -	} else {
-> -		max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
-> -						EXYNOS4_MAX_COMBINER_NR;
->  	}
-> +
->  	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
-> 
->  	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
-> @@ -593,7 +620,10 @@ static void __init combiner_init(void __iomem
-> *combiner_base,
->  	}
-> 
->  	for (i = 0; i < max_nr; i++) {
-> -		irq = IRQ_SPI(i);
-> +		if (i < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
-> +			irq = IRQ_SPI(i);
-> +		else
-> +			irq = combiner_extra_irq(i);
->  #ifdef CONFIG_OF
->  		if (np)
->  			irq = irq_of_parse_and_map(np, i);
-> diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-
-> exynos/include/mach/irqs.h
-> index 35bced6..3a83546 100644
-> --- a/arch/arm/mach-exynos/include/mach/irqs.h
-> +++ b/arch/arm/mach-exynos/include/mach/irqs.h
-> @@ -165,7 +165,9 @@
->  #define EXYNOS4_IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
->  #define EXYNOS4_IRQ_FIMD0_SYSTEM	COMBINER_IRQ(11, 2)
-> 
-> -#define EXYNOS4_MAX_COMBINER_NR		16
-> +#define EXYNOS4210_MAX_COMBINER_NR	16
-> +#define EXYNOS4212_MAX_COMBINER_NR	18
-> +#define EXYNOS4_MAX_COMBINER_NR		20
-
-EXYNOS4412_MAX_COMBINER_NR ?
-
-> 
->  #define EXYNOS4_IRQ_GPIO1_NR_GROUPS	16
->  #define EXYNOS4_IRQ_GPIO2_NR_GROUPS	9
-> --
-> 1.7.9.5
-
-
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index 01bf924..7d95c80 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1255,9 +1255,33 @@ static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
+ 	return 0;
+ }
+ 
++int at91_gpio_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
++			const u32 *intspec, unsigned int intsize,
++			irq_hw_number_t *out_hwirq, unsigned int *out_type)
++{
++	struct at91_gpio_chip *at91_gpio = d->host_data;
++	int ret;
++	int pin = at91_gpio->chip.base + intspec[0];
++
++	if (WARN_ON(intsize < 2))
++		return -EINVAL;
++	*out_hwirq = intspec[0];
++	*out_type = intspec[1] & IRQ_TYPE_SENSE_MASK;
++
++	ret = gpio_request(pin, ctrlr->full_name);
++	if (ret)
++		return ret;
++
++	ret = gpio_direction_input(pin);
++	if (ret)
++		return ret;
++
++	return 0;
++}
++
+ static struct irq_domain_ops at91_gpio_ops = {
+ 	.map	= at91_gpio_irq_map,
+-	.xlate	= irq_domain_xlate_twocell,
++	.xlate	= at91_gpio_irq_domain_xlate,
+ };
+ 
+ static int at91_gpio_of_irq_setup(struct device_node *node,
+-- 
+1.7.10.4
