@@ -1,40 +1,31 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 23 Oct 2012 18:47:53 +0530
-Subject: [PATCH v2] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
- V4L2_OUT_CAP_DV_TIMINGS
-Message-ID: <1350998273-19769-1-git-send-email-prabhakar.lad@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 23 Oct 2012 15:16:27 +0200
+Subject: [PATCH 0/2] qt1070 & gpio_keys add pinctrl consumer
+Message-ID: <20121023131627.GE18964@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.lad@ti.com>
+Hi,
 
-This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
-V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
-out.
+	The following patch series add the pinctrl support to the follwing
+	keybords:
 
-Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
-Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Sergei Shtylyov <sshtylyov@mvista.com>
----
- Changes for v2:
- 1: fixed code  alignment as pointed by Sergei
+	 - gpio_keys
+	 - qt1070
 
- arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+	The pinctrl is optionnal as not everyone need it
 
-diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-index 2924d61..8519d2d 100644
---- a/arch/arm/mach-davinci/board-dm365-evm.c
-+++ b/arch/arm/mach-davinci/board-dm365-evm.c
-@@ -514,7 +514,7 @@ static struct vpbe_output dm365evm_vpbe_outputs[] = {
- 			.index		= 1,
- 			.name		= "Component",
- 			.type		= V4L2_OUTPUT_TYPE_ANALOG,
--			.capabilities	= V4L2_OUT_CAP_CUSTOM_TIMINGS,
-+			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
- 		},
- 		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
- 		.default_mode	= "480p59_94",
--- 
-1.7.4.1
+	If no objection I'll apply them via at91 as I have a long patch series
+	of pinctrl for at91
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      input: qt1070: add pinctrl consumer
+      input: gpio_keys: add pinctrl consumer
+
+ drivers/input/keyboard/gpio_keys.c |   11 +++++++++++
+ drivers/input/keyboard/qt1070.c    |   11 +++++++++++
+ 2 files changed, 22 insertions(+)
+
+Best Regards,
+J.
