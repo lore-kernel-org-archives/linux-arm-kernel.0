@@ -1,69 +1,57 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 10:31:28 +0100
-Subject: [PATCH 2/3] PWM: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <20121023092247.GA13220@avionic-0098.mockup.avionic-design.de>
-References: <1350643135-13197-1-git-send-email-linux@prisktech.co.nz>
- <1350643135-13197-2-git-send-email-linux@prisktech.co.nz>
- <20121022063423.GA17181@avionic-0098.mockup.avionic-design.de>
- <1350888712.3592.11.camel@gitbox> <1350889747.3592.17.camel@gitbox>
- <20121022072448.GB30026@avionic-0098.mockup.avionic-design.de>
- <1350891382.3592.22.camel@gitbox>
- <20121022080414.GB4931@avionic-0098.mockup.avionic-design.de>
- <1350981706.20938.7.camel@gitbox>
- <20121023092247.GA13220@avionic-0098.mockup.avionic-design.de>
-Message-ID: <20121023093128.GR21164@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 23 Oct 2012 11:35:06 +0200
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121022155028.GA13791@core.coreip.homeip.net>
+ <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
+Message-ID: <508664CA.7000601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 11:22:47AM +0200, Thierry Reding wrote:
-> On Tue, Oct 23, 2012 at 09:41:46PM +1300, Tony Prisk wrote:
-> > Further to the discussion, my preference is still for of_clk_get()
-> > (although I've changed the patch anyway as you saw because it makes no
-> > difference in this case) :)
-> > 
-> > clk_get(x, NULL) and devm_clk_get(x, NULL) both seems like 'hacks' to
-> > allow platforms to convert to DT without having to update all their
-> > drivers first. It only allows the first (default) clock, as your pointed
-> > out. Getting a 2nd... clock relies on an optional property in DT (which
-> > again, seems like it is there to support 'old' drivers) which allows you
-> > to request clocks by name.
-> > 
-> > of_clk_get() on the other hand seems like a properly native DT function.
-> > You don't need to know anything about the clock, as long as the correct
-> > clock is specified in the correct order as documented by the binding.
-> > Relying on 'pre-OF' code for a OF-only driver also seems
-> > counter-intuitive.
+Hi Linus,
+
+On 10/23/2012 11:13 AM, Linus Walleij wrote:
+> On Mon, Oct 22, 2012 at 5:50 PM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+>> Hi Sourav,
+>>
+>> On Mon, Oct 22, 2012 at 06:43:00PM +0530, Sourav Poddar wrote:
+>>> Adapt keypad to use pinctrl framework.
+>>>
+>>> Tested on omap4430 sdp with 3.7-rc1 kernel.
+>>
+>> I do not see anything in the driver that would directly use pinctrl. Is
+>> there a better place to select default pin configuration; maybe when
+>> instantiating platform device?
 > 
-> I do agree with those arguments. What I was saying is that for drivers
-> which aren't DT only, of_clk_get() is not an option and that maybe
-> others would be encouraged by the example to not use the generic APIs
-> even if their driver could be used in non-DT setups. But maybe I'm
-> worrying needlessly.
+> The option is to use pinctrl hogs. Then the pins will be taken,
+> muxed and configured by the pin controller itself.
 > 
-> That said, maybe somebody with a broader view of things like Arnd
-> (Cc'ed) could share his thoughts.
+> Another option (not implemented) is to use bus notifiers.
+> 
+> (I wrote about this in some other thread but can't find it now.)
+> 
+> Each approach above come with its own set of problems.
+> 
+> If the driver need to handle multiple states like default/idle/sleep
+> it is IMO better to put the handling into the driver, so if that
+> is what is going to happen also to this driver it could be a good
+> idea to actually implement that code upfront and include in
+> this submission so as to show that this driver is really going
+> to exercise its pins.
+> 
+> But it's also a question of conformity: if other drivers in the
+> system is using different states and this is the only one
+> using a single "default" state, then it doesn't make sense
+> to have just one driver get its pins using hogs, it's just
+> inconsistent.
+> 
+> So Sourav, please tell us a bit about your plans for this
+> and other drivers!
 
-As I have already said, the way the DT bindings were done for the clk
-stuff was wrong.  A little thought put into it would've come up with
-a much better solution which wouldn't have needed of_clk_get() at all.
+Yeah, this idea is to handle pinctrl from all the drivers, and
+potentially change the mode during suspend when it is relevant.
 
-How?
-
-The arguments for clk_get() are:
-1. the struct device, which you can get the OF-node from.
-2. a _device_ _specific_ _clock_ _input_ _name_ (or NULL if there's only
-   one.)
-
-So, we have something that defines a hardware clock input name, which
-can be used to generate a property name for OF.  So, what _could_ have
-been done is this:
-
-	clock-<input-name> = <&provider-node clk-output-index>;
-
-where the property name is generated by:
-
-	snprintf(prop, sizeof(prop), "clk-%s", name ? name : "default");
-
-So I continue to assert that our current design is wrong - and it will
-cause driver authors to pointlessly have to make a choice at every stage
-between DT and non-DT based systems.
+Regards,
+Benoit
