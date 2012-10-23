@@ -1,94 +1,38 @@
-From: pkunapuli@nvidia.com (Pavan Kunapuli)
-Date: Tue, 23 Oct 2012 13:46:36 +0530
-Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
-In-Reply-To: <1350979047.20572.6.camel@tellur>
-References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
- <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
- <1350979047.20572.6.camel@tellur>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB7EC6B8C78B@BGMAIL01.nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 23 Oct 2012 10:17:05 +0200
+Subject: [PATCH] gpio: mvebu: correctly set the value in direction_output()
+Message-ID: <1350980225-6546-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Does this work with boards where we don't have any MMC supplies? Or are we just deferring the probe indefinitely there?
-The probe will be deferred indefinitely.
+The ->direction_output() operation of gpio_chip is supposed to set the
+direction to output but also to set the GPIO to an initial
+value. Unfortunately, this last part was not done until now, causing
+for example the LEDs to not be properly set to their default initial
+value. This patch fixes this by calling the mvebu_gpio_set() function
+from mvebu_gpio_direction_output() before configuring the GPIO as an
+output GPIO.
 
->> For boards that power MMC unconditionally, are we supposed to add dummy regulators to make them work with this patchset?
-Yes. We need to add dummy regulators for boards that power MMC unconditionally. I am not sure if there is any other solution other than using deferred probe that would guarantee regulators availability.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
------Original Message-----
-From: Lucas Stach [mailto:dev at lynxeye.de] 
-Sent: 23 October 2012 13:27
-To: Pavan Kunapuli
-Cc: swarren at wwwdotorg.org; linux at arm.linux.org.uk; cjb at laptop.org; linux-tegra at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-mmc at vger.kernel.org
-Subject: Re: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
+---
+As this is a fix, it should most likely go into 3.7.
+---
+ drivers/gpio/gpio-mvebu.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Am Dienstag, den 23.10.2012, 12:49 +0530 schrieb Pavan Kunapuli:
-> vmmc and vqmmc regulators control the voltage to the host and device. 
-> Defer the probe if either of them is not registered.
-> 
-Does this work with boards where we don't have any MMC supplies? Or are we just deferring the probe indefinitely there?
-
-For boards that power MMC unconditionally, are we supposed to add dummy regulators to make them work with this patchset?
-
-> Signed-off-by: Pavan Kunapuli <pkunapuli@nvidia.com>
-> ---
->  drivers/mmc/host/sdhci.c |   25 ++++++++++++++++++++++---
->  1 files changed, 22 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c index 
-> 7922adb..925c403 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -2844,11 +2844,17 @@ int sdhci_add_host(struct sdhci_host *host)
->  	    !(host->mmc->caps & MMC_CAP_NONREMOVABLE))
->  		mmc->caps |= MMC_CAP_NEEDS_POLL;
->  
-> -	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
-> +	/*
-> +	 * If vqmmc regulator and no 1.8V signalling, then there's no UHS.
-> +	 * vqmmc regulator should be present. If it's not present,
-> +	 * assume the regulator driver registration is not yet done and
-> +	 * defer the probe.
-> +	 */
->  	host->vqmmc = regulator_get(mmc_dev(mmc), "vqmmc");
->  	if (IS_ERR(host->vqmmc)) {
-> -		pr_info("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
-> +		pr_err("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
->  		host->vqmmc = NULL;
-> +		return -EPROBE_DEFER;
->  	}
->  	else if (regulator_is_supported_voltage(host->vqmmc, 1800000, 1800000))
->  		regulator_enable(host->vqmmc);
-> @@ -2903,10 +2909,17 @@ int sdhci_add_host(struct sdhci_host *host)
->  
->  	ocr_avail = 0;
->  
-> +	/*
-> +	 * vmmc regulator should be present. If it's not present,
-> +	 * assume the regulator driver registration is not yet done
-> +	 * and defer the probe.
-> +	 */
->  	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
->  	if (IS_ERR(host->vmmc)) {
-> -		pr_info("%s: no vmmc regulator found\n", mmc_hostname(mmc));
-> +		pr_err("%s: no vmmc regulator found\n", mmc_hostname(mmc));
->  		host->vmmc = NULL;
-> +		ret = -EPROBE_DEFER;
-> +		goto vmmc_err;
->  	} else
->  		regulator_enable(host->vmmc);
->  
-> @@ -3121,7 +3134,13 @@ reset:
->  untasklet:
->  	tasklet_kill(&host->card_tasklet);
->  	tasklet_kill(&host->finish_tasklet);
-> +vmmc_err:
-> +	if (host->vqmmc) {
-> +		if (regulator_is_enabled(host->vqmmc))
-> +			regulator_disable(host->vqmmc);
->  
-> +		regulator_put(host->vqmmc);
-> +	}
->  	return ret;
->  }
->  
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index 7a87412..eb42ab1 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -244,6 +244,8 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned pin,
+ 	if (ret)
+ 		return ret;
+ 
++	mvebu_gpio_set(chip, pin, value);
++
+ 	spin_lock_irqsave(&mvchip->lock, flags);
+ 	u = readl_relaxed(mvebu_gpioreg_io_conf(mvchip));
+ 	u &= ~(1 << pin);
+-- 
+1.7.9.5
