@@ -1,40 +1,29 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 23 Oct 2012 07:16:57 -0400
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <20121023104534.1d4ff689@skate>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121023084241.GV11837@lunn.ch> <20121023104534.1d4ff689@skate>
-Message-ID: <20121023111657.GB18811@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Oct 2012 12:16:56 +0100
+Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
+In-Reply-To: <20121023111019.GV4477@opensource.wolfsonmicro.com>
+References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
+ <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
+ <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
+ <20121023111019.GV4477@opensource.wolfsonmicro.com>
+Message-ID: <20121023111656.GT21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 10:45:34AM +0200, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
-> 
-> On Tue, 23 Oct 2012 10:42:41 +0200, Andrew Lunn wrote:
-> > > diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> > > index 49d7915..cd2717b 100644
-> > > --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> > > +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> > > @@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
-> > >  static const char * const armada_370_xp_dt_board_dt_compat[] = {
-> > >  	"marvell,a370-db",
-> > >  	"marvell,axp-db",
-> > > +	"plathome,openblocks-ax3",
-> > >  	NULL,
-> > >  };
+On Tue, Oct 23, 2012 at 12:10:19PM +0100, Mark Brown wrote:
+> On Tue, Oct 23, 2012 at 12:31:06PM +0200, Ulf Hansson wrote:
+> > It seems like this patch did not get applied together with:
+> > [PATCH 1/2] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
 > > 
-> > Hi Thomas
-> > 
-> > You will get less merge conflicts with new boards if you keep this
-> > list sorted.
+> > The problem was likely my fault, since there were a lot of resends.
+> > Anyway, it should still be possible to apply.
 > 
-> Hum, right, but isn't "plathome" after "marvell" when sorted
-> alphabetically? Or maybe I don't get which kind of sorting you are
-> referring to?
+> I *really* should not need to remind you to:
+> 
+>  - Not top post
+>  - Send patches in a form which can be applied if you want them applying
 
-No, no, no.  marvell, /then/ NULL, /then/ plathome.  ;-)  Right, Andrew?
-
-thx,
-
-Jason.
+How about actually applying the damned patch from the two-part patch set,
+rather than only the first, both of which has been around for almost a
+month now, and fixes what should never have gone into mainline in the
+first place?
