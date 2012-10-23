@@ -1,83 +1,50 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 23 Oct 2012 20:07:59 +0200
-Subject: [PATCH 1/2] ARM: dt: tegra: Add sdhci regulators
-In-Reply-To: <1350976740-19284-2-git-send-email-pkunapuli@nvidia.com>
-References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
- <1350976740-19284-2-git-send-email-pkunapuli@nvidia.com>
-Message-ID: <4346406.Jy2o1pWcOR@ax5200p>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 23 Oct 2012 11:09:31 -0700
+Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable mask
+ on disable
+Message-ID: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pavan,
+From: Kevin Hilman <khilman@ti.com>
 
-On Tuesday 23 October 2012 12:48:59 Pavan Kunapuli wrote:
-> Adding vmmc and vmmcq supplies for sdhci nodes
-> in tegra dt files.
+When debounce clocks are disabled, ensure that the banks
+dbck_enable_mask is cleared also.  Otherwise, context restore on
+subsequent off-mode transition will restore previous value from the
+shadow copies (bank->context.debounce*) leading to mismatch state
+between driver state and hardware state.
 
-<...>
+This was discovered when board code was doing
 
-> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
-> b/arch/arm/boot/dts/tegra20-paz00.dts index 6a93d14..e161b65 100644
-> --- a/arch/arm/boot/dts/tegra20-paz00.dts
-> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
-> @@ -422,13 +422,17 @@
->  		status = "okay";
->  		cd-gpios = <&gpio 173 0>; /* gpio PV5 */
->  		wp-gpios = <&gpio 57 0>;  /* gpio PH1 */
-> -		power-gpios = <&gpio 169 0>; /* gpio PV1 */
->  		bus-width = <4>;
-> +		vmmc-supply = <&vddio_sd_reg>;
-> +		vqmmc-supply = <&vddio_sd_reg>;
->  	};
-> 
->  	sdhci at c8000600 {
->  		status = "okay";
->  		bus-width = <8>;
-> +		vmmc-supply = <&vddio_sdmmc_reg>;
-> +		vqmmc-supply = <&vddio_sdmmc_reg>;
+  gpio_request_one()
+  gpio_set_debounce()
+  gpio_free()
 
-to make it better, this should be:
+which was leaving the GPIO debounce settings in a confused state.
+Then, enabling off mode causing bogus state to be restored, leaving
+GPIO debounce enabled which then prevented the CORE powerdomain from
+transitioning.
 
-vmmc-supply = <&vcore_mmc_reg>; and
-vqmmc-supply = <&vddio_nand_reg>;
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Cc: Igor Grinberg <grinberg@compulab.co.il>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
+---
+Applies on v3.7-rc2, targetted for v3.7.
 
-with vcore_mmc_reg is ldo5 and vddio_nand_reg is the fixed regulator below.
+ drivers/gpio/gpio-omap.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-By doing so, I get "sdhci-tegra sdhci-tegra.3: could not set regulator OCR 
-(-1)". MMC subsys wants to set ldo5 to 3.3V but it is fixed. I guess that's 
-harmless for now. 
-
->  	};
-> 
->  	gpio-keys {
-> @@ -465,6 +469,24 @@
->  			regulator-max-microvolt = <5000000>;
->  			regulator-always-on;
->  		};
-> +
-> +		vddio_sd_reg: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "vddio_sd";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			enable-active-high;
-> +			gpio = <&gpio 169 0>; /* gpio PV1 */
-> +		};
-> +
-> +		vddio_sdmmc_reg: regulator at 2 {
-
-       ^^ vddio_nand_reg acording to schematics
-
-> +			compatible = "regulator-fixed";
-> +			reg = <2>;
-> +			regulator-name  = "vddio_sdmmc";
-
-also here
-
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
->  	};
-> 
->  	sound {
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 94cbc84..dee2856 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -187,6 +187,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
+ 		 * to detect events and generate interrupts at least on OMAP3.
+ 		 */
+ 		__raw_writel(0, bank->base + bank->regs->debounce_en);
++		bank->dbck_enable_mask = 0;
+ 
+ 		clk_disable(bank->dbck);
+ 		bank->dbck_enabled = false;
+-- 
+1.8.0
