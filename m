@@ -1,29 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 17:58:41 +0100
-Subject: alignment faults in 3.6
-In-Reply-To: <5086C616.2030202@jonmasters.org>
-References: <506E1762.3010601@gmail.com>
- <20121005072914.GE4625@n2100.arm.linux.org.uk>
- <20121005105133.GP4625@n2100.arm.linux.org.uk>
- <5086C616.2030202@jonmasters.org>
-Message-ID: <20121023165841.GX21164@n2100.arm.linux.org.uk>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Tue, 23 Oct 2012 07:02:09 -1000
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121023100333.GA24418@arwen.pp.htv.fi>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121022155028.GA13791@core.coreip.homeip.net>
+ <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
+ <508664CA.7000601@ti.com>
+ <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
+ <20121023100333.GA24418@arwen.pp.htv.fi>
+Message-ID: <5086CD91.9070101@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 12:30:14PM -0400, Jon Masters wrote:
-> On 10/05/2012 06:51 AM, Russell King - ARM Linux wrote:
+On 10/23/2012 12:03 AM, Felipe Balbi wrote:
+> Hi,
 > 
-> <snip switch out the might_fault __get_user for atomic
-> probe_kernel_address related discussion>
-> 
-> > Okay, this should fix the issue...  I've only compile tested it so far.
-> > Rob, as you have a way to trigger this easily, can you give this patch
-> > a go and let me know if it solves your problem?  Thanks.
-> 
-> Russell, can you let me know the status of this patch? I don't see it in
-> your tree, and I think I might have missed a followup patch from you? It
-> seems to solve a real problem with in-kernel faults during the dump_mem
-> in general, even beyond just an alignment fault.
+> I much prefer having drivers explicitly manage all their resources,
+> which would mean that pinctrl calls need to be done on probe() and, if
+> necessary, during suspend()/resume().
 
-I was waiting for someone to say "I saw a problem and it works"...
-Would be nice to have a Tested-by tag against it...
+
+Per-driver resource management is certainly convenient when you are
+dealing with a single system, but it becomes difficult to maintain for
+drivers that are shared among many platforms.
+
+The industry trend for many years has been consolidation around a single
+programming model per class of device.  For example, SDHCI, EHCI, ATA.
+This trend will only accelerate, as the cost of developing controller IP
+and associated drivers increases.  Such drivers need to be as
+platform-agnostic as possible.
