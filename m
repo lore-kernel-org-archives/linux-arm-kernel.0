@@ -1,36 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Oct 2012 10:19:58 +0200
-Subject: [PATCH] arm: mvebu: add LED support in defconfig
-Message-ID: <1350980398-6745-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Oct 2012 10:31:45 +0200
+Subject: [PATCH] pinctrl/nomadik: use irq_create_mapping()
+In-Reply-To: <5085A7CA.3070001@wwwdotorg.org>
+References: <1350659375-7335-1-git-send-email-linus.walleij@stericsson.com>
+ <50817E43.8000804@wwwdotorg.org>
+ <CACRpkdbcTT_Mfa67Vw_6Y3RvqOE3CMA7kNXLG5oja0uTNn1FoA@mail.gmail.com>
+ <5085A7CA.3070001@wwwdotorg.org>
+Message-ID: <CACRpkdZLgnEHAKiyZBT1FTQPdp69rTOQ9ba9ZQ0y4eLODw4zeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added support for the PlatHome Openblocks AX3 platform
-requires the LED framework, so let's add it to mvebu_defconfig.
+On Mon, Oct 22, 2012 at 10:08 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/22/2012 02:14 AM, Linus Walleij wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> It's an IRQ handler so it should be robust to spurious IRQs due to
+>> transient hardware states etc I believe.
+>>
+>> So if there is a transient IRQ before gpio_to_irq() is called -> boom.
+>
+> I wonder though (a) why it would be unmasked in HW, and (b) why the
+> software would even look at the status bit if no handler were registered?
 
----
-This is 3.8 material
----
- arch/arm/configs/mvebu_defconfig |    5 +++++
- 1 file changed, 5 insertions(+)
+That's true of course ... OK I'll update the patch.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 3458752..b7ca617 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -26,6 +26,11 @@ CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.7.9.5
+Still I'm not feeling good about the irq_create_mapping/irq_find_mapping
+separation, I think a lot of drivers just get this wrong and it's causing
+bugs... it'd be way better if there was just one of them and we could
+count on descriptors being allocated after adding any kind of irqdomain
+but I have no clue how hard it would be to achieve this.
+
+Yours,
+Linus Walleij
