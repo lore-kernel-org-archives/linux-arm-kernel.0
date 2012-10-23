@@ -1,60 +1,40 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 23 Oct 2012 09:11:53 -0400
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <20121023122436.GC1855@beef>
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
- <50857444.9080308@ti.com>
- <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
- <50859505.5010306@ti.com> <20121023015346.GB1855@beef>
- <alpine.DEB.2.00.1210230311490.31118@utopia.booyaka.com>
- <20121023122436.GC1855@beef>
-Message-ID: <20121023131153.GE1855@beef>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 23 Oct 2012 18:47:53 +0530
+Subject: [PATCH v2] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
+ V4L2_OUT_CAP_DV_TIMINGS
+Message-ID: <1350998273-19769-1-git-send-email-prabhakar.lad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 08:24:36AM -0400, Matt Porter wrote:
-> On Tue, Oct 23, 2012 at 03:15:44AM +0000, Paul Walmsley wrote:
-> > On Mon, 22 Oct 2012, Matt Porter wrote:
-> > 
-> > > I've mentioned this a few times in various threads...no need to use
-> > > appended DTB on a current U-Boot. Some of us are indeed booting this way
-> > > with the DTB properly passed separately from the bootloader and chosen
-> > > filled out by the bootloader. And yes, am335x_evm_config applies to all
-> > > AM33xx TI EVMs and the BeagleBone board. There's an EEPROM onboard all
-> > > that is used to determine what board is present so a single
-> > > MLO/u-boot.img can be used.
-> > 
-> > As Kevin mentioned earlier, this is unfortunately not true for those of us 
-> > with earlier BeagleBoards:
-> > 
-> >    http://marc.info/?l=linux-omap&m=135094296931913&w=2
-> 
-> Yes, we spoke about this a bit.
->  
-> > Do you know what the minimum board revision is that you all are 
-> > supporting in U-boot?
-> 
-> It's not so much a revision as it is getting the right contents in the
-> EEPROM. As it's a community board, it's generally only supported over at
-> beagleboard at googlegroups.com. Jason Kridner recommends posting support
-> questions there (like why isn't my A2 supported in U-Boot?). If there
-> isn't some solution suggested there for updating the A2 I would contact
-> him directly. I have an A1 Bone here that also doesn't work with
-> mainline U-Boot even after configuring the EEPROM. You can try this
-> procedure if you want to write the proper contents in, an A2 may work
-> but for some reason there's no available history on Bone revisions prior
-> to A3. I vaguely recall a lot of chatter around the phy and so forth in
-> the A1 to A2 timeframe so it's entirely possible that your A2 will work
-> with just the eeprom contents programmed. Without it, it's guaranteed to
-> fail as the pin muxing is tied to detecting the board this way. Also,
-> you may need to change <offset>.1 in the below example to <offset>.2 for
-> your eeprom i/o to work as A2 may require an address length of 2.
+From: Lad, Prabhakar <prabhakar.lad@ti.com>
 
-Ok, very quick update...no need to mess around with the eeprom. I just
-received the official word on what will be supported. Since A2 is
-pre-release, simply go to http://beagleboard.org/support/rma and fill
-out the form to have it replaced with the current revision (A6).
+This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
+V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
+out.
 
-This applies to *anyone* that received a pre-release A2 board.
+Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Sergei Shtylyov <sshtylyov@mvista.com>
+---
+ Changes for v2:
+ 1: fixed code  alignment as pointed by Sergei
 
--Matt
+ arch/arm/mach-davinci/board-dm365-evm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 2924d61..8519d2d 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -514,7 +514,7 @@ static struct vpbe_output dm365evm_vpbe_outputs[] = {
+ 			.index		= 1,
+ 			.name		= "Component",
+ 			.type		= V4L2_OUTPUT_TYPE_ANALOG,
+-			.capabilities	= V4L2_OUT_CAP_CUSTOM_TIMINGS,
++			.capabilities	= V4L2_OUT_CAP_DV_TIMINGS,
+ 		},
+ 		.subdev_name	= VPBE_VENC_SUBDEV_NAME,
+ 		.default_mode	= "480p59_94",
+-- 
+1.7.4.1
