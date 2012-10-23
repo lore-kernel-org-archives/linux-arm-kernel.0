@@ -1,46 +1,57 @@
-From: mporter@ti.com (Matt Porter)
-Date: Tue, 23 Oct 2012 17:11:51 -0400
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <877gqg99zk.fsf@deeprootsystems.com>
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
- <50857444.9080308@ti.com>
- <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
- <50859505.5010306@ti.com> <20121023015346.GB1855@beef>
- <alpine.DEB.2.00.1210230311490.31118@utopia.booyaka.com>
- <20121023122436.GC1855@beef> <20121023131153.GE1855@beef>
- <877gqg99zk.fsf@deeprootsystems.com>
-Message-ID: <20121023211151.GF1855@beef>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Tue, 23 Oct 2012 16:24:19 -0500
+Subject: [PATCH v2 2/4] zynq: move static peripheral mappings
+In-Reply-To: <20121023211742.GA14047@elliptictech.com>
+References: <20121022211219.GC31538@beefymiracle.amer.corp.natinst.com>
+ <201210231450.11540.arnd@arndb.de> <5086F973.6050309@gmail.com>
+ <20121023205304.GJ20593@beefymiracle.amer.corp.natinst.com>
+ <20121023211742.GA14047@elliptictech.com>
+Message-ID: <20121023212419.GK20593@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 02:03:43PM -0700, Kevin Hilman wrote:
-> Matt Porter <mporter@ti.com> writes:
+On Tue, Oct 23, 2012 at 05:17:42PM -0400, Nick Bowler wrote:
+> On 2012-10-23 15:53 -0500, Josh Cartwright wrote:
+> > On Tue, Oct 23, 2012 at 03:09:23PM -0500, Rob Herring wrote:
+> > > On 10/23/2012 09:50 AM, Arnd Bergmann wrote:
+> > > > On Monday 22 October 2012, Josh Cartwright wrote:
+> > > >> -#define SCU_PERIPH_PHYS			0xF8F00000
+> > > >> -#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
+> > > >> +#define SCU_PERIPH_PHYS		0xF8F00000
+> > > >> +#define SCU_PERIPH_SIZE		SZ_8K
+> > > >> +#define SCU_PERIPH_VIRT		(PL310_L2CC_VIRT - SCU_PERIPH_SIZE)
+> > > >
+> > > > And your patch 3 already obsoletes this mapping.
+> > >
+> > > Actually, it's probably still needed. The smp platform code typically
+> > > reads the number of cores from the SCU and the mapping has to be in
+> > > place before ioremap is up. I don't think there is an architected way to
+> > > get the number of cores, but it would be nice to avoid this early SCU
+> > > access. We could also mandate getting the core count from DT instead.
+> > >
+> > > Also, the physical address can be read with this on A9's:
+> > >
+> > >         asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
+> > 
+> > For the sake of the zynq cleanups, I think it may still make sense to
+> > remove the SCU peripheral mappings for now.  By the time we're ready to
+> > push in SMP support for zynq, maybe we can tackle the problem of how to
+> > solve the SCU mapping problem generically.
 > 
-> [...]
-> 
-> > Ok, very quick update...no need to mess around with the eeprom. I just
-> > received the official word on what will be supported. Since A2 is
-> > pre-release, simply go to http://beagleboard.org/support/rma and fill
-> > out the form to have it replaced with the current revision (A6).
-> >
-> > This applies to *anyone* that received a pre-release A2 board.
-> 
-> Hmm, doesn't seem the RMA people are aware of this.  They just rejected
-> my request since it's not a "hardware related issue":
-> 
->    Kevin,
-> 
->    We only work with hardware related issue here. BeagleBone revision A2
->    was not officially released. We recommend you to work with the
->    community for support in Uboot. You can post your questions at the
->    BeagleBoard Google Groups:
->    https://groups.google.com/forum/?fromgroups=#!forum/beagleboard
-> 
->    Regards,
->    RMA Team
+> Then the static mapping can be removed if and when the we "solve the SCU
+> mapping problem generically".  There's no point in removing it until
+> then since it doesn't cause any actual problems, does it?
 
-That's sad considering the beagleboard.org/BeagleBone hardware designer
-specifically said they would be replaced via this route. *sigh*. Ok, I'll
-go back and share this with him.
+That's also fine with me as well.  I'm not strongly opinionated, and not
+convinced it really matters much.
 
--Matt
+Thanks,
+
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/2fb200b7/attachment.sig>
