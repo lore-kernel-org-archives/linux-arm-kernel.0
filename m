@@ -1,38 +1,83 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 23 Oct 2012 09:53:49 +0200
-Subject: [PATCH] pinctrl/nomadik: use zero as default irq_start
-Message-ID: <1350978829-12416-1-git-send-email-linus.walleij@stericsson.com>
+From: dev@lynxeye.de (Lucas Stach)
+Date: Tue, 23 Oct 2012 09:57:27 +0200
+Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
+In-Reply-To: <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
+References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
+ <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
+Message-ID: <1350979047.20572.6.camel@tellur>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Am Dienstag, den 23.10.2012, 12:49 +0530 schrieb Pavan Kunapuli:
+> vmmc and vqmmc regulators control the voltage to
+> the host and device. Defer the probe if either of
+> them is not registered.
+> 
+Does this work with boards where we don't have any MMC supplies? Or are
+we just deferring the probe indefinitely there?
 
-The irqdomain semantics were supposed to be such that a linear
-domain would be used if the passed first_irq was zero or
-negative, but I got it wrong so only passing zero as first_irq
-will work properly. Well, zero is NO_IRQ these days so let's
-pass zero. The semantics of irqdomain_add_simple() will be
-fixed in a separate patch.
+For boards that power MMC unconditionally, are we supposed to add dummy
+regulators to make them work with this patchset?
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Reported-by: Rikard Olsson <rikard.p.olsson@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-nomadik.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index d1d3cb9..3834629 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1281,7 +1281,7 @@ static int __devinit nmk_gpio_probe(struct platform_device *dev)
- 	struct clk *clk;
- 	int secondary_irq;
- 	void __iomem *base;
--	int irq_start = -1;
-+	int irq_start = 0;
- 	int irq;
- 	int ret;
- 
--- 
-1.7.11.3
+> Signed-off-by: Pavan Kunapuli <pkunapuli@nvidia.com>
+> ---
+>  drivers/mmc/host/sdhci.c |   25 ++++++++++++++++++++++---
+>  1 files changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 7922adb..925c403 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -2844,11 +2844,17 @@ int sdhci_add_host(struct sdhci_host *host)
+>  	    !(host->mmc->caps & MMC_CAP_NONREMOVABLE))
+>  		mmc->caps |= MMC_CAP_NEEDS_POLL;
+>  
+> -	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
+> +	/*
+> +	 * If vqmmc regulator and no 1.8V signalling, then there's no UHS.
+> +	 * vqmmc regulator should be present. If it's not present,
+> +	 * assume the regulator driver registration is not yet done and
+> +	 * defer the probe.
+> +	 */
+>  	host->vqmmc = regulator_get(mmc_dev(mmc), "vqmmc");
+>  	if (IS_ERR(host->vqmmc)) {
+> -		pr_info("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
+> +		pr_err("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
+>  		host->vqmmc = NULL;
+> +		return -EPROBE_DEFER;
+>  	}
+>  	else if (regulator_is_supported_voltage(host->vqmmc, 1800000, 1800000))
+>  		regulator_enable(host->vqmmc);
+> @@ -2903,10 +2909,17 @@ int sdhci_add_host(struct sdhci_host *host)
+>  
+>  	ocr_avail = 0;
+>  
+> +	/*
+> +	 * vmmc regulator should be present. If it's not present,
+> +	 * assume the regulator driver registration is not yet done
+> +	 * and defer the probe.
+> +	 */
+>  	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
+>  	if (IS_ERR(host->vmmc)) {
+> -		pr_info("%s: no vmmc regulator found\n", mmc_hostname(mmc));
+> +		pr_err("%s: no vmmc regulator found\n", mmc_hostname(mmc));
+>  		host->vmmc = NULL;
+> +		ret = -EPROBE_DEFER;
+> +		goto vmmc_err;
+>  	} else
+>  		regulator_enable(host->vmmc);
+>  
+> @@ -3121,7 +3134,13 @@ reset:
+>  untasklet:
+>  	tasklet_kill(&host->card_tasklet);
+>  	tasklet_kill(&host->finish_tasklet);
+> +vmmc_err:
+> +	if (host->vqmmc) {
+> +		if (regulator_is_enabled(host->vqmmc))
+> +			regulator_disable(host->vqmmc);
+>  
+> +		regulator_put(host->vqmmc);
+> +	}
+>  	return ret;
+>  }
+>  
