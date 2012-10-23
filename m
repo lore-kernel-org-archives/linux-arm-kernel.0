@@ -1,29 +1,49 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 23 Oct 2012 12:10:19 +0100
-Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
-In-Reply-To: <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
-References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
- <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
-Message-ID: <20121023111019.GV4477@opensource.wolfsonmicro.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 23 Oct 2012 13:11:56 +0200
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdZhUwMTg0suqbZiukN7Se6fzdYP3-0Dspm9WF6qZniNVQ@mail.gmail.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121022155028.GA13791@core.coreip.homeip.net>
+ <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
+ <508664CA.7000601@ti.com>
+ <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
+ <20121023100333.GA24418@arwen.pp.htv.fi>
+ <20121023122312.56b23e1c@skate>
+ <CACRpkdb+f44jw1vTYvJT0bnMOP8XQe8ztDUHiwtS2JHtPWAGXw@mail.gmail.com>
+ <20121023102903.GA24820@arwen.pp.htv.fi>
+ <CACRpkdZhUwMTg0suqbZiukN7Se6fzdYP3-0Dspm9WF6qZniNVQ@mail.gmail.com>
+Message-ID: <20121023131156.13e2d0ae@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 12:31:06PM +0200, Ulf Hansson wrote:
-> It seems like this patch did not get applied together with:
-> [PATCH 1/2] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
+
+On Tue, 23 Oct 2012 12:45:33 +0200, Linus Walleij wrote:
+
+> Hm so I have had this idea of runtime PM core helping out
+> with pins, so I could add something like
 > 
-> The problem was likely my fault, since there were a lot of resends.
-> Anyway, it should still be possible to apply.
+> pm_pins_fetch()
+> pm_pins_default()
+> pm_pins_idle()
+> pm_pins_sleep()
+> 
+> So if one is using the pin states defined in
+> <linux/pinctrl/pinctrl-state.h> then the PM core can help out in
+> keeping track of the pins and states, and the driver will just tell
+> the PM core what to do and when.
+> 
+> Would this fit the bill for everyone's code consolidation needs?
+> It would sure work for us...
 
-I *really* should not need to remind you to:
+That surely would work but is kind of non-obvious when reading a
+driver's code: that's the problem with bus notifier, they do things a
+bit "behind your back" without you noticing. Having the driver request
+its own pinctrl state, and switch between states upon suspend/resume is
+a lot more explicit, IMO.
 
- - Not top post
- - Send patches in a form which can be applied if you want them applying
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/977c8645/attachment.sig>
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
