@@ -1,27 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 10:08:05 +0100
-Subject: IMX breaking Versatile Express build
-Message-ID: <20121023090805.GQ21164@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 23 Oct 2012 11:11:53 +0200
+Subject: [PATCH 5/5] arm: mvebu: Added SMP support for Armada XP
+In-Reply-To: <20121022184537.GN21046@lunn.ch>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-6-git-send-email-gregory.clement@free-electrons.com>
+ <20121022184537.GN21046@lunn.ch>
+Message-ID: <50865F59.8000507@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The latest Versatile Express specific build is failing due to:
+On 10/22/2012 08:45 PM, Andrew Lunn wrote:
+> Hi Gregory
+> 
+>> +void __init set_secondary_cpus_clock(void)
+>> +{
+>> +	int cpu;
+>> +	unsigned long rate;
+>> +	struct clk *cpu_clk = NULL;
+>> +	struct device_node *np = NULL;
+>> +
+>> +	cpu = smp_processor_id();
+>> +	np = of_find_node_by_type(np, "cpu");
+>> +	np = NULL;
+>> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+>> +		const u32 *reg;
+>> +		int len;
+>> +		reg = of_get_property(np, "reg", &len);
+>> +		if (!reg || len != 4) {
+>> +			pr_err("%s missing reg property\n", np->full_name);
+>> +			continue;
+>> +		}
+>> +		if (be32_to_cpup(reg) == cpu) {
+>> +			cpu_clk = of_clk_get(np, 0);
+>> +			break;
+>> +		}
+>> +	}
+>> +	WARN_ON(IS_ERR(cpu_clk));
+>> +	rate = clk_get_rate(cpu_clk);
+>> +
+>> +	/* set all the other CPU clk to the same rate than the boot CPU */
+>> +	np = NULL;
+>> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+>> +		const u32 *reg;
+>> +		int len;
+>> +		reg = of_get_property(np, "reg", &len);
+>> +		if (!reg || len != 4) {
+>> +			pr_err("%s missing reg property\n", np->full_name);
+>> +			continue;
+>> +		}
+>> +		if (be32_to_cpup(reg) != cpu) {
+>> +			cpu_clk = of_clk_get(np, 0);
+>> +			clk_set_rate(cpu_clk, rate);
+>> +		}
+> 
+> Maybe its hiding somewhere, but where is the clk_prepare_enable() for
+> this cpu_clk clock?
+> 
 
-arch/arm/mach-imx/built-in.o: In function `imx_cpu_die':
-platform-imx-dma.c:(.text+0x1624): undefined reference to `imx_enable_cpu'
-arch/arm/mach-imx/built-in.o: In function `imx_boot_secondary':
-platform-imx-dma.c:(.cpuinit.text+0x14): undefined reference to `imx_set_cpu_jump'
-platform-imx-dma.c:(.cpuinit.text+0x20): undefined reference to `imx_enable_cpu'
+Well the clocks are always enable. In the clock framework, the cpu clocks
+don't provide an enable function.
+But maybe it is cleaner to call clk_prepare_enable() even if it does
+nothing except update the usage count.
 
-Config:
+Thanks,
 
-http://www.home.arm.linux.org.uk/developer/build/file.php?type=config&idx=2464
-
-This does not seem to have any IMX support selected.
-
-Thanks to the reduced default configuration files, Kconfig is deciding to
-select the new MULTI_* options on these target specific Kconfigs, which
-may have some reason as to the above.
-
-However, even so, we should _not_ be seeing such build failures.  It looks
-to me like platform-imx-dma is missing some kind of dependency.
+Gregory
