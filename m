@@ -1,51 +1,37 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 23 Oct 2012 15:33:43 -0400 (EDT)
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <5086E62D.8040407@wwwdotorg.org>
-Message-ID: <Pine.LNX.4.44L0.1210231522230.1635-100000@iolanthe.rowland.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 23 Oct 2012 19:34:16 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <20121022163825.GA4730@atomide.com>
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <50857444.9080308@ti.com> <20121022163825.GA4730@atomide.com>
+Message-ID: <alpine.DEB.2.00.1210231933400.27211@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Oct 2012, Stephen Warren wrote:
+On Mon, 22 Oct 2012, Tony Lindgren wrote:
 
-> > Nothing intrinsically distinguishes this class of hardware.  The only
-> > thing these devices have in common is that they can be managed by
-> > Linux's ehci-platform driver.
+> * Jon Hunter <jon-hunter@ti.com> [121022 09:30]:
+> > On 10/20/2012 04:26 PM, Paul Walmsley wrote:
+> > > 
+> > > * 2430sdp: vfp_reload_hw oops during MMC initialization
+> > >   - Kernel attempts to save FP registers that don't exist; fix posted:
+> > >     - http://www.spinics.net/lists/arm-kernel/msg200646.html
 > 
-> I don't agree. They're all EHCI USB controllers (or all EHCI USB
-> controllers that don't require custom drivers due to quirks), which is a
-> much more general statement than anything related to which driver Linux
-> uses for them.
+> Has that one been posted to RMK's patch system?
 
-That's true, but it doesn't distinguish these devices.  There are other
-EHCI controllers with no quirks that nevertheless can't be handled by
-ehci-platform because they have requirements (_not_ quirks) that
-ehci-platform is unable to deal with currently -- clocks or power
-supplies or special register settings or PHYs or etc.
+Just did that, let's see what happens.
 
-> > In essense, we're trying to say that the HW is compatible with a 
-> > particular driver rather than with some other type of HW.
+> > > * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+> > >   - due to a GPMC bug
+> > >   - Apparently fixed by http://www.spinics.net/lists/arm-kernel/msg200787.html
+> > 
+> > This is now addressed and I have verified it is booting on v3.7-rc2. The
+> > following patch address this boot problem ...
+> > 
+> > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8119024ef7363591fd958ec89ebfaee7c18209e3
 > 
-> Using a compatible value in order to pick a specific driver in Linux is
-> explicitly against the device tree design principles; DT is supposed to
-> represent just the hardware.
-> 
-> > Maybe DT
-> > wasn't intended to provide this kind of information, but it seems like 
-> > a logical thing to do.  Unless DT already offers some other way to 
-> > accomplish the same thing?
-> 
-> The typical way is for the Linux driver to declare that is supports a
-> variety of different HW models.
-> 
-> Admittedly this is annoying when there are many HW models that otherwise
-> wouldn't need any driver changes, hence the desire to (additionally)
-> include some generic value in the compatible field, but again, what that
-> generic value is should be driven by the HW itself, not the SW that's
-> using it.
+> That's in v3.7-rc2 already, is there some other problem too?
 
-Okay, fine.  But then what should the binding documentation specify for
-the compatible value?  A list of all the HW models that the driver
-currently supports?
+Will try a re-test.
 
-Alan Stern
+- Paul
