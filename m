@@ -1,52 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Oct 2012 12:29:28 +0200
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121023122312.56b23e1c@skate>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
- <508664CA.7000601@ti.com>
- <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
- <20121023100333.GA24418@arwen.pp.htv.fi>
- <20121023122312.56b23e1c@skate>
-Message-ID: <CACRpkdb+f44jw1vTYvJT0bnMOP8XQe8ztDUHiwtS2JHtPWAGXw@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Oct 2012 19:30:33 +0900
+Subject: [PATCH] ARM: EXYNOS: Remove wrong I2S0 clock from peril clock
+In-Reply-To: <016501cda4fa$caa62dc0$5ff28940$@com>
+References: <004d01cda2cc$37254570$a56fd050$@samsung.com>
+ <016501cda4fa$caa62dc0$5ff28940$@com>
+Message-ID: <01ab01cdb109$6f00d540$4d027fc0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 12:23 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
->
-> On Tue, 23 Oct 2012 13:03:33 +0300, Felipe Balbi wrote:
->
->> > But it appears that shmobile prefer to get all resources using
->> > bus notifiers.
->> >
->> > So we need to form some kind of consensus ... or live with
->> > the fact that different systems do it different ways. Which will
->> > explode the day we need to use a driver on two systems,
->> > each using the other approach :-)
->>
->> I much prefer having drivers explicitly manage all their resources,
->> which would mean that pinctrl calls need to be done on probe() and, if
->> necessary, during suspend()/resume().
->>
->> Using bus notifiers for that is quite a hack IMHO.
->
-> Agreed. Just like drivers do their ioremap, request_irq and others,
-> they should also request their pin resources using the pinctrl API.
-> Hiding this behind a bus notifier is not nice.
+Sangbeom Kim wrote:
+> 
+> On Friday, Oct 05, 2012 at 4:37 PM, Sangsu Park wrote:
+> > Remove I2S0 clk from peril since peril clock doesn't have I2S0 clk for
+> EXYNOS4.
+> > Audio Subsystem block has I2S0 clk.
+> >
+> > Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+> 
+> Peril control bit 19 is reserved.
+> 
+> Acked-by: Sangbeom Kim <sbkim73@samsung.com>
+> 
+Applied.
 
-So the biggest implementation of the notifier approach to resource
-handling is the SH clock thing:
-drivers/base/power/clock_ops.c
+Thanks.
 
-It's made to be generic but AFAICT only SH is using this.
-
-So according to that paradigm most device resources should
-be handled that way if I understand correctly the basic idea.
-
-So let's get Rafael, Paul and Magnus in here to beat us up
-a bit :-)
-
-Yours,
-Linus Walleij
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
