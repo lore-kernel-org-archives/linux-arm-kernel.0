@@ -1,64 +1,44 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Oct 2012 23:22:50 +0800
-Subject: [PATCH 01/10] ARM: imx6q: print silicon version on boot
+Date: Tue, 23 Oct 2012 23:22:51 +0800
+Subject: [PATCH 02/10] ARM: imx: allow timer counter to roll over
 In-Reply-To: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
 References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1351005779-30347-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1351005779-30347-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6Q has 3 revisions 1.0, 1.1 and 1.2.  Print revision on boot.
+The timer is configured in free-run mode.  The counter should be
+allowed to roll over to 0 when reaching 0xffffffff.  Let's do that
+by always returning 0 in set_next_event.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/mach-imx6q.c |   28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ arch/arm/mach-imx/time.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 978b6dd..1c5acf8 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -38,6 +38,33 @@
- #include "cpuidle.h"
- #include "hardware.h"
+diff --git a/arch/arm/mach-imx/time.c b/arch/arm/mach-imx/time.c
+index f017302..858098c 100644
+--- a/arch/arm/mach-imx/time.c
++++ b/arch/arm/mach-imx/time.c
+@@ -139,8 +139,7 @@ static int mx1_2_set_next_event(unsigned long evt,
  
-+#define IMX6Q_ANALOG_DIGPROG	0x260
-+
-+static int imx6q_revision(void)
-+{
-+	struct device_node *np;
-+	void __iomem *base;
-+	static u32 rev;
-+
-+	if (!rev) {
-+		np = of_find_compatible_node(NULL, NULL, "fsl,imx6q-anatop");
-+		base = of_iomap(np, 0);
-+		rev =  readl_relaxed(base + IMX6Q_ANALOG_DIGPROG);
-+		iounmap(base);
-+	}
-+
-+	switch (rev & 0xff) {
-+	case 0:
-+		return IMX_CHIP_REVISION_1_0;
-+	case 1:
-+		return IMX_CHIP_REVISION_1_1;
-+	case 2:
-+		return IMX_CHIP_REVISION_1_2;
-+	default:
-+		return IMX_CHIP_REVISION_UNKNOWN;
-+	}
-+}
-+
- void imx6q_restart(char mode, const char *cmd)
- {
- 	struct device_node *np;
-@@ -192,6 +219,7 @@ static void __init imx6q_timer_init(void)
- {
- 	mx6q_clocks_init();
- 	twd_local_timer_of_register();
-+	imx_print_silicon_rev("i.MX6Q", imx6q_revision());
+ 	__raw_writel(tcmp, timer_base + MX1_2_TCMP);
+ 
+-	return (int)(tcmp - __raw_readl(timer_base + MX1_2_TCN)) < 0 ?
+-				-ETIME : 0;
++	return 0;
  }
  
- static struct sys_timer imx6q_timer = {
+ static int v2_set_next_event(unsigned long evt,
+@@ -152,8 +151,7 @@ static int v2_set_next_event(unsigned long evt,
+ 
+ 	__raw_writel(tcmp, timer_base + V2_TCMP);
+ 
+-	return (int)(tcmp - __raw_readl(timer_base + V2_TCN)) < 0 ?
+-				-ETIME : 0;
++	return 0;
+ }
+ 
+ #ifdef DEBUG
 -- 
 1.7.9.5
