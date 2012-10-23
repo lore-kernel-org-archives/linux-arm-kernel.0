@@ -1,33 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Oct 2012 10:31:45 +0200
-Subject: [PATCH] pinctrl/nomadik: use irq_create_mapping()
-In-Reply-To: <5085A7CA.3070001@wwwdotorg.org>
-References: <1350659375-7335-1-git-send-email-linus.walleij@stericsson.com>
- <50817E43.8000804@wwwdotorg.org>
- <CACRpkdbcTT_Mfa67Vw_6Y3RvqOE3CMA7kNXLG5oja0uTNn1FoA@mail.gmail.com>
- <5085A7CA.3070001@wwwdotorg.org>
-Message-ID: <CACRpkdZLgnEHAKiyZBT1FTQPdp69rTOQ9ba9ZQ0y4eLODw4zeA@mail.gmail.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 23 Oct 2012 09:21:11 +0100
+Subject: [PATCH v3 1/4] net/macb: fix truncate warnings
+In-Reply-To: <1350931534-8416-2-git-send-email-manabian@gmail.com>
+References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
+ <1350931534-8416-2-git-send-email-manabian@gmail.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B705B@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 10:08 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/22/2012 02:14 AM, Linus Walleij wrote:
+> When building macb on x86_64 the following warnings show up:
+>   drivers/net/ethernet/cadence/macb.c: In function macb_interrupt:
+>   drivers/net/ethernet/cadence/macb.c:556:4: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+...
+> -			macb_writel(bp, IDR, ~0UL);
+> +			macb_writel(bp, IDR, -1);
 
->> It's an IRQ handler so it should be robust to spurious IRQs due to
->> transient hardware states etc I believe.
->>
->> So if there is a transient IRQ before gpio_to_irq() is called -> boom.
->
-> I wonder though (a) why it would be unmasked in HW, and (b) why the
-> software would even look at the status bit if no handler were registered?
+Seems wrong to fix an error with an unsigned value
+by using -1.
 
-That's true of course ... OK I'll update the patch.
-
-Still I'm not feeling good about the irq_create_mapping/irq_find_mapping
-separation, I think a lot of drivers just get this wrong and it's causing
-bugs... it'd be way better if there was just one of them and we could
-count on descriptors being allocated after adding any kind of irqdomain
-but I have no clue how hard it would be to achieve this.
-
-Yours,
-Linus Walleij
+	David
