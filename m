@@ -1,27 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 23 Oct 2012 10:29:41 -0600
-Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
-In-Reply-To: <1350979047.20572.6.camel@tellur>
-References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
- <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
- <1350979047.20572.6.camel@tellur>
-Message-ID: <5086C5F5.4070801@wwwdotorg.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 23 Oct 2012 18:28:00 +0200
+Subject: [PATCH 1/1] pinctrl: at91: fix typo on PULL_UP
+Message-ID: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 01:57 AM, Lucas Stach wrote:
-> Am Dienstag, den 23.10.2012, 12:49 +0530 schrieb Pavan Kunapuli:
->> vmmc and vqmmc regulators control the voltage to
->> the host and device. Defer the probe if either of
->> them is not registered.
->
-> Does this work with boards where we don't have any MMC supplies? Or are
-> we just deferring the probe indefinitely there?
-> 
-> For boards that power MMC unconditionally, are we supposed to add dummy
-> regulators to make them work with this patchset?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-at91.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I believe that dummy (fixed) regulators are supposed to be provided in
-all cases where the platform doesn't actually have one. The fact that
-everything worked OK without them before this patch was most likely a
-mistake/accident.
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index c87c2c5..0757e94 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -58,7 +58,7 @@ static struct at91_gpio_chip *gpio_chips[MAX_GPIO_BANKS];
+ 
+ static int gpio_banks;
+ 
+-#define PULL_UP		(0 << 1)
++#define PULL_UP		(1 << 0)
+ #define MULTI_DRIVE	(1 << 1)
+ 
+ /**
+-- 
+1.7.10.4
