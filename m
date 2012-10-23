@@ -1,107 +1,59 @@
-From: spang@chromium.org (Michael Spang)
-Date: Mon, 22 Oct 2012 21:34:51 -0400
-Subject: [PATCH] ARM: Fix page counting in mem_init and show_mem
-Message-ID: <1350956091-5276-1-git-send-email-spang@chromium.org>
+From: mporter@ti.com (Matt Porter)
+Date: Mon, 22 Oct 2012 21:53:46 -0400
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <50859505.5010306@ti.com>
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <50857444.9080308@ti.com>
+ <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
+ <50859505.5010306@ti.com>
+Message-ID: <20121023015346.GB1855@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code in mem_init & show_mem to count page usage has two issues:
+On Mon, Oct 22, 2012 at 01:48:37PM -0500, Jon Hunter wrote:
+> 
+> On 10/22/2012 01:35 PM, Paul Walmsley wrote:
+> > (including the lists in my reply this time, oops; also adding some more 
+> > detail)
+> > 
+> > On Mon, 22 Oct 2012, Jon Hunter wrote:
+> > 
+> >> On 10/20/2012 04:26 PM, Paul Walmsley wrote:
+> >>
+> >>> Failing tests: fixed by posted patches
+> >>> --------------------------------------
+> >>>
+> >>> Boot tests:
+> >>>
+> >>> * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+> >>>   - due to a GPMC bug
+> >>>   - Apparently fixed by http://www.spinics.net/lists/arm-kernel/msg200787.html
+> >>
+> >> This is now addressed and I have verified it is booting on v3.7-rc2. The
+> >> following patch address this boot problem ...
+> >>
+> >> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8119024ef7363591fd958ec89ebfaee7c18209e3
+> > 
+> > Great, thanks, will update the README.  Did you also enable 
+> > CONFIG_ARM_APPENDED_DTB and CONFIG_ARM_ATAG_DTB_COMPAT, or were you able 
+> > to pass the DTB from the bootloader?
+> 
+> Actually, I built u-boot release 2012.10 for the am335x-evm and that
+> worked for the bone board too. So that is what I used. I have not
+> checked with Vaibhav and team if that is what they are using. So with
+> this u-boot I just passed the dtb to the kernel and did not append.
 
-1. It assumes the memory map for a bank is contiguous. The sparsemem
-   memory model partitions the memory map into sections, which may not
-   be contiguous. They are usually contiguous due only to allocation
-   order. Avoid this by using pfn_to_page for each page.
+I've mentioned this a few times in various threads...no need to use
+appended DTB on a current U-Boot. Some of us are indeed booting this way
+with the DTB properly passed separately from the bootloader and chosen
+filled out by the bootloader. And yes, am335x_evm_config applies to all
+AM33xx TI EVMs and the BeagleBone board. There's an EEPROM onboard all
+that is used to determine what board is present so a single
+MLO/u-boot.img can be used.
 
-   If the memory map is not contiguous the pointer math works out
-   badly and crashes the system.
+BTW, if you pick up an RS-232 cape, you can avoid using the FTDI->UART0
+connection for console and switch to any UART brought out on the Bone
+connectors. This is useful for those using a power controller and
+console server for local automated testing.
 
-2. A memory bank may have holes. Some regions may be removed using
-   memblock_remove, and will not have valid page stucts. The code
-   should not access the page structs for such pages. Avoid this by
-   skipping pages that fail pfn_valid().
-
-   If the memory map has holes, the free & total page counts are
-   wrong.
-
-Signed-off-by: Michael Spang <spang@chromium.org>
----
- arch/arm/mm/init.c |   40 ++++++++++++++++++++++------------------
- 1 files changed, 22 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index c21d06c..97d811a 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -101,16 +101,19 @@ void show_mem(unsigned int filter)
- 
- 	for_each_bank (i, mi) {
- 		struct membank *bank = &mi->bank[i];
--		unsigned int pfn1, pfn2;
--		struct page *page, *end;
-+		unsigned int start, end, pfn;
- 
--		pfn1 = bank_pfn_start(bank);
--		pfn2 = bank_pfn_end(bank);
-+		start = bank_pfn_start(bank);
-+		end = bank_pfn_end(bank);
- 
--		page = pfn_to_page(pfn1);
--		end  = pfn_to_page(pfn2 - 1) + 1;
-+		for (pfn = start; pfn < end; pfn++) {
-+			struct page *page;
-+
-+			if (!pfn_valid(pfn))
-+				continue;
-+
-+			page = pfn_to_page(pfn);
- 
--		do {
- 			total++;
- 			if (PageReserved(page))
- 				reserved++;
-@@ -122,8 +125,7 @@ void show_mem(unsigned int filter)
- 				free++;
- 			else
- 				shared += page_count(page) - 1;
--			page++;
--		} while (page < end);
-+		}
- 	}
- 
- 	printk("%d pages of RAM\n", total);
-@@ -619,22 +621,24 @@ void __init mem_init(void)
- 
- 	for_each_bank(i, &meminfo) {
- 		struct membank *bank = &meminfo.bank[i];
--		unsigned int pfn1, pfn2;
--		struct page *page, *end;
-+		unsigned int start, end, pfn;
- 
--		pfn1 = bank_pfn_start(bank);
--		pfn2 = bank_pfn_end(bank);
-+		start = bank_pfn_start(bank);
-+		end = bank_pfn_end(bank);
- 
--		page = pfn_to_page(pfn1);
--		end  = pfn_to_page(pfn2 - 1) + 1;
-+		for (pfn = start; pfn < end; pfn++) {
-+			struct page *page;
-+
-+			if (!pfn_valid(pfn))
-+				continue;
-+
-+			page = pfn_to_page(pfn);
- 
--		do {
- 			if (PageReserved(page))
- 				reserved_pages++;
- 			else if (!page_count(page))
- 				free_pages++;
--			page++;
--		} while (page < end);
-+		}
- 	}
- 
- 	/*
--- 
-1.7.7.3
+-Matt
