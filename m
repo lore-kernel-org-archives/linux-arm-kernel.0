@@ -1,57 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 23 Oct 2012 15:29:01 +0200
-Subject: [PATCH 1/2] input: qt1070: add pinctrl consumer
-In-Reply-To: <20121023131627.GE18964@game.jcrosoft.org>
-References: <20121023131627.GE18964@game.jcrosoft.org>
-Message-ID: <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Oct 2012 14:36:35 +0100
+Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
+In-Reply-To: <4F1DF342-A2C4-434A-B878-A11374089E6E@nvidia.com>
+References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
+ <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
+ <4F1DF342-A2C4-434A-B878-A11374089E6E@nvidia.com>
+Message-ID: <20121023133635.GV21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If no pinctrl available just report a warning as some architecture may not
-need to do anything.
+On Tue, Oct 23, 2012 at 03:21:58PM +0200, Philip Rakity wrote:
+> On 23 Oct 2012, at 09:19, Pavan Kunapuli <pkunapuli@nvidia.com> wrote:
+> > -	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
+> > +	/*
+> > +	 * If vqmmc regulator and no 1.8V signalling, then there's no UHS.
+> > +	 * vqmmc regulator should be present. If it's not present,
+> > +	 * assume the regulator driver registration is not yet done and
+> > +	 * defer the probe.
+> > +	 */
+> > 	host->vqmmc = regulator_get(mmc_dev(mmc), "vqmmc");
+> > 	if (IS_ERR(host->vqmmc)) {
+> > -		pr_info("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
+> > +		pr_err("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
+> > 		host->vqmmc = NULL;
+> > +		return -EPROBE_DEFER;
+> 
+> Some systems exist where vmmc regulator exists and vqmmc regulator does not.  The vmmc regular is fixed at 3.3v.  
+> Deferring the probe will cause issues.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-input at vger.kernel.org
----
- drivers/input/keyboard/qt1070.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+That's one of the issues of deferred probing: you don't know if one of the
+_get() functions failed because it just isn't present, or whether it's
+failed because it hasn't been registered yet.
 
-diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
-index ca68f29..967734e 100644
---- a/drivers/input/keyboard/qt1070.c
-+++ b/drivers/input/keyboard/qt1070.c
-@@ -33,6 +33,7 @@
- #include <linux/interrupt.h>
- #include <linux/jiffies.h>
- #include <linux/delay.h>
-+#include <linux/pinctrl/consumer.h>
- 
- /* Address for each register */
- #define CHIP_ID            0x00
-@@ -147,6 +148,7 @@ static int __devinit qt1070_probe(struct i2c_client *client,
- 	struct input_dev *input;
- 	int i;
- 	int err;
-+	struct pinctrl *pinctrl;
- 
- 	err = i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE);
- 	if (!err) {
-@@ -155,6 +157,15 @@ static int __devinit qt1070_probe(struct i2c_client *client,
- 		return -ENODEV;
- 	}
- 
-+	pinctrl = devm_pinctrl_get_select_default(&client->dev);
-+	if (IS_ERR(pinctrl)) {
-+		err = PTR_ERR(pinctrl);
-+		if (err == -EPROBE_DEFER)
-+			return err;
-+
-+		dev_warn(&client->dev, "No pinctrl provided\n");
-+	}
-+
- 	if (!client->irq) {
- 		dev_err(&client->dev, "please assign the irq to this device\n");
- 		return -EINVAL;
--- 
-1.7.10.4
+The two conditions are indistinguishable from the driver point of view.
+
+The solution to it is to ensure that those drivers where hardware resource
+X is optional provide a dummy resource to the driver when the hardware
+resource is not available.  That means, as far as the driver is concerned,
+that it will always expect to get a full set of resources whether or not
+the hardware has them.
+
+If drivers care about such stuff, then we should have xxx_is_dummy()
+functions (eg, clk_is_dummy(clk)) which return TRUE when the hardware
+resource is not available.  (which we could use NULL to indicate and
+would be in keeping with the specified IS_ERR() usage of these APIs.)
