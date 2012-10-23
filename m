@@ -1,135 +1,130 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Oct 2012 23:22:56 +0800
-Subject: [PATCH 07/10] ARM: imx6q: get v7_cpu_resume ready for cpuidle
+Date: Tue, 23 Oct 2012 23:22:57 +0800
+Subject: [PATCH 08/10] ARM: imx: move imx6q_cpuidle_driver into a separate file
 In-Reply-To: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
 References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1351005779-30347-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1351005779-30347-9-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To get v7_cpu_resume ready for cpuidle power gating case, we need the
-following changes.
-
-* L2X0_POWER_CTRL register needs to be restored.
-
-* Enable SCU inside v7_cpu_resume.  As the result, function
-  imx_smp_prepare gets eliminated.
-
-* Remove v7_invalidate_l1 invoking from v7_cpu_resume.  It turns out
-  that v7_invalidate_l1 only needs to be called for secondary cores
-  startup.
+Move imx6q_cpuidle_driver into a separate file as more codes will
+be added when WAIT mode gets implemented as cpuidle.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/common.h   |    2 --
- arch/arm/mach-imx/headsmp.S  |   25 ++++++++++++++++++++++---
- arch/arm/mach-imx/platsmp.c  |    7 +------
- arch/arm/mach-imx/pm-imx6q.c |    1 -
- 4 files changed, 23 insertions(+), 12 deletions(-)
+ arch/arm/mach-imx/Makefile        |    6 +++++-
+ arch/arm/mach-imx/cpuidle-imx6q.c |   26 ++++++++++++++++++++++++++
+ arch/arm/mach-imx/cpuidle.h       |    5 +++++
+ arch/arm/mach-imx/mach-imx6q.c    |   12 +-----------
+ 4 files changed, 37 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm/mach-imx/cpuidle-imx6q.c
 
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 9ff0776..ea11bbc 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -125,11 +125,9 @@ extern u32 *pl310_get_save_ptr(void);
- #ifdef CONFIG_SMP
- extern void v7_secondary_startup(void);
- extern void imx_scu_map_io(void);
--extern void imx_smp_prepare(void);
- extern void imx_scu_standby_enable(bool enable);
- #else
- static inline void imx_scu_map_io(void) {}
--static inline void imx_smp_prepare(void) {}
- static inline void imx_scu_standby_enable(bool enable) {}
- #endif
- extern void imx_enable_cpu(int cpu, bool enable);
-diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-index 7e49deb..ac8a967 100644
---- a/arch/arm/mach-imx/headsmp.S
-+++ b/arch/arm/mach-imx/headsmp.S
-@@ -27,8 +27,7 @@
-  * clean + invalidate, before jumping into the kernel.
-  *
-  * This funciton is cloned from arch/arm/mach-tegra/headsmp.S, and needs
-- * to be called for both secondary cores startup and primary core resume
-- * procedures.  Ideally, it should be moved into arch/arm/mm/cache-v7.S.
-+ * to be called for secondary cores startup.
-  */
- ENTRY(v7_invalidate_l1)
- 	mov	r0, #0
-@@ -84,10 +83,16 @@ ENDPROC(v7_secondary_startup)
- 	.macro	pl310_resume
- 	ldr	r2, phys_l2x0_saved_regs
- 	ldr	r0, [r2, #L2X0_R_PHY_BASE]	@ get physical base of l2x0
-+	ldr	r1, [r0, #L2X0_CTRL]		@ check if already enabled
-+	tst	r1, #1
-+	bne	1f
- 	ldr	r1, [r2, #L2X0_R_AUX_CTRL]	@ get aux_ctrl value
- 	str	r1, [r0, #L2X0_AUX_CTRL]	@ restore aux_ctrl
-+	ldr	r1, [r2, #L2X0_R_PWR_CTRL]
-+	str	r1, [r0, #L2X0_POWER_CTRL]
- 	mov	r1, #0x1
- 	str	r1, [r0, #L2X0_CTRL]		@ re-enable L2
-+1:
- 	.endm
- 
- 	.globl	phys_l2x0_saved_regs
-@@ -98,9 +103,23 @@ phys_l2x0_saved_regs:
- 	.endm
- #endif
- 
-+#ifdef CONFIG_SMP
-+	.macro	_scu_enable
-+	/* Enable SCU */
-+	mrc	p15, 4, r0, c15, c0, 0		@ r0 = scu physical base
-+	ldr	r1, [r0]			@ r1 = scu control register
-+	tst	r1, #0x1			@ check if already enabled
-+	orreq	r1, r1, #0x1
-+	streq	r1, [r0]
-+	.endm
-+#else
-+	.macro	_scu_enable
-+	.endm
-+#endif
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index fe47b71..a29ed49 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -28,7 +28,11 @@ obj-$(CONFIG_MXC_ULPI) += ulpi.o
+ obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+ obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+ obj-$(CONFIG_CPU_FREQ_IMX)    += cpufreq.o
+-obj-$(CONFIG_CPU_IDLE) += cpuidle.o
 +
- ENTRY(v7_cpu_resume)
--	bl	v7_invalidate_l1
- 	pl310_resume
-+	_scu_enable
- 	b	cpu_resume
- ENDPROC(v7_cpu_resume)
- #endif
-diff --git a/arch/arm/mach-imx/platsmp.c b/arch/arm/mach-imx/platsmp.c
-index c739a8a..fc25062 100644
---- a/arch/arm/mach-imx/platsmp.c
-+++ b/arch/arm/mach-imx/platsmp.c
-@@ -89,14 +89,9 @@ static void __init imx_smp_init_cpus(void)
- 	set_smp_cross_call(gic_raise_softirq);
- }
++ifeq ($(CONFIG_CPU_IDLE),y)
++obj-y += cpuidle.o
++obj-$(CONFIG_SOC_IMX6Q) += cpuidle-imx6q.o
++endif
  
--void imx_smp_prepare(void)
--{
--	scu_enable(scu_base);
--}
--
- static void __init imx_smp_prepare_cpus(unsigned int max_cpus)
+ ifdef CONFIG_SND_IMX_SOC
+ obj-y += ssi-fiq.o
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+new file mode 100644
+index 0000000..83facc9
+--- /dev/null
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) 2012 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/module.h>
++#include <asm/cpuidle.h>
++
++#include "cpuidle.h"
++
++static struct cpuidle_driver imx6q_cpuidle_driver = {
++	.name = "imx6q_cpuidle",
++	.owner = THIS_MODULE,
++	.en_core_tk_irqen = 1,
++	.states[0] = ARM_CPUIDLE_WFI_STATE,
++	.state_count = 1,
++};
++
++int __init imx6q_cpuidle_init(void)
++{
++	return imx_cpuidle_init(&imx6q_cpuidle_driver);
++}
+diff --git a/arch/arm/mach-imx/cpuidle.h b/arch/arm/mach-imx/cpuidle.h
+index bc932d1..e092d13 100644
+--- a/arch/arm/mach-imx/cpuidle.h
++++ b/arch/arm/mach-imx/cpuidle.h
+@@ -14,9 +14,14 @@
+ 
+ #ifdef CONFIG_CPU_IDLE
+ extern int imx_cpuidle_init(struct cpuidle_driver *drv);
++extern int imx6q_cpuidle_init(void);
+ #else
+ static inline int imx_cpuidle_init(struct cpuidle_driver *drv)
  {
--	imx_smp_prepare();
-+	scu_enable(scu_base);
+ 	return -ENODEV;
+ }
++static inline int imx6q_cpuidle_init(void)
++{
++	return -ENODEV;
++}
+ #endif
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 1c5acf8..8ecdeb5 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -12,7 +12,6 @@
+ 
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+-#include <linux/cpuidle.h>
+ #include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/init.h>
+@@ -26,7 +25,6 @@
+ #include <linux/regmap.h>
+ #include <linux/micrel_phy.h>
+ #include <linux/mfd/syscon.h>
+-#include <asm/cpuidle.h>
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/hardware/gic.h>
+@@ -182,17 +180,9 @@ static void __init imx6q_init_machine(void)
+ 	imx6q_usb_init();
  }
  
- struct smp_operations  imx_smp_ops __initdata = {
-diff --git a/arch/arm/mach-imx/pm-imx6q.c b/arch/arm/mach-imx/pm-imx6q.c
-index a17543d..7c4347b 100644
---- a/arch/arm/mach-imx/pm-imx6q.c
-+++ b/arch/arm/mach-imx/pm-imx6q.c
-@@ -39,7 +39,6 @@ static int imx6q_pm_enter(suspend_state_t state)
- 		imx_set_cpu_jump(0, v7_cpu_resume);
- 		/* Zzz ... */
- 		cpu_suspend(0, imx6q_suspend_finish);
--		imx_smp_prepare();
- 		imx_gpc_post_resume();
- 		break;
- 	default:
+-static struct cpuidle_driver imx6q_cpuidle_driver = {
+-	.name			= "imx6q_cpuidle",
+-	.owner			= THIS_MODULE,
+-	.en_core_tk_irqen	= 1,
+-	.states[0]		= ARM_CPUIDLE_WFI_STATE,
+-	.state_count		= 1,
+-};
+-
+ static void __init imx6q_init_late(void)
+ {
+-	imx_cpuidle_init(&imx6q_cpuidle_driver);
++	imx6q_cpuidle_init();
+ }
+ 
+ static void __init imx6q_map_io(void)
 -- 
 1.7.9.5
