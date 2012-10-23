@@ -1,117 +1,96 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 23 Oct 2012 15:45:56 -0600
-Subject: [RFC PATCH] dt: describe base reset signal binding
-Message-ID: <1351028756-22309-1-git-send-email-swarren@wwwdotorg.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 23 Oct 2012 15:00:09 -0700
+Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
+ mask on disable
+In-Reply-To: <20121023190914.GA853@arwen.pp.htv.fi> (Felipe Balbi's message of
+ "Tue, 23 Oct 2012 22:09:14 +0300")
+References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
+ <20121023190914.GA853@arwen.pp.htv.fi>
+Message-ID: <87k3ug7st2.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+Felipe Balbi <balbi@ti.com> writes:
 
-This binding is intended to represent the hardware reset signals present
-internally in most IC (SoC, FPGA, ...) designs.
+> Hi,
+>
+> On Tue, Oct 23, 2012 at 11:09:31AM -0700, Kevin Hilman wrote:
+>> From: Kevin Hilman <khilman@ti.com>
+>> 
+>> When debounce clocks are disabled, ensure that the banks
+>> dbck_enable_mask is cleared also.  Otherwise, context restore on
+>> subsequent off-mode transition will restore previous value from the
+>> shadow copies (bank->context.debounce*) leading to mismatch state
+>> between driver state and hardware state.
+>> 
+>> This was discovered when board code was doing
+>> 
+>>   gpio_request_one()
+>>   gpio_set_debounce()
+>>   gpio_free()
+>> 
+>> which was leaving the GPIO debounce settings in a confused state.
+>> Then, enabling off mode causing bogus state to be restored, leaving
+>> GPIO debounce enabled which then prevented the CORE powerdomain from
+>> transitioning.
+>> 
+>> Reported-by: Paul Walmsley <paul@pwsan.com>
+>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>
+> looks like this deserves a Cc: stable at vger.kernel.org tag.
+>
 
-Such a binding would allow the creation of a "reset subsystem", which
-could replace APIs such as the following Tegra-specific API:
+Agreed.  I think this goes all the way back to v3.5, but would've only
+been seen on boards using a request/gpio_set_debounce/free sequence
+combined with off-mode.
 
-void tegra_periph_reset_deassert(struct clk *c);
-void tegra_periph_reset_assert(struct clk *c);
+Linus, feel free to add the Cc: stable when commiting.  Thanks.
 
-(Note that at present, Tegra couples reset assertion with the clock for
-the affected peripheral module. However, reset and clocking are two
-separate, yet admittedly related, concepts).
+>> ---
+>> Applies on v3.7-rc2, targetted for v3.7.
+>> 
+>>  drivers/gpio/gpio-omap.c | 1 +
+>>  1 file changed, 1 insertion(+)
+>> 
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index 94cbc84..dee2856 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -187,6 +187,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
+>>  		 * to detect events and generate interrupts at least on OMAP3.
+>>  		 */
+>>  		__raw_writel(0, bank->base + bank->regs->debounce_en);
+>> +		bank->dbck_enable_mask = 0;
+>
+> shouldn't omap_gpio_restore_context() check for dbck_enabled instead of
+> the mask ? I mean:
+>
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 94cbc84..b3a39a7 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1371,7 +1371,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+>  				bank->base + bank->regs->dataout);
+>  	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
+>  
+> -	if (bank->dbck_enable_mask) {
+> +	if (bank->dbck_enabled) {
+>  		__raw_writel(bank->context.debounce, bank->base +
+>  					bank->regs->debounce);
+>  		__raw_writel(bank->context.debounce_en,
+>
+> the outcome would be the same, so it doesn't really matter. Just that,
+> at least to me, it would look better.
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
-What do people think of this? Does it sound like a good idea to go ahead
-with a reset subsystem? Should we simply add a new API to the common clock
-subsystem instead (and assume that reset and clock domains match 1:1).
-Should this be implemented as part of the generic power management domains;
-see include/linux/pm_domain.h instead?
+I tried your version, and unfortunately, the outcome is not the same,
+but don't plan to look into why.  $SUBJECT version is targetted and
+tested.  If you want to cleanup the cosmetics here, please do in a
+subsequent patch.  This driver could certainly benefit from more
+readability cleanups.
 
- Documentation/devicetree/bindings/reset/reset.txt |   75 +++++++++++++++++++++
- 1 files changed, 75 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/reset/reset.txt
+> No strong feelings though.
 
-diff --git a/Documentation/devicetree/bindings/reset/reset.txt b/Documentation/devicetree/bindings/reset/reset.txt
-new file mode 100644
-index 0000000..31db6ff
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/reset.txt
-@@ -0,0 +1,75 @@
-+= Reset Signal Device Tree Bindings =
-+
-+This binding is intended to represent the hardware reset signals present
-+internally in most IC (SoC, FPGA, ...) designs. Reset signals for whole
-+standalone chips are most likely better represented as GPIOs, although there
-+are likely to be exceptions to this rule.
-+
-+Hardware blocks typically receive a reset signal. This signal is generated by
-+a reset provider (e.g. power management or clock module) and received by a
-+reset consumer (the module being reset, or a module managing when a sub-
-+ordinate module is reset). This binding exists to represent the provider and
-+consumer, and provide a way to couple the two together.
-+
-+A reset signal is represented by the phandle of the provider, plus a reset
-+specifier - a list of DT cells that represents the reset signal within the
-+provider. The length (number of cells) and semantics of the reset specifier
-+are dictated by the binding of the reset provider, although common schemes
-+are described below.
-+
-+A word on where to place reset signal consumers in device tree: It is possible
-+in hardware for a reset signal to affect multiple logically separate HW blocks
-+at once. In this case, it would be unwise to represent this reset signal in
-+the DT node of each affected HW block, since if activated, an unrelated block
-+may be reset. Instead, reset signals should be represented in the DT node
-+where it makes most sense to control it; this may be a bus node if all
-+children of the bus are affected by the reset signal, or an individual HW
-+block node for dedicated reset signals. The intent of this binding is to give
-+appropriate software access to the reset signals in order to manage the HW,
-+rather than to slavishly enumerate the reset signal that affects each HW
-+block.
-+
-+= Reset providers =
-+
-+Required properties:
-+#reset-cells:	Number of cells in a reset specifier; Typically 0 for nodes
-+		with a single reset output and 1 for nodes with multiple
-+		reset outputs.
-+
-+For example:
-+
-+	rst: reset-controller {
-+		#reset-cells = <1>;
-+	};
-+
-+= Reset consumers =
-+
-+Required properties:
-+resets:		List of phandle and reset specifier pairs, one pair
-+		for each reset signal that affects the device, or that the
-+		device manages. Note: if the reset provider specifies '0' for
-+		#reset-cells, then only the phandle portion of the pair will
-+		appear.
-+
-+Optional properties:
-+reset-names:	List of reset signal name strings sorted in the same order as
-+		the resets property. Consumers drivers will use reset-names to
-+		match reset signal names with reset specifiers.
-+
-+For example:
-+
-+	device {
-+		resets = <&rst 20>;
-+		reset-names = "reset";
-+	};
-+
-+This represents a device with a single reset signal named "reset".
-+
-+	bus {
-+		resets = <&rst 10> <&rst 11> <&rst 12> <&rst 11>;
-+		reset-names = "i2s1", "i2s2", "dma", "mixer";
-+	};
-+
-+This represents a bus that controls the reset signal of each of four sub-
-+ordinate devices. Consider for example a bus that fails to operate unless no
-+child device has reset asserted.
--- 
-1.7.0.4
+Good.   I'll take that as an Ack.  :)
+
+Kevin
