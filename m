@@ -1,24 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Oct 2012 15:57:37 +0100
-Subject: ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined
-In-Reply-To: <022101cdb12d$724e9650$56ebc2f0$@org>
-References: <022101cdb12d$724e9650$56ebc2f0$@org>
-Message-ID: <20121023145737.GB2823@mudshark.cambridge.arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 23 Oct 2012 17:09:10 +0200
+Subject: [PATCH v2 1/4] ARM: dts: omap5: Update GPIO with address space
+ and interrupts
+In-Reply-To: <5086AE8E.60106@ti.com>
+References: <1350981432-6750-1-git-send-email-s-guiriec@ti.com>
+ <1350981432-6750-2-git-send-email-s-guiriec@ti.com> <5086AE8E.60106@ti.com>
+Message-ID: <5086B316.6000001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 03:48:21PM +0100, Kukjin Kim wrote:
-> Hi all,
+On 10/23/2012 04:49 PM, Jon Hunter wrote:
+> Hi Seb,
 > 
-> Now, v3.7-rc2 happens following build error with s3c2410_defconfig...
+> On 10/23/2012 03:37 AM, Sebastien Guiriec wrote:
+>> Add base address and interrupt line inside Device Tree data for
+>> OMAP5
+>>
+>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>> ---
+>>  arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>> index 42c78be..9e39f9f 100644
+>> --- a/arch/arm/boot/dts/omap5.dtsi
+>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>> @@ -104,6 +104,8 @@
+>>  
+>>  		gpio1: gpio at 4ae10000 {
+>>  			compatible = "ti,omap4-gpio";
+>> +			reg = <0x4ae10000 0x200>;
+>> +			interrupts = <0 29 0x4>;
+>>  			ti,hwmods = "gpio1";
+>>  			gpio-controller;
+>>  			#gpio-cells = <2>;
 > 
-> ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
-> make[2]: *** [__modpost] Error 1
-> make[1]: *** [modules] Error 2
-> make[1]: *** Waiting for unfinished jobs....
+> I am wondering if we should add the "interrupt-parent" property to add
+> nodes in the device-tree source. I know that today the interrupt-parent
+> is being defined globally, but when device-tree maps an interrupt for a
+> device it searches for the interrupt-parent starting the current device
+> node.
 > 
-> Any idea on this?
+> So in other words, for gpio1 it will search the gpio1 binding for
+> "interrupt-parent" and if not found move up a level and search again. It
+> will keep doing this until it finds the "interrupt-parent".
+> 
+> Therefore, I believe it will improve search time and hence, boot time if
+> we have interrupt-parent defined in each node.
 
-A fix for this is queued in rmk's fixes branch.
+Mmm, I'm not that sure. it will increase the size of the blob, so
+increase the time to load it and then to parse it. Where in the current
+case, it is just going up to the parent node using the already
+un-flatten tree in memory and thus that should not take that much time.
 
-Will
+That being said, it might be interesting to benchmark that to see what
+is the real impact.
+
+Regards,
+Benoit
