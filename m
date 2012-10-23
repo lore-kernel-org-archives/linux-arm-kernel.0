@@ -1,29 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 12:16:56 +0100
-Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
-In-Reply-To: <20121023111019.GV4477@opensource.wolfsonmicro.com>
-References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
- <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
- <20121023111019.GV4477@opensource.wolfsonmicro.com>
-Message-ID: <20121023111656.GT21164@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Oct 2012 20:22:10 +0900
+Subject: [PATCH v2] ASoC: Samsung: Update Kconfig for Exynos5250 and
+ Exynos4412
+In-Reply-To: <50658325.8050704@linaro.org>
+References: <1348741777-29569-1-git-send-email-padma.v@samsung.com>
+ <003401cd9d5f$179495c0$46bdc140$@samsung.com> <50658325.8050704@linaro.org>
+Message-ID: <01ca01cdb110$a48783b0$ed968b10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 12:10:19PM +0100, Mark Brown wrote:
-> On Tue, Oct 23, 2012 at 12:31:06PM +0200, Ulf Hansson wrote:
-> > It seems like this patch did not get applied together with:
-> > [PATCH 1/2] Revert "spi/pl022: fix spi-pl022 pm enable at probe"
-> > 
-> > The problem was likely my fault, since there were a lot of resends.
-> > Anyway, it should still be possible to apply.
+Tushar Behera wrote:
 > 
-> I *really* should not need to remind you to:
-> 
->  - Not top post
->  - Send patches in a form which can be applied if you want them applying
+> On 09/28/2012 03:23 PM, Sangsu Park wrote:
+> >
+> > On Thu, Sep 27, 2012 at 07:30 PM, Padmavathi Venna wrote:
+> >
 
-How about actually applying the damned patch from the two-part patch set,
-rather than only the first, both of which has been around for almost a
-month now, and fixes what should never have gone into mainline in the
-first place?
+[...]
+
+> >> @@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
+> >>
+> >>  config SND_SOC_SAMSUNG_SMDK_WM8994
+> >>  	tristate "SoC I2S Audio support for WM8994 on SMDK"
+> >> -	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+> >> MACH_SMDK4212)
+> >> +	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 ||
+> >> MACH_SMDK4212 || MACH_SMDK4412 || MACH_EXYNOS5_DT)
+> >>  	depends on I2C=y && GENERIC_HARDIRQS
+> >>  	select MFD_WM8994
+> >>  	select SND_SOC_WM8994
+> >
+> > I'm not sure about this since MACH_EXYNOS5_DT can have others instead of
+> SMDK.
+> >
+> 
+> But there is no other way we can differentiate between two EXYNOS5_DT
+> based boards in the kernel. So, support for all possible codecs and
+> sound-cards should be enabled in the kernel. The instantiation of the
+> drivers should depend on the device-tree entries.
+> 
+Hmm...any idea on this?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
