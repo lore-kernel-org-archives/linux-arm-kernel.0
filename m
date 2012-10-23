@@ -1,26 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Oct 2012 11:00:51 +0200
-Subject: [PATCH 0/5] clk: ux500: Add clock lookups for u8500
-In-Reply-To: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdZZ4CfURSYSyTv6vLF1+O++R0GPNFCMUJ_L+JEFwUw+aQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Oct 2012 10:01:54 +0100
+Subject: [PATCH V6 3/6] arm: cache-l2x0: add support for Aurora L2
+ cache ctrl
+In-Reply-To: <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
+References: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
+ <1348738523-28609-1-git-send-email-gregory.clement@free-electrons.com>
+ <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121023090154.GP21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 3:57 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On Thu, Sep 27, 2012 at 11:35:23AM +0200, Gregory CLEMENT wrote:
+> Aurora Cache Controller was designed to be compatible with the ARM L2
+> Cache Controller. It comes with some difference or improvement such
+> as:
+> - no cache id part number available through hardware (need to get it
+>   by the DT).
+> - always write through mode available.
+> - two flavors of the controller outer cache and system cache (meaning
+>   maintenance operations on L1 are broadcasted to the L2 and L2
+>   performs the same operation).
+> - in outer cache mode, the cache maintenance operations are improved and
+>   can be done on a range inside a page and are not limited to a cache
+>   line.
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Step by step, clock lookups for u8500 are being added in this set
-> of patches.
->
-> These patches will require additional patches for sound/soc/ux500/
-> driver as well as drivers/i2c/busses/i2c-nomadik driver to prevent
-> the boot for ux500 from break. Those patches are being merged through
-> separate trees.
+This adds new build warnings:
 
-All of these look good to me.
-Acked-by: Linus Walleij <linus.walleij@linaro.org> for all.
+arch/arm/mm/cache-l2x0.c:328:13: warning: 'aurora_inv_range' defined but not used
+arch/arm/mm/cache-l2x0.c:347:13: warning: 'aurora_clean_range' defined but not used
+arch/arm/mm/cache-l2x0.c:365:13: warning: 'aurora_flush_range' defined but not used
 
-Yours,
-Linus Walleij
+to the realview build (non-DT).  Please investigate, thanks.
