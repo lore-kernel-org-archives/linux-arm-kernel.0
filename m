@@ -1,58 +1,127 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Oct 2012 10:17:49 +0200
-Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
-Message-ID: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 23 Oct 2012 10:19:25 +0200
+Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
+Message-ID: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The split of 370 and XP into two Kconfig options and the multiplatform
-kernel support has changed a few Kconfig symbols, so let's update the
-mvebu_defconfig file with the latest changes.
+This platform, available in Japan from PlatHome, has a dual-core
+Armada XP, the MV78260. For now, only the two serial ports and the
+three front LEDs are supported. Support for network, SATA, USB and
+other peripherals will be added as drivers for them become available
+for Armada XP in mainline.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 ---
-As this is a simple defconfig update against 3.7 changes, it should
-most likely go into 3.7.
+This is 3.8 material.
 ---
- arch/arm/configs/mvebu_defconfig |   10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile           |    3 +-
+ arch/arm/boot/dts/openblocks-ax3.dts |   69 ++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
+ 3 files changed, 72 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/openblocks-ax3.dts
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 7bcf850..3458752 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -1,6 +1,6 @@
- CONFIG_EXPERIMENTAL=y
- CONFIG_SYSVIPC=y
--CONFIG_NO_HZ=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_LOG_BUF_SHIFT=14
- CONFIG_BLK_DEV_INITRD=y
-@@ -9,10 +9,12 @@ CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- CONFIG_ARCH_MVEBU=y
--CONFIG_MACH_ARMADA_370_XP=y
-+CONFIG_MACH_ARMADA_370=y
-+CONFIG_MACH_ARMADA_XP=y
-+# CONFIG_CACHE_L2X0 is not set
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
--CONFIG_USE_OF=y
-+# CONFIG_COMPACTION is not set
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-@@ -23,6 +25,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..b7814b9 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -44,7 +44,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
+ dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+ 	msm8960-cdp.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+-	armada-xp-db.dtb
++	armada-xp-db.dtb \
++	openblocks-ax3.dtb
+ dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+ 	imx53-ard.dtb \
+ 	imx53-evk.dtb \
+diff --git a/arch/arm/boot/dts/openblocks-ax3.dts b/arch/arm/boot/dts/openblocks-ax3.dts
+new file mode 100644
+index 0000000..f757116
+--- /dev/null
++++ b/arch/arm/boot/dts/openblocks-ax3.dts
+@@ -0,0 +1,69 @@
++/*
++ * Device Tree file for OpenBlocks AX3 board
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "armada-xp-mv78260.dtsi"
++
++/ {
++	model = "PlatHome OpenBlocks AX3 board";
++	compatible = "plathome,openblocks-ax3", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 earlyprintk";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x40000000>; /* 1 GB */
++	};
++
++	soc {
++		serial at d0012000 {
++			clock-frequency = <250000000>;
++			status = "okay";
++		};
++		serial at d0012100 {
++			clock-frequency = <250000000>;
++			status = "okay";
++		};
++		pinctrl {
++			led_pins: led-pins-0 {
++				  marvell,pins = "mpp49", "mpp51", "mpp53";
++				  marvell,function = "gpio";
++			};
++		};
++		leds {
++		        compatible = "gpio-leds";
++			pinctrl-names = "default";
++			pinctrl-0 = <&led_pins>;
++
++			red_led {
++				   label = "red_led";
++				   gpios = <&gpio1 17 1>;
++				   default-state = "off";
++			};
++
++			yellow_led {
++				   label = "yellow_led";
++				   gpios = <&gpio1 19 1>;
++				   default-state = "off";
++			};
++
++			green_led {
++				   label = "green_led";
++				   gpios = <&gpio1 21 1>;
++				   default-state = "off";
++				   linux,default-trigger = "heartbeat";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 49d7915..cd2717b 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
+ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+ 	"marvell,a370-db",
+ 	"marvell,axp-db",
++	"plathome,openblocks-ax3",
+ 	NULL,
+ };
+ 
 -- 
 1.7.9.5
