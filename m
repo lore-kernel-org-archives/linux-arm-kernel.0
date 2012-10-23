@@ -1,56 +1,51 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 23 Oct 2012 10:12:29 +0000
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <20121019061630.GB2983@netboy.at.omicron.at>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
- <20121017235045.GB30550@atomide.com>
- <20121018030654.GE2867@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
- <20121018184443.GD2350@netboy.at.omicron.at> <50806B1D.9040504@ti.com>
- <20121019061630.GB2983@netboy.at.omicron.at>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB48592@DBDE01.ent.ti.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Tue, 23 Oct 2012 10:17:55 +0000
+Subject: [PATCH 1/4] mtd: nand: omap2: Update nerrors using ecc.strength
+In-Reply-To: <87obk3va1j.fsf@macbook.be.48ers.dk>
+References: <1349274589-11389-1-git-send-email-avinashphilip@ti.com>
+ <1349274589-11389-2-git-send-email-avinashphilip@ti.com>
+ <87obk3va1j.fsf@macbook.be.48ers.dk>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9D29BE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 11:46:30, Richard Cochran wrote:
-> On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
-> > 
-> > Another important point is, this driver is also required and used for
-> > Davinci family of devices (arch/mach/mach-davinci/).
+On Tue, Oct 16, 2012 at 00:26:40, Peter Korsgaard wrote:
+> >>>>> Philip, Avinash <avinashphilip@ti.com> writes:
 > 
-> That is really beside the point. If the code isn't ready yet, then
-> don't merge it.
+>  > Update number of errors using nand ecc strength.
+>  > Also add macro definitions BCH8_ERROR_MAX & BCH4_ERROR_MAX
 > 
-
-With respect to AM33xx the driver may not be ready, but that doesn't mean 
-driver itself is not ready. As I mentioned before, driver is used on davinci 
-platform and it could be functional there. 
-
-In case of AM33xx, where DT only boot mode is supported, you are forced to 
-migrate driver to DT, which is addition to the driver.
-
-Note that, all the patches you have posted recently are AM33xx SoC 
-integration specific patches.
-
-> When I asked about the beaglebone, I was given the impression that it
-> will be ready for v3.7-rc1.  But, as I know realize, at the current
-> rate, it might not even be ready for v3.8.
+>  > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+>  > ---
+>  > :100644 100644 5b31386... af511a9... M	drivers/mtd/nand/omap2.c
+>  >  drivers/mtd/nand/omap2.c |   12 ++++++++----
+>  >  1 files changed, 8 insertions(+), 4 deletions(-)
 > 
-
-I understand, and as you mentioned we are not fully there at v3.7-rc1 with 
-all the drivers/module support, due to all known reasons. Its good that with 
-v3.7-rc2, Beaglebone boots up out of box from mainline. 
-
-
-Thanks,
-Vaibhav
-> I don't mind waiting, but please make sure that whatever lands into a
-> release is really, truly working.
+>  > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+>  > index 5b31386..af511a9 100644
+>  > --- a/drivers/mtd/nand/omap2.c
+>  > +++ b/drivers/mtd/nand/omap2.c
+>  > @@ -111,6 +111,9 @@
+>  >  #define	ECCCLEAR			0x100
+>  >  #define	ECC1				0x1
+>  
+>  > +#define BCH8_MAX_ERROR		8	/* upto 8 bit coorectable */
+>  > +#define BCH4_MAX_ERROR		4	/* upto 4 bit correctable */
 > 
-> Thanks,
-> Richard
+> First 'correctable' misspelled.
+
+I will correct it
+
 > 
+> I don't personally think these defines improve readability very much
+> compared to to just using 4/8, though.
+
+Thought of removing magic numbers & provide information also.
+
+Thanks
+Avinash
+
 > 
+> -- 
+> Bye, Peter Korsgaard
 > 
