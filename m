@@ -1,50 +1,71 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 23 Oct 2012 21:13:56 +0530
-Subject: [RFC] ARM: OMAP: hwmod: wait for sysreset complete after enabling
- hwmod
-In-Reply-To: <87zk3edvti.fsf@deeprootsystems.com>
-References: <1350922532-26338-1-git-send-email-t-kristo@ti.com>
- <87zk3edvti.fsf@deeprootsystems.com>
-Message-ID: <CAM=Q2cvLc63tGMG1t1wguiMHqNxcrZ60GF+fHjxc6_8c7rBykw@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 23 Oct 2012 10:59:06 -0500
+Subject: [PATCH v2 1/4] ARM: dts: omap5: Update GPIO with address space
+ and interrupts
+In-Reply-To: <5086B316.6000001@ti.com>
+References: <1350981432-6750-1-git-send-email-s-guiriec@ti.com>
+ <1350981432-6750-2-git-send-email-s-guiriec@ti.com> <5086AE8E.60106@ti.com>
+ <5086B316.6000001@ti.com>
+Message-ID: <5086BECA.9070502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 3:16 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Tero Kristo <t-kristo@ti.com> writes:
->
->> When waking up from off-mode, some IP blocks are reset automatically by
->> hardware. For this reason, software must wait until the reset has
->> completed before attempting to access the IP block.
->>
->> This patch fixes for example the bug introduced by commit
->> 6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c ("mmc: omap_hsmmc: remove access
->> to SYSCONFIG register"), in which the MMC IP block is reset during
->> off-mode entry, but the code expects the module to be already available
->> during the execution of context restore.
->>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Venkatraman S <svenkatr@ti.com>
->
-> I can confirm that this patch the regression in my OMAP3 PM tests where
-> suspend test (to retention or off) failed if ran after the off-idle
-> test.
->
-> Tested-by: Kevin Hilman <khilman@ti.com>
->
-> on 3530/Overo, 3730/OveroSTORM, 3730/Beagle-xM
 
-on 3630/Beagle works.
-However on 3430 on idle path didnot work.
-let me know if i am missing some thing.
+On 10/23/2012 10:09 AM, Benoit Cousson wrote:
+> On 10/23/2012 04:49 PM, Jon Hunter wrote:
+>> Hi Seb,
+>>
+>> On 10/23/2012 03:37 AM, Sebastien Guiriec wrote:
+>>> Add base address and interrupt line inside Device Tree data for
+>>> OMAP5
+>>>
+>>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>>> ---
+>>>  arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++++
+>>>  1 file changed, 16 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>>> index 42c78be..9e39f9f 100644
+>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>> @@ -104,6 +104,8 @@
+>>>  
+>>>  		gpio1: gpio at 4ae10000 {
+>>>  			compatible = "ti,omap4-gpio";
+>>> +			reg = <0x4ae10000 0x200>;
+>>> +			interrupts = <0 29 0x4>;
+>>>  			ti,hwmods = "gpio1";
+>>>  			gpio-controller;
+>>>  			#gpio-cells = <2>;
+>>
+>> I am wondering if we should add the "interrupt-parent" property to add
+>> nodes in the device-tree source. I know that today the interrupt-parent
+>> is being defined globally, but when device-tree maps an interrupt for a
+>> device it searches for the interrupt-parent starting the current device
+>> node.
+>>
+>> So in other words, for gpio1 it will search the gpio1 binding for
+>> "interrupt-parent" and if not found move up a level and search again. It
+>> will keep doing this until it finds the "interrupt-parent".
+>>
+>> Therefore, I believe it will improve search time and hence, boot time if
+>> we have interrupt-parent defined in each node.
+> 
+> Mmm, I'm not that sure. it will increase the size of the blob, so
+> increase the time to load it and then to parse it. Where in the current
+> case, it is just going up to the parent node using the already
+> un-flatten tree in memory and thus that should not take that much time.
 
->
-> Thanks Tero for the fix,
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Yes it will definitely increase the size, so that could slow things down.
+
+> That being said, it might be interesting to benchmark that to see what
+> is the real impact.
+
+Right, I wonder what the key functions are we need to benchmark to get
+an overall feel for what is best? Right now I am seeing some people add
+the interrupt-parent for device nodes and others not. Ideally we should
+be consistent, but at the same time it is probably something that we can
+easily sort out later. So not a big deal either way.
+
+Cheers
+Jon
