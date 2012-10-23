@@ -1,167 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Oct 2012 22:11:24 +0300
-Subject: [PATCH] i2c: omap: re-factor omap_i2c_init function
-In-Reply-To: <1351006039-24332-1-git-send-email-shubhrajyoti@ti.com>
-References: <1351006039-24332-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121023191124.GB853@arwen.pp.htv.fi>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 23 Oct 2012 19:18:22 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1210231911500.26503@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-On Tue, Oct 23, 2012 at 08:57:19PM +0530, Shubhrajyoti D wrote:
-> re-factor omap_i2c_init() so that we can re-use it for resume.
-> While at it also remove the bufstate variable as we write it
-> in omap_i2c_resize_fifo for every transfer.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
-> Applies on Felipe's series
-> http://www.spinics.net/lists/linux-omap/msg79995.html
-> 
-> Tested with Terro sys fix + Felipe's stop sched_clock() during suspend
-> on omap3636 beagle both idle and suspend.
-> 
-> Functional testing on omap4sdp.
-> 
->  drivers/i2c/busses/i2c-omap.c |   68 +++++++++++++++++------------------------
->  1 files changed, 28 insertions(+), 40 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 5e5cefb..338cee7 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -209,7 +209,6 @@ struct omap_i2c_dev {
->  	u16			pscstate;
->  	u16			scllstate;
->  	u16			sclhstate;
-> -	u16			bufstate;
->  	u16			syscstate;
->  	u16			westate;
->  	u16			errata;
-> @@ -285,9 +284,26 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
->  	}
->  }
->  
-> +static void __omap_i2c_init(struct omap_i2c_dev *dev)
-> +{
-> +
-> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> +	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
-> +	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-> +
-> +	/* SCL low and high time values */
-> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-> +	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530)
-> +		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-> +	/* Take the I2C module out of reset: */
-> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
-> +
-> +}
->  static int omap_i2c_init(struct omap_i2c_dev *dev)
->  {
-> -	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
-> +	u16 psc = 0, scll = 0, sclh = 0;
->  	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
->  	unsigned long fclk_rate = 12000000;
->  	unsigned long timeout;
-> @@ -337,11 +353,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  			 * REVISIT: Some wkup sources might not be needed.
->  			 */
->  			dev->westate = OMAP_I2C_WE_ALL;
-> -			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
-> -							dev->westate);
->  		}
->  	}
-> -	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
->  
->  	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
->  		/*
-> @@ -426,28 +439,18 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  		sclh = fclk_rate / (dev->speed * 2) - 7 + psc;
->  	}
->  
-> -	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
-> -	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, psc);
-> -
-> -	/* SCL low and high time values */
-> -	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
-> -	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
-> -
-> -	/* Take the I2C module out of reset: */
-> -	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> -
->  	/* Enable interrupts */
->  	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
->  			OMAP_I2C_IE_NACK | OMAP_I2C_IE_AL)  |
->  			((dev->fifo_size) ? (OMAP_I2C_IE_RDR |
->  				OMAP_I2C_IE_XDR) : 0);
-> -	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
-> -	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-> -		dev->pscstate = psc;
-> -		dev->scllstate = scll;
-> -		dev->sclhstate = sclh;
-> -		dev->bufstate = buf;
-> -	}
-> +
-> +	dev->pscstate = psc;
-> +	dev->scllstate = scll;
-> +	dev->sclhstate = sclh;
-> +
-> +	__omap_i2c_init(dev);
-> +
->  	return 0;
->  }
->  
-> @@ -1136,7 +1139,7 @@ omap_i2c_probe(struct platform_device *pdev)
->  	if (IS_ERR_VALUE(r))
->  		goto err_free_mem;
->  
-> -	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
-> +	dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG)  & 0xff;
->  
->  	dev->errata = 0;
->  
-> @@ -1268,23 +1271,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
->  {
->  	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
->  
-> -	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> -	}
-> -
-> -	/*
-> -	 * Don't write to this register if the IE state is 0 as it can
-> -	 * cause deadlock.
-> -	 */
-> -	if (_dev->iestate)
-> -		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
-> +	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
-> +		__omap_i2c_init(_dev);
->  
->  	return 0;
->  }
+On Mon, 22 Oct 2012, Jean Pihet wrote:
 
-another thing, the few places in omap_i2c_xfer_msg() which are currently
-calling omap_i2c_init() should also be converted to call the newly added
-__omap_i2c_init(). We don't need to recalculate any of those clock
-dividers and whatnot.
+> I tried the latest l-o with omap2plus defconfig on my Beagleboard B5
+> (ES2.1) and could not reproduce the problem.
+> I do not have the I2C error messages at boot, nor at user space start
+> up. I tried to read/write the TWL RTC, successfully.
+> 
+> Another difference is the bootloader images. I have the following:
+> - Texas Instruments X-Loader 1.4.2 (Feb  3 2009 - 15:34:17)
+> - U-Boot 2009.01-dirty (Feb 19 2009 - 12:22:31)
+> Could you send your bootloader images?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/5d7bcaa9/attachment.sig>
+Just sent you a link via private E-mail.
+
+> On the PM QoS side the commit 3db11fef moves the I2C code from the
+> OMAP PM no-op layer to the PM QoS for CPU and DMA latency, which
+> influences the cpuidle states. However CPU_IDLE is not set in
+> omap2plus_defconfig so there should not be any effect.
+> Do you have CPU_IDLE enabled?
+
+No, it's omap2plus_defconfig.
+
+
+- Paul
