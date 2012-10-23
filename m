@@ -1,38 +1,58 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Oct 2012 10:17:05 +0200
-Subject: [PATCH] gpio: mvebu: correctly set the value in direction_output()
-Message-ID: <1350980225-6546-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 23 Oct 2012 10:17:49 +0200
+Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
+Message-ID: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ->direction_output() operation of gpio_chip is supposed to set the
-direction to output but also to set the GPIO to an initial
-value. Unfortunately, this last part was not done until now, causing
-for example the LEDs to not be properly set to their default initial
-value. This patch fixes this by calling the mvebu_gpio_set() function
-from mvebu_gpio_direction_output() before configuring the GPIO as an
-output GPIO.
+The split of 370 and XP into two Kconfig options and the multiplatform
+kernel support has changed a few Kconfig symbols, so let's update the
+mvebu_defconfig file with the latest changes.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
 ---
-As this is a fix, it should most likely go into 3.7.
+As this is a simple defconfig update against 3.7 changes, it should
+most likely go into 3.7.
 ---
- drivers/gpio/gpio-mvebu.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/mvebu_defconfig |   10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index 7a87412..eb42ab1 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -244,6 +244,8 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned pin,
- 	if (ret)
- 		return ret;
- 
-+	mvebu_gpio_set(chip, pin, value);
-+
- 	spin_lock_irqsave(&mvchip->lock, flags);
- 	u = readl_relaxed(mvebu_gpioreg_io_conf(mvchip));
- 	u &= ~(1 << pin);
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 7bcf850..3458752 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -1,6 +1,6 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_SYSVIPC=y
+-CONFIG_NO_HZ=y
++CONFIG_IRQ_DOMAIN_DEBUG=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=14
+ CONFIG_BLK_DEV_INITRD=y
+@@ -9,10 +9,12 @@ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ CONFIG_ARCH_MVEBU=y
+-CONFIG_MACH_ARMADA_370_XP=y
++CONFIG_MACH_ARMADA_370=y
++CONFIG_MACH_ARMADA_XP=y
++# CONFIG_CACHE_L2X0 is not set
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+-CONFIG_USE_OF=y
++# CONFIG_COMPACTION is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+@@ -23,6 +25,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_GPIOLIB=y
+ CONFIG_GPIO_SYSFS=y
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ # CONFIG_EXT3_FS_XATTR is not set
 -- 
 1.7.9.5
