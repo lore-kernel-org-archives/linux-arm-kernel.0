@@ -1,78 +1,226 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 23 Oct 2012 15:02:37 -0700
-Subject: [PATCH 1/7] ARM: OMAP2xxx: hwmod: Convert SHAM crypto device
- data to hwmod
-In-Reply-To: <alpine.DEB.2.00.1210221935320.13464@utopia.booyaka.com>
-References: <1350683640-15044-1-git-send-email-mgreer@animalcreek.com>
- <1350683640-15044-2-git-send-email-mgreer@animalcreek.com>
- <alpine.DEB.2.00.1210201934550.27264@utopia.booyaka.com>
- <20121022193336.GA1708@animalcreek.com>
- <alpine.DEB.2.00.1210221935320.13464@utopia.booyaka.com>
-Message-ID: <20121023220237.GA19671@animalcreek.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 23 Oct 2012 15:02:40 -0700
+Subject: [RFC] Energy/power monitoring within the kernel
+In-Reply-To: <1351013449.9070.5.camel@hornet>
+References: <1351013449.9070.5.camel@hornet>
+Message-ID: <20121023220240.GA25895@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 07:49:47PM +0000, Paul Walmsley wrote:
-> On Mon, 22 Oct 2012, Mark A. Greer wrote:
+On Tue, Oct 23, 2012 at 06:30:49PM +0100, Pawel Moll wrote:
+> Greetings All,
 > 
-> > On Sat, Oct 20, 2012 at 07:40:19PM +0000, Paul Walmsley wrote:
-> >
-> > > >  static void omap_init_sham(void)
-> > > >  {
-> > > > -	if (cpu_is_omap24xx()) {
-> > > > -		sham_device.resource = omap2_sham_resources;
-> > > > -		sham_device.num_resources = omap2_sham_resources_sz;
-> > > > +	if (cpu_is_omap24xx() &&
-> > > > +	    (omap2_cm_read_mod_reg(CORE_MOD, OMAP24XX_CM_IDLEST4) &
-> > > > +						 OMAP24XX_ST_SHA_MASK)) {
-> > > 
-> > > Hmm.  Not sure I understand the purpose of this CM read.  Don't we want to 
-> > > initialize this device unconditionally?
-> > 
-> > No, the device doesn't exist on all parts.
+> More and more of people are getting interested in the subject of power
+> (energy) consumption monitoring. We have some external tools like
+> "battery simulators", energy probes etc., but some targets can measure
+> their power usage on their own.
 > 
-> It should exist on all OMAP2xxx, AFAIK.  (Whether some bootloader 
-> firewalled it off is another matter, of course.)
+> Traditionally such data should be exposed to the user via hwmon sysfs
+> interface, and that's exactly what I did for "my" platform - I have
+> a /sys/class/hwmon/hwmon*/device/energy*_input and this was good
+> enough to draw pretty graphs in userspace. Everyone was happy...
 > 
-> >  This is the only way to tell if its there (AFAIK).
-> 
-> Hmm.  I don't think the CM_IDLEST bits work that way, in the general case.  
-> They just indicate whether the PRCM considers that IP block to be 
-> currently accessible.  So for example if the clocks are disabled to an IP 
-> block, the CM_IDLEST bit would indicate that it's not accessible.  The 
-> software could then enable the clocks, and the CM_IDLEST bit would 
-> indicate that it is accessible.  We use this in the clock framework and 
-> hwmod code after enabling clocks to wait until the system considers the IP 
-> block accessible.  See for example
-> 
-> http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=blob;f=arch/arm/mach-omap2/clock.c;h=961ac8f7e13d8c84a1cbb4587255ea685520bd18;hb=HEAD#l80
-> 
-> ...
-> 
-> Now it's possible that on some TI chips, the CM_IDLEST bit is tied to the 
-> SIdleAck signal originating from the IP block.  (I've been told that on 
-> other OMAPs, CM_IDLEST is actually tied to the SIdleReq signal originating 
-> from the PRCM, which is not terribly useful...)  So if it's tied to the 
-> SIdleAck signal, and the PRCM clocks are enabled, then it might provide an 
-> indication of whether the IP block exists on that chip.  But ultimately 
-> the IP block might still be firewalled off even if it appears to exist to 
-> the PRCM.  So for 3xxx, I'd suggest just adding it to the appropriate 
-> GP-specific hwmod init lists, such as omap3xxx_gp_hwmod_ocp_ifs.
+Only driver supporting "energy" output so far is ibmaem, and the reported energy
+is supposed to be cumulative, as in energy = power * time. Do you mean power,
+possibly ?
 
-Paul, thank you for the clear explanation.
+> Now I am getting new requests to do more with this data. In particular
+> I'm asked how to add such information to ftrace/perf output. The second
+> most frequent request is about providing it to a "energy aware"
+> cpufreq governor.
+> 
 
-I've talked to some hardware guys and I have come to the following
-conclusions:
+Anything energy related would have to be along the line of "do something after a
+certain amount of work has been performed", which at least at the surface does
+not make much sense to me, unless you mean something along the line of a
+process scheduler which schedules a process not based on time slices but based
+on energy consumed, ie if you want to define a time slice not in milli-seconds
+but in Joule.
 
-a) What you say above about CM_IDLEST is correct.
-b) There seems to be no good way, in general, to tell if the SHA
-   (or AES or RNG or ...) module exists.
-c) The best thing to do is what you suggest and add the SHA hwmod
-   data for all omap2's and omap3 GP's.
+If so, I would argue that a similar behavior could be achieved by varying the
+duration of time slices with the current CPU speed, or simply by using cycle
+count instead of time as time slice parameter. Not that I am sure if such an
+approach would really be of interest for anyone. 
 
-I will respin my patches with everyone's comments addressed later today.
+Or do you really mean power, not energy, such as in "reduce CPU speed if its
+power consumption is above X Watt" ?
 
-Thanks everyone.
+> I've came up with three (non-mutually exclusive) options. I will
+> appreciate any other ideas and comments (including "it makes not sense
+> whatsoever" ones, with justification). Of course I am more than willing
+> to spend time on prototyping anything that seems reasonable and propose
+> patches.
+> 
+> 
+> 
+> === Option 1: Trace event ===
+> 
+> This seems to be the "cheapest" option. Simply defining a trace event
+> that can be generated by a hwmon (or any other) driver makes the
+> interesting data immediately available to any ftrace/perf user. Of
+> course it doesn't really help with the cpufreq case, but seems to be
+> a good place to start with.
+> 
+> The question is how to define it... I've came up with two prototypes:
+> 
+> = Generic hwmon trace event =
+> 
+> This one allows any driver to generate a trace event whenever any
+> "hwmon attribute" (measured value) gets updated. The rate at which the
+> updates happen can be controlled by already existing "update_interval"
+> attribute.
+> 
+> 8<-------------------------------------------
+> TRACE_EVENT(hwmon_attr_update,
+> 	TP_PROTO(struct device *dev, struct attribute *attr, long long input),
+> 	TP_ARGS(dev, attr, input),
+> 
+> 	TP_STRUCT__entry(
+> 		__string(       dev,		dev_name(dev))
+> 		__string(	attr,		attr->name)
+> 		__field(	long long,	input)
+> 	),
+> 
+> 	TP_fast_assign(
+> 		__assign_str(dev, dev_name(dev));
+> 		__assign_str(attr, attr->name);
+> 		__entry->input = input;
+> 	),
+> 
+> 	TP_printk("%s %s %lld", __get_str(dev), __get_str(attr), __entry->input)
+> );
+> 8<-------------------------------------------
+> 
+> It generates such ftrace message:
+> 
+> <...>212.673126: hwmon_attr_update: hwmon4 temp1_input 34361
+> 
+> One issue with this is that some external knowledge is required to
+> relate a number to a processor core. Or maybe it's not an issue at all
+> because it should be left for the user(space)?
+> 
+> = CPU power/energy/temperature trace event =
+> 
+> This one is designed to emphasize the relation between the measured
+> value (whether it is energy, temperature or any other physical
+> phenomena, really) and CPUs, so it is quite specific (too specific?)
+> 
+> 8<-------------------------------------------
+> TRACE_EVENT(cpus_environment,
+> 	TP_PROTO(const struct cpumask *cpus, long long value, char unit),
+> 	TP_ARGS(cpus, value, unit),
+> 
+> 	TP_STRUCT__entry(
+> 		__array(	unsigned char,	cpus,	sizeof(struct cpumask))
+> 		__field(	long long,	value)
+> 		__field(	char,		unit)
+> 	),
+> 
+> 	TP_fast_assign(
+> 		memcpy(__entry->cpus, cpus, sizeof(struct cpumask));
+> 		__entry->value = value;
+> 		__entry->unit = unit;
+> 	),
+> 
+> 	TP_printk("cpus %s %lld[%c]",
+> 		__print_cpumask((struct cpumask *)__entry->cpus),
+> 		__entry->value, __entry->unit)
+> );
+> 8<-------------------------------------------
+> 
+> And the equivalent ftrace message is:
+> 
+> <...>127.063107: cpus_environment: cpus 0,1,2,3 34361[C]
+> 
+> It's a cpumask, not just single cpu id, because the sensor may measure
+> the value per set of CPUs, eg. a temperature of the whole silicon die
+> (so all the cores) or an energy consumed by a subset of cores (this
+> is my particular use case - two meters monitor a cluster of two
+> processors and a cluster of three processors, all working as a SMP
+> system).
+> 
+> Of course the cpus __array could be actually a special __cpumask field
+> type (I've just hacked the __print_cpumask so far). And I've just
+> realised that the unit field should actually be a string to allow unit
+> prefixes to be specified (the above should obviously be "34361[mC]"
+> not "[C]"). Also - excuse the "cpus_environment" name - this was the
+> best I was able to come up with at the time and I'm eager to accept
+> any alternative suggestions :-)
+> 
+I am not sure how this would be expected to work. hwmon is, by its very nature,
+a passive subsystem: It doesn't do anything unless data is explicitly requested
+from it. It does not update an attribute unless that attribute is read.
+That does not seem to fit well with the idea of tracing - which assumes
+that some activity is happening, ultimately, all by itself, presumably
+periodically. The idea to have a user space application read hwmon data only
+for it to trigger trace events does not seem to be very compelling to me.
 
-Mark
---
+An exception is if a monitoring device suppports interrupts, and if its driver
+actually implements those interrupts. This is, however, not the case for most of
+the current drivers (if any), mostly because interrupt support for hardware
+monitoring devices is very platform dependent and thus difficult to implement.
+
+> 
+> === Option 2: hwmon perf PMU ===
+> 
+> Although the trace event makes it possible to obtain interesting
+> information using perf, the user wouldn't be able to treat the
+> energy meter as a normal data source. In particular there would
+> be no way of creating a group of events consisting eg. of a
+> "normal" leader (eg. cache miss event) triggering energy meter
+> read. The only way to get this done is to implement a perf PMU
+> backend providing "environmental data" to the user.
+> 
+> = High-level hwmon API and PMU =
+> 
+> Current hwmon subsystem does not provide any abstraction for the
+> measured values and requires particular drivers to create specified
+> sysfs attributes than used by userspace libsensors. This makes
+> the framework ultimately flexible and ultimately hard to access
+> from within the kernel...
+> 
+> What could be done here is some (simple) API to register the
+> measured values with the hwmon core which would result in creating
+> equivalent sysfs attributes automagically, but also allow a
+> in-kernel API for values enumeration and access. That way the core
+> could also register a "hwmon PMU" with the perf framework providing
+> data from all "compliant" drivers.
+> 
+> = A driver-specific PMU =
+> 
+> Of course a particular driver could register its own perf PMU on its
+> own. It's certainly an option, just very suboptimal in my opinion.
+> Or maybe not? Maybe the task is so specialized that it makes sense?
+> 
+We had a couple of attempts to provide an in-kernel API. Unfortunately,
+the result was, at least so far, more complexity on the driver side.
+So the difficulty is really to define an API which is really simple, and does
+not just complicate driver development for a (presumably) rare use case.
+
+Guenter
+
+> 
+> 
+> === Option 3: CPU power(energy) monitoring framework ===
+> 
+> And last but not least, maybe the problem deserves some dedicated
+> API? Something that would take providers and feed their data into
+> interested parties, in particular a perf PMU implementation and
+> cpufreq governors?
+> 
+> Maybe it could be an extension to the thermal framework? It already
+> gives some meaning to a physical phenomena. Adding other, related ones
+> like energy, and relating it to cpu cores could make some sense.
+> 
+> 
+> 
+> I've tried to gather all potentially interested audience in the To:
+> list, but if I missed anyone - please, do let them (and/or me) know.
+> 
+> Best regards and thanks for participation in the discussion!
+> 
+> Pawel
+> 
+> 
+> 
+> 
