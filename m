@@ -1,62 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 23 Oct 2012 20:37:45 +0200
-Subject: Which kirkwood does your DT board use?
-In-Reply-To: <5085BA54.6050006@baker-net.org.uk>
-References: <20121020113800.GC21046@lunn.ch>
- <5085BA54.6050006@baker-net.org.uk>
-Message-ID: <20121023183745.GW21046@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 23 Oct 2012 12:42:11 -0600
+Subject: [PATCH 1/2] ARM: dt: tegra: Add sdhci regulators
+In-Reply-To: <4346406.Jy2o1pWcOR@ax5200p>
+References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
+ <1350976740-19284-2-git-send-email-pkunapuli@nvidia.com>
+ <4346406.Jy2o1pWcOR@ax5200p>
+Message-ID: <5086E503.8090604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 10:27:48PM +0100, Adam Baker wrote:
-> On 20/10/12 12:38, Andrew Lunn wrote:
-> >Hi Folks
-> >
-> >All of you in the To: have contributed a DT based Kirkwood board port.
-> >Nearly all the DT files we have declare the CPU to be
-> >marvell,kirkwood-88f6281. For adding DT based pinctrl, to replace the
-> >mpp code, we need to know the exact kirkwood being used. It should be
-> >one of MV88F6180, MV88F6190, MV88F6192, MV88F6281 or MV88F6282.
-> >
-> >You can see what your hardware has a boot time:
-> >
-> >Kirkwood: MV88F6282-Rev-A0, TCLK=200000000.
-> >
-> >Please could you check your hardware and let me know what the correct
-> >CPU is. I can then fix the .dts files and prepare a first attempt at
-> >converting boards to pinctrl.
-> >
+On 10/23/2012 12:07 PM, Marc Dietrich wrote:
+> Pavan,
 > 
-> Hi,
+> On Tuesday 23 October 2012 12:48:59 Pavan Kunapuli wrote:
+>> Adding vmmc and vmmcq supplies for sdhci nodes
+>> in tegra dt files.
 > 
-> I've not seen a reply from Arnaud yet so I'll offer
+> <...>
 > 
-> Iomega Iconnect
-> Kirkwood: MV88F6281-A0, TCLK=200000000.
+>> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+>> b/arch/arm/boot/dts/tegra20-paz00.dts index 6a93d14..e161b65 100644
+>> --- a/arch/arm/boot/dts/tegra20-paz00.dts
+>> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
+>> @@ -422,13 +422,17 @@
+>>  		status = "okay";
+>>  		cd-gpios = <&gpio 173 0>; /* gpio PV5 */
+>>  		wp-gpios = <&gpio 57 0>;  /* gpio PH1 */
+>> -		power-gpios = <&gpio 169 0>; /* gpio PV1 */
+>>  		bus-width = <4>;
+>> +		vmmc-supply = <&vddio_sd_reg>;
+>> +		vqmmc-supply = <&vddio_sd_reg>;
+>>  	};
+>>
+>>  	sdhci at c8000600 {
+>>  		status = "okay";
+>>  		bus-width = <8>;
+>> +		vmmc-supply = <&vddio_sdmmc_reg>;
+>> +		vqmmc-supply = <&vddio_sdmmc_reg>;
+> 
+> to make it better, this should be:
+> 
+> vmmc-supply = <&vcore_mmc_reg>; and
+> vqmmc-supply = <&vddio_nand_reg>;
+> 
+> with vcore_mmc_reg is ldo5 and vddio_nand_reg is the fixed regulator below.
 
-Hi Adam
+I think for the eMMC (not SD card), the core supply is actually +3vs_s3,
+and hence fixed; it looks like LDO5 used to be used, but they changed
+it. See the note for the VCC connections on the eMMC chip.
 
-Thanks. Arnaud replied p-t-p.
+> By doing so, I get "sdhci-tegra sdhci-tegra.3: could not set regulator OCR 
+> (-1)". MMC subsys wants to set ldo5 to 3.3V but it is fixed. I guess that's 
+> harmless for now. 
 
-I'm was missing just one reply, but with a bit of googling, i found a
-boot log online, so could fill the gap.
-
-kirkwood-dns320.dts	     MV88F6281
-kirkwood-dns325.dts	     MV88F6281
-kirkwood-dockstar.dts	     MV88F6281
-kirkwood-dreamplug.dts	     MV88F6281
-kirkwood-goflexnet.dts	     MV88F6281
-kirkwood-ib62x0.dts	     MV88F6281
-kirkwood-iconnect.dts	     MV88F6281
-kirkwood-iomega_ix2_200.dts  MV88F6281
-kirkwood-lschlv2.dts	     MV88F6281
-kirkwood-lsxhl.dts	     MV88F6281
-kirkwood-ts219-6281.dts      MV88F6281
-kirkwood-ts219-6282.dts      MV88F6282
-
-Not what i was expecting, nearly every one being 6281!
-But it does mean there are no DT files to correct :-)
-
-Thanks for your answers everybody.
-
-       Andrew
+What I mention above might end up fixing that?
