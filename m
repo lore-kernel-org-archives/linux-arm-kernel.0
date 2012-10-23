@@ -1,111 +1,65 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Oct 2012 20:57:33 +0900
-Subject: [PATCH v2] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
-In-Reply-To: <1393767.3tjq8gL245@amdc1227>
-References: <1393767.3tjq8gL245@amdc1227>
-Message-ID: <01d101cdb115$965b0730$c3111590$%kim@samsung.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 23 Oct 2012 12:58:07 +0100
+Subject: [PATCH 03/10] tty: pxa: configure pin
+In-Reply-To: <CACRpkdb+DkZbTDZamGMN+9t07kPktuA_3QtHQJFv+Vu859r7KA@mail.gmail.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+ <508080CB.5010904@wwwdotorg.org>
+ <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
+ <5085AC06.8070508@wwwdotorg.org>
+ <CACRpkdY-XyagxGU_ya_FZirzbqStTirOC5nuBBwwFY3f4bBTYA@mail.gmail.com>
+ <20121023093711.GS4477@opensource.wolfsonmicro.com>
+ <CACRpkdb+DkZbTDZamGMN+9t07kPktuA_3QtHQJFv+Vu859r7KA@mail.gmail.com>
+Message-ID: <20121023115806.GX4477@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Exynos4412 uses different information register for each core. This patch
-> adjusts the bring-up code to take that into account.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos/platsmp.c | 27 +++++++++++++++++++++------
->  1 file changed, 21 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-
-> exynos/platsmp.c
-> index 36c3984..816a27d 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -34,8 +34,19 @@
-> 
->  extern void exynos4_secondary_startup(void);
-> 
-> -#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1
-? \
-> -				S5P_INFORM5 : S5P_VA_SYSRAM)
-> +static inline void __iomem *cpu_boot_reg_base(void)
-> +{
-> +	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-> +		return S5P_INFORM5;
-> +	return S5P_VA_SYSRAM;
-> +}
-> +
-> +static inline void __iomem *cpu_boot_reg(int cpu)
-> +{
-> +	if (soc_is_exynos4412())
-> +		return cpu_boot_reg_base() + 4*cpu;
-> +	return cpu_boot_reg_base();
-> +}
-> 
->  /*
->   * control for which core is the next to come out of the secondary
-> @@ -89,6 +100,7 @@ void __cpuinit platform_secondary_init(unsigned int
-cpu)
->  int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
->  	unsigned long timeout;
-> +	unsigned long phys_cpu = cpu_logical_map(cpu);
-> 
->  	/*
->  	 * Set synchronisation state between this boot processor
-> @@ -104,7 +116,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
-> task_struct *idle)
->  	 * Note that "pen_release" is the hardware CPU ID, whereas
->  	 * "cpu" is Linux's internal ID.
->  	 */
-> -	write_pen_release(cpu_logical_map(cpu));
-> +	write_pen_release(phys_cpu);
-> 
->  	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
->  		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-> @@ -138,7 +150,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct
-> task_struct *idle)
->  		smp_rmb();
-> 
->  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> -			CPU1_BOOT_REG);
-> +
-cpu_boot_reg(phys_cpu));
->  		gic_raise_softirq(cpumask_of(cpu), 1);
-> 
->  		if (pen_release == -1)
-> @@ -186,6 +198,8 @@ void __init smp_init_cpus(void)
-> 
->  void __init platform_smp_prepare_cpus(unsigned int max_cpus)
->  {
-> +	int i;
-> +
->  	if (!soc_is_exynos5250())
->  		scu_enable(scu_base_addr());
-> 
-> @@ -195,6 +209,7 @@ void __init platform_smp_prepare_cpus(unsigned int
-> max_cpus)
->  	 * until it receives a soft interrupt, and then the
->  	 * secondary CPU branches to this address.
->  	 */
-> -	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> -			CPU1_BOOT_REG);
-> +	for (i = 1; i < max_cpus; ++i)
-> +		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-> +					cpu_boot_reg(cpu_logical_map(i)));
->  }
-> --
-> 1.7.12
+On Tue, Oct 23, 2012 at 11:59:30AM +0200, Linus Walleij wrote:
+> On Tue, Oct 23, 2012 at 11:37 AM, Mark Brown
+> > On Tue, Oct 23, 2012 at 11:26:40AM +0200, Linus Walleij wrote:
 
-Looks ok to me, applied.
+> > Can we handle this with power domains - if different devices require
+> > different orderings they can be placed in power domains which implement
+> > the appropriate orderings for them?
 
-Thanks.
+> clocks, regulators, pins and all in power domains?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> Then we should rename them "device resource domains" or
+> something...
+
+We can call them Ichabod for all I care...
+
+> I have a strong sense of system-wide all-or-nothing approaches
+> to this problem.
+
+> - Either we use "power" domains to handle every resource the
+>  device has.
+> - Or the device driver manages it's own resources.
+
+> I find it pretty hard to build consensus around either idea.
+
+Well, I don't think we want all or nothing approaches here.  One problem
+is that we don't have a home for the SoC integration so we're trying to
+shove it all into the drivers which just leads to a stack of pointless
+boilerplate when the driver isn't actually doing anything beyond the
+basic pattern of turning everything off when it goes idle and turning it
+on again when it needs to do something.  Having to open code that stuff
+in the drivers and then deal with the stubbing and error handling so the
+error handling in the drivers is painful.  There's also another axis
+where things aren't part of a SoC but are separate devices so you want
+to carry things along with the driver rather than have a separate bit of
+code which is required to glue things into the platform.
+
+For example it seems fairly clear to me that things like the pinctrl
+integration I see in something like sound/soc/fsl/imx-audmux.c shouldn't
+really be there as we're just setting up a static configration on boot.
+On the other hand where things are directly involved with the active
+operation of a device like changing clock rates then clearly the driver
+needs to know about and manage things.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/48f227e3/attachment.sig>
