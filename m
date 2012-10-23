@@ -1,34 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Oct 2012 14:42:49 +0200
-Subject: [PATCH 2/2] Revert "spi/pl022: enable runtime PM"
-In-Reply-To: <20121023114130.GW4477@opensource.wolfsonmicro.com>
-References: <1349452272-4002-1-git-send-email-ulf.hansson@stericsson.com>
- <1349452272-4002-2-git-send-email-ulf.hansson@stericsson.com>
- <CAPDyKFqfE0u2CPzFKeHBE1LMtuetWabR94KuASPNhw4StDCfjw@mail.gmail.com>
- <20121023111019.GV4477@opensource.wolfsonmicro.com>
- <20121023111656.GT21164@n2100.arm.linux.org.uk>
- <20121023114130.GW4477@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdZxradXJ5BfKZw8880=dnDLOkWWq4ZhZSkmudiuh=HZXw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Oct 2012 15:39:27 +0300
+Subject: [PATCH] usb: remove CONFIG_USB_MUSB_HOST etc
+In-Reply-To: <50868EED.7050909@ti.com>
+References: <1349702227-24875-1-git-send-email-const@MakeLinux.com>
+ <50868EED.7050909@ti.com>
+Message-ID: <20121023123927.GB29281@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 1:41 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
+Hi,
 
-> I have to say I had been under the impression that Linus' series that I
-> applied the other day dealt with all the outstanding stuff here; the
-> issues with this have been the awful changelogs and the overalapping
-> sets of patches.
+On Tue, Oct 23, 2012 at 06:04:53PM +0530, Sekhar Nori wrote:
+> On 10/8/2012 6:47 PM, Constantine Shulyupin wrote:
+> > From: Constantine Shulyupin <const@MakeLinux.com>
+> > 
+> > Remove USB configuration in arch/arm/mach-davinci/usb.c accordingly 
+> > CONFIG_USB_MUSB_OTG CONFIG_USB_MUSB_PERIPHERAL CONFIG_USB_MUSB_HOST 
+> > and set MUSB_OTG configuration by default
+> > because this configuration options are removed from Kconfig.
+> > 
+> > Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+> 
+> Queuing this patch for v3.8. Since the config options are removed there
+> is no use having code which refers to them. The patch has been tested on
+> DM644x and DM365 in both host and gadget mode (I will add this
+> information to commit text while committing). Without this patch .mode
+> seems to be defaulting to MUSB_UNDEFINED which I think is definitely wrong.
 
-It did I think it was patch [1/4] (same subject as this thread),
-http://sourceforge.net/mailarchive/forum.php?thread_name=1350476818-13056-1-git-send-email-linus.walleij%40stericsson.com&forum_name=spi-devel-general
-to which you replied:
+sorry for the delay, this looks ok:
 
-> This was already applied, applied the rest thanks.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-So it probably wasn't and it's just some mishap so
-that 2,3,4 /4 were applied while 1/4 was actually needed
-to.
+> 
+> Thanks,
+> Sekhar
+> 
+> >  
+> > ---
+> >  arch/arm/mach-davinci/usb.c |    6 ------
+> >  1 file changed, 6 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+> > index f77b953..34509ff 100644
+> > --- a/arch/arm/mach-davinci/usb.c
+> > +++ b/arch/arm/mach-davinci/usb.c
+> > @@ -42,14 +42,8 @@ static struct musb_hdrc_config musb_config = {
+> >  };
+> >  
+> >  static struct musb_hdrc_platform_data usb_data = {
+> > -#if defined(CONFIG_USB_MUSB_OTG)
+> >  	/* OTG requires a Mini-AB connector */
+> >  	.mode           = MUSB_OTG,
+> > -#elif defined(CONFIG_USB_MUSB_PERIPHERAL)
+> > -	.mode           = MUSB_PERIPHERAL,
+> > -#elif defined(CONFIG_USB_MUSB_HOST)
+> > -	.mode           = MUSB_HOST,
+> > -#endif
+> >  	.clock		= "usb",
+> >  	.config		= &musb_config,
+> >  };
+> > 
 
-Yours,
-Linus Walleij
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/5395fac4/attachment.sig>
