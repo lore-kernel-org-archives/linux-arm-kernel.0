@@ -1,58 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Oct 2012 10:19:49 +0100
-Subject: RT throttling and suspend/resume (was Re: [PATCH] i2c: omap:
- revert "i2c: omap: switch to threaded IRQ support")
-In-Reply-To: <87ehkqihdh.fsf@deeprootsystems.com>
-References: <20121016133356.GG21801@arwen.pp.htv.fi>
- <87ipaanljt.fsf_-_@deeprootsystems.com>
- <20121017140002.GI11394@arwen.pp.htv.fi>
- <20121017143534.GJ11394@arwen.pp.htv.fi> <87txtsitpt.fsf@deeprootsystems.com>
- <20121018055136.GF11137@arwen.pp.htv.fi> <1350655227.2768.11.camel@twins>
- <87391ahvao.fsf@deeprootsystems.com> <1350899541.2768.82.camel@twins>
- <87ehkqihdh.fsf@deeprootsystems.com>
-Message-ID: <20121023091949.GD28061@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 23 Oct 2012 11:30:29 +0200
+Subject: [PATCH 5/5] arm: mvebu: Added SMP support for Armada XP
+In-Reply-To: <50865F59.8000507@free-electrons.com>
+References: <1350925368-24243-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350925368-24243-6-git-send-email-gregory.clement@free-electrons.com>
+ <20121022184537.GN21046@lunn.ch>
+ <50865F59.8000507@free-electrons.com>
+Message-ID: <20121023093029.GY11837@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 09:47:06AM -0700, Kevin Hilman wrote:
-> Peter Zijlstra <peterz@infradead.org> writes:
+On Tue, Oct 23, 2012 at 11:11:53AM +0200, Gregory CLEMENT wrote:
+> On 10/22/2012 08:45 PM, Andrew Lunn wrote:
+> > Hi Gregory
+> > 
+> >> +void __init set_secondary_cpus_clock(void)
+> >> +{
+> >> +	int cpu;
+> >> +	unsigned long rate;
+> >> +	struct clk *cpu_clk = NULL;
+> >> +	struct device_node *np = NULL;
+> >> +
+> >> +	cpu = smp_processor_id();
+> >> +	np = of_find_node_by_type(np, "cpu");
+> >> +	np = NULL;
+> >> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+> >> +		const u32 *reg;
+> >> +		int len;
+> >> +		reg = of_get_property(np, "reg", &len);
+> >> +		if (!reg || len != 4) {
+> >> +			pr_err("%s missing reg property\n", np->full_name);
+> >> +			continue;
+> >> +		}
+> >> +		if (be32_to_cpup(reg) == cpu) {
+> >> +			cpu_clk = of_clk_get(np, 0);
+> >> +			break;
+> >> +		}
+> >> +	}
+> >> +	WARN_ON(IS_ERR(cpu_clk));
+> >> +	rate = clk_get_rate(cpu_clk);
+> >> +
+> >> +	/* set all the other CPU clk to the same rate than the boot CPU */
+> >> +	np = NULL;
+> >> +	while ((np = of_find_node_by_type(np, "cpu"))) {
+> >> +		const u32 *reg;
+> >> +		int len;
+> >> +		reg = of_get_property(np, "reg", &len);
+> >> +		if (!reg || len != 4) {
+> >> +			pr_err("%s missing reg property\n", np->full_name);
+> >> +			continue;
+> >> +		}
+> >> +		if (be32_to_cpup(reg) != cpu) {
+> >> +			cpu_clk = of_clk_get(np, 0);
+> >> +			clk_set_rate(cpu_clk, rate);
+> >> +		}
+> > 
+> > Maybe its hiding somewhere, but where is the clk_prepare_enable() for
+> > this cpu_clk clock?
+> > 
 > 
-> > On Fri, 2012-10-19 at 16:54 -0700, Kevin Hilman wrote:
-> >
-> >> So I did the same thing for my ARM SoC, and it definitley stops the RT
-> >> throttling.  
-> >> 
-> >> However, it has the undesriable (IMO) side effect of making timed printk
-> >> output rather unhelpful for debugging suspend/resume since printk time
-> >> stays constant throughout suspend/resume no matter how long you
-> >> sleep. :(
-> >> 
-> >> So does that mean we have to choose between useful printk times during
-> >> suspend/resume or functioning IRQ threads during suspend/resume ?
-> >
-> > Urgh.. this was not something I considered. This being primarily the
-> > sched_clock infrastructure and such.
-> >
-> > So what exactly is the problem with the suspend resume thing (its not
-> > something I've ever debugged), is all you need a clean break between pre
-> > and post suspend, or do you need the actual time the machine was gone?
-> 
-> I think it's more a question of what people are used to.  I think folks
-> used to debugging suspend/resume (at least on ARM) are used to having
-> the printk timestamps reflect the amount of time the machine was gone.
-> 
-> With a sched_clock() that counts during suspend, that feature doesn't
-> work anymore.  I'm not sure that this feature is a deal breaker, but it
-> has been convenient.
+> Well the clocks are always enable. In the clock framework, the cpu clocks
+> don't provide an enable function.
 
-IMHO, this isn't a deal breaker, it's nothing more than cosmetic issue.
-The big hint about the sched_clock() behaviour is partly in the name,
-and the behaviour you get from the scheduler if you don't give it what
-it wants.  The scheduler sets the requirements for sched_clock(), not
-printk, so if we have to fix sched_clock() to get correct behaviour
-from the scheduler, that's what we have to do irrespective of cosmetic
-printk issues.
+Is it possible in the hardware to disable them? Turning them off might
+save some power. If these chips end up in some data center server, it
+might be that CPU hotplugging is used.
 
-And there are many other ways to measure time off in suspend... we have
-at least three other functions which return time, and which will return
-updated time after a resume event.
+> But maybe it is cleaner to call clk_prepare_enable() even if it does
+> nothing except update the usage count.
+
+You also have to watch out for the late_initcall which will disable
+all clocks which are running but nobody has claimed. This will become
+an issue if you do have enable/disable function in later versions of
+the clock functions.
+
+	Andrew
