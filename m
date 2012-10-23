@@ -1,77 +1,76 @@
-From: pkunapuli@nvidia.com (Pavan Kunapuli)
-Date: Tue, 23 Oct 2012 12:49:00 +0530
-Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
-In-Reply-To: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
-References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
-Message-ID: <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Oct 2012 08:19:51 +0100
+Subject: [PATCH] Boottime: A tool for automatic measurement of
+ kernel/bootloader boot time
+In-Reply-To: <507C3125.70702@ti.com>
+References: <1349966545-19340-1-git-send-email-lee.jones@linaro.org>
+ <20121012134542.GH12567@gmail.com>
+ <20121012134813.GK21164@n2100.arm.linux.org.uk>
+ <201210121353.16798.arnd@arndb.de>
+ <20121012140149.GJ12567@gmail.com> <50784729.4030302@ti.com>
+ <20121012164221.GN12567@gmail.com> <507C3125.70702@ti.com>
+Message-ID: <20121023071951.GA2705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vmmc and vqmmc regulators control the voltage to
-the host and device. Defer the probe if either of
-them is not registered.
+I have a few answers for you.
 
-Signed-off-by: Pavan Kunapuli <pkunapuli@nvidia.com>
----
- drivers/mmc/host/sdhci.c |   25 ++++++++++++++++++++++---
- 1 files changed, 22 insertions(+), 3 deletions(-)
+> >>>>>>root at ME:/ cat /sys/kernel/debug/boottime/bootgraph
+> >>>>>>[    0.185254] calling  splash+0x0/0x0
+> >>>>>>[    2.984335] initcall splash+0x0/0x0 returned 0 after 2799 msecs.
+> >>>>>>[    2.984335] calling  autoboot_delay+0x0/0x0
+> >>>>>>[    4.089513] initcall autoboot_delay+0x0/0x0 returned 0 after 1105 msecs.
+> >>>>>>[    4.089513] calling  load_kernel+0x0/0x0
+> >>>>>>[    4.239174] initcall load_kernel+0x0/0x0 returned 0 after 149 msecs.
+> >>>>>>[    4.239174] calling  boot_kernel+0x0/0x0
+> >>>>>>[    4.276260] initcall boot_kernel+0x0/0x0 returned 0 after 37 msecs.
+> >>>>>>[    4.276260] calling  uncompress_ll_init+0x0/0x0
+> >>>>>>[    4.276260] initcall uncompress_ll_init+0x0/0x0 returned 0 after 0 msecs.
+> >>>>>>[    4.276260] Freeing init memory: 0K
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 7922adb..925c403 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2844,11 +2844,17 @@ int sdhci_add_host(struct sdhci_host *host)
- 	    !(host->mmc->caps & MMC_CAP_NONREMOVABLE))
- 		mmc->caps |= MMC_CAP_NEEDS_POLL;
- 
--	/* If vqmmc regulator and no 1.8V signalling, then there's no UHS */
-+	/*
-+	 * If vqmmc regulator and no 1.8V signalling, then there's no UHS.
-+	 * vqmmc regulator should be present. If it's not present,
-+	 * assume the regulator driver registration is not yet done and
-+	 * defer the probe.
-+	 */
- 	host->vqmmc = regulator_get(mmc_dev(mmc), "vqmmc");
- 	if (IS_ERR(host->vqmmc)) {
--		pr_info("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
-+		pr_err("%s: no vqmmc regulator found\n", mmc_hostname(mmc));
- 		host->vqmmc = NULL;
-+		return -EPROBE_DEFER;
- 	}
- 	else if (regulator_is_supported_voltage(host->vqmmc, 1800000, 1800000))
- 		regulator_enable(host->vqmmc);
-@@ -2903,10 +2909,17 @@ int sdhci_add_host(struct sdhci_host *host)
- 
- 	ocr_avail = 0;
- 
-+	/*
-+	 * vmmc regulator should be present. If it's not present,
-+	 * assume the regulator driver registration is not yet done
-+	 * and defer the probe.
-+	 */
- 	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
- 	if (IS_ERR(host->vmmc)) {
--		pr_info("%s: no vmmc regulator found\n", mmc_hostname(mmc));
-+		pr_err("%s: no vmmc regulator found\n", mmc_hostname(mmc));
- 		host->vmmc = NULL;
-+		ret = -EPROBE_DEFER;
-+		goto vmmc_err;
- 	} else
- 		regulator_enable(host->vmmc);
- 
-@@ -3121,7 +3134,13 @@ reset:
- untasklet:
- 	tasklet_kill(&host->card_tasklet);
- 	tasklet_kill(&host->finish_tasklet);
-+vmmc_err:
-+	if (host->vqmmc) {
-+		if (regulator_is_enabled(host->vqmmc))
-+			regulator_disable(host->vqmmc);
- 
-+		regulator_put(host->vqmmc);
-+	}
- 	return ret;
- }
- 
+> OK So has this been validated and tested on any other IC then a ST part?
+
+No, it has not. As I believe I mentioned before, this is a tool
+written for and used by ST-Ericsson. Extending it to use on other
+platforms sounds like a great idea, but won't be done by
+ST-Ericsson due to a lack of hardware and software assets.
+
+> This boottime_activate patch seems to be only for the dbx500.  If
+> this is supposed to be a generic solution I would expect
+> a generic patch for ARM to enable boot time activation.
+
+Apparently a generic boottime extention would be fairly trivial
+with the use of ktime_get().
+
+> Have you profiled how much time the boot time logging has added to
+> the over all boot?
+
+This has not been completed, but the original author suspects
+it would be <100ms.
+
+> Also the boottime commit message should explain a little more what
+> it is measuring.
+> i.e.  This patch enables logging the boot time from point x to point
+> y for the kernel only.  This does not include init.
+> What about adding the boot time from the init sequence to init complete?
+
+This sounds like a good idea, but again won't be extended upon by
+us.
+
+It appears that this driver is interesting and possibly very
+useful for quite a lot of people out there. This patch should
+therefore be seen as the foundations for other to then extend
+in the ways alluded to above and ported to work on other more
+generic platforms. I think these should be extra patches on
+top of the one submitted here.
+
+>From a personal perspective, I am happy to change a few bits
+and pieces, but I don't have the time to satisfy all of the
+suggestions made, or adapt the driver in any substantial
+manor.
+
 -- 
-1.7.1.1
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
