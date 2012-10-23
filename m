@@ -1,37 +1,41 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Tue, 23 Oct 2012 13:15:02 -0400
-Subject: alignment faults in 3.6
-In-Reply-To: <20121023165841.GX21164@n2100.arm.linux.org.uk>
-References: <506E1762.3010601@gmail.com>
- <20121005072914.GE4625@n2100.arm.linux.org.uk>
- <20121005105133.GP4625@n2100.arm.linux.org.uk>
- <5086C616.2030202@jonmasters.org>
- <20121023165841.GX21164@n2100.arm.linux.org.uk>
-Message-ID: <5086D096.6080509@jonmasters.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 23 Oct 2012 19:20:26 +0200
+Subject: [PATCH v3 1/4] net/macb: fix truncate warnings
+In-Reply-To: <20614.34540.248020.471598@ipc1.ka-ro>
+References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
+ <1350931534-8416-2-git-send-email-manabian@gmail.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B705B@saturn3.aculab.com>
+ <20121023.044829.1915412359769438159.davem@davemloft.net>
+ <20614.34540.248020.471598@ipc1.ka-ro>
+Message-ID: <CAGhQ9VxTUSdctawaXFdaRCKq_+q2H8mhPTwwMka0nLpS7TAY9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 12:58 PM, Russell King - ARM Linux wrote:
-> On Tue, Oct 23, 2012 at 12:30:14PM -0400, Jon Masters wrote:
->> On 10/05/2012 06:51 AM, Russell King - ARM Linux wrote:
+On Tue, Oct 23, 2012 at 2:00 PM, Lothar Wa?mann <LW@karo-electronics.de> wrote:
+> Hi,
+>
+> David Miller writes:
+>> From: "David Laight" <David.Laight@ACULAB.COM>
+>> Date: Tue, 23 Oct 2012 09:21:11 +0100
 >>
->> <snip switch out the might_fault __get_user for atomic
->> probe_kernel_address related discussion>
+>> >> When building macb on x86_64 the following warnings show up:
+>> >>   drivers/net/ethernet/cadence/macb.c: In function macb_interrupt:
+>> >>   drivers/net/ethernet/cadence/macb.c:556:4: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+>> > ...
+>> >> -                  macb_writel(bp, IDR, ~0UL);
+>> >> +                  macb_writel(bp, IDR, -1);
+>> >
+>> > Seems wrong to fix an error with an unsigned value
+>> > by using -1.
 >>
->>> Okay, this should fix the issue...  I've only compile tested it so far.
->>> Rob, as you have a way to trigger this easily, can you give this patch
->>> a go and let me know if it solves your problem?  Thanks.
+>> -1 is equally an unsigned value of all 1's and completely legitimate.
+>> The correction being made here is one of size not signedness.
 >>
->> Russell, can you let me know the status of this patch? I don't see it in
->> your tree, and I think I might have missed a followup patch from you? It
->> seems to solve a real problem with in-kernel faults during the dump_mem
->> in general, even beyond just an alignment fault.
-> 
-> I was waiting for someone to say "I saw a problem and it works"...
-> Would be nice to have a Tested-by tag against it...
+> You could use '~0' (without the 'UL').
 
-I've poked at the patch, made one against Fedora, and asked someone in
-my team to do a scratch build and test on our local highbank/other
-systems. We'll come back with that tag for ya asap, thanks!
+The reason for choosing '-1', as noted in patch description, is that
+it already appears in a couple of other places in the driver. So I
+though it would nice to be consistent.
 
-Jon.
+regards
+Joachim Eastwood
