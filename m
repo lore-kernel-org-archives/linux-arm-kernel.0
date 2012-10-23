@@ -1,45 +1,29 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Tue, 23 Oct 2012 14:00:44 +0200
-Subject: [PATCH v3 1/4] net/macb: fix truncate warnings
-In-Reply-To: <20121023.044829.1915412359769438159.davem@davemloft.net>
-References: <1350931534-8416-1-git-send-email-manabian@gmail.com>
- <1350931534-8416-2-git-send-email-manabian@gmail.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B705B@saturn3.aculab.com>
- <20121023.044829.1915412359769438159.davem@davemloft.net>
-Message-ID: <20614.34540.248020.471598@ipc1.ka-ro>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Oct 2012 21:03:01 +0900
+Subject: [PATCH] ARM: dts: exynos4: Enable serial controllers on Origen and
+ SMDKV310
+In-Reply-To: <16890730.oeOgcP5xf2@flatron>
+References: <1349701968-6675-1-git-send-email-t.figa@samsung.com>
+ <1587144.mixS1B3zoJ@amdc1227>
+ <10e401cdaae0$a17d44b0$e477ce10$%kim@samsung.com>
+ <16890730.oeOgcP5xf2@flatron>
+Message-ID: <01d201cdb116$59de2520$0d9a6f60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-David Miller writes:
-> From: "David Laight" <David.Laight@ACULAB.COM>
-> Date: Tue, 23 Oct 2012 09:21:11 +0100
+Tomasz Figa wrote:
 > 
-> >> When building macb on x86_64 the following warnings show up:
-> >>   drivers/net/ethernet/cadence/macb.c: In function macb_interrupt:
-> >>   drivers/net/ethernet/cadence/macb.c:556:4: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-> > ...
-> >> -			macb_writel(bp, IDR, ~0UL);
-> >> +			macb_writel(bp, IDR, -1);
-> > 
-> > Seems wrong to fix an error with an unsigned value
-> > by using -1.
+> However I think this should be considered a fix, because without it serial
+> console on Origen and SMDKV310 will be broken.
 > 
-> -1 is equally an unsigned value of all 1's and completely legitimate.
-> The correction being made here is one of size not signedness.
-> 
-You could use '~0' (without the 'UL').
+Well, I couldn't find any broken due to miss this for v3.7. I think, there
+is no usage of serial controller in mainline for Origen and SMDKV310 now. So
+this should be queued for -next. If not, please let me know.
 
+Thanks.
 
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
