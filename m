@@ -1,53 +1,107 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 22 Oct 2012 18:04:16 -0700
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com> (Paul
- Walmsley's message of "Sat, 20 Oct 2012 21:26:32 +0000 (UTC)")
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
-Message-ID: <87r4oqc833.fsf@deeprootsystems.com>
+From: spang@chromium.org (Michael Spang)
+Date: Mon, 22 Oct 2012 21:34:51 -0400
+Subject: [PATCH] ARM: Fix page counting in mem_init and show_mem
+Message-ID: <1350956091-5276-1-git-send-email-spang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Igor
+The code in mem_init & show_mem to count page usage has two issues:
 
-Paul Walmsley <paul@pwsan.com> writes:
+1. It assumes the memory map for a bank is contiguous. The sparsemem
+   memory model partitions the memory map into sections, which may not
+   be contiguous. They are usually contiguous due only to allocation
+   order. Avoid this by using pfn_to_page for each page.
 
-> Here are some basic OMAP test results for Linux v3.7-rc2.
-> Logs and other details at:
->
->     http://www.pwsan.com/omap/testlogs/test_v3.7-rc2/20121020134755/
+   If the memory map is not contiguous the pointer math works out
+   badly and crashes the system.
 
-[...]
+2. A memory bank may have holes. Some regions may be removed using
+   memblock_remove, and will not have valid page stucts. The code
+   should not access the page structs for such pages. Avoid this by
+   skipping pages that fail pfn_valid().
 
-> * 37xx EVM: CORE not entering dynamic off-idle
->   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
->     off works
+   If the memory map has holes, the free & total page counts are
+   wrong.
 
-I got a start on this one, and discovered (using CM_IDLEST1_CORE) that
-SPI1 was not idle when going off.  A quick hack disabling the
-touchscreen showed that after that, core was hitting idle just fine.
+Signed-off-by: Michael Spang <spang@chromium.org>
+---
+ arch/arm/mm/init.c |   40 ++++++++++++++++++++++------------------
+ 1 files changed, 22 insertions(+), 18 deletions(-)
 
-I ran out of time today debugging this, but it's definitely realted to
-the GPIO debounce setting for the touchscreen.  Changing it to zero[1]
-makes CORE hit retention again in idle.
-
-Igor, I'm hoping you might know what's going on here since we already
-had some problems with this ads7846 init stuff and you're more familiar
-with this debounce init.
-
-Kevin
-
-[1]
-diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
-index b9b776b..3afdc50 100644
---- a/arch/arm/mach-omap2/board-omap3evm.c
-+++ b/arch/arm/mach-omap2/board-omap3evm.c
-@@ -734,7 +734,7 @@ static void __init omap3_evm_init(void)
- 	omap_nand_flash_init(NAND_BUSWIDTH_16, omap3evm_nand_partitions,
- 			     ARRAY_SIZE(omap3evm_nand_partitions));
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index c21d06c..97d811a 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -101,16 +101,19 @@ void show_mem(unsigned int filter)
  
--	omap_ads7846_init(1, OMAP3_EVM_TS_GPIO, 310, NULL);
-+	omap_ads7846_init(1, OMAP3_EVM_TS_GPIO, 0, NULL);
- 	omap3evm_init_smsc911x();
- 	omap3_evm_display_init();
- 	omap3_evm_wl12xx_init();
+ 	for_each_bank (i, mi) {
+ 		struct membank *bank = &mi->bank[i];
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
++		unsigned int start, end, pfn;
+ 
+-		pfn1 = bank_pfn_start(bank);
+-		pfn2 = bank_pfn_end(bank);
++		start = bank_pfn_start(bank);
++		end = bank_pfn_end(bank);
+ 
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
++		for (pfn = start; pfn < end; pfn++) {
++			struct page *page;
++
++			if (!pfn_valid(pfn))
++				continue;
++
++			page = pfn_to_page(pfn);
+ 
+-		do {
+ 			total++;
+ 			if (PageReserved(page))
+ 				reserved++;
+@@ -122,8 +125,7 @@ void show_mem(unsigned int filter)
+ 				free++;
+ 			else
+ 				shared += page_count(page) - 1;
+-			page++;
+-		} while (page < end);
++		}
+ 	}
+ 
+ 	printk("%d pages of RAM\n", total);
+@@ -619,22 +621,24 @@ void __init mem_init(void)
+ 
+ 	for_each_bank(i, &meminfo) {
+ 		struct membank *bank = &meminfo.bank[i];
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
++		unsigned int start, end, pfn;
+ 
+-		pfn1 = bank_pfn_start(bank);
+-		pfn2 = bank_pfn_end(bank);
++		start = bank_pfn_start(bank);
++		end = bank_pfn_end(bank);
+ 
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
++		for (pfn = start; pfn < end; pfn++) {
++			struct page *page;
++
++			if (!pfn_valid(pfn))
++				continue;
++
++			page = pfn_to_page(pfn);
+ 
+-		do {
+ 			if (PageReserved(page))
+ 				reserved_pages++;
+ 			else if (!page_count(page))
+ 				free_pages++;
+-			page++;
+-		} while (page < end);
++		}
+ 	}
+ 
+ 	/*
+-- 
+1.7.7.3
