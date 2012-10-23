@@ -1,26 +1,27 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Tue, 23 Oct 2012 12:30:14 -0400
-Subject: alignment faults in 3.6
-In-Reply-To: <20121005105133.GP4625@n2100.arm.linux.org.uk>
-References: <506E1762.3010601@gmail.com>
- <20121005072914.GE4625@n2100.arm.linux.org.uk>
- <20121005105133.GP4625@n2100.arm.linux.org.uk>
-Message-ID: <5086C616.2030202@jonmasters.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 23 Oct 2012 10:29:41 -0600
+Subject: [PATCH 2/2] mmc: sdhci: Defer probe if regulator_get fails
+In-Reply-To: <1350979047.20572.6.camel@tellur>
+References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
+ <1350976740-19284-3-git-send-email-pkunapuli@nvidia.com>
+ <1350979047.20572.6.camel@tellur>
+Message-ID: <5086C5F5.4070801@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/2012 06:51 AM, Russell King - ARM Linux wrote:
+On 10/23/2012 01:57 AM, Lucas Stach wrote:
+> Am Dienstag, den 23.10.2012, 12:49 +0530 schrieb Pavan Kunapuli:
+>> vmmc and vqmmc regulators control the voltage to
+>> the host and device. Defer the probe if either of
+>> them is not registered.
+>
+> Does this work with boards where we don't have any MMC supplies? Or are
+> we just deferring the probe indefinitely there?
+> 
+> For boards that power MMC unconditionally, are we supposed to add dummy
+> regulators to make them work with this patchset?
 
-<snip switch out the might_fault __get_user for atomic
-probe_kernel_address related discussion>
-
-> Okay, this should fix the issue...  I've only compile tested it so far.
-> Rob, as you have a way to trigger this easily, can you give this patch
-> a go and let me know if it solves your problem?  Thanks.
-
-Russell, can you let me know the status of this patch? I don't see it in
-your tree, and I think I might have missed a followup patch from you? It
-seems to solve a real problem with in-kernel faults during the dump_mem
-in general, even beyond just an alignment fault.
-
-Jon.
+I believe that dummy (fixed) regulators are supposed to be provided in
+all cases where the platform doesn't actually have one. The fact that
+everything worked OK without them before this patch was most likely a
+mistake/accident.
