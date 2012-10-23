@@ -1,64 +1,54 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 23 Oct 2012 13:59:42 -0400 (EDT)
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <5086C2B0.6070006@wwwdotorg.org>
-Message-ID: <Pine.LNX.4.44L0.1210231340340.1635-100000@iolanthe.rowland.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Oct 2012 20:57:06 +0300
+Subject: [PATCH] i2c: omap: re-factor omap_i2c_init function
+In-Reply-To: <CAM=Q2cs-+O_BFrZFX4fuBooogEZiQO2Zxbm8W40vN9hmampLCA@mail.gmail.com>
+References: <1351006039-24332-1-git-send-email-shubhrajyoti@ti.com>
+ <20121023171840.GA32167@arwen.pp.htv.fi>
+ <CAM=Q2cs-+O_BFrZFX4fuBooogEZiQO2Zxbm8W40vN9hmampLCA@mail.gmail.com>
+Message-ID: <20121023175706.GC32517@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Oct 2012, Stephen Warren wrote:
+Hi,
 
-> >> So, rather than:
+On Tue, Oct 23, 2012 at 11:26:15PM +0530, Shubhrajyoti Datta wrote:
+> >> @@ -1268,23 +1271,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
+> >>  {
+> >>       struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
 > >>
-> >> compatible = "usb-ehci";
-> >>
-> >> You should always have e.g.:
-> >>
-> >> compatible = "nvidia,tegra20-ehci", "usb-ehci";
-> >>
-> >> Given that, there is then always enough information in the device tree
-> >> for the driver to be able to derive the other values from the compatible
-> >> value.
-> > 
-> > Yes, I get it.
-> > 
-> >> Whether you want to derive the information, or whether you want to
-> >> explicitly represent it via properties, is a decision to make based on
-> >> the trade-offs.
-> >>
-> >> Oh, and I note that quite a few device trees already use compatible
-> >> value "usb-ehci" in their device-trees. Care needs to be taken not to
-> >> usurp that value from any existing device drivers if that was to be
-> >> picked as the compatible value required by this binding.
-> > 
-> > Right.  I think Tony's new binding should use compatible value 
-> > "usb-ehci-platform".  It will essentially be a superset of "usb-ehci".
+> >> -     if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+> >> -     }
+> >> -
+> >> -     /*
+> >> -      * Don't write to this register if the IE state is 0 as it can
+> >> -      * cause deadlock.
+> >> -      */
+> >> -     if (_dev->iestate)
+> >> -             omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
+> >
+> > this part is not on __omap_i2c_init() so you're potentially causing a
+> > regression here.
 > 
-> I know this is bike-shedding a little bit, but...
-> 
-> The word "platform" isn't really about describing the HW, but rather is
-> derived from the Linux SW used to program that HW. DT should be purely
-> about describing the HW.
-> 
-> Perhaps "usb-ehci-generic" or "usb-ehci-simple" would be better?
+> iestate is set at init so cannot be zero. so the check was removed.
 
-Neither of those really describes the hardware either.  Which name gets 
-used seems pretty arbitrary.
+so you never read it back ? Then you need to add a note for that in
+changelog, since this is a behavior change ;-)
 
-Nothing intrinsically distinguishes this class of hardware.  The only
-thing these devices have in common is that they can be managed by
-Linux's ehci-platform driver.  For that purpose, "usb-ehci-platform"
-makes more sense than "usb-ehci-generic" or "usb-ehci-simple".
 
-(It also allows the class to enlarge over time as the driver becomes
-more capable -- is that a bad thing?  Are DT board descriptions written
-for a later kernel supposed to be unusable with an earlier kernel that
-doesn't support the same features?)
-
-In essense, we're trying to say that the HW is compatible with a 
-particular driver rather than with some other type of HW.  Maybe DT 
-wasn't intended to provide this kind of information, but it seems like 
-a logical thing to do.  Unless DT already offers some other way to 
-accomplish the same thing?
-
-Alan Stern
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121023/5b08f585/attachment.sig>
