@@ -1,37 +1,73 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 23 Oct 2012 19:34:16 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <20121022163825.GA4730@atomide.com>
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
- <50857444.9080308@ti.com> <20121022163825.GA4730@atomide.com>
-Message-ID: <alpine.DEB.2.00.1210231933400.27211@utopia.booyaka.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 23 Oct 2012 21:41:03 +0200
+Subject: [PATCH 1/2] ARM: dt: tegra: Add sdhci regulators
+In-Reply-To: <5086E503.8090604@wwwdotorg.org>
+References: <1350976740-19284-1-git-send-email-pkunapuli@nvidia.com>
+ <4346406.Jy2o1pWcOR@ax5200p> <5086E503.8090604@wwwdotorg.org>
+Message-ID: <2541818.PkGB9YPA25@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2012, Tony Lindgren wrote:
-
-> * Jon Hunter <jon-hunter@ti.com> [121022 09:30]:
-> > On 10/20/2012 04:26 PM, Paul Walmsley wrote:
-> > > 
-> > > * 2430sdp: vfp_reload_hw oops during MMC initialization
-> > >   - Kernel attempts to save FP registers that don't exist; fix posted:
-> > >     - http://www.spinics.net/lists/arm-kernel/msg200646.html
-> 
-> Has that one been posted to RMK's patch system?
-
-Just did that, let's see what happens.
-
-> > > * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
-> > >   - due to a GPMC bug
-> > >   - Apparently fixed by http://www.spinics.net/lists/arm-kernel/msg200787.html
+On Tuesday 23 October 2012 12:42:11 Stephen Warren wrote:
+> On 10/23/2012 12:07 PM, Marc Dietrich wrote:
+> > Pavan,
 > > 
-> > This is now addressed and I have verified it is booting on v3.7-rc2. The
-> > following patch address this boot problem ...
+> > On Tuesday 23 October 2012 12:48:59 Pavan Kunapuli wrote:
+> >> Adding vmmc and vmmcq supplies for sdhci nodes
+> >> in tegra dt files.
 > > 
-> > http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=commit;h=8119024ef7363591fd958ec89ebfaee7c18209e3
+> > <...>
+> > 
+> >> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+> >> b/arch/arm/boot/dts/tegra20-paz00.dts index 6a93d14..e161b65 100644
+> >> --- a/arch/arm/boot/dts/tegra20-paz00.dts
+> >> +++ b/arch/arm/boot/dts/tegra20-paz00.dts
+> >> @@ -422,13 +422,17 @@
+> >> 
+> >>  		status = "okay";
+> >>  		cd-gpios = <&gpio 173 0>; /* gpio PV5 */
+> >>  		wp-gpios = <&gpio 57 0>;  /* gpio PH1 */
+> >> 
+> >> -		power-gpios = <&gpio 169 0>; /* gpio PV1 */
+> >> 
+> >>  		bus-width = <4>;
+> >> 
+> >> +		vmmc-supply = <&vddio_sd_reg>;
+> >> +		vqmmc-supply = <&vddio_sd_reg>;
+> >> 
+> >>  	};
+> >>  	
+> >>  	sdhci at c8000600 {
+> >>  	
+> >>  		status = "okay";
+> >>  		bus-width = <8>;
+> >> 
+> >> +		vmmc-supply = <&vddio_sdmmc_reg>;
+> >> +		vqmmc-supply = <&vddio_sdmmc_reg>;
+> > 
+> > to make it better, this should be:
+> > 
+> > vmmc-supply = <&vcore_mmc_reg>; and
+> > vqmmc-supply = <&vddio_nand_reg>;
+> > 
+> > with vcore_mmc_reg is ldo5 and vddio_nand_reg is the fixed regulator
+> > below.
 > 
-> That's in v3.7-rc2 already, is there some other problem too?
+> I think for the eMMC (not SD card), the core supply is actually +3vs_s3,
+> and hence fixed; it looks like LDO5 used to be used, but they changed
+> it. See the note for the VCC connections on the eMMC chip.
 
-Will try a re-test.
+yes, you are right. The schematic had a comment that this was changed.
 
-- Paul
+> > By doing so, I get "sdhci-tegra sdhci-tegra.3: could not set regulator OCR
+> > (-1)". MMC subsys wants to set ldo5 to 3.3V but it is fixed. I guess
+> > that's
+> > harmless for now.
+> 
+> What I mention above might end up fixing that?
+
+yes, it does.
+
+So the original patch is just fine. Sorry for the noise.
+
+Marc
