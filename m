@@ -1,49 +1,97 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 23 Oct 2012 07:17:33 -0700
-Subject: [PATCH] arm: sched: stop sched_clock() during suspend
-In-Reply-To: <20121023092231.GE28061@n2100.arm.linux.org.uk> (Russell King's
- message of "Tue, 23 Oct 2012 10:22:31 +0100")
-References: <1350906877-19410-1-git-send-email-balbi@ti.com>
- <873916h1yi.fsf@deeprootsystems.com>
- <CACRpkdY6ox+iJAGdSD=e7Yj55TzDWqOmLqu2fSRXvKJxqwfkhQ@mail.gmail.com>
- <20121023092231.GE28061@n2100.arm.linux.org.uk>
-Message-ID: <87a9vdclxe.fsf@deeprootsystems.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 23 Oct 2012 23:17:37 +0900
+Subject: [PATCH 1/2] ARM: SAMSUNG: Insert bitmap_gpio_int member in
+ samsung_gpio_chip
+In-Reply-To: <000001cd9c63$e95c7b60$bc157220$@com>
+References: <000001cd9c63$e95c7b60$bc157220$@com>
+Message-ID: <021301cdb129$2726eb90$7574c2b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Eunki Kim wrote:
+> 
+> When a device uses GPIO interrupt, its driver assumes that GPIO
+> should be INPUT mode. However, GPIO of SAMSUNG SoC is sepated to
+> INPUT mode and INTERRUPT mode. They are set by 0x0 and 0xF in GPIO
+> control register. If the register is set to INPUT mode, the
+> interrupt never occur. Therefore, it's necessary to set INTERRUPT
+> mode instead of INPUT mode when the pin is used for GPIO interrupt.
+> 
+> This patch inserts the bitmap_gpio_int member in struct samsung_
+> gpio_chip in order to represent use of GPIO interrupt for each pin
+> and sets the related bit when s5p_register_gpio_interrupt function
+> is called.
+> 
+> Signed-off-by: Eunki Kim <eunki_kim@samsung.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/plat-samsung/include/plat/gpio-core.h |    2 ++
+>  arch/arm/plat-samsung/s5p-irq-gpioint.c        |    8 ++++++--
+>  2 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-samsung/include/plat/gpio-core.h
+> b/arch/arm/plat-samsung/include/plat/gpio-core.h
+> index 1fe6917..dfd8b7a 100644
+> --- a/arch/arm/plat-samsung/include/plat/gpio-core.h
+> +++ b/arch/arm/plat-samsung/include/plat/gpio-core.h
+> @@ -48,6 +48,7 @@ struct samsung_gpio_cfg;
+>   * @config: special function and pull-resistor control information.
+>   * @lock: Lock for exclusive access to this gpio bank.
+>   * @pm_save: Save information for suspend/resume support.
+> + * @bitmap_gpio_int: Bitmap for representing GPIO interrupt or not.
+>   *
+>   * This wrapper provides the necessary information for the Samsung
+>   * specific gpios being registered with gpiolib.
+> @@ -71,6 +72,7 @@ struct samsung_gpio_chip {
+>  #ifdef CONFIG_PM
+>  	u32			pm_save[4];
+>  #endif
+> +	u32			bitmap_gpio_int;
+>  };
+> 
+>  static inline struct samsung_gpio_chip *to_samsung_gpio(struct gpio_chip
+> *gpc)
+> diff --git a/arch/arm/plat-samsung/s5p-irq-gpioint.c b/arch/arm/plat-
+> samsung/s5p-irq-gpioint.c
+> index f9431fe..d981c61 100644
+> --- a/arch/arm/plat-samsung/s5p-irq-gpioint.c
+> +++ b/arch/arm/plat-samsung/s5p-irq-gpioint.c
+> @@ -185,7 +185,7 @@ int __init s5p_register_gpio_interrupt(int pin)
+> 
+>  	/* check if the group has been already registered */
+>  	if (my_chip->irq_base)
+> -		return my_chip->irq_base + offset;
+> +		goto success;
+> 
+>  	/* register gpio group */
+>  	ret = s5p_gpioint_add(my_chip);
+> @@ -193,9 +193,13 @@ int __init s5p_register_gpio_interrupt(int pin)
+>  		my_chip->chip.to_irq = samsung_gpiolib_to_irq;
+>  		printk(KERN_INFO "Registered interrupt support for gpio
+> group %d.\n",
+>  		       group);
+> -		return my_chip->irq_base + offset;
+> +		goto success;
+>  	}
+>  	return ret;
+> +success:
+> +	my_chip->bitmap_gpio_int |= BIT(offset);
+> +
+> +	return my_chip->irq_base + offset;
+>  }
+> 
+>  int __init s5p_register_gpioint_bank(int chain_irq, int start, int
+> nr_groups)
+> --
+> 1.7.1
 
-> On Tue, Oct 23, 2012 at 12:28:32AM +0200, Linus Walleij wrote:
->> On Mon, Oct 22, 2012 at 7:05 PM, Kevin Hilman
->> <khilman@deeprootsystems.com> wrote:
->> 
->> > However, in light of RT throttling, this a correctness issue for process
->> > accounting, so I agree that this should be done for all platforms
->> > instead of providing an optional 'needs suspend' version of the API,
->> > even though it means printk times no longer reflect time spent
->> > suspended.
->> 
->> Maybe we should get printk() to use the best clocksource
->> instead.
->> 
->> The reason AFAICT that printk() is using sched_clock() is that
->> it's supposed to be fast. But now it seems that it's not going
->> to return what printk() needs anymore.
->
-> No, printk() does not need this.  You think it does, but it doesn't.  What
-> we have is a difference between ARM and x86, and this difference is breaking
-> the scheduler.
->
-> The fact that the printk timestamp increments while suspended is a bug.  It
-> doesn't on x86.
+OK, applied.
 
-Russell, I agree that it's a bug, but does it qualify as a something
-you're willing to take for v3.7-rc?
+Thanks.
 
-For OMAP, we need to know if this will go for v3.7 or not because
-there's a regression in the OMAP I2C driver, and if this doesn't go in,
-we'll need to revert something in the I2C driver until it does.
-
-Thanks,
-
-Kevin
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
