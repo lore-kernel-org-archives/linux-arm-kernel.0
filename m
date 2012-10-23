@@ -1,71 +1,47 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 24 Oct 2012 00:14:19 +0200
-Subject: [PATCH v3] pwm: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <1350929425-17516-1-git-send-email-linux@prisktech.co.nz>
-References: <20121022084000.GB29790@avionic-0098.mockup.avionic-design.de>
- <1350929425-17516-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20121023221419.GA8501@avionic-0098.mockup.avionic-design.de>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 23 Oct 2012 15:23:04 -0700
+Subject: [PATCH] genirq: provide means to retrigger parent
+In-Reply-To: <20121016221502.GY28061@n2100.arm.linux.org.uk> (Russell King's
+ message of "Tue, 16 Oct 2012 23:15:02 +0100")
+References: <1350425269-11489-1-git-send-email-khilman@deeprootsystems.com>
+ <20121016221502.GY28061@n2100.arm.linux.org.uk>
+Message-ID: <871ugo7rqv.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 07:10:24AM +1300, Tony Prisk wrote:
-[...]
-> @@ -87,6 +98,11 @@ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->  {
->  	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
->  
-> +	if (!clk_enable(vt8500->clk)) {
-> +		dev_err(chip->dev, "failed to enable clock\n");
-> +		return -EBUSY;
-> +	};
-> +
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-I don't think that works. The clock API returns 0 on success and a
-negative error code on failure. So this should rather be something like:
+> On Tue, Oct 16, 2012 at 03:07:49PM -0700, Kevin Hilman wrote:
+>> From: Thomas Gleixner <tglx@linutronix.de>
+>> 
+>> Attempts to retrigger nested threaded IRQs currently fail because they
+>> have no primary handler.  In order to support retrigger of nested
+>> IRQs, the parent IRQ needs to be retriggered.
+>> 
+>> To fix, when an IRQ needs to be resent, if the interrupt has a parent
+>> IRQ and runs in the context of the parent IRQ, then resend the parent.
+>> 
+>> Also, handle_nested_irq() needs to clear the replay flag like the
+>> other handlers, otherwise check_irq_resend() will set it and it will
+>> never be cleared.  Without clearing, it results in the first resend
+>> working fine, but check_irq_resend() returning early on subsequent
+>> resends because the replay flag is still set.
+>> 
+>> Problem discovered on ARM/OMAP platforms where a nested IRQ that's
+>> also a wakeup IRQ happens late in suspend and needed to be retriggered
+>> during the resume process.
+>> 
+>> Reported-by: Kevin Hilman <khilman@ti.com>
+>> Tested-by: Kevin Hilman <khilman@ti.com>
+>> [khilman at ti.com: changelog edits, clear IRQS_REPLAY in handle_nested_irq()]
+>> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+>
+> Umm, we also have the converse situation.  We have platforms where the
+> resend has to be done from the child IRQ, and the parent must not be
+> touched.  I hope that doesn't break those.
 
-	err = clk_enable(vt8500->clk);
-	if (err < 0) {
-		dev_err(chip->dev, "failed to enable clock: %d\n", err);
-		return err;
-	}
+I'm assuming the child IRQs you're concerned with are not threaded,
+right?  This patch only addresses nested, threaded IRQs, and these don't
+have a primary handler to run at all, so cannot do any triggering.
 
-> @@ -123,6 +153,12 @@ static int __devinit pwm_probe(struct platform_device *pdev)
->  	chip->chip.ops = &vt8500_pwm_ops;
->  	chip->chip.base = -1;
->  	chip->chip.npwm = VT8500_NR_PWMS;
-> +	chip->clk = devm_clk_get(&pdev->dev, NULL);
-> +
-
-The blank line should go above the call to devm_clk_get().
-
-> +	if (IS_ERR_OR_NULL(chip->clk)) {
-> +		dev_err(&pdev->dev, "clock source not specified\n");
-> +		return PTR_ERR(chip->clk);
-> +	}
-[...]
-> +	if (!clk_prepare(chip->clk)) {
-> +		dev_err(&pdev->dev, "failed to prepare clock\n");
-> +		return -EBUSY;
-> +	}
-> +
-
-Same comment here. I wonder how this code can work, since if the clock
-is properly prepared, then it will return 0, and the above will return
--EBUSY.
-
->  	ret = pwmchip_add(&chip->chip);
-> -	if (ret < 0)
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add pwmchip\n");
-
-Error messages can be considered prose, so this should be: "failed to
-add PWM chip".
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/d37c6d31/attachment-0001.sig>
+Kevin
