@@ -1,49 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Oct 2012 13:11:56 +0200
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdZhUwMTg0suqbZiukN7Se6fzdYP3-0Dspm9WF6qZniNVQ@mail.gmail.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <CACRpkdaQ1WfRWrx=RXMVkeFtwdERJsOpVa3DaXBTU2KZdgqhRQ@mail.gmail.com>
- <508664CA.7000601@ti.com>
- <CACRpkdbhCS-Vb0DtbTZQ_Zw_8SOh3Bqutme3Y2-QrxNqvMiNNw@mail.gmail.com>
- <20121023100333.GA24418@arwen.pp.htv.fi>
- <20121023122312.56b23e1c@skate>
- <CACRpkdb+f44jw1vTYvJT0bnMOP8XQe8ztDUHiwtS2JHtPWAGXw@mail.gmail.com>
- <20121023102903.GA24820@arwen.pp.htv.fi>
- <CACRpkdZhUwMTg0suqbZiukN7Se6fzdYP3-0Dspm9WF6qZniNVQ@mail.gmail.com>
-Message-ID: <20121023131156.13e2d0ae@skate>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 23 Oct 2012 07:16:57 -0400
+Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
+In-Reply-To: <20121023104534.1d4ff689@skate>
+References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121023084241.GV11837@lunn.ch> <20121023104534.1d4ff689@skate>
+Message-ID: <20121023111657.GB18811@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Tue, 23 Oct 2012 12:45:33 +0200, Linus Walleij wrote:
-
-> Hm so I have had this idea of runtime PM core helping out
-> with pins, so I could add something like
+On Tue, Oct 23, 2012 at 10:45:34AM +0200, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
 > 
-> pm_pins_fetch()
-> pm_pins_default()
-> pm_pins_idle()
-> pm_pins_sleep()
+> On Tue, 23 Oct 2012 10:42:41 +0200, Andrew Lunn wrote:
+> > > diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+> > > index 49d7915..cd2717b 100644
+> > > --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> > > +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> > > @@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
+> > >  static const char * const armada_370_xp_dt_board_dt_compat[] = {
+> > >  	"marvell,a370-db",
+> > >  	"marvell,axp-db",
+> > > +	"plathome,openblocks-ax3",
+> > >  	NULL,
+> > >  };
+> > 
+> > Hi Thomas
+> > 
+> > You will get less merge conflicts with new boards if you keep this
+> > list sorted.
 > 
-> So if one is using the pin states defined in
-> <linux/pinctrl/pinctrl-state.h> then the PM core can help out in
-> keeping track of the pins and states, and the driver will just tell
-> the PM core what to do and when.
-> 
-> Would this fit the bill for everyone's code consolidation needs?
-> It would sure work for us...
+> Hum, right, but isn't "plathome" after "marvell" when sorted
+> alphabetically? Or maybe I don't get which kind of sorting you are
+> referring to?
 
-That surely would work but is kind of non-obvious when reading a
-driver's code: that's the problem with bus notifier, they do things a
-bit "behind your back" without you noticing. Having the driver request
-its own pinctrl state, and switch between states upon suspend/resume is
-a lot more explicit, IMO.
+No, no, no.  marvell, /then/ NULL, /then/ plathome.  ;-)  Right, Andrew?
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+thx,
+
+Jason.
