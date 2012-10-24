@@ -1,140 +1,28 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Wed, 24 Oct 2012 15:04:07 -0500
-Subject: [PATCH v4 3/5] zynq: remove use of CLKDEV_LOOKUP
-In-Reply-To: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121024200407.GD6713@beefymiracle.amer.corp.natinst.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 24 Oct 2012 22:04:00 +0200
+Subject: [PATCH 1/9] ARM: Kirkwood: Convert TS219 to pinctrl.
+In-Reply-To: <20121024220021.148a88ff@skate>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <1351090434-30499-2-git-send-email-andrew@lunn.ch>
+ <20121024213128.2d4c07dc@skate> <50884659.1020208@gmail.com>
+ <20121024220021.148a88ff@skate>
+Message-ID: <20121024200400.GZ21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq support in mainline does not (yet) make use of any of the
-generic clk or clk lookup functionality.  Remove what is upstream for
-now, until the out-of-tree implementation is in suitable form for
-merging.
+> I think what Shawn Guo did with i.MX 28 is really neat. In the current
+> patches posted by Andrew, for example, the following piece:
+> 
+> +			pmx_uart1: pmx-uart1 {
+> +				marvell,pins = "mpp13", "mpp14";
+> +				marvell,function = "uart1";
+> +			};
+> 
+> is needlessly repeated in kirkwood-ts219-6281.dts,
+> kirkwood-ts219-6282.dts and kirkwood-dnskw.dtsi. This is clearly a
+> pinmux configuration that sets up TXD/RXD of UART1, and it should be in
+> kirkwood.dtsi.
 
-An important side effect of this patch is that it allows the building of
-a Zynq kernel without running into unresolved symbol problems:
+I did try that, but was getting errors from dtc.
 
-   drivers/built-in.o: In function `amba_get_enable_pclk':
-   clkdev.c:(.text+0x444): undefined reference to `clk_enable'
-   drivers/built-in.o: In function `amba_remove':
-   clkdev.c:(.text+0x488): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `amba_probe':
-   clkdev.c:(.text+0x540): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `amba_device_add':
-   clkdev.c:(.text+0x77c): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `enable_clock':
-   clkdev.c:(.text+0x29738): undefined reference to `clk_enable'
-   drivers/built-in.o: In function `disable_clock':
-   clkdev.c:(.text+0x29778): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `__pm_clk_remove':
-   clkdev.c:(.text+0x297f8): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `pm_clk_suspend':
-   clkdev.c:(.text+0x29bc8): undefined reference to `clk_disable'
-   drivers/built-in.o: In function `pm_clk_resume':
-   clkdev.c:(.text+0x29c28): undefined reference to `clk_enable'
-   make[2]: *** [vmlinux] Error 1
-   make[1]: *** [sub-make] Error 2
-   make: *** [all] Error 2
-
-In addition, eliminate Zynq's "use" of the versatile platform, as it is
-no longer needed.  As Nick Bowler points out:
-
-   For the record, I think this was introduced by commit 56a34b03ff427
-   ("ARM: versatile: Make plat-versatile clock optional") which forgot to
-   select PLAT_VERSATILE_CLOCK on Zynq.  This is not all that surprising,
-   because the fact that Zynq "uses" PLAT_VERSATILE is secretly hidden in
-   the Makefile.
-
-   Nevertheless, the only feature from versatile that Zynq needed was the
-   clock support, so this patch should *also* delete the secret use of
-   plat-versatile by removing this line from arch/arm/Makefile:
-
-      plat-$(CONFIG_ARCH_ZYNQ)      += versatile
-
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-Cc: John Linn <john.linn@xilinx.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/Kconfig                         |  1 -
- arch/arm/Makefile                        |  1 -
- arch/arm/mach-zynq/common.c              |  1 -
- arch/arm/mach-zynq/include/mach/clkdev.h | 32 --------------------------------
- 4 files changed, 35 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cce4f8d..de70d99 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -946,7 +946,6 @@ config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform"
- 	select ARM_AMBA
- 	select ARM_GIC
--	select CLKDEV_LOOKUP
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select ICST
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 451757d..8dbab2d 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -197,7 +197,6 @@ machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
- # by CONFIG_* macro name.
- plat-$(CONFIG_ARCH_OMAP)	+= omap
- plat-$(CONFIG_ARCH_S3C64XX)	+= samsung
--plat-$(CONFIG_ARCH_ZYNQ)	+= versatile
- plat-$(CONFIG_PLAT_IOP)		+= iop
- plat-$(CONFIG_PLAT_NOMADIK)	+= nomadik
- plat-$(CONFIG_PLAT_ORION)	+= orion
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 056091a..ba48f06 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -31,7 +31,6 @@
- #include <asm/hardware/cache-l2x0.h>
- 
- #include <mach/zynq_soc.h>
--#include <mach/clkdev.h>
- #include "common.h"
- 
- static struct of_device_id zynq_of_bus_ids[] __initdata = {
-diff --git a/arch/arm/mach-zynq/include/mach/clkdev.h b/arch/arm/mach-zynq/include/mach/clkdev.h
-deleted file mode 100644
-index c6e73d8..0000000
---- a/arch/arm/mach-zynq/include/mach/clkdev.h
-+++ /dev/null
-@@ -1,32 +0,0 @@
--/*
-- * arch/arm/mach-zynq/include/mach/clkdev.h
-- *
-- *  Copyright (C) 2011 Xilinx, Inc.
-- *
-- * This software is licensed under the terms of the GNU General Public
-- * License version 2, as published by the Free Software Foundation, and
-- * may be copied, distributed, and modified under those terms.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- */
--
--#ifndef __MACH_CLKDEV_H__
--#define __MACH_CLKDEV_H__
--
--#include <plat/clock.h>
--
--struct clk {
--	unsigned long		rate;
--	const struct clk_ops	*ops;
--	const struct icst_params *params;
--	void __iomem		*vcoreg;
--};
--
--#define __clk_get(clk) ({ 1; })
--#define __clk_put(clk) do { } while (0)
--
--#endif
--- 
-1.8.0
+  Andrew
