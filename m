@@ -1,35 +1,52 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 24 Oct 2012 11:21:47 +0200
-Subject: [PATCH 1/1] gpio/at91: auto request and configure the pio as
- input when the interrupt is used via DT
-In-Reply-To: <CACRpkdY6xJt2Xob8DHF==LYxNMpocEkbEhy-8DmQpZjZ4VPOXw@mail.gmail.com>
-References: <1351000601-3141-1-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdY6xJt2Xob8DHF==LYxNMpocEkbEhy-8DmQpZjZ4VPOXw@mail.gmail.com>
-Message-ID: <20121024092147.GG18964@game.jcrosoft.org>
+From: s-guiriec@ti.com (Sebastien Guiriec)
+Date: Wed, 24 Oct 2012 11:27:23 +0200
+Subject: [PATCH v3 0/4] ARM: dts: Update OMAP5 with address space and
+ interrupts
+In-Reply-To: <5087B196.7090804@ti.com>
+References: <1351062434-22514-1-git-send-email-s-guiriec@ti.com>
+ <5087B196.7090804@ti.com>
+Message-ID: <5087B47B.8080009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:44 Wed 24 Oct     , Linus Walleij wrote:
-> On Tue, Oct 23, 2012 at 3:56 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> 
-> > If we do this
-> >
-> >         interrupt-parent = <&pioA>;
-> >         interrupts = <7 0x0>;
-> >
-> > The current core map the irq correctly but the gpio is not configured as input.
-> > The pinctrl configure the pin as gpio with the correct mux parameter but is
-> > not responsible to configure it as input.
-> >
-> > So do it during the xlate
-> >
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> 
-> Looks OK to me: do you want me to just apply it on my AT91 branch
-> on the pinctrl tree?
-if 3.8 I prefer via at91 if you don't mind
+Hi Benoit,
 
-Best Regards,
-J.
+On 10/24/2012 11:15 AM, Benoit Cousson wrote:
+> Hi Seb,
+>
+> Sorry, I missed your previous email, your v2 was the right one.
+> We do have a single INTC in every OMAP, there is no point to repeat the
+> same data hundred times.
+> The DTS are already big enough.
+
+So in such case we should send a series for audio IP interrupt-parent 
+removal for OMAP3/4/5 dtsi file in order to be coherent.
+
+Do you want me to do it?
+
+>
+> On 10/24/2012 09:07 AM, Sebastien Guiriec wrote:
+>> Since kernel 3.7 the DTS data are not overwriten by hwmod data we can add the address space
+>> and interrupt line description inside dtsi file for OMAP5. This serie is updating the
+>> current OMAP5 IP with missing entry.
+>>
+>> It has been tested on OMAP5 with 3.7-audio-display feature tree.
+>> - MMC is probing and functional
+>> - TWL6041 probing (GPIO/I2C)
+>> - booting (UART)
+>>
+>> Update since v1:
+>> - Add Ack and review
+>> - Fix up commit messages.
+>>
+>> Update since v2:
+>> - Add interrupt-parent.
+>
+> I will take the previous one to avoid the duplication of attributes.
+>
+> On top of that I will remove the ones introduce in audio IPs for
+> consistency on OMAP3/4/5 platforms.
+>
+> Regards,
+> Benoit
+>
