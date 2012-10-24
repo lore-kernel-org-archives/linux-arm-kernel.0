@@ -1,32 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Oct 2012 14:49:24 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: Introduce local usb.h
-In-Reply-To: <20121019073803.GG12235@arwen.pp.htv.fi>
-References: <20121019021816.6693.65985.stgit@muffinssi.local>
- <20121019022005.6693.98660.stgit@muffinssi.local>
- <20121019073803.GG12235@arwen.pp.htv.fi>
-Message-ID: <20121024214924.GL5605@atomide.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 25 Oct 2012 00:02:17 +0200
+Subject: [PATCH 1/2] cpufreq: return early from __cpufreq_driver_getavg()
+In-Reply-To: <CAKohponGwhC_zmk1Whq56vmZMvjcxXKiSpdvMk4ZU8z0Wa2TBw@mail.gmail.com>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <2737823.2JYE7UmLRN@vostro.rjw.lan>
+ <CAKohponGwhC_zmk1Whq56vmZMvjcxXKiSpdvMk4ZU8z0Wa2TBw@mail.gmail.com>
+Message-ID: <112621141.CGPLIkkgz1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121019 00:45]:
-> On Thu, Oct 18, 2012 at 07:20:05PM -0700, Tony Lindgren wrote:
-> > Let's move what we can from plat/usb.h to the local usb.h
-> > for ARM common zImage support.
-> > 
-> > This is needed so we can remove plat/usb.h for ARM common
-> > zImage support.
-> > 
-> > Cc: Felipe Balbi <balbi@ti.com>
+On Saturday 20 of October 2012 10:12:07 Viresh Kumar wrote:
+> On Oct 20, 2012 3:37 AM, "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
+> >
+> > On Saturday 20 of October 2012 01:42:05 Viresh Kumar wrote:
+> > > There is no need to do cpufreq_get_cpu() and cpufreq_put_cpu() for
+> drivers that
+> > > don't support getavg() routine.
+> > >
+> > > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >
+> > The patch doesn't seem to follow the changelog or the other way around.
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> Sorry if my log isn't clear enough.
+> But i could still see it matching the code :)
+> 
+> I have moved the check for drivers capabilities at the top
+> of routine, so that there is no need to call mentioned routines.
 
-Thanks, I've now pushed these two patches on v3.7-rc1 to
-omap-for-v3.8/cleanup-headers-usb branch.
+OK
 
-Greg and Samuel, in case you need to, it's OK to merge the
-branch above now that plat/usb.h is moved.
+Applied to linux-pm.git/linux-next as v3.8 material.
 
-Regards,
+Thanks,
+Rafael
 
-Tony
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
