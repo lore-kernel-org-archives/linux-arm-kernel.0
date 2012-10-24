@@ -1,81 +1,38 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 24 Oct 2012 09:16:43 -0500
-Subject: [PATCH] ARM: PMU: fix runtime PM enable
-In-Reply-To: <20121024093150.GA23775@mudshark.cambridge.arm.com>
-References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
- <20121024093150.GA23775@mudshark.cambridge.arm.com>
-Message-ID: <5087F84B.9070705@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 24 Oct 2012 07:19:13 -0700
+Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
+ mask on disable
+In-Reply-To: <CANOLnOOUHJg5W9VbHhnK8ta+Bys_oMpSz9M5jQ0xCeOB1gxtdg@mail.gmail.com>
+ (Grazvydas Ignotas's message of "Wed, 24 Oct 2012 15:02:30 +0300")
+References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
+ <CANOLnOOUHJg5W9VbHhnK8ta+Bys_oMpSz9M5jQ0xCeOB1gxtdg@mail.gmail.com>
+Message-ID: <87pq4854wu.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Grazvydas Ignotas <notasas@gmail.com> writes:
 
-On 10/24/2012 04:31 AM, Will Deacon wrote:
-> Hi Jon,
-> 
-> On Tue, Oct 23, 2012 at 09:31:08PM +0100, Jon Hunter wrote:
->> Commit 7be2958 (ARM: PMU: Add runtime PM Support) updated the ARM PMU code to
->> use runtime PM which was prototyped and validated on the OMAP devices. In this
->> commit, there is no call pm_runtime_enable() and for OMAP devices
->> pm_runtime_enable() is currently being called from the OMAP PMU code when the
->> PMU device is created. However, there are two problems with this:
+> On Tue, Oct 23, 2012 at 9:09 PM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> From: Kevin Hilman <khilman@ti.com>
 >>
->> 1. For any other ARM device wishing to use runtime PM for PMU they will need
->>    to call pm_runtime_enable() for runtime PM to work.
->> 2. When booting with device-tree and using device-tree to create the PMU
->>    device, pm_runtime_enable() needs to be called from within the ARM PERF
->>    driver as we are no longer calling any device specific code to create the
->>    device. Hence, PMU does not work on OMAP devices that use the runtime PM
->>    callbacks when using device-tree to create the PMU device.
->>
->> Therefore, add a new platform data variable to indicate whether runtime PM is
->> used and if so call pm_runtime_enable() when the PMU device is registered. Note
->> that devices using runtime PM may not use the runtime_resume/suspend callbacks
->> and so we cannot use the presence of these handlers in the platform data to
->> determine whether we should call pm_runtime_enable().
-> 
-> [...]
-> 
->> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
->> index a26170d..50a6c3b 100644
->> --- a/arch/arm/include/asm/pmu.h
->> +++ b/arch/arm/include/asm/pmu.h
->> @@ -36,6 +36,7 @@
->>  struct arm_pmu_platdata {
->>  	irqreturn_t (*handle_irq)(int irq, void *dev,
->>  				  irq_handler_t pmu_handler);
->> +	bool use_runtime_pm;
->>  	int (*runtime_resume)(struct device *dev);
->>  	int (*runtime_suspend)(struct device *dev);
-> 
-> Can we not just use the presence of the resume/suspend function pointers to
-> indicate whether we should enable runtime pm or not? i.e. if they're not
-> NULL, then enable the thing?
+>> When debounce clocks are disabled, ensure that the banks
+>> dbck_enable_mask is cleared also.  Otherwise, context restore on
+>> subsequent off-mode transition will restore previous value from the
+>> shadow copies (bank->context.debounce*) leading to mismatch state
+>> between driver state and hardware state.
+>
+> This doesn't look right to me, aren't you effectively disabling
+> debounce forever here? _gpio_dbck_disable is called from
+> omap_gpio_runtime_suspend() and nothing will ever restore
+> dbck_enable_mask back to what it was set by _set_gpio_debounce and
+> debounce functionality is lost.
 
-I wondered if you would ask that :-)
+Yes, you're right.   Good catch.
 
-Unfortunately, we can't. For example, OMAP3430 and OMAP4460 both require
-runtime_pm to be enabled to turn on the debug sub-system in OMAP for PMU
-to work. However, neither of these devices are using the suspend/resume
-callbacks because the HWMOD framework is doing this for us behind the
-scenes.
+I need a fix that's more targetted to the free/reset path.
 
-So then you ask, why do we need the resume/suspend callbacks, well we
-will need them for OMAP4430 where in addition to turning on the debug
-sub-system we need to configure the CTI module. Therefore, I had to add
-another plat data variable.
+Linus, please revert if it's not too late, and I'll come up with a more
+targetted fix.
 
-By the way, I did add a comment in the above changelog about this. See
-the last paragraph, not sure if this is 100% clear.
-
-One alternative I had thought about was always calling
-pm_runtime_enable() on registering the PMU device and avoid having a
-use_runtime_pm variable. For ARM platforms that don't use runtime PM the
-pm_runtime_enable() function does nothing. However, I was more concerned
-about adding unnecessary overhead for ARM platforms that are using
-runtime PM but don't need runtime PM for PMU. I don't see any side
-affects on our OMAP2 platform that does not need runtime PM for PMU.
-However, was not sure what is best here.
-
-Cheers
-Jon
+Kevin
