@@ -1,70 +1,43 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Wed, 24 Oct 2012 16:40:17 +0300
-Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
- mask on disable
-In-Reply-To: <5087E3D9.6040007@ti.com>
-References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
- <CANOLnOOUHJg5W9VbHhnK8ta+Bys_oMpSz9M5jQ0xCeOB1gxtdg@mail.gmail.com>
- <5087E3D9.6040007@ti.com>
-Message-ID: <CANOLnONCL=anZa9u6AEd4YHkZpRAS2n-4VLbCv98rL3jRwSpyw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Oct 2012 15:49:19 +0200
+Subject: [PATCH 0/2] Adding SATA support for Armada 370/XP
+Message-ID: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 3:49 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On Wednesday 24 October 2012 05:32 PM, Grazvydas Ignotas wrote:
->>
->> On Tue, Oct 23, 2012 at 9:09 PM, Kevin Hilman
->> <khilman@deeprootsystems.com> wrote:
->>>
->>> From: Kevin Hilman <khilman@ti.com>
->>>
->>> When debounce clocks are disabled, ensure that the banks
->>> dbck_enable_mask is cleared also.  Otherwise, context restore on
->>> subsequent off-mode transition will restore previous value from the
->>> shadow copies (bank->context.debounce*) leading to mismatch state
->>> between driver state and hardware state.
->>
->>
->> This doesn't look right to me, aren't you effectively disabling
->> debounce forever here? _gpio_dbck_disable is called from
->> omap_gpio_runtime_suspend() and nothing will ever restore
->> dbck_enable_mask back to what it was set by _set_gpio_debounce and
->> debounce functionality is lost.
->>
-> As per commit log, the issue seen with request->debounce->free()
-> sequence and hence on free, debounce state needs to be cleared.
-> Next gpio_set_debounce() should set the debounce mask right so
-> the patch seems to be right.
->
->
->>>
->>> This was discovered when board code was doing
->>>
->>>    gpio_request_one()
->>>    gpio_set_debounce()
->>>    gpio_free()
->>>
->>> which was leaving the GPIO debounce settings in a confused state.
->>> Then, enabling off mode causing bogus state to be restored, leaving
->>> GPIO debounce enabled which then prevented the CORE powerdomain from
->>> transitioning.
->>>
->
-> But there is one more case which might break because of this patch.
-> As part of idle, we might end up with below without gpio_free()
-> omap2_gpio_prepare_for_idle()
->  ->pm_runtime_put_sync_suspend()
->   -> omap_gpio_runtime_suspend()
->    ->_gpio_dbck_disable()
->
-> And last call will clear the debounce mask state which will lost and
-> hence the debounce clock won't be enabled on resume.
->
-> I let Kevin comment whether this is the valid case or not.
+Hello,
 
-That's exactly what I had in mind - we lose debounce functionality on
-first runtime suspend.
+this small patch set adds the SATA support for Armada 370 and Armada XP.
+
+The evaluation boards for Armada 370 and Armada XP come with 2 SATA
+ports, and when both are enable the coherent pool for DMA mapping was
+too short. It was exactly the same issue that was fixed for Kirkwood
+two months ago. So I used the same fix in the first patch. Later when
+Kirkwood will be part of mach-mvebu, then this fix will be shared
+between the 2 SoCs families.
+
+This patch set is based on 3.7-rc2 and depends one the framework clock
+support (the last version was posted last week:
+http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
+called mvebu-SATA-for-3.8 is also available at
+https://github.com/MISL-EBU-System-SW/mainline-public.git.
+
+Regards,
+
+Gregory
+
+Gregory CLEMENT (1):
+  arm: mvebu: increase atomic coherent pool size for armada 370/XP
+
+Lior Amsalem (1):
+  arm: mvebu: adding SATA support: dt binding and config update
+
+ arch/arm/boot/dts/armada-370-db.dts  |    3 +++
+ arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
+ arch/arm/boot/dts/armada-xp-db.dts   |    3 +++
+ arch/arm/configs/mvebu_defconfig     |    7 +++++++
+ arch/arm/mach-mvebu/armada-370-xp.c  |   12 ++++++++++++
+ 5 files changed, 35 insertions(+)
 
 -- 
-Gra?vydas
+1.7.9.5
