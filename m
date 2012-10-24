@@ -1,73 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 24 Oct 2012 11:34:00 +0200
-Subject: [PATCH 2/2] ASoC: ux500_msp_i2s: Fix devm_* and return code merge
- error
-In-Reply-To: <1350306806-5688-2-git-send-email-lee.jones@linaro.org>
-References: <1350306806-5688-1-git-send-email-lee.jones@linaro.org>
- <1350306806-5688-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFqrS0QT+UO0L3B29UcnjX0bSv3XvWTmC6E_ubgr8NTDiQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 24 Oct 2012 11:56:03 +0200
+Subject: pwm pin stays on 1 on mxs after pwm_config(pwm, 0, period);
+ pwm_disable(pwm);
+Message-ID: <20121024095603.GH639@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Hello,
 
-I assume this shall go into 3.7, right?
+the leds-pwm driver does the following in its led_pwm_set routine:
 
-Kind regards
-Ulf Hansson
+	if (brightness == 0) {
+		pwm_config(led_dat->pwm, 0, period);
+		pwm_disable(led_dat->pwm);
+	} else {
+		pwm_config(led_dat->pwm, brightness * period / max, period);
+		pwm_enable(led_dat->pwm);
+	}
 
-On 15 October 2012 15:13, Lee Jones <lee.jones@linaro.org> wrote:
-> Some ux500_msp_i2s patches clashed with:
->
-> b18e93a493626c1446f9788ebd5844d008bbf71c
-> ASoC: ux500_msp_i2s: better use devm functions and fix error return code
->
-> ... leaving the driver uncompilable. This patch fixes the
-> issues encountered.
->
-> Cc: alsa-devel at alsa-project.org
-> Cc: Liam Girdwood <lrg@ti.com>
-> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  sound/soc/ux500/ux500_msp_i2s.c |    8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
->
-> diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
-> index b7c996e..a26c6bf 100644
-> --- a/sound/soc/ux500/ux500_msp_i2s.c
-> +++ b/sound/soc/ux500/ux500_msp_i2s.c
-> @@ -18,6 +18,7 @@
->  #include <linux/pinctrl/consumer.h>
->  #include <linux/delay.h>
->  #include <linux/slab.h>
-> +#include <linux/io.h>
->  #include <linux/of.h>
->
->  #include <mach/hardware.h>
-> @@ -697,14 +698,11 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
->                         platform_data = devm_kzalloc(&pdev->dev,
->                                 sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
->                         if (!platform_data)
-> -                               ret = -ENOMEM;
-> +                               return -ENOMEM;
->                 }
->         } else
->                 if (!platform_data)
-> -                       ret = -EINVAL;
-> -
-> -       if (ret)
-> -               goto err_res;
-> +                       return -EINVAL;
->
->         dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
->                 pdev->name, platform_data->id);
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The effect on setting brightness = 0 on an i.MX28 based machine after
+having brightness = max = 255 before is:
+
+pwm_config(..., 0, period) doesn't disable the output at once because of
+some logic (in hardware) to prevent glitches. According to the Hardware
+manual the new values take effect after the current period (which has the
+output on 1). Now pwm_disable stopps the counter, the current period
+doesn't run out and the output keeps the 1. So the LED stays on.
+
+Where do I fix that? In the pwm driver (somehow block in pwm_config
+until the current period is over, don't know how yet), remove the
+pwm_disable in the brightness == 0 case (and then probably making the
+whole if block a simple pwm_config(led_dat->pwm, brightness * period /
+max, period)) or do we need a new API for that introducing a wait flag
+or something different I didn't think of?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
