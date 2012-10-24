@@ -1,38 +1,25 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Wed, 24 Oct 2012 19:55:59 +0900
-Subject: [PATCH 0/5] i2c-sh_mobile non-urgent changes
-Message-ID: <5087C93F.6080601@renesas.com>
+From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
+Date: Wed, 24 Oct 2012 12:56:46 +0200
+Subject: [PATCH] ARM: dts: OMAP: Move interrupt-parent to the root node
+ to avoid duplication
+In-Reply-To: <5087BCA6.1020602@ti.com>
+References: <5087BCA6.1020602@ti.com>
+Message-ID: <5087C96E.7020906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 10/24/2012 12:02 PM, Benoit Cousson wrote:
+> The interrupt-parent attribute does not have to be added in each
+> node since the DT framework will check for the parent as well to get it.
+> 
+> Create an interrupt-parent for OMAP2, OMAP3, AM33xx and remove the
+> attributes from every nodes that were using it.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: Sebastien Guiriec <s-guiriec@ti.com>
 
-This is the first batch to fix the i2c-sh_mobile driver.  As a first
-step, this comprises of the SCL optimization work and a simple fix to
-annoying spurious WAIT interrupt issue; in other words, this does not
-change tx/rx data handling logic.
+Thanks Benoit, looks good from my side.
 
-This driver has an architectural problem with send/receive procedures
-and needs a fundamental overhaul.  I've been working on splitting into
-logical chunks, but not yet completed.
-
-Patches are prepared against the vanilla v3.6.  I don't have a chance
-to give it a try with v3.6+ kernels myself, but tend to be optimistic
-about that.  I have been cooking these patches over a year, and they
-work perfectly fine with older kernels ..v3.4 so far.
-
-
-Shinya Kuribayashi (5):
-      i2c: i2c-sh_mobile: calculate clock parameters at driver probing time
-      i2c: i2c-sh_mobile: optimize ICCH/ICCL values according to I2C bus speed
-      i2c: i2c-sh_mobile: fix ICCH to avoid violation of the tHD;STA timing spec
-      i2c: i2c-sh_mobile: support I2C hardware block with a faster operating clock
-      i2c: i2c-sh_mobile: fix spurious transfer request timed out
-
- drivers/i2c/busses/i2c-sh_mobile.c | 150 ++++++++++++++++++++++++-------------
- include/linux/i2c/i2c-sh_mobile.h  |   1 +
- 2 files changed, 98 insertions(+), 53 deletions(-)
-
---
-Shinya Kuribayashi
-Renesas Electronics
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
