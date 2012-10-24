@@ -1,140 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 21:33:23 +0200
-Subject: [PATCH v2] arm: mvebu: support for the PlatHome OpenBlocks AX3-4 board
-In-Reply-To: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1351107203-31808-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 24 Oct 2012 21:38:23 +0200
+Subject: [PATCH] [RFC] pinctrl: mvebu: reset pins to an UNKNOWN state
+ on startup
+In-Reply-To: <1351106281-31288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351106281-31288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <508843AF.7060803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform, available in Japan from PlatHome, has a dual-core
-Armada XP, the MV78260. For now, only the two serial ports and the
-three front LEDs are supported. Support for SMP, network, SATA, USB
-and other peripherals will be added as drivers for them become
-available for Armada XP in mainline.
+On 10/24/2012 09:18 PM, Thomas Petazzoni wrote:
+> Note: this patch is a *RFC*, it is not intended for merging, only to
+> get a discussion started. The code is horrible, makes terrible
+> assumptions and so on.
+>
+> On many platforms, most of the pinmux initialization is done in the
+> bootloader, and therefore persists when we boot the Linux kernel. This
+> prevents us from making sure that the pinmux configuration in the
+> board device trees is correct.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Thomas,
 
----
-This is 3.8 material.
+how you make sure something you don't know about? The bootloader sets
+these pinmux settings for a reason and if the DT doesn't tell the kernel
+it should make no assumptions at all.
 
-Changes since v1:
+> One idea to make sure our device trees are correct in terms of
+> pinmuxing is to set the state of each pin to an unavailable function
+> during the initialization of the pinctrl driver. This way, only pins
+> that are explicitly configured through proper device tree attributes
+> will actually be functional.
+>
+> Remaining questions to solve:
+>
+>   * Is this useful?
 
- * Renamed the board to OpenBlocks AX3-4, since there is a variant
-   called AX3-2 which has less RAM, and no mini PCIe port. Requested
-   by Andrew Lunn.
+IMHO it isn't - but maybe I am missing the point here. What is it that
+you don't like in the bootloaders choice of configuring pinmux?
 
- * Fix the amount of memory to 3 GB. In fact, the board has 1 GB
-   soldered, and 2 GB in a SODIMM slot (which is therefore
-   removable). But as the board is delivered as is, we'll assume it
-   has 3 GB of memory by default.
----
- arch/arm/boot/dts/Makefile             |    3 +-
- arch/arm/boot/dts/openblocks-ax3-4.dts |   69 ++++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/armada-370-xp.c    |    1 +
- 3 files changed, 72 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/openblocks-ax3-4.dts
+>   * Maybe some pins should be excluded for this, especially if the
+>     console serial port pins are muxed. On Armada XP, it's not the
+>     case: UART0 RX/UART0 TX pins are not part of MPPs, so we can clear
+>     all pins. But on other mvebu platforms, it may be the case.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..6f2a25d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -44,7 +44,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
- dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
- 	msm8960-cdp.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
--	armada-xp-db.dtb
-+	armada-xp-db.dtb \
-+	openblocks-ax3-4.dtb
- dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
- 	imx53-ard.dtb \
- 	imx53-evk.dtb \
-diff --git a/arch/arm/boot/dts/openblocks-ax3-4.dts b/arch/arm/boot/dts/openblocks-ax3-4.dts
-new file mode 100644
-index 0000000..7ef8052
---- /dev/null
-+++ b/arch/arm/boot/dts/openblocks-ax3-4.dts
-@@ -0,0 +1,69 @@
-+/*
-+ * Device Tree file for OpenBlocks AX3-4 board
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+/include/ "armada-xp-mv78260.dtsi"
-+
-+/ {
-+	model = "PlatHome OpenBlocks AX3-4 board";
-+	compatible = "plathome,openblocks-ax3-4", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0xC0000000>; /* 3 GB */
-+	};
-+
-+	soc {
-+		serial at d0012000 {
-+			clock-frequency = <250000000>;
-+			status = "okay";
-+		};
-+		serial at d0012100 {
-+			clock-frequency = <250000000>;
-+			status = "okay";
-+		};
-+		pinctrl {
-+			led_pins: led-pins-0 {
-+				  marvell,pins = "mpp49", "mpp51", "mpp53";
-+				  marvell,function = "gpio";
-+			};
-+		};
-+		leds {
-+		        compatible = "gpio-leds";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&led_pins>;
-+
-+			red_led {
-+				   label = "red_led";
-+				   gpios = <&gpio1 17 1>;
-+				   default-state = "off";
-+			};
-+
-+			yellow_led {
-+				   label = "yellow_led";
-+				   gpios = <&gpio1 19 1>;
-+				   default-state = "off";
-+			};
-+
-+			green_led {
-+				   label = "green_led";
-+				   gpios = <&gpio1 21 1>;
-+				   default-state = "off";
-+				   linux,default-trigger = "heartbeat";
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 49d7915..68f1483 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
- static const char * const armada_370_xp_dt_board_dt_compat[] = {
- 	"marvell,a370-db",
- 	"marvell,axp-db",
-+	"plathome,openblocks-ax3-4",
- 	NULL,
- };
- 
--- 
-1.7.9.5
+That's why you don't touch pins that you don't know about. The mvebu
+pinctrl is written to overwrite pinctrl settings only if someone
+requests a special function. Usually this is done by a developer that
+knows about the board.
+
+Sebastian
