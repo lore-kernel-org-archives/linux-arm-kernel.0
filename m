@@ -1,49 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 24 Oct 2012 16:29:28 +0100
-Subject: [PATCH 10/10] ARM: imx6q: implement WAIT mode with coupled cpuidle
-In-Reply-To: <20121024135725.GA2464@S2101-09.ap.freescale.net>
-References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
- <1351005779-30347-11-git-send-email-shawn.guo@linaro.org>
- <20121023173543.GA15113@e102568-lin.cambridge.arm.com>
- <20121024135725.GA2464@S2101-09.ap.freescale.net>
-Message-ID: <20121024152925.GA23483@e102568-lin.cambridge.arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 24 Oct 2012 17:30:36 +0200
+Subject: [PATCH] ARM: dts: OMAP: Rename pandaES and var_som for consistency
+Message-ID: <5088099C.8020308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 02:57:31PM +0100, Shawn Guo wrote:
-> On Tue, Oct 23, 2012 at 06:35:43PM +0100, Lorenzo Pieralisi wrote:
-> > On Tue, Oct 23, 2012 at 04:22:59PM +0100, Shawn Guo wrote:
-> > 
-> > [...]
-> > 
-> > > +/*
-> > > + * For each cpu, setup the broadcast timer because local timer
-> > > + * stops for the states other than WFI.
-> > > + */
-> > > +static void imx6q_setup_broadcast_timer(void *arg)
-> > > +{
-> > > +       int cpu = smp_processor_id();
-> > > +
-> > > +       clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ON, &cpu);
-> > > +}
-> > 
-> > Can anyone explain to me please why this is needed ?
-> > 
-> It basically does nothing if either NO_HZ or HIGH_RES_TIMERS is
-> enabled, in which case tick_broadcast_setup_oneshot is already called
-> on init_timers path to set up bc->event_handler.  This is the general
-> case since nowadays we have both options enabled by default for most
-> systems.
-> 
-> However if neither option is enabled, CLOCK_EVT_NOTIFY_BROADCAST_ON
-> notifying will help route to call tick_broadcast_setup_oneshot to have
-> bc->event_handler set up.
-> 
-> So in short, it's needed to have broadcast timer work as expected when
-> neither NO_HZ or HIGH_RES_TIMERS is enabled.
+Rename the files to have consistent names across OMAP boards.
 
-Ok, point taken, it was just to check I was not missing anything on the
-expected usage on systems where those options are enabled.
+Update the Makefile to use the new names.
 
-Thanks a lot,
-Lorenzo
+Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+Cc: Uri Yosef <uri.y@variscite.com>
+---
+ arch/arm/boot/dts/Makefile                         |    4 ++--
+ .../dts/{omap4-pandaES.dts => omap4-panda-es.dts}  |    0
+ .../dts/{omap4-var_som.dts => omap4-var-som.dts}   |    0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename arch/arm/boot/dts/{omap4-pandaES.dts => omap4-panda-es.dts} (100%)
+ rename arch/arm/boot/dts/{omap4-var_som.dts => omap4-var-som.dts} (100%)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index e69c921..634bd42 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -68,8 +68,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-tobi.dtb \
+ 	omap4-panda.dtb \
+-	omap4-pandaES.dtb \
+-	omap4-var_som.dtb \
++	omap4-panda-es.dtb \
++	omap4-var-som.dtb \
+ 	omap4-sdp.dtb \
+ 	omap5-evm.dtb \
+ 	am335x-evm.dtb \
+diff --git a/arch/arm/boot/dts/omap4-pandaES.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+similarity index 100%
+rename from arch/arm/boot/dts/omap4-pandaES.dts
+rename to arch/arm/boot/dts/omap4-panda-es.dts
+diff --git a/arch/arm/boot/dts/omap4-var_som.dts b/arch/arm/boot/dts/omap4-var-som.dts
+similarity index 100%
+rename from arch/arm/boot/dts/omap4-var_som.dts
+rename to arch/arm/boot/dts/omap4-var-som.dts
+-- 
+1.7.0.4
