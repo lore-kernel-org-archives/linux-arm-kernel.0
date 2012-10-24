@@ -1,32 +1,101 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 09:44:08 +0200
-Subject: [PATCH 1/1] gpio/at91: auto request and configure the pio as
- input when the interrupt is used via DT
-In-Reply-To: <1351000601-3141-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1351000601-3141-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdY6xJt2Xob8DHF==LYxNMpocEkbEhy-8DmQpZjZ4VPOXw@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 24 Oct 2012 09:44:14 +0200
+Subject: [PATCH v2 1/4] ARM: dts: omap5: Update GPIO with address space
+ and interrupts
+In-Reply-To: <5086C29C.5000209@ti.com>
+References: <1350981432-6750-1-git-send-email-s-guiriec@ti.com>
+ <1350981432-6750-2-git-send-email-s-guiriec@ti.com> <5086AE8E.60106@ti.com>
+ <5086B316.6000001@ti.com> <5086BECA.9070502@ti.com> <5086C0C3.1060305@ti.com>
+ <5086C29C.5000209@ti.com>
+Message-ID: <50879C4E.6020003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 3:56 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
+On 10/23/2012 06:15 PM, Sebastien Guiriec wrote:
+> Hi Benoit and John,
+> 
+> On 10/23/2012 06:07 PM, Benoit Cousson wrote:
+>> On 10/23/2012 05:59 PM, Jon Hunter wrote:
+>>>
+>>> On 10/23/2012 10:09 AM, Benoit Cousson wrote:
+>>>> On 10/23/2012 04:49 PM, Jon Hunter wrote:
+>>>>> Hi Seb,
+>>>>>
+>>>>> On 10/23/2012 03:37 AM, Sebastien Guiriec wrote:
+>>>>>> Add base address and interrupt line inside Device Tree data for
+>>>>>> OMAP5
+>>>>>>
+>>>>>> Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
+>>>>>> ---
+>>>>>>   arch/arm/boot/dts/omap5.dtsi |   16 ++++++++++++++++
+>>>>>>   1 file changed, 16 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/boot/dts/omap5.dtsi
+>>>>>> b/arch/arm/boot/dts/omap5.dtsi
+>>>>>> index 42c78be..9e39f9f 100644
+>>>>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>>>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>>>>> @@ -104,6 +104,8 @@
+>>>>>>
+>>>>>>           gpio1: gpio at 4ae10000 {
+>>>>>>               compatible = "ti,omap4-gpio";
+>>>>>> +            reg = <0x4ae10000 0x200>;
+>>>>>> +            interrupts = <0 29 0x4>;
+>>>>>>               ti,hwmods = "gpio1";
+>>>>>>               gpio-controller;
+>>>>>>               #gpio-cells = <2>;
+>>>>>
+>>>>> I am wondering if we should add the "interrupt-parent" property to add
+>>>>> nodes in the device-tree source. I know that today the
+>>>>> interrupt-parent
+>>>>> is being defined globally, but when device-tree maps an interrupt
+>>>>> for a
+>>>>> device it searches for the interrupt-parent starting the current
+>>>>> device
+>>>>> node.
+>>>>>
+>>>>> So in other words, for gpio1 it will search the gpio1 binding for
+>>>>> "interrupt-parent" and if not found move up a level and search
+>>>>> again. It
+>>>>> will keep doing this until it finds the "interrupt-parent".
+>>>>>
+>>>>> Therefore, I believe it will improve search time and hence, boot
+>>>>> time if
+>>>>> we have interrupt-parent defined in each node.
+>>>>
+>>>> Mmm, I'm not that sure. it will increase the size of the blob, so
+>>>> increase the time to load it and then to parse it. Where in the current
+>>>> case, it is just going up to the parent node using the already
+>>>> un-flatten tree in memory and thus that should not take that much time.
+>>>
+>>> Yes it will definitely increase the size, so that could slow things
+>>> down.
+>>>
+>>>> That being said, it might be interesting to benchmark that to see what
+>>>> is the real impact.
+>>>
+>>> Right, I wonder what the key functions are we need to benchmark to get
+>>> an overall feel for what is best? Right now I am seeing some people add
+>>> the interrupt-parent for device nodes and others not. Ideally we should
+>>> be consistent, but at the same time it is probably something that we can
+>>> easily sort out later. So not a big deal either way.
+>>
+>> For consistency, I'd rather not add it at all for the moment.
+>> Later, when we will only support DT boot, people will start complaining
+>> about the boot time increase and then we will start optimizing a little
+>> bit :-)
+> 
+> I just do it like that to be consistent with what is inside OMAP4 dtsi
+> for those IPs (GPIO/UART/MMC/I2C). Now after checking Peter already add
+> the interrupt-parent for all audio IPs (OMAP3/4/5). But here we need
+> also interrupts name. So here we should try to be consistent.
+> 
+> So I can send back the series for OMAP5 and update the OMAP4 with
+>   interrupts-parent = <&gic>
 
-> If we do this
->
->         interrupt-parent = <&pioA>;
->         interrupts = <7 0x0>;
->
-> The current core map the irq correctly but the gpio is not configured as input.
-> The pinctrl configure the pin as gpio with the correct mux parameter but is
-> not responsible to configure it as input.
->
-> So do it during the xlate
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+No, you should not, as explained previously. You'd better remove the one
+already in audio IPs for consistency.
 
-Looks OK to me: do you want me to just apply it on my AT91 branch
-on the pinctrl tree?
 
-Yours,
-Linus Walleij
+Regards,
+Benoit
