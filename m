@@ -1,103 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 Oct 2012 16:45:32 +0200
-Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
- update
-In-Reply-To: <20121024140801.GB11837@lunn.ch>
-References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
- <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
- <20121024140801.GB11837@lunn.ch>
-Message-ID: <5087FF0C.7050303@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Oct 2012 15:45:24 +0100
+Subject: [PATCH 4/6] ARM: ux500: Specify AMBA Primecell IDs for Nomadik I2C in
+ DT
+In-Reply-To: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1351089926-32161-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 04:08 PM, Andrew Lunn wrote:
-> On Wed, Oct 24, 2012 at 03:49:21PM +0200, Gregory CLEMENT wrote:
->> From: Lior Amsalem <alior@marvell.com>
->>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> Signed-off-by: Lior Amsalem <alior@marvell.com>
->> ---
->>  arch/arm/boot/dts/armada-370-db.dts  |    3 +++
->>  arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
->>  arch/arm/boot/dts/armada-xp-db.dts   |    3 +++
->>  arch/arm/configs/mvebu_defconfig     |    7 +++++++
->>  4 files changed, 23 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
->> index 4a31b03..2a2aa75 100644
->> --- a/arch/arm/boot/dts/armada-370-db.dts
->> +++ b/arch/arm/boot/dts/armada-370-db.dts
->> @@ -34,5 +34,8 @@
->>  			clock-frequency = <200000000>;
->>  			status = "okay";
->>  		};
->> +		sata at d00a0000 {
->> +			status = "okay";
->> +		};
->>  	};
->>  };
->> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
->> index 94b4b9e..3f08233 100644
->> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
->> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
->> @@ -69,6 +69,16 @@
->>  			compatible = "marvell,armada-addr-decoding-controller";
->>  			reg = <0xd0020000 0x258>;
->>  		};
->> +
->> +		sata at d00a0000 {
->> +                        compatible = "marvell,orion-sata";
->> +                        reg = <0xd00a0000 0x2400>;
->> +                        interrupts = <55>;
->> +                        nr-ports = <2>;
->> +			clocks = <&coreclk 0>;//,  <&coreclk 0>;
->> +                        status = "disabled";
->> +		};
->> +
->>  	};
->>  };
->>  
->> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
->> index b1fc728..b0db9a3 100644
->> --- a/arch/arm/boot/dts/armada-xp-db.dts
->> +++ b/arch/arm/boot/dts/armada-xp-db.dts
->> @@ -46,5 +46,8 @@
->>  			clock-frequency = <250000000>;
->>  			status = "okay";
->>  		};
->> +		sata at d00a0000 {
->> +			status = "okay";
->> +		};
->>  	};
->>  };
-> 
-> Hi Gregory
-> 
-> Should there be some pinctrl setup somewhere, to ensure the pins used
-> for SATA are really setup up for SATA?
+Now the Nomadik I2C driver has been converted to an AMBA one, we
+are required to provide the Primecell IDs via platform code. When
+booting with DT enabled these have to be specified in the device
+nodes. We do that here.
 
-Yes you're right we should not depend of the bootloader configuration.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/dbx5x0.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-> 
-> Also, for kirkwood, the number of SATA ports varies. So we don't
-> define it in the base kirkwood.dtsi and leave each board to set it.
-> Do we want to be consistent between kirkwood and 370/xp?
-
-Yes sure. I will move it from dtsi to dts.
-
-> 
-> Thanks
->     Andrew
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
-
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 536df5d..4ed1b4b 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -452,6 +452,8 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80004000 0x1000>;
+ 			interrupts = <0 21 0x4>;
++			arm,primecell-periphid = <0x180024>;
++
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -463,6 +465,8 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80122000 0x1000>;
+ 			interrupts = <0 22 0x4>;
++			arm,primecell-periphid = <0x180024>;
++
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -474,6 +478,8 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80128000 0x1000>;
+ 			interrupts = <0 55 0x4>;
++			arm,primecell-periphid = <0x180024>;
++
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -485,6 +491,8 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x80110000 0x1000>;
+ 			interrupts = <0 12 0x4>;
++			arm,primecell-periphid = <0x180024>;
++
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -496,6 +504,8 @@
+ 			compatible = "stericsson,db8500-i2c", "st,nomadik-i2c", "arm,primecell";
+ 			reg = <0x8012a000 0x1000>;
+ 			interrupts = <0 51 0x4>;
++			arm,primecell-periphid = <0x180024>;
++
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			v-i2c-supply = <&db8500_vape_reg>;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
