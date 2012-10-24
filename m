@@ -1,44 +1,140 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 24 Oct 2012 16:40:32 +0530
-Subject: [PATCH] usb: remove CONFIG_USB_MUSB_HOST etc
-In-Reply-To: <20121023123927.GB29281@arwen.pp.htv.fi>
-References: <1349702227-24875-1-git-send-email-const@MakeLinux.com>
- <50868EED.7050909@ti.com> <20121023123927.GB29281@arwen.pp.htv.fi>
-Message-ID: <5087CCA8.9020906@ti.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Wed, 24 Oct 2012 16:33:01 +0530
+Subject: [PATCH 3/3] dmaengine: sirf: enable the driver support new
+ SiRFmarco SoC
+In-Reply-To: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
+References: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <1351076581.5263.56.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 6:09 PM, Felipe Balbi wrote:
-> Hi,
+On Thu, 2012-09-27 at 16:36 +0800, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
 > 
-> On Tue, Oct 23, 2012 at 06:04:53PM +0530, Sekhar Nori wrote:
->> On 10/8/2012 6:47 PM, Constantine Shulyupin wrote:
->>> From: Constantine Shulyupin <const@MakeLinux.com>
->>>
->>> Remove USB configuration in arch/arm/mach-davinci/usb.c accordingly 
->>> CONFIG_USB_MUSB_OTG CONFIG_USB_MUSB_PERIPHERAL CONFIG_USB_MUSB_HOST 
->>> and set MUSB_OTG configuration by default
->>> because this configuration options are removed from Kconfig.
->>>
->>> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
->>
->> Queuing this patch for v3.8. Since the config options are removed there
->> is no use having code which refers to them. The patch has been tested on
->> DM644x and DM365 in both host and gadget mode (I will add this
->> information to commit text while committing). Without this patch .mode
->> seems to be defaulting to MUSB_UNDEFINED which I think is definitely wrong.
+> The driver supports old up SiRFprimaII SoCs, this patch makes it support
+> the new SiRFmarco as well.
+> SiRFmarco, as a SMP SoC, adds new DMA_INT_EN_CLR and DMA_CH_LOOP_CTRL_CLR
+> registers, to disable IRQ/Channel, we should write 1 to the corresponding
+> bit in the two CLEAR register.
 > 
-> sorry for the delay, this looks ok:
+> Tested on SiRFmarco using SPI driver:
+>     $ /mnt/spidev-sirftest -D /dev/spidev32766.0
+>     spi mode: 0
+>     bits per word: 8
+>     max speed: 500000 Hz (500 KHz)
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+>     00 00 00 00 00 00
+>     00 00 00 00 00 00
+>     00 00 00 00 00 00
+>     00 00 00 00 00 00
+>     00 00 00 00 00 00
+>     00 00 00 00 00 00
+>     00 00 00 00
+> 
+>     $ cat /proc/interrupts
+>                CPU0       CPU1
+>      32:       1593          0       GIC  sirfsoc_timer0
+>      33:          0       3533       GIC  sirfsoc_timer1
+>      44:          0          0       GIC  sirfsoc_dma
+>      45:         16          0       GIC  sirfsoc_dma
+>      47:          6          0       GIC  sirfsoc_spi
+>      50:       5654          0       GIC  sirfsoc-uart
+>      ...
+> 
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  depends on pulled CSR SiRFmarco preparing patches:
+>  http://www.spinics.net/lists/arm-kernel/msg191412.html
+> 
+>  drivers/dma/Kconfig    |    2 +-
+>  drivers/dma/sirf-dma.c |   25 +++++++++++++++++++------
+>  2 files changed, 20 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index d06ea29..bf5f405 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -203,7 +203,7 @@ config TIMB_DMA
+>  
+>  config SIRF_DMA
+>  	tristate "CSR SiRFprimaII DMA support"
+> -	depends on ARCH_PRIMA2
+> +	depends on ARCH_SIRF
+patch description says adding support, but now your are removing for
+PRIMA2, did I miss anything?
+>  	select DMA_ENGINE
+>  	help
+>  	  Enable support for the CSR SiRFprimaII DMA engine.
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index c439489..fbb0199 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -32,7 +32,9 @@
+>  #define SIRFSOC_DMA_CH_VALID                    0x140
+>  #define SIRFSOC_DMA_CH_INT                      0x144
+>  #define SIRFSOC_DMA_INT_EN                      0x148
+> +#define SIRFSOC_DMA_INT_EN_CLR			0x14C
+can you pls align this
+>  #define SIRFSOC_DMA_CH_LOOP_CTRL                0x150
+> +#define SIRFSOC_DMA_CH_LOOP_CTRL_CLR            0x15C
+>  
+>  #define SIRFSOC_DMA_MODE_CTRL_BIT               4
+>  #define SIRFSOC_DMA_DIR_CTRL_BIT                5
+> @@ -76,6 +78,7 @@ struct sirfsoc_dma {
+>  	struct sirfsoc_dma_chan		channels[SIRFSOC_DMA_CHANNELS];
+>  	void __iomem			*base;
+>  	int				irq;
+> +	bool				is_marco;
+>  };
+>  
+>  #define DRV_NAME	"sirfsoc_dma"
+> @@ -288,13 +291,19 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
+>  	int cid = schan->chan.chan_id;
+>  	unsigned long flags;
+>  
+> -	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
+> -		~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
+> -	writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
+> -
+> -	writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+> -		& ~((1 << cid) | 1 << (cid + 16)),
+> +	if (!sdma->is_marco) {
+> +		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
+> +			~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
+> +		writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+> +			& ~((1 << cid) | 1 << (cid + 16)),
+>  			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> +	} else {
+> +		writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_INT_EN_CLR);
+> +		writel_relaxed((1 << cid) | 1 << (cid + 16),
+> +			sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+> +	}
+> +
+> +	writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
+>  
+>  	spin_lock_irqsave(&schan->lock, flags);
+>  	list_splice_tail_init(&schan->active, &schan->free);
+> @@ -568,6 +577,9 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	if (of_device_is_compatible(dn, "sirf,marco-dmac"))
+not a DT expert, but wouldn't there be a space after comma?
+> +		sdma->is_marco = true;
+> +
+>  	if (of_property_read_u32(dn, "cell-index", &id)) {
+>  		dev_err(dev, "Fail to get DMAC index\n");
+>  		ret = -ENODEV;
+> @@ -677,6 +689,7 @@ static int __devexit sirfsoc_dma_remove(struct platform_device *op)
+>  
+>  static struct of_device_id sirfsoc_dma_match[] = {
+>  	{ .compatible = "sirf,prima2-dmac", },
+> +	{ .compatible = "sirf,marco-dmac", },
+>  	{},
+>  };
+>  
 
-Thanks Felipe, I added your ack.
 
-Constantine,
-
-Patches touching arch/arm/* should be prefixed with 'ARM:' and those
-touching mach-davinci should be prefixed with 'davinci:'. I added these
-two while committing the patch this time. Please take care next time on.
-
-Thanks,
-Sekhar
+-- 
+Vinod Koul
+Intel Corp.
