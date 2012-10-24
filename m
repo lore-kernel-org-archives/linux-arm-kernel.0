@@ -1,38 +1,103 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Oct 2012 15:45:23 +0100
-Subject: [PATCH 3/6] ARM: ux500: Fix build error relating to
- IRQCHIP_SKIP_SET_WAKE
-In-Reply-To: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351089926-32161-4-git-send-email-lee.jones@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Oct 2012 16:45:32 +0200
+Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
+ update
+In-Reply-To: <20121024140801.GB11837@lunn.ch>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
+ <20121024140801.GB11837@lunn.ch>
+Message-ID: <5087FF0C.7050303@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the build error below:
+On 10/24/2012 04:08 PM, Andrew Lunn wrote:
+> On Wed, Oct 24, 2012 at 03:49:21PM +0200, Gregory CLEMENT wrote:
+>> From: Lior Amsalem <alior@marvell.com>
+>>
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Signed-off-by: Lior Amsalem <alior@marvell.com>
+>> ---
+>>  arch/arm/boot/dts/armada-370-db.dts  |    3 +++
+>>  arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
+>>  arch/arm/boot/dts/armada-xp-db.dts   |    3 +++
+>>  arch/arm/configs/mvebu_defconfig     |    7 +++++++
+>>  4 files changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+>> index 4a31b03..2a2aa75 100644
+>> --- a/arch/arm/boot/dts/armada-370-db.dts
+>> +++ b/arch/arm/boot/dts/armada-370-db.dts
+>> @@ -34,5 +34,8 @@
+>>  			clock-frequency = <200000000>;
+>>  			status = "okay";
+>>  		};
+>> +		sata at d00a0000 {
+>> +			status = "okay";
+>> +		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+>> index 94b4b9e..3f08233 100644
+>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+>> @@ -69,6 +69,16 @@
+>>  			compatible = "marvell,armada-addr-decoding-controller";
+>>  			reg = <0xd0020000 0x258>;
+>>  		};
+>> +
+>> +		sata at d00a0000 {
+>> +                        compatible = "marvell,orion-sata";
+>> +                        reg = <0xd00a0000 0x2400>;
+>> +                        interrupts = <55>;
+>> +                        nr-ports = <2>;
+>> +			clocks = <&coreclk 0>;//,  <&coreclk 0>;
+>> +                        status = "disabled";
+>> +		};
+>> +
+>>  	};
+>>  };
+>>  
+>> diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+>> index b1fc728..b0db9a3 100644
+>> --- a/arch/arm/boot/dts/armada-xp-db.dts
+>> +++ b/arch/arm/boot/dts/armada-xp-db.dts
+>> @@ -46,5 +46,8 @@
+>>  			clock-frequency = <250000000>;
+>>  			status = "okay";
+>>  		};
+>> +		sata at d00a0000 {
+>> +			status = "okay";
+>> +		};
+>>  	};
+>>  };
+> 
+> Hi Gregory
+> 
+> Should there be some pinctrl setup somewhere, to ensure the pins used
+> for SATA are really setup up for SATA?
 
-arch/arm/mach-ux500/cpu.c: In function ?ux500_init_irq?:
-arch/arm/mach-ux500/cpu.c:55:2: error: invalid use of undefined type ?struct irq_chip?
-arch/arm/mach-ux500/cpu.c:55:24: error: ?IRQCHIP_SKIP_SET_WAKE? undeclared (first use in this function)
-arch/arm/mach-ux500/cpu.c:55:24: note: each undeclared identifier is reported only once for each function it appears in
-arch/arm/mach-ux500/cpu.c:55:48: error: ?IRQCHIP_MASK_ON_SUSPEND? undeclared (first use in this function)
+Yes you're right we should not depend of the bootloader configuration.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/cpu.c |    1 +
- 1 file changed, 1 insertion(+)
+> 
+> Also, for kirkwood, the number of SATA ports varies. So we don't
+> define it in the base kirkwood.dtsi and leave each board to set it.
+> Do we want to be consistent between kirkwood and 370/xp?
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index fb25f4e..721e7b4 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -16,6 +16,7 @@
- #include <linux/stat.h>
- #include <linux/of.h>
- #include <linux/of_irq.h>
-+#include <linux/irq.h>
- #include <linux/platform_data/clk-ux500.h>
- 
- #include <asm/hardware/gic.h>
+Yes sure. I will move it from dtsi to dts.
+
+> 
+> Thanks
+>     Andrew
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
