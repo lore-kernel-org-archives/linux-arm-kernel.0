@@ -1,54 +1,115 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 16:53:45 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-Message-ID: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+Date: Wed, 24 Oct 2012 16:53:47 +0200
+Subject: [PATCH 2/9] ARM: Kirkwood: Convert iConnect to pinctrl.
+In-Reply-To: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1351090434-30499-3-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset converts all DT kirkwood boards to using pinctrl.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/boot/dts/kirkwood-iconnect.dts |   52 +++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-iconnect.c |   17 ----------
+ 2 files changed, 52 insertions(+), 17 deletions(-)
 
-This patchset depends on an earlier patchset to allow the mvebu
-pinctrl driver and gpio driver to be built for kirkwood.
-
-Only the TS219 conversion has been tested on hardware. The remaining
-are compile tested. Before merging upstream, it would be good if the
-others could be tested on hardware.
-
-This series along with the dependents can be found in:
-
-git://github.com/lunn/linux.git v3.7-rc2-pinctrl
-
-Andrew Lunn (9):
-  ARM: Kirkwood: Convert TS219 to pinctrl.
-  ARM: Kirkwood: Convert iConnect to pinctrl.
-  ARM: Kirkwood: Convert dnskw to pinctrl
-  ARM: Kirkwood: Convert dockstar to pinctrl.
-  ARM: Kirkwood: Convert dreamplug to pinctrl.
-  ARM: Kirkwood: Convert GoFlex Net to pinctrl.
-  ARM: Kirkwood: Convert ib62x0 to pinctrl.
-  ARM: Kirkwood: Convert lsxl boards to pinctrl.
-  ARM: Kirkwood: Convert IX2-200 to pinctrl.
-
- arch/arm/boot/dts/kirkwood-dnskw.dtsi         |  136 +++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-dockstar.dts       |   21 ++++
- arch/arm/boot/dts/kirkwood-dreamplug.dts      |   26 +++++
- arch/arm/boot/dts/kirkwood-goflexnet.dts      |   57 +++++++++++
- arch/arm/boot/dts/kirkwood-ib62x0.dts         |   41 ++++++++
- arch/arm/boot/dts/kirkwood-iconnect.dts       |   52 ++++++++++
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   90 ++++++++++++++++
- arch/arm/boot/dts/kirkwood-lsxl.dtsi          |   67 ++++++++++++
- arch/arm/boot/dts/kirkwood-ts219-6281.dts     |   56 ++++++++++
- arch/arm/boot/dts/kirkwood-ts219-6282.dts     |   56 ++++++++++
- arch/arm/mach-kirkwood/board-dnskw.c          |   37 -------
- arch/arm/mach-kirkwood/board-dockstar.c       |   10 --
- arch/arm/mach-kirkwood/board-dreamplug.c      |   14 ---
- arch/arm/mach-kirkwood/board-goflexnet.c      |   18 ----
- arch/arm/mach-kirkwood/board-ib62x0.c         |   21 ----
- arch/arm/mach-kirkwood/board-iconnect.c       |   17 ----
- arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   24 -----
- arch/arm/mach-kirkwood/board-lsxl.c           |   19 ----
- arch/arm/mach-kirkwood/board-ts219.c          |   25 -----
- 19 files changed, 602 insertions(+), 185 deletions(-)
-
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index d97cd9d..7b926f7 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -18,6 +18,58 @@
+ 	};
+ 
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++			compatible = "marvell,88f6281-pinctrl";
++			reg = <0x10000 0x20>;
++
++			pinctrl-0 = < &pmx_gpio_12 &pmx_gpio_35
++				      &pmx_gpio_41 &pmx_gpio_42
++				      &pmx_gpio_43 &pmx_gpio_44
++				      &pmx_gpio_45 &pmx_gpio_46
++				      &pmx_gpio_47 &pmx_gpio_48 >;
++			pinctrl-names = "default";
++
++			pmx_gpio_12: pmx-gpio-12 {
++				marvell,pins = "mpp12";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_35: pmx-gpio-35 {
++				marvell,pins = "mpp35";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_41: pmx-gpio-41 {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_42: pmx-gpio-42 {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_43: pmx-gpio-43 {
++				marvell,pins = "mpp43";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_44: pmx-gpio-44 {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_45: pmx-gpio-45 {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_46: pmx-gpio-46 {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_47: pmx-gpio-47 {
++				marvell,pins = "mpp47";
++				marvell,function = "gpio";
++			};
++			pmx_gpio_48: pmx-gpio-48 {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++		};
+ 		i2c at 11000 {
+ 			status = "okay";
+ 
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index d084b1e..aeba479 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -21,30 +21,13 @@
+ #include <asm/mach/arch.h>
+ #include <mach/kirkwood.h>
+ #include "common.h"
+-#include "mpp.h"
+ 
+ static struct mv643xx_eth_platform_data iconnect_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(11),
+ };
+ 
+-static unsigned int iconnect_mpp_config[] __initdata = {
+-	MPP12_GPIO,
+-	MPP35_GPIO,
+-	MPP41_GPIO,
+-	MPP42_GPIO,
+-	MPP43_GPIO,
+-	MPP44_GPIO,
+-	MPP45_GPIO,
+-	MPP46_GPIO,
+-	MPP47_GPIO,
+-	MPP48_GPIO,
+-	0
+-};
+-
+ void __init iconnect_init(void)
+ {
+-	kirkwood_mpp_conf(iconnect_mpp_config);
+-
+ 	kirkwood_ehci_init();
+ 	kirkwood_ge00_init(&iconnect_ge00_data);
+ }
 -- 
 1.7.10.4
