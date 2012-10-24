@@ -1,47 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Oct 2012 07:39:53 -0500
-Subject: [PATCH v2 2/2] ARM: topdown mmap support
-In-Reply-To: <CAMj5Bkg9Ht4YG9TL4yQfT5y5Fea4ywLDANoO2NTnGJZatN2RLQ@mail.gmail.com>
-References: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
- <1321566426-31184-2-git-send-email-robherring2@gmail.com>
- <CAMj5Bkg9Ht4YG9TL4yQfT5y5Fea4ywLDANoO2NTnGJZatN2RLQ@mail.gmail.com>
-Message-ID: <5087E199.4050704@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 24 Oct 2012 18:19:29 +0530
+Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
+ mask on disable
+In-Reply-To: <CANOLnOOUHJg5W9VbHhnK8ta+Bys_oMpSz9M5jQ0xCeOB1gxtdg@mail.gmail.com>
+References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
+ <CANOLnOOUHJg5W9VbHhnK8ta+Bys_oMpSz9M5jQ0xCeOB1gxtdg@mail.gmail.com>
+Message-ID: <5087E3D9.6040007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 07:22 AM, zhangfei gao wrote:
-> On Fri, Nov 18, 2011 at 5:47 AM, Rob Herring <robherring2@gmail.com> wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On Wednesday 24 October 2012 05:32 PM, Grazvydas Ignotas wrote:
+> On Tue, Oct 23, 2012 at 9:09 PM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>> From: Kevin Hilman <khilman@ti.com>
 >>
->> Similar to other architectures, this adds topdown mmap support in user
->> process address space allocation policy. This allows mmap sizes greater
->> than 2GB. This support is largely copied from MIPS and the generic
->> implementations.
->>
->> The address space randomization is moved into arch_pick_mmap_layout.
->>
->> Tested on V-Express with ubuntu and a mmap test from here:
->> https://bugs.launchpad.net/bugs/861296
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Unfortunately, we met "no vspace available" during loading libmono.so,
-> when using default arch_get_unmapped_area_topdown method, tested on
-> Jelly Bean with 3.4 kernel.
-> While no problem using arch_get_unmapped_area in the patch, or just
-> revert this patch.
-> The result is some application can not run.
-> 
-> Just google, find same issue reported on Jelly Bean with 3.4 kernel.
-> 
-> Any suggestion?
+>> When debounce clocks are disabled, ensure that the banks
+>> dbck_enable_mask is cleared also.  Otherwise, context restore on
+>> subsequent off-mode transition will restore previous value from the
+>> shadow copies (bank->context.debounce*) leading to mismatch state
+>> between driver state and hardware state.
+>
+> This doesn't look right to me, aren't you effectively disabling
+> debounce forever here? _gpio_dbck_disable is called from
+> omap_gpio_runtime_suspend() and nothing will ever restore
+> dbck_enable_mask back to what it was set by _set_gpio_debounce and
+> debounce functionality is lost.
+>
+As per commit log, the issue seen with request->debounce->free()
+sequence and hence on free, debounce state needs to be cleared.
+Next gpio_set_debounce() should set the debounce mask right so
+the patch seems to be right.
 
-Perhaps Android has hardcoded expectations about the virtual memory
-layout? I was worried about that at the time and asked the Linaro
-Android folks to test it.
+>>
+>> This was discovered when board code was doing
+>>
+>>    gpio_request_one()
+>>    gpio_set_debounce()
+>>    gpio_free()
+>>
+>> which was leaving the GPIO debounce settings in a confused state.
+>> Then, enabling off mode causing bogus state to be restored, leaving
+>> GPIO debounce enabled which then prevented the CORE powerdomain from
+>> transitioning.
+>>
 
-I believe either layout can be selected at runtime per process. I don't
-recall the exact /proc file to control this.
+But there is one more case which might break because of this patch.
+As part of idle, we might end up with below without gpio_free()
+omap2_gpio_prepare_for_idle()
+  ->pm_runtime_put_sync_suspend()
+   -> omap_gpio_runtime_suspend()
+    ->_gpio_dbck_disable()
 
-Rob
+And last call will clear the debounce mask state which will lost and
+hence the debounce clock won't be enabled on resume.
+
+I let Kevin comment whether this is the valid case or not.
+
+Regards
+Santosh
