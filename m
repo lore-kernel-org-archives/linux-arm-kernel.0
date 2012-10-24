@@ -1,37 +1,135 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 24 Oct 2012 17:05:11 +0100
-Subject: [RFC] Energy/power monitoring within the kernel
-In-Reply-To: <5086E6D6.8000208@linaro.org>
-References: <1351013449.9070.5.camel@hornet> <5086E6D6.8000208@linaro.org>
-Message-ID: <1351094711.23327.47.camel@hornet>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 24 Oct 2012 09:14:29 -0700
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121024083704.GF5665@arwen.pp.htv.fi>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121022155028.GA13791@core.coreip.homeip.net>
+ <508660D4.9030507@ti.com>
+ <20121023200249.GA2712@core.coreip.homeip.net>
+ <20121024083704.GF5665@arwen.pp.htv.fi>
+Message-ID: <20121024161429.GA16350@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-23 at 19:49 +0100, Andy Green wrote:
-> A thought on that... from an SoC perspective there are other interesting 
-> power rails than go to just the CPU core.  For example DDR power and 
-> rails involved with other IP units on the SoC such as 3D graphics unit. 
->   So tying one number to specifically a CPU core does not sound like 
-> it's enough.
-
-I do realize this. I just didn't want to try to cover too much ground,
-and cpufreq governor would be interested in cpu-related data anyway...
-
-> If you turn the problem upside down to solve the representation question 
-> first, maybe there's a way forward defining the "power tree" in terms of 
-> regulators, and then adding something in struct regulator that spams 
-> readers with timestamped results if the regulator has a power monitoring 
-> capability.
+On Wed, Oct 24, 2012 at 11:37:04AM +0300, Felipe Balbi wrote:
+> Hi,
 > 
-> Then you can map the regulators in the power tree to real devices by the 
-> names or the supply stuff.  Just a thought.
+> On Tue, Oct 23, 2012 at 01:02:49PM -0700, Dmitry Torokhov wrote:
+> > On Tue, Oct 23, 2012 at 11:18:12AM +0200, Benoit Cousson wrote:
+> > > Hi Dimitry,
+> > > 
+> > > On 10/22/2012 05:50 PM, Dmitry Torokhov wrote:
+> > > > Hi Sourav,
+> > > > 
+> > > > On Mon, Oct 22, 2012 at 06:43:00PM +0530, Sourav Poddar wrote:
+> > > >> Adapt keypad to use pinctrl framework.
+> > > >>
+> > > >> Tested on omap4430 sdp with 3.7-rc1 kernel.
+> > > > 
+> > > > I do not see anything in the driver that would directly use pinctrl. Is
+> > > > there a better place to select default pin configuration; maybe when
+> > > > instantiating platform device?
+> > > 
+> > > Why?
+> > > The devm_pinctrl_get_select_default is using the pinctrl.
+> > 
+> > No, I guess we ihave different understanding of what "directly use" means.
+> > This particular driver does directly use interrupts: it requests it and
+> > performs some actions when interrupt arrives. Same goes for IO memory -
+> > it gets requested, then we access it. With pinctrl we do not do anything
+> > - we just ask another layer to configure it and that is it.
+> 
+> this is true for almost anything we do:
+> 
+> - we ask another layer to allocate memory for us
+> - we ask another layer to call our ISR once the IRQ line is asserted
+> - we ask another layer to handle the input events we just received
+> - we ask another layer to transfer data through DMA for us
+> - we ask another layer to turn regulators on and off.
 
-Hm. Interesting idea indeed - if a regulator device was able to report
-the energy being produced by it (instead of looking at cumulative energy
-consumed by more than one device), defining "power domains" (by adding
-selected cpus as consumers) would be straight forward and the cpufreq
-could request the information that way.
+But we are _directly_ _using_ all of these. You allocate memory and you
+(the driver) stuff data into that memory. You ask for DMA and you take
+the DMAed data and work with it. Not so with pinctrl in omap keypad and
+other drivers I have seen so far.
 
-I'll look into it, thanks!
+> 
+> and so on. This is just how abstractions work, we group common parts in
+> a framework so that users don't need to know the details, but still need
+> to tell the framework when to fiddle with those resources.
+> 
+> > I have seen just in a few days 3 or 4 drivers having exactly the same
+> > change - call to devm_pinctrl_get_select_default(), and I guess I will
+> > receive the same patches for the rest of input drivers shortly.
+> > This suggests that the operation is done at the wrong level. Do the
+> > pin configuration as you parse DT data, the same way you set up i2c
+> > devices registers in of_i2c.c, and leave the individual drivers that do
+> > not care about specifics alone.
+> 
+> Makes no sense to hide that from drivers. The idea here is that driver
+> should know when it needs its pins to muxed correctly.
 
-Pawe?
+The driver also needs memory controller to be initialized, gpio chip be
+ready and registered, DMA subsystem ready, input core reade, etc, etc,
+etc. You however do not have every driver explicitly initialize any of
+that; you expect certain working environment to be already operable. The
+driver does manage resources it controls, it has ultimate knowledge
+about, pin configuration is normally is not it. We just need to know
+that we wired/muxed properly, otherwise we won't work. So please let
+parent layers deal with it.
+
+> 95% of the time
+> it will be done during probe() but then again, so what ?
+> 
+> doing that when parsing DT, or on bus notifiers is just plain wrong.
+> Drivers should be required to handle all of their resources.
+
+All of _their_ resources, exactly. They do not own nor control pins so
+they should not be bothered with them either. Look, when you see that
+potentially _every_ driver in the system needs to set up the same object
+that it doe snot use otherwise you should realize that individual driver
+is not the proper place to do that.
+
+> 
+> > > That's why it is named "get_select_default" and not "get" only.
+> > > This API ensure that the pin will be set to the default state, and this
+> > > is all we need to do during the probe.
+> > 
+> > Why during the probe and not by default? Realistically, the driver will
+> > be loaded as long as there is a matching device and pins will need to be
+> > configured.
+> 
+> likewise memory will be allocated when matching happens, IRQs will be
+> allocated, regulators will be turned on. So why don't we do all that by
+> default ? Because it is wrong.
+
+No, because we do not know how. The generic layer does not know the ISR
+to install, how much memory to allocate, etc. Having regulator turned on
+before getting to probe might not be a bad idea.
+
+> 
+> > > There is no point to change the mux if the driver is not probed, because
+> > > potentially the pin can be use be another driver.
+> > 
+> > What other driver would use it? Who would chose what driver to load?
+> 
+> Well, you _do_ know that on a SoC we have a limited amount of pins
+> right ?
+> 
+> Considering the amont of features which are packed inside a single die,
+> it's not farfetched to assume we will have a lot less pins then we
+> actually need, so we need muxers behind each pin in order to choose
+> which functionality we want.
+> 
+> If it happens that keypad's pins are shared with another IP (e.g. GPIO),
+> we need to give the final user (a OEM/ODM) the choice of using those
+> pins as either keypad or GPIOs, thus the need for pinctrl framework and
+> the calls in the drivers.
+
+Right, so please walk me through, step by step, how an OEM/ODM woudl
+select a particular configuration. Do you expect it to happen at
+runtime, or do you expect relevant data be put in DT?
+
+Thanks.
+
+-- 
+Dmitry
