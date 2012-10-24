@@ -1,60 +1,33 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Oct 2012 17:33:49 +0200
-Subject: [PATCH 0/8] at91: 3.7 fixes patch series
-Message-ID: <cover.1351092432.git.nicolas.ferre@atmel.com>
+Date: Wed, 24 Oct 2012 17:33:50 +0200
+Subject: [PATCH 1/8] ARM: at91/tc: fix typo in the DT document
+In-Reply-To: <cover.1351092432.git.nicolas.ferre@atmel.com>
+References: <cover.1351092432.git.nicolas.ferre@atmel.com>
+Message-ID: <bc543c9d3af88b9f09cd5514efc893c6f0fa459b.1351092432.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-I am posting this patch series just before sending a pull-request to Arnd and
-Olof.
-There are 2 new patches that I have just cooked today about external IRQ
-handling: please review.
-I would like you to double check that I have not made any mistake while
-collecting the other patches...
+From: Josh Wu <josh.wu@atmel.com>
 
-Thanks, best regards,
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: stable <stable@vger.kernel.org> [v3.4]
+---
+ Documentation/devicetree/bindings/arm/atmel-at91.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Bo Shen (2):
-  ARM: at91/i2c: change id to let i2c-gpio work
-  ARM: at91/i2c: change id to let i2c-at91 work
-
-Ivan Shugov (1):
-  ARM: at91: at91sam9g10: fix SOC type detection
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-  ARM: at91: drop duplicated config SOC_AT91SAM9 entry
-
-Josh Wu (1):
-  ARM: at91/tc: fix typo in the DT document
-
-Marek Belisko (1):
-  ARM: at91/dts: at91sam9g20ek_common: Fix typos in buttons labels.
-
-Nicolas Ferre (2):
-  ARM: at91: fix external interrupts in non-DT case
-  ARM: at91: fix external interrupt specification in board code
-
- Documentation/devicetree/bindings/arm/atmel-at91.txt |  2 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi          |  4 ++--
- arch/arm/mach-at91/Kconfig                           | 10 ++--------
- arch/arm/mach-at91/at91rm9200.c                      |  2 +-
- arch/arm/mach-at91/at91rm9200_devices.c              |  4 ++--
- arch/arm/mach-at91/at91sam9260.c                     |  4 ++--
- arch/arm/mach-at91/at91sam9260_devices.c             |  4 ++--
- arch/arm/mach-at91/at91sam9261.c                     |  4 ++--
- arch/arm/mach-at91/at91sam9261_devices.c             |  4 ++--
- arch/arm/mach-at91/at91sam9263.c                     |  2 +-
- arch/arm/mach-at91/at91sam9263_devices.c             |  4 ++--
- arch/arm/mach-at91/at91sam9rl_devices.c              |  4 ++--
- arch/arm/mach-at91/board-neocore926.c                |  2 +-
- arch/arm/mach-at91/board-sam9261ek.c                 |  2 +-
- arch/arm/mach-at91/board-sam9263ek.c                 |  2 +-
- arch/arm/mach-at91/generic.h                         |  3 ++-
- arch/arm/mach-at91/irq.c                             |  9 +++++++--
- arch/arm/mach-at91/setup.c                           |  4 ++--
- 18 files changed, 35 insertions(+), 35 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index ecc81e3..d187e9f 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -8,7 +8,7 @@ PIT Timer required properties:
+   shared across all System Controller members.
+ 
+ TC/TCLIB Timer required properties:
+-- compatible: Should be "atmel,<chip>-pit".
++- compatible: Should be "atmel,<chip>-tcb".
+   <chip> can be "at91rm9200" or "at91sam9x5"
+ - reg: Should contain registers location and length
+ - interrupts: Should contain all interrupts for the TC block
 -- 
 1.7.11.3
