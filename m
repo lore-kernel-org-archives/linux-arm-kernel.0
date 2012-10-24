@@ -1,28 +1,29 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 17:35:02 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <CAMW5UfaHZE2VB5Ug-5hT_29U8zfO_qZh9T=9QBbx0xv7D+OeOA@mail.gmail.com>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <CAMW5UfaHZE2VB5Ug-5hT_29U8zfO_qZh9T=9QBbx0xv7D+OeOA@mail.gmail.com>
-Message-ID: <20121024153502.GH11837@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 24 Oct 2012 17:35:20 +0200
+Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
+In-Reply-To: <20121024153131.GG11837@lunn.ch>
+References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121024150614.GD11837@lunn.ch> <20121024172050.412ff1bf@skate>
+ <20121024153131.GG11837@lunn.ch>
+Message-ID: <20121024173520.5b35fd88@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:29:08AM -0400, Josh Coombs wrote:
-> Andrew, are there any required kernel config changes to go along with
-> this?  I didn't see any updates to the default configs in the patches
-> so I want to make sure I'm testing with the right options enabled.
+Andrew,
 
-Hi Josh
+On Wed, 24 Oct 2012 17:31:31 +0200, Andrew Lunn wrote:
 
-I've been testing with is:
+> I agree with the last point. So maybe have a openblocks-ax3-4.dts and
+> set the compatibility string to plathome,openblocks-ax3-4. 
+> 
+> When somebody gets a ax3/2, they can refactor the common DT into a
+> dtsi file without causing any compatibility issues.
 
-make kirkwood_defconfig
-make 
+Ok, I'll repost with this update. Thanks!
 
-The _defconfig file now contains all boards and should build most
-common drivers to get the boards booted. If something critical is
-missing for your boards, please let us known and we will add it to
-_defconfig.
-
-    Andrew
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
