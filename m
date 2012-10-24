@@ -1,37 +1,56 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 24 Oct 2012 09:47:27 +0200
-Subject: [PATCH v3 2/2] [media]: mx2_camera: Fix regression caused by
- clock conversion
-In-Reply-To: <CAOMZO5BpJAEdwKRVE47D+7wggLsvCXtPcv272UPYsZV6v3vKMg@mail.gmail.com>
-References: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
- <Pine.LNX.4.64.1210222301100.32591@axis700.grange>
- <CAOMZO5BpJAEdwKRVE47D+7wggLsvCXtPcv272UPYsZV6v3vKMg@mail.gmail.com>
-Message-ID: <CACKLOr355VFgxPGUXwkyFHxW95p7JaF=wdhF1FYsQdM-37d7ng@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 24 Oct 2012 09:56:56 +0200
+Subject: [GIT PULL] i.MX fixes for -rc
+Message-ID: <20121024075656.GW27665@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 October 2012 00:17, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Guennadi
->
-> On Mon, Oct 22, 2012 at 7:07 PM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
->> ? I don't find a clock named "per" and associated with "mx2-camera.0" in
->> arch/arm/mach-imx/clk-imx27.c. I only find it in clk-imx25.c. Does this
->> mean, that this your patch is for i.MX25? But you're saying it's for
->> i.MX27. Confused...
->
-> I provide this mx27 clock in the first patch of the series:
-> http://patchwork.linuxtv.org/patch/14915/
+Hi Arnd, Olof,
 
-Yes, I made the same mistake.
+Please pull the following, mostly clock related, i.MX fixes for -rc.
 
+Thanks
+ Sascha
 
+The following changes since commit a0d271cbfed1dd50278c6b06bead3d00ba0a88f9:
 
+  Linux 3.6 (2012-09-30 16:47:46 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/imx/linux-2.6.git tags/imx-fixes
+
+for you to fetch changes up to 92063cee118655d25b50d04eb77b012f3287357a:
+
+  ARM i.MX25: Fix PWM per clock lookups (2012-10-10 10:02:42 +0200)
+
+----------------------------------------------------------------
+ARM i.MX fixes for 3.7-rc
+
+----------------------------------------------------------------
+Fabio Estevam (3):
+      ARM: imx_v6_v7_defconfig: Enable CONFIG_GPIO_MC9S08DZ60
+      ARM: imx: clk-imx27: Fix divider width field
+      ARM: mxc: platform-mxc-mmc: Fix register region size
+
+Sascha Hauer (3):
+      ARM i.MX25: Fix lcdc_ipg_per parent clock
+      ARM i.MX25 clk: Fix nfc_ipg_per parent
+      ARM i.MX25: Fix PWM per clock lookups
+
+Wei Yongjun (2):
+      ARM: imx: fix return value check in imx3_init_l2x0()
+      ARM: imx: fix the return value check in imx_clk_busy_divider()
+
+ arch/arm/configs/imx_v6_v7_defconfig         |    2 ++
+ arch/arm/mach-imx/clk-busy.c                 |    2 +-
+ arch/arm/mach-imx/clk-imx25.c                |   12 ++++++------
+ arch/arm/mach-imx/clk-imx27.c                |    4 ++--
+ arch/arm/mach-imx/mm-imx3.c                  |    5 ++---
+ arch/arm/plat-mxc/devices/platform-mxc-mmc.c |    2 +-
+ 6 files changed, 14 insertions(+), 13 deletions(-)
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
