@@ -1,40 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 10:16:09 +0200
-Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
- mask on disable
-In-Reply-To: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
-References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <CACRpkdb_zO0G5hsU5hTqnmD6Zju_xBwdmnk6C=Ok1R7-oNT_iQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 24 Oct 2012 10:25:29 +0200
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121024082529.GZ11837@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 8:09 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
+On Wed, Oct 24, 2012 at 10:04:01AM +0200, Gregory CLEMENT wrote:
+> Armada 370 and XP come with an unit called coherency fabric. This unit
+> allows to use the Armada XP as a nearly coherent architecture. The
+> coherency mechanism uses snoop filters to ensure the coherency between
+> caches, DRAM and devices. This mechanism needs a synchronization
+> barrier which guarantees that all memory write initiated by the
+> devices has reached their target and do not reside in intermediate
+> write buffers. That's why the architecture is not totally coherent and
+> we need to provide our own functions for some DMA operations.
+> 
+> Beside the use of the coherency fabric, the device units will have to
+> set the attribute flag to select the accurate coherency process for
+> the memory transaction. This is done each device driver programs the
+> DRAM address windows. The value of the attribute set by the driver is
+> retrieved through the orion_addr_map_cfg struct filled during the
+> early initialization of the platform.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi |    3 +-
+>  arch/arm/mach-mvebu/addr-map.c       |    3 ++
+>  arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
+>  arch/arm/mach-mvebu/coherency.c      |   87 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mvebu/common.h         |    2 +
+>  5 files changed, 95 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 18ba60b..af22e53 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -38,7 +38,8 @@
+>  
+>  	coherency-fabric at d0020200 {
+>  		compatible = "marvell,coherency-fabric";
+> -		reg = <0xd0020200 0xb0>;
+> +		reg = <0xd0020200 0xb0>,
+> +		      <0xd0021010 0x1c>;
+>  	};
 
-> From: Kevin Hilman <khilman@ti.com>
->
-> When debounce clocks are disabled, ensure that the banks
-> dbck_enable_mask is cleared also.  Otherwise, context restore on
-> subsequent off-mode transition will restore previous value from the
-> shadow copies (bank->context.debounce*) leading to mismatch state
-> between driver state and hardware state.
->
-> This was discovered when board code was doing
->
->   gpio_request_one()
->   gpio_set_debounce()
->   gpio_free()
->
-> which was leaving the GPIO debounce settings in a confused state.
-> Then, enabling off mode causing bogus state to be restored, leaving
-> GPIO debounce enabled which then prevented the CORE powerdomain from
-> transitioning.
->
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+...
 
-Thanks! Applied with Felipe's and Santosh's ACKs.
+>  int __init armada_370_xp_coherency_init(void)
+>  {
+>  	struct device_node *np;
+> @@ -82,7 +159,17 @@ int __init armada_370_xp_coherency_init(void)
+>  	if (np) {
+>  		pr_info("Initializing Coherency fabric\n");
+>  		coherency_base = of_iomap(np, 0);
+> +		coherency_cpu_base = of_iomap(np, 1);
 
-Yours,
-Linus Walleij
+Is this already in the binding documentation?
+
+   Thanks
+	Andrew
