@@ -1,53 +1,129 @@
 From: chanho61.park@samsung.com (Chanho Park)
-Date: Wed, 24 Oct 2012 14:34:49 +0900
-Subject: [PATCH v5 0/5] Add support to enable ARM PMU for EXYNOS
-Message-ID: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+Date: Wed, 24 Oct 2012 14:34:51 +0900
+Subject: [PATCH v5 2/5] ARM: EXYNOS: Correct combined IRQs for exynos4
+In-Reply-To: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+References: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1351056894-5790-3-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset fixes irq numbers of ARM Performance Monitoring unit and enable
-it for Perf(Performance Counter) on the exynos 4 and 5. The exynos4 and 5 have 2
-more cpu cores which has its own pmu.
+This patch corrects combined IRQs for exynos4 series platform. The exynos4412
+has four extra combined irq group and the exynos4212 has two more combined irqs
+than exynos4210. Each irq is mapped to IRQ_SPI(xx). Unfortunately, extra 4
+combined IRQs isn't sequential. So, we need to map the irqs manually.
 
-The exynos uses combiner-irq type for arm-pmu. Especially, the exynos4412 has 4
-extra combined irq groups. So, we need to change a max combiner number and to
-retreive it according to each soc types.
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/common.c            |   50 ++++++++++++++++++++++--------
+ arch/arm/mach-exynos/include/mach/irqs.h |    5 ++-
+ 2 files changed, 41 insertions(+), 14 deletions(-)
 
-To enable perf, we need also to implement a set_irq_affinity function for the
-combiner-irq. After applying this patch, we can use the perf for the exynos
-machine.
-
-Changes from v4:
- - Use max_combiner_nr() in combiner_cascade_irq
- - Add EXYNOS4412_MAX_COMBINER_NR to clarify a meaning
- - Change combiner_extra_irq to exynos4x12_combiner_extra_irq
-
-Changes from v3:
- - Define max_combiner_nr according to soc types
- - Add armpmu dt binding for exynos4210
- - Clean up soc types comparison from v2
-
-Changes from v2:
- - Convert to dt binding of exynos5250
-
-Changes from v1:
- - Split arm-pmu init of exynos from plat-samsung
- - Correct combined irqs of exynos4412
- - Use soc_is_xxx function instead of CONFIG_XXX to identify dynamically
-
-Chanho Park (5):
-  ARM: EXYNOS: Add set_irq_affinity function for combiner_irq
-  ARM: EXYNOS: Correct combined IRQs for exynos4
-  ARM: EXYNOS: Enable PMUs for exynos4
-  ARM: EXYNOS: Add arm-pmu DT binding for exynos5250
-  ARM: EXYNOS: Add arm-pmu DT binding for exynos421x
-
- arch/arm/boot/dts/exynos4210.dtsi        |    6 ++
- arch/arm/boot/dts/exynos5250.dtsi        |    6 ++
- arch/arm/mach-exynos/common.c            |  108 +++++++++++++++++++++++++-----
- arch/arm/mach-exynos/include/mach/irqs.h |   13 +++-
- arch/arm/plat-samsung/devs.c             |    2 +-
- 5 files changed, 113 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 709245e..19a5460 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -486,16 +486,22 @@ static struct irq_chip combiner_chip = {
+ #endif
+ };
+ 
+-static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
++static unsigned int max_combiner_nr(void)
+ {
+-	unsigned int max_nr;
+-
+ 	if (soc_is_exynos5250())
+-		max_nr = EXYNOS5_MAX_COMBINER_NR;
++		return EXYNOS5_MAX_COMBINER_NR;
++	else if (soc_is_exynos4412())
++		return EXYNOS4412_MAX_COMBINER_NR;
++	else if (soc_is_exynos4212())
++		return EXYNOS4212_MAX_COMBINER_NR;
+ 	else
+-		max_nr = EXYNOS4_MAX_COMBINER_NR;
++		return EXYNOS4210_MAX_COMBINER_NR;
++}
+ 
+-	if (combiner_nr >= max_nr)
++static void __init combiner_cascade_irq(unsigned int combiner_nr,
++					unsigned int irq)
++{
++	if (combiner_nr >= max_combiner_nr())
+ 		BUG();
+ 	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
+ 		BUG();
+@@ -560,23 +566,38 @@ static struct irq_domain_ops combiner_irq_domain_ops = {
+ 	.map	= combiner_irq_domain_map,
+ };
+ 
++static unsigned int exynos4x12_combiner_extra_irq(int group)
++{
++	switch (group) {
++	case 16:
++		return IRQ_SPI(107);
++	case 17:
++		return IRQ_SPI(108);
++	case 18:
++		return IRQ_SPI(48);
++	case 19:
++		return IRQ_SPI(42);
++	default:
++		return 0;
++	}
++}
++
+ static void __init combiner_init(void __iomem *combiner_base,
+ 				 struct device_node *np)
+ {
+ 	int i, irq, irq_base;
+ 	unsigned int max_nr, nr_irq;
+ 
++	max_nr = max_combiner_nr();
++
+ 	if (np) {
+ 		if (of_property_read_u32(np, "samsung,combiner-nr", &max_nr)) {
+-			pr_warning("%s: number of combiners not specified, "
++			pr_info("%s: number of combiners not specified, "
+ 				"setting default as %d.\n",
+-				__func__, EXYNOS4_MAX_COMBINER_NR);
+-			max_nr = EXYNOS4_MAX_COMBINER_NR;
++				__func__, max_nr);
+ 		}
+-	} else {
+-		max_nr = soc_is_exynos5250() ? EXYNOS5_MAX_COMBINER_NR :
+-						EXYNOS4_MAX_COMBINER_NR;
+ 	}
++
+ 	nr_irq = max_nr * MAX_IRQ_IN_COMBINER;
+ 
+ 	irq_base = irq_alloc_descs(COMBINER_IRQ(0, 0), 1, nr_irq, 0);
+@@ -593,7 +614,10 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 	}
+ 
+ 	for (i = 0; i < max_nr; i++) {
+-		irq = IRQ_SPI(i);
++		if (i < EXYNOS4210_MAX_COMBINER_NR || soc_is_exynos5250())
++			irq = IRQ_SPI(i);
++		else
++			irq = exynos4x12_combiner_extra_irq(i);
+ #ifdef CONFIG_OF
+ 		if (np)
+ 			irq = irq_of_parse_and_map(np, i);
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 35bced6..e740a6f 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -165,7 +165,10 @@
+ #define EXYNOS4_IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
+ #define EXYNOS4_IRQ_FIMD0_SYSTEM	COMBINER_IRQ(11, 2)
+ 
+-#define EXYNOS4_MAX_COMBINER_NR		16
++#define EXYNOS4210_MAX_COMBINER_NR	16
++#define EXYNOS4212_MAX_COMBINER_NR	18
++#define EXYNOS4412_MAX_COMBINER_NR	20
++#define EXYNOS4_MAX_COMBINER_NR		EXYNOS4412_MAX_COMBINER_NR
+ 
+ #define EXYNOS4_IRQ_GPIO1_NR_GROUPS	16
+ #define EXYNOS4_IRQ_GPIO2_NR_GROUPS	9
 -- 
 1.7.9.5
