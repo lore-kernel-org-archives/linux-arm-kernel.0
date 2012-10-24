@@ -1,24 +1,52 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 24 Oct 2012 22:04:55 +0800
-Subject: [PATCH 10/10] ARM: imx6q: implement WAIT mode with coupled cpuidle
-In-Reply-To: <D9DA41B75289BC488A38AE7992B7866301261C4A@039-SN2MPN1-022.039d.mgd.msft.net>
-References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
- <1351005779-30347-11-git-send-email-shawn.guo@linaro.org>
- <D9DA41B75289BC488A38AE7992B7866301261C4A@039-SN2MPN1-022.039d.mgd.msft.net>
-Message-ID: <20121024140443.GB2464@S2101-09.ap.freescale.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Oct 2012 16:05:45 +0200
+Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
+ update
+In-Reply-To: <20121024160139.6dbf5e16@skate>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
+ <20121024160139.6dbf5e16@skate>
+Message-ID: <5087F5B9.0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 04:09:08PM +0000, Lee Robert-B18647 wrote:
-> Hey Shawn,
+On 10/24/2012 04:01 PM, Thomas Petazzoni wrote:
+> Hello,
 > 
-> For your SRPG implementation, a couple of weeks ago an issue was found that affects all i.MX6 SRPG functionality that requires a work around for 100% reliable operation.  It's my understanding that the workaround is almost but not yet finalized.  Ranjani is most familiar with this issue so you and her can discuss further.
+> Shouldn't you split into one commit adding the SATA definition in
+> the .dtsi + doing the defconfig change (the "SoC" level modifications),
+> and then another commit for the .dts change? I don't really care
+> personally, it's really up to Jason/Andrew on this.
 > 
-Thanks for the info, Rob.
+> Another comment below, though.
+> 
+> On Wed, 24 Oct 2012 15:49:21 +0200, Gregory CLEMENT wrote:
+> 
+>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+>> index 94b4b9e..3f08233 100644
+>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+>> @@ -69,6 +69,16 @@
+>>  			compatible = "marvell,armada-addr-decoding-controller";
+>>  			reg = <0xd0020000 0x258>;
+>>  		};
+>> +
+>> +		sata at d00a0000 {
+>> +                        compatible = "marvell,orion-sata";
+>> +                        reg = <0xd00a0000 0x2400>;
+>> +                        interrupts = <55>;
+>> +                        nr-ports = <2>;
+>> +			clocks = <&coreclk 0>;//,  <&coreclk 0>;
+> 
+> Alignment problem + remainings of tests or something like that.
 
-I worked with Anson today trying to reproduce the issue with my kernel
-on imx6q.  But so far, we can not reproduce it.  So I would have the
-series go as it is, and we can add workaround later when we see the
-real failure on imx6q to keep the history clear.
+True I missed this one.
 
-Shawn
+Jason, Andrew, do you want I split this patch as suggested by Thomas or
+are you fine with having one single patch?
+
+I will wait your answer before sending the V2.
+
+Thanks,
+
+Gregory
