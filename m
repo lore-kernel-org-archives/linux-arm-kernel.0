@@ -1,49 +1,60 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 17:31:31 +0200
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <20121024172050.412ff1bf@skate>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121024150614.GD11837@lunn.ch> <20121024172050.412ff1bf@skate>
-Message-ID: <20121024153131.GG11837@lunn.ch>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 24 Oct 2012 17:33:49 +0200
+Subject: [PATCH 0/8] at91: 3.7 fixes patch series
+Message-ID: <cover.1351092432.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 05:20:50PM +0200, Thomas Petazzoni wrote:
-> Andrew,
-> 
-> On Wed, 24 Oct 2012 17:06:14 +0200, Andrew Lunn wrote:
-> 
-> > There are two variants of this box, ax3/2 and ax3/4. The ax3/4 can
-> > have more RAM and has a mini pci express slot. Do you expect both
-> > boards to be supported with one dts file?
-> 
-> I have the ax3/4 version apparently.
-> 
-> So, we can have the following possible schemes:
-> 
->  + openblocks-ax3.dtsi
->    + openblocks-ax3-2.dts
->    + openblocks-ax3-4.dts
-> 
-> But I am not sure if using a .dtsi to factorize things common between
-> multiple boards is OK. Or we can do:
-> 
->  + openblocks-ax3-2.dts
->    + openblocks-ax3-4.dts
-> 
-> With openblocks-ax3-4.dts being the simple addition of PCIe slot + more
-> RAM. That said, I don't have the ax3/2 board anyway, so should we plan
-> for something that nobody can test at the moment, or wait for someone
-> to get a ax3/2 board, and therefore be able to do the testing? I think
-> I prefer to submit dts files that are know to work and have been tested
-> on hardware that we have.
+Hi all,
+I am posting this patch series just before sending a pull-request to Arnd and
+Olof.
+There are 2 new patches that I have just cooked today about external IRQ
+handling: please review.
+I would like you to double check that I have not made any mistake while
+collecting the other patches...
 
-Hi Thomas
+Thanks, best regards,
 
-I agree with the last point. So maybe have a openblocks-ax3-4.dts and
-set the compatibility string to plathome,openblocks-ax3-4. 
 
-When somebody gets a ax3/2, they can refactor the common DT into a
-dtsi file without causing any compatibility issues.
+Bo Shen (2):
+  ARM: at91/i2c: change id to let i2c-gpio work
+  ARM: at91/i2c: change id to let i2c-at91 work
 
-     Andrew
+Ivan Shugov (1):
+  ARM: at91: at91sam9g10: fix SOC type detection
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+  ARM: at91: drop duplicated config SOC_AT91SAM9 entry
+
+Josh Wu (1):
+  ARM: at91/tc: fix typo in the DT document
+
+Marek Belisko (1):
+  ARM: at91/dts: at91sam9g20ek_common: Fix typos in buttons labels.
+
+Nicolas Ferre (2):
+  ARM: at91: fix external interrupts in non-DT case
+  ARM: at91: fix external interrupt specification in board code
+
+ Documentation/devicetree/bindings/arm/atmel-at91.txt |  2 +-
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi          |  4 ++--
+ arch/arm/mach-at91/Kconfig                           | 10 ++--------
+ arch/arm/mach-at91/at91rm9200.c                      |  2 +-
+ arch/arm/mach-at91/at91rm9200_devices.c              |  4 ++--
+ arch/arm/mach-at91/at91sam9260.c                     |  4 ++--
+ arch/arm/mach-at91/at91sam9260_devices.c             |  4 ++--
+ arch/arm/mach-at91/at91sam9261.c                     |  4 ++--
+ arch/arm/mach-at91/at91sam9261_devices.c             |  4 ++--
+ arch/arm/mach-at91/at91sam9263.c                     |  2 +-
+ arch/arm/mach-at91/at91sam9263_devices.c             |  4 ++--
+ arch/arm/mach-at91/at91sam9rl_devices.c              |  4 ++--
+ arch/arm/mach-at91/board-neocore926.c                |  2 +-
+ arch/arm/mach-at91/board-sam9261ek.c                 |  2 +-
+ arch/arm/mach-at91/board-sam9263ek.c                 |  2 +-
+ arch/arm/mach-at91/generic.h                         |  3 ++-
+ arch/arm/mach-at91/irq.c                             |  9 +++++++--
+ arch/arm/mach-at91/setup.c                           |  4 ++--
+ 18 files changed, 35 insertions(+), 35 deletions(-)
+
+-- 
+1.7.11.3
