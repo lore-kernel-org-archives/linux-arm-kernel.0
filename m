@@ -1,91 +1,84 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 16:53:50 +0200
-Subject: [PATCH 5/9] ARM: Kirkwood: Convert dreamplug to pinctrl.
-In-Reply-To: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1351090434-30499-6-git-send-email-andrew@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 24 Oct 2012 16:56:02 +0200
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <5087FD91.1050803@free-electrons.com>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
+ <20121024142722.46c0f456@skate>
+ <5087FD91.1050803@free-electrons.com>
+Message-ID: <20121024165602.631f070b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood-dreamplug.dts |   26 ++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dreamplug.c |   14 --------------
- 2 files changed, 26 insertions(+), 14 deletions(-)
+Dear Gregory CLEMENT,
 
-diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-index 26e281f..4d1ef46 100644
---- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
-@@ -16,6 +16,32 @@
- 	};
- 
- 	ocp at f1000000 {
-+		pinctrl: pinctrl at 10000 {
-+			compatible = "marvell,88f6281-pinctrl";
-+			reg = <0x10000 0x20>;
-+
-+			pinctrl-0 = < &pmx_spi
-+				      &pmx_led_bluetooth &pmx_led_wifi
-+				      &pmx_led_wifi_ap >;
-+			pinctrl-names = "default";
-+
-+			pmx_spi: pmx-spi {
-+				marvell,pins = "mpp0", "mpp1", "mpp2", "mpp3";
-+				marvell,function = "spi";
-+			};
-+			pmx_led_bluetooth: pmx-led-bluetooth {
-+				marvell,pins = "mpp47";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_wifi: pmx-led-wifi {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_wifi_ap: pmx-led-wifi-ap {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
-+		};
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
- 			status = "ok";
-diff --git a/arch/arm/mach-kirkwood/board-dreamplug.c b/arch/arm/mach-kirkwood/board-dreamplug.c
-index 20af53a..db0c280 100644
---- a/arch/arm/mach-kirkwood/board-dreamplug.c
-+++ b/arch/arm/mach-kirkwood/board-dreamplug.c
-@@ -32,7 +32,6 @@
- #include <mach/bridge-regs.h>
- #include <linux/platform_data/mmc-mvsdio.h>
- #include "common.h"
--#include "mpp.h"
- 
- static struct mv643xx_eth_platform_data dreamplug_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-@@ -46,24 +45,11 @@ static struct mvsdio_platform_data dreamplug_mvsdio_data = {
- 	/* unfortunately the CD signal has not been connected */
- };
- 
--static unsigned int dreamplug_mpp_config[] __initdata = {
--	MPP0_SPI_SCn,
--	MPP1_SPI_MOSI,
--	MPP2_SPI_SCK,
--	MPP3_SPI_MISO,
--	MPP47_GPIO,	/* Bluetooth LED */
--	MPP48_GPIO,	/* Wifi LED */
--	MPP49_GPIO,	/* Wifi AP LED */
--	0
--};
--
- void __init dreamplug_init(void)
- {
- 	/*
- 	 * Basic setup. Needs to be called early.
- 	 */
--	kirkwood_mpp_conf(dreamplug_mpp_config);
--
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dreamplug_ge00_data);
- 	kirkwood_ge01_init(&dreamplug_ge01_data);
+On Wed, 24 Oct 2012 16:39:13 +0200, Gregory CLEMENT wrote:
+
+> > As others said, the prefix is wrong. Since the file is named coherency,
+> > maybe just "coherency_" as the prefix? Not sure, though. Shouldn't the
+> > file be named coherency-armada-370-xp.c, as we have done for the irq
+> > controller file? In that case, the armada_370_xp prefix would make
+> > sense
+> 
+> I would prefer to just use coherency_ everywhere and keep the name of
+> the file as is. It made sense to suffix the irq file with
+> armada-370-xp because the other mvebu SoCs have their own irq
+> controller. Whereas, as far as I know the coherency unit is only
+> present in the Armada 370/XP.
+
+Well your argumentation may also be seen as an argument to name it
+coherency-armada-370-xp.c :-) I don't have a strong opinion on this
+though, and we can always rename it later if needed.
+
+> >>  int armada_xp_get_cpu_count(void)
+> >>  {
+> >>  	int reg, cnt;
+> > 
+> > static?
+> 
+> Which function?
+> armada_xp_get_cpu_count and armada_370_xp_set_cpu_coherent are exported
+> and moreover are not part of this patch set but the SMP one.
+
+Ok, then maybe this function shouldn't be between the DMA operations
+implementation and the bus notifier callback.
+
+> Yes indeed code in headsmp.S and armada_xp_smp_prepare_cpus() are
+> redundant we can simplify it. I will change it in the SMP series and
+> for this series also.
+
+Great, thanks!
+
+> > Do we have a good reason for having
+> > armada_370_xp_coherency_iocache_init() separate from
+> > armada_370_xp_coherency_iocache_init() ? I.e, what prevents us from
+> 
+> No good reason because they are the same! ;)
+
+Oops, indeed. but I see that you fixed the problem.
+
+> But more seriously, armada_370_xp_coherency_init() is called as an
+> early_init call whereas armada_370_xp_coherency_iocache_init() is called
+> later by armada_370_xp_dt_init(). I have to check if we can use
+> bus_register_notifier() from an early_init call or if we still need to
+> call armada_370_xp_coherency_init() as an early_init call.
+
+The early_initcall() is mandatory, see the comment on top of it:
+
++/* Coherency initialization have to be done before the SMP
++ * initialization of the CPUs*/
++early_initcall(armada_370_xp_coherency_init);
+
+(BTW, there is a missing space between CPUs and the comment terminator).
+
+So, my point was more: is it possible to register the bus notifier
+as early as inside an early_initcall() callback.
+
+Best regards,
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
