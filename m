@@ -1,23 +1,23 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 16:53:49 +0200
-Subject: [PATCH 4/9] ARM: Kirkwood: Convert dockstar to pinctrl.
+Date: Wed, 24 Oct 2012 16:53:54 +0200
+Subject: [PATCH 9/9] ARM: Kirkwood: Convert IX2-200 to pinctrl.
 In-Reply-To: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
 References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1351090434-30499-5-git-send-email-andrew@lunn.ch>
+Message-ID: <1351090434-30499-10-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-dockstar.dts |   21 +++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dockstar.c |   10 ----------
- 2 files changed, 21 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   90 +++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   24 -------
+ 2 files changed, 90 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dockstar.dts b/arch/arm/boot/dts/kirkwood-dockstar.dts
-index 08a5824..cc5e7ef 100644
---- a/arch/arm/boot/dts/kirkwood-dockstar.dts
-+++ b/arch/arm/boot/dts/kirkwood-dockstar.dts
-@@ -16,6 +16,27 @@
+diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+index 865aeec..d8fa8e8 100644
+--- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
++++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
+@@ -16,6 +16,96 @@
  	};
  
  	ocp at f1000000 {
@@ -25,56 +25,141 @@ index 08a5824..cc5e7ef 100644
 +			compatible = "marvell,88f6281-pinctrl";
 +			reg = <0x10000 0x20>;
 +
-+			pinctrl-0 = < &pmx_usb_power_enable
-+				      &pmx_led_green &pmx_led_orange >;
++			pinctrl-0 = < &pmx_button_reset &pmx_button_power
++				      &pmx_led_backup &pmx_led_power
++				      &pmx_button_otb &pmx_led_rebuild
++				      &pmx_led_health
++				      &pmx_led_sata_brt_ctrl_1
++				      &pmx_led_sata_brt_ctrl_2
++				      &pmx_led_backup_brt_ctrl_1
++				      &pmx_led_backup_brt_ctrl_2
++				      &pmx_led_power_brt_ctrl_1
++				      &pmx_led_power_brt_ctrl_2
++				      &pmx_led_health_brt_ctrl_1
++				      &pmx_led_health_brt_ctrl_2
++				      &pmx_led_rebuild_brt_ctrl_1
++				      &pmx_led_rebuild_brt_ctrl_2 >;
 +			pinctrl-names = "default";
 +
-+			pmx_usb_power_enable: pmx-usb-power-enable {
-+				marvell,pins = "mpp29";
++			pmx_button_reset: pmx-button-reset {
++				marvell,pins = "mpp12";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_green: pmx-led-green {
-+				marvell,pins = "mpp46";
++			pmx_button_power: pmx-button-power {
++				marvell,pins = "mpp14";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_orange: pmx-led-orange {
-+				marvell,pins = "mpp47";
++			pmx_led_backup: pmx-led-backup {
++				marvell,pins = "mpp15";
 +				marvell,function = "gpio";
 +			};
++			pmx_led_power: pmx-led-power {
++				marvell,pins = "mpp16";
++				marvell,function = "gpio";
++			};
++			pmx_button_otb: pmx-button-otb {
++				marvell,pins = "mpp35";
++				marvell,function = "gpio";
++			};
++			pmx_led_rebuild: pmx-led-rebuild {
++				marvell,pins = "mpp36";
++				marvell,function = "gpio";
++			};
++			pmx_led_health: pmx-led_health {
++				marvell,pins = "mpp37";
++				marvell,function = "gpio";
++			};
++			pmx_led_sata_brt_ctrl_1: pmx-led-sata-brt-ctrl-1 {
++				marvell,pins = "mpp38";
++				marvell,function = "gpio";
++			};
++			pmx_led_sata_brt_ctrl_2: pmx-led-sata-brt-ctrl-2 {
++				marvell,pins = "mpp39";
++				marvell,function = "gpio";
++			};
++			pmx_led_backup_brt_ctrl_1: pmx-led-backup-brt-ctrl-1 {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++			pmx_led_backup_brt_ctrl_2: pmx-led-backup-brt-ctrl-2 {
++				marvell,pins = "mpp41";
++				marvell,function = "gpio";
++			};
++			pmx_led_power_brt_ctrl_1: pmx-led-power-brt-ctrl-1 {
++				marvell,pins = "mpp42";
++				marvell,function = "gpio";
++			};
++			pmx_led_power_brt_ctrl_2: pmx-led-power-brt-ctrl-2 {
++				marvell,pins = "mpp43";
++				marvell,function = "gpio";
++			};
++			pmx_led_health_brt_ctrl_1: pmx-led-health-brt-ctrl-1 {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_led_health_brt_ctrl_2: pmx-led-health-brt-ctrl-2 {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++			pmx_led_rebuild_brt_ctrl_1: pmx-led-rebuild-brt-ctrl-1 {
++				marvell,pins = "mpp44";
++				marvell,function = "gpio";
++			};
++			pmx_led_rebuild_brt_ctrl_2: pmx-led-rebuild-brt-ctrl-2 {
++				marvell,pins = "mpp45";
++				marvell,function = "gpio";
++			};
++
 +		};
- 		serial at 12000 {
- 			clock-frequency = <200000000>;
- 			status = "ok";
-diff --git a/arch/arm/mach-kirkwood/board-dockstar.c b/arch/arm/mach-kirkwood/board-dockstar.c
-index f2fbb02..3bd916b 100644
---- a/arch/arm/mach-kirkwood/board-dockstar.c
-+++ b/arch/arm/mach-kirkwood/board-dockstar.c
-@@ -32,26 +32,16 @@
- #include <mach/bridge-regs.h>
- #include <linux/platform_data/mmc-mvsdio.h>
+ 		i2c at 11000 {
+ 			status = "okay";
+ 
+diff --git a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+index 158fb97..c144712 100644
+--- a/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
++++ b/arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+@@ -15,7 +15,6 @@
+ #include <linux/ethtool.h>
+ #include <mach/kirkwood.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data dockstar_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
+ 	.phy_addr       = MV643XX_ETH_PHY_NONE,
+@@ -23,34 +22,11 @@ static struct mv643xx_eth_platform_data iomega_ix2_200_ge00_data = {
+ 	.duplex         = DUPLEX_FULL,
  };
  
--static unsigned int dockstar_mpp_config[] __initdata = {
--	MPP29_GPIO,	/* USB Power Enable */
--	MPP46_GPIO,	/* LED green */
--	MPP47_GPIO,	/* LED orange */
+-static unsigned int iomega_ix2_200_mpp_config[] __initdata = {
+-	MPP12_GPIO,			/* Reset Button */
+-	MPP14_GPIO,			/* Power Button */
+-	MPP15_GPIO,			/* Backup LED (blue) */
+-	MPP16_GPIO,			/* Power LED (white) */
+-	MPP35_GPIO,			/* OTB Button */
+-	MPP36_GPIO,			/* Rebuild LED (white) */
+-	MPP37_GPIO,			/* Health LED (red) */
+-	MPP38_GPIO,			/* SATA LED brightness control 1 */
+-	MPP39_GPIO,			/* SATA LED brightness control 2 */
+-	MPP40_GPIO,			/* Backup LED brightness control 1 */
+-	MPP41_GPIO,			/* Backup LED brightness control 2 */
+-	MPP42_GPIO,			/* Power LED brightness control 1 */
+-	MPP43_GPIO,			/* Power LED brightness control 2 */
+-	MPP44_GPIO,			/* Health LED brightness control 1 */
+-	MPP45_GPIO,			/* Health LED brightness control 2 */
+-	MPP46_GPIO,			/* Rebuild LED brightness control 1 */
+-	MPP47_GPIO,			/* Rebuild LED brightness control 2 */
 -	0
 -};
 -
- void __init dockstar_dt_init(void)
+ void __init iomega_ix2_200_init(void)
  {
  	/*
  	 * Basic setup. Needs to be called early.
  	 */
--	kirkwood_mpp_conf(dockstar_mpp_config);
+-	kirkwood_mpp_conf(iomega_ix2_200_mpp_config);
 -
- 	if (gpio_request(29, "USB Power Enable") != 0 ||
- 	    gpio_direction_output(29, 1) != 0)
- 		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
+ 	kirkwood_ehci_init();
+ 
+ 	kirkwood_ge01_init(&iomega_ix2_200_ge00_data);
 -- 
 1.7.10.4
