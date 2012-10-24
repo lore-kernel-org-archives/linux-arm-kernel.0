@@ -1,107 +1,73 @@
-From: peter.korsgaard@barco.com (Peter Korsgaard)
-Date: Wed, 24 Oct 2012 16:56:43 +0200
-Subject: [PATCH 1/2] i2c: mux: Add dt support to i2c-mux-gpio driver
-In-Reply-To: <1351089624-20794-2-git-send-email-maxime.ripard@free-electrons.com>(Maxime
- Ripard's message of "Wed, 24 Oct 2012 16:40:23 +0200")
-References: <1351089624-20794-1-git-send-email-maxime.ripard@free-electrons.com><1351089624-20794-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <873913rk9g.fsf@thor.barco.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 24 Oct 2012 10:57:00 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <5086F8D6.5050605@gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "MR" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On Tue, 23 Oct 2012, Rob Herring wrote:
 
-Hi,
+> On 10/23/2012 02:33 PM, Alan Stern wrote:
+> > On Tue, 23 Oct 2012, Stephen Warren wrote:
+> > 
+> >>> Nothing intrinsically distinguishes this class of hardware.  The only
+> >>> thing these devices have in common is that they can be managed by
+> >>> Linux's ehci-platform driver.
+> >>
+> >> I don't agree. They're all EHCI USB controllers (or all EHCI USB
+> >> controllers that don't require custom drivers due to quirks), which is a
+> >> much more general statement than anything related to which driver Linux
+> >> uses for them.
+> > 
+> > That's true, but it doesn't distinguish these devices.  There are other
+> > EHCI controllers with no quirks that nevertheless can't be handled by
+> > ehci-platform because they have requirements (_not_ quirks) that
+> > ehci-platform is unable to deal with currently -- clocks or power
+> > supplies or special register settings or PHYs or etc.
+> 
+> But what if the h/w has quirks you haven't yet discovered? You need the
+> compatible property to be specific now, so if there are any future
+> driver changes needed the DT does not have to change (as it may be in
+> firmware which you can't change).
 
-MR> Allow the i2c-mux-gpio to be used by a device tree enabled device. The
-MR> bindings are inspired by the one found in the i2c-mux-pinctrl driver.
+That argument applies always, doesn't it?  There's always a chance that 
+you might discover a new quirk in a device for which the DT board file 
+has already been written and committed to firmware.  The board file 
+could declare that the device is compatible with something older, but 
+the new quirk might ruin that compatibility.
 
-MR> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-MR> Reviewed-by: Stephen Warren <swarren@nvidia.com>
-MR> ---
-MR>  .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   81 +++++++++++
-MR>  drivers/i2c/muxes/i2c-mux-gpio.c                   |  146 +++++++++++++++-----
-MR>  2 files changed, 196 insertions(+), 31 deletions(-)
-MR>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+> > Okay, fine.  But then what should the binding documentation specify for
+> > the compatible value?  A list of all the HW models that the driver
+> > currently supports?
+> 
+> The binding docs should be independent of the driver. There may be
+> fields the driver ignores. So you need to document all defined
+> compatible strings. It is fine if the driver only has "usb-ehci", but it
+> is not fine for the DT to only have that.
 
-MR> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
-MR> new file mode 100644
-MR> index 0000000..d61726f
-MR> --- /dev/null
-MR> +++ b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
-MR> @@ -0,0 +1,81 @@
-MR> +GPIO-based I2C Bus Mux
-MR> +
-MR> +This binding describes an I2C bus multiplexer that uses GPIOs to
-MR> +route the I2C signals.
-MR> +
-MR> +                                  +-----+  +-----+
-MR> +                                  | dev |  | dev |
-MR> +    +------------+                +-----+  +-----+
-MR> +    | SoC        |                   |        |
-MR> +    |            |          /--------+--------+
-MR> +    |   +------+ |  +------+    child bus A, on GPIO value set to 0
-MR> +    |   | I2C  |-|--| Mux  |
-MR> +    |   +------+ |  +--+---+    child bus B, on GPIO value set to 1
-MR> +    |            |     |    \----------+--------+--------+
-MR> +    |   +------+ |     |               |        |        |
-MR> +    |   | GPIO |-|-----+            +-----+  +-----+  +-----+
-MR> +    |   +------+ |                  | dev |  | dev |  | dev |
-MR> +    +------------+                  +-----+  +-----+  +-----+
-MR> +
-MR> +Required properties:
-MR> +- compatible: i2c-mux-gpio
-MR> +- i2c-parent: The phandle of the I2C bus that this multiplexer's master-side
-MR> +  port is connected to.
-MR> +- mux-gpios: list of gpios used to control the muxer
-MR> +* Standard I2C mux properties. See mux.txt in this directory.
-MR> +* I2C child bus nodes. See mux.txt in this directory.
-MR> +
-MR> +Optional properties:
-MR> +- idle-state: value to set to the muxer when idle. When no value is
+Under the circumstances, do we really need a new binding document for 
+the ehci-platform driver?  We should be able to use the existing 
+usb-ehci binding, perhaps with some new properties added:
 
-s/to set to the muxer/to set the muxer to/
+	has-synopsys-hc-bug
+	no-io-watchdog
+	has-tt
 
+We probably can omit has-synopsys-hc-bug, as that is specific to one
+type of MIPS ATH79 controller.  The driver can check for it explicitly,
+if necessary.
 
-MR> +++ b/drivers/i2c/muxes/i2c-mux-gpio.c
-MR> @@ -16,6 +16,8 @@
-MR>  #include <linux/module.h>
-MR>  #include <linux/slab.h>
-MR>  #include <linux/gpio.h>
-MR> +#include <linux/of_i2c.h>
-MR> +#include <linux/of_gpio.h>
- 
-MR>  struct gpiomux {
-MR>  	struct i2c_adapter *parent;
-MR> @@ -57,29 +59,111 @@ static int __devinit match_gpio_chip_by_label(struct gpio_chip *chip,
-MR>  	return !strcmp(chip->label, data);
-MR>  }
- 
-MR> +#ifdef CONFIG_OF
-MR> +static int __devinit i2c_mux_gpio_probe_dt(struct gpiomux *mux,
-MR> +					struct platform_device *pdev)
-MR> +{
-MR> +	struct device_node *np = pdev->dev.of_node;
-MR> +	struct device_node *adapter_np, *child;
-MR> +	struct i2c_adapter *adapter;
-MR> +	unsigned *values, *gpios;
-MR> +	int i = 0;
-MR> +
-MR> +	if (!np)
-MR> +		return 0;
+In fact, it's not clear that these new properties need to be added now.  
+They can be added over time as needed, as existing drivers are
+converted over to DT.  Or is it preferable to document these things
+now, preemptively as it were?
 
+The one that matters most and is most clearly a property of the HW is
+"has-tt".  IMO it should be added right away, even though there may
+already be DT board files that could specify it but don't.  Right now,
+for example, the ehci-xilinx-of driver checks instead for the
+"support-usb-fs" property, as defined in
+Documentation/devicetree/bindings/xilinx.txt.
 
-This should be -ENODEV, otherwise we end up using a zeroed out struct
-i2c_mux_gpio_platform_data in case i2c_mux_gpio is used with the
-platform bus but the platform forgets to pass the pdata.
-
-With those two minor fixes:
-
-Acked-by: Peter Korsgaard <peter.korsgaard@barco.com>
-
--- 
-Sorry about disclaimer - It's out of my control.
-Bye, Peter Korsgaard
-
-
-DISCLAIMER:
-Unless indicated otherwise, the information contained in this message is privileged and confidential, and is intended only for the use of the addressee(s) named above and others who have been specifically authorized to receive it. If you are not the intended recipient, you are hereby notified that any dissemination, distribution or copying of this message and/or attachments is strictly prohibited. The company accepts no liability for any damage caused by any virus transmitted by this email. Furthermore, the company does not warrant a proper and complete transmission of this information, nor does it accept liability for any delays. If you have received this message in error, please contact the sender and delete the message. Thank you.
+Alan Stern
