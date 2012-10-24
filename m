@@ -1,34 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 09:45:19 +0200
-Subject: [PATCH 1/1] pinctrl: at91: fix typo on PULL_UP
-In-Reply-To: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdbVFnDPu1dfYgTaiz48ioDLJxxSmFXkeQiej157DFZRQw@mail.gmail.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 24 Oct 2012 09:47:27 +0200
+Subject: [PATCH v3 2/2] [media]: mx2_camera: Fix regression caused by
+ clock conversion
+In-Reply-To: <CAOMZO5BpJAEdwKRVE47D+7wggLsvCXtPcv272UPYsZV6v3vKMg@mail.gmail.com>
+References: <1349791352-9829-1-git-send-email-fabio.estevam@freescale.com>
+ <Pine.LNX.4.64.1210222301100.32591@axis700.grange>
+ <CAOMZO5BpJAEdwKRVE47D+7wggLsvCXtPcv272UPYsZV6v3vKMg@mail.gmail.com>
+Message-ID: <CACKLOr355VFgxPGUXwkyFHxW95p7JaF=wdhF1FYsQdM-37d7ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 6:28 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/pinctrl/pinctrl-at91.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On 23 October 2012 00:17, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Guennadi
 >
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index c87c2c5..0757e94 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -58,7 +58,7 @@ static struct at91_gpio_chip *gpio_chips[MAX_GPIO_BANKS];
+> On Mon, Oct 22, 2012 at 7:07 PM, Guennadi Liakhovetski
+> <g.liakhovetski@gmx.de> wrote:
+>> ? I don't find a clock named "per" and associated with "mx2-camera.0" in
+>> arch/arm/mach-imx/clk-imx27.c. I only find it in clk-imx25.c. Does this
+>> mean, that this your patch is for i.MX25? But you're saying it's for
+>> i.MX27. Confused...
 >
->  static int gpio_banks;
->
-> -#define PULL_UP                (0 << 1)
-> +#define PULL_UP                (1 << 0)
+> I provide this mx27 clock in the first patch of the series:
+> http://patchwork.linuxtv.org/patch/14915/
 
-Makes perfect sense. Shall I just apply this to the at91 branch too?
+Yes, I made the same mistake.
 
-Yours,
-Linus Walleij
+
+
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
