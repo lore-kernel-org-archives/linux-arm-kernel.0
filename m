@@ -1,109 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 24 Oct 2012 10:39:27 +0300
-Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
- mask on disable
-In-Reply-To: <87k3ug7st2.fsf@deeprootsystems.com>
-References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
- <20121023190914.GA853@arwen.pp.htv.fi>
- <87k3ug7st2.fsf@deeprootsystems.com>
-Message-ID: <20121024073927.GC5665@arwen.pp.htv.fi>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Oct 2012 09:45:19 +0200
+Subject: [PATCH 1/1] pinctrl: at91: fix typo on PULL_UP
+In-Reply-To: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACRpkdbVFnDPu1dfYgTaiz48ioDLJxxSmFXkeQiej157DFZRQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 03:00:09PM -0700, Kevin Hilman wrote:
-> Felipe Balbi <balbi@ti.com> writes:
-> 
-> > Hi,
-> >
-> > On Tue, Oct 23, 2012 at 11:09:31AM -0700, Kevin Hilman wrote:
-> >> From: Kevin Hilman <khilman@ti.com>
-> >> 
-> >> When debounce clocks are disabled, ensure that the banks
-> >> dbck_enable_mask is cleared also.  Otherwise, context restore on
-> >> subsequent off-mode transition will restore previous value from the
-> >> shadow copies (bank->context.debounce*) leading to mismatch state
-> >> between driver state and hardware state.
-> >> 
-> >> This was discovered when board code was doing
-> >> 
-> >>   gpio_request_one()
-> >>   gpio_set_debounce()
-> >>   gpio_free()
-> >> 
-> >> which was leaving the GPIO debounce settings in a confused state.
-> >> Then, enabling off mode causing bogus state to be restored, leaving
-> >> GPIO debounce enabled which then prevented the CORE powerdomain from
-> >> transitioning.
-> >> 
-> >> Reported-by: Paul Walmsley <paul@pwsan.com>
-> >> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> >> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> >
-> > looks like this deserves a Cc: stable at vger.kernel.org tag.
-> >
-> 
-> Agreed.  I think this goes all the way back to v3.5, but would've only
-> been seen on boards using a request/gpio_set_debounce/free sequence
-> combined with off-mode.
-> 
-> Linus, feel free to add the Cc: stable when commiting.  Thanks.
-> 
-> >> ---
-> >> Applies on v3.7-rc2, targetted for v3.7.
-> >> 
-> >>  drivers/gpio/gpio-omap.c | 1 +
-> >>  1 file changed, 1 insertion(+)
-> >> 
-> >> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> >> index 94cbc84..dee2856 100644
-> >> --- a/drivers/gpio/gpio-omap.c
-> >> +++ b/drivers/gpio/gpio-omap.c
-> >> @@ -187,6 +187,7 @@ static inline void _gpio_dbck_disable(struct gpio_bank *bank)
-> >>  		 * to detect events and generate interrupts at least on OMAP3.
-> >>  		 */
-> >>  		__raw_writel(0, bank->base + bank->regs->debounce_en);
-> >> +		bank->dbck_enable_mask = 0;
-> >
-> > shouldn't omap_gpio_restore_context() check for dbck_enabled instead of
-> > the mask ? I mean:
-> >
-> > diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> > index 94cbc84..b3a39a7 100644
-> > --- a/drivers/gpio/gpio-omap.c
-> > +++ b/drivers/gpio/gpio-omap.c
-> > @@ -1371,7 +1371,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
-> >  				bank->base + bank->regs->dataout);
-> >  	__raw_writel(bank->context.oe, bank->base + bank->regs->direction);
-> >  
-> > -	if (bank->dbck_enable_mask) {
-> > +	if (bank->dbck_enabled) {
-> >  		__raw_writel(bank->context.debounce, bank->base +
-> >  					bank->regs->debounce);
-> >  		__raw_writel(bank->context.debounce_en,
-> >
-> > the outcome would be the same, so it doesn't really matter. Just that,
-> > at least to me, it would look better.
-> 
-> I tried your version, and unfortunately, the outcome is not the same,
-> but don't plan to look into why.  $SUBJECT version is targetted and
-> tested.  If you want to cleanup the cosmetics here, please do in a
-> subsequent patch.  This driver could certainly benefit from more
-> readability cleanups.
-> 
-> > No strong feelings though.
-> 
-> Good.   I'll take that as an Ack.  :)
+On Tue, Oct 23, 2012 at 6:28 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
-please do:
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/pinctrl/pinctrl-at91.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> index c87c2c5..0757e94 100644
+> --- a/drivers/pinctrl/pinctrl-at91.c
+> +++ b/drivers/pinctrl/pinctrl-at91.c
+> @@ -58,7 +58,7 @@ static struct at91_gpio_chip *gpio_chips[MAX_GPIO_BANKS];
+>
+>  static int gpio_banks;
+>
+> -#define PULL_UP                (0 << 1)
+> +#define PULL_UP                (1 << 0)
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Makes perfect sense. Shall I just apply this to the at91 branch too?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/c1558a7a/attachment.sig>
+Yours,
+Linus Walleij
