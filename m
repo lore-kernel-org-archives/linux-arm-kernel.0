@@ -1,73 +1,83 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 24 Oct 2012 10:06:07 -0500
-Subject: [PATCH] ARM: PMU: fix runtime PM enable
-In-Reply-To: <20121024143204.GF7339@mudshark.cambridge.arm.com>
-References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
- <20121024093150.GA23775@mudshark.cambridge.arm.com> <5087F84B.9070705@ti.com>
- <20121024143204.GF7339@mudshark.cambridge.arm.com>
-Message-ID: <508803DF.7020902@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 24 Oct 2012 17:06:14 +0200
+Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
+In-Reply-To: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121024150614.GD11837@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/24/2012 09:32 AM, Will Deacon wrote:
-> On Wed, Oct 24, 2012 at 03:16:43PM +0100, Jon Hunter wrote:
->> Hi Will,
->>
->> On 10/24/2012 04:31 AM, Will Deacon wrote:
->>> Can we not just use the presence of the resume/suspend function pointers to
->>> indicate whether we should enable runtime pm or not? i.e. if they're not
->>> NULL, then enable the thing?
->>
->> I wondered if you would ask that :-)
->>
->> Unfortunately, we can't. For example, OMAP3430 and OMAP4460 both require
->> runtime_pm to be enabled to turn on the debug sub-system in OMAP for PMU
->> to work. However, neither of these devices are using the suspend/resume
->> callbacks because the HWMOD framework is doing this for us behind the
->> scenes.
->>
->> So then you ask, why do we need the resume/suspend callbacks, well we
->> will need them for OMAP4430 where in addition to turning on the debug
->> sub-system we need to configure the CTI module. Therefore, I had to add
->> another plat data variable.
+On Tue, Oct 23, 2012 at 10:19:25AM +0200, Thomas Petazzoni wrote:
+> This platform, available in Japan from PlatHome, has a dual-core
+> Armada XP, the MV78260. For now, only the two serial ports and the
+> three front LEDs are supported. Support for network, SATA, USB and
+> other peripherals will be added as drivers for them become available
+> for Armada XP in mainline.
 > 
-> Hmmm, now I start to wonder whether your original idea of having separate
-> callbacks for enable/disable irq and resume/suspend doesn't make more sense.
-> Then the CTI magic can go in the irq management code and be totally separate
-> to the PM stuff.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > 
-> What do you reckon?
-
-The resume/suspend calls really replaced the enable/disable irq
-callbacks. That still seems like a good approach given that we need
-runtime PM for OMAP and PMU.
-
-The problem is going to be with device-tree. When booting with
-device-tree we will not call the current OMAP specific code that is
-creating the PMU device and calling pm_runtime_enable(). So calling
-pm_runtime_enable() needs to be done somewhere in the PERF driver and
-that's the real problem here.
-
->> By the way, I did add a comment in the above changelog about this. See
->> the last paragraph, not sure if this is 100% clear.
+> ---
+> This is 3.8 material.
+> ---
+>  arch/arm/boot/dts/Makefile           |    3 +-
+>  arch/arm/boot/dts/openblocks-ax3.dts |   69 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
+>  3 files changed, 72 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/openblocks-ax3.dts
 > 
-> Sorry, I missed that this morning.
-> 
->> One alternative I had thought about was always calling
->> pm_runtime_enable() on registering the PMU device and avoid having a
->> use_runtime_pm variable. For ARM platforms that don't use runtime PM the
->> pm_runtime_enable() function does nothing. However, I was more concerned
->> about adding unnecessary overhead for ARM platforms that are using
->> runtime PM but don't need runtime PM for PMU. I don't see any side
->> affects on our OMAP2 platform that does not need runtime PM for PMU.
->> However, was not sure what is best here.
-> 
-> Nah, we should be able to fix this in the platdata, I'd just rather have
-> function pointers instead of state variables in there.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index f37cf9f..b7814b9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -44,7 +44,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
+>  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  	msm8960-cdp.dtb
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+> -	armada-xp-db.dtb
+> +	armada-xp-db.dtb \
+> +	openblocks-ax3.dtb
+>  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+>  	imx53-ard.dtb \
+>  	imx53-evk.dtb \
+> diff --git a/arch/arm/boot/dts/openblocks-ax3.dts b/arch/arm/boot/dts/openblocks-ax3.dts
+> new file mode 100644
+> index 0000000..f757116
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/openblocks-ax3.dts
+> @@ -0,0 +1,69 @@
+> +/*
+> + * Device Tree file for OpenBlocks AX3 board
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "armada-xp-mv78260.dtsi"
+> +
+> +/ {
+> +	model = "PlatHome OpenBlocks AX3 board";
+> +	compatible = "plathome,openblocks-ax3", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x40000000>; /* 1 GB */
+> +	};
 
-Well, we could pass a pointer to pm_runtime_enable() function in the
-platdata.
+Hi Thomas
 
-Cheers
-Jon
+There are two variants of this box, ax3/2 and ax3/4. The ax3/4 can
+have more RAM and has a mini pci express slot. Do you expect both
+boards to be supported with one dts file?
+
+Thanks
+	Andrew
