@@ -1,67 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 24 Oct 2012 21:49:45 +0200
-Subject: [PATCH 1/9] ARM: Kirkwood: Convert TS219 to pinctrl.
-In-Reply-To: <20121024213128.2d4c07dc@skate>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>	<1351090434-30499-2-git-send-email-andrew@lunn.ch>
- <20121024213128.2d4c07dc@skate>
-Message-ID: <50884659.1020208@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 24 Oct 2012 21:51:13 +0200
+Subject: [PATCH] [RFC] pinctrl: mvebu: reset pins to an UNKNOWN state on
+ startup
+In-Reply-To: <508843AF.7060803@gmail.com>
+References: <1351106281-31288-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508843AF.7060803@gmail.com>
+Message-ID: <20121024215113.10640bf1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 09:31 PM, Thomas Petazzoni wrote:
-> Dear Andrew Lunn,
->
-> On Wed, 24 Oct 2012 16:53:46 +0200, Andrew Lunn wrote:
->
->> +			pinctrl-0 =<  &pmx_uart0&pmx_uart1&pmx_spi
->> +				&pmx_twsi0&pmx_sata0&pmx_sata1
->> +				&pmx_ram_size&pmx_reset_button
->> +				&pmx_USB_copy_button&pmx_board_id>;
->
-> It would be really better to have those under each device, rather than
-> globally declared here. For some devices such as UARTs, it is not yet
-> possible with the 8250 driver to associate pinctrl pins (but I'm
-> planning to work on that soon). However for the other drivers (SPI,
-> TWSI, SATA, button), it should be possible.
+Sebastian,
 
-Thomas,
+On Wed, 24 Oct 2012 21:38:23 +0200, Sebastian Hesselbarth wrote:
 
-Agree, but for now a global pinhog on pinctrl node itself is the correct
-way to go here. As soon as there is pinctrl support in the specific
-device drivers we can move pinmux phandle there.
+> how you make sure something you don't know about? The bootloader sets
+> these pinmux settings for a reason and if the DT doesn't tell the kernel
+> it should make no assumptions at all.
 
->> +			pmx_uart0: pmx-uart0 {
->> +				marvell,pins = "mpp10", "mpp11";
->> +				marvell,function = "uart0";
->> +			};
- >> ...
->
-> All those definitions are not board specific, they are common to the
-> SoC. So they should be in the corresponding .dtsi file.
->
-> Basically:
->
->   * The SoC .dtsi file should define all the pinmux groups that are
->     described in the datasheet and are used by boards. I.e, there may be
->     conflicting groups defined, where one group configures pin X with
->     function Y, while another group configures pin X with function Z.
+Apparently, the general feeling of the kernel people is that the kernel
+should reduce as much as possible its dependency on the hardware
+configuration set up by the bootloader. Therefore, even though your
+bootloader does a certain pinmux configuration, your kernel should make
+its own pinmux configuration and be fully independent from the one done
+by the bootloader. If we want to achieve this, then it seemed like a
+good idea to put all pins to an unknown state at boot time.
 
-Here I disagree. Even quite simple interfaces like uart can have dozens
-of possible mpp configurations, e.g. rx/tx on up to three different pins
-each plus rts/cts on various pins plus all possible combinations.
+> IMHO it isn't - but maybe I am missing the point here. What is it that
+> you don't like in the bootloaders choice of configuring pinmux?
 
-Now consider some more complex interface with more than one mpp pin per
-interface pin. Do you really want to predefine all possible combinations
-even if it is more likely that in fact only one is used on all boards
-because they are all based on the same reference design?
+Just because the kernel should not depend on hardware configuration
+done by the bootloader, except for very core things like DRAM timings
+and al. At least, that's my understanding of where the ARM kernel
+people are trying to go. But I might have misunderstood, in which case
+of course, the entire purpose of this patch disappears.
 
->   * The board .dts file should define the pinmux groups that are really
->     board-specific (buttons, LEDs, etc.), and then for each device,
->     point to the correct pinmux group (either defined in the .dtsi file
->     or in the board file).
+Best regards,
 
-With respect to mpp the actual configuration _is_ board specific. There
-are maybe only some pins that are always used if a specific interface is
-used, e.g. nand pins on dove can only be switched with gpio.
-
-Sebastian
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
