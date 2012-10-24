@@ -1,84 +1,66 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 24 Oct 2012 17:51:47 +0100
-Subject: [RFC] Energy/power monitoring within the kernel
-In-Reply-To: <4317776.evLpJapyim@hammer82.arch.suse.de>
-References: <1351013449.9070.5.camel@hornet>
- <4317776.evLpJapyim@hammer82.arch.suse.de>
-Message-ID: <1351097507.23327.78.camel@hornet>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 24 Oct 2012 12:54:05 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <50881727.10601@wwwdotorg.org>
+Message-ID: <Pine.LNX.4.44L0.1210241249010.1282-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-24 at 01:40 +0100, Thomas Renninger wrote:
-> > More and more of people are getting interested in the subject of power
-> > (energy) consumption monitoring. We have some external tools like
-> > "battery simulators", energy probes etc., but some targets can measure
-> > their power usage on their own.
-> > 
-> > Traditionally such data should be exposed to the user via hwmon sysfs
-> > interface, and that's exactly what I did for "my" platform - I have
-> > a /sys/class/hwmon/hwmon*/device/energy*_input and this was good
-> > enough to draw pretty graphs in userspace. Everyone was happy...
-> > 
-> > Now I am getting new requests to do more with this data. In particular
-> > I'm asked how to add such information to ftrace/perf output.
-> Why? What is the gain?
+On Wed, 24 Oct 2012, Stephen Warren wrote:
+
+> Device tree files always need a completely specific value in the
+> compatible property, even when less-specific/more-generic values are
+> also present. So for example, the Linux driver might only care about the
+> following existing:
 > 
-> Perf events can be triggered at any point in the kernel.
-> A cpufreq event is triggered when the frequency gets changed.
-> CPU idle events are triggered when the kernel requests to enter an idle state
-> or exits one.
+> compatible = "usb-ehci".
 > 
-> When would you trigger a thermal or a power event?
-> There is the possibility of (critical) thermal limits.
-> But if I understand this correctly you want this for debugging and
-> I guess you have everything interesting one can do with temperature
-> values:
->   - read the temperature
->   - draw some nice graphs from the results
+> However, any actual EHCI controller is always some specific model, so
+> the compatible value must define which specific model it is, e.g.:
 > 
-> Hm, I guess I know what you want to do:
-> In your temperature/energy graph, you want to have some dots
-> when relevant HW states (frequency, sleep states,  DDR power,...)
-> changed. Then you are able to see the effects over a timeline.
+> compatible = "nvidia,tegra20-ehci", "usb-ehci".
 > 
-> So you have to bring the existing frequency/idle perf events together
-> with temperature readings
+> Now lets say the Tegra30 EHCI controller is identical to the Tegra20
+> controller. That needs to be explicitly represented too:
 > 
-> Cleanest solution could be to enhance the exisiting userspace apps
-> (pytimechart/perf timechart) and let them add another line
-> (temperature/energy), but the data would not come from perf, but
-> from sysfs/hwmon.
-> Not sure whether this works out with the timechart tools.
-> Anyway, this sounds like a userspace only problem.
+> compatible = "nvidia,tegra30-ehci", "nvidia,tegra20-ehci", "usb-ehci".
+> 
+> In that case, the driver might still only declare support for
+> "nvidia,tegra20-ehci", but "nvidia,tegra30-ehci" is added to be explicit
+> about the actual HW model.
+> 
+> This doesn't continue forever though; you typically only list the
+> specific HW model, the base specific model it's compatible with, and any
+> generic value needed. So, a hypothetical Tegra40 EHCI controller would be:
+> 
+> compatible = "nvidia,tegra40-ehci", "nvidia,tegra20-ehci", "usb-ehci".
+> 
+> Given that, there is always something to key any newly required quirk
+> off, so even if the need for a quirk is found later, the device tree
+> already contains the information needed to trigger it.
 
-Ok, so it is actually what I'm working on right now. Not with the
-standard perf tool (there are other users of that API ;-) but indeed I'm
-trying to "enrich" the data stream coming from kernel with user-space
-originating values. I am a little bit concerned about effect of extra
-syscalls (accessing the value and gettimeofday to generate a timestamp)
-at a higher sampling rates, but most likely it won't be a problem. Can
-report once I know more, if this is of interest to anyone.
+Okay.  It appears that quite a few .dts/.dtsi files mention "usb-ehci", 
+for no apparent reason (given that the drivers don't list it):
 
-Anyway, there are at least two debug/trace related use cases that can
-not be satisfied that way (of course one could argue about their
-usefulness):
+[stern at iolanthe usb-3.6]$ find arch -name '*.dts*' | xargs grep usb-ehci
+arch/mips/cavium-octeon/octeon_3xxx.dts:                                compatible = "cavium,octeon-6335-ehci","usb-ehci";
+arch/mips/cavium-octeon/octeon_68xx.dts:                                compatible = "cavium,octeon-6335-ehci","usb-ehci";
+arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
+arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
+arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
+arch/arm/boot/dts/at91sam9x5.dtsi:                      compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ehci", "usb-ehci";
+arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ehci", "usb-ehci";
+arch/arm/boot/dts/spear3xx.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
+arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
+arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
+arch/arm/boot/dts/at91sam9g45.dtsi:                     compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+arch/powerpc/boot/dts/wii.dts:                  compatible = "nintendo,hollywood-usb-ehci",
+arch/powerpc/boot/dts/wii.dts:                                  "usb-ehci";
+arch/powerpc/boot/dts/sequoia.dts:                      compatible = "ibm,usb-ehci-440epx", "usb-ehci";
+arch/powerpc/boot/dts/canyonlands.dts:                  compatible = "ibm,usb-ehci-460ex", "usb-ehci";
 
-1. ftrace-over-network (https://lwn.net/Articles/410200/) which is
-particularly appealing for "embedded users", where there's virtually no
-useful userspace available (think Android). Here a (functional) trace
-event is embedded into a normal trace and available "for free" at the
-host side.
+Is there a real reason that I'm not aware of?  Or can all these entries
+safely be removed?
 
-2. perf groups - the general idea is that one event (let it be cycle
-counter interrupt or even a timer) triggers read of other values (eg.
-cache counter or - in this case - energy counter). The aim is to have a
-regular "snapshots" of the system state. I'm not sure if the standard
-perf tool can do this, but I do :-)
-
-And last, but not least, there are the non-debug/trace clients for
-energy data as discussed in other mails in this thread. Of course the
-trace event won't really satisfy their needs either.
-
-Thanks for your feedback!
-
-Pawe?
+Alan Stern
