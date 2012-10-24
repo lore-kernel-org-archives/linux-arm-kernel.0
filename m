@@ -1,77 +1,73 @@
-From: hechtb@googlemail.com (Bastian Hecht)
-Date: Wed, 24 Oct 2012 17:04:46 +0200
-Subject: Possible regression in arm/io.h
-In-Reply-To: <20121024135854.GD7339@mudshark.cambridge.arm.com>
-References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
- <20121024105223.GC23775@mudshark.cambridge.arm.com>
- <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
- <20121024130957.GB7339@mudshark.cambridge.arm.com>
- <CABYn4sz4v7Uf07am=MtPAKAvvAjwt+-bTRaLrBjoiRuyR9cfZw@mail.gmail.com>
- <20121024135854.GD7339@mudshark.cambridge.arm.com>
-Message-ID: <CABYn4sxnwzj8KFfELzCLzQMcAjiqS3_Vr2kStkm-na8G1noPHA@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 24 Oct 2012 10:06:07 -0500
+Subject: [PATCH] ARM: PMU: fix runtime PM enable
+In-Reply-To: <20121024143204.GF7339@mudshark.cambridge.arm.com>
+References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
+ <20121024093150.GA23775@mudshark.cambridge.arm.com> <5087F84B.9070705@ti.com>
+ <20121024143204.GF7339@mudshark.cambridge.arm.com>
+Message-ID: <508803DF.7020902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> > Ok, I'll have a look at the impact of moving exclusively to "Q" when I get a
->> > chance. Which toolchain are you using?
+
+On 10/24/2012 09:32 AM, Will Deacon wrote:
+> On Wed, Oct 24, 2012 at 03:16:43PM +0100, Jon Hunter wrote:
+>> Hi Will,
 >>
->> gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
->> For a more verbose info take a look at the bug report link.
->
-> Ok, thanks. One other thing you could try while I try to find a copy of that
-> toolchain is changing the "+" modifier to an "=", like I proposed in this
-> version of the patch:
+>> On 10/24/2012 04:31 AM, Will Deacon wrote:
+>>> Can we not just use the presence of the resume/suspend function pointers to
+>>> indicate whether we should enable runtime pm or not? i.e. if they're not
+>>> NULL, then enable the thing?
+>>
+>> I wondered if you would ask that :-)
+>>
+>> Unfortunately, we can't. For example, OMAP3430 and OMAP4460 both require
+>> runtime_pm to be enabled to turn on the debug sub-system in OMAP for PMU
+>> to work. However, neither of these devices are using the suspend/resume
+>> callbacks because the HWMOD framework is doing this for us behind the
+>> scenes.
+>>
+>> So then you ask, why do we need the resume/suspend callbacks, well we
+>> will need them for OMAP4430 where in addition to turning on the debug
+>> sub-system we need to configure the CTI module. Therefore, I had to add
+>> another plat data variable.
+> 
+> Hmmm, now I start to wonder whether your original idea of having separate
+> callbacks for enable/disable irq and resume/suspend doesn't make more sense.
+> Then the CTI magic can go in the irq management code and be totally separate
+> to the PM stuff.
+> 
+> What do you reckon?
 
-So if alter it to fit to your patch scheme the result is:
+The resume/suspend calls really replaced the enable/disable irq
+callbacks. That still seems like a good approach given that we need
+runtime PM for OMAP and PMU.
 
-  CC      arch/arm/kernel/asm-offsets.s
-In file included from include/linux/scatterlist.h:10,
-                 from include/linux/dma-mapping.h:9,
-                 from arch/arm/kernel/asm-offsets.c:15:
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h: In function
-'__raw_readb':
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:100: error:
-output operand constraint lacks '='
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:98: error:
-output operand constraint lacks '='
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:98: error:
-invalid lvalue in asm output 0
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h: In function
-'__raw_readl':
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:109: error:
-output operand constraint lacks '='
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:107: error:
-output operand constraint lacks '='
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:107: error:
-invalid lvalue in asm output 0
+The problem is going to be with device-tree. When booting with
+device-tree we will not call the current OMAP specific code that is
+creating the PMU device and calling pm_runtime_enable(). So calling
+pm_runtime_enable() needs to be done somewhere in the PERF driver and
+that's the real problem here.
 
-and if I just replace all +Q with =Q it's this:
-  LD      kernel/time/built-in.o
-drivers/sh/intc/access.c: In function 'test_8':
-drivers/sh/intc/access.c:78: warning: passing argument 1 of
-'__raw_readb' makes pointer from integer without a cast
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:95: note:
-expected 'const volatile void *' but argument is of type 'long
-unsigned int'
-drivers/sh/intc/access.c: In function 'test_16':
-drivers/sh/intc/access.c:84: warning: passing argument 1 of
-'__raw_readw' makes pointer from integer without a cast
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:71: note:
-expected 'const volatile void *' but argument is of type 'long
-unsigned int'
-drivers/sh/intc/access.c: In function 'test_32':
-drivers/sh/intc/access.c:90: warning: passing argument 1 of
-'__raw_readl' makes pointer from integer without a cast
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:104: note:
-expected 'const volatile void *' but argument is of type 'long
-unsigned int'
-drivers/sh/intc/access.c: In function 'write_8':
-drivers/sh/intc/access.c:96: warning: passing argument 2 of
-'__raw_writeb' makes pointer from integer without a cast
-/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:81: note:
-expected 'volatile void *' but argument is of type 'long unsigned int'
-... and so on
+>> By the way, I did add a comment in the above changelog about this. See
+>> the last paragraph, not sure if this is 100% clear.
+> 
+> Sorry, I missed that this morning.
+> 
+>> One alternative I had thought about was always calling
+>> pm_runtime_enable() on registering the PMU device and avoid having a
+>> use_runtime_pm variable. For ARM platforms that don't use runtime PM the
+>> pm_runtime_enable() function does nothing. However, I was more concerned
+>> about adding unnecessary overhead for ARM platforms that are using
+>> runtime PM but don't need runtime PM for PMU. I don't see any side
+>> affects on our OMAP2 platform that does not need runtime PM for PMU.
+>> However, was not sure what is best here.
+> 
+> Nah, we should be able to fix this in the platdata, I'd just rather have
+> function pointers instead of state variables in there.
 
-cheers,
+Well, we could pass a pointer to pm_runtime_enable() function in the
+platdata.
 
- Bastian
+Cheers
+Jon
