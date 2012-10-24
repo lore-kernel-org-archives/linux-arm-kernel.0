@@ -1,58 +1,33 @@
-From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Wed, 24 Oct 2012 17:26:52 +0200
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
-References: <5086F8D6.5050605@gmail.com>
- <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
-Message-ID: <20121024152652.GG4368@breakpoint.cc>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Oct 2012 16:27:30 +0100
+Subject: Possible regression in arm/io.h
+In-Reply-To: <CABYn4sxnwzj8KFfELzCLzQMcAjiqS3_Vr2kStkm-na8G1noPHA@mail.gmail.com>
+References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
+ <20121024105223.GC23775@mudshark.cambridge.arm.com>
+ <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
+ <20121024130957.GB7339@mudshark.cambridge.arm.com>
+ <CABYn4sz4v7Uf07am=MtPAKAvvAjwt+-bTRaLrBjoiRuyR9cfZw@mail.gmail.com>
+ <20121024135854.GD7339@mudshark.cambridge.arm.com>
+ <CABYn4sxnwzj8KFfELzCLzQMcAjiqS3_Vr2kStkm-na8G1noPHA@mail.gmail.com>
+Message-ID: <20121024152730.GH7339@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 10:57:00AM -0400, Alan Stern wrote:
-> Under the circumstances, do we really need a new binding document for 
-> the ehci-platform driver?  We should be able to use the existing 
-> usb-ehci binding, perhaps with some new properties added:
+On Wed, Oct 24, 2012 at 04:04:46PM +0100, Bastian Hecht wrote:
+> >> > Ok, I'll have a look at the impact of moving exclusively to "Q" when I get a
+> >> > chance. Which toolchain are you using?
+> >>
+> >> gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+> >> For a more verbose info take a look at the bug report link.
+> >
+> > Ok, thanks. One other thing you could try while I try to find a copy of that
+> > toolchain is changing the "+" modifier to an "=", like I proposed in this
+> > version of the patch:
 > 
-> 	has-synopsys-hc-bug
-> 	no-io-watchdog
-> 	has-tt
+> So if alter it to fit to your patch scheme the result is:
 
-On the PCI side we have VID, PID which is used for quirks. Sometimes we have a
-revision ID which can be used to figure out if "this quirk" is still required.
-The PCI driver probes by class so the ehci driver does not have a large table
-of VID/PID for each controller out there. And the USB controller in two
-different Intel boards has a different PID so a quirk, if required, could be
-applied only to the specific mainboard.
+Sorry, the change wasn't as trivial as I thought -- you have to reorder the
+constraints because an output becomes an input for the load accessors. I
+tried it myself and it doesn't fix the issue (I can reproduce it now).
 
-Based on this we need atleast two compatible entries one "HW-Specific"
-followed by a generic one (similar to PCI class).
-Doing it the PCI way we would have to have table and figure out which
-HW-specific compatible entry sets the TT flag and which one does the
-no-io-watchdog. Having has-tt in compatible isn't right.
-
-I'm all with Alan here, to make a shortcut and allow Linux specific properties
-which describe a specific quirk in less code lines. Other OS can just ignore
-those and build their table based on the compatible entry if they want to.
-
-So usb-ehci should be fine. It is a generic USB-EHCI controller after all.
-Quirks or no quirks, the register layout is the same, the functionality is the
-same. If you can't map memory >4GiB then you need a quirk for this but you may
-discover it way too late.
-If your platform driver requires extra code for the PHY then it is still an
-EHCI controller. The PHY wasn't setup by the bootloader / bios so Linux has to
-deal with it.
-
-> We probably can omit has-synopsys-hc-bug, as that is specific to one
-> type of MIPS ATH79 controller.  The driver can check for it explicitly,
-> if necessary.
-> 
-> In fact, it's not clear that these new properties need to be added now.  
-> They can be added over time as needed, as existing drivers are
-> converted over to DT.  Or is it preferable to document these things
-> now, preemptively as it were?
-
-I would add it only if required / has users.
-
-> Alan Stern
-
-Sebastian
+Will
