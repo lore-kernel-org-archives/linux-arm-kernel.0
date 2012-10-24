@@ -1,135 +1,102 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 24 Oct 2012 09:14:29 -0700
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121024083704.GF5665@arwen.pp.htv.fi>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <508660D4.9030507@ti.com>
- <20121023200249.GA2712@core.coreip.homeip.net>
- <20121024083704.GF5665@arwen.pp.htv.fi>
-Message-ID: <20121024161429.GA16350@core.coreip.homeip.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 24 Oct 2012 10:16:31 -0600
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <20121024152652.GG4368@breakpoint.cc>
+References: <5086F8D6.5050605@gmail.com>
+ <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
+ <20121024152652.GG4368@breakpoint.cc>
+Message-ID: <5088145F.1040504@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:37:04AM +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Oct 23, 2012 at 01:02:49PM -0700, Dmitry Torokhov wrote:
-> > On Tue, Oct 23, 2012 at 11:18:12AM +0200, Benoit Cousson wrote:
-> > > Hi Dimitry,
-> > > 
-> > > On 10/22/2012 05:50 PM, Dmitry Torokhov wrote:
-> > > > Hi Sourav,
-> > > > 
-> > > > On Mon, Oct 22, 2012 at 06:43:00PM +0530, Sourav Poddar wrote:
-> > > >> Adapt keypad to use pinctrl framework.
-> > > >>
-> > > >> Tested on omap4430 sdp with 3.7-rc1 kernel.
-> > > > 
-> > > > I do not see anything in the driver that would directly use pinctrl. Is
-> > > > there a better place to select default pin configuration; maybe when
-> > > > instantiating platform device?
-> > > 
-> > > Why?
-> > > The devm_pinctrl_get_select_default is using the pinctrl.
-> > 
-> > No, I guess we ihave different understanding of what "directly use" means.
-> > This particular driver does directly use interrupts: it requests it and
-> > performs some actions when interrupt arrives. Same goes for IO memory -
-> > it gets requested, then we access it. With pinctrl we do not do anything
-> > - we just ask another layer to configure it and that is it.
-> 
-> this is true for almost anything we do:
-> 
-> - we ask another layer to allocate memory for us
-> - we ask another layer to call our ISR once the IRQ line is asserted
-> - we ask another layer to handle the input events we just received
-> - we ask another layer to transfer data through DMA for us
-> - we ask another layer to turn regulators on and off.
+On 10/24/2012 09:26 AM, Sebastian Andrzej Siewior wrote:
+> On Wed, Oct 24, 2012 at 10:57:00AM -0400, Alan Stern wrote:
+>> Under the circumstances, do we really need a new binding document for 
+>> the ehci-platform driver?
 
-But we are _directly_ _using_ all of these. You allocate memory and you
-(the driver) stuff data into that memory. You ask for DMA and you take
-the DMAed data and work with it. Not so with pinctrl in omap keypad and
-other drivers I have seen so far.
+It seems reasonable to add the new properties to usb-ehci.txt, since
+they do describe the HW.
 
-> 
-> and so on. This is just how abstractions work, we group common parts in
-> a framework so that users don't need to know the details, but still need
-> to tell the framework when to fiddle with those resources.
-> 
-> > I have seen just in a few days 3 or 4 drivers having exactly the same
-> > change - call to devm_pinctrl_get_select_default(), and I guess I will
-> > receive the same patches for the rest of input drivers shortly.
-> > This suggests that the operation is done at the wrong level. Do the
-> > pin configuration as you parse DT data, the same way you set up i2c
-> > devices registers in of_i2c.c, and leave the individual drivers that do
-> > not care about specifics alone.
-> 
-> Makes no sense to hide that from drivers. The idea here is that driver
-> should know when it needs its pins to muxed correctly.
+>> We should be able to use the existing 
+>> usb-ehci binding, perhaps with some new properties added:
+>>
+>> 	has-synopsys-hc-bug
+>> 	no-io-watchdog
+>> 	has-tt
 
-The driver also needs memory controller to be initialized, gpio chip be
-ready and registered, DMA subsystem ready, input core reade, etc, etc,
-etc. You however do not have every driver explicitly initialize any of
-that; you expect certain working environment to be already operable. The
-driver does manage resources it controls, it has ultimate knowledge
-about, pin configuration is normally is not it. We just need to know
-that we wired/muxed properly, otherwise we won't work. So please let
-parent layers deal with it.
+That sounds fine to me.
 
-> 95% of the time
-> it will be done during probe() but then again, so what ?
+However, there is an implementation issue here. I believe the way Linux
+searches for a driver for a particular node is:
+
+for every driver that's registered
+    if the driver's supported compatible list matches the device
+        use the driver
+
+(See drivers/base/platform.c:platform_match() which implements the if
+statement above, and I assume the driver core implements the outer for
+loop above)
+
+That means that if the generic driver supports compatible="usb-ehci", it
+may "steal" device nodes that have
+compatible="something-custom","usb-ehci", even if there's a driver
+specifically for "something-custom". We would need to re-arrange the
+driver matching code to:
+
+for each compatible value in the node:
+    for each driver that's registered:
+        if the driver supports the compatible value:
+            use the driver.
+
+> On the PCI side we have VID, PID which is used for quirks. Sometimes we have a
+> revision ID which can be used to figure out if "this quirk" is still required.
+> The PCI driver probes by class so the ehci driver does not have a large table
+> of VID/PID for each controller out there. And the USB controller in two
+> different Intel boards has a different PID so a quirk, if required, could be
+> applied only to the specific mainboard.
 > 
-> doing that when parsing DT, or on bus notifiers is just plain wrong.
-> Drivers should be required to handle all of their resources.
+> Based on this we need atleast two compatible entries one "HW-Specific"
+> followed by a generic one (similar to PCI class).
+> Doing it the PCI way we would have to have table and figure out which
+> HW-specific compatible entry sets the TT flag and which one does the
+> no-io-watchdog. Having has-tt in compatible isn't right.
 
-All of _their_ resources, exactly. They do not own nor control pins so
-they should not be bothered with them either. Look, when you see that
-potentially _every_ driver in the system needs to set up the same object
-that it doe snot use otherwise you should realize that individual driver
-is not the proper place to do that.
+Yes, the driver could easily bind to anything compatible with
+"usb-ehci", then use the HW-specific compatible value to index into a
+quirk table in the same way that specific PCI IDs index into a quirk table.
 
+I agree that having separate compatible values like usb-ehci and
+usb-ehci-with-tt probably doesn't make sense here.
+
+> I'm all with Alan here, to make a shortcut and allow Linux specific properties
+> which describe a specific quirk in less code lines. Other OS can just ignore
+> those and build their table based on the compatible entry if they want to.
+
+We should absolutely avoid Linux-specific properties where possible.
+
+That said, what Linux-specific properties are you talking about? The
+properties discussed here (has-synopsys-hc-bug, no-io-watchdog, has-tt)
+are all purely a description of HW, aren't they.
+
+> So usb-ehci should be fine. It is a generic USB-EHCI controller after all.
+> Quirks or no quirks, the register layout is the same, the functionality is the
+> same. If you can't map memory >4GiB then you need a quirk for this but you may
+> discover it way too late.
+> If your platform driver requires extra code for the PHY then it is still an
+> EHCI controller. The PHY wasn't setup by the bootloader / bios so Linux has to
+> deal with it.
 > 
-> > > That's why it is named "get_select_default" and not "get" only.
-> > > This API ensure that the pin will be set to the default state, and this
-> > > is all we need to do during the probe.
-> > 
-> > Why during the probe and not by default? Realistically, the driver will
-> > be loaded as long as there is a matching device and pins will need to be
-> > configured.
-> 
-> likewise memory will be allocated when matching happens, IRQs will be
-> allocated, regulators will be turned on. So why don't we do all that by
-> default ? Because it is wrong.
+>> We probably can omit has-synopsys-hc-bug, as that is specific to one
+>> type of MIPS ATH79 controller.  The driver can check for it explicitly,
+>> if necessary.
+>>
+>> In fact, it's not clear that these new properties need to be added now.  
+>> They can be added over time as needed, as existing drivers are
+>> converted over to DT.  Or is it preferable to document these things
+>> now, preemptively as it were?
 
-No, because we do not know how. The generic layer does not know the ISR
-to install, how much memory to allocate, etc. Having regulator turned on
-before getting to probe might not be a bad idea.
+It's best to define the binding up-front so it doesn't churn, where
+possible. This will also ensure that multiple people don't try to update
+the binding document to add the same feature in different ways.
 
-> 
-> > > There is no point to change the mux if the driver is not probed, because
-> > > potentially the pin can be use be another driver.
-> > 
-> > What other driver would use it? Who would chose what driver to load?
-> 
-> Well, you _do_ know that on a SoC we have a limited amount of pins
-> right ?
-> 
-> Considering the amont of features which are packed inside a single die,
-> it's not farfetched to assume we will have a lot less pins then we
-> actually need, so we need muxers behind each pin in order to choose
-> which functionality we want.
-> 
-> If it happens that keypad's pins are shared with another IP (e.g. GPIO),
-> we need to give the final user (a OEM/ODM) the choice of using those
-> pins as either keypad or GPIOs, thus the need for pinctrl framework and
-> the calls in the drivers.
-
-Right, so please walk me through, step by step, how an OEM/ODM woudl
-select a particular configuration. Do you expect it to happen at
-runtime, or do you expect relevant data be put in DT?
-
-Thanks.
-
--- 
-Dmitry
+> I would add it only if required / has users.
