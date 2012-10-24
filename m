@@ -1,71 +1,35 @@
-From: s-guiriec@ti.com (Sebastien Guiriec)
-Date: Wed, 24 Oct 2012 09:07:14 +0200
-Subject: [PATCH v3 4/4] ARM: dts: omap5: Update MMC with address space and
- interrupts
-In-Reply-To: <1351062434-22514-1-git-send-email-s-guiriec@ti.com>
-References: <1351062434-22514-1-git-send-email-s-guiriec@ti.com>
-Message-ID: <1351062434-22514-5-git-send-email-s-guiriec@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 24 Oct 2012 13:03:45 +0530
+Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
+ mask on disable
+In-Reply-To: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
+References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <508799D9.6030501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add base address and interrupt line inside Device Tree data for
-OMAP5.
-
-Signed-off-by: Sebastien Guiriec <s-guiriec@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index b535d8e..304dd8d 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -304,6 +304,9 @@
- 
- 		mmc1: mmc at 4809c000 {
- 			compatible = "ti,omap4-hsmmc";
-+			reg = <0x4809c000 0x400>;
-+			interrupts = <0 83 0x4>;
-+			interrupt-parent = <&gic>;
- 			ti,hwmods = "mmc1";
- 			ti,dual-volt;
- 			ti,needs-special-reset;
-@@ -311,24 +314,36 @@
- 
- 		mmc2: mmc at 480b4000 {
- 			compatible = "ti,omap4-hsmmc";
-+			reg = <0x480b4000 0x400>;
-+			interrupts = <0 86 0x4>;
-+			interrupt-parent = <&gic>;
- 			ti,hwmods = "mmc2";
- 			ti,needs-special-reset;
- 		};
- 
- 		mmc3: mmc at 480ad000 {
- 			compatible = "ti,omap4-hsmmc";
-+			reg = <0x480ad000 0x400>;
-+			interrupts = <0 94 0x4>;
-+			interrupt-parent = <&gic>;
- 			ti,hwmods = "mmc3";
- 			ti,needs-special-reset;
- 		};
- 
- 		mmc4: mmc at 480d1000 {
- 			compatible = "ti,omap4-hsmmc";
-+			reg = <0x480d1000 0x400>;
-+			interrupts = <0 96 0x4>;
-+			interrupt-parent = <&gic>;
- 			ti,hwmods = "mmc4";
- 			ti,needs-special-reset;
- 		};
- 
- 		mmc5: mmc at 480d5000 {
- 			compatible = "ti,omap4-hsmmc";
-+			reg = <0x480d5000 0x400>;
-+			interrupts = <0 59 0x4>;
-+			interrupt-parent = <&gic>;
- 			ti,hwmods = "mmc5";
- 			ti,needs-special-reset;
- 		};
--- 
-1.7.10.4
+On Tuesday 23 October 2012 11:39 PM, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@ti.com>
+>
+> When debounce clocks are disabled, ensure that the banks
+> dbck_enable_mask is cleared also.  Otherwise, context restore on
+> subsequent off-mode transition will restore previous value from the
+> shadow copies (bank->context.debounce*) leading to mismatch state
+> between driver state and hardware state.
+>
+> This was discovered when board code was doing
+>
+>    gpio_request_one()
+>    gpio_set_debounce()
+>    gpio_free()
+>
+> which was leaving the GPIO debounce settings in a confused state.
+> Then, enabling off mode causing bogus state to be restored, leaving
+> GPIO debounce enabled which then prevented the CORE powerdomain from
+> transitioning.
+>
+> Reported-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
