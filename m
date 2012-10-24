@@ -1,63 +1,41 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Oct 2012 17:33:53 +0200
-Subject: [PATCH 4/8] ARM: at91: fix external interrupt specification in board
- code
+Date: Wed, 24 Oct 2012 17:33:54 +0200
+Subject: [PATCH 5/8] ARM: at91/dts: at91sam9g20ek_common: Fix typos in buttons
+ labels.
 In-Reply-To: <cover.1351092432.git.nicolas.ferre@atmel.com>
 References: <cover.1351092432.git.nicolas.ferre@atmel.com>
-Message-ID: <ecf01c6afd3969c9af1839ccbe64cdf5357d0433.1351092432.git.nicolas.ferre@atmel.com>
+Message-ID: <8e817f3a385af38a7a86ee555109bd093fb5fe39.1351092432.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the switch to sparse irq, we have to add the NR_IRQS_LEGACY
-offset to static irq numbers. It has been forgotten on these
-SPI irq definitions in board code.
+From: Marek Belisko <marek.belisko@open-nandra.com>
 
+Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> [v3.6]
 ---
- arch/arm/mach-at91/board-neocore926.c | 2 +-
- arch/arm/mach-at91/board-sam9261ek.c  | 2 +-
- arch/arm/mach-at91/board-sam9263ek.c  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-index 9cda3fd..6960778 100644
---- a/arch/arm/mach-at91/board-neocore926.c
-+++ b/arch/arm/mach-at91/board-neocore926.c
-@@ -129,7 +129,7 @@ static struct spi_board_info neocore926_spi_devices[] = {
- 		.max_speed_hz	= 125000 * 16,
- 		.bus_num	= 0,
- 		.platform_data	= &ads_info,
--		.irq		= AT91SAM9263_ID_IRQ1,
-+		.irq		= NR_IRQS_LEGACY + AT91SAM9263_ID_IRQ1,
- 	},
- #endif
- };
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index 27b3af1..a9167dd 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -309,7 +309,7 @@ static struct spi_board_info ek_spi_devices[] = {
- 		.max_speed_hz	= 125000 * 26,	/* (max sample rate @ 3V) * (cmd + data + overhead) */
- 		.bus_num	= 0,
- 		.platform_data	= &ads_info,
--		.irq		= AT91SAM9261_ID_IRQ0,
-+		.irq		= NR_IRQS_LEGACY + AT91SAM9261_ID_IRQ0,
- 		.controller_data = (void *) AT91_PIN_PA28,	/* CS pin */
- 	},
- #endif
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 073e174..b87dbe2 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -132,7 +132,7 @@ static struct spi_board_info ek_spi_devices[] = {
- 		.max_speed_hz	= 125000 * 26,	/* (max sample rate @ 3V) * (cmd + data + overhead) */
- 		.bus_num	= 0,
- 		.platform_data	= &ads_info,
--		.irq		= AT91SAM9263_ID_IRQ1,
-+		.irq		= NR_IRQS_LEGACY + AT91SAM9263_ID_IRQ1,
- 	},
- #endif
- };
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index b06c0db..e6391a4 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -126,14 +126,14 @@
+ 		#size-cells = <0>;
+ 
+ 		btn3 {
+-			label = "Buttin 3";
++			label = "Button 3";
+ 			gpios = <&pioA 30 1>;
+ 			linux,code = <0x103>;
+ 			gpio-key,wakeup;
+ 		};
+ 
+ 		btn4 {
+-			label = "Buttin 4";
++			label = "Button 4";
+ 			gpios = <&pioA 31 1>;
+ 			linux,code = <0x104>;
+ 			gpio-key,wakeup;
 -- 
 1.7.11.3
