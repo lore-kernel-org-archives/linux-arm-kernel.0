@@ -1,30 +1,36 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Oct 2012 15:54:32 -0700
-Subject: [PATCH 7/7] ARM: hw_breakpoint: use CRn as argument for debug
- reg accessor macros
-In-Reply-To: <1350487901-3108-8-git-send-email-will.deacon@arm.com>
-References: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
- <1350487901-3108-8-git-send-email-will.deacon@arm.com>
-Message-ID: <508871A8.1080906@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Oct 2012 00:57:35 +0200
+Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
+In-Reply-To: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
+References: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20121025005735.35b9f971@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/12 08:31, Will Deacon wrote:
-> From: Dietmar Eggemann <dietmar.eggemann@arm.com>
->
-> The coprocessor register CRn for accesses to the debug register can be a
-> different one than C0. Take this into account for the ARM_DBG_READ and
-> the ARM_DBG_WRITE macro.
->
-> The inline assembler calls which used a coprocessor register CRn other
-> than C0 are replaced by the ARM_DBG_READ or ARM_DBG_WRITE macro.
->
-> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
->
+Dear dinguyen at altera.com,
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+On Thu, 18 Oct 2012 11:32:47 -0600, dinguyen at altera.com wrote:
 
+> +static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> +	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+> +
+> +	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+> +
+> +	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
+> +
+> +	pen_release = 0;
+
+Are you sure that this code builds? In your v1, this variable was
+declared in your assembly file, but it is no longer here, and you
+mention in your changelog that it has been removed. But not completely
+apparently.
+
+Best regards,
+
+Thomas
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
