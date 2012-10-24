@@ -1,51 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Oct 2012 18:37:01 -0700
-Subject: [GIT PULL] ARM: OMAP: PM fixes for v3.7-rc3
-In-Reply-To: <87d3087s5k.fsf@deeprootsystems.com>
-References: <87d3087s5k.fsf@deeprootsystems.com>
-Message-ID: <20121024013700.GB5605@atomide.com>
+Date: Tue, 23 Oct 2012 19:01:31 -0700
+Subject: [PATCH] ARM: AM33XX: Fix configuration of dmtimer parent clock
+ by dmtimer driver
+In-Reply-To: <1350500155-22525-1-git-send-email-jon-hunter@ti.com>
+References: <1350500155-22525-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121024020130.GD5605@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [121023 15:15]:
-> Tony,
+* Jon Hunter <jon-hunter@ti.com> [121017 11:57]:
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> Here are a few more fixes PM-related fixes for v3.7-rc
+> Add dmtimer clock aliases for AM33XX devices so that the parent clock for
+> the dmtimer can be set correctly by the dmtimer driver. Without these clock
+> aliases the dmtimer driver will fail to find the parent clocks for the dmtimer.
 > 
-> Kevin
+> Verified that DMTIMERs can be successfully requested on AM335x beagle bone.
 > 
+> Original patch was provided by Vaibhav Hiremath [1]. Changelog and
+> additional verification performed by Jon Hunter.
 > 
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+> [1] http://marc.info/?l=linux-omap&m=134693631608018&w=2
 > 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-rc3-fixes-pm
-> 
-> for you to fetch changes up to 65bf7ca0005d7d827596d5df28583c83c9158da6:
-> 
->   ARM: OMAP3: Beagle: fix OPP customization and initcall ordering (2012-10-22 16:01:42 -0700)
-> 
-> ----------------------------------------------------------------
-> Misc. OMAP PM-related fixes for v3.7-rc
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> Tested-by: Jon Hunter <jon-hunter@ti.com>
 
-Thanks pulling into omap-for-v3.7-rc1/fixes.
+Thanks applying into omap-for-v3.7-rc2/fixes.
 
 Regards,
 
 Tony
- 
-> ----------------------------------------------------------------
-> Kevin Hilman (2):
->       ARM: OMAP2: UART: fix console UART mismatched runtime PM status
->       ARM: OMAP3: Beagle: fix OPP customization and initcall ordering
+
+> ---
+>  arch/arm/mach-omap2/clock33xx_data.c |    2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Paul Walmsley (1):
->       ARM: OMAP3: PM: apply part of the erratum i582 workaround
+> diff --git a/arch/arm/mach-omap2/clock33xx_data.c b/arch/arm/mach-omap2/clock33xx_data.c
+> index 114ab4b..1a45d6b 100644
+> --- a/arch/arm/mach-omap2/clock33xx_data.c
+> +++ b/arch/arm/mach-omap2/clock33xx_data.c
+> @@ -1073,6 +1073,8 @@ static struct omap_clk am33xx_clks[] = {
+>  	CLK(NULL,	"gfx_fck_div_ck",	&gfx_fck_div_ck,	CK_AM33XX),
+>  	CLK(NULL,	"sysclkout_pre_ck",	&sysclkout_pre_ck,	CK_AM33XX),
+>  	CLK(NULL,	"clkout2_ck",		&clkout2_ck,	CK_AM33XX),
+> +	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick,	CK_AM33XX),
+> +	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck,	CK_AM33XX),
+>  };
+>  
+>  int __init am33xx_clk_init(void)
+> -- 
+> 1.7.9.5
 > 
->  arch/arm/mach-omap2/board-omap3beagle.c | 22 +++++++++++++---------
->  arch/arm/mach-omap2/pm.h                |  1 +
->  arch/arm/mach-omap2/pm34xx.c            | 30 ++++++++++++++++++++++++++++--
->  arch/arm/mach-omap2/serial.c            |  5 +++++
->  4 files changed, 47 insertions(+), 11 deletions(-)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
