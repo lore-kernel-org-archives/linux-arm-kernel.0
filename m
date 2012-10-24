@@ -1,29 +1,148 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Oct 2012 20:30:09 +0000
-Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
-In-Reply-To: <5087F38B.1010508@free-electrons.com>
-References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
- <201210241224.06791.arnd@arndb.de> <5087F38B.1010508@free-electrons.com>
-Message-ID: <201210242030.09959.arnd@arndb.de>
+From: michael@walle.cc (Michael Walle)
+Date: Wed, 24 Oct 2012 22:37:44 +0200
+Subject: [PATCH 8/9] ARM: Kirkwood: Convert lsxl boards to pinctrl.
+In-Reply-To: <1351090434-30499-9-git-send-email-andrew@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <1351090434-30499-9-git-send-email-andrew@lunn.ch>
+Message-ID: <201210242237.44737.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 October 2012, Gregory CLEMENT wrote:
-> > No, I was thinking of making the underlying functions globally visible
-> > and have extern declarations in a header file so you can access them
-> > directly.
-> > 
-> > Generally speaking, when you run into a problem with common code, your
-> > first approach should be to fix the common code before you try to work
-> > around it.
+Am Mittwoch 24 Oktober 2012, 16:53:53 schrieb Andrew Lunn:
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   67
+> ++++++++++++++++++++++++++++++++++ arch/arm/mach-kirkwood/board-lsxl.c  | 
+>  19 ----------
+>  2 files changed, 67 insertions(+), 19 deletions(-)
 > 
-> OK I thought it was done on purpose. But if you consider it needs to be
-> fixed I will add patch for it in next version.
+> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> b/arch/arm/boot/dts/kirkwood-lsxl.dtsi index 8fea375..01d6e3a 100644
+> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
+> @@ -6,6 +6,73 @@
+>  	};
+> 
+>  	ocp at f1000000 {
+> +		pinctrl: pinctrl at 10000 {
+> +			compatible = "marvell,88f6281-pinctrl";
+> +			reg = <0x10000 0x20>;
+> +
+> +			pinctrl-0 = < &pmx_power_hdd &pmx_usb_vbus
+> +				      &pmx_fan_low &pmx_fan_high
+> +				      &pmx_led_function_red &pmx_led_alarm
+> +				      &pmx_led_info &pmx_led_power
+> +				      &pmx_fan_lock &pmx_button_function
+> +				      &pmx_power_switch &pmx_power_auto_switch
+> +				      &pmx_led_function_blue >;
+> +			pinctrl-names = "default";
+> +
+> +			pmx_power_hdd: pmx-power-hdd {
+> +				marvell,pins = "mpp10";
+> +				marvell,function = "gpio";
+function is "gpo";
 
-As long as the functions were only used locally in one file, it's
-better not to make them globally visible as a rule. But if we know
-that they are needed, that should be made explicit. Please fix this
-by submitting another patch to make those functions global and then
-rebase this series on top of that.
+> +			};
+> +			pmx_usb_vbus: pmx-usb-vbus {
+> +				marvell,pins = "mpp11";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_high: pmx-fan-high {
+> +				marvell,pins = "mpp18";
+> +				marvell,function = "gpo";
+> +			};
+> +			pmx_fan_low: pmx-fan-low {
+> +				marvell,pins = "mpp19";
+> +				marvell,function = "gpo";
+> +			};
+> +			pmx_led_function_blue: pmx-led-function-blue {
+> +				marvell,pins = "mpp36";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_alarm: pmx-led-alarm {
+> +				marvell,pins = "mpp37";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_info: pmx-led-info {
+> +				marvell,pins = "mpp38";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_power: pmx-led-power {
+> +				marvell,pins = "mpp39";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_lock: pmx-fan-lock {
+> +				marvell,pins = "mpp40";
+> +				marvell,function = "gpo";
+gpio
 
-	Arnd
+> +			};
+> +			pmx_button_function: pmx-button-function {
+> +				marvell,pins = "mpp41";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_switch: pmx-power-switch {
+> +				marvell,pins = "mpp42";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_auto_switch: pmx-power-auto-switch {
+> +				marvell,pins = "mpp43";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_function_red: pmx-led-function_red {
+> +				marvell,pins = "mpp43";
+> +				marvell,function = "gpio";
+> +			};
+> +
+> +		};
+>  		sata at 80000 {
+>  			status = "okay";
+>  			nr-ports = <1>;
+> diff --git a/arch/arm/mach-kirkwood/board-lsxl.c
+> b/arch/arm/mach-kirkwood/board-lsxl.c index 83d8975..868bdb0 100644
+> --- a/arch/arm/mach-kirkwood/board-lsxl.c
+> +++ b/arch/arm/mach-kirkwood/board-lsxl.c
+> @@ -26,7 +26,6 @@
+>  #include <asm/mach/arch.h>
+>  #include <mach/kirkwood.h>
+>  #include "common.h"
+> -#include "mpp.h"
+> 
+>  static struct mv643xx_eth_platform_data lsxl_ge00_data = {
+>  	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+> @@ -36,23 +35,6 @@ static struct mv643xx_eth_platform_data lsxl_ge01_data =
+> { .phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+>  };
+> 
+> -static unsigned int lsxl_mpp_config[] __initdata = {
+> -	MPP10_GPO,	/* HDD Power Enable */
+> -	MPP11_GPIO,	/* USB Vbus Enable */
+> -	MPP18_GPO,	/* FAN High Enable# */
+> -	MPP19_GPO,	/* FAN Low Enable# */
+> -	MPP36_GPIO,	/* Function Blue LED */
+> -	MPP37_GPIO,	/* Alarm LED */
+> -	MPP38_GPIO,	/* Info LED */
+> -	MPP39_GPIO,	/* Power LED */
+> -	MPP40_GPIO,	/* Fan Lock */
+> -	MPP41_GPIO,	/* Function Button */
+> -	MPP42_GPIO,	/* Power Switch */
+> -	MPP43_GPIO,	/* Power Auto Switch */
+> -	MPP48_GPIO,	/* Function Red LED */
+> -	0
+> -};
+> -
+>  #define LSXL_GPIO_FAN_HIGH	18
+>  #define LSXL_GPIO_FAN_LOW	19
+>  #define LSXL_GPIO_FAN_LOCK	40
+> @@ -119,7 +101,6 @@ void __init lsxl_init(void)
+>  	/*
+>  	 * Basic setup. Needs to be called early.
+>  	 */
+> -	kirkwood_mpp_conf(lsxl_mpp_config);
+> 
+>  	/* usb and sata power on */
+>  	gpio_set_value(LSXL_GPIO_USB_POWER, 1);
+
+
+-- 
+Michael
