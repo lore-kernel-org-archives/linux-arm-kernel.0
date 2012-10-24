@@ -1,29 +1,18 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 13:55:56 +0200
-Subject: [PATCH 1/2] arm: plat-orion: Add coherency attribute when setup
- mbus target
-In-Reply-To: <1351065841-18654-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
- <1351065841-18654-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121024135556.157d2e59@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Oct 2012 14:00:17 +0200
+Subject: [PATCH 1/1] pinctrl: at91: fix typo on PULL_UP
+In-Reply-To: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACRpkdavx7xeQqLf_R09wQoS=qHXZ3EOZSUz7jSoxQD-DxROqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 23, 2012 at 6:28 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
-On Wed, 24 Oct 2012 10:04:00 +0200, Gregory CLEMENT wrote:
-> Recent SoC such as Armada 370/XP came with the possibility to deal
-> with the I/O coherency by hardware. In this case the transaction
-> attribute of the window must be flagged as "Shared transaction". Once
-> this flag is set, then the transactions will be forced to be sent
-> through the coherency block, in other case transaction is driven
-> directly to DRAM.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Applied to the at91 branch, thanks!
+Linus Walleij
