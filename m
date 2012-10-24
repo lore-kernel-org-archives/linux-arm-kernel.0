@@ -1,53 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Oct 2012 10:31:50 +0100
-Subject: [PATCH] ARM: PMU: fix runtime PM enable
-In-Reply-To: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
-References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121024093150.GA23775@mudshark.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 24 Oct 2012 11:34:00 +0200
+Subject: [PATCH 2/2] ASoC: ux500_msp_i2s: Fix devm_* and return code merge
+ error
+In-Reply-To: <1350306806-5688-2-git-send-email-lee.jones@linaro.org>
+References: <1350306806-5688-1-git-send-email-lee.jones@linaro.org>
+ <1350306806-5688-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAPDyKFqrS0QT+UO0L3B29UcnjX0bSv3XvWTmC6E_ubgr8NTDiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-On Tue, Oct 23, 2012 at 09:31:08PM +0100, Jon Hunter wrote:
-> Commit 7be2958 (ARM: PMU: Add runtime PM Support) updated the ARM PMU code to
-> use runtime PM which was prototyped and validated on the OMAP devices. In this
-> commit, there is no call pm_runtime_enable() and for OMAP devices
-> pm_runtime_enable() is currently being called from the OMAP PMU code when the
-> PMU device is created. However, there are two problems with this:
-> 
-> 1. For any other ARM device wishing to use runtime PM for PMU they will need
->    to call pm_runtime_enable() for runtime PM to work.
-> 2. When booting with device-tree and using device-tree to create the PMU
->    device, pm_runtime_enable() needs to be called from within the ARM PERF
->    driver as we are no longer calling any device specific code to create the
->    device. Hence, PMU does not work on OMAP devices that use the runtime PM
->    callbacks when using device-tree to create the PMU device.
-> 
-> Therefore, add a new platform data variable to indicate whether runtime PM is
-> used and if so call pm_runtime_enable() when the PMU device is registered. Note
-> that devices using runtime PM may not use the runtime_resume/suspend callbacks
-> and so we cannot use the presence of these handlers in the platform data to
-> determine whether we should call pm_runtime_enable().
+I assume this shall go into 3.7, right?
 
-[...]
+Kind regards
+Ulf Hansson
 
-> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-> index a26170d..50a6c3b 100644
-> --- a/arch/arm/include/asm/pmu.h
-> +++ b/arch/arm/include/asm/pmu.h
-> @@ -36,6 +36,7 @@
->  struct arm_pmu_platdata {
->  	irqreturn_t (*handle_irq)(int irq, void *dev,
->  				  irq_handler_t pmu_handler);
-> +	bool use_runtime_pm;
->  	int (*runtime_resume)(struct device *dev);
->  	int (*runtime_suspend)(struct device *dev);
-
-Can we not just use the presence of the resume/suspend function pointers to
-indicate whether we should enable runtime pm or not? i.e. if they're not
-NULL, then enable the thing?
-
-Cheers,
-
-Will
+On 15 October 2012 15:13, Lee Jones <lee.jones@linaro.org> wrote:
+> Some ux500_msp_i2s patches clashed with:
+>
+> b18e93a493626c1446f9788ebd5844d008bbf71c
+> ASoC: ux500_msp_i2s: better use devm functions and fix error return code
+>
+> ... leaving the driver uncompilable. This patch fixes the
+> issues encountered.
+>
+> Cc: alsa-devel at alsa-project.org
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  sound/soc/ux500/ux500_msp_i2s.c |    8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
+>
+> diff --git a/sound/soc/ux500/ux500_msp_i2s.c b/sound/soc/ux500/ux500_msp_i2s.c
+> index b7c996e..a26c6bf 100644
+> --- a/sound/soc/ux500/ux500_msp_i2s.c
+> +++ b/sound/soc/ux500/ux500_msp_i2s.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/pinctrl/consumer.h>
+>  #include <linux/delay.h>
+>  #include <linux/slab.h>
+> +#include <linux/io.h>
+>  #include <linux/of.h>
+>
+>  #include <mach/hardware.h>
+> @@ -697,14 +698,11 @@ int ux500_msp_i2s_init_msp(struct platform_device *pdev,
+>                         platform_data = devm_kzalloc(&pdev->dev,
+>                                 sizeof(struct msp_i2s_platform_data), GFP_KERNEL);
+>                         if (!platform_data)
+> -                               ret = -ENOMEM;
+> +                               return -ENOMEM;
+>                 }
+>         } else
+>                 if (!platform_data)
+> -                       ret = -EINVAL;
+> -
+> -       if (ret)
+> -               goto err_res;
+> +                       return -EINVAL;
+>
+>         dev_dbg(&pdev->dev, "%s: Enter (name: %s, id: %d).\n", __func__,
+>                 pdev->name, platform_data->id);
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
