@@ -1,39 +1,44 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Wed, 24 Oct 2012 19:58:31 +0900
-Subject: [PATCH 5/5] i2c: i2c-sh_mobile: fix spurious transfer request timed
- out
-In-Reply-To: <5087C93F.6080601@renesas.com>
-References: <5087C93F.6080601@renesas.com>
-Message-ID: <5087C9D7.1040108@renesas.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 24 Oct 2012 18:27:33 +0800
+Subject: [PATCH v2 0/3] serial: mxs-auart: add DMA support for auart in mx28
+Message-ID: <1351074456-25863-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that any of preceding register write operations to the I2C
-hardware block reached the module, and the write data is reflected
-in the registers, before leaving the interrupt handler.
+This patch set adds the DMA support for auart in mx28.
+patch 1:
+	In mx23, the DMA has a bug(see errata:2836). We can not add the
+	DMA support in mx23, but we can add DMA support to auart in mx28.
+	So in order to add the DMA support for the auart in mx28, we should add
+	the platform_device_id to distinguish the distinguish SOCs.
 
-Otherwise, we'll suffer from spurious WAIT interrupts that lead to
-'Transfer request timed out' message, and the transaction failed.
+patch 2: add the DMA support for mx28
+	Only we meet the following conditions, we can enable the DMA support
+	for auart:
+        (1) We enable the DMA support in the dts file, such as
+            arch/arm/boot/dts/imx28.dtsi.
+        (2) We enable the hardware flow control.
+        (3) We use the mx28, not the mx23. Due to hardware bug(see errata: 2836),
+            we can not add the DMA support to mx23.
 
-Tracked-down-by: Teppei Kamijou <teppei.kamijou.yb@renesas.com>
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
----
- drivers/i2c/busses/i2c-sh_mobile.c | 3 +++
- 1 file changed, 3 insertions(+)
+patch 3: enable the DMA support in dts for mx28 
+	You can use the /ttyAPP0 to test this patch set. 
+	I tested this patch in mx28-evk board.
 
-diff --git a/drivers/i2c/busses/i2c-sh_mobile.c b/drivers/i2c/busses/i2c-sh_mobile.c
-index 4c28358..9411c1b 100644
---- a/drivers/i2c/busses/i2c-sh_mobile.c
-+++ b/drivers/i2c/busses/i2c-sh_mobile.c
-@@ -469,6 +469,9 @@ static irqreturn_t sh_mobile_i2c_isr(int irq, void *dev_id)
- 		wake_up(&pd->wait);
- 	}
- 
-+	/* defeat write posting to avoid spurious WAIT interrupts */
-+	iic_rd(pd, ICSR);
-+
- 	return IRQ_HANDLED;
- }
- 
--- 
-1.7.12.4
+v1 --> v2:
+	[1] use the inline function, not a macro, to distinguish the SOCs.
+	[2] remove the "inline" for mxs_auart_tx_chars().
+	[3] use the `pio`, not the `pio[1]` to fill the DMA descriptor.
+	[4] use bit operation to serialize the DMA TX.
+	[5] use the RX/TX DMA channel to enable the DMA support, remove the
+	    "fsl,auart-enable-dma".
+
+Huang Shijie (3):
+  serial: mxs-auart: distinguish the different SOCs
+  serial: mxs-auart: add the DMA support for mx28
+  ARM: dts: enable dma support for auart0 in mx28
+
+ .../bindings/tty/serial/fsl-mxs-auart.txt          |    8 +
+ arch/arm/boot/dts/imx28.dtsi                       |    1 +
+ drivers/tty/serial/mxs-auart.c                     |  360 +++++++++++++++++++-
+ 3 files changed, 358 insertions(+), 11 deletions(-)
