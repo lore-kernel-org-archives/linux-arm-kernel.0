@@ -1,78 +1,41 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 24 Oct 2012 11:01:02 +0200
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <87objt8305.fsf@deeprootsystems.com>
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
- <87r4oqc833.fsf@deeprootsystems.com> <87objt8305.fsf@deeprootsystems.com>
-Message-ID: <5087AE4E.7000104@compulab.co.il>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 24 Oct 2012 11:15:02 +0200
+Subject: [PATCH v3 0/4] ARM: dts: Update OMAP5 with address space and
+ interrupts
+In-Reply-To: <1351062434-22514-1-git-send-email-s-guiriec@ti.com>
+References: <1351062434-22514-1-git-send-email-s-guiriec@ti.com>
+Message-ID: <5087B196.7090804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/12 20:19, Kevin Hilman wrote:
-> Kevin Hilman <khilman@deeprootsystems.com> writes:
-> 
->> +Igor
->>
->> Paul Walmsley <paul@pwsan.com> writes:
->>
->>> Here are some basic OMAP test results for Linux v3.7-rc2.
->>> Logs and other details at:
->>>
->>>     http://www.pwsan.com/omap/testlogs/test_v3.7-rc2/20121020134755/
->>
->> [...]
->>
->>> * 37xx EVM: CORE not entering dynamic off-idle
->>>   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
->>>     off works
->>
->> I got a start on this one, and discovered (using CM_IDLEST1_CORE) that
->> SPI1 was not idle when going off.  A quick hack disabling the
->> touchscreen showed that after that, core was hitting idle just fine.
->>
->> I ran out of time today debugging this, but it's definitely realted to
->> the GPIO debounce setting for the touchscreen.  Changing it to zero[1]
->> makes CORE hit retention again in idle.
-> 
-> OK, found the root cause of this in the GPIO driver.  Patch submitted:
-> 
->     http://marc.info/?l=linux-omap&m=135101577925972&w=2
+Hi Seb,
 
-Ok that one looks good.
+Sorry, I missed your previous email, your v2 was the right one.
+We do have a single INTC in every OMAP, there is no point to repeat the
+same data hundred times.
+The DTS are already big enough.
 
+On 10/24/2012 09:07 AM, Sebastien Guiriec wrote:
+> Since kernel 3.7 the DTS data are not overwriten by hwmod data we can add the address space
+> and interrupt line description inside dtsi file for OMAP5. This serie is updating the
+> current OMAP5 IP with missing entry.
 > 
-> however...
+> It has been tested on OMAP5 with 3.7-audio-display feature tree.
+> - MMC is probing and functional
+> - TWL6041 probing (GPIO/I2C)
+> - booting (UART)
 > 
->> Igor, I'm hoping you might know what's going on here since we already
->> had some problems with this ads7846 init stuff and you're more familiar
->> with this debounce init.
+> Update since v1:
+> - Add Ack and review
+> - Fix up commit messages.
 > 
-> ... board files that are setting debounce values for ads7846 will no
-> longer work.  
-> 
-> Currently, omap_ads7846_init() in common-board-devices.c does this:
-> 
->    gpio_request_one()
->    gpio_set_debounce()
->    gpio_free()                    
-> 
-> because of a bug in the GPIO driver, the debounce settings were sticky
-> and lingered even after the gpio_free().  That bug has been fixed by the
-> above patch, which means the above gpio_set_debounce() is completely
-> pointless because it's followed immediately by a gpio_free().
-> 
-> IMO, the whole GPIO init for the ads7846 needs a rethink as it's
-> currently partially done by common-board-devices.c and done (again) in
-> the ads7846 driver.  If the gpio_free() isn't done in
-> common-board-devices, then the ads7846 driver will currently fail to
-> probe/load becasue it can't request a GPIO line.
-> 
-> Having found and fixed the PM regression, I'll leave the ads7846 cleanup to
-> somone else.
+> Update since v2:
+> - Add interrupt-parent.
 
-Ok, understood, I'll look into this one soon.
+I will take the previous one to avoid the duplication of attributes.
 
+On top of that I will remove the ones introduce in audio IPs for
+consistency on OMAP3/4/5 platforms.
 
--- 
 Regards,
-Igor.
+Benoit
