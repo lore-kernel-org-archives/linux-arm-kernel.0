@@ -1,65 +1,118 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 10:25:29 +0200
-Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
-In-Reply-To: <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
- <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121024082529.GZ11837@lunn.ch>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed, 24 Oct 2012 12:34:46 +0400
+Subject: [PATCH] GPIO: clps711x: Fix direction logic for PORTD
+Message-ID: <1351067686-19344-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 10:04:01AM +0200, Gregory CLEMENT wrote:
-> Armada 370 and XP come with an unit called coherency fabric. This unit
-> allows to use the Armada XP as a nearly coherent architecture. The
-> coherency mechanism uses snoop filters to ensure the coherency between
-> caches, DRAM and devices. This mechanism needs a synchronization
-> barrier which guarantees that all memory write initiated by the
-> devices has reached their target and do not reside in intermediate
-> write buffers. That's why the architecture is not totally coherent and
-> we need to provide our own functions for some DMA operations.
-> 
-> Beside the use of the coherency fabric, the device units will have to
-> set the attribute flag to select the accurate coherency process for
-> the memory transaction. This is done each device driver programs the
-> DRAM address windows. The value of the attribute set by the driver is
-> retrieved through the orion_addr_map_cfg struct filled during the
-> early initialization of the platform.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |    3 +-
->  arch/arm/mach-mvebu/addr-map.c       |    3 ++
->  arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
->  arch/arm/mach-mvebu/coherency.c      |   87 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mvebu/common.h         |    2 +
->  5 files changed, 95 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 18ba60b..af22e53 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -38,7 +38,8 @@
->  
->  	coherency-fabric at d0020200 {
->  		compatible = "marvell,coherency-fabric";
-> -		reg = <0xd0020200 0xb0>;
-> +		reg = <0xd0020200 0xb0>,
-> +		      <0xd0021010 0x1c>;
->  	};
+PORTD have different direction logic, i.e. "0" is output and "1" is input.
+This patch fix this issue.
 
-...
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/gpio/gpio-clps711x.c |   65 +++++++++++++++++++++++++++++++++---------
+ 1 files changed, 51 insertions(+), 14 deletions(-)
 
->  int __init armada_370_xp_coherency_init(void)
->  {
->  	struct device_node *np;
-> @@ -82,7 +159,17 @@ int __init armada_370_xp_coherency_init(void)
->  	if (np) {
->  		pr_info("Initializing Coherency fabric\n");
->  		coherency_base = of_iomap(np, 0);
-> +		coherency_cpu_base = of_iomap(np, 1);
-
-Is this already in the binding documentation?
-
-   Thanks
-	Andrew
+diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
+index 0753b3a..ad181db 100644
+--- a/drivers/gpio/gpio-clps711x.c
++++ b/drivers/gpio/gpio-clps711x.c
+@@ -65,7 +65,7 @@ static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
+ 	spin_unlock_irqrestore(&gpio->lock, flags);
+ }
+ 
+-static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
++static int gpio_clps711x_dir_in(struct gpio_chip *chip, unsigned offset)
+ {
+ 	int tmp;
+ 	unsigned long flags;
+@@ -79,8 +79,8 @@ static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
+ 	return 0;
+ }
+ 
+-static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
+-				       int value)
++static int gpio_clps711x_dir_out(struct gpio_chip *chip, unsigned offset,
++				 int value)
+ {
+ 	int tmp;
+ 	unsigned long flags;
+@@ -98,17 +98,49 @@ static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
+ 	return 0;
+ }
+ 
+-struct clps711x_gpio_port {
++static int gpio_clps711x_dir_in_inv(struct gpio_chip *chip, unsigned offset)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
++	writeb(tmp, clps711x_pdir(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static int gpio_clps711x_dir_out_inv(struct gpio_chip *chip, unsigned offset,
++				     int value)
++{
++	int tmp;
++	unsigned long flags;
++	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
++
++	spin_lock_irqsave(&gpio->lock, flags);
++	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
++	writeb(tmp, clps711x_pdir(chip));
++	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
++	if (value)
++		tmp |= 1 << offset;
++	writeb(tmp, clps711x_port(chip));
++	spin_unlock_irqrestore(&gpio->lock, flags);
++
++	return 0;
++}
++
++static struct {
+ 	char	*name;
+ 	int	nr;
+-};
+-
+-static const struct clps711x_gpio_port clps711x_gpio_ports[] __initconst = {
+-	{ "PORTA", 8, },
+-	{ "PORTB", 8, },
+-	{ "PORTC", 8, },
+-	{ "PORTD", 8, },
+-	{ "PORTE", 3, },
++	int	inv_dir;
++} clps711x_gpio_ports[] __initconst = {
++	{ "PORTA", 8, 0, },
++	{ "PORTB", 8, 0, },
++	{ "PORTC", 8, 0, },
++	{ "PORTD", 8, 1, },
++	{ "PORTE", 3, 0, },
+ };
+ 
+ static int __init gpio_clps711x_init(void)
+@@ -145,10 +177,15 @@ static int __init gpio_clps711x_init(void)
+ 		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
+ 		gpio->chip[i].base		= i * 8;
+ 		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
+-		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
+ 		gpio->chip[i].get		= gpio_clps711x_get;
+-		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
+ 		gpio->chip[i].set		= gpio_clps711x_set;
++		if (!clps711x_gpio_ports[i].inv_dir) {
++			gpio->chip[i].direction_input = gpio_clps711x_dir_in;
++			gpio->chip[i].direction_output = gpio_clps711x_dir_out;
++		} else {
++			gpio->chip[i].direction_input = gpio_clps711x_dir_in_inv;
++			gpio->chip[i].direction_output = gpio_clps711x_dir_out_inv;
++		}
+ 		WARN_ON(gpiochip_add(&gpio->chip[i]));
+ 	}
+ 
+-- 
+1.7.3.4
