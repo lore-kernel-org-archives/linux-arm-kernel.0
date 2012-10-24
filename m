@@ -1,53 +1,190 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 19:32:37 +0200
-Subject: [PATCH 2/6] pinctrl: Update clock handling for the
- pinctrl-nomadik GPIO driver
-In-Reply-To: <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 24 Oct 2012 10:34:32 -0700
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121024165215.GA32220@arwen.pp.htv.fi>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <20121024165215.GA32220@arwen.pp.htv.fi>
+Message-ID: <1595649.YT4eDUD2ax@dtor-d630.eng.vmware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday, October 24, 2012 07:52:16 PM Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Oct 24, 2012 at 09:14:29AM -0700, Dmitry Torokhov wrote:
+> 
+> <snip>
+> 
+> > > > No, I guess we ihave different understanding of what "directly use"
+> > > > means.
+> > > > This particular driver does directly use interrupts: it requests it
+> > > > and
+> > > > performs some actions when interrupt arrives. Same goes for IO memory
+> > > > -
+> > > > it gets requested, then we access it. With pinctrl we do not do
+> > > > anything
+> > > > - we just ask another layer to configure it and that is it.
+> > > 
+> > > this is true for almost anything we do:
+> > > 
+> > > - we ask another layer to allocate memory for us
+> > > - we ask another layer to call our ISR once the IRQ line is asserted
+> > > - we ask another layer to handle the input events we just received
+> > > - we ask another layer to transfer data through DMA for us
+> > > - we ask another layer to turn regulators on and off.
+> > 
+> > But we are _directly_ _using_ all of these. You allocate memory and you
+> > (the driver) stuff data into that memory. You ask for DMA and you take
+> > the DMAed data and work with it. Not so with pinctrl in omap keypad and
+> > other drivers I have seen so far.
+> 
+> of course we are. If we don't mux the pins to their correct setting, we
+> can't realy use the HW. So while you don't see any SW control of the
+> requested pins, we're still making use of them.
 
-> The clock framework has changed somewhat and it's now better to
-> invoke clock_prepare_enable() and clk_disable_unprepare() rather
-> than the legacy clk_enable() and clk_disable() calls. This patch
-> converts the Nomadik Pin Control driver to the new framework.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+So we make use of CPU too, and the main power supply, and memory chips.
 
-(...)
-> -               clk_enable(chip->clk);
-> +               clk_prepare_enable(chip->clk);
-(...)
-> -               clk_disable(chip->clk);
-> +               clk_disable_unprepare(chip->clk);
+> 
+> > > and so on. This is just how abstractions work, we group common parts in
+> > > a framework so that users don't need to know the details, but still need
+> > > to tell the framework when to fiddle with those resources.
+> > > 
+> > > > I have seen just in a few days 3 or 4 drivers having exactly the same
+> > > > change - call to devm_pinctrl_get_select_default(), and I guess I will
+> > > > receive the same patches for the rest of input drivers shortly.
+> > > > This suggests that the operation is done at the wrong level. Do the
+> > > > pin configuration as you parse DT data, the same way you set up i2c
+> > > > devices registers in of_i2c.c, and leave the individual drivers that
+> > > > do
+> > > > not care about specifics alone.
+> > > 
+> > > Makes no sense to hide that from drivers. The idea here is that driver
+> > > should know when it needs its pins to muxed correctly.
+> > 
+> > The driver also needs memory controller to be initialized, gpio chip be
+> > ready and registered, DMA subsystem ready, input core reade, etc, etc,
+> > etc. You however do not have every driver explicitly initialize any of
+> > that; you expect certain working environment to be already operable. The
+> > driver does manage resources it controls, it has ultimate knowledge
+> > about, pin configuration is normally is not it. We just need to know
+> > that we wired/muxed properly, otherwise we won't work. So please let
+> > parent layers deal with it.
+> > 
+> > > 95% of the time
+> > > it will be done during probe() but then again, so what ?
+> > > 
+> > > doing that when parsing DT, or on bus notifiers is just plain wrong.
+> > > Drivers should be required to handle all of their resources.
+> > 
+> > All of _their_ resources, exactly. They do not own nor control pins so
+> > they should not be bothered with them either. Look, when you see that
+> 
+> except that they *own* the pins. Now that the muxer has been setup
+> properly, this particular IP owns the pins.
+> 
+> > potentially _every_ driver in the system needs to set up the same object
+> > that it doe snot use otherwise you should realize that individual driver
+> > is not the proper place to do that.
+> 
+> fair enough, but IMHO, we're not there yet. We can't make that claim
+> yet. Besides, we don't know what's the default pin state in a system. It
+> might be that certain pins start out in a way which consumes less power
+> due to the internal construction of the SoC. If we set pins up before
+> driver probes, and probe fails or the driver is never really used, then
+> we could be falling into a situation where we're wasting power.
 
-(Repeated for each occurence.)
+So what about moving this into bus code - have bus's probe() request
+default pin config before probe, revert to original setup when unbinding
+or probe fails. You can even plug PM switching into bus code as well.
 
-Is this *really* causing a regression? I mean the driver
-begin like this in nmk_gpio_probe():
+> 
+> Granted, you can undo everything you did before,
 
-        clk = devm_clk_get(&dev->dev, NULL);
-        if (IS_ERR(clk)) {
-                ret = PTR_ERR(clk);
-                goto out;
-        }
-        clk_prepare(clk);
+Right, the same way as we undo every other initialization when something
+goes wrong.
 
-Then it leaves the clock prepared. So the clock is always
-prepared. You would only need to enable/disable it at times.
+> but I guess keeping
+> track of everything we setup before probe() just to remove a couple of
+> lines from drivers is wrong.
 
-And the semantics of the clk_enable/clk_disable call pair
-is such that it is fastpath and should be real quick, and that
-is exactly why we're using it repeatedly like that. Inserting
-clk_unprepare() effectively could make the whole driver a
-lot slower, so convince me on this one. ...
+If it was just about a couple lines in a couple of drivers that would
+be fine. But the way I see it eventually every driver will need to do
+this.
 
-I suspect the real bug (if there is one) must be in the clock
-implementation.
+> 
+> > > > > That's why it is named "get_select_default" and not "get" only.
+> > > > > This API ensure that the pin will be set to the default state, and
+> > > > > this
+> > > > > is all we need to do during the probe.
+> > > > 
+> > > > Why during the probe and not by default? Realistically, the driver
+> > > > will
+> > > > be loaded as long as there is a matching device and pins will need to
+> > > > be
+> > > > configured.
+> > > 
+> > > likewise memory will be allocated when matching happens, IRQs will be
+> > > allocated, regulators will be turned on. So why don't we do all that by
+> > > default ? Because it is wrong.
+> > 
+> > No, because we do not know how. The generic layer does not know the ISR
+> > to install, how much memory to allocate, etc. Having regulator turned on
+> > before getting to probe might not be a bad idea.
+> 
+> what if your driver never probes ? Will you really leave regulators on
+> consuming extra, valuable power ?
 
-Yours,
-Linus Walleij
+If we do it right in probe() we won't consume unless the dirver is bound.
+
+> 
+> > > > > There is no point to change the mux if the driver is not probed,
+> > > > > because
+> > > > > potentially the pin can be use be another driver.
+> > > > 
+> > > > What other driver would use it? Who would chose what driver to load?
+> > > 
+> > > Well, you _do_ know that on a SoC we have a limited amount of pins
+> > > right ?
+> > > 
+> > > Considering the amont of features which are packed inside a single die,
+> > > it's not farfetched to assume we will have a lot less pins then we
+> > > actually need, so we need muxers behind each pin in order to choose
+> > > which functionality we want.
+> > > 
+> > > If it happens that keypad's pins are shared with another IP (e.g. GPIO),
+> > > we need to give the final user (a OEM/ODM) the choice of using those
+> > > pins as either keypad or GPIOs, thus the need for pinctrl framework and
+> > > the calls in the drivers.
+> > 
+> > Right, so please walk me through, step by step, how an OEM/ODM woudl
+> > select a particular configuration. Do you expect it to happen at
+> > runtime, or do you expect relevant data be put in DT?
+> 
+> It depends, I've seen both happening, really. Also note that DT
+> migration is still not complete, meaning that most (all ?) OEM/ODMs are
+> still using the legacy board-file-based approach and it will still take
+> them a few years to move to DT-based boot.
+> 
+> Another point to consider is community boards such as beaglebone which
+> have tens of different "capes" to support. Depending on the cape, pins
+> might have to be remuxed, so instead of adding all that code to platform
+> support, just leave it all in drivers. Depending on the "cape" different
+> drivers will probe() and those drivers should know how to mux pins for
+> themselves.
+> 
+> Note that these are only the two easy examples that came to my mind, I'm
+> sure we can discuss this for a long, but is it valid ? For a single line
+> of code ?
+
+Multiply by hundred of drivers - yes.
+
+-- 
+Dmitry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/f5b1dd36/attachment.sig>
