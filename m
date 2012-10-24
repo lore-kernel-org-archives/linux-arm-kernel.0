@@ -1,26 +1,38 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 24 Oct 2012 12:38:44 -0700
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121024191042.GC772@arwen.pp.htv.fi>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <64355430.MNHe7H1cg3@dtor-d630.eng.vmware.com>
- <20121024191042.GC772@arwen.pp.htv.fi>
-Message-ID: <4612865.mWDXHX689T@dtor-d630.eng.vmware.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 24 Oct 2012 21:43:46 +0200
+Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
+In-Reply-To: <CAKohpomUD-JQbkyEom+_BaRqJSvw8P_hBUsrjTU3vH6bM1+scQ@mail.gmail.com>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <CAKohpo=Jsy9az4PgJ-mkq_U49EOpHGES+-DaROanCOTn-L2s3Q@mail.gmail.com>
+ <CAKohpomUD-JQbkyEom+_BaRqJSvw8P_hBUsrjTU3vH6bM1+scQ@mail.gmail.com>
+Message-ID: <1597360.JT7plJlUsZ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 24, 2012 10:10:42 PM Felipe Balbi wrote:
-> > 
-> >
-> > That is a valid concern and we'll need to find a compromise here. As I
-> > said,
-> WHAT ?? Silicon erratas are not a valid concern ? Power waste isn't a
-> valid concern ? Tell that to the millions of devices shipped with Linux
-> everyday. Power usage if it's the top concern in any product, is right
-> there as the top five. Likewise for silicon erratas.
+On Wednesday 24 of October 2012 11:37:13 Viresh Kumar wrote:
+> On 22 October 2012 14:16, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > On 20 October 2012 01:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >> Initially ondemand governor was written and then using its code conservative
+> >> governor is written. It used a lot of code from ondemand governor, but copy of
+> >> code was created instead of using the same routines from both governors. Which
+> >> increased code redundancy, which is difficult to manage.
+> >>
+> >> This patch is an attempt to move common part of both the governors to
+> >> cpufreq_governor.c file to come over above mentioned issues.
+> >>
+> >> This shouldn't change anything from functionality point of view.
+> >>
+> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> For everybody else, this patch is already pushed by Rafael in his linux-next
+> branch.
 
-I think we should come back to this discussion when you get more coffee
-and start parsing other party e-mails properly.
+Well, not yet, although I'm going to do that.
+
+Thanks,
+Rafael
+
 
 -- 
-Dmitry
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
