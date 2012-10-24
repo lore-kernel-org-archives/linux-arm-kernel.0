@@ -1,29 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 07:37:10 +0200
-Subject: [PATCH] gpio: mvebu: correctly set the value in direction_output()
-In-Reply-To: <1350980225-6546-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1350980225-6546-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdb+qmH3s8tV1qqL21sL2BNmb7FSWmKPLWMCf0JWOmQ8Bg@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 24 Oct 2012 07:41:14 +0200
+Subject: [PATCH v3] pwm: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <1351050418-23981-1-git-send-email-linux@prisktech.co.nz>
+References: <20121023221419.GA8501@avionic-0098.mockup.avionic-design.de>
+ <1351050418-23981-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20121024054114.GA9787@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 10:17 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-
-> The ->direction_output() operation of gpio_chip is supposed to set the
-> direction to output but also to set the GPIO to an initial
-> value. Unfortunately, this last part was not done until now, causing
-> for example the LEDs to not be properly set to their default initial
-> value. This patch fixes this by calling the mvebu_gpio_set() function
-> from mvebu_gpio_direction_output() before configuring the GPIO as an
-> output GPIO.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->
+On Wed, Oct 24, 2012 at 04:46:58PM +1300, Tony Prisk wrote:
+> This patch updates pwm-vt8500.c to support devicetree probing and
+> make use of the common clock subsystem.
+> 
+> A binding document describing the PWM controller found on
+> arch-vt8500 is also included.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 > ---
-> As this is a fix, it should most likely go into 3.7.
+> v2/v3:
+> Fix errors/coding style as pointed out by Thierry Reding.
+> 
+>  .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 ++++
+>  drivers/pwm/pwm-vt8500.c                           |   86 ++++++++++++++------
+>  2 files changed, 80 insertions(+), 23 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
 
-Yes, thanks. Applied to my "fixes" branch.
+Looking real good now. One last comment though and I think I'm ready to
+take this...
 
-Yours,
-Linus Walleij
+> +	err = clk_enable(vt8500->clk);
+> +	if (err < 0)
+> +		dev_err(chip->dev, "failed to enable clock\n");
+> +		return -EBUSY;
+> +	};
+
+Why do you return EBUSY instead of err?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/b14ec1cd/attachment.sig>
