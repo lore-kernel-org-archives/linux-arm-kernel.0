@@ -1,44 +1,39 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 21:51:13 +0200
-Subject: [PATCH] [RFC] pinctrl: mvebu: reset pins to an UNKNOWN state on
- startup
-In-Reply-To: <508843AF.7060803@gmail.com>
-References: <1351106281-31288-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <508843AF.7060803@gmail.com>
-Message-ID: <20121024215113.10640bf1@skate>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 24 Oct 2012 22:51:05 +0300
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <4612865.mWDXHX689T@dtor-d630.eng.vmware.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <64355430.MNHe7H1cg3@dtor-d630.eng.vmware.com>
+ <20121024191042.GC772@arwen.pp.htv.fi>
+ <4612865.mWDXHX689T@dtor-d630.eng.vmware.com>
+Message-ID: <20121024195104.GA1175@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+Hi,
 
-On Wed, 24 Oct 2012 21:38:23 +0200, Sebastian Hesselbarth wrote:
+On Wed, Oct 24, 2012 at 12:38:44PM -0700, Dmitry Torokhov wrote:
+> On Wednesday, October 24, 2012 10:10:42 PM Felipe Balbi wrote:
+> > > 
+> > >
+> > > That is a valid concern and we'll need to find a compromise here. As I
+> > > said,
+> > WHAT ?? Silicon erratas are not a valid concern ? Power waste isn't a
+> > valid concern ? Tell that to the millions of devices shipped with Linux
+> > everyday. Power usage if it's the top concern in any product, is right
+> > there as the top five. Likewise for silicon erratas.
+> 
+> I think we should come back to this discussion when you get more coffee
+> and start parsing other party e-mails properly.
 
-> how you make sure something you don't know about? The bootloader sets
-> these pinmux settings for a reason and if the DT doesn't tell the kernel
-> it should make no assumptions at all.
+indeed. I really misparsed it. My bad. comments withdrawn.
 
-Apparently, the general feeling of the kernel people is that the kernel
-should reduce as much as possible its dependency on the hardware
-configuration set up by the bootloader. Therefore, even though your
-bootloader does a certain pinmux configuration, your kernel should make
-its own pinmux configuration and be fully independent from the one done
-by the bootloader. If we want to achieve this, then it seemed like a
-good idea to put all pins to an unknown state at boot time.
-
-> IMHO it isn't - but maybe I am missing the point here. What is it that
-> you don't like in the bootloaders choice of configuring pinmux?
-
-Just because the kernel should not depend on hardware configuration
-done by the bootloader, except for very core things like DRAM timings
-and al. At least, that's my understanding of where the ARM kernel
-people are trying to go. But I might have misunderstood, in which case
-of course, the entire purpose of this patch disappears.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/8824c75d/attachment.sig>
