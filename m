@@ -1,69 +1,67 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 24 Oct 2012 15:41:20 -0400 (EDT)
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <50882EED.9020200@wwwdotorg.org>
-Message-ID: <Pine.LNX.4.44L0.1210241531300.1282-100000@iolanthe.rowland.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 24 Oct 2012 21:49:45 +0200
+Subject: [PATCH 1/9] ARM: Kirkwood: Convert TS219 to pinctrl.
+In-Reply-To: <20121024213128.2d4c07dc@skate>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>	<1351090434-30499-2-git-send-email-andrew@lunn.ch>
+ <20121024213128.2d4c07dc@skate>
+Message-ID: <50884659.1020208@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Oct 2012, Stephen Warren wrote:
+On 10/24/2012 09:31 PM, Thomas Petazzoni wrote:
+> Dear Andrew Lunn,
+>
+> On Wed, 24 Oct 2012 16:53:46 +0200, Andrew Lunn wrote:
+>
+>> +			pinctrl-0 =<  &pmx_uart0&pmx_uart1&pmx_spi
+>> +				&pmx_twsi0&pmx_sata0&pmx_sata1
+>> +				&pmx_ram_size&pmx_reset_button
+>> +				&pmx_USB_copy_button&pmx_board_id>;
+>
+> It would be really better to have those under each device, rather than
+> globally declared here. For some devices such as UARTs, it is not yet
+> possible with the 8250 driver to associate pinctrl pins (but I'm
+> planning to work on that soon). However for the other drivers (SPI,
+> TWSI, SATA, button), it should be possible.
 
-> > What's the reason for listing the generic value if drivers can't key
-> > off it?  Does it contain any information that's not already present in 
-> > the specific values?
-> 
-> This may or may not be a mistake.
-> 
-> The idea is that usb-ehci is included in the device node's compatible
-> list iff the HW is 100% compatible with a "usb-ehci" HW device, and
+Thomas,
 
-But there is no such thing as a "usb-ehci" HW device.  That's part of 
-the reason this whole discussion got started.
+Agree, but for now a global pinhog on pinctrl node itself is the correct
+way to go here. As soon as there is pinctrl support in the specific
+device drivers we can move pinmux phandle there.
 
-> hence a pure usb-ehci driver can handle the hardware without any
-> additional knowledge. (That's true in general for any compatible value).
+>> +			pmx_uart0: pmx-uart0 {
+>> +				marvell,pins = "mpp10", "mpp11";
+>> +				marvell,function = "uart0";
+>> +			};
+ >> ...
+>
+> All those definitions are not board specific, they are common to the
+> SoC. So they should be in the corresponding .dtsi file.
+>
+> Basically:
+>
+>   * The SoC .dtsi file should define all the pinmux groups that are
+>     described in the datasheet and are used by boards. I.e, there may be
+>     conflicting groups defined, where one group configures pin X with
+>     function Y, while another group configures pin X with function Z.
 
-To as great an extent as is reasonable, ehci-platform is supposed to 
-be that "pure usb-ehci driver".
+Here I disagree. Even quite simple interfaces like uart can have dozens
+of possible mpp configurations, e.g. rx/tx on up to three different pins
+each plus rts/cts on various pins plus all possible combinations.
 
-> It's quite possible that this often gets translated to the subtly
-> different "the HW is an EHCI controller, so it gets
-> compatible="usb-ehci"" when writing .dts files.
-> 
-> So yes we probably should remove compatible="usb-ehci" from any device
-> node for HW which really isn't a pure EHCI device. That would presumably
-> require looking at the existing custom drivers and/or HW specs to
-> determine what, if anything, is different about the HW.
+Now consider some more complex interface with more than one mpp pin per
+interface pin. Do you really want to predefine all possible combinations
+even if it is more likely that in fact only one is used on all boards
+because they are all based on the same reference design?
 
-Of course, removing it from the board files in the new kernel won't
-have any effect on old board files embedded in firmware.  Those old 
-firmwares then might not work with newer kernels.
+>   * The board .dts file should define the pinmux groups that are really
+>     board-specific (buttons, LEDs, etc.), and then for each device,
+>     point to the correct pinmux group (either defined in the .dtsi file
+>     or in the board file).
 
-> Related, at least on Tegra, the PHY handling is IIRC pretty tightly
-> coupled into the EHCI driver. We probably should have separate nodes
-> for, and drivers for, the PHYs instead. I don't know if that would
-> remove all the non-standard attributes of the Tegra EHCI HW and hence
-> allow Tegra's EHCI to be handled by the generic driver. From memory,
-> there are certainly some HW workarounds in the Tegra EHCI driver that
-> would need to be ported though.
+With respect to mpp the actual configuration _is_ board specific. There
+are maybe only some pins that are always used if a specific interface is
+used, e.g. nand pins on dove can only be switched with gpio.
 
-In fact, ehci-tegra is probably the _most_ non-standard of the EHCI 
-drivers.
-
-> > It sounds like the ehci-platform driver should simply list all the
-> > specific HW device types (or base HW device types) that it handles, and
-> > it shouldn't include "usb-ehci" in the list.  As more DT board files
-> > are created or as ehci-platform becomes capable to taking over from
-> > other drivers, its device list would grow.
-> 
-> That's certainly a reasonable way to go too. I think the only downside
-> with that approach is that every new device needs a kernel update to add
-> it to the table, whereas using a generic compatible="usb-ehci" wouldn't,
-> assuming no quirks were required for the new device.
-
-New devices could list an older device they are upwardly compatible 
-with.  Then no kernel update would be needed.  Now, I agree that a 
-generic entry would be more logical, but there's no generic "standard" 
-hardware for it to describe.
-
-Alan Stern
+Sebastian
