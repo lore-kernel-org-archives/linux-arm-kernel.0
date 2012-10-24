@@ -1,31 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Oct 2012 14:09:57 +0100
-Subject: Possible regression in arm/io.h
-In-Reply-To: <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
-References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
- <20121024105223.GC23775@mudshark.cambridge.arm.com>
- <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
-Message-ID: <20121024130957.GB7339@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Oct 2012 14:17:44 +0100
+Subject: [PATCH 1/1] mmc: Standardise capability type
+Message-ID: <1351084664-30526-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 01:34:18PM +0100, Bastian Hecht wrote:
-> 2012/10/24 Will Deacon <will.deacon@arm.com>:
-> > It sounds like we need to:
-> >
-> >         (a) Understand what has changed in GCC to cause this error to start
-> >             cropping up.
-> >
-> >         (b) Have a look at the impact of using only "Q" on the generated
-> >             code (especially register usage for the address).
-> >
-> 
-> Uff... I've just started to write ARM assembly and have no practical
-> experience with the inner workings of real world compilers. So this
-> time I'm afraid I was just good enough to report this. It sounds
-> interesting to hunt it, but would take ages for me at this point.
+There are discrepancies with regards to how MMC capabilities
+are carried throughout the subsystem. Let's standardise them
+to elevate any confusion.
 
-Ok, I'll have a look at the impact of moving exclusively to "Q" when I get a
-chance. Which toolchain are you using?
+Cc: Chris Ball <cjb@laptop.org>
+Cc: linux-mmc at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mmc/core/mmc.c     |    2 +-
+ include/linux/mmc/dw_mmc.h |    4 ++--
+ include/linux/mmc/host.h   |    2 +-
+ include/linux/mmc/sdhci.h  |    4 ++--
+ 4 files changed, 6 insertions(+), 6 deletions(-)
 
-Will
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index 7cc4638..f31bf80 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -239,7 +239,7 @@ static void mmc_select_card_type(struct mmc_card *card)
+ {
+ 	struct mmc_host *host = card->host;
+ 	u8 card_type = card->ext_csd.raw_card_type & EXT_CSD_CARD_TYPE_MASK;
+-	unsigned int caps = host->caps, caps2 = host->caps2;
++	unsigned long caps = host->caps, caps2 = host->caps2;
+ 	unsigned int hs_max_dtr = 0;
+ 
+ 	if (card_type & EXT_CSD_CARD_TYPE_26)
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index 7c6a113..60b71ae 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -229,8 +229,8 @@ struct dw_mci_board {
+ 	u32 quirks; /* Workaround / Quirk flags */
+ 	unsigned int bus_hz; /* Clock speed at the cclk_in pad */
+ 
+-	unsigned int caps;	/* Capabilities */
+-	unsigned int caps2;	/* More capabilities */
++	unsigned long caps;	/* Capabilities */
++	unsigned long caps2;	/* More capabilities */
+ 	/*
+ 	 * Override fifo depth. If 0, autodetect it from the FIFOTH register,
+ 	 * but note that this may not be reliable after a bootloader has used
+diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+index 7abb0e1..f89c968 100644
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -241,7 +241,7 @@ struct mmc_host {
+ #define MMC_CAP_CMD23		(1 << 30)	/* CMD23 supported. */
+ #define MMC_CAP_HW_RESET	(1 << 31)	/* Hardware reset */
+ 
+-	unsigned int		caps2;		/* More host capabilities */
++	unsigned long		caps2;		/* More host capabilities */
+ 
+ #define MMC_CAP2_BOOTPART_NOACC	(1 << 0)	/* Boot partition no access */
+ #define MMC_CAP2_CACHE_CTRL	(1 << 1)	/* Allow cache control */
+diff --git a/include/linux/mmc/sdhci.h b/include/linux/mmc/sdhci.h
+index fa8529a..8c20910 100644
+--- a/include/linux/mmc/sdhci.h
++++ b/include/linux/mmc/sdhci.h
+@@ -157,8 +157,8 @@ struct sdhci_host {
+ 
+ 	struct timer_list timer;	/* Timer for timeouts */
+ 
+-	unsigned int caps;	/* Alternative CAPABILITY_0 */
+-	unsigned int caps1;	/* Alternative CAPABILITY_1 */
++	unsigned long caps;	/* Alternative CAPABILITY_0 */
++	unsigned long caps1;	/* Alternative CAPABILITY_1 */
+ 
+ 	unsigned int            ocr_avail_sdio;	/* OCR bit masks */
+ 	unsigned int            ocr_avail_sd;
+-- 
+1.7.9.5
