@@ -1,74 +1,28 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Wed, 24 Oct 2012 16:48:55 +1300
-Subject: [PATCH v3] pwm: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <20121023221419.GA8501@avionic-0098.mockup.avionic-design.de>
-References: <20121022084000.GB29790@avionic-0098.mockup.avionic-design.de>
- <1350929425-17516-1-git-send-email-linux@prisktech.co.nz>
- <20121023221419.GA8501@avionic-0098.mockup.avionic-design.de>
-Message-ID: <1351050535.23151.1.camel@gitbox>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Wed, 24 Oct 2012 07:08:53 +0200
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB48592@DBDE01.ent.ti.com>
+References: <20121017181354.GA2412@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
+ <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at>
+ <50806B1D.9040504@ti.com>
+ <20121019061630.GB2983@netboy.at.omicron.at>
+ <79CD15C6BA57404B839C016229A409A83EB48592@DBDE01.ent.ti.com>
+Message-ID: <20121024050853.GA2124@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-24 at 00:14 +0200, Thierry Reding wrote:
-> On Tue, Oct 23, 2012 at 07:10:24AM +1300, Tony Prisk wrote:
-> [...]
-> > @@ -87,6 +98,11 @@ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> >  {
-> >  	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
-> >  
-> > +	if (!clk_enable(vt8500->clk)) {
-> > +		dev_err(chip->dev, "failed to enable clock\n");
-> > +		return -EBUSY;
-> > +	};
-> > +
+On Tue, Oct 23, 2012 at 10:12:29AM +0000, Hiremath, Vaibhav wrote:
 > 
-> I don't think that works. The clock API returns 0 on success and a
-> negative error code on failure. So this should rather be something like:
-> 
-> 	err = clk_enable(vt8500->clk);
-> 	if (err < 0) {
-> 		dev_err(chip->dev, "failed to enable clock: %d\n", err);
-> 		return err;
-> 	}
-> 
-> > @@ -123,6 +153,12 @@ static int __devinit pwm_probe(struct platform_device *pdev)
-> >  	chip->chip.ops = &vt8500_pwm_ops;
-> >  	chip->chip.base = -1;
-> >  	chip->chip.npwm = VT8500_NR_PWMS;
-> > +	chip->clk = devm_clk_get(&pdev->dev, NULL);
-> > +
-> 
-> The blank line should go above the call to devm_clk_get().
-> 
-> > +	if (IS_ERR_OR_NULL(chip->clk)) {
-> > +		dev_err(&pdev->dev, "clock source not specified\n");
-> > +		return PTR_ERR(chip->clk);
-> > +	}
-> [...]
-> > +	if (!clk_prepare(chip->clk)) {
-> > +		dev_err(&pdev->dev, "failed to prepare clock\n");
-> > +		return -EBUSY;
-> > +	}
-> > +
-> 
-> Same comment here. I wonder how this code can work, since if the clock
-> is properly prepared, then it will return 0, and the above will return
-> -EBUSY.
-> 
-> >  	ret = pwmchip_add(&chip->chip);
-> > -	if (ret < 0)
-> > +	if (ret < 0) {
-> > +		dev_err(&pdev->dev, "failed to add pwmchip\n");
-> 
-> Error messages can be considered prose, so this should be: "failed to
-> add PWM chip".
-> 
-> Thierry
+> I understand, and as you mentioned we are not fully there at v3.7-rc1 with 
+> all the drivers/module support, due to all known reasons. Its good that with 
+> v3.7-rc2, Beaglebone boots up out of box from mainline. 
 
-I don't know why none of this caused a failure when boot tested. The
-clock should have been disabled 'automagically' at bootup, and never
-reenabled. *shrug* Fixed in new patch v3 (didn't notice there was
-already a v3).
+Can you say whether we have working Ethernet on the beaglebone in v3.7?
 
-Regards
-Tony P
+Thanks,
+Richard
