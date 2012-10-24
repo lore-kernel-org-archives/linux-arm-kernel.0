@@ -1,48 +1,144 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 24 Oct 2012 10:56:52 +0200
-Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce clock enable
- mask on disable
-In-Reply-To: <CACRpkdb_zO0G5hsU5hTqnmD6Zju_xBwdmnk6C=Ok1R7-oNT_iQ@mail.gmail.com>
-References: <1351015771-6308-1-git-send-email-khilman@deeprootsystems.com>
- <CACRpkdb_zO0G5hsU5hTqnmD6Zju_xBwdmnk6C=Ok1R7-oNT_iQ@mail.gmail.com>
-Message-ID: <5087AD54.60703@compulab.co.il>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Oct 2012 10:58:02 +0200
+Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
+In-Reply-To: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <5087AD9A.8020801@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/12 10:16, Linus Walleij wrote:
-> On Tue, Oct 23, 2012 at 8:09 PM, Kevin Hilman
-> <khilman@deeprootsystems.com> wrote:
-> 
->> From: Kevin Hilman <khilman@ti.com>
->>
->> When debounce clocks are disabled, ensure that the banks
->> dbck_enable_mask is cleared also.  Otherwise, context restore on
->> subsequent off-mode transition will restore previous value from the
->> shadow copies (bank->context.debounce*) leading to mismatch state
->> between driver state and hardware state.
->>
->> This was discovered when board code was doing
->>
->>   gpio_request_one()
->>   gpio_set_debounce()
->>   gpio_free()
->>
->> which was leaving the GPIO debounce settings in a confused state.
->> Then, enabling off mode causing bogus state to be restored, leaving
->> GPIO debounce enabled which then prevented the CORE powerdomain from
->> transitioning.
->>
->> Reported-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Igor Grinberg <grinberg@compulab.co.il>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
-> 
-> Thanks! Applied with Felipe's and Santosh's ACKs.
+On 10/23/2012 10:19 AM, Thomas Petazzoni wrote:
+> This platform, available in Japan from PlatHome, has a dual-core
+> Armada XP, the MV78260. For now, only the two serial ports and the
+> three front LEDs are supported. Support for network, SATA, USB and
+> other peripherals will be added as drivers for them become available
+> for Armada XP in mainline.
+And don't forget the SMP support too, MV78260 is supposed to have 2 cores.
 
-If not too late:
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Besides this, this patch looks good. I have applied it on a v3.7-rc2
+without any problem, and managed to build it also.
+So you can add my
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Kevin, thanks for the patch and sorry I could not respond on time.
+
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> 
+> ---
+> This is 3.8 material.
+> ---
+>  arch/arm/boot/dts/Makefile           |    3 +-
+>  arch/arm/boot/dts/openblocks-ax3.dts |   69 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
+>  3 files changed, 72 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/openblocks-ax3.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index f37cf9f..b7814b9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -44,7 +44,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
+>  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
+>  	msm8960-cdp.dtb
+>  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
+> -	armada-xp-db.dtb
+> +	armada-xp-db.dtb \
+> +	openblocks-ax3.dtb
+>  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
+>  	imx53-ard.dtb \
+>  	imx53-evk.dtb \
+> diff --git a/arch/arm/boot/dts/openblocks-ax3.dts b/arch/arm/boot/dts/openblocks-ax3.dts
+> new file mode 100644
+> index 0000000..f757116
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/openblocks-ax3.dts
+> @@ -0,0 +1,69 @@
+> +/*
+> + * Device Tree file for OpenBlocks AX3 board
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "armada-xp-mv78260.dtsi"
+> +
+> +/ {
+> +	model = "PlatHome OpenBlocks AX3 board";
+> +	compatible = "plathome,openblocks-ax3", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200 earlyprintk";
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x40000000>; /* 1 GB */
+> +	};
+> +
+> +	soc {
+> +		serial at d0012000 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		serial at d0012100 {
+> +			clock-frequency = <250000000>;
+> +			status = "okay";
+> +		};
+> +		pinctrl {
+> +			led_pins: led-pins-0 {
+> +				  marvell,pins = "mpp49", "mpp51", "mpp53";
+> +				  marvell,function = "gpio";
+> +			};
+> +		};
+> +		leds {
+> +		        compatible = "gpio-leds";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&led_pins>;
+> +
+> +			red_led {
+> +				   label = "red_led";
+> +				   gpios = <&gpio1 17 1>;
+> +				   default-state = "off";
+> +			};
+> +
+> +			yellow_led {
+> +				   label = "yellow_led";
+> +				   gpios = <&gpio1 19 1>;
+> +				   default-state = "off";
+> +			};
+> +
+> +			green_led {
+> +				   label = "green_led";
+> +				   gpios = <&gpio1 21 1>;
+> +				   default-state = "off";
+> +				   linux,default-trigger = "heartbeat";
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+> index 49d7915..cd2717b 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> @@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
+>  static const char * const armada_370_xp_dt_board_dt_compat[] = {
+>  	"marvell,a370-db",
+>  	"marvell,axp-db",
+> +	"plathome,openblocks-ax3",
+>  	NULL,
+>  };
+>  
+> 
+
 
 -- 
-Regards,
-Igor.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
