@@ -1,86 +1,177 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 24 Oct 2012 16:37:35 +0200
-Subject: [PATCH 2/4] gpio: samsung: Skip registration if pinctrl driver is
- present on Exynos4x12
+Date: Wed, 24 Oct 2012 16:37:36 +0200
+Subject: [PATCH 3/4] pinctrl: samsung: Add support for Exynos4x12
 In-Reply-To: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
 References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1351089457-8205-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1351089457-8205-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the Samsung GPIO driver to check for pinctrl driver
-presence earlier and use generic matching instead of a single compatible
-value.
-
-This allows us to fix warning about unrecognized SoC in case of
-Exynos4x12, which is not supported by this driver.
+This patch extends the driver with any necessary SoC-specific
+definitions to support Exynos4x12 SoCs.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/gpio/gpio-samsung.c | 43 ++++++++++++++++++++++---------------------
- 1 file changed, 22 insertions(+), 21 deletions(-)
+ .../bindings/pinctrl/samsung-pinctrl.txt           |   1 +
+ drivers/pinctrl/pinctrl-exynos.c                   | 110 +++++++++++++++++++++
+ drivers/pinctrl/pinctrl-samsung.c                  |   2 +
+ drivers/pinctrl/pinctrl-samsung.h                  |   1 +
+ 4 files changed, 114 insertions(+)
 
-diff --git a/drivers/gpio/gpio-samsung.c b/drivers/gpio/gpio-samsung.c
-index 43c4595..01f7fe9 100644
---- a/drivers/gpio/gpio-samsung.c
-+++ b/drivers/gpio/gpio-samsung.c
-@@ -2796,27 +2796,6 @@ static __init void exynos4_gpiolib_init(void)
- 	int group = 0;
- 	void __iomem *gpx_base;
+diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+index 63806e2..e97a278 100644
+--- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+@@ -8,6 +8,7 @@ on-chip controllers onto these pads.
+ Required Properties:
+ - compatible: should be one of the following.
+   - "samsung,pinctrl-exynos4210": for Exynos4210 compatible pin-controller.
++  - "samsung,pinctrl-exynos4x12": for Exynos4x12 compatible pin-controller.
+   - "samsung,pinctrl-exynos5250": for Exynos5250 compatible pin-controller.
  
--#ifdef CONFIG_PINCTRL_SAMSUNG
--		/*
--		 * This gpio driver includes support for device tree support and
--		 * there are platforms using it. In order to maintain
--		 * compatibility with those platforms, and to allow non-dt
--		 * Exynos4210 platforms to use this gpiolib support, a check
--		 * is added to find out if there is a active pin-controller
--		 * driver support available. If it is available, this gpiolib
--		 * support is ignored and the gpiolib support available in
--		 * pin-controller driver is used. This is a temporary check and
--		 * will go away when all of the Exynos4210 platforms have
--		 * switched to using device tree and the pin-ctrl driver.
--		 */
--		struct device_node *pctrl_np;
--		const char *pctrl_compat = "samsung,pinctrl-exynos4210";
--		pctrl_np = of_find_compatible_node(NULL, NULL, pctrl_compat);
--		if (pctrl_np)
--			if (of_device_is_available(pctrl_np))
--				return;
--#endif
--
- 	/* gpio part1 */
- 	gpio_base1 = ioremap(EXYNOS4_PA_GPIO1, SZ_4K);
- 	if (gpio_base1 == NULL) {
-@@ -3031,6 +3010,28 @@ static __init int samsung_gpiolib_init(void)
- 	int i, nr_chips;
- 	int group = 0;
- 
-+#ifdef CONFIG_PINCTRL_SAMSUNG
-+	/*
-+	* This gpio driver includes support for device tree support and there
-+	* are platforms using it. In order to maintain compatibility with those
-+	* platforms, and to allow non-dt Exynos4210 platforms to use this
-+	* gpiolib support, a check is added to find out if there is a active
-+	* pin-controller driver support available. If it is available, this
-+	* gpiolib support is ignored and the gpiolib support available in
-+	* pin-controller driver is used. This is a temporary check and will go
-+	* away when all of the Exynos4210 platforms have switched to using
-+	* device tree and the pin-ctrl driver.
-+	*/
-+	struct device_node *pctrl_np;
-+	static const struct of_device_id exynos_pinctrl_ids[] = {
-+		{ .compatible = "samsung,pinctrl-exynos4210", },
-+		{ .compatible = "samsung,pinctrl-exynos4x12", },
-+	};
-+	for_each_matching_node(pctrl_np, exynos_pinctrl_ids)
-+		if (pctrl_np && of_device_is_available(pctrl_np))
-+			return -ENODEV;
-+#endif
+ - reg: Base address of the pin controller hardware module and length of
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 73a0aa2..19fab68 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -566,3 +566,113 @@ struct samsung_pin_ctrl exynos4210_pin_ctrl[] = {
+ 		.label		= "exynos4210-gpio-ctrl2",
+ 	},
+ };
 +
- 	samsung_gpiolib_set_cfg(samsung_gpio_cfgs, ARRAY_SIZE(samsung_gpio_cfgs));
++/* pin banks of exynos4x12 pin-controller 0 */
++static struct samsung_pin_bank exynos4x12_pin_banks0[] = {
++	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(6, 0x020, "gpa1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpb", 0x08),
++	EXYNOS_PIN_BANK_EINTG(5, 0x060, "gpc0", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(5, 0x080, "gpc1", 0x10),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0A0, "gpd0", 0x14),
++	EXYNOS_PIN_BANK_EINTG(4, 0x0C0, "gpd1", 0x18),
++	EXYNOS_PIN_BANK_EINTG(8, 0x180, "gpf0", 0x30),
++	EXYNOS_PIN_BANK_EINTG(8, 0x1A0, "gpf1", 0x34),
++	EXYNOS_PIN_BANK_EINTG(8, 0x1C0, "gpf2", 0x38),
++	EXYNOS_PIN_BANK_EINTG(6, 0x1E0, "gpf3", 0x3c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x240, "gpj0", 0x40),
++	EXYNOS_PIN_BANK_EINTG(5, 0x260, "gpj1", 0x44),
++};
++
++/* pin banks of exynos4x12 pin-controller 1 */
++static struct samsung_pin_bank exynos4x12_pin_banks1[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x040, "gpk0", 0x08),
++	EXYNOS_PIN_BANK_EINTG(7, 0x060, "gpk1", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(7, 0x080, "gpk2", 0x10),
++	EXYNOS_PIN_BANK_EINTG(7, 0x0A0, "gpk3", 0x14),
++	EXYNOS_PIN_BANK_EINTG(7, 0x0C0, "gpl0", 0x18),
++	EXYNOS_PIN_BANK_EINTG(2, 0x0E0, "gpl1", 0x1c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x100, "gpl2", 0x20),
++	EXYNOS_PIN_BANK_EINTG(8, 0x260, "gpm0", 0x24),
++	EXYNOS_PIN_BANK_EINTG(7, 0x280, "gpm1", 0x28),
++	EXYNOS_PIN_BANK_EINTG(5, 0x2A0, "gpm2", 0x2c),
++	EXYNOS_PIN_BANK_EINTG(8, 0x2C0, "gpm3", 0x30),
++	EXYNOS_PIN_BANK_EINTG(8, 0x2E0, "gpm4", 0x34),
++	EXYNOS_PIN_BANK_EINTN(6, 0x120, "gpy0"),
++	EXYNOS_PIN_BANK_EINTN(4, 0x140, "gpy1"),
++	EXYNOS_PIN_BANK_EINTN(6, 0x160, "gpy2"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x180, "gpy3"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x1A0, "gpy4"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x1C0, "gpy5"),
++	EXYNOS_PIN_BANK_EINTN(8, 0x1E0, "gpy6"),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC00, "gpx0", 0x00),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC20, "gpx1", 0x04),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC40, "gpx2", 0x08),
++	EXYNOS_PIN_BANK_EINTW(8, 0xC60, "gpx3", 0x0c),
++};
++
++/* pin banks of exynos4x12 pin-controller 2 */
++static struct samsung_pin_bank exynos4x12_pin_banks2[] = {
++	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz", 0x00),
++};
++
++/* pin banks of exynos4x12 pin-controller 3 */
++static struct samsung_pin_bank exynos4x12_pin_banks3[] = {
++	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpv0", 0x00),
++	EXYNOS_PIN_BANK_EINTG(8, 0x020, "gpv1", 0x04),
++	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpv2", 0x08),
++	EXYNOS_PIN_BANK_EINTG(8, 0x060, "gpv3", 0x0c),
++	EXYNOS_PIN_BANK_EINTG(2, 0x080, "gpv4", 0x10),
++};
++
++/*
++ * Samsung pinctrl driver data for Exynos4x12 SoC. Exynos4x12 SoC includes
++ * four gpio/pin-mux/pinconfig controllers.
++ */
++struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
++	{
++		/* pin-controller instance 0 data */
++		.pin_banks	= exynos4x12_pin_banks0,
++		.nr_banks	= ARRAY_SIZE(exynos4x12_pin_banks0),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos4x12-gpio-ctrl0",
++	}, {
++		/* pin-controller instance 1 data */
++		.pin_banks	= exynos4x12_pin_banks1,
++		.nr_banks	= ARRAY_SIZE(exynos4x12_pin_banks1),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.weint_con	= EXYNOS_WKUP_ECON_OFFSET,
++		.weint_mask	= EXYNOS_WKUP_EMASK_OFFSET,
++		.weint_pend	= EXYNOS_WKUP_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.eint_wkup_init = exynos_eint_wkup_init,
++		.label		= "exynos4x12-gpio-ctrl1",
++	}, {
++		/* pin-controller instance 2 data */
++		.pin_banks	= exynos4x12_pin_banks2,
++		.nr_banks	= ARRAY_SIZE(exynos4x12_pin_banks2),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos4x12-gpio-ctrl2",
++	}, {
++		/* pin-controller instance 3 data */
++		.pin_banks	= exynos4x12_pin_banks3,
++		.nr_banks	= ARRAY_SIZE(exynos4x12_pin_banks3),
++		.geint_con	= EXYNOS_GPIO_ECON_OFFSET,
++		.geint_mask	= EXYNOS_GPIO_EMASK_OFFSET,
++		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
++		.svc		= EXYNOS_SVC_OFFSET,
++		.eint_gpio_init = exynos_eint_gpio_init,
++		.label		= "exynos4x12-gpio-ctrl3",
++	},
++};
+diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
+index fc34cac..81c9896 100644
+--- a/drivers/pinctrl/pinctrl-samsung.c
++++ b/drivers/pinctrl/pinctrl-samsung.c
+@@ -947,6 +947,8 @@ static int __devinit samsung_pinctrl_probe(struct platform_device *pdev)
+ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ 	{ .compatible = "samsung,pinctrl-exynos4210",
+ 		.data = (void *)exynos4210_pin_ctrl },
++	{ .compatible = "samsung,pinctrl-exynos4x12",
++		.data = (void *)exynos4x12_pin_ctrl },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
+diff --git a/drivers/pinctrl/pinctrl-samsung.h b/drivers/pinctrl/pinctrl-samsung.h
+index 0670d9e..5addfd1 100644
+--- a/drivers/pinctrl/pinctrl-samsung.h
++++ b/drivers/pinctrl/pinctrl-samsung.h
+@@ -236,5 +236,6 @@ struct samsung_pmx_func {
  
- 	if (soc_is_s3c24xx()) {
+ /* list of all exported SoC specific data */
+ extern struct samsung_pin_ctrl exynos4210_pin_ctrl[];
++extern struct samsung_pin_ctrl exynos4x12_pin_ctrl[];
+ 
+ #endif /* __PINCTRL_SAMSUNG_H */
 -- 
 1.7.12
