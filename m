@@ -1,53 +1,29 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 25 Oct 2012 01:26:04 +0200
-Subject: [PATCH 5/6] ARM: OMAP2+: Make some definitions local
-In-Reply-To: <20121019161743.GD4730@atomide.com>
-References: <20121018202707.11834.1438.stgit@muffinssi.local>
- <2153737.CkcY4HqKKl@avalon> <20121019161743.GD4730@atomide.com>
-Message-ID: <1682925.XTJ8FK6Z8P@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 24 Oct 2012 16:27:17 -0700
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <1350935758-9215-5-git-send-email-zonque@gmail.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com>
+Message-ID: <20121024232717.GD11928@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ho Tony,
-
-On Friday 19 October 2012 09:17:43 Tony Lindgren wrote:
-> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121019 02:45]:
-> > On Thursday 18 October 2012 13:28:48 Tony Lindgren wrote:
-> > > @@ -117,13 +112,6 @@ static inline struct omap_iommu
-> > > *dev_to_omap_iommu(struct device *dev) }
-> > > 
-> > >  #endif
-> > > 
-> > > -/* IOMMU errors */
-> > > -#define OMAP_IOMMU_ERR_TLB_MISS		(1 << 0)
-> > > -#define OMAP_IOMMU_ERR_TRANS_FAULT	(1 << 1)
-> > > -#define OMAP_IOMMU_ERR_EMU_MISS		(1 << 2)
-> > > -#define OMAP_IOMMU_ERR_TBLWALK_FAULT	(1 << 3)
-> > > -#define OMAP_IOMMU_ERR_MULTIHIT_FAULT	(1 << 4)
-> > > -
-> > 
-> > I'll use those in the tidspbridge driver, in patches that I plan to push
-> > soon.
-> > 
-> > I will apply this patch set on top of mine, see what breaks. Would you
-> > like me to propose a modified version of this set, or add additional
-> > patches in my set ?
+* Daniel Mack <zonque@gmail.com> [121022 12:57]:
+> This patch adds basic DT bindings for OMAP GPMC.
 > 
-> Sure, let's try to expose only the minimal amount of omap iommu things with
-> this patch set so we don't break things. Then the iommu development can
-> continue on it's own independent of the core omap code except for the
-> platform data.
+> The actual peripherals are instanciated from child nodes within the GPMC
+> node, and the only type of device that is currently supported is NAND.
+> 
+> Code was added to parse the generic GPMC timing parameters and some
+> documentation with examples on how to use them.
+> 
+> Successfully tested on an AM33xx board.
 
-I'll rebase my DSP patches on top of this patch set then, it will be easier.
+That's great, looks good to me. Please repost at least the
+binding patch with devicetree-discuss and Rob Herring cc:d
+so hopefully we'll get an ack for the binding.
 
-> But again, if there are nasty layering violations using this code, I would
-> just remove those features. Those things tend to just get worse unless they
-> are fixed properly to start with.
-
-The long-term goal is to move the tidspbridge driver to the IOMMU API, but 
-we'll need a step by step approach.
-
--- 
 Regards,
 
-Laurent Pinchart
+Tony
