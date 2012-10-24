@@ -1,40 +1,101 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 07:43:22 +0200
-Subject: [PATCH 03/10] tty: pxa: configure pin
-In-Reply-To: <20121023115806.GX4477@opensource.wolfsonmicro.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
- <508080CB.5010904@wwwdotorg.org>
- <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
- <5085AC06.8070508@wwwdotorg.org>
- <CACRpkdY-XyagxGU_ya_FZirzbqStTirOC5nuBBwwFY3f4bBTYA@mail.gmail.com>
- <20121023093711.GS4477@opensource.wolfsonmicro.com>
- <CACRpkdb+DkZbTDZamGMN+9t07kPktuA_3QtHQJFv+Vu859r7KA@mail.gmail.com>
- <20121023115806.GX4477@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdb7jtj=J10A4pBQQH4kjWsVhCr8=5R=s3TMNi+jtiwNyg@mail.gmail.com>
+From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
+Date: Wed, 24 Oct 2012 14:48:00 +0900
+Subject: [PATCH] ARM: mach-shmobile: Use DT_MACHINE for mackerel
+Message-ID: <1351057680-4755-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 1:58 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
+Use DT_MACHINE_START() on the sh7372 based mackerel board.
 
-> One problem
-> is that we don't have a home for the SoC integration so we're trying to
-> shove it all into the drivers which just leads to a stack of pointless
-> boilerplate when the driver isn't actually doing anything beyond the
-> basic pattern of turning everything off when it goes idle and turning it
-> on again when it needs to do something.  Having to open code that stuff
-> in the drivers and then deal with the stubbing and error handling so the
-> error handling in the drivers is painful.  There's also another axis
-> where things aren't part of a SoC but are separate devices so you want
-> to carry things along with the driver rather than have a separate bit of
-> code which is required to glue things into the platform.
+Also include a tiny DTS file to describe the board and update the
+Kconfig dependencies to select CONFIG_USE_OF.
 
-I agree. I'm thinking about the approach of adding helpers into the
-PM runtime layer so state handling is centralized, while only the
-event trigger goes into the driver. Basically it's just the implicit
-triggers from pm_runtime_[get|put][[_sync] that is causing
-problems.
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+---
+ arch/arm/boot/dts/Makefile              |    3 ++-
+ arch/arm/boot/dts/sh7372-mackerel.dts   |   22 ++++++++++++++++++++++
+ arch/arm/mach-shmobile/Kconfig          |    1 +
+ arch/arm/mach-shmobile/board-mackerel.c |    8 +++++++-
+ 4 files changed, 32 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sh7372-mackerel.dts
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..a9d8a10 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -77,7 +77,8 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+ dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
+ 	r8a7740-armadillo800eva.dtb \
+-	sh73a0-kzm9g.dtb
++	sh73a0-kzm9g.dtb \
++	sh7372-mackerel.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+diff --git a/arch/arm/boot/dts/sh7372-mackerel.dts b/arch/arm/boot/dts/sh7372-mackerel.dts
+new file mode 100644
+index 0000000..286f0ca
+--- /dev/null
++++ b/arch/arm/boot/dts/sh7372-mackerel.dts
+@@ -0,0 +1,22 @@
++/*
++ * Device Tree Source for the mackerel board
++ *
++ * Copyright (C) 2012 Renesas Solutions Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Mackerel (AP4 EVM 2nd)";
++	compatible = "renesas,mackerel";
++
++	memory {
++		device_type = "memory";
++		reg = <0x40000000 0x10000000>;
++	};
++};
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 8ae100c..0750d9c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -95,6 +95,7 @@ config MACH_MACKEREL
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
++	select USE_OF
+ 
+ config MACH_KOTA2
+ 	bool "KOTA2 board"
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 0c27c81..39b8f2e 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -1651,7 +1651,12 @@ static void __init mackerel_init(void)
+ 	pm_clk_add(&hdmi_lcdc_device.dev, "hdmi");
+ }
+ 
+-MACHINE_START(MACKEREL, "mackerel")
++static const char *mackerel_boards_compat_dt[] __initdata = {
++	"renesas,mackerel",
++	NULL,
++};
++
++DT_MACHINE_START(MACKEREL_DT, "mackerel")
+ 	.map_io		= sh7372_map_io,
+ 	.init_early	= sh7372_add_early_devices,
+ 	.init_irq	= sh7372_init_irq,
+@@ -1659,4 +1664,5 @@ MACHINE_START(MACKEREL, "mackerel")
+ 	.init_machine	= mackerel_init,
+ 	.init_late	= sh7372_pm_init_late,
+ 	.timer		= &shmobile_timer,
++	.dt_compat  = mackerel_boards_compat_dt,
+ MACHINE_END
+-- 
+1.7.10.4
