@@ -1,45 +1,60 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 Oct 2012 10:03:59 +0200
-Subject: [PATCH 0/2] Add hardware I/O coherency support for Armada 370/XP
-Message-ID: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed, 24 Oct 2012 10:04:00 +0200
+Subject: [PATCH 1/2] arm: plat-orion: Add coherency attribute when setup mbus
+ target
+In-Reply-To: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1351065841-18654-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Recent SoC such as Armada 370/XP came with the possibility to deal
+with the I/O coherency by hardware. In this case the transaction
+attribute of the window must be flagged as "Shared transaction". Once
+this flag is set, then the transactions will be forced to be sent
+through the coherency block, in other case transaction is driven
+directly to DRAM.
 
-The purpose of this patch set is to add hardware I/O Coherency support
-for Armada 370 and Armada XP. Theses SoCs come with an unit called
-coherency fabric. A beginning of the support for this unit have been
-introduced with the SMP patch set. This series extend this support:
-the coherency fabric unit allows to use the Armada XP and the Armada
-370 as nearly coherent architectures.
-
-The second patches enables this new feature and register our own set
-of DMA ops, to benefit this hardware enhancement.
-
-The first patch introduces a new flag for the address decoding
-configuration in order to be able to set the memory windows as
-shared memory.
-
-This series depend on the SMP patch set posted on Monday
-(http://thread.gmane.org/gmane.linux.ports.arm.kernel/194901).
-
-Regards,
-
-Gregory
-
-Gregory CLEMENT (2):
-  arm: plat-orion: Add coherency attribute when setup mbus target
-  arm: mvebu: Add hardware I/O Coherency support
-
- arch/arm/boot/dts/armada-370-xp.dtsi        |    3 +-
- arch/arm/mach-mvebu/addr-map.c              |    3 +
- arch/arm/mach-mvebu/armada-370-xp.c         |    1 +
- arch/arm/mach-mvebu/coherency.c             |   87 +++++++++++++++++++++++++++
- arch/arm/mach-mvebu/common.h                |    2 +
- arch/arm/plat-orion/addr-map.c              |    4 ++
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Yehuda Yitschak <yehuday@marvell.com>
+---
+ arch/arm/plat-orion/addr-map.c              |    4 ++++
  arch/arm/plat-orion/include/plat/addr-map.h |    1 +
- 7 files changed, 100 insertions(+), 1 deletion(-)
+ 2 files changed, 5 insertions(+)
 
+diff --git a/arch/arm/plat-orion/addr-map.c b/arch/arm/plat-orion/addr-map.c
+index a7b8060..febe386 100644
+--- a/arch/arm/plat-orion/addr-map.c
++++ b/arch/arm/plat-orion/addr-map.c
+@@ -42,6 +42,8 @@ EXPORT_SYMBOL_GPL(mv_mbus_dram_info);
+ #define WIN_REMAP_LO_OFF	0x0008
+ #define WIN_REMAP_HI_OFF	0x000c
+ 
++#define ATTR_HW_COHERENCY	(0x1 << 4)
++
+ /*
+  * Default implementation
+  */
+@@ -163,6 +165,8 @@ void __init orion_setup_cpu_mbus_target(const struct orion_addr_map_cfg *cfg,
+ 			w = &orion_mbus_dram_info.cs[cs++];
+ 			w->cs_index = i;
+ 			w->mbus_attr = 0xf & ~(1 << i);
++			if (cfg->hw_io_coherency)
++				w->mbus_attr |= ATTR_HW_COHERENCY;
+ 			w->base = base & 0xffff0000;
+ 			w->size = (size | 0x0000ffff) + 1;
+ 		}
+diff --git a/arch/arm/plat-orion/include/plat/addr-map.h b/arch/arm/plat-orion/include/plat/addr-map.h
+index ec63e4a..b76c065 100644
+--- a/arch/arm/plat-orion/include/plat/addr-map.h
++++ b/arch/arm/plat-orion/include/plat/addr-map.h
+@@ -17,6 +17,7 @@ struct orion_addr_map_cfg {
+ 	const int num_wins;	/* Total number of windows */
+ 	const int remappable_wins;
+ 	void __iomem *bridge_virt_base;
++	int hw_io_coherency;
+ 
+ 	/* If NULL, the default cpu_win_can_remap will be used, using
+ 	   the value in remappable_wins */
 -- 
 1.7.9.5
