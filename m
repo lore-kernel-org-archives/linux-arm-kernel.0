@@ -1,89 +1,57 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 24 Oct 2012 12:09:49 -0600
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210241329230.1282-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1210241329230.1282-100000@iolanthe.rowland.org>
-Message-ID: <50882EED.9020200@wwwdotorg.org>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 24 Oct 2012 13:16:56 -0500
+Subject: [PATCH v3 3/5] zynq: remove use of CLKDEV_LOOKUP
+In-Reply-To: <20121024133231.GA28661@elliptictech.com>
+References: <20121024003218.GA31625@beefymiracle.amer.corp.natinst.com>
+ <20121024003442.GD31625@beefymiracle.amer.corp.natinst.com>
+ <20121024133231.GA28661@elliptictech.com>
+Message-ID: <20121024181656.GS20593@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 11:46 AM, Alan Stern wrote:
-> On Wed, 24 Oct 2012, Stephen Warren wrote:
+On Wed, Oct 24, 2012 at 09:32:32AM -0400, Nick Bowler wrote:
+> On 2012-10-23 19:34 -0500, Josh Cartwright wrote:
+> > The Zynq support in mainline does not (yet) make use of any of the
+> > generic clk or clk lookup functionality.  Remove what is upstream for
+> > now, until the out-of-tree implementation is in suitable form for
+> > merging.
+> > 
+> > An important side effect of this patch is that it allows the building of
+> > a Zynq kernel without running into unresolved symbol problems:
+> > 
+> >    drivers/built-in.o: In function `amba_get_enable_pclk':
+> >    clkdev.c:(.text+0x444): undefined reference to `clk_enable'
 > 
->>> How do we determine which existing drivers claim to support usb-ehci?  
->>> A quick search under arch/ and drivers/ turns up nothing but
->>> drivers/usb/host/ehci-ppc-of.c.  Changing it to a more HW-specific
->>> match should be easy enough, and then "usb-ehci" would be safe to use
->>> in ehci-platform.c.
->>
->> It's not drivers that claim to support usb-ehci, but device tree files
->> that contain nodes that include "usb-ehci" in their compatible value,
->> yet need to be handled by a driver that isn't the generic USB EHCI
->> driver, and that driver binds to the other more specific compatible value:
->>
->>> $ grep -HrnI usb-ehci arch/*/boot/dts
-...
->> and then search for all those other compatible values in drivers. The
->> ARM instances certainly all have this issue (although perhaps it's worth
->> investigating if a generic could work for them instead). The PPC
->> instances need more investigation; the values don't show up in of match
->> tables but rather in code.
+> For the record, I think this was introduced by commit 56a34b03ff427
+> ("ARM: versatile: Make plat-versatile clock optional") which forgot to
+> select PLAT_VERSATILE_CLOCK on Zynq.  This is not all that surprising,
+> because the fact that Zynq "uses" PLAT_VERSATILE is secretly hidden in
+> the Makefile.
+
+Yes, indeed.  I did try to fix my problems by having ARCH_ZYNQ select
+PLAT_VERSATILE_CLOCK, but I recall running into additional build
+problems...
+
+But now that I just tried it again, it all seems to work, barring
+Kconfig complaining I've selected PLAT_VERSATILE_CLOCK, but not
+PLAT_VERSATILE.  (Having ARCH_ZYNQ select PLAT_VERSATILE, however, leads
+to additional build problems).
+
+> Nevertheless, the only feature from versatile that Zynq needed was the
+> clock support, so this patch should *also* delete the secret use of
+> plat-versatile by removing this line from arch/arm/Makefile:
 > 
-> Ah, now I'm starting to get the picture.
-> 
-> So by listing "usb-ehci" in its device ID table, a driver would
-> essentially be saying that it can handle _all_ USB EHCI controllers.  
+>   plat-$(CONFIG_ARCH_ZYNQ)	+= versatile
 
-Yes, exactly.
+Yes, indeed it should.
 
-> (Which means that the entry in ehci-ppc-of.c is questionable; perhaps
-> the intention is that this driver really does handle all EHCI
-> controllers on any PPC-based OpenFirmware platform bus.)
+Thanks,
 
-Yes, that seems questionable, although perhaps within the context of
-only enabling the driver on PPC specifically, it may be reasonable.
-
->> This doesn't continue forever though; you typically only list the
->> specific HW model, the base specific model it's compatible with, and any
->> generic value needed. So, a hypothetical Tegra40 EHCI controller would be:
->>
->> compatible = "nvidia,tegra40-ehci", "nvidia,tegra20-ehci", "usb-ehci".
-> 
-> What's the reason for listing the generic value if drivers can't key
-> off it?  Does it contain any information that's not already present in 
-> the specific values?
-
-This may or may not be a mistake.
-
-The idea is that usb-ehci is included in the device node's compatible
-list iff the HW is 100% compatible with a "usb-ehci" HW device, and
-hence a pure usb-ehci driver can handle the hardware without any
-additional knowledge. (That's true in general for any compatible value).
-
-It's quite possible that this often gets translated to the subtly
-different "the HW is an EHCI controller, so it gets
-compatible="usb-ehci"" when writing .dts files.
-
-So yes we probably should remove compatible="usb-ehci" from any device
-node for HW which really isn't a pure EHCI device. That would presumably
-require looking at the existing custom drivers and/or HW specs to
-determine what, if anything, is different about the HW.
-
-Related, at least on Tegra, the PHY handling is IIRC pretty tightly
-coupled into the EHCI driver. We probably should have separate nodes
-for, and drivers for, the PHYs instead. I don't know if that would
-remove all the non-standard attributes of the Tegra EHCI HW and hence
-allow Tegra's EHCI to be handled by the generic driver. From memory,
-there are certainly some HW workarounds in the Tegra EHCI driver that
-would need to be ported though.
-
-> It sounds like the ehci-platform driver should simply list all the
-> specific HW device types (or base HW device types) that it handles, and
-> it shouldn't include "usb-ehci" in the list.  As more DT board files
-> are created or as ehci-platform becomes capable to taking over from
-> other drivers, its device list would grow.
-
-That's certainly a reasonable way to go too. I think the only downside
-with that approach is that every new device needs a kernel update to add
-it to the table, whereas using a generic compatible="usb-ehci" wouldn't,
-assuming no quirks were required for the new device.
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/07b24168/attachment.sig>
