@@ -1,48 +1,57 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 16:25:20 +0200
-Subject: [PATCH 1/5] ARM: Kirkwood: Allow use of pinctrl
-In-Reply-To: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
-References: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1351088724-11142-2-git-send-email-andrew@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Oct 2012 15:32:04 +0100
+Subject: [PATCH] ARM: PMU: fix runtime PM enable
+In-Reply-To: <5087F84B.9070705@ti.com>
+References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
+ <20121024093150.GA23775@mudshark.cambridge.arm.com>
+ <5087F84B.9070705@ti.com>
+Message-ID: <20121024143204.GF7339@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a pinctrl driver for arch-mvebu. It supports kirkwood out
-of the box. Allow ARCH_KIRKWOOD to select it, and make ARCH_KIRKWOOD
-select it. This then allows the convertion of board-*.c files away
-from MPP to pinctrl in DT, before they get moved over into mach-mvebu.
+On Wed, Oct 24, 2012 at 03:16:43PM +0100, Jon Hunter wrote:
+> Hi Will,
+> 
+> On 10/24/2012 04:31 AM, Will Deacon wrote:
+> > Can we not just use the presence of the resume/suspend function pointers to
+> > indicate whether we should enable runtime pm or not? i.e. if they're not
+> > NULL, then enable the thing?
+> 
+> I wondered if you would ask that :-)
+> 
+> Unfortunately, we can't. For example, OMAP3430 and OMAP4460 both require
+> runtime_pm to be enabled to turn on the debug sub-system in OMAP for PMU
+> to work. However, neither of these devices are using the suspend/resume
+> callbacks because the HWMOD framework is doing this for us behind the
+> scenes.
+> 
+> So then you ask, why do we need the resume/suspend callbacks, well we
+> will need them for OMAP4430 where in addition to turning on the debug
+> sub-system we need to configure the CTI module. Therefore, I had to add
+> another plat data variable.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/Kconfig        |    2 ++
- drivers/pinctrl/Kconfig |    2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Hmmm, now I start to wonder whether your original idea of having separate
+callbacks for enable/disable irq and resume/suspend doesn't make more sense.
+Then the CTI magic can go in the irq management code and be totally separate
+to the PM stuff.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 73067ef..160cd40 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -548,6 +548,8 @@ config ARCH_KIRKWOOD
- 	select GENERIC_CLOCKEVENTS
- 	select PCI
- 	select PLAT_ORION_LEGACY
-+	select PINCTRL
-+	select PINCTRL_KIRKWOOD
- 	help
- 	  Support for the following Marvell Kirkwood series SoCs:
- 	  88F6180, 88F6192 and 88F6281.
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 7bf914d..5682c96 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -188,7 +188,7 @@ config PINCTRL_EXYNOS4
- 
- config PINCTRL_MVEBU
- 	bool
--	depends on ARCH_MVEBU
-+	depends on ARCH_MVEBU || ARCH_KIRKWOOD
- 	select PINMUX
- 	select PINCONF
- 
--- 
-1.7.10.4
+What do you reckon?
+
+> By the way, I did add a comment in the above changelog about this. See
+> the last paragraph, not sure if this is 100% clear.
+
+Sorry, I missed that this morning.
+
+> One alternative I had thought about was always calling
+> pm_runtime_enable() on registering the PMU device and avoid having a
+> use_runtime_pm variable. For ARM platforms that don't use runtime PM the
+> pm_runtime_enable() function does nothing. However, I was more concerned
+> about adding unnecessary overhead for ARM platforms that are using
+> runtime PM but don't need runtime PM for PMU. I don't see any side
+> affects on our OMAP2 platform that does not need runtime PM for PMU.
+> However, was not sure what is best here.
+
+Nah, we should be able to fix this in the platdata, I'd just rather have
+function pointers instead of state variables in there.
+
+Will
