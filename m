@@ -1,18 +1,160 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 14:00:17 +0200
-Subject: [PATCH 1/1] pinctrl: at91: fix typo on PULL_UP
-In-Reply-To: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdavx7xeQqLf_R09wQoS=qHXZ3EOZSUz7jSoxQD-DxROqQ@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 24 Oct 2012 19:59:57 +0800
+Subject: [PATCH 3/3] dmaengine: sirf: enable the driver support new
+ SiRFmarco SoC
+In-Reply-To: <1351076581.5263.56.camel@vkoul-udesk3>
+References: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
+ <1351076581.5263.56.camel@vkoul-udesk3>
+Message-ID: <CAGsJ_4yY6YYKb+g4k7BcL_SyyBN9xYCwxRLX6rN5_afroK0e_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 6:28 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
+Hi Vinod,
+Thanks a lot!
 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+2012/10/24 Vinod Koul <vkoul@infradead.org>
+>
+> On Thu, 2012-09-27 at 16:36 +0800, Barry Song wrote:
+> > From: Barry Song <Baohua.Song@csr.com>
+> >
+> > The driver supports old up SiRFprimaII SoCs, this patch makes it support
+> > the new SiRFmarco as well.
+> > SiRFmarco, as a SMP SoC, adds new DMA_INT_EN_CLR and DMA_CH_LOOP_CTRL_CLR
+> > registers, to disable IRQ/Channel, we should write 1 to the corresponding
+> > bit in the two CLEAR register.
+> >
+> > Tested on SiRFmarco using SPI driver:
+> >     $ /mnt/spidev-sirftest -D /dev/spidev32766.0
+> >     spi mode: 0
+> >     bits per word: 8
+> >     max speed: 500000 Hz (500 KHz)
+> >
+> >     00 00 00 00 00 00
+> >     00 00 00 00 00 00
+> >     00 00 00 00 00 00
+> >     00 00 00 00 00 00
+> >     00 00 00 00 00 00
+> >     00 00 00 00 00 00
+> >     00 00 00 00
+> >
+> >     $ cat /proc/interrupts
+> >                CPU0       CPU1
+> >      32:       1593          0       GIC  sirfsoc_timer0
+> >      33:          0       3533       GIC  sirfsoc_timer1
+> >      44:          0          0       GIC  sirfsoc_dma
+> >      45:         16          0       GIC  sirfsoc_dma
+> >      47:          6          0       GIC  sirfsoc_spi
+> >      50:       5654          0       GIC  sirfsoc-uart
+> >      ...
+> >
+> > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> > ---
+> >  depends on pulled CSR SiRFmarco preparing patches:
+> >  http://www.spinics.net/lists/arm-kernel/msg191412.html
+> >
+> >  drivers/dma/Kconfig    |    2 +-
+> >  drivers/dma/sirf-dma.c |   25 +++++++++++++++++++------
+> >  2 files changed, 20 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> > index d06ea29..bf5f405 100644
+> > --- a/drivers/dma/Kconfig
+> > +++ b/drivers/dma/Kconfig
+> > @@ -203,7 +203,7 @@ config TIMB_DMA
+> >
+> >  config SIRF_DMA
+> >       tristate "CSR SiRFprimaII DMA support"
+> > -     depends on ARCH_PRIMA2
+> > +     depends on ARCH_SIRF
+> patch description says adding support, but now your are removing for
+> PRIMA2, did I miss anything?
 
-Applied to the at91 branch, thanks!
-Linus Walleij
+this is not removing PRIMA2, as you see the newest kernel, SIRF
+includes PRIMA2 and coming MARCO. so let the driver depend on SIRF
+since it supports both PRIMA2 and MARCO. see commit:
+
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=commitdiff;h=156a09979710f260f4482961869d6260148341e9
+
+> >       select DMA_ENGINE
+> >       help
+> >         Enable support for the CSR SiRFprimaII DMA engine.
+> > diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> > index c439489..fbb0199 100644
+> > --- a/drivers/dma/sirf-dma.c
+> > +++ b/drivers/dma/sirf-dma.c
+> > @@ -32,7 +32,9 @@
+> >  #define SIRFSOC_DMA_CH_VALID                    0x140
+> >  #define SIRFSOC_DMA_CH_INT                      0x144
+> >  #define SIRFSOC_DMA_INT_EN                      0x148
+> > +#define SIRFSOC_DMA_INT_EN_CLR                       0x14C
+> can you pls align this
+> >  #define SIRFSOC_DMA_CH_LOOP_CTRL                0x150
+> > +#define SIRFSOC_DMA_CH_LOOP_CTRL_CLR            0x15C
+> >
+> >  #define SIRFSOC_DMA_MODE_CTRL_BIT               4
+> >  #define SIRFSOC_DMA_DIR_CTRL_BIT                5
+> > @@ -76,6 +78,7 @@ struct sirfsoc_dma {
+> >       struct sirfsoc_dma_chan         channels[SIRFSOC_DMA_CHANNELS];
+> >       void __iomem                    *base;
+> >       int                             irq;
+> > +     bool                            is_marco;
+> >  };
+> >
+> >  #define DRV_NAME     "sirfsoc_dma"
+> > @@ -288,13 +291,19 @@ static int sirfsoc_dma_terminate_all(struct sirfsoc_dma_chan *schan)
+> >       int cid = schan->chan.chan_id;
+> >       unsigned long flags;
+> >
+> > -     writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
+> > -             ~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
+> > -     writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
+> > -
+> > -     writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+> > -             & ~((1 << cid) | 1 << (cid + 16)),
+> > +     if (!sdma->is_marco) {
+> > +             writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_INT_EN) &
+> > +                     ~(1 << cid), sdma->base + SIRFSOC_DMA_INT_EN);
+> > +             writel_relaxed(readl_relaxed(sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL)
+> > +                     & ~((1 << cid) | 1 << (cid + 16)),
+> >                       sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL);
+> > +     } else {
+> > +             writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_INT_EN_CLR);
+> > +             writel_relaxed((1 << cid) | 1 << (cid + 16),
+> > +                     sdma->base + SIRFSOC_DMA_CH_LOOP_CTRL_CLR);
+> > +     }
+> > +
+> > +     writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_VALID);
+> >
+> >       spin_lock_irqsave(&schan->lock, flags);
+> >       list_splice_tail_init(&schan->active, &schan->free);
+> > @@ -568,6 +577,9 @@ static int __devinit sirfsoc_dma_probe(struct platform_device *op)
+> >               return -ENOMEM;
+> >       }
+> >
+> > +     if (of_device_is_compatible(dn, "sirf,marco-dmac"))
+> not a DT expert, but wouldn't there be a space after comma?
+
+compatible fields in .dts don't have space after comma:
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git;a=tree;f=arch/arm/boot/dts;
+
+
+> > +             sdma->is_marco = true;
+> > +
+> >       if (of_property_read_u32(dn, "cell-index", &id)) {
+> >               dev_err(dev, "Fail to get DMAC index\n");
+> >               ret = -ENODEV;
+> > @@ -677,6 +689,7 @@ static int __devexit sirfsoc_dma_remove(struct platform_device *op)
+> >
+> >  static struct of_device_id sirfsoc_dma_match[] = {
+> >       { .compatible = "sirf,prima2-dmac", },
+> > +     { .compatible = "sirf,marco-dmac", },
+> >       {},
+> >  };
+> >
+>
+>
+> --
+> Vinod Koul
+> Intel Corp.
+
+-barry
