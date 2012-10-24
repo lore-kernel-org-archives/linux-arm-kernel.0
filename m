@@ -1,73 +1,77 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 24 Oct 2012 10:57:00 -0400 (EDT)
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <5086F8D6.5050605@gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
+From: hechtb@googlemail.com (Bastian Hecht)
+Date: Wed, 24 Oct 2012 17:04:46 +0200
+Subject: Possible regression in arm/io.h
+In-Reply-To: <20121024135854.GD7339@mudshark.cambridge.arm.com>
+References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
+ <20121024105223.GC23775@mudshark.cambridge.arm.com>
+ <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
+ <20121024130957.GB7339@mudshark.cambridge.arm.com>
+ <CABYn4sz4v7Uf07am=MtPAKAvvAjwt+-bTRaLrBjoiRuyR9cfZw@mail.gmail.com>
+ <20121024135854.GD7339@mudshark.cambridge.arm.com>
+Message-ID: <CABYn4sxnwzj8KFfELzCLzQMcAjiqS3_Vr2kStkm-na8G1noPHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Oct 2012, Rob Herring wrote:
+>> > Ok, I'll have a look at the impact of moving exclusively to "Q" when I get a
+>> > chance. Which toolchain are you using?
+>>
+>> gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+>> For a more verbose info take a look at the bug report link.
+>
+> Ok, thanks. One other thing you could try while I try to find a copy of that
+> toolchain is changing the "+" modifier to an "=", like I proposed in this
+> version of the patch:
 
-> On 10/23/2012 02:33 PM, Alan Stern wrote:
-> > On Tue, 23 Oct 2012, Stephen Warren wrote:
-> > 
-> >>> Nothing intrinsically distinguishes this class of hardware.  The only
-> >>> thing these devices have in common is that they can be managed by
-> >>> Linux's ehci-platform driver.
-> >>
-> >> I don't agree. They're all EHCI USB controllers (or all EHCI USB
-> >> controllers that don't require custom drivers due to quirks), which is a
-> >> much more general statement than anything related to which driver Linux
-> >> uses for them.
-> > 
-> > That's true, but it doesn't distinguish these devices.  There are other
-> > EHCI controllers with no quirks that nevertheless can't be handled by
-> > ehci-platform because they have requirements (_not_ quirks) that
-> > ehci-platform is unable to deal with currently -- clocks or power
-> > supplies or special register settings or PHYs or etc.
-> 
-> But what if the h/w has quirks you haven't yet discovered? You need the
-> compatible property to be specific now, so if there are any future
-> driver changes needed the DT does not have to change (as it may be in
-> firmware which you can't change).
+So if alter it to fit to your patch scheme the result is:
 
-That argument applies always, doesn't it?  There's always a chance that 
-you might discover a new quirk in a device for which the DT board file 
-has already been written and committed to firmware.  The board file 
-could declare that the device is compatible with something older, but 
-the new quirk might ruin that compatibility.
+  CC      arch/arm/kernel/asm-offsets.s
+In file included from include/linux/scatterlist.h:10,
+                 from include/linux/dma-mapping.h:9,
+                 from arch/arm/kernel/asm-offsets.c:15:
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h: In function
+'__raw_readb':
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:100: error:
+output operand constraint lacks '='
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:98: error:
+output operand constraint lacks '='
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:98: error:
+invalid lvalue in asm output 0
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h: In function
+'__raw_readl':
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:109: error:
+output operand constraint lacks '='
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:107: error:
+output operand constraint lacks '='
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:107: error:
+invalid lvalue in asm output 0
 
-> > Okay, fine.  But then what should the binding documentation specify for
-> > the compatible value?  A list of all the HW models that the driver
-> > currently supports?
-> 
-> The binding docs should be independent of the driver. There may be
-> fields the driver ignores. So you need to document all defined
-> compatible strings. It is fine if the driver only has "usb-ehci", but it
-> is not fine for the DT to only have that.
+and if I just replace all +Q with =Q it's this:
+  LD      kernel/time/built-in.o
+drivers/sh/intc/access.c: In function 'test_8':
+drivers/sh/intc/access.c:78: warning: passing argument 1 of
+'__raw_readb' makes pointer from integer without a cast
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:95: note:
+expected 'const volatile void *' but argument is of type 'long
+unsigned int'
+drivers/sh/intc/access.c: In function 'test_16':
+drivers/sh/intc/access.c:84: warning: passing argument 1 of
+'__raw_readw' makes pointer from integer without a cast
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:71: note:
+expected 'const volatile void *' but argument is of type 'long
+unsigned int'
+drivers/sh/intc/access.c: In function 'test_32':
+drivers/sh/intc/access.c:90: warning: passing argument 1 of
+'__raw_readl' makes pointer from integer without a cast
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:104: note:
+expected 'const volatile void *' but argument is of type 'long
+unsigned int'
+drivers/sh/intc/access.c: In function 'write_8':
+drivers/sh/intc/access.c:96: warning: passing argument 2 of
+'__raw_writeb' makes pointer from integer without a cast
+/home/basti/renesas/flctl_patch/arch/arm/include/asm/io.h:81: note:
+expected 'volatile void *' but argument is of type 'long unsigned int'
+... and so on
 
-Under the circumstances, do we really need a new binding document for 
-the ehci-platform driver?  We should be able to use the existing 
-usb-ehci binding, perhaps with some new properties added:
+cheers,
 
-	has-synopsys-hc-bug
-	no-io-watchdog
-	has-tt
-
-We probably can omit has-synopsys-hc-bug, as that is specific to one
-type of MIPS ATH79 controller.  The driver can check for it explicitly,
-if necessary.
-
-In fact, it's not clear that these new properties need to be added now.  
-They can be added over time as needed, as existing drivers are
-converted over to DT.  Or is it preferable to document these things
-now, preemptively as it were?
-
-The one that matters most and is most clearly a property of the HW is
-"has-tt".  IMO it should be added right away, even though there may
-already be DT board files that could specify it but don't.  Right now,
-for example, the ehci-xilinx-of driver checks instead for the
-"support-usb-fs" property, as defined in
-Documentation/devicetree/bindings/xilinx.txt.
-
-Alan Stern
+ Bastian
