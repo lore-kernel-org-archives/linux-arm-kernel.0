@@ -1,32 +1,95 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 24 Oct 2012 14:09:14 +0900
-Subject: [PATCH] ARM: dma-mapping: fix build warning in __dma_alloc()
-Message-ID: <000f01cdb1a5$b6409b60$22c1d220$%han@samsung.com>
+From: chanho61.park@samsung.com (Chanho Park)
+Date: Wed, 24 Oct 2012 14:34:50 +0900
+Subject: [PATCH v5 1/5] ARM: EXYNOS: Add set_irq_affinity function for
+ combiner_irq
+In-Reply-To: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+References: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+Message-ID: <1351056894-5790-2-git-send-email-chanho61.park@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build warning in __dma_alloc() as below:
+This patch adds set_irq_affinity function for combiner_irq. We need this
+function to enable a arm-pmu because the pmu of exynos has combined type irqs.
 
-arch/arm/mm/dma-mapping.c: In function '__dma_alloc':
-arch/arm/mm/dma-mapping.c:653:29: warning: 'page' may be used uninitialized in this function [-Wuninitialized]
-
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Reviewed-by: Thomas Abraham <thomas.abraham@linaro.org>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mm/dma-mapping.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos/common.c |   30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 477a2d2..58bc3e4 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -610,7 +610,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 			 gfp_t gfp, pgprot_t prot, bool is_coherent, const void *caller)
- {
- 	u64 mask = get_coherent_dma_mask(dev);
--	struct page *page;
-+	struct page *page = NULL;
- 	void *addr;
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 715b690..709245e 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -405,6 +405,7 @@ struct combiner_chip_data {
+ 	unsigned int irq_offset;
+ 	unsigned int irq_mask;
+ 	void __iomem *base;
++	unsigned int parent_irq;
+ };
  
- #ifdef CONFIG_DMA_API_DEBUG
+ static struct irq_domain *combiner_irq_domain;
+@@ -461,10 +462,28 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
+ 
++#ifdef CONFIG_SMP
++static int combiner_set_affinity(struct irq_data *d,
++				 const struct cpumask *mask_val, bool force)
++{
++	struct combiner_chip_data *chip_data = irq_data_get_irq_chip_data(d);
++	struct irq_chip *chip = irq_get_chip(chip_data->parent_irq);
++	struct irq_data *data = irq_get_irq_data(chip_data->parent_irq);
++
++	if (chip && chip->irq_set_affinity)
++		return chip->irq_set_affinity(data, mask_val, force);
++	else
++		return -EINVAL;
++}
++#endif
++
+ static struct irq_chip combiner_chip = {
+-	.name		= "COMBINER",
+-	.irq_mask	= combiner_mask_irq,
+-	.irq_unmask	= combiner_unmask_irq,
++	.name			= "COMBINER",
++	.irq_mask		= combiner_mask_irq,
++	.irq_unmask		= combiner_unmask_irq,
++#ifdef CONFIG_SMP
++	.irq_set_affinity	= combiner_set_affinity,
++#endif
+ };
+ 
+ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
+@@ -484,12 +503,13 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
+ }
+ 
+ static void __init combiner_init_one(unsigned int combiner_nr,
+-				     void __iomem *base)
++				     void __iomem *base, unsigned int irq)
+ {
+ 	combiner_data[combiner_nr].base = base;
+ 	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
+ 		combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
+ 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
++	combiner_data[combiner_nr].parent_irq = irq;
+ 
+ 	/* Disable all interrupts */
+ 	__raw_writel(combiner_data[combiner_nr].irq_mask,
+@@ -573,12 +593,12 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 	}
+ 
+ 	for (i = 0; i < max_nr; i++) {
+-		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
+ 		irq = IRQ_SPI(i);
+ #ifdef CONFIG_OF
+ 		if (np)
+ 			irq = irq_of_parse_and_map(np, i);
+ #endif
++		combiner_init_one(i, combiner_base + (i >> 2) * 0x10, irq);
+ 		combiner_cascade_irq(i, irq);
+ 	}
+ }
 -- 
-1.7.1
+1.7.9.5
