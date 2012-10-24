@@ -1,36 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Oct 2012 11:00:29 -0700
-Subject: [PATCH] MAINTAINERS: Add arm-soc tree entry
-Message-ID: <1351101629-11826-1-git-send-email-sboyd@codeaurora.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 24 Oct 2012 14:04:12 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <2721213.h9kKFkpVW0@flexo>
+Message-ID: <Pine.LNX.4.44L0.1210241358090.1282-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the arm-soc tree in the maintainers file so that
-developers know how arm SoC development is structured.
+On Wed, 24 Oct 2012, Florian Fainelli wrote:
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+> As long as no one enables both ehci-platform and ehci-ppc-of at the same time
+> there is no problem. ehci-ppc-of should be removed in favor of ehci-platform
+> and make sure that the specific quirk in ehci-ppc-of also gets ported, other 
+> that I see no issue using "usb-ehci" as the least detailed compatible property
+> name.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 014272b..f70afea 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -637,6 +637,13 @@ W:	http://www.arm.linux.org.uk/
- S:	Maintained
- F:	arch/arm/
- 
-+ARM SUB-ARCHITECTURES
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	MAINTAINED
-+F:	arch/arm/mach-*/
-+F:	arch/arm/plat-*/
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-+
- ARM PRIMECELL AACI PL041 DRIVER
- M:	Russell King <linux@arm.linux.org.uk>
- S:	Maintained
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Suppose a DT board file is created for a oontroller which ehci-platform
+can't handle.  Then by your proposal, the board file shouldn't have
+"usb-ehci" in its compatible property.
+
+Now later on, suppose ehci-platform is enhanced so that it can manage
+that controller.  It's too late to update the board file because the
+information has already been written to various firmwares.  The
+enhanced ehci-platform would have to include a special entry to match
+the controller.
+
+Since this reasoning applies every time ehci-platform is updated, it 
+seems reasonable to use the same approach right from the beginning.
+
+Alan Stern
