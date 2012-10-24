@@ -1,63 +1,54 @@
-From: nbowler@elliptictech.com (Nick Bowler)
-Date: Tue, 23 Oct 2012 16:27:03 -0400
-Subject: [PATCH v2 2/4] zynq: move static peripheral mappings
-In-Reply-To: <20121023162641.GG20593@beefymiracle.amer.corp.natinst.com>
-References: <20121022211219.GC31538@beefymiracle.amer.corp.natinst.com>
- <201210231450.11540.arnd@arndb.de>
- <20121023162641.GG20593@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121023202703.GA16912@elliptictech.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 23 Oct 2012 19:36:02 -0700
+Subject: [PATCH v2 2/7] ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+In-Reply-To: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
+References: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1351046167-4882-3-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-10-23 11:26 -0500, Josh Cartwright wrote:
-> On Tue, Oct 23, 2012 at 02:50:11PM +0000, Arnd Bergmann wrote:
-> > On Monday 22 October 2012, Josh Cartwright wrote:
-> > > Shifting them up into the vmalloc region prevents the following warning,
-> > > when booting a zynq qemu target with more than 512mb of RAM:
-> > > 
-> > >   BUG: mapping for 0xe0000000 at 0xe0000000 out of vmalloc space
-> > > 
-> > > In addition, it allows for reuse of these mappings when the proper
-> > > drivers issue requests via ioremap().
-> > > 
-> > > Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> > 
-> > This looks like a bug fix that should be backported to older kernels,
-> > so it would be good to add 'Cc: stable at vger.kernel.org' below your
-> > Signed-off-by.
-> 
-> Will-do, thanks.
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Just FYI, I sent a patch to fix the same bug a while back
+The current OMAP2 SHAM support doesn't enable DMA
+so add that support so it can use DMA just like OMAP3.
 
-  https://patchwork.kernel.org/patch/1156361/
+CC: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c | 2 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-together with other patches to fix early printk on the ZC702 serial
-console.  Admittedly, I dropped the ball on these as other issues
-came up so I was away from the Zynq for a while.
-
-However, I'm now getting back on the Zynq and have a bunch of patches to
-make it all work on the ZC702 board.  I've respun the ZC702 early boot
-fixes against newer git but they're obviously going to conflict with
-this series.  Should I resend them anyway?
-
-> > > -#define TTC0_PHYS			0xF8001000
-> > > -#define TTC0_VIRT			TTC0_PHYS
-> > > +#define TTC0_PHYS		0xF8001000
-> > > +#define TTC0_SIZE		SZ_4K
-> > > +#define TTC0_VIRT		(UART0_VIRT - TTC0_SIZE)
-> > 
-> > It's quite likely that this does not have to be a fixed mapping
-> > any more. Just have a look at how drivers/clocksource/dw_apb_timer_of.c
-> > calls of_iomap() to get the address.
-> 
-> Yes, this is already on my list of plans.  The in-tree TTC driver
-> unfortunately doesn't yet support device tree bindings.  Are you
-> comfortable waiting on the DT-ification of the TTC in a follow-up
-> patchset?
-
-I also have a DT binding for the TTC driver, I can send that.
-
-Cheers,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
+index bb314c5..4b4fd5f 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
+@@ -405,5 +405,5 @@ struct omap_hwmod_ocp_if omap2xxx_l4_core__sham = {
+ 	.slave		= &omap2xxx_sham_hwmod,
+ 	.clk		= "sha_ick",
+ 	.addr		= omap2xxx_sham_addrs,
+-	.user		= OCP_USER_MPU,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+index a041670..703b269 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+@@ -873,9 +873,15 @@ struct omap_hwmod_irq_info omap2_sham_mpu_irqs[] = {
+ 	{ .irq = -1 }
+ };
+ 
++struct omap_hwmod_dma_info omap2_sham_sdma_chs[] = {
++	{ .name = "rx", .dma_req = OMAP24XX_DMA_SHA1MD5_RX },
++	{ .dma_req = -1 }
++};
++
+ struct omap_hwmod omap2xxx_sham_hwmod = {
+ 	.name		= "sham",
+ 	.mpu_irqs	= omap2_sham_mpu_irqs,
++	.sdma_reqs	= omap2_sham_sdma_chs,
+ 	.main_clk	= "l4_ck",
+ 	.prcm		= {
+ 		.omap2 = {
 -- 
-Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
+1.7.12
