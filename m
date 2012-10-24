@@ -1,32 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 24 Oct 2012 14:27:32 -0700
-Subject: [PATCH v6] Enable USB peripheral mode on dm365 EVM
-In-Reply-To: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
-References: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
-Message-ID: <20121024212732.GA31406@kroah.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 24 Oct 2012 23:33:56 +0200
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <20121024200128.GY21046@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <201210242006.55879.michael@walle.cc>
+ <20121024200128.GY21046@lunn.ch>
+Message-ID: <20121024233356.1bda95bf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 02:33:32PM +0200, Constantine Shulyupin wrote:
-> From: Constantine Shulyupin <const@MakeLinux.com>
-> 
-> Sets USB PHY clock source to 24 MHz clock and call USB configuration from board initialization.
-> 
-> Tested with OTG configuration, usb gadget g_zero on DM365 EVM connected to PC.
-> 
-> References:
-> 
-> Definition of USB_PHY_CTRL and PHYCLKFREQ:
-> - http://www.makelinux.com/lib/ti/DM36x_ARM/doc-141
-> 
-> Original patch by miguel.aguilar at ridgerun.com three years ago:
-> - http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
-> 
-> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+Andrew,
 
-Note, Felipe is the right person to be sending these types of patches
-to, not me.  scripts/get_maintainer.pl is your friend :)
+On Wed, 24 Oct 2012 22:01:28 +0200, Andrew Lunn wrote:
 
-thanks,
+> I guess it is too early to use gpio. I don't think the gpio driver has
+> not been configured yet.
+> 
+> I need to think about this.
+> 
+> What happens if you comment out these two gpio_set_value calls?
 
-greg k-h
+The problem is (probably, I haven't tested) that in
+mach-kirkwood/board-dt.c, the of_platform_populate() function is called
+after all the board-specific init. So all the devices described in the
+DT, including GPIO banks, have not been registered yet. Most likely the
+of_platform_populate() should come before the board specific inits.
+
+Also there should probably  be a gpio_request() before those
+gpio_set_value().
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
