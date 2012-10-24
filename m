@@ -1,63 +1,27 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 24 Oct 2012 12:09:37 +0200
-Subject: [PATCH v3 0/4] ARM: dts: Update OMAP5 with address space and
- interrupts
-In-Reply-To: <5087B47B.8080009@ti.com>
-References: <1351062434-22514-1-git-send-email-s-guiriec@ti.com>
- <5087B196.7090804@ti.com> <5087B47B.8080009@ti.com>
-Message-ID: <5087BE61.6060704@ti.com>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Wed, 24 Oct 2012 12:19:11 +0200
+Subject: [PATCH] ARM: at91: dt: evk-pro3: enable uart0 and uart2
+In-Reply-To: <20121023104212.GD18964@game.jcrosoft.org>
+References: <1350986416-16246-1-git-send-email-fabio.porcedda@gmail.com>
+ <20121023104212.GD18964@game.jcrosoft.org>
+Message-ID: <CAHkwnC9oap8hvHszoZyAxVssz3qC671X-Ktf4++Nfd1HdyKiwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 11:27 AM, Sebastien Guiriec wrote:
-> Hi Benoit,
-> 
-> On 10/24/2012 11:15 AM, Benoit Cousson wrote:
->> Hi Seb,
->>
->> Sorry, I missed your previous email, your v2 was the right one.
->> We do have a single INTC in every OMAP, there is no point to repeat the
->> same data hundred times.
->> The DTS are already big enough.
-> 
-> So in such case we should send a series for audio IP interrupt-parent
-> removal for OMAP3/4/5 dtsi file in order to be coherent.
+On Tue, Oct 23, 2012 at 12:42 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> Hi,
+>
+>         You will have to wait a few I prepare a patch series for pinctrl
+>
+>         so most of the current drivers will support pinctrl and requere it
+>
+>         this will availabe rc3 or rc4 max
+>
+>         then I will merge more update and boards
 
-Yes. AM33xx was as well using that in some other IPs.
+Ok, i will wait.
 
-> Do you want me to do it?
-
-Thanks, but I've just done the patch, I'll sent it in a couple of minutes.
-
-Benoit
-
-> 
->>
->> On 10/24/2012 09:07 AM, Sebastien Guiriec wrote:
->>> Since kernel 3.7 the DTS data are not overwriten by hwmod data we can
->>> add the address space
->>> and interrupt line description inside dtsi file for OMAP5. This serie
->>> is updating the
->>> current OMAP5 IP with missing entry.
->>>
->>> It has been tested on OMAP5 with 3.7-audio-display feature tree.
->>> - MMC is probing and functional
->>> - TWL6041 probing (GPIO/I2C)
->>> - booting (UART)
->>>
->>> Update since v1:
->>> - Add Ack and review
->>> - Fix up commit messages.
->>>
->>> Update since v2:
->>> - Add interrupt-parent.
->>
->> I will take the previous one to avoid the duplication of attributes.
->>
->> On top of that I will remove the ones introduce in audio IPs for
->> consistency on OMAP3/4/5 platforms.
->>
->> Regards,
->> Benoit
->>
-> 
+Best regards
+-- 
+Fabio Porcedda
