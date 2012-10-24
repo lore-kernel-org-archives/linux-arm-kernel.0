@@ -1,118 +1,187 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 23 Oct 2012 19:36:05 -0700
-Subject: [PATCH v2 5/7] crypto: omap-sham: Convert to use pm_runtime API
+Date: Tue, 23 Oct 2012 19:36:03 -0700
+Subject: [PATCH v2 3/7] ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data
+ to hwmod
 In-Reply-To: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
 References: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1351046167-4882-6-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1351046167-4882-4-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-Convert the omap-sham crypto driver to use the
-pm_runtime API instead of the clk API.
+Convert the device data for the OMAP3 SHAM2 (SHA1/MD5) crypto IP
+from explicit platform_data to hwmod.
 
-CC: Kevin Hilman <khilman@deeprootsystems.com>
 CC: Paul Walmsley <paul@pwsan.com>
-CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- drivers/crypto/omap-sham.c | 25 +++++++------------------
- 1 file changed, 7 insertions(+), 18 deletions(-)
+ arch/arm/mach-omap2/clock3xxx_data.c       |  1 +
+ arch/arm/mach-omap2/devices.c              | 42 ++-------------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 60 ++++++++++++++++++++++++++++++
+ 3 files changed, 64 insertions(+), 39 deletions(-)
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index a3fd6fc..acb85df 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -22,12 +22,12 @@
- #include <linux/errno.h>
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
--#include <linux/clk.h>
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/scatterlist.h>
- #include <linux/dma-mapping.h>
-+#include <linux/pm_runtime.h>
- #include <linux/delay.h>
- #include <linux/crypto.h>
- #include <linux/cryptohash.h>
-@@ -141,7 +141,6 @@ struct omap_sham_dev {
- 	struct device		*dev;
- 	void __iomem		*io_base;
- 	int			irq;
--	struct clk		*iclk;
- 	spinlock_t		lock;
- 	int			err;
- 	int			dma;
-@@ -238,8 +237,6 @@ static void omap_sham_copy_ready_hash(struct ahash_request *req)
+diff --git a/arch/arm/mach-omap2/clock3xxx_data.c b/arch/arm/mach-omap2/clock3xxx_data.c
+index 1f42c9d..6f14d9b 100644
+--- a/arch/arm/mach-omap2/clock3xxx_data.c
++++ b/arch/arm/mach-omap2/clock3xxx_data.c
+@@ -3342,6 +3342,7 @@ static struct omap_clk omap3xxx_clks[] = {
+ 	CLK(NULL,	"icr_ick",	&icr_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-aes",	"ick",	&aes2_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap-sham",	"ick",	&sha12_ick,	CK_34XX | CK_36XX),
++	CLK(NULL,	"sha12_ick",	&sha12_ick,	CK_34XX | CK_36XX),
+ 	CLK(NULL,	"des2_ick",	&des2_ick,	CK_34XX | CK_36XX),
+ 	CLK("omap_hsmmc.1",	"ick",	&mmchs2_ick,	CK_3XXX),
+ 	CLK("omap_hsmmc.0",	"ick",	&mmchs1_ick,	CK_3XXX),
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index f18fa50..f38ac9d 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -36,6 +36,7 @@
+ #include "devices.h"
+ #include "cm2xxx_3xxx.h"
+ #include "cm-regbits-24xx.h"
++#include "cm-regbits-34xx.h"
  
- static int omap_sham_hw_init(struct omap_sham_dev *dd)
- {
--	clk_enable(dd->iclk);
+ #define L3_MODULES_MAX_LEN 12
+ #define L3_MODULES 3
+@@ -453,38 +454,9 @@ static void omap_init_rng(void)
+ 	WARN(IS_ERR(pdev), "Can't build omap_device for omap_rng\n");
+ }
+ 
+-#if defined(CONFIG_CRYPTO_DEV_OMAP_SHAM) || defined(CONFIG_CRYPTO_DEV_OMAP_SHAM_MODULE)
 -
- 	if (!test_bit(FLAGS_INIT, &dd->flags)) {
- 		omap_sham_write_mask(dd, SHA_REG_MASK,
- 			SHA_REG_MASK_SOFTRESET, SHA_REG_MASK_SOFTRESET);
-@@ -653,7 +650,6 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
- 	/* atomic operation is not needed here */
- 	dd->flags &= ~(BIT(FLAGS_BUSY) | BIT(FLAGS_FINAL) | BIT(FLAGS_CPU) |
- 			BIT(FLAGS_DMA_READY) | BIT(FLAGS_OUTPUT_READY));
--	clk_disable(dd->iclk);
- 
- 	if (req->base.complete)
- 		req->base.complete(&req->base, err);
-@@ -1198,14 +1194,6 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
- 	if (err)
- 		goto dma_err;
- 
--	/* Initializing the clock */
--	dd->iclk = clk_get(dev, "ick");
--	if (IS_ERR(dd->iclk)) {
--		dev_err(dev, "clock intialization failed.\n");
--		err = PTR_ERR(dd->iclk);
--		goto clk_err;
+-#ifdef CONFIG_ARCH_OMAP3
+-static struct resource omap3_sham_resources[] = {
+-	{
+-		.start	= OMAP34XX_SEC_SHA1MD5_BASE,
+-		.end	= OMAP34XX_SEC_SHA1MD5_BASE + 0x64,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= 49 + OMAP_INTC_START,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	{
+-		.start	= OMAP34XX_DMA_SHA1MD5_RX,
+-		.flags	= IORESOURCE_DMA,
 -	}
+-};
+-static int omap3_sham_resources_sz = ARRAY_SIZE(omap3_sham_resources);
+-#else
+-#define omap3_sham_resources		NULL
+-#define omap3_sham_resources_sz		0
+-#endif
 -
- 	dd->io_base = ioremap(dd->phys_base, SZ_4K);
- 	if (!dd->io_base) {
- 		dev_err(dev, "can't ioremap\n");
-@@ -1213,11 +1201,12 @@ static int __devinit omap_sham_probe(struct platform_device *pdev)
- 		goto io_err;
+-static struct platform_device sham_device = {
+-	.name		= "omap-sham",
+-	.id		= -1,
+-};
+-
+-static void omap_init_sham(void)
++static void __init omap_init_sham(void)
+ {
+-	if (cpu_is_omap24xx()) {
++	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+ 		struct omap_hwmod *oh;
+ 		struct platform_device *pdev;
+ 
+@@ -495,18 +467,10 @@ static void omap_init_sham(void)
+ 		pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL,
+ 					 0, 0);
+ 		WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+-	} else if (cpu_is_omap34xx()) {
+-		sham_device.resource = omap3_sham_resources;
+-		sham_device.num_resources = omap3_sham_resources_sz;
+-		platform_device_register(&sham_device);
+ 	} else {
+ 		pr_err("%s: platform not supported\n", __func__);
+-		return;
  	}
+ }
+-#else
+-static inline void omap_init_sham(void) { }
+-#endif
  
--	clk_enable(dd->iclk);
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
+ #if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index f67b7ee..785a0c5 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3543,6 +3543,65 @@ static struct omap_hwmod_ocp_if omap3xxx_l3_main__gpmc = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_core -> SHAM2 (SHA1/MD5) (similar to omap24xx) */
++static struct omap_hwmod_class_sysconfig omap3_sham_sysc = {
++	.rev_offs	= 0x5c,
++	.sysc_offs	= 0x60,
++	.syss_offs	= 0x64,
++	.sysc_flags	= (SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE |
++			   SYSS_HAS_RESET_STATUS),
++	.sysc_fields	= &omap_hwmod_sysc_type1,
++};
 +
- 	dev_info(dev, "hw accel on OMAP rev %u.%u\n",
- 		(omap_sham_read(dd, SHA_REG_REV) & SHA_REG_REV_MAJOR) >> 4,
- 		omap_sham_read(dd, SHA_REG_REV) & SHA_REG_REV_MINOR);
--	clk_disable(dd->iclk);
++static struct omap_hwmod_class omap3xxx_sham_class = {
++	.name	= "sham",
++	.sysc	= &omap3_sham_sysc,
++};
++
++struct omap_hwmod_irq_info omap3_sham_mpu_irqs[] = {
++	{ .irq = 49 + OMAP_INTC_START, },
++	{ .irq = -1 }
++};
++
++struct omap_hwmod_dma_info omap3_sham_sdma_reqs[] = {
++	{ .name = "rx", .dma_req = OMAP34XX_DMA_SHA1MD5_RX, },
++	{ .dma_req = -1 }
++};
++
++struct omap_hwmod omap3xxx_sham_hwmod = {
++	.name		= "sham",
++	.mpu_irqs	= omap3_sham_mpu_irqs,
++	.sdma_reqs	= omap3_sham_sdma_reqs,
++	.main_clk	= "sha12_ick",
++	.prcm		= {
++		.omap2 = {
++			.module_offs = CORE_MOD,
++			.prcm_reg_id = 1,
++			.module_bit = OMAP3430_EN_SHA12_SHIFT,
++			.idlest_reg_id = 1,
++			.idlest_idle_bit = OMAP3430_ST_SHA12_SHIFT,
++		},
++	},
++	.class		= &omap3xxx_sham_class,
++};
++
++static struct omap_hwmod_addr_space omap3xxx_sham_addrs[] = {
++	{
++		.pa_start	= 0x480c3000,
++		.pa_end		= 0x480c3000 + 0x64 - 1,
++		.flags		= ADDR_TYPE_RT
++	},
++	{ }
++};
++
++static struct omap_hwmod_ocp_if omap3xxx_l4_core__sham = {
++	.master		= &omap3xxx_l4_core_hwmod,
++	.slave		= &omap3xxx_sham_hwmod,
++	.clk		= "sha12_ick",
++	.addr		= omap3xxx_sham_addrs,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l3_main__l4_core,
+ 	&omap3xxx_l3_main__l4_per,
+@@ -3596,6 +3655,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_hwmod_ocp_ifs[] __initdata = {
+ /* GP-only hwmod links */
+ static struct omap_hwmod_ocp_if *omap3xxx_gp_hwmod_ocp_ifs[] __initdata = {
+ 	&omap3xxx_l4_sec__timer12,
++	&omap3xxx_l4_core__sham,
+ 	NULL
+ };
  
- 	spin_lock(&sham.lock);
- 	list_add_tail(&dd->list, &sham.dev_list);
-@@ -1235,9 +1224,8 @@ err_algs:
- 	for (j = 0; j < i; j++)
- 		crypto_unregister_ahash(&algs[j]);
- 	iounmap(dd->io_base);
-+	pm_runtime_disable(dev);
- io_err:
--	clk_put(dd->iclk);
--clk_err:
- 	omap_sham_dma_cleanup(dd);
- dma_err:
- 	if (dd->irq >= 0)
-@@ -1266,7 +1254,8 @@ static int __devexit omap_sham_remove(struct platform_device *pdev)
- 		crypto_unregister_ahash(&algs[i]);
- 	tasklet_kill(&dd->done_task);
- 	iounmap(dd->io_base);
--	clk_put(dd->iclk);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	omap_sham_dma_cleanup(dd);
- 	if (dd->irq >= 0)
- 		free_irq(dd->irq, dd);
 -- 
 1.7.12
