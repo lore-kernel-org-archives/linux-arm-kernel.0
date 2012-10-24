@@ -1,38 +1,47 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Wed, 24 Oct 2012 20:22:45 +0800
-Subject: [PATCH v2 2/2] ARM: topdown mmap support
-In-Reply-To: <1321566426-31184-2-git-send-email-robherring2@gmail.com>
-References: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
- <1321566426-31184-2-git-send-email-robherring2@gmail.com>
-Message-ID: <CAMj5Bkg9Ht4YG9TL4yQfT5y5Fea4ywLDANoO2NTnGJZatN2RLQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Oct 2012 12:24:06 +0000
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <5087D6B8.10209@free-electrons.com>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <5087D574.4030503@free-electrons.com> <5087D6B8.10209@free-electrons.com>
+Message-ID: <201210241224.06791.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 18, 2011 at 5:47 AM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+> On 10/24/2012 01:48 PM, Gregory CLEMENT wrote:
+> > On 10/24/2012 01:36 PM, Arnd Bergmann wrote:
+> >>
+> >> I think it would be cleaner to statically define the operations in a constant
+> >> structure and point directly to the functions you need. If necessary, use
+> >> multiple structures.
+> > 
+> > My problem was that these functions are not exposed, only arm_dma_op and
+> > arm_coherent_dma_ops are exported.
+> > Or do you think about something like this:
 >
-> Similar to other architectures, this adds topdown mmap support in user
-> process address space allocation policy. This allows mmap sizes greater
-> than 2GB. This support is largely copied from MIPS and the generic
-> implementations.
->
-> The address space randomization is moved into arch_pick_mmap_layout.
->
-> Tested on V-Express with ubuntu and a mmap test from here:
-> https://bugs.launchpad.net/bugs/861296
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+> struct dma_map_ops *dma_ops = {
+>         .alloc                  = arm_coherent_dma_ops.arm_coherent_dma_alloc,
+>         .free                   = arm_coherent_dma_ops.arm_coherent_dma_free,
+>         .mmap                   = arm_coherent_dma_ops.arm_dma_mmap,
+>         .get_sgtable            = arm_coherent_dma_ops.arm_dma_get_sgtable,
+>         .map_sg                 = arm_coherent_dma_ops.arm_dma_map_sg,
+>         .set_dma_mask           = arm_coherent_dma_ops.arm_dma_set_mask,
+>         .map_page               = armada_xp_dma_map_page,
+>         .unmap_page             = armada_xp_dma_unmap_page,
+>         .unmap_sg               = arm_dma_ops.unmap_sg,
+>         .sync_single_for_cpu    = armada_xp_dma_sync,
+>         .sync_single_for_device = armada_xp_dma_sync,
+>         .sync_sg_for_cpu        = arm_dma_ops.sync_sg_for_cpu,
+>         .sync_sg_for_device     = arm_dma_ops.sync_sg_for_device,
+> };
 
-Unfortunately, we met "no vspace available" during loading libmono.so,
-when using default arch_get_unmapped_area_topdown method, tested on
-Jelly Bean with 3.4 kernel.
-While no problem using arch_get_unmapped_area in the patch, or just
-revert this patch.
-The result is some application can not run.
+No, I was thinking of making the underlying functions globally visible
+and have extern declarations in a header file so you can access them
+directly.
 
-Just google, find same issue reported on Jelly Bean with 3.4 kernel.
+Generally speaking, when you run into a problem with common code, your
+first approach should be to fix the common code before you try to work
+around it.
 
-Any suggestion?
-
-Thanks
+	Arnd
