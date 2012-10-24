@@ -1,38 +1,27 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Wed, 24 Oct 2012 16:33:23 +0530
-Subject: [PATCH 1/3] dmaengine: sirf: fix a typo in dma_prep_interleaved
-In-Reply-To: <1348734938-20014-1-git-send-email-Barry.Song@csr.com>
-References: <1348734938-20014-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <1351076603.5263.57.camel@vkoul-udesk3>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 24 Oct 2012 16:49:56 +0530
+Subject: [PATCH v2] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
+ V4L2_OUT_CAP_DV_TIMINGS
+In-Reply-To: <1350998273-19769-1-git-send-email-prabhakar.lad@ti.com>
+References: <1350998273-19769-1-git-send-email-prabhakar.lad@ti.com>
+Message-ID: <5087CEDC.9050103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-09-27 at 16:35 +0800, Barry Song wrote:
-> From: Barry Song <Baohua.Song@csr.com>
+On 10/23/2012 6:47 PM, Prabhakar Lad wrote:
+> From: Lad, Prabhakar <prabhakar.lad@ti.com>
 > 
-> either DEV_TO_MEM or MEM_TO_DEV is supported, so change
-> OR to AND.
+> This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
+> V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
+> out.
 > 
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/dma/sirf-dma.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-> index 434ad31..35a329d 100644
-> --- a/drivers/dma/sirf-dma.c
-> +++ b/drivers/dma/sirf-dma.c
-> @@ -428,7 +428,7 @@ static struct dma_async_tx_descriptor *sirfsoc_dma_prep_interleaved(
->  	unsigned long iflags;
->  	int ret;
->  
-> -	if ((xt->dir != DMA_MEM_TO_DEV) || (xt->dir != DMA_DEV_TO_MEM)) {
-> +	if ((xt->dir != DMA_MEM_TO_DEV) && (xt->dir != DMA_DEV_TO_MEM)) {
->  		ret = -EINVAL;
->  		goto err_dir;
->  	}
+> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
 
-applied thanks
--- 
-Vinod Koul
-Intel Corp.
+Patches for mach-davinci should have a 'davinci:' prefix after 'ARM:'.
+Can you please resend with that fixed?
+
+Thanks,
+Sekhar
