@@ -1,55 +1,47 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 24 Oct 2012 11:31:26 +0800
-Subject: pxa:spitz_pm.c: commit b6eede11 breaks spitz resume under certain
- conditions.
-In-Reply-To: <CAHod+GfMArh3BrnOTV4VWNWDONLwdyr6V69tTV-Fk53kpXu0Pg@mail.gmail.com>
-References: <CAHod+GeMyc+5ERmzY4CYp3SJK-6LOQrhLrLiXSuV3Pdr8+UzSg@mail.gmail.com>
- <CAMPhdO-6iWUWm=vTp-e25BkYBuM5kQfxNW57xKNtKDRU-5Ymgw@mail.gmail.com>
- <CAHod+Gc1L0pPZhnPL6Q2rx0KT=-VqdWaTd1FJt2aA9hTMZyeDg@mail.gmail.com>
- <CAMPhdO8duNqisVL+FLc_0zgFTP+13r83XtRD0YbpdkzMuJov3Q@mail.gmail.com>
- <CAHod+Gd=aLbntWsX_S_26_XSUtG9DQYkki1Y+drq0+8GdnHfaw@mail.gmail.com>
- <CAHod+GcwNr6r_ZQFq-btPJ3E_keWKJhkCb2jP4CES6JTSyn8ow@mail.gmail.com>
- <CAHod+GfycPnugk0UF6aqFUb4UJwZRM_PHPiSDpGSbF3OXSwMLw@mail.gmail.com>
- <CAMPhdO9PFfHDWL6sx+4O4LYtTBXoT7QRTQq=t6YhQ+C7GT8UBQ@mail.gmail.com>
- <CAHod+GfMArh3BrnOTV4VWNWDONLwdyr6V69tTV-Fk53kpXu0Pg@mail.gmail.com>
-Message-ID: <CAMPhdO-c6hu4Szzx6iE9pi1LfNqKDo5MtwUAj5ZRgdNa2GS-1Q@mail.gmail.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Wed, 24 Oct 2012 08:56:29 +0530
+Subject: [PATCH 2/5] ARM: tegra: dts: add slink controller dt entry
+In-Reply-To: <50817820.6010301@wwwdotorg.org>
+References: <1350557795-31487-1-git-send-email-ldewangan@nvidia.com>
+ <1350557795-31487-3-git-send-email-ldewangan@nvidia.com>
+ <50808595.8070505@wwwdotorg.org> <5081190D.50200@nvidia.com>
+ <50817820.6010301@wwwdotorg.org>
+Message-ID: <1351049189.5263.13.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 8:53 PM, Marko Kati? <dromede@gmail.com> wrote:
-> On Tue, Oct 23, 2012 at 5:10 AM, Eric Miao <eric.y.miao@gmail.com> wrote:
->> On Fri, Oct 19, 2012 at 7:37 PM, Marko Kati? <dromede@gmail.com> wrote:
->>> On Thu, Oct 18, 2012 at 11:28 AM, Marko Kati? <dromede@gmail.com> wrote:
->>>>> Almost there, but I guess we could do this better and less confusing by having
->>>>> another array, e.g. tosa_gpio18_config[], which is tosa specific, and only
->>>>> initialize that MFP setting in the tosa path.
->>>>>
->>>>>>
->>>>>> I also looked at the original sharp kernel sources.
->>>>>> Only tosa used the RDY signal for it's tc6393tx chip, other machines simply
->>>>>> configured gpio18 as output in their suspend routines.
->>>>
->>>>
->>>> Actually, tosa doesn't use sharpsl_pm. Tosa uses the pda-power framework.
->>>> I said that only tosa uses the RDY signal to point out that we
->>>> probably don't need
->>>> the mfp-config line in postsuspend. That being said, i still think
->>>> that the array ordering
->>>> fix is adequate. Maybe later we may remove the mfp-config line from
->>>> postsuspend when
->>>> we're absolutely sure it isn't necessary for devices that use spitz_pm.c.
->>>
->>> So Eric what do you think, is the simple gpio array reordering patch
->>> an adequate fix for this bug?
->>
->> Sorry for late reply. That simple reordering still looks a bit confusing
->> to me, i.e. the same pin firstly configured as GPIO then RDY. Do we
->> have a less confusing way to fix this?
->
-> well, we could also remove the mfp-config line in postsuspend. I
-> suspect that it's only there because tosa was supposed to use
-> sharpsl_pm and it currently doesn't (and certainly never will). And as
-> i said, the original sharp kernels never did configure gpio 18 as RDY,
-> except for tosa.
+On Fri, 2012-10-19 at 09:56 -0600, Stephen Warren wrote:
+> On 10/19/2012 03:10 AM, Laxman Dewangan wrote:
+> > On Friday 19 October 2012 04:11 AM, Stephen Warren wrote:
+> >> On 10/18/2012 04:56 AM, Laxman Dewangan wrote:
+> >>> Add slink controller details in the dts file of
+> >>> Tegra20 and Tegra30.
+> >>> diff --git a/arch/arm/boot/dts/tegra20.dtsi
+> >>> b/arch/arm/boot/dts/tegra20.dtsi
+> >>> +    slink at 7000d400 {
+> >>> +        compatible = "nvidia,tegra20-slink";
+> >>> +        reg =<0x7000d400 0x200>;
+> >>> +        interrupts =<0 59 0x04>;
+> >>> +        nvidia,dma-req-sel =<15>;
+> >
+> 
+> (Oh, you need a space before and after the = in all the lines above)
+> 
+> >> I thought the common DT DMA bindings were going to be in 3.7, and hence
+> >> we could just use them here rather than inventing another custom
+> >> property for this purpose?
+> >
+> > Adding Vinod here.
+> > 
+> > I looked the dma devicetree bingind document and did not found the
+> > generic binding name. Howvere, for arm-pl330.txt, it is explained as ...
+> 
+> That's not the generic bindings. I guess they didn't get merged then. I
+> guess we can continue with custom bindings until they are.
+Yes they are in topic topic/dmaengine_dt in my tree. Will be merged once
+we sort out slave apis.
 
-OK, please submit the patch for review.
+
+-- 
+Vinod Koul
+Intel Corp.
