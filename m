@@ -1,48 +1,143 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 24 Oct 2012 16:34:13 +0200
-Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
-In-Reply-To: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5087FC65.30904@atmel.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 24 Oct 2012 16:35:59 +0200
+Subject: [PATCH] ARM: dts: exynos4: Add support for Exynos4x12 SoCs
+Message-ID: <1351089359-7318-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+This patch adds device tree sources for Exynos4x12 SoC series (currently
+Exynos4212 and Exynos4412) and enables mach-exynos4-dt to support these
+SoCs.
 
-Le 10/10/2012 04:25 PM, ludovic.desroches at atmel.com a ?crit :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> If the i2c message length is zero, i2c-at91 will directly return an error
-> instead of trying to send a zero-length message.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->
-> fix for 3.7
->
->   drivers/i2c/busses/i2c-at91.c | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index aa59a25..eaddc77 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -263,6 +263,9 @@ static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
->   	unsigned int_addr_flag = 0;
->   	struct i2c_msg *m_start = msg;
->
-> +	if (!msg->len)
-> +		return -EINVAL;
-> +
->   	dev_dbg(&adap->dev, "at91_xfer: processing %d messages:\n", num);
->
->   	/*
->
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/boot/dts/exynos4212.dtsi      | 28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4412.dtsi      | 28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4x12.dtsi      | 31 +++++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/mach-exynos4-dt.c |  2 ++
+ 4 files changed, 89 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4212.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos4412.dtsi
+ create mode 100644 arch/arm/boot/dts/exynos4x12.dtsi
 
-Could you take this fix for 3.7?
-
-Thanks
-
-Regards
-
-Ludovic
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+new file mode 100644
+index 0000000..c6ae200
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * Samsung's Exynos4212 SoC device tree source
++ *
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung's Exynos4212 SoC device nodes are listed in this file. Exynos4212
++ * based board files can include this file and provide values for board specfic
++ * bindings.
++ *
++ * Note: This file does not include device nodes for all the controllers in
++ * Exynos4212 SoC. As device tree coverage for Exynos4212 increases, additional
++ * nodes can be added to this file.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/include/ "exynos4x12.dtsi"
++
++/ {
++	compatible = "samsung,exynos4212";
++
++	gic:interrupt-controller at 10490000 {
++		cpu-offset = <0x8000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+new file mode 100644
+index 0000000..d7dfe31
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -0,0 +1,28 @@
++/*
++ * Samsung's Exynos4412 SoC device tree source
++ *
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung's Exynos4412 SoC device nodes are listed in this file. Exynos4412
++ * based board files can include this file and provide values for board specfic
++ * bindings.
++ *
++ * Note: This file does not include device nodes for all the controllers in
++ * Exynos4412 SoC. As device tree coverage for Exynos4412 increases, additional
++ * nodes can be added to this file.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/include/ "exynos4x12.dtsi"
++
++/ {
++	compatible = "samsung,exynos4412";
++
++	gic:interrupt-controller at 10490000 {
++		cpu-offset = <0x4000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+new file mode 100644
+index 0000000..b6a66f4
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -0,0 +1,31 @@
++/*
++ * Samsung's Exynos4x12 SoCs device tree source
++ *
++ * Copyright (c) 2012 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Samsung's Exynos4x12 SoCs device nodes are listed in this file. Exynos4x12
++ * based board files can include this file and provide values for board specfic
++ * bindings.
++ *
++ * Note: This file does not include device nodes for all the controllers in
++ * Exynos4x12 SoC. As device tree coverage for Exynos4x12 increases, additional
++ * nodes can be added to this file.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/include/ "exynos4.dtsi"
++/include/ "exynos4x12-pinctrl.dtsi"
++
++/ {
++	combiner:interrupt-controller at 10440000 {
++		interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
++			     <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
++			     <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
++			     <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
++			     <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>;
++	};
++};
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index 977bd39..b2b9cc1 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -94,6 +94,8 @@ static void __init exynos4_dt_machine_init(void)
+ 
+ static char const *exynos4_dt_compat[] __initdata = {
+ 	"samsung,exynos4210",
++	"samsung,exynos4212",
++	"samsung,exynos4412",
+ 	NULL
+ };
+ 
+-- 
+1.7.12
