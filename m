@@ -1,118 +1,144 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 24 Oct 2012 12:34:46 +0400
-Subject: [PATCH] GPIO: clps711x: Fix direction logic for PORTD
-Message-ID: <1351067686-19344-1-git-send-email-shc_work@mail.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 24 Oct 2012 10:37:57 +0200
+Subject: [PATCH 1/2] i2c: mux: Add dt support to i2c-mux-gpio driver
+In-Reply-To: <87liexrmoz.fsf@thor.barco.com>
+References: <1350910413-23925-1-git-send-email-maxime.ripard@free-electrons.com><1350910413-23925-2-git-send-email-maxime.ripard@free-electrons.com>
+ <87liexrmoz.fsf@thor.barco.com>
+Message-ID: <5087A8E5.8050103@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PORTD have different direction logic, i.e. "0" is output and "1" is input.
-This patch fix this issue.
+Hi Peter,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/gpio/gpio-clps711x.c |   65 +++++++++++++++++++++++++++++++++---------
- 1 files changed, 51 insertions(+), 14 deletions(-)
+Le 23/10/2012 21:51, Peter Korsgaard a ?crit :
+>>>>>> "MR" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+> 
+> Hi Maxime,
+> 
+> I'm fine with the idea, but a few comments:
+> 
+> 
+> MR> Allow the i2c-mux-gpio to be used by a device tree enabled device. The
+> MR> bindings are inspired by the one found in the i2c-mux-pinctrl driver.
+> 
+> MR> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> MR> ---
+> MR>  .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   81 ++++++++++
+> MR>  drivers/i2c/muxes/i2c-mux-gpio.c                   |  169 +++++++++++++++-----
+> MR>  2 files changed, 211 insertions(+), 39 deletions(-)
+> MR>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+> 
+> MR> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+> MR> new file mode 100644
+> MR> index 0000000..335fc4e
+> MR> --- /dev/null
+> MR> +++ b/Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
+> MR> @@ -0,0 +1,81 @@
+> MR> +GPIO-based I2C Bus Mux
+> MR> +
+> MR> +This binding describes an I2C bus multiplexer that uses GPIOs to
+> MR> +route the I2C signals.
+> MR> +
+> MR> +                                  +-----+  +-----+
+> MR> +                                  | dev |  | dev |
+> MR> +    +------------+                +-----+  +-----+
+> MR> +    | SoC        |                   |        |
+> MR> +    |            |          /--------+--------+
+> MR> +    |   +------+ |  +------+    child bus A, on GPIO value set to 0
+> MR> +    |   | I2C  |-|--| Mux  |
+> MR> +    |   +------+ |  +--+---+    child bus B, on GPIO value set to 1
+> MR> +    |            |     |    \----------+--------+--------+
+> MR> +    |   +------+ |     |               |        |        |
+> MR> +    |   | GPIO |-|-----+            +-----+  +-----+  +-----+
+> MR> +    |   +------+ |                  | dev |  | dev |  | dev |
+> MR> +    +------------+                  +-----+  +-----+  +-----+
+> MR> +
+> MR> +Required properties:
+> MR> +- compatible: i2c-mux-gpio
+> MR> +- i2c-parent: The phandle of the I2C bus that this multiplexer's master-side
+> MR> +  port is connected to.
+> MR> +- mux-gpios: list of gpios to use to control the muxer
+> 
+> s/to use to/used to/
+> 
+> 
+> MR> +* Standard I2C mux properties. See mux.txt in this directory.
+> MR> +* I2C child bus nodes. See mux.txt in this directory.
+> MR> +
+> MR> +Optional properties:
+> MR> +- idle-state: value to set to the muxer when idle. When no value is
+> 
+> How about 'bitmask defining mux state when idle' instead?
 
-diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
-index 0753b3a..ad181db 100644
---- a/drivers/gpio/gpio-clps711x.c
-+++ b/drivers/gpio/gpio-clps711x.c
-@@ -65,7 +65,7 @@ static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
- 	spin_unlock_irqrestore(&gpio->lock, flags);
- }
- 
--static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
-+static int gpio_clps711x_dir_in(struct gpio_chip *chip, unsigned offset)
- {
- 	int tmp;
- 	unsigned long flags;
-@@ -79,8 +79,8 @@ static int gpio_clps711x_direction_in(struct gpio_chip *chip, unsigned offset)
- 	return 0;
- }
- 
--static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
--				       int value)
-+static int gpio_clps711x_dir_out(struct gpio_chip *chip, unsigned offset,
-+				 int value)
- {
- 	int tmp;
- 	unsigned long flags;
-@@ -98,17 +98,49 @@ static int gpio_clps711x_direction_out(struct gpio_chip *chip, unsigned offset,
- 	return 0;
- }
- 
--struct clps711x_gpio_port {
-+static int gpio_clps711x_dir_in_inv(struct gpio_chip *chip, unsigned offset)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
-+	writeb(tmp, clps711x_pdir(chip));
-+	spin_unlock_irqrestore(&gpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int gpio_clps711x_dir_out_inv(struct gpio_chip *chip, unsigned offset,
-+				     int value)
-+{
-+	int tmp;
-+	unsigned long flags;
-+	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+
-+	spin_lock_irqsave(&gpio->lock, flags);
-+	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
-+	writeb(tmp, clps711x_pdir(chip));
-+	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
-+	if (value)
-+		tmp |= 1 << offset;
-+	writeb(tmp, clps711x_port(chip));
-+	spin_unlock_irqrestore(&gpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static struct {
- 	char	*name;
- 	int	nr;
--};
--
--static const struct clps711x_gpio_port clps711x_gpio_ports[] __initconst = {
--	{ "PORTA", 8, },
--	{ "PORTB", 8, },
--	{ "PORTC", 8, },
--	{ "PORTD", 8, },
--	{ "PORTE", 3, },
-+	int	inv_dir;
-+} clps711x_gpio_ports[] __initconst = {
-+	{ "PORTA", 8, 0, },
-+	{ "PORTB", 8, 0, },
-+	{ "PORTC", 8, 0, },
-+	{ "PORTD", 8, 1, },
-+	{ "PORTE", 3, 0, },
- };
- 
- static int __init gpio_clps711x_init(void)
-@@ -145,10 +177,15 @@ static int __init gpio_clps711x_init(void)
- 		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
- 		gpio->chip[i].base		= i * 8;
- 		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
--		gpio->chip[i].direction_input	= gpio_clps711x_direction_in;
- 		gpio->chip[i].get		= gpio_clps711x_get;
--		gpio->chip[i].direction_output	= gpio_clps711x_direction_out;
- 		gpio->chip[i].set		= gpio_clps711x_set;
-+		if (!clps711x_gpio_ports[i].inv_dir) {
-+			gpio->chip[i].direction_input = gpio_clps711x_dir_in;
-+			gpio->chip[i].direction_output = gpio_clps711x_dir_out;
-+		} else {
-+			gpio->chip[i].direction_input = gpio_clps711x_dir_in_inv;
-+			gpio->chip[i].direction_output = gpio_clps711x_dir_out_inv;
-+		}
- 		WARN_ON(gpiochip_add(&gpio->chip[i]));
- 	}
- 
+Since the array documented as using the bitmasks in the platform_data
+and described as an array of bitmasks is called "values", and the file
+mux.txt talks about "numbers" to put into reg, won't this be confusing
+to have three names for the exact same thing?
+
+> MR> +  given, it defaults to the last value used.
+> MR> +
+> MR> +For each i2c child node, an I2C child bus will be created. They will
+> MR> +be numbered based on the reg property of each node.
+> 
+> As far as I can see they are dynamically assigned numbers in the order
+> they are listed in the dt.
+
+Ah, yes.
+
+> MR> +
+> MR> +Whenever an access is made to a device on a child bus, the value set
+> MR> +in the revelant node's reg property will be output using the list of
+> MR> +GPIOs, the first in the list holding the most-significant value.
+> 
+> Isn't it the other way around, E.G. first gpio in mux-gpios controlled
+> by LSB of reg property, next gpio by lsb+1,  ..?
+
+True indeed.
+
+> MR> +
+> MR> +If an idle state is defined, using the idle-state (optional) property,
+> MR> +whenever an access is not being made to a device on a child bus, the
+> MR> +idle value will be programmed into the GPIOs.
+> 
+> s/idle value will be programmed into the GPIOS/GPIOS set according to
+> the idle value bitmask/
+
+Once again, I'm really not fond of the term "bitmask".
+
+[..]
+
+> MR> diff --git a/drivers/i2c/muxes/i2c-mux-gpio.c b/drivers/i2c/muxes/i2c-mux-gpio.c
+> MR> index 566a675..7ebef01 100644
+> MR> --- a/drivers/i2c/muxes/i2c-mux-gpio.c
+> MR> +++ b/drivers/i2c/muxes/i2c-mux-gpio.c
+> MR> @@ -16,11 +16,13 @@
+> MR>  #include <linux/module.h>
+> MR>  #include <linux/slab.h>
+> MR>  #include <linux/gpio.h>
+> MR> +#include <linux/of_i2c.h>
+> MR> +#include <linux/of_gpio.h>
+>  
+> MR>  struct gpiomux {
+> MR>  	struct i2c_adapter *parent;
+> MR>  	struct i2c_adapter **adap; /* child busses */
+> MR> -	struct i2c_mux_gpio_platform_data data;
+> MR> +	struct i2c_mux_gpio_platform_data *data;
+> 
+> 
+> Why this change? I don't see why it is needed and the patch would be a
+> lot easier to review without all the s/.data/->data/ noise.
+
+Ah yes, since mux is already allocated using kcalloc, we don't need to
+do it for data as well. I will remove it.
+
+Thanks,
+Maxime
+
+
+
+
 -- 
-1.7.3.4
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
