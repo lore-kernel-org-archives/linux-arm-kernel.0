@@ -1,52 +1,69 @@
-From: peter.korsgaard@barco.com (Peter Korsgaard)
-Date: Wed, 24 Oct 2012 13:45:58 +0200
-Subject: [PATCH 1/2] i2c: mux: Add dt support to i2c-mux-gpio driver
-In-Reply-To: <5087A8E5.8050103@free-electrons.com> (Maxime Ripard's message
- of"Wed, 24 Oct 2012 10:37:57 +0200")
-References: <1350910413-23925-1-git-send-email-maxime.ripard@free-electrons.com><1350910413-23925-2-git-send-email-maxime.ripard@free-electrons.com><87liexrmoz.fsf@thor.barco.com>
- <5087A8E5.8050103@free-electrons.com>
-Message-ID: <87objsqeix.fsf@thor.barco.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Oct 2012 13:48:04 +0200
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <201210241136.12779.arnd@arndb.de>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
+ <201210241136.12779.arnd@arndb.de>
+Message-ID: <5087D574.4030503@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "MR" == Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+On 10/24/2012 01:36 PM, Arnd Bergmann wrote:
+> On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+>> +void __init armada_370_xp_coherency_iocache_init(void)
+>> +{
+>> +       /* When the coherency fabric is available, the Armada XP and
+>> +        * Aramada 370 are close to a coherent architecture, so we based
+>> +        * our dma ops on the coherent one, and just changes the
+>> +        * operations which need a arch io sync */
+>> +       if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric")) {
+>> +               struct dma_map_ops *dma_ops = &armada_xp_dma_ops;
+>> +               memcpy(dma_ops, &arm_coherent_dma_ops, sizeof(*dma_ops));
+>> +               dma_ops->map_page = armada_xp_dma_map_page;
+>> +               dma_ops->unmap_page = armada_xp_dma_unmap_page;
+>> +               dma_ops->unmap_sg = arm_dma_ops.unmap_sg;
+>> +               dma_ops->sync_single_for_cpu = armada_xp_dma_sync;
+>> +               dma_ops->sync_single_for_device = armada_xp_dma_sync;
+>> +               dma_ops->sync_sg_for_cpu = arm_dma_ops.sync_sg_for_cpu;
+>> +               dma_ops->sync_sg_for_device = arm_dma_ops.sync_sg_for_device;
+>> +       }
+>> +       bus_register_notifier(&platform_bus_type, &armada_xp_platform_nb);
+> 
+> I think it would be cleaner to statically define the operations in a constant
+> structure and point directly to the functions you need. If necessary, use
+> multiple structures.
 
-Hi,
+My problem was that these functions are not exposed, only arm_dma_op and
+arm_coherent_dma_ops are exported.
+Or do you think about something like this:
 
-MR> +* Standard I2C mux properties. See mux.txt in this directory.
-MR> +* I2C child bus nodes. See mux.txt in this directory.
-MR> +
-MR> +Optional properties:
-MR> +- idle-state: value to set to the muxer when idle. When no value is
->> 
->> How about 'bitmask defining mux state when idle' instead?
-
-MR> Since the array documented as using the bitmasks in the platform_data
-MR> and described as an array of bitmasks is called "values", and the file
-MR> mux.txt talks about "numbers" to put into reg, won't this be confusing
-MR> to have three names for the exact same thing?
-
-Yeah, the mess is less than perfect. To my defense I did use bitmask in
-the platform data documentation:
-
-@values: Array of bitmasks of GPIO settings (low/high) for each position
-@idle: Bitmask to write to MUX when idle or GPIO_I2CMUX_NO_IDLE if not used
-
-But ok, I don't feel strongly about it.
+struct dma_map_ops *dma_ops = {
+	.alloc			= arm_dma_ops.arm_coherent_dma_alloc,
+	.free			= arm_dma_ops.arm_coherent_dma_free,
+	.mmap			= arm_dma_ops.arm_dma_mmap,
+	.get_sgtable		= arm_dma_ops.arm_dma_get_sgtable,
+	.map_sg			= arm_dma_ops.arm_dma_map_sg,
+	.set_dma_mask		= arm_dma_ops.arm_dma_set_mask,
+	.map_page 		= armada_xp_dma_map_page,
+	.unmap_page 		= armada_xp_dma_unmap_page,
+	.unmap_sg 		= arm_dma_ops.unmap_sg,
+	.sync_single_for_cpu 	= armada_xp_dma_sync,
+	.sync_single_for_device = armada_xp_dma_sync,
+	.sync_sg_for_cpu 	= arm_dma_ops.sync_sg_for_cpu,
+	.sync_sg_for_device	= arm_dma_ops.sync_sg_for_device,
+};
 
 
->> Why this change? I don't see why it is needed and the patch would be a
->> lot easier to review without all the s/.data/->data/ noise.
 
-MR> Ah yes, since mux is already allocated using kcalloc, we don't need to
-MR> do it for data as well. I will remove it.
 
-Ok, great.
+> 
+> 	Arnd
+> 
+
 
 -- 
-Sorry about disclaimer - It's out of my control.
-Bye, Peter Korsgaard
-
-
-DISCLAIMER:
-Unless indicated otherwise, the information contained in this message is privileged and confidential, and is intended only for the use of the addressee(s) named above and others who have been specifically authorized to receive it. If you are not the intended recipient, you are hereby notified that any dissemination, distribution or copying of this message and/or attachments is strictly prohibited. The company accepts no liability for any damage caused by any virus transmitted by this email. Furthermore, the company does not warrant a proper and complete transmission of this information, nor does it accept liability for any delays. If you have received this message in error, please contact the sender and delete the message. Thank you.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
