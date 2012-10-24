@@ -1,40 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 22:19:08 +0200
-Subject: [PATCH 1/9] ARM: Kirkwood: Convert TS219 to pinctrl.
-In-Reply-To: <50884C12.7050809@gmail.com>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-2-git-send-email-andrew@lunn.ch>
- <20121024213128.2d4c07dc@skate> <50884659.1020208@gmail.com>
- <20121024220021.148a88ff@skate> <50884C12.7050809@gmail.com>
-Message-ID: <20121024221908.081b1a8d@skate>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Wed, 24 Oct 2012 16:19:28 -0400
+Subject: [PATCH v2 2/4] zynq: move static peripheral mappings
+In-Reply-To: <20121023234219.GM20593@beefymiracle.amer.corp.natinst.com>
+References: <20121022211219.GC31538@beefymiracle.amer.corp.natinst.com>
+ <201210231450.11540.arnd@arndb.de>
+ <20121023162641.GG20593@beefymiracle.amer.corp.natinst.com>
+ <20121023202703.GA16912@elliptictech.com>
+ <20121023234219.GM20593@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121024201928.GA31069@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
-
-On Wed, 24 Oct 2012 22:14:10 +0200, Sebastian Hesselbarth wrote:
-
-> > Where did I say that you should define *all* possible configurations?
+On 2012-10-23 18:42 -0500, Josh Cartwright wrote:
+> On Tue, Oct 23, 2012 at 04:27:03PM -0400, Nick Bowler wrote:
+> > Just FYI, I sent a patch to fix the same bug a while back
 > >
-> > I said: "The SoC .dtsi file should define all the pinmux groups that are
-> > described in the datasheet and are used by boards". Read again the "and
-> > are used by boards".
+> >   https://patchwork.kernel.org/patch/1156361/
+> >
+> > together with other patches to fix early printk on the ZC702 serial
+> > console.  Admittedly, I dropped the ball on these as other issues
+> > came up so I was away from the Zynq for a while.
+> >
+> > However, I'm now getting back on the Zynq and have a bunch of patches to
+> > make it all work on the ZC702 board.  I've respun the ZC702 early boot
+> > fixes against newer git but they're obviously going to conflict with
+> > this series.  Should I resend them anyway?
 > 
-> Ok, then I overread "and used by other boards". Sorry for that.
-
-No problem :)
-
-> > So I'm clearly not advocating adding *all* possible configurations,
-> > because there would be gazillions of them. But I'm in favor of moving
-> > the *used* configurations to the .dtsi files.
+> If you have other fixes for the zc702, that'd be great.  Most of my
+> testing has been in a qemu model; I haven't had a chance to try getting
+> the zc702 booting yet.
 > 
-> Agreed.
+> The first stumbling block is that it looks like the secondary uart is
+> the primary uart on the zc702.
 
-Great!
+Yes, that is indeed the case, and was what I tried to address with my
+earlier patches.
 
-Thomas
+> > I also have a DT binding for the TTC driver, I can send that.
+> 
+> That'd be great!
+
+OK, I will respin and test this stuff on top of your v4 series and send
+them out.
+
+Cheers,
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
