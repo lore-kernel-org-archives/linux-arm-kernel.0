@@ -1,50 +1,85 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Wed, 24 Oct 2012 16:41:11 +0200
-Subject: [PATCH 3/8] i2c: omap: fix error checking
-In-Reply-To: <1350899218-13624-4-git-send-email-balbi@ti.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-4-git-send-email-balbi@ti.com>
-Message-ID: <5087FE07.6090504@amarulasolutions.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Oct 2012 15:45:21 +0100
+Subject: [PATCH 1/6] mfd: ab8500-core: Remove unused ab8500-gpio IRQ ranges
+In-Reply-To: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1351089926-32161-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+The IRQ ranges provided in ab8500-core to be passed on to the
+ab8500-gpio driver are not only redundant, but they are also
+causing a warning in the boot log. These IRQ ranges, like any
+other MFD related IRQ resource are passed though MFD core for
+automatic conversion to virtual IRQs; however, MFD core does
+not support IRQ mapping of IRQ ranges. Let's just remove them.
 
-On 10/22/2012 11:46 AM, Felipe Balbi wrote:
-> It's impossible to have Arbitration Lost,
-> Read Overflow, and Tranmist Underflow all
-> asserted at the same time.
-> 
-> Those error conditions are mutually exclusive
-> so what the code should be doing, instead, is
-> check each error flag separataly.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index bea0277..e0eab38 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -587,9 +587,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  		goto err_i2c_init;
->  	}
->  
-> -	/* We have an error */
-> -	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
-> -			    OMAP_I2C_STAT_XUDF)) {
-> +	if ((dev->cmd_err & OMAP_I2C_STAT_AL)
-> +			|| (dev->cmd_err & OMAP_I2C_STAT_ROVR)
-> +			|| (dev->cmd_err & OMAP_I2C_STAT_XUDF)) {
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mfd/ab8500-core.c |   36 ------------------------------------
+ 1 file changed, 36 deletions(-)
 
-Sorry, what is the difference? I didn't understand the optimisation and why now
-is more clear. Can you just add a comment?
-
-Michael
-
->  		ret = -EIO;
->  		goto err_i2c_init;
->  	}
-> 
+diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
+index d4008db..2a69dc2 100644
+--- a/drivers/mfd/ab8500-core.c
++++ b/drivers/mfd/ab8500-core.c
+@@ -591,38 +591,6 @@ int ab8500_suspend(struct ab8500 *ab8500)
+ 		return 0;
+ }
+ 
+-/* AB8500 GPIO Resources */
+-static struct resource __devinitdata ab8500_gpio_resources[] = {
+-	{
+-		.name	= "GPIO_INT6",
+-		.start	= AB8500_INT_GPIO6R,
+-		.end	= AB8500_INT_GPIO41F,
+-		.flags	= IORESOURCE_IRQ,
+-	}
+-};
+-
+-/* AB9540 GPIO Resources */
+-static struct resource __devinitdata ab9540_gpio_resources[] = {
+-	{
+-		.name	= "GPIO_INT6",
+-		.start	= AB8500_INT_GPIO6R,
+-		.end	= AB8500_INT_GPIO41F,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	{
+-		.name	= "GPIO_INT14",
+-		.start	= AB9540_INT_GPIO50R,
+-		.end	= AB9540_INT_GPIO54R,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	{
+-		.name	= "GPIO_INT15",
+-		.start	= AB9540_INT_GPIO50F,
+-		.end	= AB9540_INT_GPIO54F,
+-		.flags	= IORESOURCE_IRQ,
+-	}
+-};
+-
+ static struct resource __devinitdata ab8500_gpadc_resources[] = {
+ 	{
+ 		.name	= "HW_CONV_END",
+@@ -1065,8 +1033,6 @@ static struct mfd_cell __devinitdata ab8500_devs[] = {
+ 	{
+ 		.name = "ab8500-gpio",
+ 		.of_compatible = "stericsson,ab8500-gpio",
+-		.num_resources = ARRAY_SIZE(ab8500_gpio_resources),
+-		.resources = ab8500_gpio_resources,
+ 	},
+ 	{
+ 		.name = "ab8500-usb",
+@@ -1083,8 +1049,6 @@ static struct mfd_cell __devinitdata ab8500_devs[] = {
+ static struct mfd_cell __devinitdata ab9540_devs[] = {
+ 	{
+ 		.name = "ab8500-gpio",
+-		.num_resources = ARRAY_SIZE(ab9540_gpio_resources),
+-		.resources = ab9540_gpio_resources,
+ 	},
+ 	{
+ 		.name = "ab9540-usb",
+-- 
+1.7.9.5
