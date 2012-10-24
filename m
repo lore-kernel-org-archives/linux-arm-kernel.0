@@ -1,33 +1,58 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Oct 2012 17:33:50 +0200
-Subject: [PATCH 1/8] ARM: at91/tc: fix typo in the DT document
+Date: Wed, 24 Oct 2012 17:33:51 +0200
+Subject: [PATCH 2/8] ARM: at91: at91sam9g10: fix SOC type detection
 In-Reply-To: <cover.1351092432.git.nicolas.ferre@atmel.com>
 References: <cover.1351092432.git.nicolas.ferre@atmel.com>
-Message-ID: <bc543c9d3af88b9f09cd5514efc893c6f0fa459b.1351092432.git.nicolas.ferre@atmel.com>
+Message-ID: <044b1c5e664848af0159b45565183e71d212cf69.1351092432.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Wu <josh.wu@atmel.com>
+From: Ivan Shugov <ivan.shugov@gmail.com>
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Newer at91sam9g10 SoC revision can't be detected, so the kernel can't boot with
+this kind of kernel panic:
+"AT91: Impossible to detect the SOC type"
+
+CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+CPU: VIVT data cache, VIVT instruction cache
+Machine: Atmel AT91SAM9G10-EK
+Ignoring tag cmdline (using the default kernel command line)
+bootconsole [earlycon0] enabled
+Memory policy: ECC disabled, Data cache writeback
+Kernel panic - not syncing: AT91: Impossible to detect the SOC type
+[<c00133d4>] (unwind_backtrace+0x0/0xe0) from [<c02366dc>] (panic+0x78/0x1cc)
+[<c02366dc>] (panic+0x78/0x1cc) from [<c02fa35c>] (at91_map_io+0x90/0xc8)
+[<c02fa35c>] (at91_map_io+0x90/0xc8) from [<c02f9860>] (paging_init+0x564/0x6d0)
+[<c02f9860>] (paging_init+0x564/0x6d0) from [<c02f7914>] (setup_arch+0x464/0x704)
+[<c02f7914>] (setup_arch+0x464/0x704) from [<c02f44f8>] (start_kernel+0x6c/0x2d4)
+[<c02f44f8>] (start_kernel+0x6c/0x2d4) from [<20008040>] (0x20008040)
+
+The reason for this is that the Debug Unit Chip ID Register has changed between
+Engineering Sample and definitive revision of the SoC. Changing the check of
+cidr to socid will address the problem. We do not integrate this check to the
+list just above because we also have to make sure that the extended id is
+disregarded.
+
+Signed-off-by: Ivan Shugov <ivan.shugov@gmail.com>
+[nicolas.ferre at atmel.com: change commit message]
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: stable <stable@vger.kernel.org> [v3.4]
+Cc: stable <stable@vger.kernel.org> [v3.1] # since commit 8c3583b6
 ---
- Documentation/devicetree/bindings/arm/atmel-at91.txt | 2 +-
+ arch/arm/mach-at91/setup.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index ecc81e3..d187e9f 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -8,7 +8,7 @@ PIT Timer required properties:
-   shared across all System Controller members.
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index da9881b..6a3d4bb 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -151,7 +151,7 @@ static void __init soc_detect(u32 dbgu_base)
+ 	}
  
- TC/TCLIB Timer required properties:
--- compatible: Should be "atmel,<chip>-pit".
-+- compatible: Should be "atmel,<chip>-tcb".
-   <chip> can be "at91rm9200" or "at91sam9x5"
- - reg: Should contain registers location and length
- - interrupts: Should contain all interrupts for the TC block
+ 	/* at91sam9g10 */
+-	if ((cidr & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
++	if ((socid & ~AT91_CIDR_EXT) == ARCH_ID_AT91SAM9G10) {
+ 		at91_soc_initdata.type = AT91_SOC_SAM9G10;
+ 		at91_boot_soc = at91sam9261_soc;
+ 	}
 -- 
 1.7.11.3
