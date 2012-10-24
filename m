@@ -1,9 +1,9 @@
 From: trenn@suse.de (Thomas Renninger)
-Date: Wed, 24 Oct 2012 02:40:49 +0200
+Date: Wed, 24 Oct 2012 02:41:09 +0200
 Subject: [RFC] Energy/power monitoring within the kernel
 In-Reply-To: <1351013449.9070.5.camel@hornet>
 References: <1351013449.9070.5.camel@hornet>
-Message-ID: <4317776.evLpJapyim@hammer82.arch.suse.de>
+Message-ID: <2863728.eWy5qxh2lp@hammer82.arch.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
