@@ -1,161 +1,47 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 24 Oct 2012 17:59:38 +0200
-Subject: [PATCH 7/8] ARM: at91/i2c: change id to let i2c-at91 work
-In-Reply-To: <55320d29feb80bb5da64dcb82518a56174da7ce4.1351092432.git.nicolas.ferre@atmel.com>
-References: <cover.1351092432.git.nicolas.ferre@atmel.com>
- <55320d29feb80bb5da64dcb82518a56174da7ce4.1351092432.git.nicolas.ferre@atmel.com>
-Message-ID: <5088106A.5070904@atmel.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 24 Oct 2012 17:00:32 +0100
+Subject: [RFC] Energy/power monitoring within the kernel
+In-Reply-To: <1351014187.8467.24.camel@gandalf.local.home>
+References: <1351013449.9070.5.camel@hornet>
+ <1351014187.8467.24.camel@gandalf.local.home>
+Message-ID: <1351094432.23327.42.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/24/2012 05:33 PM, Nicolas Ferre a ?crit :
-> From: Bo Shen <voice.shen@atmel.com>
->
-> The i2c core driver will turn the platform device ID to busnum
-> When using platfrom device ID as -1, it means dynamically assigned
-> the busnum. When writing code, we need to make sure the busnum,
-> and call i2c_register_board_info(int busnum, ...) to register device
-> if using -1, we do not know the value of busnum
->
-> In order to solve this issue, set the platform device ID as a fix number
-> Here using 0 to match the busnum used in i2c_regsiter_board_info()
->
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tue, 2012-10-23 at 18:43 +0100, Steven Rostedt wrote:
+> > <...>212.673126: hwmon_attr_update: hwmon4 temp1_input 34361
+> > 
+> > One issue with this is that some external knowledge is required to
+> > relate a number to a processor core. Or maybe it's not an issue at all
+> > because it should be left for the user(space)?
+> 
+> If the external knowledge can be characterized in a userspace tool with
+> the given data here, I see no issues with this.
 
-Acked-By: Ludovic Desroches <ludovic.desroches@atmel.com>
+Ok, fine.
 
-> ---
->   arch/arm/mach-at91/at91rm9200.c          | 2 +-
->   arch/arm/mach-at91/at91rm9200_devices.c  | 2 +-
->   arch/arm/mach-at91/at91sam9260.c         | 4 ++--
->   arch/arm/mach-at91/at91sam9260_devices.c | 2 +-
->   arch/arm/mach-at91/at91sam9261.c         | 4 ++--
->   arch/arm/mach-at91/at91sam9261_devices.c | 2 +-
->   arch/arm/mach-at91/at91sam9263.c         | 2 +-
->   arch/arm/mach-at91/at91sam9263_devices.c | 2 +-
->   arch/arm/mach-at91/at91sam9rl_devices.c  | 2 +-
->   9 files changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> index b4f0565..5269825 100644
-> --- a/arch/arm/mach-at91/at91rm9200.c
-> +++ b/arch/arm/mach-at91/at91rm9200.c
-> @@ -187,7 +187,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->   	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
->   	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
->   	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
-> -	CLKDEV_CON_DEV_ID(NULL, "i2c-at91rm9200", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "i2c-at91rm9200.0", &twi_clk),
->   	/* fake hclk clock */
->   	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
->   	CLKDEV_CON_ID("pioA", &pioA_clk),
-> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-> index 7cd8053..1e122bc 100644
-> --- a/arch/arm/mach-at91/at91rm9200_devices.c
-> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
-> @@ -512,7 +512,7 @@ static struct resource twi_resources[] = {
->
->   static struct platform_device at91rm9200_twi_device = {
->   	.name		= "i2c-at91rm9200",
-> -	.id		= -1,
-> +	.id		= 0,
->   	.resource	= twi_resources,
->   	.num_resources	= ARRAY_SIZE(twi_resources),
->   };
-> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-> index ad29f93..f820261 100644
-> --- a/arch/arm/mach-at91/at91sam9260.c
-> +++ b/arch/arm/mach-at91/at91sam9260.c
-> @@ -211,8 +211,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->   	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
->   	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
->   	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
-> -	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260", &twi_clk),
-> -	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi_clk),
->   	/* more usart lookup table for DT entries */
->   	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
->   	CLKDEV_CON_DEV_ID("usart", "fffb0000.serial", &usart0_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-> index 44385a4..aa1e587 100644
-> --- a/arch/arm/mach-at91/at91sam9260_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
-> @@ -421,7 +421,7 @@ static struct resource twi_resources[] = {
->   };
->
->   static struct platform_device at91sam9260_twi_device = {
-> -	.id		= -1,
-> +	.id		= 0,
->   	.resource	= twi_resources,
->   	.num_resources	= ARRAY_SIZE(twi_resources),
->   };
-> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-> index 8d999eb..04295c0 100644
-> --- a/arch/arm/mach-at91/at91sam9261.c
-> +++ b/arch/arm/mach-at91/at91sam9261.c
-> @@ -178,8 +178,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
->   	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
->   	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
->   	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &hck0),
-> -	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9261", &twi_clk),
-> -	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9261.0", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10.0", &twi_clk),
->   	CLKDEV_CON_ID("pioA", &pioA_clk),
->   	CLKDEV_CON_ID("pioB", &pioB_clk),
->   	CLKDEV_CON_ID("pioC", &pioC_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
-> index 0256a00..b948769 100644
-> --- a/arch/arm/mach-at91/at91sam9261_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
-> @@ -317,7 +317,7 @@ static struct resource twi_resources[] = {
->   };
->
->   static struct platform_device at91sam9261_twi_device = {
-> -	.id		= -1,
-> +	.id		= 0,
->   	.resource	= twi_resources,
->   	.num_resources	= ARRAY_SIZE(twi_resources),
->   };
-> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-> index 6a01d03..d6f9c23 100644
-> --- a/arch/arm/mach-at91/at91sam9263.c
-> +++ b/arch/arm/mach-at91/at91sam9263.c
-> @@ -193,7 +193,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
->   	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
->   	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
->   	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
-> -	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260", &twi_clk),
-> +	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
->   	/* fake hclk clock */
->   	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
->   	CLKDEV_CON_ID("pioA", &pioA_clk),
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index 23b6384..cb85da2 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -600,7 +600,7 @@ static struct resource twi_resources[] = {
->
->   static struct platform_device at91sam9263_twi_device = {
->   	.name		= "i2c-at91sam9260",
-> -	.id		= -1,
-> +	.id		= 0,
->   	.resource	= twi_resources,
->   	.num_resources	= ARRAY_SIZE(twi_resources),
->   };
-> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-> index 3d2c81d..5047bdc 100644
-> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-> @@ -347,7 +347,7 @@ static struct resource twi_resources[] = {
->
->   static struct platform_device at91sam9rl_twi_device = {
->   	.name		= "i2c-at91sam9g20",
-> -	.id		= -1,
-> +	.id		= 0,
->   	.resource	= twi_resources,
->   	.num_resources	= ARRAY_SIZE(twi_resources),
->   };
->
+> > 	TP_fast_assign(
+> > 		memcpy(__entry->cpus, cpus, sizeof(struct cpumask));
+> 
+> Copying the entire cpumask seems like overkill. Especially when you have
+> 4096 CPU machines.
+
+Uh, right. I didn't consider such use case...
+
+> Perhaps making a field that can be a subset of cpus may be better. That
+> way we don't waste the ring buffer with lots of zeros. I'm guessing that
+> it will only be a group of cpus, and not a scattered list? Of course,
+> I've seen boxes where the cpu numbers went from core to core. That is,
+> cpu 0 was on core 1, cpu 1 was on core 2, and then it would repeat. 
+> cpu 8 was on core 1, cpu 9 was on core 2, etc.
+> 
+> But still, this could be compressed somehow.
+
+Sure thing. Or I could simply use cpumask_scnprintf() on the assign
+stage and keep an already-formatted string. Or, as the cpumask per
+sensor would be de-facto constant, I could assume keep only a pointer to
+it. Will keep it in mind if this event was supposed to happen.
+
+Thanks!
+
+Pawe?
