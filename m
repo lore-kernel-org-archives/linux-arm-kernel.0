@@ -1,28 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 22:04:00 +0200
-Subject: [PATCH 1/9] ARM: Kirkwood: Convert TS219 to pinctrl.
-In-Reply-To: <20121024220021.148a88ff@skate>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-2-git-send-email-andrew@lunn.ch>
- <20121024213128.2d4c07dc@skate> <50884659.1020208@gmail.com>
- <20121024220021.148a88ff@skate>
-Message-ID: <20121024200400.GZ21046@lunn.ch>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 24 Oct 2012 15:04:31 -0500
+Subject: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
+In-Reply-To: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121024200431.GE6713@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I think what Shawn Guo did with i.MX 28 is really neat. In the current
-> patches posted by Andrew, for example, the following piece:
-> 
-> +			pmx_uart1: pmx-uart1 {
-> +				marvell,pins = "mpp13", "mpp14";
-> +				marvell,function = "uart1";
-> +			};
-> 
-> is needlessly repeated in kirkwood-ts219-6281.dts,
-> kirkwood-ts219-6282.dts and kirkwood-dnskw.dtsi. This is clearly a
-> pinmux configuration that sets up TXD/RXD of UART1, and it should be in
-> kirkwood.dtsi.
+This makes the definition of VMALLOC_END suitable for use within
+assembly code.  This is necessary to allow the use of VMALLOC_END in
+defining where the early uart is mapped for use with DEBUG_LL.
 
-I did try that, but was getting errors from dtc.
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/include/asm/pgtable.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  Andrew
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 08c1231..72904a2 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -40,7 +40,7 @@
+  */
+ #define VMALLOC_OFFSET		(8*1024*1024)
+ #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+-#define VMALLOC_END		0xff000000UL
++#define VMALLOC_END		_AC(0xff000000,UL)
+ 
+ #define LIBRARY_TEXT_START	0x0c000000
+ 
+-- 
+1.8.0
