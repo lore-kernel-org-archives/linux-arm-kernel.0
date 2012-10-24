@@ -1,88 +1,54 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 Oct 2012 15:49:21 +0200
-Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
- update
-In-Reply-To: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 24 Oct 2012 15:52:46 +0200
+Subject: [PATCH] RFC: leds-pwm: don't disable pwm when setting brightness to 0
+In-Reply-To: <20121024095603.GH639@pengutronix.de>
+References: <20121024095603.GH639@pengutronix.de>
+Message-ID: <1351086766-5837-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+This fixes disabling the LED on i.MX28. The PWM hardware delays using
+the newly set pwm-config until the beginning of a new period.  It's very
+likely that pwm_disable is called before the current period ends. In
+case the LED was on brightness=max before the LED stays on because in
+the disabled PWM block the period never ends.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Signed-off-by: Lior Amsalem <alior@marvell.com>
+It's unclear if the mxs-pwm driver doesn't implement the API as expected
+(i.e. it should block until the newly set config is effective) or if the
+leds-pwm driver makes wrong assumptions. This patch assumes the latter.
+
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/boot/dts/armada-370-db.dts  |    3 +++
- arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
- arch/arm/boot/dts/armada-xp-db.dts   |    3 +++
- arch/arm/configs/mvebu_defconfig     |    7 +++++++
- 4 files changed, 23 insertions(+)
+Hello,
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 4a31b03..2a2aa75 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -34,5 +34,8 @@
- 			clock-frequency = <200000000>;
- 			status = "okay";
- 		};
-+		sata at d00a0000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 94b4b9e..3f08233 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -69,6 +69,16 @@
- 			compatible = "marvell,armada-addr-decoding-controller";
- 			reg = <0xd0020000 0x258>;
- 		};
-+
-+		sata at d00a0000 {
-+                        compatible = "marvell,orion-sata";
-+                        reg = <0xd00a0000 0x2400>;
-+                        interrupts = <55>;
-+                        nr-ports = <2>;
-+			clocks = <&coreclk 0>;//,  <&coreclk 0>;
-+                        status = "disabled";
-+		};
-+
- 	};
- };
+I'm not sure this is correct, but this is the workaround I'm using until
+I get some feed back.
+
+Best regards
+Uwe
+
+ drivers/leds/leds-pwm.c |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+index f2e44c7..a909f4f 100644
+--- a/drivers/leds/leds-pwm.c
++++ b/drivers/leds/leds-pwm.c
+@@ -38,13 +38,8 @@ static void led_pwm_set(struct led_classdev *led_cdev,
+ 	unsigned int max = led_dat->cdev.max_brightness;
+ 	unsigned int period =  led_dat->period;
  
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index b1fc728..b0db9a3 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -46,5 +46,8 @@
- 			clock-frequency = <250000000>;
- 			status = "okay";
- 		};
-+		sata at d00a0000 {
-+			status = "okay";
-+		};
- 	};
- };
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 7bcf850..8ac5f3c 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -18,6 +18,13 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_SATA_MV=y
-+CONFIG_MD=y
-+CONFIG_BLK_DEV_MD=y
-+# CONFIG_MD_AUTODETECT is not set
-+CONFIG_MD_RAID456=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
+-	if (brightness == 0) {
+-		pwm_config(led_dat->pwm, 0, period);
+-		pwm_disable(led_dat->pwm);
+-	} else {
+-		pwm_config(led_dat->pwm, brightness * period / max, period);
+-		pwm_enable(led_dat->pwm);
+-	}
++	pwm_config(led_dat->pwm, brightness * period / max, period);
++	pwm_enable(led_dat->pwm);
+ }
+ 
+ static int led_pwm_probe(struct platform_device *pdev)
 -- 
-1.7.9.5
+1.7.10.4
