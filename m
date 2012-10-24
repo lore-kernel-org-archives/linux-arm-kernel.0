@@ -1,54 +1,36 @@
-From: nbowler@elliptictech.com (Nick Bowler)
-Date: Wed, 24 Oct 2012 09:32:32 -0400
-Subject: [PATCH v3 3/5] zynq: remove use of CLKDEV_LOOKUP
-In-Reply-To: <20121024003442.GD31625@beefymiracle.amer.corp.natinst.com>
-References: <20121024003218.GA31625@beefymiracle.amer.corp.natinst.com>
- <20121024003442.GD31625@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121024133231.GA28661@elliptictech.com>
+From: hechtb@googlemail.com (Bastian Hecht)
+Date: Wed, 24 Oct 2012 15:35:11 +0200
+Subject: Possible regression in arm/io.h
+In-Reply-To: <20121024130957.GB7339@mudshark.cambridge.arm.com>
+References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
+ <20121024105223.GC23775@mudshark.cambridge.arm.com>
+ <CABYn4swp9JBEHgGTOkoe=tOh3Mf1dq5WYr=2xuKNpTmLX5LcFQ@mail.gmail.com>
+ <20121024130957.GB7339@mudshark.cambridge.arm.com>
+Message-ID: <CABYn4sz4v7Uf07am=MtPAKAvvAjwt+-bTRaLrBjoiRuyR9cfZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-10-23 19:34 -0500, Josh Cartwright wrote:
-> The Zynq support in mainline does not (yet) make use of any of the
-> generic clk or clk lookup functionality.  Remove what is upstream for
-> now, until the out-of-tree implementation is in suitable form for
-> merging.
-> 
-> An important side effect of this patch is that it allows the building of
-> a Zynq kernel without running into unresolved symbol problems:
-> 
->    drivers/built-in.o: In function `amba_get_enable_pclk':
->    clkdev.c:(.text+0x444): undefined reference to `clk_enable'
+2012/10/24 Will Deacon <will.deacon@arm.com>:
+> On Wed, Oct 24, 2012 at 01:34:18PM +0100, Bastian Hecht wrote:
+>> 2012/10/24 Will Deacon <will.deacon@arm.com>:
+>> > It sounds like we need to:
+>> >
+>> >         (a) Understand what has changed in GCC to cause this error to start
+>> >             cropping up.
+>> >
+>> >         (b) Have a look at the impact of using only "Q" on the generated
+>> >             code (especially register usage for the address).
+>> >
+>>
+>> Uff... I've just started to write ARM assembly and have no practical
+>> experience with the inner workings of real world compilers. So this
+>> time I'm afraid I was just good enough to report this. It sounds
+>> interesting to hunt it, but would take ages for me at this point.
+>
+> Ok, I'll have a look at the impact of moving exclusively to "Q" when I get a
+> chance. Which toolchain are you using?
 
-For the record, I think this was introduced by commit 56a34b03ff427
-("ARM: versatile: Make plat-versatile clock optional") which forgot to
-select PLAT_VERSATILE_CLOCK on Zynq.  This is not all that surprising,
-because the fact that Zynq "uses" PLAT_VERSATILE is secretly hidden in
-the Makefile.
+gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+For a more verbose info take a look at the bug report link.
 
-Nevertheless, the only feature from versatile that Zynq needed was the
-clock support, so this patch should *also* delete the secret use of
-plat-versatile by removing this line from arch/arm/Makefile:
-
-  plat-$(CONFIG_ARCH_ZYNQ)	+= versatile
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index cce4f8d..de70d99 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -946,7 +946,6 @@ config ARCH_ZYNQ
->  	bool "Xilinx Zynq ARM Cortex A9 Platform"
->  	select ARM_AMBA
->  	select ARM_GIC
-> -	select CLKDEV_LOOKUP
->  	select CPU_V7
->  	select GENERIC_CLOCKEVENTS
->  	select ICST
-
-I'd prefer if we just added "select COMMON_CLK" instead of removing this
-so we don't have to re-add this later, but I guess it doesn't really
-matter either way.
-
-Cheers,
--- 
-Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
+> Will
