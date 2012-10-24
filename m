@@ -1,77 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 19:13:57 +0200
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121024165215.GA32220@arwen.pp.htv.fi>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121022155028.GA13791@core.coreip.homeip.net>
- <508660D4.9030507@ti.com>
- <20121023200249.GA2712@core.coreip.homeip.net>
- <20121024083704.GF5665@arwen.pp.htv.fi>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <20121024165215.GA32220@arwen.pp.htv.fi>
-Message-ID: <CACRpkdYVAgO25s2RRYvt-KLS_4=NDJNfxQ+ThJuyWtksg27dhA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 24 Oct 2012 10:14:39 -0700
+Subject: [PATCH v5 3/5] ARM: EXYNOS: Enable PMUs for exynos4
+In-Reply-To: <1351056894-5790-4-git-send-email-chanho61.park@samsung.com>
+References: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+ <1351056894-5790-4-git-send-email-chanho61.park@samsung.com>
+Message-ID: <CAOesGMg5Nn5i=J8o3Rt8es3Tq_LZgVttuYSBbvYfmw1QTGwx0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 6:52 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, Oct 24, 2012 at 09:14:29AM -0700, Dmitry Torokhov wrote:
+Hi,
 
->> All of _their_ resources, exactly. They do not own nor control pins so
->> they should not be bothered with them either. Look, when you see that
+On Tue, Oct 23, 2012 at 10:34 PM, Chanho Park <chanho61.park@samsung.com> wrote:
+> This patch defines irq numbers of ARM performance monitoring unit for exynos4.
+> Firs of all, we need to fix IRQ_PMU correctly and to split pmu initialization
+> of exynos from plat-samsung for easily defining it.
 >
-> except that they *own* the pins. Now that the muxer has been setup
-> properly, this particular IP owns the pins.
+> The number of CPU cores and PMU irq numbers are vary according to soc types.
+> So, we need to identify each soc type using soc_is_xxx function and to define
+> the pmu irqs dynamically. For example, the exynos4412 has 4 cpu cores and pmus.
 
-This is true. It is then also reflected in the device model.
-And in debugfs, which is very helpful when debugging. If I
-cat
-/sys/kernel/debug/pinctrl/pinctrl-db8500/pins
+I wonder if it's worth doing this complexity on the non-DT case for exynos4?
 
-I can see a list of all pins on this ASIC and what device
-is using it. It is all due to the fact that each driver use
-[devm_]pinctrl_get(&dev) ad the struct device * pointer
-is used with dev_name() to print the corresponding
-device name.
+I wish there was more focus on the Samsung platforms for getting the
+DT support up to par with non-DT so you can avoid having to add new
+platform devices like these in the first place.
 
-When using hogs it just says the name of the pin
-controller and the pins aren't really connected to their
-real consumers :-P
 
-Example:
+Thanks,
 
-Pinmux settings per pin
-Format: pin (name): mux_owner gpio_owner hog?
-pin 0 (GPIO0_AJ5): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 1 (GPIO1_AJ3): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 2 (GPIO2_AH4): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 3 (GPIO3_AH3): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 4 (GPIO4_AH6): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 5 (GPIO5_AG6): (MUX UNCLAIMED) DB8500:5
-pin 6 (GPIO6_AF6): pinctrl-db8500 (GPIO UNCLAIMED) function ipgpio
-group ipgpio0_c_1
-pin 7 (GPIO7_AG5): pinctrl-db8500 (GPIO UNCLAIMED) function ipgpio
-group ipgpio1_c_1
-pin 8 (GPIO8_AD5): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 9 (GPIO9_AE4): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 10 (GPIO10_AF5): nmk-i2c.2 (GPIO UNCLAIMED) function i2c2 group i2c2_b_2
-pin 11 (GPIO11_AG4): nmk-i2c.2 (GPIO UNCLAIMED) function i2c2 group i2c2_b_2
-pin 12 (GPIO12_AC4): pinctrl-db8500 (GPIO UNCLAIMED) function msp0
-group msp0txrx_a_1
-pin 13 (GPIO13_AF3): pinctrl-db8500 (GPIO UNCLAIMED) function msp0
-group msp0tfstck_a_1
-pin 14 (GPIO14_AE3): pinctrl-db8500 (GPIO UNCLAIMED) function msp0
-group msp0tfstck_a_1
-pin 15 (GPIO15_AC3): pinctrl-db8500 (GPIO UNCLAIMED) function msp0
-group msp0txrx_a_1
-pin 16 (GPIO16_AD3): nmk-i2c.1 (GPIO UNCLAIMED) function i2c1 group i2c1_b_2
-pin 17 (GPIO17_AD4): nmk-i2c.1 (GPIO UNCLAIMED) function i2c1 group i2c1_b_2
-
-As you can see pins 6,7,12-15 are using hogs. Sure I can see
-the name of the function but that is just a string albeit
-helpful.
-
-Pins 10,11,16,17 are requested directly from the i2c driver
-and shows up connected to its device.
-
-Yours,
-Linus Walleij
+-Olof
