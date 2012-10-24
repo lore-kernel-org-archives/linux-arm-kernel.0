@@ -1,70 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 22:29:58 +0200
-Subject: [PATCH 9/9] ARM: Kirkwood: Convert IX2-200 to pinctrl.
-In-Reply-To: <20121024202010.GB21046@lunn.ch>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-10-git-send-email-andrew@lunn.ch>
- <20121024220429.50e2b0b8@skate> <20121024202010.GB21046@lunn.ch>
-Message-ID: <20121024222958.45a08c5b@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Oct 2012 20:30:09 +0000
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <5087F38B.1010508@free-electrons.com>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <201210241224.06791.arnd@arndb.de> <5087F38B.1010508@free-electrons.com>
+Message-ID: <201210242030.09959.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
-
-On Wed, 24 Oct 2012 22:20:10 +0200, Andrew Lunn wrote:
-
-> The reg maybe. Compatibility not. We need to tell pinctrl which of the
-> 5 different variants of kirkwood this particular kirkwood is. See
-
-Agreed.
-
-> drivers/pinctrl/pinctrl-kirkwood.c
+On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+> > No, I was thinking of making the underlying functions globally visible
+> > and have extern declarations in a header file so you can access them
+> > directly.
+> > 
+> > Generally speaking, when you run into a problem with common code, your
+> > first approach should be to fix the common code before you try to work
+> > around it.
 > 
-> enum kirkwood_variant {
->         VARIANT_MV88F6180 = V(1, 0, 0, 0, 0),
->         VARIANT_MV88F6190 = V(0, 1, 0, 0, 0),
->         VARIANT_MV88F6192 = V(0, 0, 1, 0, 0),
->         VARIANT_MV88F6281 = V(0, 0, 0, 1, 0),
->         VARIANT_MV88F6282 = V(0, 0, 0, 0, 1),
-> };
-> 
-> static struct of_device_id kirkwood_pinctrl_of_match[] __devinitdata = {
->         { .compatible = "marvell,88f6180-pinctrl", .data = &mv88f6180_info },
->         { .compatible = "marvell,88f6190-pinctrl", .data = &mv88f6190_info },
->         { .compatible = "marvell,88f6192-pinctrl", .data = &mv88f6192_info },
->         { .compatible = "marvell,88f6281-pinctrl", .data = &mv88f6281_info },
->         { .compatible = "marvell,88f6282-pinctrl", .data = &mv88f6282_info },
->         { }
-> };
-> 
-> What SoC is mounted on a board is a property of the board....
+> OK I thought it was done on purpose. But if you consider it needs to be
+> fixed I will add patch for it in next version.
 
-The way we solved that on Armada XP is that we have a common
-armada-xp.dtsi file with definitions common to all SoCs in the family.
-Then, we have sub .dtsi files named armada-xp-mv78230.dtsi,
-armada-xp-mv78260.dtsi and armada-xp-mv78460.dtsi that handle the
-differences between specific SoCs in the family. For example, the
-differences are: different compatible string for the pinctrl driver,
-different number of CPUs, different number of pins and
-therefore different number of GPIOs, different number of PCIe ports,
-etc. But besides those differences, most units have a lot of common
-definitions, that we factor out in armada-xp.dtsi.
+As long as the functions were only used locally in one file, it's
+better not to make them globally visible as a rule. But if we know
+that they are needed, that should be made explicit. Please fix this
+by submitting another patch to make those functions global and then
+rebase this series on top of that.
 
-So we have the following hierarchy:
-
- + armada-xp.dtsi
-   + armada-xp-mv78230.dtsi
-     + someboard-here.dts
-   + armada-xp-mv78260.dtsi
-     + openblocks-ax3-4.dts
-   + armada-xp-mv78460.dtsi
-     + armada-xp-db.dts
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
