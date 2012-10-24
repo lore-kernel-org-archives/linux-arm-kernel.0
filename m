@@ -1,101 +1,30 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Wed, 24 Oct 2012 14:48:00 +0900
-Subject: [PATCH] ARM: mach-shmobile: Use DT_MACHINE for mackerel
-Message-ID: <1351057680-4755-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 24 Oct 2012 11:37:13 +0530
+Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
+In-Reply-To: <CAKohpo=Jsy9az4PgJ-mkq_U49EOpHGES+-DaROanCOTn-L2s3Q@mail.gmail.com>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <98478a02ae69afc01b3c7860e42a4d763b2045e8.1350677395.git.viresh.kumar@linaro.org>
+ <CAKohpo=Jsy9az4PgJ-mkq_U49EOpHGES+-DaROanCOTn-L2s3Q@mail.gmail.com>
+Message-ID: <CAKohpomUD-JQbkyEom+_BaRqJSvw8P_hBUsrjTU3vH6bM1+scQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DT_MACHINE_START() on the sh7372 based mackerel board.
+On 22 October 2012 14:16, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 20 October 2012 01:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+>> Initially ondemand governor was written and then using its code conservative
+>> governor is written. It used a lot of code from ondemand governor, but copy of
+>> code was created instead of using the same routines from both governors. Which
+>> increased code redundancy, which is difficult to manage.
+>>
+>> This patch is an attempt to move common part of both the governors to
+>> cpufreq_governor.c file to come over above mentioned issues.
+>>
+>> This shouldn't change anything from functionality point of view.
+>>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Also include a tiny DTS file to describe the board and update the
-Kconfig dependencies to select CONFIG_USE_OF.
+For everybody else, this patch is already pushed by Rafael in his linux-next
+branch.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
----
- arch/arm/boot/dts/Makefile              |    3 ++-
- arch/arm/boot/dts/sh7372-mackerel.dts   |   22 ++++++++++++++++++++++
- arch/arm/mach-shmobile/Kconfig          |    1 +
- arch/arm/mach-shmobile/board-mackerel.c |    8 +++++++-
- 4 files changed, 32 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/sh7372-mackerel.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..a9d8a10 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -77,7 +77,8 @@ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
--	sh73a0-kzm9g.dtb
-+	sh73a0-kzm9g.dtb \
-+	sh7372-mackerel.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
- 	spear1340-evb.dtb
- dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
-diff --git a/arch/arm/boot/dts/sh7372-mackerel.dts b/arch/arm/boot/dts/sh7372-mackerel.dts
-new file mode 100644
-index 0000000..286f0ca
---- /dev/null
-+++ b/arch/arm/boot/dts/sh7372-mackerel.dts
-@@ -0,0 +1,22 @@
-+/*
-+ * Device Tree Source for the mackerel board
-+ *
-+ * Copyright (C) 2012 Renesas Solutions Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Mackerel (AP4 EVM 2nd)";
-+	compatible = "renesas,mackerel";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x40000000 0x10000000>;
-+	};
-+};
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 8ae100c..0750d9c 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -95,6 +95,7 @@ config MACH_MACKEREL
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-+	select USE_OF
- 
- config MACH_KOTA2
- 	bool "KOTA2 board"
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 0c27c81..39b8f2e 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1651,7 +1651,12 @@ static void __init mackerel_init(void)
- 	pm_clk_add(&hdmi_lcdc_device.dev, "hdmi");
- }
- 
--MACHINE_START(MACKEREL, "mackerel")
-+static const char *mackerel_boards_compat_dt[] __initdata = {
-+	"renesas,mackerel",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(MACKEREL_DT, "mackerel")
- 	.map_io		= sh7372_map_io,
- 	.init_early	= sh7372_add_early_devices,
- 	.init_irq	= sh7372_init_irq,
-@@ -1659,4 +1664,5 @@ MACHINE_START(MACKEREL, "mackerel")
- 	.init_machine	= mackerel_init,
- 	.init_late	= sh7372_pm_init_late,
- 	.timer		= &shmobile_timer,
-+	.dt_compat  = mackerel_boards_compat_dt,
- MACHINE_END
--- 
-1.7.10.4
+--
+viresh
