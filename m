@@ -1,65 +1,53 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Oct 2012 18:01:28 -0500
-Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
-In-Reply-To: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
-References: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
-Message-ID: <50887348.9070904@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 25 Oct 2012 01:26:04 +0200
+Subject: [PATCH 5/6] ARM: OMAP2+: Make some definitions local
+In-Reply-To: <20121019161743.GD4730@atomide.com>
+References: <20121018202707.11834.1438.stgit@muffinssi.local>
+ <2153737.CkcY4HqKKl@avalon> <20121019161743.GD4730@atomide.com>
+Message-ID: <1682925.XTJ8FK6Z8P@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2012 12:32 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+Ho Tony,
+
+On Friday 19 October 2012 09:17:43 Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121019 02:45]:
+> > On Thursday 18 October 2012 13:28:48 Tony Lindgren wrote:
+> > > @@ -117,13 +112,6 @@ static inline struct omap_iommu
+> > > *dev_to_omap_iommu(struct device *dev) }
+> > > 
+> > >  #endif
+> > > 
+> > > -/* IOMMU errors */
+> > > -#define OMAP_IOMMU_ERR_TLB_MISS		(1 << 0)
+> > > -#define OMAP_IOMMU_ERR_TRANS_FAULT	(1 << 1)
+> > > -#define OMAP_IOMMU_ERR_EMU_MISS		(1 << 2)
+> > > -#define OMAP_IOMMU_ERR_TBLWALK_FAULT	(1 << 3)
+> > > -#define OMAP_IOMMU_ERR_MULTIHIT_FAULT	(1 << 4)
+> > > -
+> > 
+> > I'll use those in the tidspbridge driver, in patches that I plan to push
+> > soon.
+> > 
+> > I will apply this patch set on top of mine, see what breaks. Would you
+> > like me to propose a modified version of this set, or add additional
+> > patches in my set ?
 > 
-> Enable SMP for the SOCFPGA platform.
-> 
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> ---
-> v2:
-> -Remove pen_release code
-> -Remove code that was already done by v7_setup
-> -Add bindings document for reset and system manager
-> -Move socfpga_sysmgr_init from platsmp.c to socfpga.c, because
-> we will need to use the reset and system manager for more than SMP.
-> -Move core.h to mach-socfpga from mach-socfpga/include/mach
+> Sure, let's try to expose only the minimal amount of omap iommu things with
+> this patch set so we don't break things. Then the iommu development can
+> continue on it's own independent of the core omap code except for the
+> platform data.
 
-Just some lingering comments on the defconfig. Otherwise,
+I'll rebase my DSP patches on top of this patch set then, it will be easier.
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> But again, if there are nasty layering violations using this code, I would
+> just remove those features. Those things tend to just get worse unless they
+> are fixed properly to start with.
 
-> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-> index 0ac1293..349ac22 100644
-> --- a/arch/arm/configs/socfpga_defconfig
-> +++ b/arch/arm/configs/socfpga_defconfig
+The long-term goal is to move the tidspbridge driver to the IOMMU API, but 
+we'll need a step by step approach.
 
-I'm still not clear why multi_v7 config does not work for you?
+-- 
+Regards,
 
-> @@ -1,5 +1,5 @@
->  CONFIG_EXPERIMENTAL=y
-> -CONFIG_SYSVIPC=y
-> +CONFIG_NO_HZ=y
->  CONFIG_IKCONFIG=y
->  CONFIG_IKCONFIG_PROC=y
->  CONFIG_LOG_BUF_SHIFT=14
-> @@ -16,10 +16,13 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_IOSCHED_DEADLINE is not set
->  # CONFIG_IOSCHED_CFQ is not set
->  CONFIG_ARCH_SOCFPGA=y
-> -CONFIG_MACH_SOCFPGA_CYCLONE5=y
-> -CONFIG_ARM_THUMBEE=y
-> +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
->  # CONFIG_CACHE_L2X0 is not set
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_SMP=y
-> +CONFIG_ARM_ARCH_TIMER=y
-
-You're an A9, right? You don't have arch timers.
-
-> +CONFIG_HIGHMEM=y
-
-How much RAM? You need more than 2GB with CONFIG_VMSPLIT_2G.
-
-> +CONFIG_HIGHPTE=y
->  CONFIG_VMSPLIT_2G=y
->  CONFIG_NR_CPUS=2
->  CONFIG_AEABI=y
+Laurent Pinchart
