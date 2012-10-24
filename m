@@ -1,39 +1,61 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 23:33:56 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <20121024200128.GY21046@lunn.ch>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <201210242006.55879.michael@walle.cc>
- <20121024200128.GY21046@lunn.ch>
-Message-ID: <20121024233356.1bda95bf@skate>
+Date: Wed, 24 Oct 2012 23:38:56 +0200
+Subject: [PATCH 1/3] pinctrl: mvebu: allow plat-orion architectures to use
+ pinctrl-mvebu
+Message-ID: <1351114738-26793-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+The mach-kirkwood and mach-dove architectures have not yet been
+integrated into the mach-mvebu directory, which should ultimately
+contain the support for all Marvell SoCs from the Engineering Business
+Unit.
 
-On Wed, 24 Oct 2012 22:01:28 +0200, Andrew Lunn wrote:
+However, before this can happen, we need to let mach-kirkwood and
+mach-dove use the pinctrl-mvebu driver, which supports the kirkwood
+and dove SoC families. In order to do that, we make this driver
+available as soon as PLAT_ORION is selected, instead of using
+ARCH_MVEBU as a condition. In the long term, PLAT_ORION should
+disappear and be fully replaced by ARCH_MVEBU, but the plan is to make
+the migration step by step, by first having the existing mach-*
+directories for Marvell SoCs converge on several infrastructures,
+including the pinctrl one.
 
-> I guess it is too early to use gpio. I don't think the gpio driver has
-> not been configured yet.
-> 
-> I need to think about this.
-> 
-> What happens if you comment out these two gpio_set_value calls?
+Also, like the spear pinctrl driver, we put all pinctrl-mvebu Kconfig
+options under a if, in order to avoid having certain options
+(PINCTRL_DOVE, PINCTRL_KIRKWOOD, etc.) selecting an option
+(PINCTLR_MVEBU) which itself has a dependency (on ARCH_MVEBU). In this
+a construct, the dependency is in fact ignored due to the selects.
 
-The problem is (probably, I haven't tested) that in
-mach-kirkwood/board-dt.c, the of_platform_populate() function is called
-after all the board-specific init. So all the devices described in the
-DT, including GPIO banks, have not been registered yet. Most likely the
-of_platform_populate() should come before the board specific inits.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pinctrl/Kconfig |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Also there should probably  be a gpio_request() before those
-gpio_set_value().
-
-Best regards,
-
-Thomas
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 7bf914d..a9d756e 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -186,9 +186,10 @@ config PINCTRL_EXYNOS4
+ 	bool "Pinctrl driver data for Exynos4 SoC"
+ 	select PINCTRL_SAMSUNG
+ 
++if PLAT_ORION
++
+ config PINCTRL_MVEBU
+ 	bool
+-	depends on ARCH_MVEBU
+ 	select PINMUX
+ 	select PINCONF
+ 
+@@ -208,6 +209,8 @@ config PINCTRL_ARMADA_XP
+ 	bool
+ 	select PINCTRL_MVEBU
+ 
++endif
++
+ source "drivers/pinctrl/spear/Kconfig"
+ 
+ config PINCTRL_XWAY
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
