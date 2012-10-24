@@ -1,39 +1,38 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 24 Oct 2012 14:13:41 +0200
-Subject: [PATCH 2/2] ARM: plat-nomadik: Use apb_pclock in mtu driver
-In-Reply-To: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1351080821-18660-3-git-send-email-ulf.hansson@stericsson.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Wed, 24 Oct 2012 20:22:45 +0800
+Subject: [PATCH v2 2/2] ARM: topdown mmap support
+In-Reply-To: <1321566426-31184-2-git-send-email-robherring2@gmail.com>
+References: <1321566426-31184-1-git-send-email-robherring2@gmail.com>
+ <1321566426-31184-2-git-send-email-robherring2@gmail.com>
+Message-ID: <CAMj5Bkg9Ht4YG9TL4yQfT5y5Fea4ywLDANoO2NTnGJZatN2RLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Fri, Nov 18, 2011 at 5:47 AM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Similar to other architectures, this adds topdown mmap support in user
+> process address space allocation policy. This allows mmap sizes greater
+> than 2GB. This support is largely copied from MIPS and the generic
+> implementations.
+>
+> The address space randomization is moved into arch_pick_mmap_layout.
+>
+> Tested on V-Express with ubuntu and a mmap test from here:
+> https://bugs.launchpad.net/bugs/861296
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/plat-nomadik/timer.c |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Unfortunately, we met "no vspace available" during loading libmono.so,
+when using default arch_get_unmapped_area_topdown method, tested on
+Jelly Bean with 3.4 kernel.
+While no problem using arch_get_unmapped_area in the patch, or just
+revert this patch.
+The result is some application can not run.
 
-diff --git a/arch/arm/plat-nomadik/timer.c b/arch/arm/plat-nomadik/timer.c
-index 9222e55..17c690d 100644
---- a/arch/arm/plat-nomadik/timer.c
-+++ b/arch/arm/plat-nomadik/timer.c
-@@ -177,9 +177,15 @@ void nmdk_clksrc_reset(void)
- void __init nmdk_timer_init(void __iomem *base)
- {
- 	unsigned long rate;
--	struct clk *clk0;
-+	struct clk *clk0, *pclk0;
- 
- 	mtu_base = base;
-+
-+	pclk0 = clk_get_sys("mtu0", "apb_pclk");
-+	BUG_ON(IS_ERR(pclk0));
-+	BUG_ON(clk_prepare(pclk0) < 0);
-+	BUG_ON(clk_enable(pclk0) < 0);
-+
- 	clk0 = clk_get_sys("mtu0", NULL);
- 	BUG_ON(IS_ERR(clk0));
- 	BUG_ON(clk_prepare(clk0) < 0);
--- 
-1.7.10
+Just google, find same issue reported on Jelly Bean with 3.4 kernel.
+
+Any suggestion?
+
+Thanks
