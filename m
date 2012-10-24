@@ -1,23 +1,23 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 16:53:48 +0200
-Subject: [PATCH 3/9] ARM: Kirkwood: Convert dnskw to pinctrl
+Date: Wed, 24 Oct 2012 16:53:51 +0200
+Subject: [PATCH 6/9] ARM: Kirkwood: Convert GoFlex Net to pinctrl.
 In-Reply-To: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
 References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1351090434-30499-4-git-send-email-andrew@lunn.ch>
+Message-ID: <1351090434-30499-7-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/boot/dts/kirkwood-dnskw.dtsi |  136 +++++++++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-dnskw.c  |   37 ---------
- 2 files changed, 136 insertions(+), 37 deletions(-)
+ arch/arm/boot/dts/kirkwood-goflexnet.dts |   57 ++++++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-goflexnet.c |   18 ----------
+ 2 files changed, 57 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-index 9b32d02..5d8cf93 100644
---- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-@@ -36,6 +36,142 @@
+diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+index 7c8238f..46d16a2 100644
+--- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
++++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+@@ -16,6 +16,63 @@
  	};
  
  	ocp at f1000000 {
@@ -25,200 +25,100 @@ index 9b32d02..5d8cf93 100644
 +			compatible = "marvell,88f6281-pinctrl";
 +			reg = <0x10000 0x20>;
 +
-+			pinctrl-0 = < &pmx_uart1 &pmx_sata1
-+				      &pmx_gpio_24 &pmx_gpio_25
-+				      &pmx_led_power &pmx_led_power
-+				      &pmx_led_red_right_hdd
-+				      &pmx_led_red_left_hdd
-+				      &pmx_led_red_usb_325
-+				      &pmx_gpio_30 &pmx_gpio_31
-+				      &pmx_gpio_32 &pmx_gpio_33
-+				      &pmx_button_power
-+				      &pmx_led_red_usb_320
-+				      &pmx_power_off &pmx_power_back_on
-+				      &pmx_power_sata0 &pmx_power_sata1
-+				      &pmx_present_sata0 &pmx_present_sata1
-+				      &pmx_led_white_usb &pmx_fan_tacho
-+				      &pmx_fan_high_speed &pmx_fan_low_speed
-+				      &pmx_button_unmount &pmx_button_reset
-+				      &pmx_temp_alarm >;
++			pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
++				      &pmx_led_left_cap_0 &pmx_led_left_cap_1
++				      &pmx_led_left_cap_2 &pmx_led_left_cap_3
++				      &pmx_led_right_cap_0 &pmx_led_right_cap_1
++				      &pmx_led_right_cap_2 &pmx_led_right_cap_3
++				    >;
 +			pinctrl-names = "default";
 +
-+			pmx_uart1: pmx-uart1 {
-+				marvell,pins = "mpp13", "mpp14";
-+				marvell,function = "uart1";
-+			};
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins = "mpp4", "mpp20", "mpp22";
-+				marvell,function = "sata1";
-+			};
-+			pmx_gpio_24: pmx-gpio-24 {
-+				marvell,pins = "mpp24";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_25: pmx-gpio-25 {
-+				marvell,pins = "mpp25";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_power: pmx-led-power {
-+				marvell,pins = "mpp26";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_right_hdd: pmx-led-red-right-hdd {
-+				marvell,pins = "mpp27";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_left_hdd: pmx-led-red-left-hdd {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_usb_325: pmx-led-red-usb-325 {
++			pmx_usb_power_enable: pmx-usb-power-enable {
 +				marvell,pins = "mpp29";
 +				marvell,function = "gpio";
 +			};
-+			pmx_gpio_30: pmx-gpio-30 {
-+				marvell,pins = "mpp30";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_31: pmx-gpio-31 {
-+				marvell,pins = "mpp31";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_32: pmx-gpio-32 {
-+				marvell,pins = "mpp32";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_33: pmx-gpio-33 {
-+				marvell,pins = "mpp33";
-+				marvell,function = "gpio";
-+			};
-+			pmx_button_power: pmx-button-power {
-+				marvell,pins = "mpp34";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_red_usb_320: pmx-led-red-usb-320 {
-+				marvell,pins = "mpp35";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_off: pmx-power-off {
-+				marvell,pins = "mpp36";
-+				marvell,function = "gpio";
-+			};
-+			pmx_power_back_on: pmx-power-back-on {
-+				marvell,pins = "mpp37";
-+				marvell,function = "gpio";
-+			};
-+			pmx_gpio_38: pmx-gpio-38 {
++			pmx_led_right_cap_0: pmx-led_right_cap_0 {
 +				marvell,pins = "mpp38";
 +				marvell,function = "gpio";
 +			};
-+			pmx_power_sata0: pmx-power-sata0 {
++			pmx_led_right_cap_1: pmx-led_right_cap_1 {
 +				marvell,pins = "mpp39";
 +				marvell,function = "gpio";
 +			};
-+			pmx_power_sata1: pmx-power-sata1 {
++			pmx_led_right_cap_2: pmx-led_right_cap_2 {
 +				marvell,pins = "mpp40";
 +				marvell,function = "gpio";
 +			};
-+			pmx_present_sata0: pmx-present-sata0 {
++			pmx_led_right_cap_3: pmx-led_right_cap_3 {
 +				marvell,pins = "mpp41";
 +				marvell,function = "gpio";
 +			};
-+			pmx_present_sata1: pmx-present-sata1 {
++			pmx_led_left_cap_0: pmx-led_left_cap_0 {
 +				marvell,pins = "mpp42";
 +				marvell,function = "gpio";
 +			};
-+			pmx_led_white_usb: pmx-led-white-usb {
++			pmx_led_left_cap_1: pmx-led_left_cap_1 {
 +				marvell,pins = "mpp43";
 +				marvell,function = "gpio";
 +			};
-+			pmx_fan_tacho: pmx-fan-tacho {
++			pmx_led_left_cap_2: pmx-led_left_cap_2 {
 +				marvell,pins = "mpp44";
 +				marvell,function = "gpio";
 +			};
-+			pmx_fan_high_speed: pmx-fan-high-speed {
++			pmx_led_left_cap_3: pmx-led_left_cap_3 {
 +				marvell,pins = "mpp45";
 +				marvell,function = "gpio";
 +			};
-+			pmx_fan_low_speed: pmx-fan-low-speed {
++			pmx_led_green: pmx-led_green {
 +				marvell,pins = "mpp46";
 +				marvell,function = "gpio";
 +			};
-+			pmx_button_unmount: pmx-button-unmount {
++			pmx_led_orange: pmx-led_orange {
 +				marvell,pins = "mpp47";
 +				marvell,function = "gpio";
 +			};
-+			pmx_button_reset: pmx-button-reset {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
-+			pmx_temp_alarm: pmx-temp-alarm {
-+				marvell,pins = "mpp49";
-+				marvell,function = "gpio";
-+			};
 +		};
- 		sata at 80000 {
- 			status = "okay";
- 			nr-ports = <2>;
-diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
-index 43d16d6..ed93c09 100644
---- a/arch/arm/mach-kirkwood/board-dnskw.c
-+++ b/arch/arm/mach-kirkwood/board-dnskw.c
-@@ -17,46 +17,11 @@
- #include <linux/mv643xx_eth.h>
- #include <linux/gpio.h>
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+ 			status = "ok";
+diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
+index 001ca8c..9643f4b 100644
+--- a/arch/arm/mach-kirkwood/board-goflexnet.c
++++ b/arch/arm/mach-kirkwood/board-goflexnet.c
+@@ -34,34 +34,16 @@
+ #include <mach/bridge-regs.h>
+ #include <linux/platform_data/mmc-mvsdio.h>
  #include "common.h"
 -#include "mpp.h"
  
- static struct mv643xx_eth_platform_data dnskw_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+ static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
  };
  
--static unsigned int dnskw_mpp_config[] __initdata = {
--	MPP13_UART1_TXD,	/* Custom ... */
--	MPP14_UART1_RXD,	/* ... Controller (DNS-320 only) */
--	MPP20_SATA1_ACTn,	/* LED: White Right HDD */
--	MPP21_SATA0_ACTn,	/* LED: White Left HDD */
--	MPP24_GPIO,
--	MPP25_GPIO,
--	MPP26_GPIO,	/* LED: Power */
--	MPP27_GPIO,	/* LED: Red Right HDD */
--	MPP28_GPIO,	/* LED: Red Left HDD */
--	MPP29_GPIO,	/* LED: Red USB (DNS-325 only) */
--	MPP30_GPIO,
--	MPP31_GPIO,
--	MPP32_GPIO,
--	MPP33_GPO,
--	MPP34_GPIO,	/* Button: Front power */
--	MPP35_GPIO,	/* LED: Red USB (DNS-320 only) */
--	MPP36_GPIO,	/* Power: Turn off board */
--	MPP37_GPIO,	/* Power: Turn back on after power failure */
--	MPP38_GPIO,
--	MPP39_GPIO,	/* Power: SATA0 */
--	MPP40_GPIO,	/* Power: SATA1 */
--	MPP41_GPIO,	/* SATA0 present */
--	MPP42_GPIO,	/* SATA1 present */
--	MPP43_GPIO,	/* LED: White USB */
--	MPP44_GPIO,	/* Fan: Tachometer Pin */
--	MPP45_GPIO,	/* Fan: high speed */
--	MPP46_GPIO,	/* Fan: low speed */
--	MPP47_GPIO,	/* Button: Back unmount */
--	MPP48_GPIO,	/* Button: Back reset */
--	MPP49_GPIO,	/* Temp Alarm (DNS-325) Pin of U5 (DNS-320) */
+-static unsigned int goflexnet_mpp_config[] __initdata = {
+-	MPP29_GPIO,	/* USB Power Enable */
+-	MPP47_GPIO,	/* LED Orange */
+-	MPP46_GPIO,	/* LED Green */
+-	MPP45_GPIO,	/* LED Left Capacity 3 */
+-	MPP44_GPIO,	/* LED Left Capacity 2 */
+-	MPP43_GPIO,	/* LED Left Capacity 1 */
+-	MPP42_GPIO,	/* LED Left Capacity 0 */
+-	MPP41_GPIO,	/* LED Right Capacity 3 */
+-	MPP40_GPIO,	/* LED Right Capacity 2 */
+-	MPP39_GPIO,	/* LED Right Capacity 1 */
+-	MPP38_GPIO,	/* LED Right Capacity 0 */
 -	0
 -};
 -
- static void dnskw_power_off(void)
+ void __init goflexnet_init(void)
  {
- 	gpio_set_value(36, 1);
-@@ -76,8 +41,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
- 
- void __init dnskw_init(void)
- {
--	kirkwood_mpp_conf(dnskw_mpp_config);
+ 	/*
+ 	 * Basic setup. Needs to be called early.
+ 	 */
+-	kirkwood_mpp_conf(goflexnet_mpp_config);
 -
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&dnskw_ge00_data);
- 
+ 	if (gpio_request(29, "USB Power Enable") != 0 ||
+ 	    gpio_direction_output(29, 1) != 0)
+ 		pr_err("can't setup GPIO 29 (USB Power Enable)\n");
 -- 
 1.7.10.4
