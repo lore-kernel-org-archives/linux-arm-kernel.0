@@ -1,42 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 24 Oct 2012 11:54:54 -0600
-Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1351099475-29349-1-git-send-email-sboyd@codeaurora.org>
-References: <1351099475-29349-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <50882B6E.5020103@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 24 Oct 2012 13:57:08 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <50882882.1090806@gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1210241347570.1282-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 11:24 AM, Stephen Boyd wrote:
-> The TWD and SCU configs are selected by default as long as
-> MSM_SCORPIONMP is false and/or MCT is false. Implementing the
-> logic this way certainly saves lines in the Kconfig but it
-> precludes those machines which select MSM_SCORPIONMP or MCT from
-> participating in the single zImage effort because when those
-> machines are combined with other SMP capable machines the TWD and
-> SCU are no longer selected by default.
+On Wed, 24 Oct 2012, Rob Herring wrote:
+
+> On 10/24/2012 11:44 AM, Alan Stern wrote:
+> > On Wed, 24 Oct 2012, Stephen Warren wrote:
+> > 
+> >> We should absolutely avoid Linux-specific properties where possible.
+> >>
+> >> That said, what Linux-specific properties are you talking about? The
+> >> properties discussed here (has-synopsys-hc-bug, no-io-watchdog, has-tt)
+> >> are all purely a description of HW, aren't they.
+> > 
+> > "has-tt" is definitely a description of the HW.
 > 
-> Push the select out to the machine entries so that we can compile
-> these machines together and still select the appropriate configs.
+> Can you spell out tt.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+It stands for Transaction Translator.  The acronym is a standard one, 
+used in the USB specs.
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > "has-synopsys-hc-bug" is too, although determining whether or not it 
+> > should apply to a particular controller might be difficult.  I'm 
+> > inclined not to include it among the properties.
+> 
+> What happens when there are 2 synopsys hc bugs? Something more specific
+> about what the bug is would be better.
 
-> @@ -633,6 +633,8 @@ config ARCH_TEGRA
->  	select GENERIC_GPIO
->  	select HAVE_CLK
->  	select HAVE_SMP
-> +	select HAVE_ARM_SCU if SMP
-> +	select HAVE_ARM_TWD if LOCAL_TIMERS
->  	select MIGHT_HAVE_CACHE_L2X0
->  	select SPARSE_IRQ
->  	select USE_OF
+We will leave it out.
 
-Where will this patch be merged?
+> > "no-io-watchdog" is not the greatest name.  It describes to controllers 
+> > that always do generate IRQs for I/O events when they are supposed to 
+> > (and hence the driver doesn't need to set up a watchdog timer to detect 
+> > I/O completions that didn't generate an IRQ).  So while the concept is 
+> > HW-specific, the name refers to a driver implementation issue.  A 
+> > better name might be something like "reliable-IRQs".  Again, it's not 
+> > such an easy thing to test for.  Almost all the existing drivers leave 
+> > it unset.
+> 
+> Shouldn't the default be reliable irqs? What about "unreliable-irqs"?
 
-It probably won't happen for 3.8, but that config fragment will move to
-arch/arm/mach-tegra/Kconfig when Tegra enables single zImage support, I
-believe. So, it'd be good to make sure this patch gets merged somewhere
-that could be used as a baseline for other arm-soc branches if needed,
-to avoid merge conflicts.
+I don't know why the default was set the way it was.  That was before 
+my time as EHCI maintainer.  Right now only a few EHCI drivers claim to 
+have reliable IRQs.
+
+Avoiding the watchdog timer is a fairly minor optimization in any case.  
+It fires only once every 100 ms, and only while I/O is in progress.
+
+Alan Stern
