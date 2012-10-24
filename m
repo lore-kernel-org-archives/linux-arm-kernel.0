@@ -1,115 +1,101 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Wed, 24 Oct 2012 18:36:08 +0200
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <5088145F.1040504@wwwdotorg.org>
-References: <5086F8D6.5050605@gmail.com> <20121024152652.GG4368@breakpoint.cc>
- <5088145F.1040504@wwwdotorg.org>
-Message-ID: <4072275.SyhkJA9fPe@flexo>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 24 Oct 2012 17:37:27 +0100
+Subject: [RFC] Energy/power monitoring within the kernel
+In-Reply-To: <20121023220240.GA25895@roeck-us.net>
+References: <1351013449.9070.5.camel@hornet>
+ <20121023220240.GA25895@roeck-us.net>
+Message-ID: <1351096647.23327.64.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 October 2012 10:16:31 Stephen Warren wrote:
-> On 10/24/2012 09:26 AM, Sebastian Andrzej Siewior wrote:
-> > On Wed, Oct 24, 2012 at 10:57:00AM -0400, Alan Stern wrote:
-> >> Under the circumstances, do we really need a new binding document for 
-> >> the ehci-platform driver?
-> 
-> It seems reasonable to add the new properties to usb-ehci.txt, since
-> they do describe the HW.
-> 
-> >> We should be able to use the existing 
-> >> usb-ehci binding, perhaps with some new properties added:
-> >>
-> >> 	has-synopsys-hc-bug
-> >> 	no-io-watchdog
-> >> 	has-tt
-> 
-> That sounds fine to me.
-> 
-> However, there is an implementation issue here. I believe the way Linux
-> searches for a driver for a particular node is:
-> 
-> for every driver that's registered
->     if the driver's supported compatible list matches the device
->         use the driver
-> 
-> (See drivers/base/platform.c:platform_match() which implements the if
-> statement above, and I assume the driver core implements the outer for
-> loop above)
-> 
-> That means that if the generic driver supports compatible="usb-ehci", it
-> may "steal" device nodes that have
-> compatible="something-custom","usb-ehci", even if there's a driver
-> specifically for "something-custom". We would need to re-arrange the
-> driver matching code to:
-> 
-> for each compatible value in the node:
->     for each driver that's registered:
->         if the driver supports the compatible value:
->             use the driver.
-> 
-> > On the PCI side we have VID, PID which is used for quirks. Sometimes we have a
-> > revision ID which can be used to figure out if "this quirk" is still required.
-> > The PCI driver probes by class so the ehci driver does not have a large table
-> > of VID/PID for each controller out there. And the USB controller in two
-> > different Intel boards has a different PID so a quirk, if required, could be
-> > applied only to the specific mainboard.
+On Tue, 2012-10-23 at 23:02 +0100, Guenter Roeck wrote:
+> > Traditionally such data should be exposed to the user via hwmon sysfs
+> > interface, and that's exactly what I did for "my" platform - I have
+> > a /sys/class/hwmon/hwmon*/device/energy*_input and this was good
+> > enough to draw pretty graphs in userspace. Everyone was happy...
 > > 
-> > Based on this we need atleast two compatible entries one "HW-Specific"
-> > followed by a generic one (similar to PCI class).
-> > Doing it the PCI way we would have to have table and figure out which
-> > HW-specific compatible entry sets the TT flag and which one does the
-> > no-io-watchdog. Having has-tt in compatible isn't right.
-> 
-> Yes, the driver could easily bind to anything compatible with
-> "usb-ehci", then use the HW-specific compatible value to index into a
-> quirk table in the same way that specific PCI IDs index into a quirk table.
+> Only driver supporting "energy" output so far is ibmaem, and the reported energy
+> is supposed to be cumulative, as in energy = power * time. Do you mean power,
+> possibly ?
 
-Sounds good.
+So the vexpress would be the second one, than :-) as the energy
+"monitor" actually on the latest tiles reports 64-bit value of
+microJoules consumed (or produced) since the power-up.
 
-> 
-> I agree that having separate compatible values like usb-ehci and
-> usb-ehci-with-tt probably doesn't make sense here.
-> 
-> > I'm all with Alan here, to make a shortcut and allow Linux specific properties
-> > which describe a specific quirk in less code lines. Other OS can just ignore
-> > those and build their table based on the compatible entry if they want to.
-> 
-> We should absolutely avoid Linux-specific properties where possible.
-> 
-> That said, what Linux-specific properties are you talking about? The
-> properties discussed here (has-synopsys-hc-bug, no-io-watchdog, has-tt)
-> are all purely a description of HW, aren't they.
+Some of the older boards were able to report instant power, but this
+metrics is less useful in our case.
 
-has-tt and has-synopsys-hc-bug are certainly hardware properties, while
-no-io-watchdog is a Linux driver software workaround for a hardware issue,
-so that's kind of in a grey zone to decide whether this describes hardware or
-not. Let's just assume that this is a hardware issue :)
-
+> > Now I am getting new requests to do more with this data. In particular
+> > I'm asked how to add such information to ftrace/perf output. The second
+> > most frequent request is about providing it to a "energy aware"
+> > cpufreq governor.
 > 
-> > So usb-ehci should be fine. It is a generic USB-EHCI controller after all.
-> > Quirks or no quirks, the register layout is the same, the functionality is the
-> > same. If you can't map memory >4GiB then you need a quirk for this but you may
-> > discover it way too late.
-> > If your platform driver requires extra code for the PHY then it is still an
-> > EHCI controller. The PHY wasn't setup by the bootloader / bios so Linux has to
-> > deal with it.
+> Anything energy related would have to be along the line of "do something after a
+> certain amount of work has been performed", which at least at the surface does
+> not make much sense to me, unless you mean something along the line of a
+> process scheduler which schedules a process not based on time slices but based
+> on energy consumed, ie if you want to define a time slice not in milli-seconds
+> but in Joule.
+
+Actually there is some research being done in this direction, but it's
+way too early to draw any conclusions...
+
+> If so, I would argue that a similar behavior could be achieved by varying the
+> duration of time slices with the current CPU speed, or simply by using cycle
+> count instead of time as time slice parameter. Not that I am sure if such an
+> approach would really be of interest for anyone. 
+> 
+> Or do you really mean power, not energy, such as in "reduce CPU speed if its
+> power consumption is above X Watt" ?
+
+Uh. To be completely honest I must answer: I'm not sure how the "energy
+aware" cpufreq governor is supposed to work. I have been simply asked to
+provide the data in some standard way, if possible.
+
+> I am not sure how this would be expected to work. hwmon is, by its very nature,
+> a passive subsystem: It doesn't do anything unless data is explicitly requested
+> from it. It does not update an attribute unless that attribute is read.
+> That does not seem to fit well with the idea of tracing - which assumes
+> that some activity is happening, ultimately, all by itself, presumably
+> periodically. The idea to have a user space application read hwmon data only
+> for it to trigger trace events does not seem to be very compelling to me.
+
+What I had in mind was similar to what adt7470 driver does. The driver
+would automatically access the device every now and then to update it's
+internal state and generate the trace event on the way. This
+auto-refresh "feature" is particularly appealing for me, as on some of
+"my" platforms can take up to 500 microseconds to actually get the data.
+So doing this in background (and providing users with the last known
+value in the meantime) seems attractive.
+
+> An exception is if a monitoring device suppports interrupts, and if its driver
+> actually implements those interrupts. This is, however, not the case for most of
+> the current drivers (if any), mostly because interrupt support for hardware
+> monitoring devices is very platform dependent and thus difficult to implement.
+
+Interestingly enough the newest version of our platform control micro
+(doing the energy monitoring as well) can generate and interrupt when a
+transaction is finished, so I was planning to periodically update the
+all sort of values. And again, generating a trace event on this
+opportunity would be trivial.
+
+> > Of course a particular driver could register its own perf PMU on its
+> > own. It's certainly an option, just very suboptimal in my opinion.
+> > Or maybe not? Maybe the task is so specialized that it makes sense?
 > > 
-> >> We probably can omit has-synopsys-hc-bug, as that is specific to one
-> >> type of MIPS ATH79 controller.  The driver can check for it explicitly,
-> >> if necessary.
-> >>
-> >> In fact, it's not clear that these new properties need to be added now.  
-> >> They can be added over time as needed, as existing drivers are
-> >> converted over to DT.  Or is it preferable to document these things
-> >> now, preemptively as it were?
-> 
-> It's best to define the binding up-front so it doesn't churn, where
-> possible. This will also ensure that multiple people don't try to update
-> the binding document to add the same feature in different ways.
+> We had a couple of attempts to provide an in-kernel API. Unfortunately,
+> the result was, at least so far, more complexity on the driver side.
+> So the difficulty is really to define an API which is really simple, and does
+> not just complicate driver development for a (presumably) rare use case.
 
-Agreed, we do support these properties in the non-DT case, so I see no reason
-why we should not document them in the binding too.
+Yes, I appreciate this. That's why this option is actually my least
+favourite. Anyway, what I was thinking about was just a thin shin that
+*can* be used by a driver to register some particular value with the
+core (so it can be enumerated and accessed by in-kernel clients) and the
+core could (or not) create a sysfs attribute for this value on behalf of
+the driver. Seems lightweight enough, unless previous experience
+suggests otherwise?
 
-> 
-> > I would add it only if required / has users.
+Cheers!
+
+Pawe?
