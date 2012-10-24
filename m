@@ -1,31 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 24 Oct 2012 15:22:14 +0400
-Subject: [PATCH v2] ARM: dm365: replace V4L2_OUT_CAP_CUSTOM_TIMINGS with
- V4L2_OUT_CAP_DV_TIMINGS
-In-Reply-To: <5087CEDC.9050103@ti.com>
-References: <1350998273-19769-1-git-send-email-prabhakar.lad@ti.com>
- <5087CEDC.9050103@ti.com>
-Message-ID: <5087CF66.6020805@mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Oct 2012 11:36:12 +0000
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351065841-18654-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201210241136.12779.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.10.2012 15:19, Sekhar Nori wrote:
+On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+> +void __init armada_370_xp_coherency_iocache_init(void)
+> +{
+> +       /* When the coherency fabric is available, the Armada XP and
+> +        * Aramada 370 are close to a coherent architecture, so we based
+> +        * our dma ops on the coherent one, and just changes the
+> +        * operations which need a arch io sync */
+> +       if (of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric")) {
+> +               struct dma_map_ops *dma_ops = &armada_xp_dma_ops;
+> +               memcpy(dma_ops, &arm_coherent_dma_ops, sizeof(*dma_ops));
+> +               dma_ops->map_page = armada_xp_dma_map_page;
+> +               dma_ops->unmap_page = armada_xp_dma_unmap_page;
+> +               dma_ops->unmap_sg = arm_dma_ops.unmap_sg;
+> +               dma_ops->sync_single_for_cpu = armada_xp_dma_sync;
+> +               dma_ops->sync_single_for_device = armada_xp_dma_sync;
+> +               dma_ops->sync_sg_for_cpu = arm_dma_ops.sync_sg_for_cpu;
+> +               dma_ops->sync_sg_for_device = arm_dma_ops.sync_sg_for_device;
+> +       }
+> +       bus_register_notifier(&platform_bus_type, &armada_xp_platform_nb);
 
->> This patch replaces V4L2_OUT_CAP_CUSTOM_TIMINGS macro with
->> V4L2_OUT_CAP_DV_TIMINGS. As V4L2_OUT_CAP_CUSTOM_TIMINGS is being phased
->> out.
+I think it would be cleaner to statically define the operations in a constant
+structure and point directly to the functions you need. If necessary, use
+multiple structures.
 
->> Signed-off-by: Lad, Prabhakar <prabhakar.lad@ti.com>
->> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
->> Cc: Sekhar Nori <nsekhar@ti.com>
->> Cc: Sergei Shtylyov <sshtylyov@mvista.com>
-
-> Patches for mach-davinci should have a 'davinci:' prefix after 'ARM:'.
-> Can you please resend with that fixed?
-
-    Also, the patch is for DM365 EVM board, not DM365 SoC.
-
-> Thanks,
-> Sekhar
-
-WBR, Sergei
+	Arnd
