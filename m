@@ -1,43 +1,32 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 24 Oct 2012 23:12:13 +0200
-Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
-In-Reply-To: <1597360.JT7plJlUsZ@vostro.rjw.lan>
-References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
- <CAKohpomUD-JQbkyEom+_BaRqJSvw8P_hBUsrjTU3vH6bM1+scQ@mail.gmail.com>
- <1597360.JT7plJlUsZ@vostro.rjw.lan>
-Message-ID: <3245066.cWfgP9Ikey@vostro.rjw.lan>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 24 Oct 2012 14:27:32 -0700
+Subject: [PATCH v6] Enable USB peripheral mode on dm365 EVM
+In-Reply-To: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
+References: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
+Message-ID: <20121024212732.GA31406@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 of October 2012 21:43:46 Rafael J. Wysocki wrote:
-> On Wednesday 24 of October 2012 11:37:13 Viresh Kumar wrote:
-> > On 22 October 2012 14:16, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > > On 20 October 2012 01:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> > >> Initially ondemand governor was written and then using its code conservative
-> > >> governor is written. It used a lot of code from ondemand governor, but copy of
-> > >> code was created instead of using the same routines from both governors. Which
-> > >> increased code redundancy, which is difficult to manage.
-> > >>
-> > >> This patch is an attempt to move common part of both the governors to
-> > >> cpufreq_governor.c file to come over above mentioned issues.
-> > >>
-> > >> This shouldn't change anything from functionality point of view.
-> > >>
-> > >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > 
-> > For everybody else, this patch is already pushed by Rafael in his linux-next
-> > branch.
+On Wed, Oct 10, 2012 at 02:33:32PM +0200, Constantine Shulyupin wrote:
+> From: Constantine Shulyupin <const@MakeLinux.com>
 > 
-> Well, not yet, although I'm going to do that.
+> Sets USB PHY clock source to 24 MHz clock and call USB configuration from board initialization.
+> 
+> Tested with OTG configuration, usb gadget g_zero on DM365 EVM connected to PC.
+> 
+> References:
+> 
+> Definition of USB_PHY_CTRL and PHYCLKFREQ:
+> - http://www.makelinux.com/lib/ti/DM36x_ARM/doc-141
+> 
+> Original patch by miguel.aguilar at ridgerun.com three years ago:
+> - http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
+> 
+> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
 
-Or I would if it still applied.  Unfortunately, though, it doesn't apply any
-more to my linux-next branch due to some previous changes in it.
+Note, Felipe is the right person to be sending these types of patches
+to, not me.  scripts/get_maintainer.pl is your friend :)
 
-Care to rebase?
+thanks,
 
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+greg k-h
