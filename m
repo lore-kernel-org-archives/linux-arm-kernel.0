@@ -1,144 +1,78 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 Oct 2012 10:58:02 +0200
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <5087AD9A.8020801@free-electrons.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 24 Oct 2012 11:01:02 +0200
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <87objt8305.fsf@deeprootsystems.com>
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <87r4oqc833.fsf@deeprootsystems.com> <87objt8305.fsf@deeprootsystems.com>
+Message-ID: <5087AE4E.7000104@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 10:19 AM, Thomas Petazzoni wrote:
-> This platform, available in Japan from PlatHome, has a dual-core
-> Armada XP, the MV78260. For now, only the two serial ports and the
-> three front LEDs are supported. Support for network, SATA, USB and
-> other peripherals will be added as drivers for them become available
-> for Armada XP in mainline.
-And don't forget the SMP support too, MV78260 is supposed to have 2 cores.
+On 10/23/12 20:19, Kevin Hilman wrote:
+> Kevin Hilman <khilman@deeprootsystems.com> writes:
+> 
+>> +Igor
+>>
+>> Paul Walmsley <paul@pwsan.com> writes:
+>>
+>>> Here are some basic OMAP test results for Linux v3.7-rc2.
+>>> Logs and other details at:
+>>>
+>>>     http://www.pwsan.com/omap/testlogs/test_v3.7-rc2/20121020134755/
+>>
+>> [...]
+>>
+>>> * 37xx EVM: CORE not entering dynamic off-idle
+>>>   - Cause unknown; dynamic retention-idle seems to work; system suspend to 
+>>>     off works
+>>
+>> I got a start on this one, and discovered (using CM_IDLEST1_CORE) that
+>> SPI1 was not idle when going off.  A quick hack disabling the
+>> touchscreen showed that after that, core was hitting idle just fine.
+>>
+>> I ran out of time today debugging this, but it's definitely realted to
+>> the GPIO debounce setting for the touchscreen.  Changing it to zero[1]
+>> makes CORE hit retention again in idle.
+> 
+> OK, found the root cause of this in the GPIO driver.  Patch submitted:
+> 
+>     http://marc.info/?l=linux-omap&m=135101577925972&w=2
 
-Besides this, this patch looks good. I have applied it on a v3.7-rc2
-without any problem, and managed to build it also.
-So you can add my
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
+Ok that one looks good.
 
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> however...
 > 
-> ---
-> This is 3.8 material.
-> ---
->  arch/arm/boot/dts/Makefile           |    3 +-
->  arch/arm/boot/dts/openblocks-ax3.dts |   69 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
->  3 files changed, 72 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/openblocks-ax3.dts
+>> Igor, I'm hoping you might know what's going on here since we already
+>> had some problems with this ads7846 init stuff and you're more familiar
+>> with this debounce init.
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f37cf9f..b7814b9 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -44,7 +44,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
->  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->  	msm8960-cdp.dtb
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
-> -	armada-xp-db.dtb
-> +	armada-xp-db.dtb \
-> +	openblocks-ax3.dtb
->  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
->  	imx53-ard.dtb \
->  	imx53-evk.dtb \
-> diff --git a/arch/arm/boot/dts/openblocks-ax3.dts b/arch/arm/boot/dts/openblocks-ax3.dts
-> new file mode 100644
-> index 0000000..f757116
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/openblocks-ax3.dts
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Device Tree file for OpenBlocks AX3 board
-> + *
-> + * Copyright (C) 2012 Marvell
-> + *
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "armada-xp-mv78260.dtsi"
-> +
-> +/ {
-> +	model = "PlatHome OpenBlocks AX3 board";
-> +	compatible = "plathome,openblocks-ax3", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x40000000>; /* 1 GB */
-> +	};
-> +
-> +	soc {
-> +		serial at d0012000 {
-> +			clock-frequency = <250000000>;
-> +			status = "okay";
-> +		};
-> +		serial at d0012100 {
-> +			clock-frequency = <250000000>;
-> +			status = "okay";
-> +		};
-> +		pinctrl {
-> +			led_pins: led-pins-0 {
-> +				  marvell,pins = "mpp49", "mpp51", "mpp53";
-> +				  marvell,function = "gpio";
-> +			};
-> +		};
-> +		leds {
-> +		        compatible = "gpio-leds";
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&led_pins>;
-> +
-> +			red_led {
-> +				   label = "red_led";
-> +				   gpios = <&gpio1 17 1>;
-> +				   default-state = "off";
-> +			};
-> +
-> +			yellow_led {
-> +				   label = "yellow_led";
-> +				   gpios = <&gpio1 19 1>;
-> +				   default-state = "off";
-> +			};
-> +
-> +			green_led {
-> +				   label = "green_led";
-> +				   gpios = <&gpio1 21 1>;
-> +				   default-state = "off";
-> +				   linux,default-trigger = "heartbeat";
-> +			};
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index 49d7915..cd2717b 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
->  static const char * const armada_370_xp_dt_board_dt_compat[] = {
->  	"marvell,a370-db",
->  	"marvell,axp-db",
-> +	"plathome,openblocks-ax3",
->  	NULL,
->  };
->  
+> ... board files that are setting debounce values for ads7846 will no
+> longer work.  
 > 
+> Currently, omap_ads7846_init() in common-board-devices.c does this:
+> 
+>    gpio_request_one()
+>    gpio_set_debounce()
+>    gpio_free()                    
+> 
+> because of a bug in the GPIO driver, the debounce settings were sticky
+> and lingered even after the gpio_free().  That bug has been fixed by the
+> above patch, which means the above gpio_set_debounce() is completely
+> pointless because it's followed immediately by a gpio_free().
+> 
+> IMO, the whole GPIO init for the ads7846 needs a rethink as it's
+> currently partially done by common-board-devices.c and done (again) in
+> the ads7846 driver.  If the gpio_free() isn't done in
+> common-board-devices, then the ads7846 driver will currently fail to
+> probe/load becasue it can't request a GPIO line.
+> 
+> Having found and fixed the PM regression, I'll leave the ads7846 cleanup to
+> somone else.
+
+Ok, understood, I'll look into this one soon.
 
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Igor.
