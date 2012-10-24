@@ -1,67 +1,103 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Wed, 24 Oct 2012 17:58:42 +0200
-Subject: [PATCH 4/8] ARM: at91: fix external interrupt specification in
- board code
-In-Reply-To: <ecf01c6afd3969c9af1839ccbe64cdf5357d0433.1351092432.git.nicolas.ferre@atmel.com>
+Date: Wed, 24 Oct 2012 17:59:15 +0200
+Subject: [PATCH 6/8] ARM: at91/i2c: change id to let i2c-gpio work
+In-Reply-To: <2f8dcb42aa52bd8c7828bc1e1c7bdbff397f2853.1351092432.git.nicolas.ferre@atmel.com>
 References: <cover.1351092432.git.nicolas.ferre@atmel.com>
- <ecf01c6afd3969c9af1839ccbe64cdf5357d0433.1351092432.git.nicolas.ferre@atmel.com>
-Message-ID: <50881032.3030900@atmel.com>
+ <2f8dcb42aa52bd8c7828bc1e1c7bdbff397f2853.1351092432.git.nicolas.ferre@atmel.com>
+Message-ID: <50881053.2010307@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 10/24/2012 05:33 PM, Nicolas Ferre a ?crit :
-> Since the switch to sparse irq, we have to add the NR_IRQS_LEGACY
-> offset to static irq numbers. It has been forgotten on these
-> SPI irq definitions in board code.
+> From: Bo Shen <voice.shen@atmel.com>
 >
+> The i2c core driver will turn the platform device ID to busnum
+> When using platfrom device ID as -1, it means dynamically assigned
+> the busnum. When writing code, we need to make sure the busnum,
+> and call i2c_register_board_info(int busnum, ...) to register device
+> if using -1, we do not know the value of busnum
+>
+> In order to solve this issue, set the platform device ID as a fix number
+> Here using 0 to match the busnum used in i2c_regsiter_board_info()
+>
+> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+> Acked-by: Jean Delvare <khali@linux-fr.org>
 > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 Acked-By: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> Cc: stable <stable@vger.kernel.org> [v3.6]
+> Cc: stable <stable@vger.kernel.org> [very long time]
 > ---
->   arch/arm/mach-at91/board-neocore926.c | 2 +-
->   arch/arm/mach-at91/board-sam9261ek.c  | 2 +-
->   arch/arm/mach-at91/board-sam9263ek.c  | 2 +-
->   3 files changed, 3 insertions(+), 3 deletions(-)
+>   arch/arm/mach-at91/at91rm9200_devices.c  | 2 +-
+>   arch/arm/mach-at91/at91sam9260_devices.c | 2 +-
+>   arch/arm/mach-at91/at91sam9261_devices.c | 2 +-
+>   arch/arm/mach-at91/at91sam9263_devices.c | 2 +-
+>   arch/arm/mach-at91/at91sam9rl_devices.c  | 2 +-
+>   5 files changed, 5 insertions(+), 5 deletions(-)
 >
-> diff --git a/arch/arm/mach-at91/board-neocore926.c b/arch/arm/mach-at91/board-neocore926.c
-> index 9cda3fd..6960778 100644
-> --- a/arch/arm/mach-at91/board-neocore926.c
-> +++ b/arch/arm/mach-at91/board-neocore926.c
-> @@ -129,7 +129,7 @@ static struct spi_board_info neocore926_spi_devices[] = {
->   		.max_speed_hz	= 125000 * 16,
->   		.bus_num	= 0,
->   		.platform_data	= &ads_info,
-> -		.irq		= AT91SAM9263_ID_IRQ1,
-> +		.irq		= NR_IRQS_LEGACY + AT91SAM9263_ID_IRQ1,
->   	},
->   #endif
+> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+> index a563189..7cd8053 100644
+> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+> @@ -479,7 +479,7 @@ static struct i2c_gpio_platform_data pdata = {
+>
+>   static struct platform_device at91rm9200_twi_device = {
+>   	.name			= "i2c-gpio",
+> -	.id			= -1,
+> +	.id			= 0,
+>   	.dev.platform_data	= &pdata,
 >   };
-> diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-> index 27b3af1..a9167dd 100644
-> --- a/arch/arm/mach-at91/board-sam9261ek.c
-> +++ b/arch/arm/mach-at91/board-sam9261ek.c
-> @@ -309,7 +309,7 @@ static struct spi_board_info ek_spi_devices[] = {
->   		.max_speed_hz	= 125000 * 26,	/* (max sample rate @ 3V) * (cmd + data + overhead) */
->   		.bus_num	= 0,
->   		.platform_data	= &ads_info,
-> -		.irq		= AT91SAM9261_ID_IRQ0,
-> +		.irq		= NR_IRQS_LEGACY + AT91SAM9261_ID_IRQ0,
->   		.controller_data = (void *) AT91_PIN_PA28,	/* CS pin */
->   	},
->   #endif
-> diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-> index 073e174..b87dbe2 100644
-> --- a/arch/arm/mach-at91/board-sam9263ek.c
-> +++ b/arch/arm/mach-at91/board-sam9263ek.c
-> @@ -132,7 +132,7 @@ static struct spi_board_info ek_spi_devices[] = {
->   		.max_speed_hz	= 125000 * 26,	/* (max sample rate @ 3V) * (cmd + data + overhead) */
->   		.bus_num	= 0,
->   		.platform_data	= &ads_info,
-> -		.irq		= AT91SAM9263_ID_IRQ1,
-> +		.irq		= NR_IRQS_LEGACY + AT91SAM9263_ID_IRQ1,
->   	},
->   #endif
+>
+> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+> index a76b868..44385a4 100644
+> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+> @@ -389,7 +389,7 @@ static struct i2c_gpio_platform_data pdata = {
+>
+>   static struct platform_device at91sam9260_twi_device = {
+>   	.name			= "i2c-gpio",
+> -	.id			= -1,
+> +	.id			= 0,
+>   	.dev.platform_data	= &pdata,
 >   };
+>
+> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+> index 9752f17..0256a00 100644
+> --- a/arch/arm/mach-at91/at91sam9261_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
+> @@ -285,7 +285,7 @@ static struct i2c_gpio_platform_data pdata = {
+>
+>   static struct platform_device at91sam9261_twi_device = {
+>   	.name			= "i2c-gpio",
+> -	.id			= -1,
+> +	.id			= 0,
+>   	.dev.platform_data	= &pdata,
+>   };
+>
+> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> index 8dde220..23b6384 100644
+> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> @@ -567,7 +567,7 @@ static struct i2c_gpio_platform_data pdata = {
+>
+>   static struct platform_device at91sam9263_twi_device = {
+>   	.name			= "i2c-gpio",
+> -	.id			= -1,
+> +	.id			= 0,
+>   	.dev.platform_data	= &pdata,
+>   };
+>
+> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+> index d6ca054..3d2c81d 100644
+> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+> @@ -314,7 +314,7 @@ static struct i2c_gpio_platform_data pdata = {
+>
+>   static struct platform_device at91sam9rl_twi_device = {
+>   	.name			= "i2c-gpio",
+> -	.id			= -1,
+> +	.id			= 0,
+>   	.dev.platform_data	= &pdata,
+>   };
+>
 >
