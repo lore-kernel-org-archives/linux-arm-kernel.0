@@ -1,120 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 24 Oct 2012 13:01:44 -0700
-Subject: [RFC] Energy/power monitoring within the kernel
-In-Reply-To: <1351096647.23327.64.camel@hornet>
-References: <1351013449.9070.5.camel@hornet>
- <20121023220240.GA25895@roeck-us.net>
- <1351096647.23327.64.camel@hornet>
-Message-ID: <20121024200144.GA21137@roeck-us.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 24 Oct 2012 22:01:28 +0200
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <201210242006.55879.michael@walle.cc>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <201210242006.55879.michael@walle.cc>
+Message-ID: <20121024200128.GY21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 05:37:27PM +0100, Pawel Moll wrote:
-> On Tue, 2012-10-23 at 23:02 +0100, Guenter Roeck wrote:
-> > > Traditionally such data should be exposed to the user via hwmon sysfs
-> > > interface, and that's exactly what I did for "my" platform - I have
-> > > a /sys/class/hwmon/hwmon*/device/energy*_input and this was good
-> > > enough to draw pretty graphs in userspace. Everyone was happy...
-> > > 
-> > Only driver supporting "energy" output so far is ibmaem, and the reported energy
-> > is supposed to be cumulative, as in energy = power * time. Do you mean power,
-> > possibly ?
+On Wed, Oct 24, 2012 at 08:06:55PM +0200, Michael Walle wrote:
+> Hi Andrew,
 > 
-> So the vexpress would be the second one, than :-) as the energy
-> "monitor" actually on the latest tiles reports 64-bit value of
-> microJoules consumed (or produced) since the power-up.
-> 
-> Some of the older boards were able to report instant power, but this
-> metrics is less useful in our case.
-> 
-> > > Now I am getting new requests to do more with this data. In particular
-> > > I'm asked how to add such information to ftrace/perf output. The second
-> > > most frequent request is about providing it to a "energy aware"
-> > > cpufreq governor.
+> Am Mittwoch 24 Oktober 2012, 16:53:45 schrieb Andrew Lunn:
+> > This patchset converts all DT kirkwood boards to using pinctrl.
 > > 
-> > Anything energy related would have to be along the line of "do something after a
-> > certain amount of work has been performed", which at least at the surface does
-> > not make much sense to me, unless you mean something along the line of a
-> > process scheduler which schedules a process not based on time slices but based
-> > on energy consumed, ie if you want to define a time slice not in milli-seconds
-> > but in Joule.
-> 
-> Actually there is some research being done in this direction, but it's
-> way too early to draw any conclusions...
-> 
-> > If so, I would argue that a similar behavior could be achieved by varying the
-> > duration of time slices with the current CPU speed, or simply by using cycle
-> > count instead of time as time slice parameter. Not that I am sure if such an
-> > approach would really be of interest for anyone. 
+> > This patchset depends on an earlier patchset to allow the mvebu
+> > pinctrl driver and gpio driver to be built for kirkwood.
 > > 
-> > Or do you really mean power, not energy, such as in "reduce CPU speed if its
-> > power consumption is above X Watt" ?
+> > Only the TS219 conversion has been tested on hardware. The remaining
+> > are compile tested. Before merging upstream, it would be good if the
+> > others could be tested on hardware.
+> > 
+> > This series along with the dependents can be found in:
 > 
-> Uh. To be completely honest I must answer: I'm not sure how the "energy
-> aware" cpufreq governor is supposed to work. I have been simply asked to
-> provide the data in some standard way, if possible.
+> Unfortunately, this doesn't work for me. git bisect tells me its commit 
+> e01139ec82162f21875d09e820686aede4219695.
 > 
-> > I am not sure how this would be expected to work. hwmon is, by its very nature,
-> > a passive subsystem: It doesn't do anything unless data is explicitly requested
-> > from it. It does not update an attribute unless that attribute is read.
-> > That does not seem to fit well with the idea of tracing - which assumes
-> > that some activity is happening, ultimately, all by itself, presumably
-> > periodically. The idea to have a user space application read hwmon data only
-> > for it to trigger trace events does not seem to be very compelling to me.
-> 
-> What I had in mind was similar to what adt7470 driver does. The driver
-> would automatically access the device every now and then to update it's
-> internal state and generate the trace event on the way. This
-> auto-refresh "feature" is particularly appealing for me, as on some of
-> "my" platforms can take up to 500 microseconds to actually get the data.
-> So doing this in background (and providing users with the last known
-> value in the meantime) seems attractive.
-> 
-A bad example doesn't mean it should be used elsewhere.
+> I guess it has something to do with the lsxl_init calling gpio_set_value().
 
-adt7470 needs up to two seconds for a temperature measurement cycle, and it
-can not perform automatic cycles all by itself. In this context, executing
-temperature measurement cycles in the background makes a lot of sense,
-especially since one does not want to wait for two seconds when reading
-a sysfs attribute.
+Humm.
 
-But that only means that the chip is most likely not a good choice when selecting
-a temperature sensor, not that the code necessary to get it working should be used
-as an example for other drivers. 
+I guess it is too early to use gpio. I don't think the gpio driver has
+not been configured yet.
 
-Guenter
+I need to think about this.
 
-> > An exception is if a monitoring device suppports interrupts, and if its driver
-> > actually implements those interrupts. This is, however, not the case for most of
-> > the current drivers (if any), mostly because interrupt support for hardware
-> > monitoring devices is very platform dependent and thus difficult to implement.
-> 
-> Interestingly enough the newest version of our platform control micro
-> (doing the energy monitoring as well) can generate and interrupt when a
-> transaction is finished, so I was planning to periodically update the
-> all sort of values. And again, generating a trace event on this
-> opportunity would be trivial.
-> 
-> > > Of course a particular driver could register its own perf PMU on its
-> > > own. It's certainly an option, just very suboptimal in my opinion.
-> > > Or maybe not? Maybe the task is so specialized that it makes sense?
-> > > 
-> > We had a couple of attempts to provide an in-kernel API. Unfortunately,
-> > the result was, at least so far, more complexity on the driver side.
-> > So the difficulty is really to define an API which is really simple, and does
-> > not just complicate driver development for a (presumably) rare use case.
-> 
-> Yes, I appreciate this. That's why this option is actually my least
-> favourite. Anyway, what I was thinking about was just a thin shin that
-> *can* be used by a driver to register some particular value with the
-> core (so it can be enumerated and accessed by in-kernel clients) and the
-> core could (or not) create a sysfs attribute for this value on behalf of
-> the driver. Seems lightweight enough, unless previous experience
-> suggests otherwise?
-> 
-> Cheers!
-> 
-> Pawe?
-> 
-> 
-> 
+What happens if you comment out these two gpio_set_value calls?
+
+     Andrew
