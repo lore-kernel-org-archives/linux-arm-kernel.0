@@ -1,82 +1,120 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 22:00:21 +0200
-Subject: [PATCH 1/9] ARM: Kirkwood: Convert TS219 to pinctrl.
-In-Reply-To: <50884659.1020208@gmail.com>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-2-git-send-email-andrew@lunn.ch>
- <20121024213128.2d4c07dc@skate> <50884659.1020208@gmail.com>
-Message-ID: <20121024220021.148a88ff@skate>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 24 Oct 2012 13:01:44 -0700
+Subject: [RFC] Energy/power monitoring within the kernel
+In-Reply-To: <1351096647.23327.64.camel@hornet>
+References: <1351013449.9070.5.camel@hornet>
+ <20121023220240.GA25895@roeck-us.net>
+ <1351096647.23327.64.camel@hornet>
+Message-ID: <20121024200144.GA21137@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
-
-On Wed, 24 Oct 2012 21:49:45 +0200, Sebastian Hesselbarth wrote:
-
-> Agree, but for now a global pinhog on pinctrl node itself is the correct
-> way to go here. As soon as there is pinctrl support in the specific
-> device drivers we can move pinmux phandle there.
-
-I agree.
-
-> Here I disagree. Even quite simple interfaces like uart can have dozens
-> of possible mpp configurations, e.g. rx/tx on up to three different pins
-> each plus rts/cts on various pins plus all possible combinations.
+On Wed, Oct 24, 2012 at 05:37:27PM +0100, Pawel Moll wrote:
+> On Tue, 2012-10-23 at 23:02 +0100, Guenter Roeck wrote:
+> > > Traditionally such data should be exposed to the user via hwmon sysfs
+> > > interface, and that's exactly what I did for "my" platform - I have
+> > > a /sys/class/hwmon/hwmon*/device/energy*_input and this was good
+> > > enough to draw pretty graphs in userspace. Everyone was happy...
+> > > 
+> > Only driver supporting "energy" output so far is ibmaem, and the reported energy
+> > is supposed to be cumulative, as in energy = power * time. Do you mean power,
+> > possibly ?
 > 
-> Now consider some more complex interface with more than one mpp pin per
-> interface pin. Do you really want to predefine all possible combinations
-> even if it is more likely that in fact only one is used on all boards
-> because they are all based on the same reference design?
-
-Where did I say that you should define *all* possible configurations?
-
-I said: "The SoC .dtsi file should define all the pinmux groups that are
-described in the datasheet and are used by boards". Read again the "and
-are used by boards".
-
-So I'm clearly not advocating adding *all* possible configurations,
-because there would be gazillions of them. But I'm in favor of moving
-the *used* configurations to the .dtsi files.
-
-> >   * The board .dts file should define the pinmux groups that are really
-> >     board-specific (buttons, LEDs, etc.), and then for each device,
-> >     point to the correct pinmux group (either defined in the .dtsi file
-> >     or in the board file).
+> So the vexpress would be the second one, than :-) as the energy
+> "monitor" actually on the latest tiles reports 64-bit value of
+> microJoules consumed (or produced) since the power-up.
 > 
-> With respect to mpp the actual configuration _is_ board specific. There
-> are maybe only some pins that are always used if a specific interface is
-> used, e.g. nand pins on dove can only be switched with gpio.
+> Some of the older boards were able to report instant power, but this
+> metrics is less useful in our case.
+> 
+> > > Now I am getting new requests to do more with this data. In particular
+> > > I'm asked how to add such information to ftrace/perf output. The second
+> > > most frequent request is about providing it to a "energy aware"
+> > > cpufreq governor.
+> > 
+> > Anything energy related would have to be along the line of "do something after a
+> > certain amount of work has been performed", which at least at the surface does
+> > not make much sense to me, unless you mean something along the line of a
+> > process scheduler which schedules a process not based on time slices but based
+> > on energy consumed, ie if you want to define a time slice not in milli-seconds
+> > but in Joule.
+> 
+> Actually there is some research being done in this direction, but it's
+> way too early to draw any conclusions...
+> 
+> > If so, I would argue that a similar behavior could be achieved by varying the
+> > duration of time slices with the current CPU speed, or simply by using cycle
+> > count instead of time as time slice parameter. Not that I am sure if such an
+> > approach would really be of interest for anyone. 
+> > 
+> > Or do you really mean power, not energy, such as in "reduce CPU speed if its
+> > power consumption is above X Watt" ?
+> 
+> Uh. To be completely honest I must answer: I'm not sure how the "energy
+> aware" cpufreq governor is supposed to work. I have been simply asked to
+> provide the data in some standard way, if possible.
+> 
+> > I am not sure how this would be expected to work. hwmon is, by its very nature,
+> > a passive subsystem: It doesn't do anything unless data is explicitly requested
+> > from it. It does not update an attribute unless that attribute is read.
+> > That does not seem to fit well with the idea of tracing - which assumes
+> > that some activity is happening, ultimately, all by itself, presumably
+> > periodically. The idea to have a user space application read hwmon data only
+> > for it to trigger trace events does not seem to be very compelling to me.
+> 
+> What I had in mind was similar to what adt7470 driver does. The driver
+> would automatically access the device every now and then to update it's
+> internal state and generate the trace event on the way. This
+> auto-refresh "feature" is particularly appealing for me, as on some of
+> "my" platforms can take up to 500 microseconds to actually get the data.
+> So doing this in background (and providing users with the last known
+> value in the meantime) seems attractive.
+> 
+A bad example doesn't mean it should be used elsewhere.
 
-I am not sure to follow you here. There is clearly some MPP pins whose
-muxing groups can be defined in the SoC level file, and some other MPP
-pins whose muxing should entirely be done at the board level file.
+adt7470 needs up to two seconds for a temperature measurement cycle, and it
+can not perform automatic cycles all by itself. In this context, executing
+temperature measurement cycles in the background makes a lot of sense,
+especially since one does not want to wait for two seconds when reading
+a sysfs attribute.
 
-For a UART, the .dtsi file can define a pinmux configuration for
-RX/TX/RTS/CTS, and the .dts file only needs to reference this
-configuration.
+But that only means that the chip is most likely not a good choice when selecting
+a temperature sensor, not that the code necessary to get it working should be used
+as an example for other drivers. 
 
-For LEDs, buttons and similar things, the pinmux configuration should
-be defined in the .dts file, and of course the .dts file will reference
-this configuration.
+Guenter
 
-I think what Shawn Guo did with i.MX 28 is really neat. In the current
-patches posted by Andrew, for example, the following piece:
-
-+			pmx_uart1: pmx-uart1 {
-+				marvell,pins = "mpp13", "mpp14";
-+				marvell,function = "uart1";
-+			};
-
-is needlessly repeated in kirkwood-ts219-6281.dts,
-kirkwood-ts219-6282.dts and kirkwood-dnskw.dtsi. This is clearly a
-pinmux configuration that sets up TXD/RXD of UART1, and it should be in
-kirkwood.dtsi.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> > An exception is if a monitoring device suppports interrupts, and if its driver
+> > actually implements those interrupts. This is, however, not the case for most of
+> > the current drivers (if any), mostly because interrupt support for hardware
+> > monitoring devices is very platform dependent and thus difficult to implement.
+> 
+> Interestingly enough the newest version of our platform control micro
+> (doing the energy monitoring as well) can generate and interrupt when a
+> transaction is finished, so I was planning to periodically update the
+> all sort of values. And again, generating a trace event on this
+> opportunity would be trivial.
+> 
+> > > Of course a particular driver could register its own perf PMU on its
+> > > own. It's certainly an option, just very suboptimal in my opinion.
+> > > Or maybe not? Maybe the task is so specialized that it makes sense?
+> > > 
+> > We had a couple of attempts to provide an in-kernel API. Unfortunately,
+> > the result was, at least so far, more complexity on the driver side.
+> > So the difficulty is really to define an API which is really simple, and does
+> > not just complicate driver development for a (presumably) rare use case.
+> 
+> Yes, I appreciate this. That's why this option is actually my least
+> favourite. Anyway, what I was thinking about was just a thin shin that
+> *can* be used by a driver to register some particular value with the
+> core (so it can be enumerated and accessed by in-kernel clients) and the
+> core could (or not) create a sysfs attribute for this value on behalf of
+> the driver. Seems lightweight enough, unless previous experience
+> suggests otherwise?
+> 
+> Cheers!
+> 
+> Pawe?
+> 
+> 
+> 
