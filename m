@@ -1,25 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 11:18:18 +0200
-Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
-In-Reply-To: <5087A94E.4000706@free-electrons.com>
-References: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <5087A94E.4000706@free-electrons.com>
-Message-ID: <20121024091818.GA11837@lunn.ch>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 24 Oct 2012 11:20:32 +0200
+Subject: [PATCH 1/1] pinctrl: at91: fix typo on PULL_UP
+In-Reply-To: <CACRpkdbVFnDPu1dfYgTaiz48ioDLJxxSmFXkeQiej157DFZRQw@mail.gmail.com>
+References: <1351009680-15892-1-git-send-email-plagnioj@jcrosoft.com>
+ <CACRpkdbVFnDPu1dfYgTaiz48ioDLJxxSmFXkeQiej157DFZRQw@mail.gmail.com>
+Message-ID: <20121024092032.GF18964@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 10:39:42AM +0200, Gregory CLEMENT wrote:
-> On 10/23/2012 10:17 AM, Thomas Petazzoni wrote:
-> > The split of 370 and XP into two Kconfig options and the multiplatform
-> > kernel support has changed a few Kconfig symbols, so let's update the
-> > mvebu_defconfig file with the latest changes.
+On 09:45 Wed 24 Oct     , Linus Walleij wrote:
+> On Tue, Oct 23, 2012 at 6:28 PM, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
 > 
-> Indeed this patch fixes the mvebu_defconfig which was broken.
-> But as now mvebu is part of multi_v7_defconfig, shouldn't we just
-> removed mvebu_defconfig ?
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  drivers/pinctrl/pinctrl-at91.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+> > index c87c2c5..0757e94 100644
+> > --- a/drivers/pinctrl/pinctrl-at91.c
+> > +++ b/drivers/pinctrl/pinctrl-at91.c
+> > @@ -58,7 +58,7 @@ static struct at91_gpio_chip *gpio_chips[MAX_GPIO_BANKS];
+> >
+> >  static int gpio_banks;
+> >
+> > -#define PULL_UP                (0 << 1)
+> > +#define PULL_UP                (1 << 0)
+> 
+> Makes perfect sense. Shall I just apply this to the at91 branch too?
+yeah but can the at91 is for 3.7? or 3.8?
 
-Hi Gregory
-
-It is probably useful for kisskb.
-
-   Andrew
+Best Regards,
+J.
+> 
+> Yours,
+> Linus Walleij
