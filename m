@@ -1,43 +1,62 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 24 Oct 2012 15:49:19 +0200
-Subject: [PATCH 0/2] Adding SATA support for Armada 370/XP
-Message-ID: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Wed, 24 Oct 2012 15:49:20 +0200
+Subject: [PATCH 1/2] arm: mvebu: increase atomic coherent pool size for armada
+ 370/XP
+In-Reply-To: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1351086561-13569-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+For Armada 370/XP we have the same problem that for the commit
+cb01b63, so we applied the same solution: "The default 256 KiB
+coherent pool may be too small for some of the Kirkwood devices, so
+increase it to make sure that devices will be able to allocate their
+buffers with GFP_ATOMIC flag"
 
-this small patch set adds the SATA support for Armada 370 and Armada XP.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The evaluation boards for Armada 370 and Armada XP come with 2 SATA
-ports, and when both are enable the coherent pool for DMA mapping was
-too short. It was exactly the same issue that was fixed for Kirkwood
-two months ago. So I used the same fix in the first patch. Later when
-Kirkwood will be part of mach-mvebu, then this fix will be shared
-between the 2 SoCs families.
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/mach-mvebu/armada-370-xp.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-This patch set is based on 3.7-rc2 and depends one the framework clock
-support (the last version was posted last week:
-http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
-called mvebu-SATA-for-3.8 is also available at
-https://github.com/MISL-EBU-System-SW/mainline-public.git.
-
-Regards,
-
-Gregory
-
-Gregory CLEMENT (1):
-  arm: mvebu: increase atomic coherent pool size for armada 370/XP
-
-Lior Amsalem (1):
-  arm: mvebu: adding SATA support: dt binding and config update
-
- arch/arm/boot/dts/armada-370-db.dts  |    3 +++
- arch/arm/boot/dts/armada-370-xp.dtsi |   10 ++++++++++
- arch/arm/boot/dts/armada-xp-db.dts   |    3 +++
- arch/arm/configs/mvebu_defconfig     |    7 +++++++
- arch/arm/mach-mvebu/armada-370-xp.c  |   12 ++++++++++++
- 5 files changed, 35 insertions(+)
-
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 2af6ce5..cbad821 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -17,6 +17,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/io.h>
+ #include <linux/time-armada-370-xp.h>
++#include <linux/dma-mapping.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+@@ -43,6 +44,16 @@ void __init armada_370_xp_timer_and_clk_init(void)
+ 	armada_370_xp_timer_init();
+ }
+ 
++void __init armada_370_xp_init_early(void)
++{
++	/*
++	 * Some Armada 370/XP devices allocate their coherent buffers
++	 * from atomic context. Increase size of atomic coherent pool
++	 * to make sure such the allocations won't fail.
++	 */
++	init_dma_coherent_pool_size(SZ_1M);
++}
++
+ struct sys_timer armada_370_xp_timer = {
+ 	.init		= armada_370_xp_timer_and_clk_init,
+ };
+@@ -61,6 +72,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
+ 	.init_machine	= armada_370_xp_dt_init,
+ 	.map_io		= armada_370_xp_map_io,
++	.init_early	= armada_370_xp_init_early,
+ 	.init_irq	= armada_370_xp_init_irq,
+ 	.handle_irq     = armada_370_xp_handle_irq,
+ 	.timer		= &armada_370_xp_timer,
 -- 
 1.7.9.5
