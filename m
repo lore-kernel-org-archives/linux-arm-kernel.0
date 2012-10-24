@@ -1,167 +1,99 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 22:04:29 +0200
-Subject: [PATCH 9/9] ARM: Kirkwood: Convert IX2-200 to pinctrl.
-In-Reply-To: <1351090434-30499-10-git-send-email-andrew@lunn.ch>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-10-git-send-email-andrew@lunn.ch>
-Message-ID: <20121024220429.50e2b0b8@skate>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 24 Oct 2012 15:04:51 -0500
+Subject: [PATCH v4 5/5] zynq: move static peripheral mappings
+In-Reply-To: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121024200451.GF6713@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+Shifting them up into the vmalloc region prevents the following warning,
+when booting a zynq qemu target with more than 512mb of RAM:
 
-On Wed, 24 Oct 2012 16:53:54 +0200, Andrew Lunn wrote:
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts |   90 +++++++++++++++++++++++++
->  arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   24 -------
->  2 files changed, 90 insertions(+), 24 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> index 865aeec..d8fa8e8 100644
-> --- a/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> +++ b/arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts
-> @@ -16,6 +16,96 @@
->  	};
->  
->  	ocp at f1000000 {
-> +		pinctrl: pinctrl at 10000 {
-> +			compatible = "marvell,88f6281-pinctrl";
-> +			reg = <0x10000 0x20>;
+  BUG: mapping for 0xe0000000 at 0xe0000000 out of vmalloc space
 
-This definition (compatible + reg) should go in kirkwood.dtsi. The
-pinctrl unit should be declared at the SoC level. Ditto for all other
-patches.
+In addition, it allows for reuse of these mappings when the proper
+drivers issue requests via ioremap().
 
-> +			pinctrl-0 = < &pmx_button_reset &pmx_button_power
-> +				      &pmx_led_backup &pmx_led_power
-> +				      &pmx_button_otb &pmx_led_rebuild
-> +				      &pmx_led_health
-> +				      &pmx_led_sata_brt_ctrl_1
-> +				      &pmx_led_sata_brt_ctrl_2
-> +				      &pmx_led_backup_brt_ctrl_1
-> +				      &pmx_led_backup_brt_ctrl_2
-> +				      &pmx_led_power_brt_ctrl_1
-> +				      &pmx_led_power_brt_ctrl_2
-> +				      &pmx_led_health_brt_ctrl_1
-> +				      &pmx_led_health_brt_ctrl_2
-> +				      &pmx_led_rebuild_brt_ctrl_1
-> +				      &pmx_led_rebuild_brt_ctrl_2 >;
-> +			pinctrl-names = "default";
-> +
-> +			pmx_button_reset: pmx-button-reset {
-> +				marvell,pins = "mpp12";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_button_power: pmx-button-power {
-> +				marvell,pins = "mpp14";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_backup: pmx-led-backup {
-> +				marvell,pins = "mpp15";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_power: pmx-led-power {
-> +				marvell,pins = "mpp16";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_button_otb: pmx-button-otb {
-> +				marvell,pins = "mpp35";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_rebuild: pmx-led-rebuild {
-> +				marvell,pins = "mpp36";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_health: pmx-led_health {
-> +				marvell,pins = "mpp37";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_sata_brt_ctrl_1: pmx-led-sata-brt-ctrl-1 {
-> +				marvell,pins = "mpp38";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_sata_brt_ctrl_2: pmx-led-sata-brt-ctrl-2 {
-> +				marvell,pins = "mpp39";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_backup_brt_ctrl_1: pmx-led-backup-brt-ctrl-1 {
-> +				marvell,pins = "mpp40";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_backup_brt_ctrl_2: pmx-led-backup-brt-ctrl-2 {
-> +				marvell,pins = "mpp41";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_power_brt_ctrl_1: pmx-led-power-brt-ctrl-1 {
-> +				marvell,pins = "mpp42";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_power_brt_ctrl_2: pmx-led-power-brt-ctrl-2 {
-> +				marvell,pins = "mpp43";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_health_brt_ctrl_1: pmx-led-health-brt-ctrl-1 {
-> +				marvell,pins = "mpp44";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_health_brt_ctrl_2: pmx-led-health-brt-ctrl-2 {
-> +				marvell,pins = "mpp45";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_rebuild_brt_ctrl_1: pmx-led-rebuild-brt-ctrl-1 {
-> +				marvell,pins = "mpp44";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_rebuild_brt_ctrl_2: pmx-led-rebuild-brt-ctrl-2 {
-> +				marvell,pins = "mpp45";
-> +				marvell,function = "gpio";
-> +			};
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+Cc: John Linn <john.linn@xilinx.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-zynq/common.c                |  6 +++---
+ arch/arm/mach-zynq/include/mach/zynq_soc.h | 23 +++++++++++++----------
+ 2 files changed, 16 insertions(+), 13 deletions(-)
 
-This is not a strong comment, but I am not sure it is really useful to
-define one pinmux configuration for each pin. You can do something like:
-
-	pmx_buttons: pmx-buttons {
-		marvell,pins = "mpp45", "mpp46", "mpp47", "mpp48";
-		marvell,function = "gpio";
-	};
-
-I think all the pins used for buttons or for LEDs kind of make sense to
-be muxed together. And then, when you declare the LEDs in the DT, you
-can do:
-
-                leds {
-                        compatible = "gpio-leds";
-                        pinctrl-names = "default";
-                        pinctrl-0 = <&led_pins>;
-
-                        red_led {
-                                   label = "red_led";
-                                   gpios = <&gpio1 17 1>;
-                                   default-state = "off";
-                        };
-
-                        yellow_led {
-                                   label = "yellow_led";
-                                   gpios = <&gpio1 19 1>;
-                                   default-state = "off";
-                        };
-
-                        green_led {
-                                   label = "green_led";
-                                   gpios = <&gpio1 21 1>;
-                                   default-state = "off";
-                                   linux,default-trigger = "heartbeat";
-                        };
-                };
-
-Where "led_pins" is a pinmux configuration that includes three pins.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ba48f06..ba8d14f 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -73,12 +73,12 @@ static struct map_desc io_desc[] __initdata = {
+ 	{
+ 		.virtual	= TTC0_VIRT,
+ 		.pfn		= __phys_to_pfn(TTC0_PHYS),
+-		.length		= SZ_4K,
++		.length		= TTC0_SIZE,
+ 		.type		= MT_DEVICE,
+ 	}, {
+ 		.virtual	= SCU_PERIPH_VIRT,
+ 		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
+-		.length		= SZ_8K,
++		.length		= SCU_PERIPH_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
+ 
+@@ -86,7 +86,7 @@ static struct map_desc io_desc[] __initdata = {
+ 	{
+ 		.virtual	= UART0_VIRT,
+ 		.pfn		= __phys_to_pfn(UART0_PHYS),
+-		.length		= SZ_4K,
++		.length		= UART0_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
+ #endif
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index 218283a..c6b9b67 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -15,27 +15,30 @@
+ #ifndef __MACH_XILINX_SOC_H__
+ #define __MACH_XILINX_SOC_H__
+ 
++#include <asm/pgtable.h>
++
+ #define PERIPHERAL_CLOCK_RATE		2500000
+ 
+-/* For now, all mappings are flat (physical = virtual)
++/* Static peripheral mappings are mapped at the top of the
++ * vmalloc region
+  */
+-#define UART0_PHYS			0xE0000000
+-#define UART0_VIRT			UART0_PHYS
++#define UART0_PHYS		0xE0000000
++#define UART0_SIZE		SZ_4K
++#define UART0_VIRT		(VMALLOC_END - UART0_SIZE)
+ 
+-#define TTC0_PHYS			0xF8001000
+-#define TTC0_VIRT			TTC0_PHYS
++#define TTC0_PHYS		0xF8001000
++#define TTC0_SIZE		SZ_4K
++#define TTC0_VIRT		(UART0_VIRT - TTC0_SIZE)
+ 
+-#define SCU_PERIPH_PHYS			0xF8F00000
+-#define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
++#define SCU_PERIPH_PHYS		0xF8F00000
++#define SCU_PERIPH_SIZE		SZ_8K
++#define SCU_PERIPH_VIRT		(TTC0_VIRT - SCU_PERIPH_SIZE)
+ 
+ /* The following are intended for the devices that are mapped early */
+ 
+ #define TTC0_BASE			IOMEM(TTC0_VIRT)
+ #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+ 
+-/*
+- * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
+- */
+ #define LL_UART_PADDR	UART0_PHYS
+ #define LL_UART_VADDR	UART0_VIRT
+ 
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.0
