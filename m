@@ -1,65 +1,77 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Tue, 23 Oct 2012 19:32:18 -0500
-Subject: [PATCH v3 0/5] zynq subarch cleanups
-Message-ID: <20121024003218.GA31625@beefymiracle.amer.corp.natinst.com>
+Date: Tue, 23 Oct 2012 19:33:53 -0500
+Subject: [PATCH v3 1/5] zynq: use GIC device tree bindings
+In-Reply-To: <20121024003218.GA31625@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121024003353.GB31625@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey all-
+The Zynq uses the cortex-a9-gic.  This eliminates the need to hardcode
+register addresses.
 
-Things have been relatively quiet on the Zynq front lately.  This patchset does
-a bit of cleanup of the Zynq subarchitecture.  It was the necessary set of
-things I had to do to get a zynq target booting with the upstream qemu model.
-
-Patches 1 and 2 move zynq to use the GIC and pl310 L2 cache controller device
-tree mappings respectively.
-
-Patch 3 removes unused clock infrastructure.  the plan is to rework the
-out-of-tree Xilinx generic clk support into something suitable for merging.
-What's in tree now just isn't used at all, and can be removed.
-
-Patch 4 and 5 move around the static peripheral mappings into the vmalloc area.
-
-Arnd-
-
-I intentionally did not Cc stable on patch 5, even though you had
-suggested otherwise.  I do not think it will apply cleanly to the stable
-trees independent of the other patches.  Additionally, with the current
-state of zynq upstream, I'm not convinced there would be enough users to
-make it worth the effort.
-
-Additionally, I've left the SCU static mapping around, even though its
-currently unused.  We'll eventually need it around (maybe in a different form)
-when SMP support is added.
-
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+Cc: John Linn <john.linn@xilinx.com>
 ---
-Changes since v2:
-  - Reordered patchset to prevent remapping peripherals that were subsequently
-    removed from the static map
-  - Use DT bindings for the L2 cache controller
+ arch/arm/boot/dts/zynq-ep107.dts           | 8 +++++---
+ arch/arm/mach-zynq/common.c                | 7 ++++++-
+ arch/arm/mach-zynq/include/mach/zynq_soc.h | 2 --
+ 3 files changed, 11 insertions(+), 6 deletions(-)
 
-Changes since v1:
-  - Make sure arm at kernel.org was included
-  - Rebased on arm-soc/for-next
-  - Added a cover letter
-  - Elaborated a bit on why I removed CLKDEV_LOOKUP
-
----
-Josh Cartwright (5):
-  zynq: use GIC device tree bindings
-  zynq: use pl310 device tree bindings
-  zynq: remove use of CLKDEV_LOOKUP
-  ARM: annotate VMALLOC_END definition with _AC
-  zynq: move static peripheral mappings
-
- arch/arm/Kconfig                           |  1 -
- arch/arm/boot/dts/zynq-ep107.dts           | 17 +++++++++++++---
- arch/arm/include/asm/pgtable.h             |  2 +-
- arch/arm/mach-zynq/common.c                | 23 ++++++++++-----------
- arch/arm/mach-zynq/include/mach/clkdev.h   | 32 ------------------------------
- arch/arm/mach-zynq/include/mach/zynq_soc.h | 29 ++++++++++++---------------
- 6 files changed, 38 insertions(+), 66 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
-
+diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-ep107.dts
+index 37ca192..7bfff4a 100644
+--- a/arch/arm/boot/dts/zynq-ep107.dts
++++ b/arch/arm/boot/dts/zynq-ep107.dts
+@@ -36,10 +36,12 @@
+ 		ranges;
+ 
+ 		intc: interrupt-controller at f8f01000 {
++			compatible = "arm,cortex-a9-gic";
++			#interrupt-cells = <3>;
++			#address-cells = <1>;
+ 			interrupt-controller;
+-			compatible = "arm,gic";
+-			reg = <0xF8F01000 0x1000>;
+-			#interrupt-cells = <2>;
++			reg = <0xF8F01000 0x1000>,
++			      <0xF8F00100 0x100>;
+ 		};
+ 
+ 		uart0: uart at e0000000 {
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ab5cfdd..d73963b 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -55,12 +55,17 @@ static void __init xilinx_init_machine(void)
+ 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+ }
+ 
++static struct of_device_id irq_match[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
++	{ }
++};
++
+ /**
+  * xilinx_irq_init() - Interrupt controller initialization for the GIC.
+  */
+ static void __init xilinx_irq_init(void)
+ {
+-	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
++	of_irq_init(irq_match);
+ }
+ 
+ /* The minimum devices needed to be mapped before the VM system is up and
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index d0d3f8f..3d1c6a6 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -35,8 +35,6 @@
+ 
+ #define TTC0_BASE			IOMEM(TTC0_VIRT)
+ #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+-#define SCU_GIC_CPU_BASE		(SCU_PERIPH_BASE + 0x100)
+-#define SCU_GIC_DIST_BASE		(SCU_PERIPH_BASE + 0x1000)
+ #define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
+ 
+ /*
 -- 
 1.8.0
