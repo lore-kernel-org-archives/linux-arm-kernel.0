@@ -1,65 +1,58 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 24 Oct 2012 16:26:08 +0100
-Subject: [PATCH RESEND] xen/arm: use the __HVC macro
-In-Reply-To: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1210241624400.2689@kaball.uk.xensource.com>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Wed, 24 Oct 2012 17:26:52 +0200
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
+References: <5086F8D6.5050605@gmail.com>
+ <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
+Message-ID: <20121024152652.GG4368@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new __HVC macro in hypercall.S.
+On Wed, Oct 24, 2012 at 10:57:00AM -0400, Alan Stern wrote:
+> Under the circumstances, do we really need a new binding document for 
+> the ehci-platform driver?  We should be able to use the existing 
+> usb-ehci binding, perhaps with some new properties added:
+> 
+> 	has-synopsys-hc-bug
+> 	no-io-watchdog
+> 	has-tt
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On the PCI side we have VID, PID which is used for quirks. Sometimes we have a
+revision ID which can be used to figure out if "this quirk" is still required.
+The PCI driver probes by class so the ehci driver does not have a large table
+of VID/PID for each controller out there. And the USB controller in two
+different Intel boards has a different PID so a quirk, if required, could be
+applied only to the specific mainboard.
 
----
- arch/arm/xen/hypercall.S |   14 +++++---------
- 1 files changed, 5 insertions(+), 9 deletions(-)
+Based on this we need atleast two compatible entries one "HW-Specific"
+followed by a generic one (similar to PCI class).
+Doing it the PCI way we would have to have table and figure out which
+HW-specific compatible entry sets the TT flag and which one does the
+no-io-watchdog. Having has-tt in compatible isn't right.
 
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-index 074f5ed..71f7239 100644
---- a/arch/arm/xen/hypercall.S
-+++ b/arch/arm/xen/hypercall.S
-@@ -48,20 +48,16 @@
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/opcodes-virt.h>
- #include <xen/interface/xen.h>
- 
- 
--/* HVC 0xEA1 */
--#ifdef CONFIG_THUMB2_KERNEL
--#define xen_hvc .word 0xf7e08ea1
--#else
--#define xen_hvc .word 0xe140ea71
--#endif
-+#define XEN_IMM 0xEA1
- 
- #define HYPERCALL_SIMPLE(hypercall)		\
- ENTRY(HYPERVISOR_##hypercall)			\
- 	mov r12, #__HYPERVISOR_##hypercall;	\
--	xen_hvc;							\
-+	__HVC(XEN_IMM);						\
- 	mov pc, lr;							\
- ENDPROC(HYPERVISOR_##hypercall)
- 
-@@ -76,7 +72,7 @@ ENTRY(HYPERVISOR_##hypercall)			\
- 	stmdb sp!, {r4}						\
- 	ldr r4, [sp, #4]					\
- 	mov r12, #__HYPERVISOR_##hypercall;	\
--	xen_hvc								\
-+	__HVC(XEN_IMM);						\
- 	ldm sp!, {r4}						\
- 	mov pc, lr							\
- ENDPROC(HYPERVISOR_##hypercall)
-@@ -100,7 +96,7 @@ ENTRY(privcmd_call)
- 	mov r2, r3
- 	ldr r3, [sp, #8]
- 	ldr r4, [sp, #4]
--	xen_hvc
-+	__HVC(XEN_IMM)
- 	ldm sp!, {r4}
- 	mov pc, lr
- ENDPROC(privcmd_call);
--- 
-1.7.2.5
+I'm all with Alan here, to make a shortcut and allow Linux specific properties
+which describe a specific quirk in less code lines. Other OS can just ignore
+those and build their table based on the compatible entry if they want to.
+
+So usb-ehci should be fine. It is a generic USB-EHCI controller after all.
+Quirks or no quirks, the register layout is the same, the functionality is the
+same. If you can't map memory >4GiB then you need a quirk for this but you may
+discover it way too late.
+If your platform driver requires extra code for the PHY then it is still an
+EHCI controller. The PHY wasn't setup by the bootloader / bios so Linux has to
+deal with it.
+
+> We probably can omit has-synopsys-hc-bug, as that is specific to one
+> type of MIPS ATH79 controller.  The driver can check for it explicitly,
+> if necessary.
+> 
+> In fact, it's not clear that these new properties need to be added now.  
+> They can be added over time as needed, as existing drivers are
+> converted over to DT.  Or is it preferable to document these things
+> now, preemptively as it were?
+
+I would add it only if required / has users.
+
+> Alan Stern
+
+Sebastian
