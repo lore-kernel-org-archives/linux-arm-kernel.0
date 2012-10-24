@@ -1,54 +1,55 @@
 From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Tue, 23 Oct 2012 19:36:02 -0700
-Subject: [PATCH v2 2/7] ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+Date: Tue, 23 Oct 2012 19:36:04 -0700
+Subject: [PATCH v2 4/7] ARM: OMAP2+: Remove unnecessary message when no SHA IP
+ is present
 In-Reply-To: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
 References: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
-Message-ID: <1351046167-4882-3-git-send-email-mgreer@animalcreek.com>
+Message-ID: <1351046167-4882-5-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-The current OMAP2 SHAM support doesn't enable DMA
-so add that support so it can use DMA just like OMAP3.
+Remove the error message that prints when there is no SHA IP
+present to make it consistent with all the other IPs.
 
 CC: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c | 2 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c      | 6 ++++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/mach-omap2/devices.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
-index bb314c5..4b4fd5f 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_interconnect_data.c
-@@ -405,5 +405,5 @@ struct omap_hwmod_ocp_if omap2xxx_l4_core__sham = {
- 	.slave		= &omap2xxx_sham_hwmod,
- 	.clk		= "sha_ick",
- 	.addr		= omap2xxx_sham_addrs,
--	.user		= OCP_USER_MPU,
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-index a041670..703b269 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
-@@ -873,9 +873,15 @@ struct omap_hwmod_irq_info omap2_sham_mpu_irqs[] = {
- 	{ .irq = -1 }
- };
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index f38ac9d..f41c793 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -456,20 +456,15 @@ static void omap_init_rng(void)
  
-+struct omap_hwmod_dma_info omap2_sham_sdma_chs[] = {
-+	{ .name = "rx", .dma_req = OMAP24XX_DMA_SHA1MD5_RX },
-+	{ .dma_req = -1 }
-+};
-+
- struct omap_hwmod omap2xxx_sham_hwmod = {
- 	.name		= "sham",
- 	.mpu_irqs	= omap2_sham_mpu_irqs,
-+	.sdma_reqs	= omap2_sham_sdma_chs,
- 	.main_clk	= "l4_ck",
- 	.prcm		= {
- 		.omap2 = {
+ static void __init omap_init_sham(void)
+ {
+-	if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
+-		struct omap_hwmod *oh;
+-		struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	struct platform_device *pdev;
+ 
+-		oh = omap_hwmod_lookup("sham");
+-		if (!oh)
+-			return;
++	oh = omap_hwmod_lookup("sham");
++	if (!oh)
++		return;
+ 
+-		pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL,
+-					 0, 0);
+-		WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+-	} else {
+-		pr_err("%s: platform not supported\n", __func__);
+-	}
++	pdev = omap_device_build("omap-sham", -1, oh, NULL, 0, NULL, 0, 0);
++	WARN(IS_ERR(pdev), "Can't build omap_device for omap-sham\n");
+ }
+ 
+ #if defined(CONFIG_CRYPTO_DEV_OMAP_AES) || defined(CONFIG_CRYPTO_DEV_OMAP_AES_MODULE)
 -- 
 1.7.12
