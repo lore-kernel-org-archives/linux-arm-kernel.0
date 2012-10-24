@@ -1,54 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed, 24 Oct 2012 15:52:46 +0200
-Subject: [PATCH] RFC: leds-pwm: don't disable pwm when setting brightness to 0
-In-Reply-To: <20121024095603.GH639@pengutronix.de>
-References: <20121024095603.GH639@pengutronix.de>
-Message-ID: <1351086766-5837-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 24 Oct 2012 15:56:27 +0200
+Subject: [PATCH 2/2] arm: mvebu: Add hardware I/O Coherency support
+In-Reply-To: <201210241224.06791.arnd@arndb.de>
+References: <1351065841-18654-1-git-send-email-gregory.clement@free-electrons.com>
+ <5087D574.4030503@free-electrons.com> <5087D6B8.10209@free-electrons.com>
+ <201210241224.06791.arnd@arndb.de>
+Message-ID: <5087F38B.1010508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes disabling the LED on i.MX28. The PWM hardware delays using
-the newly set pwm-config until the beginning of a new period.  It's very
-likely that pwm_disable is called before the current period ends. In
-case the LED was on brightness=max before the LED stays on because in
-the disabled PWM block the period never ends.
+On 10/24/2012 02:24 PM, Arnd Bergmann wrote:
+> On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+>> On 10/24/2012 01:48 PM, Gregory CLEMENT wrote:
+>>> On 10/24/2012 01:36 PM, Arnd Bergmann wrote:
+>>>>
+>>>> I think it would be cleaner to statically define the operations in a constant
+>>>> structure and point directly to the functions you need. If necessary, use
+>>>> multiple structures.
+>>>
+>>> My problem was that these functions are not exposed, only arm_dma_op and
+>>> arm_coherent_dma_ops are exported.
+>>> Or do you think about something like this:
+>>
+>> struct dma_map_ops *dma_ops = {
+>>         .alloc                  = arm_coherent_dma_ops.arm_coherent_dma_alloc,
+>>         .free                   = arm_coherent_dma_ops.arm_coherent_dma_free,
+>>         .mmap                   = arm_coherent_dma_ops.arm_dma_mmap,
+>>         .get_sgtable            = arm_coherent_dma_ops.arm_dma_get_sgtable,
+>>         .map_sg                 = arm_coherent_dma_ops.arm_dma_map_sg,
+>>         .set_dma_mask           = arm_coherent_dma_ops.arm_dma_set_mask,
+>>         .map_page               = armada_xp_dma_map_page,
+>>         .unmap_page             = armada_xp_dma_unmap_page,
+>>         .unmap_sg               = arm_dma_ops.unmap_sg,
+>>         .sync_single_for_cpu    = armada_xp_dma_sync,
+>>         .sync_single_for_device = armada_xp_dma_sync,
+>>         .sync_sg_for_cpu        = arm_dma_ops.sync_sg_for_cpu,
+>>         .sync_sg_for_device     = arm_dma_ops.sync_sg_for_device,
+>> };
+> 
+> No, I was thinking of making the underlying functions globally visible
+> and have extern declarations in a header file so you can access them
+> directly.
+> 
+> Generally speaking, when you run into a problem with common code, your
+> first approach should be to fix the common code before you try to work
+> around it.
 
-It's unclear if the mxs-pwm driver doesn't implement the API as expected
-(i.e. it should block until the newly set config is effective) or if the
-leds-pwm driver makes wrong assumptions. This patch assumes the latter.
+OK I thought it was done on purpose. But if you consider it needs to be
+fixed I will add patch for it in next version.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
+> 
+> 	Arnd
+> 
 
-I'm not sure this is correct, but this is the workaround I'm using until
-I get some feed back.
 
-Best regards
-Uwe
-
- drivers/leds/leds-pwm.c |    9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
-index f2e44c7..a909f4f 100644
---- a/drivers/leds/leds-pwm.c
-+++ b/drivers/leds/leds-pwm.c
-@@ -38,13 +38,8 @@ static void led_pwm_set(struct led_classdev *led_cdev,
- 	unsigned int max = led_dat->cdev.max_brightness;
- 	unsigned int period =  led_dat->period;
- 
--	if (brightness == 0) {
--		pwm_config(led_dat->pwm, 0, period);
--		pwm_disable(led_dat->pwm);
--	} else {
--		pwm_config(led_dat->pwm, brightness * period / max, period);
--		pwm_enable(led_dat->pwm);
--	}
-+	pwm_config(led_dat->pwm, brightness * period / max, period);
-+	pwm_enable(led_dat->pwm);
- }
- 
- static int led_pwm_probe(struct platform_device *pdev)
 -- 
-1.7.10.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
