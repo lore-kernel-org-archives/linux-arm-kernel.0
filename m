@@ -1,230 +1,53 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 25 Oct 2012 06:38:50 +1300
-Subject: [PATCH v4] pwm: vt8500: Update vt8500 PWM driver support
-Message-ID: <1351100330-26072-1-git-send-email-linux@prisktech.co.nz>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 24 Oct 2012 12:41:33 -0500
+Subject: [PATCH] ARM: PMU: fix runtime PM enable
+In-Reply-To: <20121024172325.GK7339@mudshark.cambridge.arm.com>
+References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
+ <20121024093150.GA23775@mudshark.cambridge.arm.com> <5087F84B.9070705@ti.com>
+ <20121024143204.GF7339@mudshark.cambridge.arm.com> <508803DF.7020902@ti.com>
+ <20121024172325.GK7339@mudshark.cambridge.arm.com>
+Message-ID: <5088284D.40404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates pwm-vt8500.c to support devicetree probing and
-make use of the common clock subsystem.
 
-A binding document describing the PWM controller found on
-arch-vt8500 is also included.
+On 10/24/2012 12:23 PM, Will Deacon wrote:
+> On Wed, Oct 24, 2012 at 04:06:07PM +0100, Jon Hunter wrote:
+>> On 10/24/2012 09:32 AM, Will Deacon wrote:
+>>> Hmmm, now I start to wonder whether your original idea of having separate
+>>> callbacks for enable/disable irq and resume/suspend doesn't make more sense.
+>>> Then the CTI magic can go in the irq management code and be totally separate
+>>> to the PM stuff.
+>>>
+>>> What do you reckon?
+>>
+>> The resume/suspend calls really replaced the enable/disable irq
+>> callbacks. That still seems like a good approach given that we need
+>> runtime PM for OMAP and PMU.
+> 
+> Ok, perhaps splitting it up isn't worth it then. I'm still not convinced
+> either way.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
-v4:
-return err from clk_enable rather than -EBUSY
+Given that we needed to employ runtime PM for OMAP, adding the handlers
+is a natural progression and fits more with the PM framework model.
 
- .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 ++++
- drivers/pwm/pwm-vt8500.c                           |   86 ++++++++++++++------
- 2 files changed, 80 insertions(+), 23 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+>>> Nah, we should be able to fix this in the platdata, I'd just rather have
+>>> function pointers instead of state variables in there.
+>>
+>> Well, we could pass a pointer to pm_runtime_enable() function in the
+>> platdata.
+> 
+> What do other drivers do? Grepping around, I see calls to pm_runtime_enable
+> made in various drivers and, given that you pass the device in there, what's
+> the problem with us just calling that unconditionally from perf? I know you
+> said that will work for OMAP, but I'm trying to understand the effect that
+> has on PM-aware platforms that don't require this for the PMU (since this
+> seems to be per-device).
 
-diff --git a/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-new file mode 100644
-index 0000000..bcc6367
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
-@@ -0,0 +1,17 @@
-+VIA/Wondermedia VT8500/WM8xxx series SoC PWM controller
-+
-+Required properties:
-+- compatible: should be "via,vt8500-pwm"
-+- reg: physical base address and length of the controller's registers
-+- #pwm-cells: should be 2.  The first cell specifies the per-chip index
-+  of the PWM to use and the second cell is the period in nanoseconds.
-+- clocks: phandle to the PWM source clock
-+
-+Example:
-+
-+pwm1: pwm at d8220000 {
-+	#pwm-cells = <2>;
-+	compatible = "via,vt8500-pwm";
-+	reg = <0xd8220000 0x1000>;
-+	clocks = <&clkpwm>;
-+};
-diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
-index ad14389..5264962 100644
---- a/drivers/pwm/pwm-vt8500.c
-+++ b/drivers/pwm/pwm-vt8500.c
-@@ -1,7 +1,8 @@
- /*
-  * drivers/pwm/pwm-vt8500.c
-  *
-- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-+ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
-  *
-  * This software is licensed under the terms of the GNU General Public
-  * License version 2, as published by the Free Software Foundation, and
-@@ -21,14 +22,24 @@
- #include <linux/io.h>
- #include <linux/pwm.h>
- #include <linux/delay.h>
-+#include <linux/clk.h>
- 
- #include <asm/div64.h>
- 
--#define VT8500_NR_PWMS 4
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+
-+/*
-+ * SoC architecture allocates register space for 4 PWMs but only
-+ * 2 are currently implemented.
-+ */
-+#define VT8500_NR_PWMS	2
- 
- struct vt8500_chip {
- 	struct pwm_chip chip;
- 	void __iomem *base;
-+	struct clk *clk;
- };
- 
- #define to_vt8500_chip(chip)	container_of(chip, struct vt8500_chip, chip)
-@@ -52,7 +63,7 @@ static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	unsigned long long c;
- 	unsigned long period_cycles, prescale, pv, dc;
- 
--	c = 25000000/2; /* wild guess --- need to implement clocks */
-+	c = clk_get_rate(vt8500->clk);
- 	c = c * period_ns;
- 	do_div(c, 1000000000);
- 	period_cycles = c;
-@@ -85,8 +96,15 @@ static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 
- static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
-+	int err;
- 	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
- 
-+	err = clk_enable(vt8500->clk);
-+	if (err < 0)
-+		dev_err(chip->dev, "failed to enable clock\n");
-+		return err;
-+	};
-+
- 	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
- 	writel(5, vt8500->base + (pwm->hwpwm << 4));
- 	return 0;
-@@ -98,6 +116,8 @@ static void vt8500_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 
- 	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
- 	writel(0, vt8500->base + (pwm->hwpwm << 4));
-+
-+	clk_disable(vt8500->clk);
- }
- 
- static struct pwm_ops vt8500_pwm_ops = {
-@@ -107,12 +127,24 @@ static struct pwm_ops vt8500_pwm_ops = {
- 	.owner = THIS_MODULE,
- };
- 
--static int __devinit pwm_probe(struct platform_device *pdev)
-+static const struct of_device_id vt8500_pwm_dt_ids[] = {
-+	{ .compatible = "via,vt8500-pwm", },
-+	{ /* Sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, vt8500_pwm_dt_ids);
-+
-+static int vt8500_pwm_probe(struct platform_device *pdev)
- {
- 	struct vt8500_chip *chip;
- 	struct resource *r;
-+	struct device_node *np = pdev->dev.of_node;
- 	int ret;
- 
-+	if (!np) {
-+		dev_err(&pdev->dev, "invalid devicetree node\n");
-+		return -EINVAL;
-+	}
-+
- 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
- 	if (chip == NULL) {
- 		dev_err(&pdev->dev, "failed to allocate memory\n");
-@@ -124,6 +156,12 @@ static int __devinit pwm_probe(struct platform_device *pdev)
- 	chip->chip.base = -1;
- 	chip->chip.npwm = VT8500_NR_PWMS;
- 
-+	chip->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR_OR_NULL(chip->clk)) {
-+		dev_err(&pdev->dev, "clock source not specified\n");
-+		return PTR_ERR(chip->clk);
-+	}
-+
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no memory resource defined\n");
-@@ -131,18 +169,26 @@ static int __devinit pwm_probe(struct platform_device *pdev)
- 	}
- 
- 	chip->base = devm_request_and_ioremap(&pdev->dev, r);
--	if (chip->base == NULL)
-+	if (!chip->base)
- 		return -EADDRNOTAVAIL;
- 
-+	ret = clk_prepare(chip->clk);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to prepare clock\n");
-+		return ret;
-+	}
-+
- 	ret = pwmchip_add(&chip->chip);
--	if (ret < 0)
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add PWM chip\n");
- 		return ret;
-+	}
- 
- 	platform_set_drvdata(pdev, chip);
- 	return ret;
- }
- 
--static int __devexit pwm_remove(struct platform_device *pdev)
-+static int vt8500_pwm_remove(struct platform_device *pdev)
- {
- 	struct vt8500_chip *chip;
- 
-@@ -150,28 +196,22 @@ static int __devexit pwm_remove(struct platform_device *pdev)
- 	if (chip == NULL)
- 		return -ENODEV;
- 
-+	clk_unprepare(chip->clk);
-+
- 	return pwmchip_remove(&chip->chip);
- }
- 
--static struct platform_driver pwm_driver = {
-+static struct platform_driver vt8500_pwm_driver = {
-+	.probe		= vt8500_pwm_probe,
-+	.remove		= vt8500_pwm_remove,
- 	.driver		= {
- 		.name	= "vt8500-pwm",
- 		.owner	= THIS_MODULE,
-+		.of_match_table = vt8500_pwm_dt_ids,
- 	},
--	.probe		= pwm_probe,
--	.remove		= __devexit_p(pwm_remove),
- };
-+module_platform_driver(vt8500_pwm_driver);
- 
--static int __init pwm_init(void)
--{
--	return platform_driver_register(&pwm_driver);
--}
--arch_initcall(pwm_init);
--
--static void __exit pwm_exit(void)
--{
--	platform_driver_unregister(&pwm_driver);
--}
--module_exit(pwm_exit);
--
--MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("VT8500 PWM Driver");
-+MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-+MODULE_LICENSE("GPL v2");
--- 
-1.7.9.5
+I had done this initially when testing on OMAP platforms that do and
+don't require runtime PM for PMU. I don't see any side affect of this,
+however, may be Kevin could comment on if that is ok. It would be the
+best approach.
+
+Cheers
+Jon
