@@ -1,28 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Oct 2012 11:27:07 +0100
-Subject: [PATCH 2/2] ASoC: ux500_msp_i2s: Fix devm_* and return code
- merge error
-In-Reply-To: <CAPDyKFqrS0QT+UO0L3B29UcnjX0bSv3XvWTmC6E_ubgr8NTDiQ@mail.gmail.com>
-References: <1350306806-5688-1-git-send-email-lee.jones@linaro.org>
- <1350306806-5688-2-git-send-email-lee.jones@linaro.org>
- <CAPDyKFqrS0QT+UO0L3B29UcnjX0bSv3XvWTmC6E_ubgr8NTDiQ@mail.gmail.com>
-Message-ID: <20121024102707.GC18814@opensource.wolfsonmicro.com>
+From: hechtb@googlemail.com (Bastian Hecht)
+Date: Wed, 24 Oct 2012 12:38:14 +0200
+Subject: Possible regression in arm/io.h
+Message-ID: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:34:00AM +0200, Ulf Hansson wrote:
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> I assume this shall go into 3.7, right?
-> 
-> Kind regards
-> Ulf Hansson
+Hello Will,
 
-You may recall that only yesterday I reminded you not to top post...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/82c742ad/attachment.sig>
+your introduction of the "+Qo" in arch/arm/include/asm/io.h makes some
+drivers fail to compile on newer gnu ARM gccs. Like in
+drivers/mtd/nand/docg4.c there is an offset of 0x800 from a pointer
+used to address I/O memory. This leads to the error message:
+
+/tmp/ccwLMdCy.s: Error: bad immediate value for 8-bit offset (2048)
+
+The gnu gcc people tracked it down to the asm directive "+Qo". Do we
+really want to enforce to allow only addresses that are offsetable
+with one byte? If I understand it correctly from the gnu gcc docs, the
+"o" is doing this.
+
+excerpt from asm/io.h:
+static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+{
+        asm volatile("strh %1, %0"
+                     : "+Qo" (*(volatile u16 __force *)addr)
+                     : "r" (val));
+}
+
+Bug report:
+http://gcc.gnu.org/bugzilla/show_bug.cgi?id=54983
+
+So do we want to remove the "o" from all __raw_readX and __raw_writeX
+functions? I've tried it and stuff compiles again without errors.
+
+cheers,
+
+Bastian Hecht
