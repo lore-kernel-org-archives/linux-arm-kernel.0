@@ -1,27 +1,28 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Wed, 24 Oct 2012 12:19:11 +0200
-Subject: [PATCH] ARM: at91: dt: evk-pro3: enable uart0 and uart2
-In-Reply-To: <20121023104212.GD18964@game.jcrosoft.org>
-References: <1350986416-16246-1-git-send-email-fabio.porcedda@gmail.com>
- <20121023104212.GD18964@game.jcrosoft.org>
-Message-ID: <CAHkwnC9oap8hvHszoZyAxVssz3qC671X-Ktf4++Nfd1HdyKiwA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 24 Oct 2012 11:27:07 +0100
+Subject: [PATCH 2/2] ASoC: ux500_msp_i2s: Fix devm_* and return code
+ merge error
+In-Reply-To: <CAPDyKFqrS0QT+UO0L3B29UcnjX0bSv3XvWTmC6E_ubgr8NTDiQ@mail.gmail.com>
+References: <1350306806-5688-1-git-send-email-lee.jones@linaro.org>
+ <1350306806-5688-2-git-send-email-lee.jones@linaro.org>
+ <CAPDyKFqrS0QT+UO0L3B29UcnjX0bSv3XvWTmC6E_ubgr8NTDiQ@mail.gmail.com>
+Message-ID: <20121024102707.GC18814@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 12:42 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> Hi,
->
->         You will have to wait a few I prepare a patch series for pinctrl
->
->         so most of the current drivers will support pinctrl and requere it
->
->         this will availabe rc3 or rc4 max
->
->         then I will merge more update and boards
+On Wed, Oct 24, 2012 at 11:34:00AM +0200, Ulf Hansson wrote:
+> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> I assume this shall go into 3.7, right?
+> 
+> Kind regards
+> Ulf Hansson
 
-Ok, i will wait.
-
-Best regards
--- 
-Fabio Porcedda
+You may recall that only yesterday I reminded you not to top post...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/82c742ad/attachment.sig>
