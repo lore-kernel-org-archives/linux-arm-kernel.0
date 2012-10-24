@@ -1,29 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Oct 2012 19:37:35 +0200
-Subject: [PATCH 1/6] mfd: ab8500-core: Remove unused ab8500-gpio IRQ ranges
-In-Reply-To: <1351089926-32161-2-git-send-email-lee.jones@linaro.org>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZbTeaa4dQJ1Nxs38_gM+yUS=FxA-Fgie-ZbtKne51C3A@mail.gmail.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 24 Oct 2012 19:37:31 +0200
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <Pine.LNX.4.44L0.1210241249010.1282-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1210241249010.1282-100000@iolanthe.rowland.org>
+Message-ID: <16682515.Yr7sQYmXfE@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 24 October 2012 12:54:05 Alan Stern wrote:
+> On Wed, 24 Oct 2012, Stephen Warren wrote:
+> 
+> > Device tree files always need a completely specific value in the
+> > compatible property, even when less-specific/more-generic values are
+> > also present. So for example, the Linux driver might only care about the
+> > following existing:
+> > 
+> > compatible = "usb-ehci".
+> > 
+> > However, any actual EHCI controller is always some specific model, so
+> > the compatible value must define which specific model it is, e.g.:
+> > 
+> > compatible = "nvidia,tegra20-ehci", "usb-ehci".
+> > 
+> > Now lets say the Tegra30 EHCI controller is identical to the Tegra20
+> > controller. That needs to be explicitly represented too:
+> > 
+> > compatible = "nvidia,tegra30-ehci", "nvidia,tegra20-ehci", "usb-ehci".
+> > 
+> > In that case, the driver might still only declare support for
+> > "nvidia,tegra20-ehci", but "nvidia,tegra30-ehci" is added to be explicit
+> > about the actual HW model.
+> > 
+> > This doesn't continue forever though; you typically only list the
+> > specific HW model, the base specific model it's compatible with, and any
+> > generic value needed. So, a hypothetical Tegra40 EHCI controller would be:
+> > 
+> > compatible = "nvidia,tegra40-ehci", "nvidia,tegra20-ehci", "usb-ehci".
+> > 
+> > Given that, there is always something to key any newly required quirk
+> > off, so even if the need for a quirk is found later, the device tree
+> > already contains the information needed to trigger it.
+> 
+> Okay.  It appears that quite a few .dts/.dtsi files mention "usb-ehci", 
+> for no apparent reason (given that the drivers don't list it):
+> 
+> [stern at iolanthe usb-3.6]$ find arch -name '*.dts*' | xargs grep usb-ehci
+> arch/mips/cavium-octeon/octeon_3xxx.dts:                                compatible = "cavium,octeon-6335-ehci","usb-ehci";
+> arch/mips/cavium-octeon/octeon_68xx.dts:                                compatible = "cavium,octeon-6335-ehci","usb-ehci";
+> arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
+> arch/arm/boot/dts/at91sam9x5.dtsi:                      compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ehci", "usb-ehci";
+> arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ehci", "usb-ehci";
+> arch/arm/boot/dts/spear3xx.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
+> arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
+> arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
+> arch/arm/boot/dts/at91sam9g45.dtsi:                     compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+> arch/powerpc/boot/dts/wii.dts:                  compatible = "nintendo,hollywood-usb-ehci",
+> arch/powerpc/boot/dts/wii.dts:                                  "usb-ehci";
+> arch/powerpc/boot/dts/sequoia.dts:                      compatible = "ibm,usb-ehci-440epx", "usb-ehci";
+> arch/powerpc/boot/dts/canyonlands.dts:                  compatible = "ibm,usb-ehci-460ex", "usb-ehci";
+> 
+> Is there a real reason that I'm not aware of?  Or can all these entries
+> safely be removed?
 
-> The IRQ ranges provided in ab8500-core to be passed on to the
-> ab8500-gpio driver are not only redundant, but they are also
-> causing a warning in the boot log. These IRQ ranges, like any
-> other MFD related IRQ resource are passed though MFD core for
-> automatic conversion to virtual IRQs; however, MFD core does
-> not support IRQ mapping of IRQ ranges. Let's just remove them.
->
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Hey! That riddes the pesky boot warning.
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-Sam, please pick this into the MFD tree for the -rc series!
-
-Yours,
-Linus Walleij
+Apart from the powerpc entries for which a real driver exists, the others were
+probably added in the hope that sooner or later, someone will come up with
+a matching driver, and the corresponding dts file would not even have to be
+updated to benefit from this.
+--
+Florian
