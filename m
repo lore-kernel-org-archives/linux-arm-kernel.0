@@ -1,46 +1,40 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Wed, 24 Oct 2012 07:41:14 +0200
-Subject: [PATCH v3] pwm: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <1351050418-23981-1-git-send-email-linux@prisktech.co.nz>
-References: <20121023221419.GA8501@avionic-0098.mockup.avionic-design.de>
- <1351050418-23981-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20121024054114.GA9787@avionic-0098.mockup.avionic-design.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Oct 2012 07:43:22 +0200
+Subject: [PATCH 03/10] tty: pxa: configure pin
+In-Reply-To: <20121023115806.GX4477@opensource.wolfsonmicro.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-3-git-send-email-haojian.zhuang@gmail.com>
+ <508080CB.5010904@wwwdotorg.org>
+ <CACRpkdb5Jiw71jBLDXpf2VTJQx7_gABqs03_20CeCLbVT=JkaA@mail.gmail.com>
+ <5085AC06.8070508@wwwdotorg.org>
+ <CACRpkdY-XyagxGU_ya_FZirzbqStTirOC5nuBBwwFY3f4bBTYA@mail.gmail.com>
+ <20121023093711.GS4477@opensource.wolfsonmicro.com>
+ <CACRpkdb+DkZbTDZamGMN+9t07kPktuA_3QtHQJFv+Vu859r7KA@mail.gmail.com>
+ <20121023115806.GX4477@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdb7jtj=J10A4pBQQH4kjWsVhCr8=5R=s3TMNi+jtiwNyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 04:46:58PM +1300, Tony Prisk wrote:
-> This patch updates pwm-vt8500.c to support devicetree probing and
-> make use of the common clock subsystem.
-> 
-> A binding document describing the PWM controller found on
-> arch-vt8500 is also included.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
-> v2/v3:
-> Fix errors/coding style as pointed out by Thierry Reding.
-> 
->  .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 ++++
->  drivers/pwm/pwm-vt8500.c                           |   86 ++++++++++++++------
->  2 files changed, 80 insertions(+), 23 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+On Tue, Oct 23, 2012 at 1:58 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-Looking real good now. One last comment though and I think I'm ready to
-take this...
+> One problem
+> is that we don't have a home for the SoC integration so we're trying to
+> shove it all into the drivers which just leads to a stack of pointless
+> boilerplate when the driver isn't actually doing anything beyond the
+> basic pattern of turning everything off when it goes idle and turning it
+> on again when it needs to do something.  Having to open code that stuff
+> in the drivers and then deal with the stubbing and error handling so the
+> error handling in the drivers is painful.  There's also another axis
+> where things aren't part of a SoC but are separate devices so you want
+> to carry things along with the driver rather than have a separate bit of
+> code which is required to glue things into the platform.
 
-> +	err = clk_enable(vt8500->clk);
-> +	if (err < 0)
-> +		dev_err(chip->dev, "failed to enable clock\n");
-> +		return -EBUSY;
-> +	};
+I agree. I'm thinking about the approach of adding helpers into the
+PM runtime layer so state handling is centralized, while only the
+event trigger goes into the driver. Basically it's just the implicit
+triggers from pm_runtime_[get|put][[_sync] that is causing
+problems.
 
-Why do you return EBUSY instead of err?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121024/b14ec1cd/attachment.sig>
+Yours,
+Linus Walleij
