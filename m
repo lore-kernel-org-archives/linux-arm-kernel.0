@@ -1,88 +1,115 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 24 Oct 2012 10:28:23 -0600
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 24 Oct 2012 18:36:08 +0200
 Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1210241013310.1481-100000@iolanthe.rowland.org>
-Message-ID: <50881727.10601@wwwdotorg.org>
+In-Reply-To: <5088145F.1040504@wwwdotorg.org>
+References: <5086F8D6.5050605@gmail.com> <20121024152652.GG4368@breakpoint.cc>
+ <5088145F.1040504@wwwdotorg.org>
+Message-ID: <4072275.SyhkJA9fPe@flexo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 08:57 AM, Alan Stern wrote:
-> On Tue, 23 Oct 2012, Rob Herring wrote:
+On Wednesday 24 October 2012 10:16:31 Stephen Warren wrote:
+> On 10/24/2012 09:26 AM, Sebastian Andrzej Siewior wrote:
+> > On Wed, Oct 24, 2012 at 10:57:00AM -0400, Alan Stern wrote:
+> >> Under the circumstances, do we really need a new binding document for 
+> >> the ehci-platform driver?
 > 
->> On 10/23/2012 02:33 PM, Alan Stern wrote:
->>> On Tue, 23 Oct 2012, Stephen Warren wrote:
->>>
->>>>> Nothing intrinsically distinguishes this class of hardware.  The only
->>>>> thing these devices have in common is that they can be managed by
->>>>> Linux's ehci-platform driver.
->>>>
->>>> I don't agree. They're all EHCI USB controllers (or all EHCI USB
->>>> controllers that don't require custom drivers due to quirks), which is a
->>>> much more general statement than anything related to which driver Linux
->>>> uses for them.
->>>
->>> That's true, but it doesn't distinguish these devices.  There are other
->>> EHCI controllers with no quirks that nevertheless can't be handled by
->>> ehci-platform because they have requirements (_not_ quirks) that
->>> ehci-platform is unable to deal with currently -- clocks or power
->>> supplies or special register settings or PHYs or etc.
->>
->> But what if the h/w has quirks you haven't yet discovered? You need the
->> compatible property to be specific now, so if there are any future
->> driver changes needed the DT does not have to change (as it may be in
->> firmware which you can't change).
+> It seems reasonable to add the new properties to usb-ehci.txt, since
+> they do describe the HW.
 > 
-> That argument applies always, doesn't it?  There's always a chance that 
-> you might discover a new quirk in a device for which the DT board file 
-> has already been written and committed to firmware.  The board file 
-> could declare that the device is compatible with something older, but 
-> the new quirk might ruin that compatibility.
+> >> We should be able to use the existing 
+> >> usb-ehci binding, perhaps with some new properties added:
+> >>
+> >> 	has-synopsys-hc-bug
+> >> 	no-io-watchdog
+> >> 	has-tt
+> 
+> That sounds fine to me.
+> 
+> However, there is an implementation issue here. I believe the way Linux
+> searches for a driver for a particular node is:
+> 
+> for every driver that's registered
+>     if the driver's supported compatible list matches the device
+>         use the driver
+> 
+> (See drivers/base/platform.c:platform_match() which implements the if
+> statement above, and I assume the driver core implements the outer for
+> loop above)
+> 
+> That means that if the generic driver supports compatible="usb-ehci", it
+> may "steal" device nodes that have
+> compatible="something-custom","usb-ehci", even if there's a driver
+> specifically for "something-custom". We would need to re-arrange the
+> driver matching code to:
+> 
+> for each compatible value in the node:
+>     for each driver that's registered:
+>         if the driver supports the compatible value:
+>             use the driver.
+> 
+> > On the PCI side we have VID, PID which is used for quirks. Sometimes we have a
+> > revision ID which can be used to figure out if "this quirk" is still required.
+> > The PCI driver probes by class so the ehci driver does not have a large table
+> > of VID/PID for each controller out there. And the USB controller in two
+> > different Intel boards has a different PID so a quirk, if required, could be
+> > applied only to the specific mainboard.
+> > 
+> > Based on this we need atleast two compatible entries one "HW-Specific"
+> > followed by a generic one (similar to PCI class).
+> > Doing it the PCI way we would have to have table and figure out which
+> > HW-specific compatible entry sets the TT flag and which one does the
+> > no-io-watchdog. Having has-tt in compatible isn't right.
+> 
+> Yes, the driver could easily bind to anything compatible with
+> "usb-ehci", then use the HW-specific compatible value to index into a
+> quirk table in the same way that specific PCI IDs index into a quirk table.
 
-If the board file /only/ declares that the device is compatible with the
-older/most-generic thing, that would be a bug in the .dts file. As a
-general rule, the device tree should be fixed, although there may be
-reasons to work around some buggy device trees in the kernel we should
-avoid it if possible.
+Sounds good.
 
-Device tree files always need a completely specific value in the
-compatible property, even when less-specific/more-generic values are
-also present. So for example, the Linux driver might only care about the
-following existing:
+> 
+> I agree that having separate compatible values like usb-ehci and
+> usb-ehci-with-tt probably doesn't make sense here.
+> 
+> > I'm all with Alan here, to make a shortcut and allow Linux specific properties
+> > which describe a specific quirk in less code lines. Other OS can just ignore
+> > those and build their table based on the compatible entry if they want to.
+> 
+> We should absolutely avoid Linux-specific properties where possible.
+> 
+> That said, what Linux-specific properties are you talking about? The
+> properties discussed here (has-synopsys-hc-bug, no-io-watchdog, has-tt)
+> are all purely a description of HW, aren't they.
 
-compatible = "usb-ehci".
+has-tt and has-synopsys-hc-bug are certainly hardware properties, while
+no-io-watchdog is a Linux driver software workaround for a hardware issue,
+so that's kind of in a grey zone to decide whether this describes hardware or
+not. Let's just assume that this is a hardware issue :)
 
-However, any actual EHCI controller is always some specific model, so
-the compatible value must define which specific model it is, e.g.:
+> 
+> > So usb-ehci should be fine. It is a generic USB-EHCI controller after all.
+> > Quirks or no quirks, the register layout is the same, the functionality is the
+> > same. If you can't map memory >4GiB then you need a quirk for this but you may
+> > discover it way too late.
+> > If your platform driver requires extra code for the PHY then it is still an
+> > EHCI controller. The PHY wasn't setup by the bootloader / bios so Linux has to
+> > deal with it.
+> > 
+> >> We probably can omit has-synopsys-hc-bug, as that is specific to one
+> >> type of MIPS ATH79 controller.  The driver can check for it explicitly,
+> >> if necessary.
+> >>
+> >> In fact, it's not clear that these new properties need to be added now.  
+> >> They can be added over time as needed, as existing drivers are
+> >> converted over to DT.  Or is it preferable to document these things
+> >> now, preemptively as it were?
+> 
+> It's best to define the binding up-front so it doesn't churn, where
+> possible. This will also ensure that multiple people don't try to update
+> the binding document to add the same feature in different ways.
 
-compatible = "nvidia,tegra20-ehci", "usb-ehci".
+Agreed, we do support these properties in the non-DT case, so I see no reason
+why we should not document them in the binding too.
 
-Now lets say the Tegra30 EHCI controller is identical to the Tegra20
-controller. That needs to be explicitly represented too:
-
-compatible = "nvidia,tegra30-ehci", "nvidia,tegra20-ehci", "usb-ehci".
-
-In that case, the driver might still only declare support for
-"nvidia,tegra20-ehci", but "nvidia,tegra30-ehci" is added to be explicit
-about the actual HW model.
-
-This doesn't continue forever though; you typically only list the
-specific HW model, the base specific model it's compatible with, and any
-generic value needed. So, a hypothetical Tegra40 EHCI controller would be:
-
-compatible = "nvidia,tegra40-ehci", "nvidia,tegra20-ehci", "usb-ehci".
-
-Given that, there is always something to key any newly required quirk
-off, so even if the need for a quirk is found later, the device tree
-already contains the information needed to trigger it.
-
-This is why quirks should always be keyed off compatible values, since
-they're guaranteed to be there in a correctly written device tree.
-
-Generic HW features (such as has-tt) don't need to be derived from the
-compatible value (although they could be), since they are something
-that's known up-front and hence should be present in any non-buggy
-device tree from day one. That's why the binding needs to thought out
-ahead of time, or if necessary (e.g. if expanded to support both EHCI
-and XHCI and XYZHCI which might require extra standard properties)
-evolved in a backwards-compatible fashion.
+> 
+> > I would add it only if required / has users.
