@@ -1,41 +1,45 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 24 Oct 2012 17:33:54 +0200
-Subject: [PATCH 5/8] ARM: at91/dts: at91sam9g20ek_common: Fix typos in buttons
- labels.
+Date: Wed, 24 Oct 2012 17:33:57 +0200
+Subject: [PATCH 8/8] ARM: at91: drop duplicated config SOC_AT91SAM9 entry
 In-Reply-To: <cover.1351092432.git.nicolas.ferre@atmel.com>
 References: <cover.1351092432.git.nicolas.ferre@atmel.com>
-Message-ID: <8e817f3a385af38a7a86ee555109bd093fb5fe39.1351092432.git.nicolas.ferre@atmel.com>
+Message-ID: <08bd4ab3897a5b06b4eb5cf3c00532ba38305be4.1351092432.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marek Belisko <marek.belisko@open-nandra.com>
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-at91/Kconfig | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index b06c0db..e6391a4 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -126,14 +126,14 @@
- 		#size-cells = <0>;
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index b142071..0436242 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -21,19 +21,13 @@ config SOC_AT91SAM9
+ 	bool
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
++	select MULTI_IRQ_HANDLER
++	select SPARSE_IRQ
  
- 		btn3 {
--			label = "Buttin 3";
-+			label = "Button 3";
- 			gpios = <&pioA 30 1>;
- 			linux,code = <0x103>;
- 			gpio-key,wakeup;
- 		};
+ menu "Atmel AT91 System-on-Chip"
  
- 		btn4 {
--			label = "Buttin 4";
-+			label = "Button 4";
- 			gpios = <&pioA 31 1>;
- 			linux,code = <0x104>;
- 			gpio-key,wakeup;
+ comment "Atmel AT91 Processor"
+ 
+-config SOC_AT91SAM9
+-	bool
+-	select AT91_SAM9_SMC
+-	select AT91_SAM9_TIME
+-	select CPU_ARM926T
+-	select MULTI_IRQ_HANDLER
+-	select SPARSE_IRQ
+-
+ config SOC_AT91RM9200
+ 	bool "AT91RM9200"
+ 	select CPU_ARM920T
 -- 
 1.7.11.3
