@@ -1,83 +1,71 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 24 Oct 2012 17:06:14 +0200
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121024150614.GD11837@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 24 Oct 2012 20:47:01 +0530
+Subject: [RFC 2/6] sched: add a new SD SHARE_POWERLINE flag for
+ sched_domain
+In-Reply-To: <1349595838-31274-3-git-send-email-vincent.guittot@linaro.org>
+References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
+ <1349595838-31274-3-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <5088066D.7000907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 10:19:25AM +0200, Thomas Petazzoni wrote:
-> This platform, available in Japan from PlatHome, has a dual-core
-> Armada XP, the MV78260. For now, only the two serial ports and the
-> three front LEDs are supported. Support for network, SATA, USB and
-> other peripherals will be added as drivers for them become available
-> for Armada XP in mainline.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
+Vincent,
+
+Few comments/questions.
+
+On Sunday 07 October 2012 01:13 PM, Vincent Guittot wrote:
+> This new flag SD SHARE_POWERLINE reflects the sharing of the power rail
+> between the members of a domain. As this is the current assumption of the
+> scheduler, the flag is added to all sched_domain
+>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 > ---
-> This is 3.8 material.
-> ---
->  arch/arm/boot/dts/Makefile           |    3 +-
->  arch/arm/boot/dts/openblocks-ax3.dts |   69 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mvebu/armada-370-xp.c  |    1 +
->  3 files changed, 72 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/openblocks-ax3.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f37cf9f..b7814b9 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -44,7 +44,8 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-dns320.dtb \
->  dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
->  	msm8960-cdp.dtb
->  dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
-> -	armada-xp-db.dtb
-> +	armada-xp-db.dtb \
-> +	openblocks-ax3.dtb
->  dtb-$(CONFIG_ARCH_MXC) += imx51-babbage.dtb \
->  	imx53-ard.dtb \
->  	imx53-evk.dtb \
-> diff --git a/arch/arm/boot/dts/openblocks-ax3.dts b/arch/arm/boot/dts/openblocks-ax3.dts
-> new file mode 100644
-> index 0000000..f757116
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/openblocks-ax3.dts
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Device Tree file for OpenBlocks AX3 board
-> + *
-> + * Copyright (C) 2012 Marvell
-> + *
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "armada-xp-mv78260.dtsi"
-> +
-> +/ {
-> +	model = "PlatHome OpenBlocks AX3 board";
-> +	compatible = "plathome,openblocks-ax3", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x40000000>; /* 1 GB */
-> +	};
+>   arch/ia64/include/asm/topology.h |    1 +
+>   arch/tile/include/asm/topology.h |    1 +
+>   include/linux/sched.h            |    1 +
+>   include/linux/topology.h         |    3 +++
+>   kernel/sched/core.c              |    5 +++++
+>   5 files changed, 11 insertions(+)
+>
+> diff --git a/arch/ia64/include/asm/topology.h b/arch/ia64/include/asm/topology.h
+> index a2496e4..065c720 100644
+> --- a/arch/ia64/include/asm/topology.h
+> +++ b/arch/ia64/include/asm/topology.h
+> @@ -65,6 +65,7 @@ void build_cpu_to_node_map(void);
+>   				| SD_BALANCE_EXEC	\
+>   				| SD_BALANCE_FORK	\
+>   				| SD_WAKE_AFFINE,	\
+> +				| arch_sd_share_power_line()		\
+>   	.last_balance		= jiffies,		\
+>   	.balance_interval	= 1,			\
+>   	.nr_balance_failed	= 0,			\
+> diff --git a/arch/tile/include/asm/topology.h b/arch/tile/include/asm/topology.h
+> index 7a7ce39..d39ed0b 100644
+> --- a/arch/tile/include/asm/topology.h
+> +++ b/arch/tile/include/asm/topology.h
+> @@ -72,6 +72,7 @@ static inline const struct cpumask *cpumask_of_node(int node)
+>   				| 0*SD_PREFER_LOCAL			\
+>   				| 0*SD_SHARE_CPUPOWER			\
+>   				| 0*SD_SHARE_PKG_RESOURCES		\
+> +				| arch_sd_share_power_line()		\
+>   				| 0*SD_SERIALIZE			\
+>   				,					\
+>   	.last_balance		= jiffies,				\
+> diff --git a/include/linux/sched.h b/include/linux/sched.h
+> index 4786b20..74f2daf 100644
+> --- a/include/linux/sched.h
+> +++ b/include/linux/sched.h
+> @@ -862,6 +862,7 @@ enum cpu_idle_type {
+>   #define SD_WAKE_AFFINE		0x0020	/* Wake task to waking CPU */
+>   #define SD_PREFER_LOCAL		0x0040  /* Prefer to keep tasks local to this domain */
+>   #define SD_SHARE_CPUPOWER	0x0080	/* Domain members share cpu power */
+> +#define SD_SHARE_POWERLINE	0x0100	/* Domain members share power domain */
+If you ignore the current use of SD_SHARE_CPUPOWER, isn't the meaning of
+CPUPOWER and POWERLINE is same here. Just trying to understand the clear
+meaning of this new flag. Have you not considered SD_SHARE_CPUPOWER
+because it is being used for cpu_power and needs at least minimum two
+domains ? SD_PACKING would have been probably more appropriate based
+on the way it is being used in further series.
 
-Hi Thomas
-
-There are two variants of this box, ax3/2 and ax3/4. The ax3/4 can
-have more RAM and has a mini pci express slot. Do you expect both
-boards to be supported with one dts file?
-
-Thanks
-	Andrew
+Regards
+Santosh
