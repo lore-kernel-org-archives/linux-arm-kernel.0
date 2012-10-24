@@ -1,53 +1,108 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Oct 2012 11:50:00 -0700
-Subject: [GIT PULL] omap fixes for v3.7-rc2
-Message-ID: <20121024184959.GI5605@atomide.com>
+From: wmb@firmworks.com (Mitch Bradley)
+Date: Wed, 24 Oct 2012 08:55:27 -1000
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <50882EED.9020200@wwwdotorg.org>
+References: <Pine.LNX.4.44L0.1210241329230.1282-100000@iolanthe.rowland.org>
+ <50882EED.9020200@wwwdotorg.org>
+Message-ID: <5088399F.2000102@firmworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/24/2012 8:09 AM, Stephen Warren wrote:
+> On 10/24/2012 11:46 AM, Alan Stern wrote:
+>> On Wed, 24 Oct 2012, Stephen Warren wrote:
+>>
+>>>> How do we determine which existing drivers claim to support usb-ehci?  
+>>>> A quick search under arch/ and drivers/ turns up nothing but
+>>>> drivers/usb/host/ehci-ppc-of.c.  Changing it to a more HW-specific
+>>>> match should be easy enough, and then "usb-ehci" would be safe to use
+>>>> in ehci-platform.c.
+>>>
+>>> It's not drivers that claim to support usb-ehci, but device tree files
+>>> that contain nodes that include "usb-ehci" in their compatible value,
+>>> yet need to be handled by a driver that isn't the generic USB EHCI
+>>> driver, and that driver binds to the other more specific compatible value:
+>>>
+>>>> $ grep -HrnI usb-ehci arch/*/boot/dts
+> ...
+>>> and then search for all those other compatible values in drivers. The
+>>> ARM instances certainly all have this issue (although perhaps it's worth
+>>> investigating if a generic could work for them instead). The PPC
+>>> instances need more investigation; the values don't show up in of match
+>>> tables but rather in code.
+>>
+>> Ah, now I'm starting to get the picture.
+>>
+>> So by listing "usb-ehci" in its device ID table, a driver would
+>> essentially be saying that it can handle _all_ USB EHCI controllers.  
 
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
 
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+Actually, it means that the driver can handle at least USB EHCI
+controllers that are 100% compatible with the EHCI spec (requiring
+nothing extra).  The driver might be able to handle almost-compatible
+controllers, possibly with the help of additional properties.
 
-are available in the git repository at:
+If a DT node lists "usb-ehci" as a "fallback", it's not guaranteed that
+a given version of that driver will work, but it's worth a try in the
+event that no more-specific driver is matched.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc2/fixes-signed
 
-for you to fetch changes up to 12ac7f9e117facfe128d6e569953fa73d2d676b3:
-
-  ARM: AM33XX: Fix configuration of dmtimer parent clock by dmtimer driverDate:Wed, 17 Oct 2012 13:55:55 -0500 (2012-10-23 18:58:21 -0700)
-
-----------------------------------------------------------------
-Timer fix for am33xx, runtime PM fix for UART, audio McBSP fixes,
-mux and pinctrl fixes, and Beagle OPP fix.
-
-----------------------------------------------------------------
-Kevin Hilman (2):
-      ARM: OMAP2: UART: fix console UART mismatched runtime PM status
-      ARM: OMAP3: Beagle: fix OPP customization and initcall ordering
-
-Paul Walmsley (1):
-      ARM: OMAP3: PM: apply part of the erratum i582 workaround
-
-Peter Ujfalusi (1):
-      ARM/dts: omap3: Fix mcbsp2/3 hwmods to be able to probe the drivers for audio
-
-Tony Lindgren (3):
-      ARM: OMAP2+: Fix location of select PINCTRL
-      ARM: OMAP3: Fix 3430 legacy mux names for ssi1 signals.
-      Merge tag 'for_3.7-rc3-fixes-pm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.7-rc2/fixes
-
-Vaibhav Hiremath (1):
-      ARM: AM33XX: Fix configuration of dmtimer parent clock by dmtimer driverDate:Wed, 17 Oct 2012 13:55:55 -0500
-
- arch/arm/boot/dts/omap3.dtsi            |    4 ++--
- arch/arm/mach-omap2/Kconfig             |    1 -
- arch/arm/mach-omap2/board-omap3beagle.c |   22 +++++++++++++---------
- arch/arm/mach-omap2/clock33xx_data.c    |    2 ++
- arch/arm/mach-omap2/mux34xx.c           |    8 ++++----
- arch/arm/mach-omap2/pm.h                |    1 +
- arch/arm/mach-omap2/pm34xx.c            |   30 ++++++++++++++++++++++++++++--
- arch/arm/mach-omap2/serial.c            |    5 +++++
- arch/arm/plat-omap/Kconfig              |    1 +
- 9 files changed, 56 insertions(+), 18 deletions(-)
+> 
+> Yes, exactly.
+> 
+>> (Which means that the entry in ehci-ppc-of.c is questionable; perhaps
+>> the intention is that this driver really does handle all EHCI
+>> controllers on any PPC-based OpenFirmware platform bus.)
+> 
+> Yes, that seems questionable, although perhaps within the context of
+> only enabling the driver on PPC specifically, it may be reasonable.
+> 
+>>> This doesn't continue forever though; you typically only list the
+>>> specific HW model, the base specific model it's compatible with, and any
+>>> generic value needed. So, a hypothetical Tegra40 EHCI controller would be:
+>>>
+>>> compatible = "nvidia,tegra40-ehci", "nvidia,tegra20-ehci", "usb-ehci".
+>>
+>> What's the reason for listing the generic value if drivers can't key
+>> off it?  Does it contain any information that's not already present in 
+>> the specific values?
+> 
+> This may or may not be a mistake.
+> 
+> The idea is that usb-ehci is included in the device node's compatible
+> list iff the HW is 100% compatible with a "usb-ehci" HW device, and
+> hence a pure usb-ehci driver can handle the hardware without any
+> additional knowledge. (That's true in general for any compatible value).
+> 
+> It's quite possible that this often gets translated to the subtly
+> different "the HW is an EHCI controller, so it gets
+> compatible="usb-ehci"" when writing .dts files.
+> 
+> So yes we probably should remove compatible="usb-ehci" from any device
+> node for HW which really isn't a pure EHCI device. That would presumably
+> require looking at the existing custom drivers and/or HW specs to
+> determine what, if anything, is different about the HW.
+> 
+> Related, at least on Tegra, the PHY handling is IIRC pretty tightly
+> coupled into the EHCI driver. We probably should have separate nodes
+> for, and drivers for, the PHYs instead. I don't know if that would
+> remove all the non-standard attributes of the Tegra EHCI HW and hence
+> allow Tegra's EHCI to be handled by the generic driver. From memory,
+> there are certainly some HW workarounds in the Tegra EHCI driver that
+> would need to be ported though.
+> 
+>> It sounds like the ehci-platform driver should simply list all the
+>> specific HW device types (or base HW device types) that it handles, and
+>> it shouldn't include "usb-ehci" in the list.  As more DT board files
+>> are created or as ehci-platform becomes capable to taking over from
+>> other drivers, its device list would grow.
+> 
+> That's certainly a reasonable way to go too. I think the only downside
+> with that approach is that every new device needs a kernel update to add
+> it to the table, whereas using a generic compatible="usb-ehci" wouldn't,
+> assuming no quirks were required for the new device.
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
