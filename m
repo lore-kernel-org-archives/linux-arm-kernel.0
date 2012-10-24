@@ -1,101 +1,61 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 24 Oct 2012 17:37:27 +0100
-Subject: [RFC] Energy/power monitoring within the kernel
-In-Reply-To: <20121023220240.GA25895@roeck-us.net>
-References: <1351013449.9070.5.camel@hornet>
- <20121023220240.GA25895@roeck-us.net>
-Message-ID: <1351096647.23327.64.camel@hornet>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 24 Oct 2012 12:38:42 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <5088145F.1040504@wwwdotorg.org>
+Message-ID: <Pine.LNX.4.44L0.1210241233040.1282-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-23 at 23:02 +0100, Guenter Roeck wrote:
-> > Traditionally such data should be exposed to the user via hwmon sysfs
-> > interface, and that's exactly what I did for "my" platform - I have
-> > a /sys/class/hwmon/hwmon*/device/energy*_input and this was good
-> > enough to draw pretty graphs in userspace. Everyone was happy...
-> > 
-> Only driver supporting "energy" output so far is ibmaem, and the reported energy
-> is supposed to be cumulative, as in energy = power * time. Do you mean power,
-> possibly ?
+On Wed, 24 Oct 2012, Stephen Warren wrote:
 
-So the vexpress would be the second one, than :-) as the energy
-"monitor" actually on the latest tiles reports 64-bit value of
-microJoules consumed (or produced) since the power-up.
-
-Some of the older boards were able to report instant power, but this
-metrics is less useful in our case.
-
-> > Now I am getting new requests to do more with this data. In particular
-> > I'm asked how to add such information to ftrace/perf output. The second
-> > most frequent request is about providing it to a "energy aware"
-> > cpufreq governor.
+> On 10/24/2012 09:26 AM, Sebastian Andrzej Siewior wrote:
+> > On Wed, Oct 24, 2012 at 10:57:00AM -0400, Alan Stern wrote:
+> >> Under the circumstances, do we really need a new binding document for 
+> >> the ehci-platform driver?
 > 
-> Anything energy related would have to be along the line of "do something after a
-> certain amount of work has been performed", which at least at the surface does
-> not make much sense to me, unless you mean something along the line of a
-> process scheduler which schedules a process not based on time slices but based
-> on energy consumed, ie if you want to define a time slice not in milli-seconds
-> but in Joule.
-
-Actually there is some research being done in this direction, but it's
-way too early to draw any conclusions...
-
-> If so, I would argue that a similar behavior could be achieved by varying the
-> duration of time slices with the current CPU speed, or simply by using cycle
-> count instead of time as time slice parameter. Not that I am sure if such an
-> approach would really be of interest for anyone. 
+> It seems reasonable to add the new properties to usb-ehci.txt, since
+> they do describe the HW.
 > 
-> Or do you really mean power, not energy, such as in "reduce CPU speed if its
-> power consumption is above X Watt" ?
+> >> We should be able to use the existing 
+> >> usb-ehci binding, perhaps with some new properties added:
+> >>
+> >> 	has-synopsys-hc-bug
+> >> 	no-io-watchdog
+> >> 	has-tt
+> 
+> That sounds fine to me.
+> 
+> However, there is an implementation issue here. I believe the way Linux
+> searches for a driver for a particular node is:
+> 
+> for every driver that's registered
+>     if the driver's supported compatible list matches the device
+>         use the driver
+> 
+> (See drivers/base/platform.c:platform_match() which implements the if
+> statement above, and I assume the driver core implements the outer for
+> loop above)
 
-Uh. To be completely honest I must answer: I'm not sure how the "energy
-aware" cpufreq governor is supposed to work. I have been simply asked to
-provide the data in some standard way, if possible.
+Yes, it does.
 
-> I am not sure how this would be expected to work. hwmon is, by its very nature,
-> a passive subsystem: It doesn't do anything unless data is explicitly requested
-> from it. It does not update an attribute unless that attribute is read.
-> That does not seem to fit well with the idea of tracing - which assumes
-> that some activity is happening, ultimately, all by itself, presumably
-> periodically. The idea to have a user space application read hwmon data only
-> for it to trigger trace events does not seem to be very compelling to me.
+> That means that if the generic driver supports compatible="usb-ehci", it
+> may "steal" device nodes that have
+> compatible="something-custom","usb-ehci", even if there's a driver
+> specifically for "something-custom". We would need to re-arrange the
+> driver matching code to:
+> 
+> for each compatible value in the node:
+>     for each driver that's registered:
+>         if the driver supports the compatible value:
+>             use the driver.
 
-What I had in mind was similar to what adt7470 driver does. The driver
-would automatically access the device every now and then to update it's
-internal state and generate the trace event on the way. This
-auto-refresh "feature" is particularly appealing for me, as on some of
-"my" platforms can take up to 500 microseconds to actually get the data.
-So doing this in background (and providing users with the last known
-value in the meantime) seems attractive.
+Which might be difficult since the inner loop would be controlled by
+the outer code in the driver core.
 
-> An exception is if a monitoring device suppports interrupts, and if its driver
-> actually implements those interrupts. This is, however, not the case for most of
-> the current drivers (if any), mostly because interrupt support for hardware
-> monitoring devices is very platform dependent and thus difficult to implement.
+How do we determine which existing drivers claim to support usb-ehci?  
+A quick search under arch/ and drivers/ turns up nothing but
+drivers/usb/host/ehci-ppc-of.c.  Changing it to a more HW-specific
+match should be easy enough, and then "usb-ehci" would be safe to use
+in ehci-platform.c.
 
-Interestingly enough the newest version of our platform control micro
-(doing the energy monitoring as well) can generate and interrupt when a
-transaction is finished, so I was planning to periodically update the
-all sort of values. And again, generating a trace event on this
-opportunity would be trivial.
-
-> > Of course a particular driver could register its own perf PMU on its
-> > own. It's certainly an option, just very suboptimal in my opinion.
-> > Or maybe not? Maybe the task is so specialized that it makes sense?
-> > 
-> We had a couple of attempts to provide an in-kernel API. Unfortunately,
-> the result was, at least so far, more complexity on the driver side.
-> So the difficulty is really to define an API which is really simple, and does
-> not just complicate driver development for a (presumably) rare use case.
-
-Yes, I appreciate this. That's why this option is actually my least
-favourite. Anyway, what I was thinking about was just a thin shin that
-*can* be used by a driver to register some particular value with the
-core (so it can be enumerated and accessed by in-kernel clients) and the
-core could (or not) create a sysfs attribute for this value on behalf of
-the driver. Seems lightweight enough, unless previous experience
-suggests otherwise?
-
-Cheers!
-
-Pawe?
+Alan Stern
