@@ -1,39 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 24 Oct 2012 10:48:35 -0600
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210241238570.1282-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1210241238570.1282-100000@iolanthe.rowland.org>
-Message-ID: <50881BE3.9020702@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Oct 2012 18:51:47 +0200
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121024161429.GA16350@core.coreip.homeip.net>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121022155028.GA13791@core.coreip.homeip.net>
+ <508660D4.9030507@ti.com>
+ <20121023200249.GA2712@core.coreip.homeip.net>
+ <20121024083704.GF5665@arwen.pp.htv.fi>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+Message-ID: <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2012 10:44 AM, Alan Stern wrote:
-> On Wed, 24 Oct 2012, Stephen Warren wrote:
-> 
->> We should absolutely avoid Linux-specific properties where possible.
->>
->> That said, what Linux-specific properties are you talking about? The
->> properties discussed here (has-synopsys-hc-bug, no-io-watchdog, has-tt)
->> are all purely a description of HW, aren't they.
-> 
-> "has-tt" is definitely a description of the HW.
+On Wed, Oct 24, 2012 at 6:14 PM, Dmitry Torokhov
+<dmitry.torokhov@gmail.com> wrote:
+> On Wed, Oct 24, 2012 at 11:37:04AM +0300, Felipe Balbi wrote:
 
-OK.
+>> - we ask another layer to allocate memory for us
+>> - we ask another layer to call our ISR once the IRQ line is asserted
+>> - we ask another layer to handle the input events we just received
+>> - we ask another layer to transfer data through DMA for us
+>> - we ask another layer to turn regulators on and off.
+>
+> But we are _directly_ _using_ all of these. You allocate memory and you
+> (the driver) stuff data into that memory. You ask for DMA and you take
+> the DMAed data and work with it. Not so with pinctrl in omap keypad and
+> other drivers I have seen so far.
 
-> "has-synopsys-hc-bug" is too, although determining whether or not it 
-> should apply to a particular controller might be difficult.  I'm 
-> inclined not to include it among the properties.
-> 
-> "no-io-watchdog" is not the greatest name.  It describes to controllers 
-> that always do generate IRQs for I/O events when they are supposed to 
-> (and hence the driver doesn't need to set up a watchdog timer to detect 
-> I/O completions that didn't generate an IRQ).  So while the concept is 
-> HW-specific, the name refers to a driver implementation issue.  A 
-> better name might be something like "reliable-IRQs".  Again, it's not 
-> such an easy thing to test for.  Almost all the existing drivers leave 
-> it unset.
+Consult:
+drivers/tty/serial/amba-pl011.c
+drivers/spi/spi-pl022.c
+drivers/i2c/busses/i2c-nomadik.c
 
-OK, I'd be inclined to drive those last two by quirks then, since they
-aren't architectural features of EHCI but rather implementation issues.
-And indeed have the quirk table have a "reliable IRQs" field instead of
-"no IO watchdog", to minimize the table size.
+for more complex pinctrl use cases. These are my dogfood drivers ...
+Most of these will request more than one state and switch the driver
+between these different states at runtime, in these examples for power
+saving there are states named "default", "sleep" and in the I2C driver
+also "idle".
+
+These examples are more typical to how the ux500 platform will
+look, also the SKE input driver will move the devise to sleep/default
+states but we need to merge PM code before we can do that.
+
+Yours,
+Linus Walleij
