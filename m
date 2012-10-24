@@ -1,61 +1,72 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 24 Oct 2012 15:53:47 -0700
-Subject: [PATCH 4/7] ARM: hw_breakpoint: don't try to clear v6 debug
- registers during boot
-In-Reply-To: <1350487901-3108-5-git-send-email-will.deacon@arm.com>
-References: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
- <1350487901-3108-5-git-send-email-will.deacon@arm.com>
-Message-ID: <5088717B.6050204@codeaurora.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 24 Oct 2012 17:54:15 -0500
+Subject: [PATCH v2] gpio/omap: fix off-mode bug: clear debounce clock
+ enable mask on free/reset
+In-Reply-To: <1351098641-23917-1-git-send-email-khilman@deeprootsystems.com>
+References: <1351098641-23917-1-git-send-email-khilman@deeprootsystems.com>
+Message-ID: <50887197.8010104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/17/12 08:31, Will Deacon wrote:
-> v6 cores do not provide a way to clear the debug registers without first
-> enabling monitor mode, meaning that we could take spurious debug
-> exceptions. Instead, rely on the registers being in a sane state when we
-> boot as they are defined to be disabled out of reset anyway.
->
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-
+On 10/24/2012 12:10 PM, Kevin Hilman wrote:
+> From: Kevin Hilman <khilman@ti.com>
+> 
+> When a GPIO bank is freed or shutdown, ensure that the banks
+> dbck_enable_mask is cleared also.  Otherwise, context restore on
+> subsequent off-mode transition will restore previous value from the
+> shadow copies (bank->context.debounce*) leading to mismatch state
+> between driver state and hardware state.
+> 
+> This was discovered when board code was doing
+> 
+>   gpio_request_one()
+>   gpio_set_debounce()
+>   gpio_free()
+> 
+> which was leaving the GPIO debounce settings in a confused state.  If
+> that GPIO bank is subsequently used with off-mode enabled, bogus state
+> would be restored, leaving GPIO debounce enabled which then prevented
+> the CORE powerdomain from transitioning.
+> 
+> To fix, ensure that bank->dbck_enable_mask is cleared when the bank
+> is freed/shutdown so debounce state doesn't persist.
+> 
+> Special thanks to Grazvydas Ignotas for pointing out a bug in an
+> earlier version that would've disabled debounce on any runtime PM
+> transition.
+> 
+> Reported-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
+> Cc: Grazvydas Ignotas <notasas@gmail.com>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
 > ---
->  arch/arm/kernel/hw_breakpoint.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> index e76cf1a..b6f4aec 100644
-> --- a/arch/arm/kernel/hw_breakpoint.c
-> +++ b/arch/arm/kernel/hw_breakpoint.c
-> @@ -912,8 +912,8 @@ static void reset_ctrl_regs(void *unused)
->  	switch (debug_arch) {
->  	case ARM_DEBUG_ARCH_V6:
->  	case ARM_DEBUG_ARCH_V6_1:
-> -		/* ARMv6 cores just need to reset the registers. */
-> -		goto reset_regs;
-> +		/* ARMv6 cores clear the registers out of reset. */
-> +		goto out_mdbgen;
->  	case ARM_DEBUG_ARCH_V7_ECP14:
->  		/*
->  		 * Ensure sticky power-down is clear (i.e. debug logic is
-> @@ -966,7 +966,6 @@ clear_vcr:
->  		return;
->  	}
->  
-> -reset_regs:
->  	/*
->  	 * The control/value register pairs are UNKNOWN out of reset so
->  	 * clear them to avoid spurious debug events.
-> @@ -991,6 +990,7 @@ reset_regs:
->  	 * Have a crack at enabling monitor mode. We don't actually need
->  	 * it yet, but reporting an error early is useful if it fails.
->  	 */
-> +out_mdbgen:
->  	if (enable_monitor_mode())
->  		cpumask_or(&debug_err_mask, &debug_err_mask, cpumask_of(cpu));
+> v2: only clear mask in free/shutdown, not in runtime PM paths, 
+>     clarified changelog   
+> Applies on v3.7-rc2.
+> 
+>  drivers/gpio/gpio-omap.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 94cbc84..113b167 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -539,6 +539,7 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
+>  	_set_gpio_irqenable(bank, gpio, 0);
+>  	_clear_gpio_irqstatus(bank, gpio);
+>  	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
+> +	bank->dbck_enable_mask = 0;
 >  }
 
+Does this need to be ...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
++	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
++	_gpio_dbck_disable(bank);
+
+There could be more than one gpio using debounce and so we should only
+clear the appropriate bit. Also after clearing a bit we could see if we
+can disable the debounce clock too.
+
+Cheers
+Jon
