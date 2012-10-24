@@ -1,59 +1,53 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 24 Oct 2012 10:28:46 -0700
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
-Message-ID: <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Oct 2012 19:32:37 +0200
+Subject: [PATCH 2/6] pinctrl: Update clock handling for the
+ pinctrl-nomadik GPIO driver
+In-Reply-To: <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+ <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 24, 2012 06:51:47 PM Linus Walleij wrote:
-> On Wed, Oct 24, 2012 at 6:14 PM, Dmitry Torokhov
-> 
-> <dmitry.torokhov@gmail.com> wrote:
-> > On Wed, Oct 24, 2012 at 11:37:04AM +0300, Felipe Balbi wrote:
-> >> - we ask another layer to allocate memory for us
-> >> - we ask another layer to call our ISR once the IRQ line is asserted
-> >> - we ask another layer to handle the input events we just received
-> >> - we ask another layer to transfer data through DMA for us
-> >> - we ask another layer to turn regulators on and off.
-> > 
-> > But we are _directly_ _using_ all of these. You allocate memory and you
-> > (the driver) stuff data into that memory. You ask for DMA and you take
-> > the DMAed data and work with it. Not so with pinctrl in omap keypad and
-> > other drivers I have seen so far.
-> 
-> Consult:
-> drivers/tty/serial/amba-pl011.c
+On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-OK.
+> The clock framework has changed somewhat and it's now better to
+> invoke clock_prepare_enable() and clk_disable_unprepare() rather
+> than the legacy clk_enable() and clk_disable() calls. This patch
+> converts the Nomadik Pin Control driver to the new framework.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> drivers/spi/spi-pl022.c
+(...)
+> -               clk_enable(chip->clk);
+> +               clk_prepare_enable(chip->clk);
+(...)
+> -               clk_disable(chip->clk);
+> +               clk_disable_unprepare(chip->clk);
 
-Default/sleep transitions could be moved into bus code.
+(Repeated for each occurence.)
 
-> drivers/i2c/busses/i2c-nomadik.c
+Is this *really* causing a regression? I mean the driver
+begin like this in nmk_gpio_probe():
 
-Don't see pinctrl in linux-next.
+        clk = devm_clk_get(&dev->dev, NULL);
+        if (IS_ERR(clk)) {
+                ret = PTR_ERR(clk);
+                goto out;
+        }
+        clk_prepare(clk);
 
- 
-> for more complex pinctrl use cases. These are my dogfood drivers ...
-> Most of these will request more than one state and switch the driver
-> between these different states at runtime, in these examples for power
-> saving there are states named "default", "sleep" and in the I2C driver
-> also "idle".
-> 
-> These examples are more typical to how the ux500 platform will
-> look, also the SKE input driver will move the devise to sleep/default
-> states but we need to merge PM code before we can do that.
+Then it leaves the clock prepared. So the clock is always
+prepared. You would only need to enable/disable it at times.
 
-I do not say that no drivers should ever touch pinctrl, just that most
-of them do not have to if you have other layers to the right thing for
-them.
+And the semantics of the clk_enable/clk_disable call pair
+is such that it is fastpath and should be real quick, and that
+is exactly why we're using it repeatedly like that. Inserting
+clk_unprepare() effectively could make the whole driver a
+lot slower, so convince me on this one. ...
 
-Thanks.
+I suspect the real bug (if there is one) must be in the clock
+implementation.
 
--- 
-Dmitry
+Yours,
+Linus Walleij
