@@ -1,33 +1,31 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 24 Oct 2012 16:15:05 +0200
-Subject: [PATCH] arm: mvebu: support for the PlatHome OpenBlocks AX3 board
-In-Reply-To: <5087AD9A.8020801@free-electrons.com>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <5087AD9A.8020801@free-electrons.com>
-Message-ID: <20121024161505.62eee02b@skate>
+Date: Wed, 24 Oct 2012 16:16:11 +0200
+Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
+In-Reply-To: <5087A94E.4000706@free-electrons.com>
+References: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5087A94E.4000706@free-electrons.com>
+Message-ID: <20121024161611.659b0989@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Gregory CLEMENT,
 
-On Wed, 24 Oct 2012 10:58:02 +0200, Gregory CLEMENT wrote:
-> On 10/23/2012 10:19 AM, Thomas Petazzoni wrote:
-> > This platform, available in Japan from PlatHome, has a dual-core
-> > Armada XP, the MV78260. For now, only the two serial ports and the
-> > three front LEDs are supported. Support for network, SATA, USB and
-> > other peripherals will be added as drivers for them become available
-> > for Armada XP in mainline.
-> And don't forget the SMP support too, MV78260 is supposed to have 2 cores.
+On Wed, 24 Oct 2012 10:39:42 +0200, Gregory CLEMENT wrote:
+> On 10/23/2012 10:17 AM, Thomas Petazzoni wrote:
+> > The split of 370 and XP into two Kconfig options and the multiplatform
+> > kernel support has changed a few Kconfig symbols, so let's update the
+> > mvebu_defconfig file with the latest changes.
+> 
+> Indeed this patch fixes the mvebu_defconfig which was broken.
+> But as now mvebu is part of multi_v7_defconfig, shouldn't we just
+> removed mvebu_defconfig ?
 
-Sure. My plan is to progressively add support for other devices and
-features (SMP included) as we get them merged in mainline.
+I think for now, SoC family specific defconfig files are still
+accepted, so I'd prefer to keep mvebu_defconfig around. Multiplatform
+is nice for users, but I prefer to build a mvebu-only kernel when I'm
+doing kernel development.
 
-> Besides this, this patch looks good. I have applied it on a v3.7-rc2
-> without any problem, and managed to build it also.
-> So you can add my
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks!
+Best regards,
 
 Thomas
 -- 
