@@ -1,73 +1,230 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Wed, 24 Oct 2012 19:37:31 +0200
-Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
-In-Reply-To: <Pine.LNX.4.44L0.1210241249010.1282-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1210241249010.1282-100000@iolanthe.rowland.org>
-Message-ID: <16682515.Yr7sQYmXfE@bender>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 25 Oct 2012 06:38:50 +1300
+Subject: [PATCH v4] pwm: vt8500: Update vt8500 PWM driver support
+Message-ID: <1351100330-26072-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 October 2012 12:54:05 Alan Stern wrote:
-> On Wed, 24 Oct 2012, Stephen Warren wrote:
-> 
-> > Device tree files always need a completely specific value in the
-> > compatible property, even when less-specific/more-generic values are
-> > also present. So for example, the Linux driver might only care about the
-> > following existing:
-> > 
-> > compatible = "usb-ehci".
-> > 
-> > However, any actual EHCI controller is always some specific model, so
-> > the compatible value must define which specific model it is, e.g.:
-> > 
-> > compatible = "nvidia,tegra20-ehci", "usb-ehci".
-> > 
-> > Now lets say the Tegra30 EHCI controller is identical to the Tegra20
-> > controller. That needs to be explicitly represented too:
-> > 
-> > compatible = "nvidia,tegra30-ehci", "nvidia,tegra20-ehci", "usb-ehci".
-> > 
-> > In that case, the driver might still only declare support for
-> > "nvidia,tegra20-ehci", but "nvidia,tegra30-ehci" is added to be explicit
-> > about the actual HW model.
-> > 
-> > This doesn't continue forever though; you typically only list the
-> > specific HW model, the base specific model it's compatible with, and any
-> > generic value needed. So, a hypothetical Tegra40 EHCI controller would be:
-> > 
-> > compatible = "nvidia,tegra40-ehci", "nvidia,tegra20-ehci", "usb-ehci".
-> > 
-> > Given that, there is always something to key any newly required quirk
-> > off, so even if the need for a quirk is found later, the device tree
-> > already contains the information needed to trigger it.
-> 
-> Okay.  It appears that quite a few .dts/.dtsi files mention "usb-ehci", 
-> for no apparent reason (given that the drivers don't list it):
-> 
-> [stern at iolanthe usb-3.6]$ find arch -name '*.dts*' | xargs grep usb-ehci
-> arch/mips/cavium-octeon/octeon_3xxx.dts:                                compatible = "cavium,octeon-6335-ehci","usb-ehci";
-> arch/mips/cavium-octeon/octeon_68xx.dts:                                compatible = "cavium,octeon-6335-ehci","usb-ehci";
-> arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
-> arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
-> arch/arm/boot/dts/tegra20.dtsi:         compatible = "nvidia,tegra20-ehci", "usb-ehci";
-> arch/arm/boot/dts/at91sam9x5.dtsi:                      compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
-> arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ehci", "usb-ehci";
-> arch/arm/boot/dts/spear13xx.dtsi:                       compatible = "st,spear600-ehci", "usb-ehci";
-> arch/arm/boot/dts/spear3xx.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
-> arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
-> arch/arm/boot/dts/spear600.dtsi:                        compatible = "st,spear600-ehci", "usb-ehci";
-> arch/arm/boot/dts/at91sam9g45.dtsi:                     compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
-> arch/powerpc/boot/dts/wii.dts:                  compatible = "nintendo,hollywood-usb-ehci",
-> arch/powerpc/boot/dts/wii.dts:                                  "usb-ehci";
-> arch/powerpc/boot/dts/sequoia.dts:                      compatible = "ibm,usb-ehci-440epx", "usb-ehci";
-> arch/powerpc/boot/dts/canyonlands.dts:                  compatible = "ibm,usb-ehci-460ex", "usb-ehci";
-> 
-> Is there a real reason that I'm not aware of?  Or can all these entries
-> safely be removed?
+This patch updates pwm-vt8500.c to support devicetree probing and
+make use of the common clock subsystem.
 
-Apart from the powerpc entries for which a real driver exists, the others were
-probably added in the hope that sooner or later, someone will come up with
-a matching driver, and the corresponding dts file would not even have to be
-updated to benefit from this.
---
-Florian
+A binding document describing the PWM controller found on
+arch-vt8500 is also included.
+
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+v4:
+return err from clk_enable rather than -EBUSY
+
+ .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 ++++
+ drivers/pwm/pwm-vt8500.c                           |   86 ++++++++++++++------
+ 2 files changed, 80 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+
+diff --git a/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+new file mode 100644
+index 0000000..bcc6367
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
+@@ -0,0 +1,17 @@
++VIA/Wondermedia VT8500/WM8xxx series SoC PWM controller
++
++Required properties:
++- compatible: should be "via,vt8500-pwm"
++- reg: physical base address and length of the controller's registers
++- #pwm-cells: should be 2.  The first cell specifies the per-chip index
++  of the PWM to use and the second cell is the period in nanoseconds.
++- clocks: phandle to the PWM source clock
++
++Example:
++
++pwm1: pwm at d8220000 {
++	#pwm-cells = <2>;
++	compatible = "via,vt8500-pwm";
++	reg = <0xd8220000 0x1000>;
++	clocks = <&clkpwm>;
++};
+diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
+index ad14389..5264962 100644
+--- a/drivers/pwm/pwm-vt8500.c
++++ b/drivers/pwm/pwm-vt8500.c
+@@ -1,7 +1,8 @@
+ /*
+  * drivers/pwm/pwm-vt8500.c
+  *
+- *  Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
++ * Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
++ * Copyright (C) 2010 Alexey Charkov <alchark@gmail.com>
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -21,14 +22,24 @@
+ #include <linux/io.h>
+ #include <linux/pwm.h>
+ #include <linux/delay.h>
++#include <linux/clk.h>
+ 
+ #include <asm/div64.h>
+ 
+-#define VT8500_NR_PWMS 4
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++
++/*
++ * SoC architecture allocates register space for 4 PWMs but only
++ * 2 are currently implemented.
++ */
++#define VT8500_NR_PWMS	2
+ 
+ struct vt8500_chip {
+ 	struct pwm_chip chip;
+ 	void __iomem *base;
++	struct clk *clk;
+ };
+ 
+ #define to_vt8500_chip(chip)	container_of(chip, struct vt8500_chip, chip)
+@@ -52,7 +63,7 @@ static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	unsigned long long c;
+ 	unsigned long period_cycles, prescale, pv, dc;
+ 
+-	c = 25000000/2; /* wild guess --- need to implement clocks */
++	c = clk_get_rate(vt8500->clk);
+ 	c = c * period_ns;
+ 	do_div(c, 1000000000);
+ 	period_cycles = c;
+@@ -85,8 +96,15 @@ static int vt8500_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 
+ static int vt8500_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
++	int err;
+ 	struct vt8500_chip *vt8500 = to_vt8500_chip(chip);
+ 
++	err = clk_enable(vt8500->clk);
++	if (err < 0)
++		dev_err(chip->dev, "failed to enable clock\n");
++		return err;
++	};
++
+ 	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
+ 	writel(5, vt8500->base + (pwm->hwpwm << 4));
+ 	return 0;
+@@ -98,6 +116,8 @@ static void vt8500_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 
+ 	pwm_busy_wait(vt8500->base + 0x40 + pwm->hwpwm, (1 << 0));
+ 	writel(0, vt8500->base + (pwm->hwpwm << 4));
++
++	clk_disable(vt8500->clk);
+ }
+ 
+ static struct pwm_ops vt8500_pwm_ops = {
+@@ -107,12 +127,24 @@ static struct pwm_ops vt8500_pwm_ops = {
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int __devinit pwm_probe(struct platform_device *pdev)
++static const struct of_device_id vt8500_pwm_dt_ids[] = {
++	{ .compatible = "via,vt8500-pwm", },
++	{ /* Sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, vt8500_pwm_dt_ids);
++
++static int vt8500_pwm_probe(struct platform_device *pdev)
+ {
+ 	struct vt8500_chip *chip;
+ 	struct resource *r;
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
++	if (!np) {
++		dev_err(&pdev->dev, "invalid devicetree node\n");
++		return -EINVAL;
++	}
++
+ 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
+ 	if (chip == NULL) {
+ 		dev_err(&pdev->dev, "failed to allocate memory\n");
+@@ -124,6 +156,12 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+ 	chip->chip.base = -1;
+ 	chip->chip.npwm = VT8500_NR_PWMS;
+ 
++	chip->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR_OR_NULL(chip->clk)) {
++		dev_err(&pdev->dev, "clock source not specified\n");
++		return PTR_ERR(chip->clk);
++	}
++
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no memory resource defined\n");
+@@ -131,18 +169,26 @@ static int __devinit pwm_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	chip->base = devm_request_and_ioremap(&pdev->dev, r);
+-	if (chip->base == NULL)
++	if (!chip->base)
+ 		return -EADDRNOTAVAIL;
+ 
++	ret = clk_prepare(chip->clk);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to prepare clock\n");
++		return ret;
++	}
++
+ 	ret = pwmchip_add(&chip->chip);
+-	if (ret < 0)
++	if (ret < 0) {
++		dev_err(&pdev->dev, "failed to add PWM chip\n");
+ 		return ret;
++	}
+ 
+ 	platform_set_drvdata(pdev, chip);
+ 	return ret;
+ }
+ 
+-static int __devexit pwm_remove(struct platform_device *pdev)
++static int vt8500_pwm_remove(struct platform_device *pdev)
+ {
+ 	struct vt8500_chip *chip;
+ 
+@@ -150,28 +196,22 @@ static int __devexit pwm_remove(struct platform_device *pdev)
+ 	if (chip == NULL)
+ 		return -ENODEV;
+ 
++	clk_unprepare(chip->clk);
++
+ 	return pwmchip_remove(&chip->chip);
+ }
+ 
+-static struct platform_driver pwm_driver = {
++static struct platform_driver vt8500_pwm_driver = {
++	.probe		= vt8500_pwm_probe,
++	.remove		= vt8500_pwm_remove,
+ 	.driver		= {
+ 		.name	= "vt8500-pwm",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = vt8500_pwm_dt_ids,
+ 	},
+-	.probe		= pwm_probe,
+-	.remove		= __devexit_p(pwm_remove),
+ };
++module_platform_driver(vt8500_pwm_driver);
+ 
+-static int __init pwm_init(void)
+-{
+-	return platform_driver_register(&pwm_driver);
+-}
+-arch_initcall(pwm_init);
+-
+-static void __exit pwm_exit(void)
+-{
+-	platform_driver_unregister(&pwm_driver);
+-}
+-module_exit(pwm_exit);
+-
+-MODULE_LICENSE("GPL");
++MODULE_DESCRIPTION("VT8500 PWM Driver");
++MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
++MODULE_LICENSE("GPL v2");
+-- 
+1.7.9.5
