@@ -1,48 +1,40 @@
-From: michael@walle.cc (Michael Walle)
-Date: Thu, 25 Oct 2012 22:19:34 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <20121025094343.58015440@skate>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <77006526a6de40ddb455b25787b08342.squirrel@ssl.serverraum.org>
- <20121025094343.58015440@skate>
-Message-ID: <201210252219.34246.michael@walle.cc>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 25 Oct 2012 22:22:48 +0200
+Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
+ include/linux/omap-iommu.h
+In-Reply-To: <20121025165643.GP11928@atomide.com>
+References: <20121025001913.2082.31062.stgit@muffinssi.local>
+ <1466344.HbU9q5zM1q@avalon> <20121025165643.GP11928@atomide.com>
+Message-ID: <1351198976.2hJjhe5gKC@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag 25 Oktober 2012, 09:43:43 schrieb Thomas Petazzoni:
-> Dear Michael Walle,
-> 
-> On Thu, 25 Oct 2012 09:39:13 +0200, Michael Walle wrote:
-> > LSXL_GPIO_USB_POWER and LSXL_GPIO_HDD_POWER switches the power on the USB
-> > and SATA connector. So they are not needed to be set before the driver
-> > probes, at least in my case here.
-> 
-> Ok.
-> 
-> > But i can imagine boards where you have to enable some kind of
-> > buffer/muxer/etc which are controlled by GPIO pins. And I don't think
-> > that should be part of the actual driver, because that would be highly
-> > board dependant.
-> 
-> You'd have to provide a more specific example so I can imagine how it
-> will be solved. But for example, if you have a GPIO-controlled muxer
-> for an I2C bus, then the I2C devices behind the muxer are described as
-> sub-devices of the muxer, so the probing order is correct.
+Hi Tony,
 
-Assume an ethernet phy which needs a valid reference clock before it can be 
-probed for example. Of course, this is pure theoretical. But should we impose 
-restrictions on when we can do the GPIO settings? Esp. since it worked before 
-(i guess).
+On Thursday 25 October 2012 09:56:44 Tony Lindgren wrote:
+> * Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121025 01:39]:
+> > I still think you should split this in two files, omap-iommu.h and omap-
+> > iovmm.h. The later would just be arch/arm/plat-omap/include/plat/iovmm.h
+> > moved to include/linux.h.
+> 
+> Can you please explain a bit more why you're thinking a separate
+> omap-iovmm.h is needed in addtion to omap-iommu.h?
 
-> Of course, I'm not pretending I have ready-to-use solutions for all
-> situations, but I think we can solve this problem on a case-by-case
-> basis.
+The IOVMM API is layered top of the IOMMU API. It's really a separate API, so 
+two header files make sense. This patch creates a hybrid omap-iommu.h header 
+with mixed definitions, it just doesn't feel right :-) I won't insist for a 
+split though, if you think it's better to have a single header we can keep it 
+that way.
 
-> Regardless of those GPIOs, did you solve the hang that happened even
-> when you removed the gpio_set_value() calls? Or is it still a problem
-> currently?
-Still a problem. Haven't really looket into i atm. Hopefully i find some time 
-this weekend.
+> My reasoning for not adding it is that neither intel nor amd needs
+> more than intel-iommu.h and amd-iommu.h. And hopefully the iommu
+> framework will eventually provide the API needed. And I'd rather
+> not be the person introducing this second new file into
+> include/linux :)
+> 
+> Joerg and Ohad, do you have any opinions on this?
 
 -- 
-michael
+Regards,
+
+Laurent Pinchart
