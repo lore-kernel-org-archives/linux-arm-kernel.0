@@ -1,52 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Oct 2012 15:49:30 +0100
-Subject: [PATCH 1/7] ARM: hw_breakpoint: only clear OS lock when
- implemented on v7
-In-Reply-To: <50887169.4060209@codeaurora.org>
-References: <1350487901-3108-1-git-send-email-will.deacon@arm.com>
- <1350487901-3108-2-git-send-email-will.deacon@arm.com>
- <50887169.4060209@codeaurora.org>
-Message-ID: <20121025144929.GI11267@mudshark.cambridge.arm.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 25 Oct 2012 16:58:39 +0200
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+Message-ID: <20121025145839.GB26929@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:53:29PM +0100, Stephen Boyd wrote:
-> On 10/17/12 08:31, Will Deacon wrote:
-> > The OS save and restore register are optional in debug architecture v7,
-> > so check the status register before attempting to clear the OS lock.
+On 10/16, Rabin Vincent wrote:
+>
+> 2012/10/15 Oleg Nesterov <oleg@redhat.com>:
+> > On 10/14, Rabin Vincent wrote:
+> >> Flush the cache so that the instructions written to the XOL area are
+> >> visible.
+> >>
+> >> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> >> ---
+> >>  kernel/events/uprobes.c |    1 +
+> >>  1 file changed, 1 insertion(+)
+> >>
+> >> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+> >> index ca000a9..8c52f93 100644
+> >> --- a/kernel/events/uprobes.c
+> >> +++ b/kernel/events/uprobes.c
+> >> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+> >>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
+> >>       vaddr = kmap_atomic(area->page);
+> >>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
+> >> +     flush_dcache_page(area->page);
+> >>       kunmap_atomic(vaddr);
 > >
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> 
-> Tested-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> > ---
-> >  arch/arm/kernel/hw_breakpoint.c |   10 +++++++++-
-> >  1 files changed, 9 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-> > index 281bf33..ec16ada 100644
-> > --- a/arch/arm/kernel/hw_breakpoint.c
-> > +++ b/arch/arm/kernel/hw_breakpoint.c
-> > @@ -929,6 +929,13 @@ static void reset_ctrl_regs(void *unused)
-> >  		asm volatile("mrc p14, 0, %0, c1, c5, 4" : "=r" (dbg_power));
-> >  		if ((dbg_power & 0x1) == 0)
-> >  			err = -EPERM;
-> > +
-> > +		/*
-> > +		 * Check whether we implement OS save and restore.
-> > +		 */
-> > +		asm volatile("mrc p14, 0, %0, c1, c1, 4" : "=r" (dbg_power));
-> 
-> minor nit for this series. dbg_power has become a catch-all variable in
-> this code. It would be nice if we named the variables used to hold the
-> read register the same as the register or if we made the name of the
-> variable generic like 'val'.
+> > I agree... but why under kmap_atomic?
+>
+> No real reason; I'll move it to after the unmap.
 
-Thanks for your feedback and tested-bys on this series Stephen, I really
-appreciate it.
+OK. I assume you will send v2.
 
-I'll send out a v2 and update the branch I'm sending to -next.
+But this patch looks like a bugfix, flush_dcache_page() is not a nop
+on powerpc. So perhaps we should apply this fix right now?
 
-Cheers,
+OTOH, I do not understand this stuff, everything is nop on x86. And
+when I look into Documentation/cachetlb.txt I am starting to think
+that may be this needs flush_icache_user_range instead?
 
-Will
+Rabin, Ananth could you clarify this?
+
+Oleg.
