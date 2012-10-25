@@ -1,30 +1,40 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 25 Oct 2012 09:55:22 +0300
-Subject: Possible regression in arm/io.h
-In-Reply-To: <20121024105223.GC23775@mudshark.cambridge.arm.com>
-References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
- <20121024105223.GC23775@mudshark.cambridge.arm.com>
-Message-ID: <1351148122.2507.63.camel@sauron.fi.intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Oct 2012 08:55:53 +0200
+Subject: [PATCH 1/3] pinctrl: mvebu: allow plat-orion architectures to use
+ pinctrl-mvebu
+In-Reply-To: <1351114738-26793-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351114738-26793-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CACRpkdZ8NK=tdSx79SkcsK01jfRazuQE0rM7uKOHsp_Rmpp-LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-24 at 11:52 +0100, Will Deacon wrote:
-> 	(a) Understand what has changed in GCC to cause this error to start
-> 	    cropping up.
+On Wed, Oct 24, 2012 at 11:38 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
 
-This is about already quite old gcc 4.6.3, which I use for about 4 last
-kernel releases already. So it is only the kernel that changed.
+> The mach-kirkwood and mach-dove architectures have not yet been
+> integrated into the mach-mvebu directory, which should ultimately
+> contain the support for all Marvell SoCs from the Engineering Business
+> Unit.
+>
+> However, before this can happen, we need to let mach-kirkwood and
+> mach-dove use the pinctrl-mvebu driver, which supports the kirkwood
+> and dove SoC families. In order to do that, we make this driver
+> available as soon as PLAT_ORION is selected, instead of using
+> ARCH_MVEBU as a condition. In the long term, PLAT_ORION should
+> disappear and be fully replaced by ARCH_MVEBU, but the plan is to make
+> the migration step by step, by first having the existing mach-*
+> directories for Marvell SoCs converge on several infrastructures,
+> including the pinctrl one.
+>
+> Also, like the spear pinctrl driver, we put all pinctrl-mvebu Kconfig
+> options under a if, in order to avoid having certain options
+> (PINCTRL_DOVE, PINCTRL_KIRKWOOD, etc.) selecting an option
+> (PINCTLR_MVEBU) which itself has a dependency (on ARCH_MVEBU). In this
+> a construct, the dependency is in fact ignored due to the selects.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-You can download the GCC I used from here:
-http://kernel.org/pub/tools/crosstool/
+OK makes sense, patch applied.
 
--- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/15484097/attachment.sig>
+Yours,
+Linus Walleij
