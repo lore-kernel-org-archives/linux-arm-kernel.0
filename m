@@ -1,75 +1,48 @@
-From: nbowler@elliptictech.com (Nick Bowler)
-Date: Thu, 25 Oct 2012 16:17:01 -0400
-Subject: [PATCH v4 5/5] zynq: move static peripheral mappings
-In-Reply-To: <20121024200451.GF6713@beefymiracle.amer.corp.natinst.com>
-References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
- <20121024200451.GF6713@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121025201701.GA18217@elliptictech.com>
+From: michael@walle.cc (Michael Walle)
+Date: Thu, 25 Oct 2012 22:19:34 +0200
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <20121025094343.58015440@skate>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <77006526a6de40ddb455b25787b08342.squirrel@ssl.serverraum.org>
+ <20121025094343.58015440@skate>
+Message-ID: <201210252219.34246.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
+Am Donnerstag 25 Oktober 2012, 09:43:43 schrieb Thomas Petazzoni:
+> Dear Michael Walle,
+> 
+> On Thu, 25 Oct 2012 09:39:13 +0200, Michael Walle wrote:
+> > LSXL_GPIO_USB_POWER and LSXL_GPIO_HDD_POWER switches the power on the USB
+> > and SATA connector. So they are not needed to be set before the driver
+> > probes, at least in my case here.
+> 
+> Ok.
+> 
+> > But i can imagine boards where you have to enable some kind of
+> > buffer/muxer/etc which are controlled by GPIO pins. And I don't think
+> > that should be part of the actual driver, because that would be highly
+> > board dependant.
+> 
+> You'd have to provide a more specific example so I can imagine how it
+> will be solved. But for example, if you have a GPIO-controlled muxer
+> for an I2C bus, then the I2C devices behind the muxer are described as
+> sub-devices of the muxer, so the probing order is correct.
 
-On 2012-10-24 15:04 -0500, Josh Cartwright wrote:
-> Shifting them up into the vmalloc region prevents the following warning,
-> when booting a zynq qemu target with more than 512mb of RAM:
-[...]
-> -/* For now, all mappings are flat (physical = virtual)
-> +/* Static peripheral mappings are mapped at the top of the
-> + * vmalloc region
->   */
-> -#define UART0_PHYS			0xE0000000
-> -#define UART0_VIRT			UART0_PHYS
-> +#define UART0_PHYS		0xE0000000
-> +#define UART0_SIZE		SZ_4K
-> +#define UART0_VIRT		(VMALLOC_END - UART0_SIZE)
+Assume an ethernet phy which needs a valid reference clock before it can be 
+probed for example. Of course, this is pure theoretical. But should we impose 
+restrictions on when we can do the GPIO settings? Esp. since it worked before 
+(i guess).
 
-Did you test this on any real hardware?  I can't get the ZC702 to work
-with the UART mapped at this address (this ends up being mapped at
-0xFEFFF000), although I can't for the life of me figure out why the
-virtual address even matters.  Note that for the ZC702, the physical
-address of the "main" UART is 0xE0001000.
+> Of course, I'm not pretending I have ready-to-use solutions for all
+> situations, but I think we can solve this problem on a case-by-case
+> basis.
 
-All I end up seeing is "Uncompressing Linux... done, booting the
-kernel." with no further messages.  With the UART mapped at
-0xF0001000, all printouts make it to the console.  I tried a couple
-different virtual addresses and I'm surprised at the results, since
-the behaviour seems to vary wildly.  I saw three behaviours depending
-only on the virtual address of the static mapping; all results are 100%
-reproducible:
+> Regardless of those GPIOs, did you solve the hang that happened even
+> when you removed the gpio_set_value() calls? Or is it still a problem
+> currently?
+Still a problem. Haven't really looket into i atm. Hopefully i find some time 
+this weekend.
 
-   "Works":     all printouts make it to the console
-   "Fails":     no printouts make it to the console after decompression
-   "Truncated": the first few lines of output do not make it to the
-                console, but after that it "Works".  The first line
-		successfully printed is always
-		  "Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 260096"
-
-And here are the addresses I tested:
-
-  Address       Result
-  -----------------------
-  0xf0000000    Truncated
-  0xf0001000    Works
-  0xf0007000    Truncated
-  0xf0008000    Fails
-  0xf0009000    Fails
-  0xf000e000    Truncated
-  0xf000f000    Fails
-  0xf8000000    Truncated
-  0xf8001000    Works
-  0xfef00000    Truncated
-  0xfef01000    Works
-  0xfef08000    Fails
-  0xfef0f000    Fails
-  0xfeff0000    Fails
-  0xfeff1000    Fails
-  0xfeffe000    Fails
-  0xfefff000    Fails
-
-Judging by the list, the console seems to only work properly if the
-defined virtual address is Fxxx1000 and xxx is not too big...
-
-Confused,
 -- 
-Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
+michael
