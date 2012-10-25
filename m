@@ -1,60 +1,56 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Thu, 25 Oct 2012 09:51:41 +0530
-Subject: [PATCH 3/3] dmaengine: sirf: enable the driver support new
- SiRFmarco SoC
-In-Reply-To: <CAGsJ_4yY6YYKb+g4k7BcL_SyyBN9xYCwxRLX6rN5_afroK0e_g@mail.gmail.com>
-References: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
- <1351076581.5263.56.camel@vkoul-udesk3>
- <CAGsJ_4yY6YYKb+g4k7BcL_SyyBN9xYCwxRLX6rN5_afroK0e_g@mail.gmail.com>
-Message-ID: <1351138901.5263.70.camel@vkoul-udesk3>
+From: gerg@snapgear.com (gerg at snapgear.com)
+Date: Thu, 25 Oct 2012 15:19:34 +1000
+Subject: [PATCH v2] ARM: add back in KS8695 based SnapGear board entries
+Message-ID: <1351142374-15435-1-git-send-email-gerg@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-24 at 19:59 +0800, Barry Song wrote:
-> Hi Vinod,
-> Thanks a lot!
-Please dont top post.
-> 
-> 2012/10/24 Vinod Koul <vkoul@infradead.org>
-> >
-> > On Thu, 2012-09-27 at 16:36 +0800, Barry Song wrote:
-> > > From: Barry Song <Baohua.Song@csr.com>
-> > >
-> > > The driver supports old up SiRFprimaII SoCs, this patch makes it support
-> > > the new SiRFmarco as well.
-> > > SiRFmarco, as a SMP SoC, adds new DMA_INT_EN_CLR and DMA_CH_LOOP_CTRL_CLR
-> > > registers, to disable IRQ/Channel, we should write 1 to the corresponding
-> > > bit in the two CLEAR register.
-> > >
-> > > Tested on SiRFmarco using SPI driver:
-> > >     $ /mnt/spidev-sirftest -D /dev/spidev32766.0
-> > >     spi mode: 0
-> > >     bits per word: 8
-> > >     max speed: 500000 Hz (500 KHz)
-> > >
-> > >     00 00 00 00 00 00
-> > >     00 00 00 00 00 00
-> > >     00 00 00 00 00 00
-> > >     00 00 00 00 00 00
-> > >     00 00 00 00 00 00
-> > >     00 00 00 00 00 00
-> > >     00 00 00 00
-> > >
-> > >     $ cat /proc/interrupts
-> > >                CPU0       CPU1
-> > >      32:       1593          0       GIC  sirfsoc_timer0
-> > >      33:          0       3533       GIC  sirfsoc_timer1
-> > >      44:          0          0       GIC  sirfsoc_dma
-> > >      45:         16          0       GIC  sirfsoc_dma
-> > >      47:          6          0       GIC  sirfsoc_spi
-> > >      50:       5654          0       GIC  sirfsoc-uart
-> > >      ...
-> > >
-> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> > > ---
-I tried applying this and it failed for me. Can you please respin this
-on my next and send again.
- 
+From: Greg Ungerer <gerg@uclinux.org>
+
+As of linux-3.7-rc1 configuring to build for the Micrel KS8695 based
+SnapGear board types will result in a build failure:
+
+  CC      arch/arm/mach-ks8695/board-sg.o
+arch/arm/mach-ks8695/board-sg.c:88: error: ?MACH_TYPE_LITE300? undeclared here (not in a function)
+arch/arm/mach-ks8695/board-sg.c:100: error: ?MACH_TYPE_SG310? undeclared here (not in a function)
+arch/arm/mach-ks8695/board-sg.c:112: error: ?MACH_TYPE_SE4200? undeclared here (not in a function)
+
+Add the removed SnapGear board IDs back into the mach-types file.
+
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+---
+v2: update commit log to reflect actual compile error now
+
+ arch/arm/tools/mach-types |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 831e1fd..df1aefb 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -95,6 +95,7 @@ lpd7a400		MACH_LPD7A400		LPD7A400		389
+ lpd7a404		MACH_LPD7A404		LPD7A404		390
+ csb337			MACH_CSB337		CSB337			399
+ mainstone		MACH_MAINSTONE		MAINSTONE		406
++lite300			MACH_LITE300		LITE300			408
+ xcep			MACH_XCEP		XCEP			413
+ arcom_vulcan		MACH_ARCOM_VULCAN	ARCOM_VULCAN		414
+ nomadik			MACH_NOMADIK		NOMADIK			420
+@@ -160,6 +161,7 @@ trizeps4		MACH_TRIZEPS4		TRIZEPS4		776
+ cpuat91			MACH_CPUAT91		CPUAT91			787
+ iq81340sc		MACH_IQ81340SC		IQ81340SC		799
+ iq81340mc		MACH_IQ81340MC		IQ81340MC		801
++se4200			MACH_SE4200		SE4200			809
+ micro9			MACH_MICRO9		MICRO9			811
+ micro9l			MACH_MICRO9L		MICRO9L			812
+ omap_palmte		MACH_OMAP_PALMTE	OMAP_PALMTE		817
+@@ -268,6 +270,7 @@ dns323			MACH_DNS323		DNS323			1542
+ omap3_beagle		MACH_OMAP3_BEAGLE	OMAP3_BEAGLE		1546
+ nokia_n810		MACH_NOKIA_N810		NOKIA_N810		1548
+ pcm038			MACH_PCM038		PCM038			1551
++sg310			MACH_SG310		SG310			1564
+ ts209			MACH_TS209		TS209			1565
+ at91cap9adk		MACH_AT91CAP9ADK	AT91CAP9ADK		1566
+ mx31moboard		MACH_MX31MOBOARD	MX31MOBOARD		1574
 -- 
-Vinod Koul
-Intel Corp.
+1.7.0.4
