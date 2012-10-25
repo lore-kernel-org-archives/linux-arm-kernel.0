@@ -1,40 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 08:55:53 +0200
-Subject: [PATCH 1/3] pinctrl: mvebu: allow plat-orion architectures to use
- pinctrl-mvebu
-In-Reply-To: <1351114738-26793-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351114738-26793-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdZ8NK=tdSx79SkcsK01jfRazuQE0rM7uKOHsp_Rmpp-LQ@mail.gmail.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Thu, 25 Oct 2012 11:37:52 +0530
+Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
+In-Reply-To: <5088D336.7040206@freescale.com>
+References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
+ <1351074456-25863-3-git-send-email-b32955@freescale.com>
+ <1351138689.5263.68.camel@vkoul-udesk3>  <5088D336.7040206@freescale.com>
+Message-ID: <1351145272.7077.8.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:38 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
+On Thu, 2012-10-25 at 13:50 +0800, Huang Shijie wrote:
+> ? 2012?10?25? 12:18, Vinod Koul ??:
+> >
+> >> +
+> >> +static int mxs_auart_dma_tx(struct mxs_auart_port *s, int size)
+> >> +{
+> >> +	struct dma_async_tx_descriptor *desc;
+> >> +	struct scatterlist *sgl =&s->tx_sgl;
+> >> +	struct dma_chan *channel = s->tx_dma_chan;
+> >> +	u32 pio;
+> >> +
+> >> +	/* [1] : send PIO. Note, the first pio word is CTRL1. */
+> >> +	pio = AUART_CTRL1_XFER_COUNT(size);
+> >> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)&pio,
+> >> +					1, DMA_TRANS_NONE, 0);
+> > this seems like a hack. API expects a scatterlist as argument.
+> > Same thing about direction, NONE doesnt mean anything for dma transfer.
+> It's not a hack. this DMA descriptor is used to set the registers.
+> Please see the code in drivers/dma/mxs-dma.c:mxs_dam_prep_slave_sg().
+yes it is, and also an abuse of the api.
+prep_slave_sg() expects a scatter list and you are passing something
+else and using DMA_TRANS_NONE to do that, which makes no sense!!!
 
-> The mach-kirkwood and mach-dove architectures have not yet been
-> integrated into the mach-mvebu directory, which should ultimately
-> contain the support for all Marvell SoCs from the Engineering Business
-> Unit.
->
-> However, before this can happen, we need to let mach-kirkwood and
-> mach-dove use the pinctrl-mvebu driver, which supports the kirkwood
-> and dove SoC families. In order to do that, we make this driver
-> available as soon as PLAT_ORION is selected, instead of using
-> ARCH_MVEBU as a condition. In the long term, PLAT_ORION should
-> disappear and be fully replaced by ARCH_MVEBU, but the plan is to make
-> the migration step by step, by first having the existing mach-*
-> directories for Marvell SoCs converge on several infrastructures,
-> including the pinctrl one.
->
-> Also, like the spear pinctrl driver, we put all pinctrl-mvebu Kconfig
-> options under a if, in order to avoid having certain options
-> (PINCTRL_DOVE, PINCTRL_KIRKWOOD, etc.) selecting an option
-> (PINCTLR_MVEBU) which itself has a dependency (on ARCH_MVEBU). In this
-> a construct, the dependency is in fact ignored due to the selects.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+If you have to setup your registers you need to setup based on what APIs
+passed you and not by abusing.
 
-OK makes sense, patch applied.
+> >> +	if (!desc) {
+> >> +		dev_err(s->dev, "step 1 error\n");
+> >> +		return -EINVAL;
+> >> +	}
+> >> +
+> >> +	/* [2] : set DMA buffer. */
+> >> +	sg_init_one(sgl, s->tx_dma_buf, size);
+> >> +	dma_map_sg(s->dev, sgl, 1, DMA_TO_DEVICE);
+> >> +	desc = dmaengine_prep_slave_sg(channel, sgl,
+> >> +			1, DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+> >> +	if (!desc) {
+> >> +		dev_err(s->dev, "step 2 error\n");
+> >> +		return -EINVAL;
+> >> +	}
+> >> +
+> >> +	/* [3] : submit the DMA */
+> >> +	desc->callback = dma_tx_callback;
+> >> +	desc->callback_param = s;
+> >> +	dmaengine_submit(desc);
+> >> +	dma_async_issue_pending(channel);
+> >> +	return 0;
+> >> +}
+> >> +
+> >>
+> >> +static bool mxs_auart_dma_filter(struct dma_chan *chan, void *param)
+> >> +{
+> >> +	struct mxs_auart_port *s = param;
+> >> +
+> >> +	if (!mxs_dma_is_apbx(chan))
+> >> +		return false;
+> >> +
+> >> +	if (s->dma_channel == chan->chan_id) {
+> >> +		chan->private =&s->dma_data;
+> > dont use chan->private. You need to dmaengine_slave_config API
+> please see the drivers/dma/mxs-dma.c:mxs_dam_alloc_chan_resoures().
+> 
+> The mxs-dma driver uses ->private to store the channel interrupt number.
+And which it should not be doing. private is not supposed to be used for
+passing info. If it is generic add to slave config.
 
-Yours,
-Linus Walleij
+-- 
+Vinod Koul
+Intel Corp.
