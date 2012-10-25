@@ -1,745 +1,514 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 17:21:13 -0600
-Subject: [PATCH 01/13] ARM: OMAP2+: common: remove mach-omap2/common.c and
- map_common_io code
+Date: Thu, 25 Oct 2012 17:21:20 -0600
+Subject: [PATCH 10/13] ARM: OMAP2+: PRCM: split and relocate the PRM/CM
+ globals setup
 In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
 References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <20121025232111.17558.10543.stgit@dusk.lan>
+Message-ID: <20121025232119.17558.41615.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of mach-omap2/common.c by moving the global initialization for
-IP block addresses that must occur early into mach-omap2/io.c.  In the
-process, remove the *_map_common_io*() and SoC-specific *set_globals*
-functions.
+Split omap2_set_globals_prcm() into PRM, CM, and PRCM_MPU variants, since
+these are all separate IP blocks.  This should make it easier to move the
+PRM, CM, PRCM_MPU code into drivers/ in future patchsets.
+
+At this point arch/arm/plat-omap/include/plat/prcm.h is empty; a
+subsequent patch will remove it, and remove the #include from all the
+files that #include it.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/Makefile           |    2 
- arch/arm/mach-omap2/am33xx.h           |    1 
- arch/arm/mach-omap2/common.c           |  202 --------------------------------
- arch/arm/mach-omap2/common.h           |  104 ++--------------
- arch/arm/mach-omap2/control.c          |   10 +-
- arch/arm/mach-omap2/control.h          |    2 
- arch/arm/mach-omap2/id.c               |    7 +
- arch/arm/mach-omap2/io.c               |   78 ++++++++++--
- arch/arm/mach-omap2/omap4-common.c     |    1 
- arch/arm/mach-omap2/prcm.c             |   15 +-
- arch/arm/mach-omap2/sdrc.c             |    8 -
- arch/arm/mach-omap2/sdrc.h             |    3 
- arch/arm/mach-omap2/ti81xx.h           |    9 +
- arch/arm/plat-omap/include/plat/prcm.h |    5 +
- 14 files changed, 115 insertions(+), 332 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/common.c
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |    2 +
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    2 +
+ arch/arm/mach-omap2/cm.h                     |    8 ++++
+ arch/arm/mach-omap2/cm2xxx_3xxx.h            |    2 +
+ arch/arm/mach-omap2/cm_common.c              |   22 +++++++++++
+ arch/arm/mach-omap2/cminst44xx.h             |    2 +
+ arch/arm/mach-omap2/io.c                     |   51 ++++++++++++++------------
+ arch/arm/mach-omap2/mcbsp.c                  |    2 +
+ arch/arm/mach-omap2/omap4-common.c           |    1 +
+ arch/arm/mach-omap2/prcm-common.h            |   16 --------
+ arch/arm/mach-omap2/prcm.c                   |   19 ----------
+ arch/arm/mach-omap2/prcm_mpu44xx.c           |   17 +++++++++
+ arch/arm/mach-omap2/prcm_mpu44xx.h           |    9 ++++-
+ arch/arm/mach-omap2/prm.h                    |    7 +++-
+ arch/arm/mach-omap2/prm_common.c             |   15 ++++++++
+ arch/arm/mach-omap2/prminst44xx.h            |    2 +
+ arch/arm/plat-omap/include/plat/prcm.h       |    6 +--
+ 17 files changed, 111 insertions(+), 72 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index f7cf382..7a628e7 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -4,7 +4,7 @@
- 
- # Common support
- obj-y := id.o io.o control.o mux.o devices.o serial.o gpmc.o timer.o pm.o \
--	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o
-+	 gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o
- 
- omap-2-3-common				= irq.o
- hwmod-common				= omap_hwmod.o \
-diff --git a/arch/arm/mach-omap2/am33xx.h b/arch/arm/mach-omap2/am33xx.h
-index 06c19bb..43296c1 100644
---- a/arch/arm/mach-omap2/am33xx.h
-+++ b/arch/arm/mach-omap2/am33xx.h
-@@ -21,5 +21,6 @@
- #define AM33XX_SCM_BASE		0x44E10000
- #define AM33XX_CTRL_BASE	AM33XX_SCM_BASE
- #define AM33XX_PRCM_BASE	0x44E00000
-+#define AM33XX_TAP_BASE		(AM33XX_CTRL_BASE + 0x3FC)
- 
- #endif /* __ASM_ARCH_AM33XX_H */
-diff --git a/arch/arm/mach-omap2/common.c b/arch/arm/mach-omap2/common.c
-deleted file mode 100644
-index 17950c6..0000000
---- a/arch/arm/mach-omap2/common.c
-+++ /dev/null
-@@ -1,202 +0,0 @@
--/*
-- * linux/arch/arm/mach-omap2/common.c
-- *
-- * Code common to all OMAP2+ machines.
-- *
-- * Copyright (C) 2009 Texas Instruments
-- * Copyright (C) 2010 Nokia Corporation
-- * Tony Lindgren <tony@atomide.com>
-- * Added OMAP4 support - Santosh Shilimkar <santosh.shilimkar@ti.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/clk.h>
--#include <linux/io.h>
--
--#include <plat/clock.h>
--
--#include "soc.h"
--#include "iomap.h"
--#include "common.h"
--#include "sdrc.h"
--#include "control.h"
--
--/* Global address base setup code */
--
--static void __init __omap2_set_globals(struct omap_globals *omap2_globals)
--{
--	omap2_set_globals_tap(omap2_globals);
--	omap2_set_globals_sdrc(omap2_globals);
--	omap2_set_globals_control(omap2_globals);
--	omap2_set_globals_prcm(omap2_globals);
--}
--
--#if defined(CONFIG_SOC_OMAP2420)
--
--static struct omap_globals omap242x_globals = {
--	.class	= OMAP242X_CLASS,
--	.tap	= OMAP2_L4_IO_ADDRESS(0x48014000),
--	.sdrc	= OMAP2_L3_IO_ADDRESS(OMAP2420_SDRC_BASE),
--	.sms	= OMAP2_L3_IO_ADDRESS(OMAP2420_SMS_BASE),
--	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE),
--	.prm	= OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE),
--	.cm	= OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE),
--};
--
--void __init omap2_set_globals_242x(void)
--{
--	__omap2_set_globals(&omap242x_globals);
--}
--
--void __init omap242x_map_io(void)
--{
--	omap242x_map_common_io();
--}
--#endif
--
--#if defined(CONFIG_SOC_OMAP2430)
--
--static struct omap_globals omap243x_globals = {
--	.class	= OMAP243X_CLASS,
--	.tap	= OMAP2_L4_IO_ADDRESS(0x4900a000),
--	.sdrc	= OMAP2_L3_IO_ADDRESS(OMAP243X_SDRC_BASE),
--	.sms	= OMAP2_L3_IO_ADDRESS(OMAP243X_SMS_BASE),
--	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE),
--	.prm	= OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE),
--	.cm	= OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE),
--};
--
--void __init omap2_set_globals_243x(void)
--{
--	__omap2_set_globals(&omap243x_globals);
--}
--
--void __init omap243x_map_io(void)
--{
--	omap243x_map_common_io();
--}
--#endif
--
--#if defined(CONFIG_ARCH_OMAP3)
--
--static struct omap_globals omap3_globals = {
--	.class	= OMAP343X_CLASS,
--	.tap	= OMAP2_L4_IO_ADDRESS(0x4830A000),
--	.sdrc	= OMAP2_L3_IO_ADDRESS(OMAP343X_SDRC_BASE),
--	.sms	= OMAP2_L3_IO_ADDRESS(OMAP343X_SMS_BASE),
--	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE),
--	.prm	= OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE),
--	.cm	= OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
--};
--
--void __init omap2_set_globals_3xxx(void)
--{
--	__omap2_set_globals(&omap3_globals);
--}
--
--void __init omap3_map_io(void)
--{
--	omap34xx_map_common_io();
--}
--
--/*
-- * Adjust TAP register base such that omap3_check_revision accesses the correct
-- * TI81XX register for checking device ID (it adds 0x204 to tap base while
-- * TI81XX DEVICE ID register is at offset 0x600 from control base).
-- */
--#define TI81XX_TAP_BASE		(TI81XX_CTRL_BASE + \
--				TI81XX_CONTROL_DEVICE_ID - 0x204)
--
--static struct omap_globals ti81xx_globals = {
--	.class  = OMAP343X_CLASS,
--	.tap    = OMAP2_L4_IO_ADDRESS(TI81XX_TAP_BASE),
--	.ctrl   = OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
--	.prm    = OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
--	.cm     = OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
--};
--
--void __init omap2_set_globals_ti81xx(void)
--{
--	__omap2_set_globals(&ti81xx_globals);
--}
--
--void __init ti81xx_map_io(void)
--{
--	omapti81xx_map_common_io();
--}
--#endif
--
--#if defined(CONFIG_SOC_AM33XX)
--#define AM33XX_TAP_BASE		(AM33XX_CTRL_BASE + \
--				TI81XX_CONTROL_DEVICE_ID - 0x204)
--
--static struct omap_globals am33xx_globals = {
--	.class  = AM335X_CLASS,
--	.tap    = AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE),
--	.ctrl   = AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
--	.prm    = AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
--	.cm     = AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
--};
--
--void __init omap2_set_globals_am33xx(void)
--{
--	__omap2_set_globals(&am33xx_globals);
--}
--
--void __init am33xx_map_io(void)
--{
--	omapam33xx_map_common_io();
--}
--#endif
--
--#if defined(CONFIG_ARCH_OMAP4)
--static struct omap_globals omap4_globals = {
--	.class	= OMAP443X_CLASS,
--	.tap	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
--	.ctrl_pad	= OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE),
--	.prm	= OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
--	.cm	= OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
--	.cm2	= OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE),
--	.prcm_mpu	= OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE),
--};
--
--void __init omap2_set_globals_443x(void)
--{
--	__omap2_set_globals(&omap4_globals);
--}
--
--void __init omap4_map_io(void)
--{
--	omap44xx_map_common_io();
--}
--#endif
--
--#if defined(CONFIG_SOC_OMAP5)
--static struct omap_globals omap5_globals = {
--	.class	= OMAP54XX_CLASS,
--	.tap	= OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--	.ctrl	= OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
--	.ctrl_pad	= OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE),
--	.prm	= OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
--	.cm	= OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
--	.cm2	= OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
--	.prcm_mpu = OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE),
--};
--
--void __init omap2_set_globals_5xxx(void)
--{
--	omap2_set_globals_tap(&omap5_globals);
--	omap2_set_globals_control(&omap5_globals);
--	omap2_set_globals_prcm(&omap5_globals);
--}
--
--void __init omap5_map_io(void)
--{
--	omap5_map_common_io();
--}
--#endif
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 7045e4d..320f0d7 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -38,54 +38,6 @@
- 
- #define OMAP_INTC_START		NR_IRQS
- 
--#ifdef CONFIG_SOC_OMAP2420
--extern void omap242x_map_common_io(void);
--#else
--static inline void omap242x_map_common_io(void)
--{
--}
--#endif
--
--#ifdef CONFIG_SOC_OMAP2430
--extern void omap243x_map_common_io(void);
--#else
--static inline void omap243x_map_common_io(void)
--{
--}
--#endif
--
--#ifdef CONFIG_ARCH_OMAP3
--extern void omap34xx_map_common_io(void);
--#else
--static inline void omap34xx_map_common_io(void)
--{
--}
--#endif
--
--#ifdef CONFIG_SOC_TI81XX
--extern void omapti81xx_map_common_io(void);
--#else
--static inline void omapti81xx_map_common_io(void)
--{
--}
--#endif
--
--#ifdef CONFIG_SOC_AM33XX
--extern void omapam33xx_map_common_io(void);
--#else
--static inline void omapam33xx_map_common_io(void)
--{
--}
--#endif
--
--#ifdef CONFIG_ARCH_OMAP4
--extern void omap44xx_map_common_io(void);
--#else
--static inline void omap44xx_map_common_io(void)
--{
--}
--#endif
--
- #if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP2)
- int omap2_pm_init(void);
- #else
-@@ -164,50 +116,18 @@ void omap4430_init_late(void);
- int omap2_common_pm_late_init(void);
- void omap_prcm_restart(char, const char *);
- 
--/*
-- * IO bases for various OMAP processors
-- * Except the tap base, rest all the io bases
-- * listed are physical addresses.
-- */
--struct omap_globals {
--	u32		class;		/* OMAP class to detect */
--	void __iomem	*tap;		/* Control module ID code */
--	void __iomem	*sdrc;           /* SDRAM Controller */
--	void __iomem	*sms;            /* SDRAM Memory Scheduler */
--	void __iomem	*ctrl;           /* System Control Module */
--	void __iomem	*ctrl_pad;	/* PAD Control Module */
--	void __iomem	*prm;            /* Power and Reset Management */
--	void __iomem	*cm;             /* Clock Management */
--	void __iomem	*cm2;
--	void __iomem	*prcm_mpu;
--};
--
--void omap2_set_globals_242x(void);
--void omap2_set_globals_243x(void);
--void omap2_set_globals_3xxx(void);
--void omap2_set_globals_443x(void);
--void omap2_set_globals_5xxx(void);
--void omap2_set_globals_ti81xx(void);
--void omap2_set_globals_am33xx(void);
--
--/* These get called from omap2_set_globals_xxxx(), do not call these */
--void omap2_set_globals_tap(struct omap_globals *);
--#if defined(CONFIG_SOC_HAS_OMAP2_SDRC)
--void omap2_set_globals_sdrc(struct omap_globals *);
--#else
--static inline void omap2_set_globals_sdrc(struct omap_globals *omap2_globals)
--{ }
--#endif
--void omap2_set_globals_control(struct omap_globals *);
--void omap2_set_globals_prcm(struct omap_globals *);
--
--void omap242x_map_io(void);
--void omap243x_map_io(void);
--void omap3_map_io(void);
--void am33xx_map_io(void);
--void omap4_map_io(void);
--void omap5_map_io(void);
--void ti81xx_map_io(void);
-+/* This gets called from mach-omap2/io.c, do not call this */
-+void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
-+
-+void __init omap242x_map_io(void);
-+void __init omap243x_map_io(void);
-+void __init omap3_map_io(void);
-+void __init am33xx_map_io(void);
-+void __init omap4_map_io(void);
-+void __init omap5_map_io(void);
-+void __init ti81xx_map_io(void);
-+
-+/* omap_barriers_init() is OMAP4 only */
- void omap_barriers_init(void);
- 
- /**
-diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-index a7d1eb8..ef0a044 100644
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -149,13 +149,11 @@ static struct omap3_control_regs control_context;
- #define OMAP_CTRL_REGADDR(reg)		(omap2_ctrl_base + (reg))
- #define OMAP4_CTRL_PAD_REGADDR(reg)	(omap4_ctrl_pad_base + (reg))
- 
--void __init omap2_set_globals_control(struct omap_globals *omap2_globals)
-+void __init omap2_set_globals_control(void __iomem *ctrl,
-+				      void __iomem *ctrl_pad)
- {
--	if (omap2_globals->ctrl)
--		omap2_ctrl_base = omap2_globals->ctrl;
--
--	if (omap2_globals->ctrl_pad)
--		omap4_ctrl_pad_base = omap2_globals->ctrl_pad;
-+	omap2_ctrl_base = ctrl;
-+	omap4_ctrl_pad_base = ctrl_pad;
- }
- 
- void __iomem *omap_ctrl_base_get(void)
-diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
-index a89e825..4ca8747 100644
---- a/arch/arm/mach-omap2/control.h
-+++ b/arch/arm/mach-omap2/control.h
-@@ -414,6 +414,8 @@ extern void omap_ctrl_write_dsp_boot_addr(u32 bootaddr);
- extern void omap_ctrl_write_dsp_boot_mode(u8 bootmode);
- extern void omap3630_ctrl_disable_rta(void);
- extern int omap3_ctrl_save_padconf(void);
-+extern void omap2_set_globals_control(void __iomem *ctrl,
-+				      void __iomem *ctrl_pad);
- #else
- #define omap_ctrl_base_get()		0
- #define omap_ctrl_readb(x)		0
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index cf2362c..f1e1215 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -559,11 +559,12 @@ void __init omap5xxx_check_revision(void)
-  * detect the exact revision later on in omap2_detect_revision() once map_io
-  * is done.
-  */
--void __init omap2_set_globals_tap(struct omap_globals *omap2_globals)
-+void __init omap2_set_globals_tap(u32 class, void __iomem *tap)
- {
--	omap_revision = omap2_globals->class;
--	tap_base = omap2_globals->tap;
-+	omap_revision = class;
-+	tap_base = tap;
- 
-+	/* XXX What is this intended to do? */
- 	if (cpu_is_omap34xx())
- 		tap_prod_id = 0x0210;
- 	else
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 4234d28..b853401 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -32,6 +32,7 @@
- #include <plat/omap_hwmod.h>
- #include <plat/multi.h>
- #include <plat/dma.h>
-+#include <plat/prcm.h>
- 
- #include "soc.h"
- #include "iomap.h"
-@@ -43,6 +44,8 @@
+diff --git a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+index 38a06d9..53d45bc 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
++++ b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
+@@ -32,7 +32,7 @@
+ #include "clock.h"
  #include "clock2xxx.h"
- #include "clock3xxx.h"
- #include "clock44xx.h"
-+#include "sdrc.h"
-+#include "control.h"
+ #include "opp2xxx.h"
+-#include "cm2xxx_3xxx.h"
++#include "cm2xxx.h"
+ #include "cm-regbits-24xx.h"
+ 
+ /* #define DOWN_VARIABLE_DPLL 1 */		/* Experimental */
+diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+index f9c71f3..18ef044 100644
+--- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
++++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
+@@ -41,7 +41,7 @@
+ #include "clock.h"
+ #include "clock2xxx.h"
+ #include "opp2xxx.h"
+-#include "cm2xxx_3xxx.h"
++#include "cm2xxx.h"
+ #include "cm-regbits-24xx.h"
+ 
+ const struct prcm_config *curr_prcm_set;
+diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
+index e419ecb..93473f9 100644
+--- a/arch/arm/mach-omap2/cm.h
++++ b/arch/arm/mach-omap2/cm.h
+@@ -1,7 +1,7 @@
+ /*
+  * OMAP2+ Clock Management prototypes
+  *
+- * Copyright (C) 2007-2009 Texas Instruments, Inc.
++ * Copyright (C) 2007-2009, 2012 Texas Instruments, Inc.
+  * Copyright (C) 2007-2009 Nokia Corporation
+  *
+  * Written by Paul Walmsley
+@@ -22,6 +22,12 @@
+  */
+ #define MAX_MODULE_READY_TIME		2000
+ 
++# ifndef __ASSEMBLER__
++extern void __iomem *cm_base;
++extern void __iomem *cm2_base;
++extern void omap2_set_globals_cm(void __iomem *cm, void __iomem *cm2);
++# endif
++
+ /*
+  * MAX_MODULE_DISABLE_TIME: max duration in microseconds to wait for
+  * the PRCM to request that a module enter the inactive state in the
+diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
+index f74a5d1..98e6b3c 100644
+--- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
+@@ -16,7 +16,7 @@
+ #ifndef __ARCH_ASM_MACH_OMAP2_CM2XXX_3XXX_H
+ #define __ARCH_ASM_MACH_OMAP2_CM2XXX_3XXX_H
+ 
+-#include "prcm-common.h"
++#include "cm.h"
  
  /*
+  * Module specific CM register offsets from CM_BASE + domain offset
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index 561969b..0bab493 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -2,7 +2,7 @@
+  * OMAP2+ common Clock Management (CM) IP block functions
+  *
+  * Copyright (C) 2012 Texas Instruments, Inc.
+- * Paul Walmsley <paul@pwsan.com>
++ * Paul Walmsley
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -17,6 +17,7 @@
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
+ #include "cm44xx.h"
++#include "common.h"
+ 
+ /*
+  * cm_ll_data: function pointers to SoC-specific implementations of
+@@ -25,6 +26,25 @@
+ static struct cm_ll_data null_cm_ll_data;
+ static struct cm_ll_data *cm_ll_data = &null_cm_ll_data;
+ 
++/* cm_base: base virtual address of the CM IP block */
++void __iomem *cm_base;
++
++/* cm2_base: base virtual address of the CM2 IP block (OMAP44xx only) */
++void __iomem *cm2_base;
++
++/**
++ * omap2_set_globals_cm - set the CM/CM2 base addresses (for early use)
++ * @cm: CM base virtual address
++ * @cm2: CM2 base virtual address (if present on the booted SoC)
++ *
++ * XXX Will be replaced when the PRM/CM drivers are completed.
++ */
++void __init omap2_set_globals_cm(void __iomem *cm, void __iomem *cm2)
++{
++	cm_base = cm;
++	cm2_base = cm2;
++}
++
+ /**
+  * cm_split_idlest_reg - split CM_IDLEST reg addr into its components
+  * @idlest_reg: CM_IDLEST* virtual address
+diff --git a/arch/arm/mach-omap2/cminst44xx.h b/arch/arm/mach-omap2/cminst44xx.h
+index d69fdef..bd7bab8 100644
+--- a/arch/arm/mach-omap2/cminst44xx.h
++++ b/arch/arm/mach-omap2/cminst44xx.h
+@@ -38,4 +38,6 @@ extern u32 omap4_cminst_clear_inst_reg_bits(u32 bits, u8 part, s16 inst,
+ extern u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx,
+ 					   u32 mask);
+ 
++extern void omap_cm_base_init(void);
++
+ #endif
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index a52d399..8573e6c 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -48,7 +48,11 @@
+ #include "control.h"
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
+-
++#include "prm.h"
++#include "cm.h"
++#include "prcm_mpu44xx.h"
++#include "prminst44xx.h"
++#include "cminst44xx.h"
+ /*
   * The machine specific code may provide the extra mapping besides the
-@@ -265,7 +268,7 @@ static struct map_desc omap54xx_io_desc[] __initdata = {
- #endif
- 
- #ifdef CONFIG_SOC_OMAP2420
--void __init omap242x_map_common_io(void)
-+void __init omap242x_map_io(void)
- {
- 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
- 	iotable_init(omap242x_io_desc, ARRAY_SIZE(omap242x_io_desc));
-@@ -273,7 +276,7 @@ void __init omap242x_map_common_io(void)
- #endif
- 
- #ifdef CONFIG_SOC_OMAP2430
--void __init omap243x_map_common_io(void)
-+void __init omap243x_map_io(void)
- {
- 	iotable_init(omap24xx_io_desc, ARRAY_SIZE(omap24xx_io_desc));
- 	iotable_init(omap243x_io_desc, ARRAY_SIZE(omap243x_io_desc));
-@@ -281,28 +284,28 @@ void __init omap243x_map_common_io(void)
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP3
--void __init omap34xx_map_common_io(void)
-+void __init omap3_map_io(void)
- {
- 	iotable_init(omap34xx_io_desc, ARRAY_SIZE(omap34xx_io_desc));
- }
- #endif
- 
- #ifdef CONFIG_SOC_TI81XX
--void __init omapti81xx_map_common_io(void)
-+void __init ti81xx_map_io(void)
- {
- 	iotable_init(omapti81xx_io_desc, ARRAY_SIZE(omapti81xx_io_desc));
- }
- #endif
- 
- #ifdef CONFIG_SOC_AM33XX
--void __init omapam33xx_map_common_io(void)
-+void __init am33xx_map_io(void)
- {
- 	iotable_init(omapam33xx_io_desc, ARRAY_SIZE(omapam33xx_io_desc));
- }
- #endif
- 
- #ifdef CONFIG_ARCH_OMAP4
--void __init omap44xx_map_common_io(void)
-+void __init omap4_map_io(void)
- {
- 	iotable_init(omap44xx_io_desc, ARRAY_SIZE(omap44xx_io_desc));
- 	omap_barriers_init();
-@@ -310,7 +313,7 @@ void __init omap44xx_map_common_io(void)
- #endif
- 
- #ifdef CONFIG_SOC_OMAP5
--void __init omap5_map_common_io(void)
-+void __init omap5_map_io(void)
- {
- 	iotable_init(omap54xx_io_desc, ARRAY_SIZE(omap54xx_io_desc));
- }
-@@ -377,7 +380,14 @@ static void __init omap_hwmod_init_postsetup(void)
- #ifdef CONFIG_SOC_OMAP2420
- void __init omap2420_init_early(void)
- {
--	omap2_set_globals_242x();
-+	omap2_set_globals_tap(OMAP242X_CLASS, OMAP2_L4_IO_ADDRESS(0x48014000));
-+	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP2420_SDRC_BASE),
-+			       OMAP2_L3_IO_ADDRESS(OMAP2420_SMS_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE),
-+				  NULL);
-+	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE),
-+			       NULL, NULL);
+  * default mapping provided here.
+@@ -387,9 +391,8 @@ void __init omap2420_init_early(void)
+ 			       OMAP2_L3_IO_ADDRESS(OMAP2420_SMS_BASE));
+ 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE),
+ 				  NULL);
+-	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE),
+-			       NULL, NULL);
++	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE));
++	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE), NULL);
  	omap2xxx_check_revision();
+ 	omap2xxx_cm_init();
  	omap_common_init_early();
- 	omap2xxx_voltagedomains_init();
-@@ -399,7 +409,14 @@ void __init omap2420_init_late(void)
- #ifdef CONFIG_SOC_OMAP2430
- void __init omap2430_init_early(void)
- {
--	omap2_set_globals_243x();
-+	omap2_set_globals_tap(OMAP243X_CLASS, OMAP2_L4_IO_ADDRESS(0x4900a000));
-+	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP243X_SDRC_BASE),
-+			       OMAP2_L3_IO_ADDRESS(OMAP243X_SMS_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE),
-+				  NULL);
-+	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE),
-+			       NULL, NULL);
+@@ -417,9 +420,8 @@ void __init omap2430_init_early(void)
+ 			       OMAP2_L3_IO_ADDRESS(OMAP243X_SMS_BASE));
+ 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE),
+ 				  NULL);
+-	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE),
+-			       NULL, NULL);
++	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE));
++	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE), NULL);
  	omap2xxx_check_revision();
+ 	omap2xxx_cm_init();
  	omap_common_init_early();
- 	omap2xxx_voltagedomains_init();
-@@ -425,7 +442,14 @@ void __init omap2430_init_late(void)
- #ifdef CONFIG_ARCH_OMAP3
- void __init omap3_init_early(void)
- {
--	omap2_set_globals_3xxx();
-+	omap2_set_globals_tap(OMAP343X_CLASS, OMAP2_L4_IO_ADDRESS(0x4830A000));
-+	omap2_set_globals_sdrc(OMAP2_L3_IO_ADDRESS(OMAP343X_SDRC_BASE),
-+			       OMAP2_L3_IO_ADDRESS(OMAP343X_SMS_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE),
-+				  NULL);
-+	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
-+			       NULL, NULL);
+@@ -451,9 +453,8 @@ void __init omap3_init_early(void)
+ 			       OMAP2_L3_IO_ADDRESS(OMAP343X_SMS_BASE));
+ 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE),
+ 				  NULL);
+-	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
+-			       NULL, NULL);
++	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
++	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE), NULL);
  	omap3xxx_check_revision();
  	omap3xxx_check_features();
- 	omap_common_init_early();
-@@ -459,7 +483,13 @@ void __init am35xx_init_early(void)
- 
- void __init ti81xx_init_early(void)
- {
--	omap2_set_globals_ti81xx();
-+	omap2_set_globals_tap(OMAP343X_CLASS,
-+			      OMAP2_L4_IO_ADDRESS(TI81XX_TAP_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
-+				  NULL);
-+	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
-+			       NULL, NULL);
+ 	omap3xxx_cm_init();
+@@ -492,9 +493,8 @@ void __init ti81xx_init_early(void)
+ 			      OMAP2_L4_IO_ADDRESS(TI81XX_TAP_BASE));
+ 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
+ 				  NULL);
+-	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
+-			       NULL, NULL);
++	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE));
++	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE), NULL);
  	omap3xxx_check_revision();
  	ti81xx_check_features();
  	omap_common_init_early();
-@@ -517,7 +547,13 @@ void __init ti81xx_init_late(void)
- #ifdef CONFIG_SOC_AM33XX
- void __init am33xx_init_early(void)
- {
--	omap2_set_globals_am33xx();
-+	omap2_set_globals_tap(AM335X_CLASS,
-+			      AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE));
-+	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
-+				  NULL);
-+	omap2_set_globals_prcm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
-+			       AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
-+			       NULL, NULL);
+@@ -556,9 +556,8 @@ void __init am33xx_init_early(void)
+ 			      AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE));
+ 	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
+ 				  NULL);
+-	omap2_set_globals_prcm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
+-			       AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
+-			       NULL, NULL);
++	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE));
++	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
  	omap3xxx_check_revision();
  	ti81xx_check_features();
  	omap_common_init_early();
-@@ -533,7 +569,14 @@ void __init am33xx_init_early(void)
- #ifdef CONFIG_ARCH_OMAP4
- void __init omap4430_init_early(void)
- {
--	omap2_set_globals_443x();
-+	omap2_set_globals_tap(OMAP443X_CLASS,
-+			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
-+				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
-+	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
+@@ -578,10 +577,12 @@ void __init omap4430_init_early(void)
+ 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
+ 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
+ 				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
+-	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
++	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE));
++	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
++			     OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE));
++	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
++	omap_prm_base_init();
++	omap_cm_base_init();
  	omap4xxx_check_revision();
  	omap4xxx_check_features();
  	omap_common_init_early();
-@@ -556,7 +599,14 @@ void __init omap4430_init_late(void)
- #ifdef CONFIG_SOC_OMAP5
- void __init omap5_init_early(void)
- {
--	omap2_set_globals_5xxx();
-+	omap2_set_globals_tap(OMAP54XX_CLASS,
-+			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
-+	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
-+				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
-+	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
-+			       OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
+@@ -608,10 +609,12 @@ void __init omap5_init_early(void)
+ 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
+ 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
+ 				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
+-	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
+-			       OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
++	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE));
++	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
++			     OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE));
++	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
++	omap_prm_base_init();
++	omap_cm_base_init();
  	omap5xxx_check_revision();
  	omap_common_init_early();
  }
+diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
+index 37f8f94..3e6e3e9 100644
+--- a/arch/arm/mach-omap2/mcbsp.c
++++ b/arch/arm/mach-omap2/mcbsp.c
+@@ -28,7 +28,7 @@
+  * FIXME: Find a mechanism to enable/disable runtime the McBSP ICLK autoidle.
+  * Sidetone needs non-gated ICLK and sidetone autoidle is broken.
+  */
+-#include "cm2xxx_3xxx.h"
++#include "cm3xxx.h"
+ #include "cm-regbits-34xx.h"
+ 
+ static int omap3_enable_st_clock(unsigned int id, bool enable)
 diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index e1f2897..6560e99 100644
+index 5348788..f207f88 100644
 --- a/arch/arm/mach-omap2/omap4-common.c
 +++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -32,6 +32,7 @@
- #include "omap-wakeupgen.h"
- 
- #include "soc.h"
-+#include "iomap.h"
+@@ -36,6 +36,7 @@
  #include "common.h"
  #include "hsmmc.h"
+ #include "prminst44xx.h"
++#include "prcm_mpu44xx.h"
  #include "omap4-sar-layout.h"
+ 
+ #ifdef CONFIG_CACHE_L2X0
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index 72df974..b25a32a 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -421,22 +421,6 @@
+ #define MAX_IOPAD_LATCH_TIME			100
+ 
+ # ifndef __ASSEMBLER__
+-extern void __iomem *prm_base;
+-extern void __iomem *cm_base;
+-extern void __iomem *cm2_base;
+-extern void __iomem *prcm_mpu_base;
+-
+-#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+-extern void omap_prm_base_init(void);
+-extern void omap_cm_base_init(void);
+-#else
+-static inline void omap_prm_base_init(void)
+-{
+-}
+-static inline void omap_cm_base_init(void)
+-{
+-}
+-#endif
+ 
+ /**
+  * struct omap_prcm_irq - describes a PRCM interrupt bit
 diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 0a2c33b..118dc87 100644
+index 827769c..8a603fe 100644
 --- a/arch/arm/mach-omap2/prcm.c
 +++ b/arch/arm/mach-omap2/prcm.c
-@@ -136,16 +136,13 @@ int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, u8 idlest,
- 	return (i < MAX_MODULE_ENABLE_WAIT) ? 1 : 0;
- };
+@@ -39,25 +39,6 @@
+ #include "prm-regbits-44xx.h"
+ #include "control.h"
  
--void __init omap2_set_globals_prcm(struct omap_globals *omap2_globals)
-+void __init omap2_set_globals_prcm(void __iomem *prm, void __iomem *cm,
-+				   void __iomem *cm2, void __iomem *prcm_mpu)
- {
--	if (omap2_globals->prm)
--		prm_base = omap2_globals->prm;
--	if (omap2_globals->cm)
--		cm_base = omap2_globals->cm;
--	if (omap2_globals->cm2)
--		cm2_base = omap2_globals->cm2;
--	if (omap2_globals->prcm_mpu)
--		prcm_mpu_base = omap2_globals->prcm_mpu;
-+	prm_base = prm;
-+	cm_base = cm;
-+	cm2_base = cm2;
-+	prcm_mpu_base = prcm_mpu;
+-void __iomem *prm_base;
+-void __iomem *cm_base;
+-void __iomem *cm2_base;
+-void __iomem *prcm_mpu_base;
+-
+-
+-void __init omap2_set_globals_prcm(void __iomem *prm, void __iomem *cm,
+-				   void __iomem *cm2, void __iomem *prcm_mpu)
+-{
+-	prm_base = prm;
+-	cm_base = cm;
+-	cm2_base = cm2;
+-	prcm_mpu_base = prcm_mpu;
+-
+-	if (cpu_is_omap44xx() || soc_is_omap54xx()) {
+-		omap_prm_base_init();
+-		omap_cm_base_init();
+-	}
+-}
  
- 	if (cpu_is_omap44xx() || soc_is_omap54xx()) {
- 		omap_prm_base_init();
-diff --git a/arch/arm/mach-omap2/sdrc.c b/arch/arm/mach-omap2/sdrc.c
-index e3d345f..2ff0891 100644
---- a/arch/arm/mach-omap2/sdrc.c
-+++ b/arch/arm/mach-omap2/sdrc.c
-@@ -115,12 +115,10 @@ int omap2_sdrc_get_params(unsigned long r,
+ /*
+  * Stubbed functions so that common files continue to build when
+diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.c b/arch/arm/mach-omap2/prcm_mpu44xx.c
+index 928dbd4..c30e44a 100644
+--- a/arch/arm/mach-omap2/prcm_mpu44xx.c
++++ b/arch/arm/mach-omap2/prcm_mpu44xx.c
+@@ -20,6 +20,12 @@
+ #include "prcm_mpu44xx.h"
+ #include "cm-regbits-44xx.h"
+ 
++/*
++ * prcm_mpu_base: the virtual address of the start of the PRCM_MPU IP
++ *   block registers
++ */
++void __iomem *prcm_mpu_base;
++
+ /* PRCM_MPU low-level functions */
+ 
+ u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 reg)
+@@ -43,3 +49,14 @@ u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 reg)
+ 
+ 	return v;
  }
++
++/**
++ * omap2_set_globals_prcm_mpu - set the MPU PRCM base address (for early use)
++ * @prcm_mpu: PRCM_MPU base virtual address
++ *
++ * XXX Will be replaced when the PRM/CM drivers are completed.
++ */
++void __init omap2_set_globals_prcm_mpu(void __iomem *prcm_mpu)
++{
++	prcm_mpu_base = prcm_mpu;
++}
+diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
+index 8a6e250..884af7b 100644
+--- a/arch/arm/mach-omap2/prcm_mpu44xx.h
++++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
+@@ -1,7 +1,7 @@
+ /*
+  * OMAP44xx PRCM MPU instance offset macros
+  *
+- * Copyright (C) 2010 Texas Instruments, Inc.
++ * Copyright (C) 2010, 2012 Texas Instruments, Inc.
+  * Copyright (C) 2010 Nokia Corporation
+  *
+  * Paul Walmsley (paul at pwsan.com)
+@@ -25,6 +25,12 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
+ #define __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
  
++#include "common.h"
++
++# ifndef __ASSEMBLER__
++extern void __iomem *prcm_mpu_base;
++# endif
++
+ #define OMAP4430_PRCM_MPU_BASE			0x48243000
  
--void __init omap2_set_globals_sdrc(struct omap_globals *omap2_globals)
-+void __init omap2_set_globals_sdrc(void __iomem *sdrc, void __iomem *sms)
- {
--	if (omap2_globals->sdrc)
--		omap2_sdrc_base = omap2_globals->sdrc;
--	if (omap2_globals->sms)
--		omap2_sms_base = omap2_globals->sms;
-+	omap2_sdrc_base = sdrc;
-+	omap2_sms_base = sms;
+ #define OMAP44XX_PRCM_MPU_REGADDR(inst, reg)				\
+@@ -98,6 +104,7 @@ extern u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 idx);
+ extern void omap4_prcm_mpu_write_inst_reg(u32 val, s16 inst, u16 idx);
+ extern u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst,
+ 					    s16 idx);
++extern void __init omap2_set_globals_prcm_mpu(void __iomem *prcm_mpu);
+ # endif
+ 
+ #endif
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index c30ab5d..fb7dee2 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -1,7 +1,7 @@
+ /*
+  * OMAP2/3/4 Power/Reset Management (PRM) bitfield definitions
+  *
+- * Copyright (C) 2007-2009 Texas Instruments, Inc.
++ * Copyright (C) 2007-2009, 2012 Texas Instruments, Inc.
+  * Copyright (C) 2010 Nokia Corporation
+  *
+  * Paul Walmsley
+@@ -15,6 +15,11 @@
+ 
+ #include "prcm-common.h"
+ 
++# ifndef __ASSEMBLER__
++extern void __iomem *prm_base;
++extern void omap2_set_globals_prm(void __iomem *prm);
++# endif
++
+ /*
+  * 24XX: PM_PWSTST_CORE, PM_PWSTST_GFX, PM_PWSTST_MPU, PM_PWSTST_DSP
+  *
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index e200e4f..c089246 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -31,6 +31,7 @@
+ #include "prm2xxx.h"
+ #include "prm3xxx.h"
+ #include "prm44xx.h"
++#include "common.h"
+ 
+ /*
+  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
+@@ -55,6 +56,9 @@ static struct irq_chip_generic **prcm_irq_chips;
+  */
+ static struct omap_prcm_irq_setup *prcm_irq_setup;
+ 
++/* prm_base: base virtual address of the PRM IP block */
++void __iomem *prm_base;
++
+ /*
+  * prm_ll_data: function pointers to SoC-specific implementations of
+  * common PRM functions
+@@ -329,6 +333,17 @@ err:
  }
  
  /**
-diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
-index b3f8379..06ebd6e5 100644
---- a/arch/arm/mach-omap2/sdrc.h
-+++ b/arch/arm/mach-omap2/sdrc.h
-@@ -50,6 +50,9 @@ static inline u32 sms_read_reg(u16 reg)
- {
- 	return __raw_readl(OMAP_SMS_REGADDR(reg));
- }
-+
-+extern void omap2_set_globals_sdrc(void __iomem *sdrc, void __iomem *sms);
-+
- #else
- #define OMAP242X_SDRC_REGADDR(reg)					\
- 			OMAP2_L3_IO_ADDRESS(OMAP2420_SDRC_BASE + (reg))
-diff --git a/arch/arm/mach-omap2/ti81xx.h b/arch/arm/mach-omap2/ti81xx.h
-index 8f9843f..a1e6caf 100644
---- a/arch/arm/mach-omap2/ti81xx.h
-+++ b/arch/arm/mach-omap2/ti81xx.h
-@@ -22,6 +22,15 @@
- #define TI81XX_CTRL_BASE	TI81XX_SCM_BASE
- #define TI81XX_PRCM_BASE	0x48180000
- 
-+/*
-+ * Adjust TAP register base such that omap3_check_revision accesses the correct
-+ * TI81XX register for checking device ID (it adds 0x204 to tap base while
-+ * TI81XX DEVICE ID register is at offset 0x600 from control base).
++ * omap2_set_globals_prm - set the PRM base address (for early use)
++ * @prm: PRM base virtual address
++ *
++ * XXX Will be replaced when the PRM/CM drivers are completed.
 + */
-+#define TI81XX_TAP_BASE		(TI81XX_CTRL_BASE + \
-+				 TI81XX_CONTROL_DEVICE_ID - 0x204)
++void __init omap2_set_globals_prm(void __iomem *prm)
++{
++	prm_base = prm;
++}
 +
-+
- #define TI81XX_ARM_INTC_BASE	0x48200000
++/**
+  * prm_read_reset_sources - return the sources of the SoC's last reset
+  *
+  * Return a u32 bitmask representing the reset sources that caused the
+diff --git a/arch/arm/mach-omap2/prminst44xx.h b/arch/arm/mach-omap2/prminst44xx.h
+index 46f2efb..a2ede2d 100644
+--- a/arch/arm/mach-omap2/prminst44xx.h
++++ b/arch/arm/mach-omap2/prminst44xx.h
+@@ -30,4 +30,6 @@ extern int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
+ extern int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
+ 					    u16 rstctrl_offs);
  
- #endif /* __ASM_ARCH_TI81XX_H */
++extern void omap_prm_base_init(void);
++
+ #endif
 diff --git a/arch/arm/plat-omap/include/plat/prcm.h b/arch/arm/plat-omap/include/plat/prcm.h
-index a76cbd4..a950a83 100644
+index 3ccee9f..08eda93 100644
 --- a/arch/arm/plat-omap/include/plat/prcm.h
 +++ b/arch/arm/plat-omap/include/plat/prcm.h
-@@ -27,8 +27,13 @@
+@@ -27,11 +27,7 @@
  #ifndef __ASM_ARM_ARCH_OMAP_PRCM_H
  #define __ASM_ARM_ARCH_OMAP_PRCM_H
  
-+#include <linux/kernel.h>
-+#include <linux/io.h>
-+
- int omap2_cm_wait_idlest(void __iomem *reg, u32 mask, u8 idlest,
- 			 const char *name);
-+void __init omap2_set_globals_prcm(void __iomem *prm, void __iomem *cm,
-+				   void __iomem *cm2, void __iomem *prcm_mpu);
+-#include <linux/kernel.h>
+-#include <linux/io.h>
+-
+-void __init omap2_set_globals_prcm(void __iomem *prm, void __iomem *cm,
+-				   void __iomem *cm2, void __iomem *prcm_mpu);
++/* XXX To be removed */
  
  #endif
  
