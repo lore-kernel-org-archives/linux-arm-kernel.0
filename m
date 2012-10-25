@@ -1,67 +1,67 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Oct 2012 13:55:16 +0300
-Subject: [PATCH 2/2] i2c: omap: make reset a seperate function
-In-Reply-To: <1351160586-12306-3-git-send-email-shubhrajyoti@ti.com>
-References: <1351160586-12306-1-git-send-email-shubhrajyoti@ti.com>
- <1351160586-12306-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121025105516.GH21217@arwen.pp.htv.fi>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Oct 2012 12:17:05 +0100
+Subject: Possible regression in arm/io.h
+In-Reply-To: <1351148122.2507.63.camel@sauron.fi.intel.com>
+References: <CABYn4syj0GZAsDYVQfXg_qKAFkbrxPLoZWpKRzwf3gfRkMGZkQ@mail.gmail.com>
+ <20121024105223.GC23775@mudshark.cambridge.arm.com>
+ <1351148122.2507.63.camel@sauron.fi.intel.com>
+Message-ID: <20121025111705.GD11267@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 25, 2012 at 07:55:22AM +0100, Artem Bityutskiy wrote:
+> On Wed, 2012-10-24 at 11:52 +0100, Will Deacon wrote:
+> > 	(a) Understand what has changed in GCC to cause this error to start
+> > 	    cropping up.
+> 
+> This is about already quite old gcc 4.6.3, which I use for about 4 last
+> kernel releases already. So it is only the kernel that changed.
 
-On Thu, Oct 25, 2012 at 03:53:06PM +0530, Shubhrajyoti D wrote:
-> Implement reset as a seperate function.
-> This will enable us to make sure that we don't do the
-> calculation again on every transfer.
-> Also at probe the reset is not added as the hwmod is doing that
-> for us.
+Looks like it's broken with gcc 4.7 too, so it might be that it's never
+worked. The problem seems to be that offsettable addresses are assumed by
+GCC to have a 12-bit immediate range, which isn't true for half- and double-
+work accessors, so GAS barfs when presented with the final (invalid) code.
 
-since you're touching registers which supposedly only hwmod should
-touch, you ought to Cc Benoit to make sure he knows what's you're doing
-here. I'm adding him to Cc
+Since we don't have double-word I/O accessors, we can just fallback to "Q"
+for the half-word case:
 
-> @@ -592,7 +597,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	if (timeout == 0) {
->  		dev_err(dev->dev, "controller timed out\n");
->  		ret = -ETIMEDOUT;
-> -		omap_i2c_init(dev);
-> +		omap_i2c_reset(dev);
-> +		__omap_i2c_init(dev);
->  		goto out;
->  	}
->  
-> @@ -603,7 +609,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  			|| (dev->cmd_err & OMAP_I2C_STAT_ROVR)
->  			|| (dev->cmd_err & OMAP_I2C_STAT_XUDF)) {
->  		ret = -EIO;
-> -		omap_i2c_init(dev);
-> +		omap_i2c_reset(dev);
-> +		__omap_i2c_init(dev);
->  		goto out;
->  	}
->  
-> @@ -621,7 +628,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  			return 0;
->  
->  		ret = -EREMOTEIO;
-> -		omap_i2c_init(dev);
-> +		omap_i2c_reset(dev);
-> +		__omap_i2c_init(dev);
 
-eventually we need to try to forcefully trigger these errors above
-(nack, overflow, underflow and arbitration lost) and try to make sure if
-actually need to reset the controller all the time. I find it really odd
-that we're always resetting the IP in every error condition without
-actually trying to figure out what's wrong with the driver (if there is
-something wrong with the driver, of course).
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 35c1ed8..42f042e 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -64,7 +64,7 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
+ static inline void __raw_writew(u16 val, volatile void __iomem *addr)
+ {
+        asm volatile("strh %1, %0"
+-                    : "+Qo" (*(volatile u16 __force *)addr)
++                    : "+Q" (*(volatile u16 __force *)addr)
+                     : "r" (val));
+ }
+ 
+@@ -72,7 +72,7 @@ static inline u16 __raw_readw(const volatile void __iomem *addr)
+ {
+        u16 val;
+        asm volatile("ldrh %1, %0"
+-                    : "+Qo" (*(volatile u16 __force *)addr),
++                    : "+Q" (*(volatile u16 __force *)addr),
+                       "=r" (val));
+        return val;
+ }
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/f4080bc0/attachment.sig>
+
+but this has the downside of *always* generating the target address into a
+register and then using the basic [rN] addressing mode. A simple example
+being smsc911x_rx_readfifo, where we see:
+
+  c021bbe4:       e1d230b2        ldrh    r3, [r2, #2]
+
+changed into:
+
+  c021bd50:       e2820002        add     r0, r2, #2
+  c021bd54:       e1d030b0        ldrh    r3, [r0]
+
+which sucks, frankly. Unfortunately, GCC doesn't give us another constraint
+that we can use for this, so I think we just have to grin and bear it.
+
+Will
