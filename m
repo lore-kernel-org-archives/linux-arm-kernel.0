@@ -1,32 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 18:42:33 +0200
-Subject: DEBUG_LL broken for socfpga
-In-Reply-To: <1351186792.15182.14.camel@dinh-ubuntu>
-References: <20121025181823.6c3fa0de@skate>
- <1351186792.15182.14.camel@dinh-ubuntu>
-Message-ID: <20121025184233.0883d4dc@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Oct 2012 17:47:14 +0100
+Subject: [PATCH] ARM: PMU: fix runtime PM enable
+In-Reply-To: <87vcdy33ma.fsf@deeprootsystems.com>
+References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
+ <20121024093150.GA23775@mudshark.cambridge.arm.com>
+ <5087F84B.9070705@ti.com>
+ <20121024143204.GF7339@mudshark.cambridge.arm.com>
+ <508803DF.7020902@ti.com>
+ <20121024172325.GK7339@mudshark.cambridge.arm.com>
+ <5088284D.40404@ti.com> <87vcdy33ma.fsf@deeprootsystems.com>
+Message-ID: <20121025164714.GK11267@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
-
-On Thu, 25 Oct 2012 11:39:52 -0600, Dinh Nguyen wrote:
-
-> Doesn't this patch address the fix?
+On Thu, Oct 25, 2012 at 05:42:21PM +0100, Kevin Hilman wrote:
+> Jon Hunter <jon-hunter@ti.com> writes:
+> > On 10/24/2012 12:23 PM, Will Deacon wrote:
+> >> What do other drivers do? Grepping around, I see calls to pm_runtime_enable
+> >> made in various drivers and, given that you pass the device in there, what's
+> >> the problem with us just calling that unconditionally from perf? I know you
+> >> said that will work for OMAP, but I'm trying to understand the effect that
+> >> has on PM-aware platforms that don't require this for the PMU (since this
+> >> seems to be per-device).
+> >
+> > I had done this initially when testing on OMAP platforms that do and
+> > don't require runtime PM for PMU. I don't see any side affect of this,
+> > however, may be Kevin could comment on if that is ok. It would be the
+> > best approach.
 > 
-> in arm-soc for-next
-> commit  ef3f94412a4d7e107392e7c7cfc3e2d0668aa1aa
+> Unconditonally enabling runtime PM should be fine.  It may add a slight
+> bit of overhead calling runtime PM functions that ultimately do nothing
+> (because there are no callbacks), but it will be harmless.
 > 
-> http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commit;h=ef3f94412a4d7e107392e7c7cfc3e2d0668aa1aa
+> Personally, I think that would be cleaner.  The less pdata we need, the
+> better, IMO.
 
-Indeed, it fixes the problem. I was looking at 3.7-rc2, and forgot to
-check in arm-soc/for-next before reporting the issue.
+Thanks Kevin, I'm fine with that. Jon: want me to write a patch or do you
+have something I can take into the ARM perf tree (if the latter, please
+base against perf/updates)?
 
-Sorry for the noise.
+Cheers,
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
