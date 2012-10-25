@@ -1,86 +1,25 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Oct 2012 15:01:40 +0300
-Subject: [PATCH 2/8] i2c: omap: reorder exit path of omap_i2c_xfer_msg()
-In-Reply-To: <CAM=Q2cvUeLbS20HScrGTOcraSUrCzhzCi8MQLxd9MOb_7ZFFYA@mail.gmail.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-3-git-send-email-balbi@ti.com>
- <CAM=Q2cvUeLbS20HScrGTOcraSUrCzhzCi8MQLxd9MOb_7ZFFYA@mail.gmail.com>
-Message-ID: <20121025120140.GP21217@arwen.pp.htv.fi>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Oct 2012 13:07:19 +0100
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <5086FEEC.5090203@free-electrons.com>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+ <20121011130955.GP4625@n2100.arm.linux.org.uk> <5076CA43.9070503@gmail.com>
+ <20121011134130.GQ4625@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.02.1210111103230.16518@xanadu.home>
+ <5086FEEC.5090203@free-electrons.com>
+Message-ID: <20121025120719.GA21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Oct 25, 2012 at 05:10:10PM +0530, Shubhrajyoti Datta wrote:
-> On Mon, Oct 22, 2012 at 3:16 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > just a cleanup patch trying to make exit path
-> > more straightforward. No changes otherwise.
-> >
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++++++---------
-> >  1 file changed, 17 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> > index c07d9c4..bea0277 100644
-> > --- a/drivers/i2c/busses/i2c-omap.c
-> > +++ b/drivers/i2c/busses/i2c-omap.c
-> > @@ -505,6 +505,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
-> >  {
-> >         struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
-> >         unsigned long timeout;
-> > +       int ret;
-> >         u16 w;
-> >
-> >         dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
-> > @@ -582,31 +583,38 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
-> >         dev->buf_len = 0;
-> >         if (timeout == 0) {
-> >                 dev_err(dev->dev, "controller timed out\n");
-> > -               omap_i2c_init(dev);
-> > -               return -ETIMEDOUT;
-> > +               ret = -ETIMEDOUT;
-> > +               goto err_i2c_init;
-> >         }
-> >
-> > -       if (likely(!dev->cmd_err))
-> > -               return 0;
-> > -
-> >         /* We have an error */
-> >         if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
-> >                             OMAP_I2C_STAT_XUDF)) {
-> > -               omap_i2c_init(dev);
-> > -               return -EIO;
-> > +               ret = -EIO;
-> > +               goto err_i2c_init;
-> >         }
-> >
-> >         if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
-> >                 if (msg->flags & I2C_M_IGNORE_NAK)
-> >                         return 0;
-> > +
-> >                 if (stop) {
-> >                         w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
-> >                         w |= OMAP_I2C_CON_STP;
-> >                         omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
-> >                 }
-> > -               return -EREMOTEIO;
-> > +
-> > +               ret = -EREMOTEIO;
-> > +               goto err;
+On Tue, Oct 23, 2012 at 10:32:44PM +0200, Gregory CLEMENT wrote:
+> So is there a chance that this patch will be applied for 3.7?
 > 
-> This adds reset to nack may be that can be removed.
+> Currently I can't boot anymore Armada XP or Armada 370, if kernel is
+> compressed in LZO. It's annoying.
+> 
+> Russell, did Nicolas manage to convince you?
 
-great catch. I will respin this series.
-
-thanks
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/ee1f2e15/attachment-0001.sig>
+Frankly, no - less so now that we have a question mark over ARMv6 which
+seems to conflict with Nicolas' justification.  This issue is larger than
+just ARMv7...
