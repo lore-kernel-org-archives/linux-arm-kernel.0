@@ -1,60 +1,64 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Thu, 25 Oct 2012 14:53:33 +0200
-Subject: [PATCH v2 2/7] i2c: omap: reorder exit path of omap_i2c_xfer_msg()
-In-Reply-To: <50893398.6070004@ti.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Thu, 25 Oct 2012 14:57:48 +0200
+Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
+In-Reply-To: <1350899218-13624-8-git-send-email-balbi@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1351167915-15079-1-git-send-email-balbi@ti.com>
- <1351167915-15079-3-git-send-email-balbi@ti.com>
- <50893398.6070004@ti.com>
-Message-ID: <20617.13901.479604.302420@ipc1.ka-ro>
+ <1350899218-13624-8-git-send-email-balbi@ti.com>
+Message-ID: <20121025145748.760c218b@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Felipe, Shubhrajyoti,
 
-Santosh Shilimkar writes:
-> On Thursday 25 October 2012 05:55 PM, Felipe Balbi wrote:
-> > just a cleanup patch trying to make exit path
-> > more straightforward. No changes otherwise.
-> >
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >   drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++++++---------
-> >   1 file changed, 17 insertions(+), 9 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> > index c07d9c4..bea0277 100644
-> > --- a/drivers/i2c/busses/i2c-omap.c
-> > +++ b/drivers/i2c/busses/i2c-omap.c
-> > @@ -505,6 +505,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
-> >   {
-> >   	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
-> >   	unsigned long timeout;
-> > +	int ret;
-[...]
-> > +		ret = -EREMOTEIO;
-> > +		goto err;
-> >   	}
-> > -	return -EIO;
-> > +
-> > +	return 0;
-> With initialized value you can use
-> return ret;
+On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
+> From: Shubhrajyoti D <shubhrajyoti@ti.com>
 > 
-Doing it this way has the advantage, that if an additional error exit
-is added it will generate an 'uninitialized variable' warning, if it
-fails to set the return value.
+> In case of a NACK, it's wise to tell our clients
+> drivers about how many bytes were actually transferred.
+> 
+> Support this by adding an extra field to the struct
+> i2c_msg which gets incremented the amount of bytes
+> actually transferred.
+> 
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  include/uapi/linux/i2c.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
+> index 0e949cb..4b35c9b 100644
+> --- a/include/uapi/linux/i2c.h
+> +++ b/include/uapi/linux/i2c.h
+> @@ -77,6 +77,7 @@ struct i2c_msg {
+>  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+>  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+>  	__u16 len;		/* msg length				*/
+> +	__u16 transferred;	/* actual bytes transferred             */
+>  	__u8 *buf;		/* pointer to msg data			*/
+>  };
 
+On the principle I am fine with this, however you also need to define
+who should initialize this field, and to what value.
 
+Not all i2c bus drivers will implement this functionality at first.
+Some may even be unable to ever implement it. As soon as i2c chip
+drivers start checking this value, you will hit combinations of chip
+driver checking the value and bus driver not setting it. And it has to
+work.
 
-Lothar Wa?mann
+We have to decide whether it is enough to initialize "transferred" to
+0, or if we need a more reliable way to distinguish between "0 bytes
+transferred" and "the bus driver can't tell". What's your take on this?
+If we need to distinguish, this could be done using a new I2C_FUNC_*
+flag, or by initializing "transferred" to (__u16)(-1) instead of 0 for
+example.
+
+Then we have to decide whether initialization is done by the individual
+drivers, or by i2c-core. By the drivers might be faster, but this may
+also mean more code (and bugs more likely) than letting i2c-core handle
+it. The exact balance probably depends on the answer to the previous
+question (initializing a field to 0 is free in many cases.)
+
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Jean Delvare
