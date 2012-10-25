@@ -1,115 +1,459 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 25 Oct 2012 23:42:40 +0530
-Subject: [RFC PATCH 00/13] sched: Integrating Per-entity-load-tracking
- with the core scheduler
-In-Reply-To: <1351180603.12171.31.camel@twins>
-References: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
- <1351180603.12171.31.camel@twins>
-Message-ID: <50898118.1050402@linux.vnet.ibm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Oct 2012 14:13:26 -0400
+Subject: [PATCH] arm: kirkwood: add support for ZyXEL NSA310
+In-Reply-To: <alpine.DEB.2.02.1210251735020.15860@mirri>
+References: <alpine.DEB.2.02.1210251735020.15860@mirri>
+Message-ID: <20121025181326.GL18811@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-Thank you very much for your feedback.Please ignore the previous post.I
-am extremely sorry about the word wrap issues with it.
+Hi Tero,
 
-On 10/25/2012 09:26 PM, Peter Zijlstra wrote:
-> OK, so I tried reading a few patches and I'm completely failing.. maybe
-> its late and my brain stopped working, but it simply doesn't make any
-> sense.
+Thanks for the patch!
+
+On Thu, Oct 25, 2012 at 06:01:00PM +0300, Tero Jaasko wrote:
+> Hello,
+> following patch adds support for the ZyXEL NSA310 NAS box. It has been
+> tested and developed in a linux-stable/linux-3.6.y tree, up to 3.6.2.
+
+hmmm, there probably won't be any conflicts when I go to apply this, but
+in the future, please base against a tag in Linus' tree.  eg v3.6
+
+> As mentioned in commit, the code is derived from the openwrt.org's 
+> repository. I have only done the device tree conversion.
+> I have tested and used it on my NAS without trouble for a while. 
+> Testing of nand and adt7476 was limited to verifying that they are 
+> probed as I have no use for them.
 > 
-> Most changelogs and comments aren't really helping either. At best they
-> mention what you're doing, not why and how. This means I get to
-> basically duplicate your entire thought pattern and I might as well do
-> the patches myself.
+> In order to use the kernel with stock uBoot, one needs to build with
+> "make zImage modules dtbs",
+> "cat arch/arm/boot/kirkwood-nsa310.dtb >> arch/arm/boot/zImage"
+> "make uImage" 
+> sequence.
+
+The above comments are typically added after SoB,--- and before the
+diffstat.
+
+> ---
+> From f31af66eadc0df17bb75c8e5607d56ce6e2ef899 Mon Sep 17 00:00:00 2001
+> From: Tero Jaasko <tero.jaasko@mail.suomi.net>
+> Date: Mon, 22 Oct 2012 22:43:37 +0300
+> Subject: [PATCH] arm: kirkwood: add support for ZyXEL NSA310
 > 
-> I also don't see the 'big' picture of what you're doing, you start out
-> by some weird avoid short running task movement.. why is that a good
-> start?
+> Bring in the support for ZyXEL NSA310 NAS box. Code is mostly imported
+> from the openwrt.org, (https://dev.openwrt.org/browser/trunk/target/
+> linux/kirkwood/patches-3.3/202-zyxel-nsa-310.patch?rev=31673).
 > 
-> I would have expected a series like this to replace rq->cpu_load /
-> rq->load with a saner metric and go from there.. instead it looks like
-> its going about at things completely backwards. Fixing small details
-> instead of the big things.
+> Original code is converted to use flattened device tree descriptions
+> for the support for serial uart, sata, gpio keys and gpio leds.
 > 
-> Do explain..
+> Signed-off-by: Tero Jaasko <tero.jaasko@mail.suomi.net>
+> ---
+>  arch/arm/boot/dts/kirkwood-nsa310.dts |  96 ++++++++++++++++++++
+>  arch/arm/mach-kirkwood/Kconfig        |   9 ++
+>  arch/arm/mach-kirkwood/Makefile       |   1 +
+>  arch/arm/mach-kirkwood/Makefile.boot  |   1 +
+>  arch/arm/mach-kirkwood/board-dt.c     |   4 +
+>  arch/arm/mach-kirkwood/board-nsa310.c | 166 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/common.h       |   6 ++
+>  7 files changed, 283 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-nsa310.dts
+>  create mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
 > 
-Let me see if I get what you are saying here right.You want to replace
-for example cfs_rq->load.weight with a saner metric because it does not
-consider the run time of the sched entities queued on it,merely their
-priorities.If this is right,in this patchset I believe
-cfs_rq->runnable_load_avg would be that right metric because it
-considers the run time of the sched entities queued on it.
+> diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+> new file mode 100644
+> index 0000000..554d81a
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+> @@ -0,0 +1,96 @@
+> +/dts-v1/;
+> +
+> +/include/ "kirkwood.dtsi"
+> +
+> +/ {
+> +	model = "ZyXEL NSA310";
+> +	compatible = "zyxel,nsa310", "marvell,kirkwood-88f6281", "marvell,kirkwood";
 
-So why didnt I replace? I added cfs_rq->runnable_load_avg as an
-additional metric instead of replacing the older metric.I let the old
-metric be as a dead metric and used the newer metric as an
-alternative.so if this alternate metric does not do us good we have the
-old metric to fall back on.
+Is there only one variant of the nsa310?  eg did they change flash types
+or ram size during a production run?  Whether they did or not, we prefer
+to be as specific as possible here, eg "zyxel,nsa310-PRODNUM" If you can
+locate a PRODNUM that will most likely change if they change the BOM,
+etc.  Please add this string in addition to what you currently have.
 
-> At best they mention what you're doing, not why and how.
-So the above explains *what* I am doing.
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x10000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200";
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		serial at 12000 {
+> +			clock-frequency = <200000000>;
+> +			status = "ok";
+> +		};
+> +
+> +		sata at 80000 {
+> +			status = "okay";
+> +			nr-ports = <2>;
+> +		};
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		button at 1 {
+> +			label = "Power Button";
+> +			linux,code = <116>;
+> +			gpios = <&gpio1 14 0>;
+> +		};
+> +		button at 2 {
+> +			label = "Copy Button";
+> +			linux,code = <133>;
+> +			gpios = <&gpio1 5 1>;
+> +		};
+> +		button at 3 {
+> +			label = "Reset Button";
+> +			linux,code = <0x198>;
+> +			gpios = <&gpio1 4 1>;
+> +		};
+> +	};
+> +
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +
+> +		green-sys {
+> +			label = "nsa310:green:sys";
+> +			gpios = <&gpio0 28 0>;
+> +		};
+> +		red-sys {
+> +			label = "nsa310:red:sys";
+> +			gpios = <&gpio0 29 0>;
+> +		};
+> +		green-hdd {
+> +			label = "nsa310:green:hdd";
+> +			gpios = <&gpio1 9 0>;
+> +		};
+> +		red-hdd {
+> +			label = "nsa310:red:hdd";
+> +			gpios = <&gpio1 10 0>;
+> +		};
+> +		green-esata {
+> +			label = "nsa310:green:esata";
+> +			gpios = <&gpio0 12 0>;
+> +		};
+> +		red-esata {
+> +			label = "nsa310:red:esata";
+> +			gpios = <&gpio0 13 0>;
+> +		};
+> +		green-usb {
+> +			label = "nsa310:green:usb";
+> +			gpios = <&gpio0 15 0>;
+> +		};
+> +		red-usb {
+> +			label = "nsa310:red:usb";
+> +			gpios = <&gpio0 16 0>;
+> +		};
+> +		green-copy {
+> +			label = "nsa310:green:copy";
+> +			gpios = <&gpio1 7 0>;
+> +		};
+> +		red-copy {
+> +			label = "nsa310:red:copy";
+> +			gpios = <&gpio1 8 0>;
+> +		};
+> +	};
+> +};
+> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> index ca5c15a..1172a2a 100644
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -195,6 +195,15 @@ config MACH_T5325
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  HP t5325 Thin Client.
+>  
+> +config MACH_NSA310_DT
+> +	bool "ZyXEL NSA-310 (Flattened Device Tree)"
+> +	select ARCH_KIRKWOOD_DT
+> +	select ARM_APPENDED_DTB
+> +	select ARM_ATAG_DTB_COMPAT
 
-*How* am i doing it: Everywhere the scheduler needs to make a decision on:
+I would prefer not to enable APPENDED_DTB by default.
 
- a.find_busiest_group/find_idlest_group/update_sg_lb_stats:use sum of
-cfs_rq->runnable_load_avg to decide this instead of sum of
-cfs_rq->load.weight.
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  ZyXEL NSA-310 board (Flattened Device Tree).
+> +
+>  endmenu
+>  
+>  endif
+> diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+> index 055c85a..b2663e2 100644
+> --- a/arch/arm/mach-kirkwood/Makefile
+> +++ b/arch/arm/mach-kirkwood/Makefile
+> @@ -28,3 +28,4 @@ obj-$(CONFIG_MACH_IB62X0_DT)		+= board-ib62x0.o
+>  obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
+>  obj-$(CONFIG_MACH_GOFLEXNET_DT)		+= board-goflexnet.o
+>  obj-$(CONFIG_MACH_LSXL_DT)		+= board-lsxl.o
+> +obj-$(CONFIG_MACH_NSA310_DT)		+= board-nsa310.o
+> diff --git a/arch/arm/mach-kirkwood/Makefile.boot b/arch/arm/mach-kirkwood/Makefile.boot
+> index a13299d..67d8666 100644
+> --- a/arch/arm/mach-kirkwood/Makefile.boot
+> +++ b/arch/arm/mach-kirkwood/Makefile.boot
+> @@ -12,3 +12,4 @@ dtb-$(CONFIG_MACH_TS219_DT)	+= kirkwood-ts219-6282.dtb
+>  dtb-$(CONFIG_MACH_GOFLEXNET_DT) += kirkwood-goflexnet.dtb
+>  dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lschlv2.dtb
+>  dtb-$(CONFIG_MACH_LSXL_DT) += kirkwood-lsxhl.dtb
+> +dtb-$(CONFIG_MACH_NSA310_DT) += kirkwood-nsa310.dtb
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index e4eb450..2a005a7 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -87,6 +87,9 @@ static void __init kirkwood_dt_init(void)
+>  	if (of_machine_is_compatible("buffalo,lsxl"))
+>  		lsxl_init();
+>  
+> +	if (of_machine_is_compatible("zyxel,nsa310"))
+> +		nsa310_init();
+> +
+>  	of_platform_populate(NULL, kirkwood_dt_match_table,
+>  			     kirkwood_auxdata_lookup, NULL);
+>  }
+> @@ -100,6 +103,7 @@ static const char *kirkwood_dt_board_compat[] = {
+>  	"qnap,ts219",
+>  	"seagate,goflexnet",
+>  	"buffalo,lsxl",
+> +	"zyxel,nsa310",
+>  	NULL
+>  };
+>  
+> diff --git a/arch/arm/mach-kirkwood/board-nsa310.c b/arch/arm/mach-kirkwood/board-nsa310.c
+> new file mode 100644
+> index 0000000..4d20841
+> --- /dev/null
+> +++ b/arch/arm/mach-kirkwood/board-nsa310.c
+> @@ -0,0 +1,166 @@
+> +/*
+> + * arch/arm/mach-kirkwood/board-nsa310.c
+> + *
+> + * ZyXEL NSA-310 Setup
 
- b.find_busiest_queue/find_idlest_queue: use cfs_rq->runnable_load_avg
-to decide this instead of cfs_rq->load.weight
+Copyright?
 
- c.move_tasks: use se->avg.load_avg_contrib to decide the weight of of
-each task instead of se->load.weight as the former reflects the runtime
-of the sched entity and hence its actual load.
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/i2c.h>
+> +#include <linux/mtd/mtd.h>
+> +#include <linux/mtd/partitions.h>
+> +#include <linux/gpio.h>
+> +
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <mach/kirkwood.h>
+> +#include "common.h"
+> +#include "mpp.h"
+> +
+> +#define NSA310_GPIO_LED_ESATA_GREEN	12
+> +#define NSA310_GPIO_LED_ESATA_RED	13
+> +#define NSA310_GPIO_LED_USB_GREEN	15
+> +#define NSA310_GPIO_LED_USB_RED		16
+> +#define NSA310_GPIO_USB_POWER_OFF	21
+> +#define NSA310_GPIO_LED_SYS_GREEN	28
+> +#define NSA310_GPIO_LED_SYS_RED		29
+> +#define NSA310_GPIO_KEY_RESTART		36
+> +#define NSA310_GPIO_KEY_COPY		37
+> +#define NSA310_GPIO_LED_COPY_GREEN	39
+> +#define NSA310_GPIO_LED_COPY_RED	40
+> +#define NSA310_GPIO_LED_HDD_GREEN	41
+> +#define NSA310_GPIO_LED_HDD_RED		42
+> +#define NSA310_GPIO_BUZZER		44
+> +#define NSA310_GPIO_KEY_POWER		46
+> +#define NSA310_GPIO_POWER_OFF		48
 
-This is what my patches3-13 do.Merely *Replace*.
+Please remove any of the above #define's that aren't used.
 
-*Why am I doing it*: Feed the load balancer with a more realistic metric
-to do load balancing and observe the consequences.
+> +
+> +
+> +static unsigned int nsa310_mpp_config[] __initdata = {
+> +	MPP12_GPIO, /* led esata green */
+> +	MPP13_GPIO, /* led esata red */
+> +	MPP15_GPIO, /* led usb green */
+> +	MPP16_GPIO, /* led usb red */
+> +	MPP21_GPIO, /* control usb power off */
+> +	MPP28_GPIO, /* led sys green */
+> +	MPP29_GPIO, /* led sys red */
+> +	MPP36_GPIO, /* key reset */
+> +	MPP37_GPIO, /* key copy */
+> +	MPP39_GPIO, /* led copy green */
+> +	MPP40_GPIO, /* led copy red */
+> +	MPP41_GPIO, /* led hdd green */
+> +	MPP42_GPIO, /* led hdd red */
+> +	MPP44_GPIO, /* ?? */
+> +	MPP46_GPIO, /* key power */
+> +	MPP48_GPIO, /* control power off */
+> +	0
+> +};
 
-> you start out by some weird avoid short running task movement.
-> why is that a good start?
+There is a patch series to convert all kirkwood DT boards over to DT
+init of MPP is under review currently.  If things go well, I'd like to
+see this use it as well.
 
-The short running tasks are not really burdening you,they have very
-little run time,so why move them?
-Throughout the concept of load balancing the focus is on *balancing the
-*existing* load* between the sched groups.But not really evaluating the
-*absolute load* of any given sched group.
+> +
+> +static struct mtd_partition nsa310_mtd_parts[] = {
+> +	{
+> +		.name	= "uboot",
+> +		.offset	= 0,
+> +		.size	= 0x100000,
+> +		.mask_flags = MTD_WRITEABLE,
+> +	}, {
+> +		.name	= "uboot_env",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0x80000,
+> +	}, {
+> +		.name	= "key_store",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0x80000,
+> +	}, {
+> +		.name	= "info",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0x80000,
+> +	}, {
+> +		.name	= "etc",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0xa00000,
+> +	}, {
+> +		.name	= "kernel_1",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0xa00000,
+> +	}, {
+> +		.name	= "rootfs1",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0x2fc0000,
+> +	}, {
+> +		.name	= "kernel_2",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0xa00000,
+> +	}, {
+> +		.name	= "rootfs2",
+> +		.offset	= MTDPART_OFS_NXTBLK,
+> +		.size	= 0x2fc0000,
+> +	},
+> +};
 
-Why is this *the start*? This is like a round of elimination before the
-actual interview round  Try to have only those sched groups as
-candidates for load balancing that are sufficiently loaded.[Patch1]
-This *sufficiently loaded* is decided by the new metric explained in the
-*How* above.
+Please move the above partition definitions into the dts file, you can
+then remove all of the nand init and relevant includes.
 
-> I also don't see the 'big' picture of what you're doing
+> +
+> +static struct i2c_board_info __initdata nsa310_i2c_info[] = {
+> +	{ I2C_BOARD_INFO("adt7476", 0x2e) },
+> +};
 
-Patch1: is explained above.*End result:Good candidates for lb.*
-Patch2:
-         10%
-         10%
-         10%                100%
-        ------             ------
-        SCHED_GP1          SCHED_GP2
+how far off from the adt7461 (lm90) is this?  If similar, please
+consider extending lm90's compatibility list and describing this in the
+dts instead.
 
-Before Patch               After Patch
------------------------------------
-SCHED_GP1 load:3072        SCHED_GP1:512
-SCHED_GP2 load:1024        SCHED_GP2:1024
+> +
+> +static void nsa310_power_off(void)
+> +{
+> +	gpio_set_value(NSA310_GPIO_POWER_OFF, 1);
+> +}
+> +
+> +static int __init nsa310_gpio_request(unsigned int gpio, unsigned long flags,
+> +				       const char *label)
+> +{
+> +	int err;
+> +
+> +	err = gpio_request_one(gpio, flags, label);
+> +	if (err)
+> +		pr_err("NSA-310: can't setup GPIO%u (%s), err=%d\n",
+> +			gpio, label, err);
+> +
+> +	return err;
+> +}
+> +
+> +static void __init nsa310_gpio_init(void)
+> +{
+> +	int err;
+> +
+> +	err = nsa310_gpio_request(NSA310_GPIO_POWER_OFF, GPIOF_OUT_INIT_LOW,
+> +				  "Power Off");
+> +	if (!err)
+> +		pm_power_off = nsa310_power_off;
 
-SCHED_GP1 is busiest       SCHED_GP2 is busiest:
+This doesn't smell right.
 
-But Patch2 re-decides between GP1 and GP2 to check if the latency of
-tasks is getting affected although there is less load on GP1.If yes it
-is a better *busy * gp.
+> +
+> +	nsa310_gpio_request(NSA310_GPIO_USB_POWER_OFF, GPIOF_OUT_INIT_LOW,
+> +			    "USB Power Off");
+> +}
+> +
+> +void __init nsa310_init(void)
+> +{
+> +	u32 dev, rev;
+> +
+> +	kirkwood_mpp_conf(nsa310_mpp_config);
+> +
+> +	nsa310_gpio_init();
+> +
+> +	kirkwood_nand_init(ARRAY_AND_SIZE(nsa310_mtd_parts), 35);
+> +
+> +	/* this can be removed once the mainline kirkwood.dtsi gets
+> +	 * the ehci configuration by default */
+> +	kirkwood_ehci_init();
+> +
+> +	kirkwood_pcie_id(&dev, &rev);
 
-*End Result: Better candidates for lb*
+Does this board actually use pcie?  If so, we've been looking for one to
+test on.  Just an fyi, we'll probably be hitting you up later for pcie
+DT binding testing. ;-)
 
-Rest of the patches: now that we have our busy sched group,let us load
-balance with the aid of the new metric.
-*End Result: Hopefully a more sensible movement of loads*
-This is how I build the picture.
+thx,
 
-Regards
-Preeti U Murthy
+Jason.
+
+
+> +
+> +	i2c_register_board_info(0, ARRAY_AND_SIZE(nsa310_i2c_info));
+> +	kirkwood_i2c_init();
+> +}
+> +
+> +static int __init nsa310_pci_init(void)
+> +{
+> +	if (of_machine_is_compatible("zyxel,nsa310"))
+> +		kirkwood_pcie_init(KW_PCIE0);
+> +
+> +	return 0;
+> +}
+> +
+> +subsys_initcall(nsa310_pci_init);
+> diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
+> index 304dd1a..a9256d7 100644
+> --- a/arch/arm/mach-kirkwood/common.h
+> +++ b/arch/arm/mach-kirkwood/common.h
+> @@ -94,6 +94,12 @@ void lsxl_init(void);
+>  static inline void lsxl_init(void) {};
+>  #endif
+>  
+> +#ifdef CONFIG_MACH_NSA310_DT
+> +void nsa310_init(void);
+> +#else
+> +static inline void nsa310_init(void) {};
+> +#endif
+> +
+>  /* early init functions not converted to fdt yet */
+>  char *kirkwood_id(void);
+>  void kirkwood_l2_init(void);
+> -- 
+> 1.7.12.3
+> 
