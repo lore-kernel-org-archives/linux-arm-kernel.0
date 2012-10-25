@@ -1,10 +1,10 @@
 From: hechtb@googlemail.com (Bastian Hecht)
-Date: Thu, 25 Oct 2012 12:58:20 +0200
-Subject: [PATCH 1/3] ARM: shmobile: emev2: Replace modify_scu_cpu_psr with
+Date: Thu, 25 Oct 2012 12:58:22 +0200
+Subject: [PATCH 3/3] ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with
  scu_power_mode
 In-Reply-To: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
 References: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
-Message-ID: <1351162702-8391-2-git-send-email-hechtb@gmail.com>
+Message-ID: <1351162702-8391-4-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,60 +15,78 @@ we save the locking overhead too.
 
 Signed-off-by: Bastian Hecht <hechtb@gmail.com>
 ---
- arch/arm/mach-shmobile/smp-emev2.c |   22 ++--------------------
- 1 file changed, 2 insertions(+), 20 deletions(-)
+ arch/arm/mach-shmobile/smp-r8a7779.c |   25 +++----------------------
+ 1 file changed, 3 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index f674562..535426c 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -32,24 +32,8 @@
- 
- #define EMEV2_SCU_BASE 0x1e000000
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 2ce6af9..9def0f2 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -61,9 +61,6 @@ static void __iomem *scu_base_addr(void)
+ 	return (void __iomem *)0xf0000000;
+ }
  
 -static DEFINE_SPINLOCK(scu_lock);
- static void __iomem *scu_base;
+-static unsigned long tmp;
+-
+ #ifdef CONFIG_HAVE_ARM_TWD
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
+ 
+@@ -73,20 +70,6 @@ void __init r8a7779_register_twd(void)
+ }
+ #endif
  
 -static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
 -{
--	unsigned long tmp;
+-	void __iomem *scu_base = scu_base_addr();
 -
--	/* we assume this code is running on a different cpu
--	 * than the one that is changing coherency setting */
 -	spin_lock(&scu_lock);
--	tmp = readl(scu_base + 8);
+-	tmp = __raw_readl(scu_base + 8);
 -	tmp &= ~clr;
 -	tmp |= set;
--	writel(tmp, scu_base + 8);
 -	spin_unlock(&scu_lock);
 -
+-	/* disable cache coherency after releasing the lock */
+-	__raw_writel(tmp, scu_base + 8);
 -}
 -
- static unsigned int __init emev2_get_core_count(void)
+ static unsigned int __init r8a7779_get_core_count(void)
  {
- 	if (!scu_base) {
-@@ -95,7 +79,7 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
+ 	void __iomem *scu_base = scu_base_addr();
+@@ -102,7 +85,7 @@ static int r8a7779_platform_cpu_kill(unsigned int cpu)
+ 	cpu = cpu_logical_map(cpu);
+ 
+ 	/* disable cache coherency */
+-	modify_scu_cpu_psr(3 << (cpu * 8), 0);
++	scu_power_mode(scu_base_addr(), 3);
+ 
+ 	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+ 		ch = r8a7779_ch_cpu[cpu];
+@@ -145,7 +128,7 @@ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct
  	cpu = cpu_logical_map(cpu);
  
  	/* enable cache coherency */
 -	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	scu_power_mode(scu_base, 0);
++	scu_power_mode(scu_base_addr(), 0);
  
- 	/* Tell ROM loader about our vector (in headsmp.S) */
- 	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
-@@ -106,12 +90,10 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
+ 	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+ 		ch = r8a7779_ch_cpu[cpu];
+@@ -158,15 +141,13 @@ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct
  
- static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
  {
 -	int cpu = cpu_logical_map(0);
 -
- 	scu_enable(scu_base);
+ 	scu_enable(scu_base_addr());
+ 
+ 	/* Map the reset vector (in headsmp.S) */
+ 	__raw_writel(__pa(shmobile_secondary_vector), AVECR);
  
  	/* enable cache coherency on CPU0 */
 -	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	scu_power_mode(scu_base, 0);
- }
++	scu_power_mode(scu_base_addr(), 0);
  
- static void __init emev2_smp_init_cpus(void)
+ 	r8a7779_pm_init();
+ 
 -- 
 1.7.9.5
