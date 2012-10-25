@@ -1,56 +1,60 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 25 Oct 2012 18:23:57 +0530
-Subject: [PATCH v2 4/7] i2c: omap: in case of VERSION_2 read IRQSTATUS_RAW
- but write to IRQSTATUS
-In-Reply-To: <1351167915-15079-5-git-send-email-balbi@ti.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Thu, 25 Oct 2012 14:53:33 +0200
+Subject: [PATCH v2 2/7] i2c: omap: reorder exit path of omap_i2c_xfer_msg()
+In-Reply-To: <50893398.6070004@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
  <1351167915-15079-1-git-send-email-balbi@ti.com>
- <1351167915-15079-5-git-send-email-balbi@ti.com>
-Message-ID: <50893665.60604@ti.com>
+ <1351167915-15079-3-git-send-email-balbi@ti.com>
+ <50893398.6070004@ti.com>
+Message-ID: <20617.13901.479604.302420@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012 05:55 PM, Felipe Balbi wrote:
-> on OMAP4+ we want to read IRQSTATUS_RAW register,
-> instead of IRQSTATUS. The reason being that IRQSTATUS
-> will only contain the bits which were enabled on
-> IRQENABLE_SET and that will break when we need to
-> poll for a certain bit which wasn't enabled as an
-> IRQ source.
->
-> One such case is after we finish converting to
-> deferred stop bit, we will have to poll for ARDY
-> bit before returning control for the client driver
-> in order to prevent us from trying to start a
-> transfer on a bus which is already busy.
->
-> Note, however, that omap-i2c.c needs a big rework
-> on register definition and register access. Such
-> work will be done in a separate series of patches.
->
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->   drivers/i2c/busses/i2c-omap.c | 12 +++++++++++-
->   1 file changed, 11 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index b004126..20f9ad6 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -271,8 +271,18 @@ static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
->
->   static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
->   {
-> -	return __raw_readw(i2c_dev->base +
-> +	/* if we are OMAP_I2C_IP_VERSION_2, we need to read from
-> +	 * IRQSTATUS_RAW, but write to IRQSTATUS
-> +	 */
-> +	if ((i2c_dev->dtrev == OMAP_I2C_IP_VERSION_2) &&
-> +			(reg == OMAP_I2C_STAT_REG)) {
-Doing this check on every I2C register read seems to
-expensive to me. Can you not sort this in init with some offset
-which can be 0 or non zero ?  Sorry in case this is already dicussed.
+Hi,
 
-regards
-santosh
+Santosh Shilimkar writes:
+> On Thursday 25 October 2012 05:55 PM, Felipe Balbi wrote:
+> > just a cleanup patch trying to make exit path
+> > more straightforward. No changes otherwise.
+> >
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >   drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++++++---------
+> >   1 file changed, 17 insertions(+), 9 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> > index c07d9c4..bea0277 100644
+> > --- a/drivers/i2c/busses/i2c-omap.c
+> > +++ b/drivers/i2c/busses/i2c-omap.c
+> > @@ -505,6 +505,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+> >   {
+> >   	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+> >   	unsigned long timeout;
+> > +	int ret;
+[...]
+> > +		ret = -EREMOTEIO;
+> > +		goto err;
+> >   	}
+> > -	return -EIO;
+> > +
+> > +	return 0;
+> With initialized value you can use
+> return ret;
+> 
+Doing it this way has the advantage, that if an additional error exit
+is added it will generate an 'uninitialized variable' warning, if it
+fails to set the return value.
+
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
