@@ -1,57 +1,35 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 25 Oct 2012 07:14:23 -0700
-Subject: OMAP baseline test results for v3.7-rc2
-In-Reply-To: <20121023211151.GF1855@beef> (Matt Porter's message of "Tue, 23
- Oct 2012 17:11:51 -0400")
-References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
- <50857444.9080308@ti.com>
- <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
- <50859505.5010306@ti.com> <20121023015346.GB1855@beef>
- <alpine.DEB.2.00.1210230311490.31118@utopia.booyaka.com>
- <20121023122436.GC1855@beef> <20121023131153.GE1855@beef>
- <877gqg99zk.fsf@deeprootsystems.com> <20121023211151.GF1855@beef>
-Message-ID: <87d30663ls.fsf@deeprootsystems.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Thu, 25 Oct 2012 16:16:45 +0200
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <50893389.2090002@gmail.com>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+ <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
+Message-ID: <20121025141645.GA16962@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Porter <mporter@ti.com> writes:
+On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
+> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
+> > On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
+> > 
+> >> While v6 can support unaligned accesses, it is optional and current
+> >> compilers won't emit unaligned accesses. So we don't clear the A bit for
+> >> v6.
+> > 
+> > not true according to the gcc changes page
+> 
+> What are you going to believe: documentation or what the compiler
+> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
+> support backported and 4.7.2, unaligned accesses are emitted for v7
+> only. I guess default here means it is the default unless you change the
+> default in your build of gcc.
 
-> On Tue, Oct 23, 2012 at 02:03:43PM -0700, Kevin Hilman wrote:
->> Matt Porter <mporter@ti.com> writes:
->> 
->> [...]
->> 
->> > Ok, very quick update...no need to mess around with the eeprom. I just
->> > received the official word on what will be supported. Since A2 is
->> > pre-release, simply go to http://beagleboard.org/support/rma and fill
->> > out the form to have it replaced with the current revision (A6).
->> >
->> > This applies to *anyone* that received a pre-release A2 board.
->> 
->> Hmm, doesn't seem the RMA people are aware of this.  They just rejected
->> my request since it's not a "hardware related issue":
->> 
->>    Kevin,
->> 
->>    We only work with hardware related issue here. BeagleBone revision A2
->>    was not officially released. We recommend you to work with the
->>    community for support in Uboot. You can post your questions at the
->>    BeagleBoard Google Groups:
->>    https://groups.google.com/forum/?fromgroups=#!forum/beagleboard
->> 
->>    Regards,
->>    RMA Team
->
-> That's sad considering the beagleboard.org/BeagleBone hardware designer
-> specifically said they would be replaced via this route. *sigh*. Ok, I'll
-> go back and share this with him.
+Since ARMv6 can handle unaligned access in the same way as ARMv7
+it seems a clear bug in gcc which might hopefully get fixed.
+Thus in this case I think it is reasonable to follow the
+gcc documentation, otherwise the code would break for ARMv6
+when gcc gets fixed.
 
-Just and update...
 
-Something happened behind the scenes (thanks Matt) and they've accepted
-my RMA request.  I'll be sending back my board in order to get a new
-one.
-
-Thanks,
-
-Kevin
+Johannes
