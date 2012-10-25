@@ -1,32 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 10:55:07 +0200
-Subject: [PATCH 1/5] ARM: Kirkwood: Allow use of pinctrl
-In-Reply-To: <1351088724-11142-2-git-send-email-andrew@lunn.ch>
+Date: Thu, 25 Oct 2012 10:57:21 +0200
+Subject: [PATCH 2/5] ARM: Kirkwood: Allow use of MVEBU GPIO driver.
+In-Reply-To: <1351088724-11142-3-git-send-email-andrew@lunn.ch>
 References: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
- <1351088724-11142-2-git-send-email-andrew@lunn.ch>
-Message-ID: <20121025105507.5bcb9eab@skate>
+ <1351088724-11142-3-git-send-email-andrew@lunn.ch>
+Message-ID: <20121025105721.67bf20a2@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Andrew Lunn,
 
-On Wed, 24 Oct 2012 16:25:20 +0200, Andrew Lunn wrote:
+On Wed, 24 Oct 2012 16:25:21 +0200, Andrew Lunn wrote:
 
-> index 7bf914d..5682c96 100644
-> --- a/drivers/pinctrl/Kconfig
-> +++ b/drivers/pinctrl/Kconfig
-> @@ -188,7 +188,7 @@ config PINCTRL_EXYNOS4
->  
->  config PINCTRL_MVEBU
->  	bool
+>  config GPIO_MVEBU
+>  	def_bool y
 > -	depends on ARCH_MVEBU
 > +	depends on ARCH_MVEBU || ARCH_KIRKWOOD
->  	select PINMUX
->  	select PINCONF
+>  	select GPIO_GENERIC
+>  	select GENERIC_IRQ_CHIP
 
-Linus Walleij has accepted a patch I have sent yesterday evening that
-makes PINCTRL_MVEBU available for all PLAT_ORION platforms, so this
-chunk is no longer needed.
+Should we turn the depends on ARCH_MVEBU into a depends on PLAT_ORION,
+like I did for the pinctrl driver (patch accepted by Linus Walleij
+yesterday) ? I think the dependency on ARCH_MVEBU was making too much
+of a shortcut, by assuming that we would very quickly move everybody
+into mach-mvebu. As we rather decided to move gradually
+mach-{kirkwood,dove,orion5x,mv78xx0} to those infrastructure while
+keeping them in their respective directories, I think a dependency on
+PLAT_ORION is more appropriate here.
+
+Best regards,
 
 Thomas
 -- 
