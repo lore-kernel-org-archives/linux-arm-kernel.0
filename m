@@ -1,29 +1,84 @@
 From: hechtb@googlemail.com (Bastian Hecht)
-Date: Thu, 25 Oct 2012 12:58:19 +0200
-Subject: [PATCH 0/3] Use generic helper scu_power_mode()
-Message-ID: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+Date: Thu, 25 Oct 2012 12:58:21 +0200
+Subject: [PATCH 2/3] ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with
+ scu_power_mode
+In-Reply-To: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+References: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+Message-ID: <1351162702-8391-3-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reposted to include the arch/arm mailing list.
+We can remove the extra code of modify_scu_cpu_psr() and use the cleaner
+generic ARM helper scu_power_mode(). As every CPU only deals with its
+own power register and scu_power_mode() operates with 8-bit accesses,
+we save the locking overhead too.
 
-The shmobile series implements its own code for setting the SCU power
-register of the ARM MPCore. It uses 32-bit wide access and thus needs
-locking as multiple CPUs might access it simultaneously for change. There is
-already a small helper function that avoids the overhead by using 8-bit
-wide access: As every CPU only accesses its own field we can drop the
-lock and use it.
+Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+---
+ arch/arm/mach-shmobile/smp-sh73a0.c |   23 ++---------------------
+ 1 file changed, 2 insertions(+), 21 deletions(-)
 
-Bastian Hecht (3):
-  ARM: shmobile: emev2: Replace modify_scu_cpu_psr with scu_power_mode
-  ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with scu_power_mode
-  ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with
-    scu_power_mode
-
- arch/arm/mach-shmobile/smp-emev2.c   |   22 ++--------------------
- arch/arm/mach-shmobile/smp-r8a7779.c |   25 +++----------------------
- arch/arm/mach-shmobile/smp-sh73a0.c  |   23 ++---------------------
- 3 files changed, 7 insertions(+), 63 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 624f00f..96ddb97 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -41,9 +41,6 @@ static void __iomem *scu_base_addr(void)
+ 	return (void __iomem *)0xf0000000;
+ }
+ 
+-static DEFINE_SPINLOCK(scu_lock);
+-static unsigned long tmp;
+-
+ #ifdef CONFIG_HAVE_ARM_TWD
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
+ void __init sh73a0_register_twd(void)
+@@ -52,20 +49,6 @@ void __init sh73a0_register_twd(void)
+ }
+ #endif
+ 
+-static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+-{
+-	void __iomem *scu_base = scu_base_addr();
+-
+-	spin_lock(&scu_lock);
+-	tmp = __raw_readl(scu_base + 8);
+-	tmp &= ~clr;
+-	tmp |= set;
+-	spin_unlock(&scu_lock);
+-
+-	/* disable cache coherency after releasing the lock */
+-	__raw_writel(tmp, scu_base + 8);
+-}
+-
+ static unsigned int __init sh73a0_get_core_count(void)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
+@@ -83,7 +66,7 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 	cpu = cpu_logical_map(cpu);
+ 
+ 	/* enable cache coherency */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	scu_power_mode(scu_base_addr(), 0);
+ 
+ 	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
+ 		__raw_writel(1 << cpu, WUPCR);	/* wake up */
+@@ -95,8 +78,6 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 
+ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	int cpu = cpu_logical_map(0);
+-
+ 	scu_enable(scu_base_addr());
+ 
+ 	/* Map the reset vector (in headsmp.S) */
+@@ -104,7 +85,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ 	__raw_writel(__pa(shmobile_secondary_vector), SBAR);
+ 
+ 	/* enable cache coherency on CPU0 */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	scu_power_mode(scu_base_addr(), 0);
+ }
+ 
+ static void __init sh73a0_smp_init_cpus(void)
 -- 
 1.7.9.5
