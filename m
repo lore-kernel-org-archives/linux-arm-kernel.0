@@ -1,118 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 10:57:07 +0100
-Subject: [PATCH 4/8] ARM: ux500: List DT compatibility using platform names
- rather than by board
+Date: Thu, 25 Oct 2012 10:57:08 +0100
+Subject: [PATCH 5/8] ARM: ux500: Add node for the MMC GPIO regulator
 In-Reply-To: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
 References: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351159031-25391-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1351159031-25391-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, each ST-Ericsson board supported by Device Tree has been similar
-enough to run though a single DT_MACHINE_INIT call. On the back of that
-it has been suggested that we should reduce the number of compatible
-strings in our dt_compat structure. After subsequent discussion with Arnd
-Bergmann the conclusion was to list entries by platform as opposed to by
-board.
+There is a very simple mechanism to change and SDI's voltage which
+consists of toggling some GPIOs. This scenario can be better handled
+if we convert it to a GPIO regulator. This patch provides one which
+can be read from Device Tree.
 
-The other suggestion was to use a single string which would cover all
-supported platforms, but any wildcard entries would include unsupported
-chipsets, such as the u5500 and potential new chips which no not yet have
-DT functionality. Hence, the best solution which encompasses all supported
-platforms, but no unsupported ones was to list the currently enabled four
-chipsets; u8500, u8540, u9500 and u9540 instead.
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ccu9540.dts     |    2 +-
- arch/arm/boot/dts/hrefprev60.dts  |    2 +-
- arch/arm/boot/dts/hrefv60plus.dts |    2 +-
- arch/arm/boot/dts/snowball.dts    |    2 +-
- arch/arm/mach-ux500/cpu-db8500.c  |   12 ++++++------
- 5 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/dbx5x0.dtsi |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ccu9540.dts b/arch/arm/boot/dts/ccu9540.dts
-index 26dfe83..0430546 100644
---- a/arch/arm/boot/dts/ccu9540.dts
-+++ b/arch/arm/boot/dts/ccu9540.dts
-@@ -14,7 +14,7 @@
- 
- / {
- 	model = "ST-Ericsson CCU9540 platform with Device Tree";
--	compatible = "st-ericsson,ccu9540";
-+	compatible = "st-ericsson,ccu9540", "st-ericsson,u9540";
- 
- 	memory {
- 		reg = <0x00000000 0x20000000>;
-diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
-index cd9e535..b398946 100644
---- a/arch/arm/boot/dts/hrefprev60.dts
-+++ b/arch/arm/boot/dts/hrefprev60.dts
-@@ -16,7 +16,7 @@
- 
- / {
- 	model = "ST-Ericsson HREF (pre-v60) platform with Device Tree";
--	compatible = "st-ericsson,mop500";
-+	compatible = "st-ericsson,mop500", "st-ericsson,u8500";
- 
- 	gpio_keys {
- 		button at 1 {
-diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-index 82103a2..a01ac8f 100644
---- a/arch/arm/boot/dts/hrefv60plus.dts
-+++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -16,7 +16,7 @@
- 
- / {
- 	model = "ST-Ericsson HREF (v60+) platform with Device Tree";
--	compatible = "st-ericsson,hrefv60+";
-+	compatible = "st-ericsson,hrefv60+", "st-ericsson,u8500";
- 
- 	gpio_keys {
- 		button at 1 {
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 6a2b58b..9e02a91 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -14,7 +14,7 @@
- 
- / {
- 	model = "Calao Systems Snowball platform with device tree";
--	compatible = "calaosystems,snowball-a9500";
-+	compatible = "calaosystems,snowball-a9500", "st-ericsson,u9500";
- 
- 	memory {
- 		reg = <0x00000000 0x20000000>;
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 472b49f..c65e7e3 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -330,11 +330,11 @@ static void __init u8500_init_machine(void)
- 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
- }
- 
--static const char * u8500_dt_board_compat[] = {
--	"calaosystems,snowball-a9500",
--	"st-ericsson,hrefv60+",
--	"st-ericsson,mop500",
--	"st-ericsson,ccu9540",
-+static const char * stericsson_dt_platform_compat[] = {
-+	"st-ericsson,u8500",
-+	"st-ericsson,u8540",
-+	"st-ericsson,u9500",
-+	"st-ericsson,u9540",
- 	NULL,
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index 07a085b..536df5d 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -614,5 +614,19 @@
+ 			ranges = <0 0x50000000 0x4000000>;
+ 			status = "disabled";
+ 		};
++
++		vmmci: regulator-gpio {
++			compatible = "regulator-gpio";
++
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <2600000>;
++			regulator-name = "mmci-reg";
++			regulator-type = "voltage";
++
++			gpios = <&tc3589x_gpio 18 0x4>;
++			gpio-enable = <&tc3589x_gpio 17 0x4>;
++			states = <1800000 0x1
++				  2900000 0x0>;
++		};
+ 	};
  };
- 
-@@ -346,7 +346,7 @@ DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= u8500_init_machine,
- 	.init_late	= NULL,
--	.dt_compat      = u8500_dt_board_compat,
-+	.dt_compat      = stericsson_dt_platform_compat,
- MACHINE_END
- 
- #endif
 -- 
 1.7.9.5
