@@ -1,65 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 25 Oct 2012 16:11:49 +0200
-Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
- update
-In-Reply-To: <50894471.9040000@gmail.com>
-References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
- <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
- <20121024160139.6dbf5e16@skate> <5087F5B9.0@free-electrons.com>
- <20121025131818.GF18811@titan.lakedaemon.net> <50894471.9040000@gmail.com>
-Message-ID: <508948A5.3020005@free-electrons.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 25 Oct 2012 07:14:23 -0700
+Subject: OMAP baseline test results for v3.7-rc2
+In-Reply-To: <20121023211151.GF1855@beef> (Matt Porter's message of "Tue, 23
+ Oct 2012 17:11:51 -0400")
+References: <alpine.DEB.2.00.1210202125300.774@utopia.booyaka.com>
+ <50857444.9080308@ti.com>
+ <alpine.DEB.2.00.1210221829270.13464@utopia.booyaka.com>
+ <50859505.5010306@ti.com> <20121023015346.GB1855@beef>
+ <alpine.DEB.2.00.1210230311490.31118@utopia.booyaka.com>
+ <20121023122436.GC1855@beef> <20121023131153.GE1855@beef>
+ <877gqg99zk.fsf@deeprootsystems.com> <20121023211151.GF1855@beef>
+Message-ID: <87d30663ls.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 03:53 PM, Rob Herring wrote:
-> On 10/25/2012 08:18 AM, Jason Cooper wrote:
->> On Wed, Oct 24, 2012 at 04:05:45PM +0200, Gregory CLEMENT wrote:
->>> On 10/24/2012 04:01 PM, Thomas Petazzoni wrote:
->>>> Hello,
->>>>
->>>> Shouldn't you split into one commit adding the SATA definition in
->>>> the .dtsi + doing the defconfig change (the "SoC" level modifications),
->>>> and then another commit for the .dts change? I don't really care
->>>> personally, it's really up to Jason/Andrew on this.
->>>>
->>>> Another comment below, though.
->>>>
->>>> On Wed, 24 Oct 2012 15:49:21 +0200, Gregory CLEMENT wrote:
->>>>
->>>>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
->>>>> index 94b4b9e..3f08233 100644
->>>>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
->>>>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
->>>>> @@ -69,6 +69,16 @@
->>>>>  			compatible = "marvell,armada-addr-decoding-controller";
->>>>>  			reg = <0xd0020000 0x258>;
->>>>>  		};
->>>>> +
->>>>> +		sata at d00a0000 {
->>>>> +                        compatible = "marvell,orion-sata";
->>>>> +                        reg = <0xd00a0000 0x2400>;
->>>>> +                        interrupts = <55>;
->>>>> +                        nr-ports = <2>;
->>>>> +			clocks = <&coreclk 0>;//,  <&coreclk 0>;
->>>>
->>>> Alignment problem + remainings of tests or something like that.
->>>
->>> True I missed this one.
->>>
->>> Jason, Andrew, do you want I split this patch as suggested by Thomas or
->>> are you fine with having one single patch?
->>
->> Yes, please make the defconfig changes a separate patch.  Also, please
->> make sure only the minimum is enabled (eq RAID... isn't needed).
-> 
-> What about updating multi_v7_defconfig instead?
+Matt Porter <mporter@ti.com> writes:
 
-About the _instead_, when I proposed to removed mvebu_defconfig Thomas
-argued that it was more convenient to build a mvebu-only kernel when
-doing kernel development, and Andrew also pointed that this defconfig
-should be useful for kisskb.
+> On Tue, Oct 23, 2012 at 02:03:43PM -0700, Kevin Hilman wrote:
+>> Matt Porter <mporter@ti.com> writes:
+>> 
+>> [...]
+>> 
+>> > Ok, very quick update...no need to mess around with the eeprom. I just
+>> > received the official word on what will be supported. Since A2 is
+>> > pre-release, simply go to http://beagleboard.org/support/rma and fill
+>> > out the form to have it replaced with the current revision (A6).
+>> >
+>> > This applies to *anyone* that received a pre-release A2 board.
+>> 
+>> Hmm, doesn't seem the RMA people are aware of this.  They just rejected
+>> my request since it's not a "hardware related issue":
+>> 
+>>    Kevin,
+>> 
+>>    We only work with hardware related issue here. BeagleBone revision A2
+>>    was not officially released. We recommend you to work with the
+>>    community for support in Uboot. You can post your questions at the
+>>    BeagleBoard Google Groups:
+>>    https://groups.google.com/forum/?fromgroups=#!forum/beagleboard
+>> 
+>>    Regards,
+>>    RMA Team
+>
+> That's sad considering the beagleboard.org/BeagleBone hardware designer
+> specifically said they would be replaced via this route. *sigh*. Ok, I'll
+> go back and share this with him.
 
-And about updated both mvebu_defconfig and multi_v7_defconfig, I'm
-fine with it.
+Just and update...
 
-Gregory
+Something happened behind the scenes (thanks Matt) and they've accepted
+my RMA request.  I'll be sending back my board in order to get a new
+one.
+
+Thanks,
+
+Kevin
