@@ -1,30 +1,135 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Oct 2012 17:48:07 -0700
-Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
-In-Reply-To: <20121016165043.GS15569@atomide.com>
-References: <1349675983-23803-1-git-send-email-kishon@ti.com>
- <1349675983-23803-2-git-send-email-kishon@ti.com>
- <20121016165043.GS15569@atomide.com>
-Message-ID: <20121025004806.GK11928@atomide.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 24 Oct 2012 20:28:56 -0500
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <1350935758-9215-5-git-send-email-zonque@gmail.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com>
+Message-ID: <508895D8.5000701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121016 09:53]:
-> * Kishon Vijay Abraham I <kishon@ti.com> [121007 23:01]:
-> > ocp2scp was not having pdata support which makes *musb* fail for non-dt
-> > boot in OMAP platform. The pdata will have information about the devices
-> > that is connected to ocp2scp. ocp2scp driver will now make use of this
-> > information to create the devices that is attached to ocp2scp.
-> > 
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Hi Daniel,
+
+On 10/22/2012 02:55 PM, Daniel Mack wrote:
+> This patch adds basic DT bindings for OMAP GPMC.
 > 
-> This fixes the regression on my panda es for musb port:
+> The actual peripherals are instanciated from child nodes within the GPMC
+> node, and the only type of device that is currently supported is NAND.
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> Code was added to parse the generic GPMC timing parameters and some
+> documentation with examples on how to use them.
+> 
+> Successfully tested on an AM33xx board.
 
-Looks like nobody has picked this one up and we need it to
-fix the musb regression on omap, so I'll queue these up.
+Thanks for sending this and sorry for the delay in responding. Some
+comments below ...
 
-Regards,
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/bus/gpmc.txt     |  59 +++++++++
+>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  65 ++++++++++
+>  arch/arm/mach-omap2/gpmc.c                         | 139 +++++++++++++++++++++
+>  3 files changed, 263 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/gpmc.txt
+>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/gpmc.txt b/Documentation/devicetree/bindings/bus/gpmc.txt
+> new file mode 100644
+> index 0000000..ef1c6e1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/gpmc.txt
+> @@ -0,0 +1,59 @@
+> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
+> +
+> +The actual devices are instantiated from the child nodes of a GPMC node.
+> +
+> +Required properties:
+> +
+> + - compatible: Should be set to "ti,gpmc"
 
-Tony
+Is this the only required property? I think that "reg" and "ti,hwmods"
+are probably also required.
+
+Also given that we are describing the hardware, I am wondering if the
+number of chip-selects and wait signals should be defined here too. I
+recall that different devices had different number of wait pins available.
+
+> +
+> +Timing properties for child nodes. All are optional and default to 0.
+> +
+> + - gpmc,sync-clk:	Minimum clock period for synchronous mode, in picoseconds
+> +
+> + Chip-select signal timings corresponding to GPMC_CS_CONFIG2:
+> + - gpmc,cs-on:		Assertion time
+> + - gpmc,cs-rd-off:	Read deassertion time
+> + - gpmc,cs-wr-off:	Write deassertion time
+> +
+> + ADV signal timings corresponding to GPMC_CONFIG3:
+> + - gpmc,adv-on:		Assertion time
+> + - gpmc,adv-rd-off:	Read deassertion time
+> + - gpmc,adv-wr-off:	Write deassertion time
+> +
+> + WE signals timings corresponding to GPMC_CONFIG4:
+> + - gpmc,we-on:		Assertion time
+> + - gpmc,we-off:		Deassertion time
+> +
+> + OE signals timings corresponding to GPMC_CONFIG4
+> + - gpmc,oe-on:		Assertion time
+> + - gpmc,oe-off:		Deassertion time
+> +
+> + Access time and cycle time timings corresponding to GPMC_CONFIG5
+> + - gpmc,page-burst-access: Multiple access word delay
+> + - gpmc,access:		Start-cycle to first data valid delay
+> + - gpmc,rd-cycle:	Total read cycle time
+> + - gpmc,wr-cycle:	Total write cycle time
+> +
+> +The following are only on OMAP3430
+> + - gpmc,wr-access
+> + - gpmc,wr-data-mux-bus
+> +
+> +
+> +Example for an AM33xx board:
+> +
+> +	gpmc: gpmc at 50000000 {
+> +		compatible = "ti,gpmc";
+> +		ti,hwmods = "gpmc";
+> +		reg = <0x50000000 0x1000000>;
+> +		interrupt-parent = <&intc>;
+> +		interrupts = <100>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		/* child nodes go here */
+> +	};
+> +
+> +
+> +
+> +
+> +
+> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+> new file mode 100644
+> index 0000000..6790fcf
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+> @@ -0,0 +1,65 @@
+> +Device tree bindings for GPMC connected NANDs
+> +
+> +GPMC connected NAND (found on OMAP boards) are represented as child nodes of
+> +the GPMC controller with a name of "nand".
+> +
+> +All timing relevant properties are explained in a separate documents - please
+> +refer to Documentation/devicetree/bindings/bus/gpmc.txt
+> +
+> +Required properties:
+> +
+> + - reg: The CS line the peripheral is connected to
+
+Is this the only required property? I would have thought that bus-width
+is needed too.
+
+In general, I am wondering if this should be broken into two patches as
+you are creating the binding for the gpmc and nand here.
+
+Cheers
+Jon
