@@ -1,55 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Oct 2012 13:10:10 +0300
-Subject: [PATCH 3/8] i2c: omap: fix error checking
-In-Reply-To: <5087FE07.6090504@amarulasolutions.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-4-git-send-email-balbi@ti.com>
- <5087FE07.6090504@amarulasolutions.com>
-Message-ID: <20121025101010.GC21217@arwen.pp.htv.fi>
+Date: Thu, 25 Oct 2012 13:12:12 +0300
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+Message-ID: <20121025101212.GD21217@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Wed, Oct 24, 2012 at 04:41:11PM +0200, Michael Trimarchi wrote:
-> Hi
-> 
-> On 10/22/2012 11:46 AM, Felipe Balbi wrote:
-> > It's impossible to have Arbitration Lost,
-> > Read Overflow, and Tranmist Underflow all
-> > asserted at the same time.
-> > 
-> > Those error conditions are mutually exclusive
-> > so what the code should be doing, instead, is
-> > check each error flag separataly.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> >  drivers/i2c/busses/i2c-omap.c | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> > index bea0277..e0eab38 100644
-> > --- a/drivers/i2c/busses/i2c-omap.c
-> > +++ b/drivers/i2c/busses/i2c-omap.c
-> > @@ -587,9 +587,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
-> >  		goto err_i2c_init;
-> >  	}
-> >  
-> > -	/* We have an error */
-> > -	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
-> > -			    OMAP_I2C_STAT_XUDF)) {
-> > +	if ((dev->cmd_err & OMAP_I2C_STAT_AL)
-> > +			|| (dev->cmd_err & OMAP_I2C_STAT_ROVR)
-> > +			|| (dev->cmd_err & OMAP_I2C_STAT_XUDF)) {
-> 
-> Sorry, what is the difference? I didn't understand the optimisation
-> and why now is more clear. Can you just add a comment?
+On Tue, Oct 23, 2012 at 09:23:03PM +0200, Jean Pihet wrote:
+> On Tue, Oct 23, 2012 at 9:19 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Mon, 22 Oct 2012, Jean Pihet wrote:
+> >
+> >> On Mon, Oct 22, 2012 at 6:12 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> >>
+> >> > Do you have CPU_IDLE enabled?
+> >> FYI the issue is not present with CPU_IDLE enabled.
+> >
+> > Hmm, how can you tell?  I thought you weren't able to reproduce it with
+> > CPU_IDLE disabled either?
+> I could not reproduce the issue, with and without CPU_IDLE enabled.
+> What puzzles me is that the PM QoS code only has influence on the
+> states chosen by cpuidle, so the change should not have any impact
+> with CPU_IDLE enabled. I reallt need to reproduce the issue.
+> Let me try with the same setup as yours (bootloader images,
+> omap2pus_defconfig, angstrom roots).
 
-semantically they're not the same, right ? We want to check if each of
-those bits are set, not if all of them are set together.
+I just sent a patch to fix a bug I found on OMAP4 panda but while
+reading this thread again, I think it could be that it's the same bug
+which is just easier to reproduce on Paul's setup.
 
-my 2 cents.
+Paul, Aaro, can you see if [1] makes the problem go away ? that would be
+another reason to push [1] during this -rc cycle.
+
+[1] http://marc.info/?l=linux-omap&m=135115602407925&w=2
 
 -- 
 balbi
@@ -59,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/f3659a9c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/75fc7df8/attachment-0001.sig>
