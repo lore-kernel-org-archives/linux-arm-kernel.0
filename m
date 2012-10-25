@@ -1,28 +1,20 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 25 Oct 2012 13:34:03 -0700
-Subject: [PATCHv2] ARM: Push selects for TWD/SCU into machine entries
-In-Reply-To: <1351099475-29349-1-git-send-email-sboyd@codeaurora.org>
-References: <1351099475-29349-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20121025203403.GA20767@codeaurora.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 25 Oct 2012 14:41:25 -0600
+Subject: [PATCH V2] ARM: dt: tegra: ventana: define pinmux for ddc
+In-Reply-To: <1351147951-19706-1-git-send-email-markz@nvidia.com>
+References: <1351147951-19706-1-git-send-email-markz@nvidia.com>
+Message-ID: <5089A3F5.40005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 10:24:35AM -0700, Stephen Boyd wrote:
-> The TWD and SCU configs are selected by default as long as
-> MSM_SCORPIONMP is false and/or MCT is false. Implementing the
-> logic this way certainly saves lines in the Kconfig but it
-> precludes those machines which select MSM_SCORPIONMP or MCT from
-> participating in the single zImage effort because when those
-> machines are combined with other SMP capable machines the TWD and
-> SCU are no longer selected by default.
-> 
-> Push the select out to the machine entries so that we can compile
-> these machines together and still select the appropriate configs.
+On 10/25/2012 12:52 AM, Mark Zhang wrote:
+> Tegra 2's I2C2 controller can be routed to either the PTA
+> or DDC pin group on Ventana. So:
+> - Remove the HDMI function definition of pta pingroup
+> - Define child i2c adapters(ddc & pta) for I2C2 controller
 
->  arch/arm/mach-msm/Kconfig      | 7 ++-----
+Thanks, this looks good now.
 
-Acked-by: David Brown <davidb@codeaurora.org>
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I've applied it to Tegra's for-3.8/dt branch for now, although I may
+have to shuffle things around (or just rename that branch) depending on
+exactly what patches we end up with to enable tegradrm.
