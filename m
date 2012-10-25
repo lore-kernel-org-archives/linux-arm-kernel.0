@@ -1,65 +1,49 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 25 Oct 2012 07:40:58 +0200
-Subject: [GIT PULL] CMA and DMA-mapping fixes for v3.7-rc3
-Message-ID: <1351143658-30902-1-git-send-email-m.szyprowski@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 25 Oct 2012 07:46:38 +0200
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <20121024233356.1bda95bf@skate>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <201210242006.55879.michael@walle.cc>
+ <20121024200128.GY21046@lunn.ch> <20121024233356.1bda95bf@skate>
+Message-ID: <20121025054638.GB8590@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Wed, Oct 24, 2012 at 11:33:56PM +0200, Thomas Petazzoni wrote:
+> Andrew,
+> 
+> On Wed, 24 Oct 2012 22:01:28 +0200, Andrew Lunn wrote:
+> 
+> > I guess it is too early to use gpio. I don't think the gpio driver has
+> > not been configured yet.
+> > 
+> > I need to think about this.
+> > 
+> > What happens if you comment out these two gpio_set_value calls?
+> 
+> The problem is (probably, I haven't tested) that in
+> mach-kirkwood/board-dt.c, the of_platform_populate() function is called
+> after all the board-specific init. So all the devices described in the
+> DT, including GPIO banks, have not been registered yet. Most likely the
+> of_platform_populate() should come before the board specific inits.
 
-I would like to ask for pulling some minor fixes for both CMA
-(Contiguous Memory Allocator) and DMA-mapping framework for v3.7-rc3.
+Thanks Thomas, i will play around with this.
 
-----------------------------------------------------------------
+I'm just wondering if we are going to get into ordering issues. These
+gpio operations are providing power to subsystems. We probably need
+that to happen before the driver is loaded. If we call
+of_platform_populate() too early, do we have the danger the driver
+probing is going to happen before the init routine can enable the
+power?
 
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+It seems like we want pinctrl/gpio working first, with pins hogged as
+specified in DT, then the board init() function, then the rest of DT
+setup.
 
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+> Also there should probably  be a gpio_request() before those
+> gpio_set_value().
 
-are available in the git repository at:
+Yes. That worked before, but might break now. Most of the init()
+functions do actually make a gpip_request() call.
 
-  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git fixes_for_linus
-
-for you to fetch changes up to 4e85fb831aa210fd1c5e2cb7909ac203c1f5b67f:
-
-  ARM: mm: Remove unused arm_vmregion priv field (2012-10-24 07:38:15 +0200)
-
-----------------------------------------------------------------
-
-This pull request consists mainly of a set of one-liner fixes and
-cleanups for a few minor issues identified in both Contiguous Memory
-Allocator code and ARM DMA-mapping subsystem.
-
-Thanks!
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-----------------------------------------------------------------
-
-Patch summary:
-
-Bob Liu (1):
-      mm: cma: alloc_contig_range: return early for err path
-
-Jingoo Han (1):
-      ARM: dma-mapping: fix build warning in __dma_alloc()
-
-Laurent Pinchart (4):
-      drivers: dma-contiguous: Don't redefine SZ_1M
-      drivers: dma-coherent: Fix typo in dma_mmap_from_coherent documentation
-      drivers: cma: Fix wrong CMA selected region size default value
-      ARM: mm: Remove unused arm_vmregion priv field
-
-Ming Lei (1):
-      ARM: dma-mapping: support debug_dma_mapping_error
-
- arch/arm/include/asm/dma-mapping.h |    1 +
- arch/arm/mm/dma-mapping.c          |    2 +-
- arch/arm/mm/vmregion.h             |    1 -
- drivers/base/Kconfig               |    2 +-
- drivers/base/dma-coherent.c        |    5 ++---
- drivers/base/dma-contiguous.c      |    5 +----
- mm/page_alloc.c                    |    2 +-
- 7 files changed, 7 insertions(+), 11 deletions(-)
+     Andrew
