@@ -1,45 +1,83 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 16:48:32 +0100
-Subject: [GIT PULL] ux500 fixes due for v3.7 RCs
-In-Reply-To: <CACRpkdZM3wHh9jey1eUfw9yjRTMK_fW5nKf1HcQuf2aExpPxbg@mail.gmail.com>
-References: <20121025094147.GA4008@gmail.com>
- <201210251352.31364.arnd@arndb.de>
- <CACRpkdZM3wHh9jey1eUfw9yjRTMK_fW5nKf1HcQuf2aExpPxbg@mail.gmail.com>
-Message-ID: <20121025154832.GJ4008@gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 25 Oct 2012 15:51:29 +0000
+Subject: [PATCH V3 1/5] ARM: dts: OMAP: Add timer nodes
+In-Reply-To: <508931A1.50608@ti.com>
+References: <1350496873-21337-1-git-send-email-jon-hunter@ti.com>
+ <1350496873-21337-2-git-send-email-jon-hunter@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB49C1B@DBDE01.ent.ti.com>
+ <50887315.2000509@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB4A768@DBDE01.ent.ti.com>
+ <50892E27.7070102@ti.com> <508931A1.50608@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB4AB84@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012, Linus Walleij wrote:
-
-> On Thu, Oct 25, 2012 at 3:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Oct 25, 2012 at 18:03:37, Hunter, Jon wrote:
 > 
-> > Since we're now getting pull requests from both of you, Lee and Linus,
-> > I'd like to understand how you are organized.
-> >
-> > Lee, are you just sending bug fixes directly and send future work through
-> > Linus, or are you acting as backup maintainer when he is busy otherwise
-> > in general?
+> On 10/25/2012 07:18 AM, Jon Hunter wrote:
 > 
-> Let us say that Lee is pushing stuff that is DT-related, e.g. fixes that
-> only manifest in DT environments and I'm pushing most other stuff.
+> ...
 > 
-> I'm happy that Lee is doing some nice offloading as pinctrl and gpio is
-> currently quite busy.
+> >> @@ -113,6 +114,9 @@ static int omap_timer_interrupt_test(struct omap_dm_timer *gptimer)
+> >>
+> >>         irq_data.gptimer = gptimer;
+> >>         init_completion(&irq_data.complete);
+> >> +
+> >> +       omap_dm_timer_enable(gptimer);
+> >> +
+> >>         omap_dm_timer_set_int_enable(gptimer, OMAP_TIMER_INT_OVERFLOW);
+> >>         omap_dm_timer_set_load_start(gptimer, 0, 0xffffff00);
+> >>
+> >> @@ -128,6 +132,8 @@ static int omap_timer_interrupt_test(struct omap_dm_timer *gptimer)
+> >>
+> >>         omap_dm_timer_stop(gptimer);
+> >>         omap_dm_timer_set_int_enable(gptimer, 0);
+> >> +       omap_dm_timer_disable(gptimer);
+> >> +
+> > 
+> > Hmmm ... I am wondering if there is another bug lingering in the dmtimer
+> > driver. Ideally, the context should be preserved by the driver.
 > 
-> One day Srinidhi may also send pull requests, as co-maintainer.
+> Looking at omap_dm_timer_set_load_start() we have the following code to
+> restore context ...
+> 
+> if (!(timer->capability & OMAP_TIMER_ALWON)) {
+> 	if (omap_pm_get_dev_context_loss_count(&timer->pdev->dev) !=
+> 			timer->ctx_loss_count)		
+> 		omap_timer_restore_context(timer);
+> }
+> 
+> Can you see if this is getting called for AM33xx for the failing timers?
+> If not then it would suggest that we are not detecting context loss
+> correctly and not restoring the context. With the above context restore
+> code we should not need those extra omap_dm_timer_enable/disable calls.
+> 
 
-Right. As I was creating quite a lot of traffic, I've basically been
-asked to push all my own stuff after I've acquired the right Acks.
-I won't be pushing/acking anything else i.e. not acting as a co-
-maintainer.
+OK, below log explains all now,
 
-Hope that clears things up.
+----------------------
+Testing 48042000.timer with 24000000 Hz clock ...
+omap_dm_timer_set_load_start:559 ctx_loss_count - 0, get_dev_context - 0
+Timer read test PASSED! No errors, 100 loops
+omap_dm_timer_set_int_enable:665: irq_ena - 0
+omap_dm_timer_set_int_enable:671: irq_ena - 2
+omap_dm_timer_set_load_start:559 ctx_loss_count - 0, get_dev_context - 0
+Timer interrupt test FAILED! No interrupt occurred in 1 sec
+omap_dm_timer_set_int_enable:665: irq_ena - 0
+omap_dm_timer_set_int_enable:671: irq_ena - 0
+Testing 48042000.timer with 32768 Hz clock ...
+omap_dm_timer_set_load_start:559 ctx_loss_count - 0, get_dev_context - 0
+----------------------
 
-Kind regards,
-Lee
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So below condition is not passing for AM33xx which results into context loss.
+
+if (omap_pm_get_dev_context_loss_count(&timer->pdev->dev) !=
+                                 timer->ctx_loss_count)
+
+
+Let me debug on this, this looks something specific to am33xx missing from 
+baseport.
+
+Thanks,
+Vaibhav
