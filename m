@@ -1,8 +1,8 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 19:57:31 +0000 (UTC)
-Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
- pdata function pointer
-In-Reply-To: <20121025193413.GA11928@atomide.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 25 Oct 2012 23:08:12 +0300
+Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add
+ read_reset_sources pdata function pointer
+In-Reply-To: <alpine.DEB.2.00.1210251944540.21193@utopia.booyaka.com>
 References: <20121016012448.21844.92339.stgit@dusk.lan>
  <20121016013213.21844.20016.stgit@dusk.lan>
  <20121025153805.GB11623@blackmetal.musicnaut.iki.fi>
@@ -12,42 +12,21 @@ References: <20121016012448.21844.92339.stgit@dusk.lan>
  <20121025191936.GZ11928@atomide.com>
  <alpine.DEB.2.00.1210251929500.21193@utopia.booyaka.com>
  <20121025193413.GA11928@atomide.com>
-Message-ID: <alpine.DEB.2.00.1210251944540.21193@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210251944540.21193@utopia.booyaka.com>
+Message-ID: <20121025200812.GC11623@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012, Tony Lindgren wrote:
+Hi,
 
-> I have not looked how the watchdog subsystem handles multiple
-> watchdogs, but..
+On Thu, Oct 25, 2012 at 07:57:31PM +0000, Paul Walmsley wrote:
+> [ As an aside, neither the OMAP watchdog driver, nor the TWL watchdog 
+> driver have been updated to use the new watchdog core code.  So they both 
+> can't be loaded at the same time until one or both are fixed. ]
 
-In the new watchdog core code, each watchdog driver gets a separate 
-/dev/watchdog* character device.  The ioctls are called on those device 
-nodes.
+FYI, this is being done currently:
 
-[ As an aside, neither the OMAP watchdog driver, nor the TWL watchdog 
-driver have been updated to use the new watchdog core code.  So they both 
-can't be loaded at the same time until one or both are fixed. ]
+	- OMAP wdt: https://lkml.org/lkml/2012/10/10/402
+	- TWL wdt: http://marc.info/?l=linux-omap&m=134734329319385&w=2
 
-> Can't we have the omap watchdog and twl watchdog return -ENOTSUPP for 
-> WDIOC_GETBOOTSTATUS and have the watchdog core fail over to the third 
-> wathcdog omap_prcm_wdt_ioctl() that only implements WDIOC_GETBOOTSTATUS? 
-> Or something like that.
-
-Sounds like a question better asked of Alan Cox and Wim, who wrote the 
-watchdog core code.
-
-Two other observations:
-
-- It's possible that two different watchdogs could report different boot 
-reasons.  The TWL might store its own watchdog boot reason which could be 
-different from what's reported via the OMAP PRM.  For example, the TWL can 
-record a thermal shutdown reset event, STS_BOOT.TS, which wouldn't be 
-reflected in the PRM reset source data, which would just see some kind of 
-external reset or power-off event.
-
-- The PRM doesn't contain a hardware watchdog, so not sure it makes sense 
-to create a watchdog driver for it.
-
-
-- Paul
+A.
