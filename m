@@ -1,76 +1,53 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 25 Oct 2012 09:38:06 -0700
-Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <1351155648-20429-1-git-send-email-balbi@ti.com> (Felipe Balbi's
- message of "Thu, 25 Oct 2012 12:00:48 +0300")
-References: <1351155648-20429-1-git-send-email-balbi@ti.com>
-Message-ID: <8739124idt.fsf@deeprootsystems.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 25 Oct 2012 11:39:52 -0600
+Subject: DEBUG_LL broken for socfpga
+In-Reply-To: <20121025181823.6c3fa0de@skate>
+References: <20121025181823.6c3fa0de@skate>
+Message-ID: <1351186792.15182.14.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Paul
+Hi Thomas,
 
-Felipe Balbi <balbi@ti.com> writes:
+On Thu, 2012-10-25 at 18:18 +0200, Thomas Petazzoni wrote:
+> Dinh,
+> 
+> The arch/arm/include/debug/socfpga.S file implements only addruart, and
+> forgets to implement waituart, senduart, busyuart:
+> 
+>   AS      arch/arm/kernel/debug.o
+> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S: Assembler messages:
+> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:83: Error: bad instruction `waituart r2,r3'
+> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:84: Error: bad instruction `senduart r1,r3'
+> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:85: Error: bad instruction `busyuart r2,r3'
+> 
+> Since the socfpga UART is apparently 8250 compatible, adding:
+> 
+> #define UART_SHIFT      2
+> #include <asm/hardware/debug-8250.S>
+> 
+> at the end of socfpga.S should be sufficient. However, socfpga.S uses
+> an undefined DEBUG_LL_UART_OFFSET. And also most likely there is a
+> missing static mapping for the UART registers in
+> arch/arm/mach-socfpga/socfpga.c in order to get a virtual address for
+> the UART registers soon enough for earlyprintk to work.
+> 
+> Probably easy to fix, but I have no hardware and no datasheet.
+> Certainly better if someone having those could handle the
+> implementation of the fix.
 
-> if we allow compiler reorder our writes, we could
-> fall into a situation where dev->buf_len is reset
-> for no apparent reason.
+Doesn't this patch address the fix?
 
-Any chance this would help with the bug Paul found with I2C timeouts on
-beagle userspace startup?
+in arm-soc for-next
+commit  ef3f94412a4d7e107392e7c7cfc3e2d0668aa1aa
 
-Kevin
 
-> This bug was found with a simple script which would
-> transfer data to an i2c client from 1 to 1024 bytes
-> (a simple for loop), when we got to transfer sizes
-> bigger than the fifo size, dev->buf_len was reset
-> to zero before we had an oportunity to handle XDR
-> Interrupt. Because dev->buf_len was zero, we entered
-> omap_i2c_transmit_data() to transfer zero bytes,
-> which would mean we would just silently exit
-> omap_i2c_transmit_data() without actually writing
-> anything to DATA register. That would cause XDR
-> IRQ to trigger forever and we would never transfer
-> the remaining bytes.
->
-> After adding the memory barrier, we also drop resetting
-> dev->buf_len to zero in omap_i2c_xfer_msg() because
-> both omap_i2c_transmit_data() and omap_i2c_receive_data()
-> will act until dev->buf_len reaches zero, rendering the
-> other write in omap_i2c_xfer_msg() redundant.
->
-> This patch has been tested with pandaboard for a few
-> iterations of the script mentioned above.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->
-> This bug has been there forever, but it's quite annoying.
-> I think it deserves being pushed upstream during this -rc
-> cycle, but if Wolfram decides to wait until v3.8, I don't
-> mind.
->
->  drivers/i2c/busses/i2c-omap.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index db31eae..1ec4e6e 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -521,6 +521,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	/* REVISIT: Could the STB bit of I2C_CON be used with probing? */
->  	dev->buf = msg->buf;
->  	dev->buf_len = msg->len;
-> +	wmb();
->  
->  	omap_i2c_write_reg(dev, OMAP_I2C_CNT_REG, dev->buf_len);
->  
-> @@ -579,7 +580,6 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	 */
->  	timeout = wait_for_completion_timeout(&dev->cmd_complete,
->  						OMAP_I2C_TIMEOUT);
-> -	dev->buf_len = 0;
->  	if (timeout == 0) {
->  		dev_err(dev->dev, "controller timed out\n");
->  		omap_i2c_init(dev);
+http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commit;h=ef3f94412a4d7e107392e7c7cfc3e2d0668aa1aa
+
+
+Thanks,
+Dinh
+> 
+> Best regards,
+> 
+> Thomas
