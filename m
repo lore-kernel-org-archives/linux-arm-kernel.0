@@ -1,38 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 09:21:45 +0100
-Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
-In-Reply-To: <CACRpkdYAKpE1oWxHYzOMtdQ9Qj_OrZnnkJpQvrzSv8WFTBFS_Q@mail.gmail.com>
-References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
- <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
- <CAM=Q2ctwTBAvKs401GgrGfz9NvaLspquje-6YfnuS5TZYeqY4Q@mail.gmail.com>
- <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
- <20121025075709.GE971@gmail.com>
- <CACRpkdYAKpE1oWxHYzOMtdQ9Qj_OrZnnkJpQvrzSv8WFTBFS_Q@mail.gmail.com>
-Message-ID: <20121025082145.GB3348@gmail.com>
+Date: Thu, 25 Oct 2012 09:23:41 +0100
+Subject: [PATCH 2/6] pinctrl: Update clock handling for the
+ pinctrl-nomadik GPIO driver
+In-Reply-To: <5088F0EE.8030900@stericsson.com>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+ <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
+ <20121025073127.GB971@gmail.com> <5088F0EE.8030900@stericsson.com>
+Message-ID: <20121025082341.GC3348@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 25 Oct 2012, Linus Walleij wrote:
 
-> On Thu, Oct 25, 2012 at 9:57 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Fri, 12 Oct 2012, Linus Walleij wrote:
-> 
-> >> Yours,
-> >> Linus Walleij
+> On 10/25/2012 09:31 AM, Lee Jones wrote:
 > >
-> > Friendly poke.
+> >This certainly doesn't fix the bug we spoke about. I believe Ulf
+> >is still working on that one.
+> >
+> >So do you want me to remove this patch?
+> >
 > 
-> This makes it look like you're poking me as I'm in the To: field but I suspect
-> the intent must be to poke Dmitry ... I was just providing background
-> for Shubhrajyoti's question.
-> 
-> Maybe this helps:
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Yeah drop it for now.
 
-Yes, that was also the intention of the other poke. Sorry about
-that, I should have moved you into Cc: instead.
+Actually, a quick question before I do:
 
-Yes, the poke was for Dmitry.
+If it's better/faster to prepare the clock and keep it prepared
+while you do clk_enable/clk_disable, why don't we do that in all
+drivers? Why do we bother to prepare/unprepare each time if all
+it does is take up cycles?
 
 -- 
 Lee Jones
