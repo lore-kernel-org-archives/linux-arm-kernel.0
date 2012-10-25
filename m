@@ -1,50 +1,50 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 10:44:58 +0100
-Subject: [PATCH 2/6] pinctrl: Update clock handling for the
- pinctrl-nomadik GPIO driver
-In-Reply-To: <CAPDyKFromkv_VYgiQsERR=PbrwYqgux=teF_HSZxCtk2BCsk1A@mail.gmail.com>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
- <20121025073127.GB971@gmail.com> <5088F0EE.8030900@stericsson.com>
- <20121025082341.GC3348@gmail.com>
- <CAPDyKFromkv_VYgiQsERR=PbrwYqgux=teF_HSZxCtk2BCsk1A@mail.gmail.com>
-Message-ID: <20121025094458.GB4008@gmail.com>
+Date: Thu, 25 Oct 2012 10:47:42 +0100
+Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
+In-Reply-To: <20121025083046.GA13882@core.coreip.homeip.net>
+References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
+ <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
+ <CAM=Q2ctwTBAvKs401GgrGfz9NvaLspquje-6YfnuS5TZYeqY4Q@mail.gmail.com>
+ <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
+ <20121025075709.GE971@gmail.com>
+ <CACRpkdYAKpE1oWxHYzOMtdQ9Qj_OrZnnkJpQvrzSv8WFTBFS_Q@mail.gmail.com>
+ <20121025082145.GB3348@gmail.com>
+ <20121025083046.GA13882@core.coreip.homeip.net>
+Message-ID: <20121025094742.GC4008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012, Ulf Hansson wrote:
+On Thu, 25 Oct 2012, Dmitry Torokhov wrote:
 
-> On 25 October 2012 10:23, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, Oct 25, 2012 at 09:21:45AM +0100, Lee Jones wrote:
 > > On Thu, 25 Oct 2012, Linus Walleij wrote:
-> >
-> >> On 10/25/2012 09:31 AM, Lee Jones wrote:
-> >> >
-> >> >This certainly doesn't fix the bug we spoke about. I believe Ulf
-> >> >is still working on that one.
-> >> >
-> >> >So do you want me to remove this patch?
-> >> >
-> >>
-> >> Yeah drop it for now.
-> >
-> > Actually, a quick question before I do:
-> >
-> > If it's better/faster to prepare the clock and keep it prepared
-> > while you do clk_enable/clk_disable, why don't we do that in all
-> > drivers? Why do we bother to prepare/unprepare each time if all
-> > it does is take up cycles?
-> >
+> > 
+> > > On Thu, Oct 25, 2012 at 9:57 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > > On Fri, 12 Oct 2012, Linus Walleij wrote:
+> > > 
+> > > >> Yours,
+> > > >> Linus Walleij
+> > > >
+> > > > Friendly poke.
+> > > 
+> > > This makes it look like you're poking me as I'm in the To: field but I suspect
+> > > the intent must be to poke Dmitry ... I was just providing background
+> > > for Shubhrajyoti's question.
+> > > 
+> > > Maybe this helps:
+> > > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> > 
+> > Yes, that was also the intention of the other poke. Sorry about
+> > that, I should have moved you into Cc: instead.
+> > 
+> > Yes, the poke was for Dmitry.
 > 
-> Depending on clock type, a clk_disable is actually not going to "gate"
-> the clock, that might happen only in unprepare. This depends on if the
-> clock is a fast or slow clock.
-> To save as much power as possible, in general, we should do both
-> disable and unprepare. Although it will be device driver dependent
-> were it is most convenient to do this things.
-> Sometimes it is possible to group them sometimes not.
+> Still do not have the right signoffs: person who sends me the patch needs
+> to put signed-off-by, not acked-by.
 
-And in this case, it's better to ... ?
+My apologies.
+
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
 -- 
 Lee Jones
