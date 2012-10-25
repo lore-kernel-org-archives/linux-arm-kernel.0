@@ -1,30 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 10:01:34 +0200
-Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
-In-Reply-To: <20121025075709.GE971@gmail.com>
-References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
- <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
- <CAM=Q2ctwTBAvKs401GgrGfz9NvaLspquje-6YfnuS5TZYeqY4Q@mail.gmail.com>
- <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
- <20121025075709.GE971@gmail.com>
-Message-ID: <CACRpkdYAKpE1oWxHYzOMtdQ9Qj_OrZnnkJpQvrzSv8WFTBFS_Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 25 Oct 2012 16:03:49 +0800
+Subject: [PATCH] RFC: leds-pwm: don't disable pwm when setting brightness
+ to 0
+In-Reply-To: <1351086766-5837-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20121024095603.GH639@pengutronix.de>
+ <1351086766-5837-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20121025080346.GB9921@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 9:57 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 12 Oct 2012, Linus Walleij wrote:
+On Wed, Oct 24, 2012 at 03:52:46PM +0200, Uwe Kleine-K?nig wrote:
+> This fixes disabling the LED on i.MX28. The PWM hardware delays using
+> the newly set pwm-config until the beginning of a new period.  It's very
+> likely that pwm_disable is called before the current period ends. In
+> case the LED was on brightness=max before the LED stays on because in
+> the disabled PWM block the period never ends.
+> 
+> It's unclear if the mxs-pwm driver doesn't implement the API as expected
+> (i.e. it should block until the newly set config is effective) or if the
+> leds-pwm driver makes wrong assumptions. This patch assumes the latter.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> I'm not sure this is correct, but this is the workaround I'm using until
+> I get some feed back.
 
->> Yours,
->> Linus Walleij
->
-> Friendly poke.
+I'm fine with it, since it fixes a real problem.  Let's see what
+Thierry says.
 
-This makes it look like you're poking me as I'm in the To: field but I suspect
-the intent must be to poke Dmitry ... I was just providing background
-for Shubhrajyoti's question.
+Shawn
 
-Maybe this helps:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+> 
+> Best regards
+> Uwe
+> 
+>  drivers/leds/leds-pwm.c |    9 ++-------
+>  1 file changed, 2 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+> index f2e44c7..a909f4f 100644
+> --- a/drivers/leds/leds-pwm.c
+> +++ b/drivers/leds/leds-pwm.c
+> @@ -38,13 +38,8 @@ static void led_pwm_set(struct led_classdev *led_cdev,
+>  	unsigned int max = led_dat->cdev.max_brightness;
+>  	unsigned int period =  led_dat->period;
+>  
+> -	if (brightness == 0) {
+> -		pwm_config(led_dat->pwm, 0, period);
+> -		pwm_disable(led_dat->pwm);
+> -	} else {
+> -		pwm_config(led_dat->pwm, brightness * period / max, period);
+> -		pwm_enable(led_dat->pwm);
+> -	}
+> +	pwm_config(led_dat->pwm, brightness * period / max, period);
+> +	pwm_enable(led_dat->pwm);
+>  }
+>  
+>  static int led_pwm_probe(struct platform_device *pdev)
+> -- 
+> 1.7.10.4
+> 
