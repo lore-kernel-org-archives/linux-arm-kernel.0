@@ -1,97 +1,53 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 25 Oct 2012 17:22:39 +0200
-Subject: [PATCH v3 5/6] ARM: EXYNOS: Add support for secondary CPU bring-up on
- Exynos4412
+Date: Thu, 25 Oct 2012 17:22:40 +0200
+Subject: [PATCH v3 6/6] ARM: EXYNOS: Add secure firmware support to secondary
+ CPU bring-up
 In-Reply-To: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
 References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1351178560-19188-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1351178560-19188-7-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4412 uses different information register for each core. This patch
-adjusts the bring-up code to take that into account.
+Boards using secure firmware must use different CPU boot registers and
+call secure firmware to boot the CPU.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/platsmp.c | 30 ++++++++++++++++++++++++------
- 1 file changed, 24 insertions(+), 6 deletions(-)
+ arch/arm/mach-exynos/platsmp.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index f93d820..4ca8ff1 100644
+index 4ca8ff1..9f8bdaf 100644
 --- a/arch/arm/mach-exynos/platsmp.c
 +++ b/arch/arm/mach-exynos/platsmp.c
-@@ -36,8 +36,22 @@
+@@ -25,6 +25,7 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
++#include <asm/firmware.h>
  
- extern void exynos4_secondary_startup(void);
- 
--#define CPU1_BOOT_REG		(samsung_rev() == EXYNOS4210_REV_1_1 ? \
--				S5P_INFORM5 : S5P_VA_SYSRAM)
-+static inline void __iomem *cpu_boot_reg_base(void)
-+{
-+	if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_1_1)
-+		return S5P_INFORM5;
-+	return S5P_VA_SYSRAM;
-+}
-+
-+static inline void __iomem *cpu_boot_reg(int cpu)
-+{
-+	void __iomem *boot_reg;
-+
-+	boot_reg = cpu_boot_reg_base();
-+	if (soc_is_exynos4412())
-+		boot_reg += 4*cpu;
-+	return boot_reg;
-+}
- 
- /*
-  * Write pen_release in a way that is guaranteed to be visible to all
-@@ -84,6 +98,7 @@ static void __cpuinit exynos_secondary_init(unsigned int cpu)
- static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ #include <mach/hardware.h>
+ #include <mach/regs-clock.h>
+@@ -47,6 +48,8 @@ static inline void __iomem *cpu_boot_reg(int cpu)
  {
- 	unsigned long timeout;
-+	unsigned long phys_cpu = cpu_logical_map(cpu);
+ 	void __iomem *boot_reg;
  
- 	/*
- 	 * Set synchronisation state between this boot processor
-@@ -99,7 +114,7 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
- 	 * Note that "pen_release" is the hardware CPU ID, whereas
- 	 * "cpu" is Linux's internal ID.
- 	 */
--	write_pen_release(cpu_logical_map(cpu));
-+	write_pen_release(phys_cpu);
- 
- 	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
- 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
-@@ -133,7 +148,7 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
- 		smp_rmb();
++	if (!call_firmware_op(cpu_boot_reg, cpu, &boot_reg))
++		return boot_reg;
+ 	boot_reg = cpu_boot_reg_base();
+ 	if (soc_is_exynos4412())
+ 		boot_reg += 4*cpu;
+@@ -149,6 +152,10 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
  
  		__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+							cpu_boot_reg(phys_cpu));
+ 							cpu_boot_reg(phys_cpu));
++
++		/* Call Exynos specific smc call */
++		call_firmware_op(cpu_boot, phys_cpu);
++
  		gic_raise_softirq(cpumask_of(cpu), 0);
  
  		if (pen_release == -1)
-@@ -181,6 +196,8 @@ static void __init exynos_smp_init_cpus(void)
- 
- static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- {
-+	int i;
-+
- 	if (!soc_is_exynos5250())
- 		scu_enable(scu_base_addr());
- 
-@@ -190,8 +207,9 @@ static void __init exynos_smp_prepare_cpus(unsigned int max_cpus)
- 	 * until it receives a soft interrupt, and then the
- 	 * secondary CPU branches to this address.
- 	 */
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
--			CPU1_BOOT_REG);
-+	for (i = 1; i < max_cpus; ++i)
-+		__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+					cpu_boot_reg(cpu_logical_map(i)));
- }
- 
- struct smp_operations exynos_smp_ops __initdata = {
 -- 
 1.7.12
