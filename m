@@ -1,45 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Oct 2012 13:35:23 +0000
-Subject: [PATCH v3] ARM: mach-imx: Fix selection of ARCH_MXC
-In-Reply-To: <20121025025117.GC2464@S2101-09.ap.freescale.net>
-References: <1350583470-15500-1-git-send-email-fabio.estevam@freescale.com>
- <20121019150544.GD21078@S2101-09.ap.freescale.net>
- <20121025025117.GC2464@S2101-09.ap.freescale.net>
-Message-ID: <201210251335.24066.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Oct 2012 09:35:56 -0400
+Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and
+ config update
+In-Reply-To: <20121025152114.73e69c92@skate>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
+ <20121024160139.6dbf5e16@skate> <5087F5B9.0@free-electrons.com>
+ <20121025131818.GF18811@titan.lakedaemon.net>
+ <20121025152114.73e69c92@skate>
+Message-ID: <20121025133556.GH18811@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012, Shawn Guo wrote:
-> On Fri, Oct 19, 2012 at 11:05:54PM +0800, Shawn Guo wrote:
-> > On Thu, Oct 18, 2012 at 03:04:30PM -0300, Fabio Estevam wrote:
-> > > Since commit c5a0d497(ARM: imx: enable multi-platform build),
-> > > ARCH_MXC is selected by the following logic:
-> > > 
-> > > config ARCH_MXC
-> > >         def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
-> > > 
-> > > , which causes build error on vexpress_defconfig:
-> > > 
-> > > arch/arm/mach-imx/hotplug.c:49: undefined reference to `imx_enable_cpu'
-> > > arch/arm/mach-imx/platsmp.c:57: undefined reference to `imx_set_cpu_jump'
-> > > arch/arm/mach-imx/platsmp.c:58: undefined reference to `imx_enable_cpu'
-> > > 
-> > > Make ARCH_MXC a user selectable option, so that it does not get built
-> > > by default on other defconfigs that select ARCH_MULTI_V4_V5 or ARCH_MULTI_V6_V7.
-> > > 
-> > > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Oct 25, 2012 at 03:21:14PM +0200, Thomas Petazzoni wrote:
+> Jason,
+> 
+> On Thu, 25 Oct 2012 09:18:18 -0400, Jason Cooper wrote:
+> 
+> > > Jason, Andrew, do you want I split this patch as suggested by
+> > > Thomas or are you fine with having one single patch?
 > > 
-> > Arnd, Olof,
-> > 
-> > I just applied this patch on my imx/multi-platform.  Can you please
-> > pull it to update the branch in arm-soc?  Thanks.
-> > 
-> I just applied another fix [1] on my branch.  Please pull both into
-> arm-soc.  Thanks.
+> > Yes, please make the defconfig changes a separate patch.  Also, please
+> > make sure only the minimum is enabled (eq RAID... isn't needed).
+> 
+> I haven't looked in details at the driver, but is nr-ports = <foo> the
+> right way of doing things? We may have platforms were port 0 is not
+> used, but port 1 is used, and just a number of ports doesn't allow to
+> express this.
 
+Do you have an example of this?
 
-Pulled into imx/multiplatform and next/cleanup now.
+thx,
 
-Thanks,
-
-	Arnd
+Jason.
