@@ -1,66 +1,78 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Thu, 25 Oct 2012 23:57:26 +0100 (BST)
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <20121025082826.693939b0@skate>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <201210242006.55879.michael@walle.cc> <20121024200128.GY21046@lunn.ch>
- <20121024233356.1bda95bf@skate> <20121025054638.GB8590@lunn.ch>
- <20121025082826.693939b0@skate>
-Message-ID: <alpine.DEB.2.00.1210252352550.10589@marmot.wormnet.eu>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 25 Oct 2012 16:43:28 -0700
+Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
+In-Reply-To: <20121022170917.GB4730@atomide.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
+ <20121019191333.GT4730@atomide.com>
+ <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
+ <20121022170917.GB4730@atomide.com>
+Message-ID: <20121025234328.GF11928@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012, Thomas Petazzoni wrote:
+* Tony Lindgren <tony@atomide.com> [121022 10:11]:
+> * Haojian Zhuang <haojian.zhuang@gmail.com> [121022 03:11]:
+> > On Sat, Oct 20, 2012 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > > * Haojian Zhuang <haojian.zhuang@gmail.com> [121018 02:08]:
+> > >> Add pinconf generic support with POWER SOURCE, BIAS PULL.
+> > > ...
+> > >
+> > >> +     case PIN_CONFIG_POWER_SOURCE:
+> > >> +             if (pcs->psmask == PCS_OFF_DISABLED
+> > >> +                     || pcs->psshift == PCS_OFF_DISABLED)
+> > >> +                     return -ENOTSUPP;
+> > >> +             data &= pcs->psmask;
+> > >> +             data = data >> pcs->psshift;
+> > >> +             *config = data;
+> > >> +             return 0;
+> > >> +             break;
+> > >
+> > > Hmm, only slightly related to this patch, mostly a generic
+> > > question to others: Do others have any mux registers with
+> > > status bits for things like PIN_CONFIG_POWER_SOURCE?
+> > >
+> > > I could use PIN_CONFIG_POWER_SOURCE for controlling the PBIAS
+> > > for omap MMC. But there's also a status bit that needs to be
+> > > checked for that. I think there was some other similar mux
+> > > register for USB PHY that has a status register.
+> > >
+> > > So I'm wondering should the checking for status bit be handled
+> > > in the pinctrl consume driver? Or should we have some bindings
+> > > for that?
+> > >
+> > 
+> > Do you mean that the status register only exists in USB PHY controller or
+> > MMC controller?
+> 
+> The status register is in the MMC PBIAS register that is mux
+> related otherwise. From OMAP4470_ES1.0_PUBLIC_TRM_vE.pdf,
+> Table 19-599. CONTROL_PBIASLITE:
+> 
+> Bits
+> 26	MMC1_PWDNZ
+> 25	MMC1_PBIASLITE_HIZ_MODE
+> 24	MMC1_PBIASLITE_SUPPLY_HI_OUT
+> 23	MMC1_PBIASLITE_VMODE_ERROR	then this bit needs to clear..
+> 22	MMC1_PBIASLITE_PWRDNZ
+> 21	MMC1_PBIASLITE_VMODE		..after VMODE bit is set to 3V
+>  
+> > If so, could we use regulator framework in USB PHY or MMC driver?
+> 
+> Yes we could use regulator framework for that that. Or just read the
+> status in the MMC driver for that bit if nobody else has mixed
+> mux-regulator needs like this.
+> 
+> The sequence is MMC specific, so from that point of view it would
+> make sense to have the logic in the MMC driver.
 
-> Andrew,
->
-> On Thu, 25 Oct 2012 07:46:38 +0200, Andrew Lunn wrote:
->
->> Thanks Thomas, i will play around with this.
->>
->> I'm just wondering if we are going to get into ordering issues. These
->> gpio operations are providing power to subsystems. We probably need
->> that to happen before the driver is loaded. If we call
->> of_platform_populate() too early, do we have the danger the driver
->> probing is going to happen before the init routine can enable the
->> power?
->>
->> It seems like we want pinctrl/gpio working first, with pins hogged as
->> specified in DT, then the board init() function, then the rest of DT
->> setup.
->
-> If those GPIO value settings are needed to get a particular driver to
-> work, then I'd recommend letting the driver do the GPIO value setting.
-> For example, in the lsxl board, I see:
->
->        /* usb and sata power on */
->        gpio_set_value(LSXL_GPIO_USB_POWER, 1);
->        gpio_set_value(LSXL_GPIO_HDD_POWER, 1);
->
-> If the LSXL_GPIO_USB_POWER GPIO should be set to one to get the EHCI
-> driver to work properly, then I think we should let the EHCI driver set
-> this GPIO value in its ->probe() operation. Of course, the GPIO
-> reference will be passed in the platform_data (for old-style probing),
-> or through specific DT properties (for new-style, DT-based, probing).
->
-> Regarding the LSXL_GPIO_HDD_POWER GPIO, I am not sure. Is it required
-> to apply power on this GPIO to get the SATA driver to probe properly,
-> or is it possible to get the SATA driver to probe properly, then apply
-> power and have the HDD still being recognized? I haven't looked at all
-> at how SATA drivers were working, so I can't say.
+Well it turns out the VMODE_ERROR bit is not just for VMODE, it's a
+comparator that can also triggers for the other invalid states for
+CONTROL_PBIASLITE pinconf register. So hiding VMODE_ERROR into a
+regulator would be wrong. For now, VMODE best handled using
+PIN_CONFIG_POWER_SOURCE and let the MMC driver do the checking
+using the pinconf API.
 
-FWIW, Applying power to the HDD after SATA probe works fine on my NAS 
-(admittedly not an lsxl board, but close enough). Turning it off again is 
-a little unclean, but works.
+Regards,
 
-> Also, ultimately, if those GPIOs are providing power, then they should
-> probably not be handled as simple GPIOs, but rather as regulator, using
-> the gpio-regulator driver. But let's do things steps by steps :-)
->
-> Best regards,
->
-> Thomas
->
-
--- 
-Jamie Lentin
+Tony
