@@ -1,80 +1,62 @@
-From: markz@nvidia.com (Mark Zhang)
-Date: Thu, 25 Oct 2012 14:32:18 +0800
-Subject: [PATCH] ARM: dt: tegra: ventana: define pinmux for ddc
-In-Reply-To: <50857EEF.2070707@wwwdotorg.org>
-References: <1350626311-18131-1-git-send-email-markz@nvidia.com>
- <50817668.6020709@wwwdotorg.org> <5084F5D1.7050005@nvidia.com>
- <50857EEF.2070707@wwwdotorg.org>
-Message-ID: <5088DCF2.7030000@nvidia.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 25 Oct 2012 12:03:06 +0530
+Subject: [PATCH] drivers: bus: omap_interconnect: Fix rand-config build
+ warning
+In-Reply-To: <20121025004216.GJ11928@atomide.com>
+References: <1350480519-1890-1-git-send-email-lokeshvutla@ti.com>
+ <507EB3CC.6060005@ti.com> <20121025003509.GI11928@atomide.com>
+ <20121025004216.GJ11928@atomide.com>
+Message-ID: <5088DD22.1050000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 01:14 AM, Stephen Warren wrote:
-> On 10/22/2012 01:29 AM, Mark Zhang wrote:
->> On 10/19/2012 11:48 PM, Stephen Warren wrote:
->>> On 10/18/2012 11:58 PM, Mark Zhang wrote:
->>>> Define pinmux for DDC. The DDC pinmux in Ventana is 2 pins in I2C2.
+On Thursday 25 October 2012 06:12 AM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [121024 17:36]:
+>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121017 06:35]:
+>>> (Looping Arnd and Olof)
 >>>
->>>> +++ b/arch/arm/boot/dts/tegra20-ventana.dts
+>>> On Wednesday 17 October 2012 06:58 PM, Lokesh Vutla wrote:
+>>>> When building omap_l3_noc/smx drivers as modules, the following
+>>>> warning appears:
+>>>>
+>>>> CC [M]  drivers/bus/omap_l3_smx.o
+>>>> drivers/bus/omap_l3_smx.c:291: warning: data definition has no type or storage class
+>>>> drivers/bus/omap_l3_smx.c:291: warning: type defaults to 'int' in declaration of 'postcore_initcall_sync'
+>>>> drivers/bus/omap_l3_smx.c:291: warning: parameter names (without types) in function declaration
+>>>> drivers/bus/omap_l3_smx.c:287: warning: 'omap3_l3_init' defined but not used
+>>>> CC [M]  drivers/bus/omap_l3_noc.o
+>>>> drivers/bus/omap_l3_noc.c:260: warning: data definition has no type or storage class
+>>>> drivers/bus/omap_l3_noc.c:260: warning: type defaults to 'int' in declaration of 'arch_initcall_sync'
+>>>> drivers/bus/omap_l3_noc.c:260: warning: parameter names (without types) in function declaration
+>>>> drivers/bus/omap_l3_noc.c:256: warning: 'omap4_l3_init' defined but not used
+>>>>
+>>>> Adding module_init() and macros in omap_l3_noc/smx drivers when building
+>>>> as modules to remove the above warning.
+>>>>
+>>>> Reported-by: Tony Lindgren <tony@atomide.com>
+>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>> ---
+>>> Thanks for the fix Lokesh. Looks fine to me.
 >>>
->>>> -            ddc {
->>>> -                nvidia,pins = "ddc", "owc", "spdi", "spdo",
->>>> -                    "uac";
->>>> -                nvidia,function = "rsvd2";
->>>> -            };
->>>
->>> So that removes the entries for 5 pin groups, yet below, entries are
->>> only added for the ddc and pta pingroups, so the other 4 pin groups
->>> become unconfigured.
->>>
+>>> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >>
->> Right. So I think it should be changed to:
->>
->>          owc {
->>              nvidia,pins = "owc", "spdi", "spdo", "uac";
->>              nvidia,function = "rsvd2";
->>          };
->>
->> Is this right?
+>> Looks like nobody else has picked this up so I'll queue this along
+>> with few other omap warnings and regressions.
 >
-> Looks correct, yes.
+> Hmm actually this might require some more discussion. If we make
+> it use regular initcalls, then the ugly ifdefs can be left
+> out. Is there a reason to init this early, can't we just use regular
+> initcalls?
 >
->>>> +
->>>> +        state_i2cmux_ddc: pinmux_i2cmux_ddc {
->>>> +            ddc {
->>>> +                nvidia,pins = "ddc";
->>>> +                nvidia,function = "i2c2";
->>>> +            };
->>>> +            pta {
->>>> +                nvidia,pins = "pta";
->>>> +                nvidia,function = "rsvd4";
->>>> +            };
->>>
->>> Does this actually work? The pta pingroup is configured by the "hog"
->>> pinctrl state of the pinctrl node itself, so this state should fail to
->>> be applied since it attempts to touch the same pingroup.
->>
->> I know little about kernel pinctrl subsystem. After reading some docs
->> and codes, I think what you mean is, in Ventana's pinmux configuration,
->> pta pingroup has been defined as "hdmi" function and this can't be
->> changed(non-dynamic pinmuxing).
->> So I want to know why we have defined pta pingroup as hdmi function?
->> Can we remove this definition to make the i2cmux above working?
->
-> I don't recall why pta was defined to be HDMI. The issue isn't that this
-> patch changes the pinmux selection for the pta pingroup, but simply that
-> both the pinctrl node's state definition, and the new I2C mux node's
-> state definition both attempt to configure pingroup pta. The solution is
-> most likely to simply remove the pta configuration from the main pinctrl
-> node.
->
+I thought about it. The whole reason we want interconnect errors enabled 
+early in the boot to avoid bad accesses issued on interconnect
+in early boot by various init codes. We managed to discovered many
+init sequence issues where the a driver is trying to access registers
+when clocks are not active, or drivers are using bad mapping. At times
+these errors gets un-noticed because of the behavior of interconnect
+and later causes serious issues. Leaving the driver init late in the
+boot means we can't catch any of the issues happen till the L3 driver
+init happens.
 
-Understood. I tried to remove the hdmi function definition of pta 
-pingroup yesterday then found HDMI can't work anymore. The EDID of HDMI 
-monitor can't be fetched. After some debugging, I have found that it's 
-caused by "i2c-mux-pinctrl" driver is loaded after drm driver. That 
-makes drm driver can't get EDID data via this i2c mux adapter because it 
-doesn't exist at that time. So I think we need to promote the load level 
-of "i2c-mux-pinctrl" driver. Any other ideas?
-
-Mark
+Regards
+Santosh
