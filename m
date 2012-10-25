@@ -1,58 +1,55 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Thu, 25 Oct 2012 15:42:02 +0200
-Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
-In-Reply-To: <20121025131459.GG28061@n2100.arm.linux.org.uk>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-8-git-send-email-balbi@ti.com>
- <20121025145748.760c218b@endymion.delvare>
- <20121025131459.GG28061@n2100.arm.linux.org.uk>
-Message-ID: <20121025154202.41f3cbba@endymion.delvare>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 25 Oct 2012 17:08:45 +0300
+Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
+In-Reply-To: <20121018092440.GS3196@tbergstrom-lnx.Nvidia.com>
+References: <5074AA0E.2080508@wwwdotorg.org>
+ <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
+ <5076F5CB.4020200@wwwdotorg.org>
+ <1350025676.20241.82.camel@jlo-ubuntu-64.nvidia.com>
+ <507885D4.10604@wwwdotorg.org>
+ <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
+ <507C32E8.1040701@wwwdotorg.org>
+ <20121016080634.GG3196@tbergstrom-lnx.Nvidia.com>
+ <507D936F.70905@wwwdotorg.org>
+ <20121018092440.GS3196@tbergstrom-lnx.Nvidia.com>
+Message-ID: <20121025140844.GC1962@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012 14:14:59 +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 25, 2012 at 02:57:48PM +0200, Jean Delvare wrote:
-> > Hi Felipe, Shubhrajyoti,
+On Thu, Oct 18, 2012 at 11:24:40AM +0200, Peter De Schrijver wrote:
+> On Tue, Oct 16, 2012 at 07:03:43PM +0200, Stephen Warren wrote:
+> > On 10/16/2012 02:06 AM, Peter De Schrijver wrote:
+> > >>> Even though we have plan to use coupled cpuidle, I still prefer to go
+> > >>> with the LP2 driver first. Then adding one more patch to support coupled
+> > >>> cpuidle based on LP2 driver. This is good for history. And if there is
+> > >>> any issue, it's more easy to roll back to the stable one.
+> > >>
+> > >> I don't think that implementing it one way and then changing to a
+> > >> different way will benefit history at all. It'll make the history more
+> > >> complicated. What exactly is the problem with just using coupled cpuidle
+> > >> from the start? If we did merge this implementation now, then switch to
+> > >> coupled cpuidle later, when do you think the switch would happen?
+> > > 
+> > > Before we consider doing this, I think we should have some idea on how
+> > > frequently we run into the situation where CPU0 is idle but a secondary
+> > > core is not. Depending on that we can then decide how useful coupled cpuidle
+> > > would be for us.
 > > 
-> > On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
-> > > From: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > > 
-> > > In case of a NACK, it's wise to tell our clients
-> > > drivers about how many bytes were actually transferred.
-> > > 
-> > > Support this by adding an extra field to the struct
-> > > i2c_msg which gets incremented the amount of bytes
-> > > actually transferred.
-> > > 
-> > > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  include/uapi/linux/i2c.h | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
-> > > index 0e949cb..4b35c9b 100644
-> > > --- a/include/uapi/linux/i2c.h
-> > > +++ b/include/uapi/linux/i2c.h
-> > > @@ -77,6 +77,7 @@ struct i2c_msg {
-> > >  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
-> > >  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
-> > >  	__u16 len;		/* msg length				*/
-> > > +	__u16 transferred;	/* actual bytes transferred             */
-> > >  	__u8 *buf;		/* pointer to msg data			*/
-> > >  };
+> > Would it not be 75% of the time where we have 1 of 4 CPUs active? At
+> > least, that's assuming that all work is evenly distributed amongst CPUs,
+> > and hence it's random which CPU is the last to go idle, but perhaps
+> > that's not the case if CPU0 is somehow special workload-wise?
 > > 
-> > On the principle I am fine with this, however you also need to define
-> > who should initialize this field, and to what value.
 > 
-> You also miss one very very very big point.  This will break every I2C
-> using userspace program out there unless it is rebuilt - this change will
-> require the exact right version of those userspace programs for the
-> kernel that they're being used on.
+> Depends, at least it used to be possible to tune the scheduler to prefer
+> CPU0 if the workload can run on a single CPU.
+> 
 
-How that? The extra field is added in a hole, so we don't change the
-struct size nor the relative positions of existing fields. Why would
-user-space care?
+I just noticed https://lwn.net/Articles/518834/. If we can configure this to
+prefer CPU0 in case all work can be done on a single core, we shouldn't
+hit the case were a secondary CPU is the only active CPU for a significant
+period of time.
 
--- 
-Jean Delvare
+Cheers,
+
+Peter.
