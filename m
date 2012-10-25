@@ -1,39 +1,49 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 08:51:38 +0100
-Subject: [PATCH 0/5] clk: ux500: Add clock lookups for u8500
-In-Reply-To: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20121025075138.GD971@gmail.com>
+Date: Thu, 25 Oct 2012 08:57:09 +0100
+Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
+In-Reply-To: <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
+References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
+ <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
+ <CAM=Q2ctwTBAvKs401GgrGfz9NvaLspquje-6YfnuS5TZYeqY4Q@mail.gmail.com>
+ <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
+Message-ID: <20121025075709.GE971@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Oct 2012, Ulf Hansson wrote:
+On Fri, 12 Oct 2012, Linus Walleij wrote:
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+> On Thu, Oct 11, 2012 at 4:22 PM, Shubhrajyoti Datta
+> <omaplinuxkernel@gmail.com> wrote:
 > 
-> Step by step, clock lookups for u8500 are being added in this set
-> of patches.
+> >> @@ -526,6 +527,7 @@ static int gpio_keys_open(struct input_dev *input)
+> >>  {
+> >>         struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
+> >>
+> >> +       pm_runtime_get_sync(input->dev.parent);
+> >
+> > I am not an expert of the runtime.
+> >
+> > However would be grateful if you explain me what it actually do.
 > 
-> These patches will require additional patches for sound/soc/ux500/
-> driver as well as drivers/i2c/busses/i2c-nomadik driver to prevent
-> the boot for ux500 from break. Those patches are being merged through
-> separate trees.
+> This increase the reference count of the runtime status container
+> for the device. _sync makes sure it happens now.
 > 
-> Ulf Hansson (5):
->   clk: ux500: Register i2c clock lookups for u8500
->   clk: ux500: Register ssp clock lookups for u8500
->   clk: ux500: Register msp clock lookups for u8500
->   clk: ux500: Update rtc clock lookup for u8500
->   clk: ux500: Register slimbus clock lookups for u8500
+> Consult:
+> Documentation/power/runtime_pm.txt
+> 
+> > Also I did not see any runtime suspend/ resume handlers populated.
+> 
+> It is not necessary to handle the power state at the driver level,
+> it can just as well be handled by the voltage/power domain,
+> or at the class, type or bus level.
+> 
+> But the individual driver has to notify the system upward if it
+> needs to be powered on or when it may or must be relaxed.
+>
+> Yours,
+> Linus Walleij
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Can I also mention that these need to go into the -rcs at the
-earliest opportunity please, as it is preventing ~50% of the
-devices from functioning on all of the ST-Ericsson development
-boards. 
-
-This is a massive blocker for us!
+Friendly poke.
 
 -- 
 Lee Jones
