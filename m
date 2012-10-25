@@ -1,63 +1,61 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Thu, 25 Oct 2012 11:46:24 -0200
-Subject: [PATCH 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
-In-Reply-To: <20121025113841.4e06cc3b@redhat.com>
-References: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
- <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
- <20121025113841.4e06cc3b@redhat.com>
-Message-ID: <20121025114624.7896b5d9@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Oct 2012 14:46:09 +0100
+Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
+In-Reply-To: <20121025154202.41f3cbba@endymion.delvare>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <1350899218-13624-8-git-send-email-balbi@ti.com>
+ <20121025145748.760c218b@endymion.delvare>
+ <20121025131459.GG28061@n2100.arm.linux.org.uk>
+ <20121025154202.41f3cbba@endymion.delvare>
+Message-ID: <20121025134609.GH28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Thu, 25 Oct 2012 11:38:41 -0200
-Mauro Carvalho Chehab <mchehab@redhat.com> escreveu:
-
-> Hi F?bio,
-> 
-> Em Fri, 5 Oct 2012 18:53:01 -0300
-> Fabio Estevam <fabio.estevam@freescale.com> escreveu:
-> 
-> > During the clock conversion for mx27 the "per4_gate" clock was missed to get
-> > registered as a dependency of mx2-camera driver.
+On Thu, Oct 25, 2012 at 03:42:02PM +0200, Jean Delvare wrote:
+> On Thu, 25 Oct 2012 14:14:59 +0100, Russell King - ARM Linux wrote:
+> > On Thu, Oct 25, 2012 at 02:57:48PM +0200, Jean Delvare wrote:
+> > > Hi Felipe, Shubhrajyoti,
+> > > 
+> > > On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
+> > > > From: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > > > 
+> > > > In case of a NACK, it's wise to tell our clients
+> > > > drivers about how many bytes were actually transferred.
+> > > > 
+> > > > Support this by adding an extra field to the struct
+> > > > i2c_msg which gets incremented the amount of bytes
+> > > > actually transferred.
+> > > > 
+> > > > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > > ---
+> > > >  include/uapi/linux/i2c.h | 1 +
+> > > >  1 file changed, 1 insertion(+)
+> > > > 
+> > > > diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
+> > > > index 0e949cb..4b35c9b 100644
+> > > > --- a/include/uapi/linux/i2c.h
+> > > > +++ b/include/uapi/linux/i2c.h
+> > > > @@ -77,6 +77,7 @@ struct i2c_msg {
+> > > >  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+> > > >  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+> > > >  	__u16 len;		/* msg length				*/
+> > > > +	__u16 transferred;	/* actual bytes transferred             */
+> > > >  	__u8 *buf;		/* pointer to msg data			*/
+> > > >  };
+> > > 
+> > > On the principle I am fine with this, however you also need to define
+> > > who should initialize this field, and to what value.
 > > 
-> > In the old mx27 clock driver we used to have:
-> > 
-> > DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
-> > 
-> > ,so does the same in the new clock driver.
-> > 
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/clk-imx27.c |    1 +
+> > You also miss one very very very big point.  This will break every I2C
+> > using userspace program out there unless it is rebuilt - this change will
+> > require the exact right version of those userspace programs for the
+> > kernel that they're being used on.
 > 
-> As this patch is for arch/arm, I'm understanding that it will be merged
-> via arm tree. So,
-> 
-> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+> How that? The extra field is added in a hole, so we don't change the
+> struct size nor the relative positions of existing fields. Why would
+> user-space care?
 
-Forgot to comment: as patch 2 relies on this change, the better, IMHO, is
-to send both via the same tree. If you decide to do so, please get arm
-maintainer's ack, instead, and we can merge both via my tree.
-
-> 
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> > index 3b6b640..5ef0f08 100644
-> > --- a/arch/arm/mach-imx/clk-imx27.c
-> > +++ b/arch/arm/mach-imx/clk-imx27.c
-> > @@ -224,6 +224,7 @@ int __init mx27_clocks_init(unsigned long fref)
-> >  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
-> >  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
-> >  	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "mx2-camera.0");
-> > +	clk_register_clkdev(clk[per4_gate], "per", "mx2-camera.0");
-> >  	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
-> >  	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
-> >  	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
-> 
-> 
-
-
--- 
-Regards,
-Mauro
+You know the layout of that struct for certain across all Linux supported
+architectures, including some of the more obscure ones which may not
+require pointers to be aligned?
