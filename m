@@ -1,36 +1,53 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 25 Oct 2012 11:43:40 +0200
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <50889BB2.3090107@ti.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com> <50889BB2.3090107@ti.com>
-Message-ID: <508909CC.9000000@gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2012 10:44:58 +0100
+Subject: [PATCH 2/6] pinctrl: Update clock handling for the
+ pinctrl-nomadik GPIO driver
+In-Reply-To: <CAPDyKFromkv_VYgiQsERR=PbrwYqgux=teF_HSZxCtk2BCsk1A@mail.gmail.com>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+ <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
+ <20121025073127.GB971@gmail.com> <5088F0EE.8030900@stericsson.com>
+ <20121025082341.GC3348@gmail.com>
+ <CAPDyKFromkv_VYgiQsERR=PbrwYqgux=teF_HSZxCtk2BCsk1A@mail.gmail.com>
+Message-ID: <20121025094458.GB4008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+On Thu, 25 Oct 2012, Ulf Hansson wrote:
 
-On 25.10.2012 03:53, Jon Hunter wrote:
+> On 25 October 2012 10:23, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 25 Oct 2012, Linus Walleij wrote:
+> >
+> >> On 10/25/2012 09:31 AM, Lee Jones wrote:
+> >> >
+> >> >This certainly doesn't fix the bug we spoke about. I believe Ulf
+> >> >is still working on that one.
+> >> >
+> >> >So do you want me to remove this patch?
+> >> >
+> >>
+> >> Yeah drop it for now.
+> >
+> > Actually, a quick question before I do:
+> >
+> > If it's better/faster to prepare the clock and keep it prepared
+> > while you do clk_enable/clk_disable, why don't we do that in all
+> > drivers? Why do we bother to prepare/unprepare each time if all
+> > it does is take up cycles?
+> >
 > 
-> On 10/22/2012 02:55 PM, Daniel Mack wrote:
+> Depending on clock type, a clk_disable is actually not going to "gate"
+> the clock, that might happen only in unprepare. This depends on if the
+> clock is a fast or slow clock.
+> To save as much power as possible, in general, we should do both
+> disable and unprepare. Although it will be device driver dependent
+> were it is most convenient to do this things.
+> Sometimes it is possible to group them sometimes not.
 
->> +Example for an AM33xx board:
->> +
->> +	gpmc: gpmc at 50000000 {
->> +		compatible = "ti,gpmc";
->> +		ti,hwmods = "gpmc";
->> +		reg = <0x50000000 0x1000000>;
-> 
-> Nit-pick, that size is quite large for a register range. I recommend
-> looking at the HWMOD data file
-> (arch/arm/mach-omap2/omap_hwmod_33xx_data.c) and see how much space is
-> allocated for the registers (see structure am33xx_gpmc_addr_space).
+And in this case, it's better to ... ?
 
-Yeah but reserving the entire memory as per the reference manual also
-prvents other from poking around in the same register space. Is there a
-scenario in which it would of disadvantage to reserve all that memory?
-
-
-
-Daniel
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
