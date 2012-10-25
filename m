@@ -1,36 +1,90 @@
-From: nori.sekhar@gmail.com (Sekhar Nori)
-Date: Thu, 25 Oct 2012 17:08:33 +0530
-Subject: [PATCH v4 0/7] uio_pruss cleanup and platform support
-In-Reply-To: <20121024165436.GG1855@beef>
-References: <1349456686-22736-1-git-send-email-mporter@ti.com>
- <5072B190.1060200@ti.com> <20121024165436.GG1855@beef>
-Message-ID: <CAKG51UBTu19DtVG2oL7XQ+0aZaKQKkRpfvwRm8Oe8+NxAdbsag@mail.gmail.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 25 Oct 2012 17:10:10 +0530
+Subject: [PATCH 2/8] i2c: omap: reorder exit path of omap_i2c_xfer_msg()
+In-Reply-To: <1350899218-13624-3-git-send-email-balbi@ti.com>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <1350899218-13624-3-git-send-email-balbi@ti.com>
+Message-ID: <CAM=Q2cvUeLbS20HScrGTOcraSUrCzhzCi8MQLxd9MOb_7ZFFYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 10:24 PM, Matt Porter <mporter@ti.com> wrote:
-> On Mon, Oct 08, 2012 at 04:27:20PM +0530, Sekhar Nori wrote:
->> On 10/5/2012 10:34 PM, Matt Porter wrote:
->>
->> > This series enables uio_pruss on DA850 and removes use of the
->> > private SRAM API by the driver. The driver previously was not
->> > enabled by any platform and the private SRAM API was accessing
->> > an invalid SRAM bank.
->> >
->> > It is regression tested on AM180x EVM with suspend/resume due
->> > to the new use of the shared SRAM for both PM and PRUSS. The
->> > uio_pruss driver is tested on the same platform using the
->> > PRU_memAccessPRUDataRam and PRU_memAccessL3andDDR examples from
->> > the PRU userspace tools available from http://www.ti.com/tool/sprc940
->>
->> I applied patches 2/7, 3/7 and 6/7 of this series for v3.8. I have some
->> comments on the board patch. Rest of the patches depend on acceptance of
->> 1/7 so I will take them only after that is accepted.
+On Mon, Oct 22, 2012 at 3:16 PM, Felipe Balbi <balbi@ti.com> wrote:
+> just a cleanup patch trying to make exit path
+> more straightforward. No changes otherwise.
 >
-> Ok, Hans has accepted 1/7, will you take the entire series through the
-> Davinci tree?
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++++++---------
+>  1 file changed, 17 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index c07d9c4..bea0277 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -505,6 +505,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  {
+>         struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+>         unsigned long timeout;
+> +       int ret;
+>         u16 w;
+>
+>         dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+> @@ -582,31 +583,38 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>         dev->buf_len = 0;
+>         if (timeout == 0) {
+>                 dev_err(dev->dev, "controller timed out\n");
+> -               omap_i2c_init(dev);
+> -               return -ETIMEDOUT;
+> +               ret = -ETIMEDOUT;
+> +               goto err_i2c_init;
+>         }
+>
+> -       if (likely(!dev->cmd_err))
+> -               return 0;
+> -
+>         /* We have an error */
+>         if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+>                             OMAP_I2C_STAT_XUDF)) {
+> -               omap_i2c_init(dev);
+> -               return -EIO;
+> +               ret = -EIO;
+> +               goto err_i2c_init;
+>         }
+>
+>         if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
+>                 if (msg->flags & I2C_M_IGNORE_NAK)
+>                         return 0;
+> +
+>                 if (stop) {
+>                         w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+>                         w |= OMAP_I2C_CON_STP;
+>                         omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+>                 }
+> -               return -EREMOTEIO;
+> +
+> +               ret = -EREMOTEIO;
+> +               goto err;
 
-Yes.
+This adds reset to nack may be that can be removed.
 
-Thanks,
-Sekhar
+
+>         }
+> -       return -EIO;
+> +
+> +       return 0;
+> +
+> +err_i2c_init:
+> +       omap_i2c_init(dev);
+> +
+> +err:
+> +       return ret;
+>  }
+>
+>
+> --
+> 1.8.0.rc0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
