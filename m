@@ -1,108 +1,108 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 25 Oct 2012 17:22:36 +0200
-Subject: [PATCH v3 2/6] ARM: EXYNOS: Add support for secure monitor calls
+Date: Thu, 25 Oct 2012 17:22:37 +0200
+Subject: [PATCH v3 3/6] ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
 In-Reply-To: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
 References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1351178560-19188-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1351178560-19188-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards use secure monitor calls to communicate with secure
-firmware.
-
-This patch adds exynos_smc function which uses smc assembly instruction
-to do secure monitor calls.
+On TrustZone-enabled boards the non-secure SYSRAM is used for secondary
+CPU bring-up, so add a mapping for it.
 
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/mach-exynos/Makefile     |  5 +++++
- arch/arm/mach-exynos/exynos-smc.S | 22 ++++++++++++++++++++++
- arch/arm/mach-exynos/smc.h        | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+)
- create mode 100644 arch/arm/mach-exynos/exynos-smc.S
- create mode 100644 arch/arm/mach-exynos/smc.h
+ arch/arm/mach-exynos/common.c                | 35 ++++++++++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h      |  3 +++
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  1 +
+ 3 files changed, 39 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 9b58024..5c1de47 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -30,6 +30,11 @@ obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 1947be8..cb891a7 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -215,6 +215,33 @@ static struct map_desc exynos4_iodesc1[] __initdata = {
+ 	},
+ };
  
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
++static struct map_desc exynos4210_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS4210_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
++static struct map_desc exynos4x12_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS4x12_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
++static struct map_desc exynos5250_iodesc[] __initdata = {
++	{
++		.virtual	= (unsigned long)S5P_VA_SYSRAM_NS,
++		.pfn		= __phys_to_pfn(EXYNOS5250_PA_SYSRAM_NS),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE,
++	},
++};
++
+ static struct map_desc exynos5_iodesc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)S3C_VA_SYS,
+@@ -322,6 +349,11 @@ static void __init exynos4_map_io(void)
+ 	else
+ 		iotable_init(exynos4_iodesc1, ARRAY_SIZE(exynos4_iodesc1));
  
-+obj-$(CONFIG_ARCH_EXYNOS)	+= exynos-smc.o
++	if (soc_is_exynos4210())
++		iotable_init(exynos4210_iodesc, ARRAY_SIZE(exynos4210_iodesc));
++	if (soc_is_exynos4212() || soc_is_exynos4412())
++		iotable_init(exynos4x12_iodesc, ARRAY_SIZE(exynos4x12_iodesc));
 +
-+plus_sec := $(call as-instr,.arch_extension sec,+sec)
-+AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
-+
- # machine support
+ 	/* initialize device information early */
+ 	exynos4_default_sdhci0();
+ 	exynos4_default_sdhci1();
+@@ -355,6 +387,9 @@ static void __init exynos5_map_io(void)
+ {
+ 	iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
  
- obj-$(CONFIG_MACH_SMDKC210)		+= mach-smdkv310.o
-diff --git a/arch/arm/mach-exynos/exynos-smc.S b/arch/arm/mach-exynos/exynos-smc.S
-new file mode 100644
-index 0000000..2e27aa3
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos-smc.S
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2012 Samsung Electronics.
-+ *
-+ * Copied from omap-smc.S Copyright (C) 2010 Texas Instruments, Inc.
-+ *
-+ * This program is free software,you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++	if (soc_is_exynos5250())
++		iotable_init(exynos5250_iodesc, ARRAY_SIZE(exynos5250_iodesc));
 +
-+#include <linux/linkage.h>
-+
-+/*
-+ * Function signature: void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3)
-+ */
-+
-+ENTRY(exynos_smc)
-+	stmfd	sp!, {r4-r11, lr}
-+	dsb
-+	smc	#0
-+	ldmfd	sp!, {r4-r11, pc}
-+ENDPROC(exynos_smc)
-diff --git a/arch/arm/mach-exynos/smc.h b/arch/arm/mach-exynos/smc.h
-new file mode 100644
-index 0000000..e972390
---- /dev/null
-+++ b/arch/arm/mach-exynos/smc.h
-@@ -0,0 +1,31 @@
-+/*
-+ *  Copyright (c) 2012 Samsung Electronics.
-+ *
-+ * EXYNOS - SMC Call
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_ARCH_EXYNOS_SMC_H
-+#define __ASM_ARCH_EXYNOS_SMC_H
-+
-+#define SMC_CMD_INIT            (-1)
-+#define SMC_CMD_INFO            (-2)
-+/* For Power Management */
-+#define SMC_CMD_SLEEP           (-3)
-+#define SMC_CMD_CPU1BOOT        (-4)
-+#define SMC_CMD_CPU0AFTR        (-5)
-+/* For CP15 Access */
-+#define SMC_CMD_C15RESUME       (-11)
-+/* For L2 Cache Access */
-+#define SMC_CMD_L2X0CTRL        (-21)
-+#define SMC_CMD_L2X0SETUP1      (-22)
-+#define SMC_CMD_L2X0SETUP2      (-23)
-+#define SMC_CMD_L2X0INVALL      (-24)
-+#define SMC_CMD_L2X0DEBUG       (-25)
-+
-+extern void exynos_smc(u32 cmd, u32 arg1, u32 arg2, u32 arg3);
-+
-+#endif
+ 	s3c_device_i2c0.resource[0].start = EXYNOS5_PA_IIC(0);
+ 	s3c_device_i2c0.resource[0].end   = EXYNOS5_PA_IIC(0) + SZ_4K - 1;
+ 	s3c_device_i2c0.resource[1].start = EXYNOS5_IRQ_IIC;
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 8480849..42f4444 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -26,6 +26,9 @@
+ #define EXYNOS4_PA_SYSRAM0		0x02025000
+ #define EXYNOS4_PA_SYSRAM1		0x02020000
+ #define EXYNOS5_PA_SYSRAM		0x02020000
++#define EXYNOS4210_PA_SYSRAM_NS		0x0203F000
++#define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
++#define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
+ 
+ #define EXYNOS4_PA_FIMC0		0x11800000
+ #define EXYNOS4_PA_FIMC1		0x11810000
+diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+index c2d7bda..c186786 100644
+--- a/arch/arm/plat-samsung/include/plat/map-s5p.h
++++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+@@ -22,6 +22,7 @@
+ #define S5P_VA_GPIO3		S3C_ADDR(0x02280000)
+ 
+ #define S5P_VA_SYSRAM		S3C_ADDR(0x02400000)
++#define S5P_VA_SYSRAM_NS	S3C_ADDR(0x02410000)
+ #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
+ #define S5P_VA_DMC1		S3C_ADDR(0x02480000)
+ #define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
 -- 
 1.7.12
