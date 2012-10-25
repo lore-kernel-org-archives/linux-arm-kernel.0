@@ -1,66 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 16:51:43 +0100
-Subject: [PATCH 2/6] pinctrl: Update clock handling for the
- pinctrl-nomadik GPIO driver
-In-Reply-To: <CACRpkdbNWE6hOdVFPxHv7MVHkZUBW3LC035CxJkZVmr8j05Kqw@mail.gmail.com>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
- <CACRpkda2NQok7kzh0pFmZPYd4nky1kUw=67DZAYAJAXGuc1yzQ@mail.gmail.com>
- <CACRpkdbNWE6hOdVFPxHv7MVHkZUBW3LC035CxJkZVmr8j05Kqw@mail.gmail.com>
-Message-ID: <20121025155143.GK4008@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 25 Oct 2012 09:53:06 -0600
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <20121025102301.GA3469@breakpoint.cc>
+References: <Pine.LNX.4.44L0.1210241329230.1282-100000@iolanthe.rowland.org>
+ <50882EED.9020200@wwwdotorg.org> <5088399F.2000102@firmworks.com>
+ <20121025102301.GA3469@breakpoint.cc>
+Message-ID: <50896062.1090907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012, Linus Walleij wrote:
+On 10/25/2012 04:23 AM, Sebastian Andrzej Siewior wrote:
+> On Wed, Oct 24, 2012 at 08:55:27AM -1000, Mitch Bradley wrote:
+>>>> So by listing "usb-ehci" in its device ID table, a driver would
+>>>> essentially be saying that it can handle _all_ USB EHCI controllers.  
+>>
+>>
+>> Actually, it means that the driver can handle at least USB EHCI
+>> controllers that are 100% compatible with the EHCI spec (requiring
+>> nothing extra).  The driver might be able to handle almost-compatible
+>> controllers, possibly with the help of additional properties.
+>>
+>> If a DT node lists "usb-ehci" as a "fallback", it's not guaranteed that
+>> a given version of that driver will work, but it's worth a try in the
+>> event that no more-specific driver is matched.
+> 
+> Not sure fallback is a good term here. The of parses the compatible from left
+> to right. If the device specific entry is not found (in the driver) then end
+> up with usb-ehci. If we need a quirk later on we add the device specific entry
+> to the driver (which will match before usb-ehci is found) and we could use
+> this entry to apply the quirk. That way you can apply quirks without touch the
+> firmware / device tree.
 
-> On Thu, Oct 25, 2012 at 2:41 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >
-> >> The clock framework has changed somewhat and it's now better to
-> >> invoke clock_prepare_enable() and clk_disable_unprepare() rather
-> >> than the legacy clk_enable() and clk_disable() calls. This patch
-> >> converts the Nomadik Pin Control driver to the new framework.
-> >>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >
-> > I was convinced that this is a good change but no regression,
-> > so applied to the devel branch for 3.8.
-> >
-> > I also removed the initial clk_prepare() so the reference count
-> > may actually go down to 0 for the GPIO block and the peripheral
-> > cluster eventually gets relaxed.
-> 
-> Famous last words!
-> 
-> The good news is that this actually works, and the refcount
-> *does* go down to zero and gate off entire peripheral
-> clusters.
-> 
-> However that was not good because something vital in
-> some peripheral cluster died and killed the system :-D
-> 
-> Lee, could to to track down the reason and fix it so the patch
-> can be applied?
-> 
-> The only thing you need to do is to remove the superfluous
-> clk_prepare() right after the devm_clk_get() that hogs each
-> peripheral cluster.
-> 
-> Probably some driver is needing a clk_get() or a clk_get_sys() is
-> needs to be added somewhere to bring up some vital cluster,
-> or there may be some out-of-tree driver needed to bring up the
-> cluster properly I have no clue... Maybe some cluster just
-> cannot be declocked like that.
-
-I leave work in 10 mins and won't be coding again for ~2.5 weeks.
-So if this is something you could squeeze in and fix-up, I'd be
-very grateful.
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That's the theory on how the compatible values are used, but in
+practice, each driver is tested against all the values in a node before
+moving on to the next driver, so the (current kernel's implementation of
+the) matching order is not what's needed to make that work.
