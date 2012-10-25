@@ -1,100 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Oct 2012 10:41:19 -0500
-Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
-In-Reply-To: <1351182356.15182.7.camel@dinh-ubuntu>
-References: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
- <50887348.9070904@gmail.com> <1351182356.15182.7.camel@dinh-ubuntu>
-Message-ID: <50895D9F.4080009@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 25 Oct 2012 17:45:49 +0200
+Subject: [PATCH 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
+In-Reply-To: <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
+References: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
+ <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121025154549.GS24458@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 05, 2012 at 06:53:01PM -0300, Fabio Estevam wrote:
+> During the clock conversion for mx27 the "per4_gate" clock was missed to get
+> registered as a dependency of mx2-camera driver.
+> 
+> In the old mx27 clock driver we used to have:
+> 
+> DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
+> 
+> ,so does the same in the new clock driver.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
+I'm fine with merging this through the media tree.
 
-On 10/25/2012 11:25 AM, Dinh Nguyen wrote:
-> Hi Rob,
-> 
-> On Wed, 2012-10-24 at 18:01 -0500, Rob Herring wrote:
->> On 10/18/2012 12:32 PM, dinguyen at altera.com wrote:
->>> From: Dinh Nguyen <dinguyen@altera.com>
->>>
->>> Enable SMP for the SOCFPGA platform.
->>>
->>> Signed-off-by: Pavel Machek <pavel@denx.de>
->>> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->>> ---
->>> v2:
->>> -Remove pen_release code
->>> -Remove code that was already done by v7_setup
->>> -Add bindings document for reset and system manager
->>> -Move socfpga_sysmgr_init from platsmp.c to socfpga.c, because
->>> we will need to use the reset and system manager for more than SMP.
->>> -Move core.h to mach-socfpga from mach-socfpga/include/mach
->>
->> Just some lingering comments on the defconfig. Otherwise,
->>
->> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
->>
->>> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
->>> index 0ac1293..349ac22 100644
->>> --- a/arch/arm/configs/socfpga_defconfig
->>> +++ b/arch/arm/configs/socfpga_defconfig
->>
->> I'm still not clear why multi_v7 config does not work for you?
-> 
-> multi_v7 works fine for me. But I need
-> +#CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set 
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Why? I don't think those should break other versions of A9. If they do,
-we need to fix that. In general, we should turn on all errata for
-multi-platform builds, so we need to make sure they are done in a
-compatible way and can be bypassed if they have performance impacts.
-That may ultimately require some runtime patching though.
+Sascha
 
-Rob
+> ---
+>  arch/arm/mach-imx/clk-imx27.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> index 3b6b640..5ef0f08 100644
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -224,6 +224,7 @@ int __init mx27_clocks_init(unsigned long fref)
+>  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx-fb.0");
+>  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx-fb.0");
+>  	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "mx2-camera.0");
+> +	clk_register_clkdev(clk[per4_gate], "per", "mx2-camera.0");
+>  	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
+>  	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
+>  	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
+> -- 
+> 1.7.9.5
+> 
+> 
+> 
 
-> 
-> in order for SMP to work correctly on our platform.
-> 
-> 
->>
->>> @@ -1,5 +1,5 @@
->>>  CONFIG_EXPERIMENTAL=y
->>> -CONFIG_SYSVIPC=y
->>> +CONFIG_NO_HZ=y
->>>  CONFIG_IKCONFIG=y
->>>  CONFIG_IKCONFIG_PROC=y
->>>  CONFIG_LOG_BUF_SHIFT=14
->>> @@ -16,10 +16,13 @@ CONFIG_MODULE_UNLOAD=y
->>>  # CONFIG_IOSCHED_DEADLINE is not set
->>>  # CONFIG_IOSCHED_CFQ is not set
->>>  CONFIG_ARCH_SOCFPGA=y
->>> -CONFIG_MACH_SOCFPGA_CYCLONE5=y
->>> -CONFIG_ARM_THUMBEE=y
->>> +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
->>>  # CONFIG_CACHE_L2X0 is not set
->>>  CONFIG_HIGH_RES_TIMERS=y
->>> +CONFIG_SMP=y
->>> +CONFIG_ARM_ARCH_TIMER=y
->>
->> You're an A9, right? You don't have arch timers.
-> 
-> Yes, will remove in v3.
->>
->>> +CONFIG_HIGHMEM=y
->>
->> How much RAM? You need more than 2GB with CONFIG_VMSPLIT_2G.
-> 
-> 1G for RAM only, so will remove in v3.
-> 
-> Thanks,
-> Dinh
->>
->>> +CONFIG_HIGHPTE=y
->>>  CONFIG_VMSPLIT_2G=y
->>>  CONFIG_NR_CPUS=2
->>>  CONFIG_AEABI=y
->>
->>
-> 
-> 
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
