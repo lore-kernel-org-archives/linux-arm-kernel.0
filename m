@@ -1,34 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 10:41:47 +0100
-Subject: [GIT PULL] ux500 fixes due for v3.7 RCs
-Message-ID: <20121025094147.GA4008@gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 25 Oct 2012 11:43:40 +0200
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <50889BB2.3090107@ti.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com> <50889BB2.3090107@ti.com>
+Message-ID: <508909CC.9000000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+Hi Jon,
 
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+On 25.10.2012 03:53, Jon Hunter wrote:
+> 
+> On 10/22/2012 02:55 PM, Daniel Mack wrote:
 
-are available in the git repository at:
+>> +Example for an AM33xx board:
+>> +
+>> +	gpmc: gpmc at 50000000 {
+>> +		compatible = "ti,gpmc";
+>> +		ti,hwmods = "gpmc";
+>> +		reg = <0x50000000 0x1000000>;
+> 
+> Nit-pick, that size is quite large for a register range. I recommend
+> looking at the HWMOD data file
+> (arch/arm/mach-omap2/omap_hwmod_33xx_data.c) and see how much space is
+> allocated for the registers (see structure am33xx_gpmc_addr_space).
 
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-rcs-3.7
+Yeah but reserving the entire memory as per the reference manual also
+prvents other from poking around in the same register space. Is there a
+scenario in which it would of disadvantage to reserve all that memory?
 
-for you to fetch changes up to 76ff4e434734f7772d1a592cc9fe1d9921a3ec40:
 
-  ARM: ux500: Correct SDI5 address and add some format changes (2012-10-25 08:46:20 +0100)
 
-----------------------------------------------------------------
-Lee Jones (3):
-      ARM: ux500: Fix build error relating to IRQCHIP_SKIP_SET_WAKE
-      ARM: ux500: Specify AMBA Primecell IDs for Nomadik I2C in DT
-      ARM: ux500: Correct SDI5 address and add some format changes
-
- arch/arm/boot/dts/dbx5x0.dtsi |   17 ++++++++++++++++-
- arch/arm/mach-ux500/cpu.c     |    1 +
- 2 files changed, 17 insertions(+), 1 deletion(-)
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Daniel
