@@ -1,41 +1,47 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Oct 2012 15:25:11 +0300
-Subject: [PATCH v2 3/7] i2c: omap: also complete() when stat becomes zero
+Date: Thu, 25 Oct 2012 15:25:09 +0300
+Subject: [PATCH v2 1/7] i2c: omap: no need to access platform_device
 In-Reply-To: <1351167915-15079-1-git-send-email-balbi@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
  <1351167915-15079-1-git-send-email-balbi@ti.com>
-Message-ID: <1351167915-15079-4-git-send-email-balbi@ti.com>
+Message-ID: <1351167915-15079-2-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case we loop on IRQ handler until stat is
-finally zero, we would end up in a situation
-where all I2C transfers would misteriously
-timeout because we were not calling complete()
-in that situation.
+PM callbacks pass our device pointer as argument
+and we don't need to access the platform_device
+just to dereference that down to dev->drvdata.
 
-Fix the issue by moving omap_i2c_complete_cmd()
-call inside the 'out' label.
+instead, just use dev_get_drvdata() directly.
 
 Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/i2c/busses/i2c-omap.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index bea0277..b004126 100644
+index db31eae..c07d9c4 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1021,9 +1021,8 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 		}
- 	} while (stat);
+@@ -1239,8 +1239,7 @@ static int __devexit omap_i2c_remove(struct platform_device *pdev)
+ #ifdef CONFIG_PM_RUNTIME
+ static int omap_i2c_runtime_suspend(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+ 	u16 iv;
  
--	omap_i2c_complete_cmd(dev, err);
--
- out:
-+	omap_i2c_complete_cmd(dev, err);
- 	spin_unlock_irqrestore(&dev->lock, flags);
+ 	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
+@@ -1261,8 +1260,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
  
- 	return IRQ_HANDLED;
+ static int omap_i2c_runtime_resume(struct device *dev)
+ {
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+ 
+ 	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+ 		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
 -- 
 1.8.0
