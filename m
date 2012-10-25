@@ -1,27 +1,64 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 18:40:54 +0200
-Subject: [PATCH] arm: mvebu: fix typo in machine name for Armada 370/XP
-Message-ID: <1351183255-4979-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 25 Oct 2012 09:42:21 -0700
+Subject: [PATCH] ARM: PMU: fix runtime PM enable
+In-Reply-To: <5088284D.40404@ti.com> (Jon Hunter's message of "Wed, 24 Oct
+ 2012 12:41:33 -0500")
+References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
+ <20121024093150.GA23775@mudshark.cambridge.arm.com>
+ <5087F84B.9070705@ti.com>
+ <20121024143204.GF7339@mudshark.cambridge.arm.com>
+ <508803DF.7020902@ti.com>
+ <20121024172325.GK7339@mudshark.cambridge.arm.com>
+ <5088284D.40404@ti.com>
+Message-ID: <87vcdy33ma.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/armada-370-xp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Jon Hunter <jon-hunter@ti.com> writes:
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 1c0021d..9618148 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -53,7 +53,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
- 	NULL,
- };
- 
--DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
-+DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
- 	.init_irq	= armada_370_xp_init_irq,
--- 
-1.7.9.5
+> On 10/24/2012 12:23 PM, Will Deacon wrote:
+>> On Wed, Oct 24, 2012 at 04:06:07PM +0100, Jon Hunter wrote:
+>>> On 10/24/2012 09:32 AM, Will Deacon wrote:
+>>>> Hmmm, now I start to wonder whether your original idea of having separate
+>>>> callbacks for enable/disable irq and resume/suspend doesn't make more sense.
+>>>> Then the CTI magic can go in the irq management code and be totally separate
+>>>> to the PM stuff.
+>>>>
+>>>> What do you reckon?
+>>>
+>>> The resume/suspend calls really replaced the enable/disable irq
+>>> callbacks. That still seems like a good approach given that we need
+>>> runtime PM for OMAP and PMU.
+>> 
+>> Ok, perhaps splitting it up isn't worth it then. I'm still not convinced
+>> either way.
+>
+> Given that we needed to employ runtime PM for OMAP, adding the handlers
+> is a natural progression and fits more with the PM framework model.
+>
+>>>> Nah, we should be able to fix this in the platdata, I'd just rather have
+>>>> function pointers instead of state variables in there.
+>>>
+>>> Well, we could pass a pointer to pm_runtime_enable() function in the
+>>> platdata.
+>> 
+>> What do other drivers do? Grepping around, I see calls to pm_runtime_enable
+>> made in various drivers and, given that you pass the device in there, what's
+>> the problem with us just calling that unconditionally from perf? I know you
+>> said that will work for OMAP, but I'm trying to understand the effect that
+>> has on PM-aware platforms that don't require this for the PMU (since this
+>> seems to be per-device).
+>
+> I had done this initially when testing on OMAP platforms that do and
+> don't require runtime PM for PMU. I don't see any side affect of this,
+> however, may be Kevin could comment on if that is ok. It would be the
+> best approach.
+
+Unconditonally enabling runtime PM should be fine.  It may add a slight
+bit of overhead calling runtime PM functions that ultimately do nothing
+(because there are no callbacks), but it will be harmless.
+
+Personally, I think that would be cleaner.  The less pdata we need, the
+better, IMO.
+
+Kevin
