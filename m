@@ -1,288 +1,224 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 17:21:17 -0600
-Subject: [PATCH 07/13] ARM: OMAP2xxx: APLL/CM: convert to use
- omap2_cm_wait_module_ready()
+Date: Thu, 25 Oct 2012 17:21:21 -0600
+Subject: [PATCH 11/13] ARM: OMAP2+: PRCM: consolidate PRCM-related timeout
+ macros
 In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
 References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <20121025232117.17558.41886.stgit@dusk.lan>
+Message-ID: <20121025232120.17558.82198.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP2xxx APLL code to use omap2_cm_wait_module_ready(),
-and move the low-level CM register manipulation functions to
-mach-omap2/cm2xxx.c.  The objectives here are to remove the dependency
-on the deprecated omap2_cm_wait_idlest() function in
-mach-omap2/prcm.c, so that code can be removed later; and move
-low-level register accesses to the CM IP block to the CM code, which
-will soon be moved into drivers/.
+Consolidate all of the copies of MAX_MODULE_HARDRESET_WAIT and
+MAX_MODULE_SOFTRESET_WAIT into one place, arch/arm/mach-omap2/prm.h.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clkt2xxx_apll.c   |   56 +++++++---------------------
- arch/arm/mach-omap2/clock2420_data.c  |    1 -
- arch/arm/mach-omap2/clock2430_data.c  |    1 -
- arch/arm/mach-omap2/clock2xxx.h       |    2 +
- arch/arm/mach-omap2/cm-regbits-24xx.h |    2 +
- arch/arm/mach-omap2/cm2xxx.c          |   65 ++++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/cm2xxx_3xxx.h     |    6 +++
- 7 files changed, 85 insertions(+), 48 deletions(-)
+ arch/arm/mach-omap2/display.c      |    2 +-
+ arch/arm/mach-omap2/hdq1w.c        |    4 +---
+ arch/arm/mach-omap2/i2c.c          |    6 ++----
+ arch/arm/mach-omap2/msdi.c         |    4 +---
+ arch/arm/mach-omap2/omap_hwmod.c   |    4 +---
+ arch/arm/mach-omap2/prcm-common.h  |    6 ------
+ arch/arm/mach-omap2/prm.h          |   17 +++++++++++++++++
+ arch/arm/mach-omap2/prm2xxx_3xxx.h |    7 -------
+ arch/arm/mach-omap2/wd_timer.c     |    5 ++---
+ 9 files changed, 25 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_apll.c b/arch/arm/mach-omap2/clkt2xxx_apll.c
-index 3d2f67e..d47f6f7 100644
---- a/arch/arm/mach-omap2/clkt2xxx_apll.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_apll.c
-@@ -38,44 +38,16 @@
- #define APLLS_CLKIN_13MHZ		2
- #define APLLS_CLKIN_12MHZ		3
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index 1011995..8a92ee6 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -34,6 +34,7 @@
+ #include "mux.h"
+ #include "control.h"
+ #include "display.h"
++#include "prm.h"
  
--void __iomem *cm_idlest_pll;
--
- /* Private functions */
+ #define DISPC_CONTROL		0x0040
+ #define DISPC_CONTROL2		0x0238
+@@ -473,7 +474,6 @@ static void dispc_disable_outputs(void)
+ 	}
+ }
  
--/* Enable an APLL if off */
--static int omap2_clk_apll_enable(struct clk *clk, u32 status_mask)
--{
--	u32 cval, apll_mask;
--
--	apll_mask = EN_APLL_LOCKED << clk->enable_bit;
--
--	cval = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
--
--	if ((cval & apll_mask) == apll_mask)
--		return 0;   /* apll already enabled */
--
--	cval &= ~apll_mask;
--	cval |= apll_mask;
--	omap2_cm_write_mod_reg(cval, PLL_MOD, CM_CLKEN);
--
--	omap2_cm_wait_idlest(cm_idlest_pll, status_mask,
--			     OMAP24XX_CM_IDLEST_VAL, __clk_get_name(clk));
--
--	/*
--	 * REVISIT: Should we return an error code if omap2_wait_clock_ready()
--	 * fails?
--	 */
--	return 0;
--}
--
--static int omap2_clk_apll96_enable(struct clk *clk)
-+static int _apll96_enable(struct clk *clk)
+-#define MAX_MODULE_SOFTRESET_WAIT	10000
+ int omap_dss_reset(struct omap_hwmod *oh)
  {
--	return omap2_clk_apll_enable(clk, OMAP24XX_ST_96M_APLL_MASK);
-+	return omap2xxx_cm_apll96_enable();
- }
+ 	struct omap_hwmod_opt_clk *oc;
+diff --git a/arch/arm/mach-omap2/hdq1w.c b/arch/arm/mach-omap2/hdq1w.c
+index e003f2b..0e30a97 100644
+--- a/arch/arm/mach-omap2/hdq1w.c
++++ b/arch/arm/mach-omap2/hdq1w.c
+@@ -31,11 +31,9 @@
+ #include <plat/omap_device.h>
+ #include "hdq1w.h"
  
--static int omap2_clk_apll54_enable(struct clk *clk)
-+static int _apll54_enable(struct clk *clk)
- {
--	return omap2_clk_apll_enable(clk, OMAP24XX_ST_54M_APLL_MASK);
-+	return omap2xxx_cm_apll54_enable();
- }
++#include "prm.h"
+ #include "common.h"
  
- static void _apll96_allow_idle(struct clk *clk)
-@@ -98,28 +70,28 @@ static void _apll54_deny_idle(struct clk *clk)
- 	omap2xxx_cm_set_apll54_disable_autoidle();
- }
- 
--/* Stop APLL */
--static void omap2_clk_apll_disable(struct clk *clk)
-+static void _apll96_disable(struct clk *clk)
- {
--	u32 cval;
-+	omap2xxx_cm_apll96_disable();
-+}
- 
--	cval = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
--	cval &= ~(EN_APLL_LOCKED << clk->enable_bit);
--	omap2_cm_write_mod_reg(cval, PLL_MOD, CM_CLKEN);
-+static void _apll54_disable(struct clk *clk)
-+{
-+	omap2xxx_cm_apll54_disable();
- }
- 
- /* Public data */
- 
- const struct clkops clkops_apll96 = {
--	.enable		= omap2_clk_apll96_enable,
--	.disable	= omap2_clk_apll_disable,
-+	.enable		= _apll96_enable,
-+	.disable	= _apll96_disable,
- 	.allow_idle	= _apll96_allow_idle,
- 	.deny_idle	= _apll96_deny_idle,
- };
- 
- const struct clkops clkops_apll54 = {
--	.enable		= omap2_clk_apll54_enable,
--	.disable	= omap2_clk_apll_disable,
-+	.enable		= _apll54_enable,
-+	.disable	= _apll54_disable,
- 	.allow_idle	= _apll54_allow_idle,
- 	.deny_idle	= _apll54_deny_idle,
- };
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 405a07a..274244f 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -1930,7 +1930,6 @@ int __init omap2420_clk_init(void)
- 	struct omap_clk *c;
- 
- 	prcm_clksrc_ctrl = OMAP2420_PRCM_CLKSRC_CTRL;
--	cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
- 	cpu_mask = RATE_IN_242X;
- 	rate_table = omap2420_rate_table;
- 
-diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index 0664fc3..9f5a471 100644
---- a/arch/arm/mach-omap2/clock2430_data.c
-+++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -2029,7 +2029,6 @@ int __init omap2430_clk_init(void)
- 	struct omap_clk *c;
- 
- 	prcm_clksrc_ctrl = OMAP2430_PRCM_CLKSRC_CTRL;
--	cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
- 	cpu_mask = RATE_IN_243X;
- 	rate_table = omap2430_rate_table;
- 
-diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
-index 25b8d02..ce809c9 100644
---- a/arch/arm/mach-omap2/clock2xxx.h
-+++ b/arch/arm/mach-omap2/clock2xxx.h
-@@ -35,7 +35,7 @@ int omap2430_clk_init(void);
- #define omap2430_clk_init()	do { } while(0)
- #endif
- 
--extern void __iomem *prcm_clksrc_ctrl, *cm_idlest_pll;
-+extern void __iomem *prcm_clksrc_ctrl;
- 
- extern const struct clkops clkops_omap2430_i2chs_wait;
- extern const struct clkops clkops_oscck;
-diff --git a/arch/arm/mach-omap2/cm-regbits-24xx.h b/arch/arm/mach-omap2/cm-regbits-24xx.h
-index 6862904..11eaf16 100644
---- a/arch/arm/mach-omap2/cm-regbits-24xx.h
-+++ b/arch/arm/mach-omap2/cm-regbits-24xx.h
-@@ -333,7 +333,9 @@
- #define OMAP24XX_EN_DPLL_MASK				(0x3 << 0)
- 
- /* CM_IDLEST_CKGEN */
-+#define OMAP24XX_ST_54M_APLL_SHIFT			9
- #define OMAP24XX_ST_54M_APLL_MASK			(1 << 9)
-+#define OMAP24XX_ST_96M_APLL_SHIFT			8
- #define OMAP24XX_ST_96M_APLL_MASK			(1 << 8)
- #define OMAP24XX_ST_54M_CLK_MASK			(1 << 6)
- #define OMAP24XX_ST_12M_CLK_MASK			(1 << 5)
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-index 6416501..e96cd70 100644
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -35,6 +35,9 @@
- #define OMAP2XXX_APLL_AUTOIDLE_DISABLE			0x0
- #define OMAP2XXX_APLL_AUTOIDLE_LOW_POWER_STOP		0x3
- 
-+/* CM_IDLEST_PLL bit value offset for APLLs (OMAP2xxx only) */
-+#define EN_APLL_LOCKED					3
-+
- static const u8 omap2xxx_cm_idlest_offs[] = {
- 	CM_IDLEST1, CM_IDLEST2, OMAP2430_CM_IDLEST3, OMAP24XX_CM_IDLEST4
- };
-@@ -99,7 +102,7 @@ void omap2xxx_cm_set_dpll_auto_low_power_stop(void)
- }
- 
- /*
-- * APLL autoidle control
-+ * APLL control
+-/* Maximum microseconds to wait for OMAP module to softreset */
+-#define MAX_MODULE_SOFTRESET_WAIT	10000
+-
+ /**
+  * omap_hdq1w_reset - reset the OMAP HDQ1W module
+  * @oh: struct omap_hwmod *
+diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
+index fc57e67..aaaf09e 100644
+--- a/arch/arm/mach-omap2/i2c.c
++++ b/arch/arm/mach-omap2/i2c.c
+@@ -20,9 +20,10 @@
   */
  
- static void _omap2xxx_set_apll_autoidle(u8 m, u32 mask)
-@@ -136,6 +139,65 @@ void omap2xxx_cm_set_apll96_auto_low_power_stop(void)
- 				    OMAP24XX_AUTO_96M_MASK);
- }
+ #include <plat/i2c.h>
+-#include "common.h"
+ #include <plat/omap_hwmod.h>
  
-+/* Enable an APLL if off */
-+static int _omap2xxx_apll_enable(u8 enable_bit, u8 status_bit)
-+{
-+	u32 v, m;
++#include "prm.h"
++#include "common.h"
+ #include "mux.h"
+ 
+ /* In register I2C_CON, Bit 15 is the I2C enable bit */
+@@ -30,9 +31,6 @@
+ #define OMAP2_I2C_CON_OFFSET			0x24
+ #define OMAP4_I2C_CON_OFFSET			0xA4
+ 
+-/* Maximum microseconds to wait for OMAP module to softreset */
+-#define MAX_MODULE_SOFTRESET_WAIT	10000
+-
+ void __init omap2_i2c_mux_pins(int bus_id)
+ {
+ 	char mux_name[sizeof("i2c2_scl.i2c2_scl")];
+diff --git a/arch/arm/mach-omap2/msdi.c b/arch/arm/mach-omap2/msdi.c
+index 9e57b4a..5438c62 100644
+--- a/arch/arm/mach-omap2/msdi.c
++++ b/arch/arm/mach-omap2/msdi.c
+@@ -29,6 +29,7 @@
+ #include <plat/omap_device.h>
+ #include <plat/mmc.h>
+ 
++#include "prm.h"
+ #include "common.h"
+ #include "control.h"
+ #include "mux.h"
+@@ -44,9 +45,6 @@
+ #define MSDI_CON_CLKD_MASK			(0x3f << 0)
+ #define MSDI_CON_CLKD_SHIFT			0
+ 
+-/* Maximum microseconds to wait for OMAP module to softreset */
+-#define MAX_MODULE_SOFTRESET_WAIT	10000
+-
+ /* MSDI_TARGET_RESET_CLKD: clock divisor to use throughout the reset */
+ #define MSDI_TARGET_RESET_CLKD		0x3ff
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 504e0e0..bc891e9 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -151,6 +151,7 @@
+ #include "cm3xxx.h"
+ #include "cminst44xx.h"
+ #include "cm33xx.h"
++#include "prm.h"
+ #include "prm3xxx.h"
+ #include "prm44xx.h"
+ #include "prm33xx.h"
+@@ -158,9 +159,6 @@
+ #include "mux.h"
+ #include "pm.h"
+ 
+-/* Maximum microseconds to wait for OMAP module to softreset */
+-#define MAX_MODULE_SOFTRESET_WAIT	10000
+-
+ /* Name of the OMAP hwmod for the MPU */
+ #define MPU_INITIATOR_NAME		"mpu"
+ 
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index b25a32a..c7d355f 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -406,11 +406,6 @@
+ #define OMAP3430_EN_CORE_MASK				(1 << 0)
+ 
+ 
+-/*
+- * MAX_MODULE_HARDRESET_WAIT: Maximum microseconds to wait for an OMAP
+- * submodule to exit hardreset
+- */
+-#define MAX_MODULE_HARDRESET_WAIT		10000
+ 
+ /*
+  * Maximum time(us) it takes to output the signal WUCLKOUT of the last
+@@ -419,7 +414,6 @@
+  * microseconds on OMAP4, so this timeout may be too high.
+  */
+ #define MAX_IOPAD_LATCH_TIME			100
+-
+ # ifndef __ASSEMBLER__
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
+index fb7dee2..a1a266c 100644
+--- a/arch/arm/mach-omap2/prm.h
++++ b/arch/arm/mach-omap2/prm.h
+@@ -20,6 +20,23 @@ extern void __iomem *prm_base;
+ extern void omap2_set_globals_prm(void __iomem *prm);
+ # endif
+ 
 +
-+	m = EN_APLL_LOCKED << enable_bit;
++/*
++ * MAX_MODULE_SOFTRESET_WAIT: Maximum microseconds to wait for OMAP
++ * module to softreset
++ */
++#define MAX_MODULE_SOFTRESET_WAIT		10000
 +
-+	v = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
-+	if (v & m)
-+		return 0;   /* apll already enabled */
++/*
++ * MAX_MODULE_HARDRESET_WAIT: Maximum microseconds to wait for an OMAP
++ * submodule to exit hardreset
++ */
++#define MAX_MODULE_HARDRESET_WAIT		10000
 +
-+	v |= m;
-+	omap2_cm_write_mod_reg(v, PLL_MOD, CM_CLKEN);
-+
-+	omap2xxx_cm_wait_module_ready(PLL_MOD, 1, status_bit);
-+
-+	/*
-+	 * REVISIT: Should we return an error code if
-+	 * omap2xxx_cm_wait_module_ready() fails?
-+	 */
-+	return 0;
-+}
-+
-+/* Stop APLL */
-+static void _omap2xxx_apll_disable(u8 enable_bit)
-+{
-+	u32 v;
-+
-+	v = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKEN);
-+	v &= ~(EN_APLL_LOCKED << enable_bit);
-+	omap2_cm_write_mod_reg(v, PLL_MOD, CM_CLKEN);
-+}
-+
-+/* Enable an APLL if off */
-+int omap2xxx_cm_apll54_enable(void)
-+{
-+	return _omap2xxx_apll_enable(OMAP24XX_EN_54M_PLL_SHIFT,
-+				     OMAP24XX_ST_54M_APLL_SHIFT);
-+}
-+
-+/* Enable an APLL if off */
-+int omap2xxx_cm_apll96_enable(void)
-+{
-+	return _omap2xxx_apll_enable(OMAP24XX_EN_96M_PLL_SHIFT,
-+				     OMAP24XX_ST_96M_APLL_SHIFT);
-+}
-+
-+/* Stop APLL */
-+void omap2xxx_cm_apll54_disable(void)
-+{
-+	_omap2xxx_apll_disable(OMAP24XX_EN_54M_PLL_SHIFT);
-+}
-+
-+/* Stop APLL */
-+void omap2xxx_cm_apll96_disable(void)
-+{
-+	_omap2xxx_apll_disable(OMAP24XX_EN_96M_PLL_SHIFT);
-+}
++/*
++ * Register bitfields
++ */
 +
  /*
+  * 24XX: PM_PWSTST_CORE, PM_PWSTST_GFX, PM_PWSTST_MPU, PM_PWSTST_DSP
   *
-  */
-@@ -252,4 +314,3 @@ struct clkdm_ops omap2_clkdm_operations = {
- 	.clkdm_clk_enable	= omap2xxx_clkdm_clk_enable,
- 	.clkdm_clk_disable	= omap2xxx_clkdm_clk_disable,
- };
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.h b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+index 3330b1b..78532d6 100644
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.h
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.h
+@@ -241,11 +241,4 @@ extern int omap2_clkdm_clear_all_wkdeps(struct clockdomain *clkdm);
+ #define OMAP_LOGICRETSTATE_MASK				(1 << 2)
+ 
+ 
+-/*
+- * MAX_MODULE_HARDRESET_WAIT: Maximum microseconds to wait for an OMAP
+- * submodule to exit hardreset
+- */
+-#define MAX_MODULE_HARDRESET_WAIT		10000
 -
-diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-index 0e26bb1..f74a5d1 100644
---- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-@@ -96,6 +96,11 @@ static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
- 	return omap2_cm_rmw_mod_reg_bits(bits, 0x0, module, idx);
- }
- 
-+extern int omap2xxx_cm_apll54_enable(void);
-+extern void omap2xxx_cm_apll54_disable(void);
-+extern int omap2xxx_cm_apll96_enable(void);
-+extern void omap2xxx_cm_apll96_disable(void);
-+
- #endif
- 
- /* CM register bits shared between 24XX and 3430 */
-@@ -111,5 +116,4 @@ static inline u32 omap2_cm_clear_mod_reg_bits(u32 bits, s16 module, s16 idx)
- /* CM_IDLEST_GFX */
- #define OMAP_ST_GFX_MASK				(1 << 0)
- 
 -
  #endif
+diff --git a/arch/arm/mach-omap2/wd_timer.c b/arch/arm/mach-omap2/wd_timer.c
+index 00ef54c..30e2cb9 100644
+--- a/arch/arm/mach-omap2/wd_timer.c
++++ b/arch/arm/mach-omap2/wd_timer.c
+@@ -1,6 +1,8 @@
+ /*
+  * OMAP2+ MPU WD_TIMER-specific code
+  *
++ * Copyright (C) 2012 Texas Instruments, Inc.
++ *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+  * the Free Software Foundation; either version 2 of the License, or
+@@ -30,9 +32,6 @@
+ #define OMAP_WDT_WPS		0x34
+ #define OMAP_WDT_SPR		0x48
+ 
+-/* Maximum microseconds to wait for OMAP module to softreset */
+-#define MAX_MODULE_SOFTRESET_WAIT	10000
+-
+ int omap2_wd_timer_disable(struct omap_hwmod *oh)
+ {
+ 	void __iomem *base;
