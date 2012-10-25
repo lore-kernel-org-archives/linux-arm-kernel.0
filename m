@@ -1,34 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 10:57:11 +0100
-Subject: [PATCH 8/8] ARM: ux500: Convert DT_MACHINE_START to use SMP operations
-In-Reply-To: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
-References: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351159031-25391-9-git-send-email-lee.jones@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 13:09:15 +0300
+Subject: [PATCH v2] i2c: omap: re-factor omap_i2c_init function
+In-Reply-To: <CAM=Q2ctcxO2eFFBDdF_Mwt1bm34pj5hvJW4AS6V-GQVTVGz98Q@mail.gmail.com>
+References: <1351147011-6500-1-git-send-email-shubhrajyoti@ti.com>
+ <20121025063608.GA5084@arwen.pp.htv.fi>
+ <CAM=Q2ctcxO2eFFBDdF_Mwt1bm34pj5hvJW4AS6V-GQVTVGz98Q@mail.gmail.com>
+Message-ID: <20121025100915.GB21217@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Device Tree machine description for the ux5x0 was moved
-recently and as a consequence missed the addition of SMP
-operations. Without this patch SMP doesn't work and only one
-CPU is present after booting.
+Hi,
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c |    1 +
- 1 file changed, 1 insertion(+)
+On Thu, Oct 25, 2012 at 03:04:29PM +0530, Shubhrajyoti Datta wrote:
+> On Thu, Oct 25, 2012 at 12:06 PM, Felipe Balbi <balbi@ti.com> wrote:
+> 
+> [...]
+> >> +      * Don't write to this register if the IE state is 0 as it can
+> >> +      * cause deadlock.
+> >> +      */
+> >> +     if (dev->iestate)
+> >> +             omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+> >> +}
+> >> +
+> >>  static int omap_i2c_init(struct omap_i2c_dev *dev)
+> >>  {
+> >> -     u16 psc = 0, scll = 0, sclh = 0, buf = 0;
+> >> +     u16 psc = 0, scll = 0, sclh = 0;
+> >>       u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+> >>       unsigned long fclk_rate = 12000000;
+> >>       unsigned long timeout;
+> >> @@ -337,11 +358,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+> >>                        * REVISIT: Some wkup sources might not be needed.
+> >>                        */
+> >>                       dev->westate = OMAP_I2C_WE_ALL;
+> >> -                     omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+> >> -                                                     dev->westate);
+> >
+> > remove the comment too since now that's done by some other function ?
+> 
+> The comment is applicable to the OMAP_I2C_WE_ALL value.
+> So I thought it could be kept.
+> 
+> dont feel strongly though.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index c65e7e3..4a0c40a 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -339,6 +339,7 @@ static const char * stericsson_dt_platform_compat[] = {
- };
- 
- DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
-+	.smp            = smp_ops(ux500_smp_ops),
- 	.map_io		= u8500_map_io,
- 	.init_irq	= ux500_init_irq,
- 	/* we re-use nomadik timer here */
+I see. that's ok then.
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/9ddee6e4/attachment.sig>
