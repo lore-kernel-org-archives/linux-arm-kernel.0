@@ -1,231 +1,94 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 25 Oct 2012 12:11:49 -0400
-Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init clk
- driver
+Date: Thu, 25 Oct 2012 12:11:56 -0400
+Subject: [PATCH v3 10/11] ARM: davinci - migrate to common clock
 In-Reply-To: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
 References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1351181518-11882-11-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the common clk driver initialization functions for DaVinci
-SoCs and other SoCs that uses similar hardware architecture.
-clock.h also defines struct types for clock definitions in a SoC
-and clock data type for configuring clk-mux. The initialization
-functions are used by clock initialization code in a specific
-platform/SoC.
+Currently migrate only DM644x as this is being reviewed. Once all
+platforms are migrated, the Makefile will be cleaned up to remove
+obsoleted files clock.o and psc.o
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- drivers/clk/davinci/clock.c |  112 +++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/davinci/clock.h |   80 +++++++++++++++++++++++++++++++
- 2 files changed, 192 insertions(+)
- create mode 100644 drivers/clk/davinci/clock.c
- create mode 100644 drivers/clk/davinci/clock.h
+ arch/arm/Kconfig               |    1 +
+ arch/arm/mach-davinci/Kconfig  |    2 ++
+ arch/arm/mach-davinci/Makefile |   11 ++++++++++-
+ 3 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/davinci/clock.c b/drivers/clk/davinci/clock.c
-new file mode 100644
-index 0000000..ad02149
---- /dev/null
-+++ b/drivers/clk/davinci/clock.c
-@@ -0,0 +1,112 @@
-+/*
-+ * clock.c - davinci clock initialization functions for various clocks
-+ *
-+ * Copyright (C) 2006-2012 Texas Instruments.
-+ * Copyright (C) 2008-2009 Deep Root Systems, LLC
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+#include <linux/init.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+
-+#include "clk-pll.h"
-+#include "clk-psc.h"
-+#include "clk-div.h"
-+#include "clock.h"
-+
-+static DEFINE_SPINLOCK(_lock);
-+
-+#ifdef	CONFIG_CLK_DAVINCI_PLL
-+struct clk *davinci_pll_clk(const char *name, const char *parent,
-+		u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
-+		struct clk_pll_data *pll_data)
-+{
-+	struct clk *clkp = NULL;
-+
-+	pll_data->reg_pllm = ioremap(phys_pllm, 4);
-+	if (WARN_ON(!pll_data->reg_pllm))
-+		return clkp;
-+
-+	pll_data->reg_prediv = ioremap(phys_prediv, 4);
-+	if (WARN_ON(!pll_data->reg_prediv))
-+		goto error1;
-+
-+	pll_data->reg_postdiv = ioremap(phys_postdiv, 4);
-+	if (WARN_ON(!pll_data->reg_postdiv))
-+		goto error2;
-+
-+	return clk_register_davinci_pll(NULL, name, parent, pll_data);
-+error1:
-+	iounmap(pll_data->reg_pllm);
-+error2:
-+	iounmap(pll_data->reg_prediv);
-+	return clkp;
-+}
-+#else
-+struct clk *davinci_pll_clk(const char *name, const char *parent,
-+		u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
-+		struct clk_pll_data *pll_data)
-+{
-+	return NULL;
-+}
-+#endif
-+
-+struct clk *davinci_mux_clk(const char *name, u8 num_parents,
-+		const char **parents, struct clk_mux_data *data)
-+
-+{
-+	void __iomem *reg;
-+
-+	reg = ioremap(data->phys_reg, 4);
-+	if (WARN_ON(!reg))
-+		return NULL;
-+
-+	return clk_register_mux(NULL, name, parents, num_parents, data->flags,
-+				reg, data->shift, data->width, data->mux_flags,
-+				 &_lock);
-+}
-+
-+struct clk *davinci_plldiv_clk(const char *name, const char *parent,
-+				struct clk_plldiv_data *data)
-+{
-+	/*
-+	 * This is a PLL divider clock with divider specified by
-+	 * div_reg in pll_div_data.
-+	 */
-+	data->reg = ioremap(data->phys_div_reg, 4);
-+	if (WARN_ON(!data->reg))
-+		return NULL;
-+
-+	return clk_register_davinci_plldiv(NULL, name, parent, data, &_lock);
-+}
-+
-+inline struct clk *davinci_fixed_factor_clk(const char *name,
-+			const char *parent, unsigned long flags,
-+			unsigned int mult, unsigned int div)
-+{
-+	if (WARN_ON(!mult))
-+		return NULL;
-+
-+	if (WARN_ON(!div))
-+		return NULL;
-+
-+	return clk_register_fixed_factor(NULL, name, parent, flags, mult, div);
-+}
-+
-+inline struct clk *davinci_fixed_ref_clk(const char *name,
-+					unsigned long rate)
-+{
-+	return clk_register_fixed_rate(NULL, name, NULL, CLK_IS_ROOT, rate);
-+}
-+
-+inline struct clk *davinci_psc_clk(const char *name, const char *parent,
-+				 struct clk_psc_data *data)
-+{
-+	return clk_register_davinci_psc(NULL, name, parent, data);
-+}
-diff --git a/drivers/clk/davinci/clock.h b/drivers/clk/davinci/clock.h
-new file mode 100644
-index 0000000..73204b8
---- /dev/null
-+++ b/drivers/clk/davinci/clock.h
-@@ -0,0 +1,80 @@
-+/*
-+ * TI DaVinci Clock definitions -  Contains Macros and Types used for
-+ * defining various clocks on a DaVinci SoC
-+ *
-+ * Copyright (C) 2012 Texas Instruments
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#ifndef __DAVINCI_CLOCK_H
-+#define __DAVINCI_CLOCK_H
-+
-+#include <linux/types.h>
-+
-+/* general flags: */
-+#define ALWAYS_ENABLED		BIT(0)
-+
-+/**
-+ * struct clk_mux_data - struct for clk mux data to configure clk-mux
-+ *
-+ * @flags: base flags for clk driver
-+ * @mux_flags: mux driver flags
-+ * @shift: shift applied to mux selector bits
-+ * @width: width of the mux selctor bits
-+ * @phys_reg: physical address of the mux register
-+ */
-+struct clk_mux_data {
-+	u32			flags;
-+	u8			mux_flags;
-+	u8			shift;
-+	u8			width;
-+	u32			phys_reg;
-+};
-+
-+/**
-+ * struct davinci_clk - struct for defining DaVinci clocks for a SoC.
-+ *
-+ * @name: name of the clock
-+ * @parent: name of parent clock
-+ * @flags: General flags for all drivers used by platform clock init code
-+ * @data: data specific to a clock used by the driver
-+ * @dev_id: dev_id used to look up this clock. If this is NULL
-+ *	clock name is used for lookup.
-+ */
-+struct davinci_clk {
-+	const char			*name;
-+	const char			*parent;
-+	u32				flags;
-+	void				*data;
-+	char				*dev_id;
-+};
-+
-+/* function prototypes for initializing various clocks */
-+struct clk *davinci_fixed_ref_clk(const char *name,
-+				unsigned long rate);
-+
-+struct clk *davinci_pll_clk(const char *name, const char *parent,
-+		u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
-+		struct clk_pll_data *pll_data);
-+
-+
-+struct clk *davinci_mux_clk(const char *name, u8 num_parents,
-+		const char **parents, struct clk_mux_data *data);
-+
-+struct clk *davinci_plldiv_clk(const char *name, const char *parent,
-+				struct clk_plldiv_data *data);
-+
-+struct clk *davinci_psc_clk(const char *name, const char *parent,
-+				 struct clk_psc_data *data);
-+
-+struct clk *davinci_fixed_factor_clk(const char *name,
-+			const char *parent, unsigned long flags,
-+			unsigned int mult, unsigned int div);
-+#endif
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index c5f9ae5..4611987 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -967,6 +967,7 @@ config ARCH_DAVINCI
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ZONE_DMA
+ 	select HAVE_IDE
++	select COMMON_CLK
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_IRQ_CHIP
+diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
+index ab99c3c..ab414b4 100644
+--- a/arch/arm/mach-davinci/Kconfig
++++ b/arch/arm/mach-davinci/Kconfig
+@@ -19,6 +19,8 @@ config ARCH_DAVINCI_DM644x
+ 	bool "DaVinci 644x based system"
+ 	select AINTC
+ 	select ARCH_DAVINCI_DMx
++	select DAVINCI_CLKS
++	select CLK_DAVINCI_PLL
+ 
+ config ARCH_DAVINCI_DM355
+ 	bool "DaVinci 355 based system"
+diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
+index 2227eff..5a5b3dc 100644
+--- a/arch/arm/mach-davinci/Makefile
++++ b/arch/arm/mach-davinci/Makefile
+@@ -4,18 +4,25 @@
+ #
+ 
+ # Common objects
++ifndef CONFIG_COMMON_CLK
+ obj-y 			:= time.o clock.o serial.o psc.o \
+ 			   dma.o usb.o common.o sram.o aemif.o
++else
++obj-y 			:= time.o serial.o \
++			   dma.o usb.o common.o sram.o aemif.o
++endif
+ 
+ obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
+ 
+ # Chip specific
+ obj-$(CONFIG_ARCH_DAVINCI_DM644x)       += dm644x.o devices.o
++ifndef CONFIG_COMMON_CLK
+ obj-$(CONFIG_ARCH_DAVINCI_DM355)        += dm355.o devices.o
+-obj-$(CONFIG_ARCH_DAVINCI_DM646x)       += dm646x.o devices.o
+ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
++obj-$(CONFIG_ARCH_DAVINCI_DM646x)       += dm646x.o devices.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA830)        += da830.o devices-da8xx.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)        += da850.o devices-da8xx.o
++endif
+ obj-$(CONFIG_ARCH_DAVINCI_TNETV107X)    += tnetv107x.o devices-tnetv107x.o
+ 
+ obj-$(CONFIG_AINTC)			+= irq.o
+@@ -23,6 +30,7 @@ obj-$(CONFIG_CP_INTC)			+= cp_intc.o
+ 
+ # Board specific
+ obj-$(CONFIG_MACH_DAVINCI_EVM)  	+= board-dm644x-evm.o
++ifndef CONFIG_COMMON_CLK
+ obj-$(CONFIG_MACH_SFFSDR)		+= board-sffsdr.o
+ obj-$(CONFIG_MACH_NEUROS_OSD2)		+= board-neuros-osd2.o
+ obj-$(CONFIG_MACH_DAVINCI_DM355_EVM)	+= board-dm355-evm.o
+@@ -31,6 +39,7 @@ obj-$(CONFIG_MACH_DAVINCI_DM6467_EVM)	+= board-dm646x-evm.o cdce949.o
+ obj-$(CONFIG_MACH_DAVINCI_DM365_EVM)	+= board-dm365-evm.o
+ obj-$(CONFIG_MACH_DAVINCI_DA830_EVM)	+= board-da830-evm.o
+ obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
++endif
+ obj-$(CONFIG_MACH_TNETV107X)		+= board-tnetv107x-evm.o
+ obj-$(CONFIG_MACH_MITYOMAPL138)		+= board-mityomapl138.o
+ obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-omapl138-hawk.o
 -- 
 1.7.9.5
