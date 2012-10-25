@@ -1,37 +1,124 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 14:07:15 +0100
-Subject: [PATCH 2/6] pinctrl: Update clock handling for the
- pinctrl-nomadik GPIO driver
-In-Reply-To: <CACRpkda2NQok7kzh0pFmZPYd4nky1kUw=67DZAYAJAXGuc1yzQ@mail.gmail.com>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
- <CACRpkda2NQok7kzh0pFmZPYd4nky1kUw=67DZAYAJAXGuc1yzQ@mail.gmail.com>
-Message-ID: <20121025130715.GG4008@gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 25 Oct 2012 08:11:13 -0500
+Subject: [PATCH v2] gpio/omap: fix off-mode bug: clear debounce clock
+ enable mask on free/reset
+In-Reply-To: <5088E387.2050704@ti.com>
+References: <1351098641-23917-1-git-send-email-khilman@deeprootsystems.com>
+ <50887197.8010104@ti.com> <5088E387.2050704@ti.com>
+Message-ID: <50893A71.1030702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012, Linus Walleij wrote:
 
-> On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > The clock framework has changed somewhat and it's now better to
-> > invoke clock_prepare_enable() and clk_disable_unprepare() rather
-> > than the legacy clk_enable() and clk_disable() calls. This patch
-> > converts the Nomadik Pin Control driver to the new framework.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> I was convinced that this is a good change but no regression,
-> so applied to the devel branch for 3.8.
-> 
-> I also removed the initial clk_prepare() so the reference count
-> may actually go down to 0 for the GPIO block and the peripheral
-> cluster eventually gets relaxed.
+On 10/25/2012 02:00 AM, Santosh Shilimkar wrote:
+> On Thursday 25 October 2012 04:24 AM, Jon Hunter wrote:
+>>
+>> On 10/24/2012 12:10 PM, Kevin Hilman wrote:
+>>> From: Kevin Hilman <khilman@ti.com>
+>>>
+>>> When a GPIO bank is freed or shutdown, ensure that the banks
+>>> dbck_enable_mask is cleared also.  Otherwise, context restore on
+>>> subsequent off-mode transition will restore previous value from the
+>>> shadow copies (bank->context.debounce*) leading to mismatch state
+>>> between driver state and hardware state.
+>>>
+>>> This was discovered when board code was doing
+>>>
+>>>    gpio_request_one()
+>>>    gpio_set_debounce()
+>>>    gpio_free()
+>>>
+>>> which was leaving the GPIO debounce settings in a confused state.  If
+>>> that GPIO bank is subsequently used with off-mode enabled, bogus state
+>>> would be restored, leaving GPIO debounce enabled which then prevented
+>>> the CORE powerdomain from transitioning.
+>>>
+>>> To fix, ensure that bank->dbck_enable_mask is cleared when the bank
+>>> is freed/shutdown so debounce state doesn't persist.
+> The freed part is fine but I don't understand why it needs to be done
+> on _a_ gpio irq shutdown callback where IRQs related configuration
+> on that one GPIO needs to be cleared. De-bounce clock is surely not IRQ
+> related configuration.
 
-Nice. Thanks Linus.
+If we are freeing the IRQs related to gpio and resetting the gpio, then
+I don't see why we should not. We should not leave the debounce clock on
+if these gpios are no longer being used.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>>> Special thanks to Grazvydas Ignotas for pointing out a bug in an
+>>> earlier version that would've disabled debounce on any runtime PM
+>>> transition.
+>>>
+>>> Reported-by: Paul Walmsley <paul@pwsan.com>
+>>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>>> Cc: Grazvydas Ignotas <notasas@gmail.com>
+>>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>>> ---
+>>> v2: only clear mask in free/shutdown, not in runtime PM paths,
+>>>      clarified changelog
+>>> Applies on v3.7-rc2.
+>>>
+>>>   drivers/gpio/gpio-omap.c | 1 +
+>>>   1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>>> index 94cbc84..113b167 100644
+>>> --- a/drivers/gpio/gpio-omap.c
+>>> +++ b/drivers/gpio/gpio-omap.c
+>>> @@ -539,6 +539,7 @@ static void _reset_gpio(struct gpio_bank *bank,
+>>> int gpio)
+>>>       _set_gpio_irqenable(bank, gpio, 0);
+>>>       _clear_gpio_irqstatus(bank, gpio);
+>>>       _set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
+>>> +    bank->dbck_enable_mask = 0;
+>>>   }
+>>
+>> Does this need to be ...
+>>
+>> +    bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
+>> +    _gpio_dbck_disable(bank);
+>>
+> Yes, its a per bank clock. There is an alternate. See below.
+> 
+>> There could be more than one gpio using debounce and so we should only
+>> clear the appropriate bit. Also after clearing a bit we could see if we
+>> can disable the debounce clock too.
+>>
+> When I mentioned the clearing in gpio_free() path will do trick, I had
+> something like below in mind.
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index dee2856..8574105 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -629,8 +629,10 @@ static void omap_gpio_free(struct gpio_chip *chip,
+> unsigned offset)
+>       * If this is the last gpio to be freed in the bank,
+>       * disable the bank module.
+>       */
+> -    if (!bank->mod_usage)
+> +    if (!bank->mod_usage) {
+> +        bank->dbck_enable_mask = 0;
+>          pm_runtime_put(bank->dev);
+> +    }
+
+However, with this we could be leaving the debounce clock on longer than
+needed. I think we need to call _gpio_dbck_disable() each time we free a
+gpio and this function will determine if it can turn off the debounce
+clock.
+
+In fact, there appears to be another bug in the current driver, that we
+do not clear the debounce_en register when freeing the gpio. Your patch
+addresses this, but I think that debounce should be disabled when a gpio
+is freed and not just when the last one is freed.
+
+Also, with the above change, can't we still run into the original
+problem? In other words, if a gpio is freed, but there is still another
+one active in the back that is not using debounce, then we could restore
+a incorrect debounce context because we have not clean-up the debounce
+settings?
+
+So may be we need to add a _clear_gpio_debounce() function and
+call this when freeing a gpio.
+
+Cheers
+Jon
