@@ -1,57 +1,93 @@
-From: chanho61.park@samsung.com (Chanho Park)
-Date: Thu, 25 Oct 2012 10:41:46 +0900
-Subject: [PATCH v5 3/5] ARM: EXYNOS: Enable PMUs for exynos4
-In-Reply-To: <CAOesGMg5Nn5i=J8o3Rt8es3Tq_LZgVttuYSBbvYfmw1QTGwx0A@mail.gmail.com>
-References: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
- <1351056894-5790-4-git-send-email-chanho61.park@samsung.com>
- <CAOesGMg5Nn5i=J8o3Rt8es3Tq_LZgVttuYSBbvYfmw1QTGwx0A@mail.gmail.com>
-Message-ID: <005801cdb251$e52f7480$af8e5d80$@samsung.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 24 Oct 2012 20:53:54 -0500
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <1350935758-9215-5-git-send-email-zonque@gmail.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com>
+Message-ID: <50889BB2.3090107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Olof Johansson [mailto:olof at lixom.net]
-> Sent: Thursday, October 25, 2012 2:15 AM
-> To: Chanho Park
-> Cc: kgene.kim at samsung.com; linux-samsung-soc at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org; linux at arm.linux.org.uk; ben-linux at fluff.org;
-> kyungmin.park at samsung.com; sachin.kamat at linaro.org;
-> thomas.abraham at linaro.org; will.deacon at arm.com
-> Subject: Re: [PATCH v5 3/5] ARM: EXYNOS: Enable PMUs for exynos4
-> 
-> Hi,
-> 
-> On Tue, Oct 23, 2012 at 10:34 PM, Chanho Park
-> <chanho61.park@samsung.com> wrote:
-> > This patch defines irq numbers of ARM performance monitoring unit for
-> exynos4.
-> > Firs of all, we need to fix IRQ_PMU correctly and to split pmu
-> > initialization of exynos from plat-samsung for easily defining it.
-> >
-> > The number of CPU cores and PMU irq numbers are vary according to soc
-> types.
-> > So, we need to identify each soc type using soc_is_xxx function and to
-> > define the pmu irqs dynamically. For example, the exynos4412 has 4 cpu
-> cores and pmus.
-> 
-> I wonder if it's worth doing this complexity on the non-DT case for exynos4?
-> 
-> I wish there was more focus on the Samsung platforms for getting the DT
-> support up to par with non-DT so you can avoid having to add new platform
-> devices like these in the first place.
 
-The DT support of exynos4 is under development.
-And many of exynos4 developers still use non-dt boot-up method.
-By this time arm-pmu of exynos did not work. IMO we should fix and support it
-for non-dt users.
-
-Thanks,
-
-Best regards,
-Chanho Park
-
+On 10/22/2012 02:55 PM, Daniel Mack wrote:
+> This patch adds basic DT bindings for OMAP GPMC.
 > 
+> The actual peripherals are instanciated from child nodes within the GPMC
+> node, and the only type of device that is currently supported is NAND.
 > 
-> Thanks,
+> Code was added to parse the generic GPMC timing parameters and some
+> documentation with examples on how to use them.
 > 
-> -Olof
+> Successfully tested on an AM33xx board.
+> 
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/bus/gpmc.txt     |  59 +++++++++
+>  .../devicetree/bindings/mtd/gpmc-nand.txt          |  65 ++++++++++
+>  arch/arm/mach-omap2/gpmc.c                         | 139 +++++++++++++++++++++
+>  3 files changed, 263 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/gpmc.txt
+>  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/gpmc.txt b/Documentation/devicetree/bindings/bus/gpmc.txt
+> new file mode 100644
+> index 0000000..ef1c6e1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/gpmc.txt
+> @@ -0,0 +1,59 @@
+> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
+> +
+> +The actual devices are instantiated from the child nodes of a GPMC node.
+> +
+> +Required properties:
+> +
+> + - compatible: Should be set to "ti,gpmc"
+> +
+> +Timing properties for child nodes. All are optional and default to 0.
+> +
+> + - gpmc,sync-clk:	Minimum clock period for synchronous mode, in picoseconds
+> +
+> + Chip-select signal timings corresponding to GPMC_CS_CONFIG2:
+> + - gpmc,cs-on:		Assertion time
+> + - gpmc,cs-rd-off:	Read deassertion time
+> + - gpmc,cs-wr-off:	Write deassertion time
+> +
+> + ADV signal timings corresponding to GPMC_CONFIG3:
+> + - gpmc,adv-on:		Assertion time
+> + - gpmc,adv-rd-off:	Read deassertion time
+> + - gpmc,adv-wr-off:	Write deassertion time
+> +
+> + WE signals timings corresponding to GPMC_CONFIG4:
+> + - gpmc,we-on:		Assertion time
+> + - gpmc,we-off:		Deassertion time
+> +
+> + OE signals timings corresponding to GPMC_CONFIG4
+> + - gpmc,oe-on:		Assertion time
+> + - gpmc,oe-off:		Deassertion time
+> +
+> + Access time and cycle time timings corresponding to GPMC_CONFIG5
+> + - gpmc,page-burst-access: Multiple access word delay
+> + - gpmc,access:		Start-cycle to first data valid delay
+> + - gpmc,rd-cycle:	Total read cycle time
+> + - gpmc,wr-cycle:	Total write cycle time
+> +
+> +The following are only on OMAP3430
+> + - gpmc,wr-access
+> + - gpmc,wr-data-mux-bus
+> +
+> +
+> +Example for an AM33xx board:
+> +
+> +	gpmc: gpmc at 50000000 {
+> +		compatible = "ti,gpmc";
+> +		ti,hwmods = "gpmc";
+> +		reg = <0x50000000 0x1000000>;
+
+Nit-pick, that size is quite large for a register range. I recommend
+looking at the HWMOD data file
+(arch/arm/mach-omap2/omap_hwmod_33xx_data.c) and see how much space is
+allocated for the registers (see structure am33xx_gpmc_addr_space).
+
+Cheers
+Jon
