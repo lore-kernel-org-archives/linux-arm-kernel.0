@@ -1,21 +1,41 @@
-From: klightspeed@killerwolves.net (Ben Peddell)
-Date: Thu, 25 Oct 2012 18:06:56 +1000
-Subject: RFC: tolerate junk after valid initramfs
-Message-ID: <5088F320.6000806@killerwolves.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2012 09:21:45 +0100
+Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
+In-Reply-To: <CACRpkdYAKpE1oWxHYzOMtdQ9Qj_OrZnnkJpQvrzSv8WFTBFS_Q@mail.gmail.com>
+References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
+ <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
+ <CAM=Q2ctwTBAvKs401GgrGfz9NvaLspquje-6YfnuS5TZYeqY4Q@mail.gmail.com>
+ <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
+ <20121025075709.GE971@gmail.com>
+ <CACRpkdYAKpE1oWxHYzOMtdQ9Qj_OrZnnkJpQvrzSv8WFTBFS_Q@mail.gmail.com>
+Message-ID: <20121025082145.GB3348@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, the initramfs handling code will reject a valid initramfs
-if there is junk between the end of the valid initramfs and the
-initramfs size given to the kernel.
+On Thu, 25 Oct 2012, Linus Walleij wrote:
 
-For example passing initrd=0x01000000,4M will not work unless the
-initramfs is either exactly 4M in size or is padded with zeroes up to 4M.
+> On Thu, Oct 25, 2012 at 9:57 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Fri, 12 Oct 2012, Linus Walleij wrote:
+> 
+> >> Yours,
+> >> Linus Walleij
+> >
+> > Friendly poke.
+> 
+> This makes it look like you're poking me as I'm in the To: field but I suspect
+> the intent must be to poke Dmitry ... I was just providing background
+> for Shubhrajyoti's question.
+> 
+> Maybe this helps:
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-As those working with ARM processors might know, the initialization code
-in the bootloader generally doesn't zero out unused memory, so that
-memory will contain garbage.
+Yes, that was also the intention of the other poke. Sorry about
+that, I should have moved you into Cc: instead.
 
-What downsides are there to patching init/initramfs.c to have the kernel
-accept valid initramfs images where the image is shorter than the length
-passed to the kernel by the bootloader?
+Yes, the poke was for Dmitry.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
