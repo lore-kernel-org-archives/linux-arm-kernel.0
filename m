@@ -1,206 +1,132 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 17:21:16 -0600
-Subject: [PATCH 05/13] ARM: OMAP2+: PRCM: create SoC-specific chip restart
- functions
-In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
-References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <20121025232116.17558.47458.stgit@dusk.lan>
+Date: Thu, 25 Oct 2012 17:21:11 -0600
+Subject: [PATCH 00/13] ARM: OMAP: remove prcm.[ch]
+Message-ID: <20121025231818.17558.57884.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split omap_prcm_restart() from mach-omap2/prcm.c into SoC-specific
-variants.  These functions need to be able to save the reboot reason
-into the scratchpad RAM.  This implies a dependency on both the PRM
-and SCM IP blocks, so they've been moved into their own file.  This
-will eventually call functions in the PRM and SCM drivers, once those
-are created.
+Remove arch/arm/mach-omap2/prcm.c and
+arch/arm/plat-omap/include/plat/prcm.h.  This is in preparation for
+moving the PRM/CM code to drivers/, although to be fair, these files
+should have been removed a long time ago.
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Intended for 3.8 cleanup.  Applies on top of the existing PRM/CM split
+cleanup series, and the WDTIMER cleanup series.
+
+
+- Paul
+
 ---
- arch/arm/mach-omap2/Makefile        |    5 +++
- arch/arm/mach-omap2/common.h        |    4 ++
- arch/arm/mach-omap2/omap2-restart.c |   65 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap3-restart.c |   36 +++++++++++++++++++
- arch/arm/mach-omap2/omap4-common.c  |   16 +++++++++
- 5 files changed, 126 insertions(+)
+
+omap2_prcm_cleanup_3.8
+   text	   data	    bss	    dec	    hex	filename
+7521423	 696876	5613996	13832295	 d31067	vmlinux.omap2plus_defconfig.orig
+7522239	 696612	5613996	13832847	 d3128f	vmlinux.omap2plus_defconfig
+
+Paul Walmsley (13):
+      ARM: OMAP2+: common: remove mach-omap2/common.c and map_common_io code
+      ARM: OMAP2/3: PRM: add SoC reset functions (using the CORE DPLL method)
+      ARM: OMAP2xxx: clock: remove global 'dclk' variable
+      ARM: OMAP2xxx: clock: move virt_prcm_set code into clkt2xxx_virt_prcm_set.c
+      ARM: OMAP2+: PRCM: create SoC-specific chip restart functions
+      ARM: OMAP2+: board files: use SoC-specific system restart functions
+      ARM: OMAP2xxx: APLL/CM: convert to use omap2_cm_wait_module_ready()
+      ARM: OMAP2+: CM/clock: convert _omap2_module_wait_ready() to use SoC-independent CM functions
+      ARM: OMAP2+: PRCM: remove omap2_cm_wait_idlest()
+      ARM: OMAP2+: PRCM: split and relocate the PRM/CM globals setup
+      ARM: OMAP2+: PRCM: consolidate PRCM-related timeout macros
+      ARM: OMAP2+: hwmod: call to _omap4_disable_module() should use the SoC-specific call
+      ARM: OMAP2+: PRCM: remove obsolete prcm.[ch]
+
+
+ arch/arm/mach-omap1/reset.c                  |    2 
+ arch/arm/mach-omap2/Makefile                 |    9 +
+ arch/arm/mach-omap2/am33xx.h                 |    1 
+ arch/arm/mach-omap2/board-2430sdp.c          |    2 
+ arch/arm/mach-omap2/board-3430sdp.c          |    2 
+ arch/arm/mach-omap2/board-3630sdp.c          |    2 
+ arch/arm/mach-omap2/board-4430sdp.c          |    2 
+ arch/arm/mach-omap2/board-am3517crane.c      |    2 
+ arch/arm/mach-omap2/board-am3517evm.c        |    2 
+ arch/arm/mach-omap2/board-apollon.c          |    2 
+ arch/arm/mach-omap2/board-cm-t35.c           |   18 +-
+ arch/arm/mach-omap2/board-cm-t3517.c         |    2 
+ arch/arm/mach-omap2/board-devkit8000.c       |    2 
+ arch/arm/mach-omap2/board-generic.c          |   10 +
+ arch/arm/mach-omap2/board-h4.c               |    2 
+ arch/arm/mach-omap2/board-igep0020.c         |    4 -
+ arch/arm/mach-omap2/board-ldp.c              |    2 
+ arch/arm/mach-omap2/board-n8x0.c             |    6 -
+ arch/arm/mach-omap2/board-omap3beagle.c      |    2 
+ arch/arm/mach-omap2/board-omap3evm.c         |    2 
+ arch/arm/mach-omap2/board-omap3logic.c       |    4 -
+ arch/arm/mach-omap2/board-omap3pandora.c     |    2 
+ arch/arm/mach-omap2/board-omap3stalker.c     |    2 
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    2 
+ arch/arm/mach-omap2/board-omap4panda.c       |    2 
+ arch/arm/mach-omap2/board-overo.c            |    2 
+ arch/arm/mach-omap2/board-rm680.c            |    4 -
+ arch/arm/mach-omap2/board-rx51.c             |    2 
+ arch/arm/mach-omap2/board-ti8168evm.c        |    4 -
+ arch/arm/mach-omap2/board-zoom.c             |    4 -
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |   57 ++-----
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |   36 ++++-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   70 ++++++++-
+ arch/arm/mach-omap2/clkt_iclk.c              |    1 
+ arch/arm/mach-omap2/clock.c                  |   15 +-
+ arch/arm/mach-omap2/clock.h                  |   28 ----
+ arch/arm/mach-omap2/clock2420_data.c         |   26 +--
+ arch/arm/mach-omap2/clock2430_data.c         |   26 +--
+ arch/arm/mach-omap2/clock2xxx.c              |   16 --
+ arch/arm/mach-omap2/clock2xxx.h              |    9 +
+ arch/arm/mach-omap2/cm-regbits-24xx.h        |    2 
+ arch/arm/mach-omap2/cm.h                     |   20 ++-
+ arch/arm/mach-omap2/cm2xxx.c                 |  128 ++++++++++++++++
+ arch/arm/mach-omap2/cm2xxx.h                 |    4 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.h            |    8 +
+ arch/arm/mach-omap2/cm3xxx.c                 |   66 ++++++++
+ arch/arm/mach-omap2/cm3xxx.h                 |    5 +
+ arch/arm/mach-omap2/cm_common.c              |   70 +++++++++
+ arch/arm/mach-omap2/cminst44xx.h             |    2 
+ arch/arm/mach-omap2/common.c                 |  202 --------------------------
+ arch/arm/mach-omap2/common.h                 |  111 ++------------
+ arch/arm/mach-omap2/control.c                |   10 +
+ arch/arm/mach-omap2/control.h                |    2 
+ arch/arm/mach-omap2/cpuidle34xx.c            |    1 
+ arch/arm/mach-omap2/display.c                |    2 
+ arch/arm/mach-omap2/hdq1w.c                  |    4 -
+ arch/arm/mach-omap2/i2c.c                    |    6 -
+ arch/arm/mach-omap2/id.c                     |    7 +
+ arch/arm/mach-omap2/io.c                     |   87 +++++++++--
+ arch/arm/mach-omap2/mcbsp.c                  |    2 
+ arch/arm/mach-omap2/msdi.c                   |    4 -
+ arch/arm/mach-omap2/omap2-restart.c          |   65 ++++++++
+ arch/arm/mach-omap2/omap3-restart.c          |   36 +++++
+ arch/arm/mach-omap2/omap4-common.c           |   18 ++
+ arch/arm/mach-omap2/omap_hwmod.c             |    8 -
+ arch/arm/mach-omap2/pm34xx.c                 |    1 
+ arch/arm/mach-omap2/powerdomain.c            |    2 
+ arch/arm/mach-omap2/prcm-common.h            |   22 ---
+ arch/arm/mach-omap2/prcm.c                   |  176 -----------------------
+ arch/arm/mach-omap2/prcm_mpu44xx.c           |   17 ++
+ arch/arm/mach-omap2/prcm_mpu44xx.h           |    9 +
+ arch/arm/mach-omap2/prm.h                    |   24 +++
+ arch/arm/mach-omap2/prm2xxx.c                |   15 ++
+ arch/arm/mach-omap2/prm2xxx.h                |    2 
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |    7 -
+ arch/arm/mach-omap2/prm3xxx.c                |   16 ++
+ arch/arm/mach-omap2/prm3xxx.h                |    2 
+ arch/arm/mach-omap2/prm44xx.c                |    1 
+ arch/arm/mach-omap2/prm_common.c             |   16 ++
+ arch/arm/mach-omap2/prminst44xx.h            |    2 
+ arch/arm/mach-omap2/sdrc.c                   |    8 -
+ arch/arm/mach-omap2/sdrc.h                   |    3 
+ arch/arm/mach-omap2/ti81xx.h                 |    9 +
+ arch/arm/mach-omap2/wd_timer.c               |    5 -
+ arch/arm/plat-omap/include/plat/prcm.h       |   36 -----
+ 85 files changed, 827 insertions(+), 804 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/common.c
  create mode 100644 arch/arm/mach-omap2/omap2-restart.c
  create mode 100644 arch/arm/mach-omap2/omap3-restart.c
-
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 7a628e7..aa0f59c 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -49,6 +49,11 @@ AFLAGS_sram242x.o			:=-Wa,-march=armv6
- AFLAGS_sram243x.o			:=-Wa,-march=armv6
- AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
- 
-+# Restart code (OMAP4/5 currently in omap4-common.c)
-+obj-$(CONFIG_SOC_OMAP2420)		+= omap2-restart.o
-+obj-$(CONFIG_SOC_OMAP2430)		+= omap2-restart.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= omap3-restart.o
-+
- # Pin multiplexing
- obj-$(CONFIG_SOC_OMAP2420)		+= mux2420.o
- obj-$(CONFIG_SOC_OMAP2430)		+= mux2430.o
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 320f0d7..06dff1a 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -115,6 +115,10 @@ void ti81xx_init_late(void);
- void omap4430_init_late(void);
- int omap2_common_pm_late_init(void);
- void omap_prcm_restart(char, const char *);
-+void omap2xxx_restart(char, const char *);
-+void omap3xxx_restart(char, const char *);
-+void omap44xx_restart(char, const char *);
-+void omap5xxx_restart(char, const char *);
- 
- /* This gets called from mach-omap2/io.c, do not call this */
- void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
-diff --git a/arch/arm/mach-omap2/omap2-restart.c b/arch/arm/mach-omap2/omap2-restart.c
-new file mode 100644
-index 0000000..be6bc89
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap2-restart.c
-@@ -0,0 +1,65 @@
-+/*
-+ * omap2-restart.c - code common to all OMAP2xxx machines.
-+ *
-+ * Copyright (C) 2012 Texas Instruments
-+ * Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+
-+#include "common.h"
-+#include "prm2xxx.h"
-+
-+/*
-+ * reset_virt_prcm_set_ck, reset_sys_ck: pointers to the virt_prcm_set
-+ * clock and the sys_ck.  Used during the reset process
-+ */
-+static struct clk *reset_virt_prcm_set_ck, *reset_sys_ck;
-+
-+/* Reboot handling */
-+
-+/**
-+ * omap2xxx_restart - Set DPLL to bypass mode for reboot to work
-+ *
-+ * Set the DPLL to bypass so that reboot completes successfully.  No
-+ * return value.
-+ */
-+void omap2xxx_restart(char mode, const char *cmd)
-+{
-+	u32 rate;
-+
-+	rate = clk_get_rate(reset_sys_ck);
-+	clk_set_rate(reset_virt_prcm_set_ck, rate);
-+
-+	/* XXX Should save the cmd argument for use after the reboot */
-+
-+	omap2xxx_prm_dpll_reset(); /* never returns */
-+	while (1);
-+}
-+
-+/**
-+ * omap2xxx_common_look_up_clks_for_reset - look up clocks needed for restart
-+ *
-+ * Some clocks need to be looked up in advance for the SoC restart
-+ * operation to work - see omap2xxx_restart().  Returns -EINVAL upon
-+ * error or 0 upon success.
-+ */
-+static int __init omap2xxx_common_look_up_clks_for_reset(void)
-+{
-+	reset_virt_prcm_set_ck = clk_get(NULL, "virt_prcm_set");
-+	if (IS_ERR(reset_virt_prcm_set_ck))
-+		return -EINVAL;
-+
-+	reset_sys_ck = clk_get(NULL, "sys_ck");
-+	if (IS_ERR(reset_sys_ck))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+core_initcall(omap2xxx_common_look_up_clks_for_reset);
-diff --git a/arch/arm/mach-omap2/omap3-restart.c b/arch/arm/mach-omap2/omap3-restart.c
-new file mode 100644
-index 0000000..923c582
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap3-restart.c
-@@ -0,0 +1,36 @@
-+/*
-+ * omap3-restart.c - Code common to all OMAP3xxx machines.
-+ *
-+ * Copyright (C) 2009, 2012 Texas Instruments
-+ * Copyright (C) 2010 Nokia Corporation
-+ * Tony Lindgren <tony@atomide.com>
-+ * Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include "iomap.h"
-+#include "common.h"
-+#include "control.h"
-+#include "prm3xxx.h"
-+
-+/* Global address base setup code */
-+
-+/**
-+ * omap3xxx_restart - trigger a software restart of the SoC
-+ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
-+ * @cmd: passed from the userspace program rebooting the system (if provided)
-+ *
-+ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
-+ * kernel/sys.c.  No return value.
-+ */
-+void omap3xxx_restart(char mode, const char *cmd)
-+{
-+	omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
-+	omap3xxx_prm_dpll3_reset(); /* never returns */
-+	while (1);
-+}
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 6560e99..5348788 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -35,6 +35,7 @@
- #include "iomap.h"
- #include "common.h"
- #include "hsmmc.h"
-+#include "prminst44xx.h"
- #include "omap4-sar-layout.h"
- 
- #ifdef CONFIG_CACHE_L2X0
-@@ -249,6 +250,21 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
- 	return 0;
- }
- 
-+/**
-+ * omap44xx_restart - trigger a software restart of the SoC
-+ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
-+ * @cmd: passed from the userspace program rebooting the system (if provided)
-+ *
-+ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
-+ * kernel/sys.c.  No return value.
-+ */
-+void omap44xx_restart(char mode, const char *cmd)
-+{
-+	/* XXX Should save 'cmd' into scratchpad for use after reboot */
-+	omap4_prminst_global_warm_sw_reset(); /* never returns */
-+	while (1);
-+}
-+
- static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
- {
- 	struct omap_mmc_platform_data *pdata;
+ delete mode 100644 arch/arm/mach-omap2/prcm.c
+ delete mode 100644 arch/arm/plat-omap/include/plat/prcm.h
