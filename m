@@ -1,61 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Oct 2012 14:46:09 +0100
-Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
-In-Reply-To: <20121025154202.41f3cbba@endymion.delvare>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-8-git-send-email-balbi@ti.com>
- <20121025145748.760c218b@endymion.delvare>
- <20121025131459.GG28061@n2100.arm.linux.org.uk>
- <20121025154202.41f3cbba@endymion.delvare>
-Message-ID: <20121025134609.GH28061@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Oct 2012 13:46:41 +0000
+Subject: [PATCH 1/2] arm: mvebu: increase atomic coherent pool size for
+ armada 370/XP
+In-Reply-To: <20121025134352.16a8ef81@skate>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <201210251127.36960.arnd@arndb.de> <20121025134352.16a8ef81@skate>
+Message-ID: <201210251346.41596.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 03:42:02PM +0200, Jean Delvare wrote:
-> On Thu, 25 Oct 2012 14:14:59 +0100, Russell King - ARM Linux wrote:
-> > On Thu, Oct 25, 2012 at 02:57:48PM +0200, Jean Delvare wrote:
-> > > Hi Felipe, Shubhrajyoti,
+On Thursday 25 October 2012, Thomas Petazzoni wrote:
+> On Thu, 25 Oct 2012 11:27:36 +0000, Arnd Bergmann wrote:
+> > On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+> > > For Armada 370/XP we have the same problem that for the commit
+> > > cb01b63, so we applied the same solution: "The default 256 KiB
+> > > coherent pool may be too small for some of the Kirkwood devices, so
+> > > increase it to make sure that devices will be able to allocate their
+> > > buffers with GFP_ATOMIC flag"
 > > > 
-> > > On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
-> > > > From: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > > > 
-> > > > In case of a NACK, it's wise to tell our clients
-> > > > drivers about how many bytes were actually transferred.
-> > > > 
-> > > > Support this by adding an extra field to the struct
-> > > > i2c_msg which gets incremented the amount of bytes
-> > > > actually transferred.
-> > > > 
-> > > > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > > ---
-> > > >  include/uapi/linux/i2c.h | 1 +
-> > > >  1 file changed, 1 insertion(+)
-> > > > 
-> > > > diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
-> > > > index 0e949cb..4b35c9b 100644
-> > > > --- a/include/uapi/linux/i2c.h
-> > > > +++ b/include/uapi/linux/i2c.h
-> > > > @@ -77,6 +77,7 @@ struct i2c_msg {
-> > > >  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
-> > > >  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
-> > > >  	__u16 len;		/* msg length				*/
-> > > > +	__u16 transferred;	/* actual bytes transferred             */
-> > > >  	__u8 *buf;		/* pointer to msg data			*/
-> > > >  };
-> > > 
-> > > On the principle I am fine with this, however you also need to define
-> > > who should initialize this field, and to what value.
+> > > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > > 
-> > You also miss one very very very big point.  This will break every I2C
-> > using userspace program out there unless it is rebuilt - this change will
-> > require the exact right version of those userspace programs for the
-> > kernel that they're being used on.
+> > Do you know why the ATA driver needs this? I find it surprising that
+> > it's necessary, so I'd like to make sure we're not just working around
+> > a device driver bug here.
 > 
-> How that? The extra field is added in a hole, so we don't change the
-> struct size nor the relative positions of existing fields. Why would
-> user-space care?
+> The sata_mv driver create dma_pool and allocate objects from them, and
+> all the memory allocated for dma_pools is allocated using
+> dma_alloc_coherent(), and I guess the driver is using too much of them.
+> 
+> Seems like the driver is too lazy and allocates everything coherent to
+> avoid the hassle of doing dma_map/dma_unmap operations when needed, but
+> I haven't looked in details at the driver yet to see if it would be
+> possible to switch those DMA coherent allocations into non-coherent
+> allocations + appropriate calls to the DMA operations.
 
-You know the layout of that struct for certain across all Linux supported
-architectures, including some of the more obscure ones which may not
-require pointers to be aligned?
+Using coherent allocations is fine, I was wondering whether they need
+to be atomic or not.
+
+> That said, that's for sure a larger task than just enabling SATA on
+> Armada 370/XP, so I would advocate to handle this problem separately.
+
+Agreed.
+
+	Arnd
