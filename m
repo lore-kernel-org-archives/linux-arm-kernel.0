@@ -1,99 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Oct 2012 10:06:53 +0300
-Subject: [PATCH v6] Enable USB peripheral mode on dm365 EVM
-In-Reply-To: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
-References: <1349872412-22040-1-git-send-email-const@MakeLinux.com>
-Message-ID: <20121025070653.GB5259@arwen.pp.htv.fi>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 25 Oct 2012 15:16:34 +0800
+Subject: [PATCH] ARM: dts: mxs: add the "clock-names" for gpmi-nand
+In-Reply-To: <1349864829-19565-1-git-send-email-b32955@freescale.com>
+References: <201210101237.13640.marex@denx.de>
+ <1349864829-19565-1-git-send-email-b32955@freescale.com>
+Message-ID: <20121025071629.GD2464@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Olof,
 
-On Wed, Oct 10, 2012 at 02:33:32PM +0200, Constantine Shulyupin wrote:
-> From: Constantine Shulyupin <const@MakeLinux.com>
+Can you please apply this fix for -rc?  Otherwise, please let me know
+if you prefer to get a pull request from me.
+
+Shawn
+
+On Wed, Oct 10, 2012 at 06:27:09PM +0800, Huang Shijie wrote:
+> The current DT nodes for mx23/mx28 miss the `clocks-names` item for gpmi-nand.
+> So the gpmi-nand driver could not find the proper clock.
 > 
-> Sets USB PHY clock source to 24 MHz clock and call USB configuration from board initialization.
+> This patch fixes this issue.
 > 
-> Tested with OTG configuration, usb gadget g_zero on DM365 EVM connected to PC.
-> 
-> References:
-> 
-> Definition of USB_PHY_CTRL and PHYCLKFREQ:
-> - http://www.makelinux.com/lib/ti/DM36x_ARM/doc-141
-> 
-> Original patch by miguel.aguilar at ridgerun.com three years ago:
-> - http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg14741.html
-> 
-> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 > ---
+>  arch/arm/boot/dts/imx23.dtsi |    1 +
+>  arch/arm/boot/dts/imx28.dtsi |    1 +
+>  2 files changed, 2 insertions(+), 0 deletions(-)
 > 
-> Note:
+> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> index 9ca4ca7..6d31aa3 100644
+> --- a/arch/arm/boot/dts/imx23.dtsi
+> +++ b/arch/arm/boot/dts/imx23.dtsi
+> @@ -69,6 +69,7 @@
+>  				interrupts = <13>, <56>;
+>  				interrupt-names = "gpmi-dma", "bch";
+>  				clocks = <&clks 34>;
+> +				clock-names = "gpmi_io";
+>  				fsl,gpmi-dma-channel = <4>;
+>  				status = "disabled";
+>  			};
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index e16d631..55c57ea 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -85,6 +85,7 @@
+>  				interrupts = <88>, <41>;
+>  				interrupt-names = "gpmi-dma", "bch";
+>  				clocks = <&clks 50>;
+> +				clock-names = "gpmi_io";
+>  				fsl,gpmi-dma-channel = <4>;
+>  				status = "disabled";
+>  			};
+> -- 
+> 1.7.0.4
 > 
-> Changelog
 > 
-> Changes since v5 http://www.spinics.net/lists/kernel/msg1413120.html
-> accordingy feedback of nsekhar at ti.com http://www.spinics.net/lists/kernel/msg1414914.html
-> - phy configuration moved to drivers/usb/musb/davinci.c
-> - USB_OTG configuration is submitted in separated patch: http://www.spinics.net/lists/kernel/msg1414964.html
-> - Setting current limit to 1000 mA. Any way the current is limited to 510 mA in davinci_setup_usb.
-> 
-> Changes since v4 http://www.spinics.net/lists/kernel/msg1412995.html
-> - removed fix of dev_info in musb_init_controller
-> 
-> Changes since v3 http://www.spinics.net/lists/kernel/msg1412544.html:
-> - removed optional altering of pr_info
-> 
-> Changes since v1  http://marc.info/?l=linux-kernel&m=130894150803661&w=2:
-> - removed optional code and reordered
-> - removed alternation of GPIO33, which is multiplexed with DRVVBUS, because is not need for peripheral USB
-> 
-> This patch is based on code from projects Arago, Angstom and RidgeRun.
-> 
-> ---
->  arch/arm/mach-davinci/board-dm365-evm.c |    2 ++
->  drivers/usb/musb/davinci.c              |    3 +++
->  drivers/usb/musb/davinci.h              |    1 +
->  3 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-> index 688a9c5..ba5ffc1 100644
-> --- a/arch/arm/mach-davinci/board-dm365-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
-> @@ -38,6 +38,7 @@
->  #include <mach/mmc.h>
->  #include <mach/nand.h>
->  #include <mach/keyscan.h>
-> +#include <mach/usb.h>
->  
->  #include <media/tvp514x.h>
->  
-> @@ -610,6 +611,7 @@ static __init void dm365_evm_init(void)
->  
->  	dm365_init_spi0(BIT(0), dm365_evm_spi_info,
->  			ARRAY_SIZE(dm365_evm_spi_info));
-> +	davinci_setup_usb(1000, 8);
->  }
->  
->  MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
-> diff --git a/drivers/usb/musb/davinci.c b/drivers/usb/musb/davinci.c
-> index 472c8b4..af09ebf 100644
-> --- a/drivers/usb/musb/davinci.c
-> +++ b/drivers/usb/musb/davinci.c
-> @@ -428,6 +428,9 @@ static int davinci_musb_init(struct musb *musb)
->  		__raw_writel(deepsleep, DM355_DEEPSLEEP);
->  	}
->  
-> +	if (machine_is_davinci_dm365_evm())
-> +		writel(readl(USB_PHY_CTRL) | USBPHY_CLKFREQ_24MHZ, USB_PHY_CTRL);
-
-no such checks in drivers. Please find another way to do this.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/bfb7ee0f/attachment.sig>
