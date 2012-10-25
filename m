@@ -1,26 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Oct 2012 13:48:41 +0000
-Subject: [GIT PULL] at91: fixes for 3.7-rc3
-In-Reply-To: <5088F131.5040600@atmel.com>
-References: <5088F131.5040600@atmel.com>
-Message-ID: <201210251348.42060.arnd@arndb.de>
+Date: Thu, 25 Oct 2012 13:52:31 +0000
+Subject: [GIT PULL] ux500 fixes due for v3.7 RCs
+In-Reply-To: <20121025094147.GA4008@gmail.com>
+References: <20121025094147.GA4008@gmail.com>
+Message-ID: <201210251352.31364.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012, Nicolas Ferre wrote:
-> Arnd, Olof,
-> 
-> This is the first Atmel AT91 "fixes" update for the 3.7 kernel.
-> 
+On Thursday 25 October 2012, Lee Jones wrote:
 > The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
 > 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700) 
+>   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
-> 
+>   git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-rcs-3.7
 
-Pulled into fixes branch now, thanks!
+Pulled into fixes branch, thanks!
+
+Since we're now getting pull requests from both of you, Lee and Linus,
+I'd like to understand how you are organized.
+
+Lee, are you just sending bug fixes directly and send future work through
+Linus, or are you acting as backup maintainer when he is busy otherwise
+in general?
 
 	Arnd
