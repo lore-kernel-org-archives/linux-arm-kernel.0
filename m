@@ -1,53 +1,40 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 25 Oct 2012 11:39:52 -0600
-Subject: DEBUG_LL broken for socfpga
-In-Reply-To: <20121025181823.6c3fa0de@skate>
-References: <20121025181823.6c3fa0de@skate>
-Message-ID: <1351186792.15182.14.camel@dinh-ubuntu>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 25 Oct 2012 17:40:08 +0100
+Subject: Question about move atmel audio part to DT support
+In-Reply-To: <50810CC8.4050009@atmel.com>
+References: <5080F54F.4000600@atmel.com>
+ <50810CC8.4050009@atmel.com>
+Message-ID: <20121025164008.GQ18814@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Fri, Oct 19, 2012 at 04:18:16PM +0800, Bo Shen wrote:
 
-On Thu, 2012-10-25 at 18:18 +0200, Thomas Petazzoni wrote:
-> Dinh,
-> 
-> The arch/arm/include/debug/socfpga.S file implements only addruart, and
-> forgets to implement waituart, senduart, busyuart:
-> 
->   AS      arch/arm/kernel/debug.o
-> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S: Assembler messages:
-> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:83: Error: bad instruction `waituart r2,r3'
-> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:84: Error: bad instruction `senduart r1,r3'
-> /home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:85: Error: bad instruction `busyuart r2,r3'
-> 
-> Since the socfpga UART is apparently 8250 compatible, adding:
-> 
-> #define UART_SHIFT      2
-> #include <asm/hardware/debug-8250.S>
-> 
-> at the end of socfpga.S should be sufficient. However, socfpga.S uses
-> an undefined DEBUG_LL_UART_OFFSET. And also most likely there is a
-> missing static mapping for the UART registers in
-> arch/arm/mach-socfpga/socfpga.c in order to get a virtual address for
-> the UART registers soon enough for earlyprintk to work.
-> 
-> Probably easy to fix, but I have no hardware and no datasheet.
-> Certainly better if someone having those could handle the
-> implementation of the fix.
+> Cc:
+>    linux-arm-kernel mailing list
+>    devicetree-discuss mailing list
+>    alsa-devel mailing list
+>    linux-sound mailing list
 
-Doesn't this patch address the fix?
+Better to resend for things like this rather than double quote.
 
-in arm-soc for-next
-commit  ef3f94412a4d7e107392e7c7cfc3e2d0668aa1aa
-
-
-http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commit;h=ef3f94412a4d7e107392e7c7cfc3e2d0668aa1aa
-
-
-Thanks,
-Dinh
 > 
-> Best regards,
-> 
-> Thomas
+> >   Atmel audio part has three platform device:
+> >     -> atmel ssc: ssc library (different SOC has different number)
+> >     -> atmel ssc dai: dai for audio
+> >     -> atmel pcm: for pdc or dma transfer (now only support pdc, dma
+> >support will add soon)
+
+> >  In DT support kernel, I don't find any similar case. So, if I want to
+> >keep ssc as library, and use dai to register pcm. Then the dts file will
+> >like:
+
+I'm not seeing anything at all unusual about the above situation - it'd
+help if you could explain what you think is complex here?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/475b32d6/attachment.sig>
