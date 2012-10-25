@@ -1,47 +1,34 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Thu, 25 Oct 2012 11:34:11 +0200
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <1349959402-24164-1-git-send-email-robherring2@gmail.com>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20121025093411.GA32662@sig21.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2012 10:41:47 +0100
+Subject: [GIT PULL] ux500 fixes due for v3.7 RCs
+Message-ID: <20121025094147.GA4008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
-> 
-> With recent compilers and move to generic unaligned.h in commit d25c881
-> (ARM: 7493/1: use generic unaligned.h), unaligned accesses will be used
-> by the LZO decompressor on v7 cores. So we need to make sure unaligned
-> accesses are allowed by clearing the SCTLR A bit.
+The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
 
-I just read this in http://gcc.gnu.org/gcc-4.7/changes.html:
+  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
 
-  On ARM, when compiling for ARMv6 (but not ARMv6-M), ARMv7-A, ARMv7-R, or
-  ARMv7-M, the new option -munaligned-access is active by default, which for
-  some source codes generates code that accesses memory on unaligned addresses.
-  This will require the kernel of those systems to enable such accesses
-  (controlled by CP15 register c1, refer to ARM documentation). Alternatively
-  or for compatibility with kernels where unaligned accesses are not supported,
-  all code has to be compiled with -mno-unaligned-access. Linux/ARM in official
-  releases has automatically and unconditionally supported unaligned accesses
-  as emitted by GCC due to this option being active, since Linux version 2.6.28.
+are available in the git repository at:
 
-My understanding is that gcc, using the same generic unaligned.h
-source code, will generate code for ARMv6 and ARMv7 that uses
-unaligned access, while for ARMv5 and older it won't.  So it seems
-gcc requires Linux to clear SCTLR.A and set SCTLR.U for ARMv6+.
+  git://git.linaro.org/people/ljones/linux-3.0-ux500.git for-rcs-3.7
 
-Or add -mno-unaligned-access.
+for you to fetch changes up to 76ff4e434734f7772d1a592cc9fe1d9921a3ec40:
 
-Is my understanding correct?
+  ARM: ux500: Correct SDI5 address and add some format changes (2012-10-25 08:46:20 +0100)
 
-> While v6 can support unaligned accesses, it is optional and current
-> compilers won't emit unaligned accesses. So we don't clear the A bit for
-> v6.
+----------------------------------------------------------------
+Lee Jones (3):
+      ARM: ux500: Fix build error relating to IRQCHIP_SKIP_SET_WAKE
+      ARM: ux500: Specify AMBA Primecell IDs for Nomadik I2C in DT
+      ARM: ux500: Correct SDI5 address and add some format changes
 
-not true according to the gcc changes page
+ arch/arm/boot/dts/dbx5x0.dtsi |   17 ++++++++++++++++-
+ arch/arm/mach-ux500/cpu.c     |    1 +
+ 2 files changed, 17 insertions(+), 1 deletion(-)
 
-
-Thanks
-Johannes
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
