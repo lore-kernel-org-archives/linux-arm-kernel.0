@@ -1,54 +1,54 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 25 Oct 2012 08:16:21 -0500
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <5088F19B.7050606@gmail.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com> <508895D8.5000701@ti.com>
- <5088F19B.7050606@gmail.com>
-Message-ID: <50893BA5.8080600@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Oct 2012 09:18:18 -0400
+Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and
+ config update
+In-Reply-To: <5087F5B9.0@free-electrons.com>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
+ <20121024160139.6dbf5e16@skate> <5087F5B9.0@free-electrons.com>
+Message-ID: <20121025131818.GF18811@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 24, 2012 at 04:05:45PM +0200, Gregory CLEMENT wrote:
+> On 10/24/2012 04:01 PM, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > Shouldn't you split into one commit adding the SATA definition in
+> > the .dtsi + doing the defconfig change (the "SoC" level modifications),
+> > and then another commit for the .dts change? I don't really care
+> > personally, it's really up to Jason/Andrew on this.
+> > 
+> > Another comment below, though.
+> > 
+> > On Wed, 24 Oct 2012 15:49:21 +0200, Gregory CLEMENT wrote:
+> > 
+> >> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> >> index 94b4b9e..3f08233 100644
+> >> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> >> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> >> @@ -69,6 +69,16 @@
+> >>  			compatible = "marvell,armada-addr-decoding-controller";
+> >>  			reg = <0xd0020000 0x258>;
+> >>  		};
+> >> +
+> >> +		sata at d00a0000 {
+> >> +                        compatible = "marvell,orion-sata";
+> >> +                        reg = <0xd00a0000 0x2400>;
+> >> +                        interrupts = <55>;
+> >> +                        nr-ports = <2>;
+> >> +			clocks = <&coreclk 0>;//,  <&coreclk 0>;
+> > 
+> > Alignment problem + remainings of tests or something like that.
+> 
+> True I missed this one.
+> 
+> Jason, Andrew, do you want I split this patch as suggested by Thomas or
+> are you fine with having one single patch?
 
-On 10/25/2012 03:00 AM, Daniel Mack wrote:
-> Hi Jon,
-> 
-> many thanks for your time to look at this.
-> 
-> On 25.10.2012 03:28, Jon Hunter wrote:
->> On 10/22/2012 02:55 PM, Daniel Mack wrote:
->>> diff --git a/Documentation/devicetree/bindings/bus/gpmc.txt b/Documentation/devicetree/bindings/bus/gpmc.txt
->>> new file mode 100644
->>> index 0000000..ef1c6e1
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/bus/gpmc.txt
->>> @@ -0,0 +1,59 @@
->>> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
->>> +
->>> +The actual devices are instantiated from the child nodes of a GPMC node.
->>> +
->>> +Required properties:
->>> +
->>> + - compatible: Should be set to "ti,gpmc"
->>
->> Is this the only required property? I think that "reg" and "ti,hwmods"
->> are probably also required.
-> 
-> Well yes, but at least "reg" is commonly omitted as it's part of a more
-> "generic" set of properties. But ok, I can add these.
-> 
->> Also given that we are describing the hardware, I am wondering if the
->> number of chip-selects and wait signals should be defined here too. I
->> recall that different devices had different number of wait pins available.
-> 
-> Hmm, that number is currently hard-coded in GPMC_CS_NUM. It would take
-> some effort to make that dynamic but I agree that this would be a good
-> thing to have. Afzal?
+Yes, please make the defconfig changes a separate patch.  Also, please
+make sure only the minimum is enabled (eq RAID... isn't needed).
 
-I believe that today all OMAP/AM devices have 8 chip-selects so probably
-not a big deal. However, given we are moving to DT it would be nice to
-move away from having such #defines for hardware related items.
+thx,
 
-Cheers
-Jon
+Jason.
