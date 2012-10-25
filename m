@@ -1,106 +1,174 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 25 Oct 2012 12:11:54 -0400
-Subject: [PATCH v3 08/11] ARM: davinci - migrating to use common clock init
- code
+Date: Thu, 25 Oct 2012 12:11:53 -0400
+Subject: [PATCH v3 07/11] ARM: davinci - restructure header files for common
+ clock migration
 In-Reply-To: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
 References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1351181518-11882-9-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1351181518-11882-8-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A clk_init function pointer is added to davinci_soc_info to allow
-SoC code to specify a clock init function for the SoC. Also
-cpu_clks, psc_bases and psc_bases_num are being obsoleted as part
-of the migration. clk_init() is now called from davinci_timer_init()
-as the davinci_common_init() is too early to call this function.
+pll.h is added to migrate some of the PLL controller defines for sleep.S.
+psc.h is modified to keep only PSC modules definitions needed by sleep.S
+after migrating to common clock. The definitions under
+ifdef CONFIG_COMMON_CLK will be removed in a subsequent patch.
+davinci_watchdog_reset prototype is moved to time.h as clock.h is
+being obsoleted. sleep.S and pm.c is modified to include the new header
+file replacements.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- arch/arm/mach-davinci/common.c              |    6 ++++++
- arch/arm/mach-davinci/include/mach/common.h |    4 ++++
- arch/arm/mach-davinci/time.c                |    7 +++++++
- 3 files changed, 17 insertions(+)
+ arch/arm/mach-davinci/devices.c           |    2 ++
+ arch/arm/mach-davinci/include/mach/pll.h  |   46 +++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/psc.h  |    4 +++
+ arch/arm/mach-davinci/include/mach/time.h |    4 ++-
+ arch/arm/mach-davinci/pm.c                |    4 +++
+ arch/arm/mach-davinci/sleep.S             |    4 +++
+ 6 files changed, 63 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-davinci/include/mach/pll.h
 
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index 64b0f65..039494e 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -20,7 +20,9 @@
- #include <mach/common.h>
- #include <mach/cputype.h>
- 
-+#ifndef CONFIG_COMMON_CLK
- #include "clock.h"
-+#endif
- 
- struct davinci_soc_info davinci_soc_info;
- EXPORT_SYMBOL(davinci_soc_info);
-@@ -105,12 +107,14 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
- 	if (ret < 0)
- 		goto err;
- 
-+#ifndef CONFIG_COMMON_CLK
- 	if (davinci_soc_info.cpu_clks) {
- 		ret = davinci_clk_init(davinci_soc_info.cpu_clks);
- 
- 		if (ret != 0)
- 			goto err;
- 	}
-+#endif
- 
- 	return;
- 
-@@ -122,5 +126,7 @@ void __init davinci_init_late(void)
- {
- 	davinci_cpufreq_init();
- 	davinci_pm_init();
-+#ifndef CONFIG_COMMON_CLK
- 	davinci_clk_disable_unused();
-+#endif
- }
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index bdc4aa8..040db17 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -54,9 +54,13 @@ struct davinci_soc_info {
- 	u32				jtag_id_reg;
- 	struct davinci_id		*ids;
- 	unsigned long			ids_num;
-+#ifdef CONFIG_COMMON_CLK
-+	void				(*clk_init)(void);
-+#else
- 	struct clk_lookup		*cpu_clks;
- 	u32				*psc_bases;
- 	unsigned long			psc_bases_num;
-+#endif
- 	u32				pinmux_base;
- 	const struct mux_config		*pinmux_pins;
- 	unsigned long			pinmux_pins_num;
-diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
-index 9847938..01467d8 100644
---- a/arch/arm/mach-davinci/time.c
-+++ b/arch/arm/mach-davinci/time.c
-@@ -27,7 +27,9 @@
- #include <mach/hardware.h>
+diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+index d2f96662..96ee175 100644
+--- a/arch/arm/mach-davinci/devices.c
++++ b/arch/arm/mach-davinci/devices.c
+@@ -24,7 +24,9 @@
  #include <mach/time.h>
  
+ #include "davinci.h"
 +#ifndef CONFIG_COMMON_CLK
  #include "clock.h"
 +#endif
  
- static struct clock_event_device clockevent_davinci;
- static unsigned int davinci_clock_tick_rate;
-@@ -347,6 +349,11 @@ static void __init davinci_timer_init(void)
- 		"%s: can't register clocksource!\n";
- 	int i;
+ #define DAVINCI_I2C_BASE	     0x01C21000
+ #define DAVINCI_ATA_BASE	     0x01C66000
+diff --git a/arch/arm/mach-davinci/include/mach/pll.h b/arch/arm/mach-davinci/include/mach/pll.h
+new file mode 100644
+index 0000000..fa51bc4
+--- /dev/null
++++ b/arch/arm/mach-davinci/include/mach/pll.h
+@@ -0,0 +1,46 @@
++/*
++ * TI DaVinci PLL definitions
++ *
++ * Copyright (C) 2006-2012 Texas Instruments.
++ * Copyright (C) 2008-2009 Deep Root Systems, LLC
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __ASM_ARCH_PLL_H
++#define __ASM_ARCH_PLL_H
++
++/* PLL/Reset register offsets */
++#define PLLCTL          0x100
++#define PLLCTL_PLLEN    BIT(0)
++#define PLLCTL_PLLPWRDN	BIT(1)
++#define PLLCTL_PLLRST	BIT(3)
++#define PLLCTL_PLLDIS	BIT(4)
++#define PLLCTL_PLLENSRC	BIT(5)
++#define PLLCTL_CLKMODE  BIT(8)
++#define PLLDIV_EN       BIT(15)
++#define PLLDIV1         0x118
++/*
++ * OMAP-L138 system reference guide recommends a wait for 4 OSCIN/CLKIN
++ * cycles to ensure that the PLLC has switched to bypass mode. Delay of 1us
++ * ensures we are good for all > 4MHz OSCIN/CLKIN inputs. Typically the input
++ * is ~25MHz. Units are micro seconds.
++ */
++#define PLL_BYPASS_TIME		1
++/* From OMAP-L138 datasheet table 6-4. Units are micro seconds */
++#define PLL_RESET_TIME		1
++/*
++ * From OMAP-L138 datasheet table 6-4; assuming prediv = 1, sqrt(pllm) = 4
++ * Units are micro seconds.
++ */
++#define PLL_LOCK_TIME		20
++#define PLLSTAT_GOSTAT		BIT(0)
++#define PLLCMD_GOSET		BIT(0)
++
++#endif /* __ASM_ARCH_PLL_H */
+diff --git a/arch/arm/mach-davinci/include/mach/psc.h b/arch/arm/mach-davinci/include/mach/psc.h
+index 405318e..eb464d3 100644
+--- a/arch/arm/mach-davinci/include/mach/psc.h
++++ b/arch/arm/mach-davinci/include/mach/psc.h
+@@ -27,6 +27,7 @@
+ #ifndef __ASM_ARCH_PSC_H
+ #define __ASM_ARCH_PSC_H
  
-+#ifdef CONFIG_COMMON_CLK
-+	/* invoke clk init function specific to a SoC */
-+	if (davinci_soc_info.clk_init)
-+		davinci_soc_info.clk_init();
++#ifndef CONFIG_COMMON_CLK
+ #define	DAVINCI_PWR_SLEEP_CNTRL_BASE	0x01C41000
+ 
+ /* Power and Sleep Controller (PSC) Domains */
+@@ -227,6 +228,7 @@
+ #define TNETV107X_LPSC_DDR2_EMIF1_VRST		42
+ #define TNETV107X_LPSC_DDR2_EMIF2_VCTL_RST	43
+ #define TNETV107X_LPSC_MAX			44
 +#endif
- 	clockevent_id = soc_info->timer_info->clockevent_id;
- 	clocksource_id = soc_info->timer_info->clocksource_id;
  
+ /* PSC register offsets */
+ #define EPCPR		0x070
+@@ -251,9 +253,11 @@
+ 
+ #ifndef __ASSEMBLER__
+ 
++#ifndef CONFIG_COMMON_CLK
+ extern int davinci_psc_is_clk_active(unsigned int ctlr, unsigned int id);
+ extern void davinci_psc_config(unsigned int domain, unsigned int ctlr,
+ 		unsigned int id, bool enable, u32 flags);
++#endif
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-davinci/include/mach/time.h b/arch/arm/mach-davinci/include/mach/time.h
+index 1c971d8..7faa530 100644
+--- a/arch/arm/mach-davinci/include/mach/time.h
++++ b/arch/arm/mach-davinci/include/mach/time.h
+@@ -31,5 +31,7 @@ enum {
+ #define ID_TO_TIMER(id)		(IS_TIMER1(id) != 0)
+ 
+ extern struct davinci_timer_instance davinci_timer_instance[];
+-
++#ifdef CONFIG_COMMON_CLK
++extern void davinci_watchdog_reset(struct platform_device *);
++#endif
+ #endif /* __ARCH_ARM_MACH_DAVINCI_TIME_H */
+diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
+index eb8360b..8802fdc 100644
+--- a/arch/arm/mach-davinci/pm.c
++++ b/arch/arm/mach-davinci/pm.c
+@@ -23,7 +23,11 @@
+ #include <mach/sram.h>
+ #include <mach/pm.h>
+ 
++#ifndef CONFIG_COMMON_CLK
+ #include "clock.h"
++#else
++#include <mach/pll.h>
++#endif
+ 
+ #define DEEPSLEEP_SLEEPCOUNT_MASK	0xFFFF
+ 
+diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
+index d4e9316..a3bd60d 100644
+--- a/arch/arm/mach-davinci/sleep.S
++++ b/arch/arm/mach-davinci/sleep.S
+@@ -24,7 +24,11 @@
+ #include <mach/psc.h>
+ #include <mach/ddr2.h>
+ 
++#ifndef CONFIG_COMMON_CLK
+ #include "clock.h"
++#else
++#include <mach/pll.h>
++#endif
+ 
+ /* Arbitrary, hardware currently does not update PHYRDY correctly */
+ #define PHYRDY_CYCLES		0x1000
 -- 
 1.7.9.5
