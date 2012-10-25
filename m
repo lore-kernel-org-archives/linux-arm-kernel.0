@@ -1,62 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Oct 2012 09:29:00 -0400
-Subject: [PATCH 3/5] pinctrl: dove: fix iomem and pdma clock
-In-Reply-To: <508900A2.20005@gmail.com>
-References: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
- <1351088724-11142-4-git-send-email-andrew@lunn.ch>
- <CACRpkdYQ+kk1jJ-GfOBd_5pahu-KOTL4GA3_zWP85E6v+h51pA@mail.gmail.com>
- <508900A2.20005@gmail.com>
-Message-ID: <20121025132900.GG18811@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Oct 2012 13:30:09 +0000
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <50893389.2090002@gmail.com>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
+Message-ID: <201210251330.09456.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 11:04:34AM +0200, Sebastian Hesselbarth wrote:
-> On 10/25/2012 09:04 AM, Linus Walleij wrote:
-> >On Wed, Oct 24, 2012 at 4:25 PM, Andrew Lunn<andrew@lunn.ch>  wrote:
-> >
-> >>Since 3.7 readl/writel require register addresses to be const void*
-> >>instead of unsigned int. The register addresses are converted using
-> >>IOMEM() and offsets are added instead of OR'ed.
-> >>Also a workaround for the pdma clock is added, that is required as
-> >>there is still no DT clock provider available on Dove.
-> >
-> >So essentially two unrelated patches squashed into one, and I
-> >would apply the first one right off but now the clock change makes
-> >me hesitate.
-> >
-> >>         clk = devm_clk_get(&pdev->dev, NULL);
-> >>+
-> >>+       /* Currently there is no DT clock provider for pdma clock,
-> >>+          this fallback ensures pdma clock is ticking */
-> >
-> >/*
-> >  * I prefer comment style like so because it's easier to read.
-> >  * Maybe it's a bit pedantic but bear with me.
-> >  */
-> >
-> >>+       if (IS_ERR(clk))
-> >>+               clk = clk_get_sys("dove-pdma", NULL);
-> >>+
-> >
-> >This is a horrible hack. But if the Marvell people agree about
-> >it I will live with it.
+On Thursday 25 October 2012, Rob Herring wrote:
+> > On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
+> >>
+> >> With recent compilers and move to generic unaligned.h in commit d25c881
+> >> (ARM: 7493/1: use generic unaligned.h), unaligned accesses will be used
+> >> by the LZO decompressor on v7 cores. So we need to make sure unaligned
+> >> accesses are allowed by clearing the SCTLR A bit.
+> > 
+> > I just read this in http://gcc.gnu.org/gcc-4.7/changes.html:
+> > 
+> >   On ARM, when compiling for ARMv6 (but not ARMv6-M), ARMv7-A, ARMv7-R, or
+> >   ARMv7-M, the new option -munaligned-access is active by default, which for
+> >   some source codes generates code that accesses memory on unaligned addresses.
+> >   This will require the kernel of those systems to enable such accesses
+> >   (controlled by CP15 register c1, refer to ARM documentation). Alternatively
+> >   or for compatibility with kernels where unaligned accesses are not supported,
+> >   all code has to be compiled with -mno-unaligned-access. Linux/ARM in official
+> >   releases has automatically and unconditionally supported unaligned accesses
+> >   as emitted by GCC due to this option being active, since Linux version 2.6.28.
 > 
-> Unfortunately, it is. This is an chicken-egg-problem here, no
-> DT clk-provider, no clocks properties..
-> 
-> While writing pinctrl-dove I was planing to enable it after
-> the clock provider but with Andrew pushing forward - for a good
-> reason - there comes the trouble ;)
-> 
-> I don't like the hack either but the clk-gate is there and
-> if I don't enable it pinctrl-dove will hang the SoC.
-> 
-> I have a clk-dove DT clk-provider in my pocket somewhere but
-> didn't find the time to prepare it for posting..
+> I don't think there is such a thing as ARMv6-M.
 
-Then let's split out the dove-pinctrl patches until you have that series
-ready.
+There is, that would be the Cortex-M0/M0+/M1. You cannot run Linux on these.
 
-thx,
-
-Jason.
+	Arnd
