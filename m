@@ -1,30 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Oct 2012 12:03:32 -0700
-Subject: [PATCH 08/16] ARM: OMAP2: Move plat/menelaus.h to
- linux/mfd/menelaus.h
-In-Reply-To: <20121025111158.GA5297@sortiz-mobl>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <20121004220451.26676.62349.stgit@muffinssi.local>
- <20121025111158.GA5297@sortiz-mobl>
-Message-ID: <20121025190332.GX11928@atomide.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 25 Oct 2012 19:09:50 +0000 (UTC)
+Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
+ pdata function pointer
+In-Reply-To: <20121025185755.GV11928@atomide.com>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+ <20121016013213.21844.20016.stgit@dusk.lan>
+ <20121025153805.GB11623@blackmetal.musicnaut.iki.fi>
+ <alpine.DEB.2.00.1210251846130.21193@utopia.booyaka.com>
+ <20121025185755.GV11928@atomide.com>
+Message-ID: <alpine.DEB.2.00.1210251908560.21193@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Samuel Ortiz <sameo@linux.intel.com> [121025 04:14]:
-> Hi Tony,
-> 
-> On Thu, Oct 04, 2012 at 03:04:52PM -0700, Tony Lindgren wrote:
-> > We can move menelaus.h to live with other mfd headers to
-> > get it out of plat for ARM common zImage support.
-> > 
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+On Thu, 25 Oct 2012, Tony Lindgren wrote:
 
-Thanks, I've now pushed a branch with this patch only
-to omap-for-v3.8/cleanup-headers-menelaus branch in case
-you need to merge it in too.
+> Ideally we'd have some Linux generic function to implement in the PRM/CM
+> drivers for getting the bootreason. But I guess we don't?
 
-Regards,
+Do you know of one, apart from WDIOC_GETBOOTSTATUS?
 
-Tony
+
+- Paul
