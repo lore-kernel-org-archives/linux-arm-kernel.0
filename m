@@ -1,54 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Oct 2012 08:57:08 -0500
-Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
- update
-In-Reply-To: <50893FC8.1050503@free-electrons.com>
-References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
- <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
- <20121024160139.6dbf5e16@skate> <5087F5B9.0@free-electrons.com>
- <20121025131818.GF18811@titan.lakedaemon.net> <20121025152114.73e69c92@skate>
- <50893FC8.1050503@free-electrons.com>
-Message-ID: <50894534.2000602@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Oct 2012 16:06:57 +0200
+Subject: [PATCH] arm: mvebu: move irq controller driver in drivers/irqchip/
+In-Reply-To: <50894346.60507@gmail.com>
+References: <1351168500-11129-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50894346.60507@gmail.com>
+Message-ID: <20121025160657.57a52658@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 08:34 AM, Gregory CLEMENT wrote:
-> On 10/25/2012 03:21 PM, Thomas Petazzoni wrote:
->> Jason,
->>
->> On Thu, 25 Oct 2012 09:18:18 -0400, Jason Cooper wrote:
->>
->>>> Jason, Andrew, do you want I split this patch as suggested by
->>>> Thomas or are you fine with having one single patch?
->>>
->>> Yes, please make the defconfig changes a separate patch.  Also, please
->>> make sure only the minimum is enabled (eq RAID... isn't needed).
->>
->> I haven't looked in details at the driver, but is nr-ports = <foo> the
->> right way of doing things? We may have platforms were port 0 is not
->> used, but port 1 is used, and just a number of ports doesn't allow to
->> express this.
->>
->> Shouldn't the DT property be
->>
->>   ports = <0>, <1>
->>   ports = <1>
->>   ports = <1>, <3>
->>
->> In order to allow to more precisely enabled SATA ports? Or maybe the
->> SATA ports cannot be enabled/disabled on a per-port basis, in which
->> case I'm obviously wrong here.
+Rob,
+
+On Thu, 25 Oct 2012 08:48:54 -0500, Rob Herring wrote:
+
+> I don't mean to pick on this specific patch, but this is a common
+> problem of moving various low-level pieces like irqchips, cpuidle,
+> timers, etc. to drivers/*. If we, just moving the code as is over, we
+> still need some hooks between arch/arm and drivers. I think if we keep
+> adding ARM SOC specific headers to include/linux, that will be the
+> next thing we get yelled at for and will have to clean-up.
 > 
-> The actual implementation of mv_sata.c doesn't work like this. You can
-> only pass the number of ports supported not the list of the port you
-> want to support. I've checked in the device tree binding documentation
-> _and_ also in the code.
+> For irqchips, the way I see this working is we would have a single
+> call to of_irq_init with a match list of all irqchips in
+> drivers/irqchips. This contains the init function within
+> drivers/irqchips. Then all the machines can just call a generic
+> irqchip_init.
 
-Is that a statement about the driver or the h/w? It does not matter what
-the driver does. If the h/w can support skipping a port, then the dts
-should allow that.
+Sounds doable indeed.
 
-A bitmask would be most appropriate here (and matches how AHCI does the
-equivalent).
+> The handle_irq ptr would also need to be plugged in at runtime.
 
-Rob
+However, do you have a more specific idea here? In setup_arch(), the
+value of mdesc->handle_irq gets picked up way before the ->init_irq
+machine hook is being called.
+
+An option would be to fill this mdesc->handle_irq() field during the
+mdesc->init_early() callback (would require moving things around a bit
+in setup_arch(), but sounds reasonable). However, at the time of
+mdesc->init_early(), I guess we can't call of_irq_init(). So we would
+have a two step process: fill in mdesc->handle_irq during
+mdesc->init_early(), and call irqchip_init() (which will do the
+of_irq_init()) in mdesc->init_irq().
+
+If that's fine with you, I can cook a patch for BCM2835 and MVEBU that
+implements this idea.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
