@@ -1,34 +1,39 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 25 Oct 2012 13:38:07 -0500
-Subject: [PATCH V3 1/5] ARM: dts: OMAP: Add timer nodes
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB4AB13@DBDE01.ent.ti.com>
-References: <1350496873-21337-1-git-send-email-jon-hunter@ti.com>
- <1350496873-21337-2-git-send-email-jon-hunter@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB49C1B@DBDE01.ent.ti.com>
- <50887315.2000509@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB4A768@DBDE01.ent.ti.com>
- <50892E27.7070102@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB4AB13@DBDE01.ent.ti.com>
-Message-ID: <5089870F.7040101@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 25 Oct 2012 18:51:02 +0000 (UTC)
+Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
+ pdata function pointer
+In-Reply-To: <20121025153805.GB11623@blackmetal.musicnaut.iki.fi>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+ <20121016013213.21844.20016.stgit@dusk.lan>
+ <20121025153805.GB11623@blackmetal.musicnaut.iki.fi>
+Message-ID: <alpine.DEB.2.00.1210251846130.21193@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Terve,
 
-On 10/25/2012 10:27 AM, Hiremath, Vaibhav wrote:
+On Thu, 25 Oct 2012, Aaro Koskinen wrote:
 
-...
-
-> Can you merge it to your test module? I am thinking of pushing application 
-> to github for others to use. I believe you are ok with this. I am planning 
-> to push all the application there.
+> On Mon, Oct 15, 2012 at 07:32:33PM -0600, Paul Walmsley wrote:
+> > The OMAP watchdog timer driver directly calls a function exported by
+> > code in arch/arm/mach-omap2.  This is not good; it tightly couples
+> > this driver to the mach-omap2 integration code.  Instead, add a
+> > temporary platform_data function pointer to abstract this function
+> > call.  A subsequent patch will convert the watchdog driver to use this
+> > function pointer.
 > 
-> https://github.com/hvaibhav/sample-applications
+> Why a function is needed? Reset cause won't change until the next reset,
+> so it should be enough to read it once during the init and store it into
+> the platform data.
 
-Thanks. I have been meaning to do this. I have pushed my latest version
-here [1]. Should include the AM335x fix too. Let me know if this is
-working for you.
+Once the PRM/CM drivers and DT conversion is complete, this driver won't 
+have any platform_data.  There won't be any watchdog driver initialization 
+code in arch/arm/mach-omap2.  At that point in time, the driver will just 
+call a function from the PRM driver that provides the reset source data.  
 
-Cheers
-Jon
+As you say, the watchdog can certainly do this from its probe code; it 
+would be more efficient.  Just didn't want to make that change now; seems 
+like it would be best done as a separate optimization patch.
 
-[1] https://github.com/jonhunter/omap-test
+
+- Paul
