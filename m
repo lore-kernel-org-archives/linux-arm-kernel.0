@@ -1,213 +1,206 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 17:21:15 -0600
-Subject: [PATCH 03/13] ARM: OMAP2xxx: clock: remove global 'dclk' variable
+Date: Thu, 25 Oct 2012 17:21:16 -0600
+Subject: [PATCH 05/13] ARM: OMAP2+: PRCM: create SoC-specific chip restart
+ functions
 In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
 References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <20121025232114.17558.43866.stgit@dusk.lan>
+Message-ID: <20121025232116.17558.47458.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the global 'dclk' variable, instead replacing it with a
-variable local to the dpllcore clock type C file.  This removes some
-of the special-case code surrounding the OMAP2xxx clock init.
-
-This patch is a prerequisite for the removal of the
-omap_prcm_restart() code from arch/arm/mach-omap2/prcm.c.  It also
-cleans up some special-case OMAP2xxx clock code in the process.
+Split omap_prcm_restart() from mach-omap2/prcm.c into SoC-specific
+variants.  These functions need to be able to save the reboot reason
+into the scratchpad RAM.  This implies a dependency on both the PRM
+and SCM IP blocks, so they've been moved into their own file.  This
+will eventually call functions in the PRM and SCM drivers, once those
+are created.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |   34 ++++++++++++++++++++++----
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    2 +-
- arch/arm/mach-omap2/clock2420_data.c         |    4 ++-
- arch/arm/mach-omap2/clock2430_data.c         |    4 ++-
- arch/arm/mach-omap2/clock2xxx.c              |    2 +-
- arch/arm/mach-omap2/clock2xxx.h              |    5 ++--
- 6 files changed, 37 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap2/Makefile        |    5 +++
+ arch/arm/mach-omap2/common.h        |    4 ++
+ arch/arm/mach-omap2/omap2-restart.c |   65 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap3-restart.c |   36 +++++++++++++++++++
+ arch/arm/mach-omap2/omap4-common.c  |   16 +++++++++
+ 5 files changed, 126 insertions(+)
+ create mode 100644 arch/arm/mach-omap2/omap2-restart.c
+ create mode 100644 arch/arm/mach-omap2/omap3-restart.c
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-index 4ae4392..38a06d9 100644
---- a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-@@ -37,9 +37,15 @@
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 7a628e7..aa0f59c 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -49,6 +49,11 @@ AFLAGS_sram242x.o			:=-Wa,-march=armv6
+ AFLAGS_sram243x.o			:=-Wa,-march=armv6
+ AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
  
- /* #define DOWN_VARIABLE_DPLL 1 */		/* Experimental */
++# Restart code (OMAP4/5 currently in omap4-common.c)
++obj-$(CONFIG_SOC_OMAP2420)		+= omap2-restart.o
++obj-$(CONFIG_SOC_OMAP2430)		+= omap2-restart.o
++obj-$(CONFIG_ARCH_OMAP3)		+= omap3-restart.o
++
+ # Pin multiplexing
+ obj-$(CONFIG_SOC_OMAP2420)		+= mux2420.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= mux2430.o
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 320f0d7..06dff1a 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -115,6 +115,10 @@ void ti81xx_init_late(void);
+ void omap4430_init_late(void);
+ int omap2_common_pm_late_init(void);
+ void omap_prcm_restart(char, const char *);
++void omap2xxx_restart(char, const char *);
++void omap3xxx_restart(char, const char *);
++void omap44xx_restart(char, const char *);
++void omap5xxx_restart(char, const char *);
  
+ /* This gets called from mach-omap2/io.c, do not call this */
+ void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
+diff --git a/arch/arm/mach-omap2/omap2-restart.c b/arch/arm/mach-omap2/omap2-restart.c
+new file mode 100644
+index 0000000..be6bc89
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap2-restart.c
+@@ -0,0 +1,65 @@
 +/*
-+ * dpll_core_ck: pointer to the combined dpll_ck + core_ck on OMAP2xxx
-+ * (currently defined as "dpll_ck" in the OMAP2xxx clock tree).  Set
-+ * during dpll_ck init and used later by omap2xxx_clk_get_core_rate().
++ * omap2-restart.c - code common to all OMAP2xxx machines.
++ *
++ * Copyright (C) 2012 Texas Instruments
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+static struct clk *dpll_core_ck;
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/io.h>
 +
- /**
-  * omap2xxx_clk_get_core_rate - return the CORE_CLK rate
-- * @clk: pointer to the combined dpll_ck + core_ck (currently "dpll_ck")
-  *
-  * Returns the CORE_CLK rate.  CORE_CLK can have one of three rate
-  * sources on OMAP2xxx: the DPLL CLKOUT rate, DPLL CLKOUTX2, or 32KHz
-@@ -47,12 +53,14 @@
-  * struct clk *dpll_ck, which is a composite clock of dpll_ck and
-  * core_ck.
-  */
--unsigned long omap2xxx_clk_get_core_rate(struct clk *clk)
-+unsigned long omap2xxx_clk_get_core_rate(void)
- {
- 	long long core_clk;
- 	u32 v;
- 
--	core_clk = omap2_get_dpll_rate(clk);
-+	WARN_ON(!dpll_core_ck);
++#include "common.h"
++#include "prm2xxx.h"
 +
-+	core_clk = omap2_get_dpll_rate(dpll_core_ck);
++/*
++ * reset_virt_prcm_set_ck, reset_sys_ck: pointers to the virt_prcm_set
++ * clock and the sys_ck.  Used during the reset process
++ */
++static struct clk *reset_virt_prcm_set_ck, *reset_sys_ck;
++
++/* Reboot handling */
++
++/**
++ * omap2xxx_restart - Set DPLL to bypass mode for reboot to work
++ *
++ * Set the DPLL to bypass so that reboot completes successfully.  No
++ * return value.
++ */
++void omap2xxx_restart(char mode, const char *cmd)
++{
++	u32 rate;
++
++	rate = clk_get_rate(reset_sys_ck);
++	clk_set_rate(reset_virt_prcm_set_ck, rate);
++
++	/* XXX Should save the cmd argument for use after the reboot */
++
++	omap2xxx_prm_dpll_reset(); /* never returns */
++	while (1);
++}
++
++/**
++ * omap2xxx_common_look_up_clks_for_reset - look up clocks needed for restart
++ *
++ * Some clocks need to be looked up in advance for the SoC restart
++ * operation to work - see omap2xxx_restart().  Returns -EINVAL upon
++ * error or 0 upon success.
++ */
++static int __init omap2xxx_common_look_up_clks_for_reset(void)
++{
++	reset_virt_prcm_set_ck = clk_get(NULL, "virt_prcm_set");
++	if (IS_ERR(reset_virt_prcm_set_ck))
++		return -EINVAL;
++
++	reset_sys_ck = clk_get(NULL, "sys_ck");
++	if (IS_ERR(reset_sys_ck))
++		return -EINVAL;
++
++	return 0;
++}
++core_initcall(omap2xxx_common_look_up_clks_for_reset);
+diff --git a/arch/arm/mach-omap2/omap3-restart.c b/arch/arm/mach-omap2/omap3-restart.c
+new file mode 100644
+index 0000000..923c582
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap3-restart.c
+@@ -0,0 +1,36 @@
++/*
++ * omap3-restart.c - Code common to all OMAP3xxx machines.
++ *
++ * Copyright (C) 2009, 2012 Texas Instruments
++ * Copyright (C) 2010 Nokia Corporation
++ * Tony Lindgren <tony@atomide.com>
++ * Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "iomap.h"
++#include "common.h"
++#include "control.h"
++#include "prm3xxx.h"
++
++/* Global address base setup code */
++
++/**
++ * omap3xxx_restart - trigger a software restart of the SoC
++ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
++ * @cmd: passed from the userspace program rebooting the system (if provided)
++ *
++ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
++ * kernel/sys.c.  No return value.
++ */
++void omap3xxx_restart(char mode, const char *cmd)
++{
++	omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
++	omap3xxx_prm_dpll3_reset(); /* never returns */
++	while (1);
++}
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 6560e99..5348788 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -35,6 +35,7 @@
+ #include "iomap.h"
+ #include "common.h"
+ #include "hsmmc.h"
++#include "prminst44xx.h"
+ #include "omap4-sar-layout.h"
  
- 	v = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
- 	v &= OMAP24XX_CORE_CLK_SRC_MASK;
-@@ -100,7 +108,7 @@ static long omap2_dpllcore_round_rate(unsigned long target_rate)
- 
- unsigned long omap2_dpllcore_recalc(struct clk *clk)
- {
--	return omap2xxx_clk_get_core_rate(clk);
-+	return omap2xxx_clk_get_core_rate();
- }
- 
- int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate)
-@@ -110,7 +118,7 @@ int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate)
- 	struct prcm_config tmpset;
- 	const struct dpll_data *dd;
- 
--	cur_rate = omap2xxx_clk_get_core_rate(dclk);
-+	cur_rate = omap2xxx_clk_get_core_rate();
- 	mult = omap2_cm_read_mod_reg(PLL_MOD, CM_CLKSEL2);
- 	mult &= OMAP24XX_CORE_CLK_SRC_MASK;
- 
-@@ -171,3 +179,19 @@ int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate)
+ #ifdef CONFIG_CACHE_L2X0
+@@ -249,6 +250,21 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
  	return 0;
  }
  
 +/**
-+ * omap2xxx_clkt_dpllcore_init - clk init function for dpll_ck
-+ * @clk: struct clk *dpll_ck
++ * omap44xx_restart - trigger a software restart of the SoC
++ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
++ * @cmd: passed from the userspace program rebooting the system (if provided)
 + *
-+ * Store a local copy of @clk in dpll_core_ck so other code can query
-+ * the core rate without having to clk_get(), which can sleep.  Must
-+ * only be called once.  No return value.  XXX If the clock
-+ * registration process is ever changed such that dpll_ck is no longer
-+ * statically defined, this code may need to change to increment some
-+ * kind of use count on dpll_ck.
++ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
++ * kernel/sys.c.  No return value.
 + */
-+void omap2xxx_clkt_dpllcore_init(struct clk *clk)
++void omap44xx_restart(char mode, const char *cmd)
 +{
-+	WARN(dpll_core_ck, "dpll_core_ck already set - should never happen");
-+	dpll_core_ck = clk;
++	/* XXX Should save 'cmd' into scratchpad for use after reboot */
++	omap4_prminst_global_warm_sw_reset(); /* never returns */
++	while (1);
 +}
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index 3524f0e..1b95078 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -119,7 +119,7 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- 	}
- 
- 	curr_prcm_set = prcm;
--	cur_rate = omap2xxx_clk_get_core_rate(dclk);
-+	cur_rate = omap2xxx_clk_get_core_rate();
- 
- 	if (prcm->dpll_speed == cur_rate / 2) {
- 		omap2xxx_sdrc_reprogram(CORE_CLK_SRC_DPLL, 1);
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 969bc58..69335d3 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -126,6 +126,7 @@ static struct clk dpll_ck = {
- 	.name		= "dpll_ck",
- 	.ops		= &clkops_omap2xxx_dpll_ops,
- 	.parent		= &sys_ck,		/* Can be func_32k also */
-+	.init		= &omap2xxx_clkt_dpllcore_init,
- 	.dpll_data	= &dpll_dd,
- 	.clkdm_name	= "wkup_clkdm",
- 	.recalc		= &omap2_dpllcore_recalc,
-@@ -1957,7 +1958,7 @@ int __init omap2420_clk_init(void)
- 	omap_clk_disable_autoidle_all();
- 
- 	/* Check the MPU rate set by bootloader */
--	clkrate = omap2xxx_clk_get_core_rate(&dpll_ck);
-+	clkrate = omap2xxx_clk_get_core_rate();
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
-@@ -1983,7 +1984,6 @@ int __init omap2420_clk_init(void)
- 	/* Avoid sleeping sleeping during omap2_clk_prepare_for_reboot() */
- 	vclk = clk_get(NULL, "virt_prcm_set");
- 	sclk = clk_get(NULL, "sys_ck");
--	dclk = clk_get(NULL, "dpll_ck");
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index 186f06a..8d9894c 100644
---- a/arch/arm/mach-omap2/clock2430_data.c
-+++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -125,6 +125,7 @@ static struct clk dpll_ck = {
- 	.name		= "dpll_ck",
- 	.ops		= &clkops_omap2xxx_dpll_ops,
- 	.parent		= &sys_ck,		/* Can be func_32k also */
-+	.init		= &omap2xxx_clkt_dpllcore_init,
- 	.dpll_data	= &dpll_dd,
- 	.clkdm_name	= "wkup_clkdm",
- 	.recalc		= &omap2_dpllcore_recalc,
-@@ -2056,7 +2057,7 @@ int __init omap2430_clk_init(void)
- 	omap_clk_disable_autoidle_all();
- 
- 	/* Check the MPU rate set by bootloader */
--	clkrate = omap2xxx_clk_get_core_rate(&dpll_ck);
-+	clkrate = omap2xxx_clk_get_core_rate();
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
-@@ -2082,7 +2083,6 @@ int __init omap2430_clk_init(void)
- 	/* Avoid sleeping sleeping during omap2_clk_prepare_for_reboot() */
- 	vclk = clk_get(NULL, "virt_prcm_set");
- 	sclk = clk_get(NULL, "sys_ck");
--	dclk = clk_get(NULL, "dpll_ck");
- 
- 	return 0;
- }
-diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
-index e92be1fc..0e71fc2 100644
---- a/arch/arm/mach-omap2/clock2xxx.c
-+++ b/arch/arm/mach-omap2/clock2xxx.c
-@@ -30,7 +30,7 @@
- #include "cm.h"
- #include "cm-regbits-24xx.h"
- 
--struct clk *vclk, *sclk, *dclk;
-+struct clk *vclk, *sclk;
- 
- /*
-  * Omap24xx specific clock functions
-diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
-index cb6df8c..19dc0659 100644
---- a/arch/arm/mach-omap2/clock2xxx.h
-+++ b/arch/arm/mach-omap2/clock2xxx.h
-@@ -15,10 +15,11 @@ unsigned long omap2xxx_sys_clk_recalc(struct clk *clk);
- unsigned long omap2_osc_clk_recalc(struct clk *clk);
- unsigned long omap2_dpllcore_recalc(struct clk *clk);
- int omap2_reprogram_dpllcore(struct clk *clk, unsigned long rate);
--unsigned long omap2xxx_clk_get_core_rate(struct clk *clk);
-+unsigned long omap2xxx_clk_get_core_rate(void);
- u32 omap2xxx_get_apll_clkin(void);
- u32 omap2xxx_get_sysclkdiv(void);
- void omap2xxx_clk_prepare_for_reboot(void);
-+void omap2xxx_clkt_dpllcore_init(struct clk *clk);
- 
- #ifdef CONFIG_SOC_OMAP2420
- int omap2420_clk_init(void);
-@@ -34,8 +35,6 @@ int omap2430_clk_init(void);
- 
- extern void __iomem *prcm_clksrc_ctrl, *cm_idlest_pll;
- 
--extern struct clk *dclk;
--
- extern const struct clkops clkops_omap2430_i2chs_wait;
- extern const struct clkops clkops_oscck;
- extern const struct clkops clkops_apll96;
++
+ static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
+ {
+ 	struct omap_mmc_platform_data *pdata;
