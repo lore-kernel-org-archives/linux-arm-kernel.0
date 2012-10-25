@@ -1,54 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 16:06:57 +0200
-Subject: [PATCH] arm: mvebu: move irq controller driver in drivers/irqchip/
-In-Reply-To: <50894346.60507@gmail.com>
-References: <1351168500-11129-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <50894346.60507@gmail.com>
-Message-ID: <20121025160657.57a52658@skate>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Thu, 25 Oct 2012 15:42:02 +0200
+Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
+In-Reply-To: <20121025131459.GG28061@n2100.arm.linux.org.uk>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <1350899218-13624-8-git-send-email-balbi@ti.com>
+ <20121025145748.760c218b@endymion.delvare>
+ <20121025131459.GG28061@n2100.arm.linux.org.uk>
+Message-ID: <20121025154202.41f3cbba@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
-
-On Thu, 25 Oct 2012 08:48:54 -0500, Rob Herring wrote:
-
-> I don't mean to pick on this specific patch, but this is a common
-> problem of moving various low-level pieces like irqchips, cpuidle,
-> timers, etc. to drivers/*. If we, just moving the code as is over, we
-> still need some hooks between arch/arm and drivers. I think if we keep
-> adding ARM SOC specific headers to include/linux, that will be the
-> next thing we get yelled at for and will have to clean-up.
+On Thu, 25 Oct 2012 14:14:59 +0100, Russell King - ARM Linux wrote:
+> On Thu, Oct 25, 2012 at 02:57:48PM +0200, Jean Delvare wrote:
+> > Hi Felipe, Shubhrajyoti,
+> > 
+> > On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
+> > > From: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > > 
+> > > In case of a NACK, it's wise to tell our clients
+> > > drivers about how many bytes were actually transferred.
+> > > 
+> > > Support this by adding an extra field to the struct
+> > > i2c_msg which gets incremented the amount of bytes
+> > > actually transferred.
+> > > 
+> > > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > > ---
+> > >  include/uapi/linux/i2c.h | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
+> > > index 0e949cb..4b35c9b 100644
+> > > --- a/include/uapi/linux/i2c.h
+> > > +++ b/include/uapi/linux/i2c.h
+> > > @@ -77,6 +77,7 @@ struct i2c_msg {
+> > >  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+> > >  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+> > >  	__u16 len;		/* msg length				*/
+> > > +	__u16 transferred;	/* actual bytes transferred             */
+> > >  	__u8 *buf;		/* pointer to msg data			*/
+> > >  };
+> > 
+> > On the principle I am fine with this, however you also need to define
+> > who should initialize this field, and to what value.
 > 
-> For irqchips, the way I see this working is we would have a single
-> call to of_irq_init with a match list of all irqchips in
-> drivers/irqchips. This contains the init function within
-> drivers/irqchips. Then all the machines can just call a generic
-> irqchip_init.
+> You also miss one very very very big point.  This will break every I2C
+> using userspace program out there unless it is rebuilt - this change will
+> require the exact right version of those userspace programs for the
+> kernel that they're being used on.
 
-Sounds doable indeed.
+How that? The extra field is added in a hole, so we don't change the
+struct size nor the relative positions of existing fields. Why would
+user-space care?
 
-> The handle_irq ptr would also need to be plugged in at runtime.
-
-However, do you have a more specific idea here? In setup_arch(), the
-value of mdesc->handle_irq gets picked up way before the ->init_irq
-machine hook is being called.
-
-An option would be to fill this mdesc->handle_irq() field during the
-mdesc->init_early() callback (would require moving things around a bit
-in setup_arch(), but sounds reasonable). However, at the time of
-mdesc->init_early(), I guess we can't call of_irq_init(). So we would
-have a two step process: fill in mdesc->handle_irq during
-mdesc->init_early(), and call irqchip_init() (which will do the
-of_irq_init()) in mdesc->init_irq().
-
-If that's fine with you, I can cook a patch for BCM2835 and MVEBU that
-implements this idea.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jean Delvare
