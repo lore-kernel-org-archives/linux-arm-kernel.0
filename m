@@ -1,26 +1,106 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 08:58:10 +0200
-Subject: [PATCH 3/3] pinctrl: mvebu: move to its own directory
-In-Reply-To: <1351114738-26793-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351114738-26793-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351114738-26793-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CACRpkdY3iPHDKQS5Z4_5KvrceGBUby6jambtQXaJLH6DVfUjHw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 25 Oct 2012 12:30:23 +0530
+Subject: [PATCH v2] gpio/omap: fix off-mode bug: clear debounce clock
+ enable mask on free/reset
+In-Reply-To: <50887197.8010104@ti.com>
+References: <1351098641-23917-1-git-send-email-khilman@deeprootsystems.com>
+ <50887197.8010104@ti.com>
+Message-ID: <5088E387.2050704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:38 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-
-> Like the spear platform, the mvebu platform has multiple files: one
-> core file, and then one file per SoC family. More files will be added
-> later, as support for mach-orion5x and mach-mv78xx0 SoCs is added to
-> pinctrl-mvebu. For those reasons, having a separate subdirectory,
-> drivers/pinctrl/mvebu/ makes sense, and it had already been suggested
-> by Linus Wallej when the driver was originally submitted.
+On Thursday 25 October 2012 04:24 AM, Jon Hunter wrote:
 >
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> On 10/24/2012 12:10 PM, Kevin Hilman wrote:
+>> From: Kevin Hilman <khilman@ti.com>
+>>
+>> When a GPIO bank is freed or shutdown, ensure that the banks
+>> dbck_enable_mask is cleared also.  Otherwise, context restore on
+>> subsequent off-mode transition will restore previous value from the
+>> shadow copies (bank->context.debounce*) leading to mismatch state
+>> between driver state and hardware state.
+>>
+>> This was discovered when board code was doing
+>>
+>>    gpio_request_one()
+>>    gpio_set_debounce()
+>>    gpio_free()
+>>
+>> which was leaving the GPIO debounce settings in a confused state.  If
+>> that GPIO bank is subsequently used with off-mode enabled, bogus state
+>> would be restored, leaving GPIO debounce enabled which then prevented
+>> the CORE powerdomain from transitioning.
+>>
+>> To fix, ensure that bank->dbck_enable_mask is cleared when the bank
+>> is freed/shutdown so debounce state doesn't persist.
+>>
+The freed part is fine but I don't understand why it needs to be done
+on _a_ gpio irq shutdown callback where IRQs related configuration
+on that one GPIO needs to be cleared. De-bounce clock is surely not IRQ
+related configuration.
 
-Thanks, patch applied.
+>> Special thanks to Grazvydas Ignotas for pointing out a bug in an
+>> earlier version that would've disabled debounce on any runtime PM
+>> transition.
+>>
+>> Reported-by: Paul Walmsley <paul@pwsan.com>
+>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>> Cc: Grazvydas Ignotas <notasas@gmail.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> v2: only clear mask in free/shutdown, not in runtime PM paths,
+>>      clarified changelog
+>> Applies on v3.7-rc2.
+>>
+>>   drivers/gpio/gpio-omap.c | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index 94cbc84..113b167 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -539,6 +539,7 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
+>>   	_set_gpio_irqenable(bank, gpio, 0);
+>>   	_clear_gpio_irqstatus(bank, gpio);
+>>   	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
+>> +	bank->dbck_enable_mask = 0;
+>>   }
+>
+> Does this need to be ...
+>
+> +	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
+> +	_gpio_dbck_disable(bank);
+>
+Yes, its a per bank clock. There is an alternate. See below.
 
-Yours,
-Linus Walleij
+> There could be more than one gpio using debounce and so we should only
+> clear the appropriate bit. Also after clearing a bit we could see if we
+> can disable the debounce clock too.
+>
+When I mentioned the clearing in gpio_free() path will do trick, I had
+something like below in mind.
+
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index dee2856..8574105 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -629,8 +629,10 @@ static void omap_gpio_free(struct gpio_chip *chip, 
+unsigned offset)
+  	 * If this is the last gpio to be freed in the bank,
+  	 * disable the bank module.
+  	 */
+-	if (!bank->mod_usage)
++	if (!bank->mod_usage) {
++		bank->dbck_enable_mask = 0;
+  		pm_runtime_put(bank->dev);
++	}
+  }
+
+  /*
+
+This patch should be enough according to me unless and until I am
+missing mask clear need in irq_shutdown path. It will also take
+care of disabling of debounce clock as part of runtime suspend callback.
+
+Regards,
+Santosh
