@@ -1,40 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Oct 2012 15:13:43 +0000
-Subject: [GIT PULL] first set of ux500 for ARM SoC for v3.8
-In-Reply-To: <CACRpkdZ9fUUugHAPGw8kEZDFnDWyyZ-b2iUdfCu2Hhhg4swaPQ@mail.gmail.com>
-References: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
- <201210251344.44546.arnd@arndb.de>
- <CACRpkdZ9fUUugHAPGw8kEZDFnDWyyZ-b2iUdfCu2Hhhg4swaPQ@mail.gmail.com>
-Message-ID: <201210251513.43931.arnd@arndb.de>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 25 Oct 2012 10:21:46 -0600
+Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
+In-Reply-To: <20121025005735.35b9f971@skate>
+References: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
+ <20121025005735.35b9f971@skate>
+Message-ID: <1351182106.15182.3.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012, Linus Walleij wrote:
-> On Thu, Oct 25, 2012 at 3:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > Please remember to write the pull request in a way that lets us reuse some
-> > of the text for the merge changeset comment. Ideally in a signed tag
-> > so git puts it in there automatically.
-> 
-> So what was wrong with this signed tag, looking like that?
-> 
-> ----------------------------------------------------------------
-> A first set of Ux500 core patches for v3.8:
-> - Support the HREF520 board
-> - Add the device serial number to the entropy pool
-> 
-> ----------------------------------------------------------------
-> 
-> I guess what I'm after is what makes it reusable if this one
-> isn't.
+Hi Thomas,
 
-The tag looks great, but you were sending the pull request for
-the branch "ux500-core", not for the tag "ux500-core-for-arm-soc".
+On Thu, 2012-10-25 at 00:57 +0200, Thomas Petazzoni wrote:
+> Dear dinguyen at altera.com,
+> 
+> On Thu, 18 Oct 2012 11:32:47 -0600, dinguyen at altera.com wrote:
+> 
+> > +static int __cpuinit socfpga_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> > +{
+> > +	int trampoline_size = &secondary_trampoline_end - &secondary_trampoline;
+> > +
+> > +	memcpy(phys_to_virt(0), &secondary_trampoline, trampoline_size);
+> > +
+> > +	__raw_writel(virt_to_phys(secondary_startup), (sys_manager_base_addr+0x10));
+> > +
+> > +	pen_release = 0;
+> 
+> Are you sure that this code builds? In your v1, this variable was
+> declared in your assembly file, but it is no longer here, and you
+> mention in your changelog that it has been removed. But not completely
+> apparently.
 
-This has happened to me a few times before, especially when pushing
-the tag just before sending the pull request. In that case,
-git-request-pull cannot find the tag on the server because it has
-not been mirrored back from the git+ssh server to the publically
-accessible one that it reads the tags from.
+It builds because pen_release is in <asm/smp.h> for arm. But you're
+right, there is no need for this variable anymore. Thanks for the
+review.
 
-	Arnd
+Dinh
+> 
+> Best regards,
+> 
+> Thomas
