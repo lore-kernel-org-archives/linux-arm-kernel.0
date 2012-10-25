@@ -1,52 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 08:57:09 +0100
-Subject: [PATCH 2/2] input: gpio-keys: Add runtime support
-In-Reply-To: <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
-References: <1349964927-18619-1-git-send-email-lee.jones@linaro.org>
- <1349964927-18619-2-git-send-email-lee.jones@linaro.org>
- <CAM=Q2ctwTBAvKs401GgrGfz9NvaLspquje-6YfnuS5TZYeqY4Q@mail.gmail.com>
- <CACRpkdb+kWW903VD45i5s_LrZ2BKX=k6enGP2R9v2ptSRkvJ9w@mail.gmail.com>
-Message-ID: <20121025075709.GE971@gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 25 Oct 2012 09:57:34 +0200
+Subject: [PATCH 2/6] pinctrl: Update clock handling for the pinctrl-nomadik
+ GPIO driver
+In-Reply-To: <20121025073127.GB971@gmail.com>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+ <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
+ <20121025073127.GB971@gmail.com>
+Message-ID: <5088F0EE.8030900@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 12 Oct 2012, Linus Walleij wrote:
-
-> On Thu, Oct 11, 2012 at 4:22 PM, Shubhrajyoti Datta
-> <omaplinuxkernel@gmail.com> wrote:
-> 
-> >> @@ -526,6 +527,7 @@ static int gpio_keys_open(struct input_dev *input)
-> >>  {
-> >>         struct gpio_keys_drvdata *ddata = input_get_drvdata(input);
-> >>
-> >> +       pm_runtime_get_sync(input->dev.parent);
-> >
-> > I am not an expert of the runtime.
-> >
-> > However would be grateful if you explain me what it actually do.
-> 
-> This increase the reference count of the runtime status container
-> for the device. _sync makes sure it happens now.
-> 
-> Consult:
-> Documentation/power/runtime_pm.txt
-> 
-> > Also I did not see any runtime suspend/ resume handlers populated.
-> 
-> It is not necessary to handle the power state at the driver level,
-> it can just as well be handled by the voltage/power domain,
-> or at the class, type or bus level.
-> 
-> But the individual driver has to notify the system upward if it
-> needs to be powered on or when it may or must be relaxed.
+On 10/25/2012 09:31 AM, Lee Jones wrote:
 >
-> Yours,
-> Linus Walleij
+> This certainly doesn't fix the bug we spoke about. I believe Ulf
+> is still working on that one.
+>
+> So do you want me to remove this patch?
+>
 
-Friendly poke.
+Yeah drop it for now.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
