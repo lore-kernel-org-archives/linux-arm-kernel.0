@@ -1,78 +1,144 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Oct 2012 16:43:28 -0700
-Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
-In-Reply-To: <20121022170917.GB4730@atomide.com>
-References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
- <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
- <20121019191333.GT4730@atomide.com>
- <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
- <20121022170917.GB4730@atomide.com>
-Message-ID: <20121025234328.GF11928@atomide.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 25 Oct 2012 16:57:19 -0700
+Subject: [PATCH v3] gpio/omap: fix off-mode bug: clear debounce clock
+ enable mask on free/reset
+In-Reply-To: <5089C2B6.5020606@ti.com> (Jon Hunter's message of "Thu, 25 Oct
+ 2012 17:52:38 -0500")
+References: <1351182858-14045-1-git-send-email-khilman@deeprootsystems.com>
+ <5089C2B6.5020606@ti.com>
+Message-ID: <871ugmqf4w.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121022 10:11]:
-> * Haojian Zhuang <haojian.zhuang@gmail.com> [121022 03:11]:
-> > On Sat, Oct 20, 2012 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Haojian Zhuang <haojian.zhuang@gmail.com> [121018 02:08]:
-> > >> Add pinconf generic support with POWER SOURCE, BIAS PULL.
-> > > ...
-> > >
-> > >> +     case PIN_CONFIG_POWER_SOURCE:
-> > >> +             if (pcs->psmask == PCS_OFF_DISABLED
-> > >> +                     || pcs->psshift == PCS_OFF_DISABLED)
-> > >> +                     return -ENOTSUPP;
-> > >> +             data &= pcs->psmask;
-> > >> +             data = data >> pcs->psshift;
-> > >> +             *config = data;
-> > >> +             return 0;
-> > >> +             break;
-> > >
-> > > Hmm, only slightly related to this patch, mostly a generic
-> > > question to others: Do others have any mux registers with
-> > > status bits for things like PIN_CONFIG_POWER_SOURCE?
-> > >
-> > > I could use PIN_CONFIG_POWER_SOURCE for controlling the PBIAS
-> > > for omap MMC. But there's also a status bit that needs to be
-> > > checked for that. I think there was some other similar mux
-> > > register for USB PHY that has a status register.
-> > >
-> > > So I'm wondering should the checking for status bit be handled
-> > > in the pinctrl consume driver? Or should we have some bindings
-> > > for that?
-> > >
-> > 
-> > Do you mean that the status register only exists in USB PHY controller or
-> > MMC controller?
-> 
-> The status register is in the MMC PBIAS register that is mux
-> related otherwise. From OMAP4470_ES1.0_PUBLIC_TRM_vE.pdf,
-> Table 19-599. CONTROL_PBIASLITE:
-> 
-> Bits
-> 26	MMC1_PWDNZ
-> 25	MMC1_PBIASLITE_HIZ_MODE
-> 24	MMC1_PBIASLITE_SUPPLY_HI_OUT
-> 23	MMC1_PBIASLITE_VMODE_ERROR	then this bit needs to clear..
-> 22	MMC1_PBIASLITE_PWRDNZ
-> 21	MMC1_PBIASLITE_VMODE		..after VMODE bit is set to 3V
->  
-> > If so, could we use regulator framework in USB PHY or MMC driver?
-> 
-> Yes we could use regulator framework for that that. Or just read the
-> status in the MMC driver for that bit if nobody else has mixed
-> mux-regulator needs like this.
-> 
-> The sequence is MMC specific, so from that point of view it would
-> make sense to have the logic in the MMC driver.
+Jon Hunter <jon-hunter@ti.com> writes:
 
-Well it turns out the VMODE_ERROR bit is not just for VMODE, it's a
-comparator that can also triggers for the other invalid states for
-CONTROL_PBIASLITE pinconf register. So hiding VMODE_ERROR into a
-regulator would be wrong. For now, VMODE best handled using
-PIN_CONFIG_POWER_SOURCE and let the MMC driver do the checking
-using the pinconf API.
+> Hi Kevin,
+>
+> On 10/25/2012 11:34 AM, Kevin Hilman wrote:
+>> From: Kevin Hilman <khilman@ti.com>
+>> 
+>> When a GPIO is freed or shutdown, ensure that the proper bit in
+>> dbck_enable_mask is cleared also.  Otherwise, context restore on
+>> subsequent off-mode transition will restore previous debounce values
+>> from the shadow copies (bank->context.debounce*) leading to mismatch
+>> state between driver state and hardware state.
+>> 
+>> This was discovered when board code was doing
+>> 
+>>   gpio_request_one()
+>>   gpio_set_debounce()
+>>   gpio_free()
+>> 
+>> which was leaving the GPIO debounce settings in a confused state.  If
+>> that GPIO bank is subsequently used with off-mode enabled, bogus state
+>> would be restored, leaving GPIO debounce enabled which then prevented
+>> the CORE powerdomain from transitioning.
+>> 
+>> To fix, ensure that right bit in bank->dbck_enable_mask is cleared
+>> when a GPIO is freed/shutdown so debounce state doesn't persist after
+>> free/reset.  If this GPIO is the last debounce-enabled GPIO in the
+>> bank, the debounce will also be cut.
+>> 
+>> Special thanks to Grazvydas Ignotas for pointing out a bug in the
+>> first version that would've disabled debounce on any runtime PM
+>> transition.
+>> 
+>> And, special thanks to Jon Hunter for pointing out a bug in the second
+>> version which was mistakenly clearing all debounce bits on reset
+>> instead of individual GPIOs, as well as suggesting cutting the
+>> debounce clock after all debounce bits are cleared.
+>
+> ... and for introducing yet another bug :-(
+>
+>> Tesed on 37xx/EVM board which configures GPIO debounce for the ads7846
+>> touchscreen in its board file using the above sequence, and so was
+>> failing off-mode tests in dynamic idle.  Verified that off-mode tests
+>> are passing with this patch.
+>> 
+>> Reported-by: Paul Walmsley <paul@pwsan.com>
+>> Cc: Igor Grinberg <grinberg@compulab.co.il>
+>> Cc: Grazvydas Ignotas <notasas@gmail.com>
+>> Cc: Jon Hunter <jon-hunter@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>>  drivers/gpio/gpio-omap.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>> 
+>> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+>> index 94cbc84..ce1da19 100644
+>> --- a/drivers/gpio/gpio-omap.c
+>> +++ b/drivers/gpio/gpio-omap.c
+>> @@ -539,6 +539,8 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
+>>  	_set_gpio_irqenable(bank, gpio, 0);
+>>  	_clear_gpio_irqstatus(bank, gpio);
+>>  	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
+>> +	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
+>> +	_gpio_dbck_disable(bank);
+>
+> We can't use _gpio_dbck_disable() here. This has been specifically implemented
+> for the suspend path and is designed to disable the debounce clock while
+> debounce is enabled (which makes sense). 
 
-Regards,
+I agree, it makes sense.  It reminds me that this driver could use some
+comments, since each time I come back to it I forget why some of this
+stuff is there.
 
-Tony
+> Yes this needs to be cleaned up.
+
+Most certainly agree.
+
+> I have implemented the following and unit tested. Care to test on your 37xx
+> board? Sorry I would do it myself I had one. 
+
+Yes, it fixes the off-mode dynamic idle problem on my 37xx EVM.
+
+> Also not sure if you just wish to squash your patch and mine together.
+> This is based on top of yours.
+
+Let's just drop mine and you can take this forward.
+
+> Cheers
+> Jon
+>
+> From 33812f3bd4f7aab1154e7194b7f11fba700a5086 Mon Sep 17 00:00:00 2001
+> From: Jon Hunter <jon-hunter@ti.com>
+> Date: Thu, 25 Oct 2012 16:00:51 -0500
+> Subject: [PATCH] gpio/omap: fix clearing of debounce settings on gpio
+>  free/reset
+>
+> When a GPIO is freed or shutdown, we need to ensure that any debounce settings
+> are cleared and if the GPIO is the only GPIO in the bank that is currently
+> using debounce, then disable the debounce clock as well to save power.
+
+Since this is a fix needed for v3.7-rc, you should add a bit more here
+describing what was broken (bogus context restore, etc.)  Basically
+answering "why" to your the "we need to ensure that..." statement.
+
+> Therefore, introduce a new function called _clear_gpio_debounce() to clear
+> any debounce settings when the GPIO is freed or shutdown.
+>
+> Please note that we cannot use _gpio_dbck_disable() to disable the debounce
+> clock because this has been specifically created for the gpio suspend path
+> and is intended to shutdown the debounce clock while debounce is enabled.
+>
+> This has been unit tested on an OMAP3430 Beagle board, by requesting a gpio,
+> enabling debounce and then freeing the gpio and checking the register contents,
+> the saved register context and the debounce clock state.
+>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+
+(though not that that matters now that I've shown a high-level of
+ incompetence with this patch)  ;)
+
+Also, 
+
+Tested-by: Kevin Hilman <khilman@ti.com>
+
+When reposting for Linus W., you might make this 'v4' so that it's clear
+that it superceeds the other bungling attempts at the same fix.
+
+Thanks for following this through,
+
+Kevin
