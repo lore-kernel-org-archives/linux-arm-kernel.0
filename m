@@ -1,49 +1,76 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 25 Oct 2012 07:46:38 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <20121024233356.1bda95bf@skate>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <201210242006.55879.michael@walle.cc>
- <20121024200128.GY21046@lunn.ch> <20121024233356.1bda95bf@skate>
-Message-ID: <20121025054638.GB8590@lunn.ch>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 25 Oct 2012 13:50:46 +0800
+Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
+In-Reply-To: <1351138689.5263.68.camel@vkoul-udesk3>
+References: <1351074456-25863-1-git-send-email-b32955@freescale.com>	
+ <1351074456-25863-3-git-send-email-b32955@freescale.com>
+ <1351138689.5263.68.camel@vkoul-udesk3>
+Message-ID: <5088D336.7040206@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 11:33:56PM +0200, Thomas Petazzoni wrote:
-> Andrew,
-> 
-> On Wed, 24 Oct 2012 22:01:28 +0200, Andrew Lunn wrote:
-> 
-> > I guess it is too early to use gpio. I don't think the gpio driver has
-> > not been configured yet.
-> > 
-> > I need to think about this.
-> > 
-> > What happens if you comment out these two gpio_set_value calls?
-> 
-> The problem is (probably, I haven't tested) that in
-> mach-kirkwood/board-dt.c, the of_platform_populate() function is called
-> after all the board-specific init. So all the devices described in the
-> DT, including GPIO banks, have not been registered yet. Most likely the
-> of_platform_populate() should come before the board specific inits.
+? 2012?10?25? 12:18, Vinod Koul ??:
+>
+>> +
+>> +static int mxs_auart_dma_tx(struct mxs_auart_port *s, int size)
+>> +{
+>> +	struct dma_async_tx_descriptor *desc;
+>> +	struct scatterlist *sgl =&s->tx_sgl;
+>> +	struct dma_chan *channel = s->tx_dma_chan;
+>> +	u32 pio;
+>> +
+>> +	/* [1] : send PIO. Note, the first pio word is CTRL1. */
+>> +	pio = AUART_CTRL1_XFER_COUNT(size);
+>> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)&pio,
+>> +					1, DMA_TRANS_NONE, 0);
+> this seems like a hack. API expects a scatterlist as argument.
+> Same thing about direction, NONE doesnt mean anything for dma transfer.
+It's not a hack. this DMA descriptor is used to set the registers.
+Please see the code in drivers/dma/mxs-dma.c:mxs_dam_prep_slave_sg().
 
-Thanks Thomas, i will play around with this.
 
-I'm just wondering if we are going to get into ordering issues. These
-gpio operations are providing power to subsystems. We probably need
-that to happen before the driver is loaded. If we call
-of_platform_populate() too early, do we have the danger the driver
-probing is going to happen before the init routine can enable the
-power?
+>> +	if (!desc) {
+>> +		dev_err(s->dev, "step 1 error\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/* [2] : set DMA buffer. */
+>> +	sg_init_one(sgl, s->tx_dma_buf, size);
+>> +	dma_map_sg(s->dev, sgl, 1, DMA_TO_DEVICE);
+>> +	desc = dmaengine_prep_slave_sg(channel, sgl,
+>> +			1, DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>> +	if (!desc) {
+>> +		dev_err(s->dev, "step 2 error\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/* [3] : submit the DMA */
+>> +	desc->callback = dma_tx_callback;
+>> +	desc->callback_param = s;
+>> +	dmaengine_submit(desc);
+>> +	dma_async_issue_pending(channel);
+>> +	return 0;
+>> +}
+>> +
+>>
+>> +static bool mxs_auart_dma_filter(struct dma_chan *chan, void *param)
+>> +{
+>> +	struct mxs_auart_port *s = param;
+>> +
+>> +	if (!mxs_dma_is_apbx(chan))
+>> +		return false;
+>> +
+>> +	if (s->dma_channel == chan->chan_id) {
+>> +		chan->private =&s->dma_data;
+> dont use chan->private. You need to dmaengine_slave_config API
+please see the drivers/dma/mxs-dma.c:mxs_dam_alloc_chan_resoures().
 
-It seems like we want pinctrl/gpio working first, with pins hogged as
-specified in DT, then the board init() function, then the rest of DT
-setup.
+The mxs-dma driver uses ->private to store the channel interrupt number.
 
-> Also there should probably  be a gpio_request() before those
-> gpio_set_value().
-
-Yes. That worked before, but might break now. Most of the init()
-functions do actually make a gpip_request() call.
-
-     Andrew
+thanks
+Huang Shijie
+>> +		return true;
+>> +	}
+>> +	return false;
+>> +}
+>> +
