@@ -1,22 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 09:22:46 +0200
-Subject: [GIT PULL] first set of ux500 for ARM SoC for v3.8
-In-Reply-To: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
-References: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
-Message-ID: <CACRpkdbSx-e4q+++=chjgyt0yD_v=JOP5OrQPoXb2-EPfNnrvg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2012 08:31:27 +0100
+Subject: [PATCH 2/6] pinctrl: Update clock handling for the
+ pinctrl-nomadik GPIO driver
+In-Reply-To: <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
+References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
+ <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
+Message-ID: <20121025073127.GB971@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 8:39 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Wed, 24 Oct 2012, Linus Walleij wrote:
 
-> Hi ARM SoC folks,
->
-> here are two small commits for v3.8 that I'd like to make sure
-> land in ARM SoC before I begin with all the other stuff.
->
-> Please pull them in!
+> On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > The clock framework has changed somewhat and it's now better to
+> > invoke clock_prepare_enable() and clk_disable_unprepare() rather
+> > than the legacy clk_enable() and clk_disable() calls. This patch
+> > converts the Nomadik Pin Control driver to the new framework.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> (...)
+> > -               clk_enable(chip->clk);
+> > +               clk_prepare_enable(chip->clk);
+> (...)
+> > -               clk_disable(chip->clk);
+> > +               clk_disable_unprepare(chip->clk);
+> 
+> (Repeated for each occurence.)
+> 
+> Is this *really* causing a regression? I mean the driver
+> begin like this in nmk_gpio_probe():
+> 
+>         clk = devm_clk_get(&dev->dev, NULL);
+>         if (IS_ERR(clk)) {
+>                 ret = PTR_ERR(clk);
+>                 goto out;
+>         }
+>         clk_prepare(clk);
+> 
+> Then it leaves the clock prepared. So the clock is always
+> prepared. You would only need to enable/disable it at times.
+> 
+> And the semantics of the clk_enable/clk_disable call pair
+> is such that it is fastpath and should be real quick, and that
+> is exactly why we're using it repeatedly like that. Inserting
+> clk_unprepare() effectively could make the whole driver a
+> lot slower, so convince me on this one. ...
+> 
+> I suspect the real bug (if there is one) must be in the clock
+> implementation.
 
-Ping on this.
+This certainly doesn't fix the bug we spoke about. I believe Ulf
+is still working on that one.
 
-Yours,
-Linus Walleij
+So do you want me to remove this patch?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
