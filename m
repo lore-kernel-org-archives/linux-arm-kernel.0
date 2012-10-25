@@ -1,69 +1,72 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 25 Oct 2012 13:25:45 +0800
-Subject: [PATCH 3/3] dmaengine: sirf: enable the driver support new
- SiRFmarco SoC
-In-Reply-To: <1351138901.5263.70.camel@vkoul-udesk3>
-References: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
- <1351076581.5263.56.camel@vkoul-udesk3>
- <CAGsJ_4yY6YYKb+g4k7BcL_SyyBN9xYCwxRLX6rN5_afroK0e_g@mail.gmail.com>
- <1351138901.5263.70.camel@vkoul-udesk3>
-Message-ID: <CAGsJ_4y=sccFizQfwO-mx5GcvkgR9nWqksmuwrvSYpL+N5U1wg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 25 Oct 2012 07:29:37 +0200
+Subject: [PATCH 1/2] arm: mvebu: increase atomic coherent pool size for
+ armada 370/XP
+In-Reply-To: <1351086561-13569-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <5088CE41.7030704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/25 Vinod Koul <vkoul@infradead.org>:
-> On Wed, 2012-10-24 at 19:59 +0800, Barry Song wrote:
->> Hi Vinod,
->> Thanks a lot!
-> Please dont top post.
+Hello,
 
-well. saying hello is an exception :-)
-
->>
->> 2012/10/24 Vinod Koul <vkoul@infradead.org>
->> >
->> > On Thu, 2012-09-27 at 16:36 +0800, Barry Song wrote:
->> > > From: Barry Song <Baohua.Song@csr.com>
->> > >
->> > > The driver supports old up SiRFprimaII SoCs, this patch makes it support
->> > > the new SiRFmarco as well.
->> > > SiRFmarco, as a SMP SoC, adds new DMA_INT_EN_CLR and DMA_CH_LOOP_CTRL_CLR
->> > > registers, to disable IRQ/Channel, we should write 1 to the corresponding
->> > > bit in the two CLEAR register.
->> > >
->> > > Tested on SiRFmarco using SPI driver:
->> > >     $ /mnt/spidev-sirftest -D /dev/spidev32766.0
->> > >     spi mode: 0
->> > >     bits per word: 8
->> > >     max speed: 500000 Hz (500 KHz)
->> > >
->> > >     00 00 00 00 00 00
->> > >     00 00 00 00 00 00
->> > >     00 00 00 00 00 00
->> > >     00 00 00 00 00 00
->> > >     00 00 00 00 00 00
->> > >     00 00 00 00 00 00
->> > >     00 00 00 00
->> > >
->> > >     $ cat /proc/interrupts
->> > >                CPU0       CPU1
->> > >      32:       1593          0       GIC  sirfsoc_timer0
->> > >      33:          0       3533       GIC  sirfsoc_timer1
->> > >      44:          0          0       GIC  sirfsoc_dma
->> > >      45:         16          0       GIC  sirfsoc_dma
->> > >      47:          6          0       GIC  sirfsoc_spi
->> > >      50:       5654          0       GIC  sirfsoc-uart
->> > >      ...
->> > >
->> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> > > ---
-> I tried applying this and it failed for me. Can you please respin this
-> on my next and send again.
-
-ok
+On 10/24/2012 3:49 PM, Gregory CLEMENT wrote:
+> For Armada 370/XP we have the same problem that for the commit
+> cb01b63, so we applied the same solution: "The default 256 KiB
+> coherent pool may be too small for some of the Kirkwood devices, so
+> increase it to make sure that devices will be able to allocate their
+> buffers with GFP_ATOMIC flag"
 >
-> --
-> Vinod Koul
-> Intel Corp.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 
--barry
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+> ---
+>   arch/arm/mach-mvebu/armada-370-xp.c |   12 ++++++++++++
+>   1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+> index 2af6ce5..cbad821 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> @@ -17,6 +17,7 @@
+>   #include <linux/of_platform.h>
+>   #include <linux/io.h>
+>   #include <linux/time-armada-370-xp.h>
+> +#include <linux/dma-mapping.h>
+>   #include <asm/mach/arch.h>
+>   #include <asm/mach/map.h>
+>   #include <asm/mach/time.h>
+> @@ -43,6 +44,16 @@ void __init armada_370_xp_timer_and_clk_init(void)
+>   	armada_370_xp_timer_init();
+>   }
+>
+> +void __init armada_370_xp_init_early(void)
+> +{
+> +	/*
+> +	 * Some Armada 370/XP devices allocate their coherent buffers
+> +	 * from atomic context. Increase size of atomic coherent pool
+> +	 * to make sure such the allocations won't fail.
+> +	 */
+> +	init_dma_coherent_pool_size(SZ_1M);
+> +}
+> +
+>   struct sys_timer armada_370_xp_timer = {
+>   	.init		= armada_370_xp_timer_and_clk_init,
+>   };
+> @@ -61,6 +72,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
+>   DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
+>   	.init_machine	= armada_370_xp_dt_init,
+>   	.map_io		= armada_370_xp_map_io,
+> +	.init_early	= armada_370_xp_init_early,
+>   	.init_irq	= armada_370_xp_init_irq,
+>   	.handle_irq     = armada_370_xp_handle_irq,
+>   	.timer		= &armada_370_xp_timer,
+>
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
