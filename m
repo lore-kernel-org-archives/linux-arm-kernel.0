@@ -1,514 +1,655 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 17:21:20 -0600
-Subject: [PATCH 10/13] ARM: OMAP2+: PRCM: split and relocate the PRM/CM
- globals setup
+Date: Thu, 25 Oct 2012 17:21:17 -0600
+Subject: [PATCH 06/13] ARM: OMAP2+: board files: use SoC-specific system
+ restart functions
 In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
 References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <20121025232119.17558.41615.stgit@dusk.lan>
+Message-ID: <20121025232116.17558.72650.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split omap2_set_globals_prcm() into PRM, CM, and PRCM_MPU variants, since
-these are all separate IP blocks.  This should make it easier to move the
-PRM, CM, PRCM_MPU code into drivers/ in future patchsets.
+Modify the board files to use the SoC-specific system restart
+functions.  At this point it's possible to remove omap_prcm_restart()
+from mach-omap2/prcm.c.
 
-At this point arch/arm/plat-omap/include/plat/prcm.h is empty; a
-subsequent patch will remove it, and remove the #include from all the
-files that #include it.
+While removing the prototypes for the now-unused restart functions, clean
+up a few more obsolete prototypes in mach-omap2/clock.h.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |    2 +
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |    2 +
- arch/arm/mach-omap2/cm.h                     |    8 ++++
- arch/arm/mach-omap2/cm2xxx_3xxx.h            |    2 +
- arch/arm/mach-omap2/cm_common.c              |   22 +++++++++++
- arch/arm/mach-omap2/cminst44xx.h             |    2 +
- arch/arm/mach-omap2/io.c                     |   51 ++++++++++++++------------
- arch/arm/mach-omap2/mcbsp.c                  |    2 +
- arch/arm/mach-omap2/omap4-common.c           |    1 +
- arch/arm/mach-omap2/prcm-common.h            |   16 --------
- arch/arm/mach-omap2/prcm.c                   |   19 ----------
- arch/arm/mach-omap2/prcm_mpu44xx.c           |   17 +++++++++
- arch/arm/mach-omap2/prcm_mpu44xx.h           |    9 ++++-
- arch/arm/mach-omap2/prm.h                    |    7 +++-
- arch/arm/mach-omap2/prm_common.c             |   15 ++++++++
- arch/arm/mach-omap2/prminst44xx.h            |    2 +
- arch/arm/plat-omap/include/plat/prcm.h       |    6 +--
- 17 files changed, 111 insertions(+), 72 deletions(-)
+ arch/arm/mach-omap2/board-2430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-3430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-3630sdp.c        |    2 +
+ arch/arm/mach-omap2/board-4430sdp.c        |    2 +
+ arch/arm/mach-omap2/board-am3517crane.c    |    2 +
+ arch/arm/mach-omap2/board-am3517evm.c      |    2 +
+ arch/arm/mach-omap2/board-apollon.c        |    2 +
+ arch/arm/mach-omap2/board-cm-t35.c         |   18 +++++-----
+ arch/arm/mach-omap2/board-cm-t3517.c       |    2 +
+ arch/arm/mach-omap2/board-devkit8000.c     |    2 +
+ arch/arm/mach-omap2/board-generic.c        |   10 +++--
+ arch/arm/mach-omap2/board-h4.c             |    2 +
+ arch/arm/mach-omap2/board-igep0020.c       |    4 +-
+ arch/arm/mach-omap2/board-ldp.c            |    2 +
+ arch/arm/mach-omap2/board-n8x0.c           |    6 ++-
+ arch/arm/mach-omap2/board-omap3beagle.c    |    2 +
+ arch/arm/mach-omap2/board-omap3evm.c       |    2 +
+ arch/arm/mach-omap2/board-omap3logic.c     |    4 +-
+ arch/arm/mach-omap2/board-omap3pandora.c   |    2 +
+ arch/arm/mach-omap2/board-omap3stalker.c   |    2 +
+ arch/arm/mach-omap2/board-omap3touchbook.c |    2 +
+ arch/arm/mach-omap2/board-omap4panda.c     |    2 +
+ arch/arm/mach-omap2/board-overo.c          |    2 +
+ arch/arm/mach-omap2/board-rm680.c          |    4 +-
+ arch/arm/mach-omap2/board-rx51.c           |    2 +
+ arch/arm/mach-omap2/board-ti8168evm.c      |    4 +-
+ arch/arm/mach-omap2/board-zoom.c           |    4 +-
+ arch/arm/mach-omap2/clock.h                |   28 ---------------
+ arch/arm/mach-omap2/clock2420_data.c       |    4 --
+ arch/arm/mach-omap2/clock2430_data.c       |    4 --
+ arch/arm/mach-omap2/clock2xxx.c            |   16 ---------
+ arch/arm/mach-omap2/common.h               |    1 -
+ arch/arm/mach-omap2/prcm.c                 |   52 ----------------------------
+ 33 files changed, 46 insertions(+), 151 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-index 38a06d9..53d45bc 100644
---- a/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_dpllcore.c
-@@ -32,7 +32,7 @@
- #include "clock.h"
- #include "clock2xxx.h"
- #include "opp2xxx.h"
--#include "cm2xxx_3xxx.h"
-+#include "cm2xxx.h"
- #include "cm-regbits-24xx.h"
+diff --git a/arch/arm/mach-omap2/board-2430sdp.c b/arch/arm/mach-omap2/board-2430sdp.c
+index 95b384d..abfcf6a 100644
+--- a/arch/arm/mach-omap2/board-2430sdp.c
++++ b/arch/arm/mach-omap2/board-2430sdp.c
+@@ -287,5 +287,5 @@ MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
+ 	.init_machine	= omap_2430sdp_init,
+ 	.init_late	= omap2430_init_late,
+ 	.timer		= &omap2_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+index 96cd369..497a7ac 100644
+--- a/arch/arm/mach-omap2/board-3430sdp.c
++++ b/arch/arm/mach-omap2/board-3430sdp.c
+@@ -597,5 +597,5 @@ MACHINE_START(OMAP_3430SDP, "OMAP3430 3430SDP board")
+ 	.init_machine	= omap_3430sdp_init,
+ 	.init_late	= omap3430_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-3630sdp.c b/arch/arm/mach-omap2/board-3630sdp.c
+index fc224ad..3ffcc15 100644
+--- a/arch/arm/mach-omap2/board-3630sdp.c
++++ b/arch/arm/mach-omap2/board-3630sdp.c
+@@ -213,5 +213,5 @@ MACHINE_START(OMAP_3630SDP, "OMAP 3630SDP board")
+ 	.init_machine	= omap_sdp_init,
+ 	.init_late	= omap3630_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 3669c12..e26b6e4 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -881,5 +881,5 @@ MACHINE_START(OMAP_4430SDP, "OMAP4430 4430SDP board")
+ 	.init_machine	= omap_4430sdp_init,
+ 	.init_late	= omap4430_init_late,
+ 	.timer		= &omap4_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
+index 318fead..9c52315 100644
+--- a/arch/arm/mach-omap2/board-am3517crane.c
++++ b/arch/arm/mach-omap2/board-am3517crane.c
+@@ -94,5 +94,5 @@ MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
+ 	.init_machine	= am3517_crane_init,
+ 	.init_late	= am35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-am3517evm.c b/arch/arm/mach-omap2/board-am3517evm.c
+index e162897..24192aaa7 100644
+--- a/arch/arm/mach-omap2/board-am3517evm.c
++++ b/arch/arm/mach-omap2/board-am3517evm.c
+@@ -393,5 +393,5 @@ MACHINE_START(OMAP3517EVM, "OMAP3517/AM3517 EVM")
+ 	.init_machine	= am3517_evm_init,
+ 	.init_late	= am35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-apollon.c b/arch/arm/mach-omap2/board-apollon.c
+index cea3aba..e753792 100644
+--- a/arch/arm/mach-omap2/board-apollon.c
++++ b/arch/arm/mach-omap2/board-apollon.c
+@@ -338,5 +338,5 @@ MACHINE_START(OMAP_APOLLON, "OMAP24xx Apollon")
+ 	.init_machine	= omap_apollon_init,
+ 	.init_late	= omap2420_init_late,
+ 	.timer		= &omap2_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index 376d26e..03bc0b5 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -753,18 +753,18 @@ MACHINE_START(CM_T35, "Compulab CM-T35")
+ 	.init_machine	= cm_t35_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
  
- /* #define DOWN_VARIABLE_DPLL 1 */		/* Experimental */
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index f9c71f3..18ef044 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -41,7 +41,7 @@
- #include "clock.h"
- #include "clock2xxx.h"
- #include "opp2xxx.h"
--#include "cm2xxx_3xxx.h"
-+#include "cm2xxx.h"
- #include "cm-regbits-24xx.h"
- 
- const struct prcm_config *curr_prcm_set;
-diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
-index e419ecb..93473f9 100644
---- a/arch/arm/mach-omap2/cm.h
-+++ b/arch/arm/mach-omap2/cm.h
-@@ -1,7 +1,7 @@
- /*
-  * OMAP2+ Clock Management prototypes
-  *
-- * Copyright (C) 2007-2009 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2009, 2012 Texas Instruments, Inc.
-  * Copyright (C) 2007-2009 Nokia Corporation
-  *
-  * Written by Paul Walmsley
-@@ -22,6 +22,12 @@
-  */
- #define MAX_MODULE_READY_TIME		2000
- 
-+# ifndef __ASSEMBLER__
-+extern void __iomem *cm_base;
-+extern void __iomem *cm2_base;
-+extern void omap2_set_globals_cm(void __iomem *cm, void __iomem *cm2);
-+# endif
-+
- /*
-  * MAX_MODULE_DISABLE_TIME: max duration in microseconds to wait for
-  * the PRCM to request that a module enter the inactive state in the
-diff --git a/arch/arm/mach-omap2/cm2xxx_3xxx.h b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-index f74a5d1..98e6b3c 100644
---- a/arch/arm/mach-omap2/cm2xxx_3xxx.h
-+++ b/arch/arm/mach-omap2/cm2xxx_3xxx.h
-@@ -16,7 +16,7 @@
- #ifndef __ARCH_ASM_MACH_OMAP2_CM2XXX_3XXX_H
- #define __ARCH_ASM_MACH_OMAP2_CM2XXX_3XXX_H
- 
--#include "prcm-common.h"
-+#include "cm.h"
- 
- /*
-  * Module specific CM register offsets from CM_BASE + domain offset
-diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
-index 561969b..0bab493 100644
---- a/arch/arm/mach-omap2/cm_common.c
-+++ b/arch/arm/mach-omap2/cm_common.c
-@@ -2,7 +2,7 @@
-  * OMAP2+ common Clock Management (CM) IP block functions
-  *
-  * Copyright (C) 2012 Texas Instruments, Inc.
-- * Paul Walmsley <paul@pwsan.com>
-+ * Paul Walmsley
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -17,6 +17,7 @@
- #include "cm2xxx.h"
- #include "cm3xxx.h"
- #include "cm44xx.h"
-+#include "common.h"
- 
- /*
-  * cm_ll_data: function pointers to SoC-specific implementations of
-@@ -25,6 +26,25 @@
- static struct cm_ll_data null_cm_ll_data;
- static struct cm_ll_data *cm_ll_data = &null_cm_ll_data;
- 
-+/* cm_base: base virtual address of the CM IP block */
-+void __iomem *cm_base;
-+
-+/* cm2_base: base virtual address of the CM2 IP block (OMAP44xx only) */
-+void __iomem *cm2_base;
-+
-+/**
-+ * omap2_set_globals_cm - set the CM/CM2 base addresses (for early use)
-+ * @cm: CM base virtual address
-+ * @cm2: CM2 base virtual address (if present on the booted SoC)
-+ *
-+ * XXX Will be replaced when the PRM/CM drivers are completed.
-+ */
-+void __init omap2_set_globals_cm(void __iomem *cm, void __iomem *cm2)
-+{
-+	cm_base = cm;
-+	cm2_base = cm2;
-+}
-+
- /**
-  * cm_split_idlest_reg - split CM_IDLEST reg addr into its components
-  * @idlest_reg: CM_IDLEST* virtual address
-diff --git a/arch/arm/mach-omap2/cminst44xx.h b/arch/arm/mach-omap2/cminst44xx.h
-index d69fdef..bd7bab8 100644
---- a/arch/arm/mach-omap2/cminst44xx.h
-+++ b/arch/arm/mach-omap2/cminst44xx.h
-@@ -38,4 +38,6 @@ extern u32 omap4_cminst_clear_inst_reg_bits(u32 bits, u8 part, s16 inst,
- extern u32 omap4_cminst_read_inst_reg_bits(u8 part, u16 inst, s16 idx,
- 					   u32 mask);
- 
-+extern void omap_cm_base_init(void);
-+
+ MACHINE_START(CM_T3730, "Compulab CM-T3730")
+-	.atag_offset    = 0x100,
+-	.reserve        = omap_reserve,
+-	.map_io         = omap3_map_io,
+-	.init_early     = omap3630_init_early,
+-	.init_irq       = omap3_init_irq,
++	.atag_offset	= 0x100,
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= omap3630_init_early,
++	.init_irq	= omap3_init_irq,
+ 	.handle_irq	= omap3_intc_handle_irq,
+-	.init_machine   = cm_t3730_init,
++	.init_machine	= cm_t3730_init,
+ 	.init_late     = omap3630_init_late,
+-	.timer          = &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.timer		= &omap3_timer,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+index 59c0a45..87202ad 100644
+--- a/arch/arm/mach-omap2/board-cm-t3517.c
++++ b/arch/arm/mach-omap2/board-cm-t3517.c
+@@ -298,5 +298,5 @@ MACHINE_START(CM_T3517, "Compulab CM-T3517")
+ 	.init_machine	= cm_t3517_init,
+ 	.init_late	= am35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
+index 1fd161e..74099e6 100644
+--- a/arch/arm/mach-omap2/board-devkit8000.c
++++ b/arch/arm/mach-omap2/board-devkit8000.c
+@@ -640,5 +640,5 @@ MACHINE_START(DEVKIT8000, "OMAP3 Devkit8000")
+ 	.init_machine	= devkit8000_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_secure_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 601ecdf..475e14f 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -57,7 +57,7 @@ DT_MACHINE_START(OMAP242X_DT, "Generic OMAP2420 (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap2_timer,
+ 	.dt_compat	= omap242x_boards_compat,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
  #endif
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index a52d399..8573e6c 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -48,7 +48,11 @@
- #include "control.h"
- #include "cm2xxx.h"
- #include "cm3xxx.h"
+ 
+@@ -76,7 +76,7 @@ DT_MACHINE_START(OMAP243X_DT, "Generic OMAP2430 (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap2_timer,
+ 	.dt_compat	= omap243x_boards_compat,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+ #endif
+ 
+@@ -95,7 +95,7 @@ DT_MACHINE_START(OMAP3_DT, "Generic OMAP3 (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap3_timer,
+ 	.dt_compat	= omap3_boards_compat,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+ #endif
+ 
+@@ -134,7 +134,7 @@ DT_MACHINE_START(OMAP4_DT, "Generic OMAP4 (Flattened Device Tree)")
+ 	.init_late	= omap4430_init_late,
+ 	.timer		= &omap4_timer,
+ 	.dt_compat	= omap4_boards_compat,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+ #endif
+ 
+@@ -154,6 +154,6 @@ DT_MACHINE_START(OMAP5_DT, "Generic OMAP5 (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap5_timer,
+ 	.dt_compat	= omap5_boards_compat,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+ #endif
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index 8d04bf8..a65942e 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -386,5 +386,5 @@ MACHINE_START(OMAP_H4, "OMAP2420 H4 board")
+ 	.init_machine	= omap_h4_init,
+ 	.init_late	= omap2420_init_late,
+ 	.timer		= &omap2_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index 48d5e41..8734c0d 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -652,7 +652,7 @@ MACHINE_START(IGEP0020, "IGEP v2 board")
+ 	.init_machine	= igep_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(IGEP0030, "IGEP OMAP3 module")
+@@ -665,5 +665,5 @@ MACHINE_START(IGEP0030, "IGEP OMAP3 module")
+ 	.init_machine	= igep_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
+index ee8c3cf..6d2892c 100644
+--- a/arch/arm/mach-omap2/board-ldp.c
++++ b/arch/arm/mach-omap2/board-ldp.c
+@@ -437,5 +437,5 @@ MACHINE_START(OMAP_LDP, "OMAP LDP board")
+ 	.init_machine	= omap_ldp_init,
+ 	.init_late	= omap3430_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-n8x0.c b/arch/arm/mach-omap2/board-n8x0.c
+index d95f727..dd71764 100644
+--- a/arch/arm/mach-omap2/board-n8x0.c
++++ b/arch/arm/mach-omap2/board-n8x0.c
+@@ -689,7 +689,7 @@ MACHINE_START(NOKIA_N800, "Nokia N800")
+ 	.init_machine	= n8x0_init_machine,
+ 	.init_late	= omap2420_init_late,
+ 	.timer		= &omap2_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(NOKIA_N810, "Nokia N810")
+@@ -702,7 +702,7 @@ MACHINE_START(NOKIA_N810, "Nokia N810")
+ 	.init_machine	= n8x0_init_machine,
+ 	.init_late	= omap2420_init_late,
+ 	.timer		= &omap2_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(NOKIA_N810_WIMAX, "Nokia N810 WiMAX")
+@@ -715,5 +715,5 @@ MACHINE_START(NOKIA_N810_WIMAX, "Nokia N810 WiMAX")
+ 	.init_machine	= n8x0_init_machine,
+ 	.init_late	= omap2420_init_late,
+ 	.timer		= &omap2_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap2xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 388c431..42e8bdd 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -537,5 +537,5 @@ MACHINE_START(OMAP3_BEAGLE, "OMAP3 Beagle Board")
+ 	.init_machine	= omap3_beagle_init,
+ 	.init_late	= omap3_init_late,
+ 	.timer		= &omap3_secure_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3evm.c b/arch/arm/mach-omap2/board-omap3evm.c
+index b9b776b..8a3cc9d 100644
+--- a/arch/arm/mach-omap2/board-omap3evm.c
++++ b/arch/arm/mach-omap2/board-omap3evm.c
+@@ -752,5 +752,5 @@ MACHINE_START(OMAP3EVM, "OMAP3 EVM")
+ 	.init_machine	= omap3_evm_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3logic.c b/arch/arm/mach-omap2/board-omap3logic.c
+index 7bd8253..5eed5db 100644
+--- a/arch/arm/mach-omap2/board-omap3logic.c
++++ b/arch/arm/mach-omap2/board-omap3logic.c
+@@ -235,7 +235,7 @@ MACHINE_START(OMAP3_TORPEDO, "Logic OMAP3 Torpedo board")
+ 	.init_machine	= omap3logic_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(OMAP3530_LV_SOM, "OMAP Logic 3530 LV SOM board")
+@@ -248,5 +248,5 @@ MACHINE_START(OMAP3530_LV_SOM, "OMAP Logic 3530 LV SOM board")
+ 	.init_machine	= omap3logic_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
+index 00a1f4a..23bf060 100644
+--- a/arch/arm/mach-omap2/board-omap3pandora.c
++++ b/arch/arm/mach-omap2/board-omap3pandora.c
+@@ -619,5 +619,5 @@ MACHINE_START(OMAP3_PANDORA, "Pandora Handheld Console")
+ 	.init_machine	= omap3pandora_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3stalker.c b/arch/arm/mach-omap2/board-omap3stalker.c
+index 731235e..4d65d7e 100644
+--- a/arch/arm/mach-omap2/board-omap3stalker.c
++++ b/arch/arm/mach-omap2/board-omap3stalker.c
+@@ -428,5 +428,5 @@ MACHINE_START(SBC3530, "OMAP3 STALKER")
+ 	.init_machine		= omap3_stalker_init,
+ 	.init_late		= omap35xx_init_late,
+ 	.timer			= &omap3_secure_timer,
+-	.restart		= omap_prcm_restart,
++	.restart		= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap3touchbook.c b/arch/arm/mach-omap2/board-omap3touchbook.c
+index 944ffc4..efcb46f 100644
+--- a/arch/arm/mach-omap2/board-omap3touchbook.c
++++ b/arch/arm/mach-omap2/board-omap3touchbook.c
+@@ -384,5 +384,5 @@ MACHINE_START(TOUCHBOOK, "OMAP3 touchbook Board")
+ 	.init_machine	= omap3_touchbook_init,
+ 	.init_late	= omap3430_init_late,
+ 	.timer		= &omap3_secure_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index bfcd397..c5131d1 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -524,5 +524,5 @@ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
+ 	.init_machine	= omap4_panda_init,
+ 	.init_late	= omap4430_init_late,
+ 	.timer		= &omap4_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index b700685..fcd5147 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -550,5 +550,5 @@ MACHINE_START(OVERO, "Gumstix Overo")
+ 	.init_machine	= overo_init,
+ 	.init_late	= omap35xx_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-rm680.c b/arch/arm/mach-omap2/board-rm680.c
+index 45997bf..5074879 100644
+--- a/arch/arm/mach-omap2/board-rm680.c
++++ b/arch/arm/mach-omap2/board-rm680.c
+@@ -151,7 +151,7 @@ MACHINE_START(NOKIA_RM680, "Nokia RM-680 board")
+ 	.init_machine	= rm680_init,
+ 	.init_late	= omap3630_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(NOKIA_RM696, "Nokia RM-696 board")
+@@ -164,5 +164,5 @@ MACHINE_START(NOKIA_RM696, "Nokia RM-696 board")
+ 	.init_machine	= rm680_init,
+ 	.init_late	= omap3630_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 7bbb05d..237f98b 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -127,5 +127,5 @@ MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+ 	.init_machine	= rx51_init,
+ 	.init_late	= omap3430_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-ti8168evm.c b/arch/arm/mach-omap2/board-ti8168evm.c
+index c4f8833..4385fbb 100644
+--- a/arch/arm/mach-omap2/board-ti8168evm.c
++++ b/arch/arm/mach-omap2/board-ti8168evm.c
+@@ -45,7 +45,7 @@ MACHINE_START(TI8168EVM, "ti8168evm")
+ 	.timer		= &omap3_timer,
+ 	.init_machine	= ti81xx_evm_init,
+ 	.init_late	= ti81xx_init_late,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(TI8148EVM, "ti8148evm")
+@@ -57,5 +57,5 @@ MACHINE_START(TI8148EVM, "ti8148evm")
+ 	.timer		= &omap3_timer,
+ 	.init_machine	= ti81xx_evm_init,
+ 	.init_late	= ti81xx_init_late,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap44xx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
+index 4994438..a93106b 100644
+--- a/arch/arm/mach-omap2/board-zoom.c
++++ b/arch/arm/mach-omap2/board-zoom.c
+@@ -138,7 +138,7 @@ MACHINE_START(OMAP_ZOOM2, "OMAP Zoom2 board")
+ 	.init_machine	= omap_zoom_init,
+ 	.init_late	= omap3430_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+ 
+ MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
+@@ -151,5 +151,5 @@ MACHINE_START(OMAP_ZOOM3, "OMAP Zoom3 board")
+ 	.init_machine	= omap_zoom_init,
+ 	.init_late	= omap3630_init_late,
+ 	.timer		= &omap3_timer,
+-	.restart	= omap_prcm_restart,
++	.restart	= omap3xxx_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-omap2/clock.h b/arch/arm/mach-omap2/clock.h
+index 35ec5f3..32b6796 100644
+--- a/arch/arm/mach-omap2/clock.h
++++ b/arch/arm/mach-omap2/clock.h
+@@ -94,33 +94,6 @@ extern void omap2_clkt_iclk_deny_idle(struct clk *clk);
+ u32 omap2_get_dpll_rate(struct clk *clk);
+ void omap2_init_dpll_parent(struct clk *clk);
+ 
+-int omap2_wait_clock_ready(void __iomem *reg, u32 cval, const char *name);
 -
-+#include "prm.h"
-+#include "cm.h"
-+#include "prcm_mpu44xx.h"
-+#include "prminst44xx.h"
-+#include "cminst44xx.h"
- /*
-  * The machine specific code may provide the extra mapping besides the
-  * default mapping provided here.
-@@ -387,9 +391,8 @@ void __init omap2420_init_early(void)
- 			       OMAP2_L3_IO_ADDRESS(OMAP2420_SMS_BASE));
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP242X_CTRL_BASE),
- 				  NULL);
--	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE),
--			       NULL, NULL);
-+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2420_PRM_BASE));
-+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE), NULL);
- 	omap2xxx_check_revision();
- 	omap2xxx_cm_init();
- 	omap_common_init_early();
-@@ -417,9 +420,8 @@ void __init omap2430_init_early(void)
- 			       OMAP2_L3_IO_ADDRESS(OMAP243X_SMS_BASE));
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP243X_CTRL_BASE),
- 				  NULL);
--	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE),
--			       NULL, NULL);
-+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP2430_PRM_BASE));
-+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE), NULL);
- 	omap2xxx_check_revision();
- 	omap2xxx_cm_init();
- 	omap_common_init_early();
-@@ -451,9 +453,8 @@ void __init omap3_init_early(void)
- 			       OMAP2_L3_IO_ADDRESS(OMAP343X_SMS_BASE));
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP343X_CTRL_BASE),
- 				  NULL);
--	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE),
--			       NULL, NULL);
-+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP3430_PRM_BASE));
-+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP3430_CM_BASE), NULL);
- 	omap3xxx_check_revision();
- 	omap3xxx_check_features();
- 	omap3xxx_cm_init();
-@@ -492,9 +493,8 @@ void __init ti81xx_init_early(void)
- 			      OMAP2_L4_IO_ADDRESS(TI81XX_TAP_BASE));
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(TI81XX_CTRL_BASE),
- 				  NULL);
--	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
--			       OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE),
--			       NULL, NULL);
-+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE));
-+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(TI81XX_PRCM_BASE), NULL);
- 	omap3xxx_check_revision();
- 	ti81xx_check_features();
- 	omap_common_init_early();
-@@ -556,9 +556,8 @@ void __init am33xx_init_early(void)
- 			      AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE));
- 	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
- 				  NULL);
--	omap2_set_globals_prcm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
--			       AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE),
--			       NULL, NULL);
-+	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE));
-+	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
- 	omap3xxx_check_revision();
- 	ti81xx_check_features();
- 	omap_common_init_early();
-@@ -578,10 +577,12 @@ void __init omap4430_init_early(void)
- 			      OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE));
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP443X_SCM_BASE),
- 				  OMAP2_L4_IO_ADDRESS(OMAP443X_CTRL_BASE));
--	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
-+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP4430_PRM_BASE));
-+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP4430_CM_BASE),
-+			     OMAP2_L4_IO_ADDRESS(OMAP4430_CM2_BASE));
-+	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP4430_PRCM_MPU_BASE));
-+	omap_prm_base_init();
-+	omap_cm_base_init();
- 	omap4xxx_check_revision();
- 	omap4xxx_check_features();
- 	omap_common_init_early();
-@@ -608,10 +609,12 @@ void __init omap5_init_early(void)
- 			      OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE));
- 	omap2_set_globals_control(OMAP2_L4_IO_ADDRESS(OMAP54XX_SCM_BASE),
- 				  OMAP2_L4_IO_ADDRESS(OMAP54XX_CTRL_BASE));
--	omap2_set_globals_prcm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE),
--			       OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
-+	omap2_set_globals_prm(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRM_BASE));
-+	omap2_set_globals_cm(OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_AON_BASE),
-+			     OMAP2_L4_IO_ADDRESS(OMAP54XX_CM_CORE_BASE));
-+	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
-+	omap_prm_base_init();
-+	omap_cm_base_init();
- 	omap5xxx_check_revision();
- 	omap_common_init_early();
- }
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index 37f8f94..3e6e3e9 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -28,7 +28,7 @@
-  * FIXME: Find a mechanism to enable/disable runtime the McBSP ICLK autoidle.
-  * Sidetone needs non-gated ICLK and sidetone autoidle is broken.
-  */
--#include "cm2xxx_3xxx.h"
-+#include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
- 
- static int omap3_enable_st_clock(unsigned int id, bool enable)
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 5348788..f207f88 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -36,6 +36,7 @@
- #include "common.h"
- #include "hsmmc.h"
- #include "prminst44xx.h"
-+#include "prcm_mpu44xx.h"
- #include "omap4-sar-layout.h"
- 
- #ifdef CONFIG_CACHE_L2X0
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index 72df974..b25a32a 100644
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -421,22 +421,6 @@
- #define MAX_IOPAD_LATCH_TIME			100
- 
- # ifndef __ASSEMBLER__
--extern void __iomem *prm_base;
--extern void __iomem *cm_base;
--extern void __iomem *cm2_base;
--extern void __iomem *prcm_mpu_base;
 -
--#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
--extern void omap_prm_base_init(void);
--extern void omap_cm_base_init(void);
+-#ifdef CONFIG_ARCH_OMAP2
+-void omap2xxx_clk_prepare_for_reboot(void);
 -#else
--static inline void omap_prm_base_init(void)
--{
--}
--static inline void omap_cm_base_init(void)
+-static inline void omap2xxx_clk_prepare_for_reboot(void)
 -{
 -}
 -#endif
+-
+-#ifdef CONFIG_ARCH_OMAP3
+-void omap3_clk_prepare_for_reboot(void);
+-#else
+-static inline void omap3_clk_prepare_for_reboot(void)
+-{
+-}
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP4
+-void omap4_clk_prepare_for_reboot(void);
+-#else
+-static inline void omap4_clk_prepare_for_reboot(void)
+-{
+-}
+-#endif
+-
+ int omap2_dflt_clk_enable(struct clk *clk);
+ void omap2_dflt_clk_disable(struct clk *clk);
+ void omap2_clk_dflt_find_companion(struct clk *clk, void __iomem **other_reg,
+@@ -139,7 +112,6 @@ extern const struct clkops clkops_dummy;
+ extern const struct clkops clkops_omap2_dflt;
  
- /**
-  * struct omap_prcm_irq - describes a PRCM interrupt bit
+ extern struct clk_functions omap2_clk_functions;
+-extern struct clk *vclk, *sclk;
+ 
+ extern const struct clksel_rate gpt_32k_rates[];
+ extern const struct clksel_rate gpt_sys_rates[];
+diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
+index 0cae0f5..405a07a 100644
+--- a/arch/arm/mach-omap2/clock2420_data.c
++++ b/arch/arm/mach-omap2/clock2420_data.c
+@@ -1972,10 +1972,6 @@ int __init omap2420_clk_init(void)
+ 	 */
+ 	clk_enable_init_clocks();
+ 
+-	/* Avoid sleeping sleeping during omap2_clk_prepare_for_reboot() */
+-	vclk = clk_get(NULL, "virt_prcm_set");
+-	sclk = clk_get(NULL, "sys_ck");
+-
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
+index 0c4f719..0664fc3 100644
+--- a/arch/arm/mach-omap2/clock2430_data.c
++++ b/arch/arm/mach-omap2/clock2430_data.c
+@@ -2071,10 +2071,6 @@ int __init omap2430_clk_init(void)
+ 	 */
+ 	clk_enable_init_clocks();
+ 
+-	/* Avoid sleeping sleeping during omap2_clk_prepare_for_reboot() */
+-	vclk = clk_get(NULL, "virt_prcm_set");
+-	sclk = clk_get(NULL, "sys_ck");
+-
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-omap2/clock2xxx.c b/arch/arm/mach-omap2/clock2xxx.c
+index 0e71fc2..d830bf9 100644
+--- a/arch/arm/mach-omap2/clock2xxx.c
++++ b/arch/arm/mach-omap2/clock2xxx.c
+@@ -30,27 +30,11 @@
+ #include "cm.h"
+ #include "cm-regbits-24xx.h"
+ 
+-struct clk *vclk, *sclk;
+-
+ /*
+  * Omap24xx specific clock functions
+  */
+ 
+ /*
+- * Set clocks for bypass mode for reboot to work.
+- */
+-void omap2xxx_clk_prepare_for_reboot(void)
+-{
+-	u32 rate;
+-
+-	if (vclk == NULL || sclk == NULL)
+-		return;
+-
+-	rate = clk_get_rate(sclk);
+-	clk_set_rate(vclk, rate);
+-}
+-
+-/*
+  * Switch the MPU rate if specified on cmdline.  We cannot do this
+  * early until cmdline is parsed.  XXX This should be removed from the
+  * clock code and handled by the OPP layer code in the near future.
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index 06dff1a..abd7465 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -114,7 +114,6 @@ void am35xx_init_late(void);
+ void ti81xx_init_late(void);
+ void omap4430_init_late(void);
+ int omap2_common_pm_late_init(void);
+-void omap_prcm_restart(char, const char *);
+ void omap2xxx_restart(char, const char *);
+ void omap3xxx_restart(char, const char *);
+ void omap44xx_restart(char, const char *);
 diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 827769c..8a603fe 100644
+index 118dc87..8cb55d3 100644
 --- a/arch/arm/mach-omap2/prcm.c
 +++ b/arch/arm/mach-omap2/prcm.c
-@@ -39,25 +39,6 @@
- #include "prm-regbits-44xx.h"
- #include "control.h"
+@@ -46,58 +46,6 @@ void __iomem *prcm_mpu_base;
  
--void __iomem *prm_base;
--void __iomem *cm_base;
--void __iomem *cm2_base;
--void __iomem *prcm_mpu_base;
--
--
--void __init omap2_set_globals_prcm(void __iomem *prm, void __iomem *cm,
--				   void __iomem *cm2, void __iomem *prcm_mpu)
+ #define MAX_MODULE_ENABLE_WAIT		100000
+ 
+-/* Resets clock rates and reboots the system. Only called from system.h */
+-void omap_prcm_restart(char mode, const char *cmd)
 -{
--	prm_base = prm;
--	cm_base = cm;
--	cm2_base = cm2;
--	prcm_mpu_base = prcm_mpu;
+-	s16 prcm_offs = 0;
 -
--	if (cpu_is_omap44xx() || soc_is_omap54xx()) {
--		omap_prm_base_init();
--		omap_cm_base_init();
+-	if (cpu_is_omap24xx()) {
+-		omap2xxx_clk_prepare_for_reboot();
+-
+-		prcm_offs = WKUP_MOD;
+-	} else if (cpu_is_omap34xx()) {
+-		prcm_offs = OMAP3430_GR_MOD;
+-		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+-	} else if (cpu_is_omap44xx()) {
+-		omap4_prminst_global_warm_sw_reset(); /* never returns */
+-	} else {
+-		WARN_ON(1);
 -	}
--}
- 
- /*
-  * Stubbed functions so that common files continue to build when
-diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.c b/arch/arm/mach-omap2/prcm_mpu44xx.c
-index 928dbd4..c30e44a 100644
---- a/arch/arm/mach-omap2/prcm_mpu44xx.c
-+++ b/arch/arm/mach-omap2/prcm_mpu44xx.c
-@@ -20,6 +20,12 @@
- #include "prcm_mpu44xx.h"
- #include "cm-regbits-44xx.h"
- 
-+/*
-+ * prcm_mpu_base: the virtual address of the start of the PRCM_MPU IP
-+ *   block registers
-+ */
-+void __iomem *prcm_mpu_base;
-+
- /* PRCM_MPU low-level functions */
- 
- u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 reg)
-@@ -43,3 +49,14 @@ u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 reg)
- 
- 	return v;
- }
-+
-+/**
-+ * omap2_set_globals_prcm_mpu - set the MPU PRCM base address (for early use)
-+ * @prcm_mpu: PRCM_MPU base virtual address
-+ *
-+ * XXX Will be replaced when the PRM/CM drivers are completed.
-+ */
-+void __init omap2_set_globals_prcm_mpu(void __iomem *prcm_mpu)
-+{
-+	prcm_mpu_base = prcm_mpu;
-+}
-diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
-index 8a6e250..884af7b 100644
---- a/arch/arm/mach-omap2/prcm_mpu44xx.h
-+++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
-@@ -1,7 +1,7 @@
- /*
-  * OMAP44xx PRCM MPU instance offset macros
-  *
-- * Copyright (C) 2010 Texas Instruments, Inc.
-+ * Copyright (C) 2010, 2012 Texas Instruments, Inc.
-  * Copyright (C) 2010 Nokia Corporation
-  *
-  * Paul Walmsley (paul at pwsan.com)
-@@ -25,6 +25,12 @@
- #ifndef __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
- #define __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
- 
-+#include "common.h"
-+
-+# ifndef __ASSEMBLER__
-+extern void __iomem *prcm_mpu_base;
-+# endif
-+
- #define OMAP4430_PRCM_MPU_BASE			0x48243000
- 
- #define OMAP44XX_PRCM_MPU_REGADDR(inst, reg)				\
-@@ -98,6 +104,7 @@ extern u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 idx);
- extern void omap4_prcm_mpu_write_inst_reg(u32 val, s16 inst, u16 idx);
- extern u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst,
- 					    s16 idx);
-+extern void __init omap2_set_globals_prcm_mpu(void __iomem *prcm_mpu);
- # endif
- 
- #endif
-diff --git a/arch/arm/mach-omap2/prm.h b/arch/arm/mach-omap2/prm.h
-index c30ab5d..fb7dee2 100644
---- a/arch/arm/mach-omap2/prm.h
-+++ b/arch/arm/mach-omap2/prm.h
-@@ -1,7 +1,7 @@
- /*
-  * OMAP2/3/4 Power/Reset Management (PRM) bitfield definitions
-  *
-- * Copyright (C) 2007-2009 Texas Instruments, Inc.
-+ * Copyright (C) 2007-2009, 2012 Texas Instruments, Inc.
-  * Copyright (C) 2010 Nokia Corporation
-  *
-  * Paul Walmsley
-@@ -15,6 +15,11 @@
- 
- #include "prcm-common.h"
- 
-+# ifndef __ASSEMBLER__
-+extern void __iomem *prm_base;
-+extern void omap2_set_globals_prm(void __iomem *prm);
-+# endif
-+
- /*
-  * 24XX: PM_PWSTST_CORE, PM_PWSTST_GFX, PM_PWSTST_MPU, PM_PWSTST_DSP
-  *
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index e200e4f..c089246 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -31,6 +31,7 @@
- #include "prm2xxx.h"
- #include "prm3xxx.h"
- #include "prm44xx.h"
-+#include "common.h"
- 
- /*
-  * OMAP_PRCM_MAX_NR_PENDING_REG: maximum number of PRM_IRQ*_MPU regs
-@@ -55,6 +56,9 @@ static struct irq_chip_generic **prcm_irq_chips;
-  */
- static struct omap_prcm_irq_setup *prcm_irq_setup;
- 
-+/* prm_base: base virtual address of the PRM IP block */
-+void __iomem *prm_base;
-+
- /*
-  * prm_ll_data: function pointers to SoC-specific implementations of
-  * common PRM functions
-@@ -329,6 +333,17 @@ err:
- }
- 
- /**
-+ * omap2_set_globals_prm - set the PRM base address (for early use)
-+ * @prm: PRM base virtual address
-+ *
-+ * XXX Will be replaced when the PRM/CM drivers are completed.
-+ */
-+void __init omap2_set_globals_prm(void __iomem *prm)
-+{
-+	prm_base = prm;
-+}
-+
-+/**
-  * prm_read_reset_sources - return the sources of the SoC's last reset
-  *
-  * Return a u32 bitmask representing the reset sources that caused the
-diff --git a/arch/arm/mach-omap2/prminst44xx.h b/arch/arm/mach-omap2/prminst44xx.h
-index 46f2efb..a2ede2d 100644
---- a/arch/arm/mach-omap2/prminst44xx.h
-+++ b/arch/arm/mach-omap2/prminst44xx.h
-@@ -30,4 +30,6 @@ extern int omap4_prminst_assert_hardreset(u8 shift, u8 part, s16 inst,
- extern int omap4_prminst_deassert_hardreset(u8 shift, u8 part, s16 inst,
- 					    u16 rstctrl_offs);
- 
-+extern void omap_prm_base_init(void);
-+
- #endif
-diff --git a/arch/arm/plat-omap/include/plat/prcm.h b/arch/arm/plat-omap/include/plat/prcm.h
-index 3ccee9f..08eda93 100644
---- a/arch/arm/plat-omap/include/plat/prcm.h
-+++ b/arch/arm/plat-omap/include/plat/prcm.h
-@@ -27,11 +27,7 @@
- #ifndef __ASM_ARM_ARCH_OMAP_PRCM_H
- #define __ASM_ARM_ARCH_OMAP_PRCM_H
- 
--#include <linux/kernel.h>
--#include <linux/io.h>
 -
--void __init omap2_set_globals_prcm(void __iomem *prm, void __iomem *cm,
--				   void __iomem *cm2, void __iomem *prcm_mpu);
-+/* XXX To be removed */
- 
- #endif
- 
+-	/*
+-	 * As per Errata i520, in some cases, user will not be able to
+-	 * access DDR memory after warm-reset.
+-	 * This situation occurs while the warm-reset happens during a read
+-	 * access to DDR memory. In that particular condition, DDR memory
+-	 * does not respond to a corrupted read command due to the warm
+-	 * reset occurrence but SDRC is waiting for read completion.
+-	 * SDRC is not sensitive to the warm reset, but the interconnect is
+-	 * reset on the fly, thus causing a misalignment between SDRC logic,
+-	 * interconnect logic and DDR memory state.
+-	 * WORKAROUND:
+-	 * Steps to perform before a Warm reset is trigged:
+-	 * 1. enable self-refresh on idle request
+-	 * 2. put SDRC in idle
+-	 * 3. wait until SDRC goes to idle
+-	 * 4. generate SW reset (Global SW reset)
+-	 *
+-	 * Steps to be performed after warm reset occurs (in bootloader):
+-	 * if HW warm reset is the source, apply below steps before any
+-	 * accesses to SDRAM:
+-	 * 1. Reset SMS and SDRC and wait till reset is complete
+-	 * 2. Re-initialize SMS, SDRC and memory
+-	 *
+-	 * NOTE: Above work around is required only if arch reset is implemented
+-	 * using Global SW reset(GLOBAL_SW_RST). DPLL3 reset does not need
+-	 * the WA since it resets SDRC as well as part of cold reset.
+-	 */
+-
+-	/* XXX should be moved to some OMAP2/3 specific code */
+-	omap2_prm_set_mod_reg_bits(OMAP_RST_DPLL3_MASK, prcm_offs,
+-				   OMAP2_RM_RSTCTRL);
+-	omap2_prm_read_mod_reg(prcm_offs, OMAP2_RM_RSTCTRL); /* OCP barrier */
+-}
+-
+ /**
+  * omap2_cm_wait_idlest - wait for IDLEST bit to indicate module readiness
+  * @reg: physical address of module IDLEST register
