@@ -1,94 +1,203 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 25 Oct 2012 12:11:56 -0400
-Subject: [PATCH v3 10/11] ARM: davinci - migrate to common clock
+Date: Thu, 25 Oct 2012 12:11:50 -0400
+Subject: [PATCH v3 04/11] clk: davinci - add pll divider clock driver
 In-Reply-To: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
 References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1351181518-11882-11-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1351181518-11882-5-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently migrate only DM644x as this is being reviewed. Once all
-platforms are migrated, the Makefile will be cleaned up to remove
-obsoleted files clock.o and psc.o
+pll dividers are present in the pll controller of DaVinci and Other
+SoCs that re-uses the same hardware IP. This has a enable bit for
+bypass the divider or enable the driver. This is a sub class of the
+clk-divider clock checks the enable bit to calculare the rate and
+invoke the recalculate() function of the clk-divider if enabled.
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- arch/arm/Kconfig               |    1 +
- arch/arm/mach-davinci/Kconfig  |    2 ++
- arch/arm/mach-davinci/Makefile |   11 ++++++++++-
- 3 files changed, 13 insertions(+), 1 deletion(-)
+ drivers/clk/davinci/clk-div.c |  124 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/davinci/clk-div.h |   42 ++++++++++++++
+ 2 files changed, 166 insertions(+)
+ create mode 100644 drivers/clk/davinci/clk-div.c
+ create mode 100644 drivers/clk/davinci/clk-div.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index c5f9ae5..4611987 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -967,6 +967,7 @@ config ARCH_DAVINCI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ZONE_DMA
- 	select HAVE_IDE
-+	select COMMON_CLK
- 	select CLKDEV_LOOKUP
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_IRQ_CHIP
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index ab99c3c..ab414b4 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -19,6 +19,8 @@ config ARCH_DAVINCI_DM644x
- 	bool "DaVinci 644x based system"
- 	select AINTC
- 	select ARCH_DAVINCI_DMx
-+	select DAVINCI_CLKS
-+	select CLK_DAVINCI_PLL
- 
- config ARCH_DAVINCI_DM355
- 	bool "DaVinci 355 based system"
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 2227eff..5a5b3dc 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -4,18 +4,25 @@
- #
- 
- # Common objects
-+ifndef CONFIG_COMMON_CLK
- obj-y 			:= time.o clock.o serial.o psc.o \
- 			   dma.o usb.o common.o sram.o aemif.o
-+else
-+obj-y 			:= time.o serial.o \
-+			   dma.o usb.o common.o sram.o aemif.o
-+endif
- 
- obj-$(CONFIG_DAVINCI_MUX)		+= mux.o
- 
- # Chip specific
- obj-$(CONFIG_ARCH_DAVINCI_DM644x)       += dm644x.o devices.o
-+ifndef CONFIG_COMMON_CLK
- obj-$(CONFIG_ARCH_DAVINCI_DM355)        += dm355.o devices.o
--obj-$(CONFIG_ARCH_DAVINCI_DM646x)       += dm646x.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
-+obj-$(CONFIG_ARCH_DAVINCI_DM646x)       += dm646x.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DA830)        += da830.o devices-da8xx.o
- obj-$(CONFIG_ARCH_DAVINCI_DA850)        += da850.o devices-da8xx.o
-+endif
- obj-$(CONFIG_ARCH_DAVINCI_TNETV107X)    += tnetv107x.o devices-tnetv107x.o
- 
- obj-$(CONFIG_AINTC)			+= irq.o
-@@ -23,6 +30,7 @@ obj-$(CONFIG_CP_INTC)			+= cp_intc.o
- 
- # Board specific
- obj-$(CONFIG_MACH_DAVINCI_EVM)  	+= board-dm644x-evm.o
-+ifndef CONFIG_COMMON_CLK
- obj-$(CONFIG_MACH_SFFSDR)		+= board-sffsdr.o
- obj-$(CONFIG_MACH_NEUROS_OSD2)		+= board-neuros-osd2.o
- obj-$(CONFIG_MACH_DAVINCI_DM355_EVM)	+= board-dm355-evm.o
-@@ -31,6 +39,7 @@ obj-$(CONFIG_MACH_DAVINCI_DM6467_EVM)	+= board-dm646x-evm.o cdce949.o
- obj-$(CONFIG_MACH_DAVINCI_DM365_EVM)	+= board-dm365-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DA830_EVM)	+= board-da830-evm.o
- obj-$(CONFIG_MACH_DAVINCI_DA850_EVM)	+= board-da850-evm.o
-+endif
- obj-$(CONFIG_MACH_TNETV107X)		+= board-tnetv107x-evm.o
- obj-$(CONFIG_MACH_MITYOMAPL138)		+= board-mityomapl138.o
- obj-$(CONFIG_MACH_OMAPL138_HAWKBOARD)	+= board-omapl138-hawk.o
+diff --git a/drivers/clk/davinci/clk-div.c b/drivers/clk/davinci/clk-div.c
+new file mode 100644
+index 0000000..8147d99
+--- /dev/null
++++ b/drivers/clk/davinci/clk-div.c
+@@ -0,0 +1,124 @@
++/*
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Texas instuments
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ */
++
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/slab.h>
++
++#include "clk-div.h"
++
++/**
++ * struct clk_div - DaVinci integer pll divider clock
++ *
++ * @divider: the parent class
++ * @ops: pointer to clk_ops of parent class
++ * @reg: register address
++ * @en_id: enable bit id
++ *
++ * The DaVinci pll divider clock is a subclass of basic clk_divider with
++ * an additional enable bit
++ */
++struct clk_div {
++	struct clk_divider divider;
++	const struct clk_ops *ops;
++	void __iomem *reg;
++	u8 en_id;
++};
++
++static inline struct clk_div *to_clk_div(struct clk_hw *hw)
++{
++	struct clk_divider *divider = container_of(hw, struct clk_divider, hw);
++
++	return container_of(divider, struct clk_div, divider);
++}
++
++static unsigned long clk_div_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_div *div = to_clk_div(hw);
++	u32 val;
++
++	val = readl(div->reg);
++	if (val & BIT(div->en_id))
++		return div->ops->recalc_rate(&div->divider.hw, parent_rate);
++
++	/* pll divider bypassed, return parent rate */
++	return parent_rate;
++}
++
++static long clk_div_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	struct clk_div *div = to_clk_div(hw);
++
++	return div->ops->round_rate(&div->divider.hw, rate, prate);
++}
++
++static int clk_div_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_div *div = to_clk_div(hw);
++
++	return div->ops->set_rate(&div->divider.hw, rate, parent_rate);
++}
++
++static struct clk_ops clk_div_ops = {
++	.recalc_rate = clk_div_recalc_rate,
++	.round_rate = clk_div_round_rate,
++	.set_rate = clk_div_set_rate,
++};
++
++/**
++ * clk_register_davinci_plldiv - register function for DaVinci PLL divider clk
++ *
++ * @dev: device ptr
++ * @name: name of the clock
++ * @parent_name: name of parent clock
++ * @plldiv_data: ptr to pll divider data
++ * @lock: ptr to spinlock passed to divider clock
++ */
++struct clk *clk_register_davinci_plldiv(struct device *dev,
++			const char *name, const char *parent_name,
++			struct clk_plldiv_data *plldiv_data,
++			spinlock_t *lock)
++{
++	struct clk_div *div;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	div = kzalloc(sizeof(*div), GFP_KERNEL);
++	if (!div)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &clk_div_ops;
++	init.flags = plldiv_data->flags;
++	init.parent_names = (parent_name ? &parent_name : NULL);
++	init.num_parents = (parent_name ? 1 : 0);
++
++	div->reg = plldiv_data->reg;
++	div->en_id = plldiv_data->en_id;
++
++	div->divider.reg = plldiv_data->reg;
++	div->divider.shift = plldiv_data->shift;
++	div->divider.width = plldiv_data->width;
++	div->divider.flags = plldiv_data->divider_flags;
++	div->divider.lock = lock;
++	div->divider.hw.init = &init;
++	div->ops = &clk_divider_ops;
++
++	clk = clk_register(NULL, &div->divider.hw);
++	if (IS_ERR(clk))
++		kfree(div);
++
++	return clk;
++}
+diff --git a/drivers/clk/davinci/clk-div.h b/drivers/clk/davinci/clk-div.h
+new file mode 100644
+index 0000000..0e3708c
+--- /dev/null
++++ b/drivers/clk/davinci/clk-div.h
+@@ -0,0 +1,42 @@
++/*
++ * Header file for DaVinci pll divider clk driver
++ *
++ * Copyright (C) 2006-2012 Texas Instruments.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#ifndef __CLK_DAVINCI_PLLDIV_H
++#define __CLK_DAVINCI_PLLDIV_H
++
++
++/**
++ * struct clk_plldiv_data - configuration for DaVinci PLL divider driver
++ *
++ * @flags - base clk driver flags
++ * @divider_flags - clk-divider flags
++ * @phys_div_reg - clk-divider register physical address
++ * @reg - clk-divider register io mapped address
++ * @shift - shift applied to the divider bits in the register
++ * @width - width of the divider bits in the register
++ * @en_id - bypass or enable bit mask id. mask = BIT(en_id)
++ */
++/* configuration data for PLL divider clock */
++struct clk_plldiv_data {
++	u32			flags;
++	u8			divider_flags;
++	u32                     phys_div_reg;
++	void __iomem		*reg;
++	u8			shift;
++	u8			width;
++	u8			en_id;
++};
++
++struct clk *clk_register_davinci_plldiv(struct device *dev,
++			const char *name, const char *parent_name,
++			struct clk_plldiv_data *plldiv_data,
++			spinlock_t *lock);
++#endif /* CLK_DAVINCI_PLLDIV_H */
 -- 
 1.7.9.5
