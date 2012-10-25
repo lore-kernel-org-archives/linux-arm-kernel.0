@@ -1,90 +1,49 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Thu, 25 Oct 2012 17:10:10 +0530
-Subject: [PATCH 2/8] i2c: omap: reorder exit path of omap_i2c_xfer_msg()
-In-Reply-To: <1350899218-13624-3-git-send-email-balbi@ti.com>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-3-git-send-email-balbi@ti.com>
-Message-ID: <CAM=Q2cvUeLbS20HScrGTOcraSUrCzhzCi8MQLxd9MOb_7ZFFYA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Oct 2012 13:43:52 +0200
+Subject: [PATCH 1/2] arm: mvebu: increase atomic coherent pool size for
+ armada 370/XP
+In-Reply-To: <201210251127.36960.arnd@arndb.de>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-2-git-send-email-gregory.clement@free-electrons.com>
+ <201210251127.36960.arnd@arndb.de>
+Message-ID: <20121025134352.16a8ef81@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 3:16 PM, Felipe Balbi <balbi@ti.com> wrote:
-> just a cleanup patch trying to make exit path
-> more straightforward. No changes otherwise.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c | 26 +++++++++++++++++---------
->  1 file changed, 17 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index c07d9c4..bea0277 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -505,6 +505,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  {
->         struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
->         unsigned long timeout;
-> +       int ret;
->         u16 w;
->
->         dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
-> @@ -582,31 +583,38 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->         dev->buf_len = 0;
->         if (timeout == 0) {
->                 dev_err(dev->dev, "controller timed out\n");
-> -               omap_i2c_init(dev);
-> -               return -ETIMEDOUT;
-> +               ret = -ETIMEDOUT;
-> +               goto err_i2c_init;
->         }
->
-> -       if (likely(!dev->cmd_err))
-> -               return 0;
-> -
->         /* We have an error */
->         if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
->                             OMAP_I2C_STAT_XUDF)) {
-> -               omap_i2c_init(dev);
-> -               return -EIO;
-> +               ret = -EIO;
-> +               goto err_i2c_init;
->         }
->
->         if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
->                 if (msg->flags & I2C_M_IGNORE_NAK)
->                         return 0;
-> +
->                 if (stop) {
->                         w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
->                         w |= OMAP_I2C_CON_STP;
->                         omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
->                 }
-> -               return -EREMOTEIO;
-> +
-> +               ret = -EREMOTEIO;
-> +               goto err;
+Arnd,
 
-This adds reset to nack may be that can be removed.
+On Thu, 25 Oct 2012 11:27:36 +0000, Arnd Bergmann wrote:
+> On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+> > For Armada 370/XP we have the same problem that for the commit
+> > cb01b63, so we applied the same solution: "The default 256 KiB
+> > coherent pool may be too small for some of the Kirkwood devices, so
+> > increase it to make sure that devices will be able to allocate their
+> > buffers with GFP_ATOMIC flag"
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Do you know why the ATA driver needs this? I find it surprising that
+> it's necessary, so I'd like to make sure we're not just working around
+> a device driver bug here.
 
+The sata_mv driver create dma_pool and allocate objects from them, and
+all the memory allocated for dma_pools is allocated using
+dma_alloc_coherent(), and I guess the driver is using too much of them.
 
->         }
-> -       return -EIO;
-> +
-> +       return 0;
-> +
-> +err_i2c_init:
-> +       omap_i2c_init(dev);
-> +
-> +err:
-> +       return ret;
->  }
->
->
-> --
-> 1.8.0.rc0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Seems like the driver is too lazy and allocates everything coherent to
+avoid the hassle of doing dma_map/dma_unmap operations when needed, but
+I haven't looked in details at the driver yet to see if it would be
+possible to switch those DMA coherent allocations into non-coherent
+allocations + appropriate calls to the DMA operations.
+
+That said, that's for sure a larger task than just enabling SATA on
+Armada 370/XP, so I would advocate to handle this problem separately.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
