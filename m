@@ -1,93 +1,66 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 24 Oct 2012 20:53:54 -0500
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <1350935758-9215-5-git-send-email-zonque@gmail.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com>
-Message-ID: <50889BB2.3090107@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 25 Oct 2012 10:51:22 +0800
+Subject: [PATCH v3] ARM: mach-imx: Fix selection of ARCH_MXC
+In-Reply-To: <20121019150544.GD21078@S2101-09.ap.freescale.net>
+References: <1350583470-15500-1-git-send-email-fabio.estevam@freescale.com>
+ <20121019150544.GD21078@S2101-09.ap.freescale.net>
+Message-ID: <20121025025117.GC2464@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 19, 2012 at 11:05:54PM +0800, Shawn Guo wrote:
+> On Thu, Oct 18, 2012 at 03:04:30PM -0300, Fabio Estevam wrote:
+> > Since commit c5a0d497(ARM: imx: enable multi-platform build),
+> > ARCH_MXC is selected by the following logic:
+> > 
+> > config ARCH_MXC
+> >         def_bool y if ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7
+> > 
+> > , which causes build error on vexpress_defconfig:
+> > 
+> > arch/arm/mach-imx/hotplug.c:49: undefined reference to `imx_enable_cpu'
+> > arch/arm/mach-imx/platsmp.c:57: undefined reference to `imx_set_cpu_jump'
+> > arch/arm/mach-imx/platsmp.c:58: undefined reference to `imx_enable_cpu'
+> > 
+> > Make ARCH_MXC a user selectable option, so that it does not get built
+> > by default on other defconfigs that select ARCH_MULTI_V4_V5 or ARCH_MULTI_V6_V7.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> Arnd, Olof,
+> 
+> I just applied this patch on my imx/multi-platform.  Can you please
+> pull it to update the branch in arm-soc?  Thanks.
+> 
+I just applied another fix [1] on my branch.  Please pull both into
+arm-soc.  Thanks.
 
-On 10/22/2012 02:55 PM, Daniel Mack wrote:
-> This patch adds basic DT bindings for OMAP GPMC.
-> 
-> The actual peripherals are instanciated from child nodes within the GPMC
-> node, and the only type of device that is currently supported is NAND.
-> 
-> Code was added to parse the generic GPMC timing parameters and some
-> documentation with examples on how to use them.
-> 
-> Successfully tested on an AM33xx board.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-> ---
->  Documentation/devicetree/bindings/bus/gpmc.txt     |  59 +++++++++
->  .../devicetree/bindings/mtd/gpmc-nand.txt          |  65 ++++++++++
->  arch/arm/mach-omap2/gpmc.c                         | 139 +++++++++++++++++++++
->  3 files changed, 263 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/gpmc.txt
->  create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/bus/gpmc.txt b/Documentation/devicetree/bindings/bus/gpmc.txt
-> new file mode 100644
-> index 0000000..ef1c6e1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/bus/gpmc.txt
-> @@ -0,0 +1,59 @@
-> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
-> +
-> +The actual devices are instantiated from the child nodes of a GPMC node.
-> +
-> +Required properties:
-> +
-> + - compatible: Should be set to "ti,gpmc"
-> +
-> +Timing properties for child nodes. All are optional and default to 0.
-> +
-> + - gpmc,sync-clk:	Minimum clock period for synchronous mode, in picoseconds
-> +
-> + Chip-select signal timings corresponding to GPMC_CS_CONFIG2:
-> + - gpmc,cs-on:		Assertion time
-> + - gpmc,cs-rd-off:	Read deassertion time
-> + - gpmc,cs-wr-off:	Write deassertion time
-> +
-> + ADV signal timings corresponding to GPMC_CONFIG3:
-> + - gpmc,adv-on:		Assertion time
-> + - gpmc,adv-rd-off:	Read deassertion time
-> + - gpmc,adv-wr-off:	Write deassertion time
-> +
-> + WE signals timings corresponding to GPMC_CONFIG4:
-> + - gpmc,we-on:		Assertion time
-> + - gpmc,we-off:		Deassertion time
-> +
-> + OE signals timings corresponding to GPMC_CONFIG4
-> + - gpmc,oe-on:		Assertion time
-> + - gpmc,oe-off:		Deassertion time
-> +
-> + Access time and cycle time timings corresponding to GPMC_CONFIG5
-> + - gpmc,page-burst-access: Multiple access word delay
-> + - gpmc,access:		Start-cycle to first data valid delay
-> + - gpmc,rd-cycle:	Total read cycle time
-> + - gpmc,wr-cycle:	Total write cycle time
-> +
-> +The following are only on OMAP3430
-> + - gpmc,wr-access
-> + - gpmc,wr-data-mux-bus
-> +
-> +
-> +Example for an AM33xx board:
-> +
-> +	gpmc: gpmc at 50000000 {
-> +		compatible = "ti,gpmc";
-> +		ti,hwmods = "gpmc";
-> +		reg = <0x50000000 0x1000000>;
+Shawn
 
-Nit-pick, that size is quite large for a register range. I recommend
-looking at the HWMOD data file
-(arch/arm/mach-omap2/omap_hwmod_33xx_data.c) and see how much space is
-allocated for the registers (see structure am33xx_gpmc_addr_space).
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/195009
 
-Cheers
-Jon
+------
+
+The following changes since commit c5a0d4977f00ca18c49d46fdaff4b2cfeaa4eb28:
+
+  ARM: imx: enable multi-platform build (2012-10-15 10:10:15 +0800)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/shawnguo/linux-2.6.git imx/multi-platform
+
+for you to fetch changes up to 68b25325a7fd290b5e472bba0df9cbe8c1a81d8f:
+
+  ARM: imx: select HAVE_IMX_SRC when SMP is enabled (2012-10-23 15:37:51 +0800)
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: mach-imx: Fix selection of ARCH_MXC
+
+Shawn Guo (1):
+      ARM: imx: select HAVE_IMX_SRC when SMP is enabled
+
+ arch/arm/configs/imx_v4_v5_defconfig |    1 +
+ arch/arm/configs/imx_v6_v7_defconfig |    1 +
+ arch/arm/mach-imx/Kconfig            |    5 ++---
+ 3 files changed, 4 insertions(+), 3 deletions(-)
