@@ -1,34 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 10:57:09 +0100
-Subject: [PATCH 6/8] ARM: ux500: Change the type of interrupt to something
- compatible
+Date: Thu, 25 Oct 2012 10:57:11 +0100
+Subject: [PATCH 8/8] ARM: ux500: Convert DT_MACHINE_START to use SMP operations
 In-Reply-To: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
 References: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351159031-25391-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <1351159031-25391-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On boot the Nomadik GPIO controller complains that an IRQ can't be
-configured as active high level-sensitive, so this patch converts
-it to be low-to-high edge triggered instead.
+The Device Tree machine description for the ux5x0 was moved
+recently and as a consequence missed the addition of SMP
+operations. Without this patch SMP doesn't work and only one
+CPU is present after booting.
 
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stuib.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
-index 6c7e492..39446a2 100644
---- a/arch/arm/boot/dts/stuib.dtsi
-+++ b/arch/arm/boot/dts/stuib.dtsi
-@@ -15,7 +15,7 @@
- 			stmpe1601: stmpe1601 at 40 {
- 				compatible = "st,stmpe1601";
- 				reg = <0x40>;
--				interrupts = <26 0x4>;
-+				interrupts = <26 0x1>;
- 				interrupt-parent = <&gpio6>;
- 				interrupt-controller;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index c65e7e3..4a0c40a 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -339,6 +339,7 @@ static const char * stericsson_dt_platform_compat[] = {
+ };
  
+ DT_MACHINE_START(U8500_DT, "ST-Ericsson Ux5x0 platform (Device Tree Support)")
++	.smp            = smp_ops(ux500_smp_ops),
+ 	.map_io		= u8500_map_io,
+ 	.init_irq	= ux500_init_irq,
+ 	/* we re-use nomadik timer here */
 -- 
 1.7.9.5
