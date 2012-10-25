@@ -1,127 +1,174 @@
-From: markz@nvidia.com (Mark Zhang)
-Date: Thu, 25 Oct 2012 14:52:30 +0800
-Subject: [PATCH V2] ARM: dt: tegra: ventana: define pinmux for ddc
-Message-ID: <1351147951-19706-1-git-send-email-markz@nvidia.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 25 Oct 2012 12:23:56 +0530
+Subject: [PATCH v2] i2c: omap: re-factor omap_i2c_init function
+In-Reply-To: <20121025063608.GA5084@arwen.pp.htv.fi>
+References: <1351147011-6500-1-git-send-email-shubhrajyoti@ti.com>
+ <20121025063608.GA5084@arwen.pp.htv.fi>
+Message-ID: <CAM=Q2cvzQ7fVL1-vUpWZdwhGk3s0GpO3uG3MH9CAzBvyeSftKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra 2's I2C2 controller can be routed to either the PTA
-or DDC pin group on Ventana. So:
-- Remove the HDMI function definition of pta pingroup
-- Define child i2c adapters(ddc & pta) for I2C2 controller
+On Thu, Oct 25, 2012 at 12:06 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Thu, Oct 25, 2012 at 12:06:51PM +0530, Shubhrajyoti D wrote:
+>> re-factor omap_i2c_init() so that we can re-use it for resume.
+>> While at it also remove the bufstate variable as we write it
+>> in omap_i2c_resize_fifo for every transfer.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+>> ---
+>> v2 - add the iestate 0 check back.
+>>    - Remove a stray change.
+>> - Applies on top of Felipe's patches.
+>> http://www.spinics.net/lists/linux-omap/msg79995.html
+>>
+>>
+>> Tested with Terro sys fix + Felipe's stop sched_clock() during suspend
+>> on omap3636 beagle both idle and suspend.
+>>
+>> Functional testing on omap4sdp.
+>>
+>>  drivers/i2c/busses/i2c-omap.c |   71 ++++++++++++++++++----------------------
+>>  1 files changed, 32 insertions(+), 39 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+>> index 5e5cefb..3d400b1 100644
+>> --- a/drivers/i2c/busses/i2c-omap.c
+>> +++ b/drivers/i2c/busses/i2c-omap.c
+>> @@ -209,7 +209,6 @@ struct omap_i2c_dev {
+>>       u16                     pscstate;
+>>       u16                     scllstate;
+>>       u16                     sclhstate;
+>> -     u16                     bufstate;
+>>       u16                     syscstate;
+>>       u16                     westate;
+>>       u16                     errata;
+>> @@ -285,9 +284,31 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+>>       }
+>>  }
+>>
+>> +static void __omap_i2c_init(struct omap_i2c_dev *dev)
+>> +{
+>> +
+>> +     omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>> +     /* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
+>> +     omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+>> +
+>> +     /* SCL low and high time values */
+>> +     omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+>> +     omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
+>> +     if (dev->rev >= OMAP_I2C_REV_ON_3430_3530)
+>> +             omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+>> +     /* Take the I2C module out of reset: */
+>> +     omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+>
+> a few blank lines in this function wouldn't hurt and they would help
+> with readability.
 
-Signed-off-by: Mark Zhang <markz@nvidia.com>
----
- arch/arm/boot/dts/tegra20-ventana.dts |   69 ++++++++++++++++++++++++++++++---
- 1 file changed, 63 insertions(+), 6 deletions(-)
+Will add .
 
-diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
-index bec8bb2..1dde0d3 100644
---- a/arch/arm/boot/dts/tegra20-ventana.dts
-+++ b/arch/arm/boot/dts/tegra20-ventana.dts
-@@ -64,11 +64,6 @@
- 				nvidia,pins = "dap4";
- 				nvidia,function = "dap4";
- 			};
--			ddc {
--				nvidia,pins = "ddc", "owc", "spdi", "spdo",
--					"uac";
--				nvidia,function = "rsvd2";
--			};
- 			dta {
- 				nvidia,pins = "dta", "dtb", "dtc", "dtd", "dte";
- 				nvidia,function = "vi";
-@@ -98,7 +93,7 @@
- 				nvidia,function = "pcie";
- 			};
- 			hdint {
--				nvidia,pins = "hdint", "pta";
-+				nvidia,pins = "hdint";
- 				nvidia,function = "hdmi";
- 			};
- 			i2cp {
-@@ -129,6 +124,10 @@
- 					"lspi", "lvp1", "lvs";
- 				nvidia,function = "displaya";
- 			};
-+			owc {
-+				nvidia,pins = "owc", "spdi", "spdo", "uac";
-+				nvidia,function = "rsvd2";
-+			};
- 			pmc {
- 				nvidia,pins = "pmc";
- 				nvidia,function = "pwr_on";
-@@ -248,6 +247,39 @@
- 				nvidia,slew-rate-falling = <3>;
- 			};
- 		};
-+
-+		state_i2cmux_ddc: pinmux_i2cmux_ddc {
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "i2c2";
-+			};
-+			pta {
-+				nvidia,pins = "pta";
-+				nvidia,function = "rsvd4";
-+			};
-+		};
-+
-+		state_i2cmux_pta: pinmux_i2cmux_pta {
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "rsvd4";
-+			};
-+			pta {
-+				nvidia,pins = "pta";
-+				nvidia,function = "i2c2";
-+			};
-+		};
-+
-+		state_i2cmux_idle: pinmux_i2cmux_idle {
-+			ddc {
-+				nvidia,pins = "ddc";
-+				nvidia,function = "rsvd4";
-+			};
-+			pta {
-+				nvidia,pins = "pta";
-+				nvidia,function = "rsvd4";
-+			};
-+		};
- 	};
- 
- 	i2s at 70002800 {
-@@ -291,6 +323,31 @@
- 		clock-frequency = <400000>;
- 	};
- 
-+	i2cmux {
-+		compatible = "i2c-mux-pinctrl";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		i2c-parent = <&{/i2c@7000c400}>;
-+
-+		pinctrl-names = "ddc", "pta", "idle";
-+		pinctrl-0 = <&state_i2cmux_ddc>;
-+		pinctrl-1 = <&state_i2cmux_pta>;
-+		pinctrl-2 = <&state_i2cmux_idle>;
-+
-+		i2c at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+	};
-+
- 	i2c at 7000c500 {
- 		status = "okay";
- 		clock-frequency = <400000>;
--- 
-1.7.9.5
+>
+>> +     /*
+>> +      * Don't write to this register if the IE state is 0 as it can
+>> +      * cause deadlock.
+>> +      */
+>> +     if (dev->iestate)
+>> +             omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+>> +}
+>> +
+>>  static int omap_i2c_init(struct omap_i2c_dev *dev)
+>>  {
+>> -     u16 psc = 0, scll = 0, sclh = 0, buf = 0;
+>> +     u16 psc = 0, scll = 0, sclh = 0;
+>>       u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+>>       unsigned long fclk_rate = 12000000;
+>>       unsigned long timeout;
+>> @@ -337,11 +358,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>>                        * REVISIT: Some wkup sources might not be needed.
+>>                        */
+>>                       dev->westate = OMAP_I2C_WE_ALL;
+>> -                     omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+>> -                                                     dev->westate);
+>
+> remove the comment too since now that's done by some other function ?
+>
+>>               }
+>>       }
+>> -     omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>>
+>>       if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+>>               /*
+>> @@ -426,28 +444,18 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>>               sclh = fclk_rate / (dev->speed * 2) - 7 + psc;
+>>       }
+>>
+>> -     /* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
+>> -     omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, psc);
+>> -
+>> -     /* SCL low and high time values */
+>> -     omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
+>> -     omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
+>> -
+>> -     /* Take the I2C module out of reset: */
+>> -     omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+>> -
+>>       /* Enable interrupts */
+>>       dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+>>                       OMAP_I2C_IE_NACK | OMAP_I2C_IE_AL)  |
+>>                       ((dev->fifo_size) ? (OMAP_I2C_IE_RDR |
+>>                               OMAP_I2C_IE_XDR) : 0);
+>> -     omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+>> -     if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+>> -             dev->pscstate = psc;
+>> -             dev->scllstate = scll;
+>> -             dev->sclhstate = sclh;
+>> -             dev->bufstate = buf;
+>> -     }
+>> +
+>> +     dev->pscstate = psc;
+>> +     dev->scllstate = scll;
+>> +     dev->sclhstate = sclh;
+>> +
+>> +     __omap_i2c_init(dev);
+>> +
+>>       return 0;
+>>  }
+>>
+>> @@ -1268,23 +1276,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
+>>  {
+>>       struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+>>
+>> -     if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+>> -     }
+>> -
+>> -     /*
+>> -      * Don't write to this register if the IE state is 0 as it can
+>> -      * cause deadlock.
+>> -      */
+>> -     if (_dev->iestate)
+>> -             omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
+>> +     if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
+>> +             __omap_i2c_init(_dev);
+>>
+>>       return 0;
+>>  }
+>
+> you continue to miss the changes in omap_i2c_xfer_msg() and your
+> explanation of why not doing it wasn't good enough IMHO.
+
+Will do that . I am preparing a seperate patch for moving the
+calculation to a seperate function.
+
+
+>
+> --
+> balbi
