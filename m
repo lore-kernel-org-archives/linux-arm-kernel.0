@@ -1,85 +1,156 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Thu, 25 Oct 2012 10:25:56 -0600
-Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
-In-Reply-To: <50887348.9070904@gmail.com>
-References: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
- <50887348.9070904@gmail.com>
-Message-ID: <1351182356.15182.7.camel@dinh-ubuntu>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 25 Oct 2012 15:27:00 +0000
+Subject: [PATCH V3 1/5] ARM: dts: OMAP: Add timer nodes
+In-Reply-To: <50892E27.7070102@ti.com>
+References: <1350496873-21337-1-git-send-email-jon-hunter@ti.com>
+ <1350496873-21337-2-git-send-email-jon-hunter@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB49C1B@DBDE01.ent.ti.com>
+ <50887315.2000509@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB4A768@DBDE01.ent.ti.com>
+ <50892E27.7070102@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB4AB13@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Wed, 2012-10-24 at 18:01 -0500, Rob Herring wrote:
-> On 10/18/2012 12:32 PM, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
+On Thu, Oct 25, 2012 at 17:48:47, Hunter, Jon wrote:
+> 
+> On 10/25/2012 07:12 AM, Hiremath, Vaibhav wrote:
+> > On Thu, Oct 25, 2012 at 04:30:37, Hunter, Jon wrote:
+> >>
+> >> On 10/24/2012 01:17 PM, Hiremath, Vaibhav wrote:
+> >>> On Wed, Oct 17, 2012 at 23:31:09, Hunter, Jon wrote:
+> >>>> Add the 12 GP timers nodes present in OMAP2.
+> >>>> Add the 12 GP timers nodes present in OMAP3.
+> >>>> Add the 11 GP timers nodes present in OMAP4.
+> >>>> Add the 7 GP timers nodes present in AM33xx.
+> >>>>
+> >>>> Add documentation for timer properties specific to OMAP.
+> >>>>
+> >>>> Please note that for OMAP2/3 devices, there is only one interrupt controller
+> >>>> for the ARM CPU (which has the label "intc") and so globally define this as the
+> >>>> interrupt parent to save duplicating the interrupt parent for all device nodes.
+> >>>>
+> >>>> Thanks to Vaibhav Hiremath for creating the AM33xx timer nodes. I have modified
+> >>>> Vaibhav's original nodes adding information on which timers support a PWM
+> >>>> output.
+> >>>>
+> >>>> Cc: Benoit Cousson <b-cousson@ti.com>
+> >>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> >>>> ---
+> >>>>  .../devicetree/bindings/arm/omap/timer.txt         |   29 ++++++
+> >>>>  arch/arm/boot/dts/am33xx.dtsi                      |   61 +++++++++++++
+> >>>>  arch/arm/boot/dts/omap2.dtsi                       |   86 ++++++++++++++++++
+> >>>>  arch/arm/boot/dts/omap2420.dtsi                    |    8 ++
+> >>>>  arch/arm/boot/dts/omap2430.dtsi                    |    8 ++
+> >>>>  arch/arm/boot/dts/omap3.dtsi                       |   96 ++++++++++++++++++++
+> >>>>  arch/arm/boot/dts/omap4.dtsi                       |   86 ++++++++++++++++++
+> >>>>  7 files changed, 374 insertions(+)
+> >>>>  create mode 100644 Documentation/devicetree/bindings/arm/omap/timer.txt
+> >>>>
+> >>>
+> >>> Although I have not tested this version of patch series at my end, but 
+> >>> whole patch-series Looks ok to me.
+> >>>
+> >>> Acked-By: Vaibhav Hiremath <hvaibhav@ti.com>
+> >>
+> >> Thanks. I made a couple cosmetic changes in V4 apart from the
+> >> "interrupt-parent" addition which we are now dropping. Care to ACK
+> >> patches 2-5 of V4?
+> >>
 > > 
-> > Enable SMP for the SOCFPGA platform.
+> > Jon,
 > > 
-> > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > ---
-> > v2:
-> > -Remove pen_release code
-> > -Remove code that was already done by v7_setup
-> > -Add bindings document for reset and system manager
-> > -Move socfpga_sysmgr_init from platsmp.c to socfpga.c, because
-> > we will need to use the reset and system manager for more than SMP.
-> > -Move core.h to mach-socfpga from mach-socfpga/include/mach
+> > Good news, I could able to spend some time today on Timer issue on Am33xx 
+> > and figure out what is going wrong there. The register context is loosing,
+> > which leads to failure of interrupt test cases.
 > 
-> Just some lingering comments on the defconfig. Otherwise,
+> Thanks!
 > 
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> > Below log describes more on this,
+> > 
+> > 
+> > [root at arago /]# echo 1 > /tmp/omap-test/timer/all
+> > [    9.156122] Testing 48042000.timer with 24000000 Hz clock ...
+> > [root at arago /]#
+> > [root at arago /]#
+> > [root at arago /]#
+> > [root at arago /]# [   11.505497] Timer read test PASSED! No errors, 100 loops
+> > [   11.511493] omap_dm_timer_set_int_enable:664: irq_ena - 0
+> > [   11.517277] omap_dm_timer_set_int_enable:670: irq_ena - 2
+> > [   11.523095] omap_timer_interrupt_test:120: irq_ena - 0 	[BOOOOOOOOM]
+> > [   12.521111] Timer interrupt test FAILED! No interrupt occurred in 1 sec
+> > 
+> > 
+> > I changed the Test code as below, and not with your Timer patches, I have 
+> > tested all the timers without any issues.
+> > 
+> > So for all patch series, 
+> > 
+> > Acked-Reviewed-&-Tested-By: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> > diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-> > index 0ac1293..349ac22 100644
-> > --- a/arch/arm/configs/socfpga_defconfig
-> > +++ b/arch/arm/configs/socfpga_defconfig
+> Thanks!
 > 
-> I'm still not clear why multi_v7 config does not work for you?
+> > 
+> > Test code diff:
+> > ===============
+> > 
+> > diff --git a/timer_test.c b/timer_test.c
+> > index e502881..c87a830 100644
+> > --- a/timer_test.c
+> > +++ b/timer_test.c
+> > @@ -13,6 +13,7 @@
+> > 
+> >  #define OMAP1_NUM_TIMERS       8
+> >  #define OMAP2_NUM_TIMERS       11
+> > +#define AM33XX_NUM_TIMERS      7
+> >  #define OMAP_MAX_NUM_TIMERS    12
+> >  #define OMAP_TIMER_SRC_CLKS    2
+> >  #define TIMER_TIMEOUT          (msecs_to_jiffies(1000))
+> > @@ -113,6 +114,9 @@ static int omap_timer_interrupt_test(struct omap_dm_timer *gptimer)
+> > 
+> >         irq_data.gptimer = gptimer;
+> >         init_completion(&irq_data.complete);
+> > +
+> > +       omap_dm_timer_enable(gptimer);
+> > +
+> >         omap_dm_timer_set_int_enable(gptimer, OMAP_TIMER_INT_OVERFLOW);
+> >         omap_dm_timer_set_load_start(gptimer, 0, 0xffffff00);
+> > 
+> > @@ -128,6 +132,8 @@ static int omap_timer_interrupt_test(struct omap_dm_timer *gptimer)
+> > 
+> >         omap_dm_timer_stop(gptimer);
+> >         omap_dm_timer_set_int_enable(gptimer, 0);
+> > +       omap_dm_timer_disable(gptimer);
+> > +
+> 
+> Hmmm ... I am wondering if there is another bug lingering in the dmtimer
+> driver. Ideally, the context should be preserved by the driver.
+> 
 
-multi_v7 works fine for me. But I need
-+#CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set 
+That's what I am going behind...
 
-in order for SMP to work correctly on our platform.
-
-
+> >         free_irq(timer_irq, &irq_data);
+> > 
+> >         return r;
+> > @@ -141,6 +147,8 @@ static u32 omap_timer_num_timers(void)
+> >                 max_num_timers = OMAP1_NUM_TIMERS;
+> >         else if (cpu_is_omap34xx() && (omap_type() == OMAP2_DEVICE_TYPE_GP))
+> >                 max_num_timers = OMAP2_NUM_TIMERS + 1;
+> > +       else if (soc_is_am33xx())
+> > +               max_num_timers = AM33XX_NUM_TIMERS;
 > 
-> > @@ -1,5 +1,5 @@
-> >  CONFIG_EXPERIMENTAL=y
-> > -CONFIG_SYSVIPC=y
-> > +CONFIG_NO_HZ=y
-> >  CONFIG_IKCONFIG=y
-> >  CONFIG_IKCONFIG_PROC=y
-> >  CONFIG_LOG_BUF_SHIFT=14
-> > @@ -16,10 +16,13 @@ CONFIG_MODULE_UNLOAD=y
-> >  # CONFIG_IOSCHED_DEADLINE is not set
-> >  # CONFIG_IOSCHED_CFQ is not set
-> >  CONFIG_ARCH_SOCFPGA=y
-> > -CONFIG_MACH_SOCFPGA_CYCLONE5=y
-> > -CONFIG_ARM_THUMBEE=y
-> > +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
-> >  # CONFIG_CACHE_L2X0 is not set
-> >  CONFIG_HIGH_RES_TIMERS=y
-> > +CONFIG_SMP=y
-> > +CONFIG_ARM_ARCH_TIMER=y
+> Thanks, I noticed that too when testing AM33xx.
 > 
-> You're an A9, right? You don't have arch timers.
 
-Yes, will remove in v3.
-> 
-> > +CONFIG_HIGHMEM=y
-> 
-> How much RAM? You need more than 2GB with CONFIG_VMSPLIT_2G.
+Can you merge it to your test module? I am thinking of pushing application 
+to github for others to use. I believe you are ok with this. I am planning 
+to push all the application there.
 
-1G for RAM only, so will remove in v3.
+https://github.com/hvaibhav/sample-applications
 
 Thanks,
-Dinh
-> 
-> > +CONFIG_HIGHPTE=y
-> >  CONFIG_VMSPLIT_2G=y
-> >  CONFIG_NR_CPUS=2
-> >  CONFIG_AEABI=y
-> 
+Vaibhav
+
+> Cheers
+> Jon
 > 
