@@ -1,97 +1,74 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Oct 2012 13:52:17 +0300
-Subject: [PATCH 1/2] i2c: omap: re-factor omap_i2c_init function
-In-Reply-To: <1351160586-12306-2-git-send-email-shubhrajyoti@ti.com>
-References: <1351160586-12306-1-git-send-email-shubhrajyoti@ti.com>
- <1351160586-12306-2-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121025105217.GG21217@arwen.pp.htv.fi>
+From: hechtb@googlemail.com (Bastian Hecht)
+Date: Thu, 25 Oct 2012 12:58:20 +0200
+Subject: [PATCH 1/3] ARM: shmobile: emev2: Replace modify_scu_cpu_psr with
+ scu_power_mode
+In-Reply-To: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+References: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+Message-ID: <1351162702-8391-2-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+We can remove the extra code of modify_scu_cpu_psr() and use the cleaner
+generic ARM helper scu_power_mode(). As every CPU only deals with its
+own power register and scu_power_mode() operates with 8-bit accesses,
+we save the locking overhead too.
 
-(a small top-post here, don't forget to keep the patch version in the
-subject, I think this is v3 already, so next patch should be v4)
+Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+---
+ arch/arm/mach-shmobile/smp-emev2.c |   22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-On Thu, Oct 25, 2012 at 03:53:05PM +0530, Shubhrajyoti D wrote:
-> re-factor omap_i2c_init() so that we can re-use it for resume.
-> While at it also remove the bufstate variable as we write it
-> in omap_i2c_resize_fifo for every transfer.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> ---
->  drivers/i2c/busses/i2c-omap.c |   71 ++++++++++++++++++----------------------
->  1 files changed, 32 insertions(+), 39 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 5e5cefb..3d400b1 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -209,7 +209,6 @@ struct omap_i2c_dev {
->  	u16			pscstate;
->  	u16			scllstate;
->  	u16			sclhstate;
-> -	u16			bufstate;
->  	u16			syscstate;
->  	u16			westate;
->  	u16			errata;
-> @@ -285,9 +284,31 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
->  	}
->  }
->  
-> +static void __omap_i2c_init(struct omap_i2c_dev *dev)
-> +{
-> +
-> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-> +	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
-> +	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-> +
-> +	/* SCL low and high time values */
-> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-> +	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530)
-> +		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-> +	/* Take the I2C module out of reset: */
-> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-> +	/*
-> +	 * Don't write to this register if the IE state is 0 as it can
-> +	 * cause deadlock.
-> +	 */
-> +	if (dev->iestate)
-> +		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
-
-you still miss the extra blank lines here. Try something like below:
-
-
-omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
-
-/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
-omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
-
-/* SCL low and high time values */
-omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
-omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
-
-if (dev->rev >= OMAP_I2C_REV_ON_3430_3530)
-	omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
-
-/* Take the I2C module out of reset: */
-omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
-
-/*
- * Don't write to this register if the IE state is 0 as it can
- * cause deadlock.
- */
-if (dev->iestate)
-	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
-
-
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index f674562..535426c 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -32,24 +32,8 @@
+ 
+ #define EMEV2_SCU_BASE 0x1e000000
+ 
+-static DEFINE_SPINLOCK(scu_lock);
+ static void __iomem *scu_base;
+ 
+-static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+-{
+-	unsigned long tmp;
+-
+-	/* we assume this code is running on a different cpu
+-	 * than the one that is changing coherency setting */
+-	spin_lock(&scu_lock);
+-	tmp = readl(scu_base + 8);
+-	tmp &= ~clr;
+-	tmp |= set;
+-	writel(tmp, scu_base + 8);
+-	spin_unlock(&scu_lock);
+-
+-}
+-
+ static unsigned int __init emev2_get_core_count(void)
+ {
+ 	if (!scu_base) {
+@@ -95,7 +79,7 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
+ 	cpu = cpu_logical_map(cpu);
+ 
+ 	/* enable cache coherency */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	scu_power_mode(scu_base, 0);
+ 
+ 	/* Tell ROM loader about our vector (in headsmp.S) */
+ 	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
+@@ -106,12 +90,10 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
+ 
+ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	int cpu = cpu_logical_map(0);
+-
+ 	scu_enable(scu_base);
+ 
+ 	/* enable cache coherency on CPU0 */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	scu_power_mode(scu_base, 0);
+ }
+ 
+ static void __init emev2_smp_init_cpus(void)
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/a7ad1a5c/attachment-0001.sig>
+1.7.9.5
