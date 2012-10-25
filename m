@@ -1,64 +1,76 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Thu, 25 Oct 2012 14:57:48 +0200
-Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
-In-Reply-To: <1350899218-13624-8-git-send-email-balbi@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 15:52:49 +0300
+Subject: [PATCH v2 4/7] i2c: omap: in case of VERSION_2 read
+ IRQSTATUS_RAW but write to IRQSTATUS
+In-Reply-To: <50893665.60604@ti.com>
 References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-8-git-send-email-balbi@ti.com>
-Message-ID: <20121025145748.760c218b@endymion.delvare>
+ <1351167915-15079-1-git-send-email-balbi@ti.com>
+ <1351167915-15079-5-git-send-email-balbi@ti.com>
+ <50893665.60604@ti.com>
+Message-ID: <20121025125249.GK21217@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe, Shubhrajyoti,
+Hi,
 
-On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
-> From: Shubhrajyoti D <shubhrajyoti@ti.com>
-> 
-> In case of a NACK, it's wise to tell our clients
-> drivers about how many bytes were actually transferred.
-> 
-> Support this by adding an extra field to the struct
-> i2c_msg which gets incremented the amount of bytes
-> actually transferred.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  include/uapi/linux/i2c.h | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
-> index 0e949cb..4b35c9b 100644
-> --- a/include/uapi/linux/i2c.h
-> +++ b/include/uapi/linux/i2c.h
-> @@ -77,6 +77,7 @@ struct i2c_msg {
->  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
->  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
->  	__u16 len;		/* msg length				*/
-> +	__u16 transferred;	/* actual bytes transferred             */
->  	__u8 *buf;		/* pointer to msg data			*/
->  };
+On Thu, Oct 25, 2012 at 06:23:57PM +0530, Santosh Shilimkar wrote:
+> On Thursday 25 October 2012 05:55 PM, Felipe Balbi wrote:
+> >on OMAP4+ we want to read IRQSTATUS_RAW register,
+> >instead of IRQSTATUS. The reason being that IRQSTATUS
+> >will only contain the bits which were enabled on
+> >IRQENABLE_SET and that will break when we need to
+> >poll for a certain bit which wasn't enabled as an
+> >IRQ source.
+> >
+> >One such case is after we finish converting to
+> >deferred stop bit, we will have to poll for ARDY
+> >bit before returning control for the client driver
+> >in order to prevent us from trying to start a
+> >transfer on a bus which is already busy.
+> >
+> >Note, however, that omap-i2c.c needs a big rework
+> >on register definition and register access. Such
+> >work will be done in a separate series of patches.
+> >
+> >Cc: Benoit Cousson <b-cousson@ti.com>
+> >Signed-off-by: Felipe Balbi <balbi@ti.com>
+> >---
+> >  drivers/i2c/busses/i2c-omap.c | 12 +++++++++++-
+> >  1 file changed, 11 insertions(+), 1 deletion(-)
+> >
+> >diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> >index b004126..20f9ad6 100644
+> >--- a/drivers/i2c/busses/i2c-omap.c
+> >+++ b/drivers/i2c/busses/i2c-omap.c
+> >@@ -271,8 +271,18 @@ static inline void omap_i2c_write_reg(struct omap_i2c_dev *i2c_dev,
+> >
+> >  static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+> >  {
+> >-	return __raw_readw(i2c_dev->base +
+> >+	/* if we are OMAP_I2C_IP_VERSION_2, we need to read from
+> >+	 * IRQSTATUS_RAW, but write to IRQSTATUS
+> >+	 */
+> >+	if ((i2c_dev->dtrev == OMAP_I2C_IP_VERSION_2) &&
+> >+			(reg == OMAP_I2C_STAT_REG)) {
+> Doing this check on every I2C register read seems to
+> expensive to me. Can you not sort this in init with some offset
+> which can be 0 or non zero ?  Sorry in case this is already dicussed.
 
-On the principle I am fine with this, however you also need to define
-who should initialize this field, and to what value.
+could be. I didn't go that route because I'm planning a complete rewrite
+of all register accesses. The way it's done today is completely broken
+and already expensive (with reg_shift and different map tables and so
+on).
 
-Not all i2c bus drivers will implement this functionality at first.
-Some may even be unable to ever implement it. As soon as i2c chip
-drivers start checking this value, you will hit combinations of chip
-driver checking the value and bus driver not setting it. And it has to
-work.
-
-We have to decide whether it is enough to initialize "transferred" to
-0, or if we need a more reliable way to distinguish between "0 bytes
-transferred" and "the bus driver can't tell". What's your take on this?
-If we need to distinguish, this could be done using a new I2C_FUNC_*
-flag, or by initializing "transferred" to (__u16)(-1) instead of 0 for
-example.
-
-Then we have to decide whether initialization is done by the individual
-drivers, or by i2c-core. By the drivers might be faster, but this may
-also mean more code (and bugs more likely) than letting i2c-core handle
-it. The exact balance probably depends on the answer to the previous
-question (initializing a field to 0 is free in many cases.)
+If it's really a big of a deal, I can try to find another way, maybe
+just adding omap_i2c_read_stat() and limit the version check just to
+I2C_STAT reads would do it for now...
 
 -- 
-Jean Delvare
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/d7a764f7/attachment.sig>
