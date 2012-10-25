@@ -1,55 +1,32 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Oct 2012 09:19:02 -0500
-Subject: [PATCH] arm: mvebu: move irq controller driver in drivers/irqchip/
-In-Reply-To: <20121025160657.57a52658@skate>
-References: <1351168500-11129-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <50894346.60507@gmail.com> <20121025160657.57a52658@skate>
-Message-ID: <50894A56.5020005@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 25 Oct 2012 12:19:45 -0200
+Subject: [PATCH 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
+In-Reply-To: <20121025114624.7896b5d9@redhat.com>
+References: <1349473981-15084-1-git-send-email-fabio.estevam@freescale.com>
+ <1349473981-15084-2-git-send-email-fabio.estevam@freescale.com>
+ <20121025113841.4e06cc3b@redhat.com>
+ <20121025114624.7896b5d9@redhat.com>
+Message-ID: <CAOMZO5APJsvV7yXsLYKMPOKHMJzDqE_89KTuS6sWzvHGMnaXfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 09:06 AM, Thomas Petazzoni wrote:
-> Rob,
-> 
-> On Thu, 25 Oct 2012 08:48:54 -0500, Rob Herring wrote:
-> 
->> I don't mean to pick on this specific patch, but this is a common
->> problem of moving various low-level pieces like irqchips, cpuidle,
->> timers, etc. to drivers/*. If we, just moving the code as is over, we
->> still need some hooks between arch/arm and drivers. I think if we keep
->> adding ARM SOC specific headers to include/linux, that will be the
->> next thing we get yelled at for and will have to clean-up.
+Hi Sascha,
+
+On Thu, Oct 25, 2012 at 11:46 AM, Mauro Carvalho Chehab
+<mchehab@redhat.com> wrote:
+
+>> As this patch is for arch/arm, I'm understanding that it will be merged
+>> via arm tree. So,
 >>
->> For irqchips, the way I see this working is we would have a single
->> call to of_irq_init with a match list of all irqchips in
->> drivers/irqchips. This contains the init function within
->> drivers/irqchips. Then all the machines can just call a generic
->> irqchip_init.
-> 
-> Sounds doable indeed.
-> 
->> The handle_irq ptr would also need to be plugged in at runtime.
-> 
-> However, do you have a more specific idea here? In setup_arch(), the
-> value of mdesc->handle_irq gets picked up way before the ->init_irq
-> machine hook is being called.
-> 
-> An option would be to fill this mdesc->handle_irq() field during the
-> mdesc->init_early() callback (would require moving things around a bit
-> in setup_arch(), but sounds reasonable). However, at the time of
-> mdesc->init_early(), I guess we can't call of_irq_init(). So we would
-> have a two step process: fill in mdesc->handle_irq during
-> mdesc->init_early(), and call irqchip_init() (which will do the
-> of_irq_init()) in mdesc->init_irq().
+>> Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+>
+> Forgot to comment: as patch 2 relies on this change, the better, IMHO, is
+> to send both via the same tree. If you decide to do so, please get arm
+> maintainer's ack, instead, and we can merge both via my tree.
 
-There's not really any reason I can see that it needs to be setup that
-early. You can't really service interrupts before .init_irq completes
-anyway. I would export handle_arch_irq and allow the irqchip driver to
-set it up.
+Can you please send your Ack to this series so that Mauro can merge it
+via his tree?
 
-> If that's fine with you, I can cook a patch for BCM2835 and MVEBU that
-> implements this idea.
+Thanks,
 
-Great!
-
-Rob
+Fabio Estevam
