@@ -1,30 +1,68 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 25 Oct 2012 21:59:01 +0100
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121024185818.GB772@arwen.pp.htv.fi>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <20121024185818.GB772@arwen.pp.htv.fi>
-Message-ID: <20121025205901.GA3827@sirena.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 23:59:26 +0300
+Subject: [PATCH 6/7] watchdog: OMAP: use standard GETBOOTSTATUS
+ interface; use platform_data fn ptr
+In-Reply-To: <alpine.DEB.2.00.1210252028330.21193@utopia.booyaka.com>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+ <20121016013233.21844.1279.stgit@dusk.lan>
+ <50899DB9.8050308@ti.com>
+ <alpine.DEB.2.00.1210252015490.21193@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210252028330.21193@utopia.booyaka.com>
+Message-ID: <20121025205926.GA19439@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 09:58:19PM +0300, Felipe Balbi wrote:
+On Thu, Oct 25, 2012 at 08:29:26PM +0000, Paul Walmsley wrote:
+> On Thu, 25 Oct 2012, Paul Walmsley wrote:
+> 
+> > On Thu, 25 Oct 2012, Jon Hunter wrote:
+> > 
+> > > In the case of booting with device-tree, pdata could be null and so
+> > > should we check for this too? In other words ...
+> > > 
+> > > +		if (!pdata || !pdata->read_reset_sources)
+> > > +			return put_user(0, (int __user *)arg);
+> > 
+> > Thanks, good catch, will integrate that fix.
+> 
+> Here's the updated patch.
+> 
+> - Paul
+> 
+> From: Paul Walmsley <paul@pwsan.com>
+> Date: Sun, 7 Oct 2012 20:13:26 -0600
+> Subject: [PATCH] watchdog: OMAP: use standard GETBOOTSTATUS interface; use
+>  platform_data fn ptr
+> 
+> Previously the OMAP watchdog driver used a non-standard way to report
+> the chip reset source via the GETBOOTSTATUS ioctl.  This patch
+> converts the driver to use the standard WDIOF_* flags for this
+> purpose.
+> 
+> This patch may break existing userspace code that uses the existing
+> non-standard data format returned by the OMAP watchdog driver's
+> GETBOOTSTATUS ioctl.  To fetch detailed reset source information,
+> userspace code will need to retrieve it directly from the CGRM or PRM
+> drivers when those are completed.
+> 
+> Previously, to fetch the reset source, the driver either read a
+> register outside the watchdog IP block (OMAP1), or called a function
+> exported directly from arch/arm/mach-omap2.  Both approaches are
+> broken.  This patch also converts the driver to use a platform_data
+> function pointer.  This approach is temporary, and is due to the lack
+> of drivers for the OMAP16xx+ Clock Generation and Reset Management IP
+> block and the OMAP2+ Power and Reset Management IP block.  Once
+> drivers are available for those IP blocks, the watchdog driver can be
+> converted to call exported drivers from those functions directly.
 
-> need a way to tell drivers/base "hey, don't touch pinctrl at all because
-> I know what I'm doing" and that has to happen before probe() too,
-> otherwise it's already too late and, according to what you suggest,
-> drivers/base will already have touched pinctrl. The only way I see would
-> be to add an extra "dont_touch_my_pins" field to every driver structure
-> in the kernel. Clearly what you say is nonsense.
+should be "exported functions from those drivers directly."
 
-I suspect that's not actually a big deal and that if we went down this
-route we'd have the driver take over control from the core code during
-probe() with the core still setting up the default state.
-
-Personally I do think we want to be factoring bolierplate out of
-drivers, if they're not doing anything constructive with pinctrl they
-should be able to avoid having code for it.  There definitely are issues
-to work through but it seems like we ought to be able to do something.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/83e5922c/attachment-0001.sig>
