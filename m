@@ -1,30 +1,127 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 08:51:31 +0200
-Subject: [PATCH] [RFC] pinctrl: mvebu: reset pins to an UNKNOWN state on
- startup
-In-Reply-To: <20121024222139.40fb2ad5@skate>
-References: <1351106281-31288-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121024201545.GA21046@lunn.ch> <20121024222139.40fb2ad5@skate>
-Message-ID: <CACRpkdbth4zGp5ZpwPUDUMag1xNCLbA6L=R9nimGX57Osyb53w@mail.gmail.com>
+From: markz@nvidia.com (Mark Zhang)
+Date: Thu, 25 Oct 2012 14:52:30 +0800
+Subject: [PATCH V2] ARM: dt: tegra: ventana: define pinmux for ddc
+Message-ID: <1351147951-19706-1-git-send-email-markz@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 10:21 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> On Wed, 24 Oct 2012 22:15:45 +0200, Andrew Lunn wrote:
+Tegra 2's I2C2 controller can be routed to either the PTA
+or DDC pin group on Ventana. So:
+- Remove the HDMI function definition of pta pingroup
+- Define child i2c adapters(ddc & pta) for I2C2 controller
 
->> If you compare the two, you can see that pin 6 has probably been set by
->> uboot, but not by DT.
->
-> Indeed, by correlating the two files, you can get a good view of which
-> pins are configured even though no driver has claimed them.
+Signed-off-by: Mark Zhang <markz@nvidia.com>
+---
+ arch/arm/boot/dts/tegra20-ventana.dts |   69 ++++++++++++++++++++++++++++++---
+ 1 file changed, 63 insertions(+), 6 deletions(-)
 
-If it is useful, please consider introducing new debugfs files, that thing
-is supposed to be helpful.
-
-For example: if a <debugfs>/pinctrl/pinctrl-foo/pins-probe-state
-caching and providing the power-on-state of all pins is useful,
-then just add that mechanism to the pinctrl core I'd say.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/tegra20-ventana.dts b/arch/arm/boot/dts/tegra20-ventana.dts
+index bec8bb2..1dde0d3 100644
+--- a/arch/arm/boot/dts/tegra20-ventana.dts
++++ b/arch/arm/boot/dts/tegra20-ventana.dts
+@@ -64,11 +64,6 @@
+ 				nvidia,pins = "dap4";
+ 				nvidia,function = "dap4";
+ 			};
+-			ddc {
+-				nvidia,pins = "ddc", "owc", "spdi", "spdo",
+-					"uac";
+-				nvidia,function = "rsvd2";
+-			};
+ 			dta {
+ 				nvidia,pins = "dta", "dtb", "dtc", "dtd", "dte";
+ 				nvidia,function = "vi";
+@@ -98,7 +93,7 @@
+ 				nvidia,function = "pcie";
+ 			};
+ 			hdint {
+-				nvidia,pins = "hdint", "pta";
++				nvidia,pins = "hdint";
+ 				nvidia,function = "hdmi";
+ 			};
+ 			i2cp {
+@@ -129,6 +124,10 @@
+ 					"lspi", "lvp1", "lvs";
+ 				nvidia,function = "displaya";
+ 			};
++			owc {
++				nvidia,pins = "owc", "spdi", "spdo", "uac";
++				nvidia,function = "rsvd2";
++			};
+ 			pmc {
+ 				nvidia,pins = "pmc";
+ 				nvidia,function = "pwr_on";
+@@ -248,6 +247,39 @@
+ 				nvidia,slew-rate-falling = <3>;
+ 			};
+ 		};
++
++		state_i2cmux_ddc: pinmux_i2cmux_ddc {
++			ddc {
++				nvidia,pins = "ddc";
++				nvidia,function = "i2c2";
++			};
++			pta {
++				nvidia,pins = "pta";
++				nvidia,function = "rsvd4";
++			};
++		};
++
++		state_i2cmux_pta: pinmux_i2cmux_pta {
++			ddc {
++				nvidia,pins = "ddc";
++				nvidia,function = "rsvd4";
++			};
++			pta {
++				nvidia,pins = "pta";
++				nvidia,function = "i2c2";
++			};
++		};
++
++		state_i2cmux_idle: pinmux_i2cmux_idle {
++			ddc {
++				nvidia,pins = "ddc";
++				nvidia,function = "rsvd4";
++			};
++			pta {
++				nvidia,pins = "pta";
++				nvidia,function = "rsvd4";
++			};
++		};
+ 	};
+ 
+ 	i2s at 70002800 {
+@@ -291,6 +323,31 @@
+ 		clock-frequency = <400000>;
+ 	};
+ 
++	i2cmux {
++		compatible = "i2c-mux-pinctrl";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		i2c-parent = <&{/i2c@7000c400}>;
++
++		pinctrl-names = "ddc", "pta", "idle";
++		pinctrl-0 = <&state_i2cmux_ddc>;
++		pinctrl-1 = <&state_i2cmux_pta>;
++		pinctrl-2 = <&state_i2cmux_idle>;
++
++		i2c at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
+ 	i2c at 7000c500 {
+ 		status = "okay";
+ 		clock-frequency = <400000>;
+-- 
+1.7.9.5
