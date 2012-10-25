@@ -1,31 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 16:37:59 +0200
-Subject: [GIT PULL] first set of ux500 for ARM SoC for v3.8
-In-Reply-To: <201210251344.44546.arnd@arndb.de>
-References: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
- <CACRpkdbSx-e4q+++=chjgyt0yD_v=JOP5OrQPoXb2-EPfNnrvg@mail.gmail.com>
- <201210251344.44546.arnd@arndb.de>
-Message-ID: <CACRpkdZ9fUUugHAPGw8kEZDFnDWyyZ-b2iUdfCu2Hhhg4swaPQ@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 25 Oct 2012 20:09:47 +0530
+Subject: [PATCHv4 0/2] i2c: omap: cleanups
+Message-ID: <1351175989-6401-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 3:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Applies on Felipe's series
+http://www.spinics.net/lists/linux-omap/msg79995.html
 
-> Please remember to write the pull request in a way that lets us reuse some
-> of the text for the merge changeset comment. Ideally in a signed tag
-> so git puts it in there automatically.
+Tested with Terro sys fix + Felipe's stop sched_clock() during suspend
+on omap3630 beagle both idle and suspend.
 
-So what was wrong with this signed tag, looking like that?
+Functional testing on omap4sdp.
 
-----------------------------------------------------------------
-A first set of Ux500 core patches for v3.8:
-- Support the HREF520 board
-- Add the device serial number to the entropy pool
+Todo: all the error cases may not need a reset. 
 
-----------------------------------------------------------------
+Shubhrajyoti D (2):
+  i2c: omap: re-factor omap_i2c_init function
+  i2c: omap: make reset a seperate function
 
-I guess what I'm after is what makes it reusable if this one
-isn't.
+ drivers/i2c/busses/i2c-omap.c |   97 +++++++++++++++++++++--------------------
+ 1 files changed, 50 insertions(+), 47 deletions(-)
 
-Yours,
-Linus Walleij
+-- 
+1.7.5.4
