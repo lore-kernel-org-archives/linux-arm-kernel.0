@@ -1,84 +1,30 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 25 Oct 2012 14:24:15 -0500
-Subject: [PATCH V3 2/2] ARM: OMAP2+: Add device-tree support for 32kHz counter
-In-Reply-To: <1351193055-12488-1-git-send-email-jon-hunter@ti.com>
-References: <1351193055-12488-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1351193055-12488-3-git-send-email-jon-hunter@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 25 Oct 2012 19:31:06 +0000 (UTC)
+Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
+ pdata function pointer
+In-Reply-To: <20121025191936.GZ11928@atomide.com>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+ <20121016013213.21844.20016.stgit@dusk.lan>
+ <20121025153805.GB11623@blackmetal.musicnaut.iki.fi>
+ <alpine.DEB.2.00.1210251846130.21193@utopia.booyaka.com>
+ <20121025185755.GV11928@atomide.com>
+ <alpine.DEB.2.00.1210251908560.21193@utopia.booyaka.com>
+ <20121025191936.GZ11928@atomide.com>
+Message-ID: <alpine.DEB.2.00.1210251929500.21193@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For OMAP devices, the 32kHz counter is the default clock-source for the kernel.
-However, this is not the only possible clock-source the kernel can use for OMAP
-devices.
+On Thu, 25 Oct 2012, Tony Lindgren wrote:
 
-When booting with device-tree, if the 32kHz counter is the desired clock-source
-for the kernel, then parse the device-tree blob to ensure that the counter is
-present and if so map memory for the counter using the device-tree of_iomap()
-function so we are no longer reliant on the OMAP HWMOD framework to do this for
-us.
+> I wonder if we can now with multiple watchdogs supported to
+> have also PRM/CM implement omap_prcm_wdt_ioctl() that just
+> handles WDIOC_GETBOOTSTATUS and then just remove that handling
+> from the other omap watchdog drivers?
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- arch/arm/mach-omap2/timer.c |   28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+The watchdog ioctl code needs access to internal watchdog state and 
+functions, for example  WDIOC_KEEPALIVE and  WDIOC_SETTIMEOUT.  How would 
+the approach you're thinking of implement those operations?
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 92447cd..0758bae 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -159,6 +159,11 @@ static struct of_device_id omap_timer_match[] __initdata = {
- 	{ }
- };
- 
-+static struct of_device_id omap_counter_match[] __initdata = {
-+	{ .compatible = "ti,omap-counter32k", },
-+	{ }
-+};
-+
- /**
-  * omap_get_timer_dt - get a timer using device-tree
-  * @match	- device-tree match structure for matching a device type
-@@ -377,11 +382,26 @@ static u32 notrace dmtimer_read_sched_clock(void)
- static int __init omap2_sync32k_clocksource_init(void)
- {
- 	int ret;
-+	struct device_node *np = NULL;
- 	struct omap_hwmod *oh;
- 	void __iomem *vbase;
- 	const char *oh_name = "counter_32k";
- 
- 	/*
-+	 * If device-tree is present, then search the DT blob
-+	 * to see if the 32kHz counter is supported.
-+	 */
-+	if (of_have_populated_dt()) {
-+		np = omap_get_timer_dt(omap_counter_match, NULL);
-+		if (!np)
-+			return -ENODEV;
-+
-+		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-+		if (!oh_name)
-+			return -ENODEV;
-+	}
-+
-+	/*
- 	 * First check hwmod data is available for sync32k counter
- 	 */
- 	oh = omap_hwmod_lookup(oh_name);
-@@ -390,7 +410,13 @@ static int __init omap2_sync32k_clocksource_init(void)
- 
- 	omap_hwmod_setup_one(oh_name);
- 
--	vbase = omap_hwmod_get_mpu_rt_va(oh);
-+	if (np) {
-+		vbase = of_iomap(np, 0);
-+		of_node_put(np);
-+	} else {
-+		vbase = omap_hwmod_get_mpu_rt_va(oh);
-+	}
-+
- 	if (!vbase) {
- 		pr_warn("%s: failed to get counter_32k resource\n", __func__);
- 		return -ENXIO;
--- 
-1.7.9.5
+
+
+- Paul
