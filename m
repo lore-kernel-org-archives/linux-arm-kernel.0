@@ -1,80 +1,86 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 25 Oct 2012 08:59:11 +0530
-Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
-In-Reply-To: <3245066.cWfgP9Ikey@vostro.rjw.lan>
-References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
- <CAKohpomUD-JQbkyEom+_BaRqJSvw8P_hBUsrjTU3vH6bM1+scQ@mail.gmail.com>
- <1597360.JT7plJlUsZ@vostro.rjw.lan>
- <3245066.cWfgP9Ikey@vostro.rjw.lan>
-Message-ID: <CAKohpo=Nv6DfXqyv=v-1Eo=pvx25qyrQ2qs+pGqJvbJu2bwWaw@mail.gmail.com>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Thu, 25 Oct 2012 09:48:09 +0530
+Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
+In-Reply-To: <1351074456-25863-3-git-send-email-b32955@freescale.com>
+References: <1351074456-25863-1-git-send-email-b32955@freescale.com>
+ <1351074456-25863-3-git-send-email-b32955@freescale.com>
+Message-ID: <1351138689.5263.68.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 October 2012 02:42, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Wednesday 24 of October 2012 21:43:46 Rafael J. Wysocki wrote:
->> On Wednesday 24 of October 2012 11:37:13 Viresh Kumar wrote:
->> > On 22 October 2012 14:16, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> > > On 20 October 2012 01:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
->> > >> Initially ondemand governor was written and then using its code conservative
->> > >> governor is written. It used a lot of code from ondemand governor, but copy of
->> > >> code was created instead of using the same routines from both governors. Which
->> > >> increased code redundancy, which is difficult to manage.
->> > >>
->> > >> This patch is an attempt to move common part of both the governors to
->> > >> cpufreq_governor.c file to come over above mentioned issues.
->> > >>
->> > >> This shouldn't change anything from functionality point of view.
->> > >>
->> > >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->> >
->> > For everybody else, this patch is already pushed by Rafael in his linux-next
->> > branch.
->>
->> Well, not yet, although I'm going to do that.
->
-> Or I would if it still applied.  Unfortunately, though, it doesn't apply any
-> more to my linux-next branch due to some previous changes in it.
->
-> Care to rebase?
+On Wed, 2012-10-24 at 18:27 +0800, Huang Shijie wrote:
+> Only we meet the following conditions, we can enable the DMA support for
+> auart:
+> 
+>   (1) We enable the DMA support in the dts file, such as
+>       arch/arm/boot/dts/imx28.dtsi.
+> 
+>   (2) We enable the hardware flow control.
+> 
+>   (3) We use the mx28, not the mx23. Due to hardware bug(see errata: 2836),
+>       we can not add the DMA support to mx23.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 
-Ahh.. I got confused by the following patch:
+>  
+>  #define to_auart_port(u) container_of(u, struct mxs_auart_port, port)
 
-commit 83a73f712f2275033b2dc7f5c664988a1823ebc7
-Author: viresh kumar <viresh.kumar@linaro.org>
-Date:   Tue Oct 23 01:28:05 2012 +0200
+> +
+> +static int mxs_auart_dma_tx(struct mxs_auart_port *s, int size)
+> +{
+> +	struct dma_async_tx_descriptor *desc;
+> +	struct scatterlist *sgl = &s->tx_sgl;
+> +	struct dma_chan *channel = s->tx_dma_chan;
+> +	u32 pio;
+> +
+> +	/* [1] : send PIO. Note, the first pio word is CTRL1. */
+> +	pio = AUART_CTRL1_XFER_COUNT(size);
+> +	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)&pio,
+> +					1, DMA_TRANS_NONE, 0);
+this seems like a hack. API expects a scatterlist as argument.
+Same thing about direction, NONE doesnt mean anything for dma transfer.
+> +	if (!desc) {
+> +		dev_err(s->dev, "step 1 error\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* [2] : set DMA buffer. */
+> +	sg_init_one(sgl, s->tx_dma_buf, size);
+> +	dma_map_sg(s->dev, sgl, 1, DMA_TO_DEVICE);
+> +	desc = dmaengine_prep_slave_sg(channel, sgl,
+> +			1, DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+> +	if (!desc) {
+> +		dev_err(s->dev, "step 2 error\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* [3] : submit the DMA */
+> +	desc->callback = dma_tx_callback;
+> +	desc->callback_param = s;
+> +	dmaengine_submit(desc);
+> +	dma_async_issue_pending(channel);
+> +	return 0;
+> +}
+> +
 
-    cpufreq: Move common part from governors to separate file, v2
+>  
+> +static bool mxs_auart_dma_filter(struct dma_chan *chan, void *param)
+> +{
+> +	struct mxs_auart_port *s = param;
+> +
+> +	if (!mxs_dma_is_apbx(chan))
+> +		return false;
+> +
+> +	if (s->dma_channel == chan->chan_id) {
+> +		chan->private = &s->dma_data;
+dont use chan->private. You need to dmaengine_slave_config API
 
-    Multiple cpufreq governers have defined similar get_cpu_idle_time_***()
-    routines. These routines must be moved to some common place, so that all
-    governors can use them.
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> +
 
-    So moving them to cpufreq_governor.c, which seems to be a better place for
-    keeping these routines.
-
-    Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-    Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
-
-Actually, i should i have replied on this patch (and i forgot). I
-wanted you to skip
-this patch, as the latest patch already had this change.
-
-But now i see commits from others on cpufreq_governor.c file.
-
-Hmm... So you can keep your tree as it is and apply the attached
-patch. It is the
-same patch getting discussed in this thread. Just rebased over your latest next.
-
-You must also apply my other patches fixing sparse warnings (they can be applied
-over this patch, tested), to fix sparse warnings from cpufreq.
-
---
-viresh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-cpufreq-governors-remove-redundant-code.patch
-Type: application/octet-stream
-Size: 67140 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/7b6d8c31/attachment-0001.obj>
+-- 
+Vinod Koul
+Intel Corp.
