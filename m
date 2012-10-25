@@ -1,41 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 18:18:23 +0200
-Subject: DEBUG_LL broken for socfpga
-Message-ID: <20121025181823.6c3fa0de@skate>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Oct 2012 18:23:52 +0200
+Subject: [PATCHv7 0/2] ARM: I2C: Add device tree bindings to i2c-mux-gpio
+Message-ID: <1351182234-22971-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dinh,
+Hi everyone,
 
-The arch/arm/include/debug/socfpga.S file implements only addruart, and
-forgets to implement waituart, senduart, busyuart:
+This patchset adds the device tree entry to the CFA-10049 board of its i2c
+muxer. This muxer controls sub-buses that contains three Nuvoton NAU7802
+ADCs and a NXP PCA955 GPIO expander. Support for these will be added
+eventually.
 
-  AS      arch/arm/kernel/debug.o
-/home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S: Assembler messages:
-/home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:83: Error: bad instruction `waituart r2,r3'
-/home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:84: Error: bad instruction `senduart r1,r3'
-/home/thomas/projets/linux-2.6/arch/arm/kernel/debug.S:85: Error: bad instruction `busyuart r2,r3'
+Thanks,
+Maxime
 
-Since the socfpga UART is apparently 8250 compatible, adding:
+Changes from v6:
+  - Changed the return value when neither platform data nor dt was available
+  - Fix a sentence in the documentation
 
-#define UART_SHIFT      2
-#include <asm/hardware/debug-8250.S>
+Maxime Ripard (2):
+  i2c: mux: Add dt support to i2c-mux-gpio driver
+  ARM: dts: cfa10049: Add the i2c muxer buses to the CFA-10049
 
-at the end of socfpga.S should be sufficient. However, socfpga.S uses
-an undefined DEBUG_LL_UART_OFFSET. And also most likely there is a
-missing static mapping for the UART registers in
-arch/arm/mach-socfpga/socfpga.c in order to get a virtual address for
-the UART registers soon enough for earlyprintk to work.
+ .../devicetree/bindings/i2c/i2c-mux-gpio.txt       |   81 +++++++++++
+ arch/arm/boot/dts/imx28-cfa10049.dts               |   24 ++++
+ drivers/i2c/muxes/i2c-mux-gpio.c                   |  146 +++++++++++++++-----
+ 3 files changed, 220 insertions(+), 31 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-mux-gpio.txt
 
-Probably easy to fix, but I have no hardware and no datasheet.
-Certainly better if someone having those could handle the
-implementation of the fix.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
