@@ -1,20 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 25 Oct 2012 14:41:25 -0600
-Subject: [PATCH V2] ARM: dt: tegra: ventana: define pinmux for ddc
-In-Reply-To: <1351147951-19706-1-git-send-email-markz@nvidia.com>
-References: <1351147951-19706-1-git-send-email-markz@nvidia.com>
-Message-ID: <5089A3F5.40005@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 25 Oct 2012 20:54:00 +0000 (UTC)
+Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
+ pdata function pointer (fwd)
+In-Reply-To: <20121023080533.GA16482@spo001.leaseweb.com>
+References: <alpine.DEB.2.00.1210180125140.30902@utopia.booyaka.com>
+ <20121023080533.GA16482@spo001.leaseweb.com>
+Message-ID: <alpine.DEB.2.00.1210252053250.4745@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 12:52 AM, Mark Zhang wrote:
-> Tegra 2's I2C2 controller can be routed to either the PTA
-> or DDC pin group on Ventana. So:
-> - Remove the HDMI function definition of pta pingroup
-> - Define child i2c adapters(ddc & pta) for I2C2 controller
+Hi Wim,
 
-Thanks, this looks good now.
+On Tue, 23 Oct 2012, Wim Van Sebroeck wrote:
 
-I've applied it to Tegra's for-3.8/dt branch for now, although I may
-have to shuffle things around (or just rename that branch) depending on
-exactly what patches we end up with to enable tegradrm.
+> > When you have the opportunity, could you take a look at this patch, and 
+> > the subsequent patch 6/7, and ack them if you're okay with them?
+> 
+> Signed them off, Acked-by would probably have been better :-).
+
+Great!  Will add your Acked-by:s. 
+
+> > We'd like to merge thse as part of a larger cleanup series through the 
+> > arm-soc tree.  They like cleanup patches to arrive at the beginning of the 
+> > -rc series, which means that we need to have the pull request sent pretty 
+> > soon.
+> 
+> Please go ahead. The sooner those ifdefs are gone the better.
+
+Thanks Wim,
+
+
+- Paul
