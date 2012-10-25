@@ -1,96 +1,179 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 14:35:00 +0200
-Subject: [PATCH] arm: mvebu: move irq controller driver in drivers/irqchip/
-Message-ID: <1351168500-11129-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 15:32:20 +0300
+Subject: [PATCH v2 5/7] i2c: omap: wait for transfer completion before
+ sending STP bit
+In-Reply-To: <1351167915-15079-6-git-send-email-balbi@ti.com>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <1351167915-15079-1-git-send-email-balbi@ti.com>
+ <1351167915-15079-6-git-send-email-balbi@ti.com>
+Message-ID: <20121025123220.GW21217@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new support for the ARM BCM2835 SoC has introduced the
-drivers/irqchip/ directory for IRQ controller drivers. So let's
-conform to this good new approach, and move the IRQ controller driver
-for Marvell Armada 370/XP in this directory.
+Hi,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/Makefile                       |    2 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |    1 +
- arch/arm/mach-mvebu/common.h                       |    3 ---
- drivers/irqchip/Makefile                           |    1 +
- .../irqchip}/irq-armada-370-xp.c                   |    0
- include/linux/irqchip/armada-370-xp.h              |   19 +++++++++++++++++++
- 6 files changed, 22 insertions(+), 4 deletions(-)
- rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (100%)
- create mode 100644 include/linux/irqchip/armada-370-xp.h
+On Thu, Oct 25, 2012 at 03:25:13PM +0300, Felipe Balbi wrote:
+> Later patches will come adding support for
+> reporting amount of bytes transferred so that
+> client drivers can count how many bytes are
+> left to transfer.
+> 
+> This is useful mostly in case of NACKs when
+> client driver wants to know exactly which
+> byte got NACKed so it doesn't have to resend
+> all bytes again.
+> 
+> In order to make that work with OMAP's I2C
+> controller, we need to prevent sending STP
+> bit until message is transferred. The reason
+> behind that is because OMAP_I2C_CNT_REG gets
+> reset to original value after STP bit is
+> shifted through I2C_SDA line and that would
+> prevent us from reading the correct number of
+> bytes left to transfer.
+> 
+> The full programming model suggested by IP
+> owner was the following:
+> 
+> - start I2C transfer (without STP bit)
+> - upon completion or NACK, read I2C_CNT register
+> - write STP bit to I2C_CON register
+> - wait for ARDY bit
+> 
+> With this patch we're implementing all steps
+> except step #2 which will come in a later
+> patch adding such support.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 89 ++++++++++++++++---------------------------
+>  1 file changed, 33 insertions(+), 56 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 20f9ad6..699fa12 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -438,9 +438,9 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  
+>  	/* Enable interrupts */
+>  	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+> -			OMAP_I2C_IE_ARDY | OMAP_I2C_IE_NACK |
+> -			OMAP_I2C_IE_AL)  | ((dev->fifo_size) ?
+> -				(OMAP_I2C_IE_RDR | OMAP_I2C_IE_XDR) : 0);
+> +			OMAP_I2C_IE_NACK | OMAP_I2C_IE_AL)  |
+> +			((dev->fifo_size) ? (OMAP_I2C_IE_RDR |
+> +				OMAP_I2C_IE_XDR) : 0);
+>  	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+>  	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+>  		dev->pscstate = psc;
+> @@ -470,6 +470,22 @@ static int omap_i2c_wait_for_bb(struct omap_i2c_dev *dev)
+>  	return 0;
+>  }
+>  
+> +static int omap_i2c_wait_for_ardy(struct omap_i2c_dev *dev)
+> +{
+> +	unsigned long timeout;
+> +
+> +	timeout = jiffies + OMAP_I2C_TIMEOUT;
+> +	while (!(omap_i2c_read_reg(dev, OMAP_I2C_STAT_REG) & OMAP_I2C_STAT_ARDY)) {
+> +		if (time_after(jiffies, timeout)) {
+> +			dev_warn(dev->dev, "timeout waiting for access ready\n");
+> +			return -ETIMEDOUT;
+> +		}
+> +		usleep_range(800, 1200);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
+>  {
+>  	u16		buf;
+> @@ -515,7 +531,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  {
+>  	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
+>  	unsigned long timeout;
+> -	int ret;
+> +	int ret = 0;
+>  	u16 w;
+>  
+>  	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
+> @@ -556,35 +572,9 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  	if (!(msg->flags & I2C_M_RD))
+>  		w |= OMAP_I2C_CON_TRX;
+>  
+> -	if (!dev->b_hw && stop)
+> -		w |= OMAP_I2C_CON_STP;
+> -
+>  	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+>  
+>  	/*
+> -	 * Don't write stt and stp together on some hardware.
+> -	 */
+> -	if (dev->b_hw && stop) {
+> -		unsigned long delay = jiffies + OMAP_I2C_TIMEOUT;
+> -		u16 con = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+> -		while (con & OMAP_I2C_CON_STT) {
+> -			con = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+> -
+> -			/* Let the user know if i2c is in a bad state */
+> -			if (time_after(jiffies, delay)) {
+> -				dev_err(dev->dev, "controller timed out "
+> -				"waiting for start condition to finish\n");
+> -				return -ETIMEDOUT;
+> -			}
+> -			cpu_relax();
+> -		}
+> -
+> -		w |= OMAP_I2C_CON_STP;
+> -		w &= ~OMAP_I2C_CON_STT;
+> -		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+> -	}
+> -
+> -	/*
+>  	 * REVISIT: We should abort the transfer on signals, but the bus goes
+>  	 * into arbitration and we're currently unable to recover from it.
+>  	 */
+> @@ -594,36 +584,36 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  	if (timeout == 0) {
+>  		dev_err(dev->dev, "controller timed out\n");
+>  		ret = -ETIMEDOUT;
+> -		goto err_i2c_init;
+> +		omap_i2c_init(dev);
+> +		goto out;
+>  	}
+>  
+>  	/* We have an error */
+>  	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+>  			    OMAP_I2C_STAT_XUDF)) {
+>  		ret = -EIO;
+> -		goto err_i2c_init;
+> +		omap_i2c_init(dev);
+> +		goto out;
+>  	}
+>  
+>  	if (dev->cmd_err & OMAP_I2C_STAT_NACK) {
+>  		if (msg->flags & I2C_M_IGNORE_NAK)
+>  			return 0;
+>  
+> -		if (stop) {
+> -			w = omap_i2c_read_reg(dev, OMAP_I2C_CON_REG);
+> -			w |= OMAP_I2C_CON_STP;
+> -			omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, w);
+> -		}
+> -
+>  		ret = -EREMOTEIO;
+> -		goto err;
+> +		omap_i2c_init(dev);
 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 57f996b..7f4e9f4 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
- 
- obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o addr-map.o
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 49d7915..1c0021d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -17,6 +17,7 @@
- #include <linux/of_platform.h>
- #include <linux/io.h>
- #include <linux/time-armada-370-xp.h>
-+#include <linux/irqchip/armada-370-xp.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 02f89ea..f0eaa21 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -17,7 +17,4 @@
- 
- void mvebu_restart(char mode, const char *cmd);
- 
--void armada_370_xp_init_irq(void);
--void armada_370_xp_handle_irq(struct pt_regs *regs);
--
- #endif
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 054321d..af0412c 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += irq-armada-370-xp.o
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-similarity index 100%
-rename from arch/arm/mach-mvebu/irq-armada-370-xp.c
-rename to drivers/irqchip/irq-armada-370-xp.c
-diff --git a/include/linux/irqchip/armada-370-xp.h b/include/linux/irqchip/armada-370-xp.h
-new file mode 100644
-index 0000000..78876c2
---- /dev/null
-+++ b/include/linux/irqchip/armada-370-xp.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#ifndef __LINUX_IRQCHIP_ARMADA_370_XP_H_
-+#define __LINUX_IRQCHIP_ARMADA_370_XP_H_
-+
-+#include <asm/exception.h>
-+
-+void armada_370_xp_init_irq(void);
-+void armada_370_xp_handle_irq(struct pt_regs *regs);
-+
-+#endif
+this is wrong. I will resend this patch alone. My bad.
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/d51dc1cc/attachment.sig>
