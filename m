@@ -1,43 +1,31 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Thu, 25 Oct 2012 15:56:33 +0200
-Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
-In-Reply-To: <20121025134609.GH28061@n2100.arm.linux.org.uk>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-8-git-send-email-balbi@ti.com>
- <20121025145748.760c218b@endymion.delvare>
- <20121025131459.GG28061@n2100.arm.linux.org.uk>
- <20121025154202.41f3cbba@endymion.delvare>
- <20121025134609.GH28061@n2100.arm.linux.org.uk>
-Message-ID: <20121025155633.609c5554@endymion.delvare>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Oct 2012 16:37:59 +0200
+Subject: [GIT PULL] first set of ux500 for ARM SoC for v3.8
+In-Reply-To: <201210251344.44546.arnd@arndb.de>
+References: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
+ <CACRpkdbSx-e4q+++=chjgyt0yD_v=JOP5OrQPoXb2-EPfNnrvg@mail.gmail.com>
+ <201210251344.44546.arnd@arndb.de>
+Message-ID: <CACRpkdZ9fUUugHAPGw8kEZDFnDWyyZ-b2iUdfCu2Hhhg4swaPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Oct 2012 14:46:09 +0100, Russell King - ARM Linux wrote:
-> On Thu, Oct 25, 2012 at 03:42:02PM +0200, Jean Delvare wrote:
-> > On Thu, 25 Oct 2012 14:14:59 +0100, Russell King - ARM Linux wrote:
-> > > You also miss one very very very big point.  This will break every I2C
-> > > using userspace program out there unless it is rebuilt - this change will
-> > > require the exact right version of those userspace programs for the
-> > > kernel that they're being used on.
-> > 
-> > How that? The extra field is added in a hole, so we don't change the
-> > struct size nor the relative positions of existing fields. Why would
-> > user-space care?
-> 
-> You know the layout of that struct for certain across all Linux supported
-> architectures, including some of the more obscure ones which may not
-> require pointers to be aligned?
+On Thu, Oct 25, 2012 at 3:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-No I don't, I naively supposed it would be fine. I would expect gcc to
-always align pointers even when the architecture doesn't need them to
-be, for performance reasons, even when it doesn't have to, as long as
-attribute packed isn't used. After all, integers don't _have_ to be
-aligned on x86, but gcc aligns them.
+> Please remember to write the pull request in a way that lets us reuse some
+> of the text for the merge changeset comment. Ideally in a signed tag
+> so git puts it in there automatically.
 
-The original idea of using the hole in the i2c_msg structure is from
-David Brownell, who was apparently familiar with such practice, so I
-assumed it was OK. Actually I still assume it is, until someone comes
-with an supported architecture where it is not.
+So what was wrong with this signed tag, looking like that?
 
--- 
-Jean Delvare
+----------------------------------------------------------------
+A first set of Ux500 core patches for v3.8:
+- Support the HREF520 board
+- Add the device serial number to the entropy pool
+
+----------------------------------------------------------------
+
+I guess what I'm after is what makes it reusable if this one
+isn't.
+
+Yours,
+Linus Walleij
