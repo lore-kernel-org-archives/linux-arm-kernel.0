@@ -1,44 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Oct 2012 15:18:00 +0100
-Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
-In-Reply-To: <20121025155633.609c5554@endymion.delvare>
-References: <1350899218-13624-1-git-send-email-balbi@ti.com>
- <1350899218-13624-8-git-send-email-balbi@ti.com>
- <20121025145748.760c218b@endymion.delvare>
- <20121025131459.GG28061@n2100.arm.linux.org.uk>
- <20121025154202.41f3cbba@endymion.delvare>
- <20121025134609.GH28061@n2100.arm.linux.org.uk>
- <20121025155633.609c5554@endymion.delvare>
-Message-ID: <20121025141800.GI28061@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 25 Oct 2012 09:19:02 -0500
+Subject: [PATCH] arm: mvebu: move irq controller driver in drivers/irqchip/
+In-Reply-To: <20121025160657.57a52658@skate>
+References: <1351168500-11129-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <50894346.60507@gmail.com> <20121025160657.57a52658@skate>
+Message-ID: <50894A56.5020005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 03:56:33PM +0200, Jean Delvare wrote:
-> On Thu, 25 Oct 2012 14:46:09 +0100, Russell King - ARM Linux wrote:
-> > On Thu, Oct 25, 2012 at 03:42:02PM +0200, Jean Delvare wrote:
-> > > On Thu, 25 Oct 2012 14:14:59 +0100, Russell King - ARM Linux wrote:
-> > > > You also miss one very very very big point.  This will break every I2C
-> > > > using userspace program out there unless it is rebuilt - this change will
-> > > > require the exact right version of those userspace programs for the
-> > > > kernel that they're being used on.
-> > > 
-> > > How that? The extra field is added in a hole, so we don't change the
-> > > struct size nor the relative positions of existing fields. Why would
-> > > user-space care?
-> > 
-> > You know the layout of that struct for certain across all Linux supported
-> > architectures, including some of the more obscure ones which may not
-> > require pointers to be aligned?
+On 10/25/2012 09:06 AM, Thomas Petazzoni wrote:
+> Rob,
 > 
-> No I don't, I naively supposed it would be fine. I would expect gcc to
-> always align pointers even when the architecture doesn't need them to
-> be, for performance reasons, even when it doesn't have to, as long as
-> attribute packed isn't used. After all, integers don't _have_ to be
-> aligned on x86, but gcc aligns them.
+> On Thu, 25 Oct 2012 08:48:54 -0500, Rob Herring wrote:
 > 
-> The original idea of using the hole in the i2c_msg structure is from
-> David Brownell, who was apparently familiar with such practice, so I
-> assumed it was OK. Actually I still assume it is, until someone comes
-> with an supported architecture where it is not.
+>> I don't mean to pick on this specific patch, but this is a common
+>> problem of moving various low-level pieces like irqchips, cpuidle,
+>> timers, etc. to drivers/*. If we, just moving the code as is over, we
+>> still need some hooks between arch/arm and drivers. I think if we keep
+>> adding ARM SOC specific headers to include/linux, that will be the
+>> next thing we get yelled at for and will have to clean-up.
+>>
+>> For irqchips, the way I see this working is we would have a single
+>> call to of_irq_init with a match list of all irqchips in
+>> drivers/irqchips. This contains the init function within
+>> drivers/irqchips. Then all the machines can just call a generic
+>> irqchip_init.
+> 
+> Sounds doable indeed.
+> 
+>> The handle_irq ptr would also need to be plugged in at runtime.
+> 
+> However, do you have a more specific idea here? In setup_arch(), the
+> value of mdesc->handle_irq gets picked up way before the ->init_irq
+> machine hook is being called.
+> 
+> An option would be to fill this mdesc->handle_irq() field during the
+> mdesc->init_early() callback (would require moving things around a bit
+> in setup_arch(), but sounds reasonable). However, at the time of
+> mdesc->init_early(), I guess we can't call of_irq_init(). So we would
+> have a two step process: fill in mdesc->handle_irq during
+> mdesc->init_early(), and call irqchip_init() (which will do the
+> of_irq_init()) in mdesc->init_irq().
 
-According to Al Viro, that would be m68k.
+There's not really any reason I can see that it needs to be setup that
+early. You can't really service interrupts before .init_irq completes
+anyway. I would export handle_arch_irq and allow the irqchip driver to
+set it up.
+
+> If that's fine with you, I can cook a patch for BCM2835 and MVEBU that
+> implements this idea.
+
+Great!
+
+Rob
