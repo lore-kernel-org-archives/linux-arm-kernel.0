@@ -1,46 +1,61 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 25 Oct 2012 11:50:15 -0500
-Subject: [PATCH] ARM: PMU: fix runtime PM enable
-In-Reply-To: <20121025164714.GK11267@mudshark.cambridge.arm.com>
-References: <1351024268-26734-1-git-send-email-jon-hunter@ti.com>
- <20121024093150.GA23775@mudshark.cambridge.arm.com> <5087F84B.9070705@ti.com>
- <20121024143204.GF7339@mudshark.cambridge.arm.com> <508803DF.7020902@ti.com>
- <20121024172325.GK7339@mudshark.cambridge.arm.com> <5088284D.40404@ti.com>
- <87vcdy33ma.fsf@deeprootsystems.com>
- <20121025164714.GK11267@mudshark.cambridge.arm.com>
-Message-ID: <50896DC7.80704@ti.com>
+From: dromede@gmail.com (dromede at gmail.com)
+Date: Thu, 25 Oct 2012 18:51:38 +0200
+Subject: [PATCH] [ARM] pxa/spitz_pm.c: Fix hang under certain conditions when
+ resuming from STR.
+Message-ID: <1351183898-12856-1-git-send-email-dromede@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Marko Katic <dromede.gmail.com>
 
-On 10/25/2012 11:47 AM, Will Deacon wrote:
-> On Thu, Oct 25, 2012 at 05:42:21PM +0100, Kevin Hilman wrote:
->> Jon Hunter <jon-hunter@ti.com> writes:
->>> On 10/24/2012 12:23 PM, Will Deacon wrote:
->>>> What do other drivers do? Grepping around, I see calls to pm_runtime_enable
->>>> made in various drivers and, given that you pass the device in there, what's
->>>> the problem with us just calling that unconditionally from perf? I know you
->>>> said that will work for OMAP, but I'm trying to understand the effect that
->>>> has on PM-aware platforms that don't require this for the PMU (since this
->>>> seems to be per-device).
->>>
->>> I had done this initially when testing on OMAP platforms that do and
->>> don't require runtime PM for PMU. I don't see any side affect of this,
->>> however, may be Kevin could comment on if that is ok. It would be the
->>> best approach.
->>
->> Unconditonally enabling runtime PM should be fine.  It may add a slight
->> bit of overhead calling runtime PM functions that ultimately do nothing
->> (because there are no callbacks), but it will be harmless.
->>
->> Personally, I think that would be cleaner.  The less pdata we need, the
->> better, IMO.
-> 
-> Thanks Kevin, I'm fine with that. Jon: want me to write a patch or do you
-> have something I can take into the ARM perf tree (if the latter, please
-> base against perf/updates)?
+Devices that use spitz_pm.c will fail to resume
+from STR (Suspend To Ram) when the charger plug is inserted
+or removed when a device is in STR mode. The culprit is
+a misconfigured gpio line - GPIO18. GPIO18 should be configured as a
+regular GPIO input but it gets configured as an alternate function
+GPIO18_RDY. And then later in postsuspend() it gets configured as
+a regular GPIO18 input line.
 
-I can easily spin this. Will base on top of your branch.
+Fix this by removing the GPIO18_RDY configuration so that GPIO18
+only gets configured as a regular gpio input.
 
-Cheers
-Jon
+Signed-off-by: Marko Katic <dromede.gmail.com>
+---
+ arch/arm/mach-pxa/spitz_pm.c |    8 ++------
+ 1 files changed, 2 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/spitz_pm.c b/arch/arm/mach-pxa/spitz_pm.c
+index 438f02f..842596d 100644
+--- a/arch/arm/mach-pxa/spitz_pm.c
++++ b/arch/arm/mach-pxa/spitz_pm.c
+@@ -86,10 +86,7 @@ static void spitz_discharge1(int on)
+ 	gpio_set_value(SPITZ_GPIO_LED_GREEN, on);
+ }
+ 
+-static unsigned long gpio18_config[] = {
+-	GPIO18_RDY,
+-	GPIO18_GPIO,
+-};
++static unsigned long gpio18_config = GPIO18_GPIO;
+ 
+ static void spitz_presuspend(void)
+ {
+@@ -112,7 +109,7 @@ static void spitz_presuspend(void)
+ 	PGSR3 &= ~SPITZ_GPIO_G3_STROBE_BIT;
+ 	PGSR2 |= GPIO_bit(SPITZ_GPIO_KEY_STROBE0);
+ 
+-	pxa2xx_mfp_config(&gpio18_config[0], 1);
++	pxa2xx_mfp_config(&gpio18_config, 1);
+ 	gpio_request_one(18, GPIOF_OUT_INIT_HIGH, "Unknown");
+ 	gpio_free(18);
+ 
+@@ -131,7 +128,6 @@ static void spitz_presuspend(void)
+ 
+ static void spitz_postsuspend(void)
+ {
+-	pxa2xx_mfp_config(&gpio18_config[1], 1);
+ }
+ 
+ static int spitz_should_wakeup(unsigned int resume_on_alarm)
+-- 
+1.7.4.1
