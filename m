@@ -1,51 +1,148 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 25 Oct 2012 12:03:34 +0530
-Subject: [RFC] cpufreq: Make sure target freq is within limits
-Message-ID: <f0099171c1c4f3048d0f29b7deb42144f26ac5d5.1351146515.git.viresh.kumar@linaro.org>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Thu, 25 Oct 2012 12:06:51 +0530
+Subject: [PATCH v2] i2c: omap: re-factor omap_i2c_init function
+Message-ID: <1351147011-6500-1-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+re-factor omap_i2c_init() so that we can re-use it for resume.
+While at it also remove the bufstate variable as we write it
+in omap_i2c_resize_fifo for every transfer.
 
-__cpufreq_driver_target() must not pass target frequency beyond the limits of
-current policy.
-
-Today most of cpufreq platform drivers are doing this check in their target
-routines. Why not move it to __cpufreq_driver_target().
-
-I wanted to get your opinion on this before making changes in all driver files.
-That's why this is an RFC.
-
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/cpufreq/cpufreq.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+v2 - add the iestate 0 check back.
+   - Remove a stray change.
+- Applies on top of Felipe's patches.
+http://www.spinics.net/lists/linux-omap/msg79995.html
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index f552d5f..59264f1 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -1470,12 +1470,19 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
- 			    unsigned int relation)
- {
- 	int retval = -EINVAL;
-+	unsigned int old_target_freq = target_freq;
+
+Tested with Terro sys fix + Felipe's stop sched_clock() during suspend
+on omap3636 beagle both idle and suspend.
+
+Functional testing on omap4sdp.
+
+ drivers/i2c/busses/i2c-omap.c |   71 ++++++++++++++++++----------------------
+ 1 files changed, 32 insertions(+), 39 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 5e5cefb..3d400b1 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -209,7 +209,6 @@ struct omap_i2c_dev {
+ 	u16			pscstate;
+ 	u16			scllstate;
+ 	u16			sclhstate;
+-	u16			bufstate;
+ 	u16			syscstate;
+ 	u16			westate;
+ 	u16			errata;
+@@ -285,9 +284,31 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+ 	}
+ }
  
- 	if (cpufreq_disabled())
- 		return -ENODEV;
- 
--	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
--		target_freq, relation);
-+	/* Make sure that target_freq is within supported range */
-+	if (target_freq > policy->max)
-+		target_freq = policy->max;
-+	if (target_freq < policy->min)
-+		target_freq = policy->min;
++static void __omap_i2c_init(struct omap_i2c_dev *dev)
++{
 +
-+	pr_debug("target for CPU %u: %u kHz, relation %u, requested %u kHz\n",
-+			policy->cpu, target_freq, relation, old_target_freq);
- 	if (cpu_online(policy->cpu) && cpufreq_driver->target)
- 		retval = cpufreq_driver->target(policy, target_freq, relation);
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
++	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
++	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
++
++	/* SCL low and high time values */
++	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
++	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
++	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530)
++		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
++	/* Take the I2C module out of reset: */
++	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
++	/*
++	 * Don't write to this register if the IE state is 0 as it can
++	 * cause deadlock.
++	 */
++	if (dev->iestate)
++		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
++}
++
+ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ {
+-	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
++	u16 psc = 0, scll = 0, sclh = 0;
+ 	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+ 	unsigned long fclk_rate = 12000000;
+ 	unsigned long timeout;
+@@ -337,11 +358,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 			 * REVISIT: Some wkup sources might not be needed.
+ 			 */
+ 			dev->westate = OMAP_I2C_WE_ALL;
+-			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+-							dev->westate);
+ 		}
+ 	}
+-	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
  
+ 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+ 		/*
+@@ -426,28 +444,18 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 		sclh = fclk_rate / (dev->speed * 2) - 7 + psc;
+ 	}
+ 
+-	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
+-	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, psc);
+-
+-	/* SCL low and high time values */
+-	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
+-	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
+-
+-	/* Take the I2C module out of reset: */
+-	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+-
+ 	/* Enable interrupts */
+ 	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+ 			OMAP_I2C_IE_NACK | OMAP_I2C_IE_AL)  |
+ 			((dev->fifo_size) ? (OMAP_I2C_IE_RDR |
+ 				OMAP_I2C_IE_XDR) : 0);
+-	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+-	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+-		dev->pscstate = psc;
+-		dev->scllstate = scll;
+-		dev->sclhstate = sclh;
+-		dev->bufstate = buf;
+-	}
++
++	dev->pscstate = psc;
++	dev->scllstate = scll;
++	dev->sclhstate = sclh;
++
++	__omap_i2c_init(dev);
++
+ 	return 0;
+ }
+ 
+@@ -1268,23 +1276,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ {
+ 	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+ 
+-	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+-		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
+-		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+-	}
+-
+-	/*
+-	 * Don't write to this register if the IE state is 0 as it can
+-	 * cause deadlock.
+-	 */
+-	if (_dev->iestate)
+-		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
++	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
++		__omap_i2c_init(_dev);
+ 
+ 	return 0;
+ }
 -- 
-1.7.12.rc2.18.g61b472e
+1.7.5.4
