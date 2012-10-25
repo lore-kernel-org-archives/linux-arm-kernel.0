@@ -1,34 +1,25 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 25 Oct 2012 13:26:40 +0200
-Subject: [PATCH 2/2] ARM: mach-imx: CAN clock fix for i.MX53
-In-Reply-To: <1351164400-27940-1-git-send-email-stigge@antcom.de>
-References: <1351164400-27940-1-git-send-email-stigge@antcom.de>
-Message-ID: <1351164400-27940-2-git-send-email-stigge@antcom.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Oct 2012 11:27:36 +0000
+Subject: [PATCH 1/2] arm: mvebu: increase atomic coherent pool size for
+ armada 370/XP
+In-Reply-To: <1351086561-13569-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351086561-13569-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201210251127.36960.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes CAN clocking on i.MX53.
+On Wednesday 24 October 2012, Gregory CLEMENT wrote:
+> For Armada 370/XP we have the same problem that for the commit
+> cb01b63, so we applied the same solution: "The default 256 KiB
+> coherent pool may be too small for some of the Kirkwood devices, so
+> increase it to make sure that devices will be able to allocate their
+> buffers with GFP_ATOMIC flag"
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Signed-off-by: Roland Stigge <stigge@antcom.de>
+Do you know why the ATA driver needs this? I find it surprising that
+it's necessary, so I'd like to make sure we're not just working around
+a device driver bug here.
 
----
- arch/arm/mach-imx/clk-imx51-imx53.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
---- linux-2.6.orig/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ linux-2.6/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -426,10 +426,10 @@ int __init mx53_clocks_init(unsigned lon
- 	clk[usb_phy2_gate] = imx_clk_gate2("usb_phy2_gate", "usb_phy_sel", MXC_CCM_CCGR4, 12);
- 	clk[can_sel] = imx_clk_mux("can_sel", MXC_CCM_CSCMR2, 6, 2,
- 				mx53_can_sel, ARRAY_SIZE(mx53_can_sel));
--	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR6, 22);
--	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR6, 20);
--	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 8);
--	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 6);
-+	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR4, 6);
-+	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
-+	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 6);
-+	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
- 	clk[i2c3_gate] = imx_clk_gate2("i2c3_gate", "per_root", MXC_CCM_CCGR1, 22);
- 
- 	for (i = 0; i < ARRAY_SIZE(clk); i++)
+	Arnd
