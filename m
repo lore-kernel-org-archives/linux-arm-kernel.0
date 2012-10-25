@@ -1,43 +1,62 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 25 Oct 2012 08:22:55 -0500
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <508909CC.9000000@gmail.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com> <50889BB2.3090107@ti.com>
- <508909CC.9000000@gmail.com>
-Message-ID: <50893D2F.6080205@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 25 Oct 2012 09:29:00 -0400
+Subject: [PATCH 3/5] pinctrl: dove: fix iomem and pdma clock
+In-Reply-To: <508900A2.20005@gmail.com>
+References: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
+ <1351088724-11142-4-git-send-email-andrew@lunn.ch>
+ <CACRpkdYQ+kk1jJ-GfOBd_5pahu-KOTL4GA3_zWP85E6v+h51pA@mail.gmail.com>
+ <508900A2.20005@gmail.com>
+Message-ID: <20121025132900.GG18811@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/25/2012 04:43 AM, Daniel Mack wrote:
-> Hi Jon,
+On Thu, Oct 25, 2012 at 11:04:34AM +0200, Sebastian Hesselbarth wrote:
+> On 10/25/2012 09:04 AM, Linus Walleij wrote:
+> >On Wed, Oct 24, 2012 at 4:25 PM, Andrew Lunn<andrew@lunn.ch>  wrote:
+> >
+> >>Since 3.7 readl/writel require register addresses to be const void*
+> >>instead of unsigned int. The register addresses are converted using
+> >>IOMEM() and offsets are added instead of OR'ed.
+> >>Also a workaround for the pdma clock is added, that is required as
+> >>there is still no DT clock provider available on Dove.
+> >
+> >So essentially two unrelated patches squashed into one, and I
+> >would apply the first one right off but now the clock change makes
+> >me hesitate.
+> >
+> >>         clk = devm_clk_get(&pdev->dev, NULL);
+> >>+
+> >>+       /* Currently there is no DT clock provider for pdma clock,
+> >>+          this fallback ensures pdma clock is ticking */
+> >
+> >/*
+> >  * I prefer comment style like so because it's easier to read.
+> >  * Maybe it's a bit pedantic but bear with me.
+> >  */
+> >
+> >>+       if (IS_ERR(clk))
+> >>+               clk = clk_get_sys("dove-pdma", NULL);
+> >>+
+> >
+> >This is a horrible hack. But if the Marvell people agree about
+> >it I will live with it.
 > 
-> On 25.10.2012 03:53, Jon Hunter wrote:
->>
->> On 10/22/2012 02:55 PM, Daniel Mack wrote:
+> Unfortunately, it is. This is an chicken-egg-problem here, no
+> DT clk-provider, no clocks properties..
 > 
->>> +Example for an AM33xx board:
->>> +
->>> +	gpmc: gpmc at 50000000 {
->>> +		compatible = "ti,gpmc";
->>> +		ti,hwmods = "gpmc";
->>> +		reg = <0x50000000 0x1000000>;
->>
->> Nit-pick, that size is quite large for a register range. I recommend
->> looking at the HWMOD data file
->> (arch/arm/mach-omap2/omap_hwmod_33xx_data.c) and see how much space is
->> allocated for the registers (see structure am33xx_gpmc_addr_space).
+> While writing pinctrl-dove I was planing to enable it after
+> the clock provider but with Andrew pushing forward - for a good
+> reason - there comes the trouble ;)
 > 
-> Yeah but reserving the entire memory as per the reference manual also
-> prvents other from poking around in the same register space. Is there a
-> scenario in which it would of disadvantage to reserve all that memory?
+> I don't like the hack either but the clk-gate is there and
+> if I don't enable it pinctrl-dove will hang the SoC.
+> 
+> I have a clk-dove DT clk-provider in my pocket somewhere but
+> didn't find the time to prepare it for posting..
 
-1. It chews up a large chunk of virtual memory space unnecessarily. For
-   devices not using HIGHMEM and wish to use say 512MB of RAM, virtual
-   memory space can be constrained.
-2. We don't do that today probably because of #1.
+Then let's split out the dove-pinctrl patches until you have that series
+ready.
 
-Cheers
-Jon
+thx,
+
+Jason.
