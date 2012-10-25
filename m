@@ -1,69 +1,115 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 26 Oct 2012 07:10:20 +1300
-Subject: [PATCH 1/2] ARM: vt8500: Convert arch-vt8500 to multiplatform
-Message-ID: <1351188620-30039-1-git-send-email-linux@prisktech.co.nz>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Thu, 25 Oct 2012 23:42:40 +0530
+Subject: [RFC PATCH 00/13] sched: Integrating Per-entity-load-tracking
+ with the core scheduler
+In-Reply-To: <1351180603.12171.31.camel@twins>
+References: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
+ <1351180603.12171.31.camel@twins>
+Message-ID: <50898118.1050402@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch almosts completes the conversion to ARCH_MULTI_V5
-for arch-vt8500.
+Hi Peter,
+Thank you very much for your feedback.Please ignore the previous post.I
+am extremely sorry about the word wrap issues with it.
 
-Both single platform and multiplatform configurations are supported
-until earlyprintk support is available for multiplatform.
+On 10/25/2012 09:26 PM, Peter Zijlstra wrote:
+> OK, so I tried reading a few patches and I'm completely failing.. maybe
+> its late and my brain stopped working, but it simply doesn't make any
+> sense.
+> 
+> Most changelogs and comments aren't really helping either. At best they
+> mention what you're doing, not why and how. This means I get to
+> basically duplicate your entire thought pattern and I might as well do
+> the patches myself.
+> 
+> I also don't see the 'big' picture of what you're doing, you start out
+> by some weird avoid short running task movement.. why is that a good
+> start?
+> 
+> I would have expected a series like this to replace rq->cpu_load /
+> rq->load with a saner metric and go from there.. instead it looks like
+> its going about at things completely backwards. Fixing small details
+> instead of the big things.
+> 
+> Do explain..
+> 
+Let me see if I get what you are saying here right.You want to replace
+for example cfs_rq->load.weight with a saner metric because it does not
+consider the run time of the sched entities queued on it,merely their
+priorities.If this is right,in this patchset I believe
+cfs_rq->runnable_load_avg would be that right metric because it
+considers the run time of the sched entities queued on it.
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
-Hi Olof/Arnd,
+So why didnt I replace? I added cfs_rq->runnable_load_avg as an
+additional metric instead of replacing the older metric.I let the old
+metric be as a dead metric and used the newer metric as an
+alternative.so if this alternate metric does not do us good we have the
+old metric to fall back on.
 
-This patch needs an 'ackd' to finish off the multiplatform conversion
-for vt8500. It was previously ack'd by Olof, but we had to revert to
-keep the single kernel image working until multiplatform earlyprintk
-is available.
+> At best they mention what you're doing, not why and how.
+So the above explains *what* I am doing.
 
- arch/arm/Kconfig             |    4 +++-
- arch/arm/mach-vt8500/Kconfig |   12 ++++++++++++
- 2 files changed, 15 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-vt8500/Kconfig
+*How* am i doing it: Everywhere the scheduler needs to make a decision on:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 97b40d0..2a262a8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -941,7 +941,7 @@ config ARCH_OMAP
- 	help
- 	  Support for TI's OMAP platform (OMAP1/2/3/4).
- 
--config ARCH_VT8500
-+config ARCH_VT8500_SINGLE
- 	bool "VIA/WonderMedia 85xx"
- 	select ARCH_HAS_CPUFREQ
- 	select ARCH_REQUIRE_GPIOLIB
-@@ -1128,6 +1128,8 @@ source "arch/arm/mach-versatile/Kconfig"
- source "arch/arm/mach-vexpress/Kconfig"
- source "arch/arm/plat-versatile/Kconfig"
- 
-+source "arch/arm/mach-vt8500/Kconfig"
-+
- source "arch/arm/mach-w90x900/Kconfig"
- 
- # Definitions to make life easier
-diff --git a/arch/arm/mach-vt8500/Kconfig b/arch/arm/mach-vt8500/Kconfig
-new file mode 100644
-index 0000000..2ed0b7d
---- /dev/null
-+++ b/arch/arm/mach-vt8500/Kconfig
-@@ -0,0 +1,12 @@
-+config ARCH_VT8500
-+	bool "VIA/WonderMedia 85xx" if ARCH_MULTI_V5
-+	default ARCH_VT8500_SINGLE
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_REQUIRE_GPIOLIB
-+	select CLKDEV_LOOKUP
-+	select CPU_ARM926T
-+	select GENERIC_CLOCKEVENTS
-+	select GENERIC_GPIO
-+	select HAVE_CLK
-+	help
-+	  Support for VIA/WonderMedia VT8500/WM85xx System-on-Chip.
--- 
-1.7.9.5
+ a.find_busiest_group/find_idlest_group/update_sg_lb_stats:use sum of
+cfs_rq->runnable_load_avg to decide this instead of sum of
+cfs_rq->load.weight.
+
+ b.find_busiest_queue/find_idlest_queue: use cfs_rq->runnable_load_avg
+to decide this instead of cfs_rq->load.weight
+
+ c.move_tasks: use se->avg.load_avg_contrib to decide the weight of of
+each task instead of se->load.weight as the former reflects the runtime
+of the sched entity and hence its actual load.
+
+This is what my patches3-13 do.Merely *Replace*.
+
+*Why am I doing it*: Feed the load balancer with a more realistic metric
+to do load balancing and observe the consequences.
+
+> you start out by some weird avoid short running task movement.
+> why is that a good start?
+
+The short running tasks are not really burdening you,they have very
+little run time,so why move them?
+Throughout the concept of load balancing the focus is on *balancing the
+*existing* load* between the sched groups.But not really evaluating the
+*absolute load* of any given sched group.
+
+Why is this *the start*? This is like a round of elimination before the
+actual interview round  Try to have only those sched groups as
+candidates for load balancing that are sufficiently loaded.[Patch1]
+This *sufficiently loaded* is decided by the new metric explained in the
+*How* above.
+
+> I also don't see the 'big' picture of what you're doing
+
+Patch1: is explained above.*End result:Good candidates for lb.*
+Patch2:
+         10%
+         10%
+         10%                100%
+        ------             ------
+        SCHED_GP1          SCHED_GP2
+
+Before Patch               After Patch
+-----------------------------------
+SCHED_GP1 load:3072        SCHED_GP1:512
+SCHED_GP2 load:1024        SCHED_GP2:1024
+
+SCHED_GP1 is busiest       SCHED_GP2 is busiest:
+
+But Patch2 re-decides between GP1 and GP2 to check if the latency of
+tasks is getting affected although there is less load on GP1.If yes it
+is a better *busy * gp.
+
+*End Result: Better candidates for lb*
+
+Rest of the patches: now that we have our busy sched group,let us load
+balance with the aid of the new metric.
+*End Result: Hopefully a more sensible movement of loads*
+This is how I build the picture.
+
+Regards
+Preeti U Murthy
