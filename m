@@ -1,244 +1,185 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 25 Oct 2012 12:11:47 -0400
-Subject: [PATCH v3 01/11] clk: davinci - add main PLL clock driver
-In-Reply-To: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
+Date: Thu, 25 Oct 2012 12:11:46 -0400
+Subject: [PATCH v3 00/11] common clk drivers migration for DaVinci SoCs
+Message-ID: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the driver for the main PLL clock hardware found on DM SoCs.
-This driver borrowed code from arch/arm/mach-davinci/clock.c and
-implemented the driver as per common clock provider API. The main PLL
-hardware typically has a multiplier, a pre-divider and a post-divider.
-Some of the SoCs has the divider fixed meaning they can not be
-configured through a register. HAS_PREDIV and HAS_POSTDIV flags are used
-to tell the driver if a hardware has these dividers present or not.
-Driver is configured through the struct clk_pll_data that has the
-SoC specific clock data.
+This is v3 of the patch series for implementing clock tree for DaVinci SoCs
+using common clk framework.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- drivers/clk/davinci/clk-pll.c |  146 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/davinci/clk-pll.h |   57 ++++++++++++++++
- 2 files changed, 203 insertions(+)
+supported platforms: DM644x
+
+This code base can be accessed at
+
+https://gitorious.org/~m-karicheri/linux-davinci/linux-davinci-clk/commits/common-clk-v3
+
+The patch series is split in two parts:-
+	 patches prefixed with "clk" are for clk drivers
+	 patches prefixed with "ARM" are for davinci machine specific code.
+
+revision history:
+-----------------
+updates in v3:
+	- Major changes done based on review of v2 to move the clock data and
+	  initialization code to drivers/clk/davinci. There is a soc specific
+	  code (for example dm644x-clock.c) for doing clock initialization.
+	- Files renamed based on the review comments.
+	- Only DM644x is supported. Other devices will be added as the code
+	  matures so that unnecessary rework can be avoided.
+	- Incorporated comments from Nori Sekhar and Linus (comments coding
+	  style)
+	- Added clk-div clock to represent DaVinci pll divider clocks
+	- Removed clk-keystone-pll.c (will be added later)
+
+updates in v2:
+	- updates to davinci_clk to use union for clk driver platform data
+	- Fixed Linus Walleij' comment on code comment
+	- added code clean up that takes out the ifdef used in previous patches
+
+updates in v1:
+	- Added DM365 and DM355
+	- updates to davinci_clk struct to accomodate clk-fixed-factor data
+
+initial version:-
+
+Currently arch/arm/mach-davinci/clock.c and arch/arm/mach-davinci/psc.c
+implements clock drivers for DaVinci. This patch makes these code obsolete
+and migrate the SoC code to use the common clk based drivers. This adds
+two clk drivers specific to DaVinci and Keystone (found in c6x arch such
+as C6678) devices. Some of the existing clk drivers such as clk-fixed-rate,
+clk-divider, and clk-mux are re-used in addition to the DaVinci specific
+drivers to initialize the clock tree for the SoCs. Please refer chapter 6
+of http://www.ti.com/lit/ug/sprue14c/sprue14c.pdf for details of the
+PLL hardware in DM6446 and chapter 7 for defails of the PSC hardware.
+
+There are two Main PLLs in DM644x. PLL1 and PLL2. Each of these generate
+different clocks in the DM device through PLL dividers. Figure above shows this
+for PLL1. Similar hardware exists for PLL2 and the related output clocks. The
+hardware is similar in most of the DM SoCs. Some of the recent Keystone devices
+(c6678 under c6x architecture) include a slight variant of the PLL that
+implemented different registers for the multipliers and dividers. All of these
+devices include PLL dividers (PLLDIVx) and Power Sleep controllers (PSC). The
+SoCs defines various Power Domains and Clock domains and there are PSC modules
+that controls power and clocks to various hardware IPs of the SoC. 
+
+Following drivers are used for various clock hardware blocks:-
+
+CLKIN and OSCIN - clk-fixed-rate (existing driver)
+MUX - clk-mux (existing driver)
+PLLDIVx - davinci/clk-div (new driver)
+PLL mult/div - clk-pll (new driver)
+PSC - clk-psc.c (new driver)
+
+Please note that initially only platforms listed above are supported. The
+idea is to review the initial patch set and get a feedback on the overall
+structure of the code organization. The other SoCs will be added in subsequent
+patch revisions.
+
+The driver code implements the features needed to support the platforms
+listed above. It is expected that these drivers get updated in subsequent
+patch revisions to support additional SoCs. I have boot tested this on DM6446
+EVM. Also verified reboot command works and the clock rates are set as before.
+The patches depends on the following patches that I had sent for review earlier:
+
+davinci spi driver preparation @
+https://patchwork.kernel.org/patch/1389321/
+davinci watchdog driver preparation @
+https://lkml.org/lkml/2012/9/7/634
+davinci nand driver preparation @
+https://lkml.org/lkml/2012/9/7/635
+davinci i2c driver preparation @
+https://patchwork.kernel.org/patch/1388841/
+davinci gpio driver preparation @
+https://lkml.org/lkml/2012/8/31/341
+
+[RFC - PATCH] base:pm: prepare driver for common clock framework
+
+ISSUES to discuss
+-----------------
+Following are to be discussed as part of this patch review.
+
+ 1. arch/arm/pm.c. This is configuring PLL controller registers for suspend and
+    resume. It appears that we need to move this code to clk-pll.c?? But
+    I can't find APIs for suspend and resume in the common clk framework. How
+    is this expected to work? Currently i have kept the code ASIS.   
+
+ 2. There are usecount=1 in the old clock implementation for dsp, vicp and timer2
+    clocks. CLK_IGNORE_UNUSED flag is used currently to implement the same as
+    disabling these unused clocks causes issues in boot up,
+
+HELP NEEDED!!:
+--------------
+I am doing this work as a background activity and hence the progress will be
+slow. Please volunteer to help me in this effort by offering to test or migrating
+other devices to this framework.
+
+Murali Karicheri (11):
+  clk: davinci - add main PLL clock driver
+  clk: davinci - add PSC clock driver
+  clk: davinci - common clk utilities to init clk driver
+  clk: davinci - add pll divider clock driver
+  clk: davinci - add dm644x clock initialization
+  clk: davinci - add build infrastructure for DaVinci clock drivers
+  ARM: davinci - restructure header files for common clock migration
+  ARM: davinci - migrating to use common clock init code
+  ARM: davinci - dm644x: update SoC code to remove the clock data
+  ARM: davinci - migrate to common clock
+  ARM: davinci - common clock migration: clean up the old code
+
+ arch/arm/Kconfig                            |    1 +
+ arch/arm/mach-davinci/Kconfig               |    2 +
+ arch/arm/mach-davinci/Makefile              |   15 +-
+ arch/arm/mach-davinci/clock.c               |  669 ---------------------------
+ arch/arm/mach-davinci/clock.h               |  135 ------
+ arch/arm/mach-davinci/common.c              |   10 -
+ arch/arm/mach-davinci/cpufreq.c             |    2 -
+ arch/arm/mach-davinci/davinci.h             |    3 +
+ arch/arm/mach-davinci/devices.c             |    1 -
+ arch/arm/mach-davinci/dm644x.c              |  302 +-----------
+ arch/arm/mach-davinci/include/mach/clock.h  |   21 -
+ arch/arm/mach-davinci/include/mach/common.h |   10 +-
+ arch/arm/mach-davinci/include/mach/pll.h    |   46 ++
+ arch/arm/mach-davinci/include/mach/psc.h    |  209 ---------
+ arch/arm/mach-davinci/include/mach/time.h   |    2 +-
+ arch/arm/mach-davinci/pm.c                  |    3 +-
+ arch/arm/mach-davinci/psc.c                 |  112 -----
+ arch/arm/mach-davinci/sleep.S               |    3 +-
+ arch/arm/mach-davinci/time.c                |    6 +-
+ drivers/clk/Kconfig                         |    2 +
+ drivers/clk/Makefile                        |    1 +
+ drivers/clk/davinci/Kconfig                 |   44 ++
+ drivers/clk/davinci/Makefile                |    5 +
+ drivers/clk/davinci/clk-div.c               |  124 +++++
+ drivers/clk/davinci/clk-div.h               |   42 ++
+ drivers/clk/davinci/clk-pll.c               |  146 ++++++
+ drivers/clk/davinci/clk-pll.h               |   57 +++
+ drivers/clk/davinci/clk-psc.c               |  207 +++++++++
+ drivers/clk/davinci/clk-psc.h               |   46 ++
+ drivers/clk/davinci/clock.c                 |  112 +++++
+ drivers/clk/davinci/clock.h                 |   80 ++++
+ drivers/clk/davinci/dm644x-clock.c          |  304 ++++++++++++
+ drivers/clk/davinci/pll.h                   |   83 ++++
+ drivers/clk/davinci/psc.h                   |  215 +++++++++
+ 34 files changed, 1530 insertions(+), 1490 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/clock.c
+ delete mode 100644 arch/arm/mach-davinci/clock.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/clock.h
+ create mode 100644 arch/arm/mach-davinci/include/mach/pll.h
+ delete mode 100644 arch/arm/mach-davinci/psc.c
+ create mode 100644 drivers/clk/davinci/Kconfig
+ create mode 100644 drivers/clk/davinci/Makefile
+ create mode 100644 drivers/clk/davinci/clk-div.c
+ create mode 100644 drivers/clk/davinci/clk-div.h
  create mode 100644 drivers/clk/davinci/clk-pll.c
  create mode 100644 drivers/clk/davinci/clk-pll.h
+ create mode 100644 drivers/clk/davinci/clk-psc.c
+ create mode 100644 drivers/clk/davinci/clk-psc.h
+ create mode 100644 drivers/clk/davinci/clock.c
+ create mode 100644 drivers/clk/davinci/clock.h
+ create mode 100644 drivers/clk/davinci/dm644x-clock.c
+ create mode 100644 drivers/clk/davinci/pll.h
+ create mode 100644 drivers/clk/davinci/psc.h
 
-diff --git a/drivers/clk/davinci/clk-pll.c b/drivers/clk/davinci/clk-pll.c
-new file mode 100644
-index 0000000..337e9af
---- /dev/null
-+++ b/drivers/clk/davinci/clk-pll.c
-@@ -0,0 +1,146 @@
-+/*
-+ * DaVinci main pll clk driver
-+ *
-+ * Copyright (C) 2006-2012 Texas Instruments.
-+ * Copyright (C) 2008-2009 Deep Root Systems, LLC
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * DaVinci PLL clk driver implementation
-+ *
-+ * TODO - Add set_parent_rate()
-+ */
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+
-+#include "clk-pll.h"
-+
-+#define PLLDIV_EN       BIT(15)
-+
-+/**
-+ * struct clk_pll - DaVinci main pll clock
-+ * @hw: clk_hw for the pll
-+ * @pll_data: ptr to driver specific data
-+ */
-+struct clk_pll {
-+	struct clk_hw hw;
-+	struct clk_pll_data *pll_data;
-+};
-+
-+#define to_clk_pll(_hw) container_of(_hw, struct clk_pll, hw)
-+
-+/**
-+ * clk_pllclk_recalc() - function to calculate rate
-+ *
-+ * @hw: clk_hw for the pll
-+ * @parent_rate: Parent clk rate
-+ */
-+static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct clk_pll *pll = to_clk_pll(hw);
-+	struct clk_pll_data *pll_data = pll->pll_data;
-+	u32 mult = 1, prediv = 1, postdiv = 1;
-+	unsigned long rate = parent_rate;
-+
-+	mult = readl(pll_data->reg_pllm);
-+
-+	/*
-+	 * if fixed_multiplier is non zero, multiply pllm value by this
-+	 * value.
-+	 */
-+	if (pll_data->fixed_multiplier)
-+		mult =  pll_data->fixed_multiplier *
-+				(mult & pll_data->pllm_mask);
-+	else
-+		mult = (mult & pll_data->pllm_mask) + 1;
-+
-+	if (pll_data->pll_flags & CLK_DAVINCI_PLL_HAS_PREDIV) {
-+		/*
-+		 * prediv register is not present, take fixed_prediv value from
-+		 * pll_data for prediv
-+		 */
-+		if (pll_data->fixed_prediv) {
-+			prediv = pll_data->fixed_prediv;
-+		} else {
-+			prediv = readl(pll_data->reg_prediv);
-+			if (prediv & PLLDIV_EN)
-+				prediv = (prediv & pll_data->prediv_mask) + 1;
-+			else
-+				prediv = 1;
-+		}
-+	}
-+
-+	if (pll_data->pll_flags & CLK_DAVINCI_PLL_HAS_POSTDIV) {
-+		postdiv = readl(pll_data->reg_postdiv);
-+		if (postdiv & PLLDIV_EN)
-+			postdiv = (postdiv & pll_data->postdiv_mask) + 1;
-+		else
-+			postdiv = 1;
-+	}
-+
-+	rate /= prediv;
-+	rate *= mult;
-+	rate /= postdiv;
-+
-+	pr_debug("PLL%d: input = %lu MHz [ ",
-+		 pll_data->num, parent_rate / 1000000);
-+	if (prediv > 1)
-+		pr_debug("/ %d ", prediv);
-+	if (mult > 1)
-+		pr_debug("* %d ", mult);
-+	if (postdiv > 1)
-+		pr_debug("/ %d ", postdiv);
-+	pr_debug("] --> %lu MHz output.\n", rate / 1000000);
-+
-+	return rate;
-+}
-+
-+static const struct clk_ops clk_pll_ops = {
-+	.recalc_rate = clk_pllclk_recalc,
-+};
-+
-+/**
-+ * clk_register_davinci_pll() - register function for DaVinci main pll clk
-+ *
-+ * @dev: device ptr
-+ * @name: name of the clk
-+ * @parent_name: name of the parent clk
-+ * @pll_data: ptr to pll clk data
-+ */
-+struct clk *clk_register_davinci_pll(struct device *dev, const char *name,
-+			const char *parent_name,
-+			struct clk_pll_data *pll_data)
-+{
-+	struct clk_init_data init;
-+	struct clk_pll *pll;
-+	struct clk *clk;
-+
-+	if (!pll_data)
-+		return ERR_PTR(-ENODEV);
-+
-+	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
-+	if (!pll)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &clk_pll_ops;
-+	init.flags = pll_data->flags;
-+	init.parent_names = (parent_name ? &parent_name : NULL);
-+	init.num_parents = (parent_name ? 1 : 0);
-+
-+	pll->pll_data	= pll_data;
-+	pll->hw.init = &init;
-+
-+	clk = clk_register(NULL, &pll->hw);
-+	if (IS_ERR(clk))
-+		kfree(pll);
-+
-+	return clk;
-+}
-diff --git a/drivers/clk/davinci/clk-pll.h b/drivers/clk/davinci/clk-pll.h
-new file mode 100644
-index 0000000..c9e4826
---- /dev/null
-+++ b/drivers/clk/davinci/clk-pll.h
-@@ -0,0 +1,57 @@
-+/*
-+ * Header file for DaVinci main pll clk driver
-+ *
-+ * Copyright (C) 2006-2012 Texas Instruments.
-+ * Copyright (C) 2008-2009 Deep Root Systems, LLC
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * DaVinci PLL clk driver implementation
-+ *
-+ * TODO - Add set_parent_rate()
-+ */
-+
-+#ifndef __CLK_DAVINCI_PLL_H
-+#define __CLK_DAVINCI_PLL_H
-+
-+/* PLL flags */
-+#define CLK_DAVINCI_PLL_HAS_PREDIV			BIT(0)
-+#define CLK_DAVINCI_PLL_HAS_POSTDIV			BIT(1)
-+
-+/**
-+ * struct clk_pll_data - configuration for DaVinci main PLL clk driver
-+ *
-+ * @reg_pllm: io mapped address of pllm register
-+ * @reg_prediv: io mapped address of prediv register
-+ * @reg_postdiv: io mapped address of postdiv register
-+ * @pllm_mask: mask bits for pllm val
-+ * @prediv_mask: mask bits for prediv val
-+ * @postdiv_mask: mask bits for postdiv val
-+ * @num: PLL number. Some SoCs have more than one main PLL
-+ *       0 - PLL0 and 1 - PLL1
-+ * @flags - clk driver base flags
-+ * @pll_flags - clk_pll driver flags
-+ * @fixed_prediv - fixed value of prediv used instead of value from prediv reg
-+ * @fixed_multiplier - pllm register value is multiplied by this factor on a
-+ *		a particular SoC. For other SoCs, this is set to zero.
-+ */
-+struct clk_pll_data {
-+	void __iomem *reg_pllm;
-+	void __iomem *reg_prediv;
-+	void __iomem *reg_postdiv;
-+	u32 pllm_mask;
-+	u32 prediv_mask;
-+	u32 postdiv_mask;
-+	u32 num;
-+	u32 flags;
-+	u32 pll_flags;
-+	u32 fixed_prediv;
-+	u32 fixed_multiplier;
-+};
-+
-+struct clk *clk_register_davinci_pll(struct device *dev,
-+			const char *name, const char *parent_name,
-+			struct clk_pll_data *pll_data);
-+#endif /* CLK_DAVINCI_PLL_H */
 -- 
 1.7.9.5
