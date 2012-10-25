@@ -1,77 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 14:33:01 +0200
-Subject: [PATCH 2/6] pinctrl: Update clock handling for the
- pinctrl-nomadik GPIO driver
-In-Reply-To: <CAPDyKFromkv_VYgiQsERR=PbrwYqgux=teF_HSZxCtk2BCsk1A@mail.gmail.com>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdaeBW2ecQZ2fA-hL8o47pYpjZ=5Mn131F87u58rX+dekw@mail.gmail.com>
- <20121025073127.GB971@gmail.com> <5088F0EE.8030900@stericsson.com>
- <20121025082341.GC3348@gmail.com>
- <CAPDyKFromkv_VYgiQsERR=PbrwYqgux=teF_HSZxCtk2BCsk1A@mail.gmail.com>
-Message-ID: <CACRpkdaoGV3+iQHV-gHd3n1mROTZvCuuu59+U_zHpK=yXs6Bsw@mail.gmail.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 25 Oct 2012 07:33:37 -0500
+Subject: [PATCH V3 1/5] ARM: dts: OMAP: Add timer nodes
+In-Reply-To: <50892E27.7070102@ti.com>
+References: <1350496873-21337-1-git-send-email-jon-hunter@ti.com>
+ <1350496873-21337-2-git-send-email-jon-hunter@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB49C1B@DBDE01.ent.ti.com>
+ <50887315.2000509@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB4A768@DBDE01.ent.ti.com>
+ <50892E27.7070102@ti.com>
+Message-ID: <508931A1.50608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 11:29 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
 
-> Depending on clock type, a clk_disable is actually not going to "gate"
-> the clock, that might happen only in unprepare. This depends on if the
-> clock is a fast or slow clock.
+On 10/25/2012 07:18 AM, Jon Hunter wrote:
 
-Hm thats interesting. Now I need to drill down into this.
-So looking at it in this case:
+...
 
-clk_disable() from the GPIO block of the pin controller will
-hit "gpio.0", "gpio.1" etc in drivers/clk/ux500/u8500_clk.c.
+>> @@ -113,6 +114,9 @@ static int omap_timer_interrupt_test(struct omap_dm_timer *gptimer)
+>>
+>>         irq_data.gptimer = gptimer;
+>>         init_completion(&irq_data.complete);
+>> +
+>> +       omap_dm_timer_enable(gptimer);
+>> +
+>>         omap_dm_timer_set_int_enable(gptimer, OMAP_TIMER_INT_OVERFLOW);
+>>         omap_dm_timer_set_load_start(gptimer, 0, 0xffffff00);
+>>
+>> @@ -128,6 +132,8 @@ static int omap_timer_interrupt_test(struct omap_dm_timer *gptimer)
+>>
+>>         omap_dm_timer_stop(gptimer);
+>>         omap_dm_timer_set_int_enable(gptimer, 0);
+>> +       omap_dm_timer_disable(gptimer);
+>> +
+> 
+> Hmmm ... I am wondering if there is another bug lingering in the dmtimer
+> driver. Ideally, the context should be preserved by the driver.
 
-These are PRCC (Programmable Clock Controller) clocks
-registered using clk_reg_prcc_pclk() from clk-prcc.c.
+Looking at omap_dm_timer_set_load_start() we have the following code to
+restore context ...
 
-pclk:s are using the clk_prcc_pclk_ops and these point to
-clk_prcc_pclk_enable()/clk_prcc_pclk_disable() for
-enable/disable respectively.
+if (!(timer->capability & OMAP_TIMER_ALWON)) {
+	if (omap_pm_get_dev_context_loss_count(&timer->pdev->dev) !=
+			timer->ctx_loss_count)		
+		omap_timer_restore_context(timer);
+}
 
-These will just write a PRCC register.
+Can you see if this is getting called for AM33xx for the failing timers?
+If not then it would suggest that we are not detecting context loss
+correctly and not restoring the context. With the above context restore
+code we should not need those extra omap_dm_timer_enable/disable calls.
 
-And prepare() and unprepare() are not implemented for
-this clock.
-
-So far we can conclude that clk_enable()/disable()
-will indeed achieve the desired effect of gating the
-clock to the GPIO block per se, so we are saving
-some power for sure.
-
-However the prepare()/unprepare() calls will of course
-also accumulate upwards and in e.g. the example of
-"gpio.0" and "gpio.1" the parent is "per1clk" which is the
-clock for the entire peripheral group.
-
-(At this point I can stick in a reminder of the idea to
-restructure the device tree in peripheral groups, because
-that exercise will certainly pay off the day we try to encode
-clocks in the device tree, I think the point can be clearly
-seen as we proceed...)
-
-This "per1clk" is registered using clk_req_prcmu_gate()
-from clk-prcmu.c.
-
-Looking at that clock type we find it's a plain software
-dummy for the clk_enable()/clk_disable() path.
-The real action is happening in the prepare()/unprepare()
-path.
-
-So to be able to shut down the entire peripheral cluster,
-indeed both functions need to be called.
-
-So in accordance with this we can see that the patch
-should be applied, in some form.
-
-However it is not removing the initial clk_prepare()
-so the entire patch will be pointless, the prepare count
-will currently always be > 0.
-
-I'll mangle Lee's patch a bit, hold on..
-
-Yours,
-Linus Walleij
+Cheers
+Jon
