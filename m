@@ -1,84 +1,67 @@
-From: hechtb@googlemail.com (Bastian Hecht)
-Date: Thu, 25 Oct 2012 12:58:21 +0200
-Subject: [PATCH 2/3] ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with
- scu_power_mode
-In-Reply-To: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
-References: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
-Message-ID: <1351162702-8391-3-git-send-email-hechtb@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 13:55:16 +0300
+Subject: [PATCH 2/2] i2c: omap: make reset a seperate function
+In-Reply-To: <1351160586-12306-3-git-send-email-shubhrajyoti@ti.com>
+References: <1351160586-12306-1-git-send-email-shubhrajyoti@ti.com>
+ <1351160586-12306-3-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20121025105516.GH21217@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can remove the extra code of modify_scu_cpu_psr() and use the cleaner
-generic ARM helper scu_power_mode(). As every CPU only deals with its
-own power register and scu_power_mode() operates with 8-bit accesses,
-we save the locking overhead too.
+Hi,
 
-Signed-off-by: Bastian Hecht <hechtb@gmail.com>
----
- arch/arm/mach-shmobile/smp-sh73a0.c |   23 ++---------------------
- 1 file changed, 2 insertions(+), 21 deletions(-)
+On Thu, Oct 25, 2012 at 03:53:06PM +0530, Shubhrajyoti D wrote:
+> Implement reset as a seperate function.
+> This will enable us to make sure that we don't do the
+> calculation again on every transfer.
+> Also at probe the reset is not added as the hwmod is doing that
+> for us.
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 624f00f..96ddb97 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -41,9 +41,6 @@ static void __iomem *scu_base_addr(void)
- 	return (void __iomem *)0xf0000000;
- }
- 
--static DEFINE_SPINLOCK(scu_lock);
--static unsigned long tmp;
--
- #ifdef CONFIG_HAVE_ARM_TWD
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
- void __init sh73a0_register_twd(void)
-@@ -52,20 +49,6 @@ void __init sh73a0_register_twd(void)
- }
- #endif
- 
--static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
--{
--	void __iomem *scu_base = scu_base_addr();
--
--	spin_lock(&scu_lock);
--	tmp = __raw_readl(scu_base + 8);
--	tmp &= ~clr;
--	tmp |= set;
--	spin_unlock(&scu_lock);
--
--	/* disable cache coherency after releasing the lock */
--	__raw_writel(tmp, scu_base + 8);
--}
--
- static unsigned int __init sh73a0_get_core_count(void)
- {
- 	void __iomem *scu_base = scu_base_addr();
-@@ -83,7 +66,7 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
- 	cpu = cpu_logical_map(cpu);
- 
- 	/* enable cache coherency */
--	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	scu_power_mode(scu_base_addr(), 0);
- 
- 	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
- 		__raw_writel(1 << cpu, WUPCR);	/* wake up */
-@@ -95,8 +78,6 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
- 
- static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- {
--	int cpu = cpu_logical_map(0);
--
- 	scu_enable(scu_base_addr());
- 
- 	/* Map the reset vector (in headsmp.S) */
-@@ -104,7 +85,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- 	__raw_writel(__pa(shmobile_secondary_vector), SBAR);
- 
- 	/* enable cache coherency on CPU0 */
--	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	scu_power_mode(scu_base_addr(), 0);
- }
- 
- static void __init sh73a0_smp_init_cpus(void)
+since you're touching registers which supposedly only hwmod should
+touch, you ought to Cc Benoit to make sure he knows what's you're doing
+here. I'm adding him to Cc
+
+> @@ -592,7 +597,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  	if (timeout == 0) {
+>  		dev_err(dev->dev, "controller timed out\n");
+>  		ret = -ETIMEDOUT;
+> -		omap_i2c_init(dev);
+> +		omap_i2c_reset(dev);
+> +		__omap_i2c_init(dev);
+>  		goto out;
+>  	}
+>  
+> @@ -603,7 +609,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  			|| (dev->cmd_err & OMAP_I2C_STAT_ROVR)
+>  			|| (dev->cmd_err & OMAP_I2C_STAT_XUDF)) {
+>  		ret = -EIO;
+> -		omap_i2c_init(dev);
+> +		omap_i2c_reset(dev);
+> +		__omap_i2c_init(dev);
+>  		goto out;
+>  	}
+>  
+> @@ -621,7 +628,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+>  			return 0;
+>  
+>  		ret = -EREMOTEIO;
+> -		omap_i2c_init(dev);
+> +		omap_i2c_reset(dev);
+> +		__omap_i2c_init(dev);
+
+eventually we need to try to forcefully trigger these errors above
+(nack, overflow, underflow and arbitration lost) and try to make sure if
+actually need to reset the controller all the time. I find it really odd
+that we're always resetting the IP in every error condition without
+actually trying to figure out what's wrong with the driver (if there is
+something wrong with the driver, of course).
+
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/f4080bc0/attachment.sig>
