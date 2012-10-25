@@ -1,55 +1,36 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 25 Oct 2012 17:08:45 +0300
-Subject: [PATCH 7/7] ARM: tegra30: cpuidle: add LP2 driver for CPU0
-In-Reply-To: <20121018092440.GS3196@tbergstrom-lnx.Nvidia.com>
-References: <5074AA0E.2080508@wwwdotorg.org>
- <1349954685.19413.207.camel@jlo-ubuntu-64.nvidia.com>
- <5076F5CB.4020200@wwwdotorg.org>
- <1350025676.20241.82.camel@jlo-ubuntu-64.nvidia.com>
- <507885D4.10604@wwwdotorg.org>
- <1350287799.23354.23.camel@jlo-ubuntu-64.nvidia.com>
- <507C32E8.1040701@wwwdotorg.org>
- <20121016080634.GG3196@tbergstrom-lnx.Nvidia.com>
- <507D936F.70905@wwwdotorg.org>
- <20121018092440.GS3196@tbergstrom-lnx.Nvidia.com>
-Message-ID: <20121025140844.GC1962@tbergstrom-lnx.Nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Oct 2012 16:09:28 +0200
+Subject: [PATCH 1/2] arm: mvebu: increase atomic coherent pool size for
+ armada 370/XP
+In-Reply-To: <201210251346.41596.arnd@arndb.de>
+References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
+ <201210251127.36960.arnd@arndb.de> <20121025134352.16a8ef81@skate>
+ <201210251346.41596.arnd@arndb.de>
+Message-ID: <20121025160928.53daf18a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 11:24:40AM +0200, Peter De Schrijver wrote:
-> On Tue, Oct 16, 2012 at 07:03:43PM +0200, Stephen Warren wrote:
-> > On 10/16/2012 02:06 AM, Peter De Schrijver wrote:
-> > >>> Even though we have plan to use coupled cpuidle, I still prefer to go
-> > >>> with the LP2 driver first. Then adding one more patch to support coupled
-> > >>> cpuidle based on LP2 driver. This is good for history. And if there is
-> > >>> any issue, it's more easy to roll back to the stable one.
-> > >>
-> > >> I don't think that implementing it one way and then changing to a
-> > >> different way will benefit history at all. It'll make the history more
-> > >> complicated. What exactly is the problem with just using coupled cpuidle
-> > >> from the start? If we did merge this implementation now, then switch to
-> > >> coupled cpuidle later, when do you think the switch would happen?
-> > > 
-> > > Before we consider doing this, I think we should have some idea on how
-> > > frequently we run into the situation where CPU0 is idle but a secondary
-> > > core is not. Depending on that we can then decide how useful coupled cpuidle
-> > > would be for us.
-> > 
-> > Would it not be 75% of the time where we have 1 of 4 CPUs active? At
-> > least, that's assuming that all work is evenly distributed amongst CPUs,
-> > and hence it's random which CPU is the last to go idle, but perhaps
-> > that's not the case if CPU0 is somehow special workload-wise?
-> > 
+
+On Thu, 25 Oct 2012 13:46:41 +0000, Arnd Bergmann wrote:
+
+> > Seems like the driver is too lazy and allocates everything coherent
+> > to avoid the hassle of doing dma_map/dma_unmap operations when
+> > needed, but I haven't looked in details at the driver yet to see if
+> > it would be possible to switch those DMA coherent allocations into
+> > non-coherent allocations + appropriate calls to the DMA operations.
 > 
-> Depends, at least it used to be possible to tune the scheduler to prefer
-> CPU0 if the workload can run on a single CPU.
-> 
+> Using coherent allocations is fine, I was wondering whether they need
+> to be atomic or not.
 
-I just noticed https://lwn.net/Articles/518834/. If we can configure this to
-prefer CPU0 in case all work can be done on a single core, we shouldn't
-hit the case were a secondary CPU is the only active CPU for a significant
-period of time.
+You're raising a good point here: all the dma_pool_alloc()
+allocations done by sata_mv are GFP_KERNEL. So why are we having
+problems with the /atomic/ coherent pool size? Is it the libata core
+that's doing GFP_ATOMIC DMA coherent allocations. It doesn't seem so.
+Something's odd.
 
-Cheers,
-
-Peter.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
