@@ -1,127 +1,72 @@
 From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 25 Oct 2012 15:54:41 +0530
-Subject: [RFC PATCH 00/13] sched: Integrating Per-entity-load-tracking with
- the core scheduler
-Message-ID: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
+Date: Thu, 25 Oct 2012 15:54:52 +0530
+Subject: [RFC PATCH 01/13] sched:Prevent movement of short running tasks
+ during load balancing
+In-Reply-To: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
+References: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
+Message-ID: <20121025102452.21022.70635.stgit@preeti.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset uses the per-entity-load-tracking patchset which will soon be
-available in the kernel.It is based on the tip/master tree before the
-(HEAD at b654f92c06e562c)integration of per-entity-load-tracking patchset.
-The first 8 latest patches of sched:per-entity-load-tracking alone have
-been imported to the tree from the quilt series of Peter(when they were
-present) to avoid the complexities of task groups and to hold back the
-optimizations of this patchset for now.This patchset is based at this level.
-Refer https://lkml.org/lkml/2012/10/12/9.This series is a continuation
-of the patchset in this link.
+Prevent sched groups with low load as tracked by PJT's metrics
+from being candidates of the load balance routine.This metric is chosen to be
+1024+15%*1024.But using PJT's metrics it has been observed that even when
+three 10% tasks are running,the load sometimes does not exceed this
+threshold.The call should be taken if the tasks can afford to be throttled.
 
-This patchset is an attempt to begin the integration of PJT's
-metric with the load balancer in a step wise fashion,and progress based
-on the consequences.This patchset has been tested with the config excluding
-CONFIG_FAIR_GROUP_SCHED.
+This is why an additional metric has been included,which can determine how
+long we can tolerate tasks not being moved even if the load is low.
 
-The following issues have been considered towards this:
-[NOTE:an x% task referred to in the logs and below is calculated over a
-duty cycle of 10ms.]
-
-1.Consider a scenario,where there are two 10% tasks running on a cpu.The
-  present code will consider the load on this queue to be 2048,while
-  using PJT's metric the load is calculated to be <1000,rarely exceeding this
-  limit.Although the tasks are not contributing much to the cpu load,they are
-  decided to be moved by the scheduler.
-
-  But one could argue that 'not moving one of these tasks could throttle
-  them.If there was an idle cpu,perhaps we could have moved them'.While the
-  power save mode would have been fine with not moving the task,the
-  performance mode would prefer not to throttle the tasks.We could strive
-  to strike a balance by making this decision tunable with certain parameters.
-  This patchset includes such tunables.This issue is addressed in Patch[1/2].
-
-  *The advantage of this behavior of PJT's metric has been demonstrated via
-   an experiment*.Please see the reply to this cover letter to be posted right
-   away.
-
-2.We need to be able to do this cautiously,as the scheduler code is too
-  complex.This patchset is an attempt to begin the integration of PJT's
-  metric with the load balancer in a step wise fashion,and progress based on
-  the consequences.
-  *What this patchset essentially does is in two primary places of the
-   scheduler,PJT's metric has replaced the existing metric to make decisions for load
-   balancing*.
-  1.load_balance()
-  2.select_task_rq_fair()
-
-  This description of the patches are below:
-
-         Patch[1/13]: This patch aims@detecting short running tasks and
-	 prevent their movement.In update_sg_lb_stats,dismiss a sched group
-         as a candidate for load balancing,if load calculated by PJT's metric
-	 says that the average load on the sched_group <= 1024+(.15*1024).
-	 This is a tunable,which can be varied after sufficient experiments.
-
-         Patch[2/13]:In the current scheduler greater load would be analogous
-         to more number of tasks.Therefore when the busiest group is picked
-         from the sched domain in update_sd_lb_stats,only the loads of the
-         groups are compared between them.If we were to use PJT's metric,a
-         higher load does not necessarily mean more number of tasks.This
-	 patch addresses this issue.
-
-	 Patch[3/13] to Patch[13/13] : Replacement of the existing metrics
-	 deciding load balancing and selecting a runqueue for load
-         placement,with the PJT's metric and subsequent usage of PJT's metric
-         for schduling.
-
-3.The Primary advantage that I see in integrating PJT's metric with the core
-  scheduler is listed below:
-
-  1. Excluding short running tasks from being candidates for load balancing.
-     This would avoid unnecessary migrations when the CPU is not sufficiently
-     loaded.This advantage has been portrayed in the results of the
-     experiment.
-
-     Run the workload attached.There are 8 threads spwaned each being 10%
-     tasks.
-     The number of migrations was measured from /proc/schedstat
-
-     Machine: 1 socket 4 core pre-nehalem.
-
-     Experimental Setup:
-     cat /proc/schedstat > stat_initial
-     gcc -Wall -Wshadow -lpthread  -o test test.c
-     cat /proc/schedstat > stat_final
-     The difference in the number of pull requests from both these files have
-     been calculated and are as below:
-
-     Observations:
-					With_Patchset	Without_patchset
-     ---------------------------------------------------------------------
-     Average_number_of_migrations	    0		 46
-     Average_number_of_records/s          9,71,114	9,45,158
-
-  With more memory intensive workloads, a higher difference in the number of
-  migrations is seen without any performance compromise.
-
+Signed-off-by:  Preeti U Murthy <preeti@linux.vnet.ibm.com>
 ---
+ kernel/sched/fair.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Preeti U Murthy (13):
-      sched:Prevent movement of short running tasks during load balancing
-      sched:Pick the apt busy sched group during load balancing
-      sched:Decide whether there be transfer of loads based on the PJT's metric
-      sched:Decide group_imb using PJT's metric
-      sched:Calculate imbalance using PJT's metric
-      sched:Changing find_busiest_queue to use PJT's metric
-      sched:Change move_tasks to use PJT's metric
-      sched:Some miscallaneous changes in load_balance
-      sched:Modify check_asym_packing to use PJT's metric
-      sched:Modify fix_small_imbalance to use PJT's metric
-      sched:Modify find_idlest_group to use PJT's metric
-      sched:Modify find_idlest_cpu to use PJT's metric
-      sched:Modifying wake_affine to use PJT's metric
-
-
- kernel/sched/fair.c |  262 ++++++++++++++++++++++++++++++++++++---------------
- 1 file changed, 186 insertions(+), 76 deletions(-)
-
--- 
-Preeti U Murthy
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index dbddcf6..e02dad4 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -4188,6 +4188,7 @@ struct sd_lb_stats {
+  */
+ struct sg_lb_stats {
+ 	unsigned long avg_load; /*Avg load across the CPUs of the group */
++	u64 avg_cfs_runnable_load; /* Equivalent of avg_load but calculated using PJT's metric */
+ 	unsigned long group_load; /* Total load over the CPUs of the group */
+ 	unsigned long sum_nr_running; /* Nr tasks running in the group */
+ 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+@@ -4504,6 +4505,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 	unsigned long load, max_cpu_load, min_cpu_load;
+ 	unsigned int balance_cpu = -1, first_idle_cpu = 0;
+ 	unsigned long avg_load_per_task = 0;
++	u64 group_load = 0; /* computed using PJT's metric */
+ 	int i;
+ 
+ 	if (local_group)
+@@ -4548,6 +4550,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 		if (idle_cpu(i))
+ 			sgs->idle_cpus++;
+ 
++		group_load += cpu_rq(i)->cfs.runnable_load_avg;
+ 		update_sg_numa_stats(sgs, rq);
+ 	}
+ 
+@@ -4572,6 +4575,19 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 	sgs->avg_load = (sgs->group_load*SCHED_POWER_SCALE) / group->sgp->power;
+ 
+ 	/*
++	 * Check if the sched group has not crossed the threshold.
++	 *
++	 * Also check if the sched_group although being within the threshold,is not
++	 * queueing too many tasks.If yes to both,then make it an
++	 * invalid candidate for load balancing
++	 *
++	 * The below condition is included as a tunable to meet performance and power needs
++	 */
++	sgs->avg_cfs_runnable_load = (group_load * SCHED_POWER_SCALE) / group->sgp->power;
++	if (sgs->avg_cfs_runnable_load <= 1178 && sgs->sum_nr_running <= 2)
++		sgs->avg_cfs_runnable_load = 0;
++
++	/*
+ 	 * Consider the group unbalanced when the imbalance is larger
+ 	 * than the average weight of a task.
+ 	 *
