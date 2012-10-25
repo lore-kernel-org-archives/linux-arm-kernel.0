@@ -1,33 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 20:54:00 +0000 (UTC)
-Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
- pdata function pointer (fwd)
-In-Reply-To: <20121023080533.GA16482@spo001.leaseweb.com>
-References: <alpine.DEB.2.00.1210180125140.30902@utopia.booyaka.com>
- <20121023080533.GA16482@spo001.leaseweb.com>
-Message-ID: <alpine.DEB.2.00.1210252053250.4745@utopia.booyaka.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 25 Oct 2012 21:59:01 +0100
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121024185818.GB772@arwen.pp.htv.fi>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <20121024185818.GB772@arwen.pp.htv.fi>
+Message-ID: <20121025205901.GA3827@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim,
+On Wed, Oct 24, 2012 at 09:58:19PM +0300, Felipe Balbi wrote:
 
-On Tue, 23 Oct 2012, Wim Van Sebroeck wrote:
+> need a way to tell drivers/base "hey, don't touch pinctrl at all because
+> I know what I'm doing" and that has to happen before probe() too,
+> otherwise it's already too late and, according to what you suggest,
+> drivers/base will already have touched pinctrl. The only way I see would
+> be to add an extra "dont_touch_my_pins" field to every driver structure
+> in the kernel. Clearly what you say is nonsense.
 
-> > When you have the opportunity, could you take a look at this patch, and 
-> > the subsequent patch 6/7, and ack them if you're okay with them?
-> 
-> Signed them off, Acked-by would probably have been better :-).
+I suspect that's not actually a big deal and that if we went down this
+route we'd have the driver take over control from the core code during
+probe() with the core still setting up the default state.
 
-Great!  Will add your Acked-by:s. 
-
-> > We'd like to merge thse as part of a larger cleanup series through the 
-> > arm-soc tree.  They like cleanup patches to arrive at the beginning of the 
-> > -rc series, which means that we need to have the pull request sent pretty 
-> > soon.
-> 
-> Please go ahead. The sooner those ifdefs are gone the better.
-
-Thanks Wim,
-
-
-- Paul
+Personally I do think we want to be factoring bolierplate out of
+drivers, if they're not doing anything constructive with pinctrl they
+should be able to avoid having code for it.  There definitely are issues
+to work through but it seems like we ought to be able to do something.
