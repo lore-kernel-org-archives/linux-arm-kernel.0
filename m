@@ -1,71 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Oct 2012 09:27:11 -0500
-Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and config
- update
-In-Reply-To: <508948A5.3020005@free-electrons.com>
-References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
- <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
- <20121024160139.6dbf5e16@skate> <5087F5B9.0@free-electrons.com>
- <20121025131818.GF18811@titan.lakedaemon.net> <50894471.9040000@gmail.com>
- <508948A5.3020005@free-electrons.com>
-Message-ID: <50894C3F.6040205@gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 25 Oct 2012 10:36:14 -0400 (EDT)
+Subject: [PATCH v2 2/2] USB: doc: Binding document for ehci-platform driver
+In-Reply-To: <20121025102301.GA3469@breakpoint.cc>
+Message-ID: <Pine.LNX.4.44L0.1210251035270.1278-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 09:11 AM, Gregory CLEMENT wrote:
-> On 10/25/2012 03:53 PM, Rob Herring wrote:
->> On 10/25/2012 08:18 AM, Jason Cooper wrote:
->>> On Wed, Oct 24, 2012 at 04:05:45PM +0200, Gregory CLEMENT wrote:
->>>> On 10/24/2012 04:01 PM, Thomas Petazzoni wrote:
->>>>> Hello,
->>>>>
->>>>> Shouldn't you split into one commit adding the SATA definition in
->>>>> the .dtsi + doing the defconfig change (the "SoC" level modifications),
->>>>> and then another commit for the .dts change? I don't really care
->>>>> personally, it's really up to Jason/Andrew on this.
->>>>>
->>>>> Another comment below, though.
->>>>>
->>>>> On Wed, 24 Oct 2012 15:49:21 +0200, Gregory CLEMENT wrote:
->>>>>
->>>>>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
->>>>>> index 94b4b9e..3f08233 100644
->>>>>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
->>>>>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
->>>>>> @@ -69,6 +69,16 @@
->>>>>>  			compatible = "marvell,armada-addr-decoding-controller";
->>>>>>  			reg = <0xd0020000 0x258>;
->>>>>>  		};
->>>>>> +
->>>>>> +		sata at d00a0000 {
->>>>>> +                        compatible = "marvell,orion-sata";
->>>>>> +                        reg = <0xd00a0000 0x2400>;
->>>>>> +                        interrupts = <55>;
->>>>>> +                        nr-ports = <2>;
->>>>>> +			clocks = <&coreclk 0>;//,  <&coreclk 0>;
->>>>>
->>>>> Alignment problem + remainings of tests or something like that.
->>>>
->>>> True I missed this one.
->>>>
->>>> Jason, Andrew, do you want I split this patch as suggested by Thomas or
->>>> are you fine with having one single patch?
->>>
->>> Yes, please make the defconfig changes a separate patch.  Also, please
->>> make sure only the minimum is enabled (eq RAID... isn't needed).
->>
->> What about updating multi_v7_defconfig instead?
+On Thu, 25 Oct 2012, Sebastian Andrzej Siewior wrote:
+
+> On Wed, Oct 24, 2012 at 08:55:27AM -1000, Mitch Bradley wrote:
+> > >> So by listing "usb-ehci" in its device ID table, a driver would
+> > >> essentially be saying that it can handle _all_ USB EHCI controllers.  
+> > 
+> > 
+> > Actually, it means that the driver can handle at least USB EHCI
+> > controllers that are 100% compatible with the EHCI spec (requiring
+> > nothing extra).  The driver might be able to handle almost-compatible
+> > controllers, possibly with the help of additional properties.
+> > 
+> > If a DT node lists "usb-ehci" as a "fallback", it's not guaranteed that
+> > a given version of that driver will work, but it's worth a try in the
+> > event that no more-specific driver is matched.
 > 
-> About the _instead_, when I proposed to removed mvebu_defconfig Thomas
-> argued that it was more convenient to build a mvebu-only kernel when
-> doing kernel development, and Andrew also pointed that this defconfig
-> should be useful for kisskb.
+> Not sure fallback is a good term here. The of parses the compatible from left
+> to right. If the device specific entry is not found (in the driver) then end
+> up with usb-ehci. If we need a quirk later on we add the device specific entry
+> to the driver (which will match before usb-ehci is found) and we could use
+> this entry to apply the quirk. That way you can apply quirks without touch the
+> firmware / device tree.
 
-Okay, missed that discussion.
+What happens if the drivers get probed in the wrong order?  That is, if 
+ehci-platform gets probed before ehci-spear (or whatever)?
 
-> And about updated both mvebu_defconfig and multi_v7_defconfig, I'm
-> fine with it.
-
-Yes, then please update both.
-
-Rob
+Alan Stern
