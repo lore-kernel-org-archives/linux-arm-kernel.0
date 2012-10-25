@@ -1,46 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 15:21:14 +0200
-Subject: [PATCH 2/2] arm: mvebu: adding SATA support: dt binding and
- config update
-In-Reply-To: <20121025131818.GF18811@titan.lakedaemon.net>
-References: <1351086561-13569-1-git-send-email-gregory.clement@free-electrons.com>
- <1351086561-13569-3-git-send-email-gregory.clement@free-electrons.com>
- <20121024160139.6dbf5e16@skate> <5087F5B9.0@free-electrons.com>
- <20121025131818.GF18811@titan.lakedaemon.net>
-Message-ID: <20121025152114.73e69c92@skate>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 25 Oct 2012 08:22:55 -0500
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <508909CC.9000000@gmail.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com> <50889BB2.3090107@ti.com>
+ <508909CC.9000000@gmail.com>
+Message-ID: <50893D2F.6080205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
 
-On Thu, 25 Oct 2012 09:18:18 -0400, Jason Cooper wrote:
-
-> > Jason, Andrew, do you want I split this patch as suggested by
-> > Thomas or are you fine with having one single patch?
+On 10/25/2012 04:43 AM, Daniel Mack wrote:
+> Hi Jon,
 > 
-> Yes, please make the defconfig changes a separate patch.  Also, please
-> make sure only the minimum is enabled (eq RAID... isn't needed).
+> On 25.10.2012 03:53, Jon Hunter wrote:
+>>
+>> On 10/22/2012 02:55 PM, Daniel Mack wrote:
+> 
+>>> +Example for an AM33xx board:
+>>> +
+>>> +	gpmc: gpmc at 50000000 {
+>>> +		compatible = "ti,gpmc";
+>>> +		ti,hwmods = "gpmc";
+>>> +		reg = <0x50000000 0x1000000>;
+>>
+>> Nit-pick, that size is quite large for a register range. I recommend
+>> looking at the HWMOD data file
+>> (arch/arm/mach-omap2/omap_hwmod_33xx_data.c) and see how much space is
+>> allocated for the registers (see structure am33xx_gpmc_addr_space).
+> 
+> Yeah but reserving the entire memory as per the reference manual also
+> prvents other from poking around in the same register space. Is there a
+> scenario in which it would of disadvantage to reserve all that memory?
 
-I haven't looked in details at the driver, but is nr-ports = <foo> the
-right way of doing things? We may have platforms were port 0 is not
-used, but port 1 is used, and just a number of ports doesn't allow to
-express this.
+1. It chews up a large chunk of virtual memory space unnecessarily. For
+   devices not using HIGHMEM and wish to use say 512MB of RAM, virtual
+   memory space can be constrained.
+2. We don't do that today probably because of #1.
 
-Shouldn't the DT property be
-
-  ports = <0>, <1>
-  ports = <1>
-  ports = <1>, <3>
-
-In order to allow to more precisely enabled SATA ports? Or maybe the
-SATA ports cannot be enabled/disabled on a per-port basis, in which
-case I'm obviously wrong here.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Cheers
+Jon
