@@ -1,45 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Oct 2012 10:57:08 +0100
-Subject: [PATCH 5/8] ARM: ux500: Add node for the MMC GPIO regulator
+Date: Thu, 25 Oct 2012 10:57:10 +0100
+Subject: [PATCH 7/8] ARM: ux500: CONFIG: Enable GPIO Regulators
 In-Reply-To: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
 References: <1351159031-25391-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351159031-25391-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1351159031-25391-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a very simple mechanism to change and SDI's voltage which
-consists of toggling some GPIOs. This scenario can be better handled
-if we convert it to a GPIO regulator. This patch provides one which
-can be read from Device Tree.
+It is the intention to convert the MMC voltage changing from
+GPIO flipping to using a proper GPIO regulator interface. A
+prerequisite of that is to enable the GPIO regulator
+functionality. As this affects all ux5x0 based boards we'll
+do it here instead of in the Kconfigs.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/configs/u8500_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 07a085b..536df5d 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -614,5 +614,19 @@
- 			ranges = <0 0x50000000 0x4000000>;
- 			status = "disabled";
- 		};
-+
-+		vmmci: regulator-gpio {
-+			compatible = "regulator-gpio";
-+
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <2600000>;
-+			regulator-name = "mmci-reg";
-+			regulator-type = "voltage";
-+
-+			gpios = <&tc3589x_gpio 18 0x4>;
-+			gpio-enable = <&tc3589x_gpio 17 0x4>;
-+			states = <1800000 0x1
-+				  2900000 0x0>;
-+		};
- 	};
- };
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index 0575d8a..50d3c22 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -76,6 +76,7 @@ CONFIG_AB8500_CORE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AB8500=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_REGULATOR_GPIO=y
+ # CONFIG_HID_SUPPORT is not set
+ CONFIG_USB_GADGET=y
+ CONFIG_AB8500_USB=y
 -- 
 1.7.9.5
