@@ -1,49 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Oct 2012 09:43:43 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <77006526a6de40ddb455b25787b08342.squirrel@ssl.serverraum.org>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <201210242006.55879.michael@walle.cc>
- <20121024200128.GY21046@lunn.ch> <20121024233356.1bda95bf@skate>
- <20121025054638.GB8590@lunn.ch> <20121025082826.693939b0@skate>
- <77006526a6de40ddb455b25787b08342.squirrel@ssl.serverraum.org>
-Message-ID: <20121025094343.58015440@skate>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2012 08:51:38 +0100
+Subject: [PATCH 0/5] clk: ux500: Add clock lookups for u8500
+In-Reply-To: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121025075138.GD971@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Michael Walle,
+On Mon, 22 Oct 2012, Ulf Hansson wrote:
 
-On Thu, 25 Oct 2012 09:39:13 +0200, Michael Walle wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> Step by step, clock lookups for u8500 are being added in this set
+> of patches.
+> 
+> These patches will require additional patches for sound/soc/ux500/
+> driver as well as drivers/i2c/busses/i2c-nomadik driver to prevent
+> the boot for ux500 from break. Those patches are being merged through
+> separate trees.
+> 
+> Ulf Hansson (5):
+>   clk: ux500: Register i2c clock lookups for u8500
+>   clk: ux500: Register ssp clock lookups for u8500
+>   clk: ux500: Register msp clock lookups for u8500
+>   clk: ux500: Update rtc clock lookup for u8500
+>   clk: ux500: Register slimbus clock lookups for u8500
 
-> LSXL_GPIO_USB_POWER and LSXL_GPIO_HDD_POWER switches the power on the USB
-> and SATA connector. So they are not needed to be set before the driver
-> probes, at least in my case here.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Ok.
+Can I also mention that these need to go into the -rcs at the
+earliest opportunity please, as it is preventing ~50% of the
+devices from functioning on all of the ST-Ericsson development
+boards. 
 
-> But i can imagine boards where you have to enable some kind of
-> buffer/muxer/etc which are controlled by GPIO pins. And I don't think that
-> should be part of the actual driver, because that would be highly board
-> dependant.
+This is a massive blocker for us!
 
-You'd have to provide a more specific example so I can imagine how it
-will be solved. But for example, if you have a GPIO-controlled muxer
-for an I2C bus, then the I2C devices behind the muxer are described as
-sub-devices of the muxer, so the probing order is correct.
-
-Of course, I'm not pretending I have ready-to-use solutions for all
-situations, but I think we can solve this problem on a case-by-case
-basis.
-
-Regardless of those GPIOs, did you solve the hang that happened even
-when you removed the gpio_set_value() calls? Or is it still a problem
-currently?
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
