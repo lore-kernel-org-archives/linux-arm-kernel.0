@@ -1,248 +1,384 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 25 Oct 2012 17:21:16 -0600
-Subject: [PATCH 04/13] ARM: OMAP2xxx: clock: move virt_prcm_set code into
- clkt2xxx_virt_prcm_set.c
+Date: Thu, 25 Oct 2012 17:21:18 -0600
+Subject: [PATCH 08/13] ARM: OMAP2+: CM/clock: convert
+ _omap2_module_wait_ready() to use SoC-independent CM functions
 In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
 References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <20121025232115.17558.12450.stgit@dusk.lan>
+Message-ID: <20121025232117.17558.83100.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Collect all of the virt_prcm_set-specific clocktype code into
-mach-omap2/clkt2xxx_virt_prcm_set.c.  Remove its dependency on the
-'sclk' and 'vclk' global variables.  Those variables will be removed
-by subsequent patches.
+Convert the OMAP clock code's _omap2_module_wait_ready() to use
+SoC-independent CM functions that are provided by the CM code, rather
+than using a deprecated function from mach-omap2/prcm.c.
 
-This is part of the process of cleaning up the OMAP2xxx clock code
-and preparing for the removal of the omap_prcm_restart() function.
+This facilitates the future conversion of the CM code to a driver, and
+also removes a mach-omap2/prcm.c user.  mach-omap2/prcm.c will be removed
+by a subsequent patch.
 
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   66 +++++++++++++++++++++++---
- arch/arm/mach-omap2/clock2420_data.c         |   19 ++-----
- arch/arm/mach-omap2/clock2430_data.c         |   19 ++-----
- arch/arm/mach-omap2/clock2xxx.h              |    2 +
- 4 files changed, 70 insertions(+), 36 deletions(-)
+ arch/arm/mach-omap2/clock.c     |   14 +++++++-
+ arch/arm/mach-omap2/cm.h        |   12 +++++++
+ arch/arm/mach-omap2/cm2xxx.c    |   65 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/cm2xxx.h    |    4 ++
+ arch/arm/mach-omap2/cm3xxx.c    |   66 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/cm3xxx.h    |    5 +++
+ arch/arm/mach-omap2/cm_common.c |   48 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/io.c        |    5 +++
+ 8 files changed, 215 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-index 1b95078..f9c71f3 100644
---- a/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-+++ b/arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c
-@@ -1,7 +1,7 @@
- /*
-  * OMAP2xxx DVFS virtual clock functions
-  *
-- * Copyright (C) 2005-2008 Texas Instruments, Inc.
-+ * Copyright (C) 2005-2008, 2012 Texas Instruments, Inc.
-  * Copyright (C) 2004-2010 Nokia Corporation
-  *
-  * Contacts:
-@@ -47,6 +47,13 @@
- const struct prcm_config *curr_prcm_set;
- const struct prcm_config *rate_table;
- 
-+/*
-+ * sys_ck_rate: the rate of the external high-frequency clock
-+ * oscillator on the board.  Set by the SoC-specific clock init code.
-+ * Once set during a boot, will not change.
-+ */
-+static unsigned long sys_ck_rate;
-+
- /**
-  * omap2_table_mpu_recalc - just return the MPU speed
-  * @clk: virt_prcm_set struct clk
-@@ -68,15 +75,14 @@ unsigned long omap2_table_mpu_recalc(struct clk *clk)
- long omap2_round_to_table_rate(struct clk *clk, unsigned long rate)
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index d0c6d9b..19acf08 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -33,6 +33,7 @@
+ #include "soc.h"
+ #include "clockdomain.h"
+ #include "clock.h"
++#include "cm.h"
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
+ #include "cm-regbits-24xx.h"
+@@ -67,7 +68,9 @@ static bool clkdm_control = true;
+ static void _omap2_module_wait_ready(struct clk *clk)
  {
- 	const struct prcm_config *ptr;
--	long highest_rate, sys_clk_rate;
-+	long highest_rate;
+ 	void __iomem *companion_reg, *idlest_reg;
+-	u8 other_bit, idlest_bit, idlest_val;
++	u8 other_bit, idlest_bit, idlest_val, idlest_reg_id;
++	s16 prcm_mod;
++	int r;
  
- 	highest_rate = -EINVAL;
--	sys_clk_rate = __clk_get_rate(sclk);
+ 	/* Not all modules have multiple clocks that their IDLEST depends on */
+ 	if (clk->ops->find_companion) {
+@@ -78,8 +81,13 @@ static void _omap2_module_wait_ready(struct clk *clk)
  
- 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
- 		if (!(ptr->flags & cpu_mask))
- 			continue;
--		if (ptr->xtal_speed != sys_clk_rate)
-+		if (ptr->xtal_speed != sys_ck_rate)
- 			continue;
+ 	clk->ops->find_idlest(clk, &idlest_reg, &idlest_bit, &idlest_val);
  
- 		highest_rate = ptr->mpu_speed;
-@@ -95,15 +101,12 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
- 	const struct prcm_config *prcm;
- 	unsigned long found_speed = 0;
- 	unsigned long flags;
--	long sys_clk_rate;
--
--	sys_clk_rate = __clk_get_rate(sclk);
+-	omap2_cm_wait_idlest(idlest_reg, (1 << idlest_bit), idlest_val,
+-			     __clk_get_name(clk));
++	r = cm_split_idlest_reg(idlest_reg, &prcm_mod, &idlest_reg_id);
++	if (r) {
++		pr_err("clock: %s: could not split idlest reg va\n", clk->name);
++		return;
++	}
++
++	cm_wait_module_ready(prcm_mod, idlest_reg_id, idlest_bit);
+ }
  
- 	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
- 		if (!(prcm->flags & cpu_mask))
- 			continue;
+ /* Public functions */
+diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
+index b3cee91..e419ecb 100644
+--- a/arch/arm/mach-omap2/cm.h
++++ b/arch/arm/mach-omap2/cm.h
+@@ -37,8 +37,18 @@
  
--		if (prcm->xtal_speed != sys_clk_rate)
-+		if (prcm->xtal_speed != sys_ck_rate)
- 			continue;
+ /**
+  * struct cm_ll_data - fn ptrs to per-SoC CM function implementations
++ * @split_idlest_reg: ptr to the SoC CM-specific split_idlest_reg impl
++ * @wait_module_ready: ptr to the SoC CM-specific wait_module_ready impl
+  */
+-struct cm_ll_data {};
++struct cm_ll_data {
++	int (*split_idlest_reg)(void __iomem *idlest_reg, s16 *prcm_inst,
++				u8 *idlest_reg_id);
++	int (*wait_module_ready)(s16 prcm_mod, u8 idlest_id, u8 idlest_shift);
++};
++
++extern int cm_split_idlest_reg(void __iomem *idlest_reg, s16 *prcm_inst,
++			       u8 *idlest_reg_id);
++extern int cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift);
  
- 		if (prcm->mpu_speed <= rate) {
-@@ -169,3 +172,50 @@ int omap2_select_table_rate(struct clk *clk, unsigned long rate)
+ extern int cm_register(struct cm_ll_data *cld);
+ extern int cm_unregister(struct cm_ll_data *cld);
+diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+index e96cd70..db65069 100644
+--- a/arch/arm/mach-omap2/cm2xxx.c
++++ b/arch/arm/mach-omap2/cm2xxx.c
+@@ -198,6 +198,43 @@ void omap2xxx_cm_apll96_disable(void)
+ 	_omap2xxx_apll_disable(OMAP24XX_EN_96M_PLL_SHIFT);
+ }
  
- 	return 0;
++/**
++ * omap2xxx_cm_split_idlest_reg - split CM_IDLEST reg addr into its components
++ * @idlest_reg: CM_IDLEST* virtual address
++ * @prcm_inst: pointer to an s16 to return the PRCM instance offset
++ * @idlest_reg_id: pointer to a u8 to return the CM_IDLESTx register ID
++ *
++ * XXX This function is only needed until absolute register addresses are
++ * removed from the OMAP struct clk records.
++ */
++int omap2xxx_cm_split_idlest_reg(void __iomem *idlest_reg, s16 *prcm_inst,
++				 u8 *idlest_reg_id)
++{
++	unsigned long offs;
++	u8 idlest_offs;
++	int i;
++
++	if (idlest_reg < cm_base || idlest_reg > (cm_base + 0x0fff))
++		return -EINVAL;
++
++	idlest_offs = (unsigned long)idlest_reg & 0xff;
++	for (i = 0; i < ARRAY_SIZE(omap2xxx_cm_idlest_offs); i++) {
++		if (idlest_offs == omap2xxx_cm_idlest_offs[i]) {
++			*idlest_reg_id = i + 1;
++			break;
++		}
++	}
++
++	if (i == ARRAY_SIZE(omap2xxx_cm_idlest_offs))
++		return -EINVAL;
++
++	offs = idlest_reg - cm_base;
++	offs &= 0xff00;
++	*prcm_inst = offs;
++
++	return 0;
++}
++
+ /*
+  *
+  */
+@@ -314,3 +351,31 @@ struct clkdm_ops omap2_clkdm_operations = {
+ 	.clkdm_clk_enable	= omap2xxx_clkdm_clk_enable,
+ 	.clkdm_clk_disable	= omap2xxx_clkdm_clk_disable,
+ };
++
++/*
++ *
++ */
++
++static struct cm_ll_data omap2xxx_cm_ll_data = {
++	.split_idlest_reg	= &omap2xxx_cm_split_idlest_reg,
++	.wait_module_ready	= &omap2xxx_cm_wait_module_ready,
++};
++
++int __init omap2xxx_cm_init(void)
++{
++	if (!cpu_is_omap24xx())
++		return 0;
++
++	return cm_register(&omap2xxx_cm_ll_data);
++}
++
++static void __exit omap2xxx_cm_exit(void)
++{
++	if (!cpu_is_omap24xx())
++		return;
++
++	/* Should never happen */
++	WARN(cm_unregister(&omap2xxx_cm_ll_data),
++	     "%s: cm_ll_data function pointer mismatch\n", __func__);
++}
++__exitcall(omap2xxx_cm_exit);
+diff --git a/arch/arm/mach-omap2/cm2xxx.h b/arch/arm/mach-omap2/cm2xxx.h
+index bce3c4b..4cbb39b 100644
+--- a/arch/arm/mach-omap2/cm2xxx.h
++++ b/arch/arm/mach-omap2/cm2xxx.h
+@@ -60,6 +60,10 @@ extern void omap2xxx_cm_set_apll96_auto_low_power_stop(void);
+ extern bool omap2xxx_cm_is_clkdm_in_hwsup(s16 module, u32 mask);
+ extern int omap2xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id,
+ 					 u8 idlest_shift);
++extern int omap2xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
++					s16 *prcm_inst, u8 *idlest_reg_id);
++
++extern int __init omap2xxx_cm_init(void);
+ 
+ #endif
+ 
+diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+index 8b03ec2..c2086f2 100644
+--- a/arch/arm/mach-omap2/cm3xxx.c
++++ b/arch/arm/mach-omap2/cm3xxx.c
+@@ -110,6 +110,44 @@ int omap3xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
+ 	return (i < MAX_MODULE_READY_TIME) ? 0 : -EBUSY;
+ }
+ 
++/**
++ * omap3xxx_cm_split_idlest_reg - split CM_IDLEST reg addr into its components
++ * @idlest_reg: CM_IDLEST* virtual address
++ * @prcm_inst: pointer to an s16 to return the PRCM instance offset
++ * @idlest_reg_id: pointer to a u8 to return the CM_IDLESTx register ID
++ *
++ * XXX This function is only needed until absolute register addresses are
++ * removed from the OMAP struct clk records.
++ */
++int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg, s16 *prcm_inst,
++				 u8 *idlest_reg_id)
++{
++	unsigned long offs;
++	u8 idlest_offs;
++	int i;
++
++	if (idlest_reg < (cm_base + OMAP3430_IVA2_MOD) ||
++	    idlest_reg > (cm_base + 0x1ffff))
++		return -EINVAL;
++
++	idlest_offs = (unsigned long)idlest_reg & 0xff;
++	for (i = 0; i < ARRAY_SIZE(omap3xxx_cm_idlest_offs); i++) {
++		if (idlest_offs == omap3xxx_cm_idlest_offs[i]) {
++			*idlest_reg_id = i + 1;
++			break;
++		}
++	}
++
++	if (i == ARRAY_SIZE(omap3xxx_cm_idlest_offs))
++		return -EINVAL;
++
++	offs = idlest_reg - cm_base;
++	offs &= 0xff00;
++	*prcm_inst = offs;
++
++	return 0;
++}
++
+ /* Clockdomain low-level operations */
+ 
+ static int omap3xxx_clkdm_add_sleepdep(struct clockdomain *clkdm1,
+@@ -597,3 +635,31 @@ void omap3_cm_restore_context(void)
+ 	omap2_cm_write_mod_reg(cm_context.cm_clkout_ctrl, OMAP3430_CCR_MOD,
+ 			       OMAP3_CM_CLKOUT_CTRL_OFFSET);
  }
 +
-+/**
-+ * omap2xxx_clkt_vps_check_bootloader_rate - determine which of the rate
-+ * table sets matches the current CORE DPLL hardware rate
++/*
 + *
-+ * Check the MPU rate set by bootloader.  Sets the 'curr_prcm_set'
-+ * global to point to the active rate set when found; otherwise, sets
-+ * it to NULL.  No return value;
 + */
-+void omap2xxx_clkt_vps_check_bootloader_rates(void)
-+{
-+	const struct prcm_config *prcm = NULL;
-+	unsigned long rate;
 +
-+	rate = omap2xxx_clk_get_core_rate();
-+	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
-+		if (!(prcm->flags & cpu_mask))
-+			continue;
-+		if (prcm->xtal_speed != sys_ck_rate)
-+			continue;
-+		if (prcm->dpll_speed <= rate)
-+			break;
++static struct cm_ll_data omap3xxx_cm_ll_data = {
++	.split_idlest_reg	= &omap3xxx_cm_split_idlest_reg,
++	.wait_module_ready	= &omap3xxx_cm_wait_module_ready,
++};
++
++int __init omap3xxx_cm_init(void)
++{
++	if (!cpu_is_omap34xx())
++		return 0;
++
++	return cm_register(&omap3xxx_cm_ll_data);
++}
++
++static void __exit omap3xxx_cm_exit(void)
++{
++	if (!cpu_is_omap34xx())
++		return;
++
++	/* Should never happen */
++	WARN(cm_unregister(&omap3xxx_cm_ll_data),
++	     "%s: cm_ll_data function pointer mismatch\n", __func__);
++}
++__exitcall(omap3xxx_cm_exit);
+diff --git a/arch/arm/mach-omap2/cm3xxx.h b/arch/arm/mach-omap2/cm3xxx.h
+index 4a6ac81..e8e146f 100644
+--- a/arch/arm/mach-omap2/cm3xxx.h
++++ b/arch/arm/mach-omap2/cm3xxx.h
+@@ -78,9 +78,14 @@ extern bool omap3xxx_cm_is_clkdm_in_hwsup(s16 module, u32 mask);
+ extern int omap3xxx_cm_wait_module_ready(s16 prcm_mod, u8 idlest_id,
+ 					 u8 idlest_shift);
+ 
++extern int omap3xxx_cm_split_idlest_reg(void __iomem *idlest_reg,
++					s16 *prcm_inst, u8 *idlest_reg_id);
++
+ extern void omap3_cm_save_context(void);
+ extern void omap3_cm_restore_context(void);
+ 
++extern int __init omap3xxx_cm_init(void);
++
+ #endif
+ 
+ #endif
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index 3246cef..561969b 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -26,6 +26,54 @@ static struct cm_ll_data null_cm_ll_data;
+ static struct cm_ll_data *cm_ll_data = &null_cm_ll_data;
+ 
+ /**
++ * cm_split_idlest_reg - split CM_IDLEST reg addr into its components
++ * @idlest_reg: CM_IDLEST* virtual address
++ * @prcm_inst: pointer to an s16 to return the PRCM instance offset
++ * @idlest_reg_id: pointer to a u8 to return the CM_IDLESTx register ID
++ *
++ * Given an absolute CM_IDLEST register address @idlest_reg, passes
++ * the PRCM instance offset and IDLEST register ID back to the caller
++ * via the @prcm_inst and @idlest_reg_id.  Returns -EINVAL upon error,
++ * or 0 upon success.  XXX This function is only needed until absolute
++ * register addresses are removed from the OMAP struct clk records.
++ */
++int cm_split_idlest_reg(void __iomem *idlest_reg, s16 *prcm_inst,
++			u8 *idlest_reg_id)
++{
++	if (!cm_ll_data->split_idlest_reg) {
++		WARN_ONCE(1, "cm: %s: no low-level function defined\n",
++			  __func__);
++		return -EINVAL;
 +	}
-+	curr_prcm_set = prcm;
++
++	return cm_ll_data->split_idlest_reg(idlest_reg, prcm_inst,
++					   idlest_reg_id);
 +}
 +
 +/**
-+ * omap2xxx_clkt_vps_late_init - store a copy of the sys_ck rate
++ * cm_wait_module_ready - wait for a module to leave idle or standby
++ * @prcm_mod: PRCM module offset
++ * @idlest_id: CM_IDLESTx register ID (i.e., x = 1, 2, 3)
++ * @idlest_shift: shift of the bit in the CM_IDLEST* register to check
 + *
-+ * Store a copy of the sys_ck rate for later use by the OMAP2xxx DVFS
-+ * code.  (The sys_ck rate does not -- or rather, must not -- change
-+ * during kernel runtime.)  Must be called after we have a valid
-+ * sys_ck rate, but before the virt_prcm_set clock rate is
-+ * recalculated.  No return value.
++ * Wait for the PRCM to indicate that the module identified by
++ * (@prcm_mod, @idlest_id, @idlest_shift) is clocked.  Return 0 upon
++ * success, -EBUSY if the module doesn't enable in time, or -EINVAL if
++ * no per-SoC wait_module_ready() function pointer has been registered
++ * or if the idlest register is unknown on the SoC.
 + */
-+void omap2xxx_clkt_vps_late_init(void)
++int cm_wait_module_ready(s16 prcm_mod, u8 idlest_id, u8 idlest_shift)
 +{
-+	struct clk *c;
-+
-+	c = clk_get(NULL, "sys_ck");
-+	if (IS_ERR(c)) {
-+		WARN(1, "could not locate sys_ck\n");
-+	} else {
-+		sys_ck_rate = clk_get_rate(c);
-+		clk_put(c);
++	if (!cm_ll_data->wait_module_ready) {
++		WARN_ONCE(1, "cm: %s: no low-level function defined\n",
++			  __func__);
++		return -EINVAL;
 +	}
++
++	return cm_ll_data->wait_module_ready(prcm_mod, idlest_id, idlest_shift);
 +}
-diff --git a/arch/arm/mach-omap2/clock2420_data.c b/arch/arm/mach-omap2/clock2420_data.c
-index 69335d3..0cae0f5 100644
---- a/arch/arm/mach-omap2/clock2420_data.c
-+++ b/arch/arm/mach-omap2/clock2420_data.c
-@@ -1,7 +1,7 @@
- /*
-  * OMAP2420 clock data
-  *
-- * Copyright (C) 2005-2009 Texas Instruments, Inc.
-+ * Copyright (C) 2005-2009, 2012 Texas Instruments, Inc.
-  * Copyright (C) 2004-2011 Nokia Corporation
-  *
-  * Contacts:
-@@ -1927,9 +1927,7 @@ static struct omap_clk omap2420_clks[] = {
- 
- int __init omap2420_clk_init(void)
- {
--	const struct prcm_config *prcm;
- 	struct omap_clk *c;
--	u32 clkrate;
- 
- 	prcm_clksrc_ctrl = OMAP2420_PRCM_CLKSRC_CTRL;
- 	cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
-@@ -1954,20 +1952,13 @@ int __init omap2420_clk_init(void)
- 		omap2_init_clk_clkdm(c->lk.clk);
- 	}
- 
-+	omap2xxx_clkt_vps_late_init();
 +
- 	/* Disable autoidle on all clocks; let the PM code enable it later */
- 	omap_clk_disable_autoidle_all();
++/**
+  * cm_register - register per-SoC low-level data with the CM
+  * @cld: low-level per-SoC OMAP CM data & function pointers to register
+  *
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index b853401..a52d399 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -46,6 +46,8 @@
+ #include "clock44xx.h"
+ #include "sdrc.h"
+ #include "control.h"
++#include "cm2xxx.h"
++#include "cm3xxx.h"
  
--	/* Check the MPU rate set by bootloader */
--	clkrate = omap2xxx_clk_get_core_rate();
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sys_ck.rate)
--			continue;
--		if (prcm->dpll_speed <= clkrate)
--			break;
--	}
--	curr_prcm_set = prcm;
-+	/* XXX Can this be done from the virt_prcm_set clk init function? */
-+	omap2xxx_clkt_vps_check_bootloader_rates();
- 
- 	recalculate_root_clocks();
- 
-diff --git a/arch/arm/mach-omap2/clock2430_data.c b/arch/arm/mach-omap2/clock2430_data.c
-index 8d9894c..0c4f719 100644
---- a/arch/arm/mach-omap2/clock2430_data.c
-+++ b/arch/arm/mach-omap2/clock2430_data.c
-@@ -1,7 +1,7 @@
  /*
-  * OMAP2430 clock data
-  *
-- * Copyright (C) 2005-2009 Texas Instruments, Inc.
-+ * Copyright (C) 2005-2009, 2012 Texas Instruments, Inc.
-  * Copyright (C) 2004-2011 Nokia Corporation
-  *
-  * Contacts:
-@@ -2026,9 +2026,7 @@ static struct omap_clk omap2430_clks[] = {
- 
- int __init omap2430_clk_init(void)
- {
--	const struct prcm_config *prcm;
- 	struct omap_clk *c;
--	u32 clkrate;
- 
- 	prcm_clksrc_ctrl = OMAP2430_PRCM_CLKSRC_CTRL;
- 	cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
-@@ -2053,20 +2051,13 @@ int __init omap2430_clk_init(void)
- 		omap2_init_clk_clkdm(c->lk.clk);
- 	}
- 
-+	omap2xxx_clkt_vps_late_init();
-+
- 	/* Disable autoidle on all clocks; let the PM code enable it later */
- 	omap_clk_disable_autoidle_all();
- 
--	/* Check the MPU rate set by bootloader */
--	clkrate = omap2xxx_clk_get_core_rate();
--	for (prcm = rate_table; prcm->mpu_speed; prcm++) {
--		if (!(prcm->flags & cpu_mask))
--			continue;
--		if (prcm->xtal_speed != sys_ck.rate)
--			continue;
--		if (prcm->dpll_speed <= clkrate)
--			break;
--	}
--	curr_prcm_set = prcm;
-+	/* XXX Can this be done from the virt_prcm_set clk init function? */
-+	omap2xxx_clkt_vps_check_bootloader_rates();
- 
- 	recalculate_root_clocks();
- 
-diff --git a/arch/arm/mach-omap2/clock2xxx.h b/arch/arm/mach-omap2/clock2xxx.h
-index 19dc0659..25b8d02 100644
---- a/arch/arm/mach-omap2/clock2xxx.h
-+++ b/arch/arm/mach-omap2/clock2xxx.h
-@@ -20,6 +20,8 @@ u32 omap2xxx_get_apll_clkin(void);
- u32 omap2xxx_get_sysclkdiv(void);
- void omap2xxx_clk_prepare_for_reboot(void);
- void omap2xxx_clkt_dpllcore_init(struct clk *clk);
-+void omap2xxx_clkt_vps_check_bootloader_rates(void);
-+void omap2xxx_clkt_vps_late_init(void);
- 
- #ifdef CONFIG_SOC_OMAP2420
- int omap2420_clk_init(void);
+  * The machine specific code may provide the extra mapping besides the
+@@ -389,6 +391,7 @@ void __init omap2420_init_early(void)
+ 			       OMAP2_L4_IO_ADDRESS(OMAP2420_CM_BASE),
+ 			       NULL, NULL);
+ 	omap2xxx_check_revision();
++	omap2xxx_cm_init();
+ 	omap_common_init_early();
+ 	omap2xxx_voltagedomains_init();
+ 	omap242x_powerdomains_init();
+@@ -418,6 +421,7 @@ void __init omap2430_init_early(void)
+ 			       OMAP2_L4_IO_ADDRESS(OMAP2430_CM_BASE),
+ 			       NULL, NULL);
+ 	omap2xxx_check_revision();
++	omap2xxx_cm_init();
+ 	omap_common_init_early();
+ 	omap2xxx_voltagedomains_init();
+ 	omap243x_powerdomains_init();
+@@ -452,6 +456,7 @@ void __init omap3_init_early(void)
+ 			       NULL, NULL);
+ 	omap3xxx_check_revision();
+ 	omap3xxx_check_features();
++	omap3xxx_cm_init();
+ 	omap_common_init_early();
+ 	omap3xxx_voltagedomains_init();
+ 	omap3xxx_powerdomains_init();
