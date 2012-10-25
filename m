@@ -1,53 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Oct 2012 15:13:58 +0200
-Subject: [PATCH 2/6] pinctrl: Update clock handling for the
- pinctrl-nomadik GPIO driver
-In-Reply-To: <CACRpkda2NQok7kzh0pFmZPYd4nky1kUw=67DZAYAJAXGuc1yzQ@mail.gmail.com>
-References: <1351089926-32161-1-git-send-email-lee.jones@linaro.org>
- <1351089926-32161-3-git-send-email-lee.jones@linaro.org>
- <CACRpkda2NQok7kzh0pFmZPYd4nky1kUw=67DZAYAJAXGuc1yzQ@mail.gmail.com>
-Message-ID: <CACRpkdbNWE6hOdVFPxHv7MVHkZUBW3LC035CxJkZVmr8j05Kqw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 25 Oct 2012 14:14:59 +0100
+Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
+In-Reply-To: <20121025145748.760c218b@endymion.delvare>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <1350899218-13624-8-git-send-email-balbi@ti.com>
+ <20121025145748.760c218b@endymion.delvare>
+Message-ID: <20121025131459.GG28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 2:41 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Oct 24, 2012 at 4:45 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
->> The clock framework has changed somewhat and it's now better to
->> invoke clock_prepare_enable() and clk_disable_unprepare() rather
->> than the legacy clk_enable() and clk_disable() calls. This patch
->> converts the Nomadik Pin Control driver to the new framework.
->>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> I was convinced that this is a good change but no regression,
-> so applied to the devel branch for 3.8.
->
-> I also removed the initial clk_prepare() so the reference count
-> may actually go down to 0 for the GPIO block and the peripheral
-> cluster eventually gets relaxed.
+On Thu, Oct 25, 2012 at 02:57:48PM +0200, Jean Delvare wrote:
+> Hi Felipe, Shubhrajyoti,
+> 
+> On Mon, 22 Oct 2012 12:46:57 +0300, Felipe Balbi wrote:
+> > From: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > 
+> > In case of a NACK, it's wise to tell our clients
+> > drivers about how many bytes were actually transferred.
+> > 
+> > Support this by adding an extra field to the struct
+> > i2c_msg which gets incremented the amount of bytes
+> > actually transferred.
+> > 
+> > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> >  include/uapi/linux/i2c.h | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/include/uapi/linux/i2c.h b/include/uapi/linux/i2c.h
+> > index 0e949cb..4b35c9b 100644
+> > --- a/include/uapi/linux/i2c.h
+> > +++ b/include/uapi/linux/i2c.h
+> > @@ -77,6 +77,7 @@ struct i2c_msg {
+> >  #define I2C_M_NO_RD_ACK		0x0800	/* if I2C_FUNC_PROTOCOL_MANGLING */
+> >  #define I2C_M_RECV_LEN		0x0400	/* length will be first received byte */
+> >  	__u16 len;		/* msg length				*/
+> > +	__u16 transferred;	/* actual bytes transferred             */
+> >  	__u8 *buf;		/* pointer to msg data			*/
+> >  };
+> 
+> On the principle I am fine with this, however you also need to define
+> who should initialize this field, and to what value.
 
-Famous last words!
+You also miss one very very very big point.  This will break every I2C
+using userspace program out there unless it is rebuilt - this change will
+require the exact right version of those userspace programs for the
+kernel that they're being used on.
 
-The good news is that this actually works, and the refcount
-*does* go down to zero and gate off entire peripheral
-clusters.
+Now that we have the userspace API headers separated, this is now much
+easier to detect: a patch which touches a uapi header needs much more
+careful consideration than one which doesn't.
 
-However that was not good because something vital in
-some peripheral cluster died and killed the system :-D
+So no, strong NAK.  This is not how we treat userspace.
 
-Lee, could to to track down the reason and fix it so the patch
-can be applied?
+If we want to change userspace API then we do it in a sane manner, where
+we provide the new functionality in a way that it doesn't break existing
+users.  There's two ways to do this:
 
-The only thing you need to do is to remove the superfluous
-clk_prepare() right after the devm_clk_get() that hogs each
-peripheral cluster.
+1. Leave the existing struct alone, introduce a new one with new ioctls.
+   Schedule the removal of the old interfaces for maybe 10 years time.
 
-Probably some driver is needing a clk_get() or a clk_get_sys() is
-needs to be added somewhere to bring up some vital cluster,
-or there may be some out-of-tree driver needed to bring up the
-cluster properly I have no clue... Maybe some cluster just
-cannot be declocked like that.
+2. Rename the existing struct (eg struct old_i2c_msg), and create a new
+   struct called i2c_msg.  Rename the existing ioctls to have OLD_ in
+   their names.  Provide the existing ioctls under those names, and
+   make them print a warning once that userspace programs need updating.
+   Schedule the removal of the old interfaces for a shorter number of
+   years than (1);
 
-Yours,
-Linus Walleij
+Remember all those "old" syscalls we have... this is no different from
+those.
