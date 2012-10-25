@@ -1,74 +1,84 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 25 Oct 2012 09:58:41 +0200
-Subject: [GIT PULL] at91: fixes for 3.7-rc3
-Message-ID: <5088F131.5040600@atmel.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 25 Oct 2012 10:00:27 +0200
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <508895D8.5000701@ti.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com> <508895D8.5000701@ti.com>
+Message-ID: <5088F19B.7050606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi Jon,
 
-This is the first Atmel AT91 "fixes" update for the 3.7 kernel.
+many thanks for your time to look at this.
 
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+On 25.10.2012 03:28, Jon Hunter wrote:
+> On 10/22/2012 02:55 PM, Daniel Mack wrote:
+>> diff --git a/Documentation/devicetree/bindings/bus/gpmc.txt b/Documentation/devicetree/bindings/bus/gpmc.txt
+>> new file mode 100644
+>> index 0000000..ef1c6e1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/bus/gpmc.txt
+>> @@ -0,0 +1,59 @@
+>> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
+>> +
+>> +The actual devices are instantiated from the child nodes of a GPMC node.
+>> +
+>> +Required properties:
+>> +
+>> + - compatible: Should be set to "ti,gpmc"
+> 
+> Is this the only required property? I think that "reg" and "ti,hwmods"
+> are probably also required.
 
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700) 
+Well yes, but at least "reg" is commonly omitted as it's part of a more
+"generic" set of properties. But ok, I can add these.
 
-are available in the git repository at:
+> Also given that we are describing the hardware, I am wondering if the
+> number of chip-selects and wait signals should be defined here too. I
+> recall that different devices had different number of wait pins available.
 
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
+Hmm, that number is currently hard-coded in GPMC_CS_NUM. It would take
+some effort to make that dynamic but I agree that this would be a good
+thing to have. Afzal?
 
-for you to fetch changes up to 08d04a135a1c2e24c4d4bc7bbafee5e0e58f80c6:
+>> diff --git a/Documentation/devicetree/bindings/mtd/gpmc-nand.txt b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>> new file mode 100644
+>> index 0000000..6790fcf
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+>> @@ -0,0 +1,65 @@
+>> +Device tree bindings for GPMC connected NANDs
+>> +
+>> +GPMC connected NAND (found on OMAP boards) are represented as child nodes of
+>> +the GPMC controller with a name of "nand".
+>> +
+>> +All timing relevant properties are explained in a separate documents - please
+>> +refer to Documentation/devicetree/bindings/bus/gpmc.txt
+>> +
+>> +Required properties:
+>> +
+>> + - reg: The CS line the peripheral is connected to
+> 
+> Is this the only required property? I would have thought that bus-width
+> is needed too.
 
-  ARM: at91: drop duplicated config SOC_AT91SAM9 entry (2012-10-24 18:08:48 +0200)
+I described bus-with in the nand bindings and stated there that it
+defaults to 8 and the only meaningful other value us 16. I did that
+because the value is in fact parsed in the NAND code, but I can as well
+move this around in the documentation.
 
-----------------------------------------------------------------
-A mix of typos and critical fixes.
-The most important ones are a duplicated definition of a Kconfig
-variable and the handling of external interrupts for non-DT case.
-The new at91sam9g10 was suffering a recognition issue due to an ID
-mis-interpreted: this was leading to a kernel panic.
+> In general, I am wondering if this should be broken into two patches as
+> you are creating the binding for the gpmc and nand here.
 
-----------------------------------------------------------------
-Bo Shen (2):
-      ARM: at91/i2c: change id to let i2c-gpio work
-      ARM: at91/i2c: change id to let i2c-at91 work
+Yes, I thought so too. The thing is that I wanted to keep documentation
+and implementation tightly together, and only the generic parser bits in
+the code doesn't make much sense without any users. Also, the two
+Documentations reference each other, so I thought having them in one
+piece could make reviewing easier. But I can of course also split it if
+that helps.
 
-Ivan Shugov (1):
-      ARM: at91: at91sam9g10: fix SOC type detection
 
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: drop duplicated config SOC_AT91SAM9 entry
-
-Josh Wu (1):
-      ARM: at91/tc: fix typo in the DT document
-
-Marek Belisko (1):
-      ARM: at91/dts: at91sam9g20ek_common: Fix typos in buttons labels.
-
-Nicolas Ferre (2):
-      ARM: at91: fix external interrupts in non-DT case
-      ARM: at91: fix external interrupt specification in board code
-
- Documentation/devicetree/bindings/arm/atmel-at91.txt |  2 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi          |  4 ++--
- arch/arm/mach-at91/Kconfig                           | 10 ++--------
- arch/arm/mach-at91/at91rm9200.c                      |  2 +-
- arch/arm/mach-at91/at91rm9200_devices.c              |  4 ++--
- arch/arm/mach-at91/at91sam9260.c                     |  4 ++--
- arch/arm/mach-at91/at91sam9260_devices.c             |  4 ++--
- arch/arm/mach-at91/at91sam9261.c                     |  4 ++--
- arch/arm/mach-at91/at91sam9261_devices.c             |  4 ++--
- arch/arm/mach-at91/at91sam9263.c                     |  2 +-
- arch/arm/mach-at91/at91sam9263_devices.c             |  4 ++--
- arch/arm/mach-at91/at91sam9rl_devices.c              |  4 ++--
- arch/arm/mach-at91/board-neocore926.c                |  2 +-
- arch/arm/mach-at91/board-sam9261ek.c                 |  2 +-
- arch/arm/mach-at91/board-sam9263ek.c                 |  2 +-
- arch/arm/mach-at91/generic.h                         |  3 ++-
- arch/arm/mach-at91/irq.c                             |  9 +++++++--
- arch/arm/mach-at91/setup.c                           |  4 ++--
- 18 files changed, 35 insertions(+), 35 deletions(-)
-
-Thanks, best regards,
--- 
-Nicolas Ferre
+Thanks,
+Daniel
