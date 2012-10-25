@@ -1,106 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 25 Oct 2012 12:30:23 +0530
-Subject: [PATCH v2] gpio/omap: fix off-mode bug: clear debounce clock
- enable mask on free/reset
-In-Reply-To: <50887197.8010104@ti.com>
-References: <1351098641-23917-1-git-send-email-khilman@deeprootsystems.com>
- <50887197.8010104@ti.com>
-Message-ID: <5088E387.2050704@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Oct 2012 09:00:52 +0200
+Subject: [PATCH 1/5] ARM: Kirkwood: Allow use of pinctrl
+In-Reply-To: <1351088724-11142-2-git-send-email-andrew@lunn.ch>
+References: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
+ <1351088724-11142-2-git-send-email-andrew@lunn.ch>
+Message-ID: <CACRpkdZq98m1hAzaL0O=9R=0tgbT7g5X6jh8F0Pw+NoPHtNwaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012 04:24 AM, Jon Hunter wrote:
+On Wed, Oct 24, 2012 at 4:25 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+
+> We now have a pinctrl driver for arch-mvebu. It supports kirkwood out
+> of the box. Allow ARCH_KIRKWOOD to select it, and make ARCH_KIRKWOOD
+> select it. This then allows the convertion of board-*.c files away
+> from MPP to pinctrl in DT, before they get moved over into mach-mvebu.
 >
-> On 10/24/2012 12:10 PM, Kevin Hilman wrote:
->> From: Kevin Hilman <khilman@ti.com>
->>
->> When a GPIO bank is freed or shutdown, ensure that the banks
->> dbck_enable_mask is cleared also.  Otherwise, context restore on
->> subsequent off-mode transition will restore previous value from the
->> shadow copies (bank->context.debounce*) leading to mismatch state
->> between driver state and hardware state.
->>
->> This was discovered when board code was doing
->>
->>    gpio_request_one()
->>    gpio_set_debounce()
->>    gpio_free()
->>
->> which was leaving the GPIO debounce settings in a confused state.  If
->> that GPIO bank is subsequently used with off-mode enabled, bogus state
->> would be restored, leaving GPIO debounce enabled which then prevented
->> the CORE powerdomain from transitioning.
->>
->> To fix, ensure that bank->dbck_enable_mask is cleared when the bank
->> is freed/shutdown so debounce state doesn't persist.
->>
-The freed part is fine but I don't understand why it needs to be done
-on _a_ gpio irq shutdown callback where IRQs related configuration
-on that one GPIO needs to be cleared. De-bounce clock is surely not IRQ
-related configuration.
-
->> Special thanks to Grazvydas Ignotas for pointing out a bug in an
->> earlier version that would've disabled debounce on any runtime PM
->> transition.
->>
->> Reported-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Igor Grinberg <grinberg@compulab.co.il>
->> Cc: Grazvydas Ignotas <notasas@gmail.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> v2: only clear mask in free/shutdown, not in runtime PM paths,
->>      clarified changelog
->> Applies on v3.7-rc2.
->>
->>   drivers/gpio/gpio-omap.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index 94cbc84..113b167 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -539,6 +539,7 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
->>   	_set_gpio_irqenable(bank, gpio, 0);
->>   	_clear_gpio_irqstatus(bank, gpio);
->>   	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
->> +	bank->dbck_enable_mask = 0;
->>   }
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/Kconfig        |    2 ++
+>  drivers/pinctrl/Kconfig |    2 +-
+>  2 files changed, 3 insertions(+), 1 deletion(-)
 >
-> Does this need to be ...
->
-> +	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
-> +	_gpio_dbck_disable(bank);
->
-Yes, its a per bank clock. There is an alternate. See below.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 73067ef..160cd40 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -548,6 +548,8 @@ config ARCH_KIRKWOOD
+>         select GENERIC_CLOCKEVENTS
+>         select PCI
+>         select PLAT_ORION_LEGACY
+> +       select PINCTRL
+> +       select PINCTRL_KIRKWOOD
 
-> There could be more than one gpio using debounce and so we should only
-> clear the appropriate bit. Also after clearing a bit we could see if we
-> can disable the debounce clock too.
->
-When I mentioned the clearing in gpio_free() path will do trick, I had
-something like below in mind.
+Russell just spent the end of the release cycle sorting all of these
+in alphanumeric order, so keep to that. (Move above
+PLAT*)
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index dee2856..8574105 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -629,8 +629,10 @@ static void omap_gpio_free(struct gpio_chip *chip, 
-unsigned offset)
-  	 * If this is the last gpio to be freed in the bank,
-  	 * disable the bank module.
-  	 */
--	if (!bank->mod_usage)
-+	if (!bank->mod_usage) {
-+		bank->dbck_enable_mask = 0;
-  		pm_runtime_put(bank->dev);
-+	}
-  }
+Once they look OK I'd like to get ACKs from one of the ARM
+SoC maintainers so I can merge this set through the
+pinctrl tree.
 
-  /*
-
-This patch should be enough according to me unless and until I am
-missing mask clear need in irq_shutdown path. It will also take
-care of disabling of debounce clock as part of runtime suspend callback.
-
-Regards,
-Santosh
+Yours,
+Linus Walleij
