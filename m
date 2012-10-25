@@ -1,53 +1,85 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 25 Oct 2012 17:22:40 +0200
-Subject: [PATCH v3 6/6] ARM: EXYNOS: Add secure firmware support to secondary
- CPU bring-up
-In-Reply-To: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
-References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1351178560-19188-7-git-send-email-t.figa@samsung.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Thu, 25 Oct 2012 10:25:56 -0600
+Subject: [PATCHv2] arm:socfpga: Enable SMP for socfpga
+In-Reply-To: <50887348.9070904@gmail.com>
+References: <1350581567-17229-1-git-send-email-dinguyen@altera.com>
+ <50887348.9070904@gmail.com>
+Message-ID: <1351182356.15182.7.camel@dinh-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boards using secure firmware must use different CPU boot registers and
-call secure firmware to boot the CPU.
+Hi Rob,
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
----
- arch/arm/mach-exynos/platsmp.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Wed, 2012-10-24 at 18:01 -0500, Rob Herring wrote:
+> On 10/18/2012 12:32 PM, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Enable SMP for the SOCFPGA platform.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > ---
+> > v2:
+> > -Remove pen_release code
+> > -Remove code that was already done by v7_setup
+> > -Add bindings document for reset and system manager
+> > -Move socfpga_sysmgr_init from platsmp.c to socfpga.c, because
+> > we will need to use the reset and system manager for more than SMP.
+> > -Move core.h to mach-socfpga from mach-socfpga/include/mach
+> 
+> Just some lingering comments on the defconfig. Otherwise,
+> 
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> 
+> > diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+> > index 0ac1293..349ac22 100644
+> > --- a/arch/arm/configs/socfpga_defconfig
+> > +++ b/arch/arm/configs/socfpga_defconfig
+> 
+> I'm still not clear why multi_v7 config does not work for you?
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 4ca8ff1..9f8bdaf 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -25,6 +25,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
-+#include <asm/firmware.h>
- 
- #include <mach/hardware.h>
- #include <mach/regs-clock.h>
-@@ -47,6 +48,8 @@ static inline void __iomem *cpu_boot_reg(int cpu)
- {
- 	void __iomem *boot_reg;
- 
-+	if (!call_firmware_op(cpu_boot_reg, cpu, &boot_reg))
-+		return boot_reg;
- 	boot_reg = cpu_boot_reg_base();
- 	if (soc_is_exynos4412())
- 		boot_reg += 4*cpu;
-@@ -149,6 +152,10 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
- 
- 		__raw_writel(virt_to_phys(exynos4_secondary_startup),
- 							cpu_boot_reg(phys_cpu));
-+
-+		/* Call Exynos specific smc call */
-+		call_firmware_op(cpu_boot, phys_cpu);
-+
- 		gic_raise_softirq(cpumask_of(cpu), 0);
- 
- 		if (pen_release == -1)
--- 
-1.7.12
+multi_v7 works fine for me. But I need
++#CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set 
+
+in order for SMP to work correctly on our platform.
+
+
+> 
+> > @@ -1,5 +1,5 @@
+> >  CONFIG_EXPERIMENTAL=y
+> > -CONFIG_SYSVIPC=y
+> > +CONFIG_NO_HZ=y
+> >  CONFIG_IKCONFIG=y
+> >  CONFIG_IKCONFIG_PROC=y
+> >  CONFIG_LOG_BUF_SHIFT=14
+> > @@ -16,10 +16,13 @@ CONFIG_MODULE_UNLOAD=y
+> >  # CONFIG_IOSCHED_DEADLINE is not set
+> >  # CONFIG_IOSCHED_CFQ is not set
+> >  CONFIG_ARCH_SOCFPGA=y
+> > -CONFIG_MACH_SOCFPGA_CYCLONE5=y
+> > -CONFIG_ARM_THUMBEE=y
+> > +# CONFIG_ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA is not set
+> >  # CONFIG_CACHE_L2X0 is not set
+> >  CONFIG_HIGH_RES_TIMERS=y
+> > +CONFIG_SMP=y
+> > +CONFIG_ARM_ARCH_TIMER=y
+> 
+> You're an A9, right? You don't have arch timers.
+
+Yes, will remove in v3.
+> 
+> > +CONFIG_HIGHMEM=y
+> 
+> How much RAM? You need more than 2GB with CONFIG_VMSPLIT_2G.
+
+1G for RAM only, so will remove in v3.
+
+Thanks,
+Dinh
+> 
+> > +CONFIG_HIGHPTE=y
+> >  CONFIG_VMSPLIT_2G=y
+> >  CONFIG_NR_CPUS=2
+> >  CONFIG_AEABI=y
+> 
+> 
