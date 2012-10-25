@@ -1,72 +1,71 @@
 From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Thu, 25 Oct 2012 15:54:52 +0530
-Subject: [RFC PATCH 01/13] sched:Prevent movement of short running tasks
- during load balancing
+Date: Thu, 25 Oct 2012 15:55:43 +0530
+Subject: [RFC PATCH 07/13] sched: Change move_tasks to use PJT's metric
 In-Reply-To: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
 References: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
-Message-ID: <20121025102452.21022.70635.stgit@preeti.in.ibm.com>
+Message-ID: <20121025102543.21022.97196.stgit@preeti.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prevent sched groups with low load as tracked by PJT's metrics
-from being candidates of the load balance routine.This metric is chosen to be
-1024+15%*1024.But using PJT's metrics it has been observed that even when
-three 10% tasks are running,the load sometimes does not exceed this
-threshold.The call should be taken if the tasks can afford to be throttled.
+Make decisions based on PJT's metrics and the dependent metrics
+about which tasks to move to reduce the imbalance.
 
-This is why an additional metric has been included,which can determine how
-long we can tolerate tasks not being moved even if the load is low.
-
-Signed-off-by:  Preeti U Murthy <preeti@linux.vnet.ibm.com>
+Signed-off-by: Preeti U Murthy <preeti@linux.vnet.ibm.com>
 ---
- kernel/sched/fair.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ kernel/sched/fair.c |   14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index dbddcf6..e02dad4 100644
+index bb1c71b..bd7b69d 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -4188,6 +4188,7 @@ struct sd_lb_stats {
-  */
- struct sg_lb_stats {
- 	unsigned long avg_load; /*Avg load across the CPUs of the group */
-+	u64 avg_cfs_runnable_load; /* Equivalent of avg_load but calculated using PJT's metric */
- 	unsigned long group_load; /* Total load over the CPUs of the group */
- 	unsigned long sum_nr_running; /* Nr tasks running in the group */
- 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
-@@ -4504,6 +4505,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 	unsigned long load, max_cpu_load, min_cpu_load;
- 	unsigned int balance_cpu = -1, first_idle_cpu = 0;
- 	unsigned long avg_load_per_task = 0;
-+	u64 group_load = 0; /* computed using PJT's metric */
- 	int i;
+@@ -3957,7 +3957,7 @@ static int move_tasks(struct lb_env *env)
+ 	unsigned long load;
+ 	int pulled = 0;
  
- 	if (local_group)
-@@ -4548,6 +4550,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 		if (idle_cpu(i))
- 			sgs->idle_cpus++;
+-	if (env->imbalance <= 0)
++	if (env->load_imbalance <= 0)
+ 		return 0;
  
-+		group_load += cpu_rq(i)->cfs.runnable_load_avg;
- 		update_sg_numa_stats(sgs, rq);
- 	}
+ again:
+@@ -3984,7 +3984,8 @@ again:
+ 		if (sched_feat(LB_MIN) && load < 16 && !env->sd->nr_balance_failed)
+ 			goto next;
  
-@@ -4572,6 +4575,19 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 	sgs->avg_load = (sgs->group_load*SCHED_POWER_SCALE) / group->sgp->power;
+-		if ((load / 2) > env->imbalance)
++		/* The below being changed to use the PJT's metric */
++		if ((load / 2) > env->load_imbalance)
+ 			goto next;
  
- 	/*
-+	 * Check if the sched group has not crossed the threshold.
-+	 *
-+	 * Also check if the sched_group although being within the threshold,is not
-+	 * queueing too many tasks.If yes to both,then make it an
-+	 * invalid candidate for load balancing
-+	 *
-+	 * The below condition is included as a tunable to meet performance and power needs
-+	 */
-+	sgs->avg_cfs_runnable_load = (group_load * SCHED_POWER_SCALE) / group->sgp->power;
-+	if (sgs->avg_cfs_runnable_load <= 1178 && sgs->sum_nr_running <= 2)
-+		sgs->avg_cfs_runnable_load = 0;
-+
-+	/*
- 	 * Consider the group unbalanced when the imbalance is larger
- 	 * than the average weight of a task.
- 	 *
+ 		if (!can_migrate_task(p, env))
+@@ -3992,7 +3993,8 @@ again:
+ 
+ 		move_task(p, env);
+ 		pulled++;
+-		env->imbalance -= load;
++		/* Using PJT's metric */
++		env->load_imbalance -= load;
+ 
+ #ifdef CONFIG_PREEMPT
+ 		/*
+@@ -4007,8 +4009,9 @@ again:
+ 		/*
+ 		 * We only want to steal up to the prescribed amount of
+ 		 * weighted load.
++		 * But the below modification is to use PJT's metric
+ 		 */
+-		if (env->imbalance <= 0)
++		if (env->load_imbalance <= 0)
+ 			goto out;
+ 
+ 		continue;
+@@ -4145,7 +4148,8 @@ static inline void update_h_load(long cpu)
+ 
+ static unsigned long task_h_load(struct task_struct *p)
+ {
+-	return p->se.load.weight;
++	/* The below is changed to use PJT's metric*/
++	return p->se.avg.load_avg_contrib;
+ }
+ #endif
+ 
