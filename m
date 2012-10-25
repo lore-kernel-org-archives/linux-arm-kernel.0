@@ -1,31 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Oct 2012 13:27:55 +0100
-Subject: [PATCHv3] ARM: Sort exception table at compile time
-In-Reply-To: <1351125882-13046-1-git-send-email-sboyd@codeaurora.org>
-References: <1351125882-13046-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20121025122754.GF11267@mudshark.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 15:25:08 +0300
+Subject: [PATCH v2 0/7] I2C patches for v3.8 merge window
+In-Reply-To: <1350899218-13624-1-git-send-email-balbi@ti.com>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+Message-ID: <1351167915-15079-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 01:44:42AM +0100, Stephen Boyd wrote:
-> Add the ARM machine identifier to sortextable and select the
-> config option so that we can sort the exception table at compile
-> time. sortextable relies on a section named __ex_table existing
-> in the vmlinux, but ARM's linker script places the exception
-> table in the data section. Give the exception table its own
-> section so that sortextable can find it.
-> 
-> This allows us to skip the sorting step during boot.
-> 
-> Cc: David Daney <david.daney@cavium.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+Hi,
 
-Just had a play with this for my A15 platform and it seems to work fine when
-targetting either ARM or Thumb-2 kernels.
+here's another series for OMAP I2C driver. There are a few cleanups
+and one very nice new feature: we can now report how many bytes
+we transferred until NACK.
 
-Tested-by: Will Deacon <will.deacon@arm.com>
+Note that the implemementation for OMAP-I2C turned out to be a
+little more complex then I expected, mainly because of the way
+I2C_CNT register behaves and because of the very buggy register
+usage on that driver.
 
-Cheers,
+I have boot tested all patches on beagle xM (3630) and pandaboard
+rev A3 (4430), will send boot-logs if anyone wants to see.
 
-Will
+All patches are available at [1] if anyone wants an easy way to
+test the patches.
+
+Changes since v1:
+	- remove unnecessary omap_i2c_init() in case of NACK
+	- drop "i2c: omap: fix error checking"
+
+Felipe Balbi (6):
+  i2c: omap: no need to access platform_device
+  i2c: omap: reorder exit path of omap_i2c_xfer_msg()
+  i2c: omap: also complete() when stat becomes zero
+  i2c: omap: in case of VERSION_2 read IRQSTATUS_RAW but write to
+    IRQSTATUS
+  i2c: omap: wait for transfer completion before sending STP bit
+  i2c: omap: implement handling for 'transferred' bytes
+
+Shubhrajyoti D (1):
+  i2c: add 'transferred' field to struct i2c_msg
+
+ drivers/i2c/busses/i2c-omap.c | 124 ++++++++++++++++++++++--------------------
+ include/uapi/linux/i2c.h      |   1 +
+ 2 files changed, 65 insertions(+), 60 deletions(-)
+
+-- 
+1.8.0
