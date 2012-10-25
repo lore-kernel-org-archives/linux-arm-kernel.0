@@ -1,60 +1,40 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Thu, 25 Oct 2012 17:08:16 +0200
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <50894BC2.5050706@gmail.com>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
- <20121025141645.GA16962@sig21.net> <50894BC2.5050706@gmail.com>
-Message-ID: <20121025150816.GA3874@sig21.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 25 Oct 2012 15:13:43 +0000
+Subject: [GIT PULL] first set of ux500 for ARM SoC for v3.8
+In-Reply-To: <CACRpkdZ9fUUugHAPGw8kEZDFnDWyyZ-b2iUdfCu2Hhhg4swaPQ@mail.gmail.com>
+References: <CACRpkdasaP_xVfQtzq29UNJBXetrUUzqpn90T6_Gr0kOsV8GeQ@mail.gmail.com>
+ <201210251344.44546.arnd@arndb.de>
+ <CACRpkdZ9fUUugHAPGw8kEZDFnDWyyZ-b2iUdfCu2Hhhg4swaPQ@mail.gmail.com>
+Message-ID: <201210251513.43931.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
-> On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
-> > On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
-> >> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
-> >>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
-> >>>
-> >>>> While v6 can support unaligned accesses, it is optional and current
-> >>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
-> >>>> v6.
-> >>>
-> >>> not true according to the gcc changes page
-> >>
-> >> What are you going to believe: documentation or what the compiler
-> >> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
-> >> support backported and 4.7.2, unaligned accesses are emitted for v7
-> >> only. I guess default here means it is the default unless you change the
-> >> default in your build of gcc.
-> > 
-> > Since ARMv6 can handle unaligned access in the same way as ARMv7
-> > it seems a clear bug in gcc which might hopefully get fixed.
-> > Thus in this case I think it is reasonable to follow the
-> > gcc documentation, otherwise the code would break for ARMv6
-> > when gcc gets fixed.
+On Thursday 25 October 2012, Linus Walleij wrote:
+> On Thu, Oct 25, 2012 at 3:44 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> But the compiler can't assume the state of the U bit. I think it is
-> still legal on v6 to not support unaligned accesses, but on v7 it is
-> required. All the standard v6 ARM cores support it, but I'm not sure
-> about custom cores or if there are SOCs with buses that don't support
-> unaligned accesses properly.
+> > Please remember to write the pull request in a way that lets us reuse some
+> > of the text for the merge changeset comment. Ideally in a signed tag
+> > so git puts it in there automatically.
+> 
+> So what was wrong with this signed tag, looking like that?
+> 
+> ----------------------------------------------------------------
+> A first set of Ux500 core patches for v3.8:
+> - Support the HREF520 board
+> - Add the device serial number to the entropy pool
+> 
+> ----------------------------------------------------------------
+> 
+> I guess what I'm after is what makes it reusable if this one
+> isn't.
 
-Well, I read the "...since Linux version 2.6.28" comment
-in the gcc changes page in the way that they assume the
-U-bit is set. (Although I'm not sure it really is???)
+The tag looks great, but you were sending the pull request for
+the branch "ux500-core", not for the tag "ux500-core-for-arm-soc".
 
-Looking at it from another side, if using the hw unaligned
-access capability gives a performance benefit then it
-would be useful to support it even if gcc doesn't
-behave as documented.  One could still use a special
-unaligned.h for ARMv6 to get the performance benefit.
-(If it doesn't give performance benfit, then why
-bother, let's just use -mno-unaligned-access for v7, too.)
+This has happened to me a few times before, especially when pushing
+the tag just before sending the pull request. In that case,
+git-request-pull cannot find the tag on the server because it has
+not been mirrored back from the git+ssh server to the publically
+accessible one that it reads the tags from.
 
-In the ARMv6 ARM unaligned support and the U-bit is
-not optional, so you could use the same SoC bus argument
-for some hypothetical v7 SoCs.
-
-
-Johannes
+	Arnd
