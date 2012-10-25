@@ -1,94 +1,75 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 25 Oct 2012 20:14:26 +0200
-Subject: [PATCH] arm: kirkwood: add support for ZyXEL NSA310
-In-Reply-To: <alpine.DEB.2.02.1210251735020.15860@mirri>
-References: <alpine.DEB.2.02.1210251735020.15860@mirri>
-Message-ID: <20121025181426.GC21046@lunn.ch>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 25 Oct 2012 13:37:16 -0500
+Subject: [PATCH V2] ARM: OMAP2+: PM: VP: minor pr_warn updates
+Message-ID: <1351190236-23443-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero
+change pr_warnings to pr_warn and ensure a newline
+is present in all messages
 
-On Thu, Oct 25, 2012 at 06:01:00PM +0300, Tero Jaasko wrote:
-> +#define NSA310_GPIO_LED_ESATA_GREEN	12
-> +#define NSA310_GPIO_LED_ESATA_RED	13
-> +#define NSA310_GPIO_LED_USB_GREEN	15
-> +#define NSA310_GPIO_LED_USB_RED		16
-> +#define NSA310_GPIO_USB_POWER_OFF	21
-> +#define NSA310_GPIO_LED_SYS_GREEN	28
-> +#define NSA310_GPIO_LED_SYS_RED		29
-> +#define NSA310_GPIO_KEY_RESTART		36
-> +#define NSA310_GPIO_KEY_COPY		37
-> +#define NSA310_GPIO_LED_COPY_GREEN	39
-> +#define NSA310_GPIO_LED_COPY_RED	40
-> +#define NSA310_GPIO_LED_HDD_GREEN	41
-> +#define NSA310_GPIO_LED_HDD_RED		42
-> +#define NSA310_GPIO_BUZZER		44
-> +#define NSA310_GPIO_KEY_POWER		46
-> +#define NSA310_GPIO_POWER_OFF		48
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 
-It looks like most of these are not used. Please remove them.
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+V2: minor checkpatch alignment warning fix
+and linux-omap in cc this time! apologies on the spam!
+V1: https://patchwork.kernel.org/patch/1646261/
+ arch/arm/mach-omap2/vp.c |   13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-> +static struct mtd_partition nsa310_mtd_parts[] = {
-> +	{
-> +		.name	= "uboot",
-> +		.offset	= 0,
-> +		.size	= 0x100000,
-> +		.mask_flags = MTD_WRITEABLE,
-> +	}, {
-> +		.name	= "uboot_env",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0x80000,
-> +	}, {
-> +		.name	= "key_store",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0x80000,
-> +	}, {
-> +		.name	= "info",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0x80000,
-> +	}, {
-> +		.name	= "etc",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0xa00000,
-> +	}, {
-> +		.name	= "kernel_1",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0xa00000,
-> +	}, {
-> +		.name	= "rootfs1",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0x2fc0000,
-> +	}, {
-> +		.name	= "kernel_2",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0xa00000,
-> +	}, {
-> +		.name	= "rootfs2",
-> +		.offset	= MTDPART_OFS_NXTBLK,
-> +		.size	= 0x2fc0000,
-> +	},
-> +};
-
-You should be able to put all that into DT. Take a look at
-
-arch/arm/boot/dts/kirkwood-goflexnet.dts for example.
-
-> +
-> +static struct i2c_board_info __initdata nsa310_i2c_info[] = {
-> +	{ I2C_BOARD_INFO("adt7476", 0x2e) },
-> +};
-
-You can also do this in DT as well. kirkwood-ts219.dtsi has
-
-                i2c at 11000 {
-                        status = "okay";
-                        clock-frequency = <400000>;
-
-                        s35390a: s35390a at 30 {
-                                compatible = "s35390a";
-                                reg = <0x30>;
-                        };
-
-Thanks
-	Andrew
+diff --git a/arch/arm/mach-omap2/vp.c b/arch/arm/mach-omap2/vp.c
+index 85241b8..6e9fe85 100644
+--- a/arch/arm/mach-omap2/vp.c
++++ b/arch/arm/mach-omap2/vp.c
+@@ -138,7 +138,7 @@ int omap_vp_forceupdate_scale(struct voltagedomain *voltdm,
+ 		udelay(1);
+ 	}
+ 	if (timeout >= VP_TRANXDONE_TIMEOUT) {
+-		pr_warn("%s: vdd_%s TRANXDONE timeout exceeded. Voltage change aborted",
++		pr_warn("%s: vdd_%s TRANXDONE timeout exceeded. Voltage change aborted\n",
+ 			__func__, voltdm->name);
+ 		return -ETIMEDOUT;
+ 	}
+@@ -197,7 +197,7 @@ void omap_vp_enable(struct voltagedomain *voltdm)
+ 	u32 vpconfig, volt;
+ 
+ 	if (!voltdm || IS_ERR(voltdm)) {
+-		pr_warning("%s: VDD specified does not exist!\n", __func__);
++		pr_warn("%s: VDD specified does not exist!\n", __func__);
+ 		return;
+ 	}
+ 
+@@ -214,8 +214,8 @@ void omap_vp_enable(struct voltagedomain *voltdm)
+ 
+ 	volt = voltdm_get_voltage(voltdm);
+ 	if (!volt) {
+-		pr_warning("%s: unable to find current voltage for %s\n",
+-			   __func__, voltdm->name);
++		pr_warn("%s: unable to find current voltage for %s\n",
++			__func__, voltdm->name);
+ 		return;
+ 	}
+ 
+@@ -242,7 +242,7 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 	int timeout;
+ 
+ 	if (!voltdm || IS_ERR(voltdm)) {
+-		pr_warning("%s: VDD specified does not exist!\n", __func__);
++		pr_warn("%s: VDD specified does not exist!\n", __func__);
+ 		return;
+ 	}
+ 
+@@ -272,8 +272,7 @@ void omap_vp_disable(struct voltagedomain *voltdm)
+ 			  VP_IDLE_TIMEOUT, timeout);
+ 
+ 	if (timeout >= VP_IDLE_TIMEOUT)
+-		pr_warning("%s: vdd_%s idle timedout\n",
+-			__func__, voltdm->name);
++		pr_warn("%s: vdd_%s idle timedout\n", __func__, voltdm->name);
+ 
+ 	vp->enabled = false;
+ 
+-- 
+1.7.9.5
