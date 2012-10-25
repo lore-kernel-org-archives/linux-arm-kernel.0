@@ -1,73 +1,69 @@
-From: gerg@snapgear.com (gerg at snapgear.com)
-Date: Thu, 25 Oct 2012 15:19:41 +1000
-Subject: [PATCH v2] ARM: add back in KS8695 based OpenGear board entries
-Message-ID: <1351142381-15460-1-git-send-email-gerg@snapgear.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 25 Oct 2012 13:25:45 +0800
+Subject: [PATCH 3/3] dmaengine: sirf: enable the driver support new
+ SiRFmarco SoC
+In-Reply-To: <1351138901.5263.70.camel@vkoul-udesk3>
+References: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
+ <1351076581.5263.56.camel@vkoul-udesk3>
+ <CAGsJ_4yY6YYKb+g4k7BcL_SyyBN9xYCwxRLX6rN5_afroK0e_g@mail.gmail.com>
+ <1351138901.5263.70.camel@vkoul-udesk3>
+Message-ID: <CAGsJ_4y=sccFizQfwO-mx5GcvkgR9nWqksmuwrvSYpL+N5U1wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Ungerer <gerg@uclinux.org>
+2012/10/25 Vinod Koul <vkoul@infradead.org>:
+> On Wed, 2012-10-24 at 19:59 +0800, Barry Song wrote:
+>> Hi Vinod,
+>> Thanks a lot!
+> Please dont top post.
 
-As of linux-3.7-rc1 configuring to build for the Micrel KS8695 based
-OpenGear board types will result in a build failure:
+well. saying hello is an exception :-)
 
-  CC      arch/arm/mach-ks8695/board-og.o
-arch/arm/mach-ks8695/board-og.c:142: error: ?MACH_TYPE_CM4002? undeclared here (not in a function)
-arch/arm/mach-ks8695/board-og.c:154: error: ?MACH_TYPE_CM4008? undeclared here (not in a function)
-arch/arm/mach-ks8695/board-og.c:166: error: ?MACH_TYPE_CM41XX? undeclared here (not in a function)
-arch/arm/mach-ks8695/board-og.c:178: error: ?MACH_TYPE_IM4004? undeclared here (not in a function)
-arch/arm/mach-ks8695/board-og.c:190: error: ?MACH_TYPE_IM42XX? undeclared here (not in a function)
+>>
+>> 2012/10/24 Vinod Koul <vkoul@infradead.org>
+>> >
+>> > On Thu, 2012-09-27 at 16:36 +0800, Barry Song wrote:
+>> > > From: Barry Song <Baohua.Song@csr.com>
+>> > >
+>> > > The driver supports old up SiRFprimaII SoCs, this patch makes it support
+>> > > the new SiRFmarco as well.
+>> > > SiRFmarco, as a SMP SoC, adds new DMA_INT_EN_CLR and DMA_CH_LOOP_CTRL_CLR
+>> > > registers, to disable IRQ/Channel, we should write 1 to the corresponding
+>> > > bit in the two CLEAR register.
+>> > >
+>> > > Tested on SiRFmarco using SPI driver:
+>> > >     $ /mnt/spidev-sirftest -D /dev/spidev32766.0
+>> > >     spi mode: 0
+>> > >     bits per word: 8
+>> > >     max speed: 500000 Hz (500 KHz)
+>> > >
+>> > >     00 00 00 00 00 00
+>> > >     00 00 00 00 00 00
+>> > >     00 00 00 00 00 00
+>> > >     00 00 00 00 00 00
+>> > >     00 00 00 00 00 00
+>> > >     00 00 00 00 00 00
+>> > >     00 00 00 00
+>> > >
+>> > >     $ cat /proc/interrupts
+>> > >                CPU0       CPU1
+>> > >      32:       1593          0       GIC  sirfsoc_timer0
+>> > >      33:          0       3533       GIC  sirfsoc_timer1
+>> > >      44:          0          0       GIC  sirfsoc_dma
+>> > >      45:         16          0       GIC  sirfsoc_dma
+>> > >      47:          6          0       GIC  sirfsoc_spi
+>> > >      50:       5654          0       GIC  sirfsoc-uart
+>> > >      ...
+>> > >
+>> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> > > ---
+> I tried applying this and it failed for me. Can you please respin this
+> on my next and send again.
 
-Add the removed OpenGear board IDs back into the mach-types file.
+ok
+>
+> --
+> Vinod Koul
+> Intel Corp.
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
-v2: update commit log to reflect actual compile error now
-
- arch/arm/tools/mach-types |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index df1aefb..d5f2fe5 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -132,12 +132,14 @@ kb9200			MACH_KB9200		KB9200			612
- sx1			MACH_SX1		SX1			613
- ixdp465			MACH_IXDP465		IXDP465			618
- ixdp2351		MACH_IXDP2351		IXDP2351		619
-+cm4008			MACH_CM4008		CM4008			624
- iq80332			MACH_IQ80332		IQ80332			629
- gtwx5715		MACH_GTWX5715		GTWX5715		641
- csb637			MACH_CSB637		CSB637			648
- n30			MACH_N30		N30			656
- nec_mp900		MACH_NEC_MP900		NEC_MP900		659
- kafa			MACH_KAFA		KAFA			662
-+cm41xx			MACH_CM41XX		CM41XX			672
- ts72xx			MACH_TS72XX		TS72XX			673
- otom			MACH_OTOM		OTOM			680
- nexcoder_2440		MACH_NEXCODER_2440	NEXCODER_2440		681
-@@ -180,6 +182,7 @@ mx21ads			MACH_MX21ADS		MX21ADS			851
- ams_delta		MACH_AMS_DELTA		AMS_DELTA		862
- nas100d			MACH_NAS100D		NAS100D			865
- magician		MACH_MAGICIAN		MAGICIAN		875
-+cm4002			MACH_CM4002		CM4002			876
- nxdkn			MACH_NXDKN		NXDKN			880
- palmtx			MACH_PALMTX		PALMTX			885
- s3c2413			MACH_S3C2413		S3C2413			887
-@@ -216,6 +219,7 @@ fsg			MACH_FSG		FSG			1091
- at91sam9260ek		MACH_AT91SAM9260EK	AT91SAM9260EK		1099
- glantank		MACH_GLANTANK		GLANTANK		1100
- n2100			MACH_N2100		N2100			1101
-+im42xx			MACH_IM42XX		IM42XX			1105
- qt2410			MACH_QT2410		QT2410			1108
- kixrp435		MACH_KIXRP435		KIXRP435		1109
- cc9p9360dev		MACH_CC9P9360DEV	CC9P9360DEV		1114
-@@ -249,6 +253,7 @@ csb726			MACH_CSB726		CSB726			1359
- davinci_dm6467_evm	MACH_DAVINCI_DM6467_EVM	DAVINCI_DM6467_EVM	1380
- davinci_dm355_evm	MACH_DAVINCI_DM355_EVM	DAVINCI_DM355_EVM	1381
- littleton		MACH_LITTLETON		LITTLETON		1388
-+im4004			MACH_IM4004		IM4004			1400
- realview_pb11mp		MACH_REALVIEW_PB11MP	REALVIEW_PB11MP		1407
- mx27_3ds		MACH_MX27_3DS		MX27_3DS		1430
- halibut			MACH_HALIBUT		HALIBUT			1439
--- 
-1.7.0.4
+-barry
