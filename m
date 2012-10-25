@@ -1,55 +1,66 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 25 Oct 2012 11:04:34 +0200
-Subject: [PATCH 3/5] pinctrl: dove: fix iomem and pdma clock
-In-Reply-To: <CACRpkdYQ+kk1jJ-GfOBd_5pahu-KOTL4GA3_zWP85E6v+h51pA@mail.gmail.com>
-References: <1351088724-11142-1-git-send-email-andrew@lunn.ch>
- <1351088724-11142-4-git-send-email-andrew@lunn.ch>
- <CACRpkdYQ+kk1jJ-GfOBd_5pahu-KOTL4GA3_zWP85E6v+h51pA@mail.gmail.com>
-Message-ID: <508900A2.20005@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Oct 2012 12:00:48 +0300
+Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
+Message-ID: <1351155648-20429-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 09:04 AM, Linus Walleij wrote:
-> On Wed, Oct 24, 2012 at 4:25 PM, Andrew Lunn<andrew@lunn.ch>  wrote:
->
->> Since 3.7 readl/writel require register addresses to be const void*
->> instead of unsigned int. The register addresses are converted using
->> IOMEM() and offsets are added instead of OR'ed.
->> Also a workaround for the pdma clock is added, that is required as
->> there is still no DT clock provider available on Dove.
->
-> So essentially two unrelated patches squashed into one, and I
-> would apply the first one right off but now the clock change makes
-> me hesitate.
->
->>          clk = devm_clk_get(&pdev->dev, NULL);
->> +
->> +       /* Currently there is no DT clock provider for pdma clock,
->> +          this fallback ensures pdma clock is ticking */
->
-> /*
->   * I prefer comment style like so because it's easier to read.
->   * Maybe it's a bit pedantic but bear with me.
->   */
->
->> +       if (IS_ERR(clk))
->> +               clk = clk_get_sys("dove-pdma", NULL);
->> +
->
-> This is a horrible hack. But if the Marvell people agree about
-> it I will live with it.
+if we allow compiler reorder our writes, we could
+fall into a situation where dev->buf_len is reset
+for no apparent reason.
 
-Unfortunately, it is. This is an chicken-egg-problem here, no
-DT clk-provider, no clocks properties..
+This bug was found with a simple script which would
+transfer data to an i2c client from 1 to 1024 bytes
+(a simple for loop), when we got to transfer sizes
+bigger than the fifo size, dev->buf_len was reset
+to zero before we had an oportunity to handle XDR
+Interrupt. Because dev->buf_len was zero, we entered
+omap_i2c_transmit_data() to transfer zero bytes,
+which would mean we would just silently exit
+omap_i2c_transmit_data() without actually writing
+anything to DATA register. That would cause XDR
+IRQ to trigger forever and we would never transfer
+the remaining bytes.
 
-While writing pinctrl-dove I was planing to enable it after
-the clock provider but with Andrew pushing forward - for a good
-reason - there comes the trouble ;)
+After adding the memory barrier, we also drop resetting
+dev->buf_len to zero in omap_i2c_xfer_msg() because
+both omap_i2c_transmit_data() and omap_i2c_receive_data()
+will act until dev->buf_len reaches zero, rendering the
+other write in omap_i2c_xfer_msg() redundant.
 
-I don't like the hack either but the clk-gate is there and
-if I don't enable it pinctrl-dove will hang the SoC.
+This patch has been tested with pandaboard for a few
+iterations of the script mentioned above.
 
-I have a clk-dove DT clk-provider in my pocket somewhere but
-didn't find the time to prepare it for posting..
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-Sebastian
+This bug has been there forever, but it's quite annoying.
+I think it deserves being pushed upstream during this -rc
+cycle, but if Wolfram decides to wait until v3.8, I don't
+mind.
+
+ drivers/i2c/busses/i2c-omap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index db31eae..1ec4e6e 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -521,6 +521,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	/* REVISIT: Could the STB bit of I2C_CON be used with probing? */
+ 	dev->buf = msg->buf;
+ 	dev->buf_len = msg->len;
++	wmb();
+ 
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CNT_REG, dev->buf_len);
+ 
+@@ -579,7 +580,6 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	 */
+ 	timeout = wait_for_completion_timeout(&dev->cmd_complete,
+ 						OMAP_I2C_TIMEOUT);
+-	dev->buf_len = 0;
+ 	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		omap_i2c_init(dev);
+-- 
+1.8.0
