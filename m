@@ -1,51 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 25 Oct 2012 17:47:45 +0200
-Subject: [PATCH] ARM i.MX: fix error-valued pointer dereference in
- clk_register_gate2()
-In-Reply-To: <CAPgLHd9Q3bZVth2NSxwH6kBpPsBmRGD+4pfZRpWL69KCw4HY4g@mail.gmail.com>
-References: <CAPgLHd9Q3bZVth2NSxwH6kBpPsBmRGD+4pfZRpWL69KCw4HY4g@mail.gmail.com>
-Message-ID: <20121025154745.GG27665@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Oct 2012 16:48:32 +0100
+Subject: [GIT PULL] ux500 fixes due for v3.7 RCs
+In-Reply-To: <CACRpkdZM3wHh9jey1eUfw9yjRTMK_fW5nKf1HcQuf2aExpPxbg@mail.gmail.com>
+References: <20121025094147.GA4008@gmail.com>
+ <201210251352.31364.arnd@arndb.de>
+ <CACRpkdZM3wHh9jey1eUfw9yjRTMK_fW5nKf1HcQuf2aExpPxbg@mail.gmail.com>
+Message-ID: <20121025154832.GJ4008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 11:02:18PM +0800, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> The error-valued pointer clk is used for the arg of kfree, it should be
-> kfree(gate) if clk_register() return ERR_PTR().
-> 
-> dpatch engine is used to auto generate this patch.
-> (https://github.com/weiyj/dpatch)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thu, 25 Oct 2012, Linus Walleij wrote:
 
-Applied, thanks
+> On Thu, Oct 25, 2012 at 3:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > Since we're now getting pull requests from both of you, Lee and Linus,
+> > I'd like to understand how you are organized.
+> >
+> > Lee, are you just sending bug fixes directly and send future work through
+> > Linus, or are you acting as backup maintainer when he is busy otherwise
+> > in general?
+> 
+> Let us say that Lee is pushing stuff that is DT-related, e.g. fixes that
+> only manifest in DT environments and I'm pushing most other stuff.
+> 
+> I'm happy that Lee is doing some nice offloading as pinctrl and gpio is
+> currently quite busy.
+> 
+> One day Srinidhi may also send pull requests, as co-maintainer.
 
-Sascha
+Right. As I was creating quite a lot of traffic, I've basically been
+asked to push all my own stuff after I've acquired the right Acks.
+I won't be pushing/acking anything else i.e. not acting as a co-
+maintainer.
 
-> ---
->  arch/arm/mach-imx/clk-gate2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/clk-gate2.c b/arch/arm/mach-imx/clk-gate2.c
-> index 3c1b8ff..cc49c7a 100644
-> --- a/arch/arm/mach-imx/clk-gate2.c
-> +++ b/arch/arm/mach-imx/clk-gate2.c
-> @@ -112,7 +112,7 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
->  
->  	clk = clk_register(dev, &gate->hw);
->  	if (IS_ERR(clk))
-> -		kfree(clk);
-> +		kfree(gate);
->  
->  	return clk;
->  }
-> 
-> 
-> 
+Hope that clears things up.
+
+Kind regards,
+Lee
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
