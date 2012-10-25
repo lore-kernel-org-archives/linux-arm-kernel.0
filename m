@@ -1,169 +1,300 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 25 Oct 2012 17:52:38 -0500
-Subject: [PATCH v3] gpio/omap: fix off-mode bug: clear debounce clock
- enable mask on free/reset
-In-Reply-To: <1351182858-14045-1-git-send-email-khilman@deeprootsystems.com>
-References: <1351182858-14045-1-git-send-email-khilman@deeprootsystems.com>
-Message-ID: <5089C2B6.5020606@ti.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Thu, 25 Oct 2012 23:58:37 +0100 (BST)
+Subject: [PATCH 3/9] ARM: Kirkwood: Convert dnskw to pinctrl
+In-Reply-To: <1351090434-30499-4-git-send-email-andrew@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <1351090434-30499-4-git-send-email-andrew@lunn.ch>
+Message-ID: <alpine.DEB.2.02.1210252352360.22302@gonzo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Thanks for doing all this. Some typos to fix, I've commented below but 
+I thought it might be easier to push a version for you to steal. It's 
+here:
 
-On 10/25/2012 11:34 AM, Kevin Hilman wrote:
-> From: Kevin Hilman <khilman@ti.com>
-> 
-> When a GPIO is freed or shutdown, ensure that the proper bit in
-> dbck_enable_mask is cleared also.  Otherwise, context restore on
-> subsequent off-mode transition will restore previous debounce values
-> from the shadow copies (bank->context.debounce*) leading to mismatch
-> state between driver state and hardware state.
-> 
-> This was discovered when board code was doing
-> 
->   gpio_request_one()
->   gpio_set_debounce()
->   gpio_free()
-> 
-> which was leaving the GPIO debounce settings in a confused state.  If
-> that GPIO bank is subsequently used with off-mode enabled, bogus state
-> would be restored, leaving GPIO debounce enabled which then prevented
-> the CORE powerdomain from transitioning.
-> 
-> To fix, ensure that right bit in bank->dbck_enable_mask is cleared
-> when a GPIO is freed/shutdown so debounce state doesn't persist after
-> free/reset.  If this GPIO is the last debounce-enabled GPIO in the
-> bank, the debounce will also be cut.
-> 
-> Special thanks to Grazvydas Ignotas for pointing out a bug in the
-> first version that would've disabled debounce on any runtime PM
-> transition.
-> 
-> And, special thanks to Jon Hunter for pointing out a bug in the second
-> version which was mistakenly clearing all debounce bits on reset
-> instead of individual GPIOs, as well as suggesting cutting the
-> debounce clock after all debounce bits are cleared.
+git://github.com/lentinj/linux.git v3.7-rc2-pinctrl
+https://raw.github.com/lentinj/linux/v3.7-rc2-pinctrl/arch/arm/boot/dts/kirkwood-dnskw.dtsi
 
-... and for introducing yet another bug :-(
- 
-> Tesed on 37xx/EVM board which configures GPIO debounce for the ads7846
-> touchscreen in its board file using the above sequence, and so was
-> failing off-mode tests in dynamic idle.  Verified that off-mode tests
-> are passing with this patch.
-> 
-> Reported-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: Grazvydas Ignotas <notasas@gmail.com>
-> Cc: Jon Hunter <jon-hunter@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
+Tested on a DNS-320, not a DNS-325 yet.
+
+Similar to lsxl_init, the custom GPIO registrations fail:-
+
+dnskw: failed to configure power-off GPIO
+dnskw: Failed to register dnskw:power:sata0
+dnskw: Failed to register dnskw:power:sata1
+dnskw: Failed to register dnskw:power:recover
+
+So I guess they will need a new home somewhere.
+
+However most things (fan, buttons, SATA detect/power via sysfs, power via 
+sysfs) work. The key thing that doesn't is LEDs. Registration looks 
+reasonable:
+
+Registered led device: dns320:blue:power
+kirkwood-pinctrl f1010000.pinctrl: request pin 43 (PIN43) for mvebu-gpio:43
+Registered led device: dns320:blue:usb
+kirkwood-pinctrl f1010000.pinctrl: request pin 28 (PIN28) for mvebu-gpio:28
+Registered led device: dns320:orange:l_hdd
+kirkwood-pinctrl f1010000.pinctrl: request pin 27 (PIN27) for mvebu-gpio:27
+Registered led device: dns320:orange:r_hdd
+kirkwood-pinctrl f1010000.pinctrl: request pin 35 (PIN35) for mvebu-gpio:35
+Registered led device: dns320:orange:usb
+
+However setting brightness on/off does the following:
+cat /sys/class/leds/dns320\:blue\:power/trigger
+
+dns320:blue:power - No effect, LED continues to blink as bootloader 
+configures it
+dns320:orange:l_hdd - Works fine
+dns320:orange:r_hdd - Works fine
+dns320:orange:usb - Turns on, turning off locks NAS hard
+dns320:blue:usb - Turns on, turning off locks NAS hard
+
+Any ideas?
+
+Cheers,
+
+On Wed, 24 Oct 2012, Andrew Lunn wrote:
+
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > ---
->  drivers/gpio/gpio-omap.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index 94cbc84..ce1da19 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -539,6 +539,8 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
->  	_set_gpio_irqenable(bank, gpio, 0);
->  	_clear_gpio_irqstatus(bank, gpio);
->  	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
-> +	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
-> +	_gpio_dbck_disable(bank);
+> arch/arm/boot/dts/kirkwood-dnskw.dtsi |  136 +++++++++++++++++++++++++++++++++
+> arch/arm/mach-kirkwood/board-dnskw.c  |   37 ---------
+> 2 files changed, 136 insertions(+), 37 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+> index 9b32d02..5d8cf93 100644
+> --- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+> +++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+> @@ -36,6 +36,142 @@
+> 	};
+>
+> 	ocp at f1000000 {
+> +		pinctrl: pinctrl at 10000 {
+> +			compatible = "marvell,88f6281-pinctrl";
+> +			reg = <0x10000 0x20>;
+> +
+> +			pinctrl-0 = < &pmx_uart1 &pmx_sata1
 
-We can't use _gpio_dbck_disable() here. This has been specifically implemented
-for the suspend path and is designed to disable the debounce clock while
-debounce is enabled (which makes sense). Yes this needs to be cleaned up.
+Need a &pmx_sata0 too (see below).
 
-I have implemented the following and unit tested. Care to test on your 37xx
-board? Sorry I would do it myself I had one. 
+> +				      &pmx_gpio_24 &pmx_gpio_25
+> +				      &pmx_led_power &pmx_led_power
 
-Also not sure if you just wish to squash your patch and mine together.
-This is based on top of yours.
+Shouldn't be repeated, I'm guessing.
 
-Cheers
-Jon
+> +				      &pmx_led_red_right_hdd
+> +				      &pmx_led_red_left_hdd
+> +				      &pmx_led_red_usb_325
+> +				      &pmx_gpio_30 &pmx_gpio_31
+> +				      &pmx_gpio_32 &pmx_gpio_33
+> +				      &pmx_button_power
+> +				      &pmx_led_red_usb_320
+> +				      &pmx_power_off &pmx_power_back_on
+> +				      &pmx_power_sata0 &pmx_power_sata1
+> +				      &pmx_present_sata0 &pmx_present_sata1
+> +				      &pmx_led_white_usb &pmx_fan_tacho
+> +				      &pmx_fan_high_speed &pmx_fan_low_speed
+> +				      &pmx_button_unmount &pmx_button_reset
+> +				      &pmx_temp_alarm >;
+> +			pinctrl-names = "default";
+> +
+> +			pmx_uart1: pmx-uart1 {
+> +				marvell,pins = "mpp13", "mpp14";
+> +				marvell,function = "uart1";
+> +			};
+> +			pmx_sata1: pmx-sata1 {
+> +				marvell,pins = "mpp4", "mpp20", "mpp22";
 
->From 33812f3bd4f7aab1154e7194b7f11fba700a5086 Mon Sep 17 00:00:00 2001
-From: Jon Hunter <jon-hunter@ti.com>
-Date: Thu, 25 Oct 2012 16:00:51 -0500
-Subject: [PATCH] gpio/omap: fix clearing of debounce settings on gpio
- free/reset
+mpp4 is for the NAND. I'm guessing mpp22 should be mpp21, but this should 
+have the "sata0" function.
 
-When a GPIO is freed or shutdown, we need to ensure that any debounce settings
-are cleared and if the GPIO is the only GPIO in the bank that is currently
-using debounce, then disable the debounce clock as well to save power.
+On a related note, the NAND pins aren't registered. I probably should have 
+done this before, although if the bootloader didn't set up the NAND pins 
+then it'd probably not get this far :)
 
-Therefore, introduce a new function called _clear_gpio_debounce() to clear
-any debounce settings when the GPIO is freed or shutdown.
+> +				marvell,function = "sata1";
+> +			};
+> +			pmx_gpio_24: pmx-gpio-24 {
+> +				marvell,pins = "mpp24";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_gpio_25: pmx-gpio-25 {
+> +				marvell,pins = "mpp25";
+> +				marvell,function = "gpio";
+> +			};
 
-Please note that we cannot use _gpio_dbck_disable() to disable the debounce
-clock because this has been specifically created for the gpio suspend path
-and is intended to shutdown the debounce clock while debounce is enabled.
+These don't actually do anything (there's no more NAS functions left to 
+find now), so could they just be left out? They didn't serve any purpose
+before other than making it easy to see where the gaps were.
 
-This has been unit tested on an OMAP3430 Beagle board, by requesting a gpio,
-enabling debounce and then freeing the gpio and checking the register contents,
-the saved register context and the debounce clock state.
+> +			pmx_led_power: pmx-led-power {
+> +				marvell,pins = "mpp26";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_red_right_hdd: pmx-led-red-right-hdd {
+> +				marvell,pins = "mpp27";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_red_left_hdd: pmx-led-red-left-hdd {
+> +				marvell,pins = "mpp28";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_red_usb_325: pmx-led-red-usb-325 {
+> +				marvell,pins = "mpp29";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_gpio_30: pmx-gpio-30 {
+> +				marvell,pins = "mpp30";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_gpio_31: pmx-gpio-31 {
+> +				marvell,pins = "mpp31";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_gpio_32: pmx-gpio-32 {
+> +				marvell,pins = "mpp32";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_gpio_33: pmx-gpio-33 {
+> +				marvell,pins = "mpp33";
+> +				marvell,function = "gpio";
+> +			};
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
----
- drivers/gpio/gpio-omap.c |   37 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
+Should be "gpo", but could just leave out all 4.
 
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index ce1da19..d335af1 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -251,6 +251,40 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 	}
- }
- 
-+/**
-+ * _clear_gpio_debounce - clear debounce settings for a gpio
-+ * @bank: the gpio bank we're acting upon
-+ * @gpio: the gpio number on this @gpio
-+ *
-+ * If a gpio is using debounce, then clear the debounce enable bit and if
-+ * this is the only gpio in this bank using debounce, then clear the debounce
-+ * time too. The debounce clock will also be disabled when calling this function
-+ * if this is the only gpio in the bank using debounce.
-+ */
-+static void _clear_gpio_debounce(struct gpio_bank *bank, unsigned gpio)
-+{
-+	u32 gpio_bit = GPIO_BIT(bank, gpio);
-+
-+	if (!bank->dbck_flag)
-+		return;
-+
-+	if (!(bank->dbck_enable_mask & gpio_bit))
-+		return;
-+
-+	bank->dbck_enable_mask &= ~gpio_bit;
-+	bank->context.debounce_en &= ~gpio_bit;
-+	__raw_writel(bank->context.debounce_en,
-+		     bank->base + bank->regs->debounce_en);
-+
-+	if (!bank->dbck_enable_mask) {
-+		bank->context.debounce = 0;
-+		__raw_writel(bank->context.debounce, bank->base +
-+			     bank->regs->debounce);
-+		clk_disable(bank->dbck);
-+		bank->dbck_enabled = false;
-+	}
-+}
-+
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
- 						unsigned trigger)
- {
-@@ -539,8 +573,7 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
- 	_set_gpio_irqenable(bank, gpio, 0);
- 	_clear_gpio_irqstatus(bank, gpio);
- 	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
--	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
--	_gpio_dbck_disable(bank);
-+	_clear_gpio_debounce(bank, gpio);
- }
- 
- /* Use disable_irq_wake() and enable_irq_wake() functions from drivers */
+> +			pmx_button_power: pmx-button-power {
+> +				marvell,pins = "mpp34";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_red_usb_320: pmx-led-red-usb-320 {
+> +				marvell,pins = "mpp35";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_off: pmx-power-off {
+> +				marvell,pins = "mpp36";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_back_on: pmx-power-back-on {
+> +				marvell,pins = "mpp37";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_gpio_38: pmx-gpio-38 {
+> +				marvell,pins = "mpp38";
+> +				marvell,function = "gpio";
+> +			};
+
+This one wasn't registered above, but not a used pin.
+
+> +			pmx_power_sata0: pmx-power-sata0 {
+> +				marvell,pins = "mpp39";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_power_sata1: pmx-power-sata1 {
+> +				marvell,pins = "mpp40";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_present_sata0: pmx-present-sata0 {
+> +				marvell,pins = "mpp41";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_present_sata1: pmx-present-sata1 {
+> +				marvell,pins = "mpp42";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_white_usb: pmx-led-white-usb {
+> +				marvell,pins = "mpp43";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_tacho: pmx-fan-tacho {
+> +				marvell,pins = "mpp44";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_high_speed: pmx-fan-high-speed {
+> +				marvell,pins = "mpp45";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_fan_low_speed: pmx-fan-low-speed {
+> +				marvell,pins = "mpp46";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_button_unmount: pmx-button-unmount {
+> +				marvell,pins = "mpp47";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_button_reset: pmx-button-reset {
+> +				marvell,pins = "mpp48";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_temp_alarm: pmx-temp-alarm {
+> +				marvell,pins = "mpp49";
+> +				marvell,function = "gpio";
+> +			};
+> +		};
+> 		sata at 80000 {
+> 			status = "okay";
+> 			nr-ports = <2>;
+> diff --git a/arch/arm/mach-kirkwood/board-dnskw.c b/arch/arm/mach-kirkwood/board-dnskw.c
+> index 43d16d6..ed93c09 100644
+> --- a/arch/arm/mach-kirkwood/board-dnskw.c
+> +++ b/arch/arm/mach-kirkwood/board-dnskw.c
+> @@ -17,46 +17,11 @@
+> #include <linux/mv643xx_eth.h>
+> #include <linux/gpio.h>
+> #include "common.h"
+> -#include "mpp.h"
+>
+> static struct mv643xx_eth_platform_data dnskw_ge00_data = {
+> 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
+> };
+>
+> -static unsigned int dnskw_mpp_config[] __initdata = {
+> -	MPP13_UART1_TXD,	/* Custom ... */
+> -	MPP14_UART1_RXD,	/* ... Controller (DNS-320 only) */
+> -	MPP20_SATA1_ACTn,	/* LED: White Right HDD */
+> -	MPP21_SATA0_ACTn,	/* LED: White Left HDD */
+> -	MPP24_GPIO,
+> -	MPP25_GPIO,
+> -	MPP26_GPIO,	/* LED: Power */
+> -	MPP27_GPIO,	/* LED: Red Right HDD */
+> -	MPP28_GPIO,	/* LED: Red Left HDD */
+> -	MPP29_GPIO,	/* LED: Red USB (DNS-325 only) */
+> -	MPP30_GPIO,
+> -	MPP31_GPIO,
+> -	MPP32_GPIO,
+> -	MPP33_GPO,
+> -	MPP34_GPIO,	/* Button: Front power */
+> -	MPP35_GPIO,	/* LED: Red USB (DNS-320 only) */
+> -	MPP36_GPIO,	/* Power: Turn off board */
+> -	MPP37_GPIO,	/* Power: Turn back on after power failure */
+> -	MPP38_GPIO,
+> -	MPP39_GPIO,	/* Power: SATA0 */
+> -	MPP40_GPIO,	/* Power: SATA1 */
+> -	MPP41_GPIO,	/* SATA0 present */
+> -	MPP42_GPIO,	/* SATA1 present */
+> -	MPP43_GPIO,	/* LED: White USB */
+> -	MPP44_GPIO,	/* Fan: Tachometer Pin */
+> -	MPP45_GPIO,	/* Fan: high speed */
+> -	MPP46_GPIO,	/* Fan: low speed */
+> -	MPP47_GPIO,	/* Button: Back unmount */
+> -	MPP48_GPIO,	/* Button: Back reset */
+> -	MPP49_GPIO,	/* Temp Alarm (DNS-325) Pin of U5 (DNS-320) */
+> -	0
+> -};
+> -
+> static void dnskw_power_off(void)
+> {
+> 	gpio_set_value(36, 1);
+> @@ -76,8 +41,6 @@ static void __init dnskw_gpio_register(unsigned gpio, char *name, int def)
+>
+> void __init dnskw_init(void)
+> {
+> -	kirkwood_mpp_conf(dnskw_mpp_config);
+> -
+> 	kirkwood_ehci_init();
+> 	kirkwood_ge00_init(&dnskw_ge00_data);
+>
+>
+
 -- 
-1.7.9.5
+Jamie Lentin
