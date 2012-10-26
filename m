@@ -1,74 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2012 13:37:16 +0000
-Subject: [GIT PULL] vexpress: soc changes for v3.8
-In-Reply-To: <1350579917.4984.19.camel@hornet>
-References: <1350579917.4984.19.camel@hornet>
-Message-ID: <201210261337.16972.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Oct 2012 15:47:08 +0200
+Subject: [PATCH V2 2/4] arm: mvebu: adding SATA support: dt binding for
+ Armada 370/XP
+In-Reply-To: <20121026133446.GM21046@lunn.ch>
+References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351254650-26861-3-git-send-email-gregory.clement@free-electrons.com>
+ <20121026133154.GN18811@titan.lakedaemon.net>
+ <20121026133446.GM21046@lunn.ch>
+Message-ID: <508A945C.4010006@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 October 2012, Pawel Moll wrote:
-> Hi Arnd, Olof,
+On 10/26/2012 03:34 PM, Andrew Lunn wrote:
+> On Fri, Oct 26, 2012 at 09:31:54AM -0400, Jason Cooper wrote:
+>> On Fri, Oct 26, 2012 at 02:30:47PM +0200, Gregory CLEMENT wrote:
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> Signed-off-by: Lior Amsalem <alior@marvell.com>
+>>> ---
+>>>  arch/arm/boot/dts/armada-370-xp.dtsi |    9 +++++++++
+>>>  1 file changed, 9 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+>>> index 94b4b9e..a911f7a 100644
+>>> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+>>> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+>>> @@ -69,6 +69,15 @@
+>>>  			compatible = "marvell,armada-addr-decoding-controller";
+>>>  			reg = <0xd0020000 0x258>;
+>>>  		};
+>>> +
+>>> +		sata at d00a0000 {
+>>> +                        compatible = "marvell,orion-sata";
+>>> +                        reg = <0xd00a0000 0x2400>;
+>>> +                        interrupts = <55>;
+>>> +			clocks = <&coreclk 0>;
+>>
+>> nit. whitespace?
 > 
-> Could you, please, pull the Versatile Express SOC updates for 3.8?
+> [Don't shoot the messenger]
 > 
+> How about extending checkpatch to check for this? I guess its just
+> spaces which should be tabs.
 
-Pulled into next/soc now, sorry for the delay.
+No it is the opposite in fact! On this line it's tabs: 3 tabs of 8
+whitespace, so the line start at 24. But as there is a '+', the first
+tab is only 7, so it is still start at 24. Whereas for the other lines
+it's 24 white spaces, so with the '+' it starts at 25. That's why I
+didn't notice it, and if you apply the patch all is fine.
 
-Since this adds new mfd drivers, it should really have an Ack from
-Samuel, and you should keep him on Cc during the submission.
+Now, about white spaces vs tab, I don't know what is the rule for .dts
+file.
 
-Samuel: I hope you're ok with this going through the arm-soc tree,
-if not please let me know and I'll take the branch out again.
 
-	Arnd
-
-> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-> 
->   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/pawelmoll/linux.git vexpress-soc
-> 
-> for you to fetch changes up to f665f235c6ee31f84049920f16d1ff6e2dabc8f5:
-> 
->   ARM: vexpress: Remove motherboard dependencies in the DTS files (2012-10-18 18:00:07 +0100)
-> 
-> ----------------------------------------------------------------
-> Pawel Moll (5):
->       mfd: Versatile Express config infrastructure
->       mfd: Versatile Express system registers driver
->       ARM: vexpress: Add config bus components and clocks to DTs
->       ARM: vexpress: Start using new Versatile Express infrastructure
->       ARM: vexpress: Remove motherboard dependencies in the DTS files
-> 
->  .../devicetree/bindings/arm/vexpress-sysreg.txt    |   50 ++
->  Documentation/devicetree/bindings/arm/vexpress.txt |   98 +++-
->  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  146 +++++-
->  arch/arm/boot/dts/vexpress-v2m.dtsi                |  146 +++++-
->  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  121 ++++-
->  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  186 ++++++-
->  arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |   84 ++-
->  arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  136 ++++-
->  arch/arm/include/asm/hardware/sp810.h              |    6 -
->  arch/arm/mach-vexpress/Kconfig                     |    4 +-
->  arch/arm/mach-vexpress/Makefile                    |    2 +-
->  arch/arm/mach-vexpress/ct-ca9x4.c                  |   41 +-
->  arch/arm/mach-vexpress/include/mach/motherboard.h  |   81 ---
->  arch/arm/mach-vexpress/platsmp.c                   |    3 +-
->  arch/arm/mach-vexpress/v2m.c                       |  349 ++++---------
->  drivers/mfd/Kconfig                                |    6 +
->  drivers/mfd/Makefile                               |    1 +
->  drivers/mfd/vexpress-config.c                      |  277 ++++++++++
->  drivers/mfd/vexpress-sysreg.c                      |  552 ++++++++++++++++++++
->  include/linux/vexpress.h                           |  121 +++++
->  20 files changed, 1993 insertions(+), 417 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/vexpress-sysreg.txt
->  create mode 100644 drivers/mfd/vexpress-config.c
->  create mode 100644 drivers/mfd/vexpress-sysreg.c
->  create mode 100644 include/linux/vexpress.h
-> 
-> 
-> 
-> 
+Gregory
