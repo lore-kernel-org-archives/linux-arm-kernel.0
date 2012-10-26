@@ -1,35 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 26 Oct 2012 14:54:24 +0200
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Oct 2012 14:55:01 +0200
 Subject: [PATCH V2 0/4] Adding SATA support for Armada 370/XP
-In-Reply-To: <20121026144804.640eabaf@skate>
+In-Reply-To: <20121026123908.GH21046@lunn.ch>
 References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
- <20121026123908.GH21046@lunn.ch> <20121026144804.640eabaf@skate>
-Message-ID: <20121026125424.GI21046@lunn.ch>
+ <20121026123908.GH21046@lunn.ch>
+Message-ID: <508A8825.8020502@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 02:48:04PM +0200, Thomas Petazzoni wrote:
+On 10/26/2012 02:39 PM, Andrew Lunn wrote:
+> On Fri, Oct 26, 2012 at 02:30:45PM +0200, Gregory CLEMENT wrote:
+>> Hello,
+>>
+>> this patch set adds the SATA support for Armada 370 and Armada XP. Few
+>> changes have been done since the first version by taking in account
+>> the comments received for the first version.
+>>
+>> The evaluation boards for Armada 370 and Armada XP come with 2 SATA
+>> ports, and when both are enable the coherent pool for DMA mapping was
+>> too short. It was exactly the same issue that was fixed for Kirkwood
+>> two months ago. So I used the same fix in the first patch. Later when
+>> Kirkwood will be part of mach-mvebu, then this fix will be shared
+>> between the 2 SoCs families.
+>>
+>> This patch set is based on 3.7-rc2 and depends one the framework clock
+>> support (the last version was posted last week:
+>> http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
+>> called mvebu-SATA-for-3.8 is also available at
+>> https://github.com/MISL-EBU-System-SW/mainline-public.git.
 > 
-> On Fri, 26 Oct 2012 14:39:08 +0200, Andrew Lunn wrote:
+> Hi Gregory
 > 
-> > What about the openblocks-ax3?
+> What about the openblocks-ax3?
+
+Well I don't have this hardware, Thomas have. But with this question
+I guess this board have (a) SATA port(s).
+
+Moreover openblocks-ax3 is not (yet) in Jason branch so I can't make
+a patch applying on a file which doesn't exist on my branch. It could
+be a dependency but I try to reduce it as far as I can.
+
+But as soon as this series will be applied, adding SATA support for
+openblocks-ax3 should be pretty fast and just a matter of updating
+the dts.
+
 > 
-> Gr??gory does not (yet) have an OpenBlocks AX3, but I'm planning to do
-> the work for SATA soon for this platform. However, supporting the
-> OpenBlocks AX3 is not part of our official contract with Marvell, it's
-> just an additional thing I'm happily doing on my spare time.
+>      Andrew
+> 
 
-Ah, O.K. I did not realize that.
 
-> So I'll
-> provide support for SATA, network and SMP on OpenBlocks AX3, but we
-> would like to first see the SATA support for the Marvell evaluation
-> boards being merged, and on my side the basic support for the
-> OpenBlocks AX3. I'll send followup patches to enable SATA/network/SMP
-> on OpenBlocks AX3 later on, if that's ok for you?
-
-Sure, no problem.
-
-Thanks for the clarification,
-
-       Andrew
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
