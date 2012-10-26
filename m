@@ -1,79 +1,35 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 26 Oct 2012 17:21:41 +0200
-Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a comparator
- driver to omap_usb2
-In-Reply-To: <508AA94B.10504@ti.com>
-References: <1346943430-18236-1-git-send-email-kishon@ti.com>
- <1346943430-18236-3-git-send-email-kishon@ti.com>
- <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
- <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
- <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
- <508AA94B.10504@ti.com>
-Message-ID: <508AAA85.6070905@ti.com>
+From: shuah.khan@hp.com (Shuah Khan)
+Date: Fri, 26 Oct 2012 09:23:03 -0600
+Subject: [PATCH linux-next] ARM64: dma-mapping: support debug_dma_mapping_error
+In-Reply-To: <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
+References: <1351205220.6851.3.camel@lorien2>
+ <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
+Message-ID: <1351264983.2712.14.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Add support for debug_dma_mapping_error() call to avoid warning from
+debug_dma_unmap() interface when it checks for mapping error checked
+status. Without this patch, device driver failed to check map error
+warning is generated. 
 
-On 10/26/2012 05:16 PM, Roger Quadros wrote:
-> Hi Kishon & Benoit,
-> 
-> On 09/24/2012 12:06 PM, Rabin Vincent wrote:
->> 2012/9/24 ABRAHAM, KISHON VIJAY <kishon@ti.com>:
->>> On Sat, Sep 22, 2012 at 3:03 AM, Rabin Vincent <rabin@rab.in> wrote:
->>>> USB doesn't work on pandaboard on linux-next, and bisection shows this
->>>> patch.  Unfortunately, I can't provide a dmesg log because USB is the
->>>> only way I currently have to get one out(!), but presumably it's because
->>>> this omap-usb2 device is never registered?  Looks like this breaks
->>>> non-dt USB on pandaboard; is that intended?
->>>
->>> Yes. omap-usb2 is *only* dt supported (New drivers shouldn't have the
->>> old non-dt support).
->>
->> Well, USB used to work fine on Pandaboard without DT before the
->> introduction of "omap-usb2", so one would expected it to continue
->> working (until the board file is completely removed).
->>
->> Anyway, I've moved to DT now.
->>
->>> Some patches are queued only for 3.7.
->>>
->>> In case you want to use MUSB please use these patches on linux-next..
->>> [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of ocp2scp
->>> [PATCH] ARM: OMAP2+: hwmod data: Fix ocp2scp_usb_phy and usb_host_hs
->>> entries (from Benoit)
->>> [PATCH 0/2] ARM: dts: Add subnode for ocp2scp (patch series)
->>> [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB (patch series)
->>
->> I got these by merging in Benoit's for_3.7/dts_part2 on top of
->> next-20120921.  Thanks.
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
-> I still can't get musb to work on 3.7-rc2. Apparently it is still
-> missing the patches from Benoit's for_3.7/dts_part2.
-> 
-> Maybe I just need to wait for it to be merged?
+Signed-off-by: Shuah Khan <shuah.khan@hp.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/dma-mapping.h |    1 +
+ 1 file changed, 1 insertion(+)
 
-They are now in a for_3.8/dts. Unfortunately, one patch that was adding
-ctrl_module address in the USB data was rejected and thus I'm not sure
-it will work without that.
-
-I think Tony had an idea to map the ctrl_register to regulator fmwk or
-something like that.
-
-> Till then, where can I get a tree where musb works on Panda?
-> 
-> Benoit,
-> 
-> FYI, I get merge conflicts when merging 3.7-rc2 on top of Linus's kernel
-> HEAD. Am I missing something?
-
-Yeah, some more patches were merged outside our tree.
-I fixed that. Can you try with the updated branch?
-
-Regards,
-Benoit
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 538f4b4..9947768 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+ static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
+ {
+ 	struct dma_map_ops *ops = get_dma_ops(dev);
++	debug_dma_mapping_error(dev, dev_addr);
+ 	return ops->mapping_error(dev, dev_addr);
+ }
+ 
+-- 
+1.7.9.5
