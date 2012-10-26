@@ -1,82 +1,56 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Oct 2012 09:40:06 -0700
-Subject: [PATCH v2 06/14] mtd: onenand: omap: use pdata info instead of
- cpu_is
-In-Reply-To: <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
-References: <cover.1349672877.git.afzal@ti.com>
- <860ba92c34cbb490beccd5442087087c1751a6a2.1349672877.git.afzal@ti.com>
- <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
-Message-ID: <20121026164005.GD11908@atomide.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Fri, 26 Oct 2012 18:39:51 +0200
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121026055239.GA4862@in.ibm.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
+Message-ID: <20121026163951.GA17742@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121025 18:50]:
-> Hi Afzal
-> 
-> On Mon, 8 Oct 2012, Afzal Mohammed wrote:
-> 
-> > platform data now contains a field to indicate whether
-> > soc belongs to omap34xx family, use it instead of
-> > cpu_is_* check.
-> > 
-> > This helps in removing dependency of platform specific
-> > header file - cpu.h
-> > 
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> 
-> This one breaks an N800 multi-OMAP build here:
-> 
->   LD      init/built-in.o
-> drivers/built-in.o: In function `omap2_onenand_probe':
-> /home/paul/linux-bisect/drivers/mtd/onenand/omap2.c:788: undefined 
-> reference to `omap3_onenand_read_bufferram'
-> /home/paul/linux-bisect/drivers/mtd/onenand/omap2.c:788: undefined 
-> reference to `omap3_onenand_write_bufferram'
-> make: *** [vmlinux] Error 1
-> 
-> A fix is below.
+On 10/26, Ananth N Mavinakayanahalli wrote:
+>
+> On Thu, Oct 25, 2012 at 04:58:39PM +0200, Oleg Nesterov wrote:
+> > On 10/16, Rabin Vincent wrote:
+> > >
+> > > >> --- a/kernel/events/uprobes.c
+> > > >> +++ b/kernel/events/uprobes.c
+> > > >> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+> > > >>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
+> > > >>       vaddr = kmap_atomic(area->page);
+> > > >>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
+> > > >> +     flush_dcache_page(area->page);
+> > > >>       kunmap_atomic(vaddr);
+> > > >
+> > > > I agree... but why under kmap_atomic?
+> > >
+> > > No real reason; I'll move it to after the unmap.
+> >
+> > OK. I assume you will send v2.
+> >
+> > But this patch looks like a bugfix, flush_dcache_page() is not a nop
+> > on powerpc. So perhaps we should apply this fix right now?
+>
+> Starting Power5, all Power processers have coherent caches.
+>
+> > OTOH, I do not understand this stuff, everything is nop on x86. And
+> > when I look into Documentation/cachetlb.txt I am starting to think
+> > that may be this needs flush_icache_user_range instead?
+> >
+> > Rabin, Ananth could you clarify this?
+>
+> Yes. We need flush_icache_user_range(). Though for x86 its always been a
+> nop, one never knows if there is some Power4 or older machine out there
+> that is still being used. We are fine for Power5 and later.
 
-If you can add this too into your fixes branch on top of
-omap-for-v3.8/cleanup-headers that would be nice.
+This is bad...
 
-Regards,
+flush_icache_user needs vma. perhaps just to check VM_EXEC...
 
-Tony
+So let me repeat to be sure I really understand, do you confirm that
+_in general_ flush_dcache_page() is not enough?
 
-> ---
->  drivers/mtd/onenand/omap2.c |   18 ++++++++++++------
->  1 file changed, 12 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
-> index 53069ae..f87cf39 100644
-> --- a/drivers/mtd/onenand/omap2.c
-> +++ b/drivers/mtd/onenand/omap2.c
-> @@ -445,13 +445,19 @@ out_copy:
->  
->  #else
->  
-> -int omap3_onenand_read_bufferram(struct mtd_info *mtd, int area,
-> -				 unsigned char *buffer, int offset,
-> -				 size_t count);
-> +static int omap3_onenand_read_bufferram(struct mtd_info *mtd, int area,
-> +					unsigned char *buffer, int offset,
-> +					size_t count)
-> +{
-> +	return -ENOSYS;
-> +}
->  
-> -int omap3_onenand_write_bufferram(struct mtd_info *mtd, int area,
-> -				  const unsigned char *buffer,
-> -				  int offset, size_t count);
-> +static int omap3_onenand_write_bufferram(struct mtd_info *mtd, int area,
-> +					 const unsigned char *buffer,
-> +					 int offset, size_t count)
-> +{
-> +	return -ENOSYS;
-> +}
->  
->  #endif
->  
-> -- 
-> 1.7.10.4
-> 
+Oleg.
