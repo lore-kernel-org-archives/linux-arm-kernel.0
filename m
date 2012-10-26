@@ -1,52 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Oct 2012 10:16:55 -0700
-Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
-In-Reply-To: <20121026064736.GA22206@arwen.pp.htv.fi>
-References: <1349675983-23803-1-git-send-email-kishon@ti.com>
- <1349675983-23803-2-git-send-email-kishon@ti.com>
- <20121016165043.GS15569@atomide.com>
- <20121025004806.GK11928@atomide.com>
- <20121025061722.GB4449@arwen.pp.htv.fi>
- <20121025174446.GT11928@atomide.com>
- <20121026064736.GA22206@arwen.pp.htv.fi>
-Message-ID: <20121026171655.GI11908@atomide.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 26 Oct 2012 10:10:09 -0700
+Subject: [PATCH v2 5/7] crypto: omap-sham: Convert to use pm_runtime API
+In-Reply-To: <87lieunkat.fsf@deeprootsystems.com>
+References: <1351046167-4882-1-git-send-email-mgreer@animalcreek.com>
+ <1351046167-4882-6-git-send-email-mgreer@animalcreek.com>
+ <87lieunkat.fsf@deeprootsystems.com>
+Message-ID: <20121026171009.GA23528@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121025 23:55]:
-> On Thu, Oct 25, 2012 at 10:44:47AM -0700, Tony Lindgren wrote:
-> > * Felipe Balbi <balbi@ti.com> [121024 23:24]:
-> > > Hi,
-> > > 
-> > > On Wed, Oct 24, 2012 at 05:48:07PM -0700, Tony Lindgren wrote:
-> > > > * Tony Lindgren <tony@atomide.com> [121016 09:53]:
-> > > > > * Kishon Vijay Abraham I <kishon@ti.com> [121007 23:01]:
-> > > > > > ocp2scp was not having pdata support which makes *musb* fail for non-dt
-> > > > > > boot in OMAP platform. The pdata will have information about the devices
-> > > > > > that is connected to ocp2scp. ocp2scp driver will now make use of this
-> > > > > > information to create the devices that is attached to ocp2scp.
-> > > > > > 
-> > > > > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > > > > 
-> > > > > This fixes the regression on my panda es for musb port:
-> > > > > 
-> > > > > Acked-by: Tony Lindgren <tony@atomide.com>
-> > > > 
-> > > > Looks like nobody has picked this one up and we need it to
-> > > > fix the musb regression on omap, so I'll queue these up.
-> > > 
-> > > I don't seem to have the patches around in any mailbox :-(
-> > 
-> > Bounced them to you. Do you have any better ideas for the
-> > -rc cycle to fix the MUSB regression on omap4?
+On Thu, Oct 25, 2012 at 05:34:02PM -0700, Kevin Hilman wrote:
+> Hi Mark,
+
+Hi Kevin.
+
+> "Mark A. Greer" <mgreer@animalcreek.com> writes:
 > 
-> Well, there are two regressions that I know of. One is caused by the
-> mode1 DMA changes, which I'll just revert, and the other is the
-> missing platform_data support on the new PHY driver which these patches
-> are supposed to solve, right ?
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> >
+> > Convert the omap-sham crypto driver to use the
+> > pm_runtime API instead of the clk API.
+> >
+> > CC: Kevin Hilman <khilman@deeprootsystems.com>
+> > CC: Paul Walmsley <paul@pwsan.com>
+> > CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> 
+> I can't pretend to fully understand this driver, It looks like the
+> current code is doing a bit more fine-grained clock gating, and leaving
+> the IP clocked only when needed.
+> 
+> The proposed version does a 'get' in probe and a 'put' in remove, which
+> means the IP will always be enabled (and thus preventing low-power
+> states), even when it's not in use.
 
-Yes that's it AFAIK.
+You're right, and what I did is wrong.  I'll fix this in the next revision.
 
-Regards,
+Thanks,
 
-Tony
+Mark
+--
