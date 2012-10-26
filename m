@@ -1,62 +1,43 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 26 Oct 2012 13:23:28 +0200
-Subject: [RFC] cpufreq: Make sure target freq is within limits
-In-Reply-To: <f0099171c1c4f3048d0f29b7deb42144f26ac5d5.1351146515.git.viresh.kumar@linaro.org>
-References: <f0099171c1c4f3048d0f29b7deb42144f26ac5d5.1351146515.git.viresh.kumar@linaro.org>
-Message-ID: <2173527.XVCDQtU61N@vostro.rjw.lan>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 26 Oct 2012 17:09:17 +0530
+Subject: [PATCH] davinci: check for presence of channel controller on
+ slot alloc
+In-Reply-To: <1347473642-9948-1-git-send-email-cyril@ti.com>
+References: <1347473642-9948-1-git-send-email-cyril@ti.com>
+Message-ID: <508A7665.4030109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 25, 2012 12:03:34 PM Viresh Kumar wrote:
-> Hi Rafael,
-> 
-> __cpufreq_driver_target() must not pass target frequency beyond the limits of
-> current policy.
-> 
-> Today most of cpufreq platform drivers are doing this check in their target
-> routines. Why not move it to __cpufreq_driver_target().
-> 
-> I wanted to get your opinion on this before making changes in all driver files.
-> That's why this is an RFC.
++ Matt, who is doing the DMA engine conversion for EDMA
 
-I'd prefer to apply the patch below before changing the drviers.
+On 9/12/2012 11:44 PM, Cyril Chemparathy wrote:
+> This patch adds a check for the presence of the channel controller when
+> trying to allocate a slot.  Without this fix, the kernel panics with a NULL
+> pointer dereference when the dma-engine drivers are probed.
+> 
+> Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+> ---
+>  arch/arm/mach-davinci/dma.c |    3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+> index a685e97..2fee31e 100644
+> --- a/arch/arm/mach-davinci/dma.c
+> +++ b/arch/arm/mach-davinci/dma.c
+> @@ -743,6 +743,9 @@ EXPORT_SYMBOL(edma_free_channel);
+>   */
+>  int edma_alloc_slot(unsigned ctlr, int slot)
+>  {
+> +	if (!edma_cc[ctlr])
+> +		return -ENODEV;
+
+I am ok with this patch, although I wonder if a better error is -ENXIO
+or even -EINVAL (since its most likely the result of a wrong argument).
+
+This patch will conflict with the EDMA movement series that Matt is
+doing and he should probably include it in his series to avoid
+conflicts. From the description it appears to be not required for v3.7
+anyway.
 
 Thanks,
-Rafael
-
-
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/cpufreq/cpufreq.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> index f552d5f..59264f1 100644
-> --- a/drivers/cpufreq/cpufreq.c
-> +++ b/drivers/cpufreq/cpufreq.c
-> @@ -1470,12 +1470,19 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
->  			    unsigned int relation)
->  {
->  	int retval = -EINVAL;
-> +	unsigned int old_target_freq = target_freq;
->  
->  	if (cpufreq_disabled())
->  		return -ENODEV;
->  
-> -	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
-> -		target_freq, relation);
-> +	/* Make sure that target_freq is within supported range */
-> +	if (target_freq > policy->max)
-> +		target_freq = policy->max;
-> +	if (target_freq < policy->min)
-> +		target_freq = policy->min;
-> +
-> +	pr_debug("target for CPU %u: %u kHz, relation %u, requested %u kHz\n",
-> +			policy->cpu, target_freq, relation, old_target_freq);
->  	if (cpu_online(policy->cpu) && cpufreq_driver->target)
->  		retval = cpufreq_driver->target(policy, target_freq, relation);
->  
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Sekhar
