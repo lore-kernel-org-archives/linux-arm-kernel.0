@@ -1,39 +1,38 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Oct 2012 13:43:04 -0500
-Subject: [PATCH 2/6] ARM: highbank: enable coherent DMA for xgmac in dts
+Date: Fri, 26 Oct 2012 13:43:06 -0500
+Subject: [PATCH 4/6] ARM: smp_twd: don't warn on no DT node
 In-Reply-To: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
 References: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1351276988-28382-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1351276988-28382-5-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Enable the xgmac to use the coherent DMA path in highbank.dts
+Not having a TWD is valid if we have multiple platforms with different
+cores, so remove the warning message.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/highbank.dts |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kernel/smp_twd.c |    6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 28d5872..e39a79a 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -308,12 +308,14 @@
- 			compatible = "calxeda,hb-xgmac";
- 			reg = <0xfff50000 0x1000>;
- 			interrupts = <0 77 4  0 78 4  0 79 4>;
-+			dma-coherent;
- 		};
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index e1f9069..e52e80a 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -366,10 +366,8 @@ void __init twd_local_timer_of_register(void)
+ 	int err;
  
- 		ethernet at fff51000 {
- 			compatible = "calxeda,hb-xgmac";
- 			reg = <0xfff51000 0x1000>;
- 			interrupts = <0 80 4  0 81 4  0 82 4>;
-+			dma-coherent;
- 		};
+ 	np = of_find_matching_node(NULL, twd_of_match);
+-	if (!np) {
+-		err = -ENODEV;
+-		goto out;
+-	}
++	if (!np)
++		return -ENODEV;
  
- 		combophy0: combo-phy at fff58000 {
+ 	twd_ppi = irq_of_parse_and_map(np, 0);
+ 	if (!twd_ppi) {
 -- 
 1.7.10.4
