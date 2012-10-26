@@ -1,8 +1,8 @@
 From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 26 Oct 2012 08:23:18 +0000
+Date: Fri, 26 Oct 2012 08:23:23 +0000
 Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
  davinci_mdio
-In-Reply-To: <20121019160041.GB4730@atomide.com>
+In-Reply-To: <20121024050853.GA2124@netboy.at.omicron.at>
 References: <20121017181354.GA2412@netboy.at.omicron.at>
  <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
  <20121017235045.GB30550@atomide.com>
@@ -10,58 +10,28 @@ References: <20121017181354.GA2412@netboy.at.omicron.at>
  <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
  <20121018184443.GD2350@netboy.at.omicron.at> <50806B1D.9040504@ti.com>
  <20121019061630.GB2983@netboy.at.omicron.at>
- <20121019160041.GB4730@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB4B4C7@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB48592@DBDE01.ent.ti.com>
+ <20121024050853.GA2124@netboy.at.omicron.at>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB4B4D0@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 21:30:41, Tony Lindgren wrote:
-> * Richard Cochran <richardcochran@gmail.com> [121018 23:18]:
-> > On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
-> > > 
-> > > Another important point is, this driver is also required and used for
-> > > Davinci family of devices (arch/mach/mach-davinci/).
+On Wed, Oct 24, 2012 at 10:38:53, Richard Cochran wrote:
+> On Tue, Oct 23, 2012 at 10:12:29AM +0000, Hiremath, Vaibhav wrote:
 > > 
-> > That is really beside the point. If the code isn't ready yet, then
-> > don't merge it.
-> > 
-> > When I asked about the beaglebone, I was given the impression that it
-> > will be ready for v3.7-rc1.  But, as I know realize, at the current
-> > rate, it might not even be ready for v3.8.
-> > 
-> > I don't mind waiting, but please make sure that whatever lands into a
-> > release is really, truly working.
+> > I understand, and as you mentioned we are not fully there at v3.7-rc1 with 
+> > all the drivers/module support, due to all known reasons. Its good that with 
+> > v3.7-rc2, Beaglebone boots up out of box from mainline. 
 > 
-> Indeed. This has been a problem with many of the TI patches in
-> general. People are working on separate product trees and then produce
-> patches for the mainline kernel that are poorly tested.
+> Can you say whether we have working Ethernet on the beaglebone in v3.7?
 > 
 
-Tony,
-
-It may not be true always, as we always work simultaneously and there are 
-high chances that some patches/development is dependent on others from 
-functionality perspective (especially baseport), but still they are 
-independent modules (may be for other devices).
-
-Lets take a example of AM33xx and OMAP5 here, we started submitting baseport 
-patches to the list (almost 6-8 months now), not all the patches gets 
-accepted together in one shot.
-As you know, when we started pushing AM33xx and OMAP5 baseport patches, we 
-were at the stage where both DT and hwmod was required. First attempt for 
-board file submission did not went through, since we decided to force all 
-new devices migrate to DT, right?
-
-So the criteria initially was, build should not break and submit patches 
-step-by-step.
-
-Now, with baseport patches submitted to list, individual developer can also 
-start submitting patches to the respective driver's list, making sure that, 
-driver doesn't change irrespective of platform. I do not see anything wrong
-with this, as we always consider driver independent.
-
-In this particular case, note that, all the patches Richard posted recently 
-are AM33xx SoC integration specific patches only.
+No, certainly not. The DT patches are still pending to get merged and v3.7 
+merge window is closed now. I expect it to get merged to v3.8.
 
 Thanks,
-Vaibhav 
+Vaibhav
+
+> Thanks,
+> Richard
+> 
