@@ -1,24 +1,47 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 26 Oct 2012 14:31:53 +0200
-Subject: [PATCH 1/2] spi: mxs: Assign message status after transfer
- finished
-In-Reply-To: <20121017071026.GB14199@opensource.wolfsonmicro.com>
-References: <1350181976-18233-1-git-send-email-marex@denx.de>
- <20121017071026.GB14199@opensource.wolfsonmicro.com>
-Message-ID: <201210261431.54371.marex@denx.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Oct 2012 14:30:48 +0200
+Subject: [PATCH V2 3/4] arm: mvebu: adding SATA support: configs update
+In-Reply-To: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1351254650-26861-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+---
+ arch/arm/configs/multi_v7_defconfig |    2 ++
+ arch/arm/configs/mvebu_defconfig    |    3 +++
+ 2 files changed, 5 insertions(+)
 
-> On Sun, Oct 14, 2012 at 04:32:55AM +0200, Marek Vasut wrote:
-> > In the current code implementing the MXS SPI driver, every transferred
-> > message had assigned status = 0, which is not correct. Properly assign
-> > status returned from the I/O functions.
-> 
-> Applied both, thanks.
-
-Will they hit 3.7 please?
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 159f75f..dbea6f4 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -17,8 +17,10 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_NET=y
++CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ CONFIG_SATA_HIGHBANK=y
++CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_CALXEDA_XGMAC=y
+ CONFIG_SMSC911X=y
+diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
+index 7bcf850..76a60b5 100644
+--- a/arch/arm/configs/mvebu_defconfig
++++ b/arch/arm/configs/mvebu_defconfig
+@@ -18,6 +18,9 @@ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_BLK_DEV_SD=y
++CONFIG_ATA=y
++CONFIG_SATA_MV=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+-- 
+1.7.9.5
