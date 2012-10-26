@@ -1,18 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2012 13:13:05 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7 #2
-In-Reply-To: <1350629360-27438-1-git-send-email-horms@verge.net.au>
-References: <1350629360-27438-1-git-send-email-horms@verge.net.au>
-Message-ID: <201210261313.05799.arnd@arndb.de>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 26 Oct 2012 15:13:47 +0200
+Subject: [PATCH 1/2] spi: mxs: Assign message status after transfer
+ finished
+In-Reply-To: <20121026130459.GW18814@opensource.wolfsonmicro.com>
+References: <1350181976-18233-1-git-send-email-marex@denx.de>
+ <201210261431.54371.marex@denx.de>
+ <20121026130459.GW18814@opensource.wolfsonmicro.com>
+Message-ID: <201210261513.47664.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 19 October 2012, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+Dear Mark Brown,
+
+> On Fri, Oct 26, 2012 at 02:31:53PM +0200, Marek Vasut wrote:
+> > Dear Mark Brown,
+> > 
+> > > Applied both, thanks.
+> > 
+> > Will they hit 3.7 please?
 > 
-> please consider the following fix for the r8a7779 SoC for 3.6.
-> It resolves some more fallout from recent IOMEM() changes.
+> I hadn't been going to do that, no - nothing about them seemed
+> especially urgent?
 
-Merged into fixes branch now, sorry for the delay.
+They're fixes, I'd be glad if you could slip them in. They're not urgent, but 
+it'd be nice to have them included. Esp. since 3.7 seems like a really _good_ 
+kernel for MXS, I'd love to have everything nicely polished in it.
 
-	Arnd
+Best regards,
+Marek Vasut
