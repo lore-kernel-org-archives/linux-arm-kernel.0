@@ -1,64 +1,67 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 22:03:11 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <20121026201539.GD29548@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
- <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
- <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
- <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
- <20121025101212.GD21217@arwen.pp.htv.fi>
- <20121026201539.GD29548@arwen.pp.htv.fi>
-Message-ID: <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Sat, 27 Oct 2012 00:36:54 +0200
+Subject: [PATCH] arm: socfpga: fix build break for allyesconfig
+In-Reply-To: <20121026215136.GC21164@n2100.arm.linux.org.uk>
+References: <1351289861-16297-1-git-send-email-dinguyen@altera.com>
+ <20121026215136.GC21164@n2100.arm.linux.org.uk>
+Message-ID: <20121026223654.GB2597@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Hi!
 
-On Fri, 26 Oct 2012, Felipe Balbi wrote:
+> > index 17d6eaf..9031a3c 100644
+> > --- a/arch/arm/mach-socfpga/headsmp.S
+> > +++ b/arch/arm/mach-socfpga/headsmp.S
+> > @@ -15,8 +15,10 @@
+> >  #define CPU1_START_ADDR 	        0xffd08010
+> >  
+> >  ENTRY(secondary_trampoline)
+> > +#if __LINUX_ARM_ARCH__ >= 7
+> >  	movw	r0, #:lower16:CPU1_START_ADDR
+> >  	movt  r0, #:upper16:CPU1_START_ADDR
+> > +#endif
+> 
+> If you do that, then it effectively means you don't need these instructions
+> and you might as well just delete them... but looking at the following one:
+> 
+> >  	ldr	r1, [r0]
+> 
+> it's clear that you do need it.  So you need to find a different solution.
+> If the above assembly file can only run on ARMv7, consider putting
+> 
+> 	.march	armv7
+> 
+> or similar before it.
 
-> On Thu, Oct 25, 2012 at 01:12:12PM +0300, Felipe Balbi wrote:
-> > On Tue, Oct 23, 2012 at 09:23:03PM +0200, Jean Pihet wrote:
-> > > On Tue, Oct 23, 2012 at 9:19 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > > > On Mon, 22 Oct 2012, Jean Pihet wrote:
-> > > >
-> > > >> On Mon, Oct 22, 2012 at 6:12 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> > > >>
-> > > >> > Do you have CPU_IDLE enabled?
-> > > >> FYI the issue is not present with CPU_IDLE enabled.
-> > > >
-> > > > Hmm, how can you tell?  I thought you weren't able to reproduce it with
-> > > > CPU_IDLE disabled either?
-> > > I could not reproduce the issue, with and without CPU_IDLE enabled.
-> > > What puzzles me is that the PM QoS code only has influence on the
-> > > states chosen by cpuidle, so the change should not have any impact
-> > > with CPU_IDLE enabled. I reallt need to reproduce the issue.
-> > > Let me try with the same setup as yours (bootloader images,
-> > > omap2pus_defconfig, angstrom roots).
-> > 
-> > I just sent a patch to fix a bug I found on OMAP4 panda but while
-> > reading this thread again, I think it could be that it's the same bug
-> > which is just easier to reproduce on Paul's setup.
-> > 
-> > Paul, Aaro, can you see if [1] makes the problem go away ? that would be
-> > another reason to push [1] during this -rc cycle.
-> > 
-> > [1] http://marc.info/?l=linux-omap&m=135115602407925&w=2
+My version of gas does not seem to recognize .march
 
-Thanks for mentioning it, but this patch doesn't fix the I2C timeout 
-problem here.  Log fragment below from the 3530ES3 Beagle.
+(  AS      arch/arm/mach-socfpga/headsmp.o
+arch/arm/mach-socfpga/headsmp.S: Assembler messages:
+arch/arm/mach-socfpga/headsmp.S:17: Error: unknown pseudo-op: `.march'
+arch/arm/mach-socfpga/headsmp.S:24: Error: selected processor does not
+support `movw r0,#:lower16:(0xffd08000+0x10)'
+arch/arm/mach-socfpga/headsmp.S:25: Error: selected processor does not
+support `movt r0,#:upper16:(0xffd08000+0x10)'
+)
 
+This seems to do the trick:
 
-- Paul
+Fix compilation with CPU_V6 option.
 
-Starting portmap daemon: portmap.
-Tue Jul 22 00:18:00 UTC 2008
-[   23.476684] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   24.492309] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   24.495574] twl: i2c_read failed to transfer all messages
-[   24.498535] twl_rtc: Could not read TWLregister D - error -110
-[   24.501800] twl_rtc twl_rtc: twl_rtc_read_time: reading CTRL_REG, error 
--110
-INIT: Entering runlevel: 5
+Signed-off-by: Pavel Machek <pavel@denx.de>
+
+diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+index a0fc372..6956e93 100644
+--- a/arch/arm/mach-socfpga/Makefile
++++ b/arch/arm/mach-socfpga/Makefile
+@@ -4,3 +4,5 @@
+ 
+ obj-y			:= socfpga.o
+ obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o hotplug.o
++
++AFLAGS_headsmp.o	:= -Wa,-march=armv7-a
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
