@@ -1,64 +1,39 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Oct 2012 13:43:03 -0500
-Subject: [PATCH 1/6] ARM: highbank: disable unused sdhci and gpio in dts
+Date: Fri, 26 Oct 2012 13:43:04 -0500
+Subject: [PATCH 2/6] ARM: highbank: enable coherent DMA for xgmac in dts
 In-Reply-To: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
 References: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1351276988-28382-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1351276988-28382-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-These peripherals are not enabled in current systems, so turn them off.
+Enable the xgmac to use the coherent DMA path in highbank.dts
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/boot/dts/highbank.dts |    5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/highbank.dts |    2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 0c6fc34..28d5872 100644
+index 28d5872..e39a79a 100644
 --- a/arch/arm/boot/dts/highbank.dts
 +++ b/arch/arm/boot/dts/highbank.dts
-@@ -132,6 +132,7 @@
- 			reg = <0xffe0e000 0x1000>;
- 			interrupts = <0 90 4>;
- 			clocks = <&eclk>;
-+			status = "disabled";
+@@ -308,12 +308,14 @@
+ 			compatible = "calxeda,hb-xgmac";
+ 			reg = <0xfff50000 0x1000>;
+ 			interrupts = <0 77 4  0 78 4  0 79 4>;
++			dma-coherent;
  		};
  
- 		memory-controller at fff00000 {
-@@ -156,6 +157,7 @@
- 			interrupts = <0 14 4>;
- 			clocks = <&pclk>;
- 			clock-names = "apb_pclk";
-+			status = "disabled";
+ 		ethernet at fff51000 {
+ 			compatible = "calxeda,hb-xgmac";
+ 			reg = <0xfff51000 0x1000>;
+ 			interrupts = <0 80 4  0 81 4  0 82 4>;
++			dma-coherent;
  		};
  
- 		gpiof: gpio at fff31000 {
-@@ -166,6 +168,7 @@
- 			interrupts = <0 15 4>;
- 			clocks = <&pclk>;
- 			clock-names = "apb_pclk";
-+			status = "disabled";
- 		};
- 
- 		gpiog: gpio at fff32000 {
-@@ -176,6 +179,7 @@
- 			interrupts = <0 16 4>;
- 			clocks = <&pclk>;
- 			clock-names = "apb_pclk";
-+			status = "disabled";
- 		};
- 
- 		gpioh: gpio at fff33000 {
-@@ -186,6 +190,7 @@
- 			interrupts = <0 17 4>;
- 			clocks = <&pclk>;
- 			clock-names = "apb_pclk";
-+			status = "disabled";
- 		};
- 
- 		timer {
+ 		combophy0: combo-phy at fff58000 {
 -- 
 1.7.10.4
