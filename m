@@ -1,144 +1,79 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Thu, 25 Oct 2012 16:57:19 -0700
-Subject: [PATCH v3] gpio/omap: fix off-mode bug: clear debounce clock
- enable mask on free/reset
-In-Reply-To: <5089C2B6.5020606@ti.com> (Jon Hunter's message of "Thu, 25 Oct
- 2012 17:52:38 -0500")
-References: <1351182858-14045-1-git-send-email-khilman@deeprootsystems.com>
- <5089C2B6.5020606@ti.com>
-Message-ID: <871ugmqf4w.fsf@deeprootsystems.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 26 Oct 2012 02:13:20 +0200
+Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
+In-Reply-To: <CAKohpo=Nv6DfXqyv=v-1Eo=pvx25qyrQ2qs+pGqJvbJu2bwWaw@mail.gmail.com>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <3245066.cWfgP9Ikey@vostro.rjw.lan>
+ <CAKohpo=Nv6DfXqyv=v-1Eo=pvx25qyrQ2qs+pGqJvbJu2bwWaw@mail.gmail.com>
+Message-ID: <1707056.POnhGSP0pg@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon Hunter <jon-hunter@ti.com> writes:
+On Thursday, October 25, 2012 08:59:11 AM Viresh Kumar wrote:
+> On 25 October 2012 02:42, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > On Wednesday 24 of October 2012 21:43:46 Rafael J. Wysocki wrote:
+> >> On Wednesday 24 of October 2012 11:37:13 Viresh Kumar wrote:
+> >> > On 22 October 2012 14:16, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >> > > On 20 October 2012 01:42, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> >> > >> Initially ondemand governor was written and then using its code conservative
+> >> > >> governor is written. It used a lot of code from ondemand governor, but copy of
+> >> > >> code was created instead of using the same routines from both governors. Which
+> >> > >> increased code redundancy, which is difficult to manage.
+> >> > >>
+> >> > >> This patch is an attempt to move common part of both the governors to
+> >> > >> cpufreq_governor.c file to come over above mentioned issues.
+> >> > >>
+> >> > >> This shouldn't change anything from functionality point of view.
+> >> > >>
+> >> > >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >> >
+> >> > For everybody else, this patch is already pushed by Rafael in his linux-next
+> >> > branch.
+> >>
+> >> Well, not yet, although I'm going to do that.
+> >
+> > Or I would if it still applied.  Unfortunately, though, it doesn't apply any
+> > more to my linux-next branch due to some previous changes in it.
+> >
+> > Care to rebase?
+> 
+> Ahh.. I got confused by the following patch:
+> 
+> commit 83a73f712f2275033b2dc7f5c664988a1823ebc7
+> Author: viresh kumar <viresh.kumar@linaro.org>
+> Date:   Tue Oct 23 01:28:05 2012 +0200
+> 
+>     cpufreq: Move common part from governors to separate file, v2
+> 
+>     Multiple cpufreq governers have defined similar get_cpu_idle_time_***()
+>     routines. These routines must be moved to some common place, so that all
+>     governors can use them.
+> 
+>     So moving them to cpufreq_governor.c, which seems to be a better place for
+>     keeping these routines.
+> 
+>     Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> 
+> 
+> Actually, i should i have replied on this patch (and i forgot). I
+> wanted you to skip
+> this patch, as the latest patch already had this change.
+> 
+> But now i see commits from others on cpufreq_governor.c file.
+> 
+> Hmm... So you can keep your tree as it is and apply the attached
+> patch. It is the
+> same patch getting discussed in this thread. Just rebased over your latest next.
 
-> Hi Kevin,
->
-> On 10/25/2012 11:34 AM, Kevin Hilman wrote:
->> From: Kevin Hilman <khilman@ti.com>
->> 
->> When a GPIO is freed or shutdown, ensure that the proper bit in
->> dbck_enable_mask is cleared also.  Otherwise, context restore on
->> subsequent off-mode transition will restore previous debounce values
->> from the shadow copies (bank->context.debounce*) leading to mismatch
->> state between driver state and hardware state.
->> 
->> This was discovered when board code was doing
->> 
->>   gpio_request_one()
->>   gpio_set_debounce()
->>   gpio_free()
->> 
->> which was leaving the GPIO debounce settings in a confused state.  If
->> that GPIO bank is subsequently used with off-mode enabled, bogus state
->> would be restored, leaving GPIO debounce enabled which then prevented
->> the CORE powerdomain from transitioning.
->> 
->> To fix, ensure that right bit in bank->dbck_enable_mask is cleared
->> when a GPIO is freed/shutdown so debounce state doesn't persist after
->> free/reset.  If this GPIO is the last debounce-enabled GPIO in the
->> bank, the debounce will also be cut.
->> 
->> Special thanks to Grazvydas Ignotas for pointing out a bug in the
->> first version that would've disabled debounce on any runtime PM
->> transition.
->> 
->> And, special thanks to Jon Hunter for pointing out a bug in the second
->> version which was mistakenly clearing all debounce bits on reset
->> instead of individual GPIOs, as well as suggesting cutting the
->> debounce clock after all debounce bits are cleared.
->
-> ... and for introducing yet another bug :-(
->
->> Tesed on 37xx/EVM board which configures GPIO debounce for the ads7846
->> touchscreen in its board file using the above sequence, and so was
->> failing off-mode tests in dynamic idle.  Verified that off-mode tests
->> are passing with this patch.
->> 
->> Reported-by: Paul Walmsley <paul@pwsan.com>
->> Cc: Igor Grinberg <grinberg@compulab.co.il>
->> Cc: Grazvydas Ignotas <notasas@gmail.com>
->> Cc: Jon Hunter <jon-hunter@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->>  drivers/gpio/gpio-omap.c | 2 ++
->>  1 file changed, 2 insertions(+)
->> 
->> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
->> index 94cbc84..ce1da19 100644
->> --- a/drivers/gpio/gpio-omap.c
->> +++ b/drivers/gpio/gpio-omap.c
->> @@ -539,6 +539,8 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
->>  	_set_gpio_irqenable(bank, gpio, 0);
->>  	_clear_gpio_irqstatus(bank, gpio);
->>  	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
->> +	bank->dbck_enable_mask &= ~(GPIO_BIT(bank, gpio));
->> +	_gpio_dbck_disable(bank);
->
-> We can't use _gpio_dbck_disable() here. This has been specifically implemented
-> for the suspend path and is designed to disable the debounce clock while
-> debounce is enabled (which makes sense). 
+I have applied this patch only because of the fixes on top of it.  It broke
+kernel compliation due to some missing EXPORT_SYMBOL_GPLs in cpufreq_governor.c,
+so I woulnd't have applied it otherwise.
 
-I agree, it makes sense.  It reminds me that this driver could use some
-comments, since each time I come back to it I forget why some of this
-stuff is there.
+Thanks,
+Rafael
 
-> Yes this needs to be cleaned up.
 
-Most certainly agree.
-
-> I have implemented the following and unit tested. Care to test on your 37xx
-> board? Sorry I would do it myself I had one. 
-
-Yes, it fixes the off-mode dynamic idle problem on my 37xx EVM.
-
-> Also not sure if you just wish to squash your patch and mine together.
-> This is based on top of yours.
-
-Let's just drop mine and you can take this forward.
-
-> Cheers
-> Jon
->
-> From 33812f3bd4f7aab1154e7194b7f11fba700a5086 Mon Sep 17 00:00:00 2001
-> From: Jon Hunter <jon-hunter@ti.com>
-> Date: Thu, 25 Oct 2012 16:00:51 -0500
-> Subject: [PATCH] gpio/omap: fix clearing of debounce settings on gpio
->  free/reset
->
-> When a GPIO is freed or shutdown, we need to ensure that any debounce settings
-> are cleared and if the GPIO is the only GPIO in the bank that is currently
-> using debounce, then disable the debounce clock as well to save power.
-
-Since this is a fix needed for v3.7-rc, you should add a bit more here
-describing what was broken (bogus context restore, etc.)  Basically
-answering "why" to your the "we need to ensure that..." statement.
-
-> Therefore, introduce a new function called _clear_gpio_debounce() to clear
-> any debounce settings when the GPIO is freed or shutdown.
->
-> Please note that we cannot use _gpio_dbck_disable() to disable the debounce
-> clock because this has been specifically created for the gpio suspend path
-> and is intended to shutdown the debounce clock while debounce is enabled.
->
-> This has been unit tested on an OMAP3430 Beagle board, by requesting a gpio,
-> enabling debounce and then freeing the gpio and checking the register contents,
-> the saved register context and the debounce clock state.
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-
-(though not that that matters now that I've shown a high-level of
- incompetence with this patch)  ;)
-
-Also, 
-
-Tested-by: Kevin Hilman <khilman@ti.com>
-
-When reposting for Linus W., you might make this 'v4' so that it's clear
-that it superceeds the other bungling attempts at the same fix.
-
-Thanks for following this through,
-
-Kevin
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
