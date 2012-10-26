@@ -1,33 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 26 Oct 2012 14:48:04 +0200
-Subject: [PATCH V2 0/4] Adding SATA support for Armada 370/XP
-In-Reply-To: <20121026123908.GH21046@lunn.ch>
-References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
- <20121026123908.GH21046@lunn.ch>
-Message-ID: <20121026144804.640eabaf@skate>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 26 Oct 2012 12:53:45 +0000
+Subject: [RFC PATCH v3 05/16] ARM: edma: add AM33XX crossbar event support
+In-Reply-To: <1350566815-409-6-git-send-email-mporter@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-6-git-send-email-mporter@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAB5BC7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 18, 2012 at 18:56:44, Porter, Matt wrote:
+> Adds support for the per-EDMA channel event mux. This is required
+> for any peripherals using DMA crossbar mapped events.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/common/edma.c             |   63 +++++++++++++++++++++++++++++++++++-
+>  include/linux/platform_data/edma.h |    1 +
+>  2 files changed, 63 insertions(+), 1 deletion(-)
+> 
 
-On Fri, 26 Oct 2012 14:39:08 +0200, Andrew Lunn wrote:
+..snip..
+..snip..
 
-> What about the openblocks-ax3?
+> +
+> +	for (i = 0; xbar_chans[i][0] != -1; i++) {
+> +		shift = (xbar_chans[i][1] % 4) * 8;
+> +		offset = xbar_chans[i][1] >> 2;
+> +		offset <<= 2;
+> +		mux = __raw_readl((void *)((u32)xbar + offset));
+> +		mux &= (~(0xff << shift));
+> +		mux |= (xbar_chans[i][0] << shift);
+> +		__raw_writel(mux, (void *)((u32)xbar + offset));
 
-Gr?gory does not (yet) have an OpenBlocks AX3, but I'm planning to do
-the work for SATA soon for this platform. However, supporting the
-OpenBlocks AX3 is not part of our official contract with Marvell, it's
-just an additional thing I'm happily doing on my spare time. So I'll
-provide support for SATA, network and SMP on OpenBlocks AX3, but we
-would like to first see the SATA support for the Marvell evaluation
-boards being merged, and on my side the basic support for the
-OpenBlocks AX3. I'll send followup patches to enable SATA/network/SMP
-on OpenBlocks AX3 later on, if that's ok for you?
+This method of calculating Xbar Channel offset has a bug that
+the code breaks with unaligned access trap error when requested 
+channel to be mapped is odd.
 
-Thanks!
+This was fixed in Arago tree [1]. Kindly verify
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+> +	}
+> +
+> +	pdata->xbar_chans = xbar_chans;
+> +
+> +	return 0;
+> +}
+> +
+
+..snip..
+..snip..
+
+[1]
+http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;
+h=c08d3cb557adf71c79aeefb38888395455824e83
+
+Regards, 
+Gururaja
