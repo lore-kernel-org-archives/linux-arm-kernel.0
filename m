@@ -1,42 +1,28 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 26 Oct 2012 14:27:08 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
-Message-ID: <20121026142708.394d5ef1e6e3b9ad19243cc6@canb.auug.org.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 26 Oct 2012 08:58:47 +0530
+Subject: [PATCH 2/2] cpufreq: governors: remove redundant code
+In-Reply-To: <1707056.POnhGSP0pg@vostro.rjw.lan>
+References: <32e5bed743cc6cc4e614291a7080299f5f0d0933.1350677395.git.viresh.kumar@linaro.org>
+ <3245066.cWfgP9Ikey@vostro.rjw.lan>
+ <CAKohpo=Nv6DfXqyv=v-1Eo=pvx25qyrQ2qs+pGqJvbJu2bwWaw@mail.gmail.com>
+ <1707056.POnhGSP0pg@vostro.rjw.lan>
+Message-ID: <CAKohpon_GLyFOfBBtBmjxJpx1pUze4gKd4Xh7rT=gs25U_sLjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 26 October 2012 05:43, Rafael J. Wysocki <rjw@sisk.pl> wrote:
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-ux500/cpu-db8500.c between commit 63c53906312f
-("pinctrl/nomadik: move the platform data header") from the pinctrl tree
-and commit 4040d10a3d44 ("ARM: ux500: add DB serial number to entropy
-pool") from the arm-soc tree.
+> I have applied this patch only because of the fixes on top of it.  It broke
+> kernel compliation due to some missing EXPORT_SYMBOL_GPLs in cpufreq_governor.c,
+> so I woulnd't have applied it otherwise.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Hi Rafael,
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+So sorry for this. I am really feeling bad for that. I should have
+tried compiling
+them as modules too. I had that in mind while coding it, but forgot it later.
 
-diff --cc arch/arm/mach-ux500/cpu-db8500.c
-index 87a8f9f,50202a1..0000000
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@@ -18,7 -18,7 +18,8 @@@
-  #include <linux/io.h>
-  #include <linux/mfd/abx500/ab8500.h>
-  #include <linux/platform_data/usb-musb-ux500.h>
- +#include <linux/platform_data/pinctrl-nomadik.h>
-+ #include <linux/random.h>
-  
-  #include <asm/pmu.h>
-  #include <asm/mach/map.h>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/4327182d/attachment.sig>
+Thanks for making changes on my behalf.
+
+--
+viresh
