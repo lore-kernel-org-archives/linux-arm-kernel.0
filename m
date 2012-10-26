@@ -1,52 +1,18 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 26 Oct 2012 15:07:15 +0200
-Subject: [RFC PATCH 00/13] sched: Integrating Per-entity-load-tracking
- with the core scheduler
-In-Reply-To: <1351254553.16863.52.camel@twins>
-References: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
- <1351180603.12171.31.camel@twins>
- <50898118.1050402@linux.vnet.ibm.com>
- <1351254553.16863.52.camel@twins>
-Message-ID: <20121026130715.GB9886@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 13:13:05 +0000
+Subject: [GIT PULL] Renesas ARM-based SoC fixes for v3.7 #2
+In-Reply-To: <1350629360-27438-1-git-send-email-horms@verge.net.au>
+References: <1350629360-27438-1-git-send-email-horms@verge.net.au>
+Message-ID: <201210261313.05799.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
-
-> [...]
+On Friday 19 October 2012, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> So a sane series would introduce maybe two functions: 
-> cpu_load() and task_load() and use those where we now use 
-> rq->load.weight and p->se.load.weight for load balancing 
-> purposes. Implement these functions using those two 
-> expression. So effectively this patch is a NOP.
-> 
-> Secondly, switch these two functions over to the per-task 
-> based averages.
-> 
-> Tada! all done. The load balancer will then try and equalize 
-> effective load instead of instant load.
-> 
-> It will do the 3x10% vs 100% thing correctly with just those 
-> two patches. Simply because it will report a lower cpu-load 
-> for the 3x10% case than it will for the 100% case, no need to 
-> go fudge about in the load-balance internals.
-> 
-> Once you've got this correctly done, you can go change 
-> balancing to better utilize the new metric, like use the 
-> effective load instead of nr_running against the capacity and 
-> things like that. But for every such change you want to be 
-> very careful and run all the benchmarks you can find -- in 
-> fact you want to do that after the 2nd patch too.
+> please consider the following fix for the r8a7779 SoC for 3.6.
+> It resolves some more fallout from recent IOMEM() changes.
 
-If anyone posted that simple two-patch series that switches over 
-to the new load metrics I'd be happy to test the performance of 
-those.
+Merged into fixes branch now, sorry for the delay.
 
-Having two parallel load metrics is really not something that we 
-should tolerate for too long.
-
-Thanks,
-
-	Ingo
+	Arnd
