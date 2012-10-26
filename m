@@ -1,48 +1,160 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 17:27:21 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP1: CGRM: fix omap1_get_reset_sources() return
- type
-Message-ID: <alpine.DEB.2.00.1210261726430.5988@utopia.booyaka.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Fri, 26 Oct 2012 13:28:08 -0400
+Subject: [PATCH 6/9] ARM: Kirkwood: Convert GoFlex Net to pinctrl.
+In-Reply-To: <1351090434-30499-7-git-send-email-andrew@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <1351090434-30499-7-git-send-email-andrew@lunn.ch>
+Message-ID: <CAMW5UfZ9KiDX=XHApvTGC=Um+RX-h8ZsvOVVwHyLH7cW==Qy7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Initial test with my 3.7-rc2 DT kernel config failed when it tried to
+build modules:
 
-An older version of the patch "ARM: OMAP1: create read_reset_sources()
-function (for initial use by watchdog)" was sent upstream, which used
-the wrong return type for the omap1_get_reset_sources() function.
-Fix it to return a u32, which is what the WDTIMER platform_data
-function pointer read_reset_sources() expects.
+  Building modules, stage 2.
+  MODPOST 733 modules
+ERROR: "read_current_timer" [drivers/video/udlfb.ko] undefined!
+ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+make[1]: *** [__modpost] Error 1
+make: *** [modules] Error 2
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap1/common.h |    2 +-
- arch/arm/mach-omap1/reset.c  |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+I didn't realize my play kernel test package still includes the
+following patch, I thought it had been dealt with already.  Should I
+start a new thread on this issue?
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index d6ac18d..ecd0bb6 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -94,6 +94,6 @@ extern int ocpi_enable(void);
- static inline int ocpi_enable(void) { return 0; }
- #endif
- 
--extern int omap1_get_reset_sources(void);
-+extern u32 omap1_get_reset_sources(void);
- 
- #endif /* __ARCH_ARM_MACH_OMAP1_COMMON_H */
-diff --git a/arch/arm/mach-omap1/reset.c b/arch/arm/mach-omap1/reset.c
-index a0a9f97..0df5536 100644
---- a/arch/arm/mach-omap1/reset.c
-+++ b/arch/arm/mach-omap1/reset.c
-@@ -43,7 +43,7 @@ void omap1_restart(char mode, const char *cmd)
-  * Returns bits that represent the last reset source for the SoC.  The
-  * format is standardized across OMAPs for use by the OMAP watchdog.
-  */
--int omap1_get_reset_sources(void)
-+u32 omap1_get_reset_sources(void)
- {
- 	int ret = 0;
- 	u16 rs;
--- 
-1.7.10.4
+diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
+index 60d3b73..6a37f8d 100644
+--- a/arch/arm/kernel/armksyms.c
++++ b/arch/arm/kernel/armksyms.c
+@@ -50,6 +50,7 @@ extern void fpundefinstr(void);
+
+        /* platform dependent support */
+ EXPORT_SYMBOL(arm_delay_ops);
++EXPORT_SYMBOL(read_current_timer);
+
+        /* networking */
+ EXPORT_SYMBOL(csum_partial);
+
+
+In the mean time, I'll start a build with the default conf as
+suggested and post test results once I have them.
+
+Josh Coombs
+
+On Wed, Oct 24, 2012 at 10:53 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+>  arch/arm/boot/dts/kirkwood-goflexnet.dts |   57 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-kirkwood/board-goflexnet.c |   18 ----------
+>  2 files changed, 57 insertions(+), 18 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> index 7c8238f..46d16a2 100644
+> --- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> +++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+> @@ -16,6 +16,63 @@
+>         };
+>
+>         ocp at f1000000 {
+> +               pinctrl: pinctrl at 10000 {
+> +                       compatible = "marvell,88f6281-pinctrl";
+> +                       reg = <0x10000 0x20>;
+> +
+> +                       pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
+> +                                     &pmx_led_left_cap_0 &pmx_led_left_cap_1
+> +                                     &pmx_led_left_cap_2 &pmx_led_left_cap_3
+> +                                     &pmx_led_right_cap_0 &pmx_led_right_cap_1
+> +                                     &pmx_led_right_cap_2 &pmx_led_right_cap_3
+> +                                   >;
+> +                       pinctrl-names = "default";
+> +
+> +                       pmx_usb_power_enable: pmx-usb-power-enable {
+> +                               marvell,pins = "mpp29";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_right_cap_0: pmx-led_right_cap_0 {
+> +                               marvell,pins = "mpp38";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_right_cap_1: pmx-led_right_cap_1 {
+> +                               marvell,pins = "mpp39";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_right_cap_2: pmx-led_right_cap_2 {
+> +                               marvell,pins = "mpp40";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_right_cap_3: pmx-led_right_cap_3 {
+> +                               marvell,pins = "mpp41";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_left_cap_0: pmx-led_left_cap_0 {
+> +                               marvell,pins = "mpp42";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_left_cap_1: pmx-led_left_cap_1 {
+> +                               marvell,pins = "mpp43";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_left_cap_2: pmx-led_left_cap_2 {
+> +                               marvell,pins = "mpp44";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_left_cap_3: pmx-led_left_cap_3 {
+> +                               marvell,pins = "mpp45";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_green: pmx-led_green {
+> +                               marvell,pins = "mpp46";
+> +                               marvell,function = "gpio";
+> +                       };
+> +                       pmx_led_orange: pmx-led_orange {
+> +                               marvell,pins = "mpp47";
+> +                               marvell,function = "gpio";
+> +                       };
+> +               };
+>                 serial at 12000 {
+>                         clock-frequency = <200000000>;
+>                         status = "ok";
+> diff --git a/arch/arm/mach-kirkwood/board-goflexnet.c b/arch/arm/mach-kirkwood/board-goflexnet.c
+> index 001ca8c..9643f4b 100644
+> --- a/arch/arm/mach-kirkwood/board-goflexnet.c
+> +++ b/arch/arm/mach-kirkwood/board-goflexnet.c
+> @@ -34,34 +34,16 @@
+>  #include <mach/bridge-regs.h>
+>  #include <linux/platform_data/mmc-mvsdio.h>
+>  #include "common.h"
+> -#include "mpp.h"
+>
+>  static struct mv643xx_eth_platform_data goflexnet_ge00_data = {
+>         .phy_addr       = MV643XX_ETH_PHY_ADDR(0),
+>  };
+>
+> -static unsigned int goflexnet_mpp_config[] __initdata = {
+> -       MPP29_GPIO,     /* USB Power Enable */
+> -       MPP47_GPIO,     /* LED Orange */
+> -       MPP46_GPIO,     /* LED Green */
+> -       MPP45_GPIO,     /* LED Left Capacity 3 */
+> -       MPP44_GPIO,     /* LED Left Capacity 2 */
+> -       MPP43_GPIO,     /* LED Left Capacity 1 */
+> -       MPP42_GPIO,     /* LED Left Capacity 0 */
+> -       MPP41_GPIO,     /* LED Right Capacity 3 */
+> -       MPP40_GPIO,     /* LED Right Capacity 2 */
+> -       MPP39_GPIO,     /* LED Right Capacity 1 */
+> -       MPP38_GPIO,     /* LED Right Capacity 0 */
+> -       0
+> -};
+> -
+>  void __init goflexnet_init(void)
+>  {
+>         /*
+>          * Basic setup. Needs to be called early.
+>          */
+> -       kirkwood_mpp_conf(goflexnet_mpp_config);
+> -
+>         if (gpio_request(29, "USB Power Enable") != 0 ||
+>             gpio_direction_output(29, 1) != 0)
+>                 pr_err("can't setup GPIO 29 (USB Power Enable)\n");
+> --
+> 1.7.10.4
+>
