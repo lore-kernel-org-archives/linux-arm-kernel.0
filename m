@@ -1,56 +1,118 @@
-From: oleg@redhat.com (Oleg Nesterov)
-Date: Fri, 26 Oct 2012 18:39:51 +0200
-Subject: [PATCH 6/9] uprobes: flush cache after xol write
-In-Reply-To: <20121026055239.GA4862@in.ibm.com>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-6-git-send-email-rabin@rab.in>
- <20121015165756.GA11737@redhat.com>
- <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
- <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
-Message-ID: <20121026163951.GA17742@redhat.com>
+From: tremyfr@yahoo.fr (Philippe Reynes)
+Date: Fri, 26 Oct 2012 18:29:40 +0200
+Subject: [PATCH] Add device tree file for the armadeus apf27
+Message-ID: <1351268980-25347-1-git-send-email-tremyfr@yahoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26, Ananth N Mavinakayanahalli wrote:
->
-> On Thu, Oct 25, 2012 at 04:58:39PM +0200, Oleg Nesterov wrote:
-> > On 10/16, Rabin Vincent wrote:
-> > >
-> > > >> --- a/kernel/events/uprobes.c
-> > > >> +++ b/kernel/events/uprobes.c
-> > > >> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
-> > > >>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
-> > > >>       vaddr = kmap_atomic(area->page);
-> > > >>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
-> > > >> +     flush_dcache_page(area->page);
-> > > >>       kunmap_atomic(vaddr);
-> > > >
-> > > > I agree... but why under kmap_atomic?
-> > >
-> > > No real reason; I'll move it to after the unmap.
-> >
-> > OK. I assume you will send v2.
-> >
-> > But this patch looks like a bugfix, flush_dcache_page() is not a nop
-> > on powerpc. So perhaps we should apply this fix right now?
->
-> Starting Power5, all Power processers have coherent caches.
->
-> > OTOH, I do not understand this stuff, everything is nop on x86. And
-> > when I look into Documentation/cachetlb.txt I am starting to think
-> > that may be this needs flush_icache_user_range instead?
-> >
-> > Rabin, Ananth could you clarify this?
->
-> Yes. We need flush_icache_user_range(). Though for x86 its always been a
-> nop, one never knows if there is some Power4 or older machine out there
-> that is still being used. We are fine for Power5 and later.
+Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
+Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
+---
+ arch/arm/boot/dts/imx27-apf27.dts |   96 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 96 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx27-apf27.dts
 
-This is bad...
-
-flush_icache_user needs vma. perhaps just to check VM_EXEC...
-
-So let me repeat to be sure I really understand, do you confirm that
-_in general_ flush_dcache_page() is not enough?
-
-Oleg.
+diff --git a/arch/arm/boot/dts/imx27-apf27.dts b/arch/arm/boot/dts/imx27-apf27.dts
+new file mode 100644
+index 0000000..b7d11e0
+--- /dev/null
++++ b/arch/arm/boot/dts/imx27-apf27.dts
+@@ -0,0 +1,96 @@
++/*
++ * Copyright 2012 Philippe Reynes <tremyfr@yahoo.fr>
++ * Copyright 2012 Armadeus Systems <support@armadeus.com>
++ *
++ * Based on code which is: Copyright 2012 Sascha Hauer, Pengutronix
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "imx27.dtsi"
++
++/ {
++	model = "Armadeus apf27";
++	compatible = "armadeus,imx27-apf27", "fsl,imx27";
++
++	memory {
++		reg = <0xa0000000 0x04000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		osc26m {
++			compatible = "fsl,imx-osc26m", "fixed-clock";
++			clock-frequency = <33554432>;
++		};
++	};
++
++	soc {
++		aipi at 10000000 {
++			wdog at 10002000 {
++				status = "okay";
++			};
++
++			serial at 1000a000 {
++				status = "okay";
++			};
++
++			ethernet at 1002b000 {
++				status = "okay";
++			};
++
++		};
++
++		nand at d8000000 {
++			status = "okay";
++			nand-bus-width = <16>;
++			nand-ecc-mode = "hw";
++			nand-on-flash-bbt;
++
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0 0x100000>;
++			};
++
++			partition at 100000 {
++				label = "env";
++				reg = <0x100000 0x80000>;
++			};
++
++			partition at 180000 {
++				label = "env2";
++				reg = <0x180000 0x80000>;
++			};
++
++			partition at 200000 {
++				label = "firmware";
++				reg = <0x200000 0x80000>;
++			};
++
++			partition at 280000 {
++				label = "dtb";
++				reg = <0x280000 0x80000>;
++			};
++
++			partition at 300000 {
++				label = "kernel";
++				reg = <0x300000 0x500000>;
++			};
++
++			partition at 800000 {
++				label = "rootfs";
++				reg = <0x800000 0xf800000>;
++			};
++		};
++
++	};
++
++};
+-- 
+1.7.4.4
