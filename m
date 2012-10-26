@@ -1,71 +1,50 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Oct 2012 13:43:08 -0500
-Subject: [PATCH 6/6] ARM: highbank: Add initial ECX-2000 support
-In-Reply-To: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
-References: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1351276988-28382-7-git-send-email-robherring2@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 26 Oct 2012 20:45:05 +0200
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <201210262006.15968.michael@walle.cc>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <77006526a6de40ddb455b25787b08342.squirrel@ssl.serverraum.org>
+ <20121025094343.58015440@skate>
+ <201210262006.15968.michael@walle.cc>
+Message-ID: <20121026204505.762fbfca@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Dear Michael Walle,
 
-And initial Calxeda ECX-2000 SOC support. This adds Cortex-A15 peripherals
-and machine DT match name.
+On Fri, 26 Oct 2012 20:06:15 +0200, Michael Walle wrote:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-highbank/Kconfig    |    2 +-
- arch/arm/mach-highbank/highbank.c |    6 ++++++
- 2 files changed, 7 insertions(+), 1 deletion(-)
+> Am Donnerstag 25 Oktober 2012, 09:43:43 schrieb Thomas Petazzoni:
+> > Regardless of those GPIOs, did you solve the hang that happened even
+> > when you removed the gpio_set_value() calls? Or is it still a
+> > problem currently?
+> 
+> quick update, i found out, that my board loops in the mvebu interrupt
+> handler mvebu_gpio_irq_handler(). maybe this is also the lockup Jamie
+> Lentin sees.
+> 
+> are interrupts always enabled, now? is there a way to control them?
+> maybe there is something missing in the dts, now.
 
-diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
-index 0e1d0a4..551c97e 100644
---- a/arch/arm/mach-highbank/Kconfig
-+++ b/arch/arm/mach-highbank/Kconfig
-@@ -1,5 +1,5 @@
- config ARCH_HIGHBANK
--	bool "Calxeda ECX-1000 (Highbank)" if ARCH_MULTI_V7
-+	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_AMBA
- 	select ARM_GIC
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 3da921a..3e60e57 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -26,6 +26,7 @@
- #include <linux/smp.h>
- #include <linux/amba/bus.h>
- 
-+#include <asm/arch_timer.h>
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- #include <asm/smp_twd.h>
-@@ -70,6 +71,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
- }
- 
- const static struct of_device_id irq_match[] = {
-+	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
- 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
- 	{}
- };
-@@ -126,6 +128,9 @@ static void __init highbank_timer_init(void)
- 	sp804_clockevents_init(timer_base, irq, "timer0");
- 
- 	twd_local_timer_of_register();
-+
-+	arch_timer_of_register();
-+	arch_timer_sched_clock_init();
- }
- 
- static struct sys_timer highbank_timer = {
-@@ -200,6 +205,7 @@ static void __init highbank_init(void)
- 
- static const char *highbank_match[] __initconst = {
- 	"calxeda,highbank",
-+	"calxeda,ecx-2000",
- 	NULL,
- };
- 
+Ah, this is interesting. It is not entirely surprising, since the gpio
+driver is new. Even though it re-uses most of the previous gpio driver,
+it is by far not impossible that there will be a few regressions.
+
+Could you add a few debug prints to see if you're looping *inside* the
+function (which I find pretty unlikely), or if the function gets called
+over and over again? Could it be that the hang occurs during the
+initialization of the gpio-leds or gpio-keys drivers?
+
+Also, even though I'm pretty sure it isn't going to fix your problem,
+note the following mvebu-gpio fix:
+
+  http://article.gmane.org/gmane.linux.ports.arm.kernel/195018
+
+Best regards,
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
