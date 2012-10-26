@@ -1,83 +1,77 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Oct 2012 11:30:09 +0100
-Subject: [PATCH v2 2/8] ARM: hw_breakpoint: fix monitor mode detection with
- v7.1
-In-Reply-To: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
-References: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1351247415-25090-2-git-send-email-will.deacon@arm.com>
+Date: Fri, 26 Oct 2012 11:30:08 +0100
+Subject: [PATCH v2 1/8] ARM: hw_breakpoint: only clear OS lock when
+ implemented on v7
+Message-ID: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Detecting whether halting debug is enabled is no longer possible via
-the DBGDSCR in v7.1, returning an UNKNOWN value for the HDBGen bit via
-CP14 when the OS lock is clear.
-
-This patch removes the halting mode check and ensures that accesses to
-the internal and external views of the DBGDSCR are serialised with an
-instruction barrier.
+The OS save and restore register are optional in debug architecture v7,
+so check the status register before attempting to clear the OS lock.
 
 Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |   25 +++++--------------------
- 1 files changed, 5 insertions(+), 20 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |   20 ++++++++++++++------
+ 1 files changed, 14 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 76a650a..c87ea68 100644
+index 281bf33..76a650a 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -235,13 +235,6 @@ static int enable_monitor_mode(void)
- 
- 	ARM_DBG_READ(c1, 0, dscr);
- 
--	/* Ensure that halting mode is disabled. */
--	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
--		"halting debug mode enabled. Unable to access hardware resources.\n")) {
--		ret = -EPERM;
--		goto out;
--	}
--
- 	/* If monitor mode is already enabled, just return. */
- 	if (dscr & ARM_DSCR_MDBGEN)
- 		goto out;
-@@ -255,6 +248,7 @@ static int enable_monitor_mode(void)
- 	case ARM_DEBUG_ARCH_V7_ECP14:
- 	case ARM_DEBUG_ARCH_V7_1:
- 		ARM_DBG_WRITE(c2, 2, (dscr | ARM_DSCR_MDBGEN));
-+		isb();
- 		break;
- 	default:
- 		ret = -ENODEV;
-@@ -1000,8 +994,6 @@ static struct notifier_block __cpuinitdata dbg_reset_nb = {
- 
- static int __init arch_hw_breakpoint_init(void)
+@@ -906,7 +906,7 @@ static struct undef_hook debug_reg_hook = {
+ static void reset_ctrl_regs(void *unused)
  {
--	u32 dscr;
--
- 	debug_arch = get_debug_arch();
+ 	int i, raw_num_brps, err = 0, cpu = smp_processor_id();
+-	u32 dbg_power;
++	u32 val;
  
- 	if (!debug_arch_supported()) {
-@@ -1036,17 +1028,10 @@ static int __init arch_hw_breakpoint_init(void)
- 		core_num_brps, core_has_mismatch_brps() ? "(+1 reserved) " :
- 		"", core_num_wrps);
+ 	/*
+ 	 * v7 debug contains save and restore registers so that debug state
+@@ -926,16 +926,23 @@ static void reset_ctrl_regs(void *unused)
+ 		 * Ensure sticky power-down is clear (i.e. debug logic is
+ 		 * powered up).
+ 		 */
+-		asm volatile("mrc p14, 0, %0, c1, c5, 4" : "=r" (dbg_power));
+-		if ((dbg_power & 0x1) == 0)
++		asm volatile("mrc p14, 0, %0, c1, c5, 4" : "=r" (val));
++		if ((val & 0x1) == 0)
+ 			err = -EPERM;
++
++		/*
++		 * Check whether we implement OS save and restore.
++		 */
++		asm volatile("mrc p14, 0, %0, c1, c1, 4" : "=r" (val));
++		if ((val & 0x9) == 0)
++			goto clear_vcr;
+ 		break;
+ 	case ARM_DEBUG_ARCH_V7_1:
+ 		/*
+ 		 * Ensure the OS double lock is clear.
+ 		 */
+-		asm volatile("mrc p14, 0, %0, c1, c3, 4" : "=r" (dbg_power));
+-		if ((dbg_power & 0x1) == 1)
++		asm volatile("mrc p14, 0, %0, c1, c3, 4" : "=r" (val));
++		if ((val & 0x1) == 1)
+ 			err = -EPERM;
+ 		break;
+ 	}
+@@ -947,7 +954,7 @@ static void reset_ctrl_regs(void *unused)
+ 	}
  
--	ARM_DBG_READ(c1, 0, dscr);
--	if (dscr & ARM_DSCR_HDBGEN) {
--		max_watchpoint_len = 4;
--		pr_warning("halting debug mode enabled. Assuming maximum watchpoint size of %u bytes.\n",
--			   max_watchpoint_len);
--	} else {
--		/* Work out the maximum supported watchpoint length. */
--		max_watchpoint_len = get_max_wp_len();
--		pr_info("maximum watchpoint size is %u bytes.\n",
--				max_watchpoint_len);
--	}
-+	/* Work out the maximum supported watchpoint length. */
-+	max_watchpoint_len = get_max_wp_len();
-+	pr_info("maximum watchpoint size is %u bytes.\n",
-+			max_watchpoint_len);
+ 	/*
+-	 * Unconditionally clear the lock by writing a value
++	 * Unconditionally clear the OS lock by writing a value
+ 	 * other than 0xC5ACCE55 to the access register.
+ 	 */
+ 	asm volatile("mcr p14, 0, %0, c1, c0, 4" : : "r" (0));
+@@ -957,6 +964,7 @@ static void reset_ctrl_regs(void *unused)
+ 	 * Clear any configured vector-catch events before
+ 	 * enabling monitor mode.
+ 	 */
++clear_vcr:
+ 	asm volatile("mcr p14, 0, %0, c0, c7, 0" : : "r" (0));
+ 	isb();
  
- 	/* Register debug fault handler. */
- 	hook_fault_code(FAULT_CODE_DEBUG, hw_breakpoint_pending, SIGTRAP,
 -- 
 1.7.4.1
