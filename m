@@ -1,48 +1,64 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Fri, 26 Oct 2012 12:40:21 -0700
-Subject: [RFC][PATCH 0/5] Introduce .get_voltage callback into voltdm
-In-Reply-To: <87fw51hzcg.fsf@deeprootsystems.com>
-References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
- <87fw51hzcg.fsf@deeprootsystems.com>
-Message-ID: <20121026194021.3141.73709@nucleus>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 26 Oct 2012 22:59:15 +0300
+Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
+In-Reply-To: <20121026171655.GI11908@atomide.com>
+References: <1349675983-23803-1-git-send-email-kishon@ti.com>
+ <1349675983-23803-2-git-send-email-kishon@ti.com>
+ <20121016165043.GS15569@atomide.com>
+ <20121025004806.GK11928@atomide.com>
+ <20121025061722.GB4449@arwen.pp.htv.fi>
+ <20121025174446.GT11928@atomide.com>
+ <20121026064736.GA22206@arwen.pp.htv.fi>
+ <20121026171655.GI11908@atomide.com>
+Message-ID: <20121026195915.GA29548@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Kevin Hilman (2012-10-26 11:17:51)
-> Hi Mike,
-> 
-> Mike Turquette <mturquette@ti.com> writes:
-> 
-> > From: Mike Turquette <mturquette@linaro.org>
-> >
-> > This series creates a new callback for struct voltagedomain,
-> > .get_voltage.  This fetches the voltage from hardware, if possible, and
-> > returns it to the caller.  We use this call to populate
-> > voltdm->nominal_volt at boot time.
-> 
-> I pointed out a couple nitpicky things on individual patches, but
-> otherwise this direction and motiviation for this series looks OK by me.
-> 
-> Just some minor comments about the structure of the series.  I tend to
-> prefer combining the introduction of a new function with it's usage.  It
-> makes review and understanding much easier, IMO.  If there are reasons
-> to keep them separate, that's fine too.  Just describe the reasons in
-> the cover letter.
-> 
+Hi,
 
-Will do.  I've thought on this topic a bit more and this approach isn't
-quite robust enough.  For instance it assumes that the kernel's voltage
-scaling approach (vp_forceupdate vs. vc_bypass) matches what the
-bootloader does.  This is of course an unsafe assumption.
-
-Also I've seen the Android guys struggle with this a bit and I'd like to
-review how they approached the problem before sending my next series.
-Couple with upcoming travel I'm not sure how quickly I'll get a V2 on
-the list.
-
-Thanks for reviewing,
-Mike
-
-> Thanks,
+On Fri, Oct 26, 2012 at 10:16:55AM -0700, Tony Lindgren wrote:
+> * Felipe Balbi <balbi@ti.com> [121025 23:55]:
+> > On Thu, Oct 25, 2012 at 10:44:47AM -0700, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [121024 23:24]:
+> > > > Hi,
+> > > > 
+> > > > On Wed, Oct 24, 2012 at 05:48:07PM -0700, Tony Lindgren wrote:
+> > > > > * Tony Lindgren <tony@atomide.com> [121016 09:53]:
+> > > > > > * Kishon Vijay Abraham I <kishon@ti.com> [121007 23:01]:
+> > > > > > > ocp2scp was not having pdata support which makes *musb* fail for non-dt
+> > > > > > > boot in OMAP platform. The pdata will have information about the devices
+> > > > > > > that is connected to ocp2scp. ocp2scp driver will now make use of this
+> > > > > > > information to create the devices that is attached to ocp2scp.
+> > > > > > > 
+> > > > > > > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > > > > > 
+> > > > > > This fixes the regression on my panda es for musb port:
+> > > > > > 
+> > > > > > Acked-by: Tony Lindgren <tony@atomide.com>
+> > > > > 
+> > > > > Looks like nobody has picked this one up and we need it to
+> > > > > fix the musb regression on omap, so I'll queue these up.
+> > > > 
+> > > > I don't seem to have the patches around in any mailbox :-(
+> > > 
+> > > Bounced them to you. Do you have any better ideas for the
+> > > -rc cycle to fix the MUSB regression on omap4?
+> > 
+> > Well, there are two regressions that I know of. One is caused by the
+> > mode1 DMA changes, which I'll just revert, and the other is the
+> > missing platform_data support on the new PHY driver which these patches
+> > are supposed to solve, right ?
 > 
-> Kevin
+> Yes that's it AFAIK.
+
+Kishon, any other patches I need to take to get MUSB working on v3.7 ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/57bda15d/attachment.sig>
