@@ -1,27 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2012 21:09:31 +0000
-Subject: [PATCH] ARM: versatile: fix versatile_defconfig
-Message-ID: <201210262109.31794.arnd@arndb.de>
+Date: Fri, 26 Oct 2012 21:11:56 +0000
+Subject: [PATCH v4] pwm: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <4EE5B48738DDED408878C97C8E050A8B1BD17DD2@SJEXCHMB05.corp.ad.broadcom.com>
+References: <1351100330-26072-1-git-send-email-linux@prisktech.co.nz>
+ <4EE5B48738DDED408878C97C8E050A8B1BD17DD2@SJEXCHMB05.corp.ad.broadcom.com>
+Message-ID: <201210262111.56608.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the introduction of CONFIG_ARCH_MULTIPLATFORM, versatile is
-no longer the default platform, so we need to enable
-CONFIG_ARCH_VERSATILE explicitly in order for that to be selected
-rather than the multiplatform configuration.
+On Friday 26 October 2012, Chris Brand wrote:
+> > @@ -124,6 +156,12 @@ static int __devinit pwm_probe(struct
+> > platform_device *pdev)
+> >       chip->chip.base = -1;
+> >       chip->chip.npwm = VT8500_NR_PWMS;
+> > 
+> > +     chip->clk = devm_clk_get(&pdev->dev, NULL);
+> > +     if (IS_ERR_OR_NULL(chip->clk)) {
+> > +             dev_err(&pdev->dev, "clock source not specified\n");
+> > +             return PTR_ERR(chip->clk);
+> > +     }
+> > +
+> 
+> Do you want IS_ERR() rather than IS_ERR_OR_NULL() here ?
+> Otherwise you may return PTR_ERR(NULL).
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+Right. devm_clk_get() never returns NULL, but as Russell pointed out
+recently, this usage of IS_ERR_OR_NULL() is completely bogus.
 
-I've applied this to the arm-soc fixes branch, since it seems obvious
-and uncontroversial. I only noticed because of another unrelated bug.
-
-diff --git a/arch/arm/configs/versatile_defconfig b/arch/arm/configs/versatile_defconfig
-index cdd4d2b..2ba9e63 100644
---- a/arch/arm/configs/versatile_defconfig
-+++ b/arch/arm/configs/versatile_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_ARCH_VERSATILE=y
- CONFIG_EXPERIMENTAL=y
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
+	Arnd
