@@ -1,249 +1,71 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Oct 2012 13:43:07 -0500
-Subject: [PATCH 5/6] ARM: highbank: abstract out SCU usage
+Date: Fri, 26 Oct 2012 13:43:08 -0500
+Subject: [PATCH 6/6] ARM: highbank: Add initial ECX-2000 support
 In-Reply-To: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
 References: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1351276988-28382-6-git-send-email-robherring2@gmail.com>
+Message-ID: <1351276988-28382-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-In preparation for A15 support on ECX-2000, the direct calls to SCU
-registers must be conditional. The SCU power mode register is replaced by
-a custom register on ECX-2000.
-
-Rather than read the number of cores from the SCU, just hardcode it to 4.
-This removes one use of SCU and removes the need for the SCU to be
-statically mapped. The cpu initialization will ultimately come from DT.
+And initial Calxeda ECX-2000 SOC support. This adds Cortex-A15 peripherals
+and machine DT match name.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-highbank/highbank.c |   21 +++++----------------
- arch/arm/mach-highbank/hotplug.c  |    6 ++----
- arch/arm/mach-highbank/platsmp.c  |    7 +++----
- arch/arm/mach-highbank/pm.c       |    3 ---
- arch/arm/mach-highbank/sysregs.h  |   19 +++++++++++++++++++
- arch/arm/mach-highbank/system.c   |    2 --
- 6 files changed, 29 insertions(+), 29 deletions(-)
+ arch/arm/mach-highbank/Kconfig    |    2 +-
+ arch/arm/mach-highbank/highbank.c |    6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+index 0e1d0a4..551c97e 100644
+--- a/arch/arm/mach-highbank/Kconfig
++++ b/arch/arm/mach-highbank/Kconfig
+@@ -1,5 +1,5 @@
+ config ARCH_HIGHBANK
+-	bool "Calxeda ECX-1000 (Highbank)" if ARCH_MULTI_V7
++	bool "Calxeda ECX-1000/2000 (Highbank/Midway)" if ARCH_MULTI_V7
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_AMBA
+ 	select ARM_GIC
 diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 40e36a5..3da921a 100644
+index 3da921a..3e60e57 100644
 --- a/arch/arm/mach-highbank/highbank.c
 +++ b/arch/arm/mach-highbank/highbank.c
-@@ -28,30 +28,19 @@
+@@ -26,6 +26,7 @@
+ #include <linux/smp.h>
+ #include <linux/amba/bus.h>
  
++#include <asm/arch_timer.h>
  #include <asm/cacheflush.h>
  #include <asm/smp_plat.h>
--#include <asm/smp_scu.h>
  #include <asm/smp_twd.h>
- #include <asm/hardware/arm_timer.h>
- #include <asm/hardware/timer-sp.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
--#include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
- #include "core.h"
- #include "sysregs.h"
- 
- void __iomem *sregs_base;
--
--#define HB_SCU_VIRT_BASE	0xfee00000
--void __iomem *scu_base_addr = ((void __iomem *)(HB_SCU_VIRT_BASE));
--
--static struct map_desc scu_io_desc __initdata = {
--	.virtual	= HB_SCU_VIRT_BASE,
--	.pfn		= 0, /* run-time */
--	.length		= SZ_4K,
--	.type		= MT_DEVICE,
--};
-+void __iomem *scu_base_addr;
- 
- static void __init highbank_scu_map_io(void)
- {
-@@ -60,13 +49,11 @@ static void __init highbank_scu_map_io(void)
- 	/* Get SCU base */
- 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
- 
--	scu_io_desc.pfn = __phys_to_pfn(base);
--	iotable_init(&scu_io_desc, 1);
-+	scu_base_addr = ioremap(base, SZ_4K);
+@@ -70,6 +71,7 @@ void highbank_set_cpu_jump(int cpu, void *jump_addr)
  }
  
- static void __init highbank_map_io(void)
- {
--	highbank_scu_map_io();
- 	highbank_lluart_map_io();
- }
+ const static struct of_device_id irq_match[] = {
++	{ .compatible = "arm,cortex-a15-gic", .data = gic_of_init, },
+ 	{ .compatible = "arm,cortex-a9-gic", .data = gic_of_init, },
+ 	{}
+ };
+@@ -126,6 +128,9 @@ static void __init highbank_timer_init(void)
+ 	sp804_clockevents_init(timer_base, irq, "timer0");
  
-@@ -99,6 +86,9 @@ static void __init highbank_init_irq(void)
- {
- 	of_irq_init(irq_match);
- 
-+	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
-+		highbank_scu_map_io();
+ 	twd_local_timer_of_register();
 +
- #ifdef CONFIG_CACHE_L2X0
- 	/* Enable PL310 L2 Cache controller */
- 	highbank_smc1(0x102, 0x1);
-@@ -145,7 +135,6 @@ static struct sys_timer highbank_timer = {
- static void highbank_power_off(void)
- {
- 	hignbank_set_pwr_shutdown();
--	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
- 
- 	while (1)
- 		cpu_do_idle();
-diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
-index 2c1b8c3..7b60fac 100644
---- a/arch/arm/mach-highbank/hotplug.c
-+++ b/arch/arm/mach-highbank/hotplug.c
-@@ -14,13 +14,11 @@
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- #include <linux/kernel.h>
--#include <linux/errno.h>
--#include <linux/smp.h>
- 
--#include <asm/smp_scu.h>
- #include <asm/cacheflush.h>
- 
- #include "core.h"
-+#include "sysregs.h"
- 
- extern void secondary_startup(void);
- 
-@@ -33,7 +31,7 @@ void __ref highbank_cpu_die(unsigned int cpu)
- 	flush_cache_all();
- 
- 	highbank_set_cpu_jump(cpu, secondary_startup);
--	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
-+	highbank_set_core_pwr();
- 
- 	cpu_do_idle();
- 
-diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
-index fa9560e..1129957 100644
---- a/arch/arm/mach-highbank/platsmp.c
-+++ b/arch/arm/mach-highbank/platsmp.c
-@@ -42,9 +42,7 @@ static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struc
-  */
- static void __init highbank_smp_init_cpus(void)
- {
--	unsigned int i, ncores;
--
--	ncores = scu_get_core_count(scu_base_addr);
-+	unsigned int i, ncores = 4;
- 
- 	/* sanity check */
- 	if (ncores > NR_CPUS) {
-@@ -65,7 +63,8 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int i;
- 
--	scu_enable(scu_base_addr);
-+	if (scu_base_addr)
-+		scu_enable(scu_base_addr);
- 
- 	/*
- 	 * Write the address of secondary startup into the jump table
-diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
-index de866f2..74aa135 100644
---- a/arch/arm/mach-highbank/pm.c
-+++ b/arch/arm/mach-highbank/pm.c
-@@ -19,7 +19,6 @@
- #include <linux/suspend.h>
- 
- #include <asm/proc-fns.h>
--#include <asm/smp_scu.h>
- #include <asm/suspend.h>
- 
- #include "core.h"
-@@ -35,8 +34,6 @@ static int highbank_pm_enter(suspend_state_t state)
- {
- 	hignbank_set_pwr_suspend();
- 	highbank_set_cpu_jump(0, cpu_resume);
--
--	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
- 	cpu_suspend(0, highbank_suspend_finish);
- 
- 	return 0;
-diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
-index 0e91338..e13e8ea 100644
---- a/arch/arm/mach-highbank/sysregs.h
-+++ b/arch/arm/mach-highbank/sysregs.h
-@@ -17,6 +17,10 @@
- #define _MACH_HIGHBANK__SYSREGS_H_
- 
- #include <linux/io.h>
-+#include <linux/smp.h>
-+#include <asm/smp_plat.h>
-+#include <asm/smp_scu.h>
-+#include "core.h"
- 
- extern void __iomem *sregs_base;
- 
-@@ -29,24 +33,39 @@ extern void __iomem *sregs_base;
- #define HB_PWR_HARD_RESET		2
- #define HB_PWR_SHUTDOWN			3
- 
-+#define SREG_CPU_PWR_CTRL(c)		(0x200 + ((c) * 4))
-+
-+static inline void highbank_set_core_pwr(void)
-+{
-+	int cpu = cpu_logical_map(smp_processor_id());
-+	if (scu_base_addr)
-+		scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
-+	else
-+		writel_relaxed(1, sregs_base + SREG_CPU_PWR_CTRL(cpu));
-+}
-+
- static inline void hignbank_set_pwr_suspend(void)
- {
- 	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
-+	highbank_set_core_pwr();
++	arch_timer_of_register();
++	arch_timer_sched_clock_init();
  }
  
- static inline void hignbank_set_pwr_shutdown(void)
- {
- 	writel(HB_PWR_SHUTDOWN, sregs_base + HB_SREG_A9_PWR_REQ);
-+	highbank_set_core_pwr();
- }
+ static struct sys_timer highbank_timer = {
+@@ -200,6 +205,7 @@ static void __init highbank_init(void)
  
- static inline void hignbank_set_pwr_soft_reset(void)
- {
- 	writel(HB_PWR_SOFT_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
-+	highbank_set_core_pwr();
- }
- 
- static inline void hignbank_set_pwr_hard_reset(void)
- {
- 	writel(HB_PWR_HARD_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
-+	highbank_set_core_pwr();
- }
- 
- #endif
-diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
-index 82c2723..194a5bb 100644
---- a/arch/arm/mach-highbank/system.c
-+++ b/arch/arm/mach-highbank/system.c
-@@ -14,7 +14,6 @@
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- #include <linux/io.h>
--#include <asm/smp_scu.h>
- #include <asm/proc-fns.h>
- 
- #include "core.h"
-@@ -27,7 +26,6 @@ void highbank_restart(char mode, const char *cmd)
- 	else
- 		hignbank_set_pwr_soft_reset();
- 
--	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
- 	cpu_do_idle();
- }
+ static const char *highbank_match[] __initconst = {
+ 	"calxeda,highbank",
++	"calxeda,ecx-2000",
+ 	NULL,
+ };
  
 -- 
 1.7.10.4
