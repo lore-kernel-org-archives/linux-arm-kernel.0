@@ -1,80 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 05:04:10 +0000 (UTC)
-Subject: [PATCH v2 06/14] mtd: onenand: omap: use pdata info instead of
- cpu_is
-In-Reply-To: <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
-References: <cover.1349672877.git.afzal@ti.com>
- <860ba92c34cbb490beccd5442087087c1751a6a2.1349672877.git.afzal@ti.com>
- <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1210260411140.27963@utopia.booyaka.com>
+From: ananth@in.ibm.com (Ananth N Mavinakayanahalli)
+Date: Fri, 26 Oct 2012 11:22:39 +0530
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121025145839.GB26929@redhat.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121025145839.GB26929@redhat.com>
+Message-ID: <20121026055239.GA4862@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Oct 2012, Paul Walmsley wrote:
-
-> On Mon, 8 Oct 2012, Afzal Mohammed wrote:
+On Thu, Oct 25, 2012 at 04:58:39PM +0200, Oleg Nesterov wrote:
+> On 10/16, Rabin Vincent wrote:
+> >
+> > 2012/10/15 Oleg Nesterov <oleg@redhat.com>:
+> > > On 10/14, Rabin Vincent wrote:
+> > >> Flush the cache so that the instructions written to the XOL area are
+> > >> visible.
+> > >>
+> > >> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> > >> ---
+> > >>  kernel/events/uprobes.c |    1 +
+> > >>  1 file changed, 1 insertion(+)
+> > >>
+> > >> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+> > >> index ca000a9..8c52f93 100644
+> > >> --- a/kernel/events/uprobes.c
+> > >> +++ b/kernel/events/uprobes.c
+> > >> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+> > >>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
+> > >>       vaddr = kmap_atomic(area->page);
+> > >>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
+> > >> +     flush_dcache_page(area->page);
+> > >>       kunmap_atomic(vaddr);
+> > >
+> > > I agree... but why under kmap_atomic?
+> >
+> > No real reason; I'll move it to after the unmap.
 > 
-> > platform data now contains a field to indicate whether
-> > soc belongs to omap34xx family, use it instead of
-> > cpu_is_* check.
-> > 
-> > This helps in removing dependency of platform specific
-> > header file - cpu.h
-> > 
-> > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> OK. I assume you will send v2.
 > 
-> This one breaks an N800 multi-OMAP build here:
+> But this patch looks like a bugfix, flush_dcache_page() is not a nop
+> on powerpc. So perhaps we should apply this fix right now?
 
-It also breaks an OMAP3+4 config:
+Starting Power5, all Power processers have coherent caches.
 
-drivers/built-in.o: In function `omap2_onenand_probe':
-/home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:742: 
-undefined reference to `omap2_onenand_read_bufferram'
-/home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:743: 
-undefined reference to `omap2_onenand_write_bufferram'
-/home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:742: 
-undefined reference to `omap2_onenand_read_bufferram'
-/home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:743: 
-undefined reference to `omap2_onenand_write_bufferram'
+> OTOH, I do not understand this stuff, everything is nop on x86. And
+> when I look into Documentation/cachetlb.txt I am starting to think
+> that may be this needs flush_icache_user_range instead?
+>
+> Rabin, Ananth could you clarify this?
 
-Fix below.
+Yes. We need flush_icache_user_range(). Though for x86 its always been a
+nop, one never knows if there is some Power4 or older machine out there
+that is still being used. We are fine for Power5 and later.
 
-
-- Paul
-
----
- drivers/mtd/onenand/omap2.c |   18 ++++++++++++------
- 1 file changed, 12 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
-index f87cf39..99f96e1 100644
---- a/drivers/mtd/onenand/omap2.c
-+++ b/drivers/mtd/onenand/omap2.c
-@@ -555,13 +555,19 @@ static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
- 
- #else
- 
--int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
--				 unsigned char *buffer, int offset,
--				 size_t count);
-+static int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
-+					unsigned char *buffer, int offset,
-+					size_t count)
-+{
-+	return -ENOSYS;
-+}
- 
--int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
--				  const unsigned char *buffer,
--				  int offset, size_t count);
-+static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
-+					 const unsigned char *buffer,
-+					 int offset, size_t count)
-+{
-+	return -ENOSYS;
-+}
- 
- #endif
- 
--- 
-1.7.10.4
+Ananth
