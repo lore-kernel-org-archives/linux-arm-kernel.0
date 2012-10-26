@@ -1,45 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Oct 2012 11:03:13 +0100
-Subject: [PATCH V2] ARM: PMU: fix runtime PM enable
-In-Reply-To: <1351196598-26667-1-git-send-email-jon-hunter@ti.com>
-References: <1351196598-26667-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121026100312.GF20914@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 26 Oct 2012 12:03:20 +0200
+Subject: [PATCH v4] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+Message-ID: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 09:23:18PM +0100, Jon Hunter wrote:
-> Commit 7be2958 (ARM: PMU: Add runtime PM Support) updated the ARM PMU code to
-> use runtime PM which was prototyped and validated on the OMAP devices. In this
-> commit, there is no call pm_runtime_enable() and for OMAP devices
-> pm_runtime_enable() is currently being called from the OMAP PMU code when the
-> PMU device is created. However, there are two problems with this:
-> 
-> 1. For any other ARM device wishing to use runtime PM for PMU they will need
->    to call pm_runtime_enable() for runtime PM to work.
-> 2. When booting with device-tree and using device-tree to create the PMU
->    device, pm_runtime_enable() needs to be called from within the ARM PERF
->    driver as we are no longer calling any device specific code to create the
->    device. Hence, PMU does not work on OMAP devices that use the runtime PM
->    callbacks when using device-tree to create the PMU device.
-> 
-> Therefore,  call pm_runtime_enable() directly from the ARM PMU driver when
-> registering the device. For platforms that do not use runtime PM,
-> pm_runtime_enable() does nothing and for platforms that do use runtime PM but
-> may not require it specifically for PMU, this will just add a little overhead
-> when initialising and uninitialising the PMU device.
-> 
-> Tested with PERF on OMAP2420, OMAP3430 and OMAP4460.
-> 
-> V2 changes:
-> - Call pm_runtime_enable() unconditionally on registering the PMU device.
-> 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
+David, Lennert,
 
-Cheers Jon! Looks a bit weird without the matching pm_runtime_disable, but
-we don't really have anywhere to put that since the PMU is not deregistered.
+This patch set adds a new network driver for the network unit
+available in the newest Marvell ARM SoCs Armada 370 and Armada XP, as
+well as the necessary Device Tree information to use this driver in
+the two evaluation platforms of those SoCs.
 
-Can we split this patch into two (even smaller!) patches so that I can take
-the perf part and the omap bit can go to Tony?
+In details:
 
-Will
+ * Patch 1 contains the driver itself. The commit log contains a
+   detailed explanation about why a new driver is needed for this new
+   Marvell SoC, compared to older Marvell SoCs (Orion, Kirkwood, Dove)
+   that use the mv643xx_eth driver.
+
+ * Patch 2 adds the necessary entry to the MAINTAINERS file.
+
+ * Patch 3 adds the SoC-level Device Tree information for Armada 370
+   and Armada XP.
+
+ * Patch 4 adds the board-level Device Tree information for the
+   Marvell evaluation boards of Armada 370 and Armada XP.
+
+Changes since v3:
+ * Use phy_find_first() to get the correct PHY. Suggested by Florian
+   Fainelli.
+ * Make pp->cause_rx_tx a simple variable instead of a per-CPU array
+   since it is not useful. Fixes a comment raised by David Miller.
+
+Changes since v2:
+ * Change compatible string from 'marvell,neta' to
+   'marvell,armada-370-neta'. Requested by Rob Herring.
+ * Rename Ethernet DT nodes from eth at ... to ethernet at ... Requested by
+   Rob Herring.
+ * Remove device_type DT property. Requested by Rob Herring.
+ * Change the PHY interface for eth0/eth1 to be rgmii-id, which allows
+   to enable TX/RX delay mechanisms at the PHY level. This fixes CRC
+   errors on received packets during iperf tests (it was a bug in v2).
+ * Remove the mvneta_ prefix from module parameters. Requested by
+   Baruch Siach.
+ * Many code style improvements suggested by Fran?ois Romieu.
+ * Properly stop/restart the TX queue when the number of TX
+   descriptors available becomes low, instead of returning
+   NETDEV_TX_BUSY. Requested by Fran?ois Romieu.
+ * Properly drop packets on the TX path when DMA mapping functions
+   return an error, instead of returning NETDEV_TX_BUSY. Requested by
+   Fran?ois Romieu.
+ * Rebased on top of Linux 3.7-rc2.
+
+Changes since v1:
+ * Reduced the Cc: list in order to make the patch set acceptable for
+   the netdev@ mailing list.
+ * Merge the mvneta.h contents into mvneta.c, since the header was
+   only used by the driver. Requested by Arnd Bergmann.
+ * Completely reorganize the organization of the register list and
+   register values, in order to make it more consistent, and hopefully
+   easier to read (especially easier to match register values with the
+   corresponding register).
+ * Integrate with the phylib, as suggested by Florian Fainelli, and
+   remove the link management code that has become useless as the
+   result of this integration
+ * Fix many small details suggested by Florian Fainelli in his review
+   of the first driver
+ * Simplify various parts of the driver (descriptors array allocation,
+   data structures, etc.)
+
+Thanks,
+
+Thomas Petazzoni
