@@ -1,39 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Oct 2012 15:48:52 +0100
-Subject: [PATCH RFT] ARM64: dma-mapping: support debug_dma_mapping_error
-In-Reply-To: <1351205220.6851.3.camel@lorien2>
-References: <1351205220.6851.3.camel@lorien2>
-Message-ID: <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Oct 2012 15:48:44 +0100
+Subject: [PATCH 1/2] of: add of_property_count_phandles
+In-Reply-To: <1351262925-10306-1-git-send-email-mark.rutland@arm.com>
+References: <1351262925-10306-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1351262925-10306-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 October 2012 23:47, Shuah Khan <shuah.khan@hp.com> wrote:
-> Add support for debug_dma_mapping_error() call to avoid warning from
-> debug_dma_unmap() interface when it checks for mapping error checked
-> status. Without this patch, device driver failed to check map error
-> warning is generated.
->
-> Signed-off-by: Shuah Khan <shuah.khan@hp.com>
-> ---
->  arch/arm64/include/asm/dma-mapping.h |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 538f4b4..9947768 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
->  static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
->  {
->         struct dma_map_ops *ops = get_dma_ops(dev);
-> +       debug_dma_mapping_error(dev, dev_addr);
->         return ops->mapping_error(dev, dev_addr);
->  }
+Though of_parse_phandle handles lists of phandles, and takes an index
+parameter, there is no standard way of discovering how many phandles are
+present on a node. This patch adds a function to count how many phandles
+are in a phandle list.
 
-The patch looks fine but debug_dma_mapping_error() is not in mainline
-yet, so it will have to wait. If you want to add it to your series
-(which I assume adds debug_dma_mapping_error() support), you can add
-my Acked-by on the patch.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ drivers/of/base.c  |   39 +++++++++++++++++++++++++++++++++++++++
+ include/linux/of.h |    8 ++++++++
+ 2 files changed, 47 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index af3b22a..30ae562 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -884,6 +884,45 @@ int of_property_count_strings(struct device_node *np, const char *propname)
+ EXPORT_SYMBOL_GPL(of_property_count_strings);
+ 
+ /**
++ * of_property_count_phandles - find and return the number of phandles from a
++ * multiple phandles property.
++ * @np:		device node from which the property value is to be read.
++ * @propname:	name of the property to be searched.
++ *
++ * Search for a property in a device tree node and retrieve the number of
++ * phandles contained in it. Returns the number of phandles on success, -ENOENT
++ * if the property does not exist, -ENODATA if there are no phandles, and
++ * -EINVAL if the property is not correctly sized for an array of phandles.
++ */
++int of_property_count_phandles(struct device_node *np, const char *propname)
++{
++	int size, count, i;
++	const __be32 *phandle;
++
++	phandle = of_get_property(np, propname, &size);
++
++	if (!phandle)
++		return -ENOENT;
++	if (size == 0)
++		return -ENODATA;
++	if (size % (sizeof *phandle))
++		return -EINVAL;
++
++	count = size / (sizeof(*phandle));
++
++	/* Check the phandle targets actually exist */
++	for (i = 0; i < count; i++) {
++		struct device_node *node = of_parse_phandle(np, propname, i);
++		if (!node)
++			return -EINVAL;
++		of_node_put(node);
++	}
++
++	return count;
++}
++EXPORT_SYMBOL_GPL(of_property_count_phandles);
++
++/**
+  * of_parse_phandle - Resolve a phandle property to a device_node pointer
+  * @np: Pointer to device node holding phandle property
+  * @phandle_name: Name of property holding a phandle value
+diff --git a/include/linux/of.h b/include/linux/of.h
+index b4e50d5..1f03f46 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -258,6 +258,8 @@ extern int of_modalias_node(struct device_node *node, char *modalias, int len);
+ extern struct device_node *of_parse_phandle(struct device_node *np,
+ 					    const char *phandle_name,
+ 					    int index);
++extern int of_property_count_phandles(struct device_node *np,
++				      const char *propname);
+ extern int of_parse_phandle_with_args(struct device_node *np,
+ 	const char *list_name, const char *cells_name, int index,
+ 	struct of_phandle_args *out_args);
+@@ -411,6 +413,12 @@ static inline int of_property_match_string(struct device_node *np,
+ 	return -ENOSYS;
+ }
+ 
++static inline int of_property_count_phandles(struct device_node *np,
++					     const char *propname)
++{
++	return -ENOSYS;
++}
++
+ static inline struct device_node *of_parse_phandle(struct device_node *np,
+ 						   const char *phandle_name,
+ 						   int index)
 -- 
-Catalin
+1.7.0.4
