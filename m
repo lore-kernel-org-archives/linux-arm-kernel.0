@@ -1,59 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Oct 2012 23:15:39 +0300
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <20121025101212.GD21217@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
- <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
- <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
- <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
- <20121025101212.GD21217@arwen.pp.htv.fi>
-Message-ID: <20121026201539.GD29548@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 20:33:40 +0000
+Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
+In-Reply-To: <20121024161611.659b0989@skate>
+References: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5087A94E.4000706@free-electrons.com> <20121024161611.659b0989@skate>
+Message-ID: <201210262033.41250.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wednesday 24 October 2012, Thomas Petazzoni wrote:
+> On Wed, 24 Oct 2012 10:39:42 +0200, Gregory CLEMENT wrote:
+> > On 10/23/2012 10:17 AM, Thomas Petazzoni wrote:
+> > > The split of 370 and XP into two Kconfig options and the multiplatform
+> > > kernel support has changed a few Kconfig symbols, so let's update the
+> > > mvebu_defconfig file with the latest changes.
+> > 
+> > Indeed this patch fixes the mvebu_defconfig which was broken.
+> > But as now mvebu is part of multi_v7_defconfig, shouldn't we just
+> > removed mvebu_defconfig ?
+> 
+> I think for now, SoC family specific defconfig files are still
+> accepted, so I'd prefer to keep mvebu_defconfig around. Multiplatform
+> is nice for users, but I prefer to build a mvebu-only kernel when I'm
+> doing kernel development.
 
-On Thu, Oct 25, 2012 at 01:12:12PM +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Oct 23, 2012 at 09:23:03PM +0200, Jean Pihet wrote:
-> > On Tue, Oct 23, 2012 at 9:19 PM, Paul Walmsley <paul@pwsan.com> wrote:
-> > > On Mon, 22 Oct 2012, Jean Pihet wrote:
-> > >
-> > >> On Mon, Oct 22, 2012 at 6:12 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
-> > >>
-> > >> > Do you have CPU_IDLE enabled?
-> > >> FYI the issue is not present with CPU_IDLE enabled.
-> > >
-> > > Hmm, how can you tell?  I thought you weren't able to reproduce it with
-> > > CPU_IDLE disabled either?
-> > I could not reproduce the issue, with and without CPU_IDLE enabled.
-> > What puzzles me is that the PM QoS code only has influence on the
-> > states chosen by cpuidle, so the change should not have any impact
-> > with CPU_IDLE enabled. I reallt need to reproduce the issue.
-> > Let me try with the same setup as yours (bootloader images,
-> > omap2pus_defconfig, angstrom roots).
-> 
-> I just sent a patch to fix a bug I found on OMAP4 panda but while
-> reading this thread again, I think it could be that it's the same bug
-> which is just easier to reproduce on Paul's setup.
-> 
-> Paul, Aaro, can you see if [1] makes the problem go away ? that would be
-> another reason to push [1] during this -rc cycle.
-> 
-> [1] http://marc.info/?l=linux-omap&m=135115602407925&w=2
+I'd certainly like to see that patch get merged. Should I just apply it
+to the fixes branch?
 
-ping
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/fb79736f/attachment-0001.sig>
+	Arnd
