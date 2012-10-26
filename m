@@ -1,27 +1,46 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 26 Oct 2012 13:09:18 +0200 (CEST)
-Subject: [BUG] read_current_timer undefined
-Message-ID: <Pine.LNX.4.64.1210261306370.20835@axis700.grange>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 26 Oct 2012 13:17:12 +0200
+Subject: [PATCH] cpufreq: Avoid calling cpufreq driver's target() routine
+ if target_freq == policy->cur
+In-Reply-To: <1d7b6e421a335255da956804b43ce3517538409c.1351244153.git.viresh.kumar@linaro.org>
+References: <1d7b6e421a335255da956804b43ce3517538409c.1351244153.git.viresh.kumar@linaro.org>
+Message-ID: <5056958.0bPciFrxt5@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent commit
+On Friday, October 26, 2012 03:06:26 PM Viresh Kumar wrote:
+> Avoid calling cpufreq driver's target() routine if new frequency is same as
+> policies current frequency.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-commit 923df96b9f31b7d08d8438ff9677326d9537accf
-Author: Will Deacon <will.deacon@arm.com>
-Date:   Fri Jul 6 15:46:45 2012 +0100
+Looks reasonable.
 
-    ARM: 7451/1: arch timer: implement read_current_timer and get_cycles
+Any objection from anyone?
 
-breaks linkage of modules, using get_cycles(), e.g. 
+Rafael
 
-ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
 
-This is present in "next" of 23 October.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> ---
+>  drivers/cpufreq/cpufreq.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> index 261ef65..28dc134 100644
+> --- a/drivers/cpufreq/cpufreq.c
+> +++ b/drivers/cpufreq/cpufreq.c
+> @@ -1476,6 +1476,10 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
+>  
+>  	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
+>  		target_freq, relation);
+> +
+> +	if (target_freq == policy->cur)
+> +		return 0;
+> +
+>  	if (cpu_online(policy->cpu) && cpufreq_driver->target)
+>  		retval = cpufreq_driver->target(policy, target_freq, relation);
+>  
+> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
