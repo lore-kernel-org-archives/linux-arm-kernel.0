@@ -1,83 +1,31 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 26 Oct 2012 13:14:33 +0530
-Subject: [PATCH] ARM: davinci: dm644x: fix out range signal for ED
-In-Reply-To: <508A3D32.6090101@ti.com>
-References: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
- <506C158D.4000906@ti.com>
- <CA+V-a8uFNXvb7bPv0dLKeSeNzZ9C3rvrXCNSWy+8HgiumR9sEw@mail.gmail.com>
- <506D3704.4060102@ti.com>
- <CA+V-a8uqQhpe+9Q_A_ojR1MahHLnbKpOEBdg9Vz3Gq8YQbHyjg@mail.gmail.com>
- <508A3D32.6090101@ti.com>
-Message-ID: <CA+V-a8u+62-Qe6C0YxB0UjiL2Yts0QQAtePbU6p-MUHgve3X4A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 07:47:11 +0000
+Subject: [PATCH v2 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
+In-Reply-To: <20121026065012.GC22206@arwen.pp.htv.fi>
+References: <1349675983-23803-1-git-send-email-kishon@ti.com>
+ <1349675983-23803-4-git-send-email-kishon@ti.com>
+ <20121026065012.GC22206@arwen.pp.htv.fi>
+Message-ID: <201210260747.11848.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sekhar,
+On Friday 26 October 2012, Felipe Balbi wrote:
+> > +static void omap_init_ocp2scp(void)
+> > +{
+> > +     struct omap_hwmod       *oh;
+> > +     struct platform_device  *pdev;
+> > +     int                     bus_id = -1, dev_cnt = 0, i;
+> > +     struct omap_ocp2scp_dev *ocp2scp_dev;
+> > +     const char              *oh_name, *name;
+> > +     struct omap_ocp2scp_platform_data *pdata;
+> > +
+> > +     oh_name = "ocp2scp_usb_phy";
+> > +     name    = "omap-ocp2scp";
+> 
+> how about adding checks here to return early case we're not running on
+> OMAP4 or OMAP5 ??
+> 
 
-On Fri, Oct 26, 2012 at 1:05 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 10/4/2012 7:23 PM, Prabhakar Lad wrote:
->> Sekhar
->>
->> On Thu, Oct 4, 2012 at 12:43 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->>> On 10/4/2012 10:22 AM, Prabhakar Lad wrote:
->>>> Hi Sekhar,
->>>>
->>>> On Wed, Oct 3, 2012 at 4:08 PM, Sekhar Nori <nsekhar@ti.com> wrote:
->>>>> On 10/3/2012 12:05 PM, Prabhakar wrote:
->>>>>> From: Lad, Prabhakar <prabhakar.lad@ti.com>
->>>>>>
->>>>>> while testing display on dm644x, for ED out-range signals
->>>>>> was observed. This patch fixes appropriate clock setting
->>>>>> for ED.
->>>>>
->>>>> Can you please clarify what you mean by "out range signal"? Are there
->>>>> any user visible artifacts on the display? What was the clock being
->>>>> provided earlier and what is the value after this patch?
->>>>>
->>>>> Also, is the issue severe enough that this patch should be applied to
->>>>> stable tree as well?
->>>>>
->>>> Ideally a clock of 54Mhz is required for  enhanced definition to
->>>> work, which it was actually set to but while testing I noticed
->>>> out-of-range signal. The out-of-range signal is often caused
->>>> when the field rate is above the rate that the television will handle.
->>>> When this is the case the TV or monitor displays "Out-Of-Range Signal".
->>>>
->>>> Reducing the clock fixed it. now the clock is set to 27Mhz.
->>>
->>> So, is the requirement for ED 54MHz or lower? Still trying to explain
->>> myself how 27MHz is working where a 54MHz is required. I guess there is
->>> also a lower limit on what the frequency should be?
->>>
->> Ideally its 54Mhz, but I see in the datasheet for AD7342/3 [1] it can also
->> work at 27Mhz too.
->
-> So, based on this discussion I think a better description would be:
->
-> "
-> Fix the video clock setting when custom timings are used with pclock  <=
-> 27MHz. Existing clock selection uses PLL2 mode which results in a 54MHz
-> clock where as using the MXI mode results in a 27MHz clock (which is the
-> one actually desired).
->
-> This affects the Enhanced Definition (ED) support on DM644x. Without
-> this patch, out-range signals errors are were observed on the TV. An
-> out-of-range signal is often caused when the field rate is above the
-> rate that the television will handle.
-> "
->
-> Is this accurate? In future, please try to be descriptive in patch
-> description as it will help understand what the patch is doing and why
-> (which in turn will lead to the patch getting accepted faster).
->
-Looks good.  I'll make sure to have descriptive commit message hence forth.
+I suppose even OMAP4-only, since OMAP5 always has DT enabled.
 
-> Also I assume you need this patch in v3.7? Or can I send it for v3.8?
->
-Since its a fix it would be good if its queued for v3.7.
-
-Regards,
---Prabhakar
-
-> Thanks,
-> Sekhar
+	Arnd
