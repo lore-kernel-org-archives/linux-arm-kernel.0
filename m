@@ -1,69 +1,90 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 26 Oct 2012 15:52:51 +0200
-Subject: [PATCH 2/2] ARM: mach-imx: CAN clock fix for i.MX53
-In-Reply-To: <508A6E92.1000107@antcom.de>
-References: <1351164400-27940-1-git-send-email-stigge@antcom.de>
- <1351164400-27940-2-git-send-email-stigge@antcom.de>
- <20121026085934.GA1641@pengutronix.de> <508A54E4.2060108@antcom.de>
- <508A665C.80107@pengutronix.de> <508A6E92.1000107@antcom.de>
-Message-ID: <508A95B3.3010306@antcom.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 14:02:19 +0000
+Subject: [GIT PULL] omap plat header removal for v3.8 merge window, part1
+In-Reply-To: <20121019023300.GN30550@atomide.com>
+References: <20121019023300.GN30550@atomide.com>
+Message-ID: <201210261402.19759.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2012 01:05 PM, Roland Stigge wrote:
-> On 10/26/2012 12:30 PM, Marc Kleine-Budde wrote:
->>>>> +	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate",
->>>>> "can_sel", MXC_CCM_CCGR4, 6); +	clk[can1_ipg_gate] =
->>>>> imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR4, 8); +
->>>>> clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate",
->>>>> "can_sel", MXC_CCM_CCGR4, 6); +	clk[can2_ipg_gate] =
->>>>> imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
->>>>
->>>> This doesn't.
->>>
->>> This may be right, but unfortunately, since the introduction of
->>> your can1 + can2 clocking change, the first block stopped working
->>> for me.
->>
->> You are effectively using can2's clock for can1. Are you sure you 
->> haven't mixed up can1 and can2?
+On Friday 19 October 2012, Tony Lindgren wrote:
+> Hi Arnd & Olof,
 > 
-> Just using the above patch and patch 1/2 from this series (missing can
-> pinmuxing), doing like this in custom .dts:
+> Here's the first set of omap plat header removal for v3.8 merge
+> window. I have at least one more related set coming, but I wanted
+> to get these into linux next before driver patches add more
+> things for me to chase down and fix.
 > 
-> +                       can1: can at 53fc8000 {
-> +                               pinctrl-names = "default";
-> +                               pinctrl-0 = <&pinctrl_can1_1>;
-> +                               clock-frequency = <66500000>;
+> Oh, forgot to mention in the tag that the increase in diffstat
+> is mostly because plat-omap/clock shared clock code is duplicated
+> as that's also needed for the common clock framework patches
+> coming up.
 
-That was the problem, since in flexcan.c probe():
+Hi Tony,
 
+This is very cool, great work! I'm sorry for taking so long before
+we processed them, I wasn't coordinating well with Olof for the last
+week.
 
-	if (pdev->dev.of_node)
-		of_property_read_u32(pdev->dev.of_node,
-						"clock-frequency", &clock_freq);
+I've applied all of it to a new next/headers branch. I thought about
+using the next/cleanup branch, but since it touches a lot of files
+outside of arch/arm, I decided to keep it separate. We might decide
+to merge it later after all.
 
-	if (!clock_freq) {
-		clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-		if (IS_ERR(clk_ipg)) {
-			dev_err(&pdev->dev, "no ipg clock defined\n");
-			err = PTR_ERR(clk_ipg);
-			goto failed_clock;
-		}
-		clock_freq = clk_get_rate(clk_ipg);
+I tried running my old multiplatform scripts again and have a few
+comments, but none of them serious:
 
-		clk_per = devm_clk_get(&pdev->dev, "per");
-		if (IS_ERR(clk_per)) {
-			dev_err(&pdev->dev, "no per clock defined\n");
-			err = PTR_ERR(clk_per);
-			goto failed_clock;
-		}
-	}
+$ git grep include.*mach-omap2
+arch/arm/plat-omap/debug-devices.c:#include "../mach-omap2/debug-devices.h"
+arch/arm/plat-omap/dma.c:#include "../mach-omap2/soc.h"
+arch/arm/plat-omap/dmtimer.c:#include "../mach-omap2/omap-pm.h"
+arch/arm/plat-omap/i2c.c:#include "../mach-omap2/soc.h"
+arch/arm/plat-omap/include/plat/cpu.h:#include "../../mach-omap2/soc.h"
+arch/arm/plat-omap/omap-pm-noop.c:#include "../mach-omap2/omap_device.h"
+arch/arm/plat-omap/omap-pm-noop.c:#include "../mach-omap2/omap-pm.h"
+arch/arm/plat-omap/sram.c:#include "../mach-omap2/soc.h"
+arch/arm/plat-omap/sram.c:#include "../mach-omap2/iomap.h"
+arch/arm/plat-omap/sram.c:#include "../mach-omap2/prm2xxx_3xxx.h"
+arch/arm/plat-omap/sram.c:#include "../mach-omap2/sdrc.h"
 
-Sorry for the noise.
+I don't like the relative include paths too much. I would have preferred
+adding the mach-omap2/include/mach path in the plat-omap Makefile, but
+I suppose you want to leave it like it is now since you mention you 
+have already built on top of it.
 
-The other patches are still current.
+drivers/staging/tidspbridge/core/_tiomap.h:#include <mach-omap2/powerdomain.h>
+drivers/staging/tidspbridge/core/_tiomap.h:#include <mach-omap2/clockdomain.h>
+drivers/staging/tidspbridge/core/_tiomap.h:#include <mach-omap2/cm2xxx_3xxx.h>
+drivers/staging/tidspbridge/core/_tiomap.h:#include <mach-omap2/prm-regbits-34xx.h>
+drivers/staging/tidspbridge/core/_tiomap.h:#include <mach-omap2/cm-regbits-34xx.h>
+drivers/staging/tidspbridge/core/tiomap3430_pwr.c:#include <mach-omap2/prm-regbits-34xx.h>
+drivers/staging/tidspbridge/core/tiomap3430_pwr.c:#include <mach-omap2/cm-regbits-34xx.h>
+drivers/staging/tidspbridge/rmgr/drv_interface.c:#include <mach-omap2/omap3-opp.h>
 
-Thanks,
+This code is broken now. I wonder whether it's time to remove it from
+staging since we now have rpmsg/remoteproc, rather than getting it to
+compile again.
 
-Roland
+sound/soc/omap/am3517evm.c:#include <mach-omap2/hardware.h>
+sound/soc/omap/am3517evm.c:#include <mach-omap2/gpio.h>
+sound/soc/omap/ams-delta.c:#include <mach-omap2/board-ams-delta.h>
+sound/soc/omap/n810.c:#include <mach-omap2/hardware.h>
+sound/soc/omap/sdp3430.c:#include <mach-omap2/hardware.h>
+sound/soc/omap/sdp3430.c:#include <mach-omap2/gpio.h>
+sound/soc/omap/zoom2.c:#include <mach-omap2/hardware.h>
+sound/soc/omap/zoom2.c:#include <mach-omap2/gpio.h>
+sound/soc/omap/zoom2.c:#include <mach-omap2/board-zoom.h>
+
+Not sure if you were just missing these or if you already have other
+patch lined up for them.
+
+$ git grep include.*mach-omap1
+drivers/video/omap/lcd_ams_delta.c:#include <mach-omap1/board-ams-delta.h>
+drivers/video/omap/lcd_inn1510.c:#include <mach-omap1/hardware.h>
+drivers/video/omap/lcd_osk.c:#include <mach-omap1/mux.h>
+drivers/video/omap/lcdc.c:#include <mach-omap1/lcdc.h>
+sound/soc/omap/osk5912.c:#include <mach-omap1/hardware.h>
+
+Same thing here.
+
+	Arnd
