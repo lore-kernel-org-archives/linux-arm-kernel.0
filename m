@@ -1,31 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2012 21:11:56 +0000
-Subject: [PATCH v4] pwm: vt8500: Update vt8500 PWM driver support
-In-Reply-To: <4EE5B48738DDED408878C97C8E050A8B1BD17DD2@SJEXCHMB05.corp.ad.broadcom.com>
-References: <1351100330-26072-1-git-send-email-linux@prisktech.co.nz>
- <4EE5B48738DDED408878C97C8E050A8B1BD17DD2@SJEXCHMB05.corp.ad.broadcom.com>
-Message-ID: <201210262111.56608.arnd@arndb.de>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Fri, 26 Oct 2012 16:17:41 -0600
+Subject: [PATCH] arm: socfpga: fix build break for allyesconfig
+Message-ID: <1351289861-16297-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 October 2012, Chris Brand wrote:
-> > @@ -124,6 +156,12 @@ static int __devinit pwm_probe(struct
-> > platform_device *pdev)
-> >       chip->chip.base = -1;
-> >       chip->chip.npwm = VT8500_NR_PWMS;
-> > 
-> > +     chip->clk = devm_clk_get(&pdev->dev, NULL);
-> > +     if (IS_ERR_OR_NULL(chip->clk)) {
-> > +             dev_err(&pdev->dev, "clock source not specified\n");
-> > +             return PTR_ERR(chip->clk);
-> > +     }
-> > +
-> 
-> Do you want IS_ERR() rather than IS_ERR_OR_NULL() here ?
-> Otherwise you may return PTR_ERR(NULL).
-> 
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Right. devm_clk_get() never returns NULL, but as Russell pointed out
-recently, this usage of IS_ERR_OR_NULL() is completely bogus.
+Add check for armv7 in headsmp.S.
 
-	Arnd
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+---
+ arch/arm/mach-socfpga/headsmp.S |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-socfpga/headsmp.S b/arch/arm/mach-socfpga/headsmp.S
+index 17d6eaf..9031a3c 100644
+--- a/arch/arm/mach-socfpga/headsmp.S
++++ b/arch/arm/mach-socfpga/headsmp.S
+@@ -15,8 +15,10 @@
+ #define CPU1_START_ADDR 	        0xffd08010
+ 
+ ENTRY(secondary_trampoline)
++#if __LINUX_ARM_ARCH__ >= 7
+ 	movw	r0, #:lower16:CPU1_START_ADDR
+ 	movt  r0, #:upper16:CPU1_START_ADDR
++#endif
+ 
+ 	ldr	r1, [r0]
+ 	bx	r1
+-- 
+1.7.9.5
