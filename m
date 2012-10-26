@@ -1,46 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2012 20:53:11 +0000
-Subject: [GIT PULL] at91: fixes for 3.7-rc3
-In-Reply-To: <5088F131.5040600@atmel.com>
-References: <5088F131.5040600@atmel.com>
-Message-ID: <201210262053.11498.arnd@arndb.de>
+Date: Fri, 26 Oct 2012 20:56:21 +0000
+Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
+In-Reply-To: <9cb693c5-b977-423d-b3a1-569775405bcd@email.android.com>
+References: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201210262033.41250.arnd@arndb.de>
+ <9cb693c5-b977-423d-b3a1-569775405bcd@email.android.com>
+Message-ID: <201210262056.21201.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012, Nicolas Ferre wrote:
->       ARM: at91: fix external interrupts in non-DT case
+On Friday 26 October 2012, Jason wrote:
+> 
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> >On Wednesday 24 October 2012, Thomas Petazzoni wrote:
+> >> On Wed, 24 Oct 2012 10:39:42 +0200, Gregory CLEMENT wrote:
+> >> > On 10/23/2012 10:17 AM, Thomas Petazzoni wrote:
+> >> > > The split of 370 and XP into two Kconfig options and the
+> >multiplatform
+> >> > > kernel support has changed a few Kconfig symbols, so let's update
+> >the
+> >> > > mvebu_defconfig file with the latest changes.
+> >> > 
+> >> > Indeed this patch fixes the mvebu_defconfig which was broken.
+> >> > But as now mvebu is part of multi_v7_defconfig, shouldn't we just
+> >> > removed mvebu_defconfig ?
+> >> 
+> >> I think for now, SoC family specific defconfig files are still
+> >> accepted, so I'd prefer to keep mvebu_defconfig around. Multiplatform
+> >> is nice for users, but I prefer to build a mvebu-only kernel when I'm
+> >> doing kernel development.
+> >
+> >I'd certainly like to see that patch get merged. Should I just apply it
+> >to the fixes branch?
+> >
+> >       Arnd
+> 
+> Please do.  I have a few other fixes for v3.7 to do this w/e, but iirc they aren't fixing build breakage.
+> 
 
-This patch now leads to build errors with at91x40_defconfig,
-which I've fixed up by applying the patch below on top.
-
-Please yell if this is not the right fix.
+Ok, thanks for the quick reply. Applied now.
 
 	Arnd
-
-commit 3a8852afde01682083028ee427e0678f9bbddd75
-Author: Arnd Bergmann <arnd@arndb.de>
-Date:   Fri Oct 26 22:49:09 2012 +0200
-
-    ARM: at91: fix at91x40 build
-    
-    patch 738a0fd7 "ARM: at91: fix external interrupts in non-DT case"
-    fixed a run-time error on some at91 platforms but did not apply
-    the same change to at91x40, which now doesn't build.
-    
-    This changes at91x40 in the same way that the other platforms
-    were changed.
-    
-    Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index 6bd7300..bb7f544 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -88,6 +88,6 @@ void __init at91x40_init_interrupts(unsigned int priority[NR_AIC_IRQS])
- 	if (!priority)
- 		priority = at91x40_default_irq_priority;
- 
--	at91_aic_init(priority);
-+	at91_aic_init(priority, at91_extern_irq);
- }
- 
