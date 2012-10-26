@@ -1,87 +1,87 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Oct 2012 09:41:15 -0700
-Subject: [PATCH v2 06/14] mtd: onenand: omap: use pdata info instead of
- cpu_is
-In-Reply-To: <alpine.DEB.2.00.1210260411140.27963@utopia.booyaka.com>
-References: <cover.1349672877.git.afzal@ti.com>
- <860ba92c34cbb490beccd5442087087c1751a6a2.1349672877.git.afzal@ti.com>
- <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
- <alpine.DEB.2.00.1210260411140.27963@utopia.booyaka.com>
-Message-ID: <20121026164115.GE11908@atomide.com>
+Date: Fri, 26 Oct 2012 09:36:19 -0700
+Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a
+ comparator driver to omap_usb2
+In-Reply-To: <508AAA85.6070905@ti.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-3-git-send-email-kishon@ti.com>
+ <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
+ <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
+ <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
+ <508AA94B.10504@ti.com> <508AAA85.6070905@ti.com>
+Message-ID: <20121026163619.GB11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121025 22:05]:
-> On Fri, 26 Oct 2012, Paul Walmsley wrote:
+* Benoit Cousson <b-cousson@ti.com> [121026 08:23]:
+> Hi Roger,
 > 
-> > On Mon, 8 Oct 2012, Afzal Mohammed wrote:
+> On 10/26/2012 05:16 PM, Roger Quadros wrote:
+> > Hi Kishon & Benoit,
 > > 
-> > > platform data now contains a field to indicate whether
-> > > soc belongs to omap34xx family, use it instead of
-> > > cpu_is_* check.
-> > > 
-> > > This helps in removing dependency of platform specific
-> > > header file - cpu.h
-> > > 
-> > > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > On 09/24/2012 12:06 PM, Rabin Vincent wrote:
+> >> 2012/9/24 ABRAHAM, KISHON VIJAY <kishon@ti.com>:
+> >>> On Sat, Sep 22, 2012 at 3:03 AM, Rabin Vincent <rabin@rab.in> wrote:
+> >>>> USB doesn't work on pandaboard on linux-next, and bisection shows this
+> >>>> patch.  Unfortunately, I can't provide a dmesg log because USB is the
+> >>>> only way I currently have to get one out(!), but presumably it's because
+> >>>> this omap-usb2 device is never registered?  Looks like this breaks
+> >>>> non-dt USB on pandaboard; is that intended?
+> >>>
+> >>> Yes. omap-usb2 is *only* dt supported (New drivers shouldn't have the
+> >>> old non-dt support).
+> >>
+> >> Well, USB used to work fine on Pandaboard without DT before the
+> >> introduction of "omap-usb2", so one would expected it to continue
+> >> working (until the board file is completely removed).
+> >>
+> >> Anyway, I've moved to DT now.
+> >>
+> >>> Some patches are queued only for 3.7.
+> >>>
+> >>> In case you want to use MUSB please use these patches on linux-next..
+> >>> [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of ocp2scp
+> >>> [PATCH] ARM: OMAP2+: hwmod data: Fix ocp2scp_usb_phy and usb_host_hs
+> >>> entries (from Benoit)
+> >>> [PATCH 0/2] ARM: dts: Add subnode for ocp2scp (patch series)
+> >>> [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB (patch series)
+> >>
+> >> I got these by merging in Benoit's for_3.7/dts_part2 on top of
+> >> next-20120921.  Thanks.
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>
 > > 
-> > This one breaks an N800 multi-OMAP build here:
+> > I still can't get musb to work on 3.7-rc2. Apparently it is still
+> > missing the patches from Benoit's for_3.7/dts_part2.
+> > 
+> > Maybe I just need to wait for it to be merged?
 > 
-> It also breaks an OMAP3+4 config:
+> They are now in a for_3.8/dts. Unfortunately, one patch that was adding
+> ctrl_module address in the USB data was rejected and thus I'm not sure
+> it will work without that.
 > 
-> drivers/built-in.o: In function `omap2_onenand_probe':
-> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:742: 
-> undefined reference to `omap2_onenand_read_bufferram'
-> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:743: 
-> undefined reference to `omap2_onenand_write_bufferram'
-> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:742: 
-> undefined reference to `omap2_onenand_read_bufferram'
-> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:743: 
-> undefined reference to `omap2_onenand_write_bufferram'
-> 
-> Fix below.
+> I think Tony had an idea to map the ctrl_register to regulator fmwk or
+> something like that.
 
-Thanks, I'd like to pull this fix in too along with the
-others.
+For device tree, we may be eventually able to handle the ctrl_register
+using pinctrl-single.c and pinconf API. It probably does not make
+sense to set it up as a regulator as the comparator can trigger errors
+also for the pinconf related bits at least for MMC PBIAS.
+ 
+> > Till then, where can I get a tree where musb works on Panda?
+
+On panda, without using device tree, use v3.7-rc2 + the following patches:
+
+ARM: OMAP: ocp2scp: create omap device for ocp2scp
+ARM: OMAP4: add _dev_attr_ to ocp2scp for representing usb_phy
+drivers: bus: ocp2scp: add pdata support
+
+Also you need to enable CONFIG_OMAP_USB2. No idea what all is needed
+to use MUSB with device tree at this point.
 
 Regards,
 
 Tony
-
-
- 
->  drivers/mtd/onenand/omap2.c |   18 ++++++++++++------
->  1 file changed, 12 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
-> index f87cf39..99f96e1 100644
-> --- a/drivers/mtd/onenand/omap2.c
-> +++ b/drivers/mtd/onenand/omap2.c
-> @@ -555,13 +555,19 @@ static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
->  
->  #else
->  
-> -int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
-> -				 unsigned char *buffer, int offset,
-> -				 size_t count);
-> +static int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
-> +					unsigned char *buffer, int offset,
-> +					size_t count)
-> +{
-> +	return -ENOSYS;
-> +}
->  
-> -int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
-> -				  const unsigned char *buffer,
-> -				  int offset, size_t count);
-> +static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
-> +					 const unsigned char *buffer,
-> +					 int offset, size_t count)
-> +{
-> +	return -ENOSYS;
-> +}
->  
->  #endif
->  
-> -- 
-> 1.7.10.4
