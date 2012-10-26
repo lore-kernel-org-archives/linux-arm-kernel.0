@@ -1,49 +1,59 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Fri, 26 Oct 2012 17:54:41 +0100
-Subject: [GIT PULL] vexpress: soc changes for v3.8
-In-Reply-To: <201210261645.00157.arnd@arndb.de>
-References: <1350579917.4984.19.camel@hornet>
- <201210261645.00157.arnd@arndb.de>
-Message-ID: <1351270481.9454.34.camel@hornet>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Oct 2012 09:39:00 -0700
+Subject: [PATCH 10/16] ARM: OMAP: Make omap_device local to mach-omap2
+In-Reply-To: <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+ <20121004220456.26676.31050.stgit@muffinssi.local>
+ <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
+Message-ID: <20121026163900.GC11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-10-26 at 17:44 +0100, Arnd Bergmann wrote:
-> On Thursday 18 October 2012, Pawel Moll wrote:
-> >       ARM: vexpress: Start using new Versatile Express infrastructure
+* Paul Walmsley <paul@pwsan.com> [121025 18:28]:
+> Hi Tony
 > 
-> This patch introduces calls to vexpress_clk_of_init and other functions
-> that don't yet exist. Can you send a fixup?
+> On Thu, 4 Oct 2012, Tony Lindgren wrote:
+> 
+> > Let's make omap_device local to mach-omap2 for
+> > ARM common zImage support.
+> > 
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> This one breaks a 5912-only build:
+> 
+> arch/arm/mach-omap1/pm_bus.c: In function 'omap1_pm_runtime_init':
+> arch/arm/mach-omap1/pm_bus.c:69:2: error: implicit declaration of function 
+> 'cpu_class_is_omap1'
+> make[1]: *** [arch/arm/mach-omap1/pm_bus.o] Error 1
+> 
+> Fixed by the usual change; it's below.
 
-The clocking stuff should already be in the -next - Mike pulled it over
-two weeks ago. In any case the branch is here:
+Thanks. I've ran randonfigs on the omap-for-v3.8/cleanup-headers,
+but have not seen these.
 
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Can you do a branch on top of omap-for-v3.8/cleanup-headers
+with all these fixes that I can pull in?
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+Regards,
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/pawelmoll/linux.git vexpress-clk
-
-for you to fetch changes up to 807e45b32837875d55df775cb179d99e3e7d4322:
-
-  clk: Common clocks implementation for Versatile Express (2012-10-26 17:51:29 +0100)
-
-----------------------------------------------------------------
-Pawel Moll (2):
-      clk: Versatile Express clock generators ("osc") driver
-      clk: Common clocks implementation for Versatile Express
-
- arch/arm/include/asm/hardware/sp810.h    |    2 ++
- drivers/clk/Kconfig                      |    8 +++++---
- drivers/clk/versatile/Makefile           |    2 ++
- drivers/clk/versatile/clk-vexpress-osc.c |  150 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/versatile/clk-vexpress.c     |  142 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 301 insertions(+), 3 deletions(-)
- create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
- create mode 100644 drivers/clk/versatile/clk-vexpress.c
-
-Cheers!
-
-Pawe?
+Tony
+ 
+>  arch/arm/mach-omap1/pm_bus.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
+> index 16bf2f9..3f2d396 100644
+> --- a/arch/arm/mach-omap1/pm_bus.c
+> +++ b/arch/arm/mach-omap1/pm_bus.c
+> @@ -19,6 +19,8 @@
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  
+> +#include "soc.h"
+> +
+>  #ifdef CONFIG_PM_RUNTIME
+>  static int omap1_pm_runtime_suspend(struct device *dev)
+>  {
+> -- 
+> 1.7.10.4
+> 
