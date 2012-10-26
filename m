@@ -1,24 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 26 Oct 2012 15:45:40 +0530
-Subject: [PATCH] ARM: davinci: dm644x: move the dereference below the
- NULL test
-In-Reply-To: <CAPgLHd81OwYR65x56Fe1+hcWQsK1wiA6+MQYLBwvP59o-kH8QA@mail.gmail.com>
-References: <CAPgLHd81OwYR65x56Fe1+hcWQsK1wiA6+MQYLBwvP59o-kH8QA@mail.gmail.com>
-Message-ID: <508A62CC.8070701@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 26 Oct 2012 15:51:57 +0530
+Subject: Build broken on linus/master?
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBE98CD@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EBE9565@DBDE01.ent.ti.com>
+ <508A50F0.2030308@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBE98CD@DBDE01.ent.ti.com>
+Message-ID: <508A6445.5080303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/10/2012 10:19 AM, Wei Yongjun wrote:
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> The dereference should be moved below the NULL test.
-> 
-> spatch with a semantic match is used to found this.
-> (http://coccinelle.lip6.fr/)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Friday 26 October 2012 03:32 PM, Bedia, Vaibhav wrote:
+> On Fri, Oct 26, 2012 at 14:29:28, Shilimkar, Santosh wrote:
+>> On Friday 26 October 2012 01:18 PM, Bedia, Vaibhav wrote:
+>>> Hi,
+>>>
+>>> Compiling the current linus/master (2ab3f29) using omap2plus_defconfig
+>>> throws up the following error
+>>>
+>>> $make -j7 uImage
+>>>     CHK     include/generated/uapi/linux/version.h
+>>>     CHK     include/generated/utsrelease.h
+>>> make[1]: `include/generated/mach-types.h' is up to date.
+>>>     CC      arch/arm/kernel/asm-offsets.s
+>>> In file included from include/linux/dma-mapping.h:76:0,
+>>>                    from arch/arm/kernel/asm-offsets.c:15:
+>>> /datalocal/kernel/arch/arm/include/asm/dma-mapping.h: In function 'dma_mapping_error':
+>>> /datalocal/kernel/arch/arm/include/asm/dma-mapping.h:94:2: error: implicit declaration of function 'debug_dma_mapping_error'
+>>> make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+>>> make: *** [prepare0] Error 2
+>>>
+>> Looks like it might break build on all ARM machines. I just
+>> noticed a patch adding debug_dma_mapping_error() for aarm64 arch.
+>>
+>> Marek, Shuah,
+>> Is kernel missing a patch which adds definition of
+>> debug_dma_mapping_error() to linux/dma-debug.h ?
+>>
+>> I can't seems to find this symbol in kernel grep.
+>>
+>
+> Just saw a pull request [1] from Marek asking Linus to revert the patch
+> which introduced this error.
+>
+Yep. I noticed that too. Just not sure whether Marek send the patch after
+seeing this email or he already seen the breakage. At least you would 
+have got some reported-by credit it was former. :-)
+Anyways, the build break fix is on its way.
 
-Queuing this for inclusion in v3.8
 
-Thanks,
-Sekhar
+Regards
+Santosh
