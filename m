@@ -1,89 +1,134 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 23:01:11 +0000 (UTC)
-Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <1351155648-20429-1-git-send-email-balbi@ti.com>
-References: <1351155648-20429-1-git-send-email-balbi@ti.com>
-Message-ID: <alpine.DEB.2.00.1210262251020.11258@utopia.booyaka.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 27 Oct 2012 01:32:52 +0200
+Subject: [PATCH 1/2] ARM: plat-versatile: use simple irqdomain for FPGA IRQ
+Message-ID: <1351294372-27596-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe
+This switches the FPGA IRQ driver over to using the simple IRQ
+domain. We can then use the same codepath for this in the
+DT and non-DT cases.
 
-just two quick comments
+To be able to use quicker irq_find_mapping() in the handlers
+we first call irq_create_mapping() on all the valid HW IRQ
+numbers so that descriptors will be created for them in the
+DT case where a linear domain will be the outcome of the
+call.
 
-On Thu, 25 Oct 2012, Felipe Balbi wrote:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/plat-versatile/fpga-irq.c | 50 +++++++++++++++++---------------------
+ 1 file changed, 22 insertions(+), 28 deletions(-)
 
-> if we allow compiler reorder our writes, we could
-> fall into a situation where dev->buf_len is reset
-> for no apparent reason.
-> 
-> This bug was found with a simple script which would
-> transfer data to an i2c client from 1 to 1024 bytes
-> (a simple for loop), when we got to transfer sizes
-> bigger than the fifo size, dev->buf_len was reset
-> to zero before we had an oportunity to handle XDR
-> Interrupt. Because dev->buf_len was zero, we entered
-> omap_i2c_transmit_data() to transfer zero bytes,
-> which would mean we would just silently exit
-> omap_i2c_transmit_data() without actually writing
-> anything to DATA register. That would cause XDR
-> IRQ to trigger forever and we would never transfer
-> the remaining bytes.
-> 
-> After adding the memory barrier, we also drop resetting
-> dev->buf_len to zero in omap_i2c_xfer_msg() because
-> both omap_i2c_transmit_data() and omap_i2c_receive_data()
-> will act until dev->buf_len reaches zero, rendering the
-> other write in omap_i2c_xfer_msg() redundant.
-> 
-> This patch has been tested with pandaboard for a few
-> iterations of the script mentioned above.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
-> 
-> This bug has been there forever, but it's quite annoying.
-> I think it deserves being pushed upstream during this -rc
-> cycle, but if Wolfram decides to wait until v3.8, I don't
-> mind.
-> 
->  drivers/i2c/busses/i2c-omap.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index db31eae..1ec4e6e 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -521,6 +521,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	/* REVISIT: Could the STB bit of I2C_CON be used with probing? */
->  	dev->buf = msg->buf;
->  	dev->buf_len = msg->len;
-> +	wmb();
->  
->  	omap_i2c_write_reg(dev, OMAP_I2C_CNT_REG, dev->buf_len);
->  
-
-Would suggest moving the wmb() immediately before the point at which the 
-interrupt can occur.  Looks to me that's when the OMAP_I2C_CON_REG write 
-occurs.
-
-Also would suggest adding a comment to clarify what the wmb() is intended 
-to do.  Maybe something like 'Prevent the compiler from moving earlier 
-changes to dev->buf and dev->buf_len after the write to CON_REG.  This 
-write enables interrupts and those variables are used in the interrupt 
-handler'.
-
-checkpatch is supposed to flag uncommented barriers, but maybe that's only 
-with --strict.
-
-# check for memory barriers without a comment.
-		if ($line =~ /\b(mb|rmb|wmb|read_barrier_depends|smp_mb|smp_rmb|smp_wmb|smp_read_barrier_depends)\(/) {
-			if (!ctx_has_comment($first_line, $linenr)) {
-				CHK("MEMORY_BARRIER",
-				    "memory barrier without comment\n" . 
-$herecurr);
-			}
-		}
-
-
-- Paul
+diff --git a/arch/arm/plat-versatile/fpga-irq.c b/arch/arm/plat-versatile/fpga-irq.c
+index 091ae10..dfe317c 100644
+--- a/arch/arm/plat-versatile/fpga-irq.c
++++ b/arch/arm/plat-versatile/fpga-irq.c
+@@ -1,6 +1,7 @@
+ /*
+  *  Support for Versatile FPGA-based IRQ controllers
+  */
++#include <linux/bitops.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
+ #include <linux/irqdomain.h>
+@@ -117,13 +118,12 @@ static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
+ 	struct fpga_irq_data *f = d->host_data;
+ 
+ 	/* Skip invalid IRQs, only register handlers for the real ones */
+-	if (!(f->valid & (1 << hwirq)))
++	if (!(f->valid & BIT(hwirq)))
+ 		return -ENOTSUPP;
+ 	irq_set_chip_data(irq, f);
+ 	irq_set_chip_and_handler(irq, &f->chip,
+ 				handle_level_irq);
+ 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+-	f->used_irqs++;
+ 	return 0;
+ }
+ 
+@@ -132,13 +132,15 @@ static struct irq_domain_ops fpga_irqdomain_ops = {
+ 	.xlate = irq_domain_xlate_onetwocell,
+ };
+ 
+-static __init struct fpga_irq_data *
+-fpga_irq_prep_struct(void __iomem *base, const char *name, u32 valid) {
++void __init fpga_irq_init(void __iomem *base, const char *name, int irq_start,
++			  int parent_irq, u32 valid, struct device_node *node)
++{
+ 	struct fpga_irq_data *f;
++	int i;
+ 
+ 	if (fpga_irq_id >= ARRAY_SIZE(fpga_irq_devices)) {
+-		printk(KERN_ERR "%s: too few FPGA IRQ controllers, increase CONFIG_PLAT_VERSATILE_FPGA_IRQ_NR\n", __func__);
+-		return NULL;
++		pr_err("%s: too few FPGA IRQ controllers, increase CONFIG_PLAT_VERSATILE_FPGA_IRQ_NR\n", __func__);
++		return;
+ 	}
+ 	f = &fpga_irq_devices[fpga_irq_id];
+ 	f->base = base;
+@@ -147,29 +149,28 @@ fpga_irq_prep_struct(void __iomem *base, const char *name, u32 valid) {
+ 	f->chip.irq_mask = fpga_irq_mask;
+ 	f->chip.irq_unmask = fpga_irq_unmask;
+ 	f->valid = valid;
+-	fpga_irq_id++;
+-
+-	return f;
+-}
+-
+-void __init fpga_irq_init(void __iomem *base, const char *name, int irq_start,
+-			  int parent_irq, u32 valid, struct device_node *node)
+-{
+-	struct fpga_irq_data *f;
+-
+-	f = fpga_irq_prep_struct(base, name, valid);
+-	if (!f)
+-		return;
+ 
+ 	if (parent_irq != -1) {
+ 		irq_set_handler_data(parent_irq, f);
+ 		irq_set_chained_handler(parent_irq, fpga_irq_handle);
+ 	}
+ 
+-	f->domain = irq_domain_add_legacy(node, fls(valid), irq_start, 0,
++	/* This will also allocate irq descriptors */
++	f->domain = irq_domain_add_simple(node, fls(valid), irq_start,
+ 					  &fpga_irqdomain_ops, f);
++
++	/* This will allocate all valid descriptors in the linear case */
++	for (i = 0; i < fls(valid); i++)
++		if (valid & BIT(i)) {
++			if (!irq_start)
++				irq_create_mapping(f->domain, i);
++			f->used_irqs++;
++		}
++
+ 	pr_info("FPGA IRQ chip %d \"%s\" @ %p, %u irqs\n",
+ 		fpga_irq_id, name, base, f->used_irqs);
++
++	fpga_irq_id++;
+ }
+ 
+ #ifdef CONFIG_OF
+@@ -193,18 +194,11 @@ int __init fpga_irq_of_init(struct device_node *node,
+ 	if (of_property_read_u32(node, "valid-mask", &valid_mask))
+ 		valid_mask = 0;
+ 
+-	f = fpga_irq_prep_struct(base, node->name, valid_mask);
+-	if (!f)
+-		return -ENOMEM;
++	fpga_irq_init(base, node->name, 0, -1, valid_mask, node);
+ 
+ 	writel(clear_mask, base + IRQ_ENABLE_CLEAR);
+ 	writel(clear_mask, base + FIQ_ENABLE_CLEAR);
+ 
+-	f->domain = irq_domain_add_linear(node, fls(valid_mask), &fpga_irqdomain_ops, f);
+-	f->used_irqs = hweight32(valid_mask);
+-
+-	pr_info("FPGA IRQ chip %d \"%s\" @ %p, %u irqs\n",
+-		fpga_irq_id, node->name, base, f->used_irqs);
+ 	return 0;
+ }
+ #endif
+-- 
+1.7.11.7
