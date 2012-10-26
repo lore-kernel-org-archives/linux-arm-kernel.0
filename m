@@ -1,71 +1,32 @@
-From: michael@walle.cc (Michael Walle)
-Date: Fri, 26 Oct 2012 22:17:46 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <20121026204505.762fbfca@skate>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <201210262006.15968.michael@walle.cc> <20121026204505.762fbfca@skate>
-Message-ID: <201210262217.46393.michael@walle.cc>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 26 Oct 2012 20:18:49 +0000 (UTC)
+Subject: [PATCH 10/16] ARM: OMAP: Make omap_device local to mach-omap2
+In-Reply-To: <20121026171059.GG11908@atomide.com>
+References: <20121004213950.26676.21898.stgit@muffinssi.local>
+ <20121004220456.26676.31050.stgit@muffinssi.local>
+ <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
+ <20121026163900.GC11908@atomide.com>
+ <alpine.DEB.2.00.1210261701060.3301@utopia.booyaka.com>
+ <20121026171059.GG11908@atomide.com>
+Message-ID: <alpine.DEB.2.00.1210262016410.11258@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas.
+On Fri, 26 Oct 2012, Tony Lindgren wrote:
 
-Am Freitag 26 Oktober 2012, 20:45:05 schrieb Thomas Petazzoni:
-> Ah, this is interesting. It is not entirely surprising, since the gpio
-> driver is new. Even though it re-uses most of the previous gpio driver,
-> it is by far not impossible that there will be a few regressions.
+> * Paul Walmsley <paul@pwsan.com> [121026 10:03]:
+> > On Fri, 26 Oct 2012, Tony Lindgren wrote:
+> > 
+> > > Can you do a branch on top of omap-for-v3.8/cleanup-headers
+> > > with all these fixes that I can pull in?
+> > 
+> > Yes, will do that today.
 > 
-> Could you add a few debug prints to see if you're looping *inside* the
-> function (which I find pretty unlikely), or if the function gets called
-> over and over again? 
+> OK thanks!
 
-ah sorry, my bad. of course the handler is called forever:
-
-mvebu_gpio_to_irq pin=8
-mvebu_gpio_irq_set_type pin=8
-mvebu_gpio_edge_irq_unmask
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=100
-mvebu_gpio_level_irq_mask irq=100
-mvebu_gpio_irq_handler irq=101
-mvebu_gpio_level_irq_mask irq=101
-mvebu_gpio_irq_handler irq=102
-mvebu_gpio_level_irq_mask irq=102
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=112
-mvebu_gpio_level_irq_mask irq=112
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-mvebu_gpio_level_irq_mask irq=103
-mvebu_gpio_irq_handler irq=103
-[..]
-
-> Could it be that the hang occurs during the
-> initialization of the gpio-leds or gpio-keys drivers?
-
-yeah, if i disable gpio-leds, gpio-keys and gpio-fan the hang will disappear. 
-But once i enable one of it the board hangs again.
+Just sent the pull request.  Are you planning to rebuild cleanup-prcm also 
+when you pull those cleanup-headers fixes in?  Am planning to send another 
+PRCM cleanup pull request next week...
 
 
-> Also, even though I'm pretty sure it isn't going to fix your problem,
-> note the following mvebu-gpio fix:
-> 
->   http://article.gmane.org/gmane.linux.ports.arm.kernel/195018
-
-thats already in andrew's tree.
-
--- 
-michael
+- Paul
