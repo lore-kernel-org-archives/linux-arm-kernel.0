@@ -1,48 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 26 Oct 2012 10:59:34 +0200
-Subject: [PATCH 2/2] ARM: mach-imx: CAN clock fix for i.MX53
-In-Reply-To: <1351164400-27940-2-git-send-email-stigge@antcom.de>
-References: <1351164400-27940-1-git-send-email-stigge@antcom.de>
- <1351164400-27940-2-git-send-email-stigge@antcom.de>
-Message-ID: <20121026085934.GA1641@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 26 Oct 2012 14:29:28 +0530
+Subject: Build broken on linus/master?
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBE9565@DBDE01.ent.ti.com>
+References: <B5906170F1614E41A8A28DE3B8D121433EBE9565@DBDE01.ent.ti.com>
+Message-ID: <508A50F0.2030308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 01:26:40PM +0200, Roland Stigge wrote:
-> This patch fixes CAN clocking on i.MX53.
-> 
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
-> 
-> ---
->  arch/arm/mach-imx/clk-imx51-imx53.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> --- linux-2.6.orig/arch/arm/mach-imx/clk-imx51-imx53.c
-> +++ linux-2.6/arch/arm/mach-imx/clk-imx51-imx53.c
-> @@ -426,10 +426,10 @@ int __init mx53_clocks_init(unsigned lon
->  	clk[usb_phy2_gate] = imx_clk_gate2("usb_phy2_gate", "usb_phy_sel", MXC_CCM_CCGR4, 12);
->  	clk[can_sel] = imx_clk_mux("can_sel", MXC_CCM_CSCMR2, 6, 2,
->  				mx53_can_sel, ARRAY_SIZE(mx53_can_sel));
-> -	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR6, 22);
-> -	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR6, 20);
-> -	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 8);
-> -	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 6);
+On Friday 26 October 2012 01:18 PM, Bedia, Vaibhav wrote:
+> Hi,
+>
+> Compiling the current linus/master (2ab3f29) using omap2plus_defconfig
+> throws up the following error
+>
+> $make -j7 uImage
+>    CHK     include/generated/uapi/linux/version.h
+>    CHK     include/generated/utsrelease.h
+> make[1]: `include/generated/mach-types.h' is up to date.
+>    CC      arch/arm/kernel/asm-offsets.s
+> In file included from include/linux/dma-mapping.h:76:0,
+>                   from arch/arm/kernel/asm-offsets.c:15:
+> /datalocal/kernel/arch/arm/include/asm/dma-mapping.h: In function 'dma_mapping_error':
+> /datalocal/kernel/arch/arm/include/asm/dma-mapping.h:94:2: error: implicit declaration of function 'debug_dma_mapping_error'
+> make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+> make: *** [prepare0] Error 2
+>
+Looks like it might break build on all ARM machines. I just
+noticed a patch adding debug_dma_mapping_error() for aarm64 arch.
 
-I just rechecked. The above matches the i.MX53 Reference Manual rev 2.1
+Marek, Shuah,
+Is kernel missing a patch which adds definition of
+debug_dma_mapping_error() to linux/dma-debug.h ?
 
-> +	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR4, 6);
-> +	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
-> +	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 6);
-> +	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
+I can't seems to find this symbol in kernel grep.
 
-This doesn't.
-
-Can you elaborate why you think this is necessary?
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Santosh
