@@ -1,44 +1,65 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 26 Oct 2012 17:06:29 +0200
-Subject: [PATCH V2 2/4] arm: mvebu: adding SATA support: dt binding for
- Armada 370/XP
-In-Reply-To: <20121026150206.GQ18811@titan.lakedaemon.net>
-References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
- <1351254650-26861-3-git-send-email-gregory.clement@free-electrons.com>
- <20121026133154.GN18811@titan.lakedaemon.net>
- <20121026133446.GM21046@lunn.ch> <508A945C.4010006@free-electrons.com>
- <20121026135225.GO21046@lunn.ch> <20121026165759.01df4489@skate>
- <20121026150206.GQ18811@titan.lakedaemon.net>
-Message-ID: <508AA6F5.7050806@free-electrons.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 26 Oct 2012 18:16:27 +0300
+Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a comparator
+ driver to omap_usb2
+In-Reply-To: <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-3-git-send-email-kishon@ti.com>
+ <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
+ <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
+ <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
+Message-ID: <508AA94B.10504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2012 05:02 PM, Jason Cooper wrote:
-> On Fri, Oct 26, 2012 at 04:57:59PM +0200, Thomas Petazzoni wrote:
+Hi Kishon & Benoit,
+
+On 09/24/2012 12:06 PM, Rabin Vincent wrote:
+> 2012/9/24 ABRAHAM, KISHON VIJAY <kishon@ti.com>:
+>> On Sat, Sep 22, 2012 at 3:03 AM, Rabin Vincent <rabin@rab.in> wrote:
+>>> USB doesn't work on pandaboard on linux-next, and bisection shows this
+>>> patch.  Unfortunately, I can't provide a dmesg log because USB is the
+>>> only way I currently have to get one out(!), but presumably it's because
+>>> this omap-usb2 device is never registered?  Looks like this breaks
+>>> non-dt USB on pandaboard; is that intended?
 >>
->> On Fri, 26 Oct 2012 15:52:25 +0200, Andrew Lunn wrote:
->>>> Now, about white spaces vs tab, I don't know what is the rule
->>>> for .dts file.
->>>
->>> I personally use tabs, but i don't see anything in the
->>> Documentation/CodingStyle.
->>>
->>> Maybe ask on the device tree mailing list?
+>> Yes. omap-usb2 is *only* dt supported (New drivers shouldn't have the
+>> old non-dt support).
+> 
+> Well, USB used to work fine on Pandaboard without DT before the
+> introduction of "omap-usb2", so one would expected it to continue
+> working (until the board file is completely removed).
+> 
+> Anyway, I've moved to DT now.
+> 
+>> Some patches are queued only for 3.7.
 >>
->> Yes, it would be good to know and document what is the rule for .dts
->> files, and possibly extend checkpatch to cover those special rules
->> for .dts files.
+>> In case you want to use MUSB please use these patches on linux-next..
+>> [PATCH v2] arm: omap: hwmod: make *phy_48m* as the main_clk of ocp2scp
+>> [PATCH] ARM: OMAP2+: hwmod data: Fix ocp2scp_usb_phy and usb_host_hs
+>> entries (from Benoit)
+>> [PATCH 0/2] ARM: dts: Add subnode for ocp2scp (patch series)
+>> [PATCH v3 0/3] ARM: dts: omap: add dt data for MUSB (patch series)
 > 
-> until that is resolved, can we make this patch conform to what is in the
-> file currently?  Once the dt folks clarify, we can run through all the
-> dts's and submit one cleanup series.
+> I got these by merging in Benoit's for_3.7/dts_part2 on top of
+> next-20120921.  Thanks.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> If there are no other comments on this series, I'm fine taking it as is
-> and doing the fixup on my end.  No need to do a version bump just for
-> this.
 
-OK then you will just have to replace my tabs by whitespace.
+I still can't get musb to work on 3.7-rc2. Apparently it is still
+missing the patches from Benoit's for_3.7/dts_part2.
 
-Thanks,
+Maybe I just need to wait for it to be merged?
 
-Gregory
+Till then, where can I get a tree where musb works on Panda?
+
+Benoit,
+
+FYI, I get merge conflicts when merging 3.7-rc2 on top of Linus's kernel
+HEAD. Am I missing something?
+
+regards,
+-roger
