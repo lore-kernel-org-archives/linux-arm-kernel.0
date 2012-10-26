@@ -1,47 +1,38 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 26 Oct 2012 14:30:48 +0200
-Subject: [PATCH V2 3/4] arm: mvebu: adding SATA support: configs update
+Date: Fri, 26 Oct 2012 14:30:47 +0200
+Subject: [PATCH V2 2/4] arm: mvebu: adding SATA support: dt binding for Armada
+ 370/XP
 In-Reply-To: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1351254650-26861-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1351254650-26861-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 ---
- arch/arm/configs/multi_v7_defconfig |    2 ++
- arch/arm/configs/mvebu_defconfig    |    3 +++
- 2 files changed, 5 insertions(+)
+ arch/arm/boot/dts/armada-370-xp.dtsi |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 159f75f..dbea6f4 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -17,8 +17,10 @@ CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_NET=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_SATA_HIGHBANK=y
-+CONFIG_SATA_MV=y
- CONFIG_NETDEVICES=y
- CONFIG_NET_CALXEDA_XGMAC=y
- CONFIG_SMSC911X=y
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 7bcf850..76a60b5 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -18,6 +18,9 @@ CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_ATA=y
-+CONFIG_SATA_MV=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_OF_PLATFORM=y
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 94b4b9e..a911f7a 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -69,6 +69,15 @@
+ 			compatible = "marvell,armada-addr-decoding-controller";
+ 			reg = <0xd0020000 0x258>;
+ 		};
++
++		sata at d00a0000 {
++                        compatible = "marvell,orion-sata";
++                        reg = <0xd00a0000 0x2400>;
++                        interrupts = <55>;
++			clocks = <&coreclk 0>;
++                        status = "disabled";
++		};
++
+ 	};
+ };
+ 
 -- 
 1.7.9.5
