@@ -1,134 +1,205 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 27 Oct 2012 01:32:52 +0200
-Subject: [PATCH 1/2] ARM: plat-versatile: use simple irqdomain for FPGA IRQ
-Message-ID: <1351294372-27596-1-git-send-email-linus.walleij@linaro.org>
+Date: Sat, 27 Oct 2012 01:33:05 +0200
+Subject: [PATCH 2/2] ARM: integrator: get rid of preallocated irq descriptors
+Message-ID: <1351294385-27637-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches the FPGA IRQ driver over to using the simple IRQ
-domain. We can then use the same codepath for this in the
-DT and non-DT cases.
+The Integrators were using the .nr_irqs field of the machine
+descriptor to pre-allocate a number of descriptors at boot. This
+is not right: the irq chip implementations should allocate
+their descriptors themselves, and as a result the simple
+irqdomain code warns about it.
 
-To be able to use quicker irq_find_mapping() in the handlers
-we first call irq_create_mapping() on all the valid HW IRQ
-numbers so that descriptors will be created for them in the
-DT case where a linear domain will be the outcome of the
-call.
+Get rid of this by just deleting the .nr_irq field from the
+machine descriptors but take care: doing so makes the default
+implementation hog the first 16 IRQ numbers, so these cannot
+be used by the still static IRQ number assignments in the
+ATAG boot case. So for these, bump the IRQ numbers to begin
+at 64 and upward.
+
+Introduce an offset to offset all IRQ numbers if need be,
+though we don't expect to do that again as device tree comes
+along.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/plat-versatile/fpga-irq.c | 50 +++++++++++++++++---------------------
- 1 file changed, 22 insertions(+), 28 deletions(-)
+ arch/arm/mach-integrator/include/mach/irqs.h | 109 +++++++++++++--------------
+ arch/arm/mach-integrator/integrator_ap.c     |   2 -
+ arch/arm/mach-integrator/integrator_cp.c     |   4 +-
+ 3 files changed, 55 insertions(+), 60 deletions(-)
 
-diff --git a/arch/arm/plat-versatile/fpga-irq.c b/arch/arm/plat-versatile/fpga-irq.c
-index 091ae10..dfe317c 100644
---- a/arch/arm/plat-versatile/fpga-irq.c
-+++ b/arch/arm/plat-versatile/fpga-irq.c
-@@ -1,6 +1,7 @@
- /*
-  *  Support for Versatile FPGA-based IRQ controllers
+diff --git a/arch/arm/mach-integrator/include/mach/irqs.h b/arch/arm/mach-integrator/include/mach/irqs.h
+index 7371018..eff0ada 100644
+--- a/arch/arm/mach-integrator/include/mach/irqs.h
++++ b/arch/arm/mach-integrator/include/mach/irqs.h
+@@ -19,64 +19,63 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
   */
-+#include <linux/bitops.h>
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/irqdomain.h>
-@@ -117,13 +118,12 @@ static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
- 	struct fpga_irq_data *f = d->host_data;
  
- 	/* Skip invalid IRQs, only register handlers for the real ones */
--	if (!(f->valid & (1 << hwirq)))
-+	if (!(f->valid & BIT(hwirq)))
- 		return -ENOTSUPP;
- 	irq_set_chip_data(irq, f);
- 	irq_set_chip_and_handler(irq, &f->chip,
- 				handle_level_irq);
- 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--	f->used_irqs++;
- 	return 0;
- }
+-/* 
+- *  Interrupt numbers
++/*
++ * Interrupt numbers, all of the above are just static reservations
++ * used so they can be encoded into device resources. They will finally
++ * be done away with when switching to device tree.
+  */
+-#define IRQ_PIC_START			1
+-#define IRQ_SOFTINT			1
+-#define IRQ_UARTINT0			2
+-#define IRQ_UARTINT1			3
+-#define IRQ_KMIINT0			4
+-#define IRQ_KMIINT1			5
+-#define IRQ_TIMERINT0			6
+-#define IRQ_TIMERINT1			7
+-#define IRQ_TIMERINT2			8
+-#define IRQ_RTCINT			9
+-#define IRQ_AP_EXPINT0			10
+-#define IRQ_AP_EXPINT1			11
+-#define IRQ_AP_EXPINT2			12
+-#define IRQ_AP_EXPINT3			13
+-#define IRQ_AP_PCIINT0			14
+-#define IRQ_AP_PCIINT1			15
+-#define IRQ_AP_PCIINT2			16
+-#define IRQ_AP_PCIINT3			17
+-#define IRQ_AP_V3INT			18
+-#define IRQ_AP_CPINT0			19
+-#define IRQ_AP_CPINT1			20
+-#define IRQ_AP_LBUSTIMEOUT 		21
+-#define IRQ_AP_APCINT			22
+-#define IRQ_CP_CLCDCINT			23
+-#define IRQ_CP_MMCIINT0			24
+-#define IRQ_CP_MMCIINT1			25
+-#define IRQ_CP_AACIINT			26
+-#define IRQ_CP_CPPLDINT			27
+-#define IRQ_CP_ETHINT			28
+-#define IRQ_CP_TSPENINT			29
+-#define IRQ_PIC_END			29
++#define IRQ_PIC_START			64
++#define IRQ_SOFTINT			(IRQ_PIC_START+0)
++#define IRQ_UARTINT0			(IRQ_PIC_START+1)
++#define IRQ_UARTINT1			(IRQ_PIC_START+2)
++#define IRQ_KMIINT0			(IRQ_PIC_START+3)
++#define IRQ_KMIINT1			(IRQ_PIC_START+4)
++#define IRQ_TIMERINT0			(IRQ_PIC_START+5)
++#define IRQ_TIMERINT1			(IRQ_PIC_START+6)
++#define IRQ_TIMERINT2			(IRQ_PIC_START+7)
++#define IRQ_RTCINT			(IRQ_PIC_START+8)
++#define IRQ_AP_EXPINT0			(IRQ_PIC_START+9)
++#define IRQ_AP_EXPINT1			(IRQ_PIC_START+10)
++#define IRQ_AP_EXPINT2			(IRQ_PIC_START+11)
++#define IRQ_AP_EXPINT3			(IRQ_PIC_START+12)
++#define IRQ_AP_PCIINT0			(IRQ_PIC_START+13)
++#define IRQ_AP_PCIINT1			(IRQ_PIC_START+14)
++#define IRQ_AP_PCIINT2			(IRQ_PIC_START+15)
++#define IRQ_AP_PCIINT3			(IRQ_PIC_START+16)
++#define IRQ_AP_V3INT			(IRQ_PIC_START+17)
++#define IRQ_AP_CPINT0			(IRQ_PIC_START+18)
++#define IRQ_AP_CPINT1			(IRQ_PIC_START+19)
++#define IRQ_AP_LBUSTIMEOUT 		(IRQ_PIC_START+20)
++#define IRQ_AP_APCINT			(IRQ_PIC_START+21)
++#define IRQ_CP_CLCDCINT			(IRQ_PIC_START+22)
++#define IRQ_CP_MMCIINT0			(IRQ_PIC_START+23)
++#define IRQ_CP_MMCIINT1			(IRQ_PIC_START+24)
++#define IRQ_CP_AACIINT			(IRQ_PIC_START+25)
++#define IRQ_CP_CPPLDINT			(IRQ_PIC_START+26)
++#define IRQ_CP_ETHINT			(IRQ_PIC_START+27)
++#define IRQ_CP_TSPENINT			(IRQ_PIC_START+28)
++#define IRQ_PIC_END			(IRQ_PIC_START+28)
  
-@@ -132,13 +132,15 @@ static struct irq_domain_ops fpga_irqdomain_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
+-#define IRQ_CIC_START			32
+-#define IRQ_CM_SOFTINT			32
+-#define IRQ_CM_COMMRX			33
+-#define IRQ_CM_COMMTX			34
+-#define IRQ_CIC_END			34
++#define IRQ_CIC_START			(IRQ_PIC_END+1)
++#define IRQ_CM_SOFTINT			(IRQ_CIC_START+0)
++#define IRQ_CM_COMMRX			(IRQ_CIC_START+1)
++#define IRQ_CM_COMMTX			(IRQ_CIC_START+2)
++#define IRQ_CIC_END			(IRQ_CIC_START+2)
  
--static __init struct fpga_irq_data *
--fpga_irq_prep_struct(void __iomem *base, const char *name, u32 valid) {
-+void __init fpga_irq_init(void __iomem *base, const char *name, int irq_start,
-+			  int parent_irq, u32 valid, struct device_node *node)
-+{
- 	struct fpga_irq_data *f;
-+	int i;
- 
- 	if (fpga_irq_id >= ARRAY_SIZE(fpga_irq_devices)) {
--		printk(KERN_ERR "%s: too few FPGA IRQ controllers, increase CONFIG_PLAT_VERSATILE_FPGA_IRQ_NR\n", __func__);
--		return NULL;
-+		pr_err("%s: too few FPGA IRQ controllers, increase CONFIG_PLAT_VERSATILE_FPGA_IRQ_NR\n", __func__);
-+		return;
- 	}
- 	f = &fpga_irq_devices[fpga_irq_id];
- 	f->base = base;
-@@ -147,29 +149,28 @@ fpga_irq_prep_struct(void __iomem *base, const char *name, u32 valid) {
- 	f->chip.irq_mask = fpga_irq_mask;
- 	f->chip.irq_unmask = fpga_irq_unmask;
- 	f->valid = valid;
--	fpga_irq_id++;
+ /*
+  * IntegratorCP only
+  */
+-#define IRQ_SIC_START			35
+-#define IRQ_SIC_CP_SOFTINT		35
+-#define IRQ_SIC_CP_RI0			36
+-#define IRQ_SIC_CP_RI1			37
+-#define IRQ_SIC_CP_CARDIN		38
+-#define IRQ_SIC_CP_LMINT0		39
+-#define IRQ_SIC_CP_LMINT1		40
+-#define IRQ_SIC_CP_LMINT2		41
+-#define IRQ_SIC_CP_LMINT3		42
+-#define IRQ_SIC_CP_LMINT4		43
+-#define IRQ_SIC_CP_LMINT5		44
+-#define IRQ_SIC_CP_LMINT6		45
+-#define IRQ_SIC_CP_LMINT7		46
+-#define IRQ_SIC_END			46
 -
--	return f;
--}
--
--void __init fpga_irq_init(void __iomem *base, const char *name, int irq_start,
--			  int parent_irq, u32 valid, struct device_node *node)
--{
--	struct fpga_irq_data *f;
--
--	f = fpga_irq_prep_struct(base, name, valid);
--	if (!f)
--		return;
+-#define NR_IRQS_INTEGRATOR_AP		34
+-#define NR_IRQS_INTEGRATOR_CP		47
++#define IRQ_SIC_START			(IRQ_CIC_END+1)
++#define IRQ_SIC_CP_SOFTINT		(IRQ_SIC_START+0)
++#define IRQ_SIC_CP_RI0			(IRQ_SIC_START+1)
++#define IRQ_SIC_CP_RI1			(IRQ_SIC_START+2)
++#define IRQ_SIC_CP_CARDIN		(IRQ_SIC_START+3)
++#define IRQ_SIC_CP_LMINT0		(IRQ_SIC_START+4)
++#define IRQ_SIC_CP_LMINT1		(IRQ_SIC_START+5)
++#define IRQ_SIC_CP_LMINT2		(IRQ_SIC_START+6)
++#define IRQ_SIC_CP_LMINT3		(IRQ_SIC_START+7)
++#define IRQ_SIC_CP_LMINT4		(IRQ_SIC_START+8)
++#define IRQ_SIC_CP_LMINT5		(IRQ_SIC_START+9)
++#define IRQ_SIC_CP_LMINT6		(IRQ_SIC_START+10)
++#define IRQ_SIC_CP_LMINT7		(IRQ_SIC_START+11)
++#define IRQ_SIC_END			(IRQ_SIC_START+11)
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index e6617c1..4f13bc5 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -499,7 +499,6 @@ static const char * ap_dt_board_compat[] = {
+ DT_MACHINE_START(INTEGRATOR_AP_DT, "ARM Integrator/AP (Device Tree)")
+ 	.reserve	= integrator_reserve,
+ 	.map_io		= ap_map_io,
+-	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
+ 	.init_early	= ap_init_early,
+ 	.init_irq	= ap_init_irq_of,
+ 	.handle_irq	= fpga_handle_irq,
+@@ -609,7 +608,6 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+ 	.atag_offset	= 0x100,
+ 	.reserve	= integrator_reserve,
+ 	.map_io		= ap_map_io,
+-	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
+ 	.init_early	= ap_init_early,
+ 	.init_irq	= ap_init_irq,
+ 	.handle_irq	= fpga_handle_irq,
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 5b08e8e..4423bc8 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -350,7 +350,6 @@ static const char * intcp_dt_board_compat[] = {
+ DT_MACHINE_START(INTEGRATOR_CP_DT, "ARM Integrator/CP (Device Tree)")
+ 	.reserve	= integrator_reserve,
+ 	.map_io		= intcp_map_io,
+-	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
+ 	.init_early	= intcp_init_early,
+ 	.init_irq	= intcp_init_irq_of,
+ 	.handle_irq	= fpga_handle_irq,
+@@ -423,7 +422,7 @@ static void __init intcp_init_irq(void)
+ 	u32 pic_mask, cic_mask, sic_mask;
  
- 	if (parent_irq != -1) {
- 		irq_set_handler_data(parent_irq, f);
- 		irq_set_chained_handler(parent_irq, fpga_irq_handle);
- 	}
- 
--	f->domain = irq_domain_add_legacy(node, fls(valid), irq_start, 0,
-+	/* This will also allocate irq descriptors */
-+	f->domain = irq_domain_add_simple(node, fls(valid), irq_start,
- 					  &fpga_irqdomain_ops, f);
-+
-+	/* This will allocate all valid descriptors in the linear case */
-+	for (i = 0; i < fls(valid); i++)
-+		if (valid & BIT(i)) {
-+			if (!irq_start)
-+				irq_create_mapping(f->domain, i);
-+			f->used_irqs++;
-+		}
-+
- 	pr_info("FPGA IRQ chip %d \"%s\" @ %p, %u irqs\n",
- 		fpga_irq_id, name, base, f->used_irqs);
-+
-+	fpga_irq_id++;
- }
- 
- #ifdef CONFIG_OF
-@@ -193,18 +194,11 @@ int __init fpga_irq_of_init(struct device_node *node,
- 	if (of_property_read_u32(node, "valid-mask", &valid_mask))
- 		valid_mask = 0;
- 
--	f = fpga_irq_prep_struct(base, node->name, valid_mask);
--	if (!f)
--		return -ENOMEM;
-+	fpga_irq_init(base, node->name, 0, -1, valid_mask, node);
- 
- 	writel(clear_mask, base + IRQ_ENABLE_CLEAR);
- 	writel(clear_mask, base + FIQ_ENABLE_CLEAR);
- 
--	f->domain = irq_domain_add_linear(node, fls(valid_mask), &fpga_irqdomain_ops, f);
--	f->used_irqs = hweight32(valid_mask);
--
--	pr_info("FPGA IRQ chip %d \"%s\" @ %p, %u irqs\n",
--		fpga_irq_id, node->name, base, f->used_irqs);
- 	return 0;
- }
- #endif
+ 	/* These masks are for the HW IRQ registers */
+-	pic_mask = ~((~0u) << (11 - IRQ_PIC_START));
++	pic_mask = ~((~0u) << (11 - 0));
+ 	pic_mask |= (~((~0u) << (29 - 22))) << 22;
+ 	cic_mask = ~((~0u) << (1 + IRQ_CIC_END - IRQ_CIC_START));
+ 	sic_mask = ~((~0u) << (1 + IRQ_SIC_END - IRQ_SIC_START));
+@@ -504,7 +503,6 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
+ 	.atag_offset	= 0x100,
+ 	.reserve	= integrator_reserve,
+ 	.map_io		= intcp_map_io,
+-	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
+ 	.init_early	= intcp_init_early,
+ 	.init_irq	= intcp_init_irq,
+ 	.handle_irq	= fpga_handle_irq,
 -- 
 1.7.11.7
