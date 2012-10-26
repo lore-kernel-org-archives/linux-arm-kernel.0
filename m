@@ -1,30 +1,22 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 26 Oct 2012 15:13:47 +0200
-Subject: [PATCH 1/2] spi: mxs: Assign message status after transfer
- finished
-In-Reply-To: <20121026130459.GW18814@opensource.wolfsonmicro.com>
-References: <1350181976-18233-1-git-send-email-marex@denx.de>
- <201210261431.54371.marex@denx.de>
- <20121026130459.GW18814@opensource.wolfsonmicro.com>
-Message-ID: <201210261513.47664.marex@denx.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 13:31:48 +0000
+Subject: [GIT PULL] vexpress: drivers for v3.8
+In-Reply-To: <1350580034.4984.21.camel@hornet>
+References: <1350580034.4984.21.camel@hornet>
+Message-ID: <201210261331.48660.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mark Brown,
-
-> On Fri, Oct 26, 2012 at 02:31:53PM +0200, Marek Vasut wrote:
-> > Dear Mark Brown,
-> > 
-> > > Applied both, thanks.
-> > 
-> > Will they hit 3.7 please?
+On Thursday 18 October 2012, Pawel Moll wrote:
+> Hi Arnd, Olof,
 > 
-> I hadn't been going to do that, no - nothing about them seemed
-> especially urgent?
+> Could you, please, pull new Versatile Express related drivers for 3.8?
+> The hwmon driver is acked by the subsystem maintainer who asked to get
+> it merged through arm-soc.
+> 
 
-They're fixes, I'd be glad if you could slip them in. They're not urgent, but 
-it'd be nice to have them included. Esp. since 3.7 seems like a really _good_ 
-kernel for MXS, I'd love to have everything nicely polished in it.
+Pulled into the next/drivers branch in arm-soc now. Sorry for the delay.
 
-Best regards,
-Marek Vasut
+Thanks,
+
+	Arnd
