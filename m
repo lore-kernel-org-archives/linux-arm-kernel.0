@@ -1,63 +1,91 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Oct 2012 11:30:15 +0100
-Subject: [PATCH v2 8/8] ARM: hw_breakpoint: kill WARN_ONCE usage
+Date: Fri, 26 Oct 2012 11:30:13 +0100
+Subject: [PATCH v2 6/8] ARM: hw_breakpoint: check if monitor mode is enabled
+ during validation
 In-Reply-To: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
 References: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1351247415-25090-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1351247415-25090-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARN_ONCE is a bit OTT for some of the simple failure cases encountered
-in hw_breakpoint, so use either pr_warning or pr_warn_once instead.
+Rather than attempt to enable monitor mode explicitly when scheduling in
+a breakpoint event (which could raise an undefined exception trap when
+accessing DBGDSCRext), instead check that DBGDSCRint.MDBGen is set
+during event validation and report an error to the caller if not.
 
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |   15 ++++++++++-----
- 1 files changed, 10 insertions(+), 5 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |   28 +++++++++++++++-------------
+ 1 files changed, 15 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 05febba..5ff2e77 100644
+index 983558e..8e95321 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -261,10 +261,11 @@ static int enable_monitor_mode(void)
+@@ -228,6 +228,13 @@ static int get_num_brps(void)
+  * be put into halting debug mode at any time by an external debugger
+  * but there is nothing we can do to prevent that.
+  */
++static int monitor_mode_enabled(void)
++{
++	u32 dscr;
++	ARM_DBG_READ(c1, 0, dscr);
++	return !!(dscr & ARM_DSCR_MDBGEN);
++}
++
+ static int enable_monitor_mode(void)
+ {
+ 	u32 dscr;
+@@ -321,14 +328,9 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+ {
+ 	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
+ 	struct perf_event **slot, **slots;
+-	int i, max_slots, ctrl_base, val_base, ret = 0;
++	int i, max_slots, ctrl_base, val_base;
+ 	u32 addr, ctrl;
  
- 	/* Check that the write made it through. */
- 	ARM_DBG_READ(c0, c1, 0, dscr);
--	if (WARN_ONCE(!(dscr & ARM_DSCR_MDBGEN),
--		"Failed to enable monitor mode on CPU %d.\n",
--		smp_processor_id()))
-+	if (!(dscr & ARM_DSCR_MDBGEN)) {
-+		pr_warn_once("Failed to enable monitor mode on CPU %d.\n",
-+				smp_processor_id());
- 		return -EPERM;
-+	}
+-	/* Ensure that we are in monitor mode and halting mode is disabled. */
+-	ret = enable_monitor_mode();
+-	if (ret)
+-		goto out;
+-
+ 	addr = info->address;
+ 	ctrl = encode_ctrl_reg(info->ctrl) | 0x1;
  
- out:
- 	return 0;
-@@ -357,8 +358,10 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+@@ -355,10 +357,8 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
  		}
  	}
  
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
-+	if (i == max_slots) {
-+		pr_warning("Can't find any breakpoint slot\n");
- 		return -EBUSY;
-+	}
+-	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n")) {
+-		ret = -EBUSY;
+-		goto out;
+-	}
++	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
++		return -EBUSY;
  
  	/* Override the breakpoint data with the step data. */
  	if (info->step_ctrl.enabled) {
-@@ -407,8 +410,10 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
- 		}
- 	}
+@@ -376,9 +376,7 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
  
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
-+	if (i == max_slots) {
-+		pr_warning("Can't find any breakpoint slot\n");
- 		return;
-+	}
+ 	/* Setup the control register. */
+ 	write_wb_reg(ctrl_base + i, ctrl);
+-
+-out:
+-	return ret;
++	return 0;
+ }
  
- 	/* Ensure that we disable the mismatch breakpoint. */
- 	if (info->ctrl.type != ARM_BREAKPOINT_EXECUTE &&
+ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
+@@ -589,6 +587,10 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+ 	int ret = 0;
+ 	u32 offset, alignment_mask = 0x3;
+ 
++	/* Ensure that we are in monitor debug mode. */
++	if (!monitor_mode_enabled())
++		return -ENODEV;
++
+ 	/* Build the arch_hw_breakpoint. */
+ 	ret = arch_build_bp_info(bp);
+ 	if (ret)
 -- 
 1.7.4.1
