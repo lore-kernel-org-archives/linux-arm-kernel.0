@@ -1,8 +1,8 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 26 Oct 2012 14:19:20 -0500
-Subject: [PATCH] gpio/omap: fix off-mode bug: clear debounce settings on
- free/reset
-Message-ID: <1351279161-3778-1-git-send-email-jon-hunter@ti.com>
+Date: Fri, 26 Oct 2012 14:20:46 -0500
+Subject: [RESEND][PATCH v4] gpio/omap: fix off-mode bug: clear debounce
+ settings on free/reset
+Message-ID: <1351279246-3923-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
