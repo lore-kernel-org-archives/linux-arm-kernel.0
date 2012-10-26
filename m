@@ -1,50 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 27 Oct 2012 02:55:53 +0900
-Subject: [PATCH 7/7] ARM: dts: Add pin controller node for Samsung EXYNOS5440
- SoC
-In-Reply-To: <1351274153-3120-1-git-send-email-kgene.kim@samsung.com>
-References: <1351274153-3120-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1351274153-3120-7-git-send-email-kgene.kim@samsung.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 26 Oct 2012 19:57:31 +0200
+Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a comparator
+ driver to omap_usb2
+In-Reply-To: <alpine.DEB.2.00.1210261750430.7573@utopia.booyaka.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-3-git-send-email-kishon@ti.com>
+ <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
+ <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
+ <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
+ <508AA94B.10504@ti.com> <508AAA85.6070905@ti.com>
+ <alpine.DEB.2.00.1210261750430.7573@utopia.booyaka.com>
+Message-ID: <508ACF0B.60808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.abraham@linaro.org>
+Hi Paul,
 
-Add a pin controller node for Samsung Exynos5440 (EXYNOS5440) SoC.
+On 10/26/2012 07:54 PM, Paul Walmsley wrote:
+> On Fri, 26 Oct 2012, Benoit Cousson wrote:
+> 
+>> On 10/26/2012 05:16 PM, Roger Quadros wrote:
+>>
+>>> I still can't get musb to work on 3.7-rc2. Apparently it is still
+>>> missing the patches from Benoit's for_3.7/dts_part2.
+>>>
+>>> Maybe I just need to wait for it to be merged?
+>>
+>> They are now in a for_3.8/dts. Unfortunately, one patch that was adding
+>> ctrl_module address in the USB data was rejected and thus I'm not sure
+>> it will work without that.
+> 
+> For v3.7-rc timeframe, looks like it's waiting on an ack from you:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg201028.html
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/boot/dts/exynos5440.dtsi |   17 +++++++++++++++++
- 1 files changed, 17 insertions(+), 0 deletions(-)
+Oups, I missed that one. But I thought Roger was mentioning the DT patch
+and not that one.
 
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 380a89a..a7cda84 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -90,6 +90,23 @@
- 		reg = <0xE0000 0x1000>;
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
-+		#gpio-cells = <2>;
-+
-+		fan: fan {
-+			samsung,exynos5440-pin-function = <1>;
-+		};
-+
-+		hdd_led0: hdd_led0 {
-+			samsung,exynos5440-pin-function = <2>;
-+		};
-+
-+		hdd_led1: hdd_led1 {
-+			samsung,exynos5440-pin-function = <3>;
-+		};
-+
-+		uart1: uart1 {
-+			samsung,exynos5440-pin-function = <4>;
-+		};
- 	};
- 
- 	i2c at F0000 {
--- 
-1.7.4.4
+Anyway, I will answer to Tony. Thanks for the reminder Paul.
+
+Regards,
+Benoit
