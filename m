@@ -1,57 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Oct 2012 13:19:43 -0700
-Subject: [GIT PULL] ARM: OMAP: fix build, sparse problems in
- cleanup-headers
-In-Reply-To: <alpine.DEB.2.00.1210262012250.11258@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210262012250.11258@utopia.booyaka.com>
-Message-ID: <20121026201943.GS11908@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 26 Oct 2012 23:15:39 +0300
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <20121025101212.GD21217@arwen.pp.htv.fi>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+Message-ID: <20121026201539.GD29548@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121026 13:16]:
-> Hi Tony,
-> 
-> The following changes since commit 2da8a79f7d81853d00b6a00621aeef7545196084:
-> 
->   Merge branch 'omap-for-v3.8/cleanup-headers-menelaus' into omap-for-v3.8/cleanup-headers (2012-10-25 12:21:48 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-fixes-a-for-3.8
-> 
-> for you to fetch changes up to 97af08b6e10e06563309728ed2fe8fdd919c5a33:
-> 
->   ARM: OMAP1: fix sparse warning added by commit 4c98dc6b8ef2f73bdbfa78186db9a76507ba9ea3 (2012-10-26 13:21:48 -0600)
-> 
-> ----------------------------------------------------------------
-> Several fixes for build failures and sparse warnings in the
-> OMAP cleanup-headers branch.  Intended for 3.8 cleanup.
-> 
-> Basic build, boot, and PM test logs are available from here:
-> 
->     http://www.pwsan.com/omap/testlogs/cleanup-headers-compile-fixes-3.8/20121026132711/
-> 
-> Due to underlying problems in v3.7-rc2, several tests fail.  These
-> failures are unrelated to these patches.
+Hi,
 
-Thanks pulling into omap-for-v3.8/cleanup-headers.
-
-Regards,
-
-Tony
- 
-> ----------------------------------------------------------------
-> Paul Walmsley (3):
->       ARM: OMAP2+: fix build breakage introduced by commit b7754452b3e27716347a528b47b0a1083af32520
->       ARM: OMAP1: fix build breakage introduced by commit 25c7d49ed48b4843da7dea56a81ae7f620211ee0
->       ARM: OMAP1: fix sparse warning added by commit 4c98dc6b8ef2f73bdbfa78186db9a76507ba9ea3
+On Thu, Oct 25, 2012 at 01:12:12PM +0300, Felipe Balbi wrote:
+> Hi,
 > 
->  arch/arm/mach-omap1/fpga.c   |    1 +
->  arch/arm/mach-omap1/pm_bus.c |    2 ++
->  drivers/mtd/onenand/omap2.c  |   36 ++++++++++++++++++++++++------------
->  3 files changed, 27 insertions(+), 12 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> On Tue, Oct 23, 2012 at 09:23:03PM +0200, Jean Pihet wrote:
+> > On Tue, Oct 23, 2012 at 9:19 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > > On Mon, 22 Oct 2012, Jean Pihet wrote:
+> > >
+> > >> On Mon, Oct 22, 2012 at 6:12 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> > >>
+> > >> > Do you have CPU_IDLE enabled?
+> > >> FYI the issue is not present with CPU_IDLE enabled.
+> > >
+> > > Hmm, how can you tell?  I thought you weren't able to reproduce it with
+> > > CPU_IDLE disabled either?
+> > I could not reproduce the issue, with and without CPU_IDLE enabled.
+> > What puzzles me is that the PM QoS code only has influence on the
+> > states chosen by cpuidle, so the change should not have any impact
+> > with CPU_IDLE enabled. I reallt need to reproduce the issue.
+> > Let me try with the same setup as yours (bootloader images,
+> > omap2pus_defconfig, angstrom roots).
+> 
+> I just sent a patch to fix a bug I found on OMAP4 panda but while
+> reading this thread again, I think it could be that it's the same bug
+> which is just easier to reproduce on Paul's setup.
+> 
+> Paul, Aaro, can you see if [1] makes the problem go away ? that would be
+> another reason to push [1] during this -rc cycle.
+> 
+> [1] http://marc.info/?l=linux-omap&m=135115602407925&w=2
+
+ping
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/fb79736f/attachment-0001.sig>
