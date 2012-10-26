@@ -1,661 +1,249 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 26 Oct 2012 13:43:05 -0500
-Subject: [PATCH 3/6] ARM: dts: Add Calxeda ECX-2000 support
+Date: Fri, 26 Oct 2012 13:43:07 -0500
+Subject: [PATCH 5/6] ARM: highbank: abstract out SCU usage
 In-Reply-To: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
 References: <1351276988-28382-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1351276988-28382-4-git-send-email-robherring2@gmail.com>
+Message-ID: <1351276988-28382-6-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Separate out common dts pieces from highbank dts and add support for
-Calxeda ECX-2000 (Midway) SOC.
+In preparation for A15 support on ECX-2000, the direct calls to SCU
+registers must be conditional. The SCU power mode register is replaced by
+a custom register on ECX-2000.
+
+Rather than read the number of cores from the SCU, just hardcode it to 4.
+This removes one use of SCU and removes the need for the SCU to be
+statically mapped. The cpu initialization will ultimately come from DT.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- Documentation/devicetree/bindings/arm/calxeda.txt |   13 +-
- arch/arm/boot/dts/Makefile                        |    3 +-
- arch/arm/boot/dts/ecx-2000.dts                    |  104 +++++++++
- arch/arm/boot/dts/ecx-common.dtsi                 |  237 +++++++++++++++++++++
- arch/arm/boot/dts/highbank.dts                    |  219 +------------------
- 5 files changed, 356 insertions(+), 220 deletions(-)
- create mode 100644 arch/arm/boot/dts/ecx-2000.dts
- create mode 100644 arch/arm/boot/dts/ecx-common.dtsi
+ arch/arm/mach-highbank/highbank.c |   21 +++++----------------
+ arch/arm/mach-highbank/hotplug.c  |    6 ++----
+ arch/arm/mach-highbank/platsmp.c  |    7 +++----
+ arch/arm/mach-highbank/pm.c       |    3 ---
+ arch/arm/mach-highbank/sysregs.h  |   19 +++++++++++++++++++
+ arch/arm/mach-highbank/system.c   |    2 --
+ 6 files changed, 29 insertions(+), 29 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/calxeda.txt b/Documentation/devicetree/bindings/arm/calxeda.txt
-index 4755caa..25fcf96 100644
---- a/Documentation/devicetree/bindings/arm/calxeda.txt
-+++ b/Documentation/devicetree/bindings/arm/calxeda.txt
-@@ -1,8 +1,15 @@
--Calxeda Highbank Platforms Device Tree Bindings
-+Calxeda Platforms Device Tree Bindings
- -----------------------------------------------
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 40e36a5..3da921a 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -28,30 +28,19 @@
  
--Boards with Calxeda Cortex-A9 based Highbank SOC shall have the following
--properties.
-+Boards with Calxeda Cortex-A9 based ECX-1000 (Highbank) SOC shall have the
-+following properties.
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+-#include <asm/smp_scu.h>
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/arm_timer.h>
+ #include <asm/hardware/timer-sp.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+ #include <asm/mach/time.h>
  
- Required root node properties:
-     - compatible = "calxeda,highbank";
-+
-+
-+Boards with Calxeda Cortex-A15 based ECX-2000 SOC shall have the following
-+properties.
-+
-+Required root node properties:
-+    - compatible = "calxeda,ecx-2000";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..5cc9566 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -24,7 +24,8 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
- 	exynos5250-smdk5250.dtb
--dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
-+dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
-+	ecx-2000.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
- 	integratorcp.dtb
- dtb-$(CONFIG_ARCH_LPC32XX) += ea3250.dtb phy3250.dtb
-diff --git a/arch/arm/boot/dts/ecx-2000.dts b/arch/arm/boot/dts/ecx-2000.dts
-new file mode 100644
-index 0000000..46477ac
---- /dev/null
-+++ b/arch/arm/boot/dts/ecx-2000.dts
-@@ -0,0 +1,104 @@
-+/*
-+ * Copyright 2011-2012 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/dts-v1/;
-+
-+/* First 4KB has pen for secondary cores. */
-+/memreserve/ 0x00000000 0x0001000;
-+
-+/ {
-+	model = "Calxeda ECX-2000";
-+	compatible = "calxeda,ecx-2000";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+	clock-ranges;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clocks = <&a9pll>;
-+			clock-names = "cpu";
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			clocks = <&a9pll>;
-+			clock-names = "cpu";
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a15";
-+			reg = <2>;
-+			clocks = <&a9pll>;
-+			clock-names = "cpu";
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a15";
-+			reg = <3>;
-+			clocks = <&a9pll>;
-+			clock-names = "cpu";
-+		};
-+	};
-+
-+	memory at 0 {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x00000000 0x00000000 0x00000000 0xff800000>;
-+	};
-+
-+	memory at 200000000 {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x00000002 0x00000000 0x00000003 0x00000000>;
-+	};
-+
-+	soc {
-+		ranges = <0x00000000 0x00000000 0x00000000 0xffffffff>;
-+
-+		timer {
-+			compatible = "arm,cortex-a15-timer", "arm,armv7-timer"; 			interrupts = <1 13 0xf08>,
-+				<1 14 0xf08>,
-+				<1 11 0xf08>,
-+				<1 10 0xf08>;
-+		};
-+
-+		intc: interrupt-controller at fff11000 {
-+			compatible = "arm,cortex-a15-gic";
-+			#interrupt-cells = <3>;
-+			#size-cells = <0>;
-+			#address-cells = <1>;
-+			interrupt-controller;
-+			interrupts = <1 9 0xf04>;
-+			reg = <0xfff11000 0x1000>,
-+			      <0xfff12000 0x1000>,
-+			      <0xfff14000 0x2000>,
-+			      <0xfff16000 0x2000>;
-+		};
-+
-+		pmu {
-+			compatible = "arm,cortex-a9-pmu";
-+			interrupts = <0 76 4  0 75 4  0 74 4  0 73 4>;
-+		};
-+	};
-+};
-+
-+/include/ "ecx-common.dtsi"
-diff --git a/arch/arm/boot/dts/ecx-common.dtsi b/arch/arm/boot/dts/ecx-common.dtsi
-new file mode 100644
-index 0000000..d61b535
---- /dev/null
-+++ b/arch/arm/boot/dts/ecx-common.dtsi
-@@ -0,0 +1,237 @@
-+/*
-+ * Copyright 2011-2012 Calxeda, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+/ {
-+	chosen {
-+		bootargs = "console=ttyAMA0";
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
-+
-+		sata at ffe08000 {
-+			compatible = "calxeda,hb-ahci";
-+			reg = <0xffe08000 0x10000>;
-+			interrupts = <0 83 4>;
-+			dma-coherent;
-+			calxeda,port-phys = <&combophy5 0 &combophy0 0
-+					     &combophy0 1 &combophy0 2
-+					     &combophy0 3>;
-+		};
-+
-+		sdhci at ffe0e000 {
-+			compatible = "calxeda,hb-sdhci";
-+			reg = <0xffe0e000 0x1000>;
-+			interrupts = <0 90 4>;
-+			clocks = <&eclk>;
-+			status = "disabled";
-+		};
-+
-+		memory-controller at fff00000 {
-+			compatible = "calxeda,hb-ddr-ctrl";
-+			reg = <0xfff00000 0x1000>;
-+			interrupts = <0 91 4>;
-+		};
-+
-+		ipc at fff20000 {
-+			compatible = "arm,pl320", "arm,primecell";
-+			reg = <0xfff20000 0x1000>;
-+			interrupts = <0 7 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		gpioe: gpio at fff30000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0xfff30000 0x1000>;
-+			interrupts = <0 14 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpiof: gpio at fff31000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0xfff31000 0x1000>;
-+			interrupts = <0 15 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpiog: gpio at fff32000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0xfff32000 0x1000>;
-+			interrupts = <0 16 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		gpioh: gpio at fff33000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0xfff33000 0x1000>;
-+			interrupts = <0 17 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+			status = "disabled";
-+		};
-+
-+		timer at fff34000 {
-+			compatible = "arm,sp804", "arm,primecell";
-+			reg = <0xfff34000 0x1000>;
-+			interrupts = <0 18 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		rtc at fff35000 {
-+			compatible = "arm,pl031", "arm,primecell";
-+			reg = <0xfff35000 0x1000>;
-+			interrupts = <0 19 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		serial at fff36000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0xfff36000 0x1000>;
-+			interrupts = <0 20 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		smic at fff3a000 {
-+			compatible = "ipmi-smic";
-+			device_type = "ipmi";
-+			reg = <0xfff3a000 0x1000>;
-+			interrupts = <0 24 4>;
-+			reg-size = <4>;
-+			reg-spacing = <4>;
-+		};
-+
-+		sregs at fff3c000 {
-+			compatible = "calxeda,hb-sregs";
-+			reg = <0xfff3c000 0x1000>;
-+
-+			clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				osc: oscillator {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <33333000>;
-+				};
-+
-+				ddrpll: ddrpll {
-+					#clock-cells = <0>;
-+					compatible = "calxeda,hb-pll-clock";
-+					clocks = <&osc>;
-+					reg = <0x108>;
-+				};
-+
-+				a9pll: a9pll {
-+					#clock-cells = <0>;
-+					compatible = "calxeda,hb-pll-clock";
-+					clocks = <&osc>;
-+					reg = <0x100>;
-+				};
-+
-+				a9periphclk: a9periphclk {
-+					#clock-cells = <0>;
-+					compatible = "calxeda,hb-a9periph-clock";
-+					clocks = <&a9pll>;
-+					reg = <0x104>;
-+				};
-+
-+				a9bclk: a9bclk {
-+					#clock-cells = <0>;
-+					compatible = "calxeda,hb-a9bus-clock";
-+					clocks = <&a9pll>;
-+					reg = <0x104>;
-+				};
-+
-+				emmcpll: emmcpll {
-+					#clock-cells = <0>;
-+					compatible = "calxeda,hb-pll-clock";
-+					clocks = <&osc>;
-+					reg = <0x10C>;
-+				};
-+
-+				eclk: eclk {
-+					#clock-cells = <0>;
-+					compatible = "calxeda,hb-emmc-clock";
-+					clocks = <&emmcpll>;
-+					reg = <0x114>;
-+				};
-+
-+				pclk: pclk {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					clock-frequency = <150000000>;
-+				};
-+			};
-+		};
-+
-+		dma at fff3d000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0xfff3d000 0x1000>;
-+			interrupts = <0 92 4>;
-+			clocks = <&pclk>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		ethernet at fff50000 {
-+			compatible = "calxeda,hb-xgmac";
-+			reg = <0xfff50000 0x1000>;
-+			interrupts = <0 77 4  0 78 4  0 79 4>;
-+			dma-coherent;
-+		};
-+
-+		ethernet at fff51000 {
-+			compatible = "calxeda,hb-xgmac";
-+			reg = <0xfff51000 0x1000>;
-+			interrupts = <0 80 4  0 81 4  0 82 4>;
-+			dma-coherent;
-+		};
-+
-+		combophy0: combo-phy at fff58000 {
-+			compatible = "calxeda,hb-combophy";
-+			#phy-cells = <1>;
-+			reg = <0xfff58000 0x1000>;
-+			phydev = <5>;
-+		};
-+
-+		combophy5: combo-phy at fff5d000 {
-+			compatible = "calxeda,hb-combophy";
-+			#phy-cells = <1>;
-+			reg = <0xfff5d000 0x1000>;
-+			phydev = <31>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index e39a79a..a9ae5d3 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -69,16 +69,8 @@
- 		reg = <0x00000000 0xff900000>;
- 	};
+ #include "core.h"
+ #include "sysregs.h"
  
--	chosen {
--		bootargs = "console=ttyAMA0";
--	};
+ void __iomem *sregs_base;
 -
- 	soc {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		compatible = "simple-bus";
--		interrupt-parent = <&intc>;
--		ranges;
-+		ranges = <0x00000000 0x00000000 0xffffffff>;
+-#define HB_SCU_VIRT_BASE	0xfee00000
+-void __iomem *scu_base_addr = ((void __iomem *)(HB_SCU_VIRT_BASE));
+-
+-static struct map_desc scu_io_desc __initdata = {
+-	.virtual	= HB_SCU_VIRT_BASE,
+-	.pfn		= 0, /* run-time */
+-	.length		= SZ_4K,
+-	.type		= MT_DEVICE,
+-};
++void __iomem *scu_base_addr;
  
- 		timer at fff10600 {
- 			compatible = "arm,cortex-a9-twd-timer";
-@@ -117,178 +109,6 @@
- 			interrupts = <0 76 4  0 75 4  0 74 4  0 73 4>;
- 		};
+ static void __init highbank_scu_map_io(void)
+ {
+@@ -60,13 +49,11 @@ static void __init highbank_scu_map_io(void)
+ 	/* Get SCU base */
+ 	asm("mrc p15, 4, %0, c15, c0, 0" : "=r" (base));
  
--		sata at ffe08000 {
--			compatible = "calxeda,hb-ahci";
--			reg = <0xffe08000 0x10000>;
--			interrupts = <0 83 4>;
--			calxeda,port-phys = <&combophy5 0 &combophy0 0
--					     &combophy0 1 &combophy0 2
--					     &combophy0 3>;
--			dma-coherent;
--		};
--
--		sdhci at ffe0e000 {
--			compatible = "calxeda,hb-sdhci";
--			reg = <0xffe0e000 0x1000>;
--			interrupts = <0 90 4>;
--			clocks = <&eclk>;
--			status = "disabled";
--		};
--
--		memory-controller at fff00000 {
--			compatible = "calxeda,hb-ddr-ctrl";
--			reg = <0xfff00000 0x1000>;
--			interrupts = <0 91 4>;
--		};
--
--		ipc at fff20000 {
--			compatible = "arm,pl320", "arm,primecell";
--			reg = <0xfff20000 0x1000>;
--			interrupts = <0 7 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--		};
--
--		gpioe: gpio at fff30000 {
--			#gpio-cells = <2>;
--			compatible = "arm,pl061", "arm,primecell";
--			gpio-controller;
--			reg = <0xfff30000 0x1000>;
--			interrupts = <0 14 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--			status = "disabled";
--		};
--
--		gpiof: gpio at fff31000 {
--			#gpio-cells = <2>;
--			compatible = "arm,pl061", "arm,primecell";
--			gpio-controller;
--			reg = <0xfff31000 0x1000>;
--			interrupts = <0 15 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--			status = "disabled";
--		};
--
--		gpiog: gpio at fff32000 {
--			#gpio-cells = <2>;
--			compatible = "arm,pl061", "arm,primecell";
--			gpio-controller;
--			reg = <0xfff32000 0x1000>;
--			interrupts = <0 16 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--			status = "disabled";
--		};
--
--		gpioh: gpio at fff33000 {
--			#gpio-cells = <2>;
--			compatible = "arm,pl061", "arm,primecell";
--			gpio-controller;
--			reg = <0xfff33000 0x1000>;
--			interrupts = <0 17 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--			status = "disabled";
--		};
--
--		timer {
--			compatible = "arm,sp804", "arm,primecell";
--			reg = <0xfff34000 0x1000>;
--			interrupts = <0 18 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--		};
--
--		rtc at fff35000 {
--			compatible = "arm,pl031", "arm,primecell";
--			reg = <0xfff35000 0x1000>;
--			interrupts = <0 19 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--		};
--
--		serial at fff36000 {
--			compatible = "arm,pl011", "arm,primecell";
--			reg = <0xfff36000 0x1000>;
--			interrupts = <0 20 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--		};
--
--		smic at fff3a000 {
--			compatible = "ipmi-smic";
--			device_type = "ipmi";
--			reg = <0xfff3a000 0x1000>;
--			interrupts = <0 24 4>;
--			reg-size = <4>;
--			reg-spacing = <4>;
--		};
--
--		sregs at fff3c000 {
--			compatible = "calxeda,hb-sregs";
--			reg = <0xfff3c000 0x1000>;
--
--			clocks {
--				#address-cells = <1>;
--				#size-cells = <0>;
--
--				osc: oscillator {
--					#clock-cells = <0>;
--					compatible = "fixed-clock";
--					clock-frequency = <33333000>;
--				};
--
--				ddrpll: ddrpll {
--					#clock-cells = <0>;
--					compatible = "calxeda,hb-pll-clock";
--					clocks = <&osc>;
--					reg = <0x108>;
--				};
--
--				a9pll: a9pll {
--					#clock-cells = <0>;
--					compatible = "calxeda,hb-pll-clock";
--					clocks = <&osc>;
--					reg = <0x100>;
--				};
--
--				a9periphclk: a9periphclk {
--					#clock-cells = <0>;
--					compatible = "calxeda,hb-a9periph-clock";
--					clocks = <&a9pll>;
--					reg = <0x104>;
--				};
--
--				a9bclk: a9bclk {
--					#clock-cells = <0>;
--					compatible = "calxeda,hb-a9bus-clock";
--					clocks = <&a9pll>;
--					reg = <0x104>;
--				};
--
--				emmcpll: emmcpll {
--					#clock-cells = <0>;
--					compatible = "calxeda,hb-pll-clock";
--					clocks = <&osc>;
--					reg = <0x10C>;
--				};
--
--				eclk: eclk {
--					#clock-cells = <0>;
--					compatible = "calxeda,hb-emmc-clock";
--					clocks = <&emmcpll>;
--					reg = <0x114>;
--				};
--
--				pclk: pclk {
--					#clock-cells = <0>;
--					compatible = "fixed-clock";
--					clock-frequency = <150000000>;
--				};
--			};
--		};
+-	scu_io_desc.pfn = __phys_to_pfn(base);
+-	iotable_init(&scu_io_desc, 1);
++	scu_base_addr = ioremap(base, SZ_4K);
+ }
  
- 		sregs at fff3c200 {
- 			compatible = "calxeda,hb-sregs-l2-ecc";
-@@ -296,40 +116,7 @@
- 			interrupts = <0 71 4  0 72 4>;
- 		};
+ static void __init highbank_map_io(void)
+ {
+-	highbank_scu_map_io();
+ 	highbank_lluart_map_io();
+ }
  
--		dma at fff3d000 {
--			compatible = "arm,pl330", "arm,primecell";
--			reg = <0xfff3d000 0x1000>;
--			interrupts = <0 92 4>;
--			clocks = <&pclk>;
--			clock-names = "apb_pclk";
--		};
--
--		ethernet at fff50000 {
--			compatible = "calxeda,hb-xgmac";
--			reg = <0xfff50000 0x1000>;
--			interrupts = <0 77 4  0 78 4  0 79 4>;
--			dma-coherent;
--		};
--
--		ethernet at fff51000 {
--			compatible = "calxeda,hb-xgmac";
--			reg = <0xfff51000 0x1000>;
--			interrupts = <0 80 4  0 81 4  0 82 4>;
--			dma-coherent;
--		};
--
--		combophy0: combo-phy at fff58000 {
--			compatible = "calxeda,hb-combophy";
--			#phy-cells = <1>;
--			reg = <0xfff58000 0x1000>;
--			phydev = <5>;
--		};
--
--		combophy5: combo-phy at fff5d000 {
--			compatible = "calxeda,hb-combophy";
--			#phy-cells = <1>;
--			reg = <0xfff5d000 0x1000>;
--			phydev = <31>;
--		};
- 	};
- };
+@@ -99,6 +86,9 @@ static void __init highbank_init_irq(void)
+ {
+ 	of_irq_init(irq_match);
+ 
++	if (of_find_compatible_node(NULL, NULL, "arm,cortex-a9"))
++		highbank_scu_map_io();
 +
-+/include/ "ecx-common.dtsi"
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Enable PL310 L2 Cache controller */
+ 	highbank_smc1(0x102, 0x1);
+@@ -145,7 +135,6 @@ static struct sys_timer highbank_timer = {
+ static void highbank_power_off(void)
+ {
+ 	hignbank_set_pwr_shutdown();
+-	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
+ 
+ 	while (1)
+ 		cpu_do_idle();
+diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
+index 2c1b8c3..7b60fac 100644
+--- a/arch/arm/mach-highbank/hotplug.c
++++ b/arch/arm/mach-highbank/hotplug.c
+@@ -14,13 +14,11 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ #include <linux/kernel.h>
+-#include <linux/errno.h>
+-#include <linux/smp.h>
+ 
+-#include <asm/smp_scu.h>
+ #include <asm/cacheflush.h>
+ 
+ #include "core.h"
++#include "sysregs.h"
+ 
+ extern void secondary_startup(void);
+ 
+@@ -33,7 +31,7 @@ void __ref highbank_cpu_die(unsigned int cpu)
+ 	flush_cache_all();
+ 
+ 	highbank_set_cpu_jump(cpu, secondary_startup);
+-	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
++	highbank_set_core_pwr();
+ 
+ 	cpu_do_idle();
+ 
+diff --git a/arch/arm/mach-highbank/platsmp.c b/arch/arm/mach-highbank/platsmp.c
+index fa9560e..1129957 100644
+--- a/arch/arm/mach-highbank/platsmp.c
++++ b/arch/arm/mach-highbank/platsmp.c
+@@ -42,9 +42,7 @@ static int __cpuinit highbank_boot_secondary(unsigned int cpu, struct task_struc
+  */
+ static void __init highbank_smp_init_cpus(void)
+ {
+-	unsigned int i, ncores;
+-
+-	ncores = scu_get_core_count(scu_base_addr);
++	unsigned int i, ncores = 4;
+ 
+ 	/* sanity check */
+ 	if (ncores > NR_CPUS) {
+@@ -65,7 +63,8 @@ static void __init highbank_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	int i;
+ 
+-	scu_enable(scu_base_addr);
++	if (scu_base_addr)
++		scu_enable(scu_base_addr);
+ 
+ 	/*
+ 	 * Write the address of secondary startup into the jump table
+diff --git a/arch/arm/mach-highbank/pm.c b/arch/arm/mach-highbank/pm.c
+index de866f2..74aa135 100644
+--- a/arch/arm/mach-highbank/pm.c
++++ b/arch/arm/mach-highbank/pm.c
+@@ -19,7 +19,6 @@
+ #include <linux/suspend.h>
+ 
+ #include <asm/proc-fns.h>
+-#include <asm/smp_scu.h>
+ #include <asm/suspend.h>
+ 
+ #include "core.h"
+@@ -35,8 +34,6 @@ static int highbank_pm_enter(suspend_state_t state)
+ {
+ 	hignbank_set_pwr_suspend();
+ 	highbank_set_cpu_jump(0, cpu_resume);
+-
+-	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
+ 	cpu_suspend(0, highbank_suspend_finish);
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-highbank/sysregs.h b/arch/arm/mach-highbank/sysregs.h
+index 0e91338..e13e8ea 100644
+--- a/arch/arm/mach-highbank/sysregs.h
++++ b/arch/arm/mach-highbank/sysregs.h
+@@ -17,6 +17,10 @@
+ #define _MACH_HIGHBANK__SYSREGS_H_
+ 
+ #include <linux/io.h>
++#include <linux/smp.h>
++#include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
++#include "core.h"
+ 
+ extern void __iomem *sregs_base;
+ 
+@@ -29,24 +33,39 @@ extern void __iomem *sregs_base;
+ #define HB_PWR_HARD_RESET		2
+ #define HB_PWR_SHUTDOWN			3
+ 
++#define SREG_CPU_PWR_CTRL(c)		(0x200 + ((c) * 4))
++
++static inline void highbank_set_core_pwr(void)
++{
++	int cpu = cpu_logical_map(smp_processor_id());
++	if (scu_base_addr)
++		scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
++	else
++		writel_relaxed(1, sregs_base + SREG_CPU_PWR_CTRL(cpu));
++}
++
+ static inline void hignbank_set_pwr_suspend(void)
+ {
+ 	writel(HB_PWR_SUSPEND, sregs_base + HB_SREG_A9_PWR_REQ);
++	highbank_set_core_pwr();
+ }
+ 
+ static inline void hignbank_set_pwr_shutdown(void)
+ {
+ 	writel(HB_PWR_SHUTDOWN, sregs_base + HB_SREG_A9_PWR_REQ);
++	highbank_set_core_pwr();
+ }
+ 
+ static inline void hignbank_set_pwr_soft_reset(void)
+ {
+ 	writel(HB_PWR_SOFT_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
++	highbank_set_core_pwr();
+ }
+ 
+ static inline void hignbank_set_pwr_hard_reset(void)
+ {
+ 	writel(HB_PWR_HARD_RESET, sregs_base + HB_SREG_A9_PWR_REQ);
++	highbank_set_core_pwr();
+ }
+ 
+ #endif
+diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
+index 82c2723..194a5bb 100644
+--- a/arch/arm/mach-highbank/system.c
++++ b/arch/arm/mach-highbank/system.c
+@@ -14,7 +14,6 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ #include <linux/io.h>
+-#include <asm/smp_scu.h>
+ #include <asm/proc-fns.h>
+ 
+ #include "core.h"
+@@ -27,7 +26,6 @@ void highbank_restart(char mode, const char *cmd)
+ 	else
+ 		hignbank_set_pwr_soft_reset();
+ 
+-	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
+ 	cpu_do_idle();
+ }
+ 
 -- 
 1.7.10.4
