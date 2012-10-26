@@ -1,165 +1,67 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Oct 2012 09:48:29 +0300
-Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
-In-Reply-To: <1349675983-23803-2-git-send-email-kishon@ti.com>
+Date: Fri, 26 Oct 2012 09:50:12 +0300
+Subject: [PATCH v2 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
+In-Reply-To: <1349675983-23803-4-git-send-email-kishon@ti.com>
 References: <1349675983-23803-1-git-send-email-kishon@ti.com>
- <1349675983-23803-2-git-send-email-kishon@ti.com>
-Message-ID: <20121026064829.GB22206@arwen.pp.htv.fi>
+ <1349675983-23803-4-git-send-email-kishon@ti.com>
+Message-ID: <20121026065012.GC22206@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2012 at 11:29:41AM +0530, Kishon Vijay Abraham I wrote:
-> ocp2scp was not having pdata support which makes *musb* fail for non-dt
-> boot in OMAP platform. The pdata will have information about the devices
-> that is connected to ocp2scp. ocp2scp driver will now make use of this
-> information to create the devices that is attached to ocp2scp.
+Hi,
+
+On Mon, Oct 08, 2012 at 11:29:43AM +0530, Kishon Vijay Abraham I wrote:
+> Platfrom device for ocp2scp is created using omap_device_build in
+> devices file. This is used for both omap4(musb) and omap5(dwc3).
 > 
 > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-
-Acked-by: Felipe Balbi <balbi@ti.com>
-
 > ---
->  drivers/bus/omap-ocp2scp.c                 |   67 ++++++++++++++++++++++++++--
->  include/linux/platform_data/omap_ocp2scp.h |   31 +++++++++++++
->  2 files changed, 95 insertions(+), 3 deletions(-)
->  create mode 100644 include/linux/platform_data/omap_ocp2scp.h
+>  arch/arm/mach-omap2/devices.c |   76 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
 > 
-> diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
-> index ff63560..5db8297 100644
-> --- a/drivers/bus/omap-ocp2scp.c
-> +++ b/drivers/bus/omap-ocp2scp.c
-> @@ -22,6 +22,26 @@
->  #include <linux/pm_runtime.h>
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index c8c2117..ac2bfce 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -19,6 +19,7 @@
 >  #include <linux/of.h>
->  #include <linux/of_platform.h>
+>  #include <linux/pinctrl/machine.h>
+>  #include <linux/platform_data/omap4-keypad.h>
 > +#include <linux/platform_data/omap_ocp2scp.h>
-> +
-> +/**
-> + * _count_resources - count for the number of resources
-> + * @res: struct resource *
-> + *
-> + * Count and return the number of resources populated for the device that is
-> + * connected to ocp2scp.
-> + */
-> +static unsigned _count_resources(struct resource *res)
+>  
+>  #include <asm/mach-types.h>
+>  #include <asm/mach/map.h>
+> @@ -613,6 +614,80 @@ static void omap_init_vout(void)
+>  static inline void omap_init_vout(void) {}
+>  #endif
+>  
+> +#if defined(CONFIG_OMAP_OCP2SCP) || defined(CONFIG_OMAP_OCP2SCP_MODULE)
+> +static int count_ocp2scp_devices(struct omap_ocp2scp_dev *ocp2scp_dev)
 > +{
 > +	int cnt	= 0;
 > +
-> +	while (res->start != res->end) {
+> +	while (ocp2scp_dev->drv_name != NULL) {
 > +		cnt++;
-> +		res++;
+> +		ocp2scp_dev++;
 > +	}
 > +
 > +	return cnt;
 > +}
->  
->  static int ocp2scp_remove_devices(struct device *dev, void *c)
->  {
-> @@ -34,20 +54,61 @@ static int ocp2scp_remove_devices(struct device *dev, void *c)
->  
->  static int __devinit omap_ocp2scp_probe(struct platform_device *pdev)
->  {
-> -	int			ret;
-> -	struct device_node	*np = pdev->dev.of_node;
-> +	int ret;
-> +	unsigned res_cnt, i;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct platform_device *pdev_child;
-> +	struct omap_ocp2scp_platform_data *pdata = pdev->dev.platform_data;
-> +	struct omap_ocp2scp_dev *dev;
->  
->  	if (np) {
->  		ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
->  		if (ret) {
-> -			dev_err(&pdev->dev, "failed to add resources for ocp2scp child\n");
-> +			dev_err(&pdev->dev,
-> +			    "failed to add resources for ocp2scp child\n");
->  			goto err0;
->  		}
-> +	} else if (pdata) {
-> +		for (i = 0, dev = *pdata->devices; i < pdata->dev_cnt; i++,
-> +		    dev++) {
-> +			res_cnt = _count_resources(dev->res);
 > +
-> +			pdev_child = platform_device_alloc(dev->drv_name, -1);
-> +			if (!pdev_child) {
-> +				dev_err(&pdev->dev,
-> +				  "failed to allocate mem for ocp2scp child\n");
-> +				goto err0;
-> +			}
+> +static void omap_init_ocp2scp(void)
+> +{
+> +	struct omap_hwmod	*oh;
+> +	struct platform_device	*pdev;
+> +	int			bus_id = -1, dev_cnt = 0, i;
+> +	struct omap_ocp2scp_dev	*ocp2scp_dev;
+> +	const char		*oh_name, *name;
+> +	struct omap_ocp2scp_platform_data *pdata;
 > +
-> +			ret = platform_device_add_resources(pdev_child,
-> +			    dev->res, res_cnt);
-> +			if (ret) {
-> +				dev_err(&pdev->dev,
-> +				 "failed to add resources for ocp2scp child\n");
-> +				goto err1;
-> +			}
-> +
-> +			pdev_child->dev.parent	= &pdev->dev;
-> +
-> +			ret = platform_device_add(pdev_child);
-> +			if (ret) {
-> +				dev_err(&pdev->dev,
-> +				   "failed to register ocp2scp child device\n");
-> +				goto err1;
-> +			}
-> +		}
-> +	} else {
-> +		dev_err(&pdev->dev, "OCP2SCP initialized without plat data\n");
-> +		return -EINVAL;
->  	}
-> +
->  	pm_runtime_enable(&pdev->dev);
->  
->  	return 0;
->  
-> +err1:
-> +	platform_device_put(pdev_child);
-> +
->  err0:
->  	device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
->  
-> diff --git a/include/linux/platform_data/omap_ocp2scp.h b/include/linux/platform_data/omap_ocp2scp.h
-> new file mode 100644
-> index 0000000..5c6c393
-> --- /dev/null
-> +++ b/include/linux/platform_data/omap_ocp2scp.h
-> @@ -0,0 +1,31 @@
-> +/*
-> + * omap_ocp2scp.h -- ocp2scp header file
-> + *
-> + * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#ifndef __DRIVERS_OMAP_OCP2SCP_H
-> +#define __DRIVERS_OMAP_OCP2SCP_H
-> +
-> +struct omap_ocp2scp_dev {
-> +	const char			*drv_name;
-> +	struct resource			*res;
-> +};
-> +
-> +struct omap_ocp2scp_platform_data {
-> +	int				dev_cnt;
-> +	struct omap_ocp2scp_dev		**devices;
-> +};
-> +#endif /* __DRIVERS_OMAP_OCP2SCP_H */
-> -- 
-> 1.7.9.5
-> 
+> +	oh_name = "ocp2scp_usb_phy";
+> +	name	= "omap-ocp2scp";
+
+how about adding checks here to return early case we're not running on
+OMAP4 or OMAP5 ??
 
 -- 
 balbi
@@ -169,4 +71,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/1419d515/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/7bf840dc/attachment.sig>
