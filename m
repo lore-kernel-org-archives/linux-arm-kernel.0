@@ -1,84 +1,33 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Fri, 26 Oct 2012 11:13:43 -0700
-Subject: [PATCH 3/5] ARM: omap: vc: .get_voltage callback
-In-Reply-To: <1349313365-5262-4-git-send-email-mturquette@ti.com> (Mike
- Turquette's message of "Wed, 3 Oct 2012 18:16:03 -0700")
+Date: Fri, 26 Oct 2012 11:17:51 -0700
+Subject: [RFC][PATCH 0/5] Introduce .get_voltage callback into voltdm
+In-Reply-To: <1349313365-5262-1-git-send-email-mturquette@ti.com> (Mike
+ Turquette's message of "Wed, 3 Oct 2012 18:16:00 -0700")
 References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
- <1349313365-5262-4-git-send-email-mturquette@ti.com>
-Message-ID: <87sj91hzjc.fsf@deeprootsystems.com>
+Message-ID: <87fw51hzcg.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Mike,
 
 Mike Turquette <mturquette@ti.com> writes:
 
 > From: Mike Turquette <mturquette@linaro.org>
 >
-> Implement the voltdm->get_voltage callback for the voltage controller
-> driver.  
+> This series creates a new callback for struct voltagedomain,
+> .get_voltage.  This fetches the voltage from hardware, if possible, and
+> returns it to the caller.  We use this call to populate
+> voltdm->nominal_volt at boot time.
 
-nit: since it's not actually used in this series, it should say
-Impelment the function that will be used as the ->get_voltage()
-callback...
+I pointed out a couple nitpicky things on individual patches, but
+otherwise this direction and motiviation for this series looks OK by me.
 
-> This reads the DATA field corresponding to each VC and returns
-> the voltage, after converting it from vsel format.
->
-> If DATA is zero (the reset value) then the caller must interpret this as
-> the PMIC running at the default power-on voltage.  In such a case DT
-> data for the PMIC is necessary to know the voltage.
->
-> Signed-off-by: Mike Turquette <mturquette@ti.com>
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
->  arch/arm/mach-omap2/vc.c |   21 +++++++++++++++++++++
->  arch/arm/mach-omap2/vc.h |    1 +
->  2 files changed, 22 insertions(+)
->
-> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
-> index 2bcac64..90a9ea6 100644
-> --- a/arch/arm/mach-omap2/vc.c
-> +++ b/arch/arm/mach-omap2/vc.c
-> @@ -101,6 +101,27 @@ static int omap_vc_config_channel(struct voltagedomain *voltdm)
->  }
->  
->  /* Voltage scale and accessory APIs */
-> +unsigned long omap_vc_get_bypass_data(struct voltagedomain *voltdm)
-> +{
-> +	struct omap_vc_channel *vc = voltdm->vc;
-> +	u32 vc_bypass_value;
-> +	u8 vsel;
-> +	unsigned long volt;
-> +
-> +	/* sanity */
-> +	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv ||
-> +			!voltdm->read || !voltdm->write)
-> +		return 0;
-> +
-> +	vc_bypass_value = voltdm->read(vc->common->bypass_val_reg);
-> +	vc_bypass_value &= vc->common->data_mask;
-> +	vsel = vc_bypass_value >> __ffs(vc->common->data_mask);
+Just some minor comments about the structure of the series.  I tend to
+prefer combining the introduction of a new function with it's usage.  It
+makes review and understanding much easier, IMO.  If there are reasons
+to keep them separate, that's fine too.  Just describe the reasons in
+the cover letter.
 
-Ah, now I see where the data_mask is used.  :)
+Thanks,
 
 Kevin
-
-> +	volt = voltdm->pmic->vsel_to_uv(vsel);
-> +
-> +	return volt;
-> +}
-> +
->  int omap_vc_pre_scale(struct voltagedomain *voltdm,
->  		      unsigned long target_volt,
->  		      u8 *target_vsel, u8 *current_vsel)
-> diff --git a/arch/arm/mach-omap2/vc.h b/arch/arm/mach-omap2/vc.h
-> index 84a61b1..e7d4719 100644
-> --- a/arch/arm/mach-omap2/vc.h
-> +++ b/arch/arm/mach-omap2/vc.h
-> @@ -112,6 +112,7 @@ extern struct omap_vc_channel omap4_vc_iva;
->  extern struct omap_vc_channel omap4_vc_core;
->  
->  void omap_vc_init_channel(struct voltagedomain *voltdm);
-> +unsigned long omap_vc_get_bypass_data(struct voltagedomain *voltdm);
->  int omap_vc_pre_scale(struct voltagedomain *voltdm,
->  		      unsigned long target_volt,
->  		      u8 *target_vsel, u8 *current_vsel);
