@@ -1,59 +1,30 @@
-From: ananth@in.ibm.com (Ananth N Mavinakayanahalli)
-Date: Fri, 26 Oct 2012 11:22:39 +0530
-Subject: [PATCH 6/9] uprobes: flush cache after xol write
-In-Reply-To: <20121025145839.GB26929@redhat.com>
-References: <1350242593-17761-1-git-send-email-rabin@rab.in>
- <1350242593-17761-6-git-send-email-rabin@rab.in>
- <20121015165756.GA11737@redhat.com>
- <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
- <20121025145839.GB26929@redhat.com>
-Message-ID: <20121026055239.GA4862@in.ibm.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 26 Oct 2012 07:50:56 +0200
+Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
+ include/linux/omap-iommu.h
+In-Reply-To: <20121025213935.GD11928@atomide.com>
+References: <20121025001913.2082.31062.stgit@muffinssi.local>
+ <1466344.HbU9q5zM1q@avalon> <20121025165643.GP11928@atomide.com>
+ <1351198976.2hJjhe5gKC@avalon> <20121025213935.GD11928@atomide.com>
+Message-ID: <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 04:58:39PM +0200, Oleg Nesterov wrote:
-> On 10/16, Rabin Vincent wrote:
-> >
-> > 2012/10/15 Oleg Nesterov <oleg@redhat.com>:
-> > > On 10/14, Rabin Vincent wrote:
-> > >> Flush the cache so that the instructions written to the XOL area are
-> > >> visible.
-> > >>
-> > >> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> > >> ---
-> > >>  kernel/events/uprobes.c |    1 +
-> > >>  1 file changed, 1 insertion(+)
-> > >>
-> > >> diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
-> > >> index ca000a9..8c52f93 100644
-> > >> --- a/kernel/events/uprobes.c
-> > >> +++ b/kernel/events/uprobes.c
-> > >> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
-> > >>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
-> > >>       vaddr = kmap_atomic(area->page);
-> > >>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
-> > >> +     flush_dcache_page(area->page);
-> > >>       kunmap_atomic(vaddr);
-> > >
-> > > I agree... but why under kmap_atomic?
-> >
-> > No real reason; I'll move it to after the unmap.
-> 
-> OK. I assume you will send v2.
-> 
-> But this patch looks like a bugfix, flush_dcache_page() is not a nop
-> on powerpc. So perhaps we should apply this fix right now?
+On Thu, Oct 25, 2012 at 11:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> > Joerg and Ohad, do you have any opinions on this?
 
-Starting Power5, all Power processers have coherent caches.
+I agree that there's some merit in having a separate header file for
+IOVMM, since it's a different layer from the IOMMU API.
 
-> OTOH, I do not understand this stuff, everything is nop on x86. And
-> when I look into Documentation/cachetlb.txt I am starting to think
-> that may be this needs flush_icache_user_range instead?
->
-> Rabin, Ananth could you clarify this?
+But in reality it's tightly coupled with OMAP's IOMMU, and ideally it
+really should go away and be replaced with the DMA API.
 
-Yes. We need flush_icache_user_range(). Though for x86 its always been a
-nop, one never knows if there is some Power4 or older machine out there
-that is still being used. We are fine for Power5 and later.
+For this reason, and for the fact that anyway there's only a single
+user for it (omap3isp) and there will never be any more, maybe we
+shouldn't pollute include/linux anymore.
 
-Ananth
+Anyone volunteering to remove IOVMM and adapt omap3isp to the DMA API
+instead ? ;)
+
+Thanks,
+Ohad.
