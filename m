@@ -1,19 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 26 Oct 2012 15:02:59 +0530
-Subject: [PATCH v2] arch/arm/mach-davinci/board-dm646x-evm.c: Remove
- unecessary semicolon
-In-Reply-To: <1347987599-30802-1-git-send-email-peter.senna@gmail.com>
-References: <1347987599-30802-1-git-send-email-peter.senna@gmail.com>
-Message-ID: <508A58CB.8010509@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 26 Oct 2012 11:35:22 +0200
+Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
+ include/linux/omap-iommu.h
+In-Reply-To: <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
+References: <20121025001913.2082.31062.stgit@muffinssi.local>
+ <20121025213935.GD11928@atomide.com>
+ <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
+Message-ID: <6561916.t72K1L6jg4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/18/2012 10:29 PM, Peter Senna Tschudin wrote:
-> Found by http://coccinelle.lip6.fr/
+Hi Ohad,
+
+On Friday 26 October 2012 07:50:56 Ohad Ben-Cohen wrote:
+> On Thu, Oct 25, 2012 at 11:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> > Joerg and Ohad, do you have any opinions on this?
 > 
-> Signed-off-by: Peter Senna Tschudin <peter.senna@gmail.com>
+> I agree that there's some merit in having a separate header file for
+> IOVMM, since it's a different layer from the IOMMU API.
+> 
+> But in reality it's tightly coupled with OMAP's IOMMU, and ideally it
+> really should go away and be replaced with the DMA API.
+> 
+> For this reason, and for the fact that anyway there's only a single
+> user for it (omap3isp) and there will never be any more, maybe we
+> shouldn't pollute include/linux anymore.
+> 
+> Anyone volunteering to remove IOVMM and adapt omap3isp to the DMA API
+> instead ? ;)
 
-Queuing this for v3.8
+That's on my to-do list, as well as porting the OMAP3 ISP driver to videobuf2, 
+adding DT support, moving to the common clock framework (when that will be 
+available for the OMAP3), supporting missing V4L2 features, ... All this in my 
+spare time of course, otherwise it wouldn't be fun, would it ? ;-)
 
-Thanks,
-Sekhar
+I would also like to move the tidspbridge to the DMA API, but I think we'll 
+need to move step by step there, and using the OMAP IOMMU and IOVMM APIs as an 
+intermediate step would allow splitting patches in reviewable chunks. I know 
+it's a step backwards in term of OMAP IOMMU usage, but that's in my opinion a 
+temporary nuisance to make the leap easier.
+
+-- 
+Regards,
+
+Laurent Pinchart
