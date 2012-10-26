@@ -1,62 +1,43 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Fri, 26 Oct 2012 11:51:22 +0800
-Subject: [PATCH 1/2] input: qt1070: add pinctrl consumer
-In-Reply-To: <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121023131627.GE18964@game.jcrosoft.org>
- <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <508A08BA.1070302@atmel.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 26 Oct 2012 16:51:37 +1300
+Subject: [GIT PULL] Convert arch-vt8500 to multiplatform
+Message-ID: <1351223497.30694.2.camel@gitbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2012 21:29, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> If no pinctrl available just report a warning as some architecture may not
-> need to do anything.
->
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-input at vger.kernel.org
-> ---
->   drivers/input/keyboard/qt1070.c |   11 +++++++++++
->   1 file changed, 11 insertions(+)
+The following changes since commit
+ddffeb8c4d0331609ef2581d84de4d763607bd37:
 
-Test it on sam9x5ek board with qt1070. It works well.
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 
-Tested-by: Bo Shen <voice.shen@atmel.com>
+are available in the git repository at:
 
-> diff --git a/drivers/input/keyboard/qt1070.c b/drivers/input/keyboard/qt1070.c
-> index ca68f29..967734e 100644
-> --- a/drivers/input/keyboard/qt1070.c
-> +++ b/drivers/input/keyboard/qt1070.c
-> @@ -33,6 +33,7 @@
->   #include <linux/interrupt.h>
->   #include <linux/jiffies.h>
->   #include <linux/delay.h>
-> +#include <linux/pinctrl/consumer.h>
->
->   /* Address for each register */
->   #define CHIP_ID            0x00
-> @@ -147,6 +148,7 @@ static int __devinit qt1070_probe(struct i2c_client *client,
->   	struct input_dev *input;
->   	int i;
->   	int err;
-> +	struct pinctrl *pinctrl;
->
->   	err = i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE);
->   	if (!err) {
-> @@ -155,6 +157,15 @@ static int __devinit qt1070_probe(struct i2c_client *client,
->   		return -ENODEV;
->   	}
->
-> +	pinctrl = devm_pinctrl_get_select_default(&client->dev);
-> +	if (IS_ERR(pinctrl)) {
-> +		err = PTR_ERR(pinctrl);
-> +		if (err == -EPROBE_DEFER)
-> +			return err;
-> +
-> +		dev_warn(&client->dev, "No pinctrl provided\n");
-> +	}
-> +
->   	if (!client->irq) {
->   		dev_err(&client->dev, "please assign the irq to this device\n");
->   		return -EINVAL;
->
+  git://server.prisktech.co.nz/git/linuxwmt.git/ tags/armsoc-for-3.8
+
+for you to fetch changes up to 6f35f9a9fabe8f0a89a17e353a77a7edef461bb2:
+
+  ARM: vt8500: Convert arch-vt8500 to multiplatform (2012-10-26 16:45:19
++1300)
+
+----------------------------------------------------------------
+Two patches for 3.8 to finish converting arch-vt8500 to multiplatform.
+Single arch build is maintained as we still need earlyprintk for
+development work.
+
+----------------------------------------------------------------
+Tony Prisk (2):
+      arm: vt8500: Convert irq.c for multiplatform integration
+      ARM: vt8500: Convert arch-vt8500 to multiplatform
+
+ arch/arm/Kconfig                                |    6 +-
+ arch/arm/mach-vt8500/Kconfig                    |   12 +++
+ arch/arm/mach-vt8500/common.h                   |    3 +
+ arch/arm/mach-vt8500/include/mach/entry-macro.S |   26 ------
+ arch/arm/mach-vt8500/include/mach/irqs.h        |   22 -----
+ arch/arm/mach-vt8500/irq.c                      |  108
++++++++++++++++--------
+ arch/arm/mach-vt8500/vt8500.c                   |    1 +
+ 7 files changed, 91 insertions(+), 87 deletions(-)
+ create mode 100644 arch/arm/mach-vt8500/Kconfig
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-vt8500/include/mach/irqs.h
