@@ -1,48 +1,67 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 26 Oct 2012 10:19:24 +0200
-Subject: [PATCH 0/8] clk: ux500: Fixup smp_twd clk for clk notifiers
-In-Reply-To: <20121011151947.GD15428@gmail.com>
-References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
- <20121011134458.GB15428@gmail.com>
- <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
- <20121011151947.GD15428@gmail.com>
-Message-ID: <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 26 Oct 2012 08:23:18 +0000
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <20121019160041.GB4730@atomide.com>
+References: <20121017181354.GA2412@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
+ <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at> <50806B1D.9040504@ti.com>
+ <20121019061630.GB2983@netboy.at.omicron.at>
+ <20121019160041.GB4730@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB4B4C7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 October 2012 17:19, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 11 Oct 2012, Linus Walleij wrote:
->
->> On Thu, Oct 11, 2012 at 3:44 PM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> >> Patches are based on Linus Torvalds tree with latest commit as of okt 10.
->> >
->> > Hmm... I get:
->> >
->> > Applying: clk: ux500: Support for prcmu_scalable_rate clock
->> > error: drivers/clk/ux500/clk-prcmu.c: does not exist in index
->> > error: drivers/clk/ux500/clk.h: does not exist in index
->> > Patch failed at 0001 clk: ux500: Support for prcmu_scalable_rate clock
->> >
->> > So when did drivers/clk/ux500/* arrive?
->>
->> Exactly here, 10 days ago on Torvalds' master branch:
->
-> Ah I see. Basing patches on commits half way through the merge
-> window. Good move! ;)
->
-> --
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+On Fri, Oct 19, 2012 at 21:30:41, Tony Lindgren wrote:
+> * Richard Cochran <richardcochran@gmail.com> [121018 23:18]:
+> > On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
+> > > 
+> > > Another important point is, this driver is also required and used for
+> > > Davinci family of devices (arch/mach/mach-davinci/).
+> > 
+> > That is really beside the point. If the code isn't ready yet, then
+> > don't merge it.
+> > 
+> > When I asked about the beaglebone, I was given the impression that it
+> > will be ready for v3.7-rc1.  But, as I know realize, at the current
+> > rate, it might not even be ready for v3.8.
+> > 
+> > I don't mind waiting, but please make sure that whatever lands into a
+> > release is really, truly working.
+> 
+> Indeed. This has been a problem with many of the TI patches in
+> general. People are working on separate product trees and then produce
+> patches for the mainline kernel that are poorly tested.
+> 
 
-Samuel, a kind reminder on this, trying to collect acks to be able to
-advise Mike to take this series through his clk tree. There are two
-mfd patches.
-[PATCH 2/8] mfd: db8500: Provide cpufreq table as platform data
-[PATCH 5/8] mfd: db8500: Connect ARMSS clk to ARM OPP
+Tony,
 
+It may not be true always, as we always work simultaneously and there are 
+high chances that some patches/development is dependent on others from 
+functionality perspective (especially baseport), but still they are 
+independent modules (may be for other devices).
 
-Kind regards
-Ulf Hansson
+Lets take a example of AM33xx and OMAP5 here, we started submitting baseport 
+patches to the list (almost 6-8 months now), not all the patches gets 
+accepted together in one shot.
+As you know, when we started pushing AM33xx and OMAP5 baseport patches, we 
+were at the stage where both DT and hwmod was required. First attempt for 
+board file submission did not went through, since we decided to force all 
+new devices migrate to DT, right?
+
+So the criteria initially was, build should not break and submit patches 
+step-by-step.
+
+Now, with baseport patches submitted to list, individual developer can also 
+start submitting patches to the respective driver's list, making sure that, 
+driver doesn't change irrespective of platform. I do not see anything wrong
+with this, as we always consider driver independent.
+
+In this particular case, note that, all the patches Richard posted recently 
+are AM33xx SoC integration specific patches only.
+
+Thanks,
+Vaibhav 
