@@ -1,41 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Oct 2012 09:20:08 +0000
-Subject: [GIT PULL] ux500 fixes due for v3.7 RCs
-In-Reply-To: <20121025154832.GJ4008@gmail.com>
-References: <20121025094147.GA4008@gmail.com>
- <CACRpkdZM3wHh9jey1eUfw9yjRTMK_fW5nKf1HcQuf2aExpPxbg@mail.gmail.com>
- <20121025154832.GJ4008@gmail.com>
-Message-ID: <201210260920.08903.arnd@arndb.de>
+From: vkoul@infradead.org (Vinod Koul)
+Date: Fri, 26 Oct 2012 14:40:56 +0530
+Subject: [PATCH V3 2/3] dmaengine: dw_dmac: Enhance device tree support
+In-Reply-To: <CAKohpo=4QDBuFZJrdCkXzijx4aD0rNXf1X2wS9LG17zg_LeAYg@mail.gmail.com>
+References: <3100e691db3f94c22afd98b609a1568d7e70dfe7.1350360935.git.viresh.kumar@linaro.org>
+ <169edae67b9a051ca7448e5b62c3cd2c5c1db470.1350360935.git.viresh.kumar@linaro.org>
+ <CAKohpokEXAGD-nUF6u8tugvF2ffJx3HLLd+Zgc2+6GB9hxnT6Q@mail.gmail.com>
+ <1351241315.7077.16.camel@vkoul-udesk3>
+ <CAKohpo=4QDBuFZJrdCkXzijx4aD0rNXf1X2wS9LG17zg_LeAYg@mail.gmail.com>
+Message-ID: <1351242656.7077.20.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 October 2012, Lee Jones wrote:
-> On Thu, 25 Oct 2012, Linus Walleij wrote:
+On Fri, 2012-10-26 at 14:35 +0530, Viresh Kumar wrote:
+> >> I can see that you applied these patches and they are present in
+> >> linux-next. But i feel
+> >> the order of patches is bad.
+> > Yes looks like I forgot to sort the mbox series :(
+> >
+> > since all patches were applied nicely, and they seem fairly independent
+> > of each other it should cause issue. Let me know if you wnat me to redo
+> > my -next.
 > 
-> > On Thu, Oct 25, 2012 at 3:52 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > > Since we're now getting pull requests from both of you, Lee and Linus,
-> > > I'd like to understand how you are organized.
-> > >
-> > > Lee, are you just sending bug fixes directly and send future work through
-> > > Linus, or are you acting as backup maintainer when he is busy otherwise
-> > > in general?
-> > 
-> > Let us say that Lee is pushing stuff that is DT-related, e.g. fixes that
-> > only manifest in DT environments and I'm pushing most other stuff.
-> > 
-> > I'm happy that Lee is doing some nice offloading as pinctrl and gpio is
-> > currently quite busy.
-> > 
-> > One day Srinidhi may also send pull requests, as co-maintainer.
-> 
-> Right. As I was creating quite a lot of traffic, I've basically been
-> asked to push all my own stuff after I've acquired the right Acks.
-> I won't be pushing/acking anything else i.e. not acting as a co-
-> maintainer.
-> 
-> Hope that clears things up.
+> yes. The ARCH specific patch 3/3 uses a routine created in 2/3. So they have
+> to be in right order for git bisect to work. 
 
-Ok, thanks for the explanations,
+Done, it should reflect now.
+Sorry for the mess.
 
-	Arnd
+-- 
+Vinod Koul
+Intel Corp.
