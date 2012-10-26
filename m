@@ -1,54 +1,84 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 26 Oct 2012 20:09:43 +0200
-Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a comparator
- driver to omap_usb2
-In-Reply-To: <508ACF0B.60808@ti.com>
-References: <1346943430-18236-1-git-send-email-kishon@ti.com>
- <1346943430-18236-3-git-send-email-kishon@ti.com>
- <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
- <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
- <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
- <508AA94B.10504@ti.com> <508AAA85.6070905@ti.com>
- <alpine.DEB.2.00.1210261750430.7573@utopia.booyaka.com>
- <508ACF0B.60808@ti.com>
-Message-ID: <508AD1E7.3080101@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Fri, 26 Oct 2012 11:13:43 -0700
+Subject: [PATCH 3/5] ARM: omap: vc: .get_voltage callback
+In-Reply-To: <1349313365-5262-4-git-send-email-mturquette@ti.com> (Mike
+ Turquette's message of "Wed, 3 Oct 2012 18:16:03 -0700")
+References: <1349313365-5262-1-git-send-email-mturquette@ti.com>
+ <1349313365-5262-4-git-send-email-mturquette@ti.com>
+Message-ID: <87sj91hzjc.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2012 07:57 PM, Benoit Cousson wrote:
-> Hi Paul,
-> 
-> On 10/26/2012 07:54 PM, Paul Walmsley wrote:
->> On Fri, 26 Oct 2012, Benoit Cousson wrote:
->>
->>> On 10/26/2012 05:16 PM, Roger Quadros wrote:
->>>
->>>> I still can't get musb to work on 3.7-rc2. Apparently it is still
->>>> missing the patches from Benoit's for_3.7/dts_part2.
->>>>
->>>> Maybe I just need to wait for it to be merged?
->>>
->>> They are now in a for_3.8/dts. Unfortunately, one patch that was adding
->>> ctrl_module address in the USB data was rejected and thus I'm not sure
->>> it will work without that.
->>
->> For v3.7-rc timeframe, looks like it's waiting on an ack from you:
->>
->> http://www.spinics.net/lists/arm-kernel/msg201028.html
-> 
-> Oups, I missed that one. But I thought Roger was mentioning the DT patch
-> and not that one.
-> 
-> Anyway, I will answer to Tony. Thanks for the reminder Paul.
+Mike Turquette <mturquette@ti.com> writes:
 
-Well, in fact, I cannot even find the original email in my mailbox :-(
-I was banned again from linux-omap around that time, so that might be
-the reason.
+> From: Mike Turquette <mturquette@linaro.org>
+>
+> Implement the voltdm->get_voltage callback for the voltage controller
+> driver.  
 
+nit: since it's not actually used in this series, it should say
+Impelment the function that will be used as the ->get_voltage()
+callback...
 
-Tony,
+> This reads the DATA field corresponding to each VC and returns
+> the voltage, after converting it from vsel format.
+>
+> If DATA is zero (the reset value) then the caller must interpret this as
+> the PMIC running at the default power-on voltage.  In such a case DT
+> data for the PMIC is necessary to know the voltage.
+>
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> ---
+>  arch/arm/mach-omap2/vc.c |   21 +++++++++++++++++++++
+>  arch/arm/mach-omap2/vc.h |    1 +
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+> index 2bcac64..90a9ea6 100644
+> --- a/arch/arm/mach-omap2/vc.c
+> +++ b/arch/arm/mach-omap2/vc.c
+> @@ -101,6 +101,27 @@ static int omap_vc_config_channel(struct voltagedomain *voltdm)
+>  }
+>  
+>  /* Voltage scale and accessory APIs */
+> +unsigned long omap_vc_get_bypass_data(struct voltagedomain *voltdm)
+> +{
+> +	struct omap_vc_channel *vc = voltdm->vc;
+> +	u32 vc_bypass_value;
+> +	u8 vsel;
+> +	unsigned long volt;
+> +
+> +	/* sanity */
+> +	if (!voltdm->pmic || !voltdm->pmic->vsel_to_uv ||
+> +			!voltdm->read || !voltdm->write)
+> +		return 0;
+> +
+> +	vc_bypass_value = voltdm->read(vc->common->bypass_val_reg);
+> +	vc_bypass_value &= vc->common->data_mask;
+> +	vsel = vc_bypass_value >> __ffs(vc->common->data_mask);
 
-So please take that hacky patch if it prevents the regression.
+Ah, now I see where the data_mask is used.  :)
 
-Thanks,
-Benoit
+Kevin
+
+> +	volt = voltdm->pmic->vsel_to_uv(vsel);
+> +
+> +	return volt;
+> +}
+> +
+>  int omap_vc_pre_scale(struct voltagedomain *voltdm,
+>  		      unsigned long target_volt,
+>  		      u8 *target_vsel, u8 *current_vsel)
+> diff --git a/arch/arm/mach-omap2/vc.h b/arch/arm/mach-omap2/vc.h
+> index 84a61b1..e7d4719 100644
+> --- a/arch/arm/mach-omap2/vc.h
+> +++ b/arch/arm/mach-omap2/vc.h
+> @@ -112,6 +112,7 @@ extern struct omap_vc_channel omap4_vc_iva;
+>  extern struct omap_vc_channel omap4_vc_core;
+>  
+>  void omap_vc_init_channel(struct voltagedomain *voltdm);
+> +unsigned long omap_vc_get_bypass_data(struct voltagedomain *voltdm);
+>  int omap_vc_pre_scale(struct voltagedomain *voltdm,
+>  		      unsigned long target_volt,
+>  		      u8 *target_vsel, u8 *current_vsel);
