@@ -1,90 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 20:52:48 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP1: usb: fix sparse warnings
-Message-ID: <alpine.DEB.2.00.1210262051290.11258@utopia.booyaka.com>
+From: chris.brand@broadcom.com (Chris Brand)
+Date: Fri, 26 Oct 2012 20:52:26 +0000
+Subject: [PATCH v4] pwm: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <1351100330-26072-1-git-send-email-linux@prisktech.co.nz>
+References: <1351100330-26072-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <4EE5B48738DDED408878C97C8E050A8B1BD17DD2@SJEXCHMB05.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-Resolve the following sparse warnings:
+> @@ -124,6 +156,12 @@ static int __devinit pwm_probe(struct
+> platform_device *pdev)
+>  	chip->chip.base = -1;
+>  	chip->chip.npwm = VT8500_NR_PWMS;
+> 
+> +	chip->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR_OR_NULL(chip->clk)) {
+> +		dev_err(&pdev->dev, "clock source not specified\n");
+> +		return PTR_ERR(chip->clk);
+> +	}
+> +
 
-arch/arm/mach-omap1/usb.c:304:12: warning: symbol 'omap1_usb0_init' was not declared. Should it be static?
-arch/arm/mach-omap1/usb.c:412:12: warning: symbol 'omap1_usb1_init' was not declared. Should it be static?
-arch/arm/mach-omap1/usb.c:478:12: warning: symbol 'omap1_usb2_init' was not declared. Should it be static?
+Do you want IS_ERR() rather than IS_ERR_OR_NULL() here ?
+Otherwise you may return PTR_ERR(NULL).
 
-by declaring those functions as static.  Also remove the unneeded
-prototypes and related code from the plat/usb.h header file.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Felipe Balbi <balbi@ti.com>
----
-
-Tony, care to take this one?
-
- arch/arm/mach-omap1/usb.c             |    6 +++---
- arch/arm/plat-omap/include/plat/usb.h |   20 --------------------
- 2 files changed, 3 insertions(+), 23 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
-index 84267ed..104fed3 100644
---- a/arch/arm/mach-omap1/usb.c
-+++ b/arch/arm/mach-omap1/usb.c
-@@ -301,7 +301,7 @@ static inline void otg_device_init(struct omap_usb_config *pdata)
- 
- #endif
- 
--u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
-+static u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
- {
- 	u32	syscon1 = 0;
- 
-@@ -409,7 +409,7 @@ u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
- 	return syscon1 << 16;
- }
- 
--u32 __init omap1_usb1_init(unsigned nwires)
-+static u32 __init omap1_usb1_init(unsigned nwires)
- {
- 	u32	syscon1 = 0;
- 
-@@ -475,7 +475,7 @@ bad:
- 	return syscon1 << 20;
- }
- 
--u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
-+static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
- {
- 	u32	syscon1 = 0;
- 
-diff --git a/arch/arm/plat-omap/include/plat/usb.h b/arch/arm/plat-omap/include/plat/usb.h
-index 87ee140..669baa1 100644
---- a/arch/arm/plat-omap/include/plat/usb.h
-+++ b/arch/arm/plat-omap/include/plat/usb.h
-@@ -156,24 +156,4 @@ extern void ti81xx_musb_phy_power(u8 on);
- #define USBPHY_OTGSESSEND_EN	(1 << 20)
- #define USBPHY_DATA_POLARITY	(1 << 23)
- 
--#if defined(CONFIG_ARCH_OMAP1) && defined(CONFIG_USB)
--u32 omap1_usb0_init(unsigned nwires, unsigned is_device);
--u32 omap1_usb1_init(unsigned nwires);
--u32 omap1_usb2_init(unsigned nwires, unsigned alt_pingroup);
--#else
--static inline u32 omap1_usb0_init(unsigned nwires, unsigned is_device)
--{
--	return 0;
--}
--static inline u32 omap1_usb1_init(unsigned nwires)
--{
--	return 0;
--
--}
--static inline u32 omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
--{
--	return 0;
--}
--#endif
--
- #endif	/* __ASM_ARCH_OMAP_USB_H */
--- 
-1.7.10.4
+Chris
