@@ -1,50 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 26 Oct 2012 18:05:21 +0530
-Subject: [PATCH RESEND] cpufreq: Make sure target freq is within limits
-Message-ID: <f79c0841be1ae16e1f2bd9084ed9a158eb171eb0.1351254846.git.viresh.kumar@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 26 Oct 2012 14:39:08 +0200
+Subject: [PATCH V2 0/4] Adding SATA support for Armada 370/XP
+In-Reply-To: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121026123908.GH21046@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__cpufreq_driver_target() must not pass target frequency beyond the limits of
-current policy.
+On Fri, Oct 26, 2012 at 02:30:45PM +0200, Gregory CLEMENT wrote:
+> Hello,
+> 
+> this patch set adds the SATA support for Armada 370 and Armada XP. Few
+> changes have been done since the first version by taking in account
+> the comments received for the first version.
+> 
+> The evaluation boards for Armada 370 and Armada XP come with 2 SATA
+> ports, and when both are enable the coherent pool for DMA mapping was
+> too short. It was exactly the same issue that was fixed for Kirkwood
+> two months ago. So I used the same fix in the first patch. Later when
+> Kirkwood will be part of mach-mvebu, then this fix will be shared
+> between the 2 SoCs families.
+> 
+> This patch set is based on 3.7-rc2 and depends one the framework clock
+> support (the last version was posted last week:
+> http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
+> called mvebu-SATA-for-3.8 is also available at
+> https://github.com/MISL-EBU-System-SW/mainline-public.git.
 
-Today most of cpufreq platform drivers are doing this check in their target
-routines. Why not move it to __cpufreq_driver_target().
+Hi Gregory
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
-Hi Rafael,
+What about the openblocks-ax3?
 
-Resend doesn't contain any change, but fixed commit log
-
- drivers/cpufreq/cpufreq.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 28dc134..2f5ac2d 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -1470,12 +1470,19 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
- 			    unsigned int relation)
- {
- 	int retval = -EINVAL;
-+	unsigned int old_target_freq = target_freq;
- 
- 	if (cpufreq_disabled())
- 		return -ENODEV;
- 
--	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
--		target_freq, relation);
-+	/* Make sure that target_freq is within supported range */
-+	if (target_freq > policy->max)
-+		target_freq = policy->max;
-+	if (target_freq < policy->min)
-+		target_freq = policy->min;
-+
-+	pr_debug("target for CPU %u: %u kHz, relation %u, requested %u kHz\n",
-+			policy->cpu, target_freq, relation, old_target_freq);
- 
- 	if (target_freq == policy->cur)
- 		return 0;
--- 
-1.7.12.rc2.18.g61b472e
+     Andrew
