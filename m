@@ -1,33 +1,27 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 26 Oct 2012 15:06:26 +0530
-Subject: [PATCH] cpufreq: Avoid calling cpufreq driver's target() routine if
- target_freq == policy->cur
-Message-ID: <1d7b6e421a335255da956804b43ce3517538409c.1351244153.git.viresh.kumar@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Oct 2012 10:36:28 +0100
+Subject: [PATCH v5 3/5] ARM: EXYNOS: Enable PMUs for exynos4
+In-Reply-To: <007301cdb32f$26eb92e0$74c2b8a0$@samsung.com>
+References: <1351056894-5790-1-git-send-email-chanho61.park@samsung.com>
+ <1351056894-5790-4-git-send-email-chanho61.park@samsung.com>
+ <CAOesGMg5Nn5i=J8o3Rt8es3Tq_LZgVttuYSBbvYfmw1QTGwx0A@mail.gmail.com>
+ <005801cdb251$e52f7480$af8e5d80$@samsung.com>
+ <20121025144125.GH11267@mudshark.cambridge.arm.com>
+ <007301cdb32f$26eb92e0$74c2b8a0$@samsung.com>
+Message-ID: <20121026093628.GE20914@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid calling cpufreq driver's target() routine if new frequency is same as
-policies current frequency.
+On Fri, Oct 26, 2012 at 05:05:36AM +0100, Chanho Park wrote:
+> > 
+> > I agree that we definitely want to support the PMU on Exynos4, but I'm
+> > tempted to postpone adding that code until DT support is available.
+> 
+> I already included DT support for exynos4(except exynos4412) in this patchset.
+> (Please see the [PATCH v5 5/5] ARM: EXYNOS: Add arm-pmu DT binding for exynos421x)
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/cpufreq.c | 4 ++++
- 1 file changed, 4 insertions(+)
+The only patch I'm objecting to is the second one, which adds the hardcoded
+combiner data. That seems orthogonal to the DT patches, which look fine to
+me.
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 261ef65..28dc134 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -1476,6 +1476,10 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
- 
- 	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
- 		target_freq, relation);
-+
-+	if (target_freq == policy->cur)
-+		return 0;
-+
- 	if (cpu_online(policy->cpu) && cpufreq_driver->target)
- 		retval = cpufreq_driver->target(policy, target_freq, relation);
- 
--- 
-1.7.12.rc2.18.g61b472e
+Will
