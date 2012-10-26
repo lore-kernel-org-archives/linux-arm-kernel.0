@@ -1,50 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 01:27:00 +0000 (UTC)
-Subject: [PATCH 10/16] ARM: OMAP: Make omap_device local to mach-omap2
-In-Reply-To: <20121004220456.26676.31050.stgit@muffinssi.local>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <20121004220456.26676.31050.stgit@muffinssi.local>
-Message-ID: <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Fri, 26 Oct 2012 09:26:18 +0800
+Subject: Question about move atmel audio part to DT support
+In-Reply-To: <20121025164008.GQ18814@opensource.wolfsonmicro.com>
+References: <5080F54F.4000600@atmel.com> <50810CC8.4050009@atmel.com>
+ <20121025164008.GQ18814@opensource.wolfsonmicro.com>
+Message-ID: <5089E6BA.2090902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+Hi Mark,
 
-On Thu, 4 Oct 2012, Tony Lindgren wrote:
+On 10/26/2012 0:40, Mark Brown wrote:
+> On Fri, Oct 19, 2012 at 04:18:16PM +0800, Bo Shen wrote:
+>
+>> Cc:
+>>     linux-arm-kernel mailing list
+>>     devicetree-discuss mailing list
+>>     alsa-devel mailing list
+>>     linux-sound mailing list
+>
+> Better to resend for things like this rather than double quote.
 
-> Let's make omap_device local to mach-omap2 for
-> ARM common zImage support.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+Got it. Thanks.
 
-This one breaks a 5912-only build:
+>>
+>>>    Atmel audio part has three platform device:
+>>>      -> atmel ssc: ssc library (different SOC has different number)
+>>>      -> atmel ssc dai: dai for audio
+>>>      -> atmel pcm: for pdc or dma transfer (now only support pdc, dma
+>>> support will add soon)
+>
+>>>   In DT support kernel, I don't find any similar case. So, if I want to
+>>> keep ssc as library, and use dai to register pcm. Then the dts file will
+>>> like:
+>
+> I'm not seeing anything at all unusual about the above situation - it'd
+> help if you could explain what you think is complex here?
 
-arch/arm/mach-omap1/pm_bus.c: In function 'omap1_pm_runtime_init':
-arch/arm/mach-omap1/pm_bus.c:69:2: error: implicit declaration of function 
-'cpu_class_is_omap1'
-make[1]: *** [arch/arm/mach-omap1/pm_bus.o] Error 1
+This is only a little different with others. We have one more DT node: 
+dai in dts file. I am worry about this won't be acceptable.
 
-Fixed by the usual change; it's below.
+Anyway, I have sent out the patches. Please help review the code if 
+possible.
+Thanks.
 
-
-- Paul
-
----
- arch/arm/mach-omap1/pm_bus.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-index 16bf2f9..3f2d396 100644
---- a/arch/arm/mach-omap1/pm_bus.c
-+++ b/arch/arm/mach-omap1/pm_bus.c
-@@ -19,6 +19,8 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- 
-+#include "soc.h"
-+
- #ifdef CONFIG_PM_RUNTIME
- static int omap1_pm_runtime_suspend(struct device *dev)
- {
--- 
-1.7.10.4
+BRs,
+Bo Shen
