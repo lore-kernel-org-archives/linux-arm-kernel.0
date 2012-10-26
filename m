@@ -1,251 +1,83 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Fri, 26 Oct 2012 15:32:26 +0800
-Subject: [PATCH v2] DMA: AT91: Get residual bytes in dma buffer
-Message-ID: <1351236746-4721-1-git-send-email-elen.song@atmel.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 26 Oct 2012 13:14:33 +0530
+Subject: [PATCH] ARM: davinci: dm644x: fix out range signal for ED
+In-Reply-To: <508A3D32.6090101@ti.com>
+References: <1349246100-7477-1-git-send-email-prabhakar.lad@ti.com>
+ <506C158D.4000906@ti.com>
+ <CA+V-a8uFNXvb7bPv0dLKeSeNzZ9C3rvrXCNSWy+8HgiumR9sEw@mail.gmail.com>
+ <506D3704.4060102@ti.com>
+ <CA+V-a8uqQhpe+9Q_A_ojR1MahHLnbKpOEBdg9Vz3Gq8YQbHyjg@mail.gmail.com>
+ <508A3D32.6090101@ti.com>
+Message-ID: <CA+V-a8u+62-Qe6C0YxB0UjiL2Yts0QQAtePbU6p-MUHgve3X4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for returning the residue for a particular descriptor by
-reading the BTSIZE in CTRLA register.
+Sekhar,
 
-- If the cookie has completed successfully, the residue will be zero.
-- If the cookie is in progress or the channel is paused, it will be
-  the number of bytes yet to be transferred.
-- If the cookie is queued, it will be the number of bytes in the
-  descriptor.
-- If get residue error, the cookie will be turn into error status,
-  and dma transfer will be terminated.
+On Fri, Oct 26, 2012 at 1:05 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 10/4/2012 7:23 PM, Prabhakar Lad wrote:
+>> Sekhar
+>>
+>> On Thu, Oct 4, 2012 at 12:43 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>> On 10/4/2012 10:22 AM, Prabhakar Lad wrote:
+>>>> Hi Sekhar,
+>>>>
+>>>> On Wed, Oct 3, 2012 at 4:08 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>>>>> On 10/3/2012 12:05 PM, Prabhakar wrote:
+>>>>>> From: Lad, Prabhakar <prabhakar.lad@ti.com>
+>>>>>>
+>>>>>> while testing display on dm644x, for ED out-range signals
+>>>>>> was observed. This patch fixes appropriate clock setting
+>>>>>> for ED.
+>>>>>
+>>>>> Can you please clarify what you mean by "out range signal"? Are there
+>>>>> any user visible artifacts on the display? What was the clock being
+>>>>> provided earlier and what is the value after this patch?
+>>>>>
+>>>>> Also, is the issue severe enough that this patch should be applied to
+>>>>> stable tree as well?
+>>>>>
+>>>> Ideally a clock of 54Mhz is required for  enhanced definition to
+>>>> work, which it was actually set to but while testing I noticed
+>>>> out-of-range signal. The out-of-range signal is often caused
+>>>> when the field rate is above the rate that the television will handle.
+>>>> When this is the case the TV or monitor displays "Out-Of-Range Signal".
+>>>>
+>>>> Reducing the clock fixed it. now the clock is set to 27Mhz.
+>>>
+>>> So, is the requirement for ED 54MHz or lower? Still trying to explain
+>>> myself how 27MHz is working where a 54MHz is required. I guess there is
+>>> also a lower limit on what the frequency should be?
+>>>
+>> Ideally its 54Mhz, but I see in the datasheet for AD7342/3 [1] it can also
+>> work at 27Mhz too.
+>
+> So, based on this discussion I think a better description would be:
+>
+> "
+> Fix the video clock setting when custom timings are used with pclock  <=
+> 27MHz. Existing clock selection uses PLL2 mode which results in a 54MHz
+> clock where as using the MXI mode results in a 27MHz clock (which is the
+> one actually desired).
+>
+> This affects the Enhanced Definition (ED) support on DM644x. Without
+> this patch, out-range signals errors are were observed on the TV. An
+> out-of-range signal is often caused when the field rate is above the
+> rate that the television will handle.
+> "
+>
+> Is this accurate? In future, please try to be descriptive in patch
+> description as it will help understand what the patch is doing and why
+> (which in turn will lead to the patch getting accepted faster).
+>
+Looks good.  I'll make sure to have descriptive commit message hence forth.
 
-Signed-off-by: Elen Song <elen.song@atmel.com>
----
-Change compare to v1:
-1. Do not need to use DMA_CTRL_ACK flag to know descriptor transfer complete.
-2. Pause dma before read residue.
-3. Change comment.
+> Also I assume you need this patch in v3.7? Or can I send it for v3.8?
+>
+Since its a fix it would be good if its queued for v3.7.
 
- drivers/dma/at_hdmac.c      |  137 +++++++++++++++++++++++++++++++++++++++----
- drivers/dma/at_hdmac_regs.h |    5 ++
- 2 files changed, 131 insertions(+), 11 deletions(-)
+Regards,
+--Prabhakar
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 13a02f4..c771e83 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -229,6 +229,101 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
- 	vdbg_dump_regs(atchan);
- }
- 
-+/*
-+ * atc_get_current_descriptors -
-+ * locate the descriptor which equal to physical address in DSCR
-+ * @atchan: the channel we want to start
-+ * @dscr_addr: physical descriptor address in DSCR
-+ */
-+static struct at_desc *atc_get_current_descriptors(struct at_dma_chan *atchan,
-+							u32 dscr_addr)
-+{
-+	struct at_desc  *desc, *_desc, *child, *desc_cur = NULL;
-+
-+	list_for_each_entry_safe(desc, _desc, &atchan->active_list, desc_node) {
-+
-+		if (desc->lli.dscr == dscr_addr) {
-+			desc_cur = desc;
-+			break;
-+		}
-+
-+		list_for_each_entry(child, &desc->tx_list, desc_node) {
-+
-+			if (child->lli.dscr == dscr_addr) {
-+				desc_cur = child;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return desc_cur;
-+}
-+
-+/*
-+ * atc_get_bytes_left -
-+ * Get the number of bytes residue in dma buffer,
-+ * the channel should be paused when calling this
-+ * @atchan: the channel we want to start
-+ */
-+static int atc_get_bytes_left(struct at_dma_chan *atchan)
-+{
-+	struct at_desc *desc_first;
-+	int left = 0, count = 0;
-+	u32 dscr_addr;
-+
-+	/* First descriptor embedds the transaction length */
-+	desc_first = atc_first_active(atchan);
-+	if (!desc_first)
-+		return -EINVAL;
-+	/*
-+	 * Initialize necessary values in the first time.
-+	 * We use desc_cur to save current descriptor,
-+	 * save_len record residual dma buffer length.
-+	 */
-+	if (!atchan->desc_cur &&
-+	    !atchan->save_len) {
-+		atchan->desc_cur = desc_first;
-+		atchan->save_len = desc_first->len;
-+	}
-+	/*
-+	 * This happens when current descriptor transfer complete.
-+	 * When transfer terminated, we reset the necessary values.
-+	 * Otherwise, we calculate the remain buffer size.
-+	 */
-+	if (test_and_clear_bit(ATC_IS_BTC, &atchan->status)) {
-+		dscr_addr = channel_readl(atchan, DSCR);
-+		/* End of a single or cyclic transfer */
-+		if (dscr_addr == 0 || dscr_addr == desc_first->lli.dscr) {
-+			atchan->desc_cur = NULL;
-+			atchan->save_len = 0;
-+		/*
-+		 * Current descriptor transfer done and switch to next.
-+		 * The residual buffer size should
-+		 * reduce current descriptor length.
-+		 */
-+		} else {
-+			atchan->desc_cur = atc_get_current_descriptors(atchan,
-+								dscr_addr);
-+			if (!atchan->desc_cur)
-+				return -EINVAL;
-+			atchan->save_len -= (atchan->desc_cur->lli.ctrla
-+						& ATC_BTSIZE_MAX);
-+		}
-+
-+		left = atchan->save_len;
-+	}
-+
-+	/*
-+	 * Get residual bytes when current descriptor transfer in progress.
-+	 */
-+	if (atchan->desc_cur) {
-+		count = channel_readl(atchan, CTRLA) & ATC_BTSIZE_MAX;
-+		left = atchan->save_len - count;
-+	}
-+
-+	return left;
-+}
-+
- /**
-  * atc_chain_complete - finish work for one transaction chain
-  * @atchan: channel we work on
-@@ -494,6 +589,8 @@ static irqreturn_t at_dma_interrupt(int irq, void *dev_id)
- 					/* Give information to tasklet */
- 					set_bit(ATC_IS_ERROR, &atchan->status);
- 				}
-+				if (pending & AT_DMA_BTC(i))
-+					set_bit(ATC_IS_BTC, &atchan->status);
- 				tasklet_schedule(&atchan->tasklet);
- 				ret = IRQ_HANDLED;
- 			}
-@@ -1034,32 +1131,50 @@ atc_tx_status(struct dma_chan *chan,
- 	dma_cookie_t		last_complete;
- 	unsigned long		flags;
- 	enum dma_status		ret;
--
--	spin_lock_irqsave(&atchan->lock, flags);
-+	int bytes = 0;
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
--	if (ret != DMA_SUCCESS) {
--		atc_cleanup_descriptors(atchan);
--
--		ret = dma_cookie_status(chan, cookie, txstate);
-+	/* Residue is zero while transactions complete */
-+	if (ret == DMA_SUCCESS) {
-+		dma_set_residue(txstate, 0);
-+		return ret;
- 	}
-+	/*
-+	 * There's no point calculating the residue if there's
-+	 * no txstate to store the value.
-+	 */
-+	if (!txstate)
-+		goto err_dma;
- 
--	last_complete = chan->completed_cookie;
--	last_used = chan->cookie;
-+	/* Channel should be paused before get residue */
-+	if (!atc_chan_is_paused(atchan))
-+		atc_control(chan, DMA_PAUSE, 0);
-+
-+	spin_lock_irqsave(&atchan->lock, flags);
-+
-+	/*  Get number of bytes left in the active transactions */
-+	bytes = atc_get_bytes_left(atchan);
- 
- 	spin_unlock_irqrestore(&atchan->lock, flags);
- 
--	if (ret != DMA_SUCCESS)
--		dma_set_residue(txstate, atc_first_active(atchan)->len);
-+	if (bytes < 0)
-+		goto err_dma;
-+	else
-+		dma_set_residue(txstate, bytes);
- 
- 	if (atc_chan_is_paused(atchan))
--		ret = DMA_PAUSED;
-+		atc_control(chan, DMA_RESUME, 0);
- 
- 	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d (d%d, u%d)\n",
- 		 ret, cookie, last_complete ? last_complete : 0,
- 		 last_used ? last_used : 0);
- 
- 	return ret;
-+
-+err_dma:
-+	atc_control(chan, DMA_TERMINATE_ALL, 0);
-+	ret = DMA_ERROR;
-+	return ret;
- }
- 
- /**
-diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index 116e4ad..b1861cb 100644
---- a/drivers/dma/at_hdmac_regs.h
-+++ b/drivers/dma/at_hdmac_regs.h
-@@ -211,6 +211,7 @@ txd_to_at_desc(struct dma_async_tx_descriptor *txd)
- enum atc_status {
- 	ATC_IS_ERROR = 0,
- 	ATC_IS_PAUSED = 1,
-+	ATC_IS_BTC = 2,
- 	ATC_IS_CYCLIC = 24,
- };
- 
-@@ -226,12 +227,14 @@ enum atc_status {
-  * @save_cfg: configuration register that is saved on suspend/resume cycle
-  * @save_dscr: for cyclic operations, preserve next descriptor address in
-  *             the cyclic list on suspend/resume cycle
-+ * @save_len: to record dma buffer length
-  * @dma_sconfig: configuration for slave transfers, passed via DMA_SLAVE_CONFIG
-  * @lock: serializes enqueue/dequeue operations to descriptors lists
-  * @active_list: list of descriptors dmaengine is being running on
-  * @queue: list of descriptors ready to be submitted to engine
-  * @free_list: list of descriptors usable by the channel
-  * @descs_allocated: records the actual size of the descriptor pool
-+ * @desc_cur: current descriptor
-  */
- struct at_dma_chan {
- 	struct dma_chan		chan_common;
-@@ -242,6 +245,7 @@ struct at_dma_chan {
- 	struct tasklet_struct	tasklet;
- 	u32			save_cfg;
- 	u32			save_dscr;
-+	u32			save_len;
- 	struct dma_slave_config dma_sconfig;
- 
- 	spinlock_t		lock;
-@@ -251,6 +255,7 @@ struct at_dma_chan {
- 	struct list_head	queue;
- 	struct list_head	free_list;
- 	unsigned int		descs_allocated;
-+	struct at_desc		*desc_cur;
- };
- 
- #define	channel_readl(atchan, name) \
--- 
-1.7.9.5
+> Thanks,
+> Sekhar
