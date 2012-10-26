@@ -1,50 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 26 Oct 2012 22:59:58 +0300
-Subject: [PATCH v2 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
-In-Reply-To: <20121026172140.GJ11908@atomide.com>
-References: <1349675983-23803-1-git-send-email-kishon@ti.com>
- <1349675983-23803-4-git-send-email-kishon@ti.com>
- <20121026065012.GC22206@arwen.pp.htv.fi>
- <201210260747.11848.arnd@arndb.de>
- <20121026172140.GJ11908@atomide.com>
-Message-ID: <20121026195958.GB29548@arwen.pp.htv.fi>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 26 Oct 2012 14:08:24 -0600
+Subject: [PATCH 0/3] ARM: OMAP: fix build, sparse problems in cleanup-headers
+Message-ID: <20121026200413.16521.88985.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 10:21:41AM -0700, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [121026 00:48]:
-> > On Friday 26 October 2012, Felipe Balbi wrote:
-> > > > +static void omap_init_ocp2scp(void)
-> > > > +{
-> > > > +     struct omap_hwmod       *oh;
-> > > > +     struct platform_device  *pdev;
-> > > > +     int                     bus_id = -1, dev_cnt = 0, i;
-> > > > +     struct omap_ocp2scp_dev *ocp2scp_dev;
-> > > > +     const char              *oh_name, *name;
-> > > > +     struct omap_ocp2scp_platform_data *pdata;
-> > > > +
-> > > > +     oh_name = "ocp2scp_usb_phy";
-> > > > +     name    = "omap-ocp2scp";
-> > > 
-> > > how about adding checks here to return early case we're not running on
-> > > OMAP4 or OMAP5 ??
-> > > 
-> > 
-> > I suppose even OMAP4-only, since OMAP5 always has DT enabled.
-> 
-> Hmm yes, currently omap_hwmod_lookup(oh_name) produces
-> bogus errors for other omaps as the hwmod data is only
-> there for omap4.
+Fix several build failures and a sparse warning in the linux-omap
+omap-for-v3.8/cleanup-headers branch.  
 
-shouldn't that be fixed too ? I mean, if data isn't just return -ENODEV
-or something similar.
+Basic test logs are here:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121026/f7cbc29e/attachment.sig>
+http://www.pwsan.com/omap/testlogs/cleanup-headers-compile-fixes-3.8/20121026132711/
+
+Due to underlying problems in v3.7-rc2, several tests fail.  The
+failures are unrelated to these patches.
+
+Intended for 3.8 cleanup.
+
+- Paul
+
+---
+
+cleanup-headers-compile-fixes-3.8
+   text	   data	    bss	    dec	    hex	filename
+5452826	 352260	 121588	5926674	 5a6f12	vmlinux.omap1_defconfig.orig
+5452826	 352260	 121588	5926674	 5a6f12	vmlinux.omap1_defconfig
+
+Paul Walmsley (3):
+      ARM: OMAP2+: fix build breakage introduced by commit b7754452b3e27716347a528b47b0a1083af32520
+      ARM: OMAP1: fix build breakage introduced by commit 25c7d49ed48b4843da7dea56a81ae7f620211ee0
+      ARM: OMAP1: fix sparse warning added by commit 4c98dc6b8ef2f73bdbfa78186db9a76507ba9ea3
+
+
+ arch/arm/mach-omap1/fpga.c   |    1 +
+ arch/arm/mach-omap1/pm_bus.c |    2 ++
+ drivers/mtd/onenand/omap2.c  |   36 ++++++++++++++++++++++++------------
+ 3 files changed, 27 insertions(+), 12 deletions(-)
