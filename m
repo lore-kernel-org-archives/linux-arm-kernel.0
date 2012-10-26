@@ -1,26 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 20:45:25 +0000 (UTC)
-Subject: [PATCH 10/16] ARM: OMAP: Make omap_device local to mach-omap2
-In-Reply-To: <20121026203741.GT11908@atomide.com>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <20121004220456.26676.31050.stgit@muffinssi.local>
- <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
- <20121026163900.GC11908@atomide.com>
- <alpine.DEB.2.00.1210261701060.3301@utopia.booyaka.com>
- <20121026171059.GG11908@atomide.com>
- <alpine.DEB.2.00.1210262016410.11258@utopia.booyaka.com>
- <20121026203741.GT11908@atomide.com>
-Message-ID: <alpine.DEB.2.00.1210262045170.11258@utopia.booyaka.com>
+From: jason@lakedaemon.net (Jason)
+Date: Fri, 26 Oct 2012 16:49:49 -0400
+Subject: [PATCH] arm: mvebu: update defconfig with 3.7 changes
+In-Reply-To: <201210262033.41250.arnd@arndb.de>
+References: <1350980269-6587-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5087A94E.4000706@free-electrons.com> <20121024161611.659b0989@skate>
+ <201210262033.41250.arnd@arndb.de>
+Message-ID: <9cb693c5-b977-423d-b3a1-569775405bcd@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Oct 2012, Tony Lindgren wrote:
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-> I've merged omap-for-v3.8/cleanup-headers into omap-for-v3.8/cleanup-prcm
-> too now, so you should be able to use commit 7fc54fd3 as the base for
-> further PRCM changes.
+>On Wednesday 24 October 2012, Thomas Petazzoni wrote:
+>> On Wed, 24 Oct 2012 10:39:42 +0200, Gregory CLEMENT wrote:
+>> > On 10/23/2012 10:17 AM, Thomas Petazzoni wrote:
+>> > > The split of 370 and XP into two Kconfig options and the
+>multiplatform
+>> > > kernel support has changed a few Kconfig symbols, so let's update
+>the
+>> > > mvebu_defconfig file with the latest changes.
+>> > 
+>> > Indeed this patch fixes the mvebu_defconfig which was broken.
+>> > But as now mvebu is part of multi_v7_defconfig, shouldn't we just
+>> > removed mvebu_defconfig ?
+>> 
+>> I think for now, SoC family specific defconfig files are still
+>> accepted, so I'd prefer to keep mvebu_defconfig around. Multiplatform
+>> is nice for users, but I prefer to build a mvebu-only kernel when I'm
+>> doing kernel development.
+>
+>I'd certainly like to see that patch get merged. Should I just apply it
+>to the fixes branch?
+>
+>	Arnd
 
-OK thanks, will do.
+Please do.  I have a few other fixes for v3.7 to do this w/e, but iirc they aren't fixing build breakage.
 
+thx,
 
-- Paul
+Jason.
