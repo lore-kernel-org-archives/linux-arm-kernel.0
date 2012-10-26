@@ -1,36 +1,21 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 26 Oct 2012 21:25:59 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP1: usb: fix sparse warnings
-In-Reply-To: <20121026212059.GV11908@atomide.com>
-References: <alpine.DEB.2.00.1210262051290.11258@utopia.booyaka.com>
- <20121026212059.GV11908@atomide.com>
-Message-ID: <alpine.DEB.2.00.1210262125410.11258@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 21:26:49 +0000
+Subject: [PATCH] arm: socfpga: fix build break for allyesconfig
+In-Reply-To: <1351289861-16297-1-git-send-email-dinguyen@altera.com>
+References: <1351289861-16297-1-git-send-email-dinguyen@altera.com>
+Message-ID: <201210262126.49201.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Oct 2012, Tony Lindgren wrote:
+On Friday 26 October 2012, dinguyen at altera.com wrote:
+>  ENTRY(secondary_trampoline)
+> +#if __LINUX_ARM_ARCH__ >= 7
+>         movw    r0, #:lower16:CPU1_START_ADDR
+>         movt  r0, #:upper16:CPU1_START_ADDR
+> +#endif
 
-> * Paul Walmsley <paul@pwsan.com> [121026 13:54]:
-> > 
-> > Resolve the following sparse warnings:
-> > 
-> > arch/arm/mach-omap1/usb.c:304:12: warning: symbol 'omap1_usb0_init' was not declared. Should it be static?
-> > arch/arm/mach-omap1/usb.c:412:12: warning: symbol 'omap1_usb1_init' was not declared. Should it be static?
-> > arch/arm/mach-omap1/usb.c:478:12: warning: symbol 'omap1_usb2_init' was not declared. Should it be static?
-> > 
-> > by declaring those functions as static.  Also remove the unneeded
-> > prototypes and related code from the plat/usb.h header file.
-> > 
-> > Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > ---
-> > 
-> > Tony, care to take this one?
-> 
-> Let's apply just the usb.c changes on omap-for-v3.8/cleanup-headers
-> as plat/usb.h is now gone?
+I don't think this is the right fix, because it will break
+running on SMP socfpga machines if you enable both socfpga
+and picoxcell in a multiplatform configuration.
 
-OK no problem, thought you might want it for the -rc series...
-
-- Paul
+	Arnd
