@@ -1,43 +1,46 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 26 Oct 2012 19:57:31 +0200
-Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a comparator
- driver to omap_usb2
-In-Reply-To: <alpine.DEB.2.00.1210261750430.7573@utopia.booyaka.com>
-References: <1346943430-18236-1-git-send-email-kishon@ti.com>
- <1346943430-18236-3-git-send-email-kishon@ti.com>
- <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
- <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
- <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
- <508AA94B.10504@ti.com> <508AAA85.6070905@ti.com>
- <alpine.DEB.2.00.1210261750430.7573@utopia.booyaka.com>
-Message-ID: <508ACF0B.60808@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Oct 2012 11:00:42 -0700
+Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
+ include/linux/omap-iommu.h
+In-Reply-To: <CAK=WgbY2-Ajm-2OSheOgLCd4589WKDSqqKjzHkE5Ogyp4puJ3g@mail.gmail.com>
+References: <20121025001913.2082.31062.stgit@muffinssi.local>
+ <20121025213935.GD11928@atomide.com>
+ <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
+ <6561916.t72K1L6jg4@avalon>
+ <CAK=WgbY2-Ajm-2OSheOgLCd4589WKDSqqKjzHkE5Ogyp4puJ3g@mail.gmail.com>
+Message-ID: <20121026180039.GM11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 10/26/2012 07:54 PM, Paul Walmsley wrote:
-> On Fri, 26 Oct 2012, Benoit Cousson wrote:
+* Ohad Ben-Cohen <ohad@wizery.com> [121026 02:56]:
+> Hi Laurent,
 > 
->> On 10/26/2012 05:16 PM, Roger Quadros wrote:
->>
->>> I still can't get musb to work on 3.7-rc2. Apparently it is still
->>> missing the patches from Benoit's for_3.7/dts_part2.
->>>
->>> Maybe I just need to wait for it to be merged?
->>
->> They are now in a for_3.8/dts. Unfortunately, one patch that was adding
->> ctrl_module address in the USB data was rejected and thus I'm not sure
->> it will work without that.
+> On Fri, Oct 26, 2012 at 11:35 AM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> > That's on my to-do list, as well as porting the OMAP3 ISP driver to videobuf2,
+> > adding DT support, moving to the common clock framework (when that will be
+> > available for the OMAP3), supporting missing V4L2 features, ... All this in my
+> > spare time of course, otherwise it wouldn't be fun, would it ? ;-)
 > 
-> For v3.7-rc timeframe, looks like it's waiting on an ack from you:
+> Hmm, seems like a short to-do list ;)
+
+Sounds Laurent will take care of it :)
+
+> > I would also like to move the tidspbridge to the DMA API, but I think we'll
+> > need to move step by step there, and using the OMAP IOMMU and IOVMM APIs as an
+> > intermediate step would allow splitting patches in reviewable chunks. I know
+> > it's a step backwards in term of OMAP IOMMU usage, but that's in my opinion a
+> > temporary nuisance to make the leap easier.
 > 
-> http://www.spinics.net/lists/arm-kernel/msg201028.html
+> Since tidspbridge is in staging I guess it's not a problem, though it
+> sounds to me like using the correct API in the first place is going to
+> make less churn.
 
-Oups, I missed that one. But I thought Roger was mentioning the DT patch
-and not that one.
-
-Anyway, I will answer to Tony. Thanks for the reminder Paul.
+Not related to these patches, but also sounds like we may need to drop
+some staging/tidspbridge code to be able to move forward with the
+ARM common zImage plans. See the "[GIT PULL] omap plat header removal
+for v3.8 merge window, part1" thread for more info.
 
 Regards,
-Benoit
+
+Tony
