@@ -1,54 +1,36 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 26 Oct 2012 13:46:27 +0400
-Subject: [PATCH v2 1/6] ARM: davinci: Changed pr_warning() to pr_warn()
-In-Reply-To: <1351197357-23528-1-git-send-email-rtivy@ti.com>
-References: <1351197357-23528-1-git-send-email-rtivy@ti.com>
-Message-ID: <508A5BF3.2060803@mvista.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 26 Oct 2012 11:54:28 +0200
+Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
+ include/linux/omap-iommu.h
+In-Reply-To: <6561916.t72K1L6jg4@avalon>
+References: <20121025001913.2082.31062.stgit@muffinssi.local>
+ <20121025213935.GD11928@atomide.com>
+ <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
+ <6561916.t72K1L6jg4@avalon>
+Message-ID: <CAK=WgbY2-Ajm-2OSheOgLCd4589WKDSqqKjzHkE5Ogyp4puJ3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Laurent,
 
-    It's not a good idea to send multiple patches with the same subject. 
-Actually, in this case it's worth merging all 4 patches into one.
+On Fri, Oct 26, 2012 at 11:35 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> That's on my to-do list, as well as porting the OMAP3 ISP driver to videobuf2,
+> adding DT support, moving to the common clock framework (when that will be
+> available for the OMAP3), supporting missing V4L2 features, ... All this in my
+> spare time of course, otherwise it wouldn't be fun, would it ? ;-)
 
-On 26-10-2012 0:35, Robert Tivy wrote:
+Hmm, seems like a short to-do list ;)
 
-> Also, while modifying those pr_warning() calls I changed hardcoded
-> function names to use '"%s:", __func__' instead
+> I would also like to move the tidspbridge to the DMA API, but I think we'll
+> need to move step by step there, and using the OMAP IOMMU and IOVMM APIs as an
+> intermediate step would allow splitting patches in reviewable chunks. I know
+> it's a step backwards in term of OMAP IOMMU usage, but that's in my opinion a
+> temporary nuisance to make the leap easier.
 
-> Signed-off-by: Robert Tivy <rtivy@ti.com>
-> ---
-> Clean up files that will be otherwise modified in subsequent patch.
+Since tidspbridge is in staging I guess it's not a problem, though it
+sounds to me like using the correct API in the first place is going to
+make less churn.
 
-> Applies to v3.5 tag (commit 28a33cbc24e4256c143dce96c7d93bf423229f92) of
-> Linus' mainline kernel at git.kernel.org.
-
-    3.5 is too old. Why not to 3.6 or even 3.7-rc2?
-
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 0149fb4..bbb3c73 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-[...]
-> @@ -1046,21 +1046,19 @@ static int __init da850_evm_config_emac(void)
->  	}
->
->  	if (ret)
-> -		pr_warning("da850_evm_init: cpgmac/rmii mux setup failed: %d\n",
-> -				ret);
-> +		pr_warn("%s: cpgmac/rmii mux setup failed: %d\n",
-> +			__func__, ret);
->
->  	/* configure the CFGCHIP3 register for RMII or MII */
->  	__raw_writel(val, cfg_chip3_base);
->
->  	ret = davinci_cfg_reg(DA850_GPIO2_6);
->  	if (ret)
-> -		pr_warning("da850_evm_init:GPIO(2,6) mux setup "
-> -							"failed\n");
-> +		pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
-
-    Worth inserting space after colon here.
-
-WBR, Sergei
+Thanks,
+Ohad.
