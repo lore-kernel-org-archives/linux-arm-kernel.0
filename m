@@ -1,27 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 25 Oct 2012 20:51:17 -0600
-Subject: [PATCH] ARM: bcm2835: implement machine restart hook
-In-Reply-To: <1348805280-7647-1-git-send-email-swarren@wwwdotorg.org>
-References: <1348805280-7647-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5089FAA5.7050908@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 25 Oct 2012 22:20:37 -0500
+Subject: [PATCH] ARM: highbank: retry wfi on reset request
+Message-ID: <1351221637-21747-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/27/2012 10:08 PM, Stephen Warren wrote:
-> Implement the machine restart hook using the SoC's watchdog timer module.
-> To support this, define a DT binding for the watchdog module, and add it
-> to the device tree.
-> 
-> The downstream rpi-split branch contains a full watchdog timer driver
-> implementation, which also implements the restart hook. However, the
-> restart function is largely separate from the watchdog driver, so for
-> simplicity, the restart hook is implemented here directly in the main
-> machine source file.
-> 
-> Overall structure (separate setup/restart) functions derived from the
-> picoxcell ARM support.
-> 
-> Watchdog register IO sequence taken from code by Simon Arlott. Note that
-> the watchdog module is not documented in BCM2835-ARM-Peripherals.pdf.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Applied to rpi's for-3.8/soc branch.
+In some cases, an interrupt can occur and prevent cause failure to enter
+wfi. This causes reset to hang. Retrying the wfi should be enough to
+prevent reset from hanging.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/mach-highbank/system.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
+index 82c2723..86e37cd 100644
+--- a/arch/arm/mach-highbank/system.c
++++ b/arch/arm/mach-highbank/system.c
+@@ -28,6 +28,7 @@ void highbank_restart(char mode, const char *cmd)
+ 		hignbank_set_pwr_soft_reset();
+ 
+ 	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
+-	cpu_do_idle();
++	while (1)
++		cpu_do_idle();
+ }
+ 
+-- 
+1.7.10.4
