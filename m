@@ -1,123 +1,28 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 26 Oct 2012 14:26:04 -0500
-Subject: [PATCH v5] gpio/omap: fix off-mode bug: clear debounce settings on
- free/reset
-Message-ID: <1351279564-4591-1-git-send-email-jon-hunter@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Oct 2012 19:26:38 +0000
+Subject: [GIT PULL] vexpress: soc changes for v3.8
+In-Reply-To: <1351273532.9454.43.camel@hornet>
+References: <1350579917.4984.19.camel@hornet>
+ <201210261718.08983.arnd@arndb.de> <1351273532.9454.43.camel@hornet>
+Message-ID: <201210261926.38370.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change was originally titled "gpio/omap: fix off-mode bug: clear debounce
-clock enable mask on free/reset". The title has been updated slightly to
-reflect (what should be) the final fix.
+On Friday 26 October 2012, Pawel Moll wrote:
+> 
+> On Fri, 2012-10-26 at 18:18 +0100, Arnd Bergmann wrote:
+> > Are you sure it's the same commit that Mike has in his tree?
+> > Is this not the tree that is part of linux-next?
+> 
+> Damn, I am seriously confused now... I'm looking at next-20121026 in
+> git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git and
+> I'm not seeing the vexpress clk drivers! Neither I can find the
+> patches in git://git.linaro.org/people/mturquette/linux.git clk-next.
+> 
+> Am I doing something wrong or just looking not where I should? You seem
+> to be able to see some -next vexpress clk patches - where about?
 
-When a GPIO is freed or shutdown, we need to ensure that any debounce settings
-are cleared and if the GPIO is the only GPIO in the bank that is currently
-using debounce, then disable the debounce clock as well to save power.
+I'm the one who was confused, they are not actually in linux-next for
+all I can tell, neither the version you used nor any other.
 
-Currently, the debounce settings are not cleared on a GPIO free or shutdown and
-so during a context restore on subsequent off-mode transition, the previous
-debounce values are restored from the shadow copies (bank->context.debounce*)
-leading to mismatch state between driver state and hardware state.
-
-This was discovered when board code was doing
-
-  gpio_request_one()
-  gpio_set_debounce()
-  gpio_free()
-
-which was leaving the GPIO debounce settings in a confused state.  If that GPIO
-bank is subsequently used with off-mode enabled, bogus state would be restored,
-leaving GPIO debounce enabled which then prevented the CORE powerdomain from
-transitioning.
-
-To fix this, introduce a new function called _clear_gpio_debounce() to clear
-any debounce settings when the GPIO is freed or shutdown. If this GPIO is the
-last debounce-enabled GPIO in the bank, the debounce will also be cut.
-
-Please note that we cannot use _gpio_dbck_disable() to disable the debounce
-clock because this has been specifically created for the gpio suspend path
-and is intended to shutdown the debounce clock while debounce is enabled.
-
-Special thanks to Kevin Hilman for root causing the bug. This fix is a
-collaborative effort with inputs from Kevin Hilman, Grazvydas Ignotas and
-Santosh Shilimkar.
-
-Testing:
-- This has been unit tested on an OMAP3430 Beagle board, by requesting a gpio,
-  enabling debounce and then freeing the gpio and checking the register
-  contents, the saved register context and the debounce clock state.
-- Kevin Hilman tested on 37xx/EVM board which configures GPIO debounce for the
-  ads7846 touchscreen in its board file using the above sequence, and so was
-  failing off-mode tests in dynamic idle. Verified that off-mode tests are
-  passing with this patch.
-
-V5 changes:
-- Corrected author
-
-Reported-by: Paul Walmsley <paul@pwsan.com>
-Cc: Igor Grinberg <grinberg@compulab.co.il>
-Cc: Grazvydas Ignotas <notasas@gmail.com>
-Cc: Jon Hunter <jon-hunter@ti.com>
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-Reviewed-by: Kevin Hilman <khilman@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/gpio/gpio-omap.c |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 94cbc84..d335af1 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -251,6 +251,40 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
- 	}
- }
- 
-+/**
-+ * _clear_gpio_debounce - clear debounce settings for a gpio
-+ * @bank: the gpio bank we're acting upon
-+ * @gpio: the gpio number on this @gpio
-+ *
-+ * If a gpio is using debounce, then clear the debounce enable bit and if
-+ * this is the only gpio in this bank using debounce, then clear the debounce
-+ * time too. The debounce clock will also be disabled when calling this function
-+ * if this is the only gpio in the bank using debounce.
-+ */
-+static void _clear_gpio_debounce(struct gpio_bank *bank, unsigned gpio)
-+{
-+	u32 gpio_bit = GPIO_BIT(bank, gpio);
-+
-+	if (!bank->dbck_flag)
-+		return;
-+
-+	if (!(bank->dbck_enable_mask & gpio_bit))
-+		return;
-+
-+	bank->dbck_enable_mask &= ~gpio_bit;
-+	bank->context.debounce_en &= ~gpio_bit;
-+	__raw_writel(bank->context.debounce_en,
-+		     bank->base + bank->regs->debounce_en);
-+
-+	if (!bank->dbck_enable_mask) {
-+		bank->context.debounce = 0;
-+		__raw_writel(bank->context.debounce, bank->base +
-+			     bank->regs->debounce);
-+		clk_disable(bank->dbck);
-+		bank->dbck_enabled = false;
-+	}
-+}
-+
- static inline void set_gpio_trigger(struct gpio_bank *bank, int gpio,
- 						unsigned trigger)
- {
-@@ -539,6 +573,7 @@ static void _reset_gpio(struct gpio_bank *bank, int gpio)
- 	_set_gpio_irqenable(bank, gpio, 0);
- 	_clear_gpio_irqstatus(bank, gpio);
- 	_set_gpio_triggering(bank, GPIO_INDEX(bank, gpio), IRQ_TYPE_NONE);
-+	_clear_gpio_debounce(bank, gpio);
- }
- 
- /* Use disable_irq_wake() and enable_irq_wake() functions from drivers */
--- 
-1.7.9.5
+	Arnd
