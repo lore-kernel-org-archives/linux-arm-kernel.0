@@ -1,35 +1,51 @@
-From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 26 Oct 2012 09:23:03 -0600
-Subject: [PATCH linux-next] ARM64: dma-mapping: support debug_dma_mapping_error
-In-Reply-To: <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
-References: <1351205220.6851.3.camel@lorien2>
- <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
-Message-ID: <1351264983.2712.14.camel@lorien2>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 26 Oct 2012 17:25:08 +0200
+Subject: [PATCH v2 0/9] net/macb: driver enhancement concerning GEM
+ support, ring logic and cleanup
+In-Reply-To: <cover.1348055112.git.nicolas.ferre@atmel.com>
+References: <cover.1348055112.git.nicolas.ferre@atmel.com>
+Message-ID: <508AAB54.9010506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for debug_dma_mapping_error() call to avoid warning from
-debug_dma_unmap() interface when it checks for mapping error checked
-status. Without this patch, device driver failed to check map error
-warning is generated. 
+David,
 
-Signed-off-by: Shuah Khan <shuah.khan@hp.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/dma-mapping.h |    1 +
- 1 file changed, 1 insertion(+)
+On 09/19/2012 01:55 PM, Nicolas Ferre :
+> This is an enhancement work that began several years ago. I try to catchup with
+> some performance improvement that has been implemented then by Havard.
+> The ring index logic and the TX error path modification are the biggest changes
+> but some cleanup/debugging have been added along the way.
+> The GEM revision will benefit from the Gigabit support.
+> 
+> The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
+> flavors.
+> 
+> v2: - modify the tx error handling: now uses a workqueue
+>     - information provided by ethtool -i were not accurate: removed
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 538f4b4..9947768 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
- static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
- {
- 	struct dma_map_ops *ops = get_dma_ops(dev);
-+	debug_dma_mapping_error(dev, dev_addr);
- 	return ops->mapping_error(dev, dev_addr);
- }
- 
+I am about to re-send this patch series. Should I rebase it on top of
+Joachim's recent modifications? I mean, I plan to rebase them on top of
+net-next, is it the proper thing to do?
+
+> Havard Skinnemoen (4):
+>   net/macb: memory barriers cleanup
+>   net/macb: change debugging messages
+>   net/macb: clean up ring buffer logic
+>   net/macb: Offset first RX buffer by two bytes
+> 
+> Nicolas Ferre (4):
+>   net/macb: remove macb_get_drvinfo()
+>   net/macb: tx status is more than 8 bits now
+>   net/macb: ethtool interface: add register dump feature
+>   net/macb: better manage tx errors
+> 
+> Patrice Vilchez (1):
+>   net/macb: Add support for Gigabit Ethernet mode
+> 
+>  drivers/net/ethernet/cadence/macb.c | 433 +++++++++++++++++++++++++-----------
+>  drivers/net/ethernet/cadence/macb.h |  30 ++-
+>  2 files changed, 321 insertions(+), 142 deletions(-)
+
+Best regards,
 -- 
-1.7.9.5
+Nicolas Ferre
