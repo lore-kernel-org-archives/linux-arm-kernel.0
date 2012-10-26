@@ -1,19 +1,63 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 26 Oct 2012 15:55:32 +0530
-Subject: [PATCH] davinci: fix the uart number in the comment
-In-Reply-To: <1347559476-25363-1-git-send-email-henrique@henriquecamargo.com>
-References: <1347559476-25363-1-git-send-email-henrique@henriquecamargo.com>
-Message-ID: <508A651C.8090709@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Oct 2012 11:30:15 +0100
+Subject: [PATCH v2 8/8] ARM: hw_breakpoint: kill WARN_ONCE usage
+In-Reply-To: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
+References: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1351247415-25090-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9/13/2012 11:34 PM, Henrique Camargo wrote:
-> The bit 0 of the field is uart0 and the bit 1 is uart1 and so on.
-> 
-> Signed-off-by: Henrique Camargo <henrique@henriquecamargo.com>
+WARN_ONCE is a bit OTT for some of the simple failure cases encountered
+in hw_breakpoint, so use either pr_warning or pr_warn_once instead.
 
-Queuing this for v3.8. Added an ARM: prefix to subject line since this
-is an arch/arm/ patch. Please take care of this next time on.
+Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/hw_breakpoint.c |   15 ++++++++++-----
+ 1 files changed, 10 insertions(+), 5 deletions(-)
 
-Thanks,
-Sekhar
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+index 05febba..5ff2e77 100644
+--- a/arch/arm/kernel/hw_breakpoint.c
++++ b/arch/arm/kernel/hw_breakpoint.c
+@@ -261,10 +261,11 @@ static int enable_monitor_mode(void)
+ 
+ 	/* Check that the write made it through. */
+ 	ARM_DBG_READ(c0, c1, 0, dscr);
+-	if (WARN_ONCE(!(dscr & ARM_DSCR_MDBGEN),
+-		"Failed to enable monitor mode on CPU %d.\n",
+-		smp_processor_id()))
++	if (!(dscr & ARM_DSCR_MDBGEN)) {
++		pr_warn_once("Failed to enable monitor mode on CPU %d.\n",
++				smp_processor_id());
+ 		return -EPERM;
++	}
+ 
+ out:
+ 	return 0;
+@@ -357,8 +358,10 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
+ 		}
+ 	}
+ 
+-	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
++	if (i == max_slots) {
++		pr_warning("Can't find any breakpoint slot\n");
+ 		return -EBUSY;
++	}
+ 
+ 	/* Override the breakpoint data with the step data. */
+ 	if (info->step_ctrl.enabled) {
+@@ -407,8 +410,10 @@ void arch_uninstall_hw_breakpoint(struct perf_event *bp)
+ 		}
+ 	}
+ 
+-	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
++	if (i == max_slots) {
++		pr_warning("Can't find any breakpoint slot\n");
+ 		return;
++	}
+ 
+ 	/* Ensure that we disable the mismatch breakpoint. */
+ 	if (info->ctrl.type != ARM_BREAKPOINT_EXECUTE &&
+-- 
+1.7.4.1
