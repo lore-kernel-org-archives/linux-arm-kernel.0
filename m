@@ -1,34 +1,39 @@
-From: const@MakeLinux.com (Constantine Shulyupin)
-Date: Fri, 26 Oct 2012 19:29:49 +0200
-Subject: [PATCH] ARM: OMAP2+: remove duplicated declaration of
- omap4430_init_late
-Message-ID: <1351272589-9885-1-git-send-email-const@MakeLinux.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Oct 2012 10:21:41 -0700
+Subject: [PATCH v2 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
+In-Reply-To: <201210260747.11848.arnd@arndb.de>
+References: <1349675983-23803-1-git-send-email-kishon@ti.com>
+ <1349675983-23803-4-git-send-email-kishon@ti.com>
+ <20121026065012.GC22206@arwen.pp.htv.fi>
+ <201210260747.11848.arnd@arndb.de>
+Message-ID: <20121026172140.GJ11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Constantine Shulyupin <const@MakeLinux.com>
+* Arnd Bergmann <arnd@arndb.de> [121026 00:48]:
+> On Friday 26 October 2012, Felipe Balbi wrote:
+> > > +static void omap_init_ocp2scp(void)
+> > > +{
+> > > +     struct omap_hwmod       *oh;
+> > > +     struct platform_device  *pdev;
+> > > +     int                     bus_id = -1, dev_cnt = 0, i;
+> > > +     struct omap_ocp2scp_dev *ocp2scp_dev;
+> > > +     const char              *oh_name, *name;
+> > > +     struct omap_ocp2scp_platform_data *pdata;
+> > > +
+> > > +     oh_name = "ocp2scp_usb_phy";
+> > > +     name    = "omap-ocp2scp";
+> > 
+> > how about adding checks here to return early case we're not running on
+> > OMAP4 or OMAP5 ??
+> > 
+> 
+> I suppose even OMAP4-only, since OMAP5 always has DT enabled.
 
-Problem:
-Function omap4430_init_late is declared twice in arch/arm/mach-omap2/common.h.
-Fix: remove out of order declaration, assuming all functions ordered accordingly processor number.
- 
+Hmm yes, currently omap_hwmod_lookup(oh_name) produces
+bogus errors for other omaps as the hwmod data is only
+there for omap4.
 
-Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
----
- arch/arm/mach-omap2/common.h |    1 -
- 1 file changed, 1 deletion(-)
+Regards,
 
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index 7045e4d..45478d1 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -152,7 +152,6 @@ void am33xx_init_early(void);
- void omap4430_init_early(void);
- void omap5_init_early(void);
- void omap3_init_late(void);	/* Do not use this one */
--void omap4430_init_late(void);
- void omap2420_init_late(void);
- void omap2430_init_late(void);
- void omap3430_init_late(void);
--- 
-1.7.9.5
+Tony
