@@ -1,38 +1,56 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 26 Oct 2012 14:59:38 -0400 (EDT)
-Subject: [PATCH v2 0/9] net/macb: driver enhancement concerning GEM
- support, ring logic and cleanup
-In-Reply-To: <508AAB54.9010506@atmel.com>
-References: <cover.1348055112.git.nicolas.ferre@atmel.com>
- <508AAB54.9010506@atmel.com>
-Message-ID: <20121026.145938.2087989420370212890.davem@davemloft.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 26 Oct 2012 12:01:30 -0700
+Subject: [PATCH 2/5] drivers: usb: otg: make twl6030_usb as a
+ comparator driver to omap_usb2
+In-Reply-To: <508AD1E7.3080101@ti.com>
+References: <1346943430-18236-1-git-send-email-kishon@ti.com>
+ <1346943430-18236-3-git-send-email-kishon@ti.com>
+ <CAH+eYFAj1ecvmiJCu8QDCr3LjHT5eXjq6zsZMiVRPROoWcDuNQ@mail.gmail.com>
+ <CAAe_U6K1RXA3b5u9WvE=2VoXym9Vj3KM7c0J27jKz+2KrV4tsg@mail.gmail.com>
+ <CAH+eYFAhVE8cAte2PFk3jinV9n3m+eDLtE43QxzRXMScnFGcrA@mail.gmail.com>
+ <508AA94B.10504@ti.com> <508AAA85.6070905@ti.com>
+ <alpine.DEB.2.00.1210261750430.7573@utopia.booyaka.com>
+ <508ACF0B.60808@ti.com> <508AD1E7.3080101@ti.com>
+Message-ID: <20121026190129.GP11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Fri, 26 Oct 2012 17:25:08 +0200
-
-> David,
+* Benoit Cousson <b-cousson@ti.com> [121026 11:11]:
+> On 10/26/2012 07:57 PM, Benoit Cousson wrote:
+> > Hi Paul,
+> > 
+> > On 10/26/2012 07:54 PM, Paul Walmsley wrote:
+> >> On Fri, 26 Oct 2012, Benoit Cousson wrote:
+> >>
+> >>> On 10/26/2012 05:16 PM, Roger Quadros wrote:
+> >>>
+> >>>> I still can't get musb to work on 3.7-rc2. Apparently it is still
+> >>>> missing the patches from Benoit's for_3.7/dts_part2.
+> >>>>
+> >>>> Maybe I just need to wait for it to be merged?
+> >>>
+> >>> They are now in a for_3.8/dts. Unfortunately, one patch that was adding
+> >>> ctrl_module address in the USB data was rejected and thus I'm not sure
+> >>> it will work without that.
+> >>
+> >> For v3.7-rc timeframe, looks like it's waiting on an ack from you:
+> >>
+> >> http://www.spinics.net/lists/arm-kernel/msg201028.html
+> > 
+> > Oups, I missed that one. But I thought Roger was mentioning the DT patch
+> > and not that one.
+> > 
+> > Anyway, I will answer to Tony. Thanks for the reminder Paul.
 > 
-> On 09/19/2012 01:55 PM, Nicolas Ferre :
->> This is an enhancement work that began several years ago. I try to catchup with
->> some performance improvement that has been implemented then by Havard.
->> The ring index logic and the TX error path modification are the biggest changes
->> but some cleanup/debugging have been added along the way.
->> The GEM revision will benefit from the Gigabit support.
->> 
->> The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
->> flavors.
->> 
->> v2: - modify the tx error handling: now uses a workqueue
->>     - information provided by ethtool -i were not accurate: removed
+> Well, in fact, I cannot even find the original email in my mailbox :-(
+> I was banned again from linux-omap around that time, so that might be
+> the reason.
 > 
-> I am about to re-send this patch series. Should I rebase it on top of
-> Joachim's recent modifications? I mean, I plan to rebase them on top of
-> net-next, is it the proper thing to do?
+> So please take that hacky patch if it prevents the regression.
 
-You should always base your patch on whatever tree you want your patches
-applied to.
+OK yes it seems like that's the only option we have until
+omap4 is device tree only.
 
-If you have a dependency on something not in that tree (for example, you
-need something in the 'net' tree) you have to tell me.
+Regards,
+
+Tony
