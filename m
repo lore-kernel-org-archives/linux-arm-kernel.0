@@ -1,28 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Oct 2012 10:57:49 +0200
-Subject: [PATCH 0/8] clk: ux500: Fixup smp_twd clk for clk notifiers
-In-Reply-To: <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
-References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
- <20121011134458.GB15428@gmail.com>
- <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
- <20121011151947.GD15428@gmail.com>
- <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
-Message-ID: <CACRpkdYdzvdJc=+gnRDEue1uZApGTc-P2pQfLAJXc_uBZLSPkQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 26 Oct 2012 10:59:34 +0200
+Subject: [PATCH 2/2] ARM: mach-imx: CAN clock fix for i.MX53
+In-Reply-To: <1351164400-27940-2-git-send-email-stigge@antcom.de>
+References: <1351164400-27940-1-git-send-email-stigge@antcom.de>
+ <1351164400-27940-2-git-send-email-stigge@antcom.de>
+Message-ID: <20121026085934.GA1641@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 10:19 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Thu, Oct 25, 2012 at 01:26:40PM +0200, Roland Stigge wrote:
+> This patch fixes CAN clocking on i.MX53.
+> 
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
+> 
+> ---
+>  arch/arm/mach-imx/clk-imx51-imx53.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> --- linux-2.6.orig/arch/arm/mach-imx/clk-imx51-imx53.c
+> +++ linux-2.6/arch/arm/mach-imx/clk-imx51-imx53.c
+> @@ -426,10 +426,10 @@ int __init mx53_clocks_init(unsigned lon
+>  	clk[usb_phy2_gate] = imx_clk_gate2("usb_phy2_gate", "usb_phy_sel", MXC_CCM_CCGR4, 12);
+>  	clk[can_sel] = imx_clk_mux("can_sel", MXC_CCM_CSCMR2, 6, 2,
+>  				mx53_can_sel, ARRAY_SIZE(mx53_can_sel));
+> -	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR6, 22);
+> -	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR6, 20);
+> -	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 8);
+> -	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 6);
 
-> Samuel, a kind reminder on this, trying to collect acks to be able to
-> advise Mike to take this series through his clk tree. There are two
-> mfd patches.
-> [PATCH 2/8] mfd: db8500: Provide cpufreq table as platform data
-> [PATCH 5/8] mfd: db8500: Connect ARMSS clk to ARM OPP
+I just rechecked. The above matches the i.MX53 Reference Manual rev 2.1
 
-Two weeks of slack for review is good enough, involved
-subsystem maintainers have been Cc:ed.
+> +	clk[can1_serial_gate] = imx_clk_gate2("can1_serial_gate", "can_sel", MXC_CCM_CCGR4, 6);
+> +	clk[can1_ipg_gate] = imx_clk_gate2("can1_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
+> +	clk[can2_serial_gate] = imx_clk_gate2("can2_serial_gate", "can_sel", MXC_CCM_CCGR4, 6);
+> +	clk[can2_ipg_gate] = imx_clk_gate2("can2_ipg_gate", "ipg", MXC_CCM_CCGR4, 8);
 
-Mike T, can you just apply the patches please.
+This doesn't.
 
-Yours,
-Linus Walleij
+Can you elaborate why you think this is necessary?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
