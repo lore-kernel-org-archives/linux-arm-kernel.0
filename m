@@ -1,91 +1,83 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Oct 2012 11:30:13 +0100
-Subject: [PATCH v2 6/8] ARM: hw_breakpoint: check if monitor mode is enabled
- during validation
+Date: Fri, 26 Oct 2012 11:30:09 +0100
+Subject: [PATCH v2 2/8] ARM: hw_breakpoint: fix monitor mode detection with
+ v7.1
 In-Reply-To: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
 References: <1351247415-25090-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1351247415-25090-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1351247415-25090-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than attempt to enable monitor mode explicitly when scheduling in
-a breakpoint event (which could raise an undefined exception trap when
-accessing DBGDSCRext), instead check that DBGDSCRint.MDBGen is set
-during event validation and report an error to the caller if not.
+Detecting whether halting debug is enabled is no longer possible via
+the DBGDSCR in v7.1, returning an UNKNOWN value for the HDBGen bit via
+CP14 when the OS lock is clear.
 
+This patch removes the halting mode check and ensures that accesses to
+the internal and external views of the DBGDSCR are serialised with an
+instruction barrier.
+
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/hw_breakpoint.c |   28 +++++++++++++++-------------
- 1 files changed, 15 insertions(+), 13 deletions(-)
+ arch/arm/kernel/hw_breakpoint.c |   25 +++++--------------------
+ 1 files changed, 5 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
-index 983558e..8e95321 100644
+index 76a650a..c87ea68 100644
 --- a/arch/arm/kernel/hw_breakpoint.c
 +++ b/arch/arm/kernel/hw_breakpoint.c
-@@ -228,6 +228,13 @@ static int get_num_brps(void)
-  * be put into halting debug mode at any time by an external debugger
-  * but there is nothing we can do to prevent that.
-  */
-+static int monitor_mode_enabled(void)
-+{
-+	u32 dscr;
-+	ARM_DBG_READ(c1, 0, dscr);
-+	return !!(dscr & ARM_DSCR_MDBGEN);
-+}
-+
- static int enable_monitor_mode(void)
- {
- 	u32 dscr;
-@@ -321,14 +328,9 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
- {
- 	struct arch_hw_breakpoint *info = counter_arch_bp(bp);
- 	struct perf_event **slot, **slots;
--	int i, max_slots, ctrl_base, val_base, ret = 0;
-+	int i, max_slots, ctrl_base, val_base;
- 	u32 addr, ctrl;
+@@ -235,13 +235,6 @@ static int enable_monitor_mode(void)
  
--	/* Ensure that we are in monitor mode and halting mode is disabled. */
--	ret = enable_monitor_mode();
--	if (ret)
--		goto out;
--
- 	addr = info->address;
- 	ctrl = encode_ctrl_reg(info->ctrl) | 0x1;
+ 	ARM_DBG_READ(c1, 0, dscr);
  
-@@ -355,10 +357,8 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
- 		}
- 	}
- 
--	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n")) {
--		ret = -EBUSY;
+-	/* Ensure that halting mode is disabled. */
+-	if (WARN_ONCE(dscr & ARM_DSCR_HDBGEN,
+-		"halting debug mode enabled. Unable to access hardware resources.\n")) {
+-		ret = -EPERM;
 -		goto out;
 -	}
-+	if (WARN_ONCE(i == max_slots, "Can't find any breakpoint slot\n"))
-+		return -EBUSY;
- 
- 	/* Override the breakpoint data with the step data. */
- 	if (info->step_ctrl.enabled) {
-@@ -376,9 +376,7 @@ int arch_install_hw_breakpoint(struct perf_event *bp)
- 
- 	/* Setup the control register. */
- 	write_wb_reg(ctrl_base + i, ctrl);
 -
--out:
--	return ret;
-+	return 0;
- }
+ 	/* If monitor mode is already enabled, just return. */
+ 	if (dscr & ARM_DSCR_MDBGEN)
+ 		goto out;
+@@ -255,6 +248,7 @@ static int enable_monitor_mode(void)
+ 	case ARM_DEBUG_ARCH_V7_ECP14:
+ 	case ARM_DEBUG_ARCH_V7_1:
+ 		ARM_DBG_WRITE(c2, 2, (dscr | ARM_DSCR_MDBGEN));
++		isb();
+ 		break;
+ 	default:
+ 		ret = -ENODEV;
+@@ -1000,8 +994,6 @@ static struct notifier_block __cpuinitdata dbg_reset_nb = {
  
- void arch_uninstall_hw_breakpoint(struct perf_event *bp)
-@@ -589,6 +587,10 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	int ret = 0;
- 	u32 offset, alignment_mask = 0x3;
+ static int __init arch_hw_breakpoint_init(void)
+ {
+-	u32 dscr;
+-
+ 	debug_arch = get_debug_arch();
  
-+	/* Ensure that we are in monitor debug mode. */
-+	if (!monitor_mode_enabled())
-+		return -ENODEV;
-+
- 	/* Build the arch_hw_breakpoint. */
- 	ret = arch_build_bp_info(bp);
- 	if (ret)
+ 	if (!debug_arch_supported()) {
+@@ -1036,17 +1028,10 @@ static int __init arch_hw_breakpoint_init(void)
+ 		core_num_brps, core_has_mismatch_brps() ? "(+1 reserved) " :
+ 		"", core_num_wrps);
+ 
+-	ARM_DBG_READ(c1, 0, dscr);
+-	if (dscr & ARM_DSCR_HDBGEN) {
+-		max_watchpoint_len = 4;
+-		pr_warning("halting debug mode enabled. Assuming maximum watchpoint size of %u bytes.\n",
+-			   max_watchpoint_len);
+-	} else {
+-		/* Work out the maximum supported watchpoint length. */
+-		max_watchpoint_len = get_max_wp_len();
+-		pr_info("maximum watchpoint size is %u bytes.\n",
+-				max_watchpoint_len);
+-	}
++	/* Work out the maximum supported watchpoint length. */
++	max_watchpoint_len = get_max_wp_len();
++	pr_info("maximum watchpoint size is %u bytes.\n",
++			max_watchpoint_len);
+ 
+ 	/* Register debug fault handler. */
+ 	hook_fault_code(FAULT_CODE_DEBUG, hw_breakpoint_pending, SIGTRAP,
 -- 
 1.7.4.1
