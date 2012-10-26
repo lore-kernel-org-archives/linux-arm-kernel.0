@@ -1,46 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 26 Oct 2012 11:35:22 +0200
-Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
- include/linux/omap-iommu.h
-In-Reply-To: <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
-References: <20121025001913.2082.31062.stgit@muffinssi.local>
- <20121025213935.GD11928@atomide.com>
- <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
-Message-ID: <6561916.t72K1L6jg4@avalon>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 26 Oct 2012 11:35:35 +0200
+Subject: [GIT PULL] Urgent DMA-mapping fix for v3.7-rc3
+Message-ID: <1351244135-12703-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Hi Linus,
 
-On Friday 26 October 2012 07:50:56 Ohad Ben-Cohen wrote:
-> On Thu, Oct 25, 2012 at 11:39 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> > Joerg and Ohad, do you have any opinions on this?
-> 
-> I agree that there's some merit in having a separate header file for
-> IOVMM, since it's a different layer from the IOMMU API.
-> 
-> But in reality it's tightly coupled with OMAP's IOMMU, and ideally it
-> really should go away and be replaced with the DMA API.
-> 
-> For this reason, and for the fact that anyway there's only a single
-> user for it (omap3isp) and there will never be any more, maybe we
-> shouldn't pollute include/linux anymore.
-> 
-> Anyone volunteering to remove IOVMM and adapt omap3isp to the DMA API
-> instead ? ;)
+I would like to ask for pulling an urgent fix for ARM DMA-mapping
+framework for v3.7-rc3. Due to my mistake, my previous pull request
+(merged as cff7b8ba60e332377568c3d55c8036e9b1de32e6) contained a patch
+which is aimed for v3.8 and lacks its dependences. This pull request
+reverts it and fixes build break of ARM architecture.
 
-That's on my to-do list, as well as porting the OMAP3 ISP driver to videobuf2, 
-adding DT support, moving to the common clock framework (when that will be 
-available for the OMAP3), supporting missing V4L2 features, ... All this in my 
-spare time of course, otherwise it wouldn't be fun, would it ? ;-)
+Thanks!
 
-I would also like to move the tidspbridge to the DMA API, but I think we'll 
-need to move step by step there, and using the OMAP IOMMU and IOVMM APIs as an 
-intermediate step would allow splitting patches in reviewable chunks. I know 
-it's a step backwards in term of OMAP IOMMU usage, but that's in my opinion a 
-temporary nuisance to make the leap easier.
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
 
--- 
-Regards,
+----------------------------------------------------------------
 
-Laurent Pinchart
+The following changes since commit 2ab3f29dddfb444c9fcc0a2f3a56ed4bdba41969:
+
+  Merge branch 'akpm' (Andrew's fixes) (2012-10-25 16:05:57 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git fixes_for_linus
+
+for you to fetch changes up to 697575896670ba9e76760ce8bbc1f5a3001967d6:
+
+  Revert "ARM: dma-mapping: support debug_dma_mapping_error" (2012-10-26 07:39:13 +0200)
+
+----------------------------------------------------------------
+Marek Szyprowski (1):
+      Revert "ARM: dma-mapping: support debug_dma_mapping_error"
+
+ arch/arm/include/asm/dma-mapping.h |    1 -
+ 1 file changed, 1 deletion(-)
