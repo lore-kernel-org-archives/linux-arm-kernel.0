@@ -1,103 +1,58 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Fri, 26 Oct 2012 13:30:25 +0100 (BST)
-Subject: [PATCH 3/9] ARM: Kirkwood: Convert dnskw to pinctrl
-In-Reply-To: <20121026102450.GG21046@lunn.ch>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-4-git-send-email-andrew@lunn.ch>
- <alpine.DEB.2.02.1210252352360.22302@gonzo> <20121026060151.GE21046@lunn.ch>
- <alpine.DEB.2.00.1210261016190.10589@marmot.wormnet.eu>
- <20121026102450.GG21046@lunn.ch>
-Message-ID: <alpine.DEB.2.00.1210261313360.10589@marmot.wormnet.eu>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 26 Oct 2012 14:30:45 +0200
+Subject: [PATCH V2 0/4] Adding SATA support for Armada 370/XP
+Message-ID: <1351254650-26861-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Oct 2012, Andrew Lunn wrote:
+Hello,
 
->> I did look at using the gpio-regulator stuff a while back, and
->> decided it wasn't quite the right shape. Although I can't remember
->> why, and it might have changed since.
->
-> O.K. I will look at it this weekend.
->
->> The power-off GPIO registration could happen in dnskw_power_off
->> instead, or the attempt at a gpio-poweroff driver could be
->> resurrected (I'd forgotten about it until now).
->
-> I dusted the code off last weekend, but ran out of time.  I wanted to
-> make it also support the pxa use-case.
+this patch set adds the SATA support for Armada 370 and Armada XP. Few
+changes have been done since the first version by taking in account
+the comments received for the first version.
 
-Okay, I'm unlikely to get a chance to have a play with it for a week or so 
-but if I do I'll let you know.
+The evaluation boards for Armada 370 and Armada XP come with 2 SATA
+ports, and when both are enable the coherent pool for DMA mapping was
+too short. It was exactly the same issue that was fixed for Kirkwood
+two months ago. So I used the same fix in the first patch. Later when
+Kirkwood will be part of mach-mvebu, then this fix will be shared
+between the 2 SoCs families.
 
->> I could accept dnskw:power:recover is a weirdo configuration option
->> that should be set in the bootloader / userland rather than the
->> kernel supporting it. Although it would be nice if the kernel
->> registered it's purpose. Maybe GPIO pins could be exported by adding
->> sub-nodes to the GPIO chip, if that's not too hackish?
->
-> We need some sort of solution. It is quite common to use GPIO this
-> way, to enable power, etc. So either we need some form of gpio
-> regulator, or the ability to set gpio defaults as you said in the gpio
-> DT node, or fix the ordering so the init function can set them up.
+This patch set is based on 3.7-rc2 and depends one the framework clock
+support (the last version was posted last week:
+http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
+called mvebu-SATA-for-3.8 is also available at
+https://github.com/MISL-EBU-System-SW/mainline-public.git.
 
-Setting the defaults in the DT gpio node would get my vote, as it pretty 
-much removes board-dnskw.c, and there'd be easy sysfs files to turn the 
-pins on/off (maybe someone out there doesn't want their NAS to turn back 
-on after a power failure...).
+Changelog:
 
->>> First thing that comes to mind, is it registering them for the correct
->>> GPIO controller. I think with the new setup, pinctrl and gpio are
->>> closely linked, so maybe, its modifying pins on the wrong controller.
->>> Bit of a long shot....
->>>
->>
->> I did wonder that, but then why would turning the LEDs on work fine?
->> I wonder if both pins are being toggled or something. I'll
->> investigate further and report back. The two that cause the NAS to
->> lock up are the only ones on &gpio1 though.
->
-> What would they map to on gpio0? NAND?
->
+V1 -> V2:
+- Added the acked-by from Marek Szyprowski for the first patch.
+- Moved the port number from dtsi to board file t o be coherent with
+  Kirwkood boards.
+- Cleaned armada-370-xp.dtsi from test strings.
+- Split the second patch in 3 part one for dts, one for config update,
+  and the last for dtsi.
+- Updated the mvebu_defconfig file with only the necessary symbols.
+- Updated also the multi_v7_defconfig file.
 
-3 & 11, so NAND and UART0 RX. But it's not just that the console is dead, 
-I can't ping the NAS any more either. However the power LED is still 
-blinking via. hardware GPIO blink.
+Regards,
 
->> The sata0 and sata1 activity leds are definitely MPP20 and
->> MPP21---I've set them up as GPIO leds before successfully.
->
-> O.K.
->
->>> [   16.187814] initial MPP regs: 01112222 43303311 55550000 00000000 00000000 00000000 00000000
->>> [   16.187833]   final MPP regs: 01552222 03303311 55550000 00000000 00000000 00000000 00000000
->>>
->>> The first line is how uboot setup the MPP pins. The second is after
->>> the init function was called.
->>
->> initial MPP regs: 01111111 03303311 00551100 00000000 00000000 00000000 00000000
->>   final MPP regs: 01111111 03303311 00551100 00000000 00000000 00000000 00000000
->>
->> Although the initial MPP regs is also set by a recompiled u-boot
->> with ~identical MPP setup code.
->
-> It might be useful to generate the same sort of dumps with the new
-> driver, even if its code just hacked in for testing.
+Gregory
 
-I'd been looking at the debugfs output if you hadn't spotted it:
+Gregory CLEMENT (4):
+  arm: mvebu: increase atomic coherent pool size for armada 370/XP
+  arm: mvebu: adding SATA support: dt binding for Armada 370/XP
+  arm: mvebu: adding SATA support: configs update
+  arm: mvebu: adding SATA support: dt binding for Armada 370/XP boards
 
-root at rocoto:~# cat /debug/pinctrl/f1010000.pinctrl/pinmux-pins
-Pinmux settings per pin
-Format: pin (name): mux_owner gpio_owner hog?
-pin 0 (PIN0): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function nand group mpp0
-pin 1 (PIN1): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function nand group mpp1
-pin 2 (PIN2): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function nand group mpp2
-  . . .
-
-Although it doesn't say what the initial MPP setup was.
-
->
-> 	Andrew
->
+ arch/arm/boot/dts/armada-370-db.dts  |    4 ++++
+ arch/arm/boot/dts/armada-370-xp.dtsi |    9 +++++++++
+ arch/arm/boot/dts/armada-xp-db.dts   |    4 ++++
+ arch/arm/configs/multi_v7_defconfig  |    2 ++
+ arch/arm/configs/mvebu_defconfig     |    3 +++
+ arch/arm/mach-mvebu/armada-370-xp.c  |   12 ++++++++++++
+ 6 files changed, 34 insertions(+)
 
 -- 
-Jamie Lentin
+1.7.9.5
