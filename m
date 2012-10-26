@@ -1,41 +1,33 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 26 Oct 2012 11:35:35 +0200
-Subject: [GIT PULL] Urgent DMA-mapping fix for v3.7-rc3
-Message-ID: <1351244135-12703-1-git-send-email-m.szyprowski@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 26 Oct 2012 15:06:26 +0530
+Subject: [PATCH] cpufreq: Avoid calling cpufreq driver's target() routine if
+ target_freq == policy->cur
+Message-ID: <1d7b6e421a335255da956804b43ce3517538409c.1351244153.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Avoid calling cpufreq driver's target() routine if new frequency is same as
+policies current frequency.
 
-I would like to ask for pulling an urgent fix for ARM DMA-mapping
-framework for v3.7-rc3. Due to my mistake, my previous pull request
-(merged as cff7b8ba60e332377568c3d55c8036e9b1de32e6) contained a patch
-which is aimed for v3.8 and lacks its dependences. This pull request
-reverts it and fixes build break of ARM architecture.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/cpufreq.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks!
-
-Best regards
-Marek Szyprowski
-Samsung Poland R&D Center
-
-----------------------------------------------------------------
-
-The following changes since commit 2ab3f29dddfb444c9fcc0a2f3a56ed4bdba41969:
-
-  Merge branch 'akpm' (Andrew's fixes) (2012-10-25 16:05:57 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/mszyprowski/linux-dma-mapping.git fixes_for_linus
-
-for you to fetch changes up to 697575896670ba9e76760ce8bbc1f5a3001967d6:
-
-  Revert "ARM: dma-mapping: support debug_dma_mapping_error" (2012-10-26 07:39:13 +0200)
-
-----------------------------------------------------------------
-Marek Szyprowski (1):
-      Revert "ARM: dma-mapping: support debug_dma_mapping_error"
-
- arch/arm/include/asm/dma-mapping.h |    1 -
- 1 file changed, 1 deletion(-)
+diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+index 261ef65..28dc134 100644
+--- a/drivers/cpufreq/cpufreq.c
++++ b/drivers/cpufreq/cpufreq.c
+@@ -1476,6 +1476,10 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
+ 
+ 	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
+ 		target_freq, relation);
++
++	if (target_freq == policy->cur)
++		return 0;
++
+ 	if (cpu_online(policy->cpu) && cpufreq_driver->target)
+ 		retval = cpufreq_driver->target(policy, target_freq, relation);
+ 
+-- 
+1.7.12.rc2.18.g61b472e
