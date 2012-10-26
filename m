@@ -1,59 +1,87 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Oct 2012 09:39:00 -0700
-Subject: [PATCH 10/16] ARM: OMAP: Make omap_device local to mach-omap2
-In-Reply-To: <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
-References: <20121004213950.26676.21898.stgit@muffinssi.local>
- <20121004220456.26676.31050.stgit@muffinssi.local>
- <alpine.DEB.2.00.1210260124360.11251@utopia.booyaka.com>
-Message-ID: <20121026163900.GC11908@atomide.com>
+Date: Fri, 26 Oct 2012 09:41:15 -0700
+Subject: [PATCH v2 06/14] mtd: onenand: omap: use pdata info instead of
+ cpu_is
+In-Reply-To: <alpine.DEB.2.00.1210260411140.27963@utopia.booyaka.com>
+References: <cover.1349672877.git.afzal@ti.com>
+ <860ba92c34cbb490beccd5442087087c1751a6a2.1349672877.git.afzal@ti.com>
+ <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210260411140.27963@utopia.booyaka.com>
+Message-ID: <20121026164115.GE11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121025 18:28]:
-> Hi Tony
+* Paul Walmsley <paul@pwsan.com> [121025 22:05]:
+> On Fri, 26 Oct 2012, Paul Walmsley wrote:
 > 
-> On Thu, 4 Oct 2012, Tony Lindgren wrote:
-> 
-> > Let's make omap_device local to mach-omap2 for
-> > ARM common zImage support.
+> > On Mon, 8 Oct 2012, Afzal Mohammed wrote:
 > > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > platform data now contains a field to indicate whether
+> > > soc belongs to omap34xx family, use it instead of
+> > > cpu_is_* check.
+> > > 
+> > > This helps in removing dependency of platform specific
+> > > header file - cpu.h
+> > > 
+> > > Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> > 
+> > This one breaks an N800 multi-OMAP build here:
 > 
-> This one breaks a 5912-only build:
+> It also breaks an OMAP3+4 config:
 > 
-> arch/arm/mach-omap1/pm_bus.c: In function 'omap1_pm_runtime_init':
-> arch/arm/mach-omap1/pm_bus.c:69:2: error: implicit declaration of function 
-> 'cpu_class_is_omap1'
-> make[1]: *** [arch/arm/mach-omap1/pm_bus.o] Error 1
+> drivers/built-in.o: In function `omap2_onenand_probe':
+> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:742: 
+> undefined reference to `omap2_onenand_read_bufferram'
+> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:743: 
+> undefined reference to `omap2_onenand_write_bufferram'
+> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:742: 
+> undefined reference to `omap2_onenand_read_bufferram'
+> /home/paul/test_build/temp/test_cleanup_prcm_8634155e_with_fixes/20121025214236/linux/drivers/mtd/onenand/omap2.c:743: 
+> undefined reference to `omap2_onenand_write_bufferram'
 > 
-> Fixed by the usual change; it's below.
+> Fix below.
 
-Thanks. I've ran randonfigs on the omap-for-v3.8/cleanup-headers,
-but have not seen these.
-
-Can you do a branch on top of omap-for-v3.8/cleanup-headers
-with all these fixes that I can pull in?
+Thanks, I'd like to pull this fix in too along with the
+others.
 
 Regards,
 
 Tony
+
+
  
->  arch/arm/mach-omap1/pm_bus.c |    2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/mtd/onenand/omap2.c |   18 ++++++++++++------
+>  1 file changed, 12 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap1/pm_bus.c b/arch/arm/mach-omap1/pm_bus.c
-> index 16bf2f9..3f2d396 100644
-> --- a/arch/arm/mach-omap1/pm_bus.c
-> +++ b/arch/arm/mach-omap1/pm_bus.c
-> @@ -19,6 +19,8 @@
->  #include <linux/clk.h>
->  #include <linux/err.h>
+> diff --git a/drivers/mtd/onenand/omap2.c b/drivers/mtd/onenand/omap2.c
+> index f87cf39..99f96e1 100644
+> --- a/drivers/mtd/onenand/omap2.c
+> +++ b/drivers/mtd/onenand/omap2.c
+> @@ -555,13 +555,19 @@ static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
 >  
-> +#include "soc.h"
-> +
->  #ifdef CONFIG_PM_RUNTIME
->  static int omap1_pm_runtime_suspend(struct device *dev)
->  {
+>  #else
+>  
+> -int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
+> -				 unsigned char *buffer, int offset,
+> -				 size_t count);
+> +static int omap2_onenand_read_bufferram(struct mtd_info *mtd, int area,
+> +					unsigned char *buffer, int offset,
+> +					size_t count)
+> +{
+> +	return -ENOSYS;
+> +}
+>  
+> -int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
+> -				  const unsigned char *buffer,
+> -				  int offset, size_t count);
+> +static int omap2_onenand_write_bufferram(struct mtd_info *mtd, int area,
+> +					 const unsigned char *buffer,
+> +					 int offset, size_t count)
+> +{
+> +	return -ENOSYS;
+> +}
+>  
+>  #endif
+>  
 > -- 
 > 1.7.10.4
-> 
