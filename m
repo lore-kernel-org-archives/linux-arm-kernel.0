@@ -1,79 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 27 Oct 2012 10:02:10 +0100
-Subject: [GIT PULL] omap plat header removal for v3.8 merge window, part1
-In-Reply-To: <20121026223848.GY11908@atomide.com>
-References: <20121019023300.GN30550@atomide.com>
- <201210261402.19759.arnd@arndb.de> <20121026170949.GF11908@atomide.com>
- <201210261728.22132.arnd@arndb.de> <20121026175537.GL11908@atomide.com>
- <20121026223848.GY11908@atomide.com>
-Message-ID: <20121027090210.GJ28061@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 27 Oct 2012 11:11:43 +0200
+Subject: [PATCH] arm: kirkwood: add support for ZyXEL NSA310
+In-Reply-To: <alpine.DEB.2.02.1210261857100.20029@mirri>
+References: <alpine.DEB.2.02.1210251735020.15860@mirri>
+ <20121025181326.GL18811@titan.lakedaemon.net>
+ <alpine.DEB.2.02.1210261857100.20029@mirri>
+Message-ID: <20121027091143.GD15143@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 03:38:49PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [121026 10:57]:
-> > * Arnd Bergmann <arnd@arndb.de> [121026 10:30]:
-> > > 
-> > > Well, once CONFIG_MULTIPLATFORM gets enabled, the mach/*.h files are
-> > > not visible to drivers any more, but they are still visible to files
-> > > in plat-omap if you add a line like
-> > > 
-> > > ccflags-$(CONFIG_ARCH_OMAP2) := -I$(srctree)/arch/arm/mach-omap2/include
-> > > ccflags-$(CONFIG_ARCH_OMAP1) := -I$(srctree)/arch/arm/mach-omap1/include
-> > > 
-> > > to arch/arm/plat-omap/Makefile. That is how the other multiplatform
-> > > Makefiles do it. If a driver writer really wants to cheat, they can of
-> > > course do the same thing in their directory, but they can also do
-> > > #include "../../../../arch/arm/mach-omap2/foo.h"
+> > > +
+> > > +static struct i2c_board_info __initdata nsa310_i2c_info[] = {
+> > > +	{ I2C_BOARD_INFO("adt7476", 0x2e) },
+> > > +};
 > > 
-> > OK thanks for clarifying that. Sounds like that can be used to
-> > fix up the relative includes for plat-omap. I'll do some patches
-> > for that after we have the #include <plat/*.h> and #include <mach/*.h>
-> > issue sorted out.
+> > how far off from the adt7461 (lm90) is this?  If similar, please
+> > consider extending lm90's compatibility list and describing this in the
+> > dts instead.
 > 
-> Here's a patch for that. It's against what I have queued up in
-> omap-for-v3.8/cleanup-headers. Does that look OK to you?
-> 
-> Regards,
-> 
-> Tony
-> 
-> 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Fri, 26 Oct 2012 15:06:40 -0700
-> Subject: [PATCH] ARM: OMAP: Fix relative includes for plat-omap with ccflags
-> 
-> As suggested by Arnd Bergmann <arnd@arndb.de>, we can keep
-> these headers local to arch/arm/*omap*/ by modifying the
-> ccflags in plat/omap/Makefile.
-> 
-> Note that eventually even most of these will go away
-> as things like SRAM and PRCM become just regular device
-> drivers.
-> 
-> Also note that this will not fix plat/cpu.h, but that
-> will be removed anyways as soon as the drivers are
-> fixed.
-> 
-> While at it, also sort the includes the standard way.
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-> index cd169c3..03b1e80 100644
-> --- a/arch/arm/mach-omap1/Makefile
-> +++ b/arch/arm/mach-omap1/Makefile
-> @@ -2,6 +2,8 @@
->  # Makefile for the linux kernel.
->  #
->  
-> +ccflags-$(CONFIG_ARCH_OMAP) := -I$(srctree)/arch/arm
-> +
+> I did move at least the I2C to DT. Good catch, this is something 
+> worth of a experimentation when a free time slot arrives. The chip seems 
+> to have some sort of compatibility mode with adt7463 so it might just 
+> work somehow with the other driver too.
 
-Rather than moving all the files from plat-omap/include/plat into plat-omap
-and then having all these totally disgusting relative includes, why don't
-you add to these makefiles:
+Hi Tero
 
-ccflags += -I$(srctree)/arch/arm/plat-omap/include
+Thanks for moving the I2C bus setup to DT.
 
-and avoid all that include moving and all the include name fixup?
+The lm90 driver explicitly supports the adt7461. No changes needed. Please
+try adding the necessary DT, something like:
+
+                        adt7476: adt7476a at 2e {
+                                compatible = "lm90";
+                                reg = <0x2e>;
+                        };
+
+    Thanks
+
+        Andrew
