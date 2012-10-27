@@ -1,62 +1,36 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Sat, 27 Oct 2012 13:56:16 +0200
-Subject: [PATCH] Fix socfpga compilation with early_printk() enabled
-In-Reply-To: <201210251458.48528.arnd@arndb.de>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <20120701184110.GA30680@elf.ucw.cz>
- <20121017181648.GA12120@elf.ucw.cz>
- <201210251458.48528.arnd@arndb.de>
-Message-ID: <20121027115615.GC5912@elf.ucw.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 27 Oct 2012 13:57:56 +0200
+Subject: [GIT PULL] i.MX fixes for -rc
+In-Reply-To: <201210262101.44700.arnd@arndb.de>
+References: <20121024075656.GW27665@pengutronix.de>
+ <201210262101.44700.arnd@arndb.de>
+Message-ID: <20121027115756.GC1641@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > This fixes early_printk() compilation for
-> > socfpga. (senduart/busyuart/waituart were missing). It does that by
-> > making Picochip code generic.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > Acked-by: Dinh Nguyen <dinguyen@altera.com>
-> > Acked-by: Jamie Iles <jamie@jamieiles.com 
+On Fri, Oct 26, 2012 at 09:01:44PM +0000, Arnd Bergmann wrote:
+> On Wednesday 24 October 2012, Sascha Hauer wrote:
+> >       ARM i.MX25: Fix PWM per clock lookups
 > 
-> Applied to fixes branch of arm-soc, but please be more explicit about
-> what you want to happen with patches in the future. Ideally we would
-> get pull requests for patches on each platform from only one person,
-> so please coordinate with Dinh Nguyen who that should be.
-
-Dinh is the maintainer, so if we can only send patches from one
-person, it needs to be him. If you'd be willing to take patches from
-second person, that would help us... if not, of course I can send all
-the patches through Dinh.
-
-> Some minor things:
+> This patch is now causing build errors in imx_v4_v5_defconfig:
 > 
-> * If you include something in the email that should not be part of
-> the git changelog (e.g. "Hi!"), then please put it below the "---"
-> line under the Signed-off list.
+> arch/arm/mach-imx/clk-imx25.c: In function 'mx25_clocks_init':
+> arch/arm/mach-imx/clk-imx25.c:206:26: error: 'pwm_ipg_per' undeclared (first use in this function)
+> arch/arm/mach-imx/clk-imx25.c:206:26: note: each undeclared identifier is reported only once for each function it appears in
+> 
+> Any idea what went wrong? The symbol doesn't seem to exist anywhere in
+> v3.7-rc2. Should I revert this patch for now?
 
-Ok.
+Yes, please revert it for now.
 
-> * you are missing a '>' after Jamies email address
+There are several gates missing in clk-imx25.c. I have a patch which
+adds support for them and I seem to have missed that the above depends
+on it.
 
-Sorry.
+Sascha
 
-> * When you submit a patch for inclusion, please always take both
-> Olof and me on Cc on the email, since we are doing this work together
-> and take turns, so you might not always know which one will take
-> the patch. We have an alias "arm at kernel.org" that you can also
-> use.
-
-Olof Johansson <olof@lixom.net>? Can do.
-
-But... perhaps you should add an entry into MAINTAINERS file
-explaining all this? arm at kernel.org is not mentioned there, Olof is
-not mentioned as maintaining arm. (And yes, I did check it before
-original patch submission).
-
-Thanks,
-								Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
