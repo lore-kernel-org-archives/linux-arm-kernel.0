@@ -1,41 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 27 Oct 2012 08:09:01 +0000
-Subject: [GIT PULL] omap plat header removal for v3.8 merge window, part1
-In-Reply-To: <20121026223848.GY11908@atomide.com>
-References: <20121019023300.GN30550@atomide.com>
- <20121026175537.GL11908@atomide.com> <20121026223848.GY11908@atomide.com>
-Message-ID: <201210270809.02140.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 27 Oct 2012 10:51:23 +0200
+Subject: [PATCH 6/9] ARM: Kirkwood: Convert GoFlex Net to pinctrl.
+In-Reply-To: <CAMW5UfZ9KiDX=XHApvTGC=Um+RX-h8ZsvOVVwHyLH7cW==Qy7g@mail.gmail.com>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <1351090434-30499-7-git-send-email-andrew@lunn.ch>
+ <CAMW5UfZ9KiDX=XHApvTGC=Um+RX-h8ZsvOVVwHyLH7cW==Qy7g@mail.gmail.com>
+Message-ID: <20121027085123.GB15143@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 October 2012, Tony Lindgren wrote:
-> Here's a patch for that. It's against what I have queued up in
-> omap-for-v3.8/cleanup-headers. Does that look OK to you?
+On Fri, Oct 26, 2012 at 01:28:08PM -0400, Josh Coombs wrote:
+> Initial test with my 3.7-rc2 DT kernel config failed when it tried to
+> build modules:
+> 
+>   Building modules, stage 2.
+>   MODPOST 733 modules
+> ERROR: "read_current_timer" [drivers/video/udlfb.ko] undefined!
+> ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+> make[1]: *** [__modpost] Error 1
+> make: *** [modules] Error 2
+> 
+> I didn't realize my play kernel test package still includes the
+> following patch, I thought it had been dealt with already.  Should I
+> start a new thread on this issue?
 
-Hi Tony,
+Hi Josh
 
-thanks for the quick follow-up. Using the absolute #include statements
-again looks good, but now there is another problem:
+It is a known issue which i've seen discussed on the lists. I expect
+it to be fixed soon.
 
-> diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-> index cd169c3..03b1e80 100644
-> --- a/arch/arm/mach-omap1/Makefile
-> +++ b/arch/arm/mach-omap1/Makefile
-> @@ -2,6 +2,8 @@
->  # Makefile for the linux kernel.
->  #
->  
-> +ccflags-$(CONFIG_ARCH_OMAP) := -I$(srctree)/arch/arm
-> +
-
-This is not what I meant, I don't think we want to have the entire
-arch/arm/ hierarchy visible in platform directories. Instead, I thought
-we'd keep using the existing arch/arm/mach-$foo/include/mach directories
-that are currently visible to all files and make them available only
-to platforms that explicitly add -I$(srctree)/arch/arm/include/mach-$foo/include
-to their local include path.
-
-This of course requires moving all those headers back to where they just came
-from.
-
-	Arnd
+   Andrew
