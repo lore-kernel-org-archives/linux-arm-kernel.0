@@ -1,31 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 27 Oct 2012 23:31:43 +0200 (CEST)
-Subject: [PATCH 1/3] irqchip: add basic infrastructure
-In-Reply-To: <201210271921.17472.arnd@arndb.de>
-References: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201210271921.17472.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1210272329380.2756@ionos>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 27 Oct 2012 22:46:44 +0100
+Subject: [PATCH] spi/pl022: Activate resourses before deactivate them in
+ suspend
+In-Reply-To: <1349423012-18048-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1349423012-18048-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121027214642.GH4564@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 27 Oct 2012, Arnd Bergmann wrote:
+On Fri, Oct 05, 2012 at 09:43:32AM +0200, Ulf Hansson wrote:
 
-> On Saturday 27 October 2012, Thomas Petazzoni wrote:
-> > With the recent creation of the drivers/irqchip/ directory, it is
-> > desirable to move irq controller drivers here. At the moment, the only
-> > driver here is irq-bcm2835, the driver for the irq controller found in
-> > the ARM BCM2835 SoC, present in Rasberry Pi systems. This irq
-> > controller driver was exporting its initialization function and its
-> > irq handling function through a header file in
-> > <linux/irqchip/bcm2835.h>.
-> 
-> Very nice series!
-> 
-> I think it would be good if Thomas Gleixner as the IRQ subsystem maintainer
-> could have a look as well. We should probably add the drivers/irqchip
-> directory to that MAINTAINERS entry.
+> To be able to deactivate resourses in suspend, the resourses must
+> first be surely active. This is done with a pm_runtime_get_sync.
+> Once the resourses are restored to active state again in resume,
+> the runtime pm usage count can be decreased with a pm_runtime_put.
 
-I skimmed over the patches and they look very reasonable. I try to
-find a time slot to give it a more thorough look.
-
-So: Tentatively-acked-by-me
+The PM core will ensure devices are runtime resumed before we enter
+suspend precisely due to this sort of issue.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121027/e3ecc64f/attachment.sig>
