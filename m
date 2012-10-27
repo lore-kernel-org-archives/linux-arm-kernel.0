@@ -1,49 +1,28 @@
-From: kishon@ti.com (kishon)
-Date: Sat, 27 Oct 2012 17:59:51 +0530
-Subject: [PATCH v2 3/3] ARM: OMAP: ocp2scp: create omap device for ocp2scp
-In-Reply-To: <20121026201631.GR11908@atomide.com>
-References: <1349675983-23803-1-git-send-email-kishon@ti.com>
- <1349675983-23803-4-git-send-email-kishon@ti.com>
- <20121026065012.GC22206@arwen.pp.htv.fi> <201210260747.11848.arnd@arndb.de>
- <20121026172140.GJ11908@atomide.com> <20121026195958.GB29548@arwen.pp.htv.fi>
- <20121026201631.GR11908@atomide.com>
-Message-ID: <508BD3BF.1080409@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 27 Oct 2012 18:42:04 +0530
+Subject: [PATCH] ARM: OMAP4: Basic default configuration for Pandaboard
+In-Reply-To: <1351339406-10082-1-git-send-email-const@MakeLinux.com>
+References: <1351339406-10082-1-git-send-email-const@MakeLinux.com>
+Message-ID: <508BDDA4.6050208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 October 2012 01:46 AM, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [121026 13:07]:
->> On Fri, Oct 26, 2012 at 10:21:41AM -0700, Tony Lindgren wrote:
->>> * Arnd Bergmann <arnd@arndb.de> [121026 00:48]:
->>>> On Friday 26 October 2012, Felipe Balbi wrote:
->>>>>> +static void omap_init_ocp2scp(void)
->>>>>> +{
->>>>>> +     struct omap_hwmod       *oh;
->>>>>> +     struct platform_device  *pdev;
->>>>>> +     int                     bus_id = -1, dev_cnt = 0, i;
->>>>>> +     struct omap_ocp2scp_dev *ocp2scp_dev;
->>>>>> +     const char              *oh_name, *name;
->>>>>> +     struct omap_ocp2scp_platform_data *pdata;
->>>>>> +
->>>>>> +     oh_name = "ocp2scp_usb_phy";
->>>>>> +     name    = "omap-ocp2scp";
->>>>>
->>>>> how about adding checks here to return early case we're not running on
->>>>> OMAP4 or OMAP5 ??
->>>>>
->>>>
->>>> I suppose even OMAP4-only, since OMAP5 always has DT enabled.
->>>
->>> Hmm yes, currently omap_hwmod_lookup(oh_name) produces
->>> bogus errors for other omaps as the hwmod data is only
->>> there for omap4.
->>
->> shouldn't that be fixed too ? I mean, if data isn't just return -ENODEV
->> or something similar.
+On Saturday 27 October 2012 05:33 PM, Constantine Shulyupin wrote:
+> From: Constantine Shulyupin <const@MakeLinux.com>
 >
-> Yes some kind of checking is needed here.
+> Tested SD (MMC) and Ethernet smsc95xx on linux-3.7-rc2
+>
+> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+> --
+> kernel size is 2.3 MiB
+> ---
+>   arch/arm/configs/omap4_panda_defconfig |  115 ++++++++++++++++++++++++++++++++
 
-Ok. I'll fix and send.
+We got rid of all omap board defconfigs and now just using
+omap2plus_defconfig for all OMAP2/3/4/5 machines. If something
+is missing from omap2plus_defconfig, which you need to on your
+panda custom config, do send patch for that. Otherwise, we are
+no longer adding board defconfigs.
 
-Thanks
-Kishon
+Regards
+Santosh
