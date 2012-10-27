@@ -1,101 +1,152 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 27 Oct 2012 16:51:32 +0200
-Subject: [PATCH] at91sam9m10g45-ek: rename leds to match board
-In-Reply-To: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
-References: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
-Message-ID: <20121027145132.GJ18964@game.jcrosoft.org>
+From: francescolavra.fl@gmail.com (Francesco Lavra)
+Date: Sat, 27 Oct 2012 17:07:20 +0200
+Subject: [PATCH 1/4] mfd: ab8500: add devicetree support for fuelgauge
+In-Reply-To: <1351146654-9110-2-git-send-email-rajanikanth.hv@stericsson.com>
+References: <1351146654-9110-1-git-send-email-rajanikanth.hv@stericsson.com>
+ <1351146654-9110-2-git-send-email-rajanikanth.hv@stericsson.com>
+Message-ID: <508BF8A8.9090206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:29 Fri 26 Oct     , Alexandre Belloni wrote:
-> The leds' name in the board file didn't match the names written on the
-> board itsef. This can be confusing when trying to use them for another
-> purpose.
+On 10/25/2012 08:30 AM, Rajanikanth H.V wrote:
+> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+> 
+> - This patch adds device tree support for fuelgauge driver
+> - optimize bm devices platform_data usage and of_probe(...)
+>   Note: of_probe() routine for battery managed devices is made
+>   common across all bm drivers.
+> - test status:
+>   - interrupt numbers assigned differs between legacy and FDT mode.
+> 
+> Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+[...]
+> diff --git a/Documentation/devicetree/bindings/power_supply/ab8500/fg.txt b/Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
+> new file mode 100644
+> index 0000000..28eaf35
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
+> @@ -0,0 +1,58 @@
+> +=== AB8500 Fuel Gauge Driver ===
+> +
+> +AB8500 is a mixed signal multimedia and power management
+> +device comprising: power and energy-management-module,
+> +wall-charger, usb-charger, audio codec, general purpose adc,
+> +tvout, clock management and sim card interface.
+> +
+> +Fuelgauge support is part of energy-management-modules, other
+> +components of this module are:
+> +main-charger, usb-combo-charger and battery-temperature-monitoring.
+> +
+> +The properties below describes the node for fuelgauge driver.
+> +
+> +Required Properties:
+> +- compatible = This shall be: "stericsson,ab8500-fg"
+> +- battery = Shall be battery specific information
+> +	Example:
+> +	ab8500_fg {
+> +		compatible = "stericsson,ab8500-fg";
+> +		battery	   = <&ab8500_battery>;
+> +	};
+> +
+> +dependent node:
+> +	ab8500_battery: ab8500_battery {
+> +	};
+> +	This node will provide information on 'thermistor interface' and
+> +	'battery technology type' used.
+> +
+> +Properties of this node are:
+> +thermistor-on-batctrl:
+> +	A boolean value indicating thermistor interface	to battery
+> +
+> +	Note:
+> +	'btemp' and 'batctrl' are the pins interfaced for battery temperature
+> +	measurement, 'btemp' signal is used when NTC(negative temperature
+> +	coefficient) resister is interfaced external to battery whereas
+> +	'batctrl' pin is used when NTC resister is internal to battery.
+> +
+> +	Example:
+> +	ab8500_battery: ab8500_battery {
+> +		thermistor-on-batctrl;
+> +	};
+> +	indiactes: NTC resister is internal to battery, 'batctrl' is used
 
-It like this for so long time and I'm not really willing to touch the dts
+s/indiactes/indicates
 
-Best Regards,
-J.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@piout.net>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/boot/dts/at91sam9m10g45ek.dts  |   12 ++++++------
->  arch/arm/mach-at91/board-sam9m10g45ek.c |    8 ++++----
->  2 files changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> index 15e1dd4..c58b628 100644
-> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-> @@ -93,20 +93,20 @@
->  	leds {
->  		compatible = "gpio-leds";
+[...]
+> +int __devinit
+> +bmdevs_of_probe(struct device *dev,
+> +		struct device_node *np,
+> +		struct abx500_bm_data **battery)
+> +{
+> +	struct	abx500_battery_type *btype;
+> +	struct  device_node *np_bat_supply;
+> +	struct	abx500_bm_data *bat;
+> +	const char *bat_tech;
+> +	int i, thermistor;
+> +
+> +	*battery = &ab8500_bm_data;
+> +
+> +	/* get phandle to 'battery-info' node */
+> +	np_bat_supply = of_parse_phandle(np, "battery", 0);
+> +	if (!np_bat_supply) {
+> +		dev_err(dev, "missing property battery\n");
+> +		return -EINVAL;
+> +	}
+> +	if (of_property_read_bool(np_bat_supply,
+> +			"thermistor-on-batctrl"))
+> +		thermistor = NTC_INTERNAL;
+> +	else
+> +		thermistor = NTC_EXTERNAL;
+> +
+> +	bat = *battery;
+> +	if (thermistor == NTC_EXTERNAL) {
+> +		bat->n_btypes  = 4;
+> +		bat->bat_type  = bat_type_ext_thermistor;
+> +		bat->adc_therm = ABx500_ADC_THERM_BATTEMP;
+> +	}
+> +	bat_tech = of_get_property(np_bat_supply,
+> +			"stericsson,battery-type", NULL);
+> +	if (!bat_tech)
+> +		dev_warn(dev, "missing property battery-name/type\n");
+> +
+> +	if (strncmp(bat_tech, "LION", 4) == 0) {
+
+What if bat_tech is NULL?
+
+[...]
+> diff --git a/drivers/power/ab8500_fg.c b/drivers/power/ab8500_fg.c
+> index bf02225..e117920 100644
+> --- a/drivers/power/ab8500_fg.c
+> +++ b/drivers/power/ab8500_fg.c
+> @@ -22,15 +22,16 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/power_supply.h>
+>  #include <linux/kobject.h>
+> -#include <linux/mfd/abx500/ab8500.h>
+> -#include <linux/mfd/abx500.h>
+>  #include <linux/slab.h>
+> -#include <linux/mfd/abx500/ab8500-bm.h>
+>  #include <linux/delay.h>
+> -#include <linux/mfd/abx500/ab8500-gpadc.h>
+> -#include <linux/mfd/abx500.h>
+>  #include <linux/time.h>
+> +#include <linux/of.h>
+>  #include <linux/completion.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/mfd/abx500.h>
+> +#include <linux/mfd/abx500/ab8500.h>
+> +#include <linux/mfd/abx500/ab8500-bm.h>
+> +#include <linux/mfd/abx500/ab8500-gpadc.h>
 >  
-> -		d8 {
-> -			label = "d8";
-> +		d3 {
-> +			label = "d3";
->  			gpios = <&pioD 30 0>;
->  			linux,default-trigger = "heartbeat";
->  		};
->  
-> -		d6 {
-> -			label = "d6";
-> +		d1 {
-> +			label = "d1";
->  			gpios = <&pioD 0 1>;
->  			linux,default-trigger = "nand-disk";
->  		};
->  
-> -		d7 {
-> -			label = "d7";
-> +		d2 {
-> +			label = "d2";
->  			gpios = <&pioD 31 1>;
->  			linux,default-trigger = "mmc0";
->  		};
-> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> index 3d48ec1..6d77687 100644
-> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-> @@ -413,19 +413,19 @@ static struct ac97c_platform_data ek_ac97_data = {
->   */
->  static struct gpio_led ek_leds[] = {
->  	{	/* "top" led, red, powerled */
-> -		.name			= "d8",
-> +		.name			= "d3",
->  		.gpio			= AT91_PIN_PD30,
->  		.default_trigger	= "heartbeat",
->  	},
->  	{	/* "left" led, green, userled2, pwm3 */
-> -		.name			= "d6",
-> +		.name			= "d1",
->  		.gpio			= AT91_PIN_PD0,
->  		.active_low		= 1,
->  		.default_trigger	= "nand-disk",
->  	},
->  #if !(defined(CONFIG_LEDS_ATMEL_PWM) || defined(CONFIG_LEDS_ATMEL_PWM_MODULE))
->  	{	/* "right" led, green, userled1, pwm1 */
-> -		.name			= "d7",
-> +		.name			= "d2",
->  		.gpio			= AT91_PIN_PD31,
->  		.active_low		= 1,
->  		.default_trigger	= "mmc0",
-> @@ -440,7 +440,7 @@ static struct gpio_led ek_leds[] = {
->  static struct gpio_led ek_pwm_led[] = {
->  #if defined(CONFIG_LEDS_ATMEL_PWM) || defined(CONFIG_LEDS_ATMEL_PWM_MODULE)
->  	{	/* "right" led, green, userled1, pwm1 */
-> -		.name			= "d7",
-> +		.name			= "d2",
->  		.gpio			= 1,	/* is PWM channel number */
->  		.active_low		= 1,
->  		.default_trigger	= "none",
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  #define MILLI_TO_MICRO			1000
+>  #define FG_LSB_IN_MA			1627
+> @@ -212,7 +213,6 @@ struct ab8500_fg {
+>  	struct ab8500_fg_avg_cap avg_cap;
+>  	struct ab8500 *parent;
+>  	struct ab8500_gpadc *gpadc;
+> -	struct abx500_fg_platform_data *pdata;
+
+pdata should be removed from the description of the struct members as well.
+
+--
+Francesco
