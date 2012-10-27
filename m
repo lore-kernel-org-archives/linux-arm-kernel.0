@@ -1,79 +1,85 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 27 Oct 2012 14:47:54 +0530
-Subject: [PATCH 9/9] pinctrl: SPEAr1340: Add clcd sleep mode pin configuration
-In-Reply-To: <cover.1351329224.git.viresh.kumar@linaro.org>
-References: <cover.1351329224.git.viresh.kumar@linaro.org>
-Message-ID: <3e57c43f3f0572de7bec94020a4b59058541210c.1351329224.git.viresh.kumar@linaro.org>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Sat, 27 Oct 2012 15:03:46 +0530
+Subject: [GIT PULL] SPEAr pinctrl updates for v-3.5
+In-Reply-To: <CACRpkdZok471mc_XqogZo2orS7aCeMDSz0oxXfncm5HgMv37aw@mail.gmail.com>
+References: <1336562136-24498-1-git-send-email-viresh.kumar@st.com>
+ <CAOh2x=mGdV_wbJC64wvb9+UV_FBgnsat9=ojD8BJYVxT+HoWhQ@mail.gmail.com>
+ <201205122142.02318.arnd@arndb.de>
+ <CACRpkdZgSJGcM9cT3yMv1jhUrD9hKXv=VVb1mFSWrMzRPYu-=g@mail.gmail.com>
+ <4FB47DE2.4070704@st.com>
+ <CACRpkdYGuqg3xy+x+adREEzkPL9RFzDDBaEBttR-HarZ7jWuFA@mail.gmail.com>
+ <CAOh2x=kOU=X2V5zBg4G_SWzNSfQyoeygwgW-vO-xxRkDXzZDJQ@mail.gmail.com>
+ <CACRpkday9+zhMHWWjNNBfhhQ2NXPc+RoGkHvxodud5HY7hLm4g@mail.gmail.com>
+ <CAPub14-CQCXf3pfZqXjHarfMfaYG3Me7aNffFJ3JMYhr8J4osg@mail.gmail.com>
+ <CACRpkdZok471mc_XqogZo2orS7aCeMDSz0oxXfncm5HgMv37aw@mail.gmail.com>
+Message-ID: <CAOh2x=kREo-gta292gmBfYxRX6YFFG-r++UnF7QPpKU=81UzfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vipul Kumar Samar <vipulkumar.samar@st.com>
+Hi Linus,
 
-CLCD pads must be configured differently for sleep mode. This patch adds support
-for clcd_sleep_pingroup.
+Sorry for replying on very old thread. Actually i wanted to give
+answer to some of
+your review comments you already gave.
 
-Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/pinctrl/spear/pinctrl-spear1340.c | 39 ++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
+On Mon, Sep 3, 2012 at 5:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sat, Sep 1, 2012 at 1:22 PM, shiraz hashim
+> <shiraz.linux.kernel@gmail.com> wrote:
 
-diff --git a/drivers/pinctrl/spear/pinctrl-spear1340.c b/drivers/pinctrl/spear/pinctrl-spear1340.c
-index 3963675..0606b8c 100644
---- a/drivers/pinctrl/spear/pinctrl-spear1340.c
-+++ b/drivers/pinctrl/spear/pinctrl-spear1340.c
-@@ -1692,7 +1692,43 @@ static struct spear_pingroup clcd_pingroup = {
- 	.nmodemuxs = ARRAY_SIZE(clcd_modemux),
- };
- 
--static const char *const clcd_grps[] = { "clcd_grp" };
-+/* Disable cld runtime to save panel damage */
-+static struct spear_muxreg clcd_sleep_muxreg[] = {
-+	{
-+		.reg = PAD_SHARED_IP_EN_1,
-+		.mask = ARM_TRACE_MASK | MIPHY_DBG_MASK,
-+		.val = 0,
-+	}, {
-+		.reg = PAD_FUNCTION_EN_5,
-+		.mask = CLCD_REG4_MASK | CLCD_AND_ARM_TRACE_REG4_MASK,
-+		.val = 0x0,
-+	}, {
-+		.reg = PAD_FUNCTION_EN_6,
-+		.mask = CLCD_AND_ARM_TRACE_REG5_MASK,
-+		.val = 0x0,
-+	}, {
-+		.reg = PAD_FUNCTION_EN_7,
-+		.mask = CLCD_AND_ARM_TRACE_REG6_MASK,
-+		.val = 0x0,
-+	},
-+};
-+
-+static struct spear_modemux clcd_sleep_modemux[] = {
-+	{
-+		.muxregs = clcd_sleep_muxreg,
-+		.nmuxregs = ARRAY_SIZE(clcd_sleep_muxreg),
-+	},
-+};
-+
-+static struct spear_pingroup clcd_sleep_pingroup = {
-+	.name = "clcd_sleep_grp",
-+	.pins = clcd_pins,
-+	.npins = ARRAY_SIZE(clcd_pins),
-+	.modemuxs = clcd_sleep_modemux,
-+	.nmodemuxs = ARRAY_SIZE(clcd_sleep_modemux),
-+};
-+
-+static const char *const clcd_grps[] = { "clcd_grp", "clcd_sleep_grp" };
- static struct spear_function clcd_function = {
- 	.name = "clcd",
- 	.groups = clcd_grps,
-@@ -1893,6 +1929,7 @@ static struct spear_pingroup *spear1340_pingroups[] = {
- 	&sdhci_pingroup,
- 	&cf_pingroup,
- 	&xd_pingroup,
-+	&clcd_sleep_pingroup,
- 	&clcd_pingroup,
- 	&arm_trace_pingroup,
- 	&miphy_dbg_pingroup,
--- 
-1.7.12.rc2.18.g61b472e
+>> +2.1) gpio-controller and pinctrl subsystem
+>> +------------------------------------------
+>>
+
+<...>
+
+>> +   &pinctrl1 and &pinctrl2 is the phandle to the pinctrl DT node.
+>> +
+>> +   Next values specify the base pin and number of pins for the range
+>> +   handled by 'qe_pio_e' gpio. In the given example from base pin 20 to
+>> +   pin 29 under pinctrl1 and pin 50 to pin 69 under pinctrl2 is handled
+>> +   by this gpio controller.
+
+> Also, you should put a big "DEPRECATED" mark on the old gpio
+> range concept, and refer to the new way of doing things.
+
+I have added following on reply to this request:
+
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index a1cd2f9..da40efb 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -364,6 +364,9 @@ will get an pin number into its handled number
+range. Further it is also passed
+ the range ID value, so that the pin controller knows which range it should
+ deal with.
+
++Calling pinctrl_add_gpio_range from pinctrl driver is DEPRECATED. Please see
++section 2.1 of Documentation/devicetree/bindings/gpio/gpio.txt on how to bind
++pinctrl and gpio drivers.
+
+
+>> diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+
+>> +#ifdef CONFIG_PINCTRL
+>
+> There's no need to #ifdef this I think.
+
+Actually there is, as definition of struct pinctrl_gpio_range is enclosed
+in this config option.
+
+>> +/**
+>> + * struct gpio_pin_range - pin range controlled by a gpio chip
+>> + * @head: list for maintaining set of pin ranges, used internally
+>> + * @pctldev: pinctrl device which handles corresponding pins
+>> + * @range: actual range of pins controlled by a gpio controller
+>> + */
+>> +
+>> +struct gpio_pin_range {
+>> +       struct list_head node;
+>> +       struct pinctrl_dev *pctldev;
+>> +       struct pinctrl_gpio_range range;
+>> +};
+>> +#endif
+
+--
+viresh
