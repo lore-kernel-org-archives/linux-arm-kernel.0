@@ -1,28 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 27 Oct 2012 18:42:04 +0530
-Subject: [PATCH] ARM: OMAP4: Basic default configuration for Pandaboard
-In-Reply-To: <1351339406-10082-1-git-send-email-const@MakeLinux.com>
-References: <1351339406-10082-1-git-send-email-const@MakeLinux.com>
-Message-ID: <508BDDA4.6050208@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 27 Oct 2012 15:28:58 +0200
+Subject: [PATCH] GPIO: mvebu-gpio: Don't initialize the mask_cache
+Message-ID: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 October 2012 05:33 PM, Constantine Shulyupin wrote:
-> From: Constantine Shulyupin <const@MakeLinux.com>
->
-> Tested SD (MMC) and Ethernet smsc95xx on linux-3.7-rc2
->
-> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
-> --
-> kernel size is 2.3 MiB
-> ---
->   arch/arm/configs/omap4_panda_defconfig |  115 ++++++++++++++++++++++++++++++++
+Due to the SMP nature of some of the chips, which have per CPU
+registers, the driver does not use the generic irq_gc_mask_set_bit() &
+irq_gc_mask_clr_bit() functions, which only support a single register.
+The driver has its own implementation of these functions, which can
+pick the correct register depending on the CPU being used. The
+functions do however use the gc->mask_cache value.
 
-We got rid of all omap board defconfigs and now just using
-omap2plus_defconfig for all OMAP2/3/4/5 machines. If something
-is missing from omap2plus_defconfig, which you need to on your
-panda custom config, do send patch for that. Otherwise, we are
-no longer adding board defconfigs.
+The call to irq_setup_generic_chip() was passing
+IRQ_GC_INIT_MASK_CACHE, which caused the gc->mask_cache to be
+initialized to the contents of some random register. This resulted in
+unexpected interrupts been delivered from random GPIO lines.
 
-Regards
-Santosh
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ drivers/gpio/gpio-mvebu.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+index eb42ab1..cf7afb9 100644
+--- a/drivers/gpio/gpio-mvebu.c
++++ b/drivers/gpio/gpio-mvebu.c
+@@ -646,7 +646,7 @@ static int __devinit mvebu_gpio_probe(struct platform_device *pdev)
+ 	ct->handler = handle_edge_irq;
+ 	ct->chip.name = mvchip->chip.label;
+ 
+-	irq_setup_generic_chip(gc, IRQ_MSK(ngpios), IRQ_GC_INIT_MASK_CACHE,
++	irq_setup_generic_chip(gc, IRQ_MSK(ngpios), 0,
+ 			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+ 
+ 	/* Setup irq domain on top of the generic chip. */
+-- 
+1.7.10.4
