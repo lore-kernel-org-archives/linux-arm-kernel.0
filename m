@@ -1,89 +1,30 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 28 Oct 2012 07:44:29 +0800
-Subject: [PATCH v2 RESEND] ARM: pxa: hx4700: Fix backlight PWM device
- number
-In-Reply-To: <50814466.235bb40a.1e56.ffffd458SMTPIN_ADDED@mx.google.com>
-References: <50814466.235bb40a.1e56.ffffd458SMTPIN_ADDED@mx.google.com>
-Message-ID: <CAN1soZy3c9PsDMUY2ZaiwKdQV19nGOJhm61ehRuHm7a+nggXfg@mail.gmail.com>
+Date: Sun, 28 Oct 2012 07:54:39 +0800
+Subject: [PATCH] [ARM] pxa/spitz_pm.c: Fix hang under certain conditions
+ when resuming from STR.
+In-Reply-To: <1351183898-12856-1-git-send-email-dromede@gmail.com>
+References: <1351183898-12856-1-git-send-email-dromede@gmail.com>
+Message-ID: <CAN1soZxmLDBp=x-9Qcwt3p+6Ta+ZPz8rPKvTNEEZ8zvoGk6=8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 8:15 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> Recent changes to PXA PWM support changed the PXA27X PWM device
-> numbering scheme.
+On Fri, Oct 26, 2012 at 12:51 AM,  <dromede@gmail.com> wrote:
+> From: Marko Katic <dromede.gmail.com>
 >
-> The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
-> the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
-> numbering scheme:
+> Devices that use spitz_pm.c will fail to resume
+> from STR (Suspend To Ram) when the charger plug is inserted
+> or removed when a device is in STR mode. The culprit is
+> a misconfigured gpio line - GPIO18. GPIO18 should be configured as a
+> regular GPIO input but it gets configured as an alternate function
+> GPIO18_RDY. And then later in postsuspend() it gets configured as
+> a regular GPIO18 input line.
 >
-> Address         Hardware        3.5 pwm_id      3.6-rc1 pwm_id
-> 0x40b00000      PWM0            0               0
-> 0x40b00010      PWM2            2               1
-> 0x40c00000      PWM1            1               2
-> 0x40c00010      PWM3            3               3
+> Fix this by removing the GPIO18_RDY configuration so that GPIO18
+> only gets configured as a regular gpio input.
 >
-> The hx4700 backlight uses PWM1 at 0x40c00000. Consequently the pwm_id
-> must be changed from 1 to 2.
->
-> This patch fixes the backlight PWM device number and at the same time
-> moves from the legacy PWM API (pwm_id) to the new PWM API (pwm_lookup).
->
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> ---
->
-> V2: Switch from legacy PWM API to new PWM API.
->
->  arch/arm/mach-pxa/hx4700.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
-> index e631198..d66f9f9 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -28,6 +28,7 @@
->  #include <linux/mfd/asic3.h>
->  #include <linux/mtd/physmap.h>
->  #include <linux/pda_power.h>
-> +#include <linux/pwm.h>
->  #include <linux/pwm_backlight.h>
->  #include <linux/regulator/driver.h>
->  #include <linux/regulator/gpio-regulator.h>
-> @@ -556,7 +557,7 @@ static struct platform_device hx4700_lcd = {
->   */
->
->  static struct platform_pwm_backlight_data backlight_data = {
-> -       .pwm_id         = 1,
-> +       .pwm_id         = -1,   /* Superseded by pwm_lookup */
->         .max_brightness = 200,
->         .dft_brightness = 100,
->         .pwm_period_ns  = 30923,
-> @@ -571,6 +572,10 @@ static struct platform_device backlight = {
->         },
->  };
->
-> +static struct pwm_lookup hx4700_pwm_lookup[] = {
-> +       PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL),
-> +};
-> +
->  /*
->   * USB "Transceiver"
->   */
-> @@ -872,6 +877,7 @@ static void __init hx4700_init(void)
->         pxa_set_stuart_info(NULL);
->
->         platform_add_devices(devices, ARRAY_SIZE(devices));
-> +       pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
->
->         pxa_set_ficp_info(&ficp_info);
->         pxa27x_set_i2c_power_info(NULL);
-> --
-> 1.7.8.6
->
->
->
->
-Applied
+> Signed-off-by: Marko Katic <dromede.gmail.com>
+
+Applied with fixing your email to dromede at gmail.com
 
 Thanks
 Haojian
