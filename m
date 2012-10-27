@@ -1,25 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 27 Oct 2012 01:34:41 +0200
-Subject: [PATCH 0/8] clk: ux500: Fixup smp_twd clk for clk notifiers
-In-Reply-To: <20121026180349.3141.76336@nucleus>
-References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
- <20121011134458.GB15428@gmail.com>
- <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
- <20121011151947.GD15428@gmail.com>
- <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
- <CACRpkdYdzvdJc=+gnRDEue1uZApGTc-P2pQfLAJXc_uBZLSPkQ@mail.gmail.com>
- <20121026180349.3141.76336@nucleus>
-Message-ID: <CACRpkdbyManMnk1wpzFWSr3SKEvGp1wNto+a7gxw4iJhZ1hi9Q@mail.gmail.com>
+From: rtivy@ti.com (Tivy, Robert)
+Date: Sat, 27 Oct 2012 00:59:06 +0000
+Subject: [PATCH v2 1/6] ARM: davinci: Changed pr_warning() to pr_warn()
+In-Reply-To: <508A5BF3.2060803@mvista.com>
+References: <1351197357-23528-1-git-send-email-rtivy@ti.com>
+ <508A5BF3.2060803@mvista.com>
+Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311F0E03@DFLE08.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 8:03 PM, Mike Turquette <mturquette@ti.com> wrote:
+Thanks for your comments, Sergei.  Please see below...
 
-> Would be better to get ACKs but enough time has passed.  I'll take these
-> into clk-next (which will get built while I fly to Copenhagen for LCE).
+> -----Original Message-----
+> From: Sergei Shtylyov [mailto:sshtylyov at mvista.com]
+> Sent: Friday, October 26, 2012 2:46 AM
+> To: Tivy, Robert
+> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
+> kernel at lists.infradead.org; Ring, Chris; Grosen, Mark; Nori, Sekhar
+> Subject: Re: [PATCH v2 1/6] ARM: davinci: Changed pr_warning() to
+> pr_warn()
+> 
+> Hello.
+> 
+>     It's not a good idea to send multiple patches with the same
+> subject.
+> Actually, in this case it's worth merging all 4 patches into one.
 
-OK FWIW: Acked-by: Linus Walleij <linus.walleij@linaro.org>
-for all.
+My first patch submission had them all as one patch, but Sekhar asked that they be split into 4 separate patches to make the merge easier.
 
-Yours,
-Linus Walleij
+I can make each one have a different subject, though.
+
+> 
+> On 26-10-2012 0:35, Robert Tivy wrote:
+> 
+> > Also, while modifying those pr_warning() calls I changed hardcoded
+> > function names to use '"%s:", __func__' instead
+> 
+> > Signed-off-by: Robert Tivy <rtivy@ti.com>
+> > ---
+> > Clean up files that will be otherwise modified in subsequent patch.
+> 
+> > Applies to v3.5 tag (commit 28a33cbc24e4256c143dce96c7d93bf423229f92)
+> of
+> > Linus' mainline kernel at git.kernel.org.
+> 
+>     3.5 is too old. Why not to 3.6 or even 3.7-rc2?
+
+I will attempt to recreate this patch series on 3.7-rc2, although I will need to change it to use the newer "rproc" APIs and data structures.
+
+> 
+> > diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-
+> davinci/board-da850-evm.c
+> > index 0149fb4..bbb3c73 100644
+> > --- a/arch/arm/mach-davinci/board-da850-evm.c
+> > +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> [...]
+> > @@ -1046,21 +1046,19 @@ static int __init da850_evm_config_emac(void)
+> >  	}
+> >
+> >  	if (ret)
+> > -		pr_warning("da850_evm_init: cpgmac/rmii mux setup failed:
+> %d\n",
+> > -				ret);
+> > +		pr_warn("%s: cpgmac/rmii mux setup failed: %d\n",
+> > +			__func__, ret);
+> >
+> >  	/* configure the CFGCHIP3 register for RMII or MII */
+> >  	__raw_writel(val, cfg_chip3_base);
+> >
+> >  	ret = davinci_cfg_reg(DA850_GPIO2_6);
+> >  	if (ret)
+> > -		pr_warning("da850_evm_init:GPIO(2,6) mux setup "
+> > -							"failed\n");
+> > +		pr_warn("%s:GPIO(2,6) mux setup failed\n", __func__);
+> 
+>     Worth inserting space after colon here.
+
+Will do.
+
+> 
+> WBR, Sergei
+
+Thanks & Regards,
+
+- Rob
