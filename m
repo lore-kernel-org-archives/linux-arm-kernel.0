@@ -1,31 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 27 Oct 2012 16:33:57 -0200
-Subject: imx-sdma.c broken on imx53 for sound
-In-Reply-To: <39c8a3f022e86d3eae0fb7b6e48049f1.squirrel@webmail.efn.org>
-References: <39c8a3f022e86d3eae0fb7b6e48049f1.squirrel@webmail.efn.org>
-Message-ID: <CAOMZO5B1k4r=6ZqQkZghuEqmEY=tOwRUmZAnckqxBM0_kVf6rQ@mail.gmail.com>
+From: const@MakeLinux.com (Constantine Shulyupin)
+Date: Sat, 27 Oct 2012 20:50:00 +0200
+Subject: [PATCH] Add FDT support to Pandaboard initialization
+Message-ID: <1351363800-28744-1-git-send-email-const@MakeLinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rick,
+From: Constantine Shulyupin <const@MakeLinux.com>
 
-On Fri, Oct 19, 2012 at 3:07 PM, Rick Bronson <rick@efn.org> wrote:
-> Hi,
->
->   On the iMX53, the sound chip sgtl5000 seems to get SDMA channel 0, but
-> this code in drivers/dma/imx-sdma.c:
->
->         /* not interested in channel 0 interrupts */
->         if (sdmac->channel == 0)
->                 return;
->
->  causes the DMA to be ignored.  If I comment out the above, I still get no
-> sound...
->
->   Anyone have any ideas?
+Problem:
+- FDT is supported only by generic OMAP board initialization in arch/arm/mach-omap2/board-generic.c and lacks some configurations, which are not yet configured in FDT (USB for example).
+Solution:
+- arch/arm/mach-omap2/board-omap4panda.c supports initialization with FDT and without it.
 
-Are you providing the mx53 sdma firmware?
+Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+---
+ arch/arm/mach-omap2/board-omap4panda.c |   33 ++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-Regards,
-
-Fabio Estevam
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index bfcd397..fea7a83 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -31,6 +31,7 @@
+ #include <linux/ti_wilink_st.h>
+ #include <linux/wl12xx.h>
+ #include <linux/platform_data/omap-abe-twl6040.h>
++#include <linux/of_platform.h>
+ 
+ #include <asm/hardware/gic.h>
+ #include <asm/mach-types.h>
+@@ -526,3 +527,35 @@ MACHINE_START(OMAP4_PANDA, "OMAP4 Panda board")
+ 	.timer		= &omap4_timer,
+ 	.restart	= omap_prcm_restart,
+ MACHINE_END
++
++static struct of_device_id omap_dt_match_table[] __initdata = {
++	{ .compatible = "simple-bus", },
++	{ .compatible = "ti,omap-infra", },
++	{ }
++};
++
++static void __init panda_dt_init(void)
++{
++	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
++	omap4_panda_init();
++}
++
++static const char *omap4_panda_compat[] __initdata = {
++	"ti,omap4-panda",
++	"ti,omap4",
++	NULL,
++};
++
++DT_MACHINE_START(OMAP4_PANDA_DT, "OMAP4 Pandaboard with FDT support")
++	.dt_compat	= omap4_panda_compat,
++	.reserve	= omap_reserve,
++	.smp		= smp_ops(omap4_smp_ops),
++	.map_io		= omap4_map_io,
++	.init_early	= omap4430_init_early,
++	.init_irq	= omap_gic_of_init,
++	.handle_irq	= gic_handle_irq,
++	.init_machine	= panda_dt_init,
++	.init_late	= omap4430_init_late,
++	.timer		= &omap4_timer,
++	.restart	= omap_prcm_restart,
++MACHINE_END
+-- 
+1.7.9.5
