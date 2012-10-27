@@ -1,156 +1,54 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Sat, 27 Oct 2012 19:05:54 +0530
-Subject: [PATCH v3 1/3] drivers: bus: ocp2scp: add pdata support
-In-Reply-To: <1351344956-22868-1-git-send-email-kishon@ti.com>
-References: <1351344956-22868-1-git-send-email-kishon@ti.com>
-Message-ID: <1351344956-22868-2-git-send-email-kishon@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Sat, 27 Oct 2012 13:39:00 +0000
+Subject: [PATCH v4 1/5] zynq: use GIC device tree bindings
+In-Reply-To: <20121024200310.GB6713@beefymiracle.amer.corp.natinst.com>
+References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
+ <20121024200310.GB6713@beefymiracle.amer.corp.natinst.com>
+Message-ID: <0d1c4cf8-70d8-4d12-bd77-393009d32b22@CH1EHSMHS001.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ocp2scp was not having pdata support which makes *musb* fail for non-dt
-boot in OMAP platform. The pdata will have information about the devices
-that is connected to ocp2scp. ocp2scp driver will now make use of this
-information to create the devices that is attached to ocp2scp.
+Hi Josh,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/bus/omap-ocp2scp.c                 |   67 ++++++++++++++++++++++++++--
- include/linux/platform_data/omap_ocp2scp.h |   31 +++++++++++++
- 2 files changed, 95 insertions(+), 3 deletions(-)
- create mode 100644 include/linux/platform_data/omap_ocp2scp.h
+> -----Original Message-----
+> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
+> Sent: Wednesday, October 24, 2012 10:03 PM
+> To: arm at kernel.org; Arnd Bergmann
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; John
+> Linn; Nick Bowler; Michal Simek
+> Subject: [PATCH v4 1/5] zynq: use GIC device tree bindings
+>
+> The Zynq uses the cortex-a9-gic.  This eliminates the need to hardcode register
+> addresses.
+>
+> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+> Cc: John Linn <john.linn@xilinx.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/boot/dts/zynq-ep107.dts           | 8 +++++---
+>  arch/arm/mach-zynq/common.c                | 7 ++++++-
+>  arch/arm/mach-zynq/include/mach/zynq_soc.h | 2 --
+>  3 files changed, 11 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-
+> ep107.dts
+> index 37ca192..7bfff4a 100644
+> --- a/arch/arm/boot/dts/zynq-ep107.dts
+> +++ b/arch/arm/boot/dts/zynq-ep107.dts
+> @@ -36,10 +36,12 @@
+>               ranges;
+>
+>               intc: interrupt-controller at f8f01000 {
+> +                     compatible = "arm,cortex-a9-gic";
+> +                     #interrupt-cells = <3>;
 
-diff --git a/drivers/bus/omap-ocp2scp.c b/drivers/bus/omap-ocp2scp.c
-index ff63560..5db8297 100644
---- a/drivers/bus/omap-ocp2scp.c
-+++ b/drivers/bus/omap-ocp2scp.c
-@@ -22,6 +22,26 @@
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/omap_ocp2scp.h>
-+
-+/**
-+ * _count_resources - count for the number of resources
-+ * @res: struct resource *
-+ *
-+ * Count and return the number of resources populated for the device that is
-+ * connected to ocp2scp.
-+ */
-+static unsigned _count_resources(struct resource *res)
-+{
-+	int cnt	= 0;
-+
-+	while (res->start != res->end) {
-+		cnt++;
-+		res++;
-+	}
-+
-+	return cnt;
-+}
- 
- static int ocp2scp_remove_devices(struct device *dev, void *c)
- {
-@@ -34,20 +54,61 @@ static int ocp2scp_remove_devices(struct device *dev, void *c)
- 
- static int __devinit omap_ocp2scp_probe(struct platform_device *pdev)
- {
--	int			ret;
--	struct device_node	*np = pdev->dev.of_node;
-+	int ret;
-+	unsigned res_cnt, i;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct platform_device *pdev_child;
-+	struct omap_ocp2scp_platform_data *pdata = pdev->dev.platform_data;
-+	struct omap_ocp2scp_dev *dev;
- 
- 	if (np) {
- 		ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
- 		if (ret) {
--			dev_err(&pdev->dev, "failed to add resources for ocp2scp child\n");
-+			dev_err(&pdev->dev,
-+			    "failed to add resources for ocp2scp child\n");
- 			goto err0;
- 		}
-+	} else if (pdata) {
-+		for (i = 0, dev = *pdata->devices; i < pdata->dev_cnt; i++,
-+		    dev++) {
-+			res_cnt = _count_resources(dev->res);
-+
-+			pdev_child = platform_device_alloc(dev->drv_name, -1);
-+			if (!pdev_child) {
-+				dev_err(&pdev->dev,
-+				  "failed to allocate mem for ocp2scp child\n");
-+				goto err0;
-+			}
-+
-+			ret = platform_device_add_resources(pdev_child,
-+			    dev->res, res_cnt);
-+			if (ret) {
-+				dev_err(&pdev->dev,
-+				 "failed to add resources for ocp2scp child\n");
-+				goto err1;
-+			}
-+
-+			pdev_child->dev.parent	= &pdev->dev;
-+
-+			ret = platform_device_add(pdev_child);
-+			if (ret) {
-+				dev_err(&pdev->dev,
-+				   "failed to register ocp2scp child device\n");
-+				goto err1;
-+			}
-+		}
-+	} else {
-+		dev_err(&pdev->dev, "OCP2SCP initialized without plat data\n");
-+		return -EINVAL;
- 	}
-+
- 	pm_runtime_enable(&pdev->dev);
- 
- 	return 0;
- 
-+err1:
-+	platform_device_put(pdev_child);
-+
- err0:
- 	device_for_each_child(&pdev->dev, NULL, ocp2scp_remove_devices);
- 
-diff --git a/include/linux/platform_data/omap_ocp2scp.h b/include/linux/platform_data/omap_ocp2scp.h
-new file mode 100644
-index 0000000..5c6c393
---- /dev/null
-+++ b/include/linux/platform_data/omap_ocp2scp.h
-@@ -0,0 +1,31 @@
-+/*
-+ * omap_ocp2scp.h -- ocp2scp header file
-+ *
-+ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * Author: Kishon Vijay Abraham I <kishon@ti.com>
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __DRIVERS_OMAP_OCP2SCP_H
-+#define __DRIVERS_OMAP_OCP2SCP_H
-+
-+struct omap_ocp2scp_dev {
-+	const char			*drv_name;
-+	struct resource			*res;
-+};
-+
-+struct omap_ocp2scp_platform_data {
-+	int				dev_cnt;
-+	struct omap_ocp2scp_dev		**devices;
-+};
-+#endif /* __DRIVERS_OMAP_OCP2SCP_H */
--- 
-1.7.9.5
+If you change git to 3 cells format you should also change it for uart below.
+
+Also will be the best to remove this dts entirely and replace it by existing
+Platform.
+
+Thanks,
+Michal
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
