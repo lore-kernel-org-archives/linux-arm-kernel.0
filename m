@@ -1,65 +1,79 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 27 Oct 2012 10:59:04 +0200
-Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
-In-Reply-To: <201210262217.46393.michael@walle.cc>
-References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <201210262006.15968.michael@walle.cc>
- <20121026204505.762fbfca@skate>
- <201210262217.46393.michael@walle.cc>
-Message-ID: <20121027085904.GC15143@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 27 Oct 2012 10:02:10 +0100
+Subject: [GIT PULL] omap plat header removal for v3.8 merge window, part1
+In-Reply-To: <20121026223848.GY11908@atomide.com>
+References: <20121019023300.GN30550@atomide.com>
+ <201210261402.19759.arnd@arndb.de> <20121026170949.GF11908@atomide.com>
+ <201210261728.22132.arnd@arndb.de> <20121026175537.GL11908@atomide.com>
+ <20121026223848.GY11908@atomide.com>
+Message-ID: <20121027090210.GJ28061@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 10:17:46PM +0200, Michael Walle wrote:
-> Hi Thomas.
-> 
-> Am Freitag 26 Oktober 2012, 20:45:05 schrieb Thomas Petazzoni:
-> > Ah, this is interesting. It is not entirely surprising, since the gpio
-> > driver is new. Even though it re-uses most of the previous gpio driver,
-> > it is by far not impossible that there will be a few regressions.
+On Fri, Oct 26, 2012 at 03:38:49PM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [121026 10:57]:
+> > * Arnd Bergmann <arnd@arndb.de> [121026 10:30]:
+> > > 
+> > > Well, once CONFIG_MULTIPLATFORM gets enabled, the mach/*.h files are
+> > > not visible to drivers any more, but they are still visible to files
+> > > in plat-omap if you add a line like
+> > > 
+> > > ccflags-$(CONFIG_ARCH_OMAP2) := -I$(srctree)/arch/arm/mach-omap2/include
+> > > ccflags-$(CONFIG_ARCH_OMAP1) := -I$(srctree)/arch/arm/mach-omap1/include
+> > > 
+> > > to arch/arm/plat-omap/Makefile. That is how the other multiplatform
+> > > Makefiles do it. If a driver writer really wants to cheat, they can of
+> > > course do the same thing in their directory, but they can also do
+> > > #include "../../../../arch/arm/mach-omap2/foo.h"
 > > 
-> > Could you add a few debug prints to see if you're looping *inside* the
-> > function (which I find pretty unlikely), or if the function gets called
-> > over and over again? 
+> > OK thanks for clarifying that. Sounds like that can be used to
+> > fix up the relative includes for plat-omap. I'll do some patches
+> > for that after we have the #include <plat/*.h> and #include <mach/*.h>
+> > issue sorted out.
 > 
-> ah sorry, my bad. of course the handler is called forever:
+> Here's a patch for that. It's against what I have queued up in
+> omap-for-v3.8/cleanup-headers. Does that look OK to you?
 > 
-> mvebu_gpio_to_irq pin=8
-> mvebu_gpio_irq_set_type pin=8
-> mvebu_gpio_edge_irq_unmask
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=100
-> mvebu_gpio_level_irq_mask irq=100
-> mvebu_gpio_irq_handler irq=101
-> mvebu_gpio_level_irq_mask irq=101
-> mvebu_gpio_irq_handler irq=102
-> mvebu_gpio_level_irq_mask irq=102
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=112
-> mvebu_gpio_level_irq_mask irq=112
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
-> mvebu_gpio_level_irq_mask irq=103
-> mvebu_gpio_irq_handler irq=103
+> Regards,
+> 
+> Tony
+> 
+> 
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Fri, 26 Oct 2012 15:06:40 -0700
+> Subject: [PATCH] ARM: OMAP: Fix relative includes for plat-omap with ccflags
+> 
+> As suggested by Arnd Bergmann <arnd@arndb.de>, we can keep
+> these headers local to arch/arm/*omap*/ by modifying the
+> ccflags in plat/omap/Makefile.
+> 
+> Note that eventually even most of these will go away
+> as things like SRAM and PRCM become just regular device
+> drivers.
+> 
+> Also note that this will not fix plat/cpu.h, but that
+> will be removed anyways as soon as the drivers are
+> fixed.
+> 
+> While at it, also sort the includes the standard way.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
+> index cd169c3..03b1e80 100644
+> --- a/arch/arm/mach-omap1/Makefile
+> +++ b/arch/arm/mach-omap1/Makefile
+> @@ -2,6 +2,8 @@
+>  # Makefile for the linux kernel.
+>  #
+>  
+> +ccflags-$(CONFIG_ARCH_OMAP) := -I$(srctree)/arch/arm
+> +
 
-That makes me think edge vs level triggering.
+Rather than moving all the files from plat-omap/include/plat into plat-omap
+and then having all these totally disgusting relative includes, why don't
+you add to these makefiles:
 
-For gpio-keys you want edge triggered interrupts, but if the
-controller is setup for level, you would see this.
+ccflags += -I$(srctree)/arch/arm/plat-omap/include
 
-Try adding some debug into the function mvebu_gpio_irq_set_type()
-
-    Andrew
+and avoid all that include moving and all the include name fixup?
