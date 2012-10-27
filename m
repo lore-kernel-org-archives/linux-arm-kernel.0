@@ -1,57 +1,26 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 27 Oct 2012 17:49:57 +0200
-Subject: [PATCH 1/1] net: macb: add pinctrl consumer support
-Message-ID: <1351352997-31116-1-git-send-email-plagnioj@jcrosoft.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 27 Oct 2012 15:59:29 +0000 (UTC)
+Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
+In-Reply-To: <508BBC59.60504@ti.com>
+References: <1351155648-20429-1-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.00.1210262251020.11258@utopia.booyaka.com>
+ <508BBC59.60504@ti.com>
+Message-ID: <alpine.DEB.2.00.1210271545390.16409@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If no pinctrl available just report a warning as some architecture may not
-need to do anything.
+On Sat, 27 Oct 2012, Santosh Shilimkar wrote:
 
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: netdev at vger.kernel.org
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- drivers/net/ethernet/cadence/macb.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+> Another alternative, which I will recommend to just make use of the
+> read*/wrire* instead __raw versions. The barriers are taken care
+> already and driver point of view, it is transparent.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 033064b..e5fdf8a 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -26,6 +26,9 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_net.h>
-+#include <linux/of_gpio.h>
-+#include <linux/gpio.h>
-+#include <linux/pinctrl/consumer.h>
- 
- #include "macb.h"
- 
-@@ -1306,6 +1309,7 @@ static int __init macb_probe(struct platform_device *pdev)
- 	struct phy_device *phydev;
- 	u32 config;
- 	int err = -ENXIO;
-+	struct pinctrl *pinctrl;
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!regs) {
-@@ -1313,6 +1317,15 @@ static int __init macb_probe(struct platform_device *pdev)
- 		goto err_out;
- 	}
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		err = PTR_ERR(pinctrl);
-+		if (err == -EPROBE_DEFER)
-+			return err;
-+
-+		dev_warn(&pdev->dev, "No pinctrl provided\n");
-+	}
-+
- 	err = -ENOMEM;
- 	dev = alloc_etherdev(sizeof(*bp));
- 	if (!dev)
--- 
-1.7.10.4
+Those barriers will disappear if CONFIG_ARM_DMA_MEM_BUFFERABLE is set to 
+N, so that's probably not the right thing to do in this case.  The barrier 
+here isn't DMA-related, it's needed due to the design of the driver.
+
+In fact the wmb() is probably overkill, since only a compiler reordering 
+barrier is needed.  It can probably just be barrier().
+
+
+- Paul
