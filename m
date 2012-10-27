@@ -1,29 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 27 Oct 2012 18:31:41 +0200
-Subject: [PATCH] GPIO: mvebu-gpio: Don't initialize the mask_cache
-In-Reply-To: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
-References: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
-Message-ID: <CACRpkdYE_P_MQch4dLuCBeUXEfr2RG3TwdUMdT75cN3MELG3pQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 27 Oct 2012 09:32:34 -0700
+Subject: [GIT PULL] omap plat header removal for v3.8 merge window, part1
+In-Reply-To: <20121027090210.GJ28061@n2100.arm.linux.org.uk>
+References: <20121019023300.GN30550@atomide.com>
+ <201210261402.19759.arnd@arndb.de>
+ <20121026170949.GF11908@atomide.com>
+ <201210261728.22132.arnd@arndb.de>
+ <20121026175537.GL11908@atomide.com>
+ <20121026223848.GY11908@atomide.com>
+ <20121027090210.GJ28061@n2100.arm.linux.org.uk>
+Message-ID: <20121027163233.GA11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2012 at 3:28 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [121027 02:03]:
+> 
+> Rather than moving all the files from plat-omap/include/plat into plat-omap
+> and then having all these totally disgusting relative includes, why don't
+> you add to these makefiles:
+> 
+> ccflags += -I$(srctree)/arch/arm/plat-omap/include
+> 
+> and avoid all that include moving and all the include name fixup?
 
-> Due to the SMP nature of some of the chips, which have per CPU
-> registers, the driver does not use the generic irq_gc_mask_set_bit() &
-> irq_gc_mask_clr_bit() functions, which only support a single register.
-> The driver has its own implementation of these functions, which can
-> pick the correct register depending on the CPU being used. The
-> functions do however use the gc->mask_cache value.
->
-> The call to irq_setup_generic_chip() was passing
-> IRQ_GC_INIT_MASK_CACHE, which caused the gc->mask_cache to be
-> initialized to the contents of some random register. This resulted in
-> unexpected interrupts been delivered from random GPIO lines.
->
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+I'll take a look. Most of these headers should be local,
+so it should not be too many files to move for plat-omap
+to fix this.
 
-Thanks, patch applied to fixes. Unless Thomas screams...
+Regards,
 
-Yours,
-Linus Walleij
+Tony
