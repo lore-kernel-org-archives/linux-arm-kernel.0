@@ -1,89 +1,57 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Sat, 27 Oct 2012 15:20:59 +0000
-Subject: [PATCH v4 1/5] zynq: use GIC device tree bindings
-In-Reply-To: <20121027144253.GC5190@beefymiracle.amer.corp.natinst.com>
-References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
- <20121024200310.GB6713@beefymiracle.amer.corp.natinst.com>
- <0d1c4cf8-70d8-4d12-bd77-393009d32b22@CH1EHSMHS001.ehs.local>
- <20121027140053.GB5190@beefymiracle.amer.corp.natinst.com>
- <4fd22fac-49c4-4000-9e70-12e94f248753@AM1EHSMHS010.ehs.local>
- <20121027144253.GC5190@beefymiracle.amer.corp.natinst.com>
-Message-ID: <60e4cbf9-52b4-4c02-8537-ecd3a7dbbf06@CO1EHSMHS020.ehs.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 27 Oct 2012 15:39:19 +0000
+Subject: [PATCH] Fix socfpga compilation with early_printk() enabled
+In-Reply-To: <20121027115615.GC5912@elf.ucw.cz>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <201210251458.48528.arnd@arndb.de> <20121027115615.GC5912@elf.ucw.cz>
+Message-ID: <201210271539.20156.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Saturday 27 October 2012, Pavel Machek wrote:
 
-
-> -----Original Message-----
-> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
-> Sent: Saturday, October 27, 2012 4:43 PM
-> To: Michal Simek
-> Cc: arm at kernel.org; Arnd Bergmann; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; John Linn; Nick Bowler
-> Subject: Re: [PATCH v4 1/5] zynq: use GIC device tree bindings
+> > > This fixes early_printk() compilation for
+> > > socfpga. (senduart/busyuart/waituart were missing). It does that by
+> > > making Picochip code generic.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > > Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> > > Acked-by: Jamie Iles <jamie@jamieiles.com 
+> > 
+> > Applied to fixes branch of arm-soc, but please be more explicit about
+> > what you want to happen with patches in the future. Ideally we would
+> > get pull requests for patches on each platform from only one person,
+> > so please coordinate with Dinh Nguyen who that should be.
 > 
-> On Sat, Oct 27, 2012 at 02:06:45PM +0000, Michal Simek wrote:
-> [...]
-> > I am not big fan to use dtsi solution because dts can be simple
-> > generated directly From Xilinx design tool based on your hw design.
-> > That's why I can't see any benefit To have dtsi file.
+> Dinh is the maintainer, so if we can only send patches from one
+> person, it needs to be him. If you'd be willing to take patches from
+> second person, that would help us... if not, of course I can send all
+> the patches through Dinh.
+
+You can both send patches, we just need to know what to expect. For most
+platforms it works best if one person collects the patches from everyone.
+
+If you are sending patches with both Dinh and us as the recipients,
+just make it clear who you want to pick up the patch.
+
+> > * When you submit a patch for inclusion, please always take both
+> > Olof and me on Cc on the email, since we are doing this work together
+> > and take turns, so you might not always know which one will take
+> > the patch. We have an alias "arm at kernel.org" that you can also
+> > use.
 > 
-> Can I ask you to reconsider? 
-
-I am open to all solution which will help others. I am not definitely saying NO   for this features
-I just haven't found a reason to support it.  
-
-> We, for example, don't make any use of the Xilinx
-> dev tools to generate our device trees.
-
-Ok. How does your working flow looks like?
-I mean you don't get any information from hardware guys how does your hw design look like?
-
->  Having a dtsi allows for easy extension
-> of the zynq-7000 platform for our boards, without having to carry duplicate data.
-
-ok. I think that make sense if you send the next your series as RFC to see how exactly
-you would like to use it. 
-
-In my workflow we generate DTS directly from design tool which I expect your hw
-guys use because it is probably needed to generate boot.bin/fsbl/etc. 
-Then there is one more additional step to setup device-tree bsp to generate DTS
-which directly fits to your HW design. 
-If you have the same boards with different programmable logic I understand
-that you would like to share that PS part and then just add it that IPs in PL.
-
- 
-> Is it going to be expected that users building kernels for their zynq targets have
-> access to the Xilinx EDK?
-
-Definitely not. You can do it just once and of course you can write it by hand
-and then just reusing. 
-
->From my point of view. You have to use design tools at least once to get bitstream
-and boot.bin with fsbl. Please correct me if I am wrong.
-In this step you can use device-tree BSP to generate DTS ( I doesn't need to be perfect with 
-all attached devices on i2c,spi, phys, etc but it reflects your hardware).
-You will get it in some seconds and your dts has correct irq numbers/ip description, compatible strings,
-addresses, position in the system - if you use bus bridges, etc) and you can just directly use it
-and kernel will boot. If you need to do changes in dts by hand, you can of course do it. 
-
-> > > Would you like for me to pull this into v5, or spin up a separate patch series?
-> >
-> > Definitely not. I have checked patches but haven't got it work on the zc702.
-> > Not sure if you have run it on real hw or just on the qemu as you have
-> > mentioned In 5/5.
+> Olof Johansson <olof@lixom.net>? Can do.
 > 
-> You're likely running into the issue Nick has identified in the thread for patch 5
-> where the chosen virtual address for the uart doesn't seem to work:
-> http://www.spinics.net/lists/arm-kernel/msg203141.html
-> 
-> We haven't yet identified the root cause; any insight you can provide here
-> would be beneficial.
-> 
-> Otherwise, I'm considering reworking patch 5 to move the uart mapping to a
-> known working location.
+> But... perhaps you should add an entry into MAINTAINERS file
+> explaining all this? arm at kernel.org is not mentioned there, Olof is
+> not mentioned as maintaining arm. (And yes, I did check it before
+> original patch submission).
 
-I just need to get some time to catch you.
+We intentionally didn't put our names into the maintainers file because
+that would mean getting Cc'd on every patch that should actually go
+to one of the sub-maintainers instead.
 
-thanks,
-Michal
+We are adding an entry pointing to the arm-soc tree now though, just
+without the arm at kernel.org entry.
+
+	Arnd
