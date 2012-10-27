@@ -1,29 +1,89 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 27 Oct 2012 23:19:55 +0100
-Subject: [PATCH 1/2] spi: spidev: Add device tree bindings
-In-Reply-To: <1351238873-25230-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1351238873-25230-1-git-send-email-maxime.ripard@free-electrons.com>
- <1351238873-25230-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121027221955.GO4564@opensource.wolfsonmicro.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sun, 28 Oct 2012 07:44:29 +0800
+Subject: [PATCH v2 RESEND] ARM: pxa: hx4700: Fix backlight PWM device
+ number
+In-Reply-To: <50814466.235bb40a.1e56.ffffd458SMTPIN_ADDED@mx.google.com>
+References: <50814466.235bb40a.1e56.ffffd458SMTPIN_ADDED@mx.google.com>
+Message-ID: <CAN1soZy3c9PsDMUY2ZaiwKdQV19nGOJhm61ehRuHm7a+nggXfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 10:07:52AM +0200, Maxime Ripard wrote:
-> This will allow to probe spidev from device tree
+On Fri, Oct 19, 2012 at 8:15 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> Recent changes to PXA PWM support changed the PXA27X PWM device
+> numbering scheme.
+>
+> The linux-3.5 PXA PWM driver followed the hardware numbering scheme for
+> the 4 PWMs, while the linux-3.6-rc1 PXA PWM driver has adopted a linear
+> numbering scheme:
+>
+> Address         Hardware        3.5 pwm_id      3.6-rc1 pwm_id
+> 0x40b00000      PWM0            0               0
+> 0x40b00010      PWM2            2               1
+> 0x40c00000      PWM1            1               2
+> 0x40c00010      PWM3            3               3
+>
+> The hx4700 backlight uses PWM1 at 0x40c00000. Consequently the pwm_id
+> must be changed from 1 to 2.
+>
+> This patch fixes the backlight PWM device number and at the same time
+> moves from the legacy PWM API (pwm_id) to the new PWM API (pwm_lookup).
+>
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> Cc: Thierry Reding <thierry.reding@avionic-design.de>
+> ---
+>
+> V2: Switch from legacy PWM API to new PWM API.
+>
+>  arch/arm/mach-pxa/hx4700.c |    8 +++++++-
+>  1 files changed, 7 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+> index e631198..d66f9f9 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/mfd/asic3.h>
+>  #include <linux/mtd/physmap.h>
+>  #include <linux/pda_power.h>
+> +#include <linux/pwm.h>
+>  #include <linux/pwm_backlight.h>
+>  #include <linux/regulator/driver.h>
+>  #include <linux/regulator/gpio-regulator.h>
+> @@ -556,7 +557,7 @@ static struct platform_device hx4700_lcd = {
+>   */
+>
+>  static struct platform_pwm_backlight_data backlight_data = {
+> -       .pwm_id         = 1,
+> +       .pwm_id         = -1,   /* Superseded by pwm_lookup */
+>         .max_brightness = 200,
+>         .dft_brightness = 100,
+>         .pwm_period_ns  = 30923,
+> @@ -571,6 +572,10 @@ static struct platform_device backlight = {
+>         },
+>  };
+>
+> +static struct pwm_lookup hx4700_pwm_lookup[] = {
+> +       PWM_LOOKUP("pxa27x-pwm.1", 0, "pwm-backlight", NULL),
+> +};
+> +
+>  /*
+>   * USB "Transceiver"
+>   */
+> @@ -872,6 +877,7 @@ static void __init hx4700_init(void)
+>         pxa_set_stuart_info(NULL);
+>
+>         platform_add_devices(devices, ARRAY_SIZE(devices));
+> +       pwm_add_table(hx4700_pwm_lookup, ARRAY_SIZE(hx4700_pwm_lookup));
+>
+>         pxa_set_ficp_info(&ficp_info);
+>         pxa27x_set_i2c_power_info(NULL);
+> --
+> 1.7.8.6
+>
+>
+>
+>
+Applied
 
-So, this isn't really something we should have in DT in this format -
-the fact that we happen to control some device from userspace isn't a
-generic property of the board really, we may end up changing our minds
-on Linux too.  The most obvious thing for this seems to be to add the
-specific devices to spidev as the OF bindings rather than just register
-as some non-specific "spidev" so we can change our minds later about how
-to handle the devices.  Not sure that's urgently tasteful but it does
-mean we move the "we handle this in userspace" bit out of the .dts into
-the kernel which seems better.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121027/bad6ce54/attachment.sig>
+Thanks
+Haojian
