@@ -1,807 +1,675 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 27 Oct 2012 15:21:37 +0530
-Subject: [PATCH V2 3/5] pinctrl: SPEAr: Add plgpio driver
+Date: Sat, 27 Oct 2012 15:21:38 +0530
+Subject: [PATCH V2 4/5] pinctrl: SPEAr: Add gpio ranges support
 In-Reply-To: <cover.1351330569.git.viresh.kumar@linaro.org>
 References: <cover.1351330569.git.viresh.kumar@linaro.org>
-Message-ID: <fb1487265f89bd2ad0d215c5ed2d6be8b0958867.1351330569.git.viresh.kumar@linaro.org>
+Message-ID: <3b2f9fa0864f1f736e24ee0dbc081cd9a79b7468.1351330569.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Most of SPEAr SoCs, which support pinctrl, can configure & use pads as gpio.
-This patch adds plgpio driver for configuring these pads as gpio.
+This patch gpio enable support for SPEAr pinctrl drivers.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Linus,
 
-It was Acked-by you last time it was sent:
-	http://www.spinics.net/lists/arm-kernel/msg173443.html
+It has few differences since the time it was last posted. I kept your Acked-by
+as the changes aren't that big (I believe). :)
 
- drivers/pinctrl/spear/Kconfig          |   7 +
- drivers/pinctrl/spear/Makefile         |   1 +
- drivers/pinctrl/spear/pinctrl-plgpio.c | 746 +++++++++++++++++++++++++++++++++
- 3 files changed, 754 insertions(+)
- create mode 100644 drivers/pinctrl/spear/pinctrl-plgpio.c
+ drivers/pinctrl/spear/Kconfig             |   4 +
+ drivers/pinctrl/spear/pinctrl-spear.c     | 107 ++++++++++--
+ drivers/pinctrl/spear/pinctrl-spear.h     |  46 ++++++
+ drivers/pinctrl/spear/pinctrl-spear1310.c | 264 ++++++++++++++++++++++++++++++
+ drivers/pinctrl/spear/pinctrl-spear300.c  |   2 +
+ drivers/pinctrl/spear/pinctrl-spear310.c  |   2 +
+ drivers/pinctrl/spear/pinctrl-spear320.c  |   2 +
+ drivers/pinctrl/spear/pinctrl-spear3xx.c  |  37 +++++
+ 8 files changed, 447 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/pinctrl/spear/Kconfig b/drivers/pinctrl/spear/Kconfig
-index 91558791..6f9a1e8 100644
+index 6f9a1e8..04d93e6 100644
 --- a/drivers/pinctrl/spear/Kconfig
 +++ b/drivers/pinctrl/spear/Kconfig
-@@ -41,4 +41,11 @@ config PINCTRL_SPEAR1340
+@@ -25,21 +25,25 @@ config PINCTRL_SPEAR310
+ 	bool "ST Microelectronics SPEAr310 SoC pin controller driver"
+ 	depends on MACH_SPEAR310
+ 	select PINCTRL_SPEAR3XX
++	select PINCTRL_SPEAR_PLGPIO
+ 
+ config PINCTRL_SPEAR320
+ 	bool "ST Microelectronics SPEAr320 SoC pin controller driver"
+ 	depends on MACH_SPEAR320
+ 	select PINCTRL_SPEAR3XX
++	select PINCTRL_SPEAR_PLGPIO
+ 
+ config PINCTRL_SPEAR1310
+ 	bool "ST Microelectronics SPEAr1310 SoC pin controller driver"
+ 	depends on MACH_SPEAR1310
+ 	select PINCTRL_SPEAR
++	select PINCTRL_SPEAR_PLGPIO
+ 
+ config PINCTRL_SPEAR1340
+ 	bool "ST Microelectronics SPEAr1340 SoC pin controller driver"
  	depends on MACH_SPEAR1340
  	select PINCTRL_SPEAR
++	select PINCTRL_SPEAR_PLGPIO
  
-+config PINCTRL_SPEAR_PLGPIO
-+	bool "SPEAr SoC PLGPIO Controller"
-+	depends on GPIOLIB && PINCTRL_SPEAR
-+	help
-+	  Say yes here to support PLGPIO controller on ST Microelectronics SPEAr
-+	  SoCs.
-+
- endif
-diff --git a/drivers/pinctrl/spear/Makefile b/drivers/pinctrl/spear/Makefile
-index b28a7ba..0e400eb 100644
---- a/drivers/pinctrl/spear/Makefile
-+++ b/drivers/pinctrl/spear/Makefile
-@@ -1,5 +1,6 @@
- # SPEAr pinmux support
+ config PINCTRL_SPEAR_PLGPIO
+ 	bool "SPEAr SoC PLGPIO Controller"
+diff --git a/drivers/pinctrl/spear/pinctrl-spear.c b/drivers/pinctrl/spear/pinctrl-spear.c
+index b1fd6ee..cbca6dc 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear.c
++++ b/drivers/pinctrl/spear/pinctrl-spear.c
+@@ -18,6 +18,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_gpio.h>
+ #include <linux/pinctrl/machine.h>
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/pinctrl/pinmux.h>
+@@ -38,6 +39,28 @@ static inline void pmx_writel(struct spear_pmx *pmx, u32 val, u32 reg)
+ 	writel_relaxed(val, pmx->vbase + reg);
+ }
  
-+obj-$(CONFIG_PINCTRL_SPEAR_PLGPIO)	+= pinctrl-plgpio.o
- obj-$(CONFIG_PINCTRL_SPEAR)	+= pinctrl-spear.o
- obj-$(CONFIG_PINCTRL_SPEAR3XX)	+= pinctrl-spear3xx.o
- obj-$(CONFIG_PINCTRL_SPEAR300)	+= pinctrl-spear300.o
-diff --git a/drivers/pinctrl/spear/pinctrl-plgpio.c b/drivers/pinctrl/spear/pinctrl-plgpio.c
-new file mode 100644
-index 0000000..1044ad3
---- /dev/null
-+++ b/drivers/pinctrl/spear/pinctrl-plgpio.c
-@@ -0,0 +1,746 @@
-+/*
-+ * SPEAr platform PLGPIO driver
-+ *
-+ * Copyright (C) 2012 ST Microelectronics
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
++static void muxregs_endisable(struct spear_pmx *pmx,
++		struct spear_muxreg *muxregs, u8 count, bool enable)
++{
++	struct spear_muxreg *muxreg;
++	u32 val, temp, j;
 +
-+#include <linux/clk.h>
-+#include <linux/err.h>
++	for (j = 0; j < count; j++) {
++		muxreg = &muxregs[j];
++
++		val = pmx_readl(pmx, muxreg->reg);
++		val &= ~muxreg->mask;
++
++		if (enable)
++			temp = muxreg->val;
++		else
++			temp = ~muxreg->val;
++
++		val |= muxreg->mask & temp;
++		pmx_writel(pmx, val, muxreg->reg);
++	}
++}
++
+ static int set_mode(struct spear_pmx *pmx, int mode)
+ {
+ 	struct spear_pmx_mode *pmx_mode = NULL;
+@@ -70,6 +93,17 @@ static int set_mode(struct spear_pmx *pmx, int mode)
+ 	return 0;
+ }
+ 
++void __devinit
++pmx_init_gpio_pingroup_addr(struct spear_gpio_pingroup *gpio_pingroup,
++		unsigned count, u16 reg)
++{
++	int i = 0, j = 0;
++
++	for (; i < count; i++)
++		for (; j < gpio_pingroup[i].nmuxregs; j++)
++			gpio_pingroup[i].muxregs[j].reg = reg;
++}
++
+ void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg)
+ {
+ 	struct spear_pingroup *pgroup;
+@@ -216,9 +250,7 @@ static int spear_pinctrl_endisable(struct pinctrl_dev *pctldev,
+ 	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
+ 	const struct spear_pingroup *pgroup;
+ 	const struct spear_modemux *modemux;
+-	struct spear_muxreg *muxreg;
+-	u32 val, temp;
+-	int i, j;
++	int i;
+ 	bool found = false;
+ 
+ 	pgroup = pmx->machdata->groups[group];
+@@ -233,20 +265,8 @@ static int spear_pinctrl_endisable(struct pinctrl_dev *pctldev,
+ 		}
+ 
+ 		found = true;
+-		for (j = 0; j < modemux->nmuxregs; j++) {
+-			muxreg = &modemux->muxregs[j];
+-
+-			val = pmx_readl(pmx, muxreg->reg);
+-			val &= ~muxreg->mask;
+-
+-			if (enable)
+-				temp = muxreg->val;
+-			else
+-				temp = ~muxreg->val;
+-
+-			val |= muxreg->mask & temp;
+-			pmx_writel(pmx, val, muxreg->reg);
+-		}
++		muxregs_endisable(pmx, modemux->muxregs, modemux->nmuxregs,
++				enable);
+ 	}
+ 
+ 	if (!found) {
+@@ -270,12 +290,65 @@ static void spear_pinctrl_disable(struct pinctrl_dev *pctldev,
+ 	spear_pinctrl_endisable(pctldev, function, group, false);
+ }
+ 
++/* gpio with pinmux */
++static struct spear_gpio_pingroup *get_gpio_pingroup(struct spear_pmx *pmx,
++		unsigned pin)
++{
++	struct spear_gpio_pingroup *gpio_pingroup;
++	int i = 0, j;
++
++	if (!pmx->machdata->gpio_pingroups)
++		return NULL;
++
++	for (; i < pmx->machdata->ngpio_pingroups; i++) {
++		gpio_pingroup = &pmx->machdata->gpio_pingroups[i];
++
++		for (j = 0; j < gpio_pingroup->npins; j++) {
++			if (gpio_pingroup->pins[j] == pin)
++				return gpio_pingroup;
++		}
++	}
++
++	return ERR_PTR(-EINVAL);
++}
++
++static int gpio_request_endisable(struct pinctrl_dev *pctldev,
++		struct pinctrl_gpio_range *range, unsigned offset, bool enable)
++{
++	struct spear_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++	struct spear_gpio_pingroup *gpio_pingroup;
++
++	gpio_pingroup = get_gpio_pingroup(pmx, offset);
++	if (IS_ERR(gpio_pingroup))
++		return PTR_ERR(gpio_pingroup);
++
++	if (gpio_pingroup)
++		muxregs_endisable(pmx, gpio_pingroup->muxregs,
++				gpio_pingroup->nmuxregs, enable);
++
++	return 0;
++}
++
++static int gpio_request_enable(struct pinctrl_dev *pctldev,
++		struct pinctrl_gpio_range *range, unsigned offset)
++{
++	return gpio_request_endisable(pctldev, range, offset, true);
++}
++
++static void gpio_disable_free(struct pinctrl_dev *pctldev,
++		struct pinctrl_gpio_range *range, unsigned offset)
++{
++	gpio_request_endisable(pctldev, range, offset, false);
++}
++
+ static struct pinmux_ops spear_pinmux_ops = {
+ 	.get_functions_count = spear_pinctrl_get_funcs_count,
+ 	.get_function_name = spear_pinctrl_get_func_name,
+ 	.get_function_groups = spear_pinctrl_get_func_groups,
+ 	.enable = spear_pinctrl_enable,
+ 	.disable = spear_pinctrl_disable,
++	.gpio_request_enable = gpio_request_enable,
++	.gpio_disable_free = gpio_disable_free,
+ };
+ 
+ static struct pinctrl_desc spear_pinctrl_desc = {
+diff --git a/drivers/pinctrl/spear/pinctrl-spear.h b/drivers/pinctrl/spear/pinctrl-spear.h
+index d950eb7..94f142c 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear.h
++++ b/drivers/pinctrl/spear/pinctrl-spear.h
+@@ -12,6 +12,7 @@
+ #ifndef __PINMUX_SPEAR_H__
+ #define __PINMUX_SPEAR_H__
+ 
 +#include <linux/gpio.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/module.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm.h>
-+#include <linux/spinlock.h>
-+#include <asm/mach/irq.h>
-+
-+#define MAX_GPIO_PER_REG		32
-+#define PIN_OFFSET(pin)			(pin % MAX_GPIO_PER_REG)
-+#define REG_OFFSET(base, reg, pin)	(base + reg + (pin / MAX_GPIO_PER_REG) \
-+							* sizeof(int *))
-+
-+/*
-+ * plgpio pins in all machines are not one to one mapped, bitwise with registers
-+ * bits. These set of macros define register masks for which below functions
-+ * (pin_to_offset and offset_to_pin) are required to be called.
-+ */
-+#define PTO_ENB_REG		0x001
-+#define PTO_WDATA_REG		0x002
-+#define PTO_DIR_REG		0x004
-+#define PTO_IE_REG		0x008
-+#define PTO_RDATA_REG		0x010
-+#define PTO_MIS_REG		0x020
-+
-+struct plgpio_regs {
-+	u32 enb;		/* enable register */
-+	u32 wdata;		/* write data register */
-+	u32 dir;		/* direction set register */
-+	u32 rdata;		/* read data register */
-+	u32 ie;			/* interrupt enable register */
-+	u32 mis;		/* mask interrupt status register */
-+	u32 eit;		/* edge interrupt type */
+ #include <linux/pinctrl/pinctrl.h>
+ #include <linux/types.h>
+ 
+@@ -46,6 +47,44 @@ struct spear_muxreg {
+ 	u32 val;
+ };
+ 
++struct spear_gpio_pingroup {
++	const unsigned *pins;
++	unsigned npins;
++	struct spear_muxreg *muxregs;
++	u8 nmuxregs;
 +};
 +
-+/*
-+ * struct plgpio: plgpio driver specific structure
-+ *
-+ * lock: lock for guarding gpio registers
-+ * base: base address of plgpio block
-+ * irq_base: irq number of plgpio0
-+ * chip: gpio framework specific chip information structure
-+ * p2o: function ptr for pin to offset conversion. This is required only for
-+ *	machines where mapping b/w pin and offset is not 1-to-1.
-+ * o2p: function ptr for offset to pin conversion. This is required only for
-+ *	machines where mapping b/w pin and offset is not 1-to-1.
-+ * p2o_regs: mask of registers for which p2o and o2p are applicable
-+ * regs: register offsets
-+ * csave_regs: context save registers for standby/sleep/hibernate cases
-+ */
-+struct plgpio {
-+	spinlock_t		lock;
-+	void __iomem		*base;
-+	struct clk		*clk;
-+	unsigned		irq_base;
-+	struct irq_domain	*irq_domain;
-+	struct gpio_chip	chip;
-+	int			(*p2o)(int pin);	/* pin_to_offset */
-+	int			(*o2p)(int offset);	/* offset_to_pin */
-+	u32			p2o_regs;
-+	struct plgpio_regs	regs;
-+#ifdef CONFIG_PM
-+	struct plgpio_regs	*csave_regs;
-+#endif
++/* ste: set to enable */
++#define DEFINE_MUXREG(__pins, __muxreg, __mask, __ste)		\
++static struct spear_muxreg __pins##_muxregs[] = {		\
++	{							\
++		.reg = __muxreg,				\
++		.mask = __mask,					\
++		.val = __ste ? __mask : 0,			\
++	},							\
++}
++
++#define DEFINE_2_MUXREG(__pins, __muxreg1, __muxreg2, __mask, __ste1, __ste2) \
++static struct spear_muxreg __pins##_muxregs[] = {		\
++	{							\
++		.reg = __muxreg1,				\
++		.mask = __mask,					\
++		.val = __ste1 ? __mask : 0,			\
++	}, {							\
++		.reg = __muxreg2,				\
++		.mask = __mask,					\
++		.val = __ste2 ? __mask : 0,			\
++	},							\
++}
++
++#define GPIO_PINGROUP(__pins)					\
++	{							\
++		.pins = __pins,					\
++		.npins = ARRAY_SIZE(__pins),			\
++		.muxregs = __pins##_muxregs,			\
++		.nmuxregs = ARRAY_SIZE(__pins##_muxregs),	\
++	}
++
+ /**
+  * struct spear_modemux - SPEAr mode mux configuration
+  * @modes: mode ids supported by this group of muxregs
+@@ -100,6 +139,8 @@ struct spear_function {
+  * @nfunctions: The numbmer of entries in @functions.
+  * @groups: An array describing all pin groups the pin SoC supports.
+  * @ngroups: The numbmer of entries in @groups.
++ * @gpio_pingroups: gpio pingroups
++ * @ngpio_pingroups: gpio pingroups count
+  *
+  * @modes_supported: Does SoC support modes
+  * @mode: mode configured from probe
+@@ -113,6 +154,8 @@ struct spear_pinctrl_machdata {
+ 	unsigned nfunctions;
+ 	struct spear_pingroup **groups;
+ 	unsigned ngroups;
++	struct spear_gpio_pingroup *gpio_pingroups;
++	unsigned ngpio_pingroups;
+ 
+ 	bool modes_supported;
+ 	u16 mode;
+@@ -136,6 +179,9 @@ struct spear_pmx {
+ 
+ /* exported routines */
+ void __devinit pmx_init_addr(struct spear_pinctrl_machdata *machdata, u16 reg);
++void __devinit
++pmx_init_gpio_pingroup_addr(struct spear_gpio_pingroup *gpio_pingroup,
++		unsigned count, u16 reg);
+ int __devinit spear_pinctrl_probe(struct platform_device *pdev,
+ 		struct spear_pinctrl_machdata *machdata);
+ int __devexit spear_pinctrl_remove(struct platform_device *pdev);
+diff --git a/drivers/pinctrl/spear/pinctrl-spear1310.c b/drivers/pinctrl/spear/pinctrl-spear1310.c
+index 0436fc7..30134f7 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear1310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear1310.c
+@@ -2418,6 +2418,268 @@ static struct spear_function *spear1310_functions[] = {
+ 	&gpt64_function,
+ };
+ 
++static const unsigned pin18[] = { 18, };
++static const unsigned pin19[] = { 19, };
++static const unsigned pin20[] = { 20, };
++static const unsigned pin21[] = { 21, };
++static const unsigned pin22[] = { 22, };
++static const unsigned pin23[] = { 23, };
++static const unsigned pin54[] = { 54, };
++static const unsigned pin55[] = { 55, };
++static const unsigned pin56[] = { 56, };
++static const unsigned pin57[] = { 57, };
++static const unsigned pin58[] = { 58, };
++static const unsigned pin59[] = { 59, };
++static const unsigned pin60[] = { 60, };
++static const unsigned pin61[] = { 61, };
++static const unsigned pin62[] = { 62, };
++static const unsigned pin63[] = { 63, };
++static const unsigned pin143[] = { 143, };
++static const unsigned pin144[] = { 144, };
++static const unsigned pin145[] = { 145, };
++static const unsigned pin146[] = { 146, };
++static const unsigned pin147[] = { 147, };
++static const unsigned pin148[] = { 148, };
++static const unsigned pin149[] = { 149, };
++static const unsigned pin150[] = { 150, };
++static const unsigned pin151[] = { 151, };
++static const unsigned pin152[] = { 152, };
++static const unsigned pin205[] = { 205, };
++static const unsigned pin206[] = { 206, };
++static const unsigned pin211[] = { 211, };
++static const unsigned pin212[] = { 212, };
++static const unsigned pin213[] = { 213, };
++static const unsigned pin214[] = { 214, };
++static const unsigned pin215[] = { 215, };
++static const unsigned pin216[] = { 216, };
++static const unsigned pin217[] = { 217, };
++static const unsigned pin218[] = { 218, };
++static const unsigned pin219[] = { 219, };
++static const unsigned pin220[] = { 220, };
++static const unsigned pin221[] = { 221, };
++static const unsigned pin222[] = { 222, };
++static const unsigned pin223[] = { 223, };
++static const unsigned pin224[] = { 224, };
++static const unsigned pin225[] = { 225, };
++static const unsigned pin226[] = { 226, };
++static const unsigned pin227[] = { 227, };
++static const unsigned pin228[] = { 228, };
++static const unsigned pin229[] = { 229, };
++static const unsigned pin230[] = { 230, };
++static const unsigned pin231[] = { 231, };
++static const unsigned pin232[] = { 232, };
++static const unsigned pin233[] = { 233, };
++static const unsigned pin234[] = { 234, };
++static const unsigned pin235[] = { 235, };
++static const unsigned pin236[] = { 236, };
++static const unsigned pin237[] = { 237, };
++static const unsigned pin238[] = { 238, };
++static const unsigned pin239[] = { 239, };
++static const unsigned pin240[] = { 240, };
++static const unsigned pin241[] = { 241, };
++static const unsigned pin242[] = { 242, };
++static const unsigned pin243[] = { 243, };
++static const unsigned pin244[] = { 244, };
++static const unsigned pin245[] = { 245, };
++
++static const unsigned pin_grp0[] = { 173, 174, };
++static const unsigned pin_grp1[] = { 175, 185, 188, 197, 198, };
++static const unsigned pin_grp2[] = { 176, 177, 178, 179, 184, 186, 187, 189,
++	190, 191, 192, };
++static const unsigned pin_grp3[] = { 180, 181, 182, 183, 193, 194, 195, 196, };
++static const unsigned pin_grp4[] = { 199, 200, };
++static const unsigned pin_grp5[] = { 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
++	75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, };
++static const unsigned pin_grp6[] = { 86, 87, 88, 89, 90, 91, 92, 93, };
++static const unsigned pin_grp7[] = { 98, 99, };
++static const unsigned pin_grp8[] = { 158, 159, 160, 161, 162, 163, 164, 165,
++	166, 167, 168, 169, 170, 171, 172, };
++
++/* Define muxreg arrays */
++DEFINE_2_MUXREG(i2c0_pins, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_I2C0_MASK, 0, 1);
++DEFINE_2_MUXREG(ssp0_pins, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_SSP0_MASK, 0, 1);
++DEFINE_2_MUXREG(ssp0_cs0_pins, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_SSP0_CS0_MASK, 0, 1);
++DEFINE_2_MUXREG(ssp0_cs1_2_pins, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_SSP0_CS1_2_MASK, 0, 1);
++DEFINE_2_MUXREG(i2s0_pins, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_I2S0_MASK, 0, 1);
++DEFINE_2_MUXREG(i2s1_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_I2S1_MASK, 0, 1);
++DEFINE_2_MUXREG(clcd_pins, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_CLCD1_MASK, 0, 1);
++DEFINE_2_MUXREG(clcd_high_res_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_CLCD2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin18, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO15_MASK, 0, 1);
++DEFINE_2_MUXREG(pin19, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO14_MASK, 0, 1);
++DEFINE_2_MUXREG(pin20, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO13_MASK, 0, 1);
++DEFINE_2_MUXREG(pin21, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO12_MASK, 0, 1);
++DEFINE_2_MUXREG(pin22, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO11_MASK, 0, 1);
++DEFINE_2_MUXREG(pin23, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO10_MASK, 0, 1);
++DEFINE_2_MUXREG(pin143, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO00_MASK, 0, 1);
++DEFINE_2_MUXREG(pin144, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO01_MASK, 0, 1);
++DEFINE_2_MUXREG(pin145, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO02_MASK, 0, 1);
++DEFINE_2_MUXREG(pin146, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO03_MASK, 0, 1);
++DEFINE_2_MUXREG(pin147, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO04_MASK, 0, 1);
++DEFINE_2_MUXREG(pin148, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO05_MASK, 0, 1);
++DEFINE_2_MUXREG(pin149, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO06_MASK, 0, 1);
++DEFINE_2_MUXREG(pin150, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO07_MASK, 0, 1);
++DEFINE_2_MUXREG(pin151, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO08_MASK, 0, 1);
++DEFINE_2_MUXREG(pin152, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_EGPIO09_MASK, 0, 1);
++DEFINE_2_MUXREG(smi_2_chips_pins, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_SMI_MASK, 0, 1);
++DEFINE_2_MUXREG(pin54, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_SMINCS3_MASK, 0, 1);
++DEFINE_2_MUXREG(pin55, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_SMINCS2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin56, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_NFRSTPWDWN3_MASK, 0, 1);
++DEFINE_2_MUXREG(pin57, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFRSTPWDWN2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin58, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFRSTPWDWN1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin59, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFRSTPWDWN0_MASK, 0, 1);
++DEFINE_2_MUXREG(pin60, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFWPRT3_MASK, 0, 1);
++DEFINE_2_MUXREG(pin61, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFCE3_MASK, 0, 1);
++DEFINE_2_MUXREG(pin62, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFAD25_MASK, 0, 1);
++DEFINE_2_MUXREG(pin63, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFAD24_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp0, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_GMIICLK_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp1, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_GMIICOL_CRS_XFERER_MIITXCLK_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp2, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_RXCLK_RDV_TXEN_D03_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp3, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_GMIID47_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp4, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_MDC_MDIO_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp5, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_NFAD23_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp6, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_MCI_DATA8_15_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp7, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_NFCE2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin_grp8, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_NAND8_MASK, 0, 1);
++DEFINE_2_MUXREG(nand_16bit_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_NAND16BIT_1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin205, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_KBD_COL1_MASK | PMX_NFCE1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin206, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_KBD_COL0_MASK | PMX_NFCE2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin211, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_KBD_ROW1_MASK | PMX_NFWPRT1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin212, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_KBD_ROW0_MASK | PMX_NFWPRT2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin213, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_MCIDATA0_MASK, 0, 1);
++DEFINE_2_MUXREG(pin214, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_MCIDATA1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin215, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_MCIDATA2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin216, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_MCIDATA3_MASK, 0, 1);
++DEFINE_2_MUXREG(pin217, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_MCIDATA4_MASK, 0, 1);
++DEFINE_2_MUXREG(pin218, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATA5_MASK, 0, 1);
++DEFINE_2_MUXREG(pin219, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATA6_MASK, 0, 1);
++DEFINE_2_MUXREG(pin220, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATA7_MASK, 0, 1);
++DEFINE_2_MUXREG(pin221, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATA1SD_MASK, 0, 1);
++DEFINE_2_MUXREG(pin222, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATA2SD_MASK, 0, 1);
++DEFINE_2_MUXREG(pin223, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATA3SD_MASK, 0, 1);
++DEFINE_2_MUXREG(pin224, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIADDR0ALE_MASK, 0, 1);
++DEFINE_2_MUXREG(pin225, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIADDR1CLECLK_MASK, 0, 1);
++DEFINE_2_MUXREG(pin226, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIADDR2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin227, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICECF_MASK, 0, 1);
++DEFINE_2_MUXREG(pin228, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICEXD_MASK, 0, 1);
++DEFINE_2_MUXREG(pin229, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICESDMMC_MASK, 0, 1);
++DEFINE_2_MUXREG(pin230, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICDCF1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin231, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICDCF2_MASK, 0, 1);
++DEFINE_2_MUXREG(pin232, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICDXD_MASK, 0, 1);
++DEFINE_2_MUXREG(pin233, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICDSDMMC_MASK, 0, 1);
++DEFINE_2_MUXREG(pin234, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDATADIR_MASK, 0, 1);
++DEFINE_2_MUXREG(pin235, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDMARQWP_MASK, 0, 1);
++DEFINE_2_MUXREG(pin236, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIIORDRE_MASK, 0, 1);
++DEFINE_2_MUXREG(pin237, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIIOWRWE_MASK, 0, 1);
++DEFINE_2_MUXREG(pin238, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIRESETCF_MASK, 0, 1);
++DEFINE_2_MUXREG(pin239, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICS0CE_MASK, 0, 1);
++DEFINE_2_MUXREG(pin240, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICFINTR_MASK, 0, 1);
++DEFINE_2_MUXREG(pin241, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIIORDY_MASK, 0, 1);
++DEFINE_2_MUXREG(pin242, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCICS1_MASK, 0, 1);
++DEFINE_2_MUXREG(pin243, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCIDMAACK_MASK, 0, 1);
++DEFINE_2_MUXREG(pin244, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCISDCMD_MASK, 0, 1);
++DEFINE_2_MUXREG(pin245, PAD_FUNCTION_EN_2, PAD_DIRECTION_SEL_2, PMX_MCILEDS_MASK, 0, 1);
++DEFINE_2_MUXREG(keyboard_rowcol6_8_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_KBD_ROWCOL68_MASK, 0, 1);
++DEFINE_2_MUXREG(uart0_pins, PAD_FUNCTION_EN_0, PAD_DIRECTION_SEL_0, PMX_UART0_MASK, 0, 1);
++DEFINE_2_MUXREG(uart0_modem_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_UART0_MODEM_MASK, 0, 1);
++DEFINE_2_MUXREG(gpt0_tmr0_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_GPT0_TMR0_MASK, 0, 1);
++DEFINE_2_MUXREG(gpt0_tmr1_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_GPT0_TMR1_MASK, 0, 1);
++DEFINE_2_MUXREG(gpt1_tmr0_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_GPT1_TMR0_MASK, 0, 1);
++DEFINE_2_MUXREG(gpt1_tmr1_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_GPT1_TMR1_MASK, 0, 1);
++DEFINE_2_MUXREG(touch_xy_pins, PAD_FUNCTION_EN_1, PAD_DIRECTION_SEL_1, PMX_TOUCH_XY_MASK, 0, 1);
++
++static struct spear_gpio_pingroup spear1310_gpio_pingroup[] = {
++	GPIO_PINGROUP(i2c0_pins),
++	GPIO_PINGROUP(ssp0_pins),
++	GPIO_PINGROUP(ssp0_cs0_pins),
++	GPIO_PINGROUP(ssp0_cs1_2_pins),
++	GPIO_PINGROUP(i2s0_pins),
++	GPIO_PINGROUP(i2s1_pins),
++	GPIO_PINGROUP(clcd_pins),
++	GPIO_PINGROUP(clcd_high_res_pins),
++	GPIO_PINGROUP(pin18),
++	GPIO_PINGROUP(pin19),
++	GPIO_PINGROUP(pin20),
++	GPIO_PINGROUP(pin21),
++	GPIO_PINGROUP(pin22),
++	GPIO_PINGROUP(pin23),
++	GPIO_PINGROUP(pin143),
++	GPIO_PINGROUP(pin144),
++	GPIO_PINGROUP(pin145),
++	GPIO_PINGROUP(pin146),
++	GPIO_PINGROUP(pin147),
++	GPIO_PINGROUP(pin148),
++	GPIO_PINGROUP(pin149),
++	GPIO_PINGROUP(pin150),
++	GPIO_PINGROUP(pin151),
++	GPIO_PINGROUP(pin152),
++	GPIO_PINGROUP(smi_2_chips_pins),
++	GPIO_PINGROUP(pin54),
++	GPIO_PINGROUP(pin55),
++	GPIO_PINGROUP(pin56),
++	GPIO_PINGROUP(pin57),
++	GPIO_PINGROUP(pin58),
++	GPIO_PINGROUP(pin59),
++	GPIO_PINGROUP(pin60),
++	GPIO_PINGROUP(pin61),
++	GPIO_PINGROUP(pin62),
++	GPIO_PINGROUP(pin63),
++	GPIO_PINGROUP(pin_grp0),
++	GPIO_PINGROUP(pin_grp1),
++	GPIO_PINGROUP(pin_grp2),
++	GPIO_PINGROUP(pin_grp3),
++	GPIO_PINGROUP(pin_grp4),
++	GPIO_PINGROUP(pin_grp5),
++	GPIO_PINGROUP(pin_grp6),
++	GPIO_PINGROUP(pin_grp7),
++	GPIO_PINGROUP(pin_grp8),
++	GPIO_PINGROUP(nand_16bit_pins),
++	GPIO_PINGROUP(pin205),
++	GPIO_PINGROUP(pin206),
++	GPIO_PINGROUP(pin211),
++	GPIO_PINGROUP(pin212),
++	GPIO_PINGROUP(pin213),
++	GPIO_PINGROUP(pin214),
++	GPIO_PINGROUP(pin215),
++	GPIO_PINGROUP(pin216),
++	GPIO_PINGROUP(pin217),
++	GPIO_PINGROUP(pin218),
++	GPIO_PINGROUP(pin219),
++	GPIO_PINGROUP(pin220),
++	GPIO_PINGROUP(pin221),
++	GPIO_PINGROUP(pin222),
++	GPIO_PINGROUP(pin223),
++	GPIO_PINGROUP(pin224),
++	GPIO_PINGROUP(pin225),
++	GPIO_PINGROUP(pin226),
++	GPIO_PINGROUP(pin227),
++	GPIO_PINGROUP(pin228),
++	GPIO_PINGROUP(pin229),
++	GPIO_PINGROUP(pin230),
++	GPIO_PINGROUP(pin231),
++	GPIO_PINGROUP(pin232),
++	GPIO_PINGROUP(pin233),
++	GPIO_PINGROUP(pin234),
++	GPIO_PINGROUP(pin235),
++	GPIO_PINGROUP(pin236),
++	GPIO_PINGROUP(pin237),
++	GPIO_PINGROUP(pin238),
++	GPIO_PINGROUP(pin239),
++	GPIO_PINGROUP(pin240),
++	GPIO_PINGROUP(pin241),
++	GPIO_PINGROUP(pin242),
++	GPIO_PINGROUP(pin243),
++	GPIO_PINGROUP(pin244),
++	GPIO_PINGROUP(pin245),
++	GPIO_PINGROUP(keyboard_rowcol6_8_pins),
++	GPIO_PINGROUP(uart0_pins),
++	GPIO_PINGROUP(uart0_modem_pins),
++	GPIO_PINGROUP(gpt0_tmr0_pins),
++	GPIO_PINGROUP(gpt0_tmr1_pins),
++	GPIO_PINGROUP(gpt1_tmr0_pins),
++	GPIO_PINGROUP(gpt1_tmr1_pins),
++	GPIO_PINGROUP(touch_xy_pins),
 +};
 +
-+/* register manipulation inline functions */
-+static inline u32 is_plgpio_set(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl_relaxed(reg_off);
+ static struct spear_pinctrl_machdata spear1310_machdata = {
+ 	.pins = spear1310_pins,
+ 	.npins = ARRAY_SIZE(spear1310_pins),
+@@ -2425,6 +2687,8 @@ static struct spear_pinctrl_machdata spear1310_machdata = {
+ 	.ngroups = ARRAY_SIZE(spear1310_pingroups),
+ 	.functions = spear1310_functions,
+ 	.nfunctions = ARRAY_SIZE(spear1310_functions),
++	.gpio_pingroups = spear1310_gpio_pingroup,
++	.ngpio_pingroups = ARRAY_SIZE(spear1310_gpio_pingroup),
+ 	.modes_supported = false,
+ };
+ 
+diff --git a/drivers/pinctrl/spear/pinctrl-spear300.c b/drivers/pinctrl/spear/pinctrl-spear300.c
+index 4dfc284..9a49100 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear300.c
++++ b/drivers/pinctrl/spear/pinctrl-spear300.c
+@@ -661,6 +661,8 @@ static int __devinit spear300_pinctrl_probe(struct platform_device *pdev)
+ 	spear3xx_machdata.ngroups = ARRAY_SIZE(spear300_pingroups);
+ 	spear3xx_machdata.functions = spear300_functions;
+ 	spear3xx_machdata.nfunctions = ARRAY_SIZE(spear300_functions);
++	spear3xx_machdata.gpio_pingroups = NULL;
++	spear3xx_machdata.ngpio_pingroups = 0;
+ 
+ 	spear3xx_machdata.modes_supported = true;
+ 	spear3xx_machdata.pmx_modes = spear300_pmx_modes;
+diff --git a/drivers/pinctrl/spear/pinctrl-spear310.c b/drivers/pinctrl/spear/pinctrl-spear310.c
+index 9688369..4d5dfe9 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear310.c
++++ b/drivers/pinctrl/spear/pinctrl-spear310.c
+@@ -388,6 +388,8 @@ static int __devinit spear310_pinctrl_probe(struct platform_device *pdev)
+ 	spear3xx_machdata.nfunctions = ARRAY_SIZE(spear310_functions);
+ 
+ 	pmx_init_addr(&spear3xx_machdata, PMX_CONFIG_REG);
++	pmx_init_gpio_pingroup_addr(spear3xx_machdata.gpio_pingroups,
++			spear3xx_machdata.ngpio_pingroups, PMX_CONFIG_REG);
+ 
+ 	spear3xx_machdata.modes_supported = false;
+ 
+diff --git a/drivers/pinctrl/spear/pinctrl-spear320.c b/drivers/pinctrl/spear/pinctrl-spear320.c
+index ca47b0e..c996e26 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear320.c
++++ b/drivers/pinctrl/spear/pinctrl-spear320.c
+@@ -3431,6 +3431,8 @@ static int __devinit spear320_pinctrl_probe(struct platform_device *pdev)
+ 	spear3xx_machdata.npmx_modes = ARRAY_SIZE(spear320_pmx_modes);
+ 
+ 	pmx_init_addr(&spear3xx_machdata, PMX_CONFIG_REG);
++	pmx_init_gpio_pingroup_addr(spear3xx_machdata.gpio_pingroups,
++			spear3xx_machdata.ngpio_pingroups, PMX_CONFIG_REG);
+ 
+ 	ret = spear_pinctrl_probe(pdev, &spear3xx_machdata);
+ 	if (ret)
+diff --git a/drivers/pinctrl/spear/pinctrl-spear3xx.c b/drivers/pinctrl/spear/pinctrl-spear3xx.c
+index 0242378..12ee21a 100644
+--- a/drivers/pinctrl/spear/pinctrl-spear3xx.c
++++ b/drivers/pinctrl/spear/pinctrl-spear3xx.c
+@@ -481,7 +481,44 @@ struct spear_function spear3xx_timer_2_3_function = {
+ 	.ngroups = ARRAY_SIZE(timer_2_3_grps),
+ };
+ 
++/* Define muxreg arrays */
++DEFINE_MUXREG(firda_pins, 0, PMX_FIRDA_MASK, 0);
++DEFINE_MUXREG(i2c_pins, 0, PMX_I2C_MASK, 0);
++DEFINE_MUXREG(ssp_cs_pins, 0, PMX_SSP_CS_MASK, 0);
++DEFINE_MUXREG(ssp_pins, 0, PMX_SSP_MASK, 0);
++DEFINE_MUXREG(mii_pins, 0, PMX_MII_MASK, 0);
++DEFINE_MUXREG(gpio0_pin0_pins, 0, PMX_GPIO_PIN0_MASK, 0);
++DEFINE_MUXREG(gpio0_pin1_pins, 0, PMX_GPIO_PIN1_MASK, 0);
++DEFINE_MUXREG(gpio0_pin2_pins, 0, PMX_GPIO_PIN2_MASK, 0);
++DEFINE_MUXREG(gpio0_pin3_pins, 0, PMX_GPIO_PIN3_MASK, 0);
++DEFINE_MUXREG(gpio0_pin4_pins, 0, PMX_GPIO_PIN4_MASK, 0);
++DEFINE_MUXREG(gpio0_pin5_pins, 0, PMX_GPIO_PIN5_MASK, 0);
++DEFINE_MUXREG(uart0_ext_pins, 0, PMX_UART0_MODEM_MASK, 0);
++DEFINE_MUXREG(uart0_pins, 0, PMX_UART0_MASK, 0);
++DEFINE_MUXREG(timer_0_1_pins, 0, PMX_TIMER_0_1_MASK, 0);
++DEFINE_MUXREG(timer_2_3_pins, 0, PMX_TIMER_2_3_MASK, 0);
 +
-+	return !!(val & (1 << offset));
-+}
-+
-+static inline void plgpio_reg_set(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl_relaxed(reg_off);
-+
-+	writel_relaxed(val | (1 << offset), reg_off);
-+}
-+
-+static inline void plgpio_reg_reset(void __iomem *base, u32 pin, u32 reg)
-+{
-+	u32 offset = PIN_OFFSET(pin);
-+	void __iomem *reg_off = REG_OFFSET(base, reg, pin);
-+	u32 val = readl_relaxed(reg_off);
-+
-+	writel_relaxed(val & ~(1 << offset), reg_off);
-+}
-+
-+/* gpio framework specific routines */
-+static int plgpio_direction_input(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_DIR_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, plgpio->regs.dir);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int plgpio_direction_output(struct gpio_chip *chip, unsigned offset,
-+		int value)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	unsigned long flags;
-+	unsigned dir_offset = offset, wdata_offset = offset, tmp;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & (PTO_DIR_REG | PTO_WDATA_REG))) {
-+		tmp = plgpio->p2o(offset);
-+		if (tmp == -1)
-+			return -EINVAL;
-+
-+		if (plgpio->p2o_regs & PTO_DIR_REG)
-+			dir_offset = tmp;
-+		if (plgpio->p2o_regs & PTO_WDATA_REG)
-+			wdata_offset = tmp;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	if (value)
-+		plgpio_reg_set(plgpio->base, wdata_offset,
-+				plgpio->regs.wdata);
-+	else
-+		plgpio_reg_reset(plgpio->base, wdata_offset,
-+				plgpio->regs.wdata);
-+
-+	plgpio_reg_reset(plgpio->base, dir_offset, plgpio->regs.dir);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int plgpio_get_value(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_RDATA_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return -EINVAL;
-+	}
-+
-+	return is_plgpio_set(plgpio->base, offset, plgpio->regs.rdata);
-+}
-+
-+static void plgpio_set_value(struct gpio_chip *chip, unsigned offset, int value)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (offset >= chip->ngpio)
-+		return;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_WDATA_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	if (value)
-+		plgpio_reg_set(plgpio->base, offset, plgpio->regs.wdata);
-+	else
-+		plgpio_reg_reset(plgpio->base, offset, plgpio->regs.wdata);
-+}
-+
-+static int plgpio_request(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	int gpio = chip->base + offset;
-+	unsigned long flags;
-+	int ret = 0;
-+
-+	if (offset >= chip->ngpio)
-+		return -EINVAL;
-+
-+	ret = pinctrl_request_gpio(gpio);
-+	if (ret)
-+		return ret;
-+
-+	if (!IS_ERR(plgpio->clk)) {
-+		ret = clk_prepare_enable(plgpio->clk);
-+		if (ret)
-+			goto err0;
-+	}
-+
-+	if (plgpio->regs.enb == -1)
-+		return 0;
-+
-+	/*
-+	 * put gpio in IN mode before enabling it. This make enabling gpio safe
-+	 */
-+	ret = plgpio_direction_input(chip, offset);
-+	if (ret)
-+		goto err1;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_ENB_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1) {
-+			ret = -EINVAL;
-+			goto err1;
-+		}
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, plgpio->regs.enb);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+	return 0;
-+
-+err1:
-+	clk_disable_unprepare(plgpio->clk);
-+err0:
-+	pinctrl_free_gpio(gpio);
-+	return ret;
-+}
-+
-+static void plgpio_free(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+	int gpio = chip->base + offset;
-+	unsigned long flags;
-+
-+	if (offset >= chip->ngpio)
-+		return;
-+
-+	if (plgpio->regs.enb == -1)
-+		goto disable_clk;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_ENB_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, offset, plgpio->regs.enb);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+
-+disable_clk:
-+	if (!IS_ERR(plgpio->clk))
-+		clk_disable_unprepare(plgpio->clk);
-+
-+	pinctrl_free_gpio(gpio);
-+}
-+
-+static int plgpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+{
-+	struct plgpio *plgpio = container_of(chip, struct plgpio, chip);
-+
-+	if (plgpio->irq_base < 0)
-+		return -EINVAL;
-+
-+	return irq_find_mapping(plgpio->irq_domain, offset);
-+}
-+
-+/* PLGPIO IRQ */
-+static void plgpio_irq_disable(struct irq_data *d)
-+{
-+	struct plgpio *plgpio = irq_data_get_irq_chip_data(d);
-+	int offset = d->irq - plgpio->irq_base;
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_IE_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_set(plgpio->base, offset, plgpio->regs.ie);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+}
-+
-+static void plgpio_irq_enable(struct irq_data *d)
-+{
-+	struct plgpio *plgpio = irq_data_get_irq_chip_data(d);
-+	int offset = d->irq - plgpio->irq_base;
-+	unsigned long flags;
-+
-+	/* get correct offset for "offset" pin */
-+	if (plgpio->p2o && (plgpio->p2o_regs & PTO_IE_REG)) {
-+		offset = plgpio->p2o(offset);
-+		if (offset == -1)
-+			return;
-+	}
-+
-+	spin_lock_irqsave(&plgpio->lock, flags);
-+	plgpio_reg_reset(plgpio->base, offset, plgpio->regs.ie);
-+	spin_unlock_irqrestore(&plgpio->lock, flags);
-+}
-+
-+static int plgpio_irq_set_type(struct irq_data *d, unsigned trigger)
-+{
-+	struct plgpio *plgpio = irq_data_get_irq_chip_data(d);
-+	int offset = d->irq - plgpio->irq_base;
-+	void __iomem *reg_off;
-+	unsigned int supported_type = 0, val;
-+
-+	if (offset >= plgpio->chip.ngpio)
-+		return -EINVAL;
-+
-+	if (plgpio->regs.eit == -1)
-+		supported_type = IRQ_TYPE_LEVEL_HIGH;
-+	else
-+		supported_type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
-+
-+	if (!(trigger & supported_type))
-+		return -EINVAL;
-+
-+	if (plgpio->regs.eit == -1)
-+		return 0;
-+
-+	reg_off = REG_OFFSET(plgpio->base, plgpio->regs.eit, offset);
-+	val = readl_relaxed(reg_off);
-+
-+	offset = PIN_OFFSET(offset);
-+	if (trigger & IRQ_TYPE_EDGE_RISING)
-+		writel_relaxed(val | (1 << offset), reg_off);
-+	else
-+		writel_relaxed(val & ~(1 << offset), reg_off);
-+
-+	return 0;
-+}
-+
-+static struct irq_chip plgpio_irqchip = {
-+	.name		= "PLGPIO",
-+	.irq_enable	= plgpio_irq_enable,
-+	.irq_disable	= plgpio_irq_disable,
-+	.irq_set_type	= plgpio_irq_set_type,
++static struct spear_gpio_pingroup spear3xx_gpio_pingroup[] = {
++	GPIO_PINGROUP(firda_pins),
++	GPIO_PINGROUP(i2c_pins),
++	GPIO_PINGROUP(ssp_cs_pins),
++	GPIO_PINGROUP(ssp_pins),
++	GPIO_PINGROUP(mii_pins),
++	GPIO_PINGROUP(gpio0_pin0_pins),
++	GPIO_PINGROUP(gpio0_pin1_pins),
++	GPIO_PINGROUP(gpio0_pin2_pins),
++	GPIO_PINGROUP(gpio0_pin3_pins),
++	GPIO_PINGROUP(gpio0_pin4_pins),
++	GPIO_PINGROUP(gpio0_pin5_pins),
++	GPIO_PINGROUP(uart0_ext_pins),
++	GPIO_PINGROUP(uart0_pins),
++	GPIO_PINGROUP(timer_0_1_pins),
++	GPIO_PINGROUP(timer_2_3_pins),
 +};
 +
-+static void plgpio_irq_handler(unsigned irq, struct irq_desc *desc)
-+{
-+	struct plgpio *plgpio = irq_get_handler_data(irq);
-+	struct irq_chip *irqchip = irq_desc_get_chip(desc);
-+	int regs_count, count, pin, offset, i = 0;
-+	unsigned long pending;
-+
-+	count = plgpio->chip.ngpio;
-+	regs_count = DIV_ROUND_UP(count, MAX_GPIO_PER_REG);
-+
-+	chained_irq_enter(irqchip, desc);
-+	/* check all plgpio MIS registers for a possible interrupt */
-+	for (; i < regs_count; i++) {
-+		pending = readl_relaxed(plgpio->base + plgpio->regs.mis +
-+				i * sizeof(int *));
-+		if (!pending)
-+			continue;
-+
-+		/* clear interrupts */
-+		writel_relaxed(~pending, plgpio->base + plgpio->regs.mis +
-+				i * sizeof(int *));
-+		/*
-+		 * clear extra bits in last register having gpios < MAX/REG
-+		 * ex: Suppose there are max 102 plgpios. then last register
-+		 * must have only (102 - MAX_GPIO_PER_REG * 3) = 6 relevant bits
-+		 * so, we must not take other 28 bits into consideration for
-+		 * checking interrupt. so clear those bits.
-+		 */
-+		count = count - i * MAX_GPIO_PER_REG;
-+		if (count < MAX_GPIO_PER_REG)
-+			pending &= (1 << count) - 1;
-+
-+		for_each_set_bit(offset, &pending, MAX_GPIO_PER_REG) {
-+			/* get correct pin for "offset" */
-+			if (plgpio->o2p && (plgpio->p2o_regs & PTO_MIS_REG)) {
-+				pin = plgpio->o2p(offset);
-+				if (pin == -1)
-+					continue;
-+			} else
-+				pin = offset;
-+
-+			/* get correct irq line number */
-+			pin = i * MAX_GPIO_PER_REG + pin;
-+			generic_handle_irq(plgpio_to_irq(&plgpio->chip, pin));
-+		}
-+	}
-+	chained_irq_exit(irqchip, desc);
-+}
-+
-+/*
-+ * pin to offset and offset to pin converter functions
-+ *
-+ * In spear310 there is inconsistency among bit positions in plgpio regiseters,
-+ * for different plgpio pins. For example: for pin 27, bit offset is 23, pin
-+ * 28-33 are not supported, pin 95 has offset bit 95, bit 100 has offset bit 1
-+ */
-+static int spear310_p2o(int pin)
-+{
-+	int offset = pin;
-+
-+	if (pin <= 27)
-+		offset += 4;
-+	else if (pin <= 33)
-+		offset = -1;
-+	else if (pin <= 97)
-+		offset -= 2;
-+	else if (pin <= 101)
-+		offset = 101 - pin;
-+	else
-+		offset = -1;
-+
-+	return offset;
-+}
-+
-+int spear310_o2p(int offset)
-+{
-+	if (offset <= 3)
-+		return 101 - offset;
-+	else if (offset <= 31)
-+		return offset - 4;
-+	else
-+		return offset + 2;
-+}
-+
-+static int __devinit plgpio_probe_dt(struct platform_device *pdev,
-+		struct plgpio *plgpio)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret = -EINVAL;
-+	u32 val;
-+
-+	if (of_machine_is_compatible("st,spear310")) {
-+		plgpio->p2o = spear310_p2o;
-+		plgpio->o2p = spear310_o2p;
-+		plgpio->p2o_regs = PTO_WDATA_REG | PTO_DIR_REG | PTO_IE_REG |
-+			PTO_RDATA_REG | PTO_MIS_REG;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,ngpio", &val)) {
-+		plgpio->chip.ngpio = val;
-+	} else {
-+		dev_err(&pdev->dev, "DT: Invalid ngpio field\n");
-+		goto end;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,enb-reg", &val))
-+		plgpio->regs.enb = val;
-+	else
-+		plgpio->regs.enb = -1;
-+
-+	if (!of_property_read_u32(np, "st-plgpio,wdata-reg", &val)) {
-+		plgpio->regs.wdata = val;
-+	} else {
-+		dev_err(&pdev->dev, "DT: Invalid wdata reg\n");
-+		goto end;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,dir-reg", &val)) {
-+		plgpio->regs.dir = val;
-+	} else {
-+		dev_err(&pdev->dev, "DT: Invalid dir reg\n");
-+		goto end;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,ie-reg", &val)) {
-+		plgpio->regs.ie = val;
-+	} else {
-+		dev_err(&pdev->dev, "DT: Invalid ie reg\n");
-+		goto end;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,rdata-reg", &val)) {
-+		plgpio->regs.rdata = val;
-+	} else {
-+		dev_err(&pdev->dev, "DT: Invalid rdata reg\n");
-+		goto end;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,mis-reg", &val)) {
-+		plgpio->regs.mis = val;
-+	} else {
-+		dev_err(&pdev->dev, "DT: Invalid mis reg\n");
-+		goto end;
-+	}
-+
-+	if (!of_property_read_u32(np, "st-plgpio,eit-reg", &val))
-+		plgpio->regs.eit = val;
-+	else
-+		plgpio->regs.eit = -1;
-+
-+	return 0;
-+
-+end:
-+	return ret;
-+}
-+static int __devinit plgpio_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct plgpio *plgpio;
-+	struct resource *res;
-+	int ret, irq, i;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "invalid IORESOURCE_MEM\n");
-+		return -EBUSY;
-+	}
-+
-+	plgpio = devm_kzalloc(&pdev->dev, sizeof(*plgpio), GFP_KERNEL);
-+	if (!plgpio) {
-+		dev_err(&pdev->dev, "memory allocation fail\n");
-+		return -ENOMEM;
-+	}
-+
-+	plgpio->base = devm_request_and_ioremap(&pdev->dev, res);
-+	if (!plgpio->base) {
-+		dev_err(&pdev->dev, "request and ioremap fail\n");
-+		return -ENOMEM;
-+	}
-+
-+	ret = plgpio_probe_dt(pdev, plgpio);
-+	if (ret) {
-+		dev_err(&pdev->dev, "DT probe failed\n");
-+		return ret;
-+	}
-+
-+	plgpio->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(plgpio->clk))
-+		dev_warn(&pdev->dev, "clk_get() failed, work without it\n");
-+
-+#ifdef CONFIG_PM
-+	plgpio->csave_regs = devm_kzalloc(&pdev->dev,
-+			sizeof(*plgpio->csave_regs) *
-+			DIV_ROUND_UP(plgpio->chip.ngpio, MAX_GPIO_PER_REG),
-+			GFP_KERNEL);
-+	if (!plgpio->csave_regs) {
-+		dev_err(&pdev->dev, "csave registers memory allocation fail\n");
-+		return -ENOMEM;
-+	}
-+#endif
-+
-+	platform_set_drvdata(pdev, plgpio);
-+	spin_lock_init(&plgpio->lock);
-+
-+	plgpio->irq_base = -1;
-+	plgpio->chip.base = -1;
-+	plgpio->chip.request = plgpio_request;
-+	plgpio->chip.free = plgpio_free;
-+	plgpio->chip.direction_input = plgpio_direction_input;
-+	plgpio->chip.direction_output = plgpio_direction_output;
-+	plgpio->chip.get = plgpio_get_value;
-+	plgpio->chip.set = plgpio_set_value;
-+	plgpio->chip.to_irq = plgpio_to_irq;
-+	plgpio->chip.label = dev_name(&pdev->dev);
-+	plgpio->chip.dev = &pdev->dev;
-+	plgpio->chip.owner = THIS_MODULE;
-+
-+	ret = gpiochip_add(&plgpio->chip);
-+	if (ret) {
-+		dev_err(&pdev->dev, "unable to add gpio chip\n");
-+		return ret;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_info(&pdev->dev, "irqs not supported\n");
-+		return 0;
-+	}
-+
-+	plgpio->irq_base = irq_alloc_descs(-1, 0, plgpio->chip.ngpio, 0);
-+	if (IS_ERR_VALUE(plgpio->irq_base)) {
-+		/* we would not support irq for gpio */
-+		dev_warn(&pdev->dev, "couldn't allocate irq base\n");
-+		return 0;
-+	}
-+
-+	plgpio->irq_domain = irq_domain_add_legacy(np, plgpio->chip.ngpio,
-+			plgpio->irq_base, 0, &irq_domain_simple_ops, NULL);
-+	if (WARN_ON(!plgpio->irq_domain)) {
-+		dev_err(&pdev->dev, "irq domain init failed\n");
-+		irq_free_descs(plgpio->irq_base, plgpio->chip.ngpio);
-+		ret = -ENXIO;
-+		goto remove_gpiochip;
-+	}
-+
-+	irq_set_chained_handler(irq, plgpio_irq_handler);
-+	for (i = 0; i < plgpio->chip.ngpio; i++) {
-+		irq_set_chip_and_handler(i + plgpio->irq_base, &plgpio_irqchip,
-+				handle_simple_irq);
-+		set_irq_flags(i + plgpio->irq_base, IRQF_VALID);
-+		irq_set_chip_data(i + plgpio->irq_base, plgpio);
-+	}
-+
-+	irq_set_handler_data(irq, plgpio);
-+	dev_info(&pdev->dev, "PLGPIO registered with IRQs\n");
-+
-+	return 0;
-+
-+remove_gpiochip:
-+	dev_info(&pdev->dev, "Remove gpiochip\n");
-+	if (gpiochip_remove(&plgpio->chip))
-+		dev_err(&pdev->dev, "unable to remove gpiochip\n");
-+
-+	return ret;
-+}
-+
-+#ifdef CONFIG_PM
-+static int plgpio_suspend(struct device *dev)
-+{
-+	struct plgpio *plgpio = dev_get_drvdata(dev);
-+	int i, reg_count = DIV_ROUND_UP(plgpio->chip.ngpio, MAX_GPIO_PER_REG);
-+	void __iomem *off;
-+
-+	for (i = 0; i < reg_count; i++) {
-+		off = plgpio->base + i * sizeof(int *);
-+
-+		if (plgpio->regs.enb != -1)
-+			plgpio->csave_regs[i].enb =
-+				readl_relaxed(plgpio->regs.enb + off);
-+		if (plgpio->regs.eit != -1)
-+			plgpio->csave_regs[i].eit =
-+				readl_relaxed(plgpio->regs.eit + off);
-+		plgpio->csave_regs[i].wdata = readl_relaxed(plgpio->regs.wdata +
-+				off);
-+		plgpio->csave_regs[i].dir = readl_relaxed(plgpio->regs.dir +
-+				off);
-+		plgpio->csave_regs[i].ie = readl_relaxed(plgpio->regs.ie + off);
-+	}
-+
-+	return 0;
-+}
-+
-+/*
-+ * This is used to correct the values in end registers. End registers contain
-+ * extra bits that might be used for other purpose in platform. So, we shouldn't
-+ * overwrite these bits. This macro, reads given register again, preserves other
-+ * bit values (non-plgpio bits), and retain captured value (plgpio bits).
-+ */
-+#define plgpio_prepare_reg(__reg, _off, _mask, _tmp)		\
-+{								\
-+	_tmp = readl_relaxed(plgpio->regs.__reg + _off);		\
-+	_tmp &= ~_mask;						\
-+	plgpio->csave_regs[i].__reg =				\
-+		_tmp | (plgpio->csave_regs[i].__reg & _mask);	\
-+}
-+
-+static int plgpio_resume(struct device *dev)
-+{
-+	struct plgpio *plgpio = dev_get_drvdata(dev);
-+	int i, reg_count = DIV_ROUND_UP(plgpio->chip.ngpio, MAX_GPIO_PER_REG);
-+	void __iomem *off;
-+	u32 mask, tmp;
-+
-+	for (i = 0; i < reg_count; i++) {
-+		off = plgpio->base + i * sizeof(int *);
-+
-+		if (i == reg_count - 1) {
-+			mask = (1 << (plgpio->chip.ngpio - i *
-+						MAX_GPIO_PER_REG)) - 1;
-+
-+			if (plgpio->regs.enb != -1)
-+				plgpio_prepare_reg(enb, off, mask, tmp);
-+
-+			if (plgpio->regs.eit != -1)
-+				plgpio_prepare_reg(eit, off, mask, tmp);
-+
-+			plgpio_prepare_reg(wdata, off, mask, tmp);
-+			plgpio_prepare_reg(dir, off, mask, tmp);
-+			plgpio_prepare_reg(ie, off, mask, tmp);
-+		}
-+
-+		writel_relaxed(plgpio->csave_regs[i].wdata, plgpio->regs.wdata +
-+				off);
-+		writel_relaxed(plgpio->csave_regs[i].dir, plgpio->regs.dir +
-+				off);
-+
-+		if (plgpio->regs.eit != -1)
-+			writel_relaxed(plgpio->csave_regs[i].eit,
-+					plgpio->regs.eit + off);
-+
-+		writel_relaxed(plgpio->csave_regs[i].ie, plgpio->regs.ie + off);
-+
-+		if (plgpio->regs.enb != -1)
-+			writel_relaxed(plgpio->csave_regs[i].enb,
-+					plgpio->regs.enb + off);
-+	}
-+
-+	return 0;
-+}
-+#endif
-+
-+static SIMPLE_DEV_PM_OPS(plgpio_dev_pm_ops, plgpio_suspend, plgpio_resume);
-+
-+static const struct of_device_id plgpio_of_match[] = {
-+	{ .compatible = "st,spear-plgpio" },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, plgpio_of_match);
-+
-+static struct platform_driver plgpio_driver = {
-+	.probe = plgpio_probe,
-+	.driver = {
-+		.owner = THIS_MODULE,
-+		.name = "spear-plgpio",
-+		.pm = &plgpio_dev_pm_ops,
-+		.of_match_table = of_match_ptr(plgpio_of_match),
-+	},
-+};
-+
-+static int __init plgpio_init(void)
-+{
-+	return platform_driver_register(&plgpio_driver);
-+}
-+subsys_initcall(plgpio_init);
-+
-+MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
-+MODULE_DESCRIPTION("ST Microlectronics SPEAr PLGPIO driver");
-+MODULE_LICENSE("GPL");
+ struct spear_pinctrl_machdata spear3xx_machdata = {
+ 	.pins = spear3xx_pins,
+ 	.npins = ARRAY_SIZE(spear3xx_pins),
++	.gpio_pingroups = spear3xx_gpio_pingroup,
++	.ngpio_pingroups = ARRAY_SIZE(spear3xx_gpio_pingroup),
+ };
 -- 
 1.7.12.rc2.18.g61b472e
