@@ -1,41 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 27 Oct 2012 18:58:58 +0200
-Subject: [PATCH] GPIO: mvebu-gpio: Don't initialize the mask_cache
-In-Reply-To: <20121027185305.71d88c07@skate>
-References: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
- <CACRpkdYE_P_MQch4dLuCBeUXEfr2RG3TwdUMdT75cN3MELG3pQ@mail.gmail.com>
- <20121027185305.71d88c07@skate>
-Message-ID: <20121027165858.GC15824@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 27 Oct 2012 19:00:49 +0200
+Subject: [PATCH] arm: bcm2835: enable proc and sysfs in defconfig
+Message-ID: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2012 at 06:53:05PM +0200, Thomas Petazzoni wrote:
-> 
-> On Sat, 27 Oct 2012 18:31:41 +0200, Linus Walleij wrote:
-> > On Sat, Oct 27, 2012 at 3:28 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > 
-> > > Due to the SMP nature of some of the chips, which have per CPU
-> > > registers, the driver does not use the generic irq_gc_mask_set_bit() &
-> > > irq_gc_mask_clr_bit() functions, which only support a single register.
-> > > The driver has its own implementation of these functions, which can
-> > > pick the correct register depending on the CPU being used. The
-> > > functions do however use the gc->mask_cache value.
-> > >
-> > > The call to irq_setup_generic_chip() was passing
-> > > IRQ_GC_INIT_MASK_CACHE, which caused the gc->mask_cache to be
-> > > initialized to the contents of some random register. This resulted in
-> > > unexpected interrupts been delivered from random GPIO lines.
-> > >
-> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > 
-> > Thanks, patch applied to fixes. Unless Thomas screams...
-> 
-> Acked-by-the-not-screaming: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> Sounds good? :-)
+For some reason, support for proc and sysfs is currently disabled in
+the bcm2835_defconfig, even though those filesystems are quite
+essential even for very basic Linux userspace. As most defconfig have
+them enabled by default, enable them as well in bcm2835_defconfig.
 
-https://lwn.net/Articles/503829
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/configs/bcm2835_defconfig |    2 --
+ 1 file changed, 2 deletions(-)
 
-Its at least new...
-
-	Andrew
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 7aea702..74e27f0 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -66,8 +66,6 @@ CONFIG_TTY_PRINTK=y
+ # CONFIG_FILE_LOCKING is not set
+ # CONFIG_DNOTIFY is not set
+ # CONFIG_INOTIFY_USER is not set
+-# CONFIG_PROC_FS is not set
+-# CONFIG_SYSFS is not set
+ # CONFIG_MISC_FILESYSTEMS is not set
+ CONFIG_PRINTK_TIME=y
+ # CONFIG_ENABLE_WARN_DEPRECATED is not set
+-- 
+1.7.9.5
