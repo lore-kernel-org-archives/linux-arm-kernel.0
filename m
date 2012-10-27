@@ -1,51 +1,37 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 27 Oct 2012 14:47:47 +0530
-Subject: [PATCH 2/9] pinctrl: SPEAr3xx: correct register space to configure pwm
+Date: Sat, 27 Oct 2012 14:47:48 +0530
+Subject: [PATCH 3/9] pinctrl: SPEAr320: Correct pad mux entries for rmii/smii
 In-Reply-To: <cover.1351329224.git.viresh.kumar@linaro.org>
 References: <cover.1351329224.git.viresh.kumar@linaro.org>
-Message-ID: <c93a7cffdf92e0bb0e4f4b78daec66218752fa7a.1351329224.git.viresh.kumar@linaro.org>
+Message-ID: <1d2c374f463bda55c687d2bbee569ca2e23310dc.1351329224.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+From: Deepak Sikri <deepak.sikri@st.com>
 
-To have pwm on pad no. 34 we also need to select between pwm and SD_LED
-functions. Add this to pwm pin mux register configuration.
+pin entries of rmii and smii are interchanged by mistake. Fix it.
 
-Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
 ---
- drivers/pinctrl/spear/pinctrl-spear320.c | 4 ++++
- drivers/pinctrl/spear/pinctrl-spear3xx.h | 1 +
- 2 files changed, 5 insertions(+)
+ drivers/pinctrl/spear/pinctrl-spear320.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pinctrl/spear/pinctrl-spear320.c b/drivers/pinctrl/spear/pinctrl-spear320.c
-index 020b1e0..4fccf95 100644
+index 4fccf95..ca47b0e 100644
 --- a/drivers/pinctrl/spear/pinctrl-spear320.c
 +++ b/drivers/pinctrl/spear/pinctrl-spear320.c
-@@ -2240,6 +2240,10 @@ static struct spear_muxreg pwm2_pin_34_muxreg[] = {
- 		.mask = PMX_SSP_CS_MASK,
- 		.val = 0,
- 	}, {
-+		.reg = MODE_CONFIG_REG,
-+		.mask = PMX_PWM_MASK,
-+		.val = PMX_PWM_MASK,
-+	}, {
- 		.reg = IP_SEL_PAD_30_39_REG,
- 		.mask = PMX_PL_34_MASK,
- 		.val = PMX_PWM2_PL_34_VAL,
-diff --git a/drivers/pinctrl/spear/pinctrl-spear3xx.h b/drivers/pinctrl/spear/pinctrl-spear3xx.h
-index 31f4434..7860b36 100644
---- a/drivers/pinctrl/spear/pinctrl-spear3xx.h
-+++ b/drivers/pinctrl/spear/pinctrl-spear3xx.h
-@@ -15,6 +15,7 @@
- #include "pinctrl-spear.h"
+@@ -2960,9 +2960,9 @@ static struct spear_function mii2_function = {
+ };
  
- /* pad mux declarations */
-+#define PMX_PWM_MASK		(1 << 16)
- #define PMX_FIRDA_MASK		(1 << 14)
- #define PMX_I2C_MASK		(1 << 13)
- #define PMX_SSP_CS_MASK		(1 << 12)
+ /* Pad multiplexing for cadence mii 1_2 as smii or rmii device */
+-static const unsigned smii0_1_pins[] = { 10, 11, 13, 14, 15, 16, 17, 18, 19, 20,
++static const unsigned rmii0_1_pins[] = { 10, 11, 13, 14, 15, 16, 17, 18, 19, 20,
+ 	21, 22, 23, 24, 25, 26, 27 };
+-static const unsigned rmii0_1_pins[] = { 10, 11, 21, 22, 23, 24, 25, 26, 27 };
++static const unsigned smii0_1_pins[] = { 10, 11, 21, 22, 23, 24, 25, 26, 27 };
+ static struct spear_muxreg mii0_1_muxreg[] = {
+ 	{
+ 		.reg = PMX_CONFIG_REG,
 -- 
 1.7.12.rc2.18.g61b472e
