@@ -1,77 +1,29 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Sat, 27 Oct 2012 21:03:25 +0200
-Subject: [PATCH 7/8] i2c: add 'transferred' field to struct i2c_msg
-In-Reply-To: <20121027171036.GA24822@ZenIV.linux.org.uk>
-References: <1350899218-13624-8-git-send-email-balbi@ti.com>
- <20121025145748.760c218b@endymion.delvare>
- <20121025131459.GG28061@n2100.arm.linux.org.uk>
- <20121025154202.41f3cbba@endymion.delvare>
- <20121025134609.GH28061@n2100.arm.linux.org.uk>
- <20121025155633.609c5554@endymion.delvare>
- <20121025141800.GI28061@n2100.arm.linux.org.uk>
- <20121027163224.67d57aef@endymion.delvare>
- <20121027164013.GV2616@ZenIV.linux.org.uk>
- <20121027170235.GA24388@ZenIV.linux.org.uk>
- <20121027171036.GA24822@ZenIV.linux.org.uk>
-Message-ID: <20121027210325.093dc92a@endymion.delvare>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 27 Oct 2012 17:19:11 -0200
+Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
+In-Reply-To: <20121004135130.GC5554@sortiz-mobl>
+References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <11987916.rOoNGcb1ly@dev1>
+ <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
+ <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
+ <20121004135130.GC5554@sortiz-mobl>
+Message-ID: <CAOMZO5CXtOT7pi6hOOwYxxthTfDZYcYe5QFTnGR=L_S82NM_Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
+Hi Samuel,
 
-On Sat, 27 Oct 2012 18:10:36 +0100, Al Viro wrote:
-> On Sat, Oct 27, 2012 at 06:02:35PM +0100, Al Viro wrote:
-> > On Sat, Oct 27, 2012 at 05:40:13PM +0100, Al Viro wrote:
-> >
-> > > You are wrong.  Assumption that pointers are aligned to 32bit boundary
-> > > is simply not true.  In particular, on m68k alignment is 16bit, i.e. there
-> > > struct foo {
-> > > 	char x;
-> > > 	void *p;
-> > > }; will have 1 byte occupied by x, followed by 1-byte gap, followed by 4 bytes
-> > > occupied by p.
-> > >
-> > > Note, BTW, that m68k includes things like coldfire, etc. and I wouldn't be
-> > > surprised by e.g. coldfire-based SoC with i2c on it.
-> >
-> > BTW, that's easily verified - take a cross-compiler and do this:
-> > ; cat >a.c <<'EOF'
-> > struct { char x; void *y; } v;
-> > int z = (char *)&v.y - (char *)&v;
-> > EOF
-> > ; m68k-linux-gnu-gcc -S a.c
-> > ; grep -A1 'z:' a.s
-> > z:
-> >         .long   2
-> > ;
-> > and watch what it puts into z.  gcc is very liberal about what it considers
-> > a constant expression, so it allows that sort of expressions as initializers
-> > for global variables.  Not a portable C, but convenient for experiments like
-> > that; just grab a cross-toolchain and feed it testcases of that kind...
+On Thu, Oct 4, 2012 at 10:51 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
 
-Thanks for the fast and complete answer.
+>> I want to add mc34708 support to mx53qsb and need this series to be applied.
+> I understand. I'll queue it to my for-next branch as soon as the merge window
+> is closed.
 
-> ... and google for i2c coldfire immediately turns up this:
-> http://mailman.uclinux.org/pipermail/uclinux-dev/2012-May/051874.html
-> with
-> +config I2C_COLDFIRE
-> +       tristate "Freescale Coldfire I2C driver"
-> +       depends on !M5272
-> +       help
-> +         This driver supports the I2C interface availible on most Freescale
-> +         Coldfire processors.
-> +
-> +         This driver can be built as a module.  If so, the module
-> +         will be called i2c-coldfire.
-> 
-> in it, along with addition of drivers/i2c/busses/i2c-coldfire.c...  IOW,
-> i2c on m68k is quite real.  Sorry, no go - you don't even have an excuse
-> of i2c never existing on the architecture in question.
+Could you please queue this series? I still do not see it applied in
+your 'for-next-merge' branch.
 
-You are completely right, we will have to find another way to let bus
-drivers report how much of each message they managed to transmit or
-receive.
+I will add mc34708 touchscreen support and need Uwe's series to be applied.
 
-Thanks again,
--- 
-Jean Delvare
+Thanks,
+
+Fabio Estevam
