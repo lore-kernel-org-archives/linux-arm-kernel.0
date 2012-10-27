@@ -1,38 +1,36 @@
-From: julien.boibessot@free.fr (julien.boibessot at free.fr)
-Date: Sat, 27 Oct 2012 12:15:46 +0200
-Subject: [PATCH] ARM: dts: mxs: Add PWM3 muxing options for i.MX28
-Message-ID: <1351332946-5933-1-git-send-email-julien.boibessot@free.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 27 Oct 2012 10:43:40 +0000
+Subject: [PATCH] arm: socfpga: fix build break for allyesconfig
+In-Reply-To: <20121026230052.GA24573@elf.ucw.cz>
+References: <1351289861-16297-1-git-send-email-dinguyen@altera.com>
+ <20121026224358.GD21164@n2100.arm.linux.org.uk>
+ <20121026230052.GA24573@elf.ucw.cz>
+Message-ID: <201210271043.40569.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julien Boibessot <julien.boibessot@armadeus.com>
+On Friday 26 October 2012, Pavel Machek wrote:
+> arch/arm/mach-socfpga/headsmp.S:21: Error: attempt to use an ARM
+> instruction on a Thumb-only processor -- `movw
+> r0,#:lower16:(0xffd08000+0x10)'
+> ...
+> 
+> Using .arch armv7-a indeed works and is a very nice solution.
+> 
+> Signed-off-by: Pavel Machek <pavel@denx.de>
+> 
+> --- a/arch/arm/mach-socfpga/headsmp.S
+> +++ b/arch/arm/mach-socfpga/headsmp.S
+> @@ -11,6 +11,7 @@
+>  #include <linux/init.h>
+>  
+>         __INIT
+> +       .arch   armv7-a
+>  
+>  #define HPS_SYSMGR_ADDRESS     0xffd08000
+>  #define CONFIG_SYSTEM_MANAGER  HPS_SYSMGR_ADDRESS
+> 
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
----
- arch/arm/boot/dts/imx28.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Thanks, applied with new commit message.
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index e16d631..2b607aa 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -491,6 +491,16 @@
- 					fsl,pull-up = <0>;
- 				};
- 
-+				pwm3_pins_a: pwm3 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x31c0 /* MX28_PAD_PWM3__PWM_3 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
- 				pwm4_pins_a: pwm4 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--- 
-1.7.5.4
+	Arnd
