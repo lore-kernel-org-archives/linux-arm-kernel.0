@@ -1,36 +1,142 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 27 Oct 2012 13:57:56 +0200
-Subject: [GIT PULL] i.MX fixes for -rc
-In-Reply-To: <201210262101.44700.arnd@arndb.de>
-References: <20121024075656.GW27665@pengutronix.de>
- <201210262101.44700.arnd@arndb.de>
-Message-ID: <20121027115756.GC1641@pengutronix.de>
+From: const@MakeLinux.com (Constantine Shulyupin)
+Date: Sat, 27 Oct 2012 14:03:26 +0200
+Subject: [PATCH] ARM: OMAP4: Basic default configuration for Pandaboard
+Message-ID: <1351339406-10082-1-git-send-email-const@MakeLinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 09:01:44PM +0000, Arnd Bergmann wrote:
-> On Wednesday 24 October 2012, Sascha Hauer wrote:
-> >       ARM i.MX25: Fix PWM per clock lookups
-> 
-> This patch is now causing build errors in imx_v4_v5_defconfig:
-> 
-> arch/arm/mach-imx/clk-imx25.c: In function 'mx25_clocks_init':
-> arch/arm/mach-imx/clk-imx25.c:206:26: error: 'pwm_ipg_per' undeclared (first use in this function)
-> arch/arm/mach-imx/clk-imx25.c:206:26: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> Any idea what went wrong? The symbol doesn't seem to exist anywhere in
-> v3.7-rc2. Should I revert this patch for now?
+From: Constantine Shulyupin <const@MakeLinux.com>
 
-Yes, please revert it for now.
+Tested SD (MMC) and Ethernet smsc95xx on linux-3.7-rc2
 
-There are several gates missing in clk-imx25.c. I have a patch which
-adds support for them and I seem to have missed that the above depends
-on it.
+Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
+--
+kernel size is 2.3 MiB
+---
+ arch/arm/configs/omap4_panda_defconfig |  115 ++++++++++++++++++++++++++++++++
+ 1 file changed, 115 insertions(+)
+ create mode 100644 arch/arm/configs/omap4_panda_defconfig
 
-Sascha
-
+diff --git a/arch/arm/configs/omap4_panda_defconfig b/arch/arm/configs/omap4_panda_defconfig
+new file mode 100644
+index 0000000..82c773d
+--- /dev/null
++++ b/arch/arm/configs/omap4_panda_defconfig
+@@ -0,0 +1,115 @@
++CONFIG_MACH_OMAP4_PANDA=y
++CONFIG_ARCH_OMAP=y
++CONFIG_OMAP_RESET_CLOCKS=y
++CONFIG_ARCH_OMAP2PLUS_TYPICAL=y
++CONFIG_ARCH_OMAP2PLUS=y
++CONFIG_ARCH_OMAP4=y
++CONFIG_SOC_HAS_OMAP2_SDRC=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=2
++
++CONFIG_MACH_OMAP_GENERIC=n
++CONFIG_ARCH_OMAP2=n
++CONFIG_ARCH_OMAP3=n
++CONFIG_SOC_AM33XX=n
++
++CONFIG_MACH_OMAP2_TUSB6010=n
++CONFIG_MACH_OMAP_H4=n
++CONFIG_MACH_OMAP_APOLLON=n
++CONFIG_MACH_OMAP_2430SDP=n
++CONFIG_MACH_OMAP3_BEAGLE=n
++CONFIG_MACH_DEVKIT8000=n
++CONFIG_MACH_OMAP_LDP=n
++CONFIG_MACH_OMAP3530_LV_SOM=n
++CONFIG_MACH_OMAP3_TORPEDO=n
++CONFIG_MACH_OVERO=n
++CONFIG_MACH_OMAP3EVM=n
++CONFIG_MACH_OMAP3517EVM=n
++CONFIG_MACH_OMAP3_PANDORA=n
++CONFIG_MACH_TOUCHBOOK=n
++CONFIG_MACH_OMAP_3430SDP=n
++CONFIG_MACH_NOKIA_N800=n
++CONFIG_MACH_NOKIA_N810=n
++CONFIG_MACH_NOKIA_N810_WIMAX=n
++CONFIG_MACH_NOKIA_N8X0=n
++CONFIG_MACH_NOKIA_RM680=n
++CONFIG_MACH_NOKIA_RX51=n
++CONFIG_MACH_OMAP_ZOOM2=n
++CONFIG_MACH_OMAP_ZOOM3=n
++CONFIG_MACH_CM_T35=n
++CONFIG_MACH_CM_T3517=n
++CONFIG_MACH_CM_T3730=n
++CONFIG_MACH_IGEP0020=n
++CONFIG_MACH_IGEP0030=n
++CONFIG_MACH_SBC3530=n
++CONFIG_MACH_OMAP_3630SDP=n
++CONFIG_MACH_TI8168EVM=n
++CONFIG_MACH_TI8148EVM=n
++CONFIG_MACH_OMAP_4430SDP=n
++
++CONFIG_MODULES=y
++CONFIG_SYSVIPC=y
++CONFIG_EXPERIMENTAL=y # required for CONFIG_USB_NET_SMSC95XX
++
++CONFIG_MMC=y
++CONFIG_MMC_OMAP=y
++CONFIG_MMC_OMAP_HS=y
++
++CONFIG_DMA_OMAP=y
++CONFIG_DMADEVICES=y
++CONFIG_DMA_ENGINE=y
++
++CONFIG_USB=y
++
++CONFIG_NET=y
++CONFIG_NETDEVICES=y
++CONFIG_NET_CORE=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_USB_USBNET=y
++CONFIG_USB_NET_SMSC95XX=y
++CONFIG_USB_EHCI_HCD=y
++
++CONFIG_USB_NET_AX8817X=n
++CONFIG_USB_NET_CDCETHER=n
++CONFIG_USB_NET_CDC_NCM=n
++CONFIG_USB_NET_NET1080=n
++CONFIG_USB_NET_CDC_SUBSET=n
++CONFIG_USB_BELKIN=n
++CONFIG_USB_ARMLINUX=n
++CONFIG_USB_NET_ZAURUS=n
++
++
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_PROC_EVENTS=y
++CONFIG_I2C_CHARDEV=y
++
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_HCTOSYS=y
++CONFIG_RTC_DRV_TWL4030=y
++
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_FAT_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
++CONFIG_CRAMFS=y
++
++CONFIG_FPE_NWFPE=y
++
++CONFIG_REGULATOR_TWL4030=y
++
++CONFIG_SPI=y
++CONFIG_SPI_OMAP24XX=y
++
++CONFIG_FB_OMAP_LCD_VGA=y
++CONFIG_OMAP2_DSS=y
++CONFIG_FB_OMAP2=y
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.9.5
