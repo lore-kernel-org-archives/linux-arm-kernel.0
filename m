@@ -1,210 +1,157 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 27 Oct 2012 18:45:16 +0200
-Subject: [PATCH 3/3] arm: mvebu: move irq controller driver to drivers/irqchip
-In-Reply-To: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1351356317-16758-3-git-send-email-thomas.petazzoni@free-electrons.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Sat, 27 Oct 2012 16:47:49 +0000
+Subject: [PATCH v4 3/5] zynq: remove use of CLKDEV_LOOKUP
+In-Reply-To: <20121024200407.GD6713@beefymiracle.amer.corp.natinst.com>
+References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
+ <20121024200407.GD6713@beefymiracle.amer.corp.natinst.com>
+Message-ID: <d45357f1-1ccb-4308-aeef-7fe2f1569cb8@CO1EHSMHS001.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/Kconfig                        |    1 +
- arch/arm/mach-mvebu/Makefile                       |    2 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |    4 +-
- arch/arm/mach-mvebu/common.h                       |    3 -
- drivers/irqchip/Makefile                           |    1 +
- .../irqchip}/irq-armada-370-xp.c                   |   58 +++++++++-----------
- drivers/irqchip/irqchip.c                          |    3 +
- drivers/irqchip/irqchip.h                          |    2 +
- 8 files changed, 36 insertions(+), 38 deletions(-)
- rename {arch/arm/mach-mvebu => drivers/irqchip}/irq-armada-370-xp.c (87%)
 
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 416d46e..415ed0f 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_MVEBU
- 	select PINCTRL
- 	select PLAT_ORION
- 	select SPARSE_IRQ
-+	select USE_IRQCHIP
- 
- if ARCH_MVEBU
- 
-diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
-index 57f996b..7f4e9f4 100644
---- a/arch/arm/mach-mvebu/Makefile
-+++ b/arch/arm/mach-mvebu/Makefile
-@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
- 	-I$(srctree)/arch/arm/plat-orion/include
- 
- obj-y += system-controller.o
--obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
-+obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o addr-map.o
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 68f1483..9b28991 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -16,6 +16,7 @@
- #include <linux/init.h>
- #include <linux/of_platform.h>
- #include <linux/io.h>
-+#include <linux/irqchip.h>
- #include <linux/time-armada-370-xp.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -56,8 +57,7 @@ static const char * const armada_370_xp_dt_board_dt_compat[] = {
- DT_MACHINE_START(ARMADA_XP_DT, "Marvell Aramada 370/XP (Device Tree)")
- 	.init_machine	= armada_370_xp_dt_init,
- 	.map_io		= armada_370_xp_map_io,
--	.init_irq	= armada_370_xp_init_irq,
--	.handle_irq     = armada_370_xp_handle_irq,
-+	.init_irq	= irqchip_init,
- 	.timer		= &armada_370_xp_timer,
- 	.restart	= mvebu_restart,
- 	.dt_compat	= armada_370_xp_dt_board_dt_compat,
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 02f89ea..f0eaa21 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -17,7 +17,4 @@
- 
- void mvebu_restart(char mode, const char *cmd);
- 
--void armada_370_xp_init_irq(void);
--void armada_370_xp_handle_irq(struct pt_regs *regs);
--
- #endif
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 77adcb1..d1a163c 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_USE_IRQCHIP) += irqchip.o
- obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
-+obj-$(CONFIG_ARCH_MVEBU)   += irq-armada-370-xp.o
-diff --git a/arch/arm/mach-mvebu/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-similarity index 87%
-rename from arch/arm/mach-mvebu/irq-armada-370-xp.c
-rename to drivers/irqchip/irq-armada-370-xp.c
-index 5f5f939..148a67c 100644
---- a/arch/arm/mach-mvebu/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -23,6 +23,7 @@
- #include <linux/of_irq.h>
- #include <linux/irqdomain.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/irq.h>
- #include <asm/exception.h>
- 
- /* Interrupt Controller Registers Map */
-@@ -39,6 +40,27 @@ static void __iomem *per_cpu_int_base;
- static void __iomem *main_int_base;
- static struct irq_domain *armada_370_xp_mpic_domain;
- 
-+static asmlinkage void __exception_irq_entry
-+armada_370_xp_handle_irq(struct pt_regs *regs)
-+{
-+	u32 irqstat, irqnr;
-+
-+	do {
-+		irqstat = readl_relaxed(per_cpu_int_base +
-+					ARMADA_370_XP_CPU_INTACK_OFFS);
-+		irqnr = irqstat & 0x3FF;
-+
-+		if (irqnr < 1023) {
-+			irqnr =
-+			    irq_find_mapping(armada_370_xp_mpic_domain, irqnr);
-+			handle_IRQ(irqnr, regs);
-+			continue;
-+		}
-+
-+		break;
-+	} while (1);
-+}
-+
- static void armada_370_xp_irq_mask(struct irq_data *d)
- {
- 	writel(irqd_to_hwirq(d),
-@@ -77,8 +99,8 @@ static struct irq_domain_ops armada_370_xp_mpic_irq_ops = {
- 	.xlate = irq_domain_xlate_onecell,
- };
- 
--static int __init armada_370_xp_mpic_of_init(struct device_node *node,
--					     struct device_node *parent)
-+int __init armada_370_xp_mpic_of_init(struct device_node *node,
-+				      struct device_node *parent)
- {
- 	u32 control;
- 
-@@ -98,36 +120,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
- 
- 	irq_set_default_host(armada_370_xp_mpic_domain);
--	return 0;
--}
- 
--asmlinkage void __exception_irq_entry armada_370_xp_handle_irq(struct pt_regs
--							       *regs)
--{
--	u32 irqstat, irqnr;
--
--	do {
--		irqstat = readl_relaxed(per_cpu_int_base +
--					ARMADA_370_XP_CPU_INTACK_OFFS);
--		irqnr = irqstat & 0x3FF;
-+	handle_arch_irq = armada_370_xp_handle_irq;
- 
--		if (irqnr < 1023) {
--			irqnr =
--			    irq_find_mapping(armada_370_xp_mpic_domain, irqnr);
--			handle_IRQ(irqnr, regs);
--			continue;
--		}
--
--		break;
--	} while (1);
--}
--
--static const struct of_device_id mpic_of_match[] __initconst = {
--	{.compatible = "marvell,mpic", .data = armada_370_xp_mpic_of_init},
--	{},
--};
--
--void __init armada_370_xp_init_irq(void)
--{
--	of_irq_init(mpic_of_match);
-+	return 0;
- }
-diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
-index f01cf6e..f8fbf00 100644
---- a/drivers/irqchip/irqchip.c
-+++ b/drivers/irqchip/irqchip.c
-@@ -17,6 +17,9 @@ static const struct of_device_id irqchip_of_match[] __initconst = {
- #ifdef CONFIG_ARCH_BCM2835
- 	{ .compatible = "brcm,bcm2835-armctrl-ic", .data = armctrl_of_init },
- #endif
-+#ifdef CONFIG_ARCH_MVEBU
-+	{.compatible = "marvell,mpic", .data = armada_370_xp_mpic_of_init },
-+#endif
- 	{},
- };
- 
-diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
-index 0e68965..a961ca9 100644
---- a/drivers/irqchip/irqchip.h
-+++ b/drivers/irqchip/irqchip.h
-@@ -12,5 +12,7 @@
- #define _IRQCHIP_H
- 
- int armctrl_of_init(struct device_node *node, struct device_node *parent);
-+int armada_370_xp_mpic_of_init(struct device_node *node,
-+			       struct device_node *parent);
- 
- #endif
--- 
-1.7.9.5
+
+> -----Original Message-----
+> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
+> Sent: Wednesday, October 24, 2012 10:04 PM
+> To: arm at kernel.org; Arnd Bergmann
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; John
+> Linn; Nick Bowler; Michal Simek
+> Subject: [PATCH v4 3/5] zynq: remove use of CLKDEV_LOOKUP
+>
+> The Zynq support in mainline does not (yet) make use of any of the generic clk
+> or clk lookup functionality.  Remove what is upstream for now, until the out-of-
+> tree implementation is in suitable form for merging.
+>
+> An important side effect of this patch is that it allows the building of a Zynq
+> kernel without running into unresolved symbol problems:
+>
+>    drivers/built-in.o: In function `amba_get_enable_pclk':
+>    clkdev.c:(.text+0x444): undefined reference to `clk_enable'
+>    drivers/built-in.o: In function `amba_remove':
+>    clkdev.c:(.text+0x488): undefined reference to `clk_disable'
+>    drivers/built-in.o: In function `amba_probe':
+>    clkdev.c:(.text+0x540): undefined reference to `clk_disable'
+>    drivers/built-in.o: In function `amba_device_add':
+>    clkdev.c:(.text+0x77c): undefined reference to `clk_disable'
+>    drivers/built-in.o: In function `enable_clock':
+>    clkdev.c:(.text+0x29738): undefined reference to `clk_enable'
+>    drivers/built-in.o: In function `disable_clock':
+>    clkdev.c:(.text+0x29778): undefined reference to `clk_disable'
+>    drivers/built-in.o: In function `__pm_clk_remove':
+>    clkdev.c:(.text+0x297f8): undefined reference to `clk_disable'
+>    drivers/built-in.o: In function `pm_clk_suspend':
+>    clkdev.c:(.text+0x29bc8): undefined reference to `clk_disable'
+>    drivers/built-in.o: In function `pm_clk_resume':
+>    clkdev.c:(.text+0x29c28): undefined reference to `clk_enable'
+>    make[2]: *** [vmlinux] Error 1
+>    make[1]: *** [sub-make] Error 2
+>    make: *** [all] Error 2
+>
+> In addition, eliminate Zynq's "use" of the versatile platform, as it is no longer
+> needed.  As Nick Bowler points out:
+>
+>    For the record, I think this was introduced by commit 56a34b03ff427
+>    ("ARM: versatile: Make plat-versatile clock optional") which forgot to
+>    select PLAT_VERSATILE_CLOCK on Zynq.  This is not all that surprising,
+>    because the fact that Zynq "uses" PLAT_VERSATILE is secretly hidden in
+>    the Makefile.
+>
+>    Nevertheless, the only feature from versatile that Zynq needed was the
+>    clock support, so this patch should *also* delete the secret use of
+>    plat-versatile by removing this line from arch/arm/Makefile:
+>
+>       plat-$(CONFIG_ARCH_ZYNQ)      += versatile
+>
+> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+> Cc: John Linn <john.linn@xilinx.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/Kconfig                         |  1 -
+>  arch/arm/Makefile                        |  1 -
+>  arch/arm/mach-zynq/common.c              |  1 -
+>  arch/arm/mach-zynq/include/mach/clkdev.h | 32 --------------------------------
+>  4 files changed, 35 deletions(-)
+>  delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index cce4f8d..de70d99 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -946,7 +946,6 @@ config ARCH_ZYNQ
+>       bool "Xilinx Zynq ARM Cortex A9 Platform"
+>       select ARM_AMBA
+>       select ARM_GIC
+> -     select CLKDEV_LOOKUP
+>       select CPU_V7
+>       select GENERIC_CLOCKEVENTS
+>       select ICST
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile index 451757d..8dbab2d
+> 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -197,7 +197,6 @@ machine-$(CONFIG_ARCH_ZYNQ)               += zynq
+>  # by CONFIG_* macro name.
+>  plat-$(CONFIG_ARCH_OMAP)     += omap
+>  plat-$(CONFIG_ARCH_S3C64XX)  += samsung
+> -plat-$(CONFIG_ARCH_ZYNQ)     += versatile
+>  plat-$(CONFIG_PLAT_IOP)              += iop
+>  plat-$(CONFIG_PLAT_NOMADIK)  += nomadik
+>  plat-$(CONFIG_PLAT_ORION)    += orion
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 056091a..ba48f06 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -31,7 +31,6 @@
+>  #include <asm/hardware/cache-l2x0.h>
+>
+>  #include <mach/zynq_soc.h>
+> -#include <mach/clkdev.h>
+>  #include "common.h"
+>
+>  static struct of_device_id zynq_of_bus_ids[] __initdata = { diff --git
+> a/arch/arm/mach-zynq/include/mach/clkdev.h b/arch/arm/mach-
+> zynq/include/mach/clkdev.h
+> deleted file mode 100644
+> index c6e73d8..0000000
+> --- a/arch/arm/mach-zynq/include/mach/clkdev.h
+> +++ /dev/null
+> @@ -1,32 +0,0 @@
+> -/*
+> - * arch/arm/mach-zynq/include/mach/clkdev.h
+> - *
+> - *  Copyright (C) 2011 Xilinx, Inc.
+> - *
+> - * This software is licensed under the terms of the GNU General Public
+> - * License version 2, as published by the Free Software Foundation, and
+> - * may be copied, distributed, and modified under those terms.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+> - */
+> -
+> -#ifndef __MACH_CLKDEV_H__
+> -#define __MACH_CLKDEV_H__
+> -
+> -#include <plat/clock.h>
+> -
+> -struct clk {
+> -     unsigned long           rate;
+> -     const struct clk_ops    *ops;
+> -     const struct icst_params *params;
+> -     void __iomem            *vcoreg;
+> -};
+> -
+> -#define __clk_get(clk) ({ 1; })
+> -#define __clk_put(clk) do { } while (0)
+> -
+> -#endif
+
+Tested-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks
+Michal
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
