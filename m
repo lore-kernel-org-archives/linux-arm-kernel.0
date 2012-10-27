@@ -1,11 +1,10 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 27 Oct 2012 02:51:16 +0000 (UTC)
-Subject: [PATCHv9 6/8] ARM: OMAP4: retrigger localtimers after re-enabling
- gic
-In-Reply-To: <1350552010-28760-7-git-send-email-t-kristo@ti.com>
+Date: Sat, 27 Oct 2012 02:52:13 +0000 (UTC)
+Subject: [PATCHv9 8/8] ARM: OMAP4: USB: power down MUSB PHY if not used
+In-Reply-To: <1350552010-28760-9-git-send-email-t-kristo@ti.com>
 References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
- <1350552010-28760-7-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1210270250140.27071@utopia.booyaka.com>
+ <1350552010-28760-9-git-send-email-t-kristo@ti.com>
+Message-ID: <alpine.DEB.2.00.1210270251460.27071@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,15 +12,19 @@ Hi
 
 On Thu, 18 Oct 2012, Tero Kristo wrote:
 
-> From: Colin Cross <ccross@android.com>
+> Commit c9e4412ab8eb8ef82d645d8749c4ce96ad490007 removed all of the USB
+> PHY functions for OMAP4, but this causes a problem with core retention
+> as the MUSB module remains enabled if omap-usb2 phy driver is not used.
+> This keeps the USB DPLL enabled and prevents l3_init pwrdm from idling.
 > 
-> 'Workaround for ROM bug because of CA9 r2pX gic control'
-> register change disables the gic distributor while the secondary
-> cpu is being booted.  If a localtimer interrupt on the primary cpu
-> occurs when the distributor is turned off, the interrupt is lost,
-> and the localtimer never fires again.
+> Fixed by adding a minimal function back that disables the USB PHY in
+> case omap-usb2 driver is not used.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
 
-Looks like this one should go in separately via Tony.
-
+Looks like another one for Tony...
 
 - Paul
