@@ -1,39 +1,101 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 27 Oct 2012 16:48:45 +0200
-Subject: [GIT PULL] at91: fixes for 3.7-rc3
-In-Reply-To: <201210262053.11498.arnd@arndb.de>
-References: <5088F131.5040600@atmel.com>
- <201210262053.11498.arnd@arndb.de>
-Message-ID: <20121027144845.GI18964@game.jcrosoft.org>
+Date: Sat, 27 Oct 2012 16:51:32 +0200
+Subject: [PATCH] at91sam9m10g45-ek: rename leds to match board
+In-Reply-To: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
+References: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
+Message-ID: <20121027145132.GJ18964@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:53 Fri 26 Oct     , Arnd Bergmann wrote:
-> On Thursday 25 October 2012, Nicolas Ferre wrote:
-> >       ARM: at91: fix external interrupts in non-DT case
-> 
-> This patch now leads to build errors with at91x40_defconfig,
-> which I've fixed up by applying the patch below on top.
-> 
-> Please yell if this is not the right fix.
-> 
-> 	Arnd
-> 
-> commit 3a8852afde01682083028ee427e0678f9bbddd75
-> Author: Arnd Bergmann <arnd@arndb.de>
-> Date:   Fri Oct 26 22:49:09 2012 +0200
-> 
->     ARM: at91: fix at91x40 build
->     
->     patch 738a0fd7 "ARM: at91: fix external interrupts in non-DT case"
->     fixed a run-time error on some at91 platforms but did not apply
->     the same change to at91x40, which now doesn't build.
->     
->     This changes at91x40 in the same way that the other platforms
->     were changed.
->     
->     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On 21:29 Fri 26 Oct     , Alexandre Belloni wrote:
+> The leds' name in the board file didn't match the names written on the
+> board itsef. This can be confusing when trying to use them for another
+> purpose.
+
+It like this for so long time and I'm not really willing to touch the dts
 
 Best Regards,
 J.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@piout.net>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts  |   12 ++++++------
+>  arch/arm/mach-at91/board-sam9m10g45ek.c |    8 ++++----
+>  2 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> index 15e1dd4..c58b628 100644
+> --- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> +++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+> @@ -93,20 +93,20 @@
+>  	leds {
+>  		compatible = "gpio-leds";
+>  
+> -		d8 {
+> -			label = "d8";
+> +		d3 {
+> +			label = "d3";
+>  			gpios = <&pioD 30 0>;
+>  			linux,default-trigger = "heartbeat";
+>  		};
+>  
+> -		d6 {
+> -			label = "d6";
+> +		d1 {
+> +			label = "d1";
+>  			gpios = <&pioD 0 1>;
+>  			linux,default-trigger = "nand-disk";
+>  		};
+>  
+> -		d7 {
+> -			label = "d7";
+> +		d2 {
+> +			label = "d2";
+>  			gpios = <&pioD 31 1>;
+>  			linux,default-trigger = "mmc0";
+>  		};
+> diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> index 3d48ec1..6d77687 100644
+> --- a/arch/arm/mach-at91/board-sam9m10g45ek.c
+> +++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
+> @@ -413,19 +413,19 @@ static struct ac97c_platform_data ek_ac97_data = {
+>   */
+>  static struct gpio_led ek_leds[] = {
+>  	{	/* "top" led, red, powerled */
+> -		.name			= "d8",
+> +		.name			= "d3",
+>  		.gpio			= AT91_PIN_PD30,
+>  		.default_trigger	= "heartbeat",
+>  	},
+>  	{	/* "left" led, green, userled2, pwm3 */
+> -		.name			= "d6",
+> +		.name			= "d1",
+>  		.gpio			= AT91_PIN_PD0,
+>  		.active_low		= 1,
+>  		.default_trigger	= "nand-disk",
+>  	},
+>  #if !(defined(CONFIG_LEDS_ATMEL_PWM) || defined(CONFIG_LEDS_ATMEL_PWM_MODULE))
+>  	{	/* "right" led, green, userled1, pwm1 */
+> -		.name			= "d7",
+> +		.name			= "d2",
+>  		.gpio			= AT91_PIN_PD31,
+>  		.active_low		= 1,
+>  		.default_trigger	= "mmc0",
+> @@ -440,7 +440,7 @@ static struct gpio_led ek_leds[] = {
+>  static struct gpio_led ek_pwm_led[] = {
+>  #if defined(CONFIG_LEDS_ATMEL_PWM) || defined(CONFIG_LEDS_ATMEL_PWM_MODULE)
+>  	{	/* "right" led, green, userled1, pwm1 */
+> -		.name			= "d7",
+> +		.name			= "d2",
+>  		.gpio			= 1,	/* is PWM channel number */
+>  		.active_low		= 1,
+>  		.default_trigger	= "none",
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
