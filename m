@@ -1,53 +1,39 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Sat, 27 Oct 2012 09:42:53 -0500
-Subject: [PATCH v4 1/5] zynq: use GIC device tree bindings
-In-Reply-To: <4fd22fac-49c4-4000-9e70-12e94f248753@AM1EHSMHS010.ehs.local>
-References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
- <20121024200310.GB6713@beefymiracle.amer.corp.natinst.com>
- <0d1c4cf8-70d8-4d12-bd77-393009d32b22@CH1EHSMHS001.ehs.local>
- <20121027140053.GB5190@beefymiracle.amer.corp.natinst.com>
- <4fd22fac-49c4-4000-9e70-12e94f248753@AM1EHSMHS010.ehs.local>
-Message-ID: <20121027144253.GC5190@beefymiracle.amer.corp.natinst.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 27 Oct 2012 16:48:45 +0200
+Subject: [GIT PULL] at91: fixes for 3.7-rc3
+In-Reply-To: <201210262053.11498.arnd@arndb.de>
+References: <5088F131.5040600@atmel.com>
+ <201210262053.11498.arnd@arndb.de>
+Message-ID: <20121027144845.GI18964@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2012 at 02:06:45PM +0000, Michal Simek wrote:
-[...]
-> I am not big fan to use dtsi solution because dts can be simple generated directly
-> From Xilinx design tool based on your hw design. That's why I can't see any benefit
-> To have dtsi file.
+On 20:53 Fri 26 Oct     , Arnd Bergmann wrote:
+> On Thursday 25 October 2012, Nicolas Ferre wrote:
+> >       ARM: at91: fix external interrupts in non-DT case
+> 
+> This patch now leads to build errors with at91x40_defconfig,
+> which I've fixed up by applying the patch below on top.
+> 
+> Please yell if this is not the right fix.
+> 
+> 	Arnd
+> 
+> commit 3a8852afde01682083028ee427e0678f9bbddd75
+> Author: Arnd Bergmann <arnd@arndb.de>
+> Date:   Fri Oct 26 22:49:09 2012 +0200
+> 
+>     ARM: at91: fix at91x40 build
+>     
+>     patch 738a0fd7 "ARM: at91: fix external interrupts in non-DT case"
+>     fixed a run-time error on some at91 platforms but did not apply
+>     the same change to at91x40, which now doesn't build.
+>     
+>     This changes at91x40 in the same way that the other platforms
+>     were changed.
+>     
+>     Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Can I ask you to reconsider?  We, for example, don't make any use of the
-Xilinx dev tools to generate our device trees.  Having a dtsi allows for
-easy extension of the zynq-7000 platform for our boards, without having
-to carry duplicate data.
-
-Is it going to be expected that users building kernels for their zynq
-targets have access to the Xilinx EDK?
-
-> > Would you like for me to pull this into v5, or spin up a separate patch series?
->
-> Definitely not. I have checked patches but haven't got it work on the zc702.
-> Not sure if you have run it on real hw or just on the qemu as you have mentioned
-> In 5/5.
-
-You're likely running into the issue Nick has identified in the thread
-for patch 5 where the chosen virtual address for the uart doesn't seem
-to work: http://www.spinics.net/lists/arm-kernel/msg203141.html
-
-We haven't yet identified the root cause; any insight you can provide
-here would be beneficial.
-
-Otherwise, I'm considering reworking patch 5 to move the uart mapping to
-a known working location.
-
-Thanks,
-
-   Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121027/1fdbdb53/attachment.sig>
+Best Regards,
+J.
