@@ -1,40 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 27 Oct 2012 11:11:43 +0200
-Subject: [PATCH] arm: kirkwood: add support for ZyXEL NSA310
-In-Reply-To: <alpine.DEB.2.02.1210261857100.20029@mirri>
-References: <alpine.DEB.2.02.1210251735020.15860@mirri>
- <20121025181326.GL18811@titan.lakedaemon.net>
- <alpine.DEB.2.02.1210261857100.20029@mirri>
-Message-ID: <20121027091143.GD15143@lunn.ch>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 27 Oct 2012 14:47:45 +0530
+Subject: [PATCH 0/9] Pinctrl: SPEAr: Fixes for 3.7-rc3
+Message-ID: <cover.1351329224.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +
-> > > +static struct i2c_board_info __initdata nsa310_i2c_info[] = {
-> > > +	{ I2C_BOARD_INFO("adt7476", 0x2e) },
-> > > +};
-> > 
-> > how far off from the adt7461 (lm90) is this?  If similar, please
-> > consider extending lm90's compatibility list and describing this in the
-> > dts instead.
-> 
-> I did move at least the I2C to DT. Good catch, this is something 
-> worth of a experimentation when a free time slot arrives. The chip seems 
-> to have some sort of compatibility mode with adt7463 so it might just 
-> work somehow with the other driver too.
+Hi Linus,
 
-Hi Tero
+This patchset fixes many errors/mistakes in current pinctrl configurations for
+various SPEAr SoCs. Please see if they can be merged in next rc release, if they
+look fine to you.
 
-Thanks for moving the I2C bus setup to DT.
+--
+viresh
 
-The lm90 driver explicitly supports the adt7461. No changes needed. Please
-try adding the necessary DT, something like:
+Deepak Sikri (2):
+  pinctrl: SPEAr320: Correct pad mux entries for rmii/smii
+  pinctrl: SPEAr1340: Make DDR reset & clock pads as gpio
 
-                        adt7476: adt7476a at 2e {
-                                compatible = "lm90";
-                                reg = <0x2e>;
-                        };
+Shiraz Hashim (3):
+  pinctrl: SPEAr3xx: correct register space to configure pwm
+  pinctrl: SPEAr1310: fix clcd high resolution pin group name
+  pinctrl: SPEAr1310: add register entries for enabling pad direction
 
-    Thanks
+Vipul Kumar Samar (3):
+  pinctrl: SPEAr1310: Fix value of PERIP_CFG reigster and
+    MCIF_SEL_SHIFT
+  pinctrl: SPEAr1310: Separate out pci pins from pcie_sata pin group
+  pinctrl: SPEAr1340: Add clcd sleep mode pin configuration
 
-        Andrew
+Viresh Kumar (1):
+  pinctrl: SPEAr: Don't update all non muxreg bits on pinctrl_disable
+
+ drivers/pinctrl/spear/pinctrl-spear.c     |   2 +-
+ drivers/pinctrl/spear/pinctrl-spear1310.c | 365 ++++++++++++++++++++++++++----
+ drivers/pinctrl/spear/pinctrl-spear1340.c |  41 +++-
+ drivers/pinctrl/spear/pinctrl-spear320.c  |   8 +-
+ drivers/pinctrl/spear/pinctrl-spear3xx.h  |   1 +
+ 5 files changed, 367 insertions(+), 50 deletions(-)
+
+-- 
+1.7.12.rc2.18.g61b472e
