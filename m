@@ -1,52 +1,57 @@
-From: akinobu.mita@gmail.com (Akinobu Mita)
-Date: Sun, 28 Oct 2012 00:49:30 +0900
-Subject: [PATCH] dma: ste_dma40: use for_each_set_bit
-Message-ID: <1351352973-3719-1-git-send-email-akinobu.mita@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sat, 27 Oct 2012 17:49:57 +0200
+Subject: [PATCH 1/1] net: macb: add pinctrl consumer support
+Message-ID: <1351352997-31116-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace open-coded loop with for_each_set_bit().
+If no pinctrl available just report a warning as some architecture may not
+need to do anything.
 
-Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: netdev at vger.kernel.org
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- drivers/dma/ste_dma40.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+ drivers/net/ethernet/cadence/macb.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index ae55091..08f5bfe 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -1487,7 +1487,7 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
- 	u32 regs[ARRAY_SIZE(il)];
- 	u32 idx;
- 	u32 row;
--	long chan = -1;
-+	long chan;
- 	struct d40_chan *d40c;
- 	unsigned long flags;
- 	struct d40_base *base = data;
-@@ -1498,15 +1498,8 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
- 	for (i = 0; i < ARRAY_SIZE(il); i++)
- 		regs[i] = readl(base->virtbase + il[i].src);
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 033064b..e5fdf8a 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -26,6 +26,9 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_net.h>
++#include <linux/of_gpio.h>
++#include <linux/gpio.h>
++#include <linux/pinctrl/consumer.h>
  
--	for (;;) {
--
--		chan = find_next_bit((unsigned long *)regs,
--				     BITS_PER_LONG * ARRAY_SIZE(il), chan + 1);
--
--		/* No more set bits found? */
--		if (chan == BITS_PER_LONG * ARRAY_SIZE(il))
--			break;
--
-+	for_each_set_bit(chan, (unsigned long *)regs,
-+			BITS_PER_LONG * ARRAY_SIZE(il)) {
- 		row = chan / BITS_PER_LONG;
- 		idx = chan & (BITS_PER_LONG - 1);
+ #include "macb.h"
  
+@@ -1306,6 +1309,7 @@ static int __init macb_probe(struct platform_device *pdev)
+ 	struct phy_device *phydev;
+ 	u32 config;
+ 	int err = -ENXIO;
++	struct pinctrl *pinctrl;
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!regs) {
+@@ -1313,6 +1317,15 @@ static int __init macb_probe(struct platform_device *pdev)
+ 		goto err_out;
+ 	}
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		err = PTR_ERR(pinctrl);
++		if (err == -EPROBE_DEFER)
++			return err;
++
++		dev_warn(&pdev->dev, "No pinctrl provided\n");
++	}
++
+ 	err = -ENOMEM;
+ 	dev = alloc_etherdev(sizeof(*bp));
+ 	if (!dev)
 -- 
-1.7.11.7
+1.7.10.4
