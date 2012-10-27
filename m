@@ -1,57 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 27 Oct 2012 15:39:19 +0000
-Subject: [PATCH] Fix socfpga compilation with early_printk() enabled
-In-Reply-To: <20121027115615.GC5912@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <201210251458.48528.arnd@arndb.de> <20121027115615.GC5912@elf.ucw.cz>
-Message-ID: <201210271539.20156.arnd@arndb.de>
+From: akinobu.mita@gmail.com (Akinobu Mita)
+Date: Sun, 28 Oct 2012 00:49:30 +0900
+Subject: [PATCH] dma: ste_dma40: use for_each_set_bit
+Message-ID: <1351352973-3719-1-git-send-email-akinobu.mita@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 October 2012, Pavel Machek wrote:
+Replace open-coded loop with for_each_set_bit().
 
-> > > This fixes early_printk() compilation for
-> > > socfpga. (senduart/busyuart/waituart were missing). It does that by
-> > > making Picochip code generic.
-> > > 
-> > > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > > Acked-by: Dinh Nguyen <dinguyen@altera.com>
-> > > Acked-by: Jamie Iles <jamie@jamieiles.com 
-> > 
-> > Applied to fixes branch of arm-soc, but please be more explicit about
-> > what you want to happen with patches in the future. Ideally we would
-> > get pull requests for patches on each platform from only one person,
-> > so please coordinate with Dinh Nguyen who that should be.
-> 
-> Dinh is the maintainer, so if we can only send patches from one
-> person, it needs to be him. If you'd be willing to take patches from
-> second person, that would help us... if not, of course I can send all
-> the patches through Dinh.
+Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+---
+ drivers/dma/ste_dma40.c | 13 +++----------
+ 1 file changed, 3 insertions(+), 10 deletions(-)
 
-You can both send patches, we just need to know what to expect. For most
-platforms it works best if one person collects the patches from everyone.
-
-If you are sending patches with both Dinh and us as the recipients,
-just make it clear who you want to pick up the patch.
-
-> > * When you submit a patch for inclusion, please always take both
-> > Olof and me on Cc on the email, since we are doing this work together
-> > and take turns, so you might not always know which one will take
-> > the patch. We have an alias "arm at kernel.org" that you can also
-> > use.
-> 
-> Olof Johansson <olof@lixom.net>? Can do.
-> 
-> But... perhaps you should add an entry into MAINTAINERS file
-> explaining all this? arm at kernel.org is not mentioned there, Olof is
-> not mentioned as maintaining arm. (And yes, I did check it before
-> original patch submission).
-
-We intentionally didn't put our names into the maintainers file because
-that would mean getting Cc'd on every patch that should actually go
-to one of the sub-maintainers instead.
-
-We are adding an entry pointing to the arm-soc tree now though, just
-without the arm at kernel.org entry.
-
-	Arnd
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index ae55091..08f5bfe 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1487,7 +1487,7 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
+ 	u32 regs[ARRAY_SIZE(il)];
+ 	u32 idx;
+ 	u32 row;
+-	long chan = -1;
++	long chan;
+ 	struct d40_chan *d40c;
+ 	unsigned long flags;
+ 	struct d40_base *base = data;
+@@ -1498,15 +1498,8 @@ static irqreturn_t d40_handle_interrupt(int irq, void *data)
+ 	for (i = 0; i < ARRAY_SIZE(il); i++)
+ 		regs[i] = readl(base->virtbase + il[i].src);
+ 
+-	for (;;) {
+-
+-		chan = find_next_bit((unsigned long *)regs,
+-				     BITS_PER_LONG * ARRAY_SIZE(il), chan + 1);
+-
+-		/* No more set bits found? */
+-		if (chan == BITS_PER_LONG * ARRAY_SIZE(il))
+-			break;
+-
++	for_each_set_bit(chan, (unsigned long *)regs,
++			BITS_PER_LONG * ARRAY_SIZE(il)) {
+ 		row = chan / BITS_PER_LONG;
+ 		idx = chan & (BITS_PER_LONG - 1);
+ 
+-- 
+1.7.11.7
