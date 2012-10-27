@@ -1,47 +1,43 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 27 Oct 2012 03:00:20 +0000 (UTC)
-Subject: [PATCHv9 1/8] ARM: OMAP: hwmod: Add support for per hwmod/module
- context lost count
-In-Reply-To: <1350552010-28760-2-git-send-email-t-kristo@ti.com>
+Date: Sat, 27 Oct 2012 03:02:10 +0000 (UTC)
+Subject: [PATCHv9 0/8] ARM: OMAP4: core retention support
+In-Reply-To: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
 References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
- <1350552010-28760-2-git-send-email-t-kristo@ti.com>
-Message-ID: <alpine.DEB.2.00.1210270300010.27071@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1210270254220.27071@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tero, Kevin,
 
 On Thu, 18 Oct 2012, Tero Kristo wrote:
 
-> From: Rajendra Nayak <rnayak@ti.com>
-> 
-> OMAP4 has module specific context lost registers which makes it now
-> possible to have module level context loss count, instead of relying
-> on the powerdomain level context count.
-> 
-> Add 2 private hwmod api's to update/clear the hwmod/module specific
-> context lost counters/register.
-> 
-> Update the module specific context_lost_counter and clear the hardware
-> bits just after enabling the module.
-> 
-> omap_hwmod_get_context_loss_count() now returns the hwmod context loss
-> count them on platforms where they exist (OMAP4), else fall back on
-> the pwrdm level counters for older platforms.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> [paul at pwsan.com: added function kerneldoc, fixed structure kerneldoc,
->  rearranged structure to avoid memory waste, marked fns as OMAP4-specific,
->  prevent fn entry on non-OMAP4 chips, reduced indentation, merged update
->  and clear, merged patches]
-> [t-kristo at ti.com: added support for arch specific hwmod ops, and changed
->  the no context offset indicator to USHRT_MAX]
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> [paul at pwsan.com: use NO_CONTEXT_LOSS_BIT flag rather than USHRT_MAX;
->  convert unsigned context lost counter to int to match the return type;
->  get rid of hwmod_ops in favor of the existing soc_ops mechanism]
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Changes compared to previous version:
+> - rebased on top of 3.7-rc1
+> - applies on top of latest func pwrst code (v6)
+> - added back patch #1 to this set (it wasn't queued yet after all)
 
-Thanks, re-queued for 3.8.
+That's because there was an interaction between it and the omap-serial 
+changes in the last merge window that caused several failures :-( 
+Hopefully it's good to go now...
+
+> - added patch #7 for fixing a bug in the functional pwrst code
+> - added patch #8 for fixing a regression with MUSB PHY power handling
+>   (not quite sure if this is the correct way to fix this or not)
+> 
+> Tested with omap4460 gp panda + omap4430 emu blaze boards, with cpuidle +
+> suspend.
+> 
+> Branch also available here:
+> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+> branch: mainline-3.7-rc1-omap4-ret-v9
+
+Looks like only patches #5 and #7 have dependencies on Jean's functional 
+powerstate series, so those should be postponed until that rework is 
+complete.  Looks like #6 and #8 should go in via Tony, assuming there are 
+no dependencies on the rest of the patches.  Have just queued #1 for 3.8 
+and kicked off a test to ensure that everything is working.
+
+As far as the rest go, Kevin, do you want to take them? 
+
 
 - Paul
