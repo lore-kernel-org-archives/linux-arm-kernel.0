@@ -1,26 +1,23 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 27 Oct 2012 15:59:29 +0000 (UTC)
-Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <508BBC59.60504@ti.com>
-References: <1351155648-20429-1-git-send-email-balbi@ti.com>
- <alpine.DEB.2.00.1210262251020.11258@utopia.booyaka.com>
- <508BBC59.60504@ti.com>
-Message-ID: <alpine.DEB.2.00.1210271545390.16409@utopia.booyaka.com>
+From: rajanikanth.hv@linaro.org (Rajanikanth HV)
+Date: Sat, 27 Oct 2012 21:30:44 +0530
+Subject: [PATCH 1/4] mfd: ab8500: add devicetree support for fuelgauge
+In-Reply-To: <508BF8A8.9090206@gmail.com>
+References: <1351146654-9110-1-git-send-email-rajanikanth.hv@stericsson.com>
+ <1351146654-9110-2-git-send-email-rajanikanth.hv@stericsson.com>
+ <508BF8A8.9090206@gmail.com>
+Message-ID: <CAB4BAkuPE6eSr2+LWTaV9trOnFk-_yt-+x8f6zpum=Ws1UvmmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 27 Oct 2012, Santosh Shilimkar wrote:
-
-> Another alternative, which I will recommend to just make use of the
-> read*/wrire* instead __raw versions. The barriers are taken care
-> already and driver point of view, it is transparent.
-
-Those barriers will disappear if CONFIG_ARM_DMA_MEM_BUFFERABLE is set to 
-N, so that's probably not the right thing to do in this case.  The barrier 
-here isn't DMA-related, it's needed due to the design of the driver.
-
-In fact the wmb() is probably overkill, since only a compiler reordering 
-barrier is needed.  It can probably just be barrier().
-
-
-- Paul
+On 27 October 2012 20:37, Francesco Lavra <francescolavra.fl@gmail.com> wrote:
+> On 10/25/2012 08:30 AM, Rajanikanth H.V wrote:
+>> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+>> +     bat_tech = of_get_property(np_bat_supply,
+>> +                     "stericsson,battery-type", NULL);
+>> +     if (!bat_tech)
+>> +             dev_warn(dev, "missing property battery-name/type\n");
+>> +
+>> +     if (strncmp(bat_tech, "LION", 4) == 0) {
+>
+> What if bat_tech is NULL?
+It will be UNKNOWN
