@@ -1,135 +1,121 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 28 Oct 2012 22:57:48 +0100
-Subject: [PATCH v2 1/5] ARM: PXA: Add z2-usb-switch driver
-In-Reply-To: <1351438946-5331-1-git-send-email-anarsoul@gmail.com>
-References: <CA+E=qVc1MGPQoWZWQAcv-NEh8WpLoqeTYLQz4iFjiOyfc9CX5w@mail.gmail.com>
- <1351438946-5331-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <201210282257.48770.marex@denx.de>
+Date: Sun, 28 Oct 2012 22:59:46 +0100
+Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
+In-Reply-To: <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+Message-ID: <201210282259.46491.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Vasily Khoruzhick,
 
-> This driver controls mode of USB port #2 pins - device or host.
+missing commit message.
 
-Please supply proper commit message. This short message describes nothing.
-
-[...]
-
-> @@ -0,0 +1,100 @@
-> +/*
-> + * USB mode switcher for Z2
-> + *
-> + * Copyright (c) 2011 Vasily Khoruzhick
-
-2012
-
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/delay.h>
-> +
-> +#include <mach/pxa27x.h>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  arch/arm/mach-pxa/z2.c | 52
+> ++++++++++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 52
+> insertions(+)
+> 
+> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+> index c97485f..ce90fa9 100644
+> --- a/arch/arm/mach-pxa/z2.c
+> +++ b/arch/arm/mach-pxa/z2.c
+> @@ -41,6 +41,9 @@
+>  #include <linux/platform_data/mmc-pxamci.h>
+>  #include <linux/platform_data/keypad-pxa27x.h>
+>  #include <mach/pm.h>
 > +#include <mach/pxa27x-udc.h>
+> +#include <mach/udc.h>
+> +#include <linux/platform_data/usb-ohci-pxa27x.h>
+> 
+>  #include "generic.h"
+>  #include "devices.h"
+> @@ -680,6 +683,52 @@ static void __init z2_pmic_init(void)
+>  static inline void z2_pmic_init(void) {}
+>  #endif
+> 
+> +/*************************************************************************
+> ***** + * USB Switch
 > +
-> +#include <asm/io.h>
-> +
-> +#define MIN(a, b) ((a) < (b) ? (a) : (b))
-
-min() is already defined in kernel.h
-
-> +static ssize_t usb_mode_show(struct device *dev, struct device_attribute
-> *attr, +	char *buf)
-> +{
-> +	if (UP2OCR & UP2OCR_HXS)
-> +		return sprintf(buf, "host\n");
-> +	else
-> +		return sprintf(buf, "device\n");
-> +}
-> +
-> +static ssize_t usb_mode_set(struct device *dev, struct device_attribute
-> *attr, +	const char *buf, size_t count)
-> +{
-> +	if (strncmp(buf, "host", MIN(count, 4)) == 0) {
-> +		UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
-> +		return count;
-> +	} else if (strncmp(buf, "device", MIN(count, 6)) == 0) {
-> +		UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
-> +		return count;
-> +	}
-> +	return -EINVAL;
-> +}
-> +
-> +static DEVICE_ATTR(usb_mode, 0644, usb_mode_show, usb_mode_set);
-
-I wonder if we have no better means to control enforcement of mode.
-
-> +static const struct attribute *attrs[] = {
-> +	&dev_attr_usb_mode.attr,
-> +	NULL,
+> **************************************************************************
+> ****/ +static struct platform_device z2_usb_switch = {
+> +	.name		= "z2-usb-switch",
+> +	.id		= -1,
 > +};
 > +
-> +static const struct attribute_group attr_group = {
-> +	.attrs	= (struct attribute **)attrs,
-> +};
-
-Isn't there some macro to do this assignment?
-
-> +static int z2_usb_switch_probe(struct platform_device *dev)
-
-Missing __devinit
-
+> +static void __init z2_usb_switch_init(void)
 > +{
-> +	int res;
-> +
-> +	res = sysfs_create_group(&dev->dev.kobj, &attr_group);
-> +	if (res)
-> +		return res;
-> +
-> +	UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
-> +
-> +	return 0;
+> +	platform_device_register(&z2_usb_switch);
 > +}
 > +
-> +static int __devexit z2_usb_switch_remove(struct platform_device *dev)
-> +{
-> +	UP2OCR = UP2OCR_HXOE;
-> +	sysfs_remove_group(&dev->dev.kobj, &attr_group);
+> +/*************************************************************************
+> ***** + * USB Gadget
 > +
-> +	return 0;
+> **************************************************************************
+> ****/ +#if defined(CONFIG_USB_GADGET_PXA27X) \
+> +	|| defined(CONFIG_USB_GADGET_PXA27X_MODULE)
+> +static int z2_udc_is_connected(void)
+> +{
+> +	return 1;
 > +}
 > +
-> +static struct platform_driver z2_usb_switch_driver = {
-> +	.probe = z2_usb_switch_probe,
-> +	.remove = __devexit_p(z2_usb_switch_remove),
-> +
-> +	.driver = {
-> +		.name = "z2-usb-switch",
-> +		.owner = THIS_MODULE,
-> +	},
+> +static struct pxa2xx_udc_mach_info z2_udc_info __initdata = {
+> +	.udc_is_connected	= z2_udc_is_connected,
+> +	.gpio_pullup		= -1,
 > +};
 > +
-> +
-> +static int __init z2_usb_switch_init(void)
+> +static void __init z2_udc_init(void)
 > +{
-> +	return platform_driver_register(&z2_usb_switch_driver);
+> +	pxa_set_udc_info(&z2_udc_info);
 > +}
-> +
-> +static void __exit z2_usb_switch_exit(void)
-> +{
-> +	platform_driver_unregister(&z2_usb_switch_driver);
-> +}
-> +
-> +module_init(z2_usb_switch_init);
-> +module_exit(z2_usb_switch_exit);
+> +#else
+> +static inline void z2_udc_init(void) {}
+> +#endif
 
-module_platform_driver()
+We really should work on the DT here.
+
+> +/*************************************************************************
+> ***** + * USB Host (OHCI)
+> +
+> **************************************************************************
+> ****/ +static struct pxaohci_platform_data z2_ohci_platform_data = {
+> +	.port_mode	= PMM_PERPORT_MODE,
+> +	.flags		= ENABLE_PORT2 | NO_OC_PROTECTION,
+> +	.power_on_delay	= 10,
+> +	.power_budget	= 500,
+> +};
+> +
+>  #ifdef CONFIG_PM
+>  static void z2_power_off(void)
+>  {
+> @@ -705,10 +754,12 @@ static void __init z2_init(void)
+>  	pxa_set_ffuart_info(NULL);
+>  	pxa_set_btuart_info(NULL);
+>  	pxa_set_stuart_info(NULL);
+> +	pxa_set_ohci_info(&z2_ohci_platform_data);
+> 
+>  	z2_lcd_init();
+>  	z2_mmc_init();
+>  	z2_mkp_init();
+> +	z2_udc_init();
+
+This patch adds _host_ ? So why do you have udc in here ?
+
+Besides, pxa_set_ohci_info() should also be wrapped in some z2_uhc_init()
+
+>  	z2_i2c_init();
+>  	z2_spi_init();
+>  	z2_nor_init();
+> @@ -716,6 +767,7 @@ static void __init z2_init(void)
+>  	z2_leds_init();
+>  	z2_keys_init();
+>  	z2_pmic_init();
+> +	z2_usb_switch_init();
+> 
+>  	pm_power_off = z2_power_off;
+>  }
 
 Best regards,
 Marek Vasut
