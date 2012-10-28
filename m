@@ -1,34 +1,132 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 28 Oct 2012 11:57:18 +0100
-Subject: [PATCH 12/12] ARM: mach-shmobile: Use DT_MACHINE for mackerel
-In-Reply-To: <20121028104438.GC10073@verge.net.au>
-References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
- <1351391173-32379-13-git-send-email-horms@verge.net.au>
- <20121028103711.4e89deb3@skate>
- <20121028104438.GC10073@verge.net.au>
-Message-ID: <20121028115718.7b8ae52b@skate>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 28 Oct 2012 16:33:39 +0530
+Subject: [RFC PATCH v3 04/16] ARM: edma: add DT and runtime PM support
+ for AM33XX
+In-Reply-To: <1350566815-409-5-git-send-email-mporter@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-5-git-send-email-mporter@ti.com>
+Message-ID: <508D110B.8010908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon,
+On 10/18/2012 6:56 PM, Matt Porter wrote:
+> Adds support for parsing the TI EDMA DT data into the required
+> EDMA private API platform data.
+> 
+> Calls runtime PM API only in the DT case in order to unidle the
+> associated hwmods on AM33XX.
 
-On Sun, 28 Oct 2012 19:44:38 +0900, Simon Horman wrote:
+Runtime PM is supported on DaVinci now, so if that was the reason for
+this choice, then it doesn't need to be that way.
 
-> shmobile is very much in the transition phase and we are, patch by patch,
-> working towards full(er) DT support for boards, SoCs and drivers. I am not
-> sure that now is the right time to jump to a approach similar to that taken
-> by mach-kirkwood/board-dt.c.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/common/edma.c                      |  255 +++++++++++++++++++++++++--
+>  arch/arm/mach-davinci/board-da830-evm.c     |    4 +-
+>  arch/arm/mach-davinci/board-da850-evm.c     |    8 +-
+>  arch/arm/mach-davinci/board-dm646x-evm.c    |    4 +-
+>  arch/arm/mach-davinci/board-omapl138-hawk.c |    8 +-
+>  arch/arm/mach-davinci/devices-da8xx.c       |    8 +-
+>  arch/arm/mach-davinci/devices-tnetv107x.c   |    4 +-
+>  arch/arm/mach-davinci/dm355.c               |    4 +-
+>  arch/arm/mach-davinci/dm365.c               |    4 +-
+>  arch/arm/mach-davinci/dm644x.c              |    4 +-
+>  arch/arm/mach-davinci/dm646x.c              |    4 +-
+>  include/linux/platform_data/edma.h          |    8 +-
+>  12 files changed, 272 insertions(+), 43 deletions(-)
+> 
+> diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+> index a3d189d..6d2a590 100644
+> --- a/arch/arm/common/edma.c
+> +++ b/arch/arm/common/edma.c
+> @@ -24,6 +24,13 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+> +#include <linux/edma.h>
+> +#include <linux/err.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_dma.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  #include <linux/platform_data/edma.h>
+>  
+> @@ -1366,31 +1373,237 @@ void edma_clear_event(unsigned channel)
+>  EXPORT_SYMBOL(edma_clear_event);
+>  
+>  /*-----------------------------------------------------------------------*/
+> +static int edma_of_read_u32_to_s8_array(const struct device_node *np,
+> +					 const char *propname, s8 *out_values,
+> +					 size_t sz)
+> +{
+> +	struct property *prop = of_find_property(np, propname, NULL);
+> +	const __be32 *val;
+> +
+> +	if (!prop)
+> +		return -EINVAL;
+> +	if (!prop->value)
+> +		return -ENODATA;
+> +	if ((sz * sizeof(u32)) > prop->length)
+> +		return -EOVERFLOW;
+> +
+> +	val = prop->value;
+> +
+> +	while (sz--)
+> +		*out_values++ = (s8)(be32_to_cpup(val++) & 0xff);
+> +
+> +	/* Terminate it */
+> +	*out_values++ = -1;
+> +	*out_values++ = -1;
+> +
+> +	return 0;
+> +}
+> +
+> +static int edma_of_read_u32_to_s16_array(const struct device_node *np,
+> +					 const char *propname, s16 *out_values,
+> +					 size_t sz)
+> +{
+> +	struct property *prop = of_find_property(np, propname, NULL);
+> +	const __be32 *val;
+> +
+> +	if (!prop)
+> +		return -EINVAL;
+> +	if (!prop->value)
+> +		return -ENODATA;
+> +	if ((sz * sizeof(u32)) > prop->length)
+> +		return -EOVERFLOW;
+> +
+> +	val = prop->value;
+> +
+> +	while (sz--)
+> +		*out_values++ = (s16)(be32_to_cpup(val++) & 0xffff);
+> +
+> +	/* Terminate it */
+> +	*out_values++ = -1;
+> +	*out_values++ = -1;
+> +
+> +	return 0;
+> +}
 
-Ok, I understand that for transition needs, each SoC family may need a
-different method. My comment was more a general comment to make sure
-that the right final direction is being taken. For sure the
-intermediate steps may be different.
+I think these helper functions will have some general use beyond EDMA
+and can be kept in drivers/of/base.c. Grant/Rob need to agree though.
 
-Best regards,
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 95b5e10..ffcbec1 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -512,7 +512,7 @@ static struct davinci_i2c_platform_data da830_evm_i2c_0_pdata = {
+>   * example: Timer, GPIO, UART events etc) on da830/omap-l137 EVM, hence
+>   * they are being reserved for codecs on the DSP side.
+>   */
+> -static const s16 da830_dma_rsv_chans[][2] = {
+> +static s16 da830_dma_rsv_chans[][2] = {
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I wonder why you had to remove const here and in other places. You seem
+to be allocating new memory for DT case anyway. Its also not a good idea
+to modify the passed platform data.
+
+Thanks,
+Sekhar
