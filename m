@@ -1,37 +1,52 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 28 Oct 2012 15:43:33 +0400
-Subject: [PATCH] arm: bcm2835: enable proc and sysfs in defconfig
-In-Reply-To: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <508D1A65.20506@mvista.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Sun, 28 Oct 2012 12:17:52 +0000 (GMT)
+Subject: [PATCH] GPIO: mvebu-gpio: Don't initialize the mask_cache
+In-Reply-To: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
+References: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
+Message-ID: <alpine.DEB.2.00.1210281213420.10589@marmot.wormnet.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Sat, 27 Oct 2012, Andrew Lunn wrote:
 
-On 27-10-2012 21:00, Thomas Petazzoni wrote:
+> Due to the SMP nature of some of the chips, which have per CPU
+> registers, the driver does not use the generic irq_gc_mask_set_bit() &
+> irq_gc_mask_clr_bit() functions, which only support a single register.
+> The driver has its own implementation of these functions, which can
+> pick the correct register depending on the CPU being used. The
+> functions do however use the gc->mask_cache value.
+>
+> The call to irq_setup_generic_chip() was passing
+> IRQ_GC_INIT_MASK_CACHE, which caused the gc->mask_cache to be
+> initialized to the contents of some random register. This resulted in
+> unexpected interrupts been delivered from random GPIO lines.
+>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-> For some reason, support for proc and sysfs is currently disabled in
-> the bcm2835_defconfig, even though those filesystems are quite
-> essential even for very basic Linux userspace. As most defconfig have
-> them enabled by default, enable them as well in bcm2835_defconfig.
+Tested-by: Jamie Lentin <jm@lentin.co.uk>
 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+This is what was causing my NAS to lock up when I turned the LEDs off. 
+Thanks! The only one not working now is the power LED, patch coming soon 
+to fix that.
+
 > ---
->   arch/arm/configs/bcm2835_defconfig |    2 --
->   1 file changed, 2 deletions(-)
+> drivers/gpio/gpio-mvebu.c |    2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+> index eb42ab1..cf7afb9 100644
+> --- a/drivers/gpio/gpio-mvebu.c
+> +++ b/drivers/gpio/gpio-mvebu.c
+> @@ -646,7 +646,7 @@ static int __devinit mvebu_gpio_probe(struct platform_device *pdev)
+> 	ct->handler = handle_edge_irq;
+> 	ct->chip.name = mvchip->chip.label;
+>
+> -	irq_setup_generic_chip(gc, IRQ_MSK(ngpios), IRQ_GC_INIT_MASK_CACHE,
+> +	irq_setup_generic_chip(gc, IRQ_MSK(ngpios), 0,
+> 			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+>
+> 	/* Setup irq domain on top of the generic chip. */
+>
 
-> diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-> index 7aea702..74e27f0 100644
-> --- a/arch/arm/configs/bcm2835_defconfig
-> +++ b/arch/arm/configs/bcm2835_defconfig
-> @@ -66,8 +66,6 @@ CONFIG_TTY_PRINTK=y
->   # CONFIG_FILE_LOCKING is not set
->   # CONFIG_DNOTIFY is not set
->   # CONFIG_INOTIFY_USER is not set
-> -# CONFIG_PROC_FS is not set
-> -# CONFIG_SYSFS is not set
-
-    Hm, I don't see where are you enabling them... So I miss something?
-
-WBR, Sergei
+-- 
+Jamie Lentin
