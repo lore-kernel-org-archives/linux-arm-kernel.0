@@ -1,355 +1,114 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 28 Oct 2012 19:31:10 +0100
-Subject: [PATCH v3 5/6] ARM: AT91: Add AT91RM9200 device tree
+Date: Sun, 28 Oct 2012 19:31:11 +0100
+Subject: [PATCH v3 6/6] ARM: AT91: Add AT91RM9200EK board device tree
 In-Reply-To: <1351449071-5763-1-git-send-email-manabian@gmail.com>
 References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
-Message-ID: <1351449071-5763-6-git-send-email-manabian@gmail.com>
+Message-ID: <1351449071-5763-7-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/at91rm9200.dtsi | 333 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 333 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91rm9200.dtsi
+ arch/arm/boot/dts/Makefile         |  2 +
+ arch/arm/boot/dts/at91rm9200ek.dts | 78 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91rm9200ek.dts
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3bf4f53..64c4e7b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1,6 +1,8 @@
+ ifeq ($(CONFIG_OF),y)
+ 
+ # Keep at91 dtb files sorted alphabetically for each SoC
++# rm9200
++dtb-$(CONFIG_ARCH_AT91) += at91rm9200ek.dtb
+ # sam9260
+ dtb-$(CONFIG_ARCH_AT91) += aks-cdu.dtb
+ dtb-$(CONFIG_ARCH_AT91) += ethernut5.dtb
+diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
 new file mode 100644
-index 0000000..5c4f91d
+index 0000000..d8a680b
 --- /dev/null
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -0,0 +1,333 @@
++++ b/arch/arm/boot/dts/at91rm9200ek.dts
+@@ -0,0 +1,78 @@
 +/*
-+ * at91rm9200.dtsi - Device Tree Include file for AT91RM9200 family SoC
++ * at91rm9200ek.dts - Device Tree file for Atmel AT91RM9200 evaluation kit
 + *
-+ *  Copyright (C) 2011 Atmel,
-+ *                2011 Nicolas Ferre <nicolas.ferre@atmel.com>,
-+ *                2012 Joachim Eastwood <manabian@gmail.com>
++ *  Copyright (C) 2012 Joachim Eastwood <manabian@gmail.com>
 + *
-+ * Based on at91sam9260.dtsi
-+ *
-+ * Licensed under GPLv2 or later.
++ * Licensed under GPLv2 only
 + */
-+
-+/include/ "skeleton.dtsi"
++/dts-v1/;
++/include/ "at91rm9200.dtsi"
 +
 +/ {
-+	model = "Atmel AT91RM9200 family SoC";
-+	compatible = "atmel,at91rm9200";
-+	interrupt-parent = <&aic>;
-+
-+	aliases {
-+		serial0 = &dbgu;
-+		serial1 = &usart0;
-+		serial2 = &usart1;
-+		serial3 = &usart2;
-+		serial4 = &usart3;
-+		gpio0 = &pioA;
-+		gpio1 = &pioB;
-+		gpio2 = &pioC;
-+		gpio3 = &pioD;
-+		tcb0 = &tcb0;
-+		tcb1 = &tcb1;
-+	};
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,arm920t";
-+		};
-+	};
++	model = "Atmel AT91RM9200 evaluation kit";
++	compatible = "atmel,at91rm9200ek", "atmel,at91rm9200";
 +
 +	memory {
-+		reg = <0x20000000 0x04000000>;
++		reg = <0x20000000 0x4000000>;
 +	};
 +
-+	ahb {
-+		compatible = "simple-bus";
++	clocks {
 +		#address-cells = <1>;
 +		#size-cells = <1>;
 +		ranges;
 +
-+		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			aic: interrupt-controller at fffff000 {
-+				#interrupt-cells = <3>;
-+				compatible = "atmel,at91rm9200-aic";
-+				interrupt-controller;
-+				reg = <0xfffff000 0x200>;
-+				atmel,external-irqs = <25 26 27 28 29 30 31>;
-+			};
-+
-+			ramc0: ramc at ffffff00 {
-+				compatible = "atmel,at91rm9200-sdramc";
-+				reg = <0xffffff00 0x100>;
-+			};
-+
-+			pmc: pmc at fffffc00 {
-+				compatible = "atmel,at91rm9200-pmc";
-+				reg = <0xfffffc00 0x100>;
-+			};
-+
-+			st: timer at fffffd00 {
-+				compatible = "atmel,at91rm9200-st";
-+				reg = <0xfffffd00 0x100>;
-+				interrupts = <1 4 7>;
-+			};
-+
-+			tcb0: timer at fffa0000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffa0000 0x100>;
-+				interrupts = <17 4 0 18 4 0 19 4 0>;
-+			};
-+
-+			tcb1: timer at fffa4000 {
-+				compatible = "atmel,at91rm9200-tcb";
-+				reg = <0xfffa4000 0x100>;
-+				interrupts = <20 4 0 21 4 0 22 4 0>;
-+			};
-+
-+			pinctrl at fffff400 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				compatible = "atmel,at91rm9200-pinctrl", "simple-bus";
-+				ranges = <0xfffff400 0xfffff400 0x800>;
-+
-+				atmel,mux-mask = <
-+					/*    A         B     */
-+					 0xffffffff 0xffffffff  /* pioA */
-+					 0xffffffff 0x083fffff  /* pioB */
-+					 0xffff3fff 0x00000000  /* pioC */
-+					 0x03ff87ff 0x0fffff80  /* pioD */
-+					>;
-+
-+				/* shared pinctrl settings */
-+				dbgu {
-+					pinctrl_dbgu: dbgu-0 {
-+						atmel,pins =
-+							<0 30 0x1 0x0	/* PA30 periph A */
-+							 0 31 0x1 0x1>;	/* PA31 periph with pullup */
-+					};
-+				};
-+
-+				uart0 {
-+					pinctrl_uart0: uart0-0 {
-+						atmel,pins =
-+							<0 17 0x1 0x0	/* PA17 periph A */
-+							 0 18 0x1 0x0>;	/* PA18 periph A */
-+					};
-+
-+					pinctrl_uart0_rts_cts: uart0_rts_cts-0 {
-+						atmel,pins =
-+							<0 20 0x1 0x0	/* PA20 periph A */
-+							 0 21 0x1 0x0>;	/* PA21 periph A */
-+					};
-+				};
-+
-+				uart1 {
-+					pinctrl_uart1: uart1-0 {
-+						atmel,pins =
-+							<1 20 0x1 0x1	/* PB20 periph A with pullup */
-+							 1 21 0x1 0x0>;	/* PB21 periph A */
-+					};
-+
-+					pinctrl_uart1_rts_cts: uart1_rts_cts-0 {
-+						atmel,pins =
-+							<1 24 0x1 0x0	/* PB24 periph A */
-+							 1 26 0x1 0x0>;	/* PB26 periph A */
-+					};
-+
-+					pinctrl_uart1_dtr_dsr: uart1_dtr_dsr-0 {
-+						atmel,pins =
-+							<1 19 0x1 0x0	/* PB19 periph A */
-+							 1 25 0x1 0x0>;	/* PB25 periph A */
-+					};
-+
-+					pinctrl_uart1_dcd: uart1_dcd-0 {
-+						atmel,pins =
-+							<1 23 0x1 0x0>;	/* PB23 periph A */
-+					};
-+
-+					pinctrl_uart1_ri: uart1_ri-0 {
-+						atmel,pins =
-+							<1 18 0x1 0x0>;	/* PB18 periph A */
-+					};
-+				};
-+
-+				uart2 {
-+					pinctrl_uart2: uart2-0 {
-+						atmel,pins =
-+							<0 22 0x1 0x0	/* PA22 periph A */
-+							 0 23 0x1 0x1>;	/* PA23 periph A with pullup */
-+					};
-+
-+					pinctrl_uart2_rts_cts: uart2_rts_cts-0 {
-+						atmel,pins =
-+							<0 30 0x2 0x0	/* PA30 periph B */
-+							 0 31 0x2 0x0>;	/* PA31 periph B */
-+					};
-+				};
-+
-+				uart3 {
-+					pinctrl_uart3: uart3-0 {
-+						atmel,pins =
-+							<0 5 0x2 0x1	/* PA5 periph B with pullup */
-+							 0 6 0x2 0x0>;	/* PA6 periph B */
-+					};
-+
-+					pinctrl_uart3_rts_cts: uart3_rts_cts-0 {
-+						atmel,pins =
-+							<1 0 0x2 0x0	/* PB0 periph B */
-+							 1 1 0x2 0x0>;	/* PB1 periph B */
-+					};
-+				};
-+
-+				nand {
-+					pinctrl_nand: nand-0 {
-+						atmel,pins =
-+							<2 2 0x0 0x1	/* PC2 gpio RDY pin pull_up */
-+							 1 1 0x0 0x1>;	/* PB1 gpio CD pin pull_up */
-+					};
-+				};
-+
-+				pioA: gpio at fffff400 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff400 0x200>;
-+					interrupts = <2 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioB: gpio at fffff600 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff600 0x200>;
-+					interrupts = <3 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioC: gpio at fffff800 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffff800 0x200>;
-+					interrupts = <4 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+
-+				pioD: gpio at fffffa00 {
-+					compatible = "atmel,at91rm9200-gpio";
-+					reg = <0xfffffa00 0x200>;
-+					interrupts = <5 4 1>;
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+				};
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffff200 0x200>;
-+				interrupts = <1 4 7>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_dbgu>;
-+				status = "disabled";
-+			};
-+
-+			usart0: serial at fffc0000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffc0000 0x200>;
-+				interrupts = <6 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0>;
-+				status = "disabled";
-+			};
-+
-+			usart1: serial at fffc4000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffc4000 0x200>;
-+				interrupts = <7 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart1>;
-+				status = "disabled";
-+			};
-+
-+			usart2: serial at fffc8000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffc8000 0x200>;
-+				interrupts = <8 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2>;
-+				status = "disabled";
-+			};
-+
-+			usart3: serial at fffcc000 {
-+				compatible = "atmel,at91rm9200-usart";
-+				reg = <0xfffcc000 0x200>;
-+				interrupts = <23 4 5>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart3>;
-+				status = "disabled";
-+			};
-+
-+			usb1: gadget at fffb0000 {
-+				compatible = "atmel,at91rm9200-udc";
-+				reg = <0xfffb0000 0x4000>;
-+				interrupts = <11 4 2>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			compatible = "atmel,at91rm9200-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x40000000 0x10000000>;
-+			atmel,nand-addr-offset = <21>;
-+			atmel,nand-cmd-offset = <22>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand>;
-+			nand-ecc-mode = "soft";
-+			gpios = <&pioC 2 0
-+				 0
-+				 &pioB 1 0
-+				>;
-+			status = "disabled";
-+		};
-+
-+		usb0: ohci at 00300000 {
-+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-+			reg = <0x00300000 0x100000>;
-+			interrupts = <23 4 2>;
-+			status = "disabled";
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <18432000>;
 +		};
 +	};
 +
-+	i2c at 0 {
-+		compatible = "i2c-gpio";
-+		gpios = <&pioA 23 0 /* sda */
-+			 &pioA 24 0 /* scl */
-+			>;
-+		i2c-gpio,sda-open-drain;
-+		i2c-gpio,scl-open-drain;
-+		i2c-gpio,delay-us = <2>;	/* ~100 kHz */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
++	ahb {
++		apb {
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			usart1: serial at fffc4000 {
++				pinctrl-0 =
++						<&pinctrl_uart1
++						 &pinctrl_uart1_rts_cts
++						 &pinctrl_uart1_dtr_dsr
++						 &pinctrl_uart1_dcd
++						 &pinctrl_uart1_ri>;
++				status = "okay";
++			};
++
++			usb1: gadget at fffb0000 {
++				atmel,vbus-gpio = <&pioD 4 0>;
++				status = "okay";
++			};
++		};
++
++		usb0: ohci at 00300000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		ds2 {
++			label = "green";
++			gpios = <&pioB 0 0x1>;
++			linux,default-trigger = "mmc0";
++		};
++
++		ds4 {
++			label = "yellow";
++			gpios = <&pioB 1 0x1>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		ds6 {
++			label = "red";
++			gpios = <&pioB 2 0x1>;
++		};
 +	};
 +};
 -- 
