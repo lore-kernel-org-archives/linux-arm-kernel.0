@@ -1,38 +1,46 @@
-From: joe@perches.com (Joe Perches)
-Date: Sun, 28 Oct 2012 05:12:15 -0700
-Subject: [PATCH 00/16] treewide: Convert dev_printk(KERN_<LEVEL> to
- dev_<level>(
-In-Reply-To: <508D0ECA.8040008@mvista.com>
-References: <cover.1351411047.git.joe@perches.com>
- <508D0ECA.8040008@mvista.com>
-Message-ID: <1351426335.2008.6.camel@joe-AO722>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 28 Oct 2012 13:28:07 +0100
+Subject: [PATCH] arm: bcm2835: enable proc and sysfs in defconfig
+In-Reply-To: <508D1A65.20506@mvista.com>
+References: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508D1A65.20506@mvista.com>
+Message-ID: <20121028132807.266a1d52@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-10-28 at 14:54 +0400, Sergei Shtylyov wrote:
-> Hello.
+Dear Sergei Shtylyov,
 
-Hi Sergei.
+On Sun, 28 Oct 2012 15:43:33 +0400, Sergei Shtylyov wrote:
 
-> On 28-10-2012 12:05, Joe Perches wrote:
+> > diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+> > index 7aea702..74e27f0 100644
+> > --- a/arch/arm/configs/bcm2835_defconfig
+> > +++ b/arch/arm/configs/bcm2835_defconfig
+> > @@ -66,8 +66,6 @@ CONFIG_TTY_PRINTK=y
+> >   # CONFIG_FILE_LOCKING is not set
+> >   # CONFIG_DNOTIFY is not set
+> >   # CONFIG_INOTIFY_USER is not set
+> > -# CONFIG_PROC_FS is not set
+> > -# CONFIG_SYSFS is not set
 > 
-> > dev_<level> create smaller objects than dev_printk(KERN_<LEVEL>.
-> > Convert non-debug calls to this form.
-> 
-> > Joe Perches (16):
-> >    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
-> [...]
-> >    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
-> [...]
-> >    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
-> 
->     Hm, somehow this patch is repeated thrice?
+>     Hm, I don't see where are you enabling them... So I miss something?
 
-Nope, I forgot to edit the 0000 file after I edited
-patches locally when I noticed I forgot to update
-the subject lines.  Patches are corrected, 0000 not.
+Yes:
 
-I don't think it's a bit deal, I could repost just the 0000
-if you want though.
+config PROC_FS
+        bool "/proc file system support" if EXPERT
+        default y
 
-cheers, Joe
+config SYSFS
+        bool "sysfs file system support" if EXPERT
+        default y
+
+Those options are enabled by default. So, when there's nothing in the
+defconfig file to disable them, they are enabled.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
