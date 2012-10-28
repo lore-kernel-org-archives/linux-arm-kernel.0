@@ -1,58 +1,65 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 28 Oct 2012 23:59:18 +0100
-Subject: [PATCH 0/8] clk: ux500: Fixup smp_twd clk for clk notifiers
-In-Reply-To: <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
-References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
- <20121011134458.GB15428@gmail.com>
- <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
- <20121011151947.GD15428@gmail.com>
- <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
-Message-ID: <20121028225918.GC5411@sortiz-mobl>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 29 Oct 2012 00:01:54 +0100
+Subject: arm-soc tree was Re: [PATCH] Fix socfpga compilation with
+ early_printk() enabled
+In-Reply-To: <201210271539.20156.arnd@arndb.de>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <201210251458.48528.arnd@arndb.de>
+ <20121027115615.GC5912@elf.ucw.cz>
+ <201210271539.20156.arnd@arndb.de>
+Message-ID: <20121028230153.GA8284@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi!
 
-On Fri, Oct 26, 2012 at 10:19:24AM +0200, Ulf Hansson wrote:
-> On 11 October 2012 17:19, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 11 Oct 2012, Linus Walleij wrote:
-> >
-> >> On Thu, Oct 11, 2012 at 3:44 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>
-> >> >> Patches are based on Linus Torvalds tree with latest commit as of okt 10.
-> >> >
-> >> > Hmm... I get:
-> >> >
-> >> > Applying: clk: ux500: Support for prcmu_scalable_rate clock
-> >> > error: drivers/clk/ux500/clk-prcmu.c: does not exist in index
-> >> > error: drivers/clk/ux500/clk.h: does not exist in index
-> >> > Patch failed at 0001 clk: ux500: Support for prcmu_scalable_rate clock
-> >> >
-> >> > So when did drivers/clk/ux500/* arrive?
-> >>
-> >> Exactly here, 10 days ago on Torvalds' master branch:
-> >
-> > Ah I see. Basing patches on commits half way through the merge
-> > window. Good move! ;)
-> >
-> > --
-> > Lee Jones
-> > Linaro ST-Ericsson Landing Team Lead
-> > Linaro.org ? Open source software for ARM SoCs
-> > Follow Linaro: Facebook | Twitter | Blog
+> > > > This fixes early_printk() compilation for
+> > > > socfpga. (senduart/busyuart/waituart were missing). It does that by
+> > > > making Picochip code generic.
+> > > > 
+> > > > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > > > Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> > > > Acked-by: Jamie Iles <jamie@jamieiles.com 
+> > > 
+> > > Applied to fixes branch of arm-soc, but please be more explicit about
+> > > what you want to happen with patches in the future. Ideally we would
+> > > get pull requests for patches on each platform from only one person,
+> > > so please coordinate with Dinh Nguyen who that should be.
+> > 
+> > Dinh is the maintainer, so if we can only send patches from one
+> > person, it needs to be him. If you'd be willing to take patches from
+> > second person, that would help us... if not, of course I can send all
+> > the patches through Dinh.
 > 
-> Samuel, a kind reminder on this, trying to collect acks to be able to
-> advise Mike to take this series through his clk tree. There are two
-> mfd patches.
-> [PATCH 2/8] mfd: db8500: Provide cpufreq table as platform data
-> [PATCH 5/8] mfd: db8500: Connect ARMSS clk to ARM OPP
-Sorry for the delay:
+> You can both send patches, we just need to know what to expect. For most
+> platforms it works best if one person collects the patches from
+> everyone.
 
-Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+> If you are sending patches with both Dinh and us as the recipients,
+> just make it clear who you want to pick up the patch.
 
-Cheers,
-Samuel.
+Thanks. Would "[PATCH for soc]" in subject line be suitable markup?
 
+BTW current for-next soc tree does not compile for me, with 
+
+arch/arm/mach-vexpress/built-in.o: In function `v2m_timer_init':
+hotplug.c:(.init.text+0xd0): undefined reference to
+`vexpress_clk_init'
+arch/arm/mach-vexpress/built-in.o: In function `v2m_dt_timer_init':
+hotplug.c:(.init.text+0x100): undefined reference to
+`vexpress_clk_of_init'
+make: *** [vmlinux] Error 1
+
+config attached.
+
+									Pavel
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.bug.gz
+Type: application/octet-stream
+Size: 11441 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/536fdb2a/attachment-0001.obj>
