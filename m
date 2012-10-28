@@ -1,32 +1,93 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 28 Oct 2012 09:41:05 +0530
-Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <alpine.DEB.2.00.1210271545390.16409@utopia.booyaka.com>
-References: <1351155648-20429-1-git-send-email-balbi@ti.com>
- <alpine.DEB.2.00.1210262251020.11258@utopia.booyaka.com>
- <508BBC59.60504@ti.com>
- <alpine.DEB.2.00.1210271545390.16409@utopia.booyaka.com>
-Message-ID: <508CB059.8000203@ti.com>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 28 Oct 2012 01:05:38 -0700
+Subject: [PATCH 00/16] treewide: Convert dev_printk(KERN_<LEVEL> to
+ dev_<level>(
+Message-ID: <cover.1351411047.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 October 2012 09:29 PM, Paul Walmsley wrote:
-> On Sat, 27 Oct 2012, Santosh Shilimkar wrote:
->
->> Another alternative, which I will recommend to just make use of the
->> read*/wrire* instead __raw versions. The barriers are taken care
->> already and driver point of view, it is transparent.
->
-> Those barriers will disappear if CONFIG_ARM_DMA_MEM_BUFFERABLE is set to
-> N, so that's probably not the right thing to do in this case.  The barrier
-> here isn't DMA-related, it's needed due to the design of the driver.
->
-Good point.
+dev_<level> create smaller objects than dev_printk(KERN_<LEVEL>.
+Convert non-debug calls to this form.
 
-> In fact the wmb() is probably overkill, since only a compiler reordering
-> barrier is needed.  It can probably just be barrier().
->
-I agree. Just barrier() is enough to avoid compiler re-ordering.
+Joe Perches (16):
+  tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  ata: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  drivers: base: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  block: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  pcmcia: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  dma: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  gpu: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  i2c: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  wireless: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  ethernet: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  pci: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  scsi: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  usb: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  watchdog: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+  tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
 
-Regards
-Santosh
+ arch/tile/kernel/pci_gx.c                   |   15 ++---
+ drivers/ata/pata_cmd64x.c                   |    6 +-
+ drivers/base/attribute_container.c          |    2 +-
+ drivers/base/devres.c                       |    4 +-
+ drivers/block/umem.c                        |   97 ++++++++++++--------------
+ drivers/char/pcmcia/cm4040_cs.c             |    5 +-
+ drivers/dma/at_hdmac_regs.h                 |    8 +-
+ drivers/dma/iop-adma.c                      |   45 ++++++------
+ drivers/dma/mv_xor.c                        |   62 ++++++++----------
+ drivers/gpu/drm/gma500/cdv_intel_crt.c      |    3 +-
+ drivers/gpu/drm/gma500/cdv_intel_lvds.c     |    7 +-
+ drivers/gpu/drm/gma500/psb_intel_lvds.c     |    7 +-
+ drivers/gpu/drm/i915/intel_opregion.c       |    8 +-
+ drivers/i2c/busses/i2c-piix4.c              |    5 +-
+ drivers/net/ethernet/chelsio/cxgb3/common.h |    7 +-
+ drivers/net/ethernet/marvell/pxa168_eth.c   |    7 +-
+ drivers/net/wireless/at76c50x-usb.c         |   85 +++++++++++------------
+ drivers/net/wireless/iwlegacy/common.h      |    5 +-
+ drivers/net/wireless/iwlwifi/pcie/trans.c   |   28 +++-----
+ drivers/pci/irq.c                           |   10 ++--
+ drivers/pci/pci-stub.c                      |    2 +-
+ drivers/pci/pcie/aspm.c                     |    7 +--
+ drivers/pcmcia/cistpl.c                     |   10 +--
+ drivers/pcmcia/cs.c                         |   28 +++-----
+ drivers/pcmcia/ds.c                         |   38 +++++------
+ drivers/pcmcia/pcmcia_cis.c                 |    4 +-
+ drivers/pcmcia/pcmcia_resource.c            |   11 +--
+ drivers/pcmcia/rsrc_nonstatic.c             |   24 +++----
+ drivers/pcmcia/ti113x.h                     |   80 +++++++++++------------
+ drivers/pcmcia/yenta_socket.c               |   61 ++++++++---------
+ drivers/scsi/53c700.c                       |    2 +-
+ drivers/scsi/aic7xxx/aic79xx_osm_pci.c      |    4 +-
+ drivers/scsi/aic7xxx/aic7xxx_osm_pci.c      |    4 +-
+ drivers/scsi/aic94xx/aic94xx_tmf.c          |    4 +-
+ drivers/scsi/bfa/bfad.c                     |   32 ++++-----
+ drivers/scsi/fcoe/fcoe_sysfs.c              |    3 +-
+ drivers/scsi/lasi700.c                      |    2 +-
+ drivers/scsi/libsas/sas_task.c              |    9 +--
+ drivers/scsi/lpfc/lpfc_attr.c               |    8 +-
+ drivers/scsi/lpfc/lpfc_debugfs.h            |    6 +-
+ drivers/scsi/lpfc/lpfc_hbadisc.c            |    4 +-
+ drivers/scsi/lpfc/lpfc_init.c               |   45 ++++++-------
+ drivers/scsi/mpt2sas/mpt2sas_transport.c    |   91 ++++++++++++-------------
+ drivers/scsi/mvsas/mv_64xx.c                |    2 +-
+ drivers/scsi/mvsas/mv_chips.h               |    8 +-
+ drivers/scsi/mvsas/mv_init.c                |   14 ++--
+ drivers/scsi/mvsas/mv_sas.c                 |    9 +--
+ drivers/scsi/pm8001/pm8001_init.c           |   10 +--
+ drivers/scsi/pm8001/pm8001_sas.c            |    4 +-
+ drivers/scsi/raid_class.c                   |    8 +-
+ drivers/scsi/scsi_scan.c                    |    3 +-
+ drivers/scsi/scsi_transport_fc.c            |   31 ++++-----
+ drivers/scsi/scsi_transport_sas.c           |    7 +-
+ drivers/scsi/sni_53c710.c                   |    2 +-
+ drivers/scsi/zalon.c                        |    4 +-
+ drivers/usb/core/hub.c                      |    2 +-
+ drivers/virtio/virtio_balloon.c             |    7 +-
+ drivers/watchdog/mpcore_wdt.c               |   19 +++---
+ sound/pci/asihpi/hpidspcd.c                 |   22 +++----
+ sound/pci/asihpi/hpioctl.c                  |   17 ++---
+ 60 files changed, 485 insertions(+), 579 deletions(-)
+
+-- 
+1.7.8.112.g3fd21
