@@ -1,25 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 28 Oct 2012 20:26:57 +0100
-Subject: [PATCH v3 04/11] clk: davinci - add pll divider clock driver
-In-Reply-To: <1351181518-11882-5-git-send-email-m-karicheri2@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-5-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CACRpkdY3ji_twCqej6Yf8grR7oovf3jeGrbQMzybk5CK5f2Y9A@mail.gmail.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Sun, 28 Oct 2012 20:50:18 +0100
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <20121028165711.GG15824@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <20121028165711.GG15824@lunn.ch>
+Message-ID: <20121028195018.GA16191@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 6:11 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+Hi Andrew,
 
-> pll dividers are present in the pll controller of DaVinci and Other
-> SoCs that re-uses the same hardware IP. This has a enable bit for
-> bypass the divider or enable the driver. This is a sub class of the
-> clk-divider clock checks the enable bit to calculare the rate and
-> invoke the recalculate() function of the clk-divider if enabled.
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+On Sun, Oct 28, 2012 at 05:57:11PM +0100, Andrew Lunn wrote:
+> On Wed, Oct 24, 2012 at 04:53:45PM +0200, Andrew Lunn wrote:
+> > This patchset converts all DT kirkwood boards to using pinctrl.
+> 
+> I still expect problems with GPIOs used for power off. I've not yet
+> touched them. Again, a regulator makes sense, but there is no 'out of
+> the box' regulator type or property which adds itself to pm_power_off.
 
-Looking good,
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+the IB-NAS 62x0 works with the exception of the power off via GPIO. 
+Additionally, the original U-Boot enables hardware blinking for the
+power led and Jamie's patch might be needed here as well.  However, I
+don't use this U-Boot anymore and can't test this.
 
-Yours,
-Linus Walleij
+- Simon
