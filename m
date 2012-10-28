@@ -1,57 +1,58 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 28 Oct 2012 23:48:48 +0100
-Subject: [PATCH v2 1/5] ARM: PXA: Add z2-usb-switch driver
-In-Reply-To: <CA+E=qVccYJApm=zx7XvS5gbi0w3=HgKxRJQfXoStSMVhuVy9cQ@mail.gmail.com>
-References: <CA+E=qVc1MGPQoWZWQAcv-NEh8WpLoqeTYLQz4iFjiOyfc9CX5w@mail.gmail.com>
- <201210282338.03505.marex@denx.de>
- <CA+E=qVccYJApm=zx7XvS5gbi0w3=HgKxRJQfXoStSMVhuVy9cQ@mail.gmail.com>
-Message-ID: <201210282348.48681.marex@denx.de>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Sun, 28 Oct 2012 23:59:18 +0100
+Subject: [PATCH 0/8] clk: ux500: Fixup smp_twd clk for clk notifiers
+In-Reply-To: <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
+References: <1349869349-8070-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121011134458.GB15428@gmail.com>
+ <CACRpkdYEukMzMX1Q8nb5zKPMZEZfttzWVC24aOkv2g8SCQtTnQ@mail.gmail.com>
+ <20121011151947.GD15428@gmail.com>
+ <CAPDyKFof65xAVyOo3FrdS2uYQwB1Wq3553PKj04FR6JXaJsH6Q@mail.gmail.com>
+Message-ID: <20121028225918.GC5411@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Vasily Khoruzhick,
+Hi Ulf,
 
-> On Mon, Oct 29, 2012 at 1:38 AM, Marek Vasut <marex@denx.de> wrote:
-> > Dear Vasily Khoruzhick,
-> > 
-> >> On Mon, Oct 29, 2012 at 12:57 AM, Marek Vasut <marex@denx.de> wrote:
-> >> > Dear Vasily Khoruzhick,
-> >> 
-> >> Dear Marek Vasut,
-> >> 
-> >> >> This driver controls mode of USB port #2 pins - device or host.
-> >> > 
-> >> > Please supply proper commit message. This short message describes
-> >> > nothing.
-> >> 
-> >> OK, "This driver allows user to choose USB port #2 mode between device
-> >> and host" - that would be OK?
-> > 
-> > Please describe why is this needed at all and what it does.
+On Fri, Oct 26, 2012 at 10:19:24AM +0200, Ulf Hansson wrote:
+> On 11 October 2012 17:19, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 11 Oct 2012, Linus Walleij wrote:
+> >
+> >> On Thu, Oct 11, 2012 at 3:44 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >>
+> >> >> Patches are based on Linus Torvalds tree with latest commit as of okt 10.
+> >> >
+> >> > Hmm... I get:
+> >> >
+> >> > Applying: clk: ux500: Support for prcmu_scalable_rate clock
+> >> > error: drivers/clk/ux500/clk-prcmu.c: does not exist in index
+> >> > error: drivers/clk/ux500/clk.h: does not exist in index
+> >> > Patch failed at 0001 clk: ux500: Support for prcmu_scalable_rate clock
+> >> >
+> >> > So when did drivers/clk/ux500/* arrive?
+> >>
+> >> Exactly here, 10 days ago on Torvalds' master branch:
+> >
+> > Ah I see. Basing patches on commits half way through the merge
+> > window. Good move! ;)
+> >
+> > --
+> > Lee Jones
+> > Linaro ST-Ericsson Landing Team Lead
+> > Linaro.org ? Open source software for ARM SoCs
+> > Follow Linaro: Facebook | Twitter | Blog
 > 
-> Because one might need USB device and USB host functionality provided
-> by USB port #2?
-> It switches pins mode from device to host and backwards.
+> Samuel, a kind reminder on this, trying to collect acks to be able to
+> advise Mike to take this series through his clk tree. There are two
+> mfd patches.
+> [PATCH 2/8] mfd: db8500: Provide cpufreq table as platform data
+> [PATCH 5/8] mfd: db8500: Connect ARMSS clk to ARM OPP
+Sorry for the delay:
 
-Good, now compile it into the commit message for v3 please.
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
-> > [...]
-> > 
-> >> > I wonder if we have no better means to control enforcement of mode.
-> >> 
-> >> Why? sysfs fits nicely.
-> > 
-> > Because if there is already an API to implement this OTG in kernel, you
-> > should use that and not reinvent wheel.
-> 
-> One needs to select USB mode manually (btw, Z2 can't even power USB
-> device properly, only 3.3v or external 5v).
-> There's no way to determine what type of device (device/host)
-> connected to Z2 at the moment.
+Cheers,
+Samuel.
 
-Good, so your OTG is software controlled.
-
-[...]
-
-Best regards,
-Marek Vasut
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
