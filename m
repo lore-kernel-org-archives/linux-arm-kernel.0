@@ -1,35 +1,86 @@
 From: stigge@antcom.de (Roland Stigge)
-Date: Sun, 28 Oct 2012 21:35:22 +0100
-Subject: [PATCH 3/3] ARM: LPC32xx: Cleanup irq.c
-In-Reply-To: <1351456522-22309-1-git-send-email-stigge@antcom.de>
-References: <1351456522-22309-1-git-send-email-stigge@antcom.de>
-Message-ID: <1351456522-22309-3-git-send-email-stigge@antcom.de>
+Date: Sun, 28 Oct 2012 21:46:45 +0100
+Subject: [PATCH RESEND 0/5 v6] gpio: Add block GPIO
+Message-ID: <1351457210-25222-1-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes the IRQ mask initialization which is already done some lines
-above.
+This set of patches adds:
 
-This was actually a bug: The init was supposed to set the bits for the
-(chained) SUB IRQs. But this is already fixed by the previous patch, doing this
-implicitely via irq_set_chained_handler().
+* Block GPIO API to gpiolib
+* Sysfs support for GPIO API, to provide userland access
+* Devicetree support to instantiate GPIO blocks via DT
+* Example implementations in several gpio drivers since they need
+  special accessor functions for block wise GPIO access
+* Fix for race condition in gpiolib on device creation
 
 Signed-off-by: Roland Stigge <stigge@antcom.de>
----
- arch/arm/mach-lpc32xx/irq.c |    5 -----
- 1 file changed, 5 deletions(-)
+--
 
---- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c
-+++ linux-2.6/arch/arm/mach-lpc32xx/irq.c
-@@ -442,11 +442,6 @@ void __init lpc32xx_init_irq(void)
- 	lpc32xx_set_default_mappings(SIC1_APR_DEFAULT, SIC1_ATR_DEFAULT, 32);
- 	lpc32xx_set_default_mappings(SIC2_APR_DEFAULT, SIC2_ATR_DEFAULT, 64);
+Changes since v5:
+* Documented sysfs: elaborated on "exported" and "values" attributes
+* Documented sysfs: gpiochip is a separate class now
+* Aggregated driver support patches for block gpio into one single patch
+* Added gpio block driver support for twl6040 and pch
+
+Changes since v4:
+* Documented word width
+* Bugfix: export/unexport on register/unregister
+* Using default dev_attrs for gpio_block_class
+* Fix gpiolib: race condition on device creation
+* Added driver support for ucb14500, vt8500, xilinx
+
+Changes since v3:
+* Added driver support for pca953x, em, pl061, max732x, pcf857x
+* Coding style improvements
+* Fixed krealloc memory leak in error case
+* sysfs: values in hex
+* Register blocks in a list
+* Narrowing lock scope
+* Use S_IWUSR and S_IRUGO instead of direct octal values
+* Use for_each_set_bit()
+* Change from unsigned to unsigned long for masks and values
+
+Changes since v2:
+* Added sysfs support
+* Added devicetree support
+* Added support for lpc32xx, generic
+* Added functions for GPIO block registration
+* Added more error checking
+* Bit remapping bugfix
+
+Changes since v1:
+* API change to 32/64 bit word, bit masks
+
+Thanks to Ryan Mallon, Linus Walleij, Stijn Devriendt, Jean-Christophe
+Plagniol-Villard, Mark Brown and Greg Kroah-Hartman for reviewing!
+
+Roland Stigge (5):
+ gpio: Add a block GPIO API to gpiolib
+ gpio: Add sysfs support to block GPIO API
+ gpiolib: Fix default attributes for class
+ gpio: Add device tree support to block GPIO API
+ gpio: Add block gpio to several gpio drivers
  
--	/* mask all interrupts except SUBIRQ */
--	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_MIC_BASE));
--	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
--	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
--
- 	/* Initially disable all wake events */
- 	__raw_writel(0, LPC32XX_CLKPWR_P01_ER);
- 	__raw_writel(0, LPC32XX_CLKPWR_INT_ER);
+ Documentation/ABI/testing/sysfs-gpio                  |   29 +
+ Documentation/devicetree/bindings/gpio/gpio-block.txt |   36 +
+ Documentation/gpio.txt                                |   47 +
+ drivers/gpio/Makefile                                 |    1 
+ drivers/gpio/gpio-em.c                                |   23 
+ drivers/gpio/gpio-generic.c                           |   56 +
+ drivers/gpio/gpio-lpc32xx.c                           |   82 ++
+ drivers/gpio/gpio-max730x.c                           |   61 ++
+ drivers/gpio/gpio-max732x.c                           |   59 ++
+ drivers/gpio/gpio-pca953x.c                           |   64 ++
+ drivers/gpio/gpio-pcf857x.c                           |   24 
+ drivers/gpio/gpio-pch.c                               |   27 
+ drivers/gpio/gpio-pl061.c                             |   17 
+ drivers/gpio/gpio-twl6040.c                           |   32 +
+ drivers/gpio/gpio-ucb1400.c                           |   23 
+ drivers/gpio/gpio-vt8500.c                            |   24 
+ drivers/gpio/gpio-xilinx.c                            |   44 +
+ drivers/gpio/gpioblock-of.c                           |   84 ++
+ drivers/gpio/gpiolib.c                                |  510 ++++++++++++++++--
+ include/asm-generic/gpio.h                            |   26 
+ include/linux/gpio.h                                  |   87 +++
+ 21 files changed, 1311 insertions(+), 45 deletions(-)
