@@ -1,46 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 28 Oct 2012 13:28:07 +0100
-Subject: [PATCH] arm: bcm2835: enable proc and sysfs in defconfig
-In-Reply-To: <508D1A65.20506@mvista.com>
-References: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <508D1A65.20506@mvista.com>
-Message-ID: <20121028132807.266a1d52@skate>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 28 Oct 2012 08:11:33 -0500
+Subject: [PATCH v2 4/4] irqchip: add to the directories part of the IRQ
+ subsystem in MAINTAINERS
+In-Reply-To: <1351416634-3352-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351416634-3352-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351416634-3352-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <508D2F05.1090404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sergei Shtylyov,
-
-On Sun, 28 Oct 2012 15:43:33 +0400, Sergei Shtylyov wrote:
-
-> > diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-> > index 7aea702..74e27f0 100644
-> > --- a/arch/arm/configs/bcm2835_defconfig
-> > +++ b/arch/arm/configs/bcm2835_defconfig
-> > @@ -66,8 +66,6 @@ CONFIG_TTY_PRINTK=y
-> >   # CONFIG_FILE_LOCKING is not set
-> >   # CONFIG_DNOTIFY is not set
-> >   # CONFIG_INOTIFY_USER is not set
-> > -# CONFIG_PROC_FS is not set
-> > -# CONFIG_SYSFS is not set
+On 10/28/2012 04:30 AM, Thomas Petazzoni wrote:
+> Now that the drivers/irqchip/ directory is getting more code, it needs
+> a maintainer. The obvious maintainer for it is Thomas Gleixner, who is
+> maintaining the overall IRQ subsystem. So we add drivers/irqchip/ in
+> the list of directories that are part of the IRQ subsystem.
 > 
->     Hm, I don't see where are you enabling them... So I miss something?
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  MAINTAINERS |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 027ec2b..c057bfc 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4034,6 +4034,7 @@ M:	Thomas Gleixner <tglx@linutronix.de>
+>  S:	Maintained
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/core
+>  F:	kernel/irq/
+> +F:	drivers/irchip/
 
-Yes:
+s/irchip/irqchip/
 
-config PROC_FS
-        bool "/proc file system support" if EXPERT
-        default y
-
-config SYSFS
-        bool "sysfs file system support" if EXPERT
-        default y
-
-Those options are enabled by default. So, when there's nothing in the
-defconfig file to disable them, they are enabled.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>  
+>  IRQ DOMAINS (IRQ NUMBER MAPPING LIBRARY)
+>  M:	Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> 
