@@ -1,62 +1,68 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sun, 28 Oct 2012 11:26:01 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC boards for v3.8
-Message-ID: <1351391173-32379-1-git-send-email-horms@verge.net.au>
+Date: Sun, 28 Oct 2012 11:26:02 +0900
+Subject: [PATCH 01/12] ARM: shmobile: r8a7740: Enable PMU
+In-Reply-To: <1351391173-32379-1-git-send-email-horms@verge.net.au>
+References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
+Message-ID: <1351391173-32379-2-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
-please consider the following board enhancements for 3.8.
+This patch enables PMU for r8a7740.
 
-----------------------------------------------------------------
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/armadillo800eva_defconfig |    1 +
+ arch/arm/mach-shmobile/setup-r8a7740.c     |   16 ++++++++++++++++
+ 2 files changed, 17 insertions(+)
 
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
-
-for you to fetch changes up to 39fe22dd9b60c26a6e1a5279abfb6473d67723e6:
-
-  ARM: mach-shmobile: Use DT_MACHINE for mackerel (2012-10-24 17:06:15 +0900)
-
-----------------------------------------------------------------
-Bastian Hecht (1):
-      ARM: mach-shmobile: add FLCTL DMA slave definitions for sh7372
-
-Kuninori Morimoto (6):
-      ARM: shmobile: armadillo800eva: enable restart
-      ARM: shmobile: r8a7779: add HSPI clock support
-      ARM: shmobile: r8a7779: add I2C clock support
-      ARM: shmobile: r8a7779: add I2C driver support
-      ARM: shmobile: marzen: add HSPI support
-      ARM: shmobile: r8a7740: fixup DT machine desc name typo
-
-Nobuhiro Iwamatsu (2):
-      ARM: shmobile: r8a7740: Enable PMU
-      ARM: mach-shmobile: Use DT_MACHINE for mackerel
-
-Tetsuyuki Kobayashi (3):
-      ARM: shmobile: kzm9g: enable magnetometer ak8975.
-      ARM: shmobile: kzm9g: enable three-axis digital accelerometer ADXL345
-      ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and SDHI2
-
- arch/arm/boot/dts/Makefile                     |    3 +-
- arch/arm/boot/dts/sh7372-mackerel.dts          |   22 +++++++
- arch/arm/configs/armadillo800eva_defconfig     |    1 +
- arch/arm/configs/kzm9g_defconfig               |    4 ++
- arch/arm/configs/marzen_defconfig              |    4 ++
- arch/arm/mach-shmobile/Kconfig                 |    1 +
- arch/arm/mach-shmobile/board-armadillo800eva.c |    8 +++
- arch/arm/mach-shmobile/board-kzm9g.c           |   14 ++++-
- arch/arm/mach-shmobile/board-mackerel.c        |    8 ++-
- arch/arm/mach-shmobile/board-marzen.c          |   25 ++++++++
- arch/arm/mach-shmobile/clock-r8a7779.c         |   16 ++++-
- arch/arm/mach-shmobile/include/mach/sh7372.h   |    4 ++
- arch/arm/mach-shmobile/setup-r8a7740.c         |   18 +++++-
- arch/arm/mach-shmobile/setup-r8a7779.c         |   77 ++++++++++++++++++++++++
- arch/arm/mach-shmobile/setup-sh7372.c          |   20 ++++++
- 15 files changed, 220 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/sh7372-mackerel.dts
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index f78d259..3d76407 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -7,6 +7,7 @@ CONFIG_LOG_BUF_SHIFT=16
+ # CONFIG_IPC_NS is not set
+ # CONFIG_PID_NS is not set
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 11bb1d9..1e032cb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -590,6 +590,21 @@ static struct platform_device i2c1_device = {
+ 	.num_resources	= ARRAY_SIZE(i2c1_resources),
+ };
+ 
++static struct resource pmu_resources[] = {
++	[0] = {
++		.start	= evt2irq(0x19a0),
++		.end	= evt2irq(0x19a0),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device pmu_device = {
++	.name	= "arm-pmu",
++	.id		= -1,
++	.num_resources = ARRAY_SIZE(pmu_resources),
++	.resource = pmu_resources,
++};
++
+ static struct platform_device *r8a7740_late_devices[] __initdata = {
+ 	&i2c0_device,
+ 	&i2c1_device,
+@@ -597,6 +612,7 @@ static struct platform_device *r8a7740_late_devices[] __initdata = {
+ 	&dma1_device,
+ 	&dma2_device,
+ 	&usb_dma_device,
++	&pmu_device,
+ };
+ 
+ /*
+-- 
+1.7.10.4
