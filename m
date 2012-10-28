@@ -1,57 +1,42 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 28 Oct 2012 15:28:47 +0400
-Subject: [PATCH 01/12] ARM: shmobile: r8a7740: Enable PMU
-In-Reply-To: <1351391173-32379-2-git-send-email-horms@verge.net.au>
-References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
- <1351391173-32379-2-git-send-email-horms@verge.net.au>
-Message-ID: <508D16EF.7030800@mvista.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 28 Oct 2012 17:01:29 +0530
+Subject: [RFC PATCH v3 16/16] ARM: dts: add AM33XX SPI support
+In-Reply-To: <1350566815-409-17-git-send-email-mporter@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-17-git-send-email-mporter@ti.com>
+Message-ID: <508D1791.1040806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 10/18/2012 6:56 PM, Matt Porter wrote:
+> Adds AM33XX SPI support for am335x-bone and am335x-evm.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone.dts |   17 +++++++++++++++
+>  arch/arm/boot/dts/am335x-evm.dts  |    9 ++++++++
+>  arch/arm/boot/dts/am33xx.dtsi     |   43 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 69 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index 5510979..23edfd8 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -18,6 +18,17 @@
+>  		reg = <0x80000000 0x10000000>; /* 256 MB */
+>  	};
+>  
+> +	am3358_pinmux: pinmux at 44e10800 {
+> +		spi1_pins: pinmux_spi1_pins {
+> +			pinctrl-single,pins = <
+> +				0x190 0x13	/* mcasp0_aclkx.spi1_sclk, OUTPUT_PULLUP | MODE3 */
+> +				0x194 0x33	/* mcasp0_fsx.spi1_d0, INPUT_PULLUP | MODE3 */
+> +				0x198 0x13	/* mcasp0_axr0.spi1_d1, OUTPUT_PULLUP | MODE3 */
+> +				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
+> +			>;
 
-On 28-10-2012 6:26, Simon Horman wrote:
+Is there a single pinmux setting that provides SPI functionality on the
+bone headers? Or this is specific to a cape you tested with?
 
-> From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-
-> This patch enables PMU for r8a7740.
-
-    And enables performance events on the Armadillo board. Perhaps the 
-defconfig part was worth a separate patch...
-
-> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> Signed-off-by: Simon Horman <horms@verge.net.au>
-[...]
-
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-> index 11bb1d9..1e032cb 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7740.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-> @@ -590,6 +590,21 @@ static struct platform_device i2c1_device = {
->   	.num_resources	= ARRAY_SIZE(i2c1_resources),
->   };
->
-> +static struct resource pmu_resources[] = {
-> +	[0] = {
-> +		.start	= evt2irq(0x19a0),
-> +		.end	= evt2irq(0x19a0),
-> +		.flags  = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +static struct platform_device pmu_device = {
-> +	.name	= "arm-pmu",
-> +	.id		= -1,
-
-    I think you should either align '=' with tabs, or not bother doing this, 
-not both. :-)
-
-> +	.num_resources = ARRAY_SIZE(pmu_resources),
-> +	.resource = pmu_resources,
-> +};
-> +
->   static struct platform_device *r8a7740_late_devices[] __initdata = {
->   	&i2c0_device,
->   	&i2c1_device,
-
-WBR, Sergei
+Thanks,
+Sekhar
