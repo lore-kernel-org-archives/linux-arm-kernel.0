@@ -1,57 +1,135 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Sun, 28 Oct 2012 21:53:09 +0000 (GMT)
-Subject: [PATCH] ARM: kirkwood: Increase NAND chip-delay for DNS-320
-In-Reply-To: <20121028205956.GH15143@lunn.ch>
-References: <1351457262-11506-1-git-send-email-jm@lentin.co.uk>
- <20121028205956.GH15143@lunn.ch>
-Message-ID: <alpine.DEB.2.00.1210282123250.10589@marmot.wormnet.eu>
+From: marex@denx.de (Marek Vasut)
+Date: Sun, 28 Oct 2012 22:57:48 +0100
+Subject: [PATCH v2 1/5] ARM: PXA: Add z2-usb-switch driver
+In-Reply-To: <1351438946-5331-1-git-send-email-anarsoul@gmail.com>
+References: <CA+E=qVc1MGPQoWZWQAcv-NEh8WpLoqeTYLQz4iFjiOyfc9CX5w@mail.gmail.com>
+ <1351438946-5331-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <201210282257.48770.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Oct 2012, Andrew Lunn wrote:
+Dear Vasily Khoruzhick,
 
-> On Sun, Oct 28, 2012 at 08:47:42PM +0000, Jamie Lentin wrote:
->> The default chip-delay of 25ns is a bit too tight for some DNS-320's,
->> increase to 35ns.
->>
->> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
->> ---
->> I now own 2 DNS-320's, the first of which is happy with a mainline
->> kernel, the second fills the console with "Bad eraseblock xxx at
->> 0x00000xxxxxxx" for every eraseblock and refuses to access the NAND.
->> Beyond this they appear identical, and report the same NAND chip
->> (I haven't physically checked that it's the same, however).
->>
->> The patch below fixes it, however:-
->> * Is there something else I should be trying, rather than potentially
->> masking the problem?
->> * Is chip-delay too low for kirkwood generally?
->
-> Do you know what NAND chip it is? We can check the datasheet and see
-> what is specified.
+> This driver controls mode of USB port #2 pins - device or host.
 
-The chip markings are: SAMSUNG 146 K9F1G08U0D SCB0 (FKJ554PWN)
+Please supply proper commit message. This short message describes nothing.
 
-Unfortunately the other NAS is too far away to get at, but D-link haven't 
-stuck to exactly the same chip. This DNS-320 review shows a different 
-Samsung part:
+[...]
 
-http://diit.cz/data/images/thumb/67491_2b9e5e4fbd.jpg?1307884464
+> @@ -0,0 +1,100 @@
+> +/*
+> + * USB mode switcher for Z2
+> + *
+> + * Copyright (c) 2011 Vasily Khoruzhick
 
-The datasheet for the K9F1G08U0D says max 35usecs "Data Transfer from Cell 
-to Register", whereas K9F1G08U0C (what the DNS-320 review shows) says 
-25usecs. If this is the value in the datasheet to check, then this would 
-explain the problems.
+2012
 
-> All kirkwood's use 25ns and i don't think there have been any problems
-> reported. But that does not mean Dlink have mounted a slower device.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/delay.h>
+> +
+> +#include <mach/pxa27x.h>
+> +#include <mach/pxa27x-udc.h>
+> +
+> +#include <asm/io.h>
+> +
+> +#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-I've not had anyone with this NAS report similar problems. It could just 
-be I've been particuarly lucky...
+min() is already defined in kernel.h
 
->
-> 	  Andrew
->
+> +static ssize_t usb_mode_show(struct device *dev, struct device_attribute
+> *attr, +	char *buf)
+> +{
+> +	if (UP2OCR & UP2OCR_HXS)
+> +		return sprintf(buf, "host\n");
+> +	else
+> +		return sprintf(buf, "device\n");
+> +}
+> +
+> +static ssize_t usb_mode_set(struct device *dev, struct device_attribute
+> *attr, +	const char *buf, size_t count)
+> +{
+> +	if (strncmp(buf, "host", MIN(count, 4)) == 0) {
+> +		UP2OCR = UP2OCR_HXS | UP2OCR_HXOE | UP2OCR_DPPDE | UP2OCR_DMPDE;
+> +		return count;
+> +	} else if (strncmp(buf, "device", MIN(count, 6)) == 0) {
+> +		UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
+> +		return count;
+> +	}
+> +	return -EINVAL;
+> +}
+> +
+> +static DEVICE_ATTR(usb_mode, 0644, usb_mode_show, usb_mode_set);
 
--- 
-Jamie Lentin
+I wonder if we have no better means to control enforcement of mode.
+
+> +static const struct attribute *attrs[] = {
+> +	&dev_attr_usb_mode.attr,
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group attr_group = {
+> +	.attrs	= (struct attribute **)attrs,
+> +};
+
+Isn't there some macro to do this assignment?
+
+> +static int z2_usb_switch_probe(struct platform_device *dev)
+
+Missing __devinit
+
+> +{
+> +	int res;
+> +
+> +	res = sysfs_create_group(&dev->dev.kobj, &attr_group);
+> +	if (res)
+> +		return res;
+> +
+> +	UP2OCR = UP2OCR_HXOE | UP2OCR_DPPUE;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __devexit z2_usb_switch_remove(struct platform_device *dev)
+> +{
+> +	UP2OCR = UP2OCR_HXOE;
+> +	sysfs_remove_group(&dev->dev.kobj, &attr_group);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver z2_usb_switch_driver = {
+> +	.probe = z2_usb_switch_probe,
+> +	.remove = __devexit_p(z2_usb_switch_remove),
+> +
+> +	.driver = {
+> +		.name = "z2-usb-switch",
+> +		.owner = THIS_MODULE,
+> +	},
+> +};
+> +
+> +
+> +static int __init z2_usb_switch_init(void)
+> +{
+> +	return platform_driver_register(&z2_usb_switch_driver);
+> +}
+> +
+> +static void __exit z2_usb_switch_exit(void)
+> +{
+> +	platform_driver_unregister(&z2_usb_switch_driver);
+> +}
+> +
+> +module_init(z2_usb_switch_init);
+> +module_exit(z2_usb_switch_exit);
+
+module_platform_driver()
+
+Best regards,
+Marek Vasut
