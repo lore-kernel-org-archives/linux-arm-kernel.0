@@ -1,19 +1,23 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 27 Oct 2012 20:33:48 -0600
-Subject: [PATCH] arm: bcm2835: enable proc and sysfs in defconfig
-In-Reply-To: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351357249-17658-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <508C998C.9070903@wwwdotorg.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 28 Oct 2012 12:11:17 +0900
+Subject: [PATCH 0/3] Use generic helper scu_power_mode()
+In-Reply-To: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+References: <1351162702-8391-1-git-send-email-hechtb@gmail.com>
+Message-ID: <20121028031117.GS3743@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2012 11:00 AM, Thomas Petazzoni wrote:
-> For some reason, support for proc and sysfs is currently disabled in
-> the bcm2835_defconfig, even though those filesystems are quite
-> essential even for very basic Linux userspace. As most defconfig have
-> them enabled by default, enable them as well in bcm2835_defconfig.
+On Thu, Oct 25, 2012 at 12:58:19PM +0200, Bastian Hecht wrote:
+> Reposted to include the arch/arm mailing list.
+> 
+> The shmobile series implements its own code for setting the SCU power
+> register of the ARM MPCore. It uses 32-bit wide access and thus needs
+> locking as multiple CPUs might access it simultaneously for change. There is
+> already a small helper function that avoids the overhead by using 8-bit
+> wide access: As every CPU only accesses its own field we can drop the
+> lock and use it.
 
-How silly of me; I had this as part of a local change for testing, but
-hadn't made a patch to add it to the defconfig upstream.
+Thanks,
 
-Applied to bcm2835's for-3.8/defconfig branch. Thanks.
+these look good to me. I will push them to the boards branch once
+its current pull request has been processed by the arm-soc people.
