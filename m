@@ -1,53 +1,49 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sun, 28 Oct 2012 19:17:55 +0100
-Subject: [PATCH] ARM: AM33xx: add support for reboot
-Message-ID: <1351448275-23509-1-git-send-email-zonque@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 28 Oct 2012 19:31:05 +0100
+Subject: [PATCH v3 0/6] DT support for AT91RM9200
+Message-ID: <1351449071-5763-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the ability to reboot am33xx-based systems.
+Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/mach-omap2/board-generic.c | 1 +
- arch/arm/mach-omap2/prcm.c          | 6 ++++++
- 2 files changed, 7 insertions(+)
+Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 601ecdf..6a69ceb 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_am33xx_timer,
- 	.dt_compat	= am33xx_boards_compat,
-+	.restart	= omap_prcm_restart,
- MACHINE_END
- #endif
- 
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index 0f51e03..8a3068a 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -32,6 +32,7 @@
- #include "clock2xxx.h"
- #include "cm2xxx_3xxx.h"
- #include "prm2xxx_3xxx.h"
-+#include "prm33xx.h"
- #include "prm44xx.h"
- #include "prminst44xx.h"
- #include "cminst44xx.h"
-@@ -72,6 +73,11 @@ void omap_prcm_restart(char mode, const char *cmd)
- 		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
- 	} else if (cpu_is_omap44xx()) {
- 		omap4_prminst_global_warm_sw_reset(); /* never returns */
-+	} else if (soc_is_am33xx()) {
-+		prcm_offs = AM33XX_PRM_DEVICE_MOD;
-+		omap2_prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_COLD_SW_MASK,
-+					   prcm_offs,
-+					   AM33XX_PRM_RSTCTRL_OFFSET);
- 	} else {
- 		WARN_ON(1);
- 	}
+Patch 3 adds clock lookups for DT.
+
+Patch 4 adds a new board for RM9200 DT support.
+
+Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
+
+
+I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a initrd. As far as I can tell pinctrl, usart and ohci all work.
+
+Patches based on linux-next.
+
+
+Joachim Eastwood (6):
+  ARM: AT91: Fix build failure on board-dt
+  ARM: AT91: Add DT support to AT91RM9200 System Timer
+  ARM: AT91: Add usart/tc/pio/ohci DT clock lookup to AT91RM9200
+  ARM: AT91: Add AT91RM9200 DT board
+  ARM: AT91: Add AT91RM9200 device tree
+  ARM: AT91: Add AT91RM9200EK board device tree
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |   6 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/at91rm9200.dtsi                  | 333 +++++++++++++++++++++
+ arch/arm/boot/dts/at91rm9200ek.dts                 |  78 +++++
+ arch/arm/mach-at91/Kconfig                         |   9 +
+ arch/arm/mach-at91/Makefile                        |   1 +
+ arch/arm/mach-at91/at91rm9200.c                    |  18 ++
+ arch/arm/mach-at91/at91rm9200_time.c               |  63 +++-
+ arch/arm/mach-at91/board-rm9200-dt.c               |  59 ++++
+ arch/arm/mach-at91/generic.h                       |   1 +
+ arch/arm/mach-at91/setup.c                         |  14 +
+ 11 files changed, 582 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91rm9200.dtsi
+ create mode 100644 arch/arm/boot/dts/at91rm9200ek.dts
+ create mode 100644 arch/arm/mach-at91/board-rm9200-dt.c
+
 -- 
-1.7.11.7
+1.8.0
