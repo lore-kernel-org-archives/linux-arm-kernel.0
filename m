@@ -1,54 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Sun, 28 Oct 2012 21:28:44 +0100
-Subject: [PATCH] spi/pl022: Activate resourses before deactivate them in
- suspend
-In-Reply-To: <CACRpkdbCfxnSSLR6GoSbAxtfnwOivxCCrLtwnR=9tpwpfACqTQ@mail.gmail.com>
-References: <1349423012-18048-1-git-send-email-ulf.hansson@stericsson.com>
- <20121027214642.GH4564@opensource.wolfsonmicro.com>
- <CACRpkdbCfxnSSLR6GoSbAxtfnwOivxCCrLtwnR=9tpwpfACqTQ@mail.gmail.com>
-Message-ID: <CAPDyKFoOJz6608b4z2PoW8ODvTJVZRq-yB0itfXnuoXdR1SpGQ@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Sun, 28 Oct 2012 21:29:47 +0100
+Subject: [PATCH] pinctrl/nomadik: db8500: fix kp pin group
+Message-ID: <1351456187-15111-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2012 20:52, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Sat, Oct 27, 2012 at 11:46 PM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Fri, Oct 05, 2012 at 09:43:32AM +0200, Ulf Hansson wrote:
->>
->>> To be able to deactivate resourses in suspend, the resourses must
->>> first be surely active. This is done with a pm_runtime_get_sync.
->>> Once the resourses are restored to active state again in resume,
->>> the runtime pm usage count can be decreased with a pm_runtime_put.
->>
->> The PM core will ensure devices are runtime resumed before we enter
->> suspend precisely due to this sort of issue.
->
-> I asked the very same question to Ulf (in speech, sorry
-> so you couldn't see it...)
->
-> So I guess we are talking about drivers/base/main.c
->
-> in device_prepare()
-> pm_runtime_get_noresume() is called
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-This will increase the "usage_counter" for the device. It will not
-"runtime_resume" the device, though it will prevent it from being
-"runtime_suspended".
+kp_a_2 pin group was defined but was not declared
+as a group of kp function.
 
-> and in device_complete()
-> pm_runtime_put_sync() is called.
->
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-nomadik-db8500.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> Both put into current for in
-> commit 88d26136a256576e444db312179e17af6dd0ea87
-> on sep 19th.
->
-> Yes it seems like it will do the job.
->
-> Ulf can you comment on this...
->
-> Yours,
-> Linus Walleij
-
-Kind regards
-Ulf Hansson
+diff --git a/drivers/pinctrl/pinctrl-nomadik-db8500.c b/drivers/pinctrl/pinctrl-nomadik-db8500.c
+index ef6f26d..6de52e7 100644
+--- a/drivers/pinctrl/pinctrl-nomadik-db8500.c
++++ b/drivers/pinctrl/pinctrl-nomadik-db8500.c
+@@ -691,6 +691,7 @@ static const struct nmk_pingroup nmk_db8500_groups[] = {
+ 	DB8500_PIN_GROUP(i2c0_a_1, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(ipgpio0_a_1, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(ipgpio1_a_1, NMK_GPIO_ALT_A),
++	DB8500_PIN_GROUP(kp_a_2, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(msp2sck_a_1, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(msp2_a_1, NMK_GPIO_ALT_A),
+ 	DB8500_PIN_GROUP(mc4_a_1, NMK_GPIO_ALT_A),
+@@ -834,7 +835,7 @@ DB8500_FUNC_GROUPS(msp1, "msp1txrx_a_1", "msp1_a_1", "msp1txrx_b_1");
+ DB8500_FUNC_GROUPS(lcdb, "lcdb_a_1");
+ DB8500_FUNC_GROUPS(lcd, "lcdvsi0_a_1", "lcdvsi1_a_1", "lcd_d0_d7_a_1",
+ 	"lcd_d8_d11_a_1", "lcd_d12_d23_a_1", "lcd_b_1");
+-DB8500_FUNC_GROUPS(kp, "kp_a_1", "kp_b_1", "kp_b_2", "kp_c_1", "kp_oc1_1");
++DB8500_FUNC_GROUPS(kp, "kp_a_1", "kp_a_2", "kp_b_1", "kp_b_2", "kp_c_1", "kp_oc1_1");
+ DB8500_FUNC_GROUPS(mc2, "mc2_a_1", "mc2rstn_c_1");
+ DB8500_FUNC_GROUPS(ssp1, "ssp1_a_1");
+ DB8500_FUNC_GROUPS(ssp0, "ssp0_a_1");
+-- 
+1.7.11.3
