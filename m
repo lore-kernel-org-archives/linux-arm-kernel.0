@@ -1,37 +1,22 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 28 Oct 2012 07:59:54 +0800
-Subject: [GIT PULL][for 3.8] pull request from upload/board in arch-pxa git
- tree
-Message-ID: <CAN1soZzhb361Gs9JVmhkjqqcr6FkGg9MVO_n9Tv29F==HdhwQQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 27 Oct 2012 20:20:03 -0600
+Subject: [PATCH 1/3] irqchip: add basic infrastructure
+In-Reply-To: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <508C9653.8010901@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd & Olof,
+On 10/27/2012 10:45 AM, Thomas Petazzoni wrote:
+...
+> So, upon the suggestion of Rob Herring and Arnd Bergmann, this commit
+> introduces a small infrastructure that defines a central
+> irqchip_init() function in drivers/irqchip/irqchip.c, which is meant
+> to be called as the ->init_irq() callback of ARM platforms.
 
-Please help to pull upload/board branch from arch-pxa git tree.
+This patch.
+Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Best Regards
-Haojian
-
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hzhuang1/linux.git upload/board
-
-for you to fetch changes up to f534958f092bab25eadc25dbfa01657918239b77:
-
-  ARM: pxa: use module_platform_driver macro (2012-10-26 17:25:15 +0800)
-
-----------------------------------------------------------------
-Paul Parsons (1):
-      ARM: pxa2xx: Remove EXPERIMENTAL dependency from spi-pxa2xx driver
-
-Srinivas Kandagatla (1):
-      ARM: pxa: use module_platform_driver macro
-
- arch/arm/mach-pxa/pxa3xx-ulpi.c |   13 +------------
- drivers/spi/Kconfig             |    2 +-
- 2 files changed, 2 insertions(+), 13 deletions(-)
+As a minor aside, I only received patch 2/3 in my inbox initially, and
+that made no sense to me without reading this patch too. It would have
+been helpful to have been CC'd on the whole series.
