@@ -1,55 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 28 Oct 2012 10:03:45 +0100
-Subject: [PATCH 2/3] arm: bcm2835: convert to the irqchip infrastructure
-In-Reply-To: <508C970F.9000305@wwwdotorg.org>
-References: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351356317-16758-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <508C970F.9000305@wwwdotorg.org>
-Message-ID: <20121028100345.32a58854@skate>
+Date: Sun, 28 Oct 2012 10:30:30 +0100
+Subject: [PATCH v2] Introduce minimal irqchip infrastructure
+Message-ID: <1351416634-3352-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Stephen Warren,
+Thomas, Rob, Arnd,
 
-On Sat, 27 Oct 2012 20:23:11 -0600, Stephen Warren wrote:
+Here is a small set of patches that introduces a small irqchip
+infrastructure that allows the registration of irqchip drivers without
+having each of those drivers to expose a public API in
+include/linux/irqchip/ (patch 1/4), moves the only existing irqchip
+driver, irq-bcm2835 to this infrastructure (patch 2/4), moves the
+irqchip driver for the Armada 370 / Armada XP SoCs to the
+drivers/irqchip directory (patch 3/4) and finally adds the
+drivers/irqchip directory to the IRQ subsystem entry in the
+MAINTAINERS file (patch 4/4).
 
-> > On the arch/arm side, use irqchip_init() as the ->init_irq() callback,
-> > and remove the definition of ->handle_irq() since this is now done by
-> > the irq controller driver.
-> 
-> > diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
-> 
-> > +static void armctrl_handle_bank(int bank, struct pt_regs *regs)
-> 
-> To make the patch more readable, I'd suggest adding function prototypes
-> at the start of the file, and not re-arranging the code. That'll remove
-> the large cut/paste block in the diff. I wouldn't point out this trivial
-> issue except that I think this needs a respin for the minor issue I
-> raise below.
+Changes since v1:
 
-OK. I thought that forward declarations were completely forbidden in
-the kernel coding style, but I don't mind changing the patch with this.
+ * Add a new patch mentionning the drivers/irqchip in the list of
+   directories part of the IRQ subsystem maintained by Thomas Gleixner
+   in the MAINTAINERS file. Requested by Arnd Bergmann.
 
-> > -static int __init armctrl_of_init(struct device_node *node,
-> > -	struct device_node *parent)
-> > +int __init armctrl_of_init(struct device_node *node,
-> > +			   struct device_node *parent)
-> 
-> Since this is now a public API, it should probably be named better. How
-> about bcm2835_irqchip_init()?
+ * Reduce the amount of code movement in the irq-bcm2835.c and
+   irq-armada-370-xp.c files by using one forward declaration for the
+   IRQ handling entry point. Requested by Stephen Warren.
 
-Well, it is public only within the boundaries of the irqchip
-infrastructure, it doesn't get exposed beyond that. But I agree a
-better name is good, so I'll change this.
+ * Rename the armctrl_of_init() function to bcm2835_irqchip_init() as
+   requested by Stephen Warren.
 
-> Aside from that,
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+ * Added the formal Acked-by and Reviewed-by received from Stephen
+   Warren.
 
-Thanks!
+Thanks,
 
 Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
