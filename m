@@ -1,41 +1,51 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 28 Oct 2012 21:29:47 +0100
-Subject: [PATCH] pinctrl/nomadik: db8500: fix kp pin group
-Message-ID: <1351456187-15111-1-git-send-email-linus.walleij@stericsson.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Sun, 28 Oct 2012 21:35:21 +0100
+Subject: [PATCH 2/3] ARM: LPC32xx: Relocate calls to irq_set_chained_handler()
+In-Reply-To: <1351456522-22309-1-git-send-email-stigge@antcom.de>
+References: <1351456522-22309-1-git-send-email-stigge@antcom.de>
+Message-ID: <1351456522-22309-2-git-send-email-stigge@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@stericsson.com>
+This patch fixes the issue of an access to a yet uninitialized data structure
+at the point where irq_set_chained_handler() was called by moving the
+respective calls to the end of lpc32xx_init_irq().
 
-kp_a_2 pin group was defined but was not declared
-as a group of kp function.
+The call path was:
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+irq_set_chained_handler()
+-> __irq_set_handler()
+-> irq_startup()
+-> irq_enable()
+-> desc->irq_data.chip->irq_unmask()
+
+at which point lpc32xx_unmask_irq() effectively read desc->irq_data.hwirq which
+was only later initialized.
+
+Signed-off-by: Roland Stigge <stigge@antcom.de>
 ---
- drivers/pinctrl/pinctrl-nomadik-db8500.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-lpc32xx/irq.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik-db8500.c b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-index ef6f26d..6de52e7 100644
---- a/drivers/pinctrl/pinctrl-nomadik-db8500.c
-+++ b/drivers/pinctrl/pinctrl-nomadik-db8500.c
-@@ -691,6 +691,7 @@ static const struct nmk_pingroup nmk_db8500_groups[] = {
- 	DB8500_PIN_GROUP(i2c0_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(ipgpio0_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(ipgpio1_a_1, NMK_GPIO_ALT_A),
-+	DB8500_PIN_GROUP(kp_a_2, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(msp2sck_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(msp2_a_1, NMK_GPIO_ALT_A),
- 	DB8500_PIN_GROUP(mc4_a_1, NMK_GPIO_ALT_A),
-@@ -834,7 +835,7 @@ DB8500_FUNC_GROUPS(msp1, "msp1txrx_a_1", "msp1_a_1", "msp1txrx_b_1");
- DB8500_FUNC_GROUPS(lcdb, "lcdb_a_1");
- DB8500_FUNC_GROUPS(lcd, "lcdvsi0_a_1", "lcdvsi1_a_1", "lcd_d0_d7_a_1",
- 	"lcd_d8_d11_a_1", "lcd_d12_d23_a_1", "lcd_b_1");
--DB8500_FUNC_GROUPS(kp, "kp_a_1", "kp_b_1", "kp_b_2", "kp_c_1", "kp_oc1_1");
-+DB8500_FUNC_GROUPS(kp, "kp_a_1", "kp_a_2", "kp_b_1", "kp_b_2", "kp_c_1", "kp_oc1_1");
- DB8500_FUNC_GROUPS(mc2, "mc2_a_1", "mc2rstn_c_1");
- DB8500_FUNC_GROUPS(ssp1, "ssp1_a_1");
- DB8500_FUNC_GROUPS(ssp0, "ssp0_a_1");
--- 
-1.7.11.3
+--- linux-2.6.orig/arch/arm/mach-lpc32xx/irq.c
++++ linux-2.6/arch/arm/mach-lpc32xx/irq.c
+@@ -447,10 +447,6 @@ void __init lpc32xx_init_irq(void)
+ 	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
+ 	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
+ 
+-	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
+-	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
+-	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
+-
+ 	/* Initially disable all wake events */
+ 	__raw_writel(0, LPC32XX_CLKPWR_P01_ER);
+ 	__raw_writel(0, LPC32XX_CLKPWR_INT_ER);
+@@ -479,4 +475,8 @@ void __init lpc32xx_init_irq(void)
+ 						   NULL);
+ 	if (!lpc32xx_mic_domain)
+ 		panic("Unable to add MIC irq domain\n");
++
++	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
++	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
++	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
+ }
