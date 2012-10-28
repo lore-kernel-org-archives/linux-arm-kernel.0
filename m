@@ -1,162 +1,174 @@
-From: preeti.lkml@gmail.com (Preeti Murthy)
-Date: Thu, 25 Oct 2012 16:03:38 +0530
-Subject: [RFC PATCH 00/13] sched: Integrating Per-entity-load-tracking
- with the core scheduler
-In-Reply-To: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
-References: <20121025102045.21022.92489.stgit@preeti.in.ibm.com>
-Message-ID: <CAM4v1pOFMu+YPc4QYJguamR9q6tx8qN702P-vz2ejcDgv3a3HA@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sun, 28 Oct 2012 23:58:21 +0100
+Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
+In-Reply-To: <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+ <201210282259.46491.marex@denx.de>
+ <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
+Message-ID: <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The benchmark:
-/*
- * test.c - Simulate workloads that load the CPU differently
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation; version 2 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307
- * USA
- */
+On Oct 28, 2012 11:44 PM, "Vasily Khoruzhick" <anarsoul@gmail.com> wrote:
+>
+> On Mon, Oct 29, 2012 at 12:59 AM, Marek Vasut <marex@denx.de> wrote:
+> > Dear Vasily Khoruzhick,
+> >
+> > missing commit message.
+>
+> OK
+>
+> >> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> >> ---
+> >>  arch/arm/mach-pxa/z2.c | 52
+> >> ++++++++++++++++++++++++++++++++++++++++++++++++++ 1 file changed, 52
+> >> insertions(+)
+> >>
+> >> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+> >> index c97485f..ce90fa9 100644
+> >> --- a/arch/arm/mach-pxa/z2.c
+> >> +++ b/arch/arm/mach-pxa/z2.c
+> >> @@ -41,6 +41,9 @@
+> >>  #include <linux/platform_data/mmc-pxamci.h>
+> >>  #include <linux/platform_data/keypad-pxa27x.h>
+> >>  #include <mach/pm.h>
+> >> +#include <mach/pxa27x-udc.h>
+> >> +#include <mach/udc.h>
+> >> +#include <linux/platform_data/usb-ohci-pxa27x.h>
+> >>
+> >>  #include "generic.h"
+> >>  #include "devices.h"
+> >> @@ -680,6 +683,52 @@ static void __init z2_pmic_init(void)
+> >>  static inline void z2_pmic_init(void) {}
+> >>  #endif
+> >>
+> >>
++/*************************************************************************
+> >> ***** + * USB Switch
+> >> +
+> >>
+**************************************************************************
+> >> ****/ +static struct platform_device z2_usb_switch = {
+> >> +     .name           = "z2-usb-switch",
+> >> +     .id             = -1,
+> >> +};
+> >> +
+> >> +static void __init z2_usb_switch_init(void)
+> >> +{
+> >> +     platform_device_register(&z2_usb_switch);
+> >> +}
+> >> +
+> >>
++/*************************************************************************
+> >> ***** + * USB Gadget
+> >> +
+> >>
+**************************************************************************
+> >> ****/ +#if defined(CONFIG_USB_GADGET_PXA27X) \
+> >> +     || defined(CONFIG_USB_GADGET_PXA27X_MODULE)
+> >> +static int z2_udc_is_connected(void)
+> >> +{
+> >> +     return 1;
+> >> +}
+> >> +
+> >> +static struct pxa2xx_udc_mach_info z2_udc_info __initdata = {
+> >> +     .udc_is_connected       = z2_udc_is_connected,
+> >> +     .gpio_pullup            = -1,
+> >> +};
+> >> +
+> >> +static void __init z2_udc_init(void)
+> >> +{
+> >> +     pxa_set_udc_info(&z2_udc_info);
+> >> +}
+> >> +#else
+> >> +static inline void z2_udc_init(void) {}
+> >> +#endif
+> >
+> > We really should work on the DT here.
+>
+> Any volunteers? :) It requires huge amount of work,
 
-/*
- * This workload spawns threads which request for allocation of a
- * memory chunk,write to it and free it.The duty cycle of these threads
- * can be varied.The idea is to simulate tasks which load the cpu
- * to different extents.
- */
+Well, it's actually quite straight forward. With the changes that got
+merged to 3.7, pxa3xx platforms boot, and I also ported some pxa specific
+peripheral drivers that should work for both 2xx and 3xx. Adding CPU
+support for 27x should also just be a matter of some extra lines.
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/mman.h>
-#include <pthread.h>
-#include <string.h>
-#include <time.h>
-#include <sys/time.h>
-#include <sys/resource.h>
-#include "malloc.h"
+So I would clearly say you should give the DT approach a try first and see
+which bits are missing. And I would vote for not taking any new features
+for the legay board support files but just bugfixes.
 
-/* Variable entities */
-static unsigned int seconds;
-static unsigned int threads;
-static unsigned int mem_chunk_size;
-static unsigned int sleep_at;
-static unsigned int sleep_interval;
+> and right now my goal
+> is to get every piece of Z2 HW working with vanilla kernel, before those
+changes
+> are lost in my github repo. I see no advantages in moving Z2 to DT except
+> self-education. I'm OK with DT, but it needs some time. Let's get non-DT
+> version working properly first.
 
-typedef size_t mem_slot_t;/* 8 bytes */
-static unsigned int slot_size = sizeof(mem_slot_t);
+At least there is a reference :-)  For mainline though, things should be
+done right in the first place.
 
-/* Other parameters */
-static volatile int start;
-static time_t start_time;
-static unsigned int records_read;
-pthread_mutex_t records_count_lock = PTHREAD_MUTEX_INITIALIZER;
+Daniel
 
-
-static unsigned int write_to_mem(void)
-{
-    int i, j;
-    mem_slot_t *scratch_pad, *temp;
-    mem_chunk_size = slot_size * 256;
-    mem_slot_t *end;
-
-    /* The below two parameters ensure that it is 10% workload
-     * with a duty cycle of 10ms.The number of records read in
-     * 1s without sleep was observed and appropriately calculated
-     * for 1ms.This number turned out to be 1228.
-     */
-    sleep_at = 1228; /* sleep for every 1228 records */
-    sleep_interval = 9000; /* sleep for 9 ms */
-
-    for (i=0; start == 1; i++)
-    {
-        scratch_pad = (mem_slot_t *)malloc(mem_chunk_size);
-        if (scratch_pad == NULL) {
-            fprintf(stderr,"Could not allocate memory\n");
-            exit(1);
-        }
-        end = scratch_pad + (mem_chunk_size / slot_size);
-        for (temp = scratch_pad, j=0; temp < end; temp++, j++)
-            *temp = (mem_slot_t)j;
-
-        free(scratch_pad);
-
-        if (sleep_at && !(i % sleep_at))
-            usleep(sleep_interval);
-    }
-    return (i);
-}
-
-static void *
-thread_run(void *arg)
-{
-
-    unsigned int records_local;
-
-    /* Wait for the start signal */
-
-    while (start == 0);
-
-    records_local = write_to_mem();
-
-    pthread_mutex_lock(&records_count_lock);
-    records_read += records_local;
-    pthread_mutex_unlock(&records_count_lock);
-
-    return NULL;
-}
-
-static void start_threads()
-{
-    double diff_time;
-    unsigned int i;
-    int err;
-    threads = 8;
-    seconds = 10;
-
-    pthread_t thread_array[threads];
-    for (i = 0; i < threads; i++) {
-        err = pthread_create(&thread_array[i], NULL, thread_run, NULL);
-        if (err) {
-            fprintf(stderr, "Error creating thread %d\n", i);
-            exit(1);
-        }
-    }
-    start_time = time(NULL);
-    start = 1;
-    sleep(seconds);
-    start = 0;
-    diff_time = difftime(time(NULL), start_time);
-
-    for (i = 0; i < threads; i++) {
-        err = pthread_join(thread_array[i], NULL);
-        if (err) {
-            fprintf(stderr, "Error joining thread %d\n", i);
-            exit(1);
-        }
-    }
-     printf("%u records/s\n",
-        (unsigned int) (((double) records_read)/diff_time));
-
-}
-int main()
-{
-    start_threads();
-    return 0;
-}
-
-
-Regards
-Preeti U Murthy
+>
+> >>
++/*************************************************************************
+> >> ***** + * USB Host (OHCI)
+> >> +
+> >>
+**************************************************************************
+> >> ****/ +static struct pxaohci_platform_data z2_ohci_platform_data = {
+> >> +     .port_mode      = PMM_PERPORT_MODE,
+> >> +     .flags          = ENABLE_PORT2 | NO_OC_PROTECTION,
+> >> +     .power_on_delay = 10,
+> >> +     .power_budget   = 500,
+> >> +};
+> >> +
+> >>  #ifdef CONFIG_PM
+> >>  static void z2_power_off(void)
+> >>  {
+> >> @@ -705,10 +754,12 @@ static void __init z2_init(void)
+> >>       pxa_set_ffuart_info(NULL);
+> >>       pxa_set_btuart_info(NULL);
+> >>       pxa_set_stuart_info(NULL);
+> >> +     pxa_set_ohci_info(&z2_ohci_platform_data);
+> >>
+> >>       z2_lcd_init();
+> >>       z2_mmc_init();
+> >>       z2_mkp_init();
+> >> +     z2_udc_init();
+> >
+> > This patch adds _host_ ? So why do you have udc in here ?
+>
+> Both, host and device.
+>
+> > Besides, pxa_set_ohci_info() should also be wrapped in some
+z2_uhc_init()
+>
+> OK
+>
+> >>       z2_i2c_init();
+> >>       z2_spi_init();
+> >>       z2_nor_init();
+> >> @@ -716,6 +767,7 @@ static void __init z2_init(void)
+> >>       z2_leds_init();
+> >>       z2_keys_init();
+> >>       z2_pmic_init();
+> >> +     z2_usb_switch_init();
+> >>
+> >>       pm_power_off = z2_power_off;
+> >>  }
+> >
+> > Best regards,
+> > Marek Vasut
+>
+> Regards
+> Vasily
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121025/9ebd9749/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121028/5f3462f4/attachment-0001.html>
