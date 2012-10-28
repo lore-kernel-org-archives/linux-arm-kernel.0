@@ -1,55 +1,55 @@
-From: marex@denx.de (Marek Vasut)
-Date: Sun, 28 Oct 2012 23:43:28 +0100
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
-Message-ID: <201210282343.28460.marex@denx.de>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 29 Oct 2012 01:45:01 +0300
+Subject: [PATCH v2 1/5] ARM: PXA: Add z2-usb-switch driver
+In-Reply-To: <201210282338.03505.marex@denx.de>
+References: <CA+E=qVc1MGPQoWZWQAcv-NEh8WpLoqeTYLQz4iFjiOyfc9CX5w@mail.gmail.com>
+ <201210282257.48770.marex@denx.de>
+ <CA+E=qVdEPcBobVDODcyjZkbhZD6KXmGR7Fo5T40GRSPWNhujsQ@mail.gmail.com>
+ <201210282338.03505.marex@denx.de>
+Message-ID: <CA+E=qVccYJApm=zx7XvS5gbi0w3=HgKxRJQfXoStSMVhuVy9cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Vasily Khoruzhick,
+On Mon, Oct 29, 2012 at 1:38 AM, Marek Vasut <marex@denx.de> wrote:
+> Dear Vasily Khoruzhick,
+>
+>> On Mon, Oct 29, 2012 at 12:57 AM, Marek Vasut <marex@denx.de> wrote:
+>> > Dear Vasily Khoruzhick,
+>>
+>> Dear Marek Vasut,
+>>
+>> >> This driver controls mode of USB port #2 pins - device or host.
+>> >
+>> > Please supply proper commit message. This short message describes
+>> > nothing.
+>>
+>> OK, "This driver allows user to choose USB port #2 mode between device
+>> and host" - that would be OK?
+>
+> Please describe why is this needed at all and what it does.
 
-[...]
+Because one might need USB device and USB host functionality provided
+by USB port #2?
+It switches pins mode from device to host and backwards.
 
-> > We really should work on the DT here.
-> 
-> Any volunteers? :)
+> [...]
+>
+>> > I wonder if we have no better means to control enforcement of mode.
+>>
+>> Why? sysfs fits nicely.
+>
+> Because if there is already an API to implement this OTG in kernel, you should
+> use that and not reinvent wheel.
 
-Daniel, did you get anywhere with migrating PXA to DT please?
+One needs to select USB mode manually (btw, Z2 can't even power USB
+device properly, only 3.3v or external 5v).
+There's no way to determine what type of device (device/host)
+connected to Z2 at the moment.
 
-> It requires huge amount of work, and right now my goal
-> is to get every piece of Z2 HW working with vanilla kernel, before those
-> changes are lost in my github repo.
+> [...]
+>
+> Best regards,
+> Marek Vasut
 
-Good, but next time please focus on DT instead. It will need a massive amount of 
-work, indeed, but then it will also weed out some legacy code.
-
-> I see no advantages in moving Z2 to DT
-> except self-education.
-
-One less platform file after the platform is fully DT, that's always good. 
-Besides, the legacy binding code is really annoying.
-
-> I'm OK with DT, but it needs some time. Let's get
-> non-DT version working properly first.
-
-While I'm not saying I'm NAKing these, such attitude usually leads to people 
-abandoning the DT idea and running away right after the patches are applied. 
-Just my $0.02.
-
-[...]
-
-> >> +     z2_udc_init();
-> > 
-> > This patch adds _host_ ? So why do you have udc in here ?
-> 
-> Both, host and device.
-
-UDC == usb device controller.
-
-[...]
-
-Best regards,
-Marek Vasut
+Regards
+Vasily
