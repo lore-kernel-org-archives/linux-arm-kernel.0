@@ -1,21 +1,29 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 28 Oct 2012 21:12:22 +0300
-Subject: [PATCH v2 1/5] ARM: PXA: Add z2-usb-switch driver
-In-Reply-To: <CAHod+GfMLV400L4p7=5j1TOGW=66jkBF1_VWx_gRYEF8=T11kQ@mail.gmail.com>
-References: <CA+E=qVc1MGPQoWZWQAcv-NEh8WpLoqeTYLQz4iFjiOyfc9CX5w@mail.gmail.com>
- <1351438946-5331-1-git-send-email-anarsoul@gmail.com>
- <CAHod+GfMLV400L4p7=5j1TOGW=66jkBF1_VWx_gRYEF8=T11kQ@mail.gmail.com>
-Message-ID: <CA+E=qVdrc3wWtrK4Q3YAAfYkByz4RPdrruLoHDU2CxOZdcwAqA@mail.gmail.com>
+From: michael@walle.cc (Michael Walle)
+Date: Sun, 28 Oct 2012 19:17:18 +0100
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <20121028165711.GG15824@lunn.ch>
+References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
+ <20121028165711.GG15824@lunn.ch>
+Message-ID: <201210281917.19200.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2012 at 8:03 PM, Marko Kati? <dromede@gmail.com> wrote:
->
-> A more fitting name might be something like "pxa270-usb-switch", since
-> this isn't really z2 specific. Other pxa270 based devices could use it
-> aswell.
 
-Sure. I'll wait for few more comments before sending v3 with fixed name.
+Hi Andrew,
 
-Regards
-Vasily
+Am Sonntag 28 Oktober 2012, 17:57:11 schrieb Andrew Lunn:
+> Since the current patchset is 18 patches, plus a few other bug fixes
+> and dependencies, i'm not going to post them all here. I think we are
+> still at the smoke/no-smoke stage of testing. Please pull from:
+> 
+> git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
+> 
+> and let me know if things work, what typo's need fixing, where the
+> smoke comes out, etc.
+
+works for me now.
+
+Thanks, Andrew
+
+-- 
+michael
