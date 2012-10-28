@@ -1,46 +1,58 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun, 28 Oct 2012 11:39:52 +0300
-Subject: [PATCH V3 1/4] Input: pxa27x_keypad keep clock on as wakeup source
-In-Reply-To: <CAN1soZxTfp9p-JoTmXRDFYLKt0mmgcSwc5F9Tk8b+E0fQRW6AQ@mail.gmail.com>
-References: <1333246084-14110-1-git-send-email-chao.xie@marvell.com>
- <CAN1soZyBPE3YExELmu5yHeMTWQf9Zs07v26F6Qz3ocKO+cXGFw@mail.gmail.com>
- <CAN1soZxTfp9p-JoTmXRDFYLKt0mmgcSwc5F9Tk8b+E0fQRW6AQ@mail.gmail.com>
-Message-ID: <CA+E=qVd4tFhkh3PJe4-4Y-cCm6eO==vd8nU-rxa6K-1ObDYMJQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 28 Oct 2012 09:58:31 +0100
+Subject: [PATCH 1/3] irqchip: add basic infrastructure
+In-Reply-To: <201210271921.17472.arnd@arndb.de>
+References: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201210271921.17472.arnd@arndb.de>
+Message-ID: <20121028095831.5e685e26@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 27, 2012 at 12:04 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Mon, Apr 2, 2012 at 5:37 PM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
->> On Sun, Apr 1, 2012 at 10:08 AM, Chao Xie <chao.xie@marvell.com> wrote:
->>> When the keypad is used as wake up source, the clock can not
->>> be disabled. Or it can not detect key pressing.
->>> If the keypad is used as wake up source, when resume back,
->>> do not enable the clock and configure it again because the
->>> register content is retained.
->>>
->>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->>> ---
->>
->> Hi Dmitry,
->>
->> I just found that you're not looped in this mail thread. Could I merge
->> them into arch-pxa tree?
->>
->> Best Regards
->> Haojian
->
-> Applied
->
-> Regards
-> Haojian
+Arnd,
 
-Hi,
+On Sat, 27 Oct 2012 19:21:17 +0000, Arnd Bergmann wrote:
+> On Saturday 27 October 2012, Thomas Petazzoni wrote:
+> > With the recent creation of the drivers/irqchip/ directory, it is
+> > desirable to move irq controller drivers here. At the moment, the only
+> > driver here is irq-bcm2835, the driver for the irq controller found in
+> > the ARM BCM2835 SoC, present in Rasberry Pi systems. This irq
+> > controller driver was exporting its initialization function and its
+> > irq handling function through a header file in
+> > <linux/irqchip/bcm2835.h>.
+> 
+> Very nice series!
 
-This patch breaks pxa27x_keypad on pxa270-based Zipit Z2 device. After
-resume keypad is not working anymore.
-Reverting this patch fixes issue. Looks like it's necessary to call
-pxa27x_keypad_config() on resume (at least on pxa27x?)
+Thanks!
 
-Regards
-Vasily
+> I think it would be good if Thomas Gleixner as the IRQ subsystem maintainer
+> could have a look as well. We should probably add the drivers/irqchip
+> directory to that MAINTAINERS entry.
+
+Sure.
+
+There are however two things I am not entirely happy with:
+
+ (*) For each irqchip driver, we have to enclose the entry in the
+     irqchip_of_match[] array between #ifdef CONFIG... #endif. Not
+     really a problem, but not very pretty either, but I don't see a
+     simple around it (I don't think we want to define yet another
+     custom ELF section just for the purpose of irqchip drivers
+     registration).
+
+ (*) The fact that all the irqchip drivers have to mess around directly
+     with handle_arch_irq, which is an internal/architecture specific
+     symbol. But since the current drivers are only compiled when a ARM
+     architecture is selected, maybe it isn't a problem.
+
+But that said, it seems like it is a good enough solution for a start.
+Trying to solve those two problems would probably lead to an
+over-engineered solution.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
