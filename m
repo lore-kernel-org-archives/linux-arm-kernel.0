@@ -1,54 +1,43 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sun, 28 Oct 2012 11:26:04 +0900
-Subject: [PATCH 03/12] ARM: shmobile: kzm9g: enable three-axis digital
- accelerometer ADXL345
+Date: Sun, 28 Oct 2012 11:26:05 +0900
+Subject: [PATCH 04/12] ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and
+ SDHI2
 In-Reply-To: <1351391173-32379-1-git-send-email-horms@verge.net.au>
 References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
-Message-ID: <1351391173-32379-4-git-send-email-horms@verge.net.au>
+Message-ID: <1351391173-32379-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-This patch enables three-axis digital accelerometer ADXL345.
-Test:
-  sudo cat /dev/input/event2
-then tip up the board. You get something from /dev/input/event2.
+This patch enables DMAEngine on SHDI0 and SDHI2 for kzm9g.
 
 Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
-Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/kzm9g_defconfig     |    2 ++
  arch/arm/mach-shmobile/board-kzm9g.c |    4 ++++
- 2 files changed, 6 insertions(+)
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index 1404b04..ce99e3e 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -74,6 +74,8 @@ CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ST1232=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_ADXL34X=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=9
 diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index a37da78..1a46422 100644
+index 1a46422..f63f2ee 100644
 --- a/arch/arm/mach-shmobile/board-kzm9g.c
 +++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -562,6 +562,10 @@ static struct i2c_board_info i2c0_devices[] = {
- 		I2C_BOARD_INFO("ak8975", 0x0c),
- 		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
- 	},
-+	{
-+		I2C_BOARD_INFO("adxl34x", 0x1d),
-+		.irq = intcs_evt2irq(0x3340), /* IRQ26 */
-+	},
- };
+@@ -384,6 +384,8 @@ static struct regulator_consumer_supply fixed2v8_power_consumers[] =
  
- static struct i2c_board_info i2c1_devices[] = {
+ /* SDHI */
+ static struct sh_mobile_sdhi_info sdhi0_info = {
++	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
++	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
+ 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
+ 	.tmio_ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
+@@ -424,6 +426,8 @@ static struct platform_device sdhi0_device = {
+ 
+ /* Micro SD */
+ static struct sh_mobile_sdhi_info sdhi2_info = {
++	.dma_slave_tx	= SHDMA_SLAVE_SDHI2_TX,
++	.dma_slave_rx	= SHDMA_SLAVE_SDHI2_RX,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
+ 			  TMIO_MMC_USE_GPIO_CD |
+ 			  TMIO_MMC_WRPROTECT_DISABLE,
 -- 
 1.7.10.4
