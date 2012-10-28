@@ -1,21 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 28 Oct 2012 20:13:31 +0100
-Subject: [PATCH 4/4] ARM: dts: exynos4x12: Add nodes for pin controllers
-In-Reply-To: <1351089457-8205-5-git-send-email-t.figa@samsung.com>
-References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
- <1351089457-8205-5-git-send-email-t.figa@samsung.com>
-Message-ID: <CACRpkdYTA-zncswzZEhuvnJZOCZyCPLpExff2BwsZg-zC69JEQ@mail.gmail.com>
+Date: Sun, 28 Oct 2012 20:18:08 +0100
+Subject: [PATCH v3 01/11] clk: davinci - add main PLL clock driver
+In-Reply-To: <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <CACRpkdaa8f7N90hknaqZmNeYD1SjQx6Fm35nS34CxwnH+fwEfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 4:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+On Thu, Oct 25, 2012 at 6:11 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
 
-> This patch adds nodes for pin controllers available on Exynos4x12 SoCs
-> supported by pinctrl-samsung driver.
+> This is the driver for the main PLL clock hardware found on DM SoCs.
+> This driver borrowed code from arch/arm/mach-davinci/clock.c and
+> implemented the driver as per common clock provider API. The main PLL
+> hardware typically has a multiplier, a pre-divider and a post-divider.
+> Some of the SoCs has the divider fixed meaning they can not be
+> configured through a register. HAS_PREDIV and HAS_POSTDIV flags are used
+> to tell the driver if a hardware has these dividers present or not.
+> Driver is configured through the struct clk_pll_data that has the
+> SoC specific clock data.
 >
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
+This looks good to me.
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
