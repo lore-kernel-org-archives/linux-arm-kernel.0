@@ -1,24 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 28 Oct 2012 20:02:48 +0100
-Subject: [PATCH 1/2] pinctrl/: at91: fix warmings
-In-Reply-To: <1351360392-8669-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1351360392-8669-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CACRpkdbP98R4+dh2SL8EeZBe=7O_j3uqt6zarwTBTPq0pEV_8g@mail.gmail.com>
+Date: Sun, 28 Oct 2012 20:06:17 +0100
+Subject: [PATCH] dma: ste_dma40: use for_each_set_bit
+In-Reply-To: <1351352973-3719-1-git-send-email-akinobu.mita@gmail.com>
+References: <1351352973-3719-1-git-send-email-akinobu.mita@gmail.com>
+Message-ID: <CACRpkdYiMu7fRGAhEfy7YfLon0CbC=6c5SwJ2kNP5JnwNaaKPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2012 at 7:53 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
+On Sat, Oct 27, 2012 at 5:49 PM, Akinobu Mita <akinobu.mita@gmail.com> wrote:
 
-> /opt/work/linux-2.6/drivers/pinctrl/pinctrl-at91.c: In function 'at91_pinctrl_probe_dt':
-> /opt/work/linux-2.6/drivers/pinctrl/pinctrl-at91.c:952:12: warning: assignment discards qualifiers from pointer target type
-> /opt/work/linux-2.6/drivers/pinctrl/pinctrl-at91.c: In function 'at91_gpio_probe':
-> /opt/work/linux-2.6/drivers/pinctrl/pinctrl-at91.c:1517:17: warning: assignment discards qualifiers from pointer target type
+> Replace open-coded loop with for_each_set_bit().
 >
+> Signed-off-by: Akinobu Mita <akinobu.mita@gmail.com>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
 > Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
 
-Thanks, patch applied to my at91 branch.
+Makes perfect sense to me,
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
