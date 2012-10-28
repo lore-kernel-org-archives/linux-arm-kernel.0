@@ -1,27 +1,34 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 28 Oct 2012 14:54:02 +0400
-Subject: [PATCH 00/16] treewide: Convert dev_printk(KERN_<LEVEL> to
- dev_<level>(
-In-Reply-To: <cover.1351411047.git.joe@perches.com>
-References: <cover.1351411047.git.joe@perches.com>
-Message-ID: <508D0ECA.8040008@mvista.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 28 Oct 2012 11:57:18 +0100
+Subject: [PATCH 12/12] ARM: mach-shmobile: Use DT_MACHINE for mackerel
+In-Reply-To: <20121028104438.GC10073@verge.net.au>
+References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
+ <1351391173-32379-13-git-send-email-horms@verge.net.au>
+ <20121028103711.4e89deb3@skate>
+ <20121028104438.GC10073@verge.net.au>
+Message-ID: <20121028115718.7b8ae52b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Simon,
 
-On 28-10-2012 12:05, Joe Perches wrote:
+On Sun, 28 Oct 2012 19:44:38 +0900, Simon Horman wrote:
 
-> dev_<level> create smaller objects than dev_printk(KERN_<LEVEL>.
-> Convert non-debug calls to this form.
+> shmobile is very much in the transition phase and we are, patch by patch,
+> working towards full(er) DT support for boards, SoCs and drivers. I am not
+> sure that now is the right time to jump to a approach similar to that taken
+> by mach-kirkwood/board-dt.c.
 
-> Joe Perches (16):
->    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
-[...]
->    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
-[...]
->    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+Ok, I understand that for transition needs, each SoC family may need a
+different method. My comment was more a general comment to make sure
+that the right final direction is being taken. For sure the
+intermediate steps may be different.
 
-    Hm, somehow this patch is repeated thrice?
+Best regards,
 
-MBR, Sergei
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
