@@ -1,54 +1,37 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 28 Oct 2012 09:58:31 +0100
+Date: Sun, 28 Oct 2012 09:59:48 +0100
 Subject: [PATCH 1/3] irqchip: add basic infrastructure
-In-Reply-To: <201210271921.17472.arnd@arndb.de>
+In-Reply-To: <508C9653.8010901@wwwdotorg.org>
 References: <1351356317-16758-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201210271921.17472.arnd@arndb.de>
-Message-ID: <20121028095831.5e685e26@skate>
+ <508C9653.8010901@wwwdotorg.org>
+Message-ID: <20121028095948.4d062bd1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
 
-On Sat, 27 Oct 2012 19:21:17 +0000, Arnd Bergmann wrote:
-> On Saturday 27 October 2012, Thomas Petazzoni wrote:
-> > With the recent creation of the drivers/irqchip/ directory, it is
-> > desirable to move irq controller drivers here. At the moment, the only
-> > driver here is irq-bcm2835, the driver for the irq controller found in
-> > the ARM BCM2835 SoC, present in Rasberry Pi systems. This irq
-> > controller driver was exporting its initialization function and its
-> > irq handling function through a header file in
-> > <linux/irqchip/bcm2835.h>.
+On Sat, 27 Oct 2012 20:20:03 -0600, Stephen Warren wrote:
+> On 10/27/2012 10:45 AM, Thomas Petazzoni wrote:
+> ...
+> > So, upon the suggestion of Rob Herring and Arnd Bergmann, this commit
+> > introduces a small infrastructure that defines a central
+> > irqchip_init() function in drivers/irqchip/irqchip.c, which is meant
+> > to be called as the ->init_irq() callback of ARM platforms.
 > 
-> Very nice series!
+> This patch.
+> Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+
+Thanks.
+
+> As a minor aside, I only received patch 2/3 in my inbox initially, and
+> that made no sense to me without reading this patch too. It would have
+> been helpful to have been CC'd on the whole series.
+
+I did Cc: you on patch 2/3 specifically because it was the one
+affecting the bcm2835 architecture you're maintaining. But agreed, it
+doesn't make much sense to see only this patch 2/3, so I'll Cc you on
+the entire series for the next version.
 
 Thanks!
-
-> I think it would be good if Thomas Gleixner as the IRQ subsystem maintainer
-> could have a look as well. We should probably add the drivers/irqchip
-> directory to that MAINTAINERS entry.
-
-Sure.
-
-There are however two things I am not entirely happy with:
-
- (*) For each irqchip driver, we have to enclose the entry in the
-     irqchip_of_match[] array between #ifdef CONFIG... #endif. Not
-     really a problem, but not very pretty either, but I don't see a
-     simple around it (I don't think we want to define yet another
-     custom ELF section just for the purpose of irqchip drivers
-     registration).
-
- (*) The fact that all the irqchip drivers have to mess around directly
-     with handle_arch_irq, which is an internal/architecture specific
-     symbol. But since the current drivers are only compiled when a ARM
-     architecture is selected, maybe it isn't a problem.
-
-But that said, it seems like it is a good enough solution for a start.
-Trying to solve those two problems would probably lead to an
-over-engineered solution.
-
-Best regards,
 
 Thomas
 -- 
