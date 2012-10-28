@@ -1,47 +1,84 @@
 From: michael@walle.cc (Michael Walle)
-Date: Sun, 28 Oct 2012 17:33:34 +0100
-Subject: [PATCH] GPIO: mvebu-gpio: Don't initialize the mask_cache
-In-Reply-To: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
-References: <1351344538-5238-1-git-send-email-andrew@lunn.ch>
-Message-ID: <201210281733.34576.michael@walle.cc>
+Date: Sun, 28 Oct 2012 17:37:44 +0100
+Subject: [PATCH] mvebu-gpio: Disable blinking when enabling a GPIO for
+ output
+In-Reply-To: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
+References: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <201210281737.44335.michael@walle.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag 27 Oktober 2012, 15:28:58 schrieb Andrew Lunn:
-> Due to the SMP nature of some of the chips, which have per CPU
-> registers, the driver does not use the generic irq_gc_mask_set_bit() &
-> irq_gc_mask_clr_bit() functions, which only support a single register.
-> The driver has its own implementation of these functions, which can
-> pick the correct register depending on the CPU being used. The
-> functions do however use the gc->mask_cache value.
+Am Sonntag 28 Oktober 2012, 13:23:24 schrieb Jamie Lentin:
+> The plat-orion GPIO driver would disable any pin blinking whenever
+> using a pin for output. Do the same here, as a blinking LED will
+> continue to blink regardless of what the GPIO pin level is.
 > 
-> The call to irq_setup_generic_chip() was passing
-> IRQ_GC_INIT_MASK_CACHE, which caused the gc->mask_cache to be
-> initialized to the contents of some random register. This resulted in
-> unexpected interrupts been delivered from random GPIO lines.
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
 > ---
->  drivers/gpio/gpio-mvebu.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> The power LED on the DNS-320/DNS-325 is left blinking by the bootloader,
+> the LED turning steady indicates it's booted. The blinking needs to be
+> disabled before setting the GPIO pin level has any effect.
+> 
+> Apart from the custom init code running too soon, I think everything is
+> working now.
+> 
+> I haven't tested this on any other boards, so not sure if it's sensible
+> beyond the kirkwood/orion world.
+> 
+>  drivers/gpio/gpio-mvebu.c |   23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
 > 
 > diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-> index eb42ab1..cf7afb9 100644
+> index cf7afb9..be65c04 100644
 > --- a/drivers/gpio/gpio-mvebu.c
 > +++ b/drivers/gpio/gpio-mvebu.c
-> @@ -646,7 +646,7 @@ static int __devinit mvebu_gpio_probe(struct
-> platform_device *pdev) ct->handler = handle_edge_irq;
->  	ct->chip.name = mvchip->chip.label;
+> @@ -92,6 +92,11 @@ static inline void __iomem *mvebu_gpioreg_out(struct
+> mvebu_gpio_chip *mvchip) return mvchip->membase + GPIO_OUT_OFF;
+>  }
 > 
-> -	irq_setup_generic_chip(gc, IRQ_MSK(ngpios), IRQ_GC_INIT_MASK_CACHE,
-> +	irq_setup_generic_chip(gc, IRQ_MSK(ngpios), 0,
->  			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+> +static inline void __iomem *mvebu_gpioreg_blink(struct mvebu_gpio_chip
+> *mvchip) +{
+> +	return mvchip->membase + GPIO_BLINK_EN_OFF;
+> +}
+> +
+>  static inline void __iomem *mvebu_gpioreg_io_conf(struct mvebu_gpio_chip
+> *mvchip) {
+>  	return mvchip->membase + GPIO_IO_CONF_OFF;
+> @@ -206,6 +211,23 @@ static int mvebu_gpio_get(struct gpio_chip *chip,
+> unsigned pin) return (u >> pin) & 1;
+>  }
 > 
->  	/* Setup irq domain on top of the generic chip. */
+> +static void mvebu_gpio_blink(struct gpio_chip *chip, unsigned pin, int
+> value) +{
+> +	struct mvebu_gpio_chip *mvchip =
+> +		container_of(chip, struct mvebu_gpio_chip, chip);
+> +	unsigned long flags;
+> +	u32 u;
+> +
+> +	spin_lock_irqsave(&mvchip->lock, flags);
+> +	u = readl_relaxed(mvebu_gpioreg_blink(mvchip));
+> +	if (value)
+> +		u |= 1 << pin;
+> +	else
+> +		u &= ~(1 << pin);
+> +	writel_relaxed(u, mvebu_gpioreg_blink(mvchip));
+> +	spin_unlock_irqrestore(&mvchip->lock, flags);
+> +}
+> +
+>  static int mvebu_gpio_direction_input(struct gpio_chip *chip, unsigned
+> pin) {
+>  	struct mvebu_gpio_chip *mvchip =
+> @@ -244,6 +266,7 @@ static int mvebu_gpio_direction_output(struct gpio_chip
+> *chip, unsigned pin, if (ret)
+>  		return ret;
+> 
+> +	mvebu_gpio_blink(chip, pin, 0);
+>  	mvebu_gpio_set(chip, pin, value);
+> 
+>  	spin_lock_irqsave(&mvchip->lock, flags);
 
 Tested-by: Michael Walle <michael@walle.cc>
 
-Fixes my lock ups when booting, too.
 
 -- 
 Michael
