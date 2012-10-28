@@ -1,153 +1,58 @@
-From: michael@walle.cc (Michael Walle)
-Date: Sun, 28 Oct 2012 17:40:45 +0100
-Subject: [PATCH 8/9] ARM: Kirkwood: Convert lsxl boards to pinctrl.
-In-Reply-To: <1351090434-30499-9-git-send-email-andrew@lunn.ch>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 28 Oct 2012 17:57:11 +0100
+Subject: [PATCH 0/9] ARM: Kirkwood: Convert to pinctrl
+In-Reply-To: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
 References: <1351090434-30499-1-git-send-email-andrew@lunn.ch>
- <1351090434-30499-9-git-send-email-andrew@lunn.ch>
-Message-ID: <201210281740.45528.michael@walle.cc>
+Message-ID: <20121028165711.GG15824@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[This is also includes the annotations from my previous reply. I missed the 
-mpp43<->mpp48 in my previous reply]
+On Wed, Oct 24, 2012 at 04:53:45PM +0200, Andrew Lunn wrote:
+> This patchset converts all DT kirkwood boards to using pinctrl.
 
-Am Mittwoch 24 Oktober 2012, 16:53:53 schrieb Andrew Lunn:
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi |   67
-> ++++++++++++++++++++++++++++++++++ arch/arm/mach-kirkwood/board-lsxl.c  | 
->  19 ----------
->  2 files changed, 67 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> b/arch/arm/boot/dts/kirkwood-lsxl.dtsi index 8fea375..01d6e3a 100644
-> --- a/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-lsxl.dtsi
-> @@ -6,6 +6,73 @@
->  	};
-> 
->  	ocp at f1000000 {
-> +		pinctrl: pinctrl at 10000 {
-> +			compatible = "marvell,88f6281-pinctrl";
-> +			reg = <0x10000 0x20>;
-> +
-> +			pinctrl-0 = < &pmx_power_hdd &pmx_usb_vbus
-> +				      &pmx_fan_low &pmx_fan_high
-> +				      &pmx_led_function_red &pmx_led_alarm
-> +				      &pmx_led_info &pmx_led_power
-> +				      &pmx_fan_lock &pmx_button_function
-> +				      &pmx_power_switch &pmx_power_auto_switch
-> +				      &pmx_led_function_blue >;
-> +			pinctrl-names = "default";
-> +
-> +			pmx_power_hdd: pmx-power-hdd {
-> +				marvell,pins = "mpp10";
-> +				marvell,function = "gpio";
-gpo
+Thanks for the feedback everybody gave.
 
-> +			};
-> +			pmx_usb_vbus: pmx-usb-vbus {
-> +				marvell,pins = "mpp11";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_fan_high: pmx-fan-high {
-> +				marvell,pins = "mpp18";
-> +				marvell,function = "gpo";
-> +			};
-> +			pmx_fan_low: pmx-fan-low {
-> +				marvell,pins = "mpp19";
-> +				marvell,function = "gpo";
-> +			};
-> +			pmx_led_function_blue: pmx-led-function-blue {
-> +				marvell,pins = "mpp36";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_alarm: pmx-led-alarm {
-> +				marvell,pins = "mpp37";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_info: pmx-led-info {
-> +				marvell,pins = "mpp38";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_power: pmx-led-power {
-> +				marvell,pins = "mpp39";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_fan_lock: pmx-fan-lock {
-> +				marvell,pins = "mpp40";
-> +				marvell,function = "gpo";
-gpio
+Progress has been made:
 
-> +			};
-> +			pmx_button_function: pmx-button-function {
-> +				marvell,pins = "mpp41";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_switch: pmx-power-switch {
-> +				marvell,pins = "mpp42";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_power_auto_switch: pmx-power-auto-switch {
-> +				marvell,pins = "mpp43";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_function_red: pmx-led-function_red {
-> +				marvell,pins = "mpp43";
-mpp48
+The bug causing the lockups has been found, fixed and passed upstream.
 
-> +				marvell,function = "gpio";
-> +			};
-> +
-> +		};
->  		sata at 80000 {
->  			status = "okay";
->  			nr-ports = <1>;
-> diff --git a/arch/arm/mach-kirkwood/board-lsxl.c
-> b/arch/arm/mach-kirkwood/board-lsxl.c index 83d8975..868bdb0 100644
-> --- a/arch/arm/mach-kirkwood/board-lsxl.c
-> +++ b/arch/arm/mach-kirkwood/board-lsxl.c
-> @@ -26,7 +26,6 @@
->  #include <asm/mach/arch.h>
->  #include <mach/kirkwood.h>
->  #include "common.h"
-> -#include "mpp.h"
-> 
->  static struct mv643xx_eth_platform_data lsxl_ge00_data = {
->  	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-> @@ -36,23 +35,6 @@ static struct mv643xx_eth_platform_data lsxl_ge01_data =
-> { .phy_addr	= MV643XX_ETH_PHY_ADDR(8),
->  };
-> 
-> -static unsigned int lsxl_mpp_config[] __initdata = {
-> -	MPP10_GPO,	/* HDD Power Enable */
-> -	MPP11_GPIO,	/* USB Vbus Enable */
-> -	MPP18_GPO,	/* FAN High Enable# */
-> -	MPP19_GPO,	/* FAN Low Enable# */
-> -	MPP36_GPIO,	/* Function Blue LED */
-> -	MPP37_GPIO,	/* Alarm LED */
-> -	MPP38_GPIO,	/* Info LED */
-> -	MPP39_GPIO,	/* Power LED */
-> -	MPP40_GPIO,	/* Fan Lock */
-> -	MPP41_GPIO,	/* Function Button */
-> -	MPP42_GPIO,	/* Power Switch */
-> -	MPP43_GPIO,	/* Power Auto Switch */
-> -	MPP48_GPIO,	/* Function Red LED */
-> -	0
-> -};
-> -
->  #define LSXL_GPIO_FAN_HIGH	18
->  #define LSXL_GPIO_FAN_LOW	19
->  #define LSXL_GPIO_FAN_LOCK	40
-> @@ -119,7 +101,6 @@ void __init lsxl_init(void)
->  	/*
->  	 * Basic setup. Needs to be called early.
->  	 */
-> -	kirkwood_mpp_conf(lsxl_mpp_config);
-> 
->  	/* usb and sata power on */
->  	gpio_set_value(LSXL_GPIO_USB_POWER, 1);
+I factored out the repeated pinmux definitions for sata0, sata1, spi,
+twsi0, uart0, uart1.
 
+I fixed a few types reported by testers.
 
--- 
-Michael
+I found a solution to many of the gpio_request() failures. The ones
+for controlling power to SATA or USB i've replaced with a regulator in
+DT. The regulator will grab the GPIO, set it to output, and driver it
+high/low as required. I just hope we don't have an ordering issue.
+The regulator framework seems to load quite early and probes all the
+regulators. This fails, because pinctrl has not yet loaded, so the
+gpio framework returns EPROBE_DEFER. This is not fatal to the
+regulator framework, it tries again later. But this later is after
+most of the rest of the drivers have loaded. So we might get into
+issues where uboot has not enabled power to USB/SATA, the driver is
+probed and fails because of the lack of power, and once things of gone
+wrong, we turn the power on.
+
+I still expect problems with GPIOs used for power off. I've not yet
+touched them. Again, a regulator makes sense, but there is no 'out of
+the box' regulator type or property which adds itself to pm_power_off.
+
+The last problem is:
+
+        /* Set NAS to turn back on after a power failure */
+        dnskw_gpio_register(37, "dnskw:power:recover", 1);
+
+I think its a bit of a stretch calling this a regulator.
+
+Since the current patchset is 18 patches, plus a few other bug fixes
+and dependencies, i'm not going to post them all here. I think we are
+still at the smoke/no-smoke stage of testing. Please pull from:
+
+git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
+
+and let me know if things work, what typo's need fixing, where the
+smoke comes out, etc.
+
+      Thanks
+	Andrew
