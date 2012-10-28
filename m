@@ -1,46 +1,25 @@
 From: marex@denx.de (Marek Vasut)
-Date: Sun, 28 Oct 2012 23:01:04 +0100
-Subject: [PATCH 4/5] ARM: PXA: Zipit Z2: Change active_state of power
- button
-In-Reply-To: <1351438555-4668-4-git-send-email-anarsoul@gmail.com>
+Date: Sun, 28 Oct 2012 23:01:45 +0100
+Subject: [PATCH 5/5] ARM: PXA: Zipit Z2: Fix backlight PWM device number
+In-Reply-To: <1351438555-4668-5-git-send-email-anarsoul@gmail.com>
 References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-4-git-send-email-anarsoul@gmail.com>
-Message-ID: <201210282301.04714.marex@denx.de>
+ <1351438555-4668-5-git-send-email-anarsoul@gmail.com>
+Message-ID: <201210282301.45790.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Dear Vasily Khoruzhick,
 
-> From: mcmajeres <mark@engine12.com>
-
-Read [1]
-
-> Otherwise userspace might be confused about button state
+> Recent changes to PXA PWM support changed the PXA27X PWM device
+> numbering scheme, so keyboard and LCD backlight is not
+> working anymore on Z2.
 > 
-> Signed-off-by: mcmajeres <mark@engine12.com>
+> Fix it and move from legacy to new PWM API.
 
-Attribution of code shall be done only towards people known by their name.
+The proper fix here would be to start moving towards DT.
 
 > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  arch/arm/mach-pxa/z2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-> index ce90fa9..fac7cba 100644
-> --- a/arch/arm/mach-pxa/z2.c
-> +++ b/arch/arm/mach-pxa/z2.c
-> @@ -437,7 +437,7 @@ static struct gpio_keys_button z2_pxa_buttons[] = {
->  	{
->  		.code		= KEY_POWER,
->  		.gpio		= GPIO1_ZIPITZ2_POWER_BUTTON,
-> -		.active_low	= 0,
-> +		.active_low	= 1,
->  		.desc		= "Power Button",
->  		.wakeup		= 1,
->  		.type		= EV_KEY,
-
-[1] http://lwn.net/Articles/195643/
+[...]
 
 Best regards,
 Marek Vasut
