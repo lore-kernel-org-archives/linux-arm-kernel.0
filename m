@@ -1,43 +1,53 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sun, 28 Oct 2012 11:26:05 +0900
-Subject: [PATCH 04/12] ARM: shmobile: kzm9g: enable DMAEngine on SHDI0 and
- SDHI2
+Date: Sun, 28 Oct 2012 11:26:03 +0900
+Subject: [PATCH 02/12] ARM: shmobile: kzm9g: enable magnetometer ak8975.
 In-Reply-To: <1351391173-32379-1-git-send-email-horms@verge.net.au>
 References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
-Message-ID: <1351391173-32379-5-git-send-email-horms@verge.net.au>
+Message-ID: <1351391173-32379-3-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-This patch enables DMAEngine on SHDI0 and SDHI2 for kzm9g.
+This patch enables magnetometer ak8975.
+I checked ak8975_probe() returns successfully.
 
 Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-kzm9g.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/configs/kzm9g_defconfig     |    2 ++
+ arch/arm/mach-shmobile/board-kzm9g.c |    6 +++++-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index c88b578..1404b04 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -119,6 +119,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_SH_DMAE=y
+ CONFIG_ASYNC_TX_DMA=y
+ CONFIG_STAGING=y
++CONFIG_SENSORS_AK8975=y
++CONFIG_IIO=y
+ # CONFIG_DNOTIFY is not set
+ CONFIG_INOTIFY_USER=y
+ CONFIG_VFAT_FS=y
 diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 1a46422..f63f2ee 100644
+index 0a43f31..a37da78 100644
 --- a/arch/arm/mach-shmobile/board-kzm9g.c
 +++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -384,6 +384,8 @@ static struct regulator_consumer_supply fixed2v8_power_consumers[] =
+@@ -557,7 +557,11 @@ static struct i2c_board_info i2c0_devices[] = {
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("r2025sd", 0x32),
+-	}
++	},
++	{
++		I2C_BOARD_INFO("ak8975", 0x0c),
++		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
++	},
+ };
  
- /* SDHI */
- static struct sh_mobile_sdhi_info sdhi0_info = {
-+	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
-+	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED,
- 	.tmio_ocr_mask	= MMC_VDD_27_28 | MMC_VDD_28_29,
-@@ -424,6 +426,8 @@ static struct platform_device sdhi0_device = {
- 
- /* Micro SD */
- static struct sh_mobile_sdhi_info sdhi2_info = {
-+	.dma_slave_tx	= SHDMA_SLAVE_SDHI2_TX,
-+	.dma_slave_rx	= SHDMA_SLAVE_SDHI2_RX,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT |
- 			  TMIO_MMC_USE_GPIO_CD |
- 			  TMIO_MMC_WRPROTECT_DISABLE,
+ static struct i2c_board_info i2c1_devices[] = {
 -- 
 1.7.10.4
