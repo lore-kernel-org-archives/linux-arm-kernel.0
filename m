@@ -1,47 +1,44 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 28 Oct 2012 08:23:54 -0500
-Subject: [PATCH v2] Introduce minimal irqchip infrastructure
-In-Reply-To: <1351416634-3352-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 28 Oct 2012 14:24:08 +0100
+Subject: [PATCH v2 1/4] irqchip: add basic infrastructure
+In-Reply-To: <508D30B2.6070806@gmail.com>
 References: <1351416634-3352-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <508D31EA.3050307@gmail.com>
+ <1351416634-3352-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508D30B2.6070806@gmail.com>
+Message-ID: <20121028142408.7512671c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2012 04:30 AM, Thomas Petazzoni wrote:
-> Thomas, Rob, Arnd,
-> 
-> Here is a small set of patches that introduces a small irqchip
-> infrastructure that allows the registration of irqchip drivers without
-> having each of those drivers to expose a public API in
-> include/linux/irqchip/ (patch 1/4), moves the only existing irqchip
-> driver, irq-bcm2835 to this infrastructure (patch 2/4), moves the
-> irqchip driver for the Armada 370 / Armada XP SoCs to the
-> drivers/irqchip directory (patch 3/4) and finally adds the
-> drivers/irqchip directory to the IRQ subsystem entry in the
-> MAINTAINERS file (patch 4/4).
-> 
-> Changes since v1:
-> 
->  * Add a new patch mentionning the drivers/irqchip in the list of
->    directories part of the IRQ subsystem maintained by Thomas Gleixner
->    in the MAINTAINERS file. Requested by Arnd Bergmann.
-> 
->  * Reduce the amount of code movement in the irq-bcm2835.c and
->    irq-armada-370-xp.c files by using one forward declaration for the
->    IRQ handling entry point. Requested by Stephen Warren.
-> 
->  * Rename the armctrl_of_init() function to bcm2835_irqchip_init() as
->    requested by Stephen Warren.
-> 
->  * Added the formal Acked-by and Reviewed-by received from Stephen
->    Warren.
+Rob,
 
-Other than the 2 minor things I mentioned, this series looks good.
+On Sun, 28 Oct 2012 08:18:42 -0500, Rob Herring wrote:
 
-Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> > index 1bb8bf6..e0ff166 100644
+> > --- a/drivers/irqchip/Kconfig
+> > +++ b/drivers/irqchip/Kconfig
+> > @@ -1 +1,2 @@
+> > -# empty
+> > +config USE_IRQCHIP
+> > +	bool
+> 
+> This should depend on OF_IRQ.
 
-Also, I have some follow-on patches to move the GIC and VIC to
-drivers/irqchip. It was much more simple than I expected. I'll post them
-later.
+It is correct that the mechanism only works for irqchip drivers that
+are probed through the Device Tree. However, having a "depends on"
+inside a configuration that gets "select"ed by other configuration
+options (in our case ARCH_BCM2835 and ARCH_MVEBU select USE_IRQCHIP) is
+useless: kconfig doesn't care of the "depends on" dependencies when
+you're "select"ing an option.
 
-Rob
+So, I can add it for documentation purposes, but it is practically
+useless.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
