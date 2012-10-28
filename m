@@ -1,42 +1,52 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 28 Oct 2012 17:09:46 -0400 (EDT)
-Subject: [PATCH] spi/pl022: Activate resourses before deactivate them in
- suspend
-In-Reply-To: <CAPDyKFoOJz6608b4z2PoW8ODvTJVZRq-yB0itfXnuoXdR1SpGQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1210281659520.9245-100000@netrider.rowland.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sun, 28 Oct 2012 22:42:52 +0100
+Subject: [PATCH V3 1/3] clk: mvebu: add armada-370-xp specific clocks
+In-Reply-To: <1350303499-30868-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1350303499-30868-1-git-send-email-gregory.clement@free-electrons.com>
+ <1350303499-30868-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <508DA6DC.4070601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 28 Oct 2012, Ulf Hansson wrote:
+On 10/15/2012 02:18 PM, Gregory CLEMENT wrote:
+> Add Armada 370/XP specific clocks: core clocks and CPU clocks.
+>
+> The CPU clocks are only for Armada XP for the SMP mode.
+>
+> ...
+> +static struct core_clk_fn armada_370_clk_fn = {
+> +	.get_tclk_freq = armada_370_get_tclk_freq,
+> +	.get_pck_freq = armada_370_get_pck_freq,
+> +	.get_fab_freq_opt = armada_370_get_fab_freq_opt,
+> +};
+> +
+> +static struct core_clk_fn armada_xp_clk_fn = {
+> +	.get_tclk_freq = armada_xp_get_tclk_freq,
+> +	.get_pck_freq = armada_xp_get_pck_freq,
+> +	.get_fab_freq_opt = armada_xp_get_fab_freq_opt,
+> +};
+> +
+> +static const __initconst struct of_device_id clk_match[] = {
+> +	{
+> +	 .compatible = "marvell,armada-370-core-clockctrl",
+> +	 .data =&armada_370_clk_fn,
+> +	 },
+> +
+> +	{
+> +	 .compatible = "marvell,armada-xp-core-clockctrl",
+> +	 .data =&armada_xp_clk_fn,
+> +	 },
+> +	{
+> +	 /* sentinel */
+> +	 }
+> +};
 
-> On 28 October 2012 20:52, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Sat, Oct 27, 2012 at 11:46 PM, Mark Brown
-> > <broonie@opensource.wolfsonmicro.com> wrote:
-> >> On Fri, Oct 05, 2012 at 09:43:32AM +0200, Ulf Hansson wrote:
-> >>
-> >>> To be able to deactivate resourses in suspend, the resourses must
-> >>> first be surely active. This is done with a pm_runtime_get_sync.
-> >>> Once the resourses are restored to active state again in resume,
-> >>> the runtime pm usage count can be decreased with a pm_runtime_put.
-> >>
-> >> The PM core will ensure devices are runtime resumed before we enter
-> >> suspend precisely due to this sort of issue.
-> >
-> > I asked the very same question to Ulf (in speech, sorry
-> > so you couldn't see it...)
-> >
-> > So I guess we are talking about drivers/base/main.c
-> >
-> > in device_prepare()
-> > pm_runtime_get_noresume() is called
-> 
-> This will increase the "usage_counter" for the device. It will not
-> "runtime_resume" the device, though it will prevent it from being
-> "runtime_suspended".
+Gregory,
 
-Indeed.  The PM core does _not_ insure that devices are runtime resumed
-before going into system suspend.  Some subsystems may do this (the PCI
-subsystem does, for example -- see
-drivers/pci/pci-driver.c:pci_pm_prepare()), but the PM core doesn't.
+armada_370_clk_fn and armada_xp_clk_fn cause section mismatches
+as they are referenced within __initconst.
 
-Alan Stern
+You should either rename them to armada_xp_clk_ops or annotate them
+with the appropriate attribute.
+
+Sebastian
