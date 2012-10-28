@@ -1,67 +1,71 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 29 Oct 2012 10:07:04 +1100
-Subject: Please add bcm2835 tree to linux-next
-In-Reply-To: <5089FD2F.9090507@wwwdotorg.org>
-References: <5089FD2F.9090507@wwwdotorg.org>
-Message-ID: <20121029100704.37f017de8b0ed0173c5d68cc@canb.auug.org.au>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 29 Oct 2012 00:13:30 +0100
+Subject: arm-soc tree was Re: [PATCH] Fix socfpga compilation with
+ early_printk() enabled
+In-Reply-To: <20121028230153.GA8284@elf.ucw.cz>
+References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
+ <201210251458.48528.arnd@arndb.de>
+ <20121027115615.GC5912@elf.ucw.cz>
+ <201210271539.20156.arnd@arndb.de>
+ <20121028230153.GA8284@elf.ucw.cz>
+Message-ID: <20121028231330.GB8284@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi!
 
-On Thu, 25 Oct 2012 21:02:07 -0600 Stephen Warren <swarren@wwwdotorg.org> wrote:
->
-> Could you please add the bcm2835 ARM SoC tree to linux-next. It's
-> available at:
+> > > > > This fixes early_printk() compilation for
+> > > > > socfpga. (senduart/busyuart/waituart were missing). It does that by
+> > > > > making Picochip code generic.
+> > > > > 
+> > > > > Signed-off-by: Pavel Machek <pavel@denx.de>
+> > > > > Acked-by: Dinh Nguyen <dinguyen@altera.com>
+> > > > > Acked-by: Jamie Iles <jamie@jamieiles.com 
+> > > > 
+> > > > Applied to fixes branch of arm-soc, but please be more explicit about
+> > > > what you want to happen with patches in the future. Ideally we would
+> > > > get pull requests for patches on each platform from only one person,
+> > > > so please coordinate with Dinh Nguyen who that should be.
+> > > 
+> > > Dinh is the maintainer, so if we can only send patches from one
+> > > person, it needs to be him. If you'd be willing to take patches from
+> > > second person, that would help us... if not, of course I can send all
+> > > the patches through Dinh.
+> > 
+> > You can both send patches, we just need to know what to expect. For most
+> > platforms it works best if one person collects the patches from
+> > everyone.
 > 
-> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git for-next
+> > If you are sending patches with both Dinh and us as the recipients,
+> > just make it clear who you want to pick up the patch.
 > 
-> Its probably best to insert it into the list somewhere after the
-> existing arm-soc tree. I also maintain the Tegra tree, so if you insert
-> it right next to that, any issues related to me will be triggered at the
-> same time:-)
+> Thanks. Would "[PATCH for soc]" in subject line be suitable markup?
 > 
-> Right now, it's based on v3.7-rc2, plus 5 patches.
+> BTW current for-next soc tree does not compile for me, with 
+> 
+> arch/arm/mach-vexpress/built-in.o: In function `v2m_timer_init':
+> hotplug.c:(.init.text+0xd0): undefined reference to
+> `vexpress_clk_init'
+> arch/arm/mach-vexpress/built-in.o: In function `v2m_dt_timer_init':
+> hotplug.c:(.init.text+0x100): undefined reference to
+> `vexpress_clk_of_init'
+> make: *** [vmlinux] Error 1
 
-Added from today.
+Aha, grep shows:
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
+arch/arm/mach-vexpress/v2m.c:   vexpress_clk_init(ioremap(V2M_SYSCTL, SZ_4K));
+include/linux/vexpress.h:void vexpress_clk_init(void __iomem *sp810_base);
 
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
+...seems vexpress_clk_init is not there, yet... And what is more
+serious:
 
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
+pavel at amd:~/mainline-altera/linux$ grep mach-vexpress MAINTAINERS
+pavel at amd:~/mainline-altera/linux$ 
+
+vexpress_clk_of_init();     has same problem.
+
+									Pavel
 
 -- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/36a8a1b8/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
