@@ -1,76 +1,38 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Sun, 28 Oct 2012 12:23:24 +0000
-Subject: [PATCH] mvebu-gpio: Disable blinking when enabling a GPIO for output
-Message-ID: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
+From: joe@perches.com (Joe Perches)
+Date: Sun, 28 Oct 2012 05:12:15 -0700
+Subject: [PATCH 00/16] treewide: Convert dev_printk(KERN_<LEVEL> to
+ dev_<level>(
+In-Reply-To: <508D0ECA.8040008@mvista.com>
+References: <cover.1351411047.git.joe@perches.com>
+ <508D0ECA.8040008@mvista.com>
+Message-ID: <1351426335.2008.6.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The plat-orion GPIO driver would disable any pin blinking whenever
-using a pin for output. Do the same here, as a blinking LED will
-continue to blink regardless of what the GPIO pin level is.
+On Sun, 2012-10-28 at 14:54 +0400, Sergei Shtylyov wrote:
+> Hello.
 
-Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
----
-The power LED on the DNS-320/DNS-325 is left blinking by the bootloader,
-the LED turning steady indicates it's booted. The blinking needs to be
-disabled before setting the GPIO pin level has any effect.
+Hi Sergei.
 
-Apart from the custom init code running too soon, I think everything is
-working now.
+> On 28-10-2012 12:05, Joe Perches wrote:
+> 
+> > dev_<level> create smaller objects than dev_printk(KERN_<LEVEL>.
+> > Convert non-debug calls to this form.
+> 
+> > Joe Perches (16):
+> >    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+> [...]
+> >    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+> [...]
+> >    tile: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
+> 
+>     Hm, somehow this patch is repeated thrice?
 
-I haven't tested this on any other boards, so not sure if it's sensible
-beyond the kirkwood/orion world.
+Nope, I forgot to edit the 0000 file after I edited
+patches locally when I noticed I forgot to update
+the subject lines.  Patches are corrected, 0000 not.
 
- drivers/gpio/gpio-mvebu.c |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+I don't think it's a bit deal, I could repost just the 0000
+if you want though.
 
-diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
-index cf7afb9..be65c04 100644
---- a/drivers/gpio/gpio-mvebu.c
-+++ b/drivers/gpio/gpio-mvebu.c
-@@ -92,6 +92,11 @@ static inline void __iomem *mvebu_gpioreg_out(struct mvebu_gpio_chip *mvchip)
- 	return mvchip->membase + GPIO_OUT_OFF;
- }
- 
-+static inline void __iomem *mvebu_gpioreg_blink(struct mvebu_gpio_chip *mvchip)
-+{
-+	return mvchip->membase + GPIO_BLINK_EN_OFF;
-+}
-+
- static inline void __iomem *mvebu_gpioreg_io_conf(struct mvebu_gpio_chip *mvchip)
- {
- 	return mvchip->membase + GPIO_IO_CONF_OFF;
-@@ -206,6 +211,23 @@ static int mvebu_gpio_get(struct gpio_chip *chip, unsigned pin)
- 	return (u >> pin) & 1;
- }
- 
-+static void mvebu_gpio_blink(struct gpio_chip *chip, unsigned pin, int value)
-+{
-+	struct mvebu_gpio_chip *mvchip =
-+		container_of(chip, struct mvebu_gpio_chip, chip);
-+	unsigned long flags;
-+	u32 u;
-+
-+	spin_lock_irqsave(&mvchip->lock, flags);
-+	u = readl_relaxed(mvebu_gpioreg_blink(mvchip));
-+	if (value)
-+		u |= 1 << pin;
-+	else
-+		u &= ~(1 << pin);
-+	writel_relaxed(u, mvebu_gpioreg_blink(mvchip));
-+	spin_unlock_irqrestore(&mvchip->lock, flags);
-+}
-+
- static int mvebu_gpio_direction_input(struct gpio_chip *chip, unsigned pin)
- {
- 	struct mvebu_gpio_chip *mvchip =
-@@ -244,6 +266,7 @@ static int mvebu_gpio_direction_output(struct gpio_chip *chip, unsigned pin,
- 	if (ret)
- 		return ret;
- 
-+	mvebu_gpio_blink(chip, pin, 0);
- 	mvebu_gpio_set(chip, pin, value);
- 
- 	spin_lock_irqsave(&mvchip->lock, flags);
--- 
-1.7.10.4
+cheers, Joe
