@@ -1,29 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 28 Oct 2012 20:18:08 +0100
-Subject: [PATCH v3 01/11] clk: davinci - add main PLL clock driver
-In-Reply-To: <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
-Message-ID: <CACRpkdaa8f7N90hknaqZmNeYD1SjQx6Fm35nS34CxwnH+fwEfg@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Sun, 28 Oct 2012 20:19:19 +0100
+Subject: [PATCH] ARM: AM33xx: add support for reboot
+In-Reply-To: <1351448275-23509-1-git-send-email-zonque@gmail.com>
+References: <1351448275-23509-1-git-send-email-zonque@gmail.com>
+Message-ID: <508D8537.9010107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 6:11 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+[Cc Tony]
 
-> This is the driver for the main PLL clock hardware found on DM SoCs.
-> This driver borrowed code from arch/arm/mach-davinci/clock.c and
-> implemented the driver as per common clock provider API. The main PLL
-> hardware typically has a multiplier, a pre-divider and a post-divider.
-> Some of the SoCs has the divider fixed meaning they can not be
-> configured through a register. HAS_PREDIV and HAS_POSTDIV flags are used
-> to tell the driver if a hardware has these dividers present or not.
-> Driver is configured through the struct clk_pll_data that has the
-> SoC specific clock data.
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+On 28.10.2012 19:17, Daniel Mack wrote:
+> This patch adds the ability to reboot am33xx-based systems.
 
-This looks good to me.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Sorry, I lacked to investigate on the attribution here. According to
+"git blame" of a BSP kernel I got these lines from, the original author
+is Afzal Mohammed.
 
-Yours,
-Linus Walleij
+Afzal, are you planning to resubmit this for mainline? My version can of
+course be disposed then.
+
+
+Thanks,
+Daniel
+
+
+
+
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 1 +
+>  arch/arm/mach-omap2/prcm.c          | 6 ++++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 601ecdf..6a69ceb 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+>  	.init_machine	= omap_generic_init,
+>  	.timer		= &omap3_am33xx_timer,
+>  	.dt_compat	= am33xx_boards_compat,
+> +	.restart	= omap_prcm_restart,
+>  MACHINE_END
+>  #endif
+>  
+> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+> index 0f51e03..8a3068a 100644
+> --- a/arch/arm/mach-omap2/prcm.c
+> +++ b/arch/arm/mach-omap2/prcm.c
+> @@ -32,6 +32,7 @@
+>  #include "clock2xxx.h"
+>  #include "cm2xxx_3xxx.h"
+>  #include "prm2xxx_3xxx.h"
+> +#include "prm33xx.h"
+>  #include "prm44xx.h"
+>  #include "prminst44xx.h"
+>  #include "cminst44xx.h"
+> @@ -72,6 +73,11 @@ void omap_prcm_restart(char mode, const char *cmd)
+>  		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+>  	} else if (cpu_is_omap44xx()) {
+>  		omap4_prminst_global_warm_sw_reset(); /* never returns */
+> +	} else if (soc_is_am33xx()) {
+> +		prcm_offs = AM33XX_PRM_DEVICE_MOD;
+> +		omap2_prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_COLD_SW_MASK,
+> +					   prcm_offs,
+> +					   AM33XX_PRM_RSTCTRL_OFFSET);
+>  	} else {
+>  		WARN_ON(1);
+>  	}
+> 
