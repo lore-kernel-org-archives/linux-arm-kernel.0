@@ -1,65 +1,52 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 29 Oct 2012 00:01:54 +0100
-Subject: arm-soc tree was Re: [PATCH] Fix socfpga compilation with
- early_printk() enabled
-In-Reply-To: <201210271539.20156.arnd@arndb.de>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <201210251458.48528.arnd@arndb.de>
- <20121027115615.GC5912@elf.ucw.cz>
- <201210271539.20156.arnd@arndb.de>
-Message-ID: <20121028230153.GA8284@elf.ucw.cz>
+From: mark@engine12.com (mark at engine12.com)
+Date: Sun, 28 Oct 2012 15:31:10 -0700
+Subject: [PATCH 4/5] ARM: PXA: Zipit Z2: Change =?UTF-8?Q?active=5Fsta?=
+ =?UTF-8?Q?te=20of=20power=20button?=
+In-Reply-To: <201210282301.04714.marex@denx.de>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-4-git-send-email-anarsoul@gmail.com>
+ <201210282301.04714.marex@denx.de>
+Message-ID: <d70e423cd1380c4b89e483eb944f9312@engine12.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+full name include:
 
-> > > > This fixes early_printk() compilation for
-> > > > socfpga. (senduart/busyuart/waituart were missing). It does that by
-> > > > making Picochip code generic.
-> > > > 
-> > > > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > > > Acked-by: Dinh Nguyen <dinguyen@altera.com>
-> > > > Acked-by: Jamie Iles <jamie@jamieiles.com 
-> > > 
-> > > Applied to fixes branch of arm-soc, but please be more explicit about
-> > > what you want to happen with patches in the future. Ideally we would
-> > > get pull requests for patches on each platform from only one person,
-> > > so please coordinate with Dinh Nguyen who that should be.
-> > 
-> > Dinh is the maintainer, so if we can only send patches from one
-> > person, it needs to be him. If you'd be willing to take patches from
-> > second person, that would help us... if not, of course I can send all
-> > the patches through Dinh.
-> 
-> You can both send patches, we just need to know what to expect. For most
-> platforms it works best if one person collects the patches from
-> everyone.
-
-> If you are sending patches with both Dinh and us as the recipients,
-> just make it clear who you want to pick up the patch.
-
-Thanks. Would "[PATCH for soc]" in subject line be suitable markup?
-
-BTW current for-next soc tree does not compile for me, with 
-
-arch/arm/mach-vexpress/built-in.o: In function `v2m_timer_init':
-hotplug.c:(.init.text+0xd0): undefined reference to
-`vexpress_clk_init'
-arch/arm/mach-vexpress/built-in.o: In function `v2m_dt_timer_init':
-hotplug.c:(.init.text+0x100): undefined reference to
-`vexpress_clk_of_init'
-make: *** [vmlinux] Error 1
-
-config attached.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: config.bug.gz
-Type: application/octet-stream
-Size: 11441 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/536fdb2a/attachment-0001.obj>
+On 2012-10-28 15:01, Marek Vasut wrote:
+> Dear Vasily Khoruzhick,
+>
+>> From: Mark Majeres <mark@engine12.com>
+>
+> Read [1]
+>
+>> Otherwise userspace might be confused about button state
+>>
+>> Signed-off-by: Mark Majeres <mark@engine12.com>
+>
+> Attribution of code shall be done only towards people known by their 
+> name.
+>
+>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>> ---
+>>  arch/arm/mach-pxa/z2.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
+>> index ce90fa9..fac7cba 100644
+>> --- a/arch/arm/mach-pxa/z2.c
+>> +++ b/arch/arm/mach-pxa/z2.c
+>> @@ -437,7 +437,7 @@ static struct gpio_keys_button z2_pxa_buttons[] 
+>> = {
+>>  	{
+>>  		.code		= KEY_POWER,
+>>  		.gpio		= GPIO1_ZIPITZ2_POWER_BUTTON,
+>> -		.active_low	= 0,
+>> +		.active_low	= 1,
+>>  		.desc		= "Power Button",
+>>  		.wakeup		= 1,
+>>  		.type		= EV_KEY,
+>
+> [1] http://lwn.net/Articles/195643/
+>
+> Best regards,
+> Marek Vasut
