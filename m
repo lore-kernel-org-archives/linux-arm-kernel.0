@@ -1,40 +1,29 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 28 Oct 2012 14:24:08 +0100
-Subject: [PATCH v2 1/4] irqchip: add basic infrastructure
-In-Reply-To: <508D30B2.6070806@gmail.com>
+Date: Sun, 28 Oct 2012 14:26:26 +0100
+Subject: [PATCH v2] Introduce minimal irqchip infrastructure
+In-Reply-To: <508D31EA.3050307@gmail.com>
 References: <1351416634-3352-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351416634-3352-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <508D30B2.6070806@gmail.com>
-Message-ID: <20121028142408.7512671c@skate>
+ <508D31EA.3050307@gmail.com>
+Message-ID: <20121028142626.3c1ab345@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
 
-On Sun, 28 Oct 2012 08:18:42 -0500, Rob Herring wrote:
+On Sun, 28 Oct 2012 08:23:54 -0500, Rob Herring wrote:
 
-> > diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> > index 1bb8bf6..e0ff166 100644
-> > --- a/drivers/irqchip/Kconfig
-> > +++ b/drivers/irqchip/Kconfig
-> > @@ -1 +1,2 @@
-> > -# empty
-> > +config USE_IRQCHIP
-> > +	bool
+> Other than the 2 minor things I mentioned, this series looks good.
 > 
-> This should depend on OF_IRQ.
+> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
 
-It is correct that the mechanism only works for irqchip drivers that
-are probed through the Device Tree. However, having a "depends on"
-inside a configuration that gets "select"ed by other configuration
-options (in our case ARCH_BCM2835 and ARCH_MVEBU select USE_IRQCHIP) is
-useless: kconfig doesn't care of the "depends on" dependencies when
-you're "select"ing an option.
+Thanks, I'll repost a v3 once you confirm the part about "depends on
+OF_IRQ".
 
-So, I can add it for documentation purposes, but it is practically
-useless.
+> Also, I have some follow-on patches to move the GIC and VIC to
+> drivers/irqchip. It was much more simple than I expected. I'll post them
+> later.
 
-Best regards,
+Ah good. Aren't they some remaining non-DT users of the GIC and VIC
+drivers?
 
 Thomas
 -- 
