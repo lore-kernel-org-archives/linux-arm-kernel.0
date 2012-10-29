@@ -1,37 +1,30 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 29 Oct 2012 22:49:39 +0530
-Subject: [PATCH V2 3/4] ARM: tegra: dts: cardhu: enable SLINK4
-In-Reply-To: <1351531180-1652-1-git-send-email-ldewangan@nvidia.com>
-References: <1351531180-1652-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1351531180-1652-4-git-send-email-ldewangan@nvidia.com>
+Date: Mon, 29 Oct 2012 22:49:36 +0530
+Subject: [PATCH V2 0/4] ARM: tegra: Enable SLINK controller driver
+Message-ID: <1351531180-1652-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SLINK4 in Tegra30 based platform Cardhu.
-Setting maximum spi frequency to 25MHz.
+This series modify the dts file to add the slink addresses,
+make AUXDATA in board dt files, enable slink4 for tegra30-cardhu and
+enable slink controller defconfig.
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
 Changes from V1:
-rename the max freq prop to spi-max-frequency
- arch/arm/boot/dts/tegra30-cardhu.dtsi |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+- Remove changes from clock tables.
+- Make the dma req dt property name to nvidia,dma-request-selector.
+- change the spi max frequency prop to spi-max-frequency.
 
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index b245e6c..1bd73ea 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -275,6 +275,11 @@
- 		};
- 	};
- 
-+	slink at 7000da00 {
-+		status = "okay";
-+		spi-max-frequency = <25000000>;
-+	};
-+
- 	ahub {
- 		i2s at 70080400 {
- 			status = "okay";
--- 
-1.7.1.1
+Laxman Dewangan (4):
+  ARM: tegra: dts: add slink controller dt entry
+  ARM: tegra: Add OF_DEV_AUXDATA for SLINK driver in board dt
+  ARM: tegra: dts: cardhu: enable SLINK4
+  ARM: tegra: config: enable spi driver for Tegra SLINK controller
+
+ arch/arm/boot/dts/tegra20.dtsi           |   40 ++++++++++++++++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi    |    5 ++
+ arch/arm/boot/dts/tegra30.dtsi           |   60 ++++++++++++++++++++++++++++++
+ arch/arm/configs/tegra_defconfig         |    2 +-
+ arch/arm/mach-tegra/board-dt-tegra20.c   |    8 ++++
+ arch/arm/mach-tegra/board-dt-tegra30.c   |   12 ++++++
+ arch/arm/mach-tegra/include/mach/iomap.h |   22 +++++++----
+ 7 files changed, 140 insertions(+), 9 deletions(-)
