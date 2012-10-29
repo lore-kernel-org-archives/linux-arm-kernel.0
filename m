@@ -1,49 +1,63 @@
-From: nbowler@elliptictech.com (Nick Bowler)
-Date: Mon, 29 Oct 2012 14:13:40 -0400
-Subject: [PATCH] ARM: zynq: Allow UART1 to be used as DEBUG_LL console.
-In-Reply-To: <20121029165621.GF5190@beefymiracle.amer.corp.natinst.com>
-References: <20121025224108.GA30705@elliptictech.com>
- <1351205254-2409-1-git-send-email-nbowler@elliptictech.com>
- <20121029165621.GF5190@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121029181340.GA4760@elliptictech.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 29 Oct 2012 11:13:49 -0700
+Subject: [PATCHv2 1/3] clk: wm831x: Fix clk_register() error code checking
+In-Reply-To: <1348519085-5888-1-git-send-email-sboyd@codeaurora.org>
+References: <1348034730-16473-1-git-send-email-sboyd@codeaurora.org>
+ <1348519085-5888-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20121029181349.18780.28418@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-10-29 10:56 -0600, Josh Cartwright wrote:
-> On Thu, Oct 25, 2012 at 06:47:34PM -0400, Nick Bowler wrote:
-> > The main UART on the Xilinx ZC702 board is UART1, located at address
-> > e0001000.  Add a Kconfig option to select this device as the low-level
-> > debugging port.  This allows the really early boot printouts to reach
-> > the USB serial adaptor on this board.
-> > 
-> > For consistency's sake, add a choice entry for UART0 even though it is
-> > the the default if UART1 is not selected.
-> > 
-> > As there are currently known issues related to the UART virtual
-> > mappings, this is KNOWN BROKEN, not to be merged yet!
-> > 
-> > Not-Yet-Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+Quoting Stephen Boyd (2012-09-24 13:38:03)
+> clk_register() returns an ERR_PTR upon failure, not NULL. Fix
+> these error paths.
 > 
-> Tested-by: Josh Cartwright <josh.cartwright@ni.com>
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Thanks for sending V2.  Taken into clk-next.
+
+Regards,
+Mike
+
+> ---
 > 
-> Now that v5 of the initial zynq cleanup patchset is queued up for
-> merging (with a workaround for the uart mapping problem), what would it
-> take for you to sign off on this patch?
-
-Great, I've tested this on top of the other 4 and the boot console is
-working now.  I will resend the patch with my signoff.
-
-(I wonder if UART0 has similar address problems on the ZC702 if it is
-selected as the boot console... but this is harder to test as AFAIK it's
-not connected to anything on this board by default, but it could in
-principle be connected to something in the PL.  We can cross that bridge
-if and when we get to it, I guess).
-
-> There is some trivial merging that has to be done to get it to apply
-> cleanly on v5.  See a rebased version below.
-
-Yup, looks good.
-
-Cheers,
--- 
-Nick Bowler, Elliptic Technologies (http://www.elliptictech.com/)
+> v2: No changes
+> 
+>  drivers/clk/clk-wm831x.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
+> index e7b7765..eb1afaf 100644
+> --- a/drivers/clk/clk-wm831x.c
+> +++ b/drivers/clk/clk-wm831x.c
+> @@ -371,20 +371,20 @@ static __devinit int wm831x_clk_probe(struct platform_device *pdev)
+>  
+>         clkdata->xtal_hw.init = &wm831x_xtal_init;
+>         clkdata->xtal = clk_register(&pdev->dev, &clkdata->xtal_hw);
+> -       if (!clkdata->xtal)
+> -               return -EINVAL;
+> +       if (IS_ERR(clkdata->xtal))
+> +               return PTR_ERR(clkdata->xtal);
+>  
+>         clkdata->fll_hw.init = &wm831x_fll_init;
+>         clkdata->fll = clk_register(&pdev->dev, &clkdata->fll_hw);
+> -       if (!clkdata->fll) {
+> -               ret = -EINVAL;
+> +       if (IS_ERR(clkdata->fll)) {
+> +               ret = PTR_ERR(clkdata->fll);
+>                 goto err_xtal;
+>         }
+>  
+>         clkdata->clkout_hw.init = &wm831x_clkout_init;
+>         clkdata->clkout = clk_register(&pdev->dev, &clkdata->clkout_hw);
+> -       if (!clkdata->clkout) {
+> -               ret = -EINVAL;
+> +       if (IS_ERR(clkdata->clkout)) {
+> +               ret = PTR_ERR(clkdata->clkout);
+>                 goto err_fll;
+>         }
+>  
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
