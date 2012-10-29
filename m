@@ -1,43 +1,51 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 29 Oct 2012 12:14:34 +0100
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
- <508E5DFB.3060002@gmail.com>
- <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
- <508E61E7.7090502@gmail.com>
- <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
-Message-ID: <508E651A.5070009@gmail.com>
+Date: Mon, 29 Oct 2012 12:15:23 +0100
+Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <508E3A0F.3040309@ti.com>
+References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
+ <1350935758-9215-5-git-send-email-zonque@gmail.com>
+ <20121024232717.GD11928@atomide.com> <50887A6B.3050108@gmail.com>
+ <508E3A0F.3040309@ti.com>
+Message-ID: <508E654B.5010404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.10.2012 12:12, Vasily Khoruzhick wrote:
-> On Mon, Oct 29, 2012 at 2:00 PM, Daniel Mack <zonque@gmail.com> wrote:
-> 
->>> Well, there's an issue - Z2 does not preserve memory contents in deep sleep
->>> (but it does in sleep), so userspace can't be fixed here unfortunatelly.
->>> There's no another possibility to turn Z2 off, and plain sleep is too
->>> power hungry.
->>> So the only way to keep Z2 in low-power mode is fake power off, which just puts
->>> Z2 in deep sleep.
->>
->> Why can't the userspace trigger a deep sleep then instead of powering
->> off? Which details do I lack?
-> 
-> How? echo mem >/sys/power/state puts system into non-deep sleep. Anyway, kernel
-> is not ready for fake power off instead of suspend (we can't resume
-> from deep sleep,
-> memory content is not preserved), so there can be some data loss.
-> Adding some sysfs file to control sleep type does not look like a good
-> idea to me.
-> 
-> Btw, how other DT-capable boards handle power off?
+Hi Afzal,
 
-No idea. I never actually used that kind of power state.
+On 29.10.2012 09:10, Afzal Mohammed wrote:
+> On Thursday 25 October 2012 05:01 AM, Daniel Mack wrote:
+> 
+>> Thanks for the review. I'll wait for feedback from Afzal next week and
+>> then repost. Wanted to see first if that goes in the right direction at
+>> all before bordering the DT people with binding details :)
+> 
+> I was thinking of a generic approach, where there won't be
+> any check for peripheral device type.
+> 
+> But going that path would delay achieving DT, may be let's
+> proceed with your approach to start with so that we can
+> have a minimal level of DT support for GPMC and probably
+> we can make it generic later. While adding new properties,
+> it would be better to keep in mind that we need not change
+> these later once gpmc DT is made generic.
+> 
+> Regarding the bindings, there are some generic nand
+> properties like ecc already available, may be that be made
+> use here.
+
+Ah, of_get_nand_ecc_mode() - nice.
+
+> Also perhaps memory size (and offset if
+> needed) to be mapped for peripherals can go with reg
+> property of child.
+
+Which detail are you referring to here? The only "size" property that is
+effective is the one of the generic GPMC block, and there it's in the
+"reg"-property.
+
+I'll take the other feedback that I got and quickly do a v2.
+
+
+Thanks,
+Daniel
