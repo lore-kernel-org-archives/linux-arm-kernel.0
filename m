@@ -1,41 +1,34 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Mon, 29 Oct 2012 14:38:17 +0800
-Subject: [PATCH 4/5] ASoC: sam9g20_wm8731: convert to device tree support
-In-Reply-To: <20121027221204.GL4564@opensource.wolfsonmicro.com>
-References: <1350901079-18307-1-git-send-email-voice.shen@atmel.com>
- <1350901079-18307-4-git-send-email-voice.shen@atmel.com>
- <20121027221204.GL4564@opensource.wolfsonmicro.com>
-Message-ID: <508E2459.5090707@atmel.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Oct 2012 07:46:32 +0100
+Subject: [PATCH] ARM: kirkwood: Increase NAND chip-delay for DNS-320
+In-Reply-To: <alpine.DEB.2.00.1210282123250.10589@marmot.wormnet.eu>
+References: <1351457262-11506-1-git-send-email-jm@lentin.co.uk>
+ <20121028205956.GH15143@lunn.ch>
+ <alpine.DEB.2.00.1210282123250.10589@marmot.wormnet.eu>
+Message-ID: <20121029064632.GJ15143@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2012 6:12, Mark Brown wrote:
-> On Mon, Oct 22, 2012 at 06:17:58PM +0800, Bo Shen wrote:
->> Covert sam9g20 wm8731 to device tree support
->> And enable it through dts file
->>
->>    Tested on sam9g20 EK board
->
-> This needs to add binding documentation for the board.
+> The chip markings are: SAMSUNG 146 K9F1G08U0D SCB0 (FKJ554PWN)
+> 
+> Unfortunately the other NAS is too far away to get at, but D-link
+> haven't stuck to exactly the same chip. This DNS-320 review shows a
+> different Samsung part:
+> 
+> http://diit.cz/data/images/thumb/67491_2b9e5e4fbd.jpg?1307884464
+> 
+> The datasheet for the K9F1G08U0D says max 35usecs "Data Transfer
+> from Cell to Register", whereas K9F1G08U0C (what the DNS-320 review
+> shows) says 25usecs. If this is the value in the datasheet to check,
+> then this would explain the problems.
 
-I will add the binding documentation in next version.
+Seems sensible.
 
->> +	dai: dai {
->> +		compatible = "atmel,atmel-ssc-dai";
->> +		atmel,dai-master = <&ssc0>;
->> +	};
->
-> This looks wrong - this is a Linux-specific virtual device sitting on
-> top of the SSC which is the actual physical device.  The usual patterns
-> would be something like have the machine driver register the DAI based
-> on the SSC specified in the bindings (much like how you're handling the
-> platform already).
+I'm currently downloading the GPL sources from dlink. If the kernel
+sources are included, we can see how dlink sets this. If its also 35,
+then there is no argument.
 
-I have a question for this, do all nodes in dts file should be physical 
-device?
+The only thing you could think about is probing the nand device, and
+if it is not K9F1G08U0D put the delay back to 25.
 
-The SSC part is a little different with other SoC family. So, I think, 
-if I keep the ssc driver in driver/misc folder as the library code. And 
-create new code into sound/soc/atmel for ssc which used for audio, would 
-this be acceptable? If so, the framework will be the same with other SoC 
-family.
+   Andrew
