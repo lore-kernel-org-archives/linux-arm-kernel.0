@@ -1,76 +1,135 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 29 Oct 2012 22:48:05 +0100
-Subject: [PATCH 1/4] DMA: PL330: fix locking in pl330_free_chan_resources()
-In-Reply-To: <1351504796-24788-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
- <1351504796-24788-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <CABb+yY3DJ8saXGmXO31nQjtmqObpJxf5-Zwv4YhkJLv6EA=Tfw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Oct 2012 21:43:07 +0000
+Subject: [PATCH] MMC: fix sdhci-dove removal
+In-Reply-To: <87txtdq90y.fsf@octavius.laptop.org>
+References: <20121015094348.GP21164@n2100.arm.linux.org.uk>
+ <20121015103725.GQ21164@n2100.arm.linux.org.uk>
+ <20121015104456.GR21164@n2100.arm.linux.org.uk>
+ <87txtdq90y.fsf@octavius.laptop.org>
+Message-ID: <20121029214307.GH21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2012 at 10:59 AM, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
-> tasklet_kill() may sleep so call it before taking pch->lock.
->
-> Fixes following lockup:
->
-> [  345.470000] BUG: scheduling while atomic: cat/2383/0x00000002
-> [  345.470000] Modules linked in:
-> [  345.470000] [<c0015858>] (unwind_backtrace+0x0/0xfc) from [<c004d980>] (__schedule_bug+0x4c/0x58)
-> [  345.470000] [<c004d980>] (__schedule_bug+0x4c/0x58) from [<c0360b6c>] (__schedule+0x690/0x6e0)
-> [  345.470000] [<c0360b6c>] (__schedule+0x690/0x6e0) from [<c004f2b4>] (sys_sched_yield+0x70/0x78)
-> [  345.470000] [<c004f2b4>] (sys_sched_yield+0x70/0x78) from [<c002acec>] (tasklet_kill+0x34/0x8c)
-> [  345.470000] [<c002acec>] (tasklet_kill+0x34/0x8c) from [<c01da4cc>] (pl330_free_chan_resources+0x24/0x88)
-> [  345.470000] [<c01da4cc>] (pl330_free_chan_resources+0x24/0x88) from [<c01d81f4>] (dma_chan_put+0x4c/0x50)
-> [  345.470000] [<c01d81f4>] (dma_chan_put+0x4c/0x50) from [<c01d82c0>] (dma_release_channel+0x28/0x98)
-> [...]
-> [  368.335000] BUG: spinlock lockup suspected on CPU#0, swapper/0/0
-> [  368.340000]  lock: 0xe52aa04c, .magic: dead4ead, .owner: cat/2383, .owner_cpu: 1
-> [  368.350000] [<c0015858>] (unwind_backtrace+0x0/0xfc) from [<c01b3d78>] (do_raw_spin_lock+0x194/0x204)
-> [  368.360000] [<c01b3d78>] (do_raw_spin_lock+0x194/0x204) from [<c0361adc>] (_raw_spin_lock_irqsave+0x20/0x28)
-> [  368.365000] [<c0361adc>] (_raw_spin_lock_irqsave+0x20/0x28) from [<c01da80c>] (pl330_tasklet+0x2c/0x5a8)
-> [  368.375000] [<c01da80c>] (pl330_tasklet+0x2c/0x5a8) from [<c002ac04>] (tasklet_action+0xfc/0x114)
-> [  368.385000] [<c002ac04>] (tasklet_action+0xfc/0x114) from [<c002b204>] (__do_softirq+0xe4/0x19c)
-> [  368.395000] [<c002b204>] (__do_softirq+0xe4/0x19c) from [<c002b398>] (irq_exit+0x98/0x9c)
-> [  368.405000] [<c002b398>] (irq_exit+0x98/0x9c) from [<c0013ebc>] (handle_IPI+0x124/0x16c)
-> [  368.410000] [<c0013ebc>] (handle_IPI+0x124/0x16c) from [<c000857c>] (gic_handle_irq+0x64/0x68)
-> [  368.420000] [<c000857c>] (gic_handle_irq+0x64/0x68) from [<c000e740>] (__irq_svc+0x40/0x70)
-> [  368.430000] Exception stack(0xc04a3f00 to 0xc04a3f48)
-> [  368.435000] 3f00: c04a3f48 00000000 6f9e23e8 00000050 c07492c8 c04a3f48 00000000 c04ccc88
-> [  368.440000] 3f20: 6f9dbac3 00000050 6f9e23e8 00000050 3b9aca00 c04a3f48 c005cfa4 c02946d4
-> [  368.450000] 3f40: 60000013 ffffffff
-> [  368.455000] [<c000e740>] (__irq_svc+0x40/0x70) from [<c02946d4>] (cpuidle_wrap_enter+0x4c/0xa0)
-> [  368.460000] [<c02946d4>] (cpuidle_wrap_enter+0x4c/0xa0) from [<c02940dc>] (cpuidle_enter_state+0x18/0x68)
-> [  368.470000] [<c02940dc>] (cpuidle_enter_state+0x18/0x68) from [<c02948e0>] (cpuidle_idle_call+0xac/0xe0)
-> [  368.480000] [<c02948e0>] (cpuidle_idle_call+0xac/0xe0) from [<c00102f8>] (cpu_idle+0xac/0xf0)
-> [  368.490000] [<c00102f8>] (cpu_idle+0xac/0xf0) from [<c04796a0>] (start_kernel+0x28c/0x294)
->
-> Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> Cc: Vinod Koul <vinod.koul@linux.intel.com>
-> Cc: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/dma/pl330.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 665668b..db7574b 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -2459,10 +2459,10 @@ static void pl330_free_chan_resources(struct dma_chan *chan)
->         struct dma_pl330_chan *pch = to_pchan(chan);
->         unsigned long flags;
->
-> -       spin_lock_irqsave(&pch->lock, flags);
-> -
->         tasklet_kill(&pch->task);
->
-> +       spin_lock_irqsave(&pch->lock, flags);
-> +
->         pl330_release_channel(pch->pl330_chid);
->         pch->pl330_chid = NULL;
->
-Thanks.
+On Mon, Oct 29, 2012 at 05:10:37PM -0400, Chris Ball wrote:
+> Hi Russell,
+> 
+> On Mon, Oct 15 2012, Russell King - ARM Linux wrote:
+> > Here's an updated patch which just about fixes the sdhci-dove driver.
+> > I would not be surprised given the idiotic sdhci-pltfm API if many
+> > other drivers suffered the same bug.
+> >
+> > 8<====
+> > From: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Subject: [PATCH] MMC: fix sdhci-dove probe/removal
+> >
+> > 1. Never ever publish a device in the system before it has been setup
+> >    to a usable state.
+> > 2. Unregister the device _BEFORE_ taking away any resources it may be
+> >    using.
+> > 3. Don't check clks against NULL.
+> >
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> This version of the patch doesn't apply cleanly or compile -- maybe you
+> have a later revision?
 
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+Well, I'm only going to send a patch against 3.6 because that's the
+kernel I'm running on the cubox - which is the platform I'm finding
+these bugs on.  As it's a platform which I want to keep stable for
+other work, it's not getting -rc kernels on it.
+
+It's also been through several revisions across conflict resolutions
+which is why the above errors occurred (thanks to having to fix them
+up multiple times.)  And to top it off, there's additional patches
+below this one too, so separating out just the fix is virtually
+impossible to do safely.
+
+Anyway, here's a replacement patch, updated against my cubox tree but
+lacking the cubox gpio changes for it.  Un-tested through: (a) I can't
+test this on its own on the cubox, (b) I don't have a separate dove
+tree to test it against and my disk space is all but out at the moment
+for yet another build tree...
+
+It would helpful of course to have _more_ of the cubox stuff in mainline
+but unfortunately it's all non-DT so wouldn't be accepted.
+
+ drivers/mmc/host/sdhci-dove.c |   38 ++++++++++++++++++++------------------
+ 1 files changed, 20 insertions(+), 18 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci-dove.c b/drivers/mmc/host/sdhci-dove.c
+index a6e53a1..bb3cefe 100644
+--- a/drivers/mmc/host/sdhci-dove.c
++++ b/drivers/mmc/host/sdhci-dove.c
+@@ -19,6 +19,7 @@
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+ 
++#include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
+@@ -83,30 +84,32 @@ static int __devinit sdhci_dove_probe(struct platform_device *pdev)
+ 	struct sdhci_dove_priv *priv;
+ 	int ret;
+ 
+-	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
+-	if (ret)
+-		goto sdhci_dove_register_fail;
+-
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_dove_priv),
+ 			    GFP_KERNEL);
+ 	if (!priv) {
+ 		dev_err(&pdev->dev, "unable to allocate private data");
+-		ret = -ENOMEM;
+-		goto sdhci_dove_allocate_fail;
++		return -ENOMEM;
+ 	}
+ 
++	priv->clk = clk_get(&pdev->dev, NULL);
++	if (!IS_ERR(priv->clk))
++		clk_prepare_enable(priv->clk);
++
++	ret = sdhci_pltfm_register(pdev, &sdhci_dove_pdata);
++	if (ret)
++		goto sdhci_dove_register_fail;
++
+ 	host = platform_get_drvdata(pdev);
+ 	pltfm_host = sdhci_priv(host);
+ 	pltfm_host->priv = priv;
+ 
+-	priv->clk = clk_get(&pdev->dev, NULL);
+-	if (!IS_ERR(priv->clk))
+-		clk_prepare_enable(priv->clk);
+ 	return 0;
+ 
+-sdhci_dove_allocate_fail:
+-	sdhci_pltfm_unregister(pdev);
+ sdhci_dove_register_fail:
++	if (!IS_ERR(priv->clk)) {
++		clk_disable_unprepare(priv->clk);
++		clk_put(priv->clk);
++	}
+ 	return ret;
+ }
+ 
+@@ -116,14 +119,13 @@ static int __devexit sdhci_dove_remove(struct platform_device *pdev)
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct sdhci_dove_priv *priv = pltfm_host->priv;
+ 
+-	if (priv->clk) {
+-		if (!IS_ERR(priv->clk)) {
+-			clk_disable_unprepare(priv->clk);
+-			clk_put(priv->clk);
+-		}
+-		devm_kfree(&pdev->dev, priv->clk);
++	sdhci_pltfm_unregister(pdev);
++
++	if (!IS_ERR(priv->clk)) {
++		clk_disable_unprepare(priv->clk);
++		clk_put(priv->clk);
+ 	}
+-	return sdhci_pltfm_unregister(pdev);
++	return 0;
+ }
+ 
+ static struct platform_driver sdhci_dove_driver = {
