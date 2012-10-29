@@ -1,41 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 29 Oct 2012 21:14:58 +0900
-Subject: [PATCH v2 0/2] ARM: exynos: Enable TMU support in exynos platforms
-In-Reply-To: <1351243746-4173-1-git-send-email-amit.daniel@samsung.com>
-References: <1351243746-4173-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <508E7342.2090307@samsung.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 29 Oct 2012 15:45:36 +0000
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+In-Reply-To: <1349879449-22657-1-git-send-email-mporter@ti.com>
+References: <1349879449-22657-1-git-send-email-mporter@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/12 18:29, Amit Daniel Kachhap wrote:
-> From: Amit Daniel Kachhap<amit.daniel@samsung.com>
->
-> These TMU enablement patches are needed for exynos4 and exynos5 TMU
-> driver already merged(drivers/thermal/exynos_thermal.c).
->
-> This patchset is based on Samsung Maintainer's tree,
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
->
-> Amit Daniel Kachhap (2):
->    ARM: exynos4: Add devicetree node for TMU driver
->    ARM: exynos5: Add devicetree node for TMU driver
->
->   arch/arm/boot/dts/exynos4210.dtsi        |    7 +++++++
->   arch/arm/boot/dts/exynos5250.dtsi        |    6 ++++++
->   arch/arm/mach-exynos/clock-exynos4.c     |    4 ++++
->   arch/arm/mach-exynos/clock-exynos5.c     |    5 +++++
->   arch/arm/mach-exynos/include/mach/irqs.h |    3 +++
->   arch/arm/mach-exynos/include/mach/map.h  |    3 +++
->   arch/arm/mach-exynos/mach-exynos4-dt.c   |    2 ++
->   arch/arm/mach-exynos/mach-exynos5-dt.c   |    2 ++
->   8 files changed, 32 insertions(+), 0 deletions(-)
+Matt,
 
-Look good to me, will apply.
+On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
+> 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
+> exposes a bug in the AM33XX clock data for mcasp. After moving to
+> clk_get() usage, the _init() of all registered hwmods fails on mcasp0
+> due to incorrect clock data causing clk_get() to fail. This causes all
+> successive hwmods to fail to _init() leaving them in a bad state.
+> 
+> This patch updates the mcasp clock entries so clk_get() will succeed.
+> It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
+> boot.
 
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+I want to test Audio on AM335x Evm with your EDMA patches. I have few 
+patches for AM335x.
+Can you share the link to the repo & branch on which I need to rebase?
+The patches are related to mcasp dt node, mcasp pinmux in dt, etc...
+
+> 
+..snip..
+..snip..
+> 
+
+
+Thanks & Regards, 
+Gururaja
