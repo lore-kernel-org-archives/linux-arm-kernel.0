@@ -1,48 +1,29 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 29 Oct 2012 14:48:55 +0000
-Subject: [PATCH v4 0/5] zynq subarch cleanups
-In-Reply-To: <20121029133609.GE5190@beefymiracle.amer.corp.natinst.com>
-References: <cover.1351466765.git.josh.cartwright@ni.com>
- <5c2911d7-f753-4d9f-b8d8-3bf011d58e52@TX2EHSMHS014.ehs.local>
- <20121029133609.GE5190@beefymiracle.amer.corp.natinst.com>
-Message-ID: <92733d32-890b-42ab-b693-3240e9613935@TX2EHSMHS013.ehs.local>
+From: alexandre.belloni@piout.net (Alexandre Belloni)
+Date: Mon, 29 Oct 2012 16:00:38 +0100
+Subject: [PATCH] at91sam9m10g45-ek: rename leds to match board
+In-Reply-To: <20121027145132.GJ18964@game.jcrosoft.org>
+References: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
+ <20121027145132.GJ18964@game.jcrosoft.org>
+Message-ID: <20121029150038.GA4995@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Josh Cartwright [mailto:josh.cartwright at ni.com]
-> Sent: Monday, October 29, 2012 2:36 PM
-> To: Michal Simek
-> Cc: arm at kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; John Linn; Nick Bowler; Arnd Bergmann
-> Subject: Re: [PATCH v4 0/5] zynq subarch cleanups
+On Sat, Oct 27, 2012 at 04:51:32PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> On 21:29 Fri 26 Oct     , Alexandre Belloni wrote:
+> > The leds' name in the board file didn't match the names written on the
+> > board itsef. This can be confusing when trying to use them for another
+> > purpose.
 > 
-> On Mon, Oct 29, 2012 at 07:24:16AM +0000, Michal Simek wrote:
-> > Hi Josh,
-> >
-> > > Michal-
-> > >
-> > > Here is a v5 of the zynq cleanup patchset that addresses your
-> > > feedback.  I've intentionally left patches 4 and 5 in the set until
-> > > we figure out the appropriate way to get them in tree (feel free to
-> > > just apply 1-3)
-> >
-> > I am ok to pick just several patches from your patchset. But this is
-> > no definitely good working style. Not expert for submission process
-> > but I think that if there is one broken patch maintainer shouldn't
-> > apply it.  Can someone else check this?
+> It like this for so long time and I'm not really willing to touch the dts
 > 
-> It turns out that with the change to patch 5 to map the uart to a known working
-> address (instead of VMALLOC_END - 0x1000), patch 4 isn't needed, and as such
-> can be dropped.  (I didn't realize this until this morning until I had saw you had
-> applied 1-3,5 to your tree, but not 4).
-> 
-> So, for what it's worth, you've applied all of the relevant patches for this
-> patchset.
 
-Ok. Great.
+I don't think any real application is build on the assumption that each
+pins are wrongly named. But, for newcomers, it can get really confusing,
+especially as the led triggers are compiled as module in the defconfigs
+and the LEDs won't turn on until you load the module. 
 
-Thanks,
-MIchal
+It just boils down to wanting to improve the usability of the
+development board or not.
+
+-- 
+Alexandre Belloni
