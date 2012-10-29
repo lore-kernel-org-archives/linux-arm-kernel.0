@@ -1,41 +1,51 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 29 Oct 2012 13:48:46 +0530
-Subject: [RFC PATCH v3 11/16] mmc: omap_hsmmc: limit max_segs with the
- EDMA DMAC
-In-Reply-To: <1350566815-409-12-git-send-email-mporter@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
- <1350566815-409-12-git-send-email-mporter@ti.com>
-Message-ID: <508E3BE6.3070609@ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 29 Oct 2012 13:51:17 +0530
+Subject: [PATCH-V2 0/4] ARM: AM33XX: net: Add DT support to CPGMAC and MDIO
+ driver
+In-Reply-To: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <1351498881-32482-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/18/2012 6:56 PM, Matt Porter wrote:
-> The EDMA DMAC has a hardware limitation that prevents supporting
-> scatter gather lists with any number of segments. Since the EDMA
-> DMA Engine driver sets the maximum segments to 16, we do the
-> same.
-> 
-> TODO: this will be replaced once the DMA Engine API supports an
-> API to query the DMAC's segment size limit.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  drivers/mmc/host/omap_hsmmc.c |   10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index b327cd0..52bab01 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -1828,6 +1828,16 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
->  	 * as we want. */
->  	mmc->max_segs = 1024;
->  
-> +	/* Eventually we should get our max_segs limitation for EDMA by
-> +	 * querying the dmaengine API */
+This patch-series adds support for,
 
-Nit picking: This is not as per multi-line comment style in
-Documentation/CodingStyle.
+[1/4]: Typo mistake in CPSW driver while invoking runtime_pm api's
 
-Thanks,
-Sekhar
+[2/4]: Adds parent<->child relation between CPSW & MDIO module inside cpsw
+       driver, as in case of AM33XX, the resources are shared and common
+       register bit-field is provided to control module/clock enable/disable,
+       makes it difficult to handle common resource.
+
+       So the solution here is, to create parent<->child relation between them.
+
+[3/4]: Add hwmod entry for MDIO module, required for MDIO driver.
+
+[4/4]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
+	am335x-evm.dts and am335x-bone.dts file
+
+This patch series has been created on top of linux-omap/master and tested
+on both AM335x-EVM and BeagleBone platforms for NFS boot and basic ping
+test cases.
+
+
+All the patches are also available at,
+
+git at github.com:hvaibhav/am335x-linux.git  am335x-upstream-staging-cpsw
+
+
+Mugunthan V N (2):
+  ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
+  arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
+
+Vaibhav Hiremath (2):
+  net: davinci_mdio: Fix typo mistake in calling runtime-pm api
+  net: cpsw: Add parent<->child relation support between cpsw and mdio
+
+ arch/arm/boot/dts/am335x-bone.dts          |    8 ++++
+ arch/arm/boot/dts/am335x-evm.dts           |    8 ++++
+ arch/arm/boot/dts/am33xx.dtsi              |   50 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   32 ++++++++++++++++++
+ drivers/net/ethernet/ti/cpsw.c             |   16 ++++++++-
+ drivers/net/ethernet/ti/davinci_mdio.c     |    2 +-
+ 6 files changed, 113 insertions(+), 3 deletions(-)
