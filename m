@@ -1,44 +1,230 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 29 Oct 2012 11:22:25 +0100
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
-Message-ID: <201210291122.25510.marex@denx.de>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 29 Oct 2012 18:25:29 +0800
+Subject: [PATCH V2] ARM: tegra30: clocks: add AHB and APB clocks
+Message-ID: <1351506329-32427-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Vasily Khoruzhick,
+Adding the AHB and APB bus clock for Tegra30.
 
-[...]
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+V2:
+* fix the round_rate func when "rate >= parent_rate"
+---
+ arch/arm/mach-tegra/common.c              |    4 +
+ arch/arm/mach-tegra/tegra30_clocks.c      |  106 +++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/tegra30_clocks.h      |    1 +
+ arch/arm/mach-tegra/tegra30_clocks_data.c |   46 +++++++++++++
+ 4 files changed, 157 insertions(+), 0 deletions(-)
 
-> > 
-> > I rather wanted to encourage you to work on the PXA2xx DT stuff :)
-> 
-> I'm not refusing to work on PXA2xx DT stuff, just want to get bugfixes in
-> place, some of them are serious enough (like fixing oops on poweroff)
-> 
-> > Please have a quick look at arch/arm/mach-pxa/pxa-dt.c - what it takes
-> > for basic 270 support is just copying the logic that is there already
-> > for the 3xx models.
-> 
-> Sure, but I need to get DT-capable bootloader working on Z2 in first
-> place, right?
-
-Uh, you already have that. U-Boot can boot kernel and pass DT properly, just use 
-latest 2012.10 release which just got out a few weeks ago.
-
-> > Some parts like the uart, host-mode usb, mmc, gpio-leds, gpio-keys, i2c
-> > etc are already finished and should work instantly. What's missing is
-> > the spi controller and the display, but maybe you can help getting these
-> > done?
-> 
-> What about libertas? I still don't understand how DT handles
-> platform-specific callbacks like set_power(). And what about pm_power_off
-> hook?
-
-Start small, platform crap and DT goo can co-exist for a while.
-
-Best regards,
-Marek Vasut
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 0b0a5f5..177f164 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -104,6 +104,10 @@ static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
+ 	{ "clk_m",	NULL,		0,		true },
+ 	{ "pll_p",	"clk_m",	408000000,	true },
+ 	{ "pll_p_out1",	"pll_p",	9600000,	true },
++	{ "pll_p_out4",	"pll_p",	102000000,	true },
++	{ "sclk",	"pll_p_out4",	102000000,	true },
++	{ "hclk",	"sclk",		102000000,	true },
++	{ "pclk",	"hclk",		51000000,	true },
+ 	{ NULL,		NULL,		0,		0},
+ };
+ #endif
+diff --git a/arch/arm/mach-tegra/tegra30_clocks.c b/arch/arm/mach-tegra/tegra30_clocks.c
+index e9de5df..665618a 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks.c
++++ b/arch/arm/mach-tegra/tegra30_clocks.c
+@@ -792,6 +792,112 @@ struct clk_ops tegra30_twd_ops = {
+ 	.recalc_rate = tegra30_twd_clk_recalc_rate,
+ };
+ 
++/* bus clock functions */
++static int tegra30_bus_clk_is_enabled(struct clk_hw *hw)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val = clk_readl(c->reg);
++
++	c->state = ((val >> c->reg_shift) & BUS_CLK_DISABLE) ? OFF : ON;
++	return c->state;
++}
++
++static int tegra30_bus_clk_enable(struct clk_hw *hw)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val;
++
++	val = clk_readl(c->reg);
++	val &= ~(BUS_CLK_DISABLE << c->reg_shift);
++	clk_writel(val, c->reg);
++
++	return 0;
++}
++
++static void tegra30_bus_clk_disable(struct clk_hw *hw)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val;
++
++	val = clk_readl(c->reg);
++	val |= BUS_CLK_DISABLE << c->reg_shift;
++	clk_writel(val, c->reg);
++}
++
++static unsigned long tegra30_bus_clk_recalc_rate(struct clk_hw *hw,
++			unsigned long prate)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	u32 val = clk_readl(c->reg);
++	u64 rate = prate;
++
++	c->div = ((val >> c->reg_shift) & BUS_CLK_DIV_MASK) + 1;
++	c->mul = 1;
++
++	if (c->mul != 0 && c->div != 0) {
++		rate *= c->mul;
++		rate += c->div - 1; /* round up */
++		do_div(rate, c->div);
++	}
++	return rate;
++}
++
++static int tegra30_bus_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++		unsigned long parent_rate)
++{
++	struct clk_tegra *c = to_clk_tegra(hw);
++	int ret = -EINVAL;
++	u32 val;
++	int i;
++
++	val = clk_readl(c->reg);
++	for (i = 1; i <= 4; i++) {
++		if (rate == parent_rate / i) {
++			val &= ~(BUS_CLK_DIV_MASK << c->reg_shift);
++			val |= (i - 1) << c->reg_shift;
++			clk_writel(val, c->reg);
++			c->div = i;
++			c->mul = 1;
++			ret = 0;
++			break;
++		}
++	}
++
++	return ret;
++}
++
++static long tegra30_bus_clk_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *prate)
++{
++	unsigned long parent_rate = *prate;
++	s64 divider;
++
++	if (rate >= parent_rate)
++		return parent_rate;
++
++	divider = parent_rate;
++	divider += rate - 1;
++	do_div(divider, rate);
++
++	if (divider < 0)
++		return divider;
++
++	if (divider > 4)
++		divider = 4;
++	do_div(parent_rate, divider);
++
++	return parent_rate;
++}
++
++struct clk_ops tegra30_bus_ops = {
++	.is_enabled = tegra30_bus_clk_is_enabled,
++	.enable = tegra30_bus_clk_enable,
++	.disable = tegra30_bus_clk_disable,
++	.set_rate = tegra30_bus_clk_set_rate,
++	.round_rate = tegra30_bus_clk_round_rate,
++	.recalc_rate = tegra30_bus_clk_recalc_rate,
++};
++
+ /* Blink output functions */
+ static int tegra30_blink_clk_is_enabled(struct clk_hw *hw)
+ {
+diff --git a/arch/arm/mach-tegra/tegra30_clocks.h b/arch/arm/mach-tegra/tegra30_clocks.h
+index f2f88fe..7a34adb 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks.h
++++ b/arch/arm/mach-tegra/tegra30_clocks.h
+@@ -34,6 +34,7 @@ extern struct clk_ops tegra_clk_out_ops;
+ extern struct clk_ops tegra30_super_ops;
+ extern struct clk_ops tegra30_blink_clk_ops;
+ extern struct clk_ops tegra30_twd_ops;
++extern struct clk_ops tegra30_bus_ops;
+ extern struct clk_ops tegra30_periph_clk_ops;
+ extern struct clk_ops tegra30_dsib_clk_ops;
+ extern struct clk_ops tegra_nand_clk_ops;
+diff --git a/arch/arm/mach-tegra/tegra30_clocks_data.c b/arch/arm/mach-tegra/tegra30_clocks_data.c
+index 3d2e553..7bc8b1d 100644
+--- a/arch/arm/mach-tegra/tegra30_clocks_data.c
++++ b/arch/arm/mach-tegra/tegra30_clocks_data.c
+@@ -711,6 +711,50 @@ static struct clk tegra_clk_sclk = {
+ 	.num_parents = ARRAY_SIZE(mux_sclk),
+ };
+ 
++static const char *tegra_hclk_parent_names[] = {
++	"tegra_sclk",
++};
++
++static struct clk *tegra_hclk_parents[] = {
++	&tegra_clk_sclk,
++};
++
++static struct clk tegra_hclk;
++static struct clk_tegra tegra_hclk_hw = {
++	.hw = {
++		.clk = &tegra_hclk,
++	},
++	.flags = DIV_BUS,
++	.reg = 0x30,
++	.reg_shift = 4,
++	.max_rate = 378000000,
++	.min_rate = 12000000,
++};
++DEFINE_CLK_TEGRA(hclk, 0, &tegra30_bus_ops, 0, tegra_hclk_parent_names,
++		tegra_hclk_parents, &tegra_clk_sclk);
++
++static const char *tegra_pclk_parent_names[] = {
++	"tegra_hclk",
++};
++
++static struct clk *tegra_pclk_parents[] = {
++	&tegra_hclk,
++};
++
++static struct clk tegra_pclk;
++static struct clk_tegra tegra_pclk_hw = {
++	.hw = {
++		.clk = &tegra_pclk,
++	},
++	.flags = DIV_BUS,
++	.reg = 0x30,
++	.reg_shift = 0,
++	.max_rate = 167000000,
++	.min_rate = 12000000,
++};
++DEFINE_CLK_TEGRA(pclk, 0, &tegra30_bus_ops, 0, tegra_pclk_parent_names,
++		tegra_pclk_parents, &tegra_hclk);
++
+ static const char *mux_blink[] = {
+ 	"clk_32k",
+ };
+@@ -1325,6 +1369,8 @@ struct clk *tegra_ptr_clks[] = {
+ 	&tegra_cml1,
+ 	&tegra_pciex,
+ 	&tegra_clk_sclk,
++	&tegra_hclk,
++	&tegra_pclk,
+ 	&tegra_clk_blink,
+ 	&tegra30_clk_twd,
+ };
+-- 
+1.7.0.4
