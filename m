@@ -1,102 +1,69 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Oct 2012 21:52:23 +0200
-Subject: [PATCHv4 2/2] i2c: omap: make reset a seperate function
-In-Reply-To: <1351176199-6479-3-git-send-email-shubhrajyoti@ti.com>
-References: <1351176199-6479-1-git-send-email-shubhrajyoti@ti.com>
- <1351176199-6479-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121029195223.GC30152@arwen.pp.htv.fi>
+Date: Mon, 29 Oct 2012 22:00:32 +0200
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+ <20121026201539.GD29548@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+Message-ID: <20121029200032.GD30152@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 08:13:19PM +0530, Shubhrajyoti D wrote:
-> Implement reset as a separate function.
-> This will enable us to make sure that we don't do the
-> calculation again on every transfer.
-> Also at probe the reset is not added as the hwmod is doing that
-> for us.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Hi,
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-(again, will test tomorrow if I have time)
-
-Next step would be to figure out if it is necessary to reset the IP in
-case of error. I don't think so, but only testing will say...
-
-> ---
-> some of the errors may not need a reset.
-> will check and post separate patch.
+On Fri, Oct 26, 2012 at 10:03:11PM +0000, Paul Walmsley wrote:
+> Hi Felipe,
 > 
->  drivers/i2c/busses/i2c-omap.c |   25 ++++++++++++++++---------
->  1 files changed, 16 insertions(+), 9 deletions(-)
+> On Fri, 26 Oct 2012, Felipe Balbi wrote:
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 38acf1a..a25b7b0 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -309,15 +309,9 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
->  		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
->  }
->  
-> -static int omap_i2c_init(struct omap_i2c_dev *dev)
-> +static int omap_i2c_reset(struct omap_i2c_dev *dev)
->  {
-> -	u16 psc = 0, scll = 0, sclh = 0;
-> -	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
-> -	unsigned long fclk_rate = 12000000;
->  	unsigned long timeout;
-> -	unsigned long internal_clk = 0;
-> -	struct clk *fclk;
-> -
->  	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
->  		/* Disable I2C controller before soft reset */
->  		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
-> @@ -363,6 +357,17 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
->  			dev->westate = OMAP_I2C_WE_ALL;
->  		}
->  	}
-> +	return 0;
-> +}
-> +
-> +static int omap_i2c_init(struct omap_i2c_dev *dev)
-> +{
-> +	u16 psc = 0, scll = 0, sclh = 0;
-> +	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
-> +	unsigned long fclk_rate = 12000000;
-> +	unsigned long internal_clk = 0;
-> +	struct clk *fclk;
-> +
->  
->  	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
->  		/*
-> @@ -595,7 +600,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	if (timeout == 0) {
->  		dev_err(dev->dev, "controller timed out\n");
->  		ret = -ETIMEDOUT;
-> -		omap_i2c_init(dev);
-> +		omap_i2c_reset(dev);
-> +		__omap_i2c_init(dev);
->  		goto out;
->  	}
->  
-> @@ -606,7 +612,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
->  	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
->  			    OMAP_I2C_STAT_XUDF)) {
->  		ret = -EIO;
-> -		omap_i2c_init(dev);
-> +		omap_i2c_reset(dev);
-> +		__omap_i2c_init(dev);
->  		goto out;
->  	}
->  
-> -- 
-> 1.7.5.4
+> > On Thu, Oct 25, 2012 at 01:12:12PM +0300, Felipe Balbi wrote:
+> > > On Tue, Oct 23, 2012 at 09:23:03PM +0200, Jean Pihet wrote:
+> > > > On Tue, Oct 23, 2012 at 9:19 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> > > > > On Mon, 22 Oct 2012, Jean Pihet wrote:
+> > > > >
+> > > > >> On Mon, Oct 22, 2012 at 6:12 PM, Jean Pihet <jean.pihet@newoldbits.com> wrote:
+> > > > >>
+> > > > >> > Do you have CPU_IDLE enabled?
+> > > > >> FYI the issue is not present with CPU_IDLE enabled.
+> > > > >
+> > > > > Hmm, how can you tell?  I thought you weren't able to reproduce it with
+> > > > > CPU_IDLE disabled either?
+> > > > I could not reproduce the issue, with and without CPU_IDLE enabled.
+> > > > What puzzles me is that the PM QoS code only has influence on the
+> > > > states chosen by cpuidle, so the change should not have any impact
+> > > > with CPU_IDLE enabled. I reallt need to reproduce the issue.
+> > > > Let me try with the same setup as yours (bootloader images,
+> > > > omap2pus_defconfig, angstrom roots).
+> > > 
+> > > I just sent a patch to fix a bug I found on OMAP4 panda but while
+> > > reading this thread again, I think it could be that it's the same bug
+> > > which is just easier to reproduce on Paul's setup.
+> > > 
+> > > Paul, Aaro, can you see if [1] makes the problem go away ? that would be
+> > > another reason to push [1] during this -rc cycle.
+> > > 
+> > > [1] http://marc.info/?l=linux-omap&m=135115602407925&w=2
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks for mentioning it, but this patch doesn't fix the I2C timeout 
+> problem here.  Log fragment below from the 3530ES3 Beagle.
+
+that's too bad :-(
+
+Can you compile with:
+
+CONFIG_I2C_DEBUG_CORE=y
+CONFIG_I2C_DEBUG_ALGO=y
+CONFIG_I2C_DEBUG_BUS=y
+CONFIG_DEFAULT_MESSAGE_LOGLEVEL=9
+
+so that I can see all transfers ?
 
 -- 
 balbi
@@ -106,4 +73,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/387812c4/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/c02377b7/attachment-0001.sig>
