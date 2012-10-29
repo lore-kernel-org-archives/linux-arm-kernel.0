@@ -1,11 +1,16 @@
 From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 29 Oct 2012 19:45:17 +0100
-Subject: [PATCH net-next V3 07/10] cpsw: add a DT field for the cpts offset
+Date: Mon, 29 Oct 2012 19:45:18 +0100
+Subject: [PATCH net-next V3 08/10] cpsw: add a DT field for the active time
+ stamping port
 In-Reply-To: <cover.1351535536.git.richardcochran@gmail.com>
 References: <cover.1351535536.git.richardcochran@gmail.com>
-Message-ID: <18ad33e907fee56947313a9a36e0d3adc1e37237.1351535540.git.richardcochran@gmail.com>
+Message-ID: <496c255aeb2c696cbb62ac0319c97cf5fadda55b.1351535540.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Because time stamping on both external ports of the switch simultaneously
+is positively useless from the application's point of view, this patch
+provides a DT configuration method to choose the active port.
 
 Signed-off-by: Richard Cochran <richardcochran@gmail.com>
 ---
@@ -15,62 +20,62 @@ Signed-off-by: Richard Cochran <richardcochran@gmail.com>
  3 files changed, 11 insertions(+), 0 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index 3af47b7..dba014f 100644
+index dba014f..9f61f2b 100644
 --- a/Documentation/devicetree/bindings/net/cpsw.txt
 +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -16,6 +16,7 @@ Required properties:
- - ale_entries		: Specifies No of entries ALE can hold
- - host_port_reg_ofs	: Specifies host port register offset
- - hw_stats_reg_ofs	: Specifies hardware statistics register offset
-+- cpts_reg_ofs		: Specifies the offset of the CPTS registers
- - bd_ram_ofs		: Specifies internal desciptor RAM offset
- - bd_ram_size		: Specifies internal descriptor RAM size
- - rx_descs		: Specifies number of Rx descriptors
-@@ -52,6 +53,7 @@ Examples:
- 		ale_entries = <1024>;
- 		host_port_reg_ofs = <0x108>;
- 		hw_stats_reg_ofs = <0x900>;
-+		cpts_reg_ofs = <0xc00>;
- 		bd_ram_ofs = <0x2000>;
- 		bd_ram_size = <0x2000>;
- 		no_bd_ram = <0>;
-@@ -86,6 +88,7 @@ Examples:
- 		ale_entries = <1024>;
- 		host_port_reg_ofs = <0x108>;
- 		hw_stats_reg_ofs = <0x900>;
-+		cpts_reg_ofs = <0xc00>;
- 		bd_ram_ofs = <0x2000>;
- 		bd_ram_size = <0x2000>;
- 		no_bd_ram = <0>;
+@@ -23,6 +23,7 @@ Required properties:
+ - mac_control		: Specifies Default MAC control register content
+ 			  for the specific platform
+ - slaves		: Specifies number for slaves
++- cpts_active_slave	: Specifies the slave to use for time stamping
+ - slave_reg_ofs		: Specifies slave register offset
+ - sliver_reg_ofs	: Specifies slave sliver register offset
+ - phy_id		: Specifies slave phy id
+@@ -60,6 +61,7 @@ Examples:
+ 		rx_descs = <64>;
+ 		mac_control = <0x20>;
+ 		slaves = <2>;
++		cpts_active_slave = <0>;
+ 		cpsw_emac0: slave at 0 {
+ 			slave_reg_ofs = <0x200>;
+ 			sliver_reg_ofs = <0xd80>;
+@@ -95,6 +97,7 @@ Examples:
+ 		rx_descs = <64>;
+ 		mac_control = <0x20>;
+ 		slaves = <2>;
++		cpts_active_slave = <0>;
+ 		cpsw_emac0: slave at 0 {
+ 			slave_reg_ofs = <0x200>;
+ 			sliver_reg_ofs = <0xd80>;
 diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 588f5c3..f1af5e0 100644
+index f1af5e0..f165791 100644
 --- a/drivers/net/ethernet/ti/cpsw.c
 +++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -912,6 +912,13 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+@@ -847,6 +847,13 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
  	}
- 	data->hw_stats_reg_ofs = prop;
+ 	data->slaves = prop;
  
-+	if (of_property_read_u32(node, "cpts_reg_ofs", &prop)) {
-+		pr_err("Missing cpts_reg_ofs property in the DT.\n");
++	if (of_property_read_u32(node, "cpts_active_slave", &prop)) {
++		pr_err("Missing cpts_active_slave property in the DT.\n");
 +		ret = -EINVAL;
 +		goto error_ret;
 +	}
-+	data->cpts_reg_ofs = prop;
++	data->cpts_active_slave = prop;
 +
- 	if (of_property_read_u32(node, "bd_ram_ofs", &prop)) {
- 		pr_err("Missing bd_ram_ofs property in the DT.\n");
- 		ret = -EINVAL;
+ 	data->slave_data = kzalloc(sizeof(struct cpsw_slave_data) *
+ 				   data->slaves, GFP_KERNEL);
+ 	if (!data->slave_data) {
 diff --git a/include/linux/platform_data/cpsw.h b/include/linux/platform_data/cpsw.h
-index c4e23d0..a052b1d 100644
+index a052b1d..15a077e 100644
 --- a/include/linux/platform_data/cpsw.h
 +++ b/include/linux/platform_data/cpsw.h
-@@ -41,6 +41,7 @@ struct cpsw_platform_data {
- 	u32     host_port_num; /* The port number for the host port */
+@@ -33,6 +33,7 @@ struct cpsw_platform_data {
  
- 	u32	hw_stats_reg_ofs;  /* cpsw hardware statistics counters */
-+	u32	cpts_reg_ofs;      /* cpts registers */
+ 	u32	slaves;		/* number of slave cpgmac ports */
+ 	struct cpsw_slave_data	*slave_data;
++	u32	cpts_active_slave; /* time stamping slave */
  
- 	u32	bd_ram_ofs;   /* embedded buffer descriptor RAM offset*/
- 	u32	bd_ram_size;  /*buffer descriptor ram size */
+ 	u32	ale_reg_ofs;	/* address lookup engine reg offset */
+ 	u32	ale_entries;	/* ale table size */
 -- 
 1.7.2.5
