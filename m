@@ -1,30 +1,50 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 29 Oct 2012 12:33:40 +0300
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
-Message-ID: <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 29 Oct 2012 10:38:59 +0100
+Subject: [PATCH v3 3/4] arm: mvebu: move irq controller driver to
+ drivers/irqchip
+In-Reply-To: <20121029102436.504d5053@skate>
+References: <1351462748-5224-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508E49E0.8050606@gmail.com> <20121029102436.504d5053@skate>
+Message-ID: <508E4EB3.5060901@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2012 at 1:58 AM, Daniel Mack <zonque@gmail.com> wrote:
->> Any volunteers? :) It requires huge amount of work,
+On 10/29/2012 10:24 AM, Thomas Petazzoni wrote:
+>> using ARCH_MVEBU for enabling irq-armada-370-xp here will lead to
+>> incompatibilities with Orion SoCs when they move over to ARCH_MVEBU.
 >
-> Well, it's actually quite straight forward. With the changes that got merged
-> to 3.7, pxa3xx platforms boot, and I also ported some pxa specific
-> peripheral drivers that should work for both 2xx and 3xx. Adding CPU support
-> for 27x should also just be a matter of some extra lines.
+> Not really: the driver is probed depending on the DT compatible string.
+> So we can perfectly have two irqchip drivers being enabled on
+> ARCH_MVEBU.
+
+I agreed but this will always build irq-armada-370-xp into the kernel
+although I maybe want a orion-only kernel. Although multi-platform will
+be great for ARM, I doubt that every kernel will be multi-platform?
+
+>> With a Kconfig within drivers/irqchip you could define a
+>> ARMADA_370_XP_IRQ and select that in MACH_ARMADA_370 and MACH_ARMADA_XP
+>> or MACH_ARMADA_370_XP, which all already exist.
 >
-> So I would clearly say you should give the DT approach a try first and see
-> which bits are missing. And I would vote for not taking any new features for
-> the legacy board support files but just bugfixes.
+> But agreed, I could use MACH_ARMADA_370_XP. I don't know if we want to
+> add Kconfig options for each irqchip driver.
 
-Fair enough, I'll resend series without USB stuff (so it'll contain
-only bugfixes)
+Ok.
 
-Regards
-Vasily
+>> As soon as the patch is through, I can provide (and use) a irq-orion
+>> based on irqchip. I can provide it earlier but to actually use it there
+>> are still some other patches required on Dove. Other Orions could
+>> switch now, I guess.
+>
+> Are you sure? The irqchip drivers only work for sub-architecture that
+> are fully converted to the Device Tree. And I don't think all of
+> mach-orion5x, mach-dove, mach-kirkwood and mach-mv78xx0 are converted
+> to the DT.
+
+Hmm, I do have an experimental branch of Dove with irqchip enabled that
+works perfectly fine even with non-DT code in it. Actually, it is based
+on 3.7-rc3 which means it is before your patches.
+
+But the irq controller itself is referenced from DT, of course.
+
+Sebastian
