@@ -1,37 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 29 Oct 2012 09:01:23 -0700
-Subject: [PATCH] Add FDT support to Pandaboard initialization
-In-Reply-To: <20121029061427.GP17570@arwen.pp.htv.fi>
-References: <1351363800-28744-1-git-send-email-const@MakeLinux.com>
- <20121029061427.GP17570@arwen.pp.htv.fi>
-Message-ID: <20121029160122.GB11908@atomide.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 29 Oct 2012 16:10:24 +0000
+Subject: [PATCH 1/2] spi: spidev: Add device tree bindings
+In-Reply-To: <508EA013.7050907@free-electrons.com>
+References: <1351238873-25230-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1351238873-25230-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20121027221955.GO4564@opensource.wolfsonmicro.com>
+ <508EA013.7050907@free-electrons.com>
+Message-ID: <20121029161023.GC4511@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121028 23:22]:
-> On Sat, Oct 27, 2012 at 08:50:00PM +0200, Constantine Shulyupin wrote:
-> > From: Constantine Shulyupin <const@MakeLinux.com>
-> > 
-> > Problem:
-> > - FDT is supported only by generic OMAP board initialization in arch/arm/mach-omap2/board-generic.c and lacks some configurations, which are not yet configured in FDT (USB for example).
-> > Solution:
-> > - arch/arm/mach-omap2/board-omap4panda.c supports initialization with FDT and without it.
-> > 
-> > Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
-> 
-> NAK, the whole idea of DT is to drop board-*.c. It would be best to see
-> the "missing initialization" being added to board-generic/dts files.
+On Mon, Oct 29, 2012 at 04:26:11PM +0100, Maxime Ripard wrote:
 
-Yes I agree, let's rather get board-generic.c to work with panda.
+> Ok, so I guess that leaves us with 2 choices here:
 
-The other board-*.c files will be dropped as soon as we have
-things usable with devicetree. And we're only two board-*.c files
-away from making omap4 device tree only ;)
+>   * Declare the device in the dt as you would have with any other
+>     driver, with its own compatible string, and we add this compatible
+>     string to the spidev dt ids array. It allows to use the existing
+>     code and thus doesn't require any effort at all, but it will
+>     generate a lot of noise for the spidev driver, since all of us will
+>     need to add its compatible string to spidev.
 
-I think we are only missing DSS, USB and WLAN bindings to
-have blaze and panda usable with device tree to the point
-where everything else can be added later on.
+>   * Rework the spidev code so that it behaves mostly like i2c-dev, that
+>     is you have an instance of it for every device enumerated in the dt,
+>     regardless of wether it has a driver loaded or not. If the
+>     userspace opens the device file corresponding to a device already
+>     attached to a driver, you return EBUSY, and that's it. I guess it
+>     would be the cleaner solution, since you only select spidev in
+>     configuration, but it definitely requires way more development than
+>     the first one.
 
-Regards,
+> What's your views on this?
+> Did you have in mind another solution?
 
-Tony
+I think either solution is good, obviously Grant's more the expert here.
+Adding the IDs is obviously simpler and doesn't preclude later doing the
+i2c-dev style thing so short term I'd probably add the IDs to get things
+going and punt on the difficult stuff for the time being but YMMV.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/d95241f4/attachment.sig>
