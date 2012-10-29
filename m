@@ -1,38 +1,31 @@
 From: x0148406@ti.com (Afzal Mohammed)
-Date: Mon, 29 Oct 2012 13:33:35 +0530
-Subject: [PATCH v4 3/5] rtc: omap: dt support
-In-Reply-To: <5084523F.2070800@gmail.com>
-References: <cover.1350633036.git.afzal@ti.com>
- <061c670b0a05570d7b83d8a8f105ee5b35583f7f.1350633036.git.afzal@ti.com>
- <5084523F.2070800@gmail.com>
-Message-ID: <508E3857.6080109@ti.com>
+Date: Mon, 29 Oct 2012 13:36:59 +0530
+Subject: [PATCH v2 06/14] mtd: onenand: omap: use pdata info instead of
+ cpu_is
+In-Reply-To: <20121026164115.GE11908@atomide.com>
+References: <cover.1349672877.git.afzal@ti.com>
+ <860ba92c34cbb490beccd5442087087c1751a6a2.1349672877.git.afzal@ti.com>
+ <alpine.DEB.2.00.1210260146270.11251@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210260411140.27963@utopia.booyaka.com>
+ <20121026164115.GE11908@atomide.com>
+Message-ID: <508E3923.4020209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On Monday 22 October 2012 01:21 AM, Daniel Mack wrote:
-> On 19.10.2012 11:59, Afzal Mohammed wrote:
+On Friday 26 October 2012 10:11 PM, Tony Lindgren wrote:
+> * Paul Walmsley<paul@pwsan.com>  [121025 22:05]:
 
->> +static const struct of_device_id omap_rtc_of_match[] = {
->> +	{	.compatible	= "ti,da830-rtc",
->> +		.data		=&omap_rtc_devtype[OMAP_RTC_DATA_DA830_IDX],
+>> It also breaks an OMAP3+4 config:
 
-> Wouldn't it make sense to list all the compatible models here? The
-> advantage of a compatible list is that we can name the models
-> explicitly, or maybe at least "davinci-rtc". Is there any reason for
-> this particular name?
+>> Fix below.
+> Thanks, I'd like to pull this fix in too along with the
+> others.
 
-Exact name followed by compatible models needs to be
-specified in DT node only, right ? (when driver for the
-first variant can handle it)
+Thanks Paul and Tony for taking care of this issue.
 
-And when additional features of newer IP's has to be
-leveraged, new entries can be added in the driver
-match table.
-
-First known variant of SoC for DT is da830 (exact name),
-hence it was used.
+I am sorry about the issue and had been on vacation
+last week.
 
 Regards
 Afzal
