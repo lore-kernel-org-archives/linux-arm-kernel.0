@@ -1,60 +1,64 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 29 Oct 2012 18:25:45 +0800
-Subject: [PATCH V2 1/2] ARM: tegra: dt: add L2 cache controller
-Message-ID: <1351506345-32524-1-git-send-email-josephl@nvidia.com>
+Date: Mon, 29 Oct 2012 18:25:57 +0800
+Subject: [PATCH V2 2/2] ARM: tegra: common: using OF api for L2 cache init
+Message-ID: <1351506357-32591-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add L2 cache controller binding into DT for Tegra.
+Moving L2 cache init to DT support.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V2:
-* remove "L2" label for cache-controller DT binding
+* no changes
 ---
- arch/arm/boot/dts/tegra20.dtsi |    9 +++++++++
- arch/arm/boot/dts/tegra30.dtsi |    9 +++++++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/common.c |   11 ++++-------
+ 1 files changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index 6934bca..21ca861 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -4,6 +4,15 @@
- 	compatible = "nvidia,tegra20";
- 	interrupt-parent = <&intc>;
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 177f164..d2d6dbb 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -113,20 +113,17 @@ static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
+ #endif
  
-+	cache-controller at 50043000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x50043000 0x1000>;
-+		arm,data-latency = <5 5 2>;
-+		arm,tag-latency = <4 4 2>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 81f5df4..568f291 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -4,6 +4,15 @@
- 	compatible = "nvidia,tegra30";
- 	interrupt-parent = <&intc>;
  
-+	cache-controller at 50043000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x50043000 0x1000>;
-+		arm,data-latency = <6 6 2>;
-+		arm,tag-latency = <5 5 2>;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
+-static void __init tegra_init_cache(u32 tag_latency, u32 data_latency)
++static void __init tegra_init_cache(void)
+ {
+ #ifdef CONFIG_CACHE_L2X0
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+ 	u32 aux_ctrl, cache_type;
+ 
+-	writel_relaxed(tag_latency, p + L2X0_TAG_LATENCY_CTRL);
+-	writel_relaxed(data_latency, p + L2X0_DATA_LATENCY_CTRL);
+-
+ 	cache_type = readl(p + L2X0_CACHE_TYPE);
+ 	aux_ctrl = (cache_type & 0x700) << (17-8);
+ 	aux_ctrl |= 0x6C000001;
+ 
+-	l2x0_init(p, aux_ctrl, 0x8200c3fe);
++	l2x0_of_init(aux_ctrl, 0x8200c3fe);
+ #endif
+ 
+ }
+@@ -138,7 +135,7 @@ void __init tegra20_init_early(void)
+ 	tegra_init_fuse();
+ 	tegra2_init_clocks();
+ 	tegra_clk_init_from_table(tegra20_clk_init_table);
+-	tegra_init_cache(0x331, 0x441);
++	tegra_init_cache();
+ 	tegra_pmc_init();
+ 	tegra_powergate_init();
+ 	tegra20_hotplug_init();
+@@ -151,7 +148,7 @@ void __init tegra30_init_early(void)
+ 	tegra_init_fuse();
+ 	tegra30_init_clocks();
+ 	tegra_clk_init_from_table(tegra30_clk_init_table);
+-	tegra_init_cache(0x441, 0x551);
++	tegra_init_cache();
+ 	tegra_pmc_init();
+ 	tegra_powergate_init();
+ 	tegra30_hotplug_init();
 -- 
 1.7.0.4
