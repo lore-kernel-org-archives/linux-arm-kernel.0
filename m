@@ -1,96 +1,63 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Tue, 23 Oct 2012 17:34:22 -0500
-Subject: [PATCH v4 2/5] zynq: use pl310 device tree bindings
-In-Reply-To: <cover.1351466765.git.josh.cartwright@ni.com>
-References: <cover.1351466765.git.josh.cartwright@ni.com>
-Message-ID: <a60818e7f2bf13cbc06b21bb3e3b0071539379ea.1351466765.git.josh.cartwright@ni.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 29 Oct 2012 09:55:48 +0800
+Subject: [PATCH v2 2/9] pinctrl: single: support gpio request and free
+In-Reply-To: <20121022213709.GL4730@atomide.com>
+References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350922139-3693-3-git-send-email-haojian.zhuang@gmail.com>
+ <20121022202805.GG4730@atomide.com>
+ <20121022213709.GL4730@atomide.com>
+Message-ID: <CAN1soZzb-un9MqVGVy8iEzT_8ag8zQyFO=deB7=VQG2K73oouw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq has a PL310 L2 cache controller.  Convert in-tree uses to using
-the device tree.
+On Tue, Oct 23, 2012 at 5:37 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [121022 13:29]:
+>> * Haojian Zhuang <haojian.zhuang@gmail.com> [121022 09:11]:
+>> > --- a/drivers/pinctrl/pinctrl-single.c
+>> > +++ b/drivers/pinctrl/pinctrl-single.c
+>> > @@ -28,8 +28,10 @@
+>> >  #define DRIVER_NAME                        "pinctrl-single"
+>> >  #define PCS_MUX_PINS_NAME          "pinctrl-single,pins"
+>> >  #define PCS_MUX_BITS_NAME          "pinctrl-single,bits"
+>> > +#define PCS_GPIO_FUNC_NAME         "pinctrl-single,gpio-func"
+>>
+>> I think we can now get rid of these defines, I initially added
+>> them as we had a bit hard time finding a suitable name for the
+>> driver. These are only used in one location, so let's not add
+>> new ones here.
+>>
+>> >  static int pcs_request_gpio(struct pinctrl_dev *pctldev,
+>> > -                   struct pinctrl_gpio_range *range, unsigned offset)
+>> > +                       struct pinctrl_gpio_range *range, unsigned pin)
+>> >  {
+>> > -   return -ENOTSUPP;
+>> > +   struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+>> > +   struct pcs_gpio_range *gpio = NULL;
+>> > +   int end, mux_bytes;
+>> > +   unsigned data;
+>> > +
+>> > +   gpio = container_of(range, struct pcs_gpio_range, range);
+>> > +   if (!gpio->func_en)
+>> > +           return 0;
+>> > +   end = range->pin_base + range->npins - 1;
+>> > +   if (pin < range->pin_base || pin > end) {
+>> > +           dev_err(pctldev->dev, "pin %d isn't in the range of "
+>> > +                   "%d to %d\n", pin, range->pin_base, end);
+>> > +           return -EINVAL;
+>> > +   }
+>> > +   mux_bytes = pcs->width / BITS_PER_BYTE;
+>> > +   data = pcs_readl(pcs->base + pin * mux_bytes) & ~pcs->fmask;
+>> > +   data |= gpio->gpio_func;
+>> > +   pcs_writel(data, pcs->base + pin * mux_bytes);
+>> > +   return 0;
+>> >  }
+>>
+>> I think I already commented on this one.. Is this safe if you don't
+>> have GPIOs configured? Or should you return -ENODEV in that case?
+>
+> Oops also you should not use pcs_readl/pcs_writel in the driver
+> directly but use pcs_read instead as you can have register width other
+> than 32-bits.
+>
 
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-Cc: John Linn <john.linn@xilinx.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Michal Simek <michal.simek@xilinx.com>
----
- arch/arm/boot/dts/zynq-ep107.dts           | 9 +++++++++
- arch/arm/mach-zynq/common.c                | 9 +--------
- arch/arm/mach-zynq/include/mach/zynq_soc.h | 4 ----
- 3 files changed, 10 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-ep107.dts
-index f914090..574bc04 100644
---- a/arch/arm/boot/dts/zynq-ep107.dts
-+++ b/arch/arm/boot/dts/zynq-ep107.dts
-@@ -44,6 +44,15 @@
- 			      <0xF8F00100 0x100>;
- 		};
- 
-+		L2: cache-controller {
-+			compatible = "arm,pl310-cache";
-+			reg = <0xF8F02000 0x1000>;
-+			arm,data-latency = <2 3 2>;
-+			arm,tag-latency = <2 3 2>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
- 		uart0: uart at e0000000 {
- 			compatible = "xlnx,xuartps";
- 			reg = <0xE0000000 0x1000>;
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index d73963b..056091a 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -45,12 +45,10 @@ static struct of_device_id zynq_of_bus_ids[] __initdata = {
-  */
- static void __init xilinx_init_machine(void)
- {
--#ifdef CONFIG_CACHE_L2X0
- 	/*
- 	 * 64KB way size, 8-way associativity, parity disabled
- 	 */
--	l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
--#endif
-+	l2x0_of_init(0x02060000, 0xF0F0FFFF);
- 
- 	of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
- }
-@@ -83,11 +81,6 @@ static struct map_desc io_desc[] __initdata = {
- 		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
- 		.length		= SZ_8K,
- 		.type		= MT_DEVICE,
--	}, {
--		.virtual	= PL310_L2CC_VIRT,
--		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
- 	},
- 
- #ifdef CONFIG_DEBUG_LL
-diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-index 3d1c6a6..218283a 100644
---- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
-+++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
-@@ -25,9 +25,6 @@
- #define TTC0_PHYS			0xF8001000
- #define TTC0_VIRT			TTC0_PHYS
- 
--#define PL310_L2CC_PHYS			0xF8F02000
--#define PL310_L2CC_VIRT			PL310_L2CC_PHYS
--
- #define SCU_PERIPH_PHYS			0xF8F00000
- #define SCU_PERIPH_VIRT			SCU_PERIPH_PHYS
- 
-@@ -35,7 +32,6 @@
- 
- #define TTC0_BASE			IOMEM(TTC0_VIRT)
- #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
--#define PL310_L2CC_BASE			IOMEM(PL310_L2CC_VIRT)
- 
- /*
-  * Mandatory for CONFIG_LL_DEBUG, UART is mapped virtual = physical
--- 
-1.8.0
+I think you're meaning pcs->read(). I'll use this interface.
