@@ -1,76 +1,53 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 29 Oct 2012 14:27:54 +0100
-Subject: [RFC 5/6] sched: pack the idle load balance
-In-Reply-To: <50880774.5090605@ti.com>
+Date: Mon, 29 Oct 2012 14:28:46 +0100
+Subject: [RFC 6/6] ARM: sched: clear SD_SHARE_POWERLINE
+In-Reply-To: <50880795.4030609@ti.com>
 References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
- <1349595838-31274-6-git-send-email-vincent.guittot@linaro.org>
- <50880774.5090605@ti.com>
-Message-ID: <CAKfTPtBsAJ4u265TzOz9qvL4d-eMmrVD-MtgG_Rri_2shGrPBQ@mail.gmail.com>
+ <1349595838-31274-7-git-send-email-vincent.guittot@linaro.org>
+ <50880795.4030609@ti.com>
+Message-ID: <CAKfTPtAZjLpwHYgj8JXku4sU0mPPf34MKkWp0=qiX5u-T0JVOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 24 October 2012 17:21, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 > On Sunday 07 October 2012 01:13 PM, Vincent Guittot wrote:
 >>
->> Look for an idle CPU close the pack buddy CPU whenever possible.
->
-> s/close/close to
-
-yes
-
->
->> The goal is to prevent the wake up of a CPU which doesn't share the power
->> line of the pack CPU
+>> The ARM platforms take advantage of packing small tasks on few cores.
+>> This is true even when the cores of a cluster can't be powergated
+>> independently.
+>>
 >>
 >> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 >> ---
->>   kernel/sched/fair.c |   18 ++++++++++++++++++
->>   1 file changed, 18 insertions(+)
+>>   arch/arm/kernel/topology.c |    5 +++++
+>>   1 file changed, 5 insertions(+)
 >>
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 6df53b5..f76acdc 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -5158,7 +5158,25 @@ static struct {
+>> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+>> index 26c12c6..00511d0 100644
+>> --- a/arch/arm/kernel/topology.c
+>> +++ b/arch/arm/kernel/topology.c
+>> @@ -226,6 +226,11 @@ static inline void update_cpu_power(unsigned int
+>> cpuid, unsigned int mpidr) {}
+>>    */
+>>   struct cputopo_arm cpu_topology[NR_CPUS];
 >>
->>   static inline int find_new_ilb(int call_cpu)
->>   {
->> +       struct sched_domain *sd;
->>         int ilb = cpumask_first(nohz.idle_cpus_mask);
->> +       int buddy = per_cpu(sd_pack_buddy, call_cpu);
->> +
->> +       /*
->> +        * If we have a pack buddy CPU, we try to run load balance on a
->> CPU
->> +        * that is close to the buddy.
->> +        */
->> +       if (buddy != -1)
->> +               for_each_domain(buddy, sd) {
->> +                       if (sd->flags & SD_SHARE_CPUPOWER)
->> +                               continue;
+>> +int arch_sd_share_power_line(void)
+>> +{
+>> +       return 0*SD_SHARE_POWERLINE;
+>> +}
 >
-> Do you mean SD_SHARE_POWERLINE here ?
-
-No, I just don't want to take hyperthread level for ILB
-
 >
->> +
->> +                       ilb = cpumask_first_and(sched_domain_span(sd),
->> +                                       nohz.idle_cpus_mask);
->> +
->> +                       if (ilb < nr_cpu_ids)
->> +                               break;
->> +               }
->>
->>         if (ilb < nr_cpu_ids && idle_cpu(ilb))
->>                 return ilb;
->>
-> Can you please expand "idle CPU _close_ the pack buddy CPU" ?
+> Making this selection of policy based on sched domain will better. Just
+> gives the flexibility to choose a separate scheme for big and little
+> systems which will be very convenient.
 
-The goal is to packed  the tasks on the pack buddy CPU so when the
-scheduler needs to start ILB, I try to wake up a CPU that is close to
-the buddy and preferably in the same cluster
+I agree that it would be more flexible to be able to set it for each level
 
 >
 > Regards
-> santosh
+> Santosh
+>
+>
+>
+>
+>
