@@ -1,204 +1,154 @@
-From: elen.song@atmel.com (Elen Song)
-Date: Mon, 29 Oct 2012 17:11:08 +0800
-Subject: [PATCH 6/6] Serial: AT91: Enable rx cyclic DMA transfer
-Message-ID: <1351501868-19358-1-git-send-email-elen.song@atmel.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Mon, 29 Oct 2012 09:11:34 +0000
+Subject: [RFC PATCH v3 16/16] ARM: dts: add AM33XX SPI support
+In-Reply-To: <1350566815-409-17-git-send-email-mporter@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-17-git-send-email-mporter@ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9D526E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prevent data overrun, we use cyclic dma transfer for rx.
+On Thu, Oct 18, 2012 at 18:56:55, Porter, Matt wrote:
+> Adds AM33XX SPI support for am335x-bone and am335x-evm.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  arch/arm/boot/dts/am335x-bone.dts |   17 +++++++++++++++
+>  arch/arm/boot/dts/am335x-evm.dts  |    9 ++++++++
+>  arch/arm/boot/dts/am33xx.dtsi     |   43 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 69 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index 5510979..23edfd8 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -18,6 +18,17 @@
+>  		reg = <0x80000000 0x10000000>; /* 256 MB */
+>  	};
+>  
+> +	am3358_pinmux: pinmux at 44e10800 {
+> +		spi1_pins: pinmux_spi1_pins {
+> +			pinctrl-single,pins = <
+> +				0x190 0x13	/* mcasp0_aclkx.spi1_sclk, OUTPUT_PULLUP | MODE3 */
+> +				0x194 0x33	/* mcasp0_fsx.spi1_d0, INPUT_PULLUP | MODE3 */
+> +				0x198 0x13	/* mcasp0_axr0.spi1_d1, OUTPUT_PULLUP | MODE3 */
+> +				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
+> +			>;
+> +		};
+> +	};
+> +
 
-atmel_allocate_desc will allocate a cycle dma cookie after request channel,
-after that, enable uart timeout interrupt in startup stage, when data successful received,
-the timeout callback will check the residual bytes and insert receiving datas into the framework
-during the transfer interval.
+Change to am33xx_pinmux.
 
-when current descriptor finished,
-the dma callback will also check the residual bytes and filp the receiving datas.
+>  	ocp {
+>  		uart1: serial at 44e09000 {
+>  			status = "okay";
+> @@ -84,3 +95,9 @@
+>  &mmc1 {
+>  	vmmc-supply = <&ldo3_reg>;
+>  };
+> +
+> +&spi1 {
+> +	status = "okay";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi1_pins>;
+> +};
+> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+> index d63fce8..8d5f660 100644
+> --- a/arch/arm/boot/dts/am335x-evm.dts
+> +++ b/arch/arm/boot/dts/am335x-evm.dts
+> @@ -124,3 +124,12 @@
+>  &mmc1 {
+>  	vmmc-supply = <&vmmc_reg>;
+>  };
+> +
+> +&spi0 {
+> +	status = "okay";
+> +	spi-flash at 0 {
+> +		compatible = "spansion,s25fl064k", "m25p80";
+> +		spi-max-frequency = <24000000>;
+> +		reg = <0>;
+> +	};
+> +};
 
-Signed-off-by: Elen Song <elen.song@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |  126 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 125 insertions(+), 1 deletion(-)
+In AM335x-evm, SPI flash available in profile #2 (am335x evm specific profiles).
+So can you drop this changes as if I understood correctly, am335x-evm.dts will be
+populated for devices present only on profile #0.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 8ee9023..d3ba9ab 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -788,6 +788,40 @@ static void atmel_tx_request_dma(struct atmel_uart_port *atmel_port)
- 	}
- }
- 
-+static void atmel_rx_dma_flip_buffer(struct uart_port *port,
-+					char *buf, size_t count)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct tty_struct *tty = port->state->port.tty;
-+
-+	dma_sync_sg_for_cpu(port->dev,
-+				&atmel_port->sg_rx,
-+				1,
-+				DMA_DEV_TO_MEM);
-+
-+	tty_insert_flip_string(tty, buf, count);
-+
-+	dma_sync_sg_for_device(port->dev,
-+				&atmel_port->sg_rx,
-+				1,
-+				DMA_DEV_TO_MEM);
-+	/*
-+	 * Drop the lock here since it might end up calling
-+	 * uart_start(), which takes the lock.
-+	 */
-+	spin_unlock(&port->lock);
-+	tty_flip_buffer_push(tty);
-+	spin_lock(&port->lock);
-+}
-+
-+static void atmel_dma_rx_complete(void *arg)
-+{
-+	struct uart_port *port = arg;
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+
-+	tasklet_schedule(&atmel_port->tasklet);
-+}
-+
- static void atmel_rx_dma_release(struct atmel_uart_port *atmel_port)
- {
- 	struct dma_chan *chan = atmel_port->chan_rx;
-@@ -804,6 +838,47 @@ static void atmel_rx_dma_release(struct atmel_uart_port *atmel_port)
- 	}
- }
- 
-+static void atmel_rx_from_dma(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct circ_buf *ring = &atmel_port->rx_ring;
-+	struct dma_chan *chan = atmel_port->chan_rx;
-+	struct dma_tx_state state;
-+	enum dma_status dmastat;
-+	size_t pending, count;
-+
-+
-+	/* Reset the UART timeout early so that we don't miss one */
-+	UART_PUT_CR(port, ATMEL_US_STTTO);
-+	dmastat = dmaengine_tx_status(chan,
-+				atmel_port->cookie_rx,
-+				&state);
-+	if (dmastat == DMA_ERROR)
-+		dev_err(port->dev, "DMA status err\n");
-+	/* current transfer size should no larger than dma buffer */
-+	pending = sg_dma_len(&atmel_port->sg_rx) - state.residue;
-+	BUG_ON(pending > sg_dma_len(&atmel_port->sg_rx));
-+
-+	/*
-+	 * This will take the chars we have so far,
-+	 * ring->head will record the transfer size, only new bytes come
-+	 * will insert into the framework.
-+	 */
-+	if (pending > ring->head) {
-+		count = pending - ring->head;
-+
-+		atmel_rx_dma_flip_buffer(port, ring->buf + ring->head, count);
-+
-+		ring->head += count;
-+		if (ring->head == sg_dma_len(&atmel_port->sg_rx))
-+			ring->head = 0;
-+
-+		port->icount.rx += count;
-+	}
-+
-+	UART_PUT_IER(port, ATMEL_US_TIMEOUT);
-+}
-+
- static void atmel_rx_request_dma(struct atmel_uart_port *atmel_port)
- {
- 	struct uart_port	*port;
-@@ -880,6 +955,37 @@ static void atmel_rx_request_dma(struct atmel_uart_port *atmel_port)
- 	}
- }
- 
-+static int atmel_allocate_desc(struct uart_port *port)
-+{
-+	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-+	struct dma_async_tx_descriptor *desc;
-+	struct dma_chan *chan = atmel_port->chan_rx;
-+
-+	if (!chan) {
-+		dev_warn(port->dev, "No channel available\n");
-+		goto err_dma;
-+	}
-+	/*
-+	 * Prepare a cyclic dma transfer, assign 2 descriptors,
-+	 * each one is half ring buffer size
-+	 */
-+	desc = dmaengine_prep_dma_cyclic(chan,
-+				sg_dma_address(&atmel_port->sg_rx),
-+				sg_dma_len(&atmel_port->sg_rx),
-+				sg_dma_len(&atmel_port->sg_rx)/2,
-+				DMA_DEV_TO_MEM);
-+	desc->callback = atmel_dma_rx_complete;
-+	desc->callback_param = port;
-+	atmel_port->desc_rx = desc;
-+	atmel_port->cookie_rx = dmaengine_submit(desc);
-+
-+	return 0;
-+
-+err_dma:
-+	atmel_rx_dma_release(atmel_port);
-+	return -EINVAL;
-+}
-+
- /*
-  * receive interrupt handler.
-  */
-@@ -907,6 +1013,13 @@ atmel_handle_receive(struct uart_port *port, unsigned int pending)
- 			atmel_pdc_rxerr(port, pending);
- 	}
- 
-+	if (atmel_use_dma_rx(port)) {
-+		if (pending & ATMEL_US_TIMEOUT) {
-+			UART_PUT_IDR(port, ATMEL_US_TIMEOUT);
-+			tasklet_schedule(&atmel_port->tasklet);
-+		}
-+	}
-+
- 	/* Interrupt receive */
- 	if (pending & ATMEL_US_RXRDY)
- 		atmel_rx_chars(port);
-@@ -1212,6 +1325,8 @@ static void atmel_tasklet_func(unsigned long data)
- 
- 	if (atmel_use_pdc_rx(port))
- 		atmel_rx_from_pdc(port);
-+	else if (atmel_use_dma_rx(port))
-+		atmel_rx_from_dma(port);
- 	else
- 		atmel_rx_from_ring(port);
- 
-@@ -1297,8 +1412,11 @@ static int atmel_startup(struct uart_port *port)
- 	if (atmel_use_dma_tx(port))
- 		atmel_tx_request_dma(atmel_port);
- 
--	if (atmel_use_dma_rx(port))
-+	if (atmel_use_dma_rx(port)) {
- 		atmel_rx_request_dma(atmel_port);
-+		if (atmel_allocate_desc(port))
-+			return -EINVAL;
-+	}
- 	/*
- 	 * If there is a specific "open" function (to register
- 	 * control line interrupts)
-@@ -1330,6 +1448,12 @@ static int atmel_startup(struct uart_port *port)
- 		UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT);
- 		/* enable PDC controller */
- 		UART_PUT_PTCR(port, ATMEL_PDC_RXTEN);
-+	} else if (atmel_use_dma_rx(port)) {
-+		/* set UART timeout */
-+		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
-+		UART_PUT_CR(port, ATMEL_US_STTTO);
-+
-+		UART_PUT_IER(port, ATMEL_US_TIMEOUT);
- 	} else {
- 		/* enable receive only */
- 		UART_PUT_IER(port, ATMEL_US_RXRDY);
--- 
-1.7.9.5
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 26a6af7..063ecea 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -40,6 +40,15 @@
+>  		};
+>  	};
+>  
+> +	am3358_pinmux: pinmux at 44e10800 {
+> +		compatible = "pinctrl-single";
+> +		reg = <0x44e10800 0x0238>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-single,register-width = <32>;
+> +		pinctrl-single,function-mask = <0x7f>;
+> +	};
+> +
+
+Pin ctrl support already submitted
+http://git.kernel.org/?p=linux/kernel/git/bcousson/linux-omap-dt.git;a=commitdiff;h=3e0603e905d9ba662e8c1885ecb1d28bc454e448
+
+Thanks
+Avinash
+
+>  	/*
+>  	 * XXX: Use a flat representation of the AM33XX interconnect.
+>  	 * The real AM33XX interconnect network is quite complex.Since
+> @@ -261,6 +270,40 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		spi0: spi at 48030000 {
+> +			compatible = "ti,omap4-mcspi";
+> +			ti,hwmods = "spi0";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x48030000 0x400>;
+> +			interrupt-parent = <&intc>;
+> +			interrupt = <65>;
+> +			dmas = <&edma 16
+> +				&edma 17
+> +				&edma 18
+> +				&edma 19>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1";
+> +			ti,spi-num-cs = <2>;
+> +			status = "disabled";
+> +		};
+> +
+> +		spi1: spi at 481a0000 {
+> +			compatible = "ti,omap4-mcspi";
+> +			ti,hwmods = "spi1";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x481a0000 0x400>;
+> +			interrupt-parent = <&intc>;
+> +			interrupt = <125>;
+> +			dmas = <&edma 42
+> +				&edma 43
+> +				&edma 44
+> +				&edma 45>;
+> +			dma-names = "tx0", "rx0", "tx1", "rx1";
+> +			ti,spi-num-cs = <2>;
+> +			status = "disabled";
+> +		};
+> +
+>  		wdt2: wdt at 44e35000 {
+>  			compatible = "ti,omap3-wdt";
+>  			ti,hwmods = "wd_timer2";
+> -- 
+> 1.7.9.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
