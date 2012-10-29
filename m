@@ -1,176 +1,31 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 29 Oct 2012 10:59:56 +0100
-Subject: [PATCH 4/4] DMA: PL330: add device tree property for DMA_MEMCPY
- capability
-In-Reply-To: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1351504796-24788-5-git-send-email-b.zolnierkie@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 29 Oct 2012 11:03:03 +0100
+Subject: [PATCH v3 3/4] arm: mvebu: move irq controller driver to
+ drivers/irqchip
+In-Reply-To: <508E4EB3.5060901@gmail.com>
+References: <1351462748-5224-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508E49E0.8050606@gmail.com> <20121029102436.504d5053@skate>
+ <508E4EB3.5060901@gmail.com>
+Message-ID: <20121029100303.GD20377@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Add device tree (DT) property ("pl330,dma-memcpy") for DMA_MEMCPY
-  capability and instead of setting this capability unconditionally
-  in pl330_probe() do it only when property is present.
+On Mon, Oct 29, 2012 at 10:38:59AM +0100, Sebastian Hesselbarth wrote:
+> On 10/29/2012 10:24 AM, Thomas Petazzoni wrote:
+> >>using ARCH_MVEBU for enabling irq-armada-370-xp here will lead to
+> >>incompatibilities with Orion SoCs when they move over to ARCH_MVEBU.
+> >
+> >Not really: the driver is probed depending on the DT compatible string.
+> >So we can perfectly have two irqchip drivers being enabled on
+> >ARCH_MVEBU.
+> 
+> I agreed but this will always build irq-armada-370-xp into the kernel
+> although I maybe want a orion-only kernel. Although multi-platform will
+> be great for ARM, I doubt that every kernel will be multi-platform?
 
-* Set the new "pl330,dma-memcpy" device tree property for all
-  current pl330 driver users except pdma controllers on ARM EXYNOS
-  platforms (so the DT case matches non-DT one).
+Actually, there are multiple multi-platform kernels, kirkwood is v5
+where as 370/XP is v6. So a kirkwood build will not need
+irq-armada-370-xp.
 
-It fixes the issue on ARM EXYNOS platforms using DT where pdma
-controller erroneously was used for DMA_MEMCPY operations instead
-of mdma one (it surprisingly seems to work but at the cost of
-worse performance).
-
-Cc: Jassi Brar <jassisinghbrar@gmail.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Dinh Nguyen <dinguyen@altera.com>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- Documentation/devicetree/bindings/dma/arm-pl330.txt |  1 +
- arch/arm/boot/dts/exynos4.dtsi                      |  1 +
- arch/arm/boot/dts/exynos5250.dtsi                   |  2 ++
- arch/arm/boot/dts/highbank.dts                      |  1 +
- arch/arm/boot/dts/socfpga.dtsi                      |  1 +
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts         |  1 +
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts          |  1 +
- drivers/dma/pl330.c                                 | 11 ++++++++---
- 8 files changed, 16 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/dma/arm-pl330.txt b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-index 36e27d5..2661c7b 100644
---- a/Documentation/devicetree/bindings/dma/arm-pl330.txt
-+++ b/Documentation/devicetree/bindings/dma/arm-pl330.txt
-@@ -11,6 +11,7 @@ Required properties:
- 
- Optional properties:
- - dma-coherent      : Present if dma operations are coherent
-+- pl330,dma-memcpy  : Present if controller has DMA_MEMCPY capability
- 
- Example:
- 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 96d4462..ce5b03f 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -249,6 +249,7 @@
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x12850000 0x1000>;
- 			interrupts = <0 34 0>;
-+			pl330,dma-memcpy;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 49546bc..d659e7b 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -247,12 +247,14 @@
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x10800000 0x1000>;
- 			interrupts = <0 33 0>;
-+			pl330,dma-memcpy;
- 		};
- 
- 		mdma1: mdma at 11C10000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x11C10000 0x1000>;
- 			interrupts = <0 124 0>;
-+			pl330,dma-memcpy;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/highbank.dts b/arch/arm/boot/dts/highbank.dts
-index 0c6fc34..87f1d25 100644
---- a/arch/arm/boot/dts/highbank.dts
-+++ b/arch/arm/boot/dts/highbank.dts
-@@ -297,6 +297,7 @@
- 			interrupts = <0 92 4>;
- 			clocks = <&pclk>;
- 			clock-names = "apb_pclk";
-+			pl330,dma-memcpy;
- 		};
- 
- 		ethernet at fff50000 {
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 0772f57..2fe1697 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -71,6 +71,7 @@
- 				compatible = "arm,pl330", "arm,primecell";
- 				reg = <0xffe01000 0x1000>;
- 				interrupts = <0 180 4>;
-+				pl330,dma-memcpy;
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index d12b34c..d82953c 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -94,6 +94,7 @@
- 			     <0 89 4>,
- 			     <0 90 4>,
- 			     <0 91 4>;
-+		pl330,dma-memcpy;
- 	};
- 
- 	timer {
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 4890a81..b9e6ba2 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -114,6 +114,7 @@
- 			     <0 89 4>,
- 			     <0 90 4>,
- 			     <0 91 4>;
-+		pl330,dma-memcpy;
- 	};
- 
- 	timer {
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index db7574b..e10290b 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -2860,6 +2860,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	struct pl330_info *pi;
- 	struct dma_device *pd;
- 	struct resource *res;
-+	struct device_node *node;
- 	int i, ret, irq;
- 	int num_chan;
- 
-@@ -2921,12 +2922,14 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 		goto probe_err4;
- 	}
- 
-+	node = adev->dev.of_node;
-+
- 	for (i = 0; i < num_chan; i++) {
- 		pch = &pdmac->peripherals[i];
--		if (!adev->dev.of_node)
-+		if (!node)
- 			pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
- 		else
--			pch->chan.private = adev->dev.of_node;
-+			pch->chan.private = node;
- 
- 		INIT_LIST_HEAD(&pch->work_list);
- 		spin_lock_init(&pch->lock);
-@@ -2942,7 +2945,9 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (pdat) {
- 		pd->cap_mask = pdat->cap_mask;
- 	} else {
--		dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-+		if (adev->dev.of_node &&
-+		    of_find_property(node, "pl330,dma-memcpy", NULL))
-+			dma_cap_set(DMA_MEMCPY, pd->cap_mask);
- 		if (pi->pcfg.num_peri) {
- 			dma_cap_set(DMA_SLAVE, pd->cap_mask);
- 			dma_cap_set(DMA_CYCLIC, pd->cap_mask);
--- 
-1.8.0
+	Andrew
