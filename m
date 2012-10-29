@@ -1,91 +1,201 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Oct 2012 11:40:23 -0600
-Subject: [PATCH 1/2] ARM: tegra: Add speedo-based process identification
-In-Reply-To: <1351495315-3282-2-git-send-email-dahuang@nvidia.com>
-References: <1351495315-3282-1-git-send-email-dahuang@nvidia.com>
- <1351495315-3282-2-git-send-email-dahuang@nvidia.com>
-Message-ID: <508EBF87.5080707@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 29 Oct 2012 10:44:21 -0700
+Subject: [PATCH v2 05/13] clk: Versatile Express clock generators ("osc")
+ driver
+In-Reply-To: <1347977875-16855-6-git-send-email-pawel.moll@arm.com>
+References: <1347977875-16855-1-git-send-email-pawel.moll@arm.com>
+ <1347977875-16855-6-git-send-email-pawel.moll@arm.com>
+Message-ID: <20121029174421.18780.21226@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2012 01:21 AM, Danny Huang wrote:
-> Detect CPU and core process ID by checking speedo corner tables.
-> This can provide a more accurate process ID.
+Quoting Pawel Moll (2012-09-18 07:17:47)
+> This driver provides a common clock framework hardware driver
+> for Versatile Express clock generators (a.k.a "osc") controlled
+> via the config bus.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/clk/versatile/Makefile           |    1 +
+>  drivers/clk/versatile/clk-vexpress-osc.c |  146 ++++++++++++++++++++++++++++++
+>  2 files changed, 147 insertions(+)
+>  create mode 100644 drivers/clk/versatile/clk-vexpress-osc.c
+> 
+> Hi Mike,
+> 
+> As agreed - this patch and the next one ("clk: Common clocks
+> implementation for Versatile Express") are all yours.
+> 
 
-> diff --git a/arch/arm/mach-tegra/fuse.c b/arch/arm/mach-tegra/fuse.c
+Taken into clk-next.
 
-> @@ -114,6 +109,8 @@ void tegra_init_fuse(void)
->  
->  	tegra_revision = tegra_get_revision(id);
->  
-> +	tegra20_init_speedo_data();
+Thanks,
+Mike
 
-This code executes on both Tegra20 and Tegra30. Calling a
-Tegra20-specific function unconditionally isn't correct. This is
-important because if someone does "git bisect" across this patch, patch
-1 might be applied, but patch 2 not.
-
-I think you need to add the switch statement from patch 2 here rather
-than later in patch 2. Also, I think you need to keep the following
-chunk of code in the Tegra30 case, and only remove it completely in patch 2
-
--	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
--	tegra_cpu_process_id = (reg >> 6) & 3;
--
--	reg = tegra_fuse_readl(FUSE_SPARE_BIT);
--	tegra_core_process_id = (reg >> 12) & 3;
-
-> diff --git a/arch/arm/mach-tegra/tegra20_speedo.c b/arch/arm/mach-tegra/tegra20_speedo.c
-
-> +static const u32 cpu_process_speedos[][PROCESS_CORNERS_NUM] = {
-> +	{315, 366, 420, UINT_MAX},
-> +	{303, 368, 419, UINT_MAX},
-> +	{316, 331, 383, UINT_MAX},
+> Regards
+> 
+> Pawel
+> 
+> diff --git a/drivers/clk/versatile/Makefile b/drivers/clk/versatile/Makefile
+> index c0a0f64..1e49a7a 100644
+> --- a/drivers/clk/versatile/Makefile
+> +++ b/drivers/clk/versatile/Makefile
+> @@ -2,3 +2,4 @@
+>  obj-$(CONFIG_ICST)             += clk-icst.o
+>  obj-$(CONFIG_ARCH_INTEGRATOR)  += clk-integrator.o
+>  obj-$(CONFIG_ARCH_REALVIEW)    += clk-realview.o
+> +obj-$(CONFIG_VEXPRESS_CONFIG)  += clk-vexpress-osc.o
+> diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+> new file mode 100644
+> index 0000000..dcb6ae0
+> --- /dev/null
+> +++ b/drivers/clk/versatile/clk-vexpress-osc.c
+> @@ -0,0 +1,146 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Copyright (C) 2012 ARM Limited
+> + */
+> +
+> +#define pr_fmt(fmt) "vexpress-osc: " fmt
+> +
+> +#include <linux/clkdev.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/err.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/vexpress.h>
+> +
+> +struct vexpress_osc {
+> +       struct vexpress_config_func *func;
+> +       struct clk_hw hw;
+> +       unsigned long rate_min;
+> +       unsigned long rate_max;
 > +};
 > +
-> +static const u32 core_process_speedos[][PROCESS_CORNERS_NUM] = {
-> +	{165, 195, 224, UINT_MAX},
-> +	{165, 195, 224, UINT_MAX},
-> +	{165, 195, 224, UINT_MAX},
-> +};
+> +#define to_vexpress_osc(osc) container_of(osc, struct vexpress_osc, hw)
 > +
-> +void tegra20_init_speedo_data(void)
+> +static unsigned long vexpress_osc_recalc_rate(struct clk_hw *hw,
+> +               unsigned long parent_rate)
 > +{
-> +	u32 reg;
-> +	u32 val;
-> +	int i;
+> +       struct vexpress_osc *osc = to_vexpress_osc(hw);
+> +       u32 rate;
 > +
-> +	if (SPEEDO_ID_SELECT_0(tegra_revision))
-> +		tegra_soc_speedo_id = 0;
-> +	else if (SPEEDO_ID_SELECT_1(tegra_sku_id))
-> +		tegra_soc_speedo_id = 1;
-> +	else
-> +		tegra_soc_speedo_id = 2;
+> +       vexpress_config_read(osc->func, 0, &rate);
 > +
-> +	WARN_ON(tegra_soc_speedo_id >= ARRAY_SIZE(cpu_process_speedos));
-> +	WARN_ON(tegra_soc_speedo_id >= ARRAY_SIZE(core_process_speedos));
-
-Can this be a BUILD_BUG_ON() instead;
-
-#define SPEEDO_ID_0 0
-#define SPEEDO_ID_1 1
-#define SPEEDO_ID_2 2
-#define SPEEDO_ID_COUNT (SPEEDO_ID_2 + 1)
-BUILD_BUG_ON(ARRAY_SIZE(cpu_process_speedos) == SPEEDO_ID_COUNT)
-BUILD_BUG_ON(ARRAY_SIZE(core_process_speedos) == SPEEDO_ID_COUNT)
-
-and use those #defines in the assignments to tegra_soc_speedod_id above,
-rather than literals?
-
-Or even just the following without the BUILD_BUG_ONs:
-
-> static const u32 core_process_speedos[SPEEDO_ID_COUNT][PROCESS_CORNERS_NUM] = {
-
-> +	val = 0;
-> +	for (i = CPU_SPEEDO_MSBIT; i >= CPU_SPEEDO_LSBIT; i--) {
-> +		reg = tegra_spare_fuse(i) |
-> +			tegra_spare_fuse(i + CPU_SPEEDO_REDUND_OFFS);
-> +		val = (val << 1) | (reg & 0x1);
-
-Out of curiosity, why did the prototype of tegra_spare_fuse() change
-from returning a bool to an int, if only bit 0 is going to be used?
+> +       return rate;
+> +}
+> +
+> +static long vexpress_osc_round_rate(struct clk_hw *hw, unsigned long rate,
+> +               unsigned long *parent_rate)
+> +{
+> +       struct vexpress_osc *osc = to_vexpress_osc(hw);
+> +
+> +       if (WARN_ON(osc->rate_min && rate < osc->rate_min))
+> +               rate = osc->rate_min;
+> +
+> +       if (WARN_ON(osc->rate_max && rate > osc->rate_max))
+> +               rate = osc->rate_max;
+> +
+> +       return rate;
+> +}
+> +
+> +static int vexpress_osc_set_rate(struct clk_hw *hw, unsigned long rate,
+> +               unsigned long parent_rate)
+> +{
+> +       struct vexpress_osc *osc = to_vexpress_osc(hw);
+> +
+> +       return vexpress_config_write(osc->func, 0, rate);
+> +}
+> +
+> +static struct clk_ops vexpress_osc_ops = {
+> +       .recalc_rate = vexpress_osc_recalc_rate,
+> +       .round_rate = vexpress_osc_round_rate,
+> +       .set_rate = vexpress_osc_set_rate,
+> +};
+> +
+> +
+> +struct clk * __init vexpress_osc_setup(struct device *dev)
+> +{
+> +       struct clk_init_data init;
+> +       struct vexpress_osc *osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+> +
+> +       if (!osc)
+> +               return NULL;
+> +
+> +       osc->func = vexpress_config_func_get_by_dev(dev);
+> +       if (!osc->func) {
+> +               kfree(osc);
+> +               return NULL;
+> +       }
+> +
+> +       init.name = dev_name(dev);
+> +       init.ops = &vexpress_osc_ops;
+> +       init.flags = CLK_IS_ROOT;
+> +       init.num_parents = 0;
+> +       osc->hw.init = &init;
+> +
+> +       return clk_register(NULL, &osc->hw);
+> +}
+> +
+> +void __init vexpress_osc_of_setup(struct device_node *node)
+> +{
+> +       struct clk_init_data init;
+> +       struct vexpress_osc *osc;
+> +       struct clk *clk;
+> +       u32 range[2];
+> +
+> +       osc = kzalloc(sizeof(*osc), GFP_KERNEL);
+> +       if (!osc)
+> +               goto error;
+> +
+> +       osc->func = vexpress_config_func_get_by_node(node);
+> +       if (!osc->func) {
+> +               pr_err("Failed to obtain config func for node '%s'!\n",
+> +                               node->name);
+> +               goto error;
+> +       }
+> +
+> +       if (of_property_read_u32_array(node, "freq-range", range,
+> +                       ARRAY_SIZE(range)) == 0) {
+> +               osc->rate_min = range[0];
+> +               osc->rate_max = range[1];
+> +       }
+> +
+> +       of_property_read_string(node, "clock-output-names", &init.name);
+> +       if (!init.name)
+> +               init.name = node->name;
+> +
+> +       init.ops = &vexpress_osc_ops;
+> +       init.flags = CLK_IS_ROOT;
+> +       init.num_parents = 0;
+> +
+> +       osc->hw.init = &init;
+> +
+> +       clk = clk_register(NULL, &osc->hw);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("Failed to register clock '%s'!\n", init.name);
+> +               goto error;
+> +       }
+> +
+> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +
+> +       pr_debug("Registered clock '%s'\n", init.name);
+> +
+> +       return;
+> +
+> +error:
+> +       if (osc->func)
+> +               vexpress_config_func_put(osc->func);
+> +       kfree(osc);
+> +}
+> -- 
+> 1.7.9.5
