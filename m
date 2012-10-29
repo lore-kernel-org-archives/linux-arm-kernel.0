@@ -1,33 +1,125 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 29 Oct 2012 22:13:07 +0530
-Subject: [PATCH] ARM: mm: uninitialized warning corrections
-Message-ID: <fb4b3c38a09b137f7823168e5f4770464b3c33bd.1351528855.git.viresh.kumar@linaro.org>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Mon, 29 Oct 2012 10:56:21 -0600
+Subject: [PATCH] ARM: zynq: Allow UART1 to be used as DEBUG_LL console.
+In-Reply-To: <1351205254-2409-1-git-send-email-nbowler@elliptictech.com>
+References: <20121025224108.GA30705@elliptictech.com>
+ <1351205254-2409-1-git-send-email-nbowler@elliptictech.com>
+Message-ID: <20121029165621.GF5190@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variables here are really not used uninitialized.
+On Thu, Oct 25, 2012 at 06:47:34PM -0400, Nick Bowler wrote:
+> The main UART on the Xilinx ZC702 board is UART1, located at address
+> e0001000.  Add a Kconfig option to select this device as the low-level
+> debugging port.  This allows the really early boot printouts to reach
+> the USB serial adaptor on this board.
+> 
+> For consistency's sake, add a choice entry for UART0 even though it is
+> the the default if UART1 is not selected.
+> 
+> As there are currently known issues related to the UART virtual
+> mappings, this is KNOWN BROKEN, not to be merged yet!
+> 
+> Not-Yet-Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
 
-arch/arm/mm/alignment.c: In function 'do_alignment':
-arch/arm/mm/alignment.c:327:15: warning: 'offset.un' may be used uninitialized in this function [-Wmaybe-uninitialized]
-arch/arm/mm/alignment.c:748:21: note: 'offset.un' was declared here
+Tested-by: Josh Cartwright <josh.cartwright@ni.com>
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mm/alignment.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Now that v5 of the initial zynq cleanup patchset is queued up for
+merging (with a workaround for the uart mapping problem), what would it
+take for you to sign off on this patch?
 
-diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
-index b9f60eb..223b4aa 100644
---- a/arch/arm/mm/alignment.c
-+++ b/arch/arm/mm/alignment.c
-@@ -745,7 +745,7 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
- static int
- do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
- {
--	union offset_union offset;
-+	union offset_union uninitialized_var(offset);
- 	unsigned long instr = 0, instrptr;
- 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
- 	unsigned int type;
--- 
-1.7.12.rc2.18.g61b472e
+There is some trivial merging that has to be done to get it to apply
+cleanly on v5.  See a rebased version below.
+
+Thanks,
+  Josh
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857..7754d51 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -132,6 +132,23 @@ choice
+ 		  their output to UART1 serial port on DaVinci TNETV107X
+ 		  devices.
+ 
++	config DEBUG_ZYNQ_UART0
++		bool "Kernel low-level debugging on Xilinx Zynq using UART0"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART0 on the Zynq platform.
++
++	config DEBUG_ZYNQ_UART1
++		bool "Kernel low-level debugging on Xilinx Zynq using UART1"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART1 on the Zynq platform.
++
++		  If you have a ZC702 board and want early boot messages to
++		  appear on the USB serial adaptor, select this option.
++
+ 	config DEBUG_DC21285_PORT
+ 		bool "Kernel low-level debugging messages via footbridge serial port"
+ 		depends on FOOTBRIDGE
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ba8d14f..93b9105 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -84,9 +84,9 @@ static struct map_desc io_desc[] __initdata = {
+ 
+ #ifdef CONFIG_DEBUG_LL
+ 	{
+-		.virtual	= UART0_VIRT,
+-		.pfn		= __phys_to_pfn(UART0_PHYS),
+-		.length		= UART0_SIZE,
++		.virtual	= LL_UART_VADDR,
++		.pfn		= __phys_to_pfn(LL_UART_PADDR),
++		.length		= UART_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
+ #endif
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index 1b8bf0e..7f4f38b 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -25,8 +25,9 @@
+  * address that is known to work.
+  */
+ #define UART0_PHYS		0xE0000000
+-#define UART0_SIZE		SZ_4K
+-#define UART0_VIRT		0xF0001000
++#define UART1_PHYS		0xE0001000
++#define UART_SIZE		SZ_4K
++#define UART_VIRT		0xF0001000
+ 
+ #define TTC0_PHYS		0xF8001000
+ #define TTC0_SIZE		SZ_4K
+@@ -36,12 +37,17 @@
+ #define SCU_PERIPH_SIZE		SZ_8K
+ #define SCU_PERIPH_VIRT		(TTC0_VIRT - SCU_PERIPH_SIZE)
+ 
++#if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
++#	define LL_UART_PADDR	UART1_PHYS
++#	define LL_UART_VADDR	UART_VIRT
++#else
++#	define LL_UART_PADDR	UART0_PHYS
++#	define LL_UART_VADDR	UART_VIRT
++#endif
++
+ /* The following are intended for the devices that are mapped early */
+ 
+ #define TTC0_BASE			IOMEM(TTC0_VIRT)
+ #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+ 
+-#define LL_UART_PADDR	UART0_PHYS
+-#define LL_UART_VADDR	UART0_VIRT
+-
+ #endif
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/8d89fb91/attachment-0001.sig>
