@@ -1,31 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 29 Oct 2012 11:03:03 +0100
-Subject: [PATCH v3 3/4] arm: mvebu: move irq controller driver to
- drivers/irqchip
-In-Reply-To: <508E4EB3.5060901@gmail.com>
-References: <1351462748-5224-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <508E49E0.8050606@gmail.com> <20121029102436.504d5053@skate>
- <508E4EB3.5060901@gmail.com>
-Message-ID: <20121029100303.GD20377@lunn.ch>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 29 Oct 2012 11:05:13 +0100
+Subject: [PATCH 0/4] DMA: PL330 fixes
+In-Reply-To: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <2027905.ZSjHgXqYha@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2012 at 10:38:59AM +0100, Sebastian Hesselbarth wrote:
-> On 10/29/2012 10:24 AM, Thomas Petazzoni wrote:
-> >>using ARCH_MVEBU for enabling irq-armada-370-xp here will lead to
-> >>incompatibilities with Orion SoCs when they move over to ARCH_MVEBU.
-> >
-> >Not really: the driver is probed depending on the DT compatible string.
-> >So we can perfectly have two irqchip drivers being enabled on
-> >ARCH_MVEBU.
+Hi Bartlomiej,
+
+On Monday 29 of October 2012 10:59:52 Bartlomiej Zolnierkiewicz wrote:
+> Hi,
 > 
-> I agreed but this will always build irq-armada-370-xp into the kernel
-> although I maybe want a orion-only kernel. Although multi-platform will
-> be great for ARM, I doubt that every kernel will be multi-platform?
+> The first patch fixes lockup caused by pl330 driver.  It doesn't add
+> any dependencies to later patches and can be applied independently.
+> 
+> The second patch fixes PL330 regression on ARM Exynos 4210 revision 0
+> SOC (used by Universal C210 board).
+> 
+> The third patch adds PL330 MDMA1 controller node to device tree on
+> ARM Exynos4 SOCs.
+> 
+> The fourth patch adds device tree property for PL330 driver to be used
+> by controllers that have DMA_MEMCPY capability and updates device tree
+> files for ARM platforms using PL330.  Since this patch depends on
+> patches #2-3 it would be probably best to also push it through Kukjin's
+> tree (with the relevant ACKs added of course).
+> 
+> 
+> Bartlomiej Zolnierkiewicz (4):
+>   DMA: PL330: fix locking in pl330_free_chan_resources()
+>   ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of Exynos4210 SOC
+>   ARM: dts: exynos4: add node for PL330 MDMA1 controller
+>   DMA: PL330: add device tree property for DMA_MEMCPY capability
+> 
+>  Documentation/devicetree/bindings/dma/arm-pl330.txt |  1 +
+>  arch/arm/boot/dts/exynos4.dtsi                      |  7 +++++++
+>  arch/arm/boot/dts/exynos5250.dtsi                   |  2 ++
+>  arch/arm/boot/dts/highbank.dts                      |  1 +
+>  arch/arm/boot/dts/socfpga.dtsi                      |  1 +
+>  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts         |  1 +
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts          |  1 +
+>  arch/arm/mach-exynos/dma.c                          |  5 ++++-
+>  arch/arm/mach-exynos/include/mach/map.h             |  3 ++-
+>  arch/arm/mach-exynos/mach-exynos4-dt.c              |  1 +
+>  drivers/dma/pl330.c                                 | 15
+> ++++++++++----- 11 files changed, 31 insertions(+), 7 deletions(-)
 
-Actually, there are multiple multi-platform kernels, kirkwood is v5
-where as 370/XP is v6. So a kirkwood build will not need
-irq-armada-370-xp.
+For all four patches:
 
-	Andrew
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
