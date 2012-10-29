@@ -1,53 +1,75 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 29 Oct 2012 14:28:46 +0100
-Subject: [RFC 6/6] ARM: sched: clear SD_SHARE_POWERLINE
-In-Reply-To: <50880795.4030609@ti.com>
-References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
- <1349595838-31274-7-git-send-email-vincent.guittot@linaro.org>
- <50880795.4030609@ti.com>
-Message-ID: <CAKfTPtAZjLpwHYgj8JXku4sU0mPPf34MKkWp0=qiX5u-T0JVOA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Oct 2012 14:28:39 +0100
+Subject: [PATCH] MMCI: fetch pinctrl handle and set default state
+Message-ID: <1351517319-22357-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 October 2012 17:21, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> On Sunday 07 October 2012 01:13 PM, Vincent Guittot wrote:
->>
->> The ARM platforms take advantage of packing small tasks on few cores.
->> This is true even when the cores of a cluster can't be powergated
->> independently.
->>
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->>   arch/arm/kernel/topology.c |    5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> index 26c12c6..00511d0 100644
->> --- a/arch/arm/kernel/topology.c
->> +++ b/arch/arm/kernel/topology.c
->> @@ -226,6 +226,11 @@ static inline void update_cpu_power(unsigned int
->> cpuid, unsigned int mpidr) {}
->>    */
->>   struct cputopo_arm cpu_topology[NR_CPUS];
->>
->> +int arch_sd_share_power_line(void)
->> +{
->> +       return 0*SD_SHARE_POWERLINE;
->> +}
->
->
-> Making this selection of policy based on sched domain will better. Just
-> gives the flexibility to choose a separate scheme for big and little
-> systems which will be very convenient.
+This fetches the pinctrl resource for the MMCI driver, and if
+a "default" state is found, it is activated.
 
-I agree that it would be more flexible to be able to set it for each level
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Change dev_err() to dev_warn() when grabbing the default pins
+  since being unable to obtain the default state is not in any
+  way fatal.
+---
+ drivers/mmc/host/mmci.c |   18 ++++++++++++++++++
+ drivers/mmc/host/mmci.h |    4 ++++
+ 2 files changed, 22 insertions(+), 0 deletions(-)
 
->
-> Regards
-> Santosh
->
->
->
->
->
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index edc3e9b..9a36226 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -33,6 +33,7 @@
+ #include <linux/amba/mmci.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/types.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include <asm/div64.h>
+ #include <asm/io.h>
+@@ -1360,6 +1361,23 @@ static int __devinit mmci_probe(struct amba_device *dev,
+ 		mmc->f_max = min(host->mclk, fmax);
+ 	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
+ 
++	host->pinctrl = devm_pinctrl_get(&dev->dev);
++	if (IS_ERR(host->pinctrl)) {
++		ret = PTR_ERR(host->pinctrl);
++		goto clk_disable;
++	}
++
++	host->pins_default = pinctrl_lookup_state(host->pinctrl,
++			PINCTRL_STATE_DEFAULT);
++
++	/* enable pins to be muxed in and configured */
++	if (!IS_ERR(host->pins_default)) {
++		ret = pinctrl_select_state(host->pinctrl, host->pins_default);
++		if (ret)
++			dev_warn(&dev->dev, "could not set default pins\n");
++	} else
++		dev_warn(&dev->dev, "could not get default pinstate\n");
++
+ #ifdef CONFIG_REGULATOR
+ 	/* If we're using the regulator framework, try to fetch a regulator */
+ 	host->vcc = regulator_get(&dev->dev, "vmmc");
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index d437ccf..d34d8c0 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -195,6 +195,10 @@ struct mmci_host {
+ 	unsigned int		size;
+ 	struct regulator	*vcc;
+ 
++	/* pinctrl handles */
++	struct pinctrl		*pinctrl;
++	struct pinctrl_state	*pins_default;
++
+ #ifdef CONFIG_DMA_ENGINE
+ 	/* DMA stuff */
+ 	struct dma_chan		*dma_current;
+-- 
+1.7.7.6
