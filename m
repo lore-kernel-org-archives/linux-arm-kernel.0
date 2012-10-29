@@ -1,96 +1,209 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 29 Oct 2012 22:11:43 +0100
-Subject: [PATCH V2 0/5]  SMP support for Armada XP
-Message-ID: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Mon, 29 Oct 2012 22:11:44 +0100
+Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric in
+ mach-mvebu
+In-Reply-To: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Yehuda Yitschak <yehuday@marvell.com>
 
-The purpose of this patch set is to add the SMP support for the Armada
-XP SoCs. Beside the SMP support itself brought by the last 3 patches,
-this patch set also adds the support for the coherency fabric unit and
-the power management service unit.
-
-The coherency fabric is responsible for ensuring hardware coherency
-between all CPUs and between CPUs and I/O masters. This unit is also
-available for Armada 370 and will be used in an incoming patch set
-for hardware I/O cache coherency.
-
-The power management service unit is responsible for powering down and
-waking up CPUs and other SOC units.
-
-The original code is from Yehuda Yitschak, it was reworked by myself
-and reviewed by Yehuda.
-
-This patch set is based on 3.7-rc3 and depends one the framework clock
-support (the last version was posted 2 weeks ago:
-http://thread.gmane.org/gmane.linux.kernel/1375701). The git branch
-called ArmadaXP-SMP-for-3.8-V2 is also available at
-https://github.com/MISL-EBU-System-SW/mainline-public.git.
-
-Arnd, Olof, as this code is SoC specific will you be able to pull it
-through Jason tree? Or should I push the part added in
-arch/arm/mm/proc-v7.S to support PJ4B CPU through Russell tree?
-
-Changelog:
-V1 -> V2:
-- Rebased on to v3.7-rc3
-- Fixed typos found by Alexandre Belloni
-- Added clk_prepare_enable() before getting rate clk in
-  set_secondary_cpus_clock()
-- Add explanation in the binding documentation about the per-CPU
-  interrupt registers: the address of the virtual register must be
-  used.
-- Removed the armada_xp prefix in the coherency.c file to be more
-  compliant with the name convention of the other files.
-- Coherency_init is now called from armada_370_xp_dt_init() and is no
-  more an early_init() call. As the device tree is not available from
-  an early_init(), it was useless to call coherency_init() so
-  early. The need to be able to call some function very early during
-  the boot were already resolved by using the hard code address of the
-  register.
-
-Regards,
-
-Yehuda Yitschak (5):
-  arm: mvebu: Added support for coherency fabric in mach-mvebu
-  arm: mvebu: Added initial support for power managmement service unit
-  arm: mvebu: Added IPI support via doorbells
-  arm: mm: Added support for PJ4B cpu and init routines
-  arm: mvebu: Added SMP support for Armada XP
-
- .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   12 +-
- .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |   20 ++++
- .../devicetree/bindings/arm/coherency-fabric.txt   |   16 +++
- arch/arm/boot/dts/armada-370-xp.dtsi               |    5 +
- arch/arm/boot/dts/armada-xp.dtsi                   |   12 +-
- arch/arm/configs/mvebu_defconfig                   |    3 +
- arch/arm/mach-mvebu/Kconfig                        |    3 +-
- arch/arm/mach-mvebu/Makefile                       |    4 +-
- arch/arm/mach-mvebu/armada-370-xp.c                |    3 +
- arch/arm/mach-mvebu/armada-370-xp.h                |   10 ++
- arch/arm/mach-mvebu/coherency.c                    |   89 ++++++++++++++
- arch/arm/mach-mvebu/coherency.h                    |   21 ++++
- arch/arm/mach-mvebu/common.h                       |    6 +
- arch/arm/mach-mvebu/headsmp.S                      |   66 +++++++++++
- arch/arm/mach-mvebu/hotplug.c                      |   30 +++++
- arch/arm/mach-mvebu/irq-armada-370-xp.c            |   92 ++++++++++++++-
- arch/arm/mach-mvebu/platsmp.c                      |  124 ++++++++++++++++++++
- arch/arm/mach-mvebu/pmsu.c                         |   78 ++++++++++++
- arch/arm/mach-mvebu/pmsu.h                         |   16 +++
- arch/arm/mm/Kconfig                                |    4 +
- arch/arm/mm/proc-v7.S                              |   46 ++++++++
- 21 files changed, 648 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
+Signed-off-by: Yehuda Yitschak <yehuday@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/arm/coherency-fabric.txt   |   16 ++++
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    5 ++
+ arch/arm/mach-mvebu/Makefile                       |    2 +-
+ arch/arm/mach-mvebu/coherency.c                    |   89 ++++++++++++++++++++
+ arch/arm/mach-mvebu/coherency.h                    |   21 +++++
+ arch/arm/mach-mvebu/common.h                       |    2 +
+ 6 files changed, 134 insertions(+), 1 deletion(-)
  create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
  create mode 100644 arch/arm/mach-mvebu/coherency.c
  create mode 100644 arch/arm/mach-mvebu/coherency.h
- create mode 100644 arch/arm/mach-mvebu/headsmp.S
- create mode 100644 arch/arm/mach-mvebu/hotplug.c
- create mode 100644 arch/arm/mach-mvebu/platsmp.c
- create mode 100644 arch/arm/mach-mvebu/pmsu.c
- create mode 100644 arch/arm/mach-mvebu/pmsu.h
 
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+new file mode 100644
+index 0000000..2bfbf67
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+@@ -0,0 +1,16 @@
++Coherency fabric
++----------------
++Available on Marvell SOCs: Armada 370 and Armada XP
++
++Required properties:
++
++- compatible: "marvell,coherency-fabric"
++- reg: Should contain,coherency fabric registers location and length.
++
++Example:
++
++coherency-fabric at d0020200 {
++	compatible = "marvell,coherency-fabric";
++	reg = <0xd0020200 0xb0>;
++};
++
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 94b4b9e..b0d075b 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -36,6 +36,11 @@
+ 	      interrupt-controller;
+ 	};
+ 
++	coherency-fabric at d0020200 {
++		compatible = "marvell,coherency-fabric";
++		reg = <0xd0020200 0xb0>;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+index 57f996b..abd6d3b 100644
+--- a/arch/arm/mach-mvebu/Makefile
++++ b/arch/arm/mach-mvebu/Makefile
+@@ -2,4 +2,4 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-orion/include
+ 
+ obj-y += system-controller.o
+-obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o
++obj-$(CONFIG_MACH_ARMADA_370_XP) += armada-370-xp.o irq-armada-370-xp.o addr-map.o coherency.o
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+new file mode 100644
+index 0000000..69e130d
+--- /dev/null
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -0,0 +1,89 @@
++/*
++ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * Yehuda Yitschak <yehuday@marvell.com>
++ * Gregory Clement <gregory.clement@free-electrons.com>
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ *
++ * The Armada 370 and Armada XP SOCs have a coherency fabric which is
++ * responsible for ensuring hardware coherency between all CPUs and between
++ * CPUs and I/O masters. This file initializes the coherency fabric and
++ * supplies basic routines for configuring and controlling hardware coherency
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++#include <linux/smp.h>
++#include <asm/smp_plat.h>
++#include "armada-370-xp.h"
++
++/* Some functions in this file are called very early during SMP
++ * initialization. At that time the device tree framework is not yet
++ * ready, and it is not possible to get the register address to
++ * ioremap it. That's why the pointer below is given with an initial
++ * value matching its virtual mapping
++ */
++static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
++
++/* Coherency fabric registers */
++#define COHERENCY_FABRIC_CTL_OFFSET		   0x0
++#define COHERENCY_FABRIC_CFG_OFFSET		   0x4
++
++static struct of_device_id of_coherency_table[] = {
++	{.compatible = "marvell,coherency-fabric"},
++	{ /* end of list */ },
++};
++
++int coherency_get_cpu_count(void)
++{
++	int reg, cnt;
++
++	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
++	cnt = (reg & 0xF) + 1;
++
++	return cnt;
++}
++
++int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
++{
++	int reg;
++
++	if (!coherency_base) {
++		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
++		pr_warn("Coherency fabric is not initialized\n");
++		return 1;
++	}
++
++	/* Enable the CPU in coherency fabric */
++	reg = readl(coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
++	reg |= 1 << (24 + hw_cpu_id);
++	writel(reg, coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
++
++	/* Add CPU to SMP group */
++	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
++	reg |= 1 << (16 + hw_cpu_id + (smp_group_id == 0 ? 8 : 0));
++	writel(reg, coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
++
++	return 0;
++}
++
++int __init coherency_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_matching_node(NULL, of_coherency_table);
++	if (np) {
++		pr_info("Initializing Coherency fabric\n");
++		coherency_base = of_iomap(np, 0);
++	}
++
++	return 0;
++}
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+new file mode 100644
+index 0000000..6182192
+--- /dev/null
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -0,0 +1,21 @@
++/*
++ * arch/arm/mach-mvebu/include/mach/coherency.h
++ *
++ *
++ * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
++ *
++ * Copyright (C) 2012 Marvell
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __MACH_370_XP_COHERENCY_H
++#define __MACH_370_XP_COHERENCY_H
++
++int set_cpu_coherent(int cpu_id, int smp_group_id);
++int coherency_get_cpu_count(void);
++int coherency_init(void);
++
++#endif	/* __MACH_370_XP_COHERENCY_H */
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index 281fab3..ea08919 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -21,4 +21,6 @@ void mvebu_clocks_init(void);
+ void armada_370_xp_init_irq(void);
+ void armada_370_xp_handle_irq(struct pt_regs *regs);
+ 
++
++int armada_370_xp_coherency_init(void);
+ #endif
 -- 
 1.7.9.5
