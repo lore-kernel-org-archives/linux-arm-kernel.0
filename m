@@ -1,41 +1,27 @@
-From: holzmayr@rsi-elektrotechnik.de (Josef Holzmayr)
-Date: Mon, 29 Oct 2012 19:30:22 +0100
-Subject: [PATCH] [PATCH] remove pcm049 from Makefile
-Message-ID: <1351535422-4644-1-git-send-email-holzmayr@rsi-elektrotechnik.de>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 29 Oct 2012 11:32:33 -0700
+Subject: [RFC PATCH] dt: describe base reset signal binding
+In-Reply-To: <1351028756-22309-1-git-send-email-swarren@wwwdotorg.org>
+References: <1351028756-22309-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121029183233.18780.11964@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/mach-omap2/Makefile |    2 --
- 1 file changed, 2 deletions(-)
+Quoting Stephen Warren (2012-10-23 14:45:56)
+> What do people think of this? Does it sound like a good idea to go ahead
+> with a reset subsystem? Should we simply add a new API to the common clock
+> subsystem instead (and assume that reset and clock domains match 1:1).
+> Should this be implemented as part of the generic power management domains;
+> see include/linux/pm_domain.h instead?
+> 
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index fe40d9e..d1155be 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -236,8 +236,6 @@ obj-$(CONFIG_MACH_TOUCHBOOK)		+= board-omap3touchbook.o
- obj-$(CONFIG_MACH_OMAP_4430SDP)		+= board-4430sdp.o
- obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o
- 
--obj-$(CONFIG_MACH_PCM049)		+= board-omap4pcm049.o
--
- obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o
- 
- obj-$(CONFIG_MACH_CRANEBOARD)		+= board-am3517crane.o
--- 
-1.7.9.5
+Hi Stephen,
 
+I'm not sure a "reset subsystem" is necessary, but I also do not like
+using clocks as the keys for IP reset.  I think it is more common to map
+IPs to struct device, no?
 
--- 
-_____________________________________________________________
-R-S-I Elektrotechnik GmbH & Co. KG
-Woelkestrasse 11
-D-85301 Schweitenkirchen
-Fon: +49 8444 9204-0
-Fax: +49 8444 9204-50
-www.rsi-elektrotechnik.de
+And of course for clocks shared by multiple users this will not scale.
 
-_____________________________________________________________
-Amtsgericht Ingolstadt - GmbH: HRB 191328 - KG: HRA 170363
-Gesch?ftsf?hrer: Dr.-Ing. Michael Sorg, Dipl.-Ing. Franz Sorg
-USt-IdNr.: DE 128592548
+Regards,
+Mike
