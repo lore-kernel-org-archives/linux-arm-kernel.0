@@ -1,37 +1,45 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 29 Oct 2012 07:24:16 +0000
-Subject: [PATCH v4 0/5] zynq subarch cleanups
-In-Reply-To: <cover.1351466765.git.josh.cartwright@ni.com>
-References: <cover.1351466765.git.josh.cartwright@ni.com>
-Message-ID: <5c2911d7-f753-4d9f-b8d8-3bf011d58e52@TX2EHSMHS014.ehs.local>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Mon, 29 Oct 2012 08:50:03 +0100
+Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB500C9@DBDE01.ent.ti.com>
+References: <20121017235045.GB30550@atomide.com>
+ <20121018030654.GE2867@netboy.at.omicron.at>
+ <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
+ <20121018184443.GD2350@netboy.at.omicron.at>
+ <50806B1D.9040504@ti.com>
+ <20121019061630.GB2983@netboy.at.omicron.at>
+ <20121019160041.GB4730@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EB4B4C7@DBDE01.ent.ti.com>
+ <20121026180627.GN11908@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EB500C9@DBDE01.ent.ti.com>
+Message-ID: <20121029075003.GA2527@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh,
-
- Michal-
+On Mon, Oct 29, 2012 at 04:58:23AM +0000, Hiremath, Vaibhav wrote:
 > 
-> Here is a v5 of the zynq cleanup patchset that addresses your feedback.  I've
-> intentionally left patches 4 and 5 in the set until we figure out the appropriate
-> way to get them in tree (feel free to just apply 1-3)
+> Now the expectation has grown to the level where people expect everything in 
+> the Mainline kernel and not in some custom kernel release.
 
-I am ok to pick just several patches from your patchset. But this is no definitely 
-good working style. Not expert for submission process but I think that 
-if there is one broken patch maintainer shouldn't apply it.
-Can someone else check this?
+You are right, except for the "has grown" part. I have always expected
+the official kernel releases to be working and complete, without the
+kind of half baked stumps that the embedded vendors are pushing.
 
+In my experience with Freescale (and now TI also), the vendor supports
+Linux on their platform by providing a heavily patched, quick and
+dirty, customized kernel that is kinda, sorta working, somehow. This
+provides a way for their customers to get started with the development
+kits right away, and as such I have no problem with it.
 
-> I've also moved the uart mapping in patch 5 to a known working address, until
-> we can work out what is happening there.  This should allow this patchset to be
-> applied and have the zc702 boot.
+What I do have a problem with is the fact the vendors then drop the
+ball and don't follow through by getting their changes into
+mainline. This makes a huge problem for the vendor's customers later
+on, when the choice becomes either stay with the dead end vendor
+kernel, or try to get mainline working all by themselves.
 
-Will look at it and apply if works.
- 
-> You had suggested removing/renaming the zynq-ep107.dts; it wasn't clear
-> whether you had wanted that in this patchset or not.  I'm going to assume not.
-> I'll follow up with this, after this patchset is applied, if that works for you.
-
-Not in this patchset. Sure feel free to send it.  
+And so I am pleased to hear that the Ethernet ports on the am335x will
+be working in v3.8. Better late than never.
 
 Thanks,
-Michal
+Richard
