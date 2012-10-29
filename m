@@ -1,104 +1,161 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Oct 2012 21:49:01 +0200
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121026160316.GY18814@opensource.wolfsonmicro.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <20121024185818.GB772@arwen.pp.htv.fi>
- <20121025205901.GA3827@sirena.org.uk>
- <20121026062008.GA21734@arwen.pp.htv.fi>
- <20121026160316.GY18814@opensource.wolfsonmicro.com>
-Message-ID: <20121029194901.GA30152@arwen.pp.htv.fi>
+Date: Mon, 29 Oct 2012 21:50:51 +0200
+Subject: [PATCHv4 1/2] i2c: omap: re-factor omap_i2c_init function
+In-Reply-To: <1351176199-6479-2-git-send-email-shubhrajyoti@ti.com>
+References: <1351176199-6479-1-git-send-email-shubhrajyoti@ti.com>
+ <1351176199-6479-2-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20121029195051.GB30152@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Oct 26, 2012 at 05:03:16PM +0100, Mark Brown wrote:
-> On Fri, Oct 26, 2012 at 09:20:36AM +0300, Felipe Balbi wrote:
-> > On Thu, Oct 25, 2012 at 09:59:01PM +0100, Mark Brown wrote:
+On Thu, Oct 25, 2012 at 08:13:18PM +0530, Shubhrajyoti D wrote:
+> re-factor omap_i2c_init() so that we can re-use it for resume.
+> While at it also remove the bufstate variable as we write it
+> in omap_i2c_resize_fifo for every transfer.
 > 
-> > > I suspect that's not actually a big deal and that if we went down this
-> > > route we'd have the driver take over control from the core code during
-> > > probe() with the core still setting up the default state.
+> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+
+FWIW:
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+
+(if I have time I will test this tomorrow and reply with a Tested-by)
+
+> ---
+> v4: add spaces for readability
 > 
-> > > Personally I do think we want to be factoring bolierplate out of
-> > > drivers, if they're not doing anything constructive with pinctrl they
-> > > should be able to avoid having code for it.  There definitely are issues
-> > > to work through but it seems like we ought to be able to do something.
+>  drivers/i2c/busses/i2c-omap.c |   74 +++++++++++++++++++---------------------
+>  1 files changed, 35 insertions(+), 39 deletions(-)
 > 
-> > IMHO this will come back to bite you in the *ss. Specially when the same
-> > driver is shared among multiple revisions of the same SoC or multiple
-> > different SoCs.
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index be329e9..38acf1a 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -209,7 +209,6 @@ struct omap_i2c_dev {
+>  	u16			pscstate;
+>  	u16			scllstate;
+>  	u16			sclhstate;
+> -	u16			bufstate;
+>  	u16			syscstate;
+>  	u16			westate;
+>  	u16			errata;
+> @@ -285,9 +284,34 @@ static inline u16 omap_i2c_read_reg(struct omap_i2c_dev *i2c_dev, int reg)
+>  	}
+>  }
+>  
+> +static void __omap_i2c_init(struct omap_i2c_dev *dev)
+> +{
+> +
+> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+> +
+> +	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
+> +	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, dev->pscstate);
+> +
+> +	/* SCL low and high time values */
+> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, dev->scllstate);
+> +	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, dev->sclhstate);
+> +	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530)
+> +		omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+> +
+> +	/* Take the I2C module out of reset: */
+> +	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+> +
+> +	/*
+> +	 * Don't write to this register if the IE state is 0 as it can
+> +	 * cause deadlock.
+> +	 */
+> +	if (dev->iestate)
+> +		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+> +}
+> +
+>  static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  {
+> -	u16 psc = 0, scll = 0, sclh = 0, buf = 0;
+> +	u16 psc = 0, scll = 0, sclh = 0;
+>  	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+>  	unsigned long fclk_rate = 12000000;
+>  	unsigned long timeout;
+> @@ -337,11 +361,8 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  			 * REVISIT: Some wkup sources might not be needed.
+>  			 */
+>  			dev->westate = OMAP_I2C_WE_ALL;
+> -			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+> -							dev->westate);
+>  		}
+>  	}
+> -	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
+>  
+>  	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+>  		/*
+> @@ -426,28 +447,18 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+>  		sclh = fclk_rate / (dev->speed * 2) - 7 + psc;
+>  	}
+>  
+> -	/* Setup clock prescaler to obtain approx 12MHz I2C module clock: */
+> -	omap_i2c_write_reg(dev, OMAP_I2C_PSC_REG, psc);
+> -
+> -	/* SCL low and high time values */
+> -	omap_i2c_write_reg(dev, OMAP_I2C_SCLL_REG, scll);
+> -	omap_i2c_write_reg(dev, OMAP_I2C_SCLH_REG, sclh);
+> -
+> -	/* Take the I2C module out of reset: */
+> -	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+> -
+>  	/* Enable interrupts */
+>  	dev->iestate = (OMAP_I2C_IE_XRDY | OMAP_I2C_IE_RRDY |
+>  			OMAP_I2C_IE_NACK | OMAP_I2C_IE_AL)  |
+>  			((dev->fifo_size) ? (OMAP_I2C_IE_RDR |
+>  				OMAP_I2C_IE_XDR) : 0);
+> -	omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+> -	if (dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+> -		dev->pscstate = psc;
+> -		dev->scllstate = scll;
+> -		dev->sclhstate = sclh;
+> -		dev->bufstate = buf;
+> -	}
+> +
+> +	dev->pscstate = psc;
+> +	dev->scllstate = scll;
+> +	dev->sclhstate = sclh;
+> +
+> +	__omap_i2c_init(dev);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -1267,23 +1278,8 @@ static int omap_i2c_runtime_resume(struct device *dev)
+>  {
+>  	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
+>  
+> -	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE) {
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, 0);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_PSC_REG, _dev->pscstate);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_SCLL_REG, _dev->scllstate);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_SCLH_REG, _dev->sclhstate);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_BUF_REG, _dev->bufstate);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_SYSC_REG, _dev->syscstate);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_WE_REG, _dev->westate);
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_CON_REG, OMAP_I2C_CON_EN);
+> -	}
+> -
+> -	/*
+> -	 * Don't write to this register if the IE state is 0 as it can
+> -	 * cause deadlock.
+> -	 */
+> -	if (_dev->iestate)
+> -		omap_i2c_write_reg(_dev, OMAP_I2C_IE_REG, _dev->iestate);
+> +	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
+> +		__omap_i2c_init(_dev);
+>  
+>  	return 0;
+>  }
+> -- 
+> 1.7.5.4
 > 
-> I'm not entirely sure you fully understood the proposal...
-> 
-> > Hypothetical situation: OMAP4 has keypad as the default pin mode and low
-> > power is handled by the HW, so keypad could have pinctlr "boilerplate"
-> > factored out. Then comes OMAP5 and low power mode has to be handled by
-> > SW for whatever reason (maybe there are more than one low power mode).
-> > Then we will need to patch omap4-keypad.c to remove "dont_touch_my_pins"
-> > flag and add pinctrl support.
-> 
-> This isn't going to make any practical difference at all, as soon as the
-> driver starts using pinctrl explicitly a flag gets set in the driver and
-> the default code does nothing more.  The only difference will be that we
-> may get a default configuration applied prior to probe.
->
-> You could have the driver explicitly set the flag, it would just be one
-> extra line, but it seems marginally nicer to just do it.
-
-You didn't get the whole picture I'm afraid. Consider the situation
-where the same e.g. keypad driver is being used on OMAP4 and OMAP5 and
-those have different requirements towards pinctrl.
-
-Let's just assume for the sake of argument that OMAP4 would set the flag
-on the driver structure which would tell drivers/base/ to handle pinctrl
-default automatically and let's assume that's just fine for OMAP4 since
-sleep mode is handled by HW (all of this is just for the sake of
-argument, I'm not claiming this is how OMAP4/5 work).
-
-Now, we need to add OMAP5 support *to the same keypad driver*.
-Unfortunately, OMAP5 needs to handle pinctrl explicitly for whatever
-reason (SW-controlled sleep mode, errata fix, whatever).
-
-This will mean that we will have to remove the flag from the keypad
-driver because that's not valid anymore for OMAP5.
-
-What I'm claiming below is that quite possibly all drivers will go
-through that:
-
-- start with transparent pinctrl default mode by letting drivers/base/
-  automagically take care of that for us.
-
-- remove the 'handle-pinctrl-automatically-for-me' flag because of new
-  requirements on different version of the IP.
-
-This is why I think hiding things from drivers makes no sense. Also
-consider the situations Linus W exposed on another subthread. If you
-change ordering of certain calls, you will really break the
-functionality of the IP. Because we can't make sure this won't work
-automagically in all cases (just like we can't make sure $size memory
-allocation is enough for all drivers) we don't hide that from the
-driver. We require driver to manage its resources properly.
-
-> > When you think of the possibilities of every single driver going
-> > throught that it sounds a lot nicer to not make that decision IMHO and
-> > keep pinctrl explicit.
-> 
-> I'm just not seeing any impact on drivers that do something interesting
-> here.
-
-that's because you didn't consider enough possibilities. See above.
-
-How can you make sure that this will work for at least 50% of the
-drivers ? You just can't. We don't know the implementation details of
-every arch/soc/platform supported by Linux today to make that decision.
-
-IMHO, it's best to require drivers to explicitly setup pin muxing by
-calling into pinctrl framework.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 balbi
@@ -108,4 +165,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/a50dc2e5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/b6f627e0/attachment.sig>
