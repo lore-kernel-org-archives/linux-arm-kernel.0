@@ -1,86 +1,73 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 29 Oct 2012 04:58:23 +0000
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <20121026180627.GN11908@atomide.com>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210172337170.30902@utopia.booyaka.com>
- <20121017235045.GB30550@atomide.com>
- <20121018030654.GE2867@netboy.at.omicron.at>
- <alpine.DEB.2.00.1210180313360.6893@utopia.booyaka.com>
- <20121018184443.GD2350@netboy.at.omicron.at> <50806B1D.9040504@ti.com>
- <20121019061630.GB2983@netboy.at.omicron.at>
- <20121019160041.GB4730@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EB4B4C7@DBDE01.ent.ti.com>
- <20121026180627.GN11908@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB500C9@DBDE01.ent.ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 29 Oct 2012 14:11:40 +0900
+Subject: [PATCH 01/12] ARM: shmobile: r8a7740: Enable PMU
+In-Reply-To: <508D16EF.7030800@mvista.com>
+References: <1351391173-32379-1-git-send-email-horms@verge.net.au>
+ <1351391173-32379-2-git-send-email-horms@verge.net.au>
+ <508D16EF.7030800@mvista.com>
+Message-ID: <20121029051140.GA10408@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 23:36:28, Tony Lindgren wrote:
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [121026 01:24]:
-> > On Fri, Oct 19, 2012 at 21:30:41, Tony Lindgren wrote:
-> > > * Richard Cochran <richardcochran@gmail.com> [121018 23:18]:
-> > > > On Fri, Oct 19, 2012 at 02:18:29AM +0530, Vaibhav Hiremath wrote:
-> > > > > 
-> > > > > Another important point is, this driver is also required and used for
-> > > > > Davinci family of devices (arch/mach/mach-davinci/).
-> > > > 
-> > > > That is really beside the point. If the code isn't ready yet, then
-> > > > don't merge it.
-> > > > 
-> > > > When I asked about the beaglebone, I was given the impression that it
-> > > > will be ready for v3.7-rc1.  But, as I know realize, at the current
-> > > > rate, it might not even be ready for v3.8.
-> > > > 
-> > > > I don't mind waiting, but please make sure that whatever lands into a
-> > > > release is really, truly working.
-> > > 
-> > > Indeed. This has been a problem with many of the TI patches in
-> > > general. People are working on separate product trees and then produce
-> > > patches for the mainline kernel that are poorly tested.
-> > > 
-> > 
-> > Tony,
-> > 
-> > It may not be true always, as we always work simultaneously and there are 
-> > high chances that some patches/development is dependent on others from 
-> > functionality perspective (especially baseport), but still they are 
-> > independent modules (may be for other devices).
-> > 
-> > Lets take a example of AM33xx and OMAP5 here, we started submitting baseport 
-> > patches to the list (almost 6-8 months now), not all the patches gets 
-> > accepted together in one shot.
-> > As you know, when we started pushing AM33xx and OMAP5 baseport patches, we 
-> > were at the stage where both DT and hwmod was required. First attempt for 
-> > board file submission did not went through, since we decided to force all 
-> > new devices migrate to DT, right?
+On Sun, Oct 28, 2012 at 03:28:47PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> I think you guys have done a pretty good job with the am33xx patches
-> in general to get the core omap changes merged.
->  
-> > So the criteria initially was, build should not break and submit patches 
-> > step-by-step.
-> > 
-> > Now, with baseport patches submitted to list, individual developer can also 
-> > start submitting patches to the respective driver's list, making sure that, 
-> > driver doesn't change irrespective of platform. I do not see anything wrong
-> > with this, as we always consider driver independent.
-> > 
-> > In this particular case, note that, all the patches Richard posted recently 
-> > are AM33xx SoC integration specific patches only.
+> On 28-10-2012 6:26, Simon Horman wrote:
 > 
-> Yes now the core omap patches are merged, and people want to use
-> the devices with mainline kernel. That's usually good news :)
+> >From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 > 
+> >This patch enables PMU for r8a7740.
+> 
+>    And enables performance events on the Armadillo board. Perhaps
+> the defconfig part was worth a separate patch...
 
-Yes, absolutely. 
+As I understand things, the Armadillo is currently the only
+board in-tree that uses the r8a7740 SoC and it seems
+reasonable to enable performance events to activate the
+code that comprises the rest of the patch.
 
-Now the expectation has grown to the level where people expect everything in 
-the Mainline kernel and not in some custom kernel release.
+So while I don't feel strongly about this I do have a slight preference
+for the current single-patch approach.
 
-I believe and expect, v3.8 merge window would be really meaningful in this 
-regard for AM33xx platform.
+> >Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> >Signed-off-by: Simon Horman <horms@verge.net.au>
+> [...]
+> 
+> >diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+> >index 11bb1d9..1e032cb 100644
+> >--- a/arch/arm/mach-shmobile/setup-r8a7740.c
+> >+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+> >@@ -590,6 +590,21 @@ static struct platform_device i2c1_device = {
+> >  	.num_resources	= ARRAY_SIZE(i2c1_resources),
+> >  };
+> >
+> >+static struct resource pmu_resources[] = {
+> >+	[0] = {
+> >+		.start	= evt2irq(0x19a0),
+> >+		.end	= evt2irq(0x19a0),
+> >+		.flags  = IORESOURCE_IRQ,
+> >+	},
+> >+};
+> >+
+> >+static struct platform_device pmu_device = {
+> >+	.name	= "arm-pmu",
+> >+	.id		= -1,
+> 
+>    I think you should either align '=' with tabs, or not bother
+> doing this, not both. :-)
 
-Thanks,
-Vaibhav
+Thanks, there seems to be an extra tab there.
+
+I'll roll this into an updated patch and series once
+we come to a consensus about the defconfig change.
+
+> >+	.num_resources = ARRAY_SIZE(pmu_resources),
+> >+	.resource = pmu_resources,
+> >+};
+> >+
+> >  static struct platform_device *r8a7740_late_devices[] __initdata = {
+> >  	&i2c0_device,
+> >  	&i2c1_device,
+> 
+> WBR, Sergei
+> 
