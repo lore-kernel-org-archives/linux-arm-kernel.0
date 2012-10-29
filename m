@@ -1,54 +1,42 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 29 Oct 2012 01:27:24 +0100
-Subject: [PATCH for soc] socfpga: map uart into virtual address space so that
- early_printk() works
-In-Reply-To: <201210271539.20156.arnd@arndb.de>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <201210251458.48528.arnd@arndb.de>
- <20121027115615.GC5912@elf.ucw.cz>
- <201210271539.20156.arnd@arndb.de>
-Message-ID: <20121029002724.GA27891@elf.ucw.cz>
+From: kyungmin.park@samsung.com (Kyungmin Park)
+Date: Mon, 29 Oct 2012 09:30:26 +0900
+Subject: [PATCH 3/4] pinctrl: samsung: Add support for Exynos4x12
+In-Reply-To: <CACRpkdaoQP2jat_mr2wr30M39eogKAq77Gw2VoNPWbgHjgW+zw@mail.gmail.com>
+References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
+ <1351089457-8205-4-git-send-email-t.figa@samsung.com>
+ <CACRpkdaoQP2jat_mr2wr30M39eogKAq77Gw2VoNPWbgHjgW+zw@mail.gmail.com>
+Message-ID: <CAH9JG2V2UjuvjK2_sjLQsEt21duCqyoQuAi0KsMfB+CjRrh8KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/29/12, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Oct 24, 2012 at 4:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>
+>> This patch extends the driver with any necessary SoC-specific
+>> definitions to support Exynos4x12 SoCs.
+>>
+>> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I guess you need all of this to go into my Samsung branch?
+> I need and ACK from the Samsung maintainer and preferably
+> Thomas A as well.
 
-Early printk code needs UART to be mapped early during
-boot. early_printk() is left there during the start-up; it is useful
-as our emulators are fairly slow.
+Hi,
 
-Signed-off-by: Pavel Machek <pavel@denx.de>
-Acked-by: Dinh Nguyen <dinguyen@altera.com>
- 
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index ab81ea9..49fb62b 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -37,6 +37,15 @@ static struct map_desc scu_io_desc __initdata = {
- 	.type		= MT_DEVICE,
- };
- 
-+
-+
-+static struct map_desc uart_io_desc __initdata = {
-+	.virtual	= 0xfec02000,
-+	.pfn		= __phys_to_pfn(0xffc02000),
-+	.length		= SZ_8K,
-+	.type		= MT_DEVICE,
-+};
-+
- static void __init socfpga_scu_map_io(void)
- {
- 	unsigned long base;
-@@ -51,6 +60,8 @@ static void __init socfpga_scu_map_io(void)
- static void __init socfpga_map_io(void)
- {
- 	socfpga_scu_map_io();
-+	iotable_init(&uart_io_desc, 1);
-+	early_printk("Early printk initialized\n");
- }
- 
- const static struct of_device_id irq_match[] = {
+Now we're trying to send the standalone patches to avoid the conflict.
+and hope to merge patches via proper subsystem. In this case, pinctl.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thank you,
+Kyungmin Park
+>
+> Yours,
+> Linus Walleij
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
