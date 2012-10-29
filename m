@@ -1,42 +1,32 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 29 Oct 2012 11:04:26 +0100
-Subject: [PATCH 2/2] MAINTAINERS: add pinctrl atmel at91 entry
-In-Reply-To: <1351360392-8669-2-git-send-email-plagnioj@jcrosoft.com>
-References: <1351360392-8669-1-git-send-email-plagnioj@jcrosoft.com>
- <1351360392-8669-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <508E54AA.1040002@atmel.com>
+From: elen.song@atmel.com (Elen Song)
+Date: Mon, 29 Oct 2012 17:09:14 +0800
+Subject: [PATCH 0/6] Serial: AT91: Support rx and tx dma
+Message-ID: <1351501754-25028-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2012 07:53 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+This is a patch series for support tx and rx dma for at91sam9 boards.
+The patches contain the following support:
+- add parameters for dma use
+- request tx dma channel and enable tx
+- request rx dma channel and enable rx
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The rx dma part use dmaengine_tx_status to get remain bytes.
+The api has been updated in the following patch:
+[PATCH]DMA: AT91: Get residual bytes in dma buffer
 
-> ---
->  MAINTAINERS |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 027ec2b..cb97031 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -5624,6 +5624,12 @@ S:	Maintained
->  F:	drivers/pinctrl/
->  F:	include/linux/pinctrl/
->  
-> +PIN CONTROLLER - ATMEL AT91
-> +M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	Maintained
-> +F:	drivers/pinctrl/pinctrl-at91.c
-> +
->  PIN CONTROLLER - ST SPEAR
->  M:	Viresh Kumar <viresh.linux@gmail.com>
->  L:	spear-devel at list.st.com
-> 
+Elen Song (6):
+  DMA: AT91: Serial: Add parameter for serial dma use
+  Serial: AT91: Distinguish PDC from DMA
+  Serial: AT91: Request tx dma channel
+  Serial: AT91: Enable tx dma
+  Serial: AT91: Request rx dma channel
+  Serial: AT91: Enable rx cyclic DMA transfer
 
+ arch/arm/mach-at91/include/mach/board.h |    2 +
+ drivers/tty/serial/atmel_serial.c       |  507 +++++++++++++++++++++++++++++--
+ include/linux/platform_data/dma-atmel.h |   10 +
+ 3 files changed, 491 insertions(+), 28 deletions(-)
 
 -- 
-Nicolas Ferre
+1.7.9.5
