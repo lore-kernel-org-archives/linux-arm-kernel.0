@@ -1,79 +1,89 @@
 From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 29 Oct 2012 19:45:18 +0100
-Subject: [PATCH net-next V3 08/10] cpsw: add a DT field for the active time
- stamping port
+Date: Mon, 29 Oct 2012 19:45:19 +0100
+Subject: [PATCH net-next V3 09/10] cpts: specify the input clock frequency via
+ DT
 In-Reply-To: <cover.1351535536.git.richardcochran@gmail.com>
 References: <cover.1351535536.git.richardcochran@gmail.com>
-Message-ID: <496c255aeb2c696cbb62ac0319c97cf5fadda55b.1351535540.git.richardcochran@gmail.com>
+Message-ID: <8766deebbaeb9015babdc20a194aa8b683a61ec6.1351535541.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because time stamping on both external ports of the switch simultaneously
-is positively useless from the application's point of view, this patch
-provides a DT configuration method to choose the active port.
+This patch adds a way to configure the CPTS input clock scaling factors
+via the device tree.
 
 Signed-off-by: Richard Cochran <richardcochran@gmail.com>
 ---
- Documentation/devicetree/bindings/net/cpsw.txt |    3 +++
- drivers/net/ethernet/ti/cpsw.c                 |    7 +++++++
- include/linux/platform_data/cpsw.h             |    1 +
- 3 files changed, 11 insertions(+), 0 deletions(-)
+ Documentation/devicetree/bindings/net/cpsw.txt |    6 ++++++
+ drivers/net/ethernet/ti/cpsw.c                 |   14 ++++++++++++++
+ include/linux/platform_data/cpsw.h             |    2 ++
+ 3 files changed, 22 insertions(+), 0 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index dba014f..9f61f2b 100644
+index 9f61f2b..2214607 100644
 --- a/Documentation/devicetree/bindings/net/cpsw.txt
 +++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -23,6 +23,7 @@ Required properties:
- - mac_control		: Specifies Default MAC control register content
+@@ -24,6 +24,8 @@ Required properties:
  			  for the specific platform
  - slaves		: Specifies number for slaves
-+- cpts_active_slave	: Specifies the slave to use for time stamping
+ - cpts_active_slave	: Specifies the slave to use for time stamping
++- cpts_clock_mult	: Numerator to convert input clock ticks into nanoseconds
++- cpts_clock_shift	: Denominator to convert input clock ticks into nanoseconds
  - slave_reg_ofs		: Specifies slave register offset
  - sliver_reg_ofs	: Specifies slave sliver register offset
  - phy_id		: Specifies slave phy id
-@@ -60,6 +61,7 @@ Examples:
- 		rx_descs = <64>;
+@@ -62,6 +64,8 @@ Examples:
  		mac_control = <0x20>;
  		slaves = <2>;
-+		cpts_active_slave = <0>;
+ 		cpts_active_slave = <0>;
++		cpts_clock_mult = <0x80000000>;
++		cpts_clock_shift = <29>;
  		cpsw_emac0: slave at 0 {
  			slave_reg_ofs = <0x200>;
  			sliver_reg_ofs = <0xd80>;
-@@ -95,6 +97,7 @@ Examples:
- 		rx_descs = <64>;
+@@ -98,6 +102,8 @@ Examples:
  		mac_control = <0x20>;
  		slaves = <2>;
-+		cpts_active_slave = <0>;
+ 		cpts_active_slave = <0>;
++		cpts_clock_mult = <0x80000000>;
++		cpts_clock_shift = <29>;
  		cpsw_emac0: slave at 0 {
  			slave_reg_ofs = <0x200>;
  			sliver_reg_ofs = <0xd80>;
 diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index f1af5e0..f165791 100644
+index f165791..c04627c 100644
 --- a/drivers/net/ethernet/ti/cpsw.c
 +++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -847,6 +847,13 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
+@@ -854,6 +854,20 @@ static int cpsw_probe_dt(struct cpsw_platform_data *data,
  	}
- 	data->slaves = prop;
+ 	data->cpts_active_slave = prop;
  
-+	if (of_property_read_u32(node, "cpts_active_slave", &prop)) {
-+		pr_err("Missing cpts_active_slave property in the DT.\n");
++	if (of_property_read_u32(node, "cpts_clock_mult", &prop)) {
++		pr_err("Missing cpts_clock_mult property in the DT.\n");
 +		ret = -EINVAL;
 +		goto error_ret;
 +	}
-+	data->cpts_active_slave = prop;
++	data->cpts_clock_mult = prop;
++
++	if (of_property_read_u32(node, "cpts_clock_shift", &prop)) {
++		pr_err("Missing cpts_clock_shift property in the DT.\n");
++		ret = -EINVAL;
++		goto error_ret;
++	}
++	data->cpts_clock_shift = prop;
 +
  	data->slave_data = kzalloc(sizeof(struct cpsw_slave_data) *
  				   data->slaves, GFP_KERNEL);
  	if (!data->slave_data) {
 diff --git a/include/linux/platform_data/cpsw.h b/include/linux/platform_data/cpsw.h
-index a052b1d..15a077e 100644
+index 15a077e..b5c16c3 100644
 --- a/include/linux/platform_data/cpsw.h
 +++ b/include/linux/platform_data/cpsw.h
-@@ -33,6 +33,7 @@ struct cpsw_platform_data {
- 
+@@ -34,6 +34,8 @@ struct cpsw_platform_data {
  	u32	slaves;		/* number of slave cpgmac ports */
  	struct cpsw_slave_data	*slave_data;
-+	u32	cpts_active_slave; /* time stamping slave */
+ 	u32	cpts_active_slave; /* time stamping slave */
++	u32	cpts_clock_mult;  /* convert input clock ticks to nanoseconds */
++	u32	cpts_clock_shift; /* convert input clock ticks to nanoseconds */
  
  	u32	ale_reg_ofs;	/* address lookup engine reg offset */
  	u32	ale_entries;	/* ale table size */
