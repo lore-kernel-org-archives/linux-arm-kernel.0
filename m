@@ -1,50 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 29 Oct 2012 22:33:45 +0100
-Subject: [PATCH] ARM: dts: imx27-3ds: Remove local watchdog inclusion
-In-Reply-To: <1348661261-7124-1-git-send-email-festevam@gmail.com>
-References: <1348661261-7124-1-git-send-email-festevam@gmail.com>
-Message-ID: <20121029213345.GB1641@pengutronix.de>
+From: alexandre.belloni@piout.net (Alexandre Belloni)
+Date: Mon, 29 Oct 2012 22:28:26 +0100
+Subject: [PATCH] at91sam9m10g45-ek: rename leds to match board
+In-Reply-To: <20121029161445.GB31214@game.jcrosoft.org>
+References: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
+ <20121027145132.GJ18964@game.jcrosoft.org>
+ <20121029150038.GA4995@piout.net>
+ <20121029161445.GB31214@game.jcrosoft.org>
+Message-ID: <20121029212826.GA6203@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 26, 2012 at 09:07:41AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> imx27.dtsi already register the watchdog, so no need to do it in the board dts
-> file.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied, thanks
+On Mon, Oct 29, 2012 at 05:14:45PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote :
+> No here it's different teh same HW have different revision
+> 
+> m10g45es
+> m10ekes
+> 9g45ekes
+> 
+> the m10ekes is the first one and the leds does match
+> 
+> So I agree we can put a comment in the c or the dts about it but do not change
+> the content as the board support is like this for really long time
+> And I do not want to ebd-up with 2 or 3 dts jsut for lesd naming
+> That I will have to maintain
+> 
 
-Sascha
+>From my discussion with atmel last week, I understood that the only
+publicly available board is the m10g45ek. Support for the other boards
+you mention is actually being dropped and you can't find them on ATMEL's
+website anymore.
 
-> ---
->  arch/arm/boot/dts/imx27-3ds.dts |    4 ----
->  1 file changed, 4 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-3ds.dts b/arch/arm/boot/dts/imx27-3ds.dts
-> index 0a8978a..b01c0d7 100644
-> --- a/arch/arm/boot/dts/imx27-3ds.dts
-> +++ b/arch/arm/boot/dts/imx27-3ds.dts
-> @@ -23,10 +23,6 @@
->  	soc {
->  		aipi at 10000000 { /* aipi */
->  
-> -			wdog at 10002000 {
-> -				status = "okay";
-> -			};
-> -
->  			uart1: serial at 1000a000 {
->  				fsl,uart-has-rtscts;
->  				status = "okay";
-> -- 
-> 1.7.9.5
-> 
-> 
+So, I agree you should support only one configuration but at least, let
+it be the one for the current board.
+
+Regards,
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Alexandre Belloni
