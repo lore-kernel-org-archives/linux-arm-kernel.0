@@ -1,32 +1,81 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Mon, 29 Oct 2012 22:49:40 +0530
-Subject: [PATCH V2 4/4] ARM: tegra: config: enable spi driver for Tegra SLINK
- controller
-In-Reply-To: <1351531180-1652-1-git-send-email-ldewangan@nvidia.com>
-References: <1351531180-1652-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1351531180-1652-5-git-send-email-ldewangan@nvidia.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 29 Oct 2012 18:22:15 +0100
+Subject: Representation of external memory-mapped devices in DT (gpmc)
+In-Reply-To: <508E9C42.10907@gmail.com>
+References: <508E9513.7050106@gmail.com> <508E9C42.10907@gmail.com>
+Message-ID: <508EBB47.8070405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
----
-No change from V1.
+On 29.10.2012 16:09, Rob Herring wrote:
+> On 10/29/2012 09:39 AM, Daniel Mack wrote:
+>> Hi,
+>>
+>> we're currently working on a DT binding for the GPMC bus that is found
+>> on SoCs by TI. The implementation is based on CS lines and an 8, 16 or
+>> 32 bit parallel interface. That IP is quite flexible, and it can for
+>> example be used for physmap flash, external peripherals or even NAND.
+>>
+>> Depending on which CS is used to control the device, different memory
+>> regions are reserved, and there's code to calculate the location and
+>> size of them, given a CS number (see arch/arm/mach-omap2/gpmc.c).
+> 
+> I don't know the details of the h/w, but I would think the DT core code
+> should be able work out the addresses. This can be done using ranges
+> property which defines the mapping of a child bus into the parent bus
+> addresses.
 
- arch/arm/configs/tegra_defconfig |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+In this case, the controller is @0x50000000 while the external device is
+mapped to address 0x0.
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index fb29680..60e1b2e 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -117,7 +117,7 @@ CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PINCTRL=y
- CONFIG_I2C_TEGRA=y
- CONFIG_SPI=y
--CONFIG_SPI_TEGRA=y
-+CONFIG_SPI_TEGRA20_SLINK=y
- CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_GPIO_TPS6586X=y
- CONFIG_GPIO_TPS65910=y
--- 
-1.7.1.1
+>> The binding will use one top-level node to describe the GPMC controller
+>> itself and register the actual devices as sub-nodes to it. The NAND type
+>> is the only one that is currently supported. This is how it currently looks:
+>>
+>> 	gpmc: gpmc at 50000000 {
+>> 		compatible = "ti,gpmc";
+>> 		ti,hwmods = "gpmc";
+>> 		reg = <0x50000000 0x2000>;
+>> 		interrupt-parent = <&intc>;
+>> 		interrupts = <100>;
+>> 		#address-cells = <1>;
+>> 		#size-cells = <0>;
+>>
+>> 		nand at 0 {
+> 
+> You may want a CS0 node with nand as a child node of that.
+
+Hmm, I don't see what that would buy us. The question is which way is
+feasible for storing both the memory region and the cs number in the
+device tree. The CS number should certainly go to the child node, no?
+
+IOW, would it be a good idea to have something like the following layout?
+
+	gpmc: gpmc at 50000000 {
+		compatible = "ti,gpmc";
+		ti,hwmods = "gpmc";
+		reg = <0x50000000 0x2000>;
+
+		/* cs-reg stores the setup of the controller's
+		   memory map */
+
+			/* offset	size */
+		cs-reg = <0x0		0x1000000
+			  ....		.....
+			  ....		.....>;
+
+		nand: child at 0 {
+			/* timings */
+			/* peripheral specifics */
+		};
+	};
+
+I would actually much prefer that approach.
+
+Afzal, because because that way, we can leave the code as-is for now and
+add the "cs-reg" property once the code is switched to dynamic handling.
+What do you think?
+
+
+Thanks,
+Daniel
