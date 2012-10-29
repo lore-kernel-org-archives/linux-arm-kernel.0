@@ -1,64 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 29 Oct 2012 09:55:38 +0000
-Subject: [PULL REQ] IXP4xx changes for Linux 3.7
-In-Reply-To: <m3a9vkahci.fsf@intrepid.localdomain>
-References: <m3bog6m5iz.fsf@intrepid.localdomain>
- <201210142002.55841.arnd@arndb.de> <m3a9vkahci.fsf@intrepid.localdomain>
-Message-ID: <20121029095538.GE21164@n2100.arm.linux.org.uk>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 29 Oct 2012 15:29:07 +0530
+Subject: [PATCH] ARM: OMAP2+: am33xx: Add PRM warm reset/reboot support
+Message-ID: <1351504747-10554-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 12:01:17AM +0200, Krzysztof Halasa wrote:
-> Hi,
-> 
-> Arnd Bergmann <arnd@arndb.de> writes:
-> > Also, never rebase your tree immediately before sending a pull
-> > request.
-> 
-> I did not, of course. My mail stated:
-> "Build-tested for now. This is based on your current tree tip because it
-> depends on commits following 3.6 release."
+This patch adds reboot capability to all AM33XX based boards/EVM's,
+by asserting PRM warm reset bit on 'reboot' command.
 
-You're lucky that you didn't get flamed by Linus himself for that, as
-others _have_ been in the past.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Tested-by: Daniel Mack <zonque@gmail.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Afzal Mohammed <afzal@ti.com>
+---
+Tested on AM335xEVM and BeagleBone platform.
 
-> Normally I wouldn't rebase, but had to (as you well knew) - because you
-> commited a conflicting patch to this very IXP4xx arch. Using your logic,
-> you were supposed to get an Ack from me (or from Imre) for this patch.
+ arch/arm/mach-omap2/board-generic.c |    1 +
+ arch/arm/mach-omap2/prcm.c          |    3 +++
+ arch/arm/mach-omap2/prm33xx.c       |   15 +++++++++++++++
+ arch/arm/mach-omap2/prm33xx.h       |    1 +
+ 4 files changed, 20 insertions(+), 0 deletions(-)
 
-If you had *bothered* asking the arm-soc people to pull your tree
-_instead_ of Linus, then that problem becomes the arm-soc's problem, not
-yours.  That  means _you_ end up with _less_ work to do.  Yet, instead
-of seeing that benefit, whenever you've been asked to send your tree via
-arm-soc, you throw your toys out of your pram and basically refuse.
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 601ecdf..6a69ceb 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+ 	.init_machine	= omap_generic_init,
+ 	.timer		= &omap3_am33xx_timer,
+ 	.dt_compat	= am33xx_boards_compat,
++	.restart	= omap_prcm_restart,
+ MACHINE_END
+ #endif
 
-So, you're making *more* work for yourself by not participating in
-arm-soc (as I've explained to you before.)
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index cff270a..07f163c 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -34,6 +34,7 @@
+ #include "cm2xxx_3xxx.h"
+ #include "prm2xxx_3xxx.h"
+ #include "prm44xx.h"
++#include "prm33xx.h"
+ #include "prminst44xx.h"
+ #include "cminst44xx.h"
+ #include "prm-regbits-24xx.h"
+@@ -73,6 +74,8 @@ void omap_prcm_restart(char mode, const char *cmd)
+ 		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+ 	} else if (cpu_is_omap44xx()) {
+ 		omap4_prminst_global_warm_sw_reset(); /* never returns */
++	} else if (soc_is_am33xx()) {
++		am33xx_prm_global_warm_sw_reset();	/* never returns */
+ 	} else {
+ 		WARN_ON(1);
+ 	}
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 53ec9cb..657c3d0 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -135,6 +135,21 @@ int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+ 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+ }
 
-The _ONLY_ thing you have to do is send your pull request to the arm-soc
-people instead of Linus before the merge window opens.  You don't need to
-rebase your stuff on a different tree, you can still use Linus' tree as
-a basis.
-
-You have offered no technical reason why you can't participate in arm-soc
-which has stood up to screutiny.
-
-The only reasons you've offered seem to be:
-
-1. it'll be more work (untrue)
-2. you look after platforms which aren't in mainline and you're not submitting
-   to mainline.
-
-Both of these a total nonsense arguments when it comes to the _route_ that
-your patches make their way into mainline.  They have absolutely no bearing
-on the path your changes take AT ALL.
-
-> Don't get me wrong. If I had time for this it could be different.
-> Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
-> this point. Given the raised barriers to participate, probably aimed at
-> paid maintainers, I have to quit doing this.
-
-As you're being difficult and not willing to co-operate, and for whatever
-reason building this issue into a mountain, this unfortunately sounds to
-me like a good thing.  Hopefully, a more co-operative maintainer will step
-up in your place who can see the benefits.
++void am33xx_prm_global_warm_sw_reset(void)
++{
++	u32 v;
++
++	v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
++				    AM33XX_PRM_RSTCTRL_OFFSET);
++	v |= AM33XX_GLOBAL_WARM_SW_RST_MASK;
++	am33xx_prm_write_reg(v, AM33XX_PRM_DEVICE_MOD,
++				 AM33XX_PRM_RSTCTRL_OFFSET);
++
++	/* OCP barrier */
++	v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
++				    AM33XX_PRM_RSTCTRL_OFFSET);
++}
++
+ static int am33xx_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
+ {
+ 	am33xx_prm_rmw_reg_bits(OMAP_POWERSTATE_MASK,
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 3f25c56..cdfc694 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -126,4 +126,5 @@ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
+ extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
+ extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+ 		u16 rstctrl_offs, u16 rstst_offs);
++extern void am33xx_prm_global_warm_sw_reset(void);
+ #endif
+--
+1.7.0.4
