@@ -1,142 +1,53 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 29 Oct 2012 09:58:16 +0800
-Subject: [PATCH v2 2/9] pinctrl: single: support gpio request and free
-In-Reply-To: <20121022202805.GG4730@atomide.com>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
- <1350922139-3693-3-git-send-email-haojian.zhuang@gmail.com>
- <20121022202805.GG4730@atomide.com>
-Message-ID: <CAN1soZzXzPVNaoC_e_Fb7rMgSFO+QkWzHSrPc0xp82Vghz0aKg@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 29 Oct 2012 10:28:21 +0800
+Subject: [PATCH 1/2] ARM: tegra: dt: add L2 cache controller
+In-Reply-To: <508AC294.7080506@wwwdotorg.org>
+References: <1351247649-15859-1-git-send-email-josephl@nvidia.com>
+ <508AC294.7080506@wwwdotorg.org>
+Message-ID: <1351477701.2779.70.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 4:28 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Haojian Zhuang <haojian.zhuang@gmail.com> [121022 09:11]:
->> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
->> Each pin binds to one register. A lot of pins could be configured
->> as gpio.
->>
->> Now add three properties in below.
->> pinctrl-single,gpio-ranges: gpio range array
->> pinctrl-single,gpio: <gpio base, npins in range, pin base in range>
->> pinctrl-single,gpio-func: <gpio function value in mux>
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> ---
->>  drivers/pinctrl/pinctrl-single.c |   94 +++++++++++++++++++++++++++++++++++++-
->>  1 files changed, 92 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
->> index 726a729..6a0b24b 100644
->> --- a/drivers/pinctrl/pinctrl-single.c
->> +++ b/drivers/pinctrl/pinctrl-single.c
->> @@ -28,8 +28,10 @@
->>  #define DRIVER_NAME                  "pinctrl-single"
->>  #define PCS_MUX_PINS_NAME            "pinctrl-single,pins"
->>  #define PCS_MUX_BITS_NAME            "pinctrl-single,bits"
->> +#define PCS_GPIO_FUNC_NAME           "pinctrl-single,gpio-func"
->
-> I think we can now get rid of these defines, I initially added
-> them as we had a bit hard time finding a suitable name for the
-> driver. These are only used in one location, so let's not add
-> new ones here.
->
-I'll fix.
+On Sat, 2012-10-27 at 01:04 +0800, Stephen Warren wrote:
+> On 10/26/2012 04:34 AM, Joseph Lo wrote:
+> > Add L2 cache controller binding into DT for Tegra.
+> 
+> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> 
+> > +	L2: cache-controller at 50043000 {
+> > +		compatible = "arm,pl310-cache";
+> > +		reg = <0x50043000 0x1000>;
+> > +		arm,data-latency = <5 5 2>;
+> > +		arm,tag-latency = <4 4 2>;
+> > +		cache-unified;
+> > +		cache-level = <2>;
+> > +	};
+> 
 
->>  static int pcs_request_gpio(struct pinctrl_dev *pctldev,
->> -                     struct pinctrl_gpio_range *range, unsigned offset)
->> +                         struct pinctrl_gpio_range *range, unsigned pin)
->>  {
->> -     return -ENOTSUPP;
->> +     struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
->> +     struct pcs_gpio_range *gpio = NULL;
->> +     int end, mux_bytes;
->> +     unsigned data;
->> +
->> +     gpio = container_of(range, struct pcs_gpio_range, range);
->> +     if (!gpio->func_en)
->> +             return 0;
->> +     end = range->pin_base + range->npins - 1;
->> +     if (pin < range->pin_base || pin > end) {
->> +             dev_err(pctldev->dev, "pin %d isn't in the range of "
->> +                     "%d to %d\n", pin, range->pin_base, end);
->> +             return -EINVAL;
->> +     }
->> +     mux_bytes = pcs->width / BITS_PER_BYTE;
->> +     data = pcs_readl(pcs->base + pin * mux_bytes) & ~pcs->fmask;
->> +     data |= gpio->gpio_func;
->> +     pcs_writel(data, pcs->base + pin * mux_bytes);
->> +     return 0;
->>  }
->
-> I think I already commented on this one.. Is this safe if you don't
-> have GPIOs configured? Or should you return -ENODEV in that case?
->
-OK. I'll use ENOTSUPP instead.
+Stephen,
 
- +     gpio = container_of(range, struct pcs_gpio_range, range);
- +     if (!gpio->func_en)
- +             return -ENOTSUPP;
+Thanks for review.
+> Do you need to specify arm,filter-ranges here? It's certainly parsed by
+> pl310_of_setup() and used if present, although I don't think we're
+> programming the register in the existing code, so I guess we don't need it.
+> 
+Yes, we don't need it. Because there are HW reset value for it. We don't
+need to configure it.
+> The L2 label above isn't necessary unless something references those
+> nodes. Usually, that something is the cpu nodes' next-level-cache
+> property. I don't suppose you could amend this series to also fill in
+> Tegra's /cpus nodes in these files too?
+OK. Will remove the label.
+> 
+> Finally, is this series going to be a dependency for any of the cpuidle
+> or other work you're submitting? I assume it's completely independent
+> and hence I can throw it in any old branch in any order I feel like?
 
->> +static int __devinit pcs_add_gpio_range(struct device_node *node,
->> +                                     struct pcs_device *pcs)
->> +{
->> +     struct pcs_gpio_range *gpio;
->> +     struct device_node *np;
->> +     const __be32 *list;
->> +     const char list_name[] = "pinctrl-single,gpio-ranges";
->> +     const char name[] = "pinctrl-single";
->> +     u32 gpiores[PCS_MAX_GPIO_VALUES];
->> +     int ret, size, i, mux_bytes = 0;
->> +
->> +     list = of_get_property(node, list_name, &size);
->> +     if (!list)
->> +             return -ENOENT;
->
-> Here you should return 0 if not found, otherwise things go bad for
-> me at least as I don't have GPIOs configured. See more below.
->
-OK. Use return 0 instead.
+No. We need this before the "powered-down" cpuidle support. Because the
+L2 init function didn't help to hook the resume API to "outer_cache_fns"
+interface currently. If we don't apply this before the "powered-down"
+cpuidle, we will lost L2 support after one successful powered-down
+cpuidle sequence.
 
->> +             gpio->range.name = kmemdup(name, sizeof(name), GFP_KERNEL);
->> +             pinctrl_add_gpio_range(pcs->pctl, &gpio->range);
->
-> Just checking.. These get released with pinctrl_unregister() when
-> unloading, right? And nothing else to free in pinctrl-single.c
-> either?
->
-I'll fix.
-
->> @@ -975,6 +1061,10 @@ static int __devinit pcs_probe(struct platform_device *pdev)
->>               goto free;
->>       }
->>
->> +     ret = pcs_add_gpio_range(np, pcs);
->> +     if (ret < 0)
->> +             return ret;
->> +
->
-> Here you need to goto free on error. Maybe just fold in the
-> attached fix if that looks OK to you:
->
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -930,7 +930,7 @@ static int __devinit pcs_add_gpio_range(struct device_node *node,
->
->         list = of_get_property(node, list_name, &size);
->         if (!list)
-> -               return -ENOENT;
-> +               return 0;
->         size = size / sizeof(*list);
->         for (i = 0; i < size; i++) {
->                 np = of_parse_phandle(node, list_name, i);
-> @@ -1065,7 +1065,7 @@ static int __devinit pcs_probe(struct platform_device *pdev)
->
->         ret = pcs_add_gpio_range(np, pcs);
->         if (ret < 0)
-> -               return ret;
-> +               goto free;
->
->         dev_info(pcs->dev, "%i pins at pa %p size %u\n",
->                  pcs->desc.npins, pcs->base, pcs->size);
-
-I'll take your fix into this patch.
+Thanks,
+Joseph
