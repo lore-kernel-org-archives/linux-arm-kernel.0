@@ -1,86 +1,31 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Mon, 29 Oct 2012 15:17:52 +0900
-Subject: [PATCH v2 2/2] SH: intc: Add support OF of IRQ
-In-Reply-To: <1351491472-3362-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1351491472-3362-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <1351491472-3362-2-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Oct 2012 08:14:27 +0200
+Subject: [PATCH] Add FDT support to Pandaboard initialization
+In-Reply-To: <1351363800-28744-1-git-send-email-const@MakeLinux.com>
+References: <1351363800-28744-1-git-send-email-const@MakeLinux.com>
+Message-ID: <20121029061427.GP17570@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add infomation of device node to struct intc_desc.
+On Sat, Oct 27, 2012 at 08:50:00PM +0200, Constantine Shulyupin wrote:
+> From: Constantine Shulyupin <const@MakeLinux.com>
+> 
+> Problem:
+> - FDT is supported only by generic OMAP board initialization in arch/arm/mach-omap2/board-generic.c and lacks some configurations, which are not yet configured in FDT (USB for example).
+> Solution:
+> - arch/arm/mach-omap2/board-omap4panda.c supports initialization with FDT and without it.
+> 
+> Signed-off-by: Constantine Shulyupin <const@MakeLinux.com>
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
----
- drivers/sh/intc/core.c      |    2 +-
- drivers/sh/intc/internals.h |    3 ++-
- drivers/sh/intc/irqdomain.c |    6 +++---
- include/linux/sh_intc.h     |    1 +
- 4 files changed, 7 insertions(+), 5 deletions(-)
+NAK, the whole idea of DT is to drop board-*.c. It would be best to see
+the "missing initialization" being added to board-generic/dts files.
 
-diff --git a/drivers/sh/intc/core.c b/drivers/sh/intc/core.c
-index 8f32a13..3963af3 100644
---- a/drivers/sh/intc/core.c
-+++ b/drivers/sh/intc/core.c
-@@ -311,7 +311,7 @@ int __init register_intc_controller(struct intc_desc *desc)
- 
- 	BUG_ON(k > 256); /* _INTC_ADDR_E() and _INTC_ADDR_D() are 8 bits */
- 
--	intc_irq_domain_init(d, hw);
-+	intc_irq_domain_init(d, hw, desc->of_node);
- 
- 	/* register the vectors one by one */
- 	for (i = 0; i < hw->nr_vectors; i++) {
-diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
-index 7dff08e..e6f64bf 100644
---- a/drivers/sh/intc/internals.h
-+++ b/drivers/sh/intc/internals.h
-@@ -190,7 +190,8 @@ void intc_enable_disable_enum(struct intc_desc *desc, struct intc_desc_int *d,
- 			      intc_enum enum_id, int enable);
- 
- /* irqdomain.c */
--void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw);
-+void intc_irq_domain_init(struct intc_desc_int *d, struct intc_hw_desc *hw,
-+				struct device_node *of_node);
- 
- /* virq.c */
- void intc_subgroup_init(struct intc_desc *desc, struct intc_desc_int *d);
-diff --git a/drivers/sh/intc/irqdomain.c b/drivers/sh/intc/irqdomain.c
-index 3968f1c..22ab7af 100644
---- a/drivers/sh/intc/irqdomain.c
-+++ b/drivers/sh/intc/irqdomain.c
-@@ -42,7 +42,7 @@ static const struct irq_domain_ops intc_evt_ops = {
- };
- 
- void __init intc_irq_domain_init(struct intc_desc_int *d,
--				 struct intc_hw_desc *hw)
-+				 struct intc_hw_desc *hw, struct device_node *np)
- {
- 	unsigned int irq_base, irq_end;
- 
-@@ -59,10 +59,10 @@ void __init intc_irq_domain_init(struct intc_desc_int *d,
- 	 * tree penalty for linear cases with non-zero hwirq bases.
- 	 */
- 	if (irq_base == 0 && irq_end == (irq_base + hw->nr_vectors - 1))
--		d->domain = irq_domain_add_linear(NULL, hw->nr_vectors,
-+		d->domain = irq_domain_add_linear(np, hw->nr_vectors,
- 						  &intc_evt_ops, NULL);
- 	else
--		d->domain = irq_domain_add_tree(NULL, &intc_evt_ops, NULL);
-+		d->domain = irq_domain_add_tree(np, &intc_evt_ops, NULL);
- 
- 	BUG_ON(!d->domain);
- }
-diff --git a/include/linux/sh_intc.h b/include/linux/sh_intc.h
-index 694cd86..79f5841 100644
---- a/include/linux/sh_intc.h
-+++ b/include/linux/sh_intc.h
-@@ -118,6 +118,7 @@ struct intc_desc {
- 	intc_enum force_disable;
- 	bool skip_syscore_suspend;
- 	struct intc_hw_desc hw;
-+	struct device_node *of_node;
- };
- 
- #define DECLARE_INTC_DESC(symbol, chipname, vectors, groups,		\
 -- 
-1.7.10.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/c0b25a4f/attachment.sig>
