@@ -1,24 +1,24 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 29 Oct 2012 14:24:48 -0600
-Subject: vexpress issues in next-20121029
-Message-ID: <508EE610.9050703@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 29 Oct 2012 18:34:58 -0200
+Subject: imx-sdma.c broken on imx53 for sound
+In-Reply-To: <20121029194505.DD38B1A1A4DB@amazonia.comcast.net>
+References: <39c8a3f022e86d3eae0fb7b6e48049f1.squirrel@webmail.efn.org>
+ <CAOMZO5B1k4r=6ZqQkZghuEqmEY=tOwRUmZAnckqxBM0_kVf6rQ@mail.gmail.com>
+ <CAOMZO5BduoMdqvgrARJ4JRVNv2M=+uH24+sHMstssPD2Cxzcfg@mail.gmail.com>
+ <20121029194505.DD38B1A1A4DB@amazonia.comcast.net>
+Message-ID: <CAOMZO5B4LK2rm5kam-VkFJBpsrCPT27aL4sm_xRgaqeGwx5BuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pawel,
+On Mon, Oct 29, 2012 at 5:45 PM, Rick Bronson <rickbronson@gmail.com> wrote:
+> Hi Fabio,
+>
+>   Thanks for the help.  Apparently the firmware moved from internal to
+> /lib/firmware/imx/sdma/sdma-imx53.bin
 
-I see two issues on vexpress in next-20121029:
+You can generate the mx53 sdma firmware using this tool:
+http://git.pengutronix.de/?p=imx/sdma-firmware.git;a=summary
 
-1) At compile-time: v2m_timer_init() and v2m_dt_timer_init() reference
-functions vexpress_clk_init() and vexpress_clk_of_init() respectively,
-which don't appear anywhere in the source tree.
+Regards,
 
-2) With those calls commented out, I find that
-vexpress_sysreg_init_leds() is device_initcall, and so executes even
-when not running on vexpress HW. This crashes on Tegra (which I have
-converted to single-zImage locally).
-
-These appear to come from the following commits:
-
-0891642 ARM: vexpress: Start using new Versatile Express infrastructure
-568e5e4 mfd: Versatile Express system registers driver
+Fabio Estevam
