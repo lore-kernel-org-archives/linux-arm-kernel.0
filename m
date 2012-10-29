@@ -1,58 +1,109 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 29 Oct 2012 10:50:12 +0100
-Subject: [PATCH v3 3/4] arm: mvebu: move irq controller driver to
- drivers/irqchip
-In-Reply-To: <508E4EB3.5060901@gmail.com>
-References: <1351462748-5224-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <508E49E0.8050606@gmail.com> <20121029102436.504d5053@skate>
- <508E4EB3.5060901@gmail.com>
-Message-ID: <20121029105012.4fa417e7@skate>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 29 Oct 2012 10:50:24 +0100
+Subject: [RFC 2/6] sched: add a new SD SHARE_POWERLINE flag for
+ sched_domain
+In-Reply-To: <CAKfTPtDMQvsbudGm71UAv1xUE86CLP-ySB1PBYXB7HoFa7gOgQ@mail.gmail.com>
+References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
+ <1349595838-31274-3-git-send-email-vincent.guittot@linaro.org>
+ <5088066D.7000907@ti.com>
+ <CAKfTPtDMQvsbudGm71UAv1xUE86CLP-ySB1PBYXB7HoFa7gOgQ@mail.gmail.com>
+Message-ID: <CAKfTPtB4CBVZDLeRsqENUgZuefpG8+7g-oyPRMyY5J2iRJuEOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+ It looks like i need to describe more what
 
-On Mon, 29 Oct 2012 10:38:59 +0100, Sebastian Hesselbarth wrote:
+On 29 October 2012 10:40, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+> On 24 October 2012 17:17, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+>> Vincent,
+>>
+>> Few comments/questions.
+>>
+>>
+>> On Sunday 07 October 2012 01:13 PM, Vincent Guittot wrote:
+>>>
+>>> This new flag SD SHARE_POWERLINE reflects the sharing of the power rail
+>>> between the members of a domain. As this is the current assumption of the
+>>> scheduler, the flag is added to all sched_domain
+>>>
+>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>>> ---
+>>>   arch/ia64/include/asm/topology.h |    1 +
+>>>   arch/tile/include/asm/topology.h |    1 +
+>>>   include/linux/sched.h            |    1 +
+>>>   include/linux/topology.h         |    3 +++
+>>>   kernel/sched/core.c              |    5 +++++
+>>>   5 files changed, 11 insertions(+)
+>>>
+>>> diff --git a/arch/ia64/include/asm/topology.h
+>>> b/arch/ia64/include/asm/topology.h
+>>> index a2496e4..065c720 100644
+>>> --- a/arch/ia64/include/asm/topology.h
+>>> +++ b/arch/ia64/include/asm/topology.h
+>>> @@ -65,6 +65,7 @@ void build_cpu_to_node_map(void);
+>>>                                 | SD_BALANCE_EXEC       \
+>>>                                 | SD_BALANCE_FORK       \
+>>>                                 | SD_WAKE_AFFINE,       \
+>>> +                               | arch_sd_share_power_line()            \
+>>>         .last_balance           = jiffies,              \
+>>>         .balance_interval       = 1,                    \
+>>>         .nr_balance_failed      = 0,                    \
+>>> diff --git a/arch/tile/include/asm/topology.h
+>>> b/arch/tile/include/asm/topology.h
+>>> index 7a7ce39..d39ed0b 100644
+>>> --- a/arch/tile/include/asm/topology.h
+>>> +++ b/arch/tile/include/asm/topology.h
+>>> @@ -72,6 +72,7 @@ static inline const struct cpumask *cpumask_of_node(int
+>>> node)
+>>>                                 | 0*SD_PREFER_LOCAL                     \
+>>>                                 | 0*SD_SHARE_CPUPOWER                   \
+>>>                                 | 0*SD_SHARE_PKG_RESOURCES              \
+>>> +                               | arch_sd_share_power_line()            \
+>>>                                 | 0*SD_SERIALIZE                        \
+>>>                                 ,                                       \
+>>>         .last_balance           = jiffies,                              \
+>>> diff --git a/include/linux/sched.h b/include/linux/sched.h
+>>> index 4786b20..74f2daf 100644
+>>> --- a/include/linux/sched.h
+>>> +++ b/include/linux/sched.h
+>>> @@ -862,6 +862,7 @@ enum cpu_idle_type {
+>>>   #define SD_WAKE_AFFINE                0x0020  /* Wake task to waking CPU
+>>> */
+>>>   #define SD_PREFER_LOCAL               0x0040  /* Prefer to keep tasks
+>>> local to this domain */
+>>>   #define SD_SHARE_CPUPOWER     0x0080  /* Domain members share cpu power
+>>> */
+>>> +#define SD_SHARE_POWERLINE     0x0100  /* Domain members share power
+>>> domain */
+>>
+>> If you ignore the current use of SD_SHARE_CPUPOWER, isn't the meaning of
+>> CPUPOWER and POWERLINE is same here. Just trying to understand the clear
+>> meaning of this new flag. Have you not considered SD_SHARE_CPUPOWER
+>> because it is being used for cpu_power and needs at least minimum two
+>> domains ? SD_PACKING would have been probably more appropriate based
+>> on the way it is being used in further series.
+>
+> CPUPOWER reflects the share of hw ressources between cores like for
+> hyper threading. POWERLINE describes the fact that cores are sharing
+> the same power line amore precisely the powergate.
 
-> > Not really: the driver is probed depending on the DT compatible string.
-> > So we can perfectly have two irqchip drivers being enabled on
-> > ARCH_MVEBU.
-> 
-> I agreed but this will always build irq-armada-370-xp into the kernel
-> although I maybe want a orion-only kernel. Although multi-platform will
-> be great for ARM, I doubt that every kernel will be multi-platform?
+Sorry, the mail has been sent too early while I was writing it
 
-Agreed.
+CPUPOWER reflects the share of hw ressources between cores like for
+hyper threading. POWERLINE describes the fact that cores are sharing
+the same power line and more precisely the same power gating. It looks
+like I need to describe more precisely what i would mean with
+SHARE_POWERLINE.
 
-> >> As soon as the patch is through, I can provide (and use) a irq-orion
-> >> based on irqchip. I can provide it earlier but to actually use it there
-> >> are still some other patches required on Dove. Other Orions could
-> >> switch now, I guess.
-> >
-> > Are you sure? The irqchip drivers only work for sub-architecture that
-> > are fully converted to the Device Tree. And I don't think all of
-> > mach-orion5x, mach-dove, mach-kirkwood and mach-mv78xx0 are converted
-> > to the DT.
-> 
-> Hmm, I do have an experimental branch of Dove with irqchip enabled that
-> works perfectly fine even with non-DT code in it. Actually, it is based
-> on 3.7-rc3 which means it is before your patches.
-> 
-> But the irq controller itself is referenced from DT, of course.
+I don't want to use PACKING because it's more a behavior than a
+feature. If cores can power gate independently (!SD_SHARE_POWERLINE),
+packing small tasks is one interesting behavior but it may be not the
+only one. I want to make a difference between the HW configuration and
+the behavior we want to have above it
 
-Yes, you need at least to probe the irq controller from DT. But neither
-mach-orion5x nor mach-mv78xx0 have DT at all, and they need irq-orion.
+Vincent
 
-I am currently in contact with an engineer from LaCie, who has put his
-hands on a mach-orion5x platform, I hope to work with him to get DT
-support in mach-orion5x.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>>
+>> Regards
+>> Santosh
+>>
