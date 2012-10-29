@@ -1,447 +1,153 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 29 Oct 2012 18:28:21 +0800
-Subject: [PATCH V3 7/7] ARM: tegra30: cpuidle: add powered-down state for CPU0
-In-Reply-To: <1351506501-600-1-git-send-email-josephl@nvidia.com>
-References: <1351506501-600-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1351506501-600-8-git-send-email-josephl@nvidia.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 29 Oct 2012 16:03:09 +0530
+Subject: [PATCH 00/13] ARM: OMAP: remove prcm.[ch]
+In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
+References: <20121025231818.17558.57884.stgit@dusk.lan>
+Message-ID: <508E5B65.2020800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a power gating idle mode. It support power gating vdd_cpu rail
-after all cpu cores in "powered-down" status. For Tegra30, the CPU0 can
-enter this state only when all secondary CPU is offline. We need to take
-care and make sure whole secondary CPUs were offline and checking the
-CPU power gate status. After that, the CPU0 can go into "powered-down"
-state safely. Then shut off the CPU rail.
 
-Be aware of that, you may see the legacy power state "LP2" in the code
-which is exactly the same meaning of "CPU power down".
 
-Base on the work by:
-Scott Williams <scwilliams@nvidia.com>
+On 10/26/2012 4:51 AM, Paul Walmsley wrote:
+> Remove arch/arm/mach-omap2/prcm.c and
+> arch/arm/plat-omap/include/plat/prcm.h.  This is in preparation for
+> moving the PRM/CM code to drivers/, although to be fair, these files
+> should have been removed a long time ago.
+> 
+> Intended for 3.8 cleanup.  Applies on top of the existing PRM/CM split
+> cleanup series, and the WDTIMER cleanup series.
+> 
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-V3:
-* Fix the potential issue that will cause the CPU corruption when CPUs
-  doing LP2. All CPUs entering LP2 is not working. The CPU0 can enter
-  LP2 only when all secondary CPU is offline. This can be covered by
-  CPUquiet and cluster switching mechanism.
-* update the commit message
-* rename the funciton name from "tegra30_idle_enter_lp2_cpu_0" to
-  "tegra30_cpu_cluster_power_down"
-* remove the redundant "flush_cache_all" in "tegra_idle_lp2_last"
-  because the "cpu_suspend" already do that after save the CPU contexts
-V2:
-* refine the pclk usage in "set_power_timers"
----
- arch/arm/mach-tegra/cpuidle-tegra30.c |   44 +++++++++-
- arch/arm/mach-tegra/pm.c              |  144 +++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/pm.h              |    3 +
- arch/arm/mach-tegra/sleep-tegra30.S   |   44 ++++++++++
- arch/arm/mach-tegra/sleep.S           |   42 ++++++++++
- arch/arm/mach-tegra/sleep.h           |    2 +
- 6 files changed, 275 insertions(+), 4 deletions(-)
+Paul,
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index cc48d7f..5e8cbf5 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -32,6 +32,7 @@
- 
- #include "pm.h"
- #include "sleep.h"
-+#include "tegra_cpu_car.h"
- 
- #ifdef CONFIG_PM_SLEEP
- static int tegra30_idle_lp2(struct cpuidle_device *dev,
-@@ -67,6 +68,31 @@ static struct cpuidle_driver tegra_idle_driver = {
- static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
- 
- #ifdef CONFIG_PM_SLEEP
-+static bool tegra30_cpu_cluster_power_down(struct cpuidle_device *dev,
-+					   struct cpuidle_driver *drv,
-+					   int index)
-+{
-+	struct cpuidle_state *state = &drv->states[index];
-+	u32 cpu_on_time = state->exit_latency;
-+	u32 cpu_off_time = state->target_residency - state->exit_latency;
-+
-+	/* All CPUs entering LP2 is not working.
-+	 * Don't let CPU0 enter LP2 when any secondary CPU is online.
-+	 */
-+	if (num_online_cpus() > 1 || !tegra_cpu_rail_off_ready()) {
-+		cpu_do_idle();
-+		return false;
-+	}
-+
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
-+
-+	tegra_idle_lp2_last(cpu_on_time, cpu_off_time);
-+
-+	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
-+
-+	return true;
-+}
-+
- #ifdef CONFIG_SMP
- static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
- 					struct cpuidle_driver *drv,
-@@ -101,16 +127,22 @@ static int __cpuinit tegra30_idle_lp2(struct cpuidle_device *dev,
- {
- 	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
- 	bool entered_lp2 = false;
-+	bool last_cpu;
- 
- 	local_fiq_disable();
- 
--	tegra_set_cpu_in_lp2(cpu);
-+	last_cpu = tegra_set_cpu_in_lp2(cpu);
- 	cpu_pm_enter();
- 
--	if (cpu == 0)
--		cpu_do_idle();
--	else
-+	if (cpu == 0) {
-+		if (last_cpu)
-+			entered_lp2 = tegra30_cpu_cluster_power_down(dev, drv,
-+								     index);
-+		else
-+			cpu_do_idle();
-+	} else {
- 		entered_lp2 = tegra30_cpu_core_power_down(dev, drv, index);
-+	}
- 
- 	cpu_pm_exit();
- 	tegra_clear_cpu_in_lp2(cpu);
-@@ -130,6 +162,10 @@ int __init tegra30_cpuidle_init(void)
- 	struct cpuidle_device *dev;
- 	struct cpuidle_driver *drv = &tegra_idle_driver;
- 
-+#ifdef CONFIG_PM_SLEEP
-+	tegra_tear_down_cpu = tegra30_tear_down_cpu;
-+#endif
-+
- 	ret = cpuidle_register_driver(&tegra_idle_driver);
- 	if (ret) {
- 		pr_err("CPUidle driver registration failed\n");
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 39ee557..0d9e8b9 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -20,14 +20,37 @@
- #include <linux/spinlock.h>
- #include <linux/io.h>
- #include <linux/cpumask.h>
-+#include <linux/delay.h>
-+#include <linux/cpu_pm.h>
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+
-+#include <asm/smp_plat.h>
-+#include <asm/cacheflush.h>
-+#include <asm/suspend.h>
-+#include <asm/idmap.h>
-+#include <asm/proc-fns.h>
-+#include <asm/tlbflush.h>
- 
- #include <mach/iomap.h>
- 
- #include "reset.h"
-+#include "flowctrl.h"
-+#include "sleep.h"
-+#include "tegra_cpu_car.h"
-+
-+#define TEGRA_POWER_CPU_PWRREQ_OE	(1 << 16)  /* CPU pwr req enable */
-+
-+#define PMC_CTRL		0x0
-+#define PMC_CPUPWRGOOD_TIMER	0xc8
-+#define PMC_CPUPWROFF_TIMER	0xcc
- 
- #ifdef CONFIG_PM_SLEEP
- static unsigned int g_diag_reg;
- static DEFINE_SPINLOCK(tegra_lp2_lock);
-+static void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-+static struct clk *tegra_pclk;
-+void (*tegra_tear_down_cpu)(void);
- 
- void save_cpu_arch_register(void)
- {
-@@ -43,6 +66,89 @@ void restore_cpu_arch_register(void)
- 	return;
- }
- 
-+static void set_power_timers(unsigned long us_on, unsigned long us_off)
-+{
-+	unsigned long long ticks;
-+	unsigned long long pclk;
-+	unsigned long rate;
-+	static unsigned long tegra_last_pclk;
-+
-+	if (tegra_pclk == NULL) {
-+		tegra_pclk = clk_get_sys(NULL, "pclk");
-+		WARN_ON(IS_ERR(tegra_pclk));
-+	}
-+
-+	rate = clk_get_rate(tegra_pclk);
-+
-+	if (WARN_ON_ONCE(rate <= 0))
-+		pclk = 100000000;
-+	else
-+		pclk = rate;
-+
-+	if ((rate != tegra_last_pclk)) {
-+		ticks = (us_on * pclk) + 999999ull;
-+		do_div(ticks, 1000000);
-+		writel((unsigned long)ticks, pmc + PMC_CPUPWRGOOD_TIMER);
-+
-+		ticks = (us_off * pclk) + 999999ull;
-+		do_div(ticks, 1000000);
-+		writel((unsigned long)ticks, pmc + PMC_CPUPWROFF_TIMER);
-+		wmb();
-+	}
-+	tegra_last_pclk = pclk;
-+}
-+
-+/*
-+ * restore_cpu_complex
-+ *
-+ * restores cpu clock setting, clears flow controller
-+ *
-+ * Always called on CPU 0.
-+ */
-+static void restore_cpu_complex(void)
-+{
-+	int cpu = smp_processor_id();
-+
-+	BUG_ON(cpu != 0);
-+
-+#ifdef CONFIG_SMP
-+	cpu = cpu_logical_map(cpu);
-+#endif
-+
-+	/* Restore the CPU clock settings */
-+	tegra_cpu_clock_resume();
-+
-+	flowctrl_cpu_suspend_exit(cpu);
-+
-+	restore_cpu_arch_register();
-+}
-+
-+/*
-+ * suspend_cpu_complex
-+ *
-+ * saves pll state for use by restart_plls, prepares flow controller for
-+ * transition to suspend state
-+ *
-+ * Must always be called on cpu 0.
-+ */
-+static void suspend_cpu_complex(void)
-+{
-+	int cpu = smp_processor_id();
-+
-+	BUG_ON(cpu != 0);
-+
-+#ifdef CONFIG_SMP
-+	cpu = cpu_logical_map(cpu);
-+#endif
-+
-+	/* Save the CPU clock settings */
-+	tegra_cpu_clock_suspend();
-+
-+	flowctrl_cpu_suspend_enter(cpu);
-+
-+	save_cpu_arch_register();
-+}
-+
- void __cpuinit tegra_clear_cpu_in_lp2(int phy_cpu_id)
- {
- 	u32 *cpu_in_lp2 = tegra_cpu_lp2_mask;
-@@ -72,4 +178,42 @@ bool __cpuinit tegra_set_cpu_in_lp2(int phy_cpu_id)
- 	spin_unlock(&tegra_lp2_lock);
- 	return last_cpu;
- }
-+
-+static int tegra_sleep_cpu(unsigned long v2p)
-+{
-+	/* Switch to the identity mapping. */
-+	cpu_switch_mm(idmap_pgd, &init_mm);
-+
-+	/* Flush the TLB. */
-+	local_flush_tlb_all();
-+
-+	tegra_sleep_cpu_finish(v2p);
-+
-+	/* should never here */
-+	BUG();
-+
-+	return 0;
-+}
-+
-+void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time)
-+{
-+	u32 mode;
-+
-+	/* Only the last cpu down does the final suspend steps */
-+	mode = readl(pmc + PMC_CTRL);
-+	mode |= TEGRA_POWER_CPU_PWRREQ_OE;
-+	writel(mode, pmc + PMC_CTRL);
-+
-+	set_power_timers(cpu_on_time, cpu_off_time);
-+
-+	cpu_cluster_pm_enter();
-+	suspend_cpu_complex();
-+	outer_disable();
-+
-+	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, &tegra_sleep_cpu);
-+
-+	outer_resume();
-+	restore_cpu_complex();
-+	cpu_cluster_pm_exit();
-+}
- #endif
-diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-index bcfc45f..512345c 100644
---- a/arch/arm/mach-tegra/pm.h
-+++ b/arch/arm/mach-tegra/pm.h
-@@ -27,4 +27,7 @@ void restore_cpu_arch_register(void);
- void tegra_clear_cpu_in_lp2(int phy_cpu_id);
- bool tegra_set_cpu_in_lp2(int phy_cpu_id);
- 
-+void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time);
-+extern void (*tegra_tear_down_cpu)(void);
-+
- #endif /* _MACH_TEGRA_PM_H_ */
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index 59984d7..562a8e7 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -124,4 +124,48 @@ ENTRY(tegra30_sleep_cpu_secondary_finish)
- 	mov	r0, #1                          @ never return here
- 	mov	pc, r7
- ENDPROC(tegra30_sleep_cpu_secondary_finish)
-+
-+/*
-+ * tegra30_tear_down_cpu
-+ *
-+ * Switches the CPU to enter sleep.
-+ */
-+ENTRY(tegra30_tear_down_cpu)
-+	mov32	r6, TEGRA_FLOW_CTRL_BASE
-+
-+	b	tegra30_enter_sleep
-+ENDPROC(tegra30_tear_down_cpu)
-+
-+/*
-+ * tegra30_enter_sleep
-+ *
-+ * uses flow controller to enter sleep state
-+ * executes from IRAM with SDRAM in selfrefresh when target state is LP0 or LP1
-+ * executes from SDRAM with target state is LP2
-+ * r6 = TEGRA_FLOW_CTRL_BASE
-+ */
-+tegra30_enter_sleep:
-+	cpu_id	r1
-+
-+	cpu_to_csr_reg	r2, r1
-+	ldr	r0, [r6, r2]
-+	orr	r0, r0, #FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-+	orr	r0, r0, #FLOW_CTRL_CSR_ENABLE
-+	str	r0, [r6, r2]
-+
-+	mov	r0, #FLOW_CTRL_WAIT_FOR_INTERRUPT
-+	orr	r0, r0, #FLOW_CTRL_HALT_CPU_IRQ | FLOW_CTRL_HALT_CPU_FIQ
-+	cpu_to_halt_reg r2, r1
-+	str	r0, [r6, r2]
-+	dsb
-+	ldr	r0, [r6, r2] /* memory barrier */
-+
-+halted:
-+	isb
-+	dsb
-+	wfi	/* CPU should be power gated here */
-+
-+	/* !!!FIXME!!! Implement halt failure handler */
-+	b	halted
-+
- #endif
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index cba7a52..b7541e2 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -25,6 +25,7 @@
- #include <linux/linkage.h>
- 
- #include <asm/assembler.h>
-+#include <asm/cache.h>
- #include <asm/cp15.h>
- 
- #include <mach/iomap.h>
-@@ -59,4 +60,45 @@ ENTRY(tegra_disable_clean_inv_dcache)
- 	ldmfd	sp!, {r0, r4-r5, r7, r9-r11, pc}
- ENDPROC(tegra_disable_clean_inv_dcache)
- 
-+/*
-+ * tegra_sleep_cpu_finish(unsigned long v2p)
-+ *
-+ * enters suspend in LP2 by turning off the mmu and jumping to
-+ * tegra?_tear_down_cpu
-+ */
-+ENTRY(tegra_sleep_cpu_finish)
-+	/* Flush and disable the L1 data cache */
-+	bl	tegra_disable_clean_inv_dcache
-+
-+	mov32	r6, tegra_tear_down_cpu
-+	ldr	r1, [r6]
-+	add	r1, r1, r0
-+
-+	mov32	r3, tegra_shut_off_mmu
-+	add	r3, r3, r0
-+	mov	r0, r1
-+
-+	mov	pc, r3
-+ENDPROC(tegra_sleep_cpu_finish)
-+
-+/*
-+ * tegra_shut_off_mmu
-+ *
-+ * r0 = physical address to jump to with mmu off
-+ *
-+ * called with VA=PA mapping
-+ * turns off MMU, icache, dcache and branch prediction
-+ */
-+	.align	L1_CACHE_SHIFT
-+	.pushsection	.idmap.text, "ax"
-+ENTRY(tegra_shut_off_mmu)
-+	mrc	p15, 0, r3, c1, c0, 0
-+	movw	r2, #CR_I | CR_Z | CR_C | CR_M
-+	bic	r3, r3, r2
-+	dsb
-+	mcr	p15, 0, r3, c1, c0, 0
-+	isb
-+	mov	pc, r0
-+ENDPROC(tegra_shut_off_mmu)
-+	.popsection
- #endif
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index 220fbd1..001920f 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -73,6 +73,7 @@
- .endm
- #else
- void tegra_resume(void);
-+int tegra_sleep_cpu_finish(unsigned long);
- 
- #ifdef CONFIG_HOTPLUG_CPU
- void tegra20_hotplug_init(void);
-@@ -83,6 +84,7 @@ static inline void tegra30_hotplug_init(void) {}
- #endif
- 
- int tegra30_sleep_cpu_secondary_finish(unsigned long);
-+void tegra30_tear_down_cpu(void);
- 
- #endif
- #endif
--- 
-1.7.0.4
+By any chance you have branch available with these patches, so that I
+can validate them here at my end?
+
+Thanks,
+Vaibhav
+
+> 
+> - Paul
+> 
+> ---
+> 
+> omap2_prcm_cleanup_3.8
+>    text	   data	    bss	    dec	    hex	filename
+> 7521423	 696876	5613996	13832295	 d31067	vmlinux.omap2plus_defconfig.orig
+> 7522239	 696612	5613996	13832847	 d3128f	vmlinux.omap2plus_defconfig
+> 
+> Paul Walmsley (13):
+>       ARM: OMAP2+: common: remove mach-omap2/common.c and map_common_io code
+>       ARM: OMAP2/3: PRM: add SoC reset functions (using the CORE DPLL method)
+>       ARM: OMAP2xxx: clock: remove global 'dclk' variable
+>       ARM: OMAP2xxx: clock: move virt_prcm_set code into clkt2xxx_virt_prcm_set.c
+>       ARM: OMAP2+: PRCM: create SoC-specific chip restart functions
+>       ARM: OMAP2+: board files: use SoC-specific system restart functions
+>       ARM: OMAP2xxx: APLL/CM: convert to use omap2_cm_wait_module_ready()
+>       ARM: OMAP2+: CM/clock: convert _omap2_module_wait_ready() to use SoC-independent CM functions
+>       ARM: OMAP2+: PRCM: remove omap2_cm_wait_idlest()
+>       ARM: OMAP2+: PRCM: split and relocate the PRM/CM globals setup
+>       ARM: OMAP2+: PRCM: consolidate PRCM-related timeout macros
+>       ARM: OMAP2+: hwmod: call to _omap4_disable_module() should use the SoC-specific call
+>       ARM: OMAP2+: PRCM: remove obsolete prcm.[ch]
+> 
+> 
+>  arch/arm/mach-omap1/reset.c                  |    2 
+>  arch/arm/mach-omap2/Makefile                 |    9 +
+>  arch/arm/mach-omap2/am33xx.h                 |    1 
+>  arch/arm/mach-omap2/board-2430sdp.c          |    2 
+>  arch/arm/mach-omap2/board-3430sdp.c          |    2 
+>  arch/arm/mach-omap2/board-3630sdp.c          |    2 
+>  arch/arm/mach-omap2/board-4430sdp.c          |    2 
+>  arch/arm/mach-omap2/board-am3517crane.c      |    2 
+>  arch/arm/mach-omap2/board-am3517evm.c        |    2 
+>  arch/arm/mach-omap2/board-apollon.c          |    2 
+>  arch/arm/mach-omap2/board-cm-t35.c           |   18 +-
+>  arch/arm/mach-omap2/board-cm-t3517.c         |    2 
+>  arch/arm/mach-omap2/board-devkit8000.c       |    2 
+>  arch/arm/mach-omap2/board-generic.c          |   10 +
+>  arch/arm/mach-omap2/board-h4.c               |    2 
+>  arch/arm/mach-omap2/board-igep0020.c         |    4 -
+>  arch/arm/mach-omap2/board-ldp.c              |    2 
+>  arch/arm/mach-omap2/board-n8x0.c             |    6 -
+>  arch/arm/mach-omap2/board-omap3beagle.c      |    2 
+>  arch/arm/mach-omap2/board-omap3evm.c         |    2 
+>  arch/arm/mach-omap2/board-omap3logic.c       |    4 -
+>  arch/arm/mach-omap2/board-omap3pandora.c     |    2 
+>  arch/arm/mach-omap2/board-omap3stalker.c     |    2 
+>  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 
+>  arch/arm/mach-omap2/board-omap4panda.c       |    2 
+>  arch/arm/mach-omap2/board-overo.c            |    2 
+>  arch/arm/mach-omap2/board-rm680.c            |    4 -
+>  arch/arm/mach-omap2/board-rx51.c             |    2 
+>  arch/arm/mach-omap2/board-ti8168evm.c        |    4 -
+>  arch/arm/mach-omap2/board-zoom.c             |    4 -
+>  arch/arm/mach-omap2/clkt2xxx_apll.c          |   57 ++-----
+>  arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |   36 ++++-
+>  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   70 ++++++++-
+>  arch/arm/mach-omap2/clkt_iclk.c              |    1 
+>  arch/arm/mach-omap2/clock.c                  |   15 +-
+>  arch/arm/mach-omap2/clock.h                  |   28 ----
+>  arch/arm/mach-omap2/clock2420_data.c         |   26 +--
+>  arch/arm/mach-omap2/clock2430_data.c         |   26 +--
+>  arch/arm/mach-omap2/clock2xxx.c              |   16 --
+>  arch/arm/mach-omap2/clock2xxx.h              |    9 +
+>  arch/arm/mach-omap2/cm-regbits-24xx.h        |    2 
+>  arch/arm/mach-omap2/cm.h                     |   20 ++-
+>  arch/arm/mach-omap2/cm2xxx.c                 |  128 ++++++++++++++++
+>  arch/arm/mach-omap2/cm2xxx.h                 |    4 +
+>  arch/arm/mach-omap2/cm2xxx_3xxx.h            |    8 +
+>  arch/arm/mach-omap2/cm3xxx.c                 |   66 ++++++++
+>  arch/arm/mach-omap2/cm3xxx.h                 |    5 +
+>  arch/arm/mach-omap2/cm_common.c              |   70 +++++++++
+>  arch/arm/mach-omap2/cminst44xx.h             |    2 
+>  arch/arm/mach-omap2/common.c                 |  202 --------------------------
+>  arch/arm/mach-omap2/common.h                 |  111 ++------------
+>  arch/arm/mach-omap2/control.c                |   10 +
+>  arch/arm/mach-omap2/control.h                |    2 
+>  arch/arm/mach-omap2/cpuidle34xx.c            |    1 
+>  arch/arm/mach-omap2/display.c                |    2 
+>  arch/arm/mach-omap2/hdq1w.c                  |    4 -
+>  arch/arm/mach-omap2/i2c.c                    |    6 -
+>  arch/arm/mach-omap2/id.c                     |    7 +
+>  arch/arm/mach-omap2/io.c                     |   87 +++++++++--
+>  arch/arm/mach-omap2/mcbsp.c                  |    2 
+>  arch/arm/mach-omap2/msdi.c                   |    4 -
+>  arch/arm/mach-omap2/omap2-restart.c          |   65 ++++++++
+>  arch/arm/mach-omap2/omap3-restart.c          |   36 +++++
+>  arch/arm/mach-omap2/omap4-common.c           |   18 ++
+>  arch/arm/mach-omap2/omap_hwmod.c             |    8 -
+>  arch/arm/mach-omap2/pm34xx.c                 |    1 
+>  arch/arm/mach-omap2/powerdomain.c            |    2 
+>  arch/arm/mach-omap2/prcm-common.h            |   22 ---
+>  arch/arm/mach-omap2/prcm.c                   |  176 -----------------------
+>  arch/arm/mach-omap2/prcm_mpu44xx.c           |   17 ++
+>  arch/arm/mach-omap2/prcm_mpu44xx.h           |    9 +
+>  arch/arm/mach-omap2/prm.h                    |   24 +++
+>  arch/arm/mach-omap2/prm2xxx.c                |   15 ++
+>  arch/arm/mach-omap2/prm2xxx.h                |    2 
+>  arch/arm/mach-omap2/prm2xxx_3xxx.h           |    7 -
+>  arch/arm/mach-omap2/prm3xxx.c                |   16 ++
+>  arch/arm/mach-omap2/prm3xxx.h                |    2 
+>  arch/arm/mach-omap2/prm44xx.c                |    1 
+>  arch/arm/mach-omap2/prm_common.c             |   16 ++
+>  arch/arm/mach-omap2/prminst44xx.h            |    2 
+>  arch/arm/mach-omap2/sdrc.c                   |    8 -
+>  arch/arm/mach-omap2/sdrc.h                   |    3 
+>  arch/arm/mach-omap2/ti81xx.h                 |    9 +
+>  arch/arm/mach-omap2/wd_timer.c               |    5 -
+>  arch/arm/plat-omap/include/plat/prcm.h       |   36 -----
+>  85 files changed, 827 insertions(+), 804 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/common.c
+>  create mode 100644 arch/arm/mach-omap2/omap2-restart.c
+>  create mode 100644 arch/arm/mach-omap2/omap3-restart.c
+>  delete mode 100644 arch/arm/mach-omap2/prcm.c
+>  delete mode 100644 arch/arm/plat-omap/include/plat/prcm.h
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
