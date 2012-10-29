@@ -1,51 +1,61 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 29 Oct 2012 05:22:34 +0000
-Subject: Fwd: [PATCH 2/5] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio
-In-Reply-To: <alpine.DEB.2.00.1210290518120.30274@utopia.booyaka.com>
-References: <20121017181354.GA2412@netboy.at.omicron.at>
- <50806B18.1010502@ti.com>
- <alpine.DEB.2.00.1210290518120.30274@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB5013F@DBDE01.ent.ti.com>
+From: ananth@in.ibm.com (Ananth N Mavinakayanahalli)
+Date: Mon, 29 Oct 2012 11:05:22 +0530
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121026163951.GA17742@redhat.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
+ <20121026163951.GA17742@redhat.com>
+Message-ID: <20121029053522.GC3400@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 29, 2012 at 10:49:54, Paul Walmsley wrote:
-> Hi Vaibhav
+On Fri, Oct 26, 2012 at 06:39:51PM +0200, Oleg Nesterov wrote:
+> On 10/26, Ananth N Mavinakayanahalli wrote:
+> >
+> > On Thu, Oct 25, 2012 at 04:58:39PM +0200, Oleg Nesterov wrote:
+> > > On 10/16, Rabin Vincent wrote:
+> > > >
+> > > > >> --- a/kernel/events/uprobes.c
+> > > > >> +++ b/kernel/events/uprobes.c
+> > > > >> @@ -1246,6 +1246,7 @@ static unsigned long xol_get_insn_slot(struct uprobe *uprobe, unsigned long slot
+> > > > >>       offset = current->utask->xol_vaddr & ~PAGE_MASK;
+> > > > >>       vaddr = kmap_atomic(area->page);
+> > > > >>       arch_uprobe_xol_copy(&uprobe->arch, vaddr + offset);
+> > > > >> +     flush_dcache_page(area->page);
+> > > > >>       kunmap_atomic(vaddr);
+> > > > >
+> > > > > I agree... but why under kmap_atomic?
+> > > >
+> > > > No real reason; I'll move it to after the unmap.
+> > >
+> > > OK. I assume you will send v2.
+> > >
+> > > But this patch looks like a bugfix, flush_dcache_page() is not a nop
+> > > on powerpc. So perhaps we should apply this fix right now?
+> >
+> > Starting Power5, all Power processers have coherent caches.
+> >
+> > > OTOH, I do not understand this stuff, everything is nop on x86. And
+> > > when I look into Documentation/cachetlb.txt I am starting to think
+> > > that may be this needs flush_icache_user_range instead?
+> > >
+> > > Rabin, Ananth could you clarify this?
+> >
+> > Yes. We need flush_icache_user_range(). Though for x86 its always been a
+> > nop, one never knows if there is some Power4 or older machine out there
+> > that is still being used. We are fine for Power5 and later.
 > 
-> On Fri, 19 Oct 2012, Vaibhav Hiremath wrote:
+> This is bad...
 > 
-> > Couple of reasons,
-> > 
-> > 1. These flags were added for validation, so I expect cpsw driver
-> > should work without these flags set. I tested it mounting NFS as rootFS
-> > and it works for me.
-> > 
-> > 2. There is HW bug as far as idle (in turn ocp reset) is concerned, and
-> > needs special handling for this. I already have patch for this, which I
-> > will submit it to the list.
-> > 
-> > http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;h=a28da2ac98f173f97dbbb46be1ce0a3879f21a11
-> > 
-> > 
-> > Note: Sorry for long commit description, it was screwed up by someone
-> > while git push.
-> > 
-> > 
-> > I have pushed the tested branch to (linux-omap/master + CPSW patches) -
-> > https://github.com/hvaibhav/am335x-linux/tree/am335x-upstream-staging
+> flush_icache_user needs vma. perhaps just to check VM_EXEC...
 > 
-> Just checking on this one.  I don't mean to rush you, but if you have 
-> some patches you'd like to see integrated for 3.8 here, it would be good 
-> to get them posted before the end of the week.
-> 
+> So let me repeat to be sure I really understand, do you confirm that
+> _in general_ flush_dcache_page() is not enough?
 
-Paul,
+flush_dcache_page() on powerpc already checks for
+CPU_FTR_COHERENT_ICACHE. So, yes, that is enough.
 
-I have just integrated all patches on top of linux-omap/master and testing 
-it now. 
-Shortly I will submit to the list...
-
-
-Thanks,
-Vaibhav
+Ananth
