@@ -1,153 +1,77 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 29 Oct 2012 16:03:09 +0530
-Subject: [PATCH 00/13] ARM: OMAP: remove prcm.[ch]
-In-Reply-To: <20121025231818.17558.57884.stgit@dusk.lan>
-References: <20121025231818.17558.57884.stgit@dusk.lan>
-Message-ID: <508E5B65.2020800@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 29 Oct 2012 11:44:11 +0100
+Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
+In-Reply-To: <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+ <201210282259.46491.marex@denx.de>
+ <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
+ <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
+ <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
+ <508E4F7F.7010607@gmail.com>
+ <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
+Message-ID: <508E5DFB.3060002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 29.10.2012 11:07, Vasily Khoruzhick wrote:
+> On Mon, Oct 29, 2012 at 12:42 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> On 29.10.2012 10:33, Vasily Khoruzhick wrote:
+>>> On Mon, Oct 29, 2012 at 1:58 AM, Daniel Mack <zonque@gmail.com> wrote:
+>>>>> Any volunteers? :) It requires huge amount of work,
+>>>>
+>>>> Well, it's actually quite straight forward. With the changes that got merged
+>>>> to 3.7, pxa3xx platforms boot, and I also ported some pxa specific
+>>>> peripheral drivers that should work for both 2xx and 3xx. Adding CPU support
+>>>> for 27x should also just be a matter of some extra lines.
+>>>>
+>>>> So I would clearly say you should give the DT approach a try first and see
+>>>> which bits are missing. And I would vote for not taking any new features for
+>>>> the legacy board support files but just bugfixes.
+>>>
+>>> Fair enough, I'll resend series without USB stuff (so it'll contain
+>>> only bugfixes)
+>>
+>> I rather wanted to encourage you to work on the PXA2xx DT stuff :)
+> 
+> I'm not refusing to work on PXA2xx DT stuff, just want to get bugfixes in place,
+> some of them are serious enough (like fixing oops on poweroff)
+> 
+>> Please have a quick look at arch/arm/mach-pxa/pxa-dt.c - what it takes
+>> for basic 270 support is just copying the logic that is there already
+>> for the 3xx models.
+> 
+> Sure, but I need to get DT-capable bootloader working on Z2 in first
+> place, right?
+> 
+>> Some parts like the uart, host-mode usb, mmc, gpio-leds, gpio-keys, i2c
+>> etc are already finished and should work instantly. What's missing is
+>> the spi controller and the display, but maybe you can help getting these
+>> done?
+> 
+> What about libertas?
+
+I haven't seen any patches for DT bindings of this yet.
+
+> I still don't understand how DT handles platform-specific
+> callbacks like set_power(). And what about pm_power_off hook?
+
+They require consideration.
+
+In general, a driver should be aware of everything that affects the
+peripheral, including all the voltages and clocks it needs and also all
+extra pins like for example reset GPIOs etc. And all that properties are
+to be exported via DT as well (things that you would have normally set
+up using pdata).
+
+If drivers lack that kind of full awareness of their environment, they
+need to be augmented, because - to stick with the example of reset GPIOs
+- the driver of all parts is the only piece that knows when to driver
+that pin and how.
+
+About the hack to put the z2 to deep-sleep when it should actually power
+down, I don't know what to do. But I would say that it's the userspace
+that should be fixed here, if possible.
 
 
-On 10/26/2012 4:51 AM, Paul Walmsley wrote:
-> Remove arch/arm/mach-omap2/prcm.c and
-> arch/arm/plat-omap/include/plat/prcm.h.  This is in preparation for
-> moving the PRM/CM code to drivers/, although to be fair, these files
-> should have been removed a long time ago.
-> 
-> Intended for 3.8 cleanup.  Applies on top of the existing PRM/CM split
-> cleanup series, and the WDTIMER cleanup series.
-> 
-
-Paul,
-
-By any chance you have branch available with these patches, so that I
-can validate them here at my end?
-
-Thanks,
-Vaibhav
-
-> 
-> - Paul
-> 
-> ---
-> 
-> omap2_prcm_cleanup_3.8
->    text	   data	    bss	    dec	    hex	filename
-> 7521423	 696876	5613996	13832295	 d31067	vmlinux.omap2plus_defconfig.orig
-> 7522239	 696612	5613996	13832847	 d3128f	vmlinux.omap2plus_defconfig
-> 
-> Paul Walmsley (13):
->       ARM: OMAP2+: common: remove mach-omap2/common.c and map_common_io code
->       ARM: OMAP2/3: PRM: add SoC reset functions (using the CORE DPLL method)
->       ARM: OMAP2xxx: clock: remove global 'dclk' variable
->       ARM: OMAP2xxx: clock: move virt_prcm_set code into clkt2xxx_virt_prcm_set.c
->       ARM: OMAP2+: PRCM: create SoC-specific chip restart functions
->       ARM: OMAP2+: board files: use SoC-specific system restart functions
->       ARM: OMAP2xxx: APLL/CM: convert to use omap2_cm_wait_module_ready()
->       ARM: OMAP2+: CM/clock: convert _omap2_module_wait_ready() to use SoC-independent CM functions
->       ARM: OMAP2+: PRCM: remove omap2_cm_wait_idlest()
->       ARM: OMAP2+: PRCM: split and relocate the PRM/CM globals setup
->       ARM: OMAP2+: PRCM: consolidate PRCM-related timeout macros
->       ARM: OMAP2+: hwmod: call to _omap4_disable_module() should use the SoC-specific call
->       ARM: OMAP2+: PRCM: remove obsolete prcm.[ch]
-> 
-> 
->  arch/arm/mach-omap1/reset.c                  |    2 
->  arch/arm/mach-omap2/Makefile                 |    9 +
->  arch/arm/mach-omap2/am33xx.h                 |    1 
->  arch/arm/mach-omap2/board-2430sdp.c          |    2 
->  arch/arm/mach-omap2/board-3430sdp.c          |    2 
->  arch/arm/mach-omap2/board-3630sdp.c          |    2 
->  arch/arm/mach-omap2/board-4430sdp.c          |    2 
->  arch/arm/mach-omap2/board-am3517crane.c      |    2 
->  arch/arm/mach-omap2/board-am3517evm.c        |    2 
->  arch/arm/mach-omap2/board-apollon.c          |    2 
->  arch/arm/mach-omap2/board-cm-t35.c           |   18 +-
->  arch/arm/mach-omap2/board-cm-t3517.c         |    2 
->  arch/arm/mach-omap2/board-devkit8000.c       |    2 
->  arch/arm/mach-omap2/board-generic.c          |   10 +
->  arch/arm/mach-omap2/board-h4.c               |    2 
->  arch/arm/mach-omap2/board-igep0020.c         |    4 -
->  arch/arm/mach-omap2/board-ldp.c              |    2 
->  arch/arm/mach-omap2/board-n8x0.c             |    6 -
->  arch/arm/mach-omap2/board-omap3beagle.c      |    2 
->  arch/arm/mach-omap2/board-omap3evm.c         |    2 
->  arch/arm/mach-omap2/board-omap3logic.c       |    4 -
->  arch/arm/mach-omap2/board-omap3pandora.c     |    2 
->  arch/arm/mach-omap2/board-omap3stalker.c     |    2 
->  arch/arm/mach-omap2/board-omap3touchbook.c   |    2 
->  arch/arm/mach-omap2/board-omap4panda.c       |    2 
->  arch/arm/mach-omap2/board-overo.c            |    2 
->  arch/arm/mach-omap2/board-rm680.c            |    4 -
->  arch/arm/mach-omap2/board-rx51.c             |    2 
->  arch/arm/mach-omap2/board-ti8168evm.c        |    4 -
->  arch/arm/mach-omap2/board-zoom.c             |    4 -
->  arch/arm/mach-omap2/clkt2xxx_apll.c          |   57 ++-----
->  arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |   36 ++++-
->  arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   70 ++++++++-
->  arch/arm/mach-omap2/clkt_iclk.c              |    1 
->  arch/arm/mach-omap2/clock.c                  |   15 +-
->  arch/arm/mach-omap2/clock.h                  |   28 ----
->  arch/arm/mach-omap2/clock2420_data.c         |   26 +--
->  arch/arm/mach-omap2/clock2430_data.c         |   26 +--
->  arch/arm/mach-omap2/clock2xxx.c              |   16 --
->  arch/arm/mach-omap2/clock2xxx.h              |    9 +
->  arch/arm/mach-omap2/cm-regbits-24xx.h        |    2 
->  arch/arm/mach-omap2/cm.h                     |   20 ++-
->  arch/arm/mach-omap2/cm2xxx.c                 |  128 ++++++++++++++++
->  arch/arm/mach-omap2/cm2xxx.h                 |    4 +
->  arch/arm/mach-omap2/cm2xxx_3xxx.h            |    8 +
->  arch/arm/mach-omap2/cm3xxx.c                 |   66 ++++++++
->  arch/arm/mach-omap2/cm3xxx.h                 |    5 +
->  arch/arm/mach-omap2/cm_common.c              |   70 +++++++++
->  arch/arm/mach-omap2/cminst44xx.h             |    2 
->  arch/arm/mach-omap2/common.c                 |  202 --------------------------
->  arch/arm/mach-omap2/common.h                 |  111 ++------------
->  arch/arm/mach-omap2/control.c                |   10 +
->  arch/arm/mach-omap2/control.h                |    2 
->  arch/arm/mach-omap2/cpuidle34xx.c            |    1 
->  arch/arm/mach-omap2/display.c                |    2 
->  arch/arm/mach-omap2/hdq1w.c                  |    4 -
->  arch/arm/mach-omap2/i2c.c                    |    6 -
->  arch/arm/mach-omap2/id.c                     |    7 +
->  arch/arm/mach-omap2/io.c                     |   87 +++++++++--
->  arch/arm/mach-omap2/mcbsp.c                  |    2 
->  arch/arm/mach-omap2/msdi.c                   |    4 -
->  arch/arm/mach-omap2/omap2-restart.c          |   65 ++++++++
->  arch/arm/mach-omap2/omap3-restart.c          |   36 +++++
->  arch/arm/mach-omap2/omap4-common.c           |   18 ++
->  arch/arm/mach-omap2/omap_hwmod.c             |    8 -
->  arch/arm/mach-omap2/pm34xx.c                 |    1 
->  arch/arm/mach-omap2/powerdomain.c            |    2 
->  arch/arm/mach-omap2/prcm-common.h            |   22 ---
->  arch/arm/mach-omap2/prcm.c                   |  176 -----------------------
->  arch/arm/mach-omap2/prcm_mpu44xx.c           |   17 ++
->  arch/arm/mach-omap2/prcm_mpu44xx.h           |    9 +
->  arch/arm/mach-omap2/prm.h                    |   24 +++
->  arch/arm/mach-omap2/prm2xxx.c                |   15 ++
->  arch/arm/mach-omap2/prm2xxx.h                |    2 
->  arch/arm/mach-omap2/prm2xxx_3xxx.h           |    7 -
->  arch/arm/mach-omap2/prm3xxx.c                |   16 ++
->  arch/arm/mach-omap2/prm3xxx.h                |    2 
->  arch/arm/mach-omap2/prm44xx.c                |    1 
->  arch/arm/mach-omap2/prm_common.c             |   16 ++
->  arch/arm/mach-omap2/prminst44xx.h            |    2 
->  arch/arm/mach-omap2/sdrc.c                   |    8 -
->  arch/arm/mach-omap2/sdrc.h                   |    3 
->  arch/arm/mach-omap2/ti81xx.h                 |    9 +
->  arch/arm/mach-omap2/wd_timer.c               |    5 -
->  arch/arm/plat-omap/include/plat/prcm.h       |   36 -----
->  85 files changed, 827 insertions(+), 804 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/common.c
->  create mode 100644 arch/arm/mach-omap2/omap2-restart.c
->  create mode 100644 arch/arm/mach-omap2/omap3-restart.c
->  delete mode 100644 arch/arm/mach-omap2/prcm.c
->  delete mode 100644 arch/arm/plat-omap/include/plat/prcm.h
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Daniel
