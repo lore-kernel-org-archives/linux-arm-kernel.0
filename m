@@ -1,58 +1,54 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 29 Oct 2012 11:05:13 +0100
-Subject: [PATCH 0/4] DMA: PL330 fixes
-In-Reply-To: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <2027905.ZSjHgXqYha@amdc1227>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Mon, 29 Oct 2012 13:07:39 +0300
+Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
+In-Reply-To: <508E4F7F.7010607@gmail.com>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+ <201210282259.46491.marex@denx.de>
+ <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
+ <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
+ <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
+ <508E4F7F.7010607@gmail.com>
+Message-ID: <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On Mon, Oct 29, 2012 at 12:42 PM, Daniel Mack <zonque@gmail.com> wrote:
+> On 29.10.2012 10:33, Vasily Khoruzhick wrote:
+>> On Mon, Oct 29, 2012 at 1:58 AM, Daniel Mack <zonque@gmail.com> wrote:
+>>>> Any volunteers? :) It requires huge amount of work,
+>>>
+>>> Well, it's actually quite straight forward. With the changes that got merged
+>>> to 3.7, pxa3xx platforms boot, and I also ported some pxa specific
+>>> peripheral drivers that should work for both 2xx and 3xx. Adding CPU support
+>>> for 27x should also just be a matter of some extra lines.
+>>>
+>>> So I would clearly say you should give the DT approach a try first and see
+>>> which bits are missing. And I would vote for not taking any new features for
+>>> the legacy board support files but just bugfixes.
+>>
+>> Fair enough, I'll resend series without USB stuff (so it'll contain
+>> only bugfixes)
+>
+> I rather wanted to encourage you to work on the PXA2xx DT stuff :)
 
-On Monday 29 of October 2012 10:59:52 Bartlomiej Zolnierkiewicz wrote:
-> Hi,
-> 
-> The first patch fixes lockup caused by pl330 driver.  It doesn't add
-> any dependencies to later patches and can be applied independently.
-> 
-> The second patch fixes PL330 regression on ARM Exynos 4210 revision 0
-> SOC (used by Universal C210 board).
-> 
-> The third patch adds PL330 MDMA1 controller node to device tree on
-> ARM Exynos4 SOCs.
-> 
-> The fourth patch adds device tree property for PL330 driver to be used
-> by controllers that have DMA_MEMCPY capability and updates device tree
-> files for ARM platforms using PL330.  Since this patch depends on
-> patches #2-3 it would be probably best to also push it through Kukjin's
-> tree (with the relevant ACKs added of course).
-> 
-> 
-> Bartlomiej Zolnierkiewicz (4):
->   DMA: PL330: fix locking in pl330_free_chan_resources()
->   ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of Exynos4210 SOC
->   ARM: dts: exynos4: add node for PL330 MDMA1 controller
->   DMA: PL330: add device tree property for DMA_MEMCPY capability
-> 
->  Documentation/devicetree/bindings/dma/arm-pl330.txt |  1 +
->  arch/arm/boot/dts/exynos4.dtsi                      |  7 +++++++
->  arch/arm/boot/dts/exynos5250.dtsi                   |  2 ++
->  arch/arm/boot/dts/highbank.dts                      |  1 +
->  arch/arm/boot/dts/socfpga.dtsi                      |  1 +
->  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts         |  1 +
->  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts          |  1 +
->  arch/arm/mach-exynos/dma.c                          |  5 ++++-
->  arch/arm/mach-exynos/include/mach/map.h             |  3 ++-
->  arch/arm/mach-exynos/mach-exynos4-dt.c              |  1 +
->  drivers/dma/pl330.c                                 | 15
-> ++++++++++----- 11 files changed, 31 insertions(+), 7 deletions(-)
+I'm not refusing to work on PXA2xx DT stuff, just want to get bugfixes in place,
+some of them are serious enough (like fixing oops on poweroff)
 
-For all four patches:
+> Please have a quick look at arch/arm/mach-pxa/pxa-dt.c - what it takes
+> for basic 270 support is just copying the logic that is there already
+> for the 3xx models.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Sure, but I need to get DT-capable bootloader working on Z2 in first
+place, right?
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+> Some parts like the uart, host-mode usb, mmc, gpio-leds, gpio-keys, i2c
+> etc are already finished and should work instantly. What's missing is
+> the spi controller and the display, but maybe you can help getting these
+> done?
+
+What about libertas? I still don't understand how DT handles platform-specific
+callbacks like set_power(). And what about pm_power_off hook?
+
+Regards
+Vasily
