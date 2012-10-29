@@ -1,41 +1,80 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Mon, 29 Oct 2012 16:58:48 +0530
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <508E654B.5010404@gmail.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com>
- <20121024232717.GD11928@atomide.com> <50887A6B.3050108@gmail.com>
- <508E3A0F.3040309@ti.com> <508E654B.5010404@gmail.com>
-Message-ID: <508E6870.7000807@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 29 Oct 2012 12:42:21 +0100
+Subject: [PATCH 1/6] DMA: AT91: Serial: Add parameter for serial dma use
+In-Reply-To: <1351501773-29024-1-git-send-email-elen.song@atmel.com>
+References: <1351501754-25028-1-git-send-email-elen.song@atmel.com>
+ <1351501773-29024-1-git-send-email-elen.song@atmel.com>
+Message-ID: <20121029114221.GA31214@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 17:09 Mon 29 Oct     , Elen Song wrote:
+> Signed-off-by: Elen Song <elen.song@atmel.com>
+> ---
+>  arch/arm/mach-at91/include/mach/board.h |    2 ++
+>  drivers/tty/serial/atmel_serial.c       |    1 +
+>  include/linux/platform_data/dma-atmel.h |   10 ++++++++++
+>  3 files changed, 13 insertions(+)
 
-On Monday 29 October 2012 04:45 PM, Daniel Mack wrote:
-> On 29.10.2012 09:10, Afzal Mohammed wrote:
+you will have to rebase this over a clean if the platofrm_data I'll send today
+or tomorrow that will move all the platform_data to inclide/linux
 
->> Also perhaps memory size (and offset if
->> needed) to be mapped for peripherals can go with reg
->> property of child.
+btw your patch broke the avr32
 
-> Which detail are you referring to here? The only "size" property that is
-> effective is the one of the generic GPMC block, and there it's in the
-> "reg"-property.
-
-I was referring to that of child, now in gpmc_nand_init(),
-gpmc_cs_request() is being done, later on if we want to
-make it generic and remove gpmc_nand_init(), additional
-information that would be required from DT at least is the
-memory size to be reserved in gpmc address space for
-the connected peripheral (assuming gpmc_cs_request()
-would be done by gpmc driver generically later)
-
-What I had in mind was example for external bus in [1],
-but I had not looked deep into this aspect yet.
-
-Regards
-Afzal
-
-[1] http://devicetree.org/Device_Tree_Usage#Memory_Mapped_Devices
+Best Regards.
+J.
+> 
+> diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+> index c55a436..a2188a6 100644
+> --- a/arch/arm/mach-at91/include/mach/board.h
+> +++ b/arch/arm/mach-at91/include/mach/board.h
+> @@ -129,6 +129,8 @@ struct atmel_uart_data {
+>  	short			use_dma_tx;	/* use transmit DMA? */
+>  	short			use_dma_rx;	/* use receive DMA? */
+>  	void __iomem		*regs;		/* virt. base address, if any */
+> +	struct at_dma_slave     *dma_tx_slave;
+> +	struct at_dma_slave     *dma_rx_slave;
+>  	struct serial_rs485	rs485;		/* rs485 settings */
+>  };
+>  extern void __init at91_add_device_serial(void);
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 3d7e1ee..1b1bd4f 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -45,6 +45,7 @@
+>  
+>  #include <asm/mach/serial_at91.h>
+>  #include <mach/board.h>
+> +#include <linux/platform_data/dma-atmel.h>
+>  
+>  #ifdef CONFIG_ARM
+>  #include <mach/cpu.h>
+> diff --git a/include/linux/platform_data/dma-atmel.h b/include/linux/platform_data/dma-atmel.h
+> index cab0997..bb05302 100644
+> --- a/include/linux/platform_data/dma-atmel.h
+> +++ b/include/linux/platform_data/dma-atmel.h
+> @@ -26,11 +26,21 @@ struct at_dma_platform_data {
+>  /**
+>   * struct at_dma_slave - Controller-specific information about a slave
+>   * @dma_dev: required DMA master device
+> + * @tx_reg: physical address of data register used for
+> + *      memory-to-peripheral transfers
+> + * @rx_reg: physical address of data register used for
+> + *      peripheral-to-memory transfers
+> + * @reg_width: peripheral register width
+>   * @cfg: Platform-specific initializer for the CFG register
+> + * @ctrla: Platform-specific initializer for the CTRLA register
+>   */
+>  struct at_dma_slave {
+>  	struct device		*dma_dev;
+> +	dma_addr_t              tx_reg;
+> +	dma_addr_t              rx_reg;
+> +	u32			reg_width;
+>  	u32			cfg;
+> +	u32                     ctrla;
+>  };
+>  
+>  
+> -- 
+> 1.7.9.5
+> 
