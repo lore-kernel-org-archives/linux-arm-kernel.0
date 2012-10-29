@@ -1,147 +1,420 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 29 Oct 2012 18:28:16 +0800
-Subject: [PATCH V3 2/7] ARM: tegra: cpuidle: add CPU resume function
+Date: Mon, 29 Oct 2012 18:28:17 +0800
+Subject: [PATCH V3 3/7] ARM: tegra30: cpuidle: add powered-down state for
+ secondary CPUs
 In-Reply-To: <1351506501-600-1-git-send-email-josephl@nvidia.com>
 References: <1351506501-600-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1351506501-600-3-git-send-email-josephl@nvidia.com>
+Message-ID: <1351506501-600-4-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPU suspending on Tegra means CPU power gating. We add a resume
-function for taking care the CPUs that resume from power gating status.
-This function was been hooked to the reset handler. We take care
-everything here before go into kernel.
+This supports power-gated idle on secondary CPUs for Tegra30. The
+secondary CPUs can go into powered-down state independently. When
+CPU goes into this state, it saves it's contexts and puts itself
+to flow controlled WFI state. After that, it will been power gated.
 
-Be aware of that, you may see the legacy power status "LP2" in the code
-which is exactly the same meaning of "CPU power down".
+Be aware of that, you may see the legacy power state "LP2" in the
+code which is exactly the same meaning of "CPU power down".
 
 Based on the work by:
 Scott Williams <scwilliams@nvidia.com>
-Colin Cross <ccross@android.com>
-Gary King <gking@nvidia.com>
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
 V3:
-* update subject and the commit message
+* remove the redundant header file
+* update the subject and the commit message
+* rename the LP2 state to "powered-down"
+* refine the function name from "tegra30_idle_enter_lp2_cpu_n" to
+  "tegra30_cpu_core_power_down"
 V2:
-* moving the code that only for Tegra30 inside the ifdef in the tegra_resume
+* static initialization for idle states when PM_SLEEP is true or not
+* using inline fuction to replace the empty fuction when #ifdef false
+* convert the phy cpu number by cpu_logical_map
+* update the usage of tegra_cpu_lp2_mask (only one copy in the IRAM)
+* update the usage of data cache maintenance API for LP2
+	* disable L1 data cache
+	* v7_flush_dcache_louis
+	* exit SMP coherency
 ---
- arch/arm/mach-tegra/headsmp.S |   58 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-tegra/reset.c   |    6 ++++
- arch/arm/mach-tegra/sleep.h   |    1 +
- 3 files changed, 65 insertions(+), 0 deletions(-)
+ arch/arm/mach-tegra/Makefile          |    1 +
+ arch/arm/mach-tegra/cpuidle-tegra30.c |   86 +++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/pm.c              |   75 ++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/pm.h              |   30 +++++++++++
+ arch/arm/mach-tegra/reset.h           |    9 ++++
+ arch/arm/mach-tegra/sleep-tegra30.S   |   22 ++++++++
+ arch/arm/mach-tegra/sleep.S           |   29 +++++++++++
+ arch/arm/mach-tegra/sleep.h           |    2 +
+ 8 files changed, 254 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/pm.c
+ create mode 100644 arch/arm/mach-tegra/pm.h
 
-diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
-index 6addc78..36066f2 100644
---- a/arch/arm/mach-tegra/headsmp.S
-+++ b/arch/arm/mach-tegra/headsmp.S
-@@ -69,6 +69,53 @@ ENTRY(tegra_secondary_startup)
-         b       secondary_startup
- ENDPROC(tegra_secondary_startup)
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index 9b80c1e..6f224f7 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -8,6 +8,7 @@ obj-y					+= pmc.o
+ obj-y					+= flowctrl.o
+ obj-y					+= powergate.o
+ obj-y					+= apbio.o
++obj-y					+= pm.o
+ obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
+ obj-$(CONFIG_CPU_IDLE)			+= sleep.o
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra20_clocks.o
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 37e7551..cc48d7f 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -22,21 +22,107 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/cpuidle.h>
++#include <linux/cpu_pm.h>
++#include <linux/clockchips.h>
+ 
+ #include <asm/cpuidle.h>
++#include <asm/proc-fns.h>
++#include <asm/suspend.h>
++#include <asm/smp_plat.h>
++
++#include "pm.h"
++#include "sleep.h"
++
++#ifdef CONFIG_PM_SLEEP
++static int tegra30_idle_lp2(struct cpuidle_device *dev,
++			    struct cpuidle_driver *drv,
++			    int index);
++#endif
+ 
+ static struct cpuidle_driver tegra_idle_driver = {
+ 	.name = "tegra_idle",
+ 	.owner = THIS_MODULE,
+ 	.en_core_tk_irqen = 1,
++#ifdef CONFIG_PM_SLEEP
++	.state_count = 2,
++#else
+ 	.state_count = 1,
++#endif
+ 	.states = {
+ 		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
++#ifdef CONFIG_PM_SLEEP
++		[1] = {
++			.enter			= tegra30_idle_lp2,
++			.exit_latency		= 2000,
++			.target_residency	= 2200,
++			.power_usage		= 0,
++			.flags			= CPUIDLE_FLAG_TIME_VALID,
++			.name			= "powered-down",
++			.desc			= "CPU power gated",
++		},
++#endif
+ 	},
+ };
+ 
+ static DEFINE_PER_CPU(struct cpuidle_device, tegra_idle_device);
+ 
++#ifdef CONFIG_PM_SLEEP
++#ifdef CONFIG_SMP
++static bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
++					struct cpuidle_driver *drv,
++					int index)
++{
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
++
++	smp_wmb();
++
++	save_cpu_arch_register();
++
++	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
++
++	restore_cpu_arch_register();
++
++	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
++
++	return true;
++}
++#else
++static inline bool tegra30_cpu_core_power_down(struct cpuidle_device *dev,
++					       struct cpuidle_driver *drv,
++					       int index)
++{
++	return true;
++}
++#endif
++
++static int __cpuinit tegra30_idle_lp2(struct cpuidle_device *dev,
++				      struct cpuidle_driver *drv,
++				      int index)
++{
++	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
++	bool entered_lp2 = false;
++
++	local_fiq_disable();
++
++	tegra_set_cpu_in_lp2(cpu);
++	cpu_pm_enter();
++
++	if (cpu == 0)
++		cpu_do_idle();
++	else
++		entered_lp2 = tegra30_cpu_core_power_down(dev, drv, index);
++
++	cpu_pm_exit();
++	tegra_clear_cpu_in_lp2(cpu);
++
++	local_fiq_enable();
++
++	smp_rmb();
++
++	return (entered_lp2) ? index : 0;
++}
++#endif
++
+ int __init tegra30_cpuidle_init(void)
+ {
+ 	int ret;
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+new file mode 100644
+index 0000000..39ee557
+--- /dev/null
++++ b/arch/arm/mach-tegra/pm.c
+@@ -0,0 +1,75 @@
++/*
++ * CPU complex suspend & resume functions for Tegra SoCs
++ *
++ * Copyright (c) 2009-2012, NVIDIA Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/kernel.h>
++#include <linux/spinlock.h>
++#include <linux/io.h>
++#include <linux/cpumask.h>
++
++#include <mach/iomap.h>
++
++#include "reset.h"
++
++#ifdef CONFIG_PM_SLEEP
++static unsigned int g_diag_reg;
++static DEFINE_SPINLOCK(tegra_lp2_lock);
++
++void save_cpu_arch_register(void)
++{
++	/* read diagnostic register */
++	asm("mrc p15, 0, %0, c15, c0, 1" : "=r"(g_diag_reg) : : "cc");
++	return;
++}
++
++void restore_cpu_arch_register(void)
++{
++	/* write diagnostic register */
++	asm("mcr p15, 0, %0, c15, c0, 1" : : "r"(g_diag_reg) : "cc");
++	return;
++}
++
++void __cpuinit tegra_clear_cpu_in_lp2(int phy_cpu_id)
++{
++	u32 *cpu_in_lp2 = tegra_cpu_lp2_mask;
++
++	spin_lock(&tegra_lp2_lock);
++
++	BUG_ON(!(*cpu_in_lp2 & BIT(phy_cpu_id)));
++	*cpu_in_lp2 &= ~BIT(phy_cpu_id);
++
++	spin_unlock(&tegra_lp2_lock);
++}
++
++bool __cpuinit tegra_set_cpu_in_lp2(int phy_cpu_id)
++{
++	bool last_cpu = false;
++	cpumask_t *cpu_lp2_mask = tegra_cpu_lp2_mask;
++	u32 *cpu_in_lp2 = tegra_cpu_lp2_mask;
++
++	spin_lock(&tegra_lp2_lock);
++
++	BUG_ON((*cpu_in_lp2 & BIT(phy_cpu_id)));
++	*cpu_in_lp2 |= BIT(phy_cpu_id);
++
++	if ((phy_cpu_id == 0) && cpumask_equal(cpu_lp2_mask, cpu_online_mask))
++		last_cpu = true;
++
++	spin_unlock(&tegra_lp2_lock);
++	return last_cpu;
++}
++#endif
+diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
+new file mode 100644
+index 0000000..bcfc45f
+--- /dev/null
++++ b/arch/arm/mach-tegra/pm.h
+@@ -0,0 +1,30 @@
++/*
++ * Copyright (C) 2010 Google, Inc.
++ * Copyright (c) 2010-2012 NVIDIA Corporation. All rights reserved.
++ *
++ * Author:
++ *	Colin Cross <ccross@google.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _MACH_TEGRA_PM_H_
++#define _MACH_TEGRA_PM_H_
++
++void save_cpu_arch_register(void);
++void restore_cpu_arch_register(void);
++
++void tegra_clear_cpu_in_lp2(int phy_cpu_id);
++bool tegra_set_cpu_in_lp2(int phy_cpu_id);
++
++#endif /* _MACH_TEGRA_PM_H_ */
+diff --git a/arch/arm/mach-tegra/reset.h b/arch/arm/mach-tegra/reset.h
+index de88bf8..234cd6b 100644
+--- a/arch/arm/mach-tegra/reset.h
++++ b/arch/arm/mach-tegra/reset.h
+@@ -29,6 +29,8 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <mach/irammap.h>
++
+ extern unsigned long __tegra_cpu_reset_handler_data[TEGRA_RESET_DATA_SIZE];
+ 
+ void __tegra_cpu_reset_handler_start(void);
+@@ -36,6 +38,13 @@ void __tegra_cpu_reset_handler(void);
+ void __tegra_cpu_reset_handler_end(void);
+ void tegra_secondary_startup(void);
+ 
++#ifdef CONFIG_PM_SLEEP
++#define tegra_cpu_lp2_mask \
++	(IO_ADDRESS(TEGRA_IRAM_BASE + TEGRA_IRAM_RESET_HANDLER_OFFSET + \
++	((u32)&__tegra_cpu_reset_handler_data[TEGRA_RESET_MASK_LP2] - \
++	 (u32)__tegra_cpu_reset_handler_start)))
++#endif
++
+ #define tegra_cpu_reset_handler_offset \
+ 		((u32)__tegra_cpu_reset_handler - \
+ 		 (u32)__tegra_cpu_reset_handler_start)
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index be7614b..59984d7 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -17,6 +17,7 @@
+ #include <linux/linkage.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/asm-offsets.h>
+ 
+ #include "sleep.h"
+ #include "flowctrl.h"
+@@ -80,6 +81,7 @@ delay_1:
+ 	ldr	r3, [r1]			@ read CSR
+ 	str	r3, [r1]			@ clear CSR
+ 	tst	r0, #TEGRA30_POWER_HOTPLUG_SHUTDOWN
++	moveq   r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT	@ For LP2
+ 	movne	r3, #FLOW_CTRL_WAITEVENT		@ For hotplug
+ 	str	r3, [r2]
+ 	ldr	r0, [r2]
+@@ -103,3 +105,23 @@ wfe_war:
+ 
+ ENDPROC(tegra30_cpu_shutdown)
+ #endif
++
++#ifdef CONFIG_PM_SLEEP
++/*
++ * tegra30_sleep_cpu_secondary_finish(unsigned long v2p)
++ *
++ * Enters LP2 on secondary CPU by exiting coherency and powergating the CPU.
++ */
++ENTRY(tegra30_sleep_cpu_secondary_finish)
++	mov	r7, lr
++
++	/* Flush and disable the L1 data cache */
++	bl	tegra_disable_clean_inv_dcache
++
++	/* Powergate this CPU. */
++	mov	r0, #0                          @ power mode flags (!hotplug)
++	bl	tegra30_cpu_shutdown
++	mov	r0, #1                          @ never return here
++	mov	pc, r7
++ENDPROC(tegra30_sleep_cpu_secondary_finish)
++#endif
+diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+index ea81554..cba7a52 100644
+--- a/arch/arm/mach-tegra/sleep.S
++++ b/arch/arm/mach-tegra/sleep.S
+@@ -25,9 +25,38 @@
+ #include <linux/linkage.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/cp15.h>
+ 
+ #include <mach/iomap.h>
+ 
+ #include "flowctrl.h"
+ #include "sleep.h"
  
 +#ifdef CONFIG_PM_SLEEP
 +/*
-+ *	tegra_resume
++ * tegra_disable_clean_inv_dcache
 + *
-+ *	  CPU boot vector when restarting the a CPU following
-+ *	  an LP2 transition. Also branched to by LP0 and LP1 resume after
-+ *	  re-enabling sdram.
++ * disable, clean & invalidate the D-cache
++ *
++ * Corrupted registers: r1-r3, r6, r8, r9-r11
 + */
-+ENTRY(tegra_resume)
-+	bl	v7_invalidate_l1
-+	/* Enable coresight */
-+	mov32	r0, 0xC5ACCE55
-+	mcr	p14, 0, r0, c7, c12, 6
++ENTRY(tegra_disable_clean_inv_dcache)
++	stmfd	sp!, {r0, r4-r5, r7, r9-r11, lr}
++	dmb					@ ensure ordering
 +
-+	cpu_id	r0
-+	cmp	r0, #0				@ CPU0?
-+	bne	cpu_resume			@ no
++	/* Disable the D-cache */
++	mrc	p15, 0, r2, c1, c0, 0
++	bic	r2, r2, #CR_C
++	mcr	p15, 0, r2, c1, c0, 0
++	isb
 +
-+#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-+	/* Are we on Tegra20? */
-+	mov32	r6, TEGRA_APB_MISC_BASE
-+	ldr	r0, [r6, #APB_MISC_GP_HIDREV]
-+	and	r0, r0, #0xff00
-+	cmp	r0, #(0x20 << 8)
-+	beq	1f				@ Yes
-+	/* Clear the flow controller flags for this CPU. */
-+	mov32	r2, TEGRA_FLOW_CTRL_BASE + FLOW_CTRL_CPU0_CSR	@ CPU0 CSR
-+	ldr	r1, [r2]
-+	/* Clear event & intr flag */
-+	orr	r1, r1, \
-+		#FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-+	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
-+	bic	r1, r1, r0
-+	str	r1, [r2]
-+1:
++	/* Flush the D-cache */
++	bl	v7_flush_dcache_louis
++
++	/* Trun off coherency */
++	exit_smp r4, r5
++
++	ldmfd	sp!, {r0, r4-r5, r7, r9-r11, pc}
++ENDPROC(tegra_disable_clean_inv_dcache)
++
 +#endif
-+
-+	/* enable SCU */
-+	mov32	r0, TEGRA_ARM_PERIF_BASE
-+	ldr	r1, [r0]
-+	orr	r1, r1, #1
-+	str	r1, [r0]
-+
-+	b	cpu_resume
-+ENDPROC(tegra_resume)
-+#endif
-+
- 	.align L1_CACHE_SHIFT
- ENTRY(__tegra_cpu_reset_handler_start)
- 
-@@ -122,6 +169,17 @@ ENTRY(__tegra_cpu_reset_handler)
- 1:
- #endif
- 
-+	/* Waking up from LP2? */
-+	ldr	r9, [r12, #RESET_DATA(MASK_LP2)]
-+	tst	r9, r11				@ if in_lp2
-+	beq	__is_not_lp2
-+	ldr	lr, [r12, #RESET_DATA(STARTUP_LP2)]
-+	cmp	lr, #0
-+	bleq	__die				@ no LP2 startup handler
-+	bx	lr
-+
-+__is_not_lp2:
-+
- #ifdef CONFIG_SMP
- 	/*
- 	 * Can only be secondary boot (initial or hotplug) but CPU 0
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 5beb7eb..c48548f 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -26,6 +26,7 @@
- #include <mach/irammap.h>
- 
- #include "reset.h"
-+#include "sleep.h"
- #include "fuse.h"
- 
- #define TEGRA_IRAM_RESET_BASE (TEGRA_IRAM_BASE + \
-@@ -80,5 +81,10 @@ void __init tegra_cpu_reset_handler_init(void)
- 		virt_to_phys((void *)tegra_secondary_startup);
- #endif
- 
-+#ifdef CONFIG_PM_SLEEP
-+	__tegra_cpu_reset_handler_data[TEGRA_RESET_STARTUP_LP2] =
-+		virt_to_phys((void *)tegra_resume);
-+#endif
-+
- 	tegra_cpu_reset_handler_enable();
- }
 diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index e25a7cd..c9dec37 100644
+index c9dec37..220fbd1 100644
 --- a/arch/arm/mach-tegra/sleep.h
 +++ b/arch/arm/mach-tegra/sleep.h
-@@ -72,6 +72,7 @@
- 	dsb
- .endm
- #else
-+void tegra_resume(void);
+@@ -82,5 +82,7 @@ static inline void tegra20_hotplug_init(void) {}
+ static inline void tegra30_hotplug_init(void) {}
+ #endif
  
- #ifdef CONFIG_HOTPLUG_CPU
- void tegra20_hotplug_init(void);
++int tegra30_sleep_cpu_secondary_finish(unsigned long);
++
+ #endif
+ #endif
 -- 
 1.7.0.4
