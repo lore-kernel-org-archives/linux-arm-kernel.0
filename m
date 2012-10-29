@@ -1,38 +1,41 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Mon, 29 Oct 2012 13:40:55 +0530
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <50887A6B.3050108@gmail.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com>
- <20121024232717.GD11928@atomide.com> <50887A6B.3050108@gmail.com>
-Message-ID: <508E3A0F.3040309@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 29 Oct 2012 13:48:46 +0530
+Subject: [RFC PATCH v3 11/16] mmc: omap_hsmmc: limit max_segs with the
+ EDMA DMAC
+In-Reply-To: <1350566815-409-12-git-send-email-mporter@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+ <1350566815-409-12-git-send-email-mporter@ti.com>
+Message-ID: <508E3BE6.3070609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 10/18/2012 6:56 PM, Matt Porter wrote:
+> The EDMA DMAC has a hardware limitation that prevents supporting
+> scatter gather lists with any number of segments. Since the EDMA
+> DMA Engine driver sets the maximum segments to 16, we do the
+> same.
+> 
+> TODO: this will be replaced once the DMA Engine API supports an
+> API to query the DMAC's segment size limit.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index b327cd0..52bab01 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1828,6 +1828,16 @@ static int __devinit omap_hsmmc_probe(struct platform_device *pdev)
+>  	 * as we want. */
+>  	mmc->max_segs = 1024;
+>  
+> +	/* Eventually we should get our max_segs limitation for EDMA by
+> +	 * querying the dmaengine API */
 
-On Thursday 25 October 2012 05:01 AM, Daniel Mack wrote:
+Nit picking: This is not as per multi-line comment style in
+Documentation/CodingStyle.
 
-> Thanks for the review. I'll wait for feedback from Afzal next week and
-> then repost. Wanted to see first if that goes in the right direction at
-> all before bordering the DT people with binding details :)
-
-I was thinking of a generic approach, where there won't be
-any check for peripheral device type.
-
-But going that path would delay achieving DT, may be let's
-proceed with your approach to start with so that we can
-have a minimal level of DT support for GPMC and probably
-we can make it generic later. While adding new properties,
-it would be better to keep in mind that we need not change
-these later once gpmc DT is made generic.
-
-Regarding the bindings, there are some generic nand
-properties like ecc already available, may be that be made
-use here. Also perhaps memory size (and offset if
-needed) to be mapped for peripherals can go with reg
-property of child.
-
-Regards
-Afzal
+Thanks,
+Sekhar
