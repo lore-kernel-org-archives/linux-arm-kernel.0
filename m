@@ -1,43 +1,20 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 29 Oct 2012 10:58:20 -0700
-Subject: [PATCH] clk: fix return value check in of_fixed_clk_setup()
-In-Reply-To: <CAPgLHd-BtGhVBHYGW1UFT9wqmnPqmuf9AWkQk6mXG7xSzWqOOA@mail.gmail.com>
-References: <CAPgLHd-BtGhVBHYGW1UFT9wqmnPqmuf9AWkQk6mXG7xSzWqOOA@mail.gmail.com>
-Message-ID: <20121029175820.18780.94731@nucleus>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 29 Oct 2012 11:12:55 -0700
+Subject: [PATCH 0/3] Minor fixes for generic clock framework
+In-Reply-To: <1349332735-20096-1-git-send-email-sboyd@codeaurora.org>
+References: <1349332735-20096-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <508EC727.9030701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Wei Yongjun (2012-09-20 23:35:18)
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function clk_register_fixed_rate() returns
-> ERR_PTR() not NULL pointer. The NULL test in the return value
-> check should be replaced with IS_ERR().
-> 
-> dpatch engine is used to auto generated this patch.
-> (https://github.com/weiyj/dpatch)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On 10/03/12 23:38, Stephen Boyd wrote:
+> This is a small set of patches that fixes some documentation
+> and fixes return values of functions that aren't used that
+> much yet. Noticed while going through this code.
+>
 
-Taken into clk-next.
+Mike, any comments on these patches?
 
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk-fixed-rate.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-fixed-rate.c b/drivers/clk/clk-fixed-rate.c
-> index f5ec0ee..af78ed6 100644
-> --- a/drivers/clk/clk-fixed-rate.c
-> +++ b/drivers/clk/clk-fixed-rate.c
-> @@ -97,7 +97,7 @@ void __init of_fixed_clk_setup(struct device_node *node)
->         of_property_read_string(node, "clock-output-names", &clk_name);
->  
->         clk = clk_register_fixed_rate(NULL, clk_name, NULL, CLK_IS_ROOT, rate);
-> -       if (clk)
-> +       if (!IS_ERR(clk))
->                 of_clk_add_provider(node, of_clk_src_simple_get, clk);
->  }
->  EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
