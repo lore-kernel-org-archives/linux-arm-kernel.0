@@ -1,304 +1,739 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 29 Oct 2012 19:45:20 +0100
-Subject: [PATCH net-next V3 10/10] cpsw: support the HWTSTAMP ioctl and the
- CPTS
-In-Reply-To: <cover.1351535536.git.richardcochran@gmail.com>
-References: <cover.1351535536.git.richardcochran@gmail.com>
-Message-ID: <6491321837e5ddba8ba1d941bc5602987390ebab.1351535541.git.richardcochran@gmail.com>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Mon, 29 Oct 2012 12:56:30 -0600
+Subject: [PATCH] ARM: zynq: move ttc timer code to drivers/clocksource
+Message-ID: <20121029185630.GA26149@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch hooks into the CPTS code and adds support for the HWTSTAMP
-ioctl. The patch includes code for the CPSW version found in the dm814x
-even though the background device tree support for this board is still
-missing.
+Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
+drivers/clocksource, and out of the mach-zynq directory.
 
-Signed-off-by: Richard Cochran <richardcochran@gmail.com>
+The common.h (which only held the timer declaration) was renamed to
+xilinx_ttc.h and moved into include/linux.
+
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/ti/cpsw.c |  182 ++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 182 insertions(+), 0 deletions(-)
+ arch/arm/mach-zynq/Makefile      |   2 +-
+ arch/arm/mach-zynq/common.c      |   2 +-
+ arch/arm/mach-zynq/common.h      |  24 ----
+ arch/arm/mach-zynq/timer.c       | 298 ---------------------------------------
+ drivers/clocksource/Makefile     |   1 +
+ drivers/clocksource/xilinx_ttc.c | 297 ++++++++++++++++++++++++++++++++++++++
+ include/linux/xilinx_ttc.h       |  24 ++++
+ 7 files changed, 324 insertions(+), 324 deletions(-)
+ delete mode 100644 arch/arm/mach-zynq/common.h
+ delete mode 100644 arch/arm/mach-zynq/timer.c
+ create mode 100644 drivers/clocksource/xilinx_ttc.c
+ create mode 100644 include/linux/xilinx_ttc.h
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index c04627c..023d439 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -24,6 +24,7 @@
- #include <linux/if_ether.h>
- #include <linux/etherdevice.h>
- #include <linux/netdevice.h>
-+#include <linux/net_tstamp.h>
- #include <linux/phy.h>
- #include <linux/workqueue.h>
- #include <linux/delay.h>
-@@ -35,6 +36,7 @@
- #include <linux/platform_data/cpsw.h>
+diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+index 397268c..320faed 100644
+--- a/arch/arm/mach-zynq/Makefile
++++ b/arch/arm/mach-zynq/Makefile
+@@ -3,4 +3,4 @@
+ #
  
- #include "cpsw_ale.h"
-+#include "cpts.h"
- #include "davinci_cpdma.h"
+ # Common support
+-obj-y				:= common.o timer.o
++obj-y				:= common.o
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 93b9105..eecc898 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -22,6 +22,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/of.h>
++#include <linux/xilinx_ttc.h>
  
- #define CPSW_DEBUG	(NETIF_MSG_HW		| NETIF_MSG_WOL		| \
-@@ -229,6 +231,14 @@ struct cpsw_ss_regs {
- /* The PTP event messages - Sync, Delay_Req, Pdelay_Req, and Pdelay_Resp. */
- #define EVENT_MSG_BITS ((1<<0) | (1<<1) | (1<<2) | (1<<3))
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -31,7 +32,6 @@
+ #include <asm/hardware/cache-l2x0.h>
  
-+/* Bit definitions for the CPSW1_TS_CTL register */
-+#define CPSW_V1_TS_RX_EN		BIT(0)
-+#define CPSW_V1_TS_TX_EN		BIT(4)
-+#define CPSW_V1_MSG_TYPE_OFS		16
+ #include <mach/zynq_soc.h>
+-#include "common.h"
+ 
+ static struct of_device_id zynq_of_bus_ids[] __initdata = {
+ 	{ .compatible = "simple-bus", },
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+deleted file mode 100644
+index a009644..0000000
+--- a/arch/arm/mach-zynq/common.h
++++ /dev/null
+@@ -1,24 +0,0 @@
+-/*
+- * This file contains common function prototypes to avoid externs
+- * in the c files.
+- *
+- *  Copyright (C) 2011 Xilinx
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#ifndef __MACH_ZYNQ_COMMON_H__
+-#define __MACH_ZYNQ_COMMON_H__
+-
+-#include <asm/mach/time.h>
+-
+-extern struct sys_timer xttcpss_sys_timer;
+-
+-#endif
+diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
+deleted file mode 100644
+index c2c96cc..0000000
+--- a/arch/arm/mach-zynq/timer.c
++++ /dev/null
+@@ -1,298 +0,0 @@
+-/*
+- * This file contains driver for the Xilinx PS Timer Counter IP.
+- *
+- *  Copyright (C) 2011 Xilinx
+- *
+- * based on arch/mips/kernel/time.c timer driver
+- *
+- * This software is licensed under the terms of the GNU General Public
+- * License version 2, as published by the Free Software Foundation, and
+- * may be copied, distributed, and modified under those terms.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/types.h>
+-#include <linux/clocksource.h>
+-#include <linux/clockchips.h>
+-#include <linux/io.h>
+-
+-#include <asm/mach/time.h>
+-#include <mach/zynq_soc.h>
+-#include "common.h"
+-
+-#define IRQ_TIMERCOUNTER0	42
+-
+-/*
+- * This driver configures the 2 16-bit count-up timers as follows:
+- *
+- * T1: Timer 1, clocksource for generic timekeeping
+- * T2: Timer 2, clockevent source for hrtimers
+- * T3: Timer 3, <unused>
+- *
+- * The input frequency to the timer module for emulation is 2.5MHz which is
+- * common to all the timer channels (T1, T2, and T3). With a pre-scaler of 32,
+- * the timers are clocked at 78.125KHz (12.8 us resolution).
+- *
+- * The input frequency to the timer module in silicon will be 200MHz. With the
+- * pre-scaler of 32, the timers are clocked at 6.25MHz (160ns resolution).
+- */
+-#define XTTCPSS_CLOCKSOURCE	0	/* Timer 1 as a generic timekeeping */
+-#define XTTCPSS_CLOCKEVENT	1	/* Timer 2 as a clock event */
+-
+-#define XTTCPSS_TIMER_BASE		TTC0_BASE
+-#define XTTCPCC_EVENT_TIMER_IRQ		(IRQ_TIMERCOUNTER0 + 1)
+-/*
+- * Timer Register Offset Definitions of Timer 1, Increment base address by 4
+- * and use same offsets for Timer 2
+- */
+-#define XTTCPSS_CLK_CNTRL_OFFSET	0x00 /* Clock Control Reg, RW */
+-#define XTTCPSS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW */
+-#define XTTCPSS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
+-#define XTTCPSS_INTR_VAL_OFFSET		0x24 /* Interval Count Reg, RW */
+-#define XTTCPSS_MATCH_1_OFFSET		0x30 /* Match 1 Value Reg, RW */
+-#define XTTCPSS_MATCH_2_OFFSET		0x3C /* Match 2 Value Reg, RW */
+-#define XTTCPSS_MATCH_3_OFFSET		0x48 /* Match 3 Value Reg, RW */
+-#define XTTCPSS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO */
+-#define XTTCPSS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW */
+-
+-#define XTTCPSS_CNT_CNTRL_DISABLE_MASK	0x1
+-
+-/* Setup the timers to use pre-scaling */
+-
+-#define TIMER_RATE (PERIPHERAL_CLOCK_RATE / 32)
+-
+-/**
+- * struct xttcpss_timer - This definition defines local timer structure
+- *
+- * @base_addr:	Base address of timer
+- **/
+-struct xttcpss_timer {
+-	void __iomem *base_addr;
+-};
+-
+-static struct xttcpss_timer timers[2];
+-static struct clock_event_device xttcpss_clockevent;
+-
+-/**
+- * xttcpss_set_interval - Set the timer interval value
+- *
+- * @timer:	Pointer to the timer instance
+- * @cycles:	Timer interval ticks
+- **/
+-static void xttcpss_set_interval(struct xttcpss_timer *timer,
+-					unsigned long cycles)
+-{
+-	u32 ctrl_reg;
+-
+-	/* Disable the counter, set the counter value  and re-enable counter */
+-	ctrl_reg = __raw_readl(timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
+-	ctrl_reg |= XTTCPSS_CNT_CNTRL_DISABLE_MASK;
+-	__raw_writel(ctrl_reg, timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
+-
+-	__raw_writel(cycles, timer->base_addr + XTTCPSS_INTR_VAL_OFFSET);
+-
+-	/* Reset the counter (0x10) so that it starts from 0, one-shot
+-	   mode makes this needed for timing to be right. */
+-	ctrl_reg |= 0x10;
+-	ctrl_reg &= ~XTTCPSS_CNT_CNTRL_DISABLE_MASK;
+-	__raw_writel(ctrl_reg, timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
+-}
+-
+-/**
+- * xttcpss_clock_event_interrupt - Clock event timer interrupt handler
+- *
+- * @irq:	IRQ number of the Timer
+- * @dev_id:	void pointer to the xttcpss_timer instance
+- *
+- * returns: Always IRQ_HANDLED - success
+- **/
+-static irqreturn_t xttcpss_clock_event_interrupt(int irq, void *dev_id)
+-{
+-	struct clock_event_device *evt = &xttcpss_clockevent;
+-	struct xttcpss_timer *timer = dev_id;
+-
+-	/* Acknowledge the interrupt and call event handler */
+-	__raw_writel(__raw_readl(timer->base_addr + XTTCPSS_ISR_OFFSET),
+-			timer->base_addr + XTTCPSS_ISR_OFFSET);
+-
+-	evt->event_handler(evt);
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction event_timer_irq = {
+-	.name	= "xttcpss clockevent",
+-	.flags	= IRQF_DISABLED | IRQF_TIMER,
+-	.handler = xttcpss_clock_event_interrupt,
+-};
+-
+-/**
+- * xttcpss_timer_hardware_init - Initialize the timer hardware
+- *
+- * Initialize the hardware to start the clock source, get the clock
+- * event timer ready to use, and hook up the interrupt.
+- **/
+-static void __init xttcpss_timer_hardware_init(void)
+-{
+-	/* Setup the clock source counter to be an incrementing counter
+-	 * with no interrupt and it rolls over at 0xFFFF. Pre-scale
+-	   it by 32 also. Let it start running now.
+-	 */
+-	timers[XTTCPSS_CLOCKSOURCE].base_addr = XTTCPSS_TIMER_BASE;
+-
+-	__raw_writel(0x0, timers[XTTCPSS_CLOCKSOURCE].base_addr +
+-				XTTCPSS_IER_OFFSET);
+-	__raw_writel(0x9, timers[XTTCPSS_CLOCKSOURCE].base_addr +
+-				XTTCPSS_CLK_CNTRL_OFFSET);
+-	__raw_writel(0x10, timers[XTTCPSS_CLOCKSOURCE].base_addr +
+-				XTTCPSS_CNT_CNTRL_OFFSET);
+-
+-	/* Setup the clock event timer to be an interval timer which
+-	 * is prescaled by 32 using the interval interrupt. Leave it
+-	 * disabled for now.
+-	 */
+-
+-	timers[XTTCPSS_CLOCKEVENT].base_addr = XTTCPSS_TIMER_BASE + 4;
+-
+-	__raw_writel(0x23, timers[XTTCPSS_CLOCKEVENT].base_addr +
+-			XTTCPSS_CNT_CNTRL_OFFSET);
+-	__raw_writel(0x9, timers[XTTCPSS_CLOCKEVENT].base_addr +
+-			XTTCPSS_CLK_CNTRL_OFFSET);
+-	__raw_writel(0x1, timers[XTTCPSS_CLOCKEVENT].base_addr +
+-			XTTCPSS_IER_OFFSET);
+-
+-	/* Setup IRQ the clock event timer */
+-	event_timer_irq.dev_id = &timers[XTTCPSS_CLOCKEVENT];
+-	setup_irq(XTTCPCC_EVENT_TIMER_IRQ, &event_timer_irq);
+-}
+-
+-/**
+- * __raw_readl_cycles - Reads the timer counter register
+- *
+- * returns: Current timer counter register value
+- **/
+-static cycle_t __raw_readl_cycles(struct clocksource *cs)
+-{
+-	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKSOURCE];
+-
+-	return (cycle_t)__raw_readl(timer->base_addr +
+-				XTTCPSS_COUNT_VAL_OFFSET);
+-}
+-
+-
+-/*
+- * Instantiate and initialize the clock source structure
+- */
+-static struct clocksource clocksource_xttcpss = {
+-	.name		= "xttcpss_timer1",
+-	.rating		= 200,			/* Reasonable clock source */
+-	.read		= __raw_readl_cycles,
+-	.mask		= CLOCKSOURCE_MASK(16),
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-
+-/**
+- * xttcpss_set_next_event - Sets the time interval for next event
+- *
+- * @cycles:	Timer interval ticks
+- * @evt:	Address of clock event instance
+- *
+- * returns: Always 0 - success
+- **/
+-static int xttcpss_set_next_event(unsigned long cycles,
+-					struct clock_event_device *evt)
+-{
+-	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
+-
+-	xttcpss_set_interval(timer, cycles);
+-	return 0;
+-}
+-
+-/**
+- * xttcpss_set_mode - Sets the mode of timer
+- *
+- * @mode:	Mode to be set
+- * @evt:	Address of clock event instance
+- **/
+-static void xttcpss_set_mode(enum clock_event_mode mode,
+-					struct clock_event_device *evt)
+-{
+-	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
+-	u32 ctrl_reg;
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		xttcpss_set_interval(timer, TIMER_RATE / HZ);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-		ctrl_reg = __raw_readl(timer->base_addr +
+-					XTTCPSS_CNT_CNTRL_OFFSET);
+-		ctrl_reg |= XTTCPSS_CNT_CNTRL_DISABLE_MASK;
+-		__raw_writel(ctrl_reg,
+-				timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
+-		break;
+-	case CLOCK_EVT_MODE_RESUME:
+-		ctrl_reg = __raw_readl(timer->base_addr +
+-					XTTCPSS_CNT_CNTRL_OFFSET);
+-		ctrl_reg &= ~XTTCPSS_CNT_CNTRL_DISABLE_MASK;
+-		__raw_writel(ctrl_reg,
+-				timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
+-		break;
+-	}
+-}
+-
+-/*
+- * Instantiate and initialize the clock event structure
+- */
+-static struct clock_event_device xttcpss_clockevent = {
+-	.name		= "xttcpss_timer2",
+-	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_next_event	= xttcpss_set_next_event,
+-	.set_mode	= xttcpss_set_mode,
+-	.rating		= 200,
+-};
+-
+-/**
+- * xttcpss_timer_init - Initialize the timer
+- *
+- * Initializes the timer hardware and register the clock source and clock event
+- * timers with Linux kernal timer framework
+- **/
+-static void __init xttcpss_timer_init(void)
+-{
+-	xttcpss_timer_hardware_init();
+-	clocksource_register_hz(&clocksource_xttcpss, TIMER_RATE);
+-
+-	/* Calculate the parameters to allow the clockevent to operate using
+-	   integer math
+-	*/
+-	clockevents_calc_mult_shift(&xttcpss_clockevent, TIMER_RATE, 4);
+-
+-	xttcpss_clockevent.max_delta_ns =
+-		clockevent_delta2ns(0xfffe, &xttcpss_clockevent);
+-	xttcpss_clockevent.min_delta_ns =
+-		clockevent_delta2ns(1, &xttcpss_clockevent);
+-
+-	/* Indicate that clock event is on 1st CPU as SMP boot needs it */
+-
+-	xttcpss_clockevent.cpumask = cpumask_of(0);
+-	clockevents_register_device(&xttcpss_clockevent);
+-}
+-
+-/*
+- * Instantiate and initialize the system timer structure
+- */
+-struct sys_timer xttcpss_sys_timer = {
+-	.init		= xttcpss_timer_init,
+-};
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 603be36..f27c7b1 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -14,5 +14,6 @@ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
++obj-$(CONFIG_ARCH_ZYNQ)		+= xilinx_ttc.o
+ 
+ obj-$(CONFIG_CLKSRC_ARM_GENERIC)	+= arm_generic.o
+diff --git a/drivers/clocksource/xilinx_ttc.c b/drivers/clocksource/xilinx_ttc.c
+new file mode 100644
+index 0000000..3296556
+--- /dev/null
++++ b/drivers/clocksource/xilinx_ttc.c
+@@ -0,0 +1,297 @@
++/*
++ * This file contains driver for the Xilinx PS Timer Counter IP.
++ *
++ *  Copyright (C) 2011 Xilinx
++ *
++ * based on arch/mips/kernel/time.c timer driver
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+/* Bit definitions for the CPSW1_TS_SEQ_LTYPE register */
-+#define CPSW_V1_SEQ_ID_OFS_SHIFT	16
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/types.h>
++#include <linux/clocksource.h>
++#include <linux/clockchips.h>
++#include <linux/io.h>
 +
- struct cpsw_host_regs {
- 	u32	max_blks;
- 	u32	blk_cnt;
-@@ -297,6 +307,7 @@ struct cpsw_priv {
- 	/* snapshot of IRQ numbers */
- 	u32 irqs_table[4];
- 	u32 num_irqs;
-+	struct cpts cpts;
- };
- 
- #define napi_to_priv(napi)	container_of(napi, struct cpsw_priv, napi)
-@@ -357,6 +368,7 @@ void cpsw_tx_handler(void *token, int len, int status)
- 
- 	if (unlikely(netif_queue_stopped(ndev)))
- 		netif_start_queue(ndev);
-+	cpts_tx_timestamp(&priv->cpts, skb);
- 	priv->stats.tx_packets++;
- 	priv->stats.tx_bytes += len;
- 	dev_kfree_skb_any(skb);
-@@ -377,6 +389,7 @@ void cpsw_rx_handler(void *token, int len, int status)
- 	}
- 	if (likely(status >= 0)) {
- 		skb_put(skb, len);
-+		cpts_rx_timestamp(&priv->cpts, skb);
- 		skb->protocol = eth_type_trans(skb, ndev);
- 		netif_receive_skb(skb);
- 		priv->stats.rx_bytes += len;
-@@ -704,6 +717,11 @@ static netdev_tx_t cpsw_ndo_start_xmit(struct sk_buff *skb,
- 		return NETDEV_TX_OK;
- 	}
- 
-+	if (skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP && priv->cpts.tx_enable)
-+		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
++#include <asm/mach/time.h>
++#include <mach/zynq_soc.h>
 +
-+	skb_tx_timestamp(skb);
++#define IRQ_TIMERCOUNTER0	42
 +
- 	ret = cpdma_chan_submit(priv->txch, skb, skb->data,
- 				skb->len, GFP_KERNEL);
- 	if (unlikely(ret != 0)) {
-@@ -741,6 +759,130 @@ static void cpsw_ndo_change_rx_flags(struct net_device *ndev, int flags)
- 		dev_err(&ndev->dev, "multicast traffic cannot be filtered!\n");
- }
- 
-+#ifdef CONFIG_TI_CPTS
++/*
++ * This driver configures the 2 16-bit count-up timers as follows:
++ *
++ * T1: Timer 1, clocksource for generic timekeeping
++ * T2: Timer 2, clockevent source for hrtimers
++ * T3: Timer 3, <unused>
++ *
++ * The input frequency to the timer module for emulation is 2.5MHz which is
++ * common to all the timer channels (T1, T2, and T3). With a pre-scaler of 32,
++ * the timers are clocked at 78.125KHz (12.8 us resolution).
++ *
++ * The input frequency to the timer module in silicon will be 200MHz. With the
++ * pre-scaler of 32, the timers are clocked at 6.25MHz (160ns resolution).
++ */
++#define XTTCPSS_CLOCKSOURCE	0	/* Timer 1 as a generic timekeeping */
++#define XTTCPSS_CLOCKEVENT	1	/* Timer 2 as a clock event */
 +
-+static void cpsw_hwtstamp_v1(struct cpsw_priv *priv)
++#define XTTCPSS_TIMER_BASE		TTC0_BASE
++#define XTTCPCC_EVENT_TIMER_IRQ		(IRQ_TIMERCOUNTER0 + 1)
++/*
++ * Timer Register Offset Definitions of Timer 1, Increment base address by 4
++ * and use same offsets for Timer 2
++ */
++#define XTTCPSS_CLK_CNTRL_OFFSET	0x00 /* Clock Control Reg, RW */
++#define XTTCPSS_CNT_CNTRL_OFFSET	0x0C /* Counter Control Reg, RW */
++#define XTTCPSS_COUNT_VAL_OFFSET	0x18 /* Counter Value Reg, RO */
++#define XTTCPSS_INTR_VAL_OFFSET		0x24 /* Interval Count Reg, RW */
++#define XTTCPSS_MATCH_1_OFFSET		0x30 /* Match 1 Value Reg, RW */
++#define XTTCPSS_MATCH_2_OFFSET		0x3C /* Match 2 Value Reg, RW */
++#define XTTCPSS_MATCH_3_OFFSET		0x48 /* Match 3 Value Reg, RW */
++#define XTTCPSS_ISR_OFFSET		0x54 /* Interrupt Status Reg, RO */
++#define XTTCPSS_IER_OFFSET		0x60 /* Interrupt Enable Reg, RW */
++
++#define XTTCPSS_CNT_CNTRL_DISABLE_MASK	0x1
++
++/* Setup the timers to use pre-scaling */
++
++#define TIMER_RATE (PERIPHERAL_CLOCK_RATE / 32)
++
++/**
++ * struct xttcpss_timer - This definition defines local timer structure
++ *
++ * @base_addr:	Base address of timer
++ **/
++struct xttcpss_timer {
++	void __iomem *base_addr;
++};
++
++static struct xttcpss_timer timers[2];
++static struct clock_event_device xttcpss_clockevent;
++
++/**
++ * xttcpss_set_interval - Set the timer interval value
++ *
++ * @timer:	Pointer to the timer instance
++ * @cycles:	Timer interval ticks
++ **/
++static void xttcpss_set_interval(struct xttcpss_timer *timer,
++					unsigned long cycles)
 +{
-+	struct cpsw_slave *slave = &priv->slaves[priv->data.cpts_active_slave];
-+	u32 ts_en, seq_id;
++	u32 ctrl_reg;
 +
-+	if (!priv->cpts.tx_enable && !priv->cpts.rx_enable) {
-+		slave_write(slave, 0, CPSW1_TS_CTL);
-+		return;
-+	}
++	/* Disable the counter, set the counter value  and re-enable counter */
++	ctrl_reg = __raw_readl(timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
++	ctrl_reg |= XTTCPSS_CNT_CNTRL_DISABLE_MASK;
++	__raw_writel(ctrl_reg, timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
 +
-+	seq_id = (30 << CPSW_V1_SEQ_ID_OFS_SHIFT) | ETH_P_1588;
-+	ts_en = EVENT_MSG_BITS << CPSW_V1_MSG_TYPE_OFS;
++	__raw_writel(cycles, timer->base_addr + XTTCPSS_INTR_VAL_OFFSET);
 +
-+	if (priv->cpts.tx_enable)
-+		ts_en |= CPSW_V1_TS_TX_EN;
-+
-+	if (priv->cpts.rx_enable)
-+		ts_en |= CPSW_V1_TS_RX_EN;
-+
-+	slave_write(slave, ts_en, CPSW1_TS_CTL);
-+	slave_write(slave, seq_id, CPSW1_TS_SEQ_LTYPE);
++	/* Reset the counter (0x10) so that it starts from 0, one-shot
++	   mode makes this needed for timing to be right. */
++	ctrl_reg |= 0x10;
++	ctrl_reg &= ~XTTCPSS_CNT_CNTRL_DISABLE_MASK;
++	__raw_writel(ctrl_reg, timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
 +}
 +
-+static void cpsw_hwtstamp_v2(struct cpsw_priv *priv)
++/**
++ * xttcpss_clock_event_interrupt - Clock event timer interrupt handler
++ *
++ * @irq:	IRQ number of the Timer
++ * @dev_id:	void pointer to the xttcpss_timer instance
++ *
++ * returns: Always IRQ_HANDLED - success
++ **/
++static irqreturn_t xttcpss_clock_event_interrupt(int irq, void *dev_id)
 +{
-+	struct cpsw_slave *slave = &priv->slaves[priv->data.cpts_active_slave];
-+	u32 ctrl, mtype;
++	struct clock_event_device *evt = &xttcpss_clockevent;
++	struct xttcpss_timer *timer = dev_id;
 +
-+	ctrl = slave_read(slave, CPSW2_CONTROL);
-+	ctrl &= ~CTRL_ALL_TS_MASK;
++	/* Acknowledge the interrupt and call event handler */
++	__raw_writel(__raw_readl(timer->base_addr + XTTCPSS_ISR_OFFSET),
++			timer->base_addr + XTTCPSS_ISR_OFFSET);
 +
-+	if (priv->cpts.tx_enable)
-+		ctrl |= CTRL_TX_TS_BITS;
++	evt->event_handler(evt);
 +
-+	if (priv->cpts.rx_enable)
-+		ctrl |= CTRL_RX_TS_BITS;
-+
-+	mtype = (30 << TS_SEQ_ID_OFFSET_SHIFT) | EVENT_MSG_BITS;
-+
-+	slave_write(slave, mtype, CPSW2_TS_SEQ_MTYPE);
-+	slave_write(slave, ctrl, CPSW2_CONTROL);
-+	__raw_writel(ETH_P_1588, &priv->regs->ts_ltype);
++	return IRQ_HANDLED;
 +}
 +
-+static int cpsw_hwtstamp_ioctl(struct cpsw_priv *priv, struct ifreq *ifr)
++static struct irqaction event_timer_irq = {
++	.name	= "xttcpss clockevent",
++	.flags	= IRQF_DISABLED | IRQF_TIMER,
++	.handler = xttcpss_clock_event_interrupt,
++};
++
++/**
++ * xttcpss_timer_hardware_init - Initialize the timer hardware
++ *
++ * Initialize the hardware to start the clock source, get the clock
++ * event timer ready to use, and hook up the interrupt.
++ **/
++static void __init xttcpss_timer_hardware_init(void)
 +{
-+	struct cpts *cpts = &priv->cpts;
-+	struct hwtstamp_config cfg;
++	/* Setup the clock source counter to be an incrementing counter
++	 * with no interrupt and it rolls over at 0xFFFF. Pre-scale
++	   it by 32 also. Let it start running now.
++	 */
++	timers[XTTCPSS_CLOCKSOURCE].base_addr = XTTCPSS_TIMER_BASE;
 +
-+	if (copy_from_user(&cfg, ifr->ifr_data, sizeof(cfg)))
-+		return -EFAULT;
++	__raw_writel(0x0, timers[XTTCPSS_CLOCKSOURCE].base_addr +
++				XTTCPSS_IER_OFFSET);
++	__raw_writel(0x9, timers[XTTCPSS_CLOCKSOURCE].base_addr +
++				XTTCPSS_CLK_CNTRL_OFFSET);
++	__raw_writel(0x10, timers[XTTCPSS_CLOCKSOURCE].base_addr +
++				XTTCPSS_CNT_CNTRL_OFFSET);
 +
-+	/* reserved for future extensions */
-+	if (cfg.flags)
-+		return -EINVAL;
++	/* Setup the clock event timer to be an interval timer which
++	 * is prescaled by 32 using the interval interrupt. Leave it
++	 * disabled for now.
++	 */
 +
-+	switch (cfg.tx_type) {
-+	case HWTSTAMP_TX_OFF:
-+		cpts->tx_enable = 0;
-+		break;
-+	case HWTSTAMP_TX_ON:
-+		cpts->tx_enable = 1;
-+		break;
-+	default:
-+		return -ERANGE;
-+	}
++	timers[XTTCPSS_CLOCKEVENT].base_addr = XTTCPSS_TIMER_BASE + 4;
 +
-+	switch (cfg.rx_filter) {
-+	case HWTSTAMP_FILTER_NONE:
-+		cpts->rx_enable = 0;
-+		break;
-+	case HWTSTAMP_FILTER_ALL:
-+	case HWTSTAMP_FILTER_PTP_V1_L4_EVENT:
-+	case HWTSTAMP_FILTER_PTP_V1_L4_SYNC:
-+	case HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ:
-+		return -ERANGE;
-+	case HWTSTAMP_FILTER_PTP_V2_L4_EVENT:
-+	case HWTSTAMP_FILTER_PTP_V2_L4_SYNC:
-+	case HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ:
-+	case HWTSTAMP_FILTER_PTP_V2_L2_EVENT:
-+	case HWTSTAMP_FILTER_PTP_V2_L2_SYNC:
-+	case HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ:
-+	case HWTSTAMP_FILTER_PTP_V2_EVENT:
-+	case HWTSTAMP_FILTER_PTP_V2_SYNC:
-+	case HWTSTAMP_FILTER_PTP_V2_DELAY_REQ:
-+		cpts->rx_enable = 1;
-+		cfg.rx_filter = HWTSTAMP_FILTER_PTP_V2_EVENT;
-+		break;
-+	default:
-+		return -ERANGE;
-+	}
++	__raw_writel(0x23, timers[XTTCPSS_CLOCKEVENT].base_addr +
++			XTTCPSS_CNT_CNTRL_OFFSET);
++	__raw_writel(0x9, timers[XTTCPSS_CLOCKEVENT].base_addr +
++			XTTCPSS_CLK_CNTRL_OFFSET);
++	__raw_writel(0x1, timers[XTTCPSS_CLOCKEVENT].base_addr +
++			XTTCPSS_IER_OFFSET);
 +
-+	switch (priv->version) {
-+	case CPSW_VERSION_1:
-+		cpsw_hwtstamp_v1(priv);
-+		break;
-+	case CPSW_VERSION_2:
-+		cpsw_hwtstamp_v2(priv);
-+		break;
-+	default:
-+		return -ENOTSUPP;
-+	}
-+
-+	return copy_to_user(ifr->ifr_data, &cfg, sizeof(cfg)) ? -EFAULT : 0;
++	/* Setup IRQ the clock event timer */
++	event_timer_irq.dev_id = &timers[XTTCPSS_CLOCKEVENT];
++	setup_irq(XTTCPCC_EVENT_TIMER_IRQ, &event_timer_irq);
 +}
 +
-+#endif /*CONFIG_TI_CPTS*/
-+
-+static int cpsw_ndo_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
++/**
++ * __raw_readl_cycles - Reads the timer counter register
++ *
++ * returns: Current timer counter register value
++ **/
++static cycle_t __raw_readl_cycles(struct clocksource *cs)
 +{
-+	struct cpsw_priv *priv = netdev_priv(dev);
++	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKSOURCE];
 +
-+	if (!netif_running(dev))
-+		return -EINVAL;
-+
-+#ifdef CONFIG_TI_CPTS
-+	if (cmd == SIOCSHWTSTAMP)
-+		return cpsw_hwtstamp_ioctl(priv, req);
-+#endif
-+	return -ENOTSUPP;
++	return (cycle_t)__raw_readl(timer->base_addr +
++				XTTCPSS_COUNT_VAL_OFFSET);
 +}
 +
- static void cpsw_ndo_tx_timeout(struct net_device *ndev)
- {
- 	struct cpsw_priv *priv = netdev_priv(ndev);
-@@ -781,6 +923,7 @@ static const struct net_device_ops cpsw_netdev_ops = {
- 	.ndo_stop		= cpsw_ndo_stop,
- 	.ndo_start_xmit		= cpsw_ndo_start_xmit,
- 	.ndo_change_rx_flags	= cpsw_ndo_change_rx_flags,
-+	.ndo_do_ioctl		= cpsw_ndo_ioctl,
- 	.ndo_validate_addr	= eth_validate_addr,
- 	.ndo_change_mtu		= eth_change_mtu,
- 	.ndo_tx_timeout		= cpsw_ndo_tx_timeout,
-@@ -812,11 +955,44 @@ static void cpsw_set_msglevel(struct net_device *ndev, u32 value)
- 	priv->msg_enable = value;
- }
- 
-+static int cpsw_get_ts_info(struct net_device *ndev,
-+			    struct ethtool_ts_info *info)
-+{
-+#ifdef CONFIG_TI_CPTS
-+	struct cpsw_priv *priv = netdev_priv(ndev);
 +
-+	info->so_timestamping =
-+		SOF_TIMESTAMPING_TX_HARDWARE |
-+		SOF_TIMESTAMPING_TX_SOFTWARE |
-+		SOF_TIMESTAMPING_RX_HARDWARE |
-+		SOF_TIMESTAMPING_RX_SOFTWARE |
-+		SOF_TIMESTAMPING_SOFTWARE |
-+		SOF_TIMESTAMPING_RAW_HARDWARE;
-+	info->phc_index = priv->cpts.phc_index;
-+	info->tx_types =
-+		(1 << HWTSTAMP_TX_OFF) |
-+		(1 << HWTSTAMP_TX_ON);
-+	info->rx_filters =
-+		(1 << HWTSTAMP_FILTER_NONE) |
-+		(1 << HWTSTAMP_FILTER_PTP_V2_EVENT);
-+#else
-+	info->so_timestamping =
-+		SOF_TIMESTAMPING_TX_SOFTWARE |
-+		SOF_TIMESTAMPING_RX_SOFTWARE |
-+		SOF_TIMESTAMPING_SOFTWARE;
-+	info->phc_index = -1;
-+	info->tx_types = 0;
-+	info->rx_filters = 0;
-+#endif
++/*
++ * Instantiate and initialize the clock source structure
++ */
++static struct clocksource clocksource_xttcpss = {
++	.name		= "xttcpss_timer1",
++	.rating		= 200,			/* Reasonable clock source */
++	.read		= __raw_readl_cycles,
++	.mask		= CLOCKSOURCE_MASK(16),
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++
++/**
++ * xttcpss_set_next_event - Sets the time interval for next event
++ *
++ * @cycles:	Timer interval ticks
++ * @evt:	Address of clock event instance
++ *
++ * returns: Always 0 - success
++ **/
++static int xttcpss_set_next_event(unsigned long cycles,
++					struct clock_event_device *evt)
++{
++	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
++
++	xttcpss_set_interval(timer, cycles);
 +	return 0;
 +}
 +
- static const struct ethtool_ops cpsw_ethtool_ops = {
- 	.get_drvinfo	= cpsw_get_drvinfo,
- 	.get_msglevel	= cpsw_get_msglevel,
- 	.set_msglevel	= cpsw_set_msglevel,
- 	.get_link	= ethtool_op_get_link,
-+	.get_ts_info	= cpsw_get_ts_info,
- };
- 
- static void cpsw_slave_init(struct cpsw_slave *slave, struct cpsw_priv *priv)
-@@ -1092,6 +1268,7 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
- 	priv->regs = regs;
- 	priv->host_port = data->host_port_num;
- 	priv->host_port_regs = regs + data->host_port_reg_ofs;
-+	priv->cpts.reg = regs + data->cpts_reg_ofs;
- 
- 	priv->cpsw_ss_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
- 	if (!priv->cpsw_ss_res) {
-@@ -1213,6 +1390,10 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
- 		goto clean_irq_ret;
- 	}
- 
-+	if (cpts_register(&pdev->dev, &priv->cpts,
-+			  data->cpts_clock_mult, data->cpts_clock_shift))
-+		dev_err(priv->dev, "error registering cpts device\n");
++/**
++ * xttcpss_set_mode - Sets the mode of timer
++ *
++ * @mode:	Mode to be set
++ * @evt:	Address of clock event instance
++ **/
++static void xttcpss_set_mode(enum clock_event_mode mode,
++					struct clock_event_device *evt)
++{
++	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
++	u32 ctrl_reg;
 +
- 	cpsw_notice(priv, probe, "initialized device (regs %x, irq %d)\n",
- 		  priv->cpsw_res->start, ndev->irq);
- 
-@@ -1252,6 +1433,7 @@ static int __devexit cpsw_remove(struct platform_device *pdev)
- 	pr_info("removing device");
- 	platform_set_drvdata(pdev, NULL);
- 
-+	cpts_unregister(&priv->cpts);
- 	free_irq(ndev->irq, priv);
- 	cpsw_ale_destroy(priv->ale);
- 	cpdma_chan_destroy(priv->txch);
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		xttcpss_set_interval(timer, TIMER_RATE / HZ);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		ctrl_reg = __raw_readl(timer->base_addr +
++					XTTCPSS_CNT_CNTRL_OFFSET);
++		ctrl_reg |= XTTCPSS_CNT_CNTRL_DISABLE_MASK;
++		__raw_writel(ctrl_reg,
++				timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
++		break;
++	case CLOCK_EVT_MODE_RESUME:
++		ctrl_reg = __raw_readl(timer->base_addr +
++					XTTCPSS_CNT_CNTRL_OFFSET);
++		ctrl_reg &= ~XTTCPSS_CNT_CNTRL_DISABLE_MASK;
++		__raw_writel(ctrl_reg,
++				timer->base_addr + XTTCPSS_CNT_CNTRL_OFFSET);
++		break;
++	}
++}
++
++/*
++ * Instantiate and initialize the clock event structure
++ */
++static struct clock_event_device xttcpss_clockevent = {
++	.name		= "xttcpss_timer2",
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= xttcpss_set_next_event,
++	.set_mode	= xttcpss_set_mode,
++	.rating		= 200,
++};
++
++/**
++ * xttcpss_timer_init - Initialize the timer
++ *
++ * Initializes the timer hardware and register the clock source and clock event
++ * timers with Linux kernal timer framework
++ **/
++static void __init xttcpss_timer_init(void)
++{
++	xttcpss_timer_hardware_init();
++	clocksource_register_hz(&clocksource_xttcpss, TIMER_RATE);
++
++	/* Calculate the parameters to allow the clockevent to operate using
++	   integer math
++	*/
++	clockevents_calc_mult_shift(&xttcpss_clockevent, TIMER_RATE, 4);
++
++	xttcpss_clockevent.max_delta_ns =
++		clockevent_delta2ns(0xfffe, &xttcpss_clockevent);
++	xttcpss_clockevent.min_delta_ns =
++		clockevent_delta2ns(1, &xttcpss_clockevent);
++
++	/* Indicate that clock event is on 1st CPU as SMP boot needs it */
++
++	xttcpss_clockevent.cpumask = cpumask_of(0);
++	clockevents_register_device(&xttcpss_clockevent);
++}
++
++/*
++ * Instantiate and initialize the system timer structure
++ */
++struct sys_timer xttcpss_sys_timer = {
++	.init		= xttcpss_timer_init,
++};
+diff --git a/include/linux/xilinx_ttc.h b/include/linux/xilinx_ttc.h
+new file mode 100644
+index 0000000..3606beb
+--- /dev/null
++++ b/include/linux/xilinx_ttc.h
+@@ -0,0 +1,24 @@
++/*
++ * This file contains common function prototypes to avoid externs
++ * in the c files.
++ *
++ *  Copyright (C) 2011 Xilinx
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __XILINX_TTC_H__
++#define __XILINX_TTC_H__
++
++#include <asm/mach/time.h>
++
++extern struct sys_timer xttcpss_sys_timer;
++
++#endif
 -- 
-1.7.2.5
+1.8.0
