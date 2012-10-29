@@ -1,154 +1,46 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 29 Oct 2012 09:11:34 +0000
-Subject: [RFC PATCH v3 16/16] ARM: dts: add AM33XX SPI support
-In-Reply-To: <1350566815-409-17-git-send-email-mporter@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
- <1350566815-409-17-git-send-email-mporter@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9D526E@DBDE01.ent.ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 29 Oct 2012 10:18:24 +0100
+Subject: [PATCH v3 3/4] arm: mvebu: move irq controller driver to
+ drivers/irqchip
+In-Reply-To: <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351462748-5224-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <508E49E0.8050606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 18:56:55, Porter, Matt wrote:
-> Adds AM33XX SPI support for am335x-bone and am335x-evm.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-bone.dts |   17 +++++++++++++++
->  arch/arm/boot/dts/am335x-evm.dts  |    9 ++++++++
->  arch/arm/boot/dts/am33xx.dtsi     |   43 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 69 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index 5510979..23edfd8 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -18,6 +18,17 @@
->  		reg = <0x80000000 0x10000000>; /* 256 MB */
->  	};
->  
-> +	am3358_pinmux: pinmux at 44e10800 {
-> +		spi1_pins: pinmux_spi1_pins {
-> +			pinctrl-single,pins = <
-> +				0x190 0x13	/* mcasp0_aclkx.spi1_sclk, OUTPUT_PULLUP | MODE3 */
-> +				0x194 0x33	/* mcasp0_fsx.spi1_d0, INPUT_PULLUP | MODE3 */
-> +				0x198 0x13	/* mcasp0_axr0.spi1_d1, OUTPUT_PULLUP | MODE3 */
-> +				0x19c 0x13	/* mcasp0_ahclkr.spi1_cs0, OUTPUT_PULLUP | MODE3 */
-> +			>;
-> +		};
-> +	};
-> +
+On 10/28/2012 11:19 PM, Thomas Petazzoni wrote:
+> Now that the drivers/irqchip/ directory has a minimal infrastructure
+> to support the addition of irq controller driver, we move the irq
+> controller driver for Armada 370 and Armada XP ARM SoCs from the
+> arch/arm/mach-mvebu/ directory to the drivers/irqchip/ directory and
+> update the irqchip infrastructure to take into account this new
+> driver.
+>
+> [...]
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 6b5a6e0..5148ffd 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -1,2 +1,3 @@
+>   obj-$(CONFIG_IRQCHIP) += irqchip.o
+>   obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
+> +obj-$(CONFIG_ARCH_MVEBU)   += irq-armada-370-xp.o
 
-Change to am33xx_pinmux.
+Thomas,
 
->  	ocp {
->  		uart1: serial at 44e09000 {
->  			status = "okay";
-> @@ -84,3 +95,9 @@
->  &mmc1 {
->  	vmmc-supply = <&ldo3_reg>;
->  };
-> +
-> +&spi1 {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi1_pins>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index d63fce8..8d5f660 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -124,3 +124,12 @@
->  &mmc1 {
->  	vmmc-supply = <&vmmc_reg>;
->  };
-> +
-> +&spi0 {
-> +	status = "okay";
-> +	spi-flash at 0 {
-> +		compatible = "spansion,s25fl064k", "m25p80";
-> +		spi-max-frequency = <24000000>;
-> +		reg = <0>;
-> +	};
-> +};
+using ARCH_MVEBU for enabling irq-armada-370-xp here will lead to
+incompatibilities with Orion SoCs when they move over to ARCH_MVEBU.
+Although, it is ok for the moment please choose either a CONFIG_
+common for both Armada 370 and XP.
 
-In AM335x-evm, SPI flash available in profile #2 (am335x evm specific profiles).
-So can you drop this changes as if I understood correctly, am335x-evm.dts will be
-populated for devices present only on profile #0.
+With a Kconfig within drivers/irqchip you could define a
+ARMADA_370_XP_IRQ and select that in MACH_ARMADA_370 and MACH_ARMADA_XP
+or MACH_ARMADA_370_XP, which all already exist.
 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 26a6af7..063ecea 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -40,6 +40,15 @@
->  		};
->  	};
->  
-> +	am3358_pinmux: pinmux at 44e10800 {
-> +		compatible = "pinctrl-single";
-> +		reg = <0x44e10800 0x0238>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-single,register-width = <32>;
-> +		pinctrl-single,function-mask = <0x7f>;
-> +	};
-> +
+As soon as the patch is through, I can provide (and use) a irq-orion
+based on irqchip. I can provide it earlier but to actually use it there
+are still some other patches required on Dove. Other Orions could
+switch now, I guess.
 
-Pin ctrl support already submitted
-http://git.kernel.org/?p=linux/kernel/git/bcousson/linux-omap-dt.git;a=commitdiff;h=3e0603e905d9ba662e8c1885ecb1d28bc454e448
-
-Thanks
-Avinash
-
->  	/*
->  	 * XXX: Use a flat representation of the AM33XX interconnect.
->  	 * The real AM33XX interconnect network is quite complex.Since
-> @@ -261,6 +270,40 @@
->  			status = "disabled";
->  		};
->  
-> +		spi0: spi at 48030000 {
-> +			compatible = "ti,omap4-mcspi";
-> +			ti,hwmods = "spi0";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x48030000 0x400>;
-> +			interrupt-parent = <&intc>;
-> +			interrupt = <65>;
-> +			dmas = <&edma 16
-> +				&edma 17
-> +				&edma 18
-> +				&edma 19>;
-> +			dma-names = "tx0", "rx0", "tx1", "rx1";
-> +			ti,spi-num-cs = <2>;
-> +			status = "disabled";
-> +		};
-> +
-> +		spi1: spi at 481a0000 {
-> +			compatible = "ti,omap4-mcspi";
-> +			ti,hwmods = "spi1";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x481a0000 0x400>;
-> +			interrupt-parent = <&intc>;
-> +			interrupt = <125>;
-> +			dmas = <&edma 42
-> +				&edma 43
-> +				&edma 44
-> +				&edma 45>;
-> +			dma-names = "tx0", "rx0", "tx1", "rx1";
-> +			ti,spi-num-cs = <2>;
-> +			status = "disabled";
-> +		};
-> +
->  		wdt2: wdt at 44e35000 {
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Sebastian
