@@ -1,78 +1,33 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Oct 2012 18:21:17 +0200
-Subject: [PATCH v2] ARM: OMAP1: usb: fix sparse warnings
-In-Reply-To: <alpine.DEB.2.00.1210262128050.11258@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210262051290.11258@utopia.booyaka.com>
- <20121026212059.GV11908@atomide.com>
- <alpine.DEB.2.00.1210262128050.11258@utopia.booyaka.com>
-Message-ID: <20121029162117.GL27566@arwen.pp.htv.fi>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 29 Oct 2012 22:13:07 +0530
+Subject: [PATCH] ARM: mm: uninitialized warning corrections
+Message-ID: <fb4b3c38a09b137f7823168e5f4770464b3c33bd.1351528855.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 09:28:58PM +0000, Paul Walmsley wrote:
-> 
-> Resolve the following sparse warnings:
-> 
-> arch/arm/mach-omap1/usb.c:304:12: warning: symbol 'omap1_usb0_init' was not declared. Should it be static?
-> arch/arm/mach-omap1/usb.c:412:12: warning: symbol 'omap1_usb1_init' was not declared. Should it be static?
-> arch/arm/mach-omap1/usb.c:478:12: warning: symbol 'omap1_usb2_init' was not declared. Should it be static?
-> 
-> by declaring those functions as static.
-> 
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Felipe Balbi <balbi@ti.com>
+The variables here are really not used uninitialized.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+arch/arm/mm/alignment.c: In function 'do_alignment':
+arch/arm/mm/alignment.c:327:15: warning: 'offset.un' may be used uninitialized in this function [-Wmaybe-uninitialized]
+arch/arm/mm/alignment.c:748:21: note: 'offset.un' was declared here
 
-> ---
-> 
-> Applies on linux-omap/omap-for-v3.8/cleanup-headers.
-> 
->  arch/arm/mach-omap1/usb.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
-> index 84267ed..104fed3 100644
-> --- a/arch/arm/mach-omap1/usb.c
-> +++ b/arch/arm/mach-omap1/usb.c
-> @@ -301,7 +301,7 @@ static inline void otg_device_init(struct omap_usb_config *pdata)
->  
->  #endif
->  
-> -u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
-> +static u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
->  {
->  	u32	syscon1 = 0;
->  
-> @@ -409,7 +409,7 @@ u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
->  	return syscon1 << 16;
->  }
->  
-> -u32 __init omap1_usb1_init(unsigned nwires)
-> +static u32 __init omap1_usb1_init(unsigned nwires)
->  {
->  	u32	syscon1 = 0;
->  
-> @@ -475,7 +475,7 @@ bad:
->  	return syscon1 << 20;
->  }
->  
-> -u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
-> +static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
->  {
->  	u32	syscon1 = 0;
->  
-> -- 
-> 1.7.10.4
-> 
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mm/alignment.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index b9f60eb..223b4aa 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -745,7 +745,7 @@ do_alignment_t32_to_handler(unsigned long *pinstr, struct pt_regs *regs,
+ static int
+ do_alignment(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ {
+-	union offset_union offset;
++	union offset_union uninitialized_var(offset);
+ 	unsigned long instr = 0, instrptr;
+ 	int (*handler)(unsigned long addr, unsigned long instr, struct pt_regs *regs);
+ 	unsigned int type;
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/cecc3b45/attachment.sig>
+1.7.12.rc2.18.g61b472e
