@@ -1,96 +1,41 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Mon, 29 Oct 2012 09:34:25 -0600
-Subject: [PATCH] ARM: quiet down the non make -s output
-Message-ID: <20121029153425.GA9486@beefymiracle.amer.corp.natinst.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 29 Oct 2012 21:14:58 +0900
+Subject: [PATCH v2 0/2] ARM: exynos: Enable TMU support in exynos platforms
+In-Reply-To: <1351243746-4173-1-git-send-email-amit.daniel@samsung.com>
+References: <1351243746-4173-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <508E7342.2090307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit edc88ceb0c7d285b9f58bc29a638cd8163b59989 silenced the make -s build, but
-inadvertently made louder the non-silent build.  Fix by prepending '@' to each
-of the added $(kecho) statements.
+On 10/26/12 18:29, Amit Daniel Kachhap wrote:
+> From: Amit Daniel Kachhap<amit.daniel@samsung.com>
+>
+> These TMU enablement patches are needed for exynos4 and exynos5 TMU
+> driver already merged(drivers/thermal/exynos_thermal.c).
+>
+> This patchset is based on Samsung Maintainer's tree,
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
+>
+> Amit Daniel Kachhap (2):
+>    ARM: exynos4: Add devicetree node for TMU driver
+>    ARM: exynos5: Add devicetree node for TMU driver
+>
+>   arch/arm/boot/dts/exynos4210.dtsi        |    7 +++++++
+>   arch/arm/boot/dts/exynos5250.dtsi        |    6 ++++++
+>   arch/arm/mach-exynos/clock-exynos4.c     |    4 ++++
+>   arch/arm/mach-exynos/clock-exynos5.c     |    5 +++++
+>   arch/arm/mach-exynos/include/mach/irqs.h |    3 +++
+>   arch/arm/mach-exynos/include/mach/map.h  |    3 +++
+>   arch/arm/mach-exynos/mach-exynos4-dt.c   |    2 ++
+>   arch/arm/mach-exynos/mach-exynos5-dt.c   |    2 ++
+>   8 files changed, 32 insertions(+), 0 deletions(-)
 
-Build with edc88ceb0c7d285b9f58bc29a638cd8163b59989:
+Look good to me, will apply.
 
-  CHK     include/generated/compile.h
-echo '  Kernel: arch/arm/boot/Image is ready'
-  Kernel: arch/arm/boot/Image is ready
-  LD      arch/arm/boot/compressed/vmlinux
-  OBJCOPY arch/arm/boot/zImage
-echo '  Kernel: arch/arm/boot/zImage is ready'
-  Kernel: arch/arm/boot/zImage is ready
+Thanks.
 
-Build with this fix:
-  CHK     include/generated/compile.h
-  Kernel: arch/arm/boot/Image is ready
-  LD      arch/arm/boot/compressed/vmlinux
-  OBJCOPY arch/arm/boot/zImage
-  Kernel: arch/arm/boot/zImage is ready
-
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
----
- arch/arm/boot/Makefile  | 10 +++++-----
- arch/arm/tools/Makefile |  2 +-
- 2 files changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index f2aa09e..9137df5 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -33,7 +33,7 @@ ifeq ($(CONFIG_XIP_KERNEL),y)
- 
- $(obj)/xipImage: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
-+	@$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
- 
- $(obj)/Image $(obj)/zImage: FORCE
- 	@echo 'Kernel configured for XIP (CONFIG_XIP_KERNEL=y)'
-@@ -48,14 +48,14 @@ $(obj)/xipImage: FORCE
- 
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	$(kecho) '  Kernel: $@ is ready'
-+	@$(kecho) '  Kernel: $@ is ready'
- 
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
- $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
--	$(kecho) '  Kernel: $@ is ready'
-+	@$(kecho) '  Kernel: $@ is ready'
- 
- endif
- 
-@@ -90,7 +90,7 @@ fi
- $(obj)/uImage:	$(obj)/zImage FORCE
- 	@$(check_for_multiple_loadaddr)
- 	$(call if_changed,uimage)
--	$(kecho) '  Image $@ is ready'
-+	@$(kecho) '  Image $@ is ready'
- 
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
-@@ -98,7 +98,7 @@ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 
- $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
- 	$(call if_changed,objcopy)
--	$(kecho) '  Kernel: $@ is ready'
-+	@$(kecho) '  Kernel: $@ is ready'
- 
- PHONY += initrd FORCE
- initrd:
-diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
-index cd60a81..32d05c8 100644
---- a/arch/arm/tools/Makefile
-+++ b/arch/arm/tools/Makefile
-@@ -5,6 +5,6 @@
- #
- 
- include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types
--	$(kecho) '  Generating $@'
-+	@$(kecho) '  Generating $@'
- 	@mkdir -p $(dir $@)
- 	$(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
--- 
-1.8.0
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
