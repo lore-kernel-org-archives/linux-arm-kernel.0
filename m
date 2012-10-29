@@ -1,20 +1,75 @@
-From: vkoul@infradead.org (Vinod Koul)
-Date: Mon, 29 Oct 2012 11:24:35 +0530
-Subject: [PATCH 06/16] dma: Convert dev_printk(KERN_<LEVEL> to dev_<level>(
-In-Reply-To: <cf922e807ca2ec44837ffc7a320851e9c5272d03.1351411047.git.joe@perches.com>
-References: <cover.1351411047.git.joe@perches.com>
- <cf922e807ca2ec44837ffc7a320851e9c5272d03.1351411047.git.joe@perches.com>
-Message-ID: <1351490075.7077.36.camel@vkoul-udesk3>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Oct 2012 08:10:26 +0200
+Subject: [PATCH v2 1/3] drivers: bus: ocp2scp: add pdata support
+In-Reply-To: <508BD344.1090001@ti.com>
+References: <1349675983-23803-1-git-send-email-kishon@ti.com>
+ <1349675983-23803-2-git-send-email-kishon@ti.com>
+ <20121016165043.GS15569@atomide.com>
+ <20121025004806.GK11928@atomide.com>
+ <20121025061722.GB4449@arwen.pp.htv.fi>
+ <20121025174446.GT11928@atomide.com>
+ <20121026064736.GA22206@arwen.pp.htv.fi>
+ <20121026171655.GI11908@atomide.com>
+ <20121026195915.GA29548@arwen.pp.htv.fi> <508BD344.1090001@ti.com>
+Message-ID: <20121029061026.GO17570@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2012-10-28 at 01:05 -0700, Joe Perches wrote:
-> dev_<level> calls take less code than dev_printk(KERN_<LEVEL>
-> and reducing object size is good.
-> Coalesce formats for easier grep. 
+Hi,
 
-Applied thanks
+On Sat, Oct 27, 2012 at 05:57:48PM +0530, kishon wrote:
+> Hi,
+> 
+> On Saturday 27 October 2012 01:29 AM, Felipe Balbi wrote:
+> >Hi,
+> >
+> >On Fri, Oct 26, 2012 at 10:16:55AM -0700, Tony Lindgren wrote:
+> >>* Felipe Balbi <balbi@ti.com> [121025 23:55]:
+> >>>On Thu, Oct 25, 2012 at 10:44:47AM -0700, Tony Lindgren wrote:
+> >>>>* Felipe Balbi <balbi@ti.com> [121024 23:24]:
+> >>>>>Hi,
+> >>>>>
+> >>>>>On Wed, Oct 24, 2012 at 05:48:07PM -0700, Tony Lindgren wrote:
+> >>>>>>* Tony Lindgren <tony@atomide.com> [121016 09:53]:
+> >>>>>>>* Kishon Vijay Abraham I <kishon@ti.com> [121007 23:01]:
+> >>>>>>>>ocp2scp was not having pdata support which makes *musb* fail for non-dt
+> >>>>>>>>boot in OMAP platform. The pdata will have information about the devices
+> >>>>>>>>that is connected to ocp2scp. ocp2scp driver will now make use of this
+> >>>>>>>>information to create the devices that is attached to ocp2scp.
+> >>>>>>>>
+> >>>>>>>>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>>>>>
+> >>>>>>>This fixes the regression on my panda es for musb port:
+> >>>>>>>
+> >>>>>>>Acked-by: Tony Lindgren <tony@atomide.com>
+> >>>>>>
+> >>>>>>Looks like nobody has picked this one up and we need it to
+> >>>>>>fix the musb regression on omap, so I'll queue these up.
+> >>>>>
+> >>>>>I don't seem to have the patches around in any mailbox :-(
+> >>>>
+> >>>>Bounced them to you. Do you have any better ideas for the
+> >>>>-rc cycle to fix the MUSB regression on omap4?
+> >>>
+> >>>Well, there are two regressions that I know of. One is caused by the
+> >>>mode1 DMA changes, which I'll just revert, and the other is the
+> >>>missing platform_data support on the new PHY driver which these patches
+> >>>are supposed to solve, right ?
+> >>
+> >>Yes that's it AFAIK.
+> >
+> >Kishon, any other patches I need to take to get MUSB working on v3.7 ?
+> 
+> These should be good enough to get MUSB working..
+
+nothing needed for omap-usb2.c ? That's great, cheers
 
 -- 
-Vinod Koul
-Intel Corp.
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/ad9b72e6/attachment.sig>
