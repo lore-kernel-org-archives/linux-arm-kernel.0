@@ -1,95 +1,46 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 29 Oct 2012 15:29:07 +0530
-Subject: [PATCH] ARM: OMAP2+: am33xx: Add PRM warm reset/reboot support
-Message-ID: <1351504747-10554-1-git-send-email-hvaibhav@ti.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 29 Oct 2012 10:59:52 +0100
+Subject: [PATCH 0/4] DMA: PL330 fixes
+Message-ID: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds reboot capability to all AM33XX based boards/EVM's,
-by asserting PRM warm reset bit on 'reboot' command.
+Hi,
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Tested-by: Daniel Mack <zonque@gmail.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Afzal Mohammed <afzal@ti.com>
----
-Tested on AM335xEVM and BeagleBone platform.
+The first patch fixes lockup caused by pl330 driver.  It doesn't add
+any dependencies to later patches and can be applied independently.
 
- arch/arm/mach-omap2/board-generic.c |    1 +
- arch/arm/mach-omap2/prcm.c          |    3 +++
- arch/arm/mach-omap2/prm33xx.c       |   15 +++++++++++++++
- arch/arm/mach-omap2/prm33xx.h       |    1 +
- 4 files changed, 20 insertions(+), 0 deletions(-)
+The second patch fixes PL330 regression on ARM Exynos 4210 revision 0
+SOC (used by Universal C210 board).
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 601ecdf..6a69ceb 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
- 	.init_machine	= omap_generic_init,
- 	.timer		= &omap3_am33xx_timer,
- 	.dt_compat	= am33xx_boards_compat,
-+	.restart	= omap_prcm_restart,
- MACHINE_END
- #endif
+The third patch adds PL330 MDMA1 controller node to device tree on
+ARM Exynos4 SOCs.
 
-diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-index cff270a..07f163c 100644
---- a/arch/arm/mach-omap2/prcm.c
-+++ b/arch/arm/mach-omap2/prcm.c
-@@ -34,6 +34,7 @@
- #include "cm2xxx_3xxx.h"
- #include "prm2xxx_3xxx.h"
- #include "prm44xx.h"
-+#include "prm33xx.h"
- #include "prminst44xx.h"
- #include "cminst44xx.h"
- #include "prm-regbits-24xx.h"
-@@ -73,6 +74,8 @@ void omap_prcm_restart(char mode, const char *cmd)
- 		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
- 	} else if (cpu_is_omap44xx()) {
- 		omap4_prminst_global_warm_sw_reset(); /* never returns */
-+	} else if (soc_is_am33xx()) {
-+		am33xx_prm_global_warm_sw_reset();	/* never returns */
- 	} else {
- 		WARN_ON(1);
- 	}
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index 53ec9cb..657c3d0 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -135,6 +135,21 @@ int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
- 	return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
- }
+The fourth patch adds device tree property for PL330 driver to be used
+by controllers that have DMA_MEMCPY capability and updates device tree
+files for ARM platforms using PL330.  Since this patch depends on
+patches #2-3 it would be probably best to also push it through Kukjin's
+tree (with the relevant ACKs added of course).
 
-+void am33xx_prm_global_warm_sw_reset(void)
-+{
-+	u32 v;
-+
-+	v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
-+				    AM33XX_PRM_RSTCTRL_OFFSET);
-+	v |= AM33XX_GLOBAL_WARM_SW_RST_MASK;
-+	am33xx_prm_write_reg(v, AM33XX_PRM_DEVICE_MOD,
-+				 AM33XX_PRM_RSTCTRL_OFFSET);
-+
-+	/* OCP barrier */
-+	v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
-+				    AM33XX_PRM_RSTCTRL_OFFSET);
-+}
-+
- static int am33xx_pwrdm_set_next_pwrst(struct powerdomain *pwrdm, u8 pwrst)
- {
- 	am33xx_prm_rmw_reg_bits(OMAP_POWERSTATE_MASK,
-diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
-index 3f25c56..cdfc694 100644
---- a/arch/arm/mach-omap2/prm33xx.h
-+++ b/arch/arm/mach-omap2/prm33xx.h
-@@ -126,4 +126,5 @@ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
- extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
- extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
- 		u16 rstctrl_offs, u16 rstst_offs);
-+extern void am33xx_prm_global_warm_sw_reset(void);
- #endif
---
-1.7.0.4
+
+Bartlomiej Zolnierkiewicz (4):
+  DMA: PL330: fix locking in pl330_free_chan_resources()
+  ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of Exynos4210 SOC
+  ARM: dts: exynos4: add node for PL330 MDMA1 controller
+  DMA: PL330: add device tree property for DMA_MEMCPY capability
+
+ Documentation/devicetree/bindings/dma/arm-pl330.txt |  1 +
+ arch/arm/boot/dts/exynos4.dtsi                      |  7 +++++++
+ arch/arm/boot/dts/exynos5250.dtsi                   |  2 ++
+ arch/arm/boot/dts/highbank.dts                      |  1 +
+ arch/arm/boot/dts/socfpga.dtsi                      |  1 +
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts         |  1 +
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts          |  1 +
+ arch/arm/mach-exynos/dma.c                          |  5 ++++-
+ arch/arm/mach-exynos/include/mach/map.h             |  3 ++-
+ arch/arm/mach-exynos/mach-exynos4-dt.c              |  1 +
+ drivers/dma/pl330.c                                 | 15 ++++++++++-----
+ 11 files changed, 31 insertions(+), 7 deletions(-)
+
+-- 
+1.8.0
