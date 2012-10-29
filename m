@@ -1,43 +1,78 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 29 Oct 2012 17:14:45 +0100
-Subject: [PATCH] at91sam9m10g45-ek: rename leds to match board
-In-Reply-To: <20121029150038.GA4995@piout.net>
-References: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
- <20121027145132.GJ18964@game.jcrosoft.org>
- <20121029150038.GA4995@piout.net>
-Message-ID: <20121029161445.GB31214@game.jcrosoft.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Oct 2012 18:21:17 +0200
+Subject: [PATCH v2] ARM: OMAP1: usb: fix sparse warnings
+In-Reply-To: <alpine.DEB.2.00.1210262128050.11258@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210262051290.11258@utopia.booyaka.com>
+ <20121026212059.GV11908@atomide.com>
+ <alpine.DEB.2.00.1210262128050.11258@utopia.booyaka.com>
+Message-ID: <20121029162117.GL27566@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:00 Mon 29 Oct     , Alexandre Belloni wrote:
-> On Sat, Oct 27, 2012 at 04:51:32PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> > On 21:29 Fri 26 Oct     , Alexandre Belloni wrote:
-> > > The leds' name in the board file didn't match the names written on the
-> > > board itsef. This can be confusing when trying to use them for another
-> > > purpose.
-> > 
-> > It like this for so long time and I'm not really willing to touch the dts
-> > 
+On Fri, Oct 26, 2012 at 09:28:58PM +0000, Paul Walmsley wrote:
 > 
-> I don't think any real application is build on the assumption that each
-> pins are wrongly named. But, for newcomers, it can get really confusing,
-> especially as the led triggers are compiled as module in the defconfigs
-> and the LEDs won't turn on until you load the module. 
+> Resolve the following sparse warnings:
 > 
-> It just boils down to wanting to improve the usability of the
-> development board or not.
-No here it's different teh same HW have different revision
+> arch/arm/mach-omap1/usb.c:304:12: warning: symbol 'omap1_usb0_init' was not declared. Should it be static?
+> arch/arm/mach-omap1/usb.c:412:12: warning: symbol 'omap1_usb1_init' was not declared. Should it be static?
+> arch/arm/mach-omap1/usb.c:478:12: warning: symbol 'omap1_usb2_init' was not declared. Should it be static?
+> 
+> by declaring those functions as static.
+> 
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Felipe Balbi <balbi@ti.com>
 
-m10g45es
-m10ekes
-9g45ekes
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-the m10ekes is the first one and the leds does match
+> ---
+> 
+> Applies on linux-omap/omap-for-v3.8/cleanup-headers.
+> 
+>  arch/arm/mach-omap1/usb.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/usb.c b/arch/arm/mach-omap1/usb.c
+> index 84267ed..104fed3 100644
+> --- a/arch/arm/mach-omap1/usb.c
+> +++ b/arch/arm/mach-omap1/usb.c
+> @@ -301,7 +301,7 @@ static inline void otg_device_init(struct omap_usb_config *pdata)
+>  
+>  #endif
+>  
+> -u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
+> +static u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
+>  {
+>  	u32	syscon1 = 0;
+>  
+> @@ -409,7 +409,7 @@ u32 __init omap1_usb0_init(unsigned nwires, unsigned is_device)
+>  	return syscon1 << 16;
+>  }
+>  
+> -u32 __init omap1_usb1_init(unsigned nwires)
+> +static u32 __init omap1_usb1_init(unsigned nwires)
+>  {
+>  	u32	syscon1 = 0;
+>  
+> @@ -475,7 +475,7 @@ bad:
+>  	return syscon1 << 20;
+>  }
+>  
+> -u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+> +static u32 __init omap1_usb2_init(unsigned nwires, unsigned alt_pingroup)
+>  {
+>  	u32	syscon1 = 0;
+>  
+> -- 
+> 1.7.10.4
+> 
 
-So I agree we can put a comment in the c or the dts about it but do not change
-the content as the board support is like this for really long time
-And I do not want to ebd-up with 2 or 3 dts jsut for lesd naming
-That I will have to maintain
-
-Best Regards,
-J.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/cecc3b45/attachment.sig>
