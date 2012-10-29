@@ -1,195 +1,112 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 29 Oct 2012 11:17:31 -0700
-Subject: [PATCH] clk: fix return value check in sirfsoc_of_clk_init()
-In-Reply-To: <CAPgLHd8Brw7dEffrj+xAM60ssgi3pJyMTGX+icPR7ZrZKz-vOQ@mail.gmail.com>
-References: <CAPgLHd8Brw7dEffrj+xAM60ssgi3pJyMTGX+icPR7ZrZKz-vOQ@mail.gmail.com>
-Message-ID: <20121029181731.18780.19582@nucleus>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Mon, 29 Oct 2012 14:19:29 -0400
+Subject: [PATCH v2] ARM: zynq: Allow UART1 to be used as DEBUG_LL console.
+Message-ID: <1351534769-22155-1-git-send-email-nbowler@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Wei Yongjun (2012-10-07 07:02:09)
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> In case of error, the function clk_register() returns ERR_PTR()
-> and never returns NULL. The NULL test in the return value check
-> should be replaced with IS_ERR().
-> 
-> dpatch engine is used to auto generate this patch.
-> (https://github.com/weiyj/dpatch)
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+The main UART on the Xilinx ZC702 board is UART1, located at address
+e0001000.  Add a Kconfig option to select this device as the low-level
+debugging port.  This allows the really early boot printouts to reach
+the USB serial adaptor on this board.
 
-Taken into clk-next.
+For consistency's sake, add a choice entry for UART0 even though it is
+the the default if UART1 is not selected.
 
-Thanks,
-Mike
+Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+Tested-by: Josh Cartwright <josh.cartwright@ni.com>
+---
+v2: rebase on newest patch series, signoff.
 
-> ---
->  drivers/clk/clk-prima2.c | 84 ++++++++++++++++++++++++------------------------
->  1 file changed, 42 insertions(+), 42 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-prima2.c b/drivers/clk/clk-prima2.c
-> index 517874f..a203ecc 100644
-> --- a/drivers/clk/clk-prima2.c
-> +++ b/drivers/clk/clk-prima2.c
-> @@ -1054,118 +1054,118 @@ void __init sirfsoc_of_clk_init(void)
->         /* These are always available (RTC and 26MHz OSC)*/
->         clk = clk_register_fixed_rate(NULL, "rtc", NULL,
->                 CLK_IS_ROOT, 32768);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register_fixed_rate(NULL, "osc", NULL,
->                 CLK_IS_ROOT, 26000000);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->  
->         clk = clk_register(NULL, &clk_pll1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_pll2.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_pll3.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_mem.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_sys.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_security.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b8030000.security");
->         clk = clk_register(NULL, &clk_dsp.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_gps.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "a8010000.gps");
->         clk = clk_register(NULL, &clk_mf.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_io.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "io");
->         clk = clk_register(NULL, &clk_cpu.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "cpu");
->         clk = clk_register(NULL, &clk_uart0.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0050000.uart");
->         clk = clk_register(NULL, &clk_uart1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0060000.uart");
->         clk = clk_register(NULL, &clk_uart2.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0070000.uart");
->         clk = clk_register(NULL, &clk_tsc.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0110000.tsc");
->         clk = clk_register(NULL, &clk_i2c0.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00e0000.i2c");
->         clk = clk_register(NULL, &clk_i2c1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00f0000.i2c");
->         clk = clk_register(NULL, &clk_spi0.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00d0000.spi");
->         clk = clk_register(NULL, &clk_spi1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0170000.spi");
->         clk = clk_register(NULL, &clk_pwmc.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0130000.pwm");
->         clk = clk_register(NULL, &clk_efuse.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0140000.efusesys");
->         clk = clk_register(NULL, &clk_pulse.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0150000.pulsec");
->         clk = clk_register(NULL, &clk_dmac0.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00b0000.dma-controller");
->         clk = clk_register(NULL, &clk_dmac1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0160000.dma-controller");
->         clk = clk_register(NULL, &clk_nand.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0030000.nand");
->         clk = clk_register(NULL, &clk_audio.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0040000.audio");
->         clk = clk_register(NULL, &clk_usp0.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0080000.usp");
->         clk = clk_register(NULL, &clk_usp1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b0090000.usp");
->         clk = clk_register(NULL, &clk_usp2.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00a0000.usp");
->         clk = clk_register(NULL, &clk_vip.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00c0000.vip");
->         clk = clk_register(NULL, &clk_gfx.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "98000000.graphics");
->         clk = clk_register(NULL, &clk_mm.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "a0000000.multimedia");
->         clk = clk_register(NULL, &clk_lcd.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "90010000.display");
->         clk = clk_register(NULL, &clk_vpp.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "90020000.vpp");
->         clk = clk_register(NULL, &clk_mmc01.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_mmc23.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_mmc45.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &usb_pll_clk_hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk = clk_register(NULL, &clk_usb0.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00e0000.usb");
->         clk = clk_register(NULL, &clk_usb1.hw);
-> -       BUG_ON(!clk);
-> +       BUG_ON(IS_ERR(clk));
->         clk_register_clkdev(clk, NULL, "b00f0000.usb");
->  }
+This should apply cleanly on top of Josh Cartwright's v5 "zynq subarch
+cleanups" series.
+
+ arch/arm/Kconfig.debug                     |   17 +++++++++++++++++
+ arch/arm/mach-zynq/common.c                |    6 +++---
+ arch/arm/mach-zynq/include/mach/zynq_soc.h |   16 +++++++++++-----
+ 3 files changed, 31 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857b3a4c..7754d51f2b19 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -132,6 +132,23 @@ choice
+ 		  their output to UART1 serial port on DaVinci TNETV107X
+ 		  devices.
+ 
++	config DEBUG_ZYNQ_UART0
++		bool "Kernel low-level debugging on Xilinx Zynq using UART0"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART0 on the Zynq platform.
++
++	config DEBUG_ZYNQ_UART1
++		bool "Kernel low-level debugging on Xilinx Zynq using UART1"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART1 on the Zynq platform.
++
++		  If you have a ZC702 board and want early boot messages to
++		  appear on the USB serial adaptor, select this option.
++
+ 	config DEBUG_DC21285_PORT
+ 		bool "Kernel low-level debugging messages via footbridge serial port"
+ 		depends on FOOTBRIDGE
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ba8d14f78d4d..93b91059faab 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -84,9 +84,9 @@ static struct map_desc io_desc[] __initdata = {
+ 
+ #ifdef CONFIG_DEBUG_LL
+ 	{
+-		.virtual	= UART0_VIRT,
+-		.pfn		= __phys_to_pfn(UART0_PHYS),
+-		.length		= UART0_SIZE,
++		.virtual	= LL_UART_VADDR,
++		.pfn		= __phys_to_pfn(LL_UART_PADDR),
++		.length		= UART_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
+ #endif
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index 1b8bf0ecbcb0..7f4f38bcada9 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -25,8 +25,9 @@
+  * address that is known to work.
+  */
+ #define UART0_PHYS		0xE0000000
+-#define UART0_SIZE		SZ_4K
+-#define UART0_VIRT		0xF0001000
++#define UART1_PHYS		0xE0001000
++#define UART_SIZE		SZ_4K
++#define UART_VIRT		0xF0001000
+ 
+ #define TTC0_PHYS		0xF8001000
+ #define TTC0_SIZE		SZ_4K
+@@ -36,12 +37,17 @@
+ #define SCU_PERIPH_SIZE		SZ_8K
+ #define SCU_PERIPH_VIRT		(TTC0_VIRT - SCU_PERIPH_SIZE)
+ 
++#if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
++#	define LL_UART_PADDR	UART1_PHYS
++#	define LL_UART_VADDR	UART_VIRT
++#else
++#	define LL_UART_PADDR	UART0_PHYS
++#	define LL_UART_VADDR	UART_VIRT
++#endif
++
+ /* The following are intended for the devices that are mapped early */
+ 
+ #define TTC0_BASE			IOMEM(TTC0_VIRT)
+ #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+ 
+-#define LL_UART_PADDR	UART0_PHYS
+-#define LL_UART_VADDR	UART0_VIRT
+-
+ #endif
+-- 
+1.7.8.6
