@@ -1,141 +1,58 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 29 Oct 2012 10:49:21 +0100
-Subject: [PATCH] ARM: AM33xx: add support for reboot
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB50073@DBDE01.ent.ti.com>
-References: <1351448275-23509-1-git-send-email-zonque@gmail.com>
- <79CD15C6BA57404B839C016229A409A83EB50073@DBDE01.ent.ti.com>
-Message-ID: <508E5121.9020304@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 29 Oct 2012 10:50:12 +0100
+Subject: [PATCH v3 3/4] arm: mvebu: move irq controller driver to
+ drivers/irqchip
+In-Reply-To: <508E4EB3.5060901@gmail.com>
+References: <1351462748-5224-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351462748-5224-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508E49E0.8050606@gmail.com> <20121029102436.504d5053@skate>
+ <508E4EB3.5060901@gmail.com>
+Message-ID: <20121029105012.4fa417e7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.10.2012 05:31, Hiremath, Vaibhav wrote:
-> On Sun, Oct 28, 2012 at 23:47:55, Daniel Mack wrote:
->> This patch adds the ability to reboot am33xx-based systems.
->>
->> Signed-off-by: Daniel Mack <zonque@gmail.com>
->> ---
->>  arch/arm/mach-omap2/board-generic.c | 1 +
->>  arch/arm/mach-omap2/prcm.c          | 6 ++++++
->>  2 files changed, 7 insertions(+)
->>
->> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
->> index 601ecdf..6a69ceb 100644
->> --- a/arch/arm/mach-omap2/board-generic.c
->> +++ b/arch/arm/mach-omap2/board-generic.c
->> @@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
->>  	.init_machine	= omap_generic_init,
->>  	.timer		= &omap3_am33xx_timer,
->>  	.dt_compat	= am33xx_boards_compat,
->> +	.restart	= omap_prcm_restart,
->>  MACHINE_END
->>  #endif
->>  
->> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
->> index 0f51e03..8a3068a 100644
->> --- a/arch/arm/mach-omap2/prcm.c
->> +++ b/arch/arm/mach-omap2/prcm.c
->> @@ -32,6 +32,7 @@
->>  #include "clock2xxx.h"
->>  #include "cm2xxx_3xxx.h"
->>  #include "prm2xxx_3xxx.h"
->> +#include "prm33xx.h"
->>  #include "prm44xx.h"
->>  #include "prminst44xx.h"
->>  #include "cminst44xx.h"
->> @@ -72,6 +73,11 @@ void omap_prcm_restart(char mode, const char *cmd)
->>  		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
->>  	} else if (cpu_is_omap44xx()) {
->>  		omap4_prminst_global_warm_sw_reset(); /* never returns */
->> +	} else if (soc_is_am33xx()) {
->> +		prcm_offs = AM33XX_PRM_DEVICE_MOD;
->> +		omap2_prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_COLD_SW_MASK,
->> +					   prcm_offs,
->> +					   AM33XX_PRM_RSTCTRL_OFFSET);
-> 
-> This is not clean way of handling it, we should have something similar to 
-> omap4. Also we should use warm-reset here instead of cold.
-> 
-> I have quickly created patch, can you please review and test is?
-> I have tested it on AM335x EVM and Bone platform.
+Hello,
 
-Works for me as well, thanks!
+On Mon, 29 Oct 2012 10:38:59 +0100, Sebastian Hesselbarth wrote:
 
-You can take my
+> > Not really: the driver is probed depending on the DT compatible string.
+> > So we can perfectly have two irqchip drivers being enabled on
+> > ARCH_MVEBU.
+> 
+> I agreed but this will always build irq-armada-370-xp into the kernel
+> although I maybe want a orion-only kernel. Although multi-platform will
+> be great for ARM, I doubt that every kernel will be multi-platform?
 
-  Tested-by: Daniel Mack <zonque@gmail.com>
+Agreed.
 
-if you wish ...
+> >> As soon as the patch is through, I can provide (and use) a irq-orion
+> >> based on irqchip. I can provide it earlier but to actually use it there
+> >> are still some other patches required on Dove. Other Orions could
+> >> switch now, I guess.
+> >
+> > Are you sure? The irqchip drivers only work for sub-architecture that
+> > are fully converted to the Device Tree. And I don't think all of
+> > mach-orion5x, mach-dove, mach-kirkwood and mach-mv78xx0 are converted
+> > to the DT.
+> 
+> Hmm, I do have an experimental branch of Dove with irqchip enabled that
+> works perfectly fine even with non-DT code in it. Actually, it is based
+> on 3.7-rc3 which means it is before your patches.
+> 
+> But the irq controller itself is referenced from DT, of course.
 
+Yes, you need at least to probe the irq controller from DT. But neither
+mach-orion5x nor mach-mv78xx0 have DT at all, and they need irq-orion.
 
-> 
-> 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index 601ecdf..6a69ceb 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
->         .init_machine   = omap_generic_init,
->         .timer          = &omap3_am33xx_timer,
->         .dt_compat      = am33xx_boards_compat,
-> +       .restart        = omap_prcm_restart,
->  MACHINE_END
->  #endif
-> 
-> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
-> index 0f51e03..490f8f6 100644
-> --- a/arch/arm/mach-omap2/prcm.c
-> +++ b/arch/arm/mach-omap2/prcm.c
-> @@ -33,6 +33,7 @@
->  #include "cm2xxx_3xxx.h"
->  #include "prm2xxx_3xxx.h"
->  #include "prm44xx.h"
-> +#include "prm33xx.h"
->  #include "prminst44xx.h"
->  #include "cminst44xx.h"
->  #include "prm-regbits-24xx.h"
-> @@ -72,6 +73,8 @@ void omap_prcm_restart(char mode, const char *cmd)
->                 omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
->         } else if (cpu_is_omap44xx()) {
->                 omap4_prminst_global_warm_sw_reset(); /* never returns */
-> +       } else if (soc_is_am33xx()) {
-> +               am33xx_prm_global_warm_sw_reset();      /* never returns */
->         } else {
->                 WARN_ON(1);
->         }
-> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-> index e7dbb6c..505219d 100644
-> --- a/arch/arm/mach-omap2/prm33xx.c
-> +++ b/arch/arm/mach-omap2/prm33xx.c
-> @@ -133,3 +133,18 @@ int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
-> 
->         return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
->  }
-> +
-> +void am33xx_prm_global_warm_sw_reset(void)
-> +{
-> +       u32 v;
-> +
-> +       v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
-> +                                   AM33XX_PRM_RSTCTRL_OFFSET);
-> +       v |= AM33XX_GLOBAL_WARM_SW_RST_MASK;
-> +       am33xx_prm_write_reg(v, AM33XX_PRM_DEVICE_MOD,
-> +                                AM33XX_PRM_RSTCTRL_OFFSET);
-> +
-> +       /* OCP barrier */
-> +       v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
-> +                                   AM33XX_PRM_RSTCTRL_OFFSET);
-> +}
-> diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
-> index 3f25c56..cdfc694 100644
-> --- a/arch/arm/mach-omap2/prm33xx.h
-> +++ b/arch/arm/mach-omap2/prm33xx.h
-> @@ -126,4 +126,5 @@ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
->  extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
->  extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
->                 u16 rstctrl_offs, u16 rstst_offs);
-> +extern void am33xx_prm_global_warm_sw_reset(void);
-> 
-> 
-> Thanks,
-> Vaibhav
-> 
+I am currently in contact with an engineer from LaCie, who has put his
+hands on a mach-orion5x platform, I hope to work with him to get DT
+support in mach-orion5x.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
