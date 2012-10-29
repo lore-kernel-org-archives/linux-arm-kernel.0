@@ -1,56 +1,104 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 29 Oct 2012 13:32:39 +0100
-Subject: [PATCH 4/4] OMAP: mtd: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <508E6870.7000807@ti.com>
-References: <1350935758-9215-1-git-send-email-zonque@gmail.com>
- <1350935758-9215-5-git-send-email-zonque@gmail.com>
- <20121024232717.GD11928@atomide.com> <50887A6B.3050108@gmail.com>
- <508E3A0F.3040309@ti.com> <508E654B.5010404@gmail.com>
- <508E6870.7000807@ti.com>
-Message-ID: <508E7767.40804@gmail.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 29 Oct 2012 18:44:15 +0530
+Subject: [PATCH] ARM: Exynos5: Remove unused static uart resource information
+Message-ID: <1351516455-344-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+All supported Exynos5 platforms are device tree enabled and hence the
+unused static uart resource information is removed.
 
-On 29.10.2012 12:28, Afzal Mohammed wrote:
-> On Monday 29 October 2012 04:45 PM, Daniel Mack wrote:
->> On 29.10.2012 09:10, Afzal Mohammed wrote:
-> 
->>> Also perhaps memory size (and offset if
->>> needed) to be mapped for peripherals can go with reg
->>> property of child.
-> 
->> Which detail are you referring to here? The only "size" property that is
->> effective is the one of the generic GPMC block, and there it's in the
->> "reg"-property.
-> 
-> I was referring to that of child, now in gpmc_nand_init(),
-> gpmc_cs_request() is being done, later on if we want to
-> make it generic and remove gpmc_nand_init(), additional
-> information that would be required from DT at least is the
-> memory size to be reserved in gpmc address space for
-> the connected peripheral (assuming gpmc_cs_request()
-> would be done by gpmc driver generically later)
-> 
-> What I had in mind was example for external bus in [1],
-> but I had not looked deep into this aspect yet.
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ arch/arm/mach-exynos/common.c            |    6 +-----
+ arch/arm/mach-exynos/dev-uart.c          |   24 ------------------------
+ arch/arm/mach-exynos/include/mach/irqs.h |    5 -----
+ arch/arm/mach-exynos/include/mach/map.h  |    1 -
+ 4 files changed, 1 insertions(+), 35 deletions(-)
 
-Ok, now I see what you mean.
-
-I would say we can use the "reg" property in child node for CS numbers
-purely and if we want to get rid of the memory node allocation, we
-should use a property in the gpmc top-node for this, something like:
-
-	gpmc: gpmc at 50000000 {
-		compatible = "ti,gpmc";
-		cs-regs = <0x51000000 0x10000000 ...>;
-	};
-
-Changing the meaning of the reg property of children from "cs number" to
-"memory sub-region" later is something I would like to avoid.
-
-
-
-Daniel
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 1947be8..5a305f0 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -96,7 +96,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+ 		.idmask		= EXYNOS5_SOC_MASK,
+ 		.map_io		= exynos5_map_io,
+ 		.init_clocks	= exynos5_init_clocks,
+-		.init_uarts	= exynos_init_uarts,
+ 		.init		= exynos_init,
+ 		.name		= name_exynos5250,
+ 	},
+@@ -735,10 +734,7 @@ static void __init exynos_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ 	for (ucnt = 0; ucnt < no; ucnt++, tcfg++)
+ 		tcfg->has_fracval = 1;
+ 
+-	if (soc_is_exynos5250())
+-		s3c24xx_init_uartdevs("exynos4210-uart", exynos5_uart_resources, cfg, no);
+-	else
+-		s3c24xx_init_uartdevs("exynos4210-uart", exynos4_uart_resources, cfg, no);
++	s3c24xx_init_uartdevs("exynos4210-uart", exynos4_uart_resources, cfg, no);
+ }
+ 
+ static void __iomem *exynos_eint_base;
+diff --git a/arch/arm/mach-exynos/dev-uart.c b/arch/arm/mach-exynos/dev-uart.c
+index 2e85c02..7c42f4b 100644
+--- a/arch/arm/mach-exynos/dev-uart.c
++++ b/arch/arm/mach-exynos/dev-uart.c
+@@ -52,27 +52,3 @@ struct s3c24xx_uart_resources exynos4_uart_resources[] __initdata = {
+ 		.nr_resources	= ARRAY_SIZE(exynos4_uart3_resource),
+ 	},
+ };
+-
+-EXYNOS_UART_RESOURCE(5, 0)
+-EXYNOS_UART_RESOURCE(5, 1)
+-EXYNOS_UART_RESOURCE(5, 2)
+-EXYNOS_UART_RESOURCE(5, 3)
+-
+-struct s3c24xx_uart_resources exynos5_uart_resources[] __initdata = {
+-	[0] = {
+-		.resources	= exynos5_uart0_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos5_uart0_resource),
+-	},
+-	[1] = {
+-		.resources	= exynos5_uart1_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos5_uart0_resource),
+-	},
+-	[2] = {
+-		.resources	= exynos5_uart2_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos5_uart2_resource),
+-	},
+-	[3] = {
+-		.resources	= exynos5_uart3_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos5_uart3_resource),
+-	},
+-};
+diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+index 35bced6..6da3115 100644
+--- a/arch/arm/mach-exynos/include/mach/irqs.h
++++ b/arch/arm/mach-exynos/include/mach/irqs.h
+@@ -259,11 +259,6 @@
+ #define EXYNOS5_IRQ_IEM_IEC		IRQ_SPI(48)
+ #define EXYNOS5_IRQ_IEM_APC		IRQ_SPI(49)
+ #define EXYNOS5_IRQ_GPIO_C2C		IRQ_SPI(50)
+-#define EXYNOS5_IRQ_UART0		IRQ_SPI(51)
+-#define EXYNOS5_IRQ_UART1		IRQ_SPI(52)
+-#define EXYNOS5_IRQ_UART2		IRQ_SPI(53)
+-#define EXYNOS5_IRQ_UART3		IRQ_SPI(54)
+-#define EXYNOS5_IRQ_UART4		IRQ_SPI(55)
+ #define EXYNOS5_IRQ_IIC			IRQ_SPI(56)
+ #define EXYNOS5_IRQ_IIC1		IRQ_SPI(57)
+ #define EXYNOS5_IRQ_IIC2		IRQ_SPI(58)
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index 8480849..e737331 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -279,7 +279,6 @@
+ #define EXYNOS5_PA_UART1		0x12C10000
+ #define EXYNOS5_PA_UART2		0x12C20000
+ #define EXYNOS5_PA_UART3		0x12C30000
+-#define EXYNOS5_SZ_UART			SZ_256
+ 
+ #define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
+ 
+-- 
+1.6.6.rc2
