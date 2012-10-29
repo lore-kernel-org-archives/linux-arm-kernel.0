@@ -1,53 +1,128 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 29 Oct 2012 10:28:21 +0800
-Subject: [PATCH 1/2] ARM: tegra: dt: add L2 cache controller
-In-Reply-To: <508AC294.7080506@wwwdotorg.org>
-References: <1351247649-15859-1-git-send-email-josephl@nvidia.com>
- <508AC294.7080506@wwwdotorg.org>
-Message-ID: <1351477701.2779.70.camel@jlo-ubuntu-64.nvidia.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 29 Oct 2012 04:31:20 +0000
+Subject: [PATCH] ARM: AM33xx: add support for reboot
+In-Reply-To: <1351448275-23509-1-git-send-email-zonque@gmail.com>
+References: <1351448275-23509-1-git-send-email-zonque@gmail.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB50073@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-10-27 at 01:04 +0800, Stephen Warren wrote:
-> On 10/26/2012 04:34 AM, Joseph Lo wrote:
-> > Add L2 cache controller binding into DT for Tegra.
+On Sun, Oct 28, 2012 at 23:47:55, Daniel Mack wrote:
+> This patch adds the ability to reboot am33xx-based systems.
 > 
-> > diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 1 +
+>  arch/arm/mach-omap2/prcm.c          | 6 ++++++
+>  2 files changed, 7 insertions(+)
 > 
-> > +	L2: cache-controller at 50043000 {
-> > +		compatible = "arm,pl310-cache";
-> > +		reg = <0x50043000 0x1000>;
-> > +		arm,data-latency = <5 5 2>;
-> > +		arm,tag-latency = <4 4 2>;
-> > +		cache-unified;
-> > +		cache-level = <2>;
-> > +	};
-> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 601ecdf..6a69ceb 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+>  	.init_machine	= omap_generic_init,
+>  	.timer		= &omap3_am33xx_timer,
+>  	.dt_compat	= am33xx_boards_compat,
+> +	.restart	= omap_prcm_restart,
+>  MACHINE_END
+>  #endif
+>  
+> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+> index 0f51e03..8a3068a 100644
+> --- a/arch/arm/mach-omap2/prcm.c
+> +++ b/arch/arm/mach-omap2/prcm.c
+> @@ -32,6 +32,7 @@
+>  #include "clock2xxx.h"
+>  #include "cm2xxx_3xxx.h"
+>  #include "prm2xxx_3xxx.h"
+> +#include "prm33xx.h"
+>  #include "prm44xx.h"
+>  #include "prminst44xx.h"
+>  #include "cminst44xx.h"
+> @@ -72,6 +73,11 @@ void omap_prcm_restart(char mode, const char *cmd)
+>  		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+>  	} else if (cpu_is_omap44xx()) {
+>  		omap4_prminst_global_warm_sw_reset(); /* never returns */
+> +	} else if (soc_is_am33xx()) {
+> +		prcm_offs = AM33XX_PRM_DEVICE_MOD;
+> +		omap2_prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_COLD_SW_MASK,
+> +					   prcm_offs,
+> +					   AM33XX_PRM_RSTCTRL_OFFSET);
 
-Stephen,
+This is not clean way of handling it, we should have something similar to 
+omap4. Also we should use warm-reset here instead of cold.
 
-Thanks for review.
-> Do you need to specify arm,filter-ranges here? It's certainly parsed by
-> pl310_of_setup() and used if present, although I don't think we're
-> programming the register in the existing code, so I guess we don't need it.
-> 
-Yes, we don't need it. Because there are HW reset value for it. We don't
-need to configure it.
-> The L2 label above isn't necessary unless something references those
-> nodes. Usually, that something is the cpu nodes' next-level-cache
-> property. I don't suppose you could amend this series to also fill in
-> Tegra's /cpus nodes in these files too?
-OK. Will remove the label.
-> 
-> Finally, is this series going to be a dependency for any of the cpuidle
-> or other work you're submitting? I assume it's completely independent
-> and hence I can throw it in any old branch in any order I feel like?
+I have quickly created patch, can you please review and test is?
+I have tested it on AM335x EVM and Bone platform.
 
-No. We need this before the "powered-down" cpuidle support. Because the
-L2 init function didn't help to hook the resume API to "outer_cache_fns"
-interface currently. If we don't apply this before the "powered-down"
-cpuidle, we will lost L2 support after one successful powered-down
-cpuidle sequence.
+
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 601ecdf..6a69ceb 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+        .init_machine   = omap_generic_init,
+        .timer          = &omap3_am33xx_timer,
+        .dt_compat      = am33xx_boards_compat,
++       .restart        = omap_prcm_restart,
+ MACHINE_END
+ #endif
+
+diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+index 0f51e03..490f8f6 100644
+--- a/arch/arm/mach-omap2/prcm.c
++++ b/arch/arm/mach-omap2/prcm.c
+@@ -33,6 +33,7 @@
+ #include "cm2xxx_3xxx.h"
+ #include "prm2xxx_3xxx.h"
+ #include "prm44xx.h"
++#include "prm33xx.h"
+ #include "prminst44xx.h"
+ #include "cminst44xx.h"
+ #include "prm-regbits-24xx.h"
+@@ -72,6 +73,8 @@ void omap_prcm_restart(char mode, const char *cmd)
+                omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+        } else if (cpu_is_omap44xx()) {
+                omap4_prminst_global_warm_sw_reset(); /* never returns */
++       } else if (soc_is_am33xx()) {
++               am33xx_prm_global_warm_sw_reset();      /* never returns */
+        } else {
+                WARN_ON(1);
+        }
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index e7dbb6c..505219d 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -133,3 +133,18 @@ int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+
+        return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+ }
++
++void am33xx_prm_global_warm_sw_reset(void)
++{
++       u32 v;
++
++       v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
++                                   AM33XX_PRM_RSTCTRL_OFFSET);
++       v |= AM33XX_GLOBAL_WARM_SW_RST_MASK;
++       am33xx_prm_write_reg(v, AM33XX_PRM_DEVICE_MOD,
++                                AM33XX_PRM_RSTCTRL_OFFSET);
++
++       /* OCP barrier */
++       v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
++                                   AM33XX_PRM_RSTCTRL_OFFSET);
++}
+diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+index 3f25c56..cdfc694 100644
+--- a/arch/arm/mach-omap2/prm33xx.h
++++ b/arch/arm/mach-omap2/prm33xx.h
+@@ -126,4 +126,5 @@ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
+ extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
+ extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+                u16 rstctrl_offs, u16 rstst_offs);
++extern void am33xx_prm_global_warm_sw_reset(void);
+
 
 Thanks,
-Joseph
+Vaibhav
