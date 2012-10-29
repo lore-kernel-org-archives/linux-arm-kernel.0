@@ -1,42 +1,34 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 29 Oct 2012 12:22:56 -0500
-Subject: [PATCH] ARM: highbank: retry wfi on reset request
-In-Reply-To: <1351221637-21747-1-git-send-email-robherring2@gmail.com>
-References: <1351221637-21747-1-git-send-email-robherring2@gmail.com>
-Message-ID: <508EBB70.2000708@gmail.com>
+From: omar.luna@linaro.org (Omar Ramirez Luna)
+Date: Mon, 29 Oct 2012 12:23:29 -0500
+Subject: tidspbridge: ARM common zImage?
+Message-ID: <CALLhW=76TG1sFXHmukJ+JN12j9CdbRLMzJdiOvrdorUehrts0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 10:20 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> In some cases, an interrupt can occur and prevent cause failure to enter
-> wfi. This causes reset to hang. Retrying the wfi should be enough to
-> prevent reset from hanging.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
+Hi,
 
-Arnd, Olof,
+On 26 October 2012 13:00, Tony Lindgren <tony@atomide.com> wrote:
+...
+>> > I would also like to move the tidspbridge to the DMA API, but I think we'll
+>> > need to move step by step there, and using the OMAP IOMMU and IOVMM APIs as an
+>> > intermediate step would allow splitting patches in reviewable chunks. I know
+>> > it's a step backwards in term of OMAP IOMMU usage, but that's in my opinion a
+>> > temporary nuisance to make the leap easier.
+>>
+>> Since tidspbridge is in staging I guess it's not a problem, though it
+>> sounds to me like using the correct API in the first place is going to
+>> make less churn.
+>
+> Not related to these patches, but also sounds like we may need to drop
+> some staging/tidspbridge code to be able to move forward with the
+> ARM common zImage plans. See the "[GIT PULL] omap plat header removal
+> for v3.8 merge window, part1" thread for more info.
 
-Can you please apply this for 3.7?
+I was trying to find some more info on this, but only found one patch
+for tidspbridge to delete an include... it seems that I must try with
+these patches and see what explodes since we heavily abuse prcm code
+too.
 
-Rob
+Thanks,
 
->  arch/arm/mach-highbank/system.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-highbank/system.c b/arch/arm/mach-highbank/system.c
-> index 82c2723..86e37cd 100644
-> --- a/arch/arm/mach-highbank/system.c
-> +++ b/arch/arm/mach-highbank/system.c
-> @@ -28,6 +28,7 @@ void highbank_restart(char mode, const char *cmd)
->  		hignbank_set_pwr_soft_reset();
->  
->  	scu_power_mode(scu_base_addr, SCU_PM_POWEROFF);
-> -	cpu_do_idle();
-> +	while (1)
-> +		cpu_do_idle();
->  }
->  
-> 
+Omar
