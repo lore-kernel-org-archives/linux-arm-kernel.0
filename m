@@ -1,67 +1,261 @@
 From: elen.song@atmel.com (Elen Song)
-Date: Mon, 29 Oct 2012 17:09:33 +0800
-Subject: [PATCH 1/6] DMA: AT91: Serial: Add parameter for serial dma use
-Message-ID: <1351501773-29024-1-git-send-email-elen.song@atmel.com>
+Date: Mon, 29 Oct 2012 17:09:52 +0800
+Subject: [PATCH 2/6] Serial: AT91: Distinguish PDC from DMA
+Message-ID: <1351501792-31201-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Elen Song <elen.song@atmel.com>
 ---
- arch/arm/mach-at91/include/mach/board.h |    2 ++
- drivers/tty/serial/atmel_serial.c       |    1 +
- include/linux/platform_data/dma-atmel.h |   10 ++++++++++
- 3 files changed, 13 insertions(+)
+ drivers/tty/serial/atmel_serial.c |   74 ++++++++++++++++++++++---------------
+ 1 file changed, 45 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index c55a436..a2188a6 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -129,6 +129,8 @@ struct atmel_uart_data {
- 	short			use_dma_tx;	/* use transmit DMA? */
- 	short			use_dma_rx;	/* use receive DMA? */
- 	void __iomem		*regs;		/* virt. base address, if any */
-+	struct at_dma_slave     *dma_tx_slave;
-+	struct at_dma_slave     *dma_rx_slave;
- 	struct serial_rs485	rs485;		/* rs485 settings */
- };
- extern void __init at91_add_device_serial(void);
 diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 3d7e1ee..1b1bd4f 100644
+index 1b1bd4f..8a4b8f8 100644
 --- a/drivers/tty/serial/atmel_serial.c
 +++ b/drivers/tty/serial/atmel_serial.c
-@@ -45,6 +45,7 @@
+@@ -142,11 +142,13 @@ struct atmel_uart_port {
+ 	u32			backup_imr;	/* IMR saved during suspend */
+ 	int			break_active;	/* break being received */
  
- #include <asm/mach/serial_at91.h>
- #include <mach/board.h>
-+#include <linux/platform_data/dma-atmel.h>
+-	short			use_dma_rx;	/* enable PDC receiver */
++	short			use_dma_rx;	/* enable DMA receiver */
++	short			use_pdc_rx;	/* enable PDC receiver */
+ 	short			pdc_rx_idx;	/* current PDC RX buffer */
+ 	struct atmel_dma_buffer	pdc_rx[2];	/* PDC receier */
  
- #ifdef CONFIG_ARM
- #include <mach/cpu.h>
-diff --git a/include/linux/platform_data/dma-atmel.h b/include/linux/platform_data/dma-atmel.h
-index cab0997..bb05302 100644
---- a/include/linux/platform_data/dma-atmel.h
-+++ b/include/linux/platform_data/dma-atmel.h
-@@ -26,11 +26,21 @@ struct at_dma_platform_data {
- /**
-  * struct at_dma_slave - Controller-specific information about a slave
-  * @dma_dev: required DMA master device
-+ * @tx_reg: physical address of data register used for
-+ *      memory-to-peripheral transfers
-+ * @rx_reg: physical address of data register used for
-+ *      peripheral-to-memory transfers
-+ * @reg_width: peripheral register width
-  * @cfg: Platform-specific initializer for the CFG register
-+ * @ctrla: Platform-specific initializer for the CTRLA register
+-	short			use_dma_tx;	/* enable PDC transmitter */
++	short			use_dma_tx;	/* enable DMA transmitter */
++	short			use_pdc_tx;	/* enable PDC transmitter */
+ 	struct atmel_dma_buffer	pdc_tx;		/* PDC transmitter */
+ 
+ 	struct tasklet_struct	tasklet;
+@@ -183,31 +185,45 @@ to_atmel_uart_port(struct uart_port *uart)
+ }
+ 
+ #ifdef CONFIG_SERIAL_ATMEL_PDC
+-static bool atmel_use_dma_rx(struct uart_port *port)
++static bool atmel_use_pdc_rx(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+-	return atmel_port->use_dma_rx;
++	return atmel_port->use_pdc_rx;
+ }
+ 
+-static bool atmel_use_dma_tx(struct uart_port *port)
++static bool atmel_use_pdc_tx(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+-	return atmel_port->use_dma_tx;
++	return atmel_port->use_pdc_tx;
+ }
+ #else
+-static bool atmel_use_dma_rx(struct uart_port *port)
++static bool atmel_use_pdc_rx(struct uart_port *port)
+ {
+ 	return false;
+ }
+ 
+-static bool atmel_use_dma_tx(struct uart_port *port)
++static bool atmel_use_pdc_tx(struct uart_port *port)
+ {
+ 	return false;
+ }
+ #endif
+ 
++static bool atmel_use_dma_tx(struct uart_port *port)
++{
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++
++	return atmel_port->use_dma_tx;
++}
++
++static bool atmel_use_dma_rx(struct uart_port *port)
++{
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++
++	return atmel_port->use_dma_rx;
++}
++
+ /* Enable or disable the rs485 support */
+ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
+ {
+@@ -235,7 +251,7 @@ void atmel_config_rs485(struct uart_port *port, struct serial_rs485 *rs485conf)
+ 		mode |= ATMEL_US_USMODE_RS485;
+ 	} else {
+ 		dev_dbg(port->dev, "Setting UART to RS232\n");
+-		if (atmel_use_dma_tx(port))
++		if (atmel_use_pdc_tx(port))
+ 			atmel_port->tx_done_mask = ATMEL_US_ENDTX |
+ 				ATMEL_US_TXBUFE;
+ 		else
+@@ -347,7 +363,7 @@ static void atmel_stop_tx(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+-	if (atmel_use_dma_tx(port)) {
++	if (atmel_use_pdc_tx(port)) {
+ 		/* disable PDC transmit */
+ 		UART_PUT_PTCR(port, ATMEL_PDC_TXTDIS);
+ 	}
+@@ -366,7 +382,7 @@ static void atmel_start_tx(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+-	if (atmel_use_dma_tx(port)) {
++	if (atmel_use_pdc_tx(port)) {
+ 		if (UART_GET_PTSR(port) & ATMEL_PDC_TXTEN)
+ 			/* The transmitter is already running.  Yes, we
+ 			   really need this.*/
+@@ -392,7 +408,7 @@ static void atmel_start_rx(struct uart_port *port)
+ 
+ 	UART_PUT_CR(port, ATMEL_US_RXEN);
+ 
+-	if (atmel_use_dma_rx(port)) {
++	if (atmel_use_pdc_rx(port)) {
+ 		/* enable PDC controller */
+ 		UART_PUT_IER(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT |
+ 			port->read_status_mask);
+@@ -409,7 +425,7 @@ static void atmel_stop_rx(struct uart_port *port)
+ {
+ 	UART_PUT_CR(port, ATMEL_US_RXDIS);
+ 
+-	if (atmel_use_dma_rx(port)) {
++	if (atmel_use_pdc_rx(port)) {
+ 		/* disable PDC receive */
+ 		UART_PUT_PTCR(port, ATMEL_PDC_RXTDIS);
+ 		UART_PUT_IDR(port, ATMEL_US_ENDRX | ATMEL_US_TIMEOUT |
+@@ -574,7 +590,7 @@ atmel_handle_receive(struct uart_port *port, unsigned int pending)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+-	if (atmel_use_dma_rx(port)) {
++	if (atmel_use_pdc_rx(port)) {
+ 		/*
+ 		 * PDC receive. Just schedule the tasklet and let it
+ 		 * figure out the details.
+@@ -663,7 +679,7 @@ static irqreturn_t atmel_interrupt(int irq, void *dev_id)
+ /*
+  * Called from tasklet with ENDTX and TXBUFE interrupts disabled.
   */
- struct at_dma_slave {
- 	struct device		*dma_dev;
-+	dma_addr_t              tx_reg;
-+	dma_addr_t              rx_reg;
-+	u32			reg_width;
- 	u32			cfg;
-+	u32                     ctrla;
- };
+-static void atmel_tx_dma(struct uart_port *port)
++static void atmel_tx_pdc(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 	struct circ_buf *xmit = &port->state->xmit;
+@@ -780,7 +796,7 @@ static void atmel_rx_from_ring(struct uart_port *port)
+ 	spin_lock(&port->lock);
+ }
  
+-static void atmel_rx_from_dma(struct uart_port *port)
++static void atmel_rx_from_pdc(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 	struct tty_struct *tty = port->state->port.tty;
+@@ -869,8 +885,8 @@ static void atmel_tasklet_func(unsigned long data)
+ 	/* The interrupt handler does not take the lock */
+ 	spin_lock(&port->lock);
  
+-	if (atmel_use_dma_tx(port))
+-		atmel_tx_dma(port);
++	if (atmel_use_pdc_tx(port))
++		atmel_tx_pdc(port);
+ 	else
+ 		atmel_tx_chars(port);
+ 
+@@ -894,8 +910,8 @@ static void atmel_tasklet_func(unsigned long data)
+ 		atmel_port->irq_status_prev = status;
+ 	}
+ 
+-	if (atmel_use_dma_rx(port))
+-		atmel_rx_from_dma(port);
++	if (atmel_use_pdc_rx(port))
++		atmel_rx_from_pdc(port);
+ 	else
+ 		atmel_rx_from_ring(port);
+ 
+@@ -931,7 +947,7 @@ static int atmel_startup(struct uart_port *port)
+ 	/*
+ 	 * Initialize DMA (if necessary)
+ 	 */
+-	if (atmel_use_dma_rx(port)) {
++	if (atmel_use_pdc_rx(port)) {
+ 		int i;
+ 
+ 		for (i = 0; i < 2; i++) {
+@@ -965,7 +981,7 @@ static int atmel_startup(struct uart_port *port)
+ 		UART_PUT_RNPR(port, atmel_port->pdc_rx[1].dma_addr);
+ 		UART_PUT_RNCR(port, PDC_BUFFER_SIZE);
+ 	}
+-	if (atmel_use_dma_tx(port)) {
++	if (atmel_use_pdc_tx(port)) {
+ 		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
+ 		struct circ_buf *xmit = &port->state->xmit;
+ 
+@@ -1001,7 +1017,7 @@ static int atmel_startup(struct uart_port *port)
+ 	/* enable xmit & rcvr */
+ 	UART_PUT_CR(port, ATMEL_US_TXEN | ATMEL_US_RXEN);
+ 
+-	if (atmel_use_dma_rx(port)) {
++	if (atmel_use_pdc_rx(port)) {
+ 		/* set UART timeout */
+ 		UART_PUT_RTOR(port, PDC_RX_TIMEOUT);
+ 		UART_PUT_CR(port, ATMEL_US_STTTO);
+@@ -1032,7 +1048,7 @@ static void atmel_shutdown(struct uart_port *port)
+ 	/*
+ 	 * Shut-down the DMA.
+ 	 */
+-	if (atmel_use_dma_rx(port)) {
++	if (atmel_use_pdc_rx(port)) {
+ 		int i;
+ 
+ 		for (i = 0; i < 2; i++) {
+@@ -1045,7 +1061,7 @@ static void atmel_shutdown(struct uart_port *port)
+ 			kfree(pdc->buf);
+ 		}
+ 	}
+-	if (atmel_use_dma_tx(port)) {
++	if (atmel_use_pdc_tx(port)) {
+ 		struct atmel_dma_buffer *pdc = &atmel_port->pdc_tx;
+ 
+ 		dma_unmap_single(port->dev,
+@@ -1081,7 +1097,7 @@ static void atmel_flush_buffer(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 
+-	if (atmel_use_dma_tx(port)) {
++	if (atmel_use_pdc_tx(port)) {
+ 		UART_PUT_TCR(port, 0);
+ 		atmel_port->pdc_tx.ofs = 0;
+ 	}
+@@ -1194,7 +1210,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	if (termios->c_iflag & (BRKINT | PARMRK))
+ 		port->read_status_mask |= ATMEL_US_RXBRK;
+ 
+-	if (atmel_use_dma_rx(port))
++	if (atmel_use_pdc_rx(port))
+ 		/* need to enable error interrupts */
+ 		UART_PUT_IER(port, port->read_status_mask);
+ 
+@@ -1506,7 +1522,7 @@ static void __devinit atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	/* Use TXEMPTY for interrupt when rs485 else TXRDY or ENDTX|TXBUFE */
+ 	if (atmel_port->rs485.flags & SER_RS485_ENABLED)
+ 		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
+-	else if (atmel_use_dma_tx(port)) {
++	else if (atmel_use_pdc_tx(port)) {
+ 		port->fifosize = PDC_BUFFER_SIZE;
+ 		atmel_port->tx_done_mask = ATMEL_US_ENDTX | ATMEL_US_TXBUFE;
+ 	} else {
+@@ -1806,7 +1822,7 @@ static int __devinit atmel_serial_probe(struct platform_device *pdev)
+ 
+ 	atmel_init_port(port, pdev);
+ 
+-	if (!atmel_use_dma_rx(&port->uart)) {
++	if (!atmel_use_pdc_rx(&port->uart)) {
+ 		ret = -ENOMEM;
+ 		data = kmalloc(sizeof(struct atmel_uart_char)
+ 				* ATMEL_SERIAL_RINGSIZE, GFP_KERNEL);
 -- 
 1.7.9.5
