@@ -1,90 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 29 Oct 2012 10:09:54 -0500
-Subject: Representation of external memory-mapped devices in DT (gpmc)
-In-Reply-To: <508E9513.7050106@gmail.com>
-References: <508E9513.7050106@gmail.com>
-Message-ID: <508E9C42.10907@gmail.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Mon, 29 Oct 2012 16:18:32 +0100
+Subject: [PATCH] fix DEBUG_LL DCC race condition
+Message-ID: <20121029151832.GA2162@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2012 09:39 AM, Daniel Mack wrote:
-> Hi,
-> 
-> we're currently working on a DT binding for the GPMC bus that is found
-> on SoCs by TI. The implementation is based on CS lines and an 8, 16 or
-> 32 bit parallel interface. That IP is quite flexible, and it can for
-> example be used for physmap flash, external peripherals or even NAND.
-> 
-> Depending on which CS is used to control the device, different memory
-> regions are reserved, and there's code to calculate the location and
-> size of them, given a CS number (see arch/arm/mach-omap2/gpmc.c).
+Trying to boot a kernel with I- and D-caches disabled
+sometimes hangs when DEBUG_LL output to DCC is enabled.
+Apparently the JTAG debugger sometimes reads the
+DCC register before busyuart could see the wDTRfull flag,
+thus busyuart spins in an endless loop.
 
-I don't know the details of the h/w, but I would think the DT core code
-should be able work out the addresses. This can be done using ranges
-property which defines the mapping of a child bus into the parent bus
-addresses.
+The reason seems to be a misunderstanding of the purpose
+of the busyuart macro.  For UART, waituart waits until
+there is space in the FIFO, and busyuart waits until
+the FIFO is empty (all data is sent).
+For DCC, busyuart should be identical to waituart since
+there is no FIFO.
 
-> The binding will use one top-level node to describe the GPMC controller
-> itself and register the actual devices as sub-nodes to it. The NAND type
-> is the only one that is currently supported. This is how it currently looks:
-> 
-> 	gpmc: gpmc at 50000000 {
-> 		compatible = "ti,gpmc";
-> 		ti,hwmods = "gpmc";
-> 		reg = <0x50000000 0x2000>;
-> 		interrupt-parent = <&intc>;
-> 		interrupts = <100>;
-> 		#address-cells = <1>;
-> 		#size-cells = <0>;
-> 
-> 		nand at 0 {
+Signed-off-by: Johannes Stezenbach <js@sig21.net>
+---
+Only tested on ARMv6.
+e.g. arch/arm/mach-at91/include/mach/debug-macro.S has some
+comments which clarify what busyuart is supposed to be doing.
 
-You may want a CS0 node with nand as a child node of that.
-
-Rob
-
-> 			reg = <0>; /* CS0 */
-> 			nand-bus-width = <16>;
-> 			nand-ecc-mode = "soft";
-> 
-> 			gpmc,sync-clk = <0>;
-> 			gpmc,cs-on = <0>;
-> 			gpmc,cs-rd-off = <44>;
-> 			gpmc,cs-wr-off = <44>;
-> 			gpmc,adv-on = <6>;
-> 			gpmc,adv-rd-off = <34>;
-> 			gpmc,adv-wr-off = <44>;
-> 			gpmc,we-off = <40>;
-> 			gpmc,oe-off = <54>;
-> 			gpmc,access = <64>;
-> 			gpmc,rd-cycle = <82>;
-> 			gpmc,wr-cycle = <82>;
-> 			gpmc,wr-access = <40>;
-> 			gpmc,wr-data-mux-bus = <0>;
-> 
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 
-> 			partition at 0 {
-> 				label = "1st";
-> 				reg = <0x0 0x20000>;
-> 			};
-> 			/* more partitions ... */
-> 		};
-> 	};
-> 
-> The question is where the resource location and sizes should be
-> described so that the code that does the magic run-time calculations can
-> be removed eventually. I would clearly prefer not to have them in the
-> child, as the only thing these nodes really care about is the chip
-> select index the hardware is wired to.
-> 
-> Should the "reg" property in the parent be augmented to hold such details?
-> 
-> Once we got that sorted out, I'll do a re-spin of the series and copy
-> devicetree-discuss on the patch that adds the bindings.
-> 
-> 
-> Thanks,
-> Daniel
-> 
+diff --git a/arch/arm/include/debug/icedcc.S b/arch/arm/include/debug/icedcc.S
+index 43afcb0..7204064 100644
+--- a/arch/arm/include/debug/icedcc.S
++++ b/arch/arm/include/debug/icedcc.S
+@@ -21,10 +21,7 @@
+ 		.endm
+ 
+ 		.macro	busyuart, rd, rx
+-1001:
+-		mrc	p14, 0, \rx, c0, c1, 0
+-		tst	\rx, #0x20000000
+-		beq	1001b
++		waituart \rd, \rx
+ 		.endm
+ 
+ 		.macro	waituart, rd, rx
+@@ -45,10 +42,7 @@
+ 		.endm
+ 
+ 		.macro	busyuart, rd, rx
+-1001:
+-		mrc	p14, 0, \rx, c14, c0, 0
+-		tst	\rx, #0x10000000
+-		beq	1001b
++		waituart \rd, \rx
+ 		.endm
+ 
+ 		.macro	waituart, rd, rx
+@@ -69,11 +63,7 @@
+ 		.endm
+ 
+ 		.macro	busyuart, rd, rx
+-1001:
+-		mrc	p14, 0, \rx, c0, c0, 0
+-		tst	\rx, #2
+-		beq	1001b
+-
++		waituart \rd, \rx
+ 		.endm
+ 
+ 		.macro	waituart, rd, rx
