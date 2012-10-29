@@ -1,58 +1,76 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 29 Oct 2012 20:23:39 +0900
-Subject: [PATCH] ARM: Exynos5: Remove static io-remapping for gic and
- combiner
-In-Reply-To: <1351516573-393-1-git-send-email-thomas.abraham@linaro.org>
-References: <1351516573-393-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <508E673B.30106@samsung.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 29 Oct 2012 15:39:15 +0100
+Subject: Representation of external memory-mapped devices in DT (gpmc)
+Message-ID: <508E9513.7050106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/12 22:16, Thomas Abraham wrote:
-> The physical base address of GIC and Interrupt Combiner is obtained from
-> device tree and then remapped during initialization. So remove the
-> static io-remapping for GIC and combiner.
->
-> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
-> ---
->   arch/arm/mach-exynos/common.c |   15 ---------------
->   1 files changed, 0 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index 5a305f0..5c75815 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -256,25 +256,10 @@ static struct map_desc exynos5_iodesc[] __initdata = {
->   		.length		= SZ_64K,
->   		.type		= MT_DEVICE,
->   	}, {
-> -		.virtual	= (unsigned long)S5P_VA_COMBINER_BASE,
-> -		.pfn		= __phys_to_pfn(EXYNOS5_PA_COMBINER),
-> -		.length		= SZ_4K,
-> -		.type		= MT_DEVICE,
-> -	}, {
->   		.virtual	= (unsigned long)S3C_VA_UART,
->   		.pfn		= __phys_to_pfn(EXYNOS5_PA_UART),
->   		.length		= SZ_512K,
->   		.type		= MT_DEVICE,
-> -	}, {
-> -		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
-> -		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_CPU),
-> -		.length		= SZ_8K,
-> -		.type		= MT_DEVICE,
-> -	}, {
-> -		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
-> -		.pfn		= __phys_to_pfn(EXYNOS5_PA_GIC_DIST),
-> -		.length		= SZ_4K,
-> -		.type		= MT_DEVICE,
->   	},
->   };
->
+Hi,
 
-Applied, thanks.
+we're currently working on a DT binding for the GPMC bus that is found
+on SoCs by TI. The implementation is based on CS lines and an 8, 16 or
+32 bit parallel interface. That IP is quite flexible, and it can for
+example be used for physmap flash, external peripherals or even NAND.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Depending on which CS is used to control the device, different memory
+regions are reserved, and there's code to calculate the location and
+size of them, given a CS number (see arch/arm/mach-omap2/gpmc.c).
+
+The binding will use one top-level node to describe the GPMC controller
+itself and register the actual devices as sub-nodes to it. The NAND type
+is the only one that is currently supported. This is how it currently looks:
+
+	gpmc: gpmc at 50000000 {
+		compatible = "ti,gpmc";
+		ti,hwmods = "gpmc";
+		reg = <0x50000000 0x2000>;
+		interrupt-parent = <&intc>;
+		interrupts = <100>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		nand at 0 {
+			reg = <0>; /* CS0 */
+			nand-bus-width = <16>;
+			nand-ecc-mode = "soft";
+
+			gpmc,sync-clk = <0>;
+			gpmc,cs-on = <0>;
+			gpmc,cs-rd-off = <44>;
+			gpmc,cs-wr-off = <44>;
+			gpmc,adv-on = <6>;
+			gpmc,adv-rd-off = <34>;
+			gpmc,adv-wr-off = <44>;
+			gpmc,we-off = <40>;
+			gpmc,oe-off = <54>;
+			gpmc,access = <64>;
+			gpmc,rd-cycle = <82>;
+			gpmc,wr-cycle = <82>;
+			gpmc,wr-access = <40>;
+			gpmc,wr-data-mux-bus = <0>;
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition at 0 {
+				label = "1st";
+				reg = <0x0 0x20000>;
+			};
+			/* more partitions ... */
+		};
+	};
+
+The question is where the resource location and sizes should be
+described so that the code that does the magic run-time calculations can
+be removed eventually. I would clearly prefer not to have them in the
+child, as the only thing these nodes really care about is the chip
+select index the hardware is wired to.
+
+Should the "reg" property in the parent be augmented to hold such details?
+
+Once we got that sorted out, I'll do a re-spin of the series and copy
+devicetree-discuss on the patch that adds the bindings.
+
+
+Thanks,
+Daniel
