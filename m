@@ -1,44 +1,141 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Mon, 29 Oct 2012 10:42:23 +0100
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
-Message-ID: <508E4F7F.7010607@gmail.com>
+Date: Mon, 29 Oct 2012 10:49:21 +0100
+Subject: [PATCH] ARM: AM33xx: add support for reboot
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB50073@DBDE01.ent.ti.com>
+References: <1351448275-23509-1-git-send-email-zonque@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EB50073@DBDE01.ent.ti.com>
+Message-ID: <508E5121.9020304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.10.2012 10:33, Vasily Khoruzhick wrote:
-> On Mon, Oct 29, 2012 at 1:58 AM, Daniel Mack <zonque@gmail.com> wrote:
->>> Any volunteers? :) It requires huge amount of work,
+On 29.10.2012 05:31, Hiremath, Vaibhav wrote:
+> On Sun, Oct 28, 2012 at 23:47:55, Daniel Mack wrote:
+>> This patch adds the ability to reboot am33xx-based systems.
 >>
->> Well, it's actually quite straight forward. With the changes that got merged
->> to 3.7, pxa3xx platforms boot, and I also ported some pxa specific
->> peripheral drivers that should work for both 2xx and 3xx. Adding CPU support
->> for 27x should also just be a matter of some extra lines.
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+>> ---
+>>  arch/arm/mach-omap2/board-generic.c | 1 +
+>>  arch/arm/mach-omap2/prcm.c          | 6 ++++++
+>>  2 files changed, 7 insertions(+)
 >>
->> So I would clearly say you should give the DT approach a try first and see
->> which bits are missing. And I would vote for not taking any new features for
->> the legacy board support files but just bugfixes.
+>> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+>> index 601ecdf..6a69ceb 100644
+>> --- a/arch/arm/mach-omap2/board-generic.c
+>> +++ b/arch/arm/mach-omap2/board-generic.c
+>> @@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+>>  	.init_machine	= omap_generic_init,
+>>  	.timer		= &omap3_am33xx_timer,
+>>  	.dt_compat	= am33xx_boards_compat,
+>> +	.restart	= omap_prcm_restart,
+>>  MACHINE_END
+>>  #endif
+>>  
+>> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+>> index 0f51e03..8a3068a 100644
+>> --- a/arch/arm/mach-omap2/prcm.c
+>> +++ b/arch/arm/mach-omap2/prcm.c
+>> @@ -32,6 +32,7 @@
+>>  #include "clock2xxx.h"
+>>  #include "cm2xxx_3xxx.h"
+>>  #include "prm2xxx_3xxx.h"
+>> +#include "prm33xx.h"
+>>  #include "prm44xx.h"
+>>  #include "prminst44xx.h"
+>>  #include "cminst44xx.h"
+>> @@ -72,6 +73,11 @@ void omap_prcm_restart(char mode, const char *cmd)
+>>  		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+>>  	} else if (cpu_is_omap44xx()) {
+>>  		omap4_prminst_global_warm_sw_reset(); /* never returns */
+>> +	} else if (soc_is_am33xx()) {
+>> +		prcm_offs = AM33XX_PRM_DEVICE_MOD;
+>> +		omap2_prm_set_mod_reg_bits(OMAP4430_RST_GLOBAL_COLD_SW_MASK,
+>> +					   prcm_offs,
+>> +					   AM33XX_PRM_RSTCTRL_OFFSET);
 > 
-> Fair enough, I'll resend series without USB stuff (so it'll contain
-> only bugfixes)
+> This is not clean way of handling it, we should have something similar to 
+> omap4. Also we should use warm-reset here instead of cold.
+> 
+> I have quickly created patch, can you please review and test is?
+> I have tested it on AM335x EVM and Bone platform.
 
-I rather wanted to encourage you to work on the PXA2xx DT stuff :)
+Works for me as well, thanks!
 
-Please have a quick look at arch/arm/mach-pxa/pxa-dt.c - what it takes
-for basic 270 support is just copying the logic that is there already
-for the 3xx models.
+You can take my
 
-Some parts like the uart, host-mode usb, mmc, gpio-leds, gpio-keys, i2c
-etc are already finished and should work instantly. What's missing is
-the spi controller and the display, but maybe you can help getting these
-done?
+  Tested-by: Daniel Mack <zonque@gmail.com>
+
+if you wish ...
 
 
-Thanks,
-Daniel
+> 
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 601ecdf..6a69ceb 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -114,6 +114,7 @@ DT_MACHINE_START(AM33XX_DT, "Generic AM33XX (Flattened Device Tree)")
+>         .init_machine   = omap_generic_init,
+>         .timer          = &omap3_am33xx_timer,
+>         .dt_compat      = am33xx_boards_compat,
+> +       .restart        = omap_prcm_restart,
+>  MACHINE_END
+>  #endif
+> 
+> diff --git a/arch/arm/mach-omap2/prcm.c b/arch/arm/mach-omap2/prcm.c
+> index 0f51e03..490f8f6 100644
+> --- a/arch/arm/mach-omap2/prcm.c
+> +++ b/arch/arm/mach-omap2/prcm.c
+> @@ -33,6 +33,7 @@
+>  #include "cm2xxx_3xxx.h"
+>  #include "prm2xxx_3xxx.h"
+>  #include "prm44xx.h"
+> +#include "prm33xx.h"
+>  #include "prminst44xx.h"
+>  #include "cminst44xx.h"
+>  #include "prm-regbits-24xx.h"
+> @@ -72,6 +73,8 @@ void omap_prcm_restart(char mode, const char *cmd)
+>                 omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+>         } else if (cpu_is_omap44xx()) {
+>                 omap4_prminst_global_warm_sw_reset(); /* never returns */
+> +       } else if (soc_is_am33xx()) {
+> +               am33xx_prm_global_warm_sw_reset();      /* never returns */
+>         } else {
+>                 WARN_ON(1);
+>         }
+> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+> index e7dbb6c..505219d 100644
+> --- a/arch/arm/mach-omap2/prm33xx.c
+> +++ b/arch/arm/mach-omap2/prm33xx.c
+> @@ -133,3 +133,18 @@ int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+> 
+>         return (c == MAX_MODULE_HARDRESET_WAIT) ? -EBUSY : 0;
+>  }
+> +
+> +void am33xx_prm_global_warm_sw_reset(void)
+> +{
+> +       u32 v;
+> +
+> +       v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
+> +                                   AM33XX_PRM_RSTCTRL_OFFSET);
+> +       v |= AM33XX_GLOBAL_WARM_SW_RST_MASK;
+> +       am33xx_prm_write_reg(v, AM33XX_PRM_DEVICE_MOD,
+> +                                AM33XX_PRM_RSTCTRL_OFFSET);
+> +
+> +       /* OCP barrier */
+> +       v = am33xx_prm_read_reg(AM33XX_PRM_DEVICE_MOD,
+> +                                   AM33XX_PRM_RSTCTRL_OFFSET);
+> +}
+> diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+> index 3f25c56..cdfc694 100644
+> --- a/arch/arm/mach-omap2/prm33xx.h
+> +++ b/arch/arm/mach-omap2/prm33xx.h
+> @@ -126,4 +126,5 @@ extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
+>  extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
+>  extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+>                 u16 rstctrl_offs, u16 rstst_offs);
+> +extern void am33xx_prm_global_warm_sw_reset(void);
+> 
+> 
+> Thanks,
+> Vaibhav
+> 
