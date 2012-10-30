@@ -1,40 +1,44 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 30 Oct 2012 10:39:14 +0000
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-In-Reply-To: <20121030101140.18780.69840@nucleus>
-References: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
- <20121030101140.18780.69840@nucleus>
-Message-ID: <1351593554.2831.8.camel@hornet>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Oct 2012 11:44:28 +0100
+Subject: [PATCH] i2c: mv64xxx: Add support Armada-XP SoC
+In-Reply-To: <1351593581-19555-1-git-send-email-iwamatsu@nigauri.org>
+References: <1351593581-19555-1-git-send-email-iwamatsu@nigauri.org>
+Message-ID: <20121030114428.45752bd0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2012-10-30 at 10:11 +0000, Mike Turquette wrote:
-> > diff --cc arch/arm/include/asm/hardware/sp810.h
-> > index 2cdcf44,afd7e91..0000000
-> > --- a/arch/arm/include/asm/hardware/sp810.h
-> > +++ b/arch/arm/include/asm/hardware/sp810.h
-> > @@@ -50,6 -50,14 +50,8 @@@
-> >   #define SCPCELLID2            0xFF8
-> >   #define SCPCELLID3            0xFFC
-> >   
-> >  -#define SCCTRL_TIMEREN0SEL_REFCLK     (0 << 15)
-> >  -#define SCCTRL_TIMEREN0SEL_TIMCLK     (1 << 15)
-> >  -
-> >  -#define SCCTRL_TIMEREN1SEL_REFCLK     (0 << 17)
-> >  -#define SCCTRL_TIMEREN1SEL_TIMCLK     (1 << 17)
-> >  -
-> > + #define SCCTRL_TIMERENnSEL_SHIFT(n)   (15 + ((n) * 2))
-> > + 
-> >   static inline void sysctl_soft_reset(void __iomem *base)
-> >   {
-> >         /* switch to slow mode */
+Dear Nobuhiro Iwamatsu,
+
+On Tue, 30 Oct 2012 19:39:41 +0900, Nobuhiro Iwamatsu wrote:
+> The Armada-XP SoC has the same I2C controller as mv64xxxi-i2c.
+> This validates to use mv64xxx in this SoC.
 > 
-> Pawel,
+> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+> ---
+>  drivers/i2c/busses/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Does this look OK for you?
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index 65dd599..ff53cf4 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -474,7 +474,7 @@ config I2C_MPC
+>  
+>  config I2C_MV64XXX
+>  	tristate "Marvell mv64xxx I2C Controller"
+> -	depends on (MV64X60 || PLAT_ORION)
+> +	depends on (MV64X60 || PLAT_ORION || MACH_ARMADA_370_XP)
+>  	help
+>  	  If you say yes to this option, support will be included for the
+>  	  built-in I2C interface on the Marvell 64xxx line of host bridges.
 
-Yes, it's correct.
+This is not needed: ARCH_MVEBU already selects PLAT_ORION.
 
-Thanks!
+Best regards,
 
-Pawe?
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
