@@ -1,34 +1,49 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 30 Oct 2012 16:03:19 +0000
-Subject: arm-soc tree was Re: [PATCH] Fix socfpga compilation with
- early_printk() enabled
-In-Reply-To: <201210290441.25964.arnd@arndb.de>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <20121028230153.GA8284@elf.ucw.cz> <20121028231330.GB8284@elf.ucw.cz>
- <201210290441.25964.arnd@arndb.de>
-Message-ID: <1351612999.6199.7.camel@hornet>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 30 Oct 2012 11:05:48 -0500
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <20121030160129.7e39619b@skate>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate>
+Message-ID: <508FFADC.3080506@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-10-29 at 04:41 +0000, Arnd Bergmann wrote:
-> On Sunday 28 October 2012, Pavel Machek wrote:
-> > arch/arm/mach-vexpress/v2m.c:   vexpress_clk_init(ioremap(V2M_SYSCTL, SZ_4K));
-> > include/linux/vexpress.h:void vexpress_clk_init(void __iomem *sp810_base);
-> > 
-> > ...seems vexpress_clk_init is not there, yet... And what is more
-> > serious:
-> > 
-> > pavel at amd:~/mainline-altera/linux$ grep mach-vexpress MAINTAINERS
-> > pavel at amd:~/mainline-altera/linux$ 
-> > 
-> > vexpress_clk_of_init();     has same problem.
+On 10/30/2012 10:01 AM, Thomas Petazzoni wrote:
+> Rob,
 > 
-> I've already reported both to Pawel Moll, and he already came  back with
-> a new series, but we're still trying to work out the dependencies.
+> On Tue, 30 Oct 2012 09:54:18 -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Now that we have drivers/irqchip, move GIC irqchip to drivers/irqchip. This
+>> is necessary to share the GIC with arm and arm64.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>  arch/arm/common/Kconfig                            |    8 --------
+>>  arch/arm/common/Makefile                           |    1 -
+>>  drivers/irqchip/Kconfig                            |    8 ++++++++
+>>  drivers/irqchip/Makefile                           |    1 +
+>>  arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |    0
+>>  drivers/irqchip/irqchip.c                          |   10 ++++++++++
+>>  drivers/irqchip/irqchip.h                          |    1 +
+>>  7 files changed, 20 insertions(+), 9 deletions(-)
+> 
+> What about arch/arm/include/asm/hardware/gic.h ?
+> 
+> Contrary to the current version of the bcm2835 IRQ controller driver
+> and the armada-370-xp IRQ controller driver, the GIC and VIC drivers
+> not only expose a <foo>_of_init() function, but also other functions
+> that are directly used by several non-DT capable ARM sub-architectures.
+> 
+> Of course, it works by leaving gic.h where it is now, but it sounds
+> strange to have the driver in drivers/irqchip/ and the header file in
+> arch/arm/include/asm/hardware/, especially if the goal is to be able to
+> use those drivers in arm64.
 
-Yes, it's been a glitch in -next between arm-soc and clk, but it should
-be fine now (as of next-20121030).
+Right. I'll have to move it. I wasn't really thinking about arm64 until
+this morning.
 
-Sorry about the hassle
-
-Pawel
+Rob
