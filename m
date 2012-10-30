@@ -1,24 +1,34 @@
-From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
-Date: Tue, 30 Oct 2012 12:33:34 +0100
-Subject: [PATCH 0/2] ARM: OMAP: hwmod/omapd_device: Fix for resource
- handling in DT boot
-In-Reply-To: <alpine.DEB.2.00.1210301123310.12697@utopia.booyaka.com>
-References: <1351593205-13590-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.00.1210301123310.12697@utopia.booyaka.com>
-Message-ID: <508FBB0E.6070802@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 30 Oct 2012 11:34:07 +0000
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+Message-ID: <20121030113407.GA24335@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2012 12:25 PM, Paul Walmsley wrote:
-> On Tue, 30 Oct 2012, Peter Ujfalusi wrote:
-> 
->> Tony, Benoit, Paul: Not sure if this qualify for 3.7 inclusion, but for sure
->> going to help us to clean up the OMAP5 hwmod database.
-> 
-> It's definitely not 3.7 material, but will look at it for 3.8 merge 
-> window.  The OMAP5 hwmod data isn't in mainline yet.
+On Sun, Oct 28, 2012 at 09:12:52PM +0100, Linus Walleij wrote:
 
-True, it can wait till 3.8.
+> The answer is that it does not know. Because drivers have
+> different needs. Depending on how the hardware and
+> system is done.
 
--- 
-P?ter
+...
+
+> I'm not making this up, it is a very real phenomenon on the
+> Ux500 and I don't think we are unique.
+
+> Moving this handling to bus code or anywhere else
+> invariably implies that resource acquisition/release order
+> does not matter, and my point is that it does.
+
+Doing this in the buses is definitely wrong, as you say it's not bus
+specific.  I do however think we can usefully do this stuff in a SoC
+specific place like a power domain, keeping the SoC integration code
+together and out of the drivers.  IME the SoCs where you need to do
+different things for different IPs shoudl mostly still get some reuse
+out of such an approach.
