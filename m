@@ -1,34 +1,64 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 30 Oct 2012 15:58:52 +0000
-Subject: [PATCH v3] video: Versatile Express DVI output driver
-In-Reply-To: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
-References: <1350405036-17997-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1351612732.6199.4.camel@hornet>
+From: vasanthananthan@gmail.com (Vasanth Ananthan)
+Date: Tue, 30 Oct 2012 17:01:32 +0100
+Subject: [PATCH v2 1/6] ARM: EXYNOS5: Clock settings for SATA and SATA PHY
+In-Reply-To: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
+References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
+Message-ID: <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello again Florian,
+This patch adds neccessary clock entries for SATA, SATA PHY and
+I2C_SATAPHY
 
-On Tue, 2012-10-16 at 17:30 +0100, Pawel Moll wrote:
-> Versatile Express' DVI video output can be connected to one the three
-> sources - motherboard's CLCD controller or a video signal generated
-> by one of the daughterboards.
-> 
-> This driver configures the muxer FPGA so the output displays content
-> of one of the framebuffers in the system (0 by default, can be changed
-> by user writing to the "fb" sysfs attribute of the muxfpga device).
-> 
-> It will also set up the display formatter mode and keep it up
-> to date with mode changes requested by the user (eg. with fbset
-> tool).
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+---
+ arch/arm/mach-exynos/clock-exynos5.c |   21 ++++++++++++++++++---
+ 1 files changed, 18 insertions(+), 3 deletions(-)
 
-It's just a polite a friendly nag regarding this patch - it's been 2
-weeks since I posted this version (and 1.5 month since the first one)...
-
-Does it look good enough or completely wrong?
-
-Cheers!
-
-Pawe?
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index c44ca1e..124c54f 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -651,15 +651,20 @@ static struct clk exynos5_init_clocks_off[] = {
+ 		.ctrlbit	= (1 << 15),
+ 	}, {
+ 		.name		= "sata",
+-		.devname	= "ahci",
++		.devname	= "exynos5-sata",
++		.parent         = &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 6),
+ 	}, {
+-		.name		= "sata_phy",
++		.name		= "sata-phy",
++		.devname	= "exynos5-sata-phy",
++		.parent         = &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 24),
+ 	}, {
+-		.name		= "sata_phy_i2c",
++		.name		= "i2c",
++		.devname	= "exynos5-sata-phy-i2c",
++		.parent         = &exynos5_clk_aclk_200.clk,
+ 		.enable		= exynos5_clk_ip_fsys_ctrl,
+ 		.ctrlbit	= (1 << 25),
+ 	}, {
+@@ -1226,6 +1231,16 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+ 		.reg_div = { .reg = EXYNOS5_CLKDIV_TOP0, .shift = 24, .size = 3 },
+ 	}, {
+ 		.clk	= {
++			.name		= "sclk_sata",
++			.devname	= "exynos5-sata",
++			.enable		= exynos5_clksrc_mask_fsys_ctrl,
++			.ctrlbit	= (1 << 24),
++		},
++		.sources = &exynos5_clkset_aclk,
++		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 24, .size = 1 },
++		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 20, .size = 4 },
++	}, {
++		.clk	= {
+ 			.name		= "sclk_gscl_wrap",
+ 			.devname	= "s5p-mipi-csis.0",
+ 			.enable		= exynos5_clksrc_mask_gscl_ctrl,
+-- 
+1.7.4.1
