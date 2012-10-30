@@ -1,48 +1,26 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 30 Oct 2012 15:06:27 +1100
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-Message-ID: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Oct 2012 04:16:46 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1210300416190.12697@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Hello Jean,
 
-Today's linux-next merge of the clk tree got a conflict in
-arch/arm/include/asm/hardware/sp810.h between commit 0891642cf117 ("ARM:
-vexpress: Start using new Versatile Express infrastructure") from the
-arm-soc tree and commit 05e3659135a4 ("clk: Common clocks implementation
-for Versatile Express") from the clk tree.
+On Tue, 23 Oct 2012, Jean Pihet wrote:
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+> Let me try with the same setup as yours (bootloader images,
+> omap2pus_defconfig, angstrom roots).
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Had any luck reproducing this one that Aaro & I are seeing?
 
-diff --cc arch/arm/include/asm/hardware/sp810.h
-index 2cdcf44,afd7e91..0000000
---- a/arch/arm/include/asm/hardware/sp810.h
-+++ b/arch/arm/include/asm/hardware/sp810.h
-@@@ -50,6 -50,14 +50,8 @@@
-  #define SCPCELLID2		0xFF8
-  #define SCPCELLID3		0xFFC
-  
- -#define SCCTRL_TIMEREN0SEL_REFCLK	(0 << 15)
- -#define SCCTRL_TIMEREN0SEL_TIMCLK	(1 << 15)
- -
- -#define SCCTRL_TIMEREN1SEL_REFCLK	(0 << 17)
- -#define SCCTRL_TIMEREN1SEL_TIMCLK	(1 << 17)
- -
-+ #define SCCTRL_TIMERENnSEL_SHIFT(n)	(15 + ((n) * 2))
-+ 
-  static inline void sysctl_soft_reset(void __iomem *base)
-  {
-  	/* switch to slow mode */
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/0d88bf1b/attachment.sig>
+
+- Paul
