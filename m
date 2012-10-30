@@ -1,44 +1,32 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Wed, 31 Oct 2012 00:20:47 +0300
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <509032F6.1050301@gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
- <508E5DFB.3060002@gmail.com>
- <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
- <508E61E7.7090502@gmail.com>
- <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
- <508E651A.5070009@gmail.com>
- <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
- <509032F6.1050301@gmail.com>
-Message-ID: <CA+E=qVfX6vrGVhmy5+KGZ_H78ERzdFcK+fnTz3z79YcQZuJrDw@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 30 Oct 2012 22:33:53 +0100
+Subject: [PATCH 1/4] net: davinci_mdio: Fix typo mistake in calling
+ runtime-pm api
+In-Reply-To: <1351498881-32482-3-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Mon, 29 Oct 2012 13:51:18 +0530")
+References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+ <1351498881-32482-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <877gq7hcfy.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 11:05 PM, Daniel Mack <zonque@gmail.com> wrote:
->> One more question: what should I use instead of pxa2xx_mfp_config in
->> DT board to configure pin modes?
->
-> Haojian was working on the PXA pinctrl drivers, but I don't know how far
-> that is yet.
->
-> If that's not yet there, have a look at the pinctrl-single driver. It's
-> admittedly not as nice to use as the constants in the board file as DT
-> lacks defines for numerical constants, but's at least a workaround.
->
-> On a more general note, it's arguable whether this kind of setup should
-> be done in the bootloader after all.
->
->
-> Daniel
+>>>>> "Vaibhav" == Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
-OK, thanks for suggestion!
+ Vaibhav> By mistake (most likely a copy-paste), instead of pm_runtime_get_sync()
+ Vaibhav> api, driver is calling pm_runtime_put_sync() api in resume callback
+ Vaibhav> function. The bug was introduced by commit id (ae2c07aaf74:
+ Vaibhav> davinci_mdio: runtime PM support).
 
-Regards
-Vasily
+ Vaibhav> Now, the reason why it didn't impact functionality is, the patch has
+ Vaibhav> been tested on AM335x-EVM and BeagleBone platform while submitting;
+ Vaibhav> and in case of AM335x the MDIO driver doesn't control the module
+ Vaibhav> enable/disable part, which is handled by CPSW driver.
+
+ Vaibhav> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+ Vaibhav> Cc: Mugunthan V N <mugunthanvnm@ti.com>
+ Vaibhav> Cc: Richard Cochran <richardcochran@gmail.com>
+
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+
+-- 
+Bye, Peter Korsgaard
