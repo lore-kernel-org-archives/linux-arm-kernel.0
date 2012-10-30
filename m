@@ -1,53 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 09:29:38 -0700
-Subject: [PATCH 3/6] ARM: OMAP2+: Move plat/iovmm.h to
- include/linux/omap-iommu.h
-In-Reply-To: <20121026180039.GM11908@atomide.com>
-References: <20121025001913.2082.31062.stgit@muffinssi.local>
- <20121025213935.GD11928@atomide.com>
- <CAK=WgbaCM+MWiHARvdfaGL6w0c7g4_keAm0ADw1vkSeiZ0CZPw@mail.gmail.com>
- <6561916.t72K1L6jg4@avalon>
- <CAK=WgbY2-Ajm-2OSheOgLCd4589WKDSqqKjzHkE5Ogyp4puJ3g@mail.gmail.com>
- <20121026180039.GM11908@atomide.com>
-Message-ID: <20121030162938.GH11908@atomide.com>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 30 Oct 2012 09:30:12 -0700
+Subject: [PATCH v2 1/5] clk: samsung: add common clock framework support
+ for Samsung platforms
+In-Reply-To: <1349629855-4962-2-git-send-email-thomas.abraham@linaro.org>
+References: <1349629855-4962-1-git-send-email-thomas.abraham@linaro.org>
+ <1349629855-4962-2-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <20121030163012.18780.19304@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121026 11:02]:
-> * Ohad Ben-Cohen <ohad@wizery.com> [121026 02:56]:
-> > Hi Laurent,
-> > 
-> > On Fri, Oct 26, 2012 at 11:35 AM, Laurent Pinchart
-> > <laurent.pinchart@ideasonboard.com> wrote:
-> > > That's on my to-do list, as well as porting the OMAP3 ISP driver to videobuf2,
-> > > adding DT support, moving to the common clock framework (when that will be
-> > > available for the OMAP3), supporting missing V4L2 features, ... All this in my
-> > > spare time of course, otherwise it wouldn't be fun, would it ? ;-)
-> > 
-> > Hmm, seems like a short to-do list ;)
-> 
-> Sounds Laurent will take care of it :)
-> 
-> > > I would also like to move the tidspbridge to the DMA API, but I think we'll
-> > > need to move step by step there, and using the OMAP IOMMU and IOVMM APIs as an
-> > > intermediate step would allow splitting patches in reviewable chunks. I know
-> > > it's a step backwards in term of OMAP IOMMU usage, but that's in my opinion a
-> > > temporary nuisance to make the leap easier.
-> > 
-> > Since tidspbridge is in staging I guess it's not a problem, though it
-> > sounds to me like using the correct API in the first place is going to
-> > make less churn.
-> 
-> Not related to these patches, but also sounds like we may need to drop
-> some staging/tidspbridge code to be able to move forward with the
-> ARM common zImage plans. See the "[GIT PULL] omap plat header removal
-> for v3.8 merge window, part1" thread for more info.
+Hi Thomas,
 
-OK so are people happy with the patches in this series?
+Quoting Thomas Abraham (2012-10-07 10:10:51)
+> +/* determine the output clock speed of the pll */
+> +static unsigned long samsung_pll_clock_recalc_rate(struct clk_hw *hw,
+> +                               unsigned long parent_rate)
+> +{
+> +       struct samsung_pll_clock *clk_pll = to_clk_pll(hw);
+> +
+> +       if (clk_pll->get_rate)
+> +               return to_clk_pll(hw)->get_rate(parent_rate);
 
-Please everybody ack if no more comments so we can move on
-towards getting CONFIG_MULTIPLATFORM to work for omaps.
+Why the extra indirection?  Does your samsung_pll_clock abstract several
+different PLL implementations (with separate clock ops)?  If so, why not
+make a unique struct for each PLL type?
+
+> +
+> +       return 0;
+> +}
+> +
+> +/* round operation not supported */
+> +static long samsung_pll_clock_round_rate(struct clk_hw *hw, unsigned long drate,
+> +                               unsigned long *prate)
+> +{
+> +       return samsung_pll_clock_recalc_rate(hw, *prate);
+
+Why is round_rate not supported?  How is returning the recalculated rate
+the right thing here?
+
+> +/*
+> + * Allow platform specific implementations to attach set_rate and get_rate
+> + * callbacks for the pll type clock. Typical calling sequence..
+> + *
+> + * struct clk *clk = clk_get(NULL, "pll-clk-name");
+> + * samsung_pll_clk_set_cb(clk, pll_set_rate, pll_get_rate);
+> + */
+> +void __init samsung_pll_clk_set_cb(struct clk *clk,
+> +                       int (*set_rate)(unsigned long rate),
+> +                       unsigned long (*get_rate)(unsigned long rate))
+> +{
+> +       struct samsung_pll_clock *clk_pll;
+> +       struct clk_hw *hw = __clk_get_hw(clk);
+> +
+> +       clk_pll = to_clk_pll(hw);
+> +       clk_pll->set_rate = set_rate;
+> +       clk_pll->get_rate = get_rate;
+> +}
+
+This answers my questions above having different PLL types.  Why not
+just make seprate clk_hw structs for each PLL type instead of the extra
+layer of abstraction + runtime assignment of clk ops?
 
 Regards,
-
-Tony
+Mike
