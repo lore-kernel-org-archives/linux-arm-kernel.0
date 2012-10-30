@@ -1,8 +1,9 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 30 Oct 2012 14:07:15 +0000
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2012 15:11:57 +0100
 Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
 In-Reply-To: <20121030114949.GC28722@arwen.pp.htv.fi>
-References: <20121024161429.GA16350@core.coreip.homeip.net>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
  <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
  <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
  <20121024185818.GB772@arwen.pp.htv.fi>
@@ -12,110 +13,51 @@ References: <20121024161429.GA16350@core.coreip.homeip.net>
  <20121029194901.GA30152@arwen.pp.htv.fi>
  <20121030112410.GM4511@opensource.wolfsonmicro.com>
  <20121030114949.GC28722@arwen.pp.htv.fi>
-Message-ID: <20121030140714.GO4511@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdZVboPbr8SQHnkbhqkMsYO8eR_a+PA-EAkRsF8Mr_K3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 01:49:49PM +0200, Felipe Balbi wrote:
+On Tue, Oct 30, 2012 at 12:49 PM, Felipe Balbi <balbi@ti.com> wrote:
 > On Tue, Oct 30, 2012 at 11:24:10AM +0000, Mark Brown wrote:
 
-> > We need some place to put the SoC integration; power domains seem like
-> > the obvious place to me but YMMV.  Nothing about having this out of the
-
+>> We need some place to put the SoC integration; power domains seem like
+>> the obvious place to me but YMMV.  Nothing about having this out of the
+>
 > except that pin muxing has nothing to do with power domain. To me that
 > sounds like an abuse of the API.
 
-Well, we can call the API Archibald if we like...  what I mean is
-something that sits in the system below the device in pretty much
-exactly the way that power domains do.
+It could be renamed to "power resources" or something as long as
+it's related to resource handling related to the PM calls.
 
-> > drivers requires that this be done by individual subsystems in isolation
-> > from each other.  Half the point here is that for the reusable IPs this
-> > stuff often isn't driver specific at all, it's often more about the SoC
-> > integration than it is about the driver and so you'll get a consistent
-> > pattern for most IPs on the SoC.
+But I worry that it violates the Unix principle to do one thing and one
+thing only.
 
+A device power resource framework goes in the opposite direction,
+trying to do a lot of unrelated things in a central place as opposed
+to distributing the task.
+
+>> drivers requires that this be done by individual subsystems in isolation
+>> from each other.  Half the point here is that for the reusable IPs this
+>> stuff often isn't driver specific at all, it's often more about the SoC
+>> integration than it is about the driver and so you'll get a consistent
+>> pattern for most IPs on the SoC.
+>
 > and all of that SoC-specific detail is already hidden behind power
 > domains, runtime PM, pinctrl, clk API, regulator framework, etc.
 
-That's all getting rather open coded, especially if you're going to get
-down to a situation where you have varying ordering constraints between
-the different APIs on different SoCs.
+I agree.
 
-> > > How can you make sure that this will work for at least 50% of the
-> > > drivers ? You just can't. We don't know the implementation details of
-> > > every arch/soc/platform supported by Linux today to make that decision.
+pinctrl has already done a fair job at trying to be abstract in the
+states requested from the core, in <linux/pinctrl/pinctrl-state.h>.
 
-> > Well, we've managed to get along for rather a long time with essentially
-> > all architectures implementing this stuff by doing static setup for the
-> > pins on boot.  That does suggest we can get a reasonably long way with
+And I accept the idea to  try to centralize more as well, maybe
+as a helpful struct and some inlines for the pinctrl core. I think
+this is enough, and pushing all handles into central code creates
+a problem elsewhere.
 
-> and this is one of the issues we're all trying to solve today so we have
-> single zImage approach for the ARM port.
+(But I'm not so certain ... so I might just
+change opinion one of those days depending on what
+arguments will be made.)
 
-I don't see the relevance of single zImage here; device tree is supposed
-to solve that one.
-
-> > something simple, and it does seem to match up with how things usually
-> > look at an electrical level too.
-
-> simple ? I really doubt it. Just look at the amount of code duplication
-> the ARM port had (still has in some places) to handle platform-specific
-> details.
-
-What I'm saying here is that I'm concerned about us ending up with more
-code duplication...
-
-> It turned out that drivers weren't very portable when they had to do
-> platform-specific initialization, we were all abusing platform_data to
-> pass strings and/or function pointers down to drivers and so on.
-
-> I'm concerned if we hide pinctrl under e.g. power domains (as said
-> above, it sounds like an abuse of the API to me) we will end up with a
-> situation like above. Maybe not as bad, but still weird-looking.
-
-Well, nothing's going to stop that happening if people are determined
-enough - one could equally see that there'll be flags getting passed to
-control the ordering of calls if things are open coded.  I would expect
-that with a power domain style approach any data would be being passed
-directly and bypassing the driver completely.
-
-> > It seems fairly obvious that if we need to add identical bolier plate
-> > code to lots of drivers we're doing something wrong, it's just churn for
-> > little practical gain and a problem if we ever decide to change how this
-> > stuff works in the future.
-
-> I wouldn't consider it boilerplate if you remember that each driver
-> might have different requirements regarding how all of those details
-> need to be handled.
-
-Essentially all the patches I'm seeing adding pinctrl are totally
-mindless, most of them are just doing the initial setup on boot and not
-doing any active management at runtime at all.
-
-> We have to consider power consumption, ordering of calls, proper IP
-> setup, IP reuse on multiple platforms (even multiple ARCHes), etc etc,
-> and to get that right outside of the driver - who's the only class that
-> actually knows what it needs to do with its resources - will just be too
-> complex and error-prone.
-
-A big part of my point here is that it's not at all clear to me that it
-is the driver which knows what's going on.  For SoC-specific IPs you can
-be confident about how the SoC integration looks but for IPs that get
-reused widely this becomes less true.  
-
-> I would strongly suggest starting with explicit calls to pinctrl, clk
-> API, etc and if we can really prove later that 95% of the users are
-> "standard", then we can factor code out, but making that assumption now
-> is quite risky IMHO.
-
-Like I say I think we're already seeing a pattern here, the code going
-into most drivers looks *very* similar with lots of the drivers simply
-calling get_select_default().
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/7fc0e92f/attachment.sig>
+Yours,
+Linus Walleij
