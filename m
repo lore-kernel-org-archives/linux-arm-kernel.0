@@ -1,123 +1,57 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 30 Oct 2012 05:33:40 +0000
-Subject: [RFC PATCH v3 13/16] ARM: dts: add AM33XX MMC support
-In-Reply-To: <1350566815-409-14-git-send-email-mporter@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
- <1350566815-409-14-git-send-email-mporter@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA5AE57@DBDE01.ent.ti.com>
+From: amit.daniel@samsung.com (Amit Daniel Kachhap)
+Date: Tue, 30 Oct 2012 11:23:26 +0530
+Subject: [PATCH v2 1/2] ARM: exynos4: Add devicetree node for TMU driver
+In-Reply-To: <508E74FE.7090900@samsung.com>
+References: <1351243746-4173-1-git-send-email-amit.daniel@samsung.com>
+ <1351243746-4173-2-git-send-email-amit.daniel@samsung.com>
+ <508E74FE.7090900@samsung.com>
+Message-ID: <CAK44p21udhZWexYkCmoFv_rPdYb0HYd1wxw1gpOQb69_OE2LGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 18:56:52, Porter, Matt wrote:
-> Adds AM33XX MMC support for am335x-bone and am335x-evm.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-bone.dts |    6 ++++++
->  arch/arm/boot/dts/am335x-evm.dts  |    6 ++++++
->  arch/arm/boot/dts/am33xx.dtsi     |   27 +++++++++++++++++++++++++++
->  3 files changed, 39 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index c634f87..5510979 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -70,6 +70,8 @@
->  		};
->  
->  		ldo3_reg: regulator at 5 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
+On 29 October 2012 17:52, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 10/26/12 18:29, Amit Daniel Kachhap wrote:
+>>
+>> From: Amit Daniel Kachhap<amit.daniel@samsung.com>
+>>
+>> This patch adds necessary source definations needed for TMU driver and
+>> adds devicetree node for exynos4210.
+>>
+>> Signed-off-by: Amit Daniel Kachhap<amit.daniel@samsung.com>
+>> ---
+>
+>
+> [...]
+>
+>
+>> +               .name           = "tmu_apbif",
+>> +               .enable         = exynos4_clk_ip_perir_ctrl,
+>> +               .ctrlbit        = (1<<  17),
+>
+>
+> tab instead of white spaces?
+>
+> I fixed them when I applied.
+Thanks Mr Kim.
+>
+> [...]
+>
+>
+>> +#define EXYNOS4_IRQ_TMU_TRIG0          COMBINER_IRQ(2, 4)
+>> +#define EXYNOS4_IRQ_TMU_TRIG1          COMBINER_IRQ(3, 4)
+>
+>
+> BTW, where are above definitions used?
 
-I think these min & max limits are regulator limits. Are these fields
-required? Add details of these additions. AFAIK fine-tuned (board
-specific) min/max limits should be add here(like mpu and core
-regulator nodes)
+They are not used currently but might be useful for non DT support.
 
->  			regulator-always-on;
->  		};
->  
-> @@ -78,3 +80,7 @@
->  		};
->  	};
->  };
-> +
-> +&mmc1 {
-> +	vmmc-supply = <&ldo3_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index 185d632..d63fce8 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -114,7 +114,13 @@
->  		};
->  
->  		vmmc_reg: regulator at 12 {
-> +			regulator-min-microvolt = <1800000>;
-> +			regulator-max-microvolt = <3300000>;
-
-=same=
-
->  			regulator-always-on;
->  		};
->  	};
->  };
-> +
-> +&mmc1 {
-> +	vmmc-supply = <&vmmc_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index ab9c78f..26a6af7 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -234,6 +234,33 @@
->  			status = "disabled";
->  		};
->  
-> +		mmc1: mmc at 48060000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc1";
-> +			ti,dual-volt;
-> +			ti,needs-special-reset;
-> +			dmas = <&edma 24
-> +				&edma 25>;
-> +			dma-names = "tx", "rx";
-
-Add status = "disabled" here and "okay" in corresponding
-.dts file
-
-> +		};
-> +
-> +		mmc2: mmc at 481d8000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc2";
-> +			ti,needs-special-reset;
-> +			dmas = <&edma 2
-> +				&edma 3>;
-> +			dma-names = "tx", "rx";
-> +			status = "disabled";
-> +		};
-> +
-> +		mmc3: mmc at 47810000 {
-> +			compatible = "ti,omap3-hsmmc";
-> +			ti,hwmods = "mmc3";
-> +			ti,needs-special-reset;
-
-What about DMA resources for mmc3?
-
-AnilKumar
-
-> +			status = "disabled";
-> +		};
-> +
->  		wdt2: wdt at 44e35000 {
->  			compatible = "ti,omap3-wdt";
->  			ti,hwmods = "wd_timer2";
-> -- 
-> 1.7.9.5
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+Thanks,
+Amit Daniel
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
