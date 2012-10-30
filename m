@@ -1,27 +1,35 @@
-From: penberg@kernel.org (Pekka Enberg)
-Date: Wed, 31 Oct 2012 09:25:17 +0200 (EET)
-Subject: [PATCH 06/16] mm/slob: use min_t() to compare ARCH_SLAB_MINALIGN
-In-Reply-To: <0000013a31d206df-8822ffd8-055d-4e9b-9b81-a8ec130ccc9d-000000@email.amazonses.com>
-References: <1349448930-23976-1-git-send-email-arnd@arndb.de>
- <1349448930-23976-7-git-send-email-arnd@arndb.de>
- <0000013a31d206df-8822ffd8-055d-4e9b-9b81-a8ec130ccc9d-000000@email.amazonses.com>
-Message-ID: <alpine.LFD.2.02.1210310925110.2281@tux.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Oct 2012 21:41:27 +0000
+Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
+In-Reply-To: <20121030074508.GG12329@verge.net.au>
+References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
+ <alpine.LFD.2.02.1210221041450.16518@xanadu.home>
+ <20121030074508.GG12329@verge.net.au>
+Message-ID: <201210302141.27919.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 5 Oct 2012, Christoph Lameter wrote:
+On Tuesday 30 October 2012, Simon Horman wrote:
+> While I am more than happy to help address the issues raised in this
+> thread, and others that arise. There do seem to be a number of issues
+> between where we are now and a more generic shmobile_defconfig. I would
+> like consideration given to allowing the exixting, working, well-maintained,
+> per-board defconfigs to be updated until these issues have been resolved.
 
-> On Fri, 5 Oct 2012, Arnd Bergmann wrote:
-> 
-> > Without this patch, building ARM collie_defconfig results in:
-> >
-> > mm/slob.c: In function '__kmalloc_node':
-> > mm/slob.c:431:152: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-> > mm/slob.c: In function 'kfree':
-> > mm/slob.c:484:153: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-> > mm/slob.c: In function 'ksize':
-> > mm/slob.c:503:153: warning: comparison of distinct pointer types lacks a cast [enabled by default]
-> 
-> Acked-by: Christoph Lameter <cl@linux.com>
+Yes, no problem. This seemed like a low-hanging fruit initially but has
+turned into something much bigger now.
 
-Applied, thanks!
+Instead of attacking all these at ones, we can leave them as something
+worthwhile doing later. I noticed that out of the 11 shmobile defconfigs,
+only three (marzen, kzm9d and kzm9g) actually have a nonzero MEMORY_START.
+
+Maybe it's possible to consolidate all or some of the others first, since
+they should still work with the same uImage at the expense of just making
+the early debugging a little harder, as we discussed earlier.
+
+For all I know, these three boards are also the ones seeing the most
+ongoing development, so you could start by using a shared defconfig
+for the oldest (ARM11 based) boards at first that are also less likely
+to impact new development starting from the defconfig.
+
+	Arnd
