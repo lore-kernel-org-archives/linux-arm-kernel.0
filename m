@@ -1,35 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Oct 2012 22:22:15 +0000
-Subject: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
-In-Reply-To: <3c9e591c-a29f-446b-9256-bb23ff6d840d@TX2EHSMHS014.ehs.local>
-References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
- <20121024200431.GE6713@beefymiracle.amer.corp.natinst.com>
- <3c9e591c-a29f-446b-9256-bb23ff6d840d@TX2EHSMHS014.ehs.local>
-Message-ID: <201210302222.15656.arnd@arndb.de>
+Date: Tue, 30 Oct 2012 22:27:55 +0000
+Subject: [PULL REQ] IXP4xx changes for Linux 3.7
+In-Reply-To: <20121029082940.GC2527@netboy.at.omicron.at>
+References: <m3bog6m5iz.fsf@intrepid.localdomain>
+ <m3a9vkahci.fsf@intrepid.localdomain>
+ <20121029082940.GC2527@netboy.at.omicron.at>
+Message-ID: <201210302227.55857.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 27 October 2012, Michal Simek wrote:
-> > diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-> > index 08c1231..72904a2 100644
-> > --- a/arch/arm/include/asm/pgtable.h
-> > +++ b/arch/arm/include/asm/pgtable.h
-> > @@ -40,7 +40,7 @@
-> >   */
-> >  #define VMALLOC_OFFSET               (8*1024*1024)
-> >  #define VMALLOC_START                (((unsigned long)high_memory +
-> > VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
-> > -#define VMALLOC_END          0xff000000UL
-> > +#define VMALLOC_END          _AC(0xff000000,UL)
+On Monday 29 October 2012, Richard Cochran wrote:
+> On Thu, Oct 18, 2012 at 12:01:17AM +0200, Krzysztof Halasa wrote:
+> > 
+> > Don't get me wrong. If I had time for this it could be different.
+> > Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
+> > this point. Given the raised barriers to participate, probably aimed at
+> > paid maintainers, I have to quit doing this.
+> > 
+> > BTW since Imre has probably even much less time, it would be a good time
+> > to find someone to maintain IXP4xx code. I will be publishing (from time
+> > to time) my tree (I'm using the hw myself), so even simple
+> > cherry-picking would probably make some sense.
 > 
-> This shouldn't be the part of this series but should go to mainline through different tree.
-> Arnd, Olof: Can you take this patch to your arm-soc tree? 
-> 
-> I don't think it is a good workstyle to propose it to mainline through zynq soc tree.
-> What do you think?
+> So if no one else wants to do this, then I am willing to look after
+> the IXP code. I think that I do have the time for it.
 
-The arm-soc tree is not the right place either, this is architecture code which is
-in Russell's domain. I would suggest getting an Ack from Russell if he's ok with
-it and then merging it together with your other changes into arm-soc.
+Thanks for the offer! 
+
+Jason Cooper was also volunteering to help out with this, and even we can't
+convince Krzysztof to continue doing it, there is also Imre who is officially
+listed as maintainer for IXP4xx and who has not commented on this. As Krzysztof
+mentions, he probably doesn't have much time for it, but I'd like to give
+him the chance to comment as well.
+
+I'm sure we can find some solution between the four of you. Right now, I think
+we should focus on getting the bug fixes from Krzysztof's tree into mainline
+and the stable kernels where applicable, and then establish a better working
+mode for the future kernels.
 
 	Arnd
