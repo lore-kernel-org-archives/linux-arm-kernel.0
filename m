@@ -1,35 +1,40 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 30 Oct 2012 18:50:03 +0300
-Subject: [PATCH] i2c: mv64xxx: Add support Armada-XP SoC
-In-Reply-To: <1351593581-19555-1-git-send-email-iwamatsu@nigauri.org>
-References: <1351593581-19555-1-git-send-email-iwamatsu@nigauri.org>
-Message-ID: <508FF72B.5080708@mvista.com>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 30 Oct 2012 15:52:10 +0100
+Subject: [PATCH v3] Visstrim SM10: Use mo_version to decide board video
+ mode.
+In-Reply-To: <CACKLOr0HO4OapJk_-ktWcfwcnVD1MLfL6MF1bbaVUHjD5LVuJg@mail.gmail.com>
+References: <1345457581-13837-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120828074710.GX26594@pengutronix.de>
+ <CACKLOr0HO4OapJk_-ktWcfwcnVD1MLfL6MF1bbaVUHjD5LVuJg@mail.gmail.com>
+Message-ID: <CACKLOr1DB1_G6ttVHc6p-+SjegmJL1r4pKpunvo43xFR7RyA4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 28 September 2012 15:06, javier Martin
+<javier.martin@vista-silicon.com> wrote:
+> Hi Mauro,
+> this patch should originally go via arm-soc but it has a dependency on
+> support for coda video codec which is already in your tree.
+>
+> Now that we've got Sascha's ack could you merge this patch through your tree?
+>
+> Regards.
+>
 
-On 10/30/2012 01:39 PM, Nobuhiro Iwamatsu wrote:
+Hi Sascha,
+it seems Mauro missed to apply this patch through his tree.
+Moreover, 1 month later from my submission I think it should already
+apply to arm-soc.
 
-> The Armada-XP SoC has the same I2C controller as mv64xxxi-i2c.
-> This validates to use mv64xxx in this SoC.
+Could you please merge it?
 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
-> ---
->  drivers/i2c/busses/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Regards.
 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 65dd599..ff53cf4 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -474,7 +474,7 @@ config I2C_MPC
->  
->  config I2C_MV64XXX
->  	tristate "Marvell mv64xxx I2C Controller"
-> -	depends on (MV64X60 || PLAT_ORION)
-> +	depends on (MV64X60 || PLAT_ORION || MACH_ARMADA_370_XP)
-
-  Could remove useless parens, while at it...
-
-WBR, Sergei
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
