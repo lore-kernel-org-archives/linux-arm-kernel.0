@@ -1,64 +1,46 @@
 From: vasanthananthan@gmail.com (Vasanth Ananthan)
-Date: Tue, 30 Oct 2012 17:01:32 +0100
-Subject: [PATCH v2 1/6] ARM: EXYNOS5: Clock settings for SATA and SATA PHY
-In-Reply-To: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
-References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
+Date: Tue, 30 Oct 2012 17:01:31 +0100
+Subject: [PATCH v2 0/6] Adding support for SATA in EXYNO5 
+Message-ID: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds neccessary clock entries for SATA, SATA PHY and
-I2C_SATAPHY
+The following set of patches provides drivers for SATA
+and SATA PHY controller and also an interface for the
+two entity to interact.
 
-Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
----
- arch/arm/mach-exynos/clock-exynos5.c |   21 ++++++++++++++++++---
- 1 files changed, 18 insertions(+), 3 deletions(-)
+Vasanth Ananthan (6):
+  ARM: EXYNOS5: Clock settings for SATA and SATA PHY
+  ARM: EXYNOS5: DT Support for SATA and SATA PHY
+  DRIVERS: ATA: SATA PHY utility framework
+  DRIVERS:I2C: I2C driver polling mode support
+  DRIVERS: ATA:  SATA controller driver
+  DRIVERS: ATA: SATA PHY controller driver
 
-diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
-index c44ca1e..124c54f 100644
---- a/arch/arm/mach-exynos/clock-exynos5.c
-+++ b/arch/arm/mach-exynos/clock-exynos5.c
-@@ -651,15 +651,20 @@ static struct clk exynos5_init_clocks_off[] = {
- 		.ctrlbit	= (1 << 15),
- 	}, {
- 		.name		= "sata",
--		.devname	= "ahci",
-+		.devname	= "exynos5-sata",
-+		.parent         = &exynos5_clk_aclk_200.clk,
- 		.enable		= exynos5_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 6),
- 	}, {
--		.name		= "sata_phy",
-+		.name		= "sata-phy",
-+		.devname	= "exynos5-sata-phy",
-+		.parent         = &exynos5_clk_aclk_200.clk,
- 		.enable		= exynos5_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 24),
- 	}, {
--		.name		= "sata_phy_i2c",
-+		.name		= "i2c",
-+		.devname	= "exynos5-sata-phy-i2c",
-+		.parent         = &exynos5_clk_aclk_200.clk,
- 		.enable		= exynos5_clk_ip_fsys_ctrl,
- 		.ctrlbit	= (1 << 25),
- 	}, {
-@@ -1226,6 +1231,16 @@ static struct clksrc_clk exynos5_clksrcs[] = {
- 		.reg_div = { .reg = EXYNOS5_CLKDIV_TOP0, .shift = 24, .size = 3 },
- 	}, {
- 		.clk	= {
-+			.name		= "sclk_sata",
-+			.devname	= "exynos5-sata",
-+			.enable		= exynos5_clksrc_mask_fsys_ctrl,
-+			.ctrlbit	= (1 << 24),
-+		},
-+		.sources = &exynos5_clkset_aclk,
-+		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 24, .size = 1 },
-+		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 20, .size = 4 },
-+	}, {
-+		.clk	= {
- 			.name		= "sclk_gscl_wrap",
- 			.devname	= "s5p-mipi-csis.0",
- 			.enable		= exynos5_clksrc_mask_gscl_ctrl,
+ .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 +
+ .../devicetree/bindings/ata/exynos-sata.txt        |   17 ++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |   15 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   18 ++
+ arch/arm/mach-exynos/clock-exynos5.c               |   21 ++-
+ arch/arm/mach-exynos/include/mach/map.h            |    3 +
+ arch/arm/mach-exynos/include/mach/regs-pmu.h       |    3 +
+ arch/arm/mach-exynos/include/mach/regs-sata.h      |   29 ++
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    6 +
+ drivers/ata/Kconfig                                |   22 ++
+ drivers/ata/Makefile                               |    2 +
+ drivers/ata/sata_exynos.c                          |  268 +++++++++++++++++
+ drivers/ata/sata_exynos_phy.c                      |  300 ++++++++++++++++++++
+ drivers/ata/sata_phy.c                             |  104 +++++++
+ drivers/ata/sata_phy.h                             |   44 +++
+ drivers/i2c/busses/i2c-s3c2410.c                   |   79 ++++--
+ 16 files changed, 923 insertions(+), 22 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+ create mode 100644 Documentation/devicetree/bindings/ata/exynos-sata.txt
+ create mode 100644 arch/arm/mach-exynos/include/mach/regs-sata.h
+ create mode 100644 drivers/ata/sata_exynos.c
+ create mode 100644 drivers/ata/sata_exynos_phy.c
+ create mode 100644 drivers/ata/sata_phy.c
+ create mode 100644 drivers/ata/sata_phy.h
+
 -- 
 1.7.4.1
