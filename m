@@ -1,26 +1,14 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 30 Oct 2012 11:47:00 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <508FB226.20604@mimc.co.uk>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
-Message-ID: <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 30 Oct 2012 15:46:05 +0400
+Subject: [PATCH] [PATCH] remove pcm049 from Makefile
+In-Reply-To: <1351535422-4644-1-git-send-email-holzmayr@rsi-elektrotechnik.de>
+References: <1351535422-4644-1-git-send-email-holzmayr@rsi-elektrotechnik.de>
+Message-ID: <508FBDFD.9000700@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc Vaibhav Hiremath
+Hello.
 
-On Tue, 30 Oct 2012, Mark Jackson wrote:
+    You forgot to sign off on the patch, so it can't be applied.
 
-> At what point is booting from MMC on the BeagleBone going to start working ?
-> 
-> I only ask, since, by default, a new BeagleBone is setup to boot from 
-> MMC, so anyone testing a new kernel will probably expect the same setup 
-> to work.
-
-BeagleBone boots initramfs from MMC now, which is what mine was shipped to 
-do.  Are you asking about rootfs on MMC?  If so, Vaibhav would have a 
-better sense of this than I.
-
-
-- Paul
+WBR, Sergei
