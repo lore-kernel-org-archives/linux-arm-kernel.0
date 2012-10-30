@@ -1,35 +1,158 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 30 Oct 2012 11:09:13 -0400
-Subject: [PATCH] mmc: at91-mci: remove driver
-In-Reply-To: <20121030150113.GB19021@game.jcrosoft.org> (Jean-Christophe
- PLAGNIOL-VILLARD's message of "Tue, 30 Oct 2012 16:01:13 +0100")
-References: <1351520875-31891-1-git-send-email-ludovic.desroches@atmel.com>
- <87625txrou.fsf@octavius.laptop.org>
- <20121030150113.GB19021@game.jcrosoft.org>
-Message-ID: <87ehkgov3a.fsf@octavius.laptop.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 30 Oct 2012 17:16:42 +0200
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121030140714.GO4511@opensource.wolfsonmicro.com>
+References: <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <20121024185818.GB772@arwen.pp.htv.fi>
+ <20121025205901.GA3827@sirena.org.uk>
+ <20121026062008.GA21734@arwen.pp.htv.fi>
+ <20121026160316.GY18814@opensource.wolfsonmicro.com>
+ <20121029194901.GA30152@arwen.pp.htv.fi>
+ <20121030112410.GM4511@opensource.wolfsonmicro.com>
+ <20121030114949.GC28722@arwen.pp.htv.fi>
+ <20121030140714.GO4511@opensource.wolfsonmicro.com>
+Message-ID: <20121030151642.GE29159@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Oct 30 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> Thanks!  Pushed to mmc-next for 3.8.
->
-> if you don't mind I prefer to take it via at91
->
-> I've a patch series that cleanup the platform_data it's difficult to merge
-> with this one
+On Tue, Oct 30, 2012 at 02:07:15PM +0000, Mark Brown wrote:
+> On Tue, Oct 30, 2012 at 01:49:49PM +0200, Felipe Balbi wrote:
+> > On Tue, Oct 30, 2012 at 11:24:10AM +0000, Mark Brown wrote:
+> 
+> > > We need some place to put the SoC integration; power domains seem like
+> > > the obvious place to me but YMMV.  Nothing about having this out of the
+> 
+> > except that pin muxing has nothing to do with power domain. To me that
+> > sounds like an abuse of the API.
+> 
+> Well, we can call the API Archibald if we like...  what I mean is
 
-Hm, I don't understand why it should be difficult to merge.  Is it
-because this patch modifies arch/arm/mach-at91/include/mach/board.h?
+I'm sure you know it's not at all about the name and much more about the
+semantics ;-)
 
-If so, sounds like we should just take that change out of this patch
-and have it go into your platform data cleanup patch, and then I can
-merge the drivers/mmc change independently?  Let me know what you think.
+> something that sits in the system below the device in pretty much
+> exactly the way that power domains do.
+> 
+> > > drivers requires that this be done by individual subsystems in isolation
+> > > from each other.  Half the point here is that for the reusable IPs this
+> > > stuff often isn't driver specific at all, it's often more about the SoC
+> > > integration than it is about the driver and so you'll get a consistent
+> > > pattern for most IPs on the SoC.
+> 
+> > and all of that SoC-specific detail is already hidden behind power
+> > domains, runtime PM, pinctrl, clk API, regulator framework, etc.
+> 
+> That's all getting rather open coded, especially if you're going to get
+> down to a situation where you have varying ordering constraints between
+> the different APIs on different SoCs.
 
-Thanks,
+however we need to consider those cases right ? Otherwise we will endup
+pushing something to mainline which will have to be reverted couple
+weeks later after a big rant from Linus ;-)
 
-- Chris.
+> > > > How can you make sure that this will work for at least 50% of the
+> > > > drivers ? You just can't. We don't know the implementation details of
+> > > > every arch/soc/platform supported by Linux today to make that decision.
+> 
+> > > Well, we've managed to get along for rather a long time with essentially
+> > > all architectures implementing this stuff by doing static setup for the
+> > > pins on boot.  That does suggest we can get a reasonably long way with
+> 
+> > and this is one of the issues we're all trying to solve today so we have
+> > single zImage approach for the ARM port.
+> 
+> I don't see the relevance of single zImage here; device tree is supposed
+> to solve that one.
+
+DT is part of the deal. DT alone will solve nothing.
+
+> > > something simple, and it does seem to match up with how things usually
+> > > look at an electrical level too.
+> 
+> > simple ? I really doubt it. Just look at the amount of code duplication
+> > the ARM port had (still has in some places) to handle platform-specific
+> > details.
+> 
+> What I'm saying here is that I'm concerned about us ending up with more
+> code duplication...
+
+a fair concern.
+
+> > It turned out that drivers weren't very portable when they had to do
+> > platform-specific initialization, we were all abusing platform_data to
+> > pass strings and/or function pointers down to drivers and so on.
+> 
+> > I'm concerned if we hide pinctrl under e.g. power domains (as said
+> > above, it sounds like an abuse of the API to me) we will end up with a
+> > situation like above. Maybe not as bad, but still weird-looking.
+> 
+> Well, nothing's going to stop that happening if people are determined
+> enough - one could equally see that there'll be flags getting passed to
+> control the ordering of calls if things are open coded.  I would expect
+> that with a power domain style approach any data would be being passed
+> directly and bypassing the driver completely.
+
+situations like that would be a lot more rare in open coded case, don't
+you think ? Also a lot more local, since they will show up on a driver
+source code which is used in a small set of use cases, instead of being
+part of the pm domain implementation for the entire platform.
+
+> > > It seems fairly obvious that if we need to add identical bolier plate
+> > > code to lots of drivers we're doing something wrong, it's just churn for
+> > > little practical gain and a problem if we ever decide to change how this
+> > > stuff works in the future.
+> 
+> > I wouldn't consider it boilerplate if you remember that each driver
+> > might have different requirements regarding how all of those details
+> > need to be handled.
+> 
+> Essentially all the patches I'm seeing adding pinctrl are totally
+> mindless, most of them are just doing the initial setup on boot and not
+> doing any active management at runtime at all.
+
+have you considered that might be just a first step ? I have mentioned
+this before. We first add the bare minimum and work on PM optimizations
+later. You can be sure most likely those mindless patches you're seeing
+are probably building blocks for upcoming patches adding sleep/idle
+modes.
+
+> > We have to consider power consumption, ordering of calls, proper IP
+> > setup, IP reuse on multiple platforms (even multiple ARCHes), etc etc,
+> > and to get that right outside of the driver - who's the only class that
+> > actually knows what it needs to do with its resources - will just be too
+> > complex and error-prone.
+> 
+> A big part of my point here is that it's not at all clear to me that it
+> is the driver which knows what's going on.  For SoC-specific IPs you can
+> be confident about how the SoC integration looks but for IPs that get
+> reused widely this becomes less true.  
+
+I don't think so. As long as we keep the meaning of the 'default'
+pinctrl state to mean that this is the working state for the IP,
+underlying pinctrl-$arch implementation should know how to set muxing up
+properly, no ?
+
+> > I would strongly suggest starting with explicit calls to pinctrl, clk
+> > API, etc and if we can really prove later that 95% of the users are
+> > "standard", then we can factor code out, but making that assumption now
+> > is quite risky IMHO.
+> 
+> Like I say I think we're already seeing a pattern here, the code going
+> into most drivers looks *very* similar with lots of the drivers simply
+> calling get_select_default().
+
+might be true, but we don't really know if those aren't building blocks
+for upcoming PM optimizations IMO.
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/973775e3/attachment.sig>
