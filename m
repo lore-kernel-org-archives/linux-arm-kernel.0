@@ -1,57 +1,45 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Tue, 30 Oct 2012 11:23:26 +0530
-Subject: [PATCH v2 1/2] ARM: exynos4: Add devicetree node for TMU driver
-In-Reply-To: <508E74FE.7090900@samsung.com>
-References: <1351243746-4173-1-git-send-email-amit.daniel@samsung.com>
- <1351243746-4173-2-git-send-email-amit.daniel@samsung.com>
- <508E74FE.7090900@samsung.com>
-Message-ID: <CAK44p21udhZWexYkCmoFv_rPdYb0HYd1wxw1gpOQb69_OE2LGQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 30 Oct 2012 07:02:26 +0100
+Subject: [PATCH] ARM: kirkwood: Increase NAND chip-delay for DNS-320
+In-Reply-To: <alpine.DEB.2.00.1210292156240.10589@marmot.wormnet.eu>
+References: <1351457262-11506-1-git-send-email-jm@lentin.co.uk>
+ <20121028205956.GH15143@lunn.ch>
+ <alpine.DEB.2.00.1210282123250.10589@marmot.wormnet.eu>
+ <20121029064632.GJ15143@lunn.ch>
+ <alpine.DEB.2.00.1210292156240.10589@marmot.wormnet.eu>
+Message-ID: <20121030060226.GA14093@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2012 17:52, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 10/26/12 18:29, Amit Daniel Kachhap wrote:
->>
->> From: Amit Daniel Kachhap<amit.daniel@samsung.com>
->>
->> This patch adds necessary source definations needed for TMU driver and
->> adds devicetree node for exynos4210.
->>
->> Signed-off-by: Amit Daniel Kachhap<amit.daniel@samsung.com>
->> ---
->
->
-> [...]
->
->
->> +               .name           = "tmu_apbif",
->> +               .enable         = exynos4_clk_ip_perir_ctrl,
->> +               .ctrlbit        = (1<<  17),
->
->
-> tab instead of white spaces?
->
-> I fixed them when I applied.
-Thanks Mr Kim.
->
-> [...]
->
->
->> +#define EXYNOS4_IRQ_TMU_TRIG0          COMBINER_IRQ(2, 4)
->> +#define EXYNOS4_IRQ_TMU_TRIG1          COMBINER_IRQ(3, 4)
->
->
-> BTW, where are above definitions used?
+> >I'm currently downloading the GPL sources from dlink. If the kernel
+> >sources are included, we can see how dlink sets this. If its also 35,
+> >then there is no argument.
+> 
+> Rummaging myself, my best guess is:
+> 
+> linux-2.6.22.18/arch/arm/mach-feroceon-kw/nand.c
+> 173:    this->chip_delay = 30;
+> 
+> u-boot-1.1.4/board/mv_feroceon/USP/mv_nand.c
+> 68: nand->chip_delay = 30;
+> 
+> However, this is too fast for my NAS when using a mainline kernel.
+> 31usecs seems to work though. It's probably worth noting that the
+> original firmware wasn't without it's problems on this particular
+> board---I couldn't get it to reflash the NAND with a new firmware
+> image. It could certainly read the NAND though.
+> 
+> This chip_delay value seems to be there in both the DNS320 and
+> DNS325 GPL source. Maybe increasing chip_delay for both would be
+> safest.
 
-They are not used currently but might be useful for non DT support.
+Yep. Please could you submit a new patch for dnskw.dtsi.
 
-Thanks,
-Amit Daniel
->
-> Thanks.
->
-> Best regards,
-> Kgene.
-> --
-> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-> SW Solution Development Team, Samsung Electronics Co., Ltd.
+I guess you are not the only person with problems with 30, so 35 seems
+sensible.
+
+Do you have any idea how much this affects performance? It might not
+be worth the effort to probe the chip and set the timing, if its only
+a couple of % difference.
+
+  Andrew
