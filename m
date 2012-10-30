@@ -1,239 +1,69 @@
-From: Elen.Song@atmel.com (Song, Elen)
-Date: Tue, 23 Oct 2012 03:32:32 +0000
-Subject: [PATCH] DMA: AT91: Get residual bytes in dma buffer
-Message-ID: <E8F7C03B253D5640818937FAAE6B175C39DD1351@penmbx02>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Mon, 29 Oct 2012 19:33:06 -0500
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+References: <1349879449-22657-1-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+Message-ID: <CAD=GYpY5-X3BJZEQ1aD4+mKxFNvb4Ug67FtXdLbNwKxWoFvA3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping....
+Hi Guraraja,
 
->-----Original Message-----
->From: Song, Elen
->Sent: 2012?10?15? 17:19
->To: Ferre, Nicolas
->Cc: 'Russell King - ARM Linux'; 'Jean-Christophe PLAGNIOL-VILLARD';
->linux-arm-kernel at lists.infradead.org
->Subject: [PATCH] DMA: AT91: Get residual bytes in dma buffer
+I am interested in this thread. I've been trying Gururaja's patches for
+audio as well.
+
+I rebased  Guraja's patches on top of Matt's EDMA patches which were
+applied to the beaglebone 3.7 kernel repo. With some fixes to make it
+compile with CONFIG_DUMMY_REGULATOR enabled, Currently it breaks at
+set_dai_fmt in davinci-mcasp.c when an audio file is played.
+
+Could you try my tree on EVM?  dts changes may be required to use mcasp1 on
+EVM,
+https://github.com/joelagnel/linux-kernel/commits/3.7
+
+v3.7-rc2-fixes to v3.7-rc2-audio commits are Gururaja's patches which I
+applied, and after that are my commits to enable config , add dt data and
+some fixes.
+
+Thanks,
+Joel
+
+On Mon, Oct 29, 2012 at 10:45 AM, Hebbar, Gururaja
+<gururaja.hebbar@ti.com>wrote:
+
+> Matt,
 >
->The main purpose of atc_tx_status is to get residual bytes when dma transfer in
->progress or complete.
+> On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
+> > 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
+> > exposes a bug in the AM33XX clock data for mcasp. After moving to
+> > clk_get() usage, the _init() of all registered hwmods fails on mcasp0
+> > due to incorrect clock data causing clk_get() to fail. This causes all
+> > successive hwmods to fail to _init() leaving them in a bad state.
+> >
+> > This patch updates the mcasp clock entries so clk_get() will succeed.
+> > It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
+> > boot.
 >
->Residual bytes is the number of bytes left to read from DMA source.
->During transfer, residual bytes is changing as DMA read from its source.
->When transfer complete, the residual bytes is zero.
 >
->atc_get_bytes_left will dynamically get bytes left in dma buffer.
->It reads count register bit btsize to get residue, the btsize only indicate current
->descriptor receive data.
->So we should let atc_get_bytes_left know when descriptor switch or dma
->transfer done.
->DMA_CTRL_ACK is a useful ack, it means current descriptor can not be reused
->when clear.
->The atc_get_bytes_left will find out whether move to next descriptor or transfer
->done.
+> I want to test Audio on AM335x Evm with your EDMA patches. I have few
+> patches for AM335x.
+> Can you share the link to the repo & branch on which I need to rebase?
+> The patches are related to mcasp dt node, mcasp pinmux in dt, etc...
 >
->So in dma handler, we get residue like below:
->dma_handler() {
->        async_tx_clear_ack; //clear ack, tell driver it is time to switch
->descriptor
->        read residue;
->        async_tx_ack; //move to next descriptor
->                        // no need to set ack when dma transfer done }
+> >
+> ..snip..
+> ..snip..
+> >
 >
->DMA should be pause so that we can trust data count.
 >
->Signed-off-by: Elen Song <elen.song@atmel.com>
->---
-> drivers/dma/at_hdmac.c      |  127
->+++++++++++++++++++++++++++++++++++++++----
-> drivers/dma/at_hdmac_regs.h |    4 ++
-> 2 files changed, 120 insertions(+), 11 deletions(-)
+> Thanks & Regards,
+> Gururaja
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
->diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c index
->13a02f4..b0aa783 100644
->--- a/drivers/dma/at_hdmac.c
->+++ b/drivers/dma/at_hdmac.c
->@@ -229,6 +229,101 @@ static void atc_dostart(struct at_dma_chan *atchan,
->struct at_desc *first)
-> 	vdbg_dump_regs(atchan);
-> }
->
->+/*
->+ * atc_get_current_descriptors - get descriptor which equal to
->+ * physical address in DSCR.
->+ * @atchan: the channel we want to start
->+ * @dscr_addr: physical descriptor address in DSCR  */ static struct
->+at_desc *atc_get_current_descriptors(struct at_dma_chan *atchan,
->+							u32 dscr_addr)
->+{
->+	struct at_desc  *desc, *_desc, *child, *desc_cur = NULL;
->+
->+	list_for_each_entry_safe(desc, _desc, &atchan->active_list, desc_node)
->+{
->+
->+		if (desc->lli.dscr == dscr_addr) {
->+			desc_cur = desc;
->+			break;
->+		}
->+
->+		list_for_each_entry(child, &desc->tx_list, desc_node) {
->+
->+			if (child->lli.dscr == dscr_addr) {
->+				desc_cur = child;
->+				break;
->+			}
->+		}
->+	}
->+
->+	return desc_cur;
->+}
->+
->+/*
->+ * atc_get_bytes_left - Get the number of bytes
->+ * residue in dma buffer,
->+ * it is unwise to call this before stopping the channel for
->+ * absolute measures.
->+ * @atchan: the channel we want to start  */ static int
->+atc_get_bytes_left(struct at_dma_chan *atchan) {
->+	struct at_desc *desc_first;
->+	int left = 0, count = 0;
->+	u32 dscr_addr;
->+
->+	/* First descriptor embedds additional information */
->+	desc_first = atc_first_active(atchan);
->+	if (!desc_first)
->+		return -EINVAL;
->+
->+	/* Initialize necessary value in the first time.
->+	 * We use desc_cur to save current descriptor,
->+	 * save_len record residual dma buffer length.
->+	 */
->+	if (!atchan->desc_cur &&
->+	    !atchan->save_len) {
->+		atchan->desc_cur = desc_first;
->+		atchan->save_len = desc_first->len;
->+	}
->+
->+	/* This happend in the end of dma transfer or descriptor switch,
->+	 * during the dma interrupt handler, DMA_CTRL_ACK should be cleared.
->+	 * We trigger this flag to get residual values.
->+	 * To be aware of, two conditions should be taken into consideration:
->+	 * at the end of a dma transfer, or descriptors switch.
->+	 */
->+	if (!(desc_first->txd.flags & DMA_CTRL_ACK)) {
->+		dscr_addr = channel_readl(atchan, DSCR);
->+		/* End of a single or cyclic transfer */
->+		if (dscr_addr == 0 || dscr_addr == desc_first->lli.dscr) {
->+			atchan->desc_cur = NULL;
->+			atchan->save_len = 0;
->+		/* Switch between two descriptor.
->+		 * Current descriptor transfer done.
->+		 * The residual buffer length should reduce current descriptor.
->+		 */
->+		} else {
->+			atchan->desc_cur = atc_get_current_descriptors(atchan,
->+								dscr_addr);
->+			if (!atchan->desc_cur)
->+				return -EINVAL;
->+			atchan->save_len -= (atchan->desc_cur->lli.ctrla
->+						& ATC_BTSIZE_MAX);
->+		}
->+
->+		left = atchan->save_len;
->+	}
->+
->+	/* Get residual value during a descriptor transfer */
->+	if (atchan->desc_cur) {
->+		count = channel_readl(atchan, CTRLA) & ATC_BTSIZE_MAX;
->+		left = atchan->save_len - count;
->+	}
->+
->+	return left;
->+}
->+
-> /**
->  * atc_chain_complete - finish work for one transaction chain
->  * @atchan: channel we work on
->@@ -1034,23 +1129,33 @@ atc_tx_status(struct dma_chan *chan,
-> 	dma_cookie_t		last_complete;
-> 	unsigned long		flags;
-> 	enum dma_status		ret;
->-
->-	spin_lock_irqsave(&atchan->lock, flags);
->+	int bytes = 0;
->
-> 	ret = dma_cookie_status(chan, cookie, txstate);
->-	if (ret != DMA_SUCCESS) {
->-		atc_cleanup_descriptors(atchan);
->-
->-		ret = dma_cookie_status(chan, cookie, txstate);
->+	/* Residue is zero while transactions complete */
->+	if (ret == DMA_SUCCESS) {
->+		dma_set_residue(txstate, 0);
->+		return ret;
->+	}
->+	/*
->+	 * There's no point calculating the residue if there's
->+	 * no txstate to store the value.
->+	 */
->+	if (!txstate) {
->+		if (atc_chan_is_paused(atchan))
->+			ret = DMA_PAUSED;
->+		return ret;
-> 	}
->
->-	last_complete = chan->completed_cookie;
->-	last_used = chan->cookie;
->+	spin_lock_irqsave(&atchan->lock, flags);
->
->-	spin_unlock_irqrestore(&atchan->lock, flags);
->+	/*  Get number of bytes left in the active transactions */
->+	bytes = atc_get_bytes_left(atchan);
->+	if (bytes < 0)
->+		dev_err(chan2dev(chan), "get residue value error\n");
->+	dma_set_residue(txstate, bytes);
->
->-	if (ret != DMA_SUCCESS)
->-		dma_set_residue(txstate, atc_first_active(atchan)->len);
->+	spin_unlock_irqrestore(&atchan->lock, flags);
->
-> 	if (atc_chan_is_paused(atchan))
-> 		ret = DMA_PAUSED;
->diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h index
->116e4ad..ea8d747 100644
->--- a/drivers/dma/at_hdmac_regs.h
->+++ b/drivers/dma/at_hdmac_regs.h
->@@ -226,12 +226,14 @@ enum atc_status {
->  * @save_cfg: configuration register that is saved on suspend/resume cycle
->  * @save_dscr: for cyclic operations, preserve next descriptor address in
->  *             the cyclic list on suspend/resume cycle
->+ * @save_len: to record dma buffer length
->  * @dma_sconfig: configuration for slave transfers, passed via
->DMA_SLAVE_CONFIG
->  * @lock: serializes enqueue/dequeue operations to descriptors lists
->  * @active_list: list of descriptors dmaengine is being running on
->  * @queue: list of descriptors ready to be submitted to engine
->  * @free_list: list of descriptors usable by the channel
->  * @descs_allocated: records the actual size of the descriptor pool
->+ * @desc_cur: current descriptor
->  */
-> struct at_dma_chan {
-> 	struct dma_chan		chan_common;
->@@ -242,6 +244,7 @@ struct at_dma_chan {
-> 	struct tasklet_struct	tasklet;
-> 	u32			save_cfg;
-> 	u32			save_dscr;
->+	u32			save_len;
-> 	struct dma_slave_config dma_sconfig;
->
-> 	spinlock_t		lock;
->@@ -251,6 +254,7 @@ struct at_dma_chan {
-> 	struct list_head	queue;
-> 	struct list_head	free_list;
-> 	unsigned int		descs_allocated;
->+	struct at_desc		*desc_cur;
-> };
->
-> #define	channel_readl(atchan, name) \
->--
->1.7.9.5
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121029/dcae992c/attachment-0001.html>
