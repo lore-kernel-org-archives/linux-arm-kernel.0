@@ -1,47 +1,51 @@
-From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Tue, 30 Oct 2012 22:16:47 +0200
-Subject: [RFC 2/7] capebus: Add beaglebone board support
-In-Reply-To: <20121030193939.GR11908@atomide.com>
-References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
- <1351702333-8456-3-git-send-email-panto@antoniou-consulting.com>
- <20121030193939.GR11908@atomide.com>
-Message-ID: <DE47929E-9579-4DD2-B01C-08554D49FADE@antoniou-consulting.com>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Tue, 30 Oct 2012 15:28:32 -0500
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+References: <1349879449-22657-1-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+Message-ID: <CAD=GYpZ9w=D55G9DOiMqZ4BCGGdGszsgG3fumHUGZ12xx+TKjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Oct 30, 2012, at 9:39 PM, Tony Lindgren wrote:
+Hi Gururaja,
 
-> * Pantelis Antoniou <panto@antoniou-consulting.com> [121030 12:00]:
->> +
->> +	priv->lcdc_oh = omap_hwmod_lookup("lcdc");
->> +	if (priv->lcdc_oh == NULL) {
->> +		dev_err(&pdev->dev, "Failed to lookup omap_hwmod lcdc\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	priv->lcdc_pdev = omap_device_build("da8xx_lcdc", 0, priv->lcdc_oh,
->> +			&priv->lcd_pdata,
->> +			sizeof(struct da8xx_lcdc_platform_data),
->> +			NULL, 0, 0);
->> +	if (priv->lcdc_pdev == NULL) {
->> +		dev_err(&pdev->dev, "Failed to build LCDC device\n");
->> +		return -ENODEV;
->> +	}
-> 
-> ..and these kind of things need to become private to
-> arch/arm/mach-omap2, we already have it working for other
-> devices with device tree.
-> 
-> Regards,
-> 
-> Tony
+On Mon, Oct 29, 2012 at 10:45 AM, Hebbar, Gururaja
+<gururaja.hebbar@ti.com> wrote:
+> Matt,
+>
+> On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
+>> 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
+>> exposes a bug in the AM33XX clock data for mcasp. After moving to
+>> clk_get() usage, the _init() of all registered hwmods fails on mcasp0
+>> due to incorrect clock data causing clk_get() to fail. This causes all
+>> successive hwmods to fail to _init() leaving them in a bad state.
+>>
+>> This patch updates the mcasp clock entries so clk_get() will succeed.
+>> It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
+>> boot.
+>
+>
+> I want to test Audio on AM335x Evm with your EDMA patches. I have few
+> patches for AM335x.
+> Can you share the link to the repo & branch on which I need to rebase?
+> The patches are related to mcasp dt node, mcasp pinmux in dt, etc...
+>
 
-I see,
+I was wondering about the status of following patches you wrote, not
+added to mainline yet:
 
-I know that if the device driver is DTified it will pick up the hwmod automatically.
-The issue is that the driver is question is not yet; how would I go about
-creating the platform device and having it pick up the hwmod automatically?
+(1)
+ ASoC: Davinci: machine: Add device tree binding
+https://patchwork.kernel.org/patch/1380511/  - will this be resubmitted?
 
-Regards
+(2)
+ASoC: AM33XX: Add support for AM33xx SoC Audio
+https://github.com/joelagnel/linux-kernel/commit/973cfb48bdb70018b3869a21595bde8630efb29d
 
--- Pantelis
+Are you planning on sending/resending these patches again? I could do this too.
+
+I guess all other audio patches except for audio dts stuff is already in.
+
+Thanks,
+Joel
