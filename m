@@ -1,26 +1,82 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 30 Oct 2012 04:16:46 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
-References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
- <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
- <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
- <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
- <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1210300416190.12697@utopia.booyaka.com>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Tue, 30 Oct 2012 13:19:15 +0900
+Subject: [PATCH 3/4] arm: mvebu: add Ethernet controllers using mvneta
+ driver for Armada 370/XP
+In-Reply-To: <1351245804-31478-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351245804-31478-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CABMQnVKswTJr9Nd4Etx4Htv0Ckn+pDNqGO8MoPBH-x8y6CwZyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jean,
+On Fri, Oct 26, 2012 at 7:03 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> The Armada 370 SoC has two network units, while the Armada XP has four
+> network units. The first two network units are common to both the
+> Armada XP and Armada 370, so they are added to armada-370-xp.dtsi,
+> while the other two network units are specific to the Armada XP and
+> therefore added to armada-xp.dtsi.
+>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi |   14 ++++++++++++++
+>  arch/arm/boot/dts/armada-xp.dtsi     |   14 ++++++++++++++
+>  2 files changed, 28 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 16cc82c..d484492 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -68,6 +68,20 @@
+>                         compatible = "marvell,armada-addr-decoding-controller";
+>                         reg = <0xd0020000 0x258>;
+>                 };
+> +
+> +                ethernet at d0070000 {
+> +                               compatible = "marvell,armada-370-neta";
+> +                               reg = <0xd0070000 0x2500>;
+> +                               interrupts = <8>;
+> +                               status = "disabled";
+> +                };
+> +
+> +                ethernet at d0074000 {
+> +                               compatible = "marvell,armada-370-neta";
+> +                               reg = <0xd0074000 0x2500>;
+> +                               interrupts = <10>;
+> +                               status = "disabled";
+> +                };
 
-On Tue, 23 Oct 2012, Jean Pihet wrote:
+Could you fit an indent?
 
-> Let me try with the same setup as yours (bootloader images,
-> omap2pus_defconfig, angstrom roots).
+>         };
+>  };
+>
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 71d6b5d..c77a43e 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -51,5 +51,19 @@
+>                                 compatible = "marvell,armada-370-xp-system-controller";
+>                                 reg = <0xd0018200 0x500>;
+>                 };
+> +
+> +                ethernet at d0030000 {
+> +                               compatible = "marvell,armada-370-neta";
+> +                               reg = <0xd0030000 0x2500>;
+> +                               interrupts = <12>;
+> +                               status = "disabled";
+> +                };
+> +
+> +                ethernet at d0034000 {
+> +                               compatible = "marvell,armada-370-neta";
+> +                               reg = <0xd0034000 0x2500>;
+> +                               interrupts = <14>;
+> +                               status = "disabled";
+> +                };
 
-Had any luck reproducing this one that Aaro & I are seeing?
+likewise.
 
-
-- Paul
+-- 
+Nobuhiro Iwamatsu
+   iwamatsu at {nigauri.org / debian.org}
+   GPG ID: 40AD1FA6
