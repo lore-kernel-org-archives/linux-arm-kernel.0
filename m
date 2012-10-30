@@ -1,161 +1,343 @@
 From: vasanthananthan@gmail.com (Vasanth Ananthan)
-Date: Tue, 30 Oct 2012 17:01:33 +0100
-Subject: [PATCH v2 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
+Date: Tue, 30 Oct 2012 17:01:36 +0100
+Subject: [PATCH v2 5/6] DRIVERS: ATA:  SATA controller driver
 In-Reply-To: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
 References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
+Message-ID: <1351612897-14923-6-git-send-email-vasanthananthan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Device Nodes for SATA and SATA PHY device.
+This patch adds a platform driver for SATA controller.
 
 Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
 ---
- .../devicetree/bindings/ata/exynos-sata-phy.txt    |   14 ++++++++++++++
- .../devicetree/bindings/ata/exynos-sata.txt        |   17 +++++++++++++++++
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |   15 +++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |   18 ++++++++++++++++++
- arch/arm/mach-exynos/include/mach/map.h            |    3 +++
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    6 ++++++
- 6 files changed, 73 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
- create mode 100644 Documentation/devicetree/bindings/ata/exynos-sata.txt
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    3 +
+ drivers/ata/Kconfig                          |   12 ++
+ drivers/ata/Makefile                         |    1 +
+ drivers/ata/sata_exynos.c                    |  268 ++++++++++++++++++++++++++
+ 4 files changed, 284 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/ata/sata_exynos.c
 
-diff --git a/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index d4e392b..3716ce8 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -367,4 +367,7 @@
+ 
+ #define EXYNOS5_OPTION_USE_RETENTION				(1 << 4)
+ 
++/* Only for EXYNOS5250 */
++#define EXYNOS5_SATA_PHY_CONTROL		S5P_PMUREG(0x0724)
++
+ #endif /* __ASM_ARCH_REGS_PMU_H */
+diff --git a/drivers/ata/Kconfig b/drivers/ata/Kconfig
+index e3a2972..f3384ed 100644
+--- a/drivers/ata/Kconfig
++++ b/drivers/ata/Kconfig
+@@ -93,6 +93,18 @@ config SATA_PHY
+ 	  with the framework through the APIs provided and the SATA
+ 	  device finds and requests for an appropriate PHY device.
+ 
++config SATA_EXYNOS
++        bool "Exynos SATA AHCI support"
++        select I2C
++        select HAVE_S3C2410_I2C
++        select I2C_S3C2410
++        select SATA_PHY
++        help
++          This option enables support for Exynos AHCI Serial ATA
++          controllers.
++
++          If unsure, say N.
++
+ config SATA_FSL
+ 	tristate "Freescale 3.0Gbps SATA support"
+ 	depends on FSL_SOC
+diff --git a/drivers/ata/Makefile b/drivers/ata/Makefile
+index 3d219a9..43bb38e 100644
+--- a/drivers/ata/Makefile
++++ b/drivers/ata/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_SATA_SIL24)	+= sata_sil24.o
+ obj-$(CONFIG_SATA_DWC)		+= sata_dwc_460ex.o
+ obj-$(CONFIG_SATA_HIGHBANK)	+= sata_highbank.o libahci.o
+ obj-$(CONFIG_SATA_PHY)		+= sata_phy.o
++obj-$(CONFIG_SATA_EXYNOS)	+= sata_exynos.o libahci.o
+ 
+ # SFF w/ custom DMA
+ obj-$(CONFIG_PDC_ADMA)		+= pdc_adma.o
+diff --git a/drivers/ata/sata_exynos.c b/drivers/ata/sata_exynos.c
 new file mode 100644
-index 0000000..37824fa
+index 0000000..41dc17d
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/exynos-sata-phy.txt
-@@ -0,0 +1,14 @@
-+* Samsung SATA PHY Controller
++++ b/drivers/ata/sata_exynos.c
+@@ -0,0 +1,268 @@
++/*
++ * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
++ *              http://www.samsung.com
++ *
++ * EXYNOS - SATA controller driver
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
 +
-+SATA PHY nodes are defined to describe on-chip SATA Physical layer controllers.
-+Each SATA PHY controller should have its own node.
++#include <linux/kernel.h>
++#include <linux/gfp.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <linux/libata.h>
++#include <linux/ahci_platform.h>
++#include <linux/clk.h>
++#include <linux/slab.h>
++#include <linux/of.h>
 +
-+Required properties:
-+- compatible        : compatible list, contains "samsung,exynos5-sata-phy"
-+- reg               : <registers mapping>
++#include "ahci.h"
++#include "sata_phy.h"
 +
-+Example:
-+        sata at ffe07000 {
-+                compatible = "samsung,exynos5-sata-phy";
-+                reg = <0xffe07000 0x1000>;
-+        };
-diff --git a/Documentation/devicetree/bindings/ata/exynos-sata.txt b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-new file mode 100644
-index 0000000..0849f10
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/exynos-sata.txt
-@@ -0,0 +1,17 @@
-+* Samsung AHCI SATA Controller
++#define MHZ            (1000 * 1000)
 +
-+SATA nodes are defined to describe on-chip Serial ATA controllers.
-+Each SATA controller should have its own node.
++static const struct ata_port_info ahci_port_info = {
++	.flags = AHCI_FLAG_COMMON,
++	.pio_mask = ATA_PIO4,
++	.udma_mask = ATA_UDMA6,
++	.port_ops = &ahci_ops,
++};
 +
-+Required properties:
-+- compatible        : compatible list, contains "samsung,exynos5-sata"
-+- interrupts        : <interrupt mapping for SATA IRQ>
-+- reg               : <registers mapping>
-+- samsung,sata-freq : <frequency in MHz>
++static struct scsi_host_template ahci_platform_sht = {
++	AHCI_SHT("ahci_platform"),
++};
 +
-+Example:
-+        sata at ffe08000 {
-+                compatible = "samsung,exynos5-sata";
-+                reg = <0xffe08000 0x1000>;
-+                interrupts = <115>;
-+        };
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index a352df4..6910deb 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -55,6 +55,21 @@
- 		};
- 	};
- 
-+	i2c at 121D0000 {
-+		samsung,i2c-sda-delay = <100>;
-+		samsung,i2c-max-bus-freq = <40000>;
-+		samsung,i2c-slave-addr = <0x38>;
++struct exynos_sata {
++	struct clk *sclk;
++	struct clk *clk;
++	struct sata_phy *phy;
++	int irq;
++	unsigned int freq;
++};
 +
-+		sata-phy {
-+			compatible = "samsung,sata-phy";
-+			reg = <0x38>;
-+		};
-+	};
++static void exynos_sata_parse_dt(struct device_node *np,
++					struct exynos_sata *sata)
++{
++	if (!np)
++		return;
 +
-+	sata at 122F0000 {
-+		samsung,sata-freq = <66>;
-+	};
++	of_property_read_u32(np, "samsung,sata-freq", &sata->freq);
++}
 +
- 	i2c at 12C80000 {
- 		status = "disabled";
- 	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index dddfd6e..e41520f 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -92,6 +92,17 @@
- 		interrupts = <0 54 0>;
- 	};
- 
-+	sata at 122F0000 {
-+		compatible = "samsung,exynos5-sata-ahci";
-+		reg = <0x122F0000 0x1ff>;
-+		interrupts = <0 115 0>;
-+	};
++static int __init exynos_sata_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ata_port_info pi = ahci_port_info;
++	const struct ata_port_info *ppi[] = { &pi, NULL };
++	struct ahci_host_priv *hpriv;
++	struct exynos_sata *sata;
++	struct ata_host *host;
++	struct resource *mem;
++	int n_ports, i, ret;
 +
-+	sata-phy at 12170000 {
-+		compatible = "samsung,exynos5-sata-phy";
-+		reg = <0x12170000 0x1ff>;
-+	};
++	sata = devm_kzalloc(dev, sizeof(*sata), GFP_KERNEL);
++	if (!sata) {
++		dev_err(dev, "can't alloc sata\n");
++		return -EINVAL;
++	}
 +
- 	i2c at 12C60000 {
- 		compatible = "samsung,s3c2440-i2c";
- 		reg = <0x12C60000 0x100>;
-@@ -156,6 +167,13 @@
- 		#size-cells = <0>;
- 	};
- 
-+	i2c at 121D0000 {
-+                compatible = "samsung,exynos5-sata-phy-i2c";
-+                reg = <0x121D0000 0x100>;
-+                #address-cells = <1>;
-+                #size-cells = <0>;
-+	};
++	hpriv = devm_kzalloc(dev, sizeof(*hpriv), GFP_KERNEL);
++	if (!hpriv) {
++		dev_err(dev, "can't alloc ahci_host_priv\n");
++		ret = -ENOMEM;
++		goto err1;
++	}
 +
- 	spi_0: spi at 12d20000 {
- 		compatible = "samsung,exynos4210-spi";
- 		reg = <0x12d20000 0x100>;
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 8480849..ffeb761 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -188,6 +188,9 @@
- #define EXYNOS4_PA_SATA			0x12560000
- #define EXYNOS4_PA_SATAPHY		0x125D0000
- #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
-+#define EXYNOS5_PA_SATA_PHY_CTRL	0x12170000
-+#define EXYNOS5_PA_SATA_PHY_I2C		0x121D0000
-+#define EXYNOS5_PA_SATA_BASE		0x122F0000
- 
- #define EXYNOS4_PA_SROMC		0x12570000
- #define EXYNOS5_PA_SROMC		0x12250000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index db1cd8e..7dbd4cc 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -61,6 +61,12 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos4210-spi.1", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS5_PA_SPI2,
- 				"exynos4210-spi.2", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", EXYNOS5_PA_SATA_BASE,
-+				"exynos5-sata", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", EXYNOS5_PA_SATA_PHY_CTRL,
-+				"exynos5-sata-phy", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c", EXYNOS5_PA_SATA_PHY_I2C,
-+				"exynos5-sata-phy-i2c", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
- 	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
++	hpriv->flags |= (unsigned long)pi.private_data;
++
++	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!mem) {
++		dev_err(dev, "no mmio space\n");
++		ret = -EINVAL;
++		goto err2;
++	}
++
++	sata->irq = platform_get_irq(pdev, 0);
++	if (sata->irq <= 0) {
++		dev_err(dev, "no irq\n");
++		ret = -EINVAL;
++		goto err2;
++	}
++
++	hpriv->mmio = devm_ioremap(dev, mem->start, resource_size(mem));
++	if (!hpriv->mmio) {
++		dev_err(dev, "can't map %pR\n", mem);
++		ret = -ENOMEM;
++		goto err2;
++	}
++
++	exynos_sata_parse_dt(dev->of_node, sata);
++
++	sata->sclk = devm_clk_get(dev, "sclk_sata");
++	if (IS_ERR(sata->sclk)) {
++		dev_err(dev, "failed to get sclk_sata\n");
++		ret = PTR_ERR(sata->sclk);
++		goto err3;
++	}
++	clk_enable(sata->sclk);
++
++	clk_set_rate(sata->sclk, sata->freq * MHZ);
++
++	sata->clk = devm_clk_get(dev, "sata");
++	if (IS_ERR(sata->clk)) {
++		dev_err(dev, "failed to get sata clock\n");
++		ret = PTR_ERR(sata->clk);
++		goto err4;
++	}
++	clk_enable(sata->clk);
++
++	/*  Get a gen 3 PHY controller */
++
++	sata->phy = sata_get_phy(SATA_PHY_GENERATION3);
++	if (!sata->phy) {
++		dev_err(dev, "failed to get sata phy\n");
++		ret = -EPROBE_DEFER;
++		goto err5;
++	}
++
++	/* Initialize the controller */
++
++	ret = sata_init_phy(sata->phy);
++	if (ret < 0) {
++		dev_err(dev, "failed to initialize sata phy\n");
++		goto err6;
++	}
++
++	ahci_save_initial_config(dev, hpriv, 0, 0);
++
++	/* prepare host */
++	if (hpriv->cap & HOST_CAP_NCQ)
++		pi.flags |= ATA_FLAG_NCQ;
++
++	if (hpriv->cap & HOST_CAP_PMP)
++		pi.flags |= ATA_FLAG_PMP;
++
++	ahci_set_em_messages(hpriv, &pi);
++
++	/* CAP.NP sometimes indicate the index of the last enabled
++	 * port, at other times, that of the last possible port, so
++	 * determining the maximum port number requires looking at
++	 * both CAP.NP and port_map.
++	 */
++	n_ports = max(ahci_nr_ports(hpriv->cap), fls(hpriv->port_map));
++
++	host = ata_host_alloc_pinfo(dev, ppi, n_ports);
++	if (!host) {
++		ret = -ENOMEM;
++		goto err7;
++	}
++
++	host->private_data = hpriv;
++
++	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
++		host->flags |= ATA_HOST_PARALLEL_SCAN;
++	else
++		pr_info(KERN_INFO
++		       "ahci: SSS flag set, parallel bus scan disabled\n");
++
++	if (pi.flags & ATA_FLAG_EM)
++		ahci_reset_em(host);
++
++	for (i = 0; i < host->n_ports; i++) {
++		struct ata_port *ap = host->ports[i];
++
++		ata_port_desc(ap, "mmio %pR", mem);
++		ata_port_desc(ap, "port 0x%x", 0x100 + ap->port_no * 0x80);
++
++		/* set enclosure management message type */
++		if (ap->flags & ATA_FLAG_EM)
++			ap->em_message_type = hpriv->em_msg_type;
++
++		/* disabled/not-implemented port */
++		if (!(hpriv->port_map & (1 << i)))
++			ap->ops = &ata_dummy_port_ops;
++	}
++
++	ret = ahci_reset_controller(host);
++	if (ret)
++		goto err7;
++
++	ahci_init_controller(host);
++	ahci_print_info(host, "platform");
++
++	ret = ata_host_activate(host, sata->irq, ahci_interrupt, IRQF_SHARED,
++				&ahci_platform_sht);
++	if (ret)
++		goto err7;
++
++	platform_set_drvdata(pdev, sata);
++
++	return 0;
++
++ err7:
++	sata_shutdown_phy(sata->phy);
++
++ err6:
++	sata_put_phy(sata->phy);
++
++ err5:
++	clk_disable(sata->clk);
++	devm_clk_put(dev, sata->clk);
++
++ err4:
++	clk_disable(sata->sclk);
++	devm_clk_put(dev, sata->sclk);
++
++ err3:
++	devm_iounmap(dev, hpriv->mmio);
++
++ err2:
++	devm_kfree(dev, hpriv);
++
++ err1:
++	devm_kfree(dev, sata);
++
++	return ret;
++}
++
++static int __devexit exynos_sata_remove(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ata_host *host = dev_get_drvdata(dev);
++	struct exynos_sata *sata = platform_get_drvdata(pdev);
++
++	ata_host_detach(host);
++
++	sata_shutdown_phy(sata->phy);
++	sata_put_phy(sata->phy);
++
++	return 0;
++}
++
++static const struct of_device_id ahci_of_match[] = {
++	{ .compatible = "samsung,exynos5-sata-ahci", },
++};
++
++MODULE_DEVICE_TABLE(of, ahci_of_match);
++
++static struct platform_driver exynos_sata_driver = {
++	.probe	= exynos_sata_probe,
++	.remove = exynos_sata_remove,
++	.driver = {
++		.name = "ahci-sata",
++		.owner = THIS_MODULE,
++		.of_match_table = ahci_of_match,
++	},
++};
++
++module_platform_driver(exynos_sata_driver);
++
++MODULE_DESCRIPTION("EXYNOS SATA DRIVER");
++MODULE_AUTHOR("Vasanth Ananthan, <vasanth.a@samsung.com>");
++MODULE_LICENSE("GPL");
 -- 
 1.7.4.1
