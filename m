@@ -1,87 +1,60 @@
-From: marek.belisko@open-nandra.com (Marek Belisko)
-Date: Tue, 30 Oct 2012 22:42:47 +0100
-Subject: [PATCH] arm/dts: Add basic support for gta04 (Openmoko next
- generation) board.
-Message-ID: <1351633367-19082-1-git-send-email-marek.belisko@open-nandra.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2012 22:51:11 +0100
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121030183704.GX4511@opensource.wolfsonmicro.com>
+References: <20121025205901.GA3827@sirena.org.uk>
+ <20121026062008.GA21734@arwen.pp.htv.fi>
+ <20121026160316.GY18814@opensource.wolfsonmicro.com>
+ <20121029194901.GA30152@arwen.pp.htv.fi>
+ <20121030112410.GM4511@opensource.wolfsonmicro.com>
+ <20121030114949.GC28722@arwen.pp.htv.fi>
+ <20121030140714.GO4511@opensource.wolfsonmicro.com>
+ <20121030151642.GE29159@arwen.pp.htv.fi>
+ <20121030155821.GU4511@opensource.wolfsonmicro.com>
+ <20121030172513.GA3993@arwen.pp.htv.fi>
+ <20121030183704.GX4511@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Belisko <marek.belisko@open-nandra.com>
----
- arch/arm/boot/dts/omap3-gta04.dts |   65 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 65 insertions(+)
- create mode 100644 arch/arm/boot/dts/omap3-gta04.dts
+On Tue, Oct 30, 2012 at 7:37 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dts b/arch/arm/boot/dts/omap3-gta04.dts
-new file mode 100644
-index 0000000..76efd13
---- /dev/null
-+++ b/arch/arm/boot/dts/omap3-gta04.dts
-@@ -0,0 +1,65 @@
-+/*
-+ * Copyright (C) 2012 Marek Belisko <marek.belisko@open-nandra.com>
-+ *
-+ * Based on omap3-beagle-xm.dts
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+/dts-v1/;
-+
-+/include/ "omap3.dtsi"
-+
-+/ {
-+	model = "OMAP3 GTA04";
-+	compatible = "ti,omap3-gta04", "ti,omap3";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x20000000>; /* 512 MB */
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		aux-button {
-+			label = "AUX";
-+			linux,code = <169>;
-+			gpios = <&gpio1 7 1>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	clock-frequency = <2600000>;
-+
-+	twl: twl at 48 {
-+		reg = <0x48>;
-+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
-+		interrupt-parent = <&intc>;
-+	};
-+};
-+
-+/include/ "twl4030.dtsi"
-+
-+&i2c2 {
-+	clock-frequency = <400000>;
-+	/* Pressure Sensor */
-+	bmp085 at 77 {
-+		compatible = "bosch,bmp085";
-+		reg = <0x77>;
-+	};
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&vmmc1>;
-+	bus-width = <4>;
-+};
-+
--- 
-1.7.9.5
+> More seriously the amount of time we seem to have been spending recently
+> on changes which end up requiring us to go through essentially every
+> driver and add code to them (often several times) doesn't seem like
+> we're doing a good job here.
+
+If this is your main concern you should be made aware that there
+are people out there planning to supplant the existing DT probe paths
+that are now being added to each and every ARM-related driver
+with an ACPI probe path as ARM servers come into the picture.
+
+> pinctrl is really noticable because it's
+> new but it's not the only thing.  As a subsystem maintainer this code
+> just makes me want to add new subsystem features to pull the code out of
+> drivers but obviously that's not something that should be being done at
+> the subsystem level.
+
+We did manage to drag the power/voltage domain per se out
+of the AMBA bus, and recommend that people (like us) do that
+business using the power domains.
+
+I think most people (including OMAP) have bought
+into the concept of using the runtime PM framework and power
+domains to control the power domain switches.
+
+It's this wider concept of using the loose concept "PM resource
+domains" to control also clocks and pins that is at stake, and so
+far the runtime PM core people (Rafael and Magnus) has not said
+much so I think we need some kind of indication from them as to
+what is to happen, long-term, with drivers handling their own clocks
+and pins. Should it be centralized or not? If it's to be centralized it
+needs to become a large piece of infrastructure refactoring and
+needs the attention of Linaro and the like to happen.
+
+I've CC:ed a few people into this thread so we get some traction,
+we need more subsystem maintainers in here.
+
+Yours,
+Linus Walleij
