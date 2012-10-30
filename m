@@ -1,85 +1,44 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Tue, 30 Oct 2012 16:04:11 -0500
-Subject: [PATCH 1/6] arm: use devicetree to get smp_twd clock
-In-Reply-To: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1351631056-25938-2-git-send-email-mark.langsdorf@calxeda.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Wed, 31 Oct 2012 00:20:47 +0300
+Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
+In-Reply-To: <509032F6.1050301@gmail.com>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+ <201210282259.46491.marex@denx.de>
+ <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
+ <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
+ <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
+ <508E4F7F.7010607@gmail.com>
+ <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
+ <508E5DFB.3060002@gmail.com>
+ <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
+ <508E61E7.7090502@gmail.com>
+ <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
+ <508E651A.5070009@gmail.com>
+ <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
+ <509032F6.1050301@gmail.com>
+Message-ID: <CA+E=qVfX6vrGVhmy5+KGZ_H78ERzdFcK+fnTz3z79YcQZuJrDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Tue, Oct 30, 2012 at 11:05 PM, Daniel Mack <zonque@gmail.com> wrote:
+>> One more question: what should I use instead of pxa2xx_mfp_config in
+>> DT board to configure pin modes?
+>
+> Haojian was working on the PXA pinctrl drivers, but I don't know how far
+> that is yet.
+>
+> If that's not yet there, have a look at the pinctrl-single driver. It's
+> admittedly not as nice to use as the constants in the board file as DT
+> lacks defines for numerical constants, but's at least a workaround.
+>
+> On a more general note, it's arguable whether this kind of setup should
+> be done in the bootloader after all.
+>
+>
+> Daniel
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/kernel/smp_twd.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+OK, thanks for suggestion!
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b22d700..600fbcc 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct clk *twd_get_clock(void)
-+static struct clk *twd_get_clock(struct device_node *np)
- {
--	struct clk *clk;
-+	struct clk *clk = NULL;
- 	int err;
- 
--	clk = clk_get_sys("smp_twd", NULL);
-+	if (np)
-+		clk = of_clk_get(np, 0);
-+	if (!clk)
-+		clk = clk_get_sys("smp_twd", NULL);
- 	if (IS_ERR(clk)) {
- 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
- 		return clk;
-@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
- 		return ERR_PTR(err);
- 	}
- 
-+	twd_timer_rate = clk_get_rate(clk);
- 	return clk;
- }
- 
-@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
- 	struct clock_event_device **this_cpu_clk;
- 
--	if (!twd_clk)
--		twd_clk = twd_get_clock();
--
--	if (!IS_ERR_OR_NULL(twd_clk))
--		twd_timer_rate = clk_get_rate(twd_clk);
--	else
-+	if (IS_ERR_OR_NULL(twd_clk))
- 		twd_calibrate_rate();
- 
- 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-@@ -349,6 +348,10 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
- 	if (!twd_base)
- 		return -ENOMEM;
- 
-+	twd_clk = twd_get_clock(NULL);
-+
-+	twd_clk = twd_get_clock(NULL);
-+
- 	return twd_local_timer_common_register();
- }
- 
-@@ -383,6 +386,8 @@ void __init twd_local_timer_of_register(void)
- 		goto out;
- 	}
- 
-+	twd_clk = twd_get_clock(np);
-+
- 	err = twd_local_timer_common_register();
- 
- out:
--- 
-1.7.11.7
+Regards
+Vasily
