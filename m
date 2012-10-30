@@ -1,62 +1,66 @@
-From: jm@lentin.co.uk (Jamie Lentin)
-Date: Mon, 29 Oct 2012 22:47:57 +0000 (GMT)
-Subject: [PATCH] ARM: kirkwood: Increase NAND chip-delay for DNS-320
-In-Reply-To: <20121029064632.GJ15143@lunn.ch>
-References: <1351457262-11506-1-git-send-email-jm@lentin.co.uk>
- <20121028205956.GH15143@lunn.ch>
- <alpine.DEB.2.00.1210282123250.10589@marmot.wormnet.eu>
- <20121029064632.GJ15143@lunn.ch>
-Message-ID: <alpine.DEB.2.00.1210292156240.10589@marmot.wormnet.eu>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Mon, 29 Oct 2012 19:35:54 -0500
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+References: <1349879449-22657-1-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+Message-ID: <CAD=GYpbBc-zTpkvWrf-4AYQy0dUniCML5ndC4cQfzOJ1MOU0mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Oct 2012, Andrew Lunn wrote:
+[resending, because the first post got rejected due to non-plaintext]
 
->> The chip markings are: SAMSUNG 146 K9F1G08U0D SCB0 (FKJ554PWN)
->>
->> Unfortunately the other NAS is too far away to get at, but D-link
->> haven't stuck to exactly the same chip. This DNS-320 review shows a
->> different Samsung part:
->>
->> http://diit.cz/data/images/thumb/67491_2b9e5e4fbd.jpg?1307884464
->>
->> The datasheet for the K9F1G08U0D says max 35usecs "Data Transfer
->> from Cell to Register", whereas K9F1G08U0C (what the DNS-320 review
->> shows) says 25usecs. If this is the value in the datasheet to check,
->> then this would explain the problems.
+Hi Guraraja,
+
+I am interested in this thread. I've been trying Gururaja's patches for
+audio as well.
+
+I rebased ?Guraja's patches on top of Matt's EDMA patches which were
+applied to the beaglebone 3.7 kernel repo. With some fixes to make it
+compile with CONFIG_DUMMY_REGULATOR enabled, Currently it breaks at
+set_dai_fmt in davinci-mcasp.c when an audio file is played.
+
+Could you try my tree on EVM? ?dts changes may be required to use mcasp1 on
+EVM, https://github.com/joelagnel/linux-kernel/commits/3.7
+
+v3.7-rc2-fixes to v3.7-rc2-audio commits are Gururaja's patches which I
+applied, and after that are my commits to enable config , add dt data and
+some fixes.
+
+Thanks,
+Joel
+
+On Mon, Oct 29, 2012 at 10:45 AM, Hebbar, Gururaja
+<gururaja.hebbar@ti.com> wrote:
 >
-> Seems sensible.
+> Matt,
 >
-> I'm currently downloading the GPL sources from dlink. If the kernel
-> sources are included, we can see how dlink sets this. If its also 35,
-> then there is no argument.
-
-Rummaging myself, my best guess is:
-
-linux-2.6.22.18/arch/arm/mach-feroceon-kw/nand.c
-173:    this->chip_delay = 30;
-
-u-boot-1.1.4/board/mv_feroceon/USP/mv_nand.c
-68: nand->chip_delay = 30;
-
-However, this is too fast for my NAS when using a mainline kernel. 31usecs 
-seems to work though. It's probably worth noting that the original 
-firmware wasn't without it's problems on this particular board---I 
-couldn't get it to reflash the NAND with a new firmware image. It could 
-certainly read the NAND though.
-
-This chip_delay value seems to be there in both the DNS320 and DNS325 GPL 
-source. Maybe increasing chip_delay for both would be safest.
-
-> The only thing you could think about is probing the nand device, and
-> if it is not K9F1G08U0D put the delay back to 25.
-
-That would be good, although the challenge will be a neat place to hang 
-the code.
-
+> On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
+> > 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
+> > exposes a bug in the AM33XX clock data for mcasp. After moving to
+> > clk_get() usage, the _init() of all registered hwmods fails on mcasp0
+> > due to incorrect clock data causing clk_get() to fail. This causes all
+> > successive hwmods to fail to _init() leaving them in a bad state.
+> >
+> > This patch updates the mcasp clock entries so clk_get() will succeed.
+> > It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
+> > boot.
 >
->   Andrew
 >
-
--- 
-Jamie Lentin
+> I want to test Audio on AM335x Evm with your EDMA patches. I have few
+> patches for AM335x.
+> Can you share the link to the repo & branch on which I need to rebase?
+> The patches are related to mcasp dt node, mcasp pinmux in dt, etc...
+>
+> >
+> ..snip..
+> ..snip..
+> >
+>
+>
+> Thanks & Regards,
+> Gururaja
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
