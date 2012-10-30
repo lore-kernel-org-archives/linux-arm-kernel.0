@@ -1,213 +1,135 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 16:52:47 -0700
-Subject: [PATCH 03/11] ARM: OMAP: Move omap1 specific code to local sram.c
+Date: Tue, 30 Oct 2012 16:52:51 -0700
+Subject: [PATCH 05/11] ARM: OMAP: Make plat-omap/i2c.c port checks local
 In-Reply-To: <20121030234852.25936.12482.stgit@muffinssi.local>
 References: <20121030234852.25936.12482.stgit@muffinssi.local>
-Message-ID: <20121030235247.25936.53373.stgit@muffinssi.local>
+Message-ID: <20121030235251.25936.92446.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's make the omap1 specific parts private to mach-omap1.
-These should not be in the shared code.
+The common code should not have any omap1 or omap2+
+specific code, and should not need to call the cpu_is_omap
+macros.
+
+The only remaining user for cpu_is_omap macros is
+omap_i2c_nr_ports(). Let's make those checks in
+the omap specific implementation of omap_i2c_add_bus()
+instead in order to remove cpu_is_omap usage from
+the common code.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/Makefile    |    3 +-
- arch/arm/mach-omap1/sram-init.c |   76 +++++++++++++++++++++++++++++++++++++++
- arch/arm/plat-omap/sram.c       |   49 ++-----------------------
- 3 files changed, 81 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/mach-omap1/sram-init.c
+ arch/arm/mach-omap1/i2c.c |    3 +++
+ arch/arm/mach-omap2/i2c.c |   16 ++++++++++++++++
+ arch/arm/plat-omap/i2c.c  |   26 +++-----------------------
+ 3 files changed, 22 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/Makefile b/arch/arm/mach-omap1/Makefile
-index cd169c3..f0e69cb 100644
---- a/arch/arm/mach-omap1/Makefile
-+++ b/arch/arm/mach-omap1/Makefile
-@@ -3,7 +3,8 @@
- #
+diff --git a/arch/arm/mach-omap1/i2c.c b/arch/arm/mach-omap1/i2c.c
+index 32bcbb8..54097a2 100644
+--- a/arch/arm/mach-omap1/i2c.c
++++ b/arch/arm/mach-omap1/i2c.c
+@@ -54,6 +54,9 @@ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *pdata,
+ 	struct platform_device *pdev;
+ 	struct resource *res;
  
- # Common support
--obj-y := io.o id.o sram.o time.o irq.o mux.o flash.o serial.o devices.o dma.o
-+obj-y := io.o id.o sram-init.o sram.o time.o irq.o mux.o flash.o \
-+	 serial.o devices.o dma.o
- obj-y += clock.o clock_data.o opp_data.o reset.o pm_bus.o timer.o
++	if (bus_id > 1)
++		return -EINVAL;
++
+ 	omap1_i2c_mux_pins(bus_id);
  
- ifneq ($(CONFIG_SND_OMAP_SOC_MCBSP),)
-diff --git a/arch/arm/mach-omap1/sram-init.c b/arch/arm/mach-omap1/sram-init.c
-new file mode 100644
-index 0000000..6431b0f
---- /dev/null
-+++ b/arch/arm/mach-omap1/sram-init.c
-@@ -0,0 +1,76 @@
-+/*
-+ * OMAP SRAM detection and management
-+ *
-+ * Copyright (C) 2005 Nokia Corporation
-+ * Written by Tony Lindgren <tony@atomide.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+
-+#include <asm/fncpy.h>
-+#include <asm/tlb.h>
-+#include <asm/cacheflush.h>
-+
-+#include <asm/mach/map.h>
-+
-+#include "soc.h"
-+#include "sram.h"
-+
-+#define OMAP1_SRAM_PA		0x20000000
-+#define SRAM_BOOTLOADER_SZ	0x80
-+
-+/*
-+ * The amount of SRAM depends on the core type.
-+ * Note that we cannot try to test for SRAM here because writes
-+ * to secure SRAM will hang the system. Also the SRAM is not
-+ * yet mapped at this point.
-+ */
-+static void __init omap_detect_and_map_sram(void)
+ 	pdev = &omap_i2c_devices[bus_id - 1];
+diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
+index ad55b94..4e63097 100644
+--- a/arch/arm/mach-omap2/i2c.c
++++ b/arch/arm/mach-omap2/i2c.c
+@@ -109,6 +109,19 @@ int omap_i2c_reset(struct omap_hwmod *oh)
+ 	return 0;
+ }
+ 
++static int __init omap_i2c_nr_ports(void)
 +{
-+	unsigned long omap_sram_skip = SRAM_BOOTLOADER_SZ;
-+	unsigned long omap_sram_start = OMAP1_SRAM_PA;
-+	unsigned long omap_sram_size;
++	int ports = 0;
 +
-+	if (cpu_is_omap7xx())
-+		omap_sram_size = 0x32000;	/* 200K */
-+	else if (cpu_is_omap15xx())
-+		omap_sram_size = 0x30000;	/* 192K */
-+	else if (cpu_is_omap1610() || cpu_is_omap1611() ||
-+			cpu_is_omap1621() || cpu_is_omap1710())
-+		omap_sram_size = 0x4000;	/* 16K */
-+	else {
-+		pr_err("Could not detect SRAM size\n");
-+		omap_sram_size = 0x4000;
-+	}
-+
-+	omap_map_sram(omap_sram_start, omap_sram_size,
-+		omap_sram_skip, 1);
++	if (cpu_is_omap24xx())
++		ports = 2;
++	else if (cpu_is_omap34xx())
++		ports = 3;
++	else if (cpu_is_omap44xx())
++		ports = 4;
++	return ports;
 +}
 +
-+static void (*_omap_sram_reprogram_clock)(u32 dpllctl, u32 ckctl);
-+
-+void omap_sram_reprogram_clock(u32 dpllctl, u32 ckctl)
-+{
-+	BUG_ON(!_omap_sram_reprogram_clock);
-+	/* On 730, bit 13 must always be 1 */
-+	if (cpu_is_omap7xx())
-+		ckctl |= 0x2000;
-+	_omap_sram_reprogram_clock(dpllctl, ckctl);
-+}
-+
-+int __init omap_sram_init(void)
-+{
-+	omap_detect_and_map_sram();
-+	_omap_sram_reprogram_clock =
-+			omap_sram_push(omap1_sram_reprogram_clock,
-+					omap1_sram_reprogram_clock_sz);
-+
-+	return 0;
-+}
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index aa2644a..6fd3216 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -26,8 +26,6 @@
+ static const char name[] = "omap_i2c";
  
- #include <asm/mach/map.h>
+ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
+@@ -121,6 +134,9 @@ int __init omap_i2c_add_bus(struct omap_i2c_bus_platform_data *i2c_pdata,
+ 	struct omap_i2c_bus_platform_data *pdata;
+ 	struct omap_i2c_dev_attr *dev_attr;
+ 
++	if (bus_id > omap_i2c_nr_ports())
++		return -EINVAL;
++
+ 	omap2_i2c_mux_pins(bus_id);
+ 
+ 	l = snprintf(oh_name, MAX_OMAP_I2C_HWMOD_NAME_LEN, "i2c%d", bus_id);
+diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
+index be6deb7..d094273 100644
+--- a/arch/arm/plat-omap/i2c.c
++++ b/arch/arm/plat-omap/i2c.c
+@@ -33,9 +33,6 @@
+ 
+ #include <mach/irqs.h>
  
 -#include "../mach-omap1/soc.h"
--#include "../mach-omap1/sram.h"
- #include "../mach-omap2/soc.h"
- #include "../mach-omap2/sram.h"
- 
-@@ -36,7 +34,6 @@
- #include "../mach-omap2/prm2xxx_3xxx.h"
- #include "../mach-omap2/sdrc.h"
- 
--#define OMAP1_SRAM_PA		0x20000000
- #define OMAP2_SRAM_PUB_PA	(OMAP2_SRAM_PA + 0xf800)
- #define OMAP3_SRAM_PUB_PA       (OMAP3_SRAM_PA + 0x8000)
- #ifdef CONFIG_OMAP4_ERRATA_I688
-@@ -150,20 +147,6 @@ static void __init omap_detect_sram(void)
- 					omap_sram_size = 0x10000; /* 64K */
- 			}
- 		}
--	} else {
--		omap_sram_start = OMAP1_SRAM_PA;
+-#include "../mach-omap2/soc.h"
 -
--		if (cpu_is_omap7xx())
--			omap_sram_size = 0x32000;	/* 200K */
--		else if (cpu_is_omap15xx())
--			omap_sram_size = 0x30000;	/* 192K */
--		else if (cpu_is_omap1610() || cpu_is_omap1611() ||
--				cpu_is_omap1621() || cpu_is_omap1710())
--			omap_sram_size = 0x4000;	/* 16K */
--		else {
--			pr_err("Could not detect SRAM size\n");
--			omap_sram_size = 0x4000;
--		}
- 	}
- }
+ #include "i2c.h"
  
-@@ -257,32 +240,6 @@ void __init omap_map_sram(unsigned long start, unsigned long size,
- 		  omap_sram_size - omap_sram_skip);
- }
+ #define OMAP_I2C_MAX_CONTROLLERS 4
+@@ -43,22 +40,6 @@ static struct omap_i2c_bus_platform_data i2c_pdata[OMAP_I2C_MAX_CONTROLLERS];
  
--#ifdef CONFIG_ARCH_OMAP1
--
--static void (*_omap_sram_reprogram_clock)(u32 dpllctl, u32 ckctl);
--
--void omap_sram_reprogram_clock(u32 dpllctl, u32 ckctl)
+ #define OMAP_I2C_CMDLINE_SETUP	(BIT(31))
+ 
+-static int __init omap_i2c_nr_ports(void)
 -{
--	BUG_ON(!_omap_sram_reprogram_clock);
--	/* On 730, bit 13 must always be 1 */
--	if (cpu_is_omap7xx())
--		ckctl |= 0x2000;
--	_omap_sram_reprogram_clock(dpllctl, ckctl);
+-	int ports = 0;
+-
+-	if (cpu_class_is_omap1())
+-		ports = 1;
+-	else if (cpu_is_omap24xx())
+-		ports = 2;
+-	else if (cpu_is_omap34xx())
+-		ports = 3;
+-	else if (cpu_is_omap44xx())
+-		ports = 4;
+-
+-	return ports;
 -}
 -
--static int __init omap1_sram_init(void)
--{
--	_omap_sram_reprogram_clock =
--			omap_sram_push(omap1_sram_reprogram_clock,
--					omap1_sram_reprogram_clock_sz);
--
--	return 0;
--}
--
--#else
--#define omap1_sram_init()	do {} while (0)
--#endif
--
- #if defined(CONFIG_ARCH_OMAP2)
- 
- static void (*_omap2_sram_ddr_init)(u32 *slow_dll_ctrl, u32 fast_dll_ctrl,
-@@ -407,14 +364,13 @@ static inline int am33xx_sram_init(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_ARCH_OMAP2PLUS
- int __init omap_sram_init(void)
+ /**
+  * omap_i2c_bus_setup - Process command line options for the I2C bus speed
+  * @str: String of options
+@@ -72,12 +53,11 @@ static int __init omap_i2c_nr_ports(void)
+  */
+ static int __init omap_i2c_bus_setup(char *str)
  {
- 	omap_detect_sram();
- 	omap_fix_and_map_sram();
+-	int ports;
+ 	int ints[3];
  
--	if (!(cpu_class_is_omap2()))
--		omap1_sram_init();
--	else if (cpu_is_omap242x())
-+	if (cpu_is_omap242x())
- 		omap242x_sram_init();
- 	else if (cpu_is_omap2430())
- 		omap243x_sram_init();
-@@ -425,3 +381,4 @@ int __init omap_sram_init(void)
+-	ports = omap_i2c_nr_ports();
+ 	get_options(str, 3, ints);
+-	if (ints[0] < 2 || ints[1] < 1 || ints[1] > ports)
++	if (ints[0] < 2 || ints[1] < 1 ||
++			ints[1] > OMAP_I2C_MAX_CONTROLLERS)
+ 		return 0;
+ 	i2c_pdata[ints[1] - 1].clkrate = ints[2];
+ 	i2c_pdata[ints[1] - 1].clkrate |= OMAP_I2C_CMDLINE_SETUP;
+@@ -122,7 +102,7 @@ int __init omap_register_i2c_bus(int bus_id, u32 clkrate,
+ {
+ 	int err;
  
- 	return 0;
- }
-+#endif
+-	BUG_ON(bus_id < 1 || bus_id > omap_i2c_nr_ports());
++	BUG_ON(bus_id < 1 || bus_id > OMAP_I2C_MAX_CONTROLLERS);
+ 
+ 	if (info) {
+ 		err = i2c_register_board_info(bus_id, info, len);
