@@ -1,161 +1,33 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 30 Oct 2012 19:23:32 +0100
-Subject: [PATCH V4 2/3] clk: armada-370-xp: add support for clock framework
-In-Reply-To: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1351621413-3637-3-git-send-email-gregory.clement@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Oct 2012 12:27:32 -0600
+Subject: [PATCH 2/3] irqchip: Move ARM VIC to drivers/irqchip
+In-Reply-To: <1351608860-24617-3-git-send-email-robherring2@gmail.com>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-3-git-send-email-robherring2@gmail.com>
+Message-ID: <50901C14.5050605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-370.dtsi   |   12 +++++++++
- arch/arm/boot/dts/armada-xp.dtsi    |   48 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/Kconfig         |    5 ++++
- arch/arm/mach-mvebu/armada-370-xp.c |    8 +++++-
- arch/arm/mach-mvebu/common.h        |    1 +
- 5 files changed, 73 insertions(+), 1 deletion(-)
+On 10/30/2012 08:54 AM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Now that we have drivers/irqchip, move VIC irqchip to drivers/irqchip.
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 2069151..ac495b4 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -75,5 +75,17 @@
- 			#interrupts-cells = <2>;
- 			interrupts = <91>;
- 		};
-+		coreclk: mvebu-sar at d0018230 {
-+			#clock-cells = <1>;
-+			reg = <0xd0018230 0x08>;
-+			compatible = "marvell,armada-370-core-clockctrl";
-+			clock-output-names =
-+				"tclk",	    /* 0 */
-+				"pclk",	    /* 1 */
-+				"nbclk",    /* 2 */
-+				"hclk",	    /* 3 */
-+				"dramclk";  /* 4 */
-+		};
-+
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 71d6b5d..8fd924a 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -27,6 +27,35 @@
- 		    <0xd0021870 0x58>;
- 	};
- 
-+	cpus {
-+	    #address-cells = <1>;
-+	    #size-cells = <0>;
-+
-+	    cpu at 0 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <0>;
-+		clocks = <&cpuclk 0>;
-+	    };
-+
-+	    cpu at 1 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <1>;
-+		clocks = <&cpuclk 1>;
-+	    };
-+
-+	    cpu at 2 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <2>;
-+		clocks = <&cpuclk 2>;
-+	    };
-+
-+	    cpu at 3 {
-+		compatible = "marvell,sheeva-v7";
-+		reg = <3>;
-+		clocks = <&cpuclk 3>;
-+	    };
-+	};
-+
- 	soc {
- 		serial at d0012200 {
- 				compatible = "ns16550";
-@@ -47,6 +76,25 @@
- 				marvell,timer-25Mhz;
- 		};
- 
-+		coreclk: mvebu-sar at d0018230 {
-+			#clock-cells = <1>;
-+			reg = <0xd0018230 0x08>;
-+			compatible = "marvell,armada-xp-core-clockctrl";
-+			clock-output-names =
-+				"tclk",	    /* 0 */
-+				"pclk",	    /* 1 */
-+				"nbclk",    /* 2 */
-+				"hclk",	    /* 3 */
-+				"dramclk";  /* 4 */
-+		};
-+
-+		cpuclk: clock-complex at d0018700 {
-+			#clock-cells = <1>;
-+			compatible = "marvell,armada-xp-cpu-clockctrl";
-+			reg = <0xd0018700 0xA0>;
-+			clocks = <&coreclk 1>;
-+		};
-+
- 		system-controller at d0018200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
- 				reg = <0xd0018200 0x500>;
-diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-index 416d46e..17d246b 100644
---- a/arch/arm/mach-mvebu/Kconfig
-+++ b/arch/arm/mach-mvebu/Kconfig
-@@ -9,11 +9,16 @@ config ARCH_MVEBU
- 	select PINCTRL
- 	select PLAT_ORION
- 	select SPARSE_IRQ
-+	select CLKDEV_LOOKUP
-+	select MVEBU_CLK_CPU
- 
- if ARCH_MVEBU
- 
- menu "Marvell SOC with device tree"
- 
-+config MVEBU_CLK_CPU
-+	   bool
-+
- config MACH_ARMADA_370_XP
- 	bool
- 	select ARMADA_370_XP_TIMER
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 49d7915..2af6ce5 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -37,8 +37,14 @@ void __init armada_370_xp_map_io(void)
- 	iotable_init(armada_370_xp_io_desc, ARRAY_SIZE(armada_370_xp_io_desc));
- }
- 
-+void __init armada_370_xp_timer_and_clk_init(void)
-+{
-+	mvebu_clocks_init();
-+	armada_370_xp_timer_init();
-+}
-+
- struct sys_timer armada_370_xp_timer = {
--	.init		= armada_370_xp_timer_init,
-+	.init		= armada_370_xp_timer_and_clk_init,
- };
- 
- static void __init armada_370_xp_dt_init(void)
-diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
-index 02f89ea..281fab3 100644
---- a/arch/arm/mach-mvebu/common.h
-+++ b/arch/arm/mach-mvebu/common.h
-@@ -16,6 +16,7 @@
- #define __ARCH_MVEBU_COMMON_H
- 
- void mvebu_restart(char mode, const char *cmd);
-+void mvebu_clocks_init(void);
- 
- void armada_370_xp_init_irq(void);
- void armada_370_xp_handle_irq(struct pt_regs *regs);
--- 
-1.7.9.5
+> diff --git a/arch/arm/common/vic.c b/drivers/irqchip/irq-vic.c
+> similarity index 100%
+> rename from arch/arm/common/vic.c
+> rename to drivers/irqchip/irq-vic.c
+
+"gic" and "vic" seems a little generic for filenames and symbol names;
+what about irq-arm-vic.c and irq-arm-gic.c? Similarly...
+
+> diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
+
+>  int gic_of_init(struct device_node *node, struct device_node *parent);
+> +int vic_of_init(struct device_node *node, struct device_node *parent);
+
+... perhaps rename those to arm_[gv]ic_of_init()?
+
+Are/will there be multiple versions of the GIC? I guess we can always
+introduce a GIC2 later if needed, and leave the current one with an
+unversioned name.
