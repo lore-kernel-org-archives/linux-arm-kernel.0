@@ -1,60 +1,64 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 30 Oct 2012 23:57:41 +0100
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
-References: <20121025205901.GA3827@sirena.org.uk>
- <20121030183704.GX4511@opensource.wolfsonmicro.com>
- <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
-Message-ID: <2288906.HJczx1g3gj@vostro.rjw.lan>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 31 Oct 2012 00:03:45 +0100 (CET)
+Subject: [PATCH] ARM: shmobile: leave CONFIG_INOTIFY_USER enabled by default
+Message-ID: <Pine.LNX.4.64.1210302358590.29432@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 30, 2012 10:51:11 PM Linus Walleij wrote:
-> On Tue, Oct 30, 2012 at 7:37 PM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
-> 
-> > More seriously the amount of time we seem to have been spending recently
-> > on changes which end up requiring us to go through essentially every
-> > driver and add code to them (often several times) doesn't seem like
-> > we're doing a good job here.
-> 
-> If this is your main concern you should be made aware that there
-> are people out there planning to supplant the existing DT probe paths
-> that are now being added to each and every ARM-related driver
-> with an ACPI probe path as ARM servers come into the picture.
+CONFIG_INOTIFY_USER is enabled by default in its Kconfig. Disabling it 
+breaks udevd. Fix shmobile defconfig files to not specify this option 
+explicitly.
 
-That's correct.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
 
-> > pinctrl is really noticable because it's
-> > new but it's not the only thing.  As a subsystem maintainer this code
-> > just makes me want to add new subsystem features to pull the code out of
-> > drivers but obviously that's not something that should be being done at
-> > the subsystem level.
-> 
-> We did manage to drag the power/voltage domain per se out
-> of the AMBA bus, and recommend that people (like us) do that
-> business using the power domains.
-> 
-> I think most people (including OMAP) have bought
-> into the concept of using the runtime PM framework and power
-> domains to control the power domain switches.
-> 
-> It's this wider concept of using the loose concept "PM resource
-> domains" to control also clocks and pins that is at stake, and so
-> far the runtime PM core people (Rafael and Magnus) has not said
-> much so I think we need some kind of indication from them as to
-> what is to happen, long-term, with drivers handling their own clocks
-> and pins. Should it be centralized or not? If it's to be centralized it
-> needs to become a large piece of infrastructure refactoring and
-> needs the attention of Linaro and the like to happen.
+Thanks to Randy for the hint :-)
 
-Well, I personally think it should be centralized somehow.  I'm not quite
-sure how to achieve that, though.
-
-Thanks,
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+diff --git a/arch/arm/configs/ap4evb_defconfig b/arch/arm/configs/ap4evb_defconfig
+index 2eef85e..66894f7 100644
+--- a/arch/arm/configs/ap4evb_defconfig
++++ b/arch/arm/configs/ap4evb_defconfig
+@@ -46,7 +46,6 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ # CONFIG_DNOTIFY is not set
+-# CONFIG_INOTIFY_USER is not set
+ CONFIG_TMPFS=y
+ # CONFIG_MISC_FILESYSTEMS is not set
+ CONFIG_MAGIC_SYSRQ=y
+diff --git a/arch/arm/configs/kota2_defconfig b/arch/arm/configs/kota2_defconfig
+index b7735d6..fa83db1 100644
+--- a/arch/arm/configs/kota2_defconfig
++++ b/arch/arm/configs/kota2_defconfig
+@@ -112,7 +112,6 @@ CONFIG_LEDS_GPIO=y
+ CONFIG_LEDS_RENESAS_TPU=y
+ CONFIG_LEDS_TRIGGERS=y
+ # CONFIG_DNOTIFY is not set
+-# CONFIG_INOTIFY_USER is not set
+ CONFIG_TMPFS=y
+ # CONFIG_MISC_FILESYSTEMS is not set
+ CONFIG_MAGIC_SYSRQ=y
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index ce99e3e..afbae28 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -124,7 +124,6 @@ CONFIG_STAGING=y
+ CONFIG_SENSORS_AK8975=y
+ CONFIG_IIO=y
+ # CONFIG_DNOTIFY is not set
+-CONFIG_INOTIFY_USER=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ # CONFIG_MISC_FILESYSTEMS is not set
+diff --git a/arch/arm/configs/mackerel_defconfig b/arch/arm/configs/mackerel_defconfig
+index 7b79a0b..2098ce1 100644
+--- a/arch/arm/configs/mackerel_defconfig
++++ b/arch/arm/configs/mackerel_defconfig
+@@ -105,7 +105,6 @@ CONFIG_EXT3_FS=y
+ CONFIG_EXT3_FS_POSIX_ACL=y
+ CONFIG_EXT3_FS_SECURITY=y
+ # CONFIG_DNOTIFY is not set
+-# CONFIG_INOTIFY_USER is not set
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
