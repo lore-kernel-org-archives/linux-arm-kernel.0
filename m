@@ -1,66 +1,51 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Mon, 29 Oct 2012 19:35:54 -0500
-Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
-References: <1349879449-22657-1-git-send-email-mporter@ti.com>
- <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
-Message-ID: <CAD=GYpbBc-zTpkvWrf-4AYQy0dUniCML5ndC4cQfzOJ1MOU0mw@mail.gmail.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Tue, 30 Oct 2012 11:46:12 +1100
+Subject: [PULL REQ] IXP4xx changes for Linux 3.7
+In-Reply-To: <m3a9vkahci.fsf@intrepid.localdomain>
+References: <m3bog6m5iz.fsf@intrepid.localdomain>
+ <201210142002.55841.arnd@arndb.de> <m3a9vkahci.fsf@intrepid.localdomain>
+Message-ID: <508F2354.3090801@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[resending, because the first post got rejected due to non-plaintext]
+On 18/10/12 09:01, Krzysztof Halasa wrote:
+> Hi,
+> 
 
-Hi Guraraja,
+<snip>
 
-I am interested in this thread. I've been trying Gururaja's patches for
-audio as well.
+> 
+> Unfortunately, as I already explained to you in
+> https://lkml.org/lkml/2012/9/29/37, my resources for IXP4xx are very
+> limited (and this isn't a paid job) and I'm in no way able to do what
+> you require. This, coupled with my inability to make the patches end up
+> upstream any other way, will make me post relevant MAINTAINERS changes
+> shortly.
+> 
+> Don't get me wrong. If I had time for this it could be different.
+> Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
+> this point. Given the raised barriers to participate, probably aimed at
+> paid maintainers, I have to quit doing this.
+> 
+> BTW since Imre has probably even much less time, it would be a good time
+> to find someone to maintain IXP4xx code. I will be publishing (from time
+> to time) my tree (I'm using the hw myself), so even simple
+> cherry-picking would probably make some sense.
 
-I rebased ?Guraja's patches on top of Matt's EDMA patches which were
-applied to the beaglebone 3.7 kernel repo. With some fixes to make it
-compile with CONFIG_DUMMY_REGULATOR enabled, Currently it breaks at
-set_dai_fmt in davinci-mcasp.c when an audio file is played.
+I maintain a tree for the ep93xx, which is another legacy arm soc. I
+also do this as a hobbyist, not as a paid position. Pushing patches to
+mainline via arm-soc has been very easy. Basically I branch from Linus's
+tree (typically 3.x-rc1), apply patches to one of a bunch of branches
+(-devel, -fixes, etc) and then send pull requests to the arm-soc
+maintainers prior to the merge window. I also have a aggregate branch
+which is tested in next.
 
-Could you try my tree on EVM? ?dts changes may be required to use mcasp1 on
-EVM, https://github.com/joelagnel/linux-kernel/commits/3.7
+It takes very little of my time to maintain this tree. I cannot see how
+it could be any harder than sending to Linus directly. Also, the arm-soc
+maintainers, Arnd and Olof, have been very helpful in getting me started
+with my maintainer tree, and in learning the development flow.
 
-v3.7-rc2-fixes to v3.7-rc2-audio commits are Gururaja's patches which I
-applied, and after that are my commits to enable config , add dt data and
-some fixes.
+I would also rather get flamed by the arm-soc guys than Linus when I
+make a mistake :-).
 
-Thanks,
-Joel
-
-On Mon, Oct 29, 2012 at 10:45 AM, Hebbar, Gururaja
-<gururaja.hebbar@ti.com> wrote:
->
-> Matt,
->
-> On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
-> > 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
-> > exposes a bug in the AM33XX clock data for mcasp. After moving to
-> > clk_get() usage, the _init() of all registered hwmods fails on mcasp0
-> > due to incorrect clock data causing clk_get() to fail. This causes all
-> > successive hwmods to fail to _init() leaving them in a bad state.
-> >
-> > This patch updates the mcasp clock entries so clk_get() will succeed.
-> > It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
-> > boot.
->
->
-> I want to test Audio on AM335x Evm with your EDMA patches. I have few
-> patches for AM335x.
-> Can you share the link to the repo & branch on which I need to rebase?
-> The patches are related to mcasp dt node, mcasp pinmux in dt, etc...
->
-> >
-> ..snip..
-> ..snip..
-> >
->
->
-> Thanks & Regards,
-> Gururaja
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+~Ryan
