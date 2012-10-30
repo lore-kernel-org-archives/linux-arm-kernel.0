@@ -1,51 +1,98 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Tue, 30 Oct 2012 11:46:12 +1100
-Subject: [PULL REQ] IXP4xx changes for Linux 3.7
-In-Reply-To: <m3a9vkahci.fsf@intrepid.localdomain>
-References: <m3bog6m5iz.fsf@intrepid.localdomain>
- <201210142002.55841.arnd@arndb.de> <m3a9vkahci.fsf@intrepid.localdomain>
-Message-ID: <508F2354.3090801@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 30 Oct 2012 02:11:45 +0100
+Subject: [PATCH v2] ARM: Dove: update defconfig
+In-Reply-To: <1351539916-29561-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1351539916-29561-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1351559505-944-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/12 09:01, Krzysztof Halasa wrote:
-> Hi,
-> 
+It has been a while since dove_defconfig was updated to recent development.
+This patch adds all currently available Dove boards, including a DT-enabled
+machine.
 
-<snip>
+DT support requires to allow ATAGS passed by boot loader as most of them are
+not yet capable of passing DT blobs. Also OF_SERIAL is enabled to actually
+see the bootlog.
 
-> 
-> Unfortunately, as I already explained to you in
-> https://lkml.org/lkml/2012/9/29/37, my resources for IXP4xx are very
-> limited (and this isn't a paid job) and I'm in no way able to do what
-> you require. This, coupled with my inability to make the patches end up
-> upstream any other way, will make me post relevant MAINTAINERS changes
-> shortly.
-> 
-> Don't get me wrong. If I had time for this it could be different.
-> Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
-> this point. Given the raised barriers to participate, probably aimed at
-> paid maintainers, I have to quit doing this.
-> 
-> BTW since Imre has probably even much less time, it would be a good time
-> to find someone to maintain IXP4xx code. I will be publishing (from time
-> to time) my tree (I'm using the hw myself), so even simple
-> cherry-picking would probably make some sense.
+Finally, sdhci driver for Dove, mv_cesa, GPIO LEDs, and highmem support is
+added.
 
-I maintain a tree for the ep93xx, which is another legacy arm soc. I
-also do this as a hobbyist, not as a paid position. Pushing patches to
-mainline via arm-soc has been very easy. Basically I branch from Linus's
-tree (typically 3.x-rc1), apply patches to one of a bunch of branches
-(-devel, -fixes, etc) and then send pull requests to the arm-soc
-maintainers prior to the merge window. I also have a aggregate branch
-which is tested in next.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changelog:
+v1->v2:
+- also add mv_cesa crypto engine
 
-It takes very little of my time to maintain this tree. I cannot see how
-it could be any harder than sending to Linus directly. Also, the arm-soc
-maintainers, Arnd and Olof, have been very helpful in getting me started
-with my maintainer tree, and in learning the development flow.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/configs/dove_defconfig |   24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-I would also rather get flamed by the arm-soc guys than Linus when I
-make a mistake :-).
-
-~Ryan
+diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
+index 40db34c..0b7ee92 100644
+--- a/arch/arm/configs/dove_defconfig
++++ b/arch/arm/configs/dove_defconfig
+@@ -8,11 +8,19 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_ARCH_DOVE=y
+ CONFIG_MACH_DOVE_DB=y
++CONFIG_MACH_CM_A510=y
++CONFIG_MACH_DOVE_DT=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_HIGHMEM=y
++CONFIG_USE_OF=y
++CONFIG_ATAGS=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
+ CONFIG_VFP=y
+ CONFIG_NET=y
+ CONFIG_PACKET=y
+@@ -62,6 +70,9 @@ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ # CONFIG_SERIAL_8250_PCI is not set
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
++CONFIG_SERIAL_CORE=y
++CONFIG_SERIAL_CORE_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+@@ -74,6 +85,18 @@ CONFIG_USB_DEVICEFS=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+ CONFIG_USB_STORAGE=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_IO_ACCESSORS=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_DOVE=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_TIMER=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_DMADEVICES=y
+@@ -122,6 +145,7 @@ CONFIG_CRYPTO_TWOFISH=y
+ CONFIG_CRYPTO_DEFLATE=y
+ CONFIG_CRYPTO_LZO=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
++CONFIG_CRYPTO_DEV_MV_CESA=y
+ CONFIG_CRC_CCITT=y
+ CONFIG_CRC16=y
+ CONFIG_LIBCRC32C=y
+-- 
+1.7.10.4
