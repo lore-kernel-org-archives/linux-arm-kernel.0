@@ -1,30 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Oct 2012 16:27:25 -0600
-Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for secondary
- CPUs
-In-Reply-To: <87sj8vr517.fsf@amiettinen-lnx.nvidia.com>
-References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
- <1349691981-31038-4-git-send-email-josephl@nvidia.com>
- <5074A74A.8010803@wwwdotorg.org>
- <1349946918.19413.130.camel@jlo-ubuntu-64.nvidia.com>
- <5076F2AE.6030509@wwwdotorg.org>
- <1350012099.20241.10.camel@jlo-ubuntu-64.nvidia.com>
- <87sj8vr517.fsf@amiettinen-lnx.nvidia.com>
-Message-ID: <5090544D.3020408@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Oct 2012 23:27:18 +0100
+Subject: [PATCH] mvebu-gpio: Disable blinking when enabling a GPIO for
+ output
+In-Reply-To: <CACRpkdY-aAxJpA7qvKWzxLRC-5_eC6cOZr7wsTLsFprOSbJ6CA@mail.gmail.com>
+References: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
+ <CACRpkdY-aAxJpA7qvKWzxLRC-5_eC6cOZr7wsTLsFprOSbJ6CA@mail.gmail.com>
+Message-ID: <20121030232718.556604f8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2012 04:03 PM, Antti P Miettinen wrote:
-> Joseph Lo <josephl@nvidia.com> writes:
->>>>>> +	writel(tegra_in_lp2.bits[0], tegra_cpu_lp2_mask);
-> 
-> BTW, writel_relaxed() would probably be more than enough? IRAM is mapped
-> stronly ordered, isn't it? And there's an explicit dsb(). And the mask
-> is observed and written only by CPUs. If there are coherence issues,
-> they would be in the fabric? And then neither CPU barriers nor L2 sync
-> would help, you'd need a readback, right?
+Dear Linus Walleij,
 
-I expect there are many places where we simply default to using
-readl/writel (e.g. due to cut/paste, their prevalence, etc.) rather than
-explicitly using the _relaxed variants if we can. Perhaps we should do a
-pass through all the Tegra code and clean that up sometime.
+On Tue, 30 Oct 2012 23:16:26 +0100, Linus Walleij wrote:
+
+> Can I have some ACK on this thing from Andrew or Thomas say...
+
+I just gave a formal ACK to the patch.
+
+> Also is this a thing for the stable kernel -rc series or next
+> merge window? I couldn't quite figure out if it was a regression.
+
+I don't think it is really necessary to have it in the 3.7-rc series.
+The driver has been introduced in 3.7, but technically speaking,
+nothing is using it yet. Users will only be introduced in 3.8.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
