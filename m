@@ -1,49 +1,38 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Oct 2012 09:36:29 +0100
-Subject: [PATCH 3/4] arm: mvebu: add Ethernet controllers using mvneta
- driver for Armada 370/XP
-In-Reply-To: <CABMQnVKswTJr9Nd4Etx4Htv0Ckn+pDNqGO8MoPBH-x8y6CwZyA@mail.gmail.com>
-References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351245804-31478-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <CABMQnVKswTJr9Nd4Etx4Htv0Ckn+pDNqGO8MoPBH-x8y6CwZyA@mail.gmail.com>
-Message-ID: <20121030093629.398ce706@skate>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 30 Oct 2012 09:54:10 +0100
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210300416190.12697@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <alpine.DEB.2.00.1210300416190.12697@utopia.booyaka.com>
+Message-ID: <CAORVsuWt22yRy9cHAU1u+9K7Fy4Zi95UN4wOh2DeVe61S-u5Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Paul,
 
-On Tue, 30 Oct 2012 13:19:15 +0900, Nobuhiro Iwamatsu wrote:
+On Tue, Oct 30, 2012 at 5:16 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hello Jean,
+>
+> On Tue, 23 Oct 2012, Jean Pihet wrote:
+>
+>> Let me try with the same setup as yours (bootloader images,
+>> omap2pus_defconfig, angstrom roots).
+>
+> Had any luck reproducing this one that Aaro & I are seeing?
+Unfortunately not. I could not reproduce the issue on my side, using
+an ES2.1 Beagleboard with the latest l-o kernel and your bootloader
+and rootfs images.
+Is there some specific to enable in order to reproduce the issue?
 
-> > diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> > index 16cc82c..d484492 100644
-> > --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> > +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> > @@ -68,6 +68,20 @@
-> >                         compatible = "marvell,armada-addr-decoding-controller";
-> >                         reg = <0xd0020000 0x258>;
-> >                 };
-> > +
-> > +                ethernet at d0070000 {
-> > +                               compatible = "marvell,armada-370-neta";
-> > +                               reg = <0xd0070000 0x2500>;
-> > +                               interrupts = <8>;
-> > +                               status = "disabled";
-> > +                };
-> > +
-> > +                ethernet at d0074000 {
-> > +                               compatible = "marvell,armada-370-neta";
-> > +                               reg = <0xd0074000 0x2500>;
-> > +                               interrupts = <10>;
-> > +                               status = "disabled";
-> > +                };
-> 
-> Could you fit an indent?
+Regards,
+Jean
 
-Right, thanks, will fix.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>
+>
+> - Paul
