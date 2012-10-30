@@ -1,49 +1,22 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Tue, 30 Oct 2012 10:55:34 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
-Message-ID: <508FB226.20604@mimc.co.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 30 Oct 2012 11:46:34 +0100
+Subject: [PATCH V2] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
+In-Reply-To: <20121030013111.GD9921@S2101-09.ap.freescale.net>
+References: <1348572738-9743-1-git-send-email-marex@denx.de>
+ <201210261201.58778.marex@denx.de>
+ <20121030013111.GD9921@S2101-09.ap.freescale.net>
+Message-ID: <201210301146.34506.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/12 02:36, Paul Walmsley wrote:
-> 
-> Here are some basic OMAP test results for Linux v3.7-rc3.
-> Logs and other details at:
-> 
->     http://www.pwsan.com/omap/testlogs/test_v3.7-rc3/20121028162003/
-> 
-> 
-> Passing tests
-> -------------
-> 
-> Boot to userspace: 2420n800, 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
->                    4430es2panda, 5912osk, am335xbone
-> 
-> PM ret/off, suspend + dynamic idle: (none)
-> 
-> 
-> Failing tests: fixed by posted patches
-> --------------------------------------
-> 
-> Boot tests:
-> 
-> * 2430sdp: vfp_reload_hw oops during MMC initialization
->   - Kernel attempts to save FP registers that don't exist; fix posted:
->     - http://www.spinics.net/lists/arm-kernel/msg200646.html
->     - added to rmk's patch system as 7566/1
-> 
-> * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
->   - Due to GPMC missing support for DT
->   - Temporary workaround at http://www.spinics.net/lists/arm-kernel/msg200787.html
->   - May be fixed now, pending retest:
->     - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+Dear Shawn Guo,
 
-At what point is booting from MMC on the BeagleBone going to start working ?
+> On Fri, Oct 26, 2012 at 12:01:58PM +0200, Marek Vasut wrote:
+> > Can we apply this for 3.7?
+> 
+> You meant for 3.8?
 
-I only ask, since, by default, a new BeagleBone is setup to boot from MMC, so anyone testing a new
-kernel will probably expect the same setup to work.
+3.7 would be nice, but it's too late now.
 
-Cheers
-Mark JACKSON
+Best regards,
+Marek Vasut
