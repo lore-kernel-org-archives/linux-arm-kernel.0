@@ -1,22 +1,39 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 30 Oct 2012 22:34:32 +0100
-Subject: [PATCH 2/4] net: cpsw: Add parent<->child relation support
- between cpsw and mdio
-In-Reply-To: <1351498881-32482-4-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Mon, 29 Oct 2012 13:51:19 +0530")
+Date: Tue, 30 Oct 2012 22:35:14 +0100
+Subject: [PATCH 3/4] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio module
+In-Reply-To: <1351498881-32482-5-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Mon, 29 Oct 2012 13:51:20 +0530")
 References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
- <1351498881-32482-4-git-send-email-hvaibhav@ti.com>
-Message-ID: <87390vhcev.fsf@macbook.be.48ers.dk>
+ <1351498881-32482-5-git-send-email-hvaibhav@ti.com>
+Message-ID: <87y5infxt9.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 >>>>> "Vaibhav" == Vaibhav Hiremath <hvaibhav@ti.com> writes:
 
- Vaibhav> CPGMAC SubSystem consist of various sub-modules, like, mdio,
- Vaibhav> cpdma, cpsw, etc... These sub-modules are also used in some of
- Vaibhav> Davinci family of devices. Now based on requirement, use-case
- Vaibhav> and available technology nodes the integration of these
- Vaibhav> sub-modules varies across devices.
+ Vaibhav> From: Mugunthan V N <mugunthanvnm@ti.com>
+ Vaibhav> This patch adds hwmod entry for davinci MDIO module,
+ Vaibhav> creating parent<->child relationship between CPSW and MDIO module.
+
+ Vaibhav> This Parent-child relation is required in order to use common resources
+ Vaibhav> like, clock, but still maintaining the logical separation between them.
+
+ Vaibhav> CPGMAC SubSystem consist of various sub-modules, like, mdio, cpdma,
+ Vaibhav> cpsw, etc... These sub-modules are also used in some of Davinci
+ Vaibhav> family of devices, so separate and independent platform devices &
+ Vaibhav> drivers for CPSW and MDIO is implemented.
+ Vaibhav> In case of AM33XX, the resources are shared and common register
+ Vaibhav> bit-field is provided to control module/clock enable/disable,
+ Vaibhav> makes it difficult to handle common resources from both drivers.
+
+ Vaibhav> So the solution is, create parent<->child relationship between
+ Vaibhav> CPGMAC & MDIO modules.
+
+ Vaibhav> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+ Vaibhav> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+ Vaibhav> Cc: Richard Cochran <richardcochran@gmail.com>
+ Vaibhav> Cc: Paul Walmsley <paul@pwsan.com>
 
 Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
