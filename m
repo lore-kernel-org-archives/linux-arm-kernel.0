@@ -1,45 +1,51 @@
-From: jussi.kivilinna@mbnet.fi (Jussi Kivilinna)
-Date: Tue, 30 Oct 2012 12:07:43 +0200
-Subject: [PATCH] [RFC] crypto: sha1/arm - fix build with CONFIG_THUMB2_KERNEL
-Message-ID: <20121030100742.17910.70241.stgit@localhost6.localdomain6>
+From: mturquette@ti.com (Mike Turquette)
+Date: Tue, 30 Oct 2012 03:11:40 -0700
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
+References: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
+Message-ID: <20121030101140.18780.69840@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building cryptodev-2.6 tree with CONFIG_THUMB2_KERNEL=y and
-CONFIG_CRYPTO_SHA1_ARM=y give following error:
+Quoting Stephen Rothwell (2012-10-29 21:06:27)
+> Hi Mike,
+> 
+> Today's linux-next merge of the clk tree got a conflict in
+> arch/arm/include/asm/hardware/sp810.h between commit 0891642cf117 ("ARM:
+> vexpress: Start using new Versatile Express infrastructure") from the
+> arm-soc tree and commit 05e3659135a4 ("clk: Common clocks implementation
+> for Versatile Express") from the clk tree.
+> 
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
+> 
+> -- 
+> Cheers,
+> Stephen Rothwell                    sfr at canb.auug.org.au
+> 
+> diff --cc arch/arm/include/asm/hardware/sp810.h
+> index 2cdcf44,afd7e91..0000000
+> --- a/arch/arm/include/asm/hardware/sp810.h
+> +++ b/arch/arm/include/asm/hardware/sp810.h
+> @@@ -50,6 -50,14 +50,8 @@@
+>   #define SCPCELLID2            0xFF8
+>   #define SCPCELLID3            0xFFC
+>   
+>  -#define SCCTRL_TIMEREN0SEL_REFCLK     (0 << 15)
+>  -#define SCCTRL_TIMEREN0SEL_TIMCLK     (1 << 15)
+>  -
+>  -#define SCCTRL_TIMEREN1SEL_REFCLK     (0 << 17)
+>  -#define SCCTRL_TIMEREN1SEL_TIMCLK     (1 << 17)
+>  -
+> + #define SCCTRL_TIMERENnSEL_SHIFT(n)   (15 + ((n) * 2))
+> + 
+>   static inline void sysctl_soft_reset(void __iomem *base)
+>   {
+>         /* switch to slow mode */
 
-   AS      arch/arm/crypto/sha1-armv4-large.o
-arch/arm/crypto/sha1-armv4-large.S: Assembler messages:
-arch/arm/crypto/sha1-armv4-large.S:197: Error: r13 not allowed here --
-`teq r14,sp'
-arch/arm/crypto/sha1-armv4-large.S:377: Error: r13 not allowed here --
-`teq r14,sp'
-arch/arm/crypto/sha1-armv4-large.S:469: Error: r13 not allowed here --
-`teq r14,sp'
+Pawel,
 
-Build can be fixed with adding '.arm' at head of sha1-armv4-large.S.
-However I'm not sure if this correct fix as this is my first stab
-at arm assembler and I could not get CONFIG_THUMB2_KERNEL boot up
-on 'qemu-system-arm -M vexpress-a9' to verify correctness. So this
-is only build tested.
+Does this look OK for you?
 
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-crypto at vger.kernel.org
-Cc: David McCullough <ucdevel@gmail.com>
----
- arch/arm/crypto/sha1-armv4-large.S |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
-index 7050ab1..e8a55eb 100644
---- a/arch/arm/crypto/sha1-armv4-large.S
-+++ b/arch/arm/crypto/sha1-armv4-large.S
-@@ -53,6 +53,8 @@
- 
- .text
- 
-+.arm
-+
- .global	sha1_block_data_order
- .type	sha1_block_data_order,%function
- 
+Thanks,
+Mike
