@@ -1,97 +1,41 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 30 Oct 2012 14:12:52 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CACRpkdaeu3JaLqSbqETT=D0mdUu5VpwRpS_Xohd6M963rw8QMg@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
- <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
- <20121001154451.GI4840@atomide.com>
- <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
- <CACRpkdaeu3JaLqSbqETT=D0mdUu5VpwRpS_Xohd6M963rw8QMg@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA5C598@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2012 15:16:02 +0100
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121030140714.GO4511@opensource.wolfsonmicro.com>
+References: <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <20121024185818.GB772@arwen.pp.htv.fi>
+ <20121025205901.GA3827@sirena.org.uk>
+ <20121026062008.GA21734@arwen.pp.htv.fi>
+ <20121026160316.GY18814@opensource.wolfsonmicro.com>
+ <20121029194901.GA30152@arwen.pp.htv.fi>
+ <20121030112410.GM4511@opensource.wolfsonmicro.com>
+ <20121030114949.GC28722@arwen.pp.htv.fi>
+ <20121030140714.GO4511@opensource.wolfsonmicro.com>
+Message-ID: <CACRpkdZysB2mxj5wZfE0N+iwTE-_AXbOV0bKRP5kSo=1hieKGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2012 at 18:06:10, Linus Walleij wrote:
-> On Wed, Oct 3, 2012 at 12:52 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> > On Tue, Oct 02, 2012 at 01:29:37, Linus Walleij wrote:
-> 
-> >> This is what we're doing for ux500 and should be a good model.
-> >
-> > I have looked into this, but not seen any named modes.
-> 
-> OK maybe it's not easy to find. If you look into:
-> arch/arm/mach-ux500/board-mop500-pins.c
-> you find our work in progress. Note that this is not (yet)
-> using device tree. (We want to migrate all our pinctrl
-> stuff first, then do DT.)
-> 
-> So for example this macro:
-> 
-> #define DB8500_PIN(pin,conf,dev) \
->         PIN_MAP_CONFIGS_PIN_DEFAULT(dev, "pinctrl-db8500", pin, conf)
-> 
-> Will define a config for the "default" mode for a certain
-> pin.
-> 
-> This:
-> 
-> #define DB8500_PIN_SLEEP(pin, conf, dev) \
->         PIN_MAP_CONFIGS_PIN(dev, PINCTRL_STATE_SLEEP, "pinctrl-db8500", \
->                             pin, conf)
-> 
-> Will mutatis mutandis define a "sleep" mode for a pin.
-> 
-> Sorry for the macros. We'll get rid of them in the DT.
-> (Now that Stephen has patched in preprocessing it will
-> even look good.)
-> 
+On Tue, Oct 30, 2012 at 3:07 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
 
-Hi Linus Walleij/Tony,
+> Essentially all the patches I'm seeing adding pinctrl are totally
+> mindless, most of them are just doing the initial setup on boot and not
+> doing any active management at runtime at all.
 
-I completely understood this named modes, I have added named
-modes like this in am335x-xxx.dts files
+None of the Ux500 pinctrl patches are like that.
 
-am33xx_pinmux: pinmux at 44e10800 {
-	pinctrl-names = "default", "sleep";
-	pinctrl-0 = <&user_leds_s0>;
-	pinctrl-1 = <&user_leds_s1>;
+I concludes in some other mails that all Ux500 drivers
+will need to handle atleast two states (default and sleep)
+and some a third state (idle).
 
-	user_leds_s0: user_leds_s0 {
-		pinctrl-single,pins = <
-			0x54 0x7        /* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-			0x58 0x17       /* gpmc_a6.gpio1_22, OUT PULLUP | MODE7 */
-			0x5c 0x7        /* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-			0x60 0x17       /* gpmc_a8.gpio1_24, OUT PULLUP | MODE7 */
-		>;
-	};
+And this is what we're doing in our patches.
 
-	user_leds_s1: user_leds_s1 {
-		pinctrl-single,pins = <
-			0x54 0x2e       /* gpmc_a5.gpio1_21, INPUT | MODE7 */
-			0x58 0x2e       /* gpmc_a6.gpio1_22, INPUT | MODE7 */
-			0x5c 0x2e       /* gpmc_a7.gpio1_23, INPUT | MODE7 */
-			0x60 0x2e       /* gpmc_a8.gpio1_24, INPUT | MODE7 */
-		>;
-	};
-};
+Arguably it can all be pushed to power domains, but that
+will as said mandate all affected systems to implement
+power domains, and effectively moving code from
+drivers/* to arch/arm/* in our case atleast.
 
-I think "pinctrl-1" state will be used in driver
-suspend/resume calls.
-
-I have the pinmux/conf settings for default state but fully
-optimized pinmux/conf values in idle & suspend states are not
-available yet. Even though if I add here, I am unable to test
-these pins in suspend state because suspend/resume of AM35xx
-is not added yet
-
-I have two options now
-- add only default states for now, I can add reset of
-the state details once suspend/resume is supported. 
-- add same values in all the states, modify those once
-suspend/resume is added for AM335x.
-
-Thanks
-AnilKumar
+Yours,
+Linus Walleij
