@@ -1,39 +1,29 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 30 Oct 2012 11:20:07 -0700
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121030172513.GA3993@arwen.pp.htv.fi>
-References: <20121025205901.GA3827@sirena.org.uk>
- <20121026062008.GA21734@arwen.pp.htv.fi>
- <20121026160316.GY18814@opensource.wolfsonmicro.com>
- <20121029194901.GA30152@arwen.pp.htv.fi>
- <20121030112410.GM4511@opensource.wolfsonmicro.com>
- <20121030114949.GC28722@arwen.pp.htv.fi>
- <20121030140714.GO4511@opensource.wolfsonmicro.com>
- <20121030151642.GE29159@arwen.pp.htv.fi>
- <20121030155821.GU4511@opensource.wolfsonmicro.com>
- <20121030172513.GA3993@arwen.pp.htv.fi>
-Message-ID: <20121030182007.GA21851@core.coreip.homeip.net>
+From: havard@skinnemoen.net (=?ISO-8859-1?Q?H=E5vard_Skinnemoen?=)
+Date: Tue, 30 Oct 2012 11:22:51 -0700
+Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
+References: <cover.1351591858.git.nicolas.ferre@atmel.com>
+ <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
+Message-ID: <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 07:25:13PM +0200, Felipe Balbi wrote:
-> On Tue, Oct 30, 2012 at 03:58:21PM +0000, Mark Brown wrote:
-> > 
-> > But then this comes round to the mindless code that ought to be factored
-> > out :)  Only the more interesting cases that do something unusual really
-> > register here.
-> 
-> fair enough. I see your point. Not saying I agree though, just that this
-> discussion has been flying for far too long, so feel free to provide
-> patches implementing what you're defending here ;-)
-> 
-> Guess code will speak for itself. On way or another, we need OMAP keypad
-> driver working in mainline
+On Tue, Oct 30, 2012 at 4:12 AM, David Laight <David.Laight@aculab.com> wrote:
+>> Instead of masking head and tail every time we increment them, just let them
+>> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
+>> functions to do the subscripting properly to minimize the chances of messing
+>> this up.
+> ...
+>> +static unsigned int macb_tx_ring_avail(struct macb *bp)
+>> +{
+>> +     return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
+>> +}
+>
+> That one doesn't look quite right to me.
+> Surely it should be masking with 'TX_RING_SIZE - 1'
 
-Are you saying that introducing pincrtl infrastructure actually _broke_
-the driver in mainline?
+Why is that? head and tail can never be more than TX_RING_SIZE apart,
+so it shouldn't make any difference.
 
-Thanks.
-
--- 
-Dmitry
+Havard
