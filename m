@@ -1,34 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Oct 2012 10:51:54 +0100
-Subject: [PATCH v4] Network driver for the Armada 370 and Armada XP ARM
- Marvell SoCs
-In-Reply-To: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121030105154.5b7c8e48@skate>
+From: srinidhi.kasagar@stericsson.com (srinidhi kasagar)
+Date: Tue, 30 Oct 2012 15:32:32 +0530
+Subject: [PATCH] ARM: cache-l2x0.c: Apply the workaround to r3p0 only
+Message-ID: <20121030100227.GA8260@bnru04>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The PL310 bug 753970 should be applied only to r3p0
 
-On Fri, 26 Oct 2012 12:03:20 +0200, Thomas Petazzoni wrote:
+Signed-off-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+---
+ arch/arm/mm/cache-l2x0.c |    9 +++++++--
+ 1 files changed, 7 insertions(+), 2 deletions(-)
 
-> This patch set adds a new network driver for the network unit
-> available in the newest Marvell ARM SoCs Armada 370 and Armada XP, as
-> well as the necessary Device Tree information to use this driver in
-> the two evaluation platforms of those SoCs.
-
-Besides Nobuhiro's small comment on the Device Tree part, are there any
-comments on the driver itself, or is the code good to go?
-
-I can send a fifth version with just the fix for Nobuhiro's comment,
-but it probably makes sense to take into account a few more comments
-(if any) at the same time.
-
-Thanks for your review,
-
-Thomas
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 2a8e380..7925734 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -311,6 +311,7 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	u32 aux;
+ 	u32 cache_id;
+ 	u32 way_size = 0;
++	u32 l2x0_revision;
+ 	int ways;
+ 	const char *type;
+ 
+@@ -331,8 +332,12 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 			ways = 8;
+ 		type = "L310";
+ #ifdef CONFIG_PL310_ERRATA_753970
+-		/* Unmapped register. */
+-		sync_reg_offset = L2X0_DUMMY_REG;
++		 /* FIXME: make sense to have dt support for L2 Erratas? */
++		l2x0_revision = readl_relaxed(l2x0_base + L2X0_CACHE_ID) &
++				L2X0_CACHE_ID_RTL_MASK;
++		if (l2x0_revision == L2X0_CACHE_ID_RTL_R3P0)
++			/* Unmapped register. */
++			sync_reg_offset = L2X0_DUMMY_REG;
+ #endif
+ 		outer_cache.set_debug = pl310_set_debug;
+ 		break;
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.2.dirty
