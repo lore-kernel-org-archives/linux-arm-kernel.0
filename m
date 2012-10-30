@@ -1,34 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Oct 2012 22:47:03 +0000
-Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <50900C90.7070101@gmail.com>
-References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
- <1351608860-24617-2-git-send-email-robherring2@gmail.com>
- <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
- <50900C90.7070101@gmail.com>
-Message-ID: <20121030224703.GI21164@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 30 Oct 2012 23:57:41 +0100
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
+References: <20121025205901.GA3827@sirena.org.uk>
+ <20121030183704.GX4511@opensource.wolfsonmicro.com>
+ <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
+Message-ID: <2288906.HJczx1g3gj@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
-> Looking at this some more, arm64 doesn't need most of what's in gic.h.
-> The register defines should be moved into the .c file. The remaining
-> function declarations either are not needed (i.e. gic_init) or should
-> should be done like the handle_irq function pointer init. We don't want
-> to have platform code calling gic_cascade_irq or gic_raise_softirq
-> directly.
+On Tuesday, October 30, 2012 10:51:11 PM Linus Walleij wrote:
+> On Tue, Oct 30, 2012 at 7:37 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+> 
+> > More seriously the amount of time we seem to have been spending recently
+> > on changes which end up requiring us to go through essentially every
+> > driver and add code to them (often several times) doesn't seem like
+> > we're doing a good job here.
+> 
+> If this is your main concern you should be made aware that there
+> are people out there planning to supplant the existing DT probe paths
+> that are now being added to each and every ARM-related driver
+> with an ACPI probe path as ARM servers come into the picture.
 
-Softirqs are about the SPIs which are used for SMP IPIs and platform
-specific wakeup of CPUs.  And platform code _needs_ to specify the
-way IPIs are delivered on the platform.  irqchip can't do that because
-irqchip knows nothing about SPIs (neither does genirq.)
+That's correct.
 
-The thing about gic_cascade_irq() is that it's to do with handling the
-(rare) case of having a system with two GICs cascaded together.  There's
-only one set of platforms I know of which has that kind of madness and
-it's the ARM development platforms, where the baseboard has a GIC, and
-the SMP tile has its own GIC as part of the SMP implementation.
+> > pinctrl is really noticable because it's
+> > new but it's not the only thing.  As a subsystem maintainer this code
+> > just makes me want to add new subsystem features to pull the code out of
+> > drivers but obviously that's not something that should be being done at
+> > the subsystem level.
+> 
+> We did manage to drag the power/voltage domain per se out
+> of the AMBA bus, and recommend that people (like us) do that
+> business using the power domains.
+> 
+> I think most people (including OMAP) have bought
+> into the concept of using the runtime PM framework and power
+> domains to control the power domain switches.
+> 
+> It's this wider concept of using the loose concept "PM resource
+> domains" to control also clocks and pins that is at stake, and so
+> far the runtime PM core people (Rafael and Magnus) has not said
+> much so I think we need some kind of indication from them as to
+> what is to happen, long-term, with drivers handling their own clocks
+> and pins. Should it be centralized or not? If it's to be centralized it
+> needs to become a large piece of infrastructure refactoring and
+> needs the attention of Linaro and the like to happen.
 
-Apart from that, gic_cascade_irq() should not be used - it should
-probably be ifdef'd out when not on one of the ARM dev platforms which
-suffer this weirdness.
+Well, I personally think it should be centralized somehow.  I'm not quite
+sure how to achieve that, though.
+
+Thanks,
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
