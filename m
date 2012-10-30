@@ -1,60 +1,59 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 30 Oct 2012 18:05:41 +0100
-Subject: [PATCH] spi/pl022: Activate resourses before deactivate them in
- suspend
-In-Reply-To: <Pine.LNX.4.44L0.1210281659520.9245-100000@netrider.rowland.org>
-References: <CAPDyKFoOJz6608b4z2PoW8ODvTJVZRq-yB0itfXnuoXdR1SpGQ@mail.gmail.com>
- <Pine.LNX.4.44L0.1210281659520.9245-100000@netrider.rowland.org>
-Message-ID: <CAPDyKFofQntK28i23JtZnEbnDfPoFvLC0yBhDR04=qfg=A+WKw@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 30 Oct 2012 12:21:20 -0500
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <508FFADC.3080506@gmail.com>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
+Message-ID: <50900C90.7070101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2012 22:09, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Sun, 28 Oct 2012, Ulf Hansson wrote:
->
->> On 28 October 2012 20:52, Linus Walleij <linus.walleij@linaro.org> wrote:
->> > On Sat, Oct 27, 2012 at 11:46 PM, Mark Brown
->> > <broonie@opensource.wolfsonmicro.com> wrote:
->> >> On Fri, Oct 05, 2012 at 09:43:32AM +0200, Ulf Hansson wrote:
->> >>
->> >>> To be able to deactivate resourses in suspend, the resourses must
->> >>> first be surely active. This is done with a pm_runtime_get_sync.
->> >>> Once the resourses are restored to active state again in resume,
->> >>> the runtime pm usage count can be decreased with a pm_runtime_put.
->> >>
->> >> The PM core will ensure devices are runtime resumed before we enter
->> >> suspend precisely due to this sort of issue.
->> >
->> > I asked the very same question to Ulf (in speech, sorry
->> > so you couldn't see it...)
->> >
->> > So I guess we are talking about drivers/base/main.c
->> >
->> > in device_prepare()
->> > pm_runtime_get_noresume() is called
+On 10/30/2012 11:05 AM, Rob Herring wrote:
+> On 10/30/2012 10:01 AM, Thomas Petazzoni wrote:
+>> Rob,
 >>
->> This will increase the "usage_counter" for the device. It will not
->> "runtime_resume" the device, though it will prevent it from being
->> "runtime_suspended".
->
-> Indeed.  The PM core does _not_ insure that devices are runtime resumed
-> before going into system suspend.  Some subsystems may do this (the PCI
-> subsystem does, for example -- see
-> drivers/pci/pci-driver.c:pci_pm_prepare()), but the PM core doesn't.
->
-> Alan Stern
->
+>> On Tue, 30 Oct 2012 09:54:18 -0500, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Now that we have drivers/irqchip, move GIC irqchip to drivers/irqchip. This
+>>> is necessary to share the GIC with arm and arm64.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> ---
+>>>  arch/arm/common/Kconfig                            |    8 --------
+>>>  arch/arm/common/Makefile                           |    1 -
+>>>  drivers/irqchip/Kconfig                            |    8 ++++++++
+>>>  drivers/irqchip/Makefile                           |    1 +
+>>>  arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |    0
+>>>  drivers/irqchip/irqchip.c                          |   10 ++++++++++
+>>>  drivers/irqchip/irqchip.h                          |    1 +
+>>>  7 files changed, 20 insertions(+), 9 deletions(-)
+>>
+>> What about arch/arm/include/asm/hardware/gic.h ?
+>>
+>> Contrary to the current version of the bcm2835 IRQ controller driver
+>> and the armada-370-xp IRQ controller driver, the GIC and VIC drivers
+>> not only expose a <foo>_of_init() function, but also other functions
+>> that are directly used by several non-DT capable ARM sub-architectures.
+>>
+>> Of course, it works by leaving gic.h where it is now, but it sounds
+>> strange to have the driver in drivers/irqchip/ and the header file in
+>> arch/arm/include/asm/hardware/, especially if the goal is to be able to
+>> use those drivers in arm64.
+> 
+> Right. I'll have to move it. I wasn't really thinking about arm64 until
+> this morning.
 
-Thanks for clarifying this Alan. Although, I am having second thoughts
-around this patch even if it does what I expect it to do.
+Looking at this some more, arm64 doesn't need most of what's in gic.h.
+The register defines should be moved into the .c file. The remaining
+function declarations either are not needed (i.e. gic_init) or should
+should be done like the handle_irq function pointer init. We don't want
+to have platform code calling gic_cascade_irq or gic_raise_softirq
+directly. Perhaps we need to support this generically in irqchip code.
+So I'll leave them in the current header and arm64 can add the necessary
+support it needs.
 
-I think that the pm_runtime_get_sync (and the corrsponding "put")
-should maybe be done in the suspend|resume functions of the amba bus
-(drivers/amba/bus.c) instead.
-The reason is because the amba bus is responsible for the apb_pclk -
-clk, which also should be handled during suspend and this is not the
-case right now. Unless we think each amba device driver should handle
-this clock during suspend|resume...
-
-Kind regards
-Ulf Hansson
+Rob
