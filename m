@@ -1,45 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Oct 2012 23:30:15 +0100
-Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <50900C90.7070101@gmail.com>
-References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
- <1351608860-24617-2-git-send-email-robherring2@gmail.com>
- <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
- <50900C90.7070101@gmail.com>
-Message-ID: <20121030233015.11652d08@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Oct 2012 16:45:10 -0600
+Subject: [PATCH V3 0/7] ARM: tegra30: cpuidle: add a powered-down state
+In-Reply-To: <1351506501-600-1-git-send-email-josephl@nvidia.com>
+References: <1351506501-600-1-git-send-email-josephl@nvidia.com>
+Message-ID: <50905876.70108@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On 10/29/2012 04:28 AM, Joseph Lo wrote:
+> This adds a "powered-down" state for cpuidle. It's a power gating idle
+> mode. It supports the secondary CPUs (i.e., CPU1-CPU3) to go into
+> powered-down state independently. When any of the secondary CPUs go into
+> this state, it can be power gated alone. There is a limitation on CPU0.
+> The CPU0 can go into powered-down state only when all secondary CPU is
+> offline. After CPU0 is in powered-down state, the CPU rail can be turned
+> off.
 
-On Tue, 30 Oct 2012 12:21:20 -0500, Rob Herring wrote:
+This series doesn't seem to apply to Tegra's current for-next, nor
+next-20121029. What is it based on?
 
-> > Right. I'll have to move it. I wasn't really thinking about arm64 until
-> > this morning.
-> 
-> Looking at this some more, arm64 doesn't need most of what's in gic.h.
-> The register defines should be moved into the .c file. The remaining
-> function declarations either are not needed (i.e. gic_init) or should
-> should be done like the handle_irq function pointer init. We don't want
-> to have platform code calling gic_cascade_irq or gic_raise_softirq
-> directly. Perhaps we need to support this generically in irqchip code.
-> So I'll leave them in the current header and arm64 can add the necessary
-> support it needs.
-
-The thing is that we have the same problem for the armada-370-xp
-IRQ controller driver. In its current form, it doesn't need to expose
-any symbol to the mach-mvebu code except the initialization function.
-However, with the SMP support, we need to expose a bunch of symbols,
-which kind of violates the whole idea of the drivers/irqchip
-infrastructure, which was aiming at limiting the number of header files
-added in <linux/irqchip/...> for each and every IRQ controller driver.
-
-As you say, we maybe need to support thing like yyy_raise_softirq()
-generically in the irqchip code.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Note: I did try merging "ARM: tegra: rename the file of "sleep-tXX" to
+"sleep-tegraXX"" first, since I assume that's a dependency.
