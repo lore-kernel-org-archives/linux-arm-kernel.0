@@ -1,23 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 30 Oct 2012 19:21:59 +0800
-Subject: [PATCH V2] ARM: mx28: Skip OCOTP FEC MAC setup if in DT
-In-Reply-To: <201210301146.34506.marex@denx.de>
-References: <1348572738-9743-1-git-send-email-marex@denx.de>
- <201210261201.58778.marex@denx.de>
- <20121030013111.GD9921@S2101-09.ap.freescale.net>
- <201210301146.34506.marex@denx.de>
-Message-ID: <20121030112155.GB11575@S2101-09.ap.freescale.net>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 30 Oct 2012 11:12:53 -0000
+Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
+In-Reply-To: <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
+References: <cover.1351591858.git.nicolas.ferre@atmel.com>
+ <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 11:46:34AM +0100, Marek Vasut wrote:
-> Dear Shawn Guo,
-> 
-> > On Fri, Oct 26, 2012 at 12:01:58PM +0200, Marek Vasut wrote:
-> > > Can we apply this for 3.7?
-> > 
-> > You meant for 3.8?
-> 
-> 3.7 would be nice, but it's too late now.
-> 
-Applied for 3.8.
+> Instead of masking head and tail every time we increment them, just let them
+> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
+> functions to do the subscripting properly to minimize the chances of messing
+> this up.
+...
+> +static unsigned int macb_tx_ring_avail(struct macb *bp)
+> +{
+> +	return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
+> +}
+
+That one doesn't look quite right to me.
+Surely it should be masking with 'TX_RING_SIZE - 1'
+
+	David
