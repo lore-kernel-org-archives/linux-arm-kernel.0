@@ -1,49 +1,37 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Tue, 30 Oct 2012 07:18:26 -0500
-Subject: [PATCH 1/2] ARM: OMAP2+: move mailbox.h out of plat-omap headers
-In-Reply-To: <20121029175228.GD11908@atomide.com>
-References: <1351530381-11459-1-git-send-email-omar.luna@linaro.org>
- <1351530381-11459-2-git-send-email-omar.luna@linaro.org>
- <20121029175228.GD11908@atomide.com>
-Message-ID: <CALLhW=4ukBuRSVcPm2A37PgBhv33yKqk2G=Dz2XTUyswXw=JMg@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Oct 2012 13:28:49 +0100
+Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP
+ network unit
+In-Reply-To: <CABMQnVLBCU-2C6DbKsXAVPanWx=oQnjE7Tpi2q5bgpYJ9SQt-A@mail.gmail.com>
+References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351245804-31478-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CABMQnVLBCU-2C6DbKsXAVPanWx=oQnjE7Tpi2q5bgpYJ9SQt-A@mail.gmail.com>
+Message-ID: <20121030132849.72d18e4f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Dear Nobuhiro Iwamatsu,
 
-On 29 October 2012 12:52, Tony Lindgren <tony@atomide.com> wrote:
->> --- /dev/null
->> +++ b/include/linux/platform_data/omap_mailbox.h
->> @@ -0,0 +1,105 @@
->
-> This file should only contain pure platform data needed
-> by the core omap code to pass to the mailbox driver.
+On Tue, 30 Oct 2012 21:07:34 +0900, Nobuhiro Iwamatsu wrote:
 
-Ok, looking at it closely, this header file is related to the API
-itself, there is nothing that could be actually considered as pure
-platform data, the structures are related with the mailbox framework
-and even if I split this file into two, the additional header would
-end up including the "platform_data" header unless I move
-save/restore_ctx functions and then export them as symbols for the
-API.
+> I tested this driver on OpenBlocks AX3 and worked fine.
 
-So, it might be better for the entire file to sit in
-linux/include/mailbox/ then.
+Thanks.
 
-> The mailbox API header should be somewhere else,
-> like include/linux/mailbox/mailbox-omap.h or similar.
+> I will send a patch which support DT for OpenBlocks AX3.
 
-Ok.
+I was also about to prepare a patch doing that, but I was waiting for
+the network driver itself to be merged, and also the basic OpenBlocks
+AX3 support as well.
 
-> But shouldn't this all now be handled by using the
-> remoteproc framework?
 
-Remoteproc doesn't handle the mailbox hardware directly, it still
-relies in the mailbox framework for the low level communications.
-E.g.: Proc1 has a message (virtqueue msg) queued to Proc2, uses
-mailbox msg to generate an interrupt to Proc2, Proc2 queries the
-message (virtqueue) based on the mailbox message received.
+> Tested-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 
-Regards,
+Thanks!
 
-Omar
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
