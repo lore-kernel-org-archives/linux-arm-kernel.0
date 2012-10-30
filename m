@@ -1,25 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 30 Oct 2012 16:07:22 +0000
-Subject: [PATCH 1/5] ARM: at91: atmel-ssc: add platform device id table
-In-Reply-To: <1350901079-18307-1-git-send-email-voice.shen@atmel.com>
-References: <1350901079-18307-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121030160722.GW4511@opensource.wolfsonmicro.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 30 Oct 2012 18:08:59 +0100
+Subject: [PATCH] mmc: at91-mci: remove driver
+In-Reply-To: <20121030154309.GD19021@game.jcrosoft.org>
+References: <1351520875-31891-1-git-send-email-ludovic.desroches@atmel.com>
+ <87625txrou.fsf@octavius.laptop.org>
+ <20121030150113.GB19021@game.jcrosoft.org>
+ <87ehkgov3a.fsf@octavius.laptop.org>
+ <20121030153350.GC19021@game.jcrosoft.org>
+ <87a9v4otqh.fsf@octavius.laptop.org>
+ <20121030154309.GD19021@game.jcrosoft.org>
+Message-ID: <509009AB.8040302@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 22, 2012 at 06:17:55PM +0800, Bo Shen wrote:
-> Using platform device id to check whether the Atmel SOC support dma for
-> data transfer
-> 
-> If match "at91rm9200_ssc" which does not support DMA transfer
-> If match "at91sam9g45_ssc" which support DMA transfer
+On 10/30/2012 04:43 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 11:38 Tue 30 Oct     , Chris Ball wrote:
+>> Hi,
+>>
+>> On Tue, Oct 30 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 11:09 Tue 30 Oct     , Chris Ball wrote:
+>>>> Hi,
+>>>>
+>>>> On Tue, Oct 30 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>>> Thanks!  Pushed to mmc-next for 3.8.
+>>>>>
+>>>>> if you don't mind I prefer to take it via at91
+>>>>>
+>>>>> I've a patch series that cleanup the platform_data it's difficult to merge
+>>>>> with this one
+>>>>
+>>>> Hm, I don't understand why it should be difficult to merge.  Is it
+>>>> because this patch modifies arch/arm/mach-at91/include/mach/board.h?
+>>>>
+>>>> If so, sounds like we should just take that change out of this patch
+>>>> and have it go into your platform data cleanup patch, and then I can
+>>>> merge the drivers/mmc change independently?  Let me know what you think.
+>>> I'm modifing and moiving the board.h so this file will not exist anymore
+>>>
+>>> and the platform data are not anymore in arch/arm/mach-at91/include/mach/board.h
+>>
+>> Can we take the modification of board.h out of this patch, then,
+>> leaving just the drivers/mmc/ changes?
+> If you really insist but for changelog history and bisectable I'll prefer to
+> do not do so
 
-Any comments on this from that Atmel folks?  If I don't see something
-I'll probably just apply.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/fa8dc4a7/attachment.sig>
+Why don't we leave the code already submitted in the mmc tree. It seems
+that the conflict can be pretty easily handled in advance as it ends up
+being a file removal...
+
+So, I would not bother Chris with our own business and would just manage
+the conflict later, in linux-next (maybe sending a little note to Stephen).
+
+My $0.02.
+
+Bye,
+-- 
+Nicolas Ferre
