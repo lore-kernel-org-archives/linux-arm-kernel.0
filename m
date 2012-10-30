@@ -1,236 +1,72 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 16:52:58 -0700
-Subject: [PATCH 08/11] ARM: OMAP: Remove plat-omap/common.h
+Date: Tue, 30 Oct 2012 16:53:00 -0700
+Subject: [PATCH 09/11] ARM: OMAP: Fix relative includes for debug-devices.h
 In-Reply-To: <20121030234852.25936.12482.stgit@muffinssi.local>
 References: <20121030234852.25936.12482.stgit@muffinssi.local>
-Message-ID: <20121030235258.25936.32564.stgit@muffinssi.local>
+Message-ID: <20121030235300.25936.9859.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of the prototypes in plat-omap/common.h are not
-common to omap1 and omap2+, they are local to omap2+
-and should not be in plat-omap/common.h.
+As discussed on linux-arm-kernel, we want to avoid
+relative includes for the arch/arm/*omap* shared code:
 
-The only shared function prototype in this file is
-omap_init_clocksource_32k(), let's put that into
-counter-32k.h.
+http://www.spinics.net/lists/linux-omap/msg80520.html
 
-Note that the new plat/counter-32k.h must not be
-included from drivers, that will break omap2+ build
-for CONFIG_MULTIPLATFORM.
+Let's add plat/debug-devices.h for debug_card_init()
+to fix the relative includes.
 
+Note that drivers must not use this header as it will
+break build for omap2+ CONFIG_MULTIPLATFORM builds.
+
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap1/common.h                       |    1 -
- arch/arm/mach-omap1/timer32k.c                     |    1 +
- arch/arm/mach-omap2/cm33xx.c                       |    2 -
- arch/arm/mach-omap2/common.h                       |    5 ++-
- .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    2 -
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 -
- arch/arm/mach-omap2/prm33xx.c                      |    2 -
- arch/arm/mach-omap2/prm_common.c                   |    1 -
- arch/arm/mach-omap2/timer.c                        |    1 +
- arch/arm/plat-omap/common.c                        |    1 -
- arch/arm/plat-omap/common.h                        |   36 --------------------
- arch/arm/plat-omap/counter_32k.c                   |    2 -
- arch/arm/plat-omap/include/plat/counter-32k.h      |    1 +
- 13 files changed, 6 insertions(+), 51 deletions(-)
- delete mode 100644 arch/arm/plat-omap/common.h
- create mode 100644 arch/arm/plat-omap/include/plat/counter-32k.h
+ arch/arm/mach-omap2/board-h4.c                  |    2 +-
+ arch/arm/plat-omap/debug-devices.c              |    2 +-
+ arch/arm/plat-omap/include/plat/debug-devices.h |    7 -------
+ 3 files changed, 2 insertions(+), 9 deletions(-)
+ rename arch/arm/{mach-omap2/debug-devices.h => plat-omap/include/plat/debug-devices.h} (54%)
 
-diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
-index 3d40f6e..fc8c944 100644
---- a/arch/arm/mach-omap1/common.h
-+++ b/arch/arm/mach-omap1/common.h
-@@ -26,7 +26,6 @@
- #ifndef __ARCH_ARM_MACH_OMAP1_COMMON_H
- #define __ARCH_ARM_MACH_OMAP1_COMMON_H
+diff --git a/arch/arm/mach-omap2/board-h4.c b/arch/arm/mach-omap2/board-h4.c
+index bd11b0a..8668c72 100644
+--- a/arch/arm/mach-omap2/board-h4.c
++++ b/arch/arm/mach-omap2/board-h4.c
+@@ -33,7 +33,7 @@
+ #include <asm/mach/map.h>
  
--#include "../plat-omap/common.h"
- #include <linux/mtd/mtd.h>
- #include <linux/i2c-omap.h>
+ #include <plat-omap/dma-omap.h>
+-#include "debug-devices.h"
++#include <plat/debug-devices.h>
  
-diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
-index 7452954..8936819 100644
---- a/arch/arm/mach-omap1/timer32k.c
-+++ b/arch/arm/mach-omap1/timer32k.c
-@@ -50,6 +50,7 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/time.h>
- 
-+#include <plat/counter-32k.h>
- #include <plat/dmtimer.h>
+ #include <video/omapdss.h>
+ #include <video/omap-panel-generic-dpi.h>
+diff --git a/arch/arm/plat-omap/debug-devices.c b/arch/arm/plat-omap/debug-devices.c
+index 5a4678e..b49be51 100644
+--- a/arch/arm/plat-omap/debug-devices.c
++++ b/arch/arm/plat-omap/debug-devices.c
+@@ -16,7 +16,7 @@
+ #include <linux/smc91x.h>
  
  #include <mach/hardware.h>
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index b4938ab..ed8dcaf 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -22,8 +22,6 @@
- #include <linux/err.h>
- #include <linux/io.h>
+-#include "../mach-omap2/debug-devices.h"
++#include <plat/debug-devices.h>
  
--#include "../plat-omap/common.h"
+ /* Many OMAP development platforms reuse the same "debug board"; these
+  * platforms include H2, H3, H4, and Perseus2.
+diff --git a/arch/arm/mach-omap2/debug-devices.h b/arch/arm/plat-omap/include/plat/debug-devices.h
+similarity index 54%
+rename from arch/arm/mach-omap2/debug-devices.h
+rename to arch/arm/plat-omap/include/plat/debug-devices.h
+index a4edbd2..8fc4287 100644
+--- a/arch/arm/mach-omap2/debug-devices.h
++++ b/arch/arm/plat-omap/include/plat/debug-devices.h
+@@ -1,9 +1,2 @@
+-#ifndef _OMAP_DEBUG_DEVICES_H
+-#define _OMAP_DEBUG_DEVICES_H
 -
- #include "cm.h"
- #include "cm33xx.h"
- #include "cm-regbits-34xx.h"
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index c925c80..426fcfc 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -34,8 +34,6 @@
- 
- #include <asm/proc-fns.h>
- 
--#include "../plat-omap/common.h"
+-#include <linux/types.h>
 -
- #include "i2c.h"
- #include "serial.h"
- 
-@@ -345,5 +343,8 @@ struct omap2_hsmmc_info;
- extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
- extern void omap_reserve(void);
- 
-+struct omap_hwmod;
-+extern int omap_dss_reset(struct omap_hwmod *);
-+
- #endif /* __ASSEMBLER__ */
- #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
-index 05c6a59..40d6c93 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
-@@ -12,8 +12,6 @@
- 
- #include <plat-omap/dma-omap.h>
- 
--#include "../plat-omap/common.h"
+ /* for TI reference platforms sharing the same debug card */
+ extern int debug_card_init(u32 addr, unsigned gpio);
 -
- #include "omap_hwmod.h"
- #include "hdq1w.h"
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 5b9be73..7a61328 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -30,8 +30,6 @@
- #include <plat/dmtimer.h>
- #include <plat/iommu.h>
- 
--#include "../plat-omap/common.h"
--
- #include "omap_hwmod.h"
- #include "omap_hwmod_common_data.h"
- #include "cm1_44xx.h"
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index 624ade5..0d8abb5 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -19,8 +19,6 @@
- #include <linux/err.h>
- #include <linux/io.h>
- 
--#include "../plat-omap/common.h"
--
- #include "common.h"
- #include "prm33xx.h"
- #include "prm-regbits-33xx.h"
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 6fabbd8..3442227 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -24,7 +24,6 @@
- #include <linux/interrupt.h>
- #include <linux/slab.h>
- 
--#include "../plat-omap/common.h"
- #include <plat/prcm.h>
- 
- #include "prm2xxx_3xxx.h"
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 95e4478..c5bc2cb 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -45,6 +45,7 @@
- #include <asm/arch_timer.h>
- #include "omap_hwmod.h"
- #include "omap_device.h"
-+#include <plat/counter-32k.h>
- #include <plat/dmtimer.h>
- #include "omap-pm.h"
- 
-diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
-index a1555e0..bf6cd80 100644
---- a/arch/arm/plat-omap/common.c
-+++ b/arch/arm/plat-omap/common.c
-@@ -16,7 +16,6 @@
- #include <linux/io.h>
- #include <linux/dma-mapping.h>
- 
--#include "common.h"
- #include <plat-omap/dma-omap.h>
- 
- void __init omap_init_consistent_dma_size(void)
-diff --git a/arch/arm/plat-omap/common.h b/arch/arm/plat-omap/common.h
-deleted file mode 100644
-index 8ae0542..0000000
---- a/arch/arm/plat-omap/common.h
-+++ /dev/null
-@@ -1,36 +0,0 @@
--/*
-- * Header for shared OMAP code in plat-omap.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License as published by the
-- * Free Software Foundation; either version 2 of the License, or (at your
-- * option) any later version.
-- *
-- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
-- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
-- * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
-- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
-- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- *
-- * You should have received a copy of the  GNU General Public License along
-- * with this program; if not, write  to the Free Software Foundation, Inc.,
-- * 675 Mass Ave, Cambridge, MA 02139, USA.
-- */
--
--#ifndef __ARCH_ARM_MACH_OMAP_COMMON_H
--#define __ARCH_ARM_MACH_OMAP_COMMON_H
--
--extern int __init omap_init_clocksource_32k(void __iomem *vbase);
--
--extern void __init omap_check_revision(void);
--
--extern void omap_reserve(void);
--struct omap_hwmod;
--extern int omap_dss_reset(struct omap_hwmod *);
--
--#endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
-diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
-index 66bf3f9..f3771cd 100644
---- a/arch/arm/plat-omap/counter_32k.c
-+++ b/arch/arm/plat-omap/counter_32k.c
-@@ -22,8 +22,6 @@
- #include <asm/mach/time.h>
- #include <asm/sched_clock.h>
- 
--#include "common.h"
--
- /* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
- #define OMAP2_32KSYNCNT_REV_OFF		0x0
- #define OMAP2_32KSYNCNT_REV_SCHEME	(0x3 << 30)
-diff --git a/arch/arm/plat-omap/include/plat/counter-32k.h b/arch/arm/plat-omap/include/plat/counter-32k.h
-new file mode 100644
-index 0000000..da000d4
---- /dev/null
-+++ b/arch/arm/plat-omap/include/plat/counter-32k.h
-@@ -0,0 +1 @@
-+int omap_init_clocksource_32k(void __iomem *vbase);
+-#endif
