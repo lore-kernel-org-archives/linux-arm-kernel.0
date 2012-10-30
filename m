@@ -1,58 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 09:24:42 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: move mailbox.h out of plat-omap headers
-In-Reply-To: <CALLhW=4ukBuRSVcPm2A37PgBhv33yKqk2G=Dz2XTUyswXw=JMg@mail.gmail.com>
-References: <1351530381-11459-1-git-send-email-omar.luna@linaro.org>
- <1351530381-11459-2-git-send-email-omar.luna@linaro.org>
- <20121029175228.GD11908@atomide.com>
- <CALLhW=4ukBuRSVcPm2A37PgBhv33yKqk2G=Dz2XTUyswXw=JMg@mail.gmail.com>
-Message-ID: <20121030162441.GF11908@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Oct 2012 10:53:12 -0600
+Subject: [PATCH 1/2] arm: bcm2835: move to the multiplatform support
+In-Reply-To: <20121030092046.7d20407b@skate>
+References: <1351419853-25146-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <508F3BFF.6010305@wwwdotorg.org> <20121030092046.7d20407b@skate>
+Message-ID: <509005F8.5030006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Omar Ramirez Luna <omar.luna@linaro.org> [121030 05:20]:
-> Tony,
+On 10/30/2012 02:20 AM, Thomas Petazzoni wrote:
+> Stephen,
 > 
-> On 29 October 2012 12:52, Tony Lindgren <tony@atomide.com> wrote:
-> >> --- /dev/null
-> >> +++ b/include/linux/platform_data/omap_mailbox.h
-> >> @@ -0,0 +1,105 @@
-> >
-> > This file should only contain pure platform data needed
-> > by the core omap code to pass to the mailbox driver.
+> Thanks for taking the time to look at this patch.
 > 
-> Ok, looking at it closely, this header file is related to the API
-> itself, there is nothing that could be actually considered as pure
-> platform data, the structures are related with the mailbox framework
-> and even if I split this file into two, the additional header would
-> end up including the "platform_data" header unless I move
-> save/restore_ctx functions and then export them as symbols for the
-> API.
+> On Mon, 29 Oct 2012 20:31:27 -0600, Stephen Warren wrote:
 > 
-> So, it might be better for the entire file to sit in
-> linux/include/mailbox/ then.
+>> Since CONFIG_VFP is enabled in bcm2835_defconfig (or in general, could
+>> be enabled in anyone's .config), I guess that means I can't apply the
+>> patch yet, because the VFP fix you mention above doesn't seem to have
+>> been applied anywhere, so applying it would cause bcm2835_defconfig to
+>> be unbootable. To apply this, I'd need to merge in a branch containing
+>> the VFP fix first.
+> 
+> I'm pretty sure the VFP fix will land somewhere at some point, we can
+> wait this moment to merge this multiplatform bcm2835 support patch.
+> 
+>> What branch is this patch series based on? Neither "git am" not "git am
+>> -3" will apply the series; apparently my repo doesn't have the blobs to
+>> perform the 3-way merge -3 invokes even though I have a remote for
+>> linux-next which should pick up most blob sources.
+> 
+> This is my fault, sorry. I based this patch on a branch that contains
+> the VFP fix + the irqchip changes I've been proposing. I can resend a
+> new version based on 3.7-rc3, or arm-soc/for-next, at your preference.
 
-OK to me.
- 
-> > The mailbox API header should be somewhere else,
-> > like include/linux/mailbox/mailbox-omap.h or similar.
-> 
-> Ok.
-> 
-> > But shouldn't this all now be handled by using the
-> > remoteproc framework?
-> 
-> Remoteproc doesn't handle the mailbox hardware directly, it still
-> relies in the mailbox framework for the low level communications.
-> E.g.: Proc1 has a message (virtqueue msg) queued to Proc2, uses
-> mailbox msg to generate an interrupt to Proc2, Proc2 queries the
-> message (virtqueue) based on the mailbox message received.
+(Once the dependencies are in arm-soc somewhere...) It'd be best to base
+it on v3.7-rcN, either with/without the VFP and debug_ll_io_init()
+patches merged (since I'll apply the patch only on top of those two
+patches anyway.
 
-OK.
-
-Greg, do these patches look OK to you to move to live under
-drivers/mailbox?
-
-Regards,
-
-Tony
+Thanks.
