@@ -1,30 +1,70 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Oct 2012 11:48:07 +0100
-Subject: [PATCH 1/3] ARM: mvebu: Add support I2C controller
-In-Reply-To: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
-References: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
-Message-ID: <20121030114807.67765823@skate>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Tue, 30 Oct 2012 16:20:53 +0530
+Subject: Representation of external memory-mapped devices in DT (gpmc)
+In-Reply-To: <508EBB47.8070405@gmail.com>
+References: <508E9513.7050106@gmail.com> <508E9C42.10907@gmail.com>
+ <508EBB47.8070405@gmail.com>
+Message-ID: <508FB10D.9030906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Nobuhiro Iwamatsu,
+Hi Daniel,
 
-On Tue, 30 Oct 2012 19:41:23 +0900, Nobuhiro Iwamatsu wrote:
-> The mvebu arch has the same I2C controller as mv64xxx-i2c.
-> This support mv64xxx-i2c on mvebu.
-> 
-> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+On Monday 29 October 2012 10:52 PM, Daniel Mack wrote:
+> On 29.10.2012 16:09, Rob Herring wrote:
 
-Thanks, looks good to me, but we have to wait for the Armada 370/XP
-clock patch set to get merged before merging this.
+>> You may want a CS0 node with nand as a child node of that.
 
-I'll give it a test on the OpenBlocks hardware and report.
+> Hmm, I don't see what that would buy us. The question is which way is
+> feasible for storing both the memory region and the cs number in the
+> device tree. The CS number should certainly go to the child node, no?
+>
+> IOW, would it be a good idea to have something like the following layout?
+>
+> 	gpmc: gpmc at 50000000 {
+> 		compatible = "ti,gpmc";
+> 		ti,hwmods = "gpmc";
+> 		reg =<0x50000000 0x2000>;
+>
+> 		/* cs-reg stores the setup of the controller's
+> 		   memory map */
+>
+> 			/* offset	size */
+> 		cs-reg =<0x0		0x1000000
+> 			  ....		.....
+> 			  ....		.....>;
+>
+> 		nand: child at 0 {
+> 			/* timings */
+> 			/* peripheral specifics */
+> 		};
+> 	};
+>
+> I would actually much prefer that approach.
+>
+> Afzal, because because that way, we can leave the code as-is for now and
+> add the "cs-reg" property once the code is switched to dynamic handling.
+> What do you think?
 
-Best regards,
+I don't know what to say, don't have a good grasp on DT to give
+right suggestion.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+It seems offset field may not be necessary. memory for connected
+peripherals is not fixed, only CS is fixed (as CS pin is hard-wired).
+Physical memory can be anywhere between 0-512MB (with
+alignment constraints depending on size, refer GPMC_CONFIG7
+register), even though right now memory region for peripheral
+seems to be fixed (for boards supported in mainline it will be
+what bootloader configures), it is possible to have it in a different
+region for those peripherals.
+
+And this memory should be presented to child device as resource,
+say for smsc911x ethernet driver.
+
+I see some similarity with PCI - BAR's, where address space
+is configured (here a difference would be that size needs to
+be known while configuring). Size here would be based on
+connected peripheral (but no auto detection)
+
+Regards
+Afzal
