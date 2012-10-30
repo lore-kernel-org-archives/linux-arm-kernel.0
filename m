@@ -1,70 +1,49 @@
-From: x0148406@ti.com (Afzal Mohammed)
-Date: Tue, 30 Oct 2012 16:20:53 +0530
-Subject: Representation of external memory-mapped devices in DT (gpmc)
-In-Reply-To: <508EBB47.8070405@gmail.com>
-References: <508E9513.7050106@gmail.com> <508E9C42.10907@gmail.com>
- <508EBB47.8070405@gmail.com>
-Message-ID: <508FB10D.9030906@ti.com>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Tue, 30 Oct 2012 10:55:34 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+Message-ID: <508FB226.20604@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 30/10/12 02:36, Paul Walmsley wrote:
+> 
+> Here are some basic OMAP test results for Linux v3.7-rc3.
+> Logs and other details at:
+> 
+>     http://www.pwsan.com/omap/testlogs/test_v3.7-rc3/20121028162003/
+> 
+> 
+> Passing tests
+> -------------
+> 
+> Boot to userspace: 2420n800, 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
+>                    4430es2panda, 5912osk, am335xbone
+> 
+> PM ret/off, suspend + dynamic idle: (none)
+> 
+> 
+> Failing tests: fixed by posted patches
+> --------------------------------------
+> 
+> Boot tests:
+> 
+> * 2430sdp: vfp_reload_hw oops during MMC initialization
+>   - Kernel attempts to save FP registers that don't exist; fix posted:
+>     - http://www.spinics.net/lists/arm-kernel/msg200646.html
+>     - added to rmk's patch system as 7566/1
+> 
+> * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+>   - Due to GPMC missing support for DT
+>   - Temporary workaround at http://www.spinics.net/lists/arm-kernel/msg200787.html
+>   - May be fixed now, pending retest:
+>     - http://marc.info/?l=linux-omap&m=135082257727502&w=2
 
-On Monday 29 October 2012 10:52 PM, Daniel Mack wrote:
-> On 29.10.2012 16:09, Rob Herring wrote:
+At what point is booting from MMC on the BeagleBone going to start working ?
 
->> You may want a CS0 node with nand as a child node of that.
+I only ask, since, by default, a new BeagleBone is setup to boot from MMC, so anyone testing a new
+kernel will probably expect the same setup to work.
 
-> Hmm, I don't see what that would buy us. The question is which way is
-> feasible for storing both the memory region and the cs number in the
-> device tree. The CS number should certainly go to the child node, no?
->
-> IOW, would it be a good idea to have something like the following layout?
->
-> 	gpmc: gpmc at 50000000 {
-> 		compatible = "ti,gpmc";
-> 		ti,hwmods = "gpmc";
-> 		reg =<0x50000000 0x2000>;
->
-> 		/* cs-reg stores the setup of the controller's
-> 		   memory map */
->
-> 			/* offset	size */
-> 		cs-reg =<0x0		0x1000000
-> 			  ....		.....
-> 			  ....		.....>;
->
-> 		nand: child at 0 {
-> 			/* timings */
-> 			/* peripheral specifics */
-> 		};
-> 	};
->
-> I would actually much prefer that approach.
->
-> Afzal, because because that way, we can leave the code as-is for now and
-> add the "cs-reg" property once the code is switched to dynamic handling.
-> What do you think?
-
-I don't know what to say, don't have a good grasp on DT to give
-right suggestion.
-
-It seems offset field may not be necessary. memory for connected
-peripherals is not fixed, only CS is fixed (as CS pin is hard-wired).
-Physical memory can be anywhere between 0-512MB (with
-alignment constraints depending on size, refer GPMC_CONFIG7
-register), even though right now memory region for peripheral
-seems to be fixed (for boards supported in mainline it will be
-what bootloader configures), it is possible to have it in a different
-region for those peripherals.
-
-And this memory should be presented to child device as resource,
-say for smsc911x ethernet driver.
-
-I see some similarity with PCI - BAR's, where address space
-is configured (here a difference would be that size needs to
-be known while configuring). Size here would be based on
-connected peripheral (but no auto detection)
-
-Regards
-Afzal
+Cheers
+Mark JACKSON
