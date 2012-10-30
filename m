@@ -1,33 +1,32 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Tue, 30 Oct 2012 12:35:22 +0530
-Subject: [PATCH V3 0/4] ARM: tegra: Enable SLINK controller driver
-Message-ID: <1351580726-17350-1-git-send-email-ldewangan@nvidia.com>
+Date: Tue, 30 Oct 2012 12:35:26 +0530
+Subject: [PATCH V3 4/4] ARM: tegra: config: enable spi driver for Tegra SLINK
+ controller
+In-Reply-To: <1351580726-17350-1-git-send-email-ldewangan@nvidia.com>
+References: <1351580726-17350-1-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1351580726-17350-5-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series modify the dts file to add the slink addresses,
-make AUXDATA in board dt files, enable slink4 for tegra30-cardhu and 
-enable slink controller defconfig.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+No change from V1 and V2.
 
-Changes from V1: 
-- Remove changes from clock tables.
-- Make the dma req dt property name to nvidia,dma-request-selector.
-- change the spi max frequency prop to spi-max-frequency.
+ arch/arm/configs/tegra_defconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Changes from V2:
-- make node name to spi.
-- get rid of iomap.h.
-
-Laxman Dewangan (4):
-  ARM: tegra: dts: add slink controller dt entry
-  ARM: tegra: Add OF_DEV_AUXDATA for SLINK driver in board dt
-  ARM: tegra: dts: cardhu: enable SLINK4
-  ARM: tegra: config: enable spi driver for Tegra SLINK controller
-
- arch/arm/boot/dts/tegra20.dtsi         |   41 ++++++++++++++++++++++
- arch/arm/boot/dts/tegra30-cardhu.dtsi  |    5 +++
- arch/arm/boot/dts/tegra30.dtsi         |   60 ++++++++++++++++++++++++++++++++
- arch/arm/configs/tegra_defconfig       |    2 +-
- arch/arm/mach-tegra/board-dt-tegra20.c |    8 ++++
- arch/arm/mach-tegra/board-dt-tegra30.c |   12 ++++++
- 6 files changed, 127 insertions(+), 1 deletions(-)
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index fb29680..60e1b2e 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -117,7 +117,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+-CONFIG_SPI_TEGRA=y
++CONFIG_SPI_TEGRA20_SLINK=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
+-- 
+1.7.1.1
