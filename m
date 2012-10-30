@@ -1,16 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 30 Oct 2012 11:08:08 +0800
-Subject: [PATCH] ARM: dts: mxs: Add PWM3 muxing options for i.MX28
-In-Reply-To: <1351332946-5933-1-git-send-email-julien.boibessot@free.fr>
-References: <1351332946-5933-1-git-send-email-julien.boibessot@free.fr>
-Message-ID: <20121030030805.GF9921@S2101-09.ap.freescale.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Oct 2012 03:11:05 +0000 (UTC)
+Subject: [RFC] ARM: OMAP: hwmod: wait for sysreset complete after enabling
+ hwmod
+In-Reply-To: <1350979419.2143.71.camel@sokoban>
+References: <1350922532-26338-1-git-send-email-t-kristo@ti.com>
+ <alpine.DEB.2.00.1210230745160.32436@utopia.booyaka.com>
+ <1350979419.2143.71.camel@sokoban>
+Message-ID: <alpine.DEB.2.00.1210300309190.12697@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2012 at 12:15:46PM +0200, julien.boibessot at free.fr wrote:
-> From: Julien Boibessot <julien.boibessot@armadeus.com>
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+Hi Tero,
 
-Applied, thanks.
+On Tue, 23 Oct 2012, Tero Kristo wrote:
+
+> Looks good to me. Only reason I pushed the reset wait to the end of the
+> function was a minimal potential timing optimization. As the beginning
+> of the function will write a register, it will consume a bit of time
+> (especially if in 32k domain), so it can maybe save a single register
+> read in the delay loop if ordered that way.
+
+Ah, OK.
+
+> Your way is probably safer, it might cause problems in some cases if the
+> config is written before reset has completed (can it?)
+
+Not sure, but seems to make sense to wait until the reset is done before 
+doing anything to the IP block's registers.  Queuing for 3.7-rc fixes,
+
+
+- Paul
