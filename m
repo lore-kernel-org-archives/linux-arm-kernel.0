@@ -1,37 +1,54 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 16:54:19 -0700
-Subject: [GIT PULL] omap plat header removal for v3.8 merge window, part1
-In-Reply-To: <20121027163233.GA11908@atomide.com>
-References: <20121019023300.GN30550@atomide.com>
- <201210261402.19759.arnd@arndb.de>
- <20121026170949.GF11908@atomide.com>
- <201210261728.22132.arnd@arndb.de>
- <20121026175537.GL11908@atomide.com>
- <20121026223848.GY11908@atomide.com>
- <20121027090210.GJ28061@n2100.arm.linux.org.uk>
- <20121027163233.GA11908@atomide.com>
-Message-ID: <20121030235419.GA12739@atomide.com>
+Date: Tue, 30 Oct 2012 16:57:15 -0700
+Subject: [RFC 2/7] capebus: Add beaglebone board support
+In-Reply-To: <DE47929E-9579-4DD2-B01C-08554D49FADE@antoniou-consulting.com>
+References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
+ <1351702333-8456-3-git-send-email-panto@antoniou-consulting.com>
+ <20121030193939.GR11908@atomide.com>
+ <DE47929E-9579-4DD2-B01C-08554D49FADE@antoniou-consulting.com>
+Message-ID: <20121030235714.GB12739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121027 09:34]:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [121027 02:03]:
-> > 
-> > Rather than moving all the files from plat-omap/include/plat into plat-omap
-> > and then having all these totally disgusting relative includes, why don't
-> > you add to these makefiles:
-> > 
-> > ccflags += -I$(srctree)/arch/arm/plat-omap/include
-> > 
-> > and avoid all that include moving and all the include name fixup?
+* Pantelis Antoniou <panto@antoniou-consulting.com> [121030 13:18]:
+> On Oct 30, 2012, at 9:39 PM, Tony Lindgren wrote:
 > 
-> I'll take a look. Most of these headers should be local,
-> so it should not be too many files to move for plat-omap
-> to fix this.
+> > * Pantelis Antoniou <panto@antoniou-consulting.com> [121030 12:00]:
+> >> +
+> >> +	priv->lcdc_oh = omap_hwmod_lookup("lcdc");
+> >> +	if (priv->lcdc_oh == NULL) {
+> >> +		dev_err(&pdev->dev, "Failed to lookup omap_hwmod lcdc\n");
+> >> +		return -ENODEV;
+> >> +	}
+> >> +
+> >> +	priv->lcdc_pdev = omap_device_build("da8xx_lcdc", 0, priv->lcdc_oh,
+> >> +			&priv->lcd_pdata,
+> >> +			sizeof(struct da8xx_lcdc_platform_data),
+> >> +			NULL, 0, 0);
+> >> +	if (priv->lcdc_pdev == NULL) {
+> >> +		dev_err(&pdev->dev, "Failed to build LCDC device\n");
+> >> +		return -ENODEV;
+> >> +	}
+> > 
+> > ..and these kind of things need to become private to
+> > arch/arm/mach-omap2, we already have it working for other
+> > devices with device tree.
+> > 
+> > Regards,
+> > 
+> > Tony
+> 
+> I see,
+> 
+> I know that if the device driver is DTified it will pick up the hwmod automatically.
+> The issue is that the driver is question is not yet; how would I go about
+> creating the platform device and having it pick up the hwmod automatically?
 
-Posted a series to fix the issue with relative includes
-as "[PATCH 00/11] Fix relative includes for omaps introduced
-by recent clean-up".
+Maybe you should make this DT only driver for omap? We already
+have am33xx DT only to start with.
+
+If you really need the platform device still, just take a look
+at the many platform device creating files under arch/arm/mach-omap2.
 
 Regards,
 
