@@ -1,60 +1,85 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 30 Oct 2012 14:02:13 -0700
-Subject: [PATCH 1/2] ARM: OMAP2+: move mailbox.h out of plat-omap headers
-In-Reply-To: <20121030162441.GF11908@atomide.com>
-References: <1351530381-11459-1-git-send-email-omar.luna@linaro.org>
- <1351530381-11459-2-git-send-email-omar.luna@linaro.org>
- <20121029175228.GD11908@atomide.com>
- <CALLhW=4ukBuRSVcPm2A37PgBhv33yKqk2G=Dz2XTUyswXw=JMg@mail.gmail.com>
- <20121030162441.GF11908@atomide.com>
-Message-ID: <20121030210213.GA6098@kroah.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Tue, 30 Oct 2012 16:04:11 -0500
+Subject: [PATCH 1/6] arm: use devicetree to get smp_twd clock
+In-Reply-To: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <1351631056-25938-2-git-send-email-mark.langsdorf@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 09:24:42AM -0700, Tony Lindgren wrote:
-> * Omar Ramirez Luna <omar.luna@linaro.org> [121030 05:20]:
-> > Tony,
-> > 
-> > On 29 October 2012 12:52, Tony Lindgren <tony@atomide.com> wrote:
-> > >> --- /dev/null
-> > >> +++ b/include/linux/platform_data/omap_mailbox.h
-> > >> @@ -0,0 +1,105 @@
-> > >
-> > > This file should only contain pure platform data needed
-> > > by the core omap code to pass to the mailbox driver.
-> > 
-> > Ok, looking at it closely, this header file is related to the API
-> > itself, there is nothing that could be actually considered as pure
-> > platform data, the structures are related with the mailbox framework
-> > and even if I split this file into two, the additional header would
-> > end up including the "platform_data" header unless I move
-> > save/restore_ctx functions and then export them as symbols for the
-> > API.
-> > 
-> > So, it might be better for the entire file to sit in
-> > linux/include/mailbox/ then.
-> 
-> OK to me.
->  
-> > > The mailbox API header should be somewhere else,
-> > > like include/linux/mailbox/mailbox-omap.h or similar.
-> > 
-> > Ok.
-> > 
-> > > But shouldn't this all now be handled by using the
-> > > remoteproc framework?
-> > 
-> > Remoteproc doesn't handle the mailbox hardware directly, it still
-> > relies in the mailbox framework for the low level communications.
-> > E.g.: Proc1 has a message (virtqueue msg) queued to Proc2, uses
-> > mailbox msg to generate an interrupt to Proc2, Proc2 queries the
-> > message (virtqueue) based on the mailbox message received.
-> 
-> OK.
-> 
-> Greg, do these patches look OK to you to move to live under
-> drivers/mailbox?
+From: Rob Herring <rob.herring@calxeda.com>
 
-Um, I don't know, I wasn't paying attention here, sorry.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/kernel/smp_twd.c | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
-greg k-h
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index b22d700..600fbcc 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-static struct clk *twd_get_clock(void)
++static struct clk *twd_get_clock(struct device_node *np)
+ {
+-	struct clk *clk;
++	struct clk *clk = NULL;
+ 	int err;
+ 
+-	clk = clk_get_sys("smp_twd", NULL);
++	if (np)
++		clk = of_clk_get(np, 0);
++	if (!clk)
++		clk = clk_get_sys("smp_twd", NULL);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
+ 		return clk;
+@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
+ 		return ERR_PTR(err);
+ 	}
+ 
++	twd_timer_rate = clk_get_rate(clk);
+ 	return clk;
+ }
+ 
+@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ {
+ 	struct clock_event_device **this_cpu_clk;
+ 
+-	if (!twd_clk)
+-		twd_clk = twd_get_clock();
+-
+-	if (!IS_ERR_OR_NULL(twd_clk))
+-		twd_timer_rate = clk_get_rate(twd_clk);
+-	else
++	if (IS_ERR_OR_NULL(twd_clk))
+ 		twd_calibrate_rate();
+ 
+ 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+@@ -349,6 +348,10 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
+ 	if (!twd_base)
+ 		return -ENOMEM;
+ 
++	twd_clk = twd_get_clock(NULL);
++
++	twd_clk = twd_get_clock(NULL);
++
+ 	return twd_local_timer_common_register();
+ }
+ 
+@@ -383,6 +386,8 @@ void __init twd_local_timer_of_register(void)
+ 		goto out;
+ 	}
+ 
++	twd_clk = twd_get_clock(np);
++
+ 	err = twd_local_timer_common_register();
+ 
+ out:
+-- 
+1.7.11.7
