@@ -1,37 +1,41 @@
-From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Tue, 30 Oct 2012 19:41:25 +0900
-Subject: [PATCH 3/3] ARM: mvebu: Add support RTC for OpenBlockS AX3
-In-Reply-To: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
-References: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
-Message-ID: <1351593685-19663-3-git-send-email-iwamatsu@nigauri.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 30 Oct 2012 11:33:23 +0100
+Subject: [PATCH 0/2] ARM: OMAP: hwmod/omapd_device: Fix for resource handling
+ in DT boot
+Message-ID: <1351593205-13590-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Hello,
 
-OpenBlockS AX3 has Seiko Instruments S-35390A as RTC controller.
-This validates RTC controller.
+This series resolves the issue we currently have with the resource handling when
+booting with DT.
+In short: at the moment the omap_device_alloc() decides if it needs to update the
+OF filled resources based on the number of resources on the device and in the
+hwmod database.
+This prevents us from removing hwmod data for platforms (OMAP5) which does not
+support non DT boot anymore.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+With this series we can make sure that the DT provided resources are used and we
+only append the DMA resources to the device from hwmod.
+I have added extra check to prepare us when the DMA resource can be filled via
+OF. In this case we do not update the resources at all.
+
+Tony, Benoit, Paul: Not sure if this qualify for 3.7 inclusion, but for sure
+going to help us to clean up the OMAP5 hwmod database.
+
+Regards,
+Peter
 ---
- arch/arm/boot/dts/openblocks-ax3-4.dts |    5 +++++
- 1 file changed, 5 insertions(+)
+Peter Ujfalusi (2):
+  ARM: OMAP: hwmod: Add possibility to count hwmod resources based on
+    type
+  ARM: OMAP: omap_device: Correct resource handling for DT boot
 
-diff --git a/arch/arm/boot/dts/openblocks-ax3-4.dts b/arch/arm/boot/dts/openblocks-ax3-4.dts
-index c42b9a5..61c2f2c 100644
---- a/arch/arm/boot/dts/openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/openblocks-ax3-4.dts
-@@ -74,6 +74,11 @@
- 		i2c at d0011100 {
- 			status = "okay";
- 			clock-frequency = <400000>;
-+
-+			s35390a: s35390a at 30 {
-+				compatible = "s35390a";
-+				reg = <0x30>;
-+			}; 
- 		}; 
- 	};
- };
+ arch/arm/mach-omap2/omap_hwmod.c             | 27 +++++----
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |  2 +-
+ arch/arm/plat-omap/omap_device.c             | 83 +++++++++++++++++-----------
+ 3 files changed, 68 insertions(+), 44 deletions(-)
+
 -- 
-1.7.10.4
+1.7.12.4
