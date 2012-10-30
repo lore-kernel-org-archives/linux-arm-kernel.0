@@ -1,51 +1,29 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 30 Oct 2012 15:04:01 +0530
-Subject: [PATCH v2] ARM: dts: am33xx: rtc node
-Message-ID: <1351589646-27082-1-git-send-email-afzal@ti.com>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Tue, 30 Oct 2012 15:09:44 +0530
+Subject: [PATCH] arm/dts: am33xx rtc node
+In-Reply-To: <1350643825-9657-1-git-send-email-afzal@ti.com>
+References: <1350643825-9657-1-git-send-email-afzal@ti.com>
+Message-ID: <508FA060.5010303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add am33xx rtc node.
-
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
 Hi Benoit,
 
-This is based on your for_3.8/dts branch.
+On Friday 19 October 2012 04:20 PM, Afzal Mohammed wrote:
+> add am33xx rtc node.
+>
+> Signed-off-by: Afzal Mohammed<afzal@ti.com>
+> ---
+>
+> Based on v3.7-rc1,
+> Dependent on series "rtc: omap dt support (for am33xx)",
+> (https://lkml.org/lkml/2012/10/19/163)
 
-This has been tested on Beagle Bone.
+The dependent series has been merged on -mm tree
+and are now present in linux-next.
 
-Bindings along with driver changes for DT has been picked by Andrew
-Morton and is now present in linux-next.
+v2 of this patch has been sent with modification on subject
+to follow new convention and removing interrupt parent.
 
 Regards
 Afzal
-
-v2
- 1. Remove interrupt parent in rtc node.
- 2. Modify subject as per new convention.
-
-
- arch/arm/boot/dts/am33xx.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 70d24b8..97a7bd3 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -291,5 +291,13 @@
- 			ti,hwmods = "timer7";
- 			ti,timer-pwm;
- 		};
-+
-+		rtc at 44e3e000 {
-+			compatible = "ti,da830-rtc";
-+			reg = <0x44e3e000 0x1000>;
-+			interrupts = <75
-+				      76>;
-+			ti,hwmods = "rtc";
-+		};
- 	};
- };
--- 
-1.7.12
