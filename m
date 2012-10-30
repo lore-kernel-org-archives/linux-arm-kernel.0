@@ -1,101 +1,45 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Oct 2012 11:17:54 +0100
-Subject: [PATCH v3 02/10] net/macb: memory barriers cleanup
+Date: Tue, 30 Oct 2012 11:17:56 +0100
+Subject: [PATCH v3 04/10] net/macb: remove macb_get_drvinfo()
 In-Reply-To: <cover.1351591858.git.nicolas.ferre@atmel.com>
 References: <cover.1351591858.git.nicolas.ferre@atmel.com>
-Message-ID: <a7cce251c588465230e5bfea8b2a562b83fa57c6.1351591858.git.nicolas.ferre@atmel.com>
+Message-ID: <6e21ef2bdcfe6f967bf883ee9834dc1a145e3223.1351591858.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Havard Skinnemoen <havard@skinnemoen.net>
+This function has little meaning so remove it altogether and
+let ethtool core fill in the fields automatically.
 
-Remove a couple of unneeded barriers and document the remaining ones.
-
-Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-[nicolas.ferre at atmel.com: split patch in topics]
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reviewed-by: Ben Hutchings <bhutchings@solarflare.com>
 ---
- drivers/net/ethernet/cadence/macb.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/cadence/macb.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
 diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 0931cb7..e7f554d 100644
+index b161d73..4db52f3 100644
 --- a/drivers/net/ethernet/cadence/macb.c
 +++ b/drivers/net/ethernet/cadence/macb.c
-@@ -373,7 +373,9 @@ static void macb_tx(struct macb *bp)
+@@ -1225,20 +1225,9 @@ static int macb_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ 	return phy_ethtool_sset(phydev, cmd);
+ }
  
- 		BUG_ON(skb == NULL);
- 
-+		/* Make hw descriptor updates visible to CPU */
- 		rmb();
-+
- 		bufstat = bp->tx_ring[tail].ctrl;
- 
- 		if (!(bufstat & MACB_BIT(TX_USED)))
-@@ -416,7 +418,10 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 			if (frag == last_frag)
- 				break;
- 		}
-+
-+		/* Make descriptor updates visible to hardware */
- 		wmb();
-+
- 		return 1;
- 	}
- 
-@@ -437,12 +442,14 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 					       frag_len);
- 		offset += RX_BUFFER_SIZE;
- 		bp->rx_ring[frag].addr &= ~MACB_BIT(RX_USED);
--		wmb();
- 
- 		if (frag == last_frag)
- 			break;
- 	}
- 
-+	/* Make descriptor updates visible to hardware */
-+	wmb();
-+
- 	skb->protocol = eth_type_trans(skb, bp->dev);
- 
- 	bp->stats.rx_packets++;
-@@ -462,6 +469,8 @@ static void discard_partial_frame(struct macb *bp, unsigned int begin,
- 
- 	for (frag = begin; frag != end; frag = NEXT_RX(frag))
- 		bp->rx_ring[frag].addr &= ~MACB_BIT(RX_USED);
-+
-+	/* Make descriptor updates visible to hardware */
- 	wmb();
- 
- 	/*
-@@ -480,7 +489,9 @@ static int macb_rx(struct macb *bp, int budget)
- 	for (; budget > 0; tail = NEXT_RX(tail)) {
- 		u32 addr, ctrl;
- 
-+		/* Make hw descriptor updates visible to CPU */
- 		rmb();
-+
- 		addr = bp->rx_ring[tail].addr;
- 		ctrl = bp->rx_ring[tail].ctrl;
- 
-@@ -675,6 +686,8 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 
- 	bp->tx_ring[entry].addr = mapping;
- 	bp->tx_ring[entry].ctrl = ctrl;
-+
-+	/* Make newly initialized descriptor visible to hardware */
- 	wmb();
- 
- 	entry = NEXT_TX(entry);
-@@ -783,9 +796,6 @@ static void macb_init_rings(struct macb *bp)
- 
- static void macb_reset_hw(struct macb *bp)
- {
--	/* Make sure we have the write buffer for ourselves */
--	wmb();
+-static void macb_get_drvinfo(struct net_device *dev,
+-			     struct ethtool_drvinfo *info)
+-{
+-	struct macb *bp = netdev_priv(dev);
 -
- 	/*
- 	 * Disable RX and TX (XXX: Should we halt the transmission
- 	 * more gracefully?)
+-	strcpy(info->driver, bp->pdev->dev.driver->name);
+-	strcpy(info->version, "$Revision: 1.14 $");
+-	strcpy(info->bus_info, dev_name(&bp->pdev->dev));
+-}
+-
+ const struct ethtool_ops macb_ethtool_ops = {
+ 	.get_settings		= macb_get_settings,
+ 	.set_settings		= macb_set_settings,
+-	.get_drvinfo		= macb_get_drvinfo,
+ 	.get_link		= ethtool_op_get_link,
+ 	.get_ts_info		= ethtool_op_get_ts_info,
+ };
 -- 
 1.8.0
