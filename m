@@ -1,24 +1,41 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 30 Oct 2012 11:12:53 -0000
-Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
-In-Reply-To: <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
-References: <cover.1351591858.git.nicolas.ferre@atmel.com>
- <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
-Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Oct 2012 11:23:07 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuWt22yRy9cHAU1u+9K7Fy4Zi95UN4wOh2DeVe61S-u5Cg@mail.gmail.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <alpine.DEB.2.00.1210300416190.12697@utopia.booyaka.com>
+ <CAORVsuWt22yRy9cHAU1u+9K7Fy4Zi95UN4wOh2DeVe61S-u5Cg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1210301120290.12697@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Instead of masking head and tail every time we increment them, just let them
-> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
-> functions to do the subscripting properly to minimize the chances of messing
-> this up.
-...
-> +static unsigned int macb_tx_ring_avail(struct macb *bp)
-> +{
-> +	return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
-> +}
+Hi Jean,
 
-That one doesn't look quite right to me.
-Surely it should be masking with 'TX_RING_SIZE - 1'
+On Tue, 30 Oct 2012, Jean Pihet wrote:
 
-	David
+> On Tue, Oct 30, 2012 at 5:16 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Tue, 23 Oct 2012, Jean Pihet wrote:
+> >
+> >> Let me try with the same setup as yours (bootloader images,
+> >> omap2pus_defconfig, angstrom roots).
+> >
+> > Had any luck reproducing this one that Aaro & I are seeing?
+> Unfortunately not. I could not reproduce the issue on my side, using
+> an ES2.1 Beagleboard with the latest l-o kernel and your bootloader
+> and rootfs images.
+> Is there some specific to enable in order to reproduce the issue?
+
+Could you please post a bootlog from your terminal program, similar to 
+
+http://www.pwsan.com/omap/testlogs/test_v3.7-rc3/20121028162003/boot/3530es3beagle/3530es3beagle_log.txt
+
+?
+
+
+- Paul
