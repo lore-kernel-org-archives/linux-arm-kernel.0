@@ -1,32 +1,53 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 30 Oct 2012 18:31:11 +0100
-Subject: [PATCH v3 00/10] net/macb: driver enhancement concerning GEM
- support, ring logic and cleanup
-In-Reply-To: <cover.1351591858.git.nicolas.ferre@atmel.com>
-References: <cover.1351591858.git.nicolas.ferre@atmel.com>
-Message-ID: <CAGhQ9Vw5pw0Hj8hLfADcaO1D3R-f-y8ho35+6YJG+-f2pU_Jrw@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 30 Oct 2012 19:27:07 +0200
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <20121030162727.GG11908@atomide.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <20121030162727.GG11908@atomide.com>
+Message-ID: <20121030172707.GB3993@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 October 2012 11:17, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> This is an enhancement work that began several years ago. I try to catchup with
-> some performance improvement that has been implemented then by Havard.
-> The ring index logic and the TX error path modification are the biggest changes
-> but some cleanup/debugging have been added along the way.
-> The GEM revision will benefit from the Gigabit support.
-> Newer pinctrl infrastructure support is added but it is optional.
->
-> The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
-> flavors.
+Hi,
 
-Gave the patch series a quick spin on RM9200 as well and the
-at91_ether driver still works. Not many patches here that touch the
-shared code though.
-So FWIW;
-Tested-by: Joachim Eastwood <manabian@gmail.com>
+On Tue, Oct 30, 2012 at 09:27:28AM -0700, Tony Lindgren wrote:
+> * Vaibhav Hiremath <hvaibhav@ti.com> [121030 07:50]:
+> > > 
+> > > MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
+> > > already submitted to the list recently. So MMC support will come along with
+> > > EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
+> 
+> This is a bogus dependency, the MMC driver needs to also work
+> without DMA.
 
-Note: Needed the patch you sent out (net/at91_ether: fix the use of
-macb structure) to fix the build error on the struct rename.
+heh, too bad driver errors out when it doesn't find DMA channels :-)
 
-regards
-Joachim Eastwood
+1869         host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
+1870         if (!host->rx_chan) {
+1871                 dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+1872                 ret = -ENXIO;
+1873                 goto err_irq;
+1874         }
+1875 
+1876         host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
+1877         if (!host->tx_chan) {
+1878                 dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+1879                 ret = -ENXIO;
+1880                 goto err_irq;
+1881         }
+
+in fact, if DMAENGINE isn't enabled, this won't even compile due to
+omap_dma_filter_fn() right ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/7f91c9c3/attachment-0001.sig>
