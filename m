@@ -1,54 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 10:58:59 -0700
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <20121030172707.GB3993@arwen.pp.htv.fi>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <20121030162727.GG11908@atomide.com>
- <20121030172707.GB3993@arwen.pp.htv.fi>
-Message-ID: <20121030175856.GK11908@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 30 Oct 2012 12:02:05 -0600
+Subject: [RFC PATCH] dt: describe base reset signal binding
+In-Reply-To: <20121029183233.18780.11964@nucleus>
+References: <1351028756-22309-1-git-send-email-swarren@wwwdotorg.org>
+ <20121029183233.18780.11964@nucleus>
+Message-ID: <5090161D.2030702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121030 10:34]:
-> Hi,
+On 10/29/2012 12:32 PM, Mike Turquette wrote:
+> Quoting Stephen Warren (2012-10-23 14:45:56)
+>> What do people think of this? Does it sound like a good idea to go ahead
+>> with a reset subsystem? Should we simply add a new API to the common clock
+>> subsystem instead (and assume that reset and clock domains match 1:1).
+>> Should this be implemented as part of the generic power management domains;
+>> see include/linux/pm_domain.h instead?
+>>
 > 
-> On Tue, Oct 30, 2012 at 09:27:28AM -0700, Tony Lindgren wrote:
-> > * Vaibhav Hiremath <hvaibhav@ti.com> [121030 07:50]:
-> > > > 
-> > > > MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
-> > > > already submitted to the list recently. So MMC support will come along with
-> > > > EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
-> > 
-> > This is a bogus dependency, the MMC driver needs to also work
-> > without DMA.
+> Hi Stephen,
 > 
-> heh, too bad driver errors out when it doesn't find DMA channels :-)
+> I'm not sure a "reset subsystem" is necessary, but I also do not like
+> using clocks as the keys for IP reset.
 
-It should just print a warning instead and continue.
- 
-> 1869         host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
-> 1870         if (!host->rx_chan) {
-> 1871                 dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
-> 1872                 ret = -ENXIO;
-> 1873                 goto err_irq;
-> 1874         }
-> 1875 
-> 1876         host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
-> 1877         if (!host->tx_chan) {
-> 1878                 dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
-> 1879                 ret = -ENXIO;
-> 1880                 goto err_irq;
-> 1881         }
-> 
-> in fact, if DMAENGINE isn't enabled, this won't even compile due to
-> omap_dma_filter_fn() right ?
+I'm not sure what you're suggesting as an alternative to a reset
+subsystem (or API if you want something that sounds smaller!) :-)
 
-It should, CONFIG_DMADEVICES is optional. If it does not compile,
-then there's a bug somewhere.
+> I think it is more common to map IPs to struct device, no?
 
-Regards,
+It is indeed probably common that there's a 1:1 mapping between IP
+blocks and struct device. However, I'm sure there are plenty of
+counter-examples; IP blocks with multiple reset domains (hence struct
+devices that encompass multiple reset domains, or reset domains that
+encompass multiple struct devices), just as there are many examples of
+non-1:1 mappings between struct device and struct clk.
 
-Tony
+Even ignoring that, we'd still need to API say device_reset(struct
+device *dev) or device_reset(struct device *dev, const char *conid)
+wouldn't we? That's really all I meant by a reset subsystem.
+
+An alternative here would be to simply move Tegra's
+tegra_periph_reset_{de,}assert() function prototypes into a header in
+include/linux rather than mach-tegra/include/mach. However, I imagine at
+least some other SoC needs a similar API, so a common API might be useful?
