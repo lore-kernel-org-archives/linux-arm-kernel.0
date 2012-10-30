@@ -1,42 +1,51 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 30 Oct 2012 10:21:42 +0100
-Subject: [PATCH 4/4] DMA: PL330: add device tree property for DMA_MEMCPY
- capability
-In-Reply-To: <CABb+yY1Ztu2n38ObXJq+shOoXw6yk0YK39QUHhDN_pJKziAFQg@mail.gmail.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
- <1351504796-24788-5-git-send-email-b.zolnierkie@samsung.com>
- <CABb+yY1Ztu2n38ObXJq+shOoXw6yk0YK39QUHhDN_pJKziAFQg@mail.gmail.com>
-Message-ID: <201210301021.42803.b.zolnierkie@samsung.com>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Tue, 30 Oct 2012 15:04:01 +0530
+Subject: [PATCH v2] ARM: dts: am33xx: rtc node
+Message-ID: <1351589646-27082-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add am33xx rtc node.
 
-Hi,
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+Hi Benoit,
 
-On Monday 29 October 2012 22:45:48 Jassi Brar wrote:
-> On Mon, Oct 29, 2012 at 10:59 AM, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> > * Add device tree (DT) property ("pl330,dma-memcpy") for DMA_MEMCPY
-> >   capability and instead of setting this capability unconditionally
-> >   in pl330_probe() do it only when property is present.
-> >
-> Perhaps we should pass the array of peripheral interfaces via DT, the
-> lack of which could imply MEMCPY capability ? (while it works, I doubt
-> if pl330 is supposed to have SLAVE and MEMCPY capabilities in any
-> instance)
+This is based on your for_3.8/dts branch.
 
-In case of PL330 on EXYNOS4 we have two interfaces with SLAVE capability
-and one interface with MEMCPY capability.  Could you please explain more
-the idea of passing the array of peripherals through DT so we can detect
-which interface has MEMCPY capability?
+This has been tested on Beagle Bone.
 
-> That would also be a step towards discarding "struct dma_pl330_platdata".
+Bindings along with driver changes for DT has been picked by Andrew
+Morton and is now present in linux-next.
 
-I don't know if getting rid of "struct dma_pl330_platdata" is possible
-but we still need to come up with some way to pass the needed information
-through DT.  Do you have an idea how it could be done?
+Regards
+Afzal
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung Poland R&D Center
+v2
+ 1. Remove interrupt parent in rtc node.
+ 2. Modify subject as per new convention.
+
+
+ arch/arm/boot/dts/am33xx.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 70d24b8..97a7bd3 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -291,5 +291,13 @@
+ 			ti,hwmods = "timer7";
+ 			ti,timer-pwm;
+ 		};
++
++		rtc at 44e3e000 {
++			compatible = "ti,da830-rtc";
++			reg = <0x44e3e000 0x1000>;
++			interrupts = <75
++				      76>;
++			ti,hwmods = "rtc";
++		};
+ 	};
+ };
+-- 
+1.7.12
