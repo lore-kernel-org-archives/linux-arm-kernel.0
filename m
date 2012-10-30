@@ -1,30 +1,41 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 30 Oct 2012 23:27:18 +0100
-Subject: [PATCH] mvebu-gpio: Disable blinking when enabling a GPIO for
- output
-In-Reply-To: <CACRpkdY-aAxJpA7qvKWzxLRC-5_eC6cOZr7wsTLsFprOSbJ6CA@mail.gmail.com>
-References: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
- <CACRpkdY-aAxJpA7qvKWzxLRC-5_eC6cOZr7wsTLsFprOSbJ6CA@mail.gmail.com>
-Message-ID: <20121030232718.556604f8@skate>
+Date: Tue, 30 Oct 2012 23:30:15 +0100
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <50900C90.7070101@gmail.com>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
+ <50900C90.7070101@gmail.com>
+Message-ID: <20121030233015.11652d08@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Linus Walleij,
+Rob,
 
-On Tue, 30 Oct 2012 23:16:26 +0100, Linus Walleij wrote:
+On Tue, 30 Oct 2012 12:21:20 -0500, Rob Herring wrote:
 
-> Can I have some ACK on this thing from Andrew or Thomas say...
+> > Right. I'll have to move it. I wasn't really thinking about arm64 until
+> > this morning.
+> 
+> Looking at this some more, arm64 doesn't need most of what's in gic.h.
+> The register defines should be moved into the .c file. The remaining
+> function declarations either are not needed (i.e. gic_init) or should
+> should be done like the handle_irq function pointer init. We don't want
+> to have platform code calling gic_cascade_irq or gic_raise_softirq
+> directly. Perhaps we need to support this generically in irqchip code.
+> So I'll leave them in the current header and arm64 can add the necessary
+> support it needs.
 
-I just gave a formal ACK to the patch.
+The thing is that we have the same problem for the armada-370-xp
+IRQ controller driver. In its current form, it doesn't need to expose
+any symbol to the mach-mvebu code except the initialization function.
+However, with the SMP support, we need to expose a bunch of symbols,
+which kind of violates the whole idea of the drivers/irqchip
+infrastructure, which was aiming at limiting the number of header files
+added in <linux/irqchip/...> for each and every IRQ controller driver.
 
-> Also is this a thing for the stable kernel -rc series or next
-> merge window? I couldn't quite figure out if it was a regression.
-
-I don't think it is really necessary to have it in the 3.7-rc series.
-The driver has been introduced in 3.7, but technically speaking,
-nothing is using it yet. Users will only be introduced in 3.8.
-
-Best regards,
+As you say, we maybe need to support thing like yyy_raise_softirq()
+generically in the irqchip code.
 
 Thomas
 -- 
