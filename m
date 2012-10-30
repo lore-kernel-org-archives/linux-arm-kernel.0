@@ -1,159 +1,236 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 16:52:55 -0700
-Subject: [PATCH 07/11] ARM: OMAP: Move omap-pm-noop.c local to mach-omap2
+Date: Tue, 30 Oct 2012 16:52:58 -0700
+Subject: [PATCH 08/11] ARM: OMAP: Remove plat-omap/common.h
 In-Reply-To: <20121030234852.25936.12482.stgit@muffinssi.local>
 References: <20121030234852.25936.12482.stgit@muffinssi.local>
-Message-ID: <20121030235255.25936.36727.stgit@muffinssi.local>
+Message-ID: <20121030235258.25936.32564.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This code should be private to mach-omap2.
+Most of the prototypes in plat-omap/common.h are not
+common to omap1 and omap2+, they are local to omap2+
+and should not be in plat-omap/common.h.
 
-The only use for it in for omap1 has been in dmtimer.c
-to check for context loss. However, omap1 does not
-lose context during idle, so the code is not needed.
-Further, omap1 timer has OMAP_TIMER_ALWON set, so omap1
-was not hitting omap_pm_get_dev_context_loss_count()
-test.
+The only shared function prototype in this file is
+omap_init_clocksource_32k(), let's put that into
+counter-32k.h.
 
-Cc: Jon Hunter <jon-hunter@ti.com>
-Cc: Kevin Hilman <khilman@deeprootsystems.com>
+Note that the new plat/counter-32k.h must not be
+included from drivers, that will break omap2+ build
+for CONFIG_MULTIPLATFORM.
+
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Makefile              |    1 +
- arch/arm/mach-omap2/omap-pm-noop.c        |    4 ++--
- arch/arm/mach-omap2/timer.c               |    2 ++
- arch/arm/plat-omap/Makefile               |    1 -
- arch/arm/plat-omap/dmtimer.c              |   17 ++++++++++-------
- arch/arm/plat-omap/include/plat/dmtimer.h |    2 ++
- 6 files changed, 17 insertions(+), 10 deletions(-)
- rename arch/arm/{plat-omap/omap-pm-noop.c => mach-omap2/omap-pm-noop.c} (99%)
+ arch/arm/mach-omap1/common.h                       |    1 -
+ arch/arm/mach-omap1/timer32k.c                     |    1 +
+ arch/arm/mach-omap2/cm33xx.c                       |    2 -
+ arch/arm/mach-omap2/common.h                       |    5 ++-
+ .../mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c |    2 -
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    2 -
+ arch/arm/mach-omap2/prm33xx.c                      |    2 -
+ arch/arm/mach-omap2/prm_common.c                   |    1 -
+ arch/arm/mach-omap2/timer.c                        |    1 +
+ arch/arm/plat-omap/common.c                        |    1 -
+ arch/arm/plat-omap/common.h                        |   36 --------------------
+ arch/arm/plat-omap/counter_32k.c                   |    2 -
+ arch/arm/plat-omap/include/plat/counter-32k.h      |    1 +
+ 13 files changed, 6 insertions(+), 51 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/common.h
+ create mode 100644 arch/arm/plat-omap/include/plat/counter-32k.h
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index e3de5d4..b118ed5 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -70,6 +70,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
- obj-$(CONFIG_ARCH_OMAP4)		+= sleep44xx.o
- obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o sleep44xx.o
- obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
-+obj-$(CONFIG_OMAP_PM_NOOP)		+= omap-pm-noop.o
+diff --git a/arch/arm/mach-omap1/common.h b/arch/arm/mach-omap1/common.h
+index 3d40f6e..fc8c944 100644
+--- a/arch/arm/mach-omap1/common.h
++++ b/arch/arm/mach-omap1/common.h
+@@ -26,7 +26,6 @@
+ #ifndef __ARCH_ARM_MACH_OMAP1_COMMON_H
+ #define __ARCH_ARM_MACH_OMAP1_COMMON_H
  
- obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
- obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)	+= smartreflex-class3.o
-diff --git a/arch/arm/plat-omap/omap-pm-noop.c b/arch/arm/mach-omap2/omap-pm-noop.c
-similarity index 99%
-rename from arch/arm/plat-omap/omap-pm-noop.c
-rename to arch/arm/mach-omap2/omap-pm-noop.c
-index 198685b..6a3be2b 100644
---- a/arch/arm/plat-omap/omap-pm-noop.c
-+++ b/arch/arm/mach-omap2/omap-pm-noop.c
-@@ -22,8 +22,8 @@
- #include <linux/device.h>
- #include <linux/platform_device.h>
+-#include "../plat-omap/common.h"
+ #include <linux/mtd/mtd.h>
+ #include <linux/i2c-omap.h>
  
--#include "../mach-omap2/omap_device.h"
--#include "../mach-omap2/omap-pm.h"
-+#include "omap_device.h"
-+#include "omap-pm.h"
+diff --git a/arch/arm/mach-omap1/timer32k.c b/arch/arm/mach-omap1/timer32k.c
+index 7452954..8936819 100644
+--- a/arch/arm/mach-omap1/timer32k.c
++++ b/arch/arm/mach-omap1/timer32k.c
+@@ -50,6 +50,7 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/time.h>
  
- static bool off_mode_enabled;
- static int dummy_context_loss_counter;
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 565e575..95e4478 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -559,6 +559,8 @@ static int __init omap_timer_init(struct omap_hwmod *oh, void *unused)
- 	if (timer_dev_attr)
- 		pdata->timer_capability = timer_dev_attr->timer_capability;
- 
-+	pdata->get_context_loss_count = omap_pm_get_dev_context_loss_count;
-+
- 	pdev = omap_device_build(name, id, oh, pdata, sizeof(*pdata),
- 				 NULL, 0, 0);
- 
-diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-index 4bd0ace..50da9bf 100644
---- a/arch/arm/plat-omap/Makefile
-+++ b/arch/arm/plat-omap/Makefile
-@@ -19,4 +19,3 @@ obj-y += $(i2c-omap-m) $(i2c-omap-y)
- # OMAP mailbox framework
- obj-$(CONFIG_OMAP_MBOX_FWK) += mailbox.o
- 
--obj-$(CONFIG_OMAP_PM_NOOP) += omap-pm-noop.o
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 4a0b30a..9a0bbc4 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -45,8 +45,6 @@
++#include <plat/counter-32k.h>
+ #include <plat/dmtimer.h>
  
  #include <mach/hardware.h>
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+index b4938ab..ed8dcaf 100644
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -22,8 +22,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
  
--#include "../mach-omap2/omap-pm.h"
+-#include "../plat-omap/common.h"
 -
- static u32 omap_reserved_systimers;
- static LIST_HEAD(omap_timer_list);
- static DEFINE_SPINLOCK(dm_timer_lock);
-@@ -349,7 +347,8 @@ int omap_dm_timer_start(struct omap_dm_timer *timer)
- 	omap_dm_timer_enable(timer);
+ #include "cm.h"
+ #include "cm33xx.h"
+ #include "cm-regbits-34xx.h"
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index c925c80..426fcfc 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -34,8 +34,6 @@
  
- 	if (!(timer->capability & OMAP_TIMER_ALWON)) {
--		if (omap_pm_get_dev_context_loss_count(&timer->pdev->dev) !=
-+		if (timer->get_context_loss_count &&
-+			timer->get_context_loss_count(&timer->pdev->dev) !=
- 				timer->ctx_loss_count)
- 			omap_timer_restore_context(timer);
- 	}
-@@ -378,9 +377,11 @@ int omap_dm_timer_stop(struct omap_dm_timer *timer)
+ #include <asm/proc-fns.h>
  
- 	__omap_dm_timer_stop(timer, timer->posted, rate);
+-#include "../plat-omap/common.h"
+-
+ #include "i2c.h"
+ #include "serial.h"
  
--	if (!(timer->capability & OMAP_TIMER_ALWON))
--		timer->ctx_loss_count =
--			omap_pm_get_dev_context_loss_count(&timer->pdev->dev);
-+	if (!(timer->capability & OMAP_TIMER_ALWON)) {
-+		if (timer->get_context_loss_count)
-+			timer->ctx_loss_count =
-+				timer->get_context_loss_count(&timer->pdev->dev);
-+	}
+@@ -345,5 +343,8 @@ struct omap2_hsmmc_info;
+ extern int omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers);
+ extern void omap_reserve(void);
  
- 	/*
- 	 * Since the register values are computed and written within
-@@ -496,7 +497,8 @@ int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
- 	omap_dm_timer_enable(timer);
++struct omap_hwmod;
++extern int omap_dss_reset(struct omap_hwmod *);
++
+ #endif /* __ASSEMBLER__ */
+ #endif /* __ARCH_ARM_MACH_OMAP2PLUS_COMMON_H */
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+index 05c6a59..40d6c93 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_3xxx_ipblock_data.c
+@@ -12,8 +12,6 @@
  
- 	if (!(timer->capability & OMAP_TIMER_ALWON)) {
--		if (omap_pm_get_dev_context_loss_count(&timer->pdev->dev) !=
-+		if (timer->get_context_loss_count &&
-+			timer->get_context_loss_count(&timer->pdev->dev) !=
- 				timer->ctx_loss_count)
- 			omap_timer_restore_context(timer);
- 	}
-@@ -730,6 +732,7 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
- 	timer->reserved = omap_dm_timer_reserved_systimer(timer->id);
- 	timer->pdev = pdev;
- 	timer->capability = pdata->timer_capability;
-+	timer->get_context_loss_count = pdata->get_context_loss_count;
+ #include <plat-omap/dma-omap.h>
  
- 	/* Skip pm_runtime_enable for OMAP1 */
- 	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 85868e9..3f5b9cf 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -94,6 +94,7 @@ struct dmtimer_platform_data {
- 	/* set_timer_src - Only used for OMAP1 devices */
- 	int (*set_timer_src)(struct platform_device *pdev, int source);
- 	u32 timer_capability;
-+	int (*get_context_loss_count)(struct device *);
- };
+-#include "../plat-omap/common.h"
+-
+ #include "omap_hwmod.h"
+ #include "hdq1w.h"
  
- int omap_dm_timer_reserve_systimer(int id);
-@@ -263,6 +264,7 @@ struct omap_dm_timer {
- 	unsigned reserved:1;
- 	unsigned posted:1;
- 	struct timer_regs context;
-+	int (*get_context_loss_count)(struct device *);
- 	int ctx_loss_count;
- 	int revision;
- 	u32 capability;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 5b9be73..7a61328 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -30,8 +30,6 @@
+ #include <plat/dmtimer.h>
+ #include <plat/iommu.h>
+ 
+-#include "../plat-omap/common.h"
+-
+ #include "omap_hwmod.h"
+ #include "omap_hwmod_common_data.h"
+ #include "cm1_44xx.h"
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+index 624ade5..0d8abb5 100644
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -19,8 +19,6 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
+-#include "../plat-omap/common.h"
+-
+ #include "common.h"
+ #include "prm33xx.h"
+ #include "prm-regbits-33xx.h"
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 6fabbd8..3442227 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -24,7 +24,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/slab.h>
+ 
+-#include "../plat-omap/common.h"
+ #include <plat/prcm.h>
+ 
+ #include "prm2xxx_3xxx.h"
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 95e4478..c5bc2cb 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -45,6 +45,7 @@
+ #include <asm/arch_timer.h>
+ #include "omap_hwmod.h"
+ #include "omap_device.h"
++#include <plat/counter-32k.h>
+ #include <plat/dmtimer.h>
+ #include "omap-pm.h"
+ 
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index a1555e0..bf6cd80 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -16,7 +16,6 @@
+ #include <linux/io.h>
+ #include <linux/dma-mapping.h>
+ 
+-#include "common.h"
+ #include <plat-omap/dma-omap.h>
+ 
+ void __init omap_init_consistent_dma_size(void)
+diff --git a/arch/arm/plat-omap/common.h b/arch/arm/plat-omap/common.h
+deleted file mode 100644
+index 8ae0542..0000000
+--- a/arch/arm/plat-omap/common.h
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/*
+- * Header for shared OMAP code in plat-omap.
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the
+- * Free Software Foundation; either version 2 of the License, or (at your
+- * option) any later version.
+- *
+- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
+- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
+- * NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+- *
+- * You should have received a copy of the  GNU General Public License along
+- * with this program; if not, write  to the Free Software Foundation, Inc.,
+- * 675 Mass Ave, Cambridge, MA 02139, USA.
+- */
+-
+-#ifndef __ARCH_ARM_MACH_OMAP_COMMON_H
+-#define __ARCH_ARM_MACH_OMAP_COMMON_H
+-
+-extern int __init omap_init_clocksource_32k(void __iomem *vbase);
+-
+-extern void __init omap_check_revision(void);
+-
+-extern void omap_reserve(void);
+-struct omap_hwmod;
+-extern int omap_dss_reset(struct omap_hwmod *);
+-
+-#endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */
+diff --git a/arch/arm/plat-omap/counter_32k.c b/arch/arm/plat-omap/counter_32k.c
+index 66bf3f9..f3771cd 100644
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -22,8 +22,6 @@
+ #include <asm/mach/time.h>
+ #include <asm/sched_clock.h>
+ 
+-#include "common.h"
+-
+ /* OMAP2_32KSYNCNT_CR_OFF: offset of 32ksync counter register */
+ #define OMAP2_32KSYNCNT_REV_OFF		0x0
+ #define OMAP2_32KSYNCNT_REV_SCHEME	(0x3 << 30)
+diff --git a/arch/arm/plat-omap/include/plat/counter-32k.h b/arch/arm/plat-omap/include/plat/counter-32k.h
+new file mode 100644
+index 0000000..da000d4
+--- /dev/null
++++ b/arch/arm/plat-omap/include/plat/counter-32k.h
+@@ -0,0 +1 @@
++int omap_init_clocksource_32k(void __iomem *vbase);
