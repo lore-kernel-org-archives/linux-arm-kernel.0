@@ -1,45 +1,37 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 30 Oct 2012 12:36:05 +0100
-Subject: [PATCH] ARM: zynq: move ttc timer code to drivers/clocksource
-In-Reply-To: <20121029185630.GA26149@beefymiracle.amer.corp.natinst.com>
-References: <20121029185630.GA26149@beefymiracle.amer.corp.natinst.com>
-Message-ID: <508FBBA5.2080707@monstr.eu>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 30 Oct 2012 04:36:52 -0700
+Subject: [PATCH V2 2/3] clk: armada-370-xp: add support for clock framework
+In-Reply-To: <1349125926-16144-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1349125926-16144-1-git-send-email-gregory.clement@free-electrons.com>
+ <1349125926-16144-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121030113652.18780.45729@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2012 07:56 PM, Josh Cartwright wrote:
-> Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
-> drivers/clocksource, and out of the mach-zynq directory.
->
-> The common.h (which only held the timer declaration) was renamed to
-> xilinx_ttc.h and moved into include/linux.
->
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> ---
->   arch/arm/mach-zynq/Makefile      |   2 +-
->   arch/arm/mach-zynq/common.c      |   2 +-
->   arch/arm/mach-zynq/common.h      |  24 ----
->   arch/arm/mach-zynq/timer.c       | 298 ---------------------------------------
->   drivers/clocksource/Makefile     |   1 +
->   drivers/clocksource/xilinx_ttc.c | 297 ++++++++++++++++++++++++++++++++++++++
->   include/linux/xilinx_ttc.h       |  24 ++++
->   7 files changed, 324 insertions(+), 324 deletions(-)
->   delete mode 100644 arch/arm/mach-zynq/common.h
->   delete mode 100644 arch/arm/mach-zynq/timer.c
->   create mode 100644 drivers/clocksource/xilinx_ttc.c
->   create mode 100644 include/linux/xilinx_ttc.h
+Quoting Gregory CLEMENT (2012-10-01 14:12:05)
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-Really?
-If yes. shouldn't be there any better naming convention
-especially for headers. linux/clocksource/xilinx_ttc.h.
+This didn't apply cleanly to -rc3.  Can you rebase this along with the
+respin of patch #1 in the series?
 
-Thanks,
-Michal
+<snip>
 
+> diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+> index 71d6b5d..e75f3a2 100644
+> --- a/arch/arm/boot/dts/armada-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp.dtsi
+> @@ -27,6 +27,35 @@
+>                     <0xd0021870 0x58>;
+>         };
+>  
+> +       cpus {
+> +           #address-cells = <1>;
+> +           #size-cells = <0>;
+> +
+> +           cpu at 0 {
+> +               compatible = "marvell,sheeva-v7";
 
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+Extra white space in front of compatible.  Should be tabs.
+
+Regards,
+Mike
