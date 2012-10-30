@@ -1,28 +1,28 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 30 Oct 2012 22:35:47 +0100
-Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes for
- AM33XX
-In-Reply-To: <1351498881-32482-6-git-send-email-hvaibhav@ti.com> (Vaibhav
- Hiremath's message of "Mon, 29 Oct 2012 13:51:21 +0530")
-References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
- <1351498881-32482-6-git-send-email-hvaibhav@ti.com>
-Message-ID: <87txtbfxsc.fsf@macbook.be.48ers.dk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 30 Oct 2012 22:37:46 +0100
+Subject: [PATCH 1/2] input: qt1070: add pinctrl consumer
+In-Reply-To: <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121023131627.GE18964@game.jcrosoft.org>
+ <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACRpkdaTciRNsG8viz19FQajFExX+ApPNcnnVBneecSe_w-EsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Vaibhav" == Vaibhav Hiremath <hvaibhav@ti.com> writes:
+On Tue, Oct 23, 2012 at 3:29 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
 
- Vaibhav> From: Mugunthan V N <mugunthanvnm@ti.com>
- Vaibhav> Add CPSW and MDIO related device tree data for AM33XX.
- Vaibhav> Also enable them into board/evm dts files by providing
- Vaibhav> respective phy-id.
+> If no pinctrl available just report a warning as some architecture may not
+> need to do anything.
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: linux-input at vger.kernel.org
 
- Vaibhav> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
- Vaibhav> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
- Vaibhav> Cc: Richard Cochran <richardcochran@gmail.com>
- Vaibhav> Cc: Benoit Cousson <b-cousson@ti.com>
+We're having a discussion on the level of where to impose pinctrl.
 
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+Jean-Christophe, could you please check the thread
+"Input: omap4-keypad: Add pinctrl support"
+and tell us what you think is the best approach?
 
--- 
-Bye, Peter Korsgaard
+Yours,
+Linus Walleij
