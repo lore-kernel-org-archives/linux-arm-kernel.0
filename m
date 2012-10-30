@@ -1,78 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Oct 2012 14:54:19 +0200
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
-References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
- <20121025101212.GD21217@arwen.pp.htv.fi>
- <20121026201539.GD29548@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
- <20121029200032.GD30152@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
- <20121030123254.GD29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
-Message-ID: <20121030125419.GG29095@arwen.pp.htv.fi>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Oct 2012 13:03:33 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <508F59FB.7080400@ti.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508F59FB.7080400@ti.com>
+Message-ID: <alpine.DEB.2.00.1210301259250.12697@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 30 Oct 2012, Vaibhav Hiremath wrote:
 
-On Tue, Oct 30, 2012 at 12:50:52PM +0000, Paul Walmsley wrote:
-> On Tue, 30 Oct 2012, Felipe Balbi wrote:
+> On 10/30/2012 8:06 AM, Paul Walmsley wrote:
+>
+> > * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
+> >   - Due to GPMC missing support for DT
+> >   - Temporary workaround at http://www.spinics.net/lists/arm-kernel/msg200787.html
+> >   - May be fixed now, pending retest:
+> >     - http://marc.info/?l=linux-omap&m=135082257727502&w=2
+> > 
 > 
-> > the wmb() patch should help, but you said it doesn't, right ?
+> This is surprising, I have tested v3.7-rc3 branch on AM335xBone platform
+> and its booting up for me without any issues.
+> Jon had submitted another patch which fixes boot issue on Bone.
 > 
-> Correct.  Not sure why you think that would help; the problem is almost 
+> https://patchwork.kernel.org/patch/1606471/
 
-because of how the driver is behaving...
+Please don't worry about this one at the moment.  This one isn't part of 
+the automated test suite, so it requires further effort from me to 
+re-test.  I've marked it as such in the README.  Will try to re-test by 
+v3.7-rc4.
 
-The only way for omap_i2c_wait_for_bb() to timeout is if the bus is
-really still busy; meaning that either transfer hasn't fully completed
-(some data still in FIFO), or we didn't send STOP or Repeated START
-condition on the bus.
 
-> certainly PM-idle related, given that the problem goes away by reverting 
-> Jean's commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc "ARM: OMAP: convert 
-> I2C driver to PM QoS for MPU latency constraints".
-> 
-> The problem is consistent and easy to reproduce here.
-
-I don't doubt that :-) What I think, however, is that PM QoS just made
-the problem a bit easier to trigger for whatever reason. Maybe because
-pm qos defers constraint updates, or something similar ?
-
-> > without seeing debugging information on the failing case, it'll be very
-> > difficult to sort this one out provided noone else seems to be able to
-> > reproduce it.
-> 
-> Aaro sees it also, so it's definitely not a local artifact.
-
-Again I don't doubt it.
-
-> It's not very surprising that the problem doesn't appear with the extra 
-> logging enabled, since the extra logging presumably keeps the system out 
-> of idle.  
-> 
-> Anyway, you are welcome to the userspace, bootloader, and X-loader here if 
-> you would like to try to reproduce it.  They've been sent to Jean and 
-> Kevin and Shubhrajyoti already.  Simply request it and I will send links.
-
-I can have a look, sure, but I don't have the same platform as you have.
-I have a beagle XM revB (according to the stickers on the board) which I
-could use to try to reproduce, if I manage to, then hooray :-)
-
-In that case, please give me also a link to your uImage so I can make
-sure to use the exact same setup.
-
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/14ae2ba0/attachment.sig>
+- Paul
