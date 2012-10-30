@@ -1,59 +1,25 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 30 Oct 2012 16:16:59 +0000
-Subject: vexpress issues in next-20121029
-In-Reply-To: <508EE610.9050703@wwwdotorg.org>
-References: <508EE610.9050703@wwwdotorg.org>
-Message-ID: <1351613819.6199.14.camel@hornet>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 Oct 2012 09:27:28 -0700
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <508FE8BA.1080404@ti.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com>
+Message-ID: <20121030162727.GG11908@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+* Vaibhav Hiremath <hvaibhav@ti.com> [121030 07:50]:
+> > 
+> > MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
+> > already submitted to the list recently. So MMC support will come along with
+> > EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
 
-On Mon, 2012-10-29 at 20:24 +0000, Stephen Warren wrote:
-> 1) At compile-time: v2m_timer_init() and v2m_dt_timer_init() reference
-> functions vexpress_clk_init() and vexpress_clk_of_init() respectively,
-> which don't appear anywhere in the source tree.
+This is a bogus dependency, the MMC driver needs to also work
+without DMA.
 
-There was a glitch between clk-next and arm-soc - it should be fine
-starting with next-20121030.
+Regards,
 
-> 2) With those calls commented out, I find that
-> vexpress_sysreg_init_leds() is device_initcall, and so executes even
-> when not running on vexpress HW. This crashes on Tegra (which I have
-> converted to single-zImage locally).
-
-Uh, how stupid of me! I have to finally get used to the new
-multi-platform-kernel reality... Sorry about it - a quick workaround
-would be:
-
-8<----------------------------
-diff --git a/drivers/mfd/vexpress-sysreg.c
-b/drivers/mfd/vexpress-sysreg.c
-index 059d6b1..99e89a8 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -474,7 +474,6 @@ static int __init vexpress_sysreg_init(void)
- }
- core_initcall(vexpress_sysreg_init);
- 
--
- #if defined(CONFIG_LEDS_CLASS)
- 
- struct vexpress_sysreg_led {
-@@ -526,6 +525,9 @@ static int __init vexpress_sysreg_init_leds(void)
- 	struct vexpress_sysreg_led *led;
- 	int i;
- 
-+	if (!vexpress_sysreg_base)
-+		return 0;
-+
- 	/* Clear all user LEDs */
- 	writel(0, vexpress_sysreg_base + SYS_LED);
- 
-8<----------------------------
-
-while I'm improving the situation by better means.
-
-Sorry about this and thanks for letting me know!
-
-Pawe?
+Tony
