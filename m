@@ -1,35 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Oct 2012 21:41:27 +0000
-Subject: [GIT PULL] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <20121030074508.GG12329@verge.net.au>
-References: <1350448698-26985-1-git-send-email-horms@verge.net.au>
- <alpine.LFD.2.02.1210221041450.16518@xanadu.home>
- <20121030074508.GG12329@verge.net.au>
-Message-ID: <201210302141.27919.arnd@arndb.de>
+Date: Tue, 30 Oct 2012 22:22:15 +0000
+Subject: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
+In-Reply-To: <3c9e591c-a29f-446b-9256-bb23ff6d840d@TX2EHSMHS014.ehs.local>
+References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
+ <20121024200431.GE6713@beefymiracle.amer.corp.natinst.com>
+ <3c9e591c-a29f-446b-9256-bb23ff6d840d@TX2EHSMHS014.ehs.local>
+Message-ID: <201210302222.15656.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 October 2012, Simon Horman wrote:
-> While I am more than happy to help address the issues raised in this
-> thread, and others that arise. There do seem to be a number of issues
-> between where we are now and a more generic shmobile_defconfig. I would
-> like consideration given to allowing the exixting, working, well-maintained,
-> per-board defconfigs to be updated until these issues have been resolved.
+On Saturday 27 October 2012, Michal Simek wrote:
+> > diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+> > index 08c1231..72904a2 100644
+> > --- a/arch/arm/include/asm/pgtable.h
+> > +++ b/arch/arm/include/asm/pgtable.h
+> > @@ -40,7 +40,7 @@
+> >   */
+> >  #define VMALLOC_OFFSET               (8*1024*1024)
+> >  #define VMALLOC_START                (((unsigned long)high_memory +
+> > VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+> > -#define VMALLOC_END          0xff000000UL
+> > +#define VMALLOC_END          _AC(0xff000000,UL)
+> 
+> This shouldn't be the part of this series but should go to mainline through different tree.
+> Arnd, Olof: Can you take this patch to your arm-soc tree? 
+> 
+> I don't think it is a good workstyle to propose it to mainline through zynq soc tree.
+> What do you think?
 
-Yes, no problem. This seemed like a low-hanging fruit initially but has
-turned into something much bigger now.
-
-Instead of attacking all these at ones, we can leave them as something
-worthwhile doing later. I noticed that out of the 11 shmobile defconfigs,
-only three (marzen, kzm9d and kzm9g) actually have a nonzero MEMORY_START.
-
-Maybe it's possible to consolidate all or some of the others first, since
-they should still work with the same uImage at the expense of just making
-the early debugging a little harder, as we discussed earlier.
-
-For all I know, these three boards are also the ones seeing the most
-ongoing development, so you could start by using a shared defconfig
-for the oldest (ARM11 based) boards at first that are also less likely
-to impact new development starting from the defconfig.
+The arm-soc tree is not the right place either, this is architecture code which is
+in Russell's domain. I would suggest getting an Ack from Russell if he's ok with
+it and then merging it together with your other changes into arm-soc.
 
 	Arnd
