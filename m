@@ -1,33 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 30 Oct 2012 12:27:32 -0600
-Subject: [PATCH 2/3] irqchip: Move ARM VIC to drivers/irqchip
-In-Reply-To: <1351608860-24617-3-git-send-email-robherring2@gmail.com>
-References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
- <1351608860-24617-3-git-send-email-robherring2@gmail.com>
-Message-ID: <50901C14.5050605@wwwdotorg.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 30 Oct 2012 18:37:04 +0000
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <20121030172513.GA3993@arwen.pp.htv.fi>
+References: <20121025205901.GA3827@sirena.org.uk>
+ <20121026062008.GA21734@arwen.pp.htv.fi>
+ <20121026160316.GY18814@opensource.wolfsonmicro.com>
+ <20121029194901.GA30152@arwen.pp.htv.fi>
+ <20121030112410.GM4511@opensource.wolfsonmicro.com>
+ <20121030114949.GC28722@arwen.pp.htv.fi>
+ <20121030140714.GO4511@opensource.wolfsonmicro.com>
+ <20121030151642.GE29159@arwen.pp.htv.fi>
+ <20121030155821.GU4511@opensource.wolfsonmicro.com>
+ <20121030172513.GA3993@arwen.pp.htv.fi>
+Message-ID: <20121030183704.GX4511@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2012 08:54 AM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Now that we have drivers/irqchip, move VIC irqchip to drivers/irqchip.
+On Tue, Oct 30, 2012 at 07:25:13PM +0200, Felipe Balbi wrote:
+> On Tue, Oct 30, 2012 at 03:58:21PM +0000, Mark Brown wrote:
 
-> diff --git a/arch/arm/common/vic.c b/drivers/irqchip/irq-vic.c
-> similarity index 100%
-> rename from arch/arm/common/vic.c
-> rename to drivers/irqchip/irq-vic.c
+> > But then this comes round to the mindless code that ought to be factored
+> > out :)  Only the more interesting cases that do something unusual really
+> > register here.
 
-"gic" and "vic" seems a little generic for filenames and symbol names;
-what about irq-arm-vic.c and irq-arm-gic.c? Similarly...
+> fair enough. I see your point. Not saying I agree though, just that this
+> discussion has been flying for far too long, so feel free to provide
+> patches implementing what you're defending here ;-)
 
-> diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
+> Guess code will speak for itself. On way or another, we need OMAP keypad
+> driver working in mainline and I don't think your arguments are strong
+> enough to keep $SUBJECT from being merged, unless you can provide
+> something stable/tested for v3.8 merge window.
 
->  int gic_of_init(struct device_node *node, struct device_node *parent);
-> +int vic_of_init(struct device_node *node, struct device_node *parent);
+Ship me an OMAP5 system and I might see what I can do :)
 
-... perhaps rename those to arm_[gv]ic_of_init()?
-
-Are/will there be multiple versions of the GIC? I guess we can always
-introduce a GIC2 later if needed, and leave the current one with an
-unversioned name.
+More seriously the amount of time we seem to have been spending recently
+on changes which end up requiring us to go through essentially every
+driver and add code to them (often several times) doesn't seem like
+we're doing a good job here.  pinctrl is really noticable because it's
+new but it's not the only thing.  As a subsystem maintainer this code
+just makes me want to add new subsystem features to pull the code out of
+drivers but obviously that's not something that should be being done at
+the subsystem level.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/650651d2/attachment.sig>
