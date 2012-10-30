@@ -1,61 +1,24 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Oct 2012 12:30:28 +0100
-Subject: [PATCH] net/at91_ether: fix the use of macb structure
-In-Reply-To: <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
-References: <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
-Message-ID: <1351596628-3405-1-git-send-email-nicolas.ferre@atmel.com>
+From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter_Ujfalusi?=)
+Date: Tue, 30 Oct 2012 12:33:34 +0100
+Subject: [PATCH 0/2] ARM: OMAP: hwmod/omapd_device: Fix for resource
+ handling in DT boot
+In-Reply-To: <alpine.DEB.2.00.1210301123310.12697@utopia.booyaka.com>
+References: <1351593205-13590-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.00.1210301123310.12697@utopia.booyaka.com>
+Message-ID: <508FBB0E.6070802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the use of common structure in at91_ether and macb drivers,
-change the name of DMA descriptor structures in at91_ether as well:
-dma_desc => macb_dma_desc
+On 10/30/2012 12:25 PM, Paul Walmsley wrote:
+> On Tue, 30 Oct 2012, Peter Ujfalusi wrote:
+> 
+>> Tony, Benoit, Paul: Not sure if this qualify for 3.7 inclusion, but for sure
+>> going to help us to clean up the OMAP5 hwmod database.
+> 
+> It's definitely not 3.7 material, but will look at it for 3.8 merge 
+> window.  The OMAP5 hwmod data isn't in mainline yet.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi,
+True, it can wait till 3.8.
 
-This patch is a fix for the patch
-[PATCH v3 06/10] net/macb: clean up ring buffer logic
-that I have just sent.
-
-I would prefer to merge it with the patch mentioned above
-that introduces the issue. Tell me if you do it or if I
-have to provide a v4 for this patch series.
-
- drivers/net/ethernet/cadence/at91_ether.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-index b92815a..0d6392d 100644
---- a/drivers/net/ethernet/cadence/at91_ether.c
-+++ b/drivers/net/ethernet/cadence/at91_ether.c
-@@ -156,7 +156,7 @@ static int at91ether_start(struct net_device *dev)
- 	int i;
- 
- 	lp->rx_ring = dma_alloc_coherent(&lp->pdev->dev,
--					MAX_RX_DESCR * sizeof(struct dma_desc),
-+					MAX_RX_DESCR * sizeof(struct macb_dma_desc),
- 					&lp->rx_ring_dma, GFP_KERNEL);
- 	if (!lp->rx_ring) {
- 		netdev_err(lp->dev, "unable to alloc rx ring DMA buffer\n");
-@@ -170,7 +170,7 @@ static int at91ether_start(struct net_device *dev)
- 		netdev_err(lp->dev, "unable to alloc rx data DMA buffer\n");
- 
- 		dma_free_coherent(&lp->pdev->dev,
--					MAX_RX_DESCR * sizeof(struct dma_desc),
-+					MAX_RX_DESCR * sizeof(struct macb_dma_desc),
- 					lp->rx_ring, lp->rx_ring_dma);
- 		lp->rx_ring = NULL;
- 		return -ENOMEM;
-@@ -256,7 +256,7 @@ static int at91ether_close(struct net_device *dev)
- 	netif_stop_queue(dev);
- 
- 	dma_free_coherent(&lp->pdev->dev,
--				MAX_RX_DESCR * sizeof(struct dma_desc),
-+				MAX_RX_DESCR * sizeof(struct macb_dma_desc),
- 				lp->rx_ring, lp->rx_ring_dma);
- 	lp->rx_ring = NULL;
- 
 -- 
-1.8.0
+P?ter
