@@ -1,31 +1,45 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 30 Oct 2012 03:05:00 -0700
-Subject: [PATCH] CLK: clk-twl6040: Initial clock driver for OMAP4+ McPDM
- fclk clock
-In-Reply-To: <508F842D.8000407@ti.com>
-References: <1347633027-20731-1-git-send-email-peter.ujfalusi@ti.com>
- <20121029173008.18780.35000@nucleus> <508F842D.8000407@ti.com>
-Message-ID: <20121030100500.18780.32416@nucleus>
+From: jussi.kivilinna@mbnet.fi (Jussi Kivilinna)
+Date: Tue, 30 Oct 2012 12:07:43 +0200
+Subject: [PATCH] [RFC] crypto: sha1/arm - fix build with CONFIG_THUMB2_KERNEL
+Message-ID: <20121030100742.17910.70241.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting P?ter Ujfalusi (2012-10-30 00:39:25)
-> Hi Mike,
-> 
-> On 10/29/2012 06:30 PM, Mike Turquette wrote:
-> > Peter,
-> > 
-> > The patch looks good to me.  To be clear, you wan this to go through
-> > clk-next or the mfd tree for avoiding conflicts?
-> 
-> clk-next is the best place for it I think. The MFD part to register the device
-> can still wait till we have ccf support on OMAP4.
->
+Building cryptodev-2.6 tree with CONFIG_THUMB2_KERNEL=y and
+CONFIG_CRYPTO_SHA1_ARM=y give following error:
 
-Cool.  I've taken this into clk-next.
+   AS      arch/arm/crypto/sha1-armv4-large.o
+arch/arm/crypto/sha1-armv4-large.S: Assembler messages:
+arch/arm/crypto/sha1-armv4-large.S:197: Error: r13 not allowed here --
+`teq r14,sp'
+arch/arm/crypto/sha1-armv4-large.S:377: Error: r13 not allowed here --
+`teq r14,sp'
+arch/arm/crypto/sha1-armv4-large.S:469: Error: r13 not allowed here --
+`teq r14,sp'
 
-Regards,
-Mike
+Build can be fixed with adding '.arm' at head of sha1-armv4-large.S.
+However I'm not sure if this correct fix as this is my first stab
+at arm assembler and I could not get CONFIG_THUMB2_KERNEL boot up
+on 'qemu-system-arm -M vexpress-a9' to verify correctness. So this
+is only build tested.
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-crypto at vger.kernel.org
+Cc: David McCullough <ucdevel@gmail.com>
+---
+ arch/arm/crypto/sha1-armv4-large.S |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
+index 7050ab1..e8a55eb 100644
+--- a/arch/arm/crypto/sha1-armv4-large.S
++++ b/arch/arm/crypto/sha1-armv4-large.S
+@@ -53,6 +53,8 @@
  
-> Thank you,
-> P?ter
+ .text
+ 
++.arm
++
+ .global	sha1_block_data_order
+ .type	sha1_block_data_order,%function
+ 
