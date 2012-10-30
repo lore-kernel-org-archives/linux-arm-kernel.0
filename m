@@ -1,139 +1,40 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 30 Oct 2012 11:33:25 +0100
-Subject: [PATCH 2/2] ARM: OMAP: omap_device: Correct resource handling for DT
- boot
-In-Reply-To: <1351593205-13590-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1351593205-13590-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1351593205-13590-3-git-send-email-peter.ujfalusi@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 30 Oct 2012 10:39:14 +0000
+Subject: linux-next: manual merge of the clk tree with the arm-soc tree
+In-Reply-To: <20121030101140.18780.69840@nucleus>
+References: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
+ <20121030101140.18780.69840@nucleus>
+Message-ID: <1351593554.2831.8.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting with DT the OF core can fill up the resources provided within
-the DT blob.
-The current way of handling the DT boot prevents us from removing hwmod data
-for platforms only suppose to boot with DT (OMAP5 for example) since we need
-to keep the whole hwmod database intact in order to have more resources in
-hwmod than in DT (to be able to append the DMA resource from hwmod).
+On Tue, 2012-10-30 at 10:11 +0000, Mike Turquette wrote:
+> > diff --cc arch/arm/include/asm/hardware/sp810.h
+> > index 2cdcf44,afd7e91..0000000
+> > --- a/arch/arm/include/asm/hardware/sp810.h
+> > +++ b/arch/arm/include/asm/hardware/sp810.h
+> > @@@ -50,6 -50,14 +50,8 @@@
+> >   #define SCPCELLID2            0xFF8
+> >   #define SCPCELLID3            0xFFC
+> >   
+> >  -#define SCCTRL_TIMEREN0SEL_REFCLK     (0 << 15)
+> >  -#define SCCTRL_TIMEREN0SEL_TIMCLK     (1 << 15)
+> >  -
+> >  -#define SCCTRL_TIMEREN1SEL_REFCLK     (0 << 17)
+> >  -#define SCCTRL_TIMEREN1SEL_TIMCLK     (1 << 17)
+> >  -
+> > + #define SCCTRL_TIMERENnSEL_SHIFT(n)   (15 + ((n) * 2))
+> > + 
+> >   static inline void sysctl_soft_reset(void __iomem *base)
+> >   {
+> >         /* switch to slow mode */
+> 
+> Pawel,
+> 
+> Does this look OK for you?
 
-To fix this issue we just examine the OF provided resources:
-If we do not have resources we use hwmod to fill them.
-If we have resources we check if we already able to recive DMA resource, if
-no we only append the DMA resurce from hwmod to the OF provided ones.
+Yes, it's correct.
 
-In this way we can start removing hwmod data for devices which have their
-resources correctly configured in DT without regressions.
+Thanks!
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/plat-omap/omap_device.c | 80 +++++++++++++++++++++++-----------------
- 1 file changed, 47 insertions(+), 33 deletions(-)
-
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 915cf68..a8a9d08 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -560,55 +560,69 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
- 	od->hwmods = hwmods;
- 	od->pdev = pdev;
- 
--	/* Count all resources for the device */
--	res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
--						    IORESOURCE_DMA |
--						    IORESOURCE_MEM);
- 	/*
-+	 * Non-DT Boot:
-+	 *   Here, pdev->num_resources = 0, and we should get all the
-+	 *   resources from hwmod.
-+	 *
- 	 * DT Boot:
- 	 *   OF framework will construct the resource structure (currently
- 	 *   does for MEM & IRQ resource) and we should respect/use these
- 	 *   resources, killing hwmod dependency.
- 	 *   If pdev->num_resources > 0, we assume that MEM & IRQ resources
- 	 *   have been allocated by OF layer already (through DTB).
--	 *
--	 * Non-DT Boot:
--	 *   Here, pdev->num_resources = 0, and we should get all the
--	 *   resources from hwmod.
-+	 *   As preparation for the future we examine the OF provided resources
-+	 *   to see if we have DMA resources provided already. In this case
-+	 *   there is no need to update the resources for the device, we use the
-+	 *   OF provided ones.
- 	 *
- 	 * TODO: Once DMA resource is available from OF layer, we should
- 	 *   kill filling any resources from hwmod.
- 	 */
--	if (res_count > pdev->num_resources) {
--		/* Allocate resources memory to account for new resources */
--		res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
--		if (!res)
--			goto oda_exit3;
--
--		/*
--		 * If pdev->num_resources > 0, then assume that,
--		 * MEM and IRQ resources will only come from DT and only
--		 * fill DMA resource from hwmod layer.
--		 */
--		if (pdev->num_resources && pdev->resource) {
--			dev_dbg(&pdev->dev, "%s(): resources already allocated %d\n",
--				__func__, res_count);
--			memcpy(res, pdev->resource,
--			       sizeof(struct resource) * pdev->num_resources);
--			_od_fill_dma_resources(od, &res[pdev->num_resources]);
--		} else {
--			dev_dbg(&pdev->dev, "%s(): using resources from hwmod %d\n",
--				__func__, res_count);
--			omap_device_fill_resources(od, res);
-+	if (!pdev->num_resources) {
-+		/* Count all resources for the device */
-+		res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
-+							    IORESOURCE_DMA |
-+							    IORESOURCE_MEM);
-+	} else {
-+		/* Take a look if we already have DMA resource via DT */
-+		for (i = 0; i < pdev->num_resources; i++) {
-+			struct resource *r = &pdev->resource[i];
-+
-+			/* We have it, no need to touch the resources */
-+			if (r->flags == IORESOURCE_DMA)
-+				goto have_everything;
- 		}
-+		/* Count only DMA resources for the device */
-+		res_count = omap_device_count_resources(od, IORESOURCE_DMA);
-+		res_count += pdev->num_resources;
-+	}
- 
--		ret = platform_device_add_resources(pdev, res, res_count);
--		kfree(res);
-+	/* Allocate resources memory to account for new resources */
-+	res = kzalloc(sizeof(struct resource) * res_count, GFP_KERNEL);
-+	if (!res)
-+		goto oda_exit3;
- 
--		if (ret)
--			goto oda_exit3;
-+	if (!pdev->num_resources) {
-+		dev_dbg(&pdev->dev, "%s: using %d resources from hwmod\n",
-+			__func__, res_count);
-+		omap_device_fill_resources(od, res);
-+	} else {
-+		dev_dbg(&pdev->dev,
-+			"%s: appending %d DMA resources from hwmod\n",
-+			__func__, res_count - pdev->num_resources);
-+		memcpy(res, pdev->resource,
-+		       sizeof(struct resource) * pdev->num_resources);
-+		_od_fill_dma_resources(od, &res[pdev->num_resources]);
- 	}
- 
-+	ret = platform_device_add_resources(pdev, res, res_count);
-+	kfree(res);
-+
-+	if (ret)
-+		goto oda_exit3;
-+
-+have_everything:
- 	if (!pm_lats) {
- 		pm_lats = omap_default_latency;
- 		pm_lats_cnt = ARRAY_SIZE(omap_default_latency);
--- 
-1.7.12.4
+Pawe?
