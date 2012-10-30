@@ -1,51 +1,48 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Tue, 30 Oct 2012 03:11:40 -0700
-Subject: linux-next: manual merge of the clk tree with the arm-soc tree
-In-Reply-To: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
-References: <20121030150627.ac1f6a3f75231ea49edf7b98@canb.auug.org.au>
-Message-ID: <20121030101140.18780.69840@nucleus>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 30 Oct 2012 11:17:52 +0100
+Subject: [PATCH v3 00/10] net/macb: driver enhancement concerning GEM support,
+ ring logic and cleanup
+Message-ID: <cover.1351591858.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Rothwell (2012-10-29 21:06:27)
-> Hi Mike,
-> 
-> Today's linux-next merge of the clk tree got a conflict in
-> arch/arm/include/asm/hardware/sp810.h between commit 0891642cf117 ("ARM:
-> vexpress: Start using new Versatile Express infrastructure") from the
-> arm-soc tree and commit 05e3659135a4 ("clk: Common clocks implementation
-> for Versatile Express") from the clk tree.
-> 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
-> 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc arch/arm/include/asm/hardware/sp810.h
-> index 2cdcf44,afd7e91..0000000
-> --- a/arch/arm/include/asm/hardware/sp810.h
-> +++ b/arch/arm/include/asm/hardware/sp810.h
-> @@@ -50,6 -50,14 +50,8 @@@
->   #define SCPCELLID2            0xFF8
->   #define SCPCELLID3            0xFFC
->   
->  -#define SCCTRL_TIMEREN0SEL_REFCLK     (0 << 15)
->  -#define SCCTRL_TIMEREN0SEL_TIMCLK     (1 << 15)
->  -
->  -#define SCCTRL_TIMEREN1SEL_REFCLK     (0 << 17)
->  -#define SCCTRL_TIMEREN1SEL_TIMCLK     (1 << 17)
->  -
-> + #define SCCTRL_TIMERENnSEL_SHIFT(n)   (15 + ((n) * 2))
-> + 
->   static inline void sysctl_soft_reset(void __iomem *base)
->   {
->         /* switch to slow mode */
+This is an enhancement work that began several years ago. I try to catchup with
+some performance improvement that has been implemented then by Havard.
+The ring index logic and the TX error path modification are the biggest changes
+but some cleanup/debugging have been added along the way.
+The GEM revision will benefit from the Gigabit support.
+Newer pinctrl infrastructure support is added but it is optional.
 
-Pawel,
+The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
+flavors.
 
-Does this look OK for you?
+v3: - rebased on net-next to take into account current effor to merge
+      at91_ether with macb drivers
+    - add additional patch to use the new pinctrl infrastructure
+v2: - modify the tx error handling: now uses a workqueue
+    - information provided by ethtool -i were not accurate: removed
 
-Thanks,
-Mike
+Havard Skinnemoen (4):
+  net/macb: memory barriers cleanup
+  net/macb: change debugging messages
+  net/macb: clean up ring buffer logic
+  net/macb: Offset first RX buffer by two bytes
+
+Jean-Christophe PLAGNIOL-VILLARD (1):
+  net/macb: add pinctrl consumer support
+
+Nicolas Ferre (4):
+  net/macb: remove macb_get_drvinfo()
+  net/macb: tx status is more than 8 bits now
+  net/macb: ethtool interface: add register dump feature
+  net/macb: better manage tx errors
+
+Patrice Vilchez (1):
+  net/macb: Add support for Gigabit Ethernet mode
+
+ drivers/net/ethernet/cadence/macb.c | 446 +++++++++++++++++++++++++-----------
+ drivers/net/ethernet/cadence/macb.h |  30 ++-
+ 2 files changed, 334 insertions(+), 142 deletions(-)
+
+-- 
+1.8.0
