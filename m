@@ -1,71 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Oct 2012 11:47:16 +0100
-Subject: [PATCH 1/1] net: macb: add pinctrl consumer support
-In-Reply-To: <1351352997-31116-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1351352997-31116-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <508FB034.70004@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 30 Oct 2012 10:51:54 +0100
+Subject: [PATCH v4] Network driver for the Armada 370 and Armada XP ARM
+ Marvell SoCs
+In-Reply-To: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121030105154.5b7c8e48@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2012 05:49 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> If no pinctrl available just report a warning as some architecture may not
-> need to do anything.
-> 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: netdev at vger.kernel.org
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ---
->  drivers/net/ethernet/cadence/macb.c |   13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index 033064b..e5fdf8a 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -26,6 +26,9 @@
->  #include <linux/of.h>
->  #include <linux/of_device.h>
->  #include <linux/of_net.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/gpio.h>
-> +#include <linux/pinctrl/consumer.h>
->  
->  #include "macb.h"
->  
-> @@ -1306,6 +1309,7 @@ static int __init macb_probe(struct platform_device *pdev)
->  	struct phy_device *phydev;
->  	u32 config;
->  	int err = -ENXIO;
-> +	struct pinctrl *pinctrl;
->  
->  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	if (!regs) {
-> @@ -1313,6 +1317,15 @@ static int __init macb_probe(struct platform_device *pdev)
->  		goto err_out;
->  	}
->  
-> +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> +	if (IS_ERR(pinctrl)) {
-> +		err = PTR_ERR(pinctrl);
-> +		if (err == -EPROBE_DEFER)
-> +			return err;
+Hello,
 
-I will modify this to be consistent with error path before and after
-this change => goto err_out.
-Do not bother to re-submit a patch, I will include this one in my
-upcoming patch series.
+On Fri, 26 Oct 2012 12:03:20 +0200, Thomas Petazzoni wrote:
 
-Thanks,
+> This patch set adds a new network driver for the network unit
+> available in the newest Marvell ARM SoCs Armada 370 and Armada XP, as
+> well as the necessary Device Tree information to use this driver in
+> the two evaluation platforms of those SoCs.
 
-> +
-> +		dev_warn(&pdev->dev, "No pinctrl provided\n");
-> +	}
-> +
->  	err = -ENOMEM;
->  	dev = alloc_etherdev(sizeof(*bp));
->  	if (!dev)
-> 
+Besides Nobuhiro's small comment on the Device Tree part, are there any
+comments on the driver itself, or is the code good to go?
 
+I can send a fifth version with just the fix for Nobuhiro's comment,
+but it probably makes sense to take into account a few more comments
+(if any) at the same time.
 
+Thanks for your review,
+
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
