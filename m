@@ -1,40 +1,50 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Tue, 30 Oct 2012 15:52:10 +0100
-Subject: [PATCH v3] Visstrim SM10: Use mo_version to decide board video
- mode.
-In-Reply-To: <CACKLOr0HO4OapJk_-ktWcfwcnVD1MLfL6MF1bbaVUHjD5LVuJg@mail.gmail.com>
-References: <1345457581-13837-1-git-send-email-javier.martin@vista-silicon.com>
- <20120828074710.GX26594@pengutronix.de>
- <CACKLOr0HO4OapJk_-ktWcfwcnVD1MLfL6MF1bbaVUHjD5LVuJg@mail.gmail.com>
-Message-ID: <CACKLOr1DB1_G6ttVHc6p-+SjegmJL1r4pKpunvo43xFR7RyA4g@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 30 Oct 2012 14:54:21 +0000
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdZysB2mxj5wZfE0N+iwTE-_AXbOV0bKRP5kSo=1hieKGg@mail.gmail.com>
+References: <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <20121024185818.GB772@arwen.pp.htv.fi>
+ <20121025205901.GA3827@sirena.org.uk>
+ <20121026062008.GA21734@arwen.pp.htv.fi>
+ <20121026160316.GY18814@opensource.wolfsonmicro.com>
+ <20121029194901.GA30152@arwen.pp.htv.fi>
+ <20121030112410.GM4511@opensource.wolfsonmicro.com>
+ <20121030114949.GC28722@arwen.pp.htv.fi>
+ <20121030140714.GO4511@opensource.wolfsonmicro.com>
+ <CACRpkdZysB2mxj5wZfE0N+iwTE-_AXbOV0bKRP5kSo=1hieKGg@mail.gmail.com>
+Message-ID: <20121030145420.GQ4511@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 September 2012 15:06, javier Martin
-<javier.martin@vista-silicon.com> wrote:
-> Hi Mauro,
-> this patch should originally go via arm-soc but it has a dependency on
-> support for coda video codec which is already in your tree.
->
-> Now that we've got Sascha's ack could you merge this patch through your tree?
->
-> Regards.
->
+On Tue, Oct 30, 2012 at 03:16:02PM +0100, Linus Walleij wrote:
+> On Tue, Oct 30, 2012 at 3:07 PM, Mark Brown
 
-Hi Sascha,
-it seems Mauro missed to apply this patch through his tree.
-Moreover, 1 month later from my submission I think it should already
-apply to arm-soc.
+> > Essentially all the patches I'm seeing adding pinctrl are totally
+> > mindless, most of them are just doing the initial setup on boot and not
+> > doing any active management at runtime at all.
 
-Could you please merge it?
+> I concludes in some other mails that all Ux500 drivers
+> will need to handle atleast two states (default and sleep)
+> and some a third state (idle).
 
-Regards.
+Right, that's the other common option and obviously it's just an
+extension of the simple hogs which maps very nicely onto the existing PM
+states for devices.
 
--- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+> And this is what we're doing in our patches.
+
+> Arguably it can all be pushed to power domains, but that
+> will as said mandate all affected systems to implement
+> power domains, and effectively moving code from
+> drivers/* to arch/arm/* in our case atleast.
+
+As soon as they start adding clock support and so on, yes.  Obviously if
+they don't want to use any of the features that are offloaded like this
+then they could happily ignore it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/1a4adf30/attachment.sig>
