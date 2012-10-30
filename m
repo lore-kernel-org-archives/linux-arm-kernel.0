@@ -1,60 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 30 Oct 2012 22:51:11 +0100
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121030183704.GX4511@opensource.wolfsonmicro.com>
-References: <20121025205901.GA3827@sirena.org.uk>
- <20121026062008.GA21734@arwen.pp.htv.fi>
- <20121026160316.GY18814@opensource.wolfsonmicro.com>
- <20121029194901.GA30152@arwen.pp.htv.fi>
- <20121030112410.GM4511@opensource.wolfsonmicro.com>
- <20121030114949.GC28722@arwen.pp.htv.fi>
- <20121030140714.GO4511@opensource.wolfsonmicro.com>
- <20121030151642.GE29159@arwen.pp.htv.fi>
- <20121030155821.GU4511@opensource.wolfsonmicro.com>
- <20121030172513.GA3993@arwen.pp.htv.fi>
- <20121030183704.GX4511@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
+Date: Tue, 30 Oct 2012 23:16:26 +0100
+Subject: [PATCH] mvebu-gpio: Disable blinking when enabling a GPIO for
+ output
+In-Reply-To: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
+References: <1351427004-32110-1-git-send-email-jm@lentin.co.uk>
+Message-ID: <CACRpkdY-aAxJpA7qvKWzxLRC-5_eC6cOZr7wsTLsFprOSbJ6CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 7:37 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
+On Sun, Oct 28, 2012 at 1:23 PM, Jamie Lentin <jm@lentin.co.uk> wrote:
 
-> More seriously the amount of time we seem to have been spending recently
-> on changes which end up requiring us to go through essentially every
-> driver and add code to them (often several times) doesn't seem like
-> we're doing a good job here.
+> The plat-orion GPIO driver would disable any pin blinking whenever
+> using a pin for output. Do the same here, as a blinking LED will
+> continue to blink regardless of what the GPIO pin level is.
+>
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> ---
+> The power LED on the DNS-320/DNS-325 is left blinking by the bootloader,
+> the LED turning steady indicates it's booted. The blinking needs to be
+> disabled before setting the GPIO pin level has any effect.
+>
+> Apart from the custom init code running too soon, I think everything is
+> working now.
+>
+> I haven't tested this on any other boards, so not sure if it's sensible
+> beyond the kirkwood/orion world.
 
-If this is your main concern you should be made aware that there
-are people out there planning to supplant the existing DT probe paths
-that are now being added to each and every ARM-related driver
-with an ACPI probe path as ARM servers come into the picture.
+Can I have some ACK on this thing from Andrew or Thomas say...
 
-> pinctrl is really noticable because it's
-> new but it's not the only thing.  As a subsystem maintainer this code
-> just makes me want to add new subsystem features to pull the code out of
-> drivers but obviously that's not something that should be being done at
-> the subsystem level.
-
-We did manage to drag the power/voltage domain per se out
-of the AMBA bus, and recommend that people (like us) do that
-business using the power domains.
-
-I think most people (including OMAP) have bought
-into the concept of using the runtime PM framework and power
-domains to control the power domain switches.
-
-It's this wider concept of using the loose concept "PM resource
-domains" to control also clocks and pins that is at stake, and so
-far the runtime PM core people (Rafael and Magnus) has not said
-much so I think we need some kind of indication from them as to
-what is to happen, long-term, with drivers handling their own clocks
-and pins. Should it be centralized or not? If it's to be centralized it
-needs to become a large piece of infrastructure refactoring and
-needs the attention of Linaro and the like to happen.
-
-I've CC:ed a few people into this thread so we get some traction,
-we need more subsystem maintainers in here.
+Also is this a thing for the stable kernel -rc series or next
+merge window? I couldn't quite figure out if it was a regression.
 
 Yours,
 Linus Walleij
