@@ -1,43 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Oct 2012 18:14:41 +0100
-Subject: [PATCH 1/5] ARM: at91: atmel-ssc: add platform device id table
-In-Reply-To: <20121030160722.GW4511@opensource.wolfsonmicro.com>
-References: <1350901079-18307-1-git-send-email-voice.shen@atmel.com>
- <20121030160722.GW4511@opensource.wolfsonmicro.com>
-Message-ID: <50900B01.3000402@atmel.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 30 Oct 2012 16:16:59 +0000
+Subject: vexpress issues in next-20121029
+In-Reply-To: <508EE610.9050703@wwwdotorg.org>
+References: <508EE610.9050703@wwwdotorg.org>
+Message-ID: <1351613819.6199.14.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+Hi Stephen,
 
-On 10/30/2012 05:07 PM, Mark Brown :
-> On Mon, Oct 22, 2012 at 06:17:55PM +0800, Bo Shen wrote:
->> Using platform device id to check whether the Atmel SOC support
->> dma for data transfer
->> 
->> If match "at91rm9200_ssc" which does not support DMA transfer If
->> match "at91sam9g45_ssc" which support DMA transfer
-> 
-> Any comments on this from that Atmel folks?  If I don't see
-> something I'll probably just apply.
+On Mon, 2012-10-29 at 20:24 +0000, Stephen Warren wrote:
+> 1) At compile-time: v2m_timer_init() and v2m_dt_timer_init() reference
+> functions vexpress_clk_init() and vexpress_clk_of_init() respectively,
+> which don't appear anywhere in the source tree.
 
-Indeed, comment sent.
+There was a glitch between clk-next and arm-soc - it should be fine
+starting with next-20121030.
 
-Thanks for the "heads-up" Mark.
+> 2) With those calls commented out, I find that
+> vexpress_sysreg_init_leds() is device_initcall, and so executes even
+> when not running on vexpress HW. This crashes on Tegra (which I have
+> converted to single-zImage locally).
 
-Best regards,
-- -- 
-Nicolas Ferre
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-Comment: Using GnuPG with Mozilla - http://www.enigmail.net/
+Uh, how stupid of me! I have to finally get used to the new
+multi-platform-kernel reality... Sorry about it - a quick workaround
+would be:
 
-iQEcBAEBAgAGBQJQkAr2AAoJEAf03oE53VmQviMIAJrjBBi3ePMgP+jwRQuKw54A
-bZOHRmaqpGPh6cLAvXeUEkv2VflLcoYxIKiV1PZsNYctUHz/rrYX4y5bMwkJqJb1
-jWR1LDibKWny74pXiilrf4pgtabqhIQN8v64DjIg4vF8I6pzBBtlA3sBBQtRlJzB
-yQulBHP63vNDHlZm+AayeuWkF16Gh+FfDtYSNDy8w8lNjJLwQo2mNvI6WurSTI85
-mqidOzW5k0wrYo/6012vAzIV3BC+1Ck0A2gXhkS8yhuThS1xT+u4c3iTAMJE2FzZ
-PM4+JLf0o5fgtOkj0UzFuVea6BxNQ/qjwyV6y+cJ/QBS7DY7N9rmD+vrr8dpgMs=
-=wvcs
------END PGP SIGNATURE-----
+8<----------------------------
+diff --git a/drivers/mfd/vexpress-sysreg.c
+b/drivers/mfd/vexpress-sysreg.c
+index 059d6b1..99e89a8 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -474,7 +474,6 @@ static int __init vexpress_sysreg_init(void)
+ }
+ core_initcall(vexpress_sysreg_init);
+ 
+-
+ #if defined(CONFIG_LEDS_CLASS)
+ 
+ struct vexpress_sysreg_led {
+@@ -526,6 +525,9 @@ static int __init vexpress_sysreg_init_leds(void)
+ 	struct vexpress_sysreg_led *led;
+ 	int i;
+ 
++	if (!vexpress_sysreg_base)
++		return 0;
++
+ 	/* Clear all user LEDs */
+ 	writel(0, vexpress_sysreg_base + SYS_LED);
+ 
+8<----------------------------
+
+while I'm improving the situation by better means.
+
+Sorry about this and thanks for letting me know!
+
+Pawe?
