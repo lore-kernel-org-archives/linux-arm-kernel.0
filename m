@@ -1,51 +1,37 @@
 From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
-Date: Tue, 30 Oct 2012 19:41:23 +0900
-Subject: [PATCH 1/3] ARM: mvebu: Add support I2C controller
-Message-ID: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
+Date: Tue, 30 Oct 2012 19:41:25 +0900
+Subject: [PATCH 3/3] ARM: mvebu: Add support RTC for OpenBlockS AX3
+In-Reply-To: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
+References: <1351593685-19663-1-git-send-email-iwamatsu@nigauri.org>
+Message-ID: <1351593685-19663-3-git-send-email-iwamatsu@nigauri.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu arch has the same I2C controller as mv64xxx-i2c.
-This support mv64xxx-i2c on mvebu.
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
-Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+OpenBlockS AX3 has Seiko Instruments S-35390A as RTC controller.
+This validates RTC controller.
+
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi |   23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/openblocks-ax3-4.dts |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index d0ea4a6..5da85c2 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -83,6 +83,29 @@
-                                interrupts = <10>;
-                                status = "disabled";
-                 };
+diff --git a/arch/arm/boot/dts/openblocks-ax3-4.dts b/arch/arm/boot/dts/openblocks-ax3-4.dts
+index c42b9a5..61c2f2c 100644
+--- a/arch/arm/boot/dts/openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/openblocks-ax3-4.dts
+@@ -74,6 +74,11 @@
+ 		i2c at d0011100 {
+ 			status = "okay";
+ 			clock-frequency = <400000>;
 +
-+
-+		i2c0: i2c at d0011000 {
-+			compatible = "marvell,mv64xxx-i2c";
-+			reg = <0xd0011000 0x20>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <31>;
-+			timeout-ms = <1000>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at d0011100 {
-+			compatible = "marvell,mv64xxx-i2c";
-+			reg = <0xd0011100 0x20>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <32>;
-+			timeout-ms = <1000>;
-+			clocks = <&coreclk 0>;
-+			status = "disabled";
-+		};
++			s35390a: s35390a at 30 {
++				compatible = "s35390a";
++				reg = <0x30>;
++			}; 
+ 		}; 
  	};
  };
- 
 -- 
 1.7.10.4
