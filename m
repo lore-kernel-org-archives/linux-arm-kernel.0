@@ -1,43 +1,39 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 30 Oct 2012 13:57:11 +0100
-Subject: [PATCH] at91sam9m10g45-ek: rename leds to match board
-In-Reply-To: <20121029212826.GA6203@piout.net>
-References: <1351279752-6491-1-git-send-email-alexandre.belloni@piout.net>
- <20121027145132.GJ18964@game.jcrosoft.org>
- <20121029150038.GA4995@piout.net>
- <20121029161445.GB31214@game.jcrosoft.org>
- <20121029212826.GA6203@piout.net>
-Message-ID: <20121030125711.GA19021@game.jcrosoft.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 30 Oct 2012 13:17:22 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <20121030125419.GG29095@arwen.pp.htv.fi>
+References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+ <20121026201539.GD29548@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+ <20121029200032.GD30152@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
+ <20121030123254.GD29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
+ <20121030125419.GG29095@arwen.pp.htv.fi>
+Message-ID: <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:28 Mon 29 Oct     , Alexandre Belloni wrote:
-> 
-> On Mon, Oct 29, 2012 at 05:14:45PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote :
-> > No here it's different teh same HW have different revision
-> > 
-> > m10g45es
-> > m10ekes
-> > 9g45ekes
-> > 
-> > the m10ekes is the first one and the leds does match
-> > 
-> > So I agree we can put a comment in the c or the dts about it but do not change
-> > the content as the board support is like this for really long time
-> > And I do not want to ebd-up with 2 or 3 dts jsut for lesd naming
-> > That I will have to maintain
-> > 
-> 
-> From my discussion with atmel last week, I understood that the only
-> publicly available board is the m10g45ek. Support for the other boards
-> you mention is actually being dropped and you can't find them on ATMEL's
-> website anymore.
-> 
-> So, I agree you should support only one configuration but at least, let
-> it be the one for the current board.
-sorry no
+On Tue, 30 Oct 2012, Felipe Balbi wrote:
 
-we touch dts only if this is a bug this is a comestic change
+> On Tue, Oct 30, 2012 at 12:50:52PM +0000, Paul Walmsley wrote:
+> > certainly PM-idle related, given that the problem goes away by reverting 
+> > Jean's commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc "ARM: OMAP: convert 
+> > I2C driver to PM QoS for MPU latency constraints".
+> > 
+> > The problem is consistent and easy to reproduce here.
+> 
+> I don't doubt that :-) What I think, however, is that PM QoS just made
+> the problem a bit easier to trigger for whatever reason. Maybe because
+> pm qos defers constraint updates, or something similar ?
 
-Best Regards,
-J.
+Based on a very quick look, I'd say the original patch 3db11fe is broken.  
+I don't see how it can ensure that its PM_QOS_CPU_DMA_LATENCY request is 
+honored when CONFIG_CPU_IDLE=n. CONFIG_CPU_IDLE=n is the default for 
+omap2plus_defconfig.
+
+
+- Paul
