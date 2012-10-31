@@ -1,48 +1,38 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 31 Oct 2012 10:05:43 +0100
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <CAORVsuX_8ryT7jmPWoQ+Lb1ztmQC-E59j64Qt1hzvsEkQ7=w+g@mail.gmail.com>
-References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <alpine.DEB.2.00.1210301400100.12697@utopia.booyaka.com>
- <CAORVsuX_8ryT7jmPWoQ+Lb1ztmQC-E59j64Qt1hzvsEkQ7=w+g@mail.gmail.com>
-Message-ID: <1803719.beylA4kOPP@vostro.rjw.lan>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 31 Oct 2012 14:32:52 +0530
+Subject: [PATCH V4 0/4] ARM: tegra: Enable SLINK controller driver
+Message-ID: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 31, 2012 04:34:21 AM Jean Pihet wrote:
-> Paul,
-> 
-> - Added Rafael for the PM QoS discussion -
-> 
-> On Tue, Oct 30, 2012 at 10:04 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> > On Tue, 30 Oct 2012, Paul Walmsley wrote:
-> >
-> >> Based on a very quick look, I'd say the original patch 3db11fe is broken.
-> >> I don't see how it can ensure that its PM_QOS_CPU_DMA_LATENCY request is
-> >> honored when CONFIG_CPU_IDLE=n. CONFIG_CPU_IDLE=n is the default for
-> >> omap2plus_defconfig.
-> >
-> > So in fact to follow up on this, looks like one of two changes are needed:
-> >
-> > 1. Revert 3db11fe
-> >
-> > or
-> >
-> > 2. If CONFIG_CPU_IDLE=n, the driver needs to call disable_hlt() in place
-> > of the pm_qos constraint add, and call enable_hlt() in place of the pm_qos
-> > constraint remove.
-> I do not think this is correct. Using disable_hlt is a too radical
-> solution and will prevent the idle completely, this is not what we
-> want.
-> 
-> Rafael, what do you think?
+This series modify the dts file to add the slink addresses,
+make AUXDATA in board dt files, enable slink4 for tegra30-cardhu and 
+enable slink controller defconfig.
 
-Well, I agree.
+Changes from V1: 
+- Remove changes from clock tables.
+- Make the dma req dt property name to nvidia,dma-request-selector.
+- change the spi max frequency prop to spi-max-frequency.
 
-Thanks,
-Rafael
+Changes from V2: 
+- make node name to spi.
+- get rid of iomap.h.
 
+Changes from V3:
+- Enable spi flash connected on slink4-cs1.
+- Enable require defconfigs.
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Laxman Dewangan (4):
+  ARM: tegra: dts: add slink controller dt entry
+  ARM: tegra: Add OF_DEV_AUXDATA for SLINK driver in board dt
+  ARM: tegra: dts: cardhu: enable SLINK4
+  ARM: tegra: config: enable spi driver for Tegra SLINK controller
+
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/boot/dts/tegra20.dtsi                     |   41 +++++++++++++
+ arch/arm/boot/dts/tegra30-cardhu.dtsi              |   10 +++
+ arch/arm/boot/dts/tegra30.dtsi                     |   60 ++++++++++++++++++++
+ arch/arm/configs/tegra_defconfig                   |    5 +-
+ arch/arm/mach-tegra/board-dt-tegra20.c             |    8 +++
+ arch/arm/mach-tegra/board-dt-tegra30.c             |   12 ++++
+ 7 files changed, 136 insertions(+), 1 deletions(-)
