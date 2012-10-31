@@ -1,412 +1,278 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 31 Oct 2012 22:31:53 +0100
-Subject: [PATCH] ARM: plat-versatile: move FPGA irq driver to drivers/irqchip
-Message-ID: <1351719113-30880-1-git-send-email-linus.walleij@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 31 Oct 2012 14:52:53 -0700
+Subject: [PATCH 12/11] ARM: OMAP: Fix relative includes for fpga.h
+In-Reply-To: <20121030234852.25936.12482.stgit@muffinssi.local>
+References: <20121030234852.25936.12482.stgit@muffinssi.local>
+Message-ID: <20121031215252.GB15766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the Versatile FPGA interrupt controller driver, used in
-the Integrator/AP, Integrator/CP and some Versatile boards, out
-of arch/arm/plat-versatile and down to drivers/irqchip where we
-have consensus that such drivers belong. The header file is
-consequently moved to <linux/platform_data/irq-versatile-fpga.h>.
+As discussed on linux-arm-kernel, we want to avoid
+relative includes for the arch/arm/*omap* code:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+http://www.spinics.net/lists/linux-omap/msg80520.html
+
+Fix includes for fpga.h by making fpga.h local
+to mach-omap1. The common code in plat-omap just
+needs to know the struct h2p2_dbg_fpga, which can
+be local to debug-leds.c.
+
+This also fixes the braindead <../*.h> style includes
+that got accidentally added with search and replace
+during the cleanup.
+
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
 ---
- arch/arm/Kconfig                                   |   4 +-
- arch/arm/mach-integrator/integrator_ap.c           |   3 +-
- arch/arm/mach-integrator/integrator_cp.c           |   2 +-
- arch/arm/mach-versatile/core.c                     |   2 +-
- arch/arm/plat-versatile/Kconfig                    |   9 -
- arch/arm/plat-versatile/Makefile                   |   1 -
- drivers/irqchip/Kconfig                            |   9 +-
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-arm-fpga.c                     | 204 +++++++++++++++++++++
- .../irqchip/irq-versatile-fpga.c                   |   4 +-
- .../linux/platform_data/irq-versatile-fpga.h       |   0
- 11 files changed, 220 insertions(+), 19 deletions(-)
- create mode 100644 drivers/irqchip/irq-arm-fpga.c
- rename arch/arm/plat-versatile/fpga-irq.c => drivers/irqchip/irq-versatile-fpga.c (97%)
- rename arch/arm/plat-versatile/include/plat/fpga-irq.h => include/linux/platform_data/irq-versatile-fpga.h (100%)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 73067ef..2205e3e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -284,8 +284,8 @@ config ARCH_INTEGRATOR
- 	select MULTI_IRQ_HANDLER
- 	select NEED_MACH_MEMORY_H
- 	select PLAT_VERSATILE
--	select PLAT_VERSATILE_FPGA_IRQ
- 	select SPARSE_IRQ
-+	select VERSATILE_FPGA_IRQ
- 	help
- 	  Support for ARM's Integrator platform.
+Looks like my grepping missed few totally braindead
+includes I accidentally introduced, posting them as
+additional patches to this series.
+
+diff --git a/arch/arm/mach-omap1/board-fsample.c b/arch/arm/mach-omap1/board-fsample.c
+index 8b5800a..e067f22 100644
+--- a/arch/arm/mach-omap1/board-fsample.c
++++ b/arch/arm/mach-omap1/board-fsample.c
+@@ -30,13 +30,13 @@
+ #include <mach/tc.h>
+ #include <mach/mux.h>
+ #include <mach/flash.h>
+-#include <../plat-omap/fpga.h>
+ #include <linux/platform_data/keypad-omap.h>
  
-@@ -318,7 +318,7 @@ config ARCH_VERSATILE
- 	select PLAT_VERSATILE
- 	select PLAT_VERSATILE_CLCD
- 	select PLAT_VERSATILE_CLOCK
--	select PLAT_VERSATILE_FPGA_IRQ
-+	select VERSATILE_FPGA_IRQ
- 	help
- 	  This enables support for ARM Ltd Versatile board.
+ #include <mach/hardware.h>
  
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 4f13bc5..caa279f 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -34,6 +34,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/clk.h>
- #include <linux/platform_data/clk-integrator.h>
-+#include <linux/platform_data/irq-versatile-fpga.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -56,8 +57,6 @@
- #include <asm/mach/pci.h>
- #include <asm/mach/time.h>
- 
--#include <plat/fpga-irq.h>
--
+ #include "iomap.h"
  #include "common.h"
++#include "fpga.h"
  
- /* 
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 4423bc8..b50fdc7 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -23,6 +23,7 @@
- #include <linux/gfp.h>
- #include <linux/mtd/physmap.h>
- #include <linux/platform_data/clk-integrator.h>
-+#include <linux/platform_data/irq-versatile-fpga.h>
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -46,7 +47,6 @@
- #include <asm/hardware/timer-sp.h>
+ /* fsample is pretty close to p2-sample */
  
- #include <plat/clcd.h>
--#include <plat/fpga-irq.h>
- #include <plat/sched_clock.h>
+diff --git a/arch/arm/mach-omap1/board-innovator.c b/arch/arm/mach-omap1/board-innovator.c
+index c66334f..f8033fa 100644
+--- a/arch/arm/mach-omap1/board-innovator.c
++++ b/arch/arm/mach-omap1/board-innovator.c
+@@ -33,7 +33,6 @@
  
+ #include <mach/mux.h>
+ #include <mach/flash.h>
+-#include <../plat-omap/fpga.h>
+ #include <mach/tc.h>
+ #include <linux/platform_data/keypad-omap.h>
+ 
+diff --git a/arch/arm/mach-omap1/board-perseus2.c b/arch/arm/mach-omap1/board-perseus2.c
+index 030bd48..9a7e483 100644
+--- a/arch/arm/mach-omap1/board-perseus2.c
++++ b/arch/arm/mach-omap1/board-perseus2.c
+@@ -30,13 +30,13 @@
+ 
+ #include <mach/tc.h>
+ #include <mach/mux.h>
+-#include <../plat-omap/fpga.h>
+ #include <mach/flash.h>
+ 
+ #include <mach/hardware.h>
+ 
+ #include "iomap.h"
  #include "common.h"
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 5b5c1ee..46bfb8c 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -35,6 +35,7 @@
- #include <linux/gfp.h>
- #include <linux/clkdev.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/platform_data/irq-versatile-fpga.h>
++#include "fpga.h"
  
+ static const unsigned int p2_keymap[] = {
+ 	KEY(0, 0, KEY_UP),
+diff --git a/arch/arm/mach-omap1/fpga.c b/arch/arm/mach-omap1/fpga.c
+index d940fac..8bd71b2 100644
+--- a/arch/arm/mach-omap1/fpga.c
++++ b/arch/arm/mach-omap1/fpga.c
+@@ -27,12 +27,11 @@
  #include <asm/irq.h>
- #include <asm/hardware/arm_timer.h>
-@@ -51,7 +52,6 @@
- #include <asm/hardware/timer-sp.h>
- 
- #include <plat/clcd.h>
--#include <plat/fpga-irq.h>
- #include <plat/sched_clock.h>
- 
- #include "core.h"
-diff --git a/arch/arm/plat-versatile/Kconfig b/arch/arm/plat-versatile/Kconfig
-index 2a4ae8a..619f0fa 100644
---- a/arch/arm/plat-versatile/Kconfig
-+++ b/arch/arm/plat-versatile/Kconfig
-@@ -6,15 +6,6 @@ config PLAT_VERSATILE_CLOCK
- config PLAT_VERSATILE_CLCD
- 	bool
- 
--config PLAT_VERSATILE_FPGA_IRQ
--	bool
--	select IRQ_DOMAIN
--
--config PLAT_VERSATILE_FPGA_IRQ_NR
--       int
--       default 4
--       depends on PLAT_VERSATILE_FPGA_IRQ
--
- config PLAT_VERSATILE_LEDS
- 	def_bool y if NEW_LEDS
- 	depends on ARCH_REALVIEW || ARCH_VERSATILE
-diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
-index 74cfd94..f88d448 100644
---- a/arch/arm/plat-versatile/Makefile
-+++ b/arch/arm/plat-versatile/Makefile
-@@ -2,7 +2,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
- 
- obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
- obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
--obj-$(CONFIG_PLAT_VERSATILE_FPGA_IRQ) += fpga-irq.o
- obj-$(CONFIG_PLAT_VERSATILE_LEDS) += leds.o
- obj-$(CONFIG_PLAT_VERSATILE_SCHED_CLOCK) += sched-clock.o
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 1bb8bf6..62ca575 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -1 +1,8 @@
--# empty
-+config VERSATILE_FPGA_IRQ
-+	bool
-+	select IRQ_DOMAIN
-+
-+config VERSATILE_FPGA_IRQ_NR
-+       int
-+       default 4
-+       depends on VERSATILE_FPGA_IRQ
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 054321d..e2e6eb5 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
-+obj-$(CONFIG_VERSATILE_FPGA_IRQ) += irq-versatile-fpga.o
-diff --git a/drivers/irqchip/irq-arm-fpga.c b/drivers/irqchip/irq-arm-fpga.c
-new file mode 100644
-index 0000000..92fb9d6
---- /dev/null
-+++ b/drivers/irqchip/irq-arm-fpga.c
-@@ -0,0 +1,204 @@
-+/*
-+ *  Support for Versatile FPGA-based IRQ controllers
-+ */
-+#include <linux/bitops.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/irqdomain.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_data/irq-versatile-fpga.h>
-+
-+#include <asm/exception.h>
-+#include <asm/mach/irq.h>
-+
-+#define IRQ_STATUS		0x00
-+#define IRQ_RAW_STATUS		0x04
-+#define IRQ_ENABLE_SET		0x08
-+#define IRQ_ENABLE_CLEAR	0x0c
-+#define INT_SOFT_SET		0x10
-+#define INT_SOFT_CLEAR		0x14
-+#define FIQ_STATUS		0x20
-+#define FIQ_RAW_STATUS		0x24
-+#define FIQ_ENABLE		0x28
-+#define FIQ_ENABLE_SET		0x28
-+#define FIQ_ENABLE_CLEAR	0x2C
-+
-+/**
-+ * struct fpga_irq_data - irq data container for the FPGA IRQ controller
-+ * @base: memory offset in virtual memory
-+ * @chip: chip container for this instance
-+ * @domain: IRQ domain for this instance
-+ * @valid: mask for valid IRQs on this controller
-+ * @used_irqs: number of active IRQs on this controller
-+ */
-+struct fpga_irq_data {
-+	void __iomem *base;
-+	struct irq_chip chip;
-+	u32 valid;
-+	struct irq_domain *domain;
-+	u8 used_irqs;
-+};
-+
-+/* we cannot allocate memory when the controllers are initially registered */
-+static struct fpga_irq_data fpga_irq_devices[CONFIG_VERSATILE_FPGA_IRQ_NR];
-+static int fpga_irq_id;
-+
-+static void fpga_irq_mask(struct irq_data *d)
-+{
-+	struct fpga_irq_data *f = irq_data_get_irq_chip_data(d);
-+	u32 mask = 1 << d->hwirq;
-+
-+	writel(mask, f->base + IRQ_ENABLE_CLEAR);
-+}
-+
-+static void fpga_irq_unmask(struct irq_data *d)
-+{
-+	struct fpga_irq_data *f = irq_data_get_irq_chip_data(d);
-+	u32 mask = 1 << d->hwirq;
-+
-+	writel(mask, f->base + IRQ_ENABLE_SET);
-+}
-+
-+static void fpga_irq_handle(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct fpga_irq_data *f = irq_desc_get_handler_data(desc);
-+	u32 status = readl(f->base + IRQ_STATUS);
-+
-+	if (status == 0) {
-+		do_bad_IRQ(irq, desc);
-+		return;
-+	}
-+
-+	do {
-+		irq = ffs(status) - 1;
-+		status &= ~(1 << irq);
-+		generic_handle_irq(irq_find_mapping(f->domain, irq));
-+	} while (status);
-+}
-+
-+/*
-+ * Handle each interrupt in a single FPGA IRQ controller.  Returns non-zero
-+ * if we've handled at least one interrupt.  This does a single read of the
-+ * status register and handles all interrupts in order from LSB first.
-+ */
-+static int handle_one_fpga(struct fpga_irq_data *f, struct pt_regs *regs)
-+{
-+	int handled = 0;
-+	int irq;
-+	u32 status;
-+
-+	while ((status  = readl(f->base + IRQ_STATUS))) {
-+		irq = ffs(status) - 1;
-+		handle_IRQ(irq_find_mapping(f->domain, irq), regs);
-+		handled = 1;
-+	}
-+
-+	return handled;
-+}
-+
-+/*
-+ * Keep iterating over all registered FPGA IRQ controllers until there are
-+ * no pending interrupts.
-+ */
-+asmlinkage void __exception_irq_entry fpga_handle_irq(struct pt_regs *regs)
-+{
-+	int i, handled;
-+
-+	do {
-+		for (i = 0, handled = 0; i < fpga_irq_id; ++i)
-+			handled |= handle_one_fpga(&fpga_irq_devices[i], regs);
-+	} while (handled);
-+}
-+
-+static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
-+		irq_hw_number_t hwirq)
-+{
-+	struct fpga_irq_data *f = d->host_data;
-+
-+	/* Skip invalid IRQs, only register handlers for the real ones */
-+	if (!(f->valid & BIT(hwirq)))
-+		return -ENOTSUPP;
-+	irq_set_chip_data(irq, f);
-+	irq_set_chip_and_handler(irq, &f->chip,
-+				handle_level_irq);
-+	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+	return 0;
-+}
-+
-+static struct irq_domain_ops fpga_irqdomain_ops = {
-+	.map = fpga_irqdomain_map,
-+	.xlate = irq_domain_xlate_onetwocell,
-+};
-+
-+void __init fpga_irq_init(void __iomem *base, const char *name, int irq_start,
-+			  int parent_irq, u32 valid, struct device_node *node)
-+{
-+	struct fpga_irq_data *f;
-+	int i;
-+
-+	if (fpga_irq_id >= ARRAY_SIZE(fpga_irq_devices)) {
-+		pr_err("%s: too few FPGA IRQ controllers, increase CONFIG_VERSATILE_FPGA_IRQ_NR\n", __func__);
-+		return;
-+	}
-+	f = &fpga_irq_devices[fpga_irq_id];
-+	f->base = base;
-+	f->chip.name = name;
-+	f->chip.irq_ack = fpga_irq_mask;
-+	f->chip.irq_mask = fpga_irq_mask;
-+	f->chip.irq_unmask = fpga_irq_unmask;
-+	f->valid = valid;
-+
-+	if (parent_irq != -1) {
-+		irq_set_handler_data(parent_irq, f);
-+		irq_set_chained_handler(parent_irq, fpga_irq_handle);
-+	}
-+
-+	/* This will also allocate irq descriptors */
-+	f->domain = irq_domain_add_simple(node, fls(valid), irq_start,
-+					  &fpga_irqdomain_ops, f);
-+
-+	/* This will allocate all valid descriptors in the linear case */
-+	for (i = 0; i < fls(valid); i++)
-+		if (valid & BIT(i)) {
-+			if (!irq_start)
-+				irq_create_mapping(f->domain, i);
-+			f->used_irqs++;
-+		}
-+
-+	pr_info("FPGA IRQ chip %d \"%s\" @ %p, %u irqs\n",
-+		fpga_irq_id, name, base, f->used_irqs);
-+
-+	fpga_irq_id++;
-+}
-+
-+#ifdef CONFIG_OF
-+int __init fpga_irq_of_init(struct device_node *node,
-+			    struct device_node *parent)
-+{
-+	struct fpga_irq_data *f;
-+	void __iomem *base;
-+	u32 clear_mask;
-+	u32 valid_mask;
-+
-+	if (WARN_ON(!node))
-+		return -ENODEV;
-+
-+	base = of_iomap(node, 0);
-+	WARN(!base, "unable to map fpga irq registers\n");
-+
-+	if (of_property_read_u32(node, "clear-mask", &clear_mask))
-+		clear_mask = 0;
-+
-+	if (of_property_read_u32(node, "valid-mask", &valid_mask))
-+		valid_mask = 0;
-+
-+	fpga_irq_init(base, node->name, 0, -1, valid_mask, node);
-+
-+	writel(clear_mask, base + IRQ_ENABLE_CLEAR);
-+	writel(clear_mask, base + FIQ_ENABLE_CLEAR);
-+
-+	return 0;
-+}
-+#endif
-diff --git a/arch/arm/plat-versatile/fpga-irq.c b/drivers/irqchip/irq-versatile-fpga.c
-similarity index 97%
-rename from arch/arm/plat-versatile/fpga-irq.c
-rename to drivers/irqchip/irq-versatile-fpga.c
-index dfe317c..b7aab6e 100644
---- a/arch/arm/plat-versatile/fpga-irq.c
-+++ b/drivers/irqchip/irq-versatile-fpga.c
-@@ -8,10 +8,10 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/platform_data/irq-versatile-fpga.h>
- 
- #include <asm/exception.h>
  #include <asm/mach/irq.h>
--#include <plat/fpga-irq.h>
  
- #define IRQ_STATUS		0x00
- #define IRQ_RAW_STATUS		0x04
-@@ -42,7 +42,7 @@ struct fpga_irq_data {
- };
+-#include <../plat-omap/fpga.h>
+-
+ #include <mach/hardware.h>
  
- /* we cannot allocate memory when the controllers are initially registered */
--static struct fpga_irq_data fpga_irq_devices[CONFIG_PLAT_VERSATILE_FPGA_IRQ_NR];
-+static struct fpga_irq_data fpga_irq_devices[CONFIG_VERSATILE_FPGA_IRQ_NR];
- static int fpga_irq_id;
+ #include "iomap.h"
+ #include "common.h"
++#include "fpga.h"
  
- static void fpga_irq_mask(struct irq_data *d)
-diff --git a/arch/arm/plat-versatile/include/plat/fpga-irq.h b/include/linux/platform_data/irq-versatile-fpga.h
-similarity index 100%
-rename from arch/arm/plat-versatile/include/plat/fpga-irq.h
-rename to include/linux/platform_data/irq-versatile-fpga.h
--- 
-1.7.11.7
+ static void fpga_mask_irq(struct irq_data *d)
+ {
+diff --git a/arch/arm/mach-omap1/fpga.h b/arch/arm/mach-omap1/fpga.h
+new file mode 100644
+index 0000000..4b4307a
+--- /dev/null
++++ b/arch/arm/mach-omap1/fpga.h
+@@ -0,0 +1,52 @@
++/*
++ * Interrupt handler for OMAP-1510 FPGA
++ *
++ * Copyright (C) 2001 RidgeRun, Inc.
++ * Author: Greg Lonnon <glonnon@ridgerun.com>
++ *
++ * Copyright (C) 2002 MontaVista Software, Inc.
++ *
++ * Separated FPGA interrupts from innovator1510.c and cleaned up for 2.6
++ * Copyright (C) 2004 Nokia Corporation by Tony Lindrgen <tony@atomide.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __ASM_ARCH_OMAP_FPGA_H
++#define __ASM_ARCH_OMAP_FPGA_H
++
++/*
++ * ---------------------------------------------------------------------------
++ *  H2/P2 Debug board FPGA
++ * ---------------------------------------------------------------------------
++ */
++/* maps in the FPGA registers and the ETHR registers */
++#define H2P2_DBG_FPGA_BASE		0xE8000000		/* VA */
++#define H2P2_DBG_FPGA_SIZE		SZ_4K			/* SIZE */
++#define H2P2_DBG_FPGA_START		0x04000000		/* PA */
++
++#define H2P2_DBG_FPGA_ETHR_START	(H2P2_DBG_FPGA_START + 0x300)
++#define H2P2_DBG_FPGA_FPGA_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x10)	/* FPGA Revision */
++#define H2P2_DBG_FPGA_BOARD_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x12)	/* Board Revision */
++#define H2P2_DBG_FPGA_GPIO		IOMEM(H2P2_DBG_FPGA_BASE + 0x14)	/* GPIO outputs */
++#define H2P2_DBG_FPGA_LEDS		IOMEM(H2P2_DBG_FPGA_BASE + 0x16)	/* LEDs outputs */
++#define H2P2_DBG_FPGA_MISC_INPUTS	IOMEM(H2P2_DBG_FPGA_BASE + 0x18)	/* Misc inputs */
++#define H2P2_DBG_FPGA_LAN_STATUS	IOMEM(H2P2_DBG_FPGA_BASE + 0x1A)	/* LAN Status line */
++#define H2P2_DBG_FPGA_LAN_RESET		IOMEM(H2P2_DBG_FPGA_BASE + 0x1C)	/* LAN Reset line */
++
++/* LEDs definition on debug board (16 LEDs, all physically green) */
++#define H2P2_DBG_FPGA_LED_GREEN		(1 << 15)
++#define H2P2_DBG_FPGA_LED_AMBER		(1 << 14)
++#define H2P2_DBG_FPGA_LED_RED		(1 << 13)
++#define H2P2_DBG_FPGA_LED_BLUE		(1 << 12)
++/*  cpu0 load-meter LEDs */
++#define H2P2_DBG_FPGA_LOAD_METER	(1 << 0)	// A bit of fun on our board ...
++#define H2P2_DBG_FPGA_LOAD_METER_SIZE	11
++#define H2P2_DBG_FPGA_LOAD_METER_MASK	((1 << H2P2_DBG_FPGA_LOAD_METER_SIZE) - 1)
++
++#define H2P2_DBG_FPGA_P2_LED_TIMER		(1 << 0)
++#define H2P2_DBG_FPGA_P2_LED_IDLE		(1 << 1)
++
++#endif
+diff --git a/arch/arm/plat-omap/debug-leds.c b/arch/arm/plat-omap/debug-leds.c
+index feca128..c43ea21 100644
+--- a/arch/arm/plat-omap/debug-leds.c
++++ b/arch/arm/plat-omap/debug-leds.c
+@@ -17,16 +17,33 @@
+ #include <linux/platform_data/gpio-omap.h>
+ #include <linux/slab.h>
+ 
+-#include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ 
+-#include "fpga.h"
+-
+ /* Many OMAP development platforms reuse the same "debug board"; these
+  * platforms include H2, H3, H4, and Perseus2.  There are 16 LEDs on the
+  * debug board (all green), accessed through FPGA registers.
+  */
+ 
++/* NOTE:  most boards don't have a static mapping for the FPGA ... */
++struct h2p2_dbg_fpga {
++	/* offset 0x00 */
++	u16		smc91x[8];
++	/* offset 0x10 */
++	u16		fpga_rev;
++	u16		board_rev;
++	u16		gpio_outputs;
++	u16		leds;
++	/* offset 0x18 */
++	u16		misc_inputs;
++	u16		lan_status;
++	u16		lan_reset;
++	u16		reserved0;
++	/* offset 0x20 */
++	u16		ps2_data;
++	u16		ps2_ctrl;
++	/* plus also 4 rs232 ports ... */
++};
++
+ static struct h2p2_dbg_fpga __iomem *fpga;
+ 
+ static u16 fpga_led_state;
+diff --git a/arch/arm/plat-omap/fpga.h b/arch/arm/plat-omap/fpga.h
+deleted file mode 100644
+index 54faaa9..0000000
+--- a/arch/arm/plat-omap/fpga.h
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/*
+- * arch/arm/plat-omap/include/mach/fpga.h
+- *
+- * Interrupt handler for OMAP-1510 FPGA
+- *
+- * Copyright (C) 2001 RidgeRun, Inc.
+- * Author: Greg Lonnon <glonnon@ridgerun.com>
+- *
+- * Copyright (C) 2002 MontaVista Software, Inc.
+- *
+- * Separated FPGA interrupts from innovator1510.c and cleaned up for 2.6
+- * Copyright (C) 2004 Nokia Corporation by Tony Lindrgen <tony@atomide.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#ifndef __ASM_ARCH_OMAP_FPGA_H
+-#define __ASM_ARCH_OMAP_FPGA_H
+-
+-/*
+- * ---------------------------------------------------------------------------
+- *  H2/P2 Debug board FPGA
+- * ---------------------------------------------------------------------------
+- */
+-/* maps in the FPGA registers and the ETHR registers */
+-#define H2P2_DBG_FPGA_BASE		0xE8000000		/* VA */
+-#define H2P2_DBG_FPGA_SIZE		SZ_4K			/* SIZE */
+-#define H2P2_DBG_FPGA_START		0x04000000		/* PA */
+-
+-#define H2P2_DBG_FPGA_ETHR_START	(H2P2_DBG_FPGA_START + 0x300)
+-#define H2P2_DBG_FPGA_FPGA_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x10)	/* FPGA Revision */
+-#define H2P2_DBG_FPGA_BOARD_REV		IOMEM(H2P2_DBG_FPGA_BASE + 0x12)	/* Board Revision */
+-#define H2P2_DBG_FPGA_GPIO		IOMEM(H2P2_DBG_FPGA_BASE + 0x14)	/* GPIO outputs */
+-#define H2P2_DBG_FPGA_LEDS		IOMEM(H2P2_DBG_FPGA_BASE + 0x16)	/* LEDs outputs */
+-#define H2P2_DBG_FPGA_MISC_INPUTS	IOMEM(H2P2_DBG_FPGA_BASE + 0x18)	/* Misc inputs */
+-#define H2P2_DBG_FPGA_LAN_STATUS	IOMEM(H2P2_DBG_FPGA_BASE + 0x1A)	/* LAN Status line */
+-#define H2P2_DBG_FPGA_LAN_RESET		IOMEM(H2P2_DBG_FPGA_BASE + 0x1C)	/* LAN Reset line */
+-
+-/* NOTE:  most boards don't have a static mapping for the FPGA ... */
+-struct h2p2_dbg_fpga {
+-	/* offset 0x00 */
+-	u16		smc91x[8];
+-	/* offset 0x10 */
+-	u16		fpga_rev;
+-	u16		board_rev;
+-	u16		gpio_outputs;
+-	u16		leds;
+-	/* offset 0x18 */
+-	u16		misc_inputs;
+-	u16		lan_status;
+-	u16		lan_reset;
+-	u16		reserved0;
+-	/* offset 0x20 */
+-	u16		ps2_data;
+-	u16		ps2_ctrl;
+-	/* plus also 4 rs232 ports ... */
+-};
+-
+-/* LEDs definition on debug board (16 LEDs, all physically green) */
+-#define H2P2_DBG_FPGA_LED_GREEN		(1 << 15)
+-#define H2P2_DBG_FPGA_LED_AMBER		(1 << 14)
+-#define H2P2_DBG_FPGA_LED_RED		(1 << 13)
+-#define H2P2_DBG_FPGA_LED_BLUE		(1 << 12)
+-/*  cpu0 load-meter LEDs */
+-#define H2P2_DBG_FPGA_LOAD_METER	(1 << 0)	// A bit of fun on our board ...
+-#define H2P2_DBG_FPGA_LOAD_METER_SIZE	11
+-#define H2P2_DBG_FPGA_LOAD_METER_MASK	((1 << H2P2_DBG_FPGA_LOAD_METER_SIZE) - 1)
+-
+-#define H2P2_DBG_FPGA_P2_LED_TIMER		(1 << 0)
+-#define H2P2_DBG_FPGA_P2_LED_IDLE		(1 << 1)
+-
+-#endif
