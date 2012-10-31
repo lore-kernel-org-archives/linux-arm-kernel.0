@@ -1,9 +1,10 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 31 Oct 2012 14:40:52 +0100
-Subject: [PATCH 1/2] clk: ux500: Register rng clock lookups for u8500
+Date: Wed, 31 Oct 2012 14:40:53 +0100
+Subject: [PATCH 2/2] clk: ux500: Register nomadik keypad clock lookups for
+ u8500
 In-Reply-To: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1351690853-13021-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1351690853-13021-3-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,27 +12,30 @@ From: Ulf Hansson <ulf.hansson@linaro.org>
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/clk/ux500/u8500_clk.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clk/ux500/u8500_clk.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index afdf738..6390486 100644
+index 6390486..8575096 100644
 --- a/drivers/clk/ux500/u8500_clk.c
 +++ b/drivers/clk/ux500/u8500_clk.c
-@@ -371,6 +371,7 @@ void u8500_clk_init(void)
+@@ -343,6 +343,8 @@ void u8500_clk_init(void)
  
- 	clk = clk_reg_prcc_pclk("p6_pclk0", "per6clk", U8500_CLKRST6_BASE,
- 				BIT(0), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "rng");
+ 	clk = clk_reg_prcc_pclk("p3_pclk5", "per3clk", U8500_CLKRST3_BASE,
+ 				BIT(5), 0);
++	clk_register_clkdev(clk, "apb_pclk", "ske");
++	clk_register_clkdev(clk, "apb_pclk", "nmk-ske-keypad");
  
- 	clk = clk_reg_prcc_pclk("p6_pclk1", "per6clk", U8500_CLKRST6_BASE,
- 				BIT(1), 0);
-@@ -514,5 +515,5 @@ void u8500_clk_init(void)
- 	/* Periph6 */
- 	clk = clk_reg_prcc_kclk("p3_rng_kclk", "rngclk",
- 			U8500_CLKRST6_BASE, BIT(0), CLK_SET_RATE_GATE);
--
-+	clk_register_clkdev(clk, NULL, "rng");
- }
+ 	clk = clk_reg_prcc_pclk("p3_pclk6", "per3clk", U8500_CLKRST3_BASE,
+ 				BIT(6), 0);
+@@ -503,6 +505,8 @@ void u8500_clk_init(void)
+ 
+ 	clk = clk_reg_prcc_kclk("p3_ske_kclk", "rtc32k",
+ 			U8500_CLKRST3_BASE, BIT(5), CLK_SET_RATE_GATE);
++	clk_register_clkdev(clk, NULL, "ske");
++	clk_register_clkdev(clk, NULL, "nmk-ske-keypad");
+ 
+ 	clk = clk_reg_prcc_kclk("p3_uart2_kclk", "uartclk",
+ 			U8500_CLKRST3_BASE, BIT(6), CLK_SET_RATE_GATE);
 -- 
 1.7.10
