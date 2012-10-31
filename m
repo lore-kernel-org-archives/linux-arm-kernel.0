@@ -1,48 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 31 Oct 2012 11:39:49 +0100
-Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
-In-Reply-To: <5090F67C.9020104@atmel.com>
-References: <cover.1351591858.git.nicolas.ferre@atmel.com>
- <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
- <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
- <5090F67C.9020104@atmel.com>
-Message-ID: <5090FFF5.6020109@atmel.com>
+From: omycle@gmail.com (Li Haifeng)
+Date: Wed, 31 Oct 2012 17:40:30 +0800
+Subject: Two questions about streaming DMA flushing
+In-Reply-To: <20121031075047.GA15743@arm.com>
+References: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
+ <20121031075047.GA15743@arm.com>
+Message-ID: <CAFNq8R4DMKqRtR7junM6v_NnU=pCi8bpOCf5HP_sQgmztQr-cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 10:59 AM, Nicolas Ferre :
-> On 10/30/2012 07:22 PM, H?vard Skinnemoen :
->> On Tue, Oct 30, 2012 at 4:12 AM, David Laight <David.Laight@aculab.com> wrote:
->>>> Instead of masking head and tail every time we increment them, just let them
->>>> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
->>>> functions to do the subscripting properly to minimize the chances of messing
->>>> this up.
->>> ...
->>>> +static unsigned int macb_tx_ring_avail(struct macb *bp)
->>>> +{
->>>> +     return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
->>>> +}
->>>
->>> That one doesn't look quite right to me.
->>> Surely it should be masking with 'TX_RING_SIZE - 1'
+2012/10/31 Catalin Marinas <catalin.marinas@arm.com>:
+> On Wed, Oct 31, 2012 at 02:15:04AM +0000, Li Haifeng wrote:
+>> Sorry to disturb you.
 >>
->> Why is that? head and tail can never be more than TX_RING_SIZE apart,
->> so it shouldn't make any difference.
-> 
-> Absolutely.
+>> I have two questions for streaming DMA flushing @ arch/arm/mm/cache-v7.S.
+>>
+>> 1.
+>> 332 ENTRY(v7_dma_map_area)
+>> 333         add     r1, r1, r0
+>> 334         teq     r2, #DMA_FROM_DEVICE
+>> 335         beq     v7_dma_inv_range
+>> 336         b       v7_dma_clean_range
+>> 337 ENDPROC(v7_dma_map_area)
+>>
+>> The function of v7_dma_map_area will invalidate corresponding cache line
+>> firstly and then clean the cache for  DMA_FROM_DEVICE . I am confused the
+>> sequence of the operations. IMO, the invalidate should be followed by the clean
+>> action. Is it right?
+>
+> If the direction is DMA_FROM_DEVICE, it only invalidates the cache (beq
+> instruction).
 
-Well not so absolute, after having thinking twice ;-)
+Sorry for my careless.
 
-We should move to:
+Why doesn't need clean for DMA_FROM_DEVICE? Will the data modified
+before dma mapping be lost?
 
-static unsigned int macb_tx_ring_avail(struct macb *bp)
-{
-	return (TX_RING_SIZE - (bp->tx_head - bp->tx_tail) & (TX_RING_SIZE - 1));
-}
+>
+>> 2.
+>> 345 ENTRY(v7_dma_unmap_area)
+>> 346         add     r1, r1, r0
+>> 347         teq     r2, #DMA_TO_DEVICE
+>> 348         bne     v7_dma_inv_range
+>> 349         mov     pc, lr
+>> 350 ENDPROC(v7_dma_unmap_area)
+>>
+>> v7_dma_unmap_area, will invalidate corresponding cache line for
+>> DMA_FROM_DEVICE . But, at v7_dma_map_area, the invalidate has been done. Why do
+>> this again?
+>
+> There can be speculative loads into the cache, so once the transfer has
+> finished you need to invalidate the range again to avoid reading stale
+> data (the first invalidate is needed to make sure there aren't any dirty
+> cache lines that could be evicted).
+>
 
-Thanks David!
+It is reasonable!
 
-(sorry for the noise) Bye,
--- 
-Nicolas Ferre
+> --
+> Catalin
