@@ -1,42 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Oct 2012 09:08:21 +0000
-Subject: Two questions about streaming DMA flushing
-In-Reply-To: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
-References: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
-Message-ID: <20121031090821.GK21164@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 31 Oct 2012 10:12:52 +0100
+Subject: [PATCHv6 0/2] Add support for the OLED in the CFA10036
+Message-ID: <1351674774-2891-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 10:15:04AM +0800, Li Haifeng wrote:
-> Sorry to disturb you.
-> 
-> I have two questions for streaming DMA flushing @ arch/arm/mm/cache-v7.S.
-> 
-> 1.
-> 332 ENTRY(v7_dma_map_area)
-> 333         add     r1, r1, r0
-> 334         teq     r2, #DMA_FROM_DEVICE
-> 335         beq     v7_dma_inv_range
-> 336         b       v7_dma_clean_range
-> 337 ENDPROC(v7_dma_map_area)
-> 
-> The function of v7_dma_map_area will invalidate corresponding cache line
-> firstly and then clean the cache for ?DMA_FROM_DEVICE?. I am confused the
-> sequence of the operations. IMO, the invalidate should be followed by the
-> clean action. Is it right?
+Hi everyone,
 
-Wrong.  beq is not a function call.
+This patchset adds support for the solomon SSD1307 OLED controller present
+in the CFA-10036 board.
 
-> 2.
-> 345 ENTRY(v7_dma_unmap_area)
-> 346         add     r1, r1, r0
-> 347         teq     r2, #DMA_TO_DEVICE
-> 348         bne     v7_dma_inv_range
-> 349         mov     pc, lr
-> 350 ENDPROC(v7_dma_unmap_area)
-> 
-> v7_dma_unmap_area, will invalidate corresponding cache line for
-> ?DMA_FROM_DEVICE?. But, at v7_dma_map_area, the invalidate has been done.
-> Why do this again?
+It first adds the framebuffer driver for this controller, and then the
+needed bits to enable it in the cfa10036 dts.
 
-Cache prefetching.
+Considering that the driver has been around since almost three months now, and
+I have not received any comments on the framebuffer part, I'd very much like it
+to be included in 3.8 if possible.
+
+Thanks,
+Maxime
+
+Changes from v5:
+  * Fixed bogus reset code
+
+Maxime Ripard (2):
+  video: Add support for the Solomon SSD1307 OLED Controller
+  ARM: dts: mxs: add oled support for the cfa-10036
+
+ .../devicetree/bindings/video/ssd1307fb.txt        |   24 ++
+ arch/arm/boot/dts/imx28-cfa10036.dts               |   19 +
+ drivers/video/Kconfig                              |   13 +
+ drivers/video/Makefile                             |    1 +
+ drivers/video/ssd1307fb.c                          |  407 ++++++++++++++++++++
+ 5 files changed, 464 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/ssd1307fb.txt
+ create mode 100644 drivers/video/ssd1307fb.c
+
+-- 
+1.7.9.5
