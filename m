@@ -1,135 +1,62 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 1 Nov 2012 00:58:39 +0800
-Subject: [PATCH v2 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <5085CC3F.30708@wwwdotorg.org>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
- <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
- <5085CC3F.30708@wwwdotorg.org>
-Message-ID: <CAN1soZy8xXGs8zEiZV0kV0dGVdXfZ9ogx83sFgPG76d0i8yH4A@mail.gmail.com>
+From: svenkatr@ti.com (Venkatraman S)
+Date: Thu, 1 Nov 2012 01:21:36 +0530
+Subject: [PATCH V3] mmc: omap_hsmmc: Enable HSPE bit for high speed cards
+In-Reply-To: <20121031122639.GA10998@arwen.pp.htv.fi>
+References: <1351684656-30275-1-git-send-email-gururaja.hebbar@ti.com>
+ <20121031122639.GA10998@arwen.pp.htv.fi>
+Message-ID: <CAOyx1LrKBE+xzSRN4F=+e1DuMJL+5SAv-YkJWJdDw8p=kDojmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 6:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/22/2012 10:08 AM, Haojian Zhuang wrote:
->> Add comments with pinconf & gpio range in the document of
->> pinctrl-single.
+On Wed, Oct 31, 2012 at 5:56 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Wed, Oct 31, 2012 at 05:27:36PM +0530, Hebbar, Gururaja wrote:
+>> HSMMC IP on AM33xx need a special setting to handle High-speed cards.
+>> Other platforms like TI81xx, OMAP4 may need this as-well. This depends
+>> on the HSMMC IP timing closure done for the high speed cards.
 >>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> ---
->>  .../devicetree/bindings/pinctrl/pinctrl-single.txt |   52 ++++++++++++++++++++
->>  arch/arm/boot/dts/pxa910.dtsi                      |    1 -
->>  2 files changed, 52 insertions(+), 1 deletions(-)
+>> From AM335x TRM (SPRUH73F - 18.3.12 Output Signals Generation)
 >>
->> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
->> index 2c81e45..6da2f13 100644
->> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
->> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
->> @@ -17,6 +17,36 @@ Optional properties:
->>  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
->>    more than one pin
+>> The MMC/SD/SDIO output signals can be driven on either falling edge or
+>> rising edge depending on the SD_HCTL[2] HSPE bit. This feature allows
+>> to reach better timing performance, and thus to increase data transfer
+>> frequency.
 >>
->> +- pinctrl-single,gpio-ranges : gpio range list
->> +
->> +- pinctrl-single,gpio : array with gpio range start, size & register
->> +  offset
->> +
->> +- pinctrl-single,gpio-func : gpio function value in the pinmux register
+>> There are few pre-requisites for enabling the HSPE bit
+>> - Controller should support High-Speed-Enable Bit and
+>> - Controller should not be using DDR Mode and
+>> - Controller should advertise that it supports High Speed in
+>>   capabilities register and
+>> - MMC/SD clock coming out of controller > 25MHz
+>>
+>> Note:
+>> The implementation reuses the output of calc_divisor() so as to reduce
+>> code addition.
+>>
+>> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
 >
-> Some more explanation is needed here; some questions/comments:
+> this looks good to my eyes, hopefully I haven't missed anything:
 >
-> 1) Looking at the example, pinctrl-single,gpio-ranges is a property
-> within the main pinctrl node, whereas pinctrl-single,gpio and
-> pinctrl-single,gpio-func are properties within some other node. There's
-> no explanation of this in the binding description itself, only in the
-> example. Related to this, the documentation for
-> pinctrl-single,gpio-ranges doesn't say what it's a list of; it needs to
-> say that it's a list of phandles.
+> Reviewed-by: Felipe Balbi <balbi@ti.com>
 >
-I'll add more comments.
 
-> 2) pinctrl-single,gpio is listed as optional. Presumably it's not; every
-> GPIO range node must have this property?
->
-Yes, they must be included in GPIO range node. But if GPIO feature
-isn't supported in the pinctrl device, pinctrl-single,gpio is still optional.
-I'll add more comments on this.
+Except for the excessively verbose comments which are just duplicating the code,
+<Quote>
+>> +      * Enable High-Speed Support
+>> +      * Pre-Requisites
+>> +      *      - Controller should support High-Speed-Enable Bit
+>> +      *      - Controller should not be using DDR Mode
+>> +      *      - Controller should advertise that it supports High Speed
+>> +      *        in capabilities register
+>> +      *      - MMC/SD clock coming out of controller > 25MHz
+>> +      */
+</Quote>
 
-> 3) Why is pinctrl-single,gpio-func optional? Presumably you always need
-> to program the pinmux HW to select the GPIO function. Yet, the driver
-> code in an earlier patch seems to deliberately do nothing if this
-> property is missing. Shouldn't the DT parsing return an error instead?
->
-pinctrl-single,gpio-func is optional for above reason.
+I'm ok with this patch as well. I'm putting a few patches under test
+including this one,
+and will send it to Chris as part of that series.
+I'll strip out the above mentioned comments, unless there are any objections.
 
-> 4) I'm a little confused re: the data model. Is the idea that if
-> pinctrl-single,gpio-ranges is specified, then the node describes a
-> combined pin controller and GPIO HW? Are the pin IDs of the pin
-> controller expected to match the pin IDs of the GPIO HW?
-
-GPIO function is enabled by setting proper field in mux field of pinmux
-register.
-
-> I'm left wondering exactly which numbering space the values in
-> pinctrl-single,gpio are; do they describe the pin controller IDs that
-> this GPIO range describes, or do they describe the GPIO IDs that this
-> range describes and attempt to map them back to pin controller IDs?
-> Similarly, I'm not sure why there's a register offset here rather than
-> say a pin controller pin ID number. Shouldn't the property be a list of
-> <pin-controller-pin-ID GPIO-controller-GPIO-ID number-of-GPIOs>
->
-Whatever it's pin ID or offset of pinmux register, they're nearly same.
-We can calculate offset from pin ID, vice visa. If pin ID is more acceptable
-by you and Tony, I can change it later.
-
->> +- pinctrl-single,power-source-mask : mask of setting power source in
->> +  the pinmux register
->> +
->> +- pinctrl-single,power-source : value of setting power source field
->> +  in the pinmux register
->> +
->> +- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
->> +  register
->> +
->> +- pinctrl-single,bias-disable : value of disabling bias in the pinmux
->> +  register
->> +
->> +- pinctrl-single,bias-pull-down : value of setting bias pull down in
->> +  the pinmux register
->> +
->> +- pinctrl-single,bias-pull-up : value of setting bias pull up in the
->> +  pinmux register
->> +
->> +- pinctrl-single,bias : value of setting bias in the pinmux register
->> +
->> +- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
->> +  in the pinmux register
->
-> I suppose it's OK that a generic pin controller binding would use the
-> generic pin configuration config options. I'm still not convinced that
-> the semantics of generic pin control make sense. Maybe if they're just
-> arbitrary names for SoC-specific things it's fine though.
->
-> Do these patches expose /all/ generic pin configuration options? It
-> doesn't seem worth exposing only some of them and ignoring others.
->
-I believe general pinconf can't support all cases in different silicons.
-And we still have some common features that could be covered in general
-pinconf. So we need a structure to support both pinconf & specific pinconf.
-
->> +/* third controller instance for pins in gpio domain */
->> +pmx_gpio: pinmux at d401e000 {
->> +     compatible = "pinctrl-single";
->> +     reg = <0xd401e000 0x0330>;
->> +     #address-cells = <1>;
->> +     #size-cells = <0>;
->
-> #gpio-cells would be needed here for a GPIO controller.
->
->> diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
->
->> -                             pinctrl-single,gpio-mask = <7>;
->
-> I assume that's a mistake; the line shouldn't be removed in this
-> documentation patch?
->
-Yes, this part should be included in the previous patch. I'll fix it.
+Thanks,
+Venkat.
