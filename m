@@ -1,44 +1,74 @@
-From: loic.pallardy@st.com (Loic PALLARDY)
-Date: Wed, 31 Oct 2012 09:45:09 +0100
-Subject: [PATCH 1/2] ARM: OMAP2+: move mailbox.h out of plat-omap headers
-In-Reply-To: <CALLhW=6p06MPdfbD2S-PRs=w0zLNsEifsJ2xL0hjEZaFpbadDA@mail.gmail.com>
-References: <1351530381-11459-1-git-send-email-omar.luna@linaro.org>
- <1351530381-11459-2-git-send-email-omar.luna@linaro.org>
- <20121029175228.GD11908@atomide.com>
- <CALLhW=4ukBuRSVcPm2A37PgBhv33yKqk2G=Dz2XTUyswXw=JMg@mail.gmail.com>
- <20121030162441.GF11908@atomide.com>	<20121030210213.GA6098@kroah.com>
- <CALLhW=6p06MPdfbD2S-PRs=w0zLNsEifsJ2xL0hjEZaFpbadDA@mail.gmail.com>
-Message-ID: <5090E515.9050407@st.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 31 Oct 2012 08:48:38 +0000
+Subject: [PATCH] ARM: zynq: move ttc timer code to drivers/clocksource
+In-Reply-To: <201210302236.43473.arnd@arndb.de>
+References: <20121029185630.GA26149@beefymiracle.amer.corp.natinst.com>
+ <508FBBA5.2080707@monstr.eu> <201210302236.43473.arnd@arndb.de>
+Message-ID: <2b8e9679-dade-4448-8c16-362de455ead0@AM1EHSMHS002.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Omar,
 
-On 10/31/2012 08:22 AM, Omar Ramirez Luna wrote:
->
-> As part of plat-omap code cleanup, I was planning to move omap-mailbox
-> framework to a newly drivers/mailbox folder, right now this code is
-> specific to OMAP platforms, but with some clean up it could be the
-> base for a generic framework. And living under drivers/mailbox could
-> give it some exposure for interested developers to give feedback and
-> propose changes.
->
-> In the past there was a mailbox-like driver in mach-ux500, I was
-> hoping both could live under the same folder, however the platform
-> using it, was dropped a couple of kernel releases back and with it the
-> other similar mailbox implementation.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Tuesday, October 30, 2012 11:37 PM
+> To: monstr at monstr.eu
+> Cc: Josh Cartwright; Michal Simek; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; arm at kernel.org; Thomas Gleixner
+> Subject: Re: [PATCH] ARM: zynq: move ttc timer code to drivers/clocksource
+> 
+> On Tuesday 30 October 2012, Michal Simek wrote:
+> > On 10/29/2012 07:56 PM, Josh Cartwright wrote:
+> > > Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
+> > > drivers/clocksource, and out of the mach-zynq directory.
+> > >
+> > > The common.h (which only held the timer declaration) was renamed to
+> > > xilinx_ttc.h and moved into include/linux.
+> > >
+> > > Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+> > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > ---
+> > >   arch/arm/mach-zynq/Makefile      |   2 +-
+> > >   arch/arm/mach-zynq/common.c      |   2 +-
+> > >   arch/arm/mach-zynq/common.h      |  24 ----
+> > >   arch/arm/mach-zynq/timer.c       | 298 ---------------------------------------
+> > >   drivers/clocksource/Makefile     |   1 +
+> > >   drivers/clocksource/xilinx_ttc.c | 297
+> ++++++++++++++++++++++++++++++++++++++
+> > >   include/linux/xilinx_ttc.h       |  24 ++++
+> > >   7 files changed, 324 insertions(+), 324 deletions(-)
+> 
+> When you submit a patch that moves files around, please use the '-M' flag to git-
+> format-patch so we can see the actual changes instead of a file being removed
+> and another one added.
+> 
+> > >   delete mode 100644 arch/arm/mach-zynq/common.h
+> > >   delete mode 100644 arch/arm/mach-zynq/timer.c
+> > >   create mode 100644 drivers/clocksource/xilinx_ttc.c
+> > >   create mode 100644 include/linux/xilinx_ttc.h
+> >
+> > Really?
+> > If yes. shouldn't be there any better naming convention especially for
+> > headers. linux/clocksource/xilinx_ttc.h.
+> 
+> Moving it is certainly the right direction, but I think we need a better way to
+> handle those forward declarations. "struct sys_timer" is actually an ARM specific
+> structure, so we might just want to add all the forward declarations for the
+> timers into arch/arm/include/asm/mach/time.h. It's not ideal to do it like that,
+> but I think it's much better than having a new globally visible header for each
+> timer that is used on ARM.
+> 
+> Eventually, we might want to do something similar to what we are discussing for
+> the top-level IRQ controllers at the moment, where we just autodetect them
+> from DT if possible, so we don't need to have any pointer to the timer from arch
+> code at all.
 
-On STE side, we are working on a mailbox driver which will rely on 
-mailbox framework.
-However some modifications in current Omap mailbox framework are needed 
-to fit STE HW specificities.
-- API naming should be generic (replace omap prefix by mailbox)
-- message type should be enhanced
-- fifo mechanism is linked to Omap maibox, not needed in STE case since 
-it relies on cross interrupt + shared memory
-I already have modifications I'll send you to see how we can create a 
-common and generic mailbox framework.
+Ok. It means that it is not big deal to keep timer as is in mach and when we
+have any generic solution we can follow it. This patch just move the code out
+of mach-zynq. 
+It should be done across architecture because for example timer I use for microblaze
+can be used by zynq too, also by Xilinx ppc. 
 
-Regards
-Loic
+Thanks,
+Michal
