@@ -1,77 +1,58 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Wed, 31 Oct 2012 05:39:27 +0000
-Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
-In-Reply-To: <CAD=GYpZ9w=D55G9DOiMqZ4BCGGdGszsgG3fumHUGZ12xx+TKjw@mail.gmail.com>
-References: <1349879449-22657-1-git-send-email-mporter@ti.com>
- <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
- <CAD=GYpZ9w=D55G9DOiMqZ4BCGGdGszsgG3fumHUGZ12xx+TKjw@mail.gmail.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAB973D@DBDE01.ent.ti.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Wed, 31 Oct 2012 11:17:29 +0530
+Subject: [PATCH] ARM: EXYNOS5: Remove wrongly placed usb2.0 PHY_CFG
+ definition from PMU_REG
+In-Reply-To: <003b01cda5f8$f84e35c0$e8eaa140$%han@samsung.com>
+References: <1349443590-29901-1-git-send-email-gautam.vivek@samsung.com>
+ <003b01cda5f8$f84e35c0$e8eaa140$%han@samsung.com>
+Message-ID: <CAFp+6iG3389wDS8TQjLYooUTNCJjRWWuvSywOP-g8u5dJO3Zhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 01:58:32, Joel A Fernandes wrote:
-> Hi Gururaja,
-> 
-> On Mon, Oct 29, 2012 at 10:45 AM, Hebbar, Gururaja
-> <gururaja.hebbar@ti.com> wrote:
-> > Matt,
-> >
-> > On Wed, Oct 10, 2012 at 20:00:49, Porter, Matt wrote:
-> >> 6ea74cb ARM: OMAP2+: hwmod: get rid of all omap_clk_get_by_name usage
-> >> exposes a bug in the AM33XX clock data for mcasp. After moving to
-> >> clk_get() usage, the _init() of all registered hwmods fails on mcasp0
-> >> due to incorrect clock data causing clk_get() to fail. This causes all
-> >> successive hwmods to fail to _init() leaving them in a bad state.
-> >>
-> >> This patch updates the mcasp clock entries so clk_get() will succeed.
-> >> It is tested on BeagleBone and is needed for 3.7-rc1 to fix AM33xx
-> >> boot.
-> >
-> >
-> > I want to test Audio on AM335x Evm with your EDMA patches. I have few
-> > patches for AM335x.
-> > Can you share the link to the repo & branch on which I need to rebase?
-> > The patches are related to mcasp dt node, mcasp pinmux in dt, etc...
-> >
-> 
-> I was wondering about the status of following patches you wrote, not
-> added to mainline yet:
-> 
-> (1)
->  ASoC: Davinci: machine: Add device tree binding
-> https://patchwork.kernel.org/patch/1380511/  - will this be resubmitted?
+Hi all,
 
-There was no review comments for V3 I submitted. 
+On Tue, Oct 9, 2012 at 2:04 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Friday, October 05, 2012 10:27 PM Vivek Gautam wrote
+>>
+>> EXYNOS5_USB_CFG macro should actually point to USB20PHY_CFG
+>> system register (base addr + 0x230). It's wrongly placed in regs-pmu.
+>> Actual register at offset 0x230 in PMU is SEQ_TRANSITION4.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>
+> As you mentioned, this definition is wrong.
+> So, it should be removed.
+>
+> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+>
+>
+>> ---
+>>  arch/arm/mach-exynos/include/mach/regs-pmu.h |    2 --
+>>  1 files changed, 0 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> index d4e392b..70b2795 100644
+>> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+>> @@ -230,8 +230,6 @@
+>>
+>>  /* For EXYNOS5 */
+>>
+>> -#define EXYNOS5_USB_CFG                                              S5P_PMUREG(0x0230)
+>> -
 
-> 
-> (2)
-> ASoC: AM33XX: Add support for AM33xx SoC Audio
-> https://github.com/joelagnel/linux-kernel/commit/973cfb48bdb70018b3869a21595bde8630efb29d
+Any thoughts about this please.
 
-I want to re-submit both the patches along with 2 more patch-set [1]. I am
-waiting for Matt Porters to reply with his recent branch, so that I can do
-a final test and re-submit.
-
-[1].
-arm/dts: Add tlv320aic3x codec DT data to am335x-evm.dts
-arm/dts: add mcasp1 dt node to am335x-evm.dt
-ASoC: davinci-mcasp: Add pinctrl support
-arm/dts: AM33XX: setup pinctrl for mcasp1 on am335x-evm
-
-I need Mark Brown's Ack for the 3rd patch. There was some discussion
-about adding pinctrl support for Audio drivers. I couldn't get the final
-decision taken on it. I will rebase on to brownie-asoc/for-next and submit
-it today.
-
-> 
-> Are you planning on sending/resending these patches again? I could do this too.
-> 
-> I guess all other audio patches except for audio dts stuff is already in.
-> 
-> Thanks,
-> Joel
-> 
+>>  #define EXYNOS5_AUTO_WDTRESET_DISABLE                                S5P_PMUREG(0x0408)
+>>  #define EXYNOS5_MASK_WDTRESET_REQUEST                                S5P_PMUREG(0x040C)
+>>
+>> --
+>> 1.7.6.5
+>>
 
 
-Regards, 
-Gururaja
+
+
+-- 
+Thanks & Regards
+Vivek
