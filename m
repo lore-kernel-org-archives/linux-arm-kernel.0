@@ -1,67 +1,85 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Oct 2012 09:58:32 -0500
-Subject: [PATCH v2 0/5] Move GIC and VIC to drivers/irqchip
-Message-ID: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+Date: Wed, 31 Oct 2012 09:58:33 -0500
+Subject: [PATCH v2 1/5] ARM: gic: move register definitions into .c file
+In-Reply-To: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1351695517-5636-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-I think I had this action from San Francisco Linaro Connect. Well, better
-late than never... Now we need to move GIC for use by arm64.
+There's only 1 user of gic registers outside of gic.c, so move the
+register definitions into gic.c. For now, keep GIC_DIST_CNT as Tegra
+uses it.
 
-This series builds on Thomas Petazzoni's series adding a common irqchip
-init function[1] and moves the ARM GIC and VIC irqchip code to
-drivers/irqchip. More work for arm64 is still needed to fix asm header
-dependencies.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/common/gic.c               |   21 ++++++++++++++++++++-
+ arch/arm/include/asm/hardware/gic.h |   18 ------------------
+ 2 files changed, 20 insertions(+), 19 deletions(-)
 
-v2 (add patches 1 and 2):
-- Move GIC register definitions to gic.c and remove dependency on
-  asm/hardware/gic.h
-- Remove direct platform dependency on gic_raise_softirq. This isn't
-  strictly needed before moving to drivers/irqchip, but is needed
-  for arm64.
-
-Rob
-
-[1] http://www.spinics.net/lists/arm-kernel/msg203687.html
-
-Rob Herring (5):
-  ARM: gic: move register definitions into .c file
-  ARM: gic: remove direct use of gic_raise_softirq
-  irqchip: Move ARM GIC to drivers/irqchip
-  irqchip: Move ARM VIC to drivers/irqchip
-  ARM: highbank: use common irqchip_init
-
- arch/arm/common/Kconfig                            |   23 -------
- arch/arm/common/Makefile                           |    2 -
- arch/arm/include/asm/hardware/gic.h                |   19 ------
- arch/arm/include/asm/smp.h                         |    1 +
- arch/arm/kernel/smp.c                              |    5 ++
- arch/arm/mach-exynos/platsmp.c                     |    4 +-
- arch/arm/mach-highbank/highbank.c                  |    8 +--
- arch/arm/mach-highbank/platsmp.c                   |    4 +-
- arch/arm/mach-imx/platsmp.c                        |    2 -
- arch/arm/mach-msm/platsmp.c                        |    4 +-
- arch/arm/mach-omap2/omap-smp.c                     |    4 +-
- arch/arm/mach-realview/platsmp.c                   |    2 -
- arch/arm/mach-shmobile/platsmp.c                   |    2 -
- arch/arm/mach-shmobile/smp-emev2.c                 |    2 +-
- arch/arm/mach-spear13xx/platsmp.c                  |    2 -
- arch/arm/mach-tegra/platsmp.c                      |    2 -
- arch/arm/mach-ux500/platsmp.c                      |    2 -
- arch/arm/mach-vexpress/ct-ca9x4.c                  |    2 -
- arch/arm/mach-vexpress/platsmp.c                   |    2 -
- arch/arm/plat-versatile/platsmp.c                  |    2 +-
- drivers/irqchip/Kconfig                            |   23 +++++++
- drivers/irqchip/Makefile                           |    2 +
- arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |   66 +++++++++++++-------
- arch/arm/common/vic.c => drivers/irqchip/irq-vic.c |    0
- drivers/irqchip/irqchip.c                          |   24 +++++++
- drivers/irqchip/irqchip.h                          |    2 +
- 26 files changed, 109 insertions(+), 102 deletions(-)
- rename arch/arm/common/gic.c => drivers/irqchip/irq-gic.c (96%)
- rename arch/arm/common/vic.c => drivers/irqchip/irq-vic.c (100%)
-
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index aa52699..55ea0d7 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -43,7 +43,26 @@
+ #include <asm/exception.h>
+ #include <asm/smp_plat.h>
+ #include <asm/mach/irq.h>
+-#include <asm/hardware/gic.h>
++
++#define GIC_CPU_CTRL			0x00
++#define GIC_CPU_PRIMASK			0x04
++#define GIC_CPU_BINPOINT		0x08
++#define GIC_CPU_INTACK			0x0c
++#define GIC_CPU_EOI			0x10
++#define GIC_CPU_RUNNINGPRI		0x14
++#define GIC_CPU_HIGHPRI			0x18
++
++#define GIC_DIST_CTRL			0x000
++#define GIC_DIST_CTR			0x004
++#define GIC_DIST_ENABLE_SET		0x100
++#define GIC_DIST_ENABLE_CLEAR		0x180
++#define GIC_DIST_PENDING_SET		0x200
++#define GIC_DIST_PENDING_CLEAR		0x280
++#define GIC_DIST_ACTIVE_BIT		0x300
++#define GIC_DIST_PRI			0x400
++#define GIC_DIST_TARGET			0x800
++#define GIC_DIST_CONFIG			0xc00
++#define GIC_DIST_SOFTINT		0xf00
+ 
+ union gic_base {
+ 	void __iomem *common_base;
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 4b1ce6c..8073dce 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -12,25 +12,7 @@
+ 
+ #include <linux/compiler.h>
+ 
+-#define GIC_CPU_CTRL			0x00
+-#define GIC_CPU_PRIMASK			0x04
+-#define GIC_CPU_BINPOINT		0x08
+-#define GIC_CPU_INTACK			0x0c
+-#define GIC_CPU_EOI			0x10
+-#define GIC_CPU_RUNNINGPRI		0x14
+-#define GIC_CPU_HIGHPRI			0x18
+-
+-#define GIC_DIST_CTRL			0x000
+ #define GIC_DIST_CTR			0x004
+-#define GIC_DIST_ENABLE_SET		0x100
+-#define GIC_DIST_ENABLE_CLEAR		0x180
+-#define GIC_DIST_PENDING_SET		0x200
+-#define GIC_DIST_PENDING_CLEAR		0x280
+-#define GIC_DIST_ACTIVE_BIT		0x300
+-#define GIC_DIST_PRI			0x400
+-#define GIC_DIST_TARGET			0x800
+-#define GIC_DIST_CONFIG			0xc00
+-#define GIC_DIST_SOFTINT		0xf00
+ 
+ #ifndef __ASSEMBLY__
+ #include <linux/irqdomain.h>
 -- 
 1.7.10.4
