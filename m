@@ -1,55 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Oct 2012 16:57:15 -0700
-Subject: [RFC 2/7] capebus: Add beaglebone board support
-In-Reply-To: <DE47929E-9579-4DD2-B01C-08554D49FADE@antoniou-consulting.com>
-References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
- <1351702333-8456-3-git-send-email-panto@antoniou-consulting.com>
- <20121030193939.GR11908@atomide.com>
- <DE47929E-9579-4DD2-B01C-08554D49FADE@antoniou-consulting.com>
-Message-ID: <20121030235714.GB12739@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 30 Oct 2012 19:04:38 -0500
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <20121030224703.GI21164@n2100.arm.linux.org.uk>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
+ <50900C90.7070101@gmail.com> <20121030224703.GI21164@n2100.arm.linux.org.uk>
+Message-ID: <50906B16.8060204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pantelis Antoniou <panto@antoniou-consulting.com> [121030 13:18]:
-> On Oct 30, 2012, at 9:39 PM, Tony Lindgren wrote:
+On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
+> On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
+>> Looking at this some more, arm64 doesn't need most of what's in gic.h.
+>> The register defines should be moved into the .c file. The remaining
+>> function declarations either are not needed (i.e. gic_init) or should
+>> should be done like the handle_irq function pointer init. We don't want
+>> to have platform code calling gic_cascade_irq or gic_raise_softirq
+>> directly.
 > 
-> > * Pantelis Antoniou <panto@antoniou-consulting.com> [121030 12:00]:
-> >> +
-> >> +	priv->lcdc_oh = omap_hwmod_lookup("lcdc");
-> >> +	if (priv->lcdc_oh == NULL) {
-> >> +		dev_err(&pdev->dev, "Failed to lookup omap_hwmod lcdc\n");
-> >> +		return -ENODEV;
-> >> +	}
-> >> +
-> >> +	priv->lcdc_pdev = omap_device_build("da8xx_lcdc", 0, priv->lcdc_oh,
-> >> +			&priv->lcd_pdata,
-> >> +			sizeof(struct da8xx_lcdc_platform_data),
-> >> +			NULL, 0, 0);
-> >> +	if (priv->lcdc_pdev == NULL) {
-> >> +		dev_err(&pdev->dev, "Failed to build LCDC device\n");
-> >> +		return -ENODEV;
-> >> +	}
-> > 
-> > ..and these kind of things need to become private to
-> > arch/arm/mach-omap2, we already have it working for other
-> > devices with device tree.
-> > 
-> > Regards,
-> > 
-> > Tony
+> Softirqs are about the SPIs which are used for SMP IPIs and platform
+> specific wakeup of CPUs.  And platform code _needs_ to specify the
+> way IPIs are delivered on the platform.  irqchip can't do that because
+> irqchip knows nothing about SPIs (neither does genirq.)
+
+Right. v7 is unchanged, so the question is really only about how v8 will
+do this. Hopefully, ARM is standardizing this for v8. We probably want
+the gic (or other irqchip) to setup a raise_softirq function ptr on init
+rather than having a direct call to gic_raise_softirq.
+
+Rob
+
+> The thing about gic_cascade_irq() is that it's to do with handling the
+> (rare) case of having a system with two GICs cascaded together.  There's
+> only one set of platforms I know of which has that kind of madness and
+> it's the ARM development platforms, where the baseboard has a GIC, and
+> the SMP tile has its own GIC as part of the SMP implementation.
 > 
-> I see,
+> Apart from that, gic_cascade_irq() should not be used - it should
+> probably be ifdef'd out when not on one of the ARM dev platforms which
+> suffer this weirdness.
 > 
-> I know that if the device driver is DTified it will pick up the hwmod automatically.
-> The issue is that the driver is question is not yet; how would I go about
-> creating the platform device and having it pick up the hwmod automatically?
-
-Maybe you should make this DT only driver for omap? We already
-have am33xx DT only to start with.
-
-If you really need the platform device still, just take a look
-at the many platform device creating files under arch/arm/mach-omap2.
-
-Regards,
-
-Tony
