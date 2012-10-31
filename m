@@ -1,80 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 31 Oct 2012 22:16:26 +0200
-Subject: [PATCH V3] mmc: omap_hsmmc: Enable HSPE bit for high speed cards
-In-Reply-To: <CAOyx1LrKBE+xzSRN4F=+e1DuMJL+5SAv-YkJWJdDw8p=kDojmw@mail.gmail.com>
-References: <1351684656-30275-1-git-send-email-gururaja.hebbar@ti.com>
- <20121031122639.GA10998@arwen.pp.htv.fi>
- <CAOyx1LrKBE+xzSRN4F=+e1DuMJL+5SAv-YkJWJdDw8p=kDojmw@mail.gmail.com>
-Message-ID: <20121031201626.GA28784@arwen.pp.htv.fi>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Oct 2012 14:24:41 -0600
+Subject: [PATCH V4 0/7] ARM: tegra30: cpuidle: add a powered-down state
+In-Reply-To: <1351676481-28425-1-git-send-email-josephl@nvidia.com>
+References: <1351676481-28425-1-git-send-email-josephl@nvidia.com>
+Message-ID: <50918909.60100@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 01, 2012 at 01:21:36AM +0530, Venkatraman S wrote:
-> On Wed, Oct 31, 2012 at 5:56 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > Hi,
-> >
-> > On Wed, Oct 31, 2012 at 05:27:36PM +0530, Hebbar, Gururaja wrote:
-> >> HSMMC IP on AM33xx need a special setting to handle High-speed cards.
-> >> Other platforms like TI81xx, OMAP4 may need this as-well. This depends
-> >> on the HSMMC IP timing closure done for the high speed cards.
-> >>
-> >> From AM335x TRM (SPRUH73F - 18.3.12 Output Signals Generation)
-> >>
-> >> The MMC/SD/SDIO output signals can be driven on either falling edge or
-> >> rising edge depending on the SD_HCTL[2] HSPE bit. This feature allows
-> >> to reach better timing performance, and thus to increase data transfer
-> >> frequency.
-> >>
-> >> There are few pre-requisites for enabling the HSPE bit
-> >> - Controller should support High-Speed-Enable Bit and
-> >> - Controller should not be using DDR Mode and
-> >> - Controller should advertise that it supports High Speed in
-> >>   capabilities register and
-> >> - MMC/SD clock coming out of controller > 25MHz
-> >>
-> >> Note:
-> >> The implementation reuses the output of calc_divisor() so as to reduce
-> >> code addition.
-> >>
-> >> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-> >
-> > this looks good to my eyes, hopefully I haven't missed anything:
-> >
-> > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> >
+On 10/31/2012 03:41 AM, Joseph Lo wrote:
+> This adds a "powered-down" state for cpuidle. It's a power gating idle
+> mode. It supports the secondary CPUs (i.e., CPU1-CPU3) to go into
+> powered-down state independently. When any of the secondary CPUs go into
+> this state, it can be power gated alone. There is a limitation on CPU0.
+> The CPU0 can go into powered-down state only when all secondary CPU is
+> offline. After CPU0 is in powered-down state, the CPU rail can be turned
+> off.
 > 
-> Except for the excessively verbose comments which are just duplicating the code,
-> <Quote>
-> >> +      * Enable High-Speed Support
-> >> +      * Pre-Requisites
-> >> +      *      - Controller should support High-Speed-Enable Bit
-> >> +      *      - Controller should not be using DDR Mode
-> >> +      *      - Controller should advertise that it supports High Speed
-> >> +      *        in capabilities register
-> >> +      *      - MMC/SD clock coming out of controller > 25MHz
-> >> +      */
-> </Quote>
-> 
-> I'm ok with this patch as well. I'm putting a few patches under test
-> including this one,
-> and will send it to Chris as part of that series.
-> I'll strip out the above mentioned comments, unless there are any
-> objections.
+> All CPUs entering powered-down state is not working. The CPU0 enters this
+> state only when secondary CPU is offline. This can be coverd by CPUquiet
+> and cluster switching mechanism.
 
-please don't. Detailing the pre-requisites for getting HSP mode working
-isn't bad at all. Should someone decide to change the behavior and ends
-up breaking it, the comment will help putting things back together.
+OK, this appears to work OK. I have applied it to Tegra's
+for-3.8/cpuidle branch.
 
-my 2 cents, you've got the final decision though.
+> V4:
+> * rebased on next-20121031
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/341e1607/attachment-0001.sig>
+Purely as an FYI, being based on top of Tegra's for-3.8/cpuidle or
+for-next branches would have been even better, although in practice this
+time around, there were no conflicts applying it there.
