@@ -1,61 +1,139 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 31 Oct 2012 12:07:16 +0100
-Subject: [PATCH v2] ARM: dts: am33xx: rtc node
-In-Reply-To: <1351589646-27082-1-git-send-email-afzal@ti.com>
-References: <1351589646-27082-1-git-send-email-afzal@ti.com>
-Message-ID: <50910664.1010304@ti.com>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Wed, 31 Oct 2012 12:09:49 +0100
+Subject: [PATCH v2 1/2] ARM: OMAP: hwmod: Add possibility to count hwmod
+ resources based on type
+In-Reply-To: <1351596296-13825-2-git-send-email-peter.ujfalusi@ti.com>
+References: <1351596296-13825-1-git-send-email-peter.ujfalusi@ti.com>
+ <1351596296-13825-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <509106FD.2040804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+Hi Peter,
 
-On 10/30/2012 10:34 AM, Afzal Mohammed wrote:
-> Add am33xx rtc node.
-> 
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
-> Hi Benoit,
-> 
-> This is based on your for_3.8/dts branch.
+That's great you've have done that fix.
 
-I've just applied it in the branch with a slight change in the subject.
+On 10/30/2012 12:24 PM, Peter Ujfalusi wrote:
+> Add flags parameter for omap_hwmod_count_resources() so users can tell which
+> type of resources they are interested when counting them in hwmod database.
+
+Mmm, does it worth doing that for every resources considering that this 
+is a temporary situation and than only the DMA resources are an issue so 
+far?
+
+Otherwise that looks fine to me and will allow a much smoother 
+transition to full DT.
 
 Thanks,
 Benoit
 
-> 
-> This has been tested on Beagle Bone.
-> 
-> Bindings along with driver changes for DT has been picked by Andrew
-> Morton and is now present in linux-next.
-> 
-> Regards
-> Afzal
-> 
-> v2
->  1. Remove interrupt parent in rtc node.
->  2. Modify subject as per new convention.
-> 
-> 
->  arch/arm/boot/dts/am33xx.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 70d24b8..97a7bd3 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -291,5 +291,13 @@
->  			ti,hwmods = "timer7";
->  			ti,timer-pwm;
->  		};
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>   arch/arm/mach-omap2/omap_hwmod.c             | 27 ++++++++++++++++-----------
+>   arch/arm/plat-omap/include/plat/omap_hwmod.h |  2 +-
+>   arch/arm/plat-omap/omap_device.c             | 11 ++++++++---
+>   3 files changed, 25 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index b969ab1..a79c941 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -3337,7 +3337,7 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
+>   /**
+>    * omap_hwmod_count_resources - count number of struct resources needed by hwmod
+>    * @oh: struct omap_hwmod *
+> - * @res: pointer to the first element of an array of struct resource to fill
+> + * @flags: Type of resources to include when counting (IRQ/DMA/MEM)
+>    *
+>    * Count the number of struct resource array elements necessary to
+>    * contain omap_hwmod @oh resources.  Intended to be called by code
+> @@ -3350,20 +3350,25 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
+>    * resource IDs.
+>    *
+>    */
+> -int omap_hwmod_count_resources(struct omap_hwmod *oh)
+> +int omap_hwmod_count_resources(struct omap_hwmod *oh, unsigned long flags)
+>   {
+> -	struct omap_hwmod_ocp_if *os;
+> -	struct list_head *p;
+> -	int ret;
+> -	int i = 0;
+> +	int ret = 0;
+>
+> -	ret = _count_mpu_irqs(oh) + _count_sdma_reqs(oh);
+> +	if (flags & IORESOURCE_IRQ)
+> +		ret += _count_mpu_irqs(oh);
+>
+> -	p = oh->slave_ports.next;
+> +	if (flags & IORESOURCE_DMA)
+> +		ret += _count_sdma_reqs(oh);
+>
+> -	while (i < oh->slaves_cnt) {
+> -		os = _fetch_next_ocp_if(&p, &i);
+> -		ret += _count_ocp_if_addr_spaces(os);
+> +	if (flags & IORESOURCE_MEM) {
+> +		int i = 0;
+> +		struct omap_hwmod_ocp_if *os;
+> +		struct list_head *p = oh->slave_ports.next;
 > +
-> +		rtc at 44e3e000 {
-> +			compatible = "ti,da830-rtc";
-> +			reg = <0x44e3e000 0x1000>;
-> +			interrupts = <75
-> +				      76>;
-> +			ti,hwmods = "rtc";
-> +		};
->  	};
->  };
-> 
+> +		while (i < oh->slaves_cnt) {
+> +			os = _fetch_next_ocp_if(&p, &i);
+> +			ret += _count_ocp_if_addr_spaces(os);
+> +		}
+>   	}
+>
+>   	return ret;
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index b3349f7..48a6f5d 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -628,7 +628,7 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs);
+>   u32 omap_hwmod_read(struct omap_hwmod *oh, u16 reg_offs);
+>   int omap_hwmod_softreset(struct omap_hwmod *oh);
+>
+> -int omap_hwmod_count_resources(struct omap_hwmod *oh);
+> +int omap_hwmod_count_resources(struct omap_hwmod *oh, unsigned long flags);
+>   int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
+>   int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
+>   int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 7a7d1f2..915cf68 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -442,19 +442,21 @@ int omap_device_get_context_loss_count(struct platform_device *pdev)
+>   /**
+>    * omap_device_count_resources - count number of struct resource entries needed
+>    * @od: struct omap_device *
+> + * @flags: Type of resources to include when counting (IRQ/DMA/MEM)
+>    *
+>    * Count the number of struct resource entries needed for this
+>    * omap_device @od.  Used by omap_device_build_ss() to determine how
+>    * much memory to allocate before calling
+>    * omap_device_fill_resources().  Returns the count.
+>    */
+> -static int omap_device_count_resources(struct omap_device *od)
+> +static int omap_device_count_resources(struct omap_device *od,
+> +				       unsigned long flags)
+>   {
+>   	int c = 0;
+>   	int i;
+>
+>   	for (i = 0; i < od->hwmods_cnt; i++)
+> -		c += omap_hwmod_count_resources(od->hwmods[i]);
+> +		c += omap_hwmod_count_resources(od->hwmods[i], flags);
+>
+>   	pr_debug("omap_device: %s: counted %d total resources across %d hwmods\n",
+>   		 od->pdev->name, c, od->hwmods_cnt);
+> @@ -558,7 +560,10 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
+>   	od->hwmods = hwmods;
+>   	od->pdev = pdev;
+>
+> -	res_count = omap_device_count_resources(od);
+> +	/* Count all resources for the device */
+> +	res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
+> +						    IORESOURCE_DMA |
+> +						    IORESOURCE_MEM);
+>   	/*
+>   	 * DT Boot:
+>   	 *   OF framework will construct the resource structure (currently
+>
