@@ -1,32 +1,50 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Oct 2012 11:30:07 +0100
-Subject: [PATCHv2 0/3] Add spidev to the CFA-10049
-Message-ID: <1351679410-11026-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 31 Oct 2012 11:30:08 +0100
+Subject: [PATCH 1/3] spi: spidev: Add device tree bindings
+In-Reply-To: <1351679410-11026-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1351679410-11026-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1351679410-11026-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This will allow to probe spidev from device tree by adding the
+compatible string of each device to this array.
 
-This patchset probes spidev on the SSP3 bus where on the CFA-10049 there is
-a Rohm DH2228FV DAC.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/spi/spidev.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-It first adds the dt bindings for the spidev driver, and the proper node in
-the CFA-10049 device tree file.
-
-Maxime
-
-Changes from v1:
-  - Removed the linux,spidev compatible string and use the compatible strings
-    of the devices instead.
-
-Maxime Ripard (3):
-  spi: spidev: Add device tree bindings
-  spi: spidev: Add Rohm DH2228FV DAC compatible string
-  ARM: dts: cfa10049: Add the DH2228FV DAC to the DTS
-
- arch/arm/boot/dts/imx28-cfa10049.dts |    6 ++++++
- drivers/spi/spidev.c                 |   10 ++++++++++
- 2 files changed, 16 insertions(+)
-
+diff --git a/drivers/spi/spidev.c b/drivers/spi/spidev.c
+index 830adbe..9fc5788 100644
+--- a/drivers/spi/spidev.c
++++ b/drivers/spi/spidev.c
+@@ -31,6 +31,8 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ #include <linux/compat.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ 
+ #include <linux/spi/spi.h>
+ #include <linux/spi/spidev.h>
+@@ -642,10 +644,17 @@ static int __devexit spidev_remove(struct spi_device *spi)
+ 	return 0;
+ }
+ 
++static const struct of_device_id spidev_dt_ids[] = {
++	{},
++};
++
++MODULE_DEVICE_TABLE(of, spidev_dt_ids);
++
+ static struct spi_driver spidev_spi_driver = {
+ 	.driver = {
+ 		.name =		"spidev",
+ 		.owner =	THIS_MODULE,
++		.of_match_table = of_match_ptr(spidev_dt_ids),
+ 	},
+ 	.probe =	spidev_probe,
+ 	.remove =	__devexit_p(spidev_remove),
 -- 
 1.7.9.5
