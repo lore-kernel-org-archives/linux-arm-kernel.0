@@ -1,76 +1,99 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 Oct 2012 16:11:15 -0700
-Subject: [PATCH 07/11] ARM: OMAP: Move omap-pm-noop.c local to mach-omap2
-In-Reply-To: <1654531.W5JISgHidu@avalon>
-References: <20121030234852.25936.12482.stgit@muffinssi.local>
- <20121030235255.25936.36727.stgit@muffinssi.local>
- <20121031205850.GO12739@atomide.com> <1654531.W5JISgHidu@avalon>
-Message-ID: <20121031231115.GG15766@atomide.com>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 31 Oct 2012 11:11:59 -0600
+Subject: [PATCH 1/8] ARM: zynq: move arm-specific sys_timer out of ttc
+In-Reply-To: <cover.1351721190.git.josh.cartwright@ni.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+Message-ID: <3ec3531d21c247ac3dcc76d91ff6be13ebfc733b.1351721190.git.josh.cartwright@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121031 16:03]:
-> Hi Tony,
-> 
-> On Wednesday 31 October 2012 13:58:50 Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [121030 16:55]:
-> > > This code should be private to mach-omap2.
-> > > 
-> > > The only use for it in for omap1 has been in dmtimer.c
-> > > to check for context loss. However, omap1 does not
-> > > lose context during idle, so the code is not needed.
-> > > Further, omap1 timer has OMAP_TIMER_ALWON set, so omap1
-> > > was not hitting omap_pm_get_dev_context_loss_count()
-> > > test.
-> > 
-> > Noticed one issue with my test compiles in the
-> > omap-for-v3.8/cleanup-headers branch that can be
-> > fixed along with this patch.
-> > 
-> > --- a/drivers/media/platform/omap3isp/ispvideo.c
-> > +++ b/drivers/media/platform/omap3isp/ispvideo.c
-> > @@ -36,7 +36,6 @@
-> >  #include <media/v4l2-ioctl.h>
-> >  #include <plat/iommu.h>
-> >  #include <plat/iovmm.h>
-> > -#include <plat/omap-pm.h>
-> 
-> The reason this was included was to call omap_pm_set_min_bus_tput() in earlier 
-> versions of the driver. We'll have to discuss what to replace that with, but 
-> that's another topic.
+Move the sys_timer definition out of ttc driver and make it part of the
+common zynq code.  This is preparation for renaming and COMMON_CLK
+support.
 
-OK thanks.
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+---
+ arch/arm/mach-zynq/common.c | 13 +++++++++++++
+ arch/arm/mach-zynq/common.h |  4 +---
+ arch/arm/mach-zynq/timer.c  | 10 +---------
+ 3 files changed, 15 insertions(+), 12 deletions(-)
 
-> > > @@ -730,6 +732,7 @@ static int __devinit omap_dm_timer_probe(struct
-> > > platform_device *pdev)> 
-> > >  	timer->reserved = omap_dm_timer_reserved_systimer(timer->id);
-> > >  	timer->pdev = pdev;
-> > >  	timer->capability = pdata->timer_capability;
-> > > 
-> > > +	timer->get_context_loss_count = pdata->get_context_loss_count;
-> > > 
-> > >  	/* Skip pm_runtime_enable for OMAP1 */
-> > >  	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
-> > > 
-> > > diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h
-> > > b/arch/arm/plat-omap/include/plat/dmtimer.h index 85868e9..3f5b9cf 100644
-> > > --- a/arch/arm/plat-omap/include/plat/dmtimer.h
-> > > +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-> > > @@ -94,6 +94,7 @@ struct dmtimer_platform_data {
-> > > 
-> > >  	/* set_timer_src - Only used for OMAP1 devices */
-> > >  	int (*set_timer_src)(struct platform_device *pdev, int source);
-> > >  	u32 timer_capability;
-> > > 
-> > > +	int (*get_context_loss_count)(struct device *);
-> 
-> That's a step forward for the common zImage, but one step backward for DT 
-> support :-) I'm fine with this for now, but do you already have an idea on how 
-> to solve that ?
-
-When it's converted to be a device driver, it can do it
-using runtime PM calls.
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ba8d14f..6f058258 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -25,6 +25,7 @@
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
++#include <asm/mach/time.h>
+ #include <asm/mach-types.h>
+ #include <asm/page.h>
+ #include <asm/hardware/gic.h>
+@@ -93,6 +94,18 @@ static struct map_desc io_desc[] __initdata = {
+ 
+ };
+ 
++static void __init xilinx_zynq_timer_init(void)
++{
++	xttcpss_timer_init();
++}
++
++/*
++ * Instantiate and initialize the system timer structure
++ */
++static struct sys_timer xttcpss_sys_timer = {
++	.init		= xilinx_zynq_timer_init,
++};
++
+ /**
+  * xilinx_map_io() - Create memory mappings needed for early I/O.
+  */
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+index a009644..954b91c 100644
+--- a/arch/arm/mach-zynq/common.h
++++ b/arch/arm/mach-zynq/common.h
+@@ -17,8 +17,6 @@
+ #ifndef __MACH_ZYNQ_COMMON_H__
+ #define __MACH_ZYNQ_COMMON_H__
+ 
+-#include <asm/mach/time.h>
+-
+-extern struct sys_timer xttcpss_sys_timer;
++void __init xttcpss_timer_init(void);
+ 
+ #endif
+diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
+index c2c96cc..c93cbe5 100644
+--- a/arch/arm/mach-zynq/timer.c
++++ b/arch/arm/mach-zynq/timer.c
+@@ -24,7 +24,6 @@
+ #include <linux/clockchips.h>
+ #include <linux/io.h>
+ 
+-#include <asm/mach/time.h>
+ #include <mach/zynq_soc.h>
+ #include "common.h"
+ 
+@@ -269,7 +268,7 @@ static struct clock_event_device xttcpss_clockevent = {
+  * Initializes the timer hardware and register the clock source and clock event
+  * timers with Linux kernal timer framework
+  **/
+-static void __init xttcpss_timer_init(void)
++void __init xttcpss_timer_init(void)
+ {
+ 	xttcpss_timer_hardware_init();
+ 	clocksource_register_hz(&clocksource_xttcpss, TIMER_RATE);
+@@ -289,10 +288,3 @@ static void __init xttcpss_timer_init(void)
+ 	xttcpss_clockevent.cpumask = cpumask_of(0);
+ 	clockevents_register_device(&xttcpss_clockevent);
+ }
+-
+-/*
+- * Instantiate and initialize the system timer structure
+- */
+-struct sys_timer xttcpss_sys_timer = {
+-	.init		= xttcpss_timer_init,
+-};
+-- 
+1.8.0
