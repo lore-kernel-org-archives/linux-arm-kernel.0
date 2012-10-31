@@ -1,77 +1,68 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 31 Oct 2012 23:31:30 +0800
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <509032F6.1050301@gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
- <508E5DFB.3060002@gmail.com>
- <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
- <508E61E7.7090502@gmail.com>
- <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
- <508E651A.5070009@gmail.com>
- <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
- <509032F6.1050301@gmail.com>
-Message-ID: <CAN1soZyAuo4UUze9yWKTOqwJ0TC4cf+uywWo1Ypbrcq0+zez0g@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 31 Oct 2012 10:41:44 -0500
+Subject: [PATCH v2 3/5] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <20121031150954.GN21164@n2100.arm.linux.org.uk>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+ <1351695517-5636-4-git-send-email-robherring2@gmail.com>
+ <20121031150954.GN21164@n2100.arm.linux.org.uk>
+Message-ID: <509146B8.2000305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 4:05 AM, Daniel Mack <zonque@gmail.com> wrote:
->
-> On 30.10.2012 21:01, Vasily Khoruzhick wrote:
-> > On Mon, Oct 29, 2012 at 2:14 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >> On 29.10.2012 12:12, Vasily Khoruzhick wrote:
-> >>> On Mon, Oct 29, 2012 at 2:00 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >>>
-> >>>>> Well, there's an issue - Z2 does not preserve memory contents in deep sleep
-> >>>>> (but it does in sleep), so userspace can't be fixed here unfortunatelly.
-> >>>>> There's no another possibility to turn Z2 off, and plain sleep is too
-> >>>>> power hungry.
-> >>>>> So the only way to keep Z2 in low-power mode is fake power off, which just puts
-> >>>>> Z2 in deep sleep.
-> >>>>
-> >>>> Why can't the userspace trigger a deep sleep then instead of powering
-> >>>> off? Which details do I lack?
-> >>>
-> >>> How? echo mem >/sys/power/state puts system into non-deep sleep. Anyway, kernel
-> >>> is not ready for fake power off instead of suspend (we can't resume
-> >>> from deep sleep,
-> >>> memory content is not preserved), so there can be some data loss.
-> >>> Adding some sysfs file to control sleep type does not look like a good
-> >>> idea to me.
-> >>>
-> >>> Btw, how other DT-capable boards handle power off?
-> >>
-> >> No idea. I never actually used that kind of power state.
-> >
-> > Hi Daniel,
-> >
-> > One more question: what should I use instead of pxa2xx_mfp_config in
-> > DT board to configure pin modes?
->
-> Haojian was working on the PXA pinctrl drivers, but I don't know how far
-> that is yet.
->
-> If that's not yet there, have a look at the pinctrl-single driver. It's
-> admittedly not as nice to use as the constants in the board file as DT
-> lacks defines for numerical constants, but's at least a workaround.
->
-> On a more general note, it's arguable whether this kind of setup should
-> be done in the bootloader after all.
->
->
-> Daniel
->
+On 10/31/2012 10:09 AM, Russell King - ARM Linux wrote:
+> On Wed, Oct 31, 2012 at 09:58:35AM -0500, Rob Herring wrote:
+>> From: Rob Herring <rob.herring@calxeda.com>
+>>
+>> Now that we have drivers/irqchip, move GIC irqchip to drivers/irqchip. This
+>> is necessary to share the GIC with arm and arm64.
+>>
+>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>  arch/arm/common/Kconfig                            |    8 --------
+>>  arch/arm/common/Makefile                           |    1 -
+>>  drivers/irqchip/Kconfig                            |    8 ++++++++
+>>  drivers/irqchip/Makefile                           |    1 +
+>>  arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |    0
+>>  drivers/irqchip/irqchip.c                          |   10 ++++++++++
+>>  drivers/irqchip/irqchip.h                          |    1 +
+>>  7 files changed, 20 insertions(+), 9 deletions(-)
+>>  rename arch/arm/common/gic.c => drivers/irqchip/irq-gic.c (100%)
+> 
+> What about its dependent arch/arm/include/asm/hardware/gic.h header,
+> which I believe after patch 1 becomes just a bunch of function calls,
+> and so no longer has any right to be in asm/hardware.
+> 
+> Nothing should be moved out of arch/arm without its associated header
+> file also moving with it.
 
-I prefer to use pinctrl-single driver instead. I'm updating mmp
-pinctrol driver to
-pinctrl-single driver framework. You can find them in mailist. I'm submitting
-a third round in these days.
+What is left is only used within arch/arm and I expect we will get rid
+of the remaining users. So I didn't want to encourage any additional
+users by moving to include/linux.
 
-Regards
-Haojian
+gic_secondary_init and gic_cascade_irq could be function ptrs.
+gic_of_init can be removed once users are converted to call irqchip_init
+instead. That leaves gic_init which are all the non-DT converted GIC
+users and will take some time to convert. I am puzzled by tegra and zynq
+which should be DT only already.
+
+$ git grep -l 'gic_init(' -- arch/arm
+arch/arm/include/asm/hardware/gic.h
+arch/arm/mach-cns3xxx/core.c
+arch/arm/mach-omap2/board-omap3logic.c
+arch/arm/mach-omap2/omap4-common.c
+arch/arm/mach-realview/realview_eb.c
+arch/arm/mach-realview/realview_pb1176.c
+arch/arm/mach-realview/realview_pb11mp.c
+arch/arm/mach-realview/realview_pba8.c
+arch/arm/mach-realview/realview_pbx.c
+arch/arm/mach-shmobile/intc-r8a7779.c
+arch/arm/mach-shmobile/intc-sh73a0.c
+arch/arm/mach-shmobile/setup-emev2.c
+arch/arm/mach-tegra/irq.c
+arch/arm/mach-ux500/cpu.c
+arch/arm/mach-vexpress/ct-ca9x4.c
+arch/arm/mach-zynq/common.c
+
+Rob
