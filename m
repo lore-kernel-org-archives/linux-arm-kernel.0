@@ -1,56 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Oct 2012 14:17:10 -0500
-Subject: [GIT PULL] Calxeda ECX-2000 support
-Message-ID: <50917936.2030405@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 31 Oct 2012 19:30:34 +0000
+Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
+ <1351457210-25222-2-git-send-email-stigge@antcom.de>
+ <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+Message-ID: <20121031193033.GA4164@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Wed, Oct 31, 2012 at 04:00:17PM +0100, Grant Likely wrote:
 
-Please pull support for Calxeda ECX-2000 SOC.
+> For the API, I don't think it is a good idea at all to try and
+> abstract away gpios on multiple controllers. I understand that it
+> makes life a lot easier for userspace to abstract those details away,
+> but the problem is that it hides very important information about how
+> the system is actually constructed that is important to actually get
+> things to work. For example, say you have a gpio-connected device with
+> the constraint that GPIOA must change either before or at the same
+> time as GPIOB, but never after. If those GPIOs are on separate
+> controllers, then the order is completely undefined, and the user has
+> no way to control that other than to fall back to manipulating GPIOs
+> one at a time again (and losing all the performance benefits). Either
+> controller affinity needs to be explicit in the API, or the API needs
+> to be constraint oriented (ie. a stream of commands and individual
+> commands can be coalesced if they meet the constraints**). Also, the
+> API requires remapping the GPIO numbers which forces the code to be a
+> lot more complex than it needs to be.
 
-There will be a trivial conflict with the GIC move to drivers/irqchip once
-that goes in. 
+It feels like I'm missing something here but can we not simply say that
+if the user cares about the ordering of the signal changes within an
+update then they should be doing two separate updates?  Most of the
+cases I'm aware of do things as an update with a strobe or clock that
+latches the values.
 
-Rob
+The big advantage of grouping things together is that it means that we
+centralise the fallback code.
 
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+> I would rather see new attribute(s) added to the gpiochip's directory
+> to allow modifying all the pins on a given controller. It's
+> considerably less complex, and I'm a lot happier about extending the
+> sysfs ABI in that way than committing to the remapping block approach.
 
-  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
-
-are available in the git repository at:
-
-  git://sources.calxeda.com/kernel/linux.git tags/calxeda-ecx-2000
-
-for you to fetch changes up to e095c0d122c09efabe7d4136ce77f72c636c4879:
-
-  ARM: highbank: Add initial ECX-2000 support (2012-10-31 13:47:01 -0500)
-
-----------------------------------------------------------------
-Support for Calxeda ECX-2000 SOC
-
-----------------------------------------------------------------
-Rob Herring (6):
-      ARM: highbank: disable unused sdhci and gpio in dts
-      ARM: highbank: enable coherent DMA for xgmac in dts
-      ARM: dts: Add Calxeda ECX-2000 support
-      ARM: smp_twd: don't warn on no DT node
-      ARM: highbank: abstract out SCU usage
-      ARM: highbank: Add initial ECX-2000 support
-
- Documentation/devicetree/bindings/arm/calxeda.txt |   13 +-
- arch/arm/boot/dts/Makefile                        |    3 +-
- arch/arm/boot/dts/ecx-2000.dts                    |  104 +++++++++
- arch/arm/boot/dts/ecx-common.dtsi                 |  237 +++++++++++++++++++++
- arch/arm/boot/dts/highbank.dts                    |  212 +-----------------
- arch/arm/kernel/smp_twd.c                         |    6 +-
- arch/arm/mach-highbank/Kconfig                    |    2 +-
- arch/arm/mach-highbank/highbank.c                 |   27 +--
- arch/arm/mach-highbank/hotplug.c                  |    6 +-
- arch/arm/mach-highbank/platsmp.c                  |    7 +-
- arch/arm/mach-highbank/pm.c                       |    3 -
- arch/arm/mach-highbank/sysregs.h                  |   19 ++
- arch/arm/mach-highbank/system.c                   |    2 -
- 13 files changed, 394 insertions(+), 247 deletions(-)
- create mode 100644 arch/arm/boot/dts/ecx-2000.dts
- create mode 100644 arch/arm/boot/dts/ecx-common.dtsi
+When I've looked at this stuff I've only looked at and thought about in
+kernel users.  The gpiolib sysfs ABI is already fun enough :)
