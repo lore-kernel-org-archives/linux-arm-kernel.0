@@ -1,28 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 Oct 2012 09:23:15 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-In-Reply-To: <20121031161614.GF31804@kroah.com>
-References: <20121031161921.3c9a46bd03f5864eed88fc87@canb.auug.org.au>
- <20121031161614.GF31804@kroah.com>
-Message-ID: <20121031162314.GD12739@atomide.com>
+Date: Wed, 31 Oct 2012 09:27:56 -0700
+Subject: [PATCH] fix DEBUG_LL DCC race condition
+In-Reply-To: <20121029151832.GA2162@sig21.net>
+References: <20121029151832.GA2162@sig21.net>
+Message-ID: <20121031162754.GE12739@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Greg KH <greg@kroah.com> [121031 09:17]:
-> On Wed, Oct 31, 2012 at 04:19:21PM +1100, Stephen Rothwell wrote:
-> > Hi all,
-> > 
-> > Today's linux-next merge of the arm-soc tree got a conflict in
-> > arch/arm/mach-omap2/drm.c between commit 5e3b08749951 ("staging:
-> > drm/omap: add support for ARCH_MULTIPLATFORM") from the staging tree and
-> > commit 2a296c8f89bc ("ARM: OMAP: Make plat/omap_hwmod.h local to
-> > mach-omap2") from the arm-soc tree.
-> > 
-> > I fixed it up (see below) and can carry the fix as necessary (no action
-> > is required).
+* Johannes Stezenbach <js@sig21.net> [121029 08:20]:
+> Trying to boot a kernel with I- and D-caches disabled
+> sometimes hangs when DEBUG_LL output to DCC is enabled.
+> Apparently the JTAG debugger sometimes reads the
+> DCC register before busyuart could see the wDTRfull flag,
+> thus busyuart spins in an endless loop.
 > 
-> Looks good to me, thanks for this.
+> The reason seems to be a misunderstanding of the purpose
+> of the busyuart macro.  For UART, waituart waits until
+> there is space in the FIFO, and busyuart waits until
+> the FIFO is empty (all data is sent).
+> For DCC, busyuart should be identical to waituart since
+> there is no FIFO.
+> 
+> Signed-off-by: Johannes Stezenbach <js@sig21.net>
+> ---
+> Only tested on ARMv6.
+> e.g. arch/arm/mach-at91/include/mach/debug-macro.S has some
+> comments which clarify what busyuart is supposed to be doing.
 
-Yes thanks.
+Your explanation makes sense to me:
 
-Tony
+Acked-by: Tony Lindgren <tony@atomide.com>
