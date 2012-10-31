@@ -1,51 +1,83 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Oct 2012 09:29:19 -0500
-Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <20121031115627.GA9123@localhost.conference>
-References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
- <1351608860-24617-2-git-send-email-robherring2@gmail.com>
- <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
- <50900C90.7070101@gmail.com> <20121030224703.GI21164@n2100.arm.linux.org.uk>
- <50906B16.8060204@gmail.com> <20121031115627.GA9123@localhost.conference>
-Message-ID: <509135BF.2080700@gmail.com>
+From: rajanikanth.hv@linaro.org (Rajanikanth H.V)
+Date: Wed, 31 Oct 2012 15:40:29 +0000
+Subject: [PATCH 0/4] Implement device tree support for ab8500 BM Devices
+Message-ID: <1351698033-8980-1-git-send-email-rajanikanth.hv@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 06:56 AM, Catalin Marinas wrote:
-> On Wed, Oct 31, 2012 at 12:04:38AM +0000, Rob Herring wrote:
->> On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
->>> On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
->>>> Looking at this some more, arm64 doesn't need most of what's in gic.h.
->>>> The register defines should be moved into the .c file. The remaining
->>>> function declarations either are not needed (i.e. gic_init) or should
->>>> should be done like the handle_irq function pointer init. We don't want
->>>> to have platform code calling gic_cascade_irq or gic_raise_softirq
->>>> directly.
->>>
->>> Softirqs are about the SPIs which are used for SMP IPIs and platform
->>> specific wakeup of CPUs.  And platform code _needs_ to specify the
->>> way IPIs are delivered on the platform.  irqchip can't do that because
->>> irqchip knows nothing about SPIs (neither does genirq.)
->>
->> Right. v7 is unchanged, so the question is really only about how v8 will
->> do this. Hopefully, ARM is standardizing this for v8. We probably want
->> the gic (or other irqchip) to setup a raise_softirq function ptr on init
->> rather than having a direct call to gic_raise_softirq.
-> 
-> In my sample ARMv8 model code I have an older version of gic.c moved to
-> drivers/irqchip and modified just for the arm64 needs. The gic_of_init()
-> function calls set_smp_cross_call(git_raise_softirq).
-> 
-> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-aarch64.git;a=commitdiff;h=5cd20480f4d7b56160b3312df14fba3b2bda6798
-> 
-> The gic_secondary_init() is done from a CPU notifier as I wanted to
-> separate this from the SoC code (even on arch/arm, all the calls to
-> gic_secondary_init() are the same, so it could be factored out to a
-> notifier or some function pointer set by gic.c).
-> 
-> And let's assume there is no need for gic_cascade_irq().
+From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
 
-What about other asm header dependencies? cpu_logical_map is needed for
-example. I guess I'll leave all those for now.
+This patch-set adds device tree binding for ab8500 battery-managed
+devices. Removes the redundant platform structure maintained
+across bm devices and implements common DT probe routine across all the
+modules.
 
-Rob
+Test status:
+a) Tested across 'legacy platform data' and DT binding support
+	a.1) ab8500_charger driver fails to get regulator in the
+		legacy platform mode.
+b) Interrupt numbers assigned differs between legacy and FDT mode.
+    (a) Legacy platform_data Mode:
+    root at ME:/ cat /proc/interrupts
+               CPU0       CPU1
+    483:          0          0    ab8500  ab8500-ponkey-dbf
+    484:          0          0    ab8500  ab8500-ponkey-dbr
+    485:          0          0    ab8500  BATT_OVV
+    494:          0          1    ab8500
+    495:          0          0    ab8500  ab8500-rtc
+    501:          0         13    ab8500  NCONV_ACCU
+    503:          7         22    ab8500  CCEOC
+    504:          0          1    ab8500  CC_INT_CALIB
+    505:          0          0    ab8500  LOW_BAT_F
+    516:          0         34    ab8500  ab8500-gpadc
+    556:          0          0    ab8500  usb-link-status
+    
+    (b) FDT Mode:
+    root at ME:/ cat /proc/interrupts
+               CPU0       CPU1
+      6:          0          0    ab8500  ab8500-ponkey-dbf
+      7:          0          0    ab8500  ab8500-ponkey-dbr
+      8:          0          0    ab8500  BATT_OVV
+    162:          0          7    ab8500  ab8500-gpadc
+    163:          0          1    ab8500
+    164:          0          0    ab8500  ab8500-rtc
+    484:          0          0    ab8500  usb-link-status
+    499:          0          4    ab8500  NCONV_ACCU
+    500:          0          0    ab8500  LOW_BAT_F
+    502:          0          1    ab8500  CC_INT_CALIB
+    503:          0          6    ab8500  CCEOC
+
+c) Event handlers across bm-modules have been verified only
+   during 'battery discharge process' as 'battery charging process'
+   depends on ab8500-usb code
+
+Rajanikanth H.V (4):
+  mfd: ab8500: add devicetree support for fuelgauge
+  mfd: ab8500: add devicetree support for btemp
+  mfd: ab8500: add devicetree support for charger
+  mfd: ab8500: add devicetree support for chargalg
+
+ Documentation/devicetree/bindings/mfd/ab8500.txt   |   27 +-
+ .../bindings/power_supply/ab8500/btemp.txt         |   16 +
+ .../bindings/power_supply/ab8500/chargalg.txt      |   16 +
+ .../bindings/power_supply/ab8500/charger.txt       |   25 +
+ .../devicetree/bindings/power_supply/ab8500/fg.txt |   58 +++
+ arch/arm/boot/dts/dbx5x0.dtsi                      |   28 +-
+ drivers/mfd/ab8500-core.c                          |   20 +
+ drivers/power/Kconfig                              |    6 -
+ drivers/power/Makefile                             |    2 +-
+ drivers/power/ab8500_bmdata.c                      |  518 ++++++++++++++++++++
+ drivers/power/ab8500_btemp.c                       |   76 +--
+ drivers/power/ab8500_charger.c                     |   83 ++--
+ drivers/power/ab8500_fg.c                          |   81 +--
+ drivers/power/abx500_chargalg.c                    |   56 ++-
+ include/linux/mfd/abx500.h                         |   34 +-
+ 15 files changed, 881 insertions(+), 165 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/chargalg.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/charger.txt
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
+ create mode 100644 drivers/power/ab8500_bmdata.c
+
+-- 
+1.7.10.4
