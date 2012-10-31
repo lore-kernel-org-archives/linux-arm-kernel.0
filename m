@@ -1,49 +1,78 @@
-From: omycle@gmail.com (Li Haifeng)
-Date: Wed, 31 Oct 2012 17:42:01 +0800
-Subject: Two questions about streaming DMA flushing
-In-Reply-To: <20121031090821.GK21164@n2100.arm.linux.org.uk>
-References: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
- <20121031090821.GK21164@n2100.arm.linux.org.uk>
-Message-ID: <CAFNq8R4v0rfQgC0yFbSyc_xJe37nVX_QqQeEUPuyBz6_Z1edsg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 31 Oct 2012 11:42:14 +0100
+Subject: [PATCH v3 10/10] net/macb: add pinctrl consumer support
+In-Reply-To: <CAGhQ9VxJ58ej3j9eEx1rex5h-ua_C53=Z4WwGk5YdjfaYTdHpw@mail.gmail.com>
+References: <cover.1351591858.git.nicolas.ferre@atmel.com>
+ <3269426bdd44debc00d027651f8248db9d40f3dc.1351591858.git.nicolas.ferre@atmel.com>
+ <CAGhQ9VxJ58ej3j9eEx1rex5h-ua_C53=Z4WwGk5YdjfaYTdHpw@mail.gmail.com>
+Message-ID: <50910086.6080705@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/31 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Wed, Oct 31, 2012 at 10:15:04AM +0800, Li Haifeng wrote:
->> Sorry to disturb you.
+On 10/30/2012 06:37 PM, Joachim Eastwood :
+> On 30 October 2012 11:18, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>> From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 >>
->> I have two questions for streaming DMA flushing @ arch/arm/mm/cache-v7.S.
+>> If no pinctrl available just report a warning as some architecture may not
+>> need to do anything.
 >>
->> 1.
->> 332 ENTRY(v7_dma_map_area)
->> 333         add     r1, r1, r0
->> 334         teq     r2, #DMA_FROM_DEVICE
->> 335         beq     v7_dma_inv_range
->> 336         b       v7_dma_clean_range
->> 337 ENDPROC(v7_dma_map_area)
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> [nicolas.ferre at atmel.com: adapt the error path]
+>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> Cc: netdev at vger.kernel.org
+>> ---
+>>  drivers/net/ethernet/cadence/macb.c | 13 +++++++++++++
+>>  1 file changed, 13 insertions(+)
 >>
->> The function of v7_dma_map_area will invalidate corresponding cache line
->> firstly and then clean the cache for ?DMA_FROM_DEVICE?. I am confused the
->> sequence of the operations. IMO, the invalidate should be followed by the
->> clean action. Is it right?
->
-> Wrong.  beq is not a function call.
+>> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+>> index 4d51877..eae3d74 100644
+>> --- a/drivers/net/ethernet/cadence/macb.c
+>> +++ b/drivers/net/ethernet/cadence/macb.c
+>> @@ -26,6 +26,9 @@
+>>  #include <linux/of.h>
+>>  #include <linux/of_device.h>
+>>  #include <linux/of_net.h>
+>> +#include <linux/of_gpio.h>
+>> +#include <linux/gpio.h>
+> Why are these two headers added?
+> I don't see anything from them used in the code added.
+> 
+> Wouldn't the pinctrl header by itself be sufficient?
 
-Yes, It's my wrong. sorry for my careless.
+It is: I will remove the two unneeded headers in my v4 patch series.
 
->
->> 2.
->> 345 ENTRY(v7_dma_unmap_area)
->> 346         add     r1, r1, r0
->> 347         teq     r2, #DMA_TO_DEVICE
->> 348         bne     v7_dma_inv_range
->> 349         mov     pc, lr
->> 350 ENDPROC(v7_dma_unmap_area)
+Thanks,
+
+> 
+>> +#include <linux/pinctrl/consumer.h>
 >>
->> v7_dma_unmap_area, will invalidate corresponding cache line for
->> ?DMA_FROM_DEVICE?. But, at v7_dma_map_area, the invalidate has been done.
->> Why do this again?
->
-> Cache prefetching.
+>>  #include "macb.h"
+>>
+>> @@ -1472,6 +1475,7 @@ static int __init macb_probe(struct platform_device *pdev)
+>>         struct phy_device *phydev;
+>>         u32 config;
+>>         int err = -ENXIO;
+>> +       struct pinctrl *pinctrl;
+>>
+>>         regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>         if (!regs) {
+>> @@ -1479,6 +1483,15 @@ static int __init macb_probe(struct platform_device *pdev)
+>>                 goto err_out;
+>>         }
+>>
+>> +       pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>> +       if (IS_ERR(pinctrl)) {
+>> +               err = PTR_ERR(pinctrl);
+>> +               if (err == -EPROBE_DEFER)
+>> +                       goto err_out;
+>> +
+>> +               dev_warn(&pdev->dev, "No pinctrl provided\n");
+>> +       }
+>> +
+>>         err = -ENOMEM;
+>>         dev = alloc_etherdev(sizeof(*bp));
+>>         if (!dev)
 
-Thanks!
+Best regards,
+-- 
+Nicolas Ferre
