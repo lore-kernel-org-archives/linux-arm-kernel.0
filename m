@@ -1,65 +1,48 @@
 From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 31 Oct 2012 14:32:54 +0530
-Subject: [PATCH V4 3/4] ARM: tegra: dts: cardhu: enable SLINK4
+Date: Wed, 31 Oct 2012 14:32:55 +0530
+Subject: [PATCH V4 4/4] ARM: tegra: config: enable spi driver for Tegra SLINK
+ controller
 In-Reply-To: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
 References: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1351674176-20603-3-git-send-email-ldewangan@nvidia.com>
+Message-ID: <1351674176-20603-4-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SLINK4 and connected device in Tegra30 based
-platform Cardhu.
-Setting maximum spi frequency to 25MHz.
-
-Spi serial flash is connected on CS1 of SLINK4 on
-cardhu platform.
+Also enable the MTD, MTD_M25P80 and MTD_CHAR driver to enable
+SPI flash.
 
 Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
 ---
-Changes from V1:
-- rename the max freq prop to spi-max-frequency
+No change from V1 and V2.
 
 Changes from V2:
-- make node name to spi@
+- enable MTD, MTD_M25P80 and MTD_CHAR drivers.
 
-Changes from V3:
-- Add winbond spi flash as cs1 for slink4.
-- Add winbond company name in vendor list.
+ arch/arm/configs/tegra_defconfig |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi              |   10 ++++++++++
- 2 files changed, 11 insertions(+), 0 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 9de2b9f..ac2c2c4 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -51,4 +51,5 @@ ti	Texas Instruments
- via	VIA Technologies, Inc.
- wlf	Wolfson Microelectronics
- wm	Wondermedia Technologies, Inc.
-+winbond Winbond Electronics corp.
- xlnx	Xilinx
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index b245e6c..b4e0eda 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -275,6 +275,16 @@
- 		};
- 	};
- 
-+	spi at 7000da00 {
-+		status = "okay";
-+		spi-max-frequency = <25000000>;
-+		spi-flash at 1 {
-+			compatible = "winbond,w25q32";
-+			spi-max-frequency = <20000000>;
-+			reg = <1>;
-+		};
-+	};
-+
- 	ahub {
- 		i2s at 70080400 {
- 			status = "okay";
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index fb29680..9dac09b 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -80,6 +80,9 @@ CONFIG_RFKILL_GPIO=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_FIRMWARE_IN_KERNEL is not set
++CONFIG_MTD=y
++CONFIG_MTD_CHAR=y
++CONFIG_MTD_M25P80=y
+ CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_AD525X_DPOT=y
+@@ -117,7 +120,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_MUX_PINCTRL=y
+ CONFIG_I2C_TEGRA=y
+ CONFIG_SPI=y
+-CONFIG_SPI_TEGRA=y
++CONFIG_SPI_TEGRA20_SLINK=y
+ CONFIG_GPIO_PCA953X_IRQ=y
+ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
 -- 
 1.7.1.1
