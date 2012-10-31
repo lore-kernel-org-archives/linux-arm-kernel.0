@@ -1,26 +1,48 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Wed, 31 Oct 2012 15:02:57 +0530
-Subject: [PATCH RFC] i2c: omap: Fix the revision register read
-In-Reply-To: <1351673959-5918-1-git-send-email-shubhrajyoti@ti.com>
-References: <1351673959-5918-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <CAM=Q2cssHRYFJprozOSJqXNgeCub27jyVXkhvvMaxz-Z44d_EA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 31 Oct 2012 11:39:49 +0100
+Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
+In-Reply-To: <5090F67C.9020104@atmel.com>
+References: <cover.1351591858.git.nicolas.ferre@atmel.com>
+ <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
+ <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
+ <5090F67C.9020104@atmel.com>
+Message-ID: <5090FFF5.6020109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 2:29 PM, Shubhrajyoti D <shubhrajyoti@ti.com> wrote:
-> The revision register on OMAP4 is a 16-bit lo and a 16-bit
-> hi. Currently the driver reads only the lower 8-bits.
-> Fix the same by preventing the truncating of the rev register
-> for OMAP4.
->
-> Also use the scheme bit ie bit-14 of the hi register to know if it
-> is OMAP_I2C_IP_VERSION_2.
->
-> On platforms previous to OMAP4 the offset 0x04 is IE register whose
-> bit-14 reset value is 0, the code uses the same to its advantage.
->
-> The dev->regs is populated after reading the rev_hi. A NULL check
-> has been added in the resume handler to prevent the access before
-> the setting of the regs.
->
-tested on omap4sdp, omap3630 based beagle , omap3430sdp.
+On 10/31/2012 10:59 AM, Nicolas Ferre :
+> On 10/30/2012 07:22 PM, H?vard Skinnemoen :
+>> On Tue, Oct 30, 2012 at 4:12 AM, David Laight <David.Laight@aculab.com> wrote:
+>>>> Instead of masking head and tail every time we increment them, just let them
+>>>> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
+>>>> functions to do the subscripting properly to minimize the chances of messing
+>>>> this up.
+>>> ...
+>>>> +static unsigned int macb_tx_ring_avail(struct macb *bp)
+>>>> +{
+>>>> +     return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
+>>>> +}
+>>>
+>>> That one doesn't look quite right to me.
+>>> Surely it should be masking with 'TX_RING_SIZE - 1'
+>>
+>> Why is that? head and tail can never be more than TX_RING_SIZE apart,
+>> so it shouldn't make any difference.
+> 
+> Absolutely.
+
+Well not so absolute, after having thinking twice ;-)
+
+We should move to:
+
+static unsigned int macb_tx_ring_avail(struct macb *bp)
+{
+	return (TX_RING_SIZE - (bp->tx_head - bp->tx_tail) & (TX_RING_SIZE - 1));
+}
+
+Thanks David!
+
+(sorry for the noise) Bye,
+-- 
+Nicolas Ferre
