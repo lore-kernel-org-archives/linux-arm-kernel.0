@@ -1,67 +1,55 @@
-From: tremyfr@yahoo.fr (trem)
-Date: Wed, 31 Oct 2012 18:38:45 +0100
-Subject: [PATCH] ARM i.MX27: Fix low reference clock path
-In-Reply-To: <1351668533-32712-1-git-send-email-s.hauer@pengutronix.de>
-References: <1351668533-32712-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <50916225.4040601@yahoo.fr>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Wed, 31 Oct 2012 23:09:48 +0530
+Subject: [PATCH V4 3/4] ARM: tegra: dts: cardhu: enable SLINK4
+In-Reply-To: <50915563.40904@wwwdotorg.org>
+References: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
+ <1351674176-20603-3-git-send-email-ldewangan@nvidia.com>
+ <50915563.40904@wwwdotorg.org>
+Message-ID: <50916264.3010107@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/12 08:28, Sascha Hauer wrote:
-> The i.MX27 clock tree can either be driven from a 26MHz oscillator
-> or from a 32768Hz oscillator. The latter was not properly implemented,
-> the mux between these two pathes was missing. Add this mux and while
-> at it rename the 'prem' (premultiplier) clk to 'fpm' (Frequency
-> Pre-Multiplier) to better match the datasheet.
+On Wednesday 31 October 2012 10:14 PM, Stephen Warren wrote:
+> On 10/31/2012 03:02 AM, Laxman Dewangan wrote:
+>> Enable SLINK4 and connected device in Tegra30 based
+>> platform Cardhu.
+>> Setting maximum spi frequency to 25MHz.
+>>
+>> Spi serial flash is connected on CS1 of SLINK4 on
+>> cardhu platform.
+>> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+>> +winbond Winbond Electronics corp.
+> That should really be a separate patch that goes through the devicetree
+> branch. But I guess it's fairly trivial, so it's not a big deal.
 >
-> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
 
-Tested-by: Philippe Reynes <tremyfr@yahoo.fr>
+Yes, I thought that it should be in separate change. I did same on 
+earlier for ISL29028 driver and found that this small change still not 
+get merged. Therefore I clubbed this together as it can go without any 
+issue.
+I believe it is fine to merge vendor-prefix from any tree.
 
-> ---
->   arch/arm/mach-imx/clk-imx27.c |   17 ++++++++++++++---
->   1 file changed, 14 insertions(+), 3 deletions(-)
+
 >
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 3b6b640..f8d9129 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -51,8 +51,10 @@
+>> +		spi-flash at 1 {
+>> +			compatible = "winbond,w25q32";
+>> +			spi-max-frequency =<20000000>;
+>> +			reg =<1>;
+>> +		};
+> Since I have an Atmel flash on my board, I see:
 >
->   static const char *vpu_sel_clks[] = { "spll", "mpll_main2", };
->   static const char *cpu_sel_clks[] = { "mpll_main2", "mpll", };
-> +static const char *mpll_sel_clks[] = { "fpm", "mpll_osc_sel", };
-> +static const char *mpll_osc_sel_clks[] = { "ckih", "ckih_div1p5", };
->   static const char *clko_sel_clks[] = {
-> -	"ckil", "prem", "ckih", "ckih",
-> +	"ckil", "fpm", "ckih", "ckih",
->   	"ckih", "mpll", "spll", "cpu_div",
->   	"ahb", "ipg", "per1_div", "per2_div",
->   	"per3_div", "per4_div", "ssi1_div", "ssi2_div",
-> @@ -79,7 +81,8 @@ enum mx27_clks {
->   	vpu_ahb_gate, fec_ahb_gate, emma_ahb_gate, emi_ahb_gate, dma_ahb_gate,
->   	csi_ahb_gate, brom_ahb_gate, ata_ahb_gate, wdog_ipg_gate, usb_ipg_gate,
->   	uart6_ipg_gate, uart5_ipg_gate, uart4_ipg_gate, uart3_ipg_gate,
-> -	uart2_ipg_gate, uart1_ipg_gate, clk_max
-> +	uart2_ipg_gate, uart1_ipg_gate, ckih_div1p5, fpm, mpll_osc_sel,
-> +	mpll_sel, clk_max
->   };
+> [    1.282958] m25p80 spi32766.1: found at25df321a, expected w25q32
+> [    1.289103] m25p80 spi32766.1: at25df321a (4096 Kbytes)
 >
->   static struct clk *clk[clk_max];
-> @@ -91,7 +94,15 @@ int __init mx27_clocks_init(unsigned long fref)
->   	clk[dummy] = imx_clk_fixed("dummy", 0);
->   	clk[ckih] = imx_clk_fixed("ckih", fref);
->   	clk[ckil] = imx_clk_fixed("ckil", 32768);
-> -	clk[mpll] = imx_clk_pllv1("mpll", "ckih", CCM_MPCTL0);
-> +	clk[fpm] = imx_clk_fixed_factor("fpm", "ckil", 1024, 1);
-> +	clk[ckih_div1p5] = imx_clk_fixed_factor("ckih_div1p5", "ckih", 2, 3);
-> +
-> +	clk[mpll_osc_sel] = imx_clk_mux("mpll_osc_sel", CCM_CSCR, 4, 1,
-> +			mpll_osc_sel_clks,
-> +			ARRAY_SIZE(mpll_osc_sel_clks));
-> +	clk[mpll_sel] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks,
-> +			ARRAY_SIZE(mpll_sel_clks));
-> +	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
->   	clk[spll] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
->   	clk[mpll_main2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
+> Is there any way around that (the first log line above)?
 >
+> I suppose the answer is that the DT should reflect the exact flash
+> device that's on the board, and perhaps the bootloader should be
+> adjusting the DT to reflect the correct value. That's probably complex.
+>
+> Do you have any idea whether Atmel or Winbond flash is more common, so
+> we can at least minimize the number of times this message appears?
+
+I observe that most of cardhu have the winbond. All SQA machine has 
+winbond. Also I believe on A04, it is winbond.
+Better to go with winbond.
