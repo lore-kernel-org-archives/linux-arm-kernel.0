@@ -1,67 +1,17 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Wed, 31 Oct 2012 05:36:48 -0600
-Subject: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
-In-Reply-To: <29530110-f967-49c0-a2bc-d035d02da2a5@VA3EHSMHS020.ehs.local>
-References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
- <20121024200431.GE6713@beefymiracle.amer.corp.natinst.com>
- <3c9e591c-a29f-446b-9256-bb23ff6d840d@TX2EHSMHS014.ehs.local>
- <201210302222.15656.arnd@arndb.de>
- <29530110-f967-49c0-a2bc-d035d02da2a5@VA3EHSMHS020.ehs.local>
-Message-ID: <20121031113648.GI5190@beefymiracle.amer.corp.natinst.com>
+From: x0148406@ti.com (Afzal Mohammed)
+Date: Wed, 31 Oct 2012 17:07:49 +0530
+Subject: [PATCH v2] ARM: dts: am33xx: rtc node
+In-Reply-To: <50910664.1010304@ti.com>
+References: <1351589646-27082-1-git-send-email-afzal@ti.com>
+ <50910664.1010304@ti.com>
+Message-ID: <50910D8D.60707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 08:43:35AM +0000, Michal Simek wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Tuesday, October 30, 2012 11:22 PM
-> > To: Michal Simek
-> > Cc: Josh Cartwright; arm at kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; John Linn; Nick Bowler; Russell King - ARM Linux
-> > Subject: Re: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
-> >
-> > On Saturday 27 October 2012, Michal Simek wrote:
-> > > > diff --git a/arch/arm/include/asm/pgtable.h
-> > > > b/arch/arm/include/asm/pgtable.h index 08c1231..72904a2 100644
-> > > > --- a/arch/arm/include/asm/pgtable.h
-> > > > +++ b/arch/arm/include/asm/pgtable.h
-> > > > @@ -40,7 +40,7 @@
-> > > >   */
-> > > >  #define VMALLOC_OFFSET               (8*1024*1024)
-> > > >  #define VMALLOC_START                (((unsigned long)high_memory +
-> > > > VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
-> > > > -#define VMALLOC_END          0xff000000UL
-> > > > +#define VMALLOC_END          _AC(0xff000000,UL)
-> > >
-> > > This shouldn't be the part of this series but should go to mainline through
-> > different tree.
-> > > Arnd, Olof: Can you take this patch to your arm-soc tree?
-> > >
-> > > I don't think it is a good workstyle to propose it to mainline through zynq soc
-> > tree.
-> > > What do you think?
-> >
-> > The arm-soc tree is not the right place either, this is architecture code which is in
-> > Russell's domain. I would suggest getting an Ack from Russell if he's ok with it
-> > and then merging it together with your other changes into arm-soc.
-> 
-> That's what I thought too.
-> Not sure if Josh wants to push this to mainline.
+On Wednesday 31 October 2012 04:37 PM, Benoit Cousson wrote:
+> I've just applied it in the branch with a slight change in the subject.
 
-The patch is not relevant anymore.  It was needed when the virtual
-address of the early uart mapping was defined via VMALLOC_END.  That was
-causing us problems, so we ended up choosing a fixed, known working
-address within the vmalloc region to map the uart.
+Thanks Benoit
 
-Thanks,
-
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/9c397885/attachment.sig>
+Regards
+Afzal
