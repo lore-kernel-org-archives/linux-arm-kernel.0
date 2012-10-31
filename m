@@ -1,69 +1,107 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 30 Oct 2012 20:51:02 +0200
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <20121030175856.GK11908@atomide.com>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <20121030162727.GG11908@atomide.com>
- <20121030172707.GB3993@arwen.pp.htv.fi>
- <20121030175856.GK11908@atomide.com>
-Message-ID: <20121030185102.GC4804@arwen.pp.htv.fi>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Wed, 31 Oct 2012 18:52:06 +0200
+Subject: [RFC 0/7] Capebus; a bus for SoCs using simple expansion connectors
+Message-ID: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Capebus is created to address the problem of many SoCs that can provide a
+multitude of hardware interfaces but in order to keep costs down the main
+boards only support a limited number of them. The rest are typically brought
+out to pin connectors on to which other boards, named capes are connected and
+allow those peripherals to be used.
 
-On Tue, Oct 30, 2012 at 10:58:59AM -0700, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [121030 10:34]:
-> > Hi,
-> > 
-> > On Tue, Oct 30, 2012 at 09:27:28AM -0700, Tony Lindgren wrote:
-> > > * Vaibhav Hiremath <hvaibhav@ti.com> [121030 07:50]:
-> > > > > 
-> > > > > MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
-> > > > > already submitted to the list recently. So MMC support will come along with
-> > > > > EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
-> > > 
-> > > This is a bogus dependency, the MMC driver needs to also work
-> > > without DMA.
-> > 
-> > heh, too bad driver errors out when it doesn't find DMA channels :-)
-> 
-> It should just print a warning instead and continue.
->  
-> > 1869         host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
-> > 1870         if (!host->rx_chan) {
-> > 1871                 dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
-> > 1872                 ret = -ENXIO;
-> > 1873                 goto err_irq;
-> > 1874         }
-> > 1875 
-> > 1876         host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
-> > 1877         if (!host->tx_chan) {
-> > 1878                 dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
-> > 1879                 ret = -ENXIO;
-> > 1880                 goto err_irq;
-> > 1881         }
-> > 
-> > in fact, if DMAENGINE isn't enabled, this won't even compile due to
-> > omap_dma_filter_fn() right ?
-> 
-> It should, CONFIG_DMADEVICES is optional. If it does not compile,
-> then there's a bug somewhere.
+These capes connect to the SoC interfaces but might also contain various other
+parts that may need some kind of driver to work.
 
-you're right, there's a static inline nop for when we don't have omap
-dma engine driver compiled.
+Since SoCs have limited pins and pin muxing options, not all capes can work
+together so some kind of resource tracking (at least for the pins in use) is
+required.
 
-nevermind.
+Before capebus all of this took place in the board support file, and frankly
+for boards with too many capes it was becoming unmanageable.
+
+Capebus provides a virtual bus, which along with a board specific controller,
+cape drivers can be written using the standard Linux device model.
+
+The core capebus infrastructure is not depended on any specific board.
+However capebus needs a board controller to provide services to the cape devices
+it controls. Services like addressing and resource reservation are provided
+by the board controller.
+
+Capebus at the moment only support TI's Beaglebone platform.
+
+This RFC introduces the core concept; most supporting patches
+have been posted to the relevant places.
+
+If you have a beaglebone and want to check it out, you can do
+so at:
+
+git://github.com/pantoniou/linux-bbxm.git branch capebus-v3
+
+Pantelis Antoniou (7):
+  capebus: Core capebus support
+  capebus: Add beaglebone board support
+  capebus: Beaglebone generic cape support
+  capebus: Beaglebone geiger cape support
+  capebus: Beaglebone capebus DT update
+  capebus: Document DT bindings
+  capebus: Documentation; capebus-summary
+
+ Documentation/capebus/capebus-summary              |  40 +
+ .../capebus/bone-capebus-slot-override.txt         |  28 +
+ .../devicetree/bindings/capebus/bone-capebus.txt   |  50 ++
+ .../bindings/capebus/bone-geiger-cape.txt          |  78 ++
+ .../bindings/capebus/bone-generic-cape.txt         |  97 +++
+ .../devicetree/bindings/capebus/da8xx-dt.txt       |  31 +
+ .../devicetree/bindings/capebus/i2c-dt.txt         |  42 +
+ .../devicetree/bindings/capebus/spi-dt.txt         |  37 +
+ .../devicetree/bindings/capebus/ti-tscadc-dt.txt   |  34 +
+ arch/arm/boot/dts/am335x-bone-common.dtsi          | 689 ++++++++++++++-
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   3 +
+ drivers/capebus/Kconfig                            |  17 +
+ drivers/capebus/Makefile                           |   8 +
+ drivers/capebus/boards/Kconfig                     |   6 +
+ drivers/capebus/boards/Makefile                    |   3 +
+ drivers/capebus/boards/capebus-bone-generic.c      | 237 ++++++
+ drivers/capebus/boards/capebus-bone-pdevs.c        | 602 +++++++++++++
+ drivers/capebus/boards/capebus-bone.c              | 931 +++++++++++++++++++++
+ drivers/capebus/capebus-driver.c                   | 608 ++++++++++++++
+ drivers/capebus/capebus-probe.c                    | 320 +++++++
+ drivers/capebus/capebus-sysfs.c                    |  52 ++
+ drivers/capebus/capes/Kconfig                      |  13 +
+ drivers/capebus/capes/Makefile                     |   2 +
+ drivers/capebus/capes/bone-geiger-cape.c           | 506 +++++++++++
+ drivers/capebus/capes/bone-generic-cape.c          |  96 +++
+ include/linux/capebus.h                            | 298 +++++++
+ include/linux/capebus/capebus-bone.h               | 120 +++
+ 28 files changed, 4920 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/capebus/capebus-summary
+ create mode 100644 Documentation/devicetree/bindings/capebus/bone-capebus-slot-override.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/bone-capebus.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/bone-geiger-cape.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/bone-generic-cape.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/da8xx-dt.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/i2c-dt.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/spi-dt.txt
+ create mode 100644 Documentation/devicetree/bindings/capebus/ti-tscadc-dt.txt
+ create mode 100644 drivers/capebus/Kconfig
+ create mode 100644 drivers/capebus/Makefile
+ create mode 100644 drivers/capebus/boards/Kconfig
+ create mode 100644 drivers/capebus/boards/Makefile
+ create mode 100644 drivers/capebus/boards/capebus-bone-generic.c
+ create mode 100644 drivers/capebus/boards/capebus-bone-pdevs.c
+ create mode 100644 drivers/capebus/boards/capebus-bone.c
+ create mode 100644 drivers/capebus/capebus-driver.c
+ create mode 100644 drivers/capebus/capebus-probe.c
+ create mode 100644 drivers/capebus/capebus-sysfs.c
+ create mode 100644 drivers/capebus/capes/Kconfig
+ create mode 100644 drivers/capebus/capes/Makefile
+ create mode 100644 drivers/capebus/capes/bone-geiger-cape.c
+ create mode 100644 drivers/capebus/capes/bone-generic-cape.c
+ create mode 100644 include/linux/capebus.h
+ create mode 100644 include/linux/capebus/capebus-bone.h
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/222e00ed/attachment.sig>
+1.7.12
