@@ -1,56 +1,129 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Tue, 30 Oct 2012 06:25:59 -0600
-Subject: [PATCH 6/8] serial: xilinx_uartps: kill CONFIG_OF conditional
+Date: Wed, 31 Oct 2012 12:24:48 -0600
+Subject: [PATCH 4/8] ARM: zynq: dts: split up device tree
 In-Reply-To: <cover.1351721190.git.josh.cartwright@ni.com>
 References: <cover.1351721190.git.josh.cartwright@ni.com>
-Message-ID: <61e872b2cd4abc25c2dab82668e5094b590571a0.1351721190.git.josh.cartwright@ni.com>
+Message-ID: <1dc81a3260da0a911dbcabd737547b7bff16a99c.1351721190.git.josh.cartwright@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Zynq platform requires the use of CONFIG_OF.  Remove the #ifdef
-conditionals in the uartps driver.
+The purpose of the created zynq-7000.dtsi file is to describe the
+hardware common to all Zynq 7000-based boards.  Also, get rid of the
+zynq-ep107 device tree, since it is not hardware anyone can purchase.
+
+Add a zc702 dts file based on the zynq-7000.dtsi.  Add it to the
+dts/Makefile so it is built with the 'dtbs' target.
 
 Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
 ---
- drivers/tty/serial/xilinx_uartps.c | 9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/boot/dts/Makefile                         |  1 +
+ .../boot/dts/{zynq-ep107.dts => zynq-7000.dtsi}    | 19 +++-----------
+ arch/arm/boot/dts/zynq-zc702.dts                   | 30 ++++++++++++++++++++++
+ arch/arm/mach-zynq/common.c                        |  3 ++-
+ 4 files changed, 36 insertions(+), 17 deletions(-)
+ rename arch/arm/boot/dts/{zynq-ep107.dts => zynq-7000.dtsi} (79%)
+ create mode 100644 arch/arm/boot/dts/zynq-zc702.dts
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index b627363..23efe17 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -946,15 +946,11 @@ static int __devinit xuartps_probe(struct platform_device *pdev)
- 	struct resource *res, *res2;
- 	int clk = 0;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..76ed11e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -103,5 +103,6 @@ dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
+ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ 	wm8505-ref.dtb \
+ 	wm8650-mid.dtb
++dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
  
--#ifdef CONFIG_OF
- 	const unsigned int *prop;
+ endif
+diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-7000.dtsi
+similarity index 79%
+rename from arch/arm/boot/dts/zynq-ep107.dts
+rename to arch/arm/boot/dts/zynq-7000.dtsi
+index 5caf100..8b30e59 100644
+--- a/arch/arm/boot/dts/zynq-ep107.dts
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -10,29 +10,16 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
++/include/ "skeleton.dtsi"
  
- 	prop = of_get_property(pdev->dev.of_node, "clock", NULL);
- 	if (prop)
- 		clk = be32_to_cpup(prop);
--#else
--	clk = *((unsigned int *)(pdev->dev.platform_data));
--#endif
- 	if (!clk) {
- 		dev_err(&pdev->dev, "no clock specified\n");
- 		return -ENODEV;
-@@ -1044,16 +1040,11 @@ static int xuartps_resume(struct platform_device *pdev)
+-/dts-v1/;
+ / {
+-	model = "Xilinx Zynq EP107";
+-	compatible = "xlnx,zynq-ep107";
+-	#address-cells = <1>;
+-	#size-cells = <1>;
+-	interrupt-parent = <&intc>;
+-
+-	memory {
+-		device_type = "memory";
+-		reg = <0x0 0x10000000>;
+-	};
+-
+-	chosen {
+-		bootargs = "console=ttyPS0,9600 root=/dev/ram rw initrd=0x800000,8M earlyprintk";
+-		linux,stdout-path = &uart0;
+-	};
++	compatible = "xlnx,zynq-7000";
+ 
+ 	amba {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		interrupt-parent = <&intc>;
+ 		ranges;
+ 
+ 		intc: interrupt-controller at f8f01000 {
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+new file mode 100644
+index 0000000..e25a307
+--- /dev/null
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -0,0 +1,30 @@
++/*
++ *  Copyright (C) 2011 Xilinx
++ *  Copyright (C) 2012 National Instruments Corp.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++/dts-v1/;
++/include/ "zynq-7000.dtsi"
++
++/ {
++	model = "Zynq ZC702 Development Board";
++	compatible = "xlnx,zynq-zc702", "xlnx,zynq-7000";
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x40000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyPS1,115200 earlyprintk";
++	};
++
++};
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 0279ea7..447904b 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -115,7 +115,8 @@ static void __init xilinx_map_io(void)
  }
  
- /* Match table for of_platform binding */
--
--#ifdef CONFIG_OF
- static struct of_device_id xuartps_of_match[] __devinitdata = {
- 	{ .compatible = "xlnx,xuartps", },
- 	{}
+ static const char *xilinx_dt_match[] = {
+-	"xlnx,zynq-ep107",
++	"xlnx,zynq-zc702",
++	"xlnx,zynq-7000",
+ 	NULL
  };
- MODULE_DEVICE_TABLE(of, xuartps_of_match);
--#else
--#define xuartps_of_match NULL
--#endif
  
- static struct platform_driver xuartps_platform_driver = {
- 	.probe   = xuartps_probe,		/* Probe method */
 -- 
 1.8.0
