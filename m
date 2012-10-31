@@ -1,49 +1,154 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 31 Oct 2012 11:56:29 +0000
-Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <50906B16.8060204@gmail.com>
-References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
- <1351608860-24617-2-git-send-email-robherring2@gmail.com>
- <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
- <50900C90.7070101@gmail.com>
- <20121030224703.GI21164@n2100.arm.linux.org.uk>
- <50906B16.8060204@gmail.com>
-Message-ID: <20121031115627.GA9123@localhost.conference>
+From: mchehab@infradead.org (Mauro Carvalho Chehab)
+Date: Wed, 31 Oct 2012 09:57:02 -0200
+Subject: [PATCH v4 2/2] mx2_camera: Fix regression caused by clock
+ conversion
+In-Reply-To: <1351598606-8485-2-git-send-email-fabio.estevam@freescale.com>
+References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
+ <1351598606-8485-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20121031095702.41649bf9@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 12:04:38AM +0000, Rob Herring wrote:
-> On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
-> > On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
-> >> Looking at this some more, arm64 doesn't need most of what's in gic.h.
-> >> The register defines should be moved into the .c file. The remaining
-> >> function declarations either are not needed (i.e. gic_init) or should
-> >> should be done like the handle_irq function pointer init. We don't want
-> >> to have platform code calling gic_cascade_irq or gic_raise_softirq
-> >> directly.
-> > 
-> > Softirqs are about the SPIs which are used for SMP IPIs and platform
-> > specific wakeup of CPUs.  And platform code _needs_ to specify the
-> > way IPIs are delivered on the platform.  irqchip can't do that because
-> > irqchip knows nothing about SPIs (neither does genirq.)
+Em Tue, 30 Oct 2012 10:03:26 -0200
+Fabio Estevam <fabio.estevam@freescale.com> escreveu:
+
+> Since mx27 transitioned to the commmon clock framework in 3.5, the correct way
+> to acquire the csi clock is to get csi_ahb and csi_per clocks separately.
 > 
-> Right. v7 is unchanged, so the question is really only about how v8 will
-> do this. Hopefully, ARM is standardizing this for v8. We probably want
-> the gic (or other irqchip) to setup a raise_softirq function ptr on init
-> rather than having a direct call to gic_raise_softirq.
+> By not doing so the camera sensor does not probe correctly:
+> 
+> soc-camera-pdrv soc-camera-pdrv.0: Probing soc-camera-pdrv.0
+> mx2-camera mx2-camera.0: Camera driver attached to camera 0
+> ov2640 0-0030: Product ID error fb:fb
+> mx2-camera mx2-camera.0: Camera driver detached from camera 0
+> mx2-camera mx2-camera.0: MX2 Camera (CSI) driver probed, clock frequency: 66500000
+> 
+> Adapt the mx2_camera driver to the new clock framework and make it functional
+> again.
+> 
+> Tested-by: Ga?tan Carlier <gcembed@gmail.com>
+> Tested-by: Javier Martin <javier.martin@vista-silicon.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-In my sample ARMv8 model code I have an older version of gic.c moved to
-drivers/irqchip and modified just for the arm64 needs. The gic_of_init()
-function calls set_smp_cross_call(git_raise_softirq).
+As it seems that those patches depend on some patches at the arm tree,
+the better is to merge them via -arm tree.
 
-http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-aarch64.git;a=commitdiff;h=5cd20480f4d7b56160b3312df14fba3b2bda6798
+So,
 
-The gic_secondary_init() is done from a CPU notifier as I wanted to
-separate this from the SoC code (even on arch/arm, all the calls to
-gic_secondary_init() are the same, so it could be factored out to a
-notifier or some function pointer set by gic.c).
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
 
-And let's assume there is no need for gic_cascade_irq().
+> ---
+> Changes since v3:
+> - Drop unneeded clk_unprepare calls as pointed out by Guennadi
+> Changes since v2:
+> - Fix clock error handling code as pointed out by Russell King
+> Changes since v1:
+> - Rebased against linux-next 20121008.
+>  drivers/media/platform/soc_camera/mx2_camera.c |   39 ++++++++++++++++++------
+>  1 file changed, 29 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/media/platform/soc_camera/mx2_camera.c b/drivers/media/platform/soc_camera/mx2_camera.c
+> index e575ae8..558f6a3 100644
+> --- a/drivers/media/platform/soc_camera/mx2_camera.c
+> +++ b/drivers/media/platform/soc_camera/mx2_camera.c
+> @@ -278,7 +278,8 @@ struct mx2_camera_dev {
+>  	struct device		*dev;
+>  	struct soc_camera_host	soc_host;
+>  	struct soc_camera_device *icd;
+> -	struct clk		*clk_csi, *clk_emma_ahb, *clk_emma_ipg;
+> +	struct clk		*clk_emma_ahb, *clk_emma_ipg;
+> +	struct clk		*clk_csi_ahb, *clk_csi_per;
+>  
+>  	void __iomem		*base_csi, *base_emma;
+>  
+> @@ -464,7 +465,8 @@ static void mx2_camera_deactivate(struct mx2_camera_dev *pcdev)
+>  {
+>  	unsigned long flags;
+>  
+> -	clk_disable_unprepare(pcdev->clk_csi);
+> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
+> +	clk_disable_unprepare(pcdev->clk_csi_per);
+>  	writel(0, pcdev->base_csi + CSICR1);
+>  	if (is_imx27_camera(pcdev)) {
+>  		writel(0, pcdev->base_emma + PRP_CNTL);
+> @@ -492,10 +494,14 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+>  	if (pcdev->icd)
+>  		return -EBUSY;
+>  
+> -	ret = clk_prepare_enable(pcdev->clk_csi);
+> +	ret = clk_prepare_enable(pcdev->clk_csi_ahb);
+>  	if (ret < 0)
+>  		return ret;
+>  
+> +	ret = clk_prepare_enable(pcdev->clk_csi_per);
+> +	if (ret < 0)
+> +		goto exit_csi_ahb;
+> +
+>  	csicr1 = CSICR1_MCLKEN;
+>  
+>  	if (is_imx27_camera(pcdev))
+> @@ -512,6 +518,11 @@ static int mx2_camera_add_device(struct soc_camera_device *icd)
+>  		 icd->devnum);
+>  
+>  	return 0;
+> +
+> +exit_csi_ahb:
+> +	clk_disable_unprepare(pcdev->clk_csi_ahb);
+> +
+> +	return ret;
+>  }
+>  
+>  static void mx2_camera_remove_device(struct soc_camera_device *icd)
+> @@ -1772,10 +1783,17 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+>  		break;
+>  	}
+>  
+> -	pcdev->clk_csi = devm_clk_get(&pdev->dev, "ahb");
+> -	if (IS_ERR(pcdev->clk_csi)) {
+> -		dev_err(&pdev->dev, "Could not get csi clock\n");
+> -		err = PTR_ERR(pcdev->clk_csi);
+> +	pcdev->clk_csi_ahb = devm_clk_get(&pdev->dev, "ahb");
+> +	if (IS_ERR(pcdev->clk_csi_ahb)) {
+> +		dev_err(&pdev->dev, "Could not get csi ahb clock\n");
+> +		err = PTR_ERR(pcdev->clk_csi_ahb);
+> +		goto exit;
+> +	}
+> +
+> +	pcdev->clk_csi_per = devm_clk_get(&pdev->dev, "per");
+> +	if (IS_ERR(pcdev->clk_csi_per)) {
+> +		dev_err(&pdev->dev, "Could not get csi per clock\n");
+> +		err = PTR_ERR(pcdev->clk_csi_per);
+>  		goto exit;
+>  	}
+>  
+> @@ -1785,12 +1803,13 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+>  
+>  		pcdev->platform_flags = pcdev->pdata->flags;
+>  
+> -		rate = clk_round_rate(pcdev->clk_csi, pcdev->pdata->clk * 2);
+> +		rate = clk_round_rate(pcdev->clk_csi_per,
+> +						pcdev->pdata->clk * 2);
+>  		if (rate <= 0) {
+>  			err = -ENODEV;
+>  			goto exit;
+>  		}
+> -		err = clk_set_rate(pcdev->clk_csi, rate);
+> +		err = clk_set_rate(pcdev->clk_csi_per, rate);
+>  		if (err < 0)
+>  			goto exit;
+>  	}
+> @@ -1848,7 +1867,7 @@ static int __devinit mx2_camera_probe(struct platform_device *pdev)
+>  		goto exit_free_emma;
+>  
+>  	dev_info(&pdev->dev, "MX2 Camera (CSI) driver probed, clock frequency: %ld\n",
+> -			clk_get_rate(pcdev->clk_csi));
+> +			clk_get_rate(pcdev->clk_csi_per));
+>  
+>  	return 0;
+>  
 
--- 
-Catalin
+
+
+
+Cheers,
+Mauro
