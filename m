@@ -1,78 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Oct 2012 15:54:25 +0000
-Subject: [PATCH v2 3/5] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <509146B8.2000305@gmail.com>
-References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
- <1351695517-5636-4-git-send-email-robherring2@gmail.com>
- <20121031150954.GN21164@n2100.arm.linux.org.uk> <509146B8.2000305@gmail.com>
-Message-ID: <20121031155425.GP21164@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 31 Oct 2012 17:04:49 +0100
+Subject: [PATCH v4 00/10] net/macb: driver enhancement concerning GEM support,
+ ring logic and cleanup
+Message-ID: <cover.1351690694.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 10:41:44AM -0500, Rob Herring wrote:
-> On 10/31/2012 10:09 AM, Russell King - ARM Linux wrote:
-> > On Wed, Oct 31, 2012 at 09:58:35AM -0500, Rob Herring wrote:
-> >> From: Rob Herring <rob.herring@calxeda.com>
-> >>
-> >> Now that we have drivers/irqchip, move GIC irqchip to drivers/irqchip. This
-> >> is necessary to share the GIC with arm and arm64.
-> >>
-> >> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Thomas Gleixner <tglx@linutronix.de>
-> >> ---
-> >>  arch/arm/common/Kconfig                            |    8 --------
-> >>  arch/arm/common/Makefile                           |    1 -
-> >>  drivers/irqchip/Kconfig                            |    8 ++++++++
-> >>  drivers/irqchip/Makefile                           |    1 +
-> >>  arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |    0
-> >>  drivers/irqchip/irqchip.c                          |   10 ++++++++++
-> >>  drivers/irqchip/irqchip.h                          |    1 +
-> >>  7 files changed, 20 insertions(+), 9 deletions(-)
-> >>  rename arch/arm/common/gic.c => drivers/irqchip/irq-gic.c (100%)
-> > 
-> > What about its dependent arch/arm/include/asm/hardware/gic.h header,
-> > which I believe after patch 1 becomes just a bunch of function calls,
-> > and so no longer has any right to be in asm/hardware.
-> > 
-> > Nothing should be moved out of arch/arm without its associated header
-> > file also moving with it.
-> 
-> What is left is only used within arch/arm and I expect we will get rid
-> of the remaining users. So I didn't want to encourage any additional
-> users by moving to include/linux.
-> 
-> gic_secondary_init and gic_cascade_irq could be function ptrs.
+This is an enhancement work that began several years ago. I try to catchup with
+some performance improvement that has been implemented then by Havard.
+The ring index logic and the TX error path modification are the biggest changes
+but some cleanup/debugging have been added along the way.
+The GEM revision will benefit from the Gigabit support.
+Newer pinctrl infrastructure support is added but it is optional.
 
-gic_secondary_init() can be, but I don't see how why you think it would
-be a good idea to turn gic_casade_irq() into a function pointer.  That
-makes zero sense to me what so ever.  As I've already pointed out,
-gic_cascade_irq() is only used by a minority of platforms where there
-are two cascaded GICs.  That being Realview, where you have a SMP tile
-with its own GIC on top of the motherboard with a motherboard GIC.
+The series has been tested on several Atmel AT91 SoC with the two MACB/GEM
+flavors.
 
-Moreover, what gic_cascade_irq() is doing is can't really be turned
-into something generic; it's setting up genirq for the chained GIC,
-which requires GIC specific data.
+v4: - remove unneeded device tree header includes
+    - modified the computation of available entries in ring buffer
+v3: - rebased on net-next to take into account current effor to merge
+      at91_ether with macb drivers
+    - add additional patch to use the new pinctrl infrastructure
+v2: - modify the tx error handling: now uses a workqueue
+    - information provided by ethtool -i were not accurate: removed
 
-You can't get around the fact that this function is attaching a
-secondary GIC to an upstream IRQ.  That's already as generic as it
-can be.
 
-And finally the exercise of turning that into a function pointer is
-pure code obfuscation with zero benefit what so ever.  The fact is
-these platforms _definitely_ have a GIC present, and as the driver
-needs to be built into the kernel for these platforms to function
-there is no point what so ever in having a direct function call into
-the GIC code.
+Havard Skinnemoen (4):
+  net/macb: memory barriers cleanup
+  net/macb: change debugging messages
+  net/macb: clean up ring buffer logic
+  net/macb: Offset first RX buffer by two bytes
 
-To think otherwise... your off your rocker IMHO.
+Jean-Christophe PLAGNIOL-VILLARD (1):
+  net/macb: add pinctrl consumer support
 
-> gic_of_init can be removed once users are converted to call irqchip_init
-> instead. That leaves gic_init which are all the non-DT converted GIC
-> users and will take some time to convert. I am puzzled by tegra and zynq
-> which should be DT only already.
+Nicolas Ferre (4):
+  net/macb: remove macb_get_drvinfo()
+  net/macb: tx status is more than 8 bits now
+  net/macb: ethtool interface: add register dump feature
+  net/macb: better manage tx errors
 
-Still, my point stands.  After this change this header file has no
-business being in asm/hardware.  At all.  It needs to move as a result
-of this change.
+Patrice Vilchez (1):
+  net/macb: Add support for Gigabit Ethernet mode
+
+ drivers/net/ethernet/cadence/at91_ether.c |   6 +-
+ drivers/net/ethernet/cadence/macb.c       | 448 +++++++++++++++++++++---------
+ drivers/net/ethernet/cadence/macb.h       |  30 +-
+ 3 files changed, 337 insertions(+), 147 deletions(-)
+
+-- 
+1.8.0
