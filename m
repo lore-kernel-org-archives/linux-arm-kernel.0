@@ -1,68 +1,51 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Wed, 31 Oct 2012 14:24:36 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
-Message-ID: <509134A4.708@mimc.co.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 31 Oct 2012 09:29:19 -0500
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <20121031115627.GA9123@localhost.conference>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
+ <50900C90.7070101@gmail.com> <20121030224703.GI21164@n2100.arm.linux.org.uk>
+ <50906B16.8060204@gmail.com> <20121031115627.GA9123@localhost.conference>
+Message-ID: <509135BF.2080700@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/12 13:57, Hiremath, Vaibhav wrote:
-> On Wed, Oct 31, 2012 at 19:11:03, Mark Jackson wrote:
+On 10/31/2012 06:56 AM, Catalin Marinas wrote:
+> On Wed, Oct 31, 2012 at 12:04:38AM +0000, Rob Herring wrote:
+>> On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
+>>> On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
+>>>> Looking at this some more, arm64 doesn't need most of what's in gic.h.
+>>>> The register defines should be moved into the .c file. The remaining
+>>>> function declarations either are not needed (i.e. gic_init) or should
+>>>> should be done like the handle_irq function pointer init. We don't want
+>>>> to have platform code calling gic_cascade_irq or gic_raise_softirq
+>>>> directly.
+>>>
+>>> Softirqs are about the SPIs which are used for SMP IPIs and platform
+>>> specific wakeup of CPUs.  And platform code _needs_ to specify the
+>>> way IPIs are delivered on the platform.  irqchip can't do that because
+>>> irqchip knows nothing about SPIs (neither does genirq.)
 >>
->> If I try the latest mainline U-Boot (or the TI branch), I just get to "Starting kernel ..." and then
->> hangs.
->>
+>> Right. v7 is unchanged, so the question is really only about how v8 will
+>> do this. Hopefully, ARM is standardizing this for v8. We probably want
+>> the gic (or other irqchip) to setup a raise_softirq function ptr on init
+>> rather than having a direct call to gic_raise_softirq.
 > 
+> In my sample ARMv8 model code I have an older version of gic.c moved to
+> drivers/irqchip and modified just for the arm64 needs. The gic_of_init()
+> function calls set_smp_cross_call(git_raise_softirq).
 > 
-> I am using Mainline u-boot and it works for me. Can you paste u-boot boot 
-> log and environment variable here?
+> http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-aarch64.git;a=commitdiff;h=5cd20480f4d7b56160b3312df14fba3b2bda6798
+> 
+> The gic_secondary_init() is done from a CPU notifier as I wanted to
+> separate this from the SoC code (even on arch/arm, all the calls to
+> gic_secondary_init() are the same, so it could be factored out to a
+> notifier or some function pointer set by gic.c).
+> 
+> And let's assume there is no need for gic_cascade_irq().
 
-------------------------
-mainline U-Boot boot log
-------------------------
-U-Boot SPL 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
-OMAP SD/MMC: 0
-reading u-boot.img
-reading u-boot.img
+What about other asm header dependencies? cpu_logical_map is needed for
+example. I guess I'll leave all those for now.
 
-
-U-Boot 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
-
-I2C:   ready
-DRAM:  256 MiB
-WARNING: Caches not enabled
-MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
-Using default environment
-
-Net:   cpsw
-Hit any key to stop autoboot:  0
-mmc0 is current device
-SD/MMC found on device 0
-reading uEnv.txt
-29 bytes read
-Loaded environment from uEnv.txt
-Importing environment from mmc ...
-4315695 bytes read
-Booting from mmc ...
-## Booting kernel from Legacy Image at 80200000 ...
-   Image Name:   Linux-3.7.0-rc1-47802-ge7289dc-d
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    4308448 Bytes = 4.1 MiB
-   Load Address: 80008000
-   Entry Point:  80008000
-   Verifying Checksum ... OK
-   Loading Kernel Image ... OK
-OK
-
-Starting kernel ...
-
-------------------------
-Contents of uEnv.txt
---------------------
-mmcrootfstype=ext2 rootwait
+Rob
