@@ -1,40 +1,39 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 31 Oct 2012 14:32:56 +0530
-Subject: [PATCH V4 0/4] ARM: tegra: Enable SLINK controller driver
-In-Reply-To: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
-References: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
-Message-ID: <1351674176-20603-5-git-send-email-ldewangan@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Oct 2012 09:05:09 +0000
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <50906B16.8060204@gmail.com>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
+ <50900C90.7070101@gmail.com> <20121030224703.GI21164@n2100.arm.linux.org.uk>
+ <50906B16.8060204@gmail.com>
+Message-ID: <20121031090508.GJ21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series modify the dts file to add the slink addresses,
-make AUXDATA in board dt files, enable slink4 for tegra30-cardhu and 
-enable slink controller defconfig.
+On Tue, Oct 30, 2012 at 07:04:38PM -0500, Rob Herring wrote:
+> On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
+> > On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
+> >> Looking at this some more, arm64 doesn't need most of what's in gic.h.
+> >> The register defines should be moved into the .c file. The remaining
+> >> function declarations either are not needed (i.e. gic_init) or should
+> >> should be done like the handle_irq function pointer init. We don't want
+> >> to have platform code calling gic_cascade_irq or gic_raise_softirq
+> >> directly.
+> > 
+> > Softirqs are about the SPIs which are used for SMP IPIs and platform
+> > specific wakeup of CPUs.  And platform code _needs_ to specify the
+> > way IPIs are delivered on the platform.  irqchip can't do that because
+> > irqchip knows nothing about SPIs (neither does genirq.)
+> 
+> Right. v7 is unchanged, so the question is really only about how v8 will
+> do this. Hopefully, ARM is standardizing this for v8. We probably want
+> the gic (or other irqchip) to setup a raise_softirq function ptr on init
+> rather than having a direct call to gic_raise_softirq.
 
-Changes from V1: 
-- Remove changes from clock tables.
-- Make the dma req dt property name to nvidia,dma-request-selector.
-- change the spi max frequency prop to spi-max-frequency.
+We already have that, except it's up to platforms to setup that pointer
+via a function call into the SMP code - it's called set_smp_cross_call().
+We could move that into the GIC code, as we don't have anyone with a GIC
+which doesn't use gic_raise_softirq.
 
-Changes from V2: 
-- make node name to spi.
-- get rid of iomap.h.
-
-Changes from V3:
-- Enable spi flash connected on slink4-cs1.
-- Enable require defconfigs.
-
-Laxman Dewangan (4):
-  ARM: tegra: dts: add slink controller dt entry
-  ARM: tegra: Add OF_DEV_AUXDATA for SLINK driver in board dt
-  ARM: tegra: dts: cardhu: enable SLINK4
-  ARM: tegra: config: enable spi driver for Tegra SLINK controller
-
- .../devicetree/bindings/vendor-prefixes.txt        |    1 +
- arch/arm/boot/dts/tegra20.dtsi                     |   41 +++++++++++++
- arch/arm/boot/dts/tegra30-cardhu.dtsi              |   10 +++
- arch/arm/boot/dts/tegra30.dtsi                     |   60 ++++++++++++++++++++
- arch/arm/configs/tegra_defconfig                   |    5 +-
- arch/arm/mach-tegra/board-dt-tegra20.c             |    8 +++
- arch/arm/mach-tegra/board-dt-tegra30.c             |   12 ++++
- 7 files changed, 136 insertions(+), 1 deletions(-)
+The only thing to remember is that there's non-SMP platforms with GICs.
