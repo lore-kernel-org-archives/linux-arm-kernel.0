@@ -1,61 +1,51 @@
-From: penberg@kernel.org (Pekka Enberg)
-Date: Wed, 31 Oct 2012 09:59:40 +0200
-Subject: [PATCH] slab : allow SLAB_RED_ZONE and SLAB_STORE_USER to work on
- arm
-In-Reply-To: <1350386231-770-1-git-send-email-matthieu.castet@parrot.com>
-References: <1350386231-770-1-git-send-email-matthieu.castet@parrot.com>
-Message-ID: <CAOJsxLHQy7pshnskn+wMp=1D9+9wGQZBhFD+kjtbCSJvoW7q2Q@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 31 Oct 2012 04:18:18 -0400
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1210301120290.12697@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210180517450.8674@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210191645390.10773@utopia.booyaka.com>
+ <alpine.DEB.2.00.1210200611150.9865@utopia.booyaka.com>
+ <CAORVsuUkU3iTTFcXfYJ=_FntjiTR33Gs4z9OsNEn2Cxq7Ef-qA@mail.gmail.com>
+ <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <alpine.DEB.2.00.1210300416190.12697@utopia.booyaka.com>
+ <CAORVsuWt22yRy9cHAU1u+9K7Fy4Zi95UN4wOh2DeVe61S-u5Cg@mail.gmail.com>
+ <alpine.DEB.2.00.1210301120290.12697@utopia.booyaka.com>
+Message-ID: <CAORVsuWBwaFR_n4eMYTuC_vZ810MzSErXHM_qX78biN1Ns-k+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Paul,
 
-(Adding more people to CC.)
+On Tue, Oct 30, 2012 at 7:23 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi Jean,
+>
+> On Tue, 30 Oct 2012, Jean Pihet wrote:
+>
+>> On Tue, Oct 30, 2012 at 5:16 AM, Paul Walmsley <paul@pwsan.com> wrote:
+>> > On Tue, 23 Oct 2012, Jean Pihet wrote:
+>> >
+>> >> Let me try with the same setup as yours (bootloader images,
+>> >> omap2pus_defconfig, angstrom roots).
+>> >
+>> > Had any luck reproducing this one that Aaro & I are seeing?
+>> Unfortunately not. I could not reproduce the issue on my side, using
+>> an ES2.1 Beagleboard with the latest l-o kernel and your bootloader
+>> and rootfs images.
+>> Is there some specific to enable in order to reproduce the issue?
+>
+> Could you please post a bootlog from your terminal program, similar to
+>
+> http://www.pwsan.com/omap/testlogs/test_v3.7-rc3/20121028162003/boot/3530es3beagle/3530es3beagle_log.txt
+>
+> ?
+Yes sure. Let me try to reproduce the problem again. As said
+previously I cannot have the timeouts issue.
 
-On Tue, Oct 16, 2012 at 2:17 PM, Matthieu CASTET
-<matthieu.castet@parrot.com> wrote:
-> From: Matthieu CASTET <castet.matthieu@free.fr>
->
-> on cortexA8 (omap3) ralign is 64 and __alignof__(unsigned long long) is 8.
-> So we always disable debug.
->
-> This patch is based on 5c5e3b33b7cb959a401f823707bee006caadd76e, but fix
-> case were align < sizeof(unsigned long long).
->
-> Signed-off-by: Matthieu Castet <matthieu.castet@parrot.com>
-> CC: Russell King <rmk@arm.linux.org.uk>
-> CC: Pekka Enberg <penberg@cs.helsinki.fi>
-> ---
->  mm/slab.c |    8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
->
-> diff --git a/mm/slab.c b/mm/slab.c
-> index c685475..8427901 100644
-> --- a/mm/slab.c
-> +++ b/mm/slab.c
-> @@ -2462,9 +2462,6 @@ __kmem_cache_create (const char *name, size_t size, size_t align,
->         if (ralign < align) {
->                 ralign = align;
->         }
-> -       /* disable debug if necessary */
-> -       if (ralign > __alignof__(unsigned long long))
-> -               flags &= ~(SLAB_RED_ZONE | SLAB_STORE_USER);
->         /*
->          * 4) Store it.
->          */
-> @@ -2491,8 +2488,9 @@ __kmem_cache_create (const char *name, size_t size, size_t align,
->          */
->         if (flags & SLAB_RED_ZONE) {
->                 /* add space for red zone words */
-> -               cachep->obj_offset += sizeof(unsigned long long);
-> -               size += 2 * sizeof(unsigned long long);
-> +               int offset = max(align, sizeof(unsigned long long));
-> +               cachep->obj_offset += offset;
-> +               size += offset + sizeof(unsigned long long);
->         }
->         if (flags & SLAB_STORE_USER) {
->                 /* user store requires one word storage behind the end of
+More to come.
 
-This piece of code tends to break in peculiar ways every time someone
-touches it. I could use some more convincing in the changelog this
-time it won't...
+Jean
+>
+>
+> - Paul
