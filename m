@@ -1,70 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 31 Oct 2012 20:02:49 +0100
-Subject: [PATCH v4 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
-In-Reply-To: <20121031165303.32921a5c@infradead.org>
-References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
- <20121031095632.536d9362@infradead.org>
- <20121031131652.GM1641@pengutronix.de>
- <CAOMZO5CLxM41LYoLmPbfzSTF85Zk4B5SqHeVbGU4WjEOXw0eyg@mail.gmail.com>
- <Pine.LNX.4.64.1210311442310.12173@axis700.grange>
- <20121031165303.32921a5c@infradead.org>
-Message-ID: <20121031190249.GO1641@pengutronix.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Oct 2012 13:16:47 -0600
+Subject: [PATCH V4 0/4] ARM: tegra: Enable SLINK controller driver
+In-Reply-To: <5091607D.8010907@nvidia.com>
+References: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
+ <50915203.8030505@wwwdotorg.org> <5091607D.8010907@nvidia.com>
+Message-ID: <5091791F.4080400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 04:53:03PM -0200, Mauro Carvalho Chehab wrote:
-> Em Wed, 31 Oct 2012 14:53:47 +0100 (CET)
-> Guennadi Liakhovetski <g.liakhovetski@gmx.de> escreveu:
+On 10/31/2012 11:31 AM, Laxman Dewangan wrote:
+> On Wednesday 31 October 2012 09:59 PM, Stephen Warren wrote:
+>> On 10/31/2012 03:02 AM, Laxman Dewangan wrote:
+>>> This series modify the dts file to add the slink addresses,
+>>> make AUXDATA in board dt files, enable slink4 for tegra30-cardhu and
+>>> enable slink controller defconfig.
+>> I don't appear to have received patch 1/4 this time around. I'll assume
+>> it's identical to V3, since I don't think anything needed to change
+>> there...
 > 
-> > On Wed, 31 Oct 2012, Fabio Estevam wrote:
-> > 
-> > > Hi Sascha,
-> > > 
-> > > On Wed, Oct 31, 2012 at 11:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > > 
-> > > > Quoting yourself:
-> > > >
-> > > >> Forgot to comment: as patch 2 relies on this change, the better, IMHO, is
-> > > >> to send both via the same tree. If you decide to do so, please get arm
-> > > >> maintainer's ack, instead, and we can merge both via my tree.
-> > > >
-> > > > That's why Fabio resent these patches with my Ack. You are free to take
-> > > > these.
-> > > 
-> > > I have just realized that this patch (1/2) will not apply against
-> > > media tree because it does not have commit 27b76486a3 (media:
-> > > mx2_camera: remove cpu_is_xxx by using platform_device_id), which
-> > > changes from mx2_camera.0 to imx27-camera.0.
-> > 
-> > This is exactly the reason why I wasn't able to merge it. The problem was, 
-> > that this "media: mx2_camera: remove cpu_is_xxx by using 
-> > platform_device_id" patch non-trivially touched both arch/arm/ and 
-> > drivers/media/ directories. And being patch 27/34 I didn't feel like 
-> > asking the author to redo it again:-) This confirms, that it's better to 
-> > avoid such overlapping patches whenever possible.
-> > 
-> > > So it seems to be better to merge this via arm tree to avoid such conflict.
-> 
-> I agree with Fabio and Guennadi. There are so many changes happening at arm
-> that merging those two patches there will likely be easier for everybody.
+> Yes, it is identical to V3, no change on the 1/4.
 
-Ok, then I'll take them. I wasn't aware in arm-soc are sitting patches
-for this driver already.
+OK, I have applied the series now. Thanks.
 
-> 
-> Otherwise, I'll need to pull from some arm tree that never rebase, with
-> the needed patches, and coordinate with you during the merge window,
-> to be sure that patches will arrive there at the right order, from the
-> right tree.
+BTW, I noticed that the Cardu board files sets the SPI controller's max
+frequency to 25MHZ (which is consistent with the commit description) but
+the SPI flash node's frequency to 20MHz. Was that intended, or should I
+fix it up to be 25MHz?
 
-Hopefully these kind of cross dependencies become fewer over time. SoC
-code is getting smaller and gets better abstracted from the drivers, so
-chances are good.
+> Only change in 3/4 and 4/4. I realize later that you already applied the
+> 2/4 yesterday.
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Oops, that was a mistake; I forgot to pull it out after testing and not
+getting it to work. Oh well.
