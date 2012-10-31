@@ -1,57 +1,49 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Wed, 31 Oct 2012 09:56:32 -0200
-Subject: [PATCH v4 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
-In-Reply-To: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
-References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20121031095632.536d9362@infradead.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 31 Oct 2012 11:56:29 +0000
+Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <50906B16.8060204@gmail.com>
+References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
+ <1351608860-24617-2-git-send-email-robherring2@gmail.com>
+ <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
+ <50900C90.7070101@gmail.com>
+ <20121030224703.GI21164@n2100.arm.linux.org.uk>
+ <50906B16.8060204@gmail.com>
+Message-ID: <20121031115627.GA9123@localhost.conference>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 30 Oct 2012 10:03:25 -0200
-Fabio Estevam <fabio.estevam@freescale.com> escreveu:
-
-> During the clock conversion for mx27 the "per4_gate" clock was missed to get
-> registered as a dependency of mx2-camera driver.
+On Wed, Oct 31, 2012 at 12:04:38AM +0000, Rob Herring wrote:
+> On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
+> > On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
+> >> Looking at this some more, arm64 doesn't need most of what's in gic.h.
+> >> The register defines should be moved into the .c file. The remaining
+> >> function declarations either are not needed (i.e. gic_init) or should
+> >> should be done like the handle_irq function pointer init. We don't want
+> >> to have platform code calling gic_cascade_irq or gic_raise_softirq
+> >> directly.
+> > 
+> > Softirqs are about the SPIs which are used for SMP IPIs and platform
+> > specific wakeup of CPUs.  And platform code _needs_ to specify the
+> > way IPIs are delivered on the platform.  irqchip can't do that because
+> > irqchip knows nothing about SPIs (neither does genirq.)
 > 
-> In the old mx27 clock driver we used to have:
-> 
-> DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
-> 
-> ,so does the same in the new clock driver
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Right. v7 is unchanged, so the question is really only about how v8 will
+> do this. Hopefully, ARM is standardizing this for v8. We probably want
+> the gic (or other irqchip) to setup a raise_softirq function ptr on init
+> rather than having a direct call to gic_raise_softirq.
 
-As it seems that those patches depend on some patches at the arm tree,
-the better is to merge them via -arm tree.
+In my sample ARMv8 model code I have an older version of gic.c moved to
+drivers/irqchip and modified just for the arm64 needs. The gic_of_init()
+function calls set_smp_cross_call(git_raise_softirq).
 
-So,
+http://git.kernel.org/?p=linux/kernel/git/cmarinas/linux-aarch64.git;a=commitdiff;h=5cd20480f4d7b56160b3312df14fba3b2bda6798
 
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+The gic_secondary_init() is done from a CPU notifier as I wanted to
+separate this from the SoC code (even on arch/arm, all the calls to
+gic_secondary_init() are the same, so it could be factored out to a
+notifier or some function pointer set by gic.c).
 
-> ---
-> Changes since v3:
-> - Use imx27-camera.0 instead of mx2-camera.0, due to recent changes in the
-> imx27 clock (commit 27b76486a3: media: mx2_camera: remove cpu_is_xxx by using platform_device_id)
-> 
->  arch/arm/mach-imx/clk-imx27.c |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
-> index 585ab25..2880bd9 100644
-> --- a/arch/arm/mach-imx/clk-imx27.c
-> +++ b/arch/arm/mach-imx/clk-imx27.c
-> @@ -224,6 +224,7 @@ int __init mx27_clocks_init(unsigned long fref)
->  	clk_register_clkdev(clk[lcdc_ipg_gate], "ipg", "imx21-fb.0");
->  	clk_register_clkdev(clk[lcdc_ahb_gate], "ahb", "imx21-fb.0");
->  	clk_register_clkdev(clk[csi_ahb_gate], "ahb", "imx27-camera.0");
-> +	clk_register_clkdev(clk[per4_gate], "per", "imx27-camera.0");
->  	clk_register_clkdev(clk[usb_div], "per", "fsl-usb2-udc");
->  	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "fsl-usb2-udc");
->  	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "fsl-usb2-udc");
+And let's assume there is no need for gic_cascade_irq().
 
-
-
-
-Cheers,
-Mauro
+-- 
+Catalin
