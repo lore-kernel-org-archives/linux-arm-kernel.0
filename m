@@ -1,34 +1,23 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 31 Oct 2012 09:35:02 +0800
-Subject: [PATCH V3 0/7] ARM: tegra30: cpuidle: add a powered-down state
-In-Reply-To: <50905876.70108@wwwdotorg.org>
-References: <1351506501-600-1-git-send-email-josephl@nvidia.com>
- <50905876.70108@wwwdotorg.org>
-Message-ID: <1351647302.5410.41.camel@jlo-ubuntu-64.nvidia.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 31 Oct 2012 11:43:34 +0800
+Subject: [PATCH 09/10] ARM: SMP: add function arch_send_wakeup_ipi_mask()
+In-Reply-To: <1351005779-30347-10-git-send-email-shawn.guo@linaro.org>
+References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
+ <1351005779-30347-10-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20121031034331.GB8100@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-10-31 at 06:45 +0800, Stephen Warren wrote:
-> On 10/29/2012 04:28 AM, Joseph Lo wrote:
-> > This adds a "powered-down" state for cpuidle. It's a power gating idle
-> > mode. It supports the secondary CPUs (i.e., CPU1-CPU3) to go into
-> > powered-down state independently. When any of the secondary CPUs go into
-> > this state, it can be power gated alone. There is a limitation on CPU0.
-> > The CPU0 can go into powered-down state only when all secondary CPU is
-> > offline. After CPU0 is in powered-down state, the CPU rail can be turned
-> > off.
+On Tue, Oct 23, 2012 at 11:22:58PM +0800, Shawn Guo wrote:
+> Add function arch_send_wakeup_ipi_mask(), so that platform code can
+> use it as an easy way to wake up cores that are in WFI.
 > 
-> This series doesn't seem to apply to Tegra's current for-next, nor
-> next-20121029. What is it based on?
-> 
-> Note: I did try merging "ARM: tegra: rename the file of "sleep-tXX" to
-> "sleep-tegraXX"" first, since I assume that's a dependency.
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Hi Stephen,
+Hi Russell,
 
-This patch set were based on next-20121026. I saw the new update for
-moving some header files on the latest "next" branch. It may cause some
-conflicts. I will update a new one later.
+Can I ask for your ack to have the patch go via arm-soc being part
+of the series?
 
-Thanks,
-Joseph
+Shawn
