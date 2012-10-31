@@ -1,47 +1,50 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 31 Oct 2012 16:19:21 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the staging tree
-Message-ID: <20121031161921.3c9a46bd03f5864eed88fc87@canb.auug.org.au>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 31 Oct 2012 05:29:05 +0000
+Subject: [PATCH 00/13] ARM: OMAP: remove prcm.[ch]
+In-Reply-To: <alpine.DEB.2.00.1210301156310.12697@utopia.booyaka.com>
+References: <20121025231818.17558.57884.stgit@dusk.lan>
+ <508E5B65.2020800@ti.com>
+ <alpine.DEB.2.00.1210301156310.12697@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB52A6E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Oct 30, 2012 at 17:27:02, Paul Walmsley wrote:
+> On Mon, 29 Oct 2012, Vaibhav Hiremath wrote:
+> 
+> > 
+> > 
+> > On 10/26/2012 4:51 AM, Paul Walmsley wrote:
+> > > Remove arch/arm/mach-omap2/prcm.c and
+> > > arch/arm/plat-omap/include/plat/prcm.h.  This is in preparation for
+> > > moving the PRM/CM code to drivers/, although to be fair, these files
+> > > should have been removed a long time ago.
+> > > 
+> > > Intended for 3.8 cleanup.  Applies on top of the existing PRM/CM split
+> > > cleanup series, and the WDTIMER cleanup series.
+> > > 
+> > 
+> > Paul,
+> > 
+> > By any chance you have branch available with these patches, so that I
+> > can validate them here at my end?
+> 
+> The current version is at
+> 
+> git://git.pwsan.com/linux-2.6
+> 
+> in the branch
+> 
+> prcm_cleanup_b_3.8
+> 
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-omap2/drm.c between commit 5e3b08749951 ("staging:
-drm/omap: add support for ARCH_MULTIPLATFORM") from the staging tree and
-commit 2a296c8f89bc ("ARM: OMAP: Make plat/omap_hwmod.h local to
-mach-omap2") from the arm-soc tree.
+Boot tested on BeagleBone platform.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Tested-By: Vaibhav Hiremath <hvaibhav@ti.com>
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Thanks,
+Vaibhav
 
-diff --cc arch/arm/mach-omap2/drm.c
-index 49a7ffb,6282cc8..0000000
---- a/arch/arm/mach-omap2/drm.c
-+++ b/arch/arm/mach-omap2/drm.c
-@@@ -23,11 -23,9 +23,11 @@@
-  #include <linux/init.h>
-  #include <linux/platform_device.h>
-  #include <linux/dma-mapping.h>
- +#include <linux/platform_data/omap_drm.h>
-  
-- #include <plat/omap_device.h>
-- #include <plat/omap_hwmod.h>
-+ #include "omap_device.h"
-+ #include "omap_hwmod.h"
- +#include <plat/cpu.h>
-  
-  #if defined(CONFIG_DRM_OMAP) || (CONFIG_DRM_OMAP_MODULE)
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/76478ec8/attachment.sig>
+> 
+> - Paul
+> 
