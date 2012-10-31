@@ -1,143 +1,130 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 31 Oct 2012 18:47:14 +0100
-Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <CACRpkdbpxR8hQ13R43T1X9be95rJNMdgNPXfT3bQOO_dZU4Fkg@mail.gmail.com>
-References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
- <1351457210-25222-2-git-send-email-stigge@antcom.de>
- <CACRpkdbpxR8hQ13R43T1X9be95rJNMdgNPXfT3bQOO_dZU4Fkg@mail.gmail.com>
-Message-ID: <50916422.2060002@antcom.de>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Wed, 31 Oct 2012 18:39:26 +0100
+Subject: [PATCH] ARM: mxs: Add support for the Armadeus Systems APF28Dev
+ docking board
+Message-ID: <1351705166-62669-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+The APF28Dev is a docking board for an APF28 SOM
 
-thanks for your notes, comments below:
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+---
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/imx28-apf28dev.dts |   92 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 93 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx28-apf28dev.dts
 
-On 10/31/2012 03:06 PM, Linus Walleij wrote:
->> +struct gpio_block *gpio_block_create(unsigned *gpios, size_t size,
->> +                                    const char *name)
->> +{
->> +       struct gpio_block *block;
->> +       struct gpio_block_chip *gbc;
->> +       struct gpio_remap *remap;
->> +       void *tmp;
->> +       int i;
->> +
->> +       if (size < 1 || size > sizeof(unsigned long) * 8)
->> +               return ERR_PTR(-EINVAL);
-> 
-> If the most GPIOs in a block is BITS_PER_LONG, why is the
-> latter clause not size > BITS_PER_LONG?
-
-Good catch, thanks! :-)
-
->> +       for (i = 0; i < size; i++)
->> +               if (!gpio_is_valid(gpios[i]))
->> +                       return ERR_PTR(-EINVAL);
->> +
->> +       block = kzalloc(sizeof(struct gpio_block), GFP_KERNEL);
->> +       if (!block)
->> +               return ERR_PTR(-ENOMEM);
-> 
-> If these were instead glued to a struct device you could do
-> devm_kzalloc() here and have it garbage collected.
-
-Good, will do.
-
-> This is why
-> https://blueprints.launchpad.net/linux-linaro/+spec/gpiochip-to-dev
-> needs to happen. (Sorry for hyperlinking.)
-> 
->> +       block->name = name;
->> +       block->ngpio = size;
->> +       block->gpio = kzalloc(sizeof(*block->gpio) * size, GFP_KERNEL);
->> +       if (!block->gpio)
->> +               goto err1;
->> +
->> +       memcpy(block->gpio, gpios, sizeof(*block->gpio) * size);
->> +
->> +       for (i = 0; i < size; i++) {
->> +               struct gpio_chip *gc = gpio_to_chip(gpios[i]);
->> +               int bit = gpios[i] - gc->base;
->> +               int index = gpio_block_chip_index(block, gc);
->> +
->> +               if (index < 0) {
->> +                       block->nchip++;
->> +                       tmp = krealloc(block->gbc,
->> +                                      sizeof(struct gpio_block_chip) *
->> +                                      block->nchip, GFP_KERNEL);
-> 
-> Don't do this dynamic array business. Use a linked list instead.
-
-OK, I checked the important spots where access to the two lists (gbc and
-remap) happen (set and get functions), and the access is always
-sequential, monotonic. So will use lists. Thanks.
-
-> [...]
-> /*
->  * Maybe I'm a bit picky on comment style but I prefer
->  * that the first line of a multi-line comment is blank.
->  * Applies everywhere.
->  */
-
-As noted earlier in the discussion, current gpiolib.c's convention is
-done first-line-not-blank. So I sticked to this (un)convention. But can
-change this - you are not the first one pointing this out. :-)
-
->> +                       if (!tmp) {
->> +                               kfree(gbc->remap);
->> +                               goto err3;
->> +                       }
->> +                       gbc->remap = tmp;
->> +                       remap = &gbc->remap[gbc->nremap - 1];
->> +                       remap->offset = bit - i;
->> +                       remap->mask = 0;
->> +               }
->> +
->> +               /* represents the mask necessary for bit reordering between
->> +                * gpio_block (i.e. as specified on gpio_block_get() and
->> +                * gpio_block_set()) and gpio_chip domain (i.e. as specified on
->> +                * the driver's .set_block() and .get_block())
->> +                */
->> +               remap->mask |= BIT(i);
->> +       }
->> +
->> +       return block;
->> +err3:
->> +       for (i = 0; i < block->nchip - 1; i++)
->> +               kfree(block->gbc[i].remap);
->> +       kfree(block->gbc);
->> +err2:
->> +       kfree(block->gpio);
->> +err1:
->> +       kfree(block);
->> +       return ERR_PTR(-ENOMEM);
->> +}
->> +EXPORT_SYMBOL_GPL(gpio_block_create);
->> +
->> +void gpio_block_free(struct gpio_block *block)
->> +{
->> +       int i;
->> +
->> +       for (i = 0; i < block->nchip; i++)
->> +               kfree(block->gbc[i].remap);
->> +       kfree(block->gpio);
->> +       kfree(block->gbc);
->> +       kfree(block);
->> +}
->> +EXPORT_SYMBOL_GPL(gpio_block_free);
-> 
-> So if we only had a real struct device  inside the gpiochip all
-> this boilerplate would go away, as devm_* take care of releasing
-> the resources.
-
-Right. I guess you mean struct gpio_block here which should have a dev?
-(Having gpiochip as a dev also would be best, though.) :-)
-
-We need a separate dev for struct gpio_block, since those can be defined
-dynamically (i.e. often) during the lifespan of gpio and gpiochip, so
-garbage collection would be deferred for too long.
-
-Thanks,
-
-Roland
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9bca96f..b451a79 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -55,6 +55,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+ 	imx23-stmp378x_devb.dtb \
+ 	imx28-apf28.dtb \
++	imx28-apf28dev.dtb \
+ 	imx28-apx4devkit.dtb \
+ 	imx28-cfa10036.dtb \
+ 	imx28-cfa10049.dtb \
+diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+new file mode 100644
+index 0000000..dde09d4
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+@@ -0,0 +1,92 @@
++/*
++ * Copyright 2012 Armadeus Systems - <support@armadeus.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/* APF28Dev is a docking board for the APF28 SOM */
++/include/ "imx28-apf28.dts"
++
++/ {
++	model = "Armadeus Systems APF28Dev docking/development board";
++	compatible = "armadeus,imx28-apf28dev", "armadeus,imx28-apf28", "fsl,imx28";
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			ssp0: ssp at 80010000 {
++				compatible = "fsl,imx28-mmc";
++				pinctrl-names = "default";
++				pinctrl-0 = <&mmc0_4bit_pins_a
++					&mmc0_cd_cfg &mmc0_sck_cfg>;
++				bus-width = <4>;
++				status = "okay";
++			};
++		};
++
++		apbx at 80040000 {
++			lradc at 80050000 {
++				status = "okay";
++			};
++
++			pwm: pwm at 80064000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pwm3_pins_a &pwm4_pins_a>;
++				status = "okay";
++			};
++
++			usbphy0: usbphy at 8007c000 {
++				status = "okay";
++			};
++
++			usbphy1: usbphy at 8007e000 {
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		usb0: usb at 80080000 {
++			vbus-supply = <&reg_usb0_vbus>;
++			status = "okay";
++		};
++
++		usb1: usb at 80090000 {
++			status = "okay";
++		};
++
++		mac1: ethernet at 800f4000 {
++			phy-mode = "rmii";
++			pinctrl-names = "default";
++			pinctrl-0 = <&mac1_pins_a>;
++			phy-reset-gpios = <&gpio0 23 0>;
++			status = "okay";
++		};
++	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_usb0_vbus: usb0_vbus {
++			compatible = "regulator-fixed";
++			regulator-name = "usb0_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio1 23 1>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		user {
++			label = "Heartbeat";
++			gpios = <&gpio0 21 0>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
+-- 
+1.7.8.6
