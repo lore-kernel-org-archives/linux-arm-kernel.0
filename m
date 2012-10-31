@@ -1,21 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Oct 2012 15:01:09 +0000
-Subject: [PATCH v2 1/5] ARM: gic: move register definitions into .c file
-In-Reply-To: <1351695517-5636-2-git-send-email-robherring2@gmail.com>
-References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
- <1351695517-5636-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20121031150109.GL21164@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 31 Oct 2012 16:04:55 +0100
+Subject: [PATCH RESEND 3/5 v6] gpiolib: Fix default attributes for class
+In-Reply-To: <1351457210-25222-4-git-send-email-stigge@antcom.de>
+References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
+ <1351457210-25222-4-git-send-email-stigge@antcom.de>
+Message-ID: <CACxGe6uNhQgG+p6iO47oWSWiDvuYQtj1x62nrTzHGPr02dj_5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 09:58:33AM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> There's only 1 user of gic registers outside of gic.c, so move the
-> register definitions into gic.c. For now, keep GIC_DIST_CNT as Tegra
-> uses it.
+On Sun, Oct 28, 2012 at 9:46 PM, Roland Stigge <stigge@antcom.de> wrote:
+> There is a race condition between creating a gpio or gpiochip device and adding
+> default attributes. This patch fixes this by defining the default attributes as
+> dev_attrs of the class. For this, it was necessary to create a separate
+> gpiochip_class besides gpio_class.
+>
+> Signed-off-by: Roland Stigge <stigge@antcom.de>
 
-> -#define GIC_DIST_CTRL			0x000
->  #define GIC_DIST_CTR			0x004
+This looks right, but I need to test it....
 
-There seems to be a disagreement here.
+g.
