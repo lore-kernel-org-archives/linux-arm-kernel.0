@@ -1,151 +1,65 @@
 From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Wed, 31 Oct 2012 18:52:09 +0200
-Subject: [RFC 3/7] capebus: Beaglebone generic cape support
+Date: Wed, 31 Oct 2012 18:52:13 +0200
+Subject: [RFC 7/7] capebus: Documentation; capebus-summary
 In-Reply-To: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
 References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
-Message-ID: <1351702333-8456-4-git-send-email-panto@antoniou-consulting.com>
+Message-ID: <1351702333-8456-8-git-send-email-panto@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introducing beaglebone generic cape support.
-
-With this you can create almost any kind of cape driver
-that doesn't require complex interconnection of the parts.
-
-Most beaglebone capes can be created with this, including
-all the display capes (DVI/VGA/LCD) with touchscreen or not,
-capes that only use i2c or spi devices, gpio-keys, leds etc.
+Small summary of capebus.
 
 Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
 ---
- drivers/capebus/capes/Kconfig             |  6 ++
- drivers/capebus/capes/Makefile            |  1 +
- drivers/capebus/capes/bone-generic-cape.c | 96 +++++++++++++++++++++++++++++++
- 3 files changed, 103 insertions(+)
- create mode 100644 drivers/capebus/capes/Kconfig
- create mode 100644 drivers/capebus/capes/Makefile
- create mode 100644 drivers/capebus/capes/bone-generic-cape.c
+ Documentation/capebus/capebus-summary | 40 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+ create mode 100644 Documentation/capebus/capebus-summary
 
-diff --git a/drivers/capebus/capes/Kconfig b/drivers/capebus/capes/Kconfig
+diff --git a/Documentation/capebus/capebus-summary b/Documentation/capebus/capebus-summary
 new file mode 100644
-index 0000000..bfe54a6
+index 0000000..742e33c
 --- /dev/null
-+++ b/drivers/capebus/capes/Kconfig
-@@ -0,0 +1,6 @@
-+config CAPEBUS_BONE_GENERIC
-+	tristate "Beaglebone Generic cape driver"
-+	depends on CAPEBUS_BONE_CONTROLLER
-+	default n
-+	help
-+	  "Select this to enable a generic cape driver; LCD/DVI capes etc"
-diff --git a/drivers/capebus/capes/Makefile b/drivers/capebus/capes/Makefile
-new file mode 100644
-index 0000000..83da381
---- /dev/null
-+++ b/drivers/capebus/capes/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_CAPEBUS_BONE_GENERIC)	+= bone-generic-cape.o
-diff --git a/drivers/capebus/capes/bone-generic-cape.c b/drivers/capebus/capes/bone-generic-cape.c
-new file mode 100644
-index 0000000..70be50a
---- /dev/null
-+++ b/drivers/capebus/capes/bone-generic-cape.c
-@@ -0,0 +1,96 @@
-+/*
-+ * Generic cape support
-+ *
-+ * Copyright (C) 2012 Pantelis Antoniou <panto@antoniou-consulting.com>
-+ * Copyright (C) 2012 Texas Instruments Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-+ */
++++ b/Documentation/capebus/capebus-summary
+@@ -0,0 +1,40 @@
++Overview of Linux kernel Capebus support
++========================================
 +
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/string.h>
-+#include <linux/timer.h>
-+#include <linux/errno.h>
-+#include <linux/init.h>
-+#include <linux/delay.h>
-+#include <linux/bitops.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/of_gpio.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/atomic.h>
-+#include <linux/clk.h>
-+#include <asm/barrier.h>
-+#include <plat/clock.h>
-+#include <plat/omap_device.h>
-+#include <linux/clkdev.h>
-+#include <linux/input/ti_am335x_tsc.h>
-+#include <linux/platform_data/ti_am335x_adc.h>
-+#include <linux/mfd/ti_am335x_tscadc.h>
++30-Oct-2012
 +
-+#include <linux/capebus/capebus-bone.h>
++What is Capebus?
++----------------
++Capebus is an abstract concept. There's no such thing as a vanilla physical
++capebus, what is there is a concept and a method on how various capebus
++based implementations can be made.
 +
-+/* fwd decl. */
-+extern struct cape_driver bonegeneric_driver;
++Capebus is created to address the problem of many SoCs that can provide a
++multitude of hardware interfaces but in order to keep costs down the main
++boards only support a limited number of them. The rest are typically brought
++out to pin connectors on to which other boards, named capes are connected and
++allow those peripherals to be used.
 +
-+static const struct of_device_id bonegeneric_of_match[] = {
-+	{
-+		.compatible = "bone-generic-cape",
-+	},	{ },
-+};
-+MODULE_DEVICE_TABLE(of, bonegeneric_of_match);
++These capes connect to the SoC interfaces but might also contain various other
++parts that may need some kind of driver to work.
 +
-+static int bonegeneric_probe(struct cape_dev *dev,
-+		const struct cape_device_id *id)
-+{
-+	struct bone_capebus_generic_info *ginfo;
-+	int err;
++Since SoCs have limited pins and pin muxing options, not all capes can work
++together so some kind of resource tracking (at least for the pins in use) is
++required.
 +
-+	err = bone_capebus_probe_prolog(dev, id);
-+	if (err != 0)
-+		return err;
++Before capebus all of this took place in the board support file, and frankly
++for boards with too many capes it was becoming unmanageable.
 +
-+	ginfo = bone_capebus_probe_generic(dev, id);
-+	if (IS_ERR_OR_NULL(ginfo))
-+		return IS_ERR(ginfo) ? PTR_ERR(ginfo) : -ENODEV;
-+	dev->drv_priv = ginfo;
-+	return 0;
-+}
++Capebus provides a virtual bus, which along with a board specific controller,
++cape drivers can be written using the standard Linux device model.
 +
-+static void bonegeneric_remove(struct cape_dev *dev)
-+{
-+	bone_capebus_remove_generic(dev->drv_priv);
-+}
++What kind of systems/boards capebus supports?
++---------------------------------------------
 +
-+struct cape_driver bonegeneric_driver = {
-+	.driver = {
-+		.name		= "bonegeneric",
-+		.owner		= THIS_MODULE,
-+		.of_match_table	= bonegeneric_of_match,
-+	},
-+	.probe		= bonegeneric_probe,
-+	.remove		= bonegeneric_remove,
-+};
++The core capebus infrastructure is not depended on any specific board.
++However capebus needs a board controller to provide services to the cape devices
++it controls. Services like addressing and resource reservation are provided
++by the board controller.
 +
-+module_capebus_driver(bonegeneric_driver);
++Capebus at the moment only support TI's Beaglebone platform.
 +
-+MODULE_AUTHOR("Pantelis Antoniou");
-+MODULE_DESCRIPTION("Beaglebone generic cape");
-+MODULE_LICENSE("GPL");
-+MODULE_ALIAS("platform:bone-generic-cape");
 -- 
 1.7.12
