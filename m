@@ -1,60 +1,61 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 31 Oct 2012 16:21:09 +0530
-Subject: [PATCH v3] ARM: dts: AM33xx: Add SPI node
-Message-ID: <1351680669-20718-1-git-send-email-avinashphilip@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 31 Oct 2012 12:07:16 +0100
+Subject: [PATCH v2] ARM: dts: am33xx: rtc node
+In-Reply-To: <1351589646-27082-1-git-send-email-afzal@ti.com>
+References: <1351589646-27082-1-git-send-email-afzal@ti.com>
+Message-ID: <50910664.1010304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add McSPI data node to AM33XX device tree file. The McSPI module (and so
-as the driver) is reused from OMAP4.
+Hi Afzal,
 
-Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-Tested-by: Matt Porter <mporter@ti.com>
----
-Changes since v2:
-        - Commit message corrected.
-	- Rebase on top of for_3.8/dts
+On 10/30/2012 10:34 AM, Afzal Mohammed wrote:
+> Add am33xx rtc node.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+> Hi Benoit,
+> 
+> This is based on your for_3.8/dts branch.
 
-Changes since v1:
-        - Corrected reg offset in reg DT entry.
+I've just applied it in the branch with a slight change in the subject.
 
-:100644 100644 97a7bd3... 6e04789... M	arch/arm/boot/dts/am33xx.dtsi
- arch/arm/boot/dts/am33xx.dtsi |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+Thanks,
+Benoit
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 97a7bd3..6e04789 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -299,5 +299,29 @@
- 				      76>;
- 			ti,hwmods = "rtc";
- 		};
-+
-+		spi0: spi at 48030000 {
-+			compatible = "ti,omap4-mcspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x48030000 0x400>;
-+			interrupt-parent = <&intc>;
-+			interrupt = <65>;
-+			ti,spi-num-cs = <2>;
-+			ti,hwmods = "spi0";
-+			status = "disabled";
-+		};
-+
-+		spi1: spi at 481a0000 {
-+			compatible = "ti,omap4-mcspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x481a0000 0x400>;
-+			interrupt-parent = <&intc>;
-+			interrupt = <125>;
-+			ti,spi-num-cs = <2>;
-+			ti,hwmods = "spi1";
-+			status = "disabled";
-+		};
- 	};
- };
--- 
-1.7.0.4
+> 
+> This has been tested on Beagle Bone.
+> 
+> Bindings along with driver changes for DT has been picked by Andrew
+> Morton and is now present in linux-next.
+> 
+> Regards
+> Afzal
+> 
+> v2
+>  1. Remove interrupt parent in rtc node.
+>  2. Modify subject as per new convention.
+> 
+> 
+>  arch/arm/boot/dts/am33xx.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 70d24b8..97a7bd3 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -291,5 +291,13 @@
+>  			ti,hwmods = "timer7";
+>  			ti,timer-pwm;
+>  		};
+> +
+> +		rtc at 44e3e000 {
+> +			compatible = "ti,da830-rtc";
+> +			reg = <0x44e3e000 0x1000>;
+> +			interrupts = <75
+> +				      76>;
+> +			ti,hwmods = "rtc";
+> +		};
+>  	};
+>  };
+> 
