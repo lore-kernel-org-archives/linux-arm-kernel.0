@@ -1,50 +1,46 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu,  1 Nov 2012 07:04:20 +0800
-Subject: [PATCH v3 8/9] i2c: pxa: configure pinmux
+Date: Thu,  1 Nov 2012 07:04:21 +0800
+Subject: [PATCH v3 9/9] pinctrl: single: dump pinmux register value
 In-Reply-To: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1351724661-29050-9-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1351724661-29050-10-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure pins by pinctrl driver.
+Dump pinmux register value, not only function part in the pinmux
+register.
+
+Also fix the issue on caluclating pin offset. The last parameter
+should be pin number, not register offset.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Ben Dooks <ben-linux@fluff.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/i2c/busses/i2c-pxa.c |    5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/pinctrl/pinctrl-single.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-pxa.c b/drivers/i2c/busses/i2c-pxa.c
-index 7c8b5d0..11e4a30 100644
---- a/drivers/i2c/busses/i2c-pxa.c
-+++ b/drivers/i2c/busses/i2c-pxa.c
-@@ -32,6 +32,7 @@
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/of_i2c.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/platform_device.h>
- #include <linux/err.h>
- #include <linux/clk.h>
-@@ -1051,6 +1052,7 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
- 			    enum pxa_i2c_types *i2c_types)
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index 3b97b65..72017e7 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -283,15 +283,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
+ 
+ static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
+ 					struct seq_file *s,
+-					unsigned offset)
++					unsigned pin)
  {
- 	struct device_node *np = pdev->dev.of_node;
-+	struct pinctrl *pinctrl;
- 	const struct of_device_id *of_id =
- 			of_match_device(i2c_pxa_dt_ids, &pdev->dev);
- 	int ret;
-@@ -1063,6 +1065,9 @@ static int i2c_pxa_probe_dt(struct platform_device *pdev, struct pxa_i2c *i2c,
- 		return ret;
- 	}
- 	pdev->id = ret;
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl))
-+		return -EPROBE_DEFER;
- 	if (of_get_property(np, "mrvl,i2c-polling", NULL))
- 		i2c->use_pio = 1;
- 	if (of_get_property(np, "mrvl,i2c-fast-mode", NULL))
+ 	struct pcs_device *pcs;
+-	unsigned val;
++	unsigned val, mux_bytes;
+ 
+ 	pcs = pinctrl_dev_get_drvdata(pctldev);
+ 
+-	val = pcs->read(pcs->base + offset);
+-	val &= pcs->fmask;
++	mux_bytes = pcs->width / BITS_PER_BYTE;
++	val = pcs->read(pcs->base + pin * mux_bytes);
+ 
+ 	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
+ }
 -- 
 1.7.10.4
