@@ -1,51 +1,62 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 31 Oct 2012 14:53:47 +0100 (CET)
-Subject: [PATCH v4 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
-In-Reply-To: <CAOMZO5CLxM41LYoLmPbfzSTF85Zk4B5SqHeVbGU4WjEOXw0eyg@mail.gmail.com>
-References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
- <20121031095632.536d9362@infradead.org> <20121031131652.GM1641@pengutronix.de>
- <CAOMZO5CLxM41LYoLmPbfzSTF85Zk4B5SqHeVbGU4WjEOXw0eyg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1210311442310.12173@axis700.grange>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 31 Oct 2012 13:57:02 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <50912A6F.1040501@mimc.co.uk>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Oct 2012, Fabio Estevam wrote:
-
-> Hi Sascha,
+On Wed, Oct 31, 2012 at 19:11:03, Mark Jackson wrote:
+> On 30/10/12 14:48, Vaibhav Hiremath wrote:
+> > 
+> > 
+> > On 10/30/2012 6:09 PM, Hiremath, Vaibhav wrote:
+> >>
+> >> Mark,
+> >>
+> >> MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
+> >> already submitted to the list recently. So MMC support will come along with
+> >> EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
+> >>
+> >>
+> >> If you refer to the Matt's repo, you should get all the patches required to 
+> >> boot MMC support -
+> >>
+> >> https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v3
+> >>
+> >>
+> > 
+> > I just tested this branch (+ one fix which Matt provided [1]) on
+> > BeagleBone, and MMC is working without any issues. I have tested with
+> > rootFS on MMC card.
+> > 
+> > 
+> > [1] - http://www.spinics.net/lists/linux-omap/msg79911.html
 > 
-> On Wed, Oct 31, 2012 at 11:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Okay, so I'm now coming up against a brick wall regarding U-Boot.
 > 
-> > Quoting yourself:
-> >
-> >> Forgot to comment: as patch 2 relies on this change, the better, IMHO, is
-> >> to send both via the same tree. If you decide to do so, please get arm
-> >> maintainer's ack, instead, and we can merge both via my tree.
-> >
-> > That's why Fabio resent these patches with my Ack. You are free to take
-> > these.
+> The Kernel boots fine (as per the tree + patch above) provided I build U-Boot using the
+> v2011.09_AM335xPSP_04.06.00.06 branch from git://arago-project.org/git/projects/u-boot-am33x.git
 > 
-> I have just realized that this patch (1/2) will not apply against
-> media tree because it does not have commit 27b76486a3 (media:
-> mx2_camera: remove cpu_is_xxx by using platform_device_id), which
-> changes from mx2_camera.0 to imx27-camera.0.
-
-This is exactly the reason why I wasn't able to merge it. The problem was, 
-that this "media: mx2_camera: remove cpu_is_xxx by using 
-platform_device_id" patch non-trivially touched both arch/arm/ and 
-drivers/media/ directories. And being patch 27/34 I didn't feel like 
-asking the author to redo it again:-) This confirms, that it's better to 
-avoid such overlapping patches whenever possible.
-
-> So it seems to be better to merge this via arm tree to avoid such conflict.
-
-Thanks
-Guennadi
-
-> Regards,
+> If I try the latest mainline U-Boot (or the TI branch), I just get to "Starting kernel ..." and then
+> hangs.
 > 
-> Fabio Estevam
+> I'm going to raise this query on the U-Boot ML, but can you let me know which U-Boot image you're
+> using ?
+> 
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+
+I am using Mainline u-boot and it works for me. Can you paste u-boot boot 
+log and environment variable here?
+
+Thanks,
+Vaibhav
+
+> Cheers
+> Mark J.
+> 
