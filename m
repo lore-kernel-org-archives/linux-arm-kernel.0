@@ -1,54 +1,50 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 31 Oct 2012 01:44:50 +0100
-Subject: [PATCH] cpufreq: Avoid calling cpufreq driver's target() routine
- if target_freq == policy->cur
-In-Reply-To: <5056958.0bPciFrxt5@vostro.rjw.lan>
-References: <1d7b6e421a335255da956804b43ce3517538409c.1351244153.git.viresh.kumar@linaro.org>
- <5056958.0bPciFrxt5@vostro.rjw.lan>
-Message-ID: <11869950.r5dVYWTkdx@vostro.rjw.lan>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 31 Oct 2012 09:26:41 +0800
+Subject: [PATCH 3/7] ARM: tegra30: cpuidle: add LP2 driver for
+ secondary CPUs
+In-Reply-To: <5090544D.3020408@wwwdotorg.org>
+References: <1349691981-31038-1-git-send-email-josephl@nvidia.com>
+ <1349691981-31038-4-git-send-email-josephl@nvidia.com>
+ <5074A74A.8010803@wwwdotorg.org>
+ <1349946918.19413.130.camel@jlo-ubuntu-64.nvidia.com>
+ <5076F2AE.6030509@wwwdotorg.org>
+ <1350012099.20241.10.camel@jlo-ubuntu-64.nvidia.com>
+ <87sj8vr517.fsf@amiettinen-lnx.nvidia.com> <5090544D.3020408@wwwdotorg.org>
+Message-ID: <1351646801.5410.32.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 26, 2012 01:17:12 PM Rafael J. Wysocki wrote:
-> On Friday, October 26, 2012 03:06:26 PM Viresh Kumar wrote:
-> > Avoid calling cpufreq driver's target() routine if new frequency is same as
-> > policies current frequency.
+On Wed, 2012-10-31 at 06:27 +0800, Stephen Warren wrote:
+> On 10/30/2012 04:03 PM, Antti P Miettinen wrote:
+> > Joseph Lo <josephl@nvidia.com> writes:
+> >>>>>> +	writel(tegra_in_lp2.bits[0], tegra_cpu_lp2_mask);
 > > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > BTW, writel_relaxed() would probably be more than enough? IRAM is mapped
+> > stronly ordered, isn't it? And there's an explicit dsb(). And the mask
+> > is observed and written only by CPUs. If there are coherence issues,
+> > they would be in the fabric? And then neither CPU barriers nor L2 sync
+> > would help, you'd need a readback, right?
 > 
-> Looks reasonable.
-> 
-> Any objection from anyone?
+> I expect there are many places where we simply default to using
+> readl/writel (e.g. due to cut/paste, their prevalence, etc.) rather than
+> explicitly using the _relaxed variants if we can. Perhaps we should do a
+> pass through all the Tegra code and clean that up sometime.
 
-OK, no objections.
+Hi Antti,
 
-Applied to the linux-next branch of linux-pm.git as v3.8 material.
+Thanks for review.
+I had updated this code from V2. The code looks like below right now.
+It's similar to "writel_relaxed" function. And I had verified this code
+in SMP environment it can sync the status of "cpu_in_lp2". I don't see
+any coherency issue in IRAM memory space right now. I knew some IO
+registers that under PPSB bus (peripheral bus) needed a readback as a
+barrier. Because PPSB queues write transactions.
+
+I had verified this on Tegra20 & Tegra30. It's reliable.
+
+*cpu_in_lp2 |= BIT(phy_cpu_id);
+or
+*cpu_in_lp2 &= ~BIT(phy_cpu_id);
 
 Thanks,
-Rafael
-
-
-> > ---
-> >  drivers/cpufreq/cpufreq.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-> > index 261ef65..28dc134 100644
-> > --- a/drivers/cpufreq/cpufreq.c
-> > +++ b/drivers/cpufreq/cpufreq.c
-> > @@ -1476,6 +1476,10 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
-> >  
-> >  	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
-> >  		target_freq, relation);
-> > +
-> > +	if (target_freq == policy->cur)
-> > +		return 0;
-> > +
-> >  	if (cpu_online(policy->cpu) && cpufreq_driver->target)
-> >  		retval = cpufreq_driver->target(policy, target_freq, relation);
-> >  
-> > 
-> 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Joseph
