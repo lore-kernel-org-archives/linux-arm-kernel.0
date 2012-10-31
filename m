@@ -1,41 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 31 Oct 2012 08:32:16 +0100
-Subject: [PATCH] Add device tree file for the armadeus apf27
-In-Reply-To: <1351626944.55016.YahooMailNeo@web28804.mail.ir2.yahoo.com>
-References: <1351268980-25347-1-git-send-email-tremyfr@yahoo.fr>
- <20121029211015.GX1641@pengutronix.de>
- <1351626944.55016.YahooMailNeo@web28804.mail.ir2.yahoo.com>
-Message-ID: <20121031073216.GI1641@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 31 Oct 2012 07:50:48 +0000
+Subject: Two questions about streaming DMA flushing
+In-Reply-To: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
+References: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
+Message-ID: <20121031075047.GA15743@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 07:55:44PM +0000, Philippe Reynes wrote:
+On Wed, Oct 31, 2012 at 02:15:04AM +0000, Li Haifeng wrote:
+> Sorry to disturb you.
 > 
+> I have two questions for streaming DMA flushing @ arch/arm/mm/cache-v7.S.
+>  
+> 1.
+> 332 ENTRY(v7_dma_map_area)
+> 333         add     r1, r1, r0
+> 334         teq     r2, #DMA_FROM_DEVICE
+> 335         beq     v7_dma_inv_range
+> 336         b       v7_dma_clean_range
+> 337 ENDPROC(v7_dma_map_area)
 > 
-> Hi Sascha,
-> >> +??? ??? osc26m {
-> 
-> >> +??? ??? ??? compatible = "fsl,imx-osc26m", "fixed-clock";
-> >> +??? ??? ??? clock-frequency = <33554432>;
-> 
-> >Is this really correct? The Datasheet specificies 26MHz, some boards
-> >have 27Mhz, but 33?
-> 
-> The clock value on this board is? 32.768kHz, so 32768 * 1024.
-> I've tried others value, all others produce weird behaviour on the serial.
+> The function of v7_dma_map_area will invalidate corresponding cache line
+> firstly and then clean the cache for  DMA_FROM_DEVICE . I am confused the
+> sequence of the operations. IMO, the invalidate should be followed by the clean
+> action. Is it right?
 
-Ok, so your board runs with the 32.768KHz clock input. I didn't know
-there are boards that use this as the reference clock. It seems this
-is not handled in the current clk code. Could you test the patch I just
-sent to the mailing list (Cced you) and provide a Tested-by tag if it
-works? The clock frequency provided in the device tree shouldn't make
-a difference then anymore. You should specify it to 0 if you have
-nothing connected there.
+If the direction is DMA_FROM_DEVICE, it only invalidates the cache (beq
+instruction).
 
-Sascha
+> 2.
+> 345 ENTRY(v7_dma_unmap_area)
+> 346         add     r1, r1, r0
+> 347         teq     r2, #DMA_TO_DEVICE
+> 348         bne     v7_dma_inv_range
+> 349         mov     pc, lr
+> 350 ENDPROC(v7_dma_unmap_area)
+> 
+> v7_dma_unmap_area, will invalidate corresponding cache line for  
+> DMA_FROM_DEVICE . But, at v7_dma_map_area, the invalidate has been done. Why do
+> this again?
+
+There can be speculative loads into the cache, so once the transfer has
+finished you need to invalidate the range again to avoid reading stale
+data (the first invalidate is needed to make sure there aren't any dirty
+cache lines that could be evicted).
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
