@@ -1,69 +1,29 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Wed, 31 Oct 2012 03:32:21 -0700
-Subject: [RFC PATCH] dt: describe base reset signal binding
-In-Reply-To: <5090161D.2030702@wwwdotorg.org>
-References: <1351028756-22309-1-git-send-email-swarren@wwwdotorg.org>
- <20121029183233.18780.11964@nucleus> <5090161D.2030702@wwwdotorg.org>
-Message-ID: <20121031103221.18780.43096@nucleus>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Wed, 31 Oct 2012 10:44:59 +0000
+Subject: AM33XX suspend-resume support (Was RE: pm: add suspend_mem and
+ suspend_standby support)
+In-Reply-To: <5090FD01.1080709@gmail.com>
+References: <20121006161429.GD12462@game.jcrosoft.org>
+ <20121009145854.GB14079@kroah.com>
+ <20121009151704.GP12801@game.jcrosoft.org>
+ <3430030.rKEkeKmzui@vostro.rjw.lan> <5075210B.3020309@ti.com>
+ <50753DD9.1080105@gmail.com>
+ <79CD15C6BA57404B839C016229A409A83EB3AF86@DBDE01.ent.ti.com>
+ <5090FD01.1080709@gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EBF5AA9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2012-10-30 11:02:05)
-> On 10/29/2012 12:32 PM, Mike Turquette wrote:
-> > Quoting Stephen Warren (2012-10-23 14:45:56)
-> >> What do people think of this? Does it sound like a good idea to go ahead
-> >> with a reset subsystem? Should we simply add a new API to the common clock
-> >> subsystem instead (and assume that reset and clock domains match 1:1).
-> >> Should this be implemented as part of the generic power management domains;
-> >> see include/linux/pm_domain.h instead?
-> >>
-> > 
-> > Hi Stephen,
-> > 
-> > I'm not sure a "reset subsystem" is necessary, but I also do not like
-> > using clocks as the keys for IP reset.
+(Changed $SUBJECT to reflect the topic being discussed)
+
+On Wed, Oct 31, 2012 at 15:57:13, Daniel Mack wrote:
+
+[...]
 > 
-> I'm not sure what you're suggesting as an alternative to a reset
-> subsystem (or API if you want something that sounds smaller!) :-)
-> 
+> May I ask whether there is anything yet I can test?
 
-My point was that I do not know if a new subsystem is necessary or not.
-Your suggestion to "simply add a new API to the common clock subsystem"
-is an example of an alternative to a whole new subsystem.  However I
-instinctively feel that the clock api is not the right place for
-reseting devices.
-
-> > I think it is more common to map IPs to struct device, no?
-> 
-> It is indeed probably common that there's a 1:1 mapping between IP
-> blocks and struct device. However, I'm sure there are plenty of
-> counter-examples; IP blocks with multiple reset domains (hence struct
-> devices that encompass multiple reset domains, or reset domains that
-> encompass multiple struct devices), just as there are many examples of
-> non-1:1 mappings between struct device and struct clk.
-> 
-
-In OMAP code we handle IP resets through the hwmod code and I prefer
-that IP-centric approach to associating IP resets with a clock node.
-Perhaps the hwmod approach could serve as inspiration for a new generic
-way to reset modules.
-
-> Even ignoring that, we'd still need to API say device_reset(struct
-> device *dev) or device_reset(struct device *dev, const char *conid)
-> wouldn't we? That's really all I meant by a reset subsystem.
-> 
-
-Of course.  The api must exist.
-
-> An alternative here would be to simply move Tegra's
-> tegra_periph_reset_{de,}assert() function prototypes into a header in
-> include/linux rather than mach-tegra/include/mach. However, I imagine at
-> least some other SoC needs a similar API, so a common API might be useful?
-
-I also agree.  I think that there was simply some confusion about how I
-responded.  To reiterate, I'm not sure whether a new subsystem should be
-created or if the API can find a home in some existing subsystem, but I
-don't think the clock framework is the right place for it.
+I am working on basic suspend-resume patches for AM33XX which builds on top of the
+current linux-omap/master. Will be posting it later this week.
 
 Regards,
-Mike
+Vaibhav
