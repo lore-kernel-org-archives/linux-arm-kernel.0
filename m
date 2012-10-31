@@ -1,56 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Oct 2012 22:36:42 +0000
-Subject: [PATCH] ARM: zynq: move ttc timer code to drivers/clocksource
-In-Reply-To: <508FBBA5.2080707@monstr.eu>
-References: <20121029185630.GA26149@beefymiracle.amer.corp.natinst.com>
- <508FBBA5.2080707@monstr.eu>
-Message-ID: <201210302236.43473.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 31 Oct 2012 08:28:53 +0100
+Subject: [PATCH] ARM i.MX27: Fix low reference clock path
+Message-ID: <1351668533-32712-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 October 2012, Michal Simek wrote:
-> On 10/29/2012 07:56 PM, Josh Cartwright wrote:
-> > Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
-> > drivers/clocksource, and out of the mach-zynq directory.
-> >
-> > The common.h (which only held the timer declaration) was renamed to
-> > xilinx_ttc.h and moved into include/linux.
-> >
-> > Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >   arch/arm/mach-zynq/Makefile      |   2 +-
-> >   arch/arm/mach-zynq/common.c      |   2 +-
-> >   arch/arm/mach-zynq/common.h      |  24 ----
-> >   arch/arm/mach-zynq/timer.c       | 298 ---------------------------------------
-> >   drivers/clocksource/Makefile     |   1 +
-> >   drivers/clocksource/xilinx_ttc.c | 297 ++++++++++++++++++++++++++++++++++++++
-> >   include/linux/xilinx_ttc.h       |  24 ++++
-> >   7 files changed, 324 insertions(+), 324 deletions(-)
+The i.MX27 clock tree can either be driven from a 26MHz oscillator
+or from a 32768Hz oscillator. The latter was not properly implemented,
+the mux between these two pathes was missing. Add this mux and while
+at it rename the 'prem' (premultiplier) clk to 'fpm' (Frequency
+Pre-Multiplier) to better match the datasheet.
 
-When you submit a patch that moves files around, please use the '-M' flag to
-git-format-patch so we can see the actual changes instead of a file being
-removed and another one added.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx27.c |   17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-> >   delete mode 100644 arch/arm/mach-zynq/common.h
-> >   delete mode 100644 arch/arm/mach-zynq/timer.c
-> >   create mode 100644 drivers/clocksource/xilinx_ttc.c
-> >   create mode 100644 include/linux/xilinx_ttc.h
-> 
-> Really?
-> If yes. shouldn't be there any better naming convention
-> especially for headers. linux/clocksource/xilinx_ttc.h.
-
-Moving it is certainly the right direction, but I think we need a better way to
-handle those forward declarations. "struct sys_timer" is actually an ARM specific
-structure, so we might just want to add all the forward declarations for the 
-timers into arch/arm/include/asm/mach/time.h. It's not ideal to do it like that,
-but I think it's much better than having a new globally visible header for
-each timer that is used on ARM.
-
-Eventually, we might want to do something similar to what we are discussing
-for the top-level IRQ controllers at the moment, where we just autodetect them
-from DT if possible, so we don't need to have any pointer to the timer from
-arch code at all.
-
-	Arnd
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 3b6b640..f8d9129 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -51,8 +51,10 @@
+ 
+ static const char *vpu_sel_clks[] = { "spll", "mpll_main2", };
+ static const char *cpu_sel_clks[] = { "mpll_main2", "mpll", };
++static const char *mpll_sel_clks[] = { "fpm", "mpll_osc_sel", };
++static const char *mpll_osc_sel_clks[] = { "ckih", "ckih_div1p5", };
+ static const char *clko_sel_clks[] = {
+-	"ckil", "prem", "ckih", "ckih",
++	"ckil", "fpm", "ckih", "ckih",
+ 	"ckih", "mpll", "spll", "cpu_div",
+ 	"ahb", "ipg", "per1_div", "per2_div",
+ 	"per3_div", "per4_div", "ssi1_div", "ssi2_div",
+@@ -79,7 +81,8 @@ enum mx27_clks {
+ 	vpu_ahb_gate, fec_ahb_gate, emma_ahb_gate, emi_ahb_gate, dma_ahb_gate,
+ 	csi_ahb_gate, brom_ahb_gate, ata_ahb_gate, wdog_ipg_gate, usb_ipg_gate,
+ 	uart6_ipg_gate, uart5_ipg_gate, uart4_ipg_gate, uart3_ipg_gate,
+-	uart2_ipg_gate, uart1_ipg_gate, clk_max
++	uart2_ipg_gate, uart1_ipg_gate, ckih_div1p5, fpm, mpll_osc_sel,
++	mpll_sel, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -91,7 +94,15 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+ 	clk[ckih] = imx_clk_fixed("ckih", fref);
+ 	clk[ckil] = imx_clk_fixed("ckil", 32768);
+-	clk[mpll] = imx_clk_pllv1("mpll", "ckih", CCM_MPCTL0);
++	clk[fpm] = imx_clk_fixed_factor("fpm", "ckil", 1024, 1);
++	clk[ckih_div1p5] = imx_clk_fixed_factor("ckih_div1p5", "ckih", 2, 3);
++
++	clk[mpll_osc_sel] = imx_clk_mux("mpll_osc_sel", CCM_CSCR, 4, 1,
++			mpll_osc_sel_clks,
++			ARRAY_SIZE(mpll_osc_sel_clks));
++	clk[mpll_sel] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks,
++			ARRAY_SIZE(mpll_sel_clks));
++	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
+ 	clk[spll] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
+ 	clk[mpll_main2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
+ 
+-- 
+1.7.10.4
