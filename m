@@ -1,82 +1,21 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 31 Oct 2012 16:00:17 +0100
-Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <1351457210-25222-2-git-send-email-stigge@antcom.de>
-References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
- <1351457210-25222-2-git-send-email-stigge@antcom.de>
-Message-ID: <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 31 Oct 2012 15:01:09 +0000
+Subject: [PATCH v2 1/5] ARM: gic: move register definitions into .c file
+In-Reply-To: <1351695517-5636-2-git-send-email-robherring2@gmail.com>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+ <1351695517-5636-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20121031150109.GL21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2012 at 9:46 PM, Roland Stigge <stigge@antcom.de> wrote:
-> The recurring task of providing simultaneous access to GPIO lines (especially
-> for bit banging protocols) needs an appropriate API.
->
-> This patch adds a kernel internal "Block GPIO" API that enables simultaneous
-> access to several GPIOs. This is done by abstracting GPIOs to an n-bit word:
-> Once requested, it provides access to a group of GPIOs which can range over
-> multiple GPIO chips.
->
-> Signed-off-by: Roland Stigge <stigge@antcom.de>
+On Wed, Oct 31, 2012 at 09:58:33AM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> There's only 1 user of gic registers outside of gic.c, so move the
+> register definitions into gic.c. For now, keep GIC_DIST_CNT as Tegra
+> uses it.
 
-Hey Roland,
+> -#define GIC_DIST_CTRL			0x000
+>  #define GIC_DIST_CTR			0x004
 
-Linus and I just sat down and talked about your changes. I think I
-understand what you need to do, but I've got concerns about the
-approach. I'm already not a big fan of the sysfs gpio interface
-design*, so you can understand that I'm not keen to extend the
-interface further. At the very least, I want to be really careful
-about the form that the extension takes.
-
-First off, thank you for writing good documentation. That makes it a
-lot easier to understand how the series is intended to be used, and I
-really appreciate it.
-
-For the API, I don't think it is a good idea at all to try and
-abstract away gpios on multiple controllers. I understand that it
-makes life a lot easier for userspace to abstract those details away,
-but the problem is that it hides very important information about how
-the system is actually constructed that is important to actually get
-things to work. For example, say you have a gpio-connected device with
-the constraint that GPIOA must change either before or at the same
-time as GPIOB, but never after. If those GPIOs are on separate
-controllers, then the order is completely undefined, and the user has
-no way to control that other than to fall back to manipulating GPIOs
-one at a time again (and losing all the performance benefits). Either
-controller affinity needs to be explicit in the API, or the API needs
-to be constraint oriented (ie. a stream of commands and individual
-commands can be coalesced if they meet the constraints**). Also, the
-API requires remapping the GPIO numbers which forces the code to be a
-lot more complex than it needs to be.
-
-I would rather see new attribute(s) added to the gpiochip's directory
-to allow modifying all the pins on a given controller. It's
-considerably less complex, and I'm a lot happier about extending the
-sysfs ABI in that way than committing to the remapping block approach.
-
-Second, the API appears a little naive in the way it approaches
-changing values. It makes the assumption that every gpio in the block
-will be written at the same time, which doesn't take into account that
-even within a block it is highly likely that only a subset of the
-gpios need to be manipulated. A lot of GPIO controllers implement
-separate 'set' and 'clear' registers for exactly this reason. The API
-needs to allow users to choose a subset for manipulation. The ABI
-needs to either have separate 'set' and 'clear' operations, or
-operations need to have both mask and value arguments. Similarly, how
-do users manipulate pin direction with this ABI?
-
-*The big problem with the sysfs interface is that each operation is
-performed on a different file descriptor. While it is convenient for
-manipulating gpios from shell scripts, it doesn't provide any good
-mechanism to restrict gpios to a specific process or keep track of
-which gpios are "opened' by userspace. Ultimately what I think what is
-really needed is a proper character device interface that can keep
-track of multiple users and who can flip which bits, but that is
-slightly out of scope for this discussion.
-** Actually, the command stream model is a very interesting idea. It
-is worth exploring. It would be a more natural ABI than the multiple
-files-and-directories model currently used. It would also eliminate
-the problems I have with the sysfs abi while still being usable from
-shell script.  :-)
-
-g.
+There seems to be a disagreement here.
