@@ -1,63 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 31 Oct 2012 04:43:16 -0600
-Subject: [PATCH 4/4] ARM: OMAP4: hwmod data: do not enable or reset the
- McPDM during kernel init
-In-Reply-To: <20121031103607.6557.64591.stgit@dusk.lan>
-References: <20121031103607.6557.64591.stgit@dusk.lan>
-Message-ID: <20121031104314.6557.36640.stgit@dusk.lan>
+From: xtfeng@gmail.com (Xiaotian Feng)
+Date: Wed, 31 Oct 2012 18:48:45 +0800
+Subject: [PATCH] mmc: s3cmci: use tasklet_kill in device remove/release process
+Message-ID: <1351680525-27253-1-git-send-email-xtfeng@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resolve this kernel boot message:
+Some driver uses tasklet_disable in device remove/release process,
+tasklet_disable will inc tasklet->count and return. If the tasklet
+is not handled yet under some softirq pressure, the tasklet will be
+placed on the tasklet_vec, never have a chance to be excuted. This might
+lead to a heavy loaded ksoftirqd, wakeup with pending_softirq, but
+tasklet is disabled. tasklet_kill should be used in this case.
 
-omap_hwmod: mcpdm: cannot be enabled for reset (3)
-
-The McPDM on OMAP4 can only receive its functional clock from an
-off-chip source.  This source is not guaranteed to be present on the
-board, and when present, it is controlled by I2C.  This would
-introduce a board dependency to the early hwmod code which it was not
-designed to handle.  Also, neither the driver for this off-chip clock
-provider nor the I2C code is available early in boot when the hwmod
-code is attempting to enable and reset IP blocks.  This effectively
-makes it impossible to enable and reset this device during hwmod init.
-
-At its core, this patch is a workaround for an OMAP hardware problem.
-It should be possible to configure the OMAP to provide any IP block's
-functional clock from an on-chip source.  (This is true for almost
-every IP block on the chip.  As far as I know, McPDM is the only
-exception.)  If the kernel cannot reset and configure IP blocks, it
-cannot guarantee a sane SoC state.  Relying on an optional off-chip
-clock also creates a board dependency which is beyond the scope of the
-early hwmod code.
-
-This patch works around the issue by marking the McPDM hwmod record
-with the HWMOD_EXT_OPT_MAIN_CLK flag.  This prevents the hwmod
-code from touching the device early during boot.
-
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: P?ter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Beno?t Cousson <b-cousson@ti.com>
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Xiaotian Feng <dannyfeng@tencent.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-mmc at vger.kernel.org
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/mmc/host/s3cmci.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 652d028..7bddfa5 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -2125,6 +2125,14 @@ static struct omap_hwmod omap44xx_mcpdm_hwmod = {
- 	.name		= "mcpdm",
- 	.class		= &omap44xx_mcpdm_hwmod_class,
- 	.clkdm_name	= "abe_clkdm",
-+	/*
-+	 * It's suspected that the McPDM requires an off-chip main
-+	 * functional clock, controlled via I2C.  This IP block is
-+	 * currently reset very early during boot, before I2C is
-+	 * available, so it doesn't seem that we have any choice in
-+	 * the kernel other than to avoid resetting it.
-+	 */
-+	.flags		= HWMOD_EXT_OPT_MAIN_CLK,
- 	.mpu_irqs	= omap44xx_mcpdm_irqs,
- 	.sdma_reqs	= omap44xx_mcpdm_sdma_reqs,
- 	.main_clk	= "mcpdm_fck",
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 4638dda..d70d0cc 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1830,7 +1830,7 @@ static int __devexit s3cmci_remove(struct platform_device *pdev)
+ 
+ 	clk_put(host->clk);
+ 
+-	tasklet_disable(&host->pio_tasklet);
++	tasklet_kill(&host->pio_tasklet);
+ 
+ 	if (s3cmci_host_usedma(host))
+ 		s3c2410_dma_free(host->dma, &s3cmci_dma_client);
+-- 
+1.7.9.5
