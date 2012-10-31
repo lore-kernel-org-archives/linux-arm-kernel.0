@@ -1,290 +1,135 @@
-From: c.dall@virtualopensystems.com (Christoffer Dall)
-Date: Fri, 30 Nov 2012 21:52:13 -0500
-Subject: [PATCH v4 05/13] ARM: KVM: VGIC accept vcpu and dist base
- addresses from user space
-In-Reply-To: <20121128131139.GG21671@mudshark.cambridge.arm.com>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154451.3061.74235.stgit@chazy-air>
- <20121128131139.GG21671@mudshark.cambridge.arm.com>
-Message-ID: <CANM98qJnobcpkPrro0rMhbONkVEwDE2X3=MK3b-koOT7mnWivA@mail.gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Thu, 1 Nov 2012 00:58:39 +0800
+Subject: [PATCH v2 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <5085CC3F.30708@wwwdotorg.org>
+References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
+ <5085CC3F.30708@wwwdotorg.org>
+Message-ID: <CAN1soZy8xXGs8zEiZV0kV0dGVdXfZ9ogx83sFgPG76d0i8yH4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2012 at 8:11 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Nov 10, 2012 at 03:44:51PM +0000, Christoffer Dall wrote:
->> User space defines the model to emulate to a guest and should therefore
->> decide which addresses are used for both the virtual CPU interface
->> directly mapped in the guest physical address space and for the emulated
->> distributor interface, which is mapped in software by the in-kernel VGIC
->> support.
+On Tue, Oct 23, 2012 at 6:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/22/2012 10:08 AM, Haojian Zhuang wrote:
+>> Add comments with pinconf & gpio range in the document of
+>> pinctrl-single.
 >>
->> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 >> ---
->>  arch/arm/include/asm/kvm_mmu.h  |    2 +
->>  arch/arm/include/asm/kvm_vgic.h |    9 ++++++
->>  arch/arm/kvm/arm.c              |   16 ++++++++++
->>  arch/arm/kvm/vgic.c             |   61 +++++++++++++++++++++++++++++++++++++++
->>  4 files changed, 87 insertions(+), 1 deletion(-)
+>>  .../devicetree/bindings/pinctrl/pinctrl-single.txt |   52 ++++++++++++++++++++
+>>  arch/arm/boot/dts/pxa910.dtsi                      |    1 -
+>>  2 files changed, 52 insertions(+), 1 deletions(-)
 >>
->> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> index 9bd0508..0800531 100644
->> --- a/arch/arm/include/asm/kvm_mmu.h
->> +++ b/arch/arm/include/asm/kvm_mmu.h
->> @@ -26,6 +26,8 @@
->>   * To save a bit of memory and to avoid alignment issues we assume 39-bit IPA
->>   * for now, but remember that the level-1 table must be aligned to its size.
->>   */
->> +#define KVM_PHYS_SHIFT       (38)
->
-> Seems a bit small...
->
->> +#define KVM_PHYS_MASK        ((1ULL << KVM_PHYS_SHIFT) - 1)
->>  #define PTRS_PER_PGD2        512
->>  #define PGD2_ORDER   get_order(PTRS_PER_PGD2 * sizeof(pgd_t))
+>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+>> index 2c81e45..6da2f13 100644
+>> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+>> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+>> @@ -17,6 +17,36 @@ Optional properties:
+>>  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
+>>    more than one pin
 >>
->> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
->> index b444ecf..9ca8d21 100644
->> --- a/arch/arm/include/asm/kvm_vgic.h
->> +++ b/arch/arm/include/asm/kvm_vgic.h
->> @@ -20,6 +20,9 @@
->>  #define __ASM_ARM_KVM_VGIC_H
->>
->>  struct vgic_dist {
->> +     /* Distributor and vcpu interface mapping in the guest */
->> +     phys_addr_t             vgic_dist_base;
->> +     phys_addr_t             vgic_cpu_base;
->>  };
->>
->>  struct vgic_cpu {
->> @@ -31,6 +34,7 @@ struct kvm_run;
->>  struct kvm_exit_mmio;
->>
->>  #ifdef CONFIG_KVM_ARM_VGIC
->> +int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr);
->>  bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
->>                     struct kvm_exit_mmio *mmio);
->>
->> @@ -40,6 +44,11 @@ static inline int kvm_vgic_hyp_init(void)
->>       return 0;
->>  }
->>
->> +static inline int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
->> +{
->> +     return 0;
->> +}
+>> +- pinctrl-single,gpio-ranges : gpio range list
 >> +
->>  static inline int kvm_vgic_init(struct kvm *kvm)
->>  {
->>       return 0;
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 426828a..3ac1aab 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -61,6 +61,8 @@ static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
->>  static u8 kvm_next_vmid;
->>  static DEFINE_SPINLOCK(kvm_vmid_lock);
->>
->> +static bool vgic_present;
+>> +- pinctrl-single,gpio : array with gpio range start, size & register
+>> +  offset
 >> +
->>  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
->>  {
->>       BUG_ON(preemptible());
->> @@ -825,7 +827,19 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
->>  static int kvm_vm_ioctl_set_device_address(struct kvm *kvm,
->>                                          struct kvm_device_address *dev_addr)
->>  {
->> -     return -ENODEV;
->> +     unsigned long dev_id, type;
->> +
->> +     dev_id = (dev_addr->id & KVM_DEVICE_ID_MASK) >> KVM_DEVICE_ID_SHIFT;
->> +     type = (dev_addr->id & KVM_DEVICE_TYPE_MASK) >> KVM_DEVICE_TYPE_SHIFT;
->> +
->> +     switch (dev_id) {
->> +     case KVM_ARM_DEVICE_VGIC_V2:
->> +             if (!vgic_present)
->> +                     return -ENXIO;
->> +             return kvm_vgic_set_addr(kvm, type, dev_addr->addr);
->> +     default:
->> +             return -ENODEV;
->> +     }
->>  }
->>
->>  long kvm_arch_vm_ioctl(struct file *filp,
->> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
->> index 26ada3b..f85b275 100644
->> --- a/arch/arm/kvm/vgic.c
->> +++ b/arch/arm/kvm/vgic.c
->> @@ -22,6 +22,13 @@
->>  #include <linux/io.h>
->>  #include <asm/kvm_emulate.h>
->>
->> +#define VGIC_ADDR_UNDEF              (-1)
->> +#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == (typeof(_x))VGIC_ADDR_UNDEF)
->> +
->> +#define VGIC_DIST_SIZE               0x1000
->> +#define VGIC_CPU_SIZE                0x2000
+>> +- pinctrl-single,gpio-func : gpio function value in the pinmux register
 >
-> These defines might be useful to userspace so that they don't request the
-> distributor and the cpu interface to be place too close together (been there,
-> done that :).
+> Some more explanation is needed here; some questions/comments:
 >
->> +
->> +
->>  #define ACCESS_READ_VALUE    (1 << 0)
->>  #define ACCESS_READ_RAZ              (0 << 0)
->>  #define ACCESS_READ_MASK(x)  ((x) & (1 << 0))
->> @@ -136,3 +143,57 @@ bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exi
->>  {
->>       return KVM_EXIT_MMIO;
->>  }
->> +
->> +static bool vgic_ioaddr_overlap(struct kvm *kvm)
->> +{
->> +     phys_addr_t dist = kvm->arch.vgic.vgic_dist_base;
->> +     phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
->> +
->> +     if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
->> +             return false;
->> +     if ((dist <= cpu && dist + VGIC_DIST_SIZE > cpu) ||
->> +         (cpu <= dist && cpu + VGIC_CPU_SIZE > dist))
->> +             return true;
->> +     return false;
+> 1) Looking at the example, pinctrl-single,gpio-ranges is a property
+> within the main pinctrl node, whereas pinctrl-single,gpio and
+> pinctrl-single,gpio-func are properties within some other node. There's
+> no explanation of this in the binding description itself, only in the
+> example. Related to this, the documentation for
+> pinctrl-single,gpio-ranges doesn't say what it's a list of; it needs to
+> say that it's a list of phandles.
 >
-> Just return the predicate that you're testing.
->
->> +}
->> +
->> +int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
->> +{
->> +     int r = 0;
->> +     struct vgic_dist *vgic = &kvm->arch.vgic;
->> +
->> +     if (addr & ~KVM_PHYS_MASK)
->> +             return -E2BIG;
->> +
->> +     if (addr & ~PAGE_MASK)
->> +             return -EINVAL;
->> +
->> +     mutex_lock(&kvm->lock);
->> +     switch (type) {
->> +     case KVM_VGIC_V2_ADDR_TYPE_DIST:
->> +             if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_dist_base))
->> +                     return -EEXIST;
->> +             if (addr + VGIC_DIST_SIZE < addr)
->> +                     return -EINVAL;
->
-> I think somebody else pointed out the missing mutex_unlocks on the failure
-> paths.
->
->> +             kvm->arch.vgic.vgic_dist_base = addr;
->> +             break;
->> +     case KVM_VGIC_V2_ADDR_TYPE_CPU:
->> +             if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_cpu_base))
->> +                     return -EEXIST;
->> +             if (addr + VGIC_CPU_SIZE < addr)
->> +                     return -EINVAL;
->> +             kvm->arch.vgic.vgic_cpu_base = addr;
->> +             break;
->> +     default:
->> +             r = -ENODEV;
->> +     }
->> +
->> +     if (vgic_ioaddr_overlap(kvm)) {
->> +             kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
->> +             kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
->> +             return -EINVAL;
->
-> Perhaps we could put all the address checking in one place, so that the wrapping
-> round zero checks and the overlap checks can be in the same function?
->
+I'll add more comments.
 
-Like this (?):
+> 2) pinctrl-single,gpio is listed as optional. Presumably it's not; every
+> GPIO range node must have this property?
+>
+Yes, they must be included in GPIO range node. But if GPIO feature
+isn't supported in the pinctrl device, pinctrl-single,gpio is still optional.
+I'll add more comments on this.
 
-diff --git a/Documentation/virtual/kvm/api.txt
-b/Documentation/virtual/kvm/api.txt
-index 7f057a2..0b6b95e 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2163,6 +2163,7 @@ Errors:
-   ENXIO:  Device not supported on current system
-   EEXIST: Address already set
-   E2BIG:  Address outside guest physical address space
-+  EBUSY:  Address overlaps with other device range
+> 3) Why is pinctrl-single,gpio-func optional? Presumably you always need
+> to program the pinmux HW to select the GPIO function. Yet, the driver
+> code in an earlier patch seems to deliberately do nothing if this
+> property is missing. Shouldn't the DT parsing return an error instead?
+>
+pinctrl-single,gpio-func is optional for above reason.
 
- struct kvm_device_address {
- 	__u64 id;
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index f697c14..660fe24 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -1230,11 +1230,28 @@ static bool vgic_ioaddr_overlap(struct kvm *kvm)
- 	phys_addr_t cpu = kvm->arch.vgic.vgic_cpu_base;
+> 4) I'm a little confused re: the data model. Is the idea that if
+> pinctrl-single,gpio-ranges is specified, then the node describes a
+> combined pin controller and GPIO HW? Are the pin IDs of the pin
+> controller expected to match the pin IDs of the GPIO HW?
 
- 	if (IS_VGIC_ADDR_UNDEF(dist) || IS_VGIC_ADDR_UNDEF(cpu))
--		return false;
-+		return 0;
- 	if ((dist <= cpu && dist + VGIC_DIST_SIZE > cpu) ||
- 	    (cpu <= dist && cpu + VGIC_CPU_SIZE > dist))
--		return true;
--	return false;
-+		return -EBUSY;
-+	return 0;
-+}
-+
-+static int vgic_ioaddr_assign(struct kvm *kvm, phys_addr_t *ioaddr,
-+			      phys_addr_t addr, phys_addr_t size)
-+{
-+	int ret;
-+
-+	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
-+		return -EEXIST;
-+	if (addr + size < addr)
-+		return -EINVAL;
-+
-+	ret = vgic_ioaddr_overlap(kvm);
-+	if (ret)
-+		return ret;
-+	*ioaddr = addr;
-+	return ret;
- }
+GPIO function is enabled by setting proper field in mux field of pinmux
+register.
 
- int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
-@@ -1251,29 +1268,21 @@ int kvm_vgic_set_addr(struct kvm *kvm,
-unsigned long type, u64 addr)
- 	mutex_lock(&kvm->lock);
- 	switch (type) {
- 	case KVM_VGIC_V2_ADDR_TYPE_DIST:
--		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_dist_base))
--			return -EEXIST;
--		if (addr + VGIC_DIST_SIZE < addr)
--			return -EINVAL;
--		kvm->arch.vgic.vgic_dist_base = addr;
-+		r = vgic_ioaddr_assign(kvm, &vgic->vgic_dist_base,
-+				       addr, VGIC_DIST_SIZE);
- 		break;
- 	case KVM_VGIC_V2_ADDR_TYPE_CPU:
- 		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_cpu_base))
- 			return -EEXIST;
- 		if (addr + VGIC_CPU_SIZE < addr)
- 			return -EINVAL;
--		kvm->arch.vgic.vgic_cpu_base = addr;
-+		r = vgic_ioaddr_assign(kvm, &vgic->vgic_cpu_base,
-+				       addr, VGIC_CPU_SIZE);
- 		break;
- 	default:
- 		r = -ENODEV;
- 	}
+> I'm left wondering exactly which numbering space the values in
+> pinctrl-single,gpio are; do they describe the pin controller IDs that
+> this GPIO range describes, or do they describe the GPIO IDs that this
+> range describes and attempt to map them back to pin controller IDs?
+> Similarly, I'm not sure why there's a register offset here rather than
+> say a pin controller pin ID number. Shouldn't the property be a list of
+> <pin-controller-pin-ID GPIO-controller-GPIO-ID number-of-GPIOs>
+>
+Whatever it's pin ID or offset of pinmux register, they're nearly same.
+We can calculate offset from pin ID, vice visa. If pin ID is more acceptable
+by you and Tony, I can change it later.
 
--	if (vgic_ioaddr_overlap(kvm)) {
--		kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
--		kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
--		r = -EINVAL;
--	}
--
- 	mutex_unlock(&kvm->lock);
- 	return r;
- }
---
+>> +- pinctrl-single,power-source-mask : mask of setting power source in
+>> +  the pinmux register
+>> +
+>> +- pinctrl-single,power-source : value of setting power source field
+>> +  in the pinmux register
+>> +
+>> +- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
+>> +  register
+>> +
+>> +- pinctrl-single,bias-disable : value of disabling bias in the pinmux
+>> +  register
+>> +
+>> +- pinctrl-single,bias-pull-down : value of setting bias pull down in
+>> +  the pinmux register
+>> +
+>> +- pinctrl-single,bias-pull-up : value of setting bias pull up in the
+>> +  pinmux register
+>> +
+>> +- pinctrl-single,bias : value of setting bias in the pinmux register
+>> +
+>> +- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
+>> +  in the pinmux register
+>
+> I suppose it's OK that a generic pin controller binding would use the
+> generic pin configuration config options. I'm still not convinced that
+> the semantics of generic pin control make sense. Maybe if they're just
+> arbitrary names for SoC-specific things it's fine though.
+>
+> Do these patches expose /all/ generic pin configuration options? It
+> doesn't seem worth exposing only some of them and ignoring others.
+>
+I believe general pinconf can't support all cases in different silicons.
+And we still have some common features that could be covered in general
+pinconf. So we need a structure to support both pinconf & specific pinconf.
 
-Thanks,
--Christoffer
+>> +/* third controller instance for pins in gpio domain */
+>> +pmx_gpio: pinmux at d401e000 {
+>> +     compatible = "pinctrl-single";
+>> +     reg = <0xd401e000 0x0330>;
+>> +     #address-cells = <1>;
+>> +     #size-cells = <0>;
+>
+> #gpio-cells would be needed here for a GPIO controller.
+>
+>> diff --git a/arch/arm/boot/dts/pxa910.dtsi b/arch/arm/boot/dts/pxa910.dtsi
+>
+>> -                             pinctrl-single,gpio-mask = <7>;
+>
+> I assume that's a mistake; the line shouldn't be removed in this
+> documentation patch?
+>
+Yes, this part should be included in the previous patch. I'll fix it.
