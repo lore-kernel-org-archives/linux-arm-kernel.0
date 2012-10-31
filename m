@@ -1,61 +1,56 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 31 Oct 2012 16:47:15 -0600
-Subject: [RFC PATCH] dt: describe base reset signal binding
-In-Reply-To: <20121031103221.18780.43096@nucleus>
-References: <1351028756-22309-1-git-send-email-swarren@wwwdotorg.org>
- <20121029183233.18780.11964@nucleus> <5090161D.2030702@wwwdotorg.org>
- <20121031103221.18780.43096@nucleus>
-Message-ID: <5091AA73.10905@wwwdotorg.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 31 Oct 2012 23:51:33 +0100
+Subject: [PATCH v2 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <5091A5AA.7000207@wwwdotorg.org>
+References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
+ <5085CC3F.30708@wwwdotorg.org>
+ <CAN1soZy8xXGs8zEiZV0kV0dGVdXfZ9ogx83sFgPG76d0i8yH4A@mail.gmail.com>
+ <5091A5AA.7000207@wwwdotorg.org>
+Message-ID: <CAN1soZyc8Kox__yOER82Oe5OtaLJWYAoMzgWGhEonTfdf11MqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 04:32 AM, Mike Turquette wrote:
-> Quoting Stephen Warren (2012-10-30 11:02:05)
->> On 10/29/2012 12:32 PM, Mike Turquette wrote:
->>> Quoting Stephen Warren (2012-10-23 14:45:56)
->>>> What do people think of this? Does it sound like a good idea to go ahead
->>>> with a reset subsystem? Should we simply add a new API to the common clock
->>>> subsystem instead (and assume that reset and clock domains match 1:1).
->>>> Should this be implemented as part of the generic power management domains;
->>>> see include/linux/pm_domain.h instead?
->>>>
+On Wed, Oct 31, 2012 at 11:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/31/2012 10:58 AM, Haojian Zhuang wrote:
+>> On Tue, Oct 23, 2012 at 6:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> 3) Why is pinctrl-single,gpio-func optional? Presumably you always need
+>>> to program the pinmux HW to select the GPIO function. Yet, the driver
+>>> code in an earlier patch seems to deliberately do nothing if this
+>>> property is missing. Shouldn't the DT parsing return an error instead?
 >>>
->>> Hi Stephen,
+>> pinctrl-single,gpio-func is optional for above reason.
+>
+> Presumably the node that contains the pinctrl-single,gpio-func property
+> is optional, but once you have such a node, pinctrl-single,gpio-func is
+> required?
+>
+Yes, gpio-func is must required if the phandle of gpio range is defined.
+I'll add such comments in document.
+
+>>> I suppose it's OK that a generic pin controller binding would use the
+>>> generic pin configuration config options. I'm still not convinced that
+>>> the semantics of generic pin control make sense. Maybe if they're just
+>>> arbitrary names for SoC-specific things it's fine though.
 >>>
->>> I'm not sure a "reset subsystem" is necessary, but I also do not like
->>> using clocks as the keys for IP reset.
+>>> Do these patches expose /all/ generic pin configuration options? It
+>>> doesn't seem worth exposing only some of them and ignoring others.
 >>
->> I'm not sure what you're suggesting as an alternative to a reset
->> subsystem (or API if you want something that sounds smaller!) :-)
-> 
-> My point was that I do not know if a new subsystem is necessary or not.
-> Your suggestion to "simply add a new API to the common clock subsystem"
-> is an example of an alternative to a whole new subsystem.  However I
-> instinctively feel that the clock api is not the right place for
-> reseting devices.
+>> I believe general pinconf can't support all cases in different silicons.
+>
+> I tend to agree.
+>
+>> And we still have some common features that could be covered in general
+>> pinconf. So we need a structure to support both pinconf & specific pinconf.
+>
+> But that tends to imply that adding support for generic pinconf into the
+> pinctrl-simple driver isnt' actually going to be useful for anyone. If
+> pinctrl-single only supports some part of your HW, how can you use it?
+> Or, do you intend to somehow make pinctrl-single support both the common
+> generic pinconf stuff, and somehow be extensible to support any
+> SoC-specific pin config fields?
 
-driver/base/power is about the only related place I can think of given a
-quick look. However, in a similar way to clocks, I don't think there's
-necessarily a 1:1 relationship between power domains and reset domains
-either, so driver/base/power doesn't feel like a good fit in just the
-same way that drivers/clk doesn't.
-
-I wonder if a drivers/base/reset/ or drivers/base/reset.c would be
-appropriate?
-
->>> I think it is more common to map IPs to struct device, no?
->>
->> It is indeed probably common that there's a 1:1 mapping between IP
->> blocks and struct device. However, I'm sure there are plenty of
->> counter-examples; IP blocks with multiple reset domains (hence struct
->> devices that encompass multiple reset domains, or reset domains that
->> encompass multiple struct devices), just as there are many examples of
->> non-1:1 mappings between struct device and struct clk.
-> 
-> In OMAP code we handle IP resets through the hwmod code and I prefer
-> that IP-centric approach to associating IP resets with a clock node.
-> Perhaps the hwmod approach could serve as inspiration for a new generic
-> way to reset modules.
-
-OK, I'm not even slightly familiar with the hwmod code, but I keep
-hearing about it, so I'll go take a quick look.
+I'm intend to make pinctrl-single to support both the common generic pinconf
+stuff and any SoC-specific pinconf. I'll try to handle it. But they
+won't be included
+in V3.
