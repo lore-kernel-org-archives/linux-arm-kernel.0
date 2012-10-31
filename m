@@ -1,41 +1,77 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 31 Oct 2012 14:40:53 +0100
-Subject: [PATCH 2/2] clk: ux500: Register nomadik keypad clock lookups for
- u8500
-In-Reply-To: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1351690853-13021-3-git-send-email-ulf.hansson@stericsson.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 31 Oct 2012 09:46:54 -0400
+Subject: [PATCH v3 01/11] clk: davinci - add main PLL clock driver
+In-Reply-To: <509119AE.6050505@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
+ <509119AE.6050505@ti.com>
+Message-ID: <50912BCE.5000401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/clk/ux500/u8500_clk.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index 6390486..8575096 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -343,6 +343,8 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_pclk("p3_pclk5", "per3clk", U8500_CLKRST3_BASE,
- 				BIT(5), 0);
-+	clk_register_clkdev(clk, "apb_pclk", "ske");
-+	clk_register_clkdev(clk, "apb_pclk", "nmk-ske-keypad");
- 
- 	clk = clk_reg_prcc_pclk("p3_pclk6", "per3clk", U8500_CLKRST3_BASE,
- 				BIT(6), 0);
-@@ -503,6 +505,8 @@ void u8500_clk_init(void)
- 
- 	clk = clk_reg_prcc_kclk("p3_ske_kclk", "rtc32k",
- 			U8500_CLKRST3_BASE, BIT(5), CLK_SET_RATE_GATE);
-+	clk_register_clkdev(clk, NULL, "ske");
-+	clk_register_clkdev(clk, NULL, "nmk-ske-keypad");
- 
- 	clk = clk_reg_prcc_kclk("p3_uart2_kclk", "uartclk",
- 			U8500_CLKRST3_BASE, BIT(6), CLK_SET_RATE_GATE);
--- 
-1.7.10
+On 10/31/2012 08:29 AM, Sekhar Nori wrote:
+> Hi Murali,
+>
+> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+>> This is the driver for the main PLL clock hardware found on DM SoCs.
+>> This driver borrowed code from arch/arm/mach-davinci/clock.c and
+>> implemented the driver as per common clock provider API. The main PLL
+>> hardware typically has a multiplier, a pre-divider and a post-divider.
+>> Some of the SoCs has the divider fixed meaning they can not be
+>> configured through a register. HAS_PREDIV and HAS_POSTDIV flags are used
+>> to tell the driver if a hardware has these dividers present or not.
+>> Driver is configured through the struct clk_pll_data that has the
+>> SoC specific clock data.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>> diff --git a/drivers/clk/davinci/clk-pll.c b/drivers/clk/davinci/clk-pll.c
+>> +static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
+>> +					unsigned long parent_rate)
+>> +{
+>> +	struct clk_pll *pll = to_clk_pll(hw);
+>> +	struct clk_pll_data *pll_data = pll->pll_data;
+>> +	u32 mult = 1, prediv = 1, postdiv = 1;
+> No need to initialize mult here. I gave this comment last time around as
+> well.
+Yes. I missed it. I will fix it in the next revision.
+>> +	unsigned long rate = parent_rate;
+>> +
+>> +	mult = readl(pll_data->reg_pllm);
+>> +
+>> +	/*
+>> +	 * if fixed_multiplier is non zero, multiply pllm value by this
+>> +	 * value.
+>> +	 */
+>> +	if (pll_data->fixed_multiplier)
+>> +		mult =  pll_data->fixed_multiplier *
+>> +				(mult & pll_data->pllm_mask);
+>> +	else
+>> +		mult = (mult & pll_data->pllm_mask) + 1;
+> Hmm, this is interpreting the 'mult' register field differently in both
+> cases. In one case it is 'actual multiplier - 1' and in other case it is
+> the 'actual multiplier' itself. Can we be sure that the mult register
+> definition will change whenever there is a fixed multiplier in the PLL
+> block? I don't think any of the existing DaVinci devices have a fixed
+> multiplier. Is this on keystone?
+Read section 6.4.3 (PLL Mode) in DM365 documentation (SPRUFG5a.pdf) that 
+states PLL multiplies the clock by 2x the value in the PLLM. In the old 
+code this is handled by a if cpu_is_* macro that we can't use in the 
+driver. So this is represented by a fixed_multiplier that can be set to 
+2 for DM365 and zero on other SoCs.
+>> +struct clk *clk_register_davinci_pll(struct device *dev, const char *name,
+>> +			const char *parent_name,
+>> +			struct clk_pll_data *pll_data)
+>> +{
+>> +	struct clk_init_data init;
+>> +	struct clk_pll *pll;
+>> +	struct clk *clk;
+>> +
+>> +	if (!pll_data)
+>> +		return ERR_PTR(-ENODEV);
+> -EINVAL? Clearly you are treating NULL value as an invalid argument here.
+Ok. Will fix to ERR_PTR(-EINVAL).
+>
+> Thanks,
+> Sekhar
+>
