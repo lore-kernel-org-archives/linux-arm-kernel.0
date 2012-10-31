@@ -1,62 +1,60 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Thu, 1 Nov 2012 01:21:36 +0530
-Subject: [PATCH V3] mmc: omap_hsmmc: Enable HSPE bit for high speed cards
-In-Reply-To: <20121031122639.GA10998@arwen.pp.htv.fi>
-References: <1351684656-30275-1-git-send-email-gururaja.hebbar@ti.com>
- <20121031122639.GA10998@arwen.pp.htv.fi>
-Message-ID: <CAOyx1LrKBE+xzSRN4F=+e1DuMJL+5SAv-YkJWJdDw8p=kDojmw@mail.gmail.com>
+From: panto@antoniou-consulting.com (Pantelis Antoniou)
+Date: Thu, 1 Nov 2012 00:03:02 +0200
+Subject: [RFC 0/7] Capebus;
+ a bus for SoCs using simple expansion connectors
+In-Reply-To: <CA+Bv8XZEpw=811-EMCMFKgZ7z03=U-KxaXBh4oMphdzwO18f8Q@mail.gmail.com>
+References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
+ <CA+Bv8XZEpw=811-EMCMFKgZ7z03=U-KxaXBh4oMphdzwO18f8Q@mail.gmail.com>
+Message-ID: <2EA1A7B9-5457-4CD3-92E2-F97D7E46D29D@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 5:56 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Wed, Oct 31, 2012 at 05:27:36PM +0530, Hebbar, Gururaja wrote:
->> HSMMC IP on AM33xx need a special setting to handle High-speed cards.
->> Other platforms like TI81xx, OMAP4 may need this as-well. This depends
->> on the HSMMC IP timing closure done for the high speed cards.
->>
->> From AM335x TRM (SPRUH73F - 18.3.12 Output Signals Generation)
->>
->> The MMC/SD/SDIO output signals can be driven on either falling edge or
->> rising edge depending on the SD_HCTL[2] HSPE bit. This feature allows
->> to reach better timing performance, and thus to increase data transfer
->> frequency.
->>
->> There are few pre-requisites for enabling the HSPE bit
->> - Controller should support High-Speed-Enable Bit and
->> - Controller should not be using DDR Mode and
->> - Controller should advertise that it supports High Speed in
->>   capabilities register and
->> - MMC/SD clock coming out of controller > 25MHz
->>
->> Note:
->> The implementation reuses the output of calc_divisor() so as to reduce
->> code addition.
->>
->> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
->
-> this looks good to my eyes, hopefully I haven't missed anything:
->
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
->
+Hi Russ,
 
-Except for the excessively verbose comments which are just duplicating the code,
-<Quote>
->> +      * Enable High-Speed Support
->> +      * Pre-Requisites
->> +      *      - Controller should support High-Speed-Enable Bit
->> +      *      - Controller should not be using DDR Mode
->> +      *      - Controller should advertise that it supports High Speed
->> +      *        in capabilities register
->> +      *      - MMC/SD clock coming out of controller > 25MHz
->> +      */
-</Quote>
+On Oct 31, 2012, at 11:56 PM, Russ Dill wrote:
 
-I'm ok with this patch as well. I'm putting a few patches under test
-including this one,
-and will send it to Chris as part of that series.
-I'll strip out the above mentioned comments, unless there are any objections.
+> On Wed, Oct 31, 2012 at 9:52 AM, Pantelis Antoniou
+> <panto@antoniou-consulting.com> wrote:
+>> Capebus is created to address the problem of many SoCs that can provide a
+>> multitude of hardware interfaces but in order to keep costs down the main
+>> boards only support a limited number of them. The rest are typically brought
+>> out to pin connectors on to which other boards, named capes are connected and
+>> allow those peripherals to be used.
+>> 
+>> These capes connect to the SoC interfaces but might also contain various other
+>> parts that may need some kind of driver to work.
+>> 
+>> Since SoCs have limited pins and pin muxing options, not all capes can work
+>> together so some kind of resource tracking (at least for the pins in use) is
+>> required.
+>> 
+>> Before capebus all of this took place in the board support file, and frankly
+>> for boards with too many capes it was becoming unmanageable.
+>> 
+>> Capebus provides a virtual bus, which along with a board specific controller,
+>> cape drivers can be written using the standard Linux device model.
+>> 
+>> The core capebus infrastructure is not depended on any specific board.
+>> However capebus needs a board controller to provide services to the cape devices
+>> it controls. Services like addressing and resource reservation are provided
+>> by the board controller.
+>> 
+>> Capebus at the moment only support TI's Beaglebone platform.
+>> 
+>> This RFC introduces the core concept; most supporting patches
+>> have been posted to the relevant places.
+> 
+> There are quite a few TODOs in the code, any chance you could
+> summarize them in the next header email?
 
-Thanks,
-Venkat.
+Yes,
+
+Most of them deal with dealing properly with removal of the board driver and the core
+capebus stuff. And of course PM is not yet handled properly.
+
+After I get on with this part of the review, I plan to fill in the docs and 
+flesh out the TODOs more.
+
+Regards
+
+-- Pantelis
