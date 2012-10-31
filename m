@@ -1,64 +1,35 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 31 Oct 2012 14:21:40 +0530
-Subject: [PATCH V3 0/4] ARM: tegra: Enable SLINK controller driver
-In-Reply-To: <509038BA.30600@wwwdotorg.org>
-References: <1351580726-17350-1-git-send-email-ldewangan@nvidia.com>
- <509038BA.30600@wwwdotorg.org>
-Message-ID: <5090E69C.4080108@nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 31 Oct 2012 10:59:24 +0100
+Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
+In-Reply-To: <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
+References: <cover.1351591858.git.nicolas.ferre@atmel.com>
+ <75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
+ <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
+Message-ID: <5090F67C.9020104@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 October 2012 01:59 AM, Stephen Warren wrote:
-> On 10/30/2012 01:05 AM, Laxman Dewangan wrote:
->> This series modify the dts file to add the slink addresses,
->> make AUXDATA in board dt files, enable slink4 for tegra30-cardhu and
->> enable slink controller defconfig.
-> This series only instantiates the SPI controller, and not any SPI
-> devices. I tried to solve this:
->
->> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
->> index 700f0a3..3689853 100644
->> --- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
->> +++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
->> @@ -278,6 +278,11 @@
->>          spi at 7000da00 {
->>                  status = "okay";
->>                  spi-max-frequency =<25000000>;
->> +               flash at 0 {
->> +                       reg =<0>;
->> +                       compatible = "atmel,at25df321a";
->> +                       spi-max-frequency =<25000000>;
->> +               };
->>          };
+On 10/30/2012 07:22 PM, H?vard Skinnemoen :
+> On Tue, Oct 30, 2012 at 4:12 AM, David Laight <David.Laight@aculab.com> wrote:
+>>> Instead of masking head and tail every time we increment them, just let them
+>>> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
+>>> functions to do the subscripting properly to minimize the chances of messing
+>>> this up.
+>> ...
+>>> +static unsigned int macb_tx_ring_avail(struct macb *bp)
+>>> +{
+>>> +     return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
+>>> +}
 >>
->>          ahub {
-> However, this didn't work. Has the driver been tested? I'm seeing the
-> exact same problems I saw with the old driver, namely that the SPI flash
-> chip can't be identified; I think the ID bytes are read back as 0, and
-> hence drivers/mtd/devices/m25p80.c falls back to identifying the device
-> as mr25h256. Attempting to hexdump -C /dev/mtd0 gives me 32K of zeros,
-> whereas the device is 4M and full of non-zero data according to U-Boot.
->
-> Do you know what the problem is here? Can you please update the patch
-> series so that the SPI flash is instantiated and works correctly?
+>> That one doesn't look quite right to me.
+>> Surely it should be masking with 'TX_RING_SIZE - 1'
+> 
+> Why is that? head and tail can never be more than TX_RING_SIZE apart,
+> so it shouldn't make any difference.
 
-I will send the new patch series for taking care of the issue.
+Absolutely.
 
-In Cardhu, there is 2 different type of flash, Winbond and Atmel.
-There is hw rework require in Cardhu A02 to enable the serial flash and 
-it is already taken care in Cardhu A04. I will forward the hw rework 
-details to you in internal mail communication.
-
-Also Serial flash is in CS1, not in CS0. So even if you have hw rework, 
-above change will not work.
-
-I had tested on different way earlier (dynamic allocating master for 
-serial flash) and also tested on above method.
-For this I enable MTD, MTD_CHAR and MTD_M25P80.
-Debug prints as:
-[    1.279424] m25p_probe
-[    1.282536] m25p80 spi32766.1: w25q32 (4096 Kbytes)
-[    1.287418] mtd .name = spi32766.1, .size = 0x400000 (4MiB) 
-.erasesize = 0x00
-001000 (4KiB) .numeraseregions = 0
-[    1.298120] m25p_probe() returns 0
+Best regards,
+-- 
+Nicolas Ferre
