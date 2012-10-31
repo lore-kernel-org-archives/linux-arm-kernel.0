@@ -1,122 +1,72 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 31 Oct 2012 04:43:13 -0600
-Subject: [PATCH 2/4] ARM: OMAP: hwmod: wait for sysreset complete after
- enabling hwmod
+Date: Wed, 31 Oct 2012 04:43:14 -0600
+Subject: [PATCH 3/4] ARM: OMAP2+: hwmod: add flag to prevent hwmod code from
+ touching IP block during init
 In-Reply-To: <20121031103607.6557.64591.stgit@dusk.lan>
 References: <20121031103607.6557.64591.stgit@dusk.lan>
-Message-ID: <20121031104312.6557.22628.stgit@dusk.lan>
+Message-ID: <20121031104313.6557.6835.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tero Kristo <t-kristo@ti.com>
+Add HWMOD_EXT_OPT_MAIN_CLK flag to indicate that this IP block is
+dependent on an off-chip functional clock that is not guaranteed to be
+present during initialization.  IP blocks marked with this flag are
+left in the INITIALIZED state during kernel init.
 
-When waking up from off-mode, some IP blocks are reset automatically by
-hardware. For this reason, software must wait until the reset has
-completed before attempting to access the IP block.
+This is a workaround for a hardware problem.  It should be possible to
+guarantee that at least one clock source will be present and active
+for any IP block's main functional clock.  This ensures that the hwmod
+code can enable and reset the IP block.  Resetting the IP block during
+kernel init prevents any bogus bootloader, ROM code, or previous OS
+configuration from affecting the kernel.  Hopefully a clock
+multiplexer can be added on future SoCs.
 
-This patch fixes for example the bug introduced by commit
-6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c ("mmc: omap_hsmmc: remove access
-to SYSCONFIG register"), in which the MMC IP block is reset during
-off-mode entry, but the code expects the module to be already available
-during the execution of context restore.
+N.B., at some point in the future, it should be possible to query the
+clock framework for this type of information.  Then this flag should
+no longer be needed.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Venkatraman S <svenkatr@ti.com>
-Tested-by: Kevin Hilman <khilman@ti.com>
-[paul at pwsan.com: moved softreset wait code into separate function; call
- from top of _enable_sysc() rather than the bottom]
 Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Beno?t Cousson <b-cousson@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   56 +++++++++++++++++++++++++++++---------
- 1 file changed, 42 insertions(+), 14 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c             |    3 +++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 ++++++
+ 2 files changed, 9 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index b969ab1..f9d8b2a 100644
+index f9d8b2a..4529650 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -422,6 +422,38 @@ static int _set_softreset(struct omap_hwmod *oh, u32 *v)
- }
+@@ -2380,6 +2380,9 @@ static int __init _setup_reset(struct omap_hwmod *oh)
+ 	if (oh->_state != _HWMOD_STATE_INITIALIZED)
+ 		return -EINVAL;
  
- /**
-+ * _wait_softreset_complete - wait for an OCP softreset to complete
-+ * @oh: struct omap_hwmod * to wait on
-+ *
-+ * Wait until the IP block represented by @oh reports that its OCP
-+ * softreset is complete.  This can be triggered by software (see
-+ * _ocp_softreset()) or by hardware upon returning from off-mode (one
-+ * example is HSMMC).  Waits for up to MAX_MODULE_SOFTRESET_WAIT
-+ * microseconds.  Returns the number of microseconds waited.
-+ */
-+static int _wait_softreset_complete(struct omap_hwmod *oh)
-+{
-+	struct omap_hwmod_class_sysconfig *sysc;
-+	u32 softrst_mask;
-+	int c = 0;
++	if (oh->flags & HWMOD_EXT_OPT_MAIN_CLK)
++		return -EPERM;
 +
-+	sysc = oh->class->sysc;
-+
-+	if (sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
-+		omap_test_timeout((omap_hwmod_read(oh, sysc->syss_offs)
-+				   & SYSS_RESETDONE_MASK),
-+				  MAX_MODULE_SOFTRESET_WAIT, c);
-+	else if (sysc->sysc_flags & SYSC_HAS_RESET_STATUS) {
-+		softrst_mask = (0x1 << sysc->sysc_fields->srst_shift);
-+		omap_test_timeout(!(omap_hwmod_read(oh, sysc->sysc_offs)
-+				    & softrst_mask),
-+				  MAX_MODULE_SOFTRESET_WAIT, c);
-+	}
-+
-+	return c;
-+}
-+
-+/**
-  * _set_dmadisable: set OCP_SYSCONFIG.DMADISABLE bit in @v
-  * @oh: struct omap_hwmod *
-  *
-@@ -1282,6 +1314,14 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	if (!oh->class->sysc)
- 		return;
- 
-+	/*
-+	 * Wait until reset has completed, this is needed as the IP
-+	 * block is reset automatically by hardware in some cases
-+	 * (off-mode for example), and the drivers require the
-+	 * IP to be ready when they access it
-+	 */
-+	_wait_softreset_complete(oh);
-+
- 	v = oh->_sysc_cache;
- 	sf = oh->class->sysc->sysc_flags;
- 
-@@ -1804,7 +1844,7 @@ static int _am33xx_disable_module(struct omap_hwmod *oh)
+ 	if (oh->rst_lines_cnt == 0) {
+ 		r = _enable(oh);
+ 		if (r) {
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index b3349f7..1db0294 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -443,6 +443,11 @@ struct omap_hwmod_omap4_prcm {
+  *     in order to complete the reset. Optional clocks will be disabled
+  *     again after the reset.
+  * HWMOD_16BIT_REG: Module has 16bit registers
++ * HWMOD_EXT_OPT_MAIN_CLK: The only main functional clock source for
++ *     this IP block comes from an off-chip source and is not always
++ *     enabled.  This prevents the hwmod code from being able to
++ *     enable and reset the IP block early.  XXX Eventually it should
++ *     be possible to query the clock framework for this information.
   */
- static int _ocp_softreset(struct omap_hwmod *oh)
- {
--	u32 v, softrst_mask;
-+	u32 v;
- 	int c = 0;
- 	int ret = 0;
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -453,6 +458,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_NO_IDLEST				(1 << 6)
+ #define HWMOD_CONTROL_OPT_CLKS_IN_RESET		(1 << 7)
+ #define HWMOD_16BIT_REG				(1 << 8)
++#define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
  
-@@ -1834,19 +1874,7 @@ static int _ocp_softreset(struct omap_hwmod *oh)
- 	if (oh->class->sysc->srst_udelay)
- 		udelay(oh->class->sysc->srst_udelay);
- 
--	if (oh->class->sysc->sysc_flags & SYSS_HAS_RESET_STATUS)
--		omap_test_timeout((omap_hwmod_read(oh,
--						    oh->class->sysc->syss_offs)
--				   & SYSS_RESETDONE_MASK),
--				  MAX_MODULE_SOFTRESET_WAIT, c);
--	else if (oh->class->sysc->sysc_flags & SYSC_HAS_RESET_STATUS) {
--		softrst_mask = (0x1 << oh->class->sysc->sysc_fields->srst_shift);
--		omap_test_timeout(!(omap_hwmod_read(oh,
--						     oh->class->sysc->sysc_offs)
--				   & softrst_mask),
--				  MAX_MODULE_SOFTRESET_WAIT, c);
--	}
--
-+	c = _wait_softreset_complete(oh);
- 	if (c == MAX_MODULE_SOFTRESET_WAIT)
- 		pr_warning("omap_hwmod: %s: softreset failed (waited %d usec)\n",
- 			   oh->name, MAX_MODULE_SOFTRESET_WAIT);
+ /*
+  * omap_hwmod._int_flags definitions
