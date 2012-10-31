@@ -1,40 +1,42 @@
-From: tremyfr@yahoo.fr (Philippe Reynes)
-Date: Tue, 30 Oct 2012 19:55:44 +0000 (GMT)
-Subject: [PATCH] Add device tree file for the armadeus apf27
-In-Reply-To: <20121029211015.GX1641@pengutronix.de>
-References: <1351268980-25347-1-git-send-email-tremyfr@yahoo.fr>
- <20121029211015.GX1641@pengutronix.de>
-Message-ID: <1351626944.55016.YahooMailNeo@web28804.mail.ir2.yahoo.com>
+From: omycle@gmail.com (Li Haifeng)
+Date: Wed, 31 Oct 2012 10:15:04 +0800
+Subject: Two questions about streaming DMA flushing
+Message-ID: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Sorry to disturb you.
 
+I have two questions for streaming DMA flushing @ arch/arm/mm/cache-v7.S.
 
-Hi Sascha,
->> +??? ??? osc26m {
+1.
+332 ENTRY(v7_dma_map_area)
+333         add     r1, r1, r0
+334         teq     r2, #DMA_FROM_DEVICE
+335         beq     v7_dma_inv_range
+336         b       v7_dma_clean_range
+337 ENDPROC(v7_dma_map_area)
 
->> +??? ??? ??? compatible = "fsl,imx-osc26m", "fixed-clock";
->> +??? ??? ??? clock-frequency = <33554432>;
+The function of v7_dma_map_area will invalidate corresponding cache line
+firstly and then clean the cache for ?DMA_FROM_DEVICE?. I am confused the
+sequence of the operations. IMO, the invalidate should be followed by the
+clean action. Is it right?
 
->Is this really correct? The Datasheet specificies 26MHz, some boards
->have 27Mhz, but 33?
+2.
+345 ENTRY(v7_dma_unmap_area)
+346         add     r1, r1, r0
+347         teq     r2, #DMA_TO_DEVICE
+348         bne     v7_dma_inv_range
+349         mov     pc, lr
+350 ENDPROC(v7_dma_unmap_area)
 
-The clock value on this board is? 32.768kHz, so 32768 * 1024.
-I've tried others value, all others produce weird behaviour on the serial.
+v7_dma_unmap_area, will invalidate corresponding cache line for
+?DMA_FROM_DEVICE?. But, at v7_dma_map_area, the invalidate has been done.
+Why do this again?
 
->> +??? soc {
->> +??? ??? aipi at 10000000 {
->> +??? ??? ??? wdog at 10002000 {
->> +??? ??? ??? ??? status = "okay";
->> +??? ??? ??? };
-
->This node is not necessary. The watchdog is enabled already in the dtsi
->file.
-
-Yes, you're right, I'll send a v2 of this patch without the watchdog.
 
 Regards,
-Philippe
+Haifeng Li
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121030/02b8b831/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/fbdfd887/attachment-0001.html>
