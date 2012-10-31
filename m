@@ -1,39 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 31 Oct 2012 09:05:09 +0000
-Subject: [PATCH 1/3] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <50906B16.8060204@gmail.com>
-References: <1351608860-24617-1-git-send-email-robherring2@gmail.com>
- <1351608860-24617-2-git-send-email-robherring2@gmail.com>
- <20121030160129.7e39619b@skate> <508FFADC.3080506@gmail.com>
- <50900C90.7070101@gmail.com> <20121030224703.GI21164@n2100.arm.linux.org.uk>
- <50906B16.8060204@gmail.com>
-Message-ID: <20121031090508.GJ21164@n2100.arm.linux.org.uk>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 31 Oct 2012 08:57:43 -0000
+Subject: [PATCH v3 06/10] net/macb: clean up ring buffer logic
+In-Reply-To: <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
+References: <cover.1351591858.git.nicolas.ferre@atmel.com><75eb5df193c504e68ebff7d6a6a88d9a1cc678cb.1351591858.git.nicolas.ferre@atmel.com><AE90C24D6B3A694183C094C60CF0A2F6026B707D@saturn3.aculab.com>
+ <CACiLriQnQcoXFqrqNt3nkY47nR8FnXbqWjtPRp250gueHSMDmQ@mail.gmail.com>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6026B707F@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 07:04:38PM -0500, Rob Herring wrote:
-> On 10/30/2012 05:47 PM, Russell King - ARM Linux wrote:
-> > On Tue, Oct 30, 2012 at 12:21:20PM -0500, Rob Herring wrote:
-> >> Looking at this some more, arm64 doesn't need most of what's in gic.h.
-> >> The register defines should be moved into the .c file. The remaining
-> >> function declarations either are not needed (i.e. gic_init) or should
-> >> should be done like the handle_irq function pointer init. We don't want
-> >> to have platform code calling gic_cascade_irq or gic_raise_softirq
-> >> directly.
-> > 
-> > Softirqs are about the SPIs which are used for SMP IPIs and platform
-> > specific wakeup of CPUs.  And platform code _needs_ to specify the
-> > way IPIs are delivered on the platform.  irqchip can't do that because
-> > irqchip knows nothing about SPIs (neither does genirq.)
+> On Tue, Oct 30, 2012 at 4:12 AM, David Laight <David.Laight@aculab.com> wrote:
+> >> Instead of masking head and tail every time we increment them, just let them
+> >> wrap through UINT_MAX and mask them when subscripting. Add simple accessor
+> >> functions to do the subscripting properly to minimize the chances of messing
+> >> this up.
+> > ...
+> >> +static unsigned int macb_tx_ring_avail(struct macb *bp)
+> >> +{
+> >> +     return TX_RING_SIZE - (bp->tx_head - bp->tx_tail);
+> >> +}
+> >
+> > That one doesn't look quite right to me.
+> > Surely it should be masking with 'TX_RING_SIZE - 1'
 > 
-> Right. v7 is unchanged, so the question is really only about how v8 will
-> do this. Hopefully, ARM is standardizing this for v8. We probably want
-> the gic (or other irqchip) to setup a raise_softirq function ptr on init
-> rather than having a direct call to gic_raise_softirq.
+> Why is that? head and tail can never be more than TX_RING_SIZE apart,
+> so it shouldn't make any difference.
 
-We already have that, except it's up to platforms to setup that pointer
-via a function call into the SMP code - it's called set_smp_cross_call().
-We could move that into the GIC code, as we don't have anyone with a GIC
-which doesn't use gic_raise_softirq.
+It's a ring buffer (I presume) the pointers can be in either order.
 
-The only thing to remember is that there's non-SMP platforms with GICs.
+	David
