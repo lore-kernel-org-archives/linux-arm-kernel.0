@@ -1,166 +1,77 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 31 Oct 2012 16:17:27 +0100
-Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes for
- AM33XX
-In-Reply-To: <1351498881-32482-6-git-send-email-hvaibhav@ti.com>
-References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
- <1351498881-32482-6-git-send-email-hvaibhav@ti.com>
-Message-ID: <50914107.2090909@ti.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 31 Oct 2012 23:31:30 +0800
+Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
+In-Reply-To: <509032F6.1050301@gmail.com>
+References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
+ <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
+ <201210282259.46491.marex@denx.de>
+ <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
+ <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
+ <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
+ <508E4F7F.7010607@gmail.com>
+ <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
+ <508E5DFB.3060002@gmail.com>
+ <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
+ <508E61E7.7090502@gmail.com>
+ <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
+ <508E651A.5070009@gmail.com>
+ <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
+ <509032F6.1050301@gmail.com>
+Message-ID: <CAN1soZyAuo4UUze9yWKTOqwJ0TC4cf+uywWo1Ypbrcq0+zez0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Oct 31, 2012 at 4:05 AM, Daniel Mack <zonque@gmail.com> wrote:
+>
+> On 30.10.2012 21:01, Vasily Khoruzhick wrote:
+> > On Mon, Oct 29, 2012 at 2:14 PM, Daniel Mack <zonque@gmail.com> wrote:
+> >> On 29.10.2012 12:12, Vasily Khoruzhick wrote:
+> >>> On Mon, Oct 29, 2012 at 2:00 PM, Daniel Mack <zonque@gmail.com> wrote:
+> >>>
+> >>>>> Well, there's an issue - Z2 does not preserve memory contents in deep sleep
+> >>>>> (but it does in sleep), so userspace can't be fixed here unfortunatelly.
+> >>>>> There's no another possibility to turn Z2 off, and plain sleep is too
+> >>>>> power hungry.
+> >>>>> So the only way to keep Z2 in low-power mode is fake power off, which just puts
+> >>>>> Z2 in deep sleep.
+> >>>>
+> >>>> Why can't the userspace trigger a deep sleep then instead of powering
+> >>>> off? Which details do I lack?
+> >>>
+> >>> How? echo mem >/sys/power/state puts system into non-deep sleep. Anyway, kernel
+> >>> is not ready for fake power off instead of suspend (we can't resume
+> >>> from deep sleep,
+> >>> memory content is not preserved), so there can be some data loss.
+> >>> Adding some sysfs file to control sleep type does not look like a good
+> >>> idea to me.
+> >>>
+> >>> Btw, how other DT-capable boards handle power off?
+> >>
+> >> No idea. I never actually used that kind of power state.
+> >
+> > Hi Daniel,
+> >
+> > One more question: what should I use instead of pxa2xx_mfp_config in
+> > DT board to configure pin modes?
+>
+> Haojian was working on the PXA pinctrl drivers, but I don't know how far
+> that is yet.
+>
+> If that's not yet there, have a look at the pinctrl-single driver. It's
+> admittedly not as nice to use as the constants in the board file as DT
+> lacks defines for numerical constants, but's at least a workaround.
+>
+> On a more general note, it's arguable whether this kind of setup should
+> be done in the bootloader after all.
+>
+>
+> Daniel
+>
 
-On 10/29/2012 09:21 AM, Vaibhav Hiremath wrote:
-> From: Mugunthan V N <mugunthanvnm@ti.com>
-> 
-> Add CPSW and MDIO related device tree data for AM33XX.
-> Also enable them into board/evm dts files by providing
-> respective phy-id.
+I prefer to use pinctrl-single driver instead. I'm updating mmp
+pinctrol driver to
+pinctrl-single driver framework. You can find them in mailist. I'm submitting
+a third round in these days.
 
-Is there any bindings documentation for that device?
-
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Richard Cochran <richardcochran@gmail.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> ---
->  arch/arm/boot/dts/am335x-bone.dts |    8 ++++++
->  arch/arm/boot/dts/am335x-evm.dts  |    8 ++++++
->  arch/arm/boot/dts/am33xx.dtsi     |   50 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 66 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index c634f87..e233cfa 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -78,3 +78,11 @@
->  		};
->  	};
->  };
-> +
-> +&cpsw_emac0 {
-> +	phy_id = "4a101000.mdio:00";
-
-Why are you using that kind of interface? You seem to want a reference
-to a device.
-
-Cannot you have something less hard coded like:
-phy_id = <&davinci_mdio>, <0>;
-
-
-> +};
-> +
-> +&cpsw_emac1 {
-> +	phy_id = "4a101000.mdio:01";
-> +};
-> diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> index 185d632..415c3b3 100644
-> --- a/arch/arm/boot/dts/am335x-evm.dts
-> +++ b/arch/arm/boot/dts/am335x-evm.dts
-> @@ -118,3 +118,11 @@
->  		};
->  	};
->  };
-> +
-> +&cpsw_emac0 {
-> +	phy_id = "4a101000.mdio:00";
-> +};
-> +
-> +&cpsw_emac1 {
-> +	phy_id = "4a101000.mdio:01";
-> +};
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index bb31bff..f6bea04 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -210,5 +210,55 @@
->  			interrupt-parent = <&intc>;
->  			interrupts = <91>;
->  		};
-> +
-> +		mac: ethernet at 4A100000 {
-
-hexa data should be in lower case.
-
-> +			compatible = "ti,cpsw";
-> +			ti,hwmods = "cpgmac0";
-> +			cpdma_channels = <8>;
-> +			host_port_no = <0>;
-> +			cpdma_reg_ofs = <0x800>;
-> +			cpdma_sram_ofs = <0xa00>;
-> +			ale_reg_ofs = <0xd00>;
-> +			ale_entries = <1024>;
-> +			host_port_reg_ofs = <0x108>;
-> +			hw_stats_reg_ofs = <0x900>;
-> +			bd_ram_ofs = <0x2000>;
-> +			bd_ram_size = <0x2000>;
-> +			no_bd_ram = <0>;
-> +			rx_descs = <64>;
-> +			mac_control = <0x20>;
-
-Do you have to store all these data in the DTS? Cannot it be in the driver?
-
-Do you expect to have several instance of the same IP with different
-parameters here?
-
-> +			slaves = <2>;
-> +			reg = <0x4a100000 0x800
-> +				0x4a101200 0x100
-> +				0x4a101000 0x100>;
-
-Please align the address.
-
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			interrupt-parent = <&intc>;
-> +			/* c0_rx_thresh_pend c0_rx_pend c0_tx_pend c0_misc_pend*/
-
-Please use a standard multi-line comment instead of trying to put
-everything in one line.
-
-> +			interrupts = <40 41 42 43>;
-> +			ranges;
-
-You should add blank line here for readability.
-
-> +			cpsw_emac0: slave at 0 {
-
-Mmm, you are using some address later and here some relative number,
-that does not looks very consistent.
-
-> +				slave_reg_ofs = <0x208>;
-
-Is it an offset from 4a100000? Cannot you use the address for the slave
-name?
-
-Something like that: cpsw_emac0: slave at 4a100208
-
-> +				sliver_reg_ofs = <0xd80>;
-> +				/* Filled in by U-Boot */
-> +				mac-address = [ 00 00 00 00 00 00 ];
-> +			};
-
-You should add blank line here for readability.
-
-> +			cpsw_emac1: slave at 1 {
-> +				slave_reg_ofs = <0x308>;
-> +				sliver_reg_ofs = <0xdc0>;
-> +				/* Filled in by U-Boot */
-> +				mac-address = [ 00 00 00 00 00 00 ];
-> +			};
-> +
-> +			davinci_mdio: mdio at 4a101000 {
-> +				compatible = "ti,davinci_mdio";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				ti,hwmods = "davinci_mdio";
-> +				bus_freq = <1000000>;
-> +				reg = <0x4a101000 0x100>;
-> +			};
-> +
-
-Stray change.
-
-Regards,
-Benoit
+Regards
+Haojian
