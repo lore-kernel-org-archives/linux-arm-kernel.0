@@ -1,63 +1,89 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 31 Oct 2012 11:13:03 -0600
-Subject: [PATCH v2 3/5] irqchip: Move ARM GIC to drivers/irqchip
-In-Reply-To: <509146B8.2000305@gmail.com>
-References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
- <1351695517-5636-4-git-send-email-robherring2@gmail.com>
- <20121031150954.GN21164@n2100.arm.linux.org.uk> <509146B8.2000305@gmail.com>
-Message-ID: <50915C1F.3050502@wwwdotorg.org>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 31 Oct 2012 18:19:56 +0100
+Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
+ <1351457210-25222-2-git-send-email-stigge@antcom.de>
+ <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+Message-ID: <50915DBC.2000802@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 09:41 AM, Rob Herring wrote:
-> On 10/31/2012 10:09 AM, Russell King - ARM Linux wrote:
->> On Wed, Oct 31, 2012 at 09:58:35AM -0500, Rob Herring wrote:
->>> From: Rob Herring <rob.herring@calxeda.com>
->>>
->>> Now that we have drivers/irqchip, move GIC irqchip to drivers/irqchip. This
->>> is necessary to share the GIC with arm and arm64.
->>>
->>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> ---
->>>  arch/arm/common/Kconfig                            |    8 --------
->>>  arch/arm/common/Makefile                           |    1 -
->>>  drivers/irqchip/Kconfig                            |    8 ++++++++
->>>  drivers/irqchip/Makefile                           |    1 +
->>>  arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |    0
->>>  drivers/irqchip/irqchip.c                          |   10 ++++++++++
->>>  drivers/irqchip/irqchip.h                          |    1 +
->>>  7 files changed, 20 insertions(+), 9 deletions(-)
->>>  rename arch/arm/common/gic.c => drivers/irqchip/irq-gic.c (100%)
->>
->> What about its dependent arch/arm/include/asm/hardware/gic.h header,
->> which I believe after patch 1 becomes just a bunch of function calls,
->> and so no longer has any right to be in asm/hardware.
->>
->> Nothing should be moved out of arch/arm without its associated header
->> file also moving with it.
+Hi Grant,
+
+thank you for your feedback!
+
+Notes below.
+
+On 10/31/2012 04:00 PM, Grant Likely wrote:
+> Linus and I just sat down and talked about your changes. I think I
+> understand what you need to do, but I've got concerns about the
+> approach. I'm already not a big fan of the sysfs gpio interface
+> design*, so you can understand that I'm not keen to extend the
+> interface further. At the very least, I want to be really careful
+> about the form that the extension takes.
 > 
-> What is left is only used within arch/arm and I expect we will get rid
-> of the remaining users. So I didn't want to encourage any additional
-> users by moving to include/linux.
+> First off, thank you for writing good documentation. That makes it a
+> lot easier to understand how the series is intended to be used, and I
+> really appreciate it.
 > 
-> gic_secondary_init and gic_cascade_irq could be function ptrs.
-> gic_of_init can be removed once users are converted to call irqchip_init
-> instead. That leaves gic_init which are all the non-DT converted GIC
-> users and will take some time to convert. I am puzzled by tegra and zynq
-> which should be DT only already.
+> For the API, I don't think it is a good idea at all to try and
+> abstract away gpios on multiple controllers. I understand that it
+> makes life a lot easier for userspace to abstract those details away,
+> but the problem is that it hides very important information about how
+> the system is actually constructed that is important to actually get
+> things to work. For example, say you have a gpio-connected device with
+> the constraint that GPIOA must change either before or at the same
+> time as GPIOB, but never after. If those GPIOs are on separate
+> controllers, then the order is completely undefined
 
-I imagine you're talking about:
+It is correct that it's not (yet) well documented and the API is also
+not very explicit about it, but the actual approach of the manipulation
+order is to let drivers handle gpios "as simultaneous as possible" and
+when not possible, do it in the _order of bits specified_ (either
+defined at the device tree level, or when created via
+block_gpio_create() directly).
 
-        /*
-         * Check if there is a devicetree present, since the GIC will be
-         * initialized elsewhere under DT.
-         */
-        if (!of_have_populated_dt())
-                gic_init(0, 29, distbase,
-                        IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+I consider it a good thing to abstract things away if possible here, if
+it is well documented what actually happens, which info should be
+available from the definition and the possibilities of the drivers and
+hardware actually used (the optional block gpio interface must be well
+implemented in the respective driver, and when combining multiple gpio
+controller chips, it should be clear that certain realtime timings on a
+resulting virtual n-bit bus are not possible.)
 
-This is probably legacy code from when we weren't DT only, and I imagine
-can simply be removed. There are probably other pieces of code we can go
-through and remove now.
+> Second, the API appears a little naive in the way it approaches
+> changing values. It makes the assumption that every gpio in the block
+> will be written at the same time, which doesn't take into account that
+> even within a block it is highly likely that only a subset of the
+> gpios need to be manipulated. A lot of GPIO controllers implement
+> separate 'set' and 'clear' registers for exactly this reason. The API
+> needs to allow users to choose a subset for manipulation. The ABI
+> needs to either have separate 'set' and 'clear' operations, or
+> operations need to have both mask and value arguments. Similarly, how
+> do users manipulate pin direction with this ABI?
+
+I'm not sure how far you tested the API in depth: You can already define
+a block that maps onto a subset of gpios on a controller and internally
+of course maps onto those set and clear operations. Whenever you need to
+manipulate a different subset (whether disjoint or overlapping), you can
+easily define _additional_ blocks. From my experience, this solves most
+of the real world problems when n-bit busses are bit banged over GPIOs.
+Doesn't this already solve this (in a different way, though)?
+
+Pin direction currently needs to be set up separately, analogous to
+requesting gpios. Need to document this better, right. The assumption is
+that I/O needs to be efficient primarily, before bloating the API with
+direction functions. Or should I add functions for this?
+
+As long as there is no consensus about mainlining this API, I will
+maintain it further at
+
+git://git.antcom.de/linux-2.6 blockgpio
+
+because I need it in projects anyway. Will post updates that go in the
+direction that you proposed.
+
+Thanks!
+
+Roland
