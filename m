@@ -1,55 +1,75 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Wed, 31 Oct 2012 16:53:03 -0200
-Subject: [PATCH v4 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
-In-Reply-To: <Pine.LNX.4.64.1210311442310.12173@axis700.grange>
-References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
- <20121031095632.536d9362@infradead.org>
- <20121031131652.GM1641@pengutronix.de>
- <CAOMZO5CLxM41LYoLmPbfzSTF85Zk4B5SqHeVbGU4WjEOXw0eyg@mail.gmail.com>
- <Pine.LNX.4.64.1210311442310.12173@axis700.grange>
-Message-ID: <20121031165303.32921a5c@infradead.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 31 Oct 2012 19:59:04 +0100
+Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <50915DBC.2000802@antcom.de>
+References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
+ <1351457210-25222-2-git-send-email-stigge@antcom.de>
+ <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+ <50915DBC.2000802@antcom.de>
+Message-ID: <CACxGe6vEr5fd0_ZuzV=nOXVfwA7_FB5L6KJsEwMEHmVj0rDA=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, 31 Oct 2012 14:53:47 +0100 (CET)
-Guennadi Liakhovetski <g.liakhovetski@gmx.de> escreveu:
+Hi Roland
 
-> On Wed, 31 Oct 2012, Fabio Estevam wrote:
-> 
-> > Hi Sascha,
-> > 
-> > On Wed, Oct 31, 2012 at 11:16 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > 
-> > > Quoting yourself:
-> > >
-> > >> Forgot to comment: as patch 2 relies on this change, the better, IMHO, is
-> > >> to send both via the same tree. If you decide to do so, please get arm
-> > >> maintainer's ack, instead, and we can merge both via my tree.
-> > >
-> > > That's why Fabio resent these patches with my Ack. You are free to take
-> > > these.
-> > 
-> > I have just realized that this patch (1/2) will not apply against
-> > media tree because it does not have commit 27b76486a3 (media:
-> > mx2_camera: remove cpu_is_xxx by using platform_device_id), which
-> > changes from mx2_camera.0 to imx27-camera.0.
-> 
-> This is exactly the reason why I wasn't able to merge it. The problem was, 
-> that this "media: mx2_camera: remove cpu_is_xxx by using 
-> platform_device_id" patch non-trivially touched both arch/arm/ and 
-> drivers/media/ directories. And being patch 27/34 I didn't feel like 
-> asking the author to redo it again:-) This confirms, that it's better to 
-> avoid such overlapping patches whenever possible.
-> 
-> > So it seems to be better to merge this via arm tree to avoid such conflict.
+On Wed, Oct 31, 2012 at 6:19 PM, Roland Stigge <stigge@antcom.de> wrote:
+> On 10/31/2012 04:00 PM, Grant Likely wrote:
+>> For the API, I don't think it is a good idea at all to try and
+>> abstract away gpios on multiple controllers. I understand that it
+>> makes life a lot easier for userspace to abstract those details away,
+>> but the problem is that it hides very important information about how
+>> the system is actually constructed that is important to actually get
+>> things to work. For example, say you have a gpio-connected device with
+>> the constraint that GPIOA must change either before or at the same
+>> time as GPIOB, but never after. If those GPIOs are on separate
+>> controllers, then the order is completely undefined
+>
+> It is correct that it's not (yet) well documented and the API is also
+> not very explicit about it, but the actual approach of the manipulation
+> order is to let drivers handle gpios "as simultaneous as possible" and
+> when not possible, do it in the _order of bits specified_ (either
+> defined at the device tree level, or when created via
+> block_gpio_create() directly).
 
-I agree with Fabio and Guennadi. There are so many changes happening at arm
-that merging those two patches there will likely be easier for everybody. 
+The documentation is actually fine. I do understand that the intent is
+"as simultaneous as possible", but I accept the point that the order
+of specification affects the behaviour*. However, it still remains
+that the method used by the ABI abstracts at the wrong level and that
+blocking arbitrary GPIO pins into a single virtual GPIO register is a
+bad idea.
 
-Otherwise, I'll need to pull from some arm tree that never rebase, with
-the needed patches, and coordinate with you during the merge window,
-to be sure that patches will arrive there at the right order, from the
-right tree.
+*note that the current code doesn't implement that intended behaviour
+either since the gpios are processed in the order of the controllers,
+not the order of the bits.
 
-Cheers,
-Mauro
+> I'm not sure how far you tested the API in depth: You can already define
+> a block that maps onto a subset of gpios on a controller and internally
+> of course maps onto those set and clear operations. Whenever you need to
+> manipulate a different subset (whether disjoint or overlapping), you can
+> easily define _additional_ blocks. From my experience, this solves most
+> of the real world problems when n-bit busses are bit banged over GPIOs.
+> Doesn't this already solve this (in a different way, though)?
+
+Blech! Requiring a new block for each possible combination of
+write-at-once bits is a horrible ABI. That just strengthens my opinion
+that the abstraction isn't right yet.
+
+> Pin direction currently needs to be set up separately, analogous to
+> requesting gpios. Need to document this better, right. The assumption is
+> that I/O needs to be efficient primarily, before bloating the API with
+> direction functions. Or should I add functions for this?
+
+Since this is a userspace facing ABI, once it is merged it cannot be
+changed in an incompatible way. I cannot merge it until there is at
+least a plan for how to handle all of the reasonable use cases. That
+means it must support set/clear or mask operations. Also, if it sticks
+with the design of grouping pins from multiple controllers, then it
+needs to handle explicitly constraining what order operations are
+performed in at the time of the operation. At the time of setup
+doesn't work since constraints between pins may not always be in the
+same order.
+
+I really think you should consider implementing a command stream type
+of interface.
+
+g.
