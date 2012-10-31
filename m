@@ -1,86 +1,74 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Wed, 31 Oct 2012 07:03:43 -0500
-Subject: [PATCH 1/6] arm: use devicetree to get smp_twd clock
-In-Reply-To: <1351685025-26698-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1351685025-26698-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1351685025-26698-2-git-send-email-mark.langsdorf@calxeda.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 31 Oct 2012 17:59:34 +0530
+Subject: [PATCH v3 01/11] clk: davinci - add main PLL clock driver
+In-Reply-To: <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-2-git-send-email-m-karicheri2@ti.com>
+Message-ID: <509119AE.6050505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hi Murali,
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/kernel/smp_twd.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+> This is the driver for the main PLL clock hardware found on DM SoCs.
+> This driver borrowed code from arch/arm/mach-davinci/clock.c and
+> implemented the driver as per common clock provider API. The main PLL
+> hardware typically has a multiplier, a pre-divider and a post-divider.
+> Some of the SoCs has the divider fixed meaning they can not be
+> configured through a register. HAS_PREDIV and HAS_POSTDIV flags are used
+> to tell the driver if a hardware has these dividers present or not.
+> Driver is configured through the struct clk_pll_data that has the
+> SoC specific clock data.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b22d700..600fbcc 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct clk *twd_get_clock(void)
-+static struct clk *twd_get_clock(struct device_node *np)
- {
--	struct clk *clk;
-+	struct clk *clk = NULL;
- 	int err;
- 
--	clk = clk_get_sys("smp_twd", NULL);
-+	if (np)
-+		clk = of_clk_get(np, 0);
-+	if (!clk)
-+		clk = clk_get_sys("smp_twd", NULL);
- 	if (IS_ERR(clk)) {
- 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
- 		return clk;
-@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
- 		return ERR_PTR(err);
- 	}
- 
-+	twd_timer_rate = clk_get_rate(clk);
- 	return clk;
- }
- 
-@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
- 	struct clock_event_device **this_cpu_clk;
- 
--	if (!twd_clk)
--		twd_clk = twd_get_clock();
--
--	if (!IS_ERR_OR_NULL(twd_clk))
--		twd_timer_rate = clk_get_rate(twd_clk);
--	else
-+	if (IS_ERR_OR_NULL(twd_clk))
- 		twd_calibrate_rate();
- 
- 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-@@ -349,6 +348,10 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
- 	if (!twd_base)
- 		return -ENOMEM;
- 
-+	twd_clk = twd_get_clock(NULL);
-+
-+	twd_clk = twd_get_clock(NULL);
-+
- 	return twd_local_timer_common_register();
- }
- 
-@@ -383,6 +386,8 @@ void __init twd_local_timer_of_register(void)
- 		goto out;
- 	}
- 
-+	twd_clk = twd_get_clock(np);
-+
- 	err = twd_local_timer_common_register();
- 
- out:
--- 
-1.7.11.7
+> diff --git a/drivers/clk/davinci/clk-pll.c b/drivers/clk/davinci/clk-pll.c
+
+> +static unsigned long clk_pllclk_recalc(struct clk_hw *hw,
+> +					unsigned long parent_rate)
+> +{
+> +	struct clk_pll *pll = to_clk_pll(hw);
+> +	struct clk_pll_data *pll_data = pll->pll_data;
+> +	u32 mult = 1, prediv = 1, postdiv = 1;
+
+No need to initialize mult here. I gave this comment last time around as
+well.
+
+> +	unsigned long rate = parent_rate;
+> +
+> +	mult = readl(pll_data->reg_pllm);
+> +
+> +	/*
+> +	 * if fixed_multiplier is non zero, multiply pllm value by this
+> +	 * value.
+> +	 */
+> +	if (pll_data->fixed_multiplier)
+> +		mult =  pll_data->fixed_multiplier *
+> +				(mult & pll_data->pllm_mask);
+> +	else
+> +		mult = (mult & pll_data->pllm_mask) + 1;
+
+Hmm, this is interpreting the 'mult' register field differently in both
+cases. In one case it is 'actual multiplier - 1' and in other case it is
+the 'actual multiplier' itself. Can we be sure that the mult register
+definition will change whenever there is a fixed multiplier in the PLL
+block? I don't think any of the existing DaVinci devices have a fixed
+multiplier. Is this on keystone?
+
+> +struct clk *clk_register_davinci_pll(struct device *dev, const char *name,
+> +			const char *parent_name,
+> +			struct clk_pll_data *pll_data)
+> +{
+> +	struct clk_init_data init;
+> +	struct clk_pll *pll;
+> +	struct clk *clk;
+> +
+> +	if (!pll_data)
+> +		return ERR_PTR(-ENODEV);
+
+-EINVAL? Clearly you are treating NULL value as an invalid argument here.
+
+Thanks,
+Sekhar
