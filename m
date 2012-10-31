@@ -1,76 +1,80 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 31 Oct 2012 16:26:50 -0600
-Subject: [PATCH v2 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <CAN1soZy8xXGs8zEiZV0kV0dGVdXfZ9ogx83sFgPG76d0i8yH4A@mail.gmail.com>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
- <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
- <5085CC3F.30708@wwwdotorg.org>
- <CAN1soZy8xXGs8zEiZV0kV0dGVdXfZ9ogx83sFgPG76d0i8yH4A@mail.gmail.com>
-Message-ID: <5091A5AA.7000207@wwwdotorg.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 31 Oct 2012 23:37:18 +0100
+Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
+In-Reply-To: <20121025234328.GF11928@atomide.com>
+References: <1350551224-12857-1-git-send-email-haojian.zhuang@gmail.com>
+ <1350551224-12857-8-git-send-email-haojian.zhuang@gmail.com>
+ <20121019191333.GT4730@atomide.com>
+ <CAN1soZzE_tTkmPBechvUcdAbWKSScwcaqe_cb0TTmnRJi9gtRg@mail.gmail.com>
+ <20121022170917.GB4730@atomide.com>
+ <20121025234328.GF11928@atomide.com>
+Message-ID: <CAN1soZw9vd-a_t8J+C0PrhOKjL9N0g8HHPDpmBOvDCpgCgSAUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 10:58 AM, Haojian Zhuang wrote:
-> On Tue, Oct 23, 2012 at 6:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 10/22/2012 10:08 AM, Haojian Zhuang wrote:
->>> Add comments with pinconf & gpio range in the document of
->>> pinctrl-single.
-...
->>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
-...
->>> @@ -17,6 +17,36 @@ Optional properties:
->>>  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
->>>    more than one pin
->>>
->>> +- pinctrl-single,gpio-ranges : gpio range list
->>> +
->>> +- pinctrl-single,gpio : array with gpio range start, size & register
->>> +  offset
->>> +
->>> +- pinctrl-single,gpio-func : gpio function value in the pinmux register
-...
->> 2) pinctrl-single,gpio is listed as optional. Presumably it's not; every
->> GPIO range node must have this property?
+On Fri, Oct 26, 2012 at 1:43 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [121022 10:11]:
+>> * Haojian Zhuang <haojian.zhuang@gmail.com> [121022 03:11]:
+>> > On Sat, Oct 20, 2012 at 3:13 AM, Tony Lindgren <tony@atomide.com> wrote:
+>> > > * Haojian Zhuang <haojian.zhuang@gmail.com> [121018 02:08]:
+>> > >> Add pinconf generic support with POWER SOURCE, BIAS PULL.
+>> > > ...
+>> > >
+>> > >> +     case PIN_CONFIG_POWER_SOURCE:
+>> > >> +             if (pcs->psmask == PCS_OFF_DISABLED
+>> > >> +                     || pcs->psshift == PCS_OFF_DISABLED)
+>> > >> +                     return -ENOTSUPP;
+>> > >> +             data &= pcs->psmask;
+>> > >> +             data = data >> pcs->psshift;
+>> > >> +             *config = data;
+>> > >> +             return 0;
+>> > >> +             break;
+>> > >
+>> > > Hmm, only slightly related to this patch, mostly a generic
+>> > > question to others: Do others have any mux registers with
+>> > > status bits for things like PIN_CONFIG_POWER_SOURCE?
+>> > >
+>> > > I could use PIN_CONFIG_POWER_SOURCE for controlling the PBIAS
+>> > > for omap MMC. But there's also a status bit that needs to be
+>> > > checked for that. I think there was some other similar mux
+>> > > register for USB PHY that has a status register.
+>> > >
+>> > > So I'm wondering should the checking for status bit be handled
+>> > > in the pinctrl consume driver? Or should we have some bindings
+>> > > for that?
+>> > >
+>> >
+>> > Do you mean that the status register only exists in USB PHY controller or
+>> > MMC controller?
 >>
-> Yes, they must be included in GPIO range node. But if GPIO feature
-> isn't supported in the pinctrl device, pinctrl-single,gpio is still optional.
-> I'll add more comments on this.
-> 
->> 3) Why is pinctrl-single,gpio-func optional? Presumably you always need
->> to program the pinmux HW to select the GPIO function. Yet, the driver
->> code in an earlier patch seems to deliberately do nothing if this
->> property is missing. Shouldn't the DT parsing return an error instead?
+>> The status register is in the MMC PBIAS register that is mux
+>> related otherwise. From OMAP4470_ES1.0_PUBLIC_TRM_vE.pdf,
+>> Table 19-599. CONTROL_PBIASLITE:
 >>
-> pinctrl-single,gpio-func is optional for above reason.
-
-Presumably the node that contains the pinctrl-single,gpio-func property
-is optional, but once you have such a node, pinctrl-single,gpio-func is
-required?
-
->>> +- pinctrl-single,power-source-mask : mask of setting power source in
->>> +  the pinmux register
->>> +
->>> +- pinctrl-single,power-source : value of setting power source field
->>> +  in the pinmux register
-...
->> I suppose it's OK that a generic pin controller binding would use the
->> generic pin configuration config options. I'm still not convinced that
->> the semantics of generic pin control make sense. Maybe if they're just
->> arbitrary names for SoC-specific things it's fine though.
+>> Bits
+>> 26    MMC1_PWDNZ
+>> 25    MMC1_PBIASLITE_HIZ_MODE
+>> 24    MMC1_PBIASLITE_SUPPLY_HI_OUT
+>> 23    MMC1_PBIASLITE_VMODE_ERROR      then this bit needs to clear..
+>> 22    MMC1_PBIASLITE_PWRDNZ
+>> 21    MMC1_PBIASLITE_VMODE            ..after VMODE bit is set to 3V
 >>
->> Do these patches expose /all/ generic pin configuration options? It
->> doesn't seem worth exposing only some of them and ignoring others.
+>> > If so, could we use regulator framework in USB PHY or MMC driver?
+>>
+>> Yes we could use regulator framework for that that. Or just read the
+>> status in the MMC driver for that bit if nobody else has mixed
+>> mux-regulator needs like this.
+>>
+>> The sequence is MMC specific, so from that point of view it would
+>> make sense to have the logic in the MMC driver.
 >
-> I believe general pinconf can't support all cases in different silicons.
-
-I tend to agree.
-
-> And we still have some common features that could be covered in general
-> pinconf. So we need a structure to support both pinconf & specific pinconf.
-
-But that tends to imply that adding support for generic pinconf into the
-pinctrl-simple driver isnt' actually going to be useful for anyone. If
-pinctrl-single only supports some part of your HW, how can you use it?
-Or, do you intend to somehow make pinctrl-single support both the common
-generic pinconf stuff, and somehow be extensible to support any
-SoC-specific pin config fields?
+> Well it turns out the VMODE_ERROR bit is not just for VMODE, it's a
+> comparator that can also triggers for the other invalid states for
+> CONTROL_PBIASLITE pinconf register. So hiding VMODE_ERROR into a
+> regulator would be wrong. For now, VMODE best handled using
+> PIN_CONFIG_POWER_SOURCE and let the MMC driver do the checking
+> using the pinconf API.
+>
+I'm seeking whether there's more flexible way to support your case.
+The fix won't
+be contained in v3 round.
