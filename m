@@ -1,52 +1,143 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Wed, 31 Oct 2012 23:13:04 +0530
-Subject: [PATCH v2 2/5] ARM: gic: remove direct use of gic_raise_softirq
-In-Reply-To: <1351695517-5636-3-git-send-email-robherring2@gmail.com>
-References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
- <1351695517-5636-3-git-send-email-robherring2@gmail.com>
-Message-ID: <CAOh2x=nu7VstzDHp1BS2qUEP9Bv9E+gA-zcZULRNqOdU2uedww@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 31 Oct 2012 18:47:14 +0100
+Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CACRpkdbpxR8hQ13R43T1X9be95rJNMdgNPXfT3bQOO_dZU4Fkg@mail.gmail.com>
+References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
+ <1351457210-25222-2-git-send-email-stigge@antcom.de>
+ <CACRpkdbpxR8hQ13R43T1X9be95rJNMdgNPXfT3bQOO_dZU4Fkg@mail.gmail.com>
+Message-ID: <50916422.2060002@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> In preparation of moving gic code to drivers/irqchip, remove the direct
-> platform dependencies on gic_raise_softirq. Move the setup of
-> smp_cross_call into the gic code. Now that all platforms are using IPI#0
-> for core wakeup, create a common wakeup ipi function.
->
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: David Brown <davidb@codeaurora.org>
-> Cc: Daniel Walker <dwalker@fifo99.com>
-> Cc: Bryan Huntsman <bryanh@codeaurora.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Cc: Viresh Kumar <viresh.linux@gmail.com>
-> Cc: Shiraz Hashim <shiraz.hashim@st.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/common/gic.c               |   45 +++++++++++++++++++----------------
->  arch/arm/include/asm/hardware/gic.h |    1 -
->  arch/arm/include/asm/smp.h          |    1 +
->  arch/arm/kernel/smp.c               |    5 ++++
->  arch/arm/mach-exynos/platsmp.c      |    4 +---
->  arch/arm/mach-highbank/platsmp.c    |    4 +---
->  arch/arm/mach-imx/platsmp.c         |    2 --
->  arch/arm/mach-msm/platsmp.c         |    4 +---
->  arch/arm/mach-omap2/omap-smp.c      |    4 +---
->  arch/arm/mach-realview/platsmp.c    |    2 --
->  arch/arm/mach-shmobile/platsmp.c    |    2 --
->  arch/arm/mach-shmobile/smp-emev2.c  |    2 +-
->  arch/arm/mach-spear13xx/platsmp.c   |    2 --
+Hi Linus,
 
-For SPEAr:
+thanks for your notes, comments below:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+On 10/31/2012 03:06 PM, Linus Walleij wrote:
+>> +struct gpio_block *gpio_block_create(unsigned *gpios, size_t size,
+>> +                                    const char *name)
+>> +{
+>> +       struct gpio_block *block;
+>> +       struct gpio_block_chip *gbc;
+>> +       struct gpio_remap *remap;
+>> +       void *tmp;
+>> +       int i;
+>> +
+>> +       if (size < 1 || size > sizeof(unsigned long) * 8)
+>> +               return ERR_PTR(-EINVAL);
+> 
+> If the most GPIOs in a block is BITS_PER_LONG, why is the
+> latter clause not size > BITS_PER_LONG?
+
+Good catch, thanks! :-)
+
+>> +       for (i = 0; i < size; i++)
+>> +               if (!gpio_is_valid(gpios[i]))
+>> +                       return ERR_PTR(-EINVAL);
+>> +
+>> +       block = kzalloc(sizeof(struct gpio_block), GFP_KERNEL);
+>> +       if (!block)
+>> +               return ERR_PTR(-ENOMEM);
+> 
+> If these were instead glued to a struct device you could do
+> devm_kzalloc() here and have it garbage collected.
+
+Good, will do.
+
+> This is why
+> https://blueprints.launchpad.net/linux-linaro/+spec/gpiochip-to-dev
+> needs to happen. (Sorry for hyperlinking.)
+> 
+>> +       block->name = name;
+>> +       block->ngpio = size;
+>> +       block->gpio = kzalloc(sizeof(*block->gpio) * size, GFP_KERNEL);
+>> +       if (!block->gpio)
+>> +               goto err1;
+>> +
+>> +       memcpy(block->gpio, gpios, sizeof(*block->gpio) * size);
+>> +
+>> +       for (i = 0; i < size; i++) {
+>> +               struct gpio_chip *gc = gpio_to_chip(gpios[i]);
+>> +               int bit = gpios[i] - gc->base;
+>> +               int index = gpio_block_chip_index(block, gc);
+>> +
+>> +               if (index < 0) {
+>> +                       block->nchip++;
+>> +                       tmp = krealloc(block->gbc,
+>> +                                      sizeof(struct gpio_block_chip) *
+>> +                                      block->nchip, GFP_KERNEL);
+> 
+> Don't do this dynamic array business. Use a linked list instead.
+
+OK, I checked the important spots where access to the two lists (gbc and
+remap) happen (set and get functions), and the access is always
+sequential, monotonic. So will use lists. Thanks.
+
+> [...]
+> /*
+>  * Maybe I'm a bit picky on comment style but I prefer
+>  * that the first line of a multi-line comment is blank.
+>  * Applies everywhere.
+>  */
+
+As noted earlier in the discussion, current gpiolib.c's convention is
+done first-line-not-blank. So I sticked to this (un)convention. But can
+change this - you are not the first one pointing this out. :-)
+
+>> +                       if (!tmp) {
+>> +                               kfree(gbc->remap);
+>> +                               goto err3;
+>> +                       }
+>> +                       gbc->remap = tmp;
+>> +                       remap = &gbc->remap[gbc->nremap - 1];
+>> +                       remap->offset = bit - i;
+>> +                       remap->mask = 0;
+>> +               }
+>> +
+>> +               /* represents the mask necessary for bit reordering between
+>> +                * gpio_block (i.e. as specified on gpio_block_get() and
+>> +                * gpio_block_set()) and gpio_chip domain (i.e. as specified on
+>> +                * the driver's .set_block() and .get_block())
+>> +                */
+>> +               remap->mask |= BIT(i);
+>> +       }
+>> +
+>> +       return block;
+>> +err3:
+>> +       for (i = 0; i < block->nchip - 1; i++)
+>> +               kfree(block->gbc[i].remap);
+>> +       kfree(block->gbc);
+>> +err2:
+>> +       kfree(block->gpio);
+>> +err1:
+>> +       kfree(block);
+>> +       return ERR_PTR(-ENOMEM);
+>> +}
+>> +EXPORT_SYMBOL_GPL(gpio_block_create);
+>> +
+>> +void gpio_block_free(struct gpio_block *block)
+>> +{
+>> +       int i;
+>> +
+>> +       for (i = 0; i < block->nchip; i++)
+>> +               kfree(block->gbc[i].remap);
+>> +       kfree(block->gpio);
+>> +       kfree(block->gbc);
+>> +       kfree(block);
+>> +}
+>> +EXPORT_SYMBOL_GPL(gpio_block_free);
+> 
+> So if we only had a real struct device  inside the gpiochip all
+> this boilerplate would go away, as devm_* take care of releasing
+> the resources.
+
+Right. I guess you mean struct gpio_block here which should have a dev?
+(Having gpiochip as a dev also would be best, though.) :-)
+
+We need a separate dev for struct gpio_block, since those can be defined
+dynamically (i.e. often) during the lifespan of gpio and gpiochip, so
+garbage collection would be deferred for too long.
+
+Thanks,
+
+Roland
