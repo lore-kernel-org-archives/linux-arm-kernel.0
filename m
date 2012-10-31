@@ -1,41 +1,32 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Wed, 31 Oct 2012 18:39:26 +0100
-Subject: [PATCH] ARM: mxs: Add support for the Armadeus Systems APF28Dev
- docking board
-Message-ID: <1351705166-62669-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: tremyfr@yahoo.fr (Philippe Reynes)
+Date: Wed, 31 Oct 2012 18:56:33 +0100
+Subject: [PATCH v3] Add device tree file for the armadeus apf27
+Message-ID: <1351706193-9021-1-git-send-email-tremyfr@yahoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The APF28Dev is a docking board for an APF28 SOM
-
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+Signed-off-by: Philippe Reynes <tremyfr@yahoo.fr>
+Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
 ---
- arch/arm/boot/dts/Makefile           |    1 +
- arch/arm/boot/dts/imx28-apf28dev.dts |   92 ++++++++++++++++++++++++++++++++++
- 2 files changed, 93 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx28-apf28dev.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9bca96f..b451a79 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -55,6 +55,7 @@ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
- 	imx23-olinuxino.dtb \
- 	imx23-stmp378x_devb.dtb \
- 	imx28-apf28.dtb \
-+	imx28-apf28dev.dtb \
- 	imx28-apx4devkit.dtb \
- 	imx28-cfa10036.dtb \
- 	imx28-cfa10049.dtb \
-diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+v3: set 26M clock to 0 (not used)
+v2: avoid enable again the watchdog
+
+ arch/arm/boot/dts/imx27-apf27.dts |   92 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 92 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx27-apf27.dts
+
+diff --git a/arch/arm/boot/dts/imx27-apf27.dts b/arch/arm/boot/dts/imx27-apf27.dts
 new file mode 100644
-index 0000000..dde09d4
+index 0000000..bf07d8d
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx28-apf28dev.dts
++++ b/arch/arm/boot/dts/imx27-apf27.dts
 @@ -0,0 +1,92 @@
 +/*
-+ * Copyright 2012 Armadeus Systems - <support@armadeus.com>
++ * Copyright 2012 Philippe Reynes <tremyfr@yahoo.fr>
++ * Copyright 2012 Armadeus Systems <support@armadeus.com>
++ *
++ * Based on code which is: Copyright 2012 Sascha Hauer, Pengutronix
 + *
 + * The code contained herein is licensed under the GNU General Public
 + * License. You may obtain a copy of the GNU General Public License
@@ -45,86 +36,83 @@ index 0000000..dde09d4
 + * http://www.gnu.org/copyleft/gpl.html
 + */
 +
-+/* APF28Dev is a docking board for the APF28 SOM */
-+/include/ "imx28-apf28.dts"
++/dts-v1/;
++/include/ "imx27.dtsi"
 +
 +/ {
-+	model = "Armadeus Systems APF28Dev docking/development board";
-+	compatible = "armadeus,imx28-apf28dev", "armadeus,imx28-apf28", "fsl,imx28";
++	model = "Armadeus apf27";
++	compatible = "armadeus,imx27-apf27", "fsl,imx27";
 +
-+	apb at 80000000 {
-+		apbh at 80000000 {
-+			ssp0: ssp at 80010000 {
-+				compatible = "fsl,imx28-mmc";
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc0_4bit_pins_a
-+					&mmc0_cd_cfg &mmc0_sck_cfg>;
-+				bus-width = <4>;
-+				status = "okay";
-+			};
-+		};
++	memory {
++		reg = <0xa0000000 0x04000000>;
++	};
 +
-+		apbx at 80040000 {
-+			lradc at 80050000 {
-+				status = "okay";
-+			};
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+			pwm: pwm at 80064000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pwm3_pins_a &pwm4_pins_a>;
-+				status = "okay";
-+			};
-+
-+			usbphy0: usbphy at 8007c000 {
-+				status = "okay";
-+			};
-+
-+			usbphy1: usbphy at 8007e000 {
-+				status = "okay";
-+			};
++		osc26m {
++			compatible = "fsl,imx-osc26m", "fixed-clock";
++			clock-frequency = <0>;
 +		};
 +	};
 +
-+	ahb at 80080000 {
-+		usb0: usb at 80080000 {
-+			vbus-supply = <&reg_usb0_vbus>;
++	soc {
++		aipi at 10000000 {
++			serial at 1000a000 {
++				status = "okay";
++			};
++
++			ethernet at 1002b000 {
++				status = "okay";
++			};
++
++		};
++
++		nand at d8000000 {
 +			status = "okay";
++			nand-bus-width = <16>;
++			nand-ecc-mode = "hw";
++			nand-on-flash-bbt;
++
++			partition at 0 {
++				label = "u-boot";
++				reg = <0x0 0x100000>;
++			};
++
++			partition at 100000 {
++				label = "env";
++				reg = <0x100000 0x80000>;
++			};
++
++			partition at 180000 {
++				label = "env2";
++				reg = <0x180000 0x80000>;
++			};
++
++			partition at 200000 {
++				label = "firmware";
++				reg = <0x200000 0x80000>;
++			};
++
++			partition at 280000 {
++				label = "dtb";
++				reg = <0x280000 0x80000>;
++			};
++
++			partition at 300000 {
++				label = "kernel";
++				reg = <0x300000 0x500000>;
++			};
++
++			partition at 800000 {
++				label = "rootfs";
++				reg = <0x800000 0xf800000>;
++			};
 +		};
 +
-+		usb1: usb at 80090000 {
-+			status = "okay";
-+		};
-+
-+		mac1: ethernet at 800f4000 {
-+			phy-mode = "rmii";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&mac1_pins_a>;
-+			phy-reset-gpios = <&gpio0 23 0>;
-+			status = "okay";
-+		};
 +	};
 +
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_usb0_vbus: usb0_vbus {
-+			compatible = "regulator-fixed";
-+			regulator-name = "usb0_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 23 1>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		user {
-+			label = "Heartbeat";
-+			gpios = <&gpio0 21 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
 +};
 -- 
-1.7.8.6
+1.7.4.4
