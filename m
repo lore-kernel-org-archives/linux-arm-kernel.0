@@ -1,55 +1,52 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 31 Oct 2012 23:09:48 +0530
-Subject: [PATCH V4 3/4] ARM: tegra: dts: cardhu: enable SLINK4
-In-Reply-To: <50915563.40904@wwwdotorg.org>
-References: <1351674176-20603-1-git-send-email-ldewangan@nvidia.com>
- <1351674176-20603-3-git-send-email-ldewangan@nvidia.com>
- <50915563.40904@wwwdotorg.org>
-Message-ID: <50916264.3010107@nvidia.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Wed, 31 Oct 2012 23:13:04 +0530
+Subject: [PATCH v2 2/5] ARM: gic: remove direct use of gic_raise_softirq
+In-Reply-To: <1351695517-5636-3-git-send-email-robherring2@gmail.com>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+ <1351695517-5636-3-git-send-email-robherring2@gmail.com>
+Message-ID: <CAOh2x=nu7VstzDHp1BS2qUEP9Bv9E+gA-zcZULRNqOdU2uedww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 October 2012 10:14 PM, Stephen Warren wrote:
-> On 10/31/2012 03:02 AM, Laxman Dewangan wrote:
->> Enable SLINK4 and connected device in Tegra30 based
->> platform Cardhu.
->> Setting maximum spi frequency to 25MHz.
->>
->> Spi serial flash is connected on CS1 of SLINK4 on
->> cardhu platform.
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +winbond Winbond Electronics corp.
-> That should really be a separate patch that goes through the devicetree
-> branch. But I guess it's fairly trivial, so it's not a big deal.
+On Wed, Oct 31, 2012 at 8:28 PM, Rob Herring <robherring2@gmail.com> wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 >
+> In preparation of moving gic code to drivers/irqchip, remove the direct
+> platform dependencies on gic_raise_softirq. Move the setup of
+> smp_cross_call into the gic code. Now that all platforms are using IPI#0
+> for core wakeup, create a common wakeup ipi function.
+>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Shiraz Hashim <shiraz.hashim@st.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/common/gic.c               |   45 +++++++++++++++++++----------------
+>  arch/arm/include/asm/hardware/gic.h |    1 -
+>  arch/arm/include/asm/smp.h          |    1 +
+>  arch/arm/kernel/smp.c               |    5 ++++
+>  arch/arm/mach-exynos/platsmp.c      |    4 +---
+>  arch/arm/mach-highbank/platsmp.c    |    4 +---
+>  arch/arm/mach-imx/platsmp.c         |    2 --
+>  arch/arm/mach-msm/platsmp.c         |    4 +---
+>  arch/arm/mach-omap2/omap-smp.c      |    4 +---
+>  arch/arm/mach-realview/platsmp.c    |    2 --
+>  arch/arm/mach-shmobile/platsmp.c    |    2 --
+>  arch/arm/mach-shmobile/smp-emev2.c  |    2 +-
+>  arch/arm/mach-spear13xx/platsmp.c   |    2 --
 
-Yes, I thought that it should be in separate change. I did same on 
-earlier for ISL29028 driver and found that this small change still not 
-get merged. Therefore I clubbed this together as it can go without any 
-issue.
-I believe it is fine to merge vendor-prefix from any tree.
+For SPEAr:
 
-
->
->> +		spi-flash at 1 {
->> +			compatible = "winbond,w25q32";
->> +			spi-max-frequency =<20000000>;
->> +			reg =<1>;
->> +		};
-> Since I have an Atmel flash on my board, I see:
->
-> [    1.282958] m25p80 spi32766.1: found at25df321a, expected w25q32
-> [    1.289103] m25p80 spi32766.1: at25df321a (4096 Kbytes)
->
-> Is there any way around that (the first log line above)?
->
-> I suppose the answer is that the DT should reflect the exact flash
-> device that's on the board, and perhaps the bootloader should be
-> adjusting the DT to reflect the correct value. That's probably complex.
->
-> Do you have any idea whether Atmel or Winbond flash is more common, so
-> we can at least minimize the number of times this message appears?
-
-I observe that most of cardhu have the winbond. All SQA machine has 
-winbond. Also I believe on A04, it is winbond.
-Better to go with winbond.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
