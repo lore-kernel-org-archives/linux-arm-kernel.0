@@ -1,83 +1,129 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 31 Oct 2012 22:00:50 +0800
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <509032F6.1050301@gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
- <508E5DFB.3060002@gmail.com>
- <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
- <508E61E7.7090502@gmail.com>
- <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
- <508E651A.5070009@gmail.com>
- <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
- <509032F6.1050301@gmail.com>
-Message-ID: <CAN1soZz-4J7Z4aAYwkqUnAB_FDRgSMYpUP4ufbVBZYeqM6DQXQ@mail.gmail.com>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 31 Oct 2012 12:24:48 -0600
+Subject: [PATCH v2 1/5] ARM: zynq: dts: split up device tree
+In-Reply-To: <cover.1352400580.git.josh.cartwright@ni.com>
+References: <cover.1352400580.git.josh.cartwright@ni.com>
+Message-ID: <052ad319f1599baa9a2fc840726a98f573e08672.1352400580.git.josh.cartwright@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 4:05 AM, Daniel Mack <zonque@gmail.com> wrote:
+The purpose of the created zynq-7000.dtsi file is to describe the
+hardware common to all Zynq 7000-based boards.  Also, get rid of the
+zynq-ep107 device tree, since it is not hardware anyone can purchase.
 
-> On 30.10.2012 21:01, Vasily Khoruzhick wrote:
-> > On Mon, Oct 29, 2012 at 2:14 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >> On 29.10.2012 12:12, Vasily Khoruzhick wrote:
-> >>> On Mon, Oct 29, 2012 at 2:00 PM, Daniel Mack <zonque@gmail.com> wrote:
-> >>>
-> >>>>> Well, there's an issue - Z2 does not preserve memory contents in
-> deep sleep
-> >>>>> (but it does in sleep), so userspace can't be fixed here
-> unfortunatelly.
-> >>>>> There's no another possibility to turn Z2 off, and plain sleep is too
-> >>>>> power hungry.
-> >>>>> So the only way to keep Z2 in low-power mode is fake power off,
-> which just puts
-> >>>>> Z2 in deep sleep.
-> >>>>
-> >>>> Why can't the userspace trigger a deep sleep then instead of powering
-> >>>> off? Which details do I lack?
-> >>>
-> >>> How? echo mem >/sys/power/state puts system into non-deep sleep.
-> Anyway, kernel
-> >>> is not ready for fake power off instead of suspend (we can't resume
-> >>> from deep sleep,
-> >>> memory content is not preserved), so there can be some data loss.
-> >>> Adding some sysfs file to control sleep type does not look like a good
-> >>> idea to me.
-> >>>
-> >>> Btw, how other DT-capable boards handle power off?
-> >>
-> >> No idea. I never actually used that kind of power state.
-> >
-> > Hi Daniel,
-> >
-> > One more question: what should I use instead of pxa2xx_mfp_config in
-> > DT board to configure pin modes?
->
-> Haojian was working on the PXA pinctrl drivers, but I don't know how far
-> that is yet.
->
-> If that's not yet there, have a look at the pinctrl-single driver. It's
-> admittedly not as nice to use as the constants in the board file as DT
-> lacks defines for numerical constants, but's at least a workaround.
->
-> On a more general note, it's arguable whether this kind of setup should
-> be done in the bootloader after all.
->
->
-> Daniel
->
->
-Using pinctrl-single driver is preferred. I'm converting mmp pinctrl driver
-into pinctrl-single
-driver. I'll submit a new round in these days.
+Add a zc702 dts file based on the zynq-7000.dtsi.  Add it to the
+dts/Makefile so it is built with the 'dtbs' target.
 
-Thanks
-Haojian
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/bcac3740/attachment-0001.html>
+Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+---
+ arch/arm/boot/dts/Makefile                         |  1 +
+ .../boot/dts/{zynq-ep107.dts => zynq-7000.dtsi}    | 19 +++-----------
+ arch/arm/boot/dts/zynq-zc702.dts                   | 30 ++++++++++++++++++++++
+ arch/arm/mach-zynq/common.c                        |  3 ++-
+ 4 files changed, 36 insertions(+), 17 deletions(-)
+ rename arch/arm/boot/dts/{zynq-ep107.dts => zynq-7000.dtsi} (79%)
+ create mode 100644 arch/arm/boot/dts/zynq-zc702.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f37cf9f..76ed11e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -103,5 +103,6 @@ dtb-$(CONFIG_ARCH_VEXPRESS) += vexpress-v2p-ca5s.dtb \
+ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+ 	wm8505-ref.dtb \
+ 	wm8650-mid.dtb
++dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+ 
+ endif
+diff --git a/arch/arm/boot/dts/zynq-ep107.dts b/arch/arm/boot/dts/zynq-7000.dtsi
+similarity index 79%
+rename from arch/arm/boot/dts/zynq-ep107.dts
+rename to arch/arm/boot/dts/zynq-7000.dtsi
+index 5caf100..8b30e59 100644
+--- a/arch/arm/boot/dts/zynq-ep107.dts
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -10,29 +10,16 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
++/include/ "skeleton.dtsi"
+ 
+-/dts-v1/;
+ / {
+-	model = "Xilinx Zynq EP107";
+-	compatible = "xlnx,zynq-ep107";
+-	#address-cells = <1>;
+-	#size-cells = <1>;
+-	interrupt-parent = <&intc>;
+-
+-	memory {
+-		device_type = "memory";
+-		reg = <0x0 0x10000000>;
+-	};
+-
+-	chosen {
+-		bootargs = "console=ttyPS0,9600 root=/dev/ram rw initrd=0x800000,8M earlyprintk";
+-		linux,stdout-path = &uart0;
+-	};
++	compatible = "xlnx,zynq-7000";
+ 
+ 	amba {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		interrupt-parent = <&intc>;
+ 		ranges;
+ 
+ 		intc: interrupt-controller at f8f01000 {
+diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+new file mode 100644
+index 0000000..e25a307
+--- /dev/null
++++ b/arch/arm/boot/dts/zynq-zc702.dts
+@@ -0,0 +1,30 @@
++/*
++ *  Copyright (C) 2011 Xilinx
++ *  Copyright (C) 2012 National Instruments Corp.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++/dts-v1/;
++/include/ "zynq-7000.dtsi"
++
++/ {
++	model = "Zynq ZC702 Development Board";
++	compatible = "xlnx,zynq-zc702", "xlnx,zynq-7000";
++
++	memory {
++		device_type = "memory";
++		reg = <0x0 0x40000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyPS1,115200 earlyprintk";
++	};
++
++};
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index f0eef84..5441323 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -115,7 +115,8 @@ static void __init xilinx_map_io(void)
+ }
+ 
+ static const char *xilinx_dt_match[] = {
+-	"xlnx,zynq-ep107",
++	"xlnx,zynq-zc702",
++	"xlnx,zynq-7000",
+ 	NULL
+ };
+ 
+-- 
+1.8.0
