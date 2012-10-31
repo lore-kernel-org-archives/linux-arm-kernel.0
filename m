@@ -1,23 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 31 Oct 2012 11:43:34 +0800
-Subject: [PATCH 09/10] ARM: SMP: add function arch_send_wakeup_ipi_mask()
-In-Reply-To: <1351005779-30347-10-git-send-email-shawn.guo@linaro.org>
-References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
- <1351005779-30347-10-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20121031034331.GB8100@S2100-06.ap.freescale.net>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Wed, 31 Oct 2012 12:38:09 +0900
+Subject: [PATCH] i2c: mv64xxx: Add support Armada-XP SoC
+In-Reply-To: <20121030114428.45752bd0@skate>
+References: <1351593581-19555-1-git-send-email-iwamatsu@nigauri.org>
+ <20121030114428.45752bd0@skate>
+Message-ID: <CABMQnV+=+Crza9kjFk8jB5-1OXXhfFamLFd-3aGz=66g-Yh9sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 23, 2012 at 11:22:58PM +0800, Shawn Guo wrote:
-> Add function arch_send_wakeup_ipi_mask(), so that platform code can
-> use it as an easy way to wake up cores that are in WFI.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
+Hi,
 
-Hi Russell,
+On Tue, Oct 30, 2012 at 7:44 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Nobuhiro Iwamatsu,
+>
+> On Tue, 30 Oct 2012 19:39:41 +0900, Nobuhiro Iwamatsu wrote:
+>> The Armada-XP SoC has the same I2C controller as mv64xxxi-i2c.
+>> This validates to use mv64xxx in this SoC.
+>>
+>> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+>> ---
+>>  drivers/i2c/busses/Kconfig |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+>> index 65dd599..ff53cf4 100644
+>> --- a/drivers/i2c/busses/Kconfig
+>> +++ b/drivers/i2c/busses/Kconfig
+>> @@ -474,7 +474,7 @@ config I2C_MPC
+>>
+>>  config I2C_MV64XXX
+>>       tristate "Marvell mv64xxx I2C Controller"
+>> -     depends on (MV64X60 || PLAT_ORION)
+>> +     depends on (MV64X60 || PLAT_ORION || MACH_ARMADA_370_XP)
+>>       help
+>>         If you say yes to this option, support will be included for the
+>>         built-in I2C interface on the Marvell 64xxx line of host bridges.
+>
+> This is not needed: ARCH_MVEBU already selects PLAT_ORION.
+>
 
-Can I ask for your ack to have the patch go via arm-soc being part
-of the series?
+Oh, I see. Thanks!
 
-Shawn
+Nobuhiro
+-- 
+Nobuhiro Iwamatsu
+   iwamatsu at {nigauri.org / debian.org}
+   GPG ID: 40AD1FA6
