@@ -1,180 +1,165 @@
 From: rajanikanth.hv@linaro.org (Rajanikanth H.V)
-Date: Wed, 31 Oct 2012 15:40:31 +0000
-Subject: =?UTF-8?q?=5BPATCH=202/4=5D=20mfd=3A=20ab8500=3A=20add=20devicetree=20support=20for=20btemp?=
+Date: Wed, 31 Oct 2012 15:40:32 +0000
+Subject: =?UTF-8?q?=5BPATCH=203/4=5D=20mfd=3A=20ab8500=3A=20add=20devicetree=20support=20for=20charger?=
 In-Reply-To: <1351698033-8980-1-git-send-email-rajanikanth.hv@linaro.org>
 References: <1351698033-8980-1-git-send-email-rajanikanth.hv@linaro.org>
-Message-ID: <1351698033-8980-3-git-send-email-rajanikanth.hv@linaro.org>
+Message-ID: <1351698033-8980-4-git-send-email-rajanikanth.hv@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
 
-This patch adds device tree support for
-battery-temperature-monitor driver
+This patch adds device tree support for ab8500-charger
+driver
 
 Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
 ---
- Documentation/devicetree/bindings/mfd/ab8500.txt   |    6 ++
- .../bindings/power_supply/ab8500/btemp.txt         |   16 +++++
- arch/arm/boot/dts/dbx5x0.dtsi                      |    5 ++
+ Documentation/devicetree/bindings/mfd/ab8500.txt   |   14 ++++
+ .../bindings/power_supply/ab8500/charger.txt       |   25 +++++++
+ arch/arm/boot/dts/dbx5x0.dtsi                      |    6 ++
  drivers/mfd/ab8500-core.c                          |    5 ++
- drivers/power/Kconfig                              |    6 --
- drivers/power/ab8500_bmdata.c                      |    4 +-
- drivers/power/ab8500_btemp.c                       |   66 ++++++++++++--------
- 7 files changed, 73 insertions(+), 35 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt
+ drivers/power/ab8500_charger.c                     |   73 ++++++++++++--------
+ 5 files changed, 95 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power_supply/ab8500/charger.txt
 
 diff --git a/Documentation/devicetree/bindings/mfd/ab8500.txt b/Documentation/devicetree/bindings/mfd/ab8500.txt
-index 6ca8d81..f2ee0e7 100644
+index f2ee0e7..13b707b 100644
 --- a/Documentation/devicetree/bindings/mfd/ab8500.txt
 +++ b/Documentation/devicetree/bindings/mfd/ab8500.txt
-@@ -30,6 +30,12 @@ ab8500-fg                : 			: vddadc       : Fuel Gauge
- 			 : LOW_BAT_F		:	       : LOW threshold battery voltage
- 			 : CC_INT_CALIB		:	       : Coulomb Counter Internal Calibration
- 			 : CCEOC		:	       : Coulomb Counter End of Conversion
-+ab8500-btemp		 :			: vtvout       : Battery Temperature
-+			 : BAT_CTRL_INDB        :              : Battery Removal Indicator
-+			 : BTEMP_LOW            :              : Btemp < BtempLow, if battery temperature is lower than -10?C
-+			 : BTEMP_LOW_MEDIUM     :              : BtempLow < Btemp < BtempMedium,if battery temperature is between -10 and 0?C
-+			 : BTEMP_MEDIUM_HIGH    :	       : BtempMedium < Btemp < BtempHigh,if battery temperature is between 0?C and?MaxTemp
-+			 : BTEMP_HIGH           :              : Btemp > BtempHigh, if battery temperature is higher than ?MaxTemp
+@@ -36,6 +36,20 @@ ab8500-btemp		 :			: vtvout       : Battery Temperature
+ 			 : BTEMP_LOW_MEDIUM     :              : BtempLow < Btemp < BtempMedium,if battery temperature is between -10 and 0?C
+ 			 : BTEMP_MEDIUM_HIGH    :	       : BtempMedium < Btemp < BtempHigh,if battery temperature is between 0?C and?MaxTemp
+ 			 : BTEMP_HIGH           :              : Btemp > BtempHigh, if battery temperature is higher than ?MaxTemp
++ab8500-charger		 :			: vddadc       : Charger interface
++			 : MAIN_CH_UNPLUG_DET	:	       : main charger unplug detection management (not in 8505)
++			 : MAIN_CHARGE_PLUG_DET	:	       : main charger plug detection management (not in 8505)
++			 : MAIN_EXT_CH_NOT_OK	:	       : main charger not OK
++			 : MAIN_CH_TH_PROT_R	:	       : Die temp is above main charger
++			 : MAIN_CH_TH_PROT_F	:	       : Die temp is below main charger
++			 : VBUS_DET_F		:	       : VBUS falling detected
++			 : VBUS_DET_R		:	       : VBUS rising detected
++			 : USB_LINK_STATUS	:	       : USB link status has changed
++			 : USB_CH_TH_PROT_R	:	       : Die temp is above usb charger
++			 : USB_CH_TH_PROT_F	:	       : Die temp is below usb charger
++			 : USB_CHARGER_NOT_OKR	:	       : allowed USB charger not ok detection
++			 : VBUS_OVV		:	       : Overvoltage on Vbus ball detected (USB charge is stopped)
++			 : CH_WD_EXP		:	       : Charger watchdog detected
  ab8500-gpadc             : HW_CONV_END          : vddadc       : Analogue to Digital Converter
                             SW_CONV_END          :              :
  ab8500-gpio              :                      :              : GPIO Controller
-diff --git a/Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt b/Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt
+diff --git a/Documentation/devicetree/bindings/power_supply/ab8500/charger.txt b/Documentation/devicetree/bindings/power_supply/ab8500/charger.txt
 new file mode 100644
-index 0000000..0ba1bcc
+index 0000000..6bdbb08
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/power_supply/ab8500/btemp.txt
-@@ -0,0 +1,16 @@
-+=== AB8500 Battery Temperature Monitor Driver ===
-+
-+The properties below describes the node for btemp driver.
++++ b/Documentation/devicetree/bindings/power_supply/ab8500/charger.txt
+@@ -0,0 +1,25 @@
++=== AB8500 Charger Driver ===
 +
 +Required Properties:
-+- compatible = Shall be: "stericsson,ab8500-btemp"
++- compatible = Shall be "stericsson,ab8500-charger"
 +- battery = Shall be battery specific information
-+
 +	Example:
-+	ab8500_btemp {
-+		compatible = "stericsson,ab8500-btemp";
++	ab8500_charger {
++		compatible = "stericsson,ab8500-charger";
 +		battery	   = <&ab8500_battery>;
++	};
++
++- vddadc-supply: Supply for USB and Main charger
++	Example:
++	ab8500-charger {
++		vddadc-supply	= <&ab8500_ldo_tvout_reg>;
++	}
++- autopower_cfg:
++	Boolean value depicting the presence of 'automatic poweron after powerloss'
++	Example:
++	ab8500-charger {
++		autopower_cfg;
 +	};
 +
 +For information on battery specific node, Ref:
 +Documentation/devicetree/bindings/power_supply/ab8500/fg.txt
 diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 68317f5..79fdee4 100644
+index 79fdee4..b1ecb5d 100644
 --- a/arch/arm/boot/dts/dbx5x0.dtsi
 +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -362,6 +362,11 @@
+@@ -367,6 +367,12 @@
  					battery	   = <&ab8500_battery>;
  				};
  
-+				ab8500_btemp {
-+					compatible = "stericsson,ab8500-btemp";
-+					battery	   = <&ab8500_battery>;
++				ab8500_charger {
++					compatible	= "stericsson,ab8500-charger";
++					battery		= <&ab8500_battery>;
++					vddadc-supply	= <&ab8500_ldo_tvout_reg>;
 +				};
 +
  				ab8500_usb {
  					compatible = "stericsson,ab8500-usb";
  					interrupts = < 90 0x4
 diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 7c3017b..94d45be 100644
+index 94d45be..c7a120b 100644
 --- a/drivers/mfd/ab8500-core.c
 +++ b/drivers/mfd/ab8500-core.c
-@@ -1046,8 +1046,13 @@ static struct mfd_cell __devinitdata ab8500_bm_devs[] = {
- 	},
+@@ -1041,8 +1041,13 @@ static struct mfd_cell __devinitdata abx500_common_devs[] = {
+ static struct mfd_cell __devinitdata ab8500_bm_devs[] = {
  	{
- 		.name = "ab8500-btemp",
-+		.of_compatible = "stericsson,ab8500-btemp",
- 		.num_resources = ARRAY_SIZE(ab8500_btemp_resources),
- 		.resources = ab8500_btemp_resources,
+ 		.name = "ab8500-charger",
++		.of_compatible = "stericsson,ab8500-charger",
+ 		.num_resources = ARRAY_SIZE(ab8500_charger_resources),
+ 		.resources = ab8500_charger_resources,
 +#ifndef CONFIG_OF
 +		.platform_data = &ab8500_bm_data,
 +		.pdata_size = sizeof(ab8500_bm_data),
 +#endif
  	},
  	{
- 		.name = "ab8500-fg",
-diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-index c1892f3..1434871 100644
---- a/drivers/power/Kconfig
-+++ b/drivers/power/Kconfig
-@@ -304,12 +304,6 @@ config AB8500_BM
- 	help
- 	  Say Y to include support for AB8500 battery management.
- 
--config AB8500_BATTERY_THERM_ON_BATCTRL
--	bool "Thermistor connected on BATCTRL ADC"
--	depends on AB8500_BM
--	help
--	  Say Y to enable battery temperature measurements using
--	  thermistor connected on BATCTRL ADC.
- endif # POWER_SUPPLY
- 
- source "drivers/power/avs/Kconfig"
-diff --git a/drivers/power/ab8500_bmdata.c b/drivers/power/ab8500_bmdata.c
-index fa6ea52..1e3a0e3 100644
---- a/drivers/power/ab8500_bmdata.c
-+++ b/drivers/power/ab8500_bmdata.c
-@@ -29,7 +29,7 @@ static struct abx500_res_to_temp temp_tbl_A_thermistor[] = {
- 	{65, 12500},
- };
- static struct abx500_res_to_temp temp_tbl_B_thermistor[] = {
--	{-5, 165418},
-+	{-5, 200000},
- 	{ 0, 159024},
- 	{ 5, 151921},
- 	{10, 144300},
-@@ -237,7 +237,7 @@ struct abx500_battery_type bat_type_thermistor[] = {
- },
- {
- 	.name = POWER_SUPPLY_TECHNOLOGY_LIPO,
--	.resis_high = 165418,
-+	.resis_high = 200000,
- 	.resis_low = 82869,
- 	.battery_resistance = 300,
- 	.charge_full_design = 900,
-diff --git a/drivers/power/ab8500_btemp.c b/drivers/power/ab8500_btemp.c
-index 803870e..a6633b4 100644
---- a/drivers/power/ab8500_btemp.c
-+++ b/drivers/power/ab8500_btemp.c
-@@ -20,11 +20,13 @@
- #include <linux/power_supply.h>
- #include <linux/completion.h>
+ 		.name = "ab8500-btemp",
+diff --git a/drivers/power/ab8500_charger.c b/drivers/power/ab8500_charger.c
+index 78a730c..a140564 100644
+--- a/drivers/power/ab8500_charger.c
++++ b/drivers/power/ab8500_charger.c
+@@ -23,6 +23,8 @@
+ #include <linux/err.h>
  #include <linux/workqueue.h>
--#include <linux/mfd/abx500/ab8500.h>
-+#include <linux/jiffies.h>
+ #include <linux/kobject.h>
 +#include <linux/of.h>
 +#include <linux/mfd/core.h>
+ #include <linux/mfd/abx500/ab8500.h>
  #include <linux/mfd/abx500.h>
-+#include <linux/mfd/abx500/ab8500.h>
  #include <linux/mfd/abx500/ab8500-bm.h>
- #include <linux/mfd/abx500/ab8500-gpadc.h>
--#include <linux/jiffies.h>
- 
- #define VTVOUT_V			1800
- 
-@@ -76,7 +78,6 @@ struct ab8500_btemp_ranges {
+@@ -181,9 +183,9 @@ struct ab8500_charger_usb_state {
+  * @vbat		Battery voltage
+  * @old_vbat		Previously measured battery voltage
+  * @autopower		Indicate if we should have automatic pwron after pwrloss
++ * @autopower_cfg	platform specific power config support for "pwron after pwrloss"
   * @parent:		Pointer to the struct ab8500
   * @gpadc:		Pointer to the struct gpadc
-  * @fg:			Pointer to the struct fg
-- * @pdata:		Pointer to the abx500_btemp platform data
+- * @pdata:		Pointer to the abx500_charger platform data
   * @bat:		Pointer to the abx500_bm platform data
-  * @btemp_psy:		Structure for BTEMP specific battery properties
-  * @events:		Structure for information about events triggered
-@@ -93,7 +94,6 @@ struct ab8500_btemp {
+  * @flags:		Structure for information about events triggered
+  * @usb_state:		Structure for usb stack information
+@@ -218,9 +220,9 @@ struct ab8500_charger {
+ 	int vbat;
+ 	int old_vbat;
+ 	bool autopower;
++	bool autopower_cfg;
  	struct ab8500 *parent;
  	struct ab8500_gpadc *gpadc;
- 	struct ab8500_fg *fg;
 -	struct abx500_bmdevs_plat_data *pdata;
  	struct abx500_bm_data *bat;
- 	struct power_supply btemp_psy;
- 	struct ab8500_btemp_events events;
-@@ -955,48 +955,57 @@ static int __devexit ab8500_btemp_remove(struct platform_device *pdev)
- 	flush_scheduled_work();
- 	power_supply_unregister(&di->btemp_psy);
+ 	struct ab8500_charger_event_flags flags;
+ 	struct ab8500_charger_usb_state usb_state;
+@@ -322,7 +324,7 @@ static void ab8500_power_loss_handling(struct ab8500_charger *di)
+ static void ab8500_power_supply_changed(struct ab8500_charger *di,
+ 					struct power_supply *psy)
+ {
+-	if (di->pdata->autopower_cfg) {
++	if (di->autopower_cfg) {
+ 		if (!di->usb.charger_connected &&
+ 		    !di->ac.charger_connected &&
+ 		    di->autopower) {
+@@ -2526,25 +2528,45 @@ static int __devexit ab8500_charger_remove(struct platform_device *pdev)
+ 	power_supply_unregister(&di->usb_chg.psy);
+ 	power_supply_unregister(&di->ac_chg.psy);
  	platform_set_drvdata(pdev, NULL);
 -	kfree(di);
  
@@ -184,15 +169,15 @@ index 803870e..a6633b4 100644
 +static char *supply_interface[] = {
 +	"ab8500_chargalg",
 +	"ab8500_fg",
++	"ab8500_btemp",
 +};
 +
- static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
+ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
  {
 -	struct abx500_bmdevs_plat_data *plat_data = pdev->dev.platform_data;
 +	struct device_node *np = pdev->dev.of_node;
- 	struct ab8500_btemp *di;
- 	int irq, i, ret = 0;
- 	u8 val;
+ 	struct ab8500_charger *di;
+ 	int irq, i, charger_status, ret = 0;
  
 -	if (!plat_data) {
 -		dev_err(&pdev->dev, "No platform data\n");
@@ -203,7 +188,7 @@ index 803870e..a6633b4 100644
 -	if (!di)
 +	di = devm_kzalloc(&pdev->dev, sizeof(*di), GFP_KERNEL);
 +	if (!di) {
-+		dev_err(&pdev->dev, "%s no mem for ab8500_btemp\n", __func__);
++		dev_err(&pdev->dev, "%s no mem for ab8500_charger\n", __func__);
  		return -ENOMEM;
 +	}
 +	di->bat = pdev->mfd_cell->platform_data;
@@ -215,72 +200,87 @@ index 803870e..a6633b4 100644
 +					"failed to get battery information\n");
 +				return ret;
 +			}
++			di->autopower_cfg = of_property_read_bool(np, "autopower_cfg");
 +		} else {
-+			dev_err(&pdev->dev, "missing dt node for ab8500_btemp\n");
++			dev_err(&pdev->dev, "missing dt node for ab8500_charger\n");
 +			return -EINVAL;
 +		}
 +	} else {
 +		dev_info(&pdev->dev, "falling back to legacy platform data\n");
++		di->autopower_cfg = false;
 +	}
  
  	/* get parent data */
  	di->dev = &pdev->dev;
- 	di->parent = dev_get_drvdata(pdev->dev.parent);
- 	di->gpadc = ab8500_gpadc_get("ab8500-gpadc.0");
+@@ -2554,14 +2576,6 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
+ 	/* initialize lock */
+ 	spin_lock_init(&di->usb_state.usb_lock);
  
--	/* get btemp specific platform data */
+-	/* get charger specific platform data */
 -	di->pdata = plat_data;
 -	if (!di->pdata) {
--		dev_err(di->dev, "no btemp platform data supplied\n");
+-		dev_err(di->dev, "no charger platform data supplied\n");
 -		ret = -EINVAL;
 -		goto free_device_info;
 -	}
 -
- 	/* BTEMP supply */
- 	di->btemp_psy.name = "ab8500_btemp";
- 	di->btemp_psy.type = POWER_SUPPLY_TYPE_BATTERY;
- 	di->btemp_psy.properties = ab8500_btemp_props;
- 	di->btemp_psy.num_properties = ARRAY_SIZE(ab8500_btemp_props);
- 	di->btemp_psy.get_property = ab8500_btemp_get_property;
--	di->btemp_psy.supplied_to = di->pdata->supplied_to;
--	di->btemp_psy.num_supplicants = di->pdata->num_supplicants;
-+	di->btemp_psy.supplied_to = supply_interface;
-+	di->btemp_psy.num_supplicants = ARRAY_SIZE(supply_interface);
- 	di->btemp_psy.external_power_changed =
- 		ab8500_btemp_external_power_changed;
+ 	di->autopower = false;
  
-@@ -1006,7 +1015,7 @@ static int __devinit ab8500_btemp_probe(struct platform_device *pdev)
- 		create_singlethread_workqueue("ab8500_btemp_wq");
- 	if (di->btemp_wq == NULL) {
+ 	/* AC supply */
+@@ -2571,8 +2585,8 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
+ 	di->ac_chg.psy.properties = ab8500_charger_ac_props;
+ 	di->ac_chg.psy.num_properties = ARRAY_SIZE(ab8500_charger_ac_props);
+ 	di->ac_chg.psy.get_property = ab8500_charger_ac_get_property;
+-	di->ac_chg.psy.supplied_to = di->pdata->supplied_to;
+-	di->ac_chg.psy.num_supplicants = di->pdata->num_supplicants;
++	di->ac_chg.psy.supplied_to = supply_interface;
++	di->ac_chg.psy.num_supplicants = ARRAY_SIZE(supply_interface),
+ 	/* ux500_charger sub-class */
+ 	di->ac_chg.ops.enable = &ab8500_charger_ac_en;
+ 	di->ac_chg.ops.kick_wd = &ab8500_charger_watchdog_kick;
+@@ -2589,8 +2603,8 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
+ 	di->usb_chg.psy.properties = ab8500_charger_usb_props;
+ 	di->usb_chg.psy.num_properties = ARRAY_SIZE(ab8500_charger_usb_props);
+ 	di->usb_chg.psy.get_property = ab8500_charger_usb_get_property;
+-	di->usb_chg.psy.supplied_to = di->pdata->supplied_to;
+-	di->usb_chg.psy.num_supplicants = di->pdata->num_supplicants;
++	di->usb_chg.psy.supplied_to = supply_interface;
++	di->usb_chg.psy.num_supplicants = ARRAY_SIZE(supply_interface),
+ 	/* ux500_charger sub-class */
+ 	di->usb_chg.ops.enable = &ab8500_charger_usb_en;
+ 	di->usb_chg.ops.kick_wd = &ab8500_charger_watchdog_kick;
+@@ -2606,7 +2620,7 @@ static int __devinit ab8500_charger_probe(struct platform_device *pdev)
+ 		create_singlethread_workqueue("ab8500_charger_wq");
+ 	if (di->charger_wq == NULL) {
  		dev_err(di->dev, "failed to create work queue\n");
 -		goto free_device_info;
 +		return -ENOMEM;
  	}
  
- 	/* Init work for measuring temperature periodically */
-@@ -1084,12 +1093,14 @@ free_irq:
- 	}
- free_btemp_wq:
- 	destroy_workqueue(di->btemp_wq);
+ 	/* Init work for HW failure check */
+@@ -2748,12 +2762,14 @@ free_regulator:
+ 	regulator_put(di->regu);
+ free_charger_wq:
+ 	destroy_workqueue(di->charger_wq);
 -free_device_info:
 -	kfree(di);
 -
  	return ret;
  }
  
-+static const struct of_device_id ab8500_btemp_match[] = {
-+	{ .compatible = "stericsson,ab8500-btemp", },
++static const struct of_device_id ab8500_charger_match[] = {
++	{ .compatible = "stericsson,ab8500-charger", },
 +	{ },
 +};
 +
- static struct platform_driver ab8500_btemp_driver = {
- 	.probe = ab8500_btemp_probe,
- 	.remove = __devexit_p(ab8500_btemp_remove),
-@@ -1098,6 +1109,7 @@ static struct platform_driver ab8500_btemp_driver = {
+ static struct platform_driver ab8500_charger_driver = {
+ 	.probe = ab8500_charger_probe,
+ 	.remove = __devexit_p(ab8500_charger_remove),
+@@ -2762,6 +2778,7 @@ static struct platform_driver ab8500_charger_driver = {
  	.driver = {
- 		.name = "ab8500-btemp",
+ 		.name = "ab8500-charger",
  		.owner = THIS_MODULE,
-+		.of_match_table = ab8500_btemp_match,
++		.of_match_table = ab8500_charger_match,
  	},
  };
  
