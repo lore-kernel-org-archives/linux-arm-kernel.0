@@ -1,259 +1,354 @@
 From: panto@antoniou-consulting.com (Pantelis Antoniou)
-Date: Wed, 31 Oct 2012 18:52:12 +0200
-Subject: [RFC 6/7] capebus: Document DT bindings
+Date: Wed, 31 Oct 2012 18:52:11 +0200
+Subject: [RFC 5/7] capebus: Beaglebone capebus DT update
 In-Reply-To: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
 References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
-Message-ID: <1351702333-8456-7-git-send-email-panto@antoniou-consulting.com>
+Message-ID: <1351702333-8456-6-git-send-email-panto@antoniou-consulting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe capebus DT bindings in detail.
+Update the common beaglebone's DTS with the required DT
+entries for all known working capes as of now.
 
 Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
 ---
- .../capebus/bone-capebus-slot-override.txt         | 28 +++++++
- .../devicetree/bindings/capebus/bone-capebus.txt   | 50 +++++++++++
- .../bindings/capebus/bone-geiger-cape.txt          | 78 +++++++++++++++++
- .../bindings/capebus/bone-generic-cape.txt         | 97 ++++++++++++++++++++++
- .../devicetree/bindings/capebus/da8xx-dt.txt       | 31 +++++++
- .../devicetree/bindings/capebus/i2c-dt.txt         | 42 ++++++++++
- .../devicetree/bindings/capebus/spi-dt.txt         | 37 +++++++++
- .../devicetree/bindings/capebus/ti-tscadc-dt.txt   | 34 ++++++++
- 8 files changed, 397 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/capebus/bone-capebus-slot-override.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/bone-capebus.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/bone-geiger-cape.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/bone-generic-cape.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/da8xx-dt.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/i2c-dt.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/spi-dt.txt
- create mode 100644 Documentation/devicetree/bindings/capebus/ti-tscadc-dt.txt
+ arch/arm/boot/dts/am335x-bone-common.dtsi | 689 ++++++++++++++++++++++++++++--
+ 1 file changed, 659 insertions(+), 30 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/capebus/bone-capebus-slot-override.txt b/Documentation/devicetree/bindings/capebus/bone-capebus-slot-override.txt
-new file mode 100644
-index 0000000..733d977
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/bone-capebus-slot-override.txt
-@@ -0,0 +1,28 @@
-+* Beagle bone capebus slot override bindings
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index 99240a5..46d5f27 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -51,6 +51,143 @@
+ 				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
+ 			>;
+ 		};
++		i2c2_pins: pinmux_i2c2_pins {
++			pinctrl-single,pins = <
++				0x178 0x73 	/* uart1_ctsn.i2c2_sda, SLEWCTRL_SLOW | INPUT_PULLUP | MODE3 */
++				0x17c 0x73	/* uart1_rtsn.i2c2_scl, SLEWCTRL_SLOW | INPUT_PULLUP | MODE3 */
++			>;
++		};
 +
-+The beagle bone capebus node can have slot override nodes. These nodes describe
-+  an override that will take place in the specified slot.
-+  Many boards during the prototype phase don't have an EEPROM (or are even
-+  wired in such a way that an eeprom cannot be added). In that case you can
-+  specify an override that will make everything work as if a real EEPROM was
-+  there.
++		bone_dvi_cape_led_pins: pinmux_bone_dvi_cape_led_pins {
++			pinctrl-single,pins = <
++				0x48 0x07	/* gpmc_a2.gpio1_18, OUTPUT | MODE7 */
++				0x4c 0x07	/* gpmc_a3.gpio1_19, OUTPUT | MODE7 */
++			>;
++		};
 +
-+Required properties:
-+- compatible: Override node must have the form "bone-capebus-slot-override"
-+- slot: Identifies the slot# to override.
-+- board-name: The cape's name as if provided by the board-name EEPROM field
++		bone_dvi_cape_dvi_00A0_pins: pinmux_bone_dvi_cape_dvi_00A0_pins {
++			pinctrl-single,pins = <
++				0x1c 0x07	/* gpmc_ad7.gpio1_7, OUTPUT | MODE7 - DVIPDn */
 +
-+Optional properties:
-+- version: The cape's version as if provided by the version EEPROM field.
-+- manufacturer: The cape's manufacturer as if provided by the manufacturer
-+  EEPROM field.
++				0xa0 0x08	/* lcd_data0.lcd_data0, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xa4 0x08	/* lcd_data1.lcd_data1, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xa8 0x08	/* lcd_data2.lcd_data2, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xac 0x08	/* lcd_data3.lcd_data3, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb0 0x08	/* lcd_data4.lcd_data4, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb4 0x08	/* lcd_data5.lcd_data5, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb8 0x08	/* lcd_data6.lcd_data6, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xbc 0x08	/* lcd_data7.lcd_data7, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc0 0x08	/* lcd_data8.lcd_data8, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc4 0x08	/* lcd_data9.lcd_data9, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc8 0x08	/* lcd_data10.lcd_data10, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xcc 0x08	/* lcd_data11.lcd_data11, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd0 0x08	/* lcd_data12.lcd_data12, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd4 0x08	/* lcd_data13.lcd_data13, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd8 0x08	/* lcd_data14.lcd_data14, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xdc 0x08	/* lcd_data15.lcd_data15, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xe0 0x00	/* lcd_vsync.lcd_vsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xe4 0x00	/* lcd_hsync.lcd_hsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xe8 0x00	/* lcd_pclk.lcd_pclk, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xec 0x00	/* lcd_ac_bias_en.lcd_ac_bias_en, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++			>;
++		};
 +
-+Example:
++		bone_dvi_cape_dvi_00A1_pins: pinmux_bone_dvi_cape_dvi_00A1_pins {
++			pinctrl-single,pins = <
++				0x84 0x07	/* gpmc_csn2.gpio1_31, OUTPUT | MODE7 - DVIPDn */
 +
-+override at 1 {
-+	compatible = "bone-capebus-slot-override";
-+	slot = <1>;
-+	board-name = "Adafruit 1.8 Cape";
-+	version = "00A0";
-+	manufacturer = "Adafruit";
++				0xa0 0x08	/* lcd_data0.lcd_data0, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xa4 0x08	/* lcd_data1.lcd_data1, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xa8 0x08	/* lcd_data2.lcd_data2, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xac 0x08	/* lcd_data3.lcd_data3, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb0 0x08	/* lcd_data4.lcd_data4, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb4 0x08	/* lcd_data5.lcd_data5, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb8 0x08	/* lcd_data6.lcd_data6, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xbc 0x08	/* lcd_data7.lcd_data7, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc0 0x08	/* lcd_data8.lcd_data8, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc4 0x08	/* lcd_data9.lcd_data9, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc8 0x08	/* lcd_data10.lcd_data10, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xcc 0x08	/* lcd_data11.lcd_data11, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd0 0x08	/* lcd_data12.lcd_data12, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd4 0x08	/* lcd_data13.lcd_data13, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd8 0x08	/* lcd_data14.lcd_data14, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xdc 0x08	/* lcd_data15.lcd_data15, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xe0 0x00	/* lcd_vsync.lcd_vsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xe4 0x00	/* lcd_hsync.lcd_hsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xe8 0x00	/* lcd_pclk.lcd_pclk, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xec 0x00	/* lcd_ac_bias_en.lcd_ac_bias_en, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++			>;
++		};
++
++		bone_geiger_cape_led_pins: pinmux_bone_geiger_cape_led_pins {
++			pinctrl-single,pins = <
++				0xe4 0x07	/* lcd_hsync.gpio2_23, OUTPUT | MODE7 */
++				0xec 0x07	/* lcd_ac_bias_en.gpio2_25, OUTPUT | MODE7 */
++			>;
++		};
++
++		bone_geiger_cape_pins: pinmux_bone_geiger_cape_pins {
++			pinctrl-single,pins = <
++				0x48 0x06       /* gpmc_a2.ehrpwm1a, OMAP_MUX_MODE6 | AM33XX_PIN_OUTPUT */
++				/* 0x19c 0x34 */	/* mcasp0_ahclkr.eCAP2_in_PWM2_out, OMAP_MUX_MODE4 | INPUT_PULLUP */
++				0x19c 0x37 	/* mcasp0_ahclkr.gpio3_17, OMAP_MUX_MODE4 | INPUT_PULLUP */
++			>;
++		};
++
++		bone_lcd3_cape_led_00A0_pins: pinmux_bone_lcd3_cape_led_00A0_pins {
++			pinctrl-single,pins = <
++				0x48 0x07	/* gpmc_a2.gpio1_18, OUTPUT | MODE7 */
++				0x4c 0x07	/* gpmc_a3.gpio1_19, OUTPUT | MODE7 */
++			>;
++		};
++
++		bone_lcd3_cape_lcd_pins: pinmux_bone_lcd3_cape_lcd_pins {
++			pinctrl-single,pins = <
++				0xa0 0x08	/* lcd_data0.lcd_data0, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xa4 0x08	/* lcd_data1.lcd_data1, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xa8 0x08	/* lcd_data2.lcd_data2, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xac 0x08	/* lcd_data3.lcd_data3, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb0 0x08	/* lcd_data4.lcd_data4, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb4 0x08	/* lcd_data5.lcd_data5, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xb8 0x08	/* lcd_data6.lcd_data6, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xbc 0x08	/* lcd_data7.lcd_data7, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc0 0x08	/* lcd_data8.lcd_data8, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc4 0x08	/* lcd_data9.lcd_data9, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xc8 0x08	/* lcd_data10.lcd_data10, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xcc 0x08	/* lcd_data11.lcd_data11, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd0 0x08	/* lcd_data12.lcd_data12, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd4 0x08	/* lcd_data13.lcd_data13, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xd8 0x08	/* lcd_data14.lcd_data14, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xdc 0x08	/* lcd_data15.lcd_data15, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT | AM33XX_PULL_DISA */
++				0xe0 0x00	/* lcd_vsync.lcd_vsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xe4 0x00	/* lcd_hsync.lcd_hsync, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xe8 0x00	/* lcd_pclk.lcd_pclk, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++				0xec 0x00	/* lcd_ac_bias_en.lcd_ac_bias_en, OMAP_MUX_MODE0 | AM33XX_PIN_OUTPUT */
++			>;
++		};
++
++		bone_lcd3_cape_keys_00A0_pins: pinmux_bone_lcd3_cape_keys_00A0_pins {
++			pinctrl-single,pins = <
++				0x040 0x2f	/* gpmc_a0.gpio1_16, INPUT | PULLDIS | MODE7 */
++				0x044 0x2f	/* gpmc_a1.gpio1_17, INPUT | PULLDIS | MODE7 */
++				0x1a4 0x2f	/* mcasp0_fsr.gpio3_19, INPUT | PULLDIS | MODE7 */
++				0x078 0x2f	/* gpmc_ben1.gpio1_28, INPUT | PULLDIS | MODE7 */
++				0x164 0x2f	/* ecap0_in_pwm0_out.gpio0_7, INPUT | PULLDIS | MODE7 */
++			>;
++		};
++
++		pwm_bl_pins: pinmux_pwm_bl_pins {
++			pinctrl-single,pins = <
++				0x4c 0x06	/* gpmc_a3.ehrpwm1b, OMAP_MUX_MODE6 | AM33XX_PIN_OUTPUT */
++				// 0x48 0x06       /* gpmc_a2.ehrpwm1a, OMAP_MUX_MODE6 | AM33XX_PIN_OUTPUT */
++			>;
++	       };
++
++		weather_cape_w1_pins: pinmux_weather_cape_w1_pins {
++			pinctrl-single,pins = <
++				0x0c 0x37       /* gpmc_ad3.gpio1_3, OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE7 - w1-gpio */
++			>;
++		};
+ 	};
+ 
+ 	ocp {
+@@ -92,16 +229,6 @@
+ 			};
+ 		};
+ 
+-		i2c1: i2c at 44e0b000 {
+-			status = "okay";
+-			clock-frequency = <400000>;
+-
+-			tps: tps at 24 {
+-				reg = <0x24>;
+-			};
+-
+-		};
+-
+ 		gpevt {
+ 			compatible = "gpevt";
+ 			pinctrl-names = "default";
+@@ -110,15 +237,117 @@
+ 			dma-names = "gpioevt";
+ 			gpio-evt = <&gpio3 2 0>;
+ 		};
++
++	};
++
++	capebus: capebus at 0 {
++			compatible = "bone-capebus";
++
++			bone_dvi_cape: cape at 0 {
++				compatible = "bone-generic-cape";
++			};
++
++			bone_geiger_cape: cape at 1 {
++				compatible = "bone-geiger-cape";
++			};
++
++			bone_lcd3_cape: cape at 2 {
++				compatible = "bone-generic-cape";
++			};
++
++			bone_lcd7_cape: cape at 3 {
++				compatible = "bone-lcd7-cape";
++			};
++
++			bone_weather_cape: cape at 4 {
++				compatible = "bone-generic-cape";
++			};
++
++			bone_adafruit_cape: cape at 5 {
++				compatible = "bone-generic-cape";
++			};
++
++			/* overrides; no EEPROM (prototyping) */
++//			override at 3 {
++//				compatible = "bone-capebus-slot-override";
++//				slot = <3>;
++//				board-name = "Geiger Cape";
++//				version = "00A0";
++//				manufacturer = "Geiger Inc";
++//				/* TODO: Add the rest */
++//			};
++
++//			override at 2 {
++//				compatible = "bone-capebus-slot-override";
++//				slot = <2>;
++//				board-name = "Weather Cape";
++//				version = "00A0";
++//				manufacturer = "CCO Inc";
++//				/* TODO: Add the rest */
++//			};
++
++//			override at 1 {
++//				compatible = "bone-capebus-slot-override";
++//				slot = <1>;
++//				board-name = "Adafruit 1.8 Cape";
++//				version = "00A0";
++//				manufacturer = "Adafruit";
++//				/* TODO: Add the rest */
++//			};
++
++//			override at 0 {
++//				compatible = "bone-capebus-slot-override";
++//				slot = <0>;
++//				board-name = "BeagleBone Weather CAPE";
++//				version = "00A0";
++//				manufacturer = "Beagleboardtoys";
++//				/* TODO: Add the rest */
++//			};
+ 	};
+ 
+-	backlight {
+-			compatible	= "pwm-backlight"; 
+-			pwms = <&ehrpwm1 0 500000 0>;
+-			pwm-names = "st7735fb";
+-			brightness-levels = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100>;
+-			default-brightness-level = <50>; /* index to the array above */ 
+-		};
 +};
-diff --git a/Documentation/devicetree/bindings/capebus/bone-capebus.txt b/Documentation/devicetree/bindings/capebus/bone-capebus.txt
-new file mode 100644
-index 0000000..6d8a08d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/bone-capebus.txt
-@@ -0,0 +1,50 @@
-+* Beagle bone capebus bindings
 +
-+The beaglebone capebus implementation is using a single capebus
-+node contained in the root node. A beaglebone cape is identified
-+at by reading an EEPROM at on of 4 possible addresses on the I2C2 bus.
++&i2c0 {
++	status = "okay";
++	clock-frequency = <400000>;
 +
-+Required properties:
-+- compatible: Every beaglebone compatible capebus node shall have the 
-+  form "bone-capebus";
-+- slots: An array of phandles pointing to the I2C node of an EEPROM that 
-+  contains the cape information.
++	tps: tps at 24 {
++		reg = <0x24>;
++	};
 +
-+Optional properties:
-+
-+The child nodes of the capebus node can contain either cape nodes
-+or override nodes. Those cape nodes are described in their respective
-+binding files.
-+
-+- override nodes: Describe an override that will take place in the specified
-+  slot. Many boards during the prototype phase don't have an EEPROM (or are even
-+  wired in such a way that an eeprom cannot be added). In that case you can
-+  specify an override that will make everything work as if a real EEPROM was
-+  there.
-+
-+Override node required properties:
-+- compatible: For override node must have the form "bone-capebus-slot-override"
-+- slot: Identifies the slot# to override.
-+- board-name: The cape's name as if provided by the board-name EEPROM field
-+
-+Override node optional properties:
-+- version: The cape's version as if provided by the version EEPROM field.
-+- manufacturer: The cape's manufacturer as if provided by the manufacturer
-+  EEPROM field.
-+
-+Example:
-+
-+capebus: capebus at 0 {
-+	compatible = "bone-capebus";
-+
-+	slots = <&cape_eeprom_0 &cape_eeprom_1 &cape_eeprom_2 &cape_eeprom_3>;
-+
-+	[cape-nodes]
-+	[override-nodes]
-+
-+	bone_adafruit_cape: cape at 5 {
-+		compatible = "bone-generic-cape";
-+		// read the bone-generic-cape bindings for the rest
-+		...
++	baseboard_eeprom: baseboard_eeprom at 50 {
++		compatible = "at,24c256";
++		reg = <0x50>;
 +	};
 +};
-diff --git a/Documentation/devicetree/bindings/capebus/bone-geiger-cape.txt b/Documentation/devicetree/bindings/capebus/bone-geiger-cape.txt
-new file mode 100644
-index 0000000..a2ed81c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/bone-geiger-cape.txt
-@@ -0,0 +1,78 @@
-+* Beagle bone geiger cape
 +
-+  A geiger cape is your run of the mill particle detector measuring
-+  ionizing radiation. It is also the first example of how a non-generic
-+  cape can be supported by capebus.
-+
-+  The geiger cape can not be created via instantiation of a generic cape 
-+  since the component need to work together.
-+
-+Required properties:
-+- compatible: Generic cape nodes must have the form "bone-geiger-cape"
-+- board-name: The cape's name as if provided by the board-name EEPROM field
-+- pwms: Pointer to the PWM we require
-+- pwm-names: Name of the PWM.
-+- pwm-frequency: Frequency of the PWM in Hz
-+- pwm-duty-cycle: Duty cycle in percent
-+- event-blink-delay: Blink delay of the event led
-+- gpios: GPIO on which an event is detected
-+- vsense-name: Name of the analog input for vsense
-+- vsense-scale: Vsense scale to convert to mVolts
-+- ti-tscadc-dt compatible node for the ADC configuration
-+- gpio-leds compatible node for the LED configuration
-+
-+Optional properties:
-+
-+The geiger cape supports the standard pinctrl properties.
-+
-+Example:
-+
-+bone_geiger_cape: cape at 1 {
-+	compatible = "bone-geiger-cape";
-+	board-name = "Geiger Cape";
-+
-+	/* note that these can't be versioned... */
++&i2c2 {
++	status = "okay";
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&bone_geiger_cape_pins>;
++	pinctrl-0 = <&i2c2_pins>;
 +
-+	pwms = <&ehrpwm1 0 500000 0>;
-+	pwm-names = "bone-geiger-cape";
++	clock-frequency = <100000>;
 +
-+	pwm-frequency  = <20000>;	/* 20KHz */
-+	pwm-duty-cycle = <60>;		/* 60% */
-+
-+	event-blink-delay = <30>;	/* 30ms */
-+
-+	gpios = <&gpio4 17 0>;		/* pulse */
-+
-+	vsense-name = "AIN5";		/* analog vsense */
-+	vsense-scale = <37325>;		/* scaling */
-+
-+	tscadc {
-+		compatible = "ti-tscadc-dt";
-+
-+		ti,hwmods = "adc_tsc";
-+
-+		adc-channels = <8>;
++	/* OK, I know these are cape but for now it will do */
++	cape_eeprom_0: cape_eeprom_0 at 54 {
++		compatible = "at,24c256";
++		reg = <0x54>;
 +	};
 +
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bone_geiger_cape_led_pins>;
-+
-+		geiger-led0 {
-+			label = "geiger:green:usr0";
-+			gpios = <&gpio3 23 0>;
-+			linux,default-trigger = "geiger-run";
-+			default-state = "off";
-+		};
-+
-+		geiger-led1 {
-+			label = "geiger:red:usr1";
-+			gpios = <&gpio3 25 0>;
-+			linux,default-trigger = "geiger-event";
-+			default-state = "off";
-+		};
++	cape_eeprom_1: cape_eeprom_1 at 55 {
++		compatible = "at,24c256";
++		reg = <0x55>;
 +	};
++
++	cape_eeprom_2: cape_eeprom_2 at 56 {
++		compatible = "at,24c256";
++		reg = <0x56>;
++	};
++
++	cape_eeprom_3: cape_eeprom_3 at 57 {
++		compatible = "at,24c256";
++		reg = <0x57>;
++	};
+ };
+ 
+ /include/ "tps65217.dtsi"
+@@ -165,6 +394,7 @@
+ 			regulator-always-on;
+ 		};
+ 	};
++
+ };
+ 
+ &mmc1 {
+@@ -172,21 +402,8 @@
+ };
+ 
+ &spi1 {
+-	status = "okay";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&spi1_pins>;
+-
+-	lcd at 0 {
+-		compatible = "adafruit,tft-lcd-1.8-green", "sitronix,st7735";
+-		spi-max-frequency = <8000000>;
+-		reg = <0>;
+-		spi-cpol;
+-		spi-cpha;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&lcd_pins>;
+-		st7735-rst = <&gpio4 19 0>;
+-		st7735-dc = <&gpio4 21 0>;
+-	};
+ };
+ 
+ &edma {
+@@ -200,3 +417,415 @@
+ &cpsw_emac1 {
+ 	phy_id = "4a101000.mdio:01";
+ };
++
++&ehrpwm1 {
++	status = "okay";
 +};
-diff --git a/Documentation/devicetree/bindings/capebus/bone-generic-cape.txt b/Documentation/devicetree/bindings/capebus/bone-generic-cape.txt
-new file mode 100644
-index 0000000..71ad2f4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/bone-generic-cape.txt
-@@ -0,0 +1,97 @@
-+* Beagle bone generic cape
 +
-+  A generic cape is one form of cape that doesn't require any per-cape
-+  driver for it to function. It is enough for the cape's node to be
-+  instantiated in the right manner and the functions that the cape provides
-+  will be available to Linux. A large number of capes fall in this category
-+  like LCD/DVI/VGA capes, audio capes, capes with a number of gpio buttons,
-+  capes with standard I2C/SPI/W1 parts etc.
-+  All that's required is to describe the parts of the cape in the DT and 
-+  how they utilize the SoC peripherals and it will work, without having
-+  to write any other driver, or modify the board support package.
++&capebus {
++	slots = <&cape_eeprom_0 &cape_eeprom_1 &cape_eeprom_2 &cape_eeprom_3>;
++};
 +
-+  As a sidenote, a large part of the complexity of capes have to do
-+  with version management. A cape as it goes through various steps of evolution
-+  changes. These changes are codified by the version field on the EEPROM.
-+  It is important that version management can be kept as simple as possible.
-+
-+  The generic concept works by instantiating the child nodes that are
-+  contained in the cape node. By default nodes that are present in the
-+  root of the node are activated for any version. Version nodes can 
-+  contain per-version changes. In the example the da8xx-dt node differs
-+  in the way it's instantiated, and this is expressed by the version nodes.
-+
-+Required properties:
-+- compatible: Generic cape nodes must have the form "bone-generic-cape"
-+- board-name: The cape's name as if provided by the board-name EEPROM field
-+
-+Optional properties:
-+- version: Only valid in a version node, and it contains the list of compatible
-+  versions this node contains.
-+
-+The standard supported nodes of the generic cape are:
-+
-+gpio-leds, tps65217-backlight, gpio-keys, w1-gpio, pwm-backlight
-+
-+The following nodes are supported via a capebus specific bridge devices, and
-+their bindings described in their respective files:
-+
-+ti-tscadc-dt, da8xx-dt, i2c-dt, spi-dt
-+
-+Example:
-+
-+bone_dvi_cape: cape at 0 {
-+
-+	compatible = "bone-generic-cape";
++&bone_dvi_cape {
 +	board-name = "BeagleBone DVI-D CAPE";
 +
 +	/* hacky, since this is not a proper DT platform device */
@@ -306,173 +401,355 @@ index 0000000..71ad2f4
 +		};
 +	};
 +};
-diff --git a/Documentation/devicetree/bindings/capebus/da8xx-dt.txt b/Documentation/devicetree/bindings/capebus/da8xx-dt.txt
-new file mode 100644
-index 0000000..0b84063
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/da8xx-dt.txt
-@@ -0,0 +1,31 @@
-+* DA8XX DT bindins
 +
-+  This is an adapter device for use in device tree cases, since the
-+  drivers DT bindings are not yet ready. It is bound to get away once
-+  they are in place. Note that there is no capebus prefix, since there's
-+  not really any dependence on capebus; the drivers can be moved out of
-+  capebus if need be.
++&bone_geiger_cape {
++	board-name = "Geiger Cape";
 +
-+Required properties:
-+- compatible: Must have the form "da8xx-dt"
-+- ti,hwmods: Must have the form "lcdc" (until hwmod DT is complete)
-+- disp-pll: PLL value
-+- panel-type: Name of the panel type connected
-+
-+Optional properties:
-+powerdn-gpio: GPIO controlling power
-+
-+Note that the pinctrl bindings are supported.
-+
-+Example:
-+
-+dvi {
-+	compatible = "da8xx-dt";
++	/* note that these can't be versioned... */
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&bone_dvi_cape_dvi_00A0_pins>;
-+	ti,hwmods = "lcdc";
++	pinctrl-0 = <&bone_geiger_cape_pins>;
 +
-+	disp-pll = <560000000>;
-+	panel-type = "1024x768 at 60";
-+	powerdn-gpio = <&gpio2 7 0>;
-+};
-diff --git a/Documentation/devicetree/bindings/capebus/i2c-dt.txt b/Documentation/devicetree/bindings/capebus/i2c-dt.txt
-new file mode 100644
-index 0000000..79a042a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/i2c-dt.txt
-@@ -0,0 +1,42 @@
-+* I2C DT bindings
++	pwms = <&ehrpwm1 0 500000 0>;
++	pwm-names = "bone-geiger-cape";
 +
-+  This is an adapter device for use in device tree cases.
-+  What we want to do is to add a number of I2C devices connected
-+  to a specified i2c adapter node, and instantiate them on
-+  successful cape match. Not only that, normally I2C adapters
-+  are disabled in the DT tree, so in that case we enable them
-+  first and then go about our business.
++	pwm-frequency  = <20000>;	/* 20KHz */
++	pwm-duty-cycle = <60>;		/* 60% */
 +
-+Required properties:
-+- compatible: Must have the form "i2c-dt"
-+- parent: The phandle of the i2c adapter node
-+- #address-cells: The same as the parent i2c adapter node
-+- #size-cells: The same as the parent i2c adapter node
++	event-blink-delay = <30>;	/* 30ms */
 +
-+Example:
++	gpios = <&gpio4 17 0>;		/* pulse */
 +
-+i2c2-devices {
-+	compatible = "i2c-dt";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
++	vsense-name = "AIN5";		/* analog vsense */
++	vsense-scale = <37325>;		/* scaling */
 +
-+	parent = <&i2c2>;
++	tscadc {
++		compatible = "ti-tscadc-dt";
 +
-+	/* Ambient light sensor */
-+	tsl2550 at 39 {
-+		compatible = "tsl,tsl2550";
-+		reg = <0x39>;
++		ti,hwmods = "adc_tsc";
++
++		adc-channels = <8>;
 +	};
 +
-+	/* Humidity Sensor */
-+	sht21 at 40 {
-+		compatible = "sensiron,sht21";
-+		reg = <0x40>;
-+	};
-+
-+	/* Barometric pressure sensor */
-+	bmp085 at 77 {
-+		compatible = "bosch,bmp085";
-+		reg = <0x77>;
-+	};
-+};
-diff --git a/Documentation/devicetree/bindings/capebus/spi-dt.txt b/Documentation/devicetree/bindings/capebus/spi-dt.txt
-new file mode 100644
-index 0000000..fd70fc4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/spi-dt.txt
-@@ -0,0 +1,37 @@
-+* SPI DT bindings
-+
-+  This is an adapter device for use in device tree cases.
-+  What we want to do is to add a number of SPI devices connected
-+  to a specified spi node, and instantiate them on
-+  successful cape match. Not only that, normally SPI nodes
-+  are disabled in the DT tree, so in that case we enable them
-+  first and then go about our business.
-+
-+Required properties:
-+- compatible: Must have the form "spi-dt"
-+- parent: The phandle of the spi node
-+- #address-cells: The same as the parent spi node
-+- #size-cells: The same as the parent spi node
-+
-+Example:
-+
-+spi1-devices {
-+	compatible = "spi-dt";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	parent = <&spi1>;
-+
-+	lcd at 0 {
-+		compatible = "adafruit,tft-lcd-1.8-red", "sitronix,st7735";
-+		spi-max-frequency = <8000000>;
-+		reg = <0>;
-+		spi-cpol;
-+		spi-cpha;
++	gpio-leds {
++		compatible = "gpio-leds";
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&lcd_pins>;
-+		st7735-rst = <&gpio4 19 0>;
-+		st7735-dc = <&gpio4 21 0>;
++		pinctrl-0 = <&bone_geiger_cape_led_pins>;
++
++		geiger-led0 {
++			label = "geiger:green:usr0";
++			gpios = <&gpio3 23 0>;
++			linux,default-trigger = "geiger-run";
++			default-state = "off";
++		};
++
++		geiger-led1 {
++			label = "geiger:red:usr1";
++			gpios = <&gpio3 25 0>;
++			linux,default-trigger = "geiger-event";
++			default-state = "off";
++		};
++	};
++};
++
++&bone_lcd3_cape {
++	board-name = "BeagleBone LCD3 CAPE";
++
++	/* hacky, since this is not a proper DT platform device */
++	/* but until we have DT bindings... */
++	lcd3 {
++		compatible = "da8xx-dt";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bone_lcd3_cape_lcd_pins>;
++
++		ti,hwmods = "lcdc";
++
++		disp-pll = <16000000>;
++		panel-type = "CDTech_S035Q01";
++	};
++
++	/* same thing as above */
++	tscadc {
++		compatible = "ti-tscadc-dt";
++
++		ti,hwmods = "adc_tsc";
++
++		tsc-wires = <4>;
++		tsc-x-plate-resistance = <200>;
++		tsc-steps = <6>;
++
++		adc-channels = <4>;
++	};
++
++	version at 00A0 {
++		version = "00A0";
++
++		backlight {
++			compatible = "tps65217-backlight";
++			isel = <1>;
++			fdim = <200>;
++
++			tps = <&tps>;	/* link to the tps */
++			brightness = <100>;
++		};
++
++		gpio-leds {
++			compatible = "gpio-leds";
++			pinctrl-names = "default";
++			pinctrl-0 = <&bone_lcd3_cape_led_00A0_pins>;
++
++			lcd3-led0 {
++				label = "lcd3:green:usr0";
++				gpios = <&gpio2 18 0>;
++				linux,default-trigger = "heartbeat";
++				default-state = "off";
++			};
++
++			lcd3-led1 {
++				label = "lcd3:green:usr1";
++				gpios = <&gpio2 19 0>;
++				linux,default-trigger = "cpu0";
++				default-state = "off";
++			};
++		};
++
++		gpio_keys {
++			compatible = "gpio-keys";
++			pinctrl-names = "default";
++			pinctrl-0 = <&bone_lcd3_cape_keys_00A0_pins>;
++
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			button at 1 {
++				debounce_interval = <50>;
++				linux,code = <105>;
++				label = "left";
++				gpios = <&gpio2 16 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 2 {
++				debounce_interval = <50>;
++				linux,code = <106>;
++				label = "right";
++				gpios = <&gpio2 17 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 3 {
++				debounce_interval = <50>;
++				linux,code = <103>;
++				label = "up";
++				gpios = <&gpio4 19 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 4 {
++				debounce_interval = <50>;
++				linux,code = <108>;
++				label = "down";
++				gpios = <&gpio2 28 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 5 {
++				debounce_interval = <50>;
++				linux,code = <28>;
++				label = "enter";
++				gpios = <&gpio1 7 0x0>;
++				gpio-key,wakeup;
++			};
++		};
++	};
++};
++
++&bone_lcd7_cape {
++	board-name = "BeagleBone LCD7 CAPE";
++
++	/* hacky, since this is not a proper DT platform device */
++	/* but until we have DT bindings... */
++	lcd7 {
++		compatible = "da8xx-dt";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bone_lcd3_cape_lcd_pins>;
++
++		ti,hwmods = "lcdc";
++
++		disp-pll = <60000000>;
++		panel-type = "TFC_S9700RTWV35TR_01B";
++	};
++
++	/* same thing as above */
++	tscadc {
++		compatible = "ti-tscadc-dt";
++
++		ti,hwmods = "adc_tsc";
++
++		tsc-wires = <4>;
++		tsc-x-plate-resistance = <200>;
++		tsc-steps = <6>;
++
++		adc-channels = <4>;
++	};
++
++	version at 00A0 {
++		version = "00A0";
++
++		backlight {
++			compatible = "tps65217-backlight";
++			isel = <1>;
++			fdim = <200>;
++
++			tps = <&tps>;	/* link to the tps */
++			brightness = <100>;
++		};
++
++		gpio-leds {
++			compatible = "gpio-leds";
++			pinctrl-names = "default";
++			pinctrl-0 = <&bone_lcd3_cape_led_00A0_pins>;
++
++			lcd3-led0 {
++				label = "lcd3:green:usr0";
++				gpios = <&gpio2 18 0>;
++				linux,default-trigger = "heartbeat";
++				default-state = "off";
++			};
++
++			lcd3-led1 {
++				label = "lcd3:green:usr1";
++				gpios = <&gpio2 19 0>;
++				linux,default-trigger = "cpu0";
++				default-state = "off";
++			};
++		};
++
++		gpio_keys {
++			compatible = "gpio-keys";
++			pinctrl-names = "default";
++			pinctrl-0 = <&bone_lcd3_cape_keys_00A0_pins>;
++
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			button at 1 {
++				debounce_interval = <50>;
++				linux,code = <105>;
++				label = "left";
++				gpios = <&gpio2 16 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 2 {
++				debounce_interval = <50>;
++				linux,code = <106>;
++				label = "right";
++				gpios = <&gpio2 17 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 3 {
++				debounce_interval = <50>;
++				linux,code = <103>;
++				label = "up";
++				gpios = <&gpio4 19 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 4 {
++				debounce_interval = <50>;
++				linux,code = <108>;
++				label = "down";
++				gpios = <&gpio2 28 0x0>;
++				gpio-key,wakeup;
++				autorepeat;
++			};
++			button at 5 {
++				debounce_interval = <50>;
++				linux,code = <28>;
++				label = "enter";
++				gpios = <&gpio1 7 0x0>;
++				gpio-key,wakeup;
++			};
++		};
++	};
++};
++
++&bone_weather_cape {
++	board-name = "BeagleBone Weather CAPE";
++
++	i2c2-devices {
++		compatible = "i2c-dt";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		parent = <&i2c2>;
++
++		/* Ambient light sensor */
++		tsl2550 at 39 {
++			compatible = "tsl,tsl2550";
++			reg = <0x39>;
++		};
++
++		/* Humidity Sensor */
++		sht21 at 40 {
++			compatible = "sensiron,sht21";
++			reg = <0x40>;
++		};
++
++		/* Barometric pressure sensor */
++		bmp085 at 77 {
++			compatible = "bosch,bmp085";
++			reg = <0x77>;
++		};
++	};
++
++	onewire at 0 {
++		compatible	= "w1-gpio";
++		pinctrl-names	= "default";
++		pinctrl-0	= <&weather_cape_w1_pins>;
++		status		= "okay";
++
++		gpios = <&gpio2 3 0>;
 +	};
 +
 +};
-diff --git a/Documentation/devicetree/bindings/capebus/ti-tscadc-dt.txt b/Documentation/devicetree/bindings/capebus/ti-tscadc-dt.txt
-new file mode 100644
-index 0000000..44ad4f2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/capebus/ti-tscadc-dt.txt
-@@ -0,0 +1,34 @@
-+* TI's TSCADC Device Tree adapter
 +
-+  This is an adapter device for use in device tree cases, since the
-+  drivers DT bindings are not yet ready. It is bound to get away once
-+  they are in place. Note that there is no capebus prefix, since there's
-+  not really any dependence on capebus; the drivers can be moved out of
-+  capebus if need be.
++&bone_adafruit_cape {
++	board-name = "Adafruit 1.8 Cape";
 +
-+Required properties:
-+- compatible: Must have the form "ti-tscadc-dt"
-+- ti,hwmods: Must have the form "adc_tsc" (until hwmod DT is complete)
++	backlight {
++		compatible	= "pwm-backlight";
++		pinctrl-names	= "default";
++		pinctrl-0	= <&pwm_bl_pins>;
 +
-+Optional properties:
-+- adc-channels: Number of ADC channels the driver should provide.
-+- tsc-wires: Number of touchscreen wires
-+- tsc-x-plate-resistance: Touchscreen X plate resistance value
-+- tsc-steps: Touchscreen steps
++		pwms = <&ehrpwm1 1 500000 0>;
++		pwm-names = "st7735fb";
++		brightness-levels = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100>;
++		default-brightness-level = <50>; /* index to the array above */
++	};
 +
-+Note if either adc-channels or tsc-wires are missing their respective
-+values are set to 0.
++	spi1-devices {
++		compatible = "spi-dt";
 +
-+Example:
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+tscadc {
-+	compatible = "ti-tscadc-dt";
++		parent = <&spi1>;
 +
-+	ti,hwmods = "adc_tsc";
++		lcd at 0 {
++			compatible = "adafruit,tft-lcd-1.8-red", "sitronix,st7735";
++			spi-max-frequency = <8000000>;
++			reg = <0>;
++			spi-cpol;
++			spi-cpha;
++			pinctrl-names = "default";
++			pinctrl-0 = <&lcd_pins>;
++			st7735-rst = <&gpio4 19 0>;
++			st7735-dc = <&gpio4 21 0>;
++		};
 +
-+	tsc-wires = <4>;
-+	tsc-x-plate-resistance = <200>;
-+	tsc-steps = <6>;
-+
-+	adc-channels = <4>;
++	};
 +};
 -- 
 1.7.12
