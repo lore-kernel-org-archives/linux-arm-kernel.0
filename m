@@ -1,30 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 31 Oct 2012 10:58:05 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP: more hwmod/PRCM fixes for 3.7-rc
-In-Reply-To: <alpine.DEB.2.00.1210311050040.4160@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210311050040.4160@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1210311057041.4160@utopia.booyaka.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Wed, 31 Oct 2012 16:28:38 +0530
+Subject: [PATCH RFC] i2c: omap: Fix the revision register read
+In-Reply-To: <20121031101201.GB10094@arwen.pp.htv.fi>
+References: <1351673959-5918-1-git-send-email-shubhrajyoti@ti.com>
+ <20121031101201.GB10094@arwen.pp.htv.fi>
+Message-ID: <5091045E.8040407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
-
-On Wed, 31 Oct 2012, Paul Walmsley wrote:
-
-> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
-> 
->   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.7-rc
-> 
-> for you to fetch changes up to 945365c4da8c29bbb0109a728e6dca691d78a5de:
-> 
->   ARM: OMAP4: hwmod data: do not enable or reset the McPDM during kernel init (2012-10-29 22:13:44 -0600)
-
-Kevin just alerted me that I missed one of the comments on one of these 
-patches.  So, will update it, re-test, and send a new pull request.
+On Wednesday 31 October 2012 03:42 PM, Felipe Balbi wrote:
+>>  
+>> > +	if (!_dev->regs)
+>> > +		return 0;
+> this is wrong, you need to make sure dev->regs is set early enough.
 
 
-- Paul
+to set the dev->regs I use the value read from revision register.
+
+to read the revision register I do a get_sync first. This in turn leads
+to the call to resume handler.
+At this point the regs is NULL and so the check.
+
+After reading the register and checking the scheme bit.
+the reg map is populated.
+
+How can this issue be solved?
