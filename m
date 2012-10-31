@@ -1,32 +1,48 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 31 Oct 2012 14:02:07 +0100
-Subject: [PATCH 1/2] input: qt1070: add pinctrl consumer
-In-Reply-To: <CACRpkdaTciRNsG8viz19FQajFExX+ApPNcnnVBneecSe_w-EsA@mail.gmail.com>
-References: <20121023131627.GE18964@game.jcrosoft.org>
- <1350998942-713-1-git-send-email-plagnioj@jcrosoft.com>
- <CACRpkdaTciRNsG8viz19FQajFExX+ApPNcnnVBneecSe_w-EsA@mail.gmail.com>
-Message-ID: <20121031130207.GE19021@game.jcrosoft.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 31 Oct 2012 14:16:52 +0100
+Subject: [PATCH v4 1/2] ARM: clk-imx27: Add missing clock for mx2-camera
+In-Reply-To: <20121031095632.536d9362@infradead.org>
+References: <1351598606-8485-1-git-send-email-fabio.estevam@freescale.com>
+ <20121031095632.536d9362@infradead.org>
+Message-ID: <20121031131652.GM1641@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:37 Tue 30 Oct     , Linus Walleij wrote:
-> 
-> On Tue, Oct 23, 2012 at 3:29 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> 
-> > If no pinctrl available just report a warning as some architecture may not
-> > need to do anything.
-> >
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: Linus Walleij <linus.walleij@linaro.org>
-> > Cc: linux-input at vger.kernel.org
-> 
-> We're having a discussion on the level of where to impose pinctrl.
-> 
-> Jean-Christophe, could you please check the thread
-> "Input: omap4-keypad: Add pinctrl support"
-> and tell us what you think is the best approach?
-ok I check it 
+Hi Mauro,
 
-Best Regards,
-J.
+On Wed, Oct 31, 2012 at 09:56:32AM -0200, Mauro Carvalho Chehab wrote:
+> Em Tue, 30 Oct 2012 10:03:25 -0200
+> Fabio Estevam <fabio.estevam@freescale.com> escreveu:
+> 
+> > During the clock conversion for mx27 the "per4_gate" clock was missed to get
+> > registered as a dependency of mx2-camera driver.
+> > 
+> > In the old mx27 clock driver we used to have:
+> > 
+> > DEFINE_CLOCK1(csi_clk, 0, NULL, 0, parent, &csi_clk1, &per4_clk);
+> > 
+> > ,so does the same in the new clock driver
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> As it seems that those patches depend on some patches at the arm tree,
+> the better is to merge them via -arm tree.
+
+Quoting yourself:
+
+> Forgot to comment: as patch 2 relies on this change, the better, IMHO, is
+> to send both via the same tree. If you decide to do so, please get arm
+> maintainer's ack, instead, and we can merge both via my tree.
+
+That's why Fabio resent these patches with my Ack. You are free to take
+these.
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
