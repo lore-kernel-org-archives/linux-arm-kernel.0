@@ -1,56 +1,76 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 31 Oct 2012 23:51:33 +0100
-Subject: [PATCH v2 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <5091A5AA.7000207@wwwdotorg.org>
-References: <1350922139-3693-1-git-send-email-haojian.zhuang@gmail.com>
- <1350922139-3693-6-git-send-email-haojian.zhuang@gmail.com>
- <5085CC3F.30708@wwwdotorg.org>
- <CAN1soZy8xXGs8zEiZV0kV0dGVdXfZ9ogx83sFgPG76d0i8yH4A@mail.gmail.com>
- <5091A5AA.7000207@wwwdotorg.org>
-Message-ID: <CAN1soZyc8Kox__yOER82Oe5OtaLJWYAoMzgWGhEonTfdf11MqQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 31 Oct 2012 16:11:15 -0700
+Subject: [PATCH 07/11] ARM: OMAP: Move omap-pm-noop.c local to mach-omap2
+In-Reply-To: <1654531.W5JISgHidu@avalon>
+References: <20121030234852.25936.12482.stgit@muffinssi.local>
+ <20121030235255.25936.36727.stgit@muffinssi.local>
+ <20121031205850.GO12739@atomide.com> <1654531.W5JISgHidu@avalon>
+Message-ID: <20121031231115.GG15766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 11:26 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/31/2012 10:58 AM, Haojian Zhuang wrote:
->> On Tue, Oct 23, 2012 at 6:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->>> 3) Why is pinctrl-single,gpio-func optional? Presumably you always need
->>> to program the pinmux HW to select the GPIO function. Yet, the driver
->>> code in an earlier patch seems to deliberately do nothing if this
->>> property is missing. Shouldn't the DT parsing return an error instead?
->>>
->> pinctrl-single,gpio-func is optional for above reason.
->
-> Presumably the node that contains the pinctrl-single,gpio-func property
-> is optional, but once you have such a node, pinctrl-single,gpio-func is
-> required?
->
-Yes, gpio-func is must required if the phandle of gpio range is defined.
-I'll add such comments in document.
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [121031 16:03]:
+> Hi Tony,
+> 
+> On Wednesday 31 October 2012 13:58:50 Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [121030 16:55]:
+> > > This code should be private to mach-omap2.
+> > > 
+> > > The only use for it in for omap1 has been in dmtimer.c
+> > > to check for context loss. However, omap1 does not
+> > > lose context during idle, so the code is not needed.
+> > > Further, omap1 timer has OMAP_TIMER_ALWON set, so omap1
+> > > was not hitting omap_pm_get_dev_context_loss_count()
+> > > test.
+> > 
+> > Noticed one issue with my test compiles in the
+> > omap-for-v3.8/cleanup-headers branch that can be
+> > fixed along with this patch.
+> > 
+> > --- a/drivers/media/platform/omap3isp/ispvideo.c
+> > +++ b/drivers/media/platform/omap3isp/ispvideo.c
+> > @@ -36,7 +36,6 @@
+> >  #include <media/v4l2-ioctl.h>
+> >  #include <plat/iommu.h>
+> >  #include <plat/iovmm.h>
+> > -#include <plat/omap-pm.h>
+> 
+> The reason this was included was to call omap_pm_set_min_bus_tput() in earlier 
+> versions of the driver. We'll have to discuss what to replace that with, but 
+> that's another topic.
 
->>> I suppose it's OK that a generic pin controller binding would use the
->>> generic pin configuration config options. I'm still not convinced that
->>> the semantics of generic pin control make sense. Maybe if they're just
->>> arbitrary names for SoC-specific things it's fine though.
->>>
->>> Do these patches expose /all/ generic pin configuration options? It
->>> doesn't seem worth exposing only some of them and ignoring others.
->>
->> I believe general pinconf can't support all cases in different silicons.
->
-> I tend to agree.
->
->> And we still have some common features that could be covered in general
->> pinconf. So we need a structure to support both pinconf & specific pinconf.
->
-> But that tends to imply that adding support for generic pinconf into the
-> pinctrl-simple driver isnt' actually going to be useful for anyone. If
-> pinctrl-single only supports some part of your HW, how can you use it?
-> Or, do you intend to somehow make pinctrl-single support both the common
-> generic pinconf stuff, and somehow be extensible to support any
-> SoC-specific pin config fields?
+OK thanks.
 
-I'm intend to make pinctrl-single to support both the common generic pinconf
-stuff and any SoC-specific pinconf. I'll try to handle it. But they
-won't be included
-in V3.
+> > > @@ -730,6 +732,7 @@ static int __devinit omap_dm_timer_probe(struct
+> > > platform_device *pdev)> 
+> > >  	timer->reserved = omap_dm_timer_reserved_systimer(timer->id);
+> > >  	timer->pdev = pdev;
+> > >  	timer->capability = pdata->timer_capability;
+> > > 
+> > > +	timer->get_context_loss_count = pdata->get_context_loss_count;
+> > > 
+> > >  	/* Skip pm_runtime_enable for OMAP1 */
+> > >  	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
+> > > 
+> > > diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h
+> > > b/arch/arm/plat-omap/include/plat/dmtimer.h index 85868e9..3f5b9cf 100644
+> > > --- a/arch/arm/plat-omap/include/plat/dmtimer.h
+> > > +++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+> > > @@ -94,6 +94,7 @@ struct dmtimer_platform_data {
+> > > 
+> > >  	/* set_timer_src - Only used for OMAP1 devices */
+> > >  	int (*set_timer_src)(struct platform_device *pdev, int source);
+> > >  	u32 timer_capability;
+> > > 
+> > > +	int (*get_context_loss_count)(struct device *);
+> 
+> That's a step forward for the common zImage, but one step backward for DT 
+> support :-) I'm fine with this for now, but do you already have an idea on how 
+> to solve that ?
+
+When it's converted to be a device driver, it can do it
+using runtime PM calls.
+
+Regards,
+
+Tony
