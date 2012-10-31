@@ -1,40 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 31 Oct 2012 10:12:52 +0100
-Subject: [PATCHv6 0/2] Add support for the OLED in the CFA10036
-Message-ID: <1351674774-2891-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 31 Oct 2012 10:12:54 +0100
+Subject: [PATCH 2/2] ARM: dts: mxs: add oled support for the cfa-10036
+In-Reply-To: <1351674774-2891-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1351674774-2891-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1351674774-2891-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Brian Lilly <brian@crystalfontz.com>
+---
+ arch/arm/boot/dts/imx28-cfa10036.dts |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-This patchset adds support for the solomon SSD1307 OLED controller present
-in the CFA-10036 board.
-
-It first adds the framebuffer driver for this controller, and then the
-needed bits to enable it in the cfa10036 dts.
-
-Considering that the driver has been around since almost three months now, and
-I have not received any comments on the framebuffer part, I'd very much like it
-to be included in 3.8 if possible.
-
-Thanks,
-Maxime
-
-Changes from v5:
-  * Fixed bogus reset code
-
-Maxime Ripard (2):
-  video: Add support for the Solomon SSD1307 OLED Controller
-  ARM: dts: mxs: add oled support for the cfa-10036
-
- .../devicetree/bindings/video/ssd1307fb.txt        |   24 ++
- arch/arm/boot/dts/imx28-cfa10036.dts               |   19 +
- drivers/video/Kconfig                              |   13 +
- drivers/video/Makefile                             |    1 +
- drivers/video/ssd1307fb.c                          |  407 ++++++++++++++++++++
- 5 files changed, 464 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/ssd1307fb.txt
- create mode 100644 drivers/video/ssd1307fb.c
-
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index c03a577..816cae9 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -33,11 +33,30 @@
+ 		};
+ 
+ 		apbx at 80040000 {
++			pwm: pwm at 80064000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pwm4_pins_a>;
++				status = "okay";
++			};
++
+ 			duart: serial at 80074000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&duart_pins_b>;
+ 				status = "okay";
+ 			};
++
++			i2c0: i2c at 80058000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins_b>;
++				status = "okay";
++
++				ssd1307: oled at 3c {
++					compatible = "solomon,ssd1307fb-i2c";
++					reg = <0x3c>;
++					pwms = <&pwm 4 3000>;
++					reset-gpios = <&gpio2 7 0>;
++				};
++			};
+ 		};
+ 	};
+ 
 -- 
 1.7.9.5
