@@ -1,51 +1,63 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Wed, 31 Oct 2012 18:08:54 +0100
-Subject: [PATCH] fix DEBUG_LL DCC race condition
-In-Reply-To: <20121031163615.GQ21164@n2100.arm.linux.org.uk>
-References: <20121029151832.GA2162@sig21.net>
- <20121031163615.GQ21164@n2100.arm.linux.org.uk>
-Message-ID: <20121031170853.GA20498@sig21.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Oct 2012 11:13:03 -0600
+Subject: [PATCH v2 3/5] irqchip: Move ARM GIC to drivers/irqchip
+In-Reply-To: <509146B8.2000305@gmail.com>
+References: <1351695517-5636-1-git-send-email-robherring2@gmail.com>
+ <1351695517-5636-4-git-send-email-robherring2@gmail.com>
+ <20121031150954.GN21164@n2100.arm.linux.org.uk> <509146B8.2000305@gmail.com>
+Message-ID: <50915C1F.3050502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 04:36:15PM +0000, Russell King - ARM Linux wrote:
-> On Mon, Oct 29, 2012 at 04:18:32PM +0100, Johannes Stezenbach wrote:
-> > Trying to boot a kernel with I- and D-caches disabled
-> > sometimes hangs when DEBUG_LL output to DCC is enabled.
-> > Apparently the JTAG debugger sometimes reads the
-> > DCC register before busyuart could see the wDTRfull flag,
-> > thus busyuart spins in an endless loop.
+On 10/31/2012 09:41 AM, Rob Herring wrote:
+> On 10/31/2012 10:09 AM, Russell King - ARM Linux wrote:
+>> On Wed, Oct 31, 2012 at 09:58:35AM -0500, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Now that we have drivers/irqchip, move GIC irqchip to drivers/irqchip. This
+>>> is necessary to share the GIC with arm and arm64.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> ---
+>>>  arch/arm/common/Kconfig                            |    8 --------
+>>>  arch/arm/common/Makefile                           |    1 -
+>>>  drivers/irqchip/Kconfig                            |    8 ++++++++
+>>>  drivers/irqchip/Makefile                           |    1 +
+>>>  arch/arm/common/gic.c => drivers/irqchip/irq-gic.c |    0
+>>>  drivers/irqchip/irqchip.c                          |   10 ++++++++++
+>>>  drivers/irqchip/irqchip.h                          |    1 +
+>>>  7 files changed, 20 insertions(+), 9 deletions(-)
+>>>  rename arch/arm/common/gic.c => drivers/irqchip/irq-gic.c (100%)
+>>
+>> What about its dependent arch/arm/include/asm/hardware/gic.h header,
+>> which I believe after patch 1 becomes just a bunch of function calls,
+>> and so no longer has any right to be in asm/hardware.
+>>
+>> Nothing should be moved out of arch/arm without its associated header
+>> file also moving with it.
 > 
-> This makes no sense.  Why is busyuart spinning if it does _not_ see a
-> full flag?  busyuart is supposed to spin _if_ the UART has data to be
-> sent.  It's not supposed to spin if the data has been sent.
-
-Maybe my wording didn't make it clear that the current code
-spins if the data has been sent (which indeed does not
-make sense).  My fix changes it to spin _until_ the data has been send.
-
-> > The reason seems to be a misunderstanding of the purpose
-> > of the busyuart macro.  For UART, waituart waits until
-> > there is space in the FIFO, and busyuart waits until
-> > the FIFO is empty (all data is sent).
-> > For DCC, busyuart should be identical to waituart since
-> > there is no FIFO.
+> What is left is only used within arch/arm and I expect we will get rid
+> of the remaining users. So I didn't want to encourage any additional
+> users by moving to include/linux.
 > 
-> Not quite.  waituart is supposed to check that the flow control allows
-> the character to be sent _or_ it's supposed to do nothing.  Look at
-> the 8250 implementation debug-8250.S - this is the first implementation,
-> authored by me, and therefore is the definitive implementation for this
-> stuff.
+> gic_secondary_init and gic_cascade_irq could be function ptrs.
+> gic_of_init can be removed once users are converted to call irqchip_init
+> instead. That leaves gic_init which are all the non-DT converted GIC
+> users and will take some time to convert. I am puzzled by tegra and zynq
+> which should be DT only already.
 
-OK, in the case of DCC "flow-control" would mean JTAG has
-read the DCC register.  So it seems correct that both
-busyuart and waituart do the same:  wait for empty DCC register.
-But I agree that the double wait is superflous, waituart
-could be changed to do nothing.  This would be in line with
-debug-8250.S which doesn't check for space in the FIFO
-in waituart.
+I imagine you're talking about:
 
-I'll send an updated patch.
+        /*
+         * Check if there is a devicetree present, since the GIC will be
+         * initialized elsewhere under DT.
+         */
+        if (!of_have_populated_dt())
+                gic_init(0, 29, distbase,
+                        IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
 
-Thanks,
-Johannes
+This is probably legacy code from when we weren't DT only, and I imagine
+can simply be removed. There are probably other pieces of code we can go
+through and remove now.
