@@ -1,59 +1,67 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Wed, 31 Oct 2012 12:12:29 +0100
-Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP network
- unit
-In-Reply-To: <1351245804-31478-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351245804-31478-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <2760802.TcHGXAmZie@bender>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Wed, 31 Oct 2012 05:36:48 -0600
+Subject: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
+In-Reply-To: <29530110-f967-49c0-a2bc-d035d02da2a5@VA3EHSMHS020.ehs.local>
+References: <20121024200222.GA6713@beefymiracle.amer.corp.natinst.com>
+ <20121024200431.GE6713@beefymiracle.amer.corp.natinst.com>
+ <3c9e591c-a29f-446b-9256-bb23ff6d840d@TX2EHSMHS014.ehs.local>
+ <201210302222.15656.arnd@arndb.de>
+ <29530110-f967-49c0-a2bc-d035d02da2a5@VA3EHSMHS020.ehs.local>
+Message-ID: <20121031113648.GI5190@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thomas,
+On Wed, Oct 31, 2012 at 08:43:35AM +0000, Michal Simek wrote:
+> 
+> 
+> > -----Original Message-----
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Tuesday, October 30, 2012 11:22 PM
+> > To: Michal Simek
+> > Cc: Josh Cartwright; arm at kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; John Linn; Nick Bowler; Russell King - ARM Linux
+> > Subject: Re: [PATCH v4 4/5] ARM: annotate VMALLOC_END definition with _AC
+> >
+> > On Saturday 27 October 2012, Michal Simek wrote:
+> > > > diff --git a/arch/arm/include/asm/pgtable.h
+> > > > b/arch/arm/include/asm/pgtable.h index 08c1231..72904a2 100644
+> > > > --- a/arch/arm/include/asm/pgtable.h
+> > > > +++ b/arch/arm/include/asm/pgtable.h
+> > > > @@ -40,7 +40,7 @@
+> > > >   */
+> > > >  #define VMALLOC_OFFSET               (8*1024*1024)
+> > > >  #define VMALLOC_START                (((unsigned long)high_memory +
+> > > > VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
+> > > > -#define VMALLOC_END          0xff000000UL
+> > > > +#define VMALLOC_END          _AC(0xff000000,UL)
+> > >
+> > > This shouldn't be the part of this series but should go to mainline through
+> > different tree.
+> > > Arnd, Olof: Can you take this patch to your arm-soc tree?
+> > >
+> > > I don't think it is a good workstyle to propose it to mainline through zynq soc
+> > tree.
+> > > What do you think?
+> >
+> > The arm-soc tree is not the right place either, this is architecture code which is in
+> > Russell's domain. I would suggest getting an Ack from Russell if he's ok with it
+> > and then merging it together with your other changes into arm-soc.
+> 
+> That's what I thought too.
+> Not sure if Josh wants to push this to mainline.
 
-On Friday 26 October 2012 12:03:21 Thomas Petazzoni wrote:
-> This patch contains a new network driver for the network unit of the
-> ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
-> processor, a Marvell-developed ARM core that implements the ARMv7
-> instruction set.
-> 
-> Compared to previous ARM Marvell SoCs (Kirkwood, Orion, Discovery),
-> the network unit in Armada 370 and Armada XP is highly different. This
-> is the reason why this new 'mvneta' driver is needed, while the older
-> ARM Marvell SoCs use the 'mv643xx_eth' driver.
-> 
-> Here is an overview of the most important hardware changes that
-> require a new, specific, driver for the network unit of Armada 370/XP:
-> 
->  - The new network unit has a completely different design and layout
->    for the RX and TX descriptors. They are now organized as a simple
->    array (each RX and TX queue has base address and size of this
->    array) rather than a linked list as in the old SoCs.
-> 
->  - The new network unit has a different RXQ and TXQ management: this
->    management is done using special read/write counter registers,
->    while in the Old SocS, it was done using the Ownership bit in RX
->    and TX descriptors.
-> 
->  - The new network unit has different interrupt registers
-> 
->  - The new network unit way of cleaning of interrupts is not done by
->    writing to the cause register, but by updating per-queue counters
-> 
->  - The new network unit has different GMAC registers (link, speed,
->    duplex configuration) and different WRR registers.
-> 
->  - The new network unit has lots of new units like PnC (Parser and
->    Classifier), PMT, BM (Memory Buffer Management), xPON, and more.
-> 
-> The driver proposed in the current patch only handles the basic
-> features. Additional hardware features will progressively be supported
-> as needed.
-> 
-> This code has originally been written by Rami Rosen
-> <rosenr@marvell.com>, and then reviewed and cleaned up by Thomas
-> Petazzoni <thomas.petazzoni@free-electrons.com>.
+The patch is not relevant anymore.  It was needed when the virtual
+address of the early uart mapping was defined via VMALLOC_END.  That was
+causing us problems, so we ended up choosing a fixed, known working
+address within the vmalloc region to map the uart.
 
-This is looking good from a PHY lib point of view now, thanks for doing this!
--- 
-Florian
+Thanks,
+
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121031/9c397885/attachment.sig>
