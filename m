@@ -1,26 +1,67 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Wed, 31 Oct 2012 23:03:41 +0530
-Subject: [PATCH V3 0/4] ARM: tegra: Enable SLINK controller driver
-In-Reply-To: <50914C82.5010704@wwwdotorg.org>
-References: <1351580726-17350-1-git-send-email-ldewangan@nvidia.com>
- <509038BA.30600@wwwdotorg.org> <5090E69C.4080108@nvidia.com>
- <50914C82.5010704@wwwdotorg.org>
-Message-ID: <509160F5.9070400@nvidia.com>
+From: tremyfr@yahoo.fr (trem)
+Date: Wed, 31 Oct 2012 18:38:45 +0100
+Subject: [PATCH] ARM i.MX27: Fix low reference clock path
+In-Reply-To: <1351668533-32712-1-git-send-email-s.hauer@pengutronix.de>
+References: <1351668533-32712-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <50916225.4040601@yahoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 31 October 2012 09:36 PM, Stephen Warren wrote:
-> On 10/31/2012 02:51 AM, Laxman Dewangan wrote:
+On 31/10/12 08:28, Sascha Hauer wrote:
+> The i.MX27 clock tree can either be driven from a 26MHz oscillator
+> or from a 32768Hz oscillator. The latter was not properly implemented,
+> the mux between these two pathes was missing. Add this mux and while
+> at it rename the 'prem' (premultiplier) clk to 'fpm' (Frequency
+> Pre-Multiplier) to better match the datasheet.
 >
-> I had forgotten about this from when I tested the older SPI driver that
-> we ripped out; I had at least compared the registers between U-Boot and
-> the kernel with that driver, so I'm pretty sure I didn't make that
-> mistake with the old driver.
+> Signed-off-by: Sascha Hauer<s.hauer@pengutronix.de>
+
+Tested-by: Philippe Reynes <tremyfr@yahoo.fr>
+
+> ---
+>   arch/arm/mach-imx/clk-imx27.c |   17 ++++++++++++++---
+>   1 file changed, 14 insertions(+), 3 deletions(-)
 >
-> So, I'll apply your patch series, and send one to add the flash device
-> to the Cardhu .dts.
-
-Great  to hear that the spi driver work for you now.
-
-Thanks,
-Laxman
+> diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+> index 3b6b640..f8d9129 100644
+> --- a/arch/arm/mach-imx/clk-imx27.c
+> +++ b/arch/arm/mach-imx/clk-imx27.c
+> @@ -51,8 +51,10 @@
+>
+>   static const char *vpu_sel_clks[] = { "spll", "mpll_main2", };
+>   static const char *cpu_sel_clks[] = { "mpll_main2", "mpll", };
+> +static const char *mpll_sel_clks[] = { "fpm", "mpll_osc_sel", };
+> +static const char *mpll_osc_sel_clks[] = { "ckih", "ckih_div1p5", };
+>   static const char *clko_sel_clks[] = {
+> -	"ckil", "prem", "ckih", "ckih",
+> +	"ckil", "fpm", "ckih", "ckih",
+>   	"ckih", "mpll", "spll", "cpu_div",
+>   	"ahb", "ipg", "per1_div", "per2_div",
+>   	"per3_div", "per4_div", "ssi1_div", "ssi2_div",
+> @@ -79,7 +81,8 @@ enum mx27_clks {
+>   	vpu_ahb_gate, fec_ahb_gate, emma_ahb_gate, emi_ahb_gate, dma_ahb_gate,
+>   	csi_ahb_gate, brom_ahb_gate, ata_ahb_gate, wdog_ipg_gate, usb_ipg_gate,
+>   	uart6_ipg_gate, uart5_ipg_gate, uart4_ipg_gate, uart3_ipg_gate,
+> -	uart2_ipg_gate, uart1_ipg_gate, clk_max
+> +	uart2_ipg_gate, uart1_ipg_gate, ckih_div1p5, fpm, mpll_osc_sel,
+> +	mpll_sel, clk_max
+>   };
+>
+>   static struct clk *clk[clk_max];
+> @@ -91,7 +94,15 @@ int __init mx27_clocks_init(unsigned long fref)
+>   	clk[dummy] = imx_clk_fixed("dummy", 0);
+>   	clk[ckih] = imx_clk_fixed("ckih", fref);
+>   	clk[ckil] = imx_clk_fixed("ckil", 32768);
+> -	clk[mpll] = imx_clk_pllv1("mpll", "ckih", CCM_MPCTL0);
+> +	clk[fpm] = imx_clk_fixed_factor("fpm", "ckil", 1024, 1);
+> +	clk[ckih_div1p5] = imx_clk_fixed_factor("ckih_div1p5", "ckih", 2, 3);
+> +
+> +	clk[mpll_osc_sel] = imx_clk_mux("mpll_osc_sel", CCM_CSCR, 4, 1,
+> +			mpll_osc_sel_clks,
+> +			ARRAY_SIZE(mpll_osc_sel_clks));
+> +	clk[mpll_sel] = imx_clk_mux("mpll_sel", CCM_CSCR, 16, 1, mpll_sel_clks,
+> +			ARRAY_SIZE(mpll_sel_clks));
+> +	clk[mpll] = imx_clk_pllv1("mpll", "mpll_sel", CCM_MPCTL0);
+>   	clk[spll] = imx_clk_pllv1("spll", "ckih", CCM_SPCTL0);
+>   	clk[mpll_main2] = imx_clk_fixed_factor("mpll_main2", "mpll", 2, 3);
+>
