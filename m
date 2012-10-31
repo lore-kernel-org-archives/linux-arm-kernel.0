@@ -1,68 +1,61 @@
-From: ucdevel@gmail.com (David McCullough)
-Date: Wed, 31 Oct 2012 10:25:00 +1000
-Subject: [PATCH] [RFC] crypto: sha1/arm - fix build with
- CONFIG_THUMB2_KERNEL
-In-Reply-To: <20121030100742.17910.70241.stgit@localhost6.localdomain6>
-References: <20121030100742.17910.70241.stgit@localhost6.localdomain6>
-Message-ID: <20121031002457.GB6972@spottygum.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 31 Oct 2012 01:44:18 +0100
+Subject: [PATCH RESEND] cpufreq: Make sure target freq is within limits
+In-Reply-To: <f79c0841be1ae16e1f2bd9084ed9a158eb171eb0.1351254846.git.viresh.kumar@linaro.org>
+References: <f79c0841be1ae16e1f2bd9084ed9a158eb171eb0.1351254846.git.viresh.kumar@linaro.org>
+Message-ID: <5507910.WhiOUESWao@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Jussi Kivilinna wrote the following:
-> Building cryptodev-2.6 tree with CONFIG_THUMB2_KERNEL=y and
-> CONFIG_CRYPTO_SHA1_ARM=y give following error:
+On Friday, October 26, 2012 06:05:21 PM Viresh Kumar wrote:
+> __cpufreq_driver_target() must not pass target frequency beyond the limits of
+> current policy.
 > 
->    AS      arch/arm/crypto/sha1-armv4-large.o
-> arch/arm/crypto/sha1-armv4-large.S: Assembler messages:
-> arch/arm/crypto/sha1-armv4-large.S:197: Error: r13 not allowed here --
-> `teq r14,sp'
-> arch/arm/crypto/sha1-armv4-large.S:377: Error: r13 not allowed here --
-> `teq r14,sp'
-> arch/arm/crypto/sha1-armv4-large.S:469: Error: r13 not allowed here --
-> `teq r14,sp'
+> Today most of cpufreq platform drivers are doing this check in their target
+> routines. Why not move it to __cpufreq_driver_target().
 > 
-> Build can be fixed with adding '.arm' at head of sha1-armv4-large.S.
-> However I'm not sure if this correct fix as this is my first stab
-> at arm assembler and I could not get CONFIG_THUMB2_KERNEL boot up
-> on 'qemu-system-arm -M vexpress-a9' to verify correctness. So this
-> is only build tested.
-
-That fixes the problem for the assembler,  in that you have forced it to
-treat the code as 32 bit (non-thumb).
-
-I know you can mix thumb and non-thumb code,  and it seems that as long as
-all parties know what code is in what mode it should work.
-
-Unfortunately I don't know enough about it be sure this is a valid fix.
-I think we need a long term arm expert to pass judgement on this one,
-unless of source you manage to get it tested.  I don't have any thumb
-targets I can try it on, sory,
-
-Cheers,
-Davidm
-
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-crypto at vger.kernel.org
-> Cc: David McCullough <ucdevel@gmail.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  arch/arm/crypto/sha1-armv4-large.S |    2 ++
->  1 file changed, 2 insertions(+)
+> Hi Rafael,
 > 
-> diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
-> index 7050ab1..e8a55eb 100644
-> --- a/arch/arm/crypto/sha1-armv4-large.S
-> +++ b/arch/arm/crypto/sha1-armv4-large.S
-> @@ -53,6 +53,8 @@
->  
->  .text
->  
-> +.arm
-> +
->  .global	sha1_block_data_order
->  .type	sha1_block_data_order,%function
->  
-> 
+> Resend doesn't contain any change, but fixed commit log
 
+Applied to the linux-next branch of linux-pm.git as v3.8 material.
+
+Thanks,
+Rafael
+
+
+>  drivers/cpufreq/cpufreq.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
+> index 28dc134..2f5ac2d 100644
+> --- a/drivers/cpufreq/cpufreq.c
+> +++ b/drivers/cpufreq/cpufreq.c
+> @@ -1470,12 +1470,19 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
+>  			    unsigned int relation)
+>  {
+>  	int retval = -EINVAL;
+> +	unsigned int old_target_freq = target_freq;
+>  
+>  	if (cpufreq_disabled())
+>  		return -ENODEV;
+>  
+> -	pr_debug("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
+> -		target_freq, relation);
+> +	/* Make sure that target_freq is within supported range */
+> +	if (target_freq > policy->max)
+> +		target_freq = policy->max;
+> +	if (target_freq < policy->min)
+> +		target_freq = policy->min;
+> +
+> +	pr_debug("target for CPU %u: %u kHz, relation %u, requested %u kHz\n",
+> +			policy->cpu, target_freq, relation, old_target_freq);
+>  
+>  	if (target_freq == policy->cur)
+>  		return 0;
+> 
 -- 
-David McCullough,  davidm at spottygum.com,   Ph: 0410 560 763
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
