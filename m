@@ -1,44 +1,92 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 31 Oct 2012 10:50:23 +0000
-Subject: Two questions about streaming DMA flushing
-In-Reply-To: <CAFNq8R4DMKqRtR7junM6v_NnU=pCi8bpOCf5HP_sQgmztQr-cg@mail.gmail.com>
-References: <CAFNq8R7Fb5Dn6pMDDNvQp=kgpY9vmdpxyhNAPUXYA0-QbfHoJg@mail.gmail.com>
- <20121031075047.GA15743@arm.com>
- <CAFNq8R4DMKqRtR7junM6v_NnU=pCi8bpOCf5HP_sQgmztQr-cg@mail.gmail.com>
-Message-ID: <CAHkRjk41UELOc091rYrfs9mZwdn4hqg8=eeWGJVq5qTo5o7VCA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 31 Oct 2012 10:51:11 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: more hwmod/PRCM fixes for 3.7-rc
+Message-ID: <alpine.DEB.2.00.1210311050040.4160@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2012 09:40, Li Haifeng <omycle@gmail.com> wrote:
-> 2012/10/31 Catalin Marinas <catalin.marinas@arm.com>:
->> On Wed, Oct 31, 2012 at 02:15:04AM +0000, Li Haifeng wrote:
->>> Sorry to disturb you.
->>>
->>> I have two questions for streaming DMA flushing @ arch/arm/mm/cache-v7.S.
->>>
->>> 1.
->>> 332 ENTRY(v7_dma_map_area)
->>> 333         add     r1, r1, r0
->>> 334         teq     r2, #DMA_FROM_DEVICE
->>> 335         beq     v7_dma_inv_range
->>> 336         b       v7_dma_clean_range
->>> 337 ENDPROC(v7_dma_map_area)
->>>
->>> The function of v7_dma_map_area will invalidate corresponding cache line
->>> firstly and then clean the cache for  DMA_FROM_DEVICE . I am confused the
->>> sequence of the operations. IMO, the invalidate should be followed by the clean
->>> action. Is it right?
->>
->> If the direction is DMA_FROM_DEVICE, it only invalidates the cache (beq
->> instruction).
->
-> Sorry for my careless.
->
-> Why doesn't need clean for DMA_FROM_DEVICE? Will the data modified
-> before dma mapping be lost?
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Yes, that's exactly the point of DMA_FROM_DEVICE, the device is going
-to write that buffer anyway.
+Hi Tony
 
--- 
-Catalin
+The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+
+  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.7-rc
+
+for you to fetch changes up to 945365c4da8c29bbb0109a728e6dca691d78a5de:
+
+  ARM: OMAP4: hwmod data: do not enable or reset the McPDM during kernel init (2012-10-29 22:13:44 -0600)
+
+- ----------------------------------------------------------------
+A few more OMAP fixes for the 3.7-rc timeframe.  Mostly hwmod fixes.
+
+Basic test logs are available here:
+
+    http://www.pwsan.com/omap/testlogs/fixes_b_v3.7-rc/20121029222655/
+
+However the v3.7-rc3 kernel is still missing fixes for several regressions,
+which cause several tests to fail.  With several reverts, fixes, and workarounds
+applied, the following test logs were obtained:
+
+    http://www.pwsan.com/omap/testlogs/TEST_fixes_b_v3.7-rc/20121030185805/
+
+ which indicate that the series tests cleanly.
+
+- ----------------------------------------------------------------
+
+vmlinux object size
+(delta in bytes from test_v3.7-rc3 (8f0d8163b50e01f398b14bcd4dc039ac5ab18d64)):
+   text     data      bss    total  kernel
+   -108       -8        0     -116  am33xx_only
+    +56      +16        0      +72  n800_multi_omap2xxx
+    +20      +16        0      +36  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+    -92      -16        0     -108  omap2plus_defconfig
+    -96       -8        0     -104  omap2plus_defconfig_2430sdp_only
+    -92      +16        0      -76  omap2plus_defconfig_cpupm
+    -92      -16        0     -108  omap2plus_defconfig_no_pm
+    -92      +16        0      -76  omap2plus_defconfig_omap2_4_only
+   -172      +16        0     -156  omap2plus_defconfig_omap3_4_only
+    +12      +16        0      +28  rmk_omap3430_ldp_oldconfig
+    +44      +24        0      +68  rmk_omap4430_sdp_oldconfig
+
+
+Miguel Vadillo (1):
+      ARM: OMAP2+: clockdomain: Fix OMAP4 ISS clk domain to support only SWSUP
+
+Paul Walmsley (2):
+      ARM: OMAP2+: hwmod: add flag to prevent hwmod code from touching IP block during init
+      ARM: OMAP4: hwmod data: do not enable or reset the McPDM during kernel init
+
+Tero Kristo (1):
+      ARM: OMAP: hwmod: wait for sysreset complete after enabling hwmod
+
+ arch/arm/mach-omap2/clockdomains44xx_data.c  |    2 +-
+ arch/arm/mach-omap2/omap_hwmod.c             |   59 ++++++++++++++++++++------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    8 ++++
+ arch/arm/plat-omap/include/plat/omap_hwmod.h |    6 +++
+ 4 files changed, 60 insertions(+), 15 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJQkQIvAAoJEMePsQ0LvSpLjvAP/A6xnRpJsqr6do1SDRfCb3G+
+xh+Cem5AkkGnhlQ1VFAyMqxAoVytZjjBxkq/UyJEFcnuQP7hV3DZtNLFyp9A3NlG
+WZDHvwUZmmWA7adqRLQ9DwXnlxx4JPrdaCHLCwBoqSFOR1De6oxqPY5KSNy5CoTL
+D55b0Yb+BH/Z6KMr6NQi8H0Vp3wE0tAAVxoUJ6SPSHgJOW/cqLAwzSdhiUWvfDMP
+nFBfPGDWC+lju3RgUM034f632zm9mC1xhtM6Y+5eHerHZgedo3eaZyGOpzZOpLeT
+bOKIoA3xelZ9AsgYT8FowRwWpP+XN+vkSccOU/n8LKdkpmfllp9J6vicoqtyMGMA
+qoyu7Y63DMOWbzvHqJbVBmWAMviDd3tPzCAPZpEqPmn0+8+mC037KnYyuMiPX7dC
+LdOqtIKYnXrk+vi7ukdzwJRMkAfCY2FOsjg4WiUqkeDS2ZSETLFm/aJyTdeHGKux
+h4mixvJ/h1rGHVc6U9gp53QlMj4wdFG+9cWhfxR/dv2/g84/IaNTFrRTJziyTPz7
+zKeKcX2ezIMHvOzySytkBQePEQsps/eBpF5MsLA5w1M3/47a4UxwhRKGxgFvzTJ9
+zIzQOAuMI01CbHvLTa1dohFcINT1Zd0cK3ZpshBKcsxCwmT7LJKM50XZ0Ddw6Kc9
+yhW5ZWK83wd+oER3mR/k
+=t6ib
+-----END PGP SIGNATURE-----
