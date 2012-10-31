@@ -1,20 +1,114 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 31 Oct 2012 06:38:50 +0000 (UTC)
-Subject: [PATCH 05/13] ARM: OMAP2+: PRCM: create SoC-specific chip restart
- functions
-In-Reply-To: <5090C6B5.3080407@ti.com>
-References: <20121025231818.17558.57884.stgit@dusk.lan>
- <20121025232116.17558.47458.stgit@dusk.lan> <5090C6B5.3080407@ti.com>
-Message-ID: <alpine.DEB.2.00.1210310638280.8340@utopia.booyaka.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Wed, 31 Oct 2012 12:25:54 +0530
+Subject: [PATCH 2/2] ARM: Exynos5250: Enabling ohci-exynos driver
+In-Reply-To: <003901cda5f8$2a4f3980$7eedac80$%han@samsung.com>
+References: <1349431818-15639-1-git-send-email-gautam.vivek@samsung.com>
+ <1349431818-15639-3-git-send-email-gautam.vivek@samsung.com>
+ <003901cda5f8$2a4f3980$7eedac80$%han@samsung.com>
+Message-ID: <CAFp+6iG8M2UaPTZS2dbWq2pyRmnn0bkuFuLWcQGL=rQ7a9UYog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Oct 2012, Vaibhav Hiremath wrote:
+Hi all,
 
-> omap5xxx_restart declaration needs to be removed from here.
-> There is no such function implemented in code.
+On Tue, Oct 9, 2012 at 1:59 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+> On Friday, October 05, 2012 7:10 PM Vivek Gautam wrote
+>>
+>> Adding OHCI device tree node for Exynos5250 along with
+>> the device base address.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>
+> It looks good. Also I have tested this patch with Exynos5250.
+>
+> Acked-by: Jingoo Han <jg1.han@samsung.com>
+>
 
-Thanks, prototype dropped.
+Any thought about this please.
+
+>> ---
+>>  .../devicetree/bindings/usb/exynos-usb.txt         |   15 +++++++++++++++
+>>  arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++++
+>>  arch/arm/mach-exynos/include/mach/map.h            |    1 +
+>>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 ++
+>>  4 files changed, 24 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> index 56e35c7..bff10a8 100644
+>> --- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> +++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+>> @@ -23,3 +23,18 @@ Example:
+>>               interrupts = <0 71 0>;
+>>               samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+>>       };
+>> +
+>> +OHCI
+>> +Required properties:
+>> + - compatible: should be "samsung,exynos-ohci" for USB 2.0
+>> +   OHCI companion controller in host mode.
+>> + - reg: physical base address of the controller and length of memory mapped
+>> +   region.
+>> + - interrupts: interrupt number to the cpu.
+>> +
+>> +Example:
+>> +     ohci {
+>> +             compatible = "samsung,exynos-ohci";
+>> +             reg = <0x12120000 0x100>;
+>> +             interrupts = <0 71 0>;
+>> +     };
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index 73ea844..bcdfbe2 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -224,6 +224,12 @@
+>>               interrupts = <0 71 0>;
+>>       };
+>>
+>> +     ohci {
+>> +             compatible = "samsung,exynos-ohci";
+>> +             reg = <0x12120000 0x100>;
+>> +             interrupts = <0 71 0>;
+>> +     };
+>> +
+>>       amba {
+>>               #address-cells = <1>;
+>>               #size-cells = <1>;
+>> diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+>> index 825fe40..cfede1f 100644
+>> --- a/arch/arm/mach-exynos/include/mach/map.h
+>> +++ b/arch/arm/mach-exynos/include/mach/map.h
+>> @@ -196,6 +196,7 @@
+>>  #define EXYNOS4_PA_OHCI                      0x12590000
+>>  #define EXYNOS4_PA_HSPHY             0x125B0000
+>>  #define EXYNOS5_PA_EHCI                      0x12110000
+>> +#define EXYNOS5_PA_OHCI                      0x12120000
+>>  #define EXYNOS4_PA_MFC                       0x13400000
+>>
+>>  #define EXYNOS4_PA_UART                      0x13800000
+>> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> index 6d950d7b..e6c2144 100644
+>> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+>> @@ -74,6 +74,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+>>                               "exynos-gsc.3", NULL),
+>>       OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
+>>                                       "s5p-ehci", NULL),
+>> +     OF_DEV_AUXDATA("samsung,exynos-ohci", EXYNOS5_PA_OHCI,
+>> +                                     "exynos-ohci", NULL),
+>>       {},
+>>  };
+>>
+>> --
+>> 1.7.6.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 
-- Paul
+
+-- 
+Thanks & Regards
+Vivek
