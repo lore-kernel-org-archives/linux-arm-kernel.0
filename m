@@ -1,139 +1,59 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 31 Oct 2012 12:09:49 +0100
-Subject: [PATCH v2 1/2] ARM: OMAP: hwmod: Add possibility to count hwmod
- resources based on type
-In-Reply-To: <1351596296-13825-2-git-send-email-peter.ujfalusi@ti.com>
-References: <1351596296-13825-1-git-send-email-peter.ujfalusi@ti.com>
- <1351596296-13825-2-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <509106FD.2040804@ti.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Wed, 31 Oct 2012 12:12:29 +0100
+Subject: [PATCH 1/4] net: mvneta: driver for Marvell Armada 370/XP network
+ unit
+In-Reply-To: <1351245804-31478-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351245804-31478-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1351245804-31478-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <2760802.TcHGXAmZie@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hello Thomas,
 
-That's great you've have done that fix.
+On Friday 26 October 2012 12:03:21 Thomas Petazzoni wrote:
+> This patch contains a new network driver for the network unit of the
+> ARM Marvell Armada 370 and the Armada XP. Both SoCs use the PJ4B
+> processor, a Marvell-developed ARM core that implements the ARMv7
+> instruction set.
+> 
+> Compared to previous ARM Marvell SoCs (Kirkwood, Orion, Discovery),
+> the network unit in Armada 370 and Armada XP is highly different. This
+> is the reason why this new 'mvneta' driver is needed, while the older
+> ARM Marvell SoCs use the 'mv643xx_eth' driver.
+> 
+> Here is an overview of the most important hardware changes that
+> require a new, specific, driver for the network unit of Armada 370/XP:
+> 
+>  - The new network unit has a completely different design and layout
+>    for the RX and TX descriptors. They are now organized as a simple
+>    array (each RX and TX queue has base address and size of this
+>    array) rather than a linked list as in the old SoCs.
+> 
+>  - The new network unit has a different RXQ and TXQ management: this
+>    management is done using special read/write counter registers,
+>    while in the Old SocS, it was done using the Ownership bit in RX
+>    and TX descriptors.
+> 
+>  - The new network unit has different interrupt registers
+> 
+>  - The new network unit way of cleaning of interrupts is not done by
+>    writing to the cause register, but by updating per-queue counters
+> 
+>  - The new network unit has different GMAC registers (link, speed,
+>    duplex configuration) and different WRR registers.
+> 
+>  - The new network unit has lots of new units like PnC (Parser and
+>    Classifier), PMT, BM (Memory Buffer Management), xPON, and more.
+> 
+> The driver proposed in the current patch only handles the basic
+> features. Additional hardware features will progressively be supported
+> as needed.
+> 
+> This code has originally been written by Rami Rosen
+> <rosenr@marvell.com>, and then reviewed and cleaned up by Thomas
+> Petazzoni <thomas.petazzoni@free-electrons.com>.
 
-On 10/30/2012 12:24 PM, Peter Ujfalusi wrote:
-> Add flags parameter for omap_hwmod_count_resources() so users can tell which
-> type of resources they are interested when counting them in hwmod database.
-
-Mmm, does it worth doing that for every resources considering that this 
-is a temporary situation and than only the DMA resources are an issue so 
-far?
-
-Otherwise that looks fine to me and will allow a much smoother 
-transition to full DT.
-
-Thanks,
-Benoit
-
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->   arch/arm/mach-omap2/omap_hwmod.c             | 27 ++++++++++++++++-----------
->   arch/arm/plat-omap/include/plat/omap_hwmod.h |  2 +-
->   arch/arm/plat-omap/omap_device.c             | 11 ++++++++---
->   3 files changed, 25 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index b969ab1..a79c941 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -3337,7 +3337,7 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
->   /**
->    * omap_hwmod_count_resources - count number of struct resources needed by hwmod
->    * @oh: struct omap_hwmod *
-> - * @res: pointer to the first element of an array of struct resource to fill
-> + * @flags: Type of resources to include when counting (IRQ/DMA/MEM)
->    *
->    * Count the number of struct resource array elements necessary to
->    * contain omap_hwmod @oh resources.  Intended to be called by code
-> @@ -3350,20 +3350,25 @@ int omap_hwmod_reset(struct omap_hwmod *oh)
->    * resource IDs.
->    *
->    */
-> -int omap_hwmod_count_resources(struct omap_hwmod *oh)
-> +int omap_hwmod_count_resources(struct omap_hwmod *oh, unsigned long flags)
->   {
-> -	struct omap_hwmod_ocp_if *os;
-> -	struct list_head *p;
-> -	int ret;
-> -	int i = 0;
-> +	int ret = 0;
->
-> -	ret = _count_mpu_irqs(oh) + _count_sdma_reqs(oh);
-> +	if (flags & IORESOURCE_IRQ)
-> +		ret += _count_mpu_irqs(oh);
->
-> -	p = oh->slave_ports.next;
-> +	if (flags & IORESOURCE_DMA)
-> +		ret += _count_sdma_reqs(oh);
->
-> -	while (i < oh->slaves_cnt) {
-> -		os = _fetch_next_ocp_if(&p, &i);
-> -		ret += _count_ocp_if_addr_spaces(os);
-> +	if (flags & IORESOURCE_MEM) {
-> +		int i = 0;
-> +		struct omap_hwmod_ocp_if *os;
-> +		struct list_head *p = oh->slave_ports.next;
-> +
-> +		while (i < oh->slaves_cnt) {
-> +			os = _fetch_next_ocp_if(&p, &i);
-> +			ret += _count_ocp_if_addr_spaces(os);
-> +		}
->   	}
->
->   	return ret;
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index b3349f7..48a6f5d 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -628,7 +628,7 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs);
->   u32 omap_hwmod_read(struct omap_hwmod *oh, u16 reg_offs);
->   int omap_hwmod_softreset(struct omap_hwmod *oh);
->
-> -int omap_hwmod_count_resources(struct omap_hwmod *oh);
-> +int omap_hwmod_count_resources(struct omap_hwmod *oh, unsigned long flags);
->   int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
->   int omap_hwmod_fill_dma_resources(struct omap_hwmod *oh, struct resource *res);
->   int omap_hwmod_get_resource_byname(struct omap_hwmod *oh, unsigned int type,
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index 7a7d1f2..915cf68 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -442,19 +442,21 @@ int omap_device_get_context_loss_count(struct platform_device *pdev)
->   /**
->    * omap_device_count_resources - count number of struct resource entries needed
->    * @od: struct omap_device *
-> + * @flags: Type of resources to include when counting (IRQ/DMA/MEM)
->    *
->    * Count the number of struct resource entries needed for this
->    * omap_device @od.  Used by omap_device_build_ss() to determine how
->    * much memory to allocate before calling
->    * omap_device_fill_resources().  Returns the count.
->    */
-> -static int omap_device_count_resources(struct omap_device *od)
-> +static int omap_device_count_resources(struct omap_device *od,
-> +				       unsigned long flags)
->   {
->   	int c = 0;
->   	int i;
->
->   	for (i = 0; i < od->hwmods_cnt; i++)
-> -		c += omap_hwmod_count_resources(od->hwmods[i]);
-> +		c += omap_hwmod_count_resources(od->hwmods[i], flags);
->
->   	pr_debug("omap_device: %s: counted %d total resources across %d hwmods\n",
->   		 od->pdev->name, c, od->hwmods_cnt);
-> @@ -558,7 +560,10 @@ struct omap_device *omap_device_alloc(struct platform_device *pdev,
->   	od->hwmods = hwmods;
->   	od->pdev = pdev;
->
-> -	res_count = omap_device_count_resources(od);
-> +	/* Count all resources for the device */
-> +	res_count = omap_device_count_resources(od, IORESOURCE_IRQ |
-> +						    IORESOURCE_DMA |
-> +						    IORESOURCE_MEM);
->   	/*
->   	 * DT Boot:
->   	 *   OF framework will construct the resource structure (currently
->
+This is looking good from a PHY lib point of view now, thanks for doing this!
+-- 
+Florian
