@@ -1,58 +1,52 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 31 Oct 2012 09:24:05 -0400
-Subject: [PULL REQ] IXP4xx changes for Linux 3.7
-In-Reply-To: <201210302227.55857.arnd@arndb.de>
-References: <m3bog6m5iz.fsf@intrepid.localdomain>
- <m3a9vkahci.fsf@intrepid.localdomain>
- <20121029082940.GC2527@netboy.at.omicron.at>
- <201210302227.55857.arnd@arndb.de>
-Message-ID: <20121031132405.GD22042@titan.lakedaemon.net>
+From: mpfj-list@mimc.co.uk (Mark Jackson)
+Date: Wed, 31 Oct 2012 13:41:03 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <508FE8BA.1080404@ti.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com>
+Message-ID: <50912A6F.1040501@mimc.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 10:27:55PM +0000, Arnd Bergmann wrote:
-> On Monday 29 October 2012, Richard Cochran wrote:
-> > On Thu, Oct 18, 2012 at 12:01:17AM +0200, Krzysztof Halasa wrote:
-> > > 
-> > > Don't get me wrong. If I had time for this it could be different.
-> > > Unfortunately IXP4xx is a legacy arch, and for me it's simply a hobby at
-> > > this point. Given the raised barriers to participate, probably aimed at
-> > > paid maintainers, I have to quit doing this.
-> > > 
-> > > BTW since Imre has probably even much less time, it would be a good time
-> > > to find someone to maintain IXP4xx code. I will be publishing (from time
-> > > to time) my tree (I'm using the hw myself), so even simple
-> > > cherry-picking would probably make some sense.
-> > 
-> > So if no one else wants to do this, then I am willing to look after
-> > the IXP code. I think that I do have the time for it.
+On 30/10/12 14:48, Vaibhav Hiremath wrote:
 > 
-> Thanks for the offer! 
+> 
+> On 10/30/2012 6:09 PM, Hiremath, Vaibhav wrote:
+>>
+>> Mark,
+>>
+>> MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
+>> already submitted to the list recently. So MMC support will come along with
+>> EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
+>>
+>>
+>> If you refer to the Matt's repo, you should get all the patches required to 
+>> boot MMC support -
+>>
+>> https://github.com/ohporter/linux/tree/edma-dmaengine-am33xx-v3
+>>
+>>
+> 
+> I just tested this branch (+ one fix which Matt provided [1]) on
+> BeagleBone, and MMC is working without any issues. I have tested with
+> rootFS on MMC card.
+> 
+> 
+> [1] - http://www.spinics.net/lists/linux-omap/msg79911.html
 
-Yes, thank you!
+Okay, so I'm now coming up against a brick wall regarding U-Boot.
 
-> Jason Cooper was also volunteering to help out with this, and even we can't
-> convince Krzysztof to continue doing it, there is also Imre who is officially
-> listed as maintainer for IXP4xx and who has not commented on this. As Krzysztof
-> mentions, he probably doesn't have much time for it, but I'd like to give
-> him the chance to comment as well.
+The Kernel boots fine (as per the tree + patch above) provided I build U-Boot using the
+v2011.09_AM335xPSP_04.06.00.06 branch from git://arago-project.org/git/projects/u-boot-am33x.git
 
-Agreed.
+If I try the latest mainline U-Boot (or the TI branch), I just get to "Starting kernel ..." and then
+hangs.
 
-> I'm sure we can find some solution between the four of you. Right now, I think
-> we should focus on getting the bug fixes from Krzysztof's tree into mainline
-> and the stable kernels where applicable, and then establish a better working
-> mode for the future kernels.
+I'm going to raise this query on the U-Boot ML, but can you let me know which U-Boot image you're
+using ?
 
-We also need to keep an eye on the big picture.  If we are going to
-keep/maintain ixp4xx in the kernel, there are some things which need to
-be done.  The drivers need moved to drivers/, platform headers need
-moved to platform_data/, and we may as well add devicetree bindings
-while we're moving things around.
-
-Making ixp4xx compatible with multiplatform zImage would probably help
-out the embedded distros as well.
-
-thx,
-
-Jason.
+Cheers
+Mark J.
