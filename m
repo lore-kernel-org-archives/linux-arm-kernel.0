@@ -1,173 +1,128 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 31 Oct 2012 19:52:13 +0000
-Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes for
- AM33XX
-In-Reply-To: <50914107.2090909@ti.com>
-References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
- <1351498881-32482-6-git-send-email-hvaibhav@ti.com> <50914107.2090909@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB56C41@DBDE01.ent.ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 31 Oct 2012 21:10:09 +0100
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 30 Oct 2012 15:02:23 +0100")
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+ <20121030113407.GA24335@sirena.org.uk>
+ <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
+Message-ID: <87obji8kta.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 20:47:27, Cousson, Benoit wrote:
-> Hi,
-> 
-> On 10/29/2012 09:21 AM, Vaibhav Hiremath wrote:
-> > From: Mugunthan V N <mugunthanvnm@ti.com>
-> > 
-> > Add CPSW and MDIO related device tree data for AM33XX.
-> > Also enable them into board/evm dts files by providing
-> > respective phy-id.
-> 
-> Is there any bindings documentation for that device?
-> 
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Yes, the base DT binding documentation is present in file
-Documentation/devicetree/bindings/net/cpsw.txt
-
-
-> > Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> > Cc: Richard Cochran <richardcochran@gmail.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > ---
-> >  arch/arm/boot/dts/am335x-bone.dts |    8 ++++++
-> >  arch/arm/boot/dts/am335x-evm.dts  |    8 ++++++
-> >  arch/arm/boot/dts/am33xx.dtsi     |   50 +++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 66 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> > index c634f87..e233cfa 100644
-> > --- a/arch/arm/boot/dts/am335x-bone.dts
-> > +++ b/arch/arm/boot/dts/am335x-bone.dts
-> > @@ -78,3 +78,11 @@
-> >  		};
-> >  	};
-> >  };
-> > +
-> > +&cpsw_emac0 {
-> > +	phy_id = "4a101000.mdio:00";
-> 
-> Why are you using that kind of interface? You seem to want a reference
-> to a device.
-> 
-> Cannot you have something less hard coded like:
-> phy_id = <&davinci_mdio>, <0>;
-> 
-> 
-> > +};
-> > +
-> > +&cpsw_emac1 {
-> > +	phy_id = "4a101000.mdio:01";
-> > +};
-> > diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-> > index 185d632..415c3b3 100644
-> > --- a/arch/arm/boot/dts/am335x-evm.dts
-> > +++ b/arch/arm/boot/dts/am335x-evm.dts
-> > @@ -118,3 +118,11 @@
-> >  		};
-> >  	};
-> >  };
-> > +
-> > +&cpsw_emac0 {
-> > +	phy_id = "4a101000.mdio:00";
-> > +};
-> > +
-> > +&cpsw_emac1 {
-> > +	phy_id = "4a101000.mdio:01";
-> > +};
-> > diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> > index bb31bff..f6bea04 100644
-> > --- a/arch/arm/boot/dts/am33xx.dtsi
-> > +++ b/arch/arm/boot/dts/am33xx.dtsi
-> > @@ -210,5 +210,55 @@
-> >  			interrupt-parent = <&intc>;
-> >  			interrupts = <91>;
-> >  		};
-> > +
-> > +		mac: ethernet at 4A100000 {
-> 
-> hexa data should be in lower case.
-> 
-
-Oops. Will correct it.
-
-> > +			compatible = "ti,cpsw";
-> > +			ti,hwmods = "cpgmac0";
-> > +			cpdma_channels = <8>;
-> > +			host_port_no = <0>;
-> > +			cpdma_reg_ofs = <0x800>;
-> > +			cpdma_sram_ofs = <0xa00>;
-> > +			ale_reg_ofs = <0xd00>;
-> > +			ale_entries = <1024>;
-> > +			host_port_reg_ofs = <0x108>;
-> > +			hw_stats_reg_ofs = <0x900>;
-> > +			bd_ram_ofs = <0x2000>;
-> > +			bd_ram_size = <0x2000>;
-> > +			no_bd_ram = <0>;
-> > +			rx_descs = <64>;
-> > +			mac_control = <0x20>;
-> 
-> Do you have to store all these data in the DTS? Cannot it be in the driver?
-> 
-> Do you expect to have several instance of the same IP with different
-> parameters here?
-> 
-
-I will let Mugunthan respond to this.
-
-
-> > +			slaves = <2>;
-> > +			reg = <0x4a100000 0x800
-> > +				0x4a101200 0x100
-> > +				0x4a101000 0x100>;
-> 
-> Please align the address.
-
-Ok.
-
-> 
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			interrupt-parent = <&intc>;
-> > +			/* c0_rx_thresh_pend c0_rx_pend c0_tx_pend c0_misc_pend*/
-> 
-> Please use a standard multi-line comment instead of trying to put
-> everything in one line.
-> 
-
-Oops. Will correct it.
-
-> > +			interrupts = <40 41 42 43>;
-> > +			ranges;
-> 
-> You should add blank line here for readability.
-> 
-
-OK.
-
-
-> > +			cpsw_emac0: slave at 0 {
-> 
-> Mmm, you are using some address later and here some relative number,
-> that does not looks very consistent.
-> 
-> > +				slave_reg_ofs = <0x208>;
-> 
-> Is it an offset from 4a100000? Cannot you use the address for the slave
-> name?
-> 
-> Something like that: cpsw_emac0: slave at 4a100208
+> On Tue, Oct 30, 2012 at 12:34 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Sun, Oct 28, 2012 at 09:12:52PM +0100, Linus Walleij wrote:
 >
-> > +				sliver_reg_ofs = <0xd80>;
-> > +				/* Filled in by U-Boot */
-> > +				mac-address = [ 00 00 00 00 00 00 ];
-> > +			};
-> 
-> You should add blank line here for readability.
-> 
+>>> Moving this handling to bus code or anywhere else
+>>> invariably implies that resource acquisition/release order
+>>> does not matter, and my point is that it does.
+>>
+>> Doing this in the buses is definitely wrong, as you say it's not bus
+>> specific.  I do however think we can usefully do this stuff in a SoC
+>> specific place like a power domain, keeping the SoC integration code
+>> together and out of the drivers.  IME the SoCs where you need to do
+>> different things for different IPs shoudl mostly still get some reuse
+>> out of such an approach.
+>
+> Talking to Kevin Hilman today he was also stressing that
+> power domains is a good thing for handling resources, especially
+> when replacing prior hacks in the custom clk code. However
+> he pointed specifically to clocks and voltages, which may
+> be true.
+>
+> What worries me is when knowledge of the hardware which
+> is traditionally a concern for the device driver start to
+> bubble up to the power domain (or better renamed resource
+> domain if use like this, as Felipe points out).
+>
+> I worry that we will end up with power/resource domain
+> code that start to look like this:
+>
+> suspend()
+> switch (device.id) {
+> case DEV_FOO:
+>   clk_disable();
+>   pinctrl_set_state();
+>   power_domain_off();
+> case DEV_BAR:
+>   pinctrl_set_state();
+>   clk_disable();
+>   // Always-on domain
+> case DEV_BAZ:
+>   pinctrl_set_state();
+>   clk_disable();
+>   power_domain_off();
+> case ...
+>
+> Mutate the above with silicon errata, specific tweaks etc that
+> Felipe was mentioning.
 
-Ok
 
-Thanks,
-Vaibhav
+like this, as well as a bunch more.  This is why we have a generic
+description of IP blocks (omap_hwmod) which abstracts all of these
+differences and keeps the PM domain layer rather simple.
+
+I agree with Mark.  Either you have to take care of this with
+conditional code in the driver, and the drivers become bloated with a
+mess of SoC integration details, or you hide it away in SoC-specific
+code that can handle this, and keep the drivers portable. 
+
+Now that we have PM domains (PM domains didn't exist when we created
+omap_device/omap_hwmod), I suspect the cleanest way to do this is to
+create separate PM domains for each "class" of devices that have
+different set of behavior.
+
+> What is happening is that device-specific behaviour which
+> traditionally handled in the driver is now inside the
+> power/resource domain.
+>
+> piece of hardware, this would be the right thing to do,
+> and I think the in-kernel examples are all "simple",
+> e.g. arch/arm/mach-omap2/powerdomain* is all about
+> power domains and nothing else, 
+
+FYI... that code isn't the same as PM domain.  That code is for the
+*hardware* powerdomains, not the software concept of "PM domain."  In
+OMAP, PM domain is implmented at the omap_device level.  And omap_device
+is the abstraction of an IP block that knows about all the PM related
+register settings, clocks, HW powerdomain, voltage domain, PM related
+pin-muxing etc. etc.    All of these things are abstracted in an
+omap_device, so that the PM domain implementation for OMAP looks rather
+simple (c.f. omap_device_pm_domain in arch/arm/plat-omap/omap_device.c.)
+
+Note that the callbacks just call omap_device_enable(),
+omap_device_disable() and all the HW ugliness, SoC-specific integration
+mess is hidden away.
+
+[...]
+
+> I think the lesser of two evils is the distributed approach,
+> and then I'm talking about pinctrl only, disregarding the
+> fact that clocks and power domains are basically subject to
+> the same kind of argument. I still buy into the concept of
+> using power domains for exactly power domains only.
+> Arguably this is an elegance opinion...
+
+The pinctrl examples I've seen mentioned so far are all PM related
+(sleep, idle, wakeup, etc.) so to me I think they still belong in
+PM domains (and that's how we handle the PM related pins in OMAP.)
+
+> I worry that the per-SoC power domain implementation
+> which will live in arch/arm/mach-* as of today will become
+> the new board file problem, overburdening the arch/* tree.
+> Maybe I'm mistaken as to the size of these things,
+> but just doing ls arch/arm/mach-omap2/powerdomain*
+> makes me start worrying.
+
+Yes, I agree that this means more code/data in arch/arm/mach-*, but
+IMO, that's really where it belongs.  It really is SoC integration
+details, and driver should really not know about it.
+
+Kevin
