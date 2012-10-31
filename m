@@ -1,7 +1,7 @@
 From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 31 Oct 2012 04:22:11 -0400
+Date: Wed, 31 Oct 2012 04:34:21 -0400
 Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
+In-Reply-To: <alpine.DEB.2.00.1210301400100.12697@utopia.booyaka.com>
 References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
  <alpine.DEB.2.00.1210231918500.27211@utopia.booyaka.com>
  <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
@@ -14,36 +14,50 @@ References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
  <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
  <20121030125419.GG29095@arwen.pp.htv.fi>
  <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
-Message-ID: <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
+ <alpine.DEB.2.00.1210301400100.12697@utopia.booyaka.com>
+Message-ID: <CAORVsuX_8ryT7jmPWoQ+Lb1ztmQC-E59j64Qt1hzvsEkQ7=w+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 9:17 AM, Paul Walmsley <paul@pwsan.com> wrote:
-> On Tue, 30 Oct 2012, Felipe Balbi wrote:
->
->> On Tue, Oct 30, 2012 at 12:50:52PM +0000, Paul Walmsley wrote:
->> > certainly PM-idle related, given that the problem goes away by reverting
->> > Jean's commit 3db11feffc1ad2ab9dea27789e6b5b3032827adc "ARM: OMAP: convert
->> > I2C driver to PM QoS for MPU latency constraints".
->> >
->> > The problem is consistent and easy to reproduce here.
->>
->> I don't doubt that :-) What I think, however, is that PM QoS just made
-I dont doubt either but cannot have it reproduced.
+Paul,
 
->> the problem a bit easier to trigger for whatever reason. Maybe because
->> pm qos defers constraint updates, or something similar ?
-PM QoS just influences the cpuidle decision on the next power state of
-the CPU and CORE power domains.
+- Added Rafael for the PM QoS discussion -
+
+On Tue, Oct 30, 2012 at 10:04 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> On Tue, 30 Oct 2012, Paul Walmsley wrote:
+>
+>> Based on a very quick look, I'd say the original patch 3db11fe is broken.
+>> I don't see how it can ensure that its PM_QOS_CPU_DMA_LATENCY request is
+>> honored when CONFIG_CPU_IDLE=n. CONFIG_CPU_IDLE=n is the default for
+>> omap2plus_defconfig.
+>
+> So in fact to follow up on this, looks like one of two changes are needed:
+>
+> 1. Revert 3db11fe
+>
+> or
+>
+> 2. If CONFIG_CPU_IDLE=n, the driver needs to call disable_hlt() in place
+> of the pm_qos constraint add, and call enable_hlt() in place of the pm_qos
+> constraint remove.
+I do not think this is correct. Using disable_hlt is a too radical
+solution and will prevent the idle completely, this is not what we
+want.
+
+Rafael, what do you think?
+
+Furthermore without the patch 3db11fe enable_hlt and disable_hlt are
+not used in the driver so this change is not the real fix for the
+issue. To me the cause is somewhere else. I was hoping Felipe's
+ordering fix would do it...
 
 >
-> Based on a very quick look, I'd say the original patch 3db11fe is broken.
-> I don't see how it can ensure that its PM_QOS_CPU_DMA_LATENCY request is
-> honored when CONFIG_CPU_IDLE=n. CONFIG_CPU_IDLE=n is the default for
-> omap2plus_defconfig.
-Withtout CPU_IDLE set the PM QoS has no influence on the power domains states.
+> Jean, could you please pick a solution and send a patch for the 3.7-rc
+> timeframe, to fix the bug in 3db11fe?
+> ?
+Let me try to reproduce the issue and hopefully investigate a bit more.
+Feel free to revert the patch if you feel like it is the thing to do.
 
->
 >
 > - Paul
 
