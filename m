@@ -1,23 +1,117 @@
-From: ccross@google.com (Colin Cross)
-Date: Wed, 31 Oct 2012 14:19:22 -0700
-Subject: [PATCH V4 3/7] ARM: tegra30: cpuidle: add powered-down state for
- secondary CPUs
-In-Reply-To: <1351676481-28425-4-git-send-email-josephl@nvidia.com>
-References: <1351676481-28425-1-git-send-email-josephl@nvidia.com>
- <1351676481-28425-4-git-send-email-josephl@nvidia.com>
-Message-ID: <CAMbhsRRT60oyecsZqjf196Y=Cog209TwfMCPJ9nyLG+fwu7mqg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 31 Oct 2012 15:21:55 -0600
+Subject: [PATCH V4 REPOST] ARM: implement debug_ll_io_init()
+Message-ID: <1351718515-871-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 2:41 AM, Joseph Lo <josephl@nvidia.com> wrote:
-> This supports power-gated idle on secondary CPUs for Tegra30. The
-> secondary CPUs can go into powered-down state independently. When
-> CPU goes into this state, it saves it's contexts and puts itself
-> to flow controlled WFI state. After that, it will been power gated.
->
-> Be aware of that, you may see the legacy power state "LP2" in the
-> code which is exactly the same meaning of "CPU power down".
+From: Rob Herring <rob.herring@calxeda.com>
 
-On Tegra20, LP2 included powering off the GIC.  Is that still the case
-for Tegra30 individual secondary cpu power gating?  If so, how do IPIs
-to an idle cpu wake it up?
+When using DEBUG_LL, the UART's (or other HW's) registers are mapped
+into early page tables based on the results of assembly macro addruart.
+Later, when the page tables are replaced, the same virtual address must
+remain valid. Historically, this has been ensured by using defines from
+<mach/iomap.h> in both the implementation of addruart, and the machine's
+.map_io() function. However, with the move to single zImage, we wish to
+remove <mach/iomap.h>. To enable this, the macro addruart may be used
+when constructing the late page tables too; addruart is exposed as a
+C function debug_ll_addr(), and used to set up the required mapping in
+debug_ll_io_init(), which may called on an opt-in basis from a machine's
+.map_io() function.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+[swarren: Mask map.virtual with PAGE_MASK. Checked for NULL results from
+ debug_ll_addr (e.g. when selected UART isn't valid). Fixed compile when
+ either !CONFIG_DEBUG_LL or CONFIG_DEBUG_SEMIHOSTING.]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+Arnd, Olof, could this patch be placed into a standalone topic branch in
+arm-soc branch; I'd like to make use of this patch for both Tegra and
+bcm2835 this cycle, and perhaps others might too. Thanks.
+
+v4: Fix DEBUG_SEMIHOSTING's debug_ll_addr to actually fill in the "out"
+    parameters.
+v3: New patch.
+---
+ arch/arm/include/asm/mach/map.h |    7 +++++++
+ arch/arm/kernel/debug.S         |   14 ++++++++++++++
+ arch/arm/mm/mmu.c               |   16 ++++++++++++++++
+ 3 files changed, 37 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/include/asm/mach/map.h b/arch/arm/include/asm/mach/map.h
+index 195ac2f..2fe141f 100644
+--- a/arch/arm/include/asm/mach/map.h
++++ b/arch/arm/include/asm/mach/map.h
+@@ -40,6 +40,13 @@ extern void iotable_init(struct map_desc *, int);
+ extern void vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 				  void *caller);
+ 
++#ifdef CONFIG_DEBUG_LL
++extern void debug_ll_addr(unsigned long *paddr, unsigned long *vaddr);
++extern void debug_ll_io_init(void);
++#else
++static inline void debug_ll_io_init(void) {}
++#endif
++
+ struct mem_type;
+ extern const struct mem_type *get_mem_type(unsigned int type);
+ /*
+diff --git a/arch/arm/kernel/debug.S b/arch/arm/kernel/debug.S
+index 66f711b..6809200 100644
+--- a/arch/arm/kernel/debug.S
++++ b/arch/arm/kernel/debug.S
+@@ -100,6 +100,13 @@ ENTRY(printch)
+ 		b	1b
+ ENDPROC(printch)
+ 
++ENTRY(debug_ll_addr)
++		addruart r2, r3, ip
++		str	r2, [r0]
++		str	r3, [r1]
++		mov	pc, lr
++ENDPROC(debug_ll_addr)
++
+ #else
+ 
+ ENTRY(printascii)
+@@ -119,4 +126,11 @@ ENTRY(printch)
+ 		mov	pc, lr
+ ENDPROC(printch)
+ 
++ENTRY(debug_ll_addr)
++		mov	r2, #0
++		str	r2, [r0]
++		str	r2, [r1]
++		mov	pc, lr
++ENDPROC(debug_ll_addr)
++
+ #endif
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b675918..08d04fc 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -893,6 +893,22 @@ static void __init pci_reserve_io(void)
+ #define pci_reserve_io() do { } while (0)
+ #endif
+ 
++#ifdef CONFIG_DEBUG_LL
++void __init debug_ll_io_init(void)
++{
++	struct map_desc map;
++
++	debug_ll_addr(&map.pfn, &map.virtual);
++	if (!map.pfn || !map.virtual)
++		return;
++	map.pfn = __phys_to_pfn(map.pfn);
++	map.virtual &= PAGE_MASK;
++	map.length = PAGE_SIZE;
++	map.type = MT_DEVICE;
++	create_mapping(&map);
++}
++#endif
++
+ static void * __initdata vmalloc_min =
+ 	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
+ 
+-- 
+1.7.0.4
