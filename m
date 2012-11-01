@@ -1,79 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 1 Nov 2012 15:17:09 +0100
-Subject: [GIT PULL] Next batch of ux500 related patches due for -next
-Message-ID: <20121101141709.GA14016@gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 1 Nov 2012 14:19:35 +0000
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
+References: <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+ <20121030113407.GA24335@sirena.org.uk>
+ <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
+ <87obji8kta.fsf@deeprootsystems.com>
+ <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
+ <20121101120713.GA4413@opensource.wolfsonmicro.com>
+ <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
+Message-ID: <20121101141935.GD4413@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+On Thu, Nov 01, 2012 at 03:01:28PM +0100, Linus Walleij wrote:
+> On Thu, Nov 1, 2012 at 1:07 PM, Mark Brown
+> 
+> > For the pin hogging I'd actually been thinking separately that we should
+> > just have the device core do a devm_pinctrl_get_set_default() prior to
+> > probing the device and store the result in the struct device.  That
 
-  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+> What if I retrieve this in the pinctrl subsystem using
+> bus notifiers and then expose the struct pinctrl * to
+> the clients by using pinctrl_get() and when you get
+> such a handle in your probe() you know that the
+> pinctrl subsystem has already fetched the handle and
+> set it to "default" at that point?
 
-are available in the git repository at:
+I'm not sure I parse a problem from the above?
 
-  git://git.linaro.org/people/ljones/linux-3.0-ux500.git ste-dt-for-next
+> I just worry whether there is a fringe case where the default
+> state is not be be default-selected in probe(), the API
+> semantics does not mandate that. But I think this is the case
+> for all in-kernel drivers so we wouldn't be breaking anything
+> by doing this right now. And platforms can just leave the
+> "default" state undefined in that case.
 
-for you to fetch changes up to f44c5fd12d8152e45585905422d03427754e1907:
+Yes, that had been my thinking too though I'd really expect that the
+platform ought to be able to think of something sensible to do by
+default.
 
-  ARM: ux500: Convert DT_MACHINE_START to use SMP operations (2012-11-01 13:02:28 +0100)
+> Then what to do with sleep and idle is a question we need
+> to handle next. Requiring PM domains for this is one
+> approach, albeit a bit controversial.
 
-----------------------------------------------------------------
-Lee Jones (31):
-      ARM: ux500: Move regulator-name properties out to board DTS files
-      ARM: ux500: Fix initialisation order for UIBs
-      ARM: ux500: Elaborate on SDI device node names in Device Tree
-      ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
-      ARM: ux500: Correct Snowball's external SD/MMC slot's bus width
-      ARM: ux500: Create a DTS hierarchy for ST-Ericsson's HREF boards
-      ARM: ux500: Create a Device Tree for early HREFs
-      ARM: ux500: Add support for gpio-keys and Proximity Sensor for HREF
-      ARM: ux500: Remove platform specific device registration when DT is enabled
-      ARM: ux500: Move all Device Tree booting into cpu-db8500
-      ARM: ux500: Strip out duplicate touch screen platform information
-      Documentation: Detail permitted DT properties for the BU21013 Touch Screen
-      ARM: ux500: Create a new Device Tree include file for boards supporting STUIBs
-      ARM: ux500: Stop calling the UIB init function when using Device Tree
-      ARM: ux500: Add all bu21013 touch screen components to supported Device Trees
-      ARM: ux500: Stop informing the regulator subsystem that we have full constraints
-      ARM: ux500: Apply a Device Tree node for the STMPE MFD
-      ARM: ux500: Supply the STMPE keypad Device Tree node to the STUIB DT
-      ARM: ux500: Remove unused board compatible string
-      ARM: ux500: Add skeleton DTS file for the u9540
-      ARM: ux500: Add support for ST-Ericsson's u9540 SoC
-      ARM: ux500: Add UART support to the u9540 Device Tree
-      ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
-      ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
-      ARM: ux500: Rename references to the ccu9540 dev board accordingly
-      ARM: ux500: Remove duplicate DT_MACHINE_START - make u8500 for generic
-      ARM: ux500: List DT compatibility using platform names rather than by board
-      ARM: ux500: Add node for the MMC GPIO regulator
-      ARM: ux500: Change the type of interrupt to something compatible
-      ARM: ux500: CONFIG: Enable GPIO Regulators
-      ARM: ux500: Convert DT_MACHINE_START to use SMP operations
-
- .../bindings/input/touchscreen/bu21013.txt         |   28 ++
- arch/arm/boot/dts/ccu9540.dts                      |   72 ++++++
- arch/arm/boot/dts/dbx5x0.dtsi                      |   57 ++--
- arch/arm/boot/dts/href.dtsi                        |  273 ++++++++++++++++++++
- arch/arm/boot/dts/hrefprev60.dts                   |   41 +++
- arch/arm/boot/dts/hrefv60plus.dts                  |   83 +-----
- arch/arm/boot/dts/snowball.dts                     |  140 +++++++++-
- arch/arm/boot/dts/stuib.dtsi                       |   78 ++++++
- arch/arm/configs/u8500_defconfig                   |    1 +
- arch/arm/mach-ux500/board-mop500-stuib.c           |   22 +-
- arch/arm/mach-ux500/board-mop500.c                 |  146 +----------
- arch/arm/mach-ux500/board-mop500.h                 |    8 +-
- arch/arm/mach-ux500/cpu-db8500.c                   |  108 +++++++-
- arch/arm/mach-ux500/cpu.c                          |    3 +
- 14 files changed, 779 insertions(+), 281 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
- create mode 100644 arch/arm/boot/dts/ccu9540.dts
- create mode 100644 arch/arm/boot/dts/href.dtsi
- create mode 100644 arch/arm/boot/dts/hrefprev60.dts
- create mode 100644 arch/arm/boot/dts/stuib.dtsi
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yup.  Notifiers are another option again I guess.  There's far fewer
+drivers doing anything at all with that so it's a bit less urgent.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/9d6217f3/attachment.sig>
