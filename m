@@ -1,87 +1,55 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Thu, 01 Nov 2012 15:52:07 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <509134A4.708@mimc.co.uk>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
- <509134A4.708@mimc.co.uk>
-Message-ID: <50929AA7.80401@mimc.co.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 1 Nov 2012 17:08:28 +0100
+Subject: [PATCH] i2c: mxs: remove broken PIOQUEUE support
+In-Reply-To: <201211011528.17596.marex@denx.de>
+References: <1351771003-6071-1-git-send-email-w.sang@pengutronix.de>
+ <201211011528.17596.marex@denx.de>
+Message-ID: <20121101160828.GA18425@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/10/12 14:24, Mark Jackson wrote:
-> On 31/10/12 13:57, Hiremath, Vaibhav wrote:
->> On Wed, Oct 31, 2012 at 19:11:03, Mark Jackson wrote:
->>>
->>> If I try the latest mainline U-Boot (or the TI branch), I just get to "Starting kernel ..." and then
->>> hangs.
->>>
->>
->>
->> I am using Mainline u-boot and it works for me. Can you paste u-boot boot 
->> log and environment variable here?
+On Thu, Nov 01, 2012 at 03:28:17PM +0100, Marek Vasut wrote:
+> Dear Wolfram Sang,
 > 
-> ------------------------
-> mainline U-Boot boot log
-> ------------------------
-> U-Boot SPL 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
-> OMAP SD/MMC: 0
-> reading u-boot.img
-> reading u-boot.img
+> > This I2C master can do DMA and PIOQUEUE (PIO with FIFO). Originally,
+> > only PIOQEUE
 > 
+> PIOQUEUE ;-)
+
+Yup, right!
+
 > 
-> U-Boot 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
+> > was supported, then DMA support was added. The original
+> > intention was to keep PIOQUEUE since it has less overhead what is nice
+> > for small transfers. However, runtime switching between PIOQEUE and DMA
+> > depending on the transfer size never worked despite a lot of trying.
+> > Since PIOQUEUE mode itself was flaky (polling at places where interrupts
+> > failed to work) and the implementation also imposed a size limit for
+> > transfers, it is best to remove the support altogether which makes the
+> > driver a lot cleaner and more robust. If somebody really wants less
+> > overhead, plain PIO mode could still be implemented with the addidtional
+> > advantage that this mode is also available on MX23, too.
 > 
-> I2C:   ready
-> DRAM:  256 MiB
-> WARNING: Caches not enabled
-> MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
-> Using default environment
+> Yes, looks to be the way to go.
 > 
-> Net:   cpsw
-> Hit any key to stop autoboot:  0
-> mmc0 is current device
-> SD/MMC found on device 0
-> reading uEnv.txt
-> 29 bytes read
-> Loaded environment from uEnv.txt
-> Importing environment from mmc ...
-> 4315695 bytes read
-> Booting from mmc ...
-> ## Booting kernel from Legacy Image at 80200000 ...
->    Image Name:   Linux-3.7.0-rc1-47802-ge7289dc-d
->    Image Type:   ARM Linux Kernel Image (uncompressed)
->    Data Size:    4308448 Bytes = 4.1 MiB
->    Load Address: 80008000
->    Entry Point:  80008000
->    Verifying Checksum ... OK
->    Loading Kernel Image ... OK
-> OK
-> 
-> Starting kernel ...
-> 
-> ------------------------
-> Contents of uEnv.txt
-> --------------------
-> mmcrootfstype=ext2 rootwait
+> Reviewed-by: Marek Vasut <marex@denx.de>
 
-Vaibhav
+Thanks.
 
-Does this boot log shed any light on my non-boot problem ?
+BTW have you tried combining all i2c-messages (msgs[]) of the transfer
+into one DMA chain? That would reduce overhead, too, no?
 
-Are we using the same U-Boot version (2012.10-00434-ged296d2) ?
+Regards,
 
-Can you post your linux-ohporter .config ?
+   Wolfram
 
-I was also thinking, if the previously mentioned patch [1] was concerning toolchains, what toolchain
-are you using ?  I'm using the latest mainline Buildroot git, which compiles gcc version 4.5.4
-(Buildroot 2012.11-git-00497-ge48bf89).
-
-[1] - http://www.spinics.net/lists/linux-omap/msg79911.html
-
-Cheers
-Mark J.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/eaefaebd/attachment.sig>
