@@ -1,25 +1,105 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 01 Nov 2012 12:30:27 -0400 (EDT)
-Subject: [PATCH 0/4] Support the MX6 FEC as a PTP hardware clock
-In-Reply-To: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
-References: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20121101.123027.1332984905040252720.davem@davemloft.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 1 Nov 2012 22:05:43 +0530
+Subject: [RFC PATCH] ARM: OMAP4: ID: Improve features detection and check
+In-Reply-To: <5092A156.4000601@ti.com>
+References: <1351765401-12487-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <50925E7F.7080602@ti.com> <5092A156.4000601@ti.com>
+Message-ID: <5092A4DF.4080405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
-Date: Wed, 31 Oct 2012 12:24:40 +0800
+On Thursday 01 November 2012 09:50 PM, ivan.khoronzhuk wrote:
+> On 11/01/2012 01:35 PM, Santosh Shilimkar wrote:
+>> On Thursday 01 November 2012 03:53 PM, Ivan Khoronzhuk wrote:
+>>> Replaces several flags bearing the same meaning. There is no need
+>>> to set flags due to different omap types here, it can be checked
+>>> in appropriate places as well.
+>>>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>> Cc: linux-omap at vger.kernel.org
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-kernel at vger.kernel.org
+>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>> ---
+>>>   arch/arm/mach-omap2/id.c  |   25 +++++++------------------
+>>>   arch/arm/mach-omap2/soc.h |    8 ++------
+>>>   2 files changed, 9 insertions(+), 24 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+>>> index cf2362c..3c47a19 100644
+>>> --- a/arch/arm/mach-omap2/id.c
+>>> +++ b/arch/arm/mach-omap2/id.c
+>>> @@ -28,6 +28,9 @@
+>>>   #include "soc.h"
+>>>   #include "control.h"
+>>>
+>>> +#define OMAP4_SILICON_TYPE_STANDARD        0x01
+>>> +#define OMAP4_SILICON_TYPE_PERFORMANCE        0x02
+>>> +
+>>>   static unsigned int omap_revision;
+>>>   static const char *cpu_rev;
+>>>   u32 omap_features;
+>>> @@ -273,25 +276,11 @@ void __init omap4xxx_check_features(void)
+>>>   {
+>>>       u32 si_type;
+>>>
+>>> -    if (cpu_is_omap443x())
+>>> -        omap_features |= OMAP4_HAS_MPU_1GHZ;
+>>> -
+>>> +    si_type =
+>>> +    (read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16)
+>>> & 0x03;
+>>>
+>>> -    if (cpu_is_omap446x()) {
+>>> -        si_type =
+>>> - read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1);
+>>> -        switch ((si_type & (3 << 16)) >> 16) {
+>>> -        case 2:
+>>> -            /* High performance device */
+>>> -            omap_features |= OMAP4_HAS_MPU_1_5GHZ;
+>>> -            break;
+>>> -        case 1:
+>>> -        default:
+>>> -            /* Standard device */
+>>> -            omap_features |= OMAP4_HAS_MPU_1_2GHZ;
+>>> -            break;
+>>> -        }
+>>> -    }
+>>> +    if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
+>>> +        omap_features = OMAP4_HAS_PERF_SILICON;
+>>
+>> Well the detection isn't for performance/standard but there are some
+>> features depend on it. For example 1 GHz doesn't DPLL DCC enable feature
+>> where as 1.2 GHz, 1.5 GHz doesn't need. This is the main reason this
+>> information is also effused. Have you considered this aspect while
+>> creating this patch ?
+>>
+>> Regards
+>> Santosh
+>>
+>
+> I had considered it. There is no dependency on the features.
+> DCC usage depends on asked frequency on the fly, not from the features.
+> Depending on "performance/standard" feature the available frequencies
+> should be chosen in places where they are needed, for example while
+> initializing OPPs.
+>
+You are correct about the way DCC is handled in the clock code. Infact
+all these features like L2CACHE, SGX, IVA etc is more for to display
+boot messages.
 
-> This patch series enables hardware time stamping and a PTP hardware clock
-> for mx6 ENET controller.
-> 
-> Frank Li (4):
->   net: fec: move fec_enet_private to header file
->   ARM: dts: imx6q: Add ENET PTP clock pin and clock source
->   ARM: imx6q: Set enet tx reference clk from anatop to support 1588
->   FEC: Add time stamping code and a PTP hardware clock
+> Currently we have several features while it is only one indeed.
+>
+1GHz, 1.2GHz, 1.5 GHz are not same since the silicon capability itself
+is different.
 
-All applied to net-next.
+git blame tells me that Nishant has sent this update so looping him
+if above differentiation in boot log helps.
 
-Please make sure your changes are in sync with Ben's PTP/PPS
-Kconfig changes of today, and send me any changes if necessary.
+Nishant,
+What's your take on removing above freq prints and marking
+those silicon as performance silicons as the $subject patch does ?
+
+Regards
+Santosh
