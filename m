@@ -1,86 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 30 Nov 2012 21:55:09 -0800
-Subject: [GIT PULL 3/3] omap late multiplatform cleanup for v3.8 merge
- window
-In-Reply-To: <20121130172643.GI5312@atomide.com>
-References: <50b4120b.d088e50a.742e.ffffd3d3SMTPIN_ADDED_MISSING@mx.google.com>
- <20121130065314.GB6899@quad.lixom.net>
- <20121130172643.GI5312@atomide.com>
-Message-ID: <CAOesGMgzPVsiVqSe30f2bGZ4MKOjA9+Usw3OqX8wFkrdD570mQ@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 1 Nov 2012 13:33:55 +0800
+Subject: [PATCH -next] CLK: clk-twl6040: fix return value check in
+ twl6040_clk_probe()
+Message-ID: <CAPgLHd-LVhPkOHUWOwjmcsDA-4spfQMTxW9z2tB7fnEuS_5OOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 30, 2012 at 9:26 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Olof Johansson <olof@lixom.net> [121129 22:55]:
->> On Mon, Nov 26, 2012 at 05:06:12PM -0800, Tony Lindgren wrote:
->> > The following changes since commit 0f9cb211ba5db93d488fe6b154138231fdd0e22d:
->> >
->> >   Merge tag 'v3.7-rc7' into next/cleanup (2012-11-25 21:34:34 -0800)
->> >
->> > are available in the git repository at:
->> >
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-multiplatform-v2-signed
->> >
->> > for you to fetch changes up to 5ebb428d045ea9b908864547819786d5bcebad05:
->> >
->> >   ARM: OMAP: Move plat-omap/dma-omap.h to include/linux/omap-dma.h (2012-11-26 13:19:23 -0800)
->>
->> Tony,
->>
->> Did you mean to base this branch on next/cleanup? We normally try to avoid
->> having vendor branches based on our common next/* branches, since it adds
->> dependencies that makes it hard to rebuild our branch if needed for some
->> reason.
->
-> Sorry I should have asked before. I wanted to base this on something
-> that compiles for with multiplatform support and is bootable with
-> minimal patching and does not produce new merge conflicts.
->
-> But I only need the resulting branch for testing, so as long as we
-> the resulting arm-soc/for-next branch is usable for me until -rc1
-> is out, I'll be happy.
->
-> For merging, the dependencies for these three patches are:
->
-> omap-for-v3.8/cleanup-fixes-part2-v2-signed (all the header clean-up)
-> omap-for-v3.8/devel-prcm-signed (needed the wdt changes)
->
-> So I've merged those two to use as a base, the patches on top
-> are the same. Hope that works for you better.
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Yep, that's better!
+In case of error, the function clk_register() returns ERR_PTR()
+and never returns NULL. The NULL test in the return value check
+should be replaced with IS_ERR().
 
-> It's now missing the common clock changes, but that's OK as the
-> branch does not yet enable the multiplatform support. Updated pull
-> request below.
->
-> BTW, note that "[GIT PULL] omap iommu clean-up dependency branch for
-> v3.8 merge window" is still pending it seems?
+dpatch engine is used to auto generate this patch.
+(https://github.com/weiyj/dpatch)
 
-Done, thanks for the reminder.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/clk/clk-twl6040.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-
-> The following changes since commit 2589d056122f6dcb405d411eae872aac8cf9da1b:
->
->   Merge tag 'tags/omap-for-v3.8/devel-prcm-signed' into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3 (2012-11-30 08:40:31 -0800)
->
-> are available in the git repository at:
->
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/tags/omap-for-v3.8/cleanup-multiplatform-no-clock-signed
->
-
-Pulled in, I had two minor conflicts to resolve resulting in two
-one-line differences in the diff stat (removed an empty line between
-some includes).
-
-I ended up pulling this into next/pm2, since that's where the last of
-the prereqs was and we'll likely reshuffle some of those late branches
-before merging anyway.
-
-
-Thanks,
-
--Olof
+diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
+index f4a3389..bc1e713 100644
+--- a/drivers/clk/clk-twl6040.c
++++ b/drivers/clk/clk-twl6040.c
+@@ -92,8 +92,8 @@ static int __devinit twl6040_clk_probe(struct platform_device *pdev)
+ 
+ 	clkdata->mcpdm_fclk.init = &wm831x_clkout_init;
+ 	clkdata->clk = clk_register(&pdev->dev, &clkdata->mcpdm_fclk);
+-	if (!clkdata->clk)
+-		return -EINVAL;
++	if (IS_ERR(clkdata->clk))
++		return PTR_ERR(clkdata->clk);
+ 
+ 	dev_set_drvdata(&pdev->dev, clkdata);
+ 
