@@ -1,42 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 1 Nov 2012 23:20:10 +0100
-Subject: [PATCH v2] ARM: plat-versatile: move FPGA irq driver to
- drivers/irqchip
-In-Reply-To: <1351805329-19576-1-git-send-email-linus.walleij@linaro.org>
-References: <1351805329-19576-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20121101232010.78269291@skate>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 1 Nov 2012 23:23:16 +0100
+Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
+In-Reply-To: <1351155648-20429-1-git-send-email-balbi@ti.com>
+References: <1351155648-20429-1-git-send-email-balbi@ti.com>
+Message-ID: <20121101222316.GC22956@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Thu, Oct 25, 2012 at 12:00:48PM +0300, Felipe Balbi wrote:
+> if we allow compiler reorder our writes, we could
+> fall into a situation where dev->buf_len is reset
+> for no apparent reason.
+> 
+> This bug was found with a simple script which would
+> transfer data to an i2c client from 1 to 1024 bytes
+> (a simple for loop), when we got to transfer sizes
+> bigger than the fifo size, dev->buf_len was reset
+> to zero before we had an oportunity to handle XDR
+> Interrupt. Because dev->buf_len was zero, we entered
+> omap_i2c_transmit_data() to transfer zero bytes,
+> which would mean we would just silently exit
+> omap_i2c_transmit_data() without actually writing
+> anything to DATA register. That would cause XDR
+> IRQ to trigger forever and we would never transfer
+> the remaining bytes.
+> 
+> After adding the memory barrier, we also drop resetting
+> dev->buf_len to zero in omap_i2c_xfer_msg() because
+> both omap_i2c_transmit_data() and omap_i2c_receive_data()
+> will act until dev->buf_len reaches zero, rendering the
+> other write in omap_i2c_xfer_msg() redundant.
+> 
+> This patch has been tested with pandaboard for a few
+> iterations of the script mentioned above.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+> 
+> This bug has been there forever, but it's quite annoying.
+> I think it deserves being pushed upstream during this -rc
+> cycle, but if Wolfram decides to wait until v3.8, I don't
+> mind.
 
-On Thu,  1 Nov 2012 22:28:49 +0100, Linus Walleij wrote:
+I would add this into 3.7, but what about the comments suggesting to use
+barrier()?
 
-> +void fpga_handle_irq(struct pt_regs *regs);
-
-This function does not need to be exposed in a public header: as
-proposed for the bcm2835 and armada-370-xp IRQ controller drivers, the
-driver should directly do handle_arch_irq = fpga_handle_irq, and
-therefore there is no need for the machine desc structure to reference
-fpga_handle_irq anymore.
-
-> +void fpga_irq_init(void __iomem *, const char *, int, int, u32,
-> +		struct device_node *node);
-> +int fpga_irq_of_init(struct device_node *node,
-> +		     struct device_node *parent);
-
-I don't think this function needs to be exported. Just move the
-compatible string to drivers/irqchip/irqchip.c and instead of calling
-of_irq_init(), call irqchip_init().
-
-This will leave only the fpga_irq_init() function, which we could get
-rid of once the non-DT support is removed.
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/928fba26/attachment.sig>
