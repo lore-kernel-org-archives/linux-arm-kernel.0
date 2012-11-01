@@ -1,32 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 1 Nov 2012 16:14:29 -0700
-Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
-In-Reply-To: <20121101224828.2103.82950.stgit@muffinssi.local>
-References: <20121101224703.2103.95474.stgit@muffinssi.local>
- <20121101224828.2103.82950.stgit@muffinssi.local>
-Message-ID: <20121101231429.GO15766@atomide.com>
+From: jm@lentin.co.uk (Jamie Lentin)
+Date: Thu,  1 Nov 2012 23:55:43 +0000
+Subject: [PATCH] hwmon: Only include of_match_table with CONFIG_OF_GPIO
+Message-ID: <1351814143-13714-1-git-send-email-jm@lentin.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121101 15:50]:
-> This file has only omap_init_consistent_dma_size()
-> left that can be moved to plat-omap/dma.c.
+The following fixes build errors on sparc. Without any DT support,
+of_match_ptr is NULL and the below is a no-op. However, if just
+CONFIG_OF is defined then so is of_match_ptr.
 
-And this one needs the following compile fix for omap1
-at least for Nokia 770. I'll fold it in.
+All useful parts of the gpio-fan DT support rely on CONFIG_OF_GPIO
+anyway, so of_match_table should too.
 
-Regards,
+Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+---
+ drivers/hwmon/gpio-fan.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-Tony
-
-
---- a/arch/arm/plat-omap/dma.c
-+++ b/arch/arm/plat-omap/dma.c
-@@ -35,6 +35,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/delay.h>
-+#include <linux/dma-mapping.h>
+diff --git a/drivers/hwmon/gpio-fan.c b/drivers/hwmon/gpio-fan.c
+index 36509ae..1381a2e 100644
+--- a/drivers/hwmon/gpio-fan.c
++++ b/drivers/hwmon/gpio-fan.c
+@@ -630,7 +630,9 @@ static struct platform_driver gpio_fan_driver = {
+ 	.driver	= {
+ 		.name	= "gpio-fan",
+ 		.pm	= GPIO_FAN_PM,
++#ifdef CONFIG_OF_GPIO
+ 		.of_match_table = of_match_ptr(of_gpio_fan_match),
++#endif
+ 	},
+ };
  
- #include <plat-omap/dma-omap.h>
- 
+-- 
+1.7.10.4
