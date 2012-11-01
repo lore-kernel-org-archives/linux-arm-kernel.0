@@ -1,60 +1,47 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Thu, 1 Nov 2012 09:52:05 -0400
-Subject: [PATCH v2 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <1351197357-23528-5-git-send-email-rtivy@ti.com>
-References: <1351197357-23528-1-git-send-email-rtivy@ti.com>
- <1351197357-23528-5-git-send-email-rtivy@ti.com>
-Message-ID: <CAPcSpEKDAEp5rS8RRpcyHN9WUUtJNppUuKvnZ6YX-tgertJBNQ@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  1 Nov 2012 15:01:41 +0100
+Subject: [PATCH] ARM: stacktrace: Fix return_address() for CONFIG_FRAME_POINTER
+Message-ID: <1351778501-29924-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+return_address() currently relies on walk_stackframe() setting
+frame->lr, but walk_stackframe() never sets this field.
 
-On Thu, Oct 25, 2012 at 4:35 PM, Robert Tivy <rtivy@ti.com> wrote:
-> [...]
-> @@ -660,6 +667,99 @@ int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
->  }
->  #endif
->
-> +static struct platform_device *da8xx_dsp;
-> +
-> +#ifdef CONFIG_CMA
-> +
-> +/*
-> + * The following address range was chosen because the XDC Platform for
-> + * OMAP-L138 DSP has this range as its default code/data placement.
-> + */
-> +#define DA8XX_RPROC_CMA_BASE  (0xc3000000)
-> [...]
-> +/*
-> + * The following address range was chosen because the XDC Platform for
-> + * OMAP-L138 DSP has this range as its default code/data placement.
-> + *
-> + * System integrators must ensure that Linux does not own this range.
-> + */
-> +#define DA_CONTIG_BASE (0xc3000000)
-> +#define DA_CONTIG_SIZE (0x02000000)
+Setting frame->lr from walk_stackframe() would require
+walk_stackframe() to unwind one frame beyond the frame being
+returned, and to track extra state in struct stackframe.
 
-I am concerned with the rigidity of the memory hole as its definition
-is currently proposed.
+The value of this is debatable, so this patch modifies
+caller_address() to unwind one extra level explicitly and reference
+frame->pc instead of frame->lr.
 
-As you noted DA_CONTIG_BASE and DA_CONTIG_SIZE must describe a range
-that is not used by Linux. Ideally this hole would not be in the
-middle of the usuable memory but instead at the top. For L138 boards
-with larger DDR packages this would mean carrying a patch to this
-file.
-
-I think the same also applies to DA8XX_RPROC_CMA_BASE but I have no
-hands-on experience yet with CMA.
-
-Is there any other means by which the hole's location and size can be
-specified which does not require patching this file? I imagine KConfig
-would work, but is this an acceptable use of KConfig?
-
-Best Regards,
-Ben Gardiner
-
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
-Nanometrics Inc.
-http://www.nanometrics.ca
+ arch/arm/kernel/return_address.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/return_address.c b/arch/arm/kernel/return_address.c
+index 8085417..0854b54 100644
+--- a/arch/arm/kernel/return_address.c
++++ b/arch/arm/kernel/return_address.c
+@@ -26,7 +26,7 @@ static int save_return_addr(struct stackframe *frame, void *d)
+ 	struct return_address_data *data = d;
+ 
+ 	if (!data->level) {
+-		data->addr = (void *)frame->lr;
++		data->addr = (void *)frame->pc;
+ 
+ 		return 1;
+ 	} else {
+@@ -41,7 +41,7 @@ void *return_address(unsigned int level)
+ 	struct stackframe frame;
+ 	register unsigned long current_sp asm ("sp");
+ 
+-	data.level = level + 1;
++	data.level = level + 2;
+ 
+ 	frame.fp = (unsigned long)__builtin_frame_address(0);
+ 	frame.sp = current_sp;
+-- 
+1.7.5.4
