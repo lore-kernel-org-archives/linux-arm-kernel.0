@@ -1,309 +1,245 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu,  1 Nov 2012 12:56:43 +0100
-Subject: [PATCH] i2c: mxs: remove broken PIOQUEUE support
-Message-ID: <1351771003-6071-1-git-send-email-w.sang@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 1 Nov 2012 11:57:42 +0000 (UTC)
+Subject: [PATCH 05/13] ARM: OMAP2+: PRCM: create SoC-specific chip restart
+ functions
+In-Reply-To: <20121025232116.17558.47458.stgit@dusk.lan>
+References: <20121025231818.17558.57884.stgit@dusk.lan>
+ <20121025232116.17558.47458.stgit@dusk.lan>
+Message-ID: <alpine.DEB.2.00.1211011151210.26661@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This I2C master can do DMA and PIOQUEUE (PIO with FIFO). Originally,
-only PIOQEUE was supported, then DMA support was added. The original
-intention was to keep PIOQUEUE since it has less overhead what is nice
-for small transfers. However, runtime switching between PIOQEUE and DMA
-depending on the transfer size never worked despite a lot of trying.
-Since PIOQUEUE mode itself was flaky (polling at places where interrupts
-failed to work) and the implementation also imposed a size limit for
-transfers, it is best to remove the support altogether which makes the
-driver a lot cleaner and more robust. If somebody really wants less
-overhead, plain PIO mode could still be implemented with the addidtional
-advantage that this mode is also available on MX23, too.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Here's an update of this one.
+
+
+- Paul
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 29 Oct 2012 20:56:07 -0600
+Subject: [PATCH] ARM: OMAP2+: PRCM: create SoC-specific chip restart
+ functions
+
+Split omap_prcm_restart() from mach-omap2/prcm.c into SoC-specific
+variants.  These functions need to be able to save the reboot reason
+into the scratchpad RAM.  This implies a dependency on both the PRM
+and SCM IP blocks, so they've been moved into their own file.  This
+will eventually call functions in the PRM and SCM drivers, once those
+are created.
+
+Vaibhav Hiremath <hvaibhav@ti.com> identified an unused prototype in
+the first version of this patch - now removed.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Tested-by: Vaibhav Hiremath <hvaibhav@ti.com>
 ---
- drivers/i2c/busses/i2c-mxs.c |  186 ++++--------------------------------------
- 1 file changed, 14 insertions(+), 172 deletions(-)
+ arch/arm/mach-omap2/Makefile        |    5 +++
+ arch/arm/mach-omap2/common.h        |   24 +++++++++++++
+ arch/arm/mach-omap2/omap2-restart.c |   65 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap3-restart.c |   36 +++++++++++++++++++
+ arch/arm/mach-omap2/omap4-common.c  |   16 +++++++++
+ 5 files changed, 146 insertions(+)
+ create mode 100644 arch/arm/mach-omap2/omap2-restart.c
+ create mode 100644 arch/arm/mach-omap2/omap3-restart.c
 
-diff --git a/drivers/i2c/busses/i2c-mxs.c b/drivers/i2c/busses/i2c-mxs.c
-index 1f58197..286ca19 100644
---- a/drivers/i2c/busses/i2c-mxs.c
-+++ b/drivers/i2c/busses/i2c-mxs.c
-@@ -1,7 +1,7 @@
- /*
-  * Freescale MXS I2C bus driver
-  *
-- * Copyright (C) 2011 Wolfram Sang, Pengutronix e.K.
-+ * Copyright (C) 2011-2012 Wolfram Sang, Pengutronix e.K.
-  *
-  * based on a (non-working) driver which was:
-  *
-@@ -35,10 +35,6 @@
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index ae87a3e..1988810 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -50,6 +50,11 @@ AFLAGS_sram242x.o			:=-Wa,-march=armv6
+ AFLAGS_sram243x.o			:=-Wa,-march=armv6
+ AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
  
- #define DRIVER_NAME "mxs-i2c"
++# Restart code (OMAP4/5 currently in omap4-common.c)
++obj-$(CONFIG_SOC_OMAP2420)		+= omap2-restart.o
++obj-$(CONFIG_SOC_OMAP2430)		+= omap2-restart.o
++obj-$(CONFIG_ARCH_OMAP3)		+= omap3-restart.o
++
+ # Pin multiplexing
+ obj-$(CONFIG_SOC_OMAP2420)		+= mux2420.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= mux2430.o
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index b8f7710..3f5aa9d 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -121,6 +121,30 @@ void omap4430_init_late(void);
+ int omap2_common_pm_late_init(void);
+ void omap_prcm_restart(char, const char *);
  
--static bool use_pioqueue;
--module_param(use_pioqueue, bool, 0);
--MODULE_PARM_DESC(use_pioqueue, "Use PIOQUEUE mode for transfer instead of DMA");
--
- #define MXS_I2C_CTRL0		(0x00)
- #define MXS_I2C_CTRL0_SET	(0x04)
++#if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
++void omap2xxx_restart(char mode, const char *cmd);
++#else
++static inline void omap2xxx_restart(char mode, const char *cmd)
++{
++}
++#endif
++
++#ifdef CONFIG_ARCH_OMAP3
++void omap3xxx_restart(char mode, const char *cmd);
++#else
++static inline void omap3xxx_restart(char mode, const char *cmd)
++{
++}
++#endif
++
++#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
++void omap44xx_restart(char mode, const char *cmd);
++#else
++static inline void omap44xx_restart(char mode, const char *cmd)
++{
++}
++#endif
++
+ /* This gets called from mach-omap2/io.c, do not call this */
+ void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
  
-@@ -75,23 +71,6 @@ MODULE_PARM_DESC(use_pioqueue, "Use PIOQUEUE mode for transfer instead of DMA");
- 				 MXS_I2C_CTRL1_SLAVE_STOP_IRQ | \
- 				 MXS_I2C_CTRL1_SLAVE_IRQ)
+diff --git a/arch/arm/mach-omap2/omap2-restart.c b/arch/arm/mach-omap2/omap2-restart.c
+new file mode 100644
+index 0000000..be6bc89
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap2-restart.c
+@@ -0,0 +1,65 @@
++/*
++ * omap2-restart.c - code common to all OMAP2xxx machines.
++ *
++ * Copyright (C) 2012 Texas Instruments
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++
++#include "common.h"
++#include "prm2xxx.h"
++
++/*
++ * reset_virt_prcm_set_ck, reset_sys_ck: pointers to the virt_prcm_set
++ * clock and the sys_ck.  Used during the reset process
++ */
++static struct clk *reset_virt_prcm_set_ck, *reset_sys_ck;
++
++/* Reboot handling */
++
++/**
++ * omap2xxx_restart - Set DPLL to bypass mode for reboot to work
++ *
++ * Set the DPLL to bypass so that reboot completes successfully.  No
++ * return value.
++ */
++void omap2xxx_restart(char mode, const char *cmd)
++{
++	u32 rate;
++
++	rate = clk_get_rate(reset_sys_ck);
++	clk_set_rate(reset_virt_prcm_set_ck, rate);
++
++	/* XXX Should save the cmd argument for use after the reboot */
++
++	omap2xxx_prm_dpll_reset(); /* never returns */
++	while (1);
++}
++
++/**
++ * omap2xxx_common_look_up_clks_for_reset - look up clocks needed for restart
++ *
++ * Some clocks need to be looked up in advance for the SoC restart
++ * operation to work - see omap2xxx_restart().  Returns -EINVAL upon
++ * error or 0 upon success.
++ */
++static int __init omap2xxx_common_look_up_clks_for_reset(void)
++{
++	reset_virt_prcm_set_ck = clk_get(NULL, "virt_prcm_set");
++	if (IS_ERR(reset_virt_prcm_set_ck))
++		return -EINVAL;
++
++	reset_sys_ck = clk_get(NULL, "sys_ck");
++	if (IS_ERR(reset_sys_ck))
++		return -EINVAL;
++
++	return 0;
++}
++core_initcall(omap2xxx_common_look_up_clks_for_reset);
+diff --git a/arch/arm/mach-omap2/omap3-restart.c b/arch/arm/mach-omap2/omap3-restart.c
+new file mode 100644
+index 0000000..923c582
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap3-restart.c
+@@ -0,0 +1,36 @@
++/*
++ * omap3-restart.c - Code common to all OMAP3xxx machines.
++ *
++ * Copyright (C) 2009, 2012 Texas Instruments
++ * Copyright (C) 2010 Nokia Corporation
++ * Tony Lindgren <tony@atomide.com>
++ * Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "iomap.h"
++#include "common.h"
++#include "control.h"
++#include "prm3xxx.h"
++
++/* Global address base setup code */
++
++/**
++ * omap3xxx_restart - trigger a software restart of the SoC
++ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
++ * @cmd: passed from the userspace program rebooting the system (if provided)
++ *
++ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
++ * kernel/sys.c.  No return value.
++ */
++void omap3xxx_restart(char mode, const char *cmd)
++{
++	omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
++	omap3xxx_prm_dpll3_reset(); /* never returns */
++	while (1);
++}
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 6cd7e87..34bd16a 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -33,6 +33,7 @@
+ #include "common.h"
+ #include "mmc.h"
+ #include "hsmmc.h"
++#include "prminst44xx.h"
+ #include "omap4-sar-layout.h"
+ #include "omap-secure.h"
  
--#define MXS_I2C_QUEUECTRL	(0x60)
--#define MXS_I2C_QUEUECTRL_SET	(0x64)
--#define MXS_I2C_QUEUECTRL_CLR	(0x68)
--
--#define MXS_I2C_QUEUECTRL_QUEUE_RUN		0x20
--#define MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE	0x04
--
--#define MXS_I2C_QUEUESTAT	(0x70)
--#define MXS_I2C_QUEUESTAT_RD_QUEUE_EMPTY        0x00002000
--#define MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK	0x0000001F
--
--#define MXS_I2C_QUEUECMD	(0x80)
--
--#define MXS_I2C_QUEUEDATA	(0x90)
--
--#define MXS_I2C_DATA		(0xa0)
--
- 
- #define MXS_CMD_I2C_SELECT	(MXS_I2C_CTRL0_RETAIN_CLOCK |	\
- 				 MXS_I2C_CTRL0_PRE_SEND_START |	\
-@@ -153,7 +132,6 @@ struct mxs_i2c_dev {
- 	const struct mxs_i2c_speed_config *speed;
- 
- 	/* DMA support components */
--	bool				dma_mode;
- 	int				dma_channel;
- 	struct dma_chan         	*dmach;
- 	struct mxs_dma_data		dma_data;
-@@ -172,99 +150,6 @@ static void mxs_i2c_reset(struct mxs_i2c_dev *i2c)
- 	writel(i2c->speed->timing2, i2c->regs + MXS_I2C_TIMING2);
- 
- 	writel(MXS_I2C_IRQ_MASK << 8, i2c->regs + MXS_I2C_CTRL1_SET);
--	if (i2c->dma_mode)
--		writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
--			i2c->regs + MXS_I2C_QUEUECTRL_CLR);
--	else
--		writel(MXS_I2C_QUEUECTRL_PIO_QUEUE_MODE,
--			i2c->regs + MXS_I2C_QUEUECTRL_SET);
--}
--
--static void mxs_i2c_pioq_setup_read(struct mxs_i2c_dev *i2c, u8 addr, int len,
--					int flags)
--{
--	u32 data;
--
--	writel(MXS_CMD_I2C_SELECT, i2c->regs + MXS_I2C_QUEUECMD);
--
--	data = (addr << 1) | I2C_SMBUS_READ;
--	writel(data, i2c->regs + MXS_I2C_DATA);
--
--	data = MXS_CMD_I2C_READ | MXS_I2C_CTRL0_XFER_COUNT(len) | flags;
--	writel(data, i2c->regs + MXS_I2C_QUEUECMD);
--}
--
--static void mxs_i2c_pioq_setup_write(struct mxs_i2c_dev *i2c,
--				    u8 addr, u8 *buf, int len, int flags)
--{
--	u32 data;
--	int i, shifts_left;
--
--	data = MXS_CMD_I2C_WRITE | MXS_I2C_CTRL0_XFER_COUNT(len + 1) | flags;
--	writel(data, i2c->regs + MXS_I2C_QUEUECMD);
--
--	/*
--	 * We have to copy the slave address (u8) and buffer (arbitrary number
--	 * of u8) into the data register (u32). To achieve that, the u8 are put
--	 * into the MSBs of 'data' which is then shifted for the next u8. When
--	 * appropriate, 'data' is written to MXS_I2C_DATA. So, the first u32
--	 * looks like this:
--	 *
--	 *  3          2          1          0
--	 * 10987654|32109876|54321098|76543210
--	 * --------+--------+--------+--------
--	 * buffer+2|buffer+1|buffer+0|slave_addr
--	 */
--
--	data = ((addr << 1) | I2C_SMBUS_WRITE) << 24;
--
--	for (i = 0; i < len; i++) {
--		data >>= 8;
--		data |= buf[i] << 24;
--		if ((i & 3) == 2)
--			writel(data, i2c->regs + MXS_I2C_DATA);
--	}
--
--	/* Write out the remaining bytes if any */
--	shifts_left = 24 - (i & 3) * 8;
--	if (shifts_left)
--		writel(data >> shifts_left, i2c->regs + MXS_I2C_DATA);
--}
--
--/*
-- * TODO: should be replaceable with a waitqueue and RD_QUEUE_IRQ (setting the
-- * rd_threshold to 1). Couldn't get this to work, though.
-- */
--static int mxs_i2c_wait_for_data(struct mxs_i2c_dev *i2c)
--{
--	unsigned long timeout = jiffies + msecs_to_jiffies(1000);
--
--	while (readl(i2c->regs + MXS_I2C_QUEUESTAT)
--			& MXS_I2C_QUEUESTAT_RD_QUEUE_EMPTY) {
--			if (time_after(jiffies, timeout))
--				return -ETIMEDOUT;
--			cond_resched();
--	}
--
--	return 0;
--}
--
--static int mxs_i2c_finish_read(struct mxs_i2c_dev *i2c, u8 *buf, int len)
--{
--	u32 uninitialized_var(data);
--	int i;
--
--	for (i = 0; i < len; i++) {
--		if ((i & 3) == 0) {
--			if (mxs_i2c_wait_for_data(i2c))
--				return -ETIMEDOUT;
--			data = readl(i2c->regs + MXS_I2C_QUEUEDATA);
--		}
--		buf[i] = data & 0xff;
--		data >>= 8;
--	}
--
--	return 0;
+@@ -248,6 +249,21 @@ static int omap4_twl6030_hsmmc_late_init(struct device *dev)
+ 	return 0;
  }
  
- static void mxs_i2c_dma_finish(struct mxs_i2c_dev *i2c)
-@@ -432,39 +317,17 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
- 	init_completion(&i2c->cmd_complete);
- 	i2c->cmd_err = 0;
- 
--	if (i2c->dma_mode) {
--		ret = mxs_i2c_dma_setup_xfer(adap, msg, flags);
--		if (ret)
--			return ret;
--	} else {
--		if (msg->flags & I2C_M_RD) {
--			mxs_i2c_pioq_setup_read(i2c, msg->addr,
--						msg->len, flags);
--		} else {
--			mxs_i2c_pioq_setup_write(i2c, msg->addr, msg->buf,
--						msg->len, flags);
--		}
--
--		writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
--			i2c->regs + MXS_I2C_QUEUECTRL_SET);
--	}
-+	ret = mxs_i2c_dma_setup_xfer(adap, msg, flags);
-+	if (ret)
-+		return ret;
- 
- 	ret = wait_for_completion_timeout(&i2c->cmd_complete,
- 						msecs_to_jiffies(1000));
- 	if (ret == 0)
- 		goto timeout;
- 
--	if (!i2c->dma_mode && !i2c->cmd_err && (msg->flags & I2C_M_RD)) {
--		ret = mxs_i2c_finish_read(i2c, msg->buf, msg->len);
--		if (ret)
--			goto timeout;
--	}
--
- 	if (i2c->cmd_err == -ENXIO)
- 		mxs_i2c_reset(i2c);
--	else
--		writel(MXS_I2C_QUEUECTRL_QUEUE_RUN,
--				i2c->regs + MXS_I2C_QUEUECTRL_CLR);
- 
- 	dev_dbg(i2c->dev, "Done with err=%d\n", i2c->cmd_err);
- 
-@@ -472,8 +335,7 @@ static int mxs_i2c_xfer_msg(struct i2c_adapter *adap, struct i2c_msg *msg,
- 
- timeout:
- 	dev_dbg(i2c->dev, "Timeout!\n");
--	if (i2c->dma_mode)
--		mxs_i2c_dma_finish(i2c);
-+	mxs_i2c_dma_finish(i2c);
- 	mxs_i2c_reset(i2c);
- 	return -ETIMEDOUT;
- }
-@@ -502,7 +364,6 @@ static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
++/**
++ * omap44xx_restart - trigger a software restart of the SoC
++ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
++ * @cmd: passed from the userspace program rebooting the system (if provided)
++ *
++ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
++ * kernel/sys.c.  No return value.
++ */
++void omap44xx_restart(char mode, const char *cmd)
++{
++	/* XXX Should save 'cmd' into scratchpad for use after reboot */
++	omap4_prminst_global_warm_sw_reset(); /* never returns */
++	while (1);
++}
++
+ static __init void omap4_twl6030_hsmmc_set_late_init(struct device *dev)
  {
- 	struct mxs_i2c_dev *i2c = dev_id;
- 	u32 stat = readl(i2c->regs + MXS_I2C_CTRL1) & MXS_I2C_IRQ_MASK;
--	bool is_last_cmd;
- 
- 	if (!stat)
- 		return IRQ_NONE;
-@@ -515,14 +376,6 @@ static irqreturn_t mxs_i2c_isr(int this_irq, void *dev_id)
- 		/* MXS_I2C_CTRL1_OVERSIZE_XFER_TERM_IRQ is only for slaves */
- 		i2c->cmd_err = -EIO;
- 
--	if (!i2c->dma_mode) {
--		is_last_cmd = (readl(i2c->regs + MXS_I2C_QUEUESTAT) &
--			MXS_I2C_QUEUESTAT_WRITE_QUEUE_CNT_MASK) == 0;
--
--		if (is_last_cmd || i2c->cmd_err)
--			complete(&i2c->cmd_complete);
--	}
--
- 	writel(stat, i2c->regs + MXS_I2C_CTRL1_CLR);
- 
- 	return IRQ_HANDLED;
-@@ -556,23 +409,14 @@ static int mxs_i2c_get_ofdata(struct mxs_i2c_dev *i2c)
- 	int ret;
- 
- 	/*
--	 * The MXS I2C DMA mode is prefered and enabled by default.
--	 * The PIO mode is still supported, but should be used only
--	 * for debuging purposes etc.
--	 */
--	i2c->dma_mode = !use_pioqueue;
--	if (!i2c->dma_mode)
--		dev_info(dev, "Using PIOQUEUE mode for I2C transfers!\n");
--
--	/*
- 	 * TODO: This is a temporary solution and should be changed
- 	 * to use generic DMA binding later when the helpers get in.
- 	 */
- 	ret = of_property_read_u32(node, "fsl,i2c-dma-channel",
- 				   &i2c->dma_channel);
- 	if (ret) {
--		dev_warn(dev, "Failed to get DMA channel, using PIOQUEUE!\n");
--		i2c->dma_mode = 0;
-+		dev_err(dev, "Failed to get DMA channel!\n");
-+		return -ENODEV;
- 	}
- 
- 	ret = of_property_read_u32(node, "clock-frequency", &speed);
-@@ -634,15 +478,13 @@ static int __devinit mxs_i2c_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Setup the DMA */
--	if (i2c->dma_mode) {
--		dma_cap_zero(mask);
--		dma_cap_set(DMA_SLAVE, mask);
--		i2c->dma_data.chan_irq = dmairq;
--		i2c->dmach = dma_request_channel(mask, mxs_i2c_dma_filter, i2c);
--		if (!i2c->dmach) {
--			dev_err(dev, "Failed to request dma\n");
--			return -ENODEV;
--		}
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_SLAVE, mask);
-+	i2c->dma_data.chan_irq = dmairq;
-+	i2c->dmach = dma_request_channel(mask, mxs_i2c_dma_filter, i2c);
-+	if (!i2c->dmach) {
-+		dev_err(dev, "Failed to request dma\n");
-+		return -ENODEV;
- 	}
- 
- 	platform_set_drvdata(pdev, i2c);
+ 	struct omap_mmc_platform_data *pdata;
 -- 
 1.7.10.4
