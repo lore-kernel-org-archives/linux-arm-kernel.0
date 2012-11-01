@@ -1,10 +1,10 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  1 Nov 2012 08:41:46 +0800
-Subject: [PATCH 04/11] ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with
+Date: Thu,  1 Nov 2012 08:41:47 +0800
+Subject: [PATCH 05/11] ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with
  scu_power_mode
 In-Reply-To: <1351730513-2952-1-git-send-email-horms@verge.net.au>
 References: <1351730513-2952-1-git-send-email-horms@verge.net.au>
-Message-ID: <1351730513-2952-5-git-send-email-horms@verge.net.au>
+Message-ID: <1351730513-2952-6-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,14 +18,14 @@ we save the locking overhead too.
 Signed-off-by: Bastian Hecht <hechtb@gmail.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |   23 ++---------------------
- 1 file changed, 2 insertions(+), 21 deletions(-)
+ arch/arm/mach-shmobile/smp-r8a7779.c |   25 +++----------------------
+ 1 file changed, 3 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 624f00f..96ddb97 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -41,9 +41,6 @@ static void __iomem *scu_base_addr(void)
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 2ce6af9..9def0f2 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -61,9 +61,6 @@ static void __iomem *scu_base_addr(void)
  	return (void __iomem *)0xf0000000;
  }
  
@@ -34,8 +34,8 @@ index 624f00f..96ddb97 100644
 -
  #ifdef CONFIG_HAVE_ARM_TWD
  static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
- void __init sh73a0_register_twd(void)
-@@ -52,20 +49,6 @@ void __init sh73a0_register_twd(void)
+ 
+@@ -73,20 +70,6 @@ void __init r8a7779_register_twd(void)
  }
  #endif
  
@@ -53,35 +53,43 @@ index 624f00f..96ddb97 100644
 -	__raw_writel(tmp, scu_base + 8);
 -}
 -
- static unsigned int __init sh73a0_get_core_count(void)
+ static unsigned int __init r8a7779_get_core_count(void)
  {
  	void __iomem *scu_base = scu_base_addr();
-@@ -83,7 +66,7 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+@@ -102,7 +85,7 @@ static int r8a7779_platform_cpu_kill(unsigned int cpu)
+ 	cpu = cpu_logical_map(cpu);
+ 
+ 	/* disable cache coherency */
+-	modify_scu_cpu_psr(3 << (cpu * 8), 0);
++	scu_power_mode(scu_base_addr(), 3);
+ 
+ 	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+ 		ch = r8a7779_ch_cpu[cpu];
+@@ -145,7 +128,7 @@ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct
  	cpu = cpu_logical_map(cpu);
  
  	/* enable cache coherency */
 -	modify_scu_cpu_psr(0, 3 << (cpu * 8));
 +	scu_power_mode(scu_base_addr(), 0);
  
- 	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
- 		__raw_writel(1 << cpu, WUPCR);	/* wake up */
-@@ -95,8 +78,6 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 	if (cpu < ARRAY_SIZE(r8a7779_ch_cpu))
+ 		ch = r8a7779_ch_cpu[cpu];
+@@ -158,15 +141,13 @@ static int __cpuinit r8a7779_boot_secondary(unsigned int cpu, struct task_struct
  
- static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ static void __init r8a7779_smp_prepare_cpus(unsigned int max_cpus)
  {
 -	int cpu = cpu_logical_map(0);
 -
  	scu_enable(scu_base_addr());
  
  	/* Map the reset vector (in headsmp.S) */
-@@ -104,7 +85,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- 	__raw_writel(__pa(shmobile_secondary_vector), SBAR);
+ 	__raw_writel(__pa(shmobile_secondary_vector), AVECR);
  
  	/* enable cache coherency on CPU0 */
 -	modify_scu_cpu_psr(0, 3 << (cpu * 8));
 +	scu_power_mode(scu_base_addr(), 0);
- }
  
- static void __init sh73a0_smp_init_cpus(void)
+ 	r8a7779_pm_init();
+ 
 -- 
 1.7.10.4
