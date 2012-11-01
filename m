@@ -1,105 +1,53 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 1 Nov 2012 22:05:43 +0530
-Subject: [RFC PATCH] ARM: OMAP4: ID: Improve features detection and check
-In-Reply-To: <5092A156.4000601@ti.com>
-References: <1351765401-12487-1-git-send-email-ivan.khoronzhuk@ti.com>
- <50925E7F.7080602@ti.com> <5092A156.4000601@ti.com>
-Message-ID: <5092A4DF.4080405@ti.com>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Thu,  1 Nov 2012 17:50:59 +0100
+Subject: [PATCH] ARM: dts: mxs: Add 16 bits LCD screen muxing options for
+ I.MX28
+Message-ID: <1351788659-67805-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 November 2012 09:50 PM, ivan.khoronzhuk wrote:
-> On 11/01/2012 01:35 PM, Santosh Shilimkar wrote:
->> On Thursday 01 November 2012 03:53 PM, Ivan Khoronzhuk wrote:
->>> Replaces several flags bearing the same meaning. There is no need
->>> to set flags due to different omap types here, it can be checked
->>> in appropriate places as well.
->>>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: linux-omap at vger.kernel.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>> ---
->>>   arch/arm/mach-omap2/id.c  |   25 +++++++------------------
->>>   arch/arm/mach-omap2/soc.h |    8 ++------
->>>   2 files changed, 9 insertions(+), 24 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
->>> index cf2362c..3c47a19 100644
->>> --- a/arch/arm/mach-omap2/id.c
->>> +++ b/arch/arm/mach-omap2/id.c
->>> @@ -28,6 +28,9 @@
->>>   #include "soc.h"
->>>   #include "control.h"
->>>
->>> +#define OMAP4_SILICON_TYPE_STANDARD        0x01
->>> +#define OMAP4_SILICON_TYPE_PERFORMANCE        0x02
->>> +
->>>   static unsigned int omap_revision;
->>>   static const char *cpu_rev;
->>>   u32 omap_features;
->>> @@ -273,25 +276,11 @@ void __init omap4xxx_check_features(void)
->>>   {
->>>       u32 si_type;
->>>
->>> -    if (cpu_is_omap443x())
->>> -        omap_features |= OMAP4_HAS_MPU_1GHZ;
->>> -
->>> +    si_type =
->>> +    (read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16)
->>> & 0x03;
->>>
->>> -    if (cpu_is_omap446x()) {
->>> -        si_type =
->>> - read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1);
->>> -        switch ((si_type & (3 << 16)) >> 16) {
->>> -        case 2:
->>> -            /* High performance device */
->>> -            omap_features |= OMAP4_HAS_MPU_1_5GHZ;
->>> -            break;
->>> -        case 1:
->>> -        default:
->>> -            /* Standard device */
->>> -            omap_features |= OMAP4_HAS_MPU_1_2GHZ;
->>> -            break;
->>> -        }
->>> -    }
->>> +    if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
->>> +        omap_features = OMAP4_HAS_PERF_SILICON;
->>
->> Well the detection isn't for performance/standard but there are some
->> features depend on it. For example 1 GHz doesn't DPLL DCC enable feature
->> where as 1.2 GHz, 1.5 GHz doesn't need. This is the main reason this
->> information is also effused. Have you considered this aspect while
->> creating this patch ?
->>
->> Regards
->> Santosh
->>
->
-> I had considered it. There is no dependency on the features.
-> DCC usage depends on asked frequency on the fly, not from the features.
-> Depending on "performance/standard" feature the available frequencies
-> should be chosen in places where they are needed, for example while
-> initializing OPPs.
->
-You are correct about the way DCC is handled in the clock code. Infact
-all these features like L2CACHE, SGX, IVA etc is more for to display
-boot messages.
 
-> Currently we have several features while it is only one indeed.
->
-1GHz, 1.2GHz, 1.5 GHz are not same since the silicon capability itself
-is different.
+Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+---
+ arch/arm/boot/dts/imx28.dtsi |   25 +++++++++++++++++++++++++
+ 1 files changed, 25 insertions(+), 0 deletions(-)
 
-git blame tells me that Nishant has sent this update so looping him
-if above differentiation in boot log helps.
-
-Nishant,
-What's your take on removing above freq prints and marking
-those silicon as performance silicons as the $subject patch does ?
-
-Regards
-Santosh
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 2b607aa..8e2c8b2 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -544,6 +544,31 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				lcdif_16bit_pins_a: lcdif-16bit at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x1000 /* MX28_PAD_LCD_D00__LCD_D0 */
++						0x1010 /* MX28_PAD_LCD_D01__LCD_D1 */
++						0x1020 /* MX28_PAD_LCD_D02__LCD_D2 */
++						0x1030 /* MX28_PAD_LCD_D03__LCD_D3 */
++						0x1040 /* MX28_PAD_LCD_D04__LCD_D4 */
++						0x1050 /* MX28_PAD_LCD_D05__LCD_D5 */
++						0x1060 /* MX28_PAD_LCD_D06__LCD_D6 */
++						0x1070 /* MX28_PAD_LCD_D07__LCD_D7 */
++						0x1080 /* MX28_PAD_LCD_D08__LCD_D8 */
++						0x1090 /* MX28_PAD_LCD_D09__LCD_D9 */
++						0x10a0 /* MX28_PAD_LCD_D10__LCD_D10 */
++						0x10b0 /* MX28_PAD_LCD_D11__LCD_D11 */
++						0x10c0 /* MX28_PAD_LCD_D12__LCD_D12 */
++						0x10d0 /* MX28_PAD_LCD_D13__LCD_D13 */
++						0x10e0 /* MX28_PAD_LCD_D14__LCD_D14 */
++						0x10f0 /* MX28_PAD_LCD_D15__LCD_D15 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 				can0_pins_a: can0 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+1.7.8.6
