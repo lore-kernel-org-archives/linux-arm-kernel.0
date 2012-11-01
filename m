@@ -1,186 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 01 Nov 2012 15:48:23 -0700
-Subject: [PATCH 2/3] ARM: OMAP: Remove NEED_MACH_GPIO_H
-In-Reply-To: <20121101224703.2103.95474.stgit@muffinssi.local>
+Date: Thu, 1 Nov 2012 16:14:29 -0700
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <20121101224828.2103.82950.stgit@muffinssi.local>
 References: <20121101224703.2103.95474.stgit@muffinssi.local>
-Message-ID: <20121101224823.2103.24591.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local>
+Message-ID: <20121101231429.GO15766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Omap no longer needs this option, mach/gpio.h is
-empty.
+* Tony Lindgren <tony@atomide.com> [121101 15:50]:
+> This file has only omap_init_consistent_dma_size()
+> left that can be moved to plat-omap/dma.c.
 
-Also remove mach/irqs.h from gpio-omap.h and
-include it directly from the related omap1
-gpio init files.
+And this one needs the following compile fix for omap1
+at least for Nokia 770. I'll fold it in.
 
-Otherwise omap2+ build fails for MULTI_PLATFORM.
+Regards,
 
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: Jarkko Nikula <jarkko.nikula@bitmer.com>
-Cc: Liam Girdwood <lrg@ti.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: alsa-devel at alsa-project.org
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/Kconfig                        |    1 -
- arch/arm/mach-omap1/gpio15xx.c          |    2 ++
- arch/arm/mach-omap1/gpio16xx.c          |    2 ++
- arch/arm/mach-omap1/gpio7xx.c           |    2 ++
- arch/arm/mach-omap1/include/mach/gpio.h |    3 ---
- arch/arm/mach-omap2/include/mach/gpio.h |    3 ---
- include/linux/platform_data/gpio-omap.h |    1 -
- sound/soc/omap/am3517evm.c              |    2 --
- sound/soc/omap/n810.c                   |    1 -
- sound/soc/omap/osk5912.c                |    1 -
- sound/soc/omap/sdp3430.c                |    2 --
- sound/soc/omap/zoom2.c                  |    3 ---
- 12 files changed, 6 insertions(+), 17 deletions(-)
- delete mode 100644 arch/arm/mach-omap1/include/mach/gpio.h
- delete mode 100644 arch/arm/mach-omap2/include/mach/gpio.h
+Tony
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 73067ef..6207cf7 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -937,7 +937,6 @@ config ARCH_OMAP
- 	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
--	select NEED_MACH_GPIO_H
- 	help
- 	  Support for TI's OMAP platform (OMAP1/2/3/4).
- 
-diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-index 98e6f39..02b3eb2 100644
---- a/arch/arm/mach-omap1/gpio15xx.c
-+++ b/arch/arm/mach-omap1/gpio15xx.c
-@@ -19,6 +19,8 @@
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
- 
-+#include <mach/irqs.h>
-+
- #define OMAP1_MPUIO_VBASE		OMAP1_MPUIO_BASE
- #define OMAP1510_GPIO_BASE		0xFFFCE000
- 
-diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-index 33f4192..b9952a2 100644
---- a/arch/arm/mach-omap1/gpio16xx.c
-+++ b/arch/arm/mach-omap1/gpio16xx.c
-@@ -19,6 +19,8 @@
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
- 
-+#include <mach/irqs.h>
-+
- #define OMAP1610_GPIO1_BASE		0xfffbe400
- #define OMAP1610_GPIO2_BASE		0xfffbec00
- #define OMAP1610_GPIO3_BASE		0xfffbb400
-diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
-index 958ce9a..f5819b2 100644
---- a/arch/arm/mach-omap1/gpio7xx.c
-+++ b/arch/arm/mach-omap1/gpio7xx.c
-@@ -19,6 +19,8 @@
- #include <linux/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
- 
-+#include <mach/irqs.h>
-+
- #define OMAP7XX_GPIO1_BASE		0xfffbc000
- #define OMAP7XX_GPIO2_BASE		0xfffbc800
- #define OMAP7XX_GPIO3_BASE		0xfffbd000
-diff --git a/arch/arm/mach-omap1/include/mach/gpio.h b/arch/arm/mach-omap1/include/mach/gpio.h
-deleted file mode 100644
-index ebf86c0..0000000
---- a/arch/arm/mach-omap1/include/mach/gpio.h
-+++ /dev/null
-@@ -1,3 +0,0 @@
--/*
-- * arch/arm/mach-omap1/include/mach/gpio.h
-- */
-diff --git a/arch/arm/mach-omap2/include/mach/gpio.h b/arch/arm/mach-omap2/include/mach/gpio.h
-deleted file mode 100644
-index 5621cc5..0000000
---- a/arch/arm/mach-omap2/include/mach/gpio.h
-+++ /dev/null
-@@ -1,3 +0,0 @@
--/*
-- * arch/arm/mach-omap2/include/mach/gpio.h
-- */
-diff --git a/include/linux/platform_data/gpio-omap.h b/include/linux/platform_data/gpio-omap.h
-index e8741c2..5d50b25 100644
---- a/include/linux/platform_data/gpio-omap.h
-+++ b/include/linux/platform_data/gpio-omap.h
-@@ -26,7 +26,6 @@
- 
+
+--- a/arch/arm/plat-omap/dma.c
++++ b/arch/arm/plat-omap/dma.c
+@@ -35,6 +35,7 @@
  #include <linux/io.h>
- #include <linux/platform_device.h>
--#include <mach/irqs.h>
+ #include <linux/slab.h>
+ #include <linux/delay.h>
++#include <linux/dma-mapping.h>
  
- #define OMAP1_MPUIO_BASE			0xfffb5000
+ #include <plat-omap/dma-omap.h>
  
-diff --git a/sound/soc/omap/am3517evm.c b/sound/soc/omap/am3517evm.c
-index fad3506..c1900b2 100644
---- a/sound/soc/omap/am3517evm.c
-+++ b/sound/soc/omap/am3517evm.c
-@@ -25,8 +25,6 @@
- #include <sound/soc.h>
- 
- #include <asm/mach-types.h>
--#include <mach/hardware.h>
--#include <mach/gpio.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
- 
- #include "omap-mcbsp.h"
-diff --git a/sound/soc/omap/n810.c b/sound/soc/omap/n810.c
-index 521bfc3..230b8c1 100644
---- a/sound/soc/omap/n810.c
-+++ b/sound/soc/omap/n810.c
-@@ -29,7 +29,6 @@
- #include <sound/soc.h>
- 
- #include <asm/mach-types.h>
--#include <mach/hardware.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
-diff --git a/sound/soc/omap/osk5912.c b/sound/soc/omap/osk5912.c
-index 3960e8d..06ef8d6 100644
---- a/sound/soc/omap/osk5912.c
-+++ b/sound/soc/omap/osk5912.c
-@@ -28,7 +28,6 @@
- #include <sound/soc.h>
- 
- #include <asm/mach-types.h>
--#include <mach/hardware.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
-diff --git a/sound/soc/omap/sdp3430.c b/sound/soc/omap/sdp3430.c
-index 597cae7..b462a2c 100644
---- a/sound/soc/omap/sdp3430.c
-+++ b/sound/soc/omap/sdp3430.c
-@@ -31,8 +31,6 @@
- #include <sound/jack.h>
- 
- #include <asm/mach-types.h>
--#include <mach/hardware.h>
--#include <mach/gpio.h>
- #include <linux/platform_data/gpio-omap.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
- 
-diff --git a/sound/soc/omap/zoom2.c b/sound/soc/omap/zoom2.c
-index 677b567..27c501c 100644
---- a/sound/soc/omap/zoom2.c
-+++ b/sound/soc/omap/zoom2.c
-@@ -26,9 +26,6 @@
- #include <sound/soc.h>
- 
- #include <asm/mach-types.h>
--#include <mach/hardware.h>
--#include <mach/gpio.h>
--#include <mach/board-zoom.h>
- #include <linux/platform_data/asoc-ti-mcbsp.h>
- 
- /* Register descriptions for twl4030 codec part */
