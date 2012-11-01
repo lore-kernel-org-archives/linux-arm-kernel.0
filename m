@@ -1,100 +1,68 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 1 Nov 2012 23:04:43 +0800
-Subject: [PATCH 6/6] pinctrl: sirf: enable the driver support new
- SiRFmarco SoC
-In-Reply-To: <CAGsJ_4wqaii9=8C8rXftzjYcPa95_Djf=uOfZZEKV-zz-ky0QQ@mail.gmail.com>
-References: <1348739790-21253-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdYT2TZX8cchPk+H4LkdVXw861BBTn1dbnSJO-ZQVT5sdw@mail.gmail.com>
- <CAGsJ_4wqaii9=8C8rXftzjYcPa95_Djf=uOfZZEKV-zz-ky0QQ@mail.gmail.com>
-Message-ID: <CAGsJ_4wPVsRNZF-c=8hU-DFKuKOk5VciXJTShuT3j53pRmSb9A@mail.gmail.com>
+From: francescolavra.fl@gmail.com (Francesco Lavra)
+Date: Thu, 01 Nov 2012 16:15:11 +0100
+Subject: [PATCH 1/4] mfd: ab8500: add devicetree support for fuelgauge
+In-Reply-To: <1351698033-8980-2-git-send-email-rajanikanth.hv@linaro.org>
+References: <1351698033-8980-1-git-send-email-rajanikanth.hv@linaro.org>
+ <1351698033-8980-2-git-send-email-rajanikanth.hv@linaro.org>
+Message-ID: <509291FF.6090500@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/9/28 Barry Song <21cnbao@gmail.com>:
-> Hi linus,
-> thanks very much!
->
-> 2012/9/28 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, Sep 27, 2012 at 11:56 AM, Barry Song <Barry.Song@csr.com> wrote:
->>
->>> From: Barry Song <Baohua.Song@csr.com>
->>>
->>> The driver supports old up SiRFprimaII SoCs, this patch makes it support
->>> the new SiRFmarco as well.
->>> SiRFmarco, as a SMP SoC, adds new SIRFSOC_GPIO_PAD_EN_CLR registers, to
->>> disable GPIO pad, we should write 1 to the corresponding bit in the new
->>> CLEAR register instead of writing 0 to SIRFSOC_GPIO_PAD_EN.
->>>
->>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->>
->> This doesn't apply to my tree, you must have some other changes that
->> are not included in the patch set...
->>
->> Can you pls try to generate and test the patch against the pinctrl tree?
->>
->> I might apply it as per the "new driver" rule if I can convince myself that it
->> doesn't destabilize the current driver.
->
-> this one actually depends on:
->
-> http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=commitdiff;h=056876f6c73406c06d530d16d020177f5ec4a0bd
-> which was applied to arm soc tree.
->
-> the only conflict comes from:
->  static const struct of_device_id pinmux_ids[] __devinitconst = {
->         { .compatible = "sirf,prima2-pinctrl" },
-> +       { .compatible = "sirf,marco-pinctrl" },
->         {}
->  };
->
-> as commit 056876f6c73406c0 renamed the old
-> static const struct of_device_id pinmux_ids[] __devinitconst = {
->         { .compatible = "sirf,prima2-gpio-pinmux" },
->         {}
-> };
-> to
-> static const struct of_device_id pinmux_ids[] __devinitconst = {
->         { .compatible = "sirf,sirf,prima2-pinctrl" },
->         {}
-> };
->
-> so i think the best way is we hold on this patch for the moment, and
-> wait for 3.7-rc1.
-> all other 5 are critical fixes and have no merge conflict with arm-soc
-> tree as i have tried.
+On 10/31/2012 04:40 PM, Rajanikanth H.V wrote:
+> From: "Rajanikanth H.V" <rajanikanth.hv@stericsson.com>
+> 
+> - This patch adds device tree support for fuelgauge driver
+> - optimize bm devices platform_data usage and of_probe(...)
+>   Note: of_probe() routine for battery managed devices is made
+>   common across all bm drivers.
+> - test status:
+>   - interrupt numbers assigned differs between legacy and FDT mode.
+> 
+> Signed-off-by: Rajanikanth H.V <rajanikanth.hv@stericsson.com>
+[...]
+> +int __devinit
+> +bmdevs_of_probe(struct device *dev,
+> +		struct device_node *np,
+> +		struct abx500_bm_data **battery)
+> +{
+> +	struct	abx500_battery_type *btype;
+> +	struct  device_node *np_bat_supply;
+> +	struct	abx500_bm_data *bat;
+> +	const char *btech;
+> +	char bat_tech[8];
+> +	int i, thermistor;
+> +
+> +	*battery = &ab8500_bm_data;
+> +
+> +	/* get phandle to 'battery-info' node */
+> +	np_bat_supply = of_parse_phandle(np, "battery", 0);
+> +	if (!np_bat_supply) {
+> +		dev_err(dev, "missing property battery\n");
+> +		return -EINVAL;
+> +	}
+> +	if (of_property_read_bool(np_bat_supply,
+> +			"thermistor-on-batctrl"))
+> +		thermistor = NTC_INTERNAL;
+> +	else
+> +		thermistor = NTC_EXTERNAL;
+> +
+> +	bat = *battery;
+> +	if (thermistor == NTC_EXTERNAL) {
+> +		bat->n_btypes  = 4;
+> +		bat->bat_type  = bat_type_ext_thermistor;
+> +		bat->adc_therm = ABx500_ADC_THERM_BATTEMP;
+> +	}
+> +	btech = of_get_property(np_bat_supply,
+> +		"stericsson,battery-type", NULL);
+> +	if (!btech) {
+> +		dev_warn(dev, "missing property battery-name/type\n");
+> +		strcpy(bat_tech, "UNKNOWN");
+> +	} else {
+> +		strcpy(bat_tech, btech);
+> +	}
 
-Hi Linus,
-this one can be applied now. would you apply? as i have tried, now it
-can be applied directly againest 3.7-rc3:
-
-barry at barry-VirtualBox:~/development/linux-2.6$ git log
-commit 5e0ca7b04ab1a5e4ca778045fdc6b97c1bd2ea3f
-Author: Barry Song <Baohua.Song@csr.com>
-Date:   Thu Sep 27 17:56:30 2012 +0800
-
-    pinctrl: sirf: enable the driver support new SiRFmarco SoC
-
-    The driver supports old up SiRFprimaII SoCs, this patch makes it support
-    the new SiRFmarco as well.
-    SiRFmarco, as a SMP SoC, adds new SIRFSOC_GPIO_PAD_EN_CLR registers, to
-    disable GPIO pad, we should write 1 to the corresponding bit in the new
-    CLEAR register instead of writing 0 to SIRFSOC_GPIO_PAD_EN.
-
-    Signed-off-by: Barry Song <Baohua.Song@csr.com>
-
-commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sun Oct 28 12:24:48 2012 -0700
-
-    Linux 3.7-rc3
-
-commit 5a5210c6adaddbed823162eb76dfdbac72bdb802
-Merge: 8e99165 8bc5e4e
-Author: Linus Torvalds <torvalds@linux-foundation.org>
-Date:   Sun Oct 28 11:14:52 2012 -0700
-
->
->> Yours,
->> Linus Walleij
-
--barry
+I don't get the point of declaring the char array and copying the string
+in it, when you could simply use just the pointer returned by
+of_get_property().
+Anyway, if the string property is longer than 8 characters, you are
+writing past the size of the destination array.
