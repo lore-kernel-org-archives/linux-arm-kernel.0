@@ -1,79 +1,54 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Thu, 01 Nov 2012 01:08:28 +0100
-Subject: Representation of external memory-mapped devices in DT (gpmc)
-In-Reply-To: <508FB10D.9030906@ti.com>
-References: <508E9513.7050106@gmail.com> <508E9C42.10907@gmail.com>
- <508EBB47.8070405@gmail.com> <508FB10D.9030906@ti.com>
-Message-ID: <5091BD7C.7040105@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu,  1 Nov 2012 08:40:05 +0800
+Subject: [PATCH 2/8] ARM: shmobile: kzm9g: enable three-axis digital
+ accelerometer ADXL345
+In-Reply-To: <1351730411-1874-1-git-send-email-horms@verge.net.au>
+References: <1351730411-1874-1-git-send-email-horms@verge.net.au>
+Message-ID: <1351730411-1874-3-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.10.2012 11:50, Afzal Mohammed wrote:
-> Hi Daniel,
-> 
-> On Monday 29 October 2012 10:52 PM, Daniel Mack wrote:
->> On 29.10.2012 16:09, Rob Herring wrote:
-> 
->>> You may want a CS0 node with nand as a child node of that.
-> 
->> Hmm, I don't see what that would buy us. The question is which way is
->> feasible for storing both the memory region and the cs number in the
->> device tree. The CS number should certainly go to the child node, no?
->>
->> IOW, would it be a good idea to have something like the following layout?
->>
->> 	gpmc: gpmc at 50000000 {
->> 		compatible = "ti,gpmc";
->> 		ti,hwmods = "gpmc";
->> 		reg =<0x50000000 0x2000>;
->>
->> 		/* cs-reg stores the setup of the controller's
->> 		   memory map */
->>
->> 			/* offset	size */
->> 		cs-reg =<0x0		0x1000000
->> 			  ....		.....
->> 			  ....		.....>;
->>
->> 		nand: child at 0 {
->> 			/* timings */
->> 			/* peripheral specifics */
->> 		};
->> 	};
->>
->> I would actually much prefer that approach.
->>
->> Afzal, because because that way, we can leave the code as-is for now and
->> add the "cs-reg" property once the code is switched to dynamic handling.
->> What do you think?
-> 
-> I don't know what to say, don't have a good grasp on DT to give
-> right suggestion.
-> 
-> It seems offset field may not be necessary. memory for connected
-> peripherals is not fixed, only CS is fixed (as CS pin is hard-wired).
-> Physical memory can be anywhere between 0-512MB (with
-> alignment constraints depending on size, refer GPMC_CONFIG7
-> register), even though right now memory region for peripheral
-> seems to be fixed (for boards supported in mainline it will be
-> what bootloader configures), it is possible to have it in a different
-> region for those peripherals.
+From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
 
-The question is whether this is transparent to the client driver at the
-end. If the driver needs to know about the address of the external
-memory (that's the case for the smsx911x for example), that value should
-be in the device tree.
+This patch enables three-axis digital accelerometer ADXL345.
+Test:
+  sudo cat /dev/input/event2
+then tip up the board. You get something from /dev/input/event2.
 
-Actually, there's an example here that matches our case quite well:
+Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/kzm9g_defconfig     |    2 ++
+ arch/arm/mach-shmobile/board-kzm9g.c |    4 ++++
+ 2 files changed, 6 insertions(+)
 
-http://devicetree.org/Device_Tree_Usage#Ranges_.28Address_Translation.29
-
-I think the important part is to get the bindings straight so we don't
-have to change them anymore later on; we don't really need to parse the
-values from the generic driver and set up the mappings accrodingly -
-that can be added easily later on. For a first shot, we can just write
-default values to the DT that are computed anyway, right?
-
-
-
-Daniel
+diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
+index 1404b04..ce99e3e 100644
+--- a/arch/arm/configs/kzm9g_defconfig
++++ b/arch/arm/configs/kzm9g_defconfig
+@@ -74,6 +74,8 @@ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ST1232=y
++CONFIG_INPUT_MISC=y
++CONFIG_INPUT_ADXL34X=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=9
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index a37da78..1a46422 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -562,6 +562,10 @@ static struct i2c_board_info i2c0_devices[] = {
+ 		I2C_BOARD_INFO("ak8975", 0x0c),
+ 		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
+ 	},
++	{
++		I2C_BOARD_INFO("adxl34x", 0x1d),
++		.irq = intcs_evt2irq(0x3340), /* IRQ26 */
++	},
+ };
+ 
+ static struct i2c_board_info i2c1_devices[] = {
+-- 
+1.7.10.4
