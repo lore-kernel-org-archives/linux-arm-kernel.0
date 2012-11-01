@@ -1,70 +1,130 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  1 Nov 2012 08:41:52 +0800
-Subject: [PATCH 10/11] ARM: mach-shmobile: add FLCTL DMA slave definitions for
- sh7372
+Date: Thu,  1 Nov 2012 08:41:51 +0800
+Subject: [PATCH 09/11] ARM: shmobile: r8a7779: add I2C driver support
 In-Reply-To: <1351730513-2952-1-git-send-email-horms@verge.net.au>
 References: <1351730513-2952-1-git-send-email-horms@verge.net.au>
-Message-ID: <1351730513-2952-11-git-send-email-horms@verge.net.au>
+Message-ID: <1351730513-2952-10-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@googlemail.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-SH7372 can use DMA with the FLCTL flash controller. Add required slave
-IDs and slave descriptors.
+This patch enable R-Car I2C driver
 
-Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/sh7372.h |    4 ++++
- arch/arm/mach-shmobile/setup-sh7372.c        |   20 ++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+ arch/arm/configs/marzen_defconfig      |    2 +
+ arch/arm/mach-shmobile/setup-r8a7779.c |   77 ++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/sh7372.h b/arch/arm/mach-shmobile/include/mach/sh7372.h
-index eb98b45..d65fbbe 100644
---- a/arch/arm/mach-shmobile/include/mach/sh7372.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh7372.h
-@@ -452,6 +452,10 @@ enum {
- 	SHDMA_SLAVE_SCIF5_RX,
- 	SHDMA_SLAVE_SCIF6_TX,
- 	SHDMA_SLAVE_SCIF6_RX,
-+	SHDMA_SLAVE_FLCTL0_TX,
-+	SHDMA_SLAVE_FLCTL0_RX,
-+	SHDMA_SLAVE_FLCTL1_TX,
-+	SHDMA_SLAVE_FLCTL1_RX,
- 	SHDMA_SLAVE_SDHI0_RX,
- 	SHDMA_SLAVE_SDHI0_TX,
- 	SHDMA_SLAVE_SDHI1_RX,
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index a07954f..a360111 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -408,6 +408,26 @@ static const struct sh_dmae_slave_config sh7372_dmae_slaves[] = {
- 		.chcr		= CHCR_RX(XMIT_SZ_8BIT),
- 		.mid_rid	= 0x3e,
- 	}, {
-+		.slave_id	= SHDMA_SLAVE_FLCTL0_TX,
-+		.addr		= 0xe6a30050,
-+		.chcr		= CHCR_TX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0x83,
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 53382b6..f79b55c 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -69,6 +69,8 @@ CONFIG_SERIAL_SH_SCI=y
+ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
+ CONFIG_SERIAL_SH_SCI_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_RCAR=y
+ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_THERMAL=y
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index 2917668..63de5cb 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -229,6 +229,79 @@ static struct platform_device tmu01_device = {
+ 	.num_resources	= ARRAY_SIZE(tmu01_resources),
+ };
+ 
++/* I2C */
++static struct resource rcar_i2c0_res[] = {
++	{
++		.start  = 0xffc70000,
++		.end    = 0xffc70fff,
++		.flags  = IORESOURCE_MEM,
 +	}, {
-+		.slave_id	= SHDMA_SLAVE_FLCTL0_RX,
-+		.addr		= 0xe6a30050,
-+		.chcr		= CHCR_RX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0x83,
++		.start  = gic_spi(79),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c0_device = {
++	.name		= "i2c-rcar",
++	.id		= 0,
++	.resource	= rcar_i2c0_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c0_res),
++};
++
++static struct resource rcar_i2c1_res[] = {
++	{
++		.start  = 0xffc71000,
++		.end    = 0xffc71fff,
++		.flags  = IORESOURCE_MEM,
 +	}, {
-+		.slave_id	= SHDMA_SLAVE_FLCTL1_TX,
-+		.addr		= 0xe6a30060,
-+		.chcr		= CHCR_TX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0x87,
++		.start  = gic_spi(82),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c1_device = {
++	.name		= "i2c-rcar",
++	.id		= 1,
++	.resource	= rcar_i2c1_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c1_res),
++};
++
++static struct resource rcar_i2c2_res[] = {
++	{
++		.start  = 0xffc72000,
++		.end    = 0xffc72fff,
++		.flags  = IORESOURCE_MEM,
 +	}, {
-+		.slave_id	= SHDMA_SLAVE_FLCTL1_RX,
-+		.addr		= 0xe6a30060,
-+		.chcr		= CHCR_RX(XMIT_SZ_32BIT),
-+		.mid_rid	= 0x87,
++		.start  = gic_spi(80),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c2_device = {
++	.name		= "i2c-rcar",
++	.id		= 2,
++	.resource	= rcar_i2c2_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c2_res),
++};
++
++static struct resource rcar_i2c3_res[] = {
++	{
++		.start  = 0xffc73000,
++		.end    = 0xffc73fff,
++		.flags  = IORESOURCE_MEM,
 +	}, {
- 		.slave_id	= SHDMA_SLAVE_SDHI0_TX,
- 		.addr		= 0xe6850030,
- 		.chcr		= CHCR_TX(XMIT_SZ_16BIT),
++		.start  = gic_spi(81),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device i2c3_device = {
++	.name		= "i2c-rcar",
++	.id		= 3,
++	.resource	= rcar_i2c3_res,
++	.num_resources	= ARRAY_SIZE(rcar_i2c3_res),
++};
++
+ static struct platform_device *r8a7779_early_devices[] __initdata = {
+ 	&scif0_device,
+ 	&scif1_device,
+@@ -238,6 +311,10 @@ static struct platform_device *r8a7779_early_devices[] __initdata = {
+ 	&scif5_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
++	&i2c0_device,
++	&i2c1_device,
++	&i2c2_device,
++	&i2c3_device,
+ };
+ 
+ static struct platform_device *r8a7779_late_devices[] __initdata = {
 -- 
 1.7.10.4
