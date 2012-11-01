@@ -1,118 +1,35 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 31 Oct 2012 20:32:43 -0500
-Subject: [PATCH] ARM: Fix the "WFI" instruction opcode definition.
-In-Reply-To: <DA41BE1DDCA941489001C7FBD7A8820E3CB5512E@szxeml549-mbx.china.huawei.com>
-References: <DA41BE1DDCA941489001C7FBD7A8820E3CB5512E@szxeml549-mbx.china.huawei.com>
-Message-ID: <5091D13B.6060106@gmail.com>
+Date: Wed, 31 Oct 2012 21:04:24 -0500
+Subject: [PATCH] arm-dt: Enable DT proc updates.
+In-Reply-To: <1351699069-4661-1-git-send-email-panto@antoniou-consulting.com>
+References: <1351699069-4661-1-git-send-email-panto@antoniou-consulting.com>
+Message-ID: <5091D8A8.9010307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 08:24 PM, Yangfei (Felix) wrote:
-> The current "WFI" opcode definiton causes CPU hot-plug feature fails to work
-> if the kernel is built with CONFIG_THUMB2_KERNEL/CONFIG_CPU_ENDIAN_BE8 being
-> defined. An invalid instruction exception will be generated.
+On 10/31/2012 10:57 AM, Pantelis Antoniou wrote:
+> This simple patch enables dynamic changes of the DT tree on runtime
+> to be visible to the device-tree proc interface.
 > 
-> Signed-off-by: yangfei.kernel at gmail.com
+> Signed-off-by: Pantelis Antoniou <panto@antoniou-consulting.com>
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
 > ---
->  arch/arm/mach-exynos/hotplug.c   |    8 +++++++-
->  arch/arm/mach-realview/hotplug.c |    8 +++++++-
->  arch/arm/mach-shmobile/hotplug.c |    8 +++++++-
->  3 files changed, 21 insertions(+), 3 deletions(-)
+>  arch/arm/include/asm/prom.h | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index f4d7dd2..823a0e4 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -18,11 +18,17 @@
->  #include <asm/cacheflush.h>
->  #include <asm/cp15.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/opcodes.h>
+> diff --git a/arch/arm/include/asm/prom.h b/arch/arm/include/asm/prom.h
+> index aeae9c6..6d65ba2 100644
+> --- a/arch/arm/include/asm/prom.h
+> +++ b/arch/arm/include/asm/prom.h
+> @@ -11,6 +11,8 @@
+>  #ifndef __ASMARM_PROM_H
+>  #define __ASMARM_PROM_H
 >  
->  #include <mach/regs-pmu.h>
->  
->  #include "common.h"
->  
-> +/*
-> + * Define opcode of the WFI instruction.
-> + */
-> +#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
+> +#define HAVE_ARCH_DEVTREE_FIXUPS
 > +
->  static inline void cpu_enter_lowpower(void)
->  {
->  	unsigned int v;
-> @@ -72,7 +78,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  		/*
->  		 * here's the WFI
->  		 */
-> -		asm(".word	0xe320f003\n"
-> +		asm(__WFI
-
-Wouldn't using the actual wfi instruction fix this. There is a wfi() macro.
-
-Or just call cpu_do_idle() which will do any other things needed before
-wfi like a dsb instruction.
-
-Rob
->  		    :
->  		    :
->  		    : "memory", "cc");
-> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-> index 53818e5..5271a1a 100644
-> --- a/arch/arm/mach-realview/hotplug.c
-> +++ b/arch/arm/mach-realview/hotplug.c
-> @@ -15,6 +15,12 @@
->  #include <asm/cacheflush.h>
->  #include <asm/cp15.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/opcodes.h>
-> +
-> +/*
-> + * Define opcode of the WFI instruction.
-> + */
-> +#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
+>  #ifdef CONFIG_OF
 >  
->  static inline void cpu_enter_lowpower(void)
->  {
-> @@ -64,7 +70,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->  		/*
->  		 * here's the WFI
->  		 */
-> -		asm(".word	0xe320f003\n"
-> +		asm(__WFI
->  		    :
->  		    :
->  		    : "memory", "cc");
-> diff --git a/arch/arm/mach-shmobile/hotplug.c b/arch/arm/mach-shmobile/hotplug.c
-> index b09a0bd..0d7b7d1 100644
-> --- a/arch/arm/mach-shmobile/hotplug.c
-> +++ b/arch/arm/mach-shmobile/hotplug.c
-> @@ -20,6 +20,12 @@
->  #include <mach/emev2.h>
->  #include <asm/cacheflush.h>
->  #include <asm/mach-types.h>
-> +#include <asm/opcodes.h>
-> +
-> +/*
-> + * Define opcode of the WFI instruction.
-> + */
-> ++#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
->  
->  static cpumask_t dead_cpus;
->  
-> @@ -39,7 +45,7 @@ void shmobile_cpu_die(unsigned int cpu)
->  		/*
->  		 * here's the WFI
->  		 */
-> -		asm(".word	0xe320f003\n"
-> +		asm(__WFI
->  		    :
->  		    :
->  		    : "memory", "cc");
-> --
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  extern struct machine_desc *setup_machine_fdt(unsigned int dt_phys);
 > 
