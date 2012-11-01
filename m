@@ -1,41 +1,75 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 1 Nov 2012 18:11:39 +0530
-Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
- clk driver
-In-Reply-To: <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
-Message-ID: <50926E03.8050102@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Nov 2012 14:22:11 +0100
+Subject: Fwd: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <874nl9tuqq.fsf@deeprootsystems.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+ <20121030113407.GA24335@sirena.org.uk>
+ <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
+ <87obji8kta.fsf@deeprootsystems.com>
+ <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
+ <CACRpkdaBmg7wtX0WsaxMw=n1sKDN5YphK=y8tzAx_CF=JnUqvw@mail.gmail.com>
+ <874nl9tuqq.fsf@deeprootsystems.com>
+Message-ID: <CACRpkdarSNg1zACZKGBt1ypMzE+-KF-o594EcZ1EP484v+4HRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/25/2012 9:41 PM, Murali Karicheri wrote:
-> This is the common clk driver initialization functions for DaVinci
-> SoCs and other SoCs that uses similar hardware architecture.
-> clock.h also defines struct types for clock definitions in a SoC
-> and clock data type for configuring clk-mux. The initialization
-> functions are used by clock initialization code in a specific
-> platform/SoC.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+On Thu, Nov 1, 2012 at 12:42 PM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> [Me]
+>> Well, the pinctrl grabbers in these drivers are using these states also
+>> for platforms that do not even select CONFIG_PM.  For example
+>> mach-nomadik is quite happy that the PL011 driver is thusly
+>> muxing in its pins. And would require refactoring to use PM
+>> domains.
+>
+> If CONFIG_PM is disabled, then is it safe to assume that the pins in
+> question are probably only done once at init time.  I assume during
+> ->probe(). ?
 
-> +struct clk *davinci_plldiv_clk(const char *name, const char *parent,
-> +				struct clk_plldiv_data *data)
-> +{
-> +	/*
-> +	 * This is a PLL divider clock with divider specified by
-> +	 * div_reg in pll_div_data.
-> +	 */
-> +	data->reg = ioremap(data->phys_div_reg, 4);
-> +	if (WARN_ON(!data->reg))
-> +		return NULL;
-> +
-> +	return clk_register_davinci_plldiv(NULL, name, parent, data, &_lock);
+Sadly no.
 
-This function does not exist at this point. Looks like you need to swap
-3/11 with 4/11. Also, you should also add build infrastructure
-(makefile, Kconfig) changes in the same patch that creates the file.
-There is no point in adding those separately.
+Consider drivers/tty/serial/amba-pl011.c
 
-Thanks,
-Sekhar
+Many ARM platforms have several instances of PL011, and not all of
+them have CONFIG_PM & friends, so it's a good example.
+
+Here the driver will probe and currently fetch a pinctrl handle and
+looks up two states: "default", which refers to the situation you
+describe, and optionally "sleep" which will put pins into a
+low-power state.
+
+The driver will currently put the pins into the "sleep" state when
+.shutdown() is called by something (userspace or in-kernel users).
+
+So in the new suggested scheme using runtime PM, this
+would have to be replaced by pm_runtime_get[_sync]()
+and pm_runtime_put() hints and the current pin handling
+deleted, and for each platform using this driver instead
+implement a PM domain to do the same thing.
+
+Else you loose this runtime power optimization.
+
+This is what I refer to the all-or-nothing charcter of
+runtime PM domains... but maybe it's a good thing,
+I haven't quite made my mind up about it.
+
+> (...) if what we want/need are only ways to introduce SoC-specific
+> integration details into non-PM transitions (e.g. probe/remove), maybe
+> bus notifiers would suffice here.  e.g. you'd get a bus notifier when
+> the device is added/attached and any init-time pinctrl setup could be
+> done then.  This still keeps drivers clean of SoC-specific integration
+> data/code, and also allows that to happen whether or not PM features are
+> enabled.
+
+It doesn't cut it for any of our drivers as shown above,
+but it would work for the patch in $SUBJECT.
+
+It sounds like the way silicon clocks are handled on
+SH am I right?
+
+Yours,
+Linus Walleij
