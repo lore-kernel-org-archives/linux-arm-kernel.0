@@ -1,72 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 01 Nov 2012 12:04:16 -0600
-Subject: [PATCH v3 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <1351724661-29050-6-git-send-email-haojian.zhuang@gmail.com>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-6-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <5092B9A0.9000204@wwwdotorg.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 1 Nov 2012 23:58:27 +0530
+Subject: [RFC PATCH] ARM: OMAP4: ID: Improve features detection and check
+In-Reply-To: <20121101170609.GA23552@kahuna>
+References: <1351765401-12487-1-git-send-email-ivan.khoronzhuk@ti.com>
+ <50925E7F.7080602@ti.com> <5092A156.4000601@ti.com> <5092A4DF.4080405@ti.com>
+ <20121101170609.GA23552@kahuna>
+Message-ID: <5092BF4B.3020004@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 05:04 PM, Haojian Zhuang wrote:
-> Add comments with pinconf & gpio range in the document of
-> pinctrl-single.
+On Thursday 01 November 2012 10:36 PM, Nishanth Menon wrote:
+> On 22:05-20121101, Santosh Shilimkar wrote:
+>> On Thursday 01 November 2012 09:50 PM, ivan.khoronzhuk wrote:
+>>> On 11/01/2012 01:35 PM, Santosh Shilimkar wrote:
+>>>> On Thursday 01 November 2012 03:53 PM, Ivan Khoronzhuk wrote:
+>>>>> Replaces several flags bearing the same meaning. There is no need
+>>>>> to set flags due to different omap types here, it can be checked
+>>>>> in appropriate places as well.
+>>>>>
+>>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>>> Cc: linux-omap at vger.kernel.org
+>>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>>> Cc: linux-kernel at vger.kernel.org
+>>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+>>>>> ---
 
-I'd tend to suggest separating the series to add GPIO range support and
-pinconf support, especially since didn't Tony suggest a separate driver
-for pinconf? Perhaps that was just for non-generic properties.
+[..]
+>>>>> +    if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
+>>>>> +        omap_features = OMAP4_HAS_PERF_SILICON;
+>>>>
+>>>> Well the detection isn't for performance/standard but there are some
+>>>> features depend on it. For example 1 GHz doesn't DPLL DCC enable feature
+>>>> where as 1.2 GHz, 1.5 GHz doesn't need. This is the main reason this
+>>>> information is also effused. Have you considered this aspect while
+>>>> creating this patch ?
+>>>>
+>>>> Regards
+>>>> Santosh
+>>>>
+>>>
+>>> I had considered it. There is no dependency on the features.
+>>> DCC usage depends on asked frequency on the fly, not from the features.
+>>> Depending on "performance/standard" feature the available frequencies
+>>> should be chosen in places where they are needed, for example while
+>>> initializing OPPs.
+>>>
+>> You are correct about the way DCC is handled in the clock code. Infact
+>> all these features like L2CACHE, SGX, IVA etc is more for to display
+>> boot messages.
+>>
+>>> Currently we have several features while it is only one indeed.
+>>>
+>> 1GHz, 1.2GHz, 1.5 GHz are not same since the silicon capability itself
+>> is different.
+>>
+>> git blame tells me that Nishant has sent this update so looping him
+>> if above differentiation in boot log helps.
+>>
+>> Nishant,
+>> What's your take on removing above freq prints and marking
+>> those silicon as performance silicons as the $subject patch does ?
+>>
+>> Regards
+>> Santosh
+> Yes $subject patch is a better approach compared to having freq based
+> handling which just increases the number of macros we need to enable
+> depending on SoC variants that we spin off the main SoC. This also
+> allows us to conserve the features bitfield ahead as well.
+>
+> I hate to admit, but after a couple of generations of SoC spinoffs,
+> my original logic is proving to be was pretty short sighted,
+> unfortunately :(
+>
+> So, approach
+> Acked-by: Nishanth Menon <nm@ti.com>
+>
+Thanks Nishant for clarification and ack.
 
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+With the clarification I also like the subject patch.
+Feel free add.
 
-> +- pinctrl-single,gpio-ranges : gpio range list of phandles.
-> +  Must be present if gpio range phandle is specified.
-> +  This property should be existing in .dtsi files for those silicons.
-> +
-> +- pinctrl-single,gpio : array with gpio range start, size & register
-> +  offset. Must be present if gpio range phandle is specified.
-> +  This property should be existing in .dts files for those boards.
-> +
-> +- pinctrl-single,gpio-func : gpio function value in the pinmux register.
-> +  Must be present if gpio range phandle is specified.
-> +  This property should be existing in .dts files for those boards.
-
-I don't see any reason why pinctrl-single,gpio or
-pinctrl-single,gpio-func are board-specific rather than SoC-specific.
-Surely it's the Soc HW construction that defines how the pinctrl and
-GPIO modules relate to each-other? I would simply remove the last
-sentence from each of the three descriptions above.
-
-Also, isn't this list a list of properties for the main pinctrl-single
-node itself? I think you should split the list up as follows:
-
-1) A description of the main node
-2) A list of required and optional properties for the main node
-3) A description of what a GPIO range node is
-4) A list of required and optional properties for a GPIO range node.
-
-I think that would explain the whole structure a lot more clearly.
-
-Oh, and why not just get rid of the pinctrl-single,gpio-ranges property
-entirely, and simply make the GPIO range definitions be child nodes of
-the pinctrl-single node? That would require them to either be named
-according to some scheme or have some compatible property to
-differentiate them from any other nodes, but I think that's workable.
-
-> @@ -42,6 +77,15 @@ Where 0xdc is the offset from the pinctrl register base address for the
->  device pinctrl register, 0x18 is the desired value, and 0xff is the sub mask to
->  be used when applying this change to the register.
->  
-> +In case pinctrl device supports gpio function, it needs to define gpio range.
-> +All the phandles of gpio range list should be set in below:
-> +
-> +	pinctrl-single,gpio-ranges = <[phandle of gpio range]>;
-> +
-> +	[phandle of gpio range]: {
-
-That's a label, not a phandle. The reference to the label gets compiled
-to a phandle in the DTB. The node name is missing. you should probably
-just use an example label and re-write the last 3 lines as:
-
-	pinctrl-single,gpio-ranges = <&range0>;
-
-	range0: range0 {
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
