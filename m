@@ -1,29 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 1 Nov 2012 12:27:31 +0000
-Subject: [PATCH 01/15] ARM: clps711x: Load serial driver from boards
-In-Reply-To: <1351762006-27368-1-git-send-email-shc_work@mail.ru>
-References: <1351762006-27368-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20121101122731.GS21164@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 1 Nov 2012 18:11:39 +0530
+Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
+ clk driver
+In-Reply-To: <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
+Message-ID: <50926E03.8050102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BOn Thu, Nov 01, 2012 at 01:26:31PM +0400, Alexander Shiyan wrote:
->  MACHINE_START(AUTCPU12, "autronix autcpu12")
->  	/* Maintainer: Thomas Gleixner */
->  	.atag_offset	= 0x20000,
-> -	.init_machine	= autcpu12_init,
->  	.map_io		= autcpu12_map_io,
-> +	.init_machine	= autcpu12_init,
->  	.init_irq	= clps711x_init_irq,
-> -	.timer		= &clps711x_timer,
->  	.restart	= clps711x_restart,
-> +	.timer		= &clps711x_timer,
->  MACHINE_END
+On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+> This is the common clk driver initialization functions for DaVinci
+> SoCs and other SoCs that uses similar hardware architecture.
+> clock.h also defines struct types for clock definitions in a SoC
+> and clock data type for configuring clk-mux. The initialization
+> functions are used by clock initialization code in a specific
+> platform/SoC.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-NAK.  If you're going to sort them, arrange them in the same order as
-in the structure declaration in mach/arch.h.  That's the order in which
-the functions will be called.
+> +struct clk *davinci_plldiv_clk(const char *name, const char *parent,
+> +				struct clk_plldiv_data *data)
+> +{
+> +	/*
+> +	 * This is a PLL divider clock with divider specified by
+> +	 * div_reg in pll_div_data.
+> +	 */
+> +	data->reg = ioremap(data->phys_div_reg, 4);
+> +	if (WARN_ON(!data->reg))
+> +		return NULL;
+> +
+> +	return clk_register_davinci_plldiv(NULL, name, parent, data, &_lock);
 
-IOW, changing the order of .timer to be after .restart is wrong, .restart
-should be the last.  .timer should be immediately before .init_machine.
-.init_irq should be immediately before .timer.
+This function does not exist at this point. Looks like you need to swap
+3/11 with 4/11. Also, you should also add build infrastructure
+(makefile, Kconfig) changes in the same patch that creates the file.
+There is no point in adding those separately.
+
+Thanks,
+Sekhar
