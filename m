@@ -1,65 +1,48 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Thu, 1 Nov 2012 06:48:34 +0100
-Subject: [PATCH v3 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <20121101004734.GK15766@atomide.com>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-10-git-send-email-haojian.zhuang@gmail.com>
- <20121101004734.GK15766@atomide.com>
-Message-ID: <CAN1soZxVp73uNWD7Q9r_3X1hCA=JhMiMpx2UMPPGiXBtQ2QjAA@mail.gmail.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Thu, 1 Nov 2012 08:45:08 +0100
+Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes
+ for AM33XX
+In-Reply-To: <50914107.2090909@ti.com>
+References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+ <1351498881-32482-6-git-send-email-hvaibhav@ti.com>
+ <50914107.2090909@ti.com>
+Message-ID: <20121101074508.GA2637@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 1:47 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Haojian Zhuang <haojian.zhuang@gmail.com> [121031 16:07]:
->> Dump pinmux register value, not only function part in the pinmux
->> register.
->>
->> Also fix the issue on caluclating pin offset. The last parameter
->> should be pin number, not register offset.
->
-> You have a minor typo   ^^^^^^^^^^^ should be calculating
-> instead.
->
-> Is there a bug that should be fixed for the -rc cycle
-> here? That's the impression I get from the description.
-> Or is it just a cosmetic fix to rename offset to pin?
->
-> Regards,
->
-> Tony
->
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> ---
->>  drivers/pinctrl/pinctrl-single.c |    8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
->> index 3b97b65..72017e7 100644
->> --- a/drivers/pinctrl/pinctrl-single.c
->> +++ b/drivers/pinctrl/pinctrl-single.c
->> @@ -283,15 +283,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
->>
->>  static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
->>                                       struct seq_file *s,
->> -                                     unsigned offset)
->> +                                     unsigned pin)
->>  {
->>       struct pcs_device *pcs;
->> -     unsigned val;
->> +     unsigned val, mux_bytes;
->>
->>       pcs = pinctrl_dev_get_drvdata(pctldev);
->>
->> -     val = pcs->read(pcs->base + offset);
->> -     val &= pcs->fmask;
->> +     mux_bytes = pcs->width / BITS_PER_BYTE;
->> +     val = pcs->read(pcs->base + pin * mux_bytes);
->>
->>       seq_printf(s, "%08x %s " , val, DRIVER_NAME);
->>  }
->> --
->> 1.7.10.4
->>
+On Wed, Oct 31, 2012 at 04:17:27PM +0100, Benoit Cousson wrote:
+> > +			compatible = "ti,cpsw";
+> > +			ti,hwmods = "cpgmac0";
+> > +			cpdma_channels = <8>;
+> > +			host_port_no = <0>;
+> > +			cpdma_reg_ofs = <0x800>;
+> > +			cpdma_sram_ofs = <0xa00>;
+> > +			ale_reg_ofs = <0xd00>;
+> > +			ale_entries = <1024>;
+> > +			host_port_reg_ofs = <0x108>;
+> > +			hw_stats_reg_ofs = <0x900>;
+> > +			bd_ram_ofs = <0x2000>;
+> > +			bd_ram_size = <0x2000>;
+> > +			no_bd_ram = <0>;
+> > +			rx_descs = <64>;
+> > +			mac_control = <0x20>;
+> 
+> Do you have to store all these data in the DTS? Cannot it be in the driver?
+> 
+> Do you expect to have several instance of the same IP with different
+> parameters here?
 
-There's also include a bug fix. I'm OK that this patch could be
-included in -rc cycle.
+As I understand it, there are only two different layouts for the CPSW,
+the one in the dm814x and the one in the am335x. So I think it would
+work to put only the version register offet in the DT, and the let the
+driver figure out the rest from there.
+
+But if TI is planning on reordering the registers with each new
+silicon revision, again and again, then it might make sense to keep
+the offsets in the DT.
+
+[ I really wonder why the hardware people think that reshuffling the
+  register layout constitutes an improvement. ]
+
+Thanks,
+Richard
