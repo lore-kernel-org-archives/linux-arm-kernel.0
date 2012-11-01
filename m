@@ -1,92 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Nov 2012 19:33:55 +0100
-Subject: [PATCH] ARM: plat-versatile: move FPGA irq driver to
- drivers/irqchip
-In-Reply-To: <20121101101233.17ffcf5a@skate>
-References: <1351719113-30880-1-git-send-email-linus.walleij@linaro.org>
- <5091CA18.7020905@gmail.com>
- <CACRpkda06BbFOiX1WSqNLM-R5Es-Nd6btUNq2mMDuH7s3jA2cw@mail.gmail.com>
- <20121101101233.17ffcf5a@skate>
-Message-ID: <CACRpkdaYyoYRg+ZnK1z4n39eO2c+U0uL=Ttsa83S2e6h6=XJag@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 1 Nov 2012 14:34:51 -0400
+Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
+ clk driver
+In-Reply-To: <50926E03.8050102@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
+ <50926E03.8050102@ti.com>
+Message-ID: <5092C0CB.5020504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 10:12 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> On Thu, 1 Nov 2012 10:00:19 +0100, Linus Walleij wrote:
+On 11/01/2012 08:41 AM, Sekhar Nori wrote:
+> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+>> This is the common clk driver initialization functions for DaVinci
+>> SoCs and other SoCs that uses similar hardware architecture.
+>> clock.h also defines struct types for clock definitions in a SoC
+>> and clock data type for configuring clk-mux. The initialization
+>> functions are used by clock initialization code in a specific
+>> platform/SoC.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> +struct clk *davinci_plldiv_clk(const char *name, const char *parent,
+>> +				struct clk_plldiv_data *data)
+>> +{
+>> +	/*
+>> +	 * This is a PLL divider clock with divider specified by
+>> +	 * div_reg in pll_div_data.
+>> +	 */
+>> +	data->reg = ioremap(data->phys_div_reg, 4);
+>> +	if (WARN_ON(!data->reg))
+>> +		return NULL;
+>> +
+>> +	return clk_register_davinci_plldiv(NULL, name, parent, data, &_lock);
+> This function does not exist at this point. Looks like you need to swap
+> 3/11 with 4/11. Also, you should also add build infrastructure
+> (makefile, Kconfig) changes in the same patch that creates the file.
+> There is no point in adding those separately.
 >
->> Sounds like a separate patch but surely we can do this. Is Thomas'
->> stuff on a branch somewhere that I can then rebase upon to get
->> it upstream? I was planning to get this series as such to the
->> ARM SoC maintainers soon-ish.
+> Thanks,
+> Sekhar
 >
-> Not at the moment. But do you want me to put that in a branch, and
-> agglomerate all the related patches (posted by Rob for GIC/VIC and by
-> you for the FPGA IRQ controller), and then later send a pull request to
-> Arnd with those changes?
+Sekhar,
 
-Whatever I can base on ... I would just push the stuff you consider
-stable to ARM SoC as quickly as possible so we can grab it
-from there and base development on it. Then each of us can
-just request the ARM SoC people to pull it and state that it
-is based on that branch so they need to pull it into the same
-place.
+So the Makefile, Kconfig and new files should be in the same patch.
+Also will re-order the 3/11 and 4/11 in the next revision.
 
-> Also, again, the whole point of the initial infrastructure in
-> drivers/irqchip/ was to avoid adding per-driver header files in
-> include/linux/irqchip/, so there should at least be a long term plan on
-> how to remove those headers file, either by moving more platforms to
-> DT, or my extending the irqchip infrastructure to cover more features.
-
-So the header in this case looks like this:
-
-#ifndef PLAT_FPGA_IRQ_H
-#define PLAT_FPGA_IRQ_H
-
-struct device_node;
-struct pt_regs;
-
-void fpga_handle_irq(struct pt_regs *regs);
-void fpga_irq_init(void __iomem *, const char *, int, int, u32,
-                struct device_node *node);
-int fpga_irq_of_init(struct device_node *node,
-                     struct device_node *parent);
-
-#endif
-
-So this is the stuff that needs to be called from the machine
-descriptor, nothing else.
-
-Example:
-
-MACHINE_START(INTEGRATOR, "ARM-Integrator")
-        /* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
-        .atag_offset    = 0x100,
-        .reserve        = integrator_reserve,
-        .map_io         = ap_map_io,
-        .init_early     = ap_init_early,
-        .init_irq       = ap_init_irq,
-        .handle_irq     = fpga_handle_irq,
-        .timer          = &ap_timer,
-        .init_machine   = ap_init,
-        .restart        = integrator_restart,
-MACHINE_END
-
-The .init_irq hooks above contain some other stuff apart from just
-calling these directly, but the problem remains: how to cross-call
-these functions from the machine start since the IRQs are needed
-by say the timer and everything else.
-
-include/linux/irqchip/bcm2835.h look exactly the same (just one
-function instead of separete DT/non-DT versions) so
-there isn't exactly a precedent on how to solve this in an
-elegant way.
-
-But maybe your patch set contains the silver bullet that will decouple
-this and fix everything?
-
-Then I can do a patch to convert this and the BCM2835 too
-probably...
-
-Yours,
-Linus Walleij
+Murali
