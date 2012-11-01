@@ -1,48 +1,38 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 1 Nov 2012 14:34:51 -0400
-Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
- clk driver
-In-Reply-To: <50926E03.8050102@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
- <50926E03.8050102@ti.com>
-Message-ID: <5092C0CB.5020504@ti.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu,  1 Nov 2012 19:36:09 +0100
+Subject: [PATCH v2 3/4] ARM: OMAP: gpmc: don't create devices from initcall on
+ DT
+In-Reply-To: <1351794970-14675-1-git-send-email-zonque@gmail.com>
+References: <1351794970-14675-1-git-send-email-zonque@gmail.com>
+Message-ID: <1351794970-14675-4-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2012 08:41 AM, Sekhar Nori wrote:
-> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->> This is the common clk driver initialization functions for DaVinci
->> SoCs and other SoCs that uses similar hardware architecture.
->> clock.h also defines struct types for clock definitions in a SoC
->> and clock data type for configuring clk-mux. The initialization
->> functions are used by clock initialization code in a specific
->> platform/SoC.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> +struct clk *davinci_plldiv_clk(const char *name, const char *parent,
->> +				struct clk_plldiv_data *data)
->> +{
->> +	/*
->> +	 * This is a PLL divider clock with divider specified by
->> +	 * div_reg in pll_div_data.
->> +	 */
->> +	data->reg = ioremap(data->phys_div_reg, 4);
->> +	if (WARN_ON(!data->reg))
->> +		return NULL;
->> +
->> +	return clk_register_davinci_plldiv(NULL, name, parent, data, &_lock);
-> This function does not exist at this point. Looks like you need to swap
-> 3/11 with 4/11. Also, you should also add build infrastructure
-> (makefile, Kconfig) changes in the same patch that creates the file.
-> There is no point in adding those separately.
->
-> Thanks,
-> Sekhar
->
-Sekhar,
+On DT driven boards, the gpmc node will match the driver. Hence, there's
+no need to do that unconditionally from the initcall.
 
-So the Makefile, Kconfig and new files should be in the same patch.
-Also will re-order the 3/11 and 4/11 in the next revision.
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ arch/arm/mach-omap2/gpmc.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Murali
+diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
+index 60f1cce..1dcb30c 100644
+--- a/arch/arm/mach-omap2/gpmc.c
++++ b/arch/arm/mach-omap2/gpmc.c
+@@ -844,6 +844,13 @@ static int __init omap_gpmc_init(void)
+ 	struct platform_device *pdev;
+ 	char *oh_name = "gpmc";
+ 
++	/*
++	 * if the board boots up with a populated DT, do not
++	 * manually add the device from this initcall
++	 */
++	if (of_have_populated_dt())
++		return -ENODEV;
++
+ 	oh = omap_hwmod_lookup(oh_name);
+ 	if (!oh) {
+ 		pr_err("Could not look up %s\n", oh_name);
+-- 
+1.7.11.7
