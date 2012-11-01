@@ -1,32 +1,37 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 1 Nov 2012 10:34:12 -0400 (EDT)
-Subject: [PATCH 1/6] arch: Change defconfigs to point to g_mass_storage.
-In-Reply-To: <46dde680f525562e9fd19567deb5247f0bf26842.1351715302.git.mina86@mina86.com>
-Message-ID: <Pine.LNX.4.44L0.1211011033170.1762-100000@iolanthe.rowland.org>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 1 Nov 2012 15:28:17 +0100
+Subject: [PATCH] i2c: mxs: remove broken PIOQUEUE support
+In-Reply-To: <1351771003-6071-1-git-send-email-w.sang@pengutronix.de>
+References: <1351771003-6071-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <201211011528.17596.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 31 Oct 2012, Michal Nazarewicz wrote:
+Dear Wolfram Sang,
 
-> From: Michal Nazarewicz <mina86@mina86.com>
-> 
-> The File-backed Storage Gadget (g_file_storage) is being removed, since
-> it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
-> changes defconfigs point to the new gadget.
+> This I2C master can do DMA and PIOQUEUE (PIO with FIFO). Originally,
+> only PIOQEUE
 
-...
+PIOQUEUE ;-)
 
-> --- a/arch/arm/configs/qil-a9260_defconfig
-> +++ b/arch/arm/configs/qil-a9260_defconfig
-> @@ -108,7 +108,6 @@ CONFIG_ROOT_NFS=y
->  CONFIG_NLS_CODEPAGE_437=y
->  CONFIG_NLS_CODEPAGE_850=y
->  CONFIG_NLS_ISO8859_1=y
-> -CONFIG_DEBUG_KERNEL=y
->  CONFIG_DEBUG_USER=y
->  CONFIG_DEBUG_LL=y
->  # CONFIG_CRYPTO_HW is not set
+> was supported, then DMA support was added. The original
+> intention was to keep PIOQUEUE since it has less overhead what is nice
+> for small transfers. However, runtime switching between PIOQEUE and DMA
+> depending on the transfer size never worked despite a lot of trying.
+> Since PIOQUEUE mode itself was flaky (polling at places where interrupts
+> failed to work) and the implementation also imposed a size limit for
+> transfers, it is best to remove the support altogether which makes the
+> driver a lot cleaner and more robust. If somebody really wants less
+> overhead, plain PIO mode could still be implemented with the addidtional
+> advantage that this mode is also available on MX23, too.
 
-This seems to have crept in by mistake.
+Yes, looks to be the way to go.
 
-Alan Stern
+Reviewed-by: Marek Vasut <marex@denx.de>
+
+Thanks
+
+[...]
+
+Best regards,
+Marek Vasut
