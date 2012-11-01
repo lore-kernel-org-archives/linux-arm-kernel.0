@@ -1,75 +1,115 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 1 Nov 2012 17:05:27 +0530
-Subject: [RFC PATCH] ARM: OMAP4: ID: Improve features detection and check
-In-Reply-To: <1351765401-12487-1-git-send-email-ivan.khoronzhuk@ti.com>
-References: <1351765401-12487-1-git-send-email-ivan.khoronzhuk@ti.com>
-Message-ID: <50925E7F.7080602@ti.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Thu, 01 Nov 2012 12:42:21 +0100
+Subject: Fwd: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdaBmg7wtX0WsaxMw=n1sKDN5YphK=y8tzAx_CF=JnUqvw@mail.gmail.com>
+ (Linus Walleij's message of "Thu, 1 Nov 2012 09:56:48 +0100")
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+ <20121030113407.GA24335@sirena.org.uk>
+ <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
+ <87obji8kta.fsf@deeprootsystems.com>
+ <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
+ <CACRpkdaBmg7wtX0WsaxMw=n1sKDN5YphK=y8tzAx_CF=JnUqvw@mail.gmail.com>
+Message-ID: <874nl9tuqq.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 November 2012 03:53 PM, Ivan Khoronzhuk wrote:
-> Replaces several flags bearing the same meaning. There is no need
-> to set flags due to different omap types here, it can be checked
-> in appropriate places as well.
->
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
-> ---
->   arch/arm/mach-omap2/id.c  |   25 +++++++------------------
->   arch/arm/mach-omap2/soc.h |    8 ++------
->   2 files changed, 9 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index cf2362c..3c47a19 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -28,6 +28,9 @@
->   #include "soc.h"
->   #include "control.h"
->
-> +#define OMAP4_SILICON_TYPE_STANDARD		0x01
-> +#define OMAP4_SILICON_TYPE_PERFORMANCE		0x02
-> +
->   static unsigned int omap_revision;
->   static const char *cpu_rev;
->   u32 omap_features;
-> @@ -273,25 +276,11 @@ void __init omap4xxx_check_features(void)
->   {
->   	u32 si_type;
->
-> -	if (cpu_is_omap443x())
-> -		omap_features |= OMAP4_HAS_MPU_1GHZ;
-> -
-> +	si_type =
-> +	(read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 0x03;
->
-> -	if (cpu_is_omap446x()) {
-> -		si_type =
-> -			read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1);
-> -		switch ((si_type & (3 << 16)) >> 16) {
-> -		case 2:
-> -			/* High performance device */
-> -			omap_features |= OMAP4_HAS_MPU_1_5GHZ;
-> -			break;
-> -		case 1:
-> -		default:
-> -			/* Standard device */
-> -			omap_features |= OMAP4_HAS_MPU_1_2GHZ;
-> -			break;
-> -		}
-> -	}
-> +	if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
-> +		omap_features = OMAP4_HAS_PERF_SILICON;
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Well the detection isn't for performance/standard but there are some
-features depend on it. For example 1 GHz doesn't DPLL DCC enable feature
-where as 1.2 GHz, 1.5 GHz doesn't need. This is the main reason this
-information is also effused. Have you considered this aspect while
-creating this patch ?
+> On Wed, Oct 31, 2012 at 9:10 PM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>
+>> Linus Walleij <linus.walleij@linaro.org> writes:
+>
+>
+>>
+>> > piece of hardware, this would be the right thing to do,
+>> > and I think the in-kernel examples are all "simple",
+>> > e.g. arch/arm/mach-omap2/powerdomain* is all about
+>> > power domains and nothing else,
+>>
+>> FYI... that code isn't the same as PM domain.
+>
+>
+> This sort of points to a core problem here. Our terminologies are
+> ambiguous that we cannot understand each others code. As long
+> as <linux/pm_domain.h> begins:
+>
+> /*
+>  * pm_domain.h - Definitions and headers related to device power domains.
+>  *
+>
+> But arguably that should just be patched (I think there are a few
+> remnants in the code still implying that these things are only about
+> power).
 
-Regards
-Santosh
+Agreed.  The terminology is confusing, and any situations like this in
+the code/comments/docs should be patched.
+
+When PM domains were introduced, I was the first to complain that we
+shouldn't use the term power domain so as not to be confused with HW
+concepts, so we settled on the term 'PM domain.'  Ultimately, it's just
+a configurable grouping of devices whose callbacks happen during PM
+transitions.
+
+>>
+>>  That code is for the
+>> *hardware* powerdomains, not the software concept of "PM domain."  In
+>> OMAP, PM domain is implmented at the omap_device level.  And omap_device
+>> is the abstraction of an IP block that knows about all the PM related
+>> register settings, clocks, HW powerdomain, voltage domain, PM related
+>> pin-muxing etc. etc.    All of these things are abstracted in an
+>> omap_device, so that the PM domain implementation for OMAP looks rather
+>> simple (c.f. omap_device_pm_domain in arch/arm/plat-omap/omap_device.c.)
+>
+>
+> OK following now...
+>
+>>
+>> > I think the lesser of two evils is the distributed approach,
+>>
+>> The pinctrl examples I've seen mentioned so far are all PM related
+>>
+>> (sleep, idle, wakeup, etc.) so to me I think they still belong in
+>> PM domains (and that's how we handle the PM related pins in OMAP.)
+>
+>
+> Well, the pinctrl grabbers in these drivers are using these states also
+> for platforms that do not even select CONFIG_PM.  For example
+> mach-nomadik is quite happy that the PL011 driver is thusly
+> muxing in its pins. And would require refactoring to use PM
+> domains.
+
+If CONFIG_PM is disabled, then is it safe to assume that the pins in
+question are probably only done once at init time.  I assume during
+->probe(). ?
+
+>
+> So basically this requirement comes down to:
+>
+> - When dealing with a SoC IP block driver
+>
+> - That need to multiplex pins
+>
+> - Then your SoC must select CONFIG_PM and
+>   CONFIG_PM_RUNTIME andb
+>   CONFIG_PM_GENERIC_DOMAINS and implement
+>   proper domain handling hooks.
+>
+> Is this correct? 
+
+I would say yes.  Currently, PM domains are the way to hook SoC-specific
+integration details into PM transitions.
+
+However, if what we want/need are only ways to introduce SoC-specific
+integration details into non-PM transitions (e.g. probe/remove), maybe
+bus notifiers would suffice here.  e.g. you'd get a bus notifier when
+the device is added/attached and any init-time pinctrl setup could be
+done then.  This still keeps drivers clean of SoC-specific integration
+data/code, and also allows that to happen whether or not PM features are
+enabled.
+
+Kevin
