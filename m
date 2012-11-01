@@ -1,239 +1,252 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Thu,  1 Nov 2012 13:26:31 +0400
-Subject: [PATCH 01/15] ARM: clps711x: Load serial driver from boards
-Message-ID: <1351762006-27368-1-git-send-email-shc_work@mail.ru>
+Date: Thu,  1 Nov 2012 13:26:32 +0400
+Subject: [PATCH 02/15] ARM: clps711x: Using platform_driver for ethernet device
+In-Reply-To: <1351762006-27368-1-git-send-email-shc_work@mail.ru>
+References: <1351762006-27368-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1351762006-27368-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently serial driver for CLPS711X is autoloaded if it compiled in kernel.
-Since we may have multiple platforms into single kernel we should avoid
-this. This patch removes this trick and adds registration of serial driver
-into board support code.
+This patch removes static mappings for ethernet devices. Now we will use
+platform_driver for ethernet devices.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/autcpu12.c |    6 +++---
- arch/arm/mach-clps711x/cdb89712.c |    9 ++++++++-
- arch/arm/mach-clps711x/clep7312.c |    9 +++++++--
- arch/arm/mach-clps711x/edb7211.c  |   11 +++++++++--
- arch/arm/mach-clps711x/fortunet.c |    9 ++++++++-
- arch/arm/mach-clps711x/p720t.c    |   11 +++++++++--
- drivers/tty/serial/clps711x.c     |   16 ----------------
- 7 files changed, 44 insertions(+), 27 deletions(-)
+ arch/arm/mach-clps711x/Kconfig                 |    2 -
+ arch/arm/mach-clps711x/autcpu12.c              |   27 ++++++++++------------
+ arch/arm/mach-clps711x/cdb89712.c              |   29 +++++++++--------------
+ arch/arm/mach-clps711x/edb7211.c               |   19 ++++++++++-----
+ arch/arm/mach-clps711x/include/mach/autcpu12.h |    3 --
+ arch/arm/mach-clps711x/include/mach/hardware.h |   11 ---------
+ 6 files changed, 36 insertions(+), 55 deletions(-)
 
+diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
+index 263242d..2d00165 100644
+--- a/arch/arm/mach-clps711x/Kconfig
++++ b/arch/arm/mach-clps711x/Kconfig
+@@ -10,7 +10,6 @@ config ARCH_AUTCPU12
+ 
+ config ARCH_CDB89712
+ 	bool "CDB89712"
+-	select ISA
+ 	help
+ 	  This is an evaluation board from Cirrus for the CS89712 processor.
+ 	  The board includes 2 serial ports, Ethernet, IRDA, and expansion
+@@ -25,7 +24,6 @@ config ARCH_EDB7211
+ 	bool "EDB7211"
+ 	select ARCH_SELECT_MEMORY_MODEL
+ 	select ARCH_SPARSEMEM_ENABLE
+-	select ISA
+ 	help
+ 	  Say Y here if you intend to run this kernel on a Cirrus Logic EDB-7211
+ 	  evaluation board.
 diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
-index 214547b..f4f122d 100644
+index f4f122d..d845dea 100644
 --- a/arch/arm/mach-clps711x/autcpu12.c
 +++ b/arch/arm/mach-clps711x/autcpu12.c
-@@ -68,16 +68,16 @@ static struct platform_device autcpu12_nvram_pdev __initdata = {
+@@ -24,6 +24,7 @@
+ #include <linux/mm.h>
+ #include <linux/io.h>
+ #include <linux/ioport.h>
++#include <linux/interrupt.h>
+ #include <linux/platform_device.h>
  
+ #include <mach/hardware.h>
+@@ -39,21 +40,13 @@
+ 
+ #include "common.h"
+ 
+-static struct map_desc autcpu12_io_desc[] __initdata = {
+-	/* Memory-mapped extra io and CS8900A Ethernet chip */
+-	{
+-		.virtual	= IO_ADDRESS(AUTCPU12_PHYS_CS8900A),
+-		.pfn		= __phys_to_pfn(AUTCPU12_PHYS_CS8900A),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE
+-	}
+-};
++#define AUTCPU12_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
++#define AUTCPU12_CS8900_IRQ	(IRQ_EINT3)
+ 
+-void __init autcpu12_map_io(void)
+-{
+-        clps711x_map_io();
+-        iotable_init(autcpu12_io_desc, ARRAY_SIZE(autcpu12_io_desc));
+-}
++static struct resource autcpu12_cs8900_resource[] __initdata = {
++	DEFINE_RES_MEM(AUTCPU12_CS8900_BASE, SZ_1K),
++	DEFINE_RES_IRQ(AUTCPU12_CS8900_IRQ),
++};
+ 
+ static struct resource autcpu12_nvram_resource[] __initdata = {
+ 	DEFINE_RES_MEM_NAMED(AUTCPU12_PHYS_NVRAM, SZ_128K, "SRAM"),
+@@ -69,13 +62,17 @@ static struct platform_device autcpu12_nvram_pdev __initdata = {
  static void __init autcpu12_init(void)
  {
-+	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
+ 	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++
++	platform_device_register_simple("cs89x0", 0, autcpu12_cs8900_resource,
++					ARRAY_SIZE(autcpu12_cs8900_resource));
++
  	platform_device_register(&autcpu12_nvram_pdev);
  }
  
  MACHINE_START(AUTCPU12, "autronix autcpu12")
  	/* Maintainer: Thomas Gleixner */
  	.atag_offset	= 0x20000,
--	.init_machine	= autcpu12_init,
- 	.map_io		= autcpu12_map_io,
-+	.init_machine	= autcpu12_init,
+-	.map_io		= autcpu12_map_io,
++	.map_io		= clps711x_map_io,
+ 	.init_machine	= autcpu12_init,
  	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
  	.restart	= clps711x_restart,
-+	.timer		= &clps711x_timer,
- MACHINE_END
--
 diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
-index d90d25c..5a03888 100644
+index 5a03888..695ca70 100644
 --- a/arch/arm/mach-clps711x/cdb89712.c
 +++ b/arch/arm/mach-clps711x/cdb89712.c
 @@ -23,6 +23,7 @@
  #include <linux/string.h>
  #include <linux/mm.h>
  #include <linux/io.h>
-+#include <linux/platform_device.h>
++#include <linux/interrupt.h>
+ #include <linux/platform_device.h>
  
  #include <mach/hardware.h>
- #include <asm/pgtable.h>
-@@ -53,11 +54,17 @@ static void __init cdb89712_map_io(void)
- 	iotable_init(cdb89712_io_desc, ARRAY_SIZE(cdb89712_io_desc));
+@@ -35,34 +36,26 @@
+ 
+ #include "common.h"
+ 
+-/*
+- * Map the CS89712 Ethernet port.  That should be moved to the
+- * ethernet driver, perhaps.
+- */
+-static struct map_desc cdb89712_io_desc[] __initdata = {
+-	{
+-		.virtual	= IO_ADDRESS(ETHER_PHYS_BASE),
+-		.pfn		= __phys_to_pfn(ETHER_PHYS_BASE),
+-		.length		= ETHER_SIZE,
+-		.type		= MT_DEVICE
+-	}
+-};
++#define CDB89712_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
++#define CDB89712_CS8900_IRQ	(IRQ_EINT3)
+ 
+-static void __init cdb89712_map_io(void)
+-{
+-	clps711x_map_io();
+-	iotable_init(cdb89712_io_desc, ARRAY_SIZE(cdb89712_io_desc));
+-}
++static struct resource cdb89712_cs8900_resource[] __initdata = {
++	DEFINE_RES_MEM(CDB89712_CS8900_BASE, SZ_1K),
++	DEFINE_RES_IRQ(CDB89712_CS8900_IRQ),
++};
+ 
+ static void __init cdb89712_init(void)
+ {
+ 	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++
++	platform_device_register_simple("cs89x0", 0, cdb89712_cs8900_resource,
++					ARRAY_SIZE(cdb89712_cs8900_resource));
  }
  
-+static void __init cdb89712_init(void)
-+{
-+	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
-+}
-+
  MACHINE_START(CDB89712, "Cirrus-CDB89712")
  	/* Maintainer: Ray Lehtiniemi */
  	.atag_offset	= 0x100,
- 	.map_io		= cdb89712_map_io,
-+	.init_machine	= cdb89712_init,
+-	.map_io		= cdb89712_map_io,
++	.map_io		= clps711x_map_io,
+ 	.init_machine	= cdb89712_init,
  	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
  	.restart	= clps711x_restart,
-+	.timer		= &clps711x_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
-index dbc7842..0301b2c 100644
---- a/arch/arm/mach-clps711x/clep7312.c
-+++ b/arch/arm/mach-clps711x/clep7312.c
-@@ -18,6 +18,7 @@
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/string.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -33,14 +34,18 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
- 	mi->bank[0].size = 0x01000000;
- }
- 
-+static void __init clep7312_init(void)
-+{
-+	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
-+}
- 
- MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
- 	/* Maintainer: Nobody */
- 	.atag_offset	= 0x0100,
- 	.fixup		= fixup_clep7312,
- 	.map_io		= clps711x_map_io,
-+	.init_machine	= clep7312_init,
- 	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
- 	.restart	= clps711x_restart,
-+	.timer		= &clps711x_timer,
- MACHINE_END
--
 diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
-index 88f4690..119610b 100644
+index 119610b..7eaaafa 100644
 --- a/arch/arm/mach-clps711x/edb7211.c
 +++ b/arch/arm/mach-clps711x/edb7211.c
 @@ -10,6 +10,7 @@
  #include <linux/init.h>
  #include <linux/memblock.h>
  #include <linux/types.h>
-+#include <linux/platform_device.h>
++#include <linux/interrupt.h>
+ #include <linux/platform_device.h>
  
  #include <asm/setup.h>
- #include <asm/mach/map.h>
-@@ -76,13 +77,19 @@ fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
- 	mi->nr_banks = 2;
+@@ -21,7 +22,15 @@
+ 
+ #include "common.h"
+ 
+-#define VIDEORAM_SIZE	SZ_128K
++#define VIDEORAM_SIZE		SZ_128K
++
++#define EDB7211_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
++#define EDB7211_CS8900_IRQ	(IRQ_EINT3)
++
++static struct resource edb7211_cs8900_resource[] __initdata = {
++	DEFINE_RES_MEM(EDB7211_CS8900_BASE, SZ_1K),
++	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
++};
+ 
+ static struct map_desc edb7211_io_desc[] __initdata = {
+ 	{	/* Memory-mapped extra keyboard row */
+@@ -29,11 +38,6 @@ static struct map_desc edb7211_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(EP7211_PHYS_EXTKBD),
+ 		.length		= SZ_1M,
+ 		.type		= MT_DEVICE,
+-	}, {	/* CS8900A Ethernet chip */
+-		.virtual	= IO_ADDRESS(EP7211_PHYS_CS8900A),
+-		.pfn		= __phys_to_pfn(EP7211_PHYS_CS8900A),
+-		.length		= SZ_1M,
+-		.type		= MT_DEVICE,
+ 	}, {	/* Flash bank 0 */
+ 		.virtual	= IO_ADDRESS(EP7211_PHYS_FLASH1),
+ 		.pfn		= __phys_to_pfn(EP7211_PHYS_FLASH1),
+@@ -80,6 +84,9 @@ fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
+ static void __init edb7211_init(void)
+ {
+ 	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++
++	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
++					ARRAY_SIZE(edb7211_cs8900_resource));
  }
  
-+static void __init edb7211_init(void)
-+{
-+	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
-+}
-+
  MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
- 	/* Maintainer: Jon McClintock */
- 	.atag_offset	= VIDEORAM_SIZE + 0x100,
- 	.fixup		= fixup_edb7211,
--	.map_io		= edb7211_map_io,
- 	.reserve	= edb7211_reserve,
-+	.map_io		= edb7211_map_io,
-+	.init_machine	= edb7211_init,
- 	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
- 	.restart	= clps711x_restart,
-+	.timer		= &clps711x_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
-index 3a3f0b7..a7f8305 100644
---- a/arch/arm/mach-clps711x/fortunet.c
-+++ b/arch/arm/mach-clps711x/fortunet.c
-@@ -22,6 +22,7 @@
- #include <linux/types.h>
- #include <linux/init.h>
- #include <linux/initrd.h>
-+#include <linux/platform_device.h>
+diff --git a/arch/arm/mach-clps711x/include/mach/autcpu12.h b/arch/arm/mach-clps711x/include/mach/autcpu12.h
+index f95ce6f..b077abd 100644
+--- a/arch/arm/mach-clps711x/include/mach/autcpu12.h
++++ b/arch/arm/mach-clps711x/include/mach/autcpu12.h
+@@ -20,9 +20,6 @@
+ #ifndef __ASM_ARCH_AUTCPU12_H
+ #define __ASM_ARCH_AUTCPU12_H
  
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -72,11 +73,17 @@ fortunet_fixup(struct tag *tags, char **cmdline, struct meminfo *mi)
- 	*mi = memmap;
- }
- 
-+static void __init fortunet_init(void)
-+{
-+	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
-+}
-+
- MACHINE_START(FORTUNET, "ARM-FortuNet")
- 	/* Maintainer: FortuNet Inc. */
- 	.fixup		= fortunet_fixup,
- 	.map_io		= clps711x_map_io,
-+	.init_machine	= fortunet_init,
- 	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
- 	.restart	= clps711x_restart,
-+	.timer		= &clps711x_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
-index dd89950..96d54d4 100644
---- a/arch/arm/mach-clps711x/p720t.c
-+++ b/arch/arm/mach-clps711x/p720t.c
-@@ -25,6 +25,7 @@
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/leds.h>
-+#include <linux/platform_device.h>
- 
- #include <mach/hardware.h>
- #include <asm/pgtable.h>
-@@ -161,13 +162,19 @@ static int __init p720t_leds_init(void)
- fs_initcall(p720t_leds_init);
+-/* The CS8900A ethernet chip has its I/O registers wired to chip select 2 */
+-#define AUTCPU12_PHYS_CS8900A		CS2_PHYS_BASE
+-
+ /*
+  * The flash bank is wired to chip select 0
+  */
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 0a3df25..bd919e7 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -64,22 +64,11 @@
+ #define CS7_PHYS_BASE		(0x00000000)
  #endif
  
-+static void __init p720t_init(void)
-+{
-+	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
-+}
-+
- MACHINE_START(P720T, "ARM-Prospector720T")
- 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
- 	.atag_offset	= 0x100,
- 	.fixup		= fixup_p720t,
--	.init_early	= p720t_init_early,
- 	.map_io		= p720t_map_io,
-+	.init_early	= p720t_init_early,
-+	.init_machine	= p720t_init,
- 	.init_irq	= clps711x_init_irq,
--	.timer		= &clps711x_timer,
- 	.restart	= clps711x_restart,
-+	.timer		= &clps711x_timer,
- MACHINE_END
-diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
-index a0a6db5..06f0e91 100644
---- a/drivers/tty/serial/clps711x.c
-+++ b/drivers/tty/serial/clps711x.c
-@@ -516,22 +516,6 @@ static struct platform_driver clps711x_uart_driver = {
- };
- module_platform_driver(clps711x_uart_driver);
+-#if defined (CONFIG_ARCH_CDB89712)
+-
+-#define ETHER_PHYS_BASE		CS2_PHYS_BASE
+-#define ETHER_SIZE		0x1000
+-
+-#endif
+-
+-
+ #if defined (CONFIG_ARCH_EDB7211)
  
--static struct platform_device clps711x_uart_device = {
--	.name	= UART_CLPS711X_NAME,
--};
+ /* The extra 8 lines of the keyboard matrix are wired to chip select 3 */
+ #define EP7211_PHYS_EXTKBD	CS3_PHYS_BASE
+ 
+-/* The CS8900A ethernet chip has its I/O registers wired to chip select 2 */
+-#define EP7211_PHYS_CS8900A	CS2_PHYS_BASE
 -
--static int __init uart_clps711x_init(void)
--{
--	return platform_device_register(&clps711x_uart_device);
--}
--module_init(uart_clps711x_init);
--
--static void __exit uart_clps711x_exit(void)
--{
--	platform_device_unregister(&clps711x_uart_device);
--}
--module_exit(uart_clps711x_exit);
--
- MODULE_AUTHOR("Deep Blue Solutions Ltd");
- MODULE_DESCRIPTION("CLPS711X serial driver");
- MODULE_LICENSE("GPL");
+ /* The two flash banks are wired to chip selects 0 and 1 */
+ #define EP7211_PHYS_FLASH1	CS0_PHYS_BASE
+ #define EP7211_PHYS_FLASH2	CS1_PHYS_BASE
 -- 
 1.7.8.6
