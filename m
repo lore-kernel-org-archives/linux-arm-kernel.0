@@ -1,41 +1,25 @@
-From: mpn@google.com (Michal Nazarewicz)
-Date: Thu, 01 Nov 2012 17:29:38 +0100
-Subject: [PATCH 1/6] arch: Change defconfigs to point to g_mass_storage.
-In-Reply-To: <Pine.LNX.4.44L0.1211011033170.1762-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1211011033170.1762-100000@iolanthe.rowland.org>
-Message-ID: <xa1tobjhwakt.fsf@mina86.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 01 Nov 2012 12:30:27 -0400 (EDT)
+Subject: [PATCH 0/4] Support the MX6 FEC as a PTP hardware clock
+In-Reply-To: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
+References: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20121101.123027.1332984905040252720.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, 31 Oct 2012, Michal Nazarewicz wrote:
->> --- a/arch/arm/configs/qil-a9260_defconfig
->> +++ b/arch/arm/configs/qil-a9260_defconfig
->> @@ -108,7 +108,6 @@ CONFIG_ROOT_NFS=y
->>  CONFIG_NLS_CODEPAGE_437=y
->>  CONFIG_NLS_CODEPAGE_850=y
->>  CONFIG_NLS_ISO8859_1=y
->> -CONFIG_DEBUG_KERNEL=y
->>  CONFIG_DEBUG_USER=y
->>  CONFIG_DEBUG_LL=y
->>  # CONFIG_CRYPTO_HW is not set
+From: Frank Li <Frank.Li@freescale.com>
+Date: Wed, 31 Oct 2012 12:24:40 +0800
 
-On Thu, Nov 01 2012, Alan Stern wrote:
-> This seems to have crept in by mistake.
+> This patch series enables hardware time stamping and a PTP hardware clock
+> for mx6 ENET controller.
+> 
+> Frank Li (4):
+>   net: fec: move fec_enet_private to header file
+>   ARM: dts: imx6q: Add ENET PTP clock pin and clock source
+>   ARM: imx6q: Set enet tx reference clk from anatop to support 1588
+>   FEC: Add time stamping code and a PTP hardware clock
 
-Yes, obviously, thanks!
+All applied to net-next.
 
-I have updated version prepared, will send it tomorrow in case someone
-have some more comments.
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +----<email/xmpp: mpn@google.com>--------------ooO--(_)--Ooo--
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 835 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/92bca589/attachment.sig>
+Please make sure your changes are in sync with Ben's PTP/PPS
+Kconfig changes of today, and send me any changes if necessary.
