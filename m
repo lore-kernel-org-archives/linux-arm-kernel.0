@@ -1,58 +1,84 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Nov 2012 14:19:35 +0000
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
-References: <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
- <20121030113407.GA24335@sirena.org.uk>
- <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
- <87obji8kta.fsf@deeprootsystems.com>
- <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
- <20121101120713.GA4413@opensource.wolfsonmicro.com>
- <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
-Message-ID: <20121101141935.GD4413@opensource.wolfsonmicro.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 1 Nov 2012 15:20:02 +0100
+Subject: [PATCH 2/2] Input: nomadik-ske-keypad - start using the apb_pclk
+In-Reply-To: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1351779602-13818-3-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2012 at 03:01:28PM +0100, Linus Walleij wrote:
-> On Thu, Nov 1, 2012 at 1:07 PM, Mark Brown
-> 
-> > For the pin hogging I'd actually been thinking separately that we should
-> > just have the device core do a devm_pinctrl_get_set_default() prior to
-> > probing the device and store the result in the struct device.  That
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-> What if I retrieve this in the pinctrl subsystem using
-> bus notifiers and then expose the struct pinctrl * to
-> the clients by using pinctrl_get() and when you get
-> such a handle in your probe() you know that the
-> pinctrl subsystem has already fetched the handle and
-> set it to "default" at that point?
+Previously this clock was handled internally by the clockdriver,
+but now this is separate clk. So we need take care of it.
 
-I'm not sure I parse a problem from the above?
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/input/keyboard/nomadik-ske-keypad.c |   22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-> I just worry whether there is a fringe case where the default
-> state is not be be default-selected in probe(), the API
-> semantics does not mandate that. But I think this is the case
-> for all in-kernel drivers so we wouldn't be breaking anything
-> by doing this right now. And platforms can just leave the
-> "default" state undefined in that case.
-
-Yes, that had been my thinking too though I'd really expect that the
-platform ought to be able to think of something sensible to do by
-default.
-
-> Then what to do with sleep and idle is a question we need
-> to handle next. Requiring PM domains for this is one
-> approach, albeit a bit controversial.
-
-Yup.  Notifiers are another option again I guess.  There's far fewer
-drivers doing anything at all with that so it's a bit less urgent.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/9d6217f3/attachment.sig>
+diff --git a/drivers/input/keyboard/nomadik-ske-keypad.c b/drivers/input/keyboard/nomadik-ske-keypad.c
+index 95dcc9b..a1a9375 100644
+--- a/drivers/input/keyboard/nomadik-ske-keypad.c
++++ b/drivers/input/keyboard/nomadik-ske-keypad.c
+@@ -67,6 +67,7 @@ struct ske_keypad {
+ 	const struct ske_keypad_platform_data *board;
+ 	unsigned short keymap[SKE_KPD_NUM_ROWS * SKE_KPD_NUM_COLS];
+ 	struct clk *clk;
++	struct clk *pclk;
+ 	spinlock_t ske_keypad_lock;
+ };
+ 
+@@ -271,11 +272,18 @@ static int __init ske_keypad_probe(struct platform_device *pdev)
+ 		goto err_free_mem_region;
+ 	}
+ 
++	keypad->pclk = clk_get(&pdev->dev, "apb_pclk");
++	if (IS_ERR(keypad->pclk)) {
++		dev_err(&pdev->dev, "failed to get pclk\n");
++		error = PTR_ERR(keypad->pclk);
++		goto err_iounmap;
++	}
++
+ 	keypad->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(keypad->clk)) {
+ 		dev_err(&pdev->dev, "failed to get clk\n");
+ 		error = PTR_ERR(keypad->clk);
+-		goto err_iounmap;
++		goto err_pclk;
+ 	}
+ 
+ 	input->id.bustype = BUS_HOST;
+@@ -294,10 +302,16 @@ static int __init ske_keypad_probe(struct platform_device *pdev)
+ 	if (!plat->no_autorepeat)
+ 		__set_bit(EV_REP, input->evbit);
+ 
++	error = clk_prepare_enable(keypad->pclk);
++	if (error) {
++		dev_err(&pdev->dev, "Failed to prepare/enable pclk\n");
++		goto err_clk;
++	}
++
+ 	error = clk_prepare_enable(keypad->clk);
+ 	if (error) {
+ 		dev_err(&pdev->dev, "Failed to prepare/enable clk\n");
+-		goto err_clk;
++		goto err_pclk_disable;
+ 	}
+ 
+ 
+@@ -336,8 +350,12 @@ err_free_irq:
+ 	free_irq(keypad->irq, keypad);
+ err_clk_disable:
+ 	clk_disable_unprepare(keypad->clk);
++err_pclk_disable:
++	clk_disable_unprepare(keypad->pclk);
+ err_clk:
+ 	clk_put(keypad->clk);
++err_pclk:
++	clk_put(keypad->pclk);
+ err_iounmap:
+ 	iounmap(keypad->reg_base);
+ err_free_mem_region:
+-- 
+1.7.10
