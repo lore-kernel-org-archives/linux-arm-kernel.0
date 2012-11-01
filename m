@@ -1,35 +1,57 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 1 Nov 2012 23:29:22 +0100
-Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
-In-Reply-To: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20121101222922.GD22956@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 01 Nov 2012 15:48:17 -0700
+Subject: [PATCH 0/3] more omap clean-up for ARCH_MULTIPLATFORM
+Message-ID: <20121101224703.2103.95474.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 04:25:58PM +0200, ludovic.desroches at atmel.com wrote:
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> 
-> If the i2c message length is zero, i2c-at91 will directly return an error
-> instead of trying to send a zero-length message.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Hi all,
 
-What happens if you send a 0 byte message? Some hardware is able to do
-this and it will be used in SMBUS QUICK which the driver states to
-support according to at91_twi_func().
+Here are patches to remove some now unnecessary code
+in preparation for enabling ARCH_MULTIPLATFORM for
+omap2+.
+
+These are based on omap-for-v3.8/cleanup-headers-relative
+branch.
 
 Regards,
 
-   Wolfram
+Tony
+
+---
+
+Tony Lindgren (3):
+      ARM: OMAP: Remove unnecessary mach and plat includes
+      ARM: OMAP: Remove NEED_MACH_GPIO_H
+      ARM: OMAP: Remove plat-omap/common.c
+
+
+ arch/arm/Kconfig                        |    1 -
+ arch/arm/mach-omap1/gpio15xx.c          |    2 ++
+ arch/arm/mach-omap1/gpio16xx.c          |    2 ++
+ arch/arm/mach-omap1/gpio7xx.c           |    2 ++
+ arch/arm/mach-omap1/include/mach/gpio.h |    3 ---
+ arch/arm/mach-omap2/board-2430sdp.c     |    1 -
+ arch/arm/mach-omap2/board-cm-t35.c      |    2 --
+ arch/arm/mach-omap2/hsmmc.c             |    1 -
+ arch/arm/mach-omap2/include/mach/gpio.h |    3 ---
+ arch/arm/plat-omap/Makefile             |    2 +-
+ arch/arm/plat-omap/common.c             |   26 --------------------------
+ arch/arm/plat-omap/debug-devices.c      |    1 -
+ arch/arm/plat-omap/dma.c                |    8 ++++++++
+ arch/arm/plat-omap/dmtimer.c            |    4 +---
+ arch/arm/plat-omap/fb.c                 |    1 -
+ arch/arm/plat-omap/i2c.c                |    2 --
+ include/linux/platform_data/gpio-omap.h |    1 -
+ sound/soc/omap/am3517evm.c              |    2 --
+ sound/soc/omap/n810.c                   |    1 -
+ sound/soc/omap/osk5912.c                |    1 -
+ sound/soc/omap/sdp3430.c                |    2 --
+ sound/soc/omap/zoom2.c                  |    3 ---
+ 22 files changed, 16 insertions(+), 55 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/include/mach/gpio.h
+ delete mode 100644 arch/arm/mach-omap2/include/mach/gpio.h
+ delete mode 100644 arch/arm/plat-omap/common.c
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/f5d6d91d/attachment.sig>
+Signature
