@@ -1,57 +1,69 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  1 Nov 2012 08:41:50 +0800
-Subject: [PATCH 08/11] ARM: shmobile: r8a7779: add I2C clock support
+Date: Thu,  1 Nov 2012 08:41:53 +0800
+Subject: [PATCH 11/11] ARM: shmobile: r8a7740: Enable PMU
 In-Reply-To: <1351730513-2952-1-git-send-email-horms@verge.net.au>
 References: <1351730513-2952-1-git-send-email-horms@verge.net.au>
-Message-ID: <1351730513-2952-9-git-send-email-horms@verge.net.au>
+Message-ID: <1351730513-2952-12-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
-This patch is required from R-Car I2C driver
+This patch enables PMU for r8a7740.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+[horms at verge.net.au: corrected indentation]
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/configs/armadillo800eva_defconfig |    1 +
+ arch/arm/mach-shmobile/setup-r8a7740.c     |   16 ++++++++++++++++
+ 2 files changed, 17 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 90d717b..24f5a84 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -87,7 +87,8 @@ static struct clk div4_clks[DIV4_NR] = {
+diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
+index f78d259..3d76407 100644
+--- a/arch/arm/configs/armadillo800eva_defconfig
++++ b/arch/arm/configs/armadillo800eva_defconfig
+@@ -7,6 +7,7 @@ CONFIG_LOG_BUF_SHIFT=16
+ # CONFIG_IPC_NS is not set
+ # CONFIG_PID_NS is not set
+ CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 9777e2d..6ac242c 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -590,6 +590,21 @@ static struct platform_device i2c1_device = {
+ 	.num_resources	= ARRAY_SIZE(i2c1_resources),
  };
  
- enum { MSTP323, MSTP322, MSTP321, MSTP320,
--	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-+	MSTP030,
-+	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015, MSTP014,
- 	MSTP007,
- 	MSTP_NR };
-@@ -97,6 +98,10 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP322] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
-+	[MSTP030] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 30, 0), /* I2C0 */
-+	[MSTP029] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 29, 0), /* I2C1 */
-+	[MSTP028] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 28, 0), /* I2C2 */
-+	[MSTP027] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 27, 0), /* I2C3 */
- 	[MSTP026] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 24, 0), /* SCIF2 */
-@@ -150,6 +155,10 @@ static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
- 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
-+	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
-+	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
-+	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
-+	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
++static struct resource pmu_resources[] = {
++	[0] = {
++		.start	= evt2irq(0x19a0),
++		.end	= evt2irq(0x19a0),
++		.flags  = IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device pmu_device = {
++	.name	= "arm-pmu",
++	.id	= -1,
++	.num_resources = ARRAY_SIZE(pmu_resources),
++	.resource = pmu_resources,
++};
++
+ static struct platform_device *r8a7740_late_devices[] __initdata = {
+ 	&i2c0_device,
+ 	&i2c1_device,
+@@ -597,6 +612,7 @@ static struct platform_device *r8a7740_late_devices[] __initdata = {
+ 	&dma1_device,
+ 	&dma2_device,
+ 	&usb_dma_device,
++	&pmu_device,
+ };
+ 
+ /*
 -- 
 1.7.10.4
