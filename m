@@ -1,102 +1,35 @@
-From: felix.yang@huawei.com (Yangfei (Felix))
-Date: Thu, 1 Nov 2012 01:24:38 +0000
-Subject: [PATCH] ARM: Fix the "WFI" instruction opcode definition.
-Message-ID: <DA41BE1DDCA941489001C7FBD7A8820E3CB5512E@szxeml549-mbx.china.huawei.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 1 Nov 2012 09:51:19 +0800
+Subject: [PATCH V4 3/7] ARM: tegra30: cpuidle: add powered-down state
+ for secondary CPUs
+In-Reply-To: <CAMbhsRRT60oyecsZqjf196Y=Cog209TwfMCPJ9nyLG+fwu7mqg@mail.gmail.com>
+References: <1351676481-28425-1-git-send-email-josephl@nvidia.com>
+ <1351676481-28425-4-git-send-email-josephl@nvidia.com>
+ <CAMbhsRRT60oyecsZqjf196Y=Cog209TwfMCPJ9nyLG+fwu7mqg@mail.gmail.com>
+Message-ID: <1351734679.3231.64.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current "WFI" opcode definiton causes CPU hot-plug feature fails to work
-if the kernel is built with CONFIG_THUMB2_KERNEL/CONFIG_CPU_ENDIAN_BE8 being
-defined. An invalid instruction exception will be generated.
+On Thu, 2012-11-01 at 05:19 +0800, Colin Cross wrote:
+> On Wed, Oct 31, 2012 at 2:41 AM, Joseph Lo <josephl@nvidia.com> wrote:
+> > This supports power-gated idle on secondary CPUs for Tegra30. The
+> > secondary CPUs can go into powered-down state independently. When
+> > CPU goes into this state, it saves it's contexts and puts itself
+> > to flow controlled WFI state. After that, it will been power gated.
+> >
+> > Be aware of that, you may see the legacy power state "LP2" in the
+> > code which is exactly the same meaning of "CPU power down".
+> 
+> On Tegra20, LP2 included powering off the GIC.  Is that still the case
+> for Tegra30 individual secondary cpu power gating?  If so, how do IPIs
+> to an idle cpu wake it up?
 
-Signed-off-by: yangfei.kernel at gmail.com
----
- arch/arm/mach-exynos/hotplug.c   |    8 +++++++-
- arch/arm/mach-realview/hotplug.c |    8 +++++++-
- arch/arm/mach-shmobile/hotplug.c |    8 +++++++-
- 3 files changed, 21 insertions(+), 3 deletions(-)
+Hi Colin,
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index f4d7dd2..823a0e4 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -18,11 +18,17 @@
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
- #include <asm/smp_plat.h>
-+#include <asm/opcodes.h>
- 
- #include <mach/regs-pmu.h>
- 
- #include "common.h"
- 
-+/*
-+ * Define opcode of the WFI instruction.
-+ */
-+#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
-+
- static inline void cpu_enter_lowpower(void)
- {
- 	unsigned int v;
-@@ -72,7 +78,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(__WFI
- 		    :
- 		    :
- 		    : "memory", "cc");
-diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-index 53818e5..5271a1a 100644
---- a/arch/arm/mach-realview/hotplug.c
-+++ b/arch/arm/mach-realview/hotplug.c
-@@ -15,6 +15,12 @@
- #include <asm/cacheflush.h>
- #include <asm/cp15.h>
- #include <asm/smp_plat.h>
-+#include <asm/opcodes.h>
-+
-+/*
-+ * Define opcode of the WFI instruction.
-+ */
-+#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
- 
- static inline void cpu_enter_lowpower(void)
- {
-@@ -64,7 +70,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(__WFI
- 		    :
- 		    :
- 		    : "memory", "cc");
-diff --git a/arch/arm/mach-shmobile/hotplug.c b/arch/arm/mach-shmobile/hotplug.c
-index b09a0bd..0d7b7d1 100644
---- a/arch/arm/mach-shmobile/hotplug.c
-+++ b/arch/arm/mach-shmobile/hotplug.c
-@@ -20,6 +20,12 @@
- #include <mach/emev2.h>
- #include <asm/cacheflush.h>
- #include <asm/mach-types.h>
-+#include <asm/opcodes.h>
-+
-+/*
-+ * Define opcode of the WFI instruction.
-+ */
-++#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
- 
- static cpumask_t dead_cpus;
- 
-@@ -39,7 +45,7 @@ void shmobile_cpu_die(unsigned int cpu)
- 		/*
- 		 * here's the WFI
- 		 */
--		asm(".word	0xe320f003\n"
-+		asm(__WFI
- 		    :
- 		    :
- 		    : "memory", "cc");
---
+Thanks for your review.
+For Tegra30, the LP2 of secondary CPU didn't power gate GIC. Only when 4
+cores in LP2, the power of cpu cluster will be shut off that include
+GIC. For the LP2 of individual secondary CPU, it can be woke up by IPI.
+
+Thanks,
+Joseph
