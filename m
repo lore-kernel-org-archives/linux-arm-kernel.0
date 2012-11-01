@@ -1,53 +1,44 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  1 Nov 2012 08:40:04 +0800
-Subject: [PATCH 1/8] ARM: shmobile: kzm9g: enable magnetometer ak8975.
+Date: Thu,  1 Nov 2012 08:40:07 +0800
+Subject: [PATCH 4/8] ARM: shmobile: armadillo800eva: enable restart
 In-Reply-To: <1351730411-1874-1-git-send-email-horms@verge.net.au>
 References: <1351730411-1874-1-git-send-email-horms@verge.net.au>
-Message-ID: <1351730411-1874-2-git-send-email-horms@verge.net.au>
+Message-ID: <1351730411-1874-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch enables magnetometer ak8975.
-I checked ak8975_probe() returns successfully.
-
-Signed-off-by: Tetsuyuki Kobayashi <koba@kmckk.co.jp>
+Cc: Masahiro Nakai <nakai@atmark-techno.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/kzm9g_defconfig     |    2 ++
- arch/arm/mach-shmobile/board-kzm9g.c |    6 +++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |    8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/configs/kzm9g_defconfig b/arch/arm/configs/kzm9g_defconfig
-index c88b578..1404b04 100644
---- a/arch/arm/configs/kzm9g_defconfig
-+++ b/arch/arm/configs/kzm9g_defconfig
-@@ -119,6 +119,8 @@ CONFIG_DMADEVICES=y
- CONFIG_SH_DMAE=y
- CONFIG_ASYNC_TX_DMA=y
- CONFIG_STAGING=y
-+CONFIG_SENSORS_AK8975=y
-+CONFIG_IIO=y
- # CONFIG_DNOTIFY is not set
- CONFIG_INOTIFY_USER=y
- CONFIG_VFAT_FS=y
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 0a43f31..a37da78 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -557,7 +557,11 @@ static struct i2c_board_info i2c0_devices[] = {
- 	},
- 	{
- 		I2C_BOARD_INFO("r2025sd", 0x32),
--	}
-+	},
-+	{
-+		I2C_BOARD_INFO("ak8975", 0x0c),
-+		.irq = intcs_evt2irq(0x3380), /* IRQ28 */
-+	},
- };
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 2912eab..fe27d7e 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1229,6 +1229,13 @@ static void __init eva_add_early_devices(void)
+ 	shmobile_timer.init = eva_earlytimer_init;
+ }
  
- static struct i2c_board_info i2c1_devices[] = {
++#define RESCNT2 IOMEM(0xe6188020)
++static void eva_restart(char mode, const char *cmd)
++{
++	/* Do soft power on reset */
++	writel((1 << 31), RESCNT2);
++}
++
+ static const char *eva_boards_compat_dt[] __initdata = {
+ 	"renesas,armadillo800eva",
+ 	NULL,
+@@ -1243,4 +1250,5 @@ DT_MACHINE_START(ARMADILLO800EVA_DT, "armadillo800eva")
+ 	.init_late	= shmobile_init_late,
+ 	.timer		= &shmobile_timer,
+ 	.dt_compat	= eva_boards_compat_dt,
++	.restart	= eva_restart,
+ MACHINE_END
 -- 
 1.7.10.4
