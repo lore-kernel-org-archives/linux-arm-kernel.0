@@ -1,60 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 Oct 2012 17:47:34 -0700
-Subject: [PATCH v3 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <1351724661-29050-10-git-send-email-haojian.zhuang@gmail.com>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-10-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20121101004734.GK15766@atomide.com>
+From: Russ.Dill@ti.com (Russ Dill)
+Date: Wed, 31 Oct 2012 17:55:29 -0700
+Subject: [RFC 1/7] capebus: Core capebus support
+In-Reply-To: <EBB972CD-D9D9-4704-AABF-2DFCED584297@antoniou-consulting.com>
+References: <1351702333-8456-1-git-send-email-panto@antoniou-consulting.com>
+ <1351702333-8456-2-git-send-email-panto@antoniou-consulting.com>
+ <CA+Bv8XZ5WnhsKqYA6TBv8wh6OvOdU-G8XhuV2dO49O1qX_FRgg@mail.gmail.com>
+ <EBB972CD-D9D9-4704-AABF-2DFCED584297@antoniou-consulting.com>
+Message-ID: <CA+Bv8XZ2bMNvb77R5gqz7FVaCF1RtfTbiaCDE6iAKk3UUmnj6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121031 16:07]:
-> Dump pinmux register value, not only function part in the pinmux
-> register.
-> 
-> Also fix the issue on caluclating pin offset. The last parameter
-> should be pin number, not register offset.
+On Wed, Oct 31, 2012 at 3:07 PM, Pantelis Antoniou
+<panto@antoniou-consulting.com> wrote:
+>
+> On Oct 31, 2012, at 11:55 PM, Russ Dill wrote:
+>
+>> On Wed, Oct 31, 2012 at 9:52 AM, Pantelis Antoniou
+>> <panto@antoniou-consulting.com> wrote:
+>>> Introducing capebus; a bus that allows small boards (capes) to connect
+>>> to a complex SoC using simple expansion connectors.
+>>>
+>
+> [snip]
+>>> +       if (drv) {
+>>> +               /* call the removed bus method (if added prev.) */
+>>> +               if (cape_dev->added) {
+>>> +                       BUG_ON(cape_dev->bus == NULL);
+>>> +                       BUG_ON(cape_dev->bus->ops == NULL);
+>>> +                       if (cape_dev->bus->ops->dev_removed)
+>>> +                               cape_dev->bus->ops->dev_removed(cape_dev);
+>>> +                       cape_dev->added = 0;
+>>> +               }
+>>
+>> Is there any case where added will not track drv?
+>
+>
+> Yes, there is a corner case here.
+>
+> There is the case where while the device is created there is no matching
+> driver yet. Either that's the case of a not supported cape, or the
+> cape driver hasn't been loaded yet.
+>
+> We do need the device to be created, so that the user can browse in the
+> sysfs it's eeprom attributes.
+>
+> There's some further complications with runtime cape overrides, but
+> that's the gist of it.
 
-You have a minor typo   ^^^^^^^^^^^ should be calculating
-instead.
+I'm trying to figure out how that would come about, here is where
+added is set to 1:
 
-Is there a bug that should be fixed for the -rc cycle
-here? That's the impression I get from the description.
-Or is it just a cosmetic fix to rename offset to pin?
++       /* all is fine... */
++       cape_dev->driver = drv;
++       cape_dev->added = 1;
 
-Regards,
+This is after calling drv->probe, so drv is not null.
 
-Tony
- 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  drivers/pinctrl/pinctrl-single.c |    8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index 3b97b65..72017e7 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -283,15 +283,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
->  
->  static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
->  					struct seq_file *s,
-> -					unsigned offset)
-> +					unsigned pin)
->  {
->  	struct pcs_device *pcs;
-> -	unsigned val;
-> +	unsigned val, mux_bytes;
->  
->  	pcs = pinctrl_dev_get_drvdata(pctldev);
->  
-> -	val = pcs->read(pcs->base + offset);
-> -	val &= pcs->fmask;
-> +	mux_bytes = pcs->width / BITS_PER_BYTE;
-> +	val = pcs->read(pcs->base + pin * mux_bytes);
->  
->  	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
->  }
-> -- 
-> 1.7.10.4
-> 
+There is a brief time here where added is 0, but driver is not.
+
++       if (drv) {
++               /* call the removed bus method (if added prev.) */
++               if (cape_dev->added) {
++                       BUG_ON(cape_dev->bus == NULL);
++                       BUG_ON(cape_dev->bus->ops == NULL);
++                       if (cape_dev->bus->ops->dev_removed)
++                               cape_dev->bus->ops->dev_removed(cape_dev);
++                       cape_dev->added = 0;
++               }
++               if (drv->remove) {
++                       pm_runtime_get_sync(dev);
++                       drv->remove(cape_dev);
++                       pm_runtime_put_noidle(dev);
++               }
++               cape_dev->driver = NULL;
+
+Is one of the remove or resume functions check added in this case?
