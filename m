@@ -1,75 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Nov 2012 14:22:11 +0100
-Subject: Fwd: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <874nl9tuqq.fsf@deeprootsystems.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
- <20121030113407.GA24335@sirena.org.uk>
- <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
- <87obji8kta.fsf@deeprootsystems.com>
- <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
- <CACRpkdaBmg7wtX0WsaxMw=n1sKDN5YphK=y8tzAx_CF=JnUqvw@mail.gmail.com>
- <874nl9tuqq.fsf@deeprootsystems.com>
-Message-ID: <CACRpkdarSNg1zACZKGBt1ypMzE+-KF-o594EcZ1EP484v+4HRw@mail.gmail.com>
+From: yangfei.kernel@gmail.com (Fei Yang)
+Date: Thu, 1 Nov 2012 21:40:10 +0800
+Subject: [PATCH] ARM: Fix the "WFI" instruction opcode definition.
+In-Reply-To: <5091D13B.6060106@gmail.com>
+References: <DA41BE1DDCA941489001C7FBD7A8820E3CB5512E@szxeml549-mbx.china.huawei.com>
+ <5091D13B.6060106@gmail.com>
+Message-ID: <CAKw8HL0ymmNRB=jgGcZn1+6k0s=FKA+qBV04y_wfeu7xMpUpkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 12:42 PM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> [Me]
->> Well, the pinctrl grabbers in these drivers are using these states also
->> for platforms that do not even select CONFIG_PM.  For example
->> mach-nomadik is quite happy that the PL011 driver is thusly
->> muxing in its pins. And would require refactoring to use PM
->> domains.
+2012/11/1 Rob Herring <robherring2@gmail.com>:
+> On 10/31/2012 08:24 PM, Yangfei (Felix) wrote:
+>> The current "WFI" opcode definiton causes CPU hot-plug feature fails to
+>> work
+>> if the kernel is built with CONFIG_THUMB2_KERNEL/CONFIG_CPU_ENDIAN_BE8
+>> being
+>> defined. An invalid instruction exception will be generated.
+>>
+>> Signed-off-by: yangfei.kernel at gmail.com
+>> ---
+>>  arch/arm/mach-exynos/hotplug.c   |    8 +++++++-
+>>  arch/arm/mach-realview/hotplug.c |    8 +++++++-
+>>  arch/arm/mach-shmobile/hotplug.c |    8 +++++++-
+>>  3 files changed, 21 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/hotplug.c
+>> b/arch/arm/mach-exynos/hotplug.c
+>> index f4d7dd2..823a0e4 100644
+>> --- a/arch/arm/mach-exynos/hotplug.c
+>> +++ b/arch/arm/mach-exynos/hotplug.c
+>> @@ -18,11 +18,17 @@
+>>  #include <asm/cacheflush.h>
+>>  #include <asm/cp15.h>
+>>  #include <asm/smp_plat.h>
+>> +#include <asm/opcodes.h>
+>>
+>>  #include <mach/regs-pmu.h>
+>>
+>>  #include "common.h"
+>>
+>> +/*
+>> + * Define opcode of the WFI instruction.
+>> + */
+>> +#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
+>> +
+>>  static inline void cpu_enter_lowpower(void)
+>>  {
+>>       unsigned int v;
+>> @@ -72,7 +78,7 @@ static inline void platform_do_lowpower(unsigned int
+>> cpu, int *spurious)
+>>               /*
+>>                * here's the WFI
+>>                */
+>> -             asm(".word      0xe320f003\n"
+>> +             asm(__WFI
 >
-> If CONFIG_PM is disabled, then is it safe to assume that the pins in
-> question are probably only done once at init time.  I assume during
-> ->probe(). ?
+> Wouldn't using the actual wfi instruction fix this. There is a wfi()
+> macro.
+>
+> Or just call cpu_do_idle() which will do any other things needed before
+> wfi like a dsb instruction.
+>
+> Rob
+>>                   :
+>>                   :
+>>                   : "memory", "cc");
 
-Sadly no.
+<Cut>
 
-Consider drivers/tty/serial/amba-pl011.c
-
-Many ARM platforms have several instances of PL011, and not all of
-them have CONFIG_PM & friends, so it's a good example.
-
-Here the driver will probe and currently fetch a pinctrl handle and
-looks up two states: "default", which refers to the situation you
-describe, and optionally "sleep" which will put pins into a
-low-power state.
-
-The driver will currently put the pins into the "sleep" state when
-.shutdown() is called by something (userspace or in-kernel users).
-
-So in the new suggested scheme using runtime PM, this
-would have to be replaced by pm_runtime_get[_sync]()
-and pm_runtime_put() hints and the current pin handling
-deleted, and for each platform using this driver instead
-implement a PM domain to do the same thing.
-
-Else you loose this runtime power optimization.
-
-This is what I refer to the all-or-nothing charcter of
-runtime PM domains... but maybe it's a good thing,
-I haven't quite made my mind up about it.
-
-> (...) if what we want/need are only ways to introduce SoC-specific
-> integration details into non-PM transitions (e.g. probe/remove), maybe
-> bus notifiers would suffice here.  e.g. you'd get a bus notifier when
-> the device is added/attached and any init-time pinctrl setup could be
-> done then.  This still keeps drivers clean of SoC-specific integration
-> data/code, and also allows that to happen whether or not PM features are
-> enabled.
-
-It doesn't cut it for any of our drivers as shown above,
-but it would work for the patch in $SUBJECT.
-
-It sounds like the way silicon clocks are handled on
-SH am I right?
-
-Yours,
-Linus Walleij
+Hi Rob,
+    Thanks for the reply. The way you suggested is more elegant. But
+here we worried about the version of the compiler toolchain used to
+build the kernel. The "WFI" assembler instruction may not be
+recognized if the toolchain is too old. Need the related ARM board
+maintainers to confirm this.
