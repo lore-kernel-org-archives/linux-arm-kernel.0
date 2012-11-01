@@ -1,84 +1,92 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 1 Nov 2012 23:58:27 +0530
-Subject: [RFC PATCH] ARM: OMAP4: ID: Improve features detection and check
-In-Reply-To: <20121101170609.GA23552@kahuna>
-References: <1351765401-12487-1-git-send-email-ivan.khoronzhuk@ti.com>
- <50925E7F.7080602@ti.com> <5092A156.4000601@ti.com> <5092A4DF.4080405@ti.com>
- <20121101170609.GA23552@kahuna>
-Message-ID: <5092BF4B.3020004@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 1 Nov 2012 19:33:55 +0100
+Subject: [PATCH] ARM: plat-versatile: move FPGA irq driver to
+ drivers/irqchip
+In-Reply-To: <20121101101233.17ffcf5a@skate>
+References: <1351719113-30880-1-git-send-email-linus.walleij@linaro.org>
+ <5091CA18.7020905@gmail.com>
+ <CACRpkda06BbFOiX1WSqNLM-R5Es-Nd6btUNq2mMDuH7s3jA2cw@mail.gmail.com>
+ <20121101101233.17ffcf5a@skate>
+Message-ID: <CACRpkdaYyoYRg+ZnK1z4n39eO2c+U0uL=Ttsa83S2e6h6=XJag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 01 November 2012 10:36 PM, Nishanth Menon wrote:
-> On 22:05-20121101, Santosh Shilimkar wrote:
->> On Thursday 01 November 2012 09:50 PM, ivan.khoronzhuk wrote:
->>> On 11/01/2012 01:35 PM, Santosh Shilimkar wrote:
->>>> On Thursday 01 November 2012 03:53 PM, Ivan Khoronzhuk wrote:
->>>>> Replaces several flags bearing the same meaning. There is no need
->>>>> to set flags due to different omap types here, it can be checked
->>>>> in appropriate places as well.
->>>>>
->>>>> Cc: Tony Lindgren <tony@atomide.com>
->>>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>>> Cc: linux-omap at vger.kernel.org
->>>>> Cc: linux-arm-kernel at lists.infradead.org
->>>>> Cc: linux-kernel at vger.kernel.org
->>>>> Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
->>>>> ---
-
-[..]
->>>>> +    if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
->>>>> +        omap_features = OMAP4_HAS_PERF_SILICON;
->>>>
->>>> Well the detection isn't for performance/standard but there are some
->>>> features depend on it. For example 1 GHz doesn't DPLL DCC enable feature
->>>> where as 1.2 GHz, 1.5 GHz doesn't need. This is the main reason this
->>>> information is also effused. Have you considered this aspect while
->>>> creating this patch ?
->>>>
->>>> Regards
->>>> Santosh
->>>>
->>>
->>> I had considered it. There is no dependency on the features.
->>> DCC usage depends on asked frequency on the fly, not from the features.
->>> Depending on "performance/standard" feature the available frequencies
->>> should be chosen in places where they are needed, for example while
->>> initializing OPPs.
->>>
->> You are correct about the way DCC is handled in the clock code. Infact
->> all these features like L2CACHE, SGX, IVA etc is more for to display
->> boot messages.
->>
->>> Currently we have several features while it is only one indeed.
->>>
->> 1GHz, 1.2GHz, 1.5 GHz are not same since the silicon capability itself
->> is different.
->>
->> git blame tells me that Nishant has sent this update so looping him
->> if above differentiation in boot log helps.
->>
->> Nishant,
->> What's your take on removing above freq prints and marking
->> those silicon as performance silicons as the $subject patch does ?
->>
->> Regards
->> Santosh
-> Yes $subject patch is a better approach compared to having freq based
-> handling which just increases the number of macros we need to enable
-> depending on SoC variants that we spin off the main SoC. This also
-> allows us to conserve the features bitfield ahead as well.
+On Thu, Nov 1, 2012 at 10:12 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> On Thu, 1 Nov 2012 10:00:19 +0100, Linus Walleij wrote:
 >
-> I hate to admit, but after a couple of generations of SoC spinoffs,
-> my original logic is proving to be was pretty short sighted,
-> unfortunately :(
+>> Sounds like a separate patch but surely we can do this. Is Thomas'
+>> stuff on a branch somewhere that I can then rebase upon to get
+>> it upstream? I was planning to get this series as such to the
+>> ARM SoC maintainers soon-ish.
 >
-> So, approach
-> Acked-by: Nishanth Menon <nm@ti.com>
->
-Thanks Nishant for clarification and ack.
+> Not at the moment. But do you want me to put that in a branch, and
+> agglomerate all the related patches (posted by Rob for GIC/VIC and by
+> you for the FPGA IRQ controller), and then later send a pull request to
+> Arnd with those changes?
 
-With the clarification I also like the subject patch.
-Feel free add.
+Whatever I can base on ... I would just push the stuff you consider
+stable to ARM SoC as quickly as possible so we can grab it
+from there and base development on it. Then each of us can
+just request the ARM SoC people to pull it and state that it
+is based on that branch so they need to pull it into the same
+place.
 
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Also, again, the whole point of the initial infrastructure in
+> drivers/irqchip/ was to avoid adding per-driver header files in
+> include/linux/irqchip/, so there should at least be a long term plan on
+> how to remove those headers file, either by moving more platforms to
+> DT, or my extending the irqchip infrastructure to cover more features.
+
+So the header in this case looks like this:
+
+#ifndef PLAT_FPGA_IRQ_H
+#define PLAT_FPGA_IRQ_H
+
+struct device_node;
+struct pt_regs;
+
+void fpga_handle_irq(struct pt_regs *regs);
+void fpga_irq_init(void __iomem *, const char *, int, int, u32,
+                struct device_node *node);
+int fpga_irq_of_init(struct device_node *node,
+                     struct device_node *parent);
+
+#endif
+
+So this is the stuff that needs to be called from the machine
+descriptor, nothing else.
+
+Example:
+
+MACHINE_START(INTEGRATOR, "ARM-Integrator")
+        /* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+        .atag_offset    = 0x100,
+        .reserve        = integrator_reserve,
+        .map_io         = ap_map_io,
+        .init_early     = ap_init_early,
+        .init_irq       = ap_init_irq,
+        .handle_irq     = fpga_handle_irq,
+        .timer          = &ap_timer,
+        .init_machine   = ap_init,
+        .restart        = integrator_restart,
+MACHINE_END
+
+The .init_irq hooks above contain some other stuff apart from just
+calling these directly, but the problem remains: how to cross-call
+these functions from the machine start since the IRQs are needed
+by say the timer and everything else.
+
+include/linux/irqchip/bcm2835.h look exactly the same (just one
+function instead of separete DT/non-DT versions) so
+there isn't exactly a precedent on how to solve this in an
+elegant way.
+
+But maybe your patch set contains the silver bullet that will decouple
+this and fix everything?
+
+Then I can do a patch to convert this and the BCM2835 too
+probably...
+
+Yours,
+Linus Walleij
