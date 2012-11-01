@@ -1,24 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 31 Oct 2012 16:26:06 -0700
-Subject: [PATCH] drivers: bus: omap_interconnect: Fix rand-config build
- warning
-In-Reply-To: <508E29E9.7020809@ti.com>
-References: <1350480519-1890-1-git-send-email-lokeshvutla@ti.com>
- <507EB3CC.6060005@ti.com> <20121025003509.GI11928@atomide.com>
- <20121025004216.GJ11928@atomide.com> <5088DD22.1050000@ti.com>
- <20121025191546.GY11928@atomide.com> <508A2F28.3020204@ti.com>
- <508E29E9.7020809@ti.com>
-Message-ID: <20121031232606.GH15766@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 31 Oct 2012 19:21:57 -0500
+Subject: Representation of external memory-mapped devices in DT (gpmc)
+In-Reply-To: <5091BD7C.7040105@gmail.com>
+References: <508E9513.7050106@gmail.com> <508E9C42.10907@gmail.com>
+ <508EBB47.8070405@gmail.com> <508FB10D.9030906@ti.com>
+ <5091BD7C.7040105@gmail.com>
+Message-ID: <5091C0A5.60000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [121029 00:03]:
-> Is the above discussion fine for you ?
-> Will you pick this patch or
-> you want any more modifications ?
+On 10/31/2012 07:08 PM, Daniel Mack wrote:
+> On 30.10.2012 11:50, Afzal Mohammed wrote:
+>> Hi Daniel,
+>>
+>> On Monday 29 October 2012 10:52 PM, Daniel Mack wrote:
+>>> On 29.10.2012 16:09, Rob Herring wrote:
+>>
+>>>> You may want a CS0 node with nand as a child node of that.
+>>
+>>> Hmm, I don't see what that would buy us. The question is which way is
+>>> feasible for storing both the memory region and the cs number in the
+>>> device tree. The CS number should certainly go to the child node, no?
+>>>
+>>> IOW, would it be a good idea to have something like the following layout?
+>>>
+>>> 	gpmc: gpmc at 50000000 {
+>>> 		compatible = "ti,gpmc";
+>>> 		ti,hwmods = "gpmc";
+>>> 		reg =<0x50000000 0x2000>;
+>>>
+>>> 		/* cs-reg stores the setup of the controller's
+>>> 		   memory map */
+>>>
+>>> 			/* offset	size */
+>>> 		cs-reg =<0x0		0x1000000
+>>> 			  ....		.....
+>>> 			  ....		.....>;
+>>>
+>>> 		nand: child at 0 {
+>>> 			/* timings */
+>>> 			/* peripheral specifics */
+>>> 		};
+>>> 	};
+>>>
+>>> I would actually much prefer that approach.
+>>>
+>>> Afzal, because because that way, we can leave the code as-is for now and
+>>> add the "cs-reg" property once the code is switched to dynamic handling.
+>>> What do you think?
+>>
+>> I don't know what to say, don't have a good grasp on DT to give
+>> right suggestion.
+>>
+>> It seems offset field may not be necessary. memory for connected
+>> peripherals is not fixed, only CS is fixed (as CS pin is hard-wired).
+>> Physical memory can be anywhere between 0-512MB (with
+>> alignment constraints depending on size, refer GPMC_CONFIG7
+>> register), even though right now memory region for peripheral
+>> seems to be fixed (for boards supported in mainline it will be
+>> what bootloader configures), it is possible to have it in a different
+>> region for those peripherals.
+> 
+> The question is whether this is transparent to the client driver at the
+> end. If the driver needs to know about the address of the external
+> memory (that's the case for the smsx911x for example), that value should
+> be in the device tree.
+> 
+> Actually, there's an example here that matches our case quite well:
+> 
+> http://devicetree.org/Device_Tree_Usage#Ranges_.28Address_Translation.29
+> 
 
-Let's see what Arnd says.
+I had tried to find an example in PPC dts files, but didn't. This
+example is what you should follow.
 
-Regards,
+> I think the important part is to get the bindings straight so we don't
+> have to change them anymore later on; we don't really need to parse the
+> values from the generic driver and set up the mappings accrodingly -
+> that can be added easily later on. For a first shot, we can just write
+> default values to the DT that are computed anyway, right?
 
-Tony
+For whatever parts of a CS are programmable, make sure they are in the
+DT or you can calculate them from the DT data.
+
+Rob
