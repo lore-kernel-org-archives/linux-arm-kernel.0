@@ -1,48 +1,38 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 1 Nov 2012 16:14:16 +0100
-Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <20121031193033.GA4164@opensource.wolfsonmicro.com>
-References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
- <1351457210-25222-2-git-send-email-stigge@antcom.de>
- <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
- <20121031193033.GA4164@opensource.wolfsonmicro.com>
-Message-ID: <CACxGe6uFs=12fH2DH=+kXq3Q2DjQ_CmfbzbmAig2iHiEezngGQ@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 1 Nov 2012 16:35:29 +0100
+Subject: [PATCH v5] pwm: vt8500: Update vt8500 PWM driver support
+In-Reply-To: <1351302597-4167-1-git-send-email-linux@prisktech.co.nz>
+References: <1351302597-4167-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20121101153525.GA16193@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 8:30 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Oct 31, 2012 at 04:00:17PM +0100, Grant Likely wrote:
->
->> For the API, I don't think it is a good idea at all to try and
->> abstract away gpios on multiple controllers. I understand that it
->> makes life a lot easier for userspace to abstract those details away,
->> but the problem is that it hides very important information about how
->> the system is actually constructed that is important to actually get
->> things to work. For example, say you have a gpio-connected device with
->> the constraint that GPIOA must change either before or at the same
->> time as GPIOB, but never after. If those GPIOs are on separate
->> controllers, then the order is completely undefined, and the user has
->> no way to control that other than to fall back to manipulating GPIOs
->> one at a time again (and losing all the performance benefits). Either
->> controller affinity needs to be explicit in the API, or the API needs
->> to be constraint oriented (ie. a stream of commands and individual
->> commands can be coalesced if they meet the constraints**). Also, the
->> API requires remapping the GPIO numbers which forces the code to be a
->> lot more complex than it needs to be.
->
-> It feels like I'm missing something here but can we not simply say that
-> if the user cares about the ordering of the signal changes within an
-> update then they should be doing two separate updates?  Most of the
-> cases I'm aware of do things as an update with a strobe or clock that
-> latches the values.
->
-> The big advantage of grouping things together is that it means that we
-> centralise the fallback code.
+On Sat, Oct 27, 2012 at 02:49:57PM +1300, Tony Prisk wrote:
+> This patch updates pwm-vt8500.c to support devicetree probing and
+> make use of the common clock subsystem.
+> 
+> A binding document describing the PWM controller found on
+> arch-vt8500 is also included.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+> v4:
+> return err from clk_enable rather than -EBUSY
+> v5:
+> replace IS_ERR_OR_NULL with IS_ERR as pointed out by Chris Brand
+> 
+>  .../devicetree/bindings/pwm/vt8500-pwm.txt         |   17 ++++
+>  drivers/pwm/pwm-vt8500.c                           |   86 ++++++++++++++------
+>  2 files changed, 80 insertions(+), 23 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/vt8500-pwm.txt
 
-The internal ABI is less of an issue because it is a whole lot easier
-to change compared to a userspace ABI (though I think we can do a lot
-better before deciding to merge it). Userspace also appears to be the
-intended usage, so I've focused my review on that use case.
+Applied, thanks.
 
-g.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/df148230/attachment.sig>
