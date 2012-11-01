@@ -1,82 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Nov 2012 15:01:28 +0100
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <20121101120713.GA4413@opensource.wolfsonmicro.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
- <20121030113407.GA24335@sirena.org.uk>
- <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
- <87obji8kta.fsf@deeprootsystems.com>
- <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
- <20121101120713.GA4413@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 1 Nov 2012 15:17:09 +0100
+Subject: [GIT PULL] Next batch of ux500 related patches due for -next
+Message-ID: <20121101141709.GA14016@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 1:07 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Nov 01, 2012 at 09:54:00AM +0100, Linus Walleij wrote:
+The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
 
-> For the pin hogging I'd actually been thinking separately that we should
-> just have the device core do a devm_pinctrl_get_set_default() prior to
-> probing the device and store the result in the struct device.  That
-> would immediately remove almost all of the current pinctrl users, users
-> that do need to do things with the data or check the result can then
-> pick up the pinctrl pointer from the device struct.
+  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
 
-I never thought of that. This sounds like it would work.
+are available in the git repository at:
 
-And the good thing is that this is a clean cut so we
-will centralized code without having to decide right now
-how to handle the pm idle/sleep cases.
+  git://git.linaro.org/people/ljones/linux-3.0-ux500.git ste-dt-for-next
 
-Talking here with Kevin Hilman on my left and Grant
-Likely on my right (they're physically here) there is some
-worry about stashing stuff into struct device.
+for you to fetch changes up to f44c5fd12d8152e45585905422d03427754e1907:
 
-What if I retrieve this in the pinctrl subsystem using
-bus notifiers and then expose the struct pinctrl * to
-the clients by using pinctrl_get() and when you get
-such a handle in your probe() you know that the
-pinctrl subsystem has already fetched the handle and
-set it to "default" at that point?
+  ARM: ux500: Convert DT_MACHINE_START to use SMP operations (2012-11-01 13:02:28 +0100)
 
-I just worry whether there is a fringe case where the default
-state is not be be default-selected in probe(), the API
-semantics does not mandate that. But I think this is the case
-for all in-kernel drivers so we wouldn't be breaking anything
-by doing this right now. And platforms can just leave the
-"default" state undefined in that case.
+----------------------------------------------------------------
+Lee Jones (31):
+      ARM: ux500: Move regulator-name properties out to board DTS files
+      ARM: ux500: Fix initialisation order for UIBs
+      ARM: ux500: Elaborate on SDI device node names in Device Tree
+      ARM: ux500: Add SDI (MMC) support to the HREF Device Tree
+      ARM: ux500: Correct Snowball's external SD/MMC slot's bus width
+      ARM: ux500: Create a DTS hierarchy for ST-Ericsson's HREF boards
+      ARM: ux500: Create a Device Tree for early HREFs
+      ARM: ux500: Add support for gpio-keys and Proximity Sensor for HREF
+      ARM: ux500: Remove platform specific device registration when DT is enabled
+      ARM: ux500: Move all Device Tree booting into cpu-db8500
+      ARM: ux500: Strip out duplicate touch screen platform information
+      Documentation: Detail permitted DT properties for the BU21013 Touch Screen
+      ARM: ux500: Create a new Device Tree include file for boards supporting STUIBs
+      ARM: ux500: Stop calling the UIB init function when using Device Tree
+      ARM: ux500: Add all bu21013 touch screen components to supported Device Trees
+      ARM: ux500: Stop informing the regulator subsystem that we have full constraints
+      ARM: ux500: Apply a Device Tree node for the STMPE MFD
+      ARM: ux500: Supply the STMPE keypad Device Tree node to the STUIB DT
+      ARM: ux500: Remove unused board compatible string
+      ARM: ux500: Add skeleton DTS file for the u9540
+      ARM: ux500: Add support for ST-Ericsson's u9540 SoC
+      ARM: ux500: Add UART support to the u9540 Device Tree
+      ARM: ux500: Enable SDI4 port on the u9540 when booting with Device Tree
+      ARM: ux500: Enable all MMC devices on the u9540 when booting with DT
+      ARM: ux500: Rename references to the ccu9540 dev board accordingly
+      ARM: ux500: Remove duplicate DT_MACHINE_START - make u8500 for generic
+      ARM: ux500: List DT compatibility using platform names rather than by board
+      ARM: ux500: Add node for the MMC GPIO regulator
+      ARM: ux500: Change the type of interrupt to something compatible
+      ARM: ux500: CONFIG: Enable GPIO Regulators
+      ARM: ux500: Convert DT_MACHINE_START to use SMP operations
 
->> It's actually something that needs to be acknowledged by the
->> ARM SoC maintainers, because they will be the ones telling
->> all subarch maintainers to go implement full PM handling
->> with these three frameworks whenever an SoC driver want
->> to handle pins.
->
-> Well, they're going to have to implement it somewhere anyway - either in
-> the drivers or in the SoC stuff.
+ .../bindings/input/touchscreen/bu21013.txt         |   28 ++
+ arch/arm/boot/dts/ccu9540.dts                      |   72 ++++++
+ arch/arm/boot/dts/dbx5x0.dtsi                      |   57 ++--
+ arch/arm/boot/dts/href.dtsi                        |  273 ++++++++++++++++++++
+ arch/arm/boot/dts/hrefprev60.dts                   |   41 +++
+ arch/arm/boot/dts/hrefv60plus.dts                  |   83 +-----
+ arch/arm/boot/dts/snowball.dts                     |  140 +++++++++-
+ arch/arm/boot/dts/stuib.dtsi                       |   78 ++++++
+ arch/arm/configs/u8500_defconfig                   |    1 +
+ arch/arm/mach-ux500/board-mop500-stuib.c           |   22 +-
+ arch/arm/mach-ux500/board-mop500.c                 |  146 +----------
+ arch/arm/mach-ux500/board-mop500.h                 |    8 +-
+ arch/arm/mach-ux500/cpu-db8500.c                   |  108 +++++++-
+ arch/arm/mach-ux500/cpu.c                          |    3 +
+ 14 files changed, 779 insertions(+), 281 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/bu21013.txt
+ create mode 100644 arch/arm/boot/dts/ccu9540.dts
+ create mode 100644 arch/arm/boot/dts/href.dtsi
+ create mode 100644 arch/arm/boot/dts/hrefprev60.dts
+ create mode 100644 arch/arm/boot/dts/stuib.dtsi
 
-Sure I just worry about it being done is several different ways
-and creating a mess so they need to be involved to block
-other approaches.
-
->> I can surely fix these for "my" systems, but it really needs
->> to be enforced widely or it will be a mess.
->
-> We definitely need to decide if it's something that should be open coded
-> everywhere.
-
-If I prepare a patch to move the fetch+set defaul to the pinctrl
-core using notifiers, we centralize one piece and we get the
-currently floating patches out of the way.
-
-Then what to do with sleep and idle is a question we need
-to handle next. Requiring PM domains for this is one
-approach, albeit a bit controversial.
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
