@@ -1,33 +1,83 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 1 Nov 2012 14:43:15 +0000
-Subject: [Patch v2 3/4] ASoC: atmel-ssc-dai: register platform from DAIs
-In-Reply-To: <1351668420-18447-3-git-send-email-voice.shen@atmel.com>
-References: <1351668420-18447-1-git-send-email-voice.shen@atmel.com>
- <1351668420-18447-3-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121101144315.GM4413@opensource.wolfsonmicro.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 1 Nov 2012 15:44:07 +0100
+Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
+In-Reply-To: <CACxGe6vEr5fd0_ZuzV=nOXVfwA7_FB5L6KJsEwMEHmVj0rDA=g@mail.gmail.com>
+References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
+ <1351457210-25222-2-git-send-email-stigge@antcom.de>
+ <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
+ <50915DBC.2000802@antcom.de>
+ <CACxGe6vEr5fd0_ZuzV=nOXVfwA7_FB5L6KJsEwMEHmVj0rDA=g@mail.gmail.com>
+Message-ID: <20121101144407.GG19021@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 03:26:59PM +0800, Bo Shen wrote:
+On 19:59 Wed 31 Oct     , Grant Likely wrote:
+> Hi Roland
+> 
+> On Wed, Oct 31, 2012 at 6:19 PM, Roland Stigge <stigge@antcom.de> wrote:
+> > On 10/31/2012 04:00 PM, Grant Likely wrote:
+> >> For the API, I don't think it is a good idea at all to try and
+> >> abstract away gpios on multiple controllers. I understand that it
+> >> makes life a lot easier for userspace to abstract those details away,
+> >> but the problem is that it hides very important information about how
+> >> the system is actually constructed that is important to actually get
+> >> things to work. For example, say you have a gpio-connected device with
+> >> the constraint that GPIOA must change either before or at the same
+> >> time as GPIOB, but never after. If those GPIOs are on separate
+> >> controllers, then the order is completely undefined
+> >
+> > It is correct that it's not (yet) well documented and the API is also
+> > not very explicit about it, but the actual approach of the manipulation
+> > order is to let drivers handle gpios "as simultaneous as possible" and
+> > when not possible, do it in the _order of bits specified_ (either
+> > defined at the device tree level, or when created via
+> > block_gpio_create() directly).
+> 
+> The documentation is actually fine. I do understand that the intent is
+> "as simultaneous as possible", but I accept the point that the order
+> of specification affects the behaviour*. However, it still remains
+> that the method used by the ABI abstracts at the wrong level and that
+> blocking arbitrary GPIO pins into a single virtual GPIO register is a
+> bad idea.
+> 
+> *note that the current code doesn't implement that intended behaviour
+> either since the gpios are processed in the order of the controllers,
+> not the order of the bits.
+> 
+> > I'm not sure how far you tested the API in depth: You can already define
+> > a block that maps onto a subset of gpios on a controller and internally
+> > of course maps onto those set and clear operations. Whenever you need to
+> > manipulate a different subset (whether disjoint or overlapping), you can
+> > easily define _additional_ blocks. From my experience, this solves most
+> > of the real world problems when n-bit busses are bit banged over GPIOs.
+> > Doesn't this already solve this (in a different way, though)?
+> 
+> Blech! Requiring a new block for each possible combination of
+> write-at-once bits is a horrible ABI. That just strengthens my opinion
+> that the abstraction isn't right yet.
+> 
+> > Pin direction currently needs to be set up separately, analogous to
+> > requesting gpios. Need to document this better, right. The assumption is
+> > that I/O needs to be efficient primarily, before bloating the API with
+> > direction functions. Or should I add functions for this?
+> 
+> Since this is a userspace facing ABI, once it is merged it cannot be
+> changed in an incompatible way. I cannot merge it until there is at
+> least a plan for how to handle all of the reasonable use cases. That
+> means it must support set/clear or mask operations. Also, if it sticks
+> with the design of grouping pins from multiple controllers, then it
+> needs to handle explicitly constraining what order operations are
+> performed in at the time of the operation. At the time of setup
+> doesn't work since constraints between pins may not always be in the
+> same order.
+> 
+> I really think you should consider implementing a command stream type
+> of interface.
+I agreed with Grant and I'm not also a fan of the sysfs ABI
 
-> +Required properties:
-> +  - compatible: "atmel,atmel-ssc-dai"
-> +  - atmel,dai-master: this dai base on which ssc controller
+as I already point out in the previous version and Linus too
 
-> +Example:
-> +dai: dai {
-> +	compatible = "atmel,atmel-ssc-dai";
-> +	atmel,dai-master = <&ssc0>;
-> +};
-
-This seems to be a purely virtual device which remaps the SSC onto the
-Linux audio subsystem?  If that is the case then it shouldn't appear in
-the device tree, the machine driver should just directly reference the
-SSC and instantiate any devices required in Linux directly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/daf7cdde/attachment-0001.sig>
+Best Regards,
+J.
+> 
+> g.
