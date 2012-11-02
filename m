@@ -1,42 +1,26 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 2 Nov 2012 09:24:44 +0100
-Subject: [PATCH v3] Visstrim SM10: Use mo_version to decide board video
- mode.
-In-Reply-To: <CACKLOr1DB1_G6ttVHc6p-+SjegmJL1r4pKpunvo43xFR7RyA4g@mail.gmail.com>
-References: <1345457581-13837-1-git-send-email-javier.martin@vista-silicon.com>
- <20120828074710.GX26594@pengutronix.de>
- <CACKLOr0HO4OapJk_-ktWcfwcnVD1MLfL6MF1bbaVUHjD5LVuJg@mail.gmail.com>
- <CACKLOr1DB1_G6ttVHc6p-+SjegmJL1r4pKpunvo43xFR7RyA4g@mail.gmail.com>
-Message-ID: <20121102082444.GD1641@pengutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 2 Nov 2012 09:43:24 +0100
+Subject: [PATCH 0/4] Support the MX6 FEC as a PTP hardware clock
+In-Reply-To: <CAHrpEqRuy=kewK-592RphVfJnNoma2CPZytoTqLc45HeT53hRQ@mail.gmail.com>
+References: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
+ <20121101.123027.1332984905040252720.davem@davemloft.net>
+ <CAHrpEqRuy=kewK-592RphVfJnNoma2CPZytoTqLc45HeT53hRQ@mail.gmail.com>
+Message-ID: <20121102084324.GA2486@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 03:52:10PM +0100, javier Martin wrote:
-> On 28 September 2012 15:06, javier Martin
-> <javier.martin@vista-silicon.com> wrote:
-> > Hi Mauro,
-> > this patch should originally go via arm-soc but it has a dependency on
-> > support for coda video codec which is already in your tree.
+On Fri, Nov 02, 2012 at 10:36:09AM +0800, Frank Li wrote:
 > >
-> > Now that we've got Sascha's ack could you merge this patch through your tree?
+> > All applied to net-next.
 > >
-> > Regards.
+> > Please make sure your changes are in sync with Ben's PTP/PPS
+> > Kconfig changes of today, and send me any changes if necessary.
 > >
 > 
-> Hi Sascha,
-> it seems Mauro missed to apply this patch through his tree.
-> Moreover, 1 month later from my submission I think it should already
-> apply to arm-soc.
-> 
-> Could you please merge it?
+> Thank you very much.
+> I checked Ben's patch, which not affect FEC.
 
-Just applied it.
+Maybe just remove the Kconfig line "select PPS".
 
-Thanks
- Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Richard
