@@ -1,39 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 2 Nov 2012 06:45:52 +0100
-Subject: [PATCH V2] ARM: kirkwood: Increase NAND chip-delay for DNS-32[05]
-In-Reply-To: <1351807021-17478-1-git-send-email-jm@lentin.co.uk>
-References: <20121030060226.GA14093@lunn.ch>
- <1351807021-17478-1-git-send-email-jm@lentin.co.uk>
-Message-ID: <20121102054552.GC27438@lunn.ch>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 2 Nov 2012 12:08:38 +0530
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <20121101224828.2103.82950.stgit@muffinssi.local>
+References: <20121101224703.2103.95474.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local>
+Message-ID: <50936A6E.3020202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2012 at 09:57:01PM +0000, Jamie Lentin wrote:
-> The default chip-delay of 25us is a bit too tight for some DNS-320's,
-> and D-Link seem to specify 30us in their kernels for both devices.
-> Increase to 35us to make sure the NAND is stable.
-> 
-> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+Tony,
+
+On Friday 02 November 2012 04:18 AM, Tony Lindgren wrote:
+> This file has only omap_init_consistent_dma_size()
+> left that can be moved to plat-omap/dma.c.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  arch/arm/boot/dts/kirkwood-dnskw.dtsi |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-> index e0e4397..0360361 100644
-> --- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-> +++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
-> @@ -48,6 +48,7 @@
->  
->  		nand at 3000000 {
->  			status = "okay";
-> +			chip-delay = <35>;
->  
->  			partition at 0 {
->  				label = "u-boot";
-> -- 
-> 1.7.10.4
-> 
+>   arch/arm/plat-omap/Makefile |    2 +-
+>   arch/arm/plat-omap/common.c |   26 --------------------------
+>   arch/arm/plat-omap/dma.c    |    8 ++++++++
+>   3 files changed, 9 insertions(+), 27 deletions(-)
+>   delete mode 100644 arch/arm/plat-omap/common.c
+>
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+[..]
 
-	  Andrew
+> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> index c288b76..00a3a53 100644
+> --- a/arch/arm/plat-omap/dma.c
+> +++ b/arch/arm/plat-omap/dma.c
+> @@ -2146,6 +2146,14 @@ static struct platform_driver omap_system_dma_driver = {
+>   	},
+>   };
+>
+> +/* This must be called from init_early() */
+> +void __init omap_init_consistent_dma_size(void)
+> +{
+> +#ifdef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
+> +	init_consistent_dma_size(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE << 20);
+> +#endif
+> +}
+> +
+Lets not move this in DMA code since the above is really related
+to frame buffer. It reserves more DMA area for dma_alloc_coherent()
+etc than default 2 MB. Infact, we should no longer need this with
+CMA and memblock in place.
+
+Tomi,
+Can we not get rid of the above memory reservation ?
+
+Regards
+santosh
