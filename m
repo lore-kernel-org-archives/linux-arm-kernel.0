@@ -1,84 +1,116 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Fri, 2 Nov 2012 05:32:35 +0000
-Subject: [PATCH V3] mmc: omap_hsmmc: Enable HSPE bit for high speed cards
-In-Reply-To: <20121031201626.GA28784@arwen.pp.htv.fi>
-References: <1351684656-30275-1-git-send-email-gururaja.hebbar@ti.com>
- <20121031122639.GA10998@arwen.pp.htv.fi>
- <CAOyx1LrKBE+xzSRN4F=+e1DuMJL+5SAv-YkJWJdDw8p=kDojmw@mail.gmail.com>
- <20121031201626.GA28784@arwen.pp.htv.fi>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EABDCB7@DBDE01.ent.ti.com>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Fri, 02 Nov 2012 11:19:09 +0530
+Subject: [PATCH 2/5] usb: s3c-hsotg: Adding phy driver support
+In-Reply-To: <CAD6zSYOvGSTF18Zr1zPFduz3povs7qiiU8p=iUtAAyDX_LUy+A@mail.gmail.com>
+References: <CAD6zSYOvGSTF18Zr1zPFduz3povs7qiiU8p=iUtAAyDX_LUy+A@mail.gmail.com>
+Message-ID: <1351835349-30210-1-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2012 at 01:46:26, Balbi, Felipe wrote:
-> Hi,
-> 
-> On Thu, Nov 01, 2012 at 01:21:36AM +0530, Venkatraman S wrote:
-> > On Wed, Oct 31, 2012 at 5:56 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > > Hi,
-> > >
-> > > On Wed, Oct 31, 2012 at 05:27:36PM +0530, Hebbar, Gururaja wrote:
-> > >> HSMMC IP on AM33xx need a special setting to handle High-speed cards.
-> > >> Other platforms like TI81xx, OMAP4 may need this as-well. This depends
-> > >> on the HSMMC IP timing closure done for the high speed cards.
-> > >>
-> > >> From AM335x TRM (SPRUH73F - 18.3.12 Output Signals Generation)
-> > >>
-> > >> The MMC/SD/SDIO output signals can be driven on either falling edge or
-> > >> rising edge depending on the SD_HCTL[2] HSPE bit. This feature allows
-> > >> to reach better timing performance, and thus to increase data transfer
-> > >> frequency.
-> > >>
-> > >> There are few pre-requisites for enabling the HSPE bit
-> > >> - Controller should support High-Speed-Enable Bit and
-> > >> - Controller should not be using DDR Mode and
-> > >> - Controller should advertise that it supports High Speed in
-> > >>   capabilities register and
-> > >> - MMC/SD clock coming out of controller > 25MHz
-> > >>
-> > >> Note:
-> > >> The implementation reuses the output of calc_divisor() so as to reduce
-> > >> code addition.
-> > >>
-> > >> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
-> > >
-> > > this looks good to my eyes, hopefully I haven't missed anything:
-> > >
-> > > Reviewed-by: Felipe Balbi <balbi@ti.com>
-> > >
-> > 
-> > Except for the excessively verbose comments which are just duplicating the code,
-> > <Quote>
-> > >> +      * Enable High-Speed Support
-> > >> +      * Pre-Requisites
-> > >> +      *      - Controller should support High-Speed-Enable Bit
-> > >> +      *      - Controller should not be using DDR Mode
-> > >> +      *      - Controller should advertise that it supports High Speed
-> > >> +      *        in capabilities register
-> > >> +      *      - MMC/SD clock coming out of controller > 25MHz
-> > >> +      */
-> > </Quote>
-> > 
-> > I'm ok with this patch as well. I'm putting a few patches under test
-> > including this one,
-> > and will send it to Chris as part of that series.
-> > I'll strip out the above mentioned comments, unless there are any
-> > objections.
-> 
-> please don't. Detailing the pre-requisites for getting HSP mode working
-> isn't bad at all. Should someone decide to change the behavior and ends
-> up breaking it, the comment will help putting things back together.
-> 
-> my 2 cents, you've got the final decision though.
+Adding the phy driver support to hsotg driver. Keeping the platform data
+for continuing the smooth operation for boards which still uses it.
 
-Same here. Description is required in commit message since it will help
-in during git bisect.
+Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
+---
+ drivers/usb/gadget/s3c-hsotg.c |   37 +++++++++++++++++++++++++++----------
+ 1 files changed, 27 insertions(+), 10 deletions(-)
 
-> 
-> -- 
-> balbi
-> 
-
-
-Regards, 
-Gururaja
+diff --git a/drivers/usb/gadget/s3c-hsotg.c b/drivers/usb/gadget/s3c-hsotg.c
+index 6f696ee..bc30a2d 100644
+--- a/drivers/usb/gadget/s3c-hsotg.c
++++ b/drivers/usb/gadget/s3c-hsotg.c
+@@ -32,6 +32,7 @@
+ 
+ #include <linux/usb/ch9.h>
+ #include <linux/usb/gadget.h>
++#include <linux/usb/phy.h>
+ #include <linux/platform_data/s3c-hsotg.h>
+ 
+ #include <mach/map.h>
+@@ -133,7 +134,9 @@ struct s3c_hsotg_ep {
+  * struct s3c_hsotg - driver state.
+  * @dev: The parent device supplied to the probe function
+  * @driver: USB gadget driver
+- * @plat: The platform specific configuration data.
++ * @phy: The otg phy transceiver structure for phy control.
++ * @plat: The platform specific configuration data. This can be removed once
++ * all SoCs support usb transceiver.
+  * @regs: The memory area mapped for accessing registers.
+  * @irq: The IRQ number we are using
+  * @supplies: Definition of USB power supplies
+@@ -153,6 +156,7 @@ struct s3c_hsotg_ep {
+ struct s3c_hsotg {
+ 	struct device		 *dev;
+ 	struct usb_gadget_driver *driver;
++	struct usb_phy		*phy;
+ 	struct s3c_hsotg_plat	 *plat;
+ 
+ 	spinlock_t              lock;
+@@ -2854,7 +2858,10 @@ static void s3c_hsotg_phy_enable(struct s3c_hsotg *hsotg)
+ 	struct platform_device *pdev = to_platform_device(hsotg->dev);
+ 
+ 	dev_dbg(hsotg->dev, "pdev 0x%p\n", pdev);
+-	if (hsotg->plat->phy_init)
++
++	if (hsotg->phy)
++		usb_phy_init(hsotg->phy);
++	else if (hsotg->plat->phy_init)
+ 		hsotg->plat->phy_init(pdev, hsotg->plat->phy_type);
+ }
+ 
+@@ -2869,7 +2876,9 @@ static void s3c_hsotg_phy_disable(struct s3c_hsotg *hsotg)
+ {
+ 	struct platform_device *pdev = to_platform_device(hsotg->dev);
+ 
+-	if (hsotg->plat->phy_exit)
++	if (hsotg->phy)
++		usb_phy_shutdown(hsotg->phy);
++	else if (hsotg->plat->phy_exit)
+ 		hsotg->plat->phy_exit(pdev, hsotg->plat->phy_type);
+ }
+ 
+@@ -3493,6 +3502,7 @@ static void s3c_hsotg_release(struct device *dev)
+ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
+ {
+ 	struct s3c_hsotg_plat *plat = pdev->dev.platform_data;
++	struct usb_phy *phy;
+ 	struct device *dev = &pdev->dev;
+ 	struct s3c_hsotg_ep *eps;
+ 	struct s3c_hsotg *hsotg;
+@@ -3501,20 +3511,27 @@ static int __devinit s3c_hsotg_probe(struct platform_device *pdev)
+ 	int ret;
+ 	int i;
+ 
+-	plat = pdev->dev.platform_data;
+-	if (!plat) {
+-		dev_err(&pdev->dev, "no platform data defined\n");
+-		return -EINVAL;
+-	}
+-
+ 	hsotg = devm_kzalloc(&pdev->dev, sizeof(struct s3c_hsotg), GFP_KERNEL);
+ 	if (!hsotg) {
+ 		dev_err(dev, "cannot get memory\n");
+ 		return -ENOMEM;
+ 	}
+ 
++	phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
++	if (IS_ERR_OR_NULL(phy)) {
++		/* Fallback for pdata */
++		plat = pdev->dev.platform_data;
++		if (!plat) {
++			dev_err(&pdev->dev, "no platform data or transceiver defined\n");
++			return -EPROBE_DEFER;
++		} else {
++			hsotg->plat = plat;
++		}
++	} else {
++		hsotg->phy = phy;
++	}
++
+ 	hsotg->dev = dev;
+-	hsotg->plat = plat;
+ 
+ 	hsotg->clk = devm_clk_get(&pdev->dev, "otg");
+ 	if (IS_ERR(hsotg->clk)) {
+-- 
+1.7.1
