@@ -1,10 +1,10 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 2 Nov 2012 12:08:38 +0530
+Date: Fri, 2 Nov 2012 12:07:43 +0530
 Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
 In-Reply-To: <20121101224828.2103.82950.stgit@muffinssi.local>
 References: <20121101224703.2103.95474.stgit@muffinssi.local>
  <20121101224828.2103.82950.stgit@muffinssi.local>
-Message-ID: <50936A6E.3020202@ti.com>
+Message-ID: <50936A37.3070403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
