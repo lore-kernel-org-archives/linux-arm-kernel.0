@@ -1,18 +1,27 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Fri, 2 Nov 2012 13:11:50 +0000
-Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EBFD849@DBDE01.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 2 Nov 2012 21:42:24 +0800
+Subject: [PATCH 09/10] ARM: SMP: add function arch_send_wakeup_ipi_mask()
+In-Reply-To: <20121031034331.GB8100@S2100-06.ap.freescale.net>
+References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
+ <1351005779-30347-10-git-send-email-shawn.guo@linaro.org>
+ <20121031034331.GB8100@S2100-06.ap.freescale.net>
+Message-ID: <20121102134223.GB11641@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 18:02:46, Bedia, Vaibhav wrote:
-[...]
-> +int wkup_mbox_msg(struct notifier_block *self, unsigned long len, void *msg)
-> +{
-> +	return 0;
-> +}
+On Wed, Oct 31, 2012 at 11:43:34AM +0800, Shawn Guo wrote:
+> On Tue, Oct 23, 2012 at 11:22:58PM +0800, Shawn Guo wrote:
+> > Add function arch_send_wakeup_ipi_mask(), so that platform code can
+> > use it as an easy way to wake up cores that are in WFI.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> Hi Russell,
+> 
+> Can I ask for your ack to have the patch go via arm-soc being part
+> of the series?
+> 
+Ping
 
-This should have been static. Will change in the next version.
+Shawn
