@@ -1,54 +1,32 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches)
-Date: Fri, 2 Nov 2012 17:00:43 +0100
-Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
-In-Reply-To: <20121102111432.GD21313@pengutronix.de>
-References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
- <20121101222922.GD22956@pengutronix.de> <5093A8CD.60006@atmel.com>
- <20121102111432.GD21313@pengutronix.de>
-Message-ID: <5093EE2B.8080005@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Nov 2012 09:37:53 -0700
+Subject: [PATCH v3 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <5092B9A0.9000204@wwwdotorg.org>
+References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
+ <1351724661-29050-6-git-send-email-haojian.zhuang@gmail.com>
+ <5092B9A0.9000204@wwwdotorg.org>
+Message-ID: <20121102163752.GV15766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/02/2012 12:14 PM, Wolfram Sang a ?crit :
-> On Fri, Nov 02, 2012 at 12:04:45PM +0100, ludovic.desroches wrote:
->> Hi Wolfram,
->>
->> Le 11/01/2012 11:29 PM, Wolfram Sang a ?crit :
->>> On Wed, Oct 10, 2012 at 04:25:58PM +0200, ludovic.desroches at atmel.com wrote:
->>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>>
->>>> If the i2c message length is zero, i2c-at91 will directly return an error
->>>> instead of trying to send a zero-length message.
->>>>
->>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> What happens if you send a 0 byte message? Some hardware is able to do
->>> this and it will be used in SMBUS QUICK which the driver states to
->>> support according to at91_twi_func().
->>
->> Without this I had some data corruption when writing to / reading
->> from a serial eeprom (depending on the IP version).
->>
->> Yes SMBUS quick command is supported but is not managed in the
->> driver, we have to tell explicitly the IP that we want to send this
->> command.
->
-> Ok, so unless you want to implement the support, please update this
-> patch with a comment that SMBUS_QUICK is a TODO and remove the
-> SMBUS_QUICK capability.
->
+* Stephen Warren <swarren@wwwdotorg.org> [121101 11:06]:
+> On 10/31/2012 05:04 PM, Haojian Zhuang wrote:
+> > Add comments with pinconf & gpio range in the document of
+> > pinctrl-single.
+> 
+> I'd tend to suggest separating the series to add GPIO range support and
+> pinconf support, especially since didn't Tony suggest a separate driver
+> for pinconf? Perhaps that was just for non-generic properties.
 
-Implementation should not be a huge task, only one bit to set in a 
-register but I have no device to test it.
-So I will choose to remove the SMBUS_QUICK capability.
+Well I was just thinking setting them up as separate driver
+instances for the register ranges supporting pinconf and
+not supporting pinconf. This combined with some pinconf
+property parsed during pinctrl-single.c probe time allows
+saving lots of unnecessary parsing of properties for
+register ranges that don't support pinconf. At least for
+omaps we have few hundred registers that don't support
+pinconf, and then some separate random register that do.
 
-Hi Nikolaus,
+Regards,
 
-Did you test the driver with SMBus compatible devices? Can I keep other 
-SMBus capabilities from SMBUS_EMUL?
-
-Thanks
-
-Regards
-
-Ludovic
+TOny 
