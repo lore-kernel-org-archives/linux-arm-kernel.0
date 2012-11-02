@@ -1,129 +1,47 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Fri, 2 Nov 2012 16:54:30 +0530
-Subject: [PATCH 1/2] i2c: omap: Fix the revision register read
-In-Reply-To: <20121102110604.GB19493@arwen.pp.htv.fi>
-References: <1351852785-16961-1-git-send-email-shubhrajyoti@ti.com>
- <1351852785-16961-2-git-send-email-shubhrajyoti@ti.com>
- <20121102110604.GB19493@arwen.pp.htv.fi>
-Message-ID: <CAM=Q2ctRODbxN_9EL=vikkbRPad1AfeiYBUdvhkSJEsx2v2NXg@mail.gmail.com>
+From: bob.beckett@gmail.com (Robert Beckett)
+Date: Fri, 2 Nov 2012 11:32:50 +0000
+Subject: gic_set_affinity
+In-Reply-To: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
+References: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
+Message-ID: <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 2, 2012 at 4:36 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Fri, Nov 02, 2012 at 04:09:44PM +0530, Shubhrajyoti D wrote:
->> The revision register on OMAP4 is a 16-bit lo and a 16-bit
->> hi. Currently the driver reads only the lower 8-bits.
->> Fix the same by preventing the truncating of the rev register
->> for OMAP4.
->>
->> Also use the scheme bit ie bit-14 of the hi register to know if it
->> is OMAP_I2C_IP_VERSION_2.
->>
->> On platforms previous to OMAP4 the offset 0x04 is IE register whose
->> bit-14 reset value is 0, the code uses the same to its advantage.
->>
->> Also since the omap_i2c_read_reg uses reg_map_ip_* a raw_readw is done
->> to fetch the revision register.
->>
->> The dev->regs is populated after reading the rev_hi. A NULL check
->> has been added in the resume handler to prevent the access before
->> the setting of the regs.
->
-> tested on which platforms ?
+(CC maintainers)
 
-omap4430 , 4460 and omap3.
+On 1 November 2012 17:54, Robert Beckett <bob.beckett@gmail.com> wrote:
+> Hello,
 >
->> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
->> ---
->>  drivers/i2c/busses/i2c-omap.c |   59 ++++++++++++++++++++++++++++++++---------
->>  1 files changed, 46 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
->> index db31eae..d8e7709 100644
->> --- a/drivers/i2c/busses/i2c-omap.c
->> +++ b/drivers/i2c/busses/i2c-omap.c
->> @@ -49,9 +49,10 @@
->>  #define OMAP_I2C_OMAP1_REV_2         0x20
->>
->>  /* I2C controller revisions present on specific hardware */
->> -#define OMAP_I2C_REV_ON_2430         0x36
->> -#define OMAP_I2C_REV_ON_3430_3530    0x3C
->> -#define OMAP_I2C_REV_ON_3630_4430    0x40
->> +#define OMAP_I2C_REV_ON_2430         0x00000036
+> I was looking through the arm gic code while debugging a problem I am
+> having, and noticed something in gic_set_affinity.
 >
-> are you sure this are the contents on 2430 ? Have you actually ran this
-> code on that platform ?
-
-I did not run on 2430. Will try to get a platform and run.
-
-However the current code already has and uses the same value so
- I feel it should be fine.:-)
-
-
+> When something comes along and setts an irq affinity mask (e.g.
+> through /proc/irq/<irq>/smp_affinity_mask), the calls goes like so :
 >
->> +#define OMAP_I2C_REV_ON_3430_3530    0x0000003C
->> +#define OMAP_I2C_REV_ON_3630         0x00000040
+> ...
+> 1. irq_set_affinity : grabs the desc->lock
+> 2. __irq_set_affinity_locked : calls chip->irq_set_affinity
+> 3. gic_set_affinity : writes a new mask to the gic distributor
 >
-> likewise for these two.
-
-I verified that the 3630 returns 0x40 on my beaglexM.
-
+> my question is, what happens if an interrupt is raised between 1 and 3?
+> To me, it looks like the interrupt could end up being handled on 2
+> cpus. When it is raised, the handler will be called and sit spinning
+> for desc->lock (e.g. in handle_fasteoi_irq). The mask will be set to
+> set the affinity to the new cpu, the new cpu will receive the
+> interrupt as it has not been ackd or disabled yet, and the handler
+> will be called on the second cpu and will wait for the same lock in
+> the handler. Once the affinity setting calls have finished, the lock
+> is released, and whichever cpu gets the lock will handle the interrupt
+> while still locking out the other cpu. Once it finishes, the other cpu
+> will try to handle it leading to an interrupt handler call for an
+> interrupt that no longer exists, which could lead to spurious
+> interrupt if it returns IRQ_NONE because it cant see that the
+> interrupt is raised.
 >
->> +#define OMAP_I2C_REV_ON_4430_PLUS    0x50400002
+> Is this what will happen? If so, the interrupt should be masked across
+> the affinity setting so that it cant be raised on both cpus.
+> if I have just missed something obvious, then please let me know...
 >
-> what about 4460, 4470, 3530, etc etc etc ?
+> Cheers.
 >
->> @@ -490,7 +491,7 @@ static void omap_i2c_resize_fifo(struct omap_i2c_dev *dev, u8 size, bool is_rx)
->>
->>       omap_i2c_write_reg(dev, OMAP_I2C_BUF_REG, buf);
->>
->> -     if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
->> +     if (dev->rev < OMAP_I2C_REV_ON_3630)
->>               dev->b_hw = 1; /* Enable hardware fixes */
->>
->>       /* calculate wakeup latency constraint for MPU */
->> @@ -1052,6 +1053,14 @@ static const struct of_device_id omap_i2c_of_match[] = {
->>  MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
->>  #endif
->>
->> +#define OMAP_I2C_SCHEME(rev)         (rev & 0xc000) >> 14
->
-> you miss () there to make sure no other operations will take higher
-> precedence when using this macro.
-
-Indeed. Thanks.
->
->> @@ -1130,7 +1136,31 @@ omap_i2c_probe(struct platform_device *pdev)
->>       if (IS_ERR_VALUE(r))
->>               goto err_free_mem;
->>
->> -     dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
->> +     /*
->> +      * Read the Rev hi bit-[15:14] ie scheme this is 1 indicates ver2.
->> +      * On omap3 Offset 4 is IE Reg the bit [15:14] is XDR_IE which is 0
->> +      * at reset. Also since the omap_i2c_read_reg uses reg_map_ip_* a
->> +      * raw_readw is done.
->> +      */
->> +     rev = __raw_readw(dev->base + 0x04);
->> +
->> +     switch (OMAP_I2C_SCHEME(rev)) {
->> +     case 0:
->
-> define macros for these two cases.
-
-OK
->
->> +             dev->regs = (u8 *)reg_map_ip_v1;
->> +             dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG) & 0xff;
->> +             minor = OMAP_I2C_REV_SCHEME_0_MAJOR(dev->rev);
->> +             major = OMAP_I2C_REV_SCHEME_0_MAJOR(dev->rev);
->> +     break;
->
-> wrong indentation.
-
-Yes will fix.
->
-> --
-> balbi
+> Bob
