@@ -1,53 +1,36 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Thu, 1 Nov 2012 20:56:47 -0600
-Subject: [PATCH 8/8] clocksource: xilinx_ttc: add OF_CLK support
-In-Reply-To: <0ea1ba71afb3f4551ac27a6dfa41bd97b63cef48.1351721190.git.josh.cartwright@ni.com>
-References: <cover.1351721190.git.josh.cartwright@ni.com>
- <0ea1ba71afb3f4551ac27a6dfa41bd97b63cef48.1351721190.git.josh.cartwright@ni.com>
-Message-ID: <20121102025647.GN5190@beefymiracle.amer.corp.natinst.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu,  1 Nov 2012 22:02:50 -0600
+Subject: [PATCH] irqchip: irq-bcm2835: Add terminating entry for of_device_id
+ table
+Message-ID: <1351828970-15081-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 01:56:14PM -0600, Josh Cartwright wrote:
-> Add support for retrieving TTC configuration from device tree.  This
-> includes the ability to pull information about the driving clocks from
-> the of_clk bindings.
-> 
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> ---
-> diff --git a/drivers/clocksource/xilinx_ttc.c b/drivers/clocksource/xilinx_ttc.c
-> index ff38b3e..a4718f7 100644
-> --- a/drivers/clocksource/xilinx_ttc.c
-> +++ b/drivers/clocksource/xilinx_ttc.c
-> @@ -209,7 +153,8 @@ static struct clocksource clocksource_xttcpss = {
->  static int xttcpss_set_next_event(unsigned long cycles,
->  					struct clock_event_device *evt)
->  {
-> -	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
-> +	struct xttcpss_timer_clockevent *xttce = to_xttcpss_timer_clkevent(evt);
-> +	struct xttcpss_timer *timer = &xttce->xttc;
->  
->  	xttcpss_set_interval(timer, cycles);
->  	return 0;
-> @@ -224,12 +169,14 @@ static int xttcpss_set_next_event(unsigned long cycles,
->  static void xttcpss_set_mode(enum clock_event_mode mode,
->  					struct clock_event_device *evt)
->  {
-> -	struct xttcpss_timer *timer = &timers[XTTCPSS_CLOCKEVENT];
-> +	struct xttcpss_timer_clockevent *xttce = to_xttcpss_timer_clkevent(evt);
-> +	struct xttcpss_timer *timer = &xttce->xttc;
->  	u32 ctrl_reg;
->  
->  	switch (mode) {
->  	case CLOCK_EVT_MODE_PERIODIC:
-> -		xttcpss_set_interval(timer, TIMER_RATE / HZ);
-> +		xttcpss_set_interval(timer,
-> +				     clk_get_rate(xttce->clk) / PRESCALE);
+From: Axel Lin <axel.lin@ingics.com>
 
-I discovered with further testing that the above calculation is broken;
-calculated interval also needs to be divided by HZ.
+The of_device_id table is supposed to be zero-terminated.
 
-(I'll post a v2; just wanted to get this out there in the slim chance
-anyone's testing this ;)
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+This is a fix for v3.7.
 
-  Josh
+ drivers/irqchip/irq-bcm2835.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index dc670cc..16c78f1 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -168,7 +168,8 @@ static int __init armctrl_of_init(struct device_node *node,
+ }
+ 
+ static struct of_device_id irq_of_match[] __initconst = {
+-	{ .compatible = "brcm,bcm2835-armctrl-ic", .data = armctrl_of_init }
++	{ .compatible = "brcm,bcm2835-armctrl-ic", .data = armctrl_of_init },
++	{ }
+ };
+ 
+ void __init bcm2835_init_irq(void)
+-- 
+1.7.9.5
