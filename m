@@ -1,72 +1,84 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Fri, 2 Nov 2012 09:56:37 +0530
-Subject: [PATCH v7 2/5] usb: s3c-hsotg: Adding phy driver support
-In-Reply-To: <20121031154407.4eb54dba@amdc308.digital.local>
-References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
- <1351573057-22249-3-git-send-email-p.paneri@samsung.com>
- <20121031140548.GE10998@arwen.pp.htv.fi>
- <20121031154407.4eb54dba@amdc308.digital.local>
-Message-ID: <CAD6zSYOvGSTF18Zr1zPFduz3povs7qiiU8p=iUtAAyDX_LUy+A@mail.gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 2 Nov 2012 05:32:35 +0000
+Subject: [PATCH V3] mmc: omap_hsmmc: Enable HSPE bit for high speed cards
+In-Reply-To: <20121031201626.GA28784@arwen.pp.htv.fi>
+References: <1351684656-30275-1-git-send-email-gururaja.hebbar@ti.com>
+ <20121031122639.GA10998@arwen.pp.htv.fi>
+ <CAOyx1LrKBE+xzSRN4F=+e1DuMJL+5SAv-YkJWJdDw8p=kDojmw@mail.gmail.com>
+ <20121031201626.GA28784@arwen.pp.htv.fi>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EABDCB7@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 8:14 PM, Lukasz Majewski <l.majewski@samsung.com> wrote:
-> Hi Felipe,
->
->> Hi,
->>
->> On Tue, Oct 30, 2012 at 10:27:34AM +0530, Praveen Paneri wrote:
->> > @@ -3501,20 +3511,27 @@ static int __devinit s3c_hsotg_probe(struct
->> > platform_device *pdev) int ret;
->> >     int i;
->> >
->> > -   plat = pdev->dev.platform_data;
->> > -   if (!plat) {
->> > -           dev_err(&pdev->dev, "no platform data defined\n");
->> > -           return -EINVAL;
->> > -   }
->> > -
->> >     hsotg = devm_kzalloc(&pdev->dev, sizeof(struct s3c_hsotg),
->> > GFP_KERNEL); if (!hsotg) {
->> >             dev_err(dev, "cannot get memory\n");
->> >             return -ENOMEM;
->> >     }
->> >
->> > +   plat = pdev->dev.platform_data;
->> > +   if (!plat) {
->> > +           /* Fallback for transceiver */
->> > +           phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
->> > +           if (IS_ERR_OR_NULL(phy)) {
->> > +                   dev_err(&pdev->dev, "no platform data or
->> > transceiver defined\n");
->> > +                   return -EPROBE_DEFER;
->> > +           } else {
->> > +                   hsotg->phy = phy;
->> > +           }
->> > +   } else {
->> > +           hsotg->plat = plat;
->> > +   }
->>
->> I think this should be the other way around, meaning you try to grab
->> the phy, if you can't, then you fallback to pdata.
-Agreed! Will swap it
+On Thu, Nov 01, 2012 at 01:46:26, Balbi, Felipe wrote:
+> Hi,
+> 
+> On Thu, Nov 01, 2012 at 01:21:36AM +0530, Venkatraman S wrote:
+> > On Wed, Oct 31, 2012 at 5:56 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > > Hi,
+> > >
+> > > On Wed, Oct 31, 2012 at 05:27:36PM +0530, Hebbar, Gururaja wrote:
+> > >> HSMMC IP on AM33xx need a special setting to handle High-speed cards.
+> > >> Other platforms like TI81xx, OMAP4 may need this as-well. This depends
+> > >> on the HSMMC IP timing closure done for the high speed cards.
+> > >>
+> > >> From AM335x TRM (SPRUH73F - 18.3.12 Output Signals Generation)
+> > >>
+> > >> The MMC/SD/SDIO output signals can be driven on either falling edge or
+> > >> rising edge depending on the SD_HCTL[2] HSPE bit. This feature allows
+> > >> to reach better timing performance, and thus to increase data transfer
+> > >> frequency.
+> > >>
+> > >> There are few pre-requisites for enabling the HSPE bit
+> > >> - Controller should support High-Speed-Enable Bit and
+> > >> - Controller should not be using DDR Mode and
+> > >> - Controller should advertise that it supports High Speed in
+> > >>   capabilities register and
+> > >> - MMC/SD clock coming out of controller > 25MHz
+> > >>
+> > >> Note:
+> > >> The implementation reuses the output of calc_divisor() so as to reduce
+> > >> code addition.
+> > >>
+> > >> Signed-off-by: Hebbar, Gururaja <gururaja.hebbar@ti.com>
+> > >
+> > > this looks good to my eyes, hopefully I haven't missed anything:
+> > >
+> > > Reviewed-by: Felipe Balbi <balbi@ti.com>
+> > >
+> > 
+> > Except for the excessively verbose comments which are just duplicating the code,
+> > <Quote>
+> > >> +      * Enable High-Speed Support
+> > >> +      * Pre-Requisites
+> > >> +      *      - Controller should support High-Speed-Enable Bit
+> > >> +      *      - Controller should not be using DDR Mode
+> > >> +      *      - Controller should advertise that it supports High Speed
+> > >> +      *        in capabilities register
+> > >> +      *      - MMC/SD clock coming out of controller > 25MHz
+> > >> +      */
+> > </Quote>
+> > 
+> > I'm ok with this patch as well. I'm putting a few patches under test
+> > including this one,
+> > and will send it to Chris as part of that series.
+> > I'll strip out the above mentioned comments, unless there are any
+> > objections.
+> 
+> please don't. Detailing the pre-requisites for getting HSP mode working
+> isn't bad at all. Should someone decide to change the behavior and ends
+> up breaking it, the comment will help putting things back together.
+> 
+> my 2 cents, you've got the final decision though.
 
-regards,
-Praveen
->>
->
-> I agree.
->
-> The new approach is to use new PHY driver. And only when failed we
-> shall use legacy approach.
->
-> --
-> Best regards,
->
-> Lukasz Majewski
->
-> Samsung Poland R&D Center | Linux Platform Group
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Same here. Description is required in commit message since it will help
+in during git bisect.
+
+> 
+> -- 
+> balbi
+> 
+
+
+Regards, 
+Gururaja
