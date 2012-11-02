@@ -1,28 +1,64 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 2 Nov 2012 09:56:16 +0100
-Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes
- for AM33XX
-In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293EA08F53@DBDE01.ent.ti.com>
-References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
- <1351498881-32482-6-git-send-email-hvaibhav@ti.com>
- <50914107.2090909@ti.com>
- <EB1619762EAF8B4E97A227FB77B7E0293EA08F53@DBDE01.ent.ti.com>
-Message-ID: <20121102085616.GB2486@netboy.at.omicron.at>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 2 Nov 2012 10:54:47 +0200
+Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
+In-Reply-To: <20121101222316.GC22956@pengutronix.de>
+References: <1351155648-20429-1-git-send-email-balbi@ti.com>
+ <20121101222316.GC22956@pengutronix.de>
+Message-ID: <20121102085447.GE17063@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 08:46:46AM +0000, N, Mugunthan V wrote:
+Hi,
+
+On Thu, Nov 01, 2012 at 11:23:16PM +0100, Wolfram Sang wrote:
+> On Thu, Oct 25, 2012 at 12:00:48PM +0300, Felipe Balbi wrote:
+> > if we allow compiler reorder our writes, we could
+> > fall into a situation where dev->buf_len is reset
+> > for no apparent reason.
 > > 
-> > Do you expect to have several instance of the same IP with different
-> > parameters here?
+> > This bug was found with a simple script which would
+> > transfer data to an i2c client from 1 to 1024 bytes
+> > (a simple for loop), when we got to transfer sizes
+> > bigger than the fifo size, dev->buf_len was reset
+> > to zero before we had an oportunity to handle XDR
+> > Interrupt. Because dev->buf_len was zero, we entered
+> > omap_i2c_transmit_data() to transfer zero bytes,
+> > which would mean we would just silently exit
+> > omap_i2c_transmit_data() without actually writing
+> > anything to DATA register. That would cause XDR
+> > IRQ to trigger forever and we would never transfer
+> > the remaining bytes.
+> > 
+> > After adding the memory barrier, we also drop resetting
+> > dev->buf_len to zero in omap_i2c_xfer_msg() because
+> > both omap_i2c_transmit_data() and omap_i2c_receive_data()
+> > will act until dev->buf_len reaches zero, rendering the
+> > other write in omap_i2c_xfer_msg() redundant.
+> > 
+> > This patch has been tested with pandaboard for a few
+> > iterations of the script mentioned above.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > ---
+> > 
+> > This bug has been there forever, but it's quite annoying.
+> > I think it deserves being pushed upstream during this -rc
+> > cycle, but if Wolfram decides to wait until v3.8, I don't
+> > mind.
 > 
-> Though CPSW is a single IP in AM335X, CPSW has sub modules like CPDMA, ALE,
-> SLIVER, CPTS and SLAVES where is IP integrator can locate it at different
-> offsets. For example comparing the CPSW ip in TI814X and AM335X all the
-> above offsets are changed. So I have kept all these offsets in DT as driver
-> should not hold any SoC related informations
+> I would add this into 3.7, but what about the comments suggesting to use
+> barrier()?
 
-Did you see the two messages on this point from yesterday?
+I was waiting for more comments, will respin the patch next week.
 
-Thanks,
-Richard
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/1206e9bb/attachment.sig>
