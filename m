@@ -1,37 +1,32 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Fri, 2 Nov 2012 18:02:44 +0530
-Subject: [PATCH 13/15] ARM: DTS: AM33XX: Add nodes for OCMCRAM and Mailbox
+Date: Fri, 2 Nov 2012 18:02:38 +0530
+Subject: [PATCH 07/15] ARM: OMAP2+: hwmod: Update the hwmod data for TPTCs in
+ AM33XX
 In-Reply-To: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1351859566-24818-14-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1351859566-24818-8-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Update the TPTC hwmod entry to reflect the fact that
+the idle and standby transitions are s/w controlled.
+
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index bb31bff..e2cbf24 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -210,5 +210,16 @@
- 			interrupt-parent = <&intc>;
- 			interrupts = <91>;
- 		};
-+
-+		ocmcram: ocmcram at 40300000 {
-+			compatible = "ti,ocmcram";
-+			ti,hwmods = "ocmcram";
-+			ti,no_idle_on_suspend;
-+		};
-+
-+		wkup_m3: wkup_m3 at 44d00000 {
-+			compatible = "ti,wkup_m3";
-+			ti,hwmods = "wkup_m3";
-+		};
- 	};
- };
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index ec3fbb2..7772c29 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -1827,6 +1827,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
+ 	.class		= &am33xx_tptc_hwmod_class,
+ 	.clkdm_name	= "l3_clkdm",
+ 	.mpu_irqs	= am33xx_tptc0_irqs,
++	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
+ 	.main_clk	= "l3_gclk",
+ 	.prcm		= {
+ 		.omap4	= {
 -- 
 1.7.0.4
