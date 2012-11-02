@@ -1,13 +1,13 @@
 From: dp@opensource.wolfsonmicro.com (Dimitris Papastamos)
-Date: Fri,  2 Nov 2012 13:01:29 +0000
-Subject: [PATCH] ARM: S3C64XX: Fix up IRQ mapping for balblair on Cragganmore
-Message-ID: <1351861289-19691-1-git-send-email-dp@opensource.wolfsonmicro.com>
+Date: Fri,  2 Nov 2012 13:04:14 +0000
+Subject: [PATCH v2] ARM: S3C64XX: Fix up IRQ mapping for balblair on
+ Cragganmore
+Message-ID: <1351861454-20032-1-git-send-email-dp@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 We are using S3C_EINT(4) instead of S3C_EINT(5).
 
-Change-Id: I84e77fd75d59c6b8fecbcb11e81dc78dbf07f156
 Signed-off-by: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
 ---
  arch/arm/mach-s3c64xx/mach-crag6410-module.c | 2 +-
