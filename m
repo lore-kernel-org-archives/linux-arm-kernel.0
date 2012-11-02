@@ -1,42 +1,81 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 02 Nov 2012 10:22:22 +0100
-Subject: [PATCH RESEND 1/5 v6] gpio: Add a block GPIO API to gpiolib
-In-Reply-To: <CACxGe6vEr5fd0_ZuzV=nOXVfwA7_FB5L6KJsEwMEHmVj0rDA=g@mail.gmail.com>
-References: <1351457210-25222-1-git-send-email-stigge@antcom.de>
- <1351457210-25222-2-git-send-email-stigge@antcom.de>
- <CACxGe6vgryMPygc8SKFLKqP8Wq=pcGiJe_dPCiDC-evzf32UMA@mail.gmail.com>
- <50915DBC.2000802@antcom.de>
- <CACxGe6vEr5fd0_ZuzV=nOXVfwA7_FB5L6KJsEwMEHmVj0rDA=g@mail.gmail.com>
-Message-ID: <509390CE.90402@antcom.de>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 02 Nov 2012 10:33:44 +0100
+Subject: [PATCH 5/8] ARM: zynq: add COMMON_CLK support
+In-Reply-To: <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+ <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
+Message-ID: <50939378.2050500@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 07:59 PM, Grant Likely wrote:
->> Pin direction currently needs to be set up separately, analogous to
->> requesting gpios. Need to document this better, right. The assumption is
->> that I/O needs to be efficient primarily, before bloating the API with
->> direction functions. Or should I add functions for this?
-> 
-> Since this is a userspace facing ABI, once it is merged it cannot be
-> changed in an incompatible way. I cannot merge it until there is at
-> least a plan for how to handle all of the reasonable use cases. That
-> means it must support set/clear or mask operations. Also, if it sticks
-> with the design of grouping pins from multiple controllers, then it
-> needs to handle explicitly constraining what order operations are
-> performed in at the time of the operation. At the time of setup
-> doesn't work since constraints between pins may not always be in the
-> same order.
-> 
-> I really think you should consider implementing a command stream type
-> of interface.
+On 10/31/2012 07:58 PM, Josh Cartwright wrote:
+> [...]
+> +#define PERIPH_CLK_CTRL_SRC(x)	(periph_clk_parent_map[((x)&3)>>4])
+> +#define PERIPH_CLK_CTRL_DIV(x)	(((x)&0x3F00)>>8)
 
-Yes, understand. What do you consider a good example of a command stream
-type interface? Link or hint appreciated!
+A few more spaces wouldn't hurt ;)
 
-There was already mentioned the idea of a device node which can be
-interfaced to via ioctl() for the various operations. Can it be a
-"struct miscdevice" or do you require sth. more sophisticated?
+> [...]
+> +static void __init zynq_periph_clk_setup(struct device_node *np)
+> +{
+> +	struct zynq_periph_clk *periph;
+> +	const char *parent_names[3];
+> +	struct clk_init_data init;
+> +	struct clk *clk;
+> +	int err;
+> +	u32 reg;
+> +	int i;
+> +
+> +	err = of_property_read_u32(np, "reg", &reg);
+> +	WARN_ON(err);
 
-Thanks in advance,
+Shouldn't the function abort if a error happens somewhere? Continuing here
+will lead to undefined behavior. Same is probably true for the other WARN_ONs.
 
-Roland
+> +
+> +	periph = kzalloc(sizeof(*periph), GFP_KERNEL);
+> +	WARN_ON(!periph);
+> +
+> +	periph->clk_ctrl = slcr_base + reg;
+> +	spin_lock_init(&periph->clkact_lock);
+> +
+> +	init.name = np->name;
+> +	init.ops = &zynq_periph_clk_ops;
+> +	for (i = 0; i < ARRAY_SIZE(parent_names); i++)
+> +		parent_names[i] = of_clk_get_parent_name(np, i);
+> +	init.parent_names = parent_names;
+> +	init.num_parents = ARRAY_SIZE(parent_names);
+> +
+> +	periph->hw.init = &init;
+> +
+> +	clk = clk_register(NULL, &periph->hw);
+> +	WARN_ON(IS_ERR(clk));
+> +
+> +	err = of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +	WARN_ON(err);
+> +
+> +	for (i = 0; i < 2; i++) {
+
+Not all of the peripheral clock generators have two output clocks. I think
+it makes sense to use the number entries in clock-output-names here.
+
+> +		const char *name;
+> +
+> +		err = of_property_read_string_index(np, "clock-output-names", i,
+> +						    &name);
+> +		WARN_ON(err);
+> +
+> +		periph->gates[i] = clk_register_gate(NULL, name, np->name, 0,
+> +						     periph->clk_ctrl, i, 0,
+> +						     &periph->clkact_lock);
+> +		WARN_ON(IS_ERR(periph->gates[i]));
+> +	}
+> +
+> +	periph->onecell_data.clks = periph->gates;
+> +	periph->onecell_data.clk_num = i;
+> +
+> +	err = of_clk_add_provider(np, of_clk_src_onecell_get,
+> +				  &periph->onecell_data);
+> +	WARN_ON(err);
+> +}
+> [...]
