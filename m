@@ -1,82 +1,71 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Fri, 2 Nov 2012 18:02:43 +0530
-Subject: [PATCH 12/15] ARM: OMAP: timer: Add suspend-resume callbacks for
- clockevent device
+Date: Fri, 2 Nov 2012 18:02:37 +0530
+Subject: [PATCH 06/15] ARM: OMAP2+: hwmod: Enable OCMCRAM registration in
+ AM33XX
 In-Reply-To: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1351859566-24818-13-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vaibhav Hiremath <hvaibhav@ti.com>
+The hwmod data for OCMCRAM in AM33XX was commented out.
+This data is needed by the power management code, hence
+uncomment the same and register the OCP interface for it.
 
-The current OMAP timer code registers two timers -
-one as clocksource and one as clockevent.
-AM33XX has only one usable timer in the WKUP domain
-so one of the timers needs suspend-resume support
-to restore the configuration to pre-suspend state.
-
-commit adc78e6 (timekeeping: Add suspend and resume
-of clock event devices) introduced .suspend and .resume
-callbacks for clock event devices. Leverages these
-callbacks to have AM33XX clockevent timer which is
-in not in WKUP domain to behave properly across system
-suspend.
-
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 ---
- arch/arm/mach-omap2/timer.c |   31 +++++++++++++++++++++++++++++++
- 1 files changed, 31 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   11 ++++++++++-
+ 1 files changed, 10 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 6584ee0..e8781fd 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -135,6 +135,35 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
- 	}
- }
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 2e470ce..ec3fbb2 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -415,7 +415,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
+  *    - cEFUSE (doesn't fall under any ocp_if)
+  *    - clkdiv32k
+  *    - debugss
+- *    - ocmc ram
+  *    - ocp watch point
+  *    - aes0
+  *    - sha0
+@@ -481,6 +480,7 @@ static struct omap_hwmod am33xx_debugss_hwmod = {
+ 		},
+ 	},
+ };
++#endif
  
-+static void omap_clkevt_suspend(struct clock_event_device *unused)
-+{
-+	char name[10];
-+	struct omap_hwmod *oh;
-+
-+	sprintf(name, "timer%d", 2);
-+	oh = omap_hwmod_lookup(name);
-+	if (!oh)
-+		return;
-+
-+	omap_hwmod_idle(oh);
-+}
-+
-+static void omap_clkevt_resume(struct clock_event_device *unused)
-+{
-+	char name[10];
-+	struct omap_hwmod *oh;
-+
-+	sprintf(name, "timer%d", 2);
-+	oh = omap_hwmod_lookup(name);
-+	if (!oh)
-+		return;
-+
-+	omap_hwmod_enable(oh);
-+	__omap_dm_timer_load_start(&clkev,
-+			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
-+	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
-+}
-+
- static struct clock_event_device clockevent_gpt = {
- 	.name		= "gp_timer",
- 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-@@ -142,6 +171,8 @@ static struct clock_event_device clockevent_gpt = {
- 	.rating		= 300,
- 	.set_next_event	= omap2_gp_timer_set_next_event,
- 	.set_mode	= omap2_gp_timer_set_mode,
-+	.suspend	= omap_clkevt_suspend,
-+	.resume		= omap_clkevt_resume,
+ /* ocmcram */
+ static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
+@@ -501,6 +501,7 @@ static struct omap_hwmod am33xx_ocmcram_hwmod = {
+ 	},
  };
  
- static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
++#if 0
+ /* ocpwp */
+ static struct omap_hwmod_class am33xx_ocpwp_hwmod_class = {
+ 	.name		= "ocpwp",
+@@ -3331,6 +3332,13 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
+ 	.flags		= OCPIF_SWSUP_IDLE,
+ };
+ 
++/* l3 main -> ocmc */
++static struct omap_hwmod_ocp_if am33xx_l3_main__ocmc = {
++	.master		= &am33xx_l3_main_hwmod,
++	.slave		= &am33xx_ocmcram_hwmod,
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l4_fw__emif_fw,
+ 	&am33xx_l3_main__emif,
+@@ -3401,6 +3409,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am33xx_l3_main__tptc0,
+ 	&am33xx_l3_main__tptc1,
+ 	&am33xx_l3_main__tptc2,
++	&am33xx_l3_main__ocmc,
+ 	&am33xx_l3_s__usbss,
+ 	&am33xx_l4_hs__cpgmac0,
+ 	&am33xx_cpgmac0__mdio,
 -- 
 1.7.0.4
