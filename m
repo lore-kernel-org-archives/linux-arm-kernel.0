@@ -1,16 +1,16 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 2 Nov 2012 09:56:16 +0800
-Subject: [PATCH 3/3] ARM: dts: cfa10049: Add the DH2228FV DAC to the DTS
-In-Reply-To: <1351679410-11026-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1351679410-11026-1-git-send-email-maxime.ripard@free-electrons.com>
- <1351679410-11026-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20121102015615.GB26637@S2101-09.ap.freescale.net>
+Date: Fri, 2 Nov 2012 10:05:34 +0800
+Subject: [PATCH] ARM: dts: mxs: Add 16 bits LCD screen muxing options for
+ I.MX28
+In-Reply-To: <1351788659-67805-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1351788659-67805-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <20121102020532.GC26637@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 11:30:10AM +0100, Maxime Ripard wrote:
-> There is no driver for it yet, so it will use spidev.
+On Thu, Nov 01, 2012 at 05:50:59PM +0100, Gwenhael Goavec-Merou wrote:
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
 Applied, thanks.
