@@ -1,79 +1,55 @@
 From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Fri, 2 Nov 2012 07:38:50 -0600
-Subject: [PATCH 5/8] ARM: zynq: add COMMON_CLK support
-In-Reply-To: <50939378.2050500@metafoo.de>
+Date: Fri, 2 Nov 2012 07:39:29 -0600
+Subject: [PATCH 7/8] serial: xilinx_uartps: get clock rate info from dts
+In-Reply-To: <50939061.9060201@metafoo.de>
 References: <cover.1351721190.git.josh.cartwright@ni.com>
- <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
- <50939378.2050500@metafoo.de>
-Message-ID: <20121102133850.GO5190@beefymiracle.amer.corp.natinst.com>
+ <23a299ee5e89cfd17bb9affd8fbb9f41b79cfd46.1351721190.git.josh.cartwright@ni.com>
+ <50939061.9060201@metafoo.de>
+Message-ID: <20121102133929.GP5190@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the review.
-
-On Fri, Nov 02, 2012 at 10:33:44AM +0100, Lars-Peter Clausen wrote:
-> On 10/31/2012 07:58 PM, Josh Cartwright wrote:
-> > [...]
-> > +#define PERIPH_CLK_CTRL_SRC(x)	(periph_clk_parent_map[((x)&3)>>4])
-> > +#define PERIPH_CLK_CTRL_DIV(x)	(((x)&0x3F00)>>8)
+On Fri, Nov 02, 2012 at 10:20:33AM +0100, Lars-Peter Clausen wrote:
+> On 10/31/2012 08:28 PM, Josh Cartwright wrote:
+> > Add support for specifying clock information for the uart clk via the
+> > device tree.  This eliminates the need to hardcode rates in the device
+> > tree.
+> > 
+> > Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+> > ---
+> >  arch/arm/boot/dts/zynq-7000.dtsi   |  4 ++--
+> >  drivers/tty/serial/xilinx_uartps.c | 30 +++++++++++++++++-------------
+> >  2 files changed, 19 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> > index bb3085c..5fb763f 100644
+> > --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> > +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> > @@ -44,14 +44,14 @@
+> >  			compatible = "xlnx,xuartps";
+> >  			reg = <0xE0000000 0x1000>;
+> >  			interrupts = <0 27 4>;
+> > -			clock = <50000000>;
+> > +			clocks = <&uart_clk 0>;
+> >  		};
+> >  
+> >  		uart1: uart at e0001000 {
+> >  			compatible = "xlnx,xuartps";
+> >  			reg = <0xE0001000 0x1000>;
+> >  			interrupts = <0 50 4>;
+> > -			clock = <50000000>;
+> > +			clocks = <&uart_clk 0>;
 > 
-> A few more spaces wouldn't hurt ;)
+> Shouldn't this be <&uart_clk 1>?
 
-Okay, sure.
+Yes, indeed.
 
-> > [...]
-> > +static void __init zynq_periph_clk_setup(struct device_node *np)
-> > +{
-> > +	struct zynq_periph_clk *periph;
-> > +	const char *parent_names[3];
-> > +	struct clk_init_data init;
-> > +	struct clk *clk;
-> > +	int err;
-> > +	u32 reg;
-> > +	int i;
-> > +
-> > +	err = of_property_read_u32(np, "reg", &reg);
-> > +	WARN_ON(err);
->
-> Shouldn't the function abort if a error happens somewhere? Continuing here
-> will lead to undefined behavior. Same is probably true for the other WARN_ONs.
-
-The way I see it is: the kernel is will be left in a bad state in the
-case of any failure, regardless of if we bail out or continue.  AFAICT,
-there is no clean way to recover from a failure this early.
-
-Given that, it seems simpler (albeit marginally so) just to continue; so
-that's what I chose to do.  I'm not opposed to bailing out, just not
-convinced it does anything for us.
-
-> > +
-> > +	periph = kzalloc(sizeof(*periph), GFP_KERNEL);
-> > +	WARN_ON(!periph);
-> > +
-> > +	periph->clk_ctrl = slcr_base + reg;
-> > +	spin_lock_init(&periph->clkact_lock);
-> > +
-> > +	init.name = np->name;
-> > +	init.ops = &zynq_periph_clk_ops;
-> > +	for (i = 0; i < ARRAY_SIZE(parent_names); i++)
-> > +		parent_names[i] = of_clk_get_parent_name(np, i);
-> > +	init.parent_names = parent_names;
-> > +	init.num_parents = ARRAY_SIZE(parent_names);
-> > +
-> > +	periph->hw.init = &init;
-> > +
-> > +	clk = clk_register(NULL, &periph->hw);
-> > +	WARN_ON(IS_ERR(clk));
-> > +
-> > +	err = of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> > +	WARN_ON(err);
-> > +
-> > +	for (i = 0; i < 2; i++) {
-> 
-> Not all of the peripheral clock generators have two output clocks. I think
-> it makes sense to use the number entries in clock-output-names here.
-
-Yes, I agree.  I'll also update the bindings documentation.
-
-Thanks again,
+Thanks,
   Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/a37426c2/attachment.sig>
