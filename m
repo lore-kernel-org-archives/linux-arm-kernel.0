@@ -1,81 +1,95 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 02 Nov 2012 10:33:44 +0100
-Subject: [PATCH 5/8] ARM: zynq: add COMMON_CLK support
-In-Reply-To: <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
-References: <cover.1351721190.git.josh.cartwright@ni.com>
- <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
-Message-ID: <50939378.2050500@metafoo.de>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Fri, 2 Nov 2012 09:44:26 +0000
+Subject: discrepancy while save and restore of debounce registers
+In-Reply-To: <50802B00.6090907@ti.com>
+References: <1BAFE6F6C881BF42822005164F1491C33EAA9A7C@DBDE01.ent.ti.com>
+ <507F1F21.8040206@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAAA89B@DBDE01.ent.ti.com>
+ <50802B00.6090907@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EABE28B@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 07:58 PM, Josh Cartwright wrote:
-> [...]
-> +#define PERIPH_CLK_CTRL_SRC(x)	(periph_clk_parent_map[((x)&3)>>4])
-> +#define PERIPH_CLK_CTRL_DIV(x)	(((x)&0x3F00)>>8)
+On Thu, Oct 18, 2012 at 21:44:56, Hunter, Jon wrote:
+> Hi Gururaja,
+> 
+> On 10/18/2012 12:31 AM, Hebbar, Gururaja wrote:
+> > Jon,
+> > 
+> > On Thu, Oct 18, 2012 at 02:42:01, Hunter, Jon wrote:
+> 
+> [snip]
+> 
+> >>> My doubt/questions are
+> >>> 1. Why should debounce registers be updated only when it's accessed previously?
+> >>
+> >> If debounce is not being used by any of the gpios, then there is no need
+> >> to restore them as there are no bits set. So this makes sense and saves
+> >> a couple register writes.
+> > 
+> > What I want to know is that other than saving register writes, is there any
+> > other important stuff that specifies this requirement.
+> 
+> From a HW perspective, none that I can see.
+> 
+> From a SW perspective, yes, as I mentioned if you restore these
+> registers without first initialising the context variables where these
+> registers are stored, then you may be restoring unknown values to the
+> registers and that is bad.
+> 
+> >>> 2. What is the relation between updating debounce registers and crash seen on
+> >>> others registers? 
+> >>
+> >> This I am not sure about. I gave this a quick try on my omap3430 beagle
+> >> board, but I did not see any side-effects from doing this. However, if
+> >> you are always restoring the debounce context regardless of whether
+> >> debounce is being used, then you could be writing bad values to the
+> >> debounce registers as the context variables bank->context.debouce and
+> >> bank->context.debouce_en may not initialised. So that is bad. However,
+> >> that said I am still not sure how this could cause a crash.
+> >>
+> >> Can you share more details on ...
+> > 
+> > Sorry for missing below details in first post.
+> > 
+> >> 1. The OMAP platform you are using?
+> > 
+> > I was trying this on TI AM335x platform (repo below). On AM335x EVM board
+> > 
+> > http://arago-project.org/git/projects/?p=linux-am33x.git;a=shortlog;
+> > h=refs/heads/v3.2-staging
+> > 
+> >> 2. What linux distro/environment you are using?
+> > 
+> > Arago AM335x PSP release (linux 3.2 + am335x patch-set)
+> > 
+> >> 3. If there are any specific steps to reproduce this 100% of the time?
+> > 
+> > On top of this tree, try suspend/resume using "echo mem > /syspower/state"
+> 
+> I have a beagle-bone but unfortunately, suspend does not appear to be
+> supported in the mainline kernel yet so I am unable to test this on the
+> am335x on the mainline.
 
-A few more spaces wouldn't hurt ;)
+You can try the suspend/resume on BB from Arago tree which I mentioned above
 
-> [...]
-> +static void __init zynq_periph_clk_setup(struct device_node *np)
-> +{
-> +	struct zynq_periph_clk *periph;
-> +	const char *parent_names[3];
-> +	struct clk_init_data init;
-> +	struct clk *clk;
-> +	int err;
-> +	u32 reg;
-> +	int i;
-> +
-> +	err = of_property_read_u32(np, "reg", &reg);
-> +	WARN_ON(err);
+> 
+> Have you compared the gpio driver from your v3.2 branch with the current
+> mainline to see how different this code is? Ideally, it would be good to
+> test on the mainline kernel for another data point to see if this is
+> local to your branch.
 
-Shouldn't the function abort if a error happens somewhere? Continuing here
-will lead to undefined behavior. Same is probably true for the other WARN_ONs.
+The mainline kernel omap GPIO driver has changed a lot from current arago
+tree (which is at v3.2). Upon comparing is when I found out about the
+register access check done before restoring.
 
-> +
-> +	periph = kzalloc(sizeof(*periph), GFP_KERNEL);
-> +	WARN_ON(!periph);
-> +
-> +	periph->clk_ctrl = slcr_base + reg;
-> +	spin_lock_init(&periph->clkact_lock);
-> +
-> +	init.name = np->name;
-> +	init.ops = &zynq_periph_clk_ops;
-> +	for (i = 0; i < ARRAY_SIZE(parent_names); i++)
-> +		parent_names[i] = of_clk_get_parent_name(np, i);
-> +	init.parent_names = parent_names;
-> +	init.num_parents = ARRAY_SIZE(parent_names);
-> +
-> +	periph->hw.init = &init;
-> +
-> +	clk = clk_register(NULL, &periph->hw);
-> +	WARN_ON(IS_ERR(clk));
-> +
-> +	err = of_clk_add_provider(np, of_clk_src_simple_get, clk);
-> +	WARN_ON(err);
-> +
-> +	for (i = 0; i < 2; i++) {
+> 
+> Cheers
+> Jon
+> 
+> 
+> 
 
-Not all of the peripheral clock generators have two output clocks. I think
-it makes sense to use the number entries in clock-output-names here.
 
-> +		const char *name;
-> +
-> +		err = of_property_read_string_index(np, "clock-output-names", i,
-> +						    &name);
-> +		WARN_ON(err);
-> +
-> +		periph->gates[i] = clk_register_gate(NULL, name, np->name, 0,
-> +						     periph->clk_ctrl, i, 0,
-> +						     &periph->clkact_lock);
-> +		WARN_ON(IS_ERR(periph->gates[i]));
-> +	}
-> +
-> +	periph->onecell_data.clks = periph->gates;
-> +	periph->onecell_data.clk_num = i;
-> +
-> +	err = of_clk_add_provider(np, of_clk_src_onecell_get,
-> +				  &periph->onecell_data);
-> +	WARN_ON(err);
-> +}
-> [...]
+Regards, 
+Gururaja
