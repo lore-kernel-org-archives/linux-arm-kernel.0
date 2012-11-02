@@ -1,91 +1,28 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 2 Nov 2012 09:56:05 +0100
-Subject: [PATCH v2] rtc: i.MX dryice: Add devicetree support
-In-Reply-To: <1348566986-9603-1-git-send-email-s.hauer@pengutronix.de>
-References: <1348566986-9603-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20121102085605.GG1641@pengutronix.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 2 Nov 2012 09:56:16 +0100
+Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes
+ for AM33XX
+In-Reply-To: <EB1619762EAF8B4E97A227FB77B7E0293EA08F53@DBDE01.ent.ti.com>
+References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+ <1351498881-32482-6-git-send-email-hvaibhav@ti.com>
+ <50914107.2090909@ti.com>
+ <EB1619762EAF8B4E97A227FB77B7E0293EA08F53@DBDE01.ent.ti.com>
+Message-ID: <20121102085616.GB2486@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alessandro,
+On Fri, Nov 02, 2012 at 08:46:46AM +0000, N, Mugunthan V wrote:
+> > 
+> > Do you expect to have several instance of the same IP with different
+> > parameters here?
+> 
+> Though CPSW is a single IP in AM335X, CPSW has sub modules like CPDMA, ALE,
+> SLIVER, CPTS and SLAVES where is IP integrator can locate it at different
+> offsets. For example comparing the CPSW ip in TI814X and AM335X all the
+> above offsets are changed. So I have kept all these offsets in DT as driver
+> should not hold any SoC related informations
 
-Everything fine with this patch? If yes, could you apply it?
+Did you see the two messages on this point from yesterday?
 
-Thanks
- Sascha
-
-On Tue, Sep 25, 2012 at 11:56:26AM +0200, Sascha Hauer wrote:
-> Add devicetree probing, fixing some whitespace damage along the way.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
-> 
-> changes since v1:
-> 
-> - document 'intrerrupts' property as mandatory, because the driver needs it.
-> 
->  Documentation/devicetree/bindings/rtc/imx-di.txt |   19 +++++++++++++++++++
->  drivers/rtc/rtc-imxdi.c                          |   12 +++++++++---
->  2 files changed, 28 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/rtc/imx-di.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/imx-di.txt b/Documentation/devicetree/bindings/rtc/imx-di.txt
-> new file mode 100644
-> index 0000000..42b92b5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/imx-di.txt
-> @@ -0,0 +1,19 @@
-> +* i.MX25 dryice Real Time Clock controller
-> +
-> +This RTC is part of the i.MX25 dryice module. Documentation for this
-> +unit is not publically available. This binding only makes use of the
-> +RTC.
-> +
-> +Required properties:
-> +- compatible: should be "fsl,imx25-rtc"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: interrupt source for the dryice module
-> +
-> +Example:
-> +
-> +	dryice at 53ffc000 {
-> +		compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
-> +		reg = <0x53ffc000 0x4000>;
-> +		interrupts = <25>;
-> +	};
-> diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-> index 891cd6c..b2fe920 100644
-> --- a/drivers/rtc/rtc-imxdi.c
-> +++ b/drivers/rtc/rtc-imxdi.c
-> @@ -493,11 +493,17 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct of_device_id of_dryice_rtc_match[] = {
-> +	{ .compatible = "fsl,imx25-rtc", },
-> +	{ },
-> +};
-> +
->  static struct platform_driver dryice_rtc_driver = {
->  	.driver = {
-> -		   .name = "imxdi_rtc",
-> -		   .owner = THIS_MODULE,
-> -		   },
-> +		.name = "imxdi_rtc",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_dryice_rtc_match,
-> +	},
->  	.remove = __devexit_p(dryice_rtc_remove),
->  };
->  
-> -- 
-> 1.7.10.4
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Richard
