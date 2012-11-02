@@ -1,37 +1,100 @@
-From: bhutchings@solarflare.com (Ben Hutchings)
-Date: Fri, 2 Nov 2012 23:25:28 +0000
-Subject: [PATCH 0/4] Support the MX6 FEC as a PTP hardware clock
-In-Reply-To: <20121102084324.GA2486@netboy.at.omicron.at>
-References: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
- <20121101.123027.1332984905040252720.davem@davemloft.net>
- <CAHrpEqRuy=kewK-592RphVfJnNoma2CPZytoTqLc45HeT53hRQ@mail.gmail.com>
- <20121102084324.GA2486@netboy.at.omicron.at>
-Message-ID: <1351898728.2703.30.camel@bwh-desktop.uk.solarflarecom.com>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 2 Nov 2012 16:47:38 -0700
+Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
+In-Reply-To: <20121010111517.GC2131@linaro.org>
+References: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
+ <20121010111517.GC2131@linaro.org>
+Message-ID: <CAMbhsRTNULfBjL=x3qFgjqsfR25EJt+2A4hY=qTXcDq8gyCxmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-11-02 at 09:43 +0100, Richard Cochran wrote:
-> On Fri, Nov 02, 2012 at 10:36:09AM +0800, Frank Li wrote:
-> > >
-> > > All applied to net-next.
-> > >
-> > > Please make sure your changes are in sync with Ben's PTP/PPS
-> > > Kconfig changes of today, and send me any changes if necessary.
-> > >
-> > 
-> > Thank you very much.
-> > I checked Ben's patch, which not affect FEC.
-> 
-> Maybe just remove the Kconfig line "select PPS".
+On Wed, Oct 10, 2012 at 4:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> On Tue, Oct 09, 2012 at 11:46:12PM -0700, Todd Poynor wrote:
+>> Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
+>> on overflow.
+>>
+>> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+>> ---
+>>  arch/arm/kernel/stacktrace.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+>> index 00f79e5..6315162 100644
+>> --- a/arch/arm/kernel/stacktrace.c
+>> +++ b/arch/arm/kernel/stacktrace.c
+>> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
+>>       high = ALIGN(low, THREAD_SIZE);
+>>
+>>       /* check current frame pointer is within bounds */
+>> -     if (fp < (low + 12) || fp + 4 >= high)
+>> +     if (fp < (low + 12) || fp >= high - 4)
+>>               return -EINVAL;
+>>
+>>       /* restore the registers from the stack frame */
+>
+> sp and fp can still be complete garbage in the case of a corrupted frame,
+> so low + 12 can still overflow and cause us to read beyond the stack base.
+>
+> A more robust patch might be as follows.  This also checks for misaligned
+> fp and sp values, since those indicate corruption and there can be no
+> sensible way to interpret the resulting frame in that case.
+>
+> Also, according to the definition of current_thread_info(),
+> IS_ALIGNED(sp, THREAD_SIZE) indicates a full stack extending from sp
+> to sp + THREAD_SIZE, and not an empty stack extending from sp -
+> THREAD_SIZE to sp.  We cannot backtrace this situation anyway, since
+> that would imply that the frame record extends beyond the stack...
+> but this patch tidies it up in the interest of clarity.
+>
+> Cheers
+> ---Dave
+>
+> (untested)
+>
+> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> index 00f79e5..fec82be 100644
+> --- a/arch/arm/kernel/stacktrace.c
+> +++ b/arch/arm/kernel/stacktrace.c
+> @@ -28,10 +28,20 @@ int notrace unwind_frame(struct stackframe *frame)
+>
+>         /* only go to a higher address on the stack */
+>         low = frame->sp;
+> -       high = ALIGN(low, THREAD_SIZE);
+> +       if (!IS_ALIGNED(fp, 4))
+> +               return -EINVAL;
+> +
+> +       /*
+> +        * low + 1 here ensures that high > sp, consistent with the
+> +        * definition of current_thread_info().
+> +        * We subtract 1 to compute the highest allowable byte address.
+> +        * Otherwise, we might get high == 0 which would confuse our
+> +        * comparisons.
+> +        */
+> +       high = ALIGN(low + 1, THREAD_SIZE) - 1;
+>
+>         /* check current frame pointer is within bounds */
+> -       if (fp < (low + 12) || fp + 4 >= high)
+> +       if (fp < 12 || fp - 12 < low || fp > high)
+>                 return -EINVAL;
+>
+>         /* restore the registers from the stack frame */
+> @@ -39,6 +49,10 @@ int notrace unwind_frame(struct stackframe *frame)
+>         frame->sp = *(unsigned long *)(fp - 8);
+>         frame->pc = *(unsigned long *)(fp - 4);
+>
+> +       /* Do not claim the frame is valid if if is obviously corrupt: */
+> +       if (!IS_ALIGNED(frame->fp, 4))
+> +               return -EINVAL;
+> +
+>         return 0;
+>  }
+>  #endif
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-More than that: FEC should select PTP_1588_CLOCK, FEC_PTP should be
-removed and all the conditional code made unconditional.  Alternately,
-if that would cost too much (in terms of performance or memory) on some
-systems where the driver is used, FEC_PTP should default to 'y'.
-
-Ben.
-
--- 
-Ben Hutchings, Staff Engineer, Solarflare
-Not speaking for my employer; that's the marketing department's job.
-They asked us to note that Solarflare product names are trademarked.
+Dave or Todd, mind reposting this, or should I squash it into my
+CONFIG_SMP stacktrace series?
