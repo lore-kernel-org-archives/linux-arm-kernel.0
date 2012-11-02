@@ -1,57 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 2 Nov 2012 13:07:13 +0200
-Subject: [PATCH 2/2] i2c: omap: use revision check for
- OMAP_I2C_FLAG_APPLY_ERRATA_I207
-In-Reply-To: <1351852785-16961-3-git-send-email-shubhrajyoti@ti.com>
-References: <1351852785-16961-1-git-send-email-shubhrajyoti@ti.com>
- <1351852785-16961-3-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121102110713.GC19493@arwen.pp.htv.fi>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Fri, 2 Nov 2012 12:14:32 +0100
+Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
+In-Reply-To: <5093A8CD.60006@atmel.com>
+References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
+ <20121101222922.GD22956@pengutronix.de> <5093A8CD.60006@atmel.com>
+Message-ID: <20121102111432.GD21313@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 04:09:45PM +0530, Shubhrajyoti D wrote:
-> The errata i207 is enabled for 2430 and 3xxx. Use the revision check
-> to enable the erratum instead.
+On Fri, Nov 02, 2012 at 12:04:45PM +0100, ludovic.desroches wrote:
+> Hi Wolfram,
 > 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-
-very good. I haven't read the errata but from a code standpoint, it
-looks good:
-
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> ---
->  drivers/i2c/busses/i2c-omap.c |    3 ++-
->  1 files changed, 2 insertions(+), 1 deletions(-)
+> Le 11/01/2012 11:29 PM, Wolfram Sang a ?crit :
+> >On Wed, Oct 10, 2012 at 04:25:58PM +0200, ludovic.desroches at atmel.com wrote:
+> >>From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>
+> >>If the i2c message length is zero, i2c-at91 will directly return an error
+> >>instead of trying to send a zero-length message.
+> >>
+> >>Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >
+> >What happens if you send a 0 byte message? Some hardware is able to do
+> >this and it will be used in SMBUS QUICK which the driver states to
+> >support according to at91_twi_func().
 > 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index d8e7709..44245d4 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1164,7 +1164,8 @@ omap_i2c_probe(struct platform_device *pdev)
->  
->  	dev->errata = 0;
->  
-> -	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
-> +	if (dev->rev >= OMAP_I2C_REV_ON_2430 &&
-> +			dev->rev < OMAP_I2C_REV_ON_4430_PLUS)
->  		dev->errata |= I2C_OMAP_ERRATA_I207;
->  
->  	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
-> -- 
-> 1.7.5.4
+> Without this I had some data corruption when writing to / reading
+> from a serial eeprom (depending on the IP version).
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Yes SMBUS quick command is supported but is not managed in the
+> driver, we have to tell explicitly the IP that we want to send this
+> command.
+
+Ok, so unless you want to implement the support, please update this
+patch with a comment that SMBUS_QUICK is a TODO and remove the
+SMBUS_QUICK capability.
 
 -- 
-balbi
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
+Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/78fc6173/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/48709ea9/attachment-0001.sig>
