@@ -1,26 +1,76 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 2 Nov 2012 09:43:24 +0100
-Subject: [PATCH 0/4] Support the MX6 FEC as a PTP hardware clock
-In-Reply-To: <CAHrpEqRuy=kewK-592RphVfJnNoma2CPZytoTqLc45HeT53hRQ@mail.gmail.com>
-References: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
- <20121101.123027.1332984905040252720.davem@davemloft.net>
- <CAHrpEqRuy=kewK-592RphVfJnNoma2CPZytoTqLc45HeT53hRQ@mail.gmail.com>
-Message-ID: <20121102084324.GA2486@netboy.at.omicron.at>
+From: mugunthanvnm@ti.com (N, Mugunthan V)
+Date: Fri, 2 Nov 2012 08:46:46 +0000
+Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes for
+ AM33XX
+In-Reply-To: <50914107.2090909@ti.com>
+References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+ <1351498881-32482-6-git-send-email-hvaibhav@ti.com> <50914107.2090909@ti.com>
+Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293EA08F53@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 10:36:09AM +0800, Frank Li wrote:
-> >
-> > All applied to net-next.
-> >
-> > Please make sure your changes are in sync with Ben's PTP/PPS
-> > Kconfig changes of today, and send me any changes if necessary.
-> >
+> -----Original Message-----
+> From: Cousson, Benoit
+> Sent: Wednesday, October 31, 2012 8:47 PM
+> To: Hiremath, Vaibhav
+> Cc: netdev at vger.kernel.org; paul at pwsan.com; linux-arm-
+> kernel at lists.infradead.org; linux-omap at vger.kernel.org; N, Mugunthan V;
+> Richard Cochran
+> Subject: Re: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module
+> nodes for AM33XX
+> > +			compatible = "ti,cpsw";
+> > +			ti,hwmods = "cpgmac0";
+> > +			cpdma_channels = <8>;
+> > +			host_port_no = <0>;
+> > +			cpdma_reg_ofs = <0x800>;
+> > +			cpdma_sram_ofs = <0xa00>;
+> > +			ale_reg_ofs = <0xd00>;
+> > +			ale_entries = <1024>;
+> > +			host_port_reg_ofs = <0x108>;
+> > +			hw_stats_reg_ofs = <0x900>;
+> > +			bd_ram_ofs = <0x2000>;
+> > +			bd_ram_size = <0x2000>;
+> > +			no_bd_ram = <0>;
+> > +			rx_descs = <64>;
+> > +			mac_control = <0x20>;
 > 
-> Thank you very much.
-> I checked Ben's patch, which not affect FEC.
+> Do you have to store all these data in the DTS? Cannot it be in the
+> driver?
+> 
+> Do you expect to have several instance of the same IP with different
+> parameters here?
 
-Maybe just remove the Kconfig line "select PPS".
+Though CPSW is a single IP in AM335X, CPSW has sub modules like CPDMA, ALE,
+SLIVER, CPTS and SLAVES where is IP integrator can locate it at different
+offsets. For example comparing the CPSW ip in TI814X and AM335X all the
+above offsets are changed. So I have kept all these offsets in DT as driver
+should not hold any SoC related informations
 
-Thanks,
-Richard
+> > +			cpsw_emac0: slave at 0 {
+> 
+> Mmm, you are using some address later and here some relative number,
+> that does not looks very consistent.
+> 
+> > +				slave_reg_ofs = <0x208>;
+> 
+> Is it an offset from 4a100000? Cannot you use the address for the slave
+> name?
+> 
+> Something like that: cpsw_emac0: slave at 4a100208
+> 
+
+I have followed the naming convention as per the TRM which is mentioned as
+Slave 0 and Slave 1 and its offset is from 0x4a100000. I have taken the
+reference from  arch/arm/boot/dts/picoxcell-pc3x2.dtsi+167 and followed
+the same naming convention from TRM. There is one more method to implement
+in reference from arch/arm/boot/dts/imx6q.dtsi+408 as below
+
++			cpsw_emac0: slave at 208 {
++				slave_reg_ofs = <0x208>;
++				sliver_reg_ofs = <0xd80>;
++				/* Filled in by U-Boot */
++				mac-address = [ 00 00 00 00 00 00 ];
++			};
+
+Regards
+Mugunthan V N 
