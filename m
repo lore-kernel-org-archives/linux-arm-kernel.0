@@ -1,41 +1,54 @@
-From: shuah.khan@hp.com (Shuah Khan)
-Date: Fri, 02 Nov 2012 09:58:53 -0600
-Subject: [PATCH linux-next] ARM64: dma-mapping: support
- debug_dma_mapping_error
-In-Reply-To: <1351264983.2712.14.camel@lorien2>
-References: <1351205220.6851.3.camel@lorien2>
- <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
- <1351264983.2712.14.camel@lorien2>
-Message-ID: <1351871933.2721.10.camel@lorien2>
+From: ludovic.desroches@atmel.com (ludovic.desroches)
+Date: Fri, 2 Nov 2012 17:00:43 +0100
+Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
+In-Reply-To: <20121102111432.GD21313@pengutronix.de>
+References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
+ <20121101222922.GD22956@pengutronix.de> <5093A8CD.60006@atmel.com>
+ <20121102111432.GD21313@pengutronix.de>
+Message-ID: <5093EE2B.8080005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-10-26 at 09:23 -0600, Shuah Khan wrote:
-> Add support for debug_dma_mapping_error() call to avoid warning from
-> debug_dma_unmap() interface when it checks for mapping error checked
-> status. Without this patch, device driver failed to check map error
-> warning is generated. 
-> 
-> Signed-off-by: Shuah Khan <shuah.khan@hp.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Le 11/02/2012 12:14 PM, Wolfram Sang a ?crit :
+> On Fri, Nov 02, 2012 at 12:04:45PM +0100, ludovic.desroches wrote:
+>> Hi Wolfram,
+>>
+>> Le 11/01/2012 11:29 PM, Wolfram Sang a ?crit :
+>>> On Wed, Oct 10, 2012 at 04:25:58PM +0200, ludovic.desroches at atmel.com wrote:
+>>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>>>
+>>>> If the i2c message length is zero, i2c-at91 will directly return an error
+>>>> instead of trying to send a zero-length message.
+>>>>
+>>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>>
+>>> What happens if you send a 0 byte message? Some hardware is able to do
+>>> this and it will be used in SMBUS QUICK which the driver states to
+>>> support according to at91_twi_func().
+>>
+>> Without this I had some data corruption when writing to / reading
+>> from a serial eeprom (depending on the IP version).
+>>
+>> Yes SMBUS quick command is supported but is not managed in the
+>> driver, we have to tell explicitly the IP that we want to send this
+>> command.
+>
+> Ok, so unless you want to implement the support, please update this
+> patch with a comment that SMBUS_QUICK is a TODO and remove the
+> SMBUS_QUICK capability.
+>
 
-Do you want this patch going through linux-next or the ARM64 tree? Let
-me know your preference.
+Implementation should not be a huge task, only one bit to set in a 
+register but I have no device to test it.
+So I will choose to remove the SMBUS_QUICK capability.
 
--- Shuah
-> ---
->  arch/arm64/include/asm/dma-mapping.h |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index 538f4b4..9947768 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
->  static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
->  {
->  	struct dma_map_ops *ops = get_dma_ops(dev);
-> +	debug_dma_mapping_error(dev, dev_addr);
->  	return ops->mapping_error(dev, dev_addr);
->  }
->  
+Hi Nikolaus,
+
+Did you test the driver with SMBus compatible devices? Can I keep other 
+SMBus capabilities from SMBUS_EMUL?
+
+Thanks
+
+Regards
+
+Ludovic
