@@ -1,96 +1,119 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sat, 3 Nov 2012 00:29:24 +0300
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CAN1soZyAuo4UUze9yWKTOqwJ0TC4cf+uywWo1Ypbrcq0+zez0g@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
- <508E5DFB.3060002@gmail.com>
- <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
- <508E61E7.7090502@gmail.com>
- <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
- <508E651A.5070009@gmail.com>
- <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
- <509032F6.1050301@gmail.com>
- <CAN1soZyAuo4UUze9yWKTOqwJ0TC4cf+uywWo1Ypbrcq0+zez0g@mail.gmail.com>
-Message-ID: <CA+E=qVfi8Ko4SDDi92jRLjQ4bKtqHkhq4N7QtbiU1k7bPbWjig@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 02 Nov 2012 23:16:53 +0100
+Subject: [RFC 00/15] Add basic suspend-resume support for AM33XX
+In-Reply-To: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <50944655.20602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 6:31 PM, Haojian Zhuang
-<haojian.zhuang@gmail.com> wrote:
-> On Wed, Oct 31, 2012 at 4:05 AM, Daniel Mack <zonque@gmail.com> wrote:
->>
->> On 30.10.2012 21:01, Vasily Khoruzhick wrote:
->> > On Mon, Oct 29, 2012 at 2:14 PM, Daniel Mack <zonque@gmail.com> wrote:
->> >> On 29.10.2012 12:12, Vasily Khoruzhick wrote:
->> >>> On Mon, Oct 29, 2012 at 2:00 PM, Daniel Mack <zonque@gmail.com> wrote:
->> >>>
->> >>>>> Well, there's an issue - Z2 does not preserve memory contents in deep sleep
->> >>>>> (but it does in sleep), so userspace can't be fixed here unfortunatelly.
->> >>>>> There's no another possibility to turn Z2 off, and plain sleep is too
->> >>>>> power hungry.
->> >>>>> So the only way to keep Z2 in low-power mode is fake power off, which just puts
->> >>>>> Z2 in deep sleep.
->> >>>>
->> >>>> Why can't the userspace trigger a deep sleep then instead of powering
->> >>>> off? Which details do I lack?
->> >>>
->> >>> How? echo mem >/sys/power/state puts system into non-deep sleep. Anyway, kernel
->> >>> is not ready for fake power off instead of suspend (we can't resume
->> >>> from deep sleep,
->> >>> memory content is not preserved), so there can be some data loss.
->> >>> Adding some sysfs file to control sleep type does not look like a good
->> >>> idea to me.
->> >>>
->> >>> Btw, how other DT-capable boards handle power off?
->> >>
->> >> No idea. I never actually used that kind of power state.
->> >
->> > Hi Daniel,
->> >
->> > One more question: what should I use instead of pxa2xx_mfp_config in
->> > DT board to configure pin modes?
->>
->> Haojian was working on the PXA pinctrl drivers, but I don't know how far
->> that is yet.
->>
->> If that's not yet there, have a look at the pinctrl-single driver. It's
->> admittedly not as nice to use as the constants in the board file as DT
->> lacks defines for numerical constants, but's at least a workaround.
->>
->> On a more general note, it's arguable whether this kind of setup should
->> be done in the bootloader after all.
->>
->>
->> Daniel
->>
->
-> I prefer to use pinctrl-single driver instead. I'm updating mmp
-> pinctrol driver to
-> pinctrl-single driver framework. You can find them in mailist. I'm submitting
-> a third round in these days.
->
-> Regards
-> Haojian
+On 02.11.2012 13:32, Vaibhav Bedia wrote:
+> This patch series adds support for suspend-resume on AM33XX.
 
-OK, one more question:
+Thanks a lot for working on this!
 
-On PXA2xx GPIO and PINMUX are not separate blocks. Each pin can be
-either input or output and have 4 modes (gpio + 3 alternate functions)
-== 8 states , so we have: gpio in, gpio out, 3 alt in, 3 alt out.
-To control pin mode one should write to GPDR (direction register) and
-GAFR (alternate function register). pxa-gpio driver controls both of
-those registers, so does pxa2xx-mfp.
+[...]
 
-I'm not sure what to do in this case. Should I move code controlling
-GPDR and GAFR into some pinctrl-pxa2xx driver, and modify pxa-gpio
-driver to use it?
+> [root at arago /]# echo 1 > ./sys/devices/ocp.2/wkup_m3.4/firmware/am335x-pm-firmware.bin/loading
+> [root at arago /]# cat binary_blob > ./sys/devices/ocp.2/wkup_m3.4/firmware/am335x-pm-firmware.bin/data
+> [root at arago /]# echo 0 > ./sys/devices/ocp.2/wkup_m3.4/firmware/am335x-pm-firmware.bin/loading
+> [   28.770356] Copied the M3 firmware to UMEM
+> [   28.778178] omap_hwmod: wkup_m3: _wait_target_disable failed
+> [root at arago /]# echo mem > /sys/power/state
+> [   32.959753] PM: Syncing filesystems ... done.
+> [   32.988434] Freezing user space processes ... (elapsed 0.02 seconds) done.
+> [   33.016120] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
+> [   33.047607] Suspending console(s) (use no_console_suspend to debug)
+> [   33.070420] PM: suspend of devices complete after 11.538 msecs
+> [   33.074095] PM: late suspend of devices complete after 3.651 msecs
+> [   33.079135] PM: noirq suspend of devices complete after 5.011 msecs
+> [   33.079196] Disabling non-boot CPUs ...
+> [   33.083923] GFX domain entered low power state
+> [   33.083973] Successfully transitioned to low power state
+> [   33.087132] PM: noirq resume of devices complete after 2.663 msecs
+> [   33.090629] PM: early resume of devices complete after 2.346 msecs
+> [   33.097607] PM: resume of devices complete after 6.951 msecs
+> [   33.155869] Restarting tasks ... done.
+> [root at arago /]#
+> 
+> All the patches have been run through checkpatch and i have also
+> tried a few OMAP build configs that Paul uses to ensure that these
+> patches do not introduce any new build warnings/errors for the OMAP
+> family.
+> 
+> A few TODOs
+> 0. Test all the patches on OMAP platforms like BeagleBoard
 
-Regards
-Vasily
+I'm testing this on a custom AM33xx board, and with
+"no_console_suspend", I get the following:
+
+# echo mem >/sys/power/state
+[   27.306144] PM: Syncing filesystems ... done.
+[   27.335524] Freezing user space processes ... (elapsed 0.01 seconds)
+done.
+[   27.361603] Freezing remaining freezable tasks ... (elapsed 0.02
+seconds) done.
+[   27.408269] ------------[ cut here ]------------
+[   27.413147] WARNING: at drivers/net/ethernet/ti/cpsw.c:298
+cpsw_rx_handler+0xbd/0xdc()
+[   27.421438] Modules linked in: ipv6
+[   27.425158] [<c0010d85>] (unwind_backtrace+0x1/0x9c) from
+[<c0319f77>] (dump_stack+0xb/0xc)
+[   27.433932] [<c0319f77>] (dump_stack+0xb/0xc) from [<c00266a3>]
+(warn_slowpath_common+0x33/0x48)
+[   27.443149] [<c00266a3>] (warn_slowpath_common+0x33/0x48) from
+[<c00266c9>] (warn_slowpath_null+0x11/0x14)
+[   27.453273] [<c00266c9>] (warn_slowpath_null+0x11/0x14) from
+[<c020f4b9>] (cpsw_rx_handler+0xbd/0xdc)
+[   27.462943] [<c020f4b9>] (cpsw_rx_handler+0xbd/0xdc) from
+[<c020d773>] (__cpdma_chan_free+0x83/0x90)
+[   27.472519] [<c020d773>] (__cpdma_chan_free+0x83/0x90) from
+[<c020d815>] (__cpdma_chan_process+0x95/0xb8)
+[   27.482550] [<c020d815>] (__cpdma_chan_process+0x95/0xb8) from
+[<c020d8ff>] (cpdma_chan_stop+0x93/0x110)
+[   27.492490] [<c020d8ff>] (cpdma_chan_stop+0x93/0x110) from
+[<c020d9ab>] (cpdma_ctlr_stop+0x2f/0x6c)
+[   27.501975] [<c020d9ab>] (cpdma_ctlr_stop+0x2f/0x6c) from
+[<c020f033>] (cpsw_ndo_stop+0x2b/0x128)
+[   27.511278] [<c020f033>] (cpsw_ndo_stop+0x2b/0x128) from [<c020f145>]
+(cpsw_suspend+0x15/0x20)
+[   27.520311] [<c020f145>] (cpsw_suspend+0x15/0x20) from [<c01cce83>]
+(platform_pm_suspend+0x13/0x28)
+[   27.529809] [<c01cce83>] (platform_pm_suspend+0x13/0x28) from
+[<c01cfb8b>] (dpm_run_callback.clone.6+0x1f/0x78)
+[   27.540390] [<c01cfb8b>] (dpm_run_callback.clone.6+0x1f/0x78) from
+[<c01d0337>] (__device_suspend+0xb3/0x168)
+[   27.550789] [<c01d0337>] (__device_suspend+0xb3/0x168) from
+[<c01d0a3d>] (dpm_suspend+0x45/0x178)
+[   27.560095] [<c01d0a3d>] (dpm_suspend+0x45/0x178) from [<c01d0d15>]
+(dpm_suspend_start+0x39/0x44)
+[   27.569404] [<c01d0d15>] (dpm_suspend_start+0x39/0x44) from
+[<c0046fdd>] (suspend_devices_and_enter+0x31/0x148)
+[   27.579981] [<c0046fdd>] (suspend_devices_and_enter+0x31/0x148) from
+[<c0047203>] (pm_suspend+0x10f/0x170)
+[   27.590103] [<c0047203>] (pm_suspend+0x10f/0x170) from [<c004693f>]
+(state_store+0x43/0x7c)
+[   27.598870] [<c004693f>] (state_store+0x43/0x7c) from [<c019500d>]
+(kobj_attr_store+0x9/0x10)
+[   27.607828] [<c019500d>] (kobj_attr_store+0x9/0x10) from [<c00cdb2d>]
+(sysfs_write_file+0xb5/0x104)
+[   27.617319] [<c00cdb2d>] (sysfs_write_file+0xb5/0x104) from
+[<c008cb5b>] (vfs_write+0x77/0x110)
+[   27.626442] [<c008cb5b>] (vfs_write+0x77/0x110) from [<c008cd75>]
+(sys_write+0x2d/0x48)
+[   27.634844] [<c008cd75>] (sys_write+0x2d/0x48) from [<c000cfc1>]
+(ret_fast_syscall+0x1/0x50)
+[   27.643683] ---[ end trace f2a0c58ea7742606 ]---
+[   27.650834] PM: suspend of devices complete after 253.597 msecs
+[   27.660392] PM: late suspend of devices complete after 3.253 msecs
+[   27.674504] omap_hwmod: cpgmac0: _wait_target_disable failed
+
+And the power consumption does not drop noticable at this point.
+
+What event did you use to bring the system back to life? I tried a GPIO
+button which has "linux,wakeup" set and is connected to GPIO bank 0, but
+without success.
+
+
+Thanks,
+Daniel
