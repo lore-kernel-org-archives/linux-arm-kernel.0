@@ -1,32 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Nov 2012 09:37:53 -0700
-Subject: [PATCH v3 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <5092B9A0.9000204@wwwdotorg.org>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-6-git-send-email-haojian.zhuang@gmail.com>
- <5092B9A0.9000204@wwwdotorg.org>
-Message-ID: <20121102163752.GV15766@atomide.com>
+From: vitas@nppfactor.kiev.ua (Vitalii Demianets)
+Date: Fri, 2 Nov 2012 19:09:24 +0200
+Subject: [PATCH net-next] macb: Keep driver's speed/duplex in sync with actual
+ NCFGR
+Message-ID: <201211021909.25473.vitas@nppfactor.kiev.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Stephen Warren <swarren@wwwdotorg.org> [121101 11:06]:
-> On 10/31/2012 05:04 PM, Haojian Zhuang wrote:
-> > Add comments with pinconf & gpio range in the document of
-> > pinctrl-single.
-> 
-> I'd tend to suggest separating the series to add GPIO range support and
-> pinconf support, especially since didn't Tony suggest a separate driver
-> for pinconf? Perhaps that was just for non-generic properties.
+When underlying phy driver restores its state very fast after being brought 
+down and up so that macb driver function macb_handle_link_change() was never 
+called with link state "down", driver's internal representation of phy speed 
+and duplex (bp->speed and bp->duplex) didn't change. So, macb driver sees no 
+reason to perform actual write to the NCFGR register, although the speed and 
+duplex settings in that register were reset when interface was brought down 
+and up. In that case actual phy speed and duplex differ from NCFGR settings.
+The patch fixes that by keeping internal driver representation of speed and 
+duplex in sync with actual content of NCFGR.
 
-Well I was just thinking setting them up as separate driver
-instances for the register ranges supporting pinconf and
-not supporting pinconf. This combined with some pinconf
-property parsed during pinctrl-single.c probe time allows
-saving lots of unnecessary parsing of properties for
-register ranges that don't support pinconf. At least for
-omaps we have few hundred registers that don't support
-pinconf, and then some separate random register that do.
+Signed-off-by: Vitalii Demianets <vitas@nppfactor.kiev.ua>
 
-Regards,
+---
+ drivers/net/ethernet/cadence/macb.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-TOny 
+diff --git a/drivers/net/ethernet/cadence/macb.c 
+b/drivers/net/ethernet/cadence/macb.c
+index c374875..13c3c33 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -1031,6 +1031,8 @@ static void macb_init_hw(struct macb *bp)
+ 		config |= MACB_BIT(NBC);	/* No BroadCast */
+ 	config |= macb_dbw(bp);
+ 	macb_writel(bp, NCFGR, config);
++	bp->speed = SPEED_10;
++	bp->duplex = DUPLEX_HALF;
+ 
+ 	macb_configure_dma(bp);
+ 
+-- 
+1.7.8.6
