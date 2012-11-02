@@ -1,38 +1,55 @@
 From: zonque@gmail.com (Daniel Mack)
-Date: Fri,  2 Nov 2012 16:25:55 +0100
-Subject: [PATCH v3 3/4] ARM: OMAP: gpmc: don't create devices from initcall on
- DT
-In-Reply-To: <1351869956-2787-1-git-send-email-zonque@gmail.com>
-References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
-Message-ID: <1351869956-2787-4-git-send-email-zonque@gmail.com>
+Date: Fri,  2 Nov 2012 16:25:52 +0100
+Subject: [PATCH v3 0/4] RFC: OMAP GPMC DT bindings
+Message-ID: <1351869956-2787-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On DT driven boards, the gpmc node will match the driver. Hence, there's
-no need to do that unconditionally from the initcall.
+This is a series of patches to support GPMC peripherals on OMAP boards.
 
-Signed-off-by: Daniel Mack <zonque@gmail.com>
----
- arch/arm/mach-omap2/gpmc.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+Depends on Linus' master +
+omap-next (branch omap-for-v3.8/cleanup-headers-gpmc)
 
-diff --git a/arch/arm/mach-omap2/gpmc.c b/arch/arm/mach-omap2/gpmc.c
-index 60f1cce..1dcb30c 100644
---- a/arch/arm/mach-omap2/gpmc.c
-+++ b/arch/arm/mach-omap2/gpmc.c
-@@ -844,6 +844,13 @@ static int __init omap_gpmc_init(void)
- 	struct platform_device *pdev;
- 	char *oh_name = "gpmc";
- 
-+	/*
-+	 * if the board boots up with a populated DT, do not
-+	 * manually add the device from this initcall
-+	 */
-+	if (of_have_populated_dt())
-+		return -ENODEV;
-+
- 	oh = omap_hwmod_lookup(oh_name);
- 	if (!oh) {
- 		pr_err("Could not look up %s\n", oh_name);
+The only supported peripheral for now is NAND, but other types would be
+easy to add.
+
+Version 2 addresses details pointed out by Jon Hunter, Afzal Mohammed
+and Rob Herring:
+
+ - add "reg" and "ti,hwmod" properties to Documentation
+ - use generic of_mtd functions and the property names defined by them,
+   namely "nand-bus-width" and "nand-ecc-mode"
+ - reduce the default register space size in the Documentation to 8K,
+   as found in the hwmod code
+ - switch to a DT layout based on ranges and address translation.
+   Although this property is not currently looked at as long as the
+   handling code still uses the runtime calculation methods, we now
+   have these values in the bindings, eventually allowing us to
+   switch the implementation with less pain.
+
+Version 3 includes fixes pointed out by Jon Hunter:
+
+ - better documentation of the 'ranges' property to describe the
+   fact that it's representing the CS lines
+ - GPMC_CS_CONFIGx -> GPMC_CONFIGx in comments
+ - drop interrupt-parent from example bindings
+ - add of_node_put() at the end of the child iteration
+
+Daniel Mack (4):
+  mtd: omap-nand: pass device_node in platform data
+  ARM: OMAP: gpmc: enable hwecc for AM33xx SoCs
+  ARM: OMAP: gpmc: don't create devices from initcall on DT
+  ARM: OMAP: gpmc: add DT bindings for GPMC timings and NAND
+
+ Documentation/devicetree/bindings/bus/ti-gpmc.txt  |  76 +++++++++++
+ .../devicetree/bindings/mtd/gpmc-nand.txt          |  60 +++++++++
+ arch/arm/mach-omap2/gpmc-nand.c                    |   2 +-
+ arch/arm/mach-omap2/gpmc.c                         | 148 +++++++++++++++++++++
+ drivers/mtd/nand/omap2.c                           |   4 +-
+ include/linux/platform_data/mtd-nand-omap2.h       |   2 +
+ 6 files changed, 290 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/ti-gpmc.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/gpmc-nand.txt
+
 -- 
 1.7.11.7
