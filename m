@@ -1,35 +1,82 @@
 From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Fri, 2 Nov 2012 18:02:39 +0530
-Subject: [PATCH 08/15] ARM: OMAP2+: hwmod: Fix the omap_hwmod_addr_space for
- CPGMAC0
+Date: Fri, 2 Nov 2012 18:02:43 +0530
+Subject: [PATCH 12/15] ARM: OMAP: timer: Add suspend-resume callbacks for
+ clockevent device
 In-Reply-To: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
 References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <1351859566-24818-9-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <1351859566-24818-13-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first entry for CPGMAC0 should be ADDR_MAP_ON_INIT
-instead of ADDR_TYPE_RT to ensure the omap hwmod code
-maps the memory space at init and writes to the SYSCONFIG
-registers.
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
+The current OMAP timer code registers two timers -
+one as clocksource and one as clockevent.
+AM33XX has only one usable timer in the WKUP domain
+so one of the timers needs suspend-resume support
+to restore the configuration to pre-suspend state.
+
+commit adc78e6 (timekeeping: Add suspend and resume
+of clock event devices) introduced .suspend and .resume
+callbacks for clock event devices. Leverages these
+callbacks to have AM33XX clockevent timer which is
+in not in WKUP domain to behave properly across system
+suspend.
+
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
 Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/timer.c |   31 +++++++++++++++++++++++++++++++
+ 1 files changed, 31 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 7772c29..881b570 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -2500,7 +2500,7 @@ static struct omap_hwmod_addr_space am33xx_cpgmac0_addr_space[] = {
- 	{
- 		.pa_start	= 0x4a100000,
- 		.pa_end		= 0x4a100000 + SZ_2K - 1,
--		.flags		= ADDR_TYPE_RT,
-+		.flags		= ADDR_MAP_ON_INIT,
- 	},
- 	/* cpsw wr */
- 	{
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 6584ee0..e8781fd 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -135,6 +135,35 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+ 	}
+ }
+ 
++static void omap_clkevt_suspend(struct clock_event_device *unused)
++{
++	char name[10];
++	struct omap_hwmod *oh;
++
++	sprintf(name, "timer%d", 2);
++	oh = omap_hwmod_lookup(name);
++	if (!oh)
++		return;
++
++	omap_hwmod_idle(oh);
++}
++
++static void omap_clkevt_resume(struct clock_event_device *unused)
++{
++	char name[10];
++	struct omap_hwmod *oh;
++
++	sprintf(name, "timer%d", 2);
++	oh = omap_hwmod_lookup(name);
++	if (!oh)
++		return;
++
++	omap_hwmod_enable(oh);
++	__omap_dm_timer_load_start(&clkev,
++			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
++	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
++}
++
+ static struct clock_event_device clockevent_gpt = {
+ 	.name		= "gp_timer",
+ 	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+@@ -142,6 +171,8 @@ static struct clock_event_device clockevent_gpt = {
+ 	.rating		= 300,
+ 	.set_next_event	= omap2_gp_timer_set_next_event,
+ 	.set_mode	= omap2_gp_timer_set_mode,
++	.suspend	= omap_clkevt_suspend,
++	.resume		= omap_clkevt_resume,
+ };
+ 
+ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
 -- 
 1.7.0.4
