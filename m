@@ -1,99 +1,45 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 2 Nov 2012 10:19:03 +0100
-Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
-In-Reply-To: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
-References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20121102091902.GA3437@netboy.at.omicron.at>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 02 Nov 2012 10:20:33 +0100
+Subject: [PATCH 7/8] serial: xilinx_uartps: get clock rate info from dts
+In-Reply-To: <23a299ee5e89cfd17bb9affd8fbb9f41b79cfd46.1351721190.git.josh.cartwright@ni.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+ <23a299ee5e89cfd17bb9affd8fbb9f41b79cfd46.1351721190.git.josh.cartwright@ni.com>
+Message-ID: <50939061.9060201@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 12:25:31PM +0800, Frank Li wrote:
-
-> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
-> index feff516..ff3be53 100644
-> --- a/drivers/net/ethernet/freescale/Kconfig
-> +++ b/drivers/net/ethernet/freescale/Kconfig
-> @@ -92,4 +92,13 @@ config GIANFAR
->  	  This driver supports the Gigabit TSEC on the MPC83xx, MPC85xx,
->  	  and MPC86xx family of chips, and the FEC on the 8540.
+On 10/31/2012 08:28 PM, Josh Cartwright wrote:
+> Add support for specifying clock information for the uart clk via the
+> device tree.  This eliminates the need to hardcode rates in the device
+> tree.
+> 
+> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi   |  4 ++--
+>  drivers/tty/serial/xilinx_uartps.c | 30 +++++++++++++++++-------------
+>  2 files changed, 19 insertions(+), 15 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index bb3085c..5fb763f 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -44,14 +44,14 @@
+>  			compatible = "xlnx,xuartps";
+>  			reg = <0xE0000000 0x1000>;
+>  			interrupts = <0 27 4>;
+> -			clock = <50000000>;
+> +			clocks = <&uart_clk 0>;
+>  		};
 >  
-> +config FEC_PTP
-> +	bool "PTP Hardware Clock (PHC)"
-> +	depends on FEC
-> +	select PPS
-> +	select PTP_1588_CLOCK
-> +	--help---
-> +	  Say Y here if you want to use PTP Hardware Clock (PHC) in the
-> +	  driver.  Only the basic clock operations have been implemented.
-> +
+>  		uart1: uart at e0001000 {
+>  			compatible = "xlnx,xuartps";
+>  			reg = <0xE0001000 0x1000>;
+>  			interrupts = <0 50 4>;
+> -			clock = <50000000>;
+> +			clocks = <&uart_clk 0>;
 
-Does the PTP function work with every FEC on ColdFire and i.MX?
+Shouldn't this be <&uart_clk 1>?
 
-Or do you need to limit this option in some way?
-
->  endif # NET_VENDOR_FREESCALE
-
-...
-
-> diff --git a/drivers/net/ethernet/freescale/fec_ptp.c b/drivers/net/ethernet/freescale/fec_ptp.c
-> new file mode 100644
-> index 0000000..9b91da9
-> --- /dev/null
-> +++ b/drivers/net/ethernet/freescale/fec_ptp.c
-
-...
-
-> +/**
-> + * fec_ptp_adjfreq - adjust ptp cycle frequency
-> + * @ptp: the ptp clock structure
-> + * @ppb: parts per billion adjustment from base
-> + *
-> + * Adjust the frequency of the ptp cycle counter by the
-> + * indicated ppb from the base frequency.
-> + *
-> + * Because ENET hardware frequency adjust is complex,
-> + * using software method to do that.
-> + */
-> +static int fec_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
-> +{
-> +	u64 diff;
-> +	unsigned long flags;
-> +	int neg_adj = 0;
-> +
-> +	struct fec_enet_private *fep =
-> +	    container_of(ptp, struct fec_enet_private, ptp_caps);
-> +
-> +	if (ppb < 0) {
-> +		ppb = -ppb;
-> +		neg_adj = 1;
-> +	}
-> +
-> +	spin_lock_irqsave(&fep->tmreg_lock, flags);
-> +	/*
-> +	 * dummy read to set cycle_last in tc to now.
-> +	 * So use adjusted mult to calculate when next call
-> +	 * timercounter_read.
-> +	 */
-> +	timecounter_read(&fep->tc);
-
-You can reduce the time that the spin lock is held by moving the next
-four lines before the locked region:
-
-> +	fep->cc.mult = FEC_CC_MULT;
-> +	diff = fep->cc.mult;
-> +	diff *= ppb;
-> +	diff = div_u64(diff, 1000000000ULL);
-
-> +
-> +	if (neg_adj)
-> +		fep->cc.mult -= diff;
-> +	else
-> +		fep->cc.mult += diff;
-> +
-> +	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
-> +
-> +	return 0;
-> +}
-
-Thanks,
-Richard
+>  		};
+>  
+>  		slcr: slcr at f8000000 {
