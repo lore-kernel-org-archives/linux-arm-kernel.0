@@ -1,40 +1,42 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 2 Nov 2012 13:44:45 +0530
-Subject: [PATCH v4 0/3] ocp2scp: add non-dt support
-Message-ID: <1351844088-27059-1-git-send-email-kishon@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 2 Nov 2012 09:24:44 +0100
+Subject: [PATCH v3] Visstrim SM10: Use mo_version to decide board video
+ mode.
+In-Reply-To: <CACKLOr1DB1_G6ttVHc6p-+SjegmJL1r4pKpunvo43xFR7RyA4g@mail.gmail.com>
+References: <1345457581-13837-1-git-send-email-javier.martin@vista-silicon.com>
+ <20120828074710.GX26594@pengutronix.de>
+ <CACKLOr0HO4OapJk_-ktWcfwcnVD1MLfL6MF1bbaVUHjD5LVuJg@mail.gmail.com>
+ <CACKLOr1DB1_G6ttVHc6p-+SjegmJL1r4pKpunvo43xFR7RyA4g@mail.gmail.com>
+Message-ID: <20121102082444.GD1641@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series allows ocp2scp driver to create its child devices
-from the platform data.
+On Tue, Oct 30, 2012 at 03:52:10PM +0100, javier Martin wrote:
+> On 28 September 2012 15:06, javier Martin
+> <javier.martin@vista-silicon.com> wrote:
+> > Hi Mauro,
+> > this patch should originally go via arm-soc but it has a dependency on
+> > support for coda video codec which is already in your tree.
+> >
+> > Now that we've got Sascha's ack could you merge this patch through your tree?
+> >
+> > Regards.
+> >
+> 
+> Hi Sascha,
+> it seems Mauro missed to apply this patch through his tree.
+> Moreover, 1 month later from my submission I think it should already
+> apply to arm-soc.
+> 
+> Could you please merge it?
 
-In omap platforms, usb phy is connected to ocp2scp and usb phy is needed
-for MUSB to be functional. When ocp2scp driver was added, it had only dt
-support which means it wont create usb phy devices for non-dt boot.
+Just applied it.
 
-This patch series adds non-dt support to ocp2scp and this series is needed
-for getting MUSB functional in non-dt boot.
-
-Changes from v3:
-used PLATFORM_DEVID_AUTO while creating a device using platform_device_alloc
-
-Changes from v2:
-*if cpu is not 44xx, dont create ocp2scp device in mach-omap2/devices.c
-
-Changes from v1:
-* Fixed Sergei's comments on memory leaks
-
-Kishon Vijay Abraham I (3):
-  drivers: bus: ocp2scp: add pdata support
-  ARM: OMAP4: add _dev_attr_ to ocp2scp for representing usb_phy
-  ARM: OMAP: ocp2scp: create omap device for ocp2scp
-
- arch/arm/mach-omap2/devices.c              |   79 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   28 ++++++++++
- drivers/bus/omap-ocp2scp.c                 |   68 ++++++++++++++++++++++--
- include/linux/platform_data/omap_ocp2scp.h |   31 +++++++++++
- 4 files changed, 203 insertions(+), 3 deletions(-)
- create mode 100644 include/linux/platform_data/omap_ocp2scp.h
+Thanks
+ Sascha
 
 -- 
-1.7.9.5
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
