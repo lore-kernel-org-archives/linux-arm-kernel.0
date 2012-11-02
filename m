@@ -1,63 +1,42 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Fri, 2 Nov 2012 09:28:26 -0600
-Subject: [PATCH 5/8] ARM: zynq: add COMMON_CLK support
-In-Reply-To: <5093E2D5.2000304@metafoo.de>
-References: <cover.1351721190.git.josh.cartwright@ni.com>
- <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
- <50939378.2050500@metafoo.de>
- <20121102133850.GO5190@beefymiracle.amer.corp.natinst.com>
- <5093E2D5.2000304@metafoo.de>
-Message-ID: <20121102152826.GQ5190@beefymiracle.amer.corp.natinst.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Nov 2012 08:49:02 -0700
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <50938A69.9040908@ti.com>
+References: <20121101224703.2103.95474.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local>
+ <50936A6E.3020202@ti.com> <5093891D.6070302@ti.com>
+ <50938A69.9040908@ti.com>
+Message-ID: <20121102154901.GU15766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 04:12:21PM +0100, Lars-Peter Clausen wrote:
-> On 11/02/2012 02:38 PM, Josh Cartwright wrote:
-> > On Fri, Nov 02, 2012 at 10:33:44AM +0100, Lars-Peter Clausen wrote:
-> >> On 10/31/2012 07:58 PM, Josh Cartwright wrote:
-[...]
-> >>> +static void __init zynq_periph_clk_setup(struct device_node *np)
-> >>> +{
-> >>> +	struct zynq_periph_clk *periph;
-> >>> +	const char *parent_names[3];
-> >>> +	struct clk_init_data init;
-> >>> +	struct clk *clk;
-> >>> +	int err;
-> >>> +	u32 reg;
-> >>> +	int i;
-> >>> +
-> >>> +	err = of_property_read_u32(np, "reg", &reg);
-> >>> +	WARN_ON(err);
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
+> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
+> >On 2012-11-02 08:38, Santosh Shilimkar wrote:
 > >>
-> >> Shouldn't the function abort if a error happens somewhere? Continuing here
-> >> will lead to undefined behavior. Same is probably true for the other WARN_ONs.
+> >>Lets not move this in DMA code since the above is really related
+> >>to frame buffer. It reserves more DMA area for dma_alloc_coherent()
+> >>etc than default 2 MB. Infact, we should no longer need this with
+> >>CMA and memblock in place.
+> >>
+> >>Tomi,
+> >>Can we not get rid of the above memory reservation ?
 > >
-> > The way I see it is: the kernel is will be left in a bad state in the
-> > case of any failure, regardless of if we bail out or continue.  AFAICT,
-> > there is no clean way to recover from a failure this early.
+> >Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
+> >and I have no means to test it out, though. But below is a patch to
+> >remove it. I also attached the patch, as it looks like thunderbird wants
+> >to reformat the pasted patch... I'll remove the
+> >CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
+> >in my tree later.
 > >
-> > Given that, it seems simpler (albeit marginally so) just to continue; so
-> > that's what I chose to do.  I'm not opposed to bailing out, just not
-> > convinced it does anything for us.
-> >
-> The issue with this approach is that, while you get a warning, unexpected
-> seemingly unrelated side-effects may happen later on. E.g. if no reg
-> property for the clock is specified the reg variable will be uninitialized
-> and contain whatever was on the stack before. The clock will be registered
-> nonetheless and the boot process continues. Now if the clock is enabled a
-> bit in a random register will be modified, which could result in strange and
-> abnormal behavior, which can be very hard to track down.
+> Great !!
+> Thanks for the patches Tomi.
+> 
+> For both the patches, feel free add.
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-Okay.....but any reasonable person would start their debugging quest at
-the source of the WARN_ON.  If someone sees the WARN_ON message but
-stupidly chooses to ignore it, they deserves to spend the time trying to
-track down abnormal behavior, so I'm still not convinced.
+Great thanks, will swap in Tomi's patch.
 
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/4744adbf/attachment.sig>
+Regards,
+
+Tony 
