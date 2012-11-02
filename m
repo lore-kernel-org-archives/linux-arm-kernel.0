@@ -1,89 +1,37 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Fri,  2 Nov 2012 13:51:44 -0500
-Subject: [PATCH 1/6 v2] arm: use devicetree to get smp_twd clock
-In-Reply-To: <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <1351882309-733-2-git-send-email-mark.langsdorf@calxeda.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 2 Nov 2012 11:54:53 -0700
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <20121102154901.GU15766@atomide.com>
+References: <20121101224703.2103.95474.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local>
+ <50936A6E.3020202@ti.com> <5093891D.6070302@ti.com>
+ <50938A69.9040908@ti.com> <20121102154901.GU15766@atomide.com>
+Message-ID: <20121102185453.GY15766@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
+> > On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
+> > >On 2012-11-02 08:38, Santosh Shilimkar wrote:
+> > >>
+> > >>Lets not move this in DMA code since the above is really related
+> > >>to frame buffer. It reserves more DMA area for dma_alloc_coherent()
+> > >>etc than default 2 MB. Infact, we should no longer need this with
+> > >>CMA and memblock in place.
+> > >>
+> > >>Tomi,
+> > >>Can we not get rid of the above memory reservation ?
+> > >
+> > >Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
+> > >and I have no means to test it out, though. But below is a patch to
+> > >remove it. I also attached the patch, as it looks like thunderbird wants
+> > >to reformat the pasted patch... I'll remove the
+> > >CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
+> > >in my tree later.
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
+Hmm actually, is it safe to remove for omap1, or should we
+still keep it around for omap1?
 
-Changes from v1
-	None.
----
- arch/arm/kernel/smp_twd.c | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+Regards,
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index b22d700..600fbcc 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
- 	return IRQ_NONE;
- }
- 
--static struct clk *twd_get_clock(void)
-+static struct clk *twd_get_clock(struct device_node *np)
- {
--	struct clk *clk;
-+	struct clk *clk = NULL;
- 	int err;
- 
--	clk = clk_get_sys("smp_twd", NULL);
-+	if (np)
-+		clk = of_clk_get(np, 0);
-+	if (!clk)
-+		clk = clk_get_sys("smp_twd", NULL);
- 	if (IS_ERR(clk)) {
- 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
- 		return clk;
-@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
- 		return ERR_PTR(err);
- 	}
- 
-+	twd_timer_rate = clk_get_rate(clk);
- 	return clk;
- }
- 
-@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
- 	struct clock_event_device **this_cpu_clk;
- 
--	if (!twd_clk)
--		twd_clk = twd_get_clock();
--
--	if (!IS_ERR_OR_NULL(twd_clk))
--		twd_timer_rate = clk_get_rate(twd_clk);
--	else
-+	if (IS_ERR_OR_NULL(twd_clk))
- 		twd_calibrate_rate();
- 
- 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
-@@ -349,6 +348,10 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
- 	if (!twd_base)
- 		return -ENOMEM;
- 
-+	twd_clk = twd_get_clock(NULL);
-+
-+	twd_clk = twd_get_clock(NULL);
-+
- 	return twd_local_timer_common_register();
- }
- 
-@@ -383,6 +386,8 @@ void __init twd_local_timer_of_register(void)
- 		goto out;
- 	}
- 
-+	twd_clk = twd_get_clock(np);
-+
- 	err = twd_local_timer_common_register();
- 
- out:
--- 
-1.7.11.7
+Tony
