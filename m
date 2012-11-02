@@ -1,28 +1,95 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Nov 2012 14:25:20 +0000
-Subject: [PATCH 2/3] ARM: OMAP: Remove NEED_MACH_GPIO_H
-In-Reply-To: <20121101224823.2103.24591.stgit@muffinssi.local>
-References: <20121101224703.2103.95474.stgit@muffinssi.local>
- <20121101224823.2103.24591.stgit@muffinssi.local>
-Message-ID: <20121102142519.GZ4413@opensource.wolfsonmicro.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 02 Nov 2012 16:12:21 +0100
+Subject: [PATCH 5/8] ARM: zynq: add COMMON_CLK support
+In-Reply-To: <20121102133850.GO5190@beefymiracle.amer.corp.natinst.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+ <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
+ <50939378.2050500@metafoo.de>
+ <20121102133850.GO5190@beefymiracle.amer.corp.natinst.com>
+Message-ID: <5093E2D5.2000304@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2012 at 03:48:23PM -0700, Tony Lindgren wrote:
-> Omap no longer needs this option, mach/gpio.h is
-> empty.
+On 11/02/2012 02:38 PM, Josh Cartwright wrote:
+> Thanks for the review.
 > 
-> Also remove mach/irqs.h from gpio-omap.h and
-> include it directly from the related omap1
-> gpio init files.
+> On Fri, Nov 02, 2012 at 10:33:44AM +0100, Lars-Peter Clausen wrote:
+>> On 10/31/2012 07:58 PM, Josh Cartwright wrote:
+>>> [...]
+>>> +#define PERIPH_CLK_CTRL_SRC(x)	(periph_clk_parent_map[((x)&3)>>4])
+>>> +#define PERIPH_CLK_CTRL_DIV(x)	(((x)&0x3F00)>>8)
+>>
+>> A few more spaces wouldn't hurt ;)
 > 
-> Otherwise omap2+ build fails for MULTI_PLATFORM.
+> Okay, sure.
+> 
+>>> [...]
+>>> +static void __init zynq_periph_clk_setup(struct device_node *np)
+>>> +{
+>>> +	struct zynq_periph_clk *periph;
+>>> +	const char *parent_names[3];
+>>> +	struct clk_init_data init;
+>>> +	struct clk *clk;
+>>> +	int err;
+>>> +	u32 reg;
+>>> +	int i;
+>>> +
+>>> +	err = of_property_read_u32(np, "reg", &reg);
+>>> +	WARN_ON(err);
+>>
+>> Shouldn't the function abort if a error happens somewhere? Continuing here
+>> will lead to undefined behavior. Same is probably true for the other WARN_ONs.
+> 
+> The way I see it is: the kernel is will be left in a bad state in the
+> case of any failure, regardless of if we bail out or continue.  AFAICT,
+> there is no clean way to recover from a failure this early.
+> 
+> Given that, it seems simpler (albeit marginally so) just to continue; so
+> that's what I chose to do.  I'm not opposed to bailing out, just not
+> convinced it does anything for us.
+> 
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/00a04e77/attachment-0001.sig>
+The issue with this approach is that, while you get a warning, unexpected
+seemingly unrelated side-effects may happen later on. E.g. if no reg
+property for the clock is specified the reg variable will be uninitialized
+and contain whatever was on the stack before. The clock will be registered
+nonetheless and the boot process continues. Now if the clock is enabled a
+bit in a random register will be modified, which could result in strange and
+abnormal behavior, which can be very hard to track down.
+
+Also if for example just one clock has its reg property missing the system
+will continue to boot if we bail out here. It is just that the peripherals
+using that clock won't work. Which will certainly be easier to diagnose than
+random abnormal behavior.
+
+>>> +
+>>> +	periph = kzalloc(sizeof(*periph), GFP_KERNEL);
+>>> +	WARN_ON(!periph);
+>>> +
+>>> +	periph->clk_ctrl = slcr_base + reg;
+>>> +	spin_lock_init(&periph->clkact_lock);
+>>> +
+>>> +	init.name = np->name;
+>>> +	init.ops = &zynq_periph_clk_ops;
+>>> +	for (i = 0; i < ARRAY_SIZE(parent_names); i++)
+>>> +		parent_names[i] = of_clk_get_parent_name(np, i);
+>>> +	init.parent_names = parent_names;
+>>> +	init.num_parents = ARRAY_SIZE(parent_names);
+>>> +
+>>> +	periph->hw.init = &init;
+>>> +
+>>> +	clk = clk_register(NULL, &periph->hw);
+>>> +	WARN_ON(IS_ERR(clk));
+>>> +
+>>> +	err = of_clk_add_provider(np, of_clk_src_simple_get, clk);
+>>> +	WARN_ON(err);
+>>> +
+>>> +	for (i = 0; i < 2; i++) {
+>>
+>> Not all of the peripheral clock generators have two output clocks. I think
+>> it makes sense to use the number entries in clock-output-names here.
+> 
+> Yes, I agree.  I'll also update the bindings documentation.
+> 
+> Thanks again,
+>   Josh
