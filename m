@@ -1,58 +1,99 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Fri, 02 Nov 2012 10:01:49 +0100
-Subject: [PATCH] lpc32xx: irq - Set the chain handlers after setting up
- the IRQ domain
-In-Reply-To: <1351772626-12615-1-git-send-email-alban.bedel@avionic-design.de>
-References: <1351772626-12615-1-git-send-email-alban.bedel@avionic-design.de>
-Message-ID: <50938BFD.1000402@antcom.de>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Fri, 2 Nov 2012 10:19:03 +0100
+Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
+In-Reply-To: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
+References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20121102091902.GA3437@netboy.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2012 01:23 PM, Alban Bedel wrote:
-> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
-> ---
->  arch/arm/mach-lpc32xx/irq.c |   12 +++++++-----
->  1 files changed, 7 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
-> index 3c63327..b92dc25 100644
-> --- a/arch/arm/mach-lpc32xx/irq.c
-> +++ b/arch/arm/mach-lpc32xx/irq.c
-> @@ -448,10 +448,6 @@ void __init lpc32xx_init_irq(void)
->  	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
->  	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
+On Wed, Oct 31, 2012 at 12:25:31PM +0800, Frank Li wrote:
+
+> diff --git a/drivers/net/ethernet/freescale/Kconfig b/drivers/net/ethernet/freescale/Kconfig
+> index feff516..ff3be53 100644
+> --- a/drivers/net/ethernet/freescale/Kconfig
+> +++ b/drivers/net/ethernet/freescale/Kconfig
+> @@ -92,4 +92,13 @@ config GIANFAR
+>  	  This driver supports the Gigabit TSEC on the MPC83xx, MPC85xx,
+>  	  and MPC86xx family of chips, and the FEC on the 8540.
 >  
-> -	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
-> -	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
-> -	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
-> -
->  	/* Initially disable all wake events */
->  	__raw_writel(0, LPC32XX_CLKPWR_P01_ER);
->  	__raw_writel(0, LPC32XX_CLKPWR_INT_ER);
-> @@ -485,6 +481,12 @@ void __init lpc32xx_init_irq(void)
->  						   irq_base, 0,
->  						   &irq_domain_simple_ops,
->  						   NULL);
-> -	if (!lpc32xx_mic_domain)
-> +	if (!lpc32xx_mic_domain) {
->  		panic("Unable to add MIC irq domain\n");
-> +		return;
+> +config FEC_PTP
+> +	bool "PTP Hardware Clock (PHC)"
+> +	depends on FEC
+> +	select PPS
+> +	select PTP_1588_CLOCK
+> +	--help---
+> +	  Say Y here if you want to use PTP Hardware Clock (PHC) in the
+> +	  driver.  Only the basic clock operations have been implemented.
+> +
+
+Does the PTP function work with every FEC on ColdFire and i.MX?
+
+Or do you need to limit this option in some way?
+
+>  endif # NET_VENDOR_FREESCALE
+
+...
+
+> diff --git a/drivers/net/ethernet/freescale/fec_ptp.c b/drivers/net/ethernet/freescale/fec_ptp.c
+> new file mode 100644
+> index 0000000..9b91da9
+> --- /dev/null
+> +++ b/drivers/net/ethernet/freescale/fec_ptp.c
+
+...
+
+> +/**
+> + * fec_ptp_adjfreq - adjust ptp cycle frequency
+> + * @ptp: the ptp clock structure
+> + * @ppb: parts per billion adjustment from base
+> + *
+> + * Adjust the frequency of the ptp cycle counter by the
+> + * indicated ppb from the base frequency.
+> + *
+> + * Because ENET hardware frequency adjust is complex,
+> + * using software method to do that.
+> + */
+> +static int fec_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
+> +{
+> +	u64 diff;
+> +	unsigned long flags;
+> +	int neg_adj = 0;
+> +
+> +	struct fec_enet_private *fep =
+> +	    container_of(ptp, struct fec_enet_private, ptp_caps);
+> +
+> +	if (ppb < 0) {
+> +		ppb = -ppb;
+> +		neg_adj = 1;
 > +	}
 > +
-> +	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
-> +	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
-> +	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
->  }
+> +	spin_lock_irqsave(&fep->tmreg_lock, flags);
+> +	/*
+> +	 * dummy read to set cycle_last in tc to now.
+> +	 * So use adjusted mult to calculate when next call
+> +	 * timercounter_read.
+> +	 */
+> +	timecounter_read(&fep->tc);
 
-Thanks for your patch!
+You can reduce the time that the spin lock is held by moving the next
+four lines before the locked region:
 
-I already posted basically the same change on 2012-10-28 already which
-is part of my patch set for LPC32xx to be merged into arm-soc.git (will
-do a pull request later). Fixing another irq bug in this platform/irq also.
+> +	fep->cc.mult = FEC_CC_MULT;
+> +	diff = fep->cc.mult;
+> +	diff *= ppb;
+> +	diff = div_u64(diff, 1000000000ULL);
 
-Please also note that panic() doesn't return, so I won't include the
-respective new return that you added.
+> +
+> +	if (neg_adj)
+> +		fep->cc.mult -= diff;
+> +	else
+> +		fep->cc.mult += diff;
+> +
+> +	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
+> +
+> +	return 0;
+> +}
 
 Thanks,
-
-Roland
+Richard
