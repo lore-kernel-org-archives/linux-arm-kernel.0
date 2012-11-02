@@ -1,42 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 2 Nov 2012 08:49:02 -0700
-Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
-In-Reply-To: <50938A69.9040908@ti.com>
-References: <20121101224703.2103.95474.stgit@muffinssi.local>
- <20121101224828.2103.82950.stgit@muffinssi.local>
- <50936A6E.3020202@ti.com> <5093891D.6070302@ti.com>
- <50938A69.9040908@ti.com>
-Message-ID: <20121102154901.GU15766@atomide.com>
+From: shuah.khan@hp.com (Shuah Khan)
+Date: Fri, 02 Nov 2012 09:58:53 -0600
+Subject: [PATCH linux-next] ARM64: dma-mapping: support
+ debug_dma_mapping_error
+In-Reply-To: <1351264983.2712.14.camel@lorien2>
+References: <1351205220.6851.3.camel@lorien2>
+ <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
+ <1351264983.2712.14.camel@lorien2>
+Message-ID: <1351871933.2721.10.camel@lorien2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
-> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
-> >On 2012-11-02 08:38, Santosh Shilimkar wrote:
-> >>
-> >>Lets not move this in DMA code since the above is really related
-> >>to frame buffer. It reserves more DMA area for dma_alloc_coherent()
-> >>etc than default 2 MB. Infact, we should no longer need this with
-> >>CMA and memblock in place.
-> >>
-> >>Tomi,
-> >>Can we not get rid of the above memory reservation ?
-> >
-> >Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
-> >and I have no means to test it out, though. But below is a patch to
-> >remove it. I also attached the patch, as it looks like thunderbird wants
-> >to reformat the pasted patch... I'll remove the
-> >CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
-> >in my tree later.
-> >
-> Great !!
-> Thanks for the patches Tomi.
+On Fri, 2012-10-26 at 09:23 -0600, Shuah Khan wrote:
+> Add support for debug_dma_mapping_error() call to avoid warning from
+> debug_dma_unmap() interface when it checks for mapping error checked
+> status. Without this patch, device driver failed to check map error
+> warning is generated. 
 > 
-> For both the patches, feel free add.
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Signed-off-by: Shuah Khan <shuah.khan@hp.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Great thanks, will swap in Tomi's patch.
+Do you want this patch going through linux-next or the ARM64 tree? Let
+me know your preference.
 
-Regards,
-
-Tony 
+-- Shuah
+> ---
+>  arch/arm64/include/asm/dma-mapping.h |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> index 538f4b4..9947768 100644
+> --- a/arch/arm64/include/asm/dma-mapping.h
+> +++ b/arch/arm64/include/asm/dma-mapping.h
+> @@ -50,6 +50,7 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+>  static inline int dma_mapping_error(struct device *dev, dma_addr_t dev_addr)
+>  {
+>  	struct dma_map_ops *ops = get_dma_ops(dev);
+> +	debug_dma_mapping_error(dev, dev_addr);
+>  	return ops->mapping_error(dev, dev_addr);
+>  }
+>  
