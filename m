@@ -1,43 +1,89 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 2 Nov 2012 18:26:32 +0000
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
-References: <20121026160316.GY18814@opensource.wolfsonmicro.com>
- <20121029194901.GA30152@arwen.pp.htv.fi>
- <20121030112410.GM4511@opensource.wolfsonmicro.com>
- <20121030114949.GC28722@arwen.pp.htv.fi>
- <20121030140714.GO4511@opensource.wolfsonmicro.com>
- <20121030151642.GE29159@arwen.pp.htv.fi>
- <20121030155821.GU4511@opensource.wolfsonmicro.com>
- <20121030172513.GA3993@arwen.pp.htv.fi>
- <20121030183704.GX4511@opensource.wolfsonmicro.com>
- <CACRpkdac=ztY0vXQ8Mu6H8fiAO4aFSSF-A6O1Q==zKOKEsJegw@mail.gmail.com>
-Message-ID: <20121102182632.GF4413@opensource.wolfsonmicro.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Fri,  2 Nov 2012 13:51:44 -0500
+Subject: [PATCH 1/6 v2] arm: use devicetree to get smp_twd clock
+In-Reply-To: <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
+Message-ID: <1351882309-733-2-git-send-email-mark.langsdorf@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 10:51:11PM +0100, Linus Walleij wrote:
-> On Tue, Oct 30, 2012 at 7:37 PM, Mark Brown
+From: Rob Herring <rob.herring@calxeda.com>
 
-> > More seriously the amount of time we seem to have been spending recently
-> > on changes which end up requiring us to go through essentially every
-> > driver and add code to them (often several times) doesn't seem like
-> > we're doing a good job here.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
 
-> If this is your main concern you should be made aware that there
-> are people out there planning to supplant the existing DT probe paths
-> that are now being added to each and every ARM-related driver
-> with an ACPI probe path as ARM servers come into the picture.
+Changes from v1
+	None.
+---
+ arch/arm/kernel/smp_twd.c | 23 ++++++++++++++---------
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
-That's different as we're adding support for a new external interface
-which will need per device configuration parsing rather than
-reorganising things within the kernel; I'd expect it won't supplant DT
-but rather sit alongside it as it's more a requirement for the server
-market than for the embedded market.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/2a2e9cba/attachment.sig>
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index b22d700..600fbcc 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -237,12 +237,15 @@ static irqreturn_t twd_handler(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
+-static struct clk *twd_get_clock(void)
++static struct clk *twd_get_clock(struct device_node *np)
+ {
+-	struct clk *clk;
++	struct clk *clk = NULL;
+ 	int err;
+ 
+-	clk = clk_get_sys("smp_twd", NULL);
++	if (np)
++		clk = of_clk_get(np, 0);
++	if (!clk)
++		clk = clk_get_sys("smp_twd", NULL);
+ 	if (IS_ERR(clk)) {
+ 		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
+ 		return clk;
+@@ -263,6 +266,7 @@ static struct clk *twd_get_clock(void)
+ 		return ERR_PTR(err);
+ 	}
+ 
++	twd_timer_rate = clk_get_rate(clk);
+ 	return clk;
+ }
+ 
+@@ -273,12 +277,7 @@ static int __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ {
+ 	struct clock_event_device **this_cpu_clk;
+ 
+-	if (!twd_clk)
+-		twd_clk = twd_get_clock();
+-
+-	if (!IS_ERR_OR_NULL(twd_clk))
+-		twd_timer_rate = clk_get_rate(twd_clk);
+-	else
++	if (IS_ERR_OR_NULL(twd_clk))
+ 		twd_calibrate_rate();
+ 
+ 	__raw_writel(0, twd_base + TWD_TIMER_CONTROL);
+@@ -349,6 +348,10 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
+ 	if (!twd_base)
+ 		return -ENOMEM;
+ 
++	twd_clk = twd_get_clock(NULL);
++
++	twd_clk = twd_get_clock(NULL);
++
+ 	return twd_local_timer_common_register();
+ }
+ 
+@@ -383,6 +386,8 @@ void __init twd_local_timer_of_register(void)
+ 		goto out;
+ 	}
+ 
++	twd_clk = twd_get_clock(np);
++
+ 	err = twd_local_timer_common_register();
+ 
+ out:
+-- 
+1.7.11.7
