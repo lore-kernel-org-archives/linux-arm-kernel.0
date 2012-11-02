@@ -1,64 +1,58 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 2 Nov 2012 10:54:47 +0200
-Subject: [PATCH] i2c: omap: ensure writes to dev->buf_len are ordered
-In-Reply-To: <20121101222316.GC22956@pengutronix.de>
-References: <1351155648-20429-1-git-send-email-balbi@ti.com>
- <20121101222316.GC22956@pengutronix.de>
-Message-ID: <20121102085447.GE17063@arwen.pp.htv.fi>
+From: stigge@antcom.de (Roland Stigge)
+Date: Fri, 02 Nov 2012 10:01:49 +0100
+Subject: [PATCH] lpc32xx: irq - Set the chain handlers after setting up
+ the IRQ domain
+In-Reply-To: <1351772626-12615-1-git-send-email-alban.bedel@avionic-design.de>
+References: <1351772626-12615-1-git-send-email-alban.bedel@avionic-design.de>
+Message-ID: <50938BFD.1000402@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 01, 2012 at 11:23:16PM +0100, Wolfram Sang wrote:
-> On Thu, Oct 25, 2012 at 12:00:48PM +0300, Felipe Balbi wrote:
-> > if we allow compiler reorder our writes, we could
-> > fall into a situation where dev->buf_len is reset
-> > for no apparent reason.
-> > 
-> > This bug was found with a simple script which would
-> > transfer data to an i2c client from 1 to 1024 bytes
-> > (a simple for loop), when we got to transfer sizes
-> > bigger than the fifo size, dev->buf_len was reset
-> > to zero before we had an oportunity to handle XDR
-> > Interrupt. Because dev->buf_len was zero, we entered
-> > omap_i2c_transmit_data() to transfer zero bytes,
-> > which would mean we would just silently exit
-> > omap_i2c_transmit_data() without actually writing
-> > anything to DATA register. That would cause XDR
-> > IRQ to trigger forever and we would never transfer
-> > the remaining bytes.
-> > 
-> > After adding the memory barrier, we also drop resetting
-> > dev->buf_len to zero in omap_i2c_xfer_msg() because
-> > both omap_i2c_transmit_data() and omap_i2c_receive_data()
-> > will act until dev->buf_len reaches zero, rendering the
-> > other write in omap_i2c_xfer_msg() redundant.
-> > 
-> > This patch has been tested with pandaboard for a few
-> > iterations of the script mentioned above.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > ---
-> > 
-> > This bug has been there forever, but it's quite annoying.
-> > I think it deserves being pushed upstream during this -rc
-> > cycle, but if Wolfram decides to wait until v3.8, I don't
-> > mind.
+On 11/01/2012 01:23 PM, Alban Bedel wrote:
+> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
+> ---
+>  arch/arm/mach-lpc32xx/irq.c |   12 +++++++-----
+>  1 files changed, 7 insertions(+), 5 deletions(-)
 > 
-> I would add this into 3.7, but what about the comments suggesting to use
-> barrier()?
+> diff --git a/arch/arm/mach-lpc32xx/irq.c b/arch/arm/mach-lpc32xx/irq.c
+> index 3c63327..b92dc25 100644
+> --- a/arch/arm/mach-lpc32xx/irq.c
+> +++ b/arch/arm/mach-lpc32xx/irq.c
+> @@ -448,10 +448,6 @@ void __init lpc32xx_init_irq(void)
+>  	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC1_BASE));
+>  	__raw_writel(0, LPC32XX_INTC_MASK(LPC32XX_SIC2_BASE));
+>  
+> -	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
+> -	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
+> -	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
+> -
+>  	/* Initially disable all wake events */
+>  	__raw_writel(0, LPC32XX_CLKPWR_P01_ER);
+>  	__raw_writel(0, LPC32XX_CLKPWR_INT_ER);
+> @@ -485,6 +481,12 @@ void __init lpc32xx_init_irq(void)
+>  						   irq_base, 0,
+>  						   &irq_domain_simple_ops,
+>  						   NULL);
+> -	if (!lpc32xx_mic_domain)
+> +	if (!lpc32xx_mic_domain) {
+>  		panic("Unable to add MIC irq domain\n");
+> +		return;
+> +	}
+> +
+> +	/* MIC SUBIRQx interrupts will route handling to the chain handlers */
+> +	irq_set_chained_handler(IRQ_LPC32XX_SUB1IRQ, lpc32xx_sic1_handler);
+> +	irq_set_chained_handler(IRQ_LPC32XX_SUB2IRQ, lpc32xx_sic2_handler);
+>  }
 
-I was waiting for more comments, will respin the patch next week.
+Thanks for your patch!
 
-cheers
+I already posted basically the same change on 2012-10-28 already which
+is part of my patch set for LPC32xx to be merged into arm-soc.git (will
+do a pull request later). Fixing another irq bug in this platform/irq also.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/1206e9bb/attachment.sig>
+Please also note that panic() doesn't return, so I won't include the
+respective new return that you added.
+
+Thanks,
+
+Roland
