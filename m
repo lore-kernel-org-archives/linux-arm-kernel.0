@@ -1,118 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 1 Nov 2012 09:54:00 +0100
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <87obji8kta.fsf@deeprootsystems.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
- <20121030113407.GA24335@sirena.org.uk>
- <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
- <87obji8kta.fsf@deeprootsystems.com>
-Message-ID: <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
+From: tdas@codeaurora.org (Taniya Das)
+Date: Fri, 02 Nov 2012 23:42:38 +0530
+Subject: idle_sleeptime calculation for hotplugged cpu
+Message-ID: <50940D16.2020304@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 31, 2012 at 9:10 PM, Kevin Hilman
-<khilman@deeprootsystems.com>wrote:
+Hello,
 
-> Linus Walleij <linus.walleij@linaro.org> writes:
->
-
-
-> > piece of hardware, this would be the right thing to do,
-> > and I think the in-kernel examples are all "simple",
-> > e.g. arch/arm/mach-omap2/powerdomain* is all about
-> > power domains and nothing else,
->
-> FYI... that code isn't the same as PM domain.
+I was looking at the arch/arm/process.c:cpu_die, I was wondering why we 
+do not exit from NOHZ for a hotplugged/offline cpu?
+If I understand correctly an offlined cpu too will enter 
+NOHz(tick_nohz_idle_enter) and update the idle_entrytime. The cpu will die
+and it will reenter the idle thread and update idle_entrytime onces it 
+comes back online and only then it will exit NOHz, but time spent in sleep
+idle_sleeptime will be wrongly calculated.
 
 
-This sort of points to a core problem here. Our terminologies are
-ambiguous that we cannot understand each others code. As long
-as <linux/pm_domain.h> begins:
+void cpu_idle(void)
 
-/*
- * pm_domain.h - Definitions and headers related to device power domains.
- *
-
-But arguably that should just be patched (I think there are a few
-remnants in the code still implying that these things are only about
-power).
+{
 
 
->  That code is for the
-> *hardware* powerdomains, not the software concept of "PM domain."  In
-> OMAP, PM domain is implmented at the omap_device level.  And omap_device
-> is the abstraction of an IP block that knows about all the PM related
-> register settings, clocks, HW powerdomain, voltage domain, PM related
-> pin-muxing etc. etc.    All of these things are abstracted in an
-> omap_device, so that the PM domain implementation for OMAP looks rather
-> simple (c.f. omap_device_pm_domain in arch/arm/plat-omap/omap_device.c.)
->
+.....
 
-OK following now...
+/* endless idle loop with no priority at all */
 
+while (1) {
 
-> > I think the lesser of two evils is the distributed approach,
->
-The pinctrl examples I've seen mentioned so far are all PM related
-> (sleep, idle, wakeup, etc.) so to me I think they still belong in
-> PM domains (and that's how we handle the PM related pins in OMAP.)
->
+idle_notifier_call_chain(IDLE_START);
 
-Well, the pinctrl grabbers in these drivers are using these states also
-for platforms that do not even select CONFIG_PM.  For example
-mach-nomadik is quite happy that the PL011 driver is thusly
-muxing in its pins. And would require refactoring to use PM
-domains.
+tick_nohz_idle_enter();-->  Offline CPU entering NOHZ
 
-So basically this requirement comes down to:
+rcu_idle_enter();
 
-- When dealing with a SoC IP block driver
+while (!need_resched()) {
 
-- That need to multiplex pins
+#ifdef CONFIG_HOTPLUG_CPU
 
-- Then your SoC must select CONFIG_PM and
-  CONFIG_PM_RUNTIME and
-  CONFIG_PM_GENERIC_DOMAINS and implement
-  proper domain handling hooks.
+if (cpu_is_offline(smp_processor_id()))
+cpu_die(); ---> CPU becomes offline and re-enter the idle thread without 
+exiting from NOHZ,
 
-Is this correct? And for Mark, Dmitry, does this correspond to
-your view?
+#endif
 
-It's actually something that needs to be acknowledged by the
-ARM SoC maintainers, because they will be the ones telling
-all subarch maintainers to go implement full PM handling
-with these three frameworks whenever an SoC driver want
-to handle pins.
-
-Bascially all subsystem maintainers dealing with embedded
-SoCs need to be aligned on this as well...
-
-And IIUC not only pins but also silicon block clocks?
-
-I can surely fix these for "my" systems, but it really needs
-to be enforced widely or it will be a mess.
+...
+}
 
 
->  > I worry that the per-SoC power domain implementation
-> > which will live in arch/arm/mach-* as of today will become
-> > the new board file problem, overburdening the arch/* tree.
-> > Maybe I'm mistaken as to the size of these things,
-> > but just doing ls arch/arm/mach-omap2/powerdomain*
-> > makes me start worrying.
->
-> Yes, I agree that this means more code/data in arch/arm/mach-*, but
-> IMO, that's really where it belongs.  It really is SoC integration
-> details, and driver should really not know about it.
+Is it a good idea to exit from NOHZ before cpu_die() or it could be 
+achieved in some other way? Please provide your
+comments.
 
+-- 
+Thanks & Regards,
+Taniya Das.
 
-OK we need feedback from ARM SoC on this.
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation.
 
-Yours,
-Linus Walleij
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121101/74f1295c/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121102/f2197fc1/attachment-0001.html>
