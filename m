@@ -1,47 +1,93 @@
-From: bob.beckett@gmail.com (Robert Beckett)
-Date: Fri, 2 Nov 2012 11:32:50 +0000
-Subject: gic_set_affinity
-In-Reply-To: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
-References: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
-Message-ID: <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 2 Nov 2012 17:03:30 +0530
+Subject: [PATCH v3 04/11] clk: davinci - add pll divider clock driver
+In-Reply-To: <1351181518-11882-5-git-send-email-m-karicheri2@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-5-git-send-email-m-karicheri2@ti.com>
+Message-ID: <5093AF8A.8000707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(CC maintainers)
+On 10/25/2012 9:41 PM, Murali Karicheri wrote:
 
-On 1 November 2012 17:54, Robert Beckett <bob.beckett@gmail.com> wrote:
-> Hello,
->
-> I was looking through the arm gic code while debugging a problem I am
-> having, and noticed something in gic_set_affinity.
->
-> When something comes along and setts an irq affinity mask (e.g.
-> through /proc/irq/<irq>/smp_affinity_mask), the calls goes like so :
->
-> ...
-> 1. irq_set_affinity : grabs the desc->lock
-> 2. __irq_set_affinity_locked : calls chip->irq_set_affinity
-> 3. gic_set_affinity : writes a new mask to the gic distributor
->
-> my question is, what happens if an interrupt is raised between 1 and 3?
-> To me, it looks like the interrupt could end up being handled on 2
-> cpus. When it is raised, the handler will be called and sit spinning
-> for desc->lock (e.g. in handle_fasteoi_irq). The mask will be set to
-> set the affinity to the new cpu, the new cpu will receive the
-> interrupt as it has not been ackd or disabled yet, and the handler
-> will be called on the second cpu and will wait for the same lock in
-> the handler. Once the affinity setting calls have finished, the lock
-> is released, and whichever cpu gets the lock will handle the interrupt
-> while still locking out the other cpu. Once it finishes, the other cpu
-> will try to handle it leading to an interrupt handler call for an
-> interrupt that no longer exists, which could lead to spurious
-> interrupt if it returns IRQ_NONE because it cant see that the
-> interrupt is raised.
->
-> Is this what will happen? If so, the interrupt should be masked across
-> the affinity setting so that it cant be raised on both cpus.
-> if I have just missed something obvious, then please let me know...
->
-> Cheers.
->
-> Bob
+> pll dividers are present in the pll controller of DaVinci and Other
+> SoCs that re-uses the same hardware IP. This has a enable bit for
+> bypass the divider or enable the driver. This is a sub class of the
+> clk-divider clock checks the enable bit to calculare the rate and
+> invoke the recalculate() function of the clk-divider if enabled.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  drivers/clk/davinci/clk-div.c |  124 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/davinci/clk-div.h |   42 ++++++++++++++
+>  2 files changed, 166 insertions(+)
+>  create mode 100644 drivers/clk/davinci/clk-div.c
+>  create mode 100644 drivers/clk/davinci/clk-div.h
+> 
+> diff --git a/drivers/clk/davinci/clk-div.c b/drivers/clk/davinci/clk-div.c
+> new file mode 100644
+> index 0000000..8147d99
+> --- /dev/null
+> +++ b/drivers/clk/davinci/clk-div.c
+> @@ -0,0 +1,124 @@
+> +/*
+> + * Copyright 2012 Freescale Semiconductor, Inc.
+> + * Copyright 2012 Texas instuments
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+
+incomplete sentence.
+
+> +/**
+> + * clk_register_davinci_plldiv - register function for DaVinci PLL divider clk
+> + *
+> + * @dev: device ptr
+> + * @name: name of the clock
+> + * @parent_name: name of parent clock
+> + * @plldiv_data: ptr to pll divider data
+> + * @lock: ptr to spinlock passed to divider clock
+> + */
+> +struct clk *clk_register_davinci_plldiv(struct device *dev,
+
+Why do you need a dev pointer here and which device does it point to? In
+the only usage of this API in the series, you pass a NULL here. I should
+have probably asked this question on one of the earlier patches itself.
+
+> +			const char *name, const char *parent_name,
+> +			struct clk_plldiv_data *plldiv_data,
+> +			spinlock_t *lock)
+> +{
+> +	struct clk_div *div;
+> +	struct clk *clk;
+> +	struct clk_init_data init;
+> +
+> +	div = kzalloc(sizeof(*div), GFP_KERNEL);
+> +	if (!div)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.ops = &clk_div_ops;
+> +	init.flags = plldiv_data->flags;
+> +	init.parent_names = (parent_name ? &parent_name : NULL);
+> +	init.num_parents = (parent_name ? 1 : 0);
+> +
+> +	div->reg = plldiv_data->reg;
+> +	div->en_id = plldiv_data->en_id;
+> +
+> +	div->divider.reg = plldiv_data->reg;
+> +	div->divider.shift = plldiv_data->shift;
+> +	div->divider.width = plldiv_data->width;
+> +	div->divider.flags = plldiv_data->divider_flags;
+> +	div->divider.lock = lock;
+> +	div->divider.hw.init = &init;
+> +	div->ops = &clk_divider_ops;
+> +
+> +	clk = clk_register(NULL, &div->divider.hw);
+
+Shouldn't you be calling clk_register_divider() here which in turn will
+do clk_register()?
+
+Thanks,
+Sekhar
