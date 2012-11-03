@@ -1,71 +1,117 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat,  3 Nov 2012 16:59:08 +0100
-Subject: [PATCH 2/2] ARM: dts: mxs: Add hog pins to Crystalfontz boards
-In-Reply-To: <1351958348-7327-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1351958348-7327-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1351958348-7327-3-git-send-email-maxime.ripard@free-electrons.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 3 Nov 2012 21:33:47 +0530
+Subject: [PATCH 01/15] ARM: OMAP2+: mailbox: Add an API for flushing the
+ FIFO
+In-Reply-To: <1351859566-24818-2-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-2-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <50954063.5010901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use a hog_pins pinctrl group to force the muxing of GPIOs used on the
-Crystalfonz CFA10036 and CFA10049 boards.
+On Friday 02 November 2012 06:02 PM, Vaibhav Bedia wrote:
+> On AM33XX, the mailbox module between the MPU and the
+> WKUP-M3 co-processor facilitates a one-way communication.
+> MPU uses the assigned mailbox sub-module to issue the
+> interrupt to the WKUP-M3 co-processor which then goes
+> and reads the the IPC data from registers in the control
+> module.
+>
+> WKUP-M3 is in the L4_WKUP and does not have any access to
+> the Mailbox module. Due to this limitation, the MPU is
+> completely responsible for FIFO maintenance and interrupt
+> generation. MPU needs to ensure that the FIFO does not
+> overflow by reading by the assigned mailbox sub-module.
+>
+> This patch adds an API in the mailbox code which the MPU
+> can use to empty the FIFO by issuing a readback command.
+>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>   arch/arm/mach-omap2/mailbox.c             |   42 ++++++++++++++++++++---------
+>   arch/arm/plat-omap/include/plat/mailbox.h |    3 ++
+>   arch/arm/plat-omap/mailbox.c              |   35 ++++++++++++++++++++++++
+>   3 files changed, 67 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+> index 0d97456..f38b4fa 100644
+> --- a/arch/arm/mach-omap2/mailbox.c
+> +++ b/arch/arm/mach-omap2/mailbox.c
+> @@ -123,6 +123,20 @@ static int omap2_mbox_fifo_full(struct omap_mbox *mbox)
+>   	return mbox_read_reg(fifo->fifo_stat);
+>   }
+>
+> +static int omap2_mbox_fifo_needs_flush(struct omap_mbox *mbox)
+> +{
+> +	struct omap_mbox2_fifo *fifo =
+> +		&((struct omap_mbox2_priv *)mbox->priv)->tx_fifo;
+type casting is generally avoided in linux code.
+> +	return mbox_read_reg(fifo->msg_stat);
+> +}
+> +
+> +static mbox_msg_t omap2_mbox_fifo_readback(struct omap_mbox *mbox)
+> +{
+> +	struct omap_mbox2_fifo *fifo =
+> +		&((struct omap_mbox2_priv *)mbox->priv)->tx_fifo;
+> +	return (mbox_msg_t) mbox_read_reg(fifo->msg);
+same here.
+> +}
+> +
+>   /* Mailbox IRQ handle functions */
+>   static void omap2_mbox_enable_irq(struct omap_mbox *mbox,
+>   		omap_mbox_type_t irq)
+> @@ -205,19 +219,21 @@ static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
+>   }
+>
+>   static struct omap_mbox_ops omap2_mbox_ops = {
+> -	.type		= OMAP_MBOX_TYPE2,
+> -	.startup	= omap2_mbox_startup,
+> -	.shutdown	= omap2_mbox_shutdown,
+> -	.fifo_read	= omap2_mbox_fifo_read,
+> -	.fifo_write	= omap2_mbox_fifo_write,
+> -	.fifo_empty	= omap2_mbox_fifo_empty,
+> -	.fifo_full	= omap2_mbox_fifo_full,
+> -	.enable_irq	= omap2_mbox_enable_irq,
+> -	.disable_irq	= omap2_mbox_disable_irq,
+> -	.ack_irq	= omap2_mbox_ack_irq,
+> -	.is_irq		= omap2_mbox_is_irq,
+> -	.save_ctx	= omap2_mbox_save_ctx,
+> -	.restore_ctx	= omap2_mbox_restore_ctx,
+> +	.type			= OMAP_MBOX_TYPE2,
+> +	.startup		= omap2_mbox_startup,
+> +	.shutdown		= omap2_mbox_shutdown,
+> +	.fifo_read		= omap2_mbox_fifo_read,
+> +	.fifo_write		= omap2_mbox_fifo_write,
+> +	.fifo_empty		= omap2_mbox_fifo_empty,
+> +	.fifo_full		= omap2_mbox_fifo_full,
+> +	.fifo_needs_flush	= omap2_mbox_fifo_needs_flush,
+> +	.fifo_readback		= omap2_mbox_fifo_readback,
+> +	.enable_irq		= omap2_mbox_enable_irq,
+> +	.disable_irq		= omap2_mbox_disable_irq,
+> +	.ack_irq		= omap2_mbox_ack_irq,
+> +	.is_irq			= omap2_mbox_is_irq,
+> +	.save_ctx		= omap2_mbox_save_ctx,
+> +	.restore_ctx		= omap2_mbox_restore_ctx,
+You should do the indentation fix in another patch.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/imx28-cfa10036.dts |   13 +++++++++++++
- arch/arm/boot/dts/imx28-cfa10049.dts |   16 ++++++++++++++++
- 2 files changed, 29 insertions(+)
+>   };
+>
+>   /*
+> diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+> index cc3921e..e136529 100644
+> --- a/arch/arm/plat-omap/include/plat/mailbox.h
+> +++ b/arch/arm/plat-omap/include/plat/mailbox.h
+> @@ -29,6 +29,8 @@ struct omap_mbox_ops {
+>   	void		(*fifo_write)(struct omap_mbox *mbox, mbox_msg_t msg);
+>   	int		(*fifo_empty)(struct omap_mbox *mbox);
+>   	int		(*fifo_full)(struct omap_mbox *mbox);
+> +	int		(*fifo_needs_flush)(struct omap_mbox *mbox);
+> +	mbox_msg_t	(*fifo_readback)(struct omap_mbox *mbox);
+Do you think passing the msg structure as an argument and letting the
+function populate it will be better instead of returning the msg
+structure ? No strong opinion since from read_foo() point of view
+what you have done might be right thing. In either case, please
+get rid of typecasting.
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
-index 8760b87..1594694 100644
---- a/arch/arm/boot/dts/imx28-cfa10036.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10036.dts
-@@ -23,6 +23,19 @@
- 	apb at 80000000 {
- 		apbh at 80000000 {
- 			pinctrl at 80018000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&hog_pins_cfa10036>;
-+
-+				hog_pins_cfa10036: hog-10036 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x2073 /* MX28_PAD_SSP0_D7__GPIO_2_7 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
- 				led_pins_cfa10036: leds-10036 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 6c4c071..bdc80a4 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -22,6 +22,22 @@
- 	apb at 80000000 {
- 		apbh at 80000000 {
- 			pinctrl@80018000 {
-+				pinctrl-names = "default", "default";
-+				pinctrl-1 = <&hog_pins_cfa10049>;
-+
-+				hog_pins_cfa10049: hog-10049 at 0 {
-+					reg = <0>;
-+					fsl,pinmux-ids = <
-+						0x0073 /* MX28_PAD_GPMI_D7__GPIO_0_7 */
-+						0x1163 /* MX28_PAD_LCD_D22__GPIO_1_22 */
-+						0x1173 /* MX28_PAD_LCD_D22__GPIO_1_23 */
-+						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
-+
- 				spi3_pins_cfa10049: spi3-cfa10049 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--- 
-1.7.9.5
+Regards
+Santosh
