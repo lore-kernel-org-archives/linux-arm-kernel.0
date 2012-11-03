@@ -1,32 +1,26 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Sat, 3 Nov 2012 08:24:10 +0000
-Subject: [PATCH 01/15] ARM: OMAP2+: mailbox: Add an API for flushing the
- FIFO
-In-Reply-To: <20121102190002.GA15766@atomide.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-2-git-send-email-vaibhav.bedia@ti.com>
- <20121102190002.GA15766@atomide.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EBFE5AE@DBDE01.ent.ti.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat,  3 Nov 2012 09:25:28 +0100
+Subject: [PATCH net-next 0/2] cpsw: fix resource leak for v3.8
+Message-ID: <cover.1351930782.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+While looking at the idea of removing all of the register offsets in
+the CPSW's device tree, I noticed that the driver would be leaking IO
+mappings. Although this is, strictly speaking, a bug fix, still it can
+wait to appear in v3.8, since there is no way to use the driver in
+v3.7 (or earlier) anyhow.
 
-On Sat, Nov 03, 2012 at 00:30:04, Tony Lindgren wrote:
-[...]
-> 
-> Patches have been posted to move the mailbox related
-> files out of arch/arm, so you'll have to update those
-> for that. Please see thread "[PATCH 0/2] ARM: OMAP:
-> mailbox out of plat code" for more information.
-> 
+Thanks,
+Richard
 
-Thanks for pointing this out. I'll update the patches for these.
 
-I had used your master branch as the baseline. Some of the patches
-also need rework to account the header file and timer code changes.
-Is there some other branch of yours that I could use or should I
-just mention the dependencies in the next version of patches?
+Richard Cochran (2):
+  cpsw: rename register banks to match the reference manual, part 2
+  cpsw: fix leaking IO mappings
 
-Regards,
-Vaibhav 
+ drivers/net/ethernet/ti/cpsw.c |   39 +++++++++++++++++++--------------------
+ 1 files changed, 19 insertions(+), 20 deletions(-)
+
+-- 
+1.7.2.5
