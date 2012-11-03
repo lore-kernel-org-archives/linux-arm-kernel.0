@@ -1,100 +1,93 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 2 Nov 2012 16:47:38 -0700
-Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
-In-Reply-To: <20121010111517.GC2131@linaro.org>
-References: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
- <20121010111517.GC2131@linaro.org>
-Message-ID: <CAMbhsRTNULfBjL=x3qFgjqsfR25EJt+2A4hY=qTXcDq8gyCxmA@mail.gmail.com>
+From: russ.dill@gmail.com (Russ Dill)
+Date: Fri, 2 Nov 2012 17:14:21 -0700
+Subject: [PATCH 02/15] ARM: OMAP2+: mailbox: Add support for AM33XX
+In-Reply-To: <1351859566-24818-3-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-3-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <CA+Bv8XY8x=BDgGDNHPMRqz3xUbzKf8+o0MJQDovHY+NqBh6NVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 10, 2012 at 4:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Tue, Oct 09, 2012 at 11:46:12PM -0700, Todd Poynor wrote:
->> Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
->> on overflow.
->>
->> Signed-off-by: Todd Poynor <toddpoynor@google.com>
->> ---
->>  arch/arm/kernel/stacktrace.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
->> index 00f79e5..6315162 100644
->> --- a/arch/arm/kernel/stacktrace.c
->> +++ b/arch/arm/kernel/stacktrace.c
->> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
->>       high = ALIGN(low, THREAD_SIZE);
->>
->>       /* check current frame pointer is within bounds */
->> -     if (fp < (low + 12) || fp + 4 >= high)
->> +     if (fp < (low + 12) || fp >= high - 4)
->>               return -EINVAL;
->>
->>       /* restore the registers from the stack frame */
+On Fri, Nov 2, 2012 at 5:32 AM, Vaibhav Bedia <vaibhav.bedia@ti.com> wrote:
+> Mailbox IP on AM33XX, is the same as that present
+> in OMAP4. The single instance of Mailbox module
+> contains 8 sub-modules and facilitates communication
+> between MPU, PRUs and WKUP_M3.
 >
-> sp and fp can still be complete garbage in the case of a corrupted frame,
-> so low + 12 can still overflow and cause us to read beyond the stack base.
+> The first mailbox sub-module is assigned for
+> communication between MPU and WKUP-M3.
 >
-> A more robust patch might be as follows.  This also checks for misaligned
-> fp and sp values, since those indicate corruption and there can be no
-> sensible way to interpret the resulting frame in that case.
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>  arch/arm/mach-omap2/mailbox.c |   35 ++++++++++++++++++++++++++++++++++-
+>  1 files changed, 34 insertions(+), 1 deletions(-)
 >
-> Also, according to the definition of current_thread_info(),
-> IS_ALIGNED(sp, THREAD_SIZE) indicates a full stack extending from sp
-> to sp + THREAD_SIZE, and not an empty stack extending from sp -
-> THREAD_SIZE to sp.  We cannot backtrace this situation anyway, since
-> that would imply that the frame record extends beyond the stack...
-> but this patch tidies it up in the interest of clarity.
+> diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+> index f38b4fa..7a343aa 100644
+> --- a/arch/arm/mach-omap2/mailbox.c
+> +++ b/arch/arm/mach-omap2/mailbox.c
+> @@ -155,7 +155,7 @@ static void omap2_mbox_disable_irq(struct omap_mbox *mbox,
+>         struct omap_mbox2_priv *p = mbox->priv;
+>         u32 bit = (irq == IRQ_TX) ? p->notfull_bit : p->newmsg_bit;
 >
-> Cheers
-> ---Dave
->
-> (untested)
->
-> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
-> index 00f79e5..fec82be 100644
-> --- a/arch/arm/kernel/stacktrace.c
-> +++ b/arch/arm/kernel/stacktrace.c
-> @@ -28,10 +28,20 @@ int notrace unwind_frame(struct stackframe *frame)
->
->         /* only go to a higher address on the stack */
->         low = frame->sp;
-> -       high = ALIGN(low, THREAD_SIZE);
-> +       if (!IS_ALIGNED(fp, 4))
-> +               return -EINVAL;
-> +
-> +       /*
-> +        * low + 1 here ensures that high > sp, consistent with the
-> +        * definition of current_thread_info().
-> +        * We subtract 1 to compute the highest allowable byte address.
-> +        * Otherwise, we might get high == 0 which would confuse our
-> +        * comparisons.
-> +        */
-> +       high = ALIGN(low + 1, THREAD_SIZE) - 1;
->
->         /* check current frame pointer is within bounds */
-> -       if (fp < (low + 12) || fp + 4 >= high)
-> +       if (fp < 12 || fp - 12 < low || fp > high)
->                 return -EINVAL;
->
->         /* restore the registers from the stack frame */
-> @@ -39,6 +49,10 @@ int notrace unwind_frame(struct stackframe *frame)
->         frame->sp = *(unsigned long *)(fp - 8);
->         frame->pc = *(unsigned long *)(fp - 4);
->
-> +       /* Do not claim the frame is valid if if is obviously corrupt: */
-> +       if (!IS_ALIGNED(frame->fp, 4))
-> +               return -EINVAL;
-> +
->         return 0;
->  }
+> -       if (!cpu_is_omap44xx())
+> +       if (!cpu_is_omap44xx() || !soc_is_am33xx())
+>                 bit = mbox_read_reg(p->irqdisable) & ~bit;
+
+Do you mean &&?
+
+>         mbox_write_reg(bit, p->irqdisable);
+> @@ -358,6 +358,32 @@ struct omap_mbox mbox_2_info = {
+>  struct omap_mbox *omap4_mboxes[] = { &mbox_1_info, &mbox_2_info, NULL };
 >  #endif
 >
+> +#if defined(CONFIG_SOC_AM33XX)
+> +static struct omap_mbox2_priv omap2_mbox_wkup_m3_priv = {
+> +       .tx_fifo = {
+> +               .msg            = MAILBOX_MESSAGE(0),
+> +               .fifo_stat      = MAILBOX_FIFOSTATUS(0),
+> +               .msg_stat       = MAILBOX_MSGSTATUS(0),
+> +       },
+> +       .rx_fifo = {
+> +               .msg            = MAILBOX_MESSAGE(1),
+> +               .msg_stat       = MAILBOX_MSGSTATUS(1),
+> +       },
+> +       .irqenable      = OMAP4_MAILBOX_IRQENABLE(3),
+> +       .irqstatus      = OMAP4_MAILBOX_IRQSTATUS(3),
+> +       .irqdisable     = OMAP4_MAILBOX_IRQENABLE_CLR(3),
+> +       .notfull_bit    = MAILBOX_IRQ_NOTFULL(0),
+> +       .newmsg_bit     = MAILBOX_IRQ_NEWMSG(0),
+> +};
+> +
+> +struct omap_mbox mbox_wkup_m3_info = {
+> +       .name   = "wkup_m3",
+> +       .ops    = &omap2_mbox_ops,
+> +       .priv   = &omap2_mbox_wkup_m3_priv,
+> +};
+> +struct omap_mbox *am33xx_mboxes[] = { &mbox_wkup_m3_info, NULL };
+> +#endif
+> +
+>  static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+>  {
+>         struct resource *mem;
+> @@ -392,6 +418,13 @@ static int __devinit omap2_mbox_probe(struct platform_device *pdev)
+>                 list[0]->irq = list[1]->irq = platform_get_irq(pdev, 0);
+>         }
+>  #endif
+> +#if defined(CONFIG_SOC_AM33XX)
+> +       else if (soc_is_am33xx()) {
+> +               list = am33xx_mboxes;
+> +
+> +               list[0]->irq = platform_get_irq(pdev, 0);
+> +       }
+> +#endif
+>         else {
+>                 pr_err("%s: platform not supported\n", __func__);
+>                 return -ENODEV;
+> --
+> 1.7.0.4
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-Dave or Todd, mind reposting this, or should I squash it into my
-CONFIG_SMP stacktrace series?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
