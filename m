@@ -1,84 +1,93 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Sat, 03 Nov 2012 20:19:32 +0530
-Subject: [PATCH] ARM: dts: add board dts file for Exynos4412 based SMDK board
-Message-ID: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sat, 3 Nov 2012 21:22:04 +0530
+Subject: [PATCH 12/15] ARM: OMAP: timer: Add suspend-resume callbacks
+ for clockevent device
+In-Reply-To: <1351859566-24818-13-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-13-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <50953DA4.10008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a minimal board dts file for Samsung Exynos4412 based SMDK board.
+On Friday 02 November 2012 06:02 PM, Vaibhav Bedia wrote:
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>
+> The current OMAP timer code registers two timers -
+> one as clocksource and one as clockevent.
+Actually OMAP also uses only one timer. The clocksource
+is taken care by 32K syntimer till OMAP4 and by realtime
+counter on OMAP5. There is a clocksource registration of
+timer is available but that is not being used in systems.
 
-Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
----
-This patch depends the on the following patch posted by Tomasz Figa.
-"ARM: dts: exynos4: Add support for Exynos4x12 SoCs"
+> AM33XX has only one usable timer in the WKUP domain
+> so one of the timers needs suspend-resume support
+> to restore the configuration to pre-suspend state.
+>
+> commit adc78e6 (timekeeping: Add suspend and resume
+> of clock event devices) introduced .suspend and .resume
+> callbacks for clock event devices. Leverages these
+> callbacks to have AM33XX clockevent timer which is
+> in not in WKUP domain to behave properly across system
+> suspend.
+>
+So you use WKUP domain timer for clocksource and PER
+domain one for clock-event ?
 
- arch/arm/boot/dts/Makefile                |    1 +
- arch/arm/boot/dts/exynos4412-smdk4412.dts |   45 +++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/exynos4412-smdk4412.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..36488a5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
- dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
- 	exynos4210-smdkv310.dtb \
- 	exynos4210-trats.dtb \
-+	exynos4412-smdk4412.dtb \
- 	exynos5250-smdk5250.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
- dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-new file mode 100644
-index 0000000..f05bf57
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Samsung's Exynos4412 based SMDK board device tree source
-+ *
-+ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Device tree source file for Samsung's SMDK4412 board which is based on
-+ * Samsung's Exynos4412 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+/dts-v1/;
-+/include/ "exynos4412.dtsi"
-+
-+/ {
-+	model = "Samsung SMDK evaluation board based on Exynos4412";
-+	compatible = "samsung,smdk4412", "samsung,exynos4412";
-+
-+	memory {
-+		reg = <0x40000000 0x40000000>;
-+	};
-+
-+	chosen {
-+		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc";
-+	};
-+
-+	serial at 13800000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13810000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13820000 {
-+		status = "okay";
-+	};
-+
-+	serial at 13830000 {
-+		status = "okay";
-+	};
-+};
--- 
-1.6.6.rc2
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>   arch/arm/mach-omap2/timer.c |   31 +++++++++++++++++++++++++++++++
+>   1 files changed, 31 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 6584ee0..e8781fd 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -135,6 +135,35 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+>   	}
+>   }
+>
+> +static void omap_clkevt_suspend(struct clock_event_device *unused)
+> +{
+> +	char name[10];
+> +	struct omap_hwmod *oh;
+> +
+> +	sprintf(name, "timer%d", 2);
+> +	oh = omap_hwmod_lookup(name);
+> +	if (!oh)
+> +		return;
+
+You can move all the look up stuff in init code and then
+suspend resume hooks will be cleaner.
+> +
+> +	omap_hwmod_idle(oh);
+> +}
+> +
+> +static void omap_clkevt_resume(struct clock_event_device *unused)
+> +{
+> +	char name[10];
+> +	struct omap_hwmod *oh;
+> +
+> +	sprintf(name, "timer%d", 2);
+> +	oh = omap_hwmod_lookup(name);
+> +	if (!oh)
+> +		return;
+> +
+> +	omap_hwmod_enable(oh);
+> +	__omap_dm_timer_load_start(&clkev,
+> +			OMAP_TIMER_CTRL_ST | OMAP_TIMER_CTRL_AR, 0, 1);
+> +	__omap_dm_timer_int_enable(&clkev, OMAP_TIMER_INT_OVERFLOW);
+> +}
+> +
+OK. So since your clk_event stops when PER idles, how do you plan
+to support the SOC idle. For CPUIDLE path, you need your clock-event
+to wakeup the system based on next timer expiry. So you need your
+clock event to be active. Indirectly, you can't let PER idle which
+leads npo CORE idle->SOC idle.
+
+How do you plan to address this ? Os is SOC idle is not suppose
+to be added for AMXXX ?
+
+Regards
+Santosh
