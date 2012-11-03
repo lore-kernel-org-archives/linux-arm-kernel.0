@@ -1,27 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 3 Nov 2012 09:03:00 +0100
-Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
-Message-ID: <20121103080300.GA9907@lunn.ch>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Sat, 3 Nov 2012 08:24:10 +0000
+Subject: [PATCH 01/15] ARM: OMAP2+: mailbox: Add an API for flushing the
+ FIFO
+In-Reply-To: <20121102190002.GA15766@atomide.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-2-git-send-email-vaibhav.bedia@ti.com>
+ <20121102190002.GA15766@atomide.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EBFE5AE@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Josh
+Hi Tony,
 
-Are you not seeing a stack trace?
+On Sat, Nov 03, 2012 at 00:30:04, Tony Lindgren wrote:
+[...]
+> 
+> Patches have been posted to move the mailbox related
+> files out of arch/arm, so you'll have to update those
+> for that. Please see thread "[PATCH 0/2] ARM: OMAP:
+> mailbox out of plat code" for more information.
+> 
 
-[   64.312377] BUG: scheduling while atomic: crond/151/0x40000300
-[   79.771862] BUG: scheduling while atomic: swapper/0/0x40000500
-[   81.826267] BUG: scheduling while atomic: swapper/0/0x40000500
-[   90.330911] BUG: scheduling while atomic: swapper/0/0x40000500
+Thanks for pointing this out. I'll update the patches for these.
 
-        printk(KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
-                prev->comm, prev->pid, preempt_count());
+I had used your master branch as the baseline. Some of the patches
+also need rework to account the header file and timer code changes.
+Is there some other branch of yours that I could use or should I
+just mention the dependencies in the next version of patches?
 
-        debug_show_held_locks(prev);
-        print_modules();
-        if (irqs_disabled())
-                print_irqtrace_events(prev);
-        dump_stack();
-        add_taint(TAINT_WARN);
-
-Andrew
+Regards,
+Vaibhav 
