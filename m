@@ -1,24 +1,46 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 3 Nov 2012 21:59:55 +0530
-Subject: [PATCH 09/15] ARM: OMAP: AM33XX: Remove unnecessary include and
- use __ASSEMBLER__ macros
-In-Reply-To: <1351859566-24818-10-git-send-email-vaibhav.bedia@ti.com>
+Date: Sat, 3 Nov 2012 22:01:46 +0530
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
+ for AM33XX
+In-Reply-To: <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
 References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-10-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50954683.4050302@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <509546F2.8080505@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Friday 02 November 2012 06:02 PM, Vaibhav Bedia wrote:
-> Get rid of some unnecessary header file inclusions
-> and also use __ASSEMBLER__ macros to allow the
-> various register offsets from PM assembly code
-> which be added in a subsequent patch.
+> AM33XX has only one usable timer in the WKUP domain.
+> Currently the timer instance in WKUP domain is used
+> as the clockevent and the timer in non-WKUP domain
+> as the clocksource. The timer in WKUP domain can keep
+> running in suspend from a 32K clock and hence serve
+> as the persistent clock. To enable this, interchange
+> the timers used as clocksource and clockevent for
+> AM33XX. A subsequent patch will add suspend-resume
+> support for the clockevent to ensure that there are
+> no issues with timekeeping.
 >
 > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-
-Ideally you should split header clean-up and assembler
-fix in seperate patches.
+> ---
+>   arch/arm/mach-omap2/timer.c |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 565e575..6584ee0 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -460,7 +460,7 @@ OMAP_SYS_TIMER(3_secure)
+>   #endif
+>
+>   #ifdef CONFIG_SOC_AM33XX
+> -OMAP_SYS_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, 2, OMAP4_MPU_SOURCE)
+> +OMAP_SYS_TIMER_INIT(3_am33xx, 2, OMAP4_MPU_SOURCE, 1, OMAP4_MPU_SOURCE)
+>   OMAP_SYS_TIMER(3_am33xx)
+>   #endif
+>
+As mentioned on other patch comment, I think this might break your
+SOC idle.
 
 Regards
 Santosh
