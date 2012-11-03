@@ -1,53 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Sat,  3 Nov 2012 23:02:23 +0100
-Subject: [PATCH 2/9] ARM: at91: Remove unused struct at91sam9g45_isi_device
- and its resources
-In-Reply-To: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
-References: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 04 Nov 2012 02:08:08 +0400
+Subject: [PATCH] ARM: S3C64XX: Fix up IRQ mapping for balblair on
+ Cragganmore
+In-Reply-To: <1351861289-19691-1-git-send-email-dp@opensource.wolfsonmicro.com>
+References: <1351861289-19691-1-git-send-email-dp@opensource.wolfsonmicro.com>
+Message-ID: <509595C8.6090605@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This the at91sam9g45_isi_device structure and its associated resources
-were added in 2008 and have been unused ever since. Let's remove them.
+Hello.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-at91/at91sam9263_devices.c |   20 --------------------
- 1 file changed, 20 deletions(-)
+On 02-11-2012 17:01, Dimitris Papastamos wrote:
 
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index cb85da2..0562a9d 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -901,26 +901,6 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
- 
- #if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
- 
--struct resource isi_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_ISI,
--		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
--		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device at91sam9263_isi_device = {
--	.name		= "at91_isi",
--	.id		= -1,
--	.resource	= isi_resources,
--	.num_resources	= ARRAY_SIZE(isi_resources),
--};
--
- void __init at91_add_device_isi(struct isi_platform_data *data,
- 		bool use_pck_as_mck)
- {
--- 
-1.7.9.5
+> We are using S3C_EINT(4) instead of S3C_EINT(5).
+
+> Change-Id: I84e77fd75d59c6b8fecbcb11e81dc78dbf07f156
+
+    You still hasven't removed this line. :-)
+
+> Signed-off-by: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
+
+WBR, Sergei
