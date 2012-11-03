@@ -1,58 +1,20 @@
-From: tdas@codeaurora.org (Taniya Das)
-Date: Mon, 05 Nov 2012 09:23:38 +0530
-Subject: ARM: idle sleep time for hotplugged cpu
-Message-ID: <50973842.9010708@codeaurora.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Sat, 03 Nov 2012 16:22:00 +0000
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
+ for AM33XX
+In-Reply-To: <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <509544A8.7010507@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 11/02/2012 12:32 PM, Vaibhav Bedia wrote:
+> AM33XX has only one usable timer in the WKUP domain.
 
-I was looking at the arch/arm/process.c:cpu_die, I was wondering why we
-do not exit from NOHZ for a hotplugged/offline cpu?
-If I understand correctly an offlined cpu too will enter
-NOHz(tick_nohz_idle_enter) and update the idle_entrytime. The cpu will die
-and it will reenter the idle thread and update idle_entrytime onces it
-comes back online and only then it will exit NOHz, but time spent in sleep
-idle_sleeptime will be wrongly calculated.
+After reading the TRM, it seems there are two: DMTIMER0 and DMTIMER1.
 
+Looking at the hwmod data though, I don't see a hwmod for DMTIMER0.  Can
+you explain a little about why DMTIMER0 is missing/broken?
 
-void cpu_idle(void)
-
-{
-
-
-.....
-
-/* endless idle loop with no priority at all */
-
-while (1) {
-
-idle_notifier_call_chain(IDLE_START);
-
-tick_nohz_idle_enter();-->  Offline CPU entering NOHZ
-
-rcu_idle_enter();
-
-while (!need_resched()) {
-
-#ifdef CONFIG_HOTPLUG_CPU
-
-if (cpu_is_offline(smp_processor_id()))
-cpu_die(); ---> CPU becomes offline and re-enter the idle thread without
-exiting from NOHZ,
-
-#endif
-
-...
-}
-
-
-Is it a good idea to exit from NOHZ before cpu_die() or it could be
-achieved in some other way? Please provide your
-comments.
-
--- 
-Thanks & Regards,
-Taniya Das.
-
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation.
+Kevin
