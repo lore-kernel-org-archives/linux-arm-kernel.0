@@ -1,44 +1,32 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sat, 3 Nov 2012 15:16:24 +0100
-Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
-In-Reply-To: <5093EE2B.8080005@atmel.com>
-References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
- <20121101222922.GD22956@pengutronix.de> <5093A8CD.60006@atmel.com>
- <20121102111432.GD21313@pengutronix.de>
- <5093EE2B.8080005@atmel.com>
-Message-ID: <20121103141624.GA24952@pengutronix.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Sat, 03 Nov 2012 20:15:33 +0530
+Subject: [PATCH 0/5] ARM: Exynos: Enable device tree support for MCT controller
+Message-ID: <1351953938-13487-1-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds device tree support for Exynos4/5 MCT controller. This
+series depends on the device tree and smp support patches for Exynos4x12 posted
+by Tomasz Figa. This patch series has been tested on Exynos4210 based Origen
+board, Exynos4412 based SMDK board and Exynos5250 based SMDK board.
 
-> >>Yes SMBUS quick command is supported but is not managed in the
-> >>driver, we have to tell explicitly the IP that we want to send this
-> >>command.
-> >
-> >Ok, so unless you want to implement the support, please update this
-> >patch with a comment that SMBUS_QUICK is a TODO and remove the
-> >SMBUS_QUICK capability.
-> >
-> 
-> Implementation should not be a huge task, only one bit to set in a
-> register but I have no device to test it.
+Thomas Abraham (5):
+  ARM: Exynos: add a register base address variable in mct controller driver
+  ARM: Exynos: prepare an array of MCT interrupt numbers and use it
+  ARM: Exynos: add device tree support for MCT controller driver
+  ARM: Exynos: remove static io-remapping of mct registers for Exynos5
+  ARM: dts: add mct device tree node for all supported Exynos SoC's
 
-'i2cdetect' from i2c-tools uses SMBUS_QUICK as one method to detect
-chips. Most slaves (both I2C and SMBus) react to that, so that would do
-in my book.
-
-> Did you test the driver with SMBus compatible devices? Can I keep
-> other SMBus capabilities from SMBUS_EMUL?
-
-The rest should be fine.
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121103/b3b8259b/attachment.sig>
+ .../bindings/timer/samsung,exynos4210-mct.txt      |   70 ++++++++
+ arch/arm/boot/dts/exynos4210.dtsi                  |    8 +
+ arch/arm/boot/dts/exynos4212.dtsi                  |   10 +
+ arch/arm/boot/dts/exynos4412.dtsi                  |    8 +
+ arch/arm/boot/dts/exynos5250.dtsi                  |   21 +++
+ arch/arm/mach-exynos/common.c                      |    5 -
+ arch/arm/mach-exynos/include/mach/irqs.h           |    6 -
+ arch/arm/mach-exynos/include/mach/map.h            |    1 -
+ arch/arm/mach-exynos/include/mach/regs-mct.h       |   53 ------
+ arch/arm/mach-exynos/mct.c                         |  176 +++++++++++++-------
+ 10 files changed, 234 insertions(+), 124 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/timer/samsung,exynos4210-mct.txt
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-mct.h
