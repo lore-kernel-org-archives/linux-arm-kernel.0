@@ -1,46 +1,73 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sat, 3 Nov 2012 22:01:46 +0530
-Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
- for AM33XX
-In-Reply-To: <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <509546F2.8080505@ti.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Sat, 3 Nov 2012 17:33:01 +0100
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121029053522.GC3400@in.ibm.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
+ <20121026163951.GA17742@redhat.com> <20121029053522.GC3400@in.ibm.com>
+Message-ID: <20121103163301.GA9496@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 02 November 2012 06:02 PM, Vaibhav Bedia wrote:
-> AM33XX has only one usable timer in the WKUP domain.
-> Currently the timer instance in WKUP domain is used
-> as the clockevent and the timer in non-WKUP domain
-> as the clocksource. The timer in WKUP domain can keep
-> running in suspend from a 32K clock and hence serve
-> as the persistent clock. To enable this, interchange
-> the timers used as clocksource and clockevent for
-> AM33XX. A subsequent patch will add suspend-resume
-> support for the clockevent to ensure that there are
-> no issues with timekeeping.
+On 10/29, Ananth N Mavinakayanahalli wrote:
 >
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> ---
->   arch/arm/mach-omap2/timer.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
+> On Fri, Oct 26, 2012 at 06:39:51PM +0200, Oleg Nesterov wrote:
+> > >
+> > > > OTOH, I do not understand this stuff, everything is nop on x86. And
+> > > > when I look into Documentation/cachetlb.txt I am starting to think
+> > > > that may be this needs flush_icache_user_range instead?
+> > > >
+> > > > Rabin, Ananth could you clarify this?
+> > >
+> > > Yes. We need flush_icache_user_range(). Though for x86 its always been a
+> > > nop, one never knows if there is some Power4 or older machine out there
+> > > that is still being used. We are fine for Power5 and later.
+> >
+> > This is bad...
+> >
+> > flush_icache_user needs vma. perhaps just to check VM_EXEC...
+> >
+> > So let me repeat to be sure I really understand, do you confirm that
+> > _in general_ flush_dcache_page() is not enough?
 >
-> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-> index 565e575..6584ee0 100644
-> --- a/arch/arm/mach-omap2/timer.c
-> +++ b/arch/arm/mach-omap2/timer.c
-> @@ -460,7 +460,7 @@ OMAP_SYS_TIMER(3_secure)
->   #endif
->
->   #ifdef CONFIG_SOC_AM33XX
-> -OMAP_SYS_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, 2, OMAP4_MPU_SOURCE)
-> +OMAP_SYS_TIMER_INIT(3_am33xx, 2, OMAP4_MPU_SOURCE, 1, OMAP4_MPU_SOURCE)
->   OMAP_SYS_TIMER(3_am33xx)
->   #endif
->
-As mentioned on other patch comment, I think this might break your
-SOC idle.
+> flush_dcache_page() on powerpc already checks for
+> CPU_FTR_COHERENT_ICACHE. So, yes, that is enough.
 
-Regards
-Santosh
+Thanks Ananth.
+
+Still it is not clear to me if flush_dcache_page() would be always right
+if we add the new port.
+
+OK. So I assume we need the fix and I am going to apply the patch below.
+
+Ananth, Rabin, will you ack it (including the comment I affed) ?
+
+Oleg.
+
+------------------------------------------------------------------------------
+[PATCH] uprobes: flush cache after xol write
+
+From: Rabin Vincent <rabin@rab.in>
+
+Flush the cache so that the instructions written to the XOL area are
+visible.
+
+Signed-off-by: Rabin Vincent <rabin@rab.in>
+
+--- x/kernel/events/uprobes.c
++++ x/kernel/events/uprobes.c
+@@ -1199,6 +1199,11 @@ static unsigned long xol_get_insn_slot(s
+ 	vaddr = kmap_atomic(area->page);
+ 	memcpy(vaddr + offset, uprobe->arch.insn, MAX_UINSN_BYTES);
+ 	kunmap_atomic(vaddr);
++	/*
++	 * We probably need flush_icache_user_range() but it needs vma.
++	 * This should work on supported architectures too.
++	 */
++	flush_dcache_page(area->page);
+ 
+ 	return current->utask->xol_vaddr;
+ }
