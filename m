@@ -1,37 +1,46 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Sat, 3 Nov 2012 08:54:21 -0400
-Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
-In-Reply-To: <20121103080300.GA9907@lunn.ch>
-References: <20121103080300.GA9907@lunn.ch>
-Message-ID: <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Sat, 03 Nov 2012 13:04:30 +0000
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
+ for AM33XX
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+ <5095037A.2020503@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
+Message-ID: <5095165E.10403@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'll fire up with ignore log level to get the full traces and post
-those this afternoon.  Given it will be a LOT of text, would you
-prefer I include them in the email, pastebin the output and provide
-links, or dump the log onto my webserver with a link?
+T
+On 11/03/2012 12:47 PM, Bedia, Vaibhav wrote:
+> Hi Kevin,
+>
+> On Sat, Nov 03, 2012 at 17:13:54, Kevin Hilman wrote:
+>> On 11/02/2012 01:32 PM, Vaibhav Bedia wrote:
+>>> AM33XX has only one usable timer in the WKUP domain.
+>>> Currently the timer instance in WKUP domain is used
+>>> as the clockevent and the timer in non-WKUP domain
+>>> as the clocksource. The timer in WKUP domain can keep
+>>> running in suspend from a 32K clock and hence serve
+>>> as the persistent clock. To enable this, interchange
+>>> the timers used as clocksource and clockevent for
+>>> AM33XX.
+>>
+>> Doesn't this also mean that you won't get timer wakeups
+>> in idle?  Or are you keeping the domain where the clockevent is
+>> on during idle?
+>>
+>
+> The lowest idle state that we are targeting will have MPU powered
+> off with external memory in self-refresh mode. Peripheral domain
+> with the clockevent will be kept on.
 
-Josh C
+Is this a limitation of the hardware?  or the software?
 
-On Sat, Nov 3, 2012 at 4:03 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Hi Josh
->
-> Are you not seeing a stack trace?
->
-> [   64.312377] BUG: scheduling while atomic: crond/151/0x40000300
-> [   79.771862] BUG: scheduling while atomic: swapper/0/0x40000500
-> [   81.826267] BUG: scheduling while atomic: swapper/0/0x40000500
-> [   90.330911] BUG: scheduling while atomic: swapper/0/0x40000500
->
->         printk(KERN_ERR "BUG: scheduling while atomic: %s/%d/0x%08x\n",
->                 prev->comm, prev->pid, preempt_count());
->
->         debug_show_held_locks(prev);
->         print_modules();
->         if (irqs_disabled())
->                 print_irqtrace_events(prev);
->         dump_stack();
->         add_taint(TAINT_WARN);
->
-> Andrew
+Kevin
+
+P.S.  I haven't yet made my way through the TRM, so I'll probably figure
+this out when I read it, but having this summarized in the changelog would
+be helpful since even after I read the TRM, I'll forget.  I'm saving the 
+TRM
+reading for entertainment on upcoming flight home from Linaro Connect.
