@@ -1,26 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 3 Nov 2012 18:06:22 +0100
-Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
-In-Reply-To: <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
-References: <20121103080300.GA9907@lunn.ch>
- <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
-Message-ID: <20121103170622.GD6832@lunn.ch>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat,  3 Nov 2012 18:45:03 +0100
+Subject: [PATCH RFC net-next 0/1] Simplify the CPSW DT
+In-Reply-To: <509240CF.6060909@ti.com>
+References: <509240CF.6060909@ti.com>
+Message-ID: <cover.1351964329.git.richardcochran@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 03, 2012 at 08:54:21AM -0400, Josh Coombs wrote:
-> I'll fire up with ignore log level to get the full traces and post
-> those this afternoon.  Given it will be a LOT of text, would you
-> prefer I include them in the email, pastebin the output and provide
-> links, or dump the log onto my webserver with a link?
+This patch is a follow up to show how to remove all the various
+register offsets from the DT for the CPSW driver. This applies on top
+of the bug fix I posted earlier for IO mapping leak.
 
-Hi Josh
+Since I am currently awaiting a replacement for my defective
+BeagleBone, this patch is compile tested only.
 
-I'm kind of expecting they will all look very similar. By looking at
-what is common it might quick become clear where the lock is being
-taken which is causing the problem.
+Thanks,
+Richard
 
-Anyway, i would suggest posting the first couple of traces to the list
-and a few more to me directly.
 
-    Andrew
+Richard Cochran (1):
+  cpsw: simplify the setup of the register pointers
+
+ Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
+ drivers/net/ethernet/ti/cpsw.c                 |  209 +++++++++--------------
+ include/linux/platform_data/cpsw.h             |   19 --
+ 3 files changed, 82 insertions(+), 180 deletions(-)
+
+-- 
+1.7.2.5
