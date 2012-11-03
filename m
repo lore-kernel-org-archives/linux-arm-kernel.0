@@ -1,61 +1,34 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Sat, 3 Nov 2012 12:26:14 +0100
-Subject: [PATCH for soc] socfpga: map uart into virtual address space so
- that early_printk() works
-In-Reply-To: <20121029002724.GA27891@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <201210251458.48528.arnd@arndb.de>
- <20121027115615.GC5912@elf.ucw.cz>
- <201210271539.20156.arnd@arndb.de>
- <20121029002724.GA27891@elf.ucw.cz>
-Message-ID: <20121103112614.GA27365@elf.ucw.cz>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Sat, 03 Nov 2012 09:31:04 +0100
+Subject: [PATCH v2 2/2] ARM: OMAP: omap_device: Correct resource handling
+ for DT boot
+In-Reply-To: <1351596296-13825-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1351596296-13825-1-git-send-email-peter.ujfalusi@ti.com>
+ <1351596296-13825-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <5094D648.80608@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 10/30/2012 12:24 PM, Peter Ujfalusi wrote:
+> When booting with DT the OF core can fill up the resources provided within
+> the DT blob.
+> The current way of handling the DT boot prevents us from removing hwmod data
+> for platforms only suppose to boot with DT (OMAP5 for example) since we need
+> to keep the whole hwmod database intact in order to have more resources in
+> hwmod than in DT (to be able to append the DMA resource from hwmod).
+>
+> To fix this issue we just examine the OF provided resources:
+> If we do not have resources we use hwmod to fill them.
+> If we have resources we check if we already able to recive DMA resource, if
+> no we only append the DMA resurce from hwmod to the OF provided ones.
+>
+> In this way we can start removing hwmod data for devices which have their
+> resources correctly configured in DT without regressions.
+>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>ke
 
-> Early printk code needs UART to be mapped early during
-> boot. early_printk() is left there during the start-up; it is useful
-> as our emulators are fairly slow.
-> 
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-> Acked-by: Dinh Nguyen <dinguyen@altera.com>
+Acked-by: Kevin Hilman <khilman@ti.com>
 
-Could we get this one applied? No comments for quite a while... and it
-is needed for machine not to crash with early_printk used...
-								Pavel
+Benoit, feel free to take this one as well.
 
-> diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-> index ab81ea9..49fb62b 100644
-> --- a/arch/arm/mach-socfpga/socfpga.c
-> +++ b/arch/arm/mach-socfpga/socfpga.c
-> @@ -37,6 +37,15 @@ static struct map_desc scu_io_desc __initdata = {
->  	.type		= MT_DEVICE,
->  };
->  
-> +
-> +
-> +static struct map_desc uart_io_desc __initdata = {
-> +	.virtual	= 0xfec02000,
-> +	.pfn		= __phys_to_pfn(0xffc02000),
-> +	.length		= SZ_8K,
-> +	.type		= MT_DEVICE,
-> +};
-> +
->  static void __init socfpga_scu_map_io(void)
->  {
->  	unsigned long base;
-> @@ -51,6 +60,8 @@ static void __init socfpga_scu_map_io(void)
->  static void __init socfpga_map_io(void)
->  {
->  	socfpga_scu_map_io();
-> +	iotable_init(&uart_io_desc, 1);
-> +	early_printk("Early printk initialized\n");
->  }
->  
->  const static struct of_device_id irq_match[] = {
-> 
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Kevin
