@@ -1,26 +1,19 @@
 From: davem@davemloft.net (David Miller)
-Date: Sat, 03 Nov 2012 15:38:13 -0400 (EDT)
-Subject: [PATCH net-next] macb: Keep driver's speed/duplex in sync with
- actual NCFGR
-In-Reply-To: <201211021909.25473.vitas@nppfactor.kiev.ua>
-References: <201211021909.25473.vitas@nppfactor.kiev.ua>
-Message-ID: <20121103.153813.1907662993079093598.davem@davemloft.net>
+Date: Sat, 03 Nov 2012 15:38:52 -0400 (EDT)
+Subject: [PATCH net-next 0/2] cpsw: fix resource leak for v3.8
+In-Reply-To: <cover.1351930782.git.richardcochran@gmail.com>
+References: <cover.1351930782.git.richardcochran@gmail.com>
+Message-ID: <20121103.153852.2120943445145443586.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitalii Demianets <vitas@nppfactor.kiev.ua>
-Date: Fri, 2 Nov 2012 19:09:24 +0200
+From: Richard Cochran <richardcochran@gmail.com>
+Date: Sat,  3 Nov 2012 09:25:28 +0100
 
-> When underlying phy driver restores its state very fast after being brought 
-> down and up so that macb driver function macb_handle_link_change() was never 
-> called with link state "down", driver's internal representation of phy speed 
-> and duplex (bp->speed and bp->duplex) didn't change. So, macb driver sees no 
-> reason to perform actual write to the NCFGR register, although the speed and 
-> duplex settings in that register were reset when interface was brought down 
-> and up. In that case actual phy speed and duplex differ from NCFGR settings.
-> The patch fixes that by keeping internal driver representation of speed and 
-> duplex in sync with actual content of NCFGR.
-> 
-> Signed-off-by: Vitalii Demianets <vitas@nppfactor.kiev.ua>
+> While looking at the idea of removing all of the register offsets in
+> the CPSW's device tree, I noticed that the driver would be leaking IO
+> mappings. Although this is, strictly speaking, a bug fix, still it can
+> wait to appear in v3.8, since there is no way to use the driver in
+> v3.7 (or earlier) anyhow.
 
-Applied.
+All applied, thanks.
