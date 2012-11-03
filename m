@@ -1,91 +1,29 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Sat,  3 Nov 2012 09:25:30 +0100
-Subject: [PATCH net-next 2/2] cpsw: fix leaking IO mappings
-In-Reply-To: <cover.1351930782.git.richardcochran@gmail.com>
-References: <cover.1351930782.git.richardcochran@gmail.com>
-Message-ID: <1c915a7d0301355342358db8f84560417609a61c.1351930782.git.richardcochran@gmail.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Sat, 3 Nov 2012 08:39:20 +0000
+Subject: [RFC 00/15] Add basic suspend-resume support for AM33XX
+In-Reply-To: <50944655.20602@gmail.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <50944655.20602@gmail.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EBFE615@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CPSW driver remaps two different IO regions, but fails to unmap them
-both. This patch fixes the issue by calling iounmap in the appropriate
-places.
+Hi Daniel,
 
-Signed-off-by: Richard Cochran <richardcochran@gmail.com>
----
- drivers/net/ethernet/ti/cpsw.c |   17 ++++++++---------
- 1 files changed, 8 insertions(+), 9 deletions(-)
+On Sat, Nov 03, 2012 at 03:46:53, Daniel Mack wrote:
+[...]
+> 
+> What event did you use to bring the system back to life? I tried a GPIO
+> button which has "linux,wakeup" set and is connected to GPIO bank 0, but
+> without success.
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 6215246..7654a62 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -1252,14 +1252,12 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
- 		ret = -ENOENT;
- 		goto clean_clk_ret;
- 	}
--
- 	if (!request_mem_region(priv->cpsw_res->start,
- 				resource_size(priv->cpsw_res), ndev->name)) {
- 		dev_err(priv->dev, "failed request i/o region\n");
- 		ret = -ENXIO;
- 		goto clean_clk_ret;
- 	}
--
- 	regs = ioremap(priv->cpsw_res->start, resource_size(priv->cpsw_res));
- 	if (!regs) {
- 		dev_err(priv->dev, "unable to map i/o region\n");
-@@ -1274,16 +1272,14 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
- 	if (!priv->cpsw_wr_res) {
- 		dev_err(priv->dev, "error getting i/o resource\n");
- 		ret = -ENOENT;
--		goto clean_clk_ret;
-+		goto clean_iomap_ret;
- 	}
--
- 	if (!request_mem_region(priv->cpsw_wr_res->start,
- 			resource_size(priv->cpsw_wr_res), ndev->name)) {
- 		dev_err(priv->dev, "failed request i/o region\n");
- 		ret = -ENXIO;
--		goto clean_clk_ret;
-+		goto clean_iomap_ret;
- 	}
--
- 	regs = ioremap(priv->cpsw_wr_res->start,
- 				resource_size(priv->cpsw_wr_res));
- 	if (!regs) {
-@@ -1326,7 +1322,7 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
- 	if (!priv->dma) {
- 		dev_err(priv->dev, "error initializing dma\n");
- 		ret = -ENOMEM;
--		goto clean_iomap_ret;
-+		goto clean_wr_iomap_ret;
- 	}
+I used uart wakeup in my testing. I see that you have CPSW driver also
+in your kernel. Can you try with a minimal set of drivers, similar to what
+BeagleBone has on Tony's master branch right now.
  
- 	priv->txch = cpdma_chan_create(priv->dma, tx_chan_num(0),
-@@ -1407,11 +1403,13 @@ clean_dma_ret:
- 	cpdma_chan_destroy(priv->txch);
- 	cpdma_chan_destroy(priv->rxch);
- 	cpdma_ctlr_destroy(priv->dma);
--clean_iomap_ret:
--	iounmap(priv->regs);
-+clean_wr_iomap_ret:
-+	iounmap(priv->wr_regs);
- clean_cpsw_wr_iores_ret:
- 	release_mem_region(priv->cpsw_wr_res->start,
- 			   resource_size(priv->cpsw_wr_res));
-+clean_iomap_ret:
-+	iounmap(priv->regs);
- clean_cpsw_iores_ret:
- 	release_mem_region(priv->cpsw_res->start,
- 			   resource_size(priv->cpsw_res));
-@@ -1442,6 +1440,7 @@ static int __devexit cpsw_remove(struct platform_device *pdev)
- 	iounmap(priv->regs);
- 	release_mem_region(priv->cpsw_res->start,
- 			   resource_size(priv->cpsw_res));
-+	iounmap(priv->wr_regs);
- 	release_mem_region(priv->cpsw_wr_res->start,
- 			   resource_size(priv->cpsw_wr_res));
- 	pm_runtime_disable(&pdev->dev);
--- 
-1.7.2.5
+Mugunthan mentioned he has a fix of the WARN_ON from CPSW driver that you
+see in the logs and that will be posted shortly. Can you mention what other
+patches you have pulled in?
+
+Regards,
+Vaibhav
