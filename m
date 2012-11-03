@@ -1,45 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Sat,  3 Nov 2012 23:02:22 +0100
-Subject: [PATCH 1/9] ARM: integrator: Remove unused icst_params lclk_params
- structure
+Date: Sat,  3 Nov 2012 23:02:23 +0100
+Subject: [PATCH 2/9] ARM: at91: Remove unused struct at91sam9g45_isi_device
+ and its resources
 In-Reply-To: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
 References: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1351980150-24145-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was introduced way back before 2005 and has remained unused for
-over 7 years. Let's remove it.
+This the at91sam9g45_isi_device structure and its associated resources
+were added in 2008 and have been unused ever since. Let's remove them.
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-integrator/cpu.c |   12 ------------
- 1 file changed, 12 deletions(-)
+ arch/arm/mach-at91/at91sam9263_devices.c |   20 --------------------
+ 1 file changed, 20 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/cpu.c b/arch/arm/mach-integrator/cpu.c
-index 590c192..4e0a689 100644
---- a/arch/arm/mach-integrator/cpu.c
-+++ b/arch/arm/mach-integrator/cpu.c
-@@ -30,18 +30,6 @@ static struct cpufreq_driver integrator_driver;
- #define CM_STAT __io_address(INTEGRATOR_HDR_STAT)
- #define CM_LOCK __io_address(INTEGRATOR_HDR_LOCK)
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index cb85da2..0562a9d 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -901,26 +901,6 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
  
--static const struct icst_params lclk_params = {
--	.ref		= 24000000,
--	.vco_max	= ICST525_VCO_MAX_5V,
--	.vco_min	= ICST525_VCO_MIN,
--	.vd_min		= 8,
--	.vd_max		= 132,
--	.rd_min		= 24,
--	.rd_max		= 24,
--	.s2div		= icst525_s2div,
--	.idx2s		= icst525_idx2s,
+ #if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
+ 
+-struct resource isi_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9263_BASE_ISI,
+-		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
+-		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
+-		.flags	= IORESOURCE_IRQ,
+-	},
 -};
 -
- static const struct icst_params cclk_params = {
- 	.ref		= 24000000,
- 	.vco_max	= ICST525_VCO_MAX_5V,
+-static struct platform_device at91sam9263_isi_device = {
+-	.name		= "at91_isi",
+-	.id		= -1,
+-	.resource	= isi_resources,
+-	.num_resources	= ARRAY_SIZE(isi_resources),
+-};
+-
+ void __init at91_add_device_isi(struct isi_platform_data *data,
+ 		bool use_pck_as_mck)
+ {
 -- 
 1.7.9.5
