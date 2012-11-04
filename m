@@ -1,64 +1,183 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  4 Nov 2012 21:57:21 +0100
-Subject: [PATCH 1/1] mtd: physmap_of: allow to specify the mtd name for retro
- compatiblity
-Message-ID: <1352062641-31850-1-git-send-email-plagnioj@jcrosoft.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sun, 4 Nov 2012 23:21:54 +0100
+Subject: [PATCH 1/2] net: at91_ether: add dt support
+In-Reply-To: <1352052637-5154-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121104154954.GJ19021@game.jcrosoft.org>
+ <1352052637-5154-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CAGhQ9VwUr=ak3Rjo0JVTkdP=4k6xkAKCDEwFyO5v3Fui0Md4Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-linux,mtd-name allow to specify the mtd name for retro capability with
-physmap-flash drivers as boot loader pass the mtd partition via the old
-device name physmap-flash.
+Hi Jean-Christophe,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- Documentation/devicetree/bindings/mtd/mtd-physmap.txt |    3 +++
- drivers/mtd/maps/physmap_of.c                         |    5 ++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+Some minor comments below.
 
-diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-index 94de19b..dab7847 100644
---- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-@@ -23,6 +23,9 @@ file systems on embedded devices.
-    unaligned accesses as implemented in the JFFS2 code via memcpy().
-    By defining "no-unaligned-direct-access", the flash will not be
-    exposed directly to the MTD users (e.g. JFFS2) any more.
-+ - linux,mtd-name: allow to specify the mtd name for retro capability with
-+   physmap-flash drivers as boot loader pass the mtd partition via the old
-+   device name physmap-flash.
- 
- For JEDEC compatible devices, the following additional properties
- are defined:
-diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of.c
-index 6f19aca..9a8db0c 100644
---- a/drivers/mtd/maps/physmap_of.c
-+++ b/drivers/mtd/maps/physmap_of.c
-@@ -170,6 +170,7 @@ static int __devinit of_flash_probe(struct platform_device *dev)
- 	resource_size_t res_size;
- 	struct mtd_part_parser_data ppdata;
- 	bool map_indirect;
-+	const char *mtd_name;
- 
- 	match = of_match_device(of_flash_match, &dev->dev);
- 	if (!match)
-@@ -178,6 +179,8 @@ static int __devinit of_flash_probe(struct platform_device *dev)
- 
- 	reg_tuple_size = (of_n_addr_cells(dp) + of_n_size_cells(dp)) * sizeof(u32);
- 
-+	of_property_read_string(dp, "linux,mtd-name", &mtd_name);
-+
- 	/*
- 	 * Get number of "reg" tuples. Scan for MTD devices on area's
- 	 * described by each "reg" region. This makes it possible (including
-@@ -234,7 +237,7 @@ static int __devinit of_flash_probe(struct platform_device *dev)
- 			goto err_out;
- 		}
- 
--		info->list[i].map.name = dev_name(&dev->dev);
-+		info->list[i].map.name = mtd_name ? mtd_name : dev_name(&dev->dev);
- 		info->list[i].map.phys = res.start;
- 		info->list[i].map.size = res_size;
- 		info->list[i].map.bankwidth = be32_to_cpup(width);
--- 
-1.7.10.4
+On 4 November 2012 19:10, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Joachim Eastwood <manabian@gmail.com>
+> Cc: netdev at vger.kernel.org
+> ---
+>  .../devicetree/bindings/net/cdns-emac.txt          |   23 +++++++
+>  drivers/net/ethernet/cadence/at91_ether.c          |   72 ++++++++++++++++++--
+>  2 files changed, 88 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/net/cdns-emac.txt
+>
+> diff --git a/Documentation/devicetree/bindings/net/cdns-emac.txt b/Documentation/devicetree/bindings/net/cdns-emac.txt
+> new file mode 100644
+> index 0000000..45b8760
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/cdns-emac.txt
+> @@ -0,0 +1,23 @@
+> +* Cadence EMAC Ethernet controller
+> +
+> +Required properties:
+> +- compatible: Should be "cdns,[<chip>-]{emac}"
+> +  Use "cdns,at91rm9200-emac" Atmel at91rm9200 SoC.
+> +  or the generic form: "cdns,emac".
+> +- reg: Address and length of the register set for the device
+> +- interrupts: Should contain macb interrupt
+> +- phy-mode: String, operation mode of the PHY interface.
+> +  Supported values are: "mii", "rmii".
+> +
+> +Optional properties:
+> +- local-mac-address: 6 bytes, mac address
+> +
+> +Examples:
+> +
+> +       macb0: ethernet at fffc4000 {
+> +               compatible = "cdns,atrm9200-emac";
+
+Typo in the compatible string. Should be "cdns,at91rm9200-emac"
+
+> +               reg = <0xfffc4000 0x4000>;
+> +               interrupts = <21>;
+> +               phy-mode = "rmii";
+> +               local-mac-address = [3a 0e 03 04 05 06];
+> +       };
+> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+> index 0d6392d..3e843b4 100644
+> --- a/drivers/net/ethernet/cadence/at91_ether.c
+> +++ b/drivers/net/ethernet/cadence/at91_ether.c
+> @@ -31,6 +31,9 @@
+>  #include <linux/gfp.h>
+>  #include <linux/phy.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_net.h>
+>
+>  #include "macb.h"
+>
+> @@ -443,6 +446,49 @@ static const struct net_device_ops at91ether_netdev_ops = {
+>  #endif
+>  };
+>
+> +#if defined(CONFIG_OF)
+> +static const struct of_device_id at91ether_dt_ids[] = {
+> +       { .compatible = "cdns,at91rm9200-emac" },
+> +       { .compatible = "cdns,emac" },
+> +       { /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, at91ether_dt_ids);
+> +
+> +static int at91ether_get_phy_mode_dt(struct platform_device *pdev)
+> +{
+> +       struct device_node *np = pdev->dev.of_node;
+> +
+> +       if (np)
+> +               return of_get_phy_mode(np);
+> +
+> +       return -ENODEV;
+> +}
+> +
+> +static int at91ether_get_hwaddr_dt(struct macb *bp)
+> +{
+> +       struct device_node *np = bp->pdev->dev.of_node;
+
+Space between variables and code, please.
+
+> +       if (np) {
+> +               const char *mac = of_get_mac_address(np);
+> +               if (mac) {
+> +                       memcpy(bp->dev->dev_addr, mac, ETH_ALEN);
+> +                       return 0;
+> +               }
+> +       }
+> +
+> +       return -ENODEV;
+> +}
+> +#else
+> +static int at91ether_get_phy_mode_dt(struct platform_device *pdev)
+> +{
+> +       return -ENODEV;
+> +}
+> +static int at91ether_get_hwaddr_dt(struct macb *bp)
+> +{
+> +       return -ENODEV;
+> +}
+> +#endif
+> +
+>  /*
+>   * Detect MAC & PHY and perform ethernet interface initialization
+>   */
+> @@ -466,7 +512,8 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>         lp = netdev_priv(dev);
+>         lp->pdev = pdev;
+>         lp->dev = dev;
+> -       lp->board_data = *board_data;
+> +       if (board_data)
+> +               lp->board_data = *board_data;
+>         spin_lock_init(&lp->lock);
+>
+>         dev->base_addr = regs->start;           /* physical base address */
+> @@ -496,18 +543,28 @@ static int __init at91ether_probe(struct platform_device *pdev)
+>         platform_set_drvdata(pdev, dev);
+>         SET_NETDEV_DEV(dev, &pdev->dev);
+>
+> -       get_mac_address(dev);           /* Get ethernet address and store it in dev->dev_addr */
+> +       res = at91ether_get_hwaddr_dt(lp);
+> +       if (res < 0)
+> +               get_mac_address(dev);           /* Get ethernet address and store it in dev->dev_addr */
+> +
+>         update_mac_address(dev);        /* Program ethernet address into MAC */
+>
+> +       res = at91ether_get_phy_mode_dt(pdev);
+> +       if (res < 0) {
+> +               if (board_data && board_data->is_rmii)
+> +                       lp->phy_interface = PHY_INTERFACE_MODE_RMII;
+> +               else
+> +                       lp->phy_interface = PHY_INTERFACE_MODE_MII;
+> +       } else {
+> +               lp->phy_interface = res;
+> +       }
+> +
+>         macb_writel(lp, NCR, 0);
+>
+> -       if (board_data->is_rmii) {
+> +       if (lp->phy_interface == PHY_INTERFACE_MODE_RMII)
+>                 macb_writel(lp, NCFGR, MACB_BF(CLK, MACB_CLK_DIV32) | MACB_BIT(BIG) | MACB_BIT(RM9200_RMII));
+> -               lp->phy_interface = PHY_INTERFACE_MODE_RMII;
+> -       } else {
+> +       else
+>                 macb_writel(lp, NCFGR, MACB_BF(CLK, MACB_CLK_DIV32) | MACB_BIT(BIG));
+> -               lp->phy_interface = PHY_INTERFACE_MODE_MII;
+> -       }
+>
+>         /* Register the network interface */
+>         res = register_netdev(dev);
+> @@ -602,6 +659,7 @@ static struct platform_driver at91ether_driver = {
+>         .driver         = {
+>                 .name   = DRV_NAME,
+>                 .owner  = THIS_MODULE,
+> +               .of_match_table = of_match_ptr(at91ether_dt_ids),
+>         },
+>  };
+>
+
+Tested-by: Joachim Eastwood <manabian@gmail.com>
+
+regards
+Joachim Eastwood
