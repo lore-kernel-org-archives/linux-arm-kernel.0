@@ -1,50 +1,83 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Sun, 4 Nov 2012 16:14:26 +0530
-Subject: [PATCHv2 0/7] i2c: omap: updates
-Message-ID: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+Date: Sun, 4 Nov 2012 16:14:32 +0530
+Subject: [PATCHv2 6/7] i2c: omap: make reset a seperate function
+In-Reply-To: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352025873-27492-7-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Implement reset as a separate function.
+This will enable us to make sure that we don't do the
+calculation again on every transfer.
+Also at probe the reset is not added as the hwmod is doing that
+for us.
 
-Does the followiing
-- Make the revision a 32- bit consisting of rev_lo amd rev_hi each
-of 16 bits.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+todo: reprodue the errors and optimise the reset if possible.
 
-- Also use the revision register for the erratum i207.
-- Refactor the i2c_omap_init code.
+ drivers/i2c/busses/i2c-omap.c |   25 ++++++++++++++++---------
+ 1 files changed, 16 insertions(+), 9 deletions(-)
 
-
-Also more cleanup is possible will check on that subsequently.
-
-
-Tested on OMAP4430sdp  ,4460 ,omap3630 ,3430 and omap2430.
-
-For omap2 testing the below patch was used
-[PATCH] ARM: vfp: fix save and restore when running on pre-VFPv3 and CONFIG_VFPv3 set
-
-Also for using the pm testing below patches are used.
-
-arm: sched: stop sched_clock() during suspend
-ARM: OMAP: hwmod: wait for sysreset complete after enabling hwmod
-
-Also available through
-git://gitorious.org/linus-tree/linus-tree.git i2c_omap/for_3.8
-
-
-Shubhrajyoti D (7):
-  i2c: omap: Fix the revision register read
-  i2c: omap: use revision check for OMAP_I2C_FLAG_APPLY_ERRATA_I207
-  i2c: omap: remove the dtrev
-  ARM: i2c: omap: Remove the i207 errata flag
-  i2c: omap: re-factor omap_i2c_init function
-  i2c: omap: make reset a seperate function
-  i2c: omap: Restore i2c context always
-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    3 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    9 +-
- drivers/i2c/busses/i2c-omap.c              |  166 +++++++++++++++++-----------
- include/linux/i2c-omap.h                   |    1 -
- 4 files changed, 104 insertions(+), 75 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index a87c20a..70d43b7 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -299,15 +299,9 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
+ 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
+ }
+ 
+-static int omap_i2c_init(struct omap_i2c_dev *dev)
++static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ {
+-	u16 psc = 0, scll = 0, sclh = 0;
+-	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+-	unsigned long fclk_rate = 12000000;
+ 	unsigned long timeout;
+-	unsigned long internal_clk = 0;
+-	struct clk *fclk;
+-
+ 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
+ 		/* Disable I2C controller before soft reset */
+ 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
+@@ -353,6 +347,17 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 			dev->westate = OMAP_I2C_WE_ALL;
+ 		}
+ 	}
++	return 0;
++}
++
++static int omap_i2c_init(struct omap_i2c_dev *dev)
++{
++	u16 psc = 0, scll = 0, sclh = 0;
++	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
++	unsigned long fclk_rate = 12000000;
++	unsigned long internal_clk = 0;
++	struct clk *fclk;
++
+ 
+ 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+ 		/*
+@@ -592,7 +597,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	dev->buf_len = 0;
+ 	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+-		omap_i2c_init(dev);
++		omap_i2c_reset(dev);
++		__omap_i2c_init(dev);
+ 		return -ETIMEDOUT;
+ 	}
+ 
+@@ -602,7 +608,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	/* We have an error */
+ 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+ 			    OMAP_I2C_STAT_XUDF)) {
+-		omap_i2c_init(dev);
++		omap_i2c_reset(dev);
++		__omap_i2c_init(dev);
+ 		return -EIO;
+ 	}
+ 
 -- 
 1.7.5.4
