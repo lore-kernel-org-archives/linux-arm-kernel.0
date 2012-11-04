@@ -1,25 +1,63 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 4 Nov 2012 16:49:54 +0100
-Subject: [PATCH 0/2] net: at91_ether add dt and pinctrl support
-Message-ID: <20121104154954.GJ19021@game.jcrosoft.org>
+Date: Sun, 4 Nov 2012 16:52:12 +0100
+Subject: [PATCH v3 0/6] DT support for AT91RM9200
+In-Reply-To: <1351449071-5763-1-git-send-email-manabian@gmail.com>
+References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
+Message-ID: <20121104155212.GK19021@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 19:31 Sun 28 Oct     , Joachim Eastwood wrote:
+> Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
+> 
+> Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
+> 
+> Patch 3 adds clock lookups for DT.
+> 
+> Patch 4 adds a new board for RM9200 DT support.
+> 
+> Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
+> 
+> 
+> I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a initrd. As far as I can tell pinctrl, usart and ohci all work.
 
-	This patch serie add dt and pinctrl support to the at91 ether
+After updating barebox to have the DT support I've tested it on rm9200ek with net support
 
-	this is need to use the network on at91rm9200 as we now have dt
-	support on it
+work fine
 
-Jean-Christophe PLAGNIOL-VILLARD (2):
-      net: at91_ether: add dt support
-      net: at91_ether: add pinctrl support
-
- Documentation/devicetree/bindings/net/cdns-emac.txt |   23 +++++++++++++++++++++++
- drivers/net/ethernet/cadence/at91_ether.c           |   83 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------
- 2 files changed, 99 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/net/cdns-emac.txt
+It does not apply on my tree as I've a more patch but I'll manage the merge
+conflict
 
 Best Regards,
 J.
+> 
+> Patches based on linux-next.
+> 
+> 
+> Joachim Eastwood (6):
+>   ARM: AT91: Fix build failure on board-dt
+>   ARM: AT91: Add DT support to AT91RM9200 System Timer
+>   ARM: AT91: Add usart/tc/pio/ohci DT clock lookup to AT91RM9200
+>   ARM: AT91: Add AT91RM9200 DT board
+>   ARM: AT91: Add AT91RM9200 device tree
+>   ARM: AT91: Add AT91RM9200EK board device tree
+> 
+>  .../devicetree/bindings/arm/atmel-at91.txt         |   6 +
+>  arch/arm/boot/dts/Makefile                         |   2 +
+>  arch/arm/boot/dts/at91rm9200.dtsi                  | 333 +++++++++++++++++++++
+>  arch/arm/boot/dts/at91rm9200ek.dts                 |  78 +++++
+>  arch/arm/mach-at91/Kconfig                         |   9 +
+>  arch/arm/mach-at91/Makefile                        |   1 +
+>  arch/arm/mach-at91/at91rm9200.c                    |  18 ++
+>  arch/arm/mach-at91/at91rm9200_time.c               |  63 +++-
+>  arch/arm/mach-at91/board-rm9200-dt.c               |  59 ++++
+>  arch/arm/mach-at91/generic.h                       |   1 +
+>  arch/arm/mach-at91/setup.c                         |  14 +
+>  11 files changed, 582 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91rm9200.dtsi
+>  create mode 100644 arch/arm/boot/dts/at91rm9200ek.dts
+>  create mode 100644 arch/arm/mach-at91/board-rm9200-dt.c
+> 
+> -- 
+> 1.8.0
+> 
