@@ -1,75 +1,78 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 4 Nov 2012 19:35:53 +0530
-Subject: [PATCH v3 07/11] ARM: davinci - restructure header files for
- common clock migration
-In-Reply-To: <1351181518-11882-8-git-send-email-m-karicheri2@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-8-git-send-email-m-karicheri2@ti.com>
-Message-ID: <50967641.4090503@ti.com>
+From: ananth@in.ibm.com (Ananth N Mavinakayanahalli)
+Date: Sun, 4 Nov 2012 19:59:27 +0530
+Subject: [PATCH 6/9] uprobes: flush cache after xol write
+In-Reply-To: <20121103163301.GA9496@redhat.com>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-6-git-send-email-rabin@rab.in>
+ <20121015165756.GA11737@redhat.com>
+ <CAH+eYFAv=UTZ1gQ5jXq8_ziNy1i3BL9y1bOUWMdTow=i3N0n+g@mail.gmail.com>
+ <20121025145839.GB26929@redhat.com> <20121026055239.GA4862@in.ibm.com>
+ <20121026163951.GA17742@redhat.com> <20121029053522.GC3400@in.ibm.com>
+ <20121103163301.GA9496@redhat.com>
+Message-ID: <20121104142927.GA4087@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/25/2012 9:41 PM, Murali Karicheri wrote:
-> pll.h is added to migrate some of the PLL controller defines for sleep.S.
-> psc.h is modified to keep only PSC modules definitions needed by sleep.S
-> after migrating to common clock. The definitions under
-> ifdef CONFIG_COMMON_CLK will be removed in a subsequent patch.
-> davinci_watchdog_reset prototype is moved to time.h as clock.h is
-> being obsoleted. sleep.S and pm.c is modified to include the new header
-> file replacements.
+On Sat, Nov 03, 2012 at 05:33:01PM +0100, Oleg Nesterov wrote:
+> On 10/29, Ananth N Mavinakayanahalli wrote:
+> >
+> > On Fri, Oct 26, 2012 at 06:39:51PM +0200, Oleg Nesterov wrote:
+> > > >
+> > > > > OTOH, I do not understand this stuff, everything is nop on x86. And
+> > > > > when I look into Documentation/cachetlb.txt I am starting to think
+> > > > > that may be this needs flush_icache_user_range instead?
+> > > > >
+> > > > > Rabin, Ananth could you clarify this?
+> > > >
+> > > > Yes. We need flush_icache_user_range(). Though for x86 its always been a
+> > > > nop, one never knows if there is some Power4 or older machine out there
+> > > > that is still being used. We are fine for Power5 and later.
+> > >
+> > > This is bad...
+> > >
+> > > flush_icache_user needs vma. perhaps just to check VM_EXEC...
+> > >
+> > > So let me repeat to be sure I really understand, do you confirm that
+> > > _in general_ flush_dcache_page() is not enough?
+> >
+> > flush_dcache_page() on powerpc already checks for
+> > CPU_FTR_COHERENT_ICACHE. So, yes, that is enough.
 > 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  arch/arm/mach-davinci/devices.c           |    2 ++
->  arch/arm/mach-davinci/include/mach/pll.h  |   46 +++++++++++++++++++++++++++++
->  arch/arm/mach-davinci/include/mach/psc.h  |    4 +++
->  arch/arm/mach-davinci/include/mach/time.h |    4 ++-
->  arch/arm/mach-davinci/pm.c                |    4 +++
->  arch/arm/mach-davinci/sleep.S             |    4 +++
->  6 files changed, 63 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/mach-davinci/include/mach/pll.h
+> Thanks Ananth.
+> 
+> Still it is not clear to me if flush_dcache_page() would be always right
+> if we add the new port.
+> 
+> OK. So I assume we need the fix and I am going to apply the patch below.
+> 
+> Ananth, Rabin, will you ack it (including the comment I affed) ?
+> 
+> Oleg.
+> 
+> ------------------------------------------------------------------------------
+> [PATCH] uprobes: flush cache after xol write
+> 
+> From: Rabin Vincent <rabin@rab.in>
+> 
+> Flush the cache so that the instructions written to the XOL area are
+> visible.
+> 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-With this patch a _third_ copy of PLL definitions is created in kernel
-sources. The existing PLL definitions in clock.h inside mach-davinci
-should be moved to mach/pll.h and the pll.h you introduced inside
-drivers/clk in 5/11 should be removed (this patch should appear before
-5/11).
+Acked-by: Ananth N Mavinakayanahalli <ananth@in.ibm.com>
 
-The biggest disadvantage of this approach is inclusion of mach/ includes
-in drivers/clk. But duplicating code is definitely not the fix for this.
-Anyway, mach/ includes are not uncommon in drivers/clk (they are all
-probably suffering from the same issue).
-
-$ grep -rl "include <mach/" drivers/clk/*
-drivers/clk/clk-u300.c
-drivers/clk/mmp/clk-pxa168.c
-drivers/clk/mmp/clk-mmp2.c
-drivers/clk/mmp/clk-pxa910.c
-drivers/clk/mxs/clk-imx23.c
-drivers/clk/mxs/clk-imx28.c
-drivers/clk/spear/spear6xx_clock.c
-drivers/clk/spear/spear3xx_clock.c
-drivers/clk/spear/spear1340_clock.c
-drivers/clk/spear/spear1310_clock.c
-drivers/clk/ux500/clk-prcc.c
-drivers/clk/versatile/clk-integrator.c
-drivers/clk/versatile/clk-realview.c
-
-pll.h can probably be moved to include/linux/clk/ to avoid this. Would
-like to hear from Mike on this before going ahead.
-
-Anyway, instead of just commenting, I though I will be more useful and
-went ahead and made some of the changes I have been talking about. I
-fixed the multiple PLL definitions issue, the build infrastructure issue
-and the commit ordering too.
-
-I pushed the patches I fixed to devel-common-clk branch of my git tree.
-It is build tested using davinci_all_defconfig but its not runtime tested.
-
-Can you start from here and provide me incremental changes on top of
-this? That way we can collaborate to finish this faster.
-
-Thanks,
-Sekhar
+> 
+> --- x/kernel/events/uprobes.c
+> +++ x/kernel/events/uprobes.c
+> @@ -1199,6 +1199,11 @@ static unsigned long xol_get_insn_slot(s
+>  	vaddr = kmap_atomic(area->page);
+>  	memcpy(vaddr + offset, uprobe->arch.insn, MAX_UINSN_BYTES);
+>  	kunmap_atomic(vaddr);
+> +	/*
+> +	 * We probably need flush_icache_user_range() but it needs vma.
+> +	 * This should work on supported architectures too.
+> +	 */
+> +	flush_dcache_page(area->page);
+> 
+>  	return current->utask->xol_vaddr;
+>  }
