@@ -1,38 +1,41 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Sun, 4 Nov 2012 07:05:13 -0500
-Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
-In-Reply-To: <20121104091146.GF6832@lunn.ch>
-References: <20121103080300.GA9907@lunn.ch>
- <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
- <20121103170622.GD6832@lunn.ch>
- <CAMW5UfZLYzCf357Z0Ncd6p5G7VYLwq3nhXVb=nAXZOxONa8yeQ@mail.gmail.com>
- <20121104091146.GF6832@lunn.ch>
-Message-ID: <CAMW5UfZoo-7WaBnsqzdmsCu31h3pWb52Y6JX5=jE6H=e80_tJQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 4 Nov 2012 18:36:41 +0530
+Subject: [PATCH v3 10/11] ARM: davinci - migrate to common clock
+In-Reply-To: <1351181518-11882-11-git-send-email-m-karicheri2@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-11-git-send-email-m-karicheri2@ti.com>
+Message-ID: <50966861.4040500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will do, I'm half curious now if I managed to pull down a copy from
-git mid-commit or something, as I can't for the life of me make it
-flake out the way it was prior and I see there has been updates to
-3.7-rc3 since it was released.  (I always thought once cut, no more
-commits went to that branch.)  Oh well, at least my build farm got a
-good workout.
+On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+> Currently migrate only DM644x as this is being reviewed. Once all
+> platforms are migrated, the Makefile will be cleaned up to remove
+> obsoleted files clock.o and psc.o
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+> ---
+>  arch/arm/Kconfig               |    1 +
+>  arch/arm/mach-davinci/Kconfig  |    2 ++
+>  arch/arm/mach-davinci/Makefile |   11 ++++++++++-
+>  3 files changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index c5f9ae5..4611987 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -967,6 +967,7 @@ config ARCH_DAVINCI
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select ZONE_DMA
+>  	select HAVE_IDE
+> +	select COMMON_CLK
+>  	select CLKDEV_LOOKUP
+>  	select GENERIC_ALLOCATOR
+>  	select GENERIC_IRQ_CHIP
 
-Josh C
+This list has to be sorted. Russell has a patch which fixed this all
+across arch/arm/* which got merged for v3.7. This patch does not apply
+to v3.7-rc3 anymore due to the same reason.
 
-On Sun, Nov 4, 2012 at 4:11 AM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Sat, Nov 03, 2012 at 09:39:55PM -0400, Josh Coombs wrote:
->> As of now I can't reproduce, so I can only assume it was something
->> with my config.  Once I nail down exactly what triggers the behavior
->> I'll post up.  For now, ignore my suggestion that there is a
->> regression.
->
-> O.K.
->
-> I also tried reproducing it.  On my QNAP Kirkwood I made a fresh
-> checkout of the kernel and built it. No problems.
->
-> If you do see it again, please let us know.
->
-> Thanks
->    Andrew
+Thanks,
+Sekhar
