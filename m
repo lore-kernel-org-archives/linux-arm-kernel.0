@@ -1,31 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 4 Nov 2012 19:12:07 +0100
-Subject: [PATCH 2/2] Input: nomadik-ske-keypad - start using the apb_pclk
-In-Reply-To: <1351779602-13818-3-git-send-email-ulf.hansson@stericsson.com>
-References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
- <1351779602-13818-3-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdbZB4nhFQtLH-GxBSK99RFk7yhSYMhO5keVjyugrqr7JA@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun,  4 Nov 2012 19:10:37 +0100
+Subject: [PATCH 2/2] net: at91_ether: add pinctrl support
+In-Reply-To: <1352052637-5154-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20121104154954.GJ19021@game.jcrosoft.org>
+ <1352052637-5154-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1352052637-5154-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 3:20 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+If no pinctrl available just report a warning as some architecture may not
+need to do anything.
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Previously this clock was handled internally by the clockdriver,
-> but now this is separate clk. So we need take care of it.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Joachim Eastwood <manabian@gmail.com>
+Cc: netdev at vger.kernel.org
+---
+ drivers/net/ethernet/cadence/at91_ether.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-So this is a silicon block clock and falls into the category of things
-we've been discussing...
-
-If I understand correctly, the only "real" solution is to
-implement the PM domains and have these enable the clocks.
-
-An alternative may be to move this driver over to the AMBA bus,
-because I think this device actually has primecell registers.
-Then the bus will take care of the pclk for starters.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+index 3e843b4..ffcdbc3 100644
+--- a/drivers/net/ethernet/cadence/at91_ether.c
++++ b/drivers/net/ethernet/cadence/at91_ether.c
+@@ -34,6 +34,7 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_net.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include "macb.h"
+ 
+@@ -500,11 +501,21 @@ static int __init at91ether_probe(struct platform_device *pdev)
+ 	struct phy_device *phydev;
+ 	struct macb *lp;
+ 	int res;
++	struct pinctrl *pinctrl;
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!regs)
+ 		return -ENOENT;
+ 
++	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
++	if (IS_ERR(pinctrl)) {
++		res = PTR_ERR(pinctrl);
++		if (res == -EPROBE_DEFER)
++			return res;
++
++		dev_warn(&pdev->dev, "No pinctrl provided\n");
++	}
++
+ 	dev = alloc_etherdev(sizeof(struct macb));
+ 	if (!dev)
+ 		return -ENOMEM;
+-- 
+1.7.10.4
