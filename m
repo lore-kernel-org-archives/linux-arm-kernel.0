@@ -1,63 +1,56 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 4 Nov 2012 18:28:11 +0100
-Subject: [GIT PULL] Integrator & Versatile IRQchip changes
-Message-ID: <CACRpkdY8_Bdd3_m85ucCSP2Sog4a0BoJM93z=JLFWz9pO3p=Pw@mail.gmail.com>
+Date: Sun, 4 Nov 2012 18:37:44 +0100
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA5C598@DBDE01.ent.ti.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
+ <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
+ <20121001154451.GI4840@atomide.com>
+ <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
+ <CACRpkdaeu3JaLqSbqETT=D0mdUu5VpwRpS_Xohd6M963rw8QMg@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA5C598@DBDE01.ent.ti.com>
+Message-ID: <CACRpkdY_db3ju4LVnoR=0Wq8TFUxa48jNFGhvGM-3uSrmGZVew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Tue, Oct 30, 2012 at 3:12 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
 
-this is a set of three irq cleanup/movement patches that affect the FPGA
-IRQ chip make the integrator a better example of how irq descriptors
-should be treated. As I suspect there may be more irqchip drivers moving
-out of arch/arm I figured that pushing these through ARM SoC was the
-best thing.
+> I completely understood this named modes, I have added named
+> modes like this in am335x-xxx.dts files
 
-Please pull them in!
+I do not understand how the pinctrl-single dts files work actually,
+so please get Tony to review this part.
+
+> I think "pinctrl-1" state will be used in driver
+> suspend/resume calls.
+
+Hopefully, I think you should test the code and monitor the
+system to make sure the right thing happens.
+
+> I have the pinmux/conf settings for default state but fully
+> optimized pinmux/conf values in idle & suspend states are not
+> available yet.
+
+You have defined a "sleep" state which is what should be used
+for suspend? Or do you mean that you do have a state but
+you're just not defining it to the most optimal setting yet?
+
+> Even though if I add here, I am unable to test
+> these pins in suspend state because suspend/resume of AM35xx
+> is not added yet
+
+Aha.
+
+> I have two options now
+> - add only default states for now, I can add reset of
+> the state details once suspend/resume is supported.
+> - add same values in all the states, modify those once
+> suspend/resume is added for AM335x.
+
+The OMAP maintainer gets to choose how this is to be done,
+it's none of my business :-)
 
 Yours,
 Linus Walleij
-
-
-The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-
-  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/integrator-irq
-
-for you to fetch changes up to 2389d5014342e9535aad212d0c68d439aaf534ba:
-
-  ARM: plat-versatile: move FPGA irq driver to drivers/irqchip
-(2012-11-04 18:09:12 +0100)
-
-----------------------------------------------------------------
-This provides the following Integrator refactorings:
-- Switch the FPGA IRQ controller to use the simple IRQ domain
-- Get rid of preallocated IRQ descriptors on the Integrator
-- Move the FPGA IRQ driver to drivers/irqchip
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: plat-versatile: use simple irqdomain for FPGA IRQ
-      ARM: integrator: get rid of preallocated irq descriptors
-      ARM: plat-versatile: move FPGA irq driver to drivers/irqchip
-
- arch/arm/Kconfig                                   |   4 +-
- arch/arm/mach-integrator/include/mach/irqs.h       | 109 ++++++++++-----------
- arch/arm/mach-integrator/integrator_ap.c           |   5 +-
- arch/arm/mach-integrator/integrator_cp.c           |   6 +-
- arch/arm/mach-versatile/core.c                     |   2 +-
- arch/arm/plat-versatile/Kconfig                    |   9 --
- arch/arm/plat-versatile/Makefile                   |   1 -
- drivers/irqchip/Kconfig                            |   9 +-
- drivers/irqchip/Makefile                           |   1 +
- .../irqchip/irq-versatile-fpga.c                   |  54 +++++-----
- .../linux/irqchip/versatile-fpga.h                 |   0
- 11 files changed, 93 insertions(+), 107 deletions(-)
- rename arch/arm/plat-versatile/fpga-irq.c =>
-drivers/irqchip/irq-versatile-fpga.c (83%)
- rename arch/arm/plat-versatile/include/plat/fpga-irq.h =>
-include/linux/irqchip/versatile-fpga.h (100%)
