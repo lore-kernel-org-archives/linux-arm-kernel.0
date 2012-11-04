@@ -1,93 +1,115 @@
-From: cyril@ti.com (Cyril Chemparathy)
-Date: Sun, 4 Nov 2012 14:23:58 +0100
-Subject: [PATCH net-next 2/2] cpsw: fix leaking IO mappings
-In-Reply-To: <1c915a7d0301355342358db8f84560417609a61c.1351930782.git.richardcochran@gmail.com>
-References: <cover.1351930782.git.richardcochran@gmail.com>
- <1c915a7d0301355342358db8f84560417609a61c.1351930782.git.richardcochran@gmail.com>
-Message-ID: <50966C6E.1000507@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 4 Nov 2012 19:04:16 +0530
+Subject: [PATCH v3 06/11] clk: davinci - add build infrastructure for
+ DaVinci clock drivers
+In-Reply-To: <1351181518-11882-7-git-send-email-m-karicheri2@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-7-git-send-email-m-karicheri2@ti.com>
+Message-ID: <50966ED8.6070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2012 09:25 AM, Richard Cochran wrote:
-> The CPSW driver remaps two different IO regions, but fails to unmap them
-> both. This patch fixes the issue by calling iounmap in the appropriate
-> places.
+On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+> This updates clk Makefile and Kconfig to integrate the DaVinci specific
+> clock drivers. Also add new Kconfig and Makefile for these drivers.
+> 
+> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 
-Any thoughts on using devres helpers to keep the bail out path simpler?
+As mentioned before, this should be folded into previous patches which
+actually add the particular functionality.
 
-> Signed-off-by: Richard Cochran <richardcochran@gmail.com>
 > ---
->   drivers/net/ethernet/ti/cpsw.c |   17 ++++++++---------
->   1 files changed, 8 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-> index 6215246..7654a62 100644
-> --- a/drivers/net/ethernet/ti/cpsw.c
-> +++ b/drivers/net/ethernet/ti/cpsw.c
-> @@ -1252,14 +1252,12 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
->   		ret = -ENOENT;
->   		goto clean_clk_ret;
->   	}
-> -
->   	if (!request_mem_region(priv->cpsw_res->start,
->   				resource_size(priv->cpsw_res), ndev->name)) {
->   		dev_err(priv->dev, "failed request i/o region\n");
->   		ret = -ENXIO;
->   		goto clean_clk_ret;
->   	}
-> -
->   	regs = ioremap(priv->cpsw_res->start, resource_size(priv->cpsw_res));
->   	if (!regs) {
->   		dev_err(priv->dev, "unable to map i/o region\n");
-> @@ -1274,16 +1272,14 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
->   	if (!priv->cpsw_wr_res) {
->   		dev_err(priv->dev, "error getting i/o resource\n");
->   		ret = -ENOENT;
-> -		goto clean_clk_ret;
-> +		goto clean_iomap_ret;
->   	}
-> -
->   	if (!request_mem_region(priv->cpsw_wr_res->start,
->   			resource_size(priv->cpsw_wr_res), ndev->name)) {
->   		dev_err(priv->dev, "failed request i/o region\n");
->   		ret = -ENXIO;
-> -		goto clean_clk_ret;
-> +		goto clean_iomap_ret;
->   	}
-> -
->   	regs = ioremap(priv->cpsw_wr_res->start,
->   				resource_size(priv->cpsw_wr_res));
->   	if (!regs) {
-> @@ -1326,7 +1322,7 @@ static int __devinit cpsw_probe(struct platform_device *pdev)
->   	if (!priv->dma) {
->   		dev_err(priv->dev, "error initializing dma\n");
->   		ret = -ENOMEM;
-> -		goto clean_iomap_ret;
-> +		goto clean_wr_iomap_ret;
->   	}
->   
->   	priv->txch = cpdma_chan_create(priv->dma, tx_chan_num(0),
-> @@ -1407,11 +1403,13 @@ clean_dma_ret:
->   	cpdma_chan_destroy(priv->txch);
->   	cpdma_chan_destroy(priv->rxch);
->   	cpdma_ctlr_destroy(priv->dma);
-> -clean_iomap_ret:
-> -	iounmap(priv->regs);
-> +clean_wr_iomap_ret:
-> +	iounmap(priv->wr_regs);
->   clean_cpsw_wr_iores_ret:
->   	release_mem_region(priv->cpsw_wr_res->start,
->   			   resource_size(priv->cpsw_wr_res));
-> +clean_iomap_ret:
-> +	iounmap(priv->regs);
->   clean_cpsw_iores_ret:
->   	release_mem_region(priv->cpsw_res->start,
->   			   resource_size(priv->cpsw_res));
-> @@ -1442,6 +1440,7 @@ static int __devexit cpsw_remove(struct platform_device *pdev)
->   	iounmap(priv->regs);
->   	release_mem_region(priv->cpsw_res->start,
->   			   resource_size(priv->cpsw_res));
-> +	iounmap(priv->wr_regs);
->   	release_mem_region(priv->cpsw_wr_res->start,
->   			   resource_size(priv->cpsw_wr_res));
->   	pm_runtime_disable(&pdev->dev);
+>  drivers/clk/Kconfig          |    2 ++
+>  drivers/clk/Makefile         |    1 +
+>  drivers/clk/davinci/Kconfig  |   44 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/davinci/Makefile |    5 +++++
+>  4 files changed, 52 insertions(+)
+>  create mode 100644 drivers/clk/davinci/Kconfig
+>  create mode 100644 drivers/clk/davinci/Makefile
+> 
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index 7f0b5ca..1ad2ab0 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -33,6 +33,8 @@ config COMMON_CLK_DEBUG
+>  	  clk_flags, clk_prepare_count, clk_enable_count &
+>  	  clk_notifier_count.
+>  
+> +source "drivers/clk/davinci/Kconfig"
+> +
+>  config COMMON_CLK_WM831X
+>  	tristate "Clock driver for WM831x/2x PMICs"
+>  	depends on MFD_WM831X
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 5869ea3..b127b6f 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
+>  obj-$(CONFIG_PLAT_SPEAR)	+= spear/
+>  obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
+>  obj-$(CONFIG_ARCH_INTEGRATOR)	+= versatile/
+> +obj-$(CONFIG_DAVINCI_CLKS)	+= davinci/
+>  
+>  # Chip specific
+>  obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+> diff --git a/drivers/clk/davinci/Kconfig b/drivers/clk/davinci/Kconfig
+> new file mode 100644
+> index 0000000..e53bbc3
+> --- /dev/null
+> +++ b/drivers/clk/davinci/Kconfig
+> @@ -0,0 +1,44 @@
+> +menu "TI DaVinci Clock drivers"
+> +	depends on COMMON_CLK
+> +
+> +config  CLK_DAVINCI_PSC
+> +	bool "TI DaVici PSC clock driver"
+> +	default n
+> +	---help---
+> +	  Selects clock driver for DaVinci PSC clocks. This clock
+> +	  hardware is found on TI DaVinci SoCs and other SoCs that
+> +	  uses this hardware IP. This hardware has a local power
+> +	  sleep control module that gate the clock to the IP.
+> +
+> +config  CLK_DAVINCI_PLL
+> +	bool "DaVici main PLL clock"
+> +	---help---
+> +	  Selects clock driver for DaVinci main PLL. This clock
+> +	  hardware is found on TI DaVinci SoCs. This typically has
+> +	  a multiplier, a pre divider and post driver. Some of the
+> +	  SoCs has the the dividers fixed, and others have it
+> +	  programmable
+> +
+> +config  CLK_DAVINCI_PLLDIV
+> +	bool "DaVici PLL divider clock"
+> +	---help---
+> +	  Selects clock driver for DaVinci PLL divider. This clock
+> +	  hardware is found on TI DaVinci SoCs. This typically has
+> +	  a divider and an enable bit to bypass or enable the
+> +	  divider.
+> +
+> +config DAVINCI_CLKS
+> +	bool "TI DaVinci common clocks"
+> +	default n
+> +	select CLK_DAVINCI_PSC
+> +	select CLK_DAVINCI_PLLDIV
+> +	---help---
+> +	  Selects common clock drivers for DaVinci. These clocks
+> +	  are re-used across many TI SoCs that are based on DaVinci and
+> +	  Keystone (c6x) families. This config option is used to select
+> +	  the common clock driver for DaVinci based SoCs. SoCs specific
+> +	  Kconfig option needs to select the driver for clocks specific
+> +	  to the SoC.
+> +
+> +endmenu
+
+I wonder if all these configurations are really required. For complete
+clock functionality you anyway require all this functionality so I
+wonder why anyone would not select any of these. And to differentiate
+between architecture changes, conditional build based on architecture
+can be used:
+
+obj-$(CONFIG_ARCH_DAVINCI)	+= clk-pll.o
+obj-$(CONFIG_ARCH_KEYSTONE)	+= clk-pll-keystone.o
+
+Thanks,
+Sekhar
