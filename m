@@ -1,36 +1,19 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 4 Nov 2012 10:08:22 +0000
-Subject: [PATCH 1/6 v2] arm: use devicetree to get smp_twd clock
-In-Reply-To: <1351882309-733-2-git-send-email-mark.langsdorf@calxeda.com>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
- <1351882309-733-2-git-send-email-mark.langsdorf@calxeda.com>
-Message-ID: <20121104100822.GY21164@n2100.arm.linux.org.uk>
+Date: Sun, 4 Nov 2012 10:13:27 +0000
+Subject: [PATCH 8/9] ARM: support uprobe handling
+In-Reply-To: <1350242593-17761-8-git-send-email-rabin@rab.in>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-8-git-send-email-rabin@rab.in>
+Message-ID: <20121104101327.GZ21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 01:51:44PM -0500, Mark Langsdorf wrote:
-> -static struct clk *twd_get_clock(void)
-> +static struct clk *twd_get_clock(struct device_node *np)
->  {
-> -	struct clk *clk;
-> +	struct clk *clk = NULL;
->  	int err;
->  
-> -	clk = clk_get_sys("smp_twd", NULL);
-> +	if (np)
-> +		clk = of_clk_get(np, 0);
-> +	if (!clk)
+On Sun, Oct 14, 2012 at 09:23:12PM +0200, Rabin Vincent wrote:
+> Extend the kprobes code to handle user-space probes.  Much of the code
+> can be reused so currently the ARM uprobes code reuses the kprobes
+> structures.  The decode tables are reused, with the modification that
+> for those instruction that require custom decoding for uprobes, a new
+> element is added in the table to specify a custom decoder function.
 
-What does a NULL return from of_clk_get() mean?  Where is this defined?
-
-> @@ -349,6 +348,10 @@ int __init twd_local_timer_register(struct twd_local_timer *tlt)
->  	if (!twd_base)
->  		return -ENOMEM;
->  
-> +	twd_clk = twd_get_clock(NULL);
-> +
-> +	twd_clk = twd_get_clock(NULL);
-> +
-
-Why twice?
+How are accesses to userspace handled by the kprobes code?  Please point
+me to where these accesses are performed.
