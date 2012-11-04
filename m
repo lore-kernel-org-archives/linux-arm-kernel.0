@@ -1,23 +1,35 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 04 Nov 2012 02:08:08 +0400
-Subject: [PATCH] ARM: S3C64XX: Fix up IRQ mapping for balblair on
- Cragganmore
-In-Reply-To: <1351861289-19691-1-git-send-email-dp@opensource.wolfsonmicro.com>
-References: <1351861289-19691-1-git-send-email-dp@opensource.wolfsonmicro.com>
-Message-ID: <509595C8.6090605@mvista.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sat, 3 Nov 2012 21:39:55 -0400
+Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
+In-Reply-To: <20121103170622.GD6832@lunn.ch>
+References: <20121103080300.GA9907@lunn.ch>
+ <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
+ <20121103170622.GD6832@lunn.ch>
+Message-ID: <CAMW5UfZLYzCf357Z0Ncd6p5G7VYLwq3nhXVb=nAXZOxONa8yeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+As of now I can't reproduce, so I can only assume it was something
+with my config.  Once I nail down exactly what triggers the behavior
+I'll post up.  For now, ignore my suggestion that there is a
+regression.
 
-On 02-11-2012 17:01, Dimitris Papastamos wrote:
+Josh C
 
-> We are using S3C_EINT(4) instead of S3C_EINT(5).
-
-> Change-Id: I84e77fd75d59c6b8fecbcb11e81dc78dbf07f156
-
-    You still hasven't removed this line. :-)
-
-> Signed-off-by: Dimitris Papastamos <dp@opensource.wolfsonmicro.com>
-
-WBR, Sergei
+On Sat, Nov 3, 2012 at 1:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Sat, Nov 03, 2012 at 08:54:21AM -0400, Josh Coombs wrote:
+>> I'll fire up with ignore log level to get the full traces and post
+>> those this afternoon.  Given it will be a LOT of text, would you
+>> prefer I include them in the email, pastebin the output and provide
+>> links, or dump the log onto my webserver with a link?
+>
+> Hi Josh
+>
+> I'm kind of expecting they will all look very similar. By looking at
+> what is common it might quick become clear where the lock is being
+> taken which is causing the problem.
+>
+> Anyway, i would suggest posting the first couple of traces to the list
+> and a few more to me directly.
+>
+>     Andrew
