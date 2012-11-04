@@ -1,29 +1,25 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Sun, 04 Nov 2012 23:30:42 +0800
-Subject: [PATCH] pinctrl: nomadik: Add terminating entry for
- platform_device_id table
-Message-ID: <1352043042.11324.0.camel@phoenix>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 4 Nov 2012 16:49:54 +0100
+Subject: [PATCH 0/2] net: at91_ether add dt and pinctrl support
+Message-ID: <20121104154954.GJ19021@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_device_id table is supposed to be zero-terminated.
+Hi,
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/pinctrl/pinctrl-nomadik.c |    1 +
- 1 file changed, 1 insertion(+)
+	This patch serie add dt and pinctrl support to the at91 ether
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
-index f2fd99b..22f6937 100644
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@ -1922,6 +1922,7 @@ static const struct platform_device_id nmk_pinctrl_id[] = {
- 	{ "pinctrl-stn8815", PINCTRL_NMK_STN8815 },
- 	{ "pinctrl-db8500", PINCTRL_NMK_DB8500 },
- 	{ "pinctrl-db8540", PINCTRL_NMK_DB8540 },
-+	{ }
- };
- 
- static struct platform_driver nmk_pinctrl_driver = {
--- 
-1.7.9.5
+	this is need to use the network on at91rm9200 as we now have dt
+	support on it
+
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      net: at91_ether: add dt support
+      net: at91_ether: add pinctrl support
+
+ Documentation/devicetree/bindings/net/cdns-emac.txt |   23 +++++++++++++++++++++++
+ drivers/net/ethernet/cadence/at91_ether.c           |   83 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 99 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/cdns-emac.txt
+
+Best Regards,
+J.
