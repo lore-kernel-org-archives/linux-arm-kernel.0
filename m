@@ -1,183 +1,59 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sun, 4 Nov 2012 23:21:54 +0100
-Subject: [PATCH 1/2] net: at91_ether: add dt support
-In-Reply-To: <1352052637-5154-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20121104154954.GJ19021@game.jcrosoft.org>
- <1352052637-5154-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CAGhQ9VwUr=ak3Rjo0JVTkdP=4k6xkAKCDEwFyO5v3Fui0Md4Lg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 4 Nov 2012 22:32:15 +0000
+Subject: [PATCH V6 3/6] arm: cache-l2x0: add support for Aurora L2
+ cache ctrl
+In-Reply-To: <5086700E.10702@free-electrons.com>
+References: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
+ <1348738523-28609-1-git-send-email-gregory.clement@free-electrons.com>
+ <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121023090154.GP21164@n2100.arm.linux.org.uk>
+ <508666A6.9040701@free-electrons.com>
+ <20121023100057.GS21164@n2100.arm.linux.org.uk>
+ <5086700E.10702@free-electrons.com>
+Message-ID: <20121104223215.GA28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Tue, Oct 23, 2012 at 12:23:10PM +0200, Gregory CLEMENT wrote:
+> On 10/23/2012 12:00 PM, Russell King - ARM Linux wrote:
+> > On Tue, Oct 23, 2012 at 11:43:02AM +0200, Gregory CLEMENT wrote:
+> >> On 10/23/2012 11:01 AM, Russell King - ARM Linux wrote:
+> >>> On Thu, Sep 27, 2012 at 11:35:23AM +0200, Gregory CLEMENT wrote:
+> >>>> Aurora Cache Controller was designed to be compatible with the ARM L2
+> >>>> Cache Controller. It comes with some difference or improvement such
+> >>>> as:
+> >>>> - no cache id part number available through hardware (need to get it
+> >>>>   by the DT).
+> >>>> - always write through mode available.
+> >>>> - two flavors of the controller outer cache and system cache (meaning
+> >>>>   maintenance operations on L1 are broadcasted to the L2 and L2
+> >>>>   performs the same operation).
+> >>>> - in outer cache mode, the cache maintenance operations are improved and
+> >>>>   can be done on a range inside a page and are not limited to a cache
+> >>>>   line.
+> >>>
+> >>> This adds new build warnings:
+> >>>
+> >>> arch/arm/mm/cache-l2x0.c:328:13: warning: 'aurora_inv_range' defined but not used
+> >>> arch/arm/mm/cache-l2x0.c:347:13: warning: 'aurora_clean_range' defined but not used
+> >>> arch/arm/mm/cache-l2x0.c:365:13: warning: 'aurora_flush_range' defined but not used
+> >>>
+> >>> to the realview build (non-DT).  Please investigate, thanks.
+> >>
+> >> OK I found the problem: aurora cache support is new so it is only
+> >> enable with device tree support. I moved all this functions in the
+> >> under OF_CONFIG (see the patch below). Do you want I submit it on the
+> >> patch system, or can you get it directly from this email?
+> > 
+> > Easier by the patch system, and much less likely to get buried and lost
+> > between now and when I do the update, thanks.
+> > 
+> OK, the initial patch 7547/1 was superseded by the patch 7547/2 that I have just
+> pushed in the patch system. I hope I have done it right.
 
-Some minor comments below.
+I know it's been a while, but it looks like it's still producing a warning.
 
-On 4 November 2012 19:10, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Joachim Eastwood <manabian@gmail.com>
-> Cc: netdev at vger.kernel.org
-> ---
->  .../devicetree/bindings/net/cdns-emac.txt          |   23 +++++++
->  drivers/net/ethernet/cadence/at91_ether.c          |   72 ++++++++++++++++++--
->  2 files changed, 88 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/net/cdns-emac.txt
->
-> diff --git a/Documentation/devicetree/bindings/net/cdns-emac.txt b/Documentation/devicetree/bindings/net/cdns-emac.txt
-> new file mode 100644
-> index 0000000..45b8760
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/cdns-emac.txt
-> @@ -0,0 +1,23 @@
-> +* Cadence EMAC Ethernet controller
-> +
-> +Required properties:
-> +- compatible: Should be "cdns,[<chip>-]{emac}"
-> +  Use "cdns,at91rm9200-emac" Atmel at91rm9200 SoC.
-> +  or the generic form: "cdns,emac".
-> +- reg: Address and length of the register set for the device
-> +- interrupts: Should contain macb interrupt
-> +- phy-mode: String, operation mode of the PHY interface.
-> +  Supported values are: "mii", "rmii".
-> +
-> +Optional properties:
-> +- local-mac-address: 6 bytes, mac address
-> +
-> +Examples:
-> +
-> +       macb0: ethernet at fffc4000 {
-> +               compatible = "cdns,atrm9200-emac";
+arch/arm/mm/cache-l2x0.c:37:12: warning: 'l2_wt_override' defined but not used
 
-Typo in the compatible string. Should be "cdns,at91rm9200-emac"
-
-> +               reg = <0xfffc4000 0x4000>;
-> +               interrupts = <21>;
-> +               phy-mode = "rmii";
-> +               local-mac-address = [3a 0e 03 04 05 06];
-> +       };
-> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-> index 0d6392d..3e843b4 100644
-> --- a/drivers/net/ethernet/cadence/at91_ether.c
-> +++ b/drivers/net/ethernet/cadence/at91_ether.c
-> @@ -31,6 +31,9 @@
->  #include <linux/gfp.h>
->  #include <linux/phy.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_net.h>
->
->  #include "macb.h"
->
-> @@ -443,6 +446,49 @@ static const struct net_device_ops at91ether_netdev_ops = {
->  #endif
->  };
->
-> +#if defined(CONFIG_OF)
-> +static const struct of_device_id at91ether_dt_ids[] = {
-> +       { .compatible = "cdns,at91rm9200-emac" },
-> +       { .compatible = "cdns,emac" },
-> +       { /* sentinel */ }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, at91ether_dt_ids);
-> +
-> +static int at91ether_get_phy_mode_dt(struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +
-> +       if (np)
-> +               return of_get_phy_mode(np);
-> +
-> +       return -ENODEV;
-> +}
-> +
-> +static int at91ether_get_hwaddr_dt(struct macb *bp)
-> +{
-> +       struct device_node *np = bp->pdev->dev.of_node;
-
-Space between variables and code, please.
-
-> +       if (np) {
-> +               const char *mac = of_get_mac_address(np);
-> +               if (mac) {
-> +                       memcpy(bp->dev->dev_addr, mac, ETH_ALEN);
-> +                       return 0;
-> +               }
-> +       }
-> +
-> +       return -ENODEV;
-> +}
-> +#else
-> +static int at91ether_get_phy_mode_dt(struct platform_device *pdev)
-> +{
-> +       return -ENODEV;
-> +}
-> +static int at91ether_get_hwaddr_dt(struct macb *bp)
-> +{
-> +       return -ENODEV;
-> +}
-> +#endif
-> +
->  /*
->   * Detect MAC & PHY and perform ethernet interface initialization
->   */
-> @@ -466,7 +512,8 @@ static int __init at91ether_probe(struct platform_device *pdev)
->         lp = netdev_priv(dev);
->         lp->pdev = pdev;
->         lp->dev = dev;
-> -       lp->board_data = *board_data;
-> +       if (board_data)
-> +               lp->board_data = *board_data;
->         spin_lock_init(&lp->lock);
->
->         dev->base_addr = regs->start;           /* physical base address */
-> @@ -496,18 +543,28 @@ static int __init at91ether_probe(struct platform_device *pdev)
->         platform_set_drvdata(pdev, dev);
->         SET_NETDEV_DEV(dev, &pdev->dev);
->
-> -       get_mac_address(dev);           /* Get ethernet address and store it in dev->dev_addr */
-> +       res = at91ether_get_hwaddr_dt(lp);
-> +       if (res < 0)
-> +               get_mac_address(dev);           /* Get ethernet address and store it in dev->dev_addr */
-> +
->         update_mac_address(dev);        /* Program ethernet address into MAC */
->
-> +       res = at91ether_get_phy_mode_dt(pdev);
-> +       if (res < 0) {
-> +               if (board_data && board_data->is_rmii)
-> +                       lp->phy_interface = PHY_INTERFACE_MODE_RMII;
-> +               else
-> +                       lp->phy_interface = PHY_INTERFACE_MODE_MII;
-> +       } else {
-> +               lp->phy_interface = res;
-> +       }
-> +
->         macb_writel(lp, NCR, 0);
->
-> -       if (board_data->is_rmii) {
-> +       if (lp->phy_interface == PHY_INTERFACE_MODE_RMII)
->                 macb_writel(lp, NCFGR, MACB_BF(CLK, MACB_CLK_DIV32) | MACB_BIT(BIG) | MACB_BIT(RM9200_RMII));
-> -               lp->phy_interface = PHY_INTERFACE_MODE_RMII;
-> -       } else {
-> +       else
->                 macb_writel(lp, NCFGR, MACB_BF(CLK, MACB_CLK_DIV32) | MACB_BIT(BIG));
-> -               lp->phy_interface = PHY_INTERFACE_MODE_MII;
-> -       }
->
->         /* Register the network interface */
->         res = register_netdev(dev);
-> @@ -602,6 +659,7 @@ static struct platform_driver at91ether_driver = {
->         .driver         = {
->                 .name   = DRV_NAME,
->                 .owner  = THIS_MODULE,
-> +               .of_match_table = of_match_ptr(at91ether_dt_ids),
->         },
->  };
->
-
-Tested-by: Joachim Eastwood <manabian@gmail.com>
-
-regards
-Joachim Eastwood
+This seems to be used only by the aurora code, which is wholely contained
+within a CONFIG_OF block, and this is outside of said block...
