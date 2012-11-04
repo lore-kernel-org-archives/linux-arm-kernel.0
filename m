@@ -1,40 +1,15 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 4 Nov 2012 10:12:12 +0100
-Subject: [4/4] arm: mvebu: enable Ethernet controllers on Armada 370/XP
- eval boards
-In-Reply-To: <20121104020311.GA26747@obsidianresearch.com>
-References: <1351245804-31478-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121104020311.GA26747@obsidianresearch.com>
-Message-ID: <20121104101212.33449081@skate>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 4 Nov 2012 09:55:56 +0000
+Subject: [PATCH] ARM: quiet down the non make -s output
+In-Reply-To: <20121029153425.GA9486@beefymiracle.amer.corp.natinst.com>
+References: <20121029153425.GA9486@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121104095556.GX21164@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+On Mon, Oct 29, 2012 at 09:34:25AM -0600, Josh Cartwright wrote:
+> Commit edc88ceb0c7d285b9f58bc29a638cd8163b59989 silenced the make -s build, but
+> inadvertently made louder the non-silent build.  Fix by prepending '@' to each
+> of the added $(kecho) statements.
 
-On Sat, 3 Nov 2012 20:03:11 -0600, Jason Gunthorpe wrote:
-
-> We've been using the patches from Ian Molton for the mv643xx driver
-> that make it use the more standard, separately described MDIO
-> bus..
-
-[...]
-
-> Where the MDIO bus is explicit, the PHY, its address and parameters
-> are explicit - the PHY has an of_node pointer - and phy-handle is used
-> to connect them.
-> 
-> I'm not sure having the MDIO bus as a distinct top level item is
-> great, considering how the registers overlap.. It might be better
-> to put it under the egiga0 block? But that is a minor nit :)
-
-Thanks for your comment. I'll see what I can come up with to make the
-phy a separate DT entity.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Please put this in the patch system, thanks.
