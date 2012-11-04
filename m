@@ -1,62 +1,27 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sat, 3 Nov 2012 20:03:11 -0600
-Subject: [4/4] arm: mvebu: enable Ethernet controllers on Armada 370/XP
- eval boards
-In-Reply-To: <1351245804-31478-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121104020311.GA26747@obsidianresearch.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 4 Nov 2012 10:11:46 +0100
+Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
+In-Reply-To: <CAMW5UfZLYzCf357Z0Ncd6p5G7VYLwq3nhXVb=nAXZOxONa8yeQ@mail.gmail.com>
+References: <20121103080300.GA9907@lunn.ch>
+ <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
+ <20121103170622.GD6832@lunn.ch>
+ <CAMW5UfZLYzCf357Z0Ncd6p5G7VYLwq3nhXVb=nAXZOxONa8yeQ@mail.gmail.com>
+Message-ID: <20121104091146.GF6832@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+                ethernet at d0070000 {
-+                        clock-frequency = <200000000>;
-+                        status = "okay";
-+                        phy-mode = "rgmii-id";
-+                        phy-addr = <0>;
-+                };
+On Sat, Nov 03, 2012 at 09:39:55PM -0400, Josh Coombs wrote:
+> As of now I can't reproduce, so I can only assume it was something
+> with my config.  Once I nail down exactly what triggers the behavior
+> I'll post up.  For now, ignore my suggestion that there is a
+> regression.
 
-We've been using the patches from Ian Molton for the mv643xx driver
-that make it use the more standard, separately described MDIO
-bus..
+O.K.
 
-Please consider not copying the unsual 'phy-addr' binding
-for the new driver.
+I also tried reproducing it.  On my QNAP Kirkwood I made a fresh
+checkout of the kernel and built it. No problems.
 
-What we are used to seeing for ethernet+mdio is more like:
+If you do see it again, please let us know.
 
-                smi0: mdio at 72000 {
-                        device_type = "mdio";
-                        compatible = "marvell,mdio-mv643xx";
-                        reg = <0x72000 0x4000>;
-                        interrupts = <46>;
-                        tx_csum_limit = <1600>;
-
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                        PHY1: ethernet-phy at 1 {
-                                reg = <1>;
-                                device_type = "ethernet-phy";
-                                phy-id = <0x01410e90>;
-                        };
-                };
-
-                egiga0 {
-                        device_type = "network";
-                        compatible = "marvell,mv643xx-eth";
-                        reg = <0x72000 0x4000>;
-                        mdio = <&smi0>;
-                        port_number = <0>;
-                        phy-handle = <&PHY1>;
-                        interrupts = <11>;
-                };
-        };
-
-Where the MDIO bus is explicit, the PHY, its address and parameters
-are explicit - the PHY has an of_node pointer - and phy-handle is used
-to connect them.
-
-I'm not sure having the MDIO bus as a distinct top level item is
-great, considering how the registers overlap.. It might be better
-to put it under the egiga0 block? But that is a minor nit :)
-
-Regards,
-Jason
+Thanks
+   Andrew
