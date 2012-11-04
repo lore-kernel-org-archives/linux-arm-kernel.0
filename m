@@ -1,67 +1,46 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 4 Nov 2012 11:15:02 +0100
-Subject: [PATCH 2/9] ARM: at91: Remove unused struct
- at91sam9g45_isi_device and its resources
-In-Reply-To: <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
-References: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
- <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20121104101502.GI19021@game.jcrosoft.org>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Sun, 4 Nov 2012 16:14:33 +0530
+Subject: [PATCHv2 7/7] i2c: omap: Restore i2c context always
+In-Reply-To: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352025873-27492-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:02 Sat 03 Nov     , Lee Jones wrote:
-> This the at91sam9g45_isi_device structure and its associated resources
-> were added in 2008 and have been unused ever since. Let's remove them.
-next time you need to Cc the matinaers
+Currently the restore is done based on the flag
+OMAP_I2C_FLAG_RESET_REGS_POSTIDLE.
 
-NACK
+This helps the following
+- The driver is always capable of restoring regardless
+of the off mode support being there or not.
 
-Best Regards,
-J.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-at91/at91sam9263_devices.c |   20 --------------------
->  1 file changed, 20 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index cb85da2..0562a9d 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -901,26 +901,6 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
->  
->  #if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
->  
-> -struct resource isi_resources[] = {
-> -	[0] = {
-> -		.start	= AT91SAM9263_BASE_ISI,
-> -		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> -		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> -};
-> -
-> -static struct platform_device at91sam9263_isi_device = {
-> -	.name		= "at91_isi",
-> -	.id		= -1,
-> -	.resource	= isi_resources,
-> -	.num_resources	= ARRAY_SIZE(isi_resources),
-> -};
-> -
->  void __init at91_add_device_isi(struct isi_platform_data *data,
->  		bool use_pck_as_mck)
->  {
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+- While testing omap2430 it is found that in case of certain
+error paths (timeout) a reset is done. However the restore
+never happens as it is dependent on the POSTIDLE flag.
+The other option would be to call a restore in the reset
+case. As there are only a few registers to be restored
+the penalty in the idle case should not be much.
+
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+Todo: the flag could be deleted if the patch is accepted.
+
+ drivers/i2c/busses/i2c-omap.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 70d43b7..f66c5ab 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1314,8 +1314,7 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 	if (!_dev->regs)
+ 		return 0;
+ 
+-	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
+-		__omap_i2c_init(_dev);
++	__omap_i2c_init(_dev);
+ 
+ 	return 0;
+ }
+-- 
+1.7.5.4
