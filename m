@@ -1,35 +1,62 @@
-From: josh.coombs@gmail.com (Josh Coombs)
-Date: Sat, 3 Nov 2012 21:39:55 -0400
-Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
-In-Reply-To: <20121103170622.GD6832@lunn.ch>
-References: <20121103080300.GA9907@lunn.ch>
- <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
- <20121103170622.GD6832@lunn.ch>
-Message-ID: <CAMW5UfZLYzCf357Z0Ncd6p5G7VYLwq3nhXVb=nAXZOxONa8yeQ@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Sat, 3 Nov 2012 20:03:11 -0600
+Subject: [4/4] arm: mvebu: enable Ethernet controllers on Armada 370/XP
+ eval boards
+In-Reply-To: <1351245804-31478-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20121104020311.GA26747@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of now I can't reproduce, so I can only assume it was something
-with my config.  Once I nail down exactly what triggers the behavior
-I'll post up.  For now, ignore my suggestion that there is a
-regression.
++                ethernet at d0070000 {
++                        clock-frequency = <200000000>;
++                        status = "okay";
++                        phy-mode = "rgmii-id";
++                        phy-addr = <0>;
++                };
 
-Josh C
+We've been using the patches from Ian Molton for the mv643xx driver
+that make it use the more standard, separately described MDIO
+bus..
 
-On Sat, Nov 3, 2012 at 1:06 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Sat, Nov 03, 2012 at 08:54:21AM -0400, Josh Coombs wrote:
->> I'll fire up with ignore log level to get the full traces and post
->> those this afternoon.  Given it will be a LOT of text, would you
->> prefer I include them in the email, pastebin the output and provide
->> links, or dump the log onto my webserver with a link?
->
-> Hi Josh
->
-> I'm kind of expecting they will all look very similar. By looking at
-> what is common it might quick become clear where the lock is being
-> taken which is causing the problem.
->
-> Anyway, i would suggest posting the first couple of traces to the list
-> and a few more to me directly.
->
->     Andrew
+Please consider not copying the unsual 'phy-addr' binding
+for the new driver.
+
+What we are used to seeing for ethernet+mdio is more like:
+
+                smi0: mdio at 72000 {
+                        device_type = "mdio";
+                        compatible = "marvell,mdio-mv643xx";
+                        reg = <0x72000 0x4000>;
+                        interrupts = <46>;
+                        tx_csum_limit = <1600>;
+
+                        #address-cells = <1>;
+                        #size-cells = <0>;
+                        PHY1: ethernet-phy at 1 {
+                                reg = <1>;
+                                device_type = "ethernet-phy";
+                                phy-id = <0x01410e90>;
+                        };
+                };
+
+                egiga0 {
+                        device_type = "network";
+                        compatible = "marvell,mv643xx-eth";
+                        reg = <0x72000 0x4000>;
+                        mdio = <&smi0>;
+                        port_number = <0>;
+                        phy-handle = <&PHY1>;
+                        interrupts = <11>;
+                };
+        };
+
+Where the MDIO bus is explicit, the PHY, its address and parameters
+are explicit - the PHY has an of_node pointer - and phy-handle is used
+to connect them.
+
+I'm not sure having the MDIO bus as a distinct top level item is
+great, considering how the registers overlap.. It might be better
+to put it under the egiga0 block? But that is a minor nit :)
+
+Regards,
+Jason
