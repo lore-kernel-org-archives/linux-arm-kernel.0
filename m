@@ -1,81 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Sun, 4 Nov 2012 11:57:02 +0100
-Subject: [PATCH 2/9] ARM: at91: Remove unused struct
- at91sam9g45_isi_device and its resources
-In-Reply-To: <20121104101502.GI19021@game.jcrosoft.org>
-References: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
- <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
- <20121104101502.GI19021@game.jcrosoft.org>
-Message-ID: <20121104105702.GD27124@gmail.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Sun, 4 Nov 2012 07:05:13 -0500
+Subject: Possible regression in 3.7-rc3 on Marvell Kirkwood
+In-Reply-To: <20121104091146.GF6832@lunn.ch>
+References: <20121103080300.GA9907@lunn.ch>
+ <CAMW5UfYmjCq0nnGY6bxV_HxizHSV0UiW74thhers096ufv3E_g@mail.gmail.com>
+ <20121103170622.GD6832@lunn.ch>
+ <CAMW5UfZLYzCf357Z0Ncd6p5G7VYLwq3nhXVb=nAXZOxONa8yeQ@mail.gmail.com>
+ <20121104091146.GF6832@lunn.ch>
+Message-ID: <CAMW5UfZoo-7WaBnsqzdmsCu31h3pWb52Y6JX5=jE6H=e80_tJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 04 Nov 2012, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 23:02 Sat 03 Nov     , Lee Jones wrote:
-> > This the at91sam9g45_isi_device structure and its associated resources
-> > were added in 2008 and have been unused ever since. Let's remove them.
-> next time you need to Cc the matinaers
+Will do, I'm half curious now if I managed to pull down a copy from
+git mid-commit or something, as I can't for the life of me make it
+flake out the way it was prior and I see there has been updates to
+3.7-rc3 since it was released.  (I always thought once cut, no more
+commits went to that branch.)  Oh well, at least my build farm got a
+good workout.
 
-I did:
+Josh C
 
-$ git show <sha1> | scripts/get_maintainer.pl
-  Russell King <linux@arm.linux.org.uk> (maintainer:ARM PORT)
-  linux-arm-kernel at lists.infradead.org (moderated list:ARM SUB-ARCHITECT...)
-  linux-kernel at vger.kernel.org (open list)
-
-> NACK
-
-Any particular reason?
-
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/mach-at91/at91sam9263_devices.c |   20 --------------------
-> >  1 file changed, 20 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> > index cb85da2..0562a9d 100644
-> > --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> > +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> > @@ -901,26 +901,6 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
-> >  
-> >  #if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
-> >  
-> > -struct resource isi_resources[] = {
-> > -	[0] = {
-> > -		.start	= AT91SAM9263_BASE_ISI,
-> > -		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
-> > -		.flags	= IORESOURCE_MEM,
-> > -	},
-> > -	[1] = {
-> > -		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> > -		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> > -		.flags	= IORESOURCE_IRQ,
-> > -	},
-> > -};
-> > -
-> > -static struct platform_device at91sam9263_isi_device = {
-> > -	.name		= "at91_isi",
-> > -	.id		= -1,
-> > -	.resource	= isi_resources,
-> > -	.num_resources	= ARRAY_SIZE(isi_resources),
-> > -};
-> > -
-> >  void __init at91_add_device_isi(struct isi_platform_data *data,
-> >  		bool use_pck_as_mck)
-> >  {
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+On Sun, Nov 4, 2012 at 4:11 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Sat, Nov 03, 2012 at 09:39:55PM -0400, Josh Coombs wrote:
+>> As of now I can't reproduce, so I can only assume it was something
+>> with my config.  Once I nail down exactly what triggers the behavior
+>> I'll post up.  For now, ignore my suggestion that there is a
+>> regression.
+>
+> O.K.
+>
+> I also tried reproducing it.  On my QNAP Kirkwood I made a fresh
+> checkout of the kernel and built it. No problems.
+>
+> If you do see it again, please let us know.
+>
+> Thanks
+>    Andrew
