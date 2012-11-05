@@ -1,204 +1,31 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 5 Nov 2012 17:43:25 +0100
-Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
-In-Reply-To: <1352108549-9341-3-git-send-email-anilkumar@ti.com>
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-3-git-send-email-anilkumar@ti.com>
-Message-ID: <5097ECAD.9010101@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 5 Nov 2012 16:46:19 +0000
+Subject: [PATCH linux-next] ARM64: dma-mapping: support
+ debug_dma_mapping_error
+In-Reply-To: <1351871933.2721.10.camel@lorien2>
+References: <1351205220.6851.3.camel@lorien2>
+ <CAHkRjk6jDKsFMa1_Wapwr7y5n8Ut8xfNBKWniSfHN_01z7qWFQ@mail.gmail.com>
+ <1351264983.2712.14.camel@lorien2>
+ <1351871933.2721.10.camel@lorien2>
+Message-ID: <20121105164618.GF17864@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil / Colin,
-
-On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
-> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+On Fri, Nov 02, 2012 at 03:58:53PM +0000, Shuah Khan wrote:
+> On Fri, 2012-10-26 at 09:23 -0600, Shuah Khan wrote:
+> > Add support for debug_dma_mapping_error() call to avoid warning from
+> > debug_dma_unmap() interface when it checks for mapping error checked
+> > status. Without this patch, device driver failed to check map error
+> > warning is generated. 
+> > 
+> > Signed-off-by: Shuah Khan <shuah.khan@hp.com>
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
-> Add system power off control to rtc driver which is the in-charge
-> of controlling the BeagleBone system power. The power_off routine
-> can be hooked up to "pm_power_off" system call.
-> 
-> System power off sequence:-
-> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
-> * Enable PMIC_POWER_EN in rtc module
-> * Set rtc ALARM2 time
-> * Enable ALARM2 interrupt
-> 
-> Added while (1); after the above steps to make sure that no other
-> process acquire cpu. Otherwise we might see an unexpected behaviour
-> because we are shutting down all the power rails of SoC except RTC.
-> 
-> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
-> [anilkumar at ti.com: move poweroff additions to rtc driver]
-> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
-> ---
->  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
->  drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
->  2 files changed, 83 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> index b47aa41..8d9f4f9 100644
-> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-> @@ -6,6 +6,10 @@ Required properties:
->  - interrupts: rtc timer, alarm interrupts in order
->  - interrupt-parent: phandle for the interrupt controller
->  
-> +Optional properties:
-> +- ti,system-power-controller: Telling whether or not rtc is controlling
-> +  the system power.
+> Do you want this patch going through linux-next or the ARM64 tree? Let
+> me know your preference.
 
-I don't know how it is connected at board level, but I'm not sure the
-binding is the proper one.
-It does not look super generic, and I'm wondering if we should not use
-instead some regulator binding to reflect the connection of the RTC to a
-regulator.
+I think it can go together with your other patches since I can't tell
+when you'll push the debug_dma_mapping_error() implementation.
 
-But without the board / soc spec it is hard to tell :-(
-
-Regards,
-Benoit
-
-
-> +
->  Example:
->  
->  rtc at 1c23000 {
-> @@ -14,4 +18,5 @@ rtc at 1c23000 {
->  	interrupts = <19
->  		      19>;
->  	interrupt-parent = <&intc>;
-> +	ti,system-power-controller;
->  };
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index 6009714..2d90170 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -72,6 +72,14 @@
->  #define OMAP_RTC_KICK0_REG		0x6c
->  #define OMAP_RTC_KICK1_REG		0x70
->  
-> +#define OMAP_RTC_ALARM2_SECONDS_REG	0x80
-> +#define OMAP_RTC_ALARM2_MINUTES_REG	0x84
-> +#define OMAP_RTC_ALARM2_HOURS_REG	0x88
-> +#define OMAP_RTC_ALARM2_DAYS_REG	0x8c
-> +#define OMAP_RTC_ALARM2_MONTHS_REG	0x90
-> +#define OMAP_RTC_ALARM2_YEARS_REG	0x94
-> +#define OMAP_RTC_PMIC_REG		0x98
-> +
->  /* OMAP_RTC_CTRL_REG bit fields: */
->  #define OMAP_RTC_CTRL_SPLIT		(1<<7)
->  #define OMAP_RTC_CTRL_DISABLE		(1<<6)
-> @@ -93,15 +101,24 @@
->  #define OMAP_RTC_STATUS_BUSY            (1<<0)
->  
->  /* OMAP_RTC_INTERRUPTS_REG bit fields: */
-> +#define OMAP_RTC_INTERRUPTS_IT_ALARM2   (1<<4)
->  #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
->  #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
->  
-> +/* OMAP_RTC_PMIC_REG bit fields: */
-> +#define OMAP_RTC_PMIC_POWER_EN_EN       (1<<16)
-> +
->  /* OMAP_RTC_KICKER values */
->  #define	KICK0_VALUE			0x83e70b13
->  #define	KICK1_VALUE			0x95a4f1e0
->  
->  #define	OMAP_RTC_HAS_KICKER		0x1
->  
-> +#define SHUTDOWN_TIME_SEC		2
-> +#define SECS_IN_MIN			60
-> +#define WAIT_AFTER			(SECS_IN_MIN - SHUTDOWN_TIME_SEC)
-> +#define WAIT_TIME_MS			(SHUTDOWN_TIME_SEC * 1000)
-> +
->  static void __iomem	*rtc_base;
->  
->  #define rtc_read(addr)		readb(rtc_base + (addr))
-> @@ -290,6 +307,58 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
->  	return 0;
->  }
->  
-> +/*
-> + * rtc_power_off: Set the pmic power off sequence. The RTC generates
-> + * pmic_pwr_enable control, which can be used to control an external
-> + * PMIC.
-> + */
-> +static void rtc_power_off(void)
-> +{
-> +	u32 val;
-> +	struct rtc_time tm;
-> +	spinlock_t lock;
-> +	unsigned long flags;
-> +
-> +	spin_lock_init(&lock);
-> +
-> +	/* Set PMIC power enable */
-> +	val = readl(rtc_base + OMAP_RTC_PMIC_REG);
-> +	writel(val | OMAP_RTC_PMIC_POWER_EN_EN, rtc_base + OMAP_RTC_PMIC_REG);
-> +
-> +	/* Wait few seconds instead of rollover */
-> +	do {
-> +		omap_rtc_read_time(NULL, &tm);
-> +		if (WAIT_AFTER <= tm.tm_sec)
-> +			mdelay(WAIT_TIME_MS);
-> +	} while (WAIT_AFTER <= tm.tm_sec);
-> +
-> +	/* Add shutdown time to the current value */
-> +	tm.tm_sec += SHUTDOWN_TIME_SEC;
-> +
-> +	if (tm2bcd(&tm) < 0)
-> +		return;
-> +
-> +	pr_info("System will go to power_off state in approx. %d secs\n",
-> +			SHUTDOWN_TIME_SEC);
-> +
-> +	/* Set the ALARM2 time */
-> +	rtc_write(tm.tm_sec, OMAP_RTC_ALARM2_SECONDS_REG);
-> +	rtc_write(tm.tm_min, OMAP_RTC_ALARM2_MINUTES_REG);
-> +	rtc_write(tm.tm_hour, OMAP_RTC_ALARM2_HOURS_REG);
-> +	rtc_write(tm.tm_mday, OMAP_RTC_ALARM2_DAYS_REG);
-> +	rtc_write(tm.tm_mon, OMAP_RTC_ALARM2_MONTHS_REG);
-> +	rtc_write(tm.tm_year, OMAP_RTC_ALARM2_YEARS_REG);
-> +
-> +	/* Enable alarm2 interrupt */
-> +	val = readl(rtc_base + OMAP_RTC_INTERRUPTS_REG);
-> +	writel(val | OMAP_RTC_INTERRUPTS_IT_ALARM2,
-> +				rtc_base + OMAP_RTC_INTERRUPTS_REG);
-> +
-> +	/* Do not allow to execute any other task */
-> +	spin_lock_irqsave(&lock, flags);
-> +	while (1);
-> +}
-> +
->  static struct rtc_class_ops omap_rtc_ops = {
->  	.read_time	= omap_rtc_read_time,
->  	.set_time	= omap_rtc_set_time,
-> @@ -327,12 +396,16 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
->  	struct resource		*res, *mem;
->  	struct rtc_device	*rtc;
->  	u8			reg, new_ctrl;
-> +	bool			pm_off = false;
->  	const struct platform_device_id *id_entry;
->  	const struct of_device_id *of_id;
->  
->  	of_id = of_match_device(omap_rtc_of_match, &pdev->dev);
-> -	if (of_id)
-> +	if (of_id) {
->  		pdev->id_entry = of_id->data;
-> +		pm_off = of_property_read_bool(pdev->dev.of_node,
-> +					"ti,system-power-controller");
-> +	}
->  
->  	omap_rtc_timer = platform_get_irq(pdev, 0);
->  	if (omap_rtc_timer <= 0) {
-> @@ -385,6 +458,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, rtc);
->  	dev_set_drvdata(&rtc->dev, mem);
->  
-> +	/* RTC power off */
-> +	if (pm_off && !pm_power_off)
-> +		pm_power_off = rtc_power_off;
-> +
->  	/* clear pending irqs, and set 1/second periodic,
->  	 * which we'll use instead of update irqs
->  	 */
-> 
+-- 
+Catalin
