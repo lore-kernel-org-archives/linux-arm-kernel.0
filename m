@@ -1,51 +1,84 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 5 Nov 2012 18:59:51 +0100
-Subject: [PATCH v3 0/6] DT support for AT91RM9200
-In-Reply-To: <20121105072857.GL19021@game.jcrosoft.org>
-References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
- <20121104155212.GK19021@game.jcrosoft.org>
- <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
- <20121105072857.GL19021@game.jcrosoft.org>
-Message-ID: <CAGhQ9Vxek1Xju4ShRV0KZtE4gsg-KZjG=6n+B54ddEv-6v9yXA@mail.gmail.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 05 Nov 2012 10:03:07 -0800
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt for
+ AM33XX
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
+ (Vaibhav Bedia's message of "Sat, 3 Nov 2012 13:48:08 +0000")
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+ <5095037A.2020503@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
+ <5095165E.10403@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
+Message-ID: <87pq3s7wro.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2012 08:28, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 18:55 Sun 04 Nov     , Joachim Eastwood wrote:
->> On 4 November 2012 16:52, Jean-Christophe PLAGNIOL-VILLARD
->> <plagnioj@jcrosoft.com> wrote:
->> > On 19:31 Sun 28 Oct     , Joachim Eastwood wrote:
->> >> Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
+"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+
+> On Sat, Nov 03, 2012 at 18:34:30, Kevin Hilman wrote:
+> [...]
 >> >>
->> >> Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
+>> >> Doesn't this also mean that you won't get timer wakeups
+>> >> in idle?  Or are you keeping the domain where the clockevent is
+>> >> on during idle?
 >> >>
->> >> Patch 3 adds clock lookups for DT.
->> >>
->> >> Patch 4 adds a new board for RM9200 DT support.
->> >>
->> >> Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
->> >>
->> >>
->> >> I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a >>initrd. As far as I can tell pinctrl, usart and ohci all work.
 >> >
->> > After updating barebox to have the DT support I've tested it on rm9200ek with net support
->> >
->> > work fine
->>
->> Excellent.
->>
->> > It does not apply on my tree as I've a more patch but I'll manage the merge
->> > conflict
->>
->>  Thanks for fixing it up Jean-Christophe.
-> I'll also fix the usb device and add missing nor flash support and emac +
-> pinctrl + defconfig
+>> > The lowest idle state that we are targeting will have MPU powered
+>> > off with external memory in self-refresh mode. Peripheral domain
+>> > with the clockevent will be kept on.
+>> 
+>> Is this a limitation of the hardware?  or the software?
+>> 
+>
+> Well, making the lowest idle state same as the suspend state will
+> require us to involve WKUP_M3 in the idle path and wakeup sources get
+> limited to the IPs in the WKUP domain alone. There's no IO daisy
+> chaining in AM33XX so that's one big difference compared to OMAP.  The
+> other potential problem is that the IPC mechanism that we have uses
+> interrupts.
 
-Very nice.
+It can still interrupt the M3, it's only the interrupt back to the MPU
+that is the issue, right?  That being said, there's no reason it
+couldn't use polling in the idle path, right?  
 
-Please make the changes available via a git tree when it's ready.
+> Assuming that the lowest idle state, say Cx, is the same as the
+> suspend state, we'll need to communicate with the WKUP_M3 using
+> interrupts once we decide to enter Cx. I am not sure if we can do
+> something in the cpuidle implementation to work around the "interrupt
+> for idle" problem. 
+>
+> We could probably not wait for an ACK when we want to enter Cx, 
 
+why not?
 
-regards
-Joachim Eastwood
+Are the response times from the M3 really up to 500ms (guessing based on
+the timeout you used in the suspend path.)  That seems rather unlikely.
+
+Hmm, but as I think about it.  Why does the MPU need to wait for an ACK
+at all?  Why not just send the cmd and WFI?
+
+> but the problem of limited wakeup sources remains. If we let the
+> various drivers block the entry to Cx, since almost all the IPs are in
+> the peripheral domain a system which uses anything other than UART and
+> Timer in WKUP domain will probably never be able enter Cx.
+
+Even so, I think the system needs to be designed to hit the same power
+states in idle and suspend.  Then, the states can be restricted based
+wakeup capabilities as you described.  This would be easy to do in the
+runtime PM implementation for this device.
+
+IMO, assuming that idle will not be useful from the begining is leading
+down the path to poor design choices that will be much more difficult to
+fixup down the road in order to add idle support later.  We need to
+design both idle and suspend at the same time.
+
+Also, don't forget about GPIO0.  Systems could easily be built such that
+peripherals which want to wakeup but don't have native wakeup
+capabilities could use a GPIO in bank 0 to wake the system.
+
+Similarily, I2C0 is in WKUP, and brought out to capes, so some simple
+designs with with I2C devices on a cape might be perfectly capable of
+hitting deep power states in idle.
+
+Kevin
