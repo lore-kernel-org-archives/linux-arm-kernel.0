@@ -1,29 +1,109 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Nov 2012 09:53:20 +0200
-Subject: [PATCHv2 3/7] i2c: omap: remove the dtrev
-In-Reply-To: <1352025873-27492-4-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 5 Nov 2012 09:53:51 +0200
+Subject: [PATCHv2 4/7] ARM: i2c: omap: Remove the i207 errata flag
+In-Reply-To: <1352025873-27492-5-git-send-email-shubhrajyoti@ti.com>
 References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-4-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121105075320.GD32468@arwen.pp.htv.fi>
+ <1352025873-27492-5-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <20121105075351.GE32468@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Nov 04, 2012 at 04:14:29PM +0530, Shubhrajyoti D wrote:
-> The dtrev is used only for the comments. Remove the same and use
-> the scheme instead to know if it is version2.
+On Sun, Nov 04, 2012 at 04:14:30PM +0530, Shubhrajyoti D wrote:
+> The commit [i2c: omap: use revision check for OMAP_I2C_FLAG_APPLY_ERRATA_I207]
+> uses the revision id instead of the flag. So the flag can be safely removed.
 > 
 > Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 
-I would drop dtrev completely and not use scheme to "emulate" it. dtrev
-is wrong and unnecessary; it was only created due to the wrong
-assumption that HW revision register was wrong. Looks like that
-assumption was made based on the driver which is clearly wrong wrt
-revision detection.
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-Also, when dropping dtrev, also drop it from platform_data and
-omap_hwmod database (could be done on a separate patch).
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    3 +--
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    9 +++------
+>  drivers/i2c/busses/i2c-omap.c              |    3 +--
+>  include/linux/i2c-omap.h                   |    1 -
+>  4 files changed, 5 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> index c455e41..b79ccf6 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+> @@ -76,8 +76,7 @@ static struct omap_hwmod_class i2c_class = {
+>  
+>  static struct omap_i2c_dev_attr i2c_dev_attr = {
+>  	.fifo_depth	= 8, /* bytes */
+> -	.flags		= OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+> -			  OMAP_I2C_FLAG_BUS_SHIFT_2 |
+> +	.flags		= OMAP_I2C_FLAG_BUS_SHIFT_2 |
+>  			  OMAP_I2C_FLAG_FORCE_19200_INT_CLK,
+>  };
+>  
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index f67b7ee..943222c4 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -791,8 +791,7 @@ static struct omap_hwmod omap3xxx_dss_venc_hwmod = {
+>  /* I2C1 */
+>  static struct omap_i2c_dev_attr i2c1_dev_attr = {
+>  	.fifo_depth	= 8, /* bytes */
+> -	.flags		= OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+> -			  OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+> +	.flags		= OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+>  			  OMAP_I2C_FLAG_BUS_SHIFT_2,
+>  };
+>  
+> @@ -818,8 +817,7 @@ static struct omap_hwmod omap3xxx_i2c1_hwmod = {
+>  /* I2C2 */
+>  static struct omap_i2c_dev_attr i2c2_dev_attr = {
+>  	.fifo_depth	= 8, /* bytes */
+> -	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+> -		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+> +	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+>  		 OMAP_I2C_FLAG_BUS_SHIFT_2,
+>  };
+>  
+> @@ -845,8 +843,7 @@ static struct omap_hwmod omap3xxx_i2c2_hwmod = {
+>  /* I2C3 */
+>  static struct omap_i2c_dev_attr i2c3_dev_attr = {
+>  	.fifo_depth	= 64, /* bytes */
+> -	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+> -		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+> +	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+>  		 OMAP_I2C_FLAG_BUS_SHIFT_2,
+>  };
+>  
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index b62cd9d..8a54efc 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1029,8 +1029,7 @@ static const struct i2c_algorithm omap_i2c_algo = {
+>  #ifdef CONFIG_OF
+>  static struct omap_i2c_bus_platform_data omap3_pdata = {
+>  	.rev = OMAP_I2C_IP_VERSION_1,
+> -	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+> -		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+> +	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+>  		 OMAP_I2C_FLAG_BUS_SHIFT_2,
+>  };
+>  
+> diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+> index df804ba..5c88187 100644
+> --- a/include/linux/i2c-omap.h
+> +++ b/include/linux/i2c-omap.h
+> @@ -21,7 +21,6 @@
+>  #define OMAP_I2C_FLAG_SIMPLE_CLOCK		BIT(1)
+>  #define OMAP_I2C_FLAG_16BIT_DATA_REG		BIT(2)
+>  #define OMAP_I2C_FLAG_RESET_REGS_POSTIDLE	BIT(3)
+> -#define OMAP_I2C_FLAG_APPLY_ERRATA_I207	BIT(4)
+>  #define OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK	BIT(5)
+>  #define OMAP_I2C_FLAG_FORCE_19200_INT_CLK	BIT(6)
+>  /* how the CPU address bus must be translated for I2C unit access */
+> -- 
+> 1.7.5.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
 balbi
@@ -33,4 +113,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/8dc799ee/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/4eacb659/attachment-0001.sig>
