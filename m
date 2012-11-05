@@ -1,21 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Nov 2012 17:36:40 +0000
-Subject: Building for MMU-less vexpress targets
-Message-ID: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Mon, 05 Nov 2012 18:35:54 +0100
+Subject: [PATCH] lpc32xx: irq - Set the chain handlers after setting up
+ the IRQ domain
+In-Reply-To: <20121105180053.20090a3e@avionic-0020.adnet.avionic-design.de>
+References: <1351772626-12615-1-git-send-email-alban.bedel@avionic-design.de>
+ <50938BFD.1000402@antcom.de>
+ <20121105180053.20090a3e@avionic-0020.adnet.avionic-design.de>
+Message-ID: <5097F8FA.6040605@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Hi!
 
-I was playing around with !CONFIG_MMU today and to my dismay noticed that
-you can't select ARCH_VEXPRESS without CONFIG_MMU=y! This is because
-ARCH_VEXPRESS is only selectable via ARCH_MULTI_V7, which depends on
-ARCH_MULTIPLATFORM which in turn depends on MMU.
+On 05/11/12 18:00, Alban Bedel wrote:
+>> I already posted basically the same change on 2012-10-28 already which
+>> is part of my patch set for LPC32xx to be merged into arm-soc.git (will
+>> do a pull request later). Fixing another irq bug in this platform/irq also.
+> 
+> I checked arm-soc.git, linux-next.git, linux-arm-kernel@ and
+> linux-kernel@, is there any other place I should check before
+> submitting LPC32xx patches?
 
-I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
-!ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
-dependency dropped) but I wondered if you'd got any better ideas?
+I usually prepare lpc32xx branches for merging into arm-soc.git at
+git.antcom.de. Expect the posted patches there and a pull request during
+the next days.
 
-Cheers,
+Thanks,
 
-Will
+Roland
