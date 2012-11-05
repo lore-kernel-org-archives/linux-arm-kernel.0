@@ -1,18 +1,68 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Mon, 5 Nov 2012 14:56:23 +0530
-Subject: [PATCHv2 3/7] i2c: omap: remove the dtrev
-In-Reply-To: <20121105090517.GB2913@arwen.pp.htv.fi>
-References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-4-git-send-email-shubhrajyoti@ti.com>
- <20121105075320.GD32468@arwen.pp.htv.fi> <50977C80.8090000@ti.com>
- <20121105090517.GB2913@arwen.pp.htv.fi>
-Message-ID: <5097863F.7030105@ti.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Mon, 5 Nov 2012 14:42:21 +0530
+Subject: [PATCH 0/8] Support for AM33xx PWM Susbsytem
+Message-ID: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 November 2012 02:35 PM, Felipe Balbi wrote:
->> egister map is different.
->> > 
->> > So the scheme may still be required.
-> fair enough, but drop it from debugging messages.
-OK thanks.
+In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+PWM subsystem. All these submodules shares the resources (clock) & has
+a clock gating register in PWM Subsystem. This patch series creates a
+parent PWM Subsystem driver to handle access synchronization of shared
+resources & clock gating from PWM Subsystem configuration space.
+Also Device tree nodes populated to support parent child relation
+between PWMSS, ECAP & EHRPWM submodules.
+In addition EHRPWM module requires explicit clock gating from control
+module & is handled by patch #2 & 6.
+
+Patch #4 & 5 submitted is a second revision as suggested by  Thierry
+for handling clock gating with a global function . This requires config
+space handling done independent from driver and is done at parent driver.
+So the parent<->child relation adopted to handle
+1. pm runtime synchronization
+2. PWM subsystem common config space clock gating for PWM submodules.
+
+Patches supports
+- Driver support for parent child relation handled patch #1
+- Optional EHRPWM tb clock in patch #2
+- Parent child in HWMOD handled at patch #3
+- Device tree binding support handled in patch #4-6
+- DT node populated in patch #7-8.
+
+This patch series based on linux-next/20121102 and tested on AM335x-evm.
+It depends on [1]
+
+1. https://lkml.org/lkml/2012/10/29/589
+pwm: Device tree support for PWM polarity
+
+Philip, Avinash (8):
+  PWMSS: Add PWM Subsystem driver for parent<->child relationship
+  ARM: am33xx: clk: Add optional clock for EHRPWM
+  ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+    subsystem
+  pwm: pwm-tiecap: Add device-tree binding support for APWM driver
+  pwm: pwm-tiehrpwm: Add device-tree binding support for EHRPWM driver
+  pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+  ARM: dts: AM33XX: Add PWMSS device tree nodes
+  ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |   22 +
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |   25 ++
+ Documentation/devicetree/bindings/pwm/tipwmss.txt  |   30 ++
+ arch/arm/boot/dts/am335x-evm.dts                   |   21 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   90 +++++
+ arch/arm/mach-omap2/clock33xx_data.c               |   37 ++
+ arch/arm/mach-omap2/control.h                      |    8 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  414 +++++++++++++-------
+ drivers/pwm/Kconfig                                |   11 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-tiecap.c                           |   36 ++-
+ drivers/pwm/pwm-tiehrpwm.c                         |   53 +++-
+ drivers/pwm/tipwmss.c                              |  136 +++++++
+ drivers/pwm/tipwmss.h                              |    8 +
+ 14 files changed, 754 insertions(+), 138 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/tipwmss.txt
+ create mode 100644 drivers/pwm/tipwmss.c
+ create mode 100644 drivers/pwm/tipwmss.h
