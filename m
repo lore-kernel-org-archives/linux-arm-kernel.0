@@ -1,36 +1,84 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Mon, 5 Nov 2012 15:12:29 +0530
-Subject: [PATCH 4/4] ARM: dts: AM33XX: Enable system power off control in
- am335x-bone
+Date: Mon, 5 Nov 2012 15:12:26 +0530
+Subject: [PATCH 1/4] mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
 In-Reply-To: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
 References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352108549-9341-5-git-send-email-anilkumar@ti.com>
+Message-ID: <1352108549-9341-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable system power off control for BeagleBone in am335x-bone.dts file
-under rtc node. RTC is the incharge of controlling the system power.
-This flag is used by the driver to hook up the pm_power_off system call.
+From: Colin Foe-Parker <colin.foeparker@logicpd.com>
 
+Set tps65217 PMIC status to OFF if power enable toggle is
+supported. Also adds platform data flag, which should be
+passed from board init data.
+
+Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
+[anilkumar at ti.com: move the additions to tps65217 MFD driver]
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-bone.dts |    4 ++++
- 1 file changed, 4 insertions(+)
+ .../devicetree/bindings/regulator/tps65217.txt     |    4 ++++
+ drivers/mfd/tps65217.c                             |   12 ++++++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 40ea3c7..6f9c48e 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -38,6 +38,10 @@
- 			};
+diff --git a/Documentation/devicetree/bindings/regulator/tps65217.txt b/Documentation/devicetree/bindings/regulator/tps65217.txt
+index d316fb8..4f05d20 100644
+--- a/Documentation/devicetree/bindings/regulator/tps65217.txt
++++ b/Documentation/devicetree/bindings/regulator/tps65217.txt
+@@ -11,6 +11,9 @@ Required properties:
+   using the standard binding for regulators found at
+   Documentation/devicetree/bindings/regulator/regulator.txt.
  
- 		};
++Optional properties:
++- ti,pmic-shutdown-controller: Telling the PMIC to shutdown on PWR_EN toggle.
 +
-+		rtc at 44e3e000 {
-+			ti,system-power-controller;
-+		};
- 	};
- };
+   The valid names for regulators are:
+   tps65217: dcdc1, dcdc2, dcdc3, ldo1, ldo2, ldo3 and ldo4
  
+@@ -20,6 +23,7 @@ Example:
+ 
+ 	tps: tps at 24 {
+ 		compatible = "ti,tps65217";
++		ti,pmic-shutdown-controller;
+ 
+ 		regulators {
+ 			dcdc1_reg: dcdc1 {
+diff --git a/drivers/mfd/tps65217.c b/drivers/mfd/tps65217.c
+index 3fb32e6..c7f17d8 100644
+--- a/drivers/mfd/tps65217.c
++++ b/drivers/mfd/tps65217.c
+@@ -160,6 +160,7 @@ static int __devinit tps65217_probe(struct i2c_client *client,
+ 	unsigned int version;
+ 	unsigned int chip_id = ids->driver_data;
+ 	const struct of_device_id *match;
++	bool status_off = false;
+ 	int ret;
+ 
+ 	if (client->dev.of_node) {
+@@ -170,6 +171,8 @@ static int __devinit tps65217_probe(struct i2c_client *client,
+ 			return -EINVAL;
+ 		}
+ 		chip_id = (unsigned int)match->data;
++		status_off = of_property_read_bool(client->dev.of_node,
++					"ti,pmic-shutdown-controller");
+ 	}
+ 
+ 	if (!chip_id) {
+@@ -207,6 +210,15 @@ static int __devinit tps65217_probe(struct i2c_client *client,
+ 		return ret;
+ 	}
+ 
++	/* Set the PMIC to shutdown on PWR_EN toggle */
++	if (status_off) {
++		ret = tps65217_set_bits(tps, TPS65217_REG_STATUS,
++				TPS65217_STATUS_OFF, TPS65217_STATUS_OFF,
++				TPS65217_PROTECT_NONE);
++		if (ret)
++			dev_warn(tps->dev, "unable to set the status OFF\n");
++	}
++
+ 	dev_info(tps->dev, "TPS65217 ID %#x version 1.%d\n",
+ 			(version & TPS65217_CHIPID_CHIP_MASK) >> 4,
+ 			version & TPS65217_CHIPID_REV_MASK);
 -- 
 1.7.9.5
