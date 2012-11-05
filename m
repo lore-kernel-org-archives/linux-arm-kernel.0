@@ -1,53 +1,53 @@
 From: walken@google.com (Michel Lespinasse)
-Date: Mon,  5 Nov 2012 14:47:08 -0800
-Subject: [PATCH 11/16] mm: use vm_unmapped_area() on arm architecture
+Date: Mon,  5 Nov 2012 14:47:09 -0800
+Subject: [PATCH 12/16] mm: use vm_unmapped_area() on sh architecture
 In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
 References: <1352155633-8648-1-git-send-email-walken@google.com>
-Message-ID: <1352155633-8648-12-git-send-email-walken@google.com>
+Message-ID: <1352155633-8648-13-git-send-email-walken@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the arm arch_get_unmapped_area[_topdown] functions to make
+Update the sh arch_get_unmapped_area[_topdown] functions to make
 use of vm_unmapped_area() instead of implementing a brute force search.
 
 Signed-off-by: Michel Lespinasse <walken@google.com>
 
 ---
- arch/arm/mm/mmap.c |  119 ++++++++++------------------------------------------
- 1 files changed, 23 insertions(+), 96 deletions(-)
+ arch/sh/mm/mmap.c |  126 ++++++++++-------------------------------------------
+ 1 files changed, 24 insertions(+), 102 deletions(-)
 
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index ce8cb1970d7a..267e63f58098 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -72,6 +72,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+diff --git a/arch/sh/mm/mmap.c b/arch/sh/mm/mmap.c
+index afeb710ec5c3..acb3b8f71908 100644
+--- a/arch/sh/mm/mmap.c
++++ b/arch/sh/mm/mmap.c
+@@ -49,6 +49,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 	struct vm_area_struct *vma;
  	unsigned long start_addr;
- 	int do_align = 0;
- 	int aliasing = cache_is_vipt_aliasing();
+ 	int do_colour_align;
 +	struct vm_unmapped_area_info info;
  
- 	/*
- 	 * We only need to do colour alignment if either the I or D
-@@ -104,46 +105,14 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
- 		    (!vma || addr + len <= vma->vm_start))
+ 	if (flags & MAP_FIXED) {
+ 		/* We do not accept a shared mapping if it would violate
+@@ -79,47 +80,13 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
  			return addr;
  	}
--	if (len > mm->cached_hole_size) {
--	        start_addr = addr = mm->free_area_cache;
--	} else {
--	        start_addr = addr = mm->mmap_base;
--	        mm->cached_hole_size = 0;
--	}
  
+-	if (len > mm->cached_hole_size) {
+-		start_addr = addr = mm->free_area_cache;
+-	} else {
+-	        mm->cached_hole_size = 0;
+-		start_addr = addr = TASK_UNMAPPED_BASE;
+-	}
+-
 -full_search:
--	if (do_align)
+-	if (do_colour_align)
 -		addr = COLOUR_ALIGN(addr, pgoff);
 -	else
--		addr = PAGE_ALIGN(addr);
+-		addr = PAGE_ALIGN(mm->free_area_cache);
 -
 -	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 -		/* At this point:  (!vma || addr < vma->vm_end). */
--		if (TASK_SIZE - len < addr) {
+-		if (unlikely(TASK_SIZE - len < addr)) {
 -			/*
 -			 * Start a new search - just in case we missed
 -			 * some holes.
@@ -59,7 +59,7 @@ index ce8cb1970d7a..267e63f58098 100644
 -			}
 -			return -ENOMEM;
 -		}
--		if (!vma || addr + len <= vma->vm_start) {
+-		if (likely(!vma || addr + len <= vma->vm_start)) {
 -			/*
 -			 * Remember the place where we stopped the search:
 -			 */
@@ -68,65 +68,61 @@ index ce8cb1970d7a..267e63f58098 100644
 -		}
 -		if (addr + mm->cached_hole_size < vma->vm_start)
 -		        mm->cached_hole_size = vma->vm_start - addr;
+-
 -		addr = vma->vm_end;
--		if (do_align)
+-		if (do_colour_align)
 -			addr = COLOUR_ALIGN(addr, pgoff);
 -	}
 +	info.flags = 0;
 +	info.length = len;
-+	info.low_limit = mm->mmap_base;
++	info.low_limit = TASK_UNMAPPED_BASE;
 +	info.high_limit = TASK_SIZE;
-+	info.align_mask = do_align ? (PAGE_MASK & (SHMLBA - 1)) : 0;
++	info.align_mask = do_colour_align ? (PAGE_MASK & shm_align_mask) : 0;
 +	info.align_offset = pgoff << PAGE_SHIFT;
 +	return vm_unmapped_area(&info);
  }
  
  unsigned long
-@@ -156,6 +125,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+@@ -131,6 +98,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 	struct mm_struct *mm = current->mm;
  	unsigned long addr = addr0;
- 	int do_align = 0;
- 	int aliasing = cache_is_vipt_aliasing();
+ 	int do_colour_align;
 +	struct vm_unmapped_area_info info;
  
- 	/*
- 	 * We only need to do colour alignment if either the I or D
-@@ -187,70 +157,27 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 	if (flags & MAP_FIXED) {
+ 		/* We do not accept a shared mapping if it would violate
+@@ -162,73 +130,27 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
  			return addr;
  	}
  
 -	/* check if free_area_cache is useful for us */
 -	if (len <= mm->cached_hole_size) {
--		mm->cached_hole_size = 0;
+-	        mm->cached_hole_size = 0;
 -		mm->free_area_cache = mm->mmap_base;
 -	}
 -
 -	/* either no address requested or can't fit in requested address hole */
 -	addr = mm->free_area_cache;
--	if (do_align) {
--		unsigned long base = COLOUR_ALIGN_DOWN(addr - len, pgoff);
+-	if (do_colour_align) {
+-		unsigned long base = COLOUR_ALIGN_DOWN(addr-len, pgoff);
+-
 -		addr = base + len;
 -	}
 -
 -	/* make sure it can fit in the remaining address space */
--	if (addr > len) {
+-	if (likely(addr > len)) {
 -		vma = find_vma(mm, addr-len);
--		if (!vma || addr <= vma->vm_start)
+-		if (!vma || addr <= vma->vm_start) {
 -			/* remember the address as a hint for next time */
 -			return (mm->free_area_cache = addr-len);
+-		}
 -	}
-+	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-+	info.length = len;
-+	info.low_limit = PAGE_SIZE;
-+	info.high_limit = mm->mmap_base;
-+	info.align_mask = do_align ? (PAGE_MASK & (SHMLBA - 1)) : 0;
-+	info.align_offset = pgoff << PAGE_SHIFT;
-+	addr = vm_unmapped_area(&info);
- 
--	if (mm->mmap_base < len)
+-
+-	if (unlikely(mm->mmap_base < len))
 -		goto bottomup;
 -
--	addr = mm->mmap_base - len;
--	if (do_align)
+-	addr = mm->mmap_base-len;
+-	if (do_colour_align)
 -		addr = COLOUR_ALIGN_DOWN(addr, pgoff);
 -
 -	do {
@@ -136,21 +132,30 @@ index ce8cb1970d7a..267e63f58098 100644
 -		 * return with success:
 -		 */
 -		vma = find_vma(mm, addr);
--		if (!vma || addr+len <= vma->vm_start)
+-		if (likely(!vma || addr+len <= vma->vm_start)) {
 -			/* remember the address as a hint for next time */
 -			return (mm->free_area_cache = addr);
+-		}
 -
 -		/* remember the largest hole we saw so far */
 -		if (addr + mm->cached_hole_size < vma->vm_start)
--			mm->cached_hole_size = vma->vm_start - addr;
+-		        mm->cached_hole_size = vma->vm_start - addr;
 -
 -		/* try just below the current vma->vm_start */
--		addr = vma->vm_start - len;
--		if (do_align)
+-		addr = vma->vm_start-len;
+-		if (do_colour_align)
 -			addr = COLOUR_ALIGN_DOWN(addr, pgoff);
--	} while (len < vma->vm_start);
+-	} while (likely(len < vma->vm_start));
 -
 -bottomup:
++	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
++	info.length = len;
++	info.low_limit = PAGE_SIZE;
++	info.high_limit = mm->mmap_base;
++	info.align_mask = do_colour_align ? (PAGE_MASK & shm_align_mask) : 0;
++	info.align_offset = pgoff << PAGE_SHIFT;
++	addr = vm_unmapped_area(&info);
++	
  	/*
  	 * A failed mmap() very likely causes application failure,
  	 * so fall back to the bottom-up function here. This scenario
@@ -168,7 +173,7 @@ index ce8cb1970d7a..267e63f58098 100644
 +	if (addr & ~PAGE_MASK) {
 +		VM_BUG_ON(addr != -ENOMEM);
 +		info.flags = 0;
-+		info.low_limit = mm->mmap_base;
++		info.low_limit = TASK_UNMAPPED_BASE;
 +		info.high_limit = TASK_SIZE;
 +		addr = vm_unmapped_area(&info);
 +	}
