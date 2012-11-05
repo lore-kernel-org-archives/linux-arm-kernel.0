@@ -1,56 +1,58 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 5 Nov 2012 03:15:16 +0000 (UTC)
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
-References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
- <20121025101212.GD21217@arwen.pp.htv.fi>
- <20121026201539.GD29548@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
- <20121029200032.GD30152@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
- <20121030123254.GD29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
- <20121030125419.GG29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
- <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
- <87fw4u3oh5.fsf@deeprootsystems.com>
- <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
- <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
- <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
- <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
+From: tdas@codeaurora.org (Taniya Das)
+Date: Mon, 05 Nov 2012 09:23:38 +0530
+Subject: ARM: idle sleep time for hotplugged cpu
+Message-ID: <50973842.9010708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+Hello,
 
-On Sat, 3 Nov 2012, Jean Pihet wrote:
-
-> The setup is as identical as possible to yours:
-> - U-Boot 2011.06-dirty (Sep 04 2012 - 17:06:58) from
-> http://www.pwsan.com/tmp/3530es3beagle-MLO-u-boot-20121023.tar.bz2.
->   Please note that the MLO image does not run on my board and so I had
-> to use my known-to-work image.
-
-Interesting...
-
-> The result is that I could reproduce the issue but it happens much
-> more rarely on my side (only once vs quasi 100% on ~50 boot cycles).
-
-Hmm...
-
-> The issue is triggered by running 'hwclock --systohc'  while the
-> system is heavily loaded (running depmod etc.).
-
-OK.
-
-> More investigation on-going, so more to come!
-
-Great, keep us posted.
-
-Will try to kick off those tests you requested within the next 24-48 
-hours.
+I was looking at the arch/arm/process.c:cpu_die, I was wondering why we
+do not exit from NOHZ for a hotplugged/offline cpu?
+If I understand correctly an offlined cpu too will enter
+NOHz(tick_nohz_idle_enter) and update the idle_entrytime. The cpu will die
+and it will reenter the idle thread and update idle_entrytime onces it
+comes back online and only then it will exit NOHz, but time spent in sleep
+idle_sleeptime will be wrongly calculated.
 
 
-- Paul
+void cpu_idle(void)
+
+{
+
+
+.....
+
+/* endless idle loop with no priority at all */
+
+while (1) {
+
+idle_notifier_call_chain(IDLE_START);
+
+tick_nohz_idle_enter();-->  Offline CPU entering NOHZ
+
+rcu_idle_enter();
+
+while (!need_resched()) {
+
+#ifdef CONFIG_HOTPLUG_CPU
+
+if (cpu_is_offline(smp_processor_id()))
+cpu_die(); ---> CPU becomes offline and re-enter the idle thread without
+exiting from NOHZ,
+
+#endif
+
+...
+}
+
+
+Is it a good idea to exit from NOHZ before cpu_die() or it could be
+achieved in some other way? Please provide your
+comments.
+
+-- 
+Thanks & Regards,
+Taniya Das.
+
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation.
