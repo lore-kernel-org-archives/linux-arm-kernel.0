@@ -1,153 +1,47 @@
-From: michael.hope@linaro.org (Michael Hope)
-Date: Tue, 6 Nov 2012 11:02:27 +1300
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <5097C3B5.4080406@gmail.com>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121025093411.GA32662@sig21.net>
- <50893389.2090002@gmail.com> <20121025141645.GA16962@sig21.net>
- <50894BC2.5050706@gmail.com> <20121025150816.GA3874@sig21.net>
- <20121105104839.GA2005@linaro.org>
- <20121105111346.GF28327@n2100.arm.linux.org.uk>
- <5097C3B5.4080406@gmail.com>
-Message-ID: <CANLjY-k7sn-7pH_0nFiktXCxvgy8XizVbPRvS8aG1rg+CmVTPQ@mail.gmail.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Mon, 5 Nov 2012 15:06:08 -0700
+Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
+In-Reply-To: <50814B83.7090203@ti.com>
+References: <20121018222046.GA28541@animalcreek.com>
+ <20121018225540.GB28061@n2100.arm.linux.org.uk>
+ <20121018232405.GA29064@animalcreek.com>
+ <20121018233335.GC28061@n2100.arm.linux.org.uk>
+ <50814B83.7090203@ti.com>
+Message-ID: <20121105220608.GE3062@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2012 02:48, Rob Herring <robherring2@gmail.com> wrote:
->
-> On 11/05/2012 05:13 AM, Russell King - ARM Linux wrote:
-> > On Mon, Nov 05, 2012 at 10:48:50AM +0000, Dave Martin wrote:
-> >> On Thu, Oct 25, 2012 at 05:08:16PM +0200, Johannes Stezenbach wrote:
-> >>> On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
-> >>>> On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
-> >>>>> On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
-> >>>>>> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
-> >>>>>>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
-> >>>>>>>
-> >>>>>>>> While v6 can support unaligned accesses, it is optional and current
-> >>>>>>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
-> >>>>>>>> v6.
-> >>>>>>>
-> >>>>>>> not true according to the gcc changes page
-> >>>>>>
-> >>>>>> What are you going to believe: documentation or what the compiler
-> >>>>>> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
-> >>>>>> support backported and 4.7.2, unaligned accesses are emitted for v7
-> >>>>>> only. I guess default here means it is the default unless you change the
-> >>>>>> default in your build of gcc.
-> >>>>>
-> >>>>> Since ARMv6 can handle unaligned access in the same way as ARMv7
-> >>>>> it seems a clear bug in gcc which might hopefully get fixed.
-> >>>>> Thus in this case I think it is reasonable to follow the
-> >>>>> gcc documentation, otherwise the code would break for ARMv6
-> >>>>> when gcc gets fixed.
-> >>>>
-> >>>> But the compiler can't assume the state of the U bit. I think it is
-> >>>> still legal on v6 to not support unaligned accesses, but on v7 it is
-> >>>> required. All the standard v6 ARM cores support it, but I'm not sure
-> >>>> about custom cores or if there are SOCs with buses that don't support
-> >>>> unaligned accesses properly.
-> >>>
-> >>> Well, I read the "...since Linux version 2.6.28" comment
-> >>> in the gcc changes page in the way that they assume the
-> >>> U-bit is set. (Although I'm not sure it really is???)
-> >>
-> >> Actually, the kernel checks the arch version and the U bit on boot,
-> >> and chooses the appropriate setting for the A bit depending on the
-> >> result.  (See arch/arm/mm/alignment.c:alignment_init().)
-> >
-> > That is in the kernel itself, _after_ the decompressor has run.  It is
-> > not relevant to any discussion about the decompressor.
-> >
-> >> Currently, we depend on the CPU reset behaviour or firmware/
-> >> bootloader to set the U bit for v6, but the behaviour should be
-> >> correct either way, though unaligned accesses will obviously
-> >> perform (much) better with U=1.
-> >
-> > Will someone _PLEASE_ address my initial comments against this patch
-> > in light of the fact that it's now been proven _NOT_ to be just a V7
-> > issue, rather than everyone seemingly buring their heads in the sand
-> > over this.
->
-> I tried adding -munaligned-accesses on a v6 build and still get byte
-> accesses rather than unaligned word accesses. So this does seem to be a
-> v7 only issue based on what gcc will currently produce. Copying Michael
-> Hope who can hopefully provide some insight on why v6 unaligned accesses
-> are not enabled.
+On Fri, Oct 19, 2012 at 02:45:55PM +0200, P?ter Ujfalusi wrote:
+> Hi,
+> 
+> On 10/19/2012 01:33 AM, Russell King - ARM Linux wrote:
+> > I would suggest getting some feedback from the ASoC people first, before
+> > trying to invent new APIs to work around this stuff.  If they can live
+> > with having prefetch enabled on OMAP then there isn't an issue here.  If
+> > not, we need a solution to this.
+> > 
+> > I do not believe that precisely stopping and starting playback across a
+> > suspend/resume event is really necessary (it's desirable but the world
+> > doesn't collapse if you miss a few samples.)  It could be more of an
+> > issue for pause/resume though, but as I say, that's for ASoC people to
+> > comment on.
+> 
+> There is another issue with the prefetch in audio:
+> we tend to like to know the position of the DMA and also to know how much data
+> we have stored in buffers, FIFOs. This information is used by userspace to do
+> echo cancellation and also used by PA for example to do runtime mixing
+> directly in the audio buffer. We have means to extract this information from
+> McBSP for example (and from tlv320dac33 codec) but AFAIK this information can
+> not be retrieved from sDMA.
+> We could assume that the sDMA FIFO is kept full and report that as a 'delay'
+> or do not account this information.
+> 
+> For now I think the cyclic mode should not set the prefetch. If I recall right
+> the cyclic mode is only used by audio at the moment.
+> 
+> > I'm merely pointing out here that we need their feedback here before
+> > deciding if there's anything further that needs to happen.
+> 
+> Thanks Russell, I'll take a look at the implication of the prefetch for audio.
 
-This looks like a bug.  Unaligned access is enabled for armv6 but
-seems to only take effect for cores with Thumb-2.  Here's a test case
-both with unaligned field access and unaligned block copy:
-
-struct foo
-{
-  char a;
-  int b;
-  struct
-  {
-    int x[3];
-  } c;
-} __attribute__((packed));
-
-int get_field(struct foo *p)
-{
-  return p->b;
-}
-
-int copy_block(struct foo *p, struct foo *q)
-{
-  p->c = q->c;
-}
-
-With -march=armv7-a you get the correct:
-
-bar:
-	ldr	r0, [r0, #1]	@ unaligned	@ 11	unaligned_loadsi/2	[length = 4]
-	bx	lr	@ 21	*arm_return	[length = 12]
-
-baz:
-	str	r4, [sp, #-4]!	@ 25	*push_multi	[length = 4]
-	mov	r2, r0	@ 2	*arm_movsi_vfp/1	[length = 4]
-	ldr	r4, [r1, #5]!	@ unaligned	@ 9	unaligned_loadsi/2	[length = 4]
-	ldr	ip, [r1, #4]	@ unaligned	@ 10	unaligned_loadsi/2	[length = 4]
-	ldr	r1, [r1, #8]	@ unaligned	@ 11	unaligned_loadsi/2	[length = 4]
-	str	r4, [r2, #5]	@ unaligned	@ 12	unaligned_storesi/2	[length = 4]
-	str	ip, [r2, #9]	@ unaligned	@ 13	unaligned_storesi/2	[length = 4]
-	str	r1, [r2, #13]	@ unaligned	@ 14	unaligned_storesi/2	[length = 4]
-	ldmfd	sp!, {r4}
-	bx	lr
-
-With -march=armv6 you get a byte-by-byte field access and a correct
-unaligned block copy:
-
-bar:
-	ldrb	r1, [r0, #2]	@ zero_extendqisi2
-	ldrb	r3, [r0, #1]	@ zero_extendqisi2
-	ldrb	r2, [r0, #3]	@ zero_extendqisi2
-	ldrb	r0, [r0, #4]	@ zero_extendqisi2
-	orr	r3, r3, r1, asl #8
-	orr	r3, r3, r2, asl #16
-	orr	r0, r3, r0, asl #24
-	bx	lr
-
-baz:
-	str	r4, [sp, #-4]!
-	mov	r2, r0
-	ldr	r4, [r1, #5]!	@ unaligned
-	ldr	ip, [r1, #4]	@ unaligned
-	ldr	r1, [r1, #8]	@ unaligned
-	str	r4, [r2, #5]	@ unaligned
-	str	ip, [r2, #9]	@ unaligned
-	str	r1, [r2, #13]	@ unaligned
-	ldmfd	sp!, {r4}
-	bx	lr
-
-readelf -A shows that the compiler planned to use unaligned access in
-both.  My suspicion is that GCC is using the extv pattern to extract
-the field from memory, and that pattern is only enabled for Thumb-2
-capable cores.
-
-I've logged PR55218.  We'll discuss it at our next meeting.
-
--- Michael
+Ping?
