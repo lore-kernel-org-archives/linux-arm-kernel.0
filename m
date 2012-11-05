@@ -1,39 +1,130 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 5 Nov 2012 10:10:52 -0500
-Subject: [PATCH v3 02/11] clk: davinci - add PSC clock driver
-In-Reply-To: <50950908.1060302@ti.com>
+Date: Mon, 5 Nov 2012 10:20:30 -0500
+Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
+ clk driver
+In-Reply-To: <50950F7E.2080309@ti.com>
 References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-3-git-send-email-m-karicheri2@ti.com>
- <50950908.1060302@ti.com>
-Message-ID: <5097D6FC.7040202@ti.com>
+ <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
+ <50950F7E.2080309@ti.com>
+Message-ID: <5097D93E.10403@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2012 08:07 AM, Sekhar Nori wrote:
+On 11/03/2012 08:35 AM, Sekhar Nori wrote:
 > On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->> This is the driver for the Power Sleep Controller (PSC) hardware
->> found on DM SoCs as well Keystone SoCs (c6x). This driver borrowed
->> code from arch/arm/mach-davinci/psc.c and implemented the driver
->> as per common clock provider API. The PSC module is responsible for
->> enabling/disabling the Power Domain and Clock domain for different IPs
->> present in the SoC. The driver is configured through the clock data
->> passed to the driver through struct clk_psc_data.
+>> This is the common clk driver initialization functions for DaVinci
+>> SoCs and other SoCs that uses similar hardware architecture.
+>> clock.h also defines struct types for clock definitions in a SoC
+>> and clock data type for configuring clk-mux. The initialization
+>> functions are used by clock initialization code in a specific
+>> platform/SoC.
 >>
 >> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 >> ---
->> +/**
->> + * struct clk_psc - DaVinci PSC clock driver data
+>>   drivers/clk/davinci/clock.c |  112 +++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/clk/davinci/clock.h |   80 +++++++++++++++++++++++++++++++
+>>   2 files changed, 192 insertions(+)
+>>   create mode 100644 drivers/clk/davinci/clock.c
+>>   create mode 100644 drivers/clk/davinci/clock.h
+>>
+>> diff --git a/drivers/clk/davinci/clock.c b/drivers/clk/davinci/clock.c
+>> new file mode 100644
+>> index 0000000..ad02149
+>> --- /dev/null
+>> +++ b/drivers/clk/davinci/clock.c
+>> @@ -0,0 +1,112 @@
+>> +/*
+>> + * clock.c - davinci clock initialization functions for various clocks
 >> + *
->> + * @hw: clk_hw for the psc
->> + * @psc_data: Driver specific data
+>> + * Copyright (C) 2006-2012 Texas Instruments.
+>> + * Copyright (C) 2008-2009 Deep Root Systems, LLC
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
 >> + */
->> +struct clk_psc {
->> +	struct clk_hw hw;
->> +	struct clk_psc_data *psc_data;
->> +	spinlock_t *lock;
-> Unused member? I don't see this being used.
-
-OK. Will remove.
+>> +#include <linux/init.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/io.h>
+>> +#include <linux/slab.h>
+>> +
+>> +#include "clk-pll.h"
+>> +#include "clk-psc.h"
+>> +#include "clk-div.h"
+>> +#include "clock.h"
+>> +
+>> +static DEFINE_SPINLOCK(_lock);
+>> +
+>> +#ifdef	CONFIG_CLK_DAVINCI_PLL
+>> +struct clk *davinci_pll_clk(const char *name, const char *parent,
+>> +		u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
+>> +		struct clk_pll_data *pll_data)
+>> +{
+>> +	struct clk *clkp = NULL;
+>> +
+>> +	pll_data->reg_pllm = ioremap(phys_pllm, 4);
+>> +	if (WARN_ON(!pll_data->reg_pllm))
+>> +		return clkp;
+> I would prefer ERR_PTR(-ENOMEM) here. Same comment applies to other
+> instances elsewhere in the patch.
+>
+>> diff --git a/drivers/clk/davinci/clock.h b/drivers/clk/davinci/clock.h
+>> new file mode 100644
+>> index 0000000..73204b8
+>> --- /dev/null
+>> +++ b/drivers/clk/davinci/clock.h
+>> @@ -0,0 +1,80 @@
+>> +/*
+>> + * TI DaVinci Clock definitions -  Contains Macros and Types used for
+>> + * defining various clocks on a DaVinci SoC
+>> + *
+>> + * Copyright (C) 2012 Texas Instruments
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +#ifndef __DAVINCI_CLOCK_H
+>> +#define __DAVINCI_CLOCK_H
+>> +
+>> +#include <linux/types.h>
+>> +
+>> +/* general flags: */
+>> +#define ALWAYS_ENABLED		BIT(0)
+> This is not used in this patch. Can you add the define along with its
+> usage so it is immediately clear why you need it?
+This is used on the next patch as this adds a bunch of utilities or 
+types for the platform specific clock code. Do you want to combine this 
+patch with 05/11?  It will become a bigger patch then? Is that fine. 
+IMO, this is a logical group that can be a standalone patch than 
+combining with 05/11.
+>> +/**
+>> + * struct davinci_clk - struct for defining DaVinci clocks for a SoC.
+>> + *
+>> + * @name: name of the clock
+>> + * @parent: name of parent clock
+>> + * @flags: General flags for all drivers used by platform clock init code
+>> + * @data: data specific to a clock used by the driver
+>> + * @dev_id: dev_id used to look up this clock. If this is NULL
+>> + *	clock name is used for lookup.
+>> + */
+>> +struct davinci_clk {
+>> +	const char			*name;
+>> +	const char			*parent;
+>> +	u32				flags;
+>> +	void				*data;
+>> +	char				*dev_id;
+> Similarly dont see this being used as well.
+For this and previous one, check lpsc_clk() macro usage. dev_id is used 
+where a specific device id is used to look up
+the clk as is done for davinci_emac.1, davinci_mmc.0 etc.
 >
 > Thanks,
 > Sekhar
