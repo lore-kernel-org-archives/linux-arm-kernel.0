@@ -1,84 +1,19 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 05 Nov 2012 10:03:07 -0800
-Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt for
- AM33XX
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
- (Vaibhav Bedia's message of "Sat, 3 Nov 2012 13:48:08 +0000")
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
- <5095037A.2020503@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
- <5095165E.10403@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
-Message-ID: <87pq3s7wro.fsf@deeprootsystems.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 05 Nov 2012 18:03:20 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+Message-ID: <1352138600.10947.26.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+On Mon, 2012-11-05 at 17:36 +0000, Will Deacon wrote:
+> I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
+> !ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
+> dependency dropped) 
 
-> On Sat, Nov 03, 2012 at 18:34:30, Kevin Hilman wrote:
-> [...]
->> >>
->> >> Doesn't this also mean that you won't get timer wakeups
->> >> in idle?  Or are you keeping the domain where the clockevent is
->> >> on during idle?
->> >>
->> >
->> > The lowest idle state that we are targeting will have MPU powered
->> > off with external memory in self-refresh mode. Peripheral domain
->> > with the clockevent will be kept on.
->> 
->> Is this a limitation of the hardware?  or the software?
->> 
->
-> Well, making the lowest idle state same as the suspend state will
-> require us to involve WKUP_M3 in the idle path and wakeup sources get
-> limited to the IPs in the WKUP domain alone. There's no IO daisy
-> chaining in AM33XX so that's one big difference compared to OMAP.  The
-> other potential problem is that the IPC mechanism that we have uses
-> interrupts.
+... depends on !ARCH_MULTIPLATFORM or maybe rather !MMU? (I assume you
+want to add an extra dummy position in the choice section, where options
+are mutually exclusive anyway?)
 
-It can still interrupt the M3, it's only the interrupt back to the MPU
-that is the issue, right?  That being said, there's no reason it
-couldn't use polling in the idle path, right?  
-
-> Assuming that the lowest idle state, say Cx, is the same as the
-> suspend state, we'll need to communicate with the WKUP_M3 using
-> interrupts once we decide to enter Cx. I am not sure if we can do
-> something in the cpuidle implementation to work around the "interrupt
-> for idle" problem. 
->
-> We could probably not wait for an ACK when we want to enter Cx, 
-
-why not?
-
-Are the response times from the M3 really up to 500ms (guessing based on
-the timeout you used in the suspend path.)  That seems rather unlikely.
-
-Hmm, but as I think about it.  Why does the MPU need to wait for an ACK
-at all?  Why not just send the cmd and WFI?
-
-> but the problem of limited wakeup sources remains. If we let the
-> various drivers block the entry to Cx, since almost all the IPs are in
-> the peripheral domain a system which uses anything other than UART and
-> Timer in WKUP domain will probably never be able enter Cx.
-
-Even so, I think the system needs to be designed to hit the same power
-states in idle and suspend.  Then, the states can be restricted based
-wakeup capabilities as you described.  This would be easy to do in the
-runtime PM implementation for this device.
-
-IMO, assuming that idle will not be useful from the begining is leading
-down the path to poor design choices that will be much more difficult to
-fixup down the road in order to add idle support later.  We need to
-design both idle and suspend at the same time.
-
-Also, don't forget about GPIO0.  Systems could easily be built such that
-peripherals which want to wakeup but don't have native wakeup
-capabilities could use a GPIO in bank 0 to wake the system.
-
-Similarily, I2C0 is in WKUP, and brought out to capes, so some simple
-designs with with I2C devices on a cape might be perfectly capable of
-hitting deep power states in idle.
-
-Kevin
+Pawe?
