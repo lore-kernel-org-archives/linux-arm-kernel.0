@@ -1,81 +1,43 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 5 Nov 2012 12:53:59 +0530
-Subject: [PATCH 06/15] ARM: OMAP2+: hwmod: Enable OCMCRAM registration
- in AM33XX
-In-Reply-To: <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <5097698F.1080609@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 5 Nov 2012 08:28:57 +0100
+Subject: [PATCH v3 0/6] DT support for AT91RM9200
+In-Reply-To: <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
+References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
+ <20121104155212.GK19021@game.jcrosoft.org>
+ <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
+Message-ID: <20121105072857.GL19021@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/2/2012 6:02 PM, Vaibhav Bedia wrote:
-> The hwmod data for OCMCRAM in AM33XX was commented out.
-> This data is needed by the power management code, hence
-> uncomment the same and register the OCP interface for it.
+On 18:55 Sun 04 Nov     , Joachim Eastwood wrote:
+> On 4 November 2012 16:52, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > On 19:31 Sun 28 Oct     , Joachim Eastwood wrote:
+> >> Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
+> >>
+> >> Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
+> >>
+> >> Patch 3 adds clock lookups for DT.
+> >>
+> >> Patch 4 adds a new board for RM9200 DT support.
+> >>
+> >> Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
+> >>
+> >>
+> >> I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a >>initrd. As far as I can tell pinctrl, usart and ohci all work.
+> >
+> > After updating barebox to have the DT support I've tested it on rm9200ek with net support
+> >
+> > work fine
 > 
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   11 ++++++++++-
->  1 files changed, 10 insertions(+), 1 deletions(-)
+> Excellent.
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index 2e470ce..ec3fbb2 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -415,7 +415,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
->   *    - cEFUSE (doesn't fall under any ocp_if)
->   *    - clkdiv32k
->   *    - debugss
-> - *    - ocmc ram
->   *    - ocp watch point
->   *    - aes0
->   *    - sha0
-> @@ -481,6 +480,7 @@ static struct omap_hwmod am33xx_debugss_hwmod = {
->  		},
->  	},
->  };
-> +#endif
->  
->  /* ocmcram */
->  static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
-> @@ -501,6 +501,7 @@ static struct omap_hwmod am33xx_ocmcram_hwmod = {
->  	},
->  };
->  
-> +#if 0
-
-Can you cut-n-paste the ocmcram hwmod entry outside of #if and resubmit
-it again?
-
-Thanks,
-Vaibhav
-
->  /* ocpwp */
->  static struct omap_hwmod_class am33xx_ocpwp_hwmod_class = {
->  	.name		= "ocpwp",
-> @@ -3331,6 +3332,13 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
->  	.flags		= OCPIF_SWSUP_IDLE,
->  };
->  
-> +/* l3 main -> ocmc */
-> +static struct omap_hwmod_ocp_if am33xx_l3_main__ocmc = {
-> +	.master		= &am33xx_l3_main_hwmod,
-> +	.slave		= &am33xx_ocmcram_hwmod,
-> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-> +};
-> +
->  static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
->  	&am33xx_l4_fw__emif_fw,
->  	&am33xx_l3_main__emif,
-> @@ -3401,6 +3409,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
->  	&am33xx_l3_main__tptc0,
->  	&am33xx_l3_main__tptc1,
->  	&am33xx_l3_main__tptc2,
-> +	&am33xx_l3_main__ocmc,
->  	&am33xx_l3_s__usbss,
->  	&am33xx_l4_hs__cpgmac0,
->  	&am33xx_cpgmac0__mdio,
+> > It does not apply on my tree as I've a more patch but I'll manage the merge
+> > conflict
 > 
+>  Thanks for fixing it up Jean-Christophe.
+I'll also fix the usb device and add missing nor flash support and emac +
+pinctrl + defconfig
+
+Best Regards,
+J.
