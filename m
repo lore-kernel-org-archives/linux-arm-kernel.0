@@ -1,63 +1,48 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 05 Nov 2012 16:13:51 +0800
-Subject: [PATCH 2/9] ARM: at91: Remove unused struct at91sam9g45_isi_device
- and its resources
-In-Reply-To: <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
-References: <1351980150-24145-1-git-send-email-lee.jones@linaro.org>
- <1351980150-24145-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <5097753F.7080307@atmel.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 5 Nov 2012 10:10:09 +0200
+Subject: [PATCH v2 0/7] I2C patches for v3.8 merge window
+In-Reply-To: <1351167915-15079-1-git-send-email-balbi@ti.com>
+References: <1350899218-13624-1-git-send-email-balbi@ti.com>
+ <1351167915-15079-1-git-send-email-balbi@ti.com>
+Message-ID: <20121105081009.GA2490@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Lee Jones
+Hi,
 
-On 11/4/2012 6:02 AM, Lee Jones wrote:
-> This the at91sam9g45_isi_device structure and its associated resources
-> were added in 2008 and have been unused ever since. Let's remove them.
+On Thu, Oct 25, 2012 at 03:25:08PM +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> here's another series for OMAP I2C driver. There are a few cleanups
+> and one very nice new feature: we can now report how many bytes
+> we transferred until NACK.
+> 
+> Note that the implemementation for OMAP-I2C turned out to be a
+> little more complex then I expected, mainly because of the way
+> I2C_CNT register behaves and because of the very buggy register
+> usage on that driver.
+> 
+> I have boot tested all patches on beagle xM (3630) and pandaboard
+> rev A3 (4430), will send boot-logs if anyone wants to see.
+> 
+> All patches are available at [1] if anyone wants an easy way to
+> test the patches.
 
-I'm the maintainer of the Atmel ISI driver. Currently the ISI still not 
-work on at91sam9263 board.
-But this task is in my plan. So keep those code and I will enable ISI 
-support for 9263 in the future. Thanks.
+Wolfram, patches 1-5 are ok to apply, we just need to rework patches 6
+and 7 so drivers can report how many bytes managed to be transferred.
+None of these patches cause any known regressions.
 
-Best Regards,
-Josh Wu
+let me know if you want me to resend only the 5 patches which should be
+applied.
 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   arch/arm/mach-at91/at91sam9263_devices.c |   20 --------------------
->   1 file changed, 20 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index cb85da2..0562a9d 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -901,26 +901,6 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data) {}
->   
->   #if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
->   
-> -struct resource isi_resources[] = {
-> -	[0] = {
-> -		.start	= AT91SAM9263_BASE_ISI,
-> -		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	[1] = {
-> -		.start	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> -		.end	= NR_IRQS_LEGACY + AT91SAM9263_ID_ISI,
-> -		.flags	= IORESOURCE_IRQ,
-> -	},
-> -};
-> -
-> -static struct platform_device at91sam9263_isi_device = {
-> -	.name		= "at91_isi",
-> -	.id		= -1,
-> -	.resource	= isi_resources,
-> -	.num_resources	= ARRAY_SIZE(isi_resources),
-> -};
-> -
->   void __init at91_add_device_isi(struct isi_platform_data *data,
->   		bool use_pck_as_mck)
->   {
+cheers
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/49c4a6f5/attachment.sig>
