@@ -1,47 +1,48 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Mon, 5 Nov 2012 15:06:08 -0700
-Subject: [RFC] dmaengine: omap-dma: Allow DMA controller to prefetch data
-In-Reply-To: <50814B83.7090203@ti.com>
-References: <20121018222046.GA28541@animalcreek.com>
- <20121018225540.GB28061@n2100.arm.linux.org.uk>
- <20121018232405.GA29064@animalcreek.com>
- <20121018233335.GC28061@n2100.arm.linux.org.uk>
- <50814B83.7090203@ti.com>
-Message-ID: <20121105220608.GE3062@animalcreek.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Nov 2012 22:17:59 +0000
+Subject: [PATCH 0/2] clk: ux500: Add some more clk lookups for u8500
+In-Reply-To: <CACRpkdZjLac9+dRwUm=ka7ZCouAx0bztNjEcjsPdsjZ=Ckz5rQ@mail.gmail.com>
+References: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdZjLac9+dRwUm=ka7ZCouAx0bztNjEcjsPdsjZ=Ckz5rQ@mail.gmail.com>
+Message-ID: <20121105221759.GH28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 19, 2012 at 02:45:55PM +0200, P?ter Ujfalusi wrote:
-> Hi,
+On Mon, Nov 05, 2012 at 12:40:20PM +0100, Linus Walleij wrote:
+> On Wed, Oct 31, 2012 at 2:40 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 > 
-> On 10/19/2012 01:33 AM, Russell King - ARM Linux wrote:
-> > I would suggest getting some feedback from the ASoC people first, before
-> > trying to invent new APIs to work around this stuff.  If they can live
-> > with having prefetch enabled on OMAP then there isn't an issue here.  If
-> > not, we need a solution to this.
-> > 
-> > I do not believe that precisely stopping and starting playback across a
-> > suspend/resume event is really necessary (it's desirable but the world
-> > doesn't collapse if you miss a few samples.)  It could be more of an
-> > issue for pause/resume though, but as I say, that's for ASoC people to
-> > comment on.
+> > From: Ulf Hansson <ulf.hansson@linaro.org>
+> >
+> > Some more clock lookups added for rng clocks and for the nomadik ske
+> > keypad clocks.
+> >
+> > Ulf Hansson (2):
+> >   clk: ux500: Register rng clock lookups for u8500
+> >   clk: ux500: Register nomadik keypad clock lookups for u8500
 > 
-> There is another issue with the prefetch in audio:
-> we tend to like to know the position of the DMA and also to know how much data
-> we have stored in buffers, FIFOs. This information is used by userspace to do
-> echo cancellation and also used by PA for example to do runtime mixing
-> directly in the audio buffer. We have means to extract this information from
-> McBSP for example (and from tlv320dac33 codec) but AFAIK this information can
-> not be retrieved from sDMA.
-> We could assume that the sDMA FIFO is kept full and report that as a 'delay'
-> or do not account this information.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> For now I think the cyclic mode should not set the prefetch. If I recall right
-> the cyclic mode is only used by audio at the moment.
+> for these.
 > 
-> > I'm merely pointing out here that we need their feedback here before
-> > deciding if there's anything further that needs to happen.
+> They have the right name and all, apb_pclk is
+> "AMBA peripheral bus, peripheral block clock"
+> so a clock for the silicon, right.
 > 
-> Thanks Russell, I'll take a look at the implication of the prefetch for audio.
+> ... then how it's supposed to be used, that's another
+> issue...
 
-Ping?
+Well, the apb pclk is the APB bus clock which times all transfers on
+the APB bus.  Without the APB bus clock running, you can't talk to any
+peripherals attached to that bus.
+
+If your SoC controls the APB bus clock to each peripheral individually
+(like, I seem to remember your Ux500 stuff does) and the peripheral is
+not being clocked, then although the bus master may be seeing a clock,
+and will manipulate the bus signals, the target will remain unresponsive
+due to lack of clock.
+
+So, the general principle is that the APB PCLK needs to be 'enabled'
+whenever the peripheral in question is expecting any kind of access via
+the APB bus.
+
+All rather simple really.
