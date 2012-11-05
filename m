@@ -1,70 +1,46 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 5 Nov 2012 14:42:29 +0530
-Subject: [PATCH 8/8] ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
-In-Reply-To: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
-References: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1352106749-9437-9-git-send-email-avinashphilip@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 5 Nov 2012 10:34:52 +0100
+Subject: [PATCH 1/1 v2] usb: at91_udc: fix typo on vubs pullup valid check
+Message-ID: <20121105093451.GA20063@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM output from ecap0 uses as backlight source. Also adds low threshold
-value to have a uniform divisions in brightness-levels scales.
+if the gpio is not valid complain
 
-Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
+since 3285e0ec088febc5a88f57ddd78385a7da71476c
+ARM: at91/udc: use gpio_is_valid to check the gpio
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: linux-usb at vger.kernel.org
+Cc: stable at vger.kernel.org
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
-Second version
-	- Combined with HWMOD changes & DT bindings.
-	- No changes
+v2:
 
-:100644 100644 185d632... 9857050... M	arch/arm/boot/dts/am335x-evm.dts
- arch/arm/boot/dts/am335x-evm.dts |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+	update commit and put Felipe in Cc
+Hi Greg,
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 185d632..9857050 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -18,6 +18,14 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
- 	};
+	this is broken since 3.2 can we have on the stable too
+
+Best Regards,
+J.
+ drivers/usb/gadget/at91_udc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+index 89d90b5..888cb2a 100644
+--- a/drivers/usb/gadget/at91_udc.c
++++ b/drivers/usb/gadget/at91_udc.c
+@@ -1739,7 +1739,7 @@ static int __devinit at91udc_probe(struct platform_device *pdev)
  
-+	am33xx_pinmux: pinmux at 44e10800 {
-+		ecap0_pins: backlight_pins {
-+			pinctrl-single,pins = <
-+				0x164 0x0	/* eCAP0_in_PWM0_out.eCAP0_in_PWM0_out MODE0 */
-+			>;
-+		};
-+	};
-+
- 	ocp {
- 		uart1: serial at 44e09000 {
- 			status = "okay";
-@@ -31,6 +39,12 @@
- 				reg = <0x2d>;
- 			};
- 		};
-+
-+		ecap0: ecap at 48300100 {
-+			status = "okay";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&ecap0_pins>;
-+		};
- 	};
- 
- 	vbat: fixedregulator at 0 {
-@@ -40,6 +54,13 @@
- 		regulator-max-microvolt = <5000000>;
- 		regulator-boot-on;
- 	};
-+
-+	backlight {
-+		compatible	= "pwm-backlight";
-+		pwms = <&ecap0 0 50000 0>;
-+		brightness-levels = <0 51 53 56 62 75 101 152 255>;
-+		default-brightness-level = <8>;
-+	};
- };
- 
- /include/ "tps65910.dtsi"
+ 	/* rm9200 needs manual D+ pullup; off by default */
+ 	if (cpu_is_at91rm9200()) {
+-		if (gpio_is_valid(udc->board.pullup_pin)) {
++		if (!gpio_is_valid(udc->board.pullup_pin)) {
+ 			DBG("no D+ pullup?\n");
+ 			retval = -ENODEV;
+ 			goto fail0;
 -- 
-1.7.0.4
+1.7.10.4
