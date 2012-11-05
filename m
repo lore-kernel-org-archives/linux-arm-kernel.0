@@ -1,48 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Nov 2012 22:17:59 +0000
-Subject: [PATCH 0/2] clk: ux500: Add some more clk lookups for u8500
-In-Reply-To: <CACRpkdZjLac9+dRwUm=ka7ZCouAx0bztNjEcjsPdsjZ=Ckz5rQ@mail.gmail.com>
-References: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdZjLac9+dRwUm=ka7ZCouAx0bztNjEcjsPdsjZ=Ckz5rQ@mail.gmail.com>
-Message-ID: <20121105221759.GH28327@n2100.arm.linux.org.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 05 Nov 2012 14:23:14 -0800
+Subject: [PATCHv9 0/8] ARM: OMAP4: core retention support
+In-Reply-To: <1350552010-28760-1-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Thu, 18 Oct 2012 12:20:02 +0300")
+References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
+Message-ID: <87d2zrg04t.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 12:40:20PM +0100, Linus Walleij wrote:
-> On Wed, Oct 31, 2012 at 2:40 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
-> 
-> > From: Ulf Hansson <ulf.hansson@linaro.org>
-> >
-> > Some more clock lookups added for rng clocks and for the nomadik ske
-> > keypad clocks.
-> >
-> > Ulf Hansson (2):
-> >   clk: ux500: Register rng clock lookups for u8500
-> >   clk: ux500: Register nomadik keypad clock lookups for u8500
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> for these.
-> 
-> They have the right name and all, apb_pclk is
-> "AMBA peripheral bus, peripheral block clock"
-> so a clock for the silicon, right.
-> 
-> ... then how it's supposed to be used, that's another
-> issue...
+Hi Tero,
 
-Well, the apb pclk is the APB bus clock which times all transfers on
-the APB bus.  Without the APB bus clock running, you can't talk to any
-peripherals attached to that bus.
+Tero Kristo <t-kristo@ti.com> writes:
 
-If your SoC controls the APB bus clock to each peripheral individually
-(like, I seem to remember your Ux500 stuff does) and the peripheral is
-not being clocked, then although the bus master may be seeing a clock,
-and will manipulate the bus signals, the target will remain unresponsive
-due to lack of clock.
+> Hi,
+>
+> Changes compared to previous version:
+> - rebased on top of 3.7-rc1
+> - applies on top of latest func pwrst code (v6)
+> - added back patch #1 to this set (it wasn't queued yet after all)
+> - added patch #7 for fixing a bug in the functional pwrst code
+> - added patch #8 for fixing a regression with MUSB PHY power handling
+>   (not quite sure if this is the correct way to fix this or not)
+>
+> Tested with omap4460 gp panda + omap4430 emu blaze boards, with cpuidle +
+> suspend.
+>
+> Branch also available here:
+> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+> branch: mainline-3.7-rc1-omap4-ret-v9
 
-So, the general principle is that the APB PCLK needs to be 'enabled'
-whenever the peripheral in question is expecting any kind of access via
-the APB bus.
+I tested this branch on 4430/Panda and 4460/Panda-ES and I'm seeing
+several domains not hitting target power state in suspend[1].
 
-All rather simple really.
+Am I missing some other fixes?  Using omap2plus_defconfig, I tried your
+branch alone, and merged with v3.7-rc4, and I get the same errors.
+
+Kevin
+
+[1]
+# echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
+# echo mem > /sys/power/state 
+[  102.271087] PM: Syncing filesystems ... done.
+[  102.282196] Freezing user space processes ... (elapsed 0.02 seconds) done.
+[  102.312133] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
+[  102.343353] Suspending console(s) (use no_console_suspend to debug)
+?[  102.363433] PM: suspend of devices complete after 10.650 msecs
+[  102.365631] PM: late suspend of devices complete after 2.166 msecs
+[  102.369201] PM: noirq suspend of devices complete after 3.509 msecs
+[  102.369232] Disabling non-boot CPUs ...
+[  102.373016] CPU1: shutdown
+[  104.357421] Powerdomain (core_pwrdm) didn't enter target state 1
+[  104.357452] Powerdomain (tesla_pwrdm) didn't enter target state 1
+[  104.357452] Powerdomain (ivahd_pwrdm) didn't enter target state 1
+[  104.357482] Powerdomain (l3init_pwrdm) didn't enter target state 1
+[  104.357482] Could not enter target state in pm_suspend
+[  104.357666] Enabling non-boot CPUs ...
+[  104.359863] CPU1: Booted secondary processor
+[  104.360626] cpu cpu0: opp_init_cpufreq_table: Device OPP not found (-19)
+[  104.360656] cpu cpu0: omap_cpu_init: cpu1: failed creating freq table[-19]
+[  104.360656] CPU1 is up
+[  104.362579] PM: noirq resume of devices complete after 1.892 msecs
+[  104.364807] PM: early resume of devices complete after 1.373 msecs
+[  104.710937] PM: resume of devices complete after 346.099 msecs
+[  104.817901] Restarting tasks ... done.
