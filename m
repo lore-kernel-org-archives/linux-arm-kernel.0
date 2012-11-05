@@ -1,81 +1,90 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 5 Nov 2012 16:57:01 -0500
-Subject: [PATCH v3 07/11] ARM: davinci - restructure header files for
- common clock migration
-In-Reply-To: <50967641.4090503@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-8-git-send-email-m-karicheri2@ti.com>
- <50967641.4090503@ti.com>
-Message-ID: <5098362D.1000007@ti.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 6 Nov 2012 03:29:22 +0530
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
+ for AM33XX
+In-Reply-To: <87pq3s7wro.fsf@deeprootsystems.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+ <5095037A.2020503@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
+ <5095165E.10403@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
+ <87pq3s7wro.fsf@deeprootsystems.com>
+Message-ID: <509836BA.5030507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2012 09:05 AM, Sekhar Nori wrote:
+On Monday 05 November 2012 11:33 PM, Kevin Hilman wrote:
+> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
 >
-> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->> pll.h is added to migrate some of the PLL controller defines for sleep.S.
->> psc.h is modified to keep only PSC modules definitions needed by sleep.S
->> after migrating to common clock. The definitions under
->> ifdef CONFIG_COMMON_CLK will be removed in a subsequent patch.
->> davinci_watchdog_reset prototype is moved to time.h as clock.h is
->> being obsoleted. sleep.S and pm.c is modified to include the new header
->> file replacements.
+>> On Sat, Nov 03, 2012 at 18:34:30, Kevin Hilman wrote:
+>> [...]
+>>>>>
+>>>>> Doesn't this also mean that you won't get timer wakeups
+>>>>> in idle?  Or are you keeping the domain where the clockevent is
+>>>>> on during idle?
+>>>>>
+>>>>
+>>>> The lowest idle state that we are targeting will have MPU powered
+>>>> off with external memory in self-refresh mode. Peripheral domain
+>>>> with the clockevent will be kept on.
+>>>
+>>> Is this a limitation of the hardware?  or the software?
+>>>
 >>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>   arch/arm/mach-davinci/devices.c           |    2 ++
->>   arch/arm/mach-davinci/include/mach/pll.h  |   46 +++++++++++++++++++++++++++++
->>   arch/arm/mach-davinci/include/mach/psc.h  |    4 +++
->>   arch/arm/mach-davinci/include/mach/time.h |    4 ++-
->>   arch/arm/mach-davinci/pm.c                |    4 +++
->>   arch/arm/mach-davinci/sleep.S             |    4 +++
->>   6 files changed, 63 insertions(+), 1 deletion(-)
->>   create mode 100644 arch/arm/mach-davinci/include/mach/pll.h
-> With this patch a _third_ copy of PLL definitions is created in kernel
-> sources. The existing PLL definitions in clock.h inside mach-davinci
-> should be moved to mach/pll.h and the pll.h you introduced inside
-> drivers/clk in 5/11 should be removed (this patch should appear before
-> 5/11).
+>> Well, making the lowest idle state same as the suspend state will
+>> require us to involve WKUP_M3 in the idle path and wakeup sources get
+>> limited to the IPs in the WKUP domain alone. There's no IO daisy
+>> chaining in AM33XX so that's one big difference compared to OMAP.  The
+>> other potential problem is that the IPC mechanism that we have uses
+>> interrupts.
 >
-> The biggest disadvantage of this approach is inclusion of mach/ includes
-> in drivers/clk. But duplicating code is definitely not the fix for this.
-> Anyway, mach/ includes are not uncommon in drivers/clk (they are all
-> probably suffering from the same issue).
+> It can still interrupt the M3, it's only the interrupt back to the MPU
+> that is the issue, right?  That being said, there's no reason it
+> couldn't use polling in the idle path, right?
 >
-> $ grep -rl "include <mach/" drivers/clk/*
-> drivers/clk/clk-u300.c
-> drivers/clk/mmp/clk-pxa168.c
-> drivers/clk/mmp/clk-mmp2.c
-> drivers/clk/mmp/clk-pxa910.c
-> drivers/clk/mxs/clk-imx23.c
-> drivers/clk/mxs/clk-imx28.c
-> drivers/clk/spear/spear6xx_clock.c
-> drivers/clk/spear/spear3xx_clock.c
-> drivers/clk/spear/spear1340_clock.c
-> drivers/clk/spear/spear1310_clock.c
-> drivers/clk/ux500/clk-prcc.c
-> drivers/clk/versatile/clk-integrator.c
-> drivers/clk/versatile/clk-realview.c
+>> Assuming that the lowest idle state, say Cx, is the same as the
+>> suspend state, we'll need to communicate with the WKUP_M3 using
+>> interrupts once we decide to enter Cx. I am not sure if we can do
+>> something in the cpuidle implementation to work around the "interrupt
+>> for idle" problem.
+>>
+>> We could probably not wait for an ACK when we want to enter Cx,
 >
-> pll.h can probably be moved to include/linux/clk/ to avoid this. Would
-> like to hear from Mike on this before going ahead.
+> why not?
 >
-> Anyway, instead of just commenting, I though I will be more useful and
-> went ahead and made some of the changes I have been talking about. I
-> fixed the multiple PLL definitions issue, the build infrastructure issue
-> and the commit ordering too.
+> Are the response times from the M3 really up to 500ms (guessing based on
+> the timeout you used in the suspend path.)  That seems rather unlikely.
 >
-> I pushed the patches I fixed to devel-common-clk branch of my git tree.
-> It is build tested using davinci_all_defconfig but its not runtime tested.
+> Hmm, but as I think about it.  Why does the MPU need to wait for an ACK
+> at all?  Why not just send the cmd and WFI?
 >
-> Can you start from here and provide me incremental changes on top of
-> this? That way we can collaborate to finish this faster.
+>> but the problem of limited wakeup sources remains. If we let the
+>> various drivers block the entry to Cx, since almost all the IPs are in
+>> the peripheral domain a system which uses anything other than UART and
+>> Timer in WKUP domain will probably never be able enter Cx.
 >
-> Thanks,
-> Sekhar
+> Even so, I think the system needs to be designed to hit the same power
+> states in idle and suspend.  Then, the states can be restricted based
+> wakeup capabilities as you described.  This would be easy to do in the
+> runtime PM implementation for this device.
 >
-I made a build from your branch and it doesn't boot up DM6446. I will 
-debug this tomorrow. But what should I focus on? I thought it is a 
-header file re-arrangement?
+> IMO, assuming that idle will not be useful from the begining is leading
+> down the path to poor design choices that will be much more difficult to
+> fixup down the road in order to add idle support later.  We need to
+> design both idle and suspend at the same time.
+>
+I agree with Kevin. Not supporting CPUIDLE deep states can hit the
+active power numbers dearly. I just don't know why the SOCs don't share
+the standard and must have design choices. But thats another discussion.
 
-Murali
+How about leaving the timer choices as is. PER timer for clock source
+and wakeuptimer for clock event. Anyway in suspend the clock-source
+can be suspended and that is evident from recent discussion. The only
+downside is you won't count time in suspend which is any way the case.
+
+Vaibhav,
+Do you guys see any implementation bottleneck for above ?
+
+Regards
+Santosh
