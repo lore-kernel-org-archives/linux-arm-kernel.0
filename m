@@ -1,32 +1,26 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 5 Nov 2012 18:24:18 +0100
-Subject: [PATCHv3 8/8] i2c: omap: cleanup the sysc write
-In-Reply-To: <20121105142517.GG4815@arwen.pp.htv.fi>
-References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
- <1352118223-3796-9-git-send-email-shubhrajyoti@ti.com>
- <20121105141442.GD4815@arwen.pp.htv.fi> <5097CBF1.6060108@ti.com>
- <20121105142517.GG4815@arwen.pp.htv.fi>
-Message-ID: <5097F642.9010803@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 5 Nov 2012 17:26:03 +0000
+Subject: [PATCH] clocksource: arm_generic: use integer math helpers
+In-Reply-To: <1351520658-23028-1-git-send-email-linus.walleij@linaro.org>
+References: <1351520658-23028-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20121105172603.GG17864@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/5/2012 3:25 PM, Felipe Balbi wrote:
-> Hi,
->
-> On Mon, Nov 05, 2012 at 07:53:45PM +0530, Shubhrajyoti wrote:
->> On Monday 05 November 2012 07:44 PM, Felipe Balbi wrote:
->>>> -							dev->syscstate);
->>>>> -		}
->>> not sure if this will work. What about the first time you call reset() ?
->>> won't SYSC just contain the reset values ?
->> No actually the hwmod sets the value.
->
-> ahaaa, ok good. Let's get an Ack from Benoit, then.
+On Mon, Oct 29, 2012 at 02:24:18PM +0000, Linus Walleij wrote:
+> This will make the two crucial integer divisions in the generic
+> ARM arch timer used for ARMv8 use the kernel DIV_ROUND_CLOSEST()
+> helper inline from <linux/kernel.h> so they get more precise.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Well, in fact, I'm a little bit surprised that we still have to hack the 
-SYSC directly without using an omap_device API. I know that we have to 
-do some weird stuff for reseting that IP, but didn't we already exposed 
-something to allow that?
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Regards,
-Benoit
+BTW, would this go through John's tree? I'm happy to push it as well.
+
+Thanks.
+
+-- 
+Catalin
