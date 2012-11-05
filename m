@@ -1,44 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 Nov 2012 09:48:41 -0800
-Subject: [PATCH v2] arm: mvebu: support for the PlatHome OpenBlocks AX3-4
- board
-In-Reply-To: <1351107203-31808-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1350980365-6698-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1351107203-31808-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121105174841.GA20194@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Nov 2012 17:52:07 +0000
+Subject: vexpress issues in next-20121029
+In-Reply-To: <1352135973.10947.23.camel@hornet>
+References: <508EE610.9050703@wwwdotorg.org>
+ <201211051647.19785.arnd@arndb.de> <1352135973.10947.23.camel@hornet>
+Message-ID: <201211051752.08400.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 09:33:23PM +0200, Thomas Petazzoni wrote:
+On Monday 05 November 2012, Pawel Moll wrote:
+> On Mon, 2012-11-05 at 16:47 +0000, Arnd Bergmann wrote:
+> > I've just tried pulling in your branch again, but it appears unchanged:
+> > The patches are still based on 807e45b328, which is a different commit
+> > from bcd6f569e874 that is in Mike's tree. Please do as I asked you before
+> > and rebase on top of the commit that you sent him,
+> 
+> Ok, I think I got the idea now. Sorry about not catching up straight
+> away...
+> 
+> The following changes since commit bcd6f569e87471d7f104bd9497f0b516a3b12e32:
+> 
+>   clk: Common clocks implementation for Versatile Express (2012-10-29 11:08:03 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/pawelmoll/linux.git vexpress-clk-soc
+> 
+> for you to fetch changes up to 433683a66401adb0150792e725cc4f631c94de46:
 
-> +	compatible = "plathome,openblocks-ax3-4", "marvell,armadaxp-mv78260", "marvell,armadaxp", "marvell,armada-370-xp";
+Ok, thanks!
 
-[...]
+I've put it into the next/soc2 branch now, separate from the earlier next/soc
+branch, since we now have a dependency on another branch.
 
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index 49d7915..68f1483 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -49,6 +49,7 @@ static void __init armada_370_xp_dt_init(void)
->  static const char * const armada_370_xp_dt_board_dt_compat[] = {
->  	"marvell,a370-db",
->  	"marvell,axp-db",
-> +	"plathome,openblocks-ax3-4",
->  	NULL,
->  };
 
-Hi,
+>   ARM: vexpress: Remove motherboard dependencies in the DTS files (2012-11-05 17:09:52 +0000)
+> 
+> >  and make sure that this is a commit that Mike never rebases.
+> 
+> Uh. Mike, is your clk-next subject to rebases?
 
-One of the big benefits of device trees is to, in a perfect world, having to avoid
-adding new C code for a new board.  It seems like this compatible array should
-contain one of the more generic compatible fields instead, and you should then
-have each board dts specify that as a fallback. It looks like you already list
-those in the board dts file, so you're good at that end.
+On a related note, there are other patches below this one now:
 
-Would that work?
+  clk: Common clocks implementation for Versatile Express
+  clk: Versatile Express clock generators ("osc") driver
+  CLK: clk-twl6040: Initial clock driver for OMAP4+ McPDM fclk clock
+  clk: fix return value check in sirfsoc_of_clk_init()
+  clk: fix return value check in of_fixed_clk_setup()
+  clk: ux500: Update sdmmc clock to 100MHz for u8500
+  clk: ux500: Support prcmu ape opp voltage clock
+  mfd: dbx500: Export prmcu_request_ape_opp_100_voltage
+  clk: Don't return negative numbers for unsigned values with !clk
+  clk: Fix documentation typos
+  clk: Document .is_enabled op
+  clk: SPEAr: Vco-pll: Fix compilation warning
 
-Also, I can't tell for sure but it seems like the list of compatibles in the
-board dts go from specific to generic, i.e. if "marvell,armadaxp" is less
-generic than "marvell,armada-370-xp".
+Mike, do you prefer us to wait for those to make it into v3.8-rc1 before
+pushing the patches from Pawel, or can we just send the entire branch
+along with the other changes?
 
--Olof
+FWIW, there is a way to avoid dependencies like this if the patches that
+are required in two branches are based directly on an -rc release and
+then merged into the two maintainer trees, rather than having one maintainer
+tree pull in (part of) the history of another one.
+
+	Arnd
