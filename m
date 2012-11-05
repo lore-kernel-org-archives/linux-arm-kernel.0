@@ -1,59 +1,96 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Nov 2012 12:01:05 +0200
-Subject: [PATCHv2 1/7] i2c: omap: Fix the revision register read
-In-Reply-To: <CAM=Q2csb_9ryaZfURqv6QgsVuSRiVMDt=x=Adko2HH4GoiHnCQ@mail.gmail.com>
-References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-2-git-send-email-shubhrajyoti@ti.com>
- <20121105075026.GB32468@arwen.pp.htv.fi> <50977A30.6040907@ti.com>
- <20121105090412.GA2913@arwen.pp.htv.fi>
- <CAM=Q2csb_9ryaZfURqv6QgsVuSRiVMDt=x=Adko2HH4GoiHnCQ@mail.gmail.com>
-Message-ID: <20121105100105.GC3327@arwen.pp.htv.fi>
+From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
+Date: Mon, 5 Nov 2012 12:16:57 +0200
+Subject: [PATCH] ARM: OMAP4: ID: Improve features detection and check
+Message-ID: <1352110617-3571-1-git-send-email-ivan.khoronzhuk@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Replaces several flags bearing the same meaning. There is no need
+to set flags due to different omap types here, it can be checked
+in appropriate places as well.
 
-On Mon, Nov 05, 2012 at 02:54:32PM +0530, Shubhrajyoti Datta wrote:
-> On Mon, Nov 5, 2012 at 2:34 PM, Felipe Balbi <balbi@ti.com> wrote:
-> 
-> > Hi,
-> >
-> > On Mon, Nov 05, 2012 at 02:04:56PM +0530, Shubhrajyoti wrote:
-> > > >> @@ -1155,7 +1187,7 @@ omap_i2c_probe(struct platform_device *pdev)
-> > > >>
-> > > >>            dev->fifo_size = (dev->fifo_size / 2);
-> > > >>
-> > > >> -          if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
-> > > >> +          if (dev->rev < OMAP_I2C_REV_ON_3630)
-> > > >>                    dev->b_hw = 1; /* Enable hardware fixes */
-> > > > looks like this was applicable to 4430 too, what happened ?
-> > > No actually this can be deleted completely once the
-> > > start -> transaction -> stop sequence recommendation is followed.
-> >
-> > yes, but we're not there just yet and this patch is changing the
-> > behavior of the driver
-> 
-> 
-> No , earlier we were truncating the register for omap4 so
-> OMAP_I2C_REV_ON_3630_4430 was there if we read both hi and lo for
-> omap4 then we donot find 3630 and 4430 value to be similar.
-> 
-> In this case the behavior is same as earlier also it enabled this for
-> lower than 3630 and the same holds good even now.
-> 
-> So in essence, Earlier  OMAP_I2C_REV_ON_3630_4430 is named to
-> OMAP_I2C_REV_ON_3630 and omap4 rev will have a 32bit value.
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Acked-by: Nishanth Menon <nm@ti.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
+---
+ arch/arm/mach-omap2/id.c  |   25 +++++++------------------
+ arch/arm/mach-omap2/soc.h |    8 ++------
+ 2 files changed, 9 insertions(+), 24 deletions(-)
 
-it's not same behavior because before dev->b_hw was set for omap4430,
-but now it won't be. This is the difference in behavior which I'm
-pointing out.
-
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index cf2362c..3c47a19 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -28,6 +28,9 @@
+ #include "soc.h"
+ #include "control.h"
+ 
++#define OMAP4_SILICON_TYPE_STANDARD		0x01
++#define OMAP4_SILICON_TYPE_PERFORMANCE		0x02
++
+ static unsigned int omap_revision;
+ static const char *cpu_rev;
+ u32 omap_features;
+@@ -273,25 +276,11 @@ void __init omap4xxx_check_features(void)
+ {
+ 	u32 si_type;
+ 
+-	if (cpu_is_omap443x())
+-		omap_features |= OMAP4_HAS_MPU_1GHZ;
+-
++	si_type =
++	(read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 0x03;
+ 
+-	if (cpu_is_omap446x()) {
+-		si_type =
+-			read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1);
+-		switch ((si_type & (3 << 16)) >> 16) {
+-		case 2:
+-			/* High performance device */
+-			omap_features |= OMAP4_HAS_MPU_1_5GHZ;
+-			break;
+-		case 1:
+-		default:
+-			/* Standard device */
+-			omap_features |= OMAP4_HAS_MPU_1_2GHZ;
+-			break;
+-		}
+-	}
++	if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
++		omap_features = OMAP4_HAS_PERF_SILICON;
+ }
+ 
+ void __init ti81xx_check_features(void)
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 0700964..f31d907 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -435,9 +435,7 @@ extern u32 omap_features;
+ #define OMAP3_HAS_IO_WAKEUP		BIT(6)
+ #define OMAP3_HAS_SDRC			BIT(7)
+ #define OMAP3_HAS_IO_CHAIN_CTRL		BIT(8)
+-#define OMAP4_HAS_MPU_1GHZ		BIT(9)
+-#define OMAP4_HAS_MPU_1_2GHZ		BIT(10)
+-#define OMAP4_HAS_MPU_1_5GHZ		BIT(11)
++#define OMAP4_HAS_PERF_SILICON		BIT(9)
+ 
+ 
+ #define OMAP3_HAS_FEATURE(feat,flag)			\
+@@ -465,9 +463,7 @@ static inline unsigned int omap4_has_ ##feat(void)	\
+ 	return omap_features & OMAP4_HAS_ ##flag;	\
+ }							\
+ 
+-OMAP4_HAS_FEATURE(mpu_1ghz, MPU_1GHZ)
+-OMAP4_HAS_FEATURE(mpu_1_2ghz, MPU_1_2GHZ)
+-OMAP4_HAS_FEATURE(mpu_1_5ghz, MPU_1_5GHZ)
++OMAP4_HAS_FEATURE(perf_silicon, PERF_SILICON)
+ 
+ #endif	/* __ASSEMBLY__ */
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/a9193efb/attachment.sig>
+1.7.9.5
