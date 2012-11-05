@@ -1,49 +1,68 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 5 Nov 2012 10:04:41 +0200
-Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
-In-Reply-To: <20121102185453.GY15766@atomide.com>
-References: <20121101224703.2103.95474.stgit@muffinssi.local>
- <20121101224828.2103.82950.stgit@muffinssi.local> <50936A6E.3020202@ti.com>
- <5093891D.6070302@ti.com> <50938A69.9040908@ti.com>
- <20121102154901.GU15766@atomide.com> <20121102185453.GY15766@atomide.com>
-Message-ID: <50977319.9070902@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 5 Nov 2012 10:04:43 +0200
+Subject: [PATCH v2] i2c: omap: ensure writes to dev->buf_len are ordered
+In-Reply-To: <20121102085447.GE17063@arwen.pp.htv.fi>
+References: <20121102085447.GE17063@arwen.pp.htv.fi>
+Message-ID: <1352102683-2243-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-02 20:54, Tony Lindgren wrote:
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
->>> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
->>>> On 2012-11-02 08:38, Santosh Shilimkar wrote:
->>>>>
->>>>> Lets not move this in DMA code since the above is really related
->>>>> to frame buffer. It reserves more DMA area for dma_alloc_coherent()
->>>>> etc than default 2 MB. Infact, we should no longer need this with
->>>>> CMA and memblock in place.
->>>>>
->>>>> Tomi,
->>>>> Can we not get rid of the above memory reservation ?
->>>>
->>>> Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
->>>> and I have no means to test it out, though. But below is a patch to
->>>> remove it. I also attached the patch, as it looks like thunderbird wants
->>>> to reformat the pasted patch... I'll remove the
->>>> CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
->>>> in my tree later.
-> 
-> Hmm actually, is it safe to remove for omap1, or should we
-> still keep it around for omap1?
+if we allow compiler reorder our writes, we could
+fall into a situation where dev->buf_len is reset
+for no apparent reason.
 
-Why wouldn't it be safe? Do you mean that CMA doesn't work on omap1,
-or...? I'm no expert on CMA, but as far as I can see with it's ARM
-generic stuff.
+This bug was found with a simple script which would
+transfer data to an i2c client from 1 to 1024 bytes
+(a simple for loop), when we got to transfer sizes
+bigger than the fifo size, dev->buf_len was reset
+to zero before we had an oportunity to handle XDR
+Interrupt. Because dev->buf_len was zero, we entered
+omap_i2c_transmit_data() to transfer zero bytes,
+which would mean we would just silently exit
+omap_i2c_transmit_data() without actually writing
+anything to DATA register. That would cause XDR
+IRQ to trigger forever and we would never transfer
+the remaining bytes.
 
- Tomi
+After adding the memory barrier, we also drop resetting
+dev->buf_len to zero in omap_i2c_xfer_msg() because
+both omap_i2c_transmit_data() and omap_i2c_receive_data()
+will act until dev->buf_len reaches zero, rendering the
+other write in omap_i2c_xfer_msg() redundant.
 
+This patch has been tested with pandaboard for a few
+iterations of the script mentioned above.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/106f3a2e/attachment.sig>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+
+Changes since v1:
+	- use barrier() instead of wmb()
+
+Note: this version was compile-tested only
+
+ drivers/i2c/busses/i2c-omap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index db31eae..ba03bec 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -521,6 +521,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	/* REVISIT: Could the STB bit of I2C_CON be used with probing? */
+ 	dev->buf = msg->buf;
+ 	dev->buf_len = msg->len;
++	barrier();
+ 
+ 	omap_i2c_write_reg(dev, OMAP_I2C_CNT_REG, dev->buf_len);
+ 
+@@ -579,7 +580,6 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	 */
+ 	timeout = wait_for_completion_timeout(&dev->cmd_complete,
+ 						OMAP_I2C_TIMEOUT);
+-	dev->buf_len = 0;
+ 	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		omap_i2c_init(dev);
+-- 
+1.8.0
