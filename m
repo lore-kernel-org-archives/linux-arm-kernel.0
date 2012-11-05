@@ -1,36 +1,40 @@
 From: walken@google.com (Michel Lespinasse)
-Date: Mon,  5 Nov 2012 14:47:10 -0800
-Subject: [PATCH 13/16] mm: use vm_unmapped_area() on sparc64 architecture
+Date: Mon,  5 Nov 2012 14:47:11 -0800
+Subject: [PATCH 14/16] mm: use vm_unmapped_area() in hugetlbfs on sparc64
+ architecture
 In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
 References: <1352155633-8648-1-git-send-email-walken@google.com>
-Message-ID: <1352155633-8648-14-git-send-email-walken@google.com>
+Message-ID: <1352155633-8648-15-git-send-email-walken@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the sparc64 arch_get_unmapped_area[_topdown] functions to make
-use of vm_unmapped_area() instead of implementing a brute force search.
+Update the sparc64 hugetlb_get_unmapped_area function to make use of
+vm_unmapped_area() instead of implementing a brute force search.
 
 Signed-off-by: Michel Lespinasse <walken@google.com>
 
 ---
- arch/sparc/kernel/sys_sparc_64.c |  132 +++++++++-----------------------------
- 1 files changed, 30 insertions(+), 102 deletions(-)
+ arch/sparc/mm/hugetlbpage.c |  123 ++++++++++--------------------------------
+ 1 files changed, 30 insertions(+), 93 deletions(-)
 
-diff --git a/arch/sparc/kernel/sys_sparc_64.c b/arch/sparc/kernel/sys_sparc_64.c
-index 11c6c9603e71..2999253ff38a 100644
---- a/arch/sparc/kernel/sys_sparc_64.c
-+++ b/arch/sparc/kernel/sys_sparc_64.c
-@@ -102,6 +102,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
+diff --git a/arch/sparc/mm/hugetlbpage.c b/arch/sparc/mm/hugetlbpage.c
+index f76f83d5ac63..42e5dba6cb26 100644
+--- a/arch/sparc/mm/hugetlbpage.c
++++ b/arch/sparc/mm/hugetlbpage.c
+@@ -30,55 +30,28 @@ static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *filp,
+ 							unsigned long pgoff,
+ 							unsigned long flags)
+ {
+-	struct mm_struct *mm = current->mm;
+-	struct vm_area_struct * vma;
  	unsigned long task_size = TASK_SIZE;
- 	unsigned long start_addr;
- 	int do_color_align;
+-	unsigned long start_addr;
 +	struct vm_unmapped_area_info info;
  
- 	if (flags & MAP_FIXED) {
- 		/* We do not accept a shared mapping if it would violate
-@@ -134,50 +135,22 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr, unsi
- 			return addr;
- 	}
+ 	if (test_thread_flag(TIF_32BIT))
+ 		task_size = STACK_TOP32;
+-	if (unlikely(len >= VA_EXCLUDE_START))
+-		return -ENOMEM;
  
 -	if (len > mm->cached_hole_size) {
 -	        start_addr = addr = mm->free_area_cache;
@@ -41,8 +45,8 @@ index 11c6c9603e71..2999253ff38a 100644
 +	info.length = len;
 +	info.low_limit = TASK_UNMAPPED_BASE;
 +	info.high_limit = min(task_size, VA_EXCLUDE_START);
-+	info.align_mask = do_color_align ? (PAGE_MASK & (SHMLBA - 1)) : 0;
-+	info.align_offset = pgoff << PAGE_SHIFT;
++	info.align_mask = PAGE_MASK & ~HPAGE_MASK;
++	info.align_offset = 0;
 +	addr = vm_unmapped_area(&info);
 +
 +	if ((addr & ~PAGE_MASK) && task_size > VA_EXCLUDE_END) {
@@ -55,10 +59,7 @@ index 11c6c9603e71..2999253ff38a 100644
 -	task_size -= len;
 -
 -full_search:
--	if (do_color_align)
--		addr = COLOUR_ALIGN(addr, pgoff);
--	else
--		addr = PAGE_ALIGN(addr);
+-	addr = ALIGN(addr, HPAGE_SIZE);
 -
 -	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 -		/* At this point:  (!vma || addr < vma->vm_end). */
@@ -85,25 +86,20 @@ index 11c6c9603e71..2999253ff38a 100644
 -		if (addr + mm->cached_hole_size < vma->vm_start)
 -		        mm->cached_hole_size = vma->vm_start - addr;
 -
--		addr = vma->vm_end;
--		if (do_color_align)
--			addr = COLOUR_ALIGN(addr, pgoff);
+-		addr = ALIGN(vma->vm_end, HPAGE_SIZE);
 -	}
 +	return addr;
  }
  
- unsigned long
-@@ -190,6 +163,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
- 	unsigned long task_size = STACK_TOP32;
+ static unsigned long
+@@ -90,68 +63,32 @@ hugetlb_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 	struct vm_area_struct *vma;
+ 	struct mm_struct *mm = current->mm;
  	unsigned long addr = addr0;
- 	int do_color_align;
 +	struct vm_unmapped_area_info info;
  
  	/* This should only ever run for 32-bit processes.  */
  	BUG_ON(!test_thread_flag(TIF_32BIT));
-@@ -224,73 +198,27 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
- 			return addr;
- 	}
  
 -	/* check if free_area_cache is useful for us */
 -	if (len <= mm->cached_hole_size) {
@@ -112,20 +108,8 @@ index 11c6c9603e71..2999253ff38a 100644
 - 	}
 -
 -	/* either no address requested or can't fit in requested address hole */
--	addr = mm->free_area_cache;
--	if (do_color_align) {
--		unsigned long base = COLOUR_ALIGN_DOWN(addr-len, pgoff);
+-	addr = mm->free_area_cache & HPAGE_MASK;
 -
--		addr = base + len;
--	}
-+	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-+	info.length = len;
-+	info.low_limit = PAGE_SIZE;
-+	info.high_limit = mm->mmap_base;
-+	info.align_mask = do_colour_align ? (PAGE_MASK & shm_align_mask) : 0;
-+	info.align_offset = pgoff << PAGE_SHIFT;
-+	addr = vm_unmapped_area(&info);
- 
 -	/* make sure it can fit in the remaining address space */
 -	if (likely(addr > len)) {
 -		vma = find_vma(mm, addr-len);
@@ -138,9 +122,7 @@ index 11c6c9603e71..2999253ff38a 100644
 -	if (unlikely(mm->mmap_base < len))
 -		goto bottomup;
 -
--	addr = mm->mmap_base-len;
--	if (do_color_align)
--		addr = COLOUR_ALIGN_DOWN(addr, pgoff);
+-	addr = (mm->mmap_base-len) & HPAGE_MASK;
 -
 -	do {
 -		/*
@@ -153,15 +135,20 @@ index 11c6c9603e71..2999253ff38a 100644
 -			/* remember the address as a hint for next time */
 -			return (mm->free_area_cache = addr);
 -		}
--
++	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
++	info.length = len;
++	info.low_limit = PAGE_SIZE;
++	info.high_limit = mm->mmap_base;
++	info.align_mask = PAGE_MASK & ~HPAGE_MASK;
++	info.align_offset = 0;
++	addr = vm_unmapped_area(&info);
+ 
 - 		/* remember the largest hole we saw so far */
 - 		if (addr + mm->cached_hole_size < vma->vm_start)
 - 		        mm->cached_hole_size = vma->vm_start - addr;
 -
 -		/* try just below the current vma->vm_start */
--		addr = vma->vm_start-len;
--		if (do_color_align)
--			addr = COLOUR_ALIGN_DOWN(addr, pgoff);
+-		addr = (vma->vm_start-len) & HPAGE_MASK;
 -	} while (likely(len < vma->vm_start));
 -
 -bottomup:
