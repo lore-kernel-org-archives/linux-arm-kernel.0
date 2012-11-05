@@ -1,96 +1,54 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 5 Nov 2012 10:48:50 +0000
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <20121025150816.GA3874@sig21.net>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
- <20121025141645.GA16962@sig21.net> <50894BC2.5050706@gmail.com>
- <20121025150816.GA3874@sig21.net>
-Message-ID: <20121105104839.GA2005@linaro.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 5 Nov 2012 11:51:00 +0100
+Subject: [PATCH V2 0/3] ARM: dts: omap5: EMIF and LPDDR2 device tree data
+In-Reply-To: <50975581.7010508@ti.com>
+References: <1349959669-16366-1-git-send-email-lokeshvutla@ti.com>
+ <50975581.7010508@ti.com>
+Message-ID: <50979A14.1050805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 25, 2012 at 05:08:16PM +0200, Johannes Stezenbach wrote:
-> On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
-> > On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
-> > > On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
-> > >> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
-> > >>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
-> > >>>
-> > >>>> While v6 can support unaligned accesses, it is optional and current
-> > >>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
-> > >>>> v6.
-> > >>>
-> > >>> not true according to the gcc changes page
-> > >>
-> > >> What are you going to believe: documentation or what the compiler
-> > >> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
-> > >> support backported and 4.7.2, unaligned accesses are emitted for v7
-> > >> only. I guess default here means it is the default unless you change the
-> > >> default in your build of gcc.
-> > > 
-> > > Since ARMv6 can handle unaligned access in the same way as ARMv7
-> > > it seems a clear bug in gcc which might hopefully get fixed.
-> > > Thus in this case I think it is reasonable to follow the
-> > > gcc documentation, otherwise the code would break for ARMv6
-> > > when gcc gets fixed.
-> > 
-> > But the compiler can't assume the state of the U bit. I think it is
-> > still legal on v6 to not support unaligned accesses, but on v7 it is
-> > required. All the standard v6 ARM cores support it, but I'm not sure
-> > about custom cores or if there are SOCs with buses that don't support
-> > unaligned accesses properly.
+Hi Lokesh,
+
+On 11/05/2012 06:58 AM, Lokesh Vutla wrote:
+> Hi,
+> On Thursday 11 October 2012 06:17 PM, Lokesh Vutla wrote:
+>> This patch series adds Device tree data for the EMIF
+>> sdram controllers in OMAP5 and LPDDR2 memory devices
+>> in OMAP5-evm board.
+>>
+>> Testing:
+>> - Boot tested on OMAP5430 evm.
+>> - Built EMIF as a module.
+>>
+>> Changes from v1:
+>> * Created a seperate dtsi file for Samsung LPDDR2 memory device
+>>    used in OMAP5-evm.
+>> * Passing reg and interrupt fields from dt for EMIF1 and EMIF2.
+> Gentle ping on this series.
+
+Sorry, I missed it. It might be too late for 3.8, since Tony wanted us
+to push before -rc4. I'll pull the series anyway just in case.
+
+I have a least one comment.
+
+Regards,
+Benoit
+
 > 
-> Well, I read the "...since Linux version 2.6.28" comment
-> in the gcc changes page in the way that they assume the
-> U-bit is set. (Although I'm not sure it really is???)
-
-Actually, the kernel checks the arch version and the U bit on boot,
-and chooses the appropriate setting for the A bit depending on the
-result.  (See arch/arm/mm/alignment.c:alignment_init().)
-
-Currently, we depend on the CPU reset behaviour or firmware/
-bootloader to set the U bit for v6, but the behaviour should be
-correct either way, though unaligned accesses will obviously
-perform (much) better with U=1.
-
->From the compiler's point of view we have always implemented the
-U=1 behaviour, but it has to be done via the alignment fault
-handler prior to v6 or with U=0.
-
-> Looking at it from another side, if using the hw unaligned
-> access capability gives a performance benefit then it
-> would be useful to support it even if gcc doesn't
-> behave as documented.  One could still use a special
-> unaligned.h for ARMv6 to get the performance benefit.
-> (If it doesn't give performance benfit, then why
-> bother, let's just use -mno-unaligned-access for v7, too.)
-
-For v7, we should definitely use -munaligned-access where available
-(unless it's the default?)
-
-For v6, the question is whether there is any legitimate reason
-ever to run the kernel with U=0.  If not, could we explicitly
-set it early and build with -munaligned-access where the compiler
-supports this?
-
-The only counterargument I can think of is that some people might
-be running some ancient userspace which actually relies on the U=0
-behaviour.  I don't know whether anyone is actually doing that on
-v6, though.
-
-Cheers
----Dave
-
-> In the ARMv6 ARM unaligned support and the U-bit is
-> not optional, so you could use the same SoC bus argument
-> for some hypothetical v7 SoCs.
+> Thanks
+> Lokesh
+>>
+>> Lokesh Vutla (3):
+>>    ARM: dts: omap5-evm: Fix size of memory defined for EVM
+>>    ARM: dts: omap5: EMIF device tree data for OMAP5 boards
+>>    ARM: dts: omap5-evm: LPDDR2 memory device details for EVM
+>>
+>>   arch/arm/boot/dts/omap5-evm.dts           |   13 +++++-
+>>   arch/arm/boot/dts/omap5.dtsi              |   24 +++++++++++
+>>   arch/arm/boot/dts/samsung_k3pe0e000b.dtsi |   67
+>> +++++++++++++++++++++++++++++
+>>   3 files changed, 103 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
+>>
 > 
-> 
-> Johannes
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
