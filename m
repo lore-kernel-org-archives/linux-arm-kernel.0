@@ -1,47 +1,99 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 5 Nov 2012 17:53:42 +0530
-Subject: [PATCHv3 7/8] i2c: omap: Restore i2c context always
+Date: Mon, 5 Nov 2012 17:53:41 +0530
+Subject: [PATCHv3 6/8] i2c: omap: make reset a seperate function
 In-Reply-To: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
 References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1352118223-3796-8-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352118223-3796-7-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the restore is done based on the flag
-OMAP_I2C_FLAG_RESET_REGS_POSTIDLE.
-
-This helps the following
-- The driver is always capable of restoring regardless
-of the off mode support being there or not.
-
-- While testing omap2430 it is found that in case of certain
-error paths (timeout) a reset is done. However the restore
-never happens as it is dependent on the POSTIDLE flag.
-The other option would be to call a restore in the reset
-case. As there are only a few registers to be restored
-the penalty in the idle case should not be much.
+Implement reset as a separate function.
+This will enable us to make sure that we don't do the
+calculation again on every transfer.
+Also at probe the reset is not added as the hwmod is doing that
+for us.
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
-Todo: the flag could be deleted if the patch is accepted.
-
- drivers/i2c/busses/i2c-omap.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+todo: reprodue the errors and optimise the reset if possible
+ drivers/i2c/busses/i2c-omap.c |   39 ++++++++++++++++++++++++---------------
+ 1 files changed, 24 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 7393017..25f1564 100644
+index 393bb22..7393017 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1316,8 +1316,7 @@ static int omap_i2c_runtime_resume(struct device *dev)
- 	if (!_dev->regs)
- 		return 0;
- 
--	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
--		__omap_i2c_init(_dev);
-+	__omap_i2c_init(_dev);
- 
- 	return 0;
+@@ -299,15 +299,9 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
+ 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
  }
+ 
+-static int omap_i2c_init(struct omap_i2c_dev *dev)
++static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ {
+-	u16 psc = 0, scll = 0, sclh = 0;
+-	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
+-	unsigned long fclk_rate = 12000000;
+ 	unsigned long timeout;
+-	unsigned long internal_clk = 0;
+-	struct clk *fclk;
+-
+ 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
+ 		/* Disable I2C controller before soft reset */
+ 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
+@@ -345,14 +339,27 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
+ 
+ 			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+ 							dev->syscstate);
+-			/*
+-			 * Enabling all wakup sources to stop I2C freezing on
+-			 * WFI instruction.
+-			 * REVISIT: Some wkup sources might not be needed.
+-			 */
+-			dev->westate = OMAP_I2C_WE_ALL;
+ 		}
+ 	}
++	return 0;
++}
++
++static int omap_i2c_init(struct omap_i2c_dev *dev)
++{
++	u16 psc = 0, scll = 0, sclh = 0;
++	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
++	unsigned long fclk_rate = 12000000;
++	unsigned long internal_clk = 0;
++	struct clk *fclk;
++
++	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
++		/*
++		 * Enabling all wakup sources to stop I2C freezing on
++		 * WFI instruction.
++		 * REVISIT: Some wkup sources might not be needed.
++		 */
++		dev->westate = OMAP_I2C_WE_ALL;
++	}
+ 
+ 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
+ 		/*
+@@ -592,7 +599,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	dev->buf_len = 0;
+ 	if (timeout == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+-		omap_i2c_init(dev);
++		omap_i2c_reset(dev);
++		__omap_i2c_init(dev);
+ 		return -ETIMEDOUT;
+ 	}
+ 
+@@ -602,7 +610,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
+ 	/* We have an error */
+ 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
+ 			    OMAP_I2C_STAT_XUDF)) {
+-		omap_i2c_init(dev);
++		omap_i2c_reset(dev);
++		__omap_i2c_init(dev);
+ 		return -EIO;
+ 	}
+ 
 -- 
 1.7.5.4
