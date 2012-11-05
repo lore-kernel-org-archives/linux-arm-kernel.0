@@ -1,37 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 5 Nov 2012 19:08:34 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <20121105173640.GR3351@mudshark.cambridge.arm.com>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
-Message-ID: <201211051908.34291.arnd@arndb.de>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Mon, 5 Nov 2012 14:11:19 -0500
+Subject: [PATCH v3 07/11] ARM: davinci - restructure header files for
+ common clock migration
+In-Reply-To: <50967641.4090503@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-8-git-send-email-m-karicheri2@ti.com>
+ <50967641.4090503@ti.com>
+Message-ID: <50980F57.1090507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 November 2012, Will Deacon wrote:
-> I was playing around with !CONFIG_MMU today and to my dismay noticed that
-> you can't select ARCH_VEXPRESS without CONFIG_MMU=y! This is because
-> ARCH_VEXPRESS is only selectable via ARCH_MULTI_V7, which depends on
-> ARCH_MULTIPLATFORM which in turn depends on MMU.
-> 
-> I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
-> !ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
-> dependency dropped) but I wondered if you'd got any better ideas?
-> 
+On 11/04/2012 09:05 AM, Sekhar Nori wrote:
+>
+> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+>> pll.h is added to migrate some of the PLL controller defines for sleep.S.
+>> psc.h is modified to keep only PSC modules definitions needed by sleep.S
+>> after migrating to common clock. The definitions under
+>> ifdef CONFIG_COMMON_CLK will be removed in a subsequent patch.
+>> davinci_watchdog_reset prototype is moved to time.h as clock.h is
+>> being obsoleted. sleep.S and pm.c is modified to include the new header
+>> file replacements.
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+>>   arch/arm/mach-davinci/devices.c           |    2 ++
+>>   arch/arm/mach-davinci/include/mach/pll.h  |   46 +++++++++++++++++++++++++++++
+>>   arch/arm/mach-davinci/include/mach/psc.h  |    4 +++
+>>   arch/arm/mach-davinci/include/mach/time.h |    4 ++-
+>>   arch/arm/mach-davinci/pm.c                |    4 +++
+>>   arch/arm/mach-davinci/sleep.S             |    4 +++
+>>   6 files changed, 63 insertions(+), 1 deletion(-)
+>>   create mode 100644 arch/arm/mach-davinci/include/mach/pll.h
+> With this patch a _third_ copy of PLL definitions is created in kernel
+> sources. The existing PLL definitions in clock.h inside mach-davinci
+> should be moved to mach/pll.h and the pll.h you introduced inside
+> drivers/clk in 5/11 should be removed (this patch should appear before
+> 5/11).
+>
+> The biggest disadvantage of this approach is inclusion of mach/ includes
+> in drivers/clk. But duplicating code is definitely not the fix for this.
+> Anyway, mach/ includes are not uncommon in drivers/clk (they are all
+> probably suffering from the same issue).
+Sekhar,
 
-I don't actually remember what the reason for making ARCH_MULTIPLATFORM
-depend on MMU was. Maybe it just works if you drop the dependency.
+I have replied to patch 5/11 that also refers to this. The main reason 
+we are not able to do this cleanly is the code in sleep.c and pm.c. That 
+is something related to Power management. Could you take a look and see 
+if you can do some clean up on this code? I believe It is more than just 
+moving the header files.
 
-Presumably it's related to ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR not
-working on NOMMU, but if that's the case, we could make it
-
-
-ARCH_MULTIPLATFORM
-	bool "Allow multiple platforms to be selected"
-	select ARM_PATCH_PHYS_VIRT if !MMU
-	select AUTO_ZRELADDR if !MMU
-
-but maybe those actually work without MMU as well. I have never looked too
-closely at NOMMU configurations, every time I tried, they were broken in
-combination with something else I wanted to enable.
-
-	Arnd
+Murali
+>
+> $ grep -rl "include <mach/" drivers/clk/*
+> drivers/clk/clk-u300.c
+> drivers/clk/mmp/clk-pxa168.c
+> drivers/clk/mmp/clk-mmp2.c
+> drivers/clk/mmp/clk-pxa910.c
+> drivers/clk/mxs/clk-imx23.c
+> drivers/clk/mxs/clk-imx28.c
+> drivers/clk/spear/spear6xx_clock.c
+> drivers/clk/spear/spear3xx_clock.c
+> drivers/clk/spear/spear1340_clock.c
+> drivers/clk/spear/spear1310_clock.c
+> drivers/clk/ux500/clk-prcc.c
+> drivers/clk/versatile/clk-integrator.c
+> drivers/clk/versatile/clk-realview.c
+>
+> pll.h can probably be moved to include/linux/clk/ to avoid this. Would
+> like to hear from Mike on this before going ahead.
+>
+> Anyway, instead of just commenting, I though I will be more useful and
+> went ahead and made some of the changes I have been talking about. I
+> fixed the multiple PLL definitions issue, the build infrastructure issue
+> and the commit ordering too.
+>
+> I pushed the patches I fixed to devel-common-clk branch of my git tree.
+> It is build tested using davinci_all_defconfig but its not runtime tested.
+>
+> Can you start from here and provide me incremental changes on top of
+> this? That way we can collaborate to finish this faster.
+Thanks for offering some help. Yes I can provide you incremental patch. 
+But then could you also help me to squash/rebase and send patches to the 
+list for review?
+> Thanks,
+> Sekhar
+>
