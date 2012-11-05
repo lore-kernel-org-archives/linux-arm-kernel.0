@@ -1,47 +1,82 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 05 Nov 2012 12:55:59 +0000
-Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
-In-Reply-To: <1352108387.3212.12.camel@linaro1.home>
-References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
- <1352108387.3212.12.camel@linaro1.home>
-Message-ID: <1352120159.10947.3.camel@hornet>
+From: zonque@gmail.com (Daniel Mack)
+Date: Mon, 05 Nov 2012 13:58:22 +0100
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
+ and NAND
+In-Reply-To: <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
+ <1351869956-2787-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+Message-ID: <5097B7EE.3000508@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-05 at 09:39 +0000, Jon Medhurst (Tixy) wrote:
-> > +static void mmio_led_brightness_set(struct led_classdev *cdev,
-> > +		enum led_brightness brightness)
-> > +{
-> > +	struct mmio_led *led = container_of(cdev, struct mmio_led, cdev);
-> > +	unsigned long uninitialized_var(flags);
+On 05.11.2012 12:03, Philip, Avinash wrote:
+> On Fri, Nov 02, 2012 at 20:55:56, Daniel Mack wrote:
+>> This patch adds basic DT bindings for OMAP GPMC.
+>>
+>> The actual peripherals are instanciated from child nodes within the GPMC
+>> node, and the only type of device that is currently supported is NAND.
+>>
+>> Code was added to parse the generic GPMC timing parameters and some
+>> documentation with examples on how to use them.
+>>
+>> Successfully tested on an AM33xx board.
+>>
+>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> [...]
+>> +
+>> +		nand at 0,0 {
+>> +			reg = <0 0 0>; /* CS0, offset 0 */
+>> +			nand-bus-width = <16>;
+>> +			nand-ecc-mode = "none";
+>> +
+>> +			gpmc,sync-clk = <0>;
+>> +			gpmc,cs-on = <0>;
+>> +			gpmc,cs-rd-off = <36>;
+>> +			gpmc,cs-wr-off = <36>;
+>> +			gpmc,adv-on = <6>;
+>> +			gpmc,adv-rd-off = <24>;
+>> +			gpmc,adv-wr-off = <36>;
+>> +			gpmc,we-off = <30>;
+>> +			gpmc,oe-off = <48>;
+>> +			gpmc,access = <54>;
+>> +			gpmc,rd-cycle = <72>;
+>> +			gpmc,wr-cycle = <72>;
+>> +			gpmc,wr-access = <30>;
+>> +			gpmc,wr-data-mux-bus = <0>;
+>> +
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +
 > 
-> uninitialized_var seems to be a bit contentious, Linus Torvalds had a
-> recent complaint about it which prompted Ingo to post a patch proposing
-> to removing it: https://patchwork.kernel.org/patch/1655621/ So perhaps
-> best to avoid using it ;-).
+> Can you take the timings (for example) from arago tree. The timings is tested in am335x-evm
+> So the timings can be directly used to populate GPMC timings. Timings can found at
 > 
-> In this case, you could possibly keep gcc quite with something like:
+> http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;
+> h=66bfbd2c5b35dc81edce0c24843c476161ab5978;hp=370630359cb8db711cf0941cd2a242e28ccfb61e
 > 
->         spinlock_t *lock = led->lock;
+> [...]
+>> +static int gpmc_probe_dt(struct platform_device *pdev)
 > 
-> and then use the local variable 'lock' everywhere instead of led->lock.
-> Or just keep it simple an initialise flags to 0 instead.
+> Can you take care of the following section mismatch.
+> WARNING: vmlinux.o(.text+0x1e2d0): Section mismatch in reference
+> from the function gpmc_probe_dt() to the function .init.text:gpmc_nand_init().
 
-Yeah, = 0 will do...
+Sore, both fixed for v4.
 
-> > +	if (!pdata)
-> > +		return -EINVAL;
-> > +
-> > +	if (pdata->reg_size != 8 && pdata->reg_size != 16 &&
-> > +			pdata->reg_size != 32)
-> > +		return -EFAULT;
+> [...]
+>> +
+>> +		val = of_get_nand_ecc_mode(child);
+>> +		if (val >= 0)
+>> +			gpmc_nand_data->ecc_opt = val;
 > 
-> Is EFAULT appropriate here? Why not EINVAL?
+> This will fail for BCH. Index of "soft_bch" is 5 & also don't have selection
+> option between for BCH4 & BCH8 also.
+> Can you use the of_property_read_u32 (as done early) to pass the ecc selection
+> from dt file. This will help selection of BCH4 & BCH8 ecc options.
 
-Hm. To distinguish it from !pdata case I guess (and a 13 bit wide
-transaction sounds like a fault to me ;-), but I can be persuaded
-otherwise without much effort...
+Hmm. Shouldn't we rather teach of_get_nand_ecc_mode() that two modes and
+bring the enum in sync?
 
-Thanks!
 
-Pawe?
+Daniel
