@@ -1,41 +1,34 @@
-From: mugunthanvnm@ti.com (N, Mugunthan V)
-Date: Mon, 5 Nov 2012 08:40:34 +0000
-Subject: [PATCH net-next 0/2] cpsw: fix resource leak for v3.8
-In-Reply-To: <cover.1351930782.git.richardcochran@gmail.com>
-References: <cover.1351930782.git.richardcochran@gmail.com>
-Message-ID: <EB1619762EAF8B4E97A227FB77B7E0293EA0A1EC@DBDE01.ent.ti.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti)
+Date: Mon, 5 Nov 2012 14:14:48 +0530
+Subject: [PATCHv2 3/7] i2c: omap: remove the dtrev
+In-Reply-To: <20121105075320.GD32468@arwen.pp.htv.fi>
+References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+ <1352025873-27492-4-git-send-email-shubhrajyoti@ti.com>
+ <20121105075320.GD32468@arwen.pp.htv.fi>
+Message-ID: <50977C80.8090000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Richard Cochran [mailto:richardcochran at gmail.com]
-> Sent: Saturday, November 03, 2012 1:55 PM
-> To: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; David Miller; Chemparathy,
-> Cyril; N, Mugunthan V; Hiremath, Vaibhav
-> Subject: [PATCH net-next 0/2] cpsw: fix resource leak for v3.8
-> 
-> While looking at the idea of removing all of the register offsets in
-> the CPSW's device tree, I noticed that the driver would be leaking IO
-> mappings. Although this is, strictly speaking, a bug fix, still it can
-> wait to appear in v3.8, since there is no way to use the driver in
-> v3.7 (or earlier) anyhow.
-> 
-> Thanks,
-> Richard
-> 
-> 
-> Richard Cochran (2):
->   cpsw: rename register banks to match the reference manual, part 2
->   cpsw: fix leaking IO mappings
-> 
->  drivers/net/ethernet/ti/cpsw.c |   39 +++++++++++++++++++-------------
-> -------
->  1 files changed, 19 insertions(+), 20 deletions(-)
-> 
-> --
-> 1.7.2.5
+On Monday 05 November 2012 01:23 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Sun, Nov 04, 2012 at 04:14:29PM +0530, Shubhrajyoti D wrote:
+>> The dtrev is used only for the comments. Remove the same and use
+>> the scheme instead to know if it is version2.
+>>
+>> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+> I would drop dtrev completely and not use scheme to "emulate" it.
+However for ver2 ie omap4plus and previous versions the
+register map is different.
 
-The patches look good to me.
-
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
+So the scheme may still be required.
+>  dtrev
+> is wrong and unnecessary; it was only created due to the wrong
+> assumption that HW revision register was wrong. Looks like that
+> assumption was made based on the driver which is clearly wrong wrt
+> revision detection.
+>
+> Also, when dropping dtrev, also drop it from platform_data and
+> omap_hwmod database (could be done on a separate patch).
+OK would do that.
+>
