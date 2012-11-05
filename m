@@ -1,41 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 5 Nov 2012 17:33:15 +0100
-Subject: [PATCH 1/8] mfd: ab8500-core: Remove unused ab8500-gpio IRQ ranges
-In-Reply-To: <201211051616.24257.arnd@arndb.de>
-References: <1352128236-11554-1-git-send-email-lee.jones@linaro.org>
- <1352128236-11554-2-git-send-email-lee.jones@linaro.org>
- <201211051616.24257.arnd@arndb.de>
-Message-ID: <20121105163315.GE5220@gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 5 Nov 2012 17:37:45 +0100
+Subject: [PATCH 00/10] ARM: dts: AM33XX: Add device tree data
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA647CE@DBDE01.ent.ti.com>
+References: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA647CE@DBDE01.ent.ti.com>
+Message-ID: <5097EB59.8070104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 05 Nov 2012, Arnd Bergmann wrote:
+Hi Anil,
 
-> On Monday 05 November 2012, Lee Jones wrote:
-> > The IRQ ranges provided in ab8500-core to be passed on to the
-> > ab8500-gpio driver are not only redundant, but they are also
-> > causing a warning in the boot log. These IRQ ranges, like any
-> > other MFD related IRQ resource are passed though MFD core for
-> > automatic conversion to virtual IRQs; however, MFD core does
-> > not support IRQ mapping of IRQ ranges. Let's just remove them.
-> > 
-> > Cc: Samuel Ortiz <sameo@linux.intel.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On 11/05/2012 02:46 PM, AnilKumar, Chimata wrote:
+> On Mon, Nov 05, 2012 at 16:15:40, AnilKumar, Chimata wrote:
+>> Add device tree date for GPIO based various drivers matrix keypad,
+>> volume keys, push buttons and use leds accross three AM33XX devices
+>> viz EVM, BeagleBone and Starter Kit.
+>>
+>> To make it functional this series also adds pinctrl data for all
+>> the GPIOs used by various drivers. In this series only default state
+>> pinmux/conf settings are added because of sleep/idle state pinctrl
+>> values are not available.
+>>
+>> These patches are based on linux-omap-dt:for_3.8/dts tree and these
 > 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> My bad, small correction in this statement, these patches apply cleanly
+> on linux-omap-dt:for_3.8/dts tree with the below two patches.
+> http://www.spinics.net/lists/arm-kernel/msg204872.html
+> http://www.spinics.net/lists/arm-kernel/msg204873.html
 
-Whoops, I missed Linus' Tested-by on this patch too, so:
+Mmm, this 2 patches do have dependency on some driver changes that might
+not be accepted for 3.8. And in fact I do have some comment on the RTC
+one :-)
+Don't you prefer to change the order to allow me to pull these ones first?
 
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-
-I also forgot to to mention that this should really be going
-for the -rcs rather than -next.
-
-Kind regards,
-Lee
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Benoit
