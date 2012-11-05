@@ -1,68 +1,100 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 05 Nov 2012 21:23:50 +0800
-Subject: [PATCH] pinctrl: at91: Staticize non-exported symbols
-Message-ID: <1352121830.14769.2.camel@phoenix>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Mon, 5 Nov 2012 13:29:19 +0000
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <5097B7EE.3000508@gmail.com>
+References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
+ <1351869956-2787-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+ <5097B7EE.3000508@gmail.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/pinctrl/pinctrl-at91.c |   22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+On Mon, Nov 05, 2012 at 18:28:22, Daniel Mack wrote:
+> On 05.11.2012 12:03, Philip, Avinash wrote:
+> > On Fri, Nov 02, 2012 at 20:55:56, Daniel Mack wrote:
+> >> This patch adds basic DT bindings for OMAP GPMC.
+> >>
+> >> The actual peripherals are instanciated from child nodes within the GPMC
+> >> node, and the only type of device that is currently supported is NAND.
+> >>
+> >> Code was added to parse the generic GPMC timing parameters and some
+> >> documentation with examples on how to use them.
+> >>
+> >> Successfully tested on an AM33xx board.
+> >>
+> >> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> > [...]
+> >> +
+> >> +		nand at 0,0 {
+> >> +			reg = <0 0 0>; /* CS0, offset 0 */
+> >> +			nand-bus-width = <16>;
+> >> +			nand-ecc-mode = "none";
+> >> +
+> >> +			gpmc,sync-clk = <0>;
+> >> +			gpmc,cs-on = <0>;
+> >> +			gpmc,cs-rd-off = <36>;
+> >> +			gpmc,cs-wr-off = <36>;
+> >> +			gpmc,adv-on = <6>;
+> >> +			gpmc,adv-rd-off = <24>;
+> >> +			gpmc,adv-wr-off = <36>;
+> >> +			gpmc,we-off = <30>;
+> >> +			gpmc,oe-off = <48>;
+> >> +			gpmc,access = <54>;
+> >> +			gpmc,rd-cycle = <72>;
+> >> +			gpmc,wr-cycle = <72>;
+> >> +			gpmc,wr-access = <30>;
+> >> +			gpmc,wr-data-mux-bus = <0>;
+> >> +
+> >> +			#address-cells = <1>;
+> >> +			#size-cells = <1>;
+> >> +
+> > 
+> > Can you take the timings (for example) from arago tree. The timings is tested in am335x-evm
+> > So the timings can be directly used to populate GPMC timings. Timings can found at
+> > 
+> > http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;
+> > h=66bfbd2c5b35dc81edce0c24843c476161ab5978;hp=370630359cb8db711cf0941cd2a242e28ccfb61e
+> > 
+> > [...]
+> >> +static int gpmc_probe_dt(struct platform_device *pdev)
+> > 
+> > Can you take care of the following section mismatch.
+> > WARNING: vmlinux.o(.text+0x1e2d0): Section mismatch in reference
+> > from the function gpmc_probe_dt() to the function .init.text:gpmc_nand_init().
+> 
+> Sore, both fixed for v4.
+> 
+> > [...]
+> >> +
+> >> +		val = of_get_nand_ecc_mode(child);
+> >> +		if (val >= 0)
+> >> +			gpmc_nand_data->ecc_opt = val;
+> > 
+> > This will fail for BCH. Index of "soft_bch" is 5 & also don't have selection
+> > option between for BCH4 & BCH8 also.
+> > Can you use the of_property_read_u32 (as done early) to pass the ecc selection
+> > from dt file. This will help selection of BCH4 & BCH8 ecc options.
+> 
+> Hmm. Shouldn't we rather teach of_get_nand_ecc_mode() that two modes and
+> bring the enum in sync?
 
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index 65f066c..b9e2cbd 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -566,9 +566,9 @@ static int at91_pmx_get_groups(struct pinctrl_dev *pctldev, unsigned selector,
- 	return 0;
- }
- 
--int at91_gpio_request_enable(struct pinctrl_dev *pctldev,
--			    struct pinctrl_gpio_range *range,
--			    unsigned offset)
-+static int at91_gpio_request_enable(struct pinctrl_dev *pctldev,
-+				    struct pinctrl_gpio_range *range,
-+				    unsigned offset)
- {
- 	struct at91_pinctrl *npct = pinctrl_dev_get_drvdata(pctldev);
- 	struct at91_gpio_chip *at91_chip;
-@@ -598,9 +598,9 @@ int at91_gpio_request_enable(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
--void at91_gpio_disable_free(struct pinctrl_dev *pctldev,
--			   struct pinctrl_gpio_range *range,
--			   unsigned offset)
-+static void at91_gpio_disable_free(struct pinctrl_dev *pctldev,
-+				   struct pinctrl_gpio_range *range,
-+				   unsigned offset)
- {
- 	struct at91_pinctrl *npct = pinctrl_dev_get_drvdata(pctldev);
- 
-@@ -952,7 +952,7 @@ err:
- 	return ret;
- }
- 
--int __devexit at91_pinctrl_remove(struct platform_device *pdev)
-+static int __devexit at91_pinctrl_remove(struct platform_device *pdev)
- {
- 	struct at91_pinctrl *info = platform_get_drvdata(pdev);
- 
-@@ -1249,9 +1249,11 @@ static int at91_gpio_irq_map(struct irq_domain *h, unsigned int virq,
- 	return 0;
- }
- 
--int at91_gpio_irq_domain_xlate(struct irq_domain *d, struct device_node *ctrlr,
--			const u32 *intspec, unsigned int intsize,
--			irq_hw_number_t *out_hwirq, unsigned int *out_type)
-+static int at91_gpio_irq_domain_xlate(struct irq_domain *d,
-+				      struct device_node *ctrlr,
-+				      const u32 *intspec, unsigned int intsize,
-+				      irq_hw_number_t *out_hwirq,
-+				      unsigned int *out_type)
- {
- 	struct at91_gpio_chip *at91_gpio = d->host_data;
- 	int ret;
--- 
-1.7.9.5
+ecc_opt is for selecting different ecc layout and not for selecting ecc mode.
+
+In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
+	OMAP_ECC_HAMMING_CODE_HW_ROMCODE
+	OMAP_ECC_BCH4_CODE_HW
+	OMAP_ECC_BCH8_CODE_HW
+
+So selection of ecc layout data should come from DT not ecc mode.
+
+Thanks
+Avinash
+
+> 
+> 
+> Daniel
+> 
+> 
+> 
