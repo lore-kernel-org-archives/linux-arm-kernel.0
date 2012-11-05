@@ -1,62 +1,52 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Mon, 5 Nov 2012 16:15:46 +0530
-Subject: [PATCH 06/10] ARM: dts: AM33XX: Add user-leds device tree data to
- am335x-bone
+Date: Mon, 5 Nov 2012 16:15:44 +0530
+Subject: [PATCH 04/10] ARM: dts: AM33XX: Add volume-keys device tree data to
+ am335x-evm
 In-Reply-To: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
 References: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352112350-13398-7-git-send-email-anilkumar@ti.com>
+Message-ID: <1352112350-13398-5-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio-leds device tree data to am335x-bone device to enable gpio
-based user-leds (USR0, USR1, USR2 and USR3) present on BeagleBone.
+Add gpio based volume keys device tree data to am335x-evm by adding
+all the required parameters like keycode, gpios and etc.
 
-[koen at dominion.thruhere.net: led0, led1 suggested by koen]
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-bone.dts |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/am335x-evm.dts |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 0bd0355..206c3eb 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -57,6 +57,36 @@
- 			ti,system-power-controller;
- 		};
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index e087b87..9f65f17 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -137,6 +137,27 @@
+ 				0x0101001c	/* ENTER */
+ 				0x0201006c>;	/* DOWN */
  	};
 +
-+	leds {
-+		compatible = "gpio-leds";
++	gpio_keys: volume_keys at 0 {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		autorepeat;
 +
-+		led at 2 {
-+			label = "beaglebone:green:heartbeat";
-+			gpios = <&gpio2 21 0>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
++		switch at 9 {
++			label = "volume-up";
++			linux,code = <115>;
++			gpios = <&gpio1 2 1>;
++			gpio-key,wakeup;
 +		};
 +
-+		led at 3 {
-+			label = "beaglebone:green:mmc0";
-+			gpios = <&gpio2 22 0>;
-+			linux,default-trigger = "mmc0";
-+			default-state = "off";
-+		};
-+
-+		led at 4 {
-+			label = "beaglebone:green:usr2";
-+			gpios = <&gpio2 23 0>;
-+			default-state = "off";
-+		};
-+
-+		led at 5 {
-+			label = "beaglebone:green:usr3";
-+			gpios = <&gpio2 24 0>;
-+			default-state = "off";
++		switch at 10 {
++			label = "volume-down";
++			linux,code = <114>;
++			gpios = <&gpio1 3 1>;
++			gpio-key,wakeup;
 +		};
 +	};
  };
  
- /include/ "tps65217.dtsi"
+ /include/ "tps65910.dtsi"
 -- 
 1.7.9.5
