@@ -1,59 +1,66 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 5 Nov 2012 17:53:35 +0530
-Subject: [PATCHv3 0/7] i2c: omap: updates
-Message-ID: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
+Date: Mon, 5 Nov 2012 17:53:43 +0530
+Subject: [PATCHv3 8/8] i2c: omap: cleanup the sysc write
+In-Reply-To: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
+References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352118223-3796-9-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently after the reset the sysc is written with hardcoded values.
+The patch reads the sysc register and writes back the same value
+after reset.
 
-Does the followiing
-- Make the revision a 32- bit consisting of rev_lo amd rev_hi each
-of 16 bits.
+- Some unnecessary rev checks can be optimised.
+- Also due to whatever reason the hwmod flags are changed
+we will not reset the values.
+- In some of the cases the minor values of the 2430 register
+is different(0x37) in that case the autoidle setting may be missed.
 
-- Also use the revision register for the erratum i207.
-- Refactor the i2c_omap_init code.
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |   20 +++++---------------
+ 1 files changed, 5 insertions(+), 15 deletions(-)
 
-Adds a patch to remove the hardcoding sysc register. Instead
-read register ,reset and then writeback the read value.
-
-Also more cleanup is possible will check on that subsequently.
-
-Previous discussions can be found
-http://www.spinics.net/lists/linux-omap/msg81265.html
-
-
-Tested on OMAP4430sdp  ,4460 ,omap3630 ,3430 and omap2430.
-
-For omap2 testing the below patch was used
-[PATCH] ARM: vfp: fix save and restore when running on pre-VFPv3 and CONFIG_VFPv3 set
-
-Also for using the pm testing below patches are used.
-
-arm: sched: stop sched_clock() during suspend
-ARM: OMAP: hwmod: wait for sysreset complete after enabling hwmod
-
-The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
-
-  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
-
-are available in the git repository at:
-  git://gitorious.org/linus-tree/linus-tree.git i2c_omap/for_3.8
-
-Shubhrajyoti D (8):
-      i2c: omap: Fix the revision register read
-      i2c: omap: use revision check for OMAP_I2C_FLAG_APPLY_ERRATA_I207
-      i2c: omap: remove the dtrev
-      ARM: i2c: omap: Remove the i207 errata flag
-      i2c: omap: re-factor omap_i2c_init function
-      i2c: omap: make reset a seperate function
-      i2c: omap: Restore i2c context always
-      i2c: omap: cleanup the sysc write
-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    3 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    9 +-
- drivers/i2c/busses/i2c-omap.c              |  202 ++++++++++++++++------------
- include/linux/i2c-omap.h                   |    1 -
- 4 files changed, 118 insertions(+), 97 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 25f1564..a09acdc 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -302,7 +302,11 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
+ static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ {
+ 	unsigned long timeout;
++	u16 sysc;
++
+ 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
++		sysc = omap_i2c_read_reg(dev, OMAP_I2C_SYSC_REG);
++
+ 		/* Disable I2C controller before soft reset */
+ 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
+ 			omap_i2c_read_reg(dev, OMAP_I2C_CON_REG) &
+@@ -324,22 +328,8 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
+ 		}
+ 
+ 		/* SYSC register is cleared by the reset; rewrite it */
+-		if (dev->rev == OMAP_I2C_REV_ON_2430) {
+-
+-			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+-					   SYSC_AUTOIDLE_MASK);
++		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, sysc);
+ 
+-		} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
+-			dev->syscstate = SYSC_AUTOIDLE_MASK;
+-			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
+-			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
+-			      __ffs(SYSC_SIDLEMODE_MASK));
+-			dev->syscstate |= (SYSC_CLOCKACTIVITY_FCLK <<
+-			      __ffs(SYSC_CLOCKACTIVITY_MASK));
+-
+-			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
+-							dev->syscstate);
+-		}
+ 	}
+ 	return 0;
+ }
 -- 
 1.7.5.4
