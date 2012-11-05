@@ -1,36 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Nov 2012 09:45:11 +0000
-Subject: vexpress issues in next-20121029
-In-Reply-To: <20121105093532.GC28327@n2100.arm.linux.org.uk>
-References: <508EE610.9050703@wwwdotorg.org> <1351613819.6199.14.camel@hornet>
- <20121105093532.GC28327@n2100.arm.linux.org.uk>
-Message-ID: <20121105094511.GE28327@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 5 Nov 2012 12:01:05 +0200
+Subject: [PATCHv2 1/7] i2c: omap: Fix the revision register read
+In-Reply-To: <CAM=Q2csb_9ryaZfURqv6QgsVuSRiVMDt=x=Adko2HH4GoiHnCQ@mail.gmail.com>
+References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
+ <1352025873-27492-2-git-send-email-shubhrajyoti@ti.com>
+ <20121105075026.GB32468@arwen.pp.htv.fi> <50977A30.6040907@ti.com>
+ <20121105090412.GA2913@arwen.pp.htv.fi>
+ <CAM=Q2csb_9ryaZfURqv6QgsVuSRiVMDt=x=Adko2HH4GoiHnCQ@mail.gmail.com>
+Message-ID: <20121105100105.GC3327@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 09:35:32AM +0000, Russell King - ARM Linux wrote:
-> On Tue, Oct 30, 2012 at 04:16:59PM +0000, Pawel Moll wrote:
-> > Hi Stephen,
-> > 
-> > On Mon, 2012-10-29 at 20:24 +0000, Stephen Warren wrote:
-> > > 1) At compile-time: v2m_timer_init() and v2m_dt_timer_init() reference
-> > > functions vexpress_clk_init() and vexpress_clk_of_init() respectively,
-> > > which don't appear anywhere in the source tree.
-> > 
-> > There was a glitch between clk-next and arm-soc - it should be fine
-> > starting with next-20121030.
-> 
-> The problem is still there - my builds of my tree plus arm-soc are
-> continuing to fail with:
-> 
-> arch/arm/mach-vexpress/built-in.o: In function `v2m_timer_init':
-> reset.c:(.init.text+0xe0): undefined reference to `vexpress_clk_init'
-> arch/arm/mach-vexpress/built-in.o: In function `v2m_dt_timer_init':
-> reset.c:(.init.text+0x114): undefined reference to `vexpress_clk_of_init'
-> 
-> My guess is you have a dependency between the clk-next tree and arm-soc
-> which you haven't told the arm-soc people about.
+Hi,
 
-Oh, and the above seems to affect all my kautobuilds for any ARM Ltd
-development platform - it's not just vexpress which is affected by this
-anymore.
+On Mon, Nov 05, 2012 at 02:54:32PM +0530, Shubhrajyoti Datta wrote:
+> On Mon, Nov 5, 2012 at 2:34 PM, Felipe Balbi <balbi@ti.com> wrote:
+> 
+> > Hi,
+> >
+> > On Mon, Nov 05, 2012 at 02:04:56PM +0530, Shubhrajyoti wrote:
+> > > >> @@ -1155,7 +1187,7 @@ omap_i2c_probe(struct platform_device *pdev)
+> > > >>
+> > > >>            dev->fifo_size = (dev->fifo_size / 2);
+> > > >>
+> > > >> -          if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
+> > > >> +          if (dev->rev < OMAP_I2C_REV_ON_3630)
+> > > >>                    dev->b_hw = 1; /* Enable hardware fixes */
+> > > > looks like this was applicable to 4430 too, what happened ?
+> > > No actually this can be deleted completely once the
+> > > start -> transaction -> stop sequence recommendation is followed.
+> >
+> > yes, but we're not there just yet and this patch is changing the
+> > behavior of the driver
+> 
+> 
+> No , earlier we were truncating the register for omap4 so
+> OMAP_I2C_REV_ON_3630_4430 was there if we read both hi and lo for
+> omap4 then we donot find 3630 and 4430 value to be similar.
+> 
+> In this case the behavior is same as earlier also it enabled this for
+> lower than 3630 and the same holds good even now.
+> 
+> So in essence, Earlier  OMAP_I2C_REV_ON_3630_4430 is named to
+> OMAP_I2C_REV_ON_3630 and omap4 rev will have a 32bit value.
+
+it's not same behavior because before dev->b_hw was set for omap4430,
+but now it won't be. This is the difference in behavior which I'm
+pointing out.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/a9193efb/attachment.sig>
