@@ -1,51 +1,56 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 5 Nov 2012 11:16:53 +0800
-Subject: [PATCH v2 2/3] serial: mxs-auart: add the DMA support for mx28
-In-Reply-To: <1351163280.7077.11.camel@vkoul-udesk3>
-References: <1351074456-25863-1-git-send-email-b32955@freescale.com>	
- <1351074456-25863-3-git-send-email-b32955@freescale.com>	
- <1351138689.5263.68.camel@vkoul-udesk3> <5088D336.7040206@freescale.com>	
- <1351145272.7077.8.camel@vkoul-udesk3> <5089033F.9040100@freescale.com>
- <1351163280.7077.11.camel@vkoul-udesk3>
-Message-ID: <50972FA5.4020605@freescale.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 5 Nov 2012 03:15:16 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
+References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+ <20121026201539.GD29548@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+ <20121029200032.GD30152@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
+ <20121030123254.GD29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
+ <20121030125419.GG29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
+ <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
+ <87fw4u3oh5.fsf@deeprootsystems.com>
+ <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
+ <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
+ <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2012?10?25? 19:08, Vinod Koul ??:
-> On Thu, 2012-10-25 at 17:15 +0800, Huang Shijie wrote:
->> yes. I have to setup the register. Could you told me which API is the
->> right API?
-> dmaengine_slave_config() should be used to send the slave specfic
-> parameters
-It seems hard to set the registers by the
+Hi Jean,
 
-dmaengine_slave_config().
+On Sat, 3 Nov 2012, Jean Pihet wrote:
 
-[1] firstly, there are several drivers use the mxs-dma, the gpmi-nand, mxs-mmc,spi-mxs, i2c-mxs.
-        If we set the registers by the dmaengine_slave_config(), we must have the register base address for gpmi, mxs, spi, i2c.
-      It's not a good idea to access these registers in the mxs-dma driver.
+> The setup is as identical as possible to yours:
+> - U-Boot 2011.06-dirty (Sep 04 2012 - 17:06:58) from
+> http://www.pwsan.com/tmp/3530es3beagle-MLO-u-boot-20121023.tar.bz2.
+>   Please note that the MLO image does not run on my board and so I had
+> to use my known-to-work image.
 
-[2] secondly, take gpmi_read_page() for example, it uses the DMA_TRANS_NONE several times :
-     If we set the registers by the dmaengine_slave_config(), the gpmi_read_page() will become like:
-     .....................................
-     dmaengine_slave_config()
-     dmaengine_prep_slave_sg().
-     ...................................
+Interesting...
 
-     dmaengine_slave_config()
-     dmaengine_prep_slave_sg().
-     ...................................
+> The result is that I could reproduce the issue but it happens much
+> more rarely on my side (only once vs quasi 100% on ~50 boot cycles).
 
-      dmaengine_slave_config()
-      dmaengine_prep_slave_sg().
-     ...................................
+Hmm...
 
-     Is it a nice look?
+> The issue is triggered by running 'hwclock --systohc'  while the
+> system is heavily loaded (running depmod etc.).
 
-  [3] dma_slave_config{} does not have the fields to contain the registers value.
+OK.
+
+> More investigation on-going, so more to come!
+
+Great, keep us posted.
+
+Will try to kick off those tests you requested within the next 24-48 
+hours.
 
 
-So I think the  current code it's ok, we'd better do not change it.
-
-thanks
-Huang Shijie
+- Paul
