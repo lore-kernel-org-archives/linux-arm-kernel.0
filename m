@@ -1,43 +1,49 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 05 Nov 2012 14:43:18 +0000
-Subject: vexpress issues in next-20121029
-In-Reply-To: <20121105094511.GE28327@n2100.arm.linux.org.uk>
-References: <508EE610.9050703@wwwdotorg.org> <1351613819.6199.14.camel@hornet>
- <20121105093532.GC28327@n2100.arm.linux.org.uk>
- <20121105094511.GE28327@n2100.arm.linux.org.uk>
-Message-ID: <1352126598.10947.13.camel@hornet>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 05 Nov 2012 08:49:12 -0600
+Subject: [PATCH 2/8] ARM: zynq: move ttc timer code to drivers/clocksource
+In-Reply-To: <CAHTX3d++0fGSw7GQHcc-S1X1Qh-rfekpr-E8Jkg2_vFqdCFFTg@mail.gmail.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+ <c0347788fbad559a249a25128a23f40c85d9cbda.1351721190.git.josh.cartwright@ni.com>
+ <CAHTX3d++0fGSw7GQHcc-S1X1Qh-rfekpr-E8Jkg2_vFqdCFFTg@mail.gmail.com>
+Message-ID: <5097D1E8.2000403@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-05 at 09:45 +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 05, 2012 at 09:35:32AM +0000, Russell King - ARM Linux wrote:
-> > On Tue, Oct 30, 2012 at 04:16:59PM +0000, Pawel Moll wrote:
-> > > There was a glitch between clk-next and arm-soc - it should be fine
-> > > starting with next-20121030.
-> > 
-> > The problem is still there - my builds of my tree plus arm-soc are
-> > continuing to fail with:
-> > 
-> > arch/arm/mach-vexpress/built-in.o: In function `v2m_timer_init':
-> > reset.c:(.init.text+0xe0): undefined reference to `vexpress_clk_init'
-> > arch/arm/mach-vexpress/built-in.o: In function `v2m_dt_timer_init':
-> > reset.c:(.init.text+0x114): undefined reference to `vexpress_clk_of_init'
-> > 
-> > My guess is you have a dependency between the clk-next tree and arm-soc
-> > which you haven't told the arm-soc people about.
+
+
+On 11/05/2012 05:22 AM, Michal Simek wrote:
+> 2012/10/29 Josh Cartwright <josh.cartwright@ni.com>:
+>> Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
+>> drivers/clocksource, and out of the mach-zynq directory.
+>>
+>> The common.h (which only held the timer declaration) was renamed to
+>> xilinx_ttc.h and moved into include/linux.
+>>
+>> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>>  arch/arm/mach-zynq/Makefile                                    | 2 +-
+>>  arch/arm/mach-zynq/common.c                                    | 2 +-
+>>  drivers/clocksource/Makefile                                   | 1 +
+>>  arch/arm/mach-zynq/timer.c => drivers/clocksource/xilinx_ttc.c | 1 -
+>>  arch/arm/mach-zynq/common.h => include/linux/xilinx_ttc.h      | 4 ++--
+>>  5 files changed, 5 insertions(+), 5 deletions(-)
+>>  rename arch/arm/mach-zynq/timer.c => drivers/clocksource/xilinx_ttc.c (99%)
+>>  rename arch/arm/mach-zynq/common.h => include/linux/xilinx_ttc.h (91%)
 > 
-> Oh, and the above seems to affect all my kautobuilds for any ARM Ltd
-> development platform - it's not just vexpress which is affected by this
-> anymore.
+> Not going to apply this patch till there is clean way how to move all
+> drivers there.
+> Especially I don't like to add xilinx_ttc.h to include/linux folder.
+> 
 
-I've just successfully built defconfigs for vexpress, versatile and
-realview with next-20121105 so I guess Arnd simply didn't have time last
-week (the Connect event) to sort out the arm-soc tree...
+A cleaner way is how we are doing irqchips [1]. This needs a single
+function (or one each for clksrc and clkevt) that has a DT match list of
+all known timers and calls their init function. It should be a bit
+simpler than irqchips init function because you don't need to worry
+about hierarchy init ordering. That doesn't solve non-DT though and if
+there are any extra functions like we have with irqchips, you still need
+the header in include/linux.
 
-Arnd, will you pull the vexpress-clk-soc (containing, as you suggested,
-the soc stuff rebased on top of the clk branch) or do you want me to do
-something else?
+Rob
 
-Thanks!
-
-Pawe?
+[1] http://www.spinics.net/lists/arm-kernel/msg203687.html
