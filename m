@@ -1,70 +1,49 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Nov 2012 09:56:27 +0200
-Subject: [PATCHv2 7/7] i2c: omap: Restore i2c context always
-In-Reply-To: <1352025873-27492-8-git-send-email-shubhrajyoti@ti.com>
-References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-8-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <20121105075627.GH32468@arwen.pp.htv.fi>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 5 Nov 2012 10:04:41 +0200
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <20121102185453.GY15766@atomide.com>
+References: <20121101224703.2103.95474.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local> <50936A6E.3020202@ti.com>
+ <5093891D.6070302@ti.com> <50938A69.9040908@ti.com>
+ <20121102154901.GU15766@atomide.com> <20121102185453.GY15766@atomide.com>
+Message-ID: <50977319.9070902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2012-11-02 20:54, Tony Lindgren wrote:
+>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
+>>> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
+>>>> On 2012-11-02 08:38, Santosh Shilimkar wrote:
+>>>>>
+>>>>> Lets not move this in DMA code since the above is really related
+>>>>> to frame buffer. It reserves more DMA area for dma_alloc_coherent()
+>>>>> etc than default 2 MB. Infact, we should no longer need this with
+>>>>> CMA and memblock in place.
+>>>>>
+>>>>> Tomi,
+>>>>> Can we not get rid of the above memory reservation ?
+>>>>
+>>>> Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
+>>>> and I have no means to test it out, though. But below is a patch to
+>>>> remove it. I also attached the patch, as it looks like thunderbird wants
+>>>> to reformat the pasted patch... I'll remove the
+>>>> CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
+>>>> in my tree later.
+> 
+> Hmm actually, is it safe to remove for omap1, or should we
+> still keep it around for omap1?
 
-On Sun, Nov 04, 2012 at 04:14:33PM +0530, Shubhrajyoti D wrote:
-> Currently the restore is done based on the flag
-> OMAP_I2C_FLAG_RESET_REGS_POSTIDLE.
-> 
-> This helps the following
-> - The driver is always capable of restoring regardless
-> of the off mode support being there or not.
-> 
-> - While testing omap2430 it is found that in case of certain
-> error paths (timeout) a reset is done. However the restore
-> never happens as it is dependent on the POSTIDLE flag.
-> The other option would be to call a restore in the reset
-> case. As there are only a few registers to be restored
-> the penalty in the idle case should not be much.
-> 
-> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+Why wouldn't it be safe? Do you mean that CMA doesn't work on omap1,
+or...? I'm no expert on CMA, but as far as I can see with it's ARM
+generic stuff.
 
-Looks ok to me, one less unnecessary flag.
+ Tomi
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
 
-> ---
-> Todo: the flag could be deleted if the patch is accepted.
-> 
->  drivers/i2c/busses/i2c-omap.c |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 70d43b7..f66c5ab 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1314,8 +1314,7 @@ static int omap_i2c_runtime_resume(struct device *dev)
->  	if (!_dev->regs)
->  		return 0;
->  
-> -	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
-> -		__omap_i2c_init(_dev);
-> +	__omap_i2c_init(_dev);
->  
->  	return 0;
->  }
-> -- 
-> 1.7.5.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/16f65478/attachment.sig>
+Size: 897 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/106f3a2e/attachment.sig>
