@@ -1,92 +1,92 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 5 Nov 2012 07:19:33 +0000
-Subject: [RFC PATCH v3 00/16] DMA Engine support for AM33XX
-In-Reply-To: <1350566815-409-1-git-send-email-mporter@ti.com>
-References: <1350566815-409-1-git-send-email-mporter@ti.com>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAC0633@DBDE01.ent.ti.com>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Mon, 5 Nov 2012 12:52:00 +0530
+Subject: [PATCH v2 1/5] clk: samsung: add common clock framework support
+ for Samsung platforms
+In-Reply-To: <20121030163012.18780.19304@nucleus>
+References: <1349629855-4962-1-git-send-email-thomas.abraham@linaro.org>
+ <1349629855-4962-2-git-send-email-thomas.abraham@linaro.org>
+ <20121030163012.18780.19304@nucleus>
+Message-ID: <CAJuYYwScWunaVsg=4whrt4gRZYOVBbvAwFhYmN2PCQS723B3og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 18, 2012 at 18:56:39, Porter, Matt wrote:
+Hi Mike,
 
-...snip...
-...snip...
-...snip...
+Thanks for your review.
 
-> 
-> This series adds DMA Engine support for AM33xx, which uses
-> an EDMA DMAC. The EDMA DMAC has been previously supported by only
-> a private API implementation (much like the situation with OMAP
-> DMA) found on the DaVinci family of SoCs.
-> 
-> The series applies on top of 3.7-rc1 and the following patches:
-> 
-> 	- GPMC fails to reserve memory fix:
-> 	  http://www.spinics.net/lists/linux-omap/msg79675.html
-> 	- TPS65910 regulator fix:
-> 	  https://patchwork.kernel.org/patch/1593651/
-> 	- dmaengine DT support from Vinod's dmaengine_dt branch in
-> 	  git://git.infradead.org/users/vkoul/slave-dma.git since
-> 	  027478851791df751176398be02a3b1c5f6aa824
-> 
-> The approach taken is similar to how OMAP DMA is being converted to
-> DMA Engine support. With the functional EDMA private API already
-> existing in mach-davinci/dma.c, we first move that to an ARM common
-> area so it can be shared. Adding DT and runtime PM support to the
-> private EDMA API implementation allows it to run on AM33xx. AM33xx
-> *only* boots using DT so we leverage Jon's generic DT DMA helpers to
-> register EDMA DMAC with the of_dma framework and then add support
-> for calling the dma_request_slave_channel() API to both the mmc
-> and spi drivers.
-> 
-> With this series both BeagleBone and the AM335x EVM have working
-> MMC and SPI support.
-> 
-> This is tested on BeagleBone with a SPI framebuffer driver and MMC
-> rootfs. A trivial gpio DMA event misc driver was used to test the
-> crossbar DMA event support. It is also tested on the AM335x EVM
-> with the onboard SPI flash and MMC rootfs. The branch at
-> https://github.com/ohporter/linux/tree/edma-dmaengine-v3 has the
-> complete series, dependencies, and some test drivers/defconfigs.
-> 
-> Regression testing was done on AM180x-EVM (which also makes use
-> of the EDMA dmaengine driver and the EDMA private API) using SD,
-> SPI flash, and the onboard audio supported by the ASoC Davinci
-> driver.
+On 30 October 2012 22:00, Mike Turquette <mturquette@ti.com> wrote:
+> Hi Thomas,
+>
+> Quoting Thomas Abraham (2012-10-07 10:10:51)
+>> +/* determine the output clock speed of the pll */
+>> +static unsigned long samsung_pll_clock_recalc_rate(struct clk_hw *hw,
+>> +                               unsigned long parent_rate)
+>> +{
+>> +       struct samsung_pll_clock *clk_pll = to_clk_pll(hw);
+>> +
+>> +       if (clk_pll->get_rate)
+>> +               return to_clk_pll(hw)->get_rate(parent_rate);
+>
+> Why the extra indirection?  Does your samsung_pll_clock abstract several
+> different PLL implementations (with separate clock ops)?  If so, why not
+> make a unique struct for each PLL type?
 
-Since you have tested MMC, and probably will be adding Audio support
-for AM335x as well, I believe you will also be adding Pin-mux support
-for both the modules.
+Yes, it abstracts several PLL types. There are multiple PLL types used
+by Samsung SoC's and this clock type was supposed to abstract all the
+types of PLL's. But yes, you are right. It is better to have a unique
+implementation for each type of PLL. That way, multiple user's of a
+PLL type need not be worried about setting up runtime callbacks for
+clock operations.
 
-Can you share your plan to release the next version? 
-I have few patches pending for AM335x Audio (DT related). 
+>
+>> +
+>> +       return 0;
+>> +}
+>> +
+>> +/* round operation not supported */
+>> +static long samsung_pll_clock_round_rate(struct clk_hw *hw, unsigned long drate,
+>> +                               unsigned long *prate)
+>> +{
+>> +       return samsung_pll_clock_recalc_rate(hw, *prate);
+>
+> Why is round_rate not supported?  How is returning the recalculated rate
+> the right thing here?
 
-Thanks in advance
+The PLL does not include a divider for the rounding operation. So the
+output of the PLL clock type is not something that can be divided
+down. The parent clock of the PLL clock type is usually a low
+frequency oscillator. Hence, the round rate operation has not been
+implemented for the PLL clock type.
 
-Regards
-Gururaja
+>
+>> +/*
+>> + * Allow platform specific implementations to attach set_rate and get_rate
+>> + * callbacks for the pll type clock. Typical calling sequence..
+>> + *
+>> + * struct clk *clk = clk_get(NULL, "pll-clk-name");
+>> + * samsung_pll_clk_set_cb(clk, pll_set_rate, pll_get_rate);
+>> + */
+>> +void __init samsung_pll_clk_set_cb(struct clk *clk,
+>> +                       int (*set_rate)(unsigned long rate),
+>> +                       unsigned long (*get_rate)(unsigned long rate))
+>> +{
+>> +       struct samsung_pll_clock *clk_pll;
+>> +       struct clk_hw *hw = __clk_get_hw(clk);
+>> +
+>> +       clk_pll = to_clk_pll(hw);
+>> +       clk_pll->set_rate = set_rate;
+>> +       clk_pll->get_rate = get_rate;
+>> +}
+>
+> This answers my questions above having different PLL types.  Why not
+> just make seprate clk_hw structs for each PLL type instead of the extra
+> layer of abstraction + runtime assignment of clk ops?
 
-> 
-> After this series, the plan is to convert the last in-tree user
-> of the private EDMA API (davinci-pcm/mcasp) and then eliminate
-> the private EDMA API by folding its functionality into
-> drivers/dma/edma.c.
-> 
-> Matt Porter (16):
->   dmaengine: edma: fix slave config dependency on direction
->   ARM: davinci: move private EDMA API to arm/common
->   ARM: edma: remove unused transfer controller handlers
->   ARM: edma: add DT and runtime PM support for AM33XX
->   ARM: edma: add AM33XX crossbar event support
->   dmaengine: edma: enable build for AM33XX
->   dmaengine: edma: Add TI EDMA device tree binding
->   ARM: dts: add AM33XX EDMA support
->   dmaengine: add dma_request_slave_channel_compat()
->   mmc: omap_hsmmc: convert to dma_request_slave_channel_compat()
->   mmc: omap_hsmmc: limit max_segs with the EDMA DMAC
->   mmc: omap_hsmmc: add generic DMA request support to the DT binding
->   ARM: dts: add AM33XX MMC support
->   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
->   spi: omap2-mcspi: add generic DMA request support to the DT binding
->   ARM: dts: add AM33XX SPI support
-> 
+Ok. I will redo this in the next version of this patch.
+
+Thanks,
+Thomas.
+
+>
+> Regards,
+> Mike
