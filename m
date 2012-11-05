@@ -1,43 +1,145 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Nov 2012 15:48:18 -0600
-Subject: [PATCH v2] ARM: plat-versatile: move FPGA irq driver to
- drivers/irqchip
-In-Reply-To: <20121102121556.GV21164@n2100.arm.linux.org.uk>
-References: <1351805329-19576-1-git-send-email-linus.walleij@linaro.org>
- <20121101232010.78269291@skate>
- <20121102121556.GV21164@n2100.arm.linux.org.uk>
-Message-ID: <50983422.9090301@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 6 Nov 2012 03:22:16 +0530
+Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87txt4aqyc.fsf@deeprootsystems.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
+ <87txt4aqyc.fsf@deeprootsystems.com>
+Message-ID: <50983510.80000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2012 07:15 AM, Russell King - ARM Linux wrote:
-> On Thu, Nov 01, 2012 at 11:20:10PM +0100, Thomas Petazzoni wrote:
->> Linus,
+On Monday 05 November 2012 11:10 PM, Kevin Hilman wrote:
+> +Santosh (to help with EMIF questions/comments)
+>
+> On 11/02/2012 12:32 PM, Vaibhav Bedia wrote:
+>> AM335x supports various low power modes as documented
+>> in section 8.1.4.3 of the AM335x TRM which is available
+>> @ http://www.ti.com/litv/pdf/spruh73f
 >>
->> On Thu,  1 Nov 2012 22:28:49 +0100, Linus Walleij wrote:
+>> DeepSleep0 mode offers the lowest power mode with limited
+>> wakeup sources without a system reboot and is mapped as
+>> the suspend state in the kernel. In this state, MPU and
+>> PER domains are turned off with the internal RAM held in
+>> retention to facilitate resume process. As part of the boot
+>> process, the assembly code is copied over to OCMCRAM using
+>> the OMAP SRAM code.
 >>
->>> +void fpga_handle_irq(struct pt_regs *regs);
+>> AM335x has a Cortex-M3 (WKUP_M3) which assists the MPU
+>> in DeepSleep0 entry and exit. WKUP_M3 takes care of the
+>> clockdomain and powerdomain transitions based on the
+>> intended low power state. MPU needs to load the appropriate
+>> WKUP_M3 binary onto the WKUP_M3 memory space before it can
+>> leverage any of the PM features like DeepSleep.
 >>
->> This function does not need to be exposed in a public header: as
->> proposed for the bcm2835 and armada-370-xp IRQ controller drivers, the
->> driver should directly do handle_arch_irq = fpga_handle_irq, and
->> therefore there is no need for the machine desc structure to reference
->> fpga_handle_irq anymore.
-> 
-> Err no, then you don't understand what's going on here.  This may or may
-> not be a top-level IRQ handler.  Some ARM platforms have three of these
-> cascaded, others have one of these cascaded off a VIC or GIC.
-> 
-> To override the top level IRQ handler unconditionally is going to break
-> platforms.
+>> The IPC mechanism between MPU and WKUP_M3 uses a mailbox
+>> sub-module and 8 IPC registers in the Control module. MPU
+>> uses the assigned Mailbox for issuing an interrupt to
+>> WKUP_M3 which then goes and checks the IPC registers for
+>> the payload. WKUP_M3 has the ability to trigger on interrupt
+>> to MPU by executing the "sev" instruction.
+>>
+>> In the current implementation when the suspend process
+>> is initiated MPU interrupts the WKUP_M3 to let about the
+>> intent of entering DeepSleep0 and waits for an ACK. When
+>> the ACK is received, MPU continues with its suspend process
+>> to suspend all the drivers and then jumps to assembly in
+>> OCMC RAM to put the PLLs in bypass, put the external RAM in
+>> self-refresh mode and then finally execute the WFI instruction.
+>> The WFI instruction triggers another interrupt to the WKUP_M3
+>> which then continues wiht the power down sequence wherein the
+>> clockdomain and powerdomain transition takes place. As part of
+>> the sleep sequence, WKUP_M3 unmasks the interrupt lines for
+>> the wakeup sources. When WKUP_M3 executes WFI, the hardware
+>> disables the main oscillator.
+>>
+>> When a wakeup event occurs, WKUP_M3 starts the power-up
+>> sequence by switching on the power domains and finally
+>> enabling the clock to MPU. Since the MPU gets powered down
+>> as part of the sleep sequence, in the resume path ROM code
+>> starts executing. The ROM code detects a wakeup from sleep
+>> and then jumps to the resume location in OCMC which was
+>> populated in one of the IPC registers as part of the suspend
+>> sequence.
+>>
+>> The low level code in OCMC relocks the PLLs, enables access
+>> to external RAM and then jumps to the cpu_resume code of
+>> the kernel to finish the resume process.
+>>
+>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>
+> Very well summarized.  Thanks for the thorough changelog.
+>
+> First, some general comments.  This is a big patch and probably should
+> be broken up a bit.  I suspect it could be broken up a bit, maybe into
+> at least:
+>
+> - EMIF interface
+> - SCM interface, new APIs
+> - assembly/OCM code
+> - pm33xx.[ch]
+> - lastly, the late_init stuff that actually initizlizes
+>
+> I have a handful of comments below.  I wrote this up on the plane over
+> the weekend, and I see that Santosh has already made some similar
+> comments, but I'll send mine anyways.
+>
+[...]
 
-But this should work:
+>
+>> +extern void __iomem *am33xx_get_emif_base(void);
+>> +int wkup_mbox_msg(struct notifier_block *self, unsigned long len, void *msg);
+>> +#endif
+>> +
+>> +#define	IPC_CMD_DS0			0x3
+>> +#define IPC_CMD_RESET                   0xe
+>> +#define DS_IPC_DEFAULT			0xffffffff
+>> +
+>> +#define IPC_RESP_SHIFT			16
+>> +#define IPC_RESP_MASK			(0xffff << 16)
+>> +
+>> +#define M3_STATE_UNKNOWN		0
+>> +#define M3_STATE_RESET			1
+>> +#define M3_STATE_INITED			2
+>> +#define M3_STATE_MSG_FOR_LP		3
+>> +#define M3_STATE_MSG_FOR_RESET		4
+>> +
+>> +#define AM33XX_OCMC_END			0x40310000
+>> +#define AM33XX_EMIF_BASE		0x4C000000
+>> +
+>> +/*
+>> + * This a subset of registers defined in drivers/memory/emif.h
+>> + * Move that to include/linux/?
+>> + */
+>
+> I'd probably suggest just moving the register definitions you
+> need into <plat/emif_plat.h> so they can be shared with the driver.
+>
+> Also, the EMIF stuff would benefit greatly from using symbolic defines
+> for the values being written.  Probably having those in
+> <plat/emif_plat.h> would also help out here.
+>
+> Or, maybe the EMIF driver can provide some self-contained stubs that can
+> be copied to OCP RAM for the functionality needed here?
+>
+> Santosh, what do you think of that?
+>
+Thats what I mentioned in my comment. I also don't know why such a bad
+hardware choice was made when we have perfectly working EMIF IP across
+low power states. Even the self refresh control is managed inside
+hardware upon idle.  My guess is DDR self-refresh might be the reason
+to use OCMC RAM.
 
-if (!handle_arch_irq)
-	handle_arch_irq = fpga_handle_irq;
+In either case, Keeping EMIF changes separate as part of EMIF 
+driver/platform code is right way to go about it. May be the
+disable_selfrefresh() might need to kept in assembly files since it 
+needs to be running from SRAM but rest need not be part of
+PM code.
 
-As long as the primary controller is always initialized first, this will
-work. This is guaranteed by DT of_irq_init, and you will probably have
-other problems if that wasn't the case for non-DT.
+Regards
+Santosh
 
-Rob
+For
+
+Regards
+Santosh
