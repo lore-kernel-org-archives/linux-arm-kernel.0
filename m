@@ -1,51 +1,50 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Mon, 5 Nov 2012 16:15:42 +0530
-Subject: [PATCH 02/10] ARM: dts: AM33XX: Add matrix keypad device tree data to
- am335x-evm
+Date: Mon, 5 Nov 2012 16:15:47 +0530
+Subject: [PATCH 07/10] ARM: dts: AM33XX: Add pinmux configuration for
+ gpio-leds to EVMSK
 In-Reply-To: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
 References: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352112350-13398-3-git-send-email-anilkumar@ti.com>
+Message-ID: <1352112350-13398-8-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add matrix keypad device tree data to am335x-evm by adding all
-the necessary parameters like keymap, row & column gpios and etc.
+Add pinmux configurations for gpio based volume keys to am335x-evmsk.
+In this patch, only single named mode/state is added and these pins
+are configured during pinctrl driver initialization.
+
+Default mode is nothing but the values required for the module during
+active state. With this configurations module is functional as
+expected.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-evm.dts |   20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/am335x-evmsk.dts |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 9199456..8076e66 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -110,6 +110,26 @@
- 		regulator-name = "lis3_reg";
- 		regulator-boot-on;
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 6f53879..659ec5b 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -30,6 +30,20 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
  	};
-+
-+	matrix_keypad: matrix_keypad at 0 {
-+		compatible = "gpio-matrix-keypad";
-+		debounce-delay-ms = <5>;
-+		col-scan-delay-us = <2>;
-+
-+		row-gpios = <&gpio2 25 0	/* Bank1, pin25 */
-+			     &gpio2 26 0	/* Bank1, pin26 */
-+			     &gpio2 27 0>;	/* Bank1, pin27 */
-+
-+		col-gpios = <&gpio2 21 0	/* Bank1, pin21 */
-+			     &gpio2 22 0>;	/* Bank1, pin22 */
-+
-+		linux,keymap = <0x0000008b	/* MENU */
-+				0x0100009e	/* BACK */
-+				0x02000069	/* LEFT */
-+				0x0001006a	/* RIGHT */
-+				0x0101001c	/* ENTER */
-+				0x0201006c>;	/* DOWN */
-+	};
- };
  
- /include/ "tps65910.dtsi"
++	am33xx_pinmux: pinmux at 44e10800 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&user_leds_s0>;
++
++		user_leds_s0: user_leds_s0 {
++			pinctrl-single,pins = <
++				0x10 0x7	/* gpmc_ad4.gpio1_4, OUTPUT | MODE7 */
++				0x14 0x7	/* gpmc_ad5.gpio1_5, OUTPUT | MODE7 */
++				0x18 0x7	/* gpmc_ad6.gpio1_6, OUTPUT | MODE7 */
++				0x1c 0x7	/* gpmc_ad7.gpio1_7, OUTPUT | MODE7 */
++			>;
++		};
++	};
++
+ 	ocp {
+ 		uart1: serial at 44e09000 {
+ 			status = "okay";
 -- 
 1.7.9.5
