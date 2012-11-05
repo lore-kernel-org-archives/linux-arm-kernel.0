@@ -1,71 +1,86 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 5 Nov 2012 10:58:17 +0000
-Subject: [PATCH RESEND] xen/arm: use the __HVC macro
-In-Reply-To: <alpine.DEB.2.02.1210241624400.2689@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1208161618550.4850@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1210241624400.2689@kaball.uk.xensource.com>
-Message-ID: <20121105105817.GC2005@linaro.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 5 Nov 2012 12:02:21 +0100
+Subject: [PATCH V2 3/3] ARM: dts: omap5-evm: LPDDR2 memory device details
+ for EVM
+In-Reply-To: <1349959669-16366-4-git-send-email-lokeshvutla@ti.com>
+References: <1349959669-16366-1-git-send-email-lokeshvutla@ti.com>
+ <1349959669-16366-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <50979CBD.8010901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 24, 2012 at 04:26:08PM +0100, Stefano Stabellini wrote:
-> Use the new __HVC macro in hypercall.S.
+On 10/11/2012 02:47 PM, Lokesh Vutla wrote:
+> Samsung's K3PE0E000B memory part is used in OMAP5-evm board.
+> Adding timings and geometry details for Samsung's memory part and
+> attaching the same to device-handle of EMIF1/2.
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-This is correct usage of the __HVC() macro, so
-
-Acked-by: Dave Martin <dave.martin@linaro.org>
-
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
->  arch/arm/xen/hypercall.S |   14 +++++---------
->  1 files changed, 5 insertions(+), 9 deletions(-)
+>  arch/arm/boot/dts/omap5-evm.dts           |   11 +++++
+>  arch/arm/boot/dts/samsung_k3pe0e000b.dtsi |   67 +++++++++++++++++++++++++++++
+>  2 files changed, 78 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
 > 
-> diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-> index 074f5ed..71f7239 100644
-> --- a/arch/arm/xen/hypercall.S
-> +++ b/arch/arm/xen/hypercall.S
-> @@ -48,20 +48,16 @@
+> diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+> index 6f87e1a..ed1d1b5 100644
+> --- a/arch/arm/boot/dts/omap5-evm.dts
+> +++ b/arch/arm/boot/dts/omap5-evm.dts
+> @@ -8,6 +8,7 @@
+>  /dts-v1/;
 >  
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> +#include <asm/opcodes-virt.h>
->  #include <xen/interface/xen.h>
+>  /include/ "omap5.dtsi"
+> +/include/ "samsung_k3pe0e000b.dtsi"
 >  
->  
-> -/* HVC 0xEA1 */
-> -#ifdef CONFIG_THUMB2_KERNEL
-> -#define xen_hvc .word 0xf7e08ea1
-> -#else
-> -#define xen_hvc .word 0xe140ea71
-> -#endif
-> +#define XEN_IMM 0xEA1
->  
->  #define HYPERCALL_SIMPLE(hypercall)		\
->  ENTRY(HYPERVISOR_##hypercall)			\
->  	mov r12, #__HYPERVISOR_##hypercall;	\
-> -	xen_hvc;							\
-> +	__HVC(XEN_IMM);						\
->  	mov pc, lr;							\
->  ENDPROC(HYPERVISOR_##hypercall)
->  
-> @@ -76,7 +72,7 @@ ENTRY(HYPERVISOR_##hypercall)			\
->  	stmdb sp!, {r4}						\
->  	ldr r4, [sp, #4]					\
->  	mov r12, #__HYPERVISOR_##hypercall;	\
-> -	xen_hvc								\
-> +	__HVC(XEN_IMM);						\
->  	ldm sp!, {r4}						\
->  	mov pc, lr							\
->  ENDPROC(HYPERVISOR_##hypercall)
-> @@ -100,7 +96,7 @@ ENTRY(privcmd_call)
->  	mov r2, r3
->  	ldr r3, [sp, #8]
->  	ldr r4, [sp, #4]
-> -	xen_hvc
-> +	__HVC(XEN_IMM)
->  	ldm sp!, {r4}
->  	mov pc, lr
->  ENDPROC(privcmd_call);
-> -- 
-> 1.7.2.5
+>  / {
+>  	model = "TI OMAP5 EVM board";
+> @@ -82,3 +83,13 @@
+>  			0x020700d9>;	/* SEARCH */
+>  	linux,input-no-autorepeat;
+>  };
+> +
+> +&emif1 {
+> +	cs1-used;
+> +	device-handle = <&samsung_K3PE0E000B>;
+> +};
+> +
+> +&emif2 {
+> +	cs1-used;
+> +	device-handle = <&samsung_K3PE0E000B>;
+> +};
+> diff --git a/arch/arm/boot/dts/samsung_k3pe0e000b.dtsi b/arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
+> new file mode 100644
+> index 0000000..b352d69
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
+> @@ -0,0 +1,67 @@
+> +/*
+> + * Timings and Geometry for Samsung K3PE0E000B memory part
+> + */
+> +
+> +/ {
+> +	samsung_K3PE0E000B: lpddr2 {
+> +		compatible	= "Samsung,K3PE0E000B","jedec,lpddr2-s4";
+> +		density		= <4096>;
+> +		io-width	= <32>;
+> +
+> +		tRPab-min-tck	= <3>;
+> +		tRCD-min-tck	= <3>;
+> +		tWR-min-tck	= <3>;
+> +		tRASmin-min-tck	= <3>;
+> +		tRRD-min-tck	= <2>;
+> +		tWTR-min-tck	= <2>;
+> +		tXP-min-tck	= <2>;
+> +		tRTP-min-tck	= <2>;
+> +		tCKE-min-tck	= <3>;
+> +		tCKESR-min-tck	= <3>;
+> +		tFAW-min-tck	= <8>;
+> +
+> +		timings_samsung_K3PE0E000B_533mhz: lpddr2-timings at 0 {
+
+Nit, but the official unit is: MHz [1].
+
+
+Regards,
+Benoit
+
+[1] http://www.bipm.org/utils/common/pdf/si_brochure_8_en.pdf
