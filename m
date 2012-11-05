@@ -1,25 +1,23 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Nov 2012 14:02:58 +0000
-Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric in
- mach-mvebu
-In-Reply-To: <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
+Date: Mon, 5 Nov 2012 14:05:58 +0000
+Subject: [PATCH V2 2/5] arm: mvebu: Added initial support for power
+ managmement service unit
+In-Reply-To: <1351545108-18954-3-git-send-email-gregory.clement@free-electrons.com>
 References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
- <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121105140258.GO3351@mudshark.cambridge.arm.com>
+ <1351545108-18954-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121105140558.GP3351@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Mon, Oct 29, 2012 at 09:11:44PM +0000, Gregory CLEMENT wrote:
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+On Mon, Oct 29, 2012 at 09:11:45PM +0000, Gregory CLEMENT wrote:
+> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
 > new file mode 100644
-> index 0000000..69e130d
+> index 0000000..cee020b
 > --- /dev/null
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -0,0 +1,89 @@
+> +++ b/arch/arm/mach-mvebu/pmsu.c
+> @@ -0,0 +1,78 @@
 > +/*
-> + * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
+> + * Power Management Service Unit(PMSU) support for Armada 370/XP platforms.
 > + *
 > + * Copyright (C) 2012 Marvell
 > + *
@@ -31,40 +29,49 @@ On Mon, Oct 29, 2012 at 09:11:44PM +0000, Gregory CLEMENT wrote:
 > + * License version 2.  This program is licensed "as is" without any
 > + * warranty of any kind, whether express or implied.
 > + *
-> + * The Armada 370 and Armada XP SOCs have a coherency fabric which is
-> + * responsible for ensuring hardware coherency between all CPUs and between
-> + * CPUs and I/O masters. This file initializes the coherency fabric and
-> + * supplies basic routines for configuring and controlling hardware coherency
+> + * The Armada 370 and Armada XP SOCs have a power management service
+> + * unit which is responsible for powering down and waking up CPUs and
+> + * other SOC units
 > + */
-
-[...]
-
-> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
-> +{
-> +	int reg;
 > +
-> +	if (!coherency_base) {
-> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
-> +		pr_warn("Coherency fabric is not initialized\n");
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of_address.h>
+> +#include <linux/io.h>
+> +#include <linux/smp.h>
+> +#include <asm/smp_plat.h>
+> +
+> +static void __iomem *pmsu_mp_base;
+> +static void __iomem *pmsu_reset_base;
+> +
+> +#define PMSU_BOOT_ADDR_REDIRECT_OFFSET(cpu)	((cpu * 0x100) + 0x24)
+> +#define PMSU_RESET_CTL_OFFSET(cpu)		(cpu * 0x8)
+> +
+> +static struct of_device_id of_pmsu_table[] = {
+> +	{.compatible = "marvell,armada-370-xp-pmsu"},
+> +	{ /* end of list */ },
+> +};
+> +
+> +#ifdef CONFIG_SMP
+> +int armada_xp_boot_cpu(unsigned int cpu_id, void __iomem *boot_addr)
+> +{
+> +	int reg, hw_cpu;
+> +
+> +	if (!pmsu_mp_base || !pmsu_reset_base) {
+> +		pr_warn("Can't boot CPU. PMSU is uninitialized\n");
 > +		return 1;
 > +	}
 > +
-> +	/* Enable the CPU in coherency fabric */
-> +	reg = readl(coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
-> +	reg |= 1 << (24 + hw_cpu_id);
-> +	writel(reg, coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
+> +	hw_cpu = cpu_logical_map(cpu_id);
 > +
-> +	/* Add CPU to SMP group */
-> +	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
-> +	reg |= 1 << (16 + hw_cpu_id + (smp_group_id == 0 ? 8 : 0));
-> +	writel(reg, coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
-> +
-> +	return 0;
-> +}
+> +	writel(virt_to_phys(boot_addr), pmsu_mp_base +
+> +			PMSU_BOOT_ADDR_REDIRECT_OFFSET(hw_cpu));
 
-These writels may expand to code containing calls to outer_sync(), which
-will attempt to take a spinlock for the aurora l2. Given that the CPU isn't
-coherent, how does this play out with the exclusive store instruction in the
-lock?
+virt_to_phys on an __iomem * doesn't feel right to me...
+
+> +	/* Make sure value hits memory before reset */
+> +	dsb();
+
+writel has barrier semantics -- you shouldn't need this dsb.
 
 Will
