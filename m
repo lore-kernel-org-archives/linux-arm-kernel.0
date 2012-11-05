@@ -1,78 +1,49 @@
-From: javier.martin@vista-silicon.com (Javier Martin)
-Date: Mon,  5 Nov 2012 16:59:45 +0100
-Subject: [PATCH 2/2] media: coda: Use iram_alloc() for codadx6 too.
-In-Reply-To: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <1352131185-12079-2-git-send-email-javier.martin@vista-silicon.com>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Mon, 05 Nov 2012 17:09:13 +0100
+Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
+ SCHED_TRACER depends on HZ]
+In-Reply-To: <20121105134655.GB27260@S2100-06.ap.freescale.net>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+Message-ID: <5097E4A9.3090008@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use this helper function instead of hardcoding the
-physical address of the IRAM in the i.MX27.
+On 05.11.2012 14:46, Shawn Guo wrote:
 
-Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
----
- drivers/media/video/Kconfig |    2 +-
- drivers/media/video/coda.c  |   18 ++++++++++--------
- 2 files changed, 11 insertions(+), 9 deletions(-)
+>>> From my quick testing on imx23 with printk timestamp, it's not OK,
+>>> so we may need to leave imx23 out there.
+>>
+> I should say it's practically not OK since it wraps in such a short
+> period.  But it actually works as expected.
+> 
+>> Hmm, does it wrap after 2 seconds?
+> 
+> Yes, it does wrap after ~2 seconds.
 
-diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-index ecab6ef..0b5f785 100644
---- a/drivers/media/video/Kconfig
-+++ b/drivers/media/video/Kconfig
-@@ -1229,7 +1229,7 @@ config VIDEO_CODA
- 	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
- 	select VIDEOBUF2_DMA_CONTIG
- 	select V4L2_MEM2MEM_DEV
--	select IRAM_ALLOC if SOC_IMX53
-+	select IRAM_ALLOC
- 	---help---
- 	   Coda is a range of video codec IPs that supports
- 	   H.264, MPEG-4, and other video formats.
-diff --git a/drivers/media/video/coda.c b/drivers/media/video/coda.c
-index 7febcd9..96ecb3f 100644
---- a/drivers/media/video/coda.c
-+++ b/drivers/media/video/coda.c
-@@ -43,6 +43,7 @@
- #define CODA_PARA_BUF_SIZE	(10 * 1024)
- #define CODA_ISRAM_SIZE	(2048 * 2)
- #define CODA7_IRAM_SIZE		0x14000 /* 81920 bytes */
-+#define CODADX6_IRAM_SIZE	45056
- 
- #define CODA_MAX_FRAMEBUFFERS	2
- 
-@@ -1919,6 +1920,8 @@ static int __devinit coda_probe(struct platform_device *pdev)
- 	const struct of_device_id *of_id =
- 			of_match_device(of_match_ptr(coda_dt_ids), &pdev->dev);
- 	const struct platform_device_id *pdev_id;
-+	void __iomem *iram_vaddr;
-+	unsigned long iram_size;
- 	struct coda_dev *dev;
- 	struct resource *res;
- 	int ret, irq;
-@@ -2016,16 +2019,15 @@ static int __devinit coda_probe(struct platform_device *pdev)
- 	}
- 
- 	if (dev->devtype->product == CODA_DX6) {
--		dev->iram_paddr = 0xffff4c00;
-+		iram_size = CODADX6_IRAM_SIZE;
- 	} else {
--		void __iomem *iram_vaddr;
-+		iram_size = CODA7_IRAM_SIZE;
-+	}
- 
--		iram_vaddr = iram_alloc(CODA7_IRAM_SIZE,
--					&dev->iram_paddr);
--		if (!iram_vaddr) {
--			dev_err(&pdev->dev, "unable to alloc iram\n");
--			return -ENOMEM;
--		}
-+	iram_vaddr = iram_alloc(iram_size, &dev->iram_paddr);
-+	if (!iram_vaddr) {
-+		dev_err(&pdev->dev, "unable to alloc iram\n");
-+		return -ENOMEM;
- 	}
- 
- 	platform_set_drvdata(pdev, dev);
+This is weird. AFAIK the printk should be using sched_clock(),
+which is a weak symbol overridden in arch/arm/kernel/sched_clock.c
+and it should take care of the extension to never-ever-wrapping
+64-bit timestamp. Looks that it does not and if it does not,
+I think there is more to be worried of than just printk timestamps.
+
+I don't see anything wrong with the code; bumping the 64-bit
+part so that it is no more than wrap time away should take
+place in sched_clock_timer which is called at 90% of the
+time interval.
+
+BTW this patch deserves IMHO looking at
+  https://patchwork.kernel.org/patch/1193631/
+but it is probably not the problem here.
+
+In case it matters I'm working with the current 3.4 with
+RT patches (none of them touches arch/arm/mach-mxs) - sorry
+not to mention it earlier, I forgot to write it again after
+I included additional mailing lists to the discussion.
+
+
+Regards
 -- 
-1.7.9.5
+                                            Stano
