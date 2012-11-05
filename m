@@ -1,77 +1,94 @@
 From: walken@google.com (Michel Lespinasse)
-Date: Mon,  5 Nov 2012 14:46:58 -0800
-Subject: [PATCH 01/16] mm: add anon_vma_lock to validate_mm()
+Date: Mon,  5 Nov 2012 14:47:00 -0800
+Subject: [PATCH 03/16] mm: check rb_subtree_gap correctness
 In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
 References: <1352155633-8648-1-git-send-email-walken@google.com>
-Message-ID: <1352155633-8648-2-git-send-email-walken@google.com>
+Message-ID: <1352155633-8648-4-git-send-email-walken@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Iterate vma->anon_vma_chain without anon_vma_lock may cause NULL ptr deref in
-anon_vma_interval_tree_verify(), because the node in the chain might have been
-removed.
+When CONFIG_DEBUG_VM_RB is enabled, check that rb_subtree_gap is
+correctly set for every vma and that mm->highest_vm_end is also correct.
 
-[ 1523.657950] BUG: unable to handle kernel paging request at fffffffffffffff0
-[ 1523.660022] IP: [<ffffffff8122c29c>] anon_vma_interval_tree_verify+0xc/0xa0
-[ 1523.660022] PGD 4e28067 PUD 4e29067 PMD 0
-[ 1523.675725] Oops: 0000 [#1] PREEMPT SMP DEBUG_PAGEALLOC
-[ 1523.750066] CPU 0
-[ 1523.750066] Pid: 9050, comm: trinity-child64 Tainted: G        W    3.7.0-rc2-next-20121025-sasha-00001-g673f98e-dirty #77
-[ 1523.750066] RIP: 0010:[<ffffffff8122c29c>]  [<ffffffff8122c29c>] anon_vma_interval_tree_verify+0xc/0xa0
-[ 1523.750066] RSP: 0018:ffff880045f81d48  EFLAGS: 00010296
-[ 1523.750066] RAX: 0000000000000000 RBX: fffffffffffffff0 RCX: 0000000000000000
-[ 1523.750066] RDX: 0000000000000000 RSI: 0000000000000001 RDI: fffffffffffffff0
-[ 1523.750066] RBP: ffff880045f81d58 R08: 0000000000000000 R09: 0000000000000f14
-[ 1523.750066] R10: 0000000000000f12 R11: 0000000000000000 R12: ffff8800096c8d70
-[ 1523.750066] R13: ffff8800096c8d00 R14: 0000000000000000 R15: ffff8800095b45e0
-[ 1523.750066] FS:  00007f7a923f3700(0000) GS:ffff880013600000(0000) knlGS:0000000000000000
-[ 1523.750066] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
-[ 1523.750066] CR2: fffffffffffffff0 CR3: 000000000969d000 CR4: 00000000000406f0
-[ 1523.750066] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
-[ 1523.750066] DR3: 0000000000000000 DR6: 00000000ffff0ff0 DR7: 0000000000000400
-[ 1523.750066] Process trinity-child64 (pid: 9050, threadinfo ffff880045f80000, task ffff880048eb0000)
-[ 1523.750066] Stack:
-[ 1523.750066]  ffff88000d7533f0 fffffffffffffff0 ffff880045f81da8 ffffffff812361d8
-[ 1523.750066]  ffff880045f81d98 ffff880048ee9000 ffff8800095b4580 ffff8800095b4580
-[ 1523.750066]  ffff88001d1cdb00 ffff8800095b45f0 ffff880022a4d630 ffff8800095b45e0
-[ 1523.750066] Call Trace:
-[ 1523.750066]  [<ffffffff812361d8>] validate_mm+0x58/0x1e0
-[ 1523.750066]  [<ffffffff81236aa5>] vma_adjust+0x635/0x6b0
-[ 1523.750066]  [<ffffffff81236c81>] __split_vma.isra.22+0x161/0x220
-[ 1523.750066]  [<ffffffff81237934>] split_vma+0x24/0x30
-[ 1523.750066]  [<ffffffff8122ce6a>] sys_madvise+0x5da/0x7b0
-[ 1523.750066]  [<ffffffff811cd14c>] ? rcu_eqs_exit+0x9c/0xb0
-[ 1523.750066]  [<ffffffff811802cd>] ? trace_hardirqs_on+0xd/0x10
-[ 1523.750066]  [<ffffffff83aee198>] tracesys+0xe1/0xe6
-[ 1523.750066] Code: 4c 09 ff 48 39 ce 77 9e f3 c3 0f 1f 44 00 00 31 c0 c3 66 66 66 66 2e 0f 1f 84 00 00 00 00 00 55 48 89 e5 53
-48 89 fb 48 83 ec 08 <48> 8b 17 48 8b 8a 90 00 00 00 48 39 4f 40 74 34 80 3d f7 1f 5c
-[ 1523.750066] RIP  [<ffffffff8122c29c>] anon_vma_interval_tree_verify+0xc/0xa0
-[ 1523.750066]  RSP <ffff880045f81d48>
-[ 1523.750066] CR2: fffffffffffffff0
-[ 1523.750066] ---[ end trace e35e5fa49072faf9 ]---
+Also add an explicit 'bug' variable to track if browse_rb() detected any
+invalid condition.
 
-Reported-by: Sasha Levin <sasha.levin@oracle.com>
-Figured-out-by: Bob Liu <lliubbo@gmail.com>
 Signed-off-by: Michel Lespinasse <walken@google.com>
+Reviewed-by: Rik van Riel <riel@redhat.com>
 
 ---
- mm/mmap.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ mm/mmap.c |   24 ++++++++++++++++--------
+ 1 files changed, 16 insertions(+), 8 deletions(-)
 
 diff --git a/mm/mmap.c b/mm/mmap.c
-index 2d942353d681..9a796c41e7d9 100644
+index 2de8bcfe859d..769a09cc71af 100644
 --- a/mm/mmap.c
 +++ b/mm/mmap.c
-@@ -334,8 +334,10 @@ void validate_mm(struct mm_struct *mm)
+@@ -365,7 +365,7 @@ static void vma_rb_erase(struct vm_area_struct *vma, struct rb_root *root)
+ #ifdef CONFIG_DEBUG_VM_RB
+ static int browse_rb(struct rb_root *root)
+ {
+-	int i = 0, j;
++	int i = 0, j, bug = 0;
+ 	struct rb_node *nd, *pn = NULL;
+ 	unsigned long prev = 0, pend = 0;
+ 
+@@ -373,29 +373,33 @@ static int browse_rb(struct rb_root *root)
+ 		struct vm_area_struct *vma;
+ 		vma = rb_entry(nd, struct vm_area_struct, vm_rb);
+ 		if (vma->vm_start < prev)
+-			printk("vm_start %lx prev %lx\n", vma->vm_start, prev), i = -1;
++			printk("vm_start %lx prev %lx\n", vma->vm_start, prev), bug = 1;
+ 		if (vma->vm_start < pend)
+-			printk("vm_start %lx pend %lx\n", vma->vm_start, pend);
++			printk("vm_start %lx pend %lx\n", vma->vm_start, pend), bug = 1;
+ 		if (vma->vm_start > vma->vm_end)
+-			printk("vm_end %lx < vm_start %lx\n", vma->vm_end, vma->vm_start);
++			printk("vm_end %lx < vm_start %lx\n", vma->vm_end, vma->vm_start), bug = 1;
++		if (vma->rb_subtree_gap != vma_compute_subtree_gap(vma))
++			printk("free gap %lx, correct %lx\n",
++			       vma->rb_subtree_gap,
++			       vma_compute_subtree_gap(vma)), bug = 1;
+ 		i++;
+ 		pn = nd;
+ 		prev = vma->vm_start;
+ 		pend = vma->vm_end;
+ 	}
+ 	j = 0;
+-	for (nd = pn; nd; nd = rb_prev(nd)) {
++	for (nd = pn; nd; nd = rb_prev(nd))
+ 		j++;
+-	}
+ 	if (i != j)
+-		printk("backwards %d, forwards %d\n", j, i), i = 0;
+-	return i;
++		printk("backwards %d, forwards %d\n", j, i), bug = 1;
++	return bug ? -1 : i;
+ }
+ 
+ void validate_mm(struct mm_struct *mm)
+ {
+ 	int bug = 0;
+ 	int i = 0;
++	unsigned long highest_address = 0;
  	struct vm_area_struct *vma = mm->mmap;
  	while (vma) {
  		struct anon_vma_chain *avc;
-+		vma_lock_anon_vma(vma);
+@@ -403,11 +407,15 @@ void validate_mm(struct mm_struct *mm)
  		list_for_each_entry(avc, &vma->anon_vma_chain, same_vma)
  			anon_vma_interval_tree_verify(avc);
-+		vma_unlock_anon_vma(vma);
+ 		anon_vma_unlock(vma->anon_vma);
++		highest_address = vma->vm_end;
  		vma = vma->vm_next;
  		i++;
  	}
+ 	if (i != mm->map_count)
+ 		printk("map_count %d vm_next %d\n", mm->map_count, i), bug = 1;
++	if (highest_address != mm->highest_vm_end)
++		printk("mm->highest_vm_end %lx, found %lx\n",
++		       mm->highest_vm_end, highest_address), bug = 1;
+ 	i = browse_rb(&mm->mm_rb);
+ 	if (i != mm->map_count)
+ 		printk("map_count %d rb %d\n", mm->map_count, i), bug = 1;
 -- 
 1.7.7.3
