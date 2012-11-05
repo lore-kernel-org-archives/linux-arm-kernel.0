@@ -1,49 +1,48 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 5 Nov 2012 07:30:44 -0800
-Subject: [PATCH V2] ARM: PMU: fix runtime PM enable
-In-Reply-To: <20121026100312.GF20914@mudshark.cambridge.arm.com>
-References: <1351196598-26667-1-git-send-email-jon-hunter@ti.com>
- <20121026100312.GF20914@mudshark.cambridge.arm.com>
-Message-ID: <20121105153044.GE4953@atomide.com>
+Date: Mon, 5 Nov 2012 07:36:33 -0800
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <50977319.9070902@ti.com>
+References: <20121101224703.2103.95474.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local>
+ <50936A6E.3020202@ti.com> <5093891D.6070302@ti.com>
+ <50938A69.9040908@ti.com> <20121102154901.GU15766@atomide.com>
+ <20121102185453.GY15766@atomide.com> <50977319.9070902@ti.com>
+Message-ID: <20121105153632.GH4953@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Will Deacon <will.deacon@arm.com> [121026 03:04]:
-> On Thu, Oct 25, 2012 at 09:23:18PM +0100, Jon Hunter wrote:
-> > Commit 7be2958 (ARM: PMU: Add runtime PM Support) updated the ARM PMU code to
-> > use runtime PM which was prototyped and validated on the OMAP devices. In this
-> > commit, there is no call pm_runtime_enable() and for OMAP devices
-> > pm_runtime_enable() is currently being called from the OMAP PMU code when the
-> > PMU device is created. However, there are two problems with this:
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [121105 00:06]:
+> On 2012-11-02 20:54, Tony Lindgren wrote:
+> >> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
+> >>> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
+> >>>> On 2012-11-02 08:38, Santosh Shilimkar wrote:
+> >>>>>
+> >>>>> Lets not move this in DMA code since the above is really related
+> >>>>> to frame buffer. It reserves more DMA area for dma_alloc_coherent()
+> >>>>> etc than default 2 MB. Infact, we should no longer need this with
+> >>>>> CMA and memblock in place.
+> >>>>>
+> >>>>> Tomi,
+> >>>>> Can we not get rid of the above memory reservation ?
+> >>>>
+> >>>> Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
+> >>>> and I have no means to test it out, though. But below is a patch to
+> >>>> remove it. I also attached the patch, as it looks like thunderbird wants
+> >>>> to reformat the pasted patch... I'll remove the
+> >>>> CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
+> >>>> in my tree later.
 > > 
-> > 1. For any other ARM device wishing to use runtime PM for PMU they will need
-> >    to call pm_runtime_enable() for runtime PM to work.
-> > 2. When booting with device-tree and using device-tree to create the PMU
-> >    device, pm_runtime_enable() needs to be called from within the ARM PERF
-> >    driver as we are no longer calling any device specific code to create the
-> >    device. Hence, PMU does not work on OMAP devices that use the runtime PM
-> >    callbacks when using device-tree to create the PMU device.
-> > 
-> > Therefore,  call pm_runtime_enable() directly from the ARM PMU driver when
-> > registering the device. For platforms that do not use runtime PM,
-> > pm_runtime_enable() does nothing and for platforms that do use runtime PM but
-> > may not require it specifically for PMU, this will just add a little overhead
-> > when initialising and uninitialising the PMU device.
-> > 
-> > Tested with PERF on OMAP2420, OMAP3430 and OMAP4460.
-> > 
-> > V2 changes:
-> > - Call pm_runtime_enable() unconditionally on registering the PMU device.
-> > 
-> > Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> > ---
+> > Hmm actually, is it safe to remove for omap1, or should we
+> > still keep it around for omap1?
 > 
-> Cheers Jon! Looks a bit weird without the matching pm_runtime_disable, but
-> we don't really have anywhere to put that since the PMU is not deregistered.
-> 
-> Can we split this patch into two (even smaller!) patches so that I can take
-> the perf part and the omap bit can go to Tony?
+> Why wouldn't it be safe? Do you mean that CMA doesn't work on omap1,
+> or...? I'm no expert on CMA, but as far as I can see with it's ARM
+> generic stuff.
 
-The omap bit looks OK for me to queue via perf:
+Just wondering after your comment "This one is only used for the old
+omapfb, i.e. omap1". But sounds like it should no longer be needed
+there either if I parse that right.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Regards,
+
+Tony
