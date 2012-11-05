@@ -1,107 +1,59 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 5 Nov 2012 18:03:39 -0500
-Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
-References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
- <1351869956-2787-5-git-send-email-zonque@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
- <5097B7EE.3000508@gmail.com>
- <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
-Message-ID: <509845CB.6050401@ti.com>
+From: riel@redhat.com (Rik van Riel)
+Date: Mon, 05 Nov 2012 18:06:30 -0500
+Subject: [PATCH 01/16] mm: add anon_vma_lock to validate_mm()
+In-Reply-To: <1352155633-8648-2-git-send-email-walken@google.com>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+ <1352155633-8648-2-git-send-email-walken@google.com>
+Message-ID: <50984676.1080307@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2012 08:29 AM, Philip, Avinash wrote:
-> On Mon, Nov 05, 2012 at 18:28:22, Daniel Mack wrote:
->> On 05.11.2012 12:03, Philip, Avinash wrote:
->>> On Fri, Nov 02, 2012 at 20:55:56, Daniel Mack wrote:
->>>> This patch adds basic DT bindings for OMAP GPMC.
->>>>
->>>> The actual peripherals are instanciated from child nodes within the GPMC
->>>> node, and the only type of device that is currently supported is NAND.
->>>>
->>>> Code was added to parse the generic GPMC timing parameters and some
->>>> documentation with examples on how to use them.
->>>>
->>>> Successfully tested on an AM33xx board.
->>>>
->>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> [...]
->>>> +
->>>> +		nand at 0,0 {
->>>> +			reg = <0 0 0>; /* CS0, offset 0 */
->>>> +			nand-bus-width = <16>;
->>>> +			nand-ecc-mode = "none";
->>>> +
->>>> +			gpmc,sync-clk = <0>;
->>>> +			gpmc,cs-on = <0>;
->>>> +			gpmc,cs-rd-off = <36>;
->>>> +			gpmc,cs-wr-off = <36>;
->>>> +			gpmc,adv-on = <6>;
->>>> +			gpmc,adv-rd-off = <24>;
->>>> +			gpmc,adv-wr-off = <36>;
->>>> +			gpmc,we-off = <30>;
->>>> +			gpmc,oe-off = <48>;
->>>> +			gpmc,access = <54>;
->>>> +			gpmc,rd-cycle = <72>;
->>>> +			gpmc,wr-cycle = <72>;
->>>> +			gpmc,wr-access = <30>;
->>>> +			gpmc,wr-data-mux-bus = <0>;
->>>> +
->>>> +			#address-cells = <1>;
->>>> +			#size-cells = <1>;
->>>> +
->>> Can you take the timings (for example) from arago tree. The timings is tested in am335x-evm
->>> So the timings can be directly used to populate GPMC timings. Timings can found at
->>>
->>> http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;
->>> h=66bfbd2c5b35dc81edce0c24843c476161ab5978;hp=370630359cb8db711cf0941cd2a242e28ccfb61e
->>>
->>> [...]
->>>> +static int gpmc_probe_dt(struct platform_device *pdev)
->>> Can you take care of the following section mismatch.
->>> WARNING: vmlinux.o(.text+0x1e2d0): Section mismatch in reference
->>> from the function gpmc_probe_dt() to the function .init.text:gpmc_nand_init().
->> Sore, both fixed for v4.
->>
->>> [...]
->>>> +
->>>> +		val = of_get_nand_ecc_mode(child);
->>>> +		if (val >= 0)
->>>> +			gpmc_nand_data->ecc_opt = val;
->>> This will fail for BCH. Index of "soft_bch" is 5 & also don't have selection
->>> option between for BCH4 & BCH8 also.
->>> Can you use the of_property_read_u32 (as done early) to pass the ecc selection
->>> from dt file. This will help selection of BCH4 & BCH8 ecc options.
->> Hmm. Shouldn't we rather teach of_get_nand_ecc_mode() that two modes and
->> bring the enum in sync?
-> ecc_opt is for selecting different ecc layout and not for selecting ecc mode.
+On 11/05/2012 05:46 PM, Michel Lespinasse wrote:
+> Iterate vma->anon_vma_chain without anon_vma_lock may cause NULL ptr deref in
+> anon_vma_interval_tree_verify(), because the node in the chain might have been
+> removed.
 >
-> In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
-> 	OMAP_ECC_HAMMING_CODE_HW_ROMCODE
-> 	OMAP_ECC_BCH4_CODE_HW
-> 	OMAP_ECC_BCH8_CODE_HW
+> [ 1523.657950] BUG: unable to handle kernel paging request at fffffffffffffff0
+> [ 1523.660022] IP: [<ffffffff8122c29c>] anon_vma_interval_tree_verify+0xc/0xa0
+> [ 1523.660022] PGD 4e28067 PUD 4e29067 PMD 0
+> [ 1523.675725] Oops: 0000 [#1] PREEMPT SMP DEBUG_PAGEALLOC
+> [ 1523.750066] CPU 0
+> [ 1523.750066] Pid: 9050, comm: trinity-child64 Tainted: G        W    3.7.0-rc2-next-20121025-sasha-00001-g673f98e-dirty #77
+> [ 1523.750066] RIP: 0010:[<ffffffff8122c29c>]  [<ffffffff8122c29c>] anon_vma_interval_tree_verify+0xc/0xa0
+> [ 1523.750066] RSP: 0018:ffff880045f81d48  EFLAGS: 00010296
+> [ 1523.750066] RAX: 0000000000000000 RBX: fffffffffffffff0 RCX: 0000000000000000
+> [ 1523.750066] RDX: 0000000000000000 RSI: 0000000000000001 RDI: fffffffffffffff0
+> [ 1523.750066] RBP: ffff880045f81d58 R08: 0000000000000000 R09: 0000000000000f14
+> [ 1523.750066] R10: 0000000000000f12 R11: 0000000000000000 R12: ffff8800096c8d70
+> [ 1523.750066] R13: ffff8800096c8d00 R14: 0000000000000000 R15: ffff8800095b45e0
+> [ 1523.750066] FS:  00007f7a923f3700(0000) GS:ffff880013600000(0000) knlGS:0000000000000000
+> [ 1523.750066] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+> [ 1523.750066] CR2: fffffffffffffff0 CR3: 000000000969d000 CR4: 00000000000406f0
+> [ 1523.750066] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+> [ 1523.750066] DR3: 0000000000000000 DR6: 00000000ffff0ff0 DR7: 0000000000000400
+> [ 1523.750066] Process trinity-child64 (pid: 9050, threadinfo ffff880045f80000, task ffff880048eb0000)
+> [ 1523.750066] Stack:
+> [ 1523.750066]  ffff88000d7533f0 fffffffffffffff0 ffff880045f81da8 ffffffff812361d8
+> [ 1523.750066]  ffff880045f81d98 ffff880048ee9000 ffff8800095b4580 ffff8800095b4580
+> [ 1523.750066]  ffff88001d1cdb00 ffff8800095b45f0 ffff880022a4d630 ffff8800095b45e0
+> [ 1523.750066] Call Trace:
+> [ 1523.750066]  [<ffffffff812361d8>] validate_mm+0x58/0x1e0
+> [ 1523.750066]  [<ffffffff81236aa5>] vma_adjust+0x635/0x6b0
+> [ 1523.750066]  [<ffffffff81236c81>] __split_vma.isra.22+0x161/0x220
+> [ 1523.750066]  [<ffffffff81237934>] split_vma+0x24/0x30
+> [ 1523.750066]  [<ffffffff8122ce6a>] sys_madvise+0x5da/0x7b0
+> [ 1523.750066]  [<ffffffff811cd14c>] ? rcu_eqs_exit+0x9c/0xb0
+> [ 1523.750066]  [<ffffffff811802cd>] ? trace_hardirqs_on+0xd/0x10
+> [ 1523.750066]  [<ffffffff83aee198>] tracesys+0xe1/0xe6
+> [ 1523.750066] Code: 4c 09 ff 48 39 ce 77 9e f3 c3 0f 1f 44 00 00 31 c0 c3 66 66 66 66 2e 0f 1f 84 00 00 00 00 00 55 48 89 e5 53
+> 48 89 fb 48 83 ec 08 <48> 8b 17 48 8b 8a 90 00 00 00 48 39 4f 40 74 34 80 3d f7 1f 5c
+> [ 1523.750066] RIP  [<ffffffff8122c29c>] anon_vma_interval_tree_verify+0xc/0xa0
+> [ 1523.750066]  RSP <ffff880045f81d48>
+> [ 1523.750066] CR2: fffffffffffffff0
+> [ 1523.750066] ---[ end trace e35e5fa49072faf9 ]---
 >
-> So selection of ecc layout data should come from DT not ecc mode.
->
-> Thanks
-> Avinash
->
->>
->> Daniel
->>
->>
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-Hi,
+> Reported-by: Sasha Levin <sasha.levin@oracle.com>
+> Figured-out-by: Bob Liu <lliubbo@gmail.com>
+> Signed-off-by: Michel Lespinasse <walken@google.com>
 
-I am working on an AEMIF driver for DaVinci that is similar to this. Is 
-this a memory or mfd device?
-
-Murali
+Reviewed-by: Rik van Riel <riel@redhat.com>
