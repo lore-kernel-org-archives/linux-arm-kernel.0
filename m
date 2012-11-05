@@ -1,49 +1,60 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Mon, 05 Nov 2012 17:09:13 +0100
-Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
- SCHED_TRACER depends on HZ]
-In-Reply-To: <20121105134655.GB27260@S2100-06.ap.freescale.net>
-References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
- <20121105025753.GA26528@S2100-06.ap.freescale.net>
- <50978370.9060001@meduna.org>
- <20121105134655.GB27260@S2100-06.ap.freescale.net>
-Message-ID: <5097E4A9.3090008@meduna.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Nov 2012 08:12:21 -0800
+Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
+In-Reply-To: <5097DFD9.5030800@ti.com>
+References: <20121101224703.2103.95474.stgit@muffinssi.local>
+ <20121101224828.2103.82950.stgit@muffinssi.local>
+ <50936A6E.3020202@ti.com> <5093891D.6070302@ti.com>
+ <50938A69.9040908@ti.com> <20121102154901.GU15766@atomide.com>
+ <20121102185453.GY15766@atomide.com> <50977319.9070902@ti.com>
+ <20121105153632.GH4953@atomide.com> <5097DFD9.5030800@ti.com>
+Message-ID: <20121105161221.GI4953@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.11.2012 14:46, Shawn Guo wrote:
-
->>> From my quick testing on imx23 with printk timestamp, it's not OK,
->>> so we may need to leave imx23 out there.
->>
-> I should say it's practically not OK since it wraps in such a short
-> period.  But it actually works as expected.
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [121105 07:50]:
+> On 2012-11-05 17:36, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [121105 00:06]:
+> >> On 2012-11-02 20:54, Tony Lindgren wrote:
+> >>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
+> >>>>> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
+> >>>>>> On 2012-11-02 08:38, Santosh Shilimkar wrote:
+> >>>>>>>
+> >>>>>>> Lets not move this in DMA code since the above is really related
+> >>>>>>> to frame buffer. It reserves more DMA area for dma_alloc_coherent()
+> >>>>>>> etc than default 2 MB. Infact, we should no longer need this with
+> >>>>>>> CMA and memblock in place.
+> >>>>>>>
+> >>>>>>> Tomi,
+> >>>>>>> Can we not get rid of the above memory reservation ?
+> >>>>>>
+> >>>>>> Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
+> >>>>>> and I have no means to test it out, though. But below is a patch to
+> >>>>>> remove it. I also attached the patch, as it looks like thunderbird wants
+> >>>>>> to reformat the pasted patch... I'll remove the
+> >>>>>> CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
+> >>>>>> in my tree later.
+> >>>
+> >>> Hmm actually, is it safe to remove for omap1, or should we
+> >>> still keep it around for omap1?
+> >>
+> >> Why wouldn't it be safe? Do you mean that CMA doesn't work on omap1,
+> >> or...? I'm no expert on CMA, but as far as I can see with it's ARM
+> >> generic stuff.
+> > 
+> > Just wondering after your comment "This one is only used for the old
+> > omapfb, i.e. omap1". But sounds like it should no longer be needed
+> > there either if I parse that right.
 > 
->> Hmm, does it wrap after 2 seconds?
+> I meant that the code that was moved in the patch "Remove
+> plat-omap/common.c" is only compiled and ran on omap1, when the old
+> omapfb has been enabled in the Kconfig. It's not used on omap2+.
 > 
-> Yes, it does wrap after ~2 seconds.
+> old omapfb uses dma_alloc_*() to allocate memory, so if CMA works on
+> omap1, I think this code in question can be removed, as done in my patch.
 
-This is weird. AFAIK the printk should be using sched_clock(),
-which is a weak symbol overridden in arch/arm/kernel/sched_clock.c
-and it should take care of the extension to never-ever-wrapping
-64-bit timestamp. Looks that it does not and if it does not,
-I think there is more to be worried of than just printk timestamps.
+OK thanks for clarifying it.
 
-I don't see anything wrong with the code; bumping the 64-bit
-part so that it is no more than wrap time away should take
-place in sched_clock_timer which is called at 90% of the
-time interval.
+Regards,
 
-BTW this patch deserves IMHO looking at
-  https://patchwork.kernel.org/patch/1193631/
-but it is probably not the problem here.
-
-In case it matters I'm working with the current 3.4 with
-RT patches (none of them touches arch/arm/mach-mxs) - sorry
-not to mention it earlier, I forgot to write it again after
-I included additional mailing lists to the discussion.
-
-
-Regards
--- 
-                                            Stano
+Tony
