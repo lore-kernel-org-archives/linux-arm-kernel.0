@@ -1,60 +1,49 @@
-From: N.Voss@weinmann.de (Voss, Nikolaus)
-Date: Mon, 5 Nov 2012 07:08:29 +0100
-Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
-In-Reply-To: <5093EE2B.8080005@atmel.com>
-References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
- <20121101222922.GD22956@pengutronix.de> <5093A8CD.60006@atmel.com>
- <20121102111432.GD21313@pengutronix.de> <5093EE2B.8080005@atmel.com>
-Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EFB340B@wm021.weinmann.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Mon, 5 Nov 2012 06:44:10 +0000
+Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
+In-Reply-To: <CACRpkdY_db3ju4LVnoR=0Wq8TFUxa48jNFGhvGM-3uSrmGZVew@mail.gmail.com>
+References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
+ <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
+ <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
+ <20121001154451.GI4840@atomide.com>
+ <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
+ <CACRpkdaeu3JaLqSbqETT=D0mdUu5VpwRpS_Xohd6M963rw8QMg@mail.gmail.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA5C598@DBDE01.ent.ti.com>
+ <CACRpkdY_db3ju4LVnoR=0Wq8TFUxa48jNFGhvGM-3uSrmGZVew@mail.gmail.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA63234@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ludovic.desroches wrote on Friday, November 02, 2012 5:01 PM:
-> Le 11/02/2012 12:14 PM, Wolfram Sang a ?crit :
-> > On Fri, Nov 02, 2012 at 12:04:45PM +0100, ludovic.desroches wrote:
-> >> Hi Wolfram,
-> >>
-> >> Le 11/01/2012 11:29 PM, Wolfram Sang a ?crit :
-> >>> On Wed, Oct 10, 2012 at 04:25:58PM +0200,
-> ludovic.desroches at atmel.com wrote:
-> >>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >>>>
-> >>>> If the i2c message length is zero, i2c-at91 will directly return an error
-> >>>> instead of trying to send a zero-length message.
-> >>>>
-> >>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >>>
-> >>> What happens if you send a 0 byte message? Some hardware is able to
-> do
-> >>> this and it will be used in SMBUS QUICK which the driver states to
-> >>> support according to at91_twi_func().
-> >>
-> >> Without this I had some data corruption when writing to / reading
-> >> from a serial eeprom (depending on the IP version).
-> >>
-> >> Yes SMBUS quick command is supported but is not managed in the
-> >> driver, we have to tell explicitly the IP that we want to send this
-> >> command.
-> >
-> > Ok, so unless you want to implement the support, please update this
-> > patch with a comment that SMBUS_QUICK is a TODO and remove the
-> > SMBUS_QUICK capability.
-> >
+On Sun, Nov 04, 2012 at 23:07:44, Linus Walleij wrote:
+> On Tue, Oct 30, 2012 at 3:12 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
 > 
-> Implementation should not be a huge task, only one bit to set in a
-> register but I have no device to test it.
-> So I will choose to remove the SMBUS_QUICK capability.
+> > I completely understood this named modes, I have added named
+> > modes like this in am335x-xxx.dts files
 > 
-> Hi Nikolaus,
+> I do not understand how the pinctrl-single dts files work actually,
+> so please get Tony to review this part.
 > 
-> Did you test the driver with SMBus compatible devices? Can I keep other
-> SMBus capabilities from SMBUS_EMUL?
+> > I think "pinctrl-1" state will be used in driver
+> > suspend/resume calls.
+> 
+> Hopefully, I think you should test the code and monitor the
+> system to make sure the right thing happens.
 
-Hi Ludovic,
+I will test while adding "pinctrl-1" data to .dts files.
 
-yes, I use this driver with the sbs driver to query a smbus-attached
-battery with a TI bq chip (I actually wrote this driver only for this
-purpose). I implemented and tested SMBUS_BLOCK but not
-SMBUS_QUICK...
+> 
+> > I have the pinmux/conf settings for default state but fully
+> > optimized pinmux/conf values in idle & suspend states are not
+> > available yet.
+> 
+> You have defined a "sleep" state which is what should be used
+> for suspend? Or do you mean that you do have a state but
+> you're just not defining it to the most optimal setting yet?
 
-Niko
+Yes, sleep state is used for suspend. Regarding to this suspend
+state fully optimized pinmux/conf values are not available.
+
+Thanks
+AnilKumar
