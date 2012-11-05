@@ -1,31 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Nov 2012 12:37:32 +0100
-Subject: [PATCH 6/7] pinctrl: exynos5440: add pinctrl driver for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <1351274153-3120-6-git-send-email-kgene.kim@samsung.com>
-References: <1351274153-3120-1-git-send-email-kgene.kim@samsung.com>
- <1351274153-3120-6-git-send-email-kgene.kim@samsung.com>
-Message-ID: <CACRpkdZP_sTKV1Nq3FWVQJocg8C8H7J9vd9hmY4k-qAnMPJcLg@mail.gmail.com>
+Date: Mon, 5 Nov 2012 12:40:20 +0100
+Subject: [PATCH 0/2] clk: ux500: Add some more clk lookups for u8500
+In-Reply-To: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdZjLac9+dRwUm=ka7ZCouAx0bztNjEcjsPdsjZ=Ckz5rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2012 at 7:55 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Wed, Oct 31, 2012 at 2:40 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-> From: Thomas Abraham <thomas.abraham@linaro.org>
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 >
-> Add a new pinctrl driver for Samsung EXYNOS5440 SoC. The pin controller
-> module in EXYNOS5440 is different from the pin controller found on other
-> Samsung SoC. Hence, the pin controller driver for EXYNOS5440 SoC is
-> independent of the Samsung pinctrl framework.
+> Some more clock lookups added for rng clocks and for the nomadik ske
+> keypad clocks.
 >
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Ulf Hansson (2):
+>   clk: ux500: Register rng clock lookups for u8500
+>   clk: ux500: Register nomadik keypad clock lookups for u8500
 
-If I haven't ACK:ed this before here's an
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I expect this to go through the Samsung tree?
+for these.
+
+They have the right name and all, apb_pclk is
+"AMBA peripheral bus, peripheral block clock"
+so a clock for the silicon, right.
+
+... then how it's supposed to be used, that's another
+issue...
 
 Yours,
 Linus Walleij
