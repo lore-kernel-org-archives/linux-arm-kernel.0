@@ -1,19 +1,42 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 05 Nov 2012 18:03:20 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <20121105173640.GR3351@mudshark.cambridge.arm.com>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
-Message-ID: <1352138600.10947.26.camel@hornet>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Nov 2012 10:11:07 -0800
+Subject: [GIT PULL 1/3] omap plat header removal for v3.8 merge window,
+ part2
+In-Reply-To: <508affc9.8f07320a.16f0.0ac0SMTPIN_ADDED@mx.google.com>
+References: <508affc9.8f07320a.16f0.0ac0SMTPIN_ADDED@mx.google.com>
+Message-ID: <20121105181107.GA22301@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-05 at 17:36 +0000, Will Deacon wrote:
-> I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
-> !ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
-> dependency dropped) 
+On Fri, Oct 26, 2012 at 02:23:39PM -0700, Tony Lindgren wrote:
+> The following changes since commit 3e9a6321f9895eac9a3d241d3126e44021e7102b:
+> 
+>   Merge tag 'omap-for-v3.8/cleanup-headers-signed' into omap-for-v3.8/cleanup-headers-serial-take2 (2012-10-24 13:25:44 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-headers-serial-take2-signed
+> 
+> for you to fetch changes up to 3d82cbbb3aadb4f8a30e3f614e51be96574a0855:
+> 
+>   ARM: OMAP: Split plat/serial.h for omap1 and omap2+ (2012-10-24 13:34:31 -0700)
+> 
+> ----------------------------------------------------------------
+> These changes remove plat/serial.h usage for omap2+.
+> 
+> Note that this branch is based on a tty commit 3e9a6321
+> (tty/serial/8250: Make omap hardware workarounds local to 8250.h)
+> merged with omap-for-v3.8/cleanup-headers-signed.
+> 
+> The tty commit is needed to keep things compiling for omaps,
+> and omap-for-v3.8/cleanup-headers-signed is needed to avoid
+> multiple merge conflicts with the includes. I've verified
+> with Greg KH that the tty commit above is immutable and OK
+> to use as a base.
 
-... depends on !ARCH_MULTIPLATFORM or maybe rather !MMU? (I assume you
-want to add an extra dummy position in the choice section, where options
-are mutually exclusive anyway?)
+Thanks, pulled into next/headers, and I kept an explicit dependency on Greg's
+tree as depends/tty so we can keep track of it.
 
-Pawe?
+
+-Olof
