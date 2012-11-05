@@ -1,122 +1,32 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 5 Nov 2012 18:22:52 +0530
-Subject: [PATCH V3 3/3] ARM: dts: omap5-evm: LPDDR2 memory device details for
- EVM
+Date: Mon, 5 Nov 2012 18:22:50 +0530
+Subject: [PATCH V3 1/3] ARM: dts: omap5-evm: Fix size of memory defined for EVM
 In-Reply-To: <1352119972-13710-1-git-send-email-lokeshvutla@ti.com>
 References: <1352119972-13710-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1352119972-13710-4-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1352119972-13710-2-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung's K3PE0E000B memory part is used in OMAP5-evm board.
-Adding timings and geometry details for Samsung's memory part and
-attaching the same to device-handle of EMIF1/2.
+Memory present for OMAP5-evm is 2GB. But in dts file
+it is specified as 1GB. Correcting the same.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/boot/dts/omap5-evm.dts           |   11 +++++
- arch/arm/boot/dts/samsung_k3pe0e000b.dtsi |   67 +++++++++++++++++++++++++++++
- 2 files changed, 78 insertions(+)
- create mode 100644 arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
+ arch/arm/boot/dts/omap5-evm.dts |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index 88d3d9b8..8722c15 100644
+index c663eba..88d3d9b8 100644
 --- a/arch/arm/boot/dts/omap5-evm.dts
 +++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -8,6 +8,7 @@
- /dts-v1/;
+@@ -15,7 +15,7 @@
  
- /include/ "omap5.dtsi"
-+/include/ "samsung_k3pe0e000b.dtsi"
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x80000000 0x40000000>; /* 1 GB */
++		reg = <0x80000000 0x80000000>; /* 2 GB */
+ 	};
  
- / {
- 	model = "TI OMAP5 EVM board";
-@@ -140,3 +141,13 @@
- &mcbsp3 {
- 	status = "disabled";
- };
-+
-+&emif1 {
-+	cs1-used;
-+	device-handle = <&samsung_K3PE0E000B>;
-+};
-+
-+&emif2 {
-+	cs1-used;
-+	device-handle = <&samsung_K3PE0E000B>;
-+};
-diff --git a/arch/arm/boot/dts/samsung_k3pe0e000b.dtsi b/arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
-new file mode 100644
-index 0000000..9657a5c
---- /dev/null
-+++ b/arch/arm/boot/dts/samsung_k3pe0e000b.dtsi
-@@ -0,0 +1,67 @@
-+/*
-+ * Timings and Geometry for Samsung K3PE0E000B memory part
-+ */
-+
-+/ {
-+	samsung_K3PE0E000B: lpddr2 {
-+		compatible	= "Samsung,K3PE0E000B","jedec,lpddr2-s4";
-+		density		= <4096>;
-+		io-width	= <32>;
-+
-+		tRPab-min-tck	= <3>;
-+		tRCD-min-tck	= <3>;
-+		tWR-min-tck	= <3>;
-+		tRASmin-min-tck	= <3>;
-+		tRRD-min-tck	= <2>;
-+		tWTR-min-tck	= <2>;
-+		tXP-min-tck	= <2>;
-+		tRTP-min-tck	= <2>;
-+		tCKE-min-tck	= <3>;
-+		tCKESR-min-tck	= <3>;
-+		tFAW-min-tck	= <8>;
-+
-+		timings_samsung_K3PE0E000B_533MHz: lpddr2-timings at 0 {
-+			compatible	= "jedec,lpddr2-timings";
-+			min-freq	= <10000000>;
-+			max-freq	= <533333333>;
-+			tRPab		= <21000>;
-+			tRCD		= <18000>;
-+			tWR		= <15000>;
-+			tRAS-min	= <42000>;
-+			tRRD		= <10000>;
-+			tWTR		= <7500>;
-+			tXP		= <7500>;
-+			tRTP		= <7500>;
-+			tCKESR		= <15000>;
-+			tDQSCK-max	= <5500>;
-+			tFAW		= <50000>;
-+			tZQCS		= <90000>;
-+			tZQCL		= <360000>;
-+			tZQinit		= <1000000>;
-+			tRAS-max-ns	= <70000>;
-+			tDQSCK-max-derated = <6000>;
-+		};
-+
-+		timings_samsung_K3PE0E000B_266MHz: lpddr2-timings at 1 {
-+			compatible	= "jedec,lpddr2-timings";
-+			min-freq	= <10000000>;
-+			max-freq	= <266666666>;
-+			tRPab		= <21000>;
-+			tRCD		= <18000>;
-+			tWR		= <15000>;
-+			tRAS-min	= <42000>;
-+			tRRD		= <10000>;
-+			tWTR		= <7500>;
-+			tXP		= <7500>;
-+			tRTP		= <7500>;
-+			tCKESR		= <15000>;
-+			tDQSCK-max	= <5500>;
-+			tFAW		= <50000>;
-+			tZQCS		= <90000>;
-+			tZQCL		= <360000>;
-+			tZQinit		= <1000000>;
-+			tRAS-max-ns	= <70000>;
-+			tDQSCK-max-derated = <6000>;
-+		};
-+	};
-+};
+ 	vmmcsd_fixed: fixedregulator-mmcsd {
 -- 
 1.7.9.5
