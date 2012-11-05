@@ -1,26 +1,35 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 5 Nov 2012 13:16:05 +0100
-Subject: [PATCH 6/8] serial: xilinx_uartps: kill CONFIG_OF conditional
-In-Reply-To: <61e872b2cd4abc25c2dab82668e5094b590571a0.1351721190.git.josh.cartwright@ni.com>
-References: <cover.1351721190.git.josh.cartwright@ni.com>
- <61e872b2cd4abc25c2dab82668e5094b590571a0.1351721190.git.josh.cartwright@ni.com>
-Message-ID: <CAHTX3dKSn0JwHsgCfLrgitb41OakHmw1o=uDRkshYi88fp2h1w@mail.gmail.com>
+From: shubhrajyoti@ti.com (Shubhrajyoti D)
+Date: Mon, 5 Nov 2012 17:53:37 +0530
+Subject: [PATCHv3 2/8] i2c: omap: use revision check for
+ OMAP_I2C_FLAG_APPLY_ERRATA_I207
+In-Reply-To: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
+References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352118223-3796-3-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/30 Josh Cartwright <josh.cartwright@ni.com>:
-> The Zynq platform requires the use of CONFIG_OF.  Remove the #ifdef
-> conditionals in the uartps driver.
->
-> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
-> ---
->  drivers/tty/serial/xilinx_uartps.c | 9 ---------
->  1 file changed, 9 deletions(-)
+The errata i207 is enabled for 2430 and 3xxx. Use the revision check
+to enable the erratum instead.
 
-Please send this separately out of this patchset.
-Also if you do this change which is understandable, you should also
-add
-depends on OF
+Reviewed-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Thanks,
-Michal
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 5c6f538..737d843 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1166,7 +1166,8 @@ omap_i2c_probe(struct platform_device *pdev)
+ 
+ 	dev->errata = 0;
+ 
+-	if (dev->flags & OMAP_I2C_FLAG_APPLY_ERRATA_I207)
++	if (dev->rev >= OMAP_I2C_REV_ON_2430 &&
++			dev->rev < OMAP_I2C_REV_ON_4430_PLUS)
+ 		dev->errata |= I2C_OMAP_ERRATA_I207;
+ 
+ 	if (dev->rev <= OMAP_I2C_REV_ON_3430_3530)
+-- 
+1.7.5.4
