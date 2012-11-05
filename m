@@ -1,130 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Nov 2012 10:25:41 +0100
-Subject: [GIT PULL] kill plat-nomadik and convert Nomadik+Ux500 to SPARSE_IRQ
-Message-ID: <CACRpkdY9ppMQ5UG5WRCJQSbme82HJACF8pz9v4SVbC6_CUt+2g@mail.gmail.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 5 Nov 2012 10:26:27 +0100
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
+References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+ <20121026201539.GD29548@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+ <20121029200032.GD30152@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
+ <20121030123254.GD29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
+ <20121030125419.GG29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
+ <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
+ <87fw4u3oh5.fsf@deeprootsystems.com>
+ <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
+ <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
+ <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
+ <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
+Message-ID: <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+Paul,
 
-this pull request will move all headers away from plat-nomadik, move the
-timer driver to drivers/clocksource, delete plat-nomadik and then convert
-Nomadik and Ux500 to SPARSE_IRQ. I consider this a big piece of
-cleanup that we need to move ahead with single zImage.
+On Mon, Nov 5, 2012 at 4:15 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> Hi Jean,
+>
+> On Sat, 3 Nov 2012, Jean Pihet wrote:
+>
+>> The setup is as identical as possible to yours:
+>> - U-Boot 2011.06-dirty (Sep 04 2012 - 17:06:58) from
+>> http://www.pwsan.com/tmp/3530es3beagle-MLO-u-boot-20121023.tar.bz2.
+>>   Please note that the MLO image does not run on my board and so I had
+>> to use my known-to-work image.
+>
+> Interesting...
+>
+>> The result is that I could reproduce the issue but it happens much
+>> more rarely on my side (only once vs quasi 100% on ~50 boot cycles).
+>
+> Hmm...
+>
+>> The issue is triggered by running 'hwclock --systohc'  while the
+>> system is heavily loaded (running depmod etc.).
+>
+> OK.
+>
+>> More investigation on-going, so more to come!
+>
+> Great, keep us posted.
+I ran some intensive stress tests on the I2C and ... unfortunately I
+could not trigger the problem. It looks like the issue is caused by
+some transient situation where the CORE and/or I2C is in a low power
+state.
 
-As discussed with Arnd in Copenhagen here is a pull request including a few
-patches that are for obvious reasons also in the pinctrl tree. We will have
-to fix this up in the merge window as the end result is the removal of the
-plat-nomadik directory which means there will be massive collissions if we
-try to pretend the changes are orthogonal.
+Here are the tests that have been performed from the user space:
+- stress test the I2C IRQ handler by reading and writing the RTC, and
+checking the amount of IRQs for the I2C bus. In that case the CORE
+never goes in low power mode,
+- stress test the CORE low power and wake-up transition by adjusting
+the autosuspend delay (e.g.
+/sys/devices/platform/omap_i2c.1/power/autosuspend_delay_ms) and
+accessing the RTC after the CORE has gone in low power.
 
-The patches have all been circulated to relevant subsystem maintainers,
-but I have not recieved an ACK from Samuel Ortiz, Mike Turquette yet,
-nor from the clocksource maintainer.
+Those tests have been run for hours (>200000 IRQs) and the I2C timeout
+issue could not be observed. The target low power mode is RET (not
+tried with OFF).
 
-However they have had time to review the patches and they're basically
-only changing #include <> statements and so I think we should move ahead
-with this anyway. I'm a bit uncertain about the clocksource though, it should
-be straight-forward.
+The next step is to detect an error situation and have data logged
+about the state at that moment. What do you think?
 
-Waiting for weeks for ACKs before being able to merge to ARM SoC
-will delay any linux-next testing which slows down everything :-(
+This brings an interesting discussion. As you indicated earlier,
+withtout CPU_IDLE enabled nothing except the autosuspend delay is
+preventing the power domains to go in low power mode. This could lead
+to situations where latency constraints are not respected. The easy
+and straight forward solution is to enable CPU_IDLE and use the PM QoS
+constraints.
 
-Signed tag per below.
+What do you think?
 
-Yours,
-Linus Walleij
+Regards,
+Jean
 
-
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
-
-  Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git
-tags/kill-plat-sparse-irq
-
-for you to fetch changes up to c3b9d1db23c4ebd4d8a0964ebcf5f27d4eb8fa3f:
-
-  ARM: plat-nomadik: convert platforms to SPARSE_IRQ (2012-11-05 09:55:34 +0100)
-
-----------------------------------------------------------------
-This patchset will:
-- Move all remaining headers out of arch/arm/plat-nomadik/include/plat
-  out to e.g. include/linux/platform_data
-- Delete arch/arm/plat-nomadik
-- Convert Nomadik and Ux500 to SPARSE_IRQ
-
-----------------------------------------------------------------
-Linus Walleij (10):
-      pinctrl/nomadik: move the platform data header
-      pinctrl/nomadik: merge old pincfg header
-      clk/ux500: explicitly include register header
-      ARM: plat-nomadik: pass IRQ to timer driver
-      ARM: plat-nomadik: use DIV_ROUND_CLOSEST()
-      ARM: plat-nomadik: move DMA40 header to <linux/platform_data>
-      ARM: plat-nomadik: move MTU, kill plat-nomadik
-      mfd/ab8500-core: use irq_domain_add_simple()
-      mfd/db8500-prcmu: use the irq_domain_add_simple()
-      ARM: plat-nomadik: convert platforms to SPARSE_IRQ
-
-Maxime Coquelin (1):
-      ARM: plat-nomadik: Introduce new DB8540 GPIO registers
-
-Patrice Chotard (1):
-      ARM: plat-nomadik: move NMK_GPIO_PER_CHIP into gpio-nomadik.h
-
- arch/arm/Kconfig                                   |   3 +-
- arch/arm/Makefile                                  |   1 -
- arch/arm/mach-nomadik/Kconfig                      |   2 +-
- arch/arm/mach-nomadik/board-nhk8815.c              |  13 +--
- arch/arm/mach-nomadik/cpu-8815.c                   |   2 +-
- arch/arm/mach-nomadik/i2c-8815nhk.c                |   3 +-
- arch/arm/mach-nomadik/include/mach/irqs.h          |   2 +-
- arch/arm/mach-ux500/Kconfig                        |   2 +-
- arch/arm/mach-ux500/board-mop500-audio.c           |   6 +-
- arch/arm/mach-ux500/board-mop500-pins.c            |   3 +-
- arch/arm/mach-ux500/board-mop500-sdi.c             |   2 +-
- arch/arm/mach-ux500/board-mop500.c                 |   6 +-
- arch/arm/mach-ux500/cpu-db8500.c                   |   5 +-
- arch/arm/mach-ux500/devices-common.c               |   4 +-
- arch/arm/mach-ux500/devices-db8500.c               |   4 +-
- arch/arm/mach-ux500/devices-db8500.h               |   1 +
- arch/arm/mach-ux500/include/mach/irqs.h            |   2 +-
- arch/arm/mach-ux500/include/mach/msp.h             |   2 +-
- arch/arm/mach-ux500/timer.c                        |   5 +-
- arch/arm/mach-ux500/usb.c                          |   4 +-
- arch/arm/plat-nomadik/Kconfig                      |  29 ------
- arch/arm/plat-nomadik/Makefile                     |   5 -
- arch/arm/plat-nomadik/include/plat/gpio-nomadik.h  | 102 -------------------
- drivers/char/hw_random/Kconfig                     |   2 +-
- drivers/clk/ux500/u8500_clk.c                      |   2 +-
- drivers/clocksource/Kconfig                        |  17 +++-
- drivers/clocksource/Makefile                       |   1 +
- .../timer.c => drivers/clocksource/nomadik-mtu.c   |  11 +-
- drivers/crypto/ux500/cryp/cryp_core.c              |   3 +-
- drivers/dma/ste_dma40.c                            |   3 +-
- drivers/dma/ste_dma40_ll.c                         |   2 +-
- drivers/input/keyboard/Kconfig                     |   2 +-
- drivers/mfd/ab8500-core.c                          |  13 +--
- drivers/mfd/db8500-prcmu.c                         |  12 ++-
- drivers/mtd/nand/Kconfig                           |   2 +-
- drivers/pinctrl/pinctrl-nomadik.c                  |  11 +-
- drivers/pinctrl/pinctrl-nomadik.h                  |   2 +-
- .../linux/platform_data/clocksource-nomadik-mtu.h  |   2 +-
- include/linux/platform_data/crypto-ux500.h         |   2 +-
- .../linux/platform_data/dma-ste-dma40.h            |   0
- .../linux/platform_data/pinctrl-nomadik.h          | 111 +++++++++++++++++++--
- sound/soc/ux500/ux500_pcm.c                        |   3 +-
- 42 files changed, 184 insertions(+), 225 deletions(-)
- delete mode 100644 arch/arm/plat-nomadik/Kconfig
- delete mode 100644 arch/arm/plat-nomadik/Makefile
- delete mode 100644 arch/arm/plat-nomadik/include/plat/gpio-nomadik.h
- rename arch/arm/plat-nomadik/timer.c => drivers/clocksource/nomadik-mtu.c (95%)
- rename arch/arm/plat-nomadik/include/plat/mtu.h =>
-include/linux/platform_data/clocksource-nomadik-mtu.h (71%)
- rename arch/arm/plat-nomadik/include/plat/ste_dma40.h =>
-include/linux/platform_data/dma-ste-dma40.h (100%)
- rename arch/arm/plat-nomadik/include/plat/pincfg.h =>
-include/linux/platform_data/pinctrl-nomadik.h (66%)
+>
+> Will try to kick off those tests you requested within the next 24-48
+> hours.
+>
+>
+> - Paul
