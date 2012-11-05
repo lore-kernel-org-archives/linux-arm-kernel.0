@@ -1,49 +1,55 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Nov 2012 08:49:12 -0600
-Subject: [PATCH 2/8] ARM: zynq: move ttc timer code to drivers/clocksource
-In-Reply-To: <CAHTX3d++0fGSw7GQHcc-S1X1Qh-rfekpr-E8Jkg2_vFqdCFFTg@mail.gmail.com>
-References: <cover.1351721190.git.josh.cartwright@ni.com>
- <c0347788fbad559a249a25128a23f40c85d9cbda.1351721190.git.josh.cartwright@ni.com>
- <CAHTX3d++0fGSw7GQHcc-S1X1Qh-rfekpr-E8Jkg2_vFqdCFFTg@mail.gmail.com>
-Message-ID: <5097D1E8.2000403@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 5 Nov 2012 20:23:11 +0530
+Subject: [PATCH 13/15] ARM: DTS: AM33XX: Add nodes for OCMCRAM and Mailbox
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EBFFD0A@DBDE01.ent.ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-14-git-send-email-vaibhav.bedia@ti.com>
+ <50953E26.40906@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EBFFD0A@DBDE01.ent.ti.com>
+Message-ID: <5097D2D7.3090204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/05/2012 05:22 AM, Michal Simek wrote:
-> 2012/10/29 Josh Cartwright <josh.cartwright@ni.com>:
->> Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
->> drivers/clocksource, and out of the mach-zynq directory.
+On Sunday 04 November 2012 08:56 PM, Bedia, Vaibhav wrote:
+> On Sat, Nov 03, 2012 at 21:24:14, Shilimkar, Santosh wrote:
+>> On Friday 02 November 2012 06:02 PM, Vaibhav Bedia wrote:
+>>> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+>>> ---
+>>>    arch/arm/boot/dts/am33xx.dtsi |   11 +++++++++++
+>>>    1 files changed, 11 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+>>> index bb31bff..e2cbf24 100644
+>>> --- a/arch/arm/boot/dts/am33xx.dtsi
+>>> +++ b/arch/arm/boot/dts/am33xx.dtsi
+>>> @@ -210,5 +210,16 @@
+>>>    			interrupt-parent = <&intc>;
+>>>    			interrupts = <91>;
+>>>    		};
+>>> +
+>>> +		ocmcram: ocmcram at 40300000 {
+>>> +			compatible = "ti,ocmcram";
+>>> +			ti,hwmods = "ocmcram";
+>>> +			ti,no_idle_on_suspend;
+>>> +		};
+>> Whats the intention behind adding OCMRAM ?
+>> Sorry if I missed any comments from the cover letter ?
 >>
->> The common.h (which only held the timer declaration) was renamed to
->> xilinx_ttc.h and moved into include/linux.
->>
->> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> ---
->>  arch/arm/mach-zynq/Makefile                                    | 2 +-
->>  arch/arm/mach-zynq/common.c                                    | 2 +-
->>  drivers/clocksource/Makefile                                   | 1 +
->>  arch/arm/mach-zynq/timer.c => drivers/clocksource/xilinx_ttc.c | 1 -
->>  arch/arm/mach-zynq/common.h => include/linux/xilinx_ttc.h      | 4 ++--
->>  5 files changed, 5 insertions(+), 5 deletions(-)
->>  rename arch/arm/mach-zynq/timer.c => drivers/clocksource/xilinx_ttc.c (99%)
->>  rename arch/arm/mach-zynq/common.h => include/linux/xilinx_ttc.h (91%)
-> 
-> Not going to apply this patch till there is clean way how to move all
-> drivers there.
-> Especially I don't like to add xilinx_ttc.h to include/linux folder.
-> 
+>
+> We need a mechanism to ensure that the clock to OCMC is kept running
+> during boot and that it doesn't get disabled as part of the suspend
+> sequence. Since the hwmod data for OCMC is already present and we have
+> the no_idle_on_suspend flag for hwmod entries we get the desired behavior.
+>
+On OMAP the OCMC RAM is always clocked and doesn't need any special
+clock enable. CM_L3_2_OCMC_RAM_CLKCTRL module mode field is read only.
+Isn't it same on AMXX ?
 
-A cleaner way is how we are doing irqchips [1]. This needs a single
-function (or one each for clksrc and clkevt) that has a DT match list of
-all known timers and calls their init function. It should be a bit
-simpler than irqchips init function because you don't need to worry
-about hierarchy init ordering. That doesn't solve non-DT though and if
-there are any extra functions like we have with irqchips, you still need
-the header in include/linux.
+> This could also have been done via the clock tree but looks like we
+> want to avoid adding leaf nodes in the clock data, hence the hwmod +
+> DT approach.
+>
+Sure. I was just trying to see why AMXX is different with OMAP here.
 
-Rob
-
-[1] http://www.spinics.net/lists/arm-kernel/msg203687.html
+Regards
+Santosh
