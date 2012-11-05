@@ -1,66 +1,111 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Nov 2012 12:45:21 +0200
-Subject: [PATCHv2 1/7] i2c: omap: Fix the revision register read
-In-Reply-To: <20121105100105.GC3327@arwen.pp.htv.fi>
-References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-2-git-send-email-shubhrajyoti@ti.com>
- <20121105075026.GB32468@arwen.pp.htv.fi> <50977A30.6040907@ti.com>
- <20121105090412.GA2913@arwen.pp.htv.fi>
- <CAM=Q2csb_9ryaZfURqv6QgsVuSRiVMDt=x=Adko2HH4GoiHnCQ@mail.gmail.com>
- <20121105100105.GC3327@arwen.pp.htv.fi>
-Message-ID: <20121105104521.GB3752@arwen.pp.htv.fi>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 5 Nov 2012 10:54:21 +0000
+Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
+In-Reply-To: <CAMbhsRTNULfBjL=x3qFgjqsfR25EJt+2A4hY=qTXcDq8gyCxmA@mail.gmail.com>
+References: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
+ <20121010111517.GC2131@linaro.org>
+ <CAMbhsRTNULfBjL=x3qFgjqsfR25EJt+2A4hY=qTXcDq8gyCxmA@mail.gmail.com>
+Message-ID: <20121105105421.GB2005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 05, 2012 at 12:01:05PM +0200, Felipe Balbi wrote:
-> Hi,
+On Fri, Nov 02, 2012 at 04:47:38PM -0700, Colin Cross wrote:
+> On Wed, Oct 10, 2012 at 4:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> > On Tue, Oct 09, 2012 at 11:46:12PM -0700, Todd Poynor wrote:
+> >> Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
+> >> on overflow.
+> >>
+> >> Signed-off-by: Todd Poynor <toddpoynor@google.com>
+> >> ---
+> >>  arch/arm/kernel/stacktrace.c |    2 +-
+> >>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> >> index 00f79e5..6315162 100644
+> >> --- a/arch/arm/kernel/stacktrace.c
+> >> +++ b/arch/arm/kernel/stacktrace.c
+> >> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
+> >>       high = ALIGN(low, THREAD_SIZE);
+> >>
+> >>       /* check current frame pointer is within bounds */
+> >> -     if (fp < (low + 12) || fp + 4 >= high)
+> >> +     if (fp < (low + 12) || fp >= high - 4)
+> >>               return -EINVAL;
+> >>
+> >>       /* restore the registers from the stack frame */
+> >
+> > sp and fp can still be complete garbage in the case of a corrupted frame,
+> > so low + 12 can still overflow and cause us to read beyond the stack base.
+> >
+> > A more robust patch might be as follows.  This also checks for misaligned
+> > fp and sp values, since those indicate corruption and there can be no
+> > sensible way to interpret the resulting frame in that case.
+> >
+> > Also, according to the definition of current_thread_info(),
+> > IS_ALIGNED(sp, THREAD_SIZE) indicates a full stack extending from sp
+> > to sp + THREAD_SIZE, and not an empty stack extending from sp -
+> > THREAD_SIZE to sp.  We cannot backtrace this situation anyway, since
+> > that would imply that the frame record extends beyond the stack...
+> > but this patch tidies it up in the interest of clarity.
+> >
+> > Cheers
+> > ---Dave
+> >
+> > (untested)
+> >
+> > diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
+> > index 00f79e5..fec82be 100644
+> > --- a/arch/arm/kernel/stacktrace.c
+> > +++ b/arch/arm/kernel/stacktrace.c
+> > @@ -28,10 +28,20 @@ int notrace unwind_frame(struct stackframe *frame)
+> >
+> >         /* only go to a higher address on the stack */
+> >         low = frame->sp;
+> > -       high = ALIGN(low, THREAD_SIZE);
+> > +       if (!IS_ALIGNED(fp, 4))
+> > +               return -EINVAL;
+> > +
+> > +       /*
+> > +        * low + 1 here ensures that high > sp, consistent with the
+> > +        * definition of current_thread_info().
+> > +        * We subtract 1 to compute the highest allowable byte address.
+> > +        * Otherwise, we might get high == 0 which would confuse our
+> > +        * comparisons.
+> > +        */
+> > +       high = ALIGN(low + 1, THREAD_SIZE) - 1;
+> >
+> >         /* check current frame pointer is within bounds */
+> > -       if (fp < (low + 12) || fp + 4 >= high)
+> > +       if (fp < 12 || fp - 12 < low || fp > high)
+> >                 return -EINVAL;
+> >
+> >         /* restore the registers from the stack frame */
+> > @@ -39,6 +49,10 @@ int notrace unwind_frame(struct stackframe *frame)
+> >         frame->sp = *(unsigned long *)(fp - 8);
+> >         frame->pc = *(unsigned long *)(fp - 4);
+> >
+> > +       /* Do not claim the frame is valid if if is obviously corrupt: */
+> > +       if (!IS_ALIGNED(frame->fp, 4))
+> > +               return -EINVAL;
+> > +
+> >         return 0;
+> >  }
+> >  #endif
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> On Mon, Nov 05, 2012 at 02:54:32PM +0530, Shubhrajyoti Datta wrote:
-> > On Mon, Nov 5, 2012 at 2:34 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > 
-> > > Hi,
-> > >
-> > > On Mon, Nov 05, 2012 at 02:04:56PM +0530, Shubhrajyoti wrote:
-> > > > >> @@ -1155,7 +1187,7 @@ omap_i2c_probe(struct platform_device *pdev)
-> > > > >>
-> > > > >>            dev->fifo_size = (dev->fifo_size / 2);
-> > > > >>
-> > > > >> -          if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
-> > > > >> +          if (dev->rev < OMAP_I2C_REV_ON_3630)
-> > > > >>                    dev->b_hw = 1; /* Enable hardware fixes */
-> > > > > looks like this was applicable to 4430 too, what happened ?
-> > > > No actually this can be deleted completely once the
-> > > > start -> transaction -> stop sequence recommendation is followed.
-> > >
-> > > yes, but we're not there just yet and this patch is changing the
-> > > behavior of the driver
-> > 
-> > 
-> > No , earlier we were truncating the register for omap4 so
-> > OMAP_I2C_REV_ON_3630_4430 was there if we read both hi and lo for
-> > omap4 then we donot find 3630 and 4430 value to be similar.
-> > 
-> > In this case the behavior is same as earlier also it enabled this for
-> > lower than 3630 and the same holds good even now.
-> > 
-> > So in essence, Earlier  OMAP_I2C_REV_ON_3630_4430 is named to
-> > OMAP_I2C_REV_ON_3630 and omap4 rev will have a 32bit value.
-> 
-> it's not same behavior because before dev->b_hw was set for omap4430,
-> but now it won't be. This is the difference in behavior which I'm
-> pointing out.
+> Dave or Todd, mind reposting this, or should I squash it into my
+> CONFIG_SMP stacktrace series?
 
-what I said is nonsense, since b_hw was set for anything older than
-3630, so current code is no different.
+I'm happy for you to fold my patch into your series if you agree
+with it.  Ideally, please fix my typo in the final comment ("if IT is
+obviously corrupt").
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/e48c95b2/attachment.sig>
+Do I assume correctly that you are already testing this stuff?
+
+Cheers
+---Dave
