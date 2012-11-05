@@ -1,92 +1,81 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 5 Nov 2012 12:52:00 +0530
-Subject: [PATCH v2 1/5] clk: samsung: add common clock framework support
- for Samsung platforms
-In-Reply-To: <20121030163012.18780.19304@nucleus>
-References: <1349629855-4962-1-git-send-email-thomas.abraham@linaro.org>
- <1349629855-4962-2-git-send-email-thomas.abraham@linaro.org>
- <20121030163012.18780.19304@nucleus>
-Message-ID: <CAJuYYwScWunaVsg=4whrt4gRZYOVBbvAwFhYmN2PCQS723B3og@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 5 Nov 2012 12:53:59 +0530
+Subject: [PATCH 06/15] ARM: OMAP2+: hwmod: Enable OCMCRAM registration
+ in AM33XX
+In-Reply-To: <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <5097698F.1080609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
 
-Thanks for your review.
 
-On 30 October 2012 22:00, Mike Turquette <mturquette@ti.com> wrote:
-> Hi Thomas,
->
-> Quoting Thomas Abraham (2012-10-07 10:10:51)
->> +/* determine the output clock speed of the pll */
->> +static unsigned long samsung_pll_clock_recalc_rate(struct clk_hw *hw,
->> +                               unsigned long parent_rate)
->> +{
->> +       struct samsung_pll_clock *clk_pll = to_clk_pll(hw);
->> +
->> +       if (clk_pll->get_rate)
->> +               return to_clk_pll(hw)->get_rate(parent_rate);
->
-> Why the extra indirection?  Does your samsung_pll_clock abstract several
-> different PLL implementations (with separate clock ops)?  If so, why not
-> make a unique struct for each PLL type?
+On 11/2/2012 6:02 PM, Vaibhav Bedia wrote:
+> The hwmod data for OCMCRAM in AM33XX was commented out.
+> This data is needed by the power management code, hence
+> uncomment the same and register the OCP interface for it.
+> 
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   11 ++++++++++-
+>  1 files changed, 10 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> index 2e470ce..ec3fbb2 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> @@ -415,7 +415,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
+>   *    - cEFUSE (doesn't fall under any ocp_if)
+>   *    - clkdiv32k
+>   *    - debugss
+> - *    - ocmc ram
+>   *    - ocp watch point
+>   *    - aes0
+>   *    - sha0
+> @@ -481,6 +480,7 @@ static struct omap_hwmod am33xx_debugss_hwmod = {
+>  		},
+>  	},
+>  };
+> +#endif
+>  
+>  /* ocmcram */
+>  static struct omap_hwmod_class am33xx_ocmcram_hwmod_class = {
+> @@ -501,6 +501,7 @@ static struct omap_hwmod am33xx_ocmcram_hwmod = {
+>  	},
+>  };
+>  
+> +#if 0
 
-Yes, it abstracts several PLL types. There are multiple PLL types used
-by Samsung SoC's and this clock type was supposed to abstract all the
-types of PLL's. But yes, you are right. It is better to have a unique
-implementation for each type of PLL. That way, multiple user's of a
-PLL type need not be worried about setting up runtime callbacks for
-clock operations.
-
->
->> +
->> +       return 0;
->> +}
->> +
->> +/* round operation not supported */
->> +static long samsung_pll_clock_round_rate(struct clk_hw *hw, unsigned long drate,
->> +                               unsigned long *prate)
->> +{
->> +       return samsung_pll_clock_recalc_rate(hw, *prate);
->
-> Why is round_rate not supported?  How is returning the recalculated rate
-> the right thing here?
-
-The PLL does not include a divider for the rounding operation. So the
-output of the PLL clock type is not something that can be divided
-down. The parent clock of the PLL clock type is usually a low
-frequency oscillator. Hence, the round rate operation has not been
-implemented for the PLL clock type.
-
->
->> +/*
->> + * Allow platform specific implementations to attach set_rate and get_rate
->> + * callbacks for the pll type clock. Typical calling sequence..
->> + *
->> + * struct clk *clk = clk_get(NULL, "pll-clk-name");
->> + * samsung_pll_clk_set_cb(clk, pll_set_rate, pll_get_rate);
->> + */
->> +void __init samsung_pll_clk_set_cb(struct clk *clk,
->> +                       int (*set_rate)(unsigned long rate),
->> +                       unsigned long (*get_rate)(unsigned long rate))
->> +{
->> +       struct samsung_pll_clock *clk_pll;
->> +       struct clk_hw *hw = __clk_get_hw(clk);
->> +
->> +       clk_pll = to_clk_pll(hw);
->> +       clk_pll->set_rate = set_rate;
->> +       clk_pll->get_rate = get_rate;
->> +}
->
-> This answers my questions above having different PLL types.  Why not
-> just make seprate clk_hw structs for each PLL type instead of the extra
-> layer of abstraction + runtime assignment of clk ops?
-
-Ok. I will redo this in the next version of this patch.
+Can you cut-n-paste the ocmcram hwmod entry outside of #if and resubmit
+it again?
 
 Thanks,
-Thomas.
+Vaibhav
 
->
-> Regards,
-> Mike
+>  /* ocpwp */
+>  static struct omap_hwmod_class am33xx_ocpwp_hwmod_class = {
+>  	.name		= "ocpwp",
+> @@ -3331,6 +3332,13 @@ static struct omap_hwmod_ocp_if am33xx_l3_s__usbss = {
+>  	.flags		= OCPIF_SWSUP_IDLE,
+>  };
+>  
+> +/* l3 main -> ocmc */
+> +static struct omap_hwmod_ocp_if am33xx_l3_main__ocmc = {
+> +	.master		= &am33xx_l3_main_hwmod,
+> +	.slave		= &am33xx_ocmcram_hwmod,
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l4_fw__emif_fw,
+>  	&am33xx_l3_main__emif,
+> @@ -3401,6 +3409,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
+>  	&am33xx_l3_main__tptc0,
+>  	&am33xx_l3_main__tptc1,
+>  	&am33xx_l3_main__tptc2,
+> +	&am33xx_l3_main__ocmc,
+>  	&am33xx_l3_s__usbss,
+>  	&am33xx_l4_hs__cpgmac0,
+>  	&am33xx_cpgmac0__mdio,
+> 
