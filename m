@@ -1,111 +1,67 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 5 Nov 2012 13:02:55 +0000
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <20121105111346.GF28327@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
- <20121025141645.GA16962@sig21.net> <50894BC2.5050706@gmail.com>
- <20121025150816.GA3874@sig21.net>
- <20121105104839.GA2005@linaro.org>
- <20121105111346.GF28327@n2100.arm.linux.org.uk>
-Message-ID: <20121105130255.GD2005@linaro.org>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 5 Nov 2012 15:14:13 +0200
+Subject: [PATCH 0/6] OMAPDSS: enable DSS for Panda & SDP with devtree
+Message-ID: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 11:13:46AM +0000, Russell King - ARM Linux wrote:
-> On Mon, Nov 05, 2012 at 10:48:50AM +0000, Dave Martin wrote:
-> > On Thu, Oct 25, 2012 at 05:08:16PM +0200, Johannes Stezenbach wrote:
-> > > On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
-> > > > On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
-> > > > > On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
-> > > > >> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
-> > > > >>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
-> > > > >>>
-> > > > >>>> While v6 can support unaligned accesses, it is optional and current
-> > > > >>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
-> > > > >>>> v6.
-> > > > >>>
-> > > > >>> not true according to the gcc changes page
-> > > > >>
-> > > > >> What are you going to believe: documentation or what the compiler
-> > > > >> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
-> > > > >> support backported and 4.7.2, unaligned accesses are emitted for v7
-> > > > >> only. I guess default here means it is the default unless you change the
-> > > > >> default in your build of gcc.
-> > > > > 
-> > > > > Since ARMv6 can handle unaligned access in the same way as ARMv7
-> > > > > it seems a clear bug in gcc which might hopefully get fixed.
-> > > > > Thus in this case I think it is reasonable to follow the
-> > > > > gcc documentation, otherwise the code would break for ARMv6
-> > > > > when gcc gets fixed.
-> > > > 
-> > > > But the compiler can't assume the state of the U bit. I think it is
-> > > > still legal on v6 to not support unaligned accesses, but on v7 it is
-> > > > required. All the standard v6 ARM cores support it, but I'm not sure
-> > > > about custom cores or if there are SOCs with buses that don't support
-> > > > unaligned accesses properly.
-> > > 
-> > > Well, I read the "...since Linux version 2.6.28" comment
-> > > in the gcc changes page in the way that they assume the
-> > > U-bit is set. (Although I'm not sure it really is???)
-> > 
-> > Actually, the kernel checks the arch version and the U bit on boot,
-> > and chooses the appropriate setting for the A bit depending on the
-> > result.  (See arch/arm/mm/alignment.c:alignment_init().)
-> 
-> That is in the kernel itself, _after_ the decompressor has run.  It is
-> not relevant to any discussion about the decompressor.
+Hi,
 
-This was merely meant as an argument that the kernel does not make
-assumptions about the U bit, and so the zImage decompressor probably
-shouldn't either.
+OMAPDSS device tree support is still some way in the future. Tony has requested
+to get DSS working for Panda & SDP boards with DT kernel, so that we'll have
+fully working boards with DT.
 
-> > Currently, we depend on the CPU reset behaviour or firmware/
-> > bootloader to set the U bit for v6, but the behaviour should be
-> > correct either way, though unaligned accesses will obviously
-> > perform (much) better with U=1.
-> 
-> Will someone _PLEASE_ address my initial comments against this patch
-> in light of the fact that it's now been proven _NOT_ to be just a V7
-> issue, rather than everyone seemingly buring their heads in the sand
-> over this.
-> 
-> The fact is, unaligned accesses in the decompressor are *undefined* at
-> present.
+This series makes a few hacks to get a working display on OMAP4 Panda and SDP
+boards. The idea is to setup the omapdss with the non-DT method, creating the
+omapdss devices and passing platform data to them. This setup code is called
+from board-generic for Panda and SDP boards.
 
-Why not allow unaligned accesses in the decompressor, though, both
-for v6 and v7?
+There was one problem with this approach: omapdss cannot get regulators using
+the omapdss's names fro the regulators. Thus there's a hack patch to get the
+regulators using the OMAP4 "native" regulator names, thus circumventing the
+problem.
 
-The decompressors run with the cache on, so we should have fault-free
-unaligned access on all CPUs which support it, provided that we set the
-SCTLR bits appropriately, and provided that the decompressers are
-written in correct C.
+Tony, if these look good, how do you want to merge these? There are three parts
+here, and I think they can be merged independently if so wished:
 
-The counterargument is that zImage would then just fall over if booted
-on a CPU older than the baseline architecture the kernel was built for.
-However, that should be detected before executing any C code, giving
-the zImage code a chance to bail out with a suitable error message.
+* .dts changes for the pinmuxing (2 patches)
+* dss-common.c and board-generic.c changes (3 patches)
+* DSS hack for the regulators (1 patch)
 
-A kernel which contains support for v6/v7 platforms cannot work on older
-CPUs anyway, because the kernel itself doesn't support such combinations.
+If one of those parts is missing, DSS won't start with DT kernel, but otherwise
+there shouldn't be any problems. So to avoid conflicts, I suggest that you take
+the first two parts, and I'll merge the DSS hack via omapdss tree.
 
-> > For v7, we should definitely use -munaligned-access where available
-> > (unless it's the default?)
-> 
-> No such option on my compiler - according to the manual I have, the only
-> option there is starting -munaligned is on SPARC for -munaligned-doubles.
+ Tomi
 
-OK, I guess that's something backported into the Linaro toolchain I'm
-currently using then.  But it seems a good idea to use this if available,
-because it allows the compiler to generate better code in some situations,
-especially for packed struct access.
- 
-> However, I believe GCC does believe that unaligned accesses are fine on
-> V6 and above.
+Ricardo Neri (2):
+  ARM/dts: omap4-panda: Add pinmux configuration for HDMI
+  ARM/dts: omap4-sdp: Add pinmux configuration for HDMI
 
-Possibly, but I've never seen it use them deliberately, prior to the
--munaligned-access support.
+Tomi Valkeinen (4):
+  OMAPDSS: HACK: look for regulators with omap4 names
+  OMAP: panda: move display init from board file to dss-common.c
+  OMAP: omap4sdp: move display init from board file to dss-common.c
+  OMAP: board-generic: enable DSS for panda & sdp boards
 
-Cheers
----Dave
+ arch/arm/boot/dts/omap4-panda-a4.dts     |   17 ++
+ arch/arm/boot/dts/omap4-panda.dts        |   18 ++
+ arch/arm/boot/dts/omap4-pandaES.dts      |    9 +
+ arch/arm/boot/dts/omap4-sdp-es23plus.dts |   17 ++
+ arch/arm/boot/dts/omap4-sdp.dts          |   18 ++
+ arch/arm/mach-omap2/Makefile             |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c      |  157 +----------------
+ arch/arm/mach-omap2/board-generic.c      |   10 ++
+ arch/arm/mach-omap2/board-omap4panda.c   |   68 +-------
+ arch/arm/mach-omap2/dss-common.c         |  276 ++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/dss-common.h         |   14 ++
+ drivers/video/omap2/dss/dsi.c            |    8 +
+ drivers/video/omap2/dss/hdmi.c           |    4 +
+ 13 files changed, 394 insertions(+), 224 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-panda-a4.dts
+ create mode 100644 arch/arm/boot/dts/omap4-sdp-es23plus.dts
+ create mode 100644 arch/arm/mach-omap2/dss-common.c
+ create mode 100644 arch/arm/mach-omap2/dss-common.h
+
+-- 
+1.7.10.4
