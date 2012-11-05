@@ -1,20 +1,32 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Sat, 03 Nov 2012 16:22:00 +0000
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Mon, 5 Nov 2012 04:40:00 +0000
 Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
  for AM33XX
-In-Reply-To: <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+In-Reply-To: <509544A8.7010507@deeprootsystems.com>
 References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
  <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <509544A8.7010507@deeprootsystems.com>
+ <509544A8.7010507@deeprootsystems.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC002B4@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2012 12:32 PM, Vaibhav Bedia wrote:
-> AM33XX has only one usable timer in the WKUP domain.
+Hi Kevin,
 
-After reading the TRM, it seems there are two: DMTIMER0 and DMTIMER1.
+On Sat, Nov 03, 2012 at 21:52:00, Kevin Hilman wrote:
+> On 11/02/2012 12:32 PM, Vaibhav Bedia wrote:
+> > AM33XX has only one usable timer in the WKUP domain.
+> 
+> After reading the TRM, it seems there are two: DMTIMER0 and DMTIMER1.
+> 
+> Looking at the hwmod data though, I don't see a hwmod for DMTIMER0.  Can
+> you explain a little about why DMTIMER0 is missing/broken?
+> 
 
-Looking at the hwmod data though, I don't see a hwmod for DMTIMER0.  Can
-you explain a little about why DMTIMER0 is missing/broken?
+DMTimer0 is usable only in secure devices only. This timer by default runs
+from an inaccurate RC oscillator the frequency of which can be anywhere
+from 16-60KHz based on process variations. There is a mux to change the
+clock source but the register for the mux can't be modified in GP devices.
+(will add this in the changelog)
 
-Kevin
+Regards,
+Vaibhav
