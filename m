@@ -1,65 +1,59 @@
 From: walken@google.com (Michel Lespinasse)
-Date: Mon,  5 Nov 2012 14:47:01 -0800
-Subject: [PATCH 04/16] mm: rearrange vm_area_struct for fewer cache misses
+Date: Mon,  5 Nov 2012 14:47:04 -0800
+Subject: [PATCH 07/16] mm: fix cache coloring on x86_64 architecture
 In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
 References: <1352155633-8648-1-git-send-email-walken@google.com>
-Message-ID: <1352155633-8648-5-git-send-email-walken@google.com>
+Message-ID: <1352155633-8648-8-git-send-email-walken@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rik van Riel <riel@surriel.com>
+Fix the x86-64 cache alignment code to take pgoff into account.
+Use the x86 and MIPS cache alignment code as the basis for a generic
+cache alignment function.
 
-The kernel walks the VMA rbtree in various places, including
-the page fault path.  However, the vm_rb node spanned two
-cache lines, on 64 bit systems with 64 byte cache lines (most
-x86 systems).
+The old x86 code will always align the mmap to aliasing boundaries,
+even if the program mmaps the file with a non-zero pgoff.
 
-Rearrange vm_area_struct a little, so all the information we
-need to do a VMA tree walk is in the first cache line.
+If program A mmaps the file with pgoff 0, and program B mmaps the
+file with pgoff 1. The old code would align the mmaps, resulting in
+misaligned pages:
+
+A:  0123
+B:  123
+
+After this patch, they are aligned so the pages line up:
+
+A: 0123
+B:  123
 
 Signed-off-by: Michel Lespinasse <walken@google.com>
-Signed-off-by: Rik van Riel <riel@redhat.com>
+Proposed-by: Rik van Riel <riel@redhat.com>
 
 ---
- include/linux/mm_types.h |   12 ++++++++----
- 1 files changed, 8 insertions(+), 4 deletions(-)
+ arch/x86/kernel/sys_x86_64.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-index 94fa52b28ee8..528da4abf8ee 100644
---- a/include/linux/mm_types.h
-+++ b/include/linux/mm_types.h
-@@ -224,7 +224,8 @@ struct vm_region {
-  * library, the executable area etc).
-  */
- struct vm_area_struct {
--	struct mm_struct * vm_mm;	/* The address space we belong to. */
-+	/* The first cache line has the info for VMA tree walking. */
-+
- 	unsigned long vm_start;		/* Our start address within vm_mm. */
- 	unsigned long vm_end;		/* The first byte after our end address
- 					   within vm_mm. */
-@@ -232,9 +233,6 @@ struct vm_area_struct {
- 	/* linked list of VM areas per task, sorted by address */
- 	struct vm_area_struct *vm_next, *vm_prev;
+diff --git a/arch/x86/kernel/sys_x86_64.c b/arch/x86/kernel/sys_x86_64.c
+index f00d006d60fd..97ef74b88e0f 100644
+--- a/arch/x86/kernel/sys_x86_64.c
++++ b/arch/x86/kernel/sys_x86_64.c
+@@ -136,7 +136,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
+ 	info.low_limit = begin;
+ 	info.high_limit = end;
+ 	info.align_mask = filp ? get_align_mask() : 0;
+-	info.align_offset = 0;
++	info.align_offset = pgoff << PAGE_SHIFT;
+ 	return vm_unmapped_area(&info);
+ }
  
--	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
--	unsigned long vm_flags;		/* Flags, see mm.h. */
--
- 	struct rb_node vm_rb;
- 
- 	/*
-@@ -245,6 +243,12 @@ struct vm_area_struct {
- 	 */
- 	unsigned long rb_subtree_gap;
- 
-+	/* Second cache line starts here. */
-+
-+	struct mm_struct * vm_mm;	/* The address space we belong to. */
-+	pgprot_t vm_page_prot;		/* Access permissions of this VMA. */
-+	unsigned long vm_flags;		/* Flags, see mm.h. */
-+
- 	/*
- 	 * For areas with an address space and backing store,
- 	 * linkage into the address_space->i_mmap interval tree, or
+@@ -175,7 +175,7 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
+ 	info.low_limit = PAGE_SIZE;
+ 	info.high_limit = mm->mmap_base;
+ 	info.align_mask = filp ? get_align_mask() : 0;
+-	info.align_offset = 0;
++	info.align_offset = pgoff << PAGE_SHIFT;
+ 	addr = vm_unmapped_area(&info);
+ 	if (!(addr & ~PAGE_MASK))
+ 		return addr;
 -- 
 1.7.7.3
