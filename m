@@ -1,46 +1,62 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 5 Nov 2012 13:25:11 +0100
-Subject: [PATCH 2/2] Input: nomadik-ske-keypad - start using the apb_pclk
-In-Reply-To: <CACRpkdbZB4nhFQtLH-GxBSK99RFk7yhSYMhO5keVjyugrqr7JA@mail.gmail.com>
-References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
- <1351779602-13818-3-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdbZB4nhFQtLH-GxBSK99RFk7yhSYMhO5keVjyugrqr7JA@mail.gmail.com>
-Message-ID: <CAPDyKFpjdVMCuBdN-O+xxK=Dko-GTEjF5AYOeEMgWghJfB8EsA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 5 Nov 2012 13:31:59 +0100
+Subject: [PATCH 5/8] ARM: zynq: add COMMON_CLK support
+In-Reply-To: <20121102152826.GQ5190@beefymiracle.amer.corp.natinst.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+ <94af5ee92c2d68f245eb902de74909aadf159be1.1351721190.git.josh.cartwright@ni.com>
+ <50939378.2050500@metafoo.de>
+ <20121102133850.GO5190@beefymiracle.amer.corp.natinst.com>
+ <5093E2D5.2000304@metafoo.de>
+ <20121102152826.GQ5190@beefymiracle.amer.corp.natinst.com>
+Message-ID: <CAHTX3dKeP-RhTXuO_9aBb=GqeGA8qgJ=RrVh+YRS0Ly8Y=X2ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 November 2012 19:12, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Nov 1, 2012 at 3:20 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+2012/11/2 Josh Cartwright <josh.cartwright@ni.com>:
+> On Fri, Nov 02, 2012 at 04:12:21PM +0100, Lars-Peter Clausen wrote:
+>> On 11/02/2012 02:38 PM, Josh Cartwright wrote:
+>> > On Fri, Nov 02, 2012 at 10:33:44AM +0100, Lars-Peter Clausen wrote:
+>> >> On 10/31/2012 07:58 PM, Josh Cartwright wrote:
+> [...]
+>> >>> +static void __init zynq_periph_clk_setup(struct device_node *np)
+>> >>> +{
+>> >>> + struct zynq_periph_clk *periph;
+>> >>> + const char *parent_names[3];
+>> >>> + struct clk_init_data init;
+>> >>> + struct clk *clk;
+>> >>> + int err;
+>> >>> + u32 reg;
+>> >>> + int i;
+>> >>> +
+>> >>> + err = of_property_read_u32(np, "reg", &reg);
+>> >>> + WARN_ON(err);
+>> >>
+>> >> Shouldn't the function abort if a error happens somewhere? Continuing here
+>> >> will lead to undefined behavior. Same is probably true for the other WARN_ONs.
+>> >
+>> > The way I see it is: the kernel is will be left in a bad state in the
+>> > case of any failure, regardless of if we bail out or continue.  AFAICT,
+>> > there is no clean way to recover from a failure this early.
+>> >
+>> > Given that, it seems simpler (albeit marginally so) just to continue; so
+>> > that's what I chose to do.  I'm not opposed to bailing out, just not
+>> > convinced it does anything for us.
+>> >
+>> The issue with this approach is that, while you get a warning, unexpected
+>> seemingly unrelated side-effects may happen later on. E.g. if no reg
+>> property for the clock is specified the reg variable will be uninitialized
+>> and contain whatever was on the stack before. The clock will be registered
+>> nonetheless and the boot process continues. Now if the clock is enabled a
+>> bit in a random register will be modified, which could result in strange and
+>> abnormal behavior, which can be very hard to track down.
 >
->> From: Ulf Hansson <ulf.hansson@linaro.org>
->>
->> Previously this clock was handled internally by the clockdriver,
->> but now this is separate clk. So we need take care of it.
->>
->> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> So this is a silicon block clock and falls into the category of things
-> we've been discussing...
->
-> If I understand correctly, the only "real" solution is to
-> implement the PM domains and have these enable the clocks.
+> Okay.....but any reasonable person would start their debugging quest at
+> the source of the WARN_ON.  If someone sees the WARN_ON message but
+> stupidly chooses to ignore it, they deserves to spend the time trying to
+> track down abnormal behavior, so I'm still not convinced.
 
-Agree.
+I am with Lars. You would be surprised how many people do no read bootlog.
+It should be handled better.
 
-Although, since the pm_domain not yet exist, this as a way forward for
-now - to fix what is broken.
-When the pm_domain is in place and when we decide to fold in the clock
-handling in there, we can move it.
-
->
-> An alternative may be to move this driver over to the AMBA bus,
-> because I think this device actually has primecell registers.
-> Then the bus will take care of the pclk for starters.
-
-You are definitely right, this driver can be converted into using the AMBA bus.
-Although, do you think that should be done _instead_ of going ahead
-with this patch or do you want that to be handled as a next and a
-separate step?
-
-Kind regards
-Ulf Hansson
+Thanks,
+Michal
