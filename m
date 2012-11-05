@@ -1,39 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 5 Nov 2012 09:18:37 -0800
-Subject: [PATCH for soc] socfpga: map uart into virtual address space so
- that early_printk() works
-In-Reply-To: <20121103112614.GA27365@elf.ucw.cz>
-References: <1340805007-3313-1-git-send-email-dinguyen@altera.com>
- <201210251458.48528.arnd@arndb.de>
- <20121027115615.GC5912@elf.ucw.cz>
- <201210271539.20156.arnd@arndb.de>
- <20121029002724.GA27891@elf.ucw.cz>
- <20121103112614.GA27365@elf.ucw.cz>
-Message-ID: <20121105171837.GA16155@quad.lixom.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 05 Nov 2012 17:19:33 +0000
+Subject: vexpress issues in next-20121029
+In-Reply-To: <201211051647.19785.arnd@arndb.de>
+References: <508EE610.9050703@wwwdotorg.org>
+ <20121105094511.GE28327@n2100.arm.linux.org.uk>
+ <1352126598.10947.13.camel@hornet> <201211051647.19785.arnd@arndb.de>
+Message-ID: <1352135973.10947.23.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 03, 2012 at 12:26:14PM +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > Early printk code needs UART to be mapped early during
-> > boot. early_printk() is left there during the start-up; it is useful
-> > as our emulators are fairly slow.
-> > 
-> > Signed-off-by: Pavel Machek <pavel@denx.de>
-> > Acked-by: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Could we get this one applied? No comments for quite a while... and it
-> is needed for machine not to crash with early_printk used...
-> 								Pavel
+On Mon, 2012-11-05 at 16:47 +0000, Arnd Bergmann wrote:
+> I've just tried pulling in your branch again, but it appears unchanged:
+> The patches are still based on 807e45b328, which is a different commit
+> from bcd6f569e874 that is in Mike's tree. Please do as I asked you before
+> and rebase on top of the commit that you sent him,
 
-Sorry, we've been delayed on applying patches due to Linaro Connect and travel.
+Ok, I think I got the idea now. Sorry about not catching up straight
+away...
 
-I've applied this now with a minor edit to remove the extra added lines before
-the struct.
+The following changes since commit bcd6f569e87471d7f104bd9497f0b516a3b12e32:
 
+  clk: Common clocks implementation for Versatile Express (2012-10-29 11:08:03 -0700)
 
-Regards,
+are available in the git repository at:
 
+  git://git.linaro.org/people/pawelmoll/linux.git vexpress-clk-soc
 
--Olof
+for you to fetch changes up to 433683a66401adb0150792e725cc4f631c94de46:
+
+  ARM: vexpress: Remove motherboard dependencies in the DTS files (2012-11-05 17:09:52 +0000)
+
+>  and make sure that this is a commit that Mike never rebases.
+
+Uh. Mike, is your clk-next subject to rebases?
+
+Pawe?
