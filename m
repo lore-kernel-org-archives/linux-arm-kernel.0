@@ -1,64 +1,60 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 5 Nov 2012 11:29:59 +0530
-Subject: [PATCH] ARM: dts: AM33XX: Add usbss node
-Message-ID: <1352095204-29028-1-git-send-email-afzal@ti.com>
+From: N.Voss@weinmann.de (Voss, Nikolaus)
+Date: Mon, 5 Nov 2012 07:08:29 +0100
+Subject: [PATCH] i2c: at91: add a sanity check on i2c message length
+In-Reply-To: <5093EE2B.8080005@atmel.com>
+References: <1349879158-27268-1-git-send-email-ludovic.desroches@atmel.com>
+ <20121101222922.GD22956@pengutronix.de> <5093A8CD.60006@atmel.com>
+ <20121102111432.GD21313@pengutronix.de> <5093EE2B.8080005@atmel.com>
+Message-ID: <EF2E73589CA71846A15D0B2CDF79505D090EFB340B@wm021.weinmann.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ajay Kumar Gupta <ajay.gupta@ti.com>
+ludovic.desroches wrote on Friday, November 02, 2012 5:01 PM:
+> Le 11/02/2012 12:14 PM, Wolfram Sang a ?crit :
+> > On Fri, Nov 02, 2012 at 12:04:45PM +0100, ludovic.desroches wrote:
+> >> Hi Wolfram,
+> >>
+> >> Le 11/01/2012 11:29 PM, Wolfram Sang a ?crit :
+> >>> On Wed, Oct 10, 2012 at 04:25:58PM +0200,
+> ludovic.desroches at atmel.com wrote:
+> >>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>>
+> >>>> If the i2c message length is zero, i2c-at91 will directly return an error
+> >>>> instead of trying to send a zero-length message.
+> >>>>
+> >>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>
+> >>> What happens if you send a 0 byte message? Some hardware is able to
+> do
+> >>> this and it will be used in SMBUS QUICK which the driver states to
+> >>> support according to at91_twi_func().
+> >>
+> >> Without this I had some data corruption when writing to / reading
+> >> from a serial eeprom (depending on the IP version).
+> >>
+> >> Yes SMBUS quick command is supported but is not managed in the
+> >> driver, we have to tell explicitly the IP that we want to send this
+> >> command.
+> >
+> > Ok, so unless you want to implement the support, please update this
+> > patch with a comment that SMBUS_QUICK is a TODO and remove the
+> > SMBUS_QUICK capability.
+> >
+> 
+> Implementation should not be a huge task, only one bit to set in a
+> register but I have no device to test it.
+> So I will choose to remove the SMBUS_QUICK capability.
+> 
+> Hi Nikolaus,
+> 
+> Did you test the driver with SMBus compatible devices? Can I keep other
+> SMBus capabilities from SMBUS_EMUL?
 
-Device tree node for usbss on AM33XX. There are two musb
-controllers on am33xx platform so have port0-mode and
-port1-mode data.
+Hi Ludovic,
 
-[afzal at ti.com: reg & interrupt property addition]
+yes, I use this driver with the sbs driver to query a smbus-attached
+battery with a TI bq chip (I actually wrote this driver only for this
+purpose). I implemented and tested SMBUS_BLOCK but not
+SMBUS_QUICK...
 
-Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-Signed-off-by: Santhapuri, Damodar <damodar.santhapuri@ti.com>
-Signed-off-by: Ravi Babu <ravibabu@ti.com>
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
-
-Hi Benoit,
-
-This is based on your "for_3.8/dts" branch.
-
-This is made on top of "usb: musb: am335x support"
-(http://marc.info/?l=linux-omap&m=135187391904863&w=2)
-and has been tested on Beagle Bone.
-
-Regards
-Afzal
-
- arch/arm/boot/dts/am33xx.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 5dfd682..78340a5 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -321,5 +321,22 @@
- 			ti,hwmods = "spi1";
- 			status = "disabled";
- 		};
-+
-+		usb_otg_hs at 47400000 {
-+			compatible = "ti,musb-am33xx";
-+			reg = <0x47400000 0x1000	/* usbss */
-+			       0x47401000 0x800		/* musb instance 0 */
-+			       0x47401800 0x800>;	/* musb instance 1 */
-+			interrupts = <17		/* usbss */
-+				      18		/* musb instance 0 */
-+				      19>;		/* musb instance 1 */
-+			multipoint = <1>;
-+			num-eps = <16>;
-+			ram-bits = <12>;
-+			port0-mode = <3>;
-+			port1-mode = <3>;
-+			power = <250>;
-+			ti,hwmods = "usb_otg_hs";
-+		};
- 	};
- };
--- 
-1.7.12
+Niko
