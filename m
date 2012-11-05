@@ -1,59 +1,70 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 05 Nov 2012 13:52:48 +0000
-Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
-In-Reply-To: <1352120159.10947.3.camel@hornet>
-References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
- <1352108387.3212.12.camel@linaro1.home> <1352120159.10947.3.camel@hornet>
-Message-ID: <1352123568.3212.52.camel@linaro1.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Nov 2012 14:02:58 +0000
+Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric in
+ mach-mvebu
+In-Reply-To: <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121105140258.GO3351@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-05 at 12:55 +0000, Pawel Moll wrote:
-> On Mon, 2012-11-05 at 09:39 +0000, Jon Medhurst (Tixy) wrote:
-> > > +static void mmio_led_brightness_set(struct led_classdev *cdev,
-> > > +		enum led_brightness brightness)
-> > > +{
-> > > +	struct mmio_led *led = container_of(cdev, struct mmio_led, cdev);
-> > > +	unsigned long uninitialized_var(flags);
-> > 
-> > uninitialized_var seems to be a bit contentious, Linus Torvalds had a
-> > recent complaint about it which prompted Ingo to post a patch proposing
-> > to removing it: https://patchwork.kernel.org/patch/1655621/ So perhaps
-> > best to avoid using it ;-).
-> > 
-> > In this case, you could possibly keep gcc quite with something like:
-> > 
-> >         spinlock_t *lock = led->lock;
-> > 
-> > and then use the local variable 'lock' everywhere instead of led->lock.
-> > Or just keep it simple an initialise flags to 0 instead.
-> 
-> Yeah, = 0 will do...
-> 
-> > > +	if (!pdata)
-> > > +		return -EINVAL;
-> > > +
-> > > +	if (pdata->reg_size != 8 && pdata->reg_size != 16 &&
-> > > +			pdata->reg_size != 32)
-> > > +		return -EFAULT;
-> > 
-> > Is EFAULT appropriate here? Why not EINVAL?
-> 
-> Hm. To distinguish it from !pdata case I guess (and a 13 bit wide
-> transaction sounds like a fault to me ;-), but I can be persuaded
-> otherwise without much effort...
+Hi Gregory,
 
-I was asking as much for my own education about use of error values as
-anything else. The comments in errno-base.h are:
+On Mon, Oct 29, 2012 at 09:11:44PM +0000, Gregory CLEMENT wrote:
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> new file mode 100644
+> index 0000000..69e130d
+> --- /dev/null
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -0,0 +1,89 @@
+> +/*
+> + * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
+> + *
+> + * Copyright (C) 2012 Marvell
+> + *
+> + * Yehuda Yitschak <yehuday@marvell.com>
+> + * Gregory Clement <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + *
+> + * The Armada 370 and Armada XP SOCs have a coherency fabric which is
+> + * responsible for ensuring hardware coherency between all CPUs and between
+> + * CPUs and I/O masters. This file initializes the coherency fabric and
+> + * supplies basic routines for configuring and controlling hardware coherency
+> + */
 
-#define	EINVAL		22	/* Invalid argument */
-#define	EFAULT		14	/* Bad address */
+[...]
 
-and from looking in the source tree it seems EFAULT is mostly used to
-indicate a bad memory address passed from user-side to the kernel.
+> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+> +{
+> +	int reg;
+> +
+> +	if (!coherency_base) {
+> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
+> +		pr_warn("Coherency fabric is not initialized\n");
+> +		return 1;
+> +	}
+> +
+> +	/* Enable the CPU in coherency fabric */
+> +	reg = readl(coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
+> +	reg |= 1 << (24 + hw_cpu_id);
+> +	writel(reg, coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
+> +
+> +	/* Add CPU to SMP group */
+> +	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
+> +	reg |= 1 << (16 + hw_cpu_id + (smp_group_id == 0 ? 8 : 0));
+> +	writel(reg, coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
+> +
+> +	return 0;
+> +}
 
-It's a trivial point so it's not worth wasting time on a long
-discussion.
+These writels may expand to code containing calls to outer_sync(), which
+will attempt to take a spinlock for the aurora l2. Given that the CPU isn't
+coherent, how does this play out with the exclusive store instruction in the
+lock?
 
--- 
-Tixy
+Will
