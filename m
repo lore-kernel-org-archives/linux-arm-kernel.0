@@ -1,24 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 05 Nov 2012 12:03:57 -0700
-Subject: [PATCH V3 1/5] ARM: implement debug_ll_io_init()
-In-Reply-To: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
-References: <1350686507-3022-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50980D9D.7050207@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 5 Nov 2012 19:08:34 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+Message-ID: <201211051908.34291.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2012 04:41 PM, Stephen Warren wrote:
-> When using DEBUG_LL, the UART's (or other HW's) registers are mapped
-> into early page tables based on the results of assembly macro addruart.
-> Later, when the page tables are replaced, the same virtual address must
-> remain valid. Historically, this has been ensured by using defines from
-> <mach/iomap.h> in both the implementation of addruart, and the machine's
-> .map_io() function. However, with the move to single zImage, we wish to
-> remove <mach/iomap.h>. To enable this, the macro addruart may be used
-> when constructing the late page tables too; addruart is exposed as a
-> C function debug_ll_addr(), and used to set up the required mapping in
-> debug_ll_io_init(), which may called on an opt-in basis from a machine's
-> .map_io() function.
+On Monday 05 November 2012, Will Deacon wrote:
+> I was playing around with !CONFIG_MMU today and to my dismay noticed that
+> you can't select ARCH_VEXPRESS without CONFIG_MMU=y! This is because
+> ARCH_VEXPRESS is only selectable via ARCH_MULTI_V7, which depends on
+> ARCH_MULTIPLATFORM which in turn depends on MMU.
+> 
+> I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
+> !ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
+> dependency dropped) but I wondered if you'd got any better ideas?
+> 
 
-Patch 1 has been taken into arm-soc, and I've applied patches 2-5 to the
-Tegra tree.
+I don't actually remember what the reason for making ARCH_MULTIPLATFORM
+depend on MMU was. Maybe it just works if you drop the dependency.
+
+Presumably it's related to ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR not
+working on NOMMU, but if that's the case, we could make it
+
+
+ARCH_MULTIPLATFORM
+	bool "Allow multiple platforms to be selected"
+	select ARM_PATCH_PHYS_VIRT if !MMU
+	select AUTO_ZRELADDR if !MMU
+
+but maybe those actually work without MMU as well. I have never looked too
+closely at NOMMU configurations, every time I tried, they were broken in
+combination with something else I wanted to enable.
+
+	Arnd
