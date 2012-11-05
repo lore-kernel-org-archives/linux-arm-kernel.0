@@ -1,40 +1,92 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 5 Nov 2012 12:49:49 +0530
-Subject: [PATCH 07/15] ARM: OMAP2+: hwmod: Update the hwmod data for TPTCs
- in AM33XX
-In-Reply-To: <1351859566-24818-8-git-send-email-vaibhav.bedia@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-8-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <50976895.9040409@ti.com>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Mon, 5 Nov 2012 07:19:33 +0000
+Subject: [RFC PATCH v3 00/16] DMA Engine support for AM33XX
+In-Reply-To: <1350566815-409-1-git-send-email-mporter@ti.com>
+References: <1350566815-409-1-git-send-email-mporter@ti.com>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EAC0633@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 18, 2012 at 18:56:39, Porter, Matt wrote:
 
+...snip...
+...snip...
+...snip...
 
-On 11/2/2012 6:02 PM, Vaibhav Bedia wrote:
-> Update the TPTC hwmod entry to reflect the fact that
-> the idle and standby transitions are s/w controlled.
 > 
-
-Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
-
-Thanks,
-Vaibhav
-> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> This series adds DMA Engine support for AM33xx, which uses
+> an EDMA DMAC. The EDMA DMAC has been previously supported by only
+> a private API implementation (much like the situation with OMAP
+> DMA) found on the DaVinci family of SoCs.
 > 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index ec3fbb2..7772c29 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -1827,6 +1827,7 @@ static struct omap_hwmod am33xx_tptc0_hwmod = {
->  	.class		= &am33xx_tptc_hwmod_class,
->  	.clkdm_name	= "l3_clkdm",
->  	.mpu_irqs	= am33xx_tptc0_irqs,
-> +	.flags		= (HWMOD_SWSUP_SIDLE | HWMOD_SWSUP_MSTANDBY),
->  	.main_clk	= "l3_gclk",
->  	.prcm		= {
->  		.omap4	= {
+> The series applies on top of 3.7-rc1 and the following patches:
+> 
+> 	- GPMC fails to reserve memory fix:
+> 	  http://www.spinics.net/lists/linux-omap/msg79675.html
+> 	- TPS65910 regulator fix:
+> 	  https://patchwork.kernel.org/patch/1593651/
+> 	- dmaengine DT support from Vinod's dmaengine_dt branch in
+> 	  git://git.infradead.org/users/vkoul/slave-dma.git since
+> 	  027478851791df751176398be02a3b1c5f6aa824
+> 
+> The approach taken is similar to how OMAP DMA is being converted to
+> DMA Engine support. With the functional EDMA private API already
+> existing in mach-davinci/dma.c, we first move that to an ARM common
+> area so it can be shared. Adding DT and runtime PM support to the
+> private EDMA API implementation allows it to run on AM33xx. AM33xx
+> *only* boots using DT so we leverage Jon's generic DT DMA helpers to
+> register EDMA DMAC with the of_dma framework and then add support
+> for calling the dma_request_slave_channel() API to both the mmc
+> and spi drivers.
+> 
+> With this series both BeagleBone and the AM335x EVM have working
+> MMC and SPI support.
+> 
+> This is tested on BeagleBone with a SPI framebuffer driver and MMC
+> rootfs. A trivial gpio DMA event misc driver was used to test the
+> crossbar DMA event support. It is also tested on the AM335x EVM
+> with the onboard SPI flash and MMC rootfs. The branch at
+> https://github.com/ohporter/linux/tree/edma-dmaengine-v3 has the
+> complete series, dependencies, and some test drivers/defconfigs.
+> 
+> Regression testing was done on AM180x-EVM (which also makes use
+> of the EDMA dmaengine driver and the EDMA private API) using SD,
+> SPI flash, and the onboard audio supported by the ASoC Davinci
+> driver.
+
+Since you have tested MMC, and probably will be adding Audio support
+for AM335x as well, I believe you will also be adding Pin-mux support
+for both the modules.
+
+Can you share your plan to release the next version? 
+I have few patches pending for AM335x Audio (DT related). 
+
+Thanks in advance
+
+Regards
+Gururaja
+
+> 
+> After this series, the plan is to convert the last in-tree user
+> of the private EDMA API (davinci-pcm/mcasp) and then eliminate
+> the private EDMA API by folding its functionality into
+> drivers/dma/edma.c.
+> 
+> Matt Porter (16):
+>   dmaengine: edma: fix slave config dependency on direction
+>   ARM: davinci: move private EDMA API to arm/common
+>   ARM: edma: remove unused transfer controller handlers
+>   ARM: edma: add DT and runtime PM support for AM33XX
+>   ARM: edma: add AM33XX crossbar event support
+>   dmaengine: edma: enable build for AM33XX
+>   dmaengine: edma: Add TI EDMA device tree binding
+>   ARM: dts: add AM33XX EDMA support
+>   dmaengine: add dma_request_slave_channel_compat()
+>   mmc: omap_hsmmc: convert to dma_request_slave_channel_compat()
+>   mmc: omap_hsmmc: limit max_segs with the EDMA DMAC
+>   mmc: omap_hsmmc: add generic DMA request support to the DT binding
+>   ARM: dts: add AM33XX MMC support
+>   spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
+>   spi: omap2-mcspi: add generic DMA request support to the DT binding
+>   ARM: dts: add AM33XX SPI support
 > 
