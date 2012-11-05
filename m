@@ -1,51 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 5 Nov 2012 16:47:19 +0000
-Subject: vexpress issues in next-20121029
-In-Reply-To: <1352126598.10947.13.camel@hornet>
-References: <508EE610.9050703@wwwdotorg.org>
- <20121105094511.GE28327@n2100.arm.linux.org.uk>
- <1352126598.10947.13.camel@hornet>
-Message-ID: <201211051647.19785.arnd@arndb.de>
+From: agnel.joel@gmail.com (Joel A Fernandes)
+Date: Mon, 5 Nov 2012 11:52:57 -0500
+Subject: [PATCH] ARM: OMAP2+: AM33XX: clock data: fix mcasp entries
+In-Reply-To: <20121105081317.GC28886@opensource.wolfsonmicro.com>
+References: <1349879449-22657-1-git-send-email-mporter@ti.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAB8596@DBDE01.ent.ti.com>
+ <CAD=GYpZ9w=D55G9DOiMqZ4BCGGdGszsgG3fumHUGZ12xx+TKjw@mail.gmail.com>
+ <1BAFE6F6C881BF42822005164F1491C33EAB973D@DBDE01.ent.ti.com>
+ <CAD=GYpYuyfGuEgAWJyE2nkKx4GEsm=eDYAhV966sWVLbEPaqYQ@mail.gmail.com>
+ <20121105081317.GC28886@opensource.wolfsonmicro.com>
+Message-ID: <CAD=GYpZ2BhXz4=0bG-ST06mbVxbmAZyzBTDz-MKcRBCb_cqKPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 November 2012, Pawel Moll wrote:
-> On Mon, 2012-11-05 at 09:45 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 05, 2012 at 09:35:32AM +0000, Russell King - ARM Linux wrote:
-> > > On Tue, Oct 30, 2012 at 04:16:59PM +0000, Pawel Moll wrote:
-> > > > There was a glitch between clk-next and arm-soc - it should be fine
-> > > > starting with next-20121030.
-> > > 
-> > > The problem is still there - my builds of my tree plus arm-soc are
-> > > continuing to fail with:
-> > > 
-> > > arch/arm/mach-vexpress/built-in.o: In function `v2m_timer_init':
-> > > reset.c:(.init.text+0xe0): undefined reference to `vexpress_clk_init'
-> > > arch/arm/mach-vexpress/built-in.o: In function `v2m_dt_timer_init':
-> > > reset.c:(.init.text+0x114): undefined reference to `vexpress_clk_of_init'
-> > > 
-> > > My guess is you have a dependency between the clk-next tree and arm-soc
-> > > which you haven't told the arm-soc people about.
-> > 
-> > Oh, and the above seems to affect all my kautobuilds for any ARM Ltd
-> > development platform - it's not just vexpress which is affected by this
-> > anymore.
-> 
-> I've just successfully built defconfigs for vexpress, versatile and
-> realview with next-20121105 so I guess Arnd simply didn't have time last
-> week (the Connect event) to sort out the arm-soc tree...
-> 
-> Arnd, will you pull the vexpress-clk-soc (containing, as you suggested,
-> the soc stuff rebased on top of the clk branch) or do you want me to do
-> something else?
+Hi Mark,
 
-Sorry for not getting back to this earlier. It was indeed a very busy
-week and I did not manage to pull in any branches.
+On Mon, Nov 5, 2012 at 3:13 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Sat, Nov 03, 2012 at 02:32:59PM -0500, Joel A Fernandes wrote:
+>
+>> beaglebone_defconfig: Add dummy regulator to init tlv320aic3x
+>> https://github.com/joelagnel/linux-kernel/commit/db5672dfe548d82625cf40ed688d05ba7cee5c93
+>
+> This should never be done in production, you should ensure that the
+> appropriate supplies are provided by the board file or device tree.
 
-I've just tried pulling in your branch again, but it appears unchanged:
-The patches are still based on 807e45b328, which is a different commit
-from bcd6f569e874 that is in Mike's tree. Please do as I asked you before
-and rebase on top of the commit that you sent him, and make sure that
-this is a commit that Mike never rebases.
+Sure I just did this for debugging purpose,
 
-	Arnd
+Thanks,
+Joel
