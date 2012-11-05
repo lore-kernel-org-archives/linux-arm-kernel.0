@@ -1,49 +1,98 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Mon, 5 Nov 2012 06:44:10 +0000
-Subject: [PATCH v2] leds: leds-gpio: adopt pinctrl support
-In-Reply-To: <CACRpkdY_db3ju4LVnoR=0Wq8TFUxa48jNFGhvGM-3uSrmGZVew@mail.gmail.com>
-References: <1346487390-11399-1-git-send-email-anilkumar@ti.com>
- <CACRpkdbSY-aH_Vf3Q4h-ufz35m6=vVXCEecGGS-WOsG7vmPZ0g@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3E24E@DBDE01.ent.ti.com>
- <CACRpkdZ_NxST-oJ=MWC5L=r8uQD_71eHUVUR85v4jfsYpqz=UQ@mail.gmail.com>
- <20121001154451.GI4840@atomide.com>
- <CACRpkdaib2M1_UwSbyUG8qwZC2h7xaT5VU7WMj=y+h4S4LianQ@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA3F22E@DBDE01.ent.ti.com>
- <CACRpkdaeu3JaLqSbqETT=D0mdUu5VpwRpS_Xohd6M963rw8QMg@mail.gmail.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA5C598@DBDE01.ent.ti.com>
- <CACRpkdY_db3ju4LVnoR=0Wq8TFUxa48jNFGhvGM-3uSrmGZVew@mail.gmail.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA63234@DBDE01.ent.ti.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Mon, 5 Nov 2012 12:28:36 +0530
+Subject: [PATCH 04/15] ARM: OMAP2+: hwmod: Update the reset API for AM33XX
+In-Reply-To: <1351859566-24818-5-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-5-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <5097639C.7000800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 04, 2012 at 23:07:44, Linus Walleij wrote:
-> On Tue, Oct 30, 2012 at 3:12 PM, AnilKumar, Chimata <anilkumar@ti.com> wrote:
-> 
-> > I completely understood this named modes, I have added named
-> > modes like this in am335x-xxx.dts files
-> 
-> I do not understand how the pinctrl-single dts files work actually,
-> so please get Tony to review this part.
-> 
-> > I think "pinctrl-1" state will be used in driver
-> > suspend/resume calls.
-> 
-> Hopefully, I think you should test the code and monitor the
-> system to make sure the right thing happens.
 
-I will test while adding "pinctrl-1" data to .dts files.
 
+On 11/2/2012 6:02 PM, Vaibhav Bedia wrote:
+> WKUP-M3 has a reset status bit (RM_WKUP_STST.WKUP_M3_LRST)
+> Update the hardreset API to take care of the same to ensure
+> that the reset line properly deasserted.
 > 
-> > I have the pinmux/conf settings for default state but fully
-> > optimized pinmux/conf values in idle & suspend states are not
-> > available yet.
+
+Thanks for the patch, comments below -
+
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c |    5 +----
+>  arch/arm/mach-omap2/prm33xx.c    |   15 +++++++--------
+>  arch/arm/mach-omap2/prm33xx.h    |    2 +-
+>  3 files changed, 9 insertions(+), 13 deletions(-)
 > 
-> You have defined a "sleep" state which is what should be used
-> for suspend? Or do you mean that you do have a state but
-> you're just not defining it to the most optimal setting yet?
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index 37eeb45..a1d5835 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2944,11 +2944,8 @@ static int _am33xx_assert_hardreset(struct omap_hwmod *oh,
+>  static int _am33xx_deassert_hardreset(struct omap_hwmod *oh,
+>  				     struct omap_hwmod_rst_info *ohri)
+>  {
+> -	if (ohri->st_shift)
+> -		pr_err("omap_hwmod: %s: %s: hwmod data error: OMAP4 does not support st_shift\n",
+> -		       oh->name, ohri->name);
+> -
+>  	return am33xx_prm_deassert_hardreset(ohri->rst_shift,
+> +				ohri->st_shift,
+>  				oh->clkdm->pwrdm.ptr->prcm_offs,
+>  				oh->prcm.omap4.rstctrl_offs,
+>  				oh->prcm.omap4.rstst_offs);
+> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+> index 53ec9cb..0f29cb9 100644
+> --- a/arch/arm/mach-omap2/prm33xx.c
+> +++ b/arch/arm/mach-omap2/prm33xx.c
+> @@ -112,23 +112,22 @@ int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs)
+>   * -EINVAL upon an argument error, -EEXIST if the submodule was already out
+>   * of reset, or -EBUSY if the submodule did not exit reset promptly.
+>   */
+> -int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+> +int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
+>  		u16 rstctrl_offs, u16 rstst_offs)
+>  {
+>  	int c;
+> -	u32 mask = 1 << shift;
+> -
+> -	/* Check the current status to avoid  de-asserting the line twice */
+> -	if (am33xx_prm_is_hardreset_asserted(shift, inst, rstctrl_offs) == 0)
+> -		return -EEXIST;
 
-Yes, sleep state is used for suspend. Regarding to this suspend
-state fully optimized pinmux/conf values are not available.
+Any specific reason why you have removed this check?
 
-Thanks
-AnilKumar
+Thanks,
+Vaibhav
+
+> +	u32 mask = 1 << st_shift;
+>  
+>  	/* Clear the reset status by writing 1 to the status bit */
+>  	am33xx_prm_rmw_reg_bits(0xffffffff, mask, inst, rstst_offs);
+> +
+>  	/* de-assert the reset control line */
+> +	mask = 1 << shift;
+> +
+>  	am33xx_prm_rmw_reg_bits(mask, 0, inst, rstctrl_offs);
+> -	/* wait the status to be set */
+>  
+> -	omap_test_timeout(am33xx_prm_is_hardreset_asserted(shift, inst,
+> +	/* wait the status to be set */
+> +	omap_test_timeout(am33xx_prm_is_hardreset_asserted(st_shift, inst,
+>  							   rstst_offs),
+>  			  MAX_MODULE_HARDRESET_WAIT, c);
+>  
+> diff --git a/arch/arm/mach-omap2/prm33xx.h b/arch/arm/mach-omap2/prm33xx.h
+> index 3f25c56..181fdab 100644
+> --- a/arch/arm/mach-omap2/prm33xx.h
+> +++ b/arch/arm/mach-omap2/prm33xx.h
+> @@ -124,6 +124,6 @@ extern void am33xx_prm_global_warm_sw_reset(void);
+>  extern int am33xx_prm_is_hardreset_asserted(u8 shift, s16 inst,
+>  		u16 rstctrl_offs);
+>  extern int am33xx_prm_assert_hardreset(u8 shift, s16 inst, u16 rstctrl_offs);
+> -extern int am33xx_prm_deassert_hardreset(u8 shift, s16 inst,
+> +extern int am33xx_prm_deassert_hardreset(u8 shift, u8 st_shift, s16 inst,
+>  		u16 rstctrl_offs, u16 rstst_offs);
+>  #endif
+> 
