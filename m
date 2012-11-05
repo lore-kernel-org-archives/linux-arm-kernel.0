@@ -1,131 +1,49 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 5 Nov 2012 10:20:30 -0500
-Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
- clk driver
-In-Reply-To: <50950F7E.2080309@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
- <50950F7E.2080309@ti.com>
-Message-ID: <5097D93E.10403@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 5 Nov 2012 07:30:44 -0800
+Subject: [PATCH V2] ARM: PMU: fix runtime PM enable
+In-Reply-To: <20121026100312.GF20914@mudshark.cambridge.arm.com>
+References: <1351196598-26667-1-git-send-email-jon-hunter@ti.com>
+ <20121026100312.GF20914@mudshark.cambridge.arm.com>
+Message-ID: <20121105153044.GE4953@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2012 08:35 AM, Sekhar Nori wrote:
-> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->> This is the common clk driver initialization functions for DaVinci
->> SoCs and other SoCs that uses similar hardware architecture.
->> clock.h also defines struct types for clock definitions in a SoC
->> and clock data type for configuring clk-mux. The initialization
->> functions are used by clock initialization code in a specific
->> platform/SoC.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>   drivers/clk/davinci/clock.c |  112 +++++++++++++++++++++++++++++++++++++++++++
->>   drivers/clk/davinci/clock.h |   80 +++++++++++++++++++++++++++++++
->>   2 files changed, 192 insertions(+)
->>   create mode 100644 drivers/clk/davinci/clock.c
->>   create mode 100644 drivers/clk/davinci/clock.h
->>
->> diff --git a/drivers/clk/davinci/clock.c b/drivers/clk/davinci/clock.c
->> new file mode 100644
->> index 0000000..ad02149
->> --- /dev/null
->> +++ b/drivers/clk/davinci/clock.c
->> @@ -0,0 +1,112 @@
->> +/*
->> + * clock.c - davinci clock initialization functions for various clocks
->> + *
->> + * Copyright (C) 2006-2012 Texas Instruments.
->> + * Copyright (C) 2008-2009 Deep Root Systems, LLC
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + */
->> +#include <linux/init.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clkdev.h>
->> +#include <linux/io.h>
->> +#include <linux/slab.h>
->> +
->> +#include "clk-pll.h"
->> +#include "clk-psc.h"
->> +#include "clk-div.h"
->> +#include "clock.h"
->> +
->> +static DEFINE_SPINLOCK(_lock);
->> +
->> +#ifdef	CONFIG_CLK_DAVINCI_PLL
->> +struct clk *davinci_pll_clk(const char *name, const char *parent,
->> +		u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
->> +		struct clk_pll_data *pll_data)
->> +{
->> +	struct clk *clkp = NULL;
->> +
->> +	pll_data->reg_pllm = ioremap(phys_pllm, 4);
->> +	if (WARN_ON(!pll_data->reg_pllm))
->> +		return clkp;
-> I would prefer ERR_PTR(-ENOMEM) here. Same comment applies to other
-> instances elsewhere in the patch.
->
->> diff --git a/drivers/clk/davinci/clock.h b/drivers/clk/davinci/clock.h
->> new file mode 100644
->> index 0000000..73204b8
->> --- /dev/null
->> +++ b/drivers/clk/davinci/clock.h
->> @@ -0,0 +1,80 @@
->> +/*
->> + * TI DaVinci Clock definitions -  Contains Macros and Types used for
->> + * defining various clocks on a DaVinci SoC
->> + *
->> + * Copyright (C) 2012 Texas Instruments
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation version 2.
->> + *
->> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->> + * kind, whether express or implied; without even the implied warranty
->> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +#ifndef __DAVINCI_CLOCK_H
->> +#define __DAVINCI_CLOCK_H
->> +
->> +#include <linux/types.h>
->> +
->> +/* general flags: */
->> +#define ALWAYS_ENABLED		BIT(0)
-> This is not used in this patch. Can you add the define along with its
-> usage so it is immediately clear why you need it?
-This is used on the next patch as this adds a bunch of utilities or 
-types for the platform specific clock code. Do you want to combine this 
-patch with 05/11?  It will become a bigger patch then? Is that fine. 
-IMO, this is a logical group that can be a standalone patch than 
-combining with 05/11.
->> +/**
->> + * struct davinci_clk - struct for defining DaVinci clocks for a SoC.
->> + *
->> + * @name: name of the clock
->> + * @parent: name of parent clock
->> + * @flags: General flags for all drivers used by platform clock init code
->> + * @data: data specific to a clock used by the driver
->> + * @dev_id: dev_id used to look up this clock. If this is NULL
->> + *	clock name is used for lookup.
->> + */
->> +struct davinci_clk {
->> +	const char			*name;
->> +	const char			*parent;
->> +	u32				flags;
->> +	void				*data;
->> +	char				*dev_id;
-> Similarly dont see this being used as well.
-For this and previous one, check lpsc_clk() macro usage. dev_id is used 
-where a specific device id is used to look up
-the clk as is done for davinci_emac.1, davinci_mmc.0 etc.
->
-> Thanks,
-> Sekhar
->
+* Will Deacon <will.deacon@arm.com> [121026 03:04]:
+> On Thu, Oct 25, 2012 at 09:23:18PM +0100, Jon Hunter wrote:
+> > Commit 7be2958 (ARM: PMU: Add runtime PM Support) updated the ARM PMU code to
+> > use runtime PM which was prototyped and validated on the OMAP devices. In this
+> > commit, there is no call pm_runtime_enable() and for OMAP devices
+> > pm_runtime_enable() is currently being called from the OMAP PMU code when the
+> > PMU device is created. However, there are two problems with this:
+> > 
+> > 1. For any other ARM device wishing to use runtime PM for PMU they will need
+> >    to call pm_runtime_enable() for runtime PM to work.
+> > 2. When booting with device-tree and using device-tree to create the PMU
+> >    device, pm_runtime_enable() needs to be called from within the ARM PERF
+> >    driver as we are no longer calling any device specific code to create the
+> >    device. Hence, PMU does not work on OMAP devices that use the runtime PM
+> >    callbacks when using device-tree to create the PMU device.
+> > 
+> > Therefore,  call pm_runtime_enable() directly from the ARM PMU driver when
+> > registering the device. For platforms that do not use runtime PM,
+> > pm_runtime_enable() does nothing and for platforms that do use runtime PM but
+> > may not require it specifically for PMU, this will just add a little overhead
+> > when initialising and uninitialising the PMU device.
+> > 
+> > Tested with PERF on OMAP2420, OMAP3430 and OMAP4460.
+> > 
+> > V2 changes:
+> > - Call pm_runtime_enable() unconditionally on registering the PMU device.
+> > 
+> > Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> > ---
+> 
+> Cheers Jon! Looks a bit weird without the matching pm_runtime_disable, but
+> we don't really have anywhere to put that since the PMU is not deregistered.
+> 
+> Can we split this patch into two (even smaller!) patches so that I can take
+> the perf part and the omap bit can go to Tony?
+
+The omap bit looks OK for me to queue via perf:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
