@@ -1,46 +1,42 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 5 Nov 2012 12:25:40 +0100
-Subject: [PATCH v2 2/2] ARM: OMAP: omap_device: Correct resource handling
- for DT boot
-In-Reply-To: <5094D648.80608@deeprootsystems.com>
-References: <1351596296-13825-1-git-send-email-peter.ujfalusi@ti.com>
- <1351596296-13825-3-git-send-email-peter.ujfalusi@ti.com>
- <5094D648.80608@deeprootsystems.com>
-Message-ID: <5097A234.7070504@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Nov 2012 11:31:03 +0000
+Subject: [PATCH 1/1] ARM: oprofile: add A5/A7/A15 entries in op_perf_name
+In-Reply-To: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
+References: <1351853016-4476-1-git-send-email-jgq516@gmail.com>
+Message-ID: <20121105113102.GF3351@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On 11/03/2012 09:31 AM, Kevin Hilman wrote:
-> On 10/30/2012 12:24 PM, Peter Ujfalusi wrote:
->> When booting with DT the OF core can fill up the resources provided
->> within
->> the DT blob.
->> The current way of handling the DT boot prevents us from removing
->> hwmod data
->> for platforms only suppose to boot with DT (OMAP5 for example) since
->> we need
->> to keep the whole hwmod database intact in order to have more
->> resources in
->> hwmod than in DT (to be able to append the DMA resource from hwmod).
->>
->> To fix this issue we just examine the OF provided resources:
->> If we do not have resources we use hwmod to fill them.
->> If we have resources we check if we already able to recive DMA
->> resource, if
->> no we only append the DMA resurce from hwmod to the OF provided ones.
->>
->> In this way we can start removing hwmod data for devices which have their
->> resources correctly configured in DT without regressions.
->>
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>ke
+On Fri, Nov 02, 2012 at 10:43:36AM +0000, jgq516 at gmail.com wrote:
+> From: Xiao Jiang <jgq516@gmail.com>
 > 
-> Acked-by: Kevin Hilman <khilman@ti.com>
+> Add related name for A5/A7/A15 which are consistent with the OProfile
+> user ABI.
 > 
-> Benoit, feel free to take this one as well.
+> Signed-off-by: Xiao Jiang <jgq516@gmail.com>
+> ---
+>  arch/arm/oprofile/common.c |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/oprofile/common.c b/arch/arm/oprofile/common.c
+> index 99c63d4b..ec10db1 100644
+> --- a/arch/arm/oprofile/common.c
+> +++ b/arch/arm/oprofile/common.c
+> @@ -37,8 +37,11 @@ static struct op_perf_name {
+>  	{ "xscale1",		"arm/xscale2"	},
+>  	{ "v6",			"arm/armv6"	},
+>  	{ "v6mpcore",		"arm/mpcore"	},
+> +	{ "ARMv7 Cortex-A5",	"arm/armv7-ca5"	},
+> +	{ "ARMv7 Cortex-A7",	"arm/armv7-ca7"	},
+>  	{ "ARMv7 Cortex-A8",	"arm/armv7"	},
+>  	{ "ARMv7 Cortex-A9",	"arm/armv7-ca9"	},
+> +	{ "ARMv7 Cortex-A15",	"arm/armv7-ca15" },
+>  };
+>  
+>  char *op_name_from_perf_id(void)
 
-Thanks, I'll do.
+I'd rather not go down this route now that we have the operf tool as part of
+oprofile, which can use the perf syscall directly and doesn't need this
+string translation.
 
-Regards,
-Benoit
+Will
