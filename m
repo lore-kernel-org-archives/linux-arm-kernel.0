@@ -1,50 +1,32 @@
-From: mark.langsdorf@calxeda.com (Mark Langsdorf)
-Date: Mon, 05 Nov 2012 16:49:09 -0600
-Subject: [PATCH 1/6 v2] arm: use devicetree to get smp_twd clock
-In-Reply-To: <20121105223155.GJ28327@n2100.arm.linux.org.uk>
-References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
- <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
- <1351882309-733-2-git-send-email-mark.langsdorf@calxeda.com>
- <20121104100822.GY21164@n2100.arm.linux.org.uk> <50983D75.50009@calxeda.com>
- <20121105223155.GJ28327@n2100.arm.linux.org.uk>
-Message-ID: <50984265.9010804@calxeda.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Mon, 5 Nov 2012 23:59:22 +0100
+Subject: [PATCH 6/8] mfd/ab8500-core: use irq_domain_add_simple()
+In-Reply-To: <1350580755-8516-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350580755-8516-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121105225922.GF7965@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2012 04:31 PM, Russell King - ARM Linux wrote:
-> On Mon, Nov 05, 2012 at 04:28:05PM -0600, Mark Langsdorf wrote:
->> On 11/04/2012 04:08 AM, Russell King - ARM Linux wrote:
->>> On Fri, Nov 02, 2012 at 01:51:44PM -0500, Mark Langsdorf wrote:
->>>> -static struct clk *twd_get_clock(void)
->>>> +static struct clk *twd_get_clock(struct device_node *np)
->>>>  {
->>>> -	struct clk *clk;
->>>> +	struct clk *clk = NULL;
->>>>  	int err;
->>>>  
->>>> -	clk = clk_get_sys("smp_twd", NULL);
->>>> +	if (np)
->>>> +		clk = of_clk_get(np, 0);
->>>> +	if (!clk)
->>>
->>> What does a NULL return from of_clk_get() mean?  Where is this defined?
->>
->> Well, it's a valid path if (np) is NULL. I'll add an IS_ERR(clk) and
->> resubmit.
-> 
-> Hang on - what logic are you trying to achieve here?  Wouldn't:
-> 
-> 	if (np)
-> 		clk = of_clk_get(np, 0);
-> 	else
-> 		clk = clk_get_sys("smp_twd", NULL);
-> 
-> be sufficient?  If we have DT, why would we ever want to fall back to
-> "smp_twd" ?
+Hi Linus,
 
-I'm just trying to make sure I have a clock so I can do cpufreq operations.
+On Thu, Oct 18, 2012 at 07:19:15PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> To be able to use SPARSE_IRQ while yet not using device tree,
+> we need to use irq_domain_add_simple() that will allocate
+> descriptors for the IRQs in the non-DT case, and fall back
+> to using the linear irqdomain in the DT case.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Samuel Ortiz <sameo@linux.intel.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+In case it's not too late:
 
-Your solution works and is sufficient. Thanks.
+Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
---Mark Langsdorf
-Calxeda, Inc.
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
