@@ -1,80 +1,46 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 5 Nov 2012 17:53:38 +0530
-Subject: [PATCHv3 3/8] i2c: omap: remove the dtrev
-In-Reply-To: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
-References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1352118223-3796-4-git-send-email-shubhrajyoti@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 5 Nov 2012 13:25:11 +0100
+Subject: [PATCH 2/2] Input: nomadik-ske-keypad - start using the apb_pclk
+In-Reply-To: <CACRpkdbZB4nhFQtLH-GxBSK99RFk7yhSYMhO5keVjyugrqr7JA@mail.gmail.com>
+References: <1351779602-13818-1-git-send-email-ulf.hansson@stericsson.com>
+ <1351779602-13818-3-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdbZB4nhFQtLH-GxBSK99RFk7yhSYMhO5keVjyugrqr7JA@mail.gmail.com>
+Message-ID: <CAPDyKFpjdVMCuBdN-O+xxK=Dko-GTEjF5AYOeEMgWghJfB8EsA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dtrev is used only for the comments. Remove the same and use
-the scheme instead to know if it is version2.
+On 4 November 2012 19:12, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Nov 1, 2012 at 3:20 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>
+>> From: Ulf Hansson <ulf.hansson@linaro.org>
+>>
+>> Previously this clock was handled internally by the clockdriver,
+>> but now this is separate clk. So we need take care of it.
+>>
+>> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> So this is a silicon block clock and falls into the category of things
+> we've been discussing...
+>
+> If I understand correctly, the only "real" solution is to
+> implement the PM domains and have these enable the clocks.
 
-Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
----
-v3: remove the scheme from the commments.
-todo: remove the dtrev from hwmod etc.
+Agree.
 
- drivers/i2c/busses/i2c-omap.c |   12 +++++-------
- 1 files changed, 5 insertions(+), 7 deletions(-)
+Although, since the pm_domain not yet exist, this as a way forward for
+now - to fix what is broken.
+When the pm_domain is in place and when we decide to fold in the clock
+handling in there, we can move it.
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 737d843..5f0c06c 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -191,7 +191,6 @@ struct omap_i2c_dev {
- 	u32			latency;	/* maximum MPU wkup latency */
- 	struct pm_qos_request	pm_qos_request;
- 	u32			speed;		/* Speed of bus in kHz */
--	u32			dtrev;		/* extra revision from DT */
- 	u32			flags;
- 	u16			cmd_err;
- 	u8			*buf;
-@@ -1076,7 +1075,7 @@ omap_i2c_probe(struct platform_device *pdev)
- 	int irq;
- 	int r;
- 	u32 rev;
--	u16 minor, major;
-+	u16 minor, major, scheme;
- 
- 	/* NOTE: driver uses the static register mapping */
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -1108,7 +1107,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 		u32 freq = 100000; /* default to 100000 Hz */
- 
- 		pdata = match->data;
--		dev->dtrev = pdata->rev;
- 		dev->flags = pdata->flags;
- 
- 		of_property_read_u32(node, "clock-frequency", &freq);
-@@ -1117,7 +1115,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	} else if (pdata != NULL) {
- 		dev->speed = pdata->clkrate;
- 		dev->flags = pdata->flags;
--		dev->dtrev = pdata->rev;
- 	}
- 
- 	dev->dev = &pdev->dev;
-@@ -1146,7 +1143,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 	 */
- 	rev = __raw_readw(dev->base + 0x04);
- 
--	switch (OMAP_I2C_SCHEME(rev)) {
-+	scheme = OMAP_I2C_SCHEME(rev);
-+	switch (scheme) {
- 	case OMAP_I2C_SCHEME_0:
- 		dev->regs = (u8 *)reg_map_ip_v1;
- 		dev->rev = omap_i2c_read_reg(dev, OMAP_I2C_REV_REG);
-@@ -1230,8 +1228,8 @@ omap_i2c_probe(struct platform_device *pdev)
- 		goto err_unuse_clocks;
- 	}
- 
--	dev_info(dev->dev, "bus %d rev%d.%d.%d at %d kHz\n", adap->nr,
--		 dev->dtrev, major, minor, dev->speed);
-+	dev_info(dev->dev, "bus %d rev%d.%d at %d kHz\n", adap->nr,
-+		 major, minor, dev->speed);
- 
- 	of_i2c_register_devices(adap);
- 
--- 
-1.7.5.4
+>
+> An alternative may be to move this driver over to the AMBA bus,
+> because I think this device actually has primecell registers.
+> Then the bus will take care of the pclk for starters.
+
+You are definitely right, this driver can be converted into using the AMBA bus.
+Although, do you think that should be done _instead_ of going ahead
+with this patch or do you want that to be handled as a next and a
+separate step?
+
+Kind regards
+Ulf Hansson
