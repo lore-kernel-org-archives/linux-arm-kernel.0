@@ -1,55 +1,58 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Mon, 5 Nov 2012 14:54:32 +0530
-Subject: [PATCHv2 1/7] i2c: omap: Fix the revision register read
-In-Reply-To: <20121105090412.GA2913@arwen.pp.htv.fi>
-References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-2-git-send-email-shubhrajyoti@ti.com>
- <20121105075026.GB32468@arwen.pp.htv.fi> <50977A30.6040907@ti.com>
- <20121105090412.GA2913@arwen.pp.htv.fi>
-Message-ID: <CAM=Q2csb_9ryaZfURqv6QgsVuSRiVMDt=x=Adko2HH4GoiHnCQ@mail.gmail.com>
+From: lznuaa@gmail.com (Frank Li)
+Date: Mon, 5 Nov 2012 19:23:39 +0800
+Subject: [PATCH 0/4] Support the MX6 FEC as a PTP hardware clock
+In-Reply-To: <1351898728.2703.30.camel@bwh-desktop.uk.solarflarecom.com>
+References: <1351657480-24745-1-git-send-email-Frank.Li@freescale.com>
+ <20121101.123027.1332984905040252720.davem@davemloft.net>
+ <CAHrpEqRuy=kewK-592RphVfJnNoma2CPZytoTqLc45HeT53hRQ@mail.gmail.com>
+ <20121102084324.GA2486@netboy.at.omicron.at>
+ <1351898728.2703.30.camel@bwh-desktop.uk.solarflarecom.com>
+Message-ID: <CAHrpEqRCVv1JLGz04Gb8q=X3x_UGG4wEvr2TBQjU_2bK8vhJOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2012 at 2:34 PM, Felipe Balbi <balbi@ti.com> wrote:
+? 2012?11?3?????Ben Hutchings ???
 
-> Hi,
+> On Fri, 2012-11-02 at 09:43 +0100, Richard Cochran wrote:
+> > On Fri, Nov 02, 2012 at 10:36:09AM +0800, Frank Li wrote:
+> > > >
+> > > > All applied to net-next.
+> > > >
+> > > > Please make sure your changes are in sync with Ben's PTP/PPS
+> > > > Kconfig changes of today, and send me any changes if necessary.
+> > > >
+> > >
+> > > Thank you very much.
+> > > I checked Ben's patch, which not affect FEC.
+> >
+> > Maybe just remove the Kconfig line "select PPS".
 >
-> On Mon, Nov 05, 2012 at 02:04:56PM +0530, Shubhrajyoti wrote:
-> > >> @@ -1155,7 +1187,7 @@ omap_i2c_probe(struct platform_device *pdev)
-> > >>
-> > >>            dev->fifo_size = (dev->fifo_size / 2);
-> > >>
-> > >> -          if (dev->rev < OMAP_I2C_REV_ON_3630_4430)
-> > >> +          if (dev->rev < OMAP_I2C_REV_ON_3630)
-> > >>                    dev->b_hw = 1; /* Enable hardware fixes */
-> > > looks like this was applicable to 4430 too, what happened ?
-> > No actually this can be deleted completely once the
-> > start -> transaction -> stop sequence recommendation is followed.
->
-> yes, but we're not there just yet and this patch is changing the
-> behavior of the driver
+> More than that: FEC should select PTP_1588_CLOCK,
 
 
-No , earlier we were truncating the register for omap4 so
-OMAP_I2C_REV_ON_3630_4430 was there if we read both hi and lo for
-omap4 then we donot find 3630 and 4430 value to be similar.
-
-In this case the behavior is same as earlier also it enabled this for lower
-than 3630 and
-the same holds good even now.
-
-So in essence,
-Earlier  OMAP_I2C_REV_ON_3630_4430 is named to OMAP_I2C_REV_ON_3630
-and omap4 rev will have a 32bit value.
+okay, I will do that.
 
 
+> FEC_PTP should be
+> removed and all the conditional code made unconditional.  Alternately,
+> if that would cost too much (in terms of performance or memory) on some
+> systems where the driver is used, FEC_PTP should default to 'y'.
 
 
-> in ways which don't belong to $SUBJECT.
+Bd description will be difference between no PTP and PTP hardware,
+So driver will not incompatible at two kind of hardware.
+
+I can set it default is Y at MX6 platform.
+
+
+> Ben.
 >
 > --
-> balbi
+> Ben Hutchings, Staff Engineer, Solarflare
+> Not speaking for my employer; that's the marketing department's job.
+> They asked us to note that Solarflare product names are trademarked.
+>
 >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/a7c816f2/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/a4a3a58c/attachment-0001.html>
