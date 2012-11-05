@@ -1,15 +1,15 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Mon, 5 Nov 2012 23:59:22 +0100
-Subject: [PATCH 6/8] mfd/ab8500-core: use irq_domain_add_simple()
-In-Reply-To: <1350580755-8516-1-git-send-email-linus.walleij@stericsson.com>
-References: <1350580755-8516-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20121105225922.GF7965@sortiz-mobl>
+Date: Tue, 6 Nov 2012 00:00:11 +0100
+Subject: [PATCH 7/8] mfd/db8500-prcmu: use the irq_domain_add_simple()
+In-Reply-To: <1350580762-8551-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350580762-8551-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20121105230011.GG7965@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Linus,
 
-On Thu, Oct 18, 2012 at 07:19:15PM +0200, Linus Walleij wrote:
+On Thu, Oct 18, 2012 at 07:19:22PM +0200, Linus Walleij wrote:
 > From: Linus Walleij <linus.walleij@linaro.org>
 > 
 > To be able to use SPARSE_IRQ while yet not using device tree,
@@ -20,8 +20,6 @@ On Thu, Oct 18, 2012 at 07:19:15PM +0200, Linus Walleij wrote:
 > Cc: Lee Jones <lee.jones@linaro.org>
 > Cc: Samuel Ortiz <sameo@linux.intel.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-In case it's not too late:
-
 Acked-by: Samuel Ortiz <sameo@linux.intel.com>
 
 Cheers,
