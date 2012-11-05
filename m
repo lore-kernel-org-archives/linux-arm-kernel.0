@@ -1,27 +1,487 @@
-From: shubhrajyoti@ti.com (Shubhrajyoti)
-Date: Wed, 14 Nov 2012 16:55:34 +0530
-Subject: [PATCH] i2c: omap: Move the remove constraint
-In-Reply-To: <CAORVsuUxA=AhPowWqTWx5AfzU6R2Ny6OEhvDmtwUh8poh=UnGg@mail.gmail.com>
-References: <1352195673-31559-1-git-send-email-shubhrajyoti@ti.com>
- <CAORVsuW_VAiemnauUs-yW+GcQpv+qpESP4kzyQm=Unmofa4k_Q@mail.gmail.com>
- <20121114105734.GE5954@pengutronix.de>
- <CAORVsuUxA=AhPowWqTWx5AfzU6R2Ny6OEhvDmtwUh8poh=UnGg@mail.gmail.com>
-Message-ID: <50A37FAE.9050004@ti.com>
+From: colin.foeparker@logicpd.com (Colin FoeParker)
+Date: Mon, 5 Nov 2012 11:39:26 -0600
+Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
+In-Reply-To: <5097ECAD.9010101@ti.com>
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-3-git-send-email-anilkumar@ti.com> <5097ECAD.9010101@ti.com>
+Message-ID: <0520A3FE5EDCF24F88B3F1451CFC64AE059F92FA8F@edprex01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 14 November 2012 04:33 PM, Jean Pihet wrote:
->>> Acked-by: Jean Pihet <j-pihet@ti.com>
->> >
->> > Since I just reverted the QoS patch, I suppose this gets merged into the
->> > original patch when resent?
-> The best for now is to re-submit a new patch that moves the constraint
-> release in the original code. Later the PM QoS patch will be applied
-> on the new code base.
->
-> What do you think? I can provide a patch if needed.
-Will resubmit this.
+Hi Benoit,
 
-> Regards,
-> Jean
+
+
+"I don't know how it is connected at board level, but I'm not sure the binding is the proper one."
+
+
+
+Here is a link to the Beaglebone schematic<http://beagleboard.org/static/beaglebone/latest/Docs/Hardware/BONE_SCH.pdf>.  The PMIC_PWR_EN net is the one that you should be interested in following.
+
+
+
+In the AM335x, this net is connected to the ALARM2 event in the RTC subsystem.  If the ALARM2 event is triggered, and the PMIC_PWR_EN pin is configured correctly, the pin is driven low.
+
+
+
+In the TPS65217 series PMIC, the PWR_EN I/O can be used to put the entire chip into a low power state.  This disables all the power rails in the PMIC with an exception of the rail that powers the RTC power domain.
+
+
+
+So when the ALARM2 event occurs, the PWR_EN I/O is pulled low and the entire system into a low power "off" state.
+
+
+
+"It does not look super generic, and I'm wondering if we should not use instead some regulator binding to reflect the connection of the RTC to a regulator.
+
+
+
+But without the board / soc spec it is hard to tell :-("
+
+
+
+This is a good point.  I know that there are other omap SOC RTC's that do not support the ALARM2 implementation.  That being said, I would argue that there is more of a RTC connection with the implementation than a regulator.
+
+
+
+Anil will probably have greater insight into the pro's/con's of the implementation.
+
+
+
+-Colin
+
+
+
+
+
+Colin Foe-Parker // Software Engineer II
+
+
+
+
+
+
+
+Logic PD /// engineering design services
+
+5 Clock Tower Place. Suite 400
+
+Maynard, MA 01754
+
+T // 978.243.2045
+
+
+
+colin.foeparker at logicpd.com
+
+www.logicpd.com
+
+/ / / / / / / / / / / / / / / / / / / / / / / / /
+
+This message (including any attachments) contains confidential information intended for a specific individual and purpose, and is protected by law. If you are not the intended recipient, you should delete this message and are hereby notified that any disclosure, copying, distribution, or other use of this message, or the taking of any action based on it, is strictly prohibited.
+
+
+
+
+
+-----Original Message-----
+From: Benoit Cousson [mailto:b-cousson at ti.com]
+Sent: Monday, November 05, 2012 11:43 AM
+To: AnilKumar Ch; Colin FoeParker
+Cc: a.zummo at towertech.it; sameo at linux.intel.com; tony at atomide.com; grant.likely at secretlab.ca; rob.herring at calxeda.com; rtc-linux at googlegroups.com; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; devicetree-discuss at lists.ozlabs.org
+Subject: Re: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
+
+
+
+Hi Anil / Colin,
+
+
+
+On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
+
+> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+
 >
+
+> Add system power off control to rtc driver which is the in-charge of
+
+> controlling the BeagleBone system power. The power_off routine can be
+
+> hooked up to "pm_power_off" system call.
+
+>
+
+> System power off sequence:-
+
+> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+
+> * Enable PMIC_POWER_EN in rtc module
+
+> * Set rtc ALARM2 time
+
+> * Enable ALARM2 interrupt
+
+>
+
+> Added while (1); after the above steps to make sure that no other
+
+> process acquire cpu. Otherwise we might see an unexpected behaviour
+
+> because we are shutting down all the power rails of SoC except RTC.
+
+>
+
+> Signed-off-by: Colin Foe-Parker <colin.foeparker at logicpd.com<mailto:colin.foeparker@logicpd.com>>
+
+> [anilkumar at ti.com: move poweroff additions to rtc driver]
+
+> Signed-off-by: AnilKumar Ch <anilkumar at ti.com<mailto:anilkumar@ti.com>>
+
+> ---
+
+>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+
+>  drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
+
+>  2 files changed, 83 insertions(+), 1 deletion(-)
+
+>
+
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+
+> b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+
+> index b47aa41..8d9f4f9 100644
+
+> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+
+> @@ -6,6 +6,10 @@ Required properties:
+
+>  - interrupts: rtc timer, alarm interrupts in order
+
+>  - interrupt-parent: phandle for the interrupt controller
+
+>
+
+> +Optional properties:
+
+> +- ti,system-power-controller: Telling whether or not rtc is
+
+> +controlling
+
+> +  the system power.
+
+
+
+I don't know how it is connected at board level, but I'm not sure the binding is the proper one.
+
+It does not look super generic, and I'm wondering if we should not use instead some regulator binding to reflect the connection of the RTC to a regulator.
+
+
+
+But without the board / soc spec it is hard to tell :-(
+
+
+
+Regards,
+
+Benoit
+
+
+
+
+
+> +
+
+>  Example:
+
+>
+
+>  rtc at 1c23000 {
+
+> @@ -14,4 +18,5 @@ rtc at 1c23000 {
+
+>             interrupts = <19
+
+>                                   19>;
+
+>             interrupt-parent = <&intc>;
+
+> +          ti,system-power-controller;
+
+>  };
+
+> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c index
+
+> 6009714..2d90170 100644
+
+> --- a/drivers/rtc/rtc-omap.c
+
+> +++ b/drivers/rtc/rtc-omap.c
+
+> @@ -72,6 +72,14 @@
+
+>  #define OMAP_RTC_KICK0_REG                         0x6c
+
+>  #define OMAP_RTC_KICK1_REG                         0x70
+
+>
+
+> +#define OMAP_RTC_ALARM2_SECONDS_REG            0x80
+
+> +#define OMAP_RTC_ALARM2_MINUTES_REG            0x84
+
+> +#define OMAP_RTC_ALARM2_HOURS_REG 0x88
+
+> +#define OMAP_RTC_ALARM2_DAYS_REG     0x8c
+
+> +#define OMAP_RTC_ALARM2_MONTHS_REG             0x90
+
+> +#define OMAP_RTC_ALARM2_YEARS_REG   0x94
+
+> +#define OMAP_RTC_PMIC_REG                        0x98
+
+> +
+
+>  /* OMAP_RTC_CTRL_REG bit fields: */
+
+>  #define OMAP_RTC_CTRL_SPLIT                         (1<<7)
+
+>  #define OMAP_RTC_CTRL_DISABLE                   (1<<6)
+
+> @@ -93,15 +101,24 @@
+
+>  #define OMAP_RTC_STATUS_BUSY            (1<<0)
+
+>
+
+>  /* OMAP_RTC_INTERRUPTS_REG bit fields: */
+
+> +#define OMAP_RTC_INTERRUPTS_IT_ALARM2   (1<<4)
+
+>  #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
+
+>  #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
+
+>
+
+> +/* OMAP_RTC_PMIC_REG bit fields: */
+
+> +#define OMAP_RTC_PMIC_POWER_EN_EN       (1<<16)
+
+> +
+
+>  /* OMAP_RTC_KICKER values */
+
+>  #define           KICK0_VALUE                                    0x83e70b13
+
+>  #define           KICK1_VALUE                                    0x95a4f1e0
+
+>
+
+>  #define           OMAP_RTC_HAS_KICKER                            0x1
+
+>
+
+> +#define SHUTDOWN_TIME_SEC                         2
+
+> +#define SECS_IN_MIN                                            60
+
+> +#define WAIT_AFTER                                              (SECS_IN_MIN - SHUTDOWN_TIME_SEC)
+
+> +#define WAIT_TIME_MS                                       (SHUTDOWN_TIME_SEC * 1000)
+
+> +
+
+>  static void __iomem  *rtc_base;
+
+>
+
+>  #define rtc_read(addr)                            readb(rtc_base + (addr))
+
+> @@ -290,6 +307,58 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
+
+>             return 0;
+
+>  }
+
+>
+
+> +/*
+
+> + * rtc_power_off: Set the pmic power off sequence. The RTC generates
+
+> + * pmic_pwr_enable control, which can be used to control an external
+
+> + * PMIC.
+
+> + */
+
+> +static void rtc_power_off(void)
+
+> +{
+
+> +          u32 val;
+
+> +          struct rtc_time tm;
+
+> +          spinlock_t lock;
+
+> +          unsigned long flags;
+
+> +
+
+> +          spin_lock_init(&lock);
+
+> +
+
+> +          /* Set PMIC power enable */
+
+> +          val = readl(rtc_base + OMAP_RTC_PMIC_REG);
+
+> +          writel(val | OMAP_RTC_PMIC_POWER_EN_EN, rtc_base +
+
+> +OMAP_RTC_PMIC_REG);
+
+> +
+
+> +          /* Wait few seconds instead of rollover */
+
+> +          do {
+
+> +                          omap_rtc_read_time(NULL, &tm);
+
+> +                          if (WAIT_AFTER <= tm.tm_sec)
+
+> +                                          mdelay(WAIT_TIME_MS);
+
+> +          } while (WAIT_AFTER <= tm.tm_sec);
+
+> +
+
+> +          /* Add shutdown time to the current value */
+
+> +          tm.tm_sec += SHUTDOWN_TIME_SEC;
+
+> +
+
+> +          if (tm2bcd(&tm) < 0)
+
+> +                          return;
+
+> +
+
+> +          pr_info("System will go to power_off state in approx. %d secs\n",
+
+> +                                          SHUTDOWN_TIME_SEC);
+
+> +
+
+> +          /* Set the ALARM2 time */
+
+> +          rtc_write(tm.tm_sec, OMAP_RTC_ALARM2_SECONDS_REG);
+
+> +          rtc_write(tm.tm_min, OMAP_RTC_ALARM2_MINUTES_REG);
+
+> +          rtc_write(tm.tm_hour, OMAP_RTC_ALARM2_HOURS_REG);
+
+> +          rtc_write(tm.tm_mday, OMAP_RTC_ALARM2_DAYS_REG);
+
+> +          rtc_write(tm.tm_mon, OMAP_RTC_ALARM2_MONTHS_REG);
+
+> +          rtc_write(tm.tm_year, OMAP_RTC_ALARM2_YEARS_REG);
+
+> +
+
+> +          /* Enable alarm2 interrupt */
+
+> +          val = readl(rtc_base + OMAP_RTC_INTERRUPTS_REG);
+
+> +          writel(val | OMAP_RTC_INTERRUPTS_IT_ALARM2,
+
+> +                                                          rtc_base + OMAP_RTC_INTERRUPTS_REG);
+
+> +
+
+> +          /* Do not allow to execute any other task */
+
+> +          spin_lock_irqsave(&lock, flags);
+
+> +          while (1);
+
+> +}
+
+> +
+
+>  static struct rtc_class_ops omap_rtc_ops = {
+
+>             .read_time         = omap_rtc_read_time,
+
+>             .set_time            = omap_rtc_set_time,
+
+> @@ -327,12 +396,16 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+
+>             struct resource                 *res, *mem;
+
+>             struct rtc_device              *rtc;
+
+>             u8                                           reg, new_ctrl;
+
+> +          bool                                       pm_off = false;
+
+>             const struct platform_device_id *id_entry;
+
+>             const struct of_device_id *of_id;
+
+>
+
+>             of_id = of_match_device(omap_rtc_of_match, &pdev->dev);
+
+> -           if (of_id)
+
+> +          if (of_id) {
+
+>                             pdev->id_entry = of_id->data;
+
+> +                          pm_off = of_property_read_bool(pdev->dev.of_node,
+
+> +                                                                          "ti,system-power-controller");
+
+> +          }
+
+>
+
+>             omap_rtc_timer = platform_get_irq(pdev, 0);
+
+>             if (omap_rtc_timer <= 0) {
+
+> @@ -385,6 +458,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+
+>             platform_set_drvdata(pdev, rtc);
+
+>             dev_set_drvdata(&rtc->dev, mem);
+
+>
+
+> +          /* RTC power off */
+
+> +          if (pm_off && !pm_power_off)
+
+> +                          pm_power_off = rtc_power_off;
+
+> +
+
+>             /* clear pending irqs, and set 1/second periodic,
+
+>              * which we'll use instead of update irqs
+
+>              */
+
+>
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/fc8fde6e/attachment-0001.html>
