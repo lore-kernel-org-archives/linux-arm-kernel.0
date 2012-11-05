@@ -1,78 +1,40 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 5 Nov 2012 12:07:45 +0100
-Subject: [PATCH] ARM: dts: AM33XX: Add usbss node
-In-Reply-To: <1352095204-29028-1-git-send-email-afzal@ti.com>
-References: <1352095204-29028-1-git-send-email-afzal@ti.com>
-Message-ID: <50979E01.4030203@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 5 Nov 2012 12:09:10 +0100
+Subject: [GIT PULL] arm-soc: Xilinx zynq changes for v3.8
+Message-ID: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Felipe
+Hi Arnd and Olof,
 
-Hi Afzal,
+please add these patches to your arm-soc trees. All these patches are
+for xilinx zynq arm platform.
+You shouldn't have any problem to merge it there are no conficts with v3.7-rc4.
 
-On 11/05/2012 06:59 AM, Afzal Mohammed wrote:
-> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> 
-> Device tree node for usbss on AM33XX. There are two musb
-> controllers on am33xx platform so have port0-mode and
-> port1-mode data.
-> 
-> [afzal at ti.com: reg & interrupt property addition]
-> 
-> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> Signed-off-by: Santhapuri, Damodar <damodar.santhapuri@ti.com>
-> Signed-off-by: Ravi Babu <ravibabu@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
-> 
-> Hi Benoit,
-> 
-> This is based on your "for_3.8/dts" branch.
-> 
-> This is made on top of "usb: musb: am335x support"
-> (http://marc.info/?l=linux-omap&m=135187391904863&w=2)
-> and has been tested on Beagle Bone.
+Please let me know if you find out any problem.
 
-That looks good to me, I just like to get an Ack from Felipe for the
-accuracy of the data part.
+Thanks,
+Michal
 
-Regards,
-Benoit
+The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+  Linus Torvalds (1):
+        Linux 3.7-rc3
 
+are available in the git repository at:
 
-> 
-> Regards
-> Afzal
-> 
->  arch/arm/boot/dts/am33xx.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 5dfd682..78340a5 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -321,5 +321,22 @@
->  			ti,hwmods = "spi1";
->  			status = "disabled";
->  		};
-> +
-> +		usb_otg_hs at 47400000 {
-> +			compatible = "ti,musb-am33xx";
-> +			reg = <0x47400000 0x1000	/* usbss */
-> +			       0x47401000 0x800		/* musb instance 0 */
-> +			       0x47401800 0x800>;	/* musb instance 1 */
-> +			interrupts = <17		/* usbss */
-> +				      18		/* musb instance 0 */
-> +				      19>;		/* musb instance 1 */
-> +			multipoint = <1>;
-> +			num-eps = <16>;
-> +			ram-bits = <12>;
-> +			port0-mode = <3>;
-> +			port1-mode = <3>;
-> +			power = <250>;
-> +			ti,hwmods = "usb_otg_hs";
-> +		};
->  	};
->  };
-> 
+  git://git.xilinx.com/linux-xlnx.git arm-next
+
+Josh Cartwright (4):
+      zynq: use GIC device tree bindings
+      zynq: use pl310 device tree bindings
+      zynq: remove use of CLKDEV_LOOKUP
+      zynq: move static peripheral mappings
+
+ arch/arm/Kconfig                           |    1 -
+ arch/arm/Makefile                          |    1 -
+ arch/arm/boot/dts/zynq-ep107.dts           |   19 +++++++++++++---
+ arch/arm/mach-zynq/common.c                |   23 ++++++++-----------
+ arch/arm/mach-zynq/include/mach/clkdev.h   |   32 ----------------------------
+ arch/arm/mach-zynq/include/mach/zynq_soc.h |   31 +++++++++++++--------------
+ 6 files changed, 40 insertions(+), 67 deletions(-)
+ delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
