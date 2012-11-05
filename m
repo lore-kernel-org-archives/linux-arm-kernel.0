@@ -1,21 +1,43 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 05 Nov 2012 18:12:35 +0000
-Subject: vexpress issues in next-20121029
-In-Reply-To: <201211051752.08400.arnd@arndb.de>
-References: <508EE610.9050703@wwwdotorg.org>
- <201211051647.19785.arnd@arndb.de> <1352135973.10947.23.camel@hornet>
- <201211051752.08400.arnd@arndb.de>
-Message-ID: <1352139155.10947.28.camel@hornet>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Nov 2012 18:13:19 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <1352138600.10947.26.camel@hornet>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <1352138600.10947.26.camel@hornet>
+Message-ID: <20121105181319.GB27781@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2012-11-05 at 17:52 +0000, Arnd Bergmann wrote:
-> Mike, do you prefer us to wait for those to make it into v3.8-rc1 before
-> pushing the patches from Pawel, or can we just send the entire branch
-> along with the other changes?
+On Mon, Nov 05, 2012 at 06:03:20PM +0000, Pawel Moll wrote:
+> On Mon, 2012-11-05 at 17:36 +0000, Will Deacon wrote:
+> > I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
+> > !ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
+> > dependency dropped) 
+> 
+> ... depends on !ARCH_MULTIPLATFORM or maybe rather !MMU? (I assume you
+> want to add an extra dummy position in the choice section, where options
+> are mutually exclusive anyway?)
 
-Or, maybe, you prefer to remove the vexpress patches from clk-next
-completely (if it is to be rebased) and let them go only through
-arm-soc? (just asking)
+Yeah, you could do something like the following but it just feels a bit
+nasty:
 
-Pawe?
+Will
+
+--->8
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 335e220..0561d87 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -305,6 +305,11 @@ config ARCH_REALVIEW
+        help
+          This enables support for ARM Ltd RealView boards.
+ 
++config ARCH_VEXPRESS_NOMMU
++       bool "ARM Ltd. Versatile Express family (nommu)"
++       depends on !MMU
++       select ARCH_VEXPRESS
++
+ config ARCH_VERSATILE
+        bool "ARM Ltd. Versatile family"
+        select ARCH_WANT_OPTIONAL_GPIOLIB
