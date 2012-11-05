@@ -1,20 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Nov 2012 12:45:41 +0100
-Subject: [PATCH] pinctrl: nomadik: Add terminating entry for
- platform_device_id table
-In-Reply-To: <1352043042.11324.0.camel@phoenix>
-References: <1352043042.11324.0.camel@phoenix>
-Message-ID: <CACRpkdZ57C-NJsRnHF9Td1L4dNoymGdk47vkjefBnsH=rHk2Fw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 5 Nov 2012 12:05:49 +0000
+Subject: gic_set_affinity
+In-Reply-To: <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
+References: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
+ <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
+Message-ID: <20121105120548.GH3351@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 4, 2012 at 4:30 PM, Axel Lin <axel.lin@ingics.com> wrote:
+On Fri, Nov 02, 2012 at 11:32:50AM +0000, Robert Beckett wrote:
+> (CC maintainers)
+> 
+> On 1 November 2012 17:54, Robert Beckett <bob.beckett@gmail.com> wrote:
+> > Hello,
+> >
+> > I was looking through the arm gic code while debugging a problem I am
+> > having, and noticed something in gic_set_affinity.
+> >
+> > When something comes along and setts an irq affinity mask (e.g.
+> > through /proc/irq/<irq>/smp_affinity_mask), the calls goes like so :
+> >
+> > ...
+> > 1. irq_set_affinity : grabs the desc->lock
+> > 2. __irq_set_affinity_locked : calls chip->irq_set_affinity
+> > 3. gic_set_affinity : writes a new mask to the gic distributor
+> >
+> > my question is, what happens if an interrupt is raised between 1 and 3?
+> > To me, it looks like the interrupt could end up being handled on 2
+> > cpus. When it is raised, the handler will be called and sit spinning
+> > for desc->lock (e.g. in handle_fasteoi_irq). The mask will be set to
+> > set the affinity to the new cpu, the new cpu will receive the
+> > interrupt as it has not been ackd or disabled yet
 
-> The platform_device_id table is supposed to be zero-terminated.
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+The interrupt will have been acked in gic_handle_irq before the flow handler
+is invoked, so it will transition to the active state and will not get
+signalled to another CPU. Since we never set more than one target CPU at the
+distributor level, the interrupt will only be forwarded to one CPU interface
+at any given time.
 
-Thanks Axel, patch applied.
-
-Yours,
-Linus Walleij
+Will
