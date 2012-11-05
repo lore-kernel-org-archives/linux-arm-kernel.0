@@ -1,39 +1,35 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 5 Nov 2012 11:05:17 +0200
-Subject: [PATCHv2 3/7] i2c: omap: remove the dtrev
-In-Reply-To: <50977C80.8090000@ti.com>
-References: <1352025873-27492-1-git-send-email-shubhrajyoti@ti.com>
- <1352025873-27492-4-git-send-email-shubhrajyoti@ti.com>
- <20121105075320.GD32468@arwen.pp.htv.fi> <50977C80.8090000@ti.com>
-Message-ID: <20121105090517.GB2913@arwen.pp.htv.fi>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Mon, 05 Nov 2012 10:14:24 +0100
+Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
+ SCHED_TRACER depends on HZ]
+In-Reply-To: <20121105025753.GA26528@S2100-06.ap.freescale.net>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+Message-ID: <50978370.9060001@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05.11.2012 03:57, Shawn Guo wrote:
 
-On Mon, Nov 05, 2012 at 02:14:48PM +0530, Shubhrajyoti wrote:
-> On Monday 05 November 2012 01:23 PM, Felipe Balbi wrote:
-> > Hi,
-> >
-> > On Sun, Nov 04, 2012 at 04:14:29PM +0530, Shubhrajyoti D wrote:
-> >> The dtrev is used only for the comments. Remove the same and use
-> >> the scheme instead to know if it is version2.
-> >>
-> >> Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
-> > I would drop dtrev completely and not use scheme to "emulate" it.
-> However for ver2 ie omap4plus and previous versions the
-> register map is different.
+>> The patch in attach fixes this. I can only test the MX28 part -
+>> I don't have any timrot_is_v1() (MX23) hardware and I don't
+>> know whether a source that wraps after ~2 seconds is OK at all.
 > 
-> So the scheme may still be required.
+> From my quick testing on imx23 with printk timestamp, it's not OK,
+> so we may need to leave imx23 out there.
 
-fair enough, but drop it from debugging messages.
+Hmm, does it wrap after 2 seconds? From my grepping and googling
+the code should now adapt itself, the hardcoded limit is gone...
+What does the dmesg line such as
 
+  sched_clock: 32 bits at 32kHz, resolution 31250ns,
+    wraps every 134217727ms
+
+output on that hardware?
+
+Thanks for the comments, I will resubmit the corrected patch after
+waiting ~1,5 days to verify correct wrapping with MX28.
+
+Regards
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/300244f5/attachment.sig>
+                                         Stano
