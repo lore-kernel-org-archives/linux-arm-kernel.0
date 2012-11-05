@@ -1,30 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Nov 2012 12:36:05 +0100
-Subject: [PATCH 0/9] Pinctrl: SPEAr: Fixes for 3.7-rc3
-In-Reply-To: <CAOh2x=nZRowRXNcOYT3P83mUS3wu==F=-L7mhYa5OYg2p30UCg@mail.gmail.com>
-References: <cover.1351329224.git.viresh.kumar@linaro.org>
- <CACRpkdZ+KhTQq+vrtoCVH2Y7fV4aT6JNzo+dL1Dg-GM8usb=Lg@mail.gmail.com>
- <CAOh2x=nZRowRXNcOYT3P83mUS3wu==F=-L7mhYa5OYg2p30UCg@mail.gmail.com>
-Message-ID: <CACRpkdYiGF_7vXs+QTdJsFyieBT3=baAea4DkcMfHbav22Q=Tg@mail.gmail.com>
+Date: Mon, 5 Nov 2012 12:37:32 +0100
+Subject: [PATCH 6/7] pinctrl: exynos5440: add pinctrl driver for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <1351274153-3120-6-git-send-email-kgene.kim@samsung.com>
+References: <1351274153-3120-1-git-send-email-kgene.kim@samsung.com>
+ <1351274153-3120-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <CACRpkdZP_sTKV1Nq3FWVQJocg8C8H7J9vd9hmY4k-qAnMPJcLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2012 at 11:46 AM, viresh kumar <viresh.kumar@linaro.org> wrote:
-> [Me]
->> I suspect they are fixing regressions in a non-mainline kernel
->> which is none of our business, but convince me and I'll move
->> them to the fixes branch ... I have still merged them, but aimed
->> for v3.8.
+On Fri, Oct 26, 2012 at 7:55 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+
+> From: Thomas Abraham <thomas.abraham@linaro.org>
 >
-> Frankly speaking i haven't thought from this perspective while sending them.
-> Just grouped the fixes/mistakes together :)
+> Add a new pinctrl driver for Samsung EXYNOS5440 SoC. The pin controller
+> module in EXYNOS5440 is different from the pin controller found on other
+> Samsung SoC. Hence, the pin controller driver for EXYNOS5440 SoC is
+> independent of the Samsung pinctrl framework.
+>
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-OK no big deal.
+If I haven't ACK:ed this before here's an
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> You can add 4,6 and 9 in your linux-next branch. :)
-
-There were merge dependencies so I just applied all of them
-to fixes. We'll manage.
+I expect this to go through the Samsung tree?
 
 Yours,
 Linus Walleij
