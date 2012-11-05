@@ -1,186 +1,50 @@
-From: walken@google.com (Michel Lespinasse)
-Date: Mon,  5 Nov 2012 14:47:13 -0800
-Subject: [PATCH 16/16] mm: use vm_unmapped_area() in hugetlbfs on tile
- architecture
-In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
-References: <1352155633-8648-1-git-send-email-walken@google.com>
-Message-ID: <1352155633-8648-17-git-send-email-walken@google.com>
+From: mark.langsdorf@calxeda.com (Mark Langsdorf)
+Date: Mon, 05 Nov 2012 16:49:09 -0600
+Subject: [PATCH 1/6 v2] arm: use devicetree to get smp_twd clock
+In-Reply-To: <20121105223155.GJ28327@n2100.arm.linux.org.uk>
+References: <1351631056-25938-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1351882309-733-1-git-send-email-mark.langsdorf@calxeda.com>
+ <1351882309-733-2-git-send-email-mark.langsdorf@calxeda.com>
+ <20121104100822.GY21164@n2100.arm.linux.org.uk> <50983D75.50009@calxeda.com>
+ <20121105223155.GJ28327@n2100.arm.linux.org.uk>
+Message-ID: <50984265.9010804@calxeda.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the tile hugetlb_get_unmapped_area function to make use of
-vm_unmapped_area() instead of implementing a brute force search.
+On 11/05/2012 04:31 PM, Russell King - ARM Linux wrote:
+> On Mon, Nov 05, 2012 at 04:28:05PM -0600, Mark Langsdorf wrote:
+>> On 11/04/2012 04:08 AM, Russell King - ARM Linux wrote:
+>>> On Fri, Nov 02, 2012 at 01:51:44PM -0500, Mark Langsdorf wrote:
+>>>> -static struct clk *twd_get_clock(void)
+>>>> +static struct clk *twd_get_clock(struct device_node *np)
+>>>>  {
+>>>> -	struct clk *clk;
+>>>> +	struct clk *clk = NULL;
+>>>>  	int err;
+>>>>  
+>>>> -	clk = clk_get_sys("smp_twd", NULL);
+>>>> +	if (np)
+>>>> +		clk = of_clk_get(np, 0);
+>>>> +	if (!clk)
+>>>
+>>> What does a NULL return from of_clk_get() mean?  Where is this defined?
+>>
+>> Well, it's a valid path if (np) is NULL. I'll add an IS_ERR(clk) and
+>> resubmit.
+> 
+> Hang on - what logic are you trying to achieve here?  Wouldn't:
+> 
+> 	if (np)
+> 		clk = of_clk_get(np, 0);
+> 	else
+> 		clk = clk_get_sys("smp_twd", NULL);
+> 
+> be sufficient?  If we have DT, why would we ever want to fall back to
+> "smp_twd" ?
 
-Signed-off-by: Michel Lespinasse <walken@google.com>
+I'm just trying to make sure I have a clock so I can do cpufreq operations.
 
----
- arch/tile/mm/hugetlbpage.c |  139 ++++++++------------------------------------
- 1 files changed, 25 insertions(+), 114 deletions(-)
+Your solution works and is sufficient. Thanks.
 
-diff --git a/arch/tile/mm/hugetlbpage.c b/arch/tile/mm/hugetlbpage.c
-index 812e2d037972..6f74cce053e1 100644
---- a/arch/tile/mm/hugetlbpage.c
-+++ b/arch/tile/mm/hugetlbpage.c
-@@ -231,42 +231,15 @@ static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
- 		unsigned long pgoff, unsigned long flags)
- {
- 	struct hstate *h = hstate_file(file);
--	struct mm_struct *mm = current->mm;
--	struct vm_area_struct *vma;
--	unsigned long start_addr;
--
--	if (len > mm->cached_hole_size) {
--		start_addr = mm->free_area_cache;
--	} else {
--		start_addr = TASK_UNMAPPED_BASE;
--		mm->cached_hole_size = 0;
--	}
--
--full_search:
--	addr = ALIGN(start_addr, huge_page_size(h));
--
--	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
--		/* At this point:  (!vma || addr < vma->vm_end). */
--		if (TASK_SIZE - len < addr) {
--			/*
--			 * Start a new search - just in case we missed
--			 * some holes.
--			 */
--			if (start_addr != TASK_UNMAPPED_BASE) {
--				start_addr = TASK_UNMAPPED_BASE;
--				mm->cached_hole_size = 0;
--				goto full_search;
--			}
--			return -ENOMEM;
--		}
--		if (!vma || addr + len <= vma->vm_start) {
--			mm->free_area_cache = addr + len;
--			return addr;
--		}
--		if (addr + mm->cached_hole_size < vma->vm_start)
--			mm->cached_hole_size = vma->vm_start - addr;
--		addr = ALIGN(vma->vm_end, huge_page_size(h));
--	}
-+	struct vm_unmapped_area_info info;
-+
-+	info.flags = 0;
-+	info.length = len;
-+	info.low_limit = TASK_UNMAPPED_BASE;
-+	info.high_limit = TASK_SIZE;
-+	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
-+	info.align_offset = 0;
-+	return vm_unmapped_area(&info);
- }
- 
- static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
-@@ -274,92 +247,30 @@ static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
- 		unsigned long pgoff, unsigned long flags)
- {
- 	struct hstate *h = hstate_file(file);
--	struct mm_struct *mm = current->mm;
--	struct vm_area_struct *vma, *prev_vma;
--	unsigned long base = mm->mmap_base, addr = addr0;
--	unsigned long largest_hole = mm->cached_hole_size;
--	int first_time = 1;
--
--	/* don't allow allocations above current base */
--	if (mm->free_area_cache > base)
--		mm->free_area_cache = base;
--
--	if (len <= largest_hole) {
--		largest_hole = 0;
--		mm->free_area_cache  = base;
--	}
--try_again:
--	/* make sure it can fit in the remaining address space */
--	if (mm->free_area_cache < len)
--		goto fail;
--
--	/* either no address requested or can't fit in requested address hole */
--	addr = (mm->free_area_cache - len) & huge_page_mask(h);
--	do {
--		/*
--		 * Lookup failure means no vma is above this address,
--		 * i.e. return with success:
--		 */
--		vma = find_vma_prev(mm, addr, &prev_vma);
--		if (!vma) {
--			return addr;
--			break;
--		}
--
--		/*
--		 * new region fits between prev_vma->vm_end and
--		 * vma->vm_start, use it:
--		 */
--		if (addr + len <= vma->vm_start &&
--			    (!prev_vma || (addr >= prev_vma->vm_end))) {
--			/* remember the address as a hint for next time */
--			mm->cached_hole_size = largest_hole;
--			mm->free_area_cache = addr;
--			return addr;
--		} else {
--			/* pull free_area_cache down to the first hole */
--			if (mm->free_area_cache == vma->vm_end) {
--				mm->free_area_cache = vma->vm_start;
--				mm->cached_hole_size = largest_hole;
--			}
--		}
-+	struct vm_unmapped_area_info info;
-+	unsigned long addr;
- 
--		/* remember the largest hole we saw so far */
--		if (addr + largest_hole < vma->vm_start)
--			largest_hole = vma->vm_start - addr;
-+	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-+	info.length = len;
-+	info.low_limit = PAGE_SIZE;
-+	info.high_limit = mm->mmap_base;
-+	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
-+	info.align_offset = 0;
-+	addr = vm_unmapped_area(&info);
- 
--		/* try just below the current vma->vm_start */
--		addr = (vma->vm_start - len) & huge_page_mask(h);
--
--	} while (len <= vma->vm_start);
--
--fail:
--	/*
--	 * if hint left us with no space for the requested
--	 * mapping then try again:
--	 */
--	if (first_time) {
--		mm->free_area_cache = base;
--		largest_hole = 0;
--		first_time = 0;
--		goto try_again;
--	}
- 	/*
- 	 * A failed mmap() very likely causes application failure,
- 	 * so fall back to the bottom-up function here. This scenario
- 	 * can happen with large stack limits and large mmap()
- 	 * allocations.
- 	 */
--	mm->free_area_cache = TASK_UNMAPPED_BASE;
--	mm->cached_hole_size = ~0UL;
--	addr = hugetlb_get_unmapped_area_bottomup(file, addr0,
--			len, pgoff, flags);
--
--	/*
--	 * Restore the topdown base:
--	 */
--	mm->free_area_cache = base;
--	mm->cached_hole_size = ~0UL;
-+	if (addr & ~PAGE_MASK) {
-+		VM_BUG_ON(addr != -ENOMEM);
-+		info.flags = 0;
-+		info.low_limit = TASK_UNMAPPED_BASE;
-+		info.high_limit = TASK_SIZE;
-+		addr = vm_unmapped_area(&info);
-+	}
- 
- 	return addr;
- }
--- 
-1.7.7.3
+--Mark Langsdorf
+Calxeda, Inc.
