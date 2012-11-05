@@ -1,90 +1,153 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 6 Nov 2012 03:29:22 +0530
-Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
- for AM33XX
-In-Reply-To: <87pq3s7wro.fsf@deeprootsystems.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
- <5095037A.2020503@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
- <5095165E.10403@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
- <87pq3s7wro.fsf@deeprootsystems.com>
-Message-ID: <509836BA.5030507@ti.com>
+From: michael.hope@linaro.org (Michael Hope)
+Date: Tue, 6 Nov 2012 11:02:27 +1300
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <5097C3B5.4080406@gmail.com>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+ <20121025093411.GA32662@sig21.net>
+ <50893389.2090002@gmail.com> <20121025141645.GA16962@sig21.net>
+ <50894BC2.5050706@gmail.com> <20121025150816.GA3874@sig21.net>
+ <20121105104839.GA2005@linaro.org>
+ <20121105111346.GF28327@n2100.arm.linux.org.uk>
+ <5097C3B5.4080406@gmail.com>
+Message-ID: <CANLjY-k7sn-7pH_0nFiktXCxvgy8XizVbPRvS8aG1rg+CmVTPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 05 November 2012 11:33 PM, Kevin Hilman wrote:
-> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+On 6 November 2012 02:48, Rob Herring <robherring2@gmail.com> wrote:
 >
->> On Sat, Nov 03, 2012 at 18:34:30, Kevin Hilman wrote:
->> [...]
->>>>>
->>>>> Doesn't this also mean that you won't get timer wakeups
->>>>> in idle?  Or are you keeping the domain where the clockevent is
->>>>> on during idle?
->>>>>
->>>>
->>>> The lowest idle state that we are targeting will have MPU powered
->>>> off with external memory in self-refresh mode. Peripheral domain
->>>> with the clockevent will be kept on.
->>>
->>> Is this a limitation of the hardware?  or the software?
->>>
->>
->> Well, making the lowest idle state same as the suspend state will
->> require us to involve WKUP_M3 in the idle path and wakeup sources get
->> limited to the IPs in the WKUP domain alone. There's no IO daisy
->> chaining in AM33XX so that's one big difference compared to OMAP.  The
->> other potential problem is that the IPC mechanism that we have uses
->> interrupts.
+> On 11/05/2012 05:13 AM, Russell King - ARM Linux wrote:
+> > On Mon, Nov 05, 2012 at 10:48:50AM +0000, Dave Martin wrote:
+> >> On Thu, Oct 25, 2012 at 05:08:16PM +0200, Johannes Stezenbach wrote:
+> >>> On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
+> >>>> On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
+> >>>>> On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
+> >>>>>> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
+> >>>>>>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
+> >>>>>>>
+> >>>>>>>> While v6 can support unaligned accesses, it is optional and current
+> >>>>>>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
+> >>>>>>>> v6.
+> >>>>>>>
+> >>>>>>> not true according to the gcc changes page
+> >>>>>>
+> >>>>>> What are you going to believe: documentation or what the compiler
+> >>>>>> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
+> >>>>>> support backported and 4.7.2, unaligned accesses are emitted for v7
+> >>>>>> only. I guess default here means it is the default unless you change the
+> >>>>>> default in your build of gcc.
+> >>>>>
+> >>>>> Since ARMv6 can handle unaligned access in the same way as ARMv7
+> >>>>> it seems a clear bug in gcc which might hopefully get fixed.
+> >>>>> Thus in this case I think it is reasonable to follow the
+> >>>>> gcc documentation, otherwise the code would break for ARMv6
+> >>>>> when gcc gets fixed.
+> >>>>
+> >>>> But the compiler can't assume the state of the U bit. I think it is
+> >>>> still legal on v6 to not support unaligned accesses, but on v7 it is
+> >>>> required. All the standard v6 ARM cores support it, but I'm not sure
+> >>>> about custom cores or if there are SOCs with buses that don't support
+> >>>> unaligned accesses properly.
+> >>>
+> >>> Well, I read the "...since Linux version 2.6.28" comment
+> >>> in the gcc changes page in the way that they assume the
+> >>> U-bit is set. (Although I'm not sure it really is???)
+> >>
+> >> Actually, the kernel checks the arch version and the U bit on boot,
+> >> and chooses the appropriate setting for the A bit depending on the
+> >> result.  (See arch/arm/mm/alignment.c:alignment_init().)
+> >
+> > That is in the kernel itself, _after_ the decompressor has run.  It is
+> > not relevant to any discussion about the decompressor.
+> >
+> >> Currently, we depend on the CPU reset behaviour or firmware/
+> >> bootloader to set the U bit for v6, but the behaviour should be
+> >> correct either way, though unaligned accesses will obviously
+> >> perform (much) better with U=1.
+> >
+> > Will someone _PLEASE_ address my initial comments against this patch
+> > in light of the fact that it's now been proven _NOT_ to be just a V7
+> > issue, rather than everyone seemingly buring their heads in the sand
+> > over this.
 >
-> It can still interrupt the M3, it's only the interrupt back to the MPU
-> that is the issue, right?  That being said, there's no reason it
-> couldn't use polling in the idle path, right?
->
->> Assuming that the lowest idle state, say Cx, is the same as the
->> suspend state, we'll need to communicate with the WKUP_M3 using
->> interrupts once we decide to enter Cx. I am not sure if we can do
->> something in the cpuidle implementation to work around the "interrupt
->> for idle" problem.
->>
->> We could probably not wait for an ACK when we want to enter Cx,
->
-> why not?
->
-> Are the response times from the M3 really up to 500ms (guessing based on
-> the timeout you used in the suspend path.)  That seems rather unlikely.
->
-> Hmm, but as I think about it.  Why does the MPU need to wait for an ACK
-> at all?  Why not just send the cmd and WFI?
->
->> but the problem of limited wakeup sources remains. If we let the
->> various drivers block the entry to Cx, since almost all the IPs are in
->> the peripheral domain a system which uses anything other than UART and
->> Timer in WKUP domain will probably never be able enter Cx.
->
-> Even so, I think the system needs to be designed to hit the same power
-> states in idle and suspend.  Then, the states can be restricted based
-> wakeup capabilities as you described.  This would be easy to do in the
-> runtime PM implementation for this device.
->
-> IMO, assuming that idle will not be useful from the begining is leading
-> down the path to poor design choices that will be much more difficult to
-> fixup down the road in order to add idle support later.  We need to
-> design both idle and suspend at the same time.
->
-I agree with Kevin. Not supporting CPUIDLE deep states can hit the
-active power numbers dearly. I just don't know why the SOCs don't share
-the standard and must have design choices. But thats another discussion.
+> I tried adding -munaligned-accesses on a v6 build and still get byte
+> accesses rather than unaligned word accesses. So this does seem to be a
+> v7 only issue based on what gcc will currently produce. Copying Michael
+> Hope who can hopefully provide some insight on why v6 unaligned accesses
+> are not enabled.
 
-How about leaving the timer choices as is. PER timer for clock source
-and wakeuptimer for clock event. Anyway in suspend the clock-source
-can be suspended and that is evident from recent discussion. The only
-downside is you won't count time in suspend which is any way the case.
+This looks like a bug.  Unaligned access is enabled for armv6 but
+seems to only take effect for cores with Thumb-2.  Here's a test case
+both with unaligned field access and unaligned block copy:
 
-Vaibhav,
-Do you guys see any implementation bottleneck for above ?
+struct foo
+{
+  char a;
+  int b;
+  struct
+  {
+    int x[3];
+  } c;
+} __attribute__((packed));
 
-Regards
-Santosh
+int get_field(struct foo *p)
+{
+  return p->b;
+}
+
+int copy_block(struct foo *p, struct foo *q)
+{
+  p->c = q->c;
+}
+
+With -march=armv7-a you get the correct:
+
+bar:
+	ldr	r0, [r0, #1]	@ unaligned	@ 11	unaligned_loadsi/2	[length = 4]
+	bx	lr	@ 21	*arm_return	[length = 12]
+
+baz:
+	str	r4, [sp, #-4]!	@ 25	*push_multi	[length = 4]
+	mov	r2, r0	@ 2	*arm_movsi_vfp/1	[length = 4]
+	ldr	r4, [r1, #5]!	@ unaligned	@ 9	unaligned_loadsi/2	[length = 4]
+	ldr	ip, [r1, #4]	@ unaligned	@ 10	unaligned_loadsi/2	[length = 4]
+	ldr	r1, [r1, #8]	@ unaligned	@ 11	unaligned_loadsi/2	[length = 4]
+	str	r4, [r2, #5]	@ unaligned	@ 12	unaligned_storesi/2	[length = 4]
+	str	ip, [r2, #9]	@ unaligned	@ 13	unaligned_storesi/2	[length = 4]
+	str	r1, [r2, #13]	@ unaligned	@ 14	unaligned_storesi/2	[length = 4]
+	ldmfd	sp!, {r4}
+	bx	lr
+
+With -march=armv6 you get a byte-by-byte field access and a correct
+unaligned block copy:
+
+bar:
+	ldrb	r1, [r0, #2]	@ zero_extendqisi2
+	ldrb	r3, [r0, #1]	@ zero_extendqisi2
+	ldrb	r2, [r0, #3]	@ zero_extendqisi2
+	ldrb	r0, [r0, #4]	@ zero_extendqisi2
+	orr	r3, r3, r1, asl #8
+	orr	r3, r3, r2, asl #16
+	orr	r0, r3, r0, asl #24
+	bx	lr
+
+baz:
+	str	r4, [sp, #-4]!
+	mov	r2, r0
+	ldr	r4, [r1, #5]!	@ unaligned
+	ldr	ip, [r1, #4]	@ unaligned
+	ldr	r1, [r1, #8]	@ unaligned
+	str	r4, [r2, #5]	@ unaligned
+	str	ip, [r2, #9]	@ unaligned
+	str	r1, [r2, #13]	@ unaligned
+	ldmfd	sp!, {r4}
+	bx	lr
+
+readelf -A shows that the compiler planned to use unaligned access in
+both.  My suspicion is that GCC is using the extv pattern to extract
+the field from memory, and that pattern is only enabled for Thumb-2
+capable cores.
+
+I've logged PR55218.  We'll discuss it at our next meeting.
+
+-- Michael
