@@ -1,90 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 05 Nov 2012 07:48:37 -0600
-Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
-In-Reply-To: <20121105111346.GF28327@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
- <1349959402-24164-1-git-send-email-robherring2@gmail.com>
- <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
- <20121025141645.GA16962@sig21.net> <50894BC2.5050706@gmail.com>
- <20121025150816.GA3874@sig21.net> <20121105104839.GA2005@linaro.org>
- <20121105111346.GF28327@n2100.arm.linux.org.uk>
-Message-ID: <5097C3B5.4080406@gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 05 Nov 2012 13:52:48 +0000
+Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
+In-Reply-To: <1352120159.10947.3.camel@hornet>
+References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
+ <1352108387.3212.12.camel@linaro1.home> <1352120159.10947.3.camel@hornet>
+Message-ID: <1352123568.3212.52.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2012 05:13 AM, Russell King - ARM Linux wrote:
-> On Mon, Nov 05, 2012 at 10:48:50AM +0000, Dave Martin wrote:
->> On Thu, Oct 25, 2012 at 05:08:16PM +0200, Johannes Stezenbach wrote:
->>> On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
->>>> On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
->>>>> On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
->>>>>> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
->>>>>>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
->>>>>>>
->>>>>>>> While v6 can support unaligned accesses, it is optional and current
->>>>>>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
->>>>>>>> v6.
->>>>>>>
->>>>>>> not true according to the gcc changes page
->>>>>>
->>>>>> What are you going to believe: documentation or what the compiler
->>>>>> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
->>>>>> support backported and 4.7.2, unaligned accesses are emitted for v7
->>>>>> only. I guess default here means it is the default unless you change the
->>>>>> default in your build of gcc.
->>>>>
->>>>> Since ARMv6 can handle unaligned access in the same way as ARMv7
->>>>> it seems a clear bug in gcc which might hopefully get fixed.
->>>>> Thus in this case I think it is reasonable to follow the
->>>>> gcc documentation, otherwise the code would break for ARMv6
->>>>> when gcc gets fixed.
->>>>
->>>> But the compiler can't assume the state of the U bit. I think it is
->>>> still legal on v6 to not support unaligned accesses, but on v7 it is
->>>> required. All the standard v6 ARM cores support it, but I'm not sure
->>>> about custom cores or if there are SOCs with buses that don't support
->>>> unaligned accesses properly.
->>>
->>> Well, I read the "...since Linux version 2.6.28" comment
->>> in the gcc changes page in the way that they assume the
->>> U-bit is set. (Although I'm not sure it really is???)
->>
->> Actually, the kernel checks the arch version and the U bit on boot,
->> and chooses the appropriate setting for the A bit depending on the
->> result.  (See arch/arm/mm/alignment.c:alignment_init().)
+On Mon, 2012-11-05 at 12:55 +0000, Pawel Moll wrote:
+> On Mon, 2012-11-05 at 09:39 +0000, Jon Medhurst (Tixy) wrote:
+> > > +static void mmio_led_brightness_set(struct led_classdev *cdev,
+> > > +		enum led_brightness brightness)
+> > > +{
+> > > +	struct mmio_led *led = container_of(cdev, struct mmio_led, cdev);
+> > > +	unsigned long uninitialized_var(flags);
+> > 
+> > uninitialized_var seems to be a bit contentious, Linus Torvalds had a
+> > recent complaint about it which prompted Ingo to post a patch proposing
+> > to removing it: https://patchwork.kernel.org/patch/1655621/ So perhaps
+> > best to avoid using it ;-).
+> > 
+> > In this case, you could possibly keep gcc quite with something like:
+> > 
+> >         spinlock_t *lock = led->lock;
+> > 
+> > and then use the local variable 'lock' everywhere instead of led->lock.
+> > Or just keep it simple an initialise flags to 0 instead.
 > 
-> That is in the kernel itself, _after_ the decompressor has run.  It is
-> not relevant to any discussion about the decompressor.
+> Yeah, = 0 will do...
 > 
->> Currently, we depend on the CPU reset behaviour or firmware/
->> bootloader to set the U bit for v6, but the behaviour should be
->> correct either way, though unaligned accesses will obviously
->> perform (much) better with U=1.
+> > > +	if (!pdata)
+> > > +		return -EINVAL;
+> > > +
+> > > +	if (pdata->reg_size != 8 && pdata->reg_size != 16 &&
+> > > +			pdata->reg_size != 32)
+> > > +		return -EFAULT;
+> > 
+> > Is EFAULT appropriate here? Why not EINVAL?
 > 
-> Will someone _PLEASE_ address my initial comments against this patch
-> in light of the fact that it's now been proven _NOT_ to be just a V7
-> issue, rather than everyone seemingly buring their heads in the sand
-> over this.
+> Hm. To distinguish it from !pdata case I guess (and a 13 bit wide
+> transaction sounds like a fault to me ;-), but I can be persuaded
+> otherwise without much effort...
 
-I tried adding -munaligned-accesses on a v6 build and still get byte
-accesses rather than unaligned word accesses. So this does seem to be a
-v7 only issue based on what gcc will currently produce. Copying Michael
-Hope who can hopefully provide some insight on why v6 unaligned accesses
-are not enabled.
+I was asking as much for my own education about use of error values as
+anything else. The comments in errno-base.h are:
 
-> The fact is, unaligned accesses in the decompressor are *undefined* at
-> present.
-> 
->> For v7, we should definitely use -munaligned-access where available
->> (unless it's the default?)
-> 
-> No such option on my compiler - according to the manual I have, the only
-> option there is starting -munaligned is on SPARC for -munaligned-doubles.
+#define	EINVAL		22	/* Invalid argument */
+#define	EFAULT		14	/* Bad address */
 
-It's only added in 4.7 and backported to Linaro 4.6.3.
+and from looking in the source tree it seems EFAULT is mostly used to
+indicate a bad memory address passed from user-side to the kernel.
 
-Rob
+It's a trivial point so it's not worth wasting time on a long
+discussion.
 
-> However, I believe GCC does believe that unaligned accesses are fine on
-> V6 and above.
-> 
+-- 
+Tixy
