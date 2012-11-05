@@ -1,99 +1,97 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 5 Nov 2012 17:53:41 +0530
-Subject: [PATCHv3 6/8] i2c: omap: make reset a seperate function
+Date: Mon, 5 Nov 2012 17:53:39 +0530
+Subject: [PATCHv3 4/8] ARM: i2c: omap: Remove the i207 errata flag
 In-Reply-To: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
 References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1352118223-3796-7-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352118223-3796-5-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement reset as a separate function.
-This will enable us to make sure that we don't do the
-calculation again on every transfer.
-Also at probe the reset is not added as the hwmod is doing that
-for us.
+The commit [i2c: omap: use revision check for OMAP_I2C_FLAG_APPLY_ERRATA_I207]
+uses the revision id instead of the flag. So the flag can be safely removed.
 
 Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
-todo: reprodue the errors and optimise the reset if possible
- drivers/i2c/busses/i2c-omap.c |   39 ++++++++++++++++++++++++---------------
- 1 files changed, 24 insertions(+), 15 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    3 +--
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    9 +++------
+ drivers/i2c/busses/i2c-omap.c              |    3 +--
+ include/linux/i2c-omap.h                   |    1 -
+ 4 files changed, 5 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index c455e41..b79ccf6 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -76,8 +76,7 @@ static struct omap_hwmod_class i2c_class = {
+ 
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+ 	.fifo_depth	= 8, /* bytes */
+-	.flags		= OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+-			  OMAP_I2C_FLAG_BUS_SHIFT_2 |
++	.flags		= OMAP_I2C_FLAG_BUS_SHIFT_2 |
+ 			  OMAP_I2C_FLAG_FORCE_19200_INT_CLK,
+ };
+ 
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index f67b7ee..943222c4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -791,8 +791,7 @@ static struct omap_hwmod omap3xxx_dss_venc_hwmod = {
+ /* I2C1 */
+ static struct omap_i2c_dev_attr i2c1_dev_attr = {
+ 	.fifo_depth	= 8, /* bytes */
+-	.flags		= OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+-			  OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
++	.flags		= OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+ 			  OMAP_I2C_FLAG_BUS_SHIFT_2,
+ };
+ 
+@@ -818,8 +817,7 @@ static struct omap_hwmod omap3xxx_i2c1_hwmod = {
+ /* I2C2 */
+ static struct omap_i2c_dev_attr i2c2_dev_attr = {
+ 	.fifo_depth	= 8, /* bytes */
+-	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+-		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
++	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+ 		 OMAP_I2C_FLAG_BUS_SHIFT_2,
+ };
+ 
+@@ -845,8 +843,7 @@ static struct omap_hwmod omap3xxx_i2c2_hwmod = {
+ /* I2C3 */
+ static struct omap_i2c_dev_attr i2c3_dev_attr = {
+ 	.fifo_depth	= 64, /* bytes */
+-	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+-		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
++	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+ 		 OMAP_I2C_FLAG_BUS_SHIFT_2,
+ };
+ 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 393bb22..7393017 100644
+index 5f0c06c..88358d8 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -299,15 +299,9 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
- 		omap_i2c_write_reg(dev, OMAP_I2C_IE_REG, dev->iestate);
- }
+@@ -1029,8 +1029,7 @@ static const struct i2c_algorithm omap_i2c_algo = {
+ #ifdef CONFIG_OF
+ static struct omap_i2c_bus_platform_data omap3_pdata = {
+ 	.rev = OMAP_I2C_IP_VERSION_1,
+-	.flags = OMAP_I2C_FLAG_APPLY_ERRATA_I207 |
+-		 OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
++	.flags = OMAP_I2C_FLAG_RESET_REGS_POSTIDLE |
+ 		 OMAP_I2C_FLAG_BUS_SHIFT_2,
+ };
  
--static int omap_i2c_init(struct omap_i2c_dev *dev)
-+static int omap_i2c_reset(struct omap_i2c_dev *dev)
- {
--	u16 psc = 0, scll = 0, sclh = 0;
--	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
--	unsigned long fclk_rate = 12000000;
- 	unsigned long timeout;
--	unsigned long internal_clk = 0;
--	struct clk *fclk;
--
- 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
- 		/* Disable I2C controller before soft reset */
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
-@@ -345,14 +339,27 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
- 
- 			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
- 							dev->syscstate);
--			/*
--			 * Enabling all wakup sources to stop I2C freezing on
--			 * WFI instruction.
--			 * REVISIT: Some wkup sources might not be needed.
--			 */
--			dev->westate = OMAP_I2C_WE_ALL;
- 		}
- 	}
-+	return 0;
-+}
-+
-+static int omap_i2c_init(struct omap_i2c_dev *dev)
-+{
-+	u16 psc = 0, scll = 0, sclh = 0;
-+	u16 fsscll = 0, fssclh = 0, hsscll = 0, hssclh = 0;
-+	unsigned long fclk_rate = 12000000;
-+	unsigned long internal_clk = 0;
-+	struct clk *fclk;
-+
-+	if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
-+		/*
-+		 * Enabling all wakup sources to stop I2C freezing on
-+		 * WFI instruction.
-+		 * REVISIT: Some wkup sources might not be needed.
-+		 */
-+		dev->westate = OMAP_I2C_WE_ALL;
-+	}
- 
- 	if (dev->flags & OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK) {
- 		/*
-@@ -592,7 +599,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	dev->buf_len = 0;
- 	if (timeout == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
--		omap_i2c_init(dev);
-+		omap_i2c_reset(dev);
-+		__omap_i2c_init(dev);
- 		return -ETIMEDOUT;
- 	}
- 
-@@ -602,7 +610,8 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
- 	/* We have an error */
- 	if (dev->cmd_err & (OMAP_I2C_STAT_AL | OMAP_I2C_STAT_ROVR |
- 			    OMAP_I2C_STAT_XUDF)) {
--		omap_i2c_init(dev);
-+		omap_i2c_reset(dev);
-+		__omap_i2c_init(dev);
- 		return -EIO;
- 	}
- 
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index df804ba..5c88187 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -21,7 +21,6 @@
+ #define OMAP_I2C_FLAG_SIMPLE_CLOCK		BIT(1)
+ #define OMAP_I2C_FLAG_16BIT_DATA_REG		BIT(2)
+ #define OMAP_I2C_FLAG_RESET_REGS_POSTIDLE	BIT(3)
+-#define OMAP_I2C_FLAG_APPLY_ERRATA_I207	BIT(4)
+ #define OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK	BIT(5)
+ #define OMAP_I2C_FLAG_FORCE_19200_INT_CLK	BIT(6)
+ /* how the CPU address bus must be translated for I2C unit access */
 -- 
 1.7.5.4
