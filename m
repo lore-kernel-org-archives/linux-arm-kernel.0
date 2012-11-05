@@ -1,43 +1,32 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 5 Nov 2012 08:28:57 +0100
-Subject: [PATCH v3 0/6] DT support for AT91RM9200
-In-Reply-To: <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
-References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
- <20121104155212.GK19021@game.jcrosoft.org>
- <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
-Message-ID: <20121105072857.GL19021@game.jcrosoft.org>
+Date: Mon, 5 Nov 2012 08:30:15 +0100
+Subject: [PATCH 0/2 v2] net: at91_ether add dt and pinctrl support
+Message-ID: <20121105073015.GM19021@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:55 Sun 04 Nov     , Joachim Eastwood wrote:
-> On 4 November 2012 16:52, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 19:31 Sun 28 Oct     , Joachim Eastwood wrote:
-> >> Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
-> >>
-> >> Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
-> >>
-> >> Patch 3 adds clock lookups for DT.
-> >>
-> >> Patch 4 adds a new board for RM9200 DT support.
-> >>
-> >> Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
-> >>
-> >>
-> >> I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a >>initrd. As far as I can tell pinctrl, usart and ohci all work.
-> >
-> > After updating barebox to have the DT support I've tested it on rm9200ek with net support
-> >
-> > work fine
-> 
-> Excellent.
-> 
-> > It does not apply on my tree as I've a more patch but I'll manage the merge
-> > conflict
-> 
->  Thanks for fixing it up Jean-Christophe.
-I'll also fix the usb device and add missing nor flash support and emac +
-pinctrl + defconfig
+Hi,
+
+	v2: fix typo in doc + miising empty line
+
+	This patch serie add dt and pinctrl support to the at91 ether
+
+	this is need to use the network on at91rm9200 as we now have dt
+	support on it
+
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      net: at91_ether: add dt support
+      net: at91_ether: add pinctrl support
+
+ Documentation/devicetree/bindings/net/cdns-emac.txt |   23 +++++++++++++++++++++++
+ drivers/net/ethernet/cadence/at91_ether.c           |   84 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 100 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/cdns-emac.txt
 
 Best Regards,
 J.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
