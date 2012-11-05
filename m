@@ -1,65 +1,46 @@
 From: shubhrajyoti@ti.com (Shubhrajyoti D)
-Date: Mon, 5 Nov 2012 17:53:43 +0530
-Subject: [PATCHv3 8/8] i2c: omap: cleanup the sysc write
+Date: Mon, 5 Nov 2012 17:53:42 +0530
+Subject: [PATCHv3 7/8] i2c: omap: Restore i2c context always
 In-Reply-To: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
 References: <1352118223-3796-1-git-send-email-shubhrajyoti@ti.com>
-Message-ID: <1352118223-3796-9-git-send-email-shubhrajyoti@ti.com>
+Message-ID: <1352118223-3796-8-git-send-email-shubhrajyoti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently after the reset the sysc is written with hardcoded values.
-The patch reads the sysc register and writes back the same value
-after reset.
+Currently the restore is done based on the flag
+OMAP_I2C_FLAG_RESET_REGS_POSTIDLE.
 
-- Some unnecessary rev checks can be optimised.
-- Also due to whatever reason the hwmod flags are changed
-we will not reset the values.
-- In some of the cases the minor values of the 2430 register
-is different(0x37) in that case the autoidle setting may be missed.
+This helps the following
+- The driver is always capable of restoring regardless
+of the off mode support being there or not.
 
+- While testing omap2430 it is found that in case of certain
+error paths (timeout) a reset is done. However the restore
+never happens as it is dependent on the POSTIDLE flag.
+The other option would be to call a restore in the reset
+case. As there are only a few registers to be restored
+the penalty in the idle case should not be much.
+
+Reviewed-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Shubhrajyoti D <shubhrajyoti@ti.com>
 ---
- drivers/i2c/busses/i2c-omap.c |   20 +++++---------------
- 1 files changed, 5 insertions(+), 15 deletions(-)
+Todo: the flag could be deleted if the patch is accepted.
+
+ drivers/i2c/busses/i2c-omap.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 25f1564..a09acdc 100644
+index 7393017..25f1564 100644
 --- a/drivers/i2c/busses/i2c-omap.c
 +++ b/drivers/i2c/busses/i2c-omap.c
-@@ -302,7 +302,11 @@ static void __omap_i2c_init(struct omap_i2c_dev *dev)
- static int omap_i2c_reset(struct omap_i2c_dev *dev)
- {
- 	unsigned long timeout;
-+	u16 sysc;
-+
- 	if (dev->rev >= OMAP_I2C_OMAP1_REV_2) {
-+		sysc = omap_i2c_read_reg(dev, OMAP_I2C_SYSC_REG);
-+
- 		/* Disable I2C controller before soft reset */
- 		omap_i2c_write_reg(dev, OMAP_I2C_CON_REG,
- 			omap_i2c_read_reg(dev, OMAP_I2C_CON_REG) &
-@@ -324,22 +328,8 @@ static int omap_i2c_reset(struct omap_i2c_dev *dev)
- 		}
+@@ -1316,8 +1316,7 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 	if (!_dev->regs)
+ 		return 0;
  
- 		/* SYSC register is cleared by the reset; rewrite it */
--		if (dev->rev == OMAP_I2C_REV_ON_2430) {
--
--			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
--					   SYSC_AUTOIDLE_MASK);
-+		omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG, sysc);
+-	if (_dev->flags & OMAP_I2C_FLAG_RESET_REGS_POSTIDLE)
+-		__omap_i2c_init(_dev);
++	__omap_i2c_init(_dev);
  
--		} else if (dev->rev >= OMAP_I2C_REV_ON_3430_3530) {
--			dev->syscstate = SYSC_AUTOIDLE_MASK;
--			dev->syscstate |= SYSC_ENAWAKEUP_MASK;
--			dev->syscstate |= (SYSC_IDLEMODE_SMART <<
--			      __ffs(SYSC_SIDLEMODE_MASK));
--			dev->syscstate |= (SYSC_CLOCKACTIVITY_FCLK <<
--			      __ffs(SYSC_CLOCKACTIVITY_MASK));
--
--			omap_i2c_write_reg(dev, OMAP_I2C_SYSC_REG,
--							dev->syscstate);
--		}
- 	}
  	return 0;
  }
 -- 
