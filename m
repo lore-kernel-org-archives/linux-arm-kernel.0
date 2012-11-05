@@ -1,68 +1,48 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 5 Nov 2012 15:14:16 +0200
-Subject: [PATCH 3/6] OMAPDSS: HACK: look for regulators with omap4 names
+Date: Mon, 5 Nov 2012 15:14:19 +0200
+Subject: [PATCH 6/6] OMAP: board-generic: enable DSS for panda & sdp boards
 In-Reply-To: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1352121259-5836-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1352121259-5836-7-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Normally the omapdss driver gets the regulators using the regulator
-names assigned for omapdss. However, in an effort to get a minimal DSS
-support for DT enabled kernel on selected boards, we will add omapdss
-devices and platform data the old way even for DT kernel. This causes
-the problem that omapdss cannot find the regulators using omapdss's
-regulator names.
-
-This patch creates a temporary workaround for DSI and HDMI by trying to
-get the regulators also using native OMAP4 regulator names.
+Call the non-DT omapdss setup code from board-generic if the board is
+omap4-panda or omap4-sdp. This will give us working omapdss for those
+boards when using DT kernel.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- drivers/video/omap2/dss/dsi.c  |    8 ++++++++
- drivers/video/omap2/dss/hdmi.c |    4 ++++
- 2 files changed, 12 insertions(+)
+ arch/arm/mach-omap2/board-generic.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/video/omap2/dss/dsi.c b/drivers/video/omap2/dss/dsi.c
-index d64ac38..738f3c4 100644
---- a/drivers/video/omap2/dss/dsi.c
-+++ b/drivers/video/omap2/dss/dsi.c
-@@ -1753,6 +1753,10 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 601ecdf..8f5f21c 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -21,6 +21,7 @@
  
- 		vdds_dsi = regulator_get(&dsi->pdev->dev, "vdds_dsi");
+ #include "common.h"
+ #include "common-board-devices.h"
++#include "dss-common.h"
  
-+		/* DT HACK: try VCXIO to make omapdss work for o4 sdp/panda */
-+		if (IS_ERR(vdds_dsi))
-+			vdds_dsi = regulator_get(&dsi->pdev->dev, "VCXIO");
+ #if !(defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3))
+ #define intc_of_init	NULL
+@@ -40,6 +41,15 @@ static void __init omap_generic_init(void)
+ 	omap_sdrc_init(NULL, NULL);
+ 
+ 	of_platform_populate(NULL, omap_dt_match_table, NULL, NULL);
 +
- 		if (IS_ERR(vdds_dsi)) {
- 			DSSERR("can't get VDDS_DSI regulator\n");
- 			return PTR_ERR(vdds_dsi);
-@@ -4972,6 +4976,10 @@ static int __init dsi_init_display(struct omap_dss_device *dssdev)
++	/*
++	 * HACK: call display setup code for selected boards to enable omapdss.
++	 * This will be removed when omapdss supports DT.
++	 */
++	if (of_machine_is_compatible("ti,omap4-panda"))
++		omap4_panda_display_init_of();
++	else if (of_machine_is_compatible("ti,omap4-sdp"))
++		omap_4430sdp_display_init_of();
+ }
  
- 		vdds_dsi = regulator_get(&dsi->pdev->dev, "vdds_dsi");
- 
-+		/* DT HACK: try VCXIO to make omapdss work for o4 sdp/panda */
-+		if (IS_ERR(vdds_dsi))
-+			vdds_dsi = regulator_get(&dsi->pdev->dev, "VCXIO");
-+
- 		if (IS_ERR(vdds_dsi)) {
- 			DSSERR("can't get VDDS_DSI regulator\n");
- 			return PTR_ERR(vdds_dsi);
-diff --git a/drivers/video/omap2/dss/hdmi.c b/drivers/video/omap2/dss/hdmi.c
-index a48a7dd..deaeb6c 100644
---- a/drivers/video/omap2/dss/hdmi.c
-+++ b/drivers/video/omap2/dss/hdmi.c
-@@ -340,6 +340,10 @@ static int __init hdmi_init_display(struct omap_dss_device *dssdev)
- 
- 		reg = devm_regulator_get(&hdmi.pdev->dev, "vdda_hdmi_dac");
- 
-+		/* DT HACK: try VDAC to make omapdss work for o4 sdp/panda */
-+		if (IS_ERR(reg))
-+			reg = devm_regulator_get(&hdmi.pdev->dev, "VDAC");
-+
- 		if (IS_ERR(reg)) {
- 			DSSERR("can't get VDDA_HDMI_DAC regulator\n");
- 			return PTR_ERR(reg);
+ #ifdef CONFIG_SOC_OMAP2420
 -- 
 1.7.10.4
