@@ -1,41 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 5 Nov 2012 12:05:49 +0000
-Subject: gic_set_affinity
-In-Reply-To: <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
-References: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
- <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
-Message-ID: <20121105120548.GH3351@mudshark.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 5 Nov 2012 13:16:05 +0100
+Subject: [PATCH 6/8] serial: xilinx_uartps: kill CONFIG_OF conditional
+In-Reply-To: <61e872b2cd4abc25c2dab82668e5094b590571a0.1351721190.git.josh.cartwright@ni.com>
+References: <cover.1351721190.git.josh.cartwright@ni.com>
+ <61e872b2cd4abc25c2dab82668e5094b590571a0.1351721190.git.josh.cartwright@ni.com>
+Message-ID: <CAHTX3dKSn0JwHsgCfLrgitb41OakHmw1o=uDRkshYi88fp2h1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 11:32:50AM +0000, Robert Beckett wrote:
-> (CC maintainers)
-> 
-> On 1 November 2012 17:54, Robert Beckett <bob.beckett@gmail.com> wrote:
-> > Hello,
-> >
-> > I was looking through the arm gic code while debugging a problem I am
-> > having, and noticed something in gic_set_affinity.
-> >
-> > When something comes along and setts an irq affinity mask (e.g.
-> > through /proc/irq/<irq>/smp_affinity_mask), the calls goes like so :
-> >
-> > ...
-> > 1. irq_set_affinity : grabs the desc->lock
-> > 2. __irq_set_affinity_locked : calls chip->irq_set_affinity
-> > 3. gic_set_affinity : writes a new mask to the gic distributor
-> >
-> > my question is, what happens if an interrupt is raised between 1 and 3?
-> > To me, it looks like the interrupt could end up being handled on 2
-> > cpus. When it is raised, the handler will be called and sit spinning
-> > for desc->lock (e.g. in handle_fasteoi_irq). The mask will be set to
-> > set the affinity to the new cpu, the new cpu will receive the
-> > interrupt as it has not been ackd or disabled yet
+2012/10/30 Josh Cartwright <josh.cartwright@ni.com>:
+> The Zynq platform requires the use of CONFIG_OF.  Remove the #ifdef
+> conditionals in the uartps driver.
+>
+> Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
+> ---
+>  drivers/tty/serial/xilinx_uartps.c | 9 ---------
+>  1 file changed, 9 deletions(-)
 
-The interrupt will have been acked in gic_handle_irq before the flow handler
-is invoked, so it will transition to the active state and will not get
-signalled to another CPU. Since we never set more than one target CPU at the
-distributor level, the interrupt will only be forwarded to one CPU interface
-at any given time.
+Please send this separately out of this patchset.
+Also if you do this change which is understandable, you should also
+add
+depends on OF
 
-Will
+Thanks,
+Michal
