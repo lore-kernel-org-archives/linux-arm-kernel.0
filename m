@@ -1,61 +1,92 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Mon, 5 Nov 2012 20:31:45 +0300
-Subject: [PATCH 2/5] ARM: PXA: Zipit Z2: Add USB host and device support
-In-Reply-To: <CA+E=qVfi8Ko4SDDi92jRLjQ4bKtqHkhq4N7QtbiU1k7bPbWjig@mail.gmail.com>
-References: <1351438555-4668-1-git-send-email-anarsoul@gmail.com>
- <1351438555-4668-2-git-send-email-anarsoul@gmail.com>
- <201210282259.46491.marex@denx.de>
- <CA+E=qVftf+A=U5CEvkFia4LMYgeU6iF5WpKPS3FVkf1d3rABFQ@mail.gmail.com>
- <CACTFLAOwUsWbqK-R1OLNfNTnkp7Mo3hFwu78dFKT8i8goTgdKw@mail.gmail.com>
- <CA+E=qVeup8QzqAiURzEfG8a2vp_rBJ-by8FORLEzSCfkxiyjtQ@mail.gmail.com>
- <508E4F7F.7010607@gmail.com>
- <CA+E=qVcnacT8L5GkqTxdowKt2KkoEWMhd3+XBk6nKsEEDtWecg@mail.gmail.com>
- <508E5DFB.3060002@gmail.com>
- <CA+E=qVcRM834_JFZskL7DEJQ10YsYexCeY3CE67fjJk4_WJLUw@mail.gmail.com>
- <508E61E7.7090502@gmail.com>
- <CA+E=qVcJ=WLJwS49zgb_=6or7Me3LLGQtBbfzBtS-p+U6Tw-pQ@mail.gmail.com>
- <508E651A.5070009@gmail.com>
- <CA+E=qVchrOXAL+cPD0-bZKSAjgyjoEFEqajva+SPtJBPOVGE=w@mail.gmail.com>
- <509032F6.1050301@gmail.com>
- <CAN1soZyAuo4UUze9yWKTOqwJ0TC4cf+uywWo1Ypbrcq0+zez0g@mail.gmail.com>
- <CA+E=qVfi8Ko4SDDi92jRLjQ4bKtqHkhq4N7QtbiU1k7bPbWjig@mail.gmail.com>
-Message-ID: <CA+E=qVfMbfh4Zx54HHbpcYPsPJiEx3T24Tv-8oaaOYK7F1CzYg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 5 Nov 2012 17:36:04 +0000
+Subject: [PATCH] ARM: Fix the "WFI" instruction opcode definition.
+In-Reply-To: <CAKw8HL0ymmNRB=jgGcZn1+6k0s=FKA+qBV04y_wfeu7xMpUpkw@mail.gmail.com>
+References: <DA41BE1DDCA941489001C7FBD7A8820E3CB5512E@szxeml549-mbx.china.huawei.com>
+ <5091D13B.6060106@gmail.com>
+ <CAKw8HL0ymmNRB=jgGcZn1+6k0s=FKA+qBV04y_wfeu7xMpUpkw@mail.gmail.com>
+Message-ID: <20121105173604.GF2005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 3, 2012 at 12:29 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+On Thu, Nov 01, 2012 at 09:40:10PM +0800, Fei Yang wrote:
+> 2012/11/1 Rob Herring <robherring2@gmail.com>:
+> > On 10/31/2012 08:24 PM, Yangfei (Felix) wrote:
+> >> The current "WFI" opcode definiton causes CPU hot-plug feature fails to
+> >> work
+> >> if the kernel is built with CONFIG_THUMB2_KERNEL/CONFIG_CPU_ENDIAN_BE8
+> >> being
+> >> defined. An invalid instruction exception will be generated.
+> >>
+> >> Signed-off-by: yangfei.kernel at gmail.com
+> >> ---
+> >>  arch/arm/mach-exynos/hotplug.c   |    8 +++++++-
+> >>  arch/arm/mach-realview/hotplug.c |    8 +++++++-
+> >>  arch/arm/mach-shmobile/hotplug.c |    8 +++++++-
+> >>  3 files changed, 21 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-exynos/hotplug.c
+> >> b/arch/arm/mach-exynos/hotplug.c
+> >> index f4d7dd2..823a0e4 100644
+> >> --- a/arch/arm/mach-exynos/hotplug.c
+> >> +++ b/arch/arm/mach-exynos/hotplug.c
+> >> @@ -18,11 +18,17 @@
+> >>  #include <asm/cacheflush.h>
+> >>  #include <asm/cp15.h>
+> >>  #include <asm/smp_plat.h>
+> >> +#include <asm/opcodes.h>
+> >>
+> >>  #include <mach/regs-pmu.h>
+> >>
+> >>  #include "common.h"
+> >>
+> >> +/*
+> >> + * Define opcode of the WFI instruction.
+> >> + */
+> >> +#define __WFI __inst_arm_thumb16(0xe320f003, 0xbf30)
+> >> +
+> >>  static inline void cpu_enter_lowpower(void)
+> >>  {
+> >>       unsigned int v;
+> >> @@ -72,7 +78,7 @@ static inline void platform_do_lowpower(unsigned int
+> >> cpu, int *spurious)
+> >>               /*
+> >>                * here's the WFI
+> >>                */
+> >> -             asm(".word      0xe320f003\n"
+> >> +             asm(__WFI
+> >
+> > Wouldn't using the actual wfi instruction fix this. There is a wfi()
+> > macro.
+> >
+> > Or just call cpu_do_idle() which will do any other things needed before
+> > wfi like a dsb instruction.
+> >
+> > Rob
+> >>                   :
+> >>                   :
+> >>                   : "memory", "cc");
+> 
+> <Cut>
+> 
+> Hi Rob,
+>     Thanks for the reply. The way you suggested is more elegant. But
+> here we worried about the version of the compiler toolchain used to
+> build the kernel. The "WFI" assembler instruction may not be
+> recognized if the toolchain is too old. Need the related ARM board
+> maintainers to confirm this.
 
->>
->> I prefer to use pinctrl-single driver instead. I'm updating mmp
->> pinctrol driver to
->> pinctrl-single driver framework. You can find them in mailist. I'm submitting
->> a third round in these days.
->>
->> Regards
->> Haojian
->
-> OK, one more question:
->
-> On PXA2xx GPIO and PINMUX are not separate blocks. Each pin can be
-> either input or output and have 4 modes (gpio + 3 alternate functions)
-> == 8 states , so we have: gpio in, gpio out, 3 alt in, 3 alt out.
-> To control pin mode one should write to GPDR (direction register) and
-> GAFR (alternate function register). pxa-gpio driver controls both of
-> those registers, so does pxa2xx-mfp.
->
-> I'm not sure what to do in this case. Should I move code controlling
-> GPDR and GAFR into some pinctrl-pxa2xx driver, and modify pxa-gpio
-> driver to use it?
->
-> Regards
-> Vasily
+Maybe all the exynos platforms are new enough for this not to be a
+problem?
 
-Daniel, Haojian, any suggestion?
+I think mach-exynos is pretty new and v7-only anyway.  If so, then it
+may be better to put
 
-I'm stuck at the moment, and have no idea how to handle it...
-pinmux/gpio are connected in hardware
-and I don't see a way to handle them with 2 separate drivers (gpio and
-pinmux) in software...
+CFLAGS_hotplug.o	:= -march=armv7-a
 
-Regards
-Vasily
+in arch/arm/mach-exynos/Makefile, and use the real "wfi" mnemonic
+directly.  People should _really_ not be building kernels containig
+v7 board support with tools that are too old to support this.
+
+Cheers
+---Dave
