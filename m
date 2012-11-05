@@ -1,23 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 5 Nov 2012 12:42:35 +0100
-Subject: [PATCH 6/6] pinctrl: sirf: enable the driver support new
- SiRFmarco SoC
-In-Reply-To: <CAGsJ_4wPVsRNZF-c=8hU-DFKuKOk5VciXJTShuT3j53pRmSb9A@mail.gmail.com>
-References: <1348739790-21253-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdYT2TZX8cchPk+H4LkdVXw861BBTn1dbnSJO-ZQVT5sdw@mail.gmail.com>
- <CAGsJ_4wqaii9=8C8rXftzjYcPa95_Djf=uOfZZEKV-zz-ky0QQ@mail.gmail.com>
- <CAGsJ_4wPVsRNZF-c=8hU-DFKuKOk5VciXJTShuT3j53pRmSb9A@mail.gmail.com>
-Message-ID: <CACRpkdbHwSfmZyt9c=EvzM3FLxgdFZwaXqzykdwNmQPFPgzMXQ@mail.gmail.com>
+Date: Mon, 5 Nov 2012 12:45:41 +0100
+Subject: [PATCH] pinctrl: nomadik: Add terminating entry for
+ platform_device_id table
+In-Reply-To: <1352043042.11324.0.camel@phoenix>
+References: <1352043042.11324.0.camel@phoenix>
+Message-ID: <CACRpkdZ57C-NJsRnHF9Td1L4dNoymGdk47vkjefBnsH=rHk2Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 4:04 PM, Barry Song <21cnbao@gmail.com> wrote:
+On Sun, Nov 4, 2012 at 4:30 PM, Axel Lin <axel.lin@ingics.com> wrote:
 
-> Hi Linus,
-> this one can be applied now. would you apply? as i have tried, now it
-> can be applied directly againest 3.7-rc3:
+> The platform_device_id table is supposed to be zero-terminated.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-Yes works like a charm, patch applied!
+Thanks Axel, patch applied.
 
-Thanks Barry,
+Yours,
 Linus Walleij
