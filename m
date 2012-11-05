@@ -1,40 +1,77 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 5 Nov 2012 12:09:10 +0100
-Subject: [GIT PULL] arm-soc: Xilinx zynq changes for v3.8
-Message-ID: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 5 Nov 2012 11:13:46 +0000
+Subject: [PATCH] ARM: decompressor: clear SCTLR.A bit for v7 cores
+In-Reply-To: <20121105104839.GA2005@linaro.org>
+References: <alpine.LFD.2.02.1210100939160.16518@xanadu.home>
+ <1349959402-24164-1-git-send-email-robherring2@gmail.com>
+ <20121025093411.GA32662@sig21.net> <50893389.2090002@gmail.com>
+ <20121025141645.GA16962@sig21.net> <50894BC2.5050706@gmail.com>
+ <20121025150816.GA3874@sig21.net> <20121105104839.GA2005@linaro.org>
+Message-ID: <20121105111346.GF28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Mon, Nov 05, 2012 at 10:48:50AM +0000, Dave Martin wrote:
+> On Thu, Oct 25, 2012 at 05:08:16PM +0200, Johannes Stezenbach wrote:
+> > On Thu, Oct 25, 2012 at 09:25:06AM -0500, Rob Herring wrote:
+> > > On 10/25/2012 09:16 AM, Johannes Stezenbach wrote:
+> > > > On Thu, Oct 25, 2012 at 07:41:45AM -0500, Rob Herring wrote:
+> > > >> On 10/25/2012 04:34 AM, Johannes Stezenbach wrote:
+> > > >>> On Thu, Oct 11, 2012 at 07:43:22AM -0500, Rob Herring wrote:
+> > > >>>
+> > > >>>> While v6 can support unaligned accesses, it is optional and current
+> > > >>>> compilers won't emit unaligned accesses. So we don't clear the A bit for
+> > > >>>> v6.
+> > > >>>
+> > > >>> not true according to the gcc changes page
+> > > >>
+> > > >> What are you going to believe: documentation or what the compiler
+> > > >> emitted? At least for ubuntu/linaro 4.6.3 which has the unaligned access
+> > > >> support backported and 4.7.2, unaligned accesses are emitted for v7
+> > > >> only. I guess default here means it is the default unless you change the
+> > > >> default in your build of gcc.
+> > > > 
+> > > > Since ARMv6 can handle unaligned access in the same way as ARMv7
+> > > > it seems a clear bug in gcc which might hopefully get fixed.
+> > > > Thus in this case I think it is reasonable to follow the
+> > > > gcc documentation, otherwise the code would break for ARMv6
+> > > > when gcc gets fixed.
+> > > 
+> > > But the compiler can't assume the state of the U bit. I think it is
+> > > still legal on v6 to not support unaligned accesses, but on v7 it is
+> > > required. All the standard v6 ARM cores support it, but I'm not sure
+> > > about custom cores or if there are SOCs with buses that don't support
+> > > unaligned accesses properly.
+> > 
+> > Well, I read the "...since Linux version 2.6.28" comment
+> > in the gcc changes page in the way that they assume the
+> > U-bit is set. (Although I'm not sure it really is???)
+> 
+> Actually, the kernel checks the arch version and the U bit on boot,
+> and chooses the appropriate setting for the A bit depending on the
+> result.  (See arch/arm/mm/alignment.c:alignment_init().)
 
-please add these patches to your arm-soc trees. All these patches are
-for xilinx zynq arm platform.
-You shouldn't have any problem to merge it there are no conficts with v3.7-rc4.
+That is in the kernel itself, _after_ the decompressor has run.  It is
+not relevant to any discussion about the decompressor.
 
-Please let me know if you find out any problem.
+> Currently, we depend on the CPU reset behaviour or firmware/
+> bootloader to set the U bit for v6, but the behaviour should be
+> correct either way, though unaligned accesses will obviously
+> perform (much) better with U=1.
 
-Thanks,
-Michal
+Will someone _PLEASE_ address my initial comments against this patch
+in light of the fact that it's now been proven _NOT_ to be just a V7
+issue, rather than everyone seemingly buring their heads in the sand
+over this.
 
-The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
-  Linus Torvalds (1):
-        Linux 3.7-rc3
+The fact is, unaligned accesses in the decompressor are *undefined* at
+present.
 
-are available in the git repository at:
+> For v7, we should definitely use -munaligned-access where available
+> (unless it's the default?)
 
-  git://git.xilinx.com/linux-xlnx.git arm-next
+No such option on my compiler - according to the manual I have, the only
+option there is starting -munaligned is on SPARC for -munaligned-doubles.
 
-Josh Cartwright (4):
-      zynq: use GIC device tree bindings
-      zynq: use pl310 device tree bindings
-      zynq: remove use of CLKDEV_LOOKUP
-      zynq: move static peripheral mappings
-
- arch/arm/Kconfig                           |    1 -
- arch/arm/Makefile                          |    1 -
- arch/arm/boot/dts/zynq-ep107.dts           |   19 +++++++++++++---
- arch/arm/mach-zynq/common.c                |   23 ++++++++-----------
- arch/arm/mach-zynq/include/mach/clkdev.h   |   32 ----------------------------
- arch/arm/mach-zynq/include/mach/zynq_soc.h |   31 +++++++++++++--------------
- 6 files changed, 40 insertions(+), 67 deletions(-)
- delete mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
+However, I believe GCC does believe that unaligned accesses are fine on
+V6 and above.
