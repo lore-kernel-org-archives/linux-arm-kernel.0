@@ -1,27 +1,26 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 5 Nov 2012 17:57:54 +0000
-Subject: [PATCH 13/15] ARM: DTS: AM33XX: Add nodes for OCMCRAM and Mailbox
-In-Reply-To: <5097D2D7.3090204@ti.com>
+Date: Mon, 5 Nov 2012 17:57:52 +0000
+Subject: [PATCH 04/15] ARM: OMAP2+: hwmod: Update the reset API for AM33XX
+In-Reply-To: <5097639C.7000800@ti.com>
 References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-14-git-send-email-vaibhav.bedia@ti.com>
- <50953E26.40906@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFFD0A@DBDE01.ent.ti.com>
- <5097D2D7.3090204@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC0337B@DBDE01.ent.ti.com>
+ <1351859566-24818-5-git-send-email-vaibhav.bedia@ti.com>
+ <5097639C.7000800@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC0336F@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 20:23:11, Shilimkar, Santosh wrote:
+On Mon, Nov 05, 2012 at 12:28:36, Hiremath, Vaibhav wrote:
 [...]
-> >
-> On OMAP the OCMC RAM is always clocked and doesn't need any special
-> clock enable. CM_L3_2_OCMC_RAM_CLKCTRL module mode field is read only.
-> Isn't it same on AMXX ?
+> > -	u32 mask = 1 << shift;
+> > -
+> > -	/* Check the current status to avoid  de-asserting the line twice */
+> > -	if (am33xx_prm_is_hardreset_asserted(shift, inst, rstctrl_offs) == 0)
+> > -		return -EEXIST;
 > 
+> Any specific reason why you have removed this check?
 
-On AM33xx, OCMC RAM is in PER domain and the corresponding CLKCLTR module
-mode fields are r/w. OCMC RAM needs to be disabled as part of the DeepSleep0
-entry to let PER domain transition.
+During bootup the hardreset line is asserted, so wouldn't that check lead
+to the function always returning without doing anything?
 
 Regards,
-Vaibhav 
+Vaibhav
