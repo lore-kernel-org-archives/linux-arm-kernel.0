@@ -1,63 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 5 Nov 2012 17:48:41 +0200
-Subject: [PATCH 3/3] ARM: OMAP: Remove plat-omap/common.c
-In-Reply-To: <20121105153632.GH4953@atomide.com>
-References: <20121101224703.2103.95474.stgit@muffinssi.local>
- <20121101224828.2103.82950.stgit@muffinssi.local> <50936A6E.3020202@ti.com>
- <5093891D.6070302@ti.com> <50938A69.9040908@ti.com>
- <20121102154901.GU15766@atomide.com> <20121102185453.GY15766@atomide.com>
- <50977319.9070902@ti.com> <20121105153632.GH4953@atomide.com>
-Message-ID: <5097DFD9.5030800@ti.com>
+From: javier.martin@vista-silicon.com (Javier Martin)
+Date: Mon,  5 Nov 2012 16:59:44 +0100
+Subject: [PATCH 1/2] ARM: i.MX27: Add platform support for IRAM.
+Message-ID: <1352131185-12079-1-git-send-email-javier.martin@vista-silicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-05 17:36, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [121105 00:06]:
->> On 2012-11-02 20:54, Tony Lindgren wrote:
->>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [121102 01:56]:
->>>>> On Friday 02 November 2012 02:19 PM, Tomi Valkeinen wrote:
->>>>>> On 2012-11-02 08:38, Santosh Shilimkar wrote:
->>>>>>>
->>>>>>> Lets not move this in DMA code since the above is really related
->>>>>>> to frame buffer. It reserves more DMA area for dma_alloc_coherent()
->>>>>>> etc than default 2 MB. Infact, we should no longer need this with
->>>>>>> CMA and memblock in place.
->>>>>>>
->>>>>>> Tomi,
->>>>>>> Can we not get rid of the above memory reservation ?
->>>>>>
->>>>>> Yes, I think so. This one is only used for the old omapfb, i.e. omap1,
->>>>>> and I have no means to test it out, though. But below is a patch to
->>>>>> remove it. I also attached the patch, as it looks like thunderbird wants
->>>>>> to reformat the pasted patch... I'll remove the
->>>>>> CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE from the omapfb driver's Kconfig file
->>>>>> in my tree later.
->>>
->>> Hmm actually, is it safe to remove for omap1, or should we
->>> still keep it around for omap1?
->>
->> Why wouldn't it be safe? Do you mean that CMA doesn't work on omap1,
->> or...? I'm no expert on CMA, but as far as I can see with it's ARM
->> generic stuff.
-> 
-> Just wondering after your comment "This one is only used for the old
-> omapfb, i.e. omap1". But sounds like it should no longer be needed
-> there either if I parse that right.
+Add support for IRAM to i.MX27 non-DT platforms using
+iram_init() function.
 
-I meant that the code that was moved in the patch "Remove
-plat-omap/common.c" is only compiled and ran on omap1, when the old
-omapfb has been enabled in the Kconfig. It's not used on omap2+.
+Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+---
+ arch/arm/mach-imx/mm-imx27.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-old omapfb uses dma_alloc_*() to allocate memory, so if CMA works on
-omap1, I think this code in question can be removed, as done in my patch.
-
- Tomi
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121105/72bf2fc7/attachment.sig>
+diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+index e7e24af..fd2416d 100644
+--- a/arch/arm/mach-imx/mm-imx27.c
++++ b/arch/arm/mach-imx/mm-imx27.c
+@@ -27,6 +27,7 @@
+ #include <asm/pgtable.h>
+ #include <asm/mach/map.h>
+ #include <mach/iomux-v1.h>
++#include <mach/iram.h>
+ 
+ /* MX27 memory map definition */
+ static struct map_desc imx27_io_desc[] __initdata = {
+@@ -94,4 +95,6 @@ void __init imx27_soc_init(void)
+ 	/* imx27 has the imx21 type audmux */
+ 	platform_device_register_simple("imx21-audmux", 0, imx27_audmux_res,
+ 					ARRAY_SIZE(imx27_audmux_res));
++	/* imx27 has an iram of 46080 bytes size */
++	iram_init(MX27_IRAM_BASE_ADDR, 46080);
+ }
+-- 
+1.7.9.5
