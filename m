@@ -1,134 +1,113 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 5 Nov 2012 15:46:17 -0600
-Subject: [PATCH v2 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC timings
- and NAND
-In-Reply-To: <50942BDC.9060806@gmail.com>
-References: <1351794970-14675-1-git-send-email-zonque@gmail.com>
- <1351794970-14675-5-git-send-email-zonque@gmail.com> <5093A36B.70101@ti.com>
- <5093AB14.9090402@gmail.com> <50941C6C.3030403@ti.com>
- <50941DC4.2050209@gmail.com> <50942590.5010202@ti.com>
- <50942BDC.9060806@gmail.com>
-Message-ID: <509833A9.8080902@ti.com>
+From: nbowler@elliptictech.com (Nick Bowler)
+Date: Mon,  5 Nov 2012 16:45:49 -0500
+Subject: =?UTF-8?q?=5BPATCH=20v3=5D=20ARM=3A=20zynq=3A=20Allow=20UART1=20to=20be=20used=20as=20DEBUG=5FLL=20console=2E?=
+Message-ID: <1352151949-18319-1-git-send-email-nbowler@elliptictech.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The main UART on the Xilinx ZC702 board is UART1, located at address
+e0001000.  Add a Kconfig option to select this device as the low-level
+debugging port.  This allows the really early boot printouts to reach
+the USB serial adaptor on this board.
 
-On 11/02/2012 03:23 PM, Daniel Mack wrote:
-> On 02.11.2012 20:57, Jon Hunter wrote:
->> On 11/02/2012 02:23 PM, Daniel Mack wrote:
->>> On 02.11.2012 20:18, Jon Hunter wrote:
->>>> On 11/02/2012 06:14 AM, Daniel Mack wrote:
-> 
->>>>>>> diff --git a/Documentation/devicetree/bindings/bus/ti-gpmc.txt b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
->>>>>>> new file mode 100644
->>>>>>> index 0000000..6f44487
->>>>>>> --- /dev/null
->>>>>>> +++ b/Documentation/devicetree/bindings/bus/ti-gpmc.txt
->>>>>>> @@ -0,0 +1,73 @@
->>>>>>> +Device tree bindings for OMAP general purpose memory controllers (GPMC)
->>>>>>> +
->>>>>>> +The actual devices are instantiated from the child nodes of a GPMC node.
->>>>>>> +
->>>>>>> +Required properties:
->>>>>>> +
->>>>>>> + - compatible:		Should be set to "ti,gpmc"
->>>>>>> + - reg:			A resource specifier for the register space
->>>>>>> +			(see the example below)
->>>>>>> + - ti,hwmods:		Should be set to "ti,gpmc" until the DT transition is
->>>>>>> +			completed.
->>>>>>> + - #address-cells:	Must be set to 2 to allow memory address translation
->>>>>>> + - #size-cells:		Must be set to 1 to allow CS address passing
->>>>>>> + - ranges:		Must be set up to reflect the memory layout
->>>>>>> +			Note that this property is not currently parsed.
->>>>>>> +			Calculated values derived from the contents of
->>>>>>> +			GPMC_CS_CONFIG7 as set up by the bootloader. That will
->>>>>>> +			change in the future, so be sure to fill the correct
->>>>>>> +			values here.
->>>>>>
->>>>>> I still think it would be good to add number of chip-selects and
->>>>>> wait-pins here.
->>>>>
->>>>> The number of chip-selects can be derived from the ranges property.
->>>>> Namely, each 4-value entry to this property maps to one chip-select. I
->>>>> can try and make the more clear in the documentation.
->>>>
->>>> Yes but that only tells you how many you are using. The binding should
->>>> describe the hardware and so should tell us how many chip-selects we
->>>> have. We should get away from using GPMC_CS_NUM in the code.
->>>
->>> Maybe I don't get your point, but we only need to care for as many cs
->>> lines as we actually use, right?
->>
->> But how many does your device have? How many clients can you support?
-> 
-> Well, you state that in the ranges property. Even if the chip could in
-> theory support 8 CS lines - if the actual setup only uses the first one
-> of them, the code would only need to allocate and set up the one that is
-> in use. And as the entries in "ranges" are mandatory, there can actually
-> be no mis-allocation.
+For consistency's sake, add a choice entry for UART0 even though it is
+the the default if UART1 is not selected.
 
-Ah, I see your point now. Well typically, we have been putting the
-device-level peripheral info in the device's *.dtsi (ie. am33xx.dtsi)
-and then board specific stuff in the board *.dts file (am335x-bone.dts).
-So I would envision that the device-level info (reg, ti,hwmods,
-interrupt, num-cs) be in am33xx.dtsi and ranges be in am335x.dts. So it
-would still be nice to catch any badly configured ranges property in the
-driver by querying in the number of chip-selects.
+Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
+Tested-by: Josh Cartwright <josh.cartwright@ni.com>
+---
+Sorry all for the phenominal delay in sending this out.  Josh, I kept
+your Tested-By since this version is Obviously Equivalent? to v2...
 
-> I can still add the maximum number as a separate property, but I wanted
-> to outline my idea here. Is "num-cs" a good name for the property?
+v2: rebase on newest patch series, signoff.
+v3: squash in style tweaks suggested by Michal Simek.
 
-Sounds good.
+ arch/arm/Kconfig.debug                     |   17 +++++++++++++++++
+ arch/arm/mach-zynq/common.c                |    6 +++---
+ arch/arm/mach-zynq/include/mach/zynq_soc.h |   16 +++++++++++-----
+ 3 files changed, 31 insertions(+), 8 deletions(-)
 
->> If we know how many the device has and then we can get rid of "#define
->> GPMC_CS_NUM". We currently allocate the CS by calling gpmc_cs_request().
->> Hmmm ... I now see that your patch is not calling this before
->> configuring the CS and so that needs to be fixed too.
-> 
-> It does implicitly, by calling gpmc_nand_init().
-
-Yes, you are right!
-
->> Without knowing the total CS available, how do we ensure we have the CS
->> available that someone is asking for?
->>
->>>> What about wait-pins?
->>>
->>> Afaik, their use depends on the driver acting as GPMC client, right?
->>> Could you point me to code that acts conditionally and that should be
->>> reflected in DT?
->>
->> Again we need to know how many the device has. Clients may or may not
->> use these. However, if a client wants one they need to request one which
->> is just like a chip-select. This is not in the current driver but Afzal
->> has a patch for this [1].
-> 
-> Ah, thanks for the pointer to the patch. Ok, I'll add a "num-waitpins"
-> property. Does that name sound appropriate?
-
-Yes, that would be great!
-
->> Bottom line, for such hardware specific features, device tree is a good
->> place to describe how many resources we have. Then we can eliminate such
->> #defines from the driver code.
-> 
-> Agreed.
-> 
->>> Quoting Documentation/devicetree/bindings/mtd/gpmc-nand.txt:
->>>
->>> 	For NAND specific properties such as ECC modes or bus width,
->>> 	please refer to Documentation/devicetree/bindings/mtd/nand.txt
->>
->> Ok, thanks I see that now. Looking at other bindings, some also include
->> these details but not all. Could be worth listing ecc-mode under
->> mandatory and bus-width under optional with a reference to nand.txt
->> binding. I don't think it is worth duplicating but listing the actual
->> property names would be nice.
-> 
-> Ok, I amended my local version. With the details above sorted out and
-> "num-cs" and "num-waitpins" in place, do you think we're ready for v4?
-
-Yes, thanks for doing this.
-
-Cheers
-Jon
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index b0f3857b3a4c..7754d51f2b19 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -132,6 +132,23 @@ choice
+ 		  their output to UART1 serial port on DaVinci TNETV107X
+ 		  devices.
+ 
++	config DEBUG_ZYNQ_UART0
++		bool "Kernel low-level debugging on Xilinx Zynq using UART0"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART0 on the Zynq platform.
++
++	config DEBUG_ZYNQ_UART1
++		bool "Kernel low-level debugging on Xilinx Zynq using UART1"
++		depends on ARCH_ZYNQ
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to UART1 on the Zynq platform.
++
++		  If you have a ZC702 board and want early boot messages to
++		  appear on the USB serial adaptor, select this option.
++
+ 	config DEBUG_DC21285_PORT
+ 		bool "Kernel low-level debugging messages via footbridge serial port"
+ 		depends on FOOTBRIDGE
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index ba8d14f78d4d..93b91059faab 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -84,9 +84,9 @@ static struct map_desc io_desc[] __initdata = {
+ 
+ #ifdef CONFIG_DEBUG_LL
+ 	{
+-		.virtual	= UART0_VIRT,
+-		.pfn		= __phys_to_pfn(UART0_PHYS),
+-		.length		= UART0_SIZE,
++		.virtual	= LL_UART_VADDR,
++		.pfn		= __phys_to_pfn(LL_UART_PADDR),
++		.length		= UART_SIZE,
+ 		.type		= MT_DEVICE,
+ 	},
+ #endif
+diff --git a/arch/arm/mach-zynq/include/mach/zynq_soc.h b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+index 1b8bf0ecbcb0..5ebbd8e6eeee 100644
+--- a/arch/arm/mach-zynq/include/mach/zynq_soc.h
++++ b/arch/arm/mach-zynq/include/mach/zynq_soc.h
+@@ -25,8 +25,9 @@
+  * address that is known to work.
+  */
+ #define UART0_PHYS		0xE0000000
+-#define UART0_SIZE		SZ_4K
+-#define UART0_VIRT		0xF0001000
++#define UART1_PHYS		0xE0001000
++#define UART_SIZE		SZ_4K
++#define UART_VIRT		0xF0001000
+ 
+ #define TTC0_PHYS		0xF8001000
+ #define TTC0_SIZE		SZ_4K
+@@ -36,12 +37,17 @@
+ #define SCU_PERIPH_SIZE		SZ_8K
+ #define SCU_PERIPH_VIRT		(TTC0_VIRT - SCU_PERIPH_SIZE)
+ 
++#if IS_ENABLED(CONFIG_DEBUG_ZYNQ_UART1)
++# define LL_UART_PADDR		UART1_PHYS
++#else
++# define LL_UART_PADDR		UART0_PHYS
++#endif
++
++#define LL_UART_VADDR		UART_VIRT
++
+ /* The following are intended for the devices that are mapped early */
+ 
+ #define TTC0_BASE			IOMEM(TTC0_VIRT)
+ #define SCU_PERIPH_BASE			IOMEM(SCU_PERIPH_VIRT)
+ 
+-#define LL_UART_PADDR	UART0_PHYS
+-#define LL_UART_VADDR	UART0_VIRT
+-
+ #endif
+-- 
+1.7.8.6
