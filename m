@@ -1,32 +1,47 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 5 Nov 2012 18:22:50 +0530
-Subject: [PATCH V3 1/3] ARM: dts: omap5-evm: Fix size of memory defined for EVM
-In-Reply-To: <1352119972-13710-1-git-send-email-lokeshvutla@ti.com>
-References: <1352119972-13710-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1352119972-13710-2-git-send-email-lokeshvutla@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 05 Nov 2012 12:55:59 +0000
+Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
+In-Reply-To: <1352108387.3212.12.camel@linaro1.home>
+References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
+ <1352108387.3212.12.camel@linaro1.home>
+Message-ID: <1352120159.10947.3.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory present for OMAP5-evm is 2GB. But in dts file
-it is specified as 1GB. Correcting the same.
+On Mon, 2012-11-05 at 09:39 +0000, Jon Medhurst (Tixy) wrote:
+> > +static void mmio_led_brightness_set(struct led_classdev *cdev,
+> > +		enum led_brightness brightness)
+> > +{
+> > +	struct mmio_led *led = container_of(cdev, struct mmio_led, cdev);
+> > +	unsigned long uninitialized_var(flags);
+> 
+> uninitialized_var seems to be a bit contentious, Linus Torvalds had a
+> recent complaint about it which prompted Ingo to post a patch proposing
+> to removing it: https://patchwork.kernel.org/patch/1655621/ So perhaps
+> best to avoid using it ;-).
+> 
+> In this case, you could possibly keep gcc quite with something like:
+> 
+>         spinlock_t *lock = led->lock;
+> 
+> and then use the local variable 'lock' everywhere instead of led->lock.
+> Or just keep it simple an initialise flags to 0 instead.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/boot/dts/omap5-evm.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Yeah, = 0 will do...
 
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
-index c663eba..88d3d9b8 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-evm.dts
-@@ -15,7 +15,7 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0x80000000 0x40000000>; /* 1 GB */
-+		reg = <0x80000000 0x80000000>; /* 2 GB */
- 	};
- 
- 	vmmcsd_fixed: fixedregulator-mmcsd {
--- 
-1.7.9.5
+> > +	if (!pdata)
+> > +		return -EINVAL;
+> > +
+> > +	if (pdata->reg_size != 8 && pdata->reg_size != 16 &&
+> > +			pdata->reg_size != 32)
+> > +		return -EFAULT;
+> 
+> Is EFAULT appropriate here? Why not EINVAL?
+
+Hm. To distinguish it from !pdata case I guess (and a 13 bit wide
+transaction sounds like a fault to me ;-), but I can be persuaded
+otherwise without much effort...
+
+Thanks!
+
+Pawe?
