@@ -1,96 +1,31 @@
-From: ivan.khoronzhuk@ti.com (Ivan Khoronzhuk)
-Date: Mon, 5 Nov 2012 12:16:57 +0200
-Subject: [PATCH] ARM: OMAP4: ID: Improve features detection and check
-Message-ID: <1352110617-3571-1-git-send-email-ivan.khoronzhuk@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 5 Nov 2012 11:38:24 +0100
+Subject: [PATCH 0/9] Pinctrl: SPEAr: Fixes for 3.7-rc3
+In-Reply-To: <cover.1351329224.git.viresh.kumar@linaro.org>
+References: <cover.1351329224.git.viresh.kumar@linaro.org>
+Message-ID: <CACRpkdZ+KhTQq+vrtoCVH2Y7fV4aT6JNzo+dL1Dg-GM8usb=Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replaces several flags bearing the same meaning. There is no need
-to set flags due to different omap types here, it can be checked
-in appropriate places as well.
+On Sat, Oct 27, 2012 at 11:17 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Acked-by: Nishanth Menon <nm@ti.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Ivan Khoronzhuk <ivan.khoronzhuk@ti.com>
----
- arch/arm/mach-omap2/id.c  |   25 +++++++------------------
- arch/arm/mach-omap2/soc.h |    8 ++------
- 2 files changed, 9 insertions(+), 24 deletions(-)
+> Hi Linus,
+>
+> This patchset fixes many errors/mistakes in current pinctrl configurations for
+> various SPEAr SoCs. Please see if they can be merged in next rc release, if they
+> look fine to you.
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index cf2362c..3c47a19 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -28,6 +28,9 @@
- #include "soc.h"
- #include "control.h"
- 
-+#define OMAP4_SILICON_TYPE_STANDARD		0x01
-+#define OMAP4_SILICON_TYPE_PERFORMANCE		0x02
-+
- static unsigned int omap_revision;
- static const char *cpu_rev;
- u32 omap_features;
-@@ -273,25 +276,11 @@ void __init omap4xxx_check_features(void)
- {
- 	u32 si_type;
- 
--	if (cpu_is_omap443x())
--		omap_features |= OMAP4_HAS_MPU_1GHZ;
--
-+	si_type =
-+	(read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1) >> 16) & 0x03;
- 
--	if (cpu_is_omap446x()) {
--		si_type =
--			read_tap_reg(OMAP4_CTRL_MODULE_CORE_STD_FUSE_PROD_ID_1);
--		switch ((si_type & (3 << 16)) >> 16) {
--		case 2:
--			/* High performance device */
--			omap_features |= OMAP4_HAS_MPU_1_5GHZ;
--			break;
--		case 1:
--		default:
--			/* Standard device */
--			omap_features |= OMAP4_HAS_MPU_1_2GHZ;
--			break;
--		}
--	}
-+	if (si_type == OMAP4_SILICON_TYPE_PERFORMANCE)
-+		omap_features = OMAP4_HAS_PERF_SILICON;
- }
- 
- void __init ti81xx_check_features(void)
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index 0700964..f31d907 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -435,9 +435,7 @@ extern u32 omap_features;
- #define OMAP3_HAS_IO_WAKEUP		BIT(6)
- #define OMAP3_HAS_SDRC			BIT(7)
- #define OMAP3_HAS_IO_CHAIN_CTRL		BIT(8)
--#define OMAP4_HAS_MPU_1GHZ		BIT(9)
--#define OMAP4_HAS_MPU_1_2GHZ		BIT(10)
--#define OMAP4_HAS_MPU_1_5GHZ		BIT(11)
-+#define OMAP4_HAS_PERF_SILICON		BIT(9)
- 
- 
- #define OMAP3_HAS_FEATURE(feat,flag)			\
-@@ -465,9 +463,7 @@ static inline unsigned int omap4_has_ ##feat(void)	\
- 	return omap_features & OMAP4_HAS_ ##flag;	\
- }							\
- 
--OMAP4_HAS_FEATURE(mpu_1ghz, MPU_1GHZ)
--OMAP4_HAS_FEATURE(mpu_1_2ghz, MPU_1_2GHZ)
--OMAP4_HAS_FEATURE(mpu_1_5ghz, MPU_1_5GHZ)
-+OMAP4_HAS_FEATURE(perf_silicon, PERF_SILICON)
- 
- #endif	/* __ASSEMBLY__ */
- 
--- 
-1.7.9.5
+First sorry for taking so long...
+
+Basically I have a hard time believeing these are regressions.
+I have applied patch 1, 2, 3 and 5 to fixes but I want an argument
+of why patch 4 and 6-9 are causing regressions in the current
+mainline kernel.
+
+I suspect they are fixing regressions in a non-mainline kernel
+which is none of our business, but convince me and I'll move
+them to the fixes branch ... I have still merged them, but aimed
+for v3.8.
+
+Yours,
+Linus Walleij
