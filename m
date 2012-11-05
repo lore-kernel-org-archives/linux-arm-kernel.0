@@ -1,75 +1,48 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Mon, 5 Nov 2012 11:03:58 +0000
-Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
- timings and NAND
-In-Reply-To: <1351869956-2787-5-git-send-email-zonque@gmail.com>
-References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
- <1351869956-2787-5-git-send-email-zonque@gmail.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 5 Nov 2012 16:36:10 +0530
+Subject: [PATCH V2 0/3] ARM: dts: omap5: EMIF and LPDDR2 device tree data
+In-Reply-To: <50979D10.1070406@ti.com>
+References: <1349959669-16366-1-git-send-email-lokeshvutla@ti.com>
+ <50975581.7010508@ti.com> <50979A14.1050805@ti.com> <50979D10.1070406@ti.com>
+Message-ID: <50979DA2.1080301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 20:55:56, Daniel Mack wrote:
-> This patch adds basic DT bindings for OMAP GPMC.
-> 
-> The actual peripherals are instanciated from child nodes within the GPMC
-> node, and the only type of device that is currently supported is NAND.
-> 
-> Code was added to parse the generic GPMC timing parameters and some
-> documentation with examples on how to use them.
-> 
-> Successfully tested on an AM33xx board.
-> 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-[...]
-> +
-> +		nand at 0,0 {
-> +			reg = <0 0 0>; /* CS0, offset 0 */
-> +			nand-bus-width = <16>;
-> +			nand-ecc-mode = "none";
-> +
-> +			gpmc,sync-clk = <0>;
-> +			gpmc,cs-on = <0>;
-> +			gpmc,cs-rd-off = <36>;
-> +			gpmc,cs-wr-off = <36>;
-> +			gpmc,adv-on = <6>;
-> +			gpmc,adv-rd-off = <24>;
-> +			gpmc,adv-wr-off = <36>;
-> +			gpmc,we-off = <30>;
-> +			gpmc,oe-off = <48>;
-> +			gpmc,access = <54>;
-> +			gpmc,rd-cycle = <72>;
-> +			gpmc,wr-cycle = <72>;
-> +			gpmc,wr-access = <30>;
-> +			gpmc,wr-data-mux-bus = <0>;
-> +
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +
+Hi Benoit,
 
-Can you take the timings (for example) from arago tree. The timings is tested in am335x-evm
-So the timings can be directly used to populate GPMC timings. Timings can found at
-
-http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;
-h=66bfbd2c5b35dc81edce0c24843c476161ab5978;hp=370630359cb8db711cf0941cd2a242e28ccfb61e
-
-[...]
-> +static int gpmc_probe_dt(struct platform_device *pdev)
-
-Can you take care of the following section mismatch.
-WARNING: vmlinux.o(.text+0x1e2d0): Section mismatch in reference
-from the function gpmc_probe_dt() to the function .init.text:gpmc_nand_init().
-
-[...]
-> +
-> +		val = of_get_nand_ecc_mode(child);
-> +		if (val >= 0)
-> +			gpmc_nand_data->ecc_opt = val;
-
-This will fail for BCH. Index of "soft_bch" is 5 & also don't have selection
-option between for BCH4 & BCH8 also.
-Can you use the of_property_read_u32 (as done early) to pass the ecc selection
-from dt file. This will help selection of BCH4 & BCH8 ecc options.
+On Monday 05 November 2012 04:33 PM, Benoit Cousson wrote:
+> On 11/05/2012 11:51 AM, Benoit Cousson wrote:
+>> Hi Lokesh,
+>>
+>> On 11/05/2012 06:58 AM, Lokesh Vutla wrote:
+>>> Hi,
+>>> On Thursday 11 October 2012 06:17 PM, Lokesh Vutla wrote:
+>>>> This patch series adds Device tree data for the EMIF
+>>>> sdram controllers in OMAP5 and LPDDR2 memory devices
+>>>> in OMAP5-evm board.
+>>>>
+>>>> Testing:
+>>>> - Boot tested on OMAP5430 evm.
+>>>> - Built EMIF as a module.
+>>>>
+>>>> Changes from v1:
+>>>> * Created a seperate dtsi file for Samsung LPDDR2 memory device
+>>>>     used in OMAP5-evm.
+>>>> * Passing reg and interrupt fields from dt for EMIF1 and EMIF2.
+>>> Gentle ping on this series.
+>>
+>> Sorry, I missed it. It might be too late for 3.8, since Tony wanted us
+>> to push before -rc4. I'll pull the series anyway just in case.
+>>
+>> I have a least one comment.
+>
+> Could you just rebase on top of the for_3.8 branch, fix the minor
+> comments and repost ASAP.
+OK I ll rebase and repost.
 
 Thanks
-Avinash
+Lokesh
+>
+> Thanks,
+> Benoit
+>
