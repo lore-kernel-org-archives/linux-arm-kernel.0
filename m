@@ -1,57 +1,47 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 5 Nov 2012 19:28:29 +0100
-Subject: [PATCH v3 0/6] DT support for AT91RM9200
-In-Reply-To: <CAGhQ9Vxek1Xju4ShRV0KZtE4gsg-KZjG=6n+B54ddEv-6v9yXA@mail.gmail.com>
-References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
- <20121104155212.GK19021@game.jcrosoft.org>
- <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
- <20121105072857.GL19021@game.jcrosoft.org>
- <CAGhQ9Vxek1Xju4ShRV0KZtE4gsg-KZjG=6n+B54ddEv-6v9yXA@mail.gmail.com>
-Message-ID: <20121105182829.GB20063@game.jcrosoft.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 5 Nov 2012 10:31:50 -0800
+Subject: [GIT PULL 2/3] omap plat header removal for v3.8 merge window,
+ part3
+In-Reply-To: <508aff60.4688e50a.0457.ffff898bSMTPIN_ADDED@mx.google.com>
+References: <pull-1351286620-406688>
+ <508aff60.4688e50a.0457.ffff898bSMTPIN_ADDED@mx.google.com>
+Message-ID: <20121105183150.GB22301@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:59 Mon 05 Nov     , Joachim Eastwood wrote:
-> On 5 November 2012 08:28, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 18:55 Sun 04 Nov     , Joachim Eastwood wrote:
-> >> On 4 November 2012 16:52, Jean-Christophe PLAGNIOL-VILLARD
-> >> <plagnioj@jcrosoft.com> wrote:
-> >> > On 19:31 Sun 28 Oct     , Joachim Eastwood wrote:
-> >> >> Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
-> >> >>
-> >> >> Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
-> >> >>
-> >> >> Patch 3 adds clock lookups for DT.
-> >> >>
-> >> >> Patch 4 adds a new board for RM9200 DT support.
-> >> >>
-> >> >> Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
-> >> >>
-> >> >>
-> >> >> I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a >>initrd. As far as I can tell pinctrl, usart and ohci all work.
-> >> >
-> >> > After updating barebox to have the DT support I've tested it on rm9200ek with net support
-> >> >
-> >> > work fine
-> >>
-> >> Excellent.
-> >>
-> >> > It does not apply on my tree as I've a more patch but I'll manage the merge
-> >> > conflict
-> >>
-> >>  Thanks for fixing it up Jean-Christophe.
-> > I'll also fix the usb device and add missing nor flash support and emac +
-> > pinctrl + defconfig
+On Fri, Oct 26, 2012 at 02:23:40PM -0700, Tony Lindgren wrote:
+> The following changes since commit 3d82cbbb3aadb4f8a30e3f614e51be96574a0855:
 > 
-> Very nice.
+>   ARM: OMAP: Split plat/serial.h for omap1 and omap2+ (2012-10-24 13:34:31 -0700)
 > 
-> Please make the changes available via a git tree when it's ready.
-for at91 the official git is on github
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-headers-part3-signed
+> 
+> for you to fetch changes up to a0212796b58061a9716178d261f318925c246643:
+> 
+>   Merge tag 'omap-cleanup-fixes-a-for-3.8' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.8/cleanup-headers (2012-10-26 13:18:19 -0700)
+> 
+> ----------------------------------------------------------------
+> 
+> Here is the third set of plat header removal for omap2+.
+> 
+> This is based on the following minimal topic branches
+> coordinated with the related driver maintainers:
+> 
+> omap-for-v3.8/cleanup-headers-usb
+> omap-for-v3.8/cleanup-headers-menelaus
+> 
+> In addition to that, there are few fixes to the previously
+> merged patches that can show up with customized configs.
 
-I've to send some patch series
+Thanks, I pulled in the two branches above as explicit dependencies, and
+resolved the conflicts the same way you did.
 
-I'll put them in our next
+New branches are:
 
-Best Regards,
-J.
+depends/omap-cleanup-headers-menelaus
+depends/omap-cleanup-headers-usb
+omap/cleanup-headers-3
+
+-Olof
