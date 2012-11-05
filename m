@@ -1,27 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 5 Nov 2012 09:42:04 +0000
-Subject: [PATCH 1/1 v2] usb: at91_udc: fix typo on vubs pullup valid check
-In-Reply-To: <20121105093451.GA20063@game.jcrosoft.org>
-References: <20121105093451.GA20063@game.jcrosoft.org>
-Message-ID: <20121105094204.GD28327@n2100.arm.linux.org.uk>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Mon, 5 Nov 2012 15:12:25 +0530
+Subject: [PATCH 0/4] pm: Add power off control
+Message-ID: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject: usb: at91_udc: fix typo on vubs pullup valid check
-                                    ^^^^
-typo.
+Add PM power_off control to rtc driver, along with this PMIC status
+is set to STATUS_OFF to shutdown PMIC if PWR_EN is toggled by RTC
+module.
 
-On Mon, Nov 05, 2012 at 10:34:52AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> if the gpio is not valid complain
-> 
-> since 3285e0ec088febc5a88f57ddd78385a7da71476c
-> ARM: at91/udc: use gpio_is_valid to check the gpio
+System power off sequence:-
+* Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+* Enable PMIC_POWER_EN in rtc module
+* Set rtc ALARM2 time
+* Enable ALARM2 interrupt
 
-Poor description.
+These patches were tested on AM335x-Bone.
 
-"The check for a valid vbus pullup gpio in commit 3285e0ec088f (ARM: at91/udc:
-use gpio_is_valid to check the gpio) is inverted.  Fix this."
+AnilKumar Ch (2):
+  ARM: dts: AM33XX: Set pmic-shutdown-controller for BeagleBone
+  ARM: dts: AM33XX: Enable system power off control in am335x-bone
 
-would be much better because it describes what the the actual problem is.
-Your description could mean that it's missing the error return path, or
-maybe you're adding a log message to the failure case, or...
+Colin Foe-Parker (2):
+  mfd: tps65217: Set PMIC to shutdowm on PWR_EN toggle
+  rtc: OMAP: Add system pm_power_off to rtc driver
+
+ .../devicetree/bindings/regulator/tps65217.txt     |    4 +
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+ arch/arm/boot/dts/am335x-bone.dts                  |    6 ++
+ drivers/mfd/tps65217.c                             |   12 +++
+ drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
+ 5 files changed, 105 insertions(+), 1 deletion(-)
+
+-- 
+1.7.9.5
