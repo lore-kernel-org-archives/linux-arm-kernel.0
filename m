@@ -1,22 +1,51 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Mon, 5 Nov 2012 17:57:53 +0000
-Subject: [PATCH 06/15] ARM: OMAP2+: hwmod: Enable OCMCRAM registration
- in AM33XX
-In-Reply-To: <5097698F.1080609@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
- <5097698F.1080609@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC03374@DBDE01.ent.ti.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 5 Nov 2012 18:59:51 +0100
+Subject: [PATCH v3 0/6] DT support for AT91RM9200
+In-Reply-To: <20121105072857.GL19021@game.jcrosoft.org>
+References: <1351449071-5763-1-git-send-email-manabian@gmail.com>
+ <20121104155212.GK19021@game.jcrosoft.org>
+ <CAGhQ9VzWxhM7QitutizN3WB6w-bDTDia9Bo6xNQ_F0runJMiqQ@mail.gmail.com>
+ <20121105072857.GL19021@game.jcrosoft.org>
+Message-ID: <CAGhQ9Vxek1Xju4ShRV0KZtE4gsg-KZjG=6n+B54ddEv-6v9yXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 12:53:59, Hiremath, Vaibhav wrote:
-> 
-> Can you cut-n-paste the ocmcram hwmod entry outside of #if and resubmit
-> it again?
-> 
+On 5 November 2012 08:28, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 18:55 Sun 04 Nov     , Joachim Eastwood wrote:
+>> On 4 November 2012 16:52, Jean-Christophe PLAGNIOL-VILLARD
+>> <plagnioj@jcrosoft.com> wrote:
+>> > On 19:31 Sun 28 Oct     , Joachim Eastwood wrote:
+>> >> Patch 1 is a fix for a build failure which can happen if board-dt is enabled when no AT91SAM machines are enabled.
+>> >>
+>> >> Patch 2 adds DT support to the AT91RM9200 system timer. Based on AT91 PIT patch by Jean-Christophe PLAGNIOL-VILLARD.
+>> >>
+>> >> Patch 3 adds clock lookups for DT.
+>> >>
+>> >> Patch 4 adds a new board for RM9200 DT support.
+>> >>
+>> >> Patch 5-6 adds the base devicetree for AT91RM9200 and support for AT91RM9200-EK board.
+>> >>
+>> >>
+>> >> I don't have a AT91RM9200-EK to test on but I was able to boot at91rm9200ek.dts on my custom board using a >>initrd. As far as I can tell pinctrl, usart and ohci all work.
+>> >
+>> > After updating barebox to have the DT support I've tested it on rm9200ek with net support
+>> >
+>> > work fine
+>>
+>> Excellent.
+>>
+>> > It does not apply on my tree as I've a more patch but I'll manage the merge
+>> > conflict
+>>
+>>  Thanks for fixing it up Jean-Christophe.
+> I'll also fix the usb device and add missing nor flash support and emac +
+> pinctrl + defconfig
 
-Ok. Will do that in the next version.
+Very nice.
 
-Regards,
-Vaibhav 
+Please make the changes available via a git tree when it's ready.
+
+
+regards
+Joachim Eastwood
