@@ -1,47 +1,68 @@
-From: samuel.ortiz@intel.com (Samuel Ortiz)
-Date: Tue, 6 Nov 2012 23:24:03 +0100
-Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
-In-Reply-To: <CAOMZO5CXtOT7pi6hOOwYxxthTfDZYcYe5QFTnGR=L_S82NM_Lg@mail.gmail.com>
-References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <11987916.rOoNGcb1ly@dev1>
- <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
- <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
- <20121004135130.GC5554@sortiz-mobl>
- <CAOMZO5CXtOT7pi6hOOwYxxthTfDZYcYe5QFTnGR=L_S82NM_Lg@mail.gmail.com>
-Message-ID: <20121106222401.GA17580@sortiz-mobl>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Tue, 06 Nov 2012 23:30:44 +0100
+Subject: scheduler clock for MXS
+In-Reply-To: <20121106202038.GB32398@n2100.arm.linux.org.uk>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <5098CB9F.9030401@meduna.org>
+ <20121106134630.GD27643@S2100-06.ap.freescale.net>
+ <20121106202038.GB32398@n2100.arm.linux.org.uk>
+Message-ID: <50998F94.8000908@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On 06.11.2012 21:20, Russell King - ARM Linux wrote:
 
-On Sat, Oct 27, 2012 at 05:19:11PM -0200, Fabio Estevam wrote:
-> Hi Samuel,
+>> With the change, it still wraps at 2 seconds.
 > 
-> On Thu, Oct 4, 2012 at 10:51 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
-> 
-> >> I want to add mc34708 support to mx53qsb and need this series to be applied.
-> > I understand. I'll queue it to my for-next branch as soon as the merge window
-> > is closed.
-> 
-> Could you please queue this series? I still do not see it applied in
-> your 'for-next-merge' branch.
-Patches 6 and 7 were not applied from this serie. I now applied them to my
-for-next branch.
+> And there's no way that such a change could ever go into mainline; it
+> can mean that the timer is registered into the timer subsystem before
+> the timer subsystem has been initialised.  That's why we postpone that
+> part to time_init().
 
-Cheers,
-Samuel.
+Sure, I just wanted to quick-check whether it helps or not, this was
+not meant as a solution for anything.
 
+This gets interesting. The same code on slightly different hardware
+(but using same source files), just 32-bits so it wraps around after
+~1,5 days:
+
+sched_clock: 32 bits at 32kHz, resolution 31250ns,
+  wraps every 134217727ms
+
+works without problem here:
+  [134919.008468] PHY: imx28-fec-1:00 - Link is Up - 100/Full
+
+(134919 > 134217).
+
+The only difference is 32 bits instead of 16 and a different
+function to read the hardware.
+
+> Well.  I just tried an experiment with OMAP4:
+> [    0.000000] sched_clock: 16 bits at 32kHz, resolution 30517ns,
+wraps every 1999ms
+> ...
+> [    3.070404] Freeing init memory: 192K
+
+
+OK, so it is not a 16-bit problem either. So where is the
+difference? Could it be that HZ / NO_HZ is playing some
+tricks here and need to be taken into consideration?
+
+I'll try to artificially limit the counter-reading function
+on my hardware to 16 bits and look whether I can also
+reproduce this - probably on Thursday or Friday earliest
+(busy with other tasks now).
+
+If it works I'll resubmit for only the iMX.28 and someone
+who actually has the iMX.23 hardware to experiment with has
+to look at it; the best start is probably to start with
+comparing it to the working OMAP4. If it does not I'll
+try to find the culprit.
+
+Thanks
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
----------------------------------------------------------------------
-Intel Corporation SAS (French simplified joint stock company)
-Registered headquarters: "Les Montalets"- 2, rue de Paris, 
-92196 Meudon Cedex, France
-Registration Number:  302 456 199 R.C.S. NANTERRE
-Capital: 4,572,000 Euros
-
-This e-mail and any attachments may contain confidential material for
-the sole use of the intended recipient(s). Any review or distribution
-by others is strictly prohibited. If you are not the intended
-recipient, please contact the sender and delete all copies.
+                                    Stano
