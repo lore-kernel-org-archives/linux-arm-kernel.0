@@ -1,48 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Nov 2012 17:33:44 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <20121106122011.GE29853@mudshark.cambridge.arm.com>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211051908.34291.arnd@arndb.de>
- <20121106122011.GE29853@mudshark.cambridge.arm.com>
-Message-ID: <201211061733.44781.arnd@arndb.de>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 06 Nov 2012 12:41:33 -0500 (EST)
+Subject: [PATCH 15/16] mm: use vm_unmapped_area() on sparc32 architecture
+In-Reply-To: <5098BC7F.7090702@redhat.com>
+References: <1352155633-8648-16-git-send-email-walken@google.com>
+ <20121105.202501.1246122770431623794.davem@davemloft.net>
+ <5098BC7F.7090702@redhat.com>
+Message-ID: <20121106.124133.1287008316099748150.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012, Will Deacon wrote:
-> > ARCH_MULTIPLATFORM
-> >       bool "Allow multiple platforms to be selected"
-> >       select ARM_PATCH_PHYS_VIRT if !MMU
-> >       select AUTO_ZRELADDR if !MMU
+From: Rik van Riel <riel@redhat.com>
+Date: Tue, 06 Nov 2012 02:30:07 -0500
+
+> On 11/05/2012 08:25 PM, David Miller wrote:
+>> From: Michel Lespinasse <walken@google.com>
+>> Date: Mon,  5 Nov 2012 14:47:12 -0800
+>>
+>>> Update the sparc32 arch_get_unmapped_area function to make use of
+>>> vm_unmapped_area() instead of implementing a brute force search.
+>>>
+>>> Signed-off-by: Michel Lespinasse <walken@google.com>
+>>
+>> Hmmm...
+>>
+>>> -	if (flags & MAP_SHARED)
+>>> -		addr = COLOUR_ALIGN(addr);
+>>> -	else
+>>> -		addr = PAGE_ALIGN(addr);
+>>
+>> What part of vm_unmapped_area() is going to duplicate this special
+>> aligning logic we need on sparc?
+>>
 > 
-> you mean if MMU, right?
-
-Yes.
-
-> > but maybe those actually work without MMU as well. I have never looked too
-> > closely at NOMMU configurations, every time I tried, they were broken in
-> > combination with something else I wanted to enable.
+> That would be this part:
 > 
-> ARM_PATCH_PHYS_VIRT wouldn't make any sense, but I can't see why
-> AUTO_ZRELADDR wouldn't be ok.
+> +found:
+> + /* We found a suitable gap. Clip it with the original low_limit. */
+> +	if (gap_start < info->low_limit)
+> +		gap_start = info->low_limit;
+> +
+> +	/* Adjust gap address to the desired alignment */
+> + gap_start += (info->align_offset - gap_start) & info->align_mask;
+> +
+> +	VM_BUG_ON(gap_start + info->length > info->high_limit);
+> +	VM_BUG_ON(gap_start + info->length > gap_end);
+> +	return gap_start;
+> +}
 
-Ok.
+Ok, now I understand.  Works for me:
 
-> nommu-XIP kernels are a different kettle
-> of fish, but we don't care about a decompressor there.
-
-XIP is only supported on ARCH_PXA and ARCH_SA1100. I don't see either
-of them moving to CONFIG_MULTIPLATFORM any time soon, given how much
-work that would be. ARCH_MMP should be possible in the future, but
-has never supported XIP so far.
-
-> The real problem will hit with things like CONFIG_DRAM_BASE, where !MMU
-> can't realistically support multiple platforms, so allowing
-> ARCH_MULTIPLATFORM doesn't feel quite right either...
-
-Anybody who wants to build a !MMU kernel already needs to tweak the
-configuration quite a lot and usually knows more about the system than
-a typical end user. Having to pick the correct DRAM_BASE probably
-isn't too bad in that case, as long as the kernels actually build.
-
-	Arnd
+Acked-by: David S. Miller <davem@davemloft.net>
