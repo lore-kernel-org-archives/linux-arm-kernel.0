@@ -1,48 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 6 Nov 2012 12:39:08 +0100
-Subject: [RFC patch v3 3/4] ASoC: atmel-ssc-dai: register dai and pcm
- directly
-In-Reply-To: <5098D930.8030403@atmel.com>
-References: <1352181474-19597-1-git-send-email-voice.shen@atmel.com>
- <1352181474-19597-3-git-send-email-voice.shen@atmel.com>
- <20121106084814.GC5044@opensource.wolfsonmicro.com>
- <5098D930.8030403@atmel.com>
-Message-ID: <20121106113908.GC10080@opensource.wolfsonmicro.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 06 Nov 2012 20:43:08 +0900
+Subject: [PATCH] ARM: Exynos: remove unused init_uarts callback for
+ exynos4x12 platforms
+In-Reply-To: <1352125973-24228-1-git-send-email-thomas.abraham@linaro.org>
+References: <1352125973-24228-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <0bf001cdbc13$e4816c20$ad844460$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 05:32:32PM +0800, Bo Shen wrote:
-> On 11/6/2012 16:48, Mark Brown wrote:
-> >On Tue, Nov 06, 2012 at 01:57:53PM +0800, Bo Shen wrote:
+Thomas Abraham wrote:
+> 
+> All the Exynos4x12 based platforms use only device tree based boot. So
+> remove
+> the unused 'init_uarts' callback from exynos cpu_ids table.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+>  arch/arm/mach-exynos/common.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> index 56844d1..ce91cba 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -78,7 +78,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.idmask		= EXYNOS4_CPU_MASK,
+>  		.map_io		= exynos4_map_io,
+>  		.init_clocks	= exynos4_init_clocks,
+> -		.init_uarts	= exynos_init_uarts,
+>  		.init		= exynos_init,
+>  		.name		= name_exynos4212,
+>  	}, {
+> @@ -86,7 +85,6 @@ static struct cpu_table cpu_ids[] __initdata = {
+>  		.idmask		= EXYNOS4_CPU_MASK,
+>  		.map_io		= exynos4_map_io,
+>  		.init_clocks	= exynos4_init_clocks,
+> -		.init_uarts	= exynos_init_uarts,
+>  		.init		= exynos_init,
+>  		.name		= name_exynos4412,
+>  	}, {
+> --
+> 1.6.6.rc2
 
-> >No, this isn't converting things to device tree which presumably is the
-> >goal here and obviously just doing the rename doesn't accomplish an
-> >enormous amount.  What I said was that you should instantiate the ASoC
-> >adaption when the machine driver needs to use them.  You shouldn't even
-> >need a separate device for this.
+Yes, correct. Applied.
 
-> Maybe this is not the best solution, but just abstract audio as a
-> separate device. The other's still keep as a ssc library.
+Thanks.
 
-It's not abstracting things, that's the whole problem.  It's putting the
-internals of how the Linux audio stack is organised into the device
-tree.  The point is that the SSC should be a library to all users.
-
-> >Please do look at other platforms with similar hardware and do something
-> >similar to them.
-
-> I take some reference (e.g: freescale, marvell, invidia soc, this
-> RFC implement is similar with them), but don't find the similar
-> hardware with us. Please help provide the information who's HW is
-> similar with us. Thanks.
-
-A *huge* range of SoCs have generic serial ports - off the top of my
-head this includes at least OMAP, PXA and Freescale.  The same issue
-also applies to DMA controllers which affects almost all SoCs.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/d18e41e4/attachment.sig>
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
