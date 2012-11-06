@@ -1,37 +1,18 @@
 From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 6 Nov 2012 14:38:19 -0800
-Subject: [PATCH 07/16] mm: fix cache coloring on x86_64 architecture
-In-Reply-To: <1352155633-8648-8-git-send-email-walken@google.com>
+Date: Tue, 6 Nov 2012 14:38:26 -0800
+Subject: [PATCH 09/16] mm: use vm_unmapped_area() in hugetlbfs on i386
+ architecture
+In-Reply-To: <1352155633-8648-10-git-send-email-walken@google.com>
 References: <1352155633-8648-1-git-send-email-walken@google.com>
- <1352155633-8648-8-git-send-email-walken@google.com>
-Message-ID: <20121106143819.4309031c.akpm@linux-foundation.org>
+ <1352155633-8648-10-git-send-email-walken@google.com>
+Message-ID: <20121106143826.dc3b960c.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Nov 2012 14:47:04 -0800
+On Mon,  5 Nov 2012 14:47:06 -0800
 Michel Lespinasse <walken@google.com> wrote:
 
-> Fix the x86-64 cache alignment code to take pgoff into account.
-> Use the x86 and MIPS cache alignment code as the basis for a generic
-> cache alignment function.
-> 
-> The old x86 code will always align the mmap to aliasing boundaries,
-> even if the program mmaps the file with a non-zero pgoff.
-> 
-> If program A mmaps the file with pgoff 0, and program B mmaps the
-> file with pgoff 1. The old code would align the mmaps, resulting in
-> misaligned pages:
-> 
-> A:  0123
-> B:  123
-> 
-> After this patch, they are aligned so the pages line up:
-> 
-> A: 0123
-> B:  123
+> Update the i386 hugetlb_get_unmapped_area function to make use of
+> vm_unmapped_area() instead of implementing a brute force search.
 
-We have a bit of a history of fiddling with coloring and finding that
-the changes made at best no improvement.  Or at least, that's my
-perhaps faulty memory of it.
-
-This one needs pretty careful testing, please.
+The x86_64 coloring "fix" wasn't copied into i386?
