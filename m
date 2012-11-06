@@ -1,63 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2012 10:12:29 +0000
-Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
- SCHED_TRACER depends on HZ]
-In-Reply-To: <20121106024052.GA27643@S2100-06.ap.freescale.net>
-References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
- <20121105025753.GA26528@S2100-06.ap.freescale.net>
- <50978370.9060001@meduna.org>
- <20121105134655.GB27260@S2100-06.ap.freescale.net>
- <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
- <20121106024052.GA27643@S2100-06.ap.freescale.net>
-Message-ID: <20121106101229.GN28327@n2100.arm.linux.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 6 Nov 2012 15:48:40 +0530
+Subject: [PATCH v3 05/11] clk: davinci - add dm644x clock initialization
+In-Reply-To: <5097DE82.2090701@ti.com>
+References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
+ <1351181518-11882-6-git-send-email-m-karicheri2@ti.com>
+ <50951C81.5050501@ti.com> <5097DE82.2090701@ti.com>
+Message-ID: <5098E400.4000204@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 10:40:54AM +0800, Shawn Guo wrote:
-> Here is the boot log on my imx23 board after applying both Stanislav's
-> and Katsuki's patches.
+On 11/5/2012 9:12 PM, Murali Karicheri wrote:
+> On 11/03/2012 09:30 AM, Sekhar Nori wrote:
+>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
+>>> This patch adds dm644x clock initialization code that consists of
+>>> clocks data for various clocks and clock register callouts to
+>>> various clock drivers. It uses following clk drivers for this
+>>>
+>>>   1. clk-fixed-rate - for ref clock
+>>>   2. clk-mux - for mux at the input and output of main pll
+>>>   3. davinci specific clk-pll for main pll clock
+>>>   4. davinci specific clk-div for pll divider clock
+>>>   5. clk-fixed-factor for fixed factor clock such as auxclk
+>>>   6. davinci specific clk-psc for psc clocks
+>>>
+>>> This patch also moves all of the PLL and PSC register definitions
+>>> from clock.h and psc.h under davinci to the clk/davinci folder so
+>>> that various soc specific clock initialization code can share these
+>>> definitions.
+>> Except this patch does not move the defines, it creates a copy of them
+>> (which is bad since you quickly lose track of which is the correct
+>> copy). Is this done to avoid including mach/ header files here?
+> Yes.
+>> It will
+>> actually be better to include the mach/ files here as a temporary
+>> solution and then remove the include mach/ files once all the SoCs have
+>> been converted over.
 > 
-> [    0.000000] Booting Linux on physical CPU 0
-> [    0.000000] Linux version 3.7.0-rc1-00012-ga31941d (r65073 at S2101-09) (gcc ver
-> sion 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) ) #756 Tue Nov 6 10:04:30 CST 2012
-> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
-> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
-> [    0.000000] Machine: Freescale i.MX23 (Device Tree), model: Freescale i.MX23
-> Evaluation Kit
-> [    0.000000] Memory policy: ECC disabled, Data cache writeback
-> [    0.000000] On node 0 totalpages: 32768
-> [    0.000000] free_area_init_node: node 0, pgdat c051ada8, node_mem_map c0a7000
-> 0
-> [    0.000000]   Normal zone: 256 pages used for memmap
-> [    0.000000]   Normal zone: 0 pages reserved
-> [    0.000000]   Normal zone: 32512 pages, LIFO batch:7
-> [    0.000000] pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
-> [    0.000000] pcpu-alloc: [0] 0
-> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pag
-> es: 32512
-> [    0.000000] Kernel command line: console=ttyAMA0,115200 debug earlyprintk roo
-> t=/dev/mmcblk0p3 rw rootwait no_console_suspend
-> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
-> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
-> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
-> [    0.000000] Memory: 128MB = 128MB total
-> [    0.000000] Memory: 119200k/119200k available, 11872k reserved, 0K highmem
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-> [    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
-> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
-> [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
-> [    0.000000]       .text : 0xc0008000 - 0xc04bf150   (4829 kB)
-> [    0.000000]       .init : 0xc04c0000 - 0xc04e29cc   ( 139 kB)
-> [    0.000000]       .data : 0xc04e4000 - 0xc051d5c0   ( 230 kB)
-> [    0.000000]        .bss : 0xc051d5e4 - 0xc0a6ce38   (5439 kB)
-> [    0.000000] SLUB: Genslabs=13, HWalign=32, Order=0-3, MinObjects=0, CPUs=1, N
-> odes=1
-> [    0.000000] NR_IRQS:16 nr_irqs:16 16
-> [    0.000000] of_irq_init: children remain, but no parents
-> [    0.000000] sched_clock: 16 bits at 32kHz, resolution 31250ns, wraps every 20
-> 47ms
+> I was thinking we are not allowed to include mach/* header files in
+> driver files. But most of the clk drivers
+> such clk-imx28, spear6xx_clock.c. versatile/clk-integrator.c etc are
+> including mach/ headers. One issue is that the definitions in pll.h are
+> re-usable across other machines falling under c6x and Keystone (new
+> device we are working on) as well. Where do we keep includes that can be
+> re-used across different architectures? include/linux/platform_data/ ?
 
-So where are you setting this up?  My guess is it's after time_init()
-has done its stuff.
+In this case, it is not really platform data or even an interface for
+drivers to use, so I prefer include/linux/clk/davinci-pll.h
+
+> I
+> see clk-integrator.h, clk-nomadik.h and clk-u300 sitting there. So I
+> suggest moving any header files that defines utility functions, register
+> definitions across different architectures to
+> include/linux/platform_data. Candidate files would be clock.h, pll.h,
+> clk-psc.h, clk-pll.h and clk-div.h. This way these can be used across
+
+It is not clear to me why you would move these files outside of
+drivers/clk/davinci. They are not used by any other code outside of this
+directory.
+
+> the above machines that use the above architectures. Can we do this in
+> my next version? This way we don't have to make another move later. All
+> these CLK IPs are re-used across multiple architectures and make perfect
+> sense to me to move to the above folder.
+
+Thanks,
+Sekhar
