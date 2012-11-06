@@ -1,71 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2012 21:50:44 +0000
-Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
-In-Reply-To: <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Tue, 6 Nov 2012 21:52:27 +0000
+Subject: [RFC PATCH 2/4] ARM: kernel: add cpu logical map DT init in
+ setup_arch
+In-Reply-To: <1350393709-23546-3-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20121106215044.GB21764@mudshark.cambridge.arm.com>
+ <1350393709-23546-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20121106215227.GC21764@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 02:21:45PM +0100, Lorenzo Pieralisi wrote:
-> When booting through a device tree, the kernel cpu logical id map can be
-> initialized using device tree data passed by FW or through an embedded blob.
+On Tue, Oct 16, 2012 at 02:21:46PM +0100, Lorenzo Pieralisi wrote:
+> As soon as the device tree is unflattened the cpu logical to physical
+> mapping is carried out in setup_arch to build a proper array of MPIDR and
+> corresponding logical indexes.
 > 
-> This patch adds a function that parses device tree "cpu" nodes and
-> retrieves the corresponding CPUs hardware identifiers (MPIDR).
-> It sets the possible cpus and the cpu logical map values according to
-> the number of CPUs defined in the device tree and respective properties.
+> The mapping could have been carried out using the flattened DT blob and
+> related primitives, but since the mapping is not needed by early boot
+> code it can safely be executed when the device tree has been uncompressed to
+> its tree data structure.
 > 
-> The primary CPU is assigned cpu logical number 0 to keep the current
-> convention valid.
+> This patch adds the arm_dt_init_cpu maps() function call in setup_arch().
 > 
-> Current bindings documentation is included in the patch:
-> 
-> Documentation/devicetree/bindings/arm/cpus.txt
+> If the kernel is not compiled with DT support the function is empty and
+> no logical mapping takes place through it; the mapping carried out in
+> smp_setup_processor_id() is left unchanged.
+> If DT is supported the mapping created in smp_setup_processor_id() is overriden.
+> The DT mapping also sets the possible cpus mask, hence platform
+> code need not set it again in the respective smp_init_cpus() functions.
 > 
 > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/kernel/setup.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index da1d1aa..20c530b 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -758,6 +758,7 @@ void __init setup_arch(char **cmdline_p)
+>  
+>  	unflatten_device_tree();
+>  
+> +	arm_dt_init_cpu_maps();
+>  #ifdef CONFIG_SMP
+>  	if (is_smp()) {
+>  		smp_set_ops(mdesc->smp);
+> -- 
+> 1.7.12
 
-[...]
-
-> +void __init arm_dt_init_cpu_maps(void)
-> +{
-> +	struct device_node *dn = NULL;
-> +	int i, cpu = 1;
-> +
-> +	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
-> +		const u32 *hwid;
-> +		int len;
-> +
-> +		pr_debug("  * %s...\n", dn->full_name);
-> +
-> +		hwid = of_get_property(dn, "reg", &len);
-> +
-> +		if (!hwid || len != 4) {
-> +			pr_err("  * %s missing reg property\n", dn->full_name);
-> +			continue;
-> +		}
-> +		/*
-> +		 * We want to assign the boot CPU logical id 0.
-> +		 * Boot CPU checks its own MPIDR and if matches the current
-> +		 * cpu node "reg" value it sets the logical cpu index to 0
-> +		 * and stores the physical id accordingly.
-> +		 * If MPIDR does not match, assign sequential cpu logical
-> +		 * id (starting from 1) and increments it.
-> +		 */
-> +		i = (be32_to_cpup(hwid) == (read_cpuid_mpidr() & 0xffffff))
-> +							? 0 : cpu++;
-> +
-> +		if (!i)
-> +			printk(KERN_INFO "Booting Linux on CPU HWID 0x%x\n",
-> +					be32_to_cpup(hwid));
-
-I don't think we should bother with this print -- we already print something
-in smp_setup_processor_id, which cannot differ for the boot CPU, If you want
-the full mpidr, we could change that code to include it as well.
-
-We might also want some sanity checking that we do indeed end up with
-logical id 0 for the boot CPU. If not, I think we should scream and fall
-back on the simple mapping created earlier.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
 Will
