@@ -1,50 +1,35 @@
 From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 06 Nov 2012 15:47:36 -0800
-Subject: [GIT PULL] OMAP: PM: misc. fixes for v3.8
-Message-ID: <877gpy2t0n.fsf@deeprootsystems.com>
+Date: Tue, 06 Nov 2012 15:49:14 -0800
+Subject: [GIT PULL] OMAP: PM: cleanups for v3.8
+Message-ID: <87zk2u1edh.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tony,
 
-Here's a small series that fixes some errata to make suspend/resume
-work on OMAP4460.
-
-This is not a regression and has been broken for awhile, so this is v3.8
-material, not v3.7.
+Here is some PM related cleanup targetted for v3.8.
 
 Kevin
 
-The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
 
-  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+
+  Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.8-fixes-pm
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.8-cleanup-pm
 
-for you to fetch changes up to cd8ce159031813eb870a5f3d5b27c3be36cd6e3a:
+for you to fetch changes up to 9bb053787d5ca12ec388bb5f871c79ffb83762ab:
 
-  ARM: OMAP4: retrigger localtimers after re-enabling gic (2012-11-05 14:26:43 -0800)
-
-----------------------------------------------------------------
-Some non-regression fixes for OMAP4460 PM support.
+  ARM: OMAP2+: PM: VP: minor pr_warn updates (2012-10-25 14:32:34 -0700)
 
 ----------------------------------------------------------------
-Colin Cross (1):
-      ARM: OMAP4: retrigger localtimers after re-enabling gic
+Minor pr_warn() cleanup for OMAP2+ Voltage Processor (VP)
 
-Santosh Shilimkar (1):
-      ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC control register change.
+----------------------------------------------------------------
+Nishanth Menon (1):
+      ARM: OMAP2+: PM: VP: minor pr_warn updates
 
-Tero Kristo (1):
-      ARM: OMAP4: PM: add errata support
-
- arch/arm/mach-omap2/common.h              |  4 +++
- arch/arm/mach-omap2/omap-headsmp.S        | 38 ++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap-mpuss-lowpower.c |  9 ++++++-
- arch/arm/mach-omap2/omap-smp.c            | 39 +++++++++++++++++++++++++++-
- arch/arm/mach-omap2/omap4-common.c        | 42 ++++++++++++++++++++++++++++++-
- arch/arm/mach-omap2/pm.h                  |  9 +++++++
- arch/arm/mach-omap2/pm44xx.c              |  1 +
- 7 files changed, 139 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/vp.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
