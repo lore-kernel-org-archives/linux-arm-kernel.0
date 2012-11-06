@@ -1,28 +1,30 @@
 From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Tue,  6 Nov 2012 12:23:42 +0900
-Subject: [PATCH v2 1/4] ARM: shmobile: Remove G3EVM machine support
-Message-ID: <1352172225-865-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Date: Tue,  6 Nov 2012 12:23:44 +0900
+Subject: [PATCH v2 3/4] ARM: shmobile: Remove G4EVM machine support
+In-Reply-To: <1352172225-865-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+References: <1352172225-865-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+Message-ID: <1352172225-865-3-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This machine is using old CPU of shmobile (SH7367) and cannot obtain
+This machine is using old CPU of shmobile (sh7377) and cannot obtain
 machine, either.
-Therefore, remove G3EVM support.
+Therefore, remove G4EVM support.
 
 Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 ---
- arch/arm/configs/g3evm_defconfig     |   57 ------
- arch/arm/mach-shmobile/Kconfig       |    7 -
+ arch/arm/configs/g4evm_defconfig     |   57 -----
+ arch/arm/mach-shmobile/Kconfig       |    9 +-
  arch/arm/mach-shmobile/Makefile      |    1 -
- arch/arm/mach-shmobile/board-g3evm.c |  343 ----------------------------------
- 4 files changed, 408 deletions(-)
- delete mode 100644 arch/arm/configs/g3evm_defconfig
- delete mode 100644 arch/arm/mach-shmobile/board-g3evm.c
+ arch/arm/mach-shmobile/board-g4evm.c |  384 ----------------------------------
+ 4 files changed, 1 insertion(+), 450 deletions(-)
+ delete mode 100644 arch/arm/configs/g4evm_defconfig
+ delete mode 100644 arch/arm/mach-shmobile/board-g4evm.c
 
-diff --git a/arch/arm/configs/g3evm_defconfig b/arch/arm/configs/g3evm_defconfig
+diff --git a/arch/arm/configs/g4evm_defconfig b/arch/arm/configs/g4evm_defconfig
 deleted file mode 100644
-index 4a336ab..0000000
---- a/arch/arm/configs/g3evm_defconfig
+index 21c6d03..0000000
+--- a/arch/arm/configs/g4evm_defconfig
 +++ /dev/null
 @@ -1,57 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
@@ -36,13 +38,13 @@ index 4a336ab..0000000
 -# CONFIG_IOSCHED_DEADLINE is not set
 -# CONFIG_IOSCHED_CFQ is not set
 -CONFIG_ARCH_SHMOBILE=y
--CONFIG_ARCH_SH7367=y
--CONFIG_MACH_G3EVM=y
+-CONFIG_ARCH_SH7377=y
+-CONFIG_MACH_G4EVM=y
 -CONFIG_AEABI=y
 -# CONFIG_OABI_COMPAT is not set
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttySC1,115200 earlyprintk=sh-sci.1,115200"
+-CONFIG_CMDLINE="console=ttySC4,115200 earlyprintk=sh-sci.4,115200"
 -CONFIG_KEXEC=y
 -CONFIG_PM=y
 -# CONFIG_SUSPEND is not set
@@ -83,57 +85,59 @@ index 4a336ab..0000000
 -# CONFIG_FTRACE is not set
 -# CONFIG_CRC32 is not set
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 8ae100c..614121f 100644
+index d3bc963..5a067b0 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -50,11 +50,6 @@ config ARCH_EMEV2
+@@ -44,12 +44,6 @@ config ARCH_EMEV2
  
  comment "SH-Mobile Board Type"
  
--config MACH_G3EVM
--	bool "G3EVM board"
--	depends on ARCH_SH7367
+-config MACH_G4EVM
+-	bool "G4EVM board"
+-	depends on ARCH_SH7377
 -	select ARCH_REQUIRE_GPIOLIB
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
 -
- config MACH_G4EVM
- 	bool "G4EVM board"
- 	depends on ARCH_SH7377
-@@ -146,7 +141,6 @@ menu "Memory configuration"
+ config MACH_AP4EVB
+ 	bool "AP4EVB board"
+ 	depends on ARCH_SH7372
+@@ -135,7 +129,7 @@ menu "Memory configuration"
  
  config MEMORY_START
  	hex "Physical memory start address"
--	default "0x50000000" if MACH_G3EVM
- 	default "0x40000000" if MACH_G4EVM || MACH_AP4EVB || MACH_AG5EVM || \
+-	default "0x40000000" if MACH_G4EVM || MACH_AP4EVB || MACH_AG5EVM || \
++	default "0x40000000" if MACH_AP4EVB || MACH_AG5EVM || \
  				MACH_MACKEREL || MACH_BONITO || \
  				MACH_ARMADILLO800EVA
-@@ -159,7 +153,6 @@ config MEMORY_START
+ 	default "0x41000000" if MACH_KOTA2
+@@ -147,7 +141,6 @@ config MEMORY_START
  
  config MEMORY_SIZE
  	hex "Physical memory size"
--	default "0x08000000" if MACH_G3EVM
- 	default "0x08000000" if MACH_G4EVM
+-	default "0x08000000" if MACH_G4EVM
  	default "0x20000000" if MACH_AG5EVM || MACH_BONITO || \
  				MACH_ARMADILLO800EVA
+ 	default "0x1e000000" if MACH_KOTA2
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index fe2c97c..30a6c83 100644
+index 7cad2bc..8c01194 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -45,7 +45,6 @@ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
+@@ -42,7 +42,6 @@ obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o
  obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
  
  # Board objects
--obj-$(CONFIG_MACH_G3EVM)	+= board-g3evm.o
- obj-$(CONFIG_MACH_G4EVM)	+= board-g4evm.o
+-obj-$(CONFIG_MACH_G4EVM)	+= board-g4evm.o
  obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
  obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
-diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
+ obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
+diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
 deleted file mode 100644
-index b179d4c..0000000
---- a/arch/arm/mach-shmobile/board-g3evm.c
+index 35c126c..0000000
+--- a/arch/arm/mach-shmobile/board-g4evm.c
 +++ /dev/null
-@@ -1,343 +0,0 @@
+@@ -1,384 +0,0 @@
 -/*
-- * G3EVM board support
+- * G4EVM board support
 - *
 - * Copyright (C) 2010  Magnus Damm
 - * Copyright (C) 2008  Yoshihiro Shimoda
@@ -160,25 +164,47 @@ index b179d4c..0000000
 -#include <linux/mtd/mtd.h>
 -#include <linux/mtd/partitions.h>
 -#include <linux/mtd/physmap.h>
--#include <linux/mtd/sh_flctl.h>
+-#include <linux/regulator/fixed.h>
+-#include <linux/regulator/machine.h>
 -#include <linux/usb/r8a66597.h>
 -#include <linux/io.h>
--#include <linux/gpio.h>
 -#include <linux/input.h>
 -#include <linux/input/sh_keysc.h>
+-#include <linux/mmc/host.h>
+-#include <linux/mmc/sh_mobile_sdhi.h>
+-#include <linux/gpio.h>
 -#include <linux/dma-mapping.h>
 -#include <mach/irqs.h>
--#include <mach/sh7367.h>
+-#include <mach/sh7377.h>
 -#include <mach/common.h>
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
 -
+-#include "sh-gpio.h"
+-
 -/*
-- * IrDA
+- * SDHI
 - *
-- * S67: 5bit : ON  power
-- *    : 6bit : ON  remote control
-- *             OFF IrDA
+- * SDHI0 : card detection is possible
+- * SDHI1 : card detection is impossible
+- *
+- * [G4-MAIN-BOARD]
+- * JP74 : short		# DBG_2V8A    for SDHI0
+- * JP75 : NC		# DBG_3V3A    for SDHI0
+- * JP76 : NC		# DBG_3V3A_SD for SDHI0
+- * JP77 : NC		# 3V3A_SDIO   for SDHI1
+- * JP78 : short		# DBG_2V8A    for SDHI1
+- * JP79 : NC		# DBG_3V3A    for SDHI1
+- * JP80 : NC		# DBG_3V3A_SD for SDHI1
+- *
+- * [G4-CORE-BOARD]
+- * S32 : all off	# to dissever from G3-CORE_DBG board
+- * S33 : all off	# to dissever from G3-CORE_DBG board
+- *
+- * [G3-CORE_DBG-BOARD]
+- * S1  : all off	# to dissever from G3-CORE_DBG board
+- * S3  : all off	# to dissever from G3-CORE_DBG board
+- * S4  : all off	# to dissever from G3-CORE_DBG board
 - */
 -
 -static struct mtd_partition nor_flash_partitions[] = {
@@ -256,7 +282,7 @@ index b179d4c..0000000
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= evt2irq(0xa20), /* USBHS_USHI0 */
+-		.start	= evt2irq(0x0a20), /* USBHS_USHI0 */
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
@@ -279,12 +305,13 @@ index b179d4c..0000000
 -	.scan_timing	= 3,
 -	.delay		= 100,
 -	.keycodes = {
--		KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G,
--		KEY_H, KEY_I, KEY_J, KEY_K, KEY_L, KEY_M, KEY_N,
--		KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T, KEY_U,
--		KEY_V, KEY_W, KEY_X, KEY_Y, KEY_Z, KEY_HOME, KEY_SLEEP,
--		KEY_WAKEUP, KEY_COFFEE, KEY_0, KEY_1, KEY_2, KEY_3, KEY_4,
--		KEY_5, KEY_6, KEY_7, KEY_8, KEY_9, KEY_STOP, KEY_COMPUTER,
+-		KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F,
+-		KEY_G, KEY_H, KEY_I, KEY_J, KEY_K, KEY_L,
+-		KEY_M, KEY_N, KEY_U, KEY_P, KEY_Q, KEY_R,
+-		KEY_S, KEY_T, KEY_U, KEY_V, KEY_W, KEY_X,
+-		KEY_Y, KEY_Z, KEY_HOME, KEY_SLEEP, KEY_WAKEUP, KEY_COFFEE,
+-		KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5,
+-		KEY_6, KEY_7, KEY_8, KEY_9, KEY_STOP, KEY_COMPUTER,
 -	},
 -};
 -
@@ -296,13 +323,14 @@ index b179d4c..0000000
 -		.flags  = IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start  = evt2irq(0xbe0), /* KEYSC_KEY */
+-		.start  = evt2irq(0x0be0), /* KEYSC_KEY */
 -		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
 -static struct platform_device keysc_device = {
 -	.name           = "sh_keysc",
+-	.id             = 0, /* keysc0 clock */
 -	.num_resources  = ARRAY_SIZE(keysc_resources),
 -	.resource       = keysc_resources,
 -	.dev	= {
@@ -310,102 +338,119 @@ index b179d4c..0000000
 -	},
 -};
 -
--static struct mtd_partition nand_partition_info[] = {
--	{
--		.name	= "system",
--		.offset	= 0,
--		.size	= 64 * 1024 * 1024,
--	},
--	{
--		.name	= "userdata",
--		.offset	= MTDPART_OFS_APPEND,
--		.size	= 128 * 1024 * 1024,
--	},
--	{
--		.name	= "cache",
--		.offset	= MTDPART_OFS_APPEND,
--		.size	= 64 * 1024 * 1024,
--	},
+-/* Fixed 3.3V regulator to be used by SDHI0 and SDHI1 */
+-static struct regulator_consumer_supply fixed3v3_power_consumers[] =
+-{
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.1"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.1"),
 -};
 -
--static struct resource nand_flash_resources[] = {
+-/* SDHI */
+-static struct sh_mobile_sdhi_info sdhi0_info = {
+-	.tmio_caps	= MMC_CAP_SDIO_IRQ,
+-};
+-
+-static struct resource sdhi0_resources[] = {
 -	[0] = {
--		.start	= 0xe6a30000,
--		.end	= 0xe6a3009b,
--		.flags	= IORESOURCE_MEM,
--	}
--};
--
--static struct sh_flctl_platform_data nand_flash_data = {
--	.parts		= nand_partition_info,
--	.nr_parts	= ARRAY_SIZE(nand_partition_info),
--	.flcmncr_val	= QTSEL_E | FCKSEL_E | TYPESEL_SET | NANWF_E
--			| SHBUSSEL | SEL_16BIT,
--};
--
--static struct platform_device nand_flash_device = {
--	.name		= "sh_flctl",
--	.resource	= nand_flash_resources,
--	.num_resources	= ARRAY_SIZE(nand_flash_resources),
--	.dev		= {
--		.platform_data = &nand_flash_data,
--	},
--};
--
--static struct resource irda_resources[] = {
--	[0] = {
--		.start	= 0xE6D00000,
--		.end	= 0xE6D01FD4 - 1,
--		.flags	= IORESOURCE_MEM,
+-		.name	= "SDHI0",
+-		.start  = 0xe6d50000,
+-		.end    = 0xe6d500ff,
+-		.flags  = IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start  = evt2irq(0x480), /* IRDA */
+-		.start  = evt2irq(0x0e00), /* SDHI0 */
 -		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device irda_device = {
--	.name		= "sh_irda",
--	.id		= -1,
--	.resource	= irda_resources,
--	.num_resources	= ARRAY_SIZE(irda_resources),
+-static struct platform_device sdhi0_device = {
+-	.name           = "sh_mobile_sdhi",
+-	.num_resources  = ARRAY_SIZE(sdhi0_resources),
+-	.resource       = sdhi0_resources,
+-	.id             = 0,
+-	.dev	= {
+-		.platform_data	= &sdhi0_info,
+-	},
 -};
 -
--static struct platform_device *g3evm_devices[] __initdata = {
+-static struct sh_mobile_sdhi_info sdhi1_info = {
+-	.tmio_caps	= MMC_CAP_NONREMOVABLE | MMC_CAP_SDIO_IRQ,
+-};
+-
+-static struct resource sdhi1_resources[] = {
+-	[0] = {
+-		.name	= "SDHI1",
+-		.start  = 0xe6d60000,
+-		.end    = 0xe6d600ff,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start  = evt2irq(0x0e80), /* SDHI1 */
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device sdhi1_device = {
+-	.name           = "sh_mobile_sdhi",
+-	.num_resources  = ARRAY_SIZE(sdhi1_resources),
+-	.resource       = sdhi1_resources,
+-	.id             = 1,
+-	.dev	= {
+-		.platform_data	= &sdhi1_info,
+-	},
+-};
+-
+-static struct platform_device *g4evm_devices[] __initdata = {
 -	&nor_flash_device,
 -	&usb_host_device,
 -	&keysc_device,
--	&nand_flash_device,
--	&irda_device,
+-	&sdhi0_device,
+-	&sdhi1_device,
 -};
 -
--static void __init g3evm_init(void)
+-#define GPIO_SDHID0_D0	IOMEM(0xe60520fc)
+-#define GPIO_SDHID0_D1	IOMEM(0xe60520fd)
+-#define GPIO_SDHID0_D2	IOMEM(0xe60520fe)
+-#define GPIO_SDHID0_D3	IOMEM(0xe60520ff)
+-#define GPIO_SDHICMD0	IOMEM(0xe6052100)
+-
+-#define GPIO_SDHID1_D0	IOMEM(0xe6052103)
+-#define GPIO_SDHID1_D1	IOMEM(0xe6052104)
+-#define GPIO_SDHID1_D2	IOMEM(0xe6052105)
+-#define GPIO_SDHID1_D3	IOMEM(0xe6052106)
+-#define GPIO_SDHICMD1	IOMEM(0xe6052107)
+-
+-static void __init g4evm_init(void)
 -{
--	sh7367_pinmux_init();
+-	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
+-				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
 -
--	/* Lit DS4 LED */
--	gpio_request(GPIO_PORT22, NULL);
--	gpio_direction_output(GPIO_PORT22, 1);
--	gpio_export(GPIO_PORT22, 0);
+-	sh7377_pinmux_init();
 -
--	/* Lit DS8 LED */
--	gpio_request(GPIO_PORT23, NULL);
--	gpio_direction_output(GPIO_PORT23, 1);
--	gpio_export(GPIO_PORT23, 0);
+-	/* Lit DS14 LED */
+-	gpio_request(GPIO_PORT109, NULL);
+-	gpio_direction_output(GPIO_PORT109, 1);
+-	gpio_export(GPIO_PORT109, 1);
 -
--	/* Lit DS3 LED */
--	gpio_request(GPIO_PORT24, NULL);
--	gpio_direction_output(GPIO_PORT24, 1);
--	gpio_export(GPIO_PORT24, 0);
+-	/* Lit DS15 LED */
+-	gpio_request(GPIO_PORT110, NULL);
+-	gpio_direction_output(GPIO_PORT110, 1);
+-	gpio_export(GPIO_PORT110, 1);
 -
--	/* SCIFA1 */
--	gpio_request(GPIO_FN_SCIFA1_TXD, NULL);
--	gpio_request(GPIO_FN_SCIFA1_RXD, NULL);
--	gpio_request(GPIO_FN_SCIFA1_CTS, NULL);
--	gpio_request(GPIO_FN_SCIFA1_RTS, NULL);
+-	/* Lit DS16 LED */
+-	gpio_request(GPIO_PORT112, NULL);
+-	gpio_direction_output(GPIO_PORT112, 1);
+-	gpio_export(GPIO_PORT112, 1);
+-
+-	/* Lit DS17 LED */
+-	gpio_request(GPIO_PORT113, NULL);
+-	gpio_direction_output(GPIO_PORT113, 1);
+-	gpio_export(GPIO_PORT113, 1);
 -
 -	/* USBHS */
--	gpio_request(GPIO_FN_VBUS0, NULL);
+-	gpio_request(GPIO_FN_VBUS_0, NULL);
 -	gpio_request(GPIO_FN_PWEN, NULL);
 -	gpio_request(GPIO_FN_OVCN, NULL);
 -	gpio_request(GPIO_FN_OVCN2, NULL);
@@ -413,65 +458,65 @@ index b179d4c..0000000
 -	gpio_request(GPIO_FN_IDIN, NULL);
 -
 -	/* setup USB phy */
--	__raw_writew(0x0300, IOMEM(0xe605810a));	/* USBCR1 */
--	__raw_writew(0x00e0, IOMEM(0xe60581c0));	/* CPFCH */
--	__raw_writew(0x6010, IOMEM(0xe60581c6));	/* CGPOSR */
--	__raw_writew(0x8a0a, IOMEM(0xe605810c));	/* USBCR2 */
+-	__raw_writew(0x0200, IOMEM(0xe605810a));       /* USBCR1 */
+-	__raw_writew(0x00e0, IOMEM(0xe60581c0));       /* CPFCH */
+-	__raw_writew(0x6010, IOMEM(0xe60581c6));       /* CGPOSR */
+-	__raw_writew(0x8a0a, IOMEM(0xe605810c));       /* USBCR2 */
 -
--	/* KEYSC @ CN7 */
--	gpio_request(GPIO_FN_PORT42_KEYOUT0, NULL);
--	gpio_request(GPIO_FN_PORT43_KEYOUT1, NULL);
--	gpio_request(GPIO_FN_PORT44_KEYOUT2, NULL);
--	gpio_request(GPIO_FN_PORT45_KEYOUT3, NULL);
--	gpio_request(GPIO_FN_PORT46_KEYOUT4, NULL);
--	gpio_request(GPIO_FN_PORT47_KEYOUT5, NULL);
--	gpio_request(GPIO_FN_PORT48_KEYIN0_PU, NULL);
--	gpio_request(GPIO_FN_PORT49_KEYIN1_PU, NULL);
--	gpio_request(GPIO_FN_PORT50_KEYIN2_PU, NULL);
--	gpio_request(GPIO_FN_PORT55_KEYIN3_PU, NULL);
--	gpio_request(GPIO_FN_PORT56_KEYIN4_PU, NULL);
--	gpio_request(GPIO_FN_PORT57_KEYIN5_PU, NULL);
--	gpio_request(GPIO_FN_PORT58_KEYIN6_PU, NULL);
+-	/* KEYSC @ CN31 */
+-	gpio_request(GPIO_FN_PORT60_KEYOUT5, NULL);
+-	gpio_request(GPIO_FN_PORT61_KEYOUT4, NULL);
+-	gpio_request(GPIO_FN_PORT62_KEYOUT3, NULL);
+-	gpio_request(GPIO_FN_PORT63_KEYOUT2, NULL);
+-	gpio_request(GPIO_FN_PORT64_KEYOUT1, NULL);
+-	gpio_request(GPIO_FN_PORT65_KEYOUT0, NULL);
+-	gpio_request(GPIO_FN_PORT66_KEYIN0_PU, NULL);
+-	gpio_request(GPIO_FN_PORT67_KEYIN1_PU, NULL);
+-	gpio_request(GPIO_FN_PORT68_KEYIN2_PU, NULL);
+-	gpio_request(GPIO_FN_PORT69_KEYIN3_PU, NULL);
+-	gpio_request(GPIO_FN_PORT70_KEYIN4_PU, NULL);
+-	gpio_request(GPIO_FN_PORT71_KEYIN5_PU, NULL);
+-	gpio_request(GPIO_FN_PORT72_KEYIN6_PU, NULL);
 -
--	/* FLCTL */
--	gpio_request(GPIO_FN_FCE0, NULL);
--	gpio_request(GPIO_FN_D0_ED0_NAF0, NULL);
--	gpio_request(GPIO_FN_D1_ED1_NAF1, NULL);
--	gpio_request(GPIO_FN_D2_ED2_NAF2, NULL);
--	gpio_request(GPIO_FN_D3_ED3_NAF3, NULL);
--	gpio_request(GPIO_FN_D4_ED4_NAF4, NULL);
--	gpio_request(GPIO_FN_D5_ED5_NAF5, NULL);
--	gpio_request(GPIO_FN_D6_ED6_NAF6, NULL);
--	gpio_request(GPIO_FN_D7_ED7_NAF7, NULL);
--	gpio_request(GPIO_FN_D8_ED8_NAF8, NULL);
--	gpio_request(GPIO_FN_D9_ED9_NAF9, NULL);
--	gpio_request(GPIO_FN_D10_ED10_NAF10, NULL);
--	gpio_request(GPIO_FN_D11_ED11_NAF11, NULL);
--	gpio_request(GPIO_FN_D12_ED12_NAF12, NULL);
--	gpio_request(GPIO_FN_D13_ED13_NAF13, NULL);
--	gpio_request(GPIO_FN_D14_ED14_NAF14, NULL);
--	gpio_request(GPIO_FN_D15_ED15_NAF15, NULL);
--	gpio_request(GPIO_FN_WE0_XWR0_FWE, NULL);
--	gpio_request(GPIO_FN_FRB, NULL);
--	/* FOE, FCDE, FSC on dedicated pins */
--	__raw_writel(__raw_readl(IOMEM(0xe6158048)) & ~(1 << 15), IOMEM(0xe6158048));
+-	/* SDHI0 */
+-	gpio_request(GPIO_FN_SDHICLK0, NULL);
+-	gpio_request(GPIO_FN_SDHICD0, NULL);
+-	gpio_request(GPIO_FN_SDHID0_0, NULL);
+-	gpio_request(GPIO_FN_SDHID0_1, NULL);
+-	gpio_request(GPIO_FN_SDHID0_2, NULL);
+-	gpio_request(GPIO_FN_SDHID0_3, NULL);
+-	gpio_request(GPIO_FN_SDHICMD0, NULL);
+-	gpio_request(GPIO_FN_SDHIWP0, NULL);
+-	gpio_request_pullup(GPIO_SDHID0_D0);
+-	gpio_request_pullup(GPIO_SDHID0_D1);
+-	gpio_request_pullup(GPIO_SDHID0_D2);
+-	gpio_request_pullup(GPIO_SDHID0_D3);
+-	gpio_request_pullup(GPIO_SDHICMD0);
 -
--	/* IrDA */
--	gpio_request(GPIO_FN_IRDA_OUT, NULL);
--	gpio_request(GPIO_FN_IRDA_IN, NULL);
--	gpio_request(GPIO_FN_IRDA_FIRSEL, NULL);
+-	/* SDHI1 */
+-	gpio_request(GPIO_FN_SDHICLK1, NULL);
+-	gpio_request(GPIO_FN_SDHID1_0, NULL);
+-	gpio_request(GPIO_FN_SDHID1_1, NULL);
+-	gpio_request(GPIO_FN_SDHID1_2, NULL);
+-	gpio_request(GPIO_FN_SDHID1_3, NULL);
+-	gpio_request(GPIO_FN_SDHICMD1, NULL);
+-	gpio_request_pullup(GPIO_SDHID1_D0);
+-	gpio_request_pullup(GPIO_SDHID1_D1);
+-	gpio_request_pullup(GPIO_SDHID1_D2);
+-	gpio_request_pullup(GPIO_SDHID1_D3);
+-	gpio_request_pullup(GPIO_SDHICMD1);
 -
--	sh7367_add_standard_devices();
+-	sh7377_add_standard_devices();
 -
--	platform_add_devices(g3evm_devices, ARRAY_SIZE(g3evm_devices));
+-	platform_add_devices(g4evm_devices, ARRAY_SIZE(g4evm_devices));
 -}
 -
--MACHINE_START(G3EVM, "g3evm")
--	.map_io		= sh7367_map_io,
--	.init_early	= sh7367_add_early_devices,
--	.init_irq	= sh7367_init_irq,
+-MACHINE_START(G4EVM, "g4evm")
+-	.map_io		= sh7377_map_io,
+-	.init_early	= sh7377_add_early_devices,
+-	.init_irq	= sh7377_init_irq,
 -	.handle_irq	= shmobile_handle_irq_intc,
--	.init_machine	= g3evm_init,
+-	.init_machine	= g4evm_init,
 -	.init_late	= shmobile_init_late,
 -	.timer		= &shmobile_timer,
 -MACHINE_END
