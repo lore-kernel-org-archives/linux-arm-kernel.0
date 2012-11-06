@@ -1,100 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 6 Nov 2012 15:33:09 +0530
-Subject: [PATCH v3 07/11] ARM: davinci - restructure header files for
- common clock migration
-In-Reply-To: <50980F57.1090507@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-8-git-send-email-m-karicheri2@ti.com>
- <50967641.4090503@ti.com> <50980F57.1090507@ti.com>
-Message-ID: <5098E05D.6020402@ti.com>
+From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
+Date: Tue, 6 Nov 2012 15:36:45 +0530
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <87fw4neh0i.fsf@deeprootsystems.com>
+References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+ <20121026201539.GD29548@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+ <20121029200032.GD30152@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
+ <20121030123254.GD29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
+ <20121030125419.GG29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
+ <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
+ <87fw4u3oh5.fsf@deeprootsystems.com>
+ <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
+ <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
+ <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
+ <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
+ <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
+ <87fw4neh0i.fsf@deeprootsystems.com>
+Message-ID: <CAM=Q2cs2LO3LOQxSMJTXZLZNsmMiLAOxMcWwSf0Wxt-Fnz6QZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/2012 12:41 AM, Murali Karicheri wrote:
-> On 11/04/2012 09:05 AM, Sekhar Nori wrote:
->>
->> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->>> pll.h is added to migrate some of the PLL controller defines for
->>> sleep.S.
->>> psc.h is modified to keep only PSC modules definitions needed by sleep.S
->>> after migrating to common clock. The definitions under
->>> ifdef CONFIG_COMMON_CLK will be removed in a subsequent patch.
->>> davinci_watchdog_reset prototype is moved to time.h as clock.h is
->>> being obsoleted. sleep.S and pm.c is modified to include the new header
->>> file replacements.
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>> ---
->>>   arch/arm/mach-davinci/devices.c           |    2 ++
->>>   arch/arm/mach-davinci/include/mach/pll.h  |   46
->>> +++++++++++++++++++++++++++++
->>>   arch/arm/mach-davinci/include/mach/psc.h  |    4 +++
->>>   arch/arm/mach-davinci/include/mach/time.h |    4 ++-
->>>   arch/arm/mach-davinci/pm.c                |    4 +++
->>>   arch/arm/mach-davinci/sleep.S             |    4 +++
->>>   6 files changed, 63 insertions(+), 1 deletion(-)
->>>   create mode 100644 arch/arm/mach-davinci/include/mach/pll.h
->> With this patch a _third_ copy of PLL definitions is created in kernel
->> sources. The existing PLL definitions in clock.h inside mach-davinci
->> should be moved to mach/pll.h and the pll.h you introduced inside
->> drivers/clk in 5/11 should be removed (this patch should appear before
->> 5/11).
->>
->> The biggest disadvantage of this approach is inclusion of mach/ includes
->> in drivers/clk. But duplicating code is definitely not the fix for this.
->> Anyway, mach/ includes are not uncommon in drivers/clk (they are all
->> probably suffering from the same issue).
-> Sekhar,
-> 
-> I have replied to patch 5/11 that also refers to this. The main reason
-> we are not able to do this cleanly is the code in sleep.c and pm.c. That
-> is something related to Power management. Could you take a look and see
-> if you can do some clean up on this code? I believe It is more than just
-> moving the header files.
+On Tue, Nov 6, 2012 at 5:31 AM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>
+> [...]
+>
+>> I ran some intensive stress tests on the I2C and ... unfortunately I
+>> could not trigger the problem. It looks like the issue is caused by
+>> some transient situation where the CORE and/or I2C is in a low power
+>> state.
+>
+> FYI... I just ran across what appears to be the same bug on 3430/n900
+> during suspend/resume testing.  With CPUidle enabled, this happens every
+> time.
+>
+> Reverting the I2C QoS patch makes it work again.
 
-I am not sure what more is required than moving header files? Can you
-elaborate?
+I think we should defer the release of the constraints
 
-> 
-> Murali
->>
->> $ grep -rl "include <mach/" drivers/clk/*
->> drivers/clk/clk-u300.c
->> drivers/clk/mmp/clk-pxa168.c
->> drivers/clk/mmp/clk-mmp2.c
->> drivers/clk/mmp/clk-pxa910.c
->> drivers/clk/mxs/clk-imx23.c
->> drivers/clk/mxs/clk-imx28.c
->> drivers/clk/spear/spear6xx_clock.c
->> drivers/clk/spear/spear3xx_clock.c
->> drivers/clk/spear/spear1340_clock.c
->> drivers/clk/spear/spear1310_clock.c
->> drivers/clk/ux500/clk-prcc.c
->> drivers/clk/versatile/clk-integrator.c
->> drivers/clk/versatile/clk-realview.c
->>
->> pll.h can probably be moved to include/linux/clk/ to avoid this. Would
->> like to hear from Mike on this before going ahead.
->>
->> Anyway, instead of just commenting, I though I will be more useful and
->> went ahead and made some of the changes I have been talking about. I
->> fixed the multiple PLL definitions issue, the build infrastructure issue
->> and the commit ordering too.
->>
->> I pushed the patches I fixed to devel-common-clk branch of my git tree.
->> It is build tested using davinci_all_defconfig but its not runtime
->> tested.
->>
->> Can you start from here and provide me incremental changes on top of
->> this? That way we can collaborate to finish this faster.
-> Thanks for offering some help. Yes I can provide you incremental patch.
-> But then could you also help me to squash/rebase and send patches to the
-> list for review?
-
-No, no. I want you to own the submissions. Towards this, if it is easier
-for you to build upon my work in your own tree, by all means, go ahead
-and do it. Just share the branch/tree details so I can take a look and
-contribute as well.
-
-Thanks,
-Sekhar
+Does this help
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg79841.html
