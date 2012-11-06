@@ -1,55 +1,27 @@
-From: mpfj-list@mimc.co.uk (Mark Jackson)
-Date: Tue, 06 Nov 2012 09:47:10 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508FB226.20604@mimc.co.uk>
- <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
- <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
- <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
- <5097EF44.5030706@mimc.co.uk>
- <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
-Message-ID: <5098DC9E.3090307@mimc.co.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2012 09:45:25 +0000
+Subject: scheduler clock for MXS
+In-Reply-To: <5098CB9F.9030401@meduna.org>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <5098CB9F.9030401@meduna.org>
+Message-ID: <20121106094525.GM28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/12 06:16, Hiremath, Vaibhav wrote:
+On Tue, Nov 06, 2012 at 09:34:39AM +0100, Stanislav Meduna wrote:
+> On 05.11.2012 23:28, Russell King - ARM Linux wrote:
 > 
-> Where is your DTB? Is it appended to Kernel image?
-> Can you try below sequence/commands from u-boot?
+> > It most certainly does handle the wrapping correctly - it was designed
+> > to from the very start.
 > 
+> I'm not an expert on Linux kernel and its core infrastructure,
+> but how is the sched_clock_timer armed for the first time
+> after calling setup_sched_clock?
 > 
-> mmc rescan 0
-> fatload mmc 0 80000000 am335x-bone.dtb
-> fatload mmc 0 81000000 uImage
-> setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/mmcblk0p2 rw noinitrd rootfstype=ext3 rootwait earlyprink=serial
-> sendln 'bootm 81000000 - 80000000'
-> 
-> 
-> 
-> To build DTB files, use "make dtbs" command on your kernel home directory.
+> The explicitely called update_sched_clock() does _not_ arm it.
 
-That works ... great !!
-
-But now I'm confused, since I thought the DTB was appended to the uImage file.
-
-I have the following in my .config:-
-
-ARM_ATAG_DTB_COMPAT=y
-ARM_APPENDED_DTB=y
-ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER=y
-
-And then I create my uImage file using:-
-
-$ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- uImage
-$ make -j 8 ARCH=arm CROSS_COMPILE=arm-linux- am335x-bone.dtb
-$ cat arch/arm/boot/uImage arch/arm/boot/am335x-bone.dtb > arch/arm/boot/uImage-dtb.am335x-bone
-$ cp arch/arm/boot/uImage-dtb.am335x-bone /media/boot/uImage
-
-Do you now have to load the DTB as a separate file ?
-
-Or should the appended DTB still work ?
-
-Cheers
-Mark J.
+Correct, but sched_clock_postinit() does, which is called from time_init().
