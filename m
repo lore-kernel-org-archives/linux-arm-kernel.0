@@ -1,34 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Nov 2012 09:38:48 +0100
-Subject: [PATCH 6/8] mfd/ab8500-core: use irq_domain_add_simple()
-In-Reply-To: <20121105225922.GF7965@sortiz-mobl>
-References: <1350580755-8516-1-git-send-email-linus.walleij@stericsson.com>
- <20121105225922.GF7965@sortiz-mobl>
-Message-ID: <CACRpkdbJPrBc8suMzoG-4ZDxL18Hdb7i=P9vVcKih7u=Lf9kTg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 6 Nov 2012 09:48:14 +0100
+Subject: [RFC patch v3 3/4] ASoC: atmel-ssc-dai: register dai and pcm
+ directly
+In-Reply-To: <1352181474-19597-3-git-send-email-voice.shen@atmel.com>
+References: <1352181474-19597-1-git-send-email-voice.shen@atmel.com>
+ <1352181474-19597-3-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121106084814.GC5044@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2012 at 11:59 PM, Samuel Ortiz <sameo@linux.intel.com> wrote:
-> On Thu, Oct 18, 2012 at 07:19:15PM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> To be able to use SPARSE_IRQ while yet not using device tree,
->> we need to use irq_domain_add_simple() that will allocate
->> descriptors for the IRQs in the non-DT case, and fall back
->> to using the linear irqdomain in the DT case.
->>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Cc: Samuel Ortiz <sameo@linux.intel.com>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> In case it's not too late:
->
-> Acked-by: Samuel Ortiz <sameo@linux.intel.com>
+On Tue, Nov 06, 2012 at 01:57:53PM +0800, Bo Shen wrote:
 
-Too late for my pull request to ARM SoC, but the important
-thing is that the ARM SoC people see that you're OK with it
-so they can pull in my patches :-)
+>  static struct platform_device at91sam9260_ssc_device = {
+> -	.name	= "at91rm9200_ssc",
+> +	.name	= "at91rm9200_ssc_dai",
+>  	.id	= 0,
+>  	.dev	= {
 
-Thanks Sam!
+No, this isn't converting things to device tree which presumably is the
+goal here and obviously just doing the rename doesn't accomplish an
+enormous amount.  What I said was that you should instantiate the ASoC
+adaption when the machine driver needs to use them.  You shouldn't even
+need a separate device for this.
 
-Yours,
-Linus Walleij
+Please do look at other platforms with similar hardware and do something
+similar to them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/e051f0f7/attachment.sig>
