@@ -1,26 +1,22 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 6 Nov 2012 13:50:36 +0900
-Subject: [GIT PULL v3] Renesas ARM-based SoC for v3.8
-In-Reply-To: <509895C3.2020109@renesas.com>
-References: <1351730513-2952-1-git-send-email-horms@verge.net.au>
- <20121106023224.GO2944@verge.net.au>
- <CABMQnVJ+6CHCfwiZ8n5xKmCfL7jW=TYHC8_cU6N1uMw7MysfQg@mail.gmail.com>
- <20121106041242.GS2944@verge.net.au> <509895C3.2020109@renesas.com>
-Message-ID: <20121106045035.GB30574@verge.net.au>
+Date: Tue, 6 Nov 2012 13:51:05 +0900
+Subject: [PATCH v2 1/4] ARM: shmobile: Remove G3EVM machine support
+In-Reply-To: <20121106041146.GR2944@verge.net.au>
+References: <1352172225-865-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+ <20121106041146.GR2944@verge.net.au>
+Message-ID: <20121106045105.GC30574@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 01:44:51PM +0900, Nobuhiro Iwamatsu wrote:
-> Simon Horman ????????:
-> >On Tue, Nov 06, 2012 at 12:30:41PM +0900, Nobuhiro Iwamatsu wrote:
-> >>Hi, Simon.
-> >>
-> >>" ARM: shmobile: Remove SH7367 support"  includes an unnecessary patch.
-> >>I already sent a new patch.  Please update, if you still have time to apply.
-> >
-> >Sure, I can make an update. Is it only " ARM: shmobile: Remove SH7367 support"
-> >that needs to be refreshed?
-> >
-> Yes, I need "ARM: shmobile: Remove SH7367 support" patch only.
+On Tue, Nov 06, 2012 at 01:11:46PM +0900, Simon Horman wrote:
+> On Tue, Nov 06, 2012 at 12:23:42PM +0900, Nobuhiro Iwamatsu wrote:
+> > This machine is using old CPU of shmobile (SH7367) and cannot obtain
+> > machine, either.
+> > Therefore, remove G3EVM support.
+> 
+> Hi Iwamatsu-san,
+> 
+> I am a little confused as I have already sent pull requests including
+> v1 of the patches in this series.
 
-Got it, will do.
+Confusion resolved in another thread, thanks.
