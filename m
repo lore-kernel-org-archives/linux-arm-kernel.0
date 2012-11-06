@@ -1,34 +1,43 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 06 Nov 2012 11:42:36 +0530
-Subject: [PATCH 5/5] ARM: EXYNOS5: Add flush_cache_all in suspend finisher
-In-Reply-To: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
-References: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1352182356-28989-6-git-send-email-a.kesavan@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 6 Nov 2012 06:09:21 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <alpine.DEB.2.00.1211050239530.23228@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508F59FB.7080400@ti.com>
+ <alpine.DEB.2.00.1211050239530.23228@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB635C9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core cpu_suspend code no longer calls flush_cache_all to
-optimize the cpu idle flow. Add a call for the same in the
-exynos specific suspend code.
+On Mon, Nov 05, 2012 at 08:11:24, Paul Walmsley wrote:
+> Hi
+> 
+> On Tue, 30 Oct 2012, Vaibhav Hiremath wrote:
+> 
+> > This is surprising, I have tested v3.7-rc3 branch on AM335xBone platform
+> > and its booting up for me without any issues.
+> > Jon had submitted another patch which fixes boot issue on Bone.
+> > 
+> > https://patchwork.kernel.org/patch/1606471/
+> 
+> v3.7-rc4 failed for me with a detached .dtb in a quick test.  Probably it 
+> is due to the original u-boot that was shipped with the MMC card:
+> 
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
- arch/arm/mach-exynos/pm.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+Pulling the tree, let me try now and update you shortly...
 
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index 8dedeb2..8df6ec5 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -81,6 +81,9 @@ static int exynos_cpu_suspend(unsigned long arg)
- 	outer_flush_all();
- #endif
- 
-+	if (soc_is_exynos5250())
-+		flush_cache_all();
-+
- 	/* issue the standby signal into the pm unit. */
- 	cpu_do_idle();
- 
--- 
-1.6.6.1
+> U-Boot 2011.09-00009-gcf6e04d (Mar 08 2012 - 17:15:43)
+> arm-arago-linux-gnueabi-gcc (GCC) 4.5.3 20110311 (prerelease)
+> 
+> 
+> Which U-boot are you using these days?
+> 
+
+I am using mainline denx u-boot.
+
+Thanks,
+Vaibhav
+
+> 
+> - Paul
+> 
