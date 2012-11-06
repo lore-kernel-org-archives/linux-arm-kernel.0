@@ -1,32 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 06 Nov 2012 14:40:32 -0700
-Subject: [PATCH] gpiolib: iron out include ladder mistakes
-In-Reply-To: <1352218863-2037-1-git-send-email-linus.walleij@stericsson.com>
-References: <1352218863-2037-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <509983D0.1060107@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Nov 2012 21:41:37 +0000
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+Message-ID: <20121106214137.GA21764@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 09:21 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Nov 06, 2012 at 09:12:27PM +0000, Nicolas Pitre wrote:
 > 
-> The <*/gpio.h> includes are updated again: now we need to account
-> for the problem introduced by commit:
-> 595679a8038584df7b9398bf34f61db3c038bfea
-> "gpiolib: fix up function prototypes etc"
+> ... instead of flush_cache_all().  The later unconditionally flushes
+> the L2 cache on ARMv7 architectures such as Cortex A15 and A7 which
+> is costly and unnecessary in some scenarios where setup_mm_for_reboot()
+> is used.  If L2 has to be flushed as well, it should already be done
+> separately on other architectures anyway.
 > 
-> Actually we need static inlines in include/asm-generic/gpio.h
-> as well since we may have GPIOLIB but not PINCTRL.
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 > 
-> And we need to keep the static inlines in <linux/gpio.h>
-> but here for the !CONFIG_GENERIC_GPIO case, and then we
-> may as well throw in a few warnings like the other
-> prototypes there, if someone would have the bad taste
-> of compiling without GENERIC_GPIO even.
+> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+> index ab88ed4f8e..2c61085a10 100644
+> --- a/arch/arm/mm/idmap.c
+> +++ b/arch/arm/mm/idmap.c
+> @@ -104,7 +104,7 @@ early_initcall(init_static_idmap);
+>  void setup_mm_for_reboot(void)
+>  {
+>  	/* Clean and invalidate L1. */
+> -	flush_cache_all();
+> +	flush_cache_louis();
+>  
+>  	/* Switch to the identity mapping. */
+>  	cpu_switch_mm(idmap_pgd, &init_mm);
 
-Hmm. Is there way to avoid the duplication of the dummy implementations?
-Having a prototype and a truly dummy implementation in one place, but a
-WARNing/failing dummy implementation elsewhere, seems like it'll cause
-issues.
+We could probably even predicate this on the half-implemented
+TLB_CAN_READ_FROM_L1_CACHE option, but that can come later.
 
-Does this patch mean the previous series causes "git bisect" failures?
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
