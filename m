@@ -1,17 +1,20 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Tue,  6 Nov 2012 12:23:45 +0900
-Subject: [PATCH v2 4/4] ARM: shmobile: Remove SH7377 support
-In-Reply-To: <1352172225-865-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-References: <1352172225-865-1-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
-Message-ID: <1352172225-865-4-git-send-email-nobuhiro.iwamatsu.yj@renesas.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue,  6 Nov 2012 13:57:24 +0900
+Subject: [PATCH 02/11] ARM: shmobile: Remove SH7377 support
+In-Reply-To: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+Message-ID: <1352177853-6008-3-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 
 This is old CPU of shmobile, and the machine by which this CPU is
 used cannot be obtained.
 Therefore, remove SH7377 support.
 
 Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
  arch/arm/boot/dts/sh7377.dtsi                |   21 -
  arch/arm/mach-shmobile/Kconfig               |    6 -
@@ -58,7 +61,7 @@ index 767ee07..0000000
 -	};
 -};
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 5a067b0..f12eca7 100644
+index d20dab4..546e40a 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
 @@ -2,12 +2,6 @@ if ARCH_SHMOBILE
@@ -75,7 +78,7 @@ index 5a067b0..f12eca7 100644
  	bool "SH-Mobile AP4 (SH7372)"
  	select ARCH_WANT_OPTIONAL_GPIOLIB
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 8c01194..0b71479 100644
+index 7c07a04..f4fd247 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
 @@ -6,7 +6,6 @@
