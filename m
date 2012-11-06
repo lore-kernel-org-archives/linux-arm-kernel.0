@@ -1,60 +1,45 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Tue, 6 Nov 2012 23:02:32 +0530
-Subject: [PATCH V4 0/7] ARM: AM33XX: net: Add DT support to CPGMAC and MDIO
- driver
-Message-ID: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
+Date: Tue, 6 Nov 2012 23:02:33 +0530
+Subject: [PATCH V4 1/7] net: davinci_mdio: Fix typo mistake in calling
+ runtime-pm api
+In-Reply-To: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
+References: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <1352223159-27504-2-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-series adds support for,
+From: Vaibhav Hiremath <hvaibhav@ti.com>
 
-[1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
+By mistake (most likely a copy-paste), instead of pm_runtime_get_sync()
+api, driver is calling pm_runtime_put_sync() api in resume callback
+function. The bug was introduced by commit id (ae2c07aaf74:
+davinci_mdio: runtime PM support).
 
-[2/7]: Adds parent<->child relation between CPSW & MDIO module inside cpsw
-       driver, as in case of AM33XX, the resources are shared and common
-       register bit-field is provided to control module/clock enable/disable,
-       makes it difficult to handle common resource.
+Now, the reason why it didn't impact functionality is, the patch has
+been tested on AM335x-EVM and BeagleBone platform while submitting;
+and in case of AM335x the MDIO driver doesn't control the module
+enable/disable part, which is handled by CPSW driver.
 
-       So the solution here is, to create parent<->child relation between them.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+Acked-by: Richard Cochran <richardcochran@gmail.com>
+---
+ drivers/net/ethernet/ti/davinci_mdio.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-[3/7]: Add hwmod entry for MDIO module, required for MDIO driver.
-
-[4/7]: cpsw: simplify the setup of the register pointers
-
-[5/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
-       am335x-evm.dts and am335x-bone.dts file
-
-[6/7]: Enable CPSW support to omap2plus_defconfig
-
-[7/7]: cpsw: Kernel warn fix during suspend
-
-This patch series has been created on top of net-next/master and tested
-on BeagleBone platform for NFS boot and basic ping test cases.
-
-Changes from V3:
-* Removed unnecessary flags in Davinci MDIO Hwmod entry.
-
-Mugunthan V N (4):
-  ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
-  arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
-  ARM: OMAP2+: omap2plus_defconfig: Enable CPSW support
-  net: cpsw: halt network stack before halting the device during
-    suspend
-
-Richard Cochran (1):
-  cpsw: simplify the setup of the register pointers
-
-Vaibhav Hiremath (2):
-  net: davinci_mdio: Fix typo mistake in calling runtime-pm api
-  net: cpsw: Add parent<->child relation support between cpsw and mdio
-
- Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
- arch/arm/boot/dts/am335x-bone.dts              |    8 +
- arch/arm/boot/dts/am335x-evm.dts               |    8 +
- arch/arm/boot/dts/am33xx.dtsi                  |   42 +++++
- arch/arm/configs/omap2plus_defconfig           |    3 +
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c     |   31 ++++
- drivers/net/ethernet/ti/cpsw.c                 |  231 ++++++++++--------------
- drivers/net/ethernet/ti/davinci_mdio.c         |    2 +-
- include/linux/platform_data/cpsw.h             |   19 --
- 9 files changed, 192 insertions(+), 186 deletions(-)
+diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
+index 51a96db..ae74280 100644
+--- a/drivers/net/ethernet/ti/davinci_mdio.c
++++ b/drivers/net/ethernet/ti/davinci_mdio.c
+@@ -465,7 +465,7 @@ static int davinci_mdio_resume(struct device *dev)
+ 	u32 ctrl;
+ 
+ 	spin_lock(&data->lock);
+-	pm_runtime_put_sync(data->dev);
++	pm_runtime_get_sync(data->dev);
+ 
+ 	/* restart the scan state machine */
+ 	ctrl = __raw_readl(&data->regs->control);
+-- 
+1.7.0.4
