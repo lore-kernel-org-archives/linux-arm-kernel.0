@@ -1,47 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Nov 2012 22:55:28 +0100
-Subject: [PATCH 3/8] mtd: uninitialized variable warning in map.h
+Date: Tue,  6 Nov 2012 22:55:30 +0100
+Subject: [PATCH 5/8] mmc: dw_mmc: fix modular build for exynos back-end
 In-Reply-To: <1352238933-4886-1-git-send-email-arnd@arndb.de>
 References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
-Message-ID: <1352238933-4886-4-git-send-email-arnd@arndb.de>
+Message-ID: <1352238933-4886-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The map_word_load() function initializes exactly
-as many words in the buffer as required, but gcc
-cannot figure this out and gives a misleading
-warning. Marking the local variable as
-uninitialized_var shuts up that warning.
+The MODULE_DEVICE_TABLE entry for dw_mci_exynos_match
+was incorrectly copied from the platform back-end, which
+causes this error when building the driver as a loadable
+module:
 
-Without this patch, building acs5k_defconfig results in:
+drivers/mmc/host/dw_mmc-exynos.c: At top level:
+drivers/mmc/host/dw_mmc-exynos.c:226:34: error: '__mod_of_device_table' aliased to undefined symbol 'dw_mci_pltfm_match'
 
-drivers/mtd/chips/cfi_cmdset_0002.c: In function 'cfi_amdstd_panic_write':
-include/linux/mtd/map.h:331:11: warning: 'r.x[0]' may be used uninitialized in this function [-Wuninitialized]
-drivers/mtd/chips/cfi_cmdset_0002.c: In function 'cfi_amdstd_write_words':
-include/linux/mtd/map.h:331:11: warning: 'r.x[0]' may be used uninitialized in this function [-Wuninitialized]
-drivers/mtd/chips/cfi_cmdset_0001.c: In function 'cfi_intelext_write_words':
-include/linux/mtd/map.h:331:11: warning: 'r.x[0]' may be used uninitialized in this function [-Wuninitialized]
+This patch fixes the problem by just using the correct
+string.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: linux-mtd at lists.infradead.org
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Will Newton <will.newton@imgtec.com>
+Cc: Chris Ball <cjb@laptop.org>
 ---
- include/linux/mtd/map.h |    2 +-
+ drivers/mmc/host/dw_mmc-exynos.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
-index 3595a02..e3559ba 100644
---- a/include/linux/mtd/map.h
-+++ b/include/linux/mtd/map.h
-@@ -328,7 +328,7 @@ static inline int map_word_bitsset(struct map_info *map, map_word val1, map_word
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index 660bbc5..0147ac3a 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -223,7 +223,7 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+ 			.data = (void *)&exynos5250_drv_data, },
+ 	{},
+ };
+-MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
++MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
  
- static inline map_word map_word_load(struct map_info *map, const void *ptr)
+ int dw_mci_exynos_probe(struct platform_device *pdev)
  {
--	map_word r;
-+	map_word uninitialized_var(r);
- 
- 	if (map_bankwidth_is_1(map))
- 		r.x[0] = *(unsigned char *)ptr;
 -- 
 1.7.10
