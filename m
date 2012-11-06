@@ -1,33 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Nov 2012 07:52:06 -0800
-Subject: [GIT PULL] arm-soc: Xilinx zynq changes for v3.8
-In-Reply-To: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
-References: <CAHTX3dLdGie9gtxbPq_gb8BLao7YYohqQWZFg3LzyNHxu=imdg@mail.gmail.com>
-Message-ID: <20121106155206.GG30580@quad.lixom.net>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Tue, 6 Nov 2012 10:00:48 -0600
+Subject: [PATCH 12/15] ARM: OMAP: timer: Add suspend-resume callbacks
+ for clockevent device
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC045C5@DBDE01.ent.ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-13-git-send-email-vaibhav.bedia@ti.com>
+ <509829C5.100@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC045C5@DBDE01.ent.ti.com>
+Message-ID: <50993430.2090907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 12:09:10PM +0100, Michal Simek wrote:
-> Hi Arnd and Olof,
-> 
-> please add these patches to your arm-soc trees. All these patches are
-> for xilinx zynq arm platform.
-> You shouldn't have any problem to merge it there are no conficts with v3.7-rc4.
-> 
-> Please let me know if you find out any problem.
-> 
-> Thanks,
-> Michal
-> 
-> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
->   Linus Torvalds (1):
->         Linux 3.7-rc3
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git arm-next
 
-Thanks, pulled into next/cleanup (local version in zynq/cleanup).
+On 11/06/2012 01:32 AM, Bedia, Vaibhav wrote:
+> Hi Jon,
+> 
+> On Tue, Nov 06, 2012 at 02:34:05, Hunter, Jon wrote:
+> [...]
+>>>  static struct clock_event_device clockevent_gpt = {
+>>>  	.name		= "gp_timer",
+>>>  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+>>> @@ -142,6 +171,8 @@ static struct clock_event_device clockevent_gpt = {
+>>>  	.rating		= 300,
+>>>  	.set_next_event	= omap2_gp_timer_set_next_event,
+>>>  	.set_mode	= omap2_gp_timer_set_mode,
+>>> +	.suspend	= omap_clkevt_suspend,
+>>> +	.resume		= omap_clkevt_resume,
+>>
+>> So these suspend/resume callbacks are going to be called for all OMAP2+
+>> and AMxxxx devices? I don't think we want that. AFAIK OMAP timers will
+>> idle on their own when stopped and don't require this.
+>>
+> 
+> IMO instead of skipping the callback registration we could have checks in the
+> suspend/resume callbacks to decide what to do. 
+> 
+> I'll check if the idling part is AM33xx specific. If not, based on the recent timer
+> changes that you did, perhaps checking if the clockevent selected doesn't have the
+> "ti,timer-alwon" capability will be good enough. What do you think?
 
+Yes, I was thinking along the same lines. If I get chance I will try and
+test your scenario on an OMAP3 too.
 
--Olof
+Cheers
+Jon
