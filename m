@@ -1,78 +1,34 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 6 Nov 2012 16:32:31 +0100
-Subject: [PATCH v2] ARM: dts: AM33XX: Add usbss node
-In-Reply-To: <20121106142950.GA3056@arwen.pp.htv.fi>
-References: <1352212178-8472-1-git-send-email-afzal@ti.com>
- <20121106142950.GA3056@arwen.pp.htv.fi>
-Message-ID: <50992D8F.1000200@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Nov 2012 07:36:35 -0800
+Subject: [GIT PULL] ARM: tegra: fixes for 3.7-rc4
+In-Reply-To: <1351784594-28982-1-git-send-email-swarren@wwwdotorg.org>
+References: <1351784594-28982-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121106153635.GC30580@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 03:29 PM, Felipe Balbi wrote:
-> Hi,
+On Thu, Nov 01, 2012 at 09:43:14AM -0600, Stephen Warren wrote:
+> Here we have just a single fix for the Tegra30 pinctrl module's register
+> range size in device tre.
 > 
-> On Tue, Nov 06, 2012 at 07:59:38PM +0530, Afzal Mohammed wrote:
->> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
->>
->> Device tree node for usbss on AM33XX. There are two musb
->> controllers on am33xx platform so have port0-mode and
->> port1-mode data.
->>
->> [afzal at ti.com: reg & interrupt property addition]
->>
->> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
->> Signed-off-by: Santhapuri, Damodar <damodar.santhapuri@ti.com>
->> Signed-off-by: Ravi Babu <ravibabu@ti.com>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ----------------------------------------------------------------
 > 
-> to my eyes, this looks ok.
+> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
 > 
-> Reviewed-by: Felipe Balbi <balbi@ti.com>
+>   Linux 3.7-rc3
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.7-fixes-for-rc4
+> 
+> for you to fetch changes up to 322337b8fbd8c392246529d5db924820fc0c7381:
+> 
+>   ARM: dt: tegra: fix length of pad control and mux registers
 
-Thanks Felipe. Patch applied in for_3.8/dts_part2 branch.
+Hi,
 
-Regards,
-Benoit
+Looks like tegra-for-3.7-fixes-for-rc4 is not in that repo, but I did find
+a for-3.7/fixes-for-rc4 with the same contents, which I pulled.
 
-> 
->> ---
->>
->> v2: node named as "usb"
->>
->> Depends on "usb: musb: dsps: dt binding - add resources, example"
->> (https://patchwork.kernel.org/patch/1704691/)
->>
->>  arch/arm/boot/dts/am33xx.dtsi | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
->> index 5dfd682..20a3f29 100644
->> --- a/arch/arm/boot/dts/am33xx.dtsi
->> +++ b/arch/arm/boot/dts/am33xx.dtsi
->> @@ -321,5 +321,22 @@
->>  			ti,hwmods = "spi1";
->>  			status = "disabled";
->>  		};
->> +
->> +		usb at 47400000 {
->> +			compatible = "ti,musb-am33xx";
->> +			reg = <0x47400000 0x1000	/* usbss */
->> +			       0x47401000 0x800		/* musb instance 0 */
->> +			       0x47401800 0x800>;	/* musb instance 1 */
->> +			interrupts = <17		/* usbss */
->> +				      18		/* musb instance 0 */
->> +				      19>;		/* musb instance 1 */
->> +			multipoint = <1>;
->> +			num-eps = <16>;
->> +			ram-bits = <12>;
->> +			port0-mode = <3>;
->> +			port1-mode = <3>;
->> +			power = <250>;
->> +			ti,hwmods = "usb_otg_hs";
->> +		};
->>  	};
->>  };
->> -- 
->> 1.7.12
->>
-> 
+
+-Olof
