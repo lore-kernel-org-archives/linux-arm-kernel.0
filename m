@@ -1,53 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2012 21:52:27 +0000
-Subject: [RFC PATCH 2/4] ARM: kernel: add cpu logical map DT init in
- setup_arch
-In-Reply-To: <1350393709-23546-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20121106215227.GC21764@mudshark.cambridge.arm.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 06 Nov 2012 13:52:43 -0800
+Subject: [PATCHv9 2/8] ARM: OMAP4: PM: add errata support
+In-Reply-To: <87zk2vekye.fsf@deeprootsystems.com> (Kevin Hilman's message of
+ "Mon, 05 Nov 2012 14:36:25 -0800")
+References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
+ <1350552010-28760-3-git-send-email-t-kristo@ti.com>
+ <87zk2vekye.fsf@deeprootsystems.com>
+Message-ID: <87d2zq761g.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 02:21:46PM +0100, Lorenzo Pieralisi wrote:
-> As soon as the device tree is unflattened the cpu logical to physical
-> mapping is carried out in setup_arch to build a proper array of MPIDR and
-> corresponding logical indexes.
-> 
-> The mapping could have been carried out using the flattened DT blob and
-> related primitives, but since the mapping is not needed by early boot
-> code it can safely be executed when the device tree has been uncompressed to
-> its tree data structure.
-> 
-> This patch adds the arm_dt_init_cpu maps() function call in setup_arch().
-> 
-> If the kernel is not compiled with DT support the function is empty and
-> no logical mapping takes place through it; the mapping carried out in
-> smp_setup_processor_id() is left unchanged.
-> If DT is supported the mapping created in smp_setup_processor_id() is overriden.
-> The DT mapping also sets the possible cpus mask, hence platform
-> code need not set it again in the respective smp_init_cpus() functions.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/kernel/setup.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index da1d1aa..20c530b 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -758,6 +758,7 @@ void __init setup_arch(char **cmdline_p)
->  
->  	unflatten_device_tree();
->  
-> +	arm_dt_init_cpu_maps();
->  #ifdef CONFIG_SMP
->  	if (is_smp()) {
->  		smp_set_ops(mdesc->smp);
-> -- 
-> 1.7.12
+Kevin Hilman <khilman@deeprootsystems.com> writes:
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> Tero Kristo <t-kristo@ti.com> writes:
+>
+>> Added similar PM errata flag support as omap3 has. This should be used
+>> in similar manner, set the flags during init time, and check the flag
+>> values during runtime.
+>>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>
+> These allow basic suspend/resume to work on 4460/Panda-ES, so I'm going
+> to queue these up as fixes.
+>
+> However, since they're not technically regressions, it may be too late
+> to get them in for v3.7, but they'll be in for v3.8 for sure.
 
-Will
+To be more specific, I'm planning on queuing patches 2, 3 and 6 as fixes
+for v3.8 (branch: for_3.8/fixes/pm).
+
+Paul has already queued patch 1, so that leaves patches 4, 5, 7 & 8.
+
+I think we can get this series in for v3.8 if we drop the functional
+pwrst dependency.  To test, I dropped patches 5 & 7, and tested on
+4430/Panda and 4460/Panda-ES (with latest mainline u-boot) and CORE
+is hitting retention just fine in suspend.
+
+If you can respin patch 8 based on the feedback from Felipe, I'll queue
+up patches 4 & 8 for v3.8 as well, then we'll at least have CORE
+retention in suspend in mainline.  Then, the  rest can be done when
+functional pwrsts are ready.
+
+Kevin
+
+P.S. do you have any patches to add any OMAP4 CPUidle support for CORE
+     retention?
+Paul has already queued patch 1, and that leaves the 
