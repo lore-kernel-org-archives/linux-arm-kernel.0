@@ -1,43 +1,30 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 6 Nov 2012 06:09:21 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-In-Reply-To: <alpine.DEB.2.00.1211050239530.23228@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508F59FB.7080400@ti.com>
- <alpine.DEB.2.00.1211050239530.23228@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB635C9@DBDE01.ent.ti.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 06 Nov 2012 11:46:58 +0530
+Subject: [PATCH] ARM: EXYNOS5: Fix system register base address
+Message-ID: <1352182618-29134-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 08:11:24, Paul Walmsley wrote:
-> Hi
-> 
-> On Tue, 30 Oct 2012, Vaibhav Hiremath wrote:
-> 
-> > This is surprising, I have tested v3.7-rc3 branch on AM335xBone platform
-> > and its booting up for me without any issues.
-> > Jon had submitted another patch which fixes boot issue on Bone.
-> > 
-> > https://patchwork.kernel.org/patch/1606471/
-> 
-> v3.7-rc4 failed for me with a detached .dtb in a quick test.  Probably it 
-> is due to the original u-boot that was shipped with the MMC card:
-> 
+Fix incorrect PA of the system register on exynos5.
 
-Pulling the tree, let me try now and update you shortly...
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/mach-exynos/include/mach/map.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-> U-Boot 2011.09-00009-gcf6e04d (Mar 08 2012 - 17:15:43)
-> arm-arago-linux-gnueabi-gcc (GCC) 4.5.3 20110311 (prerelease)
-> 
-> 
-> Which U-boot are you using these days?
-> 
-
-I am using mainline denx u-boot.
-
-Thanks,
-Vaibhav
-
-> 
-> - Paul
-> 
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index ef4958b..6ef983c 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -55,7 +55,7 @@
+ #define EXYNOS_PA_CHIPID		0x10000000
+ 
+ #define EXYNOS4_PA_SYSCON		0x10010000
+-#define EXYNOS5_PA_SYSCON		0x10050100
++#define EXYNOS5_PA_SYSCON		0x10050000
+ 
+ #define EXYNOS4_PA_PMU			0x10020000
+ #define EXYNOS5_PA_PMU			0x10040000
+-- 
+1.6.6.1
