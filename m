@@ -1,48 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Nov 2012 15:39:03 +0100
-Subject: [PATCH v3 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <CAN1soZxVp73uNWD7Q9r_3X1hCA=JhMiMpx2UMPPGiXBtQ2QjAA@mail.gmail.com>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-10-git-send-email-haojian.zhuang@gmail.com>
- <20121101004734.GK15766@atomide.com>
- <CAN1soZxVp73uNWD7Q9r_3X1hCA=JhMiMpx2UMPPGiXBtQ2QjAA@mail.gmail.com>
-Message-ID: <CACRpkdZXfOqUM+-NCSzLJ40pP8gc9k6mx=zAjnPyrgGXckrWDw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Nov 2012 06:44:07 -0800
+Subject: [PATCH 00/15] ARM: Patchset for CLPS711X
+In-Reply-To: <1351762006-27368-16-git-send-email-shc_work@mail.ru>
+References: <1351762006-27368-1-git-send-email-shc_work@mail.ru>
+ <1351762006-27368-16-git-send-email-shc_work@mail.ru>
+Message-ID: <20121106144407.GG27284@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 6:48 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
-> On Thu, Nov 1, 2012 at 1:47 AM, Tony Lindgren <tony@atomide.com> wrote:
+On Thu, Nov 01, 2012 at 01:26:46PM +0400, Alexander Shiyan wrote:
+> Here is a next small patchset for a CLPS711X-target.
+> The main direction of this patchset - approaching the platform to the
+> possibility of using configurations with multiple platforms in a single
+> kernel. Added support of the majority of the necessary kernel symbol.
+> Also part of the driver code used only for the platform was moved to the
+> board code and converted to the use of standard drivers.
 
->>>  static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
->>>                                       struct seq_file *s,
->>> -                                     unsigned offset)
->>> +                                     unsigned pin)
->>>  {
->>>       struct pcs_device *pcs;
->>> -     unsigned val;
->>> +     unsigned val, mux_bytes;
->>>
->>>       pcs = pinctrl_dev_get_drvdata(pctldev);
->>>
->>> -     val = pcs->read(pcs->base + offset);
->>> -     val &= pcs->fmask;
->>> +     mux_bytes = pcs->width / BITS_PER_BYTE;
->>> +     val = pcs->read(pcs->base + pin * mux_bytes);
->>>
->>>       seq_printf(s, "%08x %s " , val, DRIVER_NAME);
->>>  }
->>> --
->>> 1.7.10.4
->>>
->
-> There's also include a bug fix. I'm OK that this patch could be
-> included in -rc cycle.
+Hi,
 
-A debug print can by definition not be a regression, it
-should not have a specific use other than debugging.
+Based on the pending comments from Russell, I'll hold off merging these. Please
+repost with his comments addressed and I'll be happy to merge this set.
 
-And those debugging can use linux-next or separate
-patches or whatever ... better keep this series together.
+Thanks,
 
-Yours,
-Linus Walleij
+-Olof
