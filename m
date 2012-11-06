@@ -1,52 +1,125 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 06 Nov 2012 12:41:33 -0500 (EST)
-Subject: [PATCH 15/16] mm: use vm_unmapped_area() on sparc32 architecture
-In-Reply-To: <5098BC7F.7090702@redhat.com>
-References: <1352155633-8648-16-git-send-email-walken@google.com>
- <20121105.202501.1246122770431623794.davem@davemloft.net>
- <5098BC7F.7090702@redhat.com>
-Message-ID: <20121106.124133.1287008316099748150.davem@davemloft.net>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Tue, 6 Nov 2012 11:54:23 -0600
+Subject: [PATCH v3 2/4] arm: bcm2835: convert to the irqchip infrastructure
+In-Reply-To: <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
+References: <1351462748-5224-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121106175423.GA764@beefymiracle.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rik van Riel <riel@redhat.com>
-Date: Tue, 06 Nov 2012 02:30:07 -0500
-
-> On 11/05/2012 08:25 PM, David Miller wrote:
->> From: Michel Lespinasse <walken@google.com>
->> Date: Mon,  5 Nov 2012 14:47:12 -0800
->>
->>> Update the sparc32 arch_get_unmapped_area function to make use of
->>> vm_unmapped_area() instead of implementing a brute force search.
->>>
->>> Signed-off-by: Michel Lespinasse <walken@google.com>
->>
->> Hmmm...
->>
->>> -	if (flags & MAP_SHARED)
->>> -		addr = COLOUR_ALIGN(addr);
->>> -	else
->>> -		addr = PAGE_ALIGN(addr);
->>
->> What part of vm_unmapped_area() is going to duplicate this special
->> aligning logic we need on sparc?
->>
+On Tue, Nov 06, 2012 at 10:56:39AM -0600, Josh Cartwright wrote:
+> On Sun, Oct 28, 2012 at 11:19:06PM +0100, Thomas Petazzoni wrote:
+> > Register the irq controller driver in the main
+> > drivers/irqchip/irqchip.c file, and make sure that the initialization
+> > function of the driver sets handle_arch_irq() appropriately. This
+> > requires a bit of movement in the driver since the
+> > bcm2835_handle_irq() must move before the armctrl_of_init() function
+> > to avoid a forward declaration.
+> > 
+> > On the arch/arm side, use irqchip_init() as the ->init_irq() callback,
+> > and remove the definition of ->handle_irq() since this is now done by
+> > the irq controller driver.
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+> > Reviewed-by: Rob Herring <rob.herring@calxeda.com>
+> > ---
+> [..]
+> > diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+> > index dc670cc..62d1dad 100644
+> > --- a/drivers/irqchip/irq-bcm2835.c
+> > +++ b/drivers/irqchip/irq-bcm2835.c
+> [..]
+> > @@ -199,8 +197,8 @@ static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
+> >  	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
+> >  }
+> >  
+> > -asmlinkage void __exception_irq_entry bcm2835_handle_irq(
+> > -	struct pt_regs *regs)
+> > +static asmlinkage void __exception_irq_entry
+> > +bcm2835_handle_irq(struct pt_regs *regs)
+> >  {
+> >  	u32 stat, irq;
+> >  
+> > diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
+> > index 410f99f..e2496e4 100644
+> > --- a/drivers/irqchip/irqchip.c
+> > +++ b/drivers/irqchip/irqchip.c
+> > @@ -14,6 +14,12 @@
+> >  #include "irqchip.h"
+> >  
+> >  static const struct of_device_id irqchip_of_match[] __initconst = {
+> > +#ifdef CONFIG_ARCH_BCM2835
+> > +	{
+> > +		.compatible = "brcm,bcm2835-armctrl-ic",
+> > +		.data = bcm2835_irqchip_init,
+> > +	},
+> > +#endif
+> >  	{},
+> >  };
+> >  
+> > diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
+> > index 1e7a5c2..1075537 100644
+> > --- a/drivers/irqchip/irqchip.h
+> > +++ b/drivers/irqchip/irqchip.h
+> > @@ -11,4 +11,6 @@
+> >  #ifndef _IRQCHIP_H
+> >  #define _IRQCHIP_H
+> >  
+> > +int bcm2835_irqchip_init(struct device_node *node, struct device_node *parent);
+> > +
+> >  #endif
 > 
-> That would be this part:
+> Could it make sense here to kill the irqchip.h private export, and
+> instead rely on the linker to stitch together the builtin irqchip's
+> of_device_id tables?
 > 
-> +found:
-> + /* We found a suitable gap. Clip it with the original low_limit. */
-> +	if (gap_start < info->low_limit)
-> +		gap_start = info->low_limit;
-> +
-> +	/* Adjust gap address to the desired alignment */
-> + gap_start += (info->align_offset - gap_start) & info->align_mask;
-> +
-> +	VM_BUG_ON(gap_start + info->length > info->high_limit);
-> +	VM_BUG_ON(gap_start + info->length > gap_end);
-> +	return gap_start;
-> +}
+> Something like:
+> 
+> drivers/irqchip/irq-bcm2835.c:
+> 
+> 	static bcm2835_irqchip_init(struct device_node *node, struct device_node *parent)
+> 	{
+> 		/*...*/
+> 	}
+> 
+> 	static const struct of_device_id bcm2835_match[] __initconst = {
+> 		{ .compatible = "brcm,bcm2835-armctrl-ic", .data = bcm2835_irqchip_init, },
+> 		{},
+> 	};
+> 	DECLARE_IRQCHIP(bcm2835, bcm2835_match);
+> 
+> where include/linux/irqchip.h:
+> 
+> 	#define DECLARE_IRQCHIP(name,ids) \
+> 		static of_device_id * __irqchip_##name##_matches __used \
+> 		__attribute__((__section__(".init.irqchip"))) = ids
+> 
+> drivers/irqchip/irqchip.c:
+> 
+> 	void irqchip_init(void)
+> 	{
+> 		extern of_device_id *__irqchip_matches_start[], *__irqchip_matches_end[];
+> 		struct of_device_id **matchesp;
+> 
+> 		matchesp = __irqchip_matches_start;
+> 		while (matchesp < __irqchip_matches_end)
+> 			of_irq_init(*matchesp);
 
-Ok, now I understand.  Works for me:
+Hmm...more thinking leads me to believe that calling of_irq_init()
+multiple times with an incomplete set of irqchip descriptions isn't
+going to work.
 
-Acked-by: David S. Miller <davem@davemloft.net>
+Nevertheless, the idea could be extended such that a single of_device_id
+table is generated (instead of an array of pointers to incomplete an
+incomplete table).
+
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/752a3d30/attachment.sig>
