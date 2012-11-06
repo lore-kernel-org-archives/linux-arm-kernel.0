@@ -1,79 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 6 Nov 2012 16:29:50 +0200
-Subject: [PATCH v2] ARM: dts: AM33XX: Add usbss node
-In-Reply-To: <1352212178-8472-1-git-send-email-afzal@ti.com>
-References: <1352212178-8472-1-git-send-email-afzal@ti.com>
-Message-ID: <20121106142950.GA3056@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Nov 2012 14:38:16 +0000
+Subject: [PATCH v2] ARM: plat-versatile: move FPGA irq driver to
+ drivers/irqchip
+In-Reply-To: <20121105231410.GK28327@n2100.arm.linux.org.uk>
+References: <1351805329-19576-1-git-send-email-linus.walleij@linaro.org>
+ <201211052242.26894.arnd@arndb.de>
+ <20121105231410.GK28327@n2100.arm.linux.org.uk>
+Message-ID: <201211061438.16395.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 05 November 2012, Russell King - ARM Linux wrote:
+> On Mon, Nov 05, 2012 at 10:42:26PM +0000, Arnd Bergmann wrote:
+> > On Monday 05 November 2012, Rob Herring wrote:
+> > > But this should work:
+> > > 
+> > > if (!handle_arch_irq)
+> > >         handle_arch_irq = fpga_handle_irq;
+> > > 
+> > > As long as the primary controller is always initialized first, this will
+> > > work. This is guaranteed by DT of_irq_init, and you will probably have
+> > > other problems if that wasn't the case for non-DT.
+> > 
+> > How about adding a top-level function in arch/arm that does the assignment
+> > and hides the handle_arch_irq variable:
+> > 
+> > void set_handle_irq(void (*handle_irq)(struct pt_regs *))
+> > {
+> >       if (WARN_ON(handle_arch_irq))
+> >               return;
+> > 
+> >       handle_arch_irq = handle_irq;
+> > }
+> > EXPORT_SYMBOL_GPL(set_handle_irq);
+> > 
+> > Hmm, maybe putting the top-level handler into a loadable module is a bit
+> > far-fetched, but one can hope ;-)
+> 
+> Definitely no point in exporting this (never export a symbol unless you
+> really want to use it from a module) - if you don't already have something
+> in handle_arch_irq, you're not going to get anywhere near the module
+> loader.
 
-On Tue, Nov 06, 2012 at 07:59:38PM +0530, Afzal Mohammed wrote:
-> From: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> 
-> Device tree node for usbss on AM33XX. There are two musb
-> controllers on am33xx platform so have port0-mode and
-> port1-mode data.
-> 
-> [afzal at ti.com: reg & interrupt property addition]
-> 
-> Signed-off-by: Ajay Kumar Gupta <ajay.gupta@ti.com>
-> Signed-off-by: Santhapuri, Damodar <damodar.santhapuri@ti.com>
-> Signed-off-by: Ravi Babu <ravibabu@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+Yes, I agree. While I think we might theoretically get to the point where
+even the main IRQ handler can be in a module loaded from initramfs, we
+are not anywhere close to that now, and it would be better to just export
+the symbol once it actually gets used that way.
 
-to my eyes, this looks ok.
+The one case where I think we might use it earlier is when we have an irq
+chip driver that can be either a primary or a secondary chip. It has
+to call set_handle_irq() in the former case (as a built-in driver), but
+could be a module in the latter case. If this actually happens, we might
+want to export the symbol rather than adding an "#ifdef MODULE" in the
+driver.
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
-
-> ---
-> 
-> v2: node named as "usb"
-> 
-> Depends on "usb: musb: dsps: dt binding - add resources, example"
-> (https://patchwork.kernel.org/patch/1704691/)
-> 
->  arch/arm/boot/dts/am33xx.dtsi | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> index 5dfd682..20a3f29 100644
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -321,5 +321,22 @@
->  			ti,hwmods = "spi1";
->  			status = "disabled";
->  		};
-> +
-> +		usb at 47400000 {
-> +			compatible = "ti,musb-am33xx";
-> +			reg = <0x47400000 0x1000	/* usbss */
-> +			       0x47401000 0x800		/* musb instance 0 */
-> +			       0x47401800 0x800>;	/* musb instance 1 */
-> +			interrupts = <17		/* usbss */
-> +				      18		/* musb instance 0 */
-> +				      19>;		/* musb instance 1 */
-> +			multipoint = <1>;
-> +			num-eps = <16>;
-> +			ram-bits = <12>;
-> +			port0-mode = <3>;
-> +			port1-mode = <3>;
-> +			power = <250>;
-> +			ti,hwmods = "usb_otg_hs";
-> +		};
->  	};
->  };
-> -- 
-> 1.7.12
-> 
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/34961b09/attachment.sig>
+	Arnd
