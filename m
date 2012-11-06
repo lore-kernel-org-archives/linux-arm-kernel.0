@@ -1,57 +1,87 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 06 Nov 2012 10:26:26 +0530
-Subject: [PATCH V3] ASoC: Samsung: Update Kconfig for I2S,SPDIF and PCM audio
-Message-ID: <1352177786-16505-1-git-send-email-padma.v@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue,  6 Nov 2012 13:57:26 +0900
+Subject: [PATCH 04/11] ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with
+ scu_power_mode
+In-Reply-To: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+Message-ID: <1352177853-6008-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Kconfig file to enable I2S,PCM audio for wm8994 and spdif on all
-samsung platforms.
+From: Bastian Hecht <hechtb@googlemail.com>
 
-Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
-Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+We can remove the extra code of modify_scu_cpu_psr() and use the cleaner
+generic ARM helper scu_power_mode(). As every CPU only deals with its
+own power register and scu_power_mode() operates with 8-bit accesses,
+we save the locking overhead too.
+
+Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
+ arch/arm/mach-shmobile/smp-sh73a0.c |   23 ++---------------------
+ 1 file changed, 2 insertions(+), 21 deletions(-)
 
-Changes since V2:
-	- Made driver selection based on SND_SOC_SAMSUNG as suggested by Olof
-	
-Changes since V1:
-	- Made driver selection based on MACH_EXYNOS5_DT
-
- sound/soc/samsung/Kconfig |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index e7b8317..9b3b63e 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 624f00f..96ddb97 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -41,9 +41,6 @@ static void __iomem *scu_base_addr(void)
+ 	return (void __iomem *)0xf0000000;
+ }
  
- config SND_SOC_SAMSUNG_SMDK_WM8994
- 	tristate "SoC I2S Audio support for WM8994 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 || MACH_SMDK4212)
-+	depends on SND_SOC_SAMSUNG
- 	depends on I2C=y && GENERIC_HARDIRQS
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
-@@ -162,7 +162,7 @@ config SND_SOC_GONI_AQUILA_WM8994
+-static DEFINE_SPINLOCK(scu_lock);
+-static unsigned long tmp;
+-
+ #ifdef CONFIG_HAVE_ARM_TWD
+ static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
+ void __init sh73a0_register_twd(void)
+@@ -52,20 +49,6 @@ void __init sh73a0_register_twd(void)
+ }
+ #endif
  
- config SND_SOC_SAMSUNG_SMDK_SPDIF
- 	tristate "SoC S/PDIF Audio support for SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKC100 || MACH_SMDKC110 || MACH_SMDKV210 || MACH_SMDKV310 || MACH_SMDK4212)
-+	depends on SND_SOC_SAMSUNG
- 	select SND_SAMSUNG_SPDIF
- 	help
- 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
-@@ -177,7 +177,7 @@ config SND_SOC_SMDK_WM8580_PCM
+-static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
+-{
+-	void __iomem *scu_base = scu_base_addr();
+-
+-	spin_lock(&scu_lock);
+-	tmp = __raw_readl(scu_base + 8);
+-	tmp &= ~clr;
+-	tmp |= set;
+-	spin_unlock(&scu_lock);
+-
+-	/* disable cache coherency after releasing the lock */
+-	__raw_writel(tmp, scu_base + 8);
+-}
+-
+ static unsigned int __init sh73a0_get_core_count(void)
+ {
+ 	void __iomem *scu_base = scu_base_addr();
+@@ -83,7 +66,7 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 	cpu = cpu_logical_map(cpu);
  
- config SND_SOC_SMDK_WM8994_PCM
- 	tristate "SoC PCM Audio support for WM8994 on SMDK"
--	depends on SND_SOC_SAMSUNG && (MACH_SMDKC210 || MACH_SMDKV310 || MACH_SMDK4212)
-+	depends on SND_SOC_SAMSUNG
- 	depends on I2C=y && GENERIC_HARDIRQS
- 	select MFD_WM8994
- 	select SND_SOC_WM8994
+ 	/* enable cache coherency */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	scu_power_mode(scu_base_addr(), 0);
+ 
+ 	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
+ 		__raw_writel(1 << cpu, WUPCR);	/* wake up */
+@@ -95,8 +78,6 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 
+ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ {
+-	int cpu = cpu_logical_map(0);
+-
+ 	scu_enable(scu_base_addr());
+ 
+ 	/* Map the reset vector (in headsmp.S) */
+@@ -104,7 +85,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ 	__raw_writel(__pa(shmobile_secondary_vector), SBAR);
+ 
+ 	/* enable cache coherency on CPU0 */
+-	modify_scu_cpu_psr(0, 3 << (cpu * 8));
++	scu_power_mode(scu_base_addr(), 0);
+ }
+ 
+ static void __init sh73a0_smp_init_cpus(void)
 -- 
-1.7.4.4
+1.7.10.4
