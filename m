@@ -1,70 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2012 18:34:44 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <201211061733.44781.arnd@arndb.de>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211051908.34291.arnd@arndb.de>
- <20121106122011.GE29853@mudshark.cambridge.arm.com>
- <201211061733.44781.arnd@arndb.de>
-Message-ID: <20121106183444.GJ30931@mudshark.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 6 Nov 2012 10:41:17 -0800
+Subject: [PATCHv2 1/6] arch: Change defconfigs to point to g_mass_storage.
+In-Reply-To: <20121106113157.GE11931@arwen.pp.htv.fi>
+References: <cover.1351715302.v2.git.mina86@mina86.com>
+ <46dde680f525562e9fd19567deb5247f0bf26842.1351715302.v2.git.mina86@mina86.com>
+ <20121106113157.GE11931@arwen.pp.htv.fi>
+Message-ID: <20121106184117.GJ6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 05:33:44PM +0000, Arnd Bergmann wrote:
-> On Tuesday 06 November 2012, Will Deacon wrote:
-> > nommu-XIP kernels are a different kettle
-> > of fish, but we don't care about a decompressor there.
+* Felipe Balbi <balbi@ti.com> [121106 03:40]:
+> Hi,
 > 
-> XIP is only supported on ARCH_PXA and ARCH_SA1100. I don't see either
-> of them moving to CONFIG_MULTIPLATFORM any time soon, given how much
-> work that would be. ARCH_MMP should be possible in the future, but
-> has never supported XIP so far.
-
-Indeed, although I expect systems with M-class CPUs to make more use of XIP
-(I believe Uwe's board does this and uses the framebuffer for main memory).
-
-> > The real problem will hit with things like CONFIG_DRAM_BASE, where !MMU
-> > can't realistically support multiple platforms, so allowing
-> > ARCH_MULTIPLATFORM doesn't feel quite right either...
+> On Fri, Nov 02, 2012 at 02:31:50PM +0100, Michal Nazarewicz wrote:
+> > From: Michal Nazarewicz <mina86@mina86.com>
+> > 
+> > The File-backed Storage Gadget (g_file_storage) is being removed, since
+> > it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
+> > changes defconfigs point to the new gadget.
+> > 
+> > Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
 > 
-> Anybody who wants to build a !MMU kernel already needs to tweak the
-> configuration quite a lot and usually knows more about the system than
-> a typical end user. Having to pick the correct DRAM_BASE probably
-> isn't too bad in that case, as long as the kernels actually build.
+> I need more Acks here. Only got one from Nicolas. Anyone else ?
 
-Ok, that's fair enough. Patch below.
+For omaps:
 
-Cheers,
-
-Will
-
---->8
-
-    ARM: nommu: remove MMU dependency from ARCH_MULTIPLATFORM
-    
-    ARCH_MULTIPLATFORM is the only way to select ARCH_VEXPRESS, so remove
-    the dependency on MMU and instead use it to predicate the selection of
-    ARM_PATCH_PHYS_VIRT.
-    
-    Although running a multi-platform kernel on a selection of MMU-less
-    targets might not yet be possible, the thing should build and targetting
-    a nommu platform is already a fairly involved exercise.
-    
-    Cc: Arnd Bergmann <arnd@arndb.de>
-    Cc: Pawel Moll <Pawel.Moll@arm.com>
-    Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 335e220..5758cfb 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -264,8 +264,7 @@ choice
- 
- config ARCH_MULTIPLATFORM
-        bool "Allow multiple platforms to be selected"
--       depends on MMU
--       select ARM_PATCH_PHYS_VIRT
-+       select ARM_PATCH_PHYS_VIRT if MMU
-        select AUTO_ZRELADDR
-        select COMMON_CLK
-        select MULTI_IRQ_HANDLER
+Acked-by: Tony Lindgren <tony@atomide.com>
