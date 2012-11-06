@@ -1,89 +1,49 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 6 Nov 2012 06:17:02 -0600
-Subject: [PATCH 1/5] ARM: EXYNOS: fix the hotplug for Cortex-A15
-In-Reply-To: <1352182356-28989-2-git-send-email-a.kesavan@samsung.com>
-References: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
- <1352182356-28989-2-git-send-email-a.kesavan@samsung.com>
-Message-ID: <5098FFBE.4080604@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Nov 2012 12:20:11 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <201211051908.34291.arnd@arndb.de>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <201211051908.34291.arnd@arndb.de>
+Message-ID: <20121106122011.GE29853@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012 12:12 AM, Abhilash Kesavan wrote:
-> The sequence of cpu_enter_lowpower() for Cortex-A15
-> is different from the sequence for Cortex-A9.
-Are you sure ? Apart from integrated cache vs external, there
-should be no change. And L2 doesn't need to come into picture
-while powering down just a CPU.
+On Mon, Nov 05, 2012 at 07:08:34PM +0000, Arnd Bergmann wrote:
+> On Monday 05 November 2012, Will Deacon wrote:
+> > I was playing around with !CONFIG_MMU today and to my dismay noticed that
+> > you can't select ARCH_VEXPRESS without CONFIG_MMU=y! This is because
+> > ARCH_VEXPRESS is only selectable via ARCH_MULTI_V7, which depends on
+> > ARCH_MULTIPLATFORM which in turn depends on MMU.
+> > 
+> > I'm inclined to add a dummy VEXPRESS entry to arm/Kconfig which depends on
+> > !ARCH_MULTIPLATFORM and just selects ARCH_VEXPRESS (with the if ARCH_MULTI_V7
+> > dependency dropped) but I wondered if you'd got any better ideas?
+> > 
+> 
+> I don't actually remember what the reason for making ARCH_MULTIPLATFORM
+> depend on MMU was. Maybe it just works if you drop the dependency.
+> 
+> Presumably it's related to ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR not
+> working on NOMMU, but if that's the case, we could make it
+> 
+> 
+> ARCH_MULTIPLATFORM
+> 	bool "Allow multiple platforms to be selected"
+> 	select ARM_PATCH_PHYS_VIRT if !MMU
+> 	select AUTO_ZRELADDR if !MMU
 
-> This patch implements cpu_enter_lowpower() for EXYNOS5
-> SoC which has Cortex-A15 cores.
->
-> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
-> ---
->   arch/arm/mach-exynos/hotplug.c |   45 +++++++++++++++++++++++++++++++++++++--
->   1 files changed, 42 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index f4d7dd2..8c06c4f 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -20,10 +20,11 @@
->   #include <asm/smp_plat.h>
->
->   #include <mach/regs-pmu.h>
-> +#include <plat/cpu.h>
->
->   #include "common.h"
->
-> -static inline void cpu_enter_lowpower(void)
-> +static inline void cpu_enter_lowpower_a9(void)
->   {
->   	unsigned int v;
->
-> @@ -45,6 +46,35 @@ static inline void cpu_enter_lowpower(void)
->   	  : "cc");
->   }
->
-> +static inline void cpu_enter_lowpower_a15(void)
-> +{
-> +	unsigned int v;
-> +
-> +	asm volatile(
-> +	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> +	"	bic	%0, %0, %1\n"
-> +	"	mcr	p15, 0, %0, c1, c0, 0\n"
-> +	  : "=&r" (v)
-> +	  : "Ir" (CR_C)
-> +	  : "cc");
-> +
-> +	flush_cache_all();
-> +
-Why are flushing all the cache levels ?
-flush_kern_louis() should be enough for CPU power
-down.
+you mean if MMU, right?
 
-> +	asm volatile(
-> +	/*
-> +	* Turn off coherency
-> +	*/
-> +	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> +	"	bic	%0, %0, %1\n"
-> +	"	mcr	p15, 0, %0, c1, c0, 1\n"
-> +	: "=&r" (v)
-> +	: "Ir" (0x40)
-> +	: "cc");
-> +
-> +	isb();
-> +	dsb();
-> +}
-> +
-The above sequence should work on A9 as well. In general you should have
-CPU power down code under one code block and avoid making use of stack 
-in between. Otherwise you will end up with stack corruption because of
-the memory view change after C bit is disabled.
+> but maybe those actually work without MMU as well. I have never looked too
+> closely at NOMMU configurations, every time I tried, they were broken in
+> combination with something else I wanted to enable.
 
-Regards
-Santosh
+ARM_PATCH_PHYS_VIRT wouldn't make any sense, but I can't see why
+AUTO_ZRELADDR wouldn't be ok. nommu-XIP kernels are a different kettle
+of fish, but we don't care about a decompressor there.
+
+The real problem will hit with things like CONFIG_DRAM_BASE, where !MMU
+can't realistically support multiple platforms, so allowing
+ARCH_MULTIPLATFORM doesn't feel quite right either...
+
+Will
