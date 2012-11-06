@@ -1,52 +1,33 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 06 Nov 2012 11:42:33 +0530
-Subject: [PATCH 2/5] ARM: EXYNOS5: Add support for rtc wakeup
-In-Reply-To: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
-References: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1352182356-28989-3-git-send-email-a.kesavan@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 6 Nov 2012 06:07:57 +0000
+Subject: [PATCH 06/15] ARM: OMAP2+: hwmod: Enable OCMCRAM registration
+ in AM33XX
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC03374@DBDE01.ent.ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
+ <5097698F.1080609@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC03374@DBDE01.ent.ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB635BB@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Inderpal Singh <inderpal.singh@samsung.com>
+On Mon, Nov 05, 2012 at 23:27:53, Bedia, Vaibhav wrote:
+> On Mon, Nov 05, 2012 at 12:53:59, Hiremath, Vaibhav wrote:
+> > 
+> > Can you cut-n-paste the ocmcram hwmod entry outside of #if and resubmit
+> > it again?
+> > 
+> 
+> Ok. Will do that in the next version.
+> 
 
-Set the gic arch extension callback to support rtc wakeup.
+Another suggestion, all hwmod patches looks independent and trivial to me, 
+so can you submit all hwmod patches separately so that it can go separately?
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
-Signed-off-by: Inderpal Singh <inderpal.singh@samsung.com>
----
- arch/arm/mach-exynos/common.c           |    2 ++
- arch/arm/plat-samsung/include/plat/pm.h |    2 ++
- 2 files changed, 4 insertions(+), 0 deletions(-)
+Thanks,
+Vaibhav
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 4e577f6..300c40f 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -631,6 +631,8 @@ void __init exynos5_init_irq(void)
- 	 * uses GIC instead of VIC.
- 	 */
- 	s5p_init_irq(NULL, 0);
-+
-+	gic_arch_extn.irq_set_wake = s3c_irq_wake;
- }
- 
- struct bus_type exynos_subsys = {
-diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
-index 61fc537..887a0c9 100644
---- a/arch/arm/plat-samsung/include/plat/pm.h
-+++ b/arch/arm/plat-samsung/include/plat/pm.h
-@@ -107,10 +107,12 @@ extern void s3c_pm_do_restore(struct sleep_save *ptr, int count);
- extern void s3c_pm_do_restore_core(struct sleep_save *ptr, int count);
- 
- #ifdef CONFIG_PM
-+extern int s3c_irq_wake(struct irq_data *data, unsigned int state);
- extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
- extern int s3c24xx_irq_suspend(void);
- extern void s3c24xx_irq_resume(void);
- #else
-+#define s3c_irq_wake NULL
- #define s3c_irqext_wake NULL
- #define s3c24xx_irq_suspend NULL
- #define s3c24xx_irq_resume  NULL
--- 
-1.6.6.1
+> Regards,
+> Vaibhav 
+> 
+> 
