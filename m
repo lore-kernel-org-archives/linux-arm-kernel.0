@@ -1,98 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 6 Nov 2012 09:03:44 +0100
-Subject: [PATCH V2 RESEND 2/5] gpiolib: provide provision for gpiolib to
- register pin range
-In-Reply-To: <77b462979e474f8b921d0f5ab8ac5b2a2fb2808e.1351330569.git.viresh.kumar@linaro.org>
-References: <cover.1351330569.git.viresh.kumar@linaro.org>
- <77b462979e474f8b921d0f5ab8ac5b2a2fb2808e.1351330569.git.viresh.kumar@linaro.org>
-Message-ID: <CACRpkdYm6AUaRJQ3=G4tvkMrFEOpvkLC8oLFFeC5m235q21akA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Nov 2012 09:58:00 +0200
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB6361E@DBDE01.ent.ti.com>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <20121030162727.GG11908@atomide.com>
+ <20121030172707.GB3993@arwen.pp.htv.fi>
+ <20121030175856.GK11908@atomide.com>
+ <20121030185102.GC4804@arwen.pp.htv.fi>
+ <79CD15C6BA57404B839C016229A409A83EB6361E@DBDE01.ent.ti.com>
+Message-ID: <20121106075726.GA10873@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 27, 2012 at 11:51 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Hi,
 
-> From: Shiraz Hashim <shiraz.hashim@st.com>
->
-> pinctrl subsystem needs gpio chip base to prepare set of gpio pin ranges, which
-> a given pinctrl driver can handle. This is important to handle pinctrl gpio
-> request calls in order to program a given pin properly for gpio operation.
->
-> As gpio base is allocated dynamically during gpiochip registration, presently
-> there exists no clean way to pass this information to the pinctrl subsystem.
->
-> After few discussions from [1], it was concluded that may be gpio controller
-> reporting the pin range it supports, is a better way than pinctrl subsystem
-> directly registering it.
->
-> [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/184816
->
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+On Tue, Nov 06, 2012 at 07:17:19AM +0100, Hiremath, Vaibhav wrote:
+> On Wed, Oct 31, 2012 at 00:21:02, Balbi, Felipe wrote:
+> > Hi,
+> > 
+> > On Tue, Oct 30, 2012 at 10:58:59AM -0700, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [121030 10:34]:
+> > > > Hi,
+> > > > 
+> > > > On Tue, Oct 30, 2012 at 09:27:28AM -0700, Tony Lindgren wrote:
+> > > > > * Vaibhav Hiremath <hvaibhav@ti.com> [121030 07:50]:
+> > > > > > > 
+> > > > > > > MMC is dependent on EDMA-DMA conversion patches from Matt, which he has 
+> > > > > > > already submitted to the list recently. So MMC support will come along with
+> > > > > > > EDMA support. DMA-EDMA patches are targeted for v3.8, lets see how it goes.
+> > > > > 
+> > > > > This is a bogus dependency, the MMC driver needs to also work
+> > > > > without DMA.
+> > > > 
+> > > > heh, too bad driver errors out when it doesn't find DMA channels :-)
+> > > 
+> > > It should just print a warning instead and continue.
+> > >  
+> > > > 1869         host->rx_chan = dma_request_channel(mask, omap_dma_filter_fn, &rx_req);
+> > > > 1870         if (!host->rx_chan) {
+> > > > 1871                 dev_err(mmc_dev(host->mmc), "unable to obtain RX DMA engine channel %u\n", rx_req);
+> > > > 1872                 ret = -ENXIO;
+> > > > 1873                 goto err_irq;
+> > > > 1874         }
+> > > > 1875 
+> > > > 1876         host->tx_chan = dma_request_channel(mask, omap_dma_filter_fn, &tx_req);
+> > > > 1877         if (!host->tx_chan) {
+> > > > 1878                 dev_err(mmc_dev(host->mmc), "unable to obtain TX DMA engine channel %u\n", tx_req);
+> > > > 1879                 ret = -ENXIO;
+> > > > 1880                 goto err_irq;
+> > > > 1881         }
+> > > > 
+> > > > in fact, if DMAENGINE isn't enabled, this won't even compile due to
+> > > > omap_dma_filter_fn() right ?
+> > > 
+> > > It should, CONFIG_DMADEVICES is optional. If it does not compile,
+> > > then there's a bug somewhere.
+> > 
+> > you're right, there's a static inline nop for when we don't have omap
+> > dma engine driver compiled.
+> > 
+> > nevermind.
+> > 
+> 
+> Did anybody tried polling mode MMC support on OMAP devices in the
+> past?
 
-Hey thanks for working out the details of this!!
+why are you trying out polling when we have a working interrupt mode ?
 
-Patch applied, but I was a bit picky about the English in the
-documentation so I patched it around a little, hope you don't
-mind (diff below).
-
-I will now try to make the U300 use this new range concep
-as guinea pig, and that platform is *not* using DT so we'll
-see for sure if it works :-)
-
-Yours,
-Linus Walleij
-
--gpio-controller and pinctrl subsystem
-+GPIO controllers and the pinctrl subsystem
- ------------------------------------------
-
--gpio-controller on a SOC might be tightly coupled with the pinctrl
-+A GPIO controller on a SOC might be tightly coupled with the pinctrl
- subsystem, in the sense that the pins can be used by other functions
--together with optional gpio feature.
-+together with an optional gpio feature. We have already covered the
-+case where e.g. a GPIO controller need to reserve a pin or set the
-+direction of a pin by calling any of:
-
--While the pin allocation is totally managed by the pin ctrl subsystem,
-+pinctrl_request_gpio()
-+pinctrl_free_gpio()
-+pinctrl_gpio_direction_input()
-+pinctrl_gpio_direction_output()
-+
-+But how does the pin control subsystem cross-correlate the GPIO
-+numbers (which are a global business) to a certain pin on a certain
-+pin controller?
-+
-+This is done by registering "ranges" of pins, which are essentially
-+cross-reference tables. These are described in
-+Documentation/pinctrl.txt
-+
-+While the pin allocation is totally managed by the pinctrl subsystem,
- gpio (under gpiolib) is still maintained by gpio drivers. It may happen
- that different pin ranges in a SoC is managed by different gpio drivers.
-
- This makes it logical to let gpio drivers announce their pin ranges to
--the pin ctrl subsystem and call 'pinctrl_request_gpio' in order to
--request the corresponding pin before any gpio usage.
-+the pin ctrl subsystem before it will call 'pinctrl_request_gpio' in order
-+to request the corresponding pin to be prepared by the pinctrl subsystem
-+before any gpio usage.
-
--For this, the gpio controller can register its pin range with pinctrl subsystem
--There are two ways of doing it currently with or without DT.
-+For this, the gpio controller can register its pin range with pinctrl
-+subsystem. There are two ways of doing it currently: with or without DT.
-
- For with DT support refer to Documentation/devicetree/bindings/gpio/gpio.txt.
-
- For non-DT support, user can call gpiochip_add_pin_range() with appropriate
- parameters to register a range of gpio pins with a pinctrl driver. For this
--exact name string of pinctrl device has to be passed as one of the argument to
--this routine.
-+exact name string of pinctrl device has to be passed as one of the
-+argument to this routine.
-
-
- What do these conventions omit?
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/6107e7d4/attachment.sig>
