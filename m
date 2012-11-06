@@ -1,39 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 10:51:45 -0800
-Subject: [GIT PULL] ARM: OMAP: PM: few more fixes for v3.7-rc
-In-Reply-To: <87objbczw8.fsf@deeprootsystems.com>
-References: <87objbczw8.fsf@deeprootsystems.com>
-Message-ID: <20121106185144.GO6801@atomide.com>
+Date: Tue, 6 Nov 2012 09:59:59 -0800
+Subject: [GIT PULL 3/3] omap prcm cleanup for v3.8 merge window, part1
+In-Reply-To: <20121105185133.GC22301@quad.lixom.net>
+References: <pull-1351286620-406688> <E1TRrO0-00087R-UM@merlin.infradead.org>
+ <20121105185133.GC22301@quad.lixom.net>
+Message-ID: <20121106175959.GC6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [121105 16:58]:
-> Hi Tony,
+* Olof Johansson <olof@lixom.net> [121105 10:53]:
 > 
-> Here's a couple more trivial fixes for v3.7-rc.
-> 
-> Thanks,
-> 
-> Kevin
-> 
-> 
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-> 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.7-rc5-fixes-pm
-> 
-> for you to fetch changes up to 73c503cb981394872db41dd5cde385cb5373b4b9:
-> 
->   ARM: OMAP4: PM: fix regulator name for VDD_MPU (2012-11-05 16:30:29 -0800)
-> 
-> ----------------------------------------------------------------
-> Minor OMAP PM fixes for v3.7-rc
-> 
+> The history of this branch looks a little odd. Did you mean to merge in
+> cleanup-headers on top of Paul's branch in it? It seems to add no value -- all
+> that code is already in our branch and it resolves no conflicts, etc.
 
-Thanks pulling into omap-for-v3.7-rc4/fixes.
+Oh that was because I wanted to keep the header clean up separate
+and Paul needed some base for further PRCM work that would not
+conflict with the header changes. And I wanted to get the first
+set of Paul's changes into linux next early to avoid a big pile
+of pull requests later on.
+ 
+> That being said, it causes no harm, and I've pulled it in as is.
+
+OK thanks.
 
 Regards,
 
