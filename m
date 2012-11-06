@@ -1,77 +1,231 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 6 Nov 2012 10:32:27 +0530
-Subject: [PATCH v2 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <CAPcSpEKDAEp5rS8RRpcyHN9WUUtJNppUuKvnZ6YX-tgertJBNQ@mail.gmail.com>
-References: <1351197357-23528-1-git-send-email-rtivy@ti.com>
- <1351197357-23528-5-git-send-email-rtivy@ti.com>
- <CAPcSpEKDAEp5rS8RRpcyHN9WUUtJNppUuKvnZ6YX-tgertJBNQ@mail.gmail.com>
-Message-ID: <CA+V-a8uUHm5QEvzv4wxift2RTV5bLUVEJ8XBWyMZLSqNQssnhQ@mail.gmail.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 6 Nov 2012 05:07:54 +0000
+Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
+In-Reply-To: <5097ECAD.9010101@ti.com>
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-3-git-send-email-anilkumar@ti.com> <5097ECAD.9010101@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+On Mon, Nov 05, 2012 at 22:13:25, Cousson, Benoit wrote:
+> Hi Anil / Colin,
+> 
+> On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
+> > From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+> > 
+> > Add system power off control to rtc driver which is the in-charge
+> > of controlling the BeagleBone system power. The power_off routine
+> > can be hooked up to "pm_power_off" system call.
+> > 
+> > System power off sequence:-
+> > * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+> > * Enable PMIC_POWER_EN in rtc module
+> > * Set rtc ALARM2 time
+> > * Enable ALARM2 interrupt
+> > 
+> > Added while (1); after the above steps to make sure that no other
+> > process acquire cpu. Otherwise we might see an unexpected behaviour
+> > because we are shutting down all the power rails of SoC except RTC.
+> > 
+> > Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
+> > [anilkumar at ti.com: move poweroff additions to rtc driver]
+> > Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+> > ---
+> >  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+> >  drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
+> >  2 files changed, 83 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > index b47aa41..8d9f4f9 100644
+> > --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+> > @@ -6,6 +6,10 @@ Required properties:
+> >  - interrupts: rtc timer, alarm interrupts in order
+> >  - interrupt-parent: phandle for the interrupt controller
+> >  
+> > +Optional properties:
+> > +- ti,system-power-controller: Telling whether or not rtc is controlling
+> > +  the system power.
+> 
+> I don't know how it is connected at board level, but I'm not sure the
+> binding is the proper one.
 
-On Thu, Nov 1, 2012 at 7:22 PM, Ben Gardiner <bengardiner@nanometrics.ca> wrote:
-> Hi Rob,
->
-> On Thu, Oct 25, 2012 at 4:35 PM, Robert Tivy <rtivy@ti.com> wrote:
->> [...]
->> @@ -660,6 +667,99 @@ int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
->>  }
->>  #endif
->>
->> +static struct platform_device *da8xx_dsp;
->> +
->> +#ifdef CONFIG_CMA
->> +
->> +/*
->> + * The following address range was chosen because the XDC Platform for
->> + * OMAP-L138 DSP has this range as its default code/data placement.
->> + */
->> +#define DA8XX_RPROC_CMA_BASE  (0xc3000000)
->> [...]
->> +/*
->> + * The following address range was chosen because the XDC Platform for
->> + * OMAP-L138 DSP has this range as its default code/data placement.
->> + *
->> + * System integrators must ensure that Linux does not own this range.
->> + */
->> +#define DA_CONTIG_BASE (0xc3000000)
->> +#define DA_CONTIG_SIZE (0x02000000)
->
-Is there a specific requirement for the dsp dev to have the buffers from
-this '0xc3000000' address range only ? If yes then dma_declare_contiguous()
-is must to ensure contiguous memory so the above macros cant be avoided.
-If there isn?t a requirement of a specific region for dsp device you can use a
-global CMA instead, so as to ensure you have contiguous memory.
+Hi Benoit,
+ ________________________________
+|   ______          _______      |
+|  |      |        |       |     |
+|  |RTC   |        |       |     |
+|  |PMIC  |  Line  |       |     |
+|  |PWR_EN|=======>|PWR_EN |     |
+|  |______|        |_______|     |
+|  AM335x SoC       TPS65217     |
+|                                |
+|________________________________|
+          BeagleBone
 
-Regards,
---Prabhakar Lad
+This is how RTC PMIC_PWR_EN is connected to PWR_EN of TPS65217 PMIC. Only when
+RTC pull low in PMIC_PWR_EN then PMIC will go to power off state provided TPS65217
+status should be changed to STATUS_OFF.
 
-> I am concerned with the rigidity of the memory hole as its definition
-> is currently proposed.
+ALARM2 event should be trigger to configure PMIC_PWR_EN properly then the "Line"
+driven low so that PMIC will go to shutdown mode.
+
+Thanks
+AnilKumar
+
+> It does not look super generic, and I'm wondering if we should not use
+> instead some regulator binding to reflect the connection of the RTC to a
+> regulator.
+> 
+> But without the board / soc spec it is hard to tell :-(
 >
-> As you noted DA_CONTIG_BASE and DA_CONTIG_SIZE must describe a range
-> that is not used by Linux. Ideally this hole would not be in the
-> middle of the usuable memory but instead at the top. For L138 boards
-> with larger DDR packages this would mean carrying a patch to this
-> file.
->
-> I think the same also applies to DA8XX_RPROC_CMA_BASE but I have no
-> hands-on experience yet with CMA.
->
-> Is there any other means by which the hole's location and size can be
-> specified which does not require patching this file? I imagine KConfig
-> would work, but is this an acceptable use of KConfig?
->
-> Best Regards,
-> Ben Gardiner
->
-> ---
-> Nanometrics Inc.
-> http://www.nanometrics.ca
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+> Regards,
+> Benoit
+> 
+> 
+> > +
+> >  Example:
+> >  
+> >  rtc at 1c23000 {
+> > @@ -14,4 +18,5 @@ rtc at 1c23000 {
+> >  	interrupts = <19
+> >  		      19>;
+> >  	interrupt-parent = <&intc>;
+> > +	ti,system-power-controller;
+> >  };
+> > diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
+> > index 6009714..2d90170 100644
+> > --- a/drivers/rtc/rtc-omap.c
+> > +++ b/drivers/rtc/rtc-omap.c
+> > @@ -72,6 +72,14 @@
+> >  #define OMAP_RTC_KICK0_REG		0x6c
+> >  #define OMAP_RTC_KICK1_REG		0x70
+> >  
+> > +#define OMAP_RTC_ALARM2_SECONDS_REG	0x80
+> > +#define OMAP_RTC_ALARM2_MINUTES_REG	0x84
+> > +#define OMAP_RTC_ALARM2_HOURS_REG	0x88
+> > +#define OMAP_RTC_ALARM2_DAYS_REG	0x8c
+> > +#define OMAP_RTC_ALARM2_MONTHS_REG	0x90
+> > +#define OMAP_RTC_ALARM2_YEARS_REG	0x94
+> > +#define OMAP_RTC_PMIC_REG		0x98
+> > +
+> >  /* OMAP_RTC_CTRL_REG bit fields: */
+> >  #define OMAP_RTC_CTRL_SPLIT		(1<<7)
+> >  #define OMAP_RTC_CTRL_DISABLE		(1<<6)
+> > @@ -93,15 +101,24 @@
+> >  #define OMAP_RTC_STATUS_BUSY            (1<<0)
+> >  
+> >  /* OMAP_RTC_INTERRUPTS_REG bit fields: */
+> > +#define OMAP_RTC_INTERRUPTS_IT_ALARM2   (1<<4)
+> >  #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
+> >  #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
+> >  
+> > +/* OMAP_RTC_PMIC_REG bit fields: */
+> > +#define OMAP_RTC_PMIC_POWER_EN_EN       (1<<16)
+> > +
+> >  /* OMAP_RTC_KICKER values */
+> >  #define	KICK0_VALUE			0x83e70b13
+> >  #define	KICK1_VALUE			0x95a4f1e0
+> >  
+> >  #define	OMAP_RTC_HAS_KICKER		0x1
+> >  
+> > +#define SHUTDOWN_TIME_SEC		2
+> > +#define SECS_IN_MIN			60
+> > +#define WAIT_AFTER			(SECS_IN_MIN - SHUTDOWN_TIME_SEC)
+> > +#define WAIT_TIME_MS			(SHUTDOWN_TIME_SEC * 1000)
+> > +
+> >  static void __iomem	*rtc_base;
+> >  
+> >  #define rtc_read(addr)		readb(rtc_base + (addr))
+> > @@ -290,6 +307,58 @@ static int omap_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
+> >  	return 0;
+> >  }
+> >  
+> > +/*
+> > + * rtc_power_off: Set the pmic power off sequence. The RTC generates
+> > + * pmic_pwr_enable control, which can be used to control an external
+> > + * PMIC.
+> > + */
+> > +static void rtc_power_off(void)
+> > +{
+> > +	u32 val;
+> > +	struct rtc_time tm;
+> > +	spinlock_t lock;
+> > +	unsigned long flags;
+> > +
+> > +	spin_lock_init(&lock);
+> > +
+> > +	/* Set PMIC power enable */
+> > +	val = readl(rtc_base + OMAP_RTC_PMIC_REG);
+> > +	writel(val | OMAP_RTC_PMIC_POWER_EN_EN, rtc_base + OMAP_RTC_PMIC_REG);
+> > +
+> > +	/* Wait few seconds instead of rollover */
+> > +	do {
+> > +		omap_rtc_read_time(NULL, &tm);
+> > +		if (WAIT_AFTER <= tm.tm_sec)
+> > +			mdelay(WAIT_TIME_MS);
+> > +	} while (WAIT_AFTER <= tm.tm_sec);
+> > +
+> > +	/* Add shutdown time to the current value */
+> > +	tm.tm_sec += SHUTDOWN_TIME_SEC;
+> > +
+> > +	if (tm2bcd(&tm) < 0)
+> > +		return;
+> > +
+> > +	pr_info("System will go to power_off state in approx. %d secs\n",
+> > +			SHUTDOWN_TIME_SEC);
+> > +
+> > +	/* Set the ALARM2 time */
+> > +	rtc_write(tm.tm_sec, OMAP_RTC_ALARM2_SECONDS_REG);
+> > +	rtc_write(tm.tm_min, OMAP_RTC_ALARM2_MINUTES_REG);
+> > +	rtc_write(tm.tm_hour, OMAP_RTC_ALARM2_HOURS_REG);
+> > +	rtc_write(tm.tm_mday, OMAP_RTC_ALARM2_DAYS_REG);
+> > +	rtc_write(tm.tm_mon, OMAP_RTC_ALARM2_MONTHS_REG);
+> > +	rtc_write(tm.tm_year, OMAP_RTC_ALARM2_YEARS_REG);
+> > +
+> > +	/* Enable alarm2 interrupt */
+> > +	val = readl(rtc_base + OMAP_RTC_INTERRUPTS_REG);
+> > +	writel(val | OMAP_RTC_INTERRUPTS_IT_ALARM2,
+> > +				rtc_base + OMAP_RTC_INTERRUPTS_REG);
+> > +
+> > +	/* Do not allow to execute any other task */
+> > +	spin_lock_irqsave(&lock, flags);
+> > +	while (1);
+> > +}
+> > +
+> >  static struct rtc_class_ops omap_rtc_ops = {
+> >  	.read_time	= omap_rtc_read_time,
+> >  	.set_time	= omap_rtc_set_time,
+> > @@ -327,12 +396,16 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+> >  	struct resource		*res, *mem;
+> >  	struct rtc_device	*rtc;
+> >  	u8			reg, new_ctrl;
+> > +	bool			pm_off = false;
+> >  	const struct platform_device_id *id_entry;
+> >  	const struct of_device_id *of_id;
+> >  
+> >  	of_id = of_match_device(omap_rtc_of_match, &pdev->dev);
+> > -	if (of_id)
+> > +	if (of_id) {
+> >  		pdev->id_entry = of_id->data;
+> > +		pm_off = of_property_read_bool(pdev->dev.of_node,
+> > +					"ti,system-power-controller");
+> > +	}
+> >  
+> >  	omap_rtc_timer = platform_get_irq(pdev, 0);
+> >  	if (omap_rtc_timer <= 0) {
+> > @@ -385,6 +458,10 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
+> >  	platform_set_drvdata(pdev, rtc);
+> >  	dev_set_drvdata(&rtc->dev, mem);
+> >  
+> > +	/* RTC power off */
+> > +	if (pm_off && !pm_power_off)
+> > +		pm_power_off = rtc_power_off;
+> > +
+> >  	/* clear pending irqs, and set 1/second periodic,
+> >  	 * which we'll use instead of update irqs
+> >  	 */
+> > 
+> 
+> 
