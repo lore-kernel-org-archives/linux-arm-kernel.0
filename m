@@ -1,76 +1,53 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Mon, 05 Nov 2012 16:01:33 -0800
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
- (Jean Pihet's message of "Mon, 5 Nov 2012 10:26:27 +0100")
-References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
- <20121025101212.GD21217@arwen.pp.htv.fi>
- <20121026201539.GD29548@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
- <20121029200032.GD30152@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
- <20121030123254.GD29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
- <20121030125419.GG29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
- <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
- <87fw4u3oh5.fsf@deeprootsystems.com>
- <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
- <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
- <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
- <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
- <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
- <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
-Message-ID: <87fw4neh0i.fsf@deeprootsystems.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2012 00:24:44 +0000
+Subject: [PATCH V6 3/6] arm: cache-l2x0: add support for Aurora L2
+ cache ctrl
+In-Reply-To: <509850C5.9080903@free-electrons.com>
+References: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
+ <1348738523-28609-1-git-send-email-gregory.clement@free-electrons.com>
+ <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121023090154.GP21164@n2100.arm.linux.org.uk>
+ <508666A6.9040701@free-electrons.com>
+ <20121023100057.GS21164@n2100.arm.linux.org.uk>
+ <5086700E.10702@free-electrons.com>
+ <20121104223215.GA28327@n2100.arm.linux.org.uk>
+ <509850C5.9080903@free-electrons.com>
+Message-ID: <20121106002444.GL28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean Pihet <jean.pihet@newoldbits.com> writes:
+On Tue, Nov 06, 2012 at 12:50:29AM +0100, Gregory CLEMENT wrote:
+> The initial patch 7547/2 was superseded by the patch 7547/3 that I have just
+> pushed in the patch system. Last time first I fixed the code then I used the
+> versatile_defconfig configuration to test the compilation and didn't realize
+> that it did set CONFIG_OF by default.
 
-[...]
+Are you sure you put the right patch in there?
 
-> I ran some intensive stress tests on the I2C and ... unfortunately I
-> could not trigger the problem. It looks like the issue is caused by
-> some transient situation where the CORE and/or I2C is in a low power
-> state.
+diff -u <(pdb getpatch 7547/2) <(pdb getpatch 7547/3)
+--- /dev/fd/63	2012-11-06 00:23:54.451978759 +0000
++++ /dev/fd/62	2012-11-06 00:23:54.452978749 +0000
+@@ -1,5 +1,5 @@
+ ===============================================================================
+-Patch: 7547/2: cache-l2x0: add support for Aurora L2 cache ctrl
++Patch: 7547/3: cache-l2x0: add support for Aurora L2 cache ctrl
+ From: Gregory CLEMENT
+ Email: gregory.clement@free-electrons.com
+ Status: 3.7-rc1
+@@ -10,6 +10,8 @@
+  arch/arm/mm/cache-l2x0.c                   |  222 +++++++++++++++++++++++++++--
+  3 files changed, 268 insertions(+), 13 deletions(-)
+ -------------------------------------------------------------------------------
++diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
++index 5f2c7b4..3b2c40b 100644
+ --- a/arch/arm/include/asm/hardware/cache-l2x0.h
+ +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+ @@ -102,6 +102,10 @@
+@@ -443,3 +445,5 @@
+  
+  	if (data->save)
+ 
++
++
 
-FYI... I just ran across what appears to be the same bug on 3430/n900
-during suspend/resume testing.  With CPUidle enabled, this happens every
-time.
-
-Reverting the I2C QoS patch makes it work again.
-
-Kevin
-
-
-# rtcwake -m mem -s 1
-Date:    Fri Dec 31 17:00:34 MST 1999
-hwclock: Sat Jan  1 00:00:34 2000  0.000000 seconds
-[   38.819732] omap_i2c omap_i2c.1: timeout waiting for bus ready
-wakeup from "mem" at Sat Jan  1 00:00:36 2000
-[   38.841949] PM: Syncing filesystems ... done.
-[   38.859466] Freezing user space processes ... (elapsed 0.01 seconds) done.
-[   38.885284] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
-[   38.916412] Suspending console(s) (use no_console_suspend to debug)
-[   39.944274] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   39.944305] twl: i2c_read failed to transfer all messages
-[   39.944305] twl_rtc: Could not read TWLregister D - error -110
-[   39.944335] twl_rtc twl_rtc: twl_rtc_read_time: reading CTRL_REG, error -110
-[   40.975524] omap_i2c omap_i2c.1: timeout waiting for bus ready
-[   40.975555] twl: i2c_read failed to transfer all messages
-[   40.975555] VMMC2_IO_18: failed to disable
-[   40.978698] PM: suspend of devices complete after 2049.163 msecs
-[   40.984222] PM: late suspend of devices complete after 5.493 msecs
-[   40.992126] PM: noirq suspend of devices complete after 7.873 msecs
-[   40.992187] Disabling non-boot CPUs ...
-[   40.992675] Successfully put all powerdomains to target state
-[   40.997009] PM: noirq resume of devices complete after 4.058 msecs
-[   41.002014] PM: early resume of devices complete after 3.601 msecs
-[   41.179016] PM: resume of devices complete after 176.818 msecs
-[   41.277740] Restarting tasks ... done.
-real    0m 3.50s
-user    0m 0.00s
-sys     0m 0.10s
-Date:    Fri Dec 31 17:00:40 MST 1999
-hwclock: Sat Jan  1 00:00:40 2000  0.000000 seconds
+Looks mostly idential to me...
