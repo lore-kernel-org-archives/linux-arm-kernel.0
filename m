@@ -1,22 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Nov 2012 06:11:28 -0800
-Subject: [GIT PULL 1/6] DaVinci fixes for v3.8
-In-Reply-To: <1351620701-16516-1-git-send-email-nsekhar@ti.com>
-References: <1351620701-16516-1-git-send-email-nsekhar@ti.com>
-Message-ID: <20121106141128.GD27284@quad.lixom.net>
+Date: Tue, 6 Nov 2012 06:19:25 -0800
+Subject: [GIT PULL v2] Renesas ARM-based SoC defconfig for v3.8
+In-Reply-To: <1351731731-8435-1-git-send-email-horms@verge.net.au>
+References: <1351731731-8435-1-git-send-email-horms@verge.net.au>
+Message-ID: <20121106141925.GE27284@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 11:41:36PM +0530, Sekhar Nori wrote:
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+On Thu, Nov 01, 2012 at 09:02:08AM +0800, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+> please consider the following defconfig enhancements for 3.8.
+> 
+> I will work on the suggestions by Arnd to reduce the number
+> of defconfigs for shmobile - in essence moving towards one or
+> two generic configs rather than per-board configs. However,
+> this seems to be somewhat non-trivial and in the mean time
+> I would like to keep updating the existing defcoings.
+> 
+> ----------------------------------------------------------------
+> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+> 
+>   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.8/fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig
 
+Thanks, pulled into next/boards with the other branch.
 
-Pulled, thanks.
 
 -Olof
