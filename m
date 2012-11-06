@@ -1,28 +1,30 @@
-From: viresh.kumar@linaro.org (viresh kumar)
-Date: Tue, 6 Nov 2012 09:06:18 +0530
-Subject: [PATCH] clk: spear: Add stub functions for
- spear3[0|1|2]0_clk_init()
-In-Reply-To: <1352169260.2625.4.camel@phoenix>
-References: <1352169260.2625.4.camel@phoenix>
-Message-ID: <CAOh2x==ng3A66P=Vx+-C791LTGCS1fWVpMfUKDorU5G=ZXrjLQ@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 05 Nov 2012 20:40:18 -0700
+Subject: [PATCH v2 1/2] mailbox: OMAP: introduce mailbox framework
+In-Reply-To: <1352170552-29564-2-git-send-email-omar.luna@linaro.org>
+References: <1352170552-29564-1-git-send-email-omar.luna@linaro.org>
+ <1352170552-29564-2-git-send-email-omar.luna@linaro.org>
+Message-ID: <509886A2.5060509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2012 at 8:04 AM, Axel Lin <axel.lin@ingics.com> wrote:
-> This fixes compile error if one of SPEAr3xx implementations is not selected.
->
->   CC      drivers/clk/spear/spear3xx_clock.o
-> drivers/clk/spear/spear3xx_clock.c: In function 'spear3xx_clk_init':
-> drivers/clk/spear/spear3xx_clock.c:599:3: error: implicit declaration of function 'spear300_clk_init' [-Werror=implicit-function-declaration]
-> drivers/clk/spear/spear3xx_clock.c:601:3: error: implicit declaration of function 'spear310_clk_init' [-Werror=implicit-function-declaration]
-> drivers/clk/spear/spear3xx_clock.c:603:3: error: implicit declaration of function 'spear320_clk_init' [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[3]: *** [drivers/clk/spear/spear3xx_clock.o] Error 1
-> make[2]: *** [drivers/clk/spear] Error 2
-> make[1]: *** [drivers/clk] Error 2
-> make: *** [drivers] Error 2
->
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+On 11/05/2012 07:55 PM, Omar Ramirez Luna wrote:
+> Actually moving it from plat-omap, as this framework/driver code is
+> supposed to be under drivers/ folder. The framework should work with
+> the current supported OMAP processors (OMAP1+) that have mailbox and
+> can be used as a method of interprocessor communication.
+> 
+> The mailbox hardware (in OMAP) uses a queued mailbox-interrupt mechanism
+> that provides a communication channel between processors through a set of
+> registers and their associated interrupt signals by sending and receiving
+> messages.
 
-Thanks..
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
+
+Is this a public interface to the driver? If so, shouldn't the header be
+in include/linux somewhere?
+
+Is this a generic interface to any mailbox driver? If so, then I don't
+think having "omap" in the symbol names is appropriate. If the header is
+specific to the OMAP driver, I don't think using the very generic
+filename "mailbox.h" is appropriate; use omap_mailbox.h instead?
