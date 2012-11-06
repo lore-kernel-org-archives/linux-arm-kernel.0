@@ -1,50 +1,60 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 07 Nov 2012 01:23:23 +0800
-Subject: arch/arm/kernel/smp_twd.c:370:3: warning: 'return' with a value,
- in function returning void
-Message-ID: <5099478b.CqCWLYBtIvQWdTBe%fengguang.wu@intel.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 6 Nov 2012 23:02:32 +0530
+Subject: [PATCH V4 0/7] ARM: AM33XX: net: Add DT support to CPGMAC and MDIO
+ driver
+Message-ID: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/soc
-head:   f60be0d5c1f2dd0188205f04a4a7b8778234fd9c
-commit: 0336517b38c5fd643784eeee8f0d73efd48e3361 ARM: smp_twd: don't warn on no DT node
-date:   6 days ago
-config: make ARCH=arm imx_v6_v7_defconfig
+This patch-series adds support for,
 
-All warnings:
+[1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
 
-arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
-arch/arm/kernel/smp_twd.c:370:3: warning: 'return' with a value, in function returning void [enabled by default]
+[2/7]: Adds parent<->child relation between CPSW & MDIO module inside cpsw
+       driver, as in case of AM33XX, the resources are shared and common
+       register bit-field is provided to control module/clock enable/disable,
+       makes it difficult to handle common resource.
 
-vim +370 +/return arch/arm/kernel/smp_twd.c
+       So the solution here is, to create parent<->child relation between them.
 
-d8e03643 Marc Zyngier 2012-01-10  354  
-d8e03643 Marc Zyngier 2012-01-10  355  #ifdef CONFIG_OF
-d8e03643 Marc Zyngier 2012-01-10  356  const static struct of_device_id twd_of_match[] __initconst = {
-d8e03643 Marc Zyngier 2012-01-10  357  	{ .compatible = "arm,cortex-a9-twd-timer",	},
-d8e03643 Marc Zyngier 2012-01-10  358  	{ .compatible = "arm,cortex-a5-twd-timer",	},
-d8e03643 Marc Zyngier 2012-01-10  359  	{ .compatible = "arm,arm11mp-twd-timer",	},
-d8e03643 Marc Zyngier 2012-01-10  360  	{ },
-d8e03643 Marc Zyngier 2012-01-10  361  };
-d8e03643 Marc Zyngier 2012-01-10  362  
-d8e03643 Marc Zyngier 2012-01-10  363  void __init twd_local_timer_of_register(void)
-d8e03643 Marc Zyngier 2012-01-10  364  {
-d8e03643 Marc Zyngier 2012-01-10  365  	struct device_node *np;
-d8e03643 Marc Zyngier 2012-01-10  366  	int err;
-d8e03643 Marc Zyngier 2012-01-10  367  
-d8e03643 Marc Zyngier 2012-01-10  368  	np = of_find_matching_node(NULL, twd_of_match);
-0336517b Rob Herring  2012-10-25  369  	if (!np)
-0336517b Rob Herring  2012-10-25 @370  		return -ENODEV;
-d8e03643 Marc Zyngier 2012-01-10  371  
-d8e03643 Marc Zyngier 2012-01-10  372  	twd_ppi = irq_of_parse_and_map(np, 0);
-d8e03643 Marc Zyngier 2012-01-10  373  	if (!twd_ppi) {
-d8e03643 Marc Zyngier 2012-01-10  374  		err = -EINVAL;
-d8e03643 Marc Zyngier 2012-01-10  375  		goto out;
-d8e03643 Marc Zyngier 2012-01-10  376  	}
-d8e03643 Marc Zyngier 2012-01-10  377  
-d8e03643 Marc Zyngier 2012-01-10  378  	twd_base = of_iomap(np, 0);
+[3/7]: Add hwmod entry for MDIO module, required for MDIO driver.
 
----
-0-DAY kernel build testing backend         Open Source Technology Center
-Fengguang Wu, Yuanhan Liu                              Intel Corporation
+[4/7]: cpsw: simplify the setup of the register pointers
+
+[5/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
+       am335x-evm.dts and am335x-bone.dts file
+
+[6/7]: Enable CPSW support to omap2plus_defconfig
+
+[7/7]: cpsw: Kernel warn fix during suspend
+
+This patch series has been created on top of net-next/master and tested
+on BeagleBone platform for NFS boot and basic ping test cases.
+
+Changes from V3:
+* Removed unnecessary flags in Davinci MDIO Hwmod entry.
+
+Mugunthan V N (4):
+  ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
+  arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
+  ARM: OMAP2+: omap2plus_defconfig: Enable CPSW support
+  net: cpsw: halt network stack before halting the device during
+    suspend
+
+Richard Cochran (1):
+  cpsw: simplify the setup of the register pointers
+
+Vaibhav Hiremath (2):
+  net: davinci_mdio: Fix typo mistake in calling runtime-pm api
+  net: cpsw: Add parent<->child relation support between cpsw and mdio
+
+ Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
+ arch/arm/boot/dts/am335x-bone.dts              |    8 +
+ arch/arm/boot/dts/am335x-evm.dts               |    8 +
+ arch/arm/boot/dts/am33xx.dtsi                  |   42 +++++
+ arch/arm/configs/omap2plus_defconfig           |    3 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c     |   31 ++++
+ drivers/net/ethernet/ti/cpsw.c                 |  231 ++++++++++--------------
+ drivers/net/ethernet/ti/davinci_mdio.c         |    2 +-
+ include/linux/platform_data/cpsw.h             |   19 --
+ 9 files changed, 192 insertions(+), 186 deletions(-)
