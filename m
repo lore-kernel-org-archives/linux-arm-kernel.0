@@ -1,52 +1,28 @@
-From: chuansheng.liu@intel.com (Chuansheng Liu)
-Date: Wed, 07 Nov 2012 01:18:37 +0800
-Subject: [PATCH 1/7] I2c-nomadik: Fix the usage of wait_for_completion_timeout
-Message-ID: <1352222317.15558.1584.camel@cliu38-desktop-build>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 6 Nov 2012 09:26:12 +0100
+Subject: [PATCH 1/2] ASoC: Ux500: Fixup use of clocks
+In-Reply-To: <CAPDyKFqgFvY67QR8LA_KTEQwDi3o2wH=MY-D89k023-2S=ioFw@mail.gmail.com>
+References: <1350909125-20189-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121022133003.GF4477@opensource.wolfsonmicro.com>
+ <CAPDyKFqgFvY67QR8LA_KTEQwDi3o2wH=MY-D89k023-2S=ioFw@mail.gmail.com>
+Message-ID: <20121106082612.GF3283@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 05, 2012 at 03:27:08PM +0100, Ulf Hansson wrote:
 
-The return value of wait_for_completion_timeout() is always
->= 0 with unsigned int type.
+> I can not find this patch on any "next-tree" yet. Same goes for:
+> "[PATCH 2/2] ASoC: Ux500: Control apb clock".
 
-So the condition "ret < 0" or "ret >= 0" is pointless.
+> Maybe I should be more patient, but thought it make sense to send a
+> ping on this. :-)
 
-Signed-off-by: liu chuansheng <chuansheng.liu@intel.com>
----
- drivers/i2c/busses/i2c-nomadik.c |   14 --------------
- 1 files changed, 0 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
-index 02c3115..8b2ffcf 100644
---- a/drivers/i2c/busses/i2c-nomadik.c
-+++ b/drivers/i2c/busses/i2c-nomadik.c
-@@ -435,13 +435,6 @@ static int read_i2c(struct nmk_i2c_dev *dev, u16 flags)
- 	timeout = wait_for_completion_timeout(
- 		&dev->xfer_complete, dev->adap.timeout);
- 
--	if (timeout < 0) {
--		dev_err(&dev->adev->dev,
--			"wait_for_completion_timeout "
--			"returned %d waiting for event\n", timeout);
--		status = timeout;
--	}
--
- 	if (timeout == 0) {
- 		/* Controller timed out */
- 		dev_err(&dev->adev->dev, "read from slave 0x%x timed out\n",
-@@ -523,13 +516,6 @@ static int write_i2c(struct nmk_i2c_dev *dev, u16 flags)
- 	timeout = wait_for_completion_timeout(
- 		&dev->xfer_complete, dev->adap.timeout);
- 
--	if (timeout < 0) {
--		dev_err(&dev->adev->dev,
--			"wait_for_completion_timeout "
--			"returned %d waiting for event\n", timeout);
--		status = timeout;
--	}
--
- 	if (timeout == 0) {
- 		/* Controller timed out */
- 		dev_err(&dev->adev->dev, "write to slave 0x%x timed out\n",
--- 
-1.7.0.4
+As I've had to tell you before pings are pointless, don't do this - to
+repeat, if you think something has been missed resend it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/d3358676/attachment.sig>
