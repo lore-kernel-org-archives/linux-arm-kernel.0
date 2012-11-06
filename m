@@ -1,44 +1,47 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 6 Nov 2012 14:11:37 -0800
-Subject: [PATCH 00/16] mm: use augmented rbtrees for finding unmapped areas
-In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
-References: <1352155633-8648-1-git-send-email-walken@google.com>
-Message-ID: <20121106141137.68bbd4ea.akpm@linux-foundation.org>
+From: samuel.ortiz@intel.com (Samuel Ortiz)
+Date: Tue, 6 Nov 2012 23:24:03 +0100
+Subject: [PATCH 0/7] Add support for Freescale's mc34708 to mc13xxx driver
+In-Reply-To: <CAOMZO5CXtOT7pi6hOOwYxxthTfDZYcYe5QFTnGR=L_S82NM_Lg@mail.gmail.com>
+References: <1342087073-3892-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <11987916.rOoNGcb1ly@dev1>
+ <CAOMZO5AVP1L-6A7cmV-kQEfG1C+vczFKT=sQbFtLJDaGau0kRg@mail.gmail.com>
+ <CAOMZO5BqZpy5Cz0BxbpdOY=sjMjhSOjfQZmJ4j7Xwe6Q7x6Yig@mail.gmail.com>
+ <20121004135130.GC5554@sortiz-mobl>
+ <CAOMZO5CXtOT7pi6hOOwYxxthTfDZYcYe5QFTnGR=L_S82NM_Lg@mail.gmail.com>
+Message-ID: <20121106222401.GA17580@sortiz-mobl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Nov 2012 14:46:57 -0800
-Michel Lespinasse <walken@google.com> wrote:
+Hi Fabio,
 
-> Earlier this year, Rik proposed using augmented rbtrees to optimize
-> our search for a suitable unmapped area during mmap(). This prompted
-> my work on improving the augmented rbtree code. Rik doesn't seem to
-> have time to follow up on his idea at this time, so I'm sending this
-> series to revive the idea.
+On Sat, Oct 27, 2012 at 05:19:11PM -0200, Fabio Estevam wrote:
+> Hi Samuel,
+> 
+> On Thu, Oct 4, 2012 at 10:51 AM, Samuel Ortiz <samuel.ortiz@intel.com> wrote:
+> 
+> >> I want to add mc34708 support to mx53qsb and need this series to be applied.
+> > I understand. I'll queue it to my for-next branch as soon as the merge window
+> > is closed.
+> 
+> Could you please queue this series? I still do not see it applied in
+> your 'for-next-merge' branch.
+Patches 6 and 7 were not applied from this serie. I now applied them to my
+for-next branch.
 
-Well, the key word here is "optimize".  Some quantitative testing
-results would be nice, please!
+Cheers,
+Samuel.
 
-People do occasionally see nasty meltdowns in the get_unmapped_area()
-vicinity.  There was one case 2-3 years ago which was just ghastly, but
-I can't find the email (it's on linux-mm somewhere).  This one might be
-another case:
-http://lkml.indiana.edu/hypermail/linux/kernel/1101.1/00896.html
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
+---------------------------------------------------------------------
+Intel Corporation SAS (French simplified joint stock company)
+Registered headquarters: "Les Montalets"- 2, rue de Paris, 
+92196 Meudon Cedex, France
+Registration Number:  302 456 199 R.C.S. NANTERRE
+Capital: 4,572,000 Euros
 
-If you can demonstrate that this patchset fixes some of all of the bad
-search complexity scenarios then that's quite a win?
-
-> These changes are against v3.7-rc4. I have not converted all applicable
-> architectuers yet, but we don't necessarily need to get them all onboard
-> at once - the series is fully bisectable and additional architectures
-> can be added later on. I am confident enough in my tests for patches 1-8;
-> however the second half of the series basically didn't get tested as
-> I don't have access to all the relevant architectures.
-
-Yes, I'll try to get these into -next so that the thousand monkeys at
-least give us some compilation coverage testing.  Hopefully the
-relevant arch maintainers will find time to perform a runtime test.
-
-> Patch 1 is the validate_mm() fix from Bob Liu (+ fixed-the-fix from me :)
-
-I grabbed this one separately, as a post-3.6 fix.
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
