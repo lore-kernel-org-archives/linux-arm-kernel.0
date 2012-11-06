@@ -1,32 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2012 20:20:38 +0000
-Subject: scheduler clock for MXS
-In-Reply-To: <20121106134630.GD27643@S2100-06.ap.freescale.net>
-References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
- <20121105025753.GA26528@S2100-06.ap.freescale.net>
- <50978370.9060001@meduna.org>
- <20121105134655.GB27260@S2100-06.ap.freescale.net>
- <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
- <5098CB9F.9030401@meduna.org>
- <20121106134630.GD27643@S2100-06.ap.freescale.net>
-Message-ID: <20121106202038.GB32398@n2100.arm.linux.org.uk>
+From: smuckle@codeaurora.org (Steve Muckle)
+Date: Tue, 06 Nov 2012 12:24:20 -0800
+Subject: ARM: idle sleep time for hotplugged cpu
+In-Reply-To: <20121105091533.GB28327@n2100.arm.linux.org.uk>
+References: <50973842.9010708@codeaurora.org>
+ <20121105091533.GB28327@n2100.arm.linux.org.uk>
+Message-ID: <509971F4.4060604@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 09:46:31PM +0800, Shawn Guo wrote:
-> On Tue, Nov 06, 2012 at 09:34:39AM +0100, Stanislav Meduna wrote:
-> > Shawn: could you try change the
-> >   update_sched_clock();
-> > to
-> >   sched_clock_poll(sched_clock_timer.data);
-> > right after update_sched_clock call in setup_sched_clock?
-> > 
-> With the change, it still wraps at 2 seconds.
+On 11/05/12 01:15, Russell King - ARM Linux wrote:
+> On Mon, Nov 05, 2012 at 09:23:38AM +0530, Taniya Das wrote:
+>> I was looking at the arch/arm/process.c:cpu_die, I was wondering why we
+>> do not exit from NOHZ for a hotplugged/offline cpu?
+> 
+> Offlined CPUs are not supposed to just 'return' from cpu_die(), and
+> in actual fact they can't.
 
-And there's no way that such a change could ever go into mainline; it
-can mean that the timer is registered into the timer subsystem before
-the timer subsystem has been initialised.  That's why we postpone that
-part to time_init().
+Although an offline CPU will not come back into the idle thread by
+returning from cpu_die(), I believe the question about exiting nohz mode
+before cpu_die() still stands.
 
-(And it has _always_ been intended that this sched_clock() implementation
-would be usable by the time setup_arch() completes...)
+>From arch/arm/process.c:cpu_idle() it appears a CPU could enter
+pm_idle() for a while (in nohz mode), then execute the inner loop again
+and call cpu_die(). Is there the potential for cpu idle time accounting
+to get messed up here by not exiting nohz mode prior to the cpu dying,
+so that missed ticks from nohz are properly accounted for?
+
+thanks,
+Steve
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
