@@ -1,49 +1,40 @@
-From: omaplinuxkernel@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 6 Nov 2012 15:36:45 +0530
-Subject: OMAP baseline test results for v3.7-rc1
-In-Reply-To: <87fw4neh0i.fsf@deeprootsystems.com>
-References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
- <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
- <20121025101212.GD21217@arwen.pp.htv.fi>
- <20121026201539.GD29548@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
- <20121029200032.GD30152@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
- <20121030123254.GD29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
- <20121030125419.GG29095@arwen.pp.htv.fi>
- <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
- <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
- <87fw4u3oh5.fsf@deeprootsystems.com>
- <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
- <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
- <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
- <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
- <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
- <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
- <87fw4neh0i.fsf@deeprootsystems.com>
-Message-ID: <CAM=Q2cs2LO3LOQxSMJTXZLZNsmMiLAOxMcWwSf0Wxt-Fnz6QZA@mail.gmail.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 6 Nov 2012 10:09:08 +0000
+Subject: [PATCH 3/7] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
+ davinci_mdio module
+In-Reply-To: <1352189545-26303-4-git-send-email-mugunthanvnm@ti.com>
+References: <1352189545-26303-1-git-send-email-mugunthanvnm@ti.com>
+ <1352189545-26303-4-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC049CC@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2012 at 5:31 AM, Kevin Hilman
-<khilman@deeprootsystems.com> wrote:
-> Jean Pihet <jean.pihet@newoldbits.com> writes:
->
-> [...]
->
->> I ran some intensive stress tests on the I2C and ... unfortunately I
->> could not trigger the problem. It looks like the issue is caused by
->> some transient situation where the CORE and/or I2C is in a low power
->> state.
->
-> FYI... I just ran across what appears to be the same bug on 3430/n900
-> during suspend/resume testing.  With CPUidle enabled, this happens every
-> time.
->
-> Reverting the I2C QoS patch makes it work again.
+On Tue, Nov 06, 2012 at 13:42:21, N, Mugunthan V wrote:
+[...]
+> +struct omap_hwmod_addr_space am33xx_mdio_addr_space[] = {
+> +	{
+> +		.pa_start	= 0x4A101000,
+> +		.pa_end		= 0x4A101000 + SZ_256 - 1,
+> +		.flags		= ADDR_MAP_ON_INIT,
 
-I think we should defer the release of the constraints
+Based on the recent discussions and looking the hwmod code,
+I guess ADDR_MAP_ON_INIT does not make sense here. Since you
+are just creating a parent-child relationship here, maybe no
+flag is needed? 
 
-Does this help
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg79841.html
+> +	},
+> +	{ }
+> +};
+> +
+> +struct omap_hwmod_ocp_if am33xx_cpgmac0__mdio = {
+> +	.master		= &am33xx_cpgmac0_hwmod,
+> +	.slave		= &am33xx_mdio_hwmod,
+> +	.addr		= am33xx_mdio_addr_space,
+> +	.user		= OCP_USER_MPU,
+
+Is this flag necessary? Shouldn't you just skip the
+user field since there's nothing for the hwmod code
+to do here?
+
+Regards,
+Vaibhav
