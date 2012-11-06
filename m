@@ -1,35 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Nov 2012 20:35:58 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <20121106183444.GJ30931@mudshark.cambridge.arm.com>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211061733.44781.arnd@arndb.de>
- <20121106183444.GJ30931@mudshark.cambridge.arm.com>
-Message-ID: <201211062035.58250.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 6 Nov 2012 22:32:26 +0200
+Subject: [PATCHv2 1/6] arch: Change defconfigs to point to g_mass_storage.
+In-Reply-To: <20121106184227.GK6801@atomide.com>
+References: <cover.1351715302.v2.git.mina86@mina86.com>
+ <46dde680f525562e9fd19567deb5247f0bf26842.1351715302.v2.git.mina86@mina86.com>
+ <20121106113157.GE11931@arwen.pp.htv.fi>
+ <20121106184117.GJ6801@atomide.com>
+ <20121106184227.GK6801@atomide.com>
+Message-ID: <20121106203226.GB6291@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012, Will Deacon wrote:
->     ARM: nommu: remove MMU dependency from ARCH_MULTIPLATFORM
->     
->     ARCH_MULTIPLATFORM is the only way to select ARCH_VEXPRESS, so remove
->     the dependency on MMU and instead use it to predicate the selection of
->     ARM_PATCH_PHYS_VIRT.
->     
->     Although running a multi-platform kernel on a selection of MMU-less
->     targets might not yet be possible, the thing should build and targetting
->     a nommu platform is already a fairly involved exercise.
->     
->     Cc: Arnd Bergmann <arnd@arndb.de>
->     Cc: Pawel Moll <Pawel.Moll@arm.com>
->     Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi,
+
+On Tue, Nov 06, 2012 at 10:42:27AM -0800, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [121106 10:41]:
+> > * Felipe Balbi <balbi@ti.com> [121106 03:40]:
+> > > Hi,
+> > > 
+> > > On Fri, Nov 02, 2012 at 02:31:50PM +0100, Michal Nazarewicz wrote:
+> > > > From: Michal Nazarewicz <mina86@mina86.com>
+> > > > 
+> > > > The File-backed Storage Gadget (g_file_storage) is being removed, since
+> > > > it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
+> > > > changes defconfigs point to the new gadget.
+> > > > 
+> > > > Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> > > 
+> > > I need more Acks here. Only got one from Nicolas. Anyone else ?
+> > 
+> > For omaps:
+> > 
+> > Acked-by: Tony Lindgren <tony@atomide.com>
 > 
+> Heh I guess no omap changes there, so probably not
+> worth adding then.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+omap1 is old, but it's still omap :-)
 
-Before we apply this, I should probably do a round of randconfig tests. Right now,
-I have a series that fixes all build errors we currently get from randconfig
-(which always selects MULTIPLATFORM since it doesn't randomize choice statements),
-but I am pretty sure that adding NOMMU into the mix gives us a lot of new errors.
+ arch/arm/configs/omap1_defconfig                   |    3 +--
 
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/76039d0b/attachment.sig>
