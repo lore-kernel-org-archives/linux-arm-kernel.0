@@ -1,122 +1,138 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 6 Nov 2012 10:04:26 -0500
-Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
- clk driver
-In-Reply-To: <5098D904.7050707@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
- <50950F7E.2080309@ti.com> <5097D93E.10403@ti.com> <5098D904.7050707@ti.com>
-Message-ID: <509926FA.3050700@ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 6 Nov 2012 16:16:34 +0100
+Subject: [PATCH 1/5] gpiolib: fix up function prototypes etc
+Message-ID: <1352214994-30232-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 04:31 AM, Sekhar Nori wrote:
->
-> On 11/5/2012 8:50 PM, Murali Karicheri wrote:
->> On 11/03/2012 08:35 AM, Sekhar Nori wrote:
->>> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->>>> This is the common clk driver initialization functions for DaVinci
->>>> SoCs and other SoCs that uses similar hardware architecture.
->>>> clock.h also defines struct types for clock definitions in a SoC
->>>> and clock data type for configuring clk-mux. The initialization
->>>> functions are used by clock initialization code in a specific
->>>> platform/SoC.
->>>>
->>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>> ---
->>>>    drivers/clk/davinci/clock.c |  112
->>>> +++++++++++++++++++++++++++++++++++++++++++
->>>>    drivers/clk/davinci/clock.h |   80 +++++++++++++++++++++++++++++++
->>>>    2 files changed, 192 insertions(+)
->>>>    create mode 100644 drivers/clk/davinci/clock.c
->>>>    create mode 100644 drivers/clk/davinci/clock.h
->>>>
->>>> diff --git a/drivers/clk/davinci/clock.c b/drivers/clk/davinci/clock.c
->>>> new file mode 100644
->>>> index 0000000..ad02149
->>>> --- /dev/null
->>>> +++ b/drivers/clk/davinci/clock.c
->>>> @@ -0,0 +1,112 @@
->>>> +/*
->>>> + * clock.c - davinci clock initialization functions for various clocks
->>>> + *
->>>> + * Copyright (C) 2006-2012 Texas Instruments.
->>>> + * Copyright (C) 2008-2009 Deep Root Systems, LLC
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License as published by
->>>> + * the Free Software Foundation; either version 2 of the License, or
->>>> + * (at your option) any later version.
->>>> + */
->>>> +#include <linux/init.h>
->>>> +#include <linux/clk-provider.h>
->>>> +#include <linux/clkdev.h>
->>>> +#include <linux/io.h>
->>>> +#include <linux/slab.h>
->>>> +
->>>> +#include "clk-pll.h"
->>>> +#include "clk-psc.h"
->>>> +#include "clk-div.h"
->>>> +#include "clock.h"
->>>> +
->>>> +static DEFINE_SPINLOCK(_lock);
->>>> +
->>>> +#ifdef    CONFIG_CLK_DAVINCI_PLL
->>>> +struct clk *davinci_pll_clk(const char *name, const char *parent,
->>>> +        u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
->>>> +        struct clk_pll_data *pll_data)
->>>> +{
->>>> +    struct clk *clkp = NULL;
->>>> +
->>>> +    pll_data->reg_pllm = ioremap(phys_pllm, 4);
->>>> +    if (WARN_ON(!pll_data->reg_pllm))
->>>> +        return clkp;
->>> I would prefer ERR_PTR(-ENOMEM) here. Same comment applies to other
->>> instances elsewhere in the patch.
->>>
->>>> diff --git a/drivers/clk/davinci/clock.h b/drivers/clk/davinci/clock.h
->>>> new file mode 100644
->>>> index 0000000..73204b8
->>>> --- /dev/null
->>>> +++ b/drivers/clk/davinci/clock.h
->>>> @@ -0,0 +1,80 @@
->>>> +/*
->>>> + * TI DaVinci Clock definitions -  Contains Macros and Types used for
->>>> + * defining various clocks on a DaVinci SoC
->>>> + *
->>>> + * Copyright (C) 2012 Texas Instruments
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or
->>>> + * modify it under the terms of the GNU General Public License as
->>>> + * published by the Free Software Foundation version 2.
->>>> + *
->>>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>>> + * kind, whether express or implied; without even the implied warranty
->>>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + */
->>>> +#ifndef __DAVINCI_CLOCK_H
->>>> +#define __DAVINCI_CLOCK_H
->>>> +
->>>> +#include <linux/types.h>
->>>> +
->>>> +/* general flags: */
->>>> +#define ALWAYS_ENABLED        BIT(0)
->>> This is not used in this patch. Can you add the define along with its
->>> usage so it is immediately clear why you need it?
->> This is used on the next patch as this adds a bunch of utilities or
->> types for the platform specific clock code. Do you want to combine this
->> patch with 05/11?  It will become a bigger patch then? Is that fine.
->> IMO, this is a logical group that can be a standalone patch than
->> combining with 05/11.
-> It is more important to divide patches in logical functional blocks
-> rather than split it based on files. Reading this patch, I have no idea
-> what that define is for.
->
-> Thanks,
-> Sekhar
->
->
-Will combine with 05/11 since utilities are used by the clock init code 
-in dm644x.
-Murali
+From: Linus Walleij <linus.walleij@linaro.org>
+
+Commit 69e1601bca88809dc118abd1becb02c15a02ec71
+"gpiolib: provide provision to register pin ranges"
+
+Got most of it's function prototypes wrong, so fix this up by:
+
+- Moving the void declarations into static inlines in
+  <linux/gpio.h> (previously the actual prototypes were declared
+  here...)
+
+- Declare the gpiochip_add_pin_range() and
+  gpiochip_remove_pin_ranges() functions in <asm-generic/gpio.h>
+  together with the pin range struct declaration itself.
+
+- Actually only implement these very functions in gpiolib.c
+  if CONFIG_PINCTRL is set.
+
+- Additionally export the symbols since modules will need to
+  be able to do this.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/gpio/gpiolib.c     | 10 +++++-----
+ include/asm-generic/gpio.h |  6 ++++++
+ include/linux/gpio.h       | 24 ++++++++++++++++++------
+ 3 files changed, 29 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 3e84796..10fc9c3 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1183,6 +1183,7 @@ struct gpio_chip *gpiochip_find(void *data,
+ EXPORT_SYMBOL_GPL(gpiochip_find);
+ 
+ #ifdef CONFIG_PINCTRL
++
+ void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+ 		unsigned int pin_base, unsigned int npins)
+ {
+@@ -1204,6 +1205,7 @@ void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+ 
+ 	list_add_tail(&pin_range->node, &chip->pin_ranges);
+ }
++EXPORT_SYMBOL_GPL(gpiochip_add_pin_range);
+ 
+ void gpiochip_remove_pin_ranges(struct gpio_chip *chip)
+ {
+@@ -1215,11 +1217,9 @@ void gpiochip_remove_pin_ranges(struct gpio_chip *chip)
+ 				&pin_range->range);
+ 	}
+ }
+-#else
+-void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+-		unsigned int pin_base, unsigned int npins) {}
+-void gpiochip_remove_pin_ranges(struct gpio_chip *chip) {}
+-#endif
++EXPORT_SYMBOL_GPL(gpiochip_remove_pin_ranges);
++
++#endif /* CONFIG_PINCTRL */
+ 
+ /* These "optional" allocation calls help prevent drivers from stomping
+  * on each other, and help provide better diagnostics in debugfs.
+diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
+index 92e5c43..2e60de4 100644
+--- a/include/asm-generic/gpio.h
++++ b/include/asm-generic/gpio.h
+@@ -49,6 +49,7 @@ struct module;
+ struct device_node;
+ 
+ #ifdef CONFIG_PINCTRL
++
+ /**
+  * struct gpio_pin_range - pin range controlled by a gpio chip
+  * @head: list for maintaining set of pin ranges, used internally
+@@ -61,6 +62,11 @@ struct gpio_pin_range {
+ 	struct pinctrl_dev *pctldev;
+ 	struct pinctrl_gpio_range range;
+ };
++
++void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
++			    unsigned int pin_base, unsigned int npins);
++void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
++
+ #endif
+ 
+ /**
+diff --git a/include/linux/gpio.h b/include/linux/gpio.h
+index a284459..21d28b9 100644
+--- a/include/linux/gpio.h
++++ b/include/linux/gpio.h
+@@ -72,9 +72,9 @@ static inline int irq_to_gpio(unsigned int irq)
+ 	return -EINVAL;
+ }
+ 
+-#endif
++#endif /* ! CONFIG_ARCH_HAVE_CUSTOM_GPIO_H */
+ 
+-#else
++#else /* ! CONFIG_GENERIC_GPIO */
+ 
+ #include <linux/kernel.h>
+ #include <linux/types.h>
+@@ -231,9 +231,21 @@ static inline int irq_to_gpio(unsigned irq)
+ 	return -EINVAL;
+ }
+ 
+-void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
+-		unsigned int pin_base, unsigned int npins);
+-void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
+-#endif
++#ifdef CONFIG_PINCTRL
++
++static inline void
++gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
++		       unsigned int pin_base, unsigned int npins)
++{
++}
++
++static inline void
++gpiochip_remove_pin_ranges(struct gpio_chip *chip)
++{
++}
++
++#endif /* CONFIG_PINCTRL */
++
++#endif /* ! CONFIG_GENERIC_GPIO */
+ 
+ #endif /* __LINUX_GPIO_H */
+-- 
+1.7.11.3
