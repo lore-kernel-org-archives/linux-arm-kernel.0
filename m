@@ -1,39 +1,39 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 6 Nov 2012 06:06:20 +0000
-Subject: [PATCH 04/15] ARM: OMAP2+: hwmod: Update the reset API for AM33XX
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC0336F@DBDE01.ent.ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-5-git-send-email-vaibhav.bedia@ti.com>
- <5097639C.7000800@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC0336F@DBDE01.ent.ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB635A4@DBDE01.ent.ti.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 06 Nov 2012 11:42:31 +0530
+Subject: [PATCH 0/5] PM Fixes for exynos5
+Message-ID: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 23:27:52, Bedia, Vaibhav wrote:
-> On Mon, Nov 05, 2012 at 12:28:36, Hiremath, Vaibhav wrote:
-> [...]
-> > > -	u32 mask = 1 << shift;
-> > > -
-> > > -	/* Check the current status to avoid  de-asserting the line twice */
-> > > -	if (am33xx_prm_is_hardreset_asserted(shift, inst, rstctrl_offs) == 0)
-> > > -		return -EEXIST;
-> > 
-> > Any specific reason why you have removed this check?
-> 
-> During bootup the hardreset line is asserted, so wouldn't that check lead
-> to the function always returning without doing anything?
-> 
+This patchset comprises fixes to properly enable PM support on exynos5.
+Based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-next branch.
 
-The check is,
+Patches 1 and 4 are re-posts of patches sent earlier by Changhwan Youn and
+Inderpal Singh respectively. Links follow:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/098930.html
+http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/10947
 
-/* Check the current status to avoid  de-asserting the line twice */
-if (am33xx_prm_is_hardreset_asserted(shift, inst, rstctrl_offs) == 0)
-	return -EEXIST;
+Patch 2 is a fix in cpuidle while patch 3 enables the RTC alarm as a wake
+up source.
 
+Patch 5 adds a machine specific "flush_cache_all" as it is no longer part
+of the core suspend routine. This was suggested by Lorenzo Pieralisi.
 
-The code is checking whether the line is already de-asserted (== 0), so I am 
-not sure how this will change if hardreset line is asserted during bootup.
+These patches have been tested on SMDK5250.
 
-Thanks,
-Vaibhav
+Abhilash Kesavan (3):
+  ARM: EXYNOS: fix the hotplug for Cortex-A15
+  ARM: EXYNOS5: Remove scu_enable from cpuidle
+  ARM: EXYNOS5: Add flush_cache_all in suspend finisher
+
+Inderpal Singh (2):
+  ARM: EXYNOS5: Add support for rtc wakeup
+  ARM: EXYNOS: Fix soft reboot hang after suspend/resume
+
+ arch/arm/mach-exynos/common.c           |    2 +
+ arch/arm/mach-exynos/cpuidle.c          |    3 +-
+ arch/arm/mach-exynos/hotplug.c          |   45 ++++++++++++++++++++++++++++--
+ arch/arm/mach-exynos/pm.c               |    7 +++++
+ arch/arm/plat-samsung/include/plat/pm.h |    2 +
+ 5 files changed, 55 insertions(+), 4 deletions(-)
