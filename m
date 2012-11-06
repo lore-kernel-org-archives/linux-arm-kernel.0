@@ -1,42 +1,25 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Nov 2012 14:16:06 +0100
-Subject: [PATCH 9/9] ARM: ux500: fixup magnetometer pins
-Message-ID: <1352207766-8103-1-git-send-email-linus.walleij@stericsson.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Nov 2012 21:46:31 +0800
+Subject: scheduler clock for MXS
+In-Reply-To: <5098CB9F.9030401@meduna.org>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org>
+ <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <5098CB9F.9030401@meduna.org>
+Message-ID: <20121106134630.GD27643@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jorgen Jonsson <jorgen.jonsson@stericsson.com>
+On Tue, Nov 06, 2012 at 09:34:39AM +0100, Stanislav Meduna wrote:
+> Shawn: could you try change the
+>   update_sched_clock();
+> to
+>   sched_clock_poll(sched_clock_timer.data);
+> right after update_sched_clock call in setup_sched_clock?
+> 
+With the change, it still wraps at 2 seconds.
 
-GPIO31 and GPIO32 (CTS/RTS) are handled by the magnetometer and
-shall not simultaneously be controlled by UART2.
-
-Reported-by: Peter Nessrup <peter.nessrup@stericsson.com>
-Signed-off-by: Jorgen Jonsson <jorgen.jonsson@stericsson.com>
-Reviewed-by: Patrice Chotard <patrice.chotard@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-pins.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index f9ef2f4..5770ed0 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -148,15 +148,10 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	 * The setting on GPIO31 conflicts with magnetometer use on hrefv60
- 	 */
- 	/* default state for UART2 */
--	DB8500_MUX("u2ctsrts_c_1", "u2", "uart2"),
--	DB8500_PIN("GPIO31_V3", in_pu, "uart2"), /* CTS */
--	DB8500_PIN("GPIO32_V2", out_hi, "uart2"), /* RTS */
- 	DB8500_MUX("u2rxtx_c_1", "u2", "uart2"),
- 	DB8500_PIN("GPIO29_W2", in_pu, "uart2"), /* RXD */
- 	DB8500_PIN("GPIO30_W3", out_hi, "uart2"), /* TXD */
- 	/* Sleep state for UART2 */
--	DB8500_PIN_SLEEP("GPIO31_V3", in_wkup_pdis, "uart2"),
--	DB8500_PIN_SLEEP("GPIO32_V2", out_hi_wkup_pdis, "uart2"),
- 	DB8500_PIN_SLEEP("GPIO29_W2", in_wkup_pdis, "uart2"),
- 	DB8500_PIN_SLEEP("GPIO30_W3", out_wkup_pdis, "uart2"),
- 	/*
--- 
-1.7.11.3
+Shawn
