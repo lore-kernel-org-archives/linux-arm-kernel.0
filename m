@@ -1,164 +1,40 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Mon,  5 Nov 2012 20:55:52 -0600
-Subject: [PATCH v2 2/2] mailbox: split internal header from API header
-In-Reply-To: <1352170552-29564-1-git-send-email-omar.luna@linaro.org>
-References: <1352170552-29564-1-git-send-email-omar.luna@linaro.org>
-Message-ID: <1352170552-29564-3-git-send-email-omar.luna@linaro.org>
+From: walken@google.com (Michel Lespinasse)
+Date: Mon, 5 Nov 2012 19:13:19 -0800
+Subject: [PATCH 15/16] mm: use vm_unmapped_area() on sparc32 architecture
+In-Reply-To: <20121105.202501.1246122770431623794.davem@davemloft.net>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+ <1352155633-8648-16-git-send-email-walken@google.com>
+ <20121105.202501.1246122770431623794.davem@davemloft.net>
+Message-ID: <CANN689Gt2mG8xfkVkFtOHDFxkoZZAL-p-8yMSw=qvy5zaGs1ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now internal structures can remain hidden to the user and just API
-related functions and defines are made available.
+On Mon, Nov 5, 2012 at 5:25 PM, David Miller <davem@davemloft.net> wrote:
+> From: Michel Lespinasse <walken@google.com>
+> Date: Mon,  5 Nov 2012 14:47:12 -0800
+>
+>> Update the sparc32 arch_get_unmapped_area function to make use of
+>> vm_unmapped_area() instead of implementing a brute force search.
+>>
+>> Signed-off-by: Michel Lespinasse <walken@google.com>
+>
+> Hmmm...
+>
+>> -     if (flags & MAP_SHARED)
+>> -             addr = COLOUR_ALIGN(addr);
+>> -     else
+>> -             addr = PAGE_ALIGN(addr);
+>
+> What part of vm_unmapped_area() is going to duplicate this special
+> aligning logic we need on sparc?
 
-Signed-off-by: Omar Ramirez Luna <omar.luna@linaro.org>
----
- drivers/mailbox/mailbox.c |   34 ++++++++++++++++++++++++++++++++
- drivers/mailbox/mailbox.h |   48 +--------------------------------------------
- include/linux/mailbox.h   |   22 +++++++++++++++++++++
- 3 files changed, 57 insertions(+), 47 deletions(-)
- create mode 100644 include/linux/mailbox.h
+The idea there is that you can specify the desired alignment mask and
+offset using info.align_mask and info.align_offset.
 
-diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-index 6346ad3..aab9a13 100644
---- a/drivers/mailbox/mailbox.c
-+++ b/drivers/mailbox/mailbox.c
-@@ -116,6 +116,40 @@ out:
- }
- EXPORT_SYMBOL(omap_mbox_msg_send);
- 
-+void omap_mbox_save_ctx(struct omap_mbox *mbox)
-+{
-+	if (!mbox->ops->save_ctx) {
-+		dev_err(mbox->dev, "%s:\tno save\n", __func__);
-+		return;
-+	}
-+
-+	mbox->ops->save_ctx(mbox);
-+}
-+EXPORT_SYMBOL(omap_mbox_save_ctx);
-+
-+void omap_mbox_restore_ctx(struct omap_mbox *mbox)
-+{
-+	if (!mbox->ops->restore_ctx) {
-+		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
-+		return;
-+	}
-+
-+	mbox->ops->restore_ctx(mbox);
-+}
-+EXPORT_SYMBOL(omap_mbox_restore_ctx);
-+
-+void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
-+{
-+	mbox->ops->enable_irq(mbox, irq);
-+}
-+EXPORT_SYMBOL(omap_mbox_enable_irq);
-+
-+void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
-+{
-+	mbox->ops->disable_irq(mbox, irq);
-+}
-+EXPORT_SYMBOL(omap_mbox_disable_irq);
-+
- static void mbox_tx_tasklet(unsigned long tx_data)
- {
- 	struct omap_mbox *mbox = (struct omap_mbox *)tx_data;
-diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
-index cc3921e..b05f64c 100644
---- a/drivers/mailbox/mailbox.h
-+++ b/drivers/mailbox/mailbox.h
-@@ -8,17 +8,7 @@
- #include <linux/interrupt.h>
- #include <linux/device.h>
- #include <linux/kfifo.h>
--
--typedef u32 mbox_msg_t;
--struct omap_mbox;
--
--typedef int __bitwise omap_mbox_irq_t;
--#define IRQ_TX ((__force omap_mbox_irq_t) 1)
--#define IRQ_RX ((__force omap_mbox_irq_t) 2)
--
--typedef int __bitwise omap_mbox_type_t;
--#define OMAP_MBOX_TYPE1 ((__force omap_mbox_type_t) 1)
--#define OMAP_MBOX_TYPE2 ((__force omap_mbox_type_t) 2)
-+#include <linux/mailbox.h>
- 
- struct omap_mbox_ops {
- 	omap_mbox_type_t	type;
-@@ -61,45 +51,9 @@ struct omap_mbox {
- 	struct blocking_notifier_head   notifier;
- };
- 
--int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
- void omap_mbox_init_seq(struct omap_mbox *);
- 
--struct omap_mbox *omap_mbox_get(const char *, struct notifier_block *nb);
--void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
--
- int omap_mbox_register(struct device *parent, struct omap_mbox **);
- int omap_mbox_unregister(void);
- 
--static inline void omap_mbox_save_ctx(struct omap_mbox *mbox)
--{
--	if (!mbox->ops->save_ctx) {
--		dev_err(mbox->dev, "%s:\tno save\n", __func__);
--		return;
--	}
--
--	mbox->ops->save_ctx(mbox);
--}
--
--static inline void omap_mbox_restore_ctx(struct omap_mbox *mbox)
--{
--	if (!mbox->ops->restore_ctx) {
--		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
--		return;
--	}
--
--	mbox->ops->restore_ctx(mbox);
--}
--
--static inline void omap_mbox_enable_irq(struct omap_mbox *mbox,
--					omap_mbox_irq_t irq)
--{
--	mbox->ops->enable_irq(mbox, irq);
--}
--
--static inline void omap_mbox_disable_irq(struct omap_mbox *mbox,
--					 omap_mbox_irq_t irq)
--{
--	mbox->ops->disable_irq(mbox, irq);
--}
--
- #endif /* MAILBOX_H */
-diff --git a/include/linux/mailbox.h b/include/linux/mailbox.h
-new file mode 100644
-index 0000000..e8e4131
---- /dev/null
-+++ b/include/linux/mailbox.h
-@@ -0,0 +1,22 @@
-+/* mailbox.h */
-+
-+typedef u32 mbox_msg_t;
-+struct omap_mbox;
-+
-+typedef int __bitwise omap_mbox_irq_t;
-+#define IRQ_TX ((__force omap_mbox_irq_t) 1)
-+#define IRQ_RX ((__force omap_mbox_irq_t) 2)
-+
-+typedef int __bitwise omap_mbox_type_t;
-+#define OMAP_MBOX_TYPE1 ((__force omap_mbox_type_t) 1)
-+#define OMAP_MBOX_TYPE2 ((__force omap_mbox_type_t) 2)
-+
-+int omap_mbox_msg_send(struct omap_mbox *, mbox_msg_t msg);
-+
-+struct omap_mbox *omap_mbox_get(const char *, struct notifier_block *nb);
-+void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
-+
-+void omap_mbox_save_ctx(struct omap_mbox *mbox);
-+void omap_mbox_restore_ctx(struct omap_mbox *mbox);
-+void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq);
-+void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq);
+Now, I just noticed that the old code actually always uses an
+alignment offset of 0 instead of basing it on pgoff. I'm not sure why
+that is, but it looks like this may be an issue ?
+
 -- 
-1.7.9.5
+Michel "Walken" Lespinasse
+A program is never fully debugged until the last user dies.
