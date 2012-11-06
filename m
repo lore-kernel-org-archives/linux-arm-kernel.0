@@ -1,51 +1,62 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:29 +0530
-Subject: [PATCH RESEND 01/10] ARM: dts: AM33XX: Add pinmux configuration for
- matrix keypad to EVM
+Date: Tue, 6 Nov 2012 19:18:38 +0530
+Subject: [PATCH RESEND 10/10] ARM: dts: AM33XX: Add push-buttons device tree
+ data to am335x-evmsk
 In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
 References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-2-git-send-email-anilkumar@ti.com>
+Message-ID: <1352209718-5586-11-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for gpio matrix keypad. In this patch, only
-single named mode/state is added and these pins are configured during
-pinctrl driver initialization.
-
-Default mode is nothing but the values required for the module during
-active state. With this configurations module is functional as
-expected.
+Add gpio based push buttons device tree data to am335x-evmsk device
+by adding all the necessary parameters like key-code, gpios and etc.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-evm.dts |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/am335x-evmsk.dts |   31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 513284f..9199456 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -24,6 +24,21 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 0f825dd..f5a6162 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -139,6 +139,37 @@
+ 			default-state = "off";
+ 		};
  	};
- 
-+	am33xx_pinmux: pinmux at 44e10800 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&matrix_keypad_s0>;
 +
-+		matrix_keypad_s0: matrix_keypad_s0 {
-+			pinctrl-single,pins = <
-+				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-+				0x58 0x7	/* gpmc_a6.gpio1_22, OUTPUT | MODE7 */
-+				0x64 0x27	/* gpmc_a9.gpio1_25, INPUT | MODE7 */
-+				0x68 0x27	/* gpmc_a10.gpio1_26, INPUT | MODE7 */
-+				0x6c 0x27	/* gpmc_a11.gpio1_27, INPUT | MODE7 */
-+			>;
++	gpio_buttons: gpio_buttons at 0 {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		switch at 1 {
++			label = "button0";
++			linux,code = <0x100>;
++			gpios = <&gpio3 3 0>;
++		};
++
++		switch at 2 {
++			label = "button1";
++			linux,code = <0x101>;
++			gpios = <&gpio3 2 0>;
++		};
++
++		switch at 3 {
++			label = "button2";
++			linux,code = <0x102>;
++			gpios = <&gpio1 30 0>;
++			gpio-key,wakeup;
++		};
++
++		switch at 4 {
++			label = "button3";
++			linux,code = <0x103>;
++			gpios = <&gpio3 5 0>;
 +		};
 +	};
-+
- 	ocp {
- 		uart1: serial at 44e09000 {
- 			status = "okay";
+ };
+ 
+ /include/ "tps65910.dtsi"
 -- 
 1.7.9.5
