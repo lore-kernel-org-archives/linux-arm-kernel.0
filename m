@@ -1,48 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Nov 2012 22:08:47 +0000
-Subject: [GIT PULL] Calxeda ECX-2000 support
-In-Reply-To: <50996725.2090003@gmail.com>
-References: <50917936.2030405@gmail.com>
- <20121106191819.GA11353@quad.lixom.net> <50996725.2090003@gmail.com>
-Message-ID: <201211062208.47390.arnd@arndb.de>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 06 Nov 2012 17:14:18 -0500
+Subject: [PATCH 5/8] mmc: dw_mmc: fix modular build for exynos back-end
+In-Reply-To: <1352238933-4886-6-git-send-email-arnd@arndb.de> (Arnd Bergmann's
+ message of "Tue, 6 Nov 2012 22:55:30 +0100")
+References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
+ <1352238933-4886-6-git-send-email-arnd@arndb.de>
+Message-ID: <87liee8jlx.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012, Rob Herring wrote:
-> On 11/06/2012 01:18 PM, Olof Johansson wrote:
-> > The addition of include of core.h in sysregs.h gives me a build error on
-> > multi_v7_defconfig due to missing guard ifdefs. I've added the following
-> > patch on top of your branch.
-> > 
-> Thanks, I didn't see that in my tree because I have follow-on patches
-> removing this based on the DEBUG_LL clean-up. Now that the dependency
-> from Stephen is in your tree, I need to send that to you as well.
-> 
+Hi Arnd,
 
-I've just added another patch on top to get around a build warning:
+On Tue, Nov 06 2012, Arnd Bergmann wrote:
+> The MODULE_DEVICE_TABLE entry for dw_mci_exynos_match
+> was incorrectly copied from the platform back-end, which
+> causes this error when building the driver as a loadable
+> module:
+>
+> drivers/mmc/host/dw_mmc-exynos.c: At top level:
+> drivers/mmc/host/dw_mmc-exynos.c:226:34: error: '__mod_of_device_table' aliased to undefined symbol 'dw_mci_pltfm_match'
+>
+> This patch fixes the problem by just using the correct
+> string.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Will Newton <will.newton@imgtec.com>
+> Cc: Chris Ball <cjb@laptop.org>
+> ---
+>  drivers/mmc/host/dw_mmc-exynos.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+> index 660bbc5..0147ac3a 100644
+> --- a/drivers/mmc/host/dw_mmc-exynos.c
+> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+> @@ -223,7 +223,7 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+>  			.data = (void *)&exynos5250_drv_data, },
+>  	{},
+>  };
+> -MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
+> +MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
+>  
+>  int dw_mci_exynos_probe(struct platform_device *pdev)
+>  {
 
->From 5bd09fb0336aa4020b85f13e16a4d21e3f5f70c3 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 6 Nov 2012 23:02:27 +0100
-Subject: [PATCH] ARM: smp_twd: fix build warning
+Thanks, pushed to mmc-next for 3.7.
 
-0336517b38c "ARM: smp_twd: don't warn on no DT node" introduced
-a silly build warning by returning an error from a void function.
-This keeps the intention of that patch but fixes the warning by
-removing the error code
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 6ec73f9..999aa48 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -367,7 +367,7 @@ void __init twd_local_timer_of_register(void)
- 
- 	np = of_find_matching_node(NULL, twd_of_match);
- 	if (!np)
--		return -ENODEV;
-+		return;
- 
- 	twd_ppi = irq_of_parse_and_map(np, 0);
- 	if (!twd_ppi) {
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
