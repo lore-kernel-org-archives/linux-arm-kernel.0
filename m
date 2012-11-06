@@ -1,117 +1,114 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Tue, 6 Nov 2012 10:56:39 -0600
-Subject: [PATCH v3 2/4] arm: bcm2835: convert to the irqchip infrastructure
-In-Reply-To: <1351462748-5224-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 6 Nov 2012 17:56:54 +0100
+Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
+In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
+References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
+ <1352108549-9341-3-git-send-email-anilkumar@ti.com> <5097ECAD.9010101@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
+Message-ID: <50994156.4080305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2012 at 11:19:06PM +0100, Thomas Petazzoni wrote:
-> Register the irq controller driver in the main
-> drivers/irqchip/irqchip.c file, and make sure that the initialization
-> function of the driver sets handle_arch_irq() appropriately. This
-> requires a bit of movement in the driver since the
-> bcm2835_handle_irq() must move before the armctrl_of_init() function
-> to avoid a forward declaration.
+Hi Anil,
+
+On 11/06/2012 06:07 AM, AnilKumar, Chimata wrote:
+> On Mon, Nov 05, 2012 at 22:13:25, Cousson, Benoit wrote:
+>> Hi Anil / Colin,
+>>
+>> On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
+>>> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
+>>>
+>>> Add system power off control to rtc driver which is the in-charge
+>>> of controlling the BeagleBone system power. The power_off routine
+>>> can be hooked up to "pm_power_off" system call.
+>>>
+>>> System power off sequence:-
+>>> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
+>>> * Enable PMIC_POWER_EN in rtc module
+>>> * Set rtc ALARM2 time
+>>> * Enable ALARM2 interrupt
+>>>
+>>> Added while (1); after the above steps to make sure that no other
+>>> process acquire cpu. Otherwise we might see an unexpected behaviour
+>>> because we are shutting down all the power rails of SoC except RTC.
+>>>
+>>> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
+>>> [anilkumar at ti.com: move poweroff additions to rtc driver]
+>>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
+>>>  drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
+>>>  2 files changed, 83 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>>> index b47aa41..8d9f4f9 100644
+>>> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>>> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
+>>> @@ -6,6 +6,10 @@ Required properties:
+>>>  - interrupts: rtc timer, alarm interrupts in order
+>>>  - interrupt-parent: phandle for the interrupt controller
+>>>  
+>>> +Optional properties:
+>>> +- ti,system-power-controller: Telling whether or not rtc is controlling
+>>> +  the system power.
+>>
+>> I don't know how it is connected at board level, but I'm not sure the
+>> binding is the proper one.
 > 
-> On the arch/arm side, use irqchip_init() as the ->init_irq() callback,
-> and remove the definition of ->handle_irq() since this is now done by
-> the irq controller driver.
+> Hi Benoit,
+>  ________________________________
+> |   ______          _______      |
+> |  |      |        |       |     |
+> |  |RTC   |        |       |     |
+> |  |PMIC  |  Line  |       |     |
+> |  |PWR_EN|=======>|PWR_EN |     |
+> |  |______|        |_______|     |
+> |  AM335x SoC       TPS65217     |
+> |                                |
+> |________________________________|
+>           BeagleBone
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> ---
-[..]
-> diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
-> index dc670cc..62d1dad 100644
-> --- a/drivers/irqchip/irq-bcm2835.c
-> +++ b/drivers/irqchip/irq-bcm2835.c
-[..]
-> @@ -199,8 +197,8 @@ static void armctrl_handle_shortcut(int bank, struct pt_regs *regs,
->  	handle_IRQ(irq_linear_revmap(intc.domain, irq), regs);
->  }
->  
-> -asmlinkage void __exception_irq_entry bcm2835_handle_irq(
-> -	struct pt_regs *regs)
-> +static asmlinkage void __exception_irq_entry
-> +bcm2835_handle_irq(struct pt_regs *regs)
->  {
->  	u32 stat, irq;
->  
-> diff --git a/drivers/irqchip/irqchip.c b/drivers/irqchip/irqchip.c
-> index 410f99f..e2496e4 100644
-> --- a/drivers/irqchip/irqchip.c
-> +++ b/drivers/irqchip/irqchip.c
-> @@ -14,6 +14,12 @@
->  #include "irqchip.h"
->  
->  static const struct of_device_id irqchip_of_match[] __initconst = {
-> +#ifdef CONFIG_ARCH_BCM2835
-> +	{
-> +		.compatible = "brcm,bcm2835-armctrl-ic",
-> +		.data = bcm2835_irqchip_init,
-> +	},
-> +#endif
->  	{},
->  };
->  
-> diff --git a/drivers/irqchip/irqchip.h b/drivers/irqchip/irqchip.h
-> index 1e7a5c2..1075537 100644
-> --- a/drivers/irqchip/irqchip.h
-> +++ b/drivers/irqchip/irqchip.h
-> @@ -11,4 +11,6 @@
->  #ifndef _IRQCHIP_H
->  #define _IRQCHIP_H
->  
-> +int bcm2835_irqchip_init(struct device_node *node, struct device_node *parent);
-> +
->  #endif
+> This is how RTC PMIC_PWR_EN is connected to PWR_EN of TPS65217 PMIC. Only when
+> RTC pull low in PMIC_PWR_EN then PMIC will go to power off state provided TPS65217
+> status should be changed to STATUS_OFF.
+> 
+> ALARM2 event should be trigger to configure PMIC_PWR_EN properly then the "Line"
+> driven low so that PMIC will go to shutdown mode.
 
-Could it make sense here to kill the irqchip.h private export, and
-instead rely on the linker to stitch together the builtin irqchip's
-of_device_id tables?
+Thanks for the nice diagram :-)
 
-Something like:
+I'm wondering if we cannot abuse the gpio binding to describe that
+connection instead of creating two custom attributes (PMIC + RTC).
 
-drivers/irqchip/irq-bcm2835.c:
+Ideally we should do that without having to change the RTC to use the
+gpiolib at all.
 
-	static bcm2835_irqchip_init(struct device_node *node, struct device_node *parent)
-	{
-		/*...*/
-	}
 
-	static const struct of_device_id bcm2835_match[] __initconst = {
-		{ .compatible = "brcm,bcm2835-armctrl-ic", .data = bcm2835_irqchip_init, },
-		{},
-	};
-	DECLARE_IRQCHIP(bcm2835, bcm2835_match);
+rtc: rtc at 44e3e000 {
+	compatible = "ti,da830-rtc";
+	reg = <0x44e3e000 0x1000>;
+	interrupts = <75, 76>;
+	ti,hwmods = "rtc";
 
-where include/linux/irqchip.h:
+	/* expose the PWR_EN functionality of this RTC*/
+	gpio-controller;
+	#gpio-cells = <0>; /* assuming we can use 0 ??? */
+};
 
-	#define DECLARE_IRQCHIP(name,ids) \
-		static of_device_id * __irqchip_##name##_matches __used \
-		__attribute__((__section__(".init.irqchip"))) = ids
+...
 
-drivers/irqchip/irqchip.c:
+tps: tps at 24 {
+ 	compatible = "ti,tps65217";
+	/*
+         * Enable the power enable feature from
+         * the input line if that attribute is there.
+         */
+	gpio-power-en = <&rtc>; /* PWR_EN */
 
-	void irqchip_init(void)
-	{
-		extern of_device_id *__irqchip_matches_start[], *__irqchip_matches_end[];
-		struct of_device_id **matchesp;
+	...
+}	
 
-		matchesp = __irqchip_matches_start;
-		while (matchesp < __irqchip_matches_end)
-			of_irq_init(*matchesp);
-	}
+Any thought?
 
-And a suitable entry in vmlinux.lds.h.
-
-(Hopefully?) This would eliminate the need for the 'private' irqchip.h
-declarations and the centrally maintained of_device_id table, which
-sounds like a win for maintainability.
-
-Thoughts?
-
-Thanks,
-   Josh
+Regards,
+Benoit
