@@ -1,62 +1,89 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 06 Nov 2012 20:52:37 +0900
-Subject: [PATCH] ARM: Exynos: remove unused init_uarts callback for
- exynos4x12 platforms
-References: <1352125973-24228-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <0bfd01cdbc15$37948db0$a6bda910$%kim@samsung.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 6 Nov 2012 06:17:02 -0600
+Subject: [PATCH 1/5] ARM: EXYNOS: fix the hotplug for Cortex-A15
+In-Reply-To: <1352182356-28989-2-git-send-email-a.kesavan@samsung.com>
+References: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
+ <1352182356-28989-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <5098FFBE.4080604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
-> 
-> Thomas Abraham wrote:
-> >
-> > All the Exynos4x12 based platforms use only device tree based boot. So
-> > remove
-> > the unused 'init_uarts' callback from exynos cpu_ids table.
-> >
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> > ---
-> >  arch/arm/mach-exynos/common.c |    2 --
-> >  1 files changed, 0 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-
-> exynos/common.c
-> > index 56844d1..ce91cba 100644
-> > --- a/arch/arm/mach-exynos/common.c
-> > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -78,7 +78,6 @@ static struct cpu_table cpu_ids[] __initdata = {
-> >  		.idmask		= EXYNOS4_CPU_MASK,
-> >  		.map_io		= exynos4_map_io,
-> >  		.init_clocks	= exynos4_init_clocks,
-> > -		.init_uarts	= exynos_init_uarts,
-> >  		.init		= exynos_init,
-> >  		.name		= name_exynos4212,
-> >  	}, {
-> > @@ -86,7 +85,6 @@ static struct cpu_table cpu_ids[] __initdata = {
-> >  		.idmask		= EXYNOS4_CPU_MASK,
-> >  		.map_io		= exynos4_map_io,
-> >  		.init_clocks	= exynos4_init_clocks,
-> > -		.init_uarts	= exynos_init_uarts,
-> >  		.init		= exynos_init,
-> >  		.name		= name_exynos4412,
-> >  	}, {
-> > --
-> > 1.6.6.rc2
-> 
-> Yes, correct. Applied.
-> 
-Well...
+On Tuesday 06 November 2012 12:12 AM, Abhilash Kesavan wrote:
+> The sequence of cpu_enter_lowpower() for Cortex-A15
+> is different from the sequence for Cortex-A9.
+Are you sure ? Apart from integrated cache vs external, there
+should be no change. And L2 doesn't need to come into picture
+while powering down just a CPU.
 
-BTW, exynos4x12 can support non-DT yet so I just reverted this patch.
+> This patch implements cpu_enter_lowpower() for EXYNOS5
+> SoC which has Cortex-A15 cores.
+>
+> Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> ---
+>   arch/arm/mach-exynos/hotplug.c |   45 +++++++++++++++++++++++++++++++++++++--
+>   1 files changed, 42 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> index f4d7dd2..8c06c4f 100644
+> --- a/arch/arm/mach-exynos/hotplug.c
+> +++ b/arch/arm/mach-exynos/hotplug.c
+> @@ -20,10 +20,11 @@
+>   #include <asm/smp_plat.h>
+>
+>   #include <mach/regs-pmu.h>
+> +#include <plat/cpu.h>
+>
+>   #include "common.h"
+>
+> -static inline void cpu_enter_lowpower(void)
+> +static inline void cpu_enter_lowpower_a9(void)
+>   {
+>   	unsigned int v;
+>
+> @@ -45,6 +46,35 @@ static inline void cpu_enter_lowpower(void)
+>   	  : "cc");
+>   }
+>
+> +static inline void cpu_enter_lowpower_a15(void)
+> +{
+> +	unsigned int v;
+> +
+> +	asm volatile(
+> +	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> +	"	bic	%0, %0, %1\n"
+> +	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> +	  : "=&r" (v)
+> +	  : "Ir" (CR_C)
+> +	  : "cc");
+> +
+> +	flush_cache_all();
+> +
+Why are flushing all the cache levels ?
+flush_kern_louis() should be enough for CPU power
+down.
 
-I think, this can be applied when we support only DT for exynos4 series next
-time.
+> +	asm volatile(
+> +	/*
+> +	* Turn off coherency
+> +	*/
+> +	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> +	"	bic	%0, %0, %1\n"
+> +	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> +	: "=&r" (v)
+> +	: "Ir" (0x40)
+> +	: "cc");
+> +
+> +	isb();
+> +	dsb();
+> +}
+> +
+The above sequence should work on A9 as well. In general you should have
+CPU power down code under one code block and avoid making use of stack 
+in between. Otherwise you will end up with stack corruption because of
+the memory view change after C bit is disabled.
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Regards
+Santosh
