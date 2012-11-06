@@ -1,154 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2012 22:16:51 +0000
-Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
- interfaces
-In-Reply-To: <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20121106221651.GE21764@mudshark.cambridge.arm.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 6 Nov 2012 14:11:37 -0800
+Subject: [PATCH 00/16] mm: use augmented rbtrees for finding unmapped areas
+In-Reply-To: <1352155633-8648-1-git-send-email-walken@google.com>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+Message-ID: <20121106141137.68bbd4ea.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2012 at 02:21:48PM +0100, Lorenzo Pieralisi wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> The GIC interface numbering does not necessarily follow the logical
-> CPU numbering, especially for complex topologies such as multi-cluster
-> systems.
-> 
-> Fortunately we can easily probe the GIC to create a mapping as the
-> Interrupt Processor Targets Registers for the first 32 interrupts are
-> read-only, and each field returns a value that always corresponds to
-> the processor reading the register.
-> 
-> Initially all mappings target all CPUs in case an IPI is required to
-> boot secondary CPUs.  It is refined as those CPUs discover what their
-> actual mapping is.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+On Mon,  5 Nov 2012 14:46:57 -0800
+Michel Lespinasse <walken@google.com> wrote:
 
-This is a really neat idea!
+> Earlier this year, Rik proposed using augmented rbtrees to optimize
+> our search for a suitable unmapped area during mmap(). This prompted
+> my work on improving the augmented rbtree code. Rik doesn't seem to
+> have time to follow up on his idea at this time, so I'm sending this
+> series to revive the idea.
 
-> ---
->  arch/arm/common/gic.c | 42 ++++++++++++++++++++++++++++++++++--------
->  1 file changed, 34 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> index aa52699..1338a55 100644
-> --- a/arch/arm/common/gic.c
-> +++ b/arch/arm/common/gic.c
-> @@ -70,6 +70,13 @@ struct gic_chip_data {
->  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->  
->  /*
-> + * The GIC mapping of CPU interfaces does not necessarily match
-> + * the logical CPU numbering.  Let's use a mapping as returned
-> + * by the GIC itself.
-> + */
-> +static u8 gic_cpu_map[8] __read_mostly;
+Well, the key word here is "optimize".  Some quantitative testing
+results would be nice, please!
 
-Can we have a #define for the number CPUs supported by the GIC? It gets
-used a fair amount in this patch for loop bounds etc.
+People do occasionally see nasty meltdowns in the get_unmapped_area()
+vicinity.  There was one case 2-3 years ago which was just ghastly, but
+I can't find the email (it's on linux-mm somewhere).  This one might be
+another case:
+http://lkml.indiana.edu/hypermail/linux/kernel/1101.1/00896.html
 
-> +/*
->   * Supported arch specific GIC irq extension.
->   * Default make them NULL.
->   */
-> @@ -242,7 +249,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  		return -EINVAL;
->  
->  	mask = 0xff << shift;
-> -	bit = 1 << (cpu_logical_map(cpu) + shift);
-> +	bit = gic_cpu_map[cpu] << shift;
->  
->  	raw_spin_lock(&irq_controller_lock);
->  	val = readl_relaxed(reg) & ~mask;
-> @@ -349,11 +356,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->  	u32 cpumask;
->  	unsigned int gic_irqs = gic->gic_irqs;
->  	void __iomem *base = gic_data_dist_base(gic);
-> -	u32 cpu = cpu_logical_map(smp_processor_id());
-> -
-> -	cpumask = 1 << cpu;
-> -	cpumask |= cpumask << 8;
-> -	cpumask |= cpumask << 16;
->  
->  	writel_relaxed(0, base + GIC_DIST_CTRL);
->  
-> @@ -366,6 +368,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
->  	/*
->  	 * Set all global interrupts to this CPU only.
->  	 */
-> +	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
->  	for (i = 32; i < gic_irqs; i += 4)
->  		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
->  
-> @@ -389,9 +392,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
->  {
->  	void __iomem *dist_base = gic_data_dist_base(gic);
->  	void __iomem *base = gic_data_cpu_base(gic);
-> +	unsigned int cpu_mask, cpu = smp_processor_id();
->  	int i;
->  
->  	/*
-> +	 * Get what the GIC says our CPU mask is.
-> +	 */
-> +	BUG_ON(cpu >= 8);
-> +	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
+If you can demonstrate that this patchset fixes some of all of the bad
+search complexity scenarios then that's quite a win?
 
-Making the mask a u8 and using readb_relaxed here makes this bit of code
-clearer to me (and the GIC apparently allows such an access to this
-register).
+> These changes are against v3.7-rc4. I have not converted all applicable
+> architectuers yet, but we don't necessarily need to get them all onboard
+> at once - the series is fully bisectable and additional architectures
+> can be added later on. I am confident enough in my tests for patches 1-8;
+> however the second half of the series basically didn't get tested as
+> I don't have access to all the relevant architectures.
 
-> +	gic_cpu_map[cpu] = cpu_mask;
-> +
-> +	/*
-> +	 * Clear our mask from the other map entries in case they're
-> +	 * still undefined.
-> +	 */
-> +	for (i = 0; i < 8; i++)
-> +		if (i != cpu)
-> +			gic_cpu_map[i] &= ~cpu_mask;
-> +
-> +	/*
->  	 * Deal with the banked PPI and SGI interrupts - disable all
->  	 * PPI interrupts, ensure all SGI interrupts are enabled.
->  	 */
-> @@ -646,7 +665,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  {
->  	irq_hw_number_t hwirq_base;
->  	struct gic_chip_data *gic;
-> -	int gic_irqs, irq_base;
-> +	int gic_irqs, irq_base, i;
->  
->  	BUG_ON(gic_nr >= MAX_GIC_NR);
->  
-> @@ -683,6 +702,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->  	}
->  
->  	/*
-> +	 * Initialize the CPU interface map to all CPUs.
-> +	 * It will be refined as each CPU probes its ID.
-> +	 */
-> +	for (i = 0; i < 8; i++)
-> +		gic_cpu_map[i] = 0xff;
-> +
-> +	/*
->  	 * For primary GICs, skip over SGIs.
->  	 * For secondary GICs, skip over PPIs, too.
->  	 */
-> @@ -737,7 +763,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->  
->  	/* Convert our logical CPU mask into a physical one. */
->  	for_each_cpu(cpu, mask)
-> -		map |= 1 << cpu_logical_map(cpu);
-> +		map |= gic_cpu_map[cpu];
->  
->  	/*
->  	 * Ensure that stores to Normal memory are visible to the
+Yes, I'll try to get these into -next so that the thousand monkeys at
+least give us some compilation coverage testing.  Hopefully the
+relevant arch maintainers will find time to perform a runtime test.
 
-With those changes:
+> Patch 1 is the validate_mm() fix from Bob Liu (+ fixed-the-fix from me :)
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+I grabbed this one separately, as a post-3.6 fix.
