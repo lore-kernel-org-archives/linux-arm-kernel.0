@@ -1,89 +1,117 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 6 Nov 2012 11:18:02 +0200
-Subject: [PATCHv9 0/8] ARM: OMAP4: core retention support
-In-Reply-To: <87d2zrg04t.fsf@deeprootsystems.com>
-References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
- <87d2zrg04t.fsf@deeprootsystems.com>
-Message-ID: <1352193483.8788.43.camel@sokoban>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 6 Nov 2012 10:27:54 +0100
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <87fw4neh0i.fsf@deeprootsystems.com>
+References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <CAORVsuV9_4oc6+voEM9PkqzkXKHipor5XJqaXfDNxAWLofXcxg@mail.gmail.com>
+ <20121025101212.GD21217@arwen.pp.htv.fi>
+ <20121026201539.GD29548@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210262201500.11258@utopia.booyaka.com>
+ <20121029200032.GD30152@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
+ <20121030123254.GD29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
+ <20121030125419.GG29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
+ <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
+ <87fw4u3oh5.fsf@deeprootsystems.com>
+ <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
+ <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
+ <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
+ <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
+ <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
+ <87fw4neh0i.fsf@deeprootsystems.com>
+Message-ID: <CAORVsuUm4zKoSaZQ0D=gf3toKHWznjfNvQ+q4=jsgkRaJXygMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Kevin, Paul,
 
-On Mon, 2012-11-05 at 14:23 -0800, Kevin Hilman wrote:
-> Hi Tero,
-> 
-> Tero Kristo <t-kristo@ti.com> writes:
-> 
-> > Hi,
-> >
-> > Changes compared to previous version:
-> > - rebased on top of 3.7-rc1
-> > - applies on top of latest func pwrst code (v6)
-> > - added back patch #1 to this set (it wasn't queued yet after all)
-> > - added patch #7 for fixing a bug in the functional pwrst code
-> > - added patch #8 for fixing a regression with MUSB PHY power handling
-> >   (not quite sure if this is the correct way to fix this or not)
-> >
-> > Tested with omap4460 gp panda + omap4430 emu blaze boards, with cpuidle +
-> > suspend.
-> >
-> > Branch also available here:
-> > git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
-> > branch: mainline-3.7-rc1-omap4-ret-v9
-> 
-> I tested this branch on 4430/Panda and 4460/Panda-ES and I'm seeing
-> several domains not hitting target power state in suspend[1].
-> 
-> Am I missing some other fixes?  Using omap2plus_defconfig, I tried your
-> branch alone, and merged with v3.7-rc4, and I get the same errors.
-> 
+On Tue, Nov 6, 2012 at 1:01 AM, Kevin Hilman
+<khilman@deeprootsystems.com> wrote:
+> Jean Pihet <jean.pihet@newoldbits.com> writes:
+>
+> [...]
+>
+>> I ran some intensive stress tests on the I2C and ... unfortunately I
+>> could not trigger the problem. It looks like the issue is caused by
+>> some transient situation where the CORE and/or I2C is in a low power
+>> state.
+>
+> FYI... I just ran across what appears to be the same bug on 3430/n900
+> during suspend/resume testing.  With CPUidle enabled, this happens every
+> time.
+>
+> Reverting the I2C QoS patch makes it work again.
+
+That makes sense with CPU_IDLE enabled and suspend. The cause of the
+problem is that the cpuidle influences the MPU and CORE states,
+depending on the constraints set and the latency figures for the power
+domains (in arch/arm/mach-omap2/cpuidle34xx.c). Since the latency
+numbers have not been updated to measured (i.e. realistic) values in
+too-low power state is used, hence the timeout problem.
+
+Note: that does not explain why the I2C timeout issue is present
+without CPU_IDLE enabled, since in that case PM QoS should not have
+any effect on the power domains states.
+
+So yes the PM QoS I2C patch shall be reverted as long as the PM QoS
+support for OMAP is not merged in.
+
+For the records here are the patches that have been submitted to
+support the OMAP PM QoS:
+- func power states [1],
+- OMAP PM QoS support [2], which includes the latency figures update
+and which depends on [1],
+- the conversion of I2C to PM QoS [3],
+- the removal of the old no-op OMAP PM API [4], which depends on [3],
+
+The chicken-and-egg problem is clearly visible since [3] depends on [2].
+
+What to do now with those patches?
+As said above [3] and [4] must be held until [1] and [2] are merged in.
+
+[1] http://marc.info/?l=linux-arm-kernel&m=134744383120921&w=2
+[2] http://marc.info/?l=linux-omap&m=134795835604288&w=2
+[3] http://marc.info/?l=linux-omap&m=134815730108344&w=2
+[4] http://marc.info/?l=linux-omap&m=134795836904299&w=2
+
 > Kevin
-> 
-> [1]
-> # echo enabled > /sys/devices/platform/omap_uart.2/tty/ttyO2/power/wakeup
-> # echo mem > /sys/power/state 
-> [  102.271087] PM: Syncing filesystems ... done.
-> [  102.282196] Freezing user space processes ... (elapsed 0.02 seconds) done.
-> [  102.312133] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
-> [  102.343353] Suspending console(s) (use no_console_suspend to debug)
-> ?[  102.363433] PM: suspend of devices complete after 10.650 msecs
-> [  102.365631] PM: late suspend of devices complete after 2.166 msecs
-> [  102.369201] PM: noirq suspend of devices complete after 3.509 msecs
-> [  102.369232] Disabling non-boot CPUs ...
-> [  102.373016] CPU1: shutdown
-> [  104.357421] Powerdomain (core_pwrdm) didn't enter target state 1
-> [  104.357452] Powerdomain (tesla_pwrdm) didn't enter target state 1
-> [  104.357452] Powerdomain (ivahd_pwrdm) didn't enter target state 1
-> [  104.357482] Powerdomain (l3init_pwrdm) didn't enter target state 1
-> [  104.357482] Could not enter target state in pm_suspend
-> [  104.357666] Enabling non-boot CPUs ...
-> [  104.359863] CPU1: Booted secondary processor
-> [  104.360626] cpu cpu0: opp_init_cpufreq_table: Device OPP not found (-19)
-> [  104.360656] cpu cpu0: omap_cpu_init: cpu1: failed creating freq table[-19]
-> [  104.360656] CPU1 is up
-> [  104.362579] PM: noirq resume of devices complete after 1.892 msecs
-> [  104.364807] PM: early resume of devices complete after 1.373 msecs
-> [  104.710937] PM: resume of devices complete after 346.099 msecs
-> [  104.817901] Restarting tasks ... done.
 
-This looks like a combination of boot loader/kernel problems. My guess
-is that l3init is probably held on by the USB, and both ivahd / tesla
-are held on by some DSP/IVA modules which are not idling properly.
+Thanks for testing and reporting the issue.
 
-The last patch in this set should fix the USB problems at least
-partially, but also the USB DPLL itself might be in wrong state,
-attached patch might help for that one and get l3init to idle.
+Jean
 
-For DSP I don't have a patch right now, what is the boot loader you are
-using? (Can you provide git / commit / config info?)
-
--Tero
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0003-ARM-OMAP4-clock-setup-USB-DPLL-during-init.patch
-Type: text/x-patch
-Size: 1199 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/aa09bad8/attachment.bin>
+>
+>
+> # rtcwake -m mem -s 1
+> Date:    Fri Dec 31 17:00:34 MST 1999
+> hwclock: Sat Jan  1 00:00:34 2000  0.000000 seconds
+> [   38.819732] omap_i2c omap_i2c.1: timeout waiting for bus ready
+> wakeup from "mem" at Sat Jan  1 00:00:36 2000
+> [   38.841949] PM: Syncing filesystems ... done.
+> [   38.859466] Freezing user space processes ... (elapsed 0.01 seconds) done.
+> [   38.885284] Freezing remaining freezable tasks ... (elapsed 0.02 seconds) done.
+> [   38.916412] Suspending console(s) (use no_console_suspend to debug)
+> [   39.944274] omap_i2c omap_i2c.1: timeout waiting for bus ready
+> [   39.944305] twl: i2c_read failed to transfer all messages
+> [   39.944305] twl_rtc: Could not read TWLregister D - error -110
+> [   39.944335] twl_rtc twl_rtc: twl_rtc_read_time: reading CTRL_REG, error -110
+> [   40.975524] omap_i2c omap_i2c.1: timeout waiting for bus ready
+> [   40.975555] twl: i2c_read failed to transfer all messages
+> [   40.975555] VMMC2_IO_18: failed to disable
+> [   40.978698] PM: suspend of devices complete after 2049.163 msecs
+> [   40.984222] PM: late suspend of devices complete after 5.493 msecs
+> [   40.992126] PM: noirq suspend of devices complete after 7.873 msecs
+> [   40.992187] Disabling non-boot CPUs ...
+> [   40.992675] Successfully put all powerdomains to target state
+> [   40.997009] PM: noirq resume of devices complete after 4.058 msecs
+> [   41.002014] PM: early resume of devices complete after 3.601 msecs
+> [   41.179016] PM: resume of devices complete after 176.818 msecs
+> [   41.277740] Restarting tasks ... done.
+> real    0m 3.50s
+> user    0m 0.00s
+> sys     0m 0.10s
+> Date:    Fri Dec 31 17:00:40 MST 1999
+> hwclock: Sat Jan  1 00:00:40 2000  0.000000 seconds
