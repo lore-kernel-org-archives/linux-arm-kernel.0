@@ -1,200 +1,362 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Nov 2012 16:17:08 +0100
-Subject: [PATCH 5/5] gpiolib: separation of pin concerns
-Message-ID: <1352215028-30381-1-git-send-email-linus.walleij@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 6 Nov 2012 16:29:17 +0100
+Subject: [RFC patch v3 1/4] ARM: at91: atmel-ssc: add platform device
+ id table
+In-Reply-To: <20121106145255.GC20063@game.jcrosoft.org>
+References: <1352181474-19597-1-git-send-email-voice.shen@atmel.com>
+ <20121106145255.GC20063@game.jcrosoft.org>
+Message-ID: <50992CCD.4070702@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 11/06/2012 03:52 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> On 13:57 Tue 06 Nov     , Bo Shen wrote:
+>> Add platform device id to check whether the SSC controller support
+>> pdc or dam for data transfer
+>>
+>> If match "at91rm9200_ssc", which support pdc for data transfer
+>> If match "at91sam9g45_ssc", which support dma for data transfer
+> 
+> you add the dt but no pinctrl NACK
+> 
+> pinctrl is mandoatory for any new dt switch
 
-The fact that of_gpiochip_add_pin_range() and
-gpiochip_add_pin_range() share too much code is fragile and
-will invariably mean that bugs need to be fixed in two places
-instead of one.
+Well, that is a bit too demanding: We will move to pinctrl in... 3.8!
+So, it does not break something I am for merging this patch and then
+concentrating in adding the pinctrl piece just after.
 
-So separate the concerns of gpiolib.c and gpiolib-of.c and
-have the latter call the former as back-end. This is necessary
-also when going forward with other device descriptions such
-as ACPI.
+Best regards,
 
-This is done by:
+>> Signed-off-by: Bo Shen <voice.shen@atmel.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>> Change since v2
+>>   No change
+>> Change since v1
+>>   No change
+>> ---
+>>  arch/arm/mach-at91/at91rm9200.c          |    6 +++---
+>>  arch/arm/mach-at91/at91rm9200_devices.c  |    6 +++---
+>>  arch/arm/mach-at91/at91sam9260.c         |    2 +-
+>>  arch/arm/mach-at91/at91sam9260_devices.c |    2 +-
+>>  arch/arm/mach-at91/at91sam9261.c         |    6 +++---
+>>  arch/arm/mach-at91/at91sam9261_devices.c |    6 +++---
+>>  arch/arm/mach-at91/at91sam9263.c         |    4 ++--
+>>  arch/arm/mach-at91/at91sam9263_devices.c |    4 ++--
+>>  arch/arm/mach-at91/at91sam9g45.c         |    4 ++--
+>>  arch/arm/mach-at91/at91sam9g45_devices.c |    4 ++--
+>>  arch/arm/mach-at91/at91sam9rl.c          |    4 ++--
+>>  arch/arm/mach-at91/at91sam9rl_devices.c  |    4 ++--
+>>  drivers/misc/atmel-ssc.c                 |   23 +++++++++++++++++++++++
+>>  include/linux/atmel-ssc.h                |    5 +++++
+>>  14 files changed, 54 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+>> index b4f0565..85d53c5 100644
+>> --- a/arch/arm/mach-at91/at91rm9200.c
+>> +++ b/arch/arm/mach-at91/at91rm9200.c
+>> @@ -184,9 +184,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
+>>  	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
+>>  	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.2", &ssc2_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91rm9200", &twi_clk),
+>>  	/* fake hclk clock */
+>>  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+>> diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
+>> index a563189..59ceea1 100644
+>> --- a/arch/arm/mach-at91/at91rm9200_devices.c
+>> +++ b/arch/arm/mach-at91/at91rm9200_devices.c
+>> @@ -752,7 +752,7 @@ static struct resource ssc0_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91rm9200_ssc0_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 0,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc0_dmamask,
+>> @@ -794,7 +794,7 @@ static struct resource ssc1_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91rm9200_ssc1_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 1,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc1_dmamask,
+>> @@ -836,7 +836,7 @@ static struct resource ssc2_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91rm9200_ssc2_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 2,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc2_dmamask,
+>> diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+>> index ad29f93..2c8aab0 100644
+>> --- a/arch/arm/mach-at91/at91sam9260.c
+>> +++ b/arch/arm/mach-at91/at91sam9260.c
+>> @@ -210,7 +210,7 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
+>>  	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
+>>  	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260", &twi_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20", &twi_clk),
+>>  	/* more usart lookup table for DT entries */
+>> diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
+>> index 805ef95..9cfdc3f 100644
+>> --- a/arch/arm/mach-at91/at91sam9260_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9260_devices.c
+>> @@ -742,7 +742,7 @@ static struct resource ssc_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9260_ssc_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 0,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc_dmamask,
+>> diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+>> index 8d999eb..4e8c56e 100644
+>> --- a/arch/arm/mach-at91/at91sam9261.c
+>> +++ b/arch/arm/mach-at91/at91sam9261.c
+>> @@ -174,9 +174,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
+>>  	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
+>>  	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.2", &ssc2_clk),
+>>  	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &hck0),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9261", &twi_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10", &twi_clk),
+>> diff --git a/arch/arm/mach-at91/at91sam9261_devices.c b/arch/arm/mach-at91/at91sam9261_devices.c
+>> index 9752f17..299637f 100644
+>> --- a/arch/arm/mach-at91/at91sam9261_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9261_devices.c
+>> @@ -706,7 +706,7 @@ static struct resource ssc0_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9261_ssc0_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 0,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc0_dmamask,
+>> @@ -748,7 +748,7 @@ static struct resource ssc1_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9261_ssc1_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 1,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc1_dmamask,
+>> @@ -790,7 +790,7 @@ static struct resource ssc2_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9261_ssc2_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 2,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc2_dmamask,
+>> diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+>> index 6a01d03..95a5471 100644
+>> --- a/arch/arm/mach-at91/at91sam9263.c
+>> +++ b/arch/arm/mach-at91/at91sam9263.c
+>> @@ -186,8 +186,8 @@ static struct clk *periph_clocks[] __initdata = {
+>>  static struct clk_lookup periph_clocks_lookups[] = {
+>>  	/* One additional fake clock for macb_hclk */
+>>  	CLKDEV_CON_ID("hclk", &macb_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
+>>  	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.0", &mmc0_clk),
+>>  	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.1", &mmc1_clk),
+>>  	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
+>> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+>> index 8dde220..df89a00 100644
+>> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+>> @@ -1199,7 +1199,7 @@ static struct resource ssc0_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9263_ssc0_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 0,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc0_dmamask,
+>> @@ -1241,7 +1241,7 @@ static struct resource ssc1_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9263_ssc1_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 1,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc1_dmamask,
+>> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+>> index 84af1b5..f4f96a6 100644
+>> --- a/arch/arm/mach-at91/at91sam9g45.c
+>> +++ b/arch/arm/mach-at91/at91sam9g45.c
+>> @@ -239,8 +239,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tcb0_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10.0", &twi0_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10.1", &twi1_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91sam9g45_ssc.0", &ssc0_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91sam9g45_ssc.1", &ssc1_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "atmel-trng", &trng_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "atmel_sha", &aestdessha_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "atmel_tdes", &aestdessha_clk),
+>> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+>> index b159607..27e3bf6 100644
+>> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+>> @@ -1459,7 +1459,7 @@ static struct resource ssc0_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9g45_ssc0_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91sam9g45_ssc",
+>>  	.id	= 0,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc0_dmamask,
+>> @@ -1501,7 +1501,7 @@ static struct resource ssc1_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9g45_ssc1_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91sam9g45_ssc",
+>>  	.id	= 1,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc1_dmamask,
+>> diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+>> index 72e9084..4110b54 100644
+>> --- a/arch/arm/mach-at91/at91sam9rl.c
+>> +++ b/arch/arm/mach-at91/at91sam9rl.c
+>> @@ -184,8 +184,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+>>  	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
+>>  	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
+>>  	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
+>> -	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
+>> +	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.0", &twi0_clk),
+>>  	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g20.1", &twi1_clk),
+>>  	CLKDEV_CON_ID("pioA", &pioA_clk),
+>> diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
+>> index d6ca054..01220c7 100644
+>> --- a/arch/arm/mach-at91/at91sam9rl_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
+>> @@ -832,7 +832,7 @@ static struct resource ssc0_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9rl_ssc0_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 0,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc0_dmamask,
+>> @@ -874,7 +874,7 @@ static struct resource ssc1_resources[] = {
+>>  };
+>>  
+>>  static struct platform_device at91sam9rl_ssc1_device = {
+>> -	.name	= "ssc",
+>> +	.name	= "at91rm9200_ssc",
+>>  	.id	= 1,
+>>  	.dev	= {
+>>  		.dma_mask		= &ssc1_dmamask,
+>> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+>> index ac00f83..f40abd8 100644
+>> --- a/drivers/misc/atmel-ssc.c
+>> +++ b/drivers/misc/atmel-ssc.c
+>> @@ -68,6 +68,26 @@ void ssc_free(struct ssc_device *ssc)
+>>  }
+>>  EXPORT_SYMBOL(ssc_free);
+>>  
+>> +static struct atmel_ssc_platform_data at91rm9200_config = {
+>> +	.use_dma = 0,
+>> +};
+>> +
+>> +static struct atmel_ssc_platform_data at91sam9g45_config = {
+>> +	.use_dma = 1,
+>> +};
+>> +
+>> +static const struct platform_device_id atmel_ssc_devtypes[] = {
+>> +	{
+>> +		.name = "at91rm9200_ssc",
+>> +		.driver_data = (unsigned long) &at91rm9200_config,
+>> +	}, {
+>> +		.name = "at91sam9g45_ssc",
+>> +		.driver_data = (unsigned long) &at91sam9g45_config,
+>> +	}, {
+>> +		/* sentinel */
+>> +	}
+>> +};
+>> +
+>>  static int ssc_probe(struct platform_device *pdev)
+>>  {
+>>  	struct resource *regs;
+>> @@ -80,6 +100,8 @@ static int ssc_probe(struct platform_device *pdev)
+>>  	}
+>>  
+>>  	ssc->pdev = pdev;
+>> +	ssc->pdata = (struct atmel_ssc_platform_data *)
+>> +			platform_get_device_id(pdev)->driver_data;
+>>  
+>>  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>  	if (!regs) {
+>> @@ -139,6 +161,7 @@ static struct platform_driver ssc_driver = {
+>>  		.name		= "ssc",
+>>  		.owner		= THIS_MODULE,
+>>  	},
+>> +	.id_table	= atmel_ssc_devtypes,
+>>  	.probe		= ssc_probe,
+>>  	.remove		= __devexit_p(ssc_remove),
+>>  };
+>> diff --git a/include/linux/atmel-ssc.h b/include/linux/atmel-ssc.h
+>> index 4eb3175..1ca0e32 100644
+>> --- a/include/linux/atmel-ssc.h
+>> +++ b/include/linux/atmel-ssc.h
+>> @@ -5,10 +5,15 @@
+>>  #include <linux/list.h>
+>>  #include <linux/io.h>
+>>  
+>> +struct atmel_ssc_platform_data {
+>> +	int			use_dma;
+>> +};
+>> +
+>>  struct ssc_device {
+>>  	struct list_head	list;
+>>  	void __iomem		*regs;
+>>  	struct platform_device	*pdev;
+>> +	struct atmel_ssc_platform_data *pdata;
+>>  	struct clk		*clk;
+>>  	int			user;
+>>  	int			irq;
+>> -- 
+>> 1.7.9.5
+>>
+> 
 
-- Adding a return code to gpiochip_add_pin_range() so we can
-  reliably check whether this succeeds.
 
-- Get rid of the custom of_pinctrl_add_gpio_range() from
-  pinctrl. Instead create of_pinctrl_get() to just retrive the
-  pin controller per se from an OF node. This composite
-  function was just begging to be deleted, it was way to
-  purpose-specific.
-
-- Use pinctrl_dev_get_name() to get the name of the retrieved
-  pin controller and use that to call back into the generic
-  gpiochip_add_pin_range().
-
-Now the pin range is only allocated and tied to a pin
-controller from the core implementation in gpiolib.c.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/gpio/gpiolib-of.c       | 23 +++++++++--------------
- drivers/gpio/gpiolib.c          |  8 +++++---
- drivers/pinctrl/devicetree.c    |  4 +---
- include/asm-generic/gpio.h      |  4 ++--
- include/linux/gpio.h            |  2 +-
- include/linux/pinctrl/pinctrl.h |  7 ++-----
- 6 files changed, 20 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 67403e4..a40cd84 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -221,8 +221,8 @@ EXPORT_SYMBOL(of_mm_gpiochip_add);
- static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
- {
- 	struct device_node *np = chip->of_node;
--	struct gpio_pin_range *pin_range;
- 	struct of_phandle_args pinspec;
-+	struct pinctrl_dev *pctldev;
- 	int index = 0, ret;
- 
- 	if (!np)
-@@ -234,22 +234,17 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
- 		if (ret)
- 			break;
- 
--		pin_range = devm_kzalloc(chip->dev, sizeof(*pin_range),
--				GFP_KERNEL);
--		if (!pin_range) {
--			pr_err("%s: GPIO chip: failed to allocate pin ranges\n",
--					chip->label);
-+		pctldev = of_pinctrl_get(pinspec.np);
-+		if (!pctldev)
- 			break;
--		}
- 
--		pin_range->range.name = chip->label;
--		pin_range->range.base = chip->base;
--		pin_range->range.pin_base = pinspec.args[0];
--		pin_range->range.npins = pinspec.args[1];
--		pin_range->pctldev = of_pinctrl_add_gpio_range(pinspec.np,
--				&pin_range->range);
-+		ret = gpiochip_add_pin_range(chip,
-+					     pinctrl_dev_get_name(pctldev),
-+					     pinspec.args[0],
-+					     pinspec.args[1]);
- 
--		list_add_tail(&pin_range->node, &chip->pin_ranges);
-+		if (ret)
-+			break;
- 
- 	} while (index++);
- }
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index fd7280f..addbabb 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1185,8 +1185,8 @@ EXPORT_SYMBOL_GPL(gpiochip_find);
- 
- #ifdef CONFIG_PINCTRL
- 
--void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--		unsigned int pin_base, unsigned int npins)
-+int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
-+			   unsigned int pin_base, unsigned int npins)
- {
- 	struct gpio_pin_range *pin_range;
- 
-@@ -1194,7 +1194,7 @@ void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- 	if (!pin_range) {
- 		pr_err("%s: GPIO chip: failed to allocate pin ranges\n",
- 				chip->label);
--		return;
-+		return -ENOMEM;
- 	}
- 
- 	pin_range->range.name = chip->label;
-@@ -1205,6 +1205,8 @@ void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- 			&pin_range->range);
- 
- 	list_add_tail(&pin_range->node, &chip->pin_ranges);
-+
-+	return 0;
- }
- EXPORT_SYMBOL_GPL(gpiochip_add_pin_range);
- 
-diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
-index 6728ec7..fe2d1af 100644
---- a/drivers/pinctrl/devicetree.c
-+++ b/drivers/pinctrl/devicetree.c
-@@ -106,8 +106,7 @@ static struct pinctrl_dev *find_pinctrl_by_of_node(struct device_node *np)
- 	return NULL;
- }
- 
--struct pinctrl_dev *of_pinctrl_add_gpio_range(struct device_node *np,
--		struct pinctrl_gpio_range *range)
-+struct pinctrl_dev *of_pinctrl_get(struct device_node *np)
- {
- 	struct pinctrl_dev *pctldev;
- 
-@@ -115,7 +114,6 @@ struct pinctrl_dev *of_pinctrl_add_gpio_range(struct device_node *np,
- 	if (!pctldev)
- 		return NULL;
- 
--	pinctrl_add_gpio_range(pctldev, range);
- 	return pctldev;
- }
- 
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 2e60de4..50d995e 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -63,8 +63,8 @@ struct gpio_pin_range {
- 	struct pinctrl_gpio_range range;
- };
- 
--void gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--			    unsigned int pin_base, unsigned int npins);
-+int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
-+			   unsigned int pin_base, unsigned int npins);
- void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
- 
- #endif
-diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-index 21d28b9..81bbfe5 100644
---- a/include/linux/gpio.h
-+++ b/include/linux/gpio.h
-@@ -233,7 +233,7 @@ static inline int irq_to_gpio(unsigned irq)
- 
- #ifdef CONFIG_PINCTRL
- 
--static inline void
-+static inline int
- gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- 		       unsigned int pin_base, unsigned int npins)
- {
-diff --git a/include/linux/pinctrl/pinctrl.h b/include/linux/pinctrl/pinctrl.h
-index 434e5a9..4a58428 100644
---- a/include/linux/pinctrl/pinctrl.h
-+++ b/include/linux/pinctrl/pinctrl.h
-@@ -141,16 +141,13 @@ extern struct pinctrl_dev *find_pinctrl_and_add_gpio_range(const char *devname,
- 		struct pinctrl_gpio_range *range);
- 
- #ifdef CONFIG_OF
--extern struct pinctrl_dev *of_pinctrl_add_gpio_range(struct device_node *np,
--		struct pinctrl_gpio_range *range);
-+extern struct pinctrl_dev *of_pinctrl_get(struct device_node *np);
- #else
- static inline
--struct pinctrl_dev *of_pinctrl_add_gpio_range(struct device_node *np,
--		struct pinctrl_gpio_range *range)
-+struct pinctrl_dev *of_pinctrl_get(struct device_node *np)
- {
- 	return NULL;
- }
--
- #endif /* CONFIG_OF */
- 
- extern const char *pinctrl_dev_get_name(struct pinctrl_dev *pctldev);
 -- 
-1.7.11.3
+Nicolas Ferre
