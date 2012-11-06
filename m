@@ -1,81 +1,164 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 06 Nov 2012 16:59:15 -0600
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <20121106221437.GQ28327@n2100.arm.linux.org.uk>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211061733.44781.arnd@arndb.de>
- <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
- <201211062114.49933.arnd@arndb.de>
- <20121106221437.GQ28327@n2100.arm.linux.org.uk>
-Message-ID: <50999643.4010206@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Nov 2012 17:59:35 -0500 (EST)
+Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
+ interfaces
+In-Reply-To: <20121106221651.GE21764@mudshark.cambridge.arm.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121106221651.GE21764@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1211061755260.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 04:14 PM, Russell King - ARM Linux wrote:
-> On Tue, Nov 06, 2012 at 09:14:49PM +0000, Arnd Bergmann wrote:
->> The other point is being able to build such a kernel, and this is what Will
->> seems to be interested in more. We have made VEXPRESS depend on
->> MULTIPLATFORM, which broke support for building a non-MMU vexpress kernel,
->> and I think we should fix that. The two options are either to make
->> vexpress be single-platform when building for !MMU, or to allow multiplatform
->> kernels to be built without MMU support in principle. I think the second
->> option is more logical and avoids complex Kconfig constructs.
-> 
-> The other thing here is... why does a platform which _was_ able to be
-> built in isolation from every other platform suddenly become incapable
-> of being so when they join the multiplatform conglomerate?  This just
-> sounds totally perverse and wrong.
+On Tue, 6 Nov 2012, Will Deacon wrote:
 
-Arnd and I discussed this some at Connect regarding VExpress being
-selected. This is only to prevent the warning that no machine is enabled
-in a randconfig or user error case. We could simply remove this error or
-make it a warning instead. Then selecting a single platform is a matter
-of only selecting 1 platform.
+> On Tue, Oct 16, 2012 at 02:21:48PM +0100, Lorenzo Pieralisi wrote:
+> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > The GIC interface numbering does not necessarily follow the logical
+> > CPU numbering, especially for complex topologies such as multi-cluster
+> > systems.
+> > 
+> > Fortunately we can easily probe the GIC to create a mapping as the
+> > Interrupt Processor Targets Registers for the first 32 interrupts are
+> > read-only, and each field returns a value that always corresponds to
+> > the processor reading the register.
+> > 
+> > Initially all mappings target all CPUs in case an IPI is required to
+> > boot secondary CPUs.  It is refined as those CPUs discover what their
+> > actual mapping is.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> 
+> This is a really neat idea!
+> 
+> > ---
+> >  arch/arm/common/gic.c | 42 ++++++++++++++++++++++++++++++++++--------
+> >  1 file changed, 34 insertions(+), 8 deletions(-)
+> > 
+> > diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> > index aa52699..1338a55 100644
+> > --- a/arch/arm/common/gic.c
+> > +++ b/arch/arm/common/gic.c
+> > @@ -70,6 +70,13 @@ struct gic_chip_data {
+> >  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> >  
+> >  /*
+> > + * The GIC mapping of CPU interfaces does not necessarily match
+> > + * the logical CPU numbering.  Let's use a mapping as returned
+> > + * by the GIC itself.
+> > + */
+> > +static u8 gic_cpu_map[8] __read_mostly;
+> 
+> Can we have a #define for the number CPUs supported by the GIC? It gets
+> used a fair amount in this patch for loop bounds etc.
 
-> Surely it should be: platforms _not_ yet converted to multiplatform
-> can't be selected with multi-platform support enabled?
-> 
-> So, maybe the _proper_ solution here is:
-> 
-> - change the big choice to be: config SINGLE_xxx
->   - these select config MACH_FOO / PLAT_FOO / ARCH_FOO
->   eg,
-> 	config SINGLE_FOO
-> 		bool "Support for foo platforms in single kernel"
-> 		select MACH_FOO
-> - add a final option: config MULTIPLATFORM
-> - then add:
-> 
-> config MULTI_FOO
-> 	bool "Include support for foo platforms"
-> 	select MACH_FOO
-> 	depends on MULTIPLATFORM || !MMU
-> ...
-> 
-> config MACH_FOO
-> 	bool
-> 
+Sure.  I'll respin the patch.
 
-I'd rather see less xxx_FOO config symbols rather than more.
-
-Wouldn't this break defconfigs?
-
-Rob
-
-> Now, we don't _have_ to have the single and multi variants if they aren't
-> appropriate for the platform, but we can cover all the cases: a platform
-> where it's part of the multi-platform kernel when built for MMU, but is
-> incapable of being a multi-platform kernel when built without MMU.
 > 
-> And we can do it without _too_ much Kconfig pain, and certainly without
-> having to delve into anything beyond arch/arm/Kconfig.
+> > +/*
+> >   * Supported arch specific GIC irq extension.
+> >   * Default make them NULL.
+> >   */
+> > @@ -242,7 +249,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+> >  		return -EINVAL;
+> >  
+> >  	mask = 0xff << shift;
+> > -	bit = 1 << (cpu_logical_map(cpu) + shift);
+> > +	bit = gic_cpu_map[cpu] << shift;
+> >  
+> >  	raw_spin_lock(&irq_controller_lock);
+> >  	val = readl_relaxed(reg) & ~mask;
+> > @@ -349,11 +356,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+> >  	u32 cpumask;
+> >  	unsigned int gic_irqs = gic->gic_irqs;
+> >  	void __iomem *base = gic_data_dist_base(gic);
+> > -	u32 cpu = cpu_logical_map(smp_processor_id());
+> > -
+> > -	cpumask = 1 << cpu;
+> > -	cpumask |= cpumask << 8;
+> > -	cpumask |= cpumask << 16;
+> >  
+> >  	writel_relaxed(0, base + GIC_DIST_CTRL);
+> >  
+> > @@ -366,6 +368,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+> >  	/*
+> >  	 * Set all global interrupts to this CPU only.
+> >  	 */
+> > +	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
+> >  	for (i = 32; i < gic_irqs; i += 4)
+> >  		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+> >  
+> > @@ -389,9 +392,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+> >  {
+> >  	void __iomem *dist_base = gic_data_dist_base(gic);
+> >  	void __iomem *base = gic_data_cpu_base(gic);
+> > +	unsigned int cpu_mask, cpu = smp_processor_id();
+> >  	int i;
+> >  
+> >  	/*
+> > +	 * Get what the GIC says our CPU mask is.
+> > +	 */
+> > +	BUG_ON(cpu >= 8);
+> > +	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
 > 
-> I'd suggest at that point we separate out this stuff into a separate
-> file - arch/arm/Kconfig.mach, which contains all the platform selection
-> stuff.
+> Making the mask a u8 and using readb_relaxed here makes this bit of code
+> clearer to me (and the GIC apparently allows such an access to this
+> register).
+
+Not always.  At least RTSM throws an exception if you do so.
+Been there.
+
+> > +	gic_cpu_map[cpu] = cpu_mask;
+> > +
+> > +	/*
+> > +	 * Clear our mask from the other map entries in case they're
+> > +	 * still undefined.
+> > +	 */
+> > +	for (i = 0; i < 8; i++)
+> > +		if (i != cpu)
+> > +			gic_cpu_map[i] &= ~cpu_mask;
+> > +
+> > +	/*
+> >  	 * Deal with the banked PPI and SGI interrupts - disable all
+> >  	 * PPI interrupts, ensure all SGI interrupts are enabled.
+> >  	 */
+> > @@ -646,7 +665,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+> >  {
+> >  	irq_hw_number_t hwirq_base;
+> >  	struct gic_chip_data *gic;
+> > -	int gic_irqs, irq_base;
+> > +	int gic_irqs, irq_base, i;
+> >  
+> >  	BUG_ON(gic_nr >= MAX_GIC_NR);
+> >  
+> > @@ -683,6 +702,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+> >  	}
+> >  
+> >  	/*
+> > +	 * Initialize the CPU interface map to all CPUs.
+> > +	 * It will be refined as each CPU probes its ID.
+> > +	 */
+> > +	for (i = 0; i < 8; i++)
+> > +		gic_cpu_map[i] = 0xff;
+> > +
+> > +	/*
+> >  	 * For primary GICs, skip over SGIs.
+> >  	 * For secondary GICs, skip over PPIs, too.
+> >  	 */
+> > @@ -737,7 +763,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+> >  
+> >  	/* Convert our logical CPU mask into a physical one. */
+> >  	for_each_cpu(cpu, mask)
+> > -		map |= 1 << cpu_logical_map(cpu);
+> > +		map |= gic_cpu_map[cpu];
+> >  
+> >  	/*
+> >  	 * Ensure that stores to Normal memory are visible to the
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> With those changes:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Will
 > 
