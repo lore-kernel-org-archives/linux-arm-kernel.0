@@ -1,25 +1,49 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 6 Nov 2012 22:51:05 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211051908.34291.arnd@arndb.de>
- <20121106122011.GE29853@mudshark.cambridge.arm.com>
- <201211061733.44781.arnd@arndb.de>
- <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
-Message-ID: <20121106225105.GD10187@jl-vm1.vm.bytemark.co.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Nov 2012 17:53:20 -0500 (EST)
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <20121106220458.GP28327@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+ <20121106220458.GP28327@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1211061745110.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> I really think that it makes no sense at all to support !MMU kernels in 
-> a multi-platform kernel build, even if the set of included platforms 
-> were all !MMU.  The kernel has to be linked for the physical address of 
-> the target and not a common invariant virtual address.
+On Tue, 6 Nov 2012, Russell King - ARM Linux wrote:
 
-Although there's likely to be approximately zero interest in
-multi-platform !MMU, relocating at boot time doesn't sound onerous,
-should it be needed.  x86 kernels already do that.  Maybe ARM kernels
-will eventually do that anyway for the same reason as x86.
+> On Tue, Nov 06, 2012 at 04:12:27PM -0500, Nicolas Pitre wrote:
+> > 
+> > ... instead of flush_cache_all().  The later unconditionally flushes
+> > the L2 cache on ARMv7 architectures such as Cortex A15 and A7 which
+> > is costly and unnecessary in some scenarios where setup_mm_for_reboot()
+> > is used.  If L2 has to be flushed as well, it should already be done
+> > separately on other architectures anyway.
+> 
+> Why does the cost at reboot count?  It's a relatively slow operation as
+> it is anyway, because you have to wait for the system to shut down, call
+> the boot loader, etc.
 
--- Jamie
+Because I have a use case with the big.LITTLE switcher where the full 
+boot is bypassed but the kernel must be reintered as if the CPU was 
+powered up.  This is of course something that _could_ happen multiple 
+times in a second, and therefore minimizing its unneeded costs is a good 
+thing(tm).
+
+> However, the opposite argument is that the state of the L2 _shouldn't_
+> matter - except for one small little detail.  Dirty data, which could
+> get evicted and overwrite something that matters.  Generally there won't
+> be any dirty data in the L2 cache on normal boot, so this is a situation
+> which boot loaders probably don't expect.
+
+In the use case that concerns me, L2 is retained and I'd well prefer if 
+it didn't get flushed at all.
+
+> So all in all, I'm not sure of the wiseness of your change.  It's likely
+> to cause regressions.
+
+Could you please tell me if you have such a regression in mind?  Of 
+course I could carry the few operations performed by 
+setup_mm_for_reboot() locally, but that looks like useless code 
+duplication.
+
+
+Nicolas
