@@ -1,33 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 6 Nov 2012 06:07:57 +0000
-Subject: [PATCH 06/15] ARM: OMAP2+: hwmod: Enable OCMCRAM registration
- in AM33XX
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC03374@DBDE01.ent.ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-7-git-send-email-vaibhav.bedia@ti.com>
- <5097698F.1080609@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC03374@DBDE01.ent.ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB635BB@DBDE01.ent.ti.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Tue, 06 Nov 2012 11:42:34 +0530
+Subject: [PATCH 3/5] ARM: EXYNOS: Fix soft reboot hang after suspend/resume
+In-Reply-To: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
+References: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1352182356-28989-4-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 23:27:53, Bedia, Vaibhav wrote:
-> On Mon, Nov 05, 2012 at 12:53:59, Hiremath, Vaibhav wrote:
-> > 
-> > Can you cut-n-paste the ocmcram hwmod entry outside of #if and resubmit
-> > it again?
-> > 
-> 
-> Ok. Will do that in the next version.
-> 
+From: Inderpal Singh <inderpal.singh@samsung.com>
 
-Another suggestion, all hwmod patches looks independent and trivial to me, 
-so can you submit all hwmod patches separately so that it can go separately?
+Upon wake-up, clear the sleep mode set in INFORM1 register.
 
-Thanks,
-Vaibhav
+Signed-off-by: Inderpal Singh <inderpal.singh@samsung.com>
+Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/mach-exynos/pm.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-> Regards,
-> Vaibhav 
-> 
-> 
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index c06c992..8dedeb2 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -312,6 +312,10 @@ static void exynos_pm_resume(void)
+ 	}
+ 
+ early_wakeup:
++
++	/* Clear SLEEP mode set in INFORM1 */
++	__raw_writel(0x0, S5P_INFORM1);
++
+ 	return;
+ }
+ 
+-- 
+1.6.6.1
