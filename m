@@ -1,51 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 06 Nov 2012 15:58:12 -0500 (EST)
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <201211061733.44781.arnd@arndb.de>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211051908.34291.arnd@arndb.de>
- <20121106122011.GE29853@mudshark.cambridge.arm.com>
- <201211061733.44781.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 6 Nov 2012 22:00:38 +0000
+Subject: [RFC PATCH 3/4] ARM: kernel: add logical mappings look-up
+In-Reply-To: <1350393709-23546-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20121106220038.GD21764@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Nov 2012, Arnd Bergmann wrote:
-
-> On Tuesday 06 November 2012, Will Deacon wrote:
-> > nommu-XIP kernels are a different kettle
-> > of fish, but we don't care about a decompressor there.
+On Tue, Oct 16, 2012 at 02:21:47PM +0100, Lorenzo Pieralisi wrote:
+> In ARM SMP systems the MPIDR register ([23:0] bits) is used to uniquely
+> identify CPUs.
 > 
-> XIP is only supported on ARCH_PXA and ARCH_SA1100. I don't see either
-> of them moving to CONFIG_MULTIPLATFORM any time soon, given how much
-> work that would be. ARCH_MMP should be possible in the future, but
-> has never supported XIP so far.
-
-XIP kernels (CONFIG_XIP_KERNEL) are supported on any architecture.  
-This doesn't require any platform specific support.  You just need a 
-range of physical memory addresses where to get the kernel text from 
-(that could even be unmapped RAM if you wanted to play with it on a 
-platform with no NOR flash).  The prospect of PRAM usage might renew 
-interest in a XIP kernel.
-
-Maybe you are confused by CONFIG_ARCH_MTD_XIP where special support is 
-needed in order to make writable MTD devices compatible with a XIP 
-kernel located on them.  That is indeed only available for ARCH_PXA and 
-ARCH_SA1100.
-
-> > The real problem will hit with things like CONFIG_DRAM_BASE, where !MMU
-> > can't realistically support multiple platforms, so allowing
-> > ARCH_MULTIPLATFORM doesn't feel quite right either...
+> In order to retrieve the logical CPU index corresponding to a given
+> MPIDR value and guarantee a consistent translation throughout the kernel,
+> this patch adds a look-up based on the MPIDR[23:0] so that kernel subsystems
+> can use it whenever the logical cpu index corresponding to a given MPIDR
+> value is needed.
 > 
-> Anybody who wants to build a !MMU kernel already needs to tweak the
-> configuration quite a lot and usually knows more about the system than
-> a typical end user. Having to pick the correct DRAM_BASE probably
-> isn't too bad in that case, as long as the kernels actually build.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/include/asm/smp_plat.h | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+> index 558d6c8..aaa61b6 100644
+> --- a/arch/arm/include/asm/smp_plat.h
+> +++ b/arch/arm/include/asm/smp_plat.h
+> @@ -5,6 +5,9 @@
+>  #ifndef __ASMARM_SMP_PLAT_H
+>  #define __ASMARM_SMP_PLAT_H
+>  
+> +#include <linux/cpumask.h>
+> +#include <linux/err.h>
+> +
+>  #include <asm/cputype.h>
+>  
+>  /*
+> @@ -48,5 +51,19 @@ static inline int cache_ops_need_broadcast(void)
+>   */
+>  extern int __cpu_logical_map[];
+>  #define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
+> +/*
+> + * Retrieve logical cpu index corresponding to a given MPIDR[23:0]
+> + *  - mpidr: MPIDR[23:0] to be used for the look-up
+> + *
+> + * Returns the cpu logical index or -EINVAL on look-up error
+> + */
+> +static inline int get_logical_index(u32 mpidr)
+> +{
+> +	int cpu;
+> +	for (cpu = 0; cpu < nr_cpu_ids; cpu++)
+> +		if (cpu_logical_map(cpu) == mpidr)
+> +			return cpu;
+> +	return -EINVAL;
+> +}
+>  
+>  #endif
 
-I really think that it makes no sense at all to support !MMU kernels in 
-a multi-platform kernel build, even if the set of included platforms 
-were all !MMU.  The kernel has to be linked for the physical address of 
-the target and not a common invariant virtual address.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-
-Nicolas
+Will
