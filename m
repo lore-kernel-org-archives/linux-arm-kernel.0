@@ -1,45 +1,40 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Tue, 06 Nov 2012 02:30:07 -0500
-Subject: [PATCH 15/16] mm: use vm_unmapped_area() on sparc32 architecture
-In-Reply-To: <20121105.202501.1246122770431623794.davem@davemloft.net>
-References: <1352155633-8648-1-git-send-email-walken@google.com>
- <1352155633-8648-16-git-send-email-walken@google.com>
- <20121105.202501.1246122770431623794.davem@davemloft.net>
-Message-ID: <5098BC7F.7090702@redhat.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 6 Nov 2012 07:32:19 +0000
+Subject: [PATCH 12/15] ARM: OMAP: timer: Add suspend-resume callbacks
+ for clockevent device
+In-Reply-To: <509829C5.100@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-13-git-send-email-vaibhav.bedia@ti.com>
+ <509829C5.100@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC045C5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2012 08:25 PM, David Miller wrote:
-> From: Michel Lespinasse <walken@google.com>
-> Date: Mon,  5 Nov 2012 14:47:12 -0800
->
->> Update the sparc32 arch_get_unmapped_area function to make use of
->> vm_unmapped_area() instead of implementing a brute force search.
->>
->> Signed-off-by: Michel Lespinasse <walken@google.com>
->
-> Hmmm...
->
->> -	if (flags & MAP_SHARED)
->> -		addr = COLOUR_ALIGN(addr);
->> -	else
->> -		addr = PAGE_ALIGN(addr);
->
-> What part of vm_unmapped_area() is going to duplicate this special
-> aligning logic we need on sparc?
->
+Hi Jon,
 
-That would be this part:
+On Tue, Nov 06, 2012 at 02:34:05, Hunter, Jon wrote:
+[...]
+> >  static struct clock_event_device clockevent_gpt = {
+> >  	.name		= "gp_timer",
+> >  	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> > @@ -142,6 +171,8 @@ static struct clock_event_device clockevent_gpt = {
+> >  	.rating		= 300,
+> >  	.set_next_event	= omap2_gp_timer_set_next_event,
+> >  	.set_mode	= omap2_gp_timer_set_mode,
+> > +	.suspend	= omap_clkevt_suspend,
+> > +	.resume		= omap_clkevt_resume,
+> 
+> So these suspend/resume callbacks are going to be called for all OMAP2+
+> and AMxxxx devices? I don't think we want that. AFAIK OMAP timers will
+> idle on their own when stopped and don't require this.
+> 
 
-+found:
-+	/* We found a suitable gap. Clip it with the original low_limit. */
-+	if (gap_start < info->low_limit)
-+		gap_start = info->low_limit;
-+
-+	/* Adjust gap address to the desired alignment */
-+	gap_start += (info->align_offset - gap_start) & info->align_mask;
-+
-+	VM_BUG_ON(gap_start + info->length > info->high_limit);
-+	VM_BUG_ON(gap_start + info->length > gap_end);
-+	return gap_start;
-+}
+IMO instead of skipping the callback registration we could have checks in the
+suspend/resume callbacks to decide what to do. 
+
+I'll check if the idling part is AM33xx specific. If not, based on the recent timer
+changes that you did, perhaps checking if the clockevent selected doesn't have the
+"ti,timer-alwon" capability will be good enough. What do you think?
+
+Regards.
+Vaibhav
