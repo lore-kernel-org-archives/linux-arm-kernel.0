@@ -1,35 +1,20 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 10:42:27 -0800
-Subject: [PATCHv2 1/6] arch: Change defconfigs to point to g_mass_storage.
-In-Reply-To: <20121106184117.GJ6801@atomide.com>
-References: <cover.1351715302.v2.git.mina86@mina86.com>
- <46dde680f525562e9fd19567deb5247f0bf26842.1351715302.v2.git.mina86@mina86.com>
- <20121106113157.GE11931@arwen.pp.htv.fi>
- <20121106184117.GJ6801@atomide.com>
-Message-ID: <20121106184227.GK6801@atomide.com>
+Date: Tue, 6 Nov 2012 10:51:11 -0800
+Subject: [PATCH] [PATCH] remove pcm049 from Makefile
+In-Reply-To: <508FBDFD.9000700@mvista.com>
+References: <1351535422-4644-1-git-send-email-holzmayr@rsi-elektrotechnik.de>
+ <508FBDFD.9000700@mvista.com>
+Message-ID: <20121106185110.GM6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [121106 10:41]:
-> * Felipe Balbi <balbi@ti.com> [121106 03:40]:
-> > Hi,
-> > 
-> > On Fri, Nov 02, 2012 at 02:31:50PM +0100, Michal Nazarewicz wrote:
-> > > From: Michal Nazarewicz <mina86@mina86.com>
-> > > 
-> > > The File-backed Storage Gadget (g_file_storage) is being removed, since
-> > > it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
-> > > changes defconfigs point to the new gadget.
-> > > 
-> > > Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> > 
-> > I need more Acks here. Only got one from Nicolas. Anyone else ?
+* Sergei Shtylyov <sshtylyov@mvista.com> [121030 04:49]:
+> Hello.
 > 
-> For omaps:
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+>    You forgot to sign off on the patch, so it can't be applied.
 
-Heh I guess no omap changes there, so probably not
-worth adding then.
+Any news on this? It's also missing the description.
+
+Regards,
 
 Tony
