@@ -1,82 +1,46 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 06 Nov 2012 13:38:13 -0600
-Subject: [GIT PULL] Calxeda ECX-2000 support
-In-Reply-To: <20121106191819.GA11353@quad.lixom.net>
-References: <50917936.2030405@gmail.com>
- <20121106191819.GA11353@quad.lixom.net>
-Message-ID: <50996725.2090003@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2012 20:04:45 +0000
+Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
+ SCHED_TRACER depends on HZ]
+In-Reply-To: <20121106134944.GE27643@S2100-06.ap.freescale.net>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <20121106024052.GA27643@S2100-06.ap.freescale.net>
+ <20121106101229.GN28327@n2100.arm.linux.org.uk>
+ <20121106134944.GE27643@S2100-06.ap.freescale.net>
+Message-ID: <20121106200445.GA32398@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 01:18 PM, Olof Johansson wrote:
-> On Wed, Oct 31, 2012 at 02:17:10PM -0500, Rob Herring wrote:
->> Arnd, Olof,
->>
->> Please pull support for Calxeda ECX-2000 SOC.
->>
->> There will be a trivial conflict with the GIC move to drivers/irqchip once
->> that goes in. 
->>
->> Rob
->>
->> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
->>
->>   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
->>
->> are available in the git repository at:
->>
->>   git://sources.calxeda.com/kernel/linux.git tags/calxeda-ecx-2000
->>
->> for you to fetch changes up to e095c0d122c09efabe7d4136ce77f72c636c4879:
->>
->>   ARM: highbank: Add initial ECX-2000 support (2012-10-31 13:47:01 -0500)
->>
+On Tue, Nov 06, 2012 at 09:49:50PM +0800, Shawn Guo wrote:
+> On Tue, Nov 06, 2012 at 10:12:29AM +0000, Russell King - ARM Linux wrote:
+> > > [    0.000000] sched_clock: 16 bits at 32kHz, resolution 31250ns, wraps every 20
+> > > 47ms
+> > 
+> > So where are you setting this up?  My guess is it's after time_init()
+> > has done its stuff.
 > 
-> The addition of include of core.h in sysregs.h gives me a build error on
-> multi_v7_defconfig due to missing guard ifdefs. I've added the following
-> patch on top of your branch.
-> 
-> 
-> commit 9186cea8283b0d235719e82607a1aec81db7ab8d
-> Author:     Olof Johansson <olof@lixom.net>
-> AuthorDate: Tue Nov 6 11:09:10 2012 -0800
-> Commit:     Olof Johansson <olof@lixom.net>
-> CommitDate: Tue Nov 6 11:09:10 2012 -0800
-> 
->     ARM: highbank: add ifdef guards to core.h
->     
->     Fixes build error due to multiple includes:
->     
->     In file included from arch/arm/mach-highbank/sysregs.h:23:0,
->     from arch/arm/mach-highbank/system.c:20:
->     arch/arm/mach-highbank/core.h:8:91: error: redefinition of 'highbank_lluart_map_io'
->     In file included from arch/arm/mach-highbank/system.c:19:0:
->     arch/arm/mach-highbank/core.h:8:91: note: previous definition of 'highbank_lluart_map_io' was here
+> It gets set up in machine_desc->timer->init() which is called right
+> in time_init() just before sched_clock_postinit().
 
-Thanks, I didn't see that in my tree because I have follow-on patches
-removing this based on the DEBUG_LL clean-up. Now that the dependency
-from Stephen is in your tree, I need to send that to you as well.
+Well.  I just tried an experiment with OMAP4:
 
-Rob
+[    0.000000] sched_clock: 16 bits at 32kHz, resolution 30517ns, wraps every 1999ms                                                                            
 
->     
->     Signed-off-by: Olof Johansson <olof@lixom.net>
-> 
-> diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-> index 286ec82..068c687 100644
-> --- a/arch/arm/mach-highbank/core.h
-> +++ b/arch/arm/mach-highbank/core.h
-> @@ -1,3 +1,6 @@
-> +#ifndef __HIGHBANK_CORE_H
-> +#define __HIGHBANK_CORE_H
-> +
->  extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
->  extern void highbank_clocks_init(void);
->  extern void highbank_restart(char, const char *);
-> @@ -18,3 +21,5 @@ extern void highbank_smc1(int fn, int arg);
->  extern void highbank_cpu_die(unsigned int cpu);
->  
->  extern struct smp_operations highbank_smp_ops;
-> +
-> +#endif
-> 
+So, this is similar to yours, and there I get:
+
+[    1.945281] ALSA device list:
+[    1.948394]   #0: SDP4430
+[    1.951324] Waiting 2sec before mounting root device...
+[    2.926910] kjournald starting.  Commit interval 5 seconds
+[    2.927001] EXT3-fs (mmcblk1p2): warning: maximal mount count reached, running e2fsck is recommended
+[    3.041503] EXT3-fs (mmcblk1p2): using internal journal
+[    3.051422] EXT3-fs (mmcblk1p2): recovery complete
+[    3.056427] EXT3-fs (mmcblk1p2): mounted filesystem with writeback data mode
+[    3.063842] VFS: Mounted root (ext3 filesystem) on device 179:26.
+[    3.070404] Freeing init memory: 192K
+
+So it appears to be working as designed.
