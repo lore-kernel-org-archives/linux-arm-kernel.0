@@ -1,65 +1,73 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 06 Nov 2012 01:59:47 +0100
-Subject: [PATCH V6 3/6] arm: cache-l2x0: add support for Aurora L2 cache
- ctrl
-In-Reply-To: <20121106002444.GL28327@n2100.arm.linux.org.uk>
-References: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
- <1348738523-28609-1-git-send-email-gregory.clement@free-electrons.com>
- <1348738523-28609-2-git-send-email-gregory.clement@free-electrons.com>
- <20121023090154.GP21164@n2100.arm.linux.org.uk>
- <508666A6.9040701@free-electrons.com>
- <20121023100057.GS21164@n2100.arm.linux.org.uk>
- <5086700E.10702@free-electrons.com>
- <20121104223215.GA28327@n2100.arm.linux.org.uk>
- <509850C5.9080903@free-electrons.com>
- <20121106002444.GL28327@n2100.arm.linux.org.uk>
-Message-ID: <50986103.90802@free-electrons.com>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Mon, 05 Nov 2012 17:02:15 -0800
+Subject: [PATCHv7 00/21] ARM: OMAP3+: auto retention support
+In-Reply-To: <1348590833-12335-1-git-send-email-t-kristo@ti.com> (Tero
+ Kristo's message of "Tue, 25 Sep 2012 19:33:32 +0300")
+References: <1348590833-12335-1-git-send-email-t-kristo@ti.com>
+Message-ID: <87k3tzczmw.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 01:24 AM, Russell King - ARM Linux wrote:
-> On Tue, Nov 06, 2012 at 12:50:29AM +0100, Gregory CLEMENT wrote:
->> The initial patch 7547/2 was superseded by the patch 7547/3 that I have just
->> pushed in the patch system. Last time first I fixed the code then I used the
->> versatile_defconfig configuration to test the compilation and didn't realize
->> that it did set CONFIG_OF by default.
-> 
-> Are you sure you put the right patch in there?
-> 
-> diff -u <(pdb getpatch 7547/2) <(pdb getpatch 7547/3)
-> --- /dev/fd/63	2012-11-06 00:23:54.451978759 +0000
-> +++ /dev/fd/62	2012-11-06 00:23:54.452978749 +0000
-> @@ -1,5 +1,5 @@
->  ===============================================================================
-> -Patch: 7547/2: cache-l2x0: add support for Aurora L2 cache ctrl
-> +Patch: 7547/3: cache-l2x0: add support for Aurora L2 cache ctrl
->  From: Gregory CLEMENT
->  Email: gregory.clement at free-electrons.com
->  Status: 3.7-rc1
-> @@ -10,6 +10,8 @@
->   arch/arm/mm/cache-l2x0.c                   |  222 +++++++++++++++++++++++++++--
->   3 files changed, 268 insertions(+), 13 deletions(-)
->  -------------------------------------------------------------------------------
-> +diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-> +index 5f2c7b4..3b2c40b 100644
->  --- a/arch/arm/include/asm/hardware/cache-l2x0.h
->  +++ b/arch/arm/include/asm/hardware/cache-l2x0.h
->  @@ -102,6 +102,10 @@
-> @@ -443,3 +445,5 @@
->   
->   	if (data->save)
->  
-> +
-> +
-> 
-> Looks mostly idential to me...
-> 
-Right, I amend the wrong commit :(
+Hi Tero,
 
-The patch 7547/4 should be the good one.
+Tero Kristo <t-kristo@ti.com> writes:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> This set applies on top of linux-3.6-rc5 + func-pwrst code (from Jean) +
+> omap4 core retention set (from me) + PM usecounting changes set (from me).
+
+Since the functional pwrst and usecounting changes are still under
+review, I've taken the patches from this series that are not dependent
+on either of those series and queued them up here for v3.8 (branch:
+for_3.8/pm/voltage.)  
+
+That includes patches the core voltage layer changes (patches 1-10 and
+14-17) and the 4460 OPP data (patch 18.)
+
+I've left out the TPS changes so I can review those closer, and also
+left out the main auto-ret/auto off patch (PATCH 13/21) because of the
+dependencies on the usecounting series.
+
+With this, I tested DVFS on 3430/n900, 4430/Panda and 4460/PandaES and
+voltage scaling seems to be working well.
+
+Kevin
+
+> Changes compared to previous version:
+> - Added proper OMAP4 auto-retention support (now that the PM usecount set
+>   below supports OMAP4 also properly)
+> - Merged TPS6236x support to this set (patches 16,18-20), without this
+>   there will be an issue with patch #21, as panda board will misbehave
+>   without TPS support and auto-ret enabled
+> - Patch #15 fixes the addressing of voltage channels for OMAP4, without this
+>   the voltage channels either end up changing wrong voltage channel or not
+>   changing anything at all
+> - Patch #16 is new based on the discussion earlier on the separate TPS set
+>   * uses proper I2C parameters based on board data, this is still in a data
+>     table though, as calculating these runtime would be rather complicated
+>     (if even possible, as it requires some higher order mathematics according
+>      to my understanding)
+> - Patch #17 enables high speed I2C communication for voltage channel on OMAP4
+>   (this now works thanks to patch #16)
+> - Patch #18 is needed for 4460 boards, otherwise the boot-up OPP detection
+>   fails and voltage control doesn't work at all on 4460 boards
+> - Patch #19 was pulled from the TPS support set
+> - Patch #20 was pulled from the TPS support set, with following changes:
+>   * board setup for the GPIOs was sanitized a bit
+>   * dropped a number of unused defines from the code
+>
+> Working branch available:
+> git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
+> branch: mainline-3.6-rc5-omap-auto-ret-v7
+>
+> Testing done:
+> - hw used: omap3 beagle rev c4, omap4460 gp panda, omap4430 emu blaze
+> - suspend + cpuidle
+> - measured core + mpu voltage rails on all setups to verify that the
+>   voltage transitions work properly during idle
+>
+> -Tero
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
