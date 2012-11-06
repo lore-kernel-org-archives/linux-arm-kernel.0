@@ -1,39 +1,71 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 6 Nov 2012 21:41:37 +0000
-Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
-In-Reply-To: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
-References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
-Message-ID: <20121106214137.GA21764@mudshark.cambridge.arm.com>
+Date: Tue, 6 Nov 2012 21:50:44 +0000
+Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
+In-Reply-To: <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20121106215044.GB21764@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 09:12:27PM +0000, Nicolas Pitre wrote:
+On Tue, Oct 16, 2012 at 02:21:45PM +0100, Lorenzo Pieralisi wrote:
+> When booting through a device tree, the kernel cpu logical id map can be
+> initialized using device tree data passed by FW or through an embedded blob.
 > 
-> ... instead of flush_cache_all().  The later unconditionally flushes
-> the L2 cache on ARMv7 architectures such as Cortex A15 and A7 which
-> is costly and unnecessary in some scenarios where setup_mm_for_reboot()
-> is used.  If L2 has to be flushed as well, it should already be done
-> separately on other architectures anyway.
+> This patch adds a function that parses device tree "cpu" nodes and
+> retrieves the corresponding CPUs hardware identifiers (MPIDR).
+> It sets the possible cpus and the cpu logical map values according to
+> the number of CPUs defined in the device tree and respective properties.
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> The primary CPU is assigned cpu logical number 0 to keep the current
+> convention valid.
 > 
-> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-> index ab88ed4f8e..2c61085a10 100644
-> --- a/arch/arm/mm/idmap.c
-> +++ b/arch/arm/mm/idmap.c
-> @@ -104,7 +104,7 @@ early_initcall(init_static_idmap);
->  void setup_mm_for_reboot(void)
->  {
->  	/* Clean and invalidate L1. */
-> -	flush_cache_all();
-> +	flush_cache_louis();
->  
->  	/* Switch to the identity mapping. */
->  	cpu_switch_mm(idmap_pgd, &init_mm);
+> Current bindings documentation is included in the patch:
+> 
+> Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-We could probably even predicate this on the half-implemented
-TLB_CAN_READ_FROM_L1_CACHE option, but that can come later.
+[...]
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> +void __init arm_dt_init_cpu_maps(void)
+> +{
+> +	struct device_node *dn = NULL;
+> +	int i, cpu = 1;
+> +
+> +	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
+> +		const u32 *hwid;
+> +		int len;
+> +
+> +		pr_debug("  * %s...\n", dn->full_name);
+> +
+> +		hwid = of_get_property(dn, "reg", &len);
+> +
+> +		if (!hwid || len != 4) {
+> +			pr_err("  * %s missing reg property\n", dn->full_name);
+> +			continue;
+> +		}
+> +		/*
+> +		 * We want to assign the boot CPU logical id 0.
+> +		 * Boot CPU checks its own MPIDR and if matches the current
+> +		 * cpu node "reg" value it sets the logical cpu index to 0
+> +		 * and stores the physical id accordingly.
+> +		 * If MPIDR does not match, assign sequential cpu logical
+> +		 * id (starting from 1) and increments it.
+> +		 */
+> +		i = (be32_to_cpup(hwid) == (read_cpuid_mpidr() & 0xffffff))
+> +							? 0 : cpu++;
+> +
+> +		if (!i)
+> +			printk(KERN_INFO "Booting Linux on CPU HWID 0x%x\n",
+> +					be32_to_cpup(hwid));
+
+I don't think we should bother with this print -- we already print something
+in smp_setup_processor_id, which cannot differ for the boot CPU, If you want
+the full mpidr, we could change that code to include it as well.
+
+We might also want some sanity checking that we do indeed end up with
+logical id 0 for the boot CPU. If not, I think we should scream and fall
+back on the simple mapping created earlier.
 
 Will
