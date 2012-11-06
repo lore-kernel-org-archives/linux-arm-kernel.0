@@ -1,200 +1,126 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Nov 2012 14:15:28 +0100
-Subject: [PATCH 4/9] ARM: ux500: 8500: update SKE keypad pinctrl table
-Message-ID: <1352207728-7918-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 6 Nov 2012 14:15:37 +0100
+Subject: [PATCH 5/9] ARM: ux500: 8500: define SDI sleep states
+Message-ID: <1352207737-7953-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-The old pinctrl table for the SKE keypad was using all the
-wrong settings and positions. Fixing it up to one that works!
+This defines the sleep states for the SDI (MMC/SD) interfaces
+on the MOP500 reference designs.
 
-Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>nn
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-pins.c | 141 +++++++++++++++++++++-----------
- 1 file changed, 92 insertions(+), 49 deletions(-)
+ arch/arm/mach-ux500/board-mop500-pins.c | 57 +++++++++++++++++++++++++++++++--
+ 1 file changed, 55 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 7c784f5..446cbc0 100644
+index 446cbc0..662563a 100644
 --- a/arch/arm/mach-ux500/board-mop500-pins.c
 +++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -34,8 +34,6 @@ BIAS(in_nopull, PIN_INPUT_NOPULL);
- BIAS(in_nopull_slpm_nowkup, PIN_INPUT_NOPULL|PIN_SLPM_WAKEUP_DISABLE);
- BIAS(in_pu, PIN_INPUT_PULLUP);
- BIAS(in_pd, PIN_INPUT_PULLDOWN);
--BIAS(in_pd_slpm_in_pu, PIN_INPUT_PULLDOWN|PIN_SLPM_INPUT_PULLUP);
--BIAS(in_pu_slpm_out_lo, PIN_INPUT_PULLUP|PIN_SLPM_OUTPUT_LOW);
- BIAS(out_hi, PIN_OUTPUT_HIGH);
- BIAS(out_lo, PIN_OUTPUT_LOW);
- BIAS(out_lo_slpm_nowkup, PIN_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE);
-@@ -47,14 +45,26 @@ BIAS(gpio_in_pd_slpm_gpio_nopull, PIN_INPUT_PULLDOWN|PIN_GPIOMODE_ENABLED|PIN_SL
- BIAS(gpio_out_hi, PIN_OUTPUT_HIGH|PIN_GPIOMODE_ENABLED);
- BIAS(gpio_out_lo, PIN_OUTPUT_LOW|PIN_GPIOMODE_ENABLED);
- /* Sleep modes */
--BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_in_nopull_wkup, PIN_SLEEPMODE_ENABLED|PIN_SLPM_DIR_INPUT|PIN_SLPM_PULL_NONE|PIN_SLPM_WAKEUP_ENABLE);
--BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
--BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_in_nopull_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_in_nopull_wkup, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_DIR_INPUT|PIN_SLPM_PULL_NONE|PIN_SLPM_WAKEUP_ENABLE);
-+BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+@@ -53,18 +53,24 @@ BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+-BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+-	PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_out_lo_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
+ BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
++BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|PIN_SLPM_OUTPUT_HIGH|
 +	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ BIAS(slpm_in_nopull_wkup_pdis, PIN_SLEEPMODE_ENABLED|
+ 	PIN_SLPM_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
+ BIAS(slpm_in_pu_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_PULLUP|
+ 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
++BIAS(out_lo_wkup_pdis, PIN_SLPM_OUTPUT_LOW|
 +	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_out_hi_wkup_pdis, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_out_lo_pdis, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE);
-+BIAS(slpm_out_lo_wkup_pdis, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_in_nopull_wkup_pdis, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
-+BIAS(slpm_in_pu_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_PULLUP|
-+	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
++BIAS(in_wkup_pdis_en, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
++	PIN_SLPM_PDIS_ENABLED);
++BIAS(in_wkup_pdis, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
++	PIN_SLPM_PDIS_DISABLED);
  
  /* We use these to define hog settings that are always done on boot */
  #define DB8500_MUX_HOG(group,func) \
-@@ -250,6 +260,42 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_PIN_SLEEP("GPIO218_AH11", slpm_in_wkup_pdis, "spi2"), /* RXD */
- 	DB8500_PIN_SLEEP("GPIO215_AH13", slpm_out_lo_wkup_pdis, "spi2"), /* TXD */
- 	DB8500_PIN_SLEEP("GPIO217_AH12", slpm_wkup_pdis, "spi2"), /* CLK */
+@@ -207,6 +213,18 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN("GPIO26_Y2", in_pu, "sdi0"), /* DAT1 */
+ 	DB8500_PIN("GPIO27_AA2", in_pu, "sdi0"), /* DAT2 */
+ 	DB8500_PIN("GPIO28_AA1", in_pu, "sdi0"), /* DAT3 */
++	/* SDI0 sleep state */
++	DB8500_PIN_SLEEP("GPIO18_AC2", slpm_out_hi_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO19_AC1", slpm_out_hi_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO20_AB4", slpm_out_hi_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO22_AA3", slpm_in_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO23_AA4", slpm_out_lo_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO24_AB2", slpm_in_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO25_Y4", slpm_in_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO26_Y2", slpm_in_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO27_AA2", slpm_in_wkup_pdis, "sdi0"),
++	DB8500_PIN_SLEEP("GPIO28_AA1", slpm_in_wkup_pdis, "sdi0"),
 +
-+	/* ske default state */
-+	DB8500_MUX("kp_a_2", "kp", "nmk-ske-keypad"),
-+	DB8500_PIN("GPIO153_B17", in_pd, "nmk-ske-keypad"), /* I7 */
-+	DB8500_PIN("GPIO154_C16", in_pd, "nmk-ske-keypad"), /* I6 */
-+	DB8500_PIN("GPIO155_C19", in_pd, "nmk-ske-keypad"), /* I5 */
-+	DB8500_PIN("GPIO156_C17", in_pd, "nmk-ske-keypad"), /* I4 */
-+	DB8500_PIN("GPIO161_D21", in_pd, "nmk-ske-keypad"), /* I3 */
-+	DB8500_PIN("GPIO162_D20", in_pd, "nmk-ske-keypad"), /* I2 */
-+	DB8500_PIN("GPIO163_C20", in_pd, "nmk-ske-keypad"), /* I1 */
-+	DB8500_PIN("GPIO164_B21", in_pd, "nmk-ske-keypad"), /* I0 */
-+	DB8500_PIN("GPIO157_A18", out_lo, "nmk-ske-keypad"), /* O7 */
-+	DB8500_PIN("GPIO158_C18", out_lo, "nmk-ske-keypad"), /* O6 */
-+	DB8500_PIN("GPIO159_B19", out_lo, "nmk-ske-keypad"), /* O5 */
-+	DB8500_PIN("GPIO160_B20", out_lo, "nmk-ske-keypad"), /* O4 */
-+	DB8500_PIN("GPIO165_C21", out_lo, "nmk-ske-keypad"), /* O3 */
-+	DB8500_PIN("GPIO166_A22", out_lo, "nmk-ske-keypad"), /* O2 */
-+	DB8500_PIN("GPIO167_B24", out_lo, "nmk-ske-keypad"), /* O1 */
-+	DB8500_PIN("GPIO168_C22", out_lo, "nmk-ske-keypad"), /* O0 */
-+	/* ske sleep state */
-+	DB8500_PIN_SLEEP("GPIO153_B17", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I7 */
-+	DB8500_PIN_SLEEP("GPIO154_C16", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I6 */
-+	DB8500_PIN_SLEEP("GPIO155_C19", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I5 */
-+	DB8500_PIN_SLEEP("GPIO156_C17", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I4 */
-+	DB8500_PIN_SLEEP("GPIO161_D21", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I3 */
-+	DB8500_PIN_SLEEP("GPIO162_D20", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I2 */
-+	DB8500_PIN_SLEEP("GPIO163_C20", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I1 */
-+	DB8500_PIN_SLEEP("GPIO164_B21", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I0 */
-+	DB8500_PIN_SLEEP("GPIO157_A18", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O7 */
-+	DB8500_PIN_SLEEP("GPIO158_C18", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O6 */
-+	DB8500_PIN_SLEEP("GPIO159_B19", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O5 */
-+	DB8500_PIN_SLEEP("GPIO160_B20", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O4 */
-+	DB8500_PIN_SLEEP("GPIO165_C21", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O3 */
-+	DB8500_PIN_SLEEP("GPIO166_A22", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O2 */
-+	DB8500_PIN_SLEEP("GPIO167_B24", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O1 */
-+	DB8500_PIN_SLEEP("GPIO168_C22", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O0 */
- };
- 
- /*
-@@ -284,23 +330,42 @@ static struct pinctrl_map __initdata mop500_pinmap[] = {
- 	 * Runtime stuff: make it possible to mux in the SKE keypad
- 	 * and bias the pins
- 	 */
--	DB8500_MUX("kp_a_2", "kp", "ske"),
--	DB8500_PIN("GPIO153_B17", in_pd_slpm_in_pu, "ske"), /* I7 */
--	DB8500_PIN("GPIO154_C16", in_pd_slpm_in_pu, "ske"), /* I6 */
--	DB8500_PIN("GPIO155_C19", in_pd_slpm_in_pu, "ske"), /* I5 */
--	DB8500_PIN("GPIO156_C17", in_pd_slpm_in_pu, "ske"), /* I4 */
--	DB8500_PIN("GPIO161_D21", in_pd_slpm_in_pu, "ske"), /* I3 */
--	DB8500_PIN("GPIO162_D20", in_pd_slpm_in_pu, "ske"), /* I2 */
--	DB8500_PIN("GPIO163_C20", in_pd_slpm_in_pu, "ske"), /* I1 */
--	DB8500_PIN("GPIO164_B21", in_pd_slpm_in_pu, "ske"), /* I0 */
--	DB8500_PIN("GPIO157_A18", in_pu_slpm_out_lo, "ske"), /* O7 */
--	DB8500_PIN("GPIO158_C18", in_pu_slpm_out_lo, "ske"), /* O6 */
--	DB8500_PIN("GPIO159_B19", in_pu_slpm_out_lo, "ske"), /* O5 */
--	DB8500_PIN("GPIO160_B20", in_pu_slpm_out_lo, "ske"), /* O4 */
--	DB8500_PIN("GPIO165_C21", in_pu_slpm_out_lo, "ske"), /* O3 */
--	DB8500_PIN("GPIO166_A22", in_pu_slpm_out_lo, "ske"), /* O2 */
--	DB8500_PIN("GPIO167_B24", in_pu_slpm_out_lo, "ske"), /* O1 */
--	DB8500_PIN("GPIO168_C22", in_pu_slpm_out_lo, "ske"), /* O0 */
-+	/* ske default state */
-+	DB8500_MUX("kp_a_2", "kp", "nmk-ske-keypad"),
-+	DB8500_PIN("GPIO153_B17", in_pu, "nmk-ske-keypad"), /* I7 */
-+	DB8500_PIN("GPIO154_C16", in_pu, "nmk-ske-keypad"), /* I6 */
-+	DB8500_PIN("GPIO155_C19", in_pu, "nmk-ske-keypad"), /* I5 */
-+	DB8500_PIN("GPIO156_C17", in_pu, "nmk-ske-keypad"), /* I4 */
-+	DB8500_PIN("GPIO161_D21", in_pu, "nmk-ske-keypad"), /* I3 */
-+	DB8500_PIN("GPIO162_D20", in_pu, "nmk-ske-keypad"), /* I2 */
-+	DB8500_PIN("GPIO163_C20", in_pu, "nmk-ske-keypad"), /* I1 */
-+	DB8500_PIN("GPIO164_B21", in_pu, "nmk-ske-keypad"), /* I0 */
-+	DB8500_PIN("GPIO157_A18", out_lo, "nmk-ske-keypad"), /* O7 */
-+	DB8500_PIN("GPIO158_C18", out_lo, "nmk-ske-keypad"), /* O6 */
-+	DB8500_PIN("GPIO159_B19", out_lo, "nmk-ske-keypad"), /* O5 */
-+	DB8500_PIN("GPIO160_B20", out_lo, "nmk-ske-keypad"), /* O4 */
-+	DB8500_PIN("GPIO165_C21", out_lo, "nmk-ske-keypad"), /* O3 */
-+	DB8500_PIN("GPIO166_A22", out_lo, "nmk-ske-keypad"), /* O2 */
-+	DB8500_PIN("GPIO167_B24", out_lo, "nmk-ske-keypad"), /* O1 */
-+	DB8500_PIN("GPIO168_C22", out_lo, "nmk-ske-keypad"), /* O0 */
-+	/* ske sleep state */
-+	DB8500_PIN_SLEEP("GPIO153_B17", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I7 */
-+	DB8500_PIN_SLEEP("GPIO154_C16", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I6 */
-+	DB8500_PIN_SLEEP("GPIO155_C19", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I5 */
-+	DB8500_PIN_SLEEP("GPIO156_C17", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I4 */
-+	DB8500_PIN_SLEEP("GPIO161_D21", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I3 */
-+	DB8500_PIN_SLEEP("GPIO162_D20", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I2 */
-+	DB8500_PIN_SLEEP("GPIO163_C20", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I1 */
-+	DB8500_PIN_SLEEP("GPIO164_B21", slpm_in_pu_wkup_pdis_en, "nmk-ske-keypad"), /* I0 */
-+	DB8500_PIN_SLEEP("GPIO157_A18", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O7 */
-+	DB8500_PIN_SLEEP("GPIO158_C18", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O6 */
-+	DB8500_PIN_SLEEP("GPIO159_B19", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O5 */
-+	DB8500_PIN_SLEEP("GPIO160_B20", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O4 */
-+	DB8500_PIN_SLEEP("GPIO165_C21", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O3 */
-+	DB8500_PIN_SLEEP("GPIO166_A22", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O2 */
-+	DB8500_PIN_SLEEP("GPIO167_B24", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O1 */
-+	DB8500_PIN_SLEEP("GPIO168_C22", slpm_out_lo_pdis, "nmk-ske-keypad"), /* O0 */
+ 	/* Mux in SDI1 (here called MC1) used for SDIO for CW1200 WLAN */
+ 	DB8500_MUX("mc1_a_1", "mc1", "sdi1"),
+ 	DB8500_PIN("GPIO208_AH16", out_lo, "sdi1"), /* CLK */
+@@ -216,6 +234,15 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN("GPIO212_AF13", in_pu, "sdi1"), /* DAT1 */
+ 	DB8500_PIN("GPIO213_AG13", in_pu, "sdi1"), /* DAT2 */
+ 	DB8500_PIN("GPIO214_AH15", in_pu, "sdi1"), /* DAT3 */
++	/* SDI1 sleep state */
++	DB8500_PIN_SLEEP("GPIO208_AH16", slpm_out_lo_wkup_pdis, "sdi1"), /* CLK */
++	DB8500_PIN_SLEEP("GPIO209_AG15", slpm_in_wkup_pdis, "sdi1"), /* FBCLK */
++	DB8500_PIN_SLEEP("GPIO210_AJ15", slpm_in_wkup_pdis, "sdi1"), /* CMD */
++	DB8500_PIN_SLEEP("GPIO211_AG14", slpm_in_wkup_pdis, "sdi1"), /* DAT0 */
++	DB8500_PIN_SLEEP("GPIO212_AF13", slpm_in_wkup_pdis, "sdi1"), /* DAT1 */
++	DB8500_PIN_SLEEP("GPIO213_AG13", slpm_in_wkup_pdis, "sdi1"), /* DAT2 */
++	DB8500_PIN_SLEEP("GPIO214_AH15", slpm_in_wkup_pdis, "sdi1"), /* DAT3 */
 +
- 	/* Mux in and drive the SDI0 DAT31DIR line high at runtime */
- 	DB8500_MUX("mc0dat31dir_a_1", "mc0", "sdi0"),
- 	DB8500_PIN("GPIO21_AB3", out_hi, "sdi0"),
-@@ -403,28 +468,6 @@ static struct pinctrl_map __initdata hrefv60_pinmap[] = {
- 	DB8500_PIN("GPIO217_AH12", gpio_in_pu_slpm_gpio_nopull, "gpio-keys.0"),
- 	DB8500_PIN("GPIO145_C13", gpio_in_pd_slpm_gpio_nopull, "gpio-keys.0"),
- 	DB8500_PIN("GPIO139_C9", gpio_in_pu_slpm_gpio_nopull, "gpio-keys.0"),
--	/*
--	 * Make it possible to mux in the SKE keypad and bias the pins
--	 * FIXME: what's the point with this on HREFv60? KP/SKE is already
--	 * muxed in at another place! Enabling this will bork.
--	 */
--	DB8500_MUX("kp_a_2", "kp", "ske"),
--	DB8500_PIN("GPIO153_B17", in_pd_slpm_in_pu, "ske"), /* I7 */
--	DB8500_PIN("GPIO154_C16", in_pd_slpm_in_pu, "ske"), /* I6 */
--	DB8500_PIN("GPIO155_C19", in_pd_slpm_in_pu, "ske"), /* I5 */
--	DB8500_PIN("GPIO156_C17", in_pd_slpm_in_pu, "ske"), /* I4 */
--	DB8500_PIN("GPIO161_D21", in_pd_slpm_in_pu, "ske"), /* I3 */
--	DB8500_PIN("GPIO162_D20", in_pd_slpm_in_pu, "ske"), /* I2 */
--	DB8500_PIN("GPIO163_C20", in_pd_slpm_in_pu, "ske"), /* I1 */
--	DB8500_PIN("GPIO164_B21", in_pd_slpm_in_pu, "ske"), /* I0 */
--	DB8500_PIN("GPIO157_A18", in_pu_slpm_out_lo, "ske"), /* O7 */
--	DB8500_PIN("GPIO158_C18", in_pu_slpm_out_lo, "ske"), /* O6 */
--	DB8500_PIN("GPIO159_B19", in_pu_slpm_out_lo, "ske"), /* O5 */
--	DB8500_PIN("GPIO160_B20", in_pu_slpm_out_lo, "ske"), /* O4 */
--	DB8500_PIN("GPIO165_C21", in_pu_slpm_out_lo, "ske"), /* O3 */
--	DB8500_PIN("GPIO166_A22", in_pu_slpm_out_lo, "ske"), /* O2 */
--	DB8500_PIN("GPIO167_B24", in_pu_slpm_out_lo, "ske"), /* O1 */
--	DB8500_PIN("GPIO168_C22", in_pu_slpm_out_lo, "ske"), /* O0 */
- };
- 
- static struct pinctrl_map __initdata u9500_pinmap[] = {
+ 	/* Mux in SDI2 (here called MC2) used for for PoP eMMC */
+ 	DB8500_MUX("mc2_a_1", "mc2", "sdi2"),
+ 	DB8500_PIN("GPIO128_A5", out_lo, "sdi2"), /* CLK */
+@@ -229,6 +256,19 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN("GPIO136_C7", in_pu, "sdi2"), /* DAT5 */
+ 	DB8500_PIN("GPIO137_A7", in_pu, "sdi2"), /* DAT6 */
+ 	DB8500_PIN("GPIO138_C5", in_pu, "sdi2"), /* DAT7 */
++	/* SDI2 sleep state */
++	DB8500_PIN_SLEEP("GPIO128_A5", out_lo_wkup_pdis, "sdi2"), /* CLK */
++	DB8500_PIN_SLEEP("GPIO129_B4", in_wkup_pdis_en, "sdi2"), /* CMD */
++	DB8500_PIN_SLEEP("GPIO130_C8", in_wkup_pdis_en, "sdi2"), /* FBCLK */
++	DB8500_PIN_SLEEP("GPIO131_A12", in_wkup_pdis, "sdi2"), /* DAT0 */
++	DB8500_PIN_SLEEP("GPIO132_C10", in_wkup_pdis, "sdi2"), /* DAT1 */
++	DB8500_PIN_SLEEP("GPIO133_B10", in_wkup_pdis, "sdi2"), /* DAT2 */
++	DB8500_PIN_SLEEP("GPIO134_B9", in_wkup_pdis, "sdi2"), /* DAT3 */
++	DB8500_PIN_SLEEP("GPIO135_A9", in_wkup_pdis, "sdi2"), /* DAT4 */
++	DB8500_PIN_SLEEP("GPIO136_C7", in_wkup_pdis, "sdi2"), /* DAT5 */
++	DB8500_PIN_SLEEP("GPIO137_A7", in_wkup_pdis, "sdi2"), /* DAT6 */
++	DB8500_PIN_SLEEP("GPIO138_C5", in_wkup_pdis, "sdi2"), /* DAT7 */
++
+ 	/* Mux in SDI4 (here called MC4) used for for PCB-mounted eMMC */
+ 	DB8500_MUX("mc4_a_1", "mc4", "sdi4"),
+ 	DB8500_PIN("GPIO197_AH24", in_pu, "sdi4"), /* DAT3 */
+@@ -242,6 +282,19 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN("GPIO205_AG23", in_pu, "sdi4"), /* DAT6 */
+ 	DB8500_PIN("GPIO206_AG24", in_pu, "sdi4"), /* DAT5 */
+ 	DB8500_PIN("GPIO207_AJ23", in_pu, "sdi4"), /* DAT4 */
++	/*SDI4 sleep state */
++	DB8500_PIN_SLEEP("GPIO197_AH24", slpm_in_wkup_pdis, "sdi4"), /* DAT3 */
++	DB8500_PIN_SLEEP("GPIO198_AG25", slpm_in_wkup_pdis, "sdi4"), /* DAT2 */
++	DB8500_PIN_SLEEP("GPIO199_AH23", slpm_in_wkup_pdis, "sdi4"), /* DAT1 */
++	DB8500_PIN_SLEEP("GPIO200_AH26", slpm_in_wkup_pdis, "sdi4"), /* DAT0 */
++	DB8500_PIN_SLEEP("GPIO201_AF24", slpm_in_wkup_pdis, "sdi4"), /* CMD */
++	DB8500_PIN_SLEEP("GPIO202_AF25", slpm_in_wkup_pdis, "sdi4"), /* FBCLK */
++	DB8500_PIN_SLEEP("GPIO203_AE23", slpm_out_lo_wkup_pdis, "sdi4"), /* CLK */
++	DB8500_PIN_SLEEP("GPIO204_AF23", slpm_in_wkup_pdis, "sdi4"), /* DAT7 */
++	DB8500_PIN_SLEEP("GPIO205_AG23", slpm_in_wkup_pdis, "sdi4"), /* DAT6 */
++	DB8500_PIN_SLEEP("GPIO206_AG24", slpm_in_wkup_pdis, "sdi4"), /* DAT5 */
++	DB8500_PIN_SLEEP("GPIO207_AJ23", slpm_in_wkup_pdis, "sdi4"), /* DAT4 */
++
+ 	/* Mux in USB pins, drive STP high */
+ 	DB8500_MUX("usb_a_1", "usb", "musb-ux500.0"),
+ 	DB8500_PIN("GPIO257_AE29", out_hi, "musb-ux500.0"), /* STP */
 -- 
 1.7.11.3
