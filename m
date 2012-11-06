@@ -1,28 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 6 Nov 2012 13:41:56 +0530
-Subject: [PATCH V2 4/5] pinctrl: SPEAr: Add gpio ranges support
-In-Reply-To: <CACRpkdbRDi-TcDvVbAywMeWocfyYUrXS3a=e_GS5onXBj1Cdng@mail.gmail.com>
-References: <cover.1351330569.git.viresh.kumar@linaro.org>
- <3b2f9fa0864f1f736e24ee0dbc081cd9a79b7468.1351330569.git.viresh.kumar@linaro.org>
- <CACRpkdbRDi-TcDvVbAywMeWocfyYUrXS3a=e_GS5onXBj1Cdng@mail.gmail.com>
-Message-ID: <CAKohpo=n9=z+UuvYbrzz2isi+BN-0RMsDgPCL-zhQMsa8m0ZSg@mail.gmail.com>
+From: smoch@web.de (=?ISO-8859-1?Q?S=F6ren_Moch?=)
+Date: Tue, 06 Nov 2012 22:28:45 +0100
+Subject: [PATCH V2 1/4] arm: mvebu: increase atomic coherent pool size
+ for armada 370/XP
+Message-ID: <5099810D.9040902@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2012 13:39, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> This does not apply to my devel branch, so I guess it is dependent
-> on some of the stuff I just merged to fixes. I will send the
-> fixes up to Torvalds, then merge fixes to the devel branch
-> so we can proceed with patches 4 and 5, OK?
+resent as plain text, sorry.
 
 
-When will i learn how to send patches  x-(
+ > For Armada 370/XP we have the same problem that for the commit
+ > cb01b63, so we applied the same solution: "The default 256 KiB
+ > coherent pool may be too small for some of the Kirkwood devices, so
+ > increase it to make sure that devices will be able to allocate their
+ > buffers with GFP_ATOMIC flag"
 
-Yes, they were rebased over fixes.
+I see a regression from linux-3.5 to linux-3.6 and think there might be 
+a fundamental problem
+with this patch. On my Kirkwood system (guruplug server plus) with 
+linux-3.6.2 I see following
+errors and corresponding malfunction even with further increased (2M, 
+4M) pool size:
 
---
-viresh
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121106/060b0d9e/attachment-0001.html>
+Oct 19 00:41:22 guru kernel: ERROR: 4096 KiB atomic DMA coherent pool is 
+too small!
+Oct 19 00:41:22 guru kernel: Please increase it with coherent_pool= 
+kernel parameter!
+
+So I had to downgrade to linux-3.5 which is running without problems.
+
+I use SATA and several DVB sticks (em28xx / drxk and dib0700).
+
+I already sent this bug report to m.szyprowski and 
+gregory.clementearlier, but
+Sebastian suggested to send it to the mailing list and the responsible 
+maintainers, too.
+
+Please write to my e-mail directly if you have further questions or 
+patches for me to test.
+
+Regards,
+Soeren
