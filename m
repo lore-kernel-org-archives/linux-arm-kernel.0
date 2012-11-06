@@ -1,39 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2012 21:00:56 +0000
-Subject: ARM: idle sleep time for hotplugged cpu
-In-Reply-To: <509971F4.4060604@codeaurora.org>
-References: <50973842.9010708@codeaurora.org>
- <20121105091533.GB28327@n2100.arm.linux.org.uk>
- <509971F4.4060604@codeaurora.org>
-Message-ID: <20121106210056.GC32398@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 6 Nov 2012 16:12:27 -0500 (EST)
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+Message-ID: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 12:24:20PM -0800, Steve Muckle wrote:
-> On 11/05/12 01:15, Russell King - ARM Linux wrote:
-> > On Mon, Nov 05, 2012 at 09:23:38AM +0530, Taniya Das wrote:
-> >> I was looking at the arch/arm/process.c:cpu_die, I was wondering why we
-> >> do not exit from NOHZ for a hotplugged/offline cpu?
-> > 
-> > Offlined CPUs are not supposed to just 'return' from cpu_die(), and
-> > in actual fact they can't.
-> 
-> Although an offline CPU will not come back into the idle thread by
-> returning from cpu_die(), I believe the question about exiting nohz mode
-> before cpu_die() still stands.
 
-Well, that depends on the design of all that.  I don't know that, but
-what I do know is we're doing exactly the same as x86 which I presume
-is correct.
+... instead of flush_cache_all().  The later unconditionally flushes
+the L2 cache on ARMv7 architectures such as Cortex A15 and A7 which
+is costly and unnecessary in some scenarios where setup_mm_for_reboot()
+is used.  If L2 has to be flushed as well, it should already be done
+separately on other architectures anyway.
 
-> >From arch/arm/process.c:cpu_idle() it appears a CPU could enter
-> pm_idle() for a while (in nohz mode), then execute the inner loop again
-> and call cpu_die(). Is there the potential for cpu idle time accounting
-> to get messed up here by not exiting nohz mode prior to the cpu dying,
-> so that missed ticks from nohz are properly accounted for?
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Why does the idle time matter if the CPU has been taken offline?
-
-In any case, I think this is a question for the CPU idle people; it's not
-a feature that I've ever knowingly used or have any interest in using at
-the moment.
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index ab88ed4f8e..2c61085a10 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -104,7 +104,7 @@ early_initcall(init_static_idmap);
+ void setup_mm_for_reboot(void)
+ {
+ 	/* Clean and invalidate L1. */
+-	flush_cache_all();
++	flush_cache_louis();
+ 
+ 	/* Switch to the identity mapping. */
+ 	cpu_switch_mm(idmap_pgd, &init_mm);
