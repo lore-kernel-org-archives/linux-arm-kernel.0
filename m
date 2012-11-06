@@ -1,115 +1,82 @@
-From: rtivy@ti.com (Tivy, Robert)
-Date: Tue, 6 Nov 2012 19:33:41 +0000
-Subject: [PATCH v2 5/6] ARM: davinci: remoteproc board support for
- OMAP-L138 DSP
-In-Reply-To: <CA+V-a8uUHm5QEvzv4wxift2RTV5bLUVEJ8XBWyMZLSqNQssnhQ@mail.gmail.com>
-References: <1351197357-23528-1-git-send-email-rtivy@ti.com>
- <1351197357-23528-5-git-send-email-rtivy@ti.com>
- <CAPcSpEKDAEp5rS8RRpcyHN9WUUtJNppUuKvnZ6YX-tgertJBNQ@mail.gmail.com>
- <CA+V-a8uUHm5QEvzv4wxift2RTV5bLUVEJ8XBWyMZLSqNQssnhQ@mail.gmail.com>
-Message-ID: <13514BD7FAEBA745BBD7D8A672905C14311F1E5E@DFLE08.ent.ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 06 Nov 2012 13:38:13 -0600
+Subject: [GIT PULL] Calxeda ECX-2000 support
+In-Reply-To: <20121106191819.GA11353@quad.lixom.net>
+References: <50917936.2030405@gmail.com>
+ <20121106191819.GA11353@quad.lixom.net>
+Message-ID: <50996725.2090003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
-
-Thanks for your consideration, please see my response below...
-
-> -----Original Message-----
-> From: Prabhakar Lad [mailto:prabhakar.csengg at gmail.com]
-> Sent: Monday, November 05, 2012 9:02 PM
-> To: Tivy, Robert; Ben Gardiner
-> Cc: davinci-linux-open-source at linux.davincidsp.com; linux-arm-
-> kernel at lists.infradead.org; Marek Szyprowski
-> Subject: Re: [PATCH v2 5/6] ARM: davinci: remoteproc board support for
-> OMAP-L138 DSP
+On 11/06/2012 01:18 PM, Olof Johansson wrote:
+> On Wed, Oct 31, 2012 at 02:17:10PM -0500, Rob Herring wrote:
+>> Arnd, Olof,
+>>
+>> Please pull support for Calxeda ECX-2000 SOC.
+>>
+>> There will be a trivial conflict with the GIC move to drivers/irqchip once
+>> that goes in. 
+>>
+>> Rob
+>>
+>> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+>>
+>>   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://sources.calxeda.com/kernel/linux.git tags/calxeda-ecx-2000
+>>
+>> for you to fetch changes up to e095c0d122c09efabe7d4136ce77f72c636c4879:
+>>
+>>   ARM: highbank: Add initial ECX-2000 support (2012-10-31 13:47:01 -0500)
+>>
 > 
-> Hi Robert,
+> The addition of include of core.h in sysregs.h gives me a build error on
+> multi_v7_defconfig due to missing guard ifdefs. I've added the following
+> patch on top of your branch.
 > 
-> On Thu, Nov 1, 2012 at 7:22 PM, Ben Gardiner
-> <bengardiner@nanometrics.ca> wrote:
-> > Hi Rob,
-> >
-> > On Thu, Oct 25, 2012 at 4:35 PM, Robert Tivy <rtivy@ti.com> wrote:
-> >> [...]
-> >> @@ -660,6 +667,99 @@ int __init da850_register_mmcsd1(struct
-> davinci_mmc_config *config)
-> >>  }
-> >>  #endif
-> >>
-> >> +static struct platform_device *da8xx_dsp;
-> >> +
-> >> +#ifdef CONFIG_CMA
-> >> +
-> >> +/*
-> >> + * The following address range was chosen because the XDC Platform
-> for
-> >> + * OMAP-L138 DSP has this range as its default code/data placement.
-> >> + */
-> >> +#define DA8XX_RPROC_CMA_BASE  (0xc3000000)
-> >> [...]
-> >> +/*
-> >> + * The following address range was chosen because the XDC Platform
-> for
-> >> + * OMAP-L138 DSP has this range as its default code/data placement.
-> >> + *
-> >> + * System integrators must ensure that Linux does not own this
-> range.
-> >> + */
-> >> +#define DA_CONTIG_BASE (0xc3000000)
-> >> +#define DA_CONTIG_SIZE (0x02000000)
-> >
-> Is there a specific requirement for the dsp dev to have the buffers
-> from
-> this '0xc3000000' address range only ? If yes then
-> dma_declare_contiguous()
-> is must to ensure contiguous memory so the above macros cant be
-> avoided.
-> If there isn't a requirement of a specific region for dsp device you
-> can use a
-> global CMA instead, so as to ensure you have contiguous memory.
-
-The requirement is that the contiguous buffer matches the address range to which the DSP image was linked, including uninitialized sections that don't actually get loaded.
-
-I was thinking of making those #defines into Kconfig variables, so that kernel sources don't need to be touched by the end customer.  Another alternative is to make them be kernel command line variables, which would prevent the need to even rebuild the kernel.  What are your thoughts regarding those alternatives?
-
-The above address range was decided upon because it matches the RTSC platform's defined area for OMAP-L138 [1] (although, the customer can end up redefining that range).  One of the reasons that range was chosen for the RTSC platform is that it exists on boards with smaller DDR sizes.  In other words, for a board with 256MB of DDR, if a range at the top of the DDR address space was chosen then that DSP image wouldn't work with a board with only 128MB.
-
-Regards,
-
-- Rob
-
-[1] http://rtsc.eclipse.org/cdoc-tip/index.html#ti/platforms/evmOMAPL138/Platform.html#per-instance_config_parameters, however, we extended the range an additional 16MB beyond the RTSC platform's range.
-
 > 
-> Regards,
-> --Prabhakar Lad
+> commit 9186cea8283b0d235719e82607a1aec81db7ab8d
+> Author:     Olof Johansson <olof@lixom.net>
+> AuthorDate: Tue Nov 6 11:09:10 2012 -0800
+> Commit:     Olof Johansson <olof@lixom.net>
+> CommitDate: Tue Nov 6 11:09:10 2012 -0800
 > 
-> > I am concerned with the rigidity of the memory hole as its definition
-> > is currently proposed.
-> >
-> > As you noted DA_CONTIG_BASE and DA_CONTIG_SIZE must describe a range
-> > that is not used by Linux. Ideally this hole would not be in the
-> > middle of the usuable memory but instead at the top. For L138 boards
-> > with larger DDR packages this would mean carrying a patch to this
-> > file.
-> >
-> > I think the same also applies to DA8XX_RPROC_CMA_BASE but I have no
-> > hands-on experience yet with CMA.
-> >
-> > Is there any other means by which the hole's location and size can be
-> > specified which does not require patching this file? I imagine
-> KConfig
-> > would work, but is this an acceptable use of KConfig?
-> >
-> > Best Regards,
-> > Ben Gardiner
-> >
-> > ---
-> > Nanometrics Inc.
-> > http://www.nanometrics.ca
-> > _______________________________________________
-> > Davinci-linux-open-source mailing list
-> > Davinci-linux-open-source at linux.davincidsp.com
-> > http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-
-> source
+>     ARM: highbank: add ifdef guards to core.h
+>     
+>     Fixes build error due to multiple includes:
+>     
+>     In file included from arch/arm/mach-highbank/sysregs.h:23:0,
+>     from arch/arm/mach-highbank/system.c:20:
+>     arch/arm/mach-highbank/core.h:8:91: error: redefinition of 'highbank_lluart_map_io'
+>     In file included from arch/arm/mach-highbank/system.c:19:0:
+>     arch/arm/mach-highbank/core.h:8:91: note: previous definition of 'highbank_lluart_map_io' was here
+
+Thanks, I didn't see that in my tree because I have follow-on patches
+removing this based on the DEBUG_LL clean-up. Now that the dependency
+from Stephen is in your tree, I need to send that to you as well.
+
+Rob
+
+>     
+>     Signed-off-by: Olof Johansson <olof@lixom.net>
+> 
+> diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+> index 286ec82..068c687 100644
+> --- a/arch/arm/mach-highbank/core.h
+> +++ b/arch/arm/mach-highbank/core.h
+> @@ -1,3 +1,6 @@
+> +#ifndef __HIGHBANK_CORE_H
+> +#define __HIGHBANK_CORE_H
+> +
+>  extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+>  extern void highbank_clocks_init(void);
+>  extern void highbank_restart(char, const char *);
+> @@ -18,3 +21,5 @@ extern void highbank_smc1(int fn, int arg);
+>  extern void highbank_cpu_die(unsigned int cpu);
+>  
+>  extern struct smp_operations highbank_smp_ops;
+> +
+> +#endif
+> 
