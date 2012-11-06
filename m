@@ -1,7 +1,7 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Nov 2012 16:16:43 +0100
-Subject: [PATCH 2/5] gpiolib-of: staticize the pin range calls
-Message-ID: <1352215003-30268-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 6 Nov 2012 16:16:54 +0100
+Subject: [PATCH 3/5] gpiolib: remove duplicate pin range code
+Message-ID: <1352215014-30305-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,47 +10,48 @@ From: Linus Walleij <linus.walleij@linaro.org>
 Commit 69e1601bca88809dc118abd1becb02c15a02ec71
 "gpiolib: provide provision to register pin ranges"
 
-Declared the of_gpiochip_[add|remove]_pin_range() global
-while they should be static as they are only ever used in
-this file. Let's convert them to static.
+Introduced both of_gpiochip_remove_pin_range() and
+gpiochip_remove_pin_ranges(). But the contents are exactly
+the same so remove the OF one and rely on the range deletion
+in the core.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpiolib-of.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/gpio/gpiolib-of.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
 diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index a5b90c8..220caa5 100644
+index 220caa5..67403e4 100644
 --- a/drivers/gpio/gpiolib-of.c
 +++ b/drivers/gpio/gpiolib-of.c
-@@ -218,7 +218,7 @@ err0:
- EXPORT_SYMBOL(of_mm_gpiochip_add);
- 
- #ifdef CONFIG_PINCTRL
--void of_gpiochip_add_pin_range(struct gpio_chip *chip)
-+static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
- {
- 	struct device_node *np = chip->of_node;
- 	struct gpio_pin_range *pin_range;
-@@ -254,7 +254,7 @@ void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+@@ -254,19 +254,8 @@ static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
  	} while (index++);
  }
  
--void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
-+static void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
- {
- 	struct gpio_pin_range *pin_range, *tmp;
- 
-@@ -265,8 +265,8 @@ void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
- 	}
- }
+-static void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
+-{
+-	struct gpio_pin_range *pin_range, *tmp;
+-
+-	list_for_each_entry_safe(pin_range, tmp, &chip->pin_ranges, node) {
+-		list_del(&pin_range->node);
+-		pinctrl_remove_gpio_range(pin_range->pctldev,
+-				&pin_range->range);
+-	}
+-}
  #else
--void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
--void of_gpiochip_remove_pin_range(struct gpio_chip *chip) {}
-+static void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
-+static void of_gpiochip_remove_pin_range(struct gpio_chip *chip) {}
+ static void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
+-static void of_gpiochip_remove_pin_range(struct gpio_chip *chip) {}
  #endif
  
  void of_gpiochip_add(struct gpio_chip *chip)
+@@ -288,7 +277,7 @@ void of_gpiochip_add(struct gpio_chip *chip)
+ 
+ void of_gpiochip_remove(struct gpio_chip *chip)
+ {
+-	of_gpiochip_remove_pin_range(chip);
++	gpiochip_remove_pin_ranges(chip);
+ 
+ 	if (chip->of_node)
+ 		of_node_put(chip->of_node);
 -- 
 1.7.11.3
