@@ -1,46 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Nov 2012 08:12:46 -0800
-Subject: [GIT PULL 2/6] DaVinci cleanup for v3.8
-In-Reply-To: <1351620701-16516-2-git-send-email-nsekhar@ti.com>
-References: <1351620701-16516-1-git-send-email-nsekhar@ti.com>
- <1351620701-16516-2-git-send-email-nsekhar@ti.com>
-Message-ID: <20121106161246.GA3247@quad.lixom.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 6 Nov 2012 16:13:00 +0000 (UTC)
+Subject: OMAP baseline test results for v3.7-rc1
+In-Reply-To: <CAORVsuUm4zKoSaZQ0D=gf3toKHWznjfNvQ+q4=jsgkRaJXygMg@mail.gmail.com>
+References: <CAORVsuWFzH3UmXCaY=iqmYsE72KOecLo40tG9BcTUBirJQ5iLA@mail.gmail.com>
+ <20121029200032.GD30152@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301216330.12697@utopia.booyaka.com>
+ <20121030123254.GD29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301239310.12697@utopia.booyaka.com>
+ <20121030125419.GG29095@arwen.pp.htv.fi>
+ <alpine.DEB.2.00.1210301313190.12697@utopia.booyaka.com>
+ <CAORVsuWqoqrza-qrJskpMTj=2MW6JxNEhVzjWVXkM1mpqVO8cQ@mail.gmail.com>
+ <87fw4u3oh5.fsf@deeprootsystems.com>
+ <CAORVsuUWD3gHh1NcMLeGwZ=hF=UiOG2VyJkADZNcGVr1g1TFgQ@mail.gmail.com>
+ <alpine.DEB.2.00.1211010242001.6693@utopia.booyaka.com>
+ <CAORVsuXHxqhcTHv8Y=8gw4N+0+rx+N91bh971zK-TmcsrTu5nQ@mail.gmail.com>
+ <CAORVsuUda69_sE9LpBnuETXSA2jPxw7nQ=MkAq=Or8B7t1fvcA@mail.gmail.com>
+ <alpine.DEB.2.00.1211050313130.23228@utopia.booyaka.com>
+ <CAORVsuUGcydD13-VcaNjmAmrsyo9ZVHGTRoSKgLyr4-Bkw7zhg@mail.gmail.com>
+ <87fw4neh0i.fsf@deeprootsystems.com>
+ <CAORVsuUm4zKoSaZQ0D=gf3toKHWznjfNvQ+q4=jsgkRaJXygMg@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1211061611460.20573@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2012 at 11:41:37PM +0530, Sekhar Nori wrote:
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
+On Tue, 6 Nov 2012, Jean Pihet wrote:
+
+> On Tue, Nov 6, 2012 at 1:01 AM, Kevin Hilman
+> <khilman@deeprootsystems.com> wrote:
+>
+> > FYI... I just ran across what appears to be the same bug on 3430/n900
+> > during suspend/resume testing.  With CPUidle enabled, this happens every
+> > time.
+> >
+> > Reverting the I2C QoS patch makes it work again.
 > 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
+> That makes sense with CPU_IDLE enabled and suspend.
+
+...
+
+> For the records here are the patches that have been submitted to
+> support the OMAP PM QoS:
+> - func power states [1],
+> - OMAP PM QoS support [2], which includes the latency figures update
+> and which depends on [1],
+> - the conversion of I2C to PM QoS [3],
+> - the removal of the old no-op OMAP PM API [4], which depends on [3],
 > 
-> are available in the git repository at:
-> 
->   git://gitorious.org/linux-davinci/linux-davinci.git tags/davinci-for-v3.8/cleanup
+> The chicken-and-egg problem is clearly visible since [3] depends on [2].
+
+Well it's definitely time for a revert, then.  #3 should not have been 
+sent until #2 was merged.  Will send this in a new thread, please ack it.
 
 
-Pulled, but would you mind moving your tree to a better git hosting service?
-
-It takes _forever_ to do a pull from gitorious. Do you have a signed
-PGP key so you can get a kernel.org account, per chance?
-
-
--Olof
-> 
-> for you to fetch changes up to baad1b33f4d86d223d665fcefa79b4acc832a269:
-> 
->   ARM: davinci: board-dm646x-evm.c: Remove unecessary semicolon (2012-10-26 13:59:01 +0530)
-> 
-> ----------------------------------------------------------------
-> These changes make minor clean-ups to remove some
-> unused MUSB defines and an unnecessary semicolon.
-> 
-> ----------------------------------------------------------------
-> Constantine Shulyupin (1):
->       ARM: davinci: usb: remove CONFIG_USB_MUSB_HOST etc
-> 
-> Peter Senna Tschudin (1):
->       ARM: davinci: board-dm646x-evm.c: Remove unecessary semicolon
-> 
->  arch/arm/mach-davinci/board-dm646x-evm.c |    2 +-
->  arch/arm/mach-davinci/usb.c              |    6 ------
->  2 files changed, 1 insertion(+), 7 deletions(-)
+- Paul
