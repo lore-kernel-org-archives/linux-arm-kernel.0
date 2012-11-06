@@ -1,42 +1,39 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Tue, 6 Nov 2012 04:33:44 +0000
-Subject: [PATCH 00/10] ARM: dts: AM33XX: Add device tree data
-In-Reply-To: <5097EB59.8070104@ti.com>
-References: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA647CE@DBDE01.ent.ti.com>
- <5097EB59.8070104@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA64E4C@DBDE01.ent.ti.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 06 Nov 2012 10:06:45 +0530
+Subject: [PATCH V3] ARM: EXYNOS5: Add I2S SFR base addresse
+Message-ID: <1352176605-16153-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 22:07:45, Cousson, Benoit wrote:
-> Hi Anil,
-> 
-> On 11/05/2012 02:46 PM, AnilKumar, Chimata wrote:
-> > On Mon, Nov 05, 2012 at 16:15:40, AnilKumar, Chimata wrote:
-> >> Add device tree date for GPIO based various drivers matrix keypad,
-> >> volume keys, push buttons and use leds accross three AM33XX devices
-> >> viz EVM, BeagleBone and Starter Kit.
-> >>
-> >> To make it functional this series also adds pinctrl data for all
-> >> the GPIOs used by various drivers. In this series only default state
-> >> pinmux/conf settings are added because of sleep/idle state pinctrl
-> >> values are not available.
-> >>
-> >> These patches are based on linux-omap-dt:for_3.8/dts tree and these
-> > 
-> > My bad, small correction in this statement, these patches apply cleanly
-> > on linux-omap-dt:for_3.8/dts tree with the below two patches.
-> > http://www.spinics.net/lists/arm-kernel/msg204872.html
-> > http://www.spinics.net/lists/arm-kernel/msg204873.html
-> 
-> Mmm, this 2 patches do have dependency on some driver changes that might
-> not be accepted for 3.8. And in fact I do have some comment on the RTC
-> one :-)
-> Don't you prefer to change the order to allow me to pull these ones first?
-> 
+This patch adds I2S controller0,1,2 base addresses
 
-Today I will resend the patches by removing this dependency.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
 
-Thanks
-AnilKumar 
+Changes since V2:
+	- Rebased on 3.7-rc3
+
+Changes since V1:
+	- Rebased on 3.6-rc6
+	- Reverted Exynos4 I2S1,2 address changes that are added in V1
+	  as Exynos4 based boards have different I2S base addresses.
+
+ arch/arm/mach-exynos/include/mach/map.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index ef4958b..4192d23 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -42,6 +42,9 @@
+ #define EXYNOS4_PA_I2S0			0x03830000
+ #define EXYNOS4_PA_I2S1			0xE3100000
+ #define EXYNOS4_PA_I2S2			0xE2A00000
++#define EXYNOS5_PA_I2S0			0x03830000
++#define EXYNOS5_PA_I2S1			0x12D60000
++#define EXYNOS5_PA_I2S2			0x12D70000
+ 
+ #define EXYNOS4_PA_PCM0			0x03840000
+ #define EXYNOS4_PA_PCM1			0x13980000
+-- 
+1.7.4.4
