@@ -1,56 +1,48 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 6 Nov 2012 14:38:48 +0000
-Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
- for AM33XX
-In-Reply-To: <509836BA.5030507@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
- <5095037A.2020503@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
- <5095165E.10403@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
- <87pq3s7wro.fsf@deeprootsystems.com> <509836BA.5030507@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC05561@DBDE01.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 6 Nov 2012 15:39:03 +0100
+Subject: [PATCH v3 9/9] pinctrl: single: dump pinmux register value
+In-Reply-To: <CAN1soZxVp73uNWD7Q9r_3X1hCA=JhMiMpx2UMPPGiXBtQ2QjAA@mail.gmail.com>
+References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
+ <1351724661-29050-10-git-send-email-haojian.zhuang@gmail.com>
+ <20121101004734.GK15766@atomide.com>
+ <CAN1soZxVp73uNWD7Q9r_3X1hCA=JhMiMpx2UMPPGiXBtQ2QjAA@mail.gmail.com>
+Message-ID: <CACRpkdZXfOqUM+-NCSzLJ40pP8gc9k6mx=zAjnPyrgGXckrWDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+On Thu, Nov 1, 2012 at 6:48 AM, Haojian Zhuang <haojian.zhuang@gmail.com> wrote:
+> On Thu, Nov 1, 2012 at 1:47 AM, Tony Lindgren <tony@atomide.com> wrote:
 
-On Tue, Nov 06, 2012 at 03:29:22, Shilimkar, Santosh wrote:
+>>>  static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
+>>>                                       struct seq_file *s,
+>>> -                                     unsigned offset)
+>>> +                                     unsigned pin)
+>>>  {
+>>>       struct pcs_device *pcs;
+>>> -     unsigned val;
+>>> +     unsigned val, mux_bytes;
+>>>
+>>>       pcs = pinctrl_dev_get_drvdata(pctldev);
+>>>
+>>> -     val = pcs->read(pcs->base + offset);
+>>> -     val &= pcs->fmask;
+>>> +     mux_bytes = pcs->width / BITS_PER_BYTE;
+>>> +     val = pcs->read(pcs->base + pin * mux_bytes);
+>>>
+>>>       seq_printf(s, "%08x %s " , val, DRIVER_NAME);
+>>>  }
+>>> --
+>>> 1.7.10.4
+>>>
+>
+> There's also include a bug fix. I'm OK that this patch could be
+> included in -rc cycle.
 
-[...]
+A debug print can by definition not be a regression, it
+should not have a specific use other than debugging.
 
-> >
-> > IMO, assuming that idle will not be useful from the begining is leading
-> > down the path to poor design choices that will be much more difficult to
-> > fixup down the road in order to add idle support later.  We need to
-> > design both idle and suspend at the same time.
-> >
-> I agree with Kevin. Not supporting CPUIDLE deep states can hit the
-> active power numbers dearly. I just don't know why the SOCs don't share
-> the standard and must have design choices. But thats another discussion.
-> 
+And those debugging can use linux-next or separate
+patches or whatever ... better keep this series together.
 
-Yes, active power numbers are not comparable to OMAP :(
-
-> How about leaving the timer choices as is. PER timer for clock source
-> and wakeuptimer for clock event. Anyway in suspend the clock-source
-> can be suspended and that is evident from recent discussion. The only
-> downside is you won't count time in suspend which is any way the case.
-> 
-> Vaibhav,
-> Do you guys see any implementation bottleneck for above ?
-> 
-
-Looking at the timekeeping code I see one more potential reason for making
-this change. OMAP registers the 32k sync timer as the persistent clock and
-since there's no 32k sync timer in AM33xx it doesn't register a persistent
-clock right now. Based on what I understood, we need to have to register
-one and DMTimer1 is the only clock that can serve as the persistent clock
-in suspend state. When we do so we might as well use it as the clocksource.
-
-A related question that I had was, is there a mechanism to handle the 32k
-counter (DMTimer or sync timer) wraparound condition in suspend?
-
-Regards,
-Vaibhav
+Yours,
+Linus Walleij
