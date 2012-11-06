@@ -1,26 +1,42 @@
-From: nobuhiro.iwamatsu.yj@renesas.com (Nobuhiro Iwamatsu)
-Date: Tue, 06 Nov 2012 13:44:51 +0900
-Subject: [GIT PULL v3] Renesas ARM-based SoC for v3.8
-In-Reply-To: <20121106041242.GS2944@verge.net.au>
-References: <1351730513-2952-1-git-send-email-horms@verge.net.au>
- <20121106023224.GO2944@verge.net.au>
- <CABMQnVJ+6CHCfwiZ8n5xKmCfL7jW=TYHC8_cU6N1uMw7MysfQg@mail.gmail.com>
- <20121106041242.GS2944@verge.net.au>
-Message-ID: <509895C3.2020109@renesas.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Tue, 6 Nov 2012 04:33:44 +0000
+Subject: [PATCH 00/10] ARM: dts: AM33XX: Add device tree data
+In-Reply-To: <5097EB59.8070104@ti.com>
+References: <1352112350-13398-1-git-send-email-anilkumar@ti.com>
+ <331ABD5ECB02734CA317220B2BBEABC13EA647CE@DBDE01.ent.ti.com>
+ <5097EB59.8070104@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA64E4C@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simon Horman ????????:
-> On Tue, Nov 06, 2012 at 12:30:41PM +0900, Nobuhiro Iwamatsu wrote:
->> Hi, Simon.
->>
->> " ARM: shmobile: Remove SH7367 support"  includes an unnecessary patch.
->> I already sent a new patch.  Please update, if you still have time to apply.
+On Mon, Nov 05, 2012 at 22:07:45, Cousson, Benoit wrote:
+> Hi Anil,
 > 
-> Sure, I can make an update. Is it only " ARM: shmobile: Remove SH7367 support"
-> that needs to be refreshed?
+> On 11/05/2012 02:46 PM, AnilKumar, Chimata wrote:
+> > On Mon, Nov 05, 2012 at 16:15:40, AnilKumar, Chimata wrote:
+> >> Add device tree date for GPIO based various drivers matrix keypad,
+> >> volume keys, push buttons and use leds accross three AM33XX devices
+> >> viz EVM, BeagleBone and Starter Kit.
+> >>
+> >> To make it functional this series also adds pinctrl data for all
+> >> the GPIOs used by various drivers. In this series only default state
+> >> pinmux/conf settings are added because of sleep/idle state pinctrl
+> >> values are not available.
+> >>
+> >> These patches are based on linux-omap-dt:for_3.8/dts tree and these
+> > 
+> > My bad, small correction in this statement, these patches apply cleanly
+> > on linux-omap-dt:for_3.8/dts tree with the below two patches.
+> > http://www.spinics.net/lists/arm-kernel/msg204872.html
+> > http://www.spinics.net/lists/arm-kernel/msg204873.html
 > 
-Yes, I need "ARM: shmobile: Remove SH7367 support" patch only.
-Thanks!
+> Mmm, this 2 patches do have dependency on some driver changes that might
+> not be accepted for 3.8. And in fact I do have some comment on the RTC
+> one :-)
+> Don't you prefer to change the order to allow me to pull these ones first?
+> 
 
-Nobuhiro
+Today I will resend the patches by removing this dependency.
+
+Thanks
+AnilKumar 
