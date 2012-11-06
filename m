@@ -1,44 +1,75 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Nov 2012 22:55:29 +0100
-Subject: [PATCH 4/8] sched: warnings in kernel/sched/fair.c
+Date: Tue,  6 Nov 2012 22:55:27 +0100
+Subject: [PATCH 2/8] mtd: diskonchip: use inline functions for DocRead/DocWrite
 In-Reply-To: <1352238933-4886-1-git-send-email-arnd@arndb.de>
 References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
-Message-ID: <1352238933-4886-5-git-send-email-arnd@arndb.de>
+Message-ID: <1352238933-4886-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-a4c96ae319 "sched: Unthrottle rt runqueues in __disable_runtime()"
-turned the unthrottle_offline_cfs_rqs function into a static symbol,
-which now triggers a warning about it being potentially unused:
+The diskonchip drivers traditionally use home-grown macros for
+doing MMIO accesses, which cause a lot of warnings, at least
+on ARM machines:
 
-kernel/sched/fair.c:2055:13: warning: 'unthrottle_offline_cfs_rqs' defined but not used [-Wunused-function]
+drivers/mtd/devices/doc2000.c: In function 'doc_write':
+drivers/mtd/devices/doc2000.c:854:5: warning: value computed is not used [-Wunused-value]
+drivers/mtd/devices/doc2000.c: In function 'doc_erase':
+drivers/mtd/devices/doc2000.c:1123:5: warning: value computed is not used [-Wunused-value
+drivers/mtd/nand/diskonchip.c: In function 'doc2000_read_byte':
+drivers/mtd/nand/diskonchip.c:318:3: warning: value computed is not used [-Wunused-value]
 
-Marking it __maybe_unused shuts up the gcc warning and lets the
-compiler safely drop the function body when it's not being used.
-
-To reproduce, build the ARM bcm2835_defconfig.
+A nicer solution is to use the architecture-defined I/O accessors.
+Here, we use the __raw_readl/__raw_writel style, instead of the
+proper readl/writel ones, in order to preserve the odd semantics
+of the existing macros that have their own barrier implementation
+and no byte swap. It would be nice to fix this properly and use
+the correct accessors as well as make the word size independent
+from the architecture, but I guess the hardware is obsolete
+enough that we should better not mess the driver an more than
+necessary.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Peter Boonstoppel <pboonstoppel@nvidia.com>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Paul Turner <pjt@google.com>
-Cc: Ingo Molnar <mingo@kernel.org>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Cc: linux-mtd at lists.infradead.org
 ---
- kernel/sched/fair.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/mtd/doc2000.h |   22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 6b800a1..9f52728 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -2052,7 +2052,7 @@ static void destroy_cfs_bandwidth(struct cfs_bandwidth *cfs_b)
- 	hrtimer_cancel(&cfs_b->slack_timer);
- }
- 
--static void unthrottle_offline_cfs_rqs(struct rq *rq)
-+static void __maybe_unused unthrottle_offline_cfs_rqs(struct rq *rq)
- {
- 	struct cfs_rq *cfs_rq;
- 
+diff --git a/include/linux/mtd/doc2000.h b/include/linux/mtd/doc2000.h
+index 0f6fea7..407d1e5 100644
+--- a/include/linux/mtd/doc2000.h
++++ b/include/linux/mtd/doc2000.h
+@@ -92,12 +92,26 @@
+  * Others use readb/writeb
+  */
+ #if defined(__arm__)
+-#define ReadDOC_(adr, reg)      ((unsigned char)(*(volatile __u32 *)(((unsigned long)adr)+((reg)<<2))))
+-#define WriteDOC_(d, adr, reg)  do{ *(volatile __u32 *)(((unsigned long)adr)+((reg)<<2)) = (__u32)d; wmb();} while(0)
++static inline u8 ReadDOC_(u32 __iomem *addr, unsigned long reg)
++{
++	return __raw_readl(addr + reg);
++}
++static inline void WriteDOC_(u8 data, u32 __iomem *addr, unsigned long reg)
++{
++	__raw_writel(data, addr + reg);
++	wmb();
++}
+ #define DOC_IOREMAP_LEN 0x8000
+ #elif defined(__ppc__)
+-#define ReadDOC_(adr, reg)      ((unsigned char)(*(volatile __u16 *)(((unsigned long)adr)+((reg)<<1))))
+-#define WriteDOC_(d, adr, reg)  do{ *(volatile __u16 *)(((unsigned long)adr)+((reg)<<1)) = (__u16)d; wmb();} while(0)
++static inline u8 ReadDOC_(u16 __iomem *addr, unsigned long reg)
++{
++	return __raw_readw(addr + reg);
++}
++static inline void WriteDOC_(u8 data, u16 __iomem *addr, unsigned long reg)
++{
++	__raw_writew(data, addr + reg);
++	wmb();
++}
+ #define DOC_IOREMAP_LEN 0x4000
+ #else
+ #define ReadDOC_(adr, reg)      readb((void __iomem *)(adr) + (reg))
 -- 
 1.7.10
