@@ -1,46 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 6 Nov 2012 20:04:45 +0000
-Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
- SCHED_TRACER depends on HZ]
-In-Reply-To: <20121106134944.GE27643@S2100-06.ap.freescale.net>
+Date: Tue, 6 Nov 2012 20:20:38 +0000
+Subject: scheduler clock for MXS
+In-Reply-To: <20121106134630.GD27643@S2100-06.ap.freescale.net>
 References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
  <20121105025753.GA26528@S2100-06.ap.freescale.net>
  <50978370.9060001@meduna.org>
  <20121105134655.GB27260@S2100-06.ap.freescale.net>
  <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
- <20121106024052.GA27643@S2100-06.ap.freescale.net>
- <20121106101229.GN28327@n2100.arm.linux.org.uk>
- <20121106134944.GE27643@S2100-06.ap.freescale.net>
-Message-ID: <20121106200445.GA32398@n2100.arm.linux.org.uk>
+ <5098CB9F.9030401@meduna.org>
+ <20121106134630.GD27643@S2100-06.ap.freescale.net>
+Message-ID: <20121106202038.GB32398@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 09:49:50PM +0800, Shawn Guo wrote:
-> On Tue, Nov 06, 2012 at 10:12:29AM +0000, Russell King - ARM Linux wrote:
-> > > [    0.000000] sched_clock: 16 bits at 32kHz, resolution 31250ns, wraps every 20
-> > > 47ms
+On Tue, Nov 06, 2012 at 09:46:31PM +0800, Shawn Guo wrote:
+> On Tue, Nov 06, 2012 at 09:34:39AM +0100, Stanislav Meduna wrote:
+> > Shawn: could you try change the
+> >   update_sched_clock();
+> > to
+> >   sched_clock_poll(sched_clock_timer.data);
+> > right after update_sched_clock call in setup_sched_clock?
 > > 
-> > So where are you setting this up?  My guess is it's after time_init()
-> > has done its stuff.
-> 
-> It gets set up in machine_desc->timer->init() which is called right
-> in time_init() just before sched_clock_postinit().
+> With the change, it still wraps at 2 seconds.
 
-Well.  I just tried an experiment with OMAP4:
+And there's no way that such a change could ever go into mainline; it
+can mean that the timer is registered into the timer subsystem before
+the timer subsystem has been initialised.  That's why we postpone that
+part to time_init().
 
-[    0.000000] sched_clock: 16 bits at 32kHz, resolution 30517ns, wraps every 1999ms                                                                            
-
-So, this is similar to yours, and there I get:
-
-[    1.945281] ALSA device list:
-[    1.948394]   #0: SDP4430
-[    1.951324] Waiting 2sec before mounting root device...
-[    2.926910] kjournald starting.  Commit interval 5 seconds
-[    2.927001] EXT3-fs (mmcblk1p2): warning: maximal mount count reached, running e2fsck is recommended
-[    3.041503] EXT3-fs (mmcblk1p2): using internal journal
-[    3.051422] EXT3-fs (mmcblk1p2): recovery complete
-[    3.056427] EXT3-fs (mmcblk1p2): mounted filesystem with writeback data mode
-[    3.063842] VFS: Mounted root (ext3 filesystem) on device 179:26.
-[    3.070404] Freeing init memory: 192K
-
-So it appears to be working as designed.
+(And it has _always_ been intended that this sched_clock() implementation
+would be usable by the time setup_arch() completes...)
