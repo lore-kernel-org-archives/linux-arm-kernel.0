@@ -1,114 +1,50 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Tue, 6 Nov 2012 17:56:54 +0100
-Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
-In-Reply-To: <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-3-git-send-email-anilkumar@ti.com> <5097ECAD.9010101@ti.com>
- <331ABD5ECB02734CA317220B2BBEABC13EA64F14@DBDE01.ent.ti.com>
-Message-ID: <50994156.4080305@ti.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 07 Nov 2012 01:23:23 +0800
+Subject: arch/arm/kernel/smp_twd.c:370:3: warning: 'return' with a value,
+ in function returning void
+Message-ID: <5099478b.CqCWLYBtIvQWdTBe%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anil,
+tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git next/soc
+head:   f60be0d5c1f2dd0188205f04a4a7b8778234fd9c
+commit: 0336517b38c5fd643784eeee8f0d73efd48e3361 ARM: smp_twd: don't warn on no DT node
+date:   6 days ago
+config: make ARCH=arm imx_v6_v7_defconfig
 
-On 11/06/2012 06:07 AM, AnilKumar, Chimata wrote:
-> On Mon, Nov 05, 2012 at 22:13:25, Cousson, Benoit wrote:
->> Hi Anil / Colin,
->>
->> On 11/05/2012 10:42 AM, AnilKumar Ch wrote:
->>> From: Colin Foe-Parker <colin.foeparker@logicpd.com>
->>>
->>> Add system power off control to rtc driver which is the in-charge
->>> of controlling the BeagleBone system power. The power_off routine
->>> can be hooked up to "pm_power_off" system call.
->>>
->>> System power off sequence:-
->>> * Set PMIC STATUS_OFF when PMIC_POWER_EN is pulled low
->>> * Enable PMIC_POWER_EN in rtc module
->>> * Set rtc ALARM2 time
->>> * Enable ALARM2 interrupt
->>>
->>> Added while (1); after the above steps to make sure that no other
->>> process acquire cpu. Otherwise we might see an unexpected behaviour
->>> because we are shutting down all the power rails of SoC except RTC.
->>>
->>> Signed-off-by: Colin Foe-Parker <colin.foeparker@logicpd.com>
->>> [anilkumar at ti.com: move poweroff additions to rtc driver]
->>> Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
->>> ---
->>>  Documentation/devicetree/bindings/rtc/rtc-omap.txt |    5 ++
->>>  drivers/rtc/rtc-omap.c                             |   79 +++++++++++++++++++-
->>>  2 files changed, 83 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->>> index b47aa41..8d9f4f9 100644
->>> --- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->>> +++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
->>> @@ -6,6 +6,10 @@ Required properties:
->>>  - interrupts: rtc timer, alarm interrupts in order
->>>  - interrupt-parent: phandle for the interrupt controller
->>>  
->>> +Optional properties:
->>> +- ti,system-power-controller: Telling whether or not rtc is controlling
->>> +  the system power.
->>
->> I don't know how it is connected at board level, but I'm not sure the
->> binding is the proper one.
-> 
-> Hi Benoit,
->  ________________________________
-> |   ______          _______      |
-> |  |      |        |       |     |
-> |  |RTC   |        |       |     |
-> |  |PMIC  |  Line  |       |     |
-> |  |PWR_EN|=======>|PWR_EN |     |
-> |  |______|        |_______|     |
-> |  AM335x SoC       TPS65217     |
-> |                                |
-> |________________________________|
->           BeagleBone
-> 
-> This is how RTC PMIC_PWR_EN is connected to PWR_EN of TPS65217 PMIC. Only when
-> RTC pull low in PMIC_PWR_EN then PMIC will go to power off state provided TPS65217
-> status should be changed to STATUS_OFF.
-> 
-> ALARM2 event should be trigger to configure PMIC_PWR_EN properly then the "Line"
-> driven low so that PMIC will go to shutdown mode.
+All warnings:
 
-Thanks for the nice diagram :-)
+arch/arm/kernel/smp_twd.c: In function 'twd_local_timer_of_register':
+arch/arm/kernel/smp_twd.c:370:3: warning: 'return' with a value, in function returning void [enabled by default]
 
-I'm wondering if we cannot abuse the gpio binding to describe that
-connection instead of creating two custom attributes (PMIC + RTC).
+vim +370 +/return arch/arm/kernel/smp_twd.c
 
-Ideally we should do that without having to change the RTC to use the
-gpiolib at all.
+d8e03643 Marc Zyngier 2012-01-10  354  
+d8e03643 Marc Zyngier 2012-01-10  355  #ifdef CONFIG_OF
+d8e03643 Marc Zyngier 2012-01-10  356  const static struct of_device_id twd_of_match[] __initconst = {
+d8e03643 Marc Zyngier 2012-01-10  357  	{ .compatible = "arm,cortex-a9-twd-timer",	},
+d8e03643 Marc Zyngier 2012-01-10  358  	{ .compatible = "arm,cortex-a5-twd-timer",	},
+d8e03643 Marc Zyngier 2012-01-10  359  	{ .compatible = "arm,arm11mp-twd-timer",	},
+d8e03643 Marc Zyngier 2012-01-10  360  	{ },
+d8e03643 Marc Zyngier 2012-01-10  361  };
+d8e03643 Marc Zyngier 2012-01-10  362  
+d8e03643 Marc Zyngier 2012-01-10  363  void __init twd_local_timer_of_register(void)
+d8e03643 Marc Zyngier 2012-01-10  364  {
+d8e03643 Marc Zyngier 2012-01-10  365  	struct device_node *np;
+d8e03643 Marc Zyngier 2012-01-10  366  	int err;
+d8e03643 Marc Zyngier 2012-01-10  367  
+d8e03643 Marc Zyngier 2012-01-10  368  	np = of_find_matching_node(NULL, twd_of_match);
+0336517b Rob Herring  2012-10-25  369  	if (!np)
+0336517b Rob Herring  2012-10-25 @370  		return -ENODEV;
+d8e03643 Marc Zyngier 2012-01-10  371  
+d8e03643 Marc Zyngier 2012-01-10  372  	twd_ppi = irq_of_parse_and_map(np, 0);
+d8e03643 Marc Zyngier 2012-01-10  373  	if (!twd_ppi) {
+d8e03643 Marc Zyngier 2012-01-10  374  		err = -EINVAL;
+d8e03643 Marc Zyngier 2012-01-10  375  		goto out;
+d8e03643 Marc Zyngier 2012-01-10  376  	}
+d8e03643 Marc Zyngier 2012-01-10  377  
+d8e03643 Marc Zyngier 2012-01-10  378  	twd_base = of_iomap(np, 0);
 
-
-rtc: rtc at 44e3e000 {
-	compatible = "ti,da830-rtc";
-	reg = <0x44e3e000 0x1000>;
-	interrupts = <75, 76>;
-	ti,hwmods = "rtc";
-
-	/* expose the PWR_EN functionality of this RTC*/
-	gpio-controller;
-	#gpio-cells = <0>; /* assuming we can use 0 ??? */
-};
-
-...
-
-tps: tps at 24 {
- 	compatible = "ti,tps65217";
-	/*
-         * Enable the power enable feature from
-         * the input line if that attribute is there.
-         */
-	gpio-power-en = <&rtc>; /* PWR_EN */
-
-	...
-}	
-
-Any thought?
-
-Regards,
-Benoit
+---
+0-DAY kernel build testing backend         Open Source Technology Center
+Fengguang Wu, Yuanhan Liu                              Intel Corporation
