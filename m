@@ -1,75 +1,31 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 6 Nov 2012 06:35:24 +0000
-Subject: [PATCH 1/8] PWMSS: Add PWM Subsystem driver for parent<->child
- relationship
-In-Reply-To: <1352106749-9437-2-git-send-email-avinashphilip@ti.com>
+Date: Tue, 6 Nov 2012 06:46:13 +0000
+Subject: [PATCH 6/8] pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+In-Reply-To: <1352106749-9437-7-git-send-email-avinashphilip@ti.com>
 References: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
- <1352106749-9437-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC0444A@DBDE01.ent.ti.com>
+ <1352106749-9437-7-git-send-email-avinashphilip@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC04483@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2012 at 14:42:22, Philip, Avinash wrote:
-[...]
-> +pwmss0: pwmss at 48300000 {
-> +	compatible = "ti,am33xx-pwmss";
-> +	reg = <0x48300000 0x10
-> +		0x48300100 0x80
-> +		0x48300180 0x80
-> +		0x48300200 0x80>;
-Do you really need the 4 address ranges here? You eventually do add in
-child nodes with other address ranges so isn't the first entry sufficient?
-I haven't really looked at the DT details so it is enforced by that let me
-know.
-
-[...]
-> +
-> +#define PWMSS_CLKCONFIG		8
-> +
-
-This #def can use a comment.
-
-> +void pwmss_submodule_state_change(struct device *dev, int pos, bool enable)
-> +{
-> +	struct pwmss_info *info = dev_get_drvdata(dev);
-> +	u16 val;
-> +
-> +	val = readw(info->mmio_base + PWMSS_CLKCONFIG);
-> +	if (enable)
-> +		val |= 1 << pos;
-> +	else
-> +		val &= ~(1 << pos);
-> +	mutex_lock(&info->pwmss_lock);
-> +	writew(val , info->mmio_base + PWMSS_CLKCONFIG);
-> +	mutex_unlock(&info->pwmss_lock);
-> +}
-> +EXPORT_SYMBOL(pwmss_submodule_state_change);
-
-I see a clk_en_ack field in the clock status register. You should be checking that.
-
+On Mon, Nov 05, 2012 at 14:42:27, Philip, Avinash wrote:
 [...]
 
+> +	/* Some platforms require explicit tbclk gating */
+> +	if (of_property_read_bool(pdev->dev.of_node, "tbclkgating")) {
+> +		pc->tbclk = clk_get(&pdev->dev, "tbclk");
+> +		if (IS_ERR(pc->tbclk)) {
+> +			dev_err(&pdev->dev, "Could not get EHRPWM TBCLK\n");
+> +			return PTR_ERR(pc->tbclk);
+> +		}
+> +	}
 > +
-> +MODULE_DESCRIPTION("pwmss driver");
-> +MODULE_AUTHOR("Texas Instruments");
-> +MODULE_LICENSE("GPL");
-> diff --git a/drivers/pwm/tipwmss.h b/drivers/pwm/tipwmss.h
-> new file mode 100644
-> index 0000000..83fdc29
-> --- /dev/null
-> +++ b/drivers/pwm/tipwmss.h
-> @@ -0,0 +1,8 @@
+> +	/* Enable tbclk & leave */
+> +	if (pc->tbclk)
+> +		clk_enable(pc->tbclk);
+> +
 
-License text?
- 
-> +#ifdef CONFIG_PWM_TIPWMSS
-> +extern void pwmss_submodule_state_change(struct device *dev, int pos,
-> +		bool enable);
-> +#else
-> +static inline void pwmss_submodule_state_change(struct device *dev, int pos,
-> +		bool enable)
-> +{}
-> +#endif
+Here also why are you leaving this clock always running?
 
 Regards,
 Vaibhav
