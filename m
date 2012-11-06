@@ -1,54 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 6 Nov 2012 11:32:32 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <1351731731-8435-1-git-send-email-horms@verge.net.au>
-References: <1351731731-8435-1-git-send-email-horms@verge.net.au>
-Message-ID: <20121106023232.GP2944@verge.net.au>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Tue, 06 Nov 2012 10:34:20 +0800
+Subject: [PATCH] clk: spear: Add stub functions for spear3[0|1|2]0_clk_init()
+Message-ID: <1352169260.2625.4.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 01, 2012 at 09:02:08AM +0800, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> please consider the following defconfig enhancements for 3.8.
+This fixes compile error if one of SPEAr3xx implementations is not selected.
 
-Ping.
+  CC      drivers/clk/spear/spear3xx_clock.o
+drivers/clk/spear/spear3xx_clock.c: In function 'spear3xx_clk_init':
+drivers/clk/spear/spear3xx_clock.c:599:3: error: implicit declaration of function 'spear300_clk_init' [-Werror=implicit-function-declaration]
+drivers/clk/spear/spear3xx_clock.c:601:3: error: implicit declaration of function 'spear310_clk_init' [-Werror=implicit-function-declaration]
+drivers/clk/spear/spear3xx_clock.c:603:3: error: implicit declaration of function 'spear320_clk_init' [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[3]: *** [drivers/clk/spear/spear3xx_clock.o] Error 1
+make[2]: *** [drivers/clk/spear] Error 2
+make[1]: *** [drivers/clk] Error 2
+make: *** [drivers] Error 2
 
-> I will work on the suggestions by Arnd to reduce the number
-> of defconfigs for shmobile - in essence moving towards one or
-> two generic configs rather than per-board configs. However,
-> this seems to be somewhat non-trivial and in the mean time
-> I would like to keep updating the existing defcoings.
-> 
-> ----------------------------------------------------------------
-> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-> 
->   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git defconfig
-> 
-> for you to fetch changes up to 67e13cbb807c6b95706e4ec0ca2c068f14f25588:
-> 
->   ARM: shmobile: leave CONFIG_INOTIFY_USER enabled by default (2012-11-01 08:51:34 +0800)
-> 
-> ----------------------------------------------------------------
-> Guennadi Liakhovetski (1):
->       ARM: shmobile: leave CONFIG_INOTIFY_USER enabled by default
-> 
-> Kuninori Morimoto (2):
->       ARM: shmobile: mackerel: defconfig update
->       ARM: shmobile: armadillo800eva: enable L2X0 cache on defconfig
-> 
->  arch/arm/configs/ap4evb_defconfig          |    1 -
->  arch/arm/configs/armadillo800eva_defconfig |    2 +-
->  arch/arm/configs/kota2_defconfig           |    1 -
->  arch/arm/configs/kzm9g_defconfig           |    1 -
->  arch/arm/configs/mackerel_defconfig        |   19 ++++++++++++++++---
->  5 files changed, 17 insertions(+), 7 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+ drivers/clk/spear/spear3xx_clock.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/clk/spear/spear3xx_clock.c b/drivers/clk/spear/spear3xx_clock.c
+index c315745..59049cf 100644
+--- a/drivers/clk/spear/spear3xx_clock.c
++++ b/drivers/clk/spear/spear3xx_clock.c
+@@ -157,6 +157,8 @@ static void __init spear300_clk_init(void)
+ 			1);
+ 	clk_register_clkdev(clk, NULL, "a0000000.kbd");
+ }
++#else
++static inline void spear300_clk_init(void) { }
+ #endif
+ 
+ /* array of all spear 310 clock lookups */
+@@ -197,6 +199,8 @@ static void __init spear310_clk_init(void)
+ 			1);
+ 	clk_register_clkdev(clk, NULL, "b2200000.serial");
+ }
++#else
++static inline void spear310_clk_init(void) { }
+ #endif
+ 
+ /* array of all spear 320 clock lookups */
+@@ -336,6 +340,8 @@ static void __init spear320_clk_init(void)
+ 			&_lock);
+ 	clk_register_clkdev(clk, NULL, "60100000.serial");
+ }
++#else
++static inline void spear320_clk_init(void) { }
+ #endif
+ 
+ void __init spear3xx_clk_init(void)
+-- 
+1.7.9.5
