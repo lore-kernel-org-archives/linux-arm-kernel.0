@@ -1,29 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 09:59:59 -0800
-Subject: [GIT PULL 3/3] omap prcm cleanup for v3.8 merge window, part1
-In-Reply-To: <20121105185133.GC22301@quad.lixom.net>
-References: <pull-1351286620-406688> <E1TRrO0-00087R-UM@merlin.infradead.org>
- <20121105185133.GC22301@quad.lixom.net>
-Message-ID: <20121106175959.GC6801@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 6 Nov 2012 11:18:19 -0800
+Subject: [GIT PULL] Calxeda ECX-2000 support
+In-Reply-To: <50917936.2030405@gmail.com>
+References: <50917936.2030405@gmail.com>
+Message-ID: <20121106191819.GA11353@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [121105 10:53]:
+On Wed, Oct 31, 2012 at 02:17:10PM -0500, Rob Herring wrote:
+> Arnd, Olof,
 > 
-> The history of this branch looks a little odd. Did you mean to merge in
-> cleanup-headers on top of Paul's branch in it? It seems to add no value -- all
-> that code is already in our branch and it resolves no conflicts, etc.
+> Please pull support for Calxeda ECX-2000 SOC.
+> 
+> There will be a trivial conflict with the GIC move to drivers/irqchip once
+> that goes in. 
+> 
+> Rob
+> 
+> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+> 
+>   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://sources.calxeda.com/kernel/linux.git tags/calxeda-ecx-2000
+> 
+> for you to fetch changes up to e095c0d122c09efabe7d4136ce77f72c636c4879:
+> 
+>   ARM: highbank: Add initial ECX-2000 support (2012-10-31 13:47:01 -0500)
+> 
 
-Oh that was because I wanted to keep the header clean up separate
-and Paul needed some base for further PRCM work that would not
-conflict with the header changes. And I wanted to get the first
-set of Paul's changes into linux next early to avoid a big pile
-of pull requests later on.
+The addition of include of core.h in sysregs.h gives me a build error on
+multi_v7_defconfig due to missing guard ifdefs. I've added the following
+patch on top of your branch.
+
+
+commit 9186cea8283b0d235719e82607a1aec81db7ab8d
+Author:     Olof Johansson <olof@lixom.net>
+AuthorDate: Tue Nov 6 11:09:10 2012 -0800
+Commit:     Olof Johansson <olof@lixom.net>
+CommitDate: Tue Nov 6 11:09:10 2012 -0800
+
+    ARM: highbank: add ifdef guards to core.h
+    
+    Fixes build error due to multiple includes:
+    
+    In file included from arch/arm/mach-highbank/sysregs.h:23:0,
+    from arch/arm/mach-highbank/system.c:20:
+    arch/arm/mach-highbank/core.h:8:91: error: redefinition of 'highbank_lluart_map_io'
+    In file included from arch/arm/mach-highbank/system.c:19:0:
+    arch/arm/mach-highbank/core.h:8:91: note: previous definition of 'highbank_lluart_map_io' was here
+    
+    Signed-off-by: Olof Johansson <olof@lixom.net>
+
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index 286ec82..068c687 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -1,3 +1,6 @@
++#ifndef __HIGHBANK_CORE_H
++#define __HIGHBANK_CORE_H
++
+ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+ extern void highbank_clocks_init(void);
+ extern void highbank_restart(char, const char *);
+@@ -18,3 +21,5 @@ extern void highbank_smc1(int fn, int arg);
+ extern void highbank_cpu_die(unsigned int cpu);
  
-> That being said, it causes no harm, and I've pulled it in as is.
-
-OK thanks.
-
-Regards,
-
-Tony
+ extern struct smp_operations highbank_smp_ops;
++
++#endif
