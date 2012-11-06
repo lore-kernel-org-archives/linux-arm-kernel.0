@@ -1,243 +1,356 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 6 Nov 2012 10:24:09 +0000
-Subject: OMAP baseline test results for v3.7-rc3
-References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
- <508F59FB.7080400@ti.com>
- <alpine.DEB.2.00.1211050239530.23228@utopia.booyaka.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB63E9C@DBDE01.ent.ti.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 6 Nov 2012 10:40:09 +0000
+Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87txt4aqyc.fsf@deeprootsystems.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
+ <87txt4aqyc.fsf@deeprootsystems.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC04AE5@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 11:39:18, Hiremath, Vaibhav wrote:
-> On Mon, Nov 05, 2012 at 08:11:24, Paul Walmsley wrote:
-> > Hi
-> > 
-> > On Tue, 30 Oct 2012, Vaibhav Hiremath wrote:
-> > 
-> > > This is surprising, I have tested v3.7-rc3 branch on AM335xBone platform
-> > > and its booting up for me without any issues.
-> > > Jon had submitted another patch which fixes boot issue on Bone.
-> > > 
-> > > https://patchwork.kernel.org/patch/1606471/
-> > 
-> > v3.7-rc4 failed for me with a detached .dtb in a quick test.  Probably it 
-> > is due to the original u-boot that was shipped with the MMC card:
-> > 
+Hi Kevin,
+
+On Mon, Nov 05, 2012 at 23:10:27, Kevin Hilman wrote:
+[...]
 > 
-> Pulling the tree, let me try now and update you shortly...
+> First, some general comments.  This is a big patch and probably should
+> be broken up a bit.  I suspect it could be broken up a bit, maybe into
+> at least:
+> 
+> - EMIF interface
+> - SCM interface, new APIs
+> - assembly/OCM code
+> - pm33xx.[ch]
+> - lastly, the late_init stuff that actually initizlizes 
+
+Ok, I'll try splitting the patches in the next version.
+
+> 
+> I have a handful of comments below.  I wrote this up on the plane over
+> the weekend, and I see that Santosh has already made some similar
+> comments, but I'll send mine anyways.  
+
+[...]
+
+> 
+> Doing this on every suspend looks a bit strange.  Why not just have some
+> init function handle these devices once at boot.  If this is really
+> needed on every suspend, it needs some more description, and probably 
+> some basic stub drivers need to be created.
+
+We do require it for every suspend (but more below). I'll add in more
+description in the comment that's already there.
+
+> 
+> Also, if there are drivers for these devices, won't this interfere?
 > 
 
-Just tried -rc4, and it boots up fine for me. I tested it with Mainline u-
-boot and mainline Kernel, I have pasted log below for reference -
+Hmm, I can think of the following scenarios
+
+1. Runtime PM adapted drivers are compiled in - We'll have to ensure that
+in their suspend callbacks they end up doing omap_hwmod_idle() via the
+runtime PM APIs. In this case the omap_hwmod_enable() followed by
+omap_hwmod_idle() is not necessary in the PM code.
+
+2. The drivers are not compiled in - In this case, the hwmod code puts
+the IPs in standby during bootup so the first suspend-resume iteration
+will pass. During resuming, the SYSC configuration for forced standby will
+be lost, so in the subsequent iterations these IPs won't go standby and the
+hwmod code does not touch them since they never got enabled. In this case
+we do need the sequence that is there currently.
+
+3. For some reason the respective drivers don't idle the IPs during suspend -
+(no_idle_on_suspend flag for the hwmod in DT?). In this scenario I think
+we should abort the suspend process since we know that the suspend is not
+going to work. 
+
+Is there some other scenario that needs to be covered?
 
 
-> > U-Boot 2011.09-00009-gcf6e04d (Mar 08 2012 - 17:15:43)
-> > arm-arago-linux-gnueabi-gcc (GCC) 4.5.3 20110311 (prerelease)
-> > 
+How about adding some flag in hwmod code for handling this? Something
+similar to what was done for MMC [1]. I think the problem that we have
+is in some ways similar to the one addressed in [1].
+ 
+> > +	/* Put the GFX clockdomains to sleep */
+> > +	clkdm_sleep(gfx_l3_clkdm);
+> > +	clkdm_sleep(gfx_l4ls_clkdm);
+> > +
+> > +	/* Try to put GFX to sleep */
+> > +	pwrdm_set_next_pwrst(gfx_pwrdm, PWRDM_POWER_OFF);
+> 
+> ditto.
 
-I do not suspect anything here, but still think we should use mainline 
-u-boot version. Can you share the images with me, so that I can try them?
+I'll check if this can be removed.
 
+> 
+> [...]
+> 
+> > +static int am33xx_pm_begin(suspend_state_t state)
+> > +{
+> > +	int ret = 0;
+> > +
+> > +	disable_hlt();
+> > +
+> > +	/*
+> > +	 * Physical resume address to be used by ROM code
+> > +	 */
+> > +	wkup_m3->resume_addr = (AM33XX_OCMC_END - am33xx_do_wfi_sz +
+> > +					am33xx_resume_offset + 0x4);
+> 
+> Why does this need to be calculated every suspend/resume?
+> 
 
-====================Log=======================
+Will move this to init phase.
 
+> > +	wkup_m3->sleep_mode = IPC_CMD_DS0;
+> > +	wkup_m3->ipc_data1  = DS_IPC_DEFAULT;
+> > +	wkup_m3->ipc_data2  = DS_IPC_DEFAULT;
+> > +
+> > +	am33xx_ipc_cmd();
+> 
+> This IPC needs a cleaner interface/API.  Also, since it involves
+> register writes to the SCM, it should be defined in control.c.  (NOTE:
+> we're in the process of creating a real driver out of the SCM, so all
+> SCM register accesses need to be contained in control.c)
+> 
+> For example, you probably want an am33xx_m3_* API in control.c, with
+> some pre-baked commands for the M3.  
 
-U-Boot SPL 2013.01-rc1-00071-g1cc619b (Nov 06 2012 - 15:33:43)
-OMAP SD/MMC: 0
-reading u-boot.img
-reading u-boot.img
+Ok. I'll work on this for the next version.
 
+> 
+> > +	wkup_m3->state = M3_STATE_MSG_FOR_LP;
+> >
+> > +	omap_mbox_enable_irq(wkup_m3->mbox, IRQ_RX);
+> > +
+> > +	ret = omap_mbox_msg_send(wkup_m3->mbox, 0xABCDABCD);
+> > +	if (ret) {
+> > +		pr_err("A8<->CM3 MSG for LP failed\n");
+> > +		am33xx_m3_state_machine_reset();
+> > +		ret = -1;
+> > +	}
+> > +
+> > +	if (!wait_for_completion_timeout(&wkup_m3_sync,
+> > +					msecs_to_jiffies(500))) {
+> 
+> hmm, interesting.  I know you're not implementing idle here, but I'm
+> rather curious how this sync w/M3 is going to work for idle.
+> 
 
-U-Boot 2013.01-rc1-00071-g1cc619b (Nov 06 2012 - 15:33:43)
+Like you mentioned in another thread we could probably not have
+a sync in the idle path. (More in the other thread).
 
-I2C:   ready
-DRAM:  256 MiB
-WARNING: Caches not enabled
-MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
-Using default environment
+> > +		pr_err("A8<->CM3 sync failure\n");
+> > +		am33xx_m3_state_machine_reset();
+> > +		ret = -1;
+> > +	} else {
+> > +		pr_debug("Message sent for entering DeepSleep mode\n");
+> > +		omap_mbox_disable_irq(wkup_m3->mbox, IRQ_RX);
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> 
+> [...]
+> 
+> > +static void am33xx_m3_state_machine_reset(void)
+> > +{
+> > +	int ret = 0;
+> > +
+> > +	wkup_m3->resume_addr	= 0x0;
+> > +	wkup_m3->sleep_mode	= IPC_CMD_RESET;
+> > +	wkup_m3->ipc_data1	= DS_IPC_DEFAULT;
+> > +	wkup_m3->ipc_data2	= DS_IPC_DEFAULT;
+> > +
+> > +	am33xx_ipc_cmd();
+> > +
+> > +	wkup_m3->state = M3_STATE_MSG_FOR_RESET;
+> > +
+> > +	ret = omap_mbox_msg_send(wkup_m3->mbox, 0xABCDABCD);
+> 
+> magic constant needs a #define
 
-Net:   cpsw
-Hit any key to stop autoboot:  0
-U-Boot#
-U-Boot#
-U-Boot# mmc rescan 0
-U-Boot# fatload mmc 0 80000000 am335x-bone.dtb
-reading am335x-bone.dtb
-4391 bytes read
-U-Boot# fatload mmc 0 81000000 uImage
-reading uImage
-3842256 bytes read
-U-Boot# fatload mmc 0 82000000 ramdisk-pm.gz
-reading ramdisk-pm.gz
-2022580 bytes read
-U-Boot# setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/ram rw initrd=0x82000000,16MB ramdisk_size=65536 earlyprintk=serial
-U-Boot# bootm 81000000 - 80000000
-## Booting kernel from Legacy Image at 81000000 ...
-   Image Name:   Linux-3.7.0-rc4
-   Image Type:   ARM Linux Kernel Image (uncompressed)
-   Data Size:    3842192 Bytes = 3.7 MiB
-   Load Address: 80008000
-   Entry Point:  80008000
-   Verifying Checksum ... OK
-## Flattened Device Tree blob at 80000000
-   Booting using the fdt blob at 0x80000000
-   Loading Kernel Image ... OK
-OK
-   Loading Device Tree to 8fe65000, end 8fe69126 ... OK
+Ok.
 
-Starting kernel ...
+> 
+> > +	if (!ret) {
+> > +		pr_debug("Message sent for resetting M3 state machine\n");
+> > +		if (!wait_for_completion_timeout(&wkup_m3_sync,
+> > +						msecs_to_jiffies(500)))
+> > +			pr_err("A8<->CM3 sync failure\n");
+> > +	} else {
+> > +		pr_err("Could not reset M3 state machine!!!\n");
+> > +		wkup_m3->state = M3_STATE_UNKNOWN;
+> > +	}
+> > +}
+> > +#endif /* CONFIG_SUSPEND */
+> > +
+> > +/*
+> > + * Dummy notifier for the mailbox
+> > + */
+> > +int wkup_mbox_msg(struct notifier_block *self, unsigned long len, void *msg)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +static struct notifier_block wkup_mbox_notifier = {
+> > +	.notifier_call = wkup_mbox_msg,
+> > +};
+> 
+> Why do you need a dummy notifier?  Looks like maybe plat-omap/mailbox.c
+> needs a few minor fixes to support not being passed a notifier instead?
+> 
 
-[    0.000000] Booting Linux on physical CPU 0
-[    0.000000] Linux version 3.7.0-rc4 (a0393758 at psplinux064) (gcc version 4.5.3 20110311 (prerelease) (GCC) ) #1 SMP Tue Nov 6 15:28:21 IST 2012
-[    0.000000] CPU: ARMv7 Processor [413fc082] revision 2 (ARMv7), cr=10c53c7d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-[    0.000000] Machine: Generic AM33XX (Flattened Device Tree), model: TI AM335x BeagleBone
-[    0.000000] Memory policy: ECC disabled, Data cache writeback
-[    0.000000] AM335X ES1.0 (neon )
-[    0.000000] PERCPU: Embedded 9 pages/cpu @c0f03000 s12928 r8192 d15744 u36864
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 64768
-[    0.000000] Kernel command line: console=ttyO0,115200n8 mem=256M root=/dev/ram rw initrd=0x82000000,16MB ramdisk_size=65536 earlyprintk=serial
-[    0.000000] PID hash table entries: 1024 (order: 0, 4096 bytes)
-[    0.000000] Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-[    0.000000] Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-[    0.000000] Memory: 255MB = 255MB total
-[    0.000000] Memory: 229112k/229112k available, 33032k reserved, 0K highmem
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-[    0.000000]     vmalloc : 0xd0800000 - 0xff000000   ( 744 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc06c4b94   (6899 kB)
-[    0.000000]       .init : 0xc06c5000 - 0xc0715280   ( 321 kB)
-[    0.000000]       .data : 0xc0716000 - 0xc07a13a0   ( 557 kB)
-[    0.000000]        .bss : 0xc07a13c4 - 0xc0cfbd6c   (5483 kB)
-[    0.000000] Hierarchical RCU implementation.
-[    0.000000]  RCU restricting CPUs from NR_CPUS=2 to nr_cpu_ids=1.
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] IRQ: Found an INTC at 0xfa200000 (revision 5.0) with 128 interrupts
-[    0.000000] Total of 128 interrupts on 1 active controller
-[    0.000000] OMAP clockevent source: GPTIMER1 at 24000000 Hz
-[    0.000000] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps every 178956ms
-[    0.000000] OMAP clocksource: GPTIMER2 at 24000000 Hz
-[    0.000000] Console: colour dummy device 80x30
-[    0.000000] Lock dependency validator: Copyright (c) 2006 Red Hat, Inc., Ingo Molnar
-[    0.000000] ... MAX_LOCKDEP_SUBCLASSES:  8
-[    0.000000] ... MAX_LOCK_DEPTH:          48
-[    0.000000] ... MAX_LOCKDEP_KEYS:        8191
-[    0.000000] ... CLASSHASH_SIZE:          4096
-[    0.000000] ... MAX_LOCKDEP_ENTRIES:     16384
-[    0.000000] ... MAX_LOCKDEP_CHAINS:      32768
-[    0.000000] ... CHAINHASH_SIZE:          16384
-[    0.000000]  memory used by lock dependency info: 3695 kB
-[    0.000000]  per task-struct memory footprint: 1152 bytes
-[    0.001135] Calibrating delay loop... 364.48 BogoMIPS (lpj=1425408)
-[    0.107571] pid_max: default: 32768 minimum: 301
-[    0.108255] Security Framework initialized
-[    0.108464] Mount-cache hash table entries: 512
-[    0.118582] CPU: Testing write buffer coherency: ok
-[    0.119703] CPU0: thread -1, cpu 0, socket -1, mpidr 0
-[    0.119790] Setting up static identity map for 0x804d61e0 - 0x804d6250
-[    0.122980] Brought up 1 CPUs
-[    0.123012] SMP: Total of 1 processors activated (364.48 BogoMIPS).
-[    0.147821] pinctrl core: initialized pinctrl subsystem
-[    0.156108] regulator-dummy: no parameters
-[    0.158717] NET: Registered protocol family 16
-[    0.159696] DMA: preallocated 256 KiB pool for atomic coherent allocations
-[    0.161182] omap-gpmc omap-gpmc: GPMC revision 6.0
-[    0.161403] omap-gpmc omap-gpmc: failed to reserve memory
-[    0.161501] omap-gpmc: probe of omap-gpmc failed with error -16
-[    0.190475] OMAP GPIO hardware version 0.1
-[    0.206060] No ATAGs?
-[    0.206089] hw-breakpoint: debug architecture 0x4 unsupported.
-[    0.293133] bio: create slab <bio-0> at 0
-[    0.400112] omap-dma-engine omap-dma-engine: OMAP DMA engine driver
-[    0.407996] SCSI subsystem initialized
-[    0.410955] usbcore: registered new interface driver usbfs
-[    0.411594] usbcore: registered new interface driver hub
-[    0.413229] usbcore: registered new device driver usb
-[    0.418391] omap_i2c 44e0b000.i2c: bus 0 rev2.4.0 at 400 kHz
-[    0.430593] Switching to clocksource gp_timer
-[    0.586714] NET: Registered protocol family 2
-[    0.589620] TCP established hash table entries: 8192 (order: 4, 65536 bytes)
-[    0.590148] TCP bind hash table entries: 8192 (order: 6, 294912 bytes)
-[    0.595587] TCP: Hash tables configured (established 8192 bind 8192)
-[    0.595897] TCP: reno registered
-[    0.595941] UDP hash table entries: 256 (order: 2, 20480 bytes)
-[    0.596311] UDP-Lite hash table entries: 256 (order: 2, 20480 bytes)
-[    0.597375] NET: Registered protocol family 1
-[    0.599070] RPC: Registered named UNIX socket transport module.
-[    0.599101] RPC: Registered udp transport module.
-[    0.599117] RPC: Registered tcp transport module.
-[    0.599133] RPC: Registered tcp NFSv4.1 backchannel transport module.
-[    0.600475] Trying to unpack rootfs image as initramfs...
-[    0.603605] rootfs image is not initramfs (no cpio magic); looks like an initrd
-[    0.746420] Freeing initrd memory: 16384K
-[    0.746624] NetWinder Floating Point Emulator V0.97 (double precision)
-[    0.747263] CPU PMU: probing PMU on CPU 0
-[    0.747496] hw perfevents: enabled with ARMv7 Cortex-A8 PMU driver, 5 counters available
-[    0.953802] VFS: Disk quotas dquot_6.5.2
-[    0.954099] Dquot-cache hash table entries: 1024 (order 0, 4096 bytes)
-[    0.957740] NFS: Registering the id_resolver key type
-[    0.958396] Key type id_resolver registered
-[    0.958425] Key type id_legacy registered
-[    0.958612] jffs2: version 2.2. (NAND) (SUMMARY)  (c) 2001-2006 Red Hat, Inc.
-[    0.959333] msgmni has been set to 479
-[    0.964156] io scheduler noop registered
-[    0.964191] io scheduler deadline registered
-[    0.964331] io scheduler cfq registered (default)
-[    0.967982] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
-[    0.975911] omap_uart 44e09000.serial: did not get pins for uart0 error: -19
-[    0.976583] 44e09000.serial: ttyO0 at MMIO 0x44e09000 (irq = 88) is a OMAP UART0
-[    1.579209] console [ttyO0] enabled
-[    1.622741] brd: module loaded
-[    1.651866] loop: module loaded
-[    1.661935] mtdoops: mtd device (mtddev=name/number) must be supplied
-[    1.670613] OneNAND driver initializing
-[    1.682234] usbcore: registered new interface driver asix
-[    1.688544] usbcore: registered new interface driver cdc_ether
-[    1.695670] usbcore: registered new interface driver smsc95xx
-[    1.702759] usbcore: registered new interface driver net1080
-[    1.709533] usbcore: registered new interface driver cdc_subset
-[    1.716526] usbcore: registered new interface driver zaurus
-[    1.723296] usbcore: registered new interface driver cdc_ncm
-[    1.732034] usbcore: registered new interface driver cdc_wdm
-[    1.738182] Initializing USB Mass Storage driver...
-[    1.744230] usbcore: registered new interface driver usb-storage
-[    1.750559] USB Mass Storage support registered.
-[    1.756198] usbcore: registered new interface driver usbtest
-[    1.764520] mousedev: PS/2 mouse device common for all mice
-[    1.775792] i2c /dev entries driver
-[    1.782078] Driver for 1-wire Dallas network protocol.
-[    1.792090] omap_wdt: OMAP Watchdog Timer Rev 0x01: initial timeout 60 sec
-[    1.805350] usbcore: registered new interface driver usbhid
-[    1.811484] usbhid: USB HID core driver
-[    1.817257] oprofile: using arm/armv7
-[    1.822333] TCP: cubic registered
-[    1.825843] Initializing XFRM netlink socket
-[    1.830589] NET: Registered protocol family 17
-[    1.835398] NET: Registered protocol family 15
-[    1.840638] Key type dns_resolver registered
-[    1.845380] VFP support v0.3: implementor 41 architecture 3 part 30 variant c rev 3
-[    1.853623] ThumbEE CPU extension supported.
-[    1.870806] clock: disabling unused clocks to save power
-[    1.884043] drivers/rtc/hctosys.c: unable to open rtc device (rtc0)
-[    1.895403] RAMDISK: gzip image found at block 0
-[    2.375558] VFS: Mounted root (ext2 filesystem) on device 1:0.
-[    2.382761] Freeing init memory: 320K
-mount: mounting none on /var/shm failed: No such file or directory
-  ::
-  :: Enabling hot-plug  : [SUCCESS]
-  ::
-  ::
-   : Populating /dev    : [SUCCESS]
-[SUCCESS]
-  ::
-  ::
-  :: Setting PATH
-  ::
-   : syslogd            : [SUCCESS]
-   : telnetd            : [SUCCESS]
+Ok. Will add checks in the mailbox code instead. (I wasn't too sure
+about the mailbox users so I tried to take the path of least resistance :) 
 
-Please press Enter to activate this console.
+> > +static irqreturn_t wkup_m3_txev_handler(int irq, void *unused)
+> > +{
+> > +	omap_ctrl_writel(0x1, AM33XX_CONTROL_M3_TXEV_EOI);
+> 
+> undocumented magic write (but presumably an IRQ ack?)
+> 
+
+Yes, it's for clearing the interrupt. Will add a comment 
+put a #def for this and other places that you mentioned.
+
+> Note this also needs to be moved to control.c and given a useful API.
+> 
+> > +	switch (wkup_m3->state) {
+> > +	case M3_STATE_RESET:
+> > +		wkup_m3->state = M3_STATE_INITED;
+> > +		break;
+> > +	case M3_STATE_MSG_FOR_RESET:
+> > +		wkup_m3->state = M3_STATE_INITED;
+> > +		omap_mbox_msg_rx_flush(wkup_m3->mbox);
+> > +		complete(&wkup_m3_sync);
+> > +		break;
+> > +	case M3_STATE_MSG_FOR_LP:
+> > +		omap_mbox_msg_rx_flush(wkup_m3->mbox);
+> > +		complete(&wkup_m3_sync);
+> > +		break;
+> > +	case M3_STATE_UNKNOWN:
+> > +		pr_err("IRQ %d with WKUP_M3 in unknown state\n", irq);
+> > +		omap_mbox_msg_rx_flush(wkup_m3->mbox);
+> > +		return IRQ_NONE;
+> > +	}
+> > +
+> > +	omap_ctrl_writel(0x0, AM33XX_CONTROL_M3_TXEV_EOI);
+> 
+> undoumented magic write?
+> 
+
+Will fix. This is for re-arming the interrupt line.
+
+[...]
+
+> > +
+> > +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (!mem)
+> > +		dev_err(wkup_m3->dev, "no memory resource\n");
+> 
+> if !mem, this continues and still tries to ioremap NULL.
+> 
+
+Will fix the error path.
+
+[...]
+
+> > +
+> > +/*
+> > + * This a subset of registers defined in drivers/memory/emif.h
+> > + * Move that to include/linux/?
+> > + */
+> 
+> I'd probably suggest just moving the register definitions you
+> need into <plat/emif_plat.h> so they can be shared with the driver.
+> 
+> Also, the EMIF stuff would benefit greatly from using symbolic defines
+> for the values being written.  Probably having those in
+> <plat/emif_plat.h> would also help out here.
+> 
+> Or, maybe the EMIF driver can provide some self-contained stubs that can
+> be copied to OCP RAM for the functionality needed here?
+> 
+> Santosh, what do you think of that?
+> 
+
+[...]
+
+> Another user of the EMIF virtual addr is emif_self_refresh_dis, but I
+> don't see that code actually used anywhere.
+
+Will check and remove it.
+
+> 
+> Looking closer, now I see the ddr_self_refresh macro is using
+> emif_virt_addr (that macro should be fixed to take the base address, for
+> readability.)
+> 
+
+Ok.
+
+> On a related note, just a quick glance at all the code running out of
+> OCM RAM makes me wonder if any that could be done before jumping to OCM
+> RAM.  Ideally, we only want the absolute minimum running out of OCM RAM.
+> 
+
+Some of the EMIF register saves could perhaps be moved in C but I kept it
+in assembly to be consistent with the resume sequence for the case where
+WFI ends up as NOP and the normal resume path.
+
+[...]
+
+> > +
+> > +/* replicated define because linux/bitops.h cannot be included in assembly */
+> > +#define BIT(nr)		(1 << (nr))
+> 
+> never used, just remove it.  Using shifts as below is fine (but using
+> symbolic constants would be even better.)
+
+I recall using it one place. Looks like I got rid of it after all.
+
+> 
+> In fact, there are lots of magic constants in this code that I'd like
+> to see #defined.
+> 
+
+Ok.
+
+> [...]
+> 
+> > +	wfi
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> > +	nop
+> 
+> Why all the nops?  Some comments would be helpful there.
+> 
+
+That was for the A8 pipeline. Will add a comment.
+
+> [...]
+> 
+> > +/* Values recommended by the HW team */
+> 
+> A little documentation of these values would be helpful here.
+> 
+
+Ok.
+
+Thanks,
+Vaibhav
+
+[1] http://www.spinics.net/lists/linux-omap/msg80918.html
