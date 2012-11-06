@@ -1,44 +1,81 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 06 Nov 2012 23:55:54 +0100
-Subject: [PATCH V2 1/4] arm: mvebu: increase atomic coherent pool size
- for armada 370/XP
-In-Reply-To: <20121106223257.GB30428@lunn.ch>
-References: <5099810D.9040902@web.de> <20121106223257.GB30428@lunn.ch>
-Message-ID: <5099957A.4020404@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 06 Nov 2012 16:59:15 -0600
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <20121106221437.GQ28327@n2100.arm.linux.org.uk>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <201211061733.44781.arnd@arndb.de>
+ <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
+ <201211062114.49933.arnd@arndb.de>
+ <20121106221437.GQ28327@n2100.arm.linux.org.uk>
+Message-ID: <50999643.4010206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 11:32 PM, Andrew Lunn wrote:
-> On Tue, Nov 06, 2012 at 10:28:45PM +0100, S?ren Moch wrote:
->> I see a regression from linux-3.5 to linux-3.6 and think there might
->> be a fundamental problem
->> with this patch. On my Kirkwood system (guruplug server plus) with
->> linux-3.6.2 I see following
->> errors and corresponding malfunction even with further increased
->> (2M, 4M) pool size:
->>
->> Oct 19 00:41:22 guru kernel: ERROR: 4096 KiB atomic DMA coherent
->> pool is too small!
->> Oct 19 00:41:22 guru kernel: Please increase it with coherent_pool=
->> kernel parameter!
->>
->> So I had to downgrade to linux-3.5 which is running without problems.
->>
->> I use SATA and several DVB sticks (em28xx / drxk and dib0700).
->
-> I'm guess its the DVB sticks which are causing the problems. We have a
-> number of kirkwood devices with two SATA devices which had problems
-> until we extended the coherent_pool. The DVB sticks are probably take
-> more coherent RAM. There was also an issue found recently:
->
-> http://www.spinics.net/lists/arm-kernel/msg203962.html
->
-> That conversation has gone quiet, but that could be because the
-> participants are at ELCE.
+On 11/06/2012 04:14 PM, Russell King - ARM Linux wrote:
+> On Tue, Nov 06, 2012 at 09:14:49PM +0000, Arnd Bergmann wrote:
+>> The other point is being able to build such a kernel, and this is what Will
+>> seems to be interested in more. We have made VEXPRESS depend on
+>> MULTIPLATFORM, which broke support for building a non-MMU vexpress kernel,
+>> and I think we should fix that. The two options are either to make
+>> vexpress be single-platform when building for !MMU, or to allow multiplatform
+>> kernels to be built without MMU support in principle. I think the second
+>> option is more logical and avoids complex Kconfig constructs.
+> 
+> The other thing here is... why does a platform which _was_ able to be
+> built in isolation from every other platform suddenly become incapable
+> of being so when they join the multiplatform conglomerate?  This just
+> sounds totally perverse and wrong.
 
-So what is the call here? Should we just increase the coherent buffer
-size back to what it was before? I am not into this too much but just
-increasing the buffer will just postpone the actual issue to a later
-point in running the kernel?
+Arnd and I discussed this some at Connect regarding VExpress being
+selected. This is only to prevent the warning that no machine is enabled
+in a randconfig or user error case. We could simply remove this error or
+make it a warning instead. Then selecting a single platform is a matter
+of only selecting 1 platform.
 
-Sebastian
+> Surely it should be: platforms _not_ yet converted to multiplatform
+> can't be selected with multi-platform support enabled?
+> 
+> So, maybe the _proper_ solution here is:
+> 
+> - change the big choice to be: config SINGLE_xxx
+>   - these select config MACH_FOO / PLAT_FOO / ARCH_FOO
+>   eg,
+> 	config SINGLE_FOO
+> 		bool "Support for foo platforms in single kernel"
+> 		select MACH_FOO
+> - add a final option: config MULTIPLATFORM
+> - then add:
+> 
+> config MULTI_FOO
+> 	bool "Include support for foo platforms"
+> 	select MACH_FOO
+> 	depends on MULTIPLATFORM || !MMU
+> ...
+> 
+> config MACH_FOO
+> 	bool
+> 
+
+I'd rather see less xxx_FOO config symbols rather than more.
+
+Wouldn't this break defconfigs?
+
+Rob
+
+> Now, we don't _have_ to have the single and multi variants if they aren't
+> appropriate for the platform, but we can cover all the cases: a platform
+> where it's part of the multi-platform kernel when built for MMU, but is
+> incapable of being a multi-platform kernel when built without MMU.
+> 
+> And we can do it without _too_ much Kconfig pain, and certainly without
+> having to delve into anything beyond arch/arm/Kconfig.
+> 
+> I'd suggest at that point we separate out this stuff into a separate
+> file - arch/arm/Kconfig.mach, which contains all the platform selection
+> stuff.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
