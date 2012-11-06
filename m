@@ -1,54 +1,51 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 6 Nov 2012 13:46:58 +0000
-Subject: [PATCH 08/15] ARM: OMAP2+: hwmod: Fix the omap_hwmod_addr_space
- for CPGMAC0
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB64336@DBDE01.ent.ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-9-git-send-email-vaibhav.bedia@ti.com>
- <509543E8.60209@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC00B9B@DBDE01.ent.ti.com>
- <5098D889.60909@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC049E4@DBDE01.ent.ti.com>
- <79CD15C6BA57404B839C016229A409A83EB64336@DBDE01.ent.ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC05260@DBDE01.ent.ti.com>
+From: anilkumar@ti.com (AnilKumar Ch)
+Date: Tue, 6 Nov 2012 19:18:30 +0530
+Subject: [PATCH RESEND 02/10] ARM: dts: AM33XX: Add matrix keypad device tree
+ data to am335x-evm
+In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
+References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
+Message-ID: <1352209718-5586-3-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 18:38:08, Hiremath, Vaibhav wrote:
-> On Tue, Nov 06, 2012 at 15:39:14, Bedia, Vaibhav wrote:
-> > On Tue, Nov 06, 2012 at 14:59:45, Hiremath, Vaibhav wrote:
-> > [...]
-> > > > 
-> > > > Ok I checked this one. The change I made was indirectly fixing another
-> > > > issue with the AM33xx hwmod data. am33xx_cpgmac0_addr_space[] has two
-> > > > entries and the SYSC register is part of the second entry. The function
-> > > > _find_mpu_rt_addr_space in omap_hwmod.c looks for the first entry with
-> > > > the flag ADDR_TYPE_RT flag. The change I made indirectly made the second
-> > > > entry in am33xx_cpgmac0_addr_space[] become the first memory space with
-> > > > the ADDR_TYPE_RT flag. Due to this the hwmod code wrote to the correct
-> > > > SYSC address of CPGMAC0 and the IP went to standby during bootup. 
-> > > > After changing the order of the entries in am33xx_cpgmac0_addr_space[]
-> > > > things work fine.
-> > > > 
-> > > 
-> > > Good catch.
-> > > 
-> > > Just a side note on this, driver expects the addresses in this order
-> > > only, first SS and then WR.
-> > > 
-> > 
-> > Sorry I didn't understand your comment. For HWMOD code to work as expected,
-> > we need to change the order. 
-> 
-> Why do you want to change the order? Just specify "ADDR_TYPE_RT", that 
-> should be it.
-> 
+Add matrix keypad device tree data to am335x-evm by adding all
+the necessary parameters like keymap, row & column gpios and etc.
 
-The problem is that the memory space without the SYSC comes first and is labeled
-as ADDR_TYPE_RT. I think this is not correct and hence either we change the order
-or remove the flag from the first entry. If we do the latter then taking the logic
-of putting in the flag only for memory spaces with SYSC further we need to fixup
-the entries for ephrpwm0/1/2 and ecap0/1/2.
+Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
+---
+ arch/arm/boot/dts/am335x-evm.dts |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Regards,
-Vaibhav 
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 9199456..8076e66 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -110,6 +110,26 @@
+ 		regulator-name = "lis3_reg";
+ 		regulator-boot-on;
+ 	};
++
++	matrix_keypad: matrix_keypad at 0 {
++		compatible = "gpio-matrix-keypad";
++		debounce-delay-ms = <5>;
++		col-scan-delay-us = <2>;
++
++		row-gpios = <&gpio2 25 0	/* Bank1, pin25 */
++			     &gpio2 26 0	/* Bank1, pin26 */
++			     &gpio2 27 0>;	/* Bank1, pin27 */
++
++		col-gpios = <&gpio2 21 0	/* Bank1, pin21 */
++			     &gpio2 22 0>;	/* Bank1, pin22 */
++
++		linux,keymap = <0x0000008b	/* MENU */
++				0x0100009e	/* BACK */
++				0x02000069	/* LEFT */
++				0x0001006a	/* RIGHT */
++				0x0101001c	/* ENTER */
++				0x0201006c>;	/* DOWN */
++	};
+ };
+ 
+ /include/ "tps65910.dtsi"
+-- 
+1.7.9.5
