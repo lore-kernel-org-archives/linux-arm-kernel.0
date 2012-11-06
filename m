@@ -1,53 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 14:08:34 -0800
-Subject: [GIT PULL] ARM: OMAP: second set of PRCM cleanups for 3.8
-In-Reply-To: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
-Message-ID: <20121106220833.GQ6801@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Nov 2012 22:08:47 +0000
+Subject: [GIT PULL] Calxeda ECX-2000 support
+In-Reply-To: <50996725.2090003@gmail.com>
+References: <50917936.2030405@gmail.com>
+ <20121106191819.GA11353@quad.lixom.net> <50996725.2090003@gmail.com>
+Message-ID: <201211062208.47390.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121101 05:18]:
-> Hi Tony
+On Tuesday 06 November 2012, Rob Herring wrote:
+> On 11/06/2012 01:18 PM, Olof Johansson wrote:
+> > The addition of include of core.h in sysregs.h gives me a build error on
+> > multi_v7_defconfig due to missing guard ifdefs. I've added the following
+> > patch on top of your branch.
+> > 
+> Thanks, I didn't see that in my tree because I have follow-on patches
+> removing this based on the DEBUG_LL clean-up. Now that the dependency
+> from Stephen is in your tree, I need to send that to you as well.
 > 
-> The following changes since commit 7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33:
-> 
->   Merge branch 'omap-for-v3.8/cleanup-headers' into omap-for-v3.8/cleanup-prcm (2012-10-26 13:32:22 -0700)
-> 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-b-for-3.8
-> 
-> for you to fetch changes up to f17d60d20eb8e679cdd1e9d507394237e58ce0d8:
 
-Tried pulling but..
+I've just added another patch on top to get around a build warning:
 
-> These patches remove the use of omap_prcm_get_reset_sources() from the
-> OMAP watchdog driver, and remove mach-omap2/prcm.c and
-> plat-omap/include/plat/prcm.h.
-> 
-> Basic test logs for this branch on top of Tony's cleanup-prcm branch
-> at commit 7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33 are here:
-> 
->     http://www.pwsan.com/omap/testlogs/prcm_cleanup_b_3.8/20121101044824/
-> 
-> However, cleanup-prcm at 7fc54fd3 does not build for several
-> Kconfigs here and doesn't include some fixes that are needed for
-> a successful test.  With several reverts, fixes, and workarounds
-> applied, the following test logs were obtained:
+>From 5bd09fb0336aa4020b85f13e16a4d21e3f5f70c3 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 6 Nov 2012 23:02:27 +0100
+Subject: [PATCH] ARM: smp_twd: fix build warning
 
-..now wondering which configs do not build for you at 7fc54fd3?
+0336517b38c "ARM: smp_twd: don't warn on no DT node" introduced
+a silly build warning by returning an error from a void function.
+This keeps the intention of that patch but fixes the warning by
+removing the error code
 
-It builds at least all my test configs. Well at least the ones
-I have recovered after accidentally deleting some files yesterday,
-did not have a back up copy of two of them.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-However if I pull your branch in, build breaks for me for
-with the rmk-omap3430-ldp-noconfig and rmk-omap4430-sdp-noconfig:
-
-arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x48): undefined reference to `omap44xx_restart'
-
-Regards,
-
-Tony
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 6ec73f9..999aa48 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -367,7 +367,7 @@ void __init twd_local_timer_of_register(void)
+ 
+ 	np = of_find_matching_node(NULL, twd_of_match);
+ 	if (!np)
+-		return -ENODEV;
++		return;
+ 
+ 	twd_ppi = irq_of_parse_and_map(np, 0);
+ 	if (!twd_ppi) {
