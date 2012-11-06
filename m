@@ -1,34 +1,35 @@
-From: smuckle@codeaurora.org (Steve Muckle)
-Date: Tue, 06 Nov 2012 12:24:20 -0800
-Subject: ARM: idle sleep time for hotplugged cpu
-In-Reply-To: <20121105091533.GB28327@n2100.arm.linux.org.uk>
-References: <50973842.9010708@codeaurora.org>
- <20121105091533.GB28327@n2100.arm.linux.org.uk>
-Message-ID: <509971F4.4060604@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 6 Nov 2012 20:35:58 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <20121106183444.GJ30931@mudshark.cambridge.arm.com>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <201211061733.44781.arnd@arndb.de>
+ <20121106183444.GJ30931@mudshark.cambridge.arm.com>
+Message-ID: <201211062035.58250.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/12 01:15, Russell King - ARM Linux wrote:
-> On Mon, Nov 05, 2012 at 09:23:38AM +0530, Taniya Das wrote:
->> I was looking at the arch/arm/process.c:cpu_die, I was wondering why we
->> do not exit from NOHZ for a hotplugged/offline cpu?
+On Tuesday 06 November 2012, Will Deacon wrote:
+>     ARM: nommu: remove MMU dependency from ARCH_MULTIPLATFORM
+>     
+>     ARCH_MULTIPLATFORM is the only way to select ARCH_VEXPRESS, so remove
+>     the dependency on MMU and instead use it to predicate the selection of
+>     ARM_PATCH_PHYS_VIRT.
+>     
+>     Although running a multi-platform kernel on a selection of MMU-less
+>     targets might not yet be possible, the thing should build and targetting
+>     a nommu platform is already a fairly involved exercise.
+>     
+>     Cc: Arnd Bergmann <arnd@arndb.de>
+>     Cc: Pawel Moll <Pawel.Moll@arm.com>
+>     Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> Offlined CPUs are not supposed to just 'return' from cpu_die(), and
-> in actual fact they can't.
 
-Although an offline CPU will not come back into the idle thread by
-returning from cpu_die(), I believe the question about exiting nohz mode
-before cpu_die() still stands.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
->From arch/arm/process.c:cpu_idle() it appears a CPU could enter
-pm_idle() for a while (in nohz mode), then execute the inner loop again
-and call cpu_die(). Is there the potential for cpu idle time accounting
-to get messed up here by not exiting nohz mode prior to the cpu dying,
-so that missed ticks from nohz are properly accounted for?
+Before we apply this, I should probably do a round of randconfig tests. Right now,
+I have a series that fixes all build errors we currently get from randconfig
+(which always selects MULTIPLATFORM since it doesn't randomize choice statements),
+but I am pretty sure that adding NOMMU into the mix gives us a lot of new errors.
 
-thanks,
-Steve
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+	Arnd
