@@ -1,50 +1,94 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Nov 2012 14:15:44 +0100
-Subject: [PATCH 6/9] ARM: ux500: cosmetic fixups for uart0
-Message-ID: <1352207744-7991-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 6 Nov 2012 14:15:52 +0100
+Subject: [PATCH 7/9] ARM: ux500: 8500: add pinctrl support for uart1 and uart2
+Message-ID: <1352207752-8026-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-Changed a comment and ordered BIAS defines around a bit.
+This adds pin mappings for UART1 and UART2.
 
 Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500-pins.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/board-mop500-pins.c | 34 +++++++++++++++++++++++----------
+ 1 file changed, 24 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 662563a..0009ca2 100644
+index 0009ca2..05102ad 100644
 --- a/arch/arm/mach-ux500/board-mop500-pins.c
 +++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -51,8 +51,6 @@ BIAS(slpm_in_wkup_pdis, PIN_SLEEPMODE_ENABLED|
- 	PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_wkup_pdis, PIN_SLEEPMODE_ENABLED|
- 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
--BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|
--	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_out_lo_pdis, PIN_SLEEPMODE_ENABLED|
- 	PIN_SLPM_OUTPUT_LOW|PIN_SLPM_WAKEUP_DISABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_out_lo_wkup, PIN_SLEEPMODE_ENABLED|
-@@ -65,6 +63,8 @@ BIAS(slpm_in_nopull_wkup_pdis, PIN_SLEEPMODE_ENABLED|
- 	PIN_SLPM_INPUT_NOPULL|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(slpm_in_pu_wkup_pdis_en, PIN_SLEEPMODE_ENABLED|PIN_SLPM_INPUT_PULLUP|
- 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_ENABLED);
-+BIAS(slpm_out_wkup_pdis, PIN_SLEEPMODE_ENABLED|
-+	PIN_SLPM_DIR_OUTPUT|PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(out_lo_wkup_pdis, PIN_SLPM_OUTPUT_LOW|
- 	PIN_SLPM_WAKEUP_ENABLE|PIN_SLPM_PDIS_DISABLED);
- BIAS(in_wkup_pdis_en, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
-@@ -156,7 +156,7 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_PIN("GPIO1_AJ3", out_hi, "uart0"), /* RTS */
- 	DB8500_PIN("GPIO2_AH4", in_pu, "uart0"), /* RXD */
- 	DB8500_PIN("GPIO3_AH3", out_hi, "uart0"), /* TXD */
--	/* UART0 sleep state */
-+	/* Sleep state for UART0 */
- 	DB8500_PIN_SLEEP("GPIO0_AJ5", slpm_in_wkup_pdis, "uart0"),
+@@ -71,6 +71,10 @@ BIAS(in_wkup_pdis_en, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
+ 	PIN_SLPM_PDIS_ENABLED);
+ BIAS(in_wkup_pdis, PIN_SLPM_DIR_INPUT|PIN_SLPM_WAKEUP_ENABLE|
+ 	PIN_SLPM_PDIS_DISABLED);
++BIAS(out_hi_wkup_pdis, PIN_SLPM_OUTPUT_HIGH|PIN_SLPM_WAKEUP_ENABLE|
++	PIN_SLPM_PDIS_DISABLED);
++BIAS(out_wkup_pdis, PIN_SLPM_DIR_OUTPUT|PIN_SLPM_WAKEUP_ENABLE|
++	PIN_SLPM_PDIS_DISABLED);
+ 
+ /* We use these to define hog settings that are always done on boot */
+ #define DB8500_MUX_HOG(group,func) \
+@@ -128,7 +132,7 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	 * UART0, we do not mux in u0 here.
+ 	 * uart-0 pins gpio configuration should be kept intact to prevent
+ 	 * a glitch in tx line when the tty dev is opened. Later these pins
+-	 * are configured to uart mop500_pins_uart0
++	 * are configured by uart driver
+ 	 */
+ 	DB8500_PIN_HOG("GPIO0_AJ5", in_pu), /* CTS */
+ 	DB8500_PIN_HOG("GPIO1_AJ3", out_hi), /* RTS */
+@@ -139,12 +143,18 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	 * TODO: is this used on U8500 variants and Snowball really?
+ 	 * The setting on GPIO31 conflicts with magnetometer use on hrefv60
+ 	 */
+-	DB8500_MUX_HOG("u2rxtx_c_1", "u2"),
+-	DB8500_MUX_HOG("u2ctsrts_c_1", "u2"),
+-	DB8500_PIN_HOG("GPIO29_W2", in_pu), /* RXD */
+-	DB8500_PIN_HOG("GPIO30_W3", out_hi), /* TXD */
+-	DB8500_PIN_HOG("GPIO31_V3", in_pu), /* CTS */
+-	DB8500_PIN_HOG("GPIO32_V2", out_hi), /* RTS */
++	/* default state for UART2 */
++	DB8500_MUX("u2ctsrts_c_1", "u2", "uart2"),
++	DB8500_PIN("GPIO31_V3", in_pu, "uart2"), /* CTS */
++	DB8500_PIN("GPIO32_V2", out_hi, "uart2"), /* RTS */
++	DB8500_MUX("u2rxtx_c_1", "u2", "uart2"),
++	DB8500_PIN("GPIO29_W2", in_pu, "uart2"), /* RXD */
++	DB8500_PIN("GPIO30_W3", out_hi, "uart2"), /* TXD */
++	/* Sleep state for UART2 */
++	DB8500_PIN_SLEEP("GPIO31_V3", in_wkup_pdis, "uart2"),
++	DB8500_PIN_SLEEP("GPIO32_V2", out_hi_wkup_pdis, "uart2"),
++	DB8500_PIN_SLEEP("GPIO29_W2", in_wkup_pdis, "uart2"),
++	DB8500_PIN_SLEEP("GPIO30_W3", out_wkup_pdis, "uart2"),
+ 	/*
+ 	 * The following pin sets were known as "runtime pins" before being
+ 	 * converted to the pinctrl model. Here we model them as "default"
+@@ -161,6 +171,13 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
  	DB8500_PIN_SLEEP("GPIO1_AJ3", slpm_out_hi_wkup_pdis, "uart0"),
  	DB8500_PIN_SLEEP("GPIO2_AH4", slpm_in_wkup_pdis, "uart0"),
+ 	DB8500_PIN_SLEEP("GPIO3_AH3", slpm_out_wkup_pdis, "uart0"),
++	/* Mux in UART1 after initialization */
++	DB8500_MUX("u1rxtx_a_1", "u1", "uart1"),
++	DB8500_PIN("GPIO4_AH6", in_pu, "uart1"), /* RXD */
++	DB8500_PIN("GPIO5_AG6", out_hi, "uart1"), /* TXD */
++	/* Sleep state for UART1 */
++	DB8500_PIN_SLEEP("GPIO4_AH6", slpm_in_wkup_pdis, "uart1"),
++	DB8500_PIN_SLEEP("GPIO5_AG6", slpm_out_wkup_pdis, "uart1"),
+ 	/* MSP1 for ALSA codec */
+ 	DB8500_MUX("msp1txrx_a_1", "msp1", "ux500-msp-i2s.1"),
+ 	DB8500_MUX("msp1_a_1", "msp1", "ux500-msp-i2s.1"),
+@@ -374,11 +391,8 @@ static struct pinctrl_map __initdata mop500_pinmap[] = {
+ 	DB8500_PIN_HOG("GPIO217_AH12", gpio_in_pu),
+ 	/* Mux in UART1 and set the pull-ups */
+ 	DB8500_MUX_HOG("u1rxtx_a_1", "u1"),
+-	DB8500_MUX_HOG("u1ctsrts_a_1", "u1"),
+ 	DB8500_PIN_HOG("GPIO4_AH6", in_pu), /* RXD */
+ 	DB8500_PIN_HOG("GPIO5_AG6", out_hi), /* TXD */
+-	DB8500_PIN_HOG("GPIO6_AF6", in_pu), /* CTS */
+-	DB8500_PIN_HOG("GPIO7_AG5", out_hi), /* RTS */
+ 	/*
+ 	 * Runtime stuff: make it possible to mux in the SKE keypad
+ 	 * and bias the pins
 -- 
 1.7.11.3
