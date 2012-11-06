@@ -1,65 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Nov 2012 22:55:25 +0100
-Subject: [PATCH 0/8] warning fixes for v3.7-rc4
-Message-ID: <1352238933-4886-1-git-send-email-arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 6 Nov 2012 15:57:17 -0600
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+Message-ID: <509987BD.8090800@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On Tuesday 06 November 2012 03:12 PM, Nicolas Pitre wrote:
+>
+> ... instead of flush_cache_all().  The later unconditionally flushes
+> the L2 cache on ARMv7 architectures such as Cortex A15 and A7 which
+> is costly and unnecessary in some scenarios where setup_mm_for_reboot()
+> is used.  If L2 has to be flushed as well, it should already be done
+> separately on other architectures anyway.
+>
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+>
+> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+> index ab88ed4f8e..2c61085a10 100644
+> --- a/arch/arm/mm/idmap.c
+> +++ b/arch/arm/mm/idmap.c
+> @@ -104,7 +104,7 @@ early_initcall(init_static_idmap);
+>   void setup_mm_for_reboot(void)
+>   {
+>   	/* Clean and invalidate L1. */
+> -	flush_cache_all();
+> +	flush_cache_louis();
+>
+>   	/* Switch to the identity mapping. */
+>   	cpu_switch_mm(idmap_pgd, &init_mm);
+>
+Nice. Just one difference is that the I-cache invalidation won't
+happen with this change. Not that it is needed here but capturing
+that in change-log would be good.
 
-Here are a few patches for remaining or newly introduced build
-warnings in the ARM defconfig builds. The MTD patches have
-been around for some time, but I had not submitted them because
-I had to redo most of them first.
-
-The only build error in this series is the exynos drm patch,
-which is a very recent regression.
-
-Please apply in to the respective maintainer trees.
-
-	Arnd
-
-Arnd Bergmann (8):
-  mtd: diskonchip: don't warn about ARM architecture
-  mtd: diskonchip: use inline functions for DocRead/DocWrite
-  mtd: uninitialized variable warning in map.h
-  sched: warnings in kernel/sched/fair.c
-  mmc: dw_mmc: fix modular build for exynos back-end
-  mmc: dw_mmc: constify dw_mci_idmac_ops in exynos back-end
-  ata: highbank: mark ahci_highbank_probe as __devinit
-  drm/exynos: don't include plat/gpio-cfg.h
-
- drivers/ata/sata_highbank.c          |    2 +-
- drivers/gpu/drm/exynos/exynos_hdmi.c |    1 -
- drivers/mmc/host/dw_mmc-exynos.c     |    8 ++++----
- drivers/mmc/host/dw_mmc-pltfm.c      |    2 +-
- drivers/mmc/host/dw_mmc-pltfm.h      |    2 +-
- drivers/mmc/host/dw_mmc.c            |    2 +-
- drivers/mtd/devices/docprobe.c       |    2 --
- drivers/mtd/nand/diskonchip.c        |    2 --
- include/linux/mmc/dw_mmc.h           |    4 ++--
- include/linux/mtd/doc2000.h          |   22 ++++++++++++++++++----
- include/linux/mtd/map.h              |    2 +-
- kernel/sched/fair.c                  |    2 +-
- 12 files changed, 30 insertions(+), 21 deletions(-)
-
-
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Jeff Garzik <jgarzik@redhat.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
-Cc: Paul Turner <pjt@google.com>
-Cc: Peter Boonstoppel <pboonstoppel@nvidia.com>
-Cc: Peter Zijlstra <a.p.zijlstra@chello.nl>
-Cc: Rahul Sharma <rahul.sharma@samsung.com>
-Cc: Rob Clark <rob@ti.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Will Newton <will.newton@imgtec.com>
-Cc: linux-mtd at lists.infradead.org
--- 
-1.7.10
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
