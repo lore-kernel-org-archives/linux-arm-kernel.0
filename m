@@ -1,68 +1,47 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Tue, 06 Nov 2012 23:30:44 +0100
-Subject: scheduler clock for MXS
-In-Reply-To: <20121106202038.GB32398@n2100.arm.linux.org.uk>
-References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
- <20121105025753.GA26528@S2100-06.ap.freescale.net>
- <50978370.9060001@meduna.org>
- <20121105134655.GB27260@S2100-06.ap.freescale.net>
- <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
- <5098CB9F.9030401@meduna.org>
- <20121106134630.GD27643@S2100-06.ap.freescale.net>
- <20121106202038.GB32398@n2100.arm.linux.org.uk>
-Message-ID: <50998F94.8000908@meduna.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 6 Nov 2012 23:32:57 +0100
+Subject: [PATCH V2 1/4] arm: mvebu: increase atomic coherent pool size
+ for armada 370/XP
+In-Reply-To: <5099810D.9040902@web.de>
+References: <5099810D.9040902@web.de>
+Message-ID: <20121106223257.GB30428@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.11.2012 21:20, Russell King - ARM Linux wrote:
-
->> With the change, it still wraps at 2 seconds.
+On Tue, Nov 06, 2012 at 10:28:45PM +0100, S?ren Moch wrote:
+> resent as plain text, sorry.
 > 
-> And there's no way that such a change could ever go into mainline; it
-> can mean that the timer is registered into the timer subsystem before
-> the timer subsystem has been initialised.  That's why we postpone that
-> part to time_init().
+> 
+> > For Armada 370/XP we have the same problem that for the commit
+> > cb01b63, so we applied the same solution: "The default 256 KiB
+> > coherent pool may be too small for some of the Kirkwood devices, so
+> > increase it to make sure that devices will be able to allocate their
+> > buffers with GFP_ATOMIC flag"
+> 
+> I see a regression from linux-3.5 to linux-3.6 and think there might
+> be a fundamental problem
+> with this patch. On my Kirkwood system (guruplug server plus) with
+> linux-3.6.2 I see following
+> errors and corresponding malfunction even with further increased
+> (2M, 4M) pool size:
+> 
+> Oct 19 00:41:22 guru kernel: ERROR: 4096 KiB atomic DMA coherent
+> pool is too small!
+> Oct 19 00:41:22 guru kernel: Please increase it with coherent_pool=
+> kernel parameter!
+> 
+> So I had to downgrade to linux-3.5 which is running without problems.
+> 
+> I use SATA and several DVB sticks (em28xx / drxk and dib0700).
 
-Sure, I just wanted to quick-check whether it helps or not, this was
-not meant as a solution for anything.
+I'm guess its the DVB sticks which are causing the problems. We have a
+number of kirkwood devices with two SATA devices which had problems
+until we extended the coherent_pool. The DVB sticks are probably take
+more coherent RAM. There was also an issue found recently:
 
-This gets interesting. The same code on slightly different hardware
-(but using same source files), just 32-bits so it wraps around after
-~1,5 days:
+http://www.spinics.net/lists/arm-kernel/msg203962.html
 
-sched_clock: 32 bits at 32kHz, resolution 31250ns,
-  wraps every 134217727ms
+That conversation has gone quiet, but that could be because the
+participants are at ELCE.
 
-works without problem here:
-  [134919.008468] PHY: imx28-fec-1:00 - Link is Up - 100/Full
-
-(134919 > 134217).
-
-The only difference is 32 bits instead of 16 and a different
-function to read the hardware.
-
-> Well.  I just tried an experiment with OMAP4:
-> [    0.000000] sched_clock: 16 bits at 32kHz, resolution 30517ns,
-wraps every 1999ms
-> ...
-> [    3.070404] Freeing init memory: 192K
-
-
-OK, so it is not a 16-bit problem either. So where is the
-difference? Could it be that HZ / NO_HZ is playing some
-tricks here and need to be taken into consideration?
-
-I'll try to artificially limit the counter-reading function
-on my hardware to 16 bits and look whether I can also
-reproduce this - probably on Thursday or Friday earliest
-(busy with other tasks now).
-
-If it works I'll resubmit for only the iMX.28 and someone
-who actually has the iMX.23 hardware to experiment with has
-to look at it; the best start is probably to start with
-comparing it to the working OMAP4. If it does not I'll
-try to find the culprit.
-
-Thanks
--- 
-                                    Stano
+	     Andrew
