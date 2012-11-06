@@ -1,50 +1,62 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:33 +0530
-Subject: [PATCH RESEND 05/10] ARM: dts: AM33XX: Add pinmux configuration for
- user-leds to BONE
+Date: Tue, 6 Nov 2012 19:18:36 +0530
+Subject: [PATCH RESEND 08/10] ARM: dts: AM33XX: Add user-leds device tree data
+ to am335x-evmsk
 In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
 References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-6-git-send-email-anilkumar@ti.com>
+Message-ID: <1352209718-5586-9-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for gpio based user-keys to am335x-bone.
-In this patch, only single named mode/state is added and these pins
-are configured during pinctrl driver initialization.
-
-Default mode is nothing but the values required for the module during
-active state. With this configurations module is functional as
-expected.
+Add gpio-leds device tree data to am335x-evmsk device to enable gpio
+based user-leds (USR0, USR1, USR2 and USR3) present on am335x starter
+kit.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/am335x-evmsk.dts |   30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index 91eee97..1aac58b 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -24,6 +24,20 @@
- 		reg = <0x80000000 0x10000000>; /* 256 MB */
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 659ec5b..7262fa8 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -100,6 +100,36 @@
+ 		regulator-name = "lis3_reg";
+ 		regulator-boot-on;
  	};
- 
-+	am33xx_pinmux: pinmux at 44e10800 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&user_leds_s0>;
 +
-+		user_leds_s0: user_leds_s0 {
-+			pinctrl-single,pins = <
-+				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-+				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-+				0x5c 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-+				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-+			>;
++	leds {
++		compatible = "gpio-leds";
++
++		led at 1 {
++			label = "evmsk:green:usr0";
++			gpios = <&gpio2 4 0>;
++			default-state = "off";
++		};
++
++		led at 2 {
++			label = "evmsk:green:usr1";
++			gpios = <&gpio2 5 0>;
++			default-state = "off";
++		};
++
++		led at 3 {
++			label = "evmsk:green:mmc0";
++			gpios = <&gpio2 6 0>;
++			linux,default-trigger = "mmc0";
++			default-state = "off";
++		};
++
++		led at 4 {
++			label = "evmsk:green:heartbeat";
++			gpios = <&gpio2 7 0>;
++			linux,default-trigger = "heartbeat";
++			default-state = "off";
 +		};
 +	};
-+
- 	ocp {
- 		uart1: serial at 44e09000 {
- 			status = "okay";
+ };
+ 
+ /include/ "tps65910.dtsi"
 -- 
 1.7.9.5
