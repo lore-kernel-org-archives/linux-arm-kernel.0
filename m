@@ -1,66 +1,26 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 06 Nov 2012 10:18:37 +0530
-Subject: [PATCH V3 5/5] ARM: Exynos: Avoid passing the clks through platform
- data
-In-Reply-To: <1352177317-16395-1-git-send-email-padma.v@samsung.com>
-References: <1352177317-16395-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1352177317-16395-6-git-send-email-padma.v@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 6 Nov 2012 13:50:36 +0900
+Subject: [GIT PULL v3] Renesas ARM-based SoC for v3.8
+In-Reply-To: <509895C3.2020109@renesas.com>
+References: <1351730513-2952-1-git-send-email-horms@verge.net.au>
+ <20121106023224.GO2944@verge.net.au>
+ <CABMQnVJ+6CHCfwiZ8n5xKmCfL7jW=TYHC8_cU6N1uMw7MysfQg@mail.gmail.com>
+ <20121106041242.GS2944@verge.net.au> <509895C3.2020109@renesas.com>
+Message-ID: <20121106045035.GB30574@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I2S controller has an internal mux for RCLK source clks. The list
-of source clk names were passed through platform data in non-dt case.
-The variable holding the list of RCLK source clk names is not
-required, as the list of clks need to be registered with clkdev
-using generic connection id. This is required as part of adding DT
-support for I2S controller driver.
+On Tue, Nov 06, 2012 at 01:44:51PM +0900, Nobuhiro Iwamatsu wrote:
+> Simon Horman ????????:
+> >On Tue, Nov 06, 2012 at 12:30:41PM +0900, Nobuhiro Iwamatsu wrote:
+> >>Hi, Simon.
+> >>
+> >>" ARM: shmobile: Remove SH7367 support"  includes an unnecessary patch.
+> >>I already sent a new patch.  Please update, if you still have time to apply.
+> >
+> >Sure, I can make an update. Is it only " ARM: shmobile: Remove SH7367 support"
+> >that needs to be refreshed?
+> >
+> Yes, I need "ARM: shmobile: Remove SH7367 support" patch only.
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/mach-exynos/dev-audio.c |   12 ------------
- 1 files changed, 0 insertions(+), 12 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
-index ae321c7..e7d46fd 100644
---- a/arch/arm/mach-exynos/dev-audio.c
-+++ b/arch/arm/mach-exynos/dev-audio.c
-@@ -23,11 +23,6 @@
- #include <mach/irqs.h>
- #include <mach/regs-audss.h>
- 
--static const char *rclksrc[] = {
--	[0] = "busclk",
--	[1] = "i2sclk",
--};
--
- static int exynos4_cfg_i2s(struct platform_device *pdev)
- {
- 	/* configure GPIO for i2s port */
-@@ -55,7 +50,6 @@ static struct s3c_audio_pdata i2sv5_pdata = {
- 		.i2s = {
- 			.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
- 					 | QUIRK_NEED_RSTCLR,
--			.src_clk = rclksrc,
- 			.idma_addr = EXYNOS4_AUDSS_INT_MEM,
- 		},
- 	},
-@@ -78,17 +72,11 @@ struct platform_device exynos4_device_i2s0 = {
- 	},
- };
- 
--static const char *rclksrc_v3[] = {
--	[0] = "sclk_i2s",
--	[1] = "no_such_clock",
--};
--
- static struct s3c_audio_pdata i2sv3_pdata = {
- 	.cfg_gpio = exynos4_cfg_i2s,
- 	.type = {
- 		.i2s = {
- 			.quirks = QUIRK_NO_MUXPSR,
--			.src_clk = rclksrc_v3,
- 		},
- 	},
- };
--- 
-1.7.4.4
+Got it, will do.
