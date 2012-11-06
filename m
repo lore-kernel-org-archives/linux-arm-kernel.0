@@ -1,164 +1,54 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 6 Nov 2012 17:59:35 -0500 (EST)
-Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
- interfaces
-In-Reply-To: <20121106221651.GE21764@mudshark.cambridge.arm.com>
-References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
- <20121106221651.GE21764@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1211061755260.21033@xanadu.home>
+From: smoch@web.de (=?ISO-8859-1?Q?S=F6ren_Moch?=)
+Date: Wed, 07 Nov 2012 00:07:01 +0100
+Subject: [PATCH V2 1/4] arm: mvebu: increase atomic coherent pool size
+ for armada 370/XP
+In-Reply-To: <20121106223257.GB30428@lunn.ch>
+References: <5099810D.9040902@web.de> <20121106223257.GB30428@lunn.ch>
+Message-ID: <50999815.4020701@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Nov 2012, Will Deacon wrote:
 
-> On Tue, Oct 16, 2012 at 02:21:48PM +0100, Lorenzo Pieralisi wrote:
-> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > 
-> > The GIC interface numbering does not necessarily follow the logical
-> > CPU numbering, especially for complex topologies such as multi-cluster
-> > systems.
-> > 
-> > Fortunately we can easily probe the GIC to create a mapping as the
-> > Interrupt Processor Targets Registers for the first 32 interrupts are
-> > read-only, and each field returns a value that always corresponds to
-> > the processor reading the register.
-> > 
-> > Initially all mappings target all CPUs in case an IPI is required to
-> > boot secondary CPUs.  It is refined as those CPUs discover what their
-> > actual mapping is.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> 
-> This is a really neat idea!
-> 
-> > ---
-> >  arch/arm/common/gic.c | 42 ++++++++++++++++++++++++++++++++++--------
-> >  1 file changed, 34 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-> > index aa52699..1338a55 100644
-> > --- a/arch/arm/common/gic.c
-> > +++ b/arch/arm/common/gic.c
-> > @@ -70,6 +70,13 @@ struct gic_chip_data {
-> >  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-> >  
-> >  /*
-> > + * The GIC mapping of CPU interfaces does not necessarily match
-> > + * the logical CPU numbering.  Let's use a mapping as returned
-> > + * by the GIC itself.
-> > + */
-> > +static u8 gic_cpu_map[8] __read_mostly;
-> 
-> Can we have a #define for the number CPUs supported by the GIC? It gets
-> used a fair amount in this patch for loop bounds etc.
+ >>> For Armada 370/XP we have the same problem that for the commit
+ >>> cb01b63, so we applied the same solution: "The default 256 KiB
+ >>> coherent pool may be too small for some of the Kirkwood devices, so
+ >>> increase it to make sure that devices will be able to allocate their
+ >>> buffers with GFP_ATOMIC flag"
+ >>
+ >> I see a regression from linux-3.5 to linux-3.6 and think there might
+ >> be a fundamental problem
+ >> with this patch. On my Kirkwood system (guruplug server plus) with
+ >> linux-3.6.2 I see following
+ >> errors and corresponding malfunction even with further increased
+ >> (2M, 4M) pool size:
+ >>
+ >> Oct 19 00:41:22 guru kernel: ERROR: 4096 KiB atomic DMA coherent
+ >> pool is too small!
+ >> Oct 19 00:41:22 guru kernel: Please increase it with coherent_pool=
+ >> kernel parameter!
+ >>
+ >> So I had to downgrade to linux-3.5 which is running without problems.
+ >>
+ >> I use SATA and several DVB sticks (em28xx / drxk and dib0700).
+ >
+ > I'm guess its the DVB sticks which are causing the problems. We have a
+ > number of kirkwood devices with two SATA devices which had problems
+ > until we extended the coherent_pool. The DVB sticks are probably take
+ > more coherent RAM. There was also an issue found recently:
+ >
+ > http://www.spinics.net/lists/arm-kernel/msg203962.html
+ >
+ > That conversation has gone quiet, but that could be because the
+ > participants are at ELCE.
+ >
+ >          Andrew
 
-Sure.  I'll respin the patch.
+OK, I hope this GFP flag correction will help.
 
-> 
-> > +/*
-> >   * Supported arch specific GIC irq extension.
-> >   * Default make them NULL.
-> >   */
-> > @@ -242,7 +249,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
-> >  		return -EINVAL;
-> >  
-> >  	mask = 0xff << shift;
-> > -	bit = 1 << (cpu_logical_map(cpu) + shift);
-> > +	bit = gic_cpu_map[cpu] << shift;
-> >  
-> >  	raw_spin_lock(&irq_controller_lock);
-> >  	val = readl_relaxed(reg) & ~mask;
-> > @@ -349,11 +356,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
-> >  	u32 cpumask;
-> >  	unsigned int gic_irqs = gic->gic_irqs;
-> >  	void __iomem *base = gic_data_dist_base(gic);
-> > -	u32 cpu = cpu_logical_map(smp_processor_id());
-> > -
-> > -	cpumask = 1 << cpu;
-> > -	cpumask |= cpumask << 8;
-> > -	cpumask |= cpumask << 16;
-> >  
-> >  	writel_relaxed(0, base + GIC_DIST_CTRL);
-> >  
-> > @@ -366,6 +368,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
-> >  	/*
-> >  	 * Set all global interrupts to this CPU only.
-> >  	 */
-> > +	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
-> >  	for (i = 32; i < gic_irqs; i += 4)
-> >  		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
-> >  
-> > @@ -389,9 +392,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
-> >  {
-> >  	void __iomem *dist_base = gic_data_dist_base(gic);
-> >  	void __iomem *base = gic_data_cpu_base(gic);
-> > +	unsigned int cpu_mask, cpu = smp_processor_id();
-> >  	int i;
-> >  
-> >  	/*
-> > +	 * Get what the GIC says our CPU mask is.
-> > +	 */
-> > +	BUG_ON(cpu >= 8);
-> > +	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
-> 
-> Making the mask a u8 and using readb_relaxed here makes this bit of code
-> clearer to me (and the GIC apparently allows such an access to this
-> register).
+Could there be a fragmentation problem in the coherent_pool with the
+different drivers running under heavy load?
+With a pool size of 1M I see this error after several minutes, with a 4M
+pool I see this error after several 10 minutes. Difficult to test, but not
+acceptable on a production system.
 
-Not always.  At least RTSM throws an exception if you do so.
-Been there.
-
-> > +	gic_cpu_map[cpu] = cpu_mask;
-> > +
-> > +	/*
-> > +	 * Clear our mask from the other map entries in case they're
-> > +	 * still undefined.
-> > +	 */
-> > +	for (i = 0; i < 8; i++)
-> > +		if (i != cpu)
-> > +			gic_cpu_map[i] &= ~cpu_mask;
-> > +
-> > +	/*
-> >  	 * Deal with the banked PPI and SGI interrupts - disable all
-> >  	 * PPI interrupts, ensure all SGI interrupts are enabled.
-> >  	 */
-> > @@ -646,7 +665,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >  {
-> >  	irq_hw_number_t hwirq_base;
-> >  	struct gic_chip_data *gic;
-> > -	int gic_irqs, irq_base;
-> > +	int gic_irqs, irq_base, i;
-> >  
-> >  	BUG_ON(gic_nr >= MAX_GIC_NR);
-> >  
-> > @@ -683,6 +702,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
-> >  	}
-> >  
-> >  	/*
-> > +	 * Initialize the CPU interface map to all CPUs.
-> > +	 * It will be refined as each CPU probes its ID.
-> > +	 */
-> > +	for (i = 0; i < 8; i++)
-> > +		gic_cpu_map[i] = 0xff;
-> > +
-> > +	/*
-> >  	 * For primary GICs, skip over SGIs.
-> >  	 * For secondary GICs, skip over PPIs, too.
-> >  	 */
-> > @@ -737,7 +763,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
-> >  
-> >  	/* Convert our logical CPU mask into a physical one. */
-> >  	for_each_cpu(cpu, mask)
-> > -		map |= 1 << cpu_logical_map(cpu);
-> > +		map |= gic_cpu_map[cpu];
-> >  
-> >  	/*
-> >  	 * Ensure that stores to Normal memory are visible to the
-> 
-> With those changes:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Will
-> 
+Soeren
