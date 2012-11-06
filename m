@@ -1,38 +1,50 @@
-From: jamie@shareable.org (Jamie Lokier)
-Date: Tue, 6 Nov 2012 23:46:53 +0000
-Subject: Building for MMU-less vexpress targets
-In-Reply-To: <alpine.LFD.2.02.1211061826090.21033@xanadu.home>
-References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
- <201211051908.34291.arnd@arndb.de>
- <20121106122011.GE29853@mudshark.cambridge.arm.com>
- <201211061733.44781.arnd@arndb.de>
- <alpine.LFD.2.02.1211061533490.21033@xanadu.home>
- <20121106225105.GD10187@jl-vm1.vm.bytemark.co.uk>
- <alpine.LFD.2.02.1211061826090.21033@xanadu.home>
-Message-ID: <20121106234653.GF10187@jl-vm1.vm.bytemark.co.uk>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 06 Nov 2012 15:47:36 -0800
+Subject: [GIT PULL] OMAP: PM: misc. fixes for v3.8
+Message-ID: <877gpy2t0n.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicolas Pitre wrote:
-> On Tue, 6 Nov 2012, Jamie Lokier wrote:
-> 
-> > Nicolas Pitre wrote:
-> > > I really think that it makes no sense at all to support !MMU kernels in 
-> > > a multi-platform kernel build, even if the set of included platforms 
-> > > were all !MMU.  The kernel has to be linked for the physical address of 
-> > > the target and not a common invariant virtual address.
-> > 
-> > Although there's likely to be approximately zero interest in
-> > multi-platform !MMU, relocating at boot time doesn't sound onerous,
-> > should it be needed.  x86 kernels already do that.  Maybe ARM kernels
-> > will eventually do that anyway for the same reason as x86.
-> 
-> We already have something similar but simpler: CONFIG_ARM_PATCH_PHYS_VIRT.
-> Except that the virtual address the kernel is using always remains the 
-> same, even if the physical address can move.  Although this is not the 
-> case at the moment, the ARM kdump implementation could take advantage of 
-> this ability and avoid the copying of memory around.
+Tony,
 
-I wonder why x86 didn't go that route.  Not that it matters.
+Here's a small series that fixes some errata to make suspend/resume
+work on OMAP4460.
 
--- Jamie
+This is not a regression and has been broken for awhile, so this is v3.8
+material, not v3.7.
+
+Kevin
+
+The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+
+  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.8-fixes-pm
+
+for you to fetch changes up to cd8ce159031813eb870a5f3d5b27c3be36cd6e3a:
+
+  ARM: OMAP4: retrigger localtimers after re-enabling gic (2012-11-05 14:26:43 -0800)
+
+----------------------------------------------------------------
+Some non-regression fixes for OMAP4460 PM support.
+
+----------------------------------------------------------------
+Colin Cross (1):
+      ARM: OMAP4: retrigger localtimers after re-enabling gic
+
+Santosh Shilimkar (1):
+      ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC control register change.
+
+Tero Kristo (1):
+      ARM: OMAP4: PM: add errata support
+
+ arch/arm/mach-omap2/common.h              |  4 +++
+ arch/arm/mach-omap2/omap-headsmp.S        | 38 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c |  9 ++++++-
+ arch/arm/mach-omap2/omap-smp.c            | 39 +++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/omap4-common.c        | 42 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-omap2/pm.h                  |  9 +++++++
+ arch/arm/mach-omap2/pm44xx.c              |  1 +
+ 7 files changed, 139 insertions(+), 3 deletions(-)
