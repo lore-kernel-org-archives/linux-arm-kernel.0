@@ -1,64 +1,123 @@
-From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Tue, 06 Nov 2012 11:48:46 +0530
-Subject: [PATCH RFC] ARM: EXYNOS5: Setup legacy i2c controller interrupts on
- SMDK5250
-Message-ID: <1352182726-29221-1-git-send-email-a.kesavan@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 6 Nov 2012 06:16:21 +0000
+Subject: OMAP baseline test results for v3.7-rc3
+In-Reply-To: <5097EF44.5030706@mimc.co.uk>
+References: <alpine.DEB.2.00.1210300229590.12697@utopia.booyaka.com>
+ <508FB226.20604@mimc.co.uk>
+ <alpine.DEB.2.00.1210301143420.12697@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EB51E84@DBDE01.ent.ti.com>
+ <508FE8BA.1080404@ti.com> <50912A6F.1040501@mimc.co.uk>
+ <79CD15C6BA57404B839C016229A409A83EB563F8@DBDE01.ent.ti.com>
+ <5097EF44.5030706@mimc.co.uk>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB63609@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos5 we have a new high-speed i2c controller. The interrupt
-sources for the legacy and new controller are muxed and are controlled
-via the SYSCON I2C_CFG register.
-At reset the interrupt source is configured for the high-speed controller,
-to continue using the old i2c controller we need to modify the I2C_CFG
-register.
+On Mon, Nov 05, 2012 at 22:24:28, Mark Jackson wrote:
+> On 31/10/12 13:57, Hiremath, Vaibhav wrote:
+> > On Wed, Oct 31, 2012 at 19:11:03, Mark Jackson wrote:
+> >> On 30/10/12 14:48, Vaibhav Hiremath wrote:
+> >>
+> >> Okay, so I'm now coming up against a brick wall regarding U-Boot.
+> >>
+> >> The Kernel boots fine (as per the tree + patch above) provided I build U-Boot using the
+> >> v2011.09_AM335xPSP_04.06.00.06 branch from git://arago-project.org/git/projects/u-boot-am33x.git
+> >>
+> >> If I try the latest mainline U-Boot (or the TI branch), I just get to "Starting kernel ..." and then
+> >> hangs.
+> >>
+> >> I'm going to raise this query on the U-Boot ML, but can you let me know which U-Boot image you're
+> >> using ?
+> >>
+> > 
+> > 
+> > I am using Mainline u-boot and it works for me. Can you paste u-boot boot 
+> > log and environment variable here?
+> > 
+> > Thanks,
+> > Vaibhav
+> 
+> So I've now spent several days trying to fix this problem, but still no joy.
+> 
+> Did my previous emails give any clue as to where I'm going wrong ?
+> 
+> Thanks for any help you can provide.
+> 
 
-Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
----
-This is a hack, I am not quite clear on how to handle this via DT. Suggestions
-welcome.
+Sorry for delayed response, I was really got pulled into other things, now I 
+am back.
 
- arch/arm/mach-exynos/mach-exynos5-dt.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+I looked at your boot-log, didn't understand how it was booting earlier for 
+you -
 
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index ed37273..badffd4 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -13,10 +13,12 @@
- #include <linux/serial_core.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
-+#include <linux/io.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
- #include <mach/map.h>
-+#include <mach/regs-pmu.h>
- 
- #include <plat/cpu.h>
- #include <plat/regs-serial.h>
-@@ -89,6 +91,12 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 	{},
- };
- 
-+static void exynos5_i2c_setup(void)
-+{
-+	/* Setup the low-speed i2c controller interrupts */
-+	writel(0x0, EXYNOS5_SYS_I2C_CFG);
-+}
-+
- static void __init exynos5250_dt_map_io(void)
- {
- 	exynos_init_io(NULL, 0);
-@@ -97,6 +105,8 @@ static void __init exynos5250_dt_map_io(void)
- 
- static void __init exynos5250_dt_machine_init(void)
- {
-+	exynos5_i2c_setup();
-+
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 				exynos5250_auxdata_lookup, NULL);
- }
--- 
-1.6.6.1
+
+------------------------
+mainline U-Boot boot log
+------------------------
+U-Boot SPL 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
+OMAP SD/MMC: 0
+reading u-boot.img
+reading u-boot.img
+
+
+> ------------------------
+> mainline U-Boot boot log
+> ------------------------
+> U-Boot SPL 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
+> OMAP SD/MMC: 0
+> reading u-boot.img
+> reading u-boot.img
+> 
+> 
+> U-Boot 2012.10-00434-ged296d2 (Oct 31 2012 - 14:18:50)
+> 
+> I2C:   ready
+> DRAM:  256 MiB
+
+This is important, since u-boot relocated DTB file.
+
+> WARNING: Caches not enabled
+> MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
+> Using default environment
+> 
+> Net:   cpsw
+> Hit any key to stop autoboot:  0
+> mmc0 is current device
+> SD/MMC found on device 0
+> reading uEnv.txt
+> 29 bytes read
+> Loaded environment from uEnv.txt
+> Importing environment from mmc ...
+> 4315695 bytes read
+> Booting from mmc ...
+> ## Booting kernel from Legacy Image at 80200000 ...
+>    Image Name:   Linux-3.7.0-rc1-47802-ge7289dc-d
+>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>    Data Size:    4308448 Bytes = 4.1 MiB
+>    Load Address: 80008000
+>    Entry Point:  80008000
+>    Verifying Checksum ... OK
+>    Loading Kernel Image ... OK
+> OK
+> 
+
+Where is your DTB? Is it appended to Kernel image?
+Can you try below sequence/commands from u-boot?
+
+
+mmc rescan 0
+fatload mmc 0 80000000 am335x-bone.dtb
+fatload mmc 0 81000000 uImage
+setenv bootargs console=ttyO0,115200n8 mem=256M root=/dev/mmcblk0p2 rw noinitrd rootfstype=ext3 rootwait earlyprink=serial
+sendln 'bootm 81000000 - 80000000'
+
+
+
+To build DTB files, use "make dtbs" command on your kernel home directory.
+
+Thanks,
+Vaibhav
+
+> Starting kernel ...
+> Mark J.
+> 
