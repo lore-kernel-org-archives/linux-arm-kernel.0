@@ -1,67 +1,39 @@
-From: khilman@deeprootsystems.com (Kevin Hilman)
-Date: Tue, 06 Nov 2012 13:19:05 -0800
-Subject: [PATCHv9 0/8] ARM: OMAP4: core retention support
-In-Reply-To: <1352193483.8788.43.camel@sokoban> (Tero Kristo's message of
- "Tue, 6 Nov 2012 11:18:02 +0200")
-References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
- <87d2zrg04t.fsf@deeprootsystems.com>
- <1352193483.8788.43.camel@sokoban>
-Message-ID: <87wqxy77li.fsf@deeprootsystems.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 06 Nov 2012 14:37:16 -0700
+Subject: [PATCH 5/5] gpiolib: separation of pin concerns
+In-Reply-To: <1352215028-30381-1-git-send-email-linus.walleij@stericsson.com>
+References: <1352215028-30381-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <5099830C.4010703@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tero Kristo <t-kristo@ti.com> writes:
+On 11/06/2012 08:17 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The fact that of_gpiochip_add_pin_range() and
+> gpiochip_add_pin_range() share too much code is fragile and
+> will invariably mean that bugs need to be fixed in two places
+> instead of one.
+> 
+> So separate the concerns of gpiolib.c and gpiolib-of.c and
+> have the latter call the former as back-end. This is necessary
+> also when going forward with other device descriptions such
+> as ACPI.
 
-> Hi Kevin,
->
-> On Mon, 2012-11-05 at 14:23 -0800, Kevin Hilman wrote:
->> Hi Tero,
->> 
->> Tero Kristo <t-kristo@ti.com> writes:
->> 
->> > Hi,
->> >
->> > Changes compared to previous version:
->> > - rebased on top of 3.7-rc1
->> > - applies on top of latest func pwrst code (v6)
->> > - added back patch #1 to this set (it wasn't queued yet after all)
->> > - added patch #7 for fixing a bug in the functional pwrst code
->> > - added patch #8 for fixing a regression with MUSB PHY power handling
->> >   (not quite sure if this is the correct way to fix this or not)
->> >
->> > Tested with omap4460 gp panda + omap4430 emu blaze boards, with cpuidle +
->> > suspend.
->> >
->> > Branch also available here:
->> > git://gitorious.org/~kristo/omap-pm/omap-pm-work.git
->> > branch: mainline-3.7-rc1-omap4-ret-v9
->> 
->> I tested this branch on 4430/Panda and 4460/Panda-ES and I'm seeing
->> several domains not hitting target power state in suspend[1].
->> 
->> Am I missing some other fixes?  Using omap2plus_defconfig, I tried your
->> branch alone, and merged with v3.7-rc4, and I get the same errors.
+> diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
 
-[...]
+> @@ -115,7 +114,6 @@ struct pinctrl_dev *of_pinctrl_add_gpio_range(struct device_node *np,
+>  	if (!pctldev)
+>  		return NULL;
+>  
+> -	pinctrl_add_gpio_range(pctldev, range);
+>  	return pctldev;
+>  }
 
-> This looks like a combination of boot loader/kernel problems. My guess
-> is that l3init is probably held on by the USB, and both ivahd / tesla
-> are held on by some DSP/IVA modules which are not idling properly.
->
-> The last patch in this set should fix the USB problems at least
-> partially, but also the USB DPLL itself might be in wrong state,
-> attached patch might help for that one and get l3init to idle.
->
-> For DSP I don't have a patch right now, what is the boot loader you are
-> using? (Can you provide git / commit / config info?)
+I think that collapses to just:
 
-I was using mainline u-boot at tag v2012.04.01 when I saw the errors.  
+	return pctldev;
 
-To check the bootloader, I upgraded to the latest mainline tag
-(v2012.10) and the problems are gone on both 4430/Panda and
-4460/Panda-ES...   Interesting.
+Aside from that, the series,
 
-That suggests that there's still some kernel assumptions/dependencies on
-the bootloader that need to be addressed.
-
-Kevin
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
