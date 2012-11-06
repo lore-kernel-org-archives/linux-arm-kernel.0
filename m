@@ -1,45 +1,36 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 6 Nov 2012 13:08:08 +0000
-Subject: [PATCH 08/15] ARM: OMAP2+: hwmod: Fix the omap_hwmod_addr_space
- for CPGMAC0
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC049E4@DBDE01.ent.ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-9-git-send-email-vaibhav.bedia@ti.com>
- <509543E8.60209@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC00B9B@DBDE01.ent.ti.com>
- <5098D889.60909@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC049E4@DBDE01.ent.ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB64336@DBDE01.ent.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 6 Nov 2012 14:14:56 +0100
+Subject: [PATCH 0/9] Ux500 pinctrl table updates
+Message-ID: <1352207696-7778-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 15:39:14, Bedia, Vaibhav wrote:
-> On Tue, Nov 06, 2012 at 14:59:45, Hiremath, Vaibhav wrote:
-> [...]
-> > > 
-> > > Ok I checked this one. The change I made was indirectly fixing another
-> > > issue with the AM33xx hwmod data. am33xx_cpgmac0_addr_space[] has two
-> > > entries and the SYSC register is part of the second entry. The function
-> > > _find_mpu_rt_addr_space in omap_hwmod.c looks for the first entry with
-> > > the flag ADDR_TYPE_RT flag. The change I made indirectly made the second
-> > > entry in am33xx_cpgmac0_addr_space[] become the first memory space with
-> > > the ADDR_TYPE_RT flag. Due to this the hwmod code wrote to the correct
-> > > SYSC address of CPGMAC0 and the IP went to standby during bootup. 
-> > > After changing the order of the entries in am33xx_cpgmac0_addr_space[]
-> > > things work fine.
-> > > 
-> > 
-> > Good catch.
-> > 
-> > Just a side note on this, driver expects the addresses in this order
-> > only, first SS and then WR.
-> > 
-> 
-> Sorry I didn't understand your comment. For HWMOD code to work as expected,
-> we need to change the order. 
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Why do you want to change the order? Just specify "ADDR_TYPE_RT", that 
-should be it.
+So until we have device tree support for the pinctrl mapping table
+we need to manage this in a consistent manner. The following patch
+series reflect the internal ST-Ericsson development to migrate
+our codebase over to use the pinctrl subsystem.
 
-Thanks,
-Vaibhav
+Jean-Nicolas Graux (1):
+  ARM: ux500: add STM pin configuration
+
+Jorgen Jonsson (1):
+  ARM: ux500: fixup magnetometer pins
+
+Linus Walleij (1):
+  ARM: ux500: delete duplicate macro
+
+Patrice Chotard (6):
+  ARM: ux500: 8500: register LCD VSI pinctrl table
+  ARM: ux500: 8500: add IDLE pin configuration for SPI
+  ARM: ux500: 8500: update SKE keypad pinctrl table
+  ARM: ux500: 8500: define SDI sleep states
+  ARM: ux500: cosmetic fixups for uart0
+  ARM: ux500: 8500: add pinctrl support for uart1 and uart2
+
+ arch/arm/mach-ux500/board-mop500-pins.c | 427 +++++++++++++++++++++++++++-----
+ 1 file changed, 362 insertions(+), 65 deletions(-)
+
+-- 
+1.7.11.3
