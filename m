@@ -1,16 +1,16 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:35 +0530
-Subject: [PATCH RESEND 07/10] ARM: dts: AM33XX: Add pinmux configuration for
- gpio-leds to EVMSK
+Date: Tue, 6 Nov 2012 19:18:29 +0530
+Subject: [PATCH RESEND 01/10] ARM: dts: AM33XX: Add pinmux configuration for
+ matrix keypad to EVM
 In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
 References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-8-git-send-email-anilkumar@ti.com>
+Message-ID: <1352209718-5586-2-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for gpio based volume keys to am335x-evmsk.
-In this patch, only single named mode/state is added and these pins
-are configured during pinctrl driver initialization.
+Add pinmux configurations for gpio matrix keypad. In this patch, only
+single named mode/state is added and these pins are configured during
+pinctrl driver initialization.
 
 Default mode is nothing but the values required for the module during
 active state. With this configurations module is functional as
@@ -18,27 +18,28 @@ expected.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-evmsk.dts |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/am335x-evm.dts |   15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 6f53879..659ec5b 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -30,6 +30,20 @@
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index 513284f..9199456 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -24,6 +24,21 @@
  		reg = <0x80000000 0x10000000>; /* 256 MB */
  	};
  
 +	am33xx_pinmux: pinmux at 44e10800 {
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&user_leds_s0>;
++		pinctrl-0 = <&matrix_keypad_s0>;
 +
-+		user_leds_s0: user_leds_s0 {
++		matrix_keypad_s0: matrix_keypad_s0 {
 +			pinctrl-single,pins = <
-+				0x10 0x7	/* gpmc_ad4.gpio1_4, OUTPUT | MODE7 */
-+				0x14 0x7	/* gpmc_ad5.gpio1_5, OUTPUT | MODE7 */
-+				0x18 0x7	/* gpmc_ad6.gpio1_6, OUTPUT | MODE7 */
-+				0x1c 0x7	/* gpmc_ad7.gpio1_7, OUTPUT | MODE7 */
++				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
++				0x58 0x7	/* gpmc_a6.gpio1_22, OUTPUT | MODE7 */
++				0x64 0x27	/* gpmc_a9.gpio1_25, INPUT | MODE7 */
++				0x68 0x27	/* gpmc_a10.gpio1_26, INPUT | MODE7 */
++				0x6c 0x27	/* gpmc_a11.gpio1_27, INPUT | MODE7 */
 +			>;
 +		};
 +	};
