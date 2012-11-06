@@ -1,36 +1,36 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 6 Nov 2012 14:14:56 +0100
-Subject: [PATCH 0/9] Ux500 pinctrl table updates
-Message-ID: <1352207696-7778-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 6 Nov 2012 14:15:07 +0100
+Subject: [PATCH 1/9] ARM: ux500: 8500: register LCD VSI pinctrl table
+Message-ID: <1352207707-7813-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+From: Patrice Chotard <patrice.chotard@stericsson.com>
 
-So until we have device tree support for the pinctrl mapping table
-we need to manage this in a consistent manner. The following patch
-series reflect the internal ST-Ericsson development to migrate
-our codebase over to use the pinctrl subsystem.
+This fixes up the pins used by the VSI interface to the HDMI
+AV8100 encoder.
 
-Jean-Nicolas Graux (1):
-  ARM: ux500: add STM pin configuration
+Signed-off-by: Patrice Chotard <patrice.chotard@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-pins.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Jorgen Jonsson (1):
-  ARM: ux500: fixup magnetometer pins
-
-Linus Walleij (1):
-  ARM: ux500: delete duplicate macro
-
-Patrice Chotard (6):
-  ARM: ux500: 8500: register LCD VSI pinctrl table
-  ARM: ux500: 8500: add IDLE pin configuration for SPI
-  ARM: ux500: 8500: update SKE keypad pinctrl table
-  ARM: ux500: 8500: define SDI sleep states
-  ARM: ux500: cosmetic fixups for uart0
-  ARM: ux500: 8500: add pinctrl support for uart1 and uart2
-
- arch/arm/mach-ux500/board-mop500-pins.c | 427 +++++++++++++++++++++++++++-----
- 1 file changed, 362 insertions(+), 65 deletions(-)
-
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index a267c6d..8ab8688 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -162,7 +162,10 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
+ 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
+ 	/* Mux in LCD VSI1 and pull it up for MCDE HDMI output */
+-	DB8500_MUX("lcdvsi1_a_1", "lcd", "av8100-hdmi"),
++	DB8500_MUX("lcdvsi1_a_1", "lcd", "0-0070"),
++	DB8500_PIN("GPIO69_E2", in_pu, "0-0070"),
++	/* LCD VSI1 sleep state */
++	DB8500_PIN_SLEEP("GPIO69_E2", slpm_in_wkup_pdis, "0-0070"),
+ 	/* Mux in i2c0 block, default state */
+ 	DB8500_MUX("i2c0_a_1", "i2c0", "nmk-i2c.0"),
+ 	/* i2c0 sleep state */
 -- 
 1.7.11.3
