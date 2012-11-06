@@ -1,75 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Nov 2012 22:55:27 +0100
-Subject: [PATCH 2/8] mtd: diskonchip: use inline functions for DocRead/DocWrite
+Date: Tue,  6 Nov 2012 22:55:33 +0100
+Subject: [PATCH 8/8] drm/exynos: don't include plat/gpio-cfg.h
 In-Reply-To: <1352238933-4886-1-git-send-email-arnd@arndb.de>
 References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
-Message-ID: <1352238933-4886-3-git-send-email-arnd@arndb.de>
+Message-ID: <1352238933-4886-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The diskonchip drivers traditionally use home-grown macros for
-doing MMIO accesses, which cause a lot of warnings, at least
-on ARM machines:
+Patch  9eb3e9e6f3 "drm/exynos: add support for ARCH_MULTIPLATFORM"
+allowed building the exynos hdmi driver on non-samsung platforms,
+which unfortunately broke compilation in combination with 22c4f42897
+"drm: exynos: hdmi: add support for exynos5 hdmi", which added
+an inclusion of the samsung-specific plat/gpio-cfg.h header file.
 
-drivers/mtd/devices/doc2000.c: In function 'doc_write':
-drivers/mtd/devices/doc2000.c:854:5: warning: value computed is not used [-Wunused-value]
-drivers/mtd/devices/doc2000.c: In function 'doc_erase':
-drivers/mtd/devices/doc2000.c:1123:5: warning: value computed is not used [-Wunused-value
-drivers/mtd/nand/diskonchip.c: In function 'doc2000_read_byte':
-drivers/mtd/nand/diskonchip.c:318:3: warning: value computed is not used [-Wunused-value]
+Fortunately, that header file is not required any more here, so
+we can simply revert the inclusion in order to build the ARM
+allyesconfig again without getting this error:
 
-A nicer solution is to use the architecture-defined I/O accessors.
-Here, we use the __raw_readl/__raw_writel style, instead of the
-proper readl/writel ones, in order to preserve the odd semantics
-of the existing macros that have their own barrier implementation
-and no byte swap. It would be nice to fix this properly and use
-the correct accessors as well as make the word size independent
-from the architecture, but I guess the hardware is obsolete
-enough that we should better not mess the driver an more than
-necessary.
+drivers/gpu/drm/exynos/exynos_hdmi.c:37:27: fatal error: plat/gpio-cfg.h: No such file or directory
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: linux-mtd at lists.infradead.org
+Cc: Rob Clark <rob@ti.com>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Rahul Sharma <rahul.sharma@samsung.com>
 ---
- include/linux/mtd/doc2000.h |   22 ++++++++++++++++++----
- 1 file changed, 18 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/exynos/exynos_hdmi.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/include/linux/mtd/doc2000.h b/include/linux/mtd/doc2000.h
-index 0f6fea7..407d1e5 100644
---- a/include/linux/mtd/doc2000.h
-+++ b/include/linux/mtd/doc2000.h
-@@ -92,12 +92,26 @@
-  * Others use readb/writeb
-  */
- #if defined(__arm__)
--#define ReadDOC_(adr, reg)      ((unsigned char)(*(volatile __u32 *)(((unsigned long)adr)+((reg)<<2))))
--#define WriteDOC_(d, adr, reg)  do{ *(volatile __u32 *)(((unsigned long)adr)+((reg)<<2)) = (__u32)d; wmb();} while(0)
-+static inline u8 ReadDOC_(u32 __iomem *addr, unsigned long reg)
-+{
-+	return __raw_readl(addr + reg);
-+}
-+static inline void WriteDOC_(u8 data, u32 __iomem *addr, unsigned long reg)
-+{
-+	__raw_writel(data, addr + reg);
-+	wmb();
-+}
- #define DOC_IOREMAP_LEN 0x8000
- #elif defined(__ppc__)
--#define ReadDOC_(adr, reg)      ((unsigned char)(*(volatile __u16 *)(((unsigned long)adr)+((reg)<<1))))
--#define WriteDOC_(d, adr, reg)  do{ *(volatile __u16 *)(((unsigned long)adr)+((reg)<<1)) = (__u16)d; wmb();} while(0)
-+static inline u8 ReadDOC_(u16 __iomem *addr, unsigned long reg)
-+{
-+	return __raw_readw(addr + reg);
-+}
-+static inline void WriteDOC_(u8 data, u16 __iomem *addr, unsigned long reg)
-+{
-+	__raw_writew(data, addr + reg);
-+	wmb();
-+}
- #define DOC_IOREMAP_LEN 0x4000
- #else
- #define ReadDOC_(adr, reg)      readb((void __iomem *)(adr) + (reg))
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 2c115f8..7f0fc4e 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -34,7 +34,6 @@
+ #include <linux/regulator/consumer.h>
+ #include <linux/io.h>
+ #include <linux/of_gpio.h>
+-#include <plat/gpio-cfg.h>
+ 
+ #include <drm/exynos_drm.h>
+ 
 -- 
 1.7.10
