@@ -1,15 +1,15 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:37 +0530
-Subject: [PATCH RESEND 09/10] ARM: dts: AM33XX: Add pinmux configuration for
- gpio-keys to EVMSK
+Date: Tue, 6 Nov 2012 19:18:33 +0530
+Subject: [PATCH RESEND 05/10] ARM: dts: AM33XX: Add pinmux configuration for
+ user-leds to BONE
 In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
 References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-10-git-send-email-anilkumar@ti.com>
+Message-ID: <1352209718-5586-6-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for gpio based keys to am335x-evmsk. In
-this patch, only single named mode/state is added and these pins
+Add pinmux configurations for gpio based user-keys to am335x-bone.
+In this patch, only single named mode/state is added and these pins
 are configured during pinctrl driver initialization.
 
 Default mode is nothing but the values required for the module during
@@ -18,37 +18,33 @@ expected.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-evmsk.dts |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/am335x-bone.dts |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 7262fa8..0f825dd 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -32,7 +32,7 @@
- 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <&user_leds_s0>;
-+		pinctrl-0 = <&user_leds_s0 &gpio_keys_s0>;
- 
- 		user_leds_s0: user_leds_s0 {
- 			pinctrl-single,pins = <
-@@ -42,6 +42,15 @@
- 				0x1c 0x7	/* gpmc_ad7.gpio1_7, OUTPUT | MODE7 */
- 			>;
- 		};
-+
-+		gpio_keys_s0: gpio_keys_s0 {
-+			pinctrl-single,pins = <
-+				0x94 0x27	/* gpmc_oen_ren.gpio2_3, INPUT | MODE7 */
-+				0x90 0x27	/* gpmc_advn_ale.gpio2_2, INPUT | MODE7 */
-+				0x70 0x27	/* gpmc_wait0.gpio0_30, INPUT | MODE7 */
-+				0x9c 0x27	/* gpmc_ben0_cle.gpio2_5, INPUT | MODE7 */
-+			>;
-+		};
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index 91eee97..1aac58b 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -24,6 +24,20 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
  	};
  
++	am33xx_pinmux: pinmux at 44e10800 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&user_leds_s0>;
++
++		user_leds_s0: user_leds_s0 {
++			pinctrl-single,pins = <
++				0x54 0x7	/* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
++				0x58 0x17	/* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
++				0x5c 0x7	/* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
++				0x60 0x17	/* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
++			>;
++		};
++	};
++
  	ocp {
+ 		uart1: serial at 44e09000 {
+ 			status = "okay";
 -- 
 1.7.9.5
