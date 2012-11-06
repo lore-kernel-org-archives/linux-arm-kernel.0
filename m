@@ -1,123 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Nov 2012 22:55:31 +0100
-Subject: [PATCH 6/8] mmc: dw_mmc: constify dw_mci_idmac_ops in exynos back-end
+Date: Tue,  6 Nov 2012 22:55:26 +0100
+Subject: [PATCH 1/8] mtd: diskonchip: don't warn about ARM architecture
 In-Reply-To: <1352238933-4886-1-git-send-email-arnd@arndb.de>
 References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
-Message-ID: <1352238933-4886-7-git-send-email-arnd@arndb.de>
+Message-ID: <1352238933-4886-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_device_id match data is now marked as const and
-must not be modified. This changes the dw_mmc to mark
-all pointers passing the dw_mci_drv_data or dw_mci_dma_ops
-structures as const, and also marks the static definitions
-as const.
-
-drivers/mmc/host/dw_mmc-exynos.c: In function 'dw_mci_exynos_probe':
-drivers/mmc/host/dw_mmc-exynos.c:234:11: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+Enabling the diskonchip drivers on most architectures results
+in a pointless warning "#warning Unknown architecture for
+DiskOnChip. No default probe locations defined". The driver
+can in fact handle the default location already through the
+CONFIG_MTD_DOCPROBE_ADDRESS, which gets set on the platforms
+that need it, and we get a run-time error if this is not
+set correctly.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Will Newton <will.newton@imgtec.com>
-Cc: Chris Ball <cjb@laptop.org>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
+Cc: linux-mtd at lists.infradead.org
 ---
- drivers/mmc/host/dw_mmc-exynos.c |    6 +++---
- drivers/mmc/host/dw_mmc-pltfm.c  |    2 +-
- drivers/mmc/host/dw_mmc-pltfm.h  |    2 +-
- drivers/mmc/host/dw_mmc.c        |    2 +-
- include/linux/mmc/dw_mmc.h       |    4 ++--
- 5 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/mtd/devices/docprobe.c |    2 --
+ drivers/mtd/nand/diskonchip.c  |    2 --
+ 2 files changed, 4 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 0147ac3a..4d50da6 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -208,7 +208,7 @@ static unsigned long exynos5250_dwmmc_caps[4] = {
- 	MMC_CAP_CMD23,
- };
+diff --git a/drivers/mtd/devices/docprobe.c b/drivers/mtd/devices/docprobe.c
+index 706b847..88b3fd3 100644
+--- a/drivers/mtd/devices/docprobe.c
++++ b/drivers/mtd/devices/docprobe.c
+@@ -70,8 +70,6 @@ static unsigned long __initdata doc_locations[] = {
+ 	0xe0000, 0xe2000, 0xe4000, 0xe6000,
+ 	0xe8000, 0xea000, 0xec000, 0xee000,
+ #endif /*  CONFIG_MTD_DOCPROBE_HIGH */
+-#else
+-#warning Unknown architecture for DiskOnChip. No default probe locations defined
+ #endif
+ 	0xffffffff };
  
--static struct dw_mci_drv_data exynos5250_drv_data = {
-+static const struct dw_mci_drv_data exynos5250_drv_data = {
- 	.caps			= exynos5250_dwmmc_caps,
- 	.init			= dw_mci_exynos_priv_init,
- 	.setup_clock		= dw_mci_exynos_setup_clock,
-@@ -220,14 +220,14 @@ static struct dw_mci_drv_data exynos5250_drv_data = {
+diff --git a/drivers/mtd/nand/diskonchip.c b/drivers/mtd/nand/diskonchip.c
+index 256eb30..81fa578 100644
+--- a/drivers/mtd/nand/diskonchip.c
++++ b/drivers/mtd/nand/diskonchip.c
+@@ -53,8 +53,6 @@ static unsigned long __initdata doc_locations[] = {
+ 	0xe0000, 0xe2000, 0xe4000, 0xe6000,
+ 	0xe8000, 0xea000, 0xec000, 0xee000,
+ #endif /*  CONFIG_MTD_DOCPROBE_HIGH */
+-#else
+-#warning Unknown architecture for DiskOnChip. No default probe locations defined
+ #endif
+ 	0xffffffff };
  
- static const struct of_device_id dw_mci_exynos_match[] = {
- 	{ .compatible = "samsung,exynos5250-dw-mshc",
--			.data = (void *)&exynos5250_drv_data, },
-+			.data = &exynos5250_drv_data, },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
- 
- int dw_mci_exynos_probe(struct platform_device *pdev)
- {
--	struct dw_mci_drv_data *drv_data;
-+	const struct dw_mci_drv_data *drv_data;
- 	const struct of_device_id *match;
- 
- 	match = of_match_node(dw_mci_exynos_match, pdev->dev.of_node);
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-index c960ca7..5e33156 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.c
-+++ b/drivers/mmc/host/dw_mmc-pltfm.c
-@@ -24,7 +24,7 @@
- #include "dw_mmc.h"
- 
- int dw_mci_pltfm_register(struct platform_device *pdev,
--				struct dw_mci_drv_data *drv_data)
-+				const struct dw_mci_drv_data *drv_data)
- {
- 	struct dw_mci *host;
- 	struct resource	*regs;
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.h b/drivers/mmc/host/dw_mmc-pltfm.h
-index 301f245..2ac37b8 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.h
-+++ b/drivers/mmc/host/dw_mmc-pltfm.h
-@@ -13,7 +13,7 @@
- #define _DW_MMC_PLTFM_H_
- 
- extern int dw_mci_pltfm_register(struct platform_device *pdev,
--				struct dw_mci_drv_data *drv_data);
-+				const struct dw_mci_drv_data *drv_data);
- extern int __devexit dw_mci_pltfm_remove(struct platform_device *pdev);
- extern const struct dev_pm_ops dw_mci_pltfm_pmops;
- 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 250aa18..4f01f9f 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -434,7 +434,7 @@ static int dw_mci_idmac_init(struct dw_mci *host)
- 	return 0;
- }
- 
--static struct dw_mci_dma_ops dw_mci_idmac_ops = {
-+static const struct dw_mci_dma_ops dw_mci_idmac_ops = {
- 	.init = dw_mci_idmac_init,
- 	.start = dw_mci_idmac_start_dma,
- 	.stop = dw_mci_idmac_stop_dma,
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index 7c6a113..b611f32 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -137,7 +137,7 @@ struct dw_mci {
- 
- 	dma_addr_t		sg_dma;
- 	void			*sg_cpu;
--	struct dw_mci_dma_ops	*dma_ops;
-+	const struct dw_mci_dma_ops	*dma_ops;
- #ifdef CONFIG_MMC_DW_IDMAC
- 	unsigned int		ring_size;
- #else
-@@ -162,7 +162,7 @@ struct dw_mci {
- 	u16			data_offset;
- 	struct device		*dev;
- 	struct dw_mci_board	*pdata;
--	struct dw_mci_drv_data	*drv_data;
-+	const struct dw_mci_drv_data	*drv_data;
- 	void			*priv;
- 	struct clk		*biu_clk;
- 	struct clk		*ciu_clk;
 -- 
 1.7.10
