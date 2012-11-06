@@ -1,43 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  6 Nov 2012 22:55:30 +0100
-Subject: [PATCH 5/8] mmc: dw_mmc: fix modular build for exynos back-end
+Date: Tue,  6 Nov 2012 22:55:32 +0100
+Subject: [PATCH 7/8] ata: highbank: mark ahci_highbank_probe as __devinit
 In-Reply-To: <1352238933-4886-1-git-send-email-arnd@arndb.de>
 References: <1352238933-4886-1-git-send-email-arnd@arndb.de>
-Message-ID: <1352238933-4886-6-git-send-email-arnd@arndb.de>
+Message-ID: <1352238933-4886-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MODULE_DEVICE_TABLE entry for dw_mci_exynos_match
-was incorrectly copied from the platform back-end, which
-causes this error when building the driver as a loadable
-module:
+The ahci_highbank_probe function is incorrectly marked as __init,
+which means it can get discarded at boot time, which might be
+a problem if for some reason the device only becomes operational
+after loading another module.
 
-drivers/mmc/host/dw_mmc-exynos.c: At top level:
-drivers/mmc/host/dw_mmc-exynos.c:226:34: error: '__mod_of_device_table' aliased to undefined symbol 'dw_mci_pltfm_match'
+Using __devinit instead avoids seeing this warning for every build:
 
-This patch fixes the problem by just using the correct
-string.
+WARNING: vmlinux.o(.data+0xf7b0): Section mismatch in reference from the
+variable ahci_highbank_driver to the function .init.text:ahci_highbank_probe()
+The variable ahci_highbank_driver references
+the function __init ahci_highbank_probe()
+If the reference is valid then annotate the
+variable with __init* or __refdata (see linux/init.h) or name the variable:
+*_template, *_timer, *_sht, *_ops, *_probe, *_probe_one, *_console
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Thomas Abraham <thomas.abraham@linaro.org>
-Cc: Will Newton <will.newton@imgtec.com>
-Cc: Chris Ball <cjb@laptop.org>
+Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Jeff Garzik <jgarzik@redhat.com>
 ---
- drivers/mmc/host/dw_mmc-exynos.c |    2 +-
+ drivers/ata/sata_highbank.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-index 660bbc5..0147ac3a 100644
---- a/drivers/mmc/host/dw_mmc-exynos.c
-+++ b/drivers/mmc/host/dw_mmc-exynos.c
-@@ -223,7 +223,7 @@ static const struct of_device_id dw_mci_exynos_match[] = {
- 			.data = (void *)&exynos5250_drv_data, },
- 	{},
+diff --git a/drivers/ata/sata_highbank.c b/drivers/ata/sata_highbank.c
+index 0d7c4c2..36a141a 100644
+--- a/drivers/ata/sata_highbank.c
++++ b/drivers/ata/sata_highbank.c
+@@ -260,7 +260,7 @@ static const struct of_device_id ahci_of_match[] = {
  };
--MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
-+MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
+ MODULE_DEVICE_TABLE(of, ahci_of_match);
  
- int dw_mci_exynos_probe(struct platform_device *pdev)
+-static int __init ahci_highbank_probe(struct platform_device *pdev)
++static int __devinit ahci_highbank_probe(struct platform_device *pdev)
  {
+ 	struct device *dev = &pdev->dev;
+ 	struct ahci_host_priv *hpriv;
 -- 
 1.7.10
