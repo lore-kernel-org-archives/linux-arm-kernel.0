@@ -1,46 +1,120 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue,  6 Nov 2012 14:51:11 +0100
-Subject: [PATCH] ARM: dts: add missing ux500 device trees
-Message-ID: <1352209871-25202-1-git-send-email-fabio.baltieri@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 6 Nov 2012 13:55:02 +0000
+Subject: [PATCH 1/5] ARM: EXYNOS: fix the hotplug for Cortex-A15
+In-Reply-To: <5098FFBE.4080604@ti.com>
+References: <1352182356-28989-1-git-send-email-a.kesavan@samsung.com>
+ <1352182356-28989-2-git-send-email-a.kesavan@samsung.com>
+ <5098FFBE.4080604@ti.com>
+Message-ID: <20121106135502.GE30439@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds hrefprev60, hrefv60plus and ccu9540 to device trees compiled
-during build.
+On Tue, Nov 06, 2012 at 12:17:02PM +0000, Santosh Shilimkar wrote:
+> On Tuesday 06 November 2012 12:12 AM, Abhilash Kesavan wrote:
+> > The sequence of cpu_enter_lowpower() for Cortex-A15
+> > is different from the sequence for Cortex-A9.
+> Are you sure ? Apart from integrated cache vs external, there
+> should be no change. And L2 doesn't need to come into picture
+> while powering down just a CPU.
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
-Hi Lee,
+Reiterating Santosh point in here. v7 shutdown procedure is and has to
+be identical across all v7 cores. There is not such a thing as "A15
+specific" shutdown procedure.
 
-this applies on top of your ste-dt-for-next and allows you to remove manual
-device-tree building in your scripts.
+Embedded L2 will come into the picture on multi-cluster systems, for the
+time being L2 must not be flushed when hotplugging a CPU in a single cluster
+so the LoUIS API is to be used here.
 
-Please let me know if you think these patches should be pushed somewhere in the
-gerrit or in some list - this stacks on top of your so you I don't think it
-makes sense for me to subit it directly to a public list.
+> > This patch implements cpu_enter_lowpower() for EXYNOS5
+> > SoC which has Cortex-A15 cores.
+> >
+> > Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > Tested-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> > ---
+> >   arch/arm/mach-exynos/hotplug.c |   45 +++++++++++++++++++++++++++++++++++++--
+> >   1 files changed, 42 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+> > index f4d7dd2..8c06c4f 100644
+> > --- a/arch/arm/mach-exynos/hotplug.c
+> > +++ b/arch/arm/mach-exynos/hotplug.c
+> > @@ -20,10 +20,11 @@
+> >   #include <asm/smp_plat.h>
+> >
+> >   #include <mach/regs-pmu.h>
+> > +#include <plat/cpu.h>
+> >
+> >   #include "common.h"
+> >
+> > -static inline void cpu_enter_lowpower(void)
+> > +static inline void cpu_enter_lowpower_a9(void)
+> >   {
+> >   	unsigned int v;
+> >
+> > @@ -45,6 +46,35 @@ static inline void cpu_enter_lowpower(void)
+> >   	  : "cc");
+> >   }
+> >
+> > +static inline void cpu_enter_lowpower_a15(void)
+> > +{
+> > +	unsigned int v;
+> > +
+> > +	asm volatile(
+> > +	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> > +	"	bic	%0, %0, %1\n"
+> > +	"	mcr	p15, 0, %0, c1, c0, 0\n"
+> > +	  : "=&r" (v)
+> > +	  : "Ir" (CR_C)
+> > +	  : "cc");
+> > +
+> > +	flush_cache_all();
+> > +
+> Why are flushing all the cache levels ?
+> flush_kern_louis() should be enough for CPU power
+> down.
 
-Fabio
+Agree with Santosh again.
 
- arch/arm/boot/dts/Makefile | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> > +	asm volatile(
+> > +	/*
+> > +	* Turn off coherency
+> > +	*/
+> > +	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> > +	"	bic	%0, %0, %1\n"
+> > +	"	mcr	p15, 0, %0, c1, c0, 1\n"
+> > +	: "=&r" (v)
+> > +	: "Ir" (0x40)
+> > +	: "cc");
+> > +
+> > +	isb();
+> > +	dsb();
+> > +}
+> > +
+> The above sequence should work on A9 as well. In general you should have
+> CPU power down code under one code block and avoid making use of stack 
+> in between. Otherwise you will end up with stack corruption because of
+> the memory view change after C bit is disabled.
+> 
+> Regards
+> Santosh
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f37cf9f..01433b9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -74,7 +74,10 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	am335x-evm.dtb \
- 	am335x-bone.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
--dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
-+dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
-+	hrefprev60.dtb \
-+	hrefv60plus.dtb \
-+	ccu9540.dtb
- dtb-$(CONFIG_ARCH_SHMOBILE) += emev2-kzm9d.dtb \
- 	r8a7740-armadillo800eva.dtb \
- 	sh73a0-kzm9g.dtb
--- 
-1.7.12.1
+The above sequence does not work on A9 since A9 does not look-up the
+caches when the C bit is cleared. It is an accident waiting to happen,
+as Santosh explained.
+
+The sequence:
+
+- clear C bit
+- clean L1
+- exit SMP
+
+must be written in assembly with no access to any data whatsoever, no stack,
+_nothing_.
+
+There is some code in the works to consolidate this procedure once for all but
+all bits and pieces are already in the kernel.
+
+Lorenzo
