@@ -1,118 +1,183 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 6 Nov 2012 15:01:48 +0530
-Subject: [PATCH v3 03/11] clk: davinci - common clk utilities to init
- clk driver
-In-Reply-To: <5097D93E.10403@ti.com>
-References: <1351181518-11882-1-git-send-email-m-karicheri2@ti.com>
- <1351181518-11882-4-git-send-email-m-karicheri2@ti.com>
- <50950F7E.2080309@ti.com> <5097D93E.10403@ti.com>
-Message-ID: <5098D904.7050707@ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 6 Nov 2012 17:32:57 +0800
+Subject: [PATCH] ARM: tegra: retain L2 content over CPU suspend/resume
+Message-ID: <1352194377-6209-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The L2 RAM is in different power domain from the CPU cluster. So the
+L2 content can be retained over CPU suspend/resume. To do that, we
+need to disable L2 after the MMU is disabled, and enable L2 before
+the MMU is enabled. But the L2 controller is in the same power domain
+with the CPU cluster. We need to restore it's settings and re-enable
+it after the power be resumed.
 
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+ arch/arm/mach-tegra/common.c  |    6 +++++-
+ arch/arm/mach-tegra/headsmp.S |   11 +++++++++++
+ arch/arm/mach-tegra/pm.c      |    2 --
+ arch/arm/mach-tegra/pm.h      |    2 ++
+ arch/arm/mach-tegra/sleep.S   |    7 +++++++
+ arch/arm/mach-tegra/sleep.h   |   28 ++++++++++++++++++++++++++++
+ 6 files changed, 53 insertions(+), 3 deletions(-)
 
-On 11/5/2012 8:50 PM, Murali Karicheri wrote:
-> On 11/03/2012 08:35 AM, Sekhar Nori wrote:
->> On 10/25/2012 9:41 PM, Murali Karicheri wrote:
->>> This is the common clk driver initialization functions for DaVinci
->>> SoCs and other SoCs that uses similar hardware architecture.
->>> clock.h also defines struct types for clock definitions in a SoC
->>> and clock data type for configuring clk-mux. The initialization
->>> functions are used by clock initialization code in a specific
->>> platform/SoC.
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>> ---
->>>   drivers/clk/davinci/clock.c |  112
->>> +++++++++++++++++++++++++++++++++++++++++++
->>>   drivers/clk/davinci/clock.h |   80 +++++++++++++++++++++++++++++++
->>>   2 files changed, 192 insertions(+)
->>>   create mode 100644 drivers/clk/davinci/clock.c
->>>   create mode 100644 drivers/clk/davinci/clock.h
->>>
->>> diff --git a/drivers/clk/davinci/clock.c b/drivers/clk/davinci/clock.c
->>> new file mode 100644
->>> index 0000000..ad02149
->>> --- /dev/null
->>> +++ b/drivers/clk/davinci/clock.c
->>> @@ -0,0 +1,112 @@
->>> +/*
->>> + * clock.c - davinci clock initialization functions for various clocks
->>> + *
->>> + * Copyright (C) 2006-2012 Texas Instruments.
->>> + * Copyright (C) 2008-2009 Deep Root Systems, LLC
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License as published by
->>> + * the Free Software Foundation; either version 2 of the License, or
->>> + * (at your option) any later version.
->>> + */
->>> +#include <linux/init.h>
->>> +#include <linux/clk-provider.h>
->>> +#include <linux/clkdev.h>
->>> +#include <linux/io.h>
->>> +#include <linux/slab.h>
->>> +
->>> +#include "clk-pll.h"
->>> +#include "clk-psc.h"
->>> +#include "clk-div.h"
->>> +#include "clock.h"
->>> +
->>> +static DEFINE_SPINLOCK(_lock);
->>> +
->>> +#ifdef    CONFIG_CLK_DAVINCI_PLL
->>> +struct clk *davinci_pll_clk(const char *name, const char *parent,
->>> +        u32 phys_pllm, u32 phys_prediv, u32 phys_postdiv,
->>> +        struct clk_pll_data *pll_data)
->>> +{
->>> +    struct clk *clkp = NULL;
->>> +
->>> +    pll_data->reg_pllm = ioremap(phys_pllm, 4);
->>> +    if (WARN_ON(!pll_data->reg_pllm))
->>> +        return clkp;
->> I would prefer ERR_PTR(-ENOMEM) here. Same comment applies to other
->> instances elsewhere in the patch.
->>
->>> diff --git a/drivers/clk/davinci/clock.h b/drivers/clk/davinci/clock.h
->>> new file mode 100644
->>> index 0000000..73204b8
->>> --- /dev/null
->>> +++ b/drivers/clk/davinci/clock.h
->>> @@ -0,0 +1,80 @@
->>> +/*
->>> + * TI DaVinci Clock definitions -  Contains Macros and Types used for
->>> + * defining various clocks on a DaVinci SoC
->>> + *
->>> + * Copyright (C) 2012 Texas Instruments
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> + * modify it under the terms of the GNU General Public License as
->>> + * published by the Free Software Foundation version 2.
->>> + *
->>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
->>> + * kind, whether express or implied; without even the implied warranty
->>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + */
->>> +#ifndef __DAVINCI_CLOCK_H
->>> +#define __DAVINCI_CLOCK_H
->>> +
->>> +#include <linux/types.h>
->>> +
->>> +/* general flags: */
->>> +#define ALWAYS_ENABLED        BIT(0)
->> This is not used in this patch. Can you add the define along with its
->> usage so it is immediately clear why you need it?
-> This is used on the next patch as this adds a bunch of utilities or
-> types for the platform specific clock code. Do you want to combine this
-> patch with 05/11?  It will become a bigger patch then? Is that fine.
-> IMO, this is a logical group that can be a standalone patch than
-> combining with 05/11.
-
-It is more important to divide patches in logical functional blocks
-rather than split it based on files. Reading this patch, I have no idea
-what that define is for.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 35b7dd3..c25746e 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -36,6 +36,7 @@
+ #include "pmc.h"
+ #include "apbio.h"
+ #include "sleep.h"
++#include "pm.h"
+ 
+ /*
+  * Storage for debug-macro.S's state.
+@@ -117,6 +118,7 @@ static __initdata struct tegra_clk_init_table tegra30_clk_init_table[] = {
+ static void __init tegra_init_cache(void)
+ {
+ #ifdef CONFIG_CACHE_L2X0
++	int ret;
+ 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
+ 	u32 aux_ctrl, cache_type;
+ 
+@@ -124,7 +126,9 @@ static void __init tegra_init_cache(void)
+ 	aux_ctrl = (cache_type & 0x700) << (17-8);
+ 	aux_ctrl |= 0x6C000001;
+ 
+-	l2x0_of_init(aux_ctrl, 0x8200c3fe);
++	ret = l2x0_of_init(aux_ctrl, 0x8200c3fe);
++	if (!ret)
++		l2x0_saved_regs_addr = virt_to_phys(&l2x0_saved_regs);
+ #endif
+ 
+ }
+diff --git a/arch/arm/mach-tegra/headsmp.S b/arch/arm/mach-tegra/headsmp.S
+index 82dc84b..4a317fa 100644
+--- a/arch/arm/mach-tegra/headsmp.S
++++ b/arch/arm/mach-tegra/headsmp.S
+@@ -2,6 +2,8 @@
+ #include <linux/init.h>
+ 
+ #include <asm/cache.h>
++#include <asm/asm-offsets.h>
++#include <asm/hardware/cache-l2x0.h>
+ 
+ #include "flowctrl.h"
+ #include "iomap.h"
+@@ -113,10 +115,19 @@ ENTRY(tegra_resume)
+ 	str	r1, [r0]
+ #endif
+ 
++	/* L2 cache resume & re-enable */
++	l2_cache_resume r0, r1, r2, l2x0_saved_regs_addr
++
+ 	b	cpu_resume
+ ENDPROC(tegra_resume)
+ #endif
+ 
++#ifdef CONFIG_CACHE_L2X0
++	.globl	l2x0_saved_regs_addr
++l2x0_saved_regs_addr:
++	.long	0
++#endif
++
+ 	.align L1_CACHE_SHIFT
+ ENTRY(__tegra_cpu_reset_handler_start)
+ 
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 1460c3d..1b11707 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -207,11 +207,9 @@ void tegra_idle_lp2_last(u32 cpu_on_time, u32 cpu_off_time)
+ 
+ 	cpu_cluster_pm_enter();
+ 	suspend_cpu_complex();
+-	outer_disable();
+ 
+ 	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, &tegra_sleep_cpu);
+ 
+-	outer_resume();
+ 	restore_cpu_complex();
+ 	cpu_cluster_pm_exit();
+ }
+diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
+index 512345c..787335c 100644
+--- a/arch/arm/mach-tegra/pm.h
++++ b/arch/arm/mach-tegra/pm.h
+@@ -21,6 +21,8 @@
+ #ifndef _MACH_TEGRA_PM_H_
+ #define _MACH_TEGRA_PM_H_
+ 
++extern unsigned long l2x0_saved_regs_addr;
++
+ void save_cpu_arch_register(void);
+ void restore_cpu_arch_register(void);
+ 
+diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+index 88f4de9..26afa7c 100644
+--- a/arch/arm/mach-tegra/sleep.S
++++ b/arch/arm/mach-tegra/sleep.S
+@@ -27,6 +27,7 @@
+ #include <asm/assembler.h>
+ #include <asm/cache.h>
+ #include <asm/cp15.h>
++#include <asm/hardware/cache-l2x0.h>
+ 
+ #include "iomap.h"
+ 
+@@ -98,6 +99,12 @@ ENTRY(tegra_shut_off_mmu)
+ 	dsb
+ 	mcr	p15, 0, r3, c1, c0, 0
+ 	isb
++#ifdef CONFIG_CACHE_L2X0
++	/* Disable L2 cache */
++	mov32	r4, TEGRA_ARM_PERIF_BASE + 0x3000
++	mov	r5, #0
++	str	r5, [r4, #L2X0_CTRL]
++#endif
+ 	mov	pc, r0
+ ENDPROC(tegra_shut_off_mmu)
+ 	.popsection
+diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
+index 6e1b949..45d4d08 100644
+--- a/arch/arm/mach-tegra/sleep.h
++++ b/arch/arm/mach-tegra/sleep.h
+@@ -71,6 +71,34 @@
+ 	str	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
+ 	dsb
+ .endm
++
++/* Macro to resume & re-enable L2 cache */
++#ifdef CONFIG_CACHE_L2X0
++.macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
++	adr	\tmp1, \phys_l2x0_saved_regs
++	ldr	\tmp1, [\tmp1]
++	ldr	\tmp2, [\tmp1, #L2X0_R_PHY_BASE]
++	ldr	\tmp3, [\tmp2, #L2X0_CTRL]
++	tst	\tmp3, #L2X0_CTRL_EN
++	bne	exit_l2_resume
++	ldr	\tmp3, [\tmp1, #L2X0_R_TAG_LATENCY]
++	str	\tmp3, [\tmp2, #L2X0_TAG_LATENCY_CTRL]
++	ldr	\tmp3, [\tmp1, #L2X0_R_DATA_LATENCY]
++	str	\tmp3, [\tmp2, #L2X0_DATA_LATENCY_CTRL]
++	ldr	\tmp3, [\tmp1, #L2X0_R_PREFETCH_CTRL]
++	str	\tmp3, [\tmp2, #L2X0_PREFETCH_CTRL]
++	ldr	\tmp3, [\tmp1, #L2X0_R_PWR_CTRL]
++	str	\tmp3, [\tmp2, #L2X0_POWER_CTRL]
++	ldr	\tmp3, [\tmp1, #L2X0_R_AUX_CTRL]
++	str	\tmp3, [\tmp2, #L2X0_AUX_CTRL]
++	mov	\tmp3, #L2X0_CTRL_EN
++	str	\tmp3, [\tmp2, #L2X0_CTRL]
++exit_l2_resume:
++.endm
++#else /* CONFIG_CACHE_L2X0 */
++.macro l2_cache_resume, tmp1, tmp2, tmp3, phys_l2x0_saved_regs
++.endm
++#endif /* CONFIG_CACHE_L2X0 */
+ #else
+ void tegra_resume(void);
+ int tegra_sleep_cpu_finish(unsigned long);
+-- 
+1.7.0.4
