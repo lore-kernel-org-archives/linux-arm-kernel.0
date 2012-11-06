@@ -1,39 +1,57 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 06 Nov 2012 10:23:38 +0530
-Subject: [PATCH V3] ARM: SAMSUNG: Delete the unnecessary variable
-Message-ID: <1352177618-16460-1-git-send-email-padma.v@samsung.com>
+Date: Tue, 06 Nov 2012 10:26:26 +0530
+Subject: [PATCH V3] ASoC: Samsung: Update Kconfig for I2S,SPDIF and PCM audio
+Message-ID: <1352177786-16505-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the RCLK src clks are registered with clkdev using generic
-connection id , these clk names need not to be passed through
-platform data. So it is deleted.
+Update Kconfig file to enable I2S,PCM audio for wm8994 and spdif on all
+samsung platforms.
 
+Signed-off-by: Sangsu Park <sangsu4u.park@samsung.com>
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
 
 Changes since V2:
-	- Rebased on 3.7-rc3
+	- Made driver selection based on SND_SOC_SAMSUNG as suggested by Olof
 	
- include/linux/platform_data/asoc-s3c.h |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+Changes since V1:
+	- Made driver selection based on MACH_EXYNOS5_DT
 
-diff --git a/include/linux/platform_data/asoc-s3c.h b/include/linux/platform_data/asoc-s3c.h
-index aa9875f..8827259 100644
---- a/include/linux/platform_data/asoc-s3c.h
-+++ b/include/linux/platform_data/asoc-s3c.h
-@@ -38,12 +38,6 @@ struct samsung_i2s {
- #define QUIRK_NEED_RSTCLR	(1 << 3)
- 	/* Quirks of the I2S controller */
- 	u32 quirks;
--
--	/*
--	 * Array of clock names that can be used to generate I2S signals.
--	 * Also corresponds to clocks of I2SMOD[10]
--	 */
--	const char **src_clk;
- 	dma_addr_t idma_addr;
- };
+ sound/soc/samsung/Kconfig |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index e7b8317..9b3b63e 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -63,7 +63,7 @@ config SND_SOC_SAMSUNG_SMDK_WM8580
  
+ config SND_SOC_SAMSUNG_SMDK_WM8994
+ 	tristate "SoC I2S Audio support for WM8994 on SMDK"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDKV310 || MACH_SMDKC210 || MACH_SMDK4212)
++	depends on SND_SOC_SAMSUNG
+ 	depends on I2C=y && GENERIC_HARDIRQS
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
+@@ -162,7 +162,7 @@ config SND_SOC_GONI_AQUILA_WM8994
+ 
+ config SND_SOC_SAMSUNG_SMDK_SPDIF
+ 	tristate "SoC S/PDIF Audio support for SMDK"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDKC100 || MACH_SMDKC110 || MACH_SMDKV210 || MACH_SMDKV310 || MACH_SMDK4212)
++	depends on SND_SOC_SAMSUNG
+ 	select SND_SAMSUNG_SPDIF
+ 	help
+ 	  Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
+@@ -177,7 +177,7 @@ config SND_SOC_SMDK_WM8580_PCM
+ 
+ config SND_SOC_SMDK_WM8994_PCM
+ 	tristate "SoC PCM Audio support for WM8994 on SMDK"
+-	depends on SND_SOC_SAMSUNG && (MACH_SMDKC210 || MACH_SMDKV310 || MACH_SMDK4212)
++	depends on SND_SOC_SAMSUNG
+ 	depends on I2C=y && GENERIC_HARDIRQS
+ 	select MFD_WM8994
+ 	select SND_SOC_WM8994
 -- 
 1.7.4.4
