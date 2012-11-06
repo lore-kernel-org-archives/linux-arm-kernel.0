@@ -1,40 +1,29 @@
 From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 6 Nov 2012 10:09:08 +0000
-Subject: [PATCH 3/7] ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for
- davinci_mdio module
-In-Reply-To: <1352189545-26303-4-git-send-email-mugunthanvnm@ti.com>
-References: <1352189545-26303-1-git-send-email-mugunthanvnm@ti.com>
- <1352189545-26303-4-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC049CC@DBDE01.ent.ti.com>
+Date: Tue, 6 Nov 2012 10:09:11 +0000
+Subject: [PATCH 3/8] ARM: OMAP: AM33xx hwmod: Add parent-child
+ relationship for PWM subsystem
+In-Reply-To: <1352106749-9437-4-git-send-email-avinashphilip@ti.com>
+References: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
+ <1352106749-9437-4-git-send-email-avinashphilip@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC049D9@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 13:42:21, N, Mugunthan V wrote:
+On Mon, Nov 05, 2012 at 14:42:24, Philip, Avinash wrote:
 [...]
-> +struct omap_hwmod_addr_space am33xx_mdio_addr_space[] = {
-> +	{
-> +		.pa_start	= 0x4A101000,
-> +		.pa_end		= 0x4A101000 + SZ_256 - 1,
-> +		.flags		= ADDR_MAP_ON_INIT,
 
-Based on the recent discussions and looking the hwmod code,
-I guess ADDR_MAP_ON_INIT does not make sense here. Since you
-are just creating a parent-child relationship here, maybe no
-flag is needed? 
-
-> +	},
-> +	{ }
-> +};
 > +
-> +struct omap_hwmod_ocp_if am33xx_cpgmac0__mdio = {
-> +	.master		= &am33xx_cpgmac0_hwmod,
-> +	.slave		= &am33xx_mdio_hwmod,
-> +	.addr		= am33xx_mdio_addr_space,
+> +static struct omap_hwmod_ocp_if am33xx_epwmss0__ecap0 = {
+> +	.master		= &am33xx_epwmss0_hwmod,
+> +	.slave		= &am33xx_ecap0_hwmod,
+> +	.clk		= "l4ls_gclk",
+> +	.addr		= am33xx_ecap0_addr_space,
 > +	.user		= OCP_USER_MPU,
+> +};
 
-Is this flag necessary? Shouldn't you just skip the
-user field since there's nothing for the hwmod code
-to do here?
+Noticed this in another patch which is quite similar so commenting here
+again. Is the user field required if you are just creating a parent-child
+relationship here?
 
 Regards,
-Vaibhav
+Vaibhav 
