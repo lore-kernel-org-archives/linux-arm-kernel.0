@@ -1,27 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 05 Nov 2012 20:25:01 -0500 (EST)
-Subject: [PATCH 15/16] mm: use vm_unmapped_area() on sparc32 architecture
-In-Reply-To: <1352155633-8648-16-git-send-email-walken@google.com>
-References: <1352155633-8648-1-git-send-email-walken@google.com>
- <1352155633-8648-16-git-send-email-walken@google.com>
-Message-ID: <20121105.202501.1246122770431623794.davem@davemloft.net>
+From: lznuaa@gmail.com (Frank Li)
+Date: Tue, 6 Nov 2012 09:36:39 +0800
+Subject: [PATCH 4/4] FEC: Add time stamping code and a PTP hardware clock
+In-Reply-To: <20121102091902.GA3437@netboy.at.omicron.at>
+References: <1351657531-25989-1-git-send-email-Frank.Li@freescale.com>
+ <20121102091902.GA3437@netboy.at.omicron.at>
+Message-ID: <CAHrpEqQsOj-m6QGr6URhOQfkdUxL8jkZUnA0ssZG3jG6zRvZjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michel Lespinasse <walken@google.com>
-Date: Mon,  5 Nov 2012 14:47:12 -0800
+>> +       Say Y here if you want to use PTP Hardware Clock (PHC) in the
+>> +       driver.  Only the basic clock operations have been implemented.
+>> +
+>
+> Does the PTP function work with every FEC on ColdFire and i.MX?
 
-> Update the sparc32 arch_get_unmapped_area function to make use of
-> vm_unmapped_area() instead of implementing a brute force search.
-> 
-> Signed-off-by: Michel Lespinasse <walken@google.com>
+No, I just test i.MX.
 
-Hmmm...
+>
+> Or do you need to limit this option in some way?
 
-> -	if (flags & MAP_SHARED)
-> -		addr = COLOUR_ALIGN(addr);
-> -	else
-> -		addr = PAGE_ALIGN(addr);
+Okay, I will do that at new patch because this patch have been accepted.
 
-What part of vm_unmapped_area() is going to duplicate this special
-aligning logic we need on sparc?
+>
+> You can reduce the time that the spin lock is held by moving the next
+> four lines before the locked region:
+>
+>> +     fep->cc.mult = FEC_CC_MULT;
+>> +     diff = fep->cc.mult;
+>> +     diff *= ppb;
+>> +     diff = div_u64(diff, 1000000000ULL);
+>
+
+Okay, I will do that at new patch and fix a bug when two boards
+directly connect at 1G mode.
