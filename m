@@ -1,28 +1,74 @@
-From: riel@redhat.com (Rik van Riel)
-Date: Tue, 06 Nov 2012 17:48:05 -0500
-Subject: [PATCH 09/16] mm: use vm_unmapped_area() in hugetlbfs on i386
- architecture
-In-Reply-To: <20121106143826.dc3b960c.akpm@linux-foundation.org>
-References: <1352155633-8648-1-git-send-email-walken@google.com>
- <1352155633-8648-10-git-send-email-walken@google.com>
- <20121106143826.dc3b960c.akpm@linux-foundation.org>
-Message-ID: <509993A5.2000605@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2012 22:46:24 +0000
+Subject: scheduler clock for MXS
+In-Reply-To: <50998F94.8000908@meduna.org>
+References: <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <5098CB9F.9030401@meduna.org>
+ <20121106134630.GD27643@S2100-06.ap.freescale.net>
+ <20121106202038.GB32398@n2100.arm.linux.org.uk> <50998F94.8000908@meduna.org>
+Message-ID: <20121106224624.GR28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2012 05:38 PM, Andrew Morton wrote:
-> On Mon,  5 Nov 2012 14:47:06 -0800
-> Michel Lespinasse <walken@google.com> wrote:
->
->> Update the i386 hugetlb_get_unmapped_area function to make use of
->> vm_unmapped_area() instead of implementing a brute force search.
->
-> The x86_64 coloring "fix" wasn't copied into i386?
+On Tue, Nov 06, 2012 at 11:30:44PM +0100, Stanislav Meduna wrote:
+> On 06.11.2012 21:20, Russell King - ARM Linux wrote:
+> > Well.  I just tried an experiment with OMAP4:
+> > [    0.000000] sched_clock: 16 bits at 32kHz, resolution 30517ns,
+> wraps every 1999ms
+> > ...
+> > [    3.070404] Freeing init memory: 192K
+> 
+> 
+> OK, so it is not a 16-bit problem either. So where is the
+> difference? Could it be that HZ / NO_HZ is playing some
+> tricks here and need to be taken into consideration?
+> 
+> I'll try to artificially limit the counter-reading function
+> on my hardware to 16 bits and look whether I can also
+> reproduce this - probably on Thursday or Friday earliest
+> (busy with other tasks now).
+> 
+> If it works I'll resubmit for only the iMX.28 and someone
+> who actually has the iMX.23 hardware to experiment with has
+> to look at it; the best start is probably to start with
+> comparing it to the working OMAP4. If it does not I'll
+> try to find the culprit.
 
-Only certain 64 bit AMD CPUs have that issue at all.
+I wonder if the NO_HZ slack is preventing the sched_clock epoch update
+from happening in time.  Hmm.
 
-On x86, page coloring is really not much of an issue.
+ * round_jiffies - function to round jiffies to a full second
 
-All the x86-64 patch does is make the x86-64 page
-coloring code behave the same way page coloring
-does on MIPS, SPARC, ARM, PA-RISC and others...
+This is probably it.  With mine, it's a 32.768kHz clock, so limiting
+it to 16-bit gives a wrap period of 2 seconds exactly.  We take 10%
+off, so the timer would be asked to fire every 1.8s, which would be
+rounded up to 2 seconds.  That's a little too close for comfort...
+
+Yours on the other hand:
+
+sched_clock: 16 bits at 32kHz, resolution 31250ns, wraps every 2047ms
+
+says that this timer runs at _exactly_ 32kHz (are you sure?  If this is
+generated from a separate 32k crystal oscilator, it's most likely
+32.768kHz because that's the standard crystal frequency.  In any case,
+this would give a wrap period of just over 2 seconds.
+
+But remember, we take of 10%, so this would give 1843ms.  Jiffy
+conversion would give 185 jiffies, and rounded up to a second gives
+200 jiffies, so again 2 seconds.
+
+I suspect that your timer _does_ run at approximately 32768kHz, meaning
+that it _does_ roll over at 2 second intervals.  But maybe it's trimmed
+to be slightly fast or maybe your kernel's idea of time is slightly
+slow - either one of which would then give you this effect.
+
+However, either way, rounding 1.8s up to 2s for a 16-bit 32768kHz
+counter isn't going to give reliable results.
+
+I think in this case, we need a version of round_jiffies() which _always_
+rounds down.  Unfortunately, it doesn't exist.  Thomas?  What are the
+options here?
