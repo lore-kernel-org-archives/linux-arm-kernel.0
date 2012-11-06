@@ -1,81 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue,  6 Nov 2012 13:57:22 +0900
-Subject: [GIT PULL v4] Renesas ARM-based SoC for v3.8
-Message-ID: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+Date: Tue,  6 Nov 2012 13:57:28 +0900
+Subject: [PATCH 06/11] ARM: shmobile: r8a7740: fixup DT machine desc name typo
+In-Reply-To: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
+Message-ID: <1352177853-6008-7-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider the following SoC enhancements for 3.8.
+r8a7740 machine desc name should be R8A7740,
+not SH7372
 
-Change since v3:
-* Remove noise from "ARM: shmobile: Remove SH7367 support"
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7740.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-----------------------------------------------------------------
-The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
-
-  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-
-for you to fetch changes up to 86bc52ef4373be64867b56f3a9e30cbabf64e0dd:
-
-  ARM: shmobile: r8a7740: Enable PMU (2012-11-06 13:47:24 +0900)
-
-----------------------------------------------------------------
-Bastian Hecht (4):
-      ARM: shmobile: emev2: Replace modify_scu_cpu_psr with scu_power_mode
-      ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with scu_power_mode
-      ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with scu_power_mode
-      ARM: mach-shmobile: add FLCTL DMA slave definitions for sh7372
-
-Kuninori Morimoto (4):
-      ARM: shmobile: r8a7740: fixup DT machine desc name typo
-      ARM: shmobile: r8a7779: add HSPI clock support
-      ARM: shmobile: r8a7779: add I2C clock support
-      ARM: shmobile: r8a7779: add I2C driver support
-
-Nobuhiro Iwamatsu (3):
-      ARM: shmobile: Remove SH7367 support
-      ARM: shmobile: Remove SH7377 support
-      ARM: shmobile: r8a7740: Enable PMU
-
- arch/arm/boot/dts/sh7377.dtsi                |   21 -
- arch/arm/configs/armadillo800eva_defconfig   |    1 +
- arch/arm/configs/marzen_defconfig            |    2 +
- arch/arm/mach-shmobile/Kconfig               |   12 -
- arch/arm/mach-shmobile/Makefile              |    6 -
- arch/arm/mach-shmobile/clock-r8a7779.c       |   16 +-
- arch/arm/mach-shmobile/clock-sh7367.c        |  355 ------
- arch/arm/mach-shmobile/clock-sh7377.c        |  366 ------
- arch/arm/mach-shmobile/include/mach/common.h |   18 -
- arch/arm/mach-shmobile/include/mach/sh7367.h |  332 -----
- arch/arm/mach-shmobile/include/mach/sh7372.h |    4 +
- arch/arm/mach-shmobile/include/mach/sh7377.h |  360 ------
- arch/arm/mach-shmobile/intc-sh7367.c         |  413 ------
- arch/arm/mach-shmobile/intc-sh7377.c         |  592 ---------
- arch/arm/mach-shmobile/pfc-sh7367.c          | 1727 --------------------------
- arch/arm/mach-shmobile/pfc-sh7377.c          | 1688 -------------------------
- arch/arm/mach-shmobile/setup-r8a7740.c       |   18 +-
- arch/arm/mach-shmobile/setup-r8a7779.c       |   77 ++
- arch/arm/mach-shmobile/setup-sh7367.c        |  481 -------
- arch/arm/mach-shmobile/setup-sh7372.c        |   20 +
- arch/arm/mach-shmobile/setup-sh7377.c        |  549 --------
- arch/arm/mach-shmobile/smp-emev2.c           |   22 +-
- arch/arm/mach-shmobile/smp-r8a7779.c         |   25 +-
- arch/arm/mach-shmobile/smp-sh73a0.c          |   23 +-
- 24 files changed, 143 insertions(+), 6985 deletions(-)
- delete mode 100644 arch/arm/boot/dts/sh7377.dtsi
- delete mode 100644 arch/arm/mach-shmobile/clock-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/clock-sh7377.c
- delete mode 100644 arch/arm/mach-shmobile/include/mach/sh7367.h
- delete mode 100644 arch/arm/mach-shmobile/include/mach/sh7377.h
- delete mode 100644 arch/arm/mach-shmobile/intc-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/intc-sh7377.c
- delete mode 100644 arch/arm/mach-shmobile/pfc-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/pfc-sh7377.c
- delete mode 100644 arch/arm/mach-shmobile/setup-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/setup-sh7377.c
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 11bb1d9..9777e2d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -747,7 +747,7 @@ static const char *r8a7740_boards_compat_dt[] __initdata = {
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(SH7372_DT, "Generic R8A7740 (Flattened Device Tree)")
++DT_MACHINE_START(R8A7740_DT, "Generic R8A7740 (Flattened Device Tree)")
+ 	.map_io		= r8a7740_map_io,
+ 	.init_early	= r8a7740_add_early_devices_dt,
+ 	.init_irq	= r8a7740_init_irq,
+-- 
+1.7.10.4
