@@ -1,69 +1,77 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue,  6 Nov 2012 13:57:33 +0900
-Subject: [PATCH 11/11] ARM: shmobile: r8a7740: Enable PMU
-In-Reply-To: <1352177853-6008-1-git-send-email-horms@verge.net.au>
-References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352177853-6008-12-git-send-email-horms@verge.net.au>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Tue, 6 Nov 2012 10:32:27 +0530
+Subject: [PATCH v2 5/6] ARM: davinci: remoteproc board support for
+ OMAP-L138 DSP
+In-Reply-To: <CAPcSpEKDAEp5rS8RRpcyHN9WUUtJNppUuKvnZ6YX-tgertJBNQ@mail.gmail.com>
+References: <1351197357-23528-1-git-send-email-rtivy@ti.com>
+ <1351197357-23528-5-git-send-email-rtivy@ti.com>
+ <CAPcSpEKDAEp5rS8RRpcyHN9WUUtJNppUuKvnZ6YX-tgertJBNQ@mail.gmail.com>
+Message-ID: <CA+V-a8uUHm5QEvzv4wxift2RTV5bLUVEJ8XBWyMZLSqNQssnhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Hi Robert,
 
-This patch enables PMU for r8a7740.
+On Thu, Nov 1, 2012 at 7:22 PM, Ben Gardiner <bengardiner@nanometrics.ca> wrote:
+> Hi Rob,
+>
+> On Thu, Oct 25, 2012 at 4:35 PM, Robert Tivy <rtivy@ti.com> wrote:
+>> [...]
+>> @@ -660,6 +667,99 @@ int __init da850_register_mmcsd1(struct davinci_mmc_config *config)
+>>  }
+>>  #endif
+>>
+>> +static struct platform_device *da8xx_dsp;
+>> +
+>> +#ifdef CONFIG_CMA
+>> +
+>> +/*
+>> + * The following address range was chosen because the XDC Platform for
+>> + * OMAP-L138 DSP has this range as its default code/data placement.
+>> + */
+>> +#define DA8XX_RPROC_CMA_BASE  (0xc3000000)
+>> [...]
+>> +/*
+>> + * The following address range was chosen because the XDC Platform for
+>> + * OMAP-L138 DSP has this range as its default code/data placement.
+>> + *
+>> + * System integrators must ensure that Linux does not own this range.
+>> + */
+>> +#define DA_CONTIG_BASE (0xc3000000)
+>> +#define DA_CONTIG_SIZE (0x02000000)
+>
+Is there a specific requirement for the dsp dev to have the buffers from
+this '0xc3000000' address range only ? If yes then dma_declare_contiguous()
+is must to ensure contiguous memory so the above macros cant be avoided.
+If there isn?t a requirement of a specific region for dsp device you can use a
+global CMA instead, so as to ensure you have contiguous memory.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-[horms at verge.net.au: corrected indentation]
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/configs/armadillo800eva_defconfig |    1 +
- arch/arm/mach-shmobile/setup-r8a7740.c     |   16 ++++++++++++++++
- 2 files changed, 17 insertions(+)
+Regards,
+--Prabhakar Lad
 
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index f78d259..3d76407 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -7,6 +7,7 @@ CONFIG_LOG_BUF_SHIFT=16
- # CONFIG_IPC_NS is not set
- # CONFIG_PID_NS is not set
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
- CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 9777e2d..6ac242c 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -590,6 +590,21 @@ static struct platform_device i2c1_device = {
- 	.num_resources	= ARRAY_SIZE(i2c1_resources),
- };
- 
-+static struct resource pmu_resources[] = {
-+	[0] = {
-+		.start	= evt2irq(0x19a0),
-+		.end	= evt2irq(0x19a0),
-+		.flags  = IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device pmu_device = {
-+	.name	= "arm-pmu",
-+	.id	= -1,
-+	.num_resources = ARRAY_SIZE(pmu_resources),
-+	.resource = pmu_resources,
-+};
-+
- static struct platform_device *r8a7740_late_devices[] __initdata = {
- 	&i2c0_device,
- 	&i2c1_device,
-@@ -597,6 +612,7 @@ static struct platform_device *r8a7740_late_devices[] __initdata = {
- 	&dma1_device,
- 	&dma2_device,
- 	&usb_dma_device,
-+	&pmu_device,
- };
- 
- /*
--- 
-1.7.10.4
+> I am concerned with the rigidity of the memory hole as its definition
+> is currently proposed.
+>
+> As you noted DA_CONTIG_BASE and DA_CONTIG_SIZE must describe a range
+> that is not used by Linux. Ideally this hole would not be in the
+> middle of the usuable memory but instead at the top. For L138 boards
+> with larger DDR packages this would mean carrying a patch to this
+> file.
+>
+> I think the same also applies to DA8XX_RPROC_CMA_BASE but I have no
+> hands-on experience yet with CMA.
+>
+> Is there any other means by which the hole's location and size can be
+> specified which does not require patching this file? I imagine KConfig
+> would work, but is this an acceptable use of KConfig?
+>
+> Best Regards,
+> Ben Gardiner
+>
+> ---
+> Nanometrics Inc.
+> http://www.nanometrics.ca
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
