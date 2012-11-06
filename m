@@ -1,52 +1,65 @@
-From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:31 +0530
-Subject: [PATCH RESEND 03/10] ARM: dts: AM33XX: Add pinmux configuration for
- volume-keys to EVM
-In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-4-git-send-email-anilkumar@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 6 Nov 2012 14:50:46 +0100
+Subject: [PATCH 08/15] ARM: OMAP2+: hwmod: Fix the omap_hwmod_addr_space
+ for CPGMAC0
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC05260@DBDE01.ent.ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-9-git-send-email-vaibhav.bedia@ti.com>
+ <509543E8.60209@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC00B9B@DBDE01.ent.ti.com>
+ <5098D889.60909@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC049E4@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB64336@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC05260@DBDE01.ent.ti.com>
+Message-ID: <509915B6.1070405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for gpio volume keys. In this patch, only
-single named mode/state is added and these pins are configured during
-pinctrl driver initialization.
+Hi Vaibhav & Vaibhav,
 
-Default mode is nothing but the values required for the module during
-active state. With this configurations module is functional as
-expected.
+On 11/06/2012 02:46 PM, Bedia, Vaibhav wrote:
+> On Tue, Nov 06, 2012 at 18:38:08, Hiremath, Vaibhav wrote:
+>> On Tue, Nov 06, 2012 at 15:39:14, Bedia, Vaibhav wrote:
+>>> On Tue, Nov 06, 2012 at 14:59:45, Hiremath, Vaibhav wrote:
+>>> [...]
+>>>>>
+>>>>> Ok I checked this one. The change I made was indirectly fixing another
+>>>>> issue with the AM33xx hwmod data. am33xx_cpgmac0_addr_space[] has two
+>>>>> entries and the SYSC register is part of the second entry. The function
+>>>>> _find_mpu_rt_addr_space in omap_hwmod.c looks for the first entry with
+>>>>> the flag ADDR_TYPE_RT flag. The change I made indirectly made the second
+>>>>> entry in am33xx_cpgmac0_addr_space[] become the first memory space with
+>>>>> the ADDR_TYPE_RT flag. Due to this the hwmod code wrote to the correct
+>>>>> SYSC address of CPGMAC0 and the IP went to standby during bootup. 
+>>>>> After changing the order of the entries in am33xx_cpgmac0_addr_space[]
+>>>>> things work fine.
+>>>>>
+>>>>
+>>>> Good catch.
+>>>>
+>>>> Just a side note on this, driver expects the addresses in this order
+>>>> only, first SS and then WR.
+>>>>
+>>>
+>>> Sorry I didn't understand your comment. For HWMOD code to work as expected,
+>>> we need to change the order. 
+>>
+>> Why do you want to change the order? Just specify "ADDR_TYPE_RT", that 
+>> should be it.
+>>
+> 
+> The problem is that the memory space without the SYSC comes first and is labeled
+> as ADDR_TYPE_RT. I think this is not correct and hence either we change the order
+> or remove the flag from the first entry. If we do the latter then taking the logic
+> of putting in the flag only for memory spaces with SYSC further we need to fixup
+> the entries for ephrpwm0/1/2 and ecap0/1/2.
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am335x-evm.dts |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+The order should not matter, just use ADDR_TYPE_RT for the relevant
+entry. I have a patch ongoing to remove this flag for the non-SYSC entry
+to avoid this kind of confusion.
+The name should probably be changed as well to reflect that at some point.
+Since these entries will be removed anyway with pure DT boot, that
+should be a temporary issue.
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 8076e66..e087b87 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -26,7 +26,7 @@
- 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <&matrix_keypad_s0>;
-+		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
- 
- 		matrix_keypad_s0: matrix_keypad_s0 {
- 			pinctrl-single,pins = <
-@@ -37,6 +37,13 @@
- 				0x6c 0x27	/* gpmc_a11.gpio1_27, INPUT | MODE7 */
- 			>;
- 		};
-+
-+		volume_keys_s0: volume_keys_s0 {
-+			pinctrl-single,pins = <
-+				0x150 0x27	/* spi0_sclk.gpio0_2, INPUT | MODE7 */
-+				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
-+			>;
-+		};
- 	};
- 
- 	ocp {
--- 
-1.7.9.5
+Regards,
+Benoit
