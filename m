@@ -1,29 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 6 Nov 2012 05:55:19 -0800
-Subject: [GIT PULL][for 3.7] pull request from upload/fix in arch-pxa git
- tree
-In-Reply-To: <CAN1soZxgXGFNqnFMM5ZaAf6tpbxPBFdmr8BqHJpOxUGVr08W=w@mail.gmail.com>
-References: <CAN1soZxgXGFNqnFMM5ZaAf6tpbxPBFdmr8BqHJpOxUGVr08W=w@mail.gmail.com>
-Message-ID: <20121106135519.GA27284@quad.lixom.net>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Tue, 6 Nov 2012 13:56:29 +0000
+Subject: [PATCH 08/15] ARM: OMAP2+: hwmod: Fix the omap_hwmod_addr_space
+ for CPGMAC0
+In-Reply-To: <509915B6.1070405@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-9-git-send-email-vaibhav.bedia@ti.com>
+ <509543E8.60209@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC00B9B@DBDE01.ent.ti.com>
+ <5098D889.60909@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC049E4@DBDE01.ent.ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB64336@DBDE01.ent.ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC05260@DBDE01.ent.ti.com>
+ <509915B6.1070405@ti.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC052C8@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 28, 2012 at 07:57:55AM +0800, Haojian Zhuang wrote:
-> Hi Olof & Arnd,
-> 
-> Please help to pull upload/fix branch from arch-pxa git tree.
-> 
-> Best Regards
-> Haojian
-> 
-> The following changes since commit 6f0c0580b70c89094b3422ba81118c7b959c7556:
-> 
->   Linux 3.7-rc2 (2012-10-20 12:11:32 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hzhuang1/linux.git upload/fix
+Hi Benoit,
 
-Thanks, pulled into fixes.
+On Tue, Nov 06, 2012 at 19:20:46, Cousson, Benoit wrote:
+> Hi Vaibhav & Vaibhav,
+> 
+> On 11/06/2012 02:46 PM, Bedia, Vaibhav wrote:
+> > On Tue, Nov 06, 2012 at 18:38:08, Hiremath, Vaibhav wrote:
+> >> On Tue, Nov 06, 2012 at 15:39:14, Bedia, Vaibhav wrote:
+> >>> On Tue, Nov 06, 2012 at 14:59:45, Hiremath, Vaibhav wrote:
+> >>> [...]
+> >>>>>
+> >>>>> Ok I checked this one. The change I made was indirectly fixing another
+> >>>>> issue with the AM33xx hwmod data. am33xx_cpgmac0_addr_space[] has two
+> >>>>> entries and the SYSC register is part of the second entry. The function
+> >>>>> _find_mpu_rt_addr_space in omap_hwmod.c looks for the first entry with
+> >>>>> the flag ADDR_TYPE_RT flag. The change I made indirectly made the second
+> >>>>> entry in am33xx_cpgmac0_addr_space[] become the first memory space with
+> >>>>> the ADDR_TYPE_RT flag. Due to this the hwmod code wrote to the correct
+> >>>>> SYSC address of CPGMAC0 and the IP went to standby during bootup. 
+> >>>>> After changing the order of the entries in am33xx_cpgmac0_addr_space[]
+> >>>>> things work fine.
+> >>>>>
+> >>>>
+> >>>> Good catch.
+> >>>>
+> >>>> Just a side note on this, driver expects the addresses in this order
+> >>>> only, first SS and then WR.
+> >>>>
+> >>>
+> >>> Sorry I didn't understand your comment. For HWMOD code to work as expected,
+> >>> we need to change the order. 
+> >>
+> >> Why do you want to change the order? Just specify "ADDR_TYPE_RT", that 
+> >> should be it.
+> >>
+> > 
+> > The problem is that the memory space without the SYSC comes first and is labeled
+> > as ADDR_TYPE_RT. I think this is not correct and hence either we change the order
+> > or remove the flag from the first entry. If we do the latter then taking the logic
+> > of putting in the flag only for memory spaces with SYSC further we need to fixup
+> > the entries for ephrpwm0/1/2 and ecap0/1/2.
+> 
+> The order should not matter, just use ADDR_TYPE_RT for the relevant
+> entry. I have a patch ongoing to remove this flag for the non-SYSC entry
+> to avoid this kind of confusion.
+> The name should probably be changed as well to reflect that at some point.
+> Since these entries will be removed anyway with pure DT boot, that
+> should be a temporary issue.
+> 
 
--Olof
+Thanks for the clarification. I'll make the change accordingly.
+
+Regards,
+Vaibhav
