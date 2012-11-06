@@ -1,58 +1,31 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Tue, 06 Nov 2012 10:34:20 +0800
-Subject: [PATCH] clk: spear: Add stub functions for spear3[0|1|2]0_clk_init()
-Message-ID: <1352169260.2625.4.camel@phoenix>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 6 Nov 2012 11:18:01 +0800
+Subject: [PATCH 09/10] ARM: SMP: add function arch_send_wakeup_ipi_mask()
+In-Reply-To: <20121102134223.GB11641@S2100-06.ap.freescale.net>
+References: <1351005779-30347-1-git-send-email-shawn.guo@linaro.org>
+ <1351005779-30347-10-git-send-email-shawn.guo@linaro.org>
+ <20121031034331.GB8100@S2100-06.ap.freescale.net>
+ <20121102134223.GB11641@S2100-06.ap.freescale.net>
+Message-ID: <20121106031759.GB27643@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes compile error if one of SPEAr3xx implementations is not selected.
+On Fri, Nov 02, 2012 at 09:42:24PM +0800, Shawn Guo wrote:
+> On Wed, Oct 31, 2012 at 11:43:34AM +0800, Shawn Guo wrote:
+> > On Tue, Oct 23, 2012 at 11:22:58PM +0800, Shawn Guo wrote:
+> > > Add function arch_send_wakeup_ipi_mask(), so that platform code can
+> > > use it as an easy way to wake up cores that are in WFI.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > 
+> > Hi Russell,
+> > 
+> > Can I ask for your ack to have the patch go via arm-soc being part
+> > of the series?
+> > 
+> Ping
+> 
+Okay, just tried another way around - put it into patch track system.
 
-  CC      drivers/clk/spear/spear3xx_clock.o
-drivers/clk/spear/spear3xx_clock.c: In function 'spear3xx_clk_init':
-drivers/clk/spear/spear3xx_clock.c:599:3: error: implicit declaration of function 'spear300_clk_init' [-Werror=implicit-function-declaration]
-drivers/clk/spear/spear3xx_clock.c:601:3: error: implicit declaration of function 'spear310_clk_init' [-Werror=implicit-function-declaration]
-drivers/clk/spear/spear3xx_clock.c:603:3: error: implicit declaration of function 'spear320_clk_init' [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
-make[3]: *** [drivers/clk/spear/spear3xx_clock.o] Error 1
-make[2]: *** [drivers/clk/spear] Error 2
-make[1]: *** [drivers/clk] Error 2
-make: *** [drivers] Error 2
-
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/clk/spear/spear3xx_clock.c |    6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/clk/spear/spear3xx_clock.c b/drivers/clk/spear/spear3xx_clock.c
-index c315745..59049cf 100644
---- a/drivers/clk/spear/spear3xx_clock.c
-+++ b/drivers/clk/spear/spear3xx_clock.c
-@@ -157,6 +157,8 @@ static void __init spear300_clk_init(void)
- 			1);
- 	clk_register_clkdev(clk, NULL, "a0000000.kbd");
- }
-+#else
-+static inline void spear300_clk_init(void) { }
- #endif
- 
- /* array of all spear 310 clock lookups */
-@@ -197,6 +199,8 @@ static void __init spear310_clk_init(void)
- 			1);
- 	clk_register_clkdev(clk, NULL, "b2200000.serial");
- }
-+#else
-+static inline void spear310_clk_init(void) { }
- #endif
- 
- /* array of all spear 320 clock lookups */
-@@ -336,6 +340,8 @@ static void __init spear320_clk_init(void)
- 			&_lock);
- 	clk_register_clkdev(clk, NULL, "60100000.serial");
- }
-+#else
-+static inline void spear320_clk_init(void) { }
- #endif
- 
- void __init spear3xx_clk_init(void)
--- 
-1.7.9.5
+Shawn
