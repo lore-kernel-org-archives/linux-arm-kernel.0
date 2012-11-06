@@ -1,62 +1,41 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:36 +0530
-Subject: [PATCH RESEND 08/10] ARM: dts: AM33XX: Add user-leds device tree data
- to am335x-evmsk
-In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-9-git-send-email-anilkumar@ti.com>
+Date: Tue, 6 Nov 2012 19:18:28 +0530
+Subject: [PATCH RESEND 00/10] ARM: dts: AM33XX: Add device tree data
+Message-ID: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio-leds device tree data to am335x-evmsk device to enable gpio
-based user-leds (USR0, USR1, USR2 and USR3) present on am335x starter
-kit.
+Add device tree date for GPIO based various drivers matrix keypad,
+volume keys, push buttons and use leds accross three AM33XX devices
+viz EVM, BeagleBone and Starter Kit.
 
-Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
----
- arch/arm/boot/dts/am335x-evmsk.dts |   30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+To make it functional this series also adds pinctrl data for all
+the GPIOs used by various drivers. In this series only default state
+pinmux/conf settings are added because of sleep/idle state pinctrl
+values are not available.
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 659ec5b..7262fa8 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -100,6 +100,36 @@
- 		regulator-name = "lis3_reg";
- 		regulator-boot-on;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led at 1 {
-+			label = "evmsk:green:usr0";
-+			gpios = <&gpio2 4 0>;
-+			default-state = "off";
-+		};
-+
-+		led at 2 {
-+			label = "evmsk:green:usr1";
-+			gpios = <&gpio2 5 0>;
-+			default-state = "off";
-+		};
-+
-+		led at 3 {
-+			label = "evmsk:green:mmc0";
-+			gpios = <&gpio2 6 0>;
-+			linux,default-trigger = "mmc0";
-+			default-state = "off";
-+		};
-+
-+		led at 4 {
-+			label = "evmsk:green:heartbeat";
-+			gpios = <&gpio2 7 0>;
-+			linux,default-trigger = "heartbeat";
-+			default-state = "off";
-+		};
-+	};
- };
- 
- /include/ "tps65910.dtsi"
+These patches are based on linux-omap-dt:for_3.8/dts_part2 tree and
+these were tested on am33xx devices according to added functionality.
+
+Change log:
+	- Rebased on for_3.8/dts_part2
+
+AnilKumar Ch (10):
+  ARM: dts: AM33XX: Add pinmux configuration for matrix keypad to EVM
+  ARM: dts: AM33XX: Add matrix keypad device tree data to am335x-evm
+  ARM: dts: AM33XX: Add pinmux configuration for volume-keys to EVM
+  ARM: dts: AM33XX: Add volume-keys device tree data to am335x-evm
+  ARM: dts: AM33XX: Add pinmux configuration for user-leds to BONE
+  ARM: dts: AM33XX: Add user-leds device tree data to am335x-bone
+  ARM: dts: AM33XX: Add pinmux configuration for gpio-leds to EVMSK
+  ARM: dts: AM33XX: Add user-leds device tree data to am335x-evmsk
+  ARM: dts: AM33XX: Add pinmux configuration for gpio-keys to EVMSK
+  ARM: dts: AM33XX: Add push-buttons device tree data to am335x-evmsk
+
+ arch/arm/boot/dts/am335x-bone.dts  |   44 +++++++++++++++++++
+ arch/arm/boot/dts/am335x-evm.dts   |   63 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/am335x-evmsk.dts |   84 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 191 insertions(+)
+
 -- 
 1.7.9.5
