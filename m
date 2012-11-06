@@ -1,47 +1,126 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 6 Nov 2012 23:32:57 +0100
-Subject: [PATCH V2 1/4] arm: mvebu: increase atomic coherent pool size
- for armada 370/XP
-In-Reply-To: <5099810D.9040902@web.de>
-References: <5099810D.9040902@web.de>
-Message-ID: <20121106223257.GB30428@lunn.ch>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 6 Nov 2012 14:38:15 -0800
+Subject: [PATCH 03/16] mm: check rb_subtree_gap correctness
+In-Reply-To: <1352155633-8648-4-git-send-email-walken@google.com>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+ <1352155633-8648-4-git-send-email-walken@google.com>
+Message-ID: <20121106143815.2d311383.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 10:28:45PM +0100, S?ren Moch wrote:
-> resent as plain text, sorry.
-> 
-> 
-> > For Armada 370/XP we have the same problem that for the commit
-> > cb01b63, so we applied the same solution: "The default 256 KiB
-> > coherent pool may be too small for some of the Kirkwood devices, so
-> > increase it to make sure that devices will be able to allocate their
-> > buffers with GFP_ATOMIC flag"
-> 
-> I see a regression from linux-3.5 to linux-3.6 and think there might
-> be a fundamental problem
-> with this patch. On my Kirkwood system (guruplug server plus) with
-> linux-3.6.2 I see following
-> errors and corresponding malfunction even with further increased
-> (2M, 4M) pool size:
-> 
-> Oct 19 00:41:22 guru kernel: ERROR: 4096 KiB atomic DMA coherent
-> pool is too small!
-> Oct 19 00:41:22 guru kernel: Please increase it with coherent_pool=
-> kernel parameter!
-> 
-> So I had to downgrade to linux-3.5 which is running without problems.
-> 
-> I use SATA and several DVB sticks (em28xx / drxk and dib0700).
+On Mon,  5 Nov 2012 14:47:00 -0800
+Michel Lespinasse <walken@google.com> wrote:
 
-I'm guess its the DVB sticks which are causing the problems. We have a
-number of kirkwood devices with two SATA devices which had problems
-until we extended the coherent_pool. The DVB sticks are probably take
-more coherent RAM. There was also an issue found recently:
+> When CONFIG_DEBUG_VM_RB is enabled, check that rb_subtree_gap is
+> correctly set for every vma and that mm->highest_vm_end is also correct.
+> 
+> Also add an explicit 'bug' variable to track if browse_rb() detected any
+> invalid condition.
+> 
+> ...
+>
+> @@ -365,7 +365,7 @@ static void vma_rb_erase(struct vm_area_struct *vma, struct rb_root *root)
+>  #ifdef CONFIG_DEBUG_VM_RB
+>  static int browse_rb(struct rb_root *root)
+>  {
+> -	int i = 0, j;
+> +	int i = 0, j, bug = 0;
+>  	struct rb_node *nd, *pn = NULL;
+>  	unsigned long prev = 0, pend = 0;
+>  
+> @@ -373,29 +373,33 @@ static int browse_rb(struct rb_root *root)
+>  		struct vm_area_struct *vma;
+>  		vma = rb_entry(nd, struct vm_area_struct, vm_rb);
+>  		if (vma->vm_start < prev)
+> -			printk("vm_start %lx prev %lx\n", vma->vm_start, prev), i = -1;
+> +			printk("vm_start %lx prev %lx\n", vma->vm_start, prev), bug = 1;
+>  		if (vma->vm_start < pend)
+> -			printk("vm_start %lx pend %lx\n", vma->vm_start, pend);
+> +			printk("vm_start %lx pend %lx\n", vma->vm_start, pend), bug = 1;
+>  		if (vma->vm_start > vma->vm_end)
+> -			printk("vm_end %lx < vm_start %lx\n", vma->vm_end, vma->vm_start);
+> +			printk("vm_end %lx < vm_start %lx\n", vma->vm_end, vma->vm_start), bug = 1;
+> +		if (vma->rb_subtree_gap != vma_compute_subtree_gap(vma))
+> +			printk("free gap %lx, correct %lx\n",
+> +			       vma->rb_subtree_gap,
+> +			       vma_compute_subtree_gap(vma)), bug = 1;
 
-http://www.spinics.net/lists/arm-kernel/msg203962.html
+OK, now who did that.  Whoever it was: stop it or you'll have your
+kernel license revoked!
 
-That conversation has gone quiet, but that could be because the
-participants are at ELCE.
-
-	     Andrew
+--- a/mm/mmap.c~mm-check-rb_subtree_gap-correctness-fix
++++ a/mm/mmap.c
+@@ -372,16 +372,25 @@ static int browse_rb(struct rb_root *roo
+ 	for (nd = rb_first(root); nd; nd = rb_next(nd)) {
+ 		struct vm_area_struct *vma;
+ 		vma = rb_entry(nd, struct vm_area_struct, vm_rb);
+-		if (vma->vm_start < prev)
+-			printk("vm_start %lx prev %lx\n", vma->vm_start, prev), bug = 1;
+-		if (vma->vm_start < pend)
+-			printk("vm_start %lx pend %lx\n", vma->vm_start, pend), bug = 1;
+-		if (vma->vm_start > vma->vm_end)
+-			printk("vm_end %lx < vm_start %lx\n", vma->vm_end, vma->vm_start), bug = 1;
+-		if (vma->rb_subtree_gap != vma_compute_subtree_gap(vma))
++		if (vma->vm_start < prev) {
++			printk("vm_start %lx prev %lx\n", vma->vm_start, prev);
++			bug = 1;
++		}
++		if (vma->vm_start < pend) {
++			printk("vm_start %lx pend %lx\n", vma->vm_start, pend);
++			bug = 1;
++		}
++		if (vma->vm_start > vma->vm_end) {
++			printk("vm_end %lx < vm_start %lx\n",
++				vma->vm_end, vma->vm_start);
++			bug = 1;
++		}
++		if (vma->rb_subtree_gap != vma_compute_subtree_gap(vma)) {
+ 			printk("free gap %lx, correct %lx\n",
+ 			       vma->rb_subtree_gap,
+-			       vma_compute_subtree_gap(vma)), bug = 1;
++			       vma_compute_subtree_gap(vma));
++			bug = 1;
++		}
+ 		i++;
+ 		pn = nd;
+ 		prev = vma->vm_start;
+@@ -390,8 +399,10 @@ static int browse_rb(struct rb_root *roo
+ 	j = 0;
+ 	for (nd = pn; nd; nd = rb_prev(nd))
+ 		j++;
+-	if (i != j)
+-		printk("backwards %d, forwards %d\n", j, i), bug = 1;
++	if (i != j) {
++		printk("backwards %d, forwards %d\n", j, i);
++		bug = 1;
++	}
+ 	return bug ? -1 : i;
+ }
+ 
+@@ -411,14 +422,20 @@ void validate_mm(struct mm_struct *mm)
+ 		vma = vma->vm_next;
+ 		i++;
+ 	}
+-	if (i != mm->map_count)
+-		printk("map_count %d vm_next %d\n", mm->map_count, i), bug = 1;
+-	if (highest_address != mm->highest_vm_end)
++	if (i != mm->map_count) {
++		printk("map_count %d vm_next %d\n", mm->map_count, i);
++		bug = 1;
++	}
++	if (highest_address != mm->highest_vm_end) {
+ 		printk("mm->highest_vm_end %lx, found %lx\n",
+-		       mm->highest_vm_end, highest_address), bug = 1;
++		       mm->highest_vm_end, highest_address);
++		bug = 1;
++	}
+ 	i = browse_rb(&mm->mm_rb);
+-	if (i != mm->map_count)
+-		printk("map_count %d rb %d\n", mm->map_count, i), bug = 1;
++	if (i != mm->map_count) {
++		printk("map_count %d rb %d\n", mm->map_count, i);
++		bug = 1;
++	}
+ 	BUG_ON(bug);
+ }
+ #else
