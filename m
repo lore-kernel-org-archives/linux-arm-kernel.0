@@ -1,52 +1,50 @@
 From: anilkumar@ti.com (AnilKumar Ch)
-Date: Tue, 6 Nov 2012 19:18:32 +0530
-Subject: [PATCH RESEND 04/10] ARM: dts: AM33XX: Add volume-keys device tree
- data to am335x-evm
+Date: Tue, 6 Nov 2012 19:18:35 +0530
+Subject: [PATCH RESEND 07/10] ARM: dts: AM33XX: Add pinmux configuration for
+ gpio-leds to EVMSK
 In-Reply-To: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
 References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
-Message-ID: <1352209718-5586-5-git-send-email-anilkumar@ti.com>
+Message-ID: <1352209718-5586-8-git-send-email-anilkumar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add gpio based volume keys device tree data to am335x-evm by adding
-all the required parameters like keycode, gpios and etc.
+Add pinmux configurations for gpio based volume keys to am335x-evmsk.
+In this patch, only single named mode/state is added and these pins
+are configured during pinctrl driver initialization.
+
+Default mode is nothing but the values required for the module during
+active state. With this configurations module is functional as
+expected.
 
 Signed-off-by: AnilKumar Ch <anilkumar@ti.com>
 ---
- arch/arm/boot/dts/am335x-evm.dts |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/am335x-evmsk.dts |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index e087b87..9f65f17 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -137,6 +137,27 @@
- 				0x0101001c	/* ENTER */
- 				0x0201006c>;	/* DOWN */
+diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
+index 6f53879..659ec5b 100644
+--- a/arch/arm/boot/dts/am335x-evmsk.dts
++++ b/arch/arm/boot/dts/am335x-evmsk.dts
+@@ -30,6 +30,20 @@
+ 		reg = <0x80000000 0x10000000>; /* 256 MB */
  	};
+ 
++	am33xx_pinmux: pinmux at 44e10800 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&user_leds_s0>;
 +
-+	gpio_keys: volume_keys at 0 {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		switch at 9 {
-+			label = "volume-up";
-+			linux,code = <115>;
-+			gpios = <&gpio1 2 1>;
-+			gpio-key,wakeup;
-+		};
-+
-+		switch at 10 {
-+			label = "volume-down";
-+			linux,code = <114>;
-+			gpios = <&gpio1 3 1>;
-+			gpio-key,wakeup;
++		user_leds_s0: user_leds_s0 {
++			pinctrl-single,pins = <
++				0x10 0x7	/* gpmc_ad4.gpio1_4, OUTPUT | MODE7 */
++				0x14 0x7	/* gpmc_ad5.gpio1_5, OUTPUT | MODE7 */
++				0x18 0x7	/* gpmc_ad6.gpio1_6, OUTPUT | MODE7 */
++				0x1c 0x7	/* gpmc_ad7.gpio1_7, OUTPUT | MODE7 */
++			>;
 +		};
 +	};
- };
- 
- /include/ "tps65910.dtsi"
++
+ 	ocp {
+ 		uart1: serial at 44e09000 {
+ 			status = "okay";
 -- 
 1.7.9.5
