@@ -1,47 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 12:40:12 -0800
-Subject: [PATCHv2 1/6] arch: Change defconfigs to point to g_mass_storage.
-In-Reply-To: <20121106203226.GB6291@arwen.pp.htv.fi>
-References: <cover.1351715302.v2.git.mina86@mina86.com>
- <46dde680f525562e9fd19567deb5247f0bf26842.1351715302.v2.git.mina86@mina86.com>
- <20121106113157.GE11931@arwen.pp.htv.fi>
- <20121106184117.GJ6801@atomide.com>
- <20121106184227.GK6801@atomide.com>
- <20121106203226.GB6291@arwen.pp.htv.fi>
-Message-ID: <20121106204012.GP6801@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2012 21:00:56 +0000
+Subject: ARM: idle sleep time for hotplugged cpu
+In-Reply-To: <509971F4.4060604@codeaurora.org>
+References: <50973842.9010708@codeaurora.org>
+ <20121105091533.GB28327@n2100.arm.linux.org.uk>
+ <509971F4.4060604@codeaurora.org>
+Message-ID: <20121106210056.GC32398@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [121106 12:40]:
-> Hi,
-> 
-> On Tue, Nov 06, 2012 at 10:42:27AM -0800, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [121106 10:41]:
-> > > * Felipe Balbi <balbi@ti.com> [121106 03:40]:
-> > > > Hi,
-> > > > 
-> > > > On Fri, Nov 02, 2012 at 02:31:50PM +0100, Michal Nazarewicz wrote:
-> > > > > From: Michal Nazarewicz <mina86@mina86.com>
-> > > > > 
-> > > > > The File-backed Storage Gadget (g_file_storage) is being removed, since
-> > > > > it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
-> > > > > changes defconfigs point to the new gadget.
-> > > > > 
-> > > > > Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> > > > 
-> > > > I need more Acks here. Only got one from Nicolas. Anyone else ?
-> > > 
-> > > For omaps:
-> > > 
-> > > Acked-by: Tony Lindgren <tony@atomide.com>
+On Tue, Nov 06, 2012 at 12:24:20PM -0800, Steve Muckle wrote:
+> On 11/05/12 01:15, Russell King - ARM Linux wrote:
+> > On Mon, Nov 05, 2012 at 09:23:38AM +0530, Taniya Das wrote:
+> >> I was looking at the arch/arm/process.c:cpu_die, I was wondering why we
+> >> do not exit from NOHZ for a hotplugged/offline cpu?
 > > 
-> > Heh I guess no omap changes there, so probably not
-> > worth adding then.
+> > Offlined CPUs are not supposed to just 'return' from cpu_die(), and
+> > in actual fact they can't.
 > 
-> omap1 is old, but it's still omap :-)
-> 
->  arch/arm/configs/omap1_defconfig                   |    3 +--
+> Although an offline CPU will not come back into the idle thread by
+> returning from cpu_die(), I believe the question about exiting nohz mode
+> before cpu_die() still stands.
 
-Oh OK so it was not a spurious ack after all :)
+Well, that depends on the design of all that.  I don't know that, but
+what I do know is we're doing exactly the same as x86 which I presume
+is correct.
 
-Tony
+> >From arch/arm/process.c:cpu_idle() it appears a CPU could enter
+> pm_idle() for a while (in nohz mode), then execute the inner loop again
+> and call cpu_die(). Is there the potential for cpu idle time accounting
+> to get messed up here by not exiting nohz mode prior to the cpu dying,
+> so that missed ticks from nohz are properly accounted for?
+
+Why does the idle time matter if the CPU has been taken offline?
+
+In any case, I think this is a question for the CPU idle people; it's not
+a feature that I've ever knowingly used or have any interest in using at
+the moment.
