@@ -1,41 +1,63 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Tue, 6 Nov 2012 10:09:14 +0000
-Subject: [PATCH 08/15] ARM: OMAP2+: hwmod: Fix the omap_hwmod_addr_space
- for CPGMAC0
-In-Reply-To: <5098D889.60909@ti.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-9-git-send-email-vaibhav.bedia@ti.com>
- <509543E8.60209@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC00B9B@DBDE01.ent.ti.com>
- <5098D889.60909@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC049E4@DBDE01.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 6 Nov 2012 10:12:29 +0000
+Subject: scheduler clock for MXS [Was: Re: Wakeup latency measured with
+ SCHED_TRACER depends on HZ]
+In-Reply-To: <20121106024052.GA27643@S2100-06.ap.freescale.net>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <20121106024052.GA27643@S2100-06.ap.freescale.net>
+Message-ID: <20121106101229.GN28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 14:59:45, Hiremath, Vaibhav wrote:
-[...]
-> > 
-> > Ok I checked this one. The change I made was indirectly fixing another
-> > issue with the AM33xx hwmod data. am33xx_cpgmac0_addr_space[] has two
-> > entries and the SYSC register is part of the second entry. The function
-> > _find_mpu_rt_addr_space in omap_hwmod.c looks for the first entry with
-> > the flag ADDR_TYPE_RT flag. The change I made indirectly made the second
-> > entry in am33xx_cpgmac0_addr_space[] become the first memory space with
-> > the ADDR_TYPE_RT flag. Due to this the hwmod code wrote to the correct
-> > SYSC address of CPGMAC0 and the IP went to standby during bootup. 
-> > After changing the order of the entries in am33xx_cpgmac0_addr_space[]
-> > things work fine.
-> > 
+On Tue, Nov 06, 2012 at 10:40:54AM +0800, Shawn Guo wrote:
+> Here is the boot log on my imx23 board after applying both Stanislav's
+> and Katsuki's patches.
 > 
-> Good catch.
-> 
-> Just a side note on this, driver expects the addresses in this order
-> only, first SS and then WR.
-> 
+> [    0.000000] Booting Linux on physical CPU 0
+> [    0.000000] Linux version 3.7.0-rc1-00012-ga31941d (r65073 at S2101-09) (gcc ver
+> sion 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5) ) #756 Tue Nov 6 10:04:30 CST 2012
+> [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+> [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> [    0.000000] Machine: Freescale i.MX23 (Device Tree), model: Freescale i.MX23
+> Evaluation Kit
+> [    0.000000] Memory policy: ECC disabled, Data cache writeback
+> [    0.000000] On node 0 totalpages: 32768
+> [    0.000000] free_area_init_node: node 0, pgdat c051ada8, node_mem_map c0a7000
+> 0
+> [    0.000000]   Normal zone: 256 pages used for memmap
+> [    0.000000]   Normal zone: 0 pages reserved
+> [    0.000000]   Normal zone: 32512 pages, LIFO batch:7
+> [    0.000000] pcpu-alloc: s0 r0 d32768 u32768 alloc=1*32768
+> [    0.000000] pcpu-alloc: [0] 0
+> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pag
+> es: 32512
+> [    0.000000] Kernel command line: console=ttyAMA0,115200 debug earlyprintk roo
+> t=/dev/mmcblk0p3 rw rootwait no_console_suspend
+> [    0.000000] PID hash table entries: 512 (order: -1, 2048 bytes)
+> [    0.000000] Dentry cache hash table entries: 16384 (order: 4, 65536 bytes)
+> [    0.000000] Inode-cache hash table entries: 8192 (order: 3, 32768 bytes)
+> [    0.000000] Memory: 128MB = 128MB total
+> [    0.000000] Memory: 119200k/119200k available, 11872k reserved, 0K highmem
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> [    0.000000]     fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
+> [    0.000000]     vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
+> [    0.000000]     lowmem  : 0xc0000000 - 0xc8000000   ( 128 MB)
+> [    0.000000]     modules : 0xbf000000 - 0xc0000000   (  16 MB)
+> [    0.000000]       .text : 0xc0008000 - 0xc04bf150   (4829 kB)
+> [    0.000000]       .init : 0xc04c0000 - 0xc04e29cc   ( 139 kB)
+> [    0.000000]       .data : 0xc04e4000 - 0xc051d5c0   ( 230 kB)
+> [    0.000000]        .bss : 0xc051d5e4 - 0xc0a6ce38   (5439 kB)
+> [    0.000000] SLUB: Genslabs=13, HWalign=32, Order=0-3, MinObjects=0, CPUs=1, N
+> odes=1
+> [    0.000000] NR_IRQS:16 nr_irqs:16 16
+> [    0.000000] of_irq_init: children remain, but no parents
+> [    0.000000] sched_clock: 16 bits at 32kHz, resolution 31250ns, wraps every 20
+> 47ms
 
-Sorry I didn't understand your comment. For HWMOD code to work as expected,
-we need to change the order. Are you saying that I should not be doing this
-because the driver will get affected?
-
-Regards,
-Vaibhav
+So where are you setting this up?  My guess is it's after time_init()
+has done its stuff.
