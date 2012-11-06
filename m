@@ -1,25 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 6 Nov 2012 08:30:37 +0000
-Subject: [GIT PULL v2] Renesas ARM-based SoC defconfig for v3.8
-In-Reply-To: <20121106023232.GP2944@verge.net.au>
-References: <1351731731-8435-1-git-send-email-horms@verge.net.au>
- <20121106023232.GP2944@verge.net.au>
-Message-ID: <201211060830.37220.arnd@arndb.de>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Tue, 06 Nov 2012 09:34:39 +0100
+Subject: scheduler clock for MXS
+In-Reply-To: <20121105222859.GI28327@n2100.arm.linux.org.uk>
+References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+Message-ID: <5098CB9F.9030401@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012, Simon Horman wrote:
-> On Thu, Nov 01, 2012 at 09:02:08AM +0800, Simon Horman wrote:
-> > Hi Olof, Hi Arnd,
-> > 
-> > please consider the following defconfig enhancements for 3.8.
-> 
-> Ping.
-> 
+On 05.11.2012 23:28, Russell King - ARM Linux wrote:
 
-Thanks for the reminder. Olof and I were both attending Linaro Connect last
-week and did not merge any pull requests. Olof just started new merges
-yesterday, he'll get to it today I assume. If not, I can take care of them
-tomorrow.
+> It most certainly does handle the wrapping correctly - it was designed
+> to from the very start.
 
-	Arnd
+I'm not an expert on Linux kernel and its core infrastructure,
+but how is the sched_clock_timer armed for the first time
+after calling setup_sched_clock?
+
+The explicitely called update_sched_clock() does _not_ arm it.
+
+Shawn: could you try change the
+  update_sched_clock();
+to
+  sched_clock_poll(sched_clock_timer.data);
+right after update_sched_clock call in setup_sched_clock?
+
+Regards
+-- 
+                                    Stano
