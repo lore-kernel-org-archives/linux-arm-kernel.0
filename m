@@ -1,10 +1,10 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue,  6 Nov 2012 13:57:26 +0900
-Subject: [PATCH 04/11] ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with
+Date: Tue,  6 Nov 2012 13:57:25 +0900
+Subject: [PATCH 03/11] ARM: shmobile: emev2: Replace modify_scu_cpu_psr with
  scu_power_mode
 In-Reply-To: <1352177853-6008-1-git-send-email-horms@verge.net.au>
 References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352177853-6008-5-git-send-email-horms@verge.net.au>
+Message-ID: <1352177853-6008-4-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,70 +18,60 @@ we save the locking overhead too.
 Signed-off-by: Bastian Hecht <hechtb@gmail.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-sh73a0.c |   23 ++---------------------
- 1 file changed, 2 insertions(+), 21 deletions(-)
+ arch/arm/mach-shmobile/smp-emev2.c |   22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index 624f00f..96ddb97 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -41,9 +41,6 @@ static void __iomem *scu_base_addr(void)
- 	return (void __iomem *)0xf0000000;
- }
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index f674562..535426c 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -32,24 +32,8 @@
+ 
+ #define EMEV2_SCU_BASE 0x1e000000
  
 -static DEFINE_SPINLOCK(scu_lock);
--static unsigned long tmp;
--
- #ifdef CONFIG_HAVE_ARM_TWD
- static DEFINE_TWD_LOCAL_TIMER(twd_local_timer, 0xf0000600, 29);
- void __init sh73a0_register_twd(void)
-@@ -52,20 +49,6 @@ void __init sh73a0_register_twd(void)
- }
- #endif
+ static void __iomem *scu_base;
  
 -static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
 -{
--	void __iomem *scu_base = scu_base_addr();
+-	unsigned long tmp;
 -
+-	/* we assume this code is running on a different cpu
+-	 * than the one that is changing coherency setting */
 -	spin_lock(&scu_lock);
--	tmp = __raw_readl(scu_base + 8);
+-	tmp = readl(scu_base + 8);
 -	tmp &= ~clr;
 -	tmp |= set;
+-	writel(tmp, scu_base + 8);
 -	spin_unlock(&scu_lock);
 -
--	/* disable cache coherency after releasing the lock */
--	__raw_writel(tmp, scu_base + 8);
 -}
 -
- static unsigned int __init sh73a0_get_core_count(void)
+ static unsigned int __init emev2_get_core_count(void)
  {
- 	void __iomem *scu_base = scu_base_addr();
-@@ -83,7 +66,7 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 	if (!scu_base) {
+@@ -95,7 +79,7 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
  	cpu = cpu_logical_map(cpu);
  
  	/* enable cache coherency */
 -	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	scu_power_mode(scu_base_addr(), 0);
++	scu_power_mode(scu_base, 0);
  
- 	if (((__raw_readl(PSTR) >> (4 * cpu)) & 3) == 3)
- 		__raw_writel(1 << cpu, WUPCR);	/* wake up */
-@@ -95,8 +78,6 @@ static int __cpuinit sh73a0_boot_secondary(unsigned int cpu, struct task_struct
+ 	/* Tell ROM loader about our vector (in headsmp.S) */
+ 	emev2_set_boot_vector(__pa(shmobile_secondary_vector));
+@@ -106,12 +90,10 @@ static int __cpuinit emev2_boot_secondary(unsigned int cpu, struct task_struct *
  
- static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
  {
 -	int cpu = cpu_logical_map(0);
 -
- 	scu_enable(scu_base_addr());
- 
- 	/* Map the reset vector (in headsmp.S) */
-@@ -104,7 +85,7 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
- 	__raw_writel(__pa(shmobile_secondary_vector), SBAR);
+ 	scu_enable(scu_base);
  
  	/* enable cache coherency on CPU0 */
 -	modify_scu_cpu_psr(0, 3 << (cpu * 8));
-+	scu_power_mode(scu_base_addr(), 0);
++	scu_power_mode(scu_base, 0);
  }
  
- static void __init sh73a0_smp_init_cpus(void)
+ static void __init emev2_smp_init_cpus(void)
 -- 
 1.7.10.4
