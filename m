@@ -1,51 +1,84 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 7 Nov 2012 02:39:07 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP: second set of PRCM cleanups for 3.8
-In-Reply-To: <20121107015841.GC6801@atomide.com>
-References: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
- <20121106220833.GQ6801@atomide.com>
- <alpine.DEB.2.00.1211070150100.8758@utopia.booyaka.com>
- <20121107015841.GC6801@atomide.com>
-Message-ID: <alpine.DEB.2.00.1211070227500.8758@utopia.booyaka.com>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue,  6 Nov 2012 19:57:06 -0700
+Subject: [PATCH v3 0/7] crypto: omap-sham updates
+Message-ID: <1352257033-32495-1-git-send-email-mgreer@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Nov 2012, Tony Lindgren wrote:
+From: "Mark A. Greer" <mgreer@animalcreek.com>
 
-> * Paul Walmsley <paul@pwsan.com> [121106 17:54]:
-> > On Tue, 6 Nov 2012, Tony Lindgren wrote:
-> > 
-> > > ..now wondering which configs do not build for you at 7fc54fd3?
-> > > 
-> > > It builds at least all my test configs. Well at least the ones
-> > > I have recovered after accidentally deleting some files yesterday,
-> > > did not have a back up copy of two of them.
-> 
-> The build errors you are talking about are the ones I already pulled
-> into one of the cleanup branches, right? If so, that's fine.
+Changes since v2:
+	- Reworked pm_runtime calls to match where original clk_*
+	  calls were so provide better PM (as per Kevin Hilman's
+	  comments).
 
-The build logs I sent were for the "ARM: OMAP: second set of PRCM 
-cleanups for 3.8" branch.  The last commit in that branch is 
-f17d60d20eb8e679cdd1e9d507394237e58ce0d8 and it is based on 	
-7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33.  That one builds cleanly.
-
-If you're asking for a test build of the base commit, 
-7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33, I just kicked off a test build 
-of that; will post when done.
-
-> > Maybe the versions of the rmk configs you're using are different than 
-> > mine?  The ones here were updated during the v3.6 -> v3.7-rc1 transition.
-> > You can find mine at:
-> > 
-> > http://www.pwsan.com/omap/testlogs/prcm_cleanup_b_3.8/20121101044824/build/rmk_omap3430_ldp_oldconfig/rmk_omap3430_ldp_oldconfig
-> > 
-> > http://www.pwsan.com/omap/testlogs/prcm_cleanup_b_3.8/20121101044824/build/rmk_omap4430_sdp_oldconfig/rmk_omap4430_sdp_oldconfig
-> 
-> I'm getting errors with the allnoconfig ones, there are total four
-> omap defconfigs there not counting the randconfigs.
-
-That might indeed explain the discrepancy; so far only have been building 
-his oldconfig seeds here.  Will add his allnoconfig seeds and test again.
+Changes since v1:
+	- Removed the check of CM_IDLEST to see if the module exists
+	  and instead add the hwmod data for all omap2's and omap3 GP's.
+	- Placed new sha_ick clk entries after the 'omap-sham' entry
+	  in the clockxxx_data.c files
+	- Removed cpu_is_xxx() checks in
+	  arch/arm/mach-omap2/devices.c:omap_init_sham()
+	- Rebased on the latest k.o. kernel
 
 
-- Paul
+This series updates the crypto omap-sham driver and supporting
+infrastructure.
+
+Notes:
+
+a) Based on v3.7-rc4
+
+b) Since these patches will likely go though the OMAP tree (and not
+   through the crypto tree), it would be nice if the crypto guy(s)
+   would ACK or NACK patches 5-7 which modify the
+   drivers/crypto/omap-sham.c driver.
+
+c) These have only been tested on an omap2420 h4 and an am37x evm.  If you
+   have different hardware available and a few minutes, please test them.
+   A quick and easy test is to enable tcrypt as a module
+   (CONFIG_CRYPTO_TEST=m), boot, then run 'modprobe tcrypt sec=2 mode=403'.
+   'CONFIG_CRYPTO_SHA1' and 'CONFIG_CRYPTO_DEV_OMAP_SHAM' also have to be
+   enabled.  A quick 'grep omap-sham /proc/interrupts' will tell you if
+   the omap-sham driver was really used.
+
+d) To test these patches, you will likely need...
+   i) The patch included here:
+	   http://marc.info/?l=kernel-janitors&m=134910841909057&w=2
+   ii) This patch from linux-omap/master:
+	   27615a9 (ARM: OMAP: Trivial driver changes to remove include
+			   plat/cpu.h)
+   iii) This patch from Paul Walmsley:
+	   http://www.spinics.net/lists/linux-omap/msg79436.html
+
+e) If you prefer, a version you can test is available at
+   git at github.com:mgreeraz/linux-mag.git wip/crypto/sham-v3+test
+
+f) There is a reduction in DMA performance after switching to dmaengine
+   (see http://www.spinics.net/lists/linux-omap/msg79855.html)
+
+g) Many thanks to Jon Hunter for testing on his omap2420 h4.
+
+Mark A. Greer (7):
+  ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
+  ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
+  ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
+  ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
+  crypto: omap-sham: Convert to use pm_runtime API
+  crypto: omap-sham: Add code to use dmaengine API
+  crypto: omap_sham: Remove usage of private DMA API
+
+ arch/arm/mach-omap2/clock2430_data.c               |   1 +
+ arch/arm/mach-omap2/clock3xxx_data.c               |   1 +
+ arch/arm/mach-omap2/devices.c                      |  73 ++------
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |   1 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |   1 +
+ .../mach-omap2/omap_hwmod_2xxx_interconnect_data.c |  18 ++
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  43 +++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  60 +++++++
+ arch/arm/mach-omap2/omap_hwmod_common_data.h       |   2 +
+ drivers/crypto/omap-sham.c                         | 195 +++++++++++----------
+ 10 files changed, 245 insertions(+), 150 deletions(-)
+
+-- 
+1.7.12
