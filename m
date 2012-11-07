@@ -1,142 +1,40 @@
-From: nicolas@eukrea.com (Nicolas Royer)
-Date: Wed,  7 Nov 2012 18:34:27 +0100
-Subject: [PATCH 2/5 v3] ARM: AT91SAM9G45: same platform data structure for all
- crypto peripherals
-In-Reply-To: <20121107164523.GG4576@game.jcrosoft.org>
-References: <20121107164523.GG4576@game.jcrosoft.org>
-Message-ID: <1352309667-30868-1-git-send-email-nicolas@eukrea.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 7 Nov 2012 18:36:59 +0100
+Subject: [RFC PATCH 0/2] Kirkwood 98dx4122 pinctrl variant
+In-Reply-To: <1352304792-22443-1-git-send-email-valentin.longchamp@keymile.com>
+References: <20121028165711.GG15824@lunn.ch>
+ <1352304792-22443-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <20121107173659.GA3547@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only AES use DMA in AT91SAM9G45 (TDES and SHA use PDC).
+On Wed, Nov 07, 2012 at 05:13:10PM +0100, Valentin Longchamp wrote:
+> These two patches add a pinctrl variant for the kirkwood embedded in the
+> 98dx4122 SoC. Although it is based on a 6281 kirkwood, a lot of pins and
+> functionalities are absent ant that's why a new variant is needed.
+> 
+> These two patches are based on Andrew's v2 pinctrl branch:
+> 
+> git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
+> 
+> Valentin Longchamp (2):
+>   ARM: support 98DX412x kirkwoods with pinctrl
+>   ARM: convert the km_kirkwood board to pinctrl
+> 
+>  .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |   39 ++
+>  arch/arm/boot/dts/kirkwood-98dx4122.dtsi           |   31 ++
+>  arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   17 +
+>  arch/arm/mach-kirkwood/board-km_kirkwood.c         |   11 -
+>  drivers/pinctrl/mvebu/pinctrl-kirkwood.c           |  568 ++++++++++----------
+>  5 files changed, 377 insertions(+), 289 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-98dx4122.dtsi
 
-However latest Atmel TDES and SHA IP releases use DMA instead of PDC.
-  --> Atmel TDES and SHA drivers need DMA platform data for those IP releases.
 
-Goal of this patch is to use the same platform data structure for all Atmel
-crypto peripherals. This structure contains information about DMA interface.
+Hi Valentin
 
-Signed-off-by: Nicolas Royer <nicolas@eukrea.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Eric B?nard <eric@eukrea.com>
-Tested-by: Eric B?nard <eric@eukrea.com>
----
-v2 : check kzalloc return value.
+Thanks for doing this. It looks great. I will pull them into my
+pinctrl tree and if nobody makes any comments see about passing them
+up to Jason.
 
-v3 : alt_atslave structure declared as static.
-
- arch/arm/mach-at91/at91sam9g45_devices.c   |   14 ++++++--------
- include/linux/platform_data/atmel-aes.h    |   22 ----------------------
- include/linux/platform_data/crypto-atmel.h |   22 ++++++++++++++++++++++
- 3 files changed, 28 insertions(+), 30 deletions(-)
- delete mode 100644 include/linux/platform_data/atmel-aes.h
- create mode 100644 include/linux/platform_data/crypto-atmel.h
-
-diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index fcd233c..1501e58 100644
---- a/arch/arm/mach-at91/at91sam9g45_devices.c
-+++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -18,7 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/i2c-gpio.h>
- #include <linux/atmel-mci.h>
--#include <linux/platform_data/atmel-aes.h>
-+#include <linux/platform_data/crypto-atmel.h>
- 
- #include <linux/platform_data/at91_adc.h>
- 
-@@ -1900,7 +1900,8 @@ static void __init at91_add_device_tdes(void) {}
-  * -------------------------------------------------------------------- */
- 
- #if defined(CONFIG_CRYPTO_DEV_ATMEL_AES) || defined(CONFIG_CRYPTO_DEV_ATMEL_AES_MODULE)
--static struct aes_platform_data aes_data;
-+static struct crypto_platform_data aes_data;
-+static struct crypto_dma_data alt_atslave;
- static u64 aes_dmamask = DMA_BIT_MASK(32);
- 
- static struct resource aes_resources[] = {
-@@ -1931,23 +1932,20 @@ static struct platform_device at91sam9g45_aes_device = {
- static void __init at91_add_device_aes(void)
- {
- 	struct at_dma_slave	*atslave;
--	struct aes_dma_data	*alt_atslave;
--
--	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
- 
- 	/* DMA TX slave channel configuration */
--	atslave = &alt_atslave->txdata;
-+	atslave = &alt_atslave.txdata;
- 	atslave->dma_dev = &at_hdmac_device.dev;
- 	atslave->cfg = ATC_FIFOCFG_ENOUGHSPACE	| ATC_SRC_H2SEL_HW |
- 						ATC_SRC_PER(AT_DMA_ID_AES_RX);
- 
- 	/* DMA RX slave channel configuration */
--	atslave = &alt_atslave->rxdata;
-+	atslave = &alt_atslave.rxdata;
- 	atslave->dma_dev = &at_hdmac_device.dev;
- 	atslave->cfg = ATC_FIFOCFG_ENOUGHSPACE	| ATC_DST_H2SEL_HW |
- 						ATC_DST_PER(AT_DMA_ID_AES_TX);
- 
--	aes_data.dma_slave = alt_atslave;
-+	aes_data.dma_slave = &alt_atslave;
- 	platform_device_register(&at91sam9g45_aes_device);
- }
- #else
-diff --git a/include/linux/platform_data/atmel-aes.h b/include/linux/platform_data/atmel-aes.h
-deleted file mode 100644
-index ab68082..0000000
---- a/include/linux/platform_data/atmel-aes.h
-+++ /dev/null
-@@ -1,22 +0,0 @@
--#ifndef __LINUX_ATMEL_AES_H
--#define __LINUX_ATMEL_AES_H
--
--#include <linux/platform_data/dma-atmel.h>
--
--/**
-- * struct aes_dma_data - DMA data for AES
-- */
--struct aes_dma_data {
--	struct at_dma_slave	txdata;
--	struct at_dma_slave	rxdata;
--};
--
--/**
-- * struct aes_platform_data - board-specific AES configuration
-- * @dma_slave: DMA slave interface to use in data transfers.
-- */
--struct aes_platform_data {
--	struct aes_dma_data	*dma_slave;
--};
--
--#endif /* __LINUX_ATMEL_AES_H */
-diff --git a/include/linux/platform_data/crypto-atmel.h b/include/linux/platform_data/crypto-atmel.h
-new file mode 100644
-index 0000000..b46e0d9
---- /dev/null
-+++ b/include/linux/platform_data/crypto-atmel.h
-@@ -0,0 +1,22 @@
-+#ifndef __LINUX_CRYPTO_ATMEL_H
-+#define __LINUX_CRYPTO_ATMEL_H
-+
-+#include <linux/platform_data/dma-atmel.h>
-+
-+/**
-+ * struct crypto_dma_data - DMA data for AES/TDES/SHA
-+ */
-+struct crypto_dma_data {
-+	struct at_dma_slave	txdata;
-+	struct at_dma_slave	rxdata;
-+};
-+
-+/**
-+ * struct crypto_platform_data - board-specific AES/TDES/SHA configuration
-+ * @dma_slave: DMA slave interface to use in data transfers.
-+ */
-+struct crypto_platform_data {
-+	struct crypto_dma_data	*dma_slave;
-+};
-+
-+#endif /* __LINUX_CRYPTO_ATMEL_H */
--- 
-1.7.6.5
+   Thanks
+	Andrew
