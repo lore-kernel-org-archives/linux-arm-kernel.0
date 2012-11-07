@@ -1,52 +1,51 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 7 Nov 2012 10:11:00 -0500 (EST)
-Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
- interfaces
-In-Reply-To: <20121107102357.GD23305@mudshark.cambridge.arm.com>
-References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
- <20121106221651.GE21764@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1211061755260.21033@xanadu.home>
- <20121107102357.GD23305@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1211070950250.21033@xanadu.home>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 7 Nov 2012 16:14:41 +0100
+Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
+ support
+In-Reply-To: <20121107144450.GF20844@opensource.wolfsonmicro.com>
+References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
+ <20121107084932.GE20063@game.jcrosoft.org>
+ <20121107092124.GE12323@opensource.wolfsonmicro.com>
+ <20121107104121.GG20063@game.jcrosoft.org>
+ <20121107140535.GA28954@opensource.wolfsonmicro.com>
+ <20121107143046.GA4576@game.jcrosoft.org>
+ <20121107144450.GF20844@opensource.wolfsonmicro.com>
+Message-ID: <20121107151441.GB4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Nov 2012, Will Deacon wrote:
-
-> On Tue, Nov 06, 2012 at 10:59:35PM +0000, Nicolas Pitre wrote:
-> > On Tue, 6 Nov 2012, Will Deacon wrote:
-> > > >  	/*
-> > > > +	 * Get what the GIC says our CPU mask is.
-> > > > +	 */
-> > > > +	BUG_ON(cpu >= 8);
-> > > > +	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
-> > > 
-> > > Making the mask a u8 and using readb_relaxed here makes this bit of code
-> > > clearer to me (and the GIC apparently allows such an access to this
-> > > register).
-> > 
-> > Not always.  At least RTSM throws an exception if you do so.
-> > Been there.
+On 15:44 Wed 07 Nov     , Mark Brown wrote:
+> On Wed, Nov 07, 2012 at 03:30:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
 > 
-> That would be a bug in the RTSM then. Have you reported it to support? (if
-> not, I can chase this one up). I'd rather we just fix the model than work
-> around it in Linux.
+> > the one via ASoC for the driver with the pinctrl for now but MUST add it later
+> 
+> > the arch/arm related via AT91 tree where the pinctrl is mandatory in the dtsi
+> 
+> > I'm no going to spend hours to do the pinctrl to test Bo patch that he is
+> > supposed to have deon to test this code
+> 
+> > As basically today on DT none of the board will work if BO does no provide the
+> > pinctrl so for me he MUST put in the dtsi
+> 
+> > is it ok with you?
+> 
+> Or add the pinmux bindings for other IPs over in the pinmux branch and
+> the pinmux binding for SSC here (which will help with bisection as the
+> DT bindings for the audio will then always exist in conjunction with the
+> .dtsi changes for them).  Either way is fine with me; I'll leave things
+> as they are until I see some new patches.
+> 
+> Though I have to say now that I look in -next it's a bit surprising that
+> there are so many IPs in the file that have no pinmix configuration,
+> based on what you're saying it seems like the entire board will be
+> falling over with the pinmux code anyway - in the case of the sam9g20ek
+> we'd at least need I2C pinmux settings.  I may be misunderstanding.
 
-I have no problem with you chasing it down with the support people.
+yes I've a new patch series that finish to add them as they was in the Dt
+before the add of the pinctrl (macb/usb device /host) i2c after as on 9g20ek
+we use gpio i2c so no need to do any pinctrl for now
 
-I don't want to wait for fixed RTSM versions to be released and the 
-whole world to migrate to them though.
+but now new switch to DT must handle the pinctrl
 
-While the readl is maybe marginally unintuitive compared to a readb 
-here, the code is always using readl everywhere else already, even using 
-bit masking and shifting when a readb/writeb could have made the code 
-much simpler (see gic_set_affinity() for example).  I therefore much 
-prefer to stick to a proven 32-bit access than risking regression on 
-some possible implementation where the 8-bit access wasn't properly 
-implemented as the doc says it should and never exercised before.
-
-In other words, I prefer erring on the safe side here.
-
-
-Nicolas
+Best Regards,
+J.
