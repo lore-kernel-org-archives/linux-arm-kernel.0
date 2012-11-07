@@ -1,32 +1,36 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 7 Nov 2012 13:49:36 +0100
-Subject: [PATCH v3] ARM: zynq: Allow UART1 to be used as DEBUG_LL console.
-In-Reply-To: <20121105215410.GC1254@beefymiracle.amer.corp.natinst.com>
-References: <1352151949-18319-1-git-send-email-nbowler@elliptictech.com>
- <20121105215410.GC1254@beefymiracle.amer.corp.natinst.com>
-Message-ID: <CAHTX3dKV470iByg8MybxSch4i+r7_VxOWtxmeS94JapL4YpRYA@mail.gmail.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Wed, 07 Nov 2012 13:52:34 +0100
+Subject: [GIT PULL] arm-soc: lpc32xx: platform updates
+Message-ID: <509A5992.60009@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/5 Josh Cartwright <josh.cartwright@ni.com>:
-> On Mon, Nov 05, 2012 at 04:45:49PM -0500, Nick Bowler wrote:
->> The main UART on the Xilinx ZC702 board is UART1, located at address
->> e0001000.  Add a Kconfig option to select this device as the low-level
->> debugging port.  This allows the really early boot printouts to reach
->> the USB serial adaptor on this board.
->>
->> For consistency's sake, add a choice entry for UART0 even though it is
->> the the default if UART1 is not selected.
->>
->> Signed-off-by: Nick Bowler <nbowler@elliptictech.com>
->> Tested-by: Josh Cartwright <josh.cartwright@ni.com>
->> ---
->> Sorry all for the phenominal delay in sending this out.  Josh, I kept
->> your Tested-By since this version is Obviously Equivalent??? to v2...
->
-> I re-tested again just in case and everything is good.
+Hi Arnd and Olof,
+
+this pull request includes the platform topic branch for lpc32xx.
+
+Thanks in advance,
+
+Roland
 
 
-Thanks guys, Applied.
+The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
 
-Michal
+  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+
+are available in the git repository at:
+
+  git://git.antcom.de/linux-2.6.git lpc32xx/core
+
+for you to fetch changes up to 91deef8069e7ffafac4467200e1d37af1b2d7c56:
+
+  ARM: LPC32xx: Cleanup irq.c (2012-11-07 13:30:50 +0100)
+
+----------------------------------------------------------------
+Roland Stigge (3):
+      ARM: LPC32xx: Remove superfluous irq_alloc_descs()
+      ARM: LPC32xx: Relocate calls to irq_set_chained_handler()
+      ARM: LPC32xx: Cleanup irq.c
+
+ arch/arm/mach-lpc32xx/irq.c |   23 +++++------------------
+ 1 file changed, 5 insertions(+), 18 deletions(-)
