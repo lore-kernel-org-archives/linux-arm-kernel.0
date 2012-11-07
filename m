@@ -1,47 +1,63 @@
-From: omar.luna@linaro.org (Omar Ramirez Luna)
-Date: Tue, 6 Nov 2012 19:05:13 -0600
-Subject: [PATCH v2 1/2] mailbox: OMAP: introduce mailbox framework
-In-Reply-To: <509886A2.5060509@wwwdotorg.org>
-References: <1352170552-29564-1-git-send-email-omar.luna@linaro.org>
- <1352170552-29564-2-git-send-email-omar.luna@linaro.org>
- <509886A2.5060509@wwwdotorg.org>
-Message-ID: <CALLhW=5AypWUzRbCkO4fKO=qAtUPTC3H8VjHgXWV_uFUp=GJzA@mail.gmail.com>
+From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
+Date: Wed, 7 Nov 2012 01:38:44 +0100
+Subject: [PATCHv3 1/6] arch: Change defconfigs to point to g_mass_storage.
+In-Reply-To: <007d0b4e8872b877076918bd3268832e9ea9d667.1352237765.git.mina86@mina86.com>
+References: <cover.1352237765.git.mina86@mina86.com>
+ <007d0b4e8872b877076918bd3268832e9ea9d667.1352237765.git.mina86@mina86.com>
+Message-ID: <20121107003844.GA8837@samfundet.no>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Around Tue 06 Nov 2012 22:52:35 +0100 or thereabout, Michal Nazarewicz wrote:
+> From: Michal Nazarewicz <mina86@mina86.com>
+> 
+> The File-backed Storage Gadget (g_file_storage) is being removed, since
+> it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
+> changes defconfigs point to the new gadget.
+> 
+> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>  (fort AT91)
+> Acked-by: Tony Lindgren <tony@atomide.com>  (for omap1)
+> ---
+>  arch/arm/configs/afeb9260_defconfig                |    2 +-
+>  arch/arm/configs/at91sam9260_defconfig             |    2 +-
+>  arch/arm/configs/at91sam9261_defconfig             |    2 +-
+>  arch/arm/configs/at91sam9263_defconfig             |    2 +-
+>  arch/arm/configs/at91sam9g20_defconfig             |    2 +-
+>  arch/arm/configs/corgi_defconfig                   |    2 +-
+>  arch/arm/configs/davinci_all_defconfig             |    2 +-
+>  arch/arm/configs/h7202_defconfig                   |    3 +--
+>  arch/arm/configs/magician_defconfig                |    2 +-
+>  arch/arm/configs/mini2440_defconfig                |    2 +-
+>  arch/arm/configs/omap1_defconfig                   |    3 +--
+>  arch/arm/configs/prima2_defconfig                  |    1 -
+>  arch/arm/configs/spitz_defconfig                   |    2 +-
+>  arch/arm/configs/stamp9g20_defconfig               |    2 +-
+>  arch/arm/configs/viper_defconfig                   |    2 +-
+>  arch/arm/configs/zeus_defconfig                    |    2 +-
+>  arch/avr32/configs/atngw100_defconfig              |    2 +-
+>  arch/avr32/configs/atngw100_evklcd100_defconfig    |    2 +-
+>  arch/avr32/configs/atngw100_evklcd101_defconfig    |    2 +-
+>  arch/avr32/configs/atngw100_mrmt_defconfig         |    2 +-
+>  arch/avr32/configs/atngw100mkii_defconfig          |    2 +-
+>  .../avr32/configs/atngw100mkii_evklcd100_defconfig |    2 +-
+>  .../avr32/configs/atngw100mkii_evklcd101_defconfig |    2 +-
+>  arch/avr32/configs/atstk1002_defconfig             |    2 +-
+>  arch/avr32/configs/atstk1003_defconfig             |    2 +-
+>  arch/avr32/configs/atstk1004_defconfig             |    2 +-
+>  arch/avr32/configs/atstk1006_defconfig             |    2 +-
+>  arch/avr32/configs/favr-32_defconfig               |    2 +-
+>  arch/avr32/configs/hammerhead_defconfig            |    2 +-
 
-On 5 November 2012 21:40, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/05/2012 07:55 PM, Omar Ramirez Luna wrote:
->> Actually moving it from plat-omap, as this framework/driver code is
->> supposed to be under drivers/ folder. The framework should work with
->> the current supported OMAP processors (OMAP1+) that have mailbox and
->> can be used as a method of interprocessor communication.
->>
->> The mailbox hardware (in OMAP) uses a queued mailbox-interrupt mechanism
->> that provides a communication channel between processors through a set of
->> registers and their associated interrupt signals by sending and receiving
->> messages.
->
->> diff --git a/drivers/mailbox/mailbox.h b/drivers/mailbox/mailbox.h
->
-> Is this a public interface to the driver? If so, shouldn't the header be
-> in include/linux somewhere?
->
-> Is this a generic interface to any mailbox driver? If so, then I don't
-> think having "omap" in the symbol names is appropriate. If the header is
-> specific to the OMAP driver, I don't think using the very generic
-> filename "mailbox.h" is appropriate; use omap_mailbox.h instead?
+For all the AVR32 related changes +1 (-:
 
-It was a mixture between the two, the next patch splits the API from
-the mailbox driver interfaces.
+Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
 
-I kept the files named as plain mailbox.[ch], in hopes that we could
-progress with the cleanup after moving the files from plat-omap, as it
-seems they interfere with the current single Image effort, but if it
-is preferred (as it seems to be) I can resend again after removing the
-omap_ prefixes from the intended-to-be generic code.
+IMHO this patch is trivial and needed since you change all the users of a
+certain symbol. Thanks for doing the maintenance.
 
-Thanks,
+<snipp diff>
 
-Omar
+-- 
+mvh
+Hans-Christian Egtvedt
