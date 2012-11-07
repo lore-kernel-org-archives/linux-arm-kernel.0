@@ -1,59 +1,26 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 7 Nov 2012 14:56:07 -0600
-Subject: OMAP baseline test results for v3.7-rc4
-In-Reply-To: <alpine.DEB.2.00.1211071728310.20704@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
- <509A96DA.2010003@ti.com>
- <alpine.DEB.2.00.1211071728310.20704@utopia.booyaka.com>
-Message-ID: <509ACAE7.5030707@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Nov 2012 13:22:54 -0800
+Subject: [PATCH V2 00/14] ARM: OMAP: DMTIMER fixes
+In-Reply-To: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
+References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121107212254.GK6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Jon Hunter <jon-hunter@ti.com> [121107 11:03]:
+> This series includes several fixes for the OMAP DMTIMER driver. This is
+> based upon 3.7-rc4 with the two series adding device-tree support for
+> DMTIMERs [1] and the 32kHz Counter [2]
 
-On 11/07/2012 11:32 AM, Paul Walmsley wrote:
-> On Wed, 7 Nov 2012, Jon Hunter wrote:
-> 
->> On 11/04/2012 08:46 PM, Paul Walmsley wrote:
->>
->>> * 4460pandaes: boot fails early
->>>   - Appears to be due to X-loader problems here
->>>   - Need to note the X-loader version so we know it's broken
->>
->> Are you still planning to investigate this further or migrate to a new
->> bootloader?
-> 
-> Yes.  The problem with the current boot setup is that the new 
-> bootloader is breaking as well! :-(
-> 
-> This can be seen by comparing:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/boot/4460pandaes/4460pandaes_log.txt
-> 
-> (the old bootloader)
-> 
-> with
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.7-rc4/20121104142910/boot/4460pandaes/4460pandaes_log.txt
-> 
-> (the new bootloader)
-> 
-> Dealing with this will require hands-on access, and unfortunately, right 
-> now I am traveling and away from my testbed.  Next week, will take a 
-> closer look.
-> 
->> With 4460 and 3.7-rc4, I am seeing that resume from suspend is not
->> working (not sure when this broke though). I am just curious if anyone
->> else sees this. My u-boot version is v2012.10.
-> 
-> If you have the chance, it would be useful to know if any of the v3.7-rcs 
-> worked.  Otherwise, will look at this next week.
+These look OK to me, I'm assuming you'll do a pull request eventually
+for these. Might be worth checking if these merge fine also on
+omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3, rename detection
+might be able to deal with that for the header.
 
-Kevin pointed me to his pm fixes for 3.8 as it is working there and I
-have confirmed suspend is fixed on v3.7-rc4 with the rom code fix [1]
-Kevin has queued for v3.8.
+Regards,
 
-Cheers
-Jon
+Tony
 
-[1]
-http://git.kernel.org/?p=linux/kernel/git/khilman/linux-omap-pm.git;a=commit;h=ff999b8a0983ee15668394ed49e38d3568fc6859
+
+> [1] http://marc.info/?l=linux-omap&m=135065875808614&w=2
+> [2] http://marc.info/?l=linux-omap&m=135119308123513&w=2
