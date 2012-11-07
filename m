@@ -1,48 +1,229 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Nov 2012 16:06:12 -0700
-Subject: struct sys_timer .suspend/.resume ignored for ARCH_SA1100/ARCH_PXA?
-Message-ID: <509AE964.8070009@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  7 Nov 2012 17:23:42 -0600
+Subject: [PATCH] cpuidle: add Calxeda SOC idle support
+Message-ID: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Kevin,
+From: Rob Herring <rob.herring@calxeda.com>
 
-In commit 9e4559d "[ARM] 4258/2: Support for dynticks in idle loop" in
-2007, Kevin applied the following change:
+Add support for core powergating on Calxeda platforms. Initially, this
+supports ECX-1000 (highbank), but support will be added for ECX-2000
+later.
 
-> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Len Brown <len.brown@intel.com>
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+---
 
-> -#ifdef CONFIG_PM
-> +#if defined(CONFIG_PM) && !defined(CONFIG_GENERIC_CLOCKEVENTS)
->  static int timer_suspend(struct sys_device *dev, pm_message_t state)
+It's not really clear where we want ARM cpuidle drivers. We're moving
+everything else out of arch/arm, and my understanding is Len doesn't want
+them in drivers/idle. It seems kind of silly to me to have the framework
+and drivers in 2 places. I've put this in drivers/cpuidle, but it doesn't
+make any difference to me.
 
-This means that for any architecture that enables GENERIC_CLOCKEVENTS,
-the .suspend/.resume fields of struct sys_timer will be ignored, since
-timer_suspend()/timer_resume() won't be filled into
-arch/arm/kernel/time.c's struct syscore_ops timer_syscore_ops.
+Rob
 
-Later, in commit 3e238be "[ARM] sa1100: add clock event support" in
-2008, Russell modified ARCH_SA1100 to select GENERIC_CLOCKEVENTS. I
-believe this means that sa1100_timer_suspend()/resume() haven't been
-used since.
+ drivers/cpuidle/Kconfig           |   10 +++
+ drivers/cpuidle/Makefile          |    2 +
+ drivers/cpuidle/cpuidle-calxeda.c |  161 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 173 insertions(+)
+ create mode 100644 drivers/cpuidle/cpuidle-calxeda.c
 
-A similar issue exists for ARCH_PXA.
-
-Should sa1100_timer_suspend(), sa1100_timer_resume(),
-pxa_timer_suspend(), pxa_timer_suspend() simply be deleted since they
-are dead code, or should they be revived somehow; is the ifdef from
-Kevin's change incorrect?
-
-
-As background, I'm working on a patch series that will remove all fields
-from struct sys_timer except for .init, and will then replace the ARM
-machine descriptor's .timer struct pointer with a .init_timer function
-pointer. This will allow machines, on an opt-in basis, to call into a
-central function in drivers/clocksource to initialize the required
-timer, as determined by searching device tree for a known device type,
-in much the same way as has been proposed to use a single implementation
-for for the machine descriptor's .init_irq. As part of this, I've been
-looking at moving any use of struct sys_timer .suspend/.resume into e.g.
-struct clock_event_device .suspend/.resume, and found this issue.
-
-Thanks for any hints.
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+index a76b689..d2d007b 100644
+--- a/drivers/cpuidle/Kconfig
++++ b/drivers/cpuidle/Kconfig
+@@ -21,3 +21,13 @@ config CPU_IDLE_GOV_MENU
+ 
+ config ARCH_NEEDS_CPU_IDLE_COUPLED
+ 	def_bool n
++
++if CPU_IDLE
++
++config CPU_IDLE_CALXEDA
++	bool "CPU Idle Driver for Calxeda processors"
++	depends on ARCH_HIGHBANK
++	help
++	  Select this to enable cpuidle on Calxeda processors.
++
++endif
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index 38c8f69..03ee874 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -4,3 +4,5 @@
+ 
+ obj-y += cpuidle.o driver.o governor.o sysfs.o governors/
+ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
++
++obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+new file mode 100644
+index 0000000..e1aab38
+--- /dev/null
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -0,0 +1,161 @@
++/*
++ * Copyright 2012 Calxeda, Inc.
++ *
++ * Based on arch/arm/plat-mxc/cpuidle.c:
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2012 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/cpuidle.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/time.h>
++#include <linux/delay.h>
++#include <linux/suspend.h>
++#include <asm/cpuidle.h>
++#include <asm/proc-fns.h>
++#include <asm/smp_scu.h>
++#include <asm/suspend.h>
++#include <asm/cacheflush.h>
++#include <asm/cp15.h>
++
++extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
++extern void *scu_base_addr;
++
++static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
++
++static inline unsigned int get_auxcr(void)
++{
++	unsigned int val;
++	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
++	return val;
++}
++
++static inline void set_auxcr(unsigned int val)
++{
++	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
++	  : : "r" (val) : "cc");
++	isb();
++}
++
++static noinline void calxeda_idle_restore(void)
++{
++	set_cr(get_cr() | CR_C);
++	set_auxcr(get_auxcr() | 0x40);
++	scu_power_mode(scu_base_addr, SCU_PM_NORMAL);
++}
++
++static int calxeda_idle_finish(unsigned long val)
++{
++	/* Already flushed cache, but do it again as the outer cache functions
++	 * dirty the cache with spinlocks */
++	flush_cache_all();
++
++	set_auxcr(get_auxcr() & ~0x40);
++	set_cr(get_cr() & ~CR_C);
++
++	scu_power_mode(scu_base_addr, SCU_PM_DORMANT);
++
++	cpu_do_idle();
++
++	/* Restore things if we didn't enter power-gating */
++	calxeda_idle_restore();
++	return 1;
++}
++
++static int calxeda_pwrdown_idle(struct cpuidle_device *dev,
++				struct cpuidle_driver *drv,
++				int index)
++{
++	highbank_set_cpu_jump(smp_processor_id(), cpu_resume);
++	cpu_suspend(0, calxeda_idle_finish);
++	return index;
++}
++
++static void calxeda_idle_cpuidle_devices_uninit(void)
++{
++	int i;
++	struct cpuidle_device *dev;
++
++	for_each_possible_cpu(i) {
++		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, i);
++		cpuidle_unregister_device(dev);
++	}
++
++	free_percpu(calxeda_idle_cpuidle_devices);
++}
++
++static struct cpuidle_driver calxeda_idle_driver = {
++	.name = "calxeda_idle",
++	.en_core_tk_irqen = 1,
++	.states = {
++		ARM_CPUIDLE_WFI_STATE,
++		{
++			.name = "PG",
++			.desc = "Power Gate",
++			.flags = CPUIDLE_FLAG_TIME_VALID,
++			.exit_latency = 30,
++			.power_usage = 50,
++			.target_residency = 200,
++			.enter = calxeda_pwrdown_idle,
++		},
++	},
++	.state_count = 2,
++};
++
++static int __init calxeda_cpuidle_init(void)
++{
++	int cpu_id;
++	int ret;
++	struct cpuidle_device *dev;
++	struct cpuidle_driver *drv = &calxeda_idle_driver;
++
++	if (!of_machine_is_compatible("calxeda,highbank"))
++		return -ENODEV;
++
++	ret = cpuidle_register_driver(drv);
++	if (ret)
++		return ret;
++
++	calxeda_idle_cpuidle_devices = alloc_percpu(struct cpuidle_device);
++	if (calxeda_idle_cpuidle_devices == NULL) {
++		ret = -ENOMEM;
++		goto unregister_drv;
++	}
++
++	/* initialize state data for each cpuidle_device */
++	for_each_possible_cpu(cpu_id) {
++		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, cpu_id);
++		dev->cpu = cpu_id;
++		dev->state_count = drv->state_count;
++
++		ret = cpuidle_register_device(dev);
++		if (ret) {
++			pr_err("Failed to register cpu %u, error: %d\n",
++			       cpu_id, ret);
++			goto uninit;
++		}
++	}
++
++	return 0;
++
++uninit:
++	calxeda_idle_cpuidle_devices_uninit();
++unregister_drv:
++	cpuidle_unregister_driver(drv);
++	return ret;
++}
++module_init(calxeda_cpuidle_init);
+-- 
+1.7.10.4
