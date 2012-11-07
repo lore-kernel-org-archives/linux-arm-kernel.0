@@ -1,159 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 7 Nov 2012 15:10:49 -0500 (EST)
-Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
-In-Reply-To: <20121107184129.GB18293@mudshark.cambridge.arm.com>
-References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
- <20121106220458.GP28327@n2100.arm.linux.org.uk>
- <20121107095106.GA23305@mudshark.cambridge.arm.com>
- <20121107095635.GV28327@n2100.arm.linux.org.uk>
- <20121107100835.GB23305@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1211071035220.21033@xanadu.home>
- <20121107184129.GB18293@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1211071505410.21033@xanadu.home>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Wed, 7 Nov 2012 21:30:28 +0100
+Subject: [PATCH] pwm: lpc32xx - Add a driver for the motor PWM
+In-Reply-To: <509A982A.6020401@antcom.de>
+References: <1352305828-25298-1-git-send-email-alban.bedel@avionic-design.de>
+ <509A982A.6020401@antcom.de>
+Message-ID: <20121107203028.GA6186@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 7 Nov 2012, Will Deacon wrote:
+On Wed, Nov 07, 2012 at 06:19:38PM +0100, Roland Stigge wrote:
+> On 07/11/12 17:30, Alban Bedel wrote:
+> > Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
+> > ---
+> >  .../devicetree/bindings/pwm/lpc32xx-motor-pwm.txt  |   24 ++
+> >  arch/arm/boot/dts/lpc32xx.dtsi                     |    7 +
+> 
+> Is all this supposed to go via mach-lpc32xx -> arm-soc.git? Then, I can
+> take this into the lpc32xx tree. Otherwise, you can split off the .dtsi
+> file and I include it via lpc32xx.
 
-> On Wed, Nov 07, 2012 at 06:03:40PM +0000, Nicolas Pitre wrote:
-> > On Wed, 7 Nov 2012, Will Deacon wrote:
-> > > On Wed, Nov 07, 2012 at 09:56:35AM +0000, Russell King - ARM Linux wrote:
-> > > > On Wed, Nov 07, 2012 at 09:51:06AM +0000, Will Deacon wrote:
-> > > > > Wouldn't the L2 flush in this case be included with the code that turns off
-> > > > > caching? For reboot, that's currently done in __sort_restart -- the cache
-> > > > > flush in setup_mm_for_reboot is just to ensure that the idmap tables are
-> > > > > visible to the hardware walker iirc.
-> > > > 
-> > > > Good point - but it does raise another issue.  Why do we do this flush and
-> > > > TLB invalidate afterwards in setup_mm_for_reboot() ?  It makes sense if
-> > > > we change existing page tables, but we don't anymore, we're just switching
-> > > > them, and cpu_switch_mm() will do whatever's necessary to make the new
-> > > > page tables visible.  So I think we can get rid of that flusing in there.
-> > > 
-> > > Hmm, I'm not sure about that. Looking at cpu_v7_switch_mm (the 2-level
-> > > version) for example, we set the ASID and then set the new TTBR. There's no
-> > > flushing of page tables like we get in set_pte and no TLB flushing either.
-> > > 
-> > > Now, given that the idmap_pgd is populated as an early_initcall, I really
-> > > doubt we need that flush_cache_all but the TLB invalidate is surely
-> > > required?
-> > 
-> > Why wouldn't cpu_switch_mm() take care of that already if that is 
-> > necessary?  Hmmm, I suppose the asid of the init task isn't associated 
-> > with the idmap in any way, hence the need for flushing the tlbs.
-> 
-> Yes, cpu_switch_mm can't know about whether tables are visible or an ASID is
-> dirty so all it can do is defer that to the caller or do the cleaning and
-> invalidation every time.
-> 
-> > I'd not rely on the early_initcall to assume the new page table is moved 
-> > out of the cache though.
-> 
-> Yeah, it's not nice, I was just pointing out that it's all hanging off an
-> initcall now (before it was created ad-hoc by its users).
-> 
-> > What about this alternate patch:
-> > 
-> > diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-> > index ab88ed4f8e..1ab429761c 100644
-> > --- a/arch/arm/mm/idmap.c
-> > +++ b/arch/arm/mm/idmap.c
-> > @@ -92,6 +92,9 @@ static int __init init_static_idmap(void)
-> >  		(long long)idmap_start, (long long)idmap_end);
-> >  	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
-> >  
-> > +	/* Flush L1 for the hardware to see this page table content */
-> > +	flush_cache_louis();
-> > +
-> >  	return 0;
-> >  }
-> 
-> Yep, we can do this now. Good thinking! At some point I'll get around to
-> making this conditional, as I don't think it's needed on A5, A7, A9 or A15.
-> 
-> >  early_initcall(init_static_idmap);
-> > @@ -103,12 +106,12 @@ early_initcall(init_static_idmap);
-> >   */
-> >  void setup_mm_for_reboot(void)
-> >  {
-> > -	/* Clean and invalidate L1. */
-> > -	flush_cache_all();
-> > -
-> >  	/* Switch to the identity mapping. */
-> >  	cpu_switch_mm(idmap_pgd, &init_mm);
-> >  
-> > -	/* Flush the TLB. */
-> > +	/*
-> > +	 * On ARMv7, the ASID of the init task is not associated with
-> > +	 * this mapping.  TLBs must be flushed.
-> > +	 */
-> >  	local_flush_tlb_all();
-> >  }
-> 
-> Can we change this comment slightly please? Basically, we don't have a clean
-> ASID for the identity mapping, which may clash with virtual addresses of the
-> previous page tables and therefore potentially in the TLB. That's why
-> we need the invalidation: so that we don't hit stale entries from before.
-> 
-> Other than that, looks good to me:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+I'd prefer a split between the arch/arm changes and the rest. I'll take
+the drivers/pwm and Documentation changes through the PWM tree.
 
-Here's my latest version.  I made the tlb flush conditional.  Please 
-review again before I add your ACK.
-
----- >8
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Subject: [PATCH] ARM: idmap: use flush_cache_louis() and flush TLBs only when necessary
-
-Flushing the cache is needed for the hardware to see the idmap table
-and therefore can be done at init time.  On ARMv7 it is not necessary to 
-flush L2 so flush_cache_louis() is used here instead.
-
-There is no point flushing the cache in setup_mm_for_reboot() as the
-caller should, and already is, taking care of this.  If switching the
-memory map requires a cache flush, then cpu_switch_mm() already includes
-that operation.
-
-What is not done by cpu_switch_mm() on ASID capable CPUs is TLB flushing
-as the whole point of the ASID is to tag the TLBs and avoid flushing them
-on a context switch.  Since we don't have a clean ASID for the identity
-mapping, we need to flush the TLB explicitly in that case.  Otherwise
-this is already performed by cpu_switch_mm().
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index ab88ed4f8e..99db769307 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -92,6 +92,9 @@ static int __init init_static_idmap(void)
- 		(long long)idmap_start, (long long)idmap_end);
- 	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
- 
-+	/* Flush L1 for the hardware to see this page table content */
-+	flush_cache_louis();
-+
- 	return 0;
- }
- early_initcall(init_static_idmap);
-@@ -103,12 +106,15 @@ early_initcall(init_static_idmap);
-  */
- void setup_mm_for_reboot(void)
- {
--	/* Clean and invalidate L1. */
--	flush_cache_all();
--
- 	/* Switch to the identity mapping. */
- 	cpu_switch_mm(idmap_pgd, &init_mm);
- 
--	/* Flush the TLB. */
-+#ifdef CONFIG_CPU_HAS_ASID
-+	/*
-+	 * We don't have a clean ASID for the identity mapping, which
-+	 * may clash with virtual addresses of the previous page tables
-+	 * and therefore potentially in the TLB.
-+	 */
- 	local_flush_tlb_all();
-+#endif
- }
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/61af1347/attachment.sig>
