@@ -1,60 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2012 17:13:59 +0000
-Subject: gic_set_affinity
-In-Reply-To: <CAOmFF10qn=JaNmjpkR3GjZ1dp2MVXqdxT=pdPrbPTijCejf79A@mail.gmail.com>
-References: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
- <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
- <20121105120548.GH3351@mudshark.cambridge.arm.com>
- <CAOmFF10qn=JaNmjpkR3GjZ1dp2MVXqdxT=pdPrbPTijCejf79A@mail.gmail.com>
-Message-ID: <20121107171359.GB15349@mudshark.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 7 Nov 2012 18:12:17 +0100
+Subject: [PATCH 2/5 v2] ARM: AT91SAM9G45: same platform data structure
+ for all crypto peripherals
+In-Reply-To: <20121107175946.01f9dc78@eb-e6520>
+References: <20121107152615.GD4576@game.jcrosoft.org>
+ <1352305675-21961-1-git-send-email-nicolas@eukrea.com>
+ <20121107164523.GG4576@game.jcrosoft.org>
+ <20121107175946.01f9dc78@eb-e6520>
+Message-ID: <20121107171217.GH4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 05:08:36PM +0000, Robert Beckett wrote:
-> On 5 November 2012 12:05, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Nov 02, 2012 at 11:32:50AM +0000, Robert Beckett wrote:
-> >> (CC maintainers)
-> >>
-> >> On 1 November 2012 17:54, Robert Beckett <bob.beckett@gmail.com> wrote:
-> >> > Hello,
-> >> >
-> >> > I was looking through the arm gic code while debugging a problem I am
-> >> > having, and noticed something in gic_set_affinity.
-> >> >
-> >> > When something comes along and setts an irq affinity mask (e.g.
-> >> > through /proc/irq/<irq>/smp_affinity_mask), the calls goes like so :
-> >> >
-> >> > ...
-> >> > 1. irq_set_affinity : grabs the desc->lock
-> >> > 2. __irq_set_affinity_locked : calls chip->irq_set_affinity
-> >> > 3. gic_set_affinity : writes a new mask to the gic distributor
-> >> >
-> >> > my question is, what happens if an interrupt is raised between 1 and 3?
-> >> > To me, it looks like the interrupt could end up being handled on 2
-> >> > cpus. When it is raised, the handler will be called and sit spinning
-> >> > for desc->lock (e.g. in handle_fasteoi_irq). The mask will be set to
-> >> > set the affinity to the new cpu, the new cpu will receive the
-> >> > interrupt as it has not been ackd or disabled yet
-> >
-> > The interrupt will have been acked in gic_handle_irq before the flow handler
-> > is invoked, so it will transition to the active state and will not get
-> > signalled to another CPU. Since we never set more than one target CPU at the
-> > distributor level, the interrupt will only be forwarded to one CPU interface
-> > at any given time.
-> >
-> > Will
+On 17:59 Wed 07 Nov     , Eric B?nard wrote:
+> Hi Jean-Christophe,
 > 
-> Thanks for the response,
-> 
-> I cant see anything in gic_handle_irq that would ack the interrupt
-> (unless it is an IPI interrupt).
-> For irqnr > 15, it just calls handle_IRQ, which would call the desc
-> handler, which would sit and wait on the desc->lock at the top of
-> handle_fasteoi_irq.
-> Which code are you referring to that is meant to ack the interrupt?
+> Le Wed, 7 Nov 2012 17:45:23 +0100,
+> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
+> > > @@ -1900,7 +1900,7 @@ static void __init at91_add_device_tdes(void) {}
+> > >   * -------------------------------------------------------------------- */
+> > >  
+> > >  #if defined(CONFIG_CRYPTO_DEV_ATMEL_AES) || defined(CONFIG_CRYPTO_DEV_ATMEL_AES_MODULE)
+> > > -static struct aes_platform_data aes_data;
+> > > +static struct crypto_platform_data aes_data;
+> > >  static u64 aes_dmamask = DMA_BIT_MASK(32);
+> > >  
+> > >  static struct resource aes_resources[] = {
+> > > @@ -1931,9 +1931,11 @@ static struct platform_device at91sam9g45_aes_device = {
+> > >  static void __init at91_add_device_aes(void)
+> > >  {
+> > >  	struct at_dma_slave	*atslave;
+> > > -	struct aes_dma_data	*alt_atslave;
+> > > +	struct crypto_dma_data	*alt_atslave;
+> > >  
+> > > -	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
+> > > +	alt_atslave = kzalloc(sizeof(struct crypto_dma_data), GFP_KERNEL);
+> > I still not understand why we need to allocate it
+> > 
+> > just declare it as static
+> > 
+> last time we had some data static and you asked to alloc them (and
+> didn't bother to answer why you required that :
+> http://lkml.indiana.edu/hypermail/linux/kernel/1207.0/02779.html ), now
+> you ask to declare static something which is allocated (and
+> that's already done this way for the mci) : may you please explain why
+> so that we get it the right way for next time ?
 
-Reading the interrupt ID signifies an ACK in GIC terminology:
+in the driver yes we write multi instance and generic code but in the platfrom I do not see why
 
-  irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
-
-Will
+Best Regards,
+J.
