@@ -1,61 +1,28 @@
-From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
-Date: Wed, 7 Nov 2012 13:55:49 -0200
-Subject: [PATCH] lpc32xx: Add the motor PWM clock
-In-Reply-To: <1352303237-16052-1-git-send-email-alban.bedel@avionic-design.de>
-References: <1352303237-16052-1-git-send-email-alban.bedel@avionic-design.de>
-Message-ID: <CAAAP30FjE0QQSJaRN26M-1JdDCXCByK3UNkenBhoN3=dX1-Bbg@mail.gmail.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Wed,  7 Nov 2012 17:13:10 +0100
+Subject: [RFC PATCH 0/2] Kirkwood 98dx4122 pinctrl variant
+In-Reply-To: <20121028165711.GG15824@lunn.ch>
+References: <20121028165711.GG15824@lunn.ch>
+Message-ID: <1352304792-22443-1-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2012 at 1:47 PM, Alban Bedel
-<alban.bedel@avionic-design.de> wrote:
-> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
+These two patches add a pinctrl variant for the kirkwood embedded in the
+98dx4122 SoC. Although it is based on a 6281 kirkwood, a lot of pins and
+functionalities are absent ant that's why a new variant is needed.
 
-Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
+These two patches are based on Andrew's v2 pinctrl branch:
 
-> ---
->  arch/arm/mach-lpc32xx/clock.c                 |    8 ++++++++
->  arch/arm/mach-lpc32xx/include/mach/platform.h |    1 +
->  2 files changed, 9 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
-> index f48c2e9..dd5d6f5 100644
-> --- a/arch/arm/mach-lpc32xx/clock.c
-> +++ b/arch/arm/mach-lpc32xx/clock.c
-> @@ -585,6 +585,13 @@ static struct clk clk_timer3 = {
->         .enable_mask    = LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN,
->         .get_rate       = local_return_parent_rate,
->  };
-> +static struct clk clk_mpwm = {
-> +       .parent         = &clk_pclk,
-> +       .enable         = local_onoff_enable,
-> +       .enable_reg     = LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
-> +       .enable_mask    = LPC32XX_CLKPWR_TMRPWMCLK_MPWM_EN,
-> +       .get_rate       = local_return_parent_rate,
-> +};
->  static struct clk clk_wdt = {
->         .parent         = &clk_pclk,
->         .enable         = local_onoff_enable,
-> @@ -1202,6 +1209,7 @@ static struct clk_lookup lookups[] = {
->         CLKDEV_INIT("pl08xdmac", NULL, &clk_dma),
->         CLKDEV_INIT("4003c000.watchdog", NULL, &clk_wdt),
->         CLKDEV_INIT("4005c000.pwm", NULL, &clk_pwm),
-> +       CLKDEV_INIT("400e8000.mpwm", NULL, &clk_mpwm),
->         CLKDEV_INIT(NULL, "uart3_ck", &clk_uart3),
->         CLKDEV_INIT(NULL, "uart4_ck", &clk_uart4),
->         CLKDEV_INIT(NULL, "uart5_ck", &clk_uart5),
-> diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
-> index acc4aab..b5612a1 100644
-> --- a/arch/arm/mach-lpc32xx/include/mach/platform.h
-> +++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
-> @@ -515,6 +515,7 @@
->  /*
->   * clkpwr_timers_pwms_clk_ctrl_1 register definitions
->   */
-> +#define LPC32XX_CLKPWR_TMRPWMCLK_MPWM_EN       0x40
->  #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN     0x20
->  #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER2_EN     0x10
->  #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER1_EN     0x08
-> --
-> 1.7.0.4
->
+git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
+
+Valentin Longchamp (2):
+  ARM: support 98DX412x kirkwoods with pinctrl
+  ARM: convert the km_kirkwood board to pinctrl
+
+ .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |   39 ++
+ arch/arm/boot/dts/kirkwood-98dx4122.dtsi           |   31 ++
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   17 +
+ arch/arm/mach-kirkwood/board-km_kirkwood.c         |   11 -
+ drivers/pinctrl/mvebu/pinctrl-kirkwood.c           |  568 ++++++++++----------
+ 5 files changed, 377 insertions(+), 289 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-98dx4122.dtsi
