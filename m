@@ -1,16 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Nov 2012 09:34:19 +0000
-Subject: [PATCH] ARM: cache-l2x0: move 'l2_wt_override' variable to
- proper place
-In-Reply-To: <003f01cdbcad$a024c1e0$e06e45a0$%han@samsung.com>
-References: <003f01cdbcad$a024c1e0$e06e45a0$%han@samsung.com>
-Message-ID: <20121107093419.GS28327@n2100.arm.linux.org.uk>
+Date: Wed, 7 Nov 2012 09:41:22 +0000
+Subject: Build failure: drivers/net/wan/wanxlfw.inc
+Message-ID: <20121107094122.GT28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 03:03:36PM +0900, Jingoo Han wrote:
-> Fixed build warning as below:
-> 
-> arch/arm/mm/cache-l2x0.c:37:12: warning: 'l2_wt_override' defined but not used [-Wunused-variable]
+During a randconfig build last night, the following was observed:
 
-You're too late with this; it's already been resolved.
+  BLD FW  drivers/net/wan/wanxlfw.inc
+/bin/sh: as68k: command not found
+In file included from include/linux/kernel.h:10:0,
+                 from include/linux/skbuff.h:17,
+                 from include/linux/hdlc.h:14,
+                 from drivers/net/wan/wanxlfw.S:37:
+include/linux/bitops.h:181:2: error: #error BITS_PER_LONG not 32 or 64
+In file included from include/linux/string.h:9:0,
+                 from include/linux/dynamic_debug.h:100,
+                 from include/linux/kernel.h:14,
+                 from include/linux/skbuff.h:17,
+                 from include/linux/hdlc.h:14,
+                 from drivers/net/wan/wanxlfw.S:37:
+include/uapi/linux/string.h:7:20: fatal error: string.h: No such file or directocompilation terminated.
+make[4]: *** [drivers/net/wan/wanxlfw.inc] Error 127
+
+Obviously the lack of as68k doesn't help, but it looks like something is
+broken with the includes too.
+
+Full log and config at:
+http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2640
+http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2640
