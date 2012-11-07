@@ -1,63 +1,66 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Wed, 7 Nov 2012 01:38:44 +0100
-Subject: [PATCHv3 1/6] arch: Change defconfigs to point to g_mass_storage.
-In-Reply-To: <007d0b4e8872b877076918bd3268832e9ea9d667.1352237765.git.mina86@mina86.com>
-References: <cover.1352237765.git.mina86@mina86.com>
- <007d0b4e8872b877076918bd3268832e9ea9d667.1352237765.git.mina86@mina86.com>
-Message-ID: <20121107003844.GA8837@samfundet.no>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Tue, 06 Nov 2012 17:06:06 -0800
+Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC04AE5@DBDE01.ent.ti.com>
+ (Vaibhav Bedia's message of "Tue, 6 Nov 2012 10:40:09 +0000")
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
+ <87txt4aqyc.fsf@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC04AE5@DBDE01.ent.ti.com>
+Message-ID: <87r4o68bnl.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Tue 06 Nov 2012 22:52:35 +0100 or thereabout, Michal Nazarewicz wrote:
-> From: Michal Nazarewicz <mina86@mina86.com>
-> 
-> The File-backed Storage Gadget (g_file_storage) is being removed, since
-> it has been replaced by Mass Storage Gadget (g_mass_storage).  This commit
-> changes defconfigs point to the new gadget.
-> 
-> Signed-off-by: Michal Nazarewicz <mina86@mina86.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>  (fort AT91)
-> Acked-by: Tony Lindgren <tony@atomide.com>  (for omap1)
-> ---
->  arch/arm/configs/afeb9260_defconfig                |    2 +-
->  arch/arm/configs/at91sam9260_defconfig             |    2 +-
->  arch/arm/configs/at91sam9261_defconfig             |    2 +-
->  arch/arm/configs/at91sam9263_defconfig             |    2 +-
->  arch/arm/configs/at91sam9g20_defconfig             |    2 +-
->  arch/arm/configs/corgi_defconfig                   |    2 +-
->  arch/arm/configs/davinci_all_defconfig             |    2 +-
->  arch/arm/configs/h7202_defconfig                   |    3 +--
->  arch/arm/configs/magician_defconfig                |    2 +-
->  arch/arm/configs/mini2440_defconfig                |    2 +-
->  arch/arm/configs/omap1_defconfig                   |    3 +--
->  arch/arm/configs/prima2_defconfig                  |    1 -
->  arch/arm/configs/spitz_defconfig                   |    2 +-
->  arch/arm/configs/stamp9g20_defconfig               |    2 +-
->  arch/arm/configs/viper_defconfig                   |    2 +-
->  arch/arm/configs/zeus_defconfig                    |    2 +-
->  arch/avr32/configs/atngw100_defconfig              |    2 +-
->  arch/avr32/configs/atngw100_evklcd100_defconfig    |    2 +-
->  arch/avr32/configs/atngw100_evklcd101_defconfig    |    2 +-
->  arch/avr32/configs/atngw100_mrmt_defconfig         |    2 +-
->  arch/avr32/configs/atngw100mkii_defconfig          |    2 +-
->  .../avr32/configs/atngw100mkii_evklcd100_defconfig |    2 +-
->  .../avr32/configs/atngw100mkii_evklcd101_defconfig |    2 +-
->  arch/avr32/configs/atstk1002_defconfig             |    2 +-
->  arch/avr32/configs/atstk1003_defconfig             |    2 +-
->  arch/avr32/configs/atstk1004_defconfig             |    2 +-
->  arch/avr32/configs/atstk1006_defconfig             |    2 +-
->  arch/avr32/configs/favr-32_defconfig               |    2 +-
->  arch/avr32/configs/hammerhead_defconfig            |    2 +-
+"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
 
-For all the AVR32 related changes +1 (-:
+> On Mon, Nov 05, 2012 at 23:10:27, Kevin Hilman wrote:
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+[...]
 
-IMHO this patch is trivial and needed since you change all the users of a
-certain symbol. Thanks for doing the maintenance.
+>> 
+>> Also, if there are drivers for these devices, won't this interfere?
+>> 
+>
+> Hmm, I can think of the following scenarios
+>
+> 1. Runtime PM adapted drivers are compiled in - We'll have to ensure that
+> in their suspend callbacks they end up doing omap_hwmod_idle() via the
+> runtime PM APIs. 
 
-<snipp diff>
+That already happens for all omap_devices.
 
--- 
-mvh
-Hans-Christian Egtvedt
+> In this case the omap_hwmod_enable() followed by omap_hwmod_idle() is
+> not necessary in the PM code.
+
+Correct.
+
+> 2. The drivers are not compiled in - In this case, the hwmod code puts
+> the IPs in standby during bootup so the first suspend-resume iteration
+> will pass. During resuming, the SYSC configuration for forced standby will
+> be lost, 
+
+Please clarify how the SYSC is lost in this case.
+
+> so in the subsequent iterations these IPs won't go standby and the
+> hwmod code does not touch them since they never got enabled. In this case
+> we do need the sequence that is there currently.
+>
+> 3. For some reason the respective drivers don't idle the IPs during suspend -
+> (no_idle_on_suspend flag for the hwmod in DT?). In this scenario I think
+> we should abort the suspend process since we know that the suspend is not
+> going to work. 
+
+Agreed.
+
+> Is there some other scenario that needs to be covered?
+
+You covered the ones I was thinking of.
+
+> How about adding some flag in hwmod code for handling this? Something
+> similar to what was done for MMC [1]. I think the problem that we have
+> is in some ways similar to the one addressed in [1].
+
+Except that in the absence of drivers, no hwmod code is executed on the
+suspend/resume path.
+
+Kevin
