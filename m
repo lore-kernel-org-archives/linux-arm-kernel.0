@@ -1,86 +1,53 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 7 Nov 2012 16:45:41 +0100
-Subject: [PATCH V4 0/7] ARM: AM33XX: net: Add DT support to CPGMAC and
- MDIO driver
-In-Reply-To: <509A7D39.8050506@ti.com>
-References: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
- <509A7D39.8050506@ti.com>
-Message-ID: <509A8225.8050508@ti.com>
+From: alban.bedel@avionic-design.de (Alban Bedel)
+Date: Wed,  7 Nov 2012 16:47:17 +0100
+Subject: [PATCH] lpc32xx: Add the motor PWM clock
+Message-ID: <1352303237-16052-1-git-send-email-alban.bedel@avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mugunthan,
+Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
+---
+ arch/arm/mach-lpc32xx/clock.c                 |    8 ++++++++
+ arch/arm/mach-lpc32xx/include/mach/platform.h |    1 +
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-On 11/07/2012 04:24 PM, Mugunthan V N wrote:
-> On 11/6/2012 11:02 PM, Mugunthan V N wrote:
->> This patch-series adds support for,
->>
->> [1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
->>
->> [2/7]: Adds parent<->child relation between CPSW & MDIO module inside
->> cpsw
->>         driver, as in case of AM33XX, the resources are shared and common
->>         register bit-field is provided to control module/clock
->> enable/disable,
->>         makes it difficult to handle common resource.
->>
->>         So the solution here is, to create parent<->child relation
->> between them.
->>
->> [3/7]: Add hwmod entry for MDIO module, required for MDIO driver.
->>
->> [4/7]: cpsw: simplify the setup of the register pointers
->>
->> [5/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
->>         am335x-evm.dts and am335x-bone.dts file
->>
->> [6/7]: Enable CPSW support to omap2plus_defconfig
->>
->> [7/7]: cpsw: Kernel warn fix during suspend
->>
->> This patch series has been created on top of net-next/master and tested
->> on BeagleBone platform for NFS boot and basic ping test cases.
->>
->> Changes from V3:
->> * Removed unnecessary flags in Davinci MDIO Hwmod entry.
->>
->> Mugunthan V N (4):
->>    ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
->>    arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
->>    ARM: OMAP2+: omap2plus_defconfig: Enable CPSW support
->>    net: cpsw: halt network stack before halting the device during
->>      suspend
->>
->> Richard Cochran (1):
->>    cpsw: simplify the setup of the register pointers
->>
->> Vaibhav Hiremath (2):
->>    net: davinci_mdio: Fix typo mistake in calling runtime-pm api
->>    net: cpsw: Add parent<->child relation support between cpsw and mdio
->>
->>   Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
->>   arch/arm/boot/dts/am335x-bone.dts              |    8 +
->>   arch/arm/boot/dts/am335x-evm.dts               |    8 +
->>   arch/arm/boot/dts/am33xx.dtsi                  |   42 +++++
->>   arch/arm/configs/omap2plus_defconfig           |    3 +
->>   arch/arm/mach-omap2/omap_hwmod_33xx_data.c     |   31 ++++
->>   drivers/net/ethernet/ti/cpsw.c                 |  231
->> ++++++++++--------------
->>   drivers/net/ethernet/ti/davinci_mdio.c         |    2 +-
->>   include/linux/platform_data/cpsw.h             |   19 --
->>   9 files changed, 192 insertions(+), 186 deletions(-)
->>
-> Paul/Benoit
-> 
-> Do you any comments
-
-The DTS looks better thanks to Richard cleanup.
-But you did not take into account the minor cosmetic comments I did last
-time.
-
-Could you just clean the DTS based on last time comments and change the
-subject to be compliant with the other ones and I will take it in my
-for_3.8/dts_part2 branch.
-
-Thanks,
-Benoit
+diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+index f48c2e9..dd5d6f5 100644
+--- a/arch/arm/mach-lpc32xx/clock.c
++++ b/arch/arm/mach-lpc32xx/clock.c
+@@ -585,6 +585,13 @@ static struct clk clk_timer3 = {
+ 	.enable_mask	= LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN,
+ 	.get_rate	= local_return_parent_rate,
+ };
++static struct clk clk_mpwm = {
++	.parent		= &clk_pclk,
++	.enable		= local_onoff_enable,
++	.enable_reg	= LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
++	.enable_mask	= LPC32XX_CLKPWR_TMRPWMCLK_MPWM_EN,
++	.get_rate	= local_return_parent_rate,
++};
+ static struct clk clk_wdt = {
+ 	.parent		= &clk_pclk,
+ 	.enable		= local_onoff_enable,
+@@ -1202,6 +1209,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_INIT("pl08xdmac", NULL, &clk_dma),
+ 	CLKDEV_INIT("4003c000.watchdog", NULL, &clk_wdt),
+ 	CLKDEV_INIT("4005c000.pwm", NULL, &clk_pwm),
++	CLKDEV_INIT("400e8000.mpwm", NULL, &clk_mpwm),
+ 	CLKDEV_INIT(NULL, "uart3_ck", &clk_uart3),
+ 	CLKDEV_INIT(NULL, "uart4_ck", &clk_uart4),
+ 	CLKDEV_INIT(NULL, "uart5_ck", &clk_uart5),
+diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
+index acc4aab..b5612a1 100644
+--- a/arch/arm/mach-lpc32xx/include/mach/platform.h
++++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
+@@ -515,6 +515,7 @@
+ /*
+  * clkpwr_timers_pwms_clk_ctrl_1 register definitions
+  */
++#define LPC32XX_CLKPWR_TMRPWMCLK_MPWM_EN	0x40
+ #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN	0x20
+ #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER2_EN	0x10
+ #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER1_EN	0x08
+-- 
+1.7.0.4
