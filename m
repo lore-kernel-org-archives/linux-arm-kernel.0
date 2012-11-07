@@ -1,20 +1,60 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 16:41:33 -0800
-Subject: [GIT PULL] ARM: OMAP: DTS for 3.8
-In-Reply-To: <5092ADE7.1030709@ti.com>
-References: <5092ADE7.1030709@ti.com>
-Message-ID: <20121107004133.GR6801@atomide.com>
+Date: Tue, 6 Nov 2012 16:47:03 -0800
+Subject: [GIT PULL] ARM: OMAP: Timer and Counter DT Updates for v3.8
+In-Reply-To: <50941812.2070501@ti.com>
+References: <50941812.2070501@ti.com>
+Message-ID: <20121107004703.GS6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [121101 10:16]:
+* Jon Hunter <jon-hunter@ti.com> [121102 12:01]:
 > Hi Tony,
 > 
-> Please pull some more OMAP5 and AM33xx data for 3.8.
-> The branch contains as well some cleanup and the omap3-beagle support since the previous one was in fact a beagle-xm.
+> Please pull the remaining patches to migrate OMAP timers and counters
+> over to use device-tree. I recommend applying this after Benoit's DT
+> series for v3.8 [1]. 
+> 
+> This branch contains ...
+> - Handling OMAP3 secure timers with device-tree
+> - Requesting timer by capability/feature
+> - Adds new DT machine descriptor for OMAP3 GP devices
+> - Look-up of clocksource/events timers from DT
+> - Migrate dmtimer driver to use DT
+> 
+> Cheers
+> Jon
+> 
+> [1] http://marc.info/?l=linux-omap&m=135179007210696&w=2
+>  
+> 
+> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
+> 
+>   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git at github.com:jonhunter/linux.git dev-dt-timer
 
-Thanks pulling into omap-for-v3.8/dt.
+Thanks pulling into omap-for-v3.8/dt branch.
 
 Regards,
 
 Tony
+ 
+> for you to fetch changes up to 9883f7c8dd21acb90697582ca331f3f8a66ac054:
+> 
+>   ARM: OMAP2+: Add device-tree support for 32kHz counter (2012-11-02 13:16:31 -0500)
+> 
+> ----------------------------------------------------------------
+> Jon Hunter (5):
+>       ARM: OMAP3: Dynamically disable secure timer nodes for secure devices
+>       ARM: OMAP: Add function to request a timer by capability
+>       ARM: OMAP3: Add generic machine descriptor for boards with OMAP3 GP devices
+>       ARM: OMAP: Add DT support for timer driver
+>       ARM: OMAP2+: Add device-tree support for 32kHz counter
+> 
+>  arch/arm/mach-omap2/board-generic.c       |   17 +++
+>  arch/arm/mach-omap2/timer.c               |  203 ++++++++++++++++++++++++-----
+>  arch/arm/plat-omap/dmtimer.c              |   93 ++++++++++++-
+>  arch/arm/plat-omap/include/plat/dmtimer.h |    1 +
+>  4 files changed, 275 insertions(+), 39 deletions(-)
