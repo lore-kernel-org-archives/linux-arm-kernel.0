@@ -1,13 +1,12 @@
 From: lkml.js@gmail.com (jungseung lee)
-Date: Wed, 7 Nov 2012 11:07:29 +0900
+Date: Wed, 7 Nov 2012 11:19:53 +0900
 Subject: arm: Add ARM ERRATA 775420 workaround
-In-Reply-To: <CACEL3L3O-9v8T1ELVK3gUBaqG0=+vkuLhbQ=dx3-5kJHg6t9UA@mail.gmail.com>
+In-Reply-To: <CACEL3L1cZkvxBMSyTp3kr=+5y-aso+gZYBvuCPXk3ZQnHZQOzQ@mail.gmail.com>
 References: <CACEL3L3O-9v8T1ELVK3gUBaqG0=+vkuLhbQ=dx3-5kJHg6t9UA@mail.gmail.com>
-Message-ID: <CACEL3L3U_MAwy7SaM=T5OWy-9yC0MyTRR-+FWtvw2qSfwpsAag@mail.gmail.com>
+ <CACEL3L1cZkvxBMSyTp3kr=+5y-aso+gZYBvuCPXk3ZQnHZQOzQ@mail.gmail.com>
+Message-ID: <CACEL3L3TW8r4MR+WPtsLxMjoxKnRrKxm9d8UFQTwBEce6Eghjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-2012. 11. 6. ?? 3:55? "jungseung lee" <lkml.js@gmail.com>?? ??:
 
 Hi,
 
@@ -19,24 +18,24 @@ instruction on exception handling code for breaking erratum condition .
 It could meet the requirement?
 
 > source "arch/arm/common/Kconfig"
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index 39e3fb3..3b17227 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -211,6 +211,9 @@ ENTRY(v7_coherent_user_range)
->   * isn't mapped, fail with -EFAULT.
->   */
-> 9001:
-> +#ifdef CONFIG_ARM_ERRATA_775420
-> + dsb
-> +#endif
->   mov r0, #-EFAULT
->   mov pc, lr
->   UNWIND(.fnend )
+> > diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+> > index 39e3fb3..3b17227 100644
+> > --- a/arch/arm/mm/cache-v7.S
+> > +++ b/arch/arm/mm/cache-v7.S
+> > @@ -211,6 +211,9 @@ ENTRY(v7_coherent_user_range)
+> >   * isn't mapped, fail with -EFAULT.
+> >   */
+> > 9001:
+> > +#ifdef CONFIG_ARM_ERRATA_775420
+> > + dsb
+> > +#endif
+> >   mov r0, #-EFAULT
+> >   mov pc, lr
+> >   UNWIND(.fnend )
+> >
+> >
+> thanks
 >
->
-thanks
-
 > > On Thu, Sep 20, 2012 at 10:58:53AM +0100, Catalin Marinas wrote:
 > > > On 12 September 2012 08:14, Simon Horman wrote:
 > > > > +config ARM_ERRATA_775420
@@ -139,4 +138,4 @@ aborts, might lead to deadlock"
 > >
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/cbcf2f25/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/5e13cf89/attachment-0001.html>
