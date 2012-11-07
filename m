@@ -1,36 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Nov 2012 13:52:04 -0800
-Subject: [PATCH V2 00/14] ARM: OMAP: DMTIMER fixes
-In-Reply-To: <509AD621.7060402@ti.com>
-References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
- <20121107212254.GK6801@atomide.com> <509AD621.7060402@ti.com>
-Message-ID: <20121107215204.GN6801@atomide.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Wed,  7 Nov 2012 23:00:56 +0100
+Subject: [PATCH 1/2] ARM: S3C24XX: Add clkdev entry for camif-upll clock
+Message-ID: <1352325657-28885-1-git-send-email-sylvester.nawrocki@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121107 13:45]:
-> 
-> On 11/07/2012 03:22 PM, Tony Lindgren wrote:
-> > * Jon Hunter <jon-hunter@ti.com> [121107 11:03]:
-> >> This series includes several fixes for the OMAP DMTIMER driver. This is
-> >> based upon 3.7-rc4 with the two series adding device-tree support for
-> >> DMTIMERs [1] and the 32kHz Counter [2]
-> > 
-> > These look OK to me, I'm assuming you'll do a pull request eventually
-> > for these. Might be worth checking if these merge fine also on
-> > omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3, rename detection
-> > might be able to deal with that for the header.
-> 
-> Yes I was going to wait a few days for people to review before sending a
-> pull request. I will make sure it merges on your master. Is Monday too
-> late for v3.8?
+The s3c-camif driver uses "camera" clock conn_id for the "camif-upll"
+(s3c244x) and "camera" (s3c64xx) platform clock. By adding this new
+clkdev entry the platform differences are isolated from the driver.
 
-Probably not for this series as it fixes some issues, but in general
-we should have most of the patches queued by -rc4 time.
+Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+---
+ arch/arm/mach-s3c24xx/clock-s3c2440.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-s3c24xx/clock-s3c2440.c b/arch/arm/mach-s3c24xx/clock-s3c2440.c
+index 4407b17..04b87ec 100644
+--- a/arch/arm/mach-s3c24xx/clock-s3c2440.c
++++ b/arch/arm/mach-s3c24xx/clock-s3c2440.c
+@@ -161,6 +161,7 @@ static struct clk_lookup s3c2440_clk_lookup[] = {
+ 	CLKDEV_INIT(NULL, "clk_uart_baud1", &s3c24xx_uclk),
+ 	CLKDEV_INIT(NULL, "clk_uart_baud2", &clk_p),
+ 	CLKDEV_INIT(NULL, "clk_uart_baud3", &s3c2440_clk_fclk_n),
++	CLKDEV_INIT("s3c2440-camif", "camera", &s3c2440_clk_cam_upll),
+ };
  
-> >> [1] http://marc.info/?l=linux-omap&m=135065875808614&w=2
-> >> [2] http://marc.info/?l=linux-omap&m=135119308123513&w=2
+ static int __init_refok s3c2440_clk_add(struct device *dev, struct subsys_interface *sif)
+-- 
+1.7.4.1
