@@ -1,92 +1,65 @@
-From: andreas.devel@googlemail.com (=?ISO-8859-1?Q?Andreas_Bie=DFmann?=)
-Date: Wed, 07 Nov 2012 10:56:59 +0100
-Subject: [PATCH] Revert "serial: omap: fix software flow control"
-In-Reply-To: <1350396562-32579-1-git-send-email-balbi@ti.com>
-References: <1350396562-32579-1-git-send-email-balbi@ti.com>
-Message-ID: <509A306B.10409@gmail.com>
+From: fengguang.wu@intel.com (Fengguang Wu)
+Date: Wed, 7 Nov 2012 18:05:25 +0800
+Subject: drivers/staging/ced1401/ced_ioc.c:918 GetTransfer() error: potential
+ null dereference 'tx'.  (kzalloc returns null)
+In-Reply-To: <509a31bd.DqNZ+8tDIvryTj7L%yuanhan.liu@linux.intel.com>
+Message-ID: <20121107100525.GA31190@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.10.2012 16:09, Felipe Balbi wrote:
-> This reverts commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6
-> (serial: omap: fix software flow control).
-> 
-> As Russell has pointed out, that commit isn't fixing
-> Software Flow Control at all, and it actually makes
-> it even more broken.
-> 
-> It was agreed to revert this commit and use Russell's
-> latest UART patches instead.
-> 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+Hi Arnd,
 
-since 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6 made it into stable (at
-least 3.4) I think it would be good decision to also apply this revert
-to stable until a working solution exists.
+FYI, there are new smatch warnings show up in
 
-Best regards
+tree:   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git testing/defconfig-warnings
+head:   ee68ab14f293996cc746aeb016fd2c124e2914f0
+commit: 47b83e2bd41f9cc656b7b933cefec484f4d12026 Fix potential stack overflow locations
+date:   2 hours ago
 
-Andreas Bie?mann
+  drivers/staging/ced1401/ced_ioc.c:875 WaitEvent() warn: inconsistent returns mutex:&pdx->io_mutex: locked (853) unlocked (841,875)
++ drivers/staging/ced1401/ced_ioc.c:918 GetTransfer() error: potential null dereference 'tx'.  (kzalloc returns null)
+  drivers/staging/ced1401/ced_ioc.c:1079 CheckSelfTest() warn: check that 'gst.code' doesn't leak information
+  drivers/staging/ced1401/ced_ioc.c:1515 FreeCircBlock() warn: inconsistent returns mutex:&pdx->io_mutex: locked (1512) unlocked (1424,1515)
+--
+  drivers/staging/wlan-ng/hfa384x_usb.c:3517 hfa384x_usbin_rx() error: potential NULL dereference 'rxmeta'.
+  drivers/staging/wlan-ng/prism2fw.c:594 mkpdrlist() error: buffer overflow 'pda16' 512 <= 512
+  drivers/staging/wlan-ng/prism2fw.c:635 mkpdrlist() error: buffer overflow 'pda16' 512 <= 512
++ drivers/staging/wlan-ng/prism2fw.c:773 read_cardpda() error: potential null dereference 'msg'.  (kmalloc returns null)
+--
+  drivers/misc/lkdtm.c:268 recursive_loop() warn: 'buf' puts 512 bytes on stack
++ drivers/misc/lkdtm.c:270 recursive_loop() error: __builtin_memset() 'buf' too small (512 vs 1024)
+  drivers/misc/lkdtm.c:301 lkdtm_do_action() error: buffer overflow 'p' 8 <= 12
+  drivers/misc/lkdtm.c:320 lkdtm_do_action() error: potential null dereference 'data'.  (kmalloc returns null)
+  drivers/misc/lkdtm.c:320 lkdtm_do_action() error: buffer overflow 'data' 255 <= 256
 
-> ---
-> 
-> Hi Greg,
-> 
-> you might prefer to do the revert yourself, in that case just
-> revert commit 957ee7270d632245b43f6feb0e70d9a5e9ea6cf6.
-> 
-> thanks
-> 
->  arch/arm/plat-omap/include/plat/omap-serial.h |  4 ++--
->  drivers/tty/serial/omap-serial.c              | 12 ++++++------
->  2 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-> index f4a4cd0..1957a85 100644
-> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
-> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-> @@ -40,10 +40,10 @@
->  #define OMAP_UART_WER_MOD_WKUP	0X7F
->  
->  /* Enable XON/XOFF flow control on output */
-> -#define OMAP_UART_SW_TX		0x8
-> +#define OMAP_UART_SW_TX		0x04
->  
->  /* Enable XON/XOFF flow control on input */
-> -#define OMAP_UART_SW_RX		0x2
-> +#define OMAP_UART_SW_RX		0x04
->  
->  #define OMAP_UART_SYSC_RESET	0X07
->  #define OMAP_UART_TCR_TRIG	0X0F
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 6ede6fd..6d3d26a 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -671,19 +671,19 @@ serial_omap_configure_xonxoff
->  
->  	/*
->  	 * IXON Flag:
-> -	 * Flow control for OMAP.TX
-> -	 * OMAP.RX should listen for XON/XOFF
-> +	 * Enable XON/XOFF flow control on output.
-> +	 * Transmit XON1, XOFF1
->  	 */
->  	if (termios->c_iflag & IXON)
-> -		up->efr |= OMAP_UART_SW_RX;
-> +		up->efr |= OMAP_UART_SW_TX;
->  
->  	/*
->  	 * IXOFF Flag:
-> -	 * Flow control for OMAP.RX
-> -	 * OMAP.TX should send XON/XOFF
-> +	 * Enable XON/XOFF flow control on input.
-> +	 * Receiver compares XON1, XOFF1.
->  	 */
->  	if (termios->c_iflag & IXOFF)
-> -		up->efr |= OMAP_UART_SW_TX;
-> +		up->efr |= OMAP_UART_SW_RX;
->  
->  	serial_out(up, UART_EFR, up->efr | UART_EFR_ECB);
->  	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_A);
-> 
+vim +918 +/tx drivers/staging/ced1401/ced_ioc.c
+
+2eae6bdc Alois Schl?gl      2012-09-17  902  ** GetTransferInfo
+2eae6bdc Alois Schl?gl      2012-09-17  903  ** Puts the current state of the 1401 in a TGET_TX_BLOCK.
+2eae6bdc Alois Schl?gl      2012-09-17  904  *****************************************************************************/
+cd915200 Greg Kroah-Hartman 2012-09-17  905  int GetTransfer(DEVICE_EXTENSION * pdx, TGET_TX_BLOCK __user * pTX)
+2eae6bdc Alois Schl?gl      2012-09-17  906  {
+cd915200 Greg Kroah-Hartman 2012-09-17  907  	int iReturn = U14ERR_NOERROR;
+cd915200 Greg Kroah-Hartman 2012-09-17  908  	unsigned int dwIdent;
+cd915200 Greg Kroah-Hartman 2012-09-17  909  
+cd915200 Greg Kroah-Hartman 2012-09-17  910  	mutex_lock(&pdx->io_mutex);
+cd915200 Greg Kroah-Hartman 2012-09-17  911  	dwIdent = pdx->StagedId;	// area ident for last xfer
+cd915200 Greg Kroah-Hartman 2012-09-17  912  	if (dwIdent >= MAX_TRANSAREAS)
+cd915200 Greg Kroah-Hartman 2012-09-17  913  		iReturn = U14ERR_BADAREA;
+cd915200 Greg Kroah-Hartman 2012-09-17  914  	else {
+cd915200 Greg Kroah-Hartman 2012-09-17  915  		// Return the best information we have - we don't have physical addresses
+47b83e2b Arnd Bergmann      2012-10-16  916  		TGET_TX_BLOCK *tx;
+47b83e2b Arnd Bergmann      2012-10-16  917  		tx = kzalloc(sizeof *tx, GFP_KERNEL);
+47b83e2b Arnd Bergmann      2012-10-16 @918  		tx->size = pdx->rTransDef[dwIdent].dwLength;
+47b83e2b Arnd Bergmann      2012-10-16  919  		tx->linear = (long long)((long)pdx->rTransDef[dwIdent].lpvBuff);
+47b83e2b Arnd Bergmann      2012-10-16  920  		tx->avail = GET_TX_MAXENTRIES;	// how many blocks we could return
+47b83e2b Arnd Bergmann      2012-10-16  921  		tx->used = 1;	// number we actually return
+47b83e2b Arnd Bergmann      2012-10-16  922  		tx->entries[0].physical =
+47b83e2b Arnd Bergmann      2012-10-16  923  		   (long long)(tx->linear + pdx->StagedOffset);
+47b83e2b Arnd Bergmann      2012-10-16  924  		tx->entries[0].size = tx->size;
+47b83e2b Arnd Bergmann      2012-10-16  925  
+47b83e2b Arnd Bergmann      2012-10-16  926  		if (copy_to_user(pTX, tx, sizeof(*tx)))
+
+---
+0-DAY kernel build testing backend         Open Source Technology Center
+Fengguang Wu, Yuanhan Liu                              Intel Corporation
