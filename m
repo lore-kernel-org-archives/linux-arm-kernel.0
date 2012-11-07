@@ -1,79 +1,51 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 7 Nov 2012 13:25:56 +0000
-Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
-In-Reply-To: <87r4o68bnl.fsf@deeprootsystems.com>
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
- <87txt4aqyc.fsf@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EC04AE5@DBDE01.ent.ti.com>
- <87r4o68bnl.fsf@deeprootsystems.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC085EE@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 7 Nov 2012 13:29:26 +0000
+Subject: Building for MMU-less vexpress targets
+In-Reply-To: <alpine.LFD.2.02.1211061802240.21033@xanadu.home>
+References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
+ <201211062114.49933.arnd@arndb.de>
+ <alpine.LFD.2.02.1211061802240.21033@xanadu.home>
+Message-ID: <201211071329.26995.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Tuesday 06 November 2012, Nicolas Pitre wrote:
+> On Tue, 6 Nov 2012, Arnd Bergmann wrote:
+> 
+> > On Tuesday 06 November 2012, Nicolas Pitre wrote:
+> > > I really think that it makes no sense at all to support !MMU kernels in 
+> > > a multi-platform kernel build, even if the set of included platforms 
+> > > were all !MMU.  The kernel has to be linked for the physical address of 
+> > > the target and not a common invariant virtual address.
+> > 
+> > There are two separate aspects here: One is to run a kernel on !MMU that is
+> > built to support multiple platforms. I agree that this is rather pointless
+> > and not interesting.
+> > 
+> > The other point is being able to build such a kernel, and this is what Will
+> > seems to be interested in more.
+> 
+> What's the point of building a pointless and uninteresting kernel?
 
-On Wed, Nov 07, 2012 at 06:36:06, Kevin Hilman wrote:
-> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
-> 
-> > On Mon, Nov 05, 2012 at 23:10:27, Kevin Hilman wrote:
-> 
-> [...]
-> 
-> >> 
-> >> Also, if there are drivers for these devices, won't this interfere?
-> >> 
-> >
-> > Hmm, I can think of the following scenarios
-> >
-> > 1. Runtime PM adapted drivers are compiled in - We'll have to ensure that
-> > in their suspend callbacks they end up doing omap_hwmod_idle() via the
-> > runtime PM APIs. 
-> 
-> That already happens for all omap_devices.
-> 
-> > In this case the omap_hwmod_enable() followed by omap_hwmod_idle() is
-> > not necessary in the PM code.
-> 
-> Correct.
-> 
-> > 2. The drivers are not compiled in - In this case, the hwmod code puts
-> > the IPs in standby during bootup so the first suspend-resume iteration
-> > will pass. During resuming, the SYSC configuration for forced standby will
-> > be lost, 
-> 
-> Please clarify how the SYSC is lost in this case.
+Built-time coverage is the only one I can think of, but I think it's a
+good reason. Being able to build an "allyesconfig" with MMU disabled
+sounds like a good sniff test to see if something broke and is much faster
+than building all the defconfigs.
 
-The register configuration of IPs in the PER domain is lost when we enter
-the suspend state. So the forced standby configuration from SYSC is lost
-and we need to do this for every successful suspend-resume cycle.
+> > The two options are either to make
+> > vexpress be single-platform when building for !MMU, or to allow multiplatform
+> > kernels to be built without MMU support in principle. I think the second
+> > option is more logical and avoids complex Kconfig constructs.
+> 
+> Well, I'd rather prefer to think that the first option is the most 
+> logical between those 2 options, regardless of Kconfig complexity 
+> issues.
+> 
+> I didn't look, but just making MULTIPLATFORM depend on !MMU, and 
+> VEXPRESS depend on MULTIPLATFORM || MMU should be close to what is 
+> needed, no?
 
-> 
-> > so in the subsequent iterations these IPs won't go standby and the
-> > hwmod code does not touch them since they never got enabled. In this case
-> > we do need the sequence that is there currently.
-> >
-> > 3. For some reason the respective drivers don't idle the IPs during suspend -
-> > (no_idle_on_suspend flag for the hwmod in DT?). In this scenario I think
-> > we should abort the suspend process since we know that the suspend is not
-> > going to work. 
-> 
-> Agreed.
-> 
-> > Is there some other scenario that needs to be covered?
-> 
-> You covered the ones I was thinking of.
-> 
-> > How about adding some flag in hwmod code for handling this? Something
-> > similar to what was done for MMC [1]. I think the problem that we have
-> > is in some ways similar to the one addressed in [1].
-> 
-> Except that in the absence of drivers, no hwmod code is executed on the
-> suspend/resume path.
-> 
+Fine with me too. I suppose you just made the same logic error that
+I had earlier in this thread and meant !MMU where you wrote MMU.
 
-We could perhaps add a couple of APIs to check the SYSC values when coming
-out of suspend and take appropriate action if the sysc cache does not match?
-
-Regards,
-Vaibhav 
+	Arnd
