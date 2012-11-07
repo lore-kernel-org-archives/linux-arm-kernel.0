@@ -1,48 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 07 Nov 2012 13:41:44 +0900
-Subject: [PATCH 2/4] gpio: samsung: Skip registration if pinctrl driver is
- present on Exynos4x12
-In-Reply-To: <CACRpkdYNDSp0K3wpvUem9ecsW-JQ9L6aKqaOmHNUR65DQTMNHA@mail.gmail.com>
-References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
- <1351089457-8205-3-git-send-email-t.figa@samsung.com>
- <CACRpkdYNDSp0K3wpvUem9ecsW-JQ9L6aKqaOmHNUR65DQTMNHA@mail.gmail.com>
-Message-ID: <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Wed, 7 Nov 2012 10:41:51 +0530
+Subject: [PATCH 2/5] gpiolib-of: staticize the pin range calls
+In-Reply-To: <1352215003-30268-1-git-send-email-linus.walleij@stericsson.com>
+References: <1352215003-30268-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAOh2x==WYpq_hZa9bZhDNhD_ptE3hw3hBBugtyRu4AN0qetyTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
-> 
-> On Wed, Oct 24, 2012 at 4:37 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> 
-> > This patch modifies the Samsung GPIO driver to check for pinctrl driver
-> > presence earlier and use generic matching instead of a single compatible
-> > value.
-> >
-> > This allows us to fix warning about unrecognized SoC in case of
-> > Exynos4x12, which is not supported by this driver.
-> >
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Tell me if there is something you want merged through
-> the GPIO or pinctrl tree. I have this Samsung branch on the
-> pinctrl tree...
-> 
-Hi Linus, 
+On 6 November 2012 20:46, Linus Walleij <linus.walleij@stericsson.com> wrote:
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
 
-A commit 1b6056d6 ("pinctrl: samsung: Include bank-specific eint offset in
-bank struct") which is in your pinctrl tree (samsung branch) changed
-macro(EXYNOS_PIN_BANK_EINTG) to add offset. Eventually, this series(due to
-3rd patch, pinctrl: samsung: Add support for Exynos4x12) breaks compilation
-without the commit. So if you don't have a plan to rebase samsung branch of
-your pinctrl tree, I'd like to merge it in my tree. Is it ok to you?
+ #ifdef CONFIG_PINCTRL
+-void of_gpiochip_add_pin_range(struct gpio_chip *chip)
++static void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+ {
+        struct device_node *np = chip->of_node;
+        struct gpio_pin_range *pin_range;
+@@ -254,7 +254,7 @@ void of_gpiochip_add_pin_range(struct gpio_chip *chip)
+        } while (index++);
+ }
 
-Thanks.
+-void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
++static void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
+ {
+        struct gpio_pin_range *pin_range, *tmp;
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+@@ -265,8 +265,8 @@ void of_gpiochip_remove_pin_range(struct gpio_chip *chip)
+        }
+ }
+ #else
+-void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
+-void of_gpiochip_remove_pin_range(struct gpio_chip *chip) {}
++static void of_gpiochip_add_pin_range(struct gpio_chip *chip) {}
++static void of_gpiochip_remove_pin_range(struct gpio_chip *chip) {}
+
+Maybe static inline??
+
+Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
