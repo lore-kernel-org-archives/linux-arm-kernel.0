@@ -1,77 +1,103 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed, 7 Nov 2012 12:57:35 +0100
-Subject: [PATCH v3 0/3] Add DMA and device tree support to the flash
- controller FLCTL
-In-Reply-To: <1350641736-18192-1-git-send-email-hechtb@gmail.com>
-References: <1350641736-18192-1-git-send-email-hechtb@gmail.com>
-Message-ID: <CABYn4sx_z7zcqNYC6huK2Ua=_LkC5hgNY3UufKbZtUmNS0YtMg@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 7 Nov 2012 12:00:52 +0000
+Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
+In-Reply-To: <20121107110542.GH23305@mudshark.cambridge.arm.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121106215044.GB21764@mudshark.cambridge.arm.com>
+ <20121107102349.GC17831@e102568-lin.cambridge.arm.com>
+ <20121107110542.GH23305@mudshark.cambridge.arm.com>
+Message-ID: <20121107120052.GD17831@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Artem,
+On Wed, Nov 07, 2012 at 11:05:42AM +0000, Will Deacon wrote:
+> On Wed, Nov 07, 2012 at 10:23:49AM +0000, Lorenzo Pieralisi wrote:
+> > On Tue, Nov 06, 2012 at 09:50:44PM +0000, Will Deacon wrote:
+> > > > +	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
+> > > > +		const u32 *hwid;
+> > > > +		int len;
+> > > > +
+> > > > +		pr_debug("  * %s...\n", dn->full_name);
+> > > > +
+> > > > +		hwid = of_get_property(dn, "reg", &len);
+> > > > +
+> > > > +		if (!hwid || len != 4) {
+> > > > +			pr_err("  * %s missing reg property\n", dn->full_name);
+> > > > +			continue;
+> > > > +		}
+> > > > +		/*
+> > > > +		 * We want to assign the boot CPU logical id 0.
+> > > > +		 * Boot CPU checks its own MPIDR and if matches the current
+> > > > +		 * cpu node "reg" value it sets the logical cpu index to 0
+> > > > +		 * and stores the physical id accordingly.
+> > > > +		 * If MPIDR does not match, assign sequential cpu logical
+> > > > +		 * id (starting from 1) and increments it.
+> > > > +		 */
+> > > > +		i = (be32_to_cpup(hwid) == (read_cpuid_mpidr() & 0xffffff))
+> > > > +							? 0 : cpu++;
+> > > > +
+> > > > +		if (!i)
+> > > > +			printk(KERN_INFO "Booting Linux on CPU HWID 0x%x\n",
+> > > > +					be32_to_cpup(hwid));
+> > > 
+> > > I don't think we should bother with this print -- we already print something
+> > > in smp_setup_processor_id, which cannot differ for the boot CPU, If you want
+> > > the full mpidr, we could change that code to include it as well.
+> > 
+> > Yes, it is duplicate code, I will remove it. Extending the printk in
+> > smp_setup_processor_id() to include the entire MPIDR should be done
+> > though, otherwise we might have printk aliases on system with multiple
+> > clusters.
+> 
+> Feel free to make that change. You could also replace NR_CPUS in
+> smp_setup_processor_id with nr_cpu_ids for consistency (they'll be the same
+> this early on).
 
-I hope all aiaiai warnings except the adress space issue are fixed. As
-I don't see how to fix the address space conversion I wonder if you
-can accept the patchset as it is now.
+Ok.
 
-cheers,
+> > > We might also want some sanity checking that we do indeed end up with
+> > > logical id 0 for the boot CPU. If not, I think we should scream and fall
+> > > back on the simple mapping created earlier.
+> > 
+> > Well, this basically means that we have to make sure this function is
+> > executed on the boot CPU (and it is as the code stands now), right ?
+> 
+> Yes, smp is not up yet which is why we're allowed to play with the logical
+> map.
+> 
+> > Since we are reading the MPIDR of the CPU parsing the tree and assign logical
+> > cpu 0 accordingly I think we have this check carried out automatically,
+> > unless for any given reason someone calls this function on a CPU that is
+> > not the boot one (Why ?).
+> > 
+> > Basically I could add a check like:
+> > 
+> > if (WARN_ON(smp_processor_id())
+> > 	return;
+> > 
+> > to fall back to the previous mapping, but that's overkill IMHO.
+> 
+> No, I was thinking about what happens if the devicetree doesn't contain an
+> mpidr property that matches the boot cpu. In this case, we will fail to
+> assign logical ID 0, right? If this happens, we should complain about an
+> invalid devicetree and try to fall back on the logical_map that was
+> generated earlier on.
 
- Bastian
+Good point. What I could do, I can assign the MPIDR of the boot CPU to
+the logical index 0 before even starting to parse the DT (that's what it
+is done in smp_setup_processor_id(), with a couple of twists). Then, if I
+find a node that matches the boot CPU mpidr I just skip over it. This
+way the boot CPU MPIDR will always be correct the only difference with
+the current approach will be that instead of generating the secondaries
+MPIDRs we will read them from DT.
 
+The problem with this approach is that if we need a pointer (phandle) to the
+boot CPU DT node through the MPIDR and the boot CPU node is botched or missing
+we still behave as if the DT CPU nodes were ok.
 
-2012/10/19 Bastian Hecht <hechtb@googlemail.com>:
-> changelog v3:   - due to shame on me by letting aiaiai complain, I've added
->                   a third patch (1/3) that cleans up some parts of the driver
->                   and added a correct error path to probe() in patch 3 (formerly 2/2).
->                   I found no way to fix this though:
-> +drivers/mtd/nand/sh_flctl.c:181:25: warning: cast removes address space of expression [sparse]
->
-> changelog v2:   - cosmetic fixes in patch 1
->                 - added dmas and dma-names field in patch 2
->
-> This mini-series consists of 2 separately posted patch-sets that shrunk
-> to one patch each. It adds DMA support for the data part (not ECC) as
-> well as device tree support to the FLCTL flash controller.
-> As the 2nd patch is based on the 1st, I've decided to
-> collect them here to avoid any confusion.
->
-> The first set contained
-> [PATCH 1/2] mtd: sh_flctl: Setup and release DMA channels
-> [PATCH 2/2] mtd: sh_flctl: Use DMA for data fifo FLTDFIFO when available
-> and was merged after 2 reviews to
-> [PATCH] mtd: sh_flctl: Add DMA capabilty (same patch as in here)
->
-> The second set contained
-> [PATCH 1/3] mtd: sh_flctl: Probe SNAND_E flag from NAND chip
-> [PATCH 2/3] mtd: sh_flctl: Add device tree support
-> [PATCH 3/3] mtd: sh_flctl: Add sh7372 device tree config
-> and is merged here to
-> mtd: sh_flctl: Add device tree support
->
-> Patch 1 can be omitted as SNAND_E is handled in the FLCTL source anyway
-> correctly in set_cmd_regs() and the flag can be removed from existing board
-> codes without this patch.
-> Patch 2 without patch 3 may be confusing so I merged them too. Documentation
-> is added as well.
->
-> I've added linux-arm-kernel at lists.infradead.org as recipient for the
-> device tree part.
->
-> The patchset is based on
-> l2-mtd  git://git.infradead.org/users/dedekind/l2-mtd.git
-> with reverted commit e26c113b4130aefa1d8446602bb5b05cfd646bfe.
->
->
-> Bastian Hecht (2):
->   mtd: sh_flctl: Add DMA capabilty
->   mtd: sh_flctl: Add device tree support
->
->  .../devicetree/bindings/mtd/flctl-nand.txt         |   37 +++
->  drivers/mtd/nand/sh_flctl.c                        |  266 +++++++++++++++++++-
->  include/linux/mtd/sh_flctl.h                       |   12 +
->  3 files changed, 305 insertions(+), 10 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mtd/flctl-nand.txt
->
-> --
-> 1.7.5.4
->
+I think I'd better stick a warning condition in there if the boot CPU
+node is not present or botched (from a MPIDR perspective at least).
+
+Thoughts ?
+Lorenzo
