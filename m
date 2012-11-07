@@ -1,60 +1,23 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 7 Nov 2012 12:07:08 -0600
-Subject: OMAP baseline test results for v3.7-rc4
-In-Reply-To: <alpine.DEB.2.00.1211071728310.20704@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
- <509A96DA.2010003@ti.com>
- <alpine.DEB.2.00.1211071728310.20704@utopia.booyaka.com>
-Message-ID: <509AA34C.9030203@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 7 Nov 2012 18:19:33 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: second set of PRCM cleanups for 3.8
+In-Reply-To: <alpine.DEB.2.00.1211070227500.8758@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
+ <20121106220833.GQ6801@atomide.com>
+ <alpine.DEB.2.00.1211070150100.8758@utopia.booyaka.com>
+ <20121107015841.GC6801@atomide.com>
+ <alpine.DEB.2.00.1211070227500.8758@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1211071819160.20704@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 7 Nov 2012, Paul Walmsley wrote:
 
-On 11/07/2012 11:32 AM, Paul Walmsley wrote:
-> On Wed, 7 Nov 2012, Jon Hunter wrote:
-> 
->> On 11/04/2012 08:46 PM, Paul Walmsley wrote:
->>
->>> * 4460pandaes: boot fails early
->>>   - Appears to be due to X-loader problems here
->>>   - Need to note the X-loader version so we know it's broken
->>
->> Are you still planning to investigate this further or migrate to a new
->> bootloader?
-> 
-> Yes.  The problem with the current boot setup is that the new 
-> bootloader is breaking as well! :-(
+> If you're asking for a test build of the base commit, 
+> 7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33, I just kicked off a test build 
+> of that; will post when done.
 
-Ugh!
+Just confirmed that this one passes all build tests here.
 
-> This can be seen by comparing:
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/boot/4460pandaes/4460pandaes_log.txt
-> 
-> (the old bootloader)
-> 
-> with
-> 
-> http://www.pwsan.com/omap/testlogs/test_v3.7-rc4/20121104142910/boot/4460pandaes/4460pandaes_log.txt
-> 
-> (the new bootloader)
 
-If you get chance, it would be good to test u-boot v2012.10 release, as
-I am using this and it is working fine. I see the "new" bootloader you
-are using is v2012.07 (however, I though this was working too). Weird ...
-
-> Dealing with this will require hands-on access, and unfortunately, right 
-> now I am traveling and away from my testbed.  Next week, will take a 
-> closer look.
-> 
->> With 4460 and 3.7-rc4, I am seeing that resume from suspend is not
->> working (not sure when this broke though). I am just curious if anyone
->> else sees this. My u-boot version is v2012.10.
-> 
-> If you have the chance, it would be useful to know if any of the v3.7-rcs 
-> worked.  Otherwise, will look at this next week.
-
-Ok, I will see if I can figure out where this broke.
-
-Cheers
-Jon
+- Paul
