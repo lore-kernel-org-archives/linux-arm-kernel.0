@@ -1,77 +1,33 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Wed, 07 Nov 2012 16:01:05 +0900
-Subject: [PATCH 10/10] serial: sh-sci: fix possible race cases on SCSCR
- register accesses
-In-Reply-To: <509A0658.1010503@renesas.com>
-References: <509A0658.1010503@renesas.com>
-Message-ID: <509A0731.6020908@renesas.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 7 Nov 2012 08:09:52 +0100
+Subject: [PATCH v3 2/4] arm: bcm2835: convert to the irqchip infrastructure
+In-Reply-To: <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
+References: <1351462748-5224-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
+Message-ID: <20121107080952.0594f3ef@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the previous commit, console write function (serial_console_write)
-is changed to disable SCI interrupts while printing console strings.
-This introduces possible race cases in the serial startup / shutdown
-functions on SMP systems.
+Josh,
 
-This patch fixes the sh-sci in the same way as commit 9ec1882df2
-(tty: serial: imx: console write routing is unsafe on SMP, from
-Xinyu Chen <xinyu.chen@freescale.com>, 2012-08-27) did.
+On Tue, 6 Nov 2012 10:56:39 -0600, Josh Cartwright wrote:
 
-There could be several consumers of the console,
-* the kernel printk
-* the init process using /dev/kmsg to call printk to show log
-* shell, which opens /dev/console and writes with sys_write()
+> Could it make sense here to kill the irqchip.h private export, and
+> instead rely on the linker to stitch together the builtin irqchip's
+> of_device_id tables?
 
-The shell goes into the normal UART open() and write() system calls,
-while the other two go into the console operations.  The open() call
-invokes serial startup function (sci_startup), which will write to
-the SCSCR register (to enable or disable SCI interrupts) without any
-locking.  This will conflict with the console serial function.
+Yes, using yet another ELF section is another option to do that. I just
+wasn't sure it was worth the effort for now, but if it is seen as
+necessary, I can certainly go ahead and implement this.
 
-Add spinlock protections in sci_startup() and sci_shutdown() properly.
+I am at ELCE at the moment, so quite busy with talks, discussions...
+and drinks. I'll get back to this when I get back from ELCE.
 
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
----
- drivers/tty/serial/sh-sci.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Thanks for your suggestion,
 
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 0b8d029..8e3c7f7 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -1742,6 +1742,7 @@ static inline void sci_free_dma(struct uart_port *port)
- static int sci_startup(struct uart_port *port)
- {
- 	struct sci_port *s = to_sci_port(port);
-+	unsigned long flags;
- 	int ret;
- 
- 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
-@@ -1752,8 +1753,10 @@ static int sci_startup(struct uart_port *port)
- 
- 	sci_request_dma(port);
- 
-+	spin_lock_irqsave(&port->lock, flags);
- 	sci_start_tx(port);
- 	sci_start_rx(port);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	return 0;
- }
-@@ -1761,11 +1764,14 @@ static int sci_startup(struct uart_port *port)
- static void sci_shutdown(struct uart_port *port)
- {
- 	struct sci_port *s = to_sci_port(port);
-+	unsigned long flags;
- 
- 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
- 
-+	spin_lock_irqsave(&port->lock, flags);
- 	sci_stop_rx(port);
- 	sci_stop_tx(port);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	sci_free_dma(port);
- 	sci_free_irq(s);
+Thomas
 -- 
-1.7.12.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
