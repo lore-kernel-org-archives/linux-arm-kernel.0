@@ -1,53 +1,72 @@
-From: voice.shen@atmel.com (Bo Shen)
-Date: Wed, 07 Nov 2012 15:38:24 +0800
-Subject: [RFC patch v3 3/4] ASoC: atmel-ssc-dai: register dai and pcm
- directly
-In-Reply-To: <20121106113908.GC10080@opensource.wolfsonmicro.com>
-References: <1352181474-19597-1-git-send-email-voice.shen@atmel.com>
- <1352181474-19597-3-git-send-email-voice.shen@atmel.com>
- <20121106084814.GC5044@opensource.wolfsonmicro.com>
- <5098D930.8030403@atmel.com>
- <20121106113908.GC10080@opensource.wolfsonmicro.com>
-Message-ID: <509A0FF0.7030501@atmel.com>
+From: anilkumar@ti.com (AnilKumar, Chimata)
+Date: Wed, 7 Nov 2012 08:10:02 +0000
+Subject: [PATCH RESEND 00/10] ARM: dts: AM33XX: Add device tree data
+In-Reply-To: <50992530.8030501@ti.com>
+References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
+ <50992530.8030501@ti.com>
+Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA6602E@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/2012 19:39, Mark Brown wrote:
-> On Tue, Nov 06, 2012 at 05:32:32PM +0800, Bo Shen wrote:
->> On 11/6/2012 16:48, Mark Brown wrote:
->>> On Tue, Nov 06, 2012 at 01:57:53PM +0800, Bo Shen wrote:
->
->>> No, this isn't converting things to device tree which presumably is the
->>> goal here and obviously just doing the rename doesn't accomplish an
->>> enormous amount.  What I said was that you should instantiate the ASoC
->>> adaption when the machine driver needs to use them.  You shouldn't even
->>> need a separate device for this.
->
->> Maybe this is not the best solution, but just abstract audio as a
->> separate device. The other's still keep as a ssc library.
->
-> It's not abstracting things, that's the whole problem.  It's putting the
-> internals of how the Linux audio stack is organised into the device
-> tree.  The point is that the SSC should be a library to all users.
+On Tue, Nov 06, 2012 at 20:26:48, Cousson, Benoit wrote:
+> Hi Anil,
+> 
+> On 11/06/2012 02:48 PM, AnilKumar Ch wrote:
+> > Add device tree date for GPIO based various drivers matrix keypad,
+> > volume keys, push buttons and use leds accross three AM33XX devices
+> > viz EVM, BeagleBone and Starter Kit.
+> > 
+> > To make it functional this series also adds pinctrl data for all
+> > the GPIOs used by various drivers. In this series only default state
+> > pinmux/conf settings are added because of sleep/idle state pinctrl
+> > values are not available.
+> > 
+> > These patches are based on linux-omap-dt:for_3.8/dts_part2 tree and
+> > these were tested on am33xx devices according to added functionality.
+> > 
+> > Change log:
+> > 	- Rebased on for_3.8/dts_part2
+> 
+> Thanks for the update. Applied in for_3.8/dts_part2.
+> 
+> BTW, I've just noticed that am335x-evmsk is not built with make dtbs. The target was missing from the arch/arm/boot/dts/Makefile.
+> 
+> Please find below the patch to add it.
 
-OK. I will keep the SSC as a library for all users.
+Hi Benoit,
 
->>> Please do look at other platforms with similar hardware and do something
->>> similar to them.
->
->> I take some reference (e.g: freescale, marvell, invidia soc, this
->> RFC implement is similar with them), but don't find the similar
->> hardware with us. Please help provide the information who's HW is
->> similar with us. Thanks.
->
-> A *huge* range of SoCs have generic serial ports - off the top of my
-> head this includes at least OMAP, PXA and Freescale.  The same issue
-> also applies to DMA controllers which affects almost all SoCs.
+Thanks for addition. Below change is missed from evmsk patch.
 
-Thanks for this information, I will try to implement the SSC framework 
-like this. If it is finished, I will send out v4 patch series.
-
-Thanks again.
-
-BRs,
-Bo Shen
+Thanks
+AnilKumar
+ 
+> ---
+> From 6990451aca80a5107206688308302241f799057a Mon Sep 17 00:00:00 2001
+> From: Benoit Cousson <b-cousson@ti.com>
+> Date: Tue, 6 Nov 2012 15:52:23 +0100
+> Subject: [PATCH] ARM: dts: Makefile: Add the am335x-evmsk target in dtbs list
+> 
+> The EVMSK was not built with the 'make dtbs' command.
+> Add the missing antry in the dts Makefile.
+> 
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> ---
+>  arch/arm/boot/dts/Makefile |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 634bd42..2458b69 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+>  	omap4-sdp.dtb \
+>  	omap5-evm.dtb \
+>  	am335x-evm.dtb \
+> +	am335x-evmsk.dtb \
+>  	am335x-bone.dtb
+>  dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+>  dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
+> -- 
+> 1.7.0.4
+> 
+> 
