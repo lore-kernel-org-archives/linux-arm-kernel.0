@@ -1,83 +1,52 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 7 Nov 2012 23:04:36 +0800
-Subject: [PATCH v3 5/9] document: devicetree: bind pinconf with pin-single
-In-Reply-To: <5092B9A0.9000204@wwwdotorg.org>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-6-git-send-email-haojian.zhuang@gmail.com>
- <5092B9A0.9000204@wwwdotorg.org>
-Message-ID: <CAN1soZxJFOLUDSCBuk8z7GVUFszLtV3gdhNb6q_zLmESMbJupA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 Nov 2012 10:11:00 -0500 (EST)
+Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
+ interfaces
+In-Reply-To: <20121107102357.GD23305@mudshark.cambridge.arm.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121106221651.GE21764@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1211061755260.21033@xanadu.home>
+ <20121107102357.GD23305@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1211070950250.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 2, 2012 at 2:04 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 10/31/2012 05:04 PM, Haojian Zhuang wrote:
->> Add comments with pinconf & gpio range in the document of
->> pinctrl-single.
->
-> I'd tend to suggest separating the series to add GPIO range support and
-> pinconf support, especially since didn't Tony suggest a separate driver
-> for pinconf? Perhaps that was just for non-generic properties.
->
->> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
->
->> +- pinctrl-single,gpio-ranges : gpio range list of phandles.
->> +  Must be present if gpio range phandle is specified.
->> +  This property should be existing in .dtsi files for those silicons.
->> +
->> +- pinctrl-single,gpio : array with gpio range start, size & register
->> +  offset. Must be present if gpio range phandle is specified.
->> +  This property should be existing in .dts files for those boards.
->> +
->> +- pinctrl-single,gpio-func : gpio function value in the pinmux register.
->> +  Must be present if gpio range phandle is specified.
->> +  This property should be existing in .dts files for those boards.
->
-> I don't see any reason why pinctrl-single,gpio or
-> pinctrl-single,gpio-func are board-specific rather than SoC-specific.
+On Wed, 7 Nov 2012, Will Deacon wrote:
 
-Oh, I wrote it with error. It should be SoC-specific.
+> On Tue, Nov 06, 2012 at 10:59:35PM +0000, Nicolas Pitre wrote:
+> > On Tue, 6 Nov 2012, Will Deacon wrote:
+> > > >  	/*
+> > > > +	 * Get what the GIC says our CPU mask is.
+> > > > +	 */
+> > > > +	BUG_ON(cpu >= 8);
+> > > > +	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
+> > > 
+> > > Making the mask a u8 and using readb_relaxed here makes this bit of code
+> > > clearer to me (and the GIC apparently allows such an access to this
+> > > register).
+> > 
+> > Not always.  At least RTSM throws an exception if you do so.
+> > Been there.
+> 
+> That would be a bug in the RTSM then. Have you reported it to support? (if
+> not, I can chase this one up). I'd rather we just fix the model than work
+> around it in Linux.
 
-> Surely it's the Soc HW construction that defines how the pinctrl and
-> GPIO modules relate to each-other? I would simply remove the last
-> sentence from each of the three descriptions above.
->
-> Also, isn't this list a list of properties for the main pinctrl-single
-> node itself? I think you should split the list up as follows:
->
-> 1) A description of the main node
-> 2) A list of required and optional properties for the main node
-> 3) A description of what a GPIO range node is
-> 4) A list of required and optional properties for a GPIO range node.
->
-> I think that would explain the whole structure a lot more clearly.
->
-> Oh, and why not just get rid of the pinctrl-single,gpio-ranges property
-> entirely, and simply make the GPIO range definitions be child nodes of
-> the pinctrl-single node? That would require them to either be named
-> according to some scheme or have some compatible property to
-> differentiate them from any other nodes, but I think that's workable.
->
-Em. Removing pinctrl-single,gpio-ranges should be better. Now I define
-range as sub node. There're two properties in this sub-node: reg &
-pinctrl-single,gpio.
+I have no problem with you chasing it down with the support people.
 
->> @@ -42,6 +77,15 @@ Where 0xdc is the offset from the pinctrl register base address for the
->>  device pinctrl register, 0x18 is the desired value, and 0xff is the sub mask to
->>  be used when applying this change to the register.
->>
->> +In case pinctrl device supports gpio function, it needs to define gpio range.
->> +All the phandles of gpio range list should be set in below:
->> +
->> +     pinctrl-single,gpio-ranges = <[phandle of gpio range]>;
->> +
->> +     [phandle of gpio range]: {
->
-> That's a label, not a phandle. The reference to the label gets compiled
-> to a phandle in the DTB. The node name is missing. you should probably
-> just use an example label and re-write the last 3 lines as:
->
->         pinctrl-single,gpio-ranges = <&range0>;
->
->         range0: range0 {
->
-Updated.
+I don't want to wait for fixed RTSM versions to be released and the 
+whole world to migrate to them though.
+
+While the readl is maybe marginally unintuitive compared to a readb 
+here, the code is always using readl everywhere else already, even using 
+bit masking and shifting when a readb/writeb could have made the code 
+much simpler (see gic_set_affinity() for example).  I therefore much 
+prefer to stick to a proven 32-bit access than risking regression on 
+some possible implementation where the 8-bit access wasn't properly 
+implemented as the doc says it should and never exercised before.
+
+In other words, I prefer erring on the safe side here.
+
+
+Nicolas
