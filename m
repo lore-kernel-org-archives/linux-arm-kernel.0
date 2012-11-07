@@ -1,99 +1,57 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 7 Nov 2012 10:23:49 +0000
-Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
-In-Reply-To: <20121106215044.GB21764@mudshark.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Nov 2012 10:23:57 +0000
+Subject: [RFC PATCH 4/4] ARM: gic: use a private mapping for CPU target
+ interfaces
+In-Reply-To: <alpine.LFD.2.02.1211061755260.21033@xanadu.home>
 References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20121106215044.GB21764@mudshark.cambridge.arm.com>
-Message-ID: <20121107102349.GC17831@e102568-lin.cambridge.arm.com>
+ <1350393709-23546-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121106221651.GE21764@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1211061755260.21033@xanadu.home>
+Message-ID: <20121107102357.GD23305@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-thanks for the review on the series.
-
-On Tue, Nov 06, 2012 at 09:50:44PM +0000, Will Deacon wrote:
-> On Tue, Oct 16, 2012 at 02:21:45PM +0100, Lorenzo Pieralisi wrote:
-> > When booting through a device tree, the kernel cpu logical id map can be
-> > initialized using device tree data passed by FW or through an embedded blob.
+On Tue, Nov 06, 2012 at 10:59:35PM +0000, Nicolas Pitre wrote:
+> On Tue, 6 Nov 2012, Will Deacon wrote:
+> > >  arch/arm/common/gic.c | 42 ++++++++++++++++++++++++++++++++++--------
+> > >  1 file changed, 34 insertions(+), 8 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+> > > index aa52699..1338a55 100644
+> > > --- a/arch/arm/common/gic.c
+> > > +++ b/arch/arm/common/gic.c
+> > > @@ -70,6 +70,13 @@ struct gic_chip_data {
+> > >  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+> > >  
+> > >  /*
+> > > + * The GIC mapping of CPU interfaces does not necessarily match
+> > > + * the logical CPU numbering.  Let's use a mapping as returned
+> > > + * by the GIC itself.
+> > > + */
+> > > +static u8 gic_cpu_map[8] __read_mostly;
 > > 
-> > This patch adds a function that parses device tree "cpu" nodes and
-> > retrieves the corresponding CPUs hardware identifiers (MPIDR).
-> > It sets the possible cpus and the cpu logical map values according to
-> > the number of CPUs defined in the device tree and respective properties.
-> > 
-> > The primary CPU is assigned cpu logical number 0 to keep the current
-> > convention valid.
-> > 
-> > Current bindings documentation is included in the patch:
-> > 
-> > Documentation/devicetree/bindings/arm/cpus.txt
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Can we have a #define for the number CPUs supported by the GIC? It gets
+> > used a fair amount in this patch for loop bounds etc.
 > 
-> [...]
+> Sure.  I'll respin the patch.
+
+Cheers Nicolas.
+
+> > >  	/*
+> > > +	 * Get what the GIC says our CPU mask is.
+> > > +	 */
+> > > +	BUG_ON(cpu >= 8);
+> > > +	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
+> > 
+> > Making the mask a u8 and using readb_relaxed here makes this bit of code
+> > clearer to me (and the GIC apparently allows such an access to this
+> > register).
 > 
-> > +void __init arm_dt_init_cpu_maps(void)
-> > +{
-> > +	struct device_node *dn = NULL;
-> > +	int i, cpu = 1;
-> > +
-> > +	while ((dn = of_find_node_by_type(dn, "cpu")) && cpu <= nr_cpu_ids) {
-> > +		const u32 *hwid;
-> > +		int len;
-> > +
-> > +		pr_debug("  * %s...\n", dn->full_name);
-> > +
-> > +		hwid = of_get_property(dn, "reg", &len);
-> > +
-> > +		if (!hwid || len != 4) {
-> > +			pr_err("  * %s missing reg property\n", dn->full_name);
-> > +			continue;
-> > +		}
-> > +		/*
-> > +		 * We want to assign the boot CPU logical id 0.
-> > +		 * Boot CPU checks its own MPIDR and if matches the current
-> > +		 * cpu node "reg" value it sets the logical cpu index to 0
-> > +		 * and stores the physical id accordingly.
-> > +		 * If MPIDR does not match, assign sequential cpu logical
-> > +		 * id (starting from 1) and increments it.
-> > +		 */
-> > +		i = (be32_to_cpup(hwid) == (read_cpuid_mpidr() & 0xffffff))
-> > +							? 0 : cpu++;
-> > +
-> > +		if (!i)
-> > +			printk(KERN_INFO "Booting Linux on CPU HWID 0x%x\n",
-> > +					be32_to_cpup(hwid));
-> 
-> I don't think we should bother with this print -- we already print something
-> in smp_setup_processor_id, which cannot differ for the boot CPU, If you want
-> the full mpidr, we could change that code to include it as well.
+> Not always.  At least RTSM throws an exception if you do so.
+> Been there.
 
-Yes, it is duplicate code, I will remove it. Extending the printk in
-smp_setup_processor_id() to include the entire MPIDR should be done
-though, otherwise we might have printk aliases on system with multiple
-clusters.
+That would be a bug in the RTSM then. Have you reported it to support? (if
+not, I can chase this one up). I'd rather we just fix the model than work
+around it in Linux.
 
-> 
-> We might also want some sanity checking that we do indeed end up with
-> logical id 0 for the boot CPU. If not, I think we should scream and fall
-> back on the simple mapping created earlier.
-
-Well, this basically means that we have to make sure this function is
-executed on the boot CPU (and it is as the code stands now), right ?
-
-Since we are reading the MPIDR of the CPU parsing the tree and assign logical
-cpu 0 accordingly I think we have this check carried out automatically,
-unless for any given reason someone calls this function on a CPU that is
-not the boot one (Why ?).
-
-Basically I could add a check like:
-
-if (WARN_ON(smp_processor_id())
-	return;
-
-to fall back to the previous mapping, but that's overkill IMHO.
-
-Thanks,
-Lorenzo
+Will
