@@ -1,47 +1,83 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Nov 2012 15:44:51 +0100
-Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
- support
-In-Reply-To: <20121107143046.GA4576@game.jcrosoft.org>
-References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
- <20121107084932.GE20063@game.jcrosoft.org>
- <20121107092124.GE12323@opensource.wolfsonmicro.com>
- <20121107104121.GG20063@game.jcrosoft.org>
- <20121107140535.GA28954@opensource.wolfsonmicro.com>
- <20121107143046.GA4576@game.jcrosoft.org>
-Message-ID: <20121107144450.GF20844@opensource.wolfsonmicro.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed, 7 Nov 2012 23:04:36 +0800
+Subject: [PATCH v3 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <5092B9A0.9000204@wwwdotorg.org>
+References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
+ <1351724661-29050-6-git-send-email-haojian.zhuang@gmail.com>
+ <5092B9A0.9000204@wwwdotorg.org>
+Message-ID: <CAN1soZxJFOLUDSCBuk8z7GVUFszLtV3gdhNb6q_zLmESMbJupA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 03:30:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Fri, Nov 2, 2012 at 2:04 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 10/31/2012 05:04 PM, Haojian Zhuang wrote:
+>> Add comments with pinconf & gpio range in the document of
+>> pinctrl-single.
+>
+> I'd tend to suggest separating the series to add GPIO range support and
+> pinconf support, especially since didn't Tony suggest a separate driver
+> for pinconf? Perhaps that was just for non-generic properties.
+>
+>> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+>
+>> +- pinctrl-single,gpio-ranges : gpio range list of phandles.
+>> +  Must be present if gpio range phandle is specified.
+>> +  This property should be existing in .dtsi files for those silicons.
+>> +
+>> +- pinctrl-single,gpio : array with gpio range start, size & register
+>> +  offset. Must be present if gpio range phandle is specified.
+>> +  This property should be existing in .dts files for those boards.
+>> +
+>> +- pinctrl-single,gpio-func : gpio function value in the pinmux register.
+>> +  Must be present if gpio range phandle is specified.
+>> +  This property should be existing in .dts files for those boards.
+>
+> I don't see any reason why pinctrl-single,gpio or
+> pinctrl-single,gpio-func are board-specific rather than SoC-specific.
 
-> the one via ASoC for the driver with the pinctrl for now but MUST add it later
+Oh, I wrote it with error. It should be SoC-specific.
 
-> the arch/arm related via AT91 tree where the pinctrl is mandatory in the dtsi
+> Surely it's the Soc HW construction that defines how the pinctrl and
+> GPIO modules relate to each-other? I would simply remove the last
+> sentence from each of the three descriptions above.
+>
+> Also, isn't this list a list of properties for the main pinctrl-single
+> node itself? I think you should split the list up as follows:
+>
+> 1) A description of the main node
+> 2) A list of required and optional properties for the main node
+> 3) A description of what a GPIO range node is
+> 4) A list of required and optional properties for a GPIO range node.
+>
+> I think that would explain the whole structure a lot more clearly.
+>
+> Oh, and why not just get rid of the pinctrl-single,gpio-ranges property
+> entirely, and simply make the GPIO range definitions be child nodes of
+> the pinctrl-single node? That would require them to either be named
+> according to some scheme or have some compatible property to
+> differentiate them from any other nodes, but I think that's workable.
+>
+Em. Removing pinctrl-single,gpio-ranges should be better. Now I define
+range as sub node. There're two properties in this sub-node: reg &
+pinctrl-single,gpio.
 
-> I'm no going to spend hours to do the pinctrl to test Bo patch that he is
-> supposed to have deon to test this code
-
-> As basically today on DT none of the board will work if BO does no provide the
-> pinctrl so for me he MUST put in the dtsi
-
-> is it ok with you?
-
-Or add the pinmux bindings for other IPs over in the pinmux branch and
-the pinmux binding for SSC here (which will help with bisection as the
-DT bindings for the audio will then always exist in conjunction with the
-.dtsi changes for them).  Either way is fine with me; I'll leave things
-as they are until I see some new patches.
-
-Though I have to say now that I look in -next it's a bit surprising that
-there are so many IPs in the file that have no pinmix configuration,
-based on what you're saying it seems like the entire board will be
-falling over with the pinmux code anyway - in the case of the sam9g20ek
-we'd at least need I2C pinmux settings.  I may be misunderstanding.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/a6759dba/attachment.sig>
+>> @@ -42,6 +77,15 @@ Where 0xdc is the offset from the pinctrl register base address for the
+>>  device pinctrl register, 0x18 is the desired value, and 0xff is the sub mask to
+>>  be used when applying this change to the register.
+>>
+>> +In case pinctrl device supports gpio function, it needs to define gpio range.
+>> +All the phandles of gpio range list should be set in below:
+>> +
+>> +     pinctrl-single,gpio-ranges = <[phandle of gpio range]>;
+>> +
+>> +     [phandle of gpio range]: {
+>
+> That's a label, not a phandle. The reference to the label gets compiled
+> to a phandle in the DTB. The node name is missing. you should probably
+> just use an example label and re-write the last 3 lines as:
+>
+>         pinctrl-single,gpio-ranges = <&range0>;
+>
+>         range0: range0 {
+>
+Updated.
