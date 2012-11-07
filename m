@@ -1,20 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Nov 2012 13:36:12 -0700
-Subject: vexpress issues in next-20121029
-In-Reply-To: <508EE610.9050703@wwwdotorg.org>
-References: <508EE610.9050703@wwwdotorg.org>
-Message-ID: <509AC63C.1070309@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 7 Nov 2012 14:56:07 -0600
+Subject: OMAP baseline test results for v3.7-rc4
+In-Reply-To: <alpine.DEB.2.00.1211071728310.20704@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
+ <509A96DA.2010003@ti.com>
+ <alpine.DEB.2.00.1211071728310.20704@utopia.booyaka.com>
+Message-ID: <509ACAE7.5030707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2012 02:24 PM, Stephen Warren wrote:
-> Pawel,
-> 
-> I see two issues on vexpress in next-20121029:
-...
-> 2) With those calls commented out, I find that
-> vexpress_sysreg_init_leds() is device_initcall, and so executes even
-> when not running on vexpress HW. This crashes on Tegra (which I have
-> converted to single-zImage locally).
 
-This issue still appears to be present in next-20121107.
+On 11/07/2012 11:32 AM, Paul Walmsley wrote:
+> On Wed, 7 Nov 2012, Jon Hunter wrote:
+> 
+>> On 11/04/2012 08:46 PM, Paul Walmsley wrote:
+>>
+>>> * 4460pandaes: boot fails early
+>>>   - Appears to be due to X-loader problems here
+>>>   - Need to note the X-loader version so we know it's broken
+>>
+>> Are you still planning to investigate this further or migrate to a new
+>> bootloader?
+> 
+> Yes.  The problem with the current boot setup is that the new 
+> bootloader is breaking as well! :-(
+> 
+> This can be seen by comparing:
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.7-rc1/20121017205513/boot/4460pandaes/4460pandaes_log.txt
+> 
+> (the old bootloader)
+> 
+> with
+> 
+> http://www.pwsan.com/omap/testlogs/test_v3.7-rc4/20121104142910/boot/4460pandaes/4460pandaes_log.txt
+> 
+> (the new bootloader)
+> 
+> Dealing with this will require hands-on access, and unfortunately, right 
+> now I am traveling and away from my testbed.  Next week, will take a 
+> closer look.
+> 
+>> With 4460 and 3.7-rc4, I am seeing that resume from suspend is not
+>> working (not sure when this broke though). I am just curious if anyone
+>> else sees this. My u-boot version is v2012.10.
+> 
+> If you have the chance, it would be useful to know if any of the v3.7-rcs 
+> worked.  Otherwise, will look at this next week.
+
+Kevin pointed me to his pm fixes for 3.8 as it is working there and I
+have confirmed suspend is fixed on v3.7-rc4 with the rom code fix [1]
+Kevin has queued for v3.8.
+
+Cheers
+Jon
+
+[1]
+http://git.kernel.org/?p=linux/kernel/git/khilman/linux-omap-pm.git;a=commit;h=ff999b8a0983ee15668394ed49e38d3568fc6859
