@@ -1,116 +1,70 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 7 Nov 2012 15:20:28 +0000
-Subject: [PATCH 5/8] pwm: pwm-tiehrpwm: Add device-tree binding support
- for EHRPWM driver
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC0447E@DBDE01.ent.ti.com>
-References: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
- <1352106749-9437-6-git-send-email-avinashphilip@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC0447E@DBDE01.ent.ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9DE3A5@DBDE01.ent.ti.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Wed, 7 Nov 2012 20:54:41 +0530
+Subject: [PATCH V4 0/7] ARM: AM33XX: net: Add DT support to CPGMAC and
+ MDIO driver
+In-Reply-To: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
+References: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <509A7D39.8050506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 12:16:13, Bedia, Vaibhav wrote:
-> On Mon, Nov 05, 2012 at 14:42:26, Philip, Avinash wrote:
-> [...]
-> 	
-> > +#include <linux/of_device.h>
-> > +#include <linux/pinctrl/consumer.h>
-> 
-> Pinctrl changes should be separate patch. Morevoer, you don't mention
-> that you making this change.
+On 11/6/2012 11:02 PM, Mugunthan V N wrote:
+> This patch-series adds support for,
+>
+> [1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
+>
+> [2/7]: Adds parent<->child relation between CPSW & MDIO module inside cpsw
+>         driver, as in case of AM33XX, the resources are shared and common
+>         register bit-field is provided to control module/clock enable/disable,
+>         makes it difficult to handle common resource.
+>
+>         So the solution here is, to create parent<->child relation between them.
+>
+> [3/7]: Add hwmod entry for MDIO module, required for MDIO driver.
+>
+> [4/7]: cpsw: simplify the setup of the register pointers
+>
+> [5/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
+>         am335x-evm.dts and am335x-bone.dts file
+>
+> [6/7]: Enable CPSW support to omap2plus_defconfig
+>
+> [7/7]: cpsw: Kernel warn fix during suspend
+>
+> This patch series has been created on top of net-next/master and tested
+> on BeagleBone platform for NFS boot and basic ping test cases.
+>
+> Changes from V3:
+> * Removed unnecessary flags in Davinci MDIO Hwmod entry.
+>
+> Mugunthan V N (4):
+>    ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
+>    arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
+>    ARM: OMAP2+: omap2plus_defconfig: Enable CPSW support
+>    net: cpsw: halt network stack before halting the device during
+>      suspend
+>
+> Richard Cochran (1):
+>    cpsw: simplify the setup of the register pointers
+>
+> Vaibhav Hiremath (2):
+>    net: davinci_mdio: Fix typo mistake in calling runtime-pm api
+>    net: cpsw: Add parent<->child relation support between cpsw and mdio
+>
+>   Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
+>   arch/arm/boot/dts/am335x-bone.dts              |    8 +
+>   arch/arm/boot/dts/am335x-evm.dts               |    8 +
+>   arch/arm/boot/dts/am33xx.dtsi                  |   42 +++++
+>   arch/arm/configs/omap2plus_defconfig           |    3 +
+>   arch/arm/mach-omap2/omap_hwmod_33xx_data.c     |   31 ++++
+>   drivers/net/ethernet/ti/cpsw.c                 |  231 ++++++++++--------------
+>   drivers/net/ethernet/ti/davinci_mdio.c         |    2 +-
+>   include/linux/platform_data/cpsw.h             |   19 --
+>   9 files changed, 192 insertions(+), 186 deletions(-)
+>
+Paul/Benoit
 
-Ok. I will make a separate patch for pinctrl changes.
+Do you any comments
 
-> 
-> > +
-> > +#include "tipwmss.h"
-> >  
-> >  /* EHRPWM registers and bits definitions */
-> >  
-> > @@ -107,6 +111,10 @@
-> >  #define AQCSFRC_CSFA_FRCHIGH	BIT(1)
-> >  #define AQCSFRC_CSFA_DISSWFRC	(BIT(1) | BIT(0))
-> >  
-> > +#define EPWMCLK_EN_SHIFT	8
-> > +
-> > +#define PWM_CELL_SIZE		3
-> > +
-> >  #define NUM_PWM_CHANNEL		2	/* EHRPWM channels */
-> >  
-> >  struct ehrpwm_pwm_chip {
-> > @@ -392,12 +400,27 @@ static const struct pwm_ops ehrpwm_pwm_ops = {
-> >  	.owner		= THIS_MODULE,
-> >  };
-> >  
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id ehrpwm_of_match[] = {
-> > +	{
-> > +		.compatible	= "ti,am33xx-ehrpwm",
-> > +	},
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, ehrpwm_of_match);
-> > +#endif
-> > +
-> >  static int __devinit ehrpwm_pwm_probe(struct platform_device *pdev)
-> >  {
-> >  	int ret;
-> >  	struct resource *r;
-> >  	struct clk *clk;
-> >  	struct ehrpwm_pwm_chip *pc;
-> > +	struct pinctrl *pinctrl;
-> > +
-> > +	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> 
-> I didn't see a patch adding the pinctrl entries.
-
-Patch 8/8 has pinctrl entries in DT. First driver changes for supporting
-DT data. 
-
-> 
-> > +	if (IS_ERR(pinctrl))
-> > +		dev_warn(&pdev->dev, "failed to configure pins from driver\n");
-> >  
-> >  	pc = devm_kzalloc(&pdev->dev, sizeof(*pc), GFP_KERNEL);
-> >  	if (!pc) {
-> > @@ -419,6 +442,7 @@ static int __devinit ehrpwm_pwm_probe(struct platform_device *pdev)
-> >  
-> >  	pc->chip.dev = &pdev->dev;
-> >  	pc->chip.ops = &ehrpwm_pwm_ops;
-> > +	pc->chip.of_pwm_n_cells = PWM_CELL_SIZE;
-> >  	pc->chip.base = -1;
-> >  	pc->chip.npwm = NUM_PWM_CHANNEL;
-> >  
-> > @@ -437,8 +461,11 @@ static int __devinit ehrpwm_pwm_probe(struct platform_device *pdev)
-> >  		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
-> >  		return ret;
-> >  	}
-> > -
-> >  	pm_runtime_enable(&pdev->dev);
-> > +	pm_runtime_get_sync(&pdev->dev);
-> > +	pwmss_submodule_state_change(pdev->dev.parent, EPWMCLK_EN_SHIFT, true);
-> 
-> I think you should modify this API to return the status for drivers to check.
-
-Check for status check will add.
-
-> 
-> Another related question, why should this clock be enabled in probe and not only when it
-> is required?
-
-This is another clock gating from PWM subsystem as all sub modules shared the clock resource.
-Still this gating from PWM subsystem is required to access PWM sub modules.
-Handling of this for context loss & restore done at pwmss driver, will add the support.
-
-> Shouldn't it be disabled in suspend?
-
-Will take care when adding suspend/resume functionality.
-
-Thanks
-Avinash
-
-> 
-> Regards,
-> Vaibhav
-> 
+Regards
+Mugunthan V N
