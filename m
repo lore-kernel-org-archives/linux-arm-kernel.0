@@ -1,38 +1,21 @@
-From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
-Date: Wed, 07 Nov 2012 15:58:26 +0530
-Subject: [PATCH] i2c: samsung: resume race fix
-Message-ID: <1352284106-24988-1-git-send-email-ch.naveen@samsung.com>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Wed, 07 Nov 2012 16:16:57 +0530
+Subject: [PATCH 0/3] Legacy I2C controller fixes for exynos5
+Message-ID: <1352285220-31544-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't unmark the device as suspended until after it's been re-setup.
+This patchset comprises fixes to enable the legacy I2C controller on exynos5.
+Based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+for-next branch.
 
-The main race would be w.r.t. an i2c driver that gets resumed at the same
-time (asyncronously), that is allowed to do a transfer since suspended
-is set to 0 before reinit, but really should have seen the -EIO return
-instead.
+Abhilash Kesavan (3):
+  ARM: EXYNOS5: Setup legacy i2c controller interrupts on SMDK5250
+  ARM: EXYNOS5: Add aliases for i2c controller
+  ARM: EXYNOS5: Fix i2c suspend/resume for legacy controller
 
-Signed-off-by: Olof Johansson <olofj@chromium.org>
-Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
----
- drivers/i2c/busses/i2c-s3c2410.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 3e0335f..dbaf920 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1134,10 +1134,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
- 
--	i2c->suspended = 0;
- 	clk_prepare_enable(i2c->clk);
- 	s3c24xx_i2c_init(i2c);
- 	clk_disable_unprepare(i2c->clk);
-+	i2c->suspended = 0;
- 
- 	return 0;
- }
--- 
-1.7.9.5
+ arch/arm/boot/dts/exynos5250.dtsi            |   27 +++++++++++++++++--------
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    2 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c       |   24 +++++++++++++++++++++++
+ arch/arm/mach-exynos/pm.c                    |    9 ++++++++
+ 4 files changed, 53 insertions(+), 9 deletions(-)
