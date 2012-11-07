@@ -1,70 +1,69 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Wed, 7 Nov 2012 20:54:41 +0530
-Subject: [PATCH V4 0/7] ARM: AM33XX: net: Add DT support to CPGMAC and
- MDIO driver
-In-Reply-To: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
-References: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <509A7D39.8050506@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 7 Nov 2012 16:26:15 +0100
+Subject: [PATCH 2/5] ARM: AT91SAM9G45: same platform data structure for
+ all crypto peripherals
+In-Reply-To: <1352219544-30416-1-git-send-email-nicolas@eukrea.com>
+References: <1352219544-30416-1-git-send-email-nicolas@eukrea.com>
+Message-ID: <20121107152615.GD4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/2012 11:02 PM, Mugunthan V N wrote:
-> This patch-series adds support for,
->
-> [1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
->
-> [2/7]: Adds parent<->child relation between CPSW & MDIO module inside cpsw
->         driver, as in case of AM33XX, the resources are shared and common
->         register bit-field is provided to control module/clock enable/disable,
->         makes it difficult to handle common resource.
->
->         So the solution here is, to create parent<->child relation between them.
->
-> [3/7]: Add hwmod entry for MDIO module, required for MDIO driver.
->
-> [4/7]: cpsw: simplify the setup of the register pointers
->
-> [5/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
->         am335x-evm.dts and am335x-bone.dts file
->
-> [6/7]: Enable CPSW support to omap2plus_defconfig
->
-> [7/7]: cpsw: Kernel warn fix during suspend
->
-> This patch series has been created on top of net-next/master and tested
-> on BeagleBone platform for NFS boot and basic ping test cases.
->
-> Changes from V3:
-> * Removed unnecessary flags in Davinci MDIO Hwmod entry.
->
-> Mugunthan V N (4):
->    ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
->    arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
->    ARM: OMAP2+: omap2plus_defconfig: Enable CPSW support
->    net: cpsw: halt network stack before halting the device during
->      suspend
->
-> Richard Cochran (1):
->    cpsw: simplify the setup of the register pointers
->
-> Vaibhav Hiremath (2):
->    net: davinci_mdio: Fix typo mistake in calling runtime-pm api
->    net: cpsw: Add parent<->child relation support between cpsw and mdio
->
->   Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
->   arch/arm/boot/dts/am335x-bone.dts              |    8 +
->   arch/arm/boot/dts/am335x-evm.dts               |    8 +
->   arch/arm/boot/dts/am33xx.dtsi                  |   42 +++++
->   arch/arm/configs/omap2plus_defconfig           |    3 +
->   arch/arm/mach-omap2/omap_hwmod_33xx_data.c     |   31 ++++
->   drivers/net/ethernet/ti/cpsw.c                 |  231 ++++++++++--------------
->   drivers/net/ethernet/ti/davinci_mdio.c         |    2 +-
->   include/linux/platform_data/cpsw.h             |   19 --
->   9 files changed, 192 insertions(+), 186 deletions(-)
->
-Paul/Benoit
+On 17:32 Tue 06 Nov     , Nicolas Royer wrote:
+> Only AES use DMA in AT91SAM9G45 (TDES and SHA use PDC).
+> 
+> However latest Atmel TDES and SHA IP releases use DMA instead of PDC.
+>   --> Atmel TDES and SHA drivers need DMA platform data for those IP releases.
+> 
+> Goal of this patch is to use the same platform data structure for all Atmel
+> crypto peripherals. This structure contains information about DMA interface.
+> 
+> Signed-off-by: Nicolas Royer <nicolas@eukrea.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Eric B?nard <eric@eukrea.com>
+> Tested-by: Eric B?nard <eric@eukrea.com>
+> ---
+>  arch/arm/mach-at91/at91sam9g45_devices.c   |    8 ++++----
+>  include/linux/platform_data/atmel-aes.h    |   22 ----------------------
+>  include/linux/platform_data/crypto-atmel.h |   22 ++++++++++++++++++++++
+>  3 files changed, 26 insertions(+), 26 deletions(-)
+>  delete mode 100644 include/linux/platform_data/atmel-aes.h
+>  create mode 100644 include/linux/platform_data/crypto-atmel.h
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
+> index fcd233c..a48dcb4 100644
+> --- a/arch/arm/mach-at91/at91sam9g45_devices.c
+> +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
+> @@ -18,7 +18,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/i2c-gpio.h>
+>  #include <linux/atmel-mci.h>
+> -#include <linux/platform_data/atmel-aes.h>
+> +#include <linux/platform_data/crypto-atmel.h>
+>  
+>  #include <linux/platform_data/at91_adc.h>
+>  
+> @@ -1900,7 +1900,7 @@ static void __init at91_add_device_tdes(void) {}
+>   * -------------------------------------------------------------------- */
+>  
+>  #if defined(CONFIG_CRYPTO_DEV_ATMEL_AES) || defined(CONFIG_CRYPTO_DEV_ATMEL_AES_MODULE)
+> -static struct aes_platform_data aes_data;
+> +static struct crypto_platform_data aes_data;
+>  static u64 aes_dmamask = DMA_BIT_MASK(32);
+>  
+>  static struct resource aes_resources[] = {
+> @@ -1931,9 +1931,9 @@ static struct platform_device at91sam9g45_aes_device = {
+>  static void __init at91_add_device_aes(void)
+>  {
+>  	struct at_dma_slave	*atslave;
+> -	struct aes_dma_data	*alt_atslave;
+> +	struct crypto_dma_data	*alt_atslave;
+>  
+> -	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
+> +	alt_atslave = kzalloc(sizeof(struct crypto_dma_data), GFP_KERNEL);
+we do not check the result of kzalloc ouch
 
-Do you any comments
+and why we allocate it?
 
-Regards
-Mugunthan V N
+Best Regards,
+J.
+J.
