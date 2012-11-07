@@ -1,90 +1,119 @@
 From: a.kesavan@samsung.com (Abhilash Kesavan)
-Date: Wed, 07 Nov 2012 16:16:58 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS5: Setup legacy i2c controller interrupts on
- SMDK5250
+Date: Wed, 07 Nov 2012 16:16:59 +0530
+Subject: [PATCH 2/3] ARM: EXYNOS5: Add aliases for i2c controller
 In-Reply-To: <1352285220-31544-1-git-send-email-a.kesavan@samsung.com>
 References: <1352285220-31544-1-git-send-email-a.kesavan@samsung.com>
-Message-ID: <1352285220-31544-2-git-send-email-a.kesavan@samsung.com>
+Message-ID: <1352285220-31544-3-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos5 we have a new high-speed i2c controller. The interrupt
-sources for the legacy and new controller are muxed and are controlled
-via the SYSCON I2C_CFG register. At reset the interrupt source is
-configured for the high-speed controller, to continue using the old
-i2c controller we need to modify the I2C_CFG register.
+Add aliases to determine the i2c controller instance.
 
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/regs-pmu.h |    2 ++
- arch/arm/mach-exynos/mach-exynos5-dt.c       |   24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/exynos5250.dtsi |   27 ++++++++++++++++++---------
+ 1 files changed, 18 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-index d4e392b..684625a 100644
---- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
-+++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
-@@ -15,6 +15,7 @@
- #include <mach/map.h>
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index cf6a02d..3ae23fd 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -31,6 +31,15 @@
+ 		gsc1 = &gsc_1;
+ 		gsc2 = &gsc_2;
+ 		gsc3 = &gsc_3;
++		i2c0 = &i2c_0;
++		i2c1 = &i2c_1;
++		i2c2 = &i2c_2;
++		i2c3 = &i2c_3;
++		i2c4 = &i2c_4;
++		i2c5 = &i2c_5;
++		i2c6 = &i2c_6;
++		i2c7 = &i2c_7;
++		i2c8 = &i2c_8;
+ 	};
  
- #define S5P_PMUREG(x)				(S5P_VA_PMU + (x))
-+#define S5P_SYSREG(x)				(S3C_VA_SYS + (x))
+ 	gic:interrupt-controller at 10481000 {
+@@ -104,7 +113,7 @@
+ 		interrupts = <0 54 0>;
+ 	};
  
- #define S5P_CENTRAL_SEQ_CONFIGURATION		S5P_PMUREG(0x0200)
+-	i2c at 12C60000 {
++	i2c_0: i2c at 12C60000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12C60000 0x100>;
+ 		interrupts = <0 56 0>;
+@@ -112,7 +121,7 @@
+ 		#size-cells = <0>;
+ 	};
  
-@@ -230,6 +231,7 @@
+-	i2c at 12C70000 {
++	i2c_1: i2c at 12C70000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12C70000 0x100>;
+ 		interrupts = <0 57 0>;
+@@ -120,7 +129,7 @@
+ 		#size-cells = <0>;
+ 	};
  
- /* For EXYNOS5 */
+-	i2c at 12C80000 {
++	i2c_2: i2c at 12C80000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12C80000 0x100>;
+ 		interrupts = <0 58 0>;
+@@ -128,7 +137,7 @@
+ 		#size-cells = <0>;
+ 	};
  
-+#define EXYNOS5_SYS_I2C_CFG					S5P_SYSREG(0x0234)
- #define EXYNOS5_USB_CFG						S5P_PMUREG(0x0230)
+-	i2c at 12C90000 {
++	i2c_3: i2c at 12C90000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12C90000 0x100>;
+ 		interrupts = <0 59 0>;
+@@ -136,7 +145,7 @@
+ 		#size-cells = <0>;
+ 	};
  
- #define EXYNOS5_AUTO_WDTRESET_DISABLE				S5P_PMUREG(0x0408)
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index ed37273..7e9baf7 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -13,10 +13,12 @@
- #include <linux/serial_core.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
-+#include <linux/io.h>
+-	i2c at 12CA0000 {
++	i2c_4: i2c at 12CA0000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12CA0000 0x100>;
+ 		interrupts = <0 60 0>;
+@@ -144,7 +153,7 @@
+ 		#size-cells = <0>;
+ 	};
  
- #include <asm/mach/arch.h>
- #include <asm/hardware/gic.h>
- #include <mach/map.h>
-+#include <mach/regs-pmu.h>
+-	i2c at 12CB0000 {
++	i2c_5: i2c at 12CB0000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12CB0000 0x100>;
+ 		interrupts = <0 61 0>;
+@@ -152,7 +161,7 @@
+ 		#size-cells = <0>;
+ 	};
  
- #include <plat/cpu.h>
- #include <plat/regs-serial.h>
-@@ -97,6 +99,28 @@ static void __init exynos5250_dt_map_io(void)
+-	i2c at 12CC0000 {
++	i2c_6: i2c at 12CC0000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12CC0000 0x100>;
+ 		interrupts = <0 62 0>;
+@@ -160,7 +169,7 @@
+ 		#size-cells = <0>;
+ 	};
  
- static void __init exynos5250_dt_machine_init(void)
- {
-+	struct device_node *i2c_np;
-+	const char *i2c_compat = "samsung,s3c2440-i2c";
-+	unsigned int tmp;
-+
-+	/*
-+	 * Exynos5's legacy i2c controller and new high speed i2c
-+	 * controller have muxed interrupt sources. By default the
-+	 * interrupts for 4-channel HS-I2C controller are enabled.
-+	 * If node for first four channels of legacy i2c controller
-+	 * are available then re-configure the interrupts via the
-+	 * system register.
-+	 */
-+	for_each_compatible_node(i2c_np, NULL, i2c_compat) {
-+		if (of_device_is_available(i2c_np)) {
-+			if (of_alias_get_id(i2c_np, "i2c") < 4) {
-+				tmp = readl(EXYNOS5_SYS_I2C_CFG);
-+				writel(tmp & ~(0x1 << of_alias_get_id(i2c_np, "i2c")),
-+						EXYNOS5_SYS_I2C_CFG);
-+			}
-+		}
-+	}
-+
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 				exynos5250_auxdata_lookup, NULL);
- }
+-	i2c at 12CD0000 {
++	i2c_7: i2c at 12CD0000 {
+ 		compatible = "samsung,s3c2440-i2c";
+ 		reg = <0x12CD0000 0x100>;
+ 		interrupts = <0 63 0>;
+@@ -168,7 +177,7 @@
+ 		#size-cells = <0>;
+ 	};
+ 
+-	i2c at 12CE0000 {
++	i2c_8: i2c at 12CE0000 {
+ 		compatible = "samsung,s3c2440-hdmiphy-i2c";
+ 		reg = <0x12CE0000 0x1000>;
+ 		interrupts = <0 64 0>;
 -- 
 1.6.6.1
