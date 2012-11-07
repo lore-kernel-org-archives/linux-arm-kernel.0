@@ -1,56 +1,50 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Wed, 7 Nov 2012 11:44:37 +0100
-Subject: [PATCH] i2c: samsung: resume race fix
-In-Reply-To: <1352284106-24988-1-git-send-email-ch.naveen@samsung.com>
-References: <1352284106-24988-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20121107114437.0a563c7e@endymion.delvare>
+From: koba@kmckk.co.jp (Tetsuyuki Kobayashi)
+Date: Wed, 07 Nov 2012 19:54:58 +0900
+Subject: [PATCH 06/15] ARM: shmobile: Add DT table of INTC for sh73a0
+In-Reply-To: <1352278244-26702-7-git-send-email-horms@verge.net.au>
+References: <1352278244-26702-1-git-send-email-horms@verge.net.au>
+ <1352278244-26702-7-git-send-email-horms@verge.net.au>
+Message-ID: <509A3E02.3050507@kmckk.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 07 Nov 2012 15:58:26 +0530, Naveen Krishna Chatradhi wrote:
-> Don't unmark the device as suspended until after it's been re-setup.
+Hello, Iwamatsu-san, Simon-san
+
+(2012/11/07 17:50), Simon Horman wrote:
+> From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
 > 
-> The main race would be w.r.t. an i2c driver that gets resumed at the same
-> time (asyncronously), that is allowed to do a transfer since suspended
-> is set to 0 before reinit, but really should have seen the -EIO return
-> instead.
-
-I thought that the suspend order was children first and the resume
-order was parent first?
-
-If this can really happen then I am afraid this is an issue for more
-than just i2c-s3c2410. The proposed solution is also not really
-satisfactory, as the i2c client will certainly still fail to resume
-properly (the only improvement is that now the failure is no longer
-silent.)
-
-> 
-> Signed-off-by: Olof Johansson <olofj@chromium.org>
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+> Signed-off-by: Simon Horman <horms@verge.net.au>
 > ---
->  drivers/i2c/busses/i2c-s3c2410.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>   arch/arm/boot/dts/sh73a0.dtsi |  810 +++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 810 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
 > 
-> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-> index 3e0335f..dbaf920 100644
-> --- a/drivers/i2c/busses/i2c-s3c2410.c
-> +++ b/drivers/i2c/busses/i2c-s3c2410.c
-> @@ -1134,10 +1134,10 @@ static int s3c24xx_i2c_resume(struct device *dev)
->  	struct platform_device *pdev = to_platform_device(dev);
->  	struct s3c24xx_i2c *i2c = platform_get_drvdata(pdev);
->  
-> -	i2c->suspended = 0;
->  	clk_prepare_enable(i2c->clk);
->  	s3c24xx_i2c_init(i2c);
->  	clk_disable_unprepare(i2c->clk);
-> +	i2c->suspended = 0;
->  
->  	return 0;
->  }
+> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+> new file mode 100644
+> index 0000000..b0c55e1
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> @@ -0,0 +1,810 @@
+> +/*
+> + * Device Tree Source for the SH73A0
+> + *
+> + * Copyright (C) 2012 Renesas Solutions Corp.
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	compatible = "renesas,sh73a0";
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a8";
+> +		};
+> +	};
 
-Acked-by: Jean Delvare <khali@linux-fr.org>
-
-(Not perfect but still better than before.)
-
--- 
-Jean Delvare
+SH73A0 is dual core cortex-a9.
