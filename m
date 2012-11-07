@@ -1,131 +1,83 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed,  7 Nov 2012 12:22:53 +0100
-Subject: [PATCH 09/10] arm: at91: move reset controller header to
- arm/arm/mach-at91
+Date: Wed,  7 Nov 2012 12:22:52 +0100
+Subject: [PATCH 08/10] arm: at91: move pit define to the driver
 In-Reply-To: <1352287374-25176-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20121107111235.GH20063@game.jcrosoft.org>
  <1352287374-25176-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1352287374-25176-9-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1352287374-25176-8-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-at91/{include/mach => }/at91_rstc.h |    0
- arch/arm/mach-at91/at91sam9260.c                  |    2 +-
- arch/arm/mach-at91/at91sam9261.c                  |    2 +-
- arch/arm/mach-at91/at91sam9263.c                  |    2 +-
- arch/arm/mach-at91/at91sam9_alt_reset.S           |    2 +-
- arch/arm/mach-at91/at91sam9g45_reset.S            |    3 +--
- arch/arm/mach-at91/at91sam9rl.c                   |    2 +-
- arch/arm/mach-at91/pm.c                           |    2 +-
- 8 files changed, 7 insertions(+), 8 deletions(-)
- rename arch/arm/mach-at91/{include/mach => }/at91_rstc.h (100%)
+ arch/arm/mach-at91/at91sam926x_time.c      |   14 ++++++++++--
+ arch/arm/mach-at91/include/mach/at91_pit.h |   32 ----------------------------
+ 2 files changed, 12 insertions(+), 34 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/include/mach/at91_pit.h
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_rstc.h b/arch/arm/mach-at91/at91_rstc.h
-similarity index 100%
-rename from arch/arm/mach-at91/include/mach/at91_rstc.h
-rename to arch/arm/mach-at91/at91_rstc.h
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index bb2e17c..9942984 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -21,9 +21,9 @@
- #include <mach/at91_dbgu.h>
- #include <mach/at91sam9260.h>
- #include <mach/at91_pmc.h>
--#include <mach/at91_rstc.h>
+diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
+index ffc0957..358412f 100644
+--- a/arch/arm/mach-at91/at91sam926x_time.c
++++ b/arch/arm/mach-at91/at91sam926x_time.c
+@@ -20,8 +20,18 @@
  
- #include "at91_aic.h"
-+#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 09009d8..c583ba2 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -20,9 +20,9 @@
- #include <mach/cpu.h>
- #include <mach/at91sam9261.h>
- #include <mach/at91_pmc.h>
--#include <mach/at91_rstc.h>
+ #include <asm/mach/time.h>
  
- #include "at91_aic.h"
-+#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index 0c86aa8..500ee19 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -19,9 +19,9 @@
- #include <asm/system_misc.h>
- #include <mach/at91sam9263.h>
- #include <mach/at91_pmc.h>
--#include <mach/at91_rstc.h>
- 
- #include "at91_aic.h"
-+#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9_alt_reset.S b/arch/arm/mach-at91/at91sam9_alt_reset.S
-index 7af2e10..f039538 100644
---- a/arch/arm/mach-at91/at91sam9_alt_reset.S
-+++ b/arch/arm/mach-at91/at91sam9_alt_reset.S
-@@ -16,7 +16,7 @@
- #include <linux/linkage.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
--#include <mach/at91_rstc.h>
-+#include "at91_rstc.h"
- 
- 			.arm
- 
-diff --git a/arch/arm/mach-at91/at91sam9g45_reset.S b/arch/arm/mach-at91/at91sam9g45_reset.S
-index 9d45718..721a1a3 100644
---- a/arch/arm/mach-at91/at91sam9g45_reset.S
-+++ b/arch/arm/mach-at91/at91sam9g45_reset.S
-@@ -13,8 +13,7 @@
- #include <linux/linkage.h>
- #include <mach/hardware.h>
- #include <mach/at91_ramc.h>
--#include <mach/at91_rstc.h>
+-#include <mach/at91_pit.h>
 -
-+#include "at91_rstc.h"
- 			.arm
++#define AT91_PIT_MR		0x00			/* Mode Register */
++#define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
++#define		AT91_PIT_PITEN		(1 << 24)		/* Timer Enabled */
++#define		AT91_PIT_PIV		(0xfffff)		/* Periodic Interval Value */
++
++#define AT91_PIT_SR		0x04			/* Status Register */
++#define		AT91_PIT_PITS		(1 << 0)		/* Timer Status */
++
++#define AT91_PIT_PIVR		0x08			/* Periodic Interval Value Register */
++#define AT91_PIT_PIIR		0x0c			/* Periodic Interval Image Register */
++#define		AT91_PIT_PICNT		(0xfff << 20)		/* Interval Counter */
++#define		AT91_PIT_CPIV		(0xfffff)		/* Inverval Value */
  
- 			.globl	at91sam9g45_restart
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 5cd076b..97dd8f1 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -20,9 +20,9 @@
- #include <mach/at91_dbgu.h>
- #include <mach/at91sam9rl.h>
- #include <mach/at91_pmc.h>
--#include <mach/at91_rstc.h>
- 
- #include "at91_aic.h"
-+#include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 3455740..adb6db8 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -36,7 +36,7 @@
-  * Show the reason for the previous system reset.
-  */
- 
--#include <mach/at91_rstc.h>
-+#include "at91_rstc.h"
- #include "at91_shdwc.h"
- 
- static void __init show_reset_status(void)
+ #define PIT_CPIV(x)	((x) & AT91_PIT_CPIV)
+ #define PIT_PICNT(x)	(((x) & AT91_PIT_PICNT) >> 20)
+diff --git a/arch/arm/mach-at91/include/mach/at91_pit.h b/arch/arm/mach-at91/include/mach/at91_pit.h
+deleted file mode 100644
+index d1f80ad..0000000
+--- a/arch/arm/mach-at91/include/mach/at91_pit.h
++++ /dev/null
+@@ -1,32 +0,0 @@
+-/*
+- * arch/arm/mach-at91/include/mach/at91_pit.h
+- *
+- * Copyright (C) 2007 Andrew Victor
+- * Copyright (C) 2007 Atmel Corporation.
+- *
+- * Periodic Interval Timer (PIT) - System peripherals regsters.
+- * Based on AT91SAM9261 datasheet revision D.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef AT91_PIT_H
+-#define AT91_PIT_H
+-
+-#define AT91_PIT_MR		0x00			/* Mode Register */
+-#define		AT91_PIT_PITIEN		(1 << 25)		/* Timer Interrupt Enable */
+-#define		AT91_PIT_PITEN		(1 << 24)		/* Timer Enabled */
+-#define		AT91_PIT_PIV		(0xfffff)		/* Periodic Interval Value */
+-
+-#define AT91_PIT_SR		0x04			/* Status Register */
+-#define		AT91_PIT_PITS		(1 << 0)		/* Timer Status */
+-
+-#define AT91_PIT_PIVR		0x08			/* Periodic Interval Value Register */
+-#define AT91_PIT_PIIR		0x0c			/* Periodic Interval Image Register */
+-#define		AT91_PIT_PICNT		(0xfff << 20)		/* Interval Counter */
+-#define		AT91_PIT_CPIV		(0xfffff)		/* Inverval Value */
+-
+-#endif
 -- 
 1.7.10.4
