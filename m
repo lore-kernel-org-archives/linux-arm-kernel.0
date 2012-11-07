@@ -1,99 +1,60 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 7 Nov 2012 11:14:02 -0600
-Subject: OMAP baseline test results for v3.7-rc4
-In-Reply-To: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1211050241410.23228@utopia.booyaka.com>
-Message-ID: <509A96DA.2010003@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Nov 2012 17:13:59 +0000
+Subject: gic_set_affinity
+In-Reply-To: <CAOmFF10qn=JaNmjpkR3GjZ1dp2MVXqdxT=pdPrbPTijCejf79A@mail.gmail.com>
+References: <CAOmFF10StbsQ6WU6J=MFoM87zgD+XpZqQrr2dLsJHPnW0gVang@mail.gmail.com>
+ <CAOmFF10ZvpoJ4gaW5WWhzvV4ecxrYJx-kobvNVmaNxBria6Jzg@mail.gmail.com>
+ <20121105120548.GH3351@mudshark.cambridge.arm.com>
+ <CAOmFF10qn=JaNmjpkR3GjZ1dp2MVXqdxT=pdPrbPTijCejf79A@mail.gmail.com>
+Message-ID: <20121107171359.GB15349@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 07, 2012 at 05:08:36PM +0000, Robert Beckett wrote:
+> On 5 November 2012 12:05, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Nov 02, 2012 at 11:32:50AM +0000, Robert Beckett wrote:
+> >> (CC maintainers)
+> >>
+> >> On 1 November 2012 17:54, Robert Beckett <bob.beckett@gmail.com> wrote:
+> >> > Hello,
+> >> >
+> >> > I was looking through the arm gic code while debugging a problem I am
+> >> > having, and noticed something in gic_set_affinity.
+> >> >
+> >> > When something comes along and setts an irq affinity mask (e.g.
+> >> > through /proc/irq/<irq>/smp_affinity_mask), the calls goes like so :
+> >> >
+> >> > ...
+> >> > 1. irq_set_affinity : grabs the desc->lock
+> >> > 2. __irq_set_affinity_locked : calls chip->irq_set_affinity
+> >> > 3. gic_set_affinity : writes a new mask to the gic distributor
+> >> >
+> >> > my question is, what happens if an interrupt is raised between 1 and 3?
+> >> > To me, it looks like the interrupt could end up being handled on 2
+> >> > cpus. When it is raised, the handler will be called and sit spinning
+> >> > for desc->lock (e.g. in handle_fasteoi_irq). The mask will be set to
+> >> > set the affinity to the new cpu, the new cpu will receive the
+> >> > interrupt as it has not been ackd or disabled yet
+> >
+> > The interrupt will have been acked in gic_handle_irq before the flow handler
+> > is invoked, so it will transition to the active state and will not get
+> > signalled to another CPU. Since we never set more than one target CPU at the
+> > distributor level, the interrupt will only be forwarded to one CPU interface
+> > at any given time.
+> >
+> > Will
+> 
+> Thanks for the response,
+> 
+> I cant see anything in gic_handle_irq that would ack the interrupt
+> (unless it is an IPI interrupt).
+> For irqnr > 15, it just calls handle_IRQ, which would call the desc
+> handler, which would sit and wait on the desc->lock at the top of
+> handle_fasteoi_irq.
+> Which code are you referring to that is meant to ack the interrupt?
 
-On 11/04/2012 08:46 PM, Paul Walmsley wrote:
-> 
-> Here are some basic OMAP test results for Linux v3.7-rc4.
-> Logs and other details at:
-> 
->     http://www.pwsan.com/omap/testlogs/test_v3.7-rc4/20121104142910/
-> 
-> 
-> Passing tests
-> -------------
-> 
-> Boot to userspace: 2420n800, 3517evm, 3530es3beagle, 3730beaglexm, 37xxevm,
->                    4430es2panda, 5912osk, am335xbone
-> 
-> PM ret/off, suspend + dynamic idle: (none)
-> 
-> 
-> Failing tests: fixed by posted patches
-> --------------------------------------
-> 
-> Boot tests:
-> 
-> * 2430sdp: vfp_reload_hw oops during MMC initialization
->   - Kernel attempts to save FP registers that don't exist; fix posted:
->     - http://www.spinics.net/lists/arm-kernel/msg200646.html
->     - added to rmk's patch system as 7566/1
-> 
-> * AM335x Beaglebone: omap2plus_defconfig kernels don't boot
->   - Due to GPMC missing support for DT
->   - Temporary workaround at 
-> http://www.spinics.net/lists/arm-kernel/msg200787.html
->   - May be fixed now, pending retest:
->     - http://marc.info/?l=linux-omap&m=135082257727502&w=2
->   - Not yet part of the automated test suite
->   * May be due to an old U-boot with FDT support problems?
-> 
-> PM tests:
-> 
-> * 3530es3beagle, 37xxevm, 3730beaglexm: I2C fails during resume from suspend
->   - Causes MMC to become unusable since regulators are not reenabled
->   - Caused by RT throttling
->   - Fixed by http://www.spinics.net/lists/arm-kernel/msg202224.html
->   - Patch in rmk's patch system as 7565/1
-> 
-> * 3530es3beagle: hangs during off-mode dynamic idle test
->   - Appears to be caused by commit 6c31b2150ff96755d24e0ab6d6fea08a7bf5c44c:
->     - http://marc.info/?l=linux-omap&m=135075364705188&w=2
->   - Fixed by http://www.spinics.net/lists/arm-kernel/msg202116.html
->  
-> Other:
-> 
-> * 2420N800: powers down 30 seconds after boot
->   - Presumably due to missing CBUS patches for watchdog control
->   - http://lkml.org/lkml/2012/9/3/265
-> 
-> * 4430es2panda: omap_hwmod: mcpdm: cannot be enabled for reset (3)
->   - clock source is from an external I2C-controlled source
->   - must skip reset until the switchover to hwmod late init
->   - http://www.spinics.net/lists/arm-kernel/msg178138.html
-> 
-> 
-> Failing tests: needing investigation
-> ------------------------------------
-> 
-> Boot tests:
-> 
-> * CM-T3517: L3 in-band error with IPSS during boot
->   - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
->   - Longstanding issue; does not occur on the 3517EVM
-> 
-> * 3517EVM & CM-T3517: boot hangs with NFS root
->   - Likely some Kconfig, board file, and PM issues with EMAC
-> 
-> * CM-T3517: boot hangs with MMC boot
->   - Due to missing MMC setup in board file
-> 
-> * 4460pandaes: boot fails early
->   - Appears to be due to X-loader problems here
->   - Need to note the X-loader version so we know it's broken
+Reading the interrupt ID signifies an ACK in GIC terminology:
 
-Are you still planning to investigate this further or migrate to a new
-bootloader?
+  irqstat = readl_relaxed(cpu_base + GIC_CPU_INTACK);
 
-With 4460 and 3.7-rc4, I am seeing that resume from suspend is not
-working (not sure when this broke though). I am just curious if anyone
-else sees this. My u-boot version is v2012.10.
-
-Cheers
-Jon
+Will
