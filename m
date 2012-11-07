@@ -1,47 +1,53 @@
 From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Wed, 07 Nov 2012 15:57:28 +0900
-Subject: [PATCH 00/10] serial: sh-sci fixes - console PM, SCIFB, SMP lockup,
- etc.
-Message-ID: <509A0658.1010503@renesas.com>
+Date: Wed, 07 Nov 2012 15:58:06 +0900
+Subject: [PATCH 01/10] Revert "sh-sci / PM: Avoid deadlocking runtime PM"
+In-Reply-To: <509A0658.1010503@renesas.com>
+References: <509A0658.1010503@renesas.com>
+Message-ID: <509A067E.1040202@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul and serial forks,
+This reverts commit 048be431e4 (sh-sci / PM: Avoid deadlocking runtime
+PM, from Rafael J. Wysocki <rjw@sisk.pl>, 2012-03-09).
 
-Here are sh-sci serial driver fixes that have been cooking for months
-privately on my end:
-* console PM rework with the help of serial-core's uart_change_pm()
-* provide missing piece in SCIFB support (from Yoshii-san)
-* address console write function vs. SMP lockup issue
+In order to get console PM work properly, we should implement uart_ops
+->pm() operation, rather than sprinkle band-ading runtime PM calls in
+the driver.
 
-and so on.  Comments and suggestions are welcome.
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+---
+ drivers/tty/serial/sh-sci.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Build tested with vanilla v3.6, but not boot- nor PM-tested with
-newer kernels after v3.4.  Anyone with can-sleep shmobile systems,
-please give it try.
-
-Thanks in advance,
-
-----------------------------------------------------------------
-Shinya Kuribayashi (5):
-      Revert "sh-sci / PM: Avoid deadlocking runtime PM"
-      Revert "sh-sci / PM: Use power.irq_safe"
-      Partially revert "serial: sh-sci: console Runtime PM support"
-      serial: sh-sci: add locking to console write function to avoid SMP lockup
-      serial: sh-sci: fix possible race cases on SCSCR register accesses
-
-Takashi YOSHII (4):
-      serial: sh-sci: fix condition test to set SCBRR
-      serial: sh-sci: support lower baud rate
-      serial: sh-sci: mask SCTFDR/RFDR according to fifosize
-      serial: sh-sci: fix common SCIFB regmap definition
-
-Teppei Kamijou (1):
-      serial: sh-sci: console runtime PM support (revisit)
-
- drivers/tty/serial/sh-sci.c | 140 ++++++++++++++++++--------------------------
- 1 file changed, 56 insertions(+), 84 deletions(-)
-
+diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+index 9be296c..526ad04 100644
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -1752,8 +1752,6 @@ static int sci_startup(struct uart_port *port)
+ 
+ 	dev_dbg(port->dev, "%s(%d)\n", __func__, port->line);
+ 
+-	pm_runtime_put_noidle(port->dev);
+-
+ 	sci_port_enable(s);
+ 
+ 	ret = sci_request_irq(s);
+@@ -1781,8 +1779,6 @@ static void sci_shutdown(struct uart_port *port)
+ 	sci_free_irq(s);
+ 
+ 	sci_port_disable(s);
+-
+-	pm_runtime_get_noresume(port->dev);
+ }
+ 
+ static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
+@@ -2121,7 +2117,6 @@ static int __devinit sci_init_single(struct platform_device *dev,
+ 		sci_init_gpios(sci_port);
+ 
+ 		pm_runtime_irq_safe(&dev->dev);
+-		pm_runtime_get_noresume(&dev->dev);
+ 		pm_runtime_enable(&dev->dev);
+ 	}
+ 
 -- 
-Shinya Kuribayashi
-Renesas Electronics
+1.7.12.4
