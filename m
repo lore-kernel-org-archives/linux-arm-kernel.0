@@ -1,40 +1,29 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 7 Nov 2012 11:58:42 +0100
-Subject: [PATCH 0/6] OMAPDSS: enable DSS for Panda & SDP with devtree
-In-Reply-To: <20121107010405.GU6801@atomide.com>
-References: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
- <20121107010405.GU6801@atomide.com>
-Message-ID: <509A3EE2.1080500@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 7 Nov 2012 11:00:43 +0000
+Subject: [PATCH] ARM: Fix the "WFI" instruction opcode definition.
+In-Reply-To: <0bee01cdbc11$4a59afb0$df0d0f10$%kim@samsung.com>
+References: <DA41BE1DDCA941489001C7FBD7A8820E3CB5512E@szxeml549-mbx.china.huawei.com>
+ <5091D13B.6060106@gmail.com>
+ <CAKw8HL0ymmNRB=jgGcZn1+6k0s=FKA+qBV04y_wfeu7xMpUpkw@mail.gmail.com>
+ <20121105173604.GF2005@linaro.org>
+ <0bee01cdbc11$4a59afb0$df0d0f10$%kim@samsung.com>
+Message-ID: <CAHkRjk5MV7DWUGEhndUbvym9we90FcmvPD+arDfWtuj6PXCy2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2012 02:04 AM, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [121105 05:16]:
->> Hi,
->>
->> OMAPDSS device tree support is still some way in the future. Tony has requested
->> to get DSS working for Panda & SDP boards with DT kernel, so that we'll have
->> fully working boards with DT.
->>
->> This series makes a few hacks to get a working display on OMAP4 Panda and SDP
->> boards. The idea is to setup the omapdss with the non-DT method, creating the
->> omapdss devices and passing platform data to them. This setup code is called
->> from board-generic for Panda and SDP boards.
->>
->> There was one problem with this approach: omapdss cannot get regulators using
->> the omapdss's names fro the regulators. Thus there's a hack patch to get the
->> regulators using the OMAP4 "native" regulator names, thus circumventing the
->> problem.
->>
->> Tony, if these look good, how do you want to merge these? There are three parts
->> here, and I think they can be merged independently if so wished:
->>
->> * .dts changes for the pinmuxing (2 patches)
-> 
-> Let's let Benoit queue these.
+On 6 November 2012 11:24, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> BTW, if mach-exynos includes ARMv8 later?...ARMv8 platform codes will be put
+> in the arch/arm/ or arch/arm/64/ if some platform codes share with ARMv7?
+> Just wondering...
 
-Done. I'll send you the pull-request tomorrow in case some more DTS
-patches are coming.
+If mach-exynos would support ARMv8 at some point, I would expect most
+of the code to go under various drivers/ subsystems (mfd, power etc.).
+I don't see any point in using opcodes. For wfi just use a macro or
+cpu_do_idle() (as Rob said, it does the required dsb as well).
 
-Regards,
-Benoit
+I'm also pushing for a standard hotplug.c implementation that is
+shared by multiple platforms and uses the power state coordination
+interface implemented by the firmware.
+
+-- 
+Catalin
