@@ -1,53 +1,39 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed,  7 Nov 2012 17:34:56 +0900
-Subject: [PATCH 2/4] ARM: shmobile: r8a7740: add USB24 clock explain
-In-Reply-To: <1352277298-23312-1-git-send-email-horms@verge.net.au>
-References: <1352277298-23312-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352277298-23312-3-git-send-email-horms@verge.net.au>
+Date: Wed,  7 Nov 2012 17:34:54 +0900
+Subject: [GIT PULL] Renesas ARM-based SoC for v3.8 #2
+Message-ID: <1352277298-23312-1-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-USBCKCR is controlling USB parent clock and divide rate.
-This parent clock is used as a "usb24s" from other devices,
-but the "divide rate" is not used.
-Further, this clock itself is known as "usb24".
-So, to set this clock is a little confusable.
-This patch adds quick explain and sample settings for this clock.
+please consider the following SoC enhancements for 3.8.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7740.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+This series is based on the previous SoC series that I sent on Tuesday
+and was merged later that day: [GIT PULL v4] Renesas ARM-based SoC for v3.8
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index 6729e00..c012bbf 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -188,6 +188,22 @@ static struct clk pllc1_div2_clk = {
- };
- 
- /* USB clock */
-+/*
-+ * USBCKCR is controlling usb24 clock
-+ * bit[7] : parent clock
-+ * bit[6] : clock divide rate
-+ * And this bit[7] is used as a "usb24s" from other devices.
-+ * (Video clock / Sub clock / SPU clock)
-+ * You can controll this clock as a below.
-+ *
-+ * struct clk *usb24	= clk_get(dev,  "usb24");
-+ * struct clk *usb24s	= clk_get(NULL, "usb24s");
-+ * struct clk *system	= clk_get(NULL, "system_clk");
-+ * int rate = clk_get_rate(system);
-+ *
-+ * clk_set_parent(usb24s, system);  // for bit[7]
-+ * clk_set_rate(usb24, rate / 2);   // for bit[6]
-+ */
- static struct clk *usb24s_parents[] = {
- 	[0] = &system_clk,
- 	[1] = &extal2_clk
--- 
-1.7.10.4
+----------------------------------------------------------------
+The following changes since commit 86bc52ef4373be64867b56f3a9e30cbabf64e0dd:
+
+  ARM: shmobile: r8a7740: Enable PMU (2012-11-06 13:47:24 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
+
+for you to fetch changes up to 9d69f5b87e7f6df51ad2a70557474093de934a8c:
+
+  ARM: shmobile: r8a7779: add USB OHCI clock support (2012-11-07 17:11:48 +0900)
+
+----------------------------------------------------------------
+Kuninori Morimoto (4):
+      ARM: shmobile: r8a7779: PFC rename PENCx -> USB_PENCx
+      ARM: shmobile: r8a7740: add USB24 clock explain
+      ARM: shmobile: r8a7779: add USB EHCI clock support
+      ARM: shmobile: r8a7779: add USB OHCI clock support
+
+ arch/arm/mach-shmobile/clock-r8a7740.c        |   16 ++++++++++++++++
+ arch/arm/mach-shmobile/clock-r8a7779.c        |    7 +++++++
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 +-
+ arch/arm/mach-shmobile/pfc-r8a7779.c          |   16 ++++++++--------
+ 4 files changed, 32 insertions(+), 9 deletions(-)
