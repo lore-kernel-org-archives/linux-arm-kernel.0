@@ -1,133 +1,247 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 7 Nov 2012 13:01:30 -0600
-Subject: [PATCH V2 14/14] ARM: OMAP: Remove __omap_dm_timer_set_source function
-In-Reply-To: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
-References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1352314890-22224-15-git-send-email-jon-hunter@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 7 Nov 2012 20:03:57 +0000 (UTC)
+Subject: [PATCH 05/13] ARM: OMAP2+: PRCM: create SoC-specific chip restart
+ functions
+In-Reply-To: <alpine.DEB.2.00.1211011151210.26661@utopia.booyaka.com>
+References: <20121025231818.17558.57884.stgit@dusk.lan>
+ <20121025232116.17558.47458.stgit@dusk.lan>
+ <alpine.DEB.2.00.1211011151210.26661@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1211072002040.20704@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __omap_dm_timer_set_source() function is only used by the system timer
-(clock-events and clock-source) code for OMAP2+ devices. Therefore, we can
-remove this code from the dmtimer driver and move it to the system timer
-code for OMAP2+ devices.
 
-The current __omap_dm_timer_set_source() function calls clk_disable() before
-calling clk_set_parent() and clk_enable() afterwards. We can avoid these calls
-to clk_disable/enable by moving the calls to omap_hwmod_setup_one() and
-omap_hwmod_enable() to after the call to clk_set_parent() in
-omap_dm_timer_init_one().
+Another update on this one to fix a build break that Tony spotted.  
 
-The function omap_hwmod_setup_one() will enable the timers functional clock
-and therefore increment the use-count of the functional clock to 1.
-clk_set_parent() will fail if the use-count is not 0 when called. Hence, if
-omap_hwmod_setup_one() is called before clk_set_parent(), we will need to call
-clk_disable() before calling clk_set_parent() to decrement the use-count.
-Hence, avoid these extra calls to disable and enable the functional clock by
-moving the calls to omap_hwmod_setup_one() and omap_hwmod_enable() to after
-clk_set_parent().
 
-We can also remove the delay from the __omap_dm_timer_set_source() function
-because enabling the clock will now be handled via the HWMOD framework by
-calling omap_hwmod_setup_one(). Therefore, by moving the calls to
-omap_hwmod_setup_one() and omap_hwmod_enable() to after the call to
-clk_set_parent(), we can simply replace __omap_dm_timer_set_source() with
-clk_set_parent().
+- Paul
 
-It should be safe to move these hwmod calls to later in the
-omap_dm_timer_init_one() because other calls to the hwmod layer that occur
-before are just requesting resource information.
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 29 Oct 2012 20:56:07 -0600
+Subject: [PATCH] ARM: OMAP2+: PRCM: create SoC-specific chip restart
+ functions
 
-Testing includes boot testing on OMAP2420 H4, OMAP3430 SDP and OMAP4430 Blaze
-with the following configurations:
-1. CONFIG_OMAP_32K_TIMER=y
-2. CONFIG_OMAP_32K_TIMER=y and boot parameter "clocksource=gp_timer"
-3. CONFIG_OMAP_32K_TIMER not set
-4. CONFIG_OMAP_32K_TIMER not set and boot parameter "clocksource=gp_timer"
+Split omap_prcm_restart() from mach-omap2/prcm.c into SoC-specific
+variants.  These functions need to be able to save the reboot reason
+into the scratchpad RAM.  This implies a dependency on both the PRM
+and SCM IP blocks, so they've been moved into their own file.  This
+will eventually call functions in the PRM and SCM drivers, once those
+are created.
 
-Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+Vaibhav Hiremath <hvaibhav@ti.com> identified an unused prototype in
+the first version of this patch - now removed.  Tony Lindgren
+<tony@atomide.com> noted a compile problem with some RMK Kconfigs;
+resolved in this patch.
+
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+Tested-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/timer.c               |    9 ++++-----
- arch/arm/plat-omap/include/plat/dmtimer.h |   19 -------------------
- 2 files changed, 4 insertions(+), 24 deletions(-)
+ arch/arm/mach-omap2/Makefile        |    5 +++
+ arch/arm/mach-omap2/common.h        |   24 +++++++++++++
+ arch/arm/mach-omap2/omap2-restart.c |   65 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/omap3-restart.c |   36 +++++++++++++++++++
+ arch/arm/mach-omap2/omap4-common.c  |   17 +++++++++
+ 5 files changed, 147 insertions(+)
+ create mode 100644 arch/arm/mach-omap2/omap2-restart.c
+ create mode 100644 arch/arm/mach-omap2/omap3-restart.c
 
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index b9b6f21..066a48d 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -277,9 +277,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 		oh_name = name;
- 	}
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index ae87a3e..1988810 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -50,6 +50,11 @@ AFLAGS_sram242x.o			:=-Wa,-march=armv6
+ AFLAGS_sram243x.o			:=-Wa,-march=armv6
+ AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
  
--	omap_hwmod_setup_one(oh_name);
- 	oh = omap_hwmod_lookup(oh_name);
--
- 	if (!oh)
- 		return -ENODEV;
- 
-@@ -309,8 +307,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 	if (IS_ERR(timer->fclk))
- 		return -ENODEV;
- 
--	omap_hwmod_enable(oh);
--
- 	/* FIXME: Need to remove hard-coded test on timer ID */
- 	if (gptimer_id != 12) {
- 		struct clk *src;
-@@ -319,13 +315,16 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 		if (IS_ERR(src)) {
- 			res = -EINVAL;
- 		} else {
--			res = __omap_dm_timer_set_source(timer->fclk, src);
-+			res = clk_set_parent(timer->fclk, src);
- 			if (IS_ERR_VALUE(res))
- 				pr_warn("%s: %s cannot set source\n",
- 					__func__, oh->name);
- 			clk_put(src);
- 		}
- 	}
++# Restart code (OMAP4/5 currently in omap4-common.c)
++obj-$(CONFIG_SOC_OMAP2420)		+= omap2-restart.o
++obj-$(CONFIG_SOC_OMAP2430)		+= omap2-restart.o
++obj-$(CONFIG_ARCH_OMAP3)		+= omap3-restart.o
 +
-+	omap_hwmod_setup_one(oh_name);
-+	omap_hwmod_enable(oh);
- 	__omap_dm_timer_init_regs(timer);
+ # Pin multiplexing
+ obj-$(CONFIG_SOC_OMAP2420)		+= mux2420.o
+ obj-$(CONFIG_SOC_OMAP2430)		+= mux2430.o
+diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
+index ed21815..349d015 100644
+--- a/arch/arm/mach-omap2/common.h
++++ b/arch/arm/mach-omap2/common.h
+@@ -113,6 +113,30 @@ void omap4430_init_late(void);
+ int omap2_common_pm_late_init(void);
+ void omap_prcm_restart(char, const char *);
  
- 	if (posted)
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 14190e8..24a1c74 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -32,7 +32,6 @@
-  * 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
++#if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
++void omap2xxx_restart(char mode, const char *cmd);
++#else
++static inline void omap2xxx_restart(char mode, const char *cmd)
++{
++}
++#endif
++
++#ifdef CONFIG_ARCH_OMAP3
++void omap3xxx_restart(char mode, const char *cmd);
++#else
++static inline void omap3xxx_restart(char mode, const char *cmd)
++{
++}
++#endif
++
++#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
++void omap44xx_restart(char mode, const char *cmd);
++#else
++static inline void omap44xx_restart(char mode, const char *cmd)
++{
++}
++#endif
++
+ /* This gets called from mach-omap2/io.c, do not call this */
+ void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
  
--#include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-@@ -358,24 +357,6 @@ static inline void __omap_dm_timer_reset(struct omap_dm_timer *timer,
- 	__raw_writel(l, timer->io_base + OMAP_TIMER_OCP_CFG_OFFSET);
+diff --git a/arch/arm/mach-omap2/omap2-restart.c b/arch/arm/mach-omap2/omap2-restart.c
+new file mode 100644
+index 0000000..be6bc89
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap2-restart.c
+@@ -0,0 +1,65 @@
++/*
++ * omap2-restart.c - code common to all OMAP2xxx machines.
++ *
++ * Copyright (C) 2012 Texas Instruments
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/clk.h>
++#include <linux/io.h>
++
++#include "common.h"
++#include "prm2xxx.h"
++
++/*
++ * reset_virt_prcm_set_ck, reset_sys_ck: pointers to the virt_prcm_set
++ * clock and the sys_ck.  Used during the reset process
++ */
++static struct clk *reset_virt_prcm_set_ck, *reset_sys_ck;
++
++/* Reboot handling */
++
++/**
++ * omap2xxx_restart - Set DPLL to bypass mode for reboot to work
++ *
++ * Set the DPLL to bypass so that reboot completes successfully.  No
++ * return value.
++ */
++void omap2xxx_restart(char mode, const char *cmd)
++{
++	u32 rate;
++
++	rate = clk_get_rate(reset_sys_ck);
++	clk_set_rate(reset_virt_prcm_set_ck, rate);
++
++	/* XXX Should save the cmd argument for use after the reboot */
++
++	omap2xxx_prm_dpll_reset(); /* never returns */
++	while (1);
++}
++
++/**
++ * omap2xxx_common_look_up_clks_for_reset - look up clocks needed for restart
++ *
++ * Some clocks need to be looked up in advance for the SoC restart
++ * operation to work - see omap2xxx_restart().  Returns -EINVAL upon
++ * error or 0 upon success.
++ */
++static int __init omap2xxx_common_look_up_clks_for_reset(void)
++{
++	reset_virt_prcm_set_ck = clk_get(NULL, "virt_prcm_set");
++	if (IS_ERR(reset_virt_prcm_set_ck))
++		return -EINVAL;
++
++	reset_sys_ck = clk_get(NULL, "sys_ck");
++	if (IS_ERR(reset_sys_ck))
++		return -EINVAL;
++
++	return 0;
++}
++core_initcall(omap2xxx_common_look_up_clks_for_reset);
+diff --git a/arch/arm/mach-omap2/omap3-restart.c b/arch/arm/mach-omap2/omap3-restart.c
+new file mode 100644
+index 0000000..923c582
+--- /dev/null
++++ b/arch/arm/mach-omap2/omap3-restart.c
+@@ -0,0 +1,36 @@
++/*
++ * omap3-restart.c - Code common to all OMAP3xxx machines.
++ *
++ * Copyright (C) 2009, 2012 Texas Instruments
++ * Copyright (C) 2010 Nokia Corporation
++ * Tony Lindgren <tony@atomide.com>
++ * Santosh Shilimkar <santosh.shilimkar@ti.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include "iomap.h"
++#include "common.h"
++#include "control.h"
++#include "prm3xxx.h"
++
++/* Global address base setup code */
++
++/**
++ * omap3xxx_restart - trigger a software restart of the SoC
++ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
++ * @cmd: passed from the userspace program rebooting the system (if provided)
++ *
++ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
++ * kernel/sys.c.  No return value.
++ */
++void omap3xxx_restart(char mode, const char *cmd)
++{
++	omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
++	omap3xxx_prm_dpll3_reset(); /* never returns */
++	while (1);
++}
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 6cd7e87..3b13987 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -33,6 +33,7 @@
+ #include "common.h"
+ #include "mmc.h"
+ #include "hsmmc.h"
++#include "prminst44xx.h"
+ #include "omap4-sar-layout.h"
+ #include "omap-secure.h"
+ 
+@@ -281,3 +282,19 @@ int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
+ 	return 0;
  }
- 
--static inline int __omap_dm_timer_set_source(struct clk *timer_fck,
--						struct clk *parent)
--{
--	int ret;
--
--	clk_disable(timer_fck);
--	ret = clk_set_parent(timer_fck, parent);
--	clk_enable(timer_fck);
--
--	/*
--	 * When the functional clock disappears, too quick writes seem
--	 * to cause an abort. XXX Is this still necessary?
--	 */
--	__delay(300000);
--
--	return ret;
--}
--
- static inline void __omap_dm_timer_stop(struct omap_dm_timer *timer,
- 					int posted, unsigned long rate)
- {
+ #endif
++
++/**
++ * omap44xx_restart - trigger a software restart of the SoC
++ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
++ * @cmd: passed from the userspace program rebooting the system (if provided)
++ *
++ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
++ * kernel/sys.c.  No return value.
++ */
++void omap44xx_restart(char mode, const char *cmd)
++{
++	/* XXX Should save 'cmd' into scratchpad for use after reboot */
++	omap4_prminst_global_warm_sw_reset(); /* never returns */
++	while (1);
++}
++
 -- 
-1.7.9.5
+1.7.10.4
