@@ -1,43 +1,55 @@
-From: smoch@web.de (=?ISO-8859-1?Q?S=F6ren_Moch?=)
-Date: Tue, 06 Nov 2012 22:28:45 +0100
-Subject: [PATCH V2 1/4] arm: mvebu: increase atomic coherent pool size
- for armada 370/XP
-Message-ID: <5099810D.9040902@web.de>
+From: Dander.He@sonymobile.com (He, Dander)
+Date: Wed, 7 Nov 2012 09:24:49 +0800
+Subject: what's the purpose for the few bytes at the end of kernel stack
+Message-ID: <4BD5AEA95F49F0438C51470A9A2A7A0C0CF752@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-resent as plain text, sorry.
+Hi,
+
+Recently I?m studying linux kernel. I have a question about the space after struct pt_regs in kernel stack.
+Why reserved 8 bytes at the end of kernel stack for ARM and 32 bytes for MIPS?
+
+Do you know what?s the purpose for it?  Who and where use it?
+
+I checked the real kernel stack for some processes. Some of them are all zero. Some of them are not.
+Here are some sample data on ARM for those 8 bytes in different kernel stack:
+0x55555575      0x55155545
+0x5d555574      0xf17d5552
+0x55155555      0x15155151
+0x51555d55      0x55515545
+0x5d555574      0x7579d552
+0x55795534      0xf1055515
+0xa83fc821      0xa83fcc21
+0x55795534      0xf1055d15
+0x557555dd      0x55659155
+0x51555d55      0x55515545
+0x5355545d      0x54c45135
+0x57555455      0x6f45f545
+
+Br/Dander
 
 
- > For Armada 370/XP we have the same problem that for the commit
- > cb01b63, so we applied the same solution: "The default 256 KiB
- > coherent pool may be too small for some of the Kirkwood devices, so
- > increase it to make sure that devices will be able to allocate their
- > buffers with GFP_ATOMIC flag"
 
-I see a regression from linux-3.5 to linux-3.6 and think there might be 
-a fundamental problem
-with this patch. On my Kirkwood system (guruplug server plus) with 
-linux-3.6.2 I see following
-errors and corresponding malfunction even with further increased (2M, 
-4M) pool size:
+1.       In arm, it?s reserved 8 bytes
+kernel/arch/arm/include/asm/thread_info.h
+#define THREAD_START_SP             (THREAD_SIZE - 8)
 
-Oct 19 00:41:22 guru kernel: ERROR: 4096 KiB atomic DMA coherent pool is 
-too small!
-Oct 19 00:41:22 guru kernel: Please increase it with coherent_pool= 
-kernel parameter!
 
-So I had to downgrade to linux-3.5 which is running without problems.
 
-I use SATA and several DVB sticks (em28xx / drxk and dib0700).
+2.       In mips, it?s reserved 32 bytes.
 
-I already sent this bug report to m.szyprowski and 
-gregory.clementearlier, but
-Sebastian suggested to send it to the mailing list and the responsible 
-maintainers, too.
+kernel/arch/mips/kernel/r4k_switch.S
 
-Please write to my e-mail directly if you have further questions or 
-patches for me to test.
+/*
+* Offset to the current process status flags, the first 32 bytes of the
+* stack are not used.
+*/
+#define ST_OFF (_THREAD_SIZE - 32 - PT_SIZE + PT_STATUS)
 
-Regards,
-Soeren
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/6af4d04a/attachment-0001.html>
