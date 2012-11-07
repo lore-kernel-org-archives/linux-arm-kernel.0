@@ -1,31 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 7 Nov 2012 09:41:22 +0000
-Subject: Build failure: drivers/net/wan/wanxlfw.inc
-Message-ID: <20121107094122.GT28327@n2100.arm.linux.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 7 Nov 2012 09:47:26 +0000
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <509987BD.8090800@ti.com>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+ <509987BD.8090800@ti.com>
+Message-ID: <20121107094726.GB17831@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During a randconfig build last night, the following was observed:
+On Tue, Nov 06, 2012 at 09:57:17PM +0000, Santosh Shilimkar wrote:
+> On Tuesday 06 November 2012 03:12 PM, Nicolas Pitre wrote:
+> >
+> > ... instead of flush_cache_all().  The later unconditionally flushes
+> > the L2 cache on ARMv7 architectures such as Cortex A15 and A7 which
+> > is costly and unnecessary in some scenarios where setup_mm_for_reboot()
+> > is used.  If L2 has to be flushed as well, it should already be done
+> > separately on other architectures anyway.
+> >
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> >
+> > diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+> > index ab88ed4f8e..2c61085a10 100644
+> > --- a/arch/arm/mm/idmap.c
+> > +++ b/arch/arm/mm/idmap.c
+> > @@ -104,7 +104,7 @@ early_initcall(init_static_idmap);
+> >   void setup_mm_for_reboot(void)
+> >   {
+> >   	/* Clean and invalidate L1. */
+> > -	flush_cache_all();
+> > +	flush_cache_louis();
+> >
+> >   	/* Switch to the identity mapping. */
+> >   	cpu_switch_mm(idmap_pgd, &init_mm);
+> >
+> Nice. Just one difference is that the I-cache invalidation won't
+> happen with this change. Not that it is needed here but capturing
+> that in change-log would be good.
 
-  BLD FW  drivers/net/wan/wanxlfw.inc
-/bin/sh: as68k: command not found
-In file included from include/linux/kernel.h:10:0,
-                 from include/linux/skbuff.h:17,
-                 from include/linux/hdlc.h:14,
-                 from drivers/net/wan/wanxlfw.S:37:
-include/linux/bitops.h:181:2: error: #error BITS_PER_LONG not 32 or 64
-In file included from include/linux/string.h:9:0,
-                 from include/linux/dynamic_debug.h:100,
-                 from include/linux/kernel.h:14,
-                 from include/linux/skbuff.h:17,
-                 from include/linux/hdlc.h:14,
-                 from drivers/net/wan/wanxlfw.S:37:
-include/uapi/linux/string.h:7:20: fatal error: string.h: No such file or directocompilation terminated.
-make[4]: *** [drivers/net/wan/wanxlfw.inc] Error 127
+Yes, it does happen. The LoUIS API mirrors the flush_cache_all() API in
+this respect, and it has to. The only change is the data cache level at
+which it operates.
 
-Obviously the lack of as68k doesn't help, but it looks like something is
-broken with the includes too.
-
-Full log and config at:
-http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2640
-http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2640
+Lorenzo
