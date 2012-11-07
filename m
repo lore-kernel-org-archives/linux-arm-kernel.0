@@ -1,5 +1,5 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Nov 2012 16:14:41 +0100
+Date: Wed, 7 Nov 2012 16:16:07 +0100
 Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
  support
 In-Reply-To: <20121107144450.GF20844@opensource.wolfsonmicro.com>
@@ -10,7 +10,7 @@ References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
  <20121107140535.GA28954@opensource.wolfsonmicro.com>
  <20121107143046.GA4576@game.jcrosoft.org>
  <20121107144450.GF20844@opensource.wolfsonmicro.com>
-Message-ID: <20121107151441.GB4576@game.jcrosoft.org>
+Message-ID: <20121107151607.GC4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -34,18 +34,8 @@ On 15:44 Wed 07 Nov     , Mark Brown wrote:
 > DT bindings for the audio will then always exist in conjunction with the
 > .dtsi changes for them).  Either way is fine with me; I'll leave things
 > as they are until I see some new patches.
-> 
-> Though I have to say now that I look in -next it's a bit surprising that
-> there are so many IPs in the file that have no pinmix configuration,
-> based on what you're saying it seems like the entire board will be
-> falling over with the pinmux code anyway - in the case of the sam9g20ek
-> we'd at least need I2C pinmux settings.  I may be misunderstanding.
-
-yes I've a new patch series that finish to add them as they was in the Dt
-before the add of the pinctrl (macb/usb device /host) i2c after as on 9g20ek
-we use gpio i2c so no need to do any pinctrl for now
-
-but now new switch to DT must handle the pinctrl
+for where it's merge honestly I do not care much but the pinctrl must be
+handled correctly
 
 Best Regards,
 J.
