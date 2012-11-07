@@ -1,18 +1,18 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Nov 2012 09:23:25 +0100
-Subject: [PATCH] spi: s3c64xx: Add fix for crash in spi suspend/resume
-In-Reply-To: <1352268612-9671-1-git-send-email-ch.naveen@samsung.com>
-References: <1352268612-9671-1-git-send-email-ch.naveen@samsung.com>
-Message-ID: <20121107082324.GA12323@opensource.wolfsonmicro.com>
+Date: Wed, 7 Nov 2012 09:24:20 +0100
+Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
+ support
+In-Reply-To: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
+References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
+Message-ID: <20121107082419.GB12323@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 11:40:12AM +0530, Naveen Krishna Chatradhi wrote:
-> From: Abhilash Kesavan <a.kesavan@samsung.com>
+On Wed, Nov 07, 2012 at 11:41:41AM +0800, Bo Shen wrote:
+> Add atmel-ssc for device tree support
 > 
-> The SPI driver makes a gpio_request during initialization. The requested
-> gpios need to be populated as part of the s3c64xx_spi_driver_data so that
-> they can be released during suspend and requested again during resume.
+> Match "atmel,at91rm9200-ssc" for using pdc for data transfer
+> Match "atmel,at91sam9g45-ssc" for using dma for data transfer
 
 Applied, thanks.
 -------------- next part --------------
@@ -21,4 +21,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/8043c2a9/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/ce411975/attachment.sig>
