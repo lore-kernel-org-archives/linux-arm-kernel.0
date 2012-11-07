@@ -1,47 +1,32 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Wed, 7 Nov 2012 17:59:46 +0100
-Subject: [PATCH 2/5 v2] ARM: AT91SAM9G45: same platform data structure
- for all crypto peripherals
-In-Reply-To: <20121107164523.GG4576@game.jcrosoft.org>
-References: <20121107152615.GD4576@game.jcrosoft.org>
- <1352305675-21961-1-git-send-email-nicolas@eukrea.com>
- <20121107164523.GG4576@game.jcrosoft.org>
-Message-ID: <20121107175946.01f9dc78@eb-e6520>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Nov 2012 09:06:09 -0800
+Subject: [GIT PULL] ARM: OMAP: second set of PRCM cleanups for 3.8
+In-Reply-To: <alpine.DEB.2.00.1211071655000.20704@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
+ <20121106220833.GQ6801@atomide.com>
+ <alpine.DEB.2.00.1211070150100.8758@utopia.booyaka.com>
+ <20121107015841.GC6801@atomide.com>
+ <alpine.DEB.2.00.1211070227500.8758@utopia.booyaka.com>
+ <alpine.DEB.2.00.1211071655000.20704@utopia.booyaka.com>
+Message-ID: <20121107170608.GD6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
-
-Le Wed, 7 Nov 2012 17:45:23 +0100,
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
-> > @@ -1900,7 +1900,7 @@ static void __init at91_add_device_tdes(void) {}
-> >   * -------------------------------------------------------------------- */
-> >  
-> >  #if defined(CONFIG_CRYPTO_DEV_ATMEL_AES) || defined(CONFIG_CRYPTO_DEV_ATMEL_AES_MODULE)
-> > -static struct aes_platform_data aes_data;
-> > +static struct crypto_platform_data aes_data;
-> >  static u64 aes_dmamask = DMA_BIT_MASK(32);
-> >  
-> >  static struct resource aes_resources[] = {
-> > @@ -1931,9 +1931,11 @@ static struct platform_device at91sam9g45_aes_device = {
-> >  static void __init at91_add_device_aes(void)
-> >  {
-> >  	struct at_dma_slave	*atslave;
-> > -	struct aes_dma_data	*alt_atslave;
-> > +	struct crypto_dma_data	*alt_atslave;
-> >  
-> > -	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
-> > +	alt_atslave = kzalloc(sizeof(struct crypto_dma_data), GFP_KERNEL);
-> I still not understand why we need to allocate it
+* Paul Walmsley <paul@pwsan.com> [121107 08:57]:
+> On Wed, 7 Nov 2012, Paul Walmsley wrote:
 > 
-> just declare it as static
+> > On Tue, 6 Nov 2012, Tony Lindgren wrote:
+> > 
+> > > I'm getting errors with the allnoconfig ones, there are total four
+> > > omap defconfigs there not counting the randconfigs.
+> > 
+> > That might indeed explain the discrepancy; so far only have been building 
+> > his oldconfig seeds here.  Will add his allnoconfig seeds and test again.
 > 
-last time we had some data static and you asked to alloc them (and
-didn't bother to answer why you required that :
-http://lkml.indiana.edu/hypermail/linux/kernel/1207.0/02779.html ), now
-you ask to declare static something which is allocated (and
-that's already done this way for the mci) : may you please explain why
-so that we get it the right way for next time ?
+> Can reproduce this here.  Thanks for catching this.  Will fix and send a 
+> new pull request today and ensure that the two allnoconfigs are added to 
+> the build tests from now on.
 
-Thanks
-Eric
+OK thanks!
+
+Tony
