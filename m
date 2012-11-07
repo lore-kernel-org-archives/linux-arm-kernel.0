@@ -1,63 +1,78 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 7 Nov 2012 16:27:52 -0600
-Subject: [PATCH V2 00/14] ARM: OMAP: DMTIMER fixes
-In-Reply-To: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 7 Nov 2012 16:41:47 -0600
+Subject: [PATCH V2 02/14] ARM: OMAP2+: Disable posted mode for the
+ clocksource timer
+In-Reply-To: <509ADC5F.7020307@ti.com>
 References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <509AE068.7040401@ti.com>
+ <1352314890-22224-3-git-send-email-jon-hunter@ti.com>
+ <509ADC5F.7020307@ti.com>
+Message-ID: <509AE3AB.8080008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon,
 
-On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
-> This series includes several fixes for the OMAP DMTIMER driver. This is
-> based upon 3.7-rc4 with the two series adding device-tree support for
-> DMTIMERs [1] and the 32kHz Counter [2]
->
-> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda.
-> Testing includes ...
-> 1. Booting kernel on above boards
-> 2. Set date and ensuring time of day is correct after 24 hours
-> 3. Checking the timer counter is incrementing when configuring and starting
->     a timer
-> 4. Checking the timer overflow interrupt when timer expires.
-> 5. Using different clock sources to operate the timer with.
-> 6. Running a loop test overnight that continually runs test #3 and #4 for
->     each available timer
->
-> This has also been boot tested on the AM335x Beagle Bone.
->
-> [1] http://marc.info/?l=linux-omap&m=135065875808614&w=2
-> [2] http://marc.info/?l=linux-omap&m=135119308123513&w=2
->
-> Jon Hunter (14):
->    ARM: OMAP: Add DMTIMER definitions for posted mode
->    ARM: OMAP2+: Disable posted mode for the clocksource timer
->    ARM: OMAP3+: Implement timer workaround for errata i103 and i767
->    ARM: OMAP: Fix timer posted mode support
->    ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
->    ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
->    ARM: OMAP2+: Don't use __omap_dm_timer_reset()
->    ARM: OMAP: Fix dmtimer reset for timer1
->    ARM: OMAP: Don't restore of DMTIMER TISTAT register
->    ARM: OMAP: Don't restore DMTIMER interrupt status register
->    ARM: OMAP: Fix spurious interrupts when using timer match feature
->    ARM: OMAP: Add dmtimer interrupt disable function
->    ARM: OMAP: Remove unnecessary call to clk_get()
->    ARM: OMAP: Remove __omap_dm_timer_set_source function
->
->   arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   15 ++-
->   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   41 +++---
->   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +
->   arch/arm/mach-omap2/timer.c                        |   73 ++++++++---
->   arch/arm/plat-omap/dmtimer.c                       |  132 +++++++++++++++-----
->   arch/arm/plat-omap/include/plat/dmtimer.h          |   47 ++++---
->   6 files changed, 215 insertions(+), 97 deletions(-)
->
-Nice work. Apart from some minor comments, this series looks pretty
-good to me.
+On 11/07/2012 04:10 PM, Santosh Shilimkar wrote:
+> On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
+>> When using a DMTIMER as the clock-source timer, posted mode
+>> configuration of
+>> the DMTIMER is used. Posted mode is only benefical when configuring
+>> timers as
+>> it allows writes to be posted and does not stall the CPU until the
+>> write is
+>> complete. The clock-source timer is only configured once on boot and
+>> so using
+>> posted mode has no benefit. In fact, by using posted mode, it adds
+>> overhead
+>> to reading the timer. Therefore, by default disable posted mode for
+>> DMTIMERs
+>> used for clock-source.
+>>
+>> Using objdump this change reduces the function clocksource_read_cycles()
+>> function from a total of 15 instructions (including 3 branches and 7
+>> loads)
+>> to 5 instructions (including 1 branch and 3 loads). Please note that
+>> before
+>> the minimum number of instructions that would be executed when calling
+>> clocksource_read_cycles() would be 9 instructions (including 2
+>> branches and 5
+>> loads) where as now it will always be 5 instructions.
+>>
+>> This change also reduces the function dmtimer_read_sched_clock()
+>> function from
+>> a total of 17 instructions (including 4 branches and 8 loads) to 6
+>> instructions
+>> (including 1 branch and 4 loads). Please note that before the minimum
+>> number of
+>> instructions that would be executed when calling
+>> dmtimer_read_sched_clock()
+>> would be 11 instructions (including 2 branches and 6 loads) where as
+>> now it
+>> will always be 6 instructions.
+>>
+> This isn't right way to calculate the penalty of posted mode. Non-posted
+> mode can results in 100 of cycles wait over interconnect
+> and that can not be justified with few instructions savings.
 
-Feel free to add my ack for entire series.
+Right, I see your point. Non-posted reads are going to add
+re-synchronisation overhead. However, our hands are tied here because of
+errata i103 we can't use posted mode for reading the counter.
 
-Regards
-Santosh
+So may be I should squash this change with patch #3 and just make this
+part of the errata workaround. I can always re-visit later and do some
+profiling to see what the optimal configuration should be.
+
+>> This change removes the configuration of posted mode from the
+>> __omap_dm_timer_reset() function and adds a new function called
+>> omap_dm_timer_enable_posted() for enabling posted mode. Hence, call
+>> omap_dm_timer_enable_posted() where ever we are calling
+>> __omap_dm_timer_reset().
+>>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> ---
+> But clock-source doesn't involve much into writes so patch as
+> such is fine.
+
+Yes writes are only on init.
+
+Cheers
+Jon
