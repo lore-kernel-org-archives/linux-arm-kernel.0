@@ -1,60 +1,50 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 16:53:52 -0800
-Subject: [GIT PULL] OMAP: PM: misc. fixes for v3.8
-In-Reply-To: <877gpy2t0n.fsf@deeprootsystems.com>
-References: <877gpy2t0n.fsf@deeprootsystems.com>
-Message-ID: <20121107005352.GT6801@atomide.com>
+Date: Tue, 6 Nov 2012 17:04:05 -0800
+Subject: [PATCH 0/6] OMAPDSS: enable DSS for Panda & SDP with devtree
+In-Reply-To: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1352121259-5836-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20121107010405.GU6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@deeprootsystems.com> [121106 15:49]:
-> Tony,
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [121105 05:16]:
+> Hi,
 > 
-> Here's a small series that fixes some errata to make suspend/resume
-> work on OMAP4460.
+> OMAPDSS device tree support is still some way in the future. Tony has requested
+> to get DSS working for Panda & SDP boards with DT kernel, so that we'll have
+> fully working boards with DT.
 > 
-> This is not a regression and has been broken for awhile, so this is v3.8
-> material, not v3.7.
+> This series makes a few hacks to get a working display on OMAP4 Panda and SDP
+> boards. The idea is to setup the omapdss with the non-DT method, creating the
+> omapdss devices and passing platform data to them. This setup code is called
+> from board-generic for Panda and SDP boards.
 > 
-> Kevin
+> There was one problem with this approach: omapdss cannot get regulators using
+> the omapdss's names fro the regulators. Thus there's a hack patch to get the
+> regulators using the OMAP4 "native" regulator names, thus circumventing the
+> problem.
 > 
-> The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+> Tony, if these look good, how do you want to merge these? There are three parts
+> here, and I think they can be merged independently if so wished:
 > 
->   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.8-fixes-pm
+> * .dts changes for the pinmuxing (2 patches)
 
-Thanks pulling into omap-for-v3.8/fixes-non-critical.
+Let's let Benoit queue these.
+
+> * dss-common.c and board-generic.c changes (3 patches)
+
+And I can take these.
+
+> * DSS hack for the regulators (1 patch)
+
+And you can take this.
+ 
+> If one of those parts is missing, DSS won't start with DT kernel, but otherwise
+> there shouldn't be any problems. So to avoid conflicts, I suggest that you take
+> the first two parts, and I'll merge the DSS hack via omapdss tree.
+
+Cool thanks for doing this. Looks OK to me until we have the DT bindings ready.
 
 Regards,
 
 Tony
-
-> 
-> for you to fetch changes up to cd8ce159031813eb870a5f3d5b27c3be36cd6e3a:
-> 
->   ARM: OMAP4: retrigger localtimers after re-enabling gic (2012-11-05 14:26:43 -0800)
-> 
-> ----------------------------------------------------------------
-> Some non-regression fixes for OMAP4460 PM support.
-> 
-> ----------------------------------------------------------------
-> Colin Cross (1):
->       ARM: OMAP4: retrigger localtimers after re-enabling gic
-> 
-> Santosh Shilimkar (1):
->       ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC control register change.
-> 
-> Tero Kristo (1):
->       ARM: OMAP4: PM: add errata support
-> 
->  arch/arm/mach-omap2/common.h              |  4 +++
->  arch/arm/mach-omap2/omap-headsmp.S        | 38 ++++++++++++++++++++++++++++
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |  9 ++++++-
->  arch/arm/mach-omap2/omap-smp.c            | 39 +++++++++++++++++++++++++++-
->  arch/arm/mach-omap2/omap4-common.c        | 42 ++++++++++++++++++++++++++++++-
->  arch/arm/mach-omap2/pm.h                  |  9 +++++++
->  arch/arm/mach-omap2/pm44xx.c              |  1 +
->  7 files changed, 139 insertions(+), 3 deletions(-)
