@@ -1,58 +1,53 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed, 7 Nov 2012 15:27:28 +0800
-Subject: [PATCH 08/10] pinctrl: single: support pinconf generic
-In-Reply-To: <20121101004406.GJ15766@atomide.com>
-References: <1351724661-29050-1-git-send-email-haojian.zhuang@gmail.com>
- <1351724661-29050-4-git-send-email-haojian.zhuang@gmail.com>
- <20121101004406.GJ15766@atomide.com>
-Message-ID: <CAN1soZzX_0O7GtGfHHn-8N=CFSpEmBYhTSuvUGpQ0ajh8Hp2wQ@mail.gmail.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Wed, 07 Nov 2012 15:38:24 +0800
+Subject: [RFC patch v3 3/4] ASoC: atmel-ssc-dai: register dai and pcm
+ directly
+In-Reply-To: <20121106113908.GC10080@opensource.wolfsonmicro.com>
+References: <1352181474-19597-1-git-send-email-voice.shen@atmel.com>
+ <1352181474-19597-3-git-send-email-voice.shen@atmel.com>
+ <20121106084814.GC5044@opensource.wolfsonmicro.com>
+ <5098D930.8030403@atmel.com>
+ <20121106113908.GC10080@opensource.wolfsonmicro.com>
+Message-ID: <509A0FF0.7030501@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 1, 2012, Tony Lindgren wrote:
+On 11/6/2012 19:39, Mark Brown wrote:
+> On Tue, Nov 06, 2012 at 05:32:32PM +0800, Bo Shen wrote:
+>> On 11/6/2012 16:48, Mark Brown wrote:
+>>> On Tue, Nov 06, 2012 at 01:57:53PM +0800, Bo Shen wrote:
 >
-> > --- a/drivers/pinctrl/pinctrl-single.c
-> > +++ b/drivers/pinctrl/pinctrl-single.c
-> > @@ -20,6 +20,7 @@
-> >  #include <linux/of_device.h>
-> >  #include <linux/of_address.h>
-> >
-> > +#include <linux/pinctrl/pinconf-generic.h>
-> >  #include <linux/pinctrl/pinctrl.h>
-> >  #include <linux/pinctrl/pinmux.h>
-> >
-> > @@ -28,6 +29,9 @@
-> >  #define DRIVER_NAME                  "pinctrl-single"
-> >  #define PCS_MUX_PINS_NAME            "pinctrl-single,pins"
-> >  #define PCS_MUX_BITS_NAME            "pinctrl-single,bits"
-> > +#define PCS_BIAS_NAME                        "pinctrl-single,bias"
-> > +#define PCS_POWER_SOURCE_NAME                "pinctrl-single,power-source"
-> > +#define PCS_SCHMITT_NAME             "pinctrl-single,input-schmitt"
-> >  #define PCS_REG_NAME_LEN             ((sizeof(unsigned long) * 2) + 1)
-> >  #define PCS_OFF_DISABLED             ~0U
-> >  #define PCS_MAX_GPIO_VALUES          3
+>>> No, this isn't converting things to device tree which presumably is the
+>>> goal here and obviously just doing the rename doesn't accomplish an
+>>> enormous amount.  What I said was that you should instantiate the ASoC
+>>> adaption when the machine driver needs to use them.  You shouldn't even
+>>> need a separate device for this.
 >
-> Here too you can remove the new defines.
+>> Maybe this is not the best solution, but just abstract audio as a
+>> separate device. The other's still keep as a ssc library.
 >
-> >  static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
-> >                                               struct device_node *np,
-> >                                               struct pinctrl_map **map,
-> > +                                             unsigned num_configs,
-> >                                               const char **pgnames)
-> >  {
-> ...
->
-> Then I suggest you add a generic pinconf-generic property to
-> indicate the controller supports pinconf. At least for omaps,
-> only some register ranges support pinconf. And by adding
-> pinconf-generic, you can parse it once during the probe of
-> pinctrl-single.c, and set pcs->pinconf flag.
->
-> Then you can use here and avoid calling of_property_read_u32
-> for about 600 times unnecessarily for omap4:
->
-I don't want to add new property for this. I think that we can use
-compatible name instead.
+> It's not abstracting things, that's the whole problem.  It's putting the
+> internals of how the Linux audio stack is organised into the device
+> tree.  The point is that the SSC should be a library to all users.
 
-"pinctrl-single" is only for pinmux & gpio range.
-"pinconf-single" is for pinmux & gpio range & generic pinconf.
+OK. I will keep the SSC as a library for all users.
+
+>>> Please do look at other platforms with similar hardware and do something
+>>> similar to them.
+>
+>> I take some reference (e.g: freescale, marvell, invidia soc, this
+>> RFC implement is similar with them), but don't find the similar
+>> hardware with us. Please help provide the information who's HW is
+>> similar with us. Thanks.
+>
+> A *huge* range of SoCs have generic serial ports - off the top of my
+> head this includes at least OMAP, PXA and Freescale.  The same issue
+> also applies to DMA controllers which affects almost all SoCs.
+
+Thanks for this information, I will try to implement the SSC framework 
+like this. If it is finished, I will send out v4 patch series.
+
+Thanks again.
+
+BRs,
+Bo Shen
