@@ -1,50 +1,64 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 7 Nov 2012 16:10:39 -0600
-Subject: [PATCH V2 02/14] ARM: OMAP2+: Disable posted mode for the
- clocksource timer
-In-Reply-To: <1352314890-22224-3-git-send-email-jon-hunter@ti.com>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Wed, 7 Nov 2012 16:11:37 -0600
+Subject: [PATCH V2 01/14] ARM: OMAP: Add DMTIMER definitions for posted
+ mode
+In-Reply-To: <509ADAFE.4070109@ti.com>
 References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
- <1352314890-22224-3-git-send-email-jon-hunter@ti.com>
-Message-ID: <509ADC5F.7020307@ti.com>
+ <1352314890-22224-2-git-send-email-jon-hunter@ti.com>
+ <509ADAFE.4070109@ti.com>
+Message-ID: <509ADC99.3020106@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
-> When using a DMTIMER as the clock-source timer, posted mode configuration of
-> the DMTIMER is used. Posted mode is only benefical when configuring timers as
-> it allows writes to be posted and does not stall the CPU until the write is
-> complete. The clock-source timer is only configured once on boot and so using
-> posted mode has no benefit. In fact, by using posted mode, it adds overhead
-> to reading the timer. Therefore, by default disable posted mode for DMTIMERs
-> used for clock-source.
->
-> Using objdump this change reduces the function clocksource_read_cycles()
-> function from a total of 15 instructions (including 3 branches and 7 loads)
-> to 5 instructions (including 1 branch and 3 loads). Please note that before
-> the minimum number of instructions that would be executed when calling
-> clocksource_read_cycles() would be 9 instructions (including 2 branches and 5
-> loads) where as now it will always be 5 instructions.
->
-> This change also reduces the function dmtimer_read_sched_clock() function from
-> a total of 17 instructions (including 4 branches and 8 loads) to 6 instructions
-> (including 1 branch and 4 loads). Please note that before the minimum number of
-> instructions that would be executed when calling dmtimer_read_sched_clock()
-> would be 11 instructions (including 2 branches and 6 loads) where as now it
-> will always be 6 instructions.
->
-This isn't right way to calculate the penalty of posted mode. Non-posted 
-mode can results in 100 of cycles wait over interconnect
-and that can not be justified with few instructions savings.
 
-> This change removes the configuration of posted mode from the
-> __omap_dm_timer_reset() function and adds a new function called
-> omap_dm_timer_enable_posted() for enabling posted mode. Hence, call
-> omap_dm_timer_enable_posted() where ever we are calling __omap_dm_timer_reset().
->
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
-> ---
-But clock-source doesn't involve much into writes so patch as
-such is fine.
+On 11/07/2012 04:04 PM, Santosh Shilimkar wrote:
+> On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
+>> For OMAP2+ devices, when using DMTIMERs for system timers
+>> (clock-events and
+>> clock-source) the posted mode configuration of the timers is used. To
+>> allow
+>> the compiler to optimise the functions for configuring and reading the
+>> system
+>> timers, the posted flag variable is hard-coded with the value 1. To
+>> make it
+>> clear that posted mode is being used add some definitions so that it
+>> is more
+>> readable.
+>>
+>> Add separate definitions for the clock-events and clock-source timers
+>> so that
+>> we can change the posted mode of clock-events and clock-source
+>> independently.
+>>
+>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/timer.c               |   26
+>> +++++++++++++++++++-------
+>>   arch/arm/plat-omap/include/plat/dmtimer.h |    4 ++++
+>>   2 files changed, 23 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>> index 0758bae..28c6078 100644
+>> --- a/arch/arm/mach-omap2/timer.c
+>> +++ b/arch/arm/mach-omap2/timer.c
+>> @@ -82,6 +82,13 @@
+>>   #define INCREMENTER_DENUMERATOR_RELOAD_OFFSET        0x14
+>>   #define NUMERATOR_DENUMERATOR_MASK            0xfffff000
+>>
+>> +/*
+>> + * For clock-events timer, always use posted mode to
+>> + * minimise CPU overhead for configuring the timer.
+>> + */
+>> +#define OMAP_CLKEVT_POSTEDMODE    OMAP_TIMER_POSTED
+>> +#define OMAP_CLKSRC_POSTEDMODE    OMAP_TIMER_POSTED
+>> +
+> I don't see need of above defines. Just use OMAP_TIMER_POSTED directly
+> with API. Rest of the patch looks fine.
 
-Regards
-Santosh
+Yes that's possible, however, in patch #2, I am disabling posted mode
+for clock-source (see changelog of patch #2 for details). Having these
+#defines makes it easier to change the posted configuration. That was
+the real motivation here.
+
+Cheers
+Jon
