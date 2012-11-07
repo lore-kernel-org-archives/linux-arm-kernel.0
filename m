@@ -1,28 +1,78 @@
 From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Wed,  7 Nov 2012 17:13:10 +0100
-Subject: [RFC PATCH 0/2] Kirkwood 98dx4122 pinctrl variant
+Date: Wed,  7 Nov 2012 17:13:12 +0100
+Subject: [PATCH 2/2] ARM: convert the km_kirkwood board to pinctrl
 In-Reply-To: <20121028165711.GG15824@lunn.ch>
 References: <20121028165711.GG15824@lunn.ch>
-Message-ID: <1352304792-22443-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <1352304792-22443-3-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two patches add a pinctrl variant for the kirkwood embedded in the
-98dx4122 SoC. Although it is based on a 6281 kirkwood, a lot of pins and
-functionalities are absent ant that's why a new variant is needed.
+Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+---
+ arch/arm/boot/dts/kirkwood-km_kirkwood.dts |   17 +++++++++++++++++
+ arch/arm/mach-kirkwood/board-km_kirkwood.c |   11 -----------
+ 2 files changed, 17 insertions(+), 11 deletions(-)
 
-These two patches are based on Andrew's v2 pinctrl branch:
-
-git://github.com/lunn/linux.git v3.7-rc2-pinctrl-v2
-
-Valentin Longchamp (2):
-  ARM: support 98DX412x kirkwoods with pinctrl
-  ARM: convert the km_kirkwood board to pinctrl
-
- .../bindings/pinctrl/marvell,kirkwood-pinctrl.txt  |   39 ++
- arch/arm/boot/dts/kirkwood-98dx4122.dtsi           |   31 ++
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |   17 +
- arch/arm/mach-kirkwood/board-km_kirkwood.c         |   11 -
- drivers/pinctrl/mvebu/pinctrl-kirkwood.c           |  568 ++++++++++----------
- 5 files changed, 377 insertions(+), 289 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-98dx4122.dtsi
+diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+index 75bdb93..1d4b23a 100644
+--- a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
++++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ 
+ /include/ "kirkwood.dtsi"
++/include/ "kirkwood-98dx4122.dtsi"
+ 
+ / {
+ 	model = "Keymile Kirkwood Reference Design";
+@@ -16,6 +17,22 @@
+ 	};
+ 
+ 	ocp at f1000000 {
++		pinctrl: pinctrl at 10000 {
++
++			pinctrl-0 = < &pmx_nand &pmx_i2c_gpio_sda
++				&pmx_i2c_gpio_scl >;
++			pinctrl-names = "default";	
++
++			pmx_i2c_gpio_sda: pmx-gpio-sda {
++				marvell,pins = "mpp8";
++				marvell,function = "gpio";
++			};
++			pmx_i2c_gpio_scl: pmx-gpio-scl {
++				marvell,pins = "mpp9";
++				marvell,function = "gpio";
++			};
++		};
++
+ 		serial at 12000 {
+ 			clock-frequency = <200000000>;
+ 			status = "ok";
+diff --git a/arch/arm/mach-kirkwood/board-km_kirkwood.c b/arch/arm/mach-kirkwood/board-km_kirkwood.c
+index f7d3283..58b2e07 100644
+--- a/arch/arm/mach-kirkwood/board-km_kirkwood.c
++++ b/arch/arm/mach-kirkwood/board-km_kirkwood.c
+@@ -24,21 +24,10 @@ static struct mv643xx_eth_platform_data km_kirkwood_ge00_data = {
+ 	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
+ };
+ 
+-static unsigned int km_kirkwood_mpp_config[] __initdata = {
+-	MPP8_GPIO,	/* I2C SDA */
+-	MPP9_GPIO,	/* I2C SCL */
+-	0
+-};
+-
+ void __init km_kirkwood_init(void)
+ {
+ 	struct clk *sata_clk;
+ 	/*
+-	 * Basic setup. Needs to be called early.
+-	 */
+-	kirkwood_mpp_conf(km_kirkwood_mpp_config);
+-
+-	/*
+ 	 * Our variant of kirkwood (integrated in the Bobcat) hangs on accessing
+ 	 * SATA bits (14-15) of the Clock Gating Control Register. Since these
+ 	 * devices are also not present in this variant, their clocks get
+-- 
+1.7.1
