@@ -1,60 +1,60 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 6 Nov 2012 16:47:03 -0800
-Subject: [GIT PULL] ARM: OMAP: Timer and Counter DT Updates for v3.8
-In-Reply-To: <50941812.2070501@ti.com>
-References: <50941812.2070501@ti.com>
-Message-ID: <20121107004703.GS6801@atomide.com>
+Date: Tue, 6 Nov 2012 16:53:52 -0800
+Subject: [GIT PULL] OMAP: PM: misc. fixes for v3.8
+In-Reply-To: <877gpy2t0n.fsf@deeprootsystems.com>
+References: <877gpy2t0n.fsf@deeprootsystems.com>
+Message-ID: <20121107005352.GT6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121102 12:01]:
-> Hi Tony,
+* Kevin Hilman <khilman@deeprootsystems.com> [121106 15:49]:
+> Tony,
 > 
-> Please pull the remaining patches to migrate OMAP timers and counters
-> over to use device-tree. I recommend applying this after Benoit's DT
-> series for v3.8 [1]. 
+> Here's a small series that fixes some errata to make suspend/resume
+> work on OMAP4460.
 > 
-> This branch contains ...
-> - Handling OMAP3 secure timers with device-tree
-> - Requesting timer by capability/feature
-> - Adds new DT machine descriptor for OMAP3 GP devices
-> - Look-up of clocksource/events timers from DT
-> - Migrate dmtimer driver to use DT
+> This is not a regression and has been broken for awhile, so this is v3.8
+> material, not v3.7.
 > 
-> Cheers
-> Jon
+> Kevin
 > 
-> [1] http://marc.info/?l=linux-omap&m=135179007210696&w=2
->  
+> The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
 > 
-> The following changes since commit 8f0d8163b50e01f398b14bcd4dc039ac5ab18d64:
-> 
->   Linux 3.7-rc3 (2012-10-28 12:24:48 -0700)
+>   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
 > 
 > are available in the git repository at:
 > 
->   git at github.com:jonhunter/linux.git dev-dt-timer
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/for_3.8-fixes-pm
 
-Thanks pulling into omap-for-v3.8/dt branch.
+Thanks pulling into omap-for-v3.8/fixes-non-critical.
 
 Regards,
 
 Tony
- 
-> for you to fetch changes up to 9883f7c8dd21acb90697582ca331f3f8a66ac054:
+
 > 
->   ARM: OMAP2+: Add device-tree support for 32kHz counter (2012-11-02 13:16:31 -0500)
+> for you to fetch changes up to cd8ce159031813eb870a5f3d5b27c3be36cd6e3a:
+> 
+>   ARM: OMAP4: retrigger localtimers after re-enabling gic (2012-11-05 14:26:43 -0800)
 > 
 > ----------------------------------------------------------------
-> Jon Hunter (5):
->       ARM: OMAP3: Dynamically disable secure timer nodes for secure devices
->       ARM: OMAP: Add function to request a timer by capability
->       ARM: OMAP3: Add generic machine descriptor for boards with OMAP3 GP devices
->       ARM: OMAP: Add DT support for timer driver
->       ARM: OMAP2+: Add device-tree support for 32kHz counter
+> Some non-regression fixes for OMAP4460 PM support.
 > 
->  arch/arm/mach-omap2/board-generic.c       |   17 +++
->  arch/arm/mach-omap2/timer.c               |  203 ++++++++++++++++++++++++-----
->  arch/arm/plat-omap/dmtimer.c              |   93 ++++++++++++-
->  arch/arm/plat-omap/include/plat/dmtimer.h |    1 +
->  4 files changed, 275 insertions(+), 39 deletions(-)
+> ----------------------------------------------------------------
+> Colin Cross (1):
+>       ARM: OMAP4: retrigger localtimers after re-enabling gic
+> 
+> Santosh Shilimkar (1):
+>       ARM: OMAP4460: Workaround for ROM bug because of CA9 r2pX GIC control register change.
+> 
+> Tero Kristo (1):
+>       ARM: OMAP4: PM: add errata support
+> 
+>  arch/arm/mach-omap2/common.h              |  4 +++
+>  arch/arm/mach-omap2/omap-headsmp.S        | 38 ++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/omap-mpuss-lowpower.c |  9 ++++++-
+>  arch/arm/mach-omap2/omap-smp.c            | 39 +++++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/omap4-common.c        | 42 ++++++++++++++++++++++++++++++-
+>  arch/arm/mach-omap2/pm.h                  |  9 +++++++
+>  arch/arm/mach-omap2/pm44xx.c              |  1 +
+>  7 files changed, 139 insertions(+), 3 deletions(-)
