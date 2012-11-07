@@ -1,41 +1,39 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Nov 2012 16:16:07 +0100
-Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
- support
-In-Reply-To: <20121107144450.GF20844@opensource.wolfsonmicro.com>
-References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
- <20121107084932.GE20063@game.jcrosoft.org>
- <20121107092124.GE12323@opensource.wolfsonmicro.com>
- <20121107104121.GG20063@game.jcrosoft.org>
- <20121107140535.GA28954@opensource.wolfsonmicro.com>
- <20121107143046.GA4576@game.jcrosoft.org>
- <20121107144450.GF20844@opensource.wolfsonmicro.com>
-Message-ID: <20121107151607.GC4576@game.jcrosoft.org>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Wed,  7 Nov 2012 23:19:33 +0800
+Subject: [PATCH v4 0/9] use pinctrl-single in arch mmp
+Message-ID: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:44 Wed 07 Nov     , Mark Brown wrote:
-> On Wed, Nov 07, 2012 at 03:30:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> > the one via ASoC for the driver with the pinctrl for now but MUST add it later
-> 
-> > the arch/arm related via AT91 tree where the pinctrl is mandatory in the dtsi
-> 
-> > I'm no going to spend hours to do the pinctrl to test Bo patch that he is
-> > supposed to have deon to test this code
-> 
-> > As basically today on DT none of the board will work if BO does no provide the
-> > pinctrl so for me he MUST put in the dtsi
-> 
-> > is it ok with you?
-> 
-> Or add the pinmux bindings for other IPs over in the pinmux branch and
-> the pinmux binding for SSC here (which will help with bisection as the
-> DT bindings for the audio will then always exist in conjunction with the
-> .dtsi changes for them).  Either way is fine with me; I'll leave things
-> as they are until I see some new patches.
-for where it's merge honestly I do not care much but the pinctrl must be
-handled correctly
+Changelog:
+v4:
+1. Define gpio range as sub-node, not label. And remove
+pinctrl-single,gpio-ranges property.
+2. Use new two properties in sub-node, reg &
+pinctrl-single,gpio. GPIO number & GPIO function are listed in
+the pinctrl-single,gpio property.
+3. Reference the names like pinctrl-single,bias.
+4. Add compatible name "pinconf-single". If the compatible name is
+"pinctrl-single", there's no pinconf. If the compatible name is
+"pinconf-single", there's the generic pinconf in pinctrl-single.
+5. Update documents.
 
-Best Regards,
-J.
+v3:
+1. Add more comments in document.
+2. Replace pcs_readl() & pcs_writel() by pcs->read() & pcs->write().
+3. Clean code.
+
+v2:
+1. Remove "pinctrl-single,gpio-mask". Since GPIO function is one of the
+mux function in the pinmux register of both OMAP and PXA/MMP silicons.
+Use "pinctrl-single,function-mask" instead.
+2. Remove "pinctrl-single,gpio-enable" & "pinctrl-single,gpio-disable".
+Use "pinctrl-single,gpio-func" instead. Because GPIO mode is only one
+of the mux functions in the pinmux register. Defining "gpio-enable" &
+"gpio-disable" are redundant.
+3. Define register with __iomem, not u32 type.
+4. Remove "pinctrl-single,input-schmit-shift",
+"pinctrl-single,power-source-shift", "pinctrl-single,bias-shift". All
+these properties could be calculated by mask fields.
+5. Return -EPROBE_DEFER if pinmux could be got in device driver. And
+the device driver would be probed again deferred.
