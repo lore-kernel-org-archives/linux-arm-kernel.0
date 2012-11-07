@@ -1,38 +1,48 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Wed,  7 Nov 2012 23:00:57 +0100
-Subject: [PATCH 2/2] ARM: S3C64XX: Statically define parent clock of the
- "camera" clock
-In-Reply-To: <1352325657-28885-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1352325657-28885-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <1352325657-28885-2-git-send-email-sylvester.nawrocki@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 7 Nov 2012 16:04:46 -0600
+Subject: [PATCH V2 01/14] ARM: OMAP: Add DMTIMER definitions for posted
+ mode
+In-Reply-To: <1352314890-22224-2-git-send-email-jon-hunter@ti.com>
+References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
+ <1352314890-22224-2-git-send-email-jon-hunter@ti.com>
+Message-ID: <509ADAFE.4070109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "camera" clock defined in arch/arm/mach-s3c64xx/clock.c has null
-clock source mux control register as it can have only one parent
-clock. In such cases there is a need to configure the parent clock
-statically, otherwise s3c_set_clksrc() bails out with an error message
-"no parent clock specified" leaving the parent clock not configured.
-Define statically the parent clock so it is possible to get or set rate
-of the "camera" clock.
+On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
+> For OMAP2+ devices, when using DMTIMERs for system timers (clock-events and
+> clock-source) the posted mode configuration of the timers is used. To allow
+> the compiler to optimise the functions for configuring and reading the system
+> timers, the posted flag variable is hard-coded with the value 1. To make it
+> clear that posted mode is being used add some definitions so that it is more
+> readable.
+>
+> Add separate definitions for the clock-events and clock-source timers so that
+> we can change the posted mode of clock-events and clock-source independently.
+>
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>   arch/arm/mach-omap2/timer.c               |   26 +++++++++++++++++++-------
+>   arch/arm/plat-omap/include/plat/dmtimer.h |    4 ++++
+>   2 files changed, 23 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 0758bae..28c6078 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -82,6 +82,13 @@
+>   #define INCREMENTER_DENUMERATOR_RELOAD_OFFSET		0x14
+>   #define NUMERATOR_DENUMERATOR_MASK			0xfffff000
+>
+> +/*
+> + * For clock-events timer, always use posted mode to
+> + * minimise CPU overhead for configuring the timer.
+> + */
+> +#define OMAP_CLKEVT_POSTEDMODE	OMAP_TIMER_POSTED
+> +#define OMAP_CLKSRC_POSTEDMODE	OMAP_TIMER_POSTED
+> +
+I don't see need of above defines. Just use OMAP_TIMER_POSTED directly
+with API. Rest of the patch looks fine.
 
-Reported-by: In-Bae Jeong <kukyakya@gmail.com>
-Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
----
- arch/arm/mach-s3c64xx/clock.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-index 28041e8..85b9cf1 100644
---- a/arch/arm/mach-s3c64xx/clock.c
-+++ b/arch/arm/mach-s3c64xx/clock.c
-@@ -744,6 +744,7 @@ static struct clksrc_clk clksrcs[] = {
- 			.name		= "camera",
- 			.ctrlbit        = S3C_CLKCON_SCLK_CAM,
- 			.enable		= s3c64xx_sclk_ctrl,
-+			.parent		= &clk_h2,
- 		},
- 		.reg_div	= { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
- 		.reg_src	= { .reg = NULL, .shift = 0, .size = 0  },
--- 
-1.7.4.1
+Apart from above one comment,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
