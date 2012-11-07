@@ -1,51 +1,86 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Nov 2012 18:12:17 +0100
-Subject: [PATCH 2/5 v2] ARM: AT91SAM9G45: same platform data structure
- for all crypto peripherals
-In-Reply-To: <20121107175946.01f9dc78@eb-e6520>
-References: <20121107152615.GD4576@game.jcrosoft.org>
- <1352305675-21961-1-git-send-email-nicolas@eukrea.com>
- <20121107164523.GG4576@game.jcrosoft.org>
- <20121107175946.01f9dc78@eb-e6520>
-Message-ID: <20121107171217.GH4576@game.jcrosoft.org>
+From: khilman@deeprootsystems.com (Kevin Hilman)
+Date: Wed, 07 Nov 2012 09:15:20 -0800
+Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC085EE@DBDE01.ent.ti.com>
+ (Vaibhav Bedia's message of "Wed, 7 Nov 2012 13:25:56 +0000")
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
+ <87txt4aqyc.fsf@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC04AE5@DBDE01.ent.ti.com>
+ <87r4o68bnl.fsf@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC085EE@DBDE01.ent.ti.com>
+Message-ID: <87pq3p72s7.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:59 Wed 07 Nov     , Eric B?nard wrote:
-> Hi Jean-Christophe,
-> 
-> Le Wed, 7 Nov 2012 17:45:23 +0100,
-> Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
-> > > @@ -1900,7 +1900,7 @@ static void __init at91_add_device_tdes(void) {}
-> > >   * -------------------------------------------------------------------- */
-> > >  
-> > >  #if defined(CONFIG_CRYPTO_DEV_ATMEL_AES) || defined(CONFIG_CRYPTO_DEV_ATMEL_AES_MODULE)
-> > > -static struct aes_platform_data aes_data;
-> > > +static struct crypto_platform_data aes_data;
-> > >  static u64 aes_dmamask = DMA_BIT_MASK(32);
-> > >  
-> > >  static struct resource aes_resources[] = {
-> > > @@ -1931,9 +1931,11 @@ static struct platform_device at91sam9g45_aes_device = {
-> > >  static void __init at91_add_device_aes(void)
-> > >  {
-> > >  	struct at_dma_slave	*atslave;
-> > > -	struct aes_dma_data	*alt_atslave;
-> > > +	struct crypto_dma_data	*alt_atslave;
-> > >  
-> > > -	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
-> > > +	alt_atslave = kzalloc(sizeof(struct crypto_dma_data), GFP_KERNEL);
-> > I still not understand why we need to allocate it
-> > 
-> > just declare it as static
-> > 
-> last time we had some data static and you asked to alloc them (and
-> didn't bother to answer why you required that :
-> http://lkml.indiana.edu/hypermail/linux/kernel/1207.0/02779.html ), now
-> you ask to declare static something which is allocated (and
-> that's already done this way for the mci) : may you please explain why
-> so that we get it the right way for next time ?
+"Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
 
-in the driver yes we write multi instance and generic code but in the platfrom I do not see why
+> Hi Kevin,
+>
+> On Wed, Nov 07, 2012 at 06:36:06, Kevin Hilman wrote:
+>> "Bedia, Vaibhav" <vaibhav.bedia@ti.com> writes:
+>> 
+>> > On Mon, Nov 05, 2012 at 23:10:27, Kevin Hilman wrote:
+>> 
+>> [...]
+>> 
+>> >> 
+>> >> Also, if there are drivers for these devices, won't this interfere?
+>> >> 
+>> >
+>> > Hmm, I can think of the following scenarios
+>> >
+>> > 1. Runtime PM adapted drivers are compiled in - We'll have to ensure that
+>> > in their suspend callbacks they end up doing omap_hwmod_idle() via the
+>> > runtime PM APIs. 
+>> 
+>> That already happens for all omap_devices.
+>> 
+>> > In this case the omap_hwmod_enable() followed by omap_hwmod_idle() is
+>> > not necessary in the PM code.
+>> 
+>> Correct.
+>> 
+>> > 2. The drivers are not compiled in - In this case, the hwmod code puts
+>> > the IPs in standby during bootup so the first suspend-resume iteration
+>> > will pass. During resuming, the SYSC configuration for forced standby will
+>> > be lost, 
+>> 
+>> Please clarify how the SYSC is lost in this case.
+>
+> The register configuration of IPs in the PER domain is lost when we enter
+> the suspend state. So the forced standby configuration from SYSC is lost
+> and we need to do this for every successful suspend-resume cycle.
+>
+>> 
+>> > so in the subsequent iterations these IPs won't go standby and the
+>> > hwmod code does not touch them since they never got enabled. In this case
+>> > we do need the sequence that is there currently.
+>> >
+>> > 3. For some reason the respective drivers don't idle the IPs during suspend -
+>> > (no_idle_on_suspend flag for the hwmod in DT?). In this scenario I think
+>> > we should abort the suspend process since we know that the suspend is not
+>> > going to work. 
+>> 
+>> Agreed.
+>> 
+>> > Is there some other scenario that needs to be covered?
+>> 
+>> You covered the ones I was thinking of.
+>> 
+>> > How about adding some flag in hwmod code for handling this? Something
+>> > similar to what was done for MMC [1]. I think the problem that we have
+>> > is in some ways similar to the one addressed in [1].
+>> 
+>> Except that in the absence of drivers, no hwmod code is executed on the
+>> suspend/resume path.
+>> 
+>
+> We could perhaps add a couple of APIs to check the SYSC values when coming
+> out of suspend and take appropriate action if the sysc cache does not match?
 
-Best Regards,
-J.
+Yes, for IPs with only SW support and no drivers, we may need something
+like this.  But again, it needs to be suspend and idle aware, not just
+suspend.
+
+Kevin
