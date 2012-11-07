@@ -1,36 +1,32 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 07 Nov 2012 13:52:34 +0100
-Subject: [GIT PULL] arm-soc: lpc32xx: platform updates
-Message-ID: <509A5992.60009@antcom.de>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 7 Nov 2012 20:53:49 +0800
+Subject: [PATCH -next] ARM: OMAP2+: remove duplicated include from
+ board-overo.c
+Message-ID: <CAPgLHd9ZWdBzaM15ZBckZUGwSq-xcMncFayUrLtWjs0V+QYeqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-this pull request includes the platform topic branch for lpc32xx.
+Remove duplicated include.
 
-Thanks in advance,
+dpatch engine is used to auto generate this patch.
+(https://github.com/weiyj/dpatch)
 
-Roland
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ arch/arm/mach-omap2/board-overo.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-
-The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
-
-  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/core
-
-for you to fetch changes up to 91deef8069e7ffafac4467200e1d37af1b2d7c56:
-
-  ARM: LPC32xx: Cleanup irq.c (2012-11-07 13:30:50 +0100)
-
-----------------------------------------------------------------
-Roland Stigge (3):
-      ARM: LPC32xx: Remove superfluous irq_alloc_descs()
-      ARM: LPC32xx: Relocate calls to irq_set_chained_handler()
-      ARM: LPC32xx: Cleanup irq.c
-
- arch/arm/mach-lpc32xx/irq.c |   23 +++++------------------
- 1 file changed, 5 insertions(+), 18 deletions(-)
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 1cfb037..f5ba43f 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -45,7 +45,6 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ 
+-#include "common.h"
+ #include <video/omapdss.h>
+ #include <video/omap-panel-generic-dpi.h>
+ #include <video/omap-panel-tfp410.h>
