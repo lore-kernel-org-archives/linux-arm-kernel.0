@@ -1,46 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2012 15:35:30 +0000
-Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
-In-Reply-To: <20121107120052.GD17831@e102568-lin.cambridge.arm.com>
-References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20121106215044.GB21764@mudshark.cambridge.arm.com>
- <20121107102349.GC17831@e102568-lin.cambridge.arm.com>
- <20121107110542.GH23305@mudshark.cambridge.arm.com>
- <20121107120052.GD17831@e102568-lin.cambridge.arm.com>
-Message-ID: <20121107153529.GT23305@mudshark.cambridge.arm.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 7 Nov 2012 15:37:02 +0000
+Subject: [PATCH v3 4/4] ARM: OMAP: gpmc: add DT bindings for GPMC
+ timings and NAND
+In-Reply-To: <509A2E75.5060307@gmail.com>
+References: <1351869956-2787-1-git-send-email-zonque@gmail.com>
+ <1351869956-2787-5-git-send-email-zonque@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DA81F@DBDE01.ent.ti.com>
+ <5097B7EE.3000508@gmail.com>
+ <518397C60809E147AF5323E0420B992E3E9DC1F1@DBDE01.ent.ti.com>
+ <509A2E75.5060307@gmail.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9DE420@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 12:00:52PM +0000, Lorenzo Pieralisi wrote:
-> On Wed, Nov 07, 2012 at 11:05:42AM +0000, Will Deacon wrote:
-> > No, I was thinking about what happens if the devicetree doesn't contain an
-> > mpidr property that matches the boot cpu. In this case, we will fail to
-> > assign logical ID 0, right? If this happens, we should complain about an
-> > invalid devicetree and try to fall back on the logical_map that was
-> > generated earlier on.
+On Wed, Nov 07, 2012 at 15:18:37, Daniel Mack wrote:
+> On 05.11.2012 14:29, Philip, Avinash wrote:
+> > On Mon, Nov 05, 2012 at 18:28:22, Daniel Mack wrote:
+> >> On 05.11.2012 12:03, Philip, Avinash wrote:
+> >>> On Fri, Nov 02, 2012 at 20:55:56, Daniel Mack wrote:
+> >>>> This patch adds basic DT bindings for OMAP GPMC.
+> >>>>
+> >>>> The actual peripherals are instanciated from child nodes within the GPMC
+> >>>> node, and the only type of device that is currently supported is NAND.
+> >>>>
+> >>>> Code was added to parse the generic GPMC timing parameters and some
+> >>>> documentation with examples on how to use them.
+> >>>>
+> >>>> Successfully tested on an AM33xx board.
+> >>>>
+> >>>> Signed-off-by: Daniel Mack <zonque@gmail.com>
+> >>> [...]
+> >>>> +
+> >>>> +		nand at 0,0 {
+> >>>> +			reg = <0 0 0>; /* CS0, offset 0 */
+> >>>> +			nand-bus-width = <16>;
+> >>>> +			nand-ecc-mode = "none";
+> >>>> +
+> >>>> +			gpmc,sync-clk = <0>;
+> >>>> +			gpmc,cs-on = <0>;
+> >>>> +			gpmc,cs-rd-off = <36>;
+> >>>> +			gpmc,cs-wr-off = <36>;
+> >>>> +			gpmc,adv-on = <6>;
+> >>>> +			gpmc,adv-rd-off = <24>;
+> >>>> +			gpmc,adv-wr-off = <36>;
+> >>>> +			gpmc,we-off = <30>;
+> >>>> +			gpmc,oe-off = <48>;
+> >>>> +			gpmc,access = <54>;
+> >>>> +			gpmc,rd-cycle = <72>;
+> >>>> +			gpmc,wr-cycle = <72>;
+> >>>> +			gpmc,wr-access = <30>;
+> >>>> +			gpmc,wr-data-mux-bus = <0>;
+> >>>> +
+> >>>> +			#address-cells = <1>;
+> >>>> +			#size-cells = <1>;
+> >>>> +
+> >>>
+> >>> Can you take the timings (for example) from arago tree. The timings is tested in am335x-evm
+> >>> So the timings can be directly used to populate GPMC timings. Timings can found at
+> >>>
+> >>> http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;
+> >>> h=66bfbd2c5b35dc81edce0c24843c476161ab5978;hp=370630359cb8db711cf0941cd2a242e28ccfb61e
+> >>>
+> >>> [...]
+> >>>> +static int gpmc_probe_dt(struct platform_device *pdev)
+> >>>
+> >>> Can you take care of the following section mismatch.
+> >>> WARNING: vmlinux.o(.text+0x1e2d0): Section mismatch in reference
+> >>> from the function gpmc_probe_dt() to the function .init.text:gpmc_nand_init().
+> >>
+> >> Sore, both fixed for v4.
+> >>
+> >>> [...]
+> >>>> +
+> >>>> +		val = of_get_nand_ecc_mode(child);
+> >>>> +		if (val >= 0)
+> >>>> +			gpmc_nand_data->ecc_opt = val;
+> >>>
+> >>> This will fail for BCH. Index of "soft_bch" is 5 & also don't have selection
+> >>> option between for BCH4 & BCH8 also.
+> >>> Can you use the of_property_read_u32 (as done early) to pass the ecc selection
+> >>> from dt file. This will help selection of BCH4 & BCH8 ecc options.
+> >>
+> >> Hmm. Shouldn't we rather teach of_get_nand_ecc_mode() that two modes and
+> >> bring the enum in sync?
+> > 
+> > ecc_opt is for selecting different ecc layout and not for selecting ecc mode.
+> > 
+> > In omap2 driver NAND_ECC_HW ecc mode supports 3 ecc layout
+> > 	OMAP_ECC_HAMMING_CODE_HW_ROMCODE
+> > 	OMAP_ECC_BCH4_CODE_HW
+> > 	OMAP_ECC_BCH8_CODE_HW
+> > 
+> > So selection of ecc layout data should come from DT not ecc mode.
 > 
-> Good point. What I could do, I can assign the MPIDR of the boot CPU to
-> the logical index 0 before even starting to parse the DT (that's what it
-> is done in smp_setup_processor_id(), with a couple of twists). Then, if I
-> find a node that matches the boot CPU mpidr I just skip over it. This
-> way the boot CPU MPIDR will always be correct the only difference with
-> the current approach will be that instead of generating the secondaries
-> MPIDRs we will read them from DT.
+> Ok, I see. I would still like to set them by string rather than magic
+> numbers that map to enum entries. Valid values would be "none", "hw",
+> "hw-romcode", "bch4" and "bch8". Are you ok with that?
 
-That should work, although I'm not sure why you can't just give up
-altogether and use the initial mapping from smp_setup_processor_id?
+Ok, that's nice. Better use ecc_opt instead of ecc_mode.
 
-> The problem with this approach is that if we need a pointer (phandle) to the
-> boot CPU DT node through the MPIDR and the boot CPU node is botched or missing
-> we still behave as if the DT CPU nodes were ok.
+Thanks
+Avinash
 
-Does any code do this? Wouldn't it be much better to lookup logical CPU 0 if
-you want to find anything out about the boot CPU?
-
-> I think I'd better stick a warning condition in there if the boot CPU
-> node is not present or botched (from a MPIDR perspective at least).
-
-Definitely!
-
-Will
+> 
+> 
+> Thanks,
+> Daniel
+> 
+> 
