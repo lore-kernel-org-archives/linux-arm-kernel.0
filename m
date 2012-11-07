@@ -1,37 +1,38 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed,  7 Nov 2012 12:40:05 +0100
-Subject: [PATCH 2/4] spi: Add SH Mobile series as dependency to MSIOF
- controller
+Date: Wed,  7 Nov 2012 12:40:07 +0100
+Subject: [PATCH 4/4] devicetree: Add Renesas SH Mobile MSIOF spi controller
+ binding doc
 In-Reply-To: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
 References: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
-Message-ID: <1352288407-20594-3-git-send-email-hechtb@gmail.com>
+Message-ID: <1352288407-20594-5-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSIOF hardware block is used in the SH Mobile series as well, so we
-add it here.
+Add binding documentation for Renesas' MSIOF SPI controller.
 
 Signed-off-by: Bastian Hecht <hechtb@gmail.com>
 ---
- drivers/spi/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/spi/sh-msiof.txt |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/sh-msiof.txt
 
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 1acae35..d0c0ae6 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -341,10 +341,10 @@ config SPI_SC18IS602
- 
- config SPI_SH_MSIOF
- 	tristate "SuperH MSIOF SPI controller"
--	depends on SUPERH && HAVE_CLK
-+	depends on (SUPERH || ARCH_SHMOBILE) && HAVE_CLK
- 	select SPI_BITBANG
- 	help
--	  SPI driver for SuperH MSIOF blocks.
-+	  SPI driver for SuperH and SH Mobile MSIOF blocks.
- 
- config SPI_SH
- 	tristate "SuperH SPI controller"
+diff --git a/Documentation/devicetree/bindings/spi/sh-msiof.txt b/Documentation/devicetree/bindings/spi/sh-msiof.txt
+new file mode 100644
+index 0000000..b62312e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/sh-msiof.txt
+@@ -0,0 +1,12 @@
++Renesas MSIOF spi controller
++
++Required properties:
++- compatible : 	"renesas,sh-msiof" for SuperH or
++		"renesas,sh-mobile-msiof" for SH Mobile series
++- reg : Offset and length of the register set for the device
++- interrupts : interrupt line used by MSIOF
++
++Optional properties:
++- chip_select  : Chip select, defaults to 0
++- tx_fifo_size : Overrides the default tx fifo size given in words
++- rx_fifo_size : Overrides the default rx fifo size given in words
 -- 
 1.7.5.4
