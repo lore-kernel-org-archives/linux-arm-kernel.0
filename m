@@ -1,51 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 7 Nov 2012 13:29:26 +0000
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 7 Nov 2012 13:39:15 +0000
 Subject: Building for MMU-less vexpress targets
-In-Reply-To: <alpine.LFD.2.02.1211061802240.21033@xanadu.home>
+In-Reply-To: <201211071259.15107.arnd@arndb.de>
 References: <20121105173640.GR3351@mudshark.cambridge.arm.com>
  <201211062114.49933.arnd@arndb.de>
- <alpine.LFD.2.02.1211061802240.21033@xanadu.home>
-Message-ID: <201211071329.26995.arnd@arndb.de>
+ <20121106221437.GQ28327@n2100.arm.linux.org.uk>
+ <201211071259.15107.arnd@arndb.de>
+Message-ID: <20121107133915.GX28327@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 06 November 2012, Nicolas Pitre wrote:
-> On Tue, 6 Nov 2012, Arnd Bergmann wrote:
+On Wed, Nov 07, 2012 at 12:59:14PM +0000, Arnd Bergmann wrote:
+> On Tuesday 06 November 2012, Russell King - ARM Linux wrote:
+> > Now, we don't _have_ to have the single and multi variants if they aren't
+> > appropriate for the platform, but we can cover all the cases: a platform
+> > where it's part of the multi-platform kernel when built for MMU, but is
+> > incapable of being a multi-platform kernel when built without MMU.
+> >
+> > And we can do it without _too_ much Kconfig pain, and certainly without
+> > having to delve into anything beyond arch/arm/Kconfig.
 > 
-> > On Tuesday 06 November 2012, Nicolas Pitre wrote:
-> > > I really think that it makes no sense at all to support !MMU kernels in 
-> > > a multi-platform kernel build, even if the set of included platforms 
-> > > were all !MMU.  The kernel has to be linked for the physical address of 
-> > > the target and not a common invariant virtual address.
-> > 
-> > There are two separate aspects here: One is to run a kernel on !MMU that is
-> > built to support multiple platforms. I agree that this is rather pointless
-> > and not interesting.
-> > 
-> > The other point is being able to build such a kernel, and this is what Will
-> > seems to be interested in more.
+> Sure, that works. My point was just that I think it would be simpler
+> to keep vexpress multiplatform-only if there are no reasons that prevent
+> us from doing that.
 > 
-> What's the point of building a pointless and uninteresting kernel?
+> I also hope that we can at some point in the future get all ARMv6 and ARMv7
+> platforms to be multiplatform-only, while leaving each ARMv4/ARMv5 to be
+> any of single, multi, or mixed.
 
-Built-time coverage is the only one I can think of, but I think it's a
-good reason. Being able to build an "allyesconfig" with MMU disabled
-sounds like a good sniff test to see if something broke and is much faster
-than building all the defconfigs.
-
-> > The two options are either to make
-> > vexpress be single-platform when building for !MMU, or to allow multiplatform
-> > kernels to be built without MMU support in principle. I think the second
-> > option is more logical and avoids complex Kconfig constructs.
-> 
-> Well, I'd rather prefer to think that the first option is the most 
-> logical between those 2 options, regardless of Kconfig complexity 
-> issues.
-> 
-> I didn't look, but just making MULTIPLATFORM depend on !MMU, and 
-> VEXPRESS depend on MULTIPLATFORM || MMU should be close to what is 
-> needed, no?
-
-Fine with me too. I suppose you just made the same logic error that
-I had earlier in this thread and meant !MMU where you wrote MMU.
-
-	Arnd
+Except... we have one report where this approach already doesn't work,
+where we have what is essentially an ARMv7 platform needing to be built
+outside the multiplatform stuff...
