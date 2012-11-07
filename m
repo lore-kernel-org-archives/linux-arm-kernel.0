@@ -1,72 +1,24 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Wed, 7 Nov 2012 08:10:02 +0000
-Subject: [PATCH RESEND 00/10] ARM: dts: AM33XX: Add device tree data
-In-Reply-To: <50992530.8030501@ti.com>
-References: <1352209718-5586-1-git-send-email-anilkumar@ti.com>
- <50992530.8030501@ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA6602E@DBDE01.ent.ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 7 Nov 2012 09:23:25 +0100
+Subject: [PATCH] spi: s3c64xx: Add fix for crash in spi suspend/resume
+In-Reply-To: <1352268612-9671-1-git-send-email-ch.naveen@samsung.com>
+References: <1352268612-9671-1-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20121107082324.GA12323@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 20:26:48, Cousson, Benoit wrote:
-> Hi Anil,
+On Wed, Nov 07, 2012 at 11:40:12AM +0530, Naveen Krishna Chatradhi wrote:
+> From: Abhilash Kesavan <a.kesavan@samsung.com>
 > 
-> On 11/06/2012 02:48 PM, AnilKumar Ch wrote:
-> > Add device tree date for GPIO based various drivers matrix keypad,
-> > volume keys, push buttons and use leds accross three AM33XX devices
-> > viz EVM, BeagleBone and Starter Kit.
-> > 
-> > To make it functional this series also adds pinctrl data for all
-> > the GPIOs used by various drivers. In this series only default state
-> > pinmux/conf settings are added because of sleep/idle state pinctrl
-> > values are not available.
-> > 
-> > These patches are based on linux-omap-dt:for_3.8/dts_part2 tree and
-> > these were tested on am33xx devices according to added functionality.
-> > 
-> > Change log:
-> > 	- Rebased on for_3.8/dts_part2
-> 
-> Thanks for the update. Applied in for_3.8/dts_part2.
-> 
-> BTW, I've just noticed that am335x-evmsk is not built with make dtbs. The target was missing from the arch/arm/boot/dts/Makefile.
-> 
-> Please find below the patch to add it.
+> The SPI driver makes a gpio_request during initialization. The requested
+> gpios need to be populated as part of the s3c64xx_spi_driver_data so that
+> they can be released during suspend and requested again during resume.
 
-Hi Benoit,
-
-Thanks for addition. Below change is missed from evmsk patch.
-
-Thanks
-AnilKumar
- 
-> ---
-> From 6990451aca80a5107206688308302241f799057a Mon Sep 17 00:00:00 2001
-> From: Benoit Cousson <b-cousson@ti.com>
-> Date: Tue, 6 Nov 2012 15:52:23 +0100
-> Subject: [PATCH] ARM: dts: Makefile: Add the am335x-evmsk target in dtbs list
-> 
-> The EVMSK was not built with the 'make dtbs' command.
-> Add the missing antry in the dts Makefile.
-> 
-> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
-> ---
->  arch/arm/boot/dts/Makefile |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 634bd42..2458b69 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -73,6 +73,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
->  	omap4-sdp.dtb \
->  	omap5-evm.dtb \
->  	am335x-evm.dtb \
-> +	am335x-evmsk.dtb \
->  	am335x-bone.dtb
->  dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
->  dtb-$(CONFIG_ARCH_U8500) += snowball.dtb
-> -- 
-> 1.7.0.4
-> 
-> 
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/8043c2a9/attachment-0001.sig>
