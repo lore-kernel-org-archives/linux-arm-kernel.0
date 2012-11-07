@@ -1,40 +1,44 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 07 Nov 2012 15:03:36 +0900
-Subject: [PATCH] ARM: cache-l2x0: move 'l2_wt_override' variable to proper
- place
-Message-ID: <003f01cdbcad$a024c1e0$e06e45a0$%han@samsung.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Wed, 07 Nov 2012 11:40:12 +0530
+Subject: [PATCH] spi: s3c64xx: Add fix for crash in spi suspend/resume
+Message-ID: <1352268612-9671-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed build warning as below:
+From: Abhilash Kesavan <a.kesavan@samsung.com>
 
-arch/arm/mm/cache-l2x0.c:37:12: warning: 'l2_wt_override' defined but not used [-Wunused-variable]
+The SPI driver makes a gpio_request during initialization. The requested
+gpios need to be populated as part of the s3c64xx_spi_driver_data so that
+they can be released during suspend and requested again during resume.
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+Add the missing code to save the requested gpios as part of the driver
+data. This fixes a SPI driver suspend crash.
+
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 ---
- arch/arm/mm/cache-l2x0.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 92ee4a0..920a704 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -34,7 +34,6 @@ static DEFINE_RAW_SPINLOCK(l2x0_lock);
- static u32 l2x0_way_mask;	/* Bitmask of active ways */
- static u32 l2x0_size;
- static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
--static int l2_wt_override;
- 
- /* Aurora don't have the cache ID register available, so we have to
-  * pass it though the device tree */
-@@ -429,6 +428,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
-  * noninclusive, while the hardware cache range operations use
-  * inclusive start and end addresses.
-  */
-+static int l2_wt_override;
-+
- static unsigned long calc_range_end(unsigned long start, unsigned long end)
- {
- 	/*
+This was tested on spi-next branch
+http://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc.git
+
+With S2R patches submitted on mailing list.
+http://www.spinics.net/lists/arm-kernel/msg205244.html
+
+ drivers/spi/spi-s3c64xx.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 01b2f56..57900a8 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -1112,7 +1112,7 @@ static int s3c64xx_spi_parse_dt_gpio(struct s3c64xx_spi_driver_data *sdd)
+ 			dev_err(dev, "invalid gpio[%d]: %d\n", idx, gpio);
+ 			goto free_gpio;
+ 		}
+-
++		sdd->gpios[idx] = gpio;
+ 		ret = gpio_request(gpio, "spi-bus");
+ 		if (ret) {
+ 			dev_err(dev, "gpio [%d] request failed: %d\n",
 -- 
-1.7.1
+1.7.9.5
