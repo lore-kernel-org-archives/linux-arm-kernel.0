@@ -1,52 +1,86 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 7 Nov 2012 16:42:41 +0100
-Subject: [RESEND PATCH 1/2] ASoC: Ux500: Fixup use of clocks
-Message-ID: <1352302962-25201-1-git-send-email-ulf.hansson@stericsson.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 7 Nov 2012 16:45:41 +0100
+Subject: [PATCH V4 0/7] ARM: AM33XX: net: Add DT support to CPGMAC and
+ MDIO driver
+In-Reply-To: <509A7D39.8050506@ti.com>
+References: <1352223159-27504-1-git-send-email-mugunthanvnm@ti.com>
+ <509A7D39.8050506@ti.com>
+Message-ID: <509A8225.8050508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Hi Mugunthan,
 
-Make sure clocks are being prepared and unprepared as well
-as enabled and disabled.
+On 11/07/2012 04:24 PM, Mugunthan V N wrote:
+> On 11/6/2012 11:02 PM, Mugunthan V N wrote:
+>> This patch-series adds support for,
+>>
+>> [1/7]: Typo mistake in CPSW driver while invoking runtime_pm api's
+>>
+>> [2/7]: Adds parent<->child relation between CPSW & MDIO module inside
+>> cpsw
+>>         driver, as in case of AM33XX, the resources are shared and common
+>>         register bit-field is provided to control module/clock
+>> enable/disable,
+>>         makes it difficult to handle common resource.
+>>
+>>         So the solution here is, to create parent<->child relation
+>> between them.
+>>
+>> [3/7]: Add hwmod entry for MDIO module, required for MDIO driver.
+>>
+>> [4/7]: cpsw: simplify the setup of the register pointers
+>>
+>> [5/7]: Add DT device nodes for both CPSW and MDIO modules in am33xx.dtsi,
+>>         am335x-evm.dts and am335x-bone.dts file
+>>
+>> [6/7]: Enable CPSW support to omap2plus_defconfig
+>>
+>> [7/7]: cpsw: Kernel warn fix during suspend
+>>
+>> This patch series has been created on top of net-next/master and tested
+>> on BeagleBone platform for NFS boot and basic ping test cases.
+>>
+>> Changes from V3:
+>> * Removed unnecessary flags in Davinci MDIO Hwmod entry.
+>>
+>> Mugunthan V N (4):
+>>    ARM: OMAP3+: hwmod: Add AM33XX HWMOD data for davinci_mdio module
+>>    arm/dts: am33xx: Add CPSW and MDIO module nodes for AM33XX
+>>    ARM: OMAP2+: omap2plus_defconfig: Enable CPSW support
+>>    net: cpsw: halt network stack before halting the device during
+>>      suspend
+>>
+>> Richard Cochran (1):
+>>    cpsw: simplify the setup of the register pointers
+>>
+>> Vaibhav Hiremath (2):
+>>    net: davinci_mdio: Fix typo mistake in calling runtime-pm api
+>>    net: cpsw: Add parent<->child relation support between cpsw and mdio
+>>
+>>   Documentation/devicetree/bindings/net/cpsw.txt |   34 ----
+>>   arch/arm/boot/dts/am335x-bone.dts              |    8 +
+>>   arch/arm/boot/dts/am335x-evm.dts               |    8 +
+>>   arch/arm/boot/dts/am33xx.dtsi                  |   42 +++++
+>>   arch/arm/configs/omap2plus_defconfig           |    3 +
+>>   arch/arm/mach-omap2/omap_hwmod_33xx_data.c     |   31 ++++
+>>   drivers/net/ethernet/ti/cpsw.c                 |  231
+>> ++++++++++--------------
+>>   drivers/net/ethernet/ti/davinci_mdio.c         |    2 +-
+>>   include/linux/platform_data/cpsw.h             |   19 --
+>>   9 files changed, 192 insertions(+), 186 deletions(-)
+>>
+> Paul/Benoit
+> 
+> Do you any comments
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- sound/soc/ux500/ux500_msp_dai.c |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+The DTS looks better thanks to Richard cleanup.
+But you did not take into account the minor cosmetic comments I did last
+time.
 
-diff --git a/sound/soc/ux500/ux500_msp_dai.c b/sound/soc/ux500/ux500_msp_dai.c
-index be94bf9..e11187f 100644
---- a/sound/soc/ux500/ux500_msp_dai.c
-+++ b/sound/soc/ux500/ux500_msp_dai.c
-@@ -398,11 +398,13 @@ static int ux500_msp_dai_startup(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
- 
--	/* Enable clock */
-+	/* Prepare and enable clock */
- 	dev_dbg(dai->dev, "%s: Enabling MSP-clock.\n", __func__);
--	clk_enable(drvdata->clk);
-+	ret = clk_prepare_enable(drvdata->clk);
-+	if (ret)
-+		regulator_disable(drvdata->reg_vape);
- 
--	return 0;
-+	return ret;
- }
- 
- static void ux500_msp_dai_shutdown(struct snd_pcm_substream *substream,
-@@ -428,8 +430,8 @@ static void ux500_msp_dai_shutdown(struct snd_pcm_substream *substream,
- 			__func__, dai->id, snd_pcm_stream_str(substream));
- 	}
- 
--	/* Disable clock */
--	clk_disable(drvdata->clk);
-+	/* Disable and unprepare clock */
-+	clk_disable_unprepare(drvdata->clk);
- 
- 	/* Disable regulator */
- 	ret = regulator_disable(drvdata->reg_vape);
--- 
-1.7.10
+Could you just clean the DTS based on last time comments and change the
+subject to be compliant with the other ones and I will take it in my
+for_3.8/dts_part2 branch.
+
+Thanks,
+Benoit
