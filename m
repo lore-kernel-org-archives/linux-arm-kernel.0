@@ -1,247 +1,159 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 7 Nov 2012 20:03:57 +0000 (UTC)
-Subject: [PATCH 05/13] ARM: OMAP2+: PRCM: create SoC-specific chip restart
- functions
-In-Reply-To: <alpine.DEB.2.00.1211011151210.26661@utopia.booyaka.com>
-References: <20121025231818.17558.57884.stgit@dusk.lan>
- <20121025232116.17558.47458.stgit@dusk.lan>
- <alpine.DEB.2.00.1211011151210.26661@utopia.booyaka.com>
-Message-ID: <alpine.DEB.2.00.1211072002040.20704@utopia.booyaka.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 Nov 2012 15:10:49 -0500 (EST)
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <20121107184129.GB18293@mudshark.cambridge.arm.com>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+ <20121106220458.GP28327@n2100.arm.linux.org.uk>
+ <20121107095106.GA23305@mudshark.cambridge.arm.com>
+ <20121107095635.GV28327@n2100.arm.linux.org.uk>
+ <20121107100835.GB23305@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1211071035220.21033@xanadu.home>
+ <20121107184129.GB18293@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1211071505410.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 7 Nov 2012, Will Deacon wrote:
 
-Another update on this one to fix a build break that Tony spotted.  
+> On Wed, Nov 07, 2012 at 06:03:40PM +0000, Nicolas Pitre wrote:
+> > On Wed, 7 Nov 2012, Will Deacon wrote:
+> > > On Wed, Nov 07, 2012 at 09:56:35AM +0000, Russell King - ARM Linux wrote:
+> > > > On Wed, Nov 07, 2012 at 09:51:06AM +0000, Will Deacon wrote:
+> > > > > Wouldn't the L2 flush in this case be included with the code that turns off
+> > > > > caching? For reboot, that's currently done in __sort_restart -- the cache
+> > > > > flush in setup_mm_for_reboot is just to ensure that the idmap tables are
+> > > > > visible to the hardware walker iirc.
+> > > > 
+> > > > Good point - but it does raise another issue.  Why do we do this flush and
+> > > > TLB invalidate afterwards in setup_mm_for_reboot() ?  It makes sense if
+> > > > we change existing page tables, but we don't anymore, we're just switching
+> > > > them, and cpu_switch_mm() will do whatever's necessary to make the new
+> > > > page tables visible.  So I think we can get rid of that flusing in there.
+> > > 
+> > > Hmm, I'm not sure about that. Looking at cpu_v7_switch_mm (the 2-level
+> > > version) for example, we set the ASID and then set the new TTBR. There's no
+> > > flushing of page tables like we get in set_pte and no TLB flushing either.
+> > > 
+> > > Now, given that the idmap_pgd is populated as an early_initcall, I really
+> > > doubt we need that flush_cache_all but the TLB invalidate is surely
+> > > required?
+> > 
+> > Why wouldn't cpu_switch_mm() take care of that already if that is 
+> > necessary?  Hmmm, I suppose the asid of the init task isn't associated 
+> > with the idmap in any way, hence the need for flushing the tlbs.
+> 
+> Yes, cpu_switch_mm can't know about whether tables are visible or an ASID is
+> dirty so all it can do is defer that to the caller or do the cleaning and
+> invalidation every time.
+> 
+> > I'd not rely on the early_initcall to assume the new page table is moved 
+> > out of the cache though.
+> 
+> Yeah, it's not nice, I was just pointing out that it's all hanging off an
+> initcall now (before it was created ad-hoc by its users).
+> 
+> > What about this alternate patch:
+> > 
+> > diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+> > index ab88ed4f8e..1ab429761c 100644
+> > --- a/arch/arm/mm/idmap.c
+> > +++ b/arch/arm/mm/idmap.c
+> > @@ -92,6 +92,9 @@ static int __init init_static_idmap(void)
+> >  		(long long)idmap_start, (long long)idmap_end);
+> >  	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
+> >  
+> > +	/* Flush L1 for the hardware to see this page table content */
+> > +	flush_cache_louis();
+> > +
+> >  	return 0;
+> >  }
+> 
+> Yep, we can do this now. Good thinking! At some point I'll get around to
+> making this conditional, as I don't think it's needed on A5, A7, A9 or A15.
+> 
+> >  early_initcall(init_static_idmap);
+> > @@ -103,12 +106,12 @@ early_initcall(init_static_idmap);
+> >   */
+> >  void setup_mm_for_reboot(void)
+> >  {
+> > -	/* Clean and invalidate L1. */
+> > -	flush_cache_all();
+> > -
+> >  	/* Switch to the identity mapping. */
+> >  	cpu_switch_mm(idmap_pgd, &init_mm);
+> >  
+> > -	/* Flush the TLB. */
+> > +	/*
+> > +	 * On ARMv7, the ASID of the init task is not associated with
+> > +	 * this mapping.  TLBs must be flushed.
+> > +	 */
+> >  	local_flush_tlb_all();
+> >  }
+> 
+> Can we change this comment slightly please? Basically, we don't have a clean
+> ASID for the identity mapping, which may clash with virtual addresses of the
+> previous page tables and therefore potentially in the TLB. That's why
+> we need the invalidation: so that we don't hit stale entries from before.
+> 
+> Other than that, looks good to me:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
+Here's my latest version.  I made the tlb flush conditional.  Please 
+review again before I add your ACK.
 
-- Paul
+---- >8
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
+Subject: [PATCH] ARM: idmap: use flush_cache_louis() and flush TLBs only when necessary
 
-From: Paul Walmsley <paul@pwsan.com>
-Date: Mon, 29 Oct 2012 20:56:07 -0600
-Subject: [PATCH] ARM: OMAP2+: PRCM: create SoC-specific chip restart
- functions
+Flushing the cache is needed for the hardware to see the idmap table
+and therefore can be done at init time.  On ARMv7 it is not necessary to 
+flush L2 so flush_cache_louis() is used here instead.
 
-Split omap_prcm_restart() from mach-omap2/prcm.c into SoC-specific
-variants.  These functions need to be able to save the reboot reason
-into the scratchpad RAM.  This implies a dependency on both the PRM
-and SCM IP blocks, so they've been moved into their own file.  This
-will eventually call functions in the PRM and SCM drivers, once those
-are created.
+There is no point flushing the cache in setup_mm_for_reboot() as the
+caller should, and already is, taking care of this.  If switching the
+memory map requires a cache flush, then cpu_switch_mm() already includes
+that operation.
 
-Vaibhav Hiremath <hvaibhav@ti.com> identified an unused prototype in
-the first version of this patch - now removed.  Tony Lindgren
-<tony@atomide.com> noted a compile problem with some RMK Kconfigs;
-resolved in this patch.
+What is not done by cpu_switch_mm() on ASID capable CPUs is TLB flushing
+as the whole point of the ASID is to tag the TLBs and avoid flushing them
+on a context switch.  Since we don't have a clean ASID for the identity
+mapping, we need to flush the TLB explicitly in that case.  Otherwise
+this is already performed by cpu_switch_mm().
 
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
-Cc: Vaibhav Hiremath <hvaibhav@ti.com>
-Tested-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/Makefile        |    5 +++
- arch/arm/mach-omap2/common.h        |   24 +++++++++++++
- arch/arm/mach-omap2/omap2-restart.c |   65 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap3-restart.c |   36 +++++++++++++++++++
- arch/arm/mach-omap2/omap4-common.c  |   17 +++++++++
- 5 files changed, 147 insertions(+)
- create mode 100644 arch/arm/mach-omap2/omap2-restart.c
- create mode 100644 arch/arm/mach-omap2/omap3-restart.c
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index ae87a3e..1988810 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -50,6 +50,11 @@ AFLAGS_sram242x.o			:=-Wa,-march=armv6
- AFLAGS_sram243x.o			:=-Wa,-march=armv6
- AFLAGS_sram34xx.o			:=-Wa,-march=armv7-a
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index ab88ed4f8e..99db769307 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -92,6 +92,9 @@ static int __init init_static_idmap(void)
+ 		(long long)idmap_start, (long long)idmap_end);
+ 	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
  
-+# Restart code (OMAP4/5 currently in omap4-common.c)
-+obj-$(CONFIG_SOC_OMAP2420)		+= omap2-restart.o
-+obj-$(CONFIG_SOC_OMAP2430)		+= omap2-restart.o
-+obj-$(CONFIG_ARCH_OMAP3)		+= omap3-restart.o
++	/* Flush L1 for the hardware to see this page table content */
++	flush_cache_louis();
 +
- # Pin multiplexing
- obj-$(CONFIG_SOC_OMAP2420)		+= mux2420.o
- obj-$(CONFIG_SOC_OMAP2430)		+= mux2430.o
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index ed21815..349d015 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -113,6 +113,30 @@ void omap4430_init_late(void);
- int omap2_common_pm_late_init(void);
- void omap_prcm_restart(char, const char *);
- 
-+#if defined(CONFIG_SOC_OMAP2420) || defined(CONFIG_SOC_OMAP2430)
-+void omap2xxx_restart(char mode, const char *cmd);
-+#else
-+static inline void omap2xxx_restart(char mode, const char *cmd)
-+{
-+}
-+#endif
-+
-+#ifdef CONFIG_ARCH_OMAP3
-+void omap3xxx_restart(char mode, const char *cmd);
-+#else
-+static inline void omap3xxx_restart(char mode, const char *cmd)
-+{
-+}
-+#endif
-+
-+#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
-+void omap44xx_restart(char mode, const char *cmd);
-+#else
-+static inline void omap44xx_restart(char mode, const char *cmd)
-+{
-+}
-+#endif
-+
- /* This gets called from mach-omap2/io.c, do not call this */
- void __init omap2_set_globals_tap(u32 class, void __iomem *tap);
- 
-diff --git a/arch/arm/mach-omap2/omap2-restart.c b/arch/arm/mach-omap2/omap2-restart.c
-new file mode 100644
-index 0000000..be6bc89
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap2-restart.c
-@@ -0,0 +1,65 @@
-+/*
-+ * omap2-restart.c - code common to all OMAP2xxx machines.
-+ *
-+ * Copyright (C) 2012 Texas Instruments
-+ * Paul Walmsley
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/clk.h>
-+#include <linux/io.h>
-+
-+#include "common.h"
-+#include "prm2xxx.h"
-+
-+/*
-+ * reset_virt_prcm_set_ck, reset_sys_ck: pointers to the virt_prcm_set
-+ * clock and the sys_ck.  Used during the reset process
-+ */
-+static struct clk *reset_virt_prcm_set_ck, *reset_sys_ck;
-+
-+/* Reboot handling */
-+
-+/**
-+ * omap2xxx_restart - Set DPLL to bypass mode for reboot to work
-+ *
-+ * Set the DPLL to bypass so that reboot completes successfully.  No
-+ * return value.
-+ */
-+void omap2xxx_restart(char mode, const char *cmd)
-+{
-+	u32 rate;
-+
-+	rate = clk_get_rate(reset_sys_ck);
-+	clk_set_rate(reset_virt_prcm_set_ck, rate);
-+
-+	/* XXX Should save the cmd argument for use after the reboot */
-+
-+	omap2xxx_prm_dpll_reset(); /* never returns */
-+	while (1);
-+}
-+
-+/**
-+ * omap2xxx_common_look_up_clks_for_reset - look up clocks needed for restart
-+ *
-+ * Some clocks need to be looked up in advance for the SoC restart
-+ * operation to work - see omap2xxx_restart().  Returns -EINVAL upon
-+ * error or 0 upon success.
-+ */
-+static int __init omap2xxx_common_look_up_clks_for_reset(void)
-+{
-+	reset_virt_prcm_set_ck = clk_get(NULL, "virt_prcm_set");
-+	if (IS_ERR(reset_virt_prcm_set_ck))
-+		return -EINVAL;
-+
-+	reset_sys_ck = clk_get(NULL, "sys_ck");
-+	if (IS_ERR(reset_sys_ck))
-+		return -EINVAL;
-+
-+	return 0;
-+}
-+core_initcall(omap2xxx_common_look_up_clks_for_reset);
-diff --git a/arch/arm/mach-omap2/omap3-restart.c b/arch/arm/mach-omap2/omap3-restart.c
-new file mode 100644
-index 0000000..923c582
---- /dev/null
-+++ b/arch/arm/mach-omap2/omap3-restart.c
-@@ -0,0 +1,36 @@
-+/*
-+ * omap3-restart.c - Code common to all OMAP3xxx machines.
-+ *
-+ * Copyright (C) 2009, 2012 Texas Instruments
-+ * Copyright (C) 2010 Nokia Corporation
-+ * Tony Lindgren <tony@atomide.com>
-+ * Santosh Shilimkar <santosh.shilimkar@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+
-+#include "iomap.h"
-+#include "common.h"
-+#include "control.h"
-+#include "prm3xxx.h"
-+
-+/* Global address base setup code */
-+
-+/**
-+ * omap3xxx_restart - trigger a software restart of the SoC
-+ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
-+ * @cmd: passed from the userspace program rebooting the system (if provided)
-+ *
-+ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
-+ * kernel/sys.c.  No return value.
-+ */
-+void omap3xxx_restart(char mode, const char *cmd)
-+{
-+	omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
-+	omap3xxx_prm_dpll3_reset(); /* never returns */
-+	while (1);
-+}
-diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-index 6cd7e87..3b13987 100644
---- a/arch/arm/mach-omap2/omap4-common.c
-+++ b/arch/arm/mach-omap2/omap4-common.c
-@@ -33,6 +33,7 @@
- #include "common.h"
- #include "mmc.h"
- #include "hsmmc.h"
-+#include "prminst44xx.h"
- #include "omap4-sar-layout.h"
- #include "omap-secure.h"
- 
-@@ -281,3 +282,19 @@ int __init omap4_twl6030_hsmmc_init(struct omap2_hsmmc_info *controllers)
  	return 0;
  }
- #endif
-+
-+/**
-+ * omap44xx_restart - trigger a software restart of the SoC
-+ * @mode: the "reboot mode", see arch/arm/kernel/{setup,process}.c
-+ * @cmd: passed from the userspace program rebooting the system (if provided)
-+ *
-+ * Resets the SoC.  For @cmd, see the 'reboot' syscall in
-+ * kernel/sys.c.  No return value.
-+ */
-+void omap44xx_restart(char mode, const char *cmd)
-+{
-+	/* XXX Should save 'cmd' into scratchpad for use after reboot */
-+	omap4_prminst_global_warm_sw_reset(); /* never returns */
-+	while (1);
-+}
-+
--- 
-1.7.10.4
+ early_initcall(init_static_idmap);
+@@ -103,12 +106,15 @@ early_initcall(init_static_idmap);
+  */
+ void setup_mm_for_reboot(void)
+ {
+-	/* Clean and invalidate L1. */
+-	flush_cache_all();
+-
+ 	/* Switch to the identity mapping. */
+ 	cpu_switch_mm(idmap_pgd, &init_mm);
+ 
+-	/* Flush the TLB. */
++#ifdef CONFIG_CPU_HAS_ASID
++	/*
++	 * We don't have a clean ASID for the identity mapping, which
++	 * may clash with virtual addresses of the previous page tables
++	 * and therefore potentially in the TLB.
++	 */
+ 	local_flush_tlb_all();
++#endif
+ }
