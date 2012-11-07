@@ -1,49 +1,43 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 7 Nov 2012 14:29:16 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd and
- pinctrl trees
-Message-ID: <20121107142916.824003a6c863320fbf379652@canb.auug.org.au>
+From: kesavan.abhilash@gmail.com (Abhilash Kesavan)
+Date: Wed, 7 Nov 2012 09:12:20 +0530
+Subject: [PATCH RFC] ARM: EXYNOS5: Setup legacy i2c controller interrupts
+ on SMDK5250
+In-Reply-To: <CAJuYYwSka_-w+_hJQivu6M2tUDtD-9zH-4YtLeSoTwPODODQMw@mail.gmail.com>
+References: <1352182726-29221-1-git-send-email-a.kesavan@samsung.com>
+ <CAJuYYwSka_-w+_hJQivu6M2tUDtD-9zH-4YtLeSoTwPODODQMw@mail.gmail.com>
+Message-ID: <CAM4voaki_t=AMNZ4g8-aWTCATNYQTSBSjxiH0jPX2dddMoj+jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Thomas,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-nomadik/board-nhk8815.c between commit 1cd2fc449091 ("ARM:
-nomadik: fixup some FSMC merge problems") from the l2-mtd tree, commits
-bb16bd9b9da4 ("pinctrl/nomadik: move the platform data header") from the
-pinctrl and commit 44e47ccf8ab6 ("Merge branch 'next/multiplatform' into
-for-next") from the arm-soc tree.
+Thanks for the suggestions.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+On Tue, Nov 6, 2012 at 1:45 PM, Thomas Abraham
+<thomas.abraham@linaro.org> wrote:
+> On 6 November 2012 11:48, Abhilash Kesavan <a.kesavan@samsung.com> wrote:
+>> On Exynos5 we have a new high-speed i2c controller. The interrupt
+>> sources for the legacy and new controller are muxed and are controlled
+>> via the SYSCON I2C_CFG register.
+>> At reset the interrupt source is configured for the high-speed controller,
+>> to continue using the old i2c controller we need to modify the I2C_CFG
+>> register.
+>
+> If the high-speed i2c controllers are not used, can this configuration
+> be moved into the bootloader?
+>
+> The other option could be, in the exynos5250_dt_machine_init()
+> function, first check if the platform is compatible with
+> "samsung,exynos5250" and if so search for a high-speed i2c controller
+> compatible node. If a high-speed controller node is found and if that
+> node is not disabled, then do not change the reset value of I2C_CFG
+> register.
+>
+I'd like to try this out. Do we have to a scenario where both hs-i2c and legacy
+i2c nodes are added to the dts file without disabling either of them or is it
+expected that one of these will always be disabled in the board-specific
+dts file (as only one can work at a time) ?
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-nomadik/board-nhk8815.c
-index ab7104f,5ccdf53..0000000
---- a/arch/arm/mach-nomadik/board-nhk8815.c
-+++ b/arch/arm/mach-nomadik/board-nhk8815.c
-@@@ -30,11 -31,10 +32,9 @@@
-  #include <asm/sizes.h>
-  #include <asm/mach-types.h>
-  #include <asm/mach/arch.h>
-- #include <asm/mach/irq.h>
-  #include <asm/mach/flash.h>
-  #include <asm/mach/time.h>
-- 
-- #include <plat/mtu.h>
- -#include <mach/fsmc.h>
-+ #include <mach/irqs.h>
-  
-  #include "cpu-8815.h"
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/e075bca6/attachment.sig>
+> Thanks,
+> Thomas.
+>
