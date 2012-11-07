@@ -1,82 +1,48 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 7 Nov 2012 16:47:08 -0600
-Subject: [PATCH V2 01/14] ARM: OMAP: Add DMTIMER definitions for posted
- mode
-In-Reply-To: <509ADE4E.6070106@ti.com>
-References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
- <1352314890-22224-2-git-send-email-jon-hunter@ti.com>
- <509ADAFE.4070109@ti.com> <509ADC99.3020106@ti.com> <509ADE4E.6070106@ti.com>
-Message-ID: <509AE4EC.1000706@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 07 Nov 2012 16:06:12 -0700
+Subject: struct sys_timer .suspend/.resume ignored for ARCH_SA1100/ARCH_PXA?
+Message-ID: <509AE964.8070009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Russell, Kevin,
+
+In commit 9e4559d "[ARM] 4258/2: Support for dynticks in idle loop" in
+2007, Kevin applied the following change:
+
+> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+
+> -#ifdef CONFIG_PM
+> +#if defined(CONFIG_PM) && !defined(CONFIG_GENERIC_CLOCKEVENTS)
+>  static int timer_suspend(struct sys_device *dev, pm_message_t state)
+
+This means that for any architecture that enables GENERIC_CLOCKEVENTS,
+the .suspend/.resume fields of struct sys_timer will be ignored, since
+timer_suspend()/timer_resume() won't be filled into
+arch/arm/kernel/time.c's struct syscore_ops timer_syscore_ops.
+
+Later, in commit 3e238be "[ARM] sa1100: add clock event support" in
+2008, Russell modified ARCH_SA1100 to select GENERIC_CLOCKEVENTS. I
+believe this means that sa1100_timer_suspend()/resume() haven't been
+used since.
+
+A similar issue exists for ARCH_PXA.
+
+Should sa1100_timer_suspend(), sa1100_timer_resume(),
+pxa_timer_suspend(), pxa_timer_suspend() simply be deleted since they
+are dead code, or should they be revived somehow; is the ifdef from
+Kevin's change incorrect?
 
 
-On 11/07/2012 04:18 PM, Santosh Shilimkar wrote:
-> On Wednesday 07 November 2012 04:11 PM, Jon Hunter wrote:
->>
->> On 11/07/2012 04:04 PM, Santosh Shilimkar wrote:
->>> On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
->>>> For OMAP2+ devices, when using DMTIMERs for system timers
->>>> (clock-events and
->>>> clock-source) the posted mode configuration of the timers is used. To
->>>> allow
->>>> the compiler to optimise the functions for configuring and reading the
->>>> system
->>>> timers, the posted flag variable is hard-coded with the value 1. To
->>>> make it
->>>> clear that posted mode is being used add some definitions so that it
->>>> is more
->>>> readable.
->>>>
->>>> Add separate definitions for the clock-events and clock-source timers
->>>> so that
->>>> we can change the posted mode of clock-events and clock-source
->>>> independently.
->>>>
->>>> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->>>> ---
->>>>    arch/arm/mach-omap2/timer.c               |   26
->>>> +++++++++++++++++++-------
->>>>    arch/arm/plat-omap/include/plat/dmtimer.h |    4 ++++
->>>>    2 files changed, 23 insertions(+), 7 deletions(-)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->>>> index 0758bae..28c6078 100644
->>>> --- a/arch/arm/mach-omap2/timer.c
->>>> +++ b/arch/arm/mach-omap2/timer.c
->>>> @@ -82,6 +82,13 @@
->>>>    #define INCREMENTER_DENUMERATOR_RELOAD_OFFSET        0x14
->>>>    #define NUMERATOR_DENUMERATOR_MASK            0xfffff000
->>>>
->>>> +/*
->>>> + * For clock-events timer, always use posted mode to
->>>> + * minimise CPU overhead for configuring the timer.
->>>> + */
->>>> +#define OMAP_CLKEVT_POSTEDMODE    OMAP_TIMER_POSTED
->>>> +#define OMAP_CLKSRC_POSTEDMODE    OMAP_TIMER_POSTED
->>>> +
->>> I don't see need of above defines. Just use OMAP_TIMER_POSTED directly
->>> with API. Rest of the patch looks fine.
->>
->> Yes that's possible, however, in patch #2, I am disabling posted mode
->> for clock-source (see changelog of patch #2 for details). Having these
->> #defines makes it easier to change the posted configuration. That was
->> the real motivation here.
->>
-> Sure but that is more confusing because you are flipping
-> the meaning of the macro. Better to specify direct
-> argument to avoid the confusion.
+As background, I'm working on a patch series that will remove all fields
+from struct sys_timer except for .init, and will then replace the ARM
+machine descriptor's .timer struct pointer with a .init_timer function
+pointer. This will allow machines, on an opt-in basis, to call into a
+central function in drivers/clocksource to initialize the required
+timer, as determined by searching device tree for a known device type,
+in much the same way as has been proposed to use a single implementation
+for for the machine descriptor's .init_irq. As part of this, I've been
+looking at moving any use of struct sys_timer .suspend/.resume into e.g.
+struct clock_event_device .suspend/.resume, and found this issue.
 
-Hmmm ... I guess I don't see it that way. The intent was that the
-definitions OMAP_CLKxxx_POSTEDMODE described the posted configuration
-(ie. posted or non-posted) and a user could change/flip it if so desired.
-
-I can use the OMAP_TIMER_POSTED/NONPOSTED directly, but my concern with
-that was if someone wanted to changed the posted mode then they have to
-change it in multiple places and there is a chance they could miss one.
-This way, as long as I have it right to begin with, then no one should
-be able to screw it up :-)
-
-Cheers
-Jon
+Thanks for any hints.
