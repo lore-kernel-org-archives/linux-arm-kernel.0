@@ -1,33 +1,36 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 7 Nov 2012 09:49:32 +0100
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 7 Nov 2012 10:04:16 +0100
 Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
  support
-In-Reply-To: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
+In-Reply-To: <20121107084733.GD20063@game.jcrosoft.org>
 References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
-Message-ID: <20121107084932.GE20063@game.jcrosoft.org>
+ <20121107082419.GB12323@opensource.wolfsonmicro.com>
+ <20121107084733.GD20063@game.jcrosoft.org>
+Message-ID: <20121107090416.GD12323@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:41 Wed 07 Nov     , Bo Shen wrote:
-> Add atmel-ssc for device tree support
-> 
-> Match "atmel,at91rm9200-ssc" for using pdc for data transfer
-> Match "atmel,at91sam9g45-ssc" for using dma for data transfer
-> 
-> Signed-off-by: Bo Shen <voice.shen@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Resend
->   Fix a error find by Fengguang Yu
-> 
->   Although there is a NACK from Jean-Christophe PLAGNIOL-VILLARD,
->   however the pinctrl for at91 is not in mainline. So, plan to add
->   pinctrl support after the pinctrl driver for at91 is merged.
-yes the pinctrl is mainline in -next via pinctrl tree
+On Wed, Nov 07, 2012 at 09:47:33AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-s code does not work on the DT kernel untill it's done
+> Mark I nack the patch series this patch series does not run on any DT kernel
 
-NACK stand I refuse this touch the at91 dtsi untiol it's done correctly
+> as no picntrl is done
 
-Best Regards,
-J.
+> do not apply until this patfh handle the pinctrl
+
+Nicholas seemed to be disagreeing you on that one and his observation
+that it won't be an issue until v3.8 anyway seemed totally reasonable.
+In any case it doesn't seems like it'll be an issue to get it resolved
+before it actually gets merged down to become an issue.
+
+Of course there's also some ongoing discussion on the question of having
+to add mindless pinctrl_get_set_default() to all the drivers at all, the
+fact that we're having to do that at all seems like a failure to me at
+least.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/2ee5157c/attachment.sig>
