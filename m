@@ -1,36 +1,55 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 7 Nov 2012 10:04:16 +0100
-Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
- support
-In-Reply-To: <20121107084733.GD20063@game.jcrosoft.org>
-References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
- <20121107082419.GB12323@opensource.wolfsonmicro.com>
- <20121107084733.GD20063@game.jcrosoft.org>
-Message-ID: <20121107090416.GD12323@opensource.wolfsonmicro.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 07 Nov 2012 10:07:32 +0100
+Subject: [PATCH] ARM: mxs: apf28dev: Add I2C, SPI and spidev support
+In-Reply-To: <1352225793-93208-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+References: <1352225793-93208-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+Message-ID: <509A24D4.9000308@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 09:47:33AM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Le 06/11/2012 19:16, Gwenhael Goavec-Merou a ?crit :
+> 
+> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+> ---
+>  arch/arm/boot/dts/imx28-apf28dev.dts |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+> index 1643d25..da7013d 100644
+> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
+> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+> @@ -27,6 +27,19 @@
+>  				status = "okay";
+>  			};
+>  
+> +			ssp2: ssp at 80014000 {
+> +				compatible = "fsl,imx28-spi";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&spi2_pins_a>;
+> +				status = "okay";
+> +
+> +				spidev: spidev at 0 {
+> +					compatible = "spidev";
+> +					spi-max-frequency = <40000000>;
+> +					reg = <0>;
+> +				};
+> +			};
 
-> Mark I nack the patch series this patch series does not run on any DT kernel
+This won't work, since the compatible string is not matching in the
+spidev driver.
 
-> as no picntrl is done
+You need to add the compatible string of the spi device that you will
+drive with spidev in the spidev driver, and then use this string in your
+dts.
 
-> do not apply until this patfh handle the pinctrl
+See
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/129134.html
+and
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/129133.html
 
-Nicholas seemed to be disagreeing you on that one and his observation
-that it won't be an issue until v3.8 anyway seemed totally reasonable.
-In any case it doesn't seems like it'll be an issue to get it resolved
-before it actually gets merged down to become an issue.
 
-Of course there's also some ongoing discussion on the question of having
-to add mindless pinctrl_get_set_default() to all the drivers at all, the
-fact that we're having to do that at all seems like a failure to me at
-least.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/2ee5157c/attachment.sig>
+-- 
+Maxime Ripard, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
