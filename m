@@ -1,112 +1,77 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed,  7 Nov 2012 12:40:06 +0100
-Subject: [PATCH 3/4] spi: sh-msiof: Add device tree parsing to driver
-In-Reply-To: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
-References: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
-Message-ID: <1352288407-20594-4-git-send-email-hechtb@gmail.com>
+Date: Wed, 7 Nov 2012 12:57:35 +0100
+Subject: [PATCH v3 0/3] Add DMA and device tree support to the flash
+ controller FLCTL
+In-Reply-To: <1350641736-18192-1-git-send-email-hechtb@gmail.com>
+References: <1350641736-18192-1-git-send-email-hechtb@gmail.com>
+Message-ID: <CABYn4sx_z7zcqNYC6huK2Ua=_LkC5hgNY3UufKbZtUmNS0YtMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the capability to retrieve setup data from the device tree
-node. The usage of platform data is still available.
+Hello Artem,
 
-Signed-off-by: Bastian Hecht <hechtb@gmail.com>
----
- drivers/spi/spi-sh-msiof.c |   54 +++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 53 insertions(+), 1 deletions(-)
+I hope all aiaiai warnings except the adress space issue are fixed. As
+I don't see how to fix the address space conversion I wonder if you
+can accept the patchset as it is now.
 
-diff --git a/drivers/spi/spi-sh-msiof.c b/drivers/spi/spi-sh-msiof.c
-index 96358d0..65cd19c 100644
---- a/drivers/spi/spi-sh-msiof.c
-+++ b/drivers/spi/spi-sh-msiof.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- 
-@@ -592,6 +593,35 @@ static u32 sh_msiof_spi_txrx_word(struct spi_device *spi, unsigned nsecs,
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static struct sh_msiof_spi_info *sh_msiof_spi_parse_dt(struct device *dev)
-+{
-+	struct sh_msiof_spi_info *info;
-+	struct device_node *np = dev->of_node;
-+	u32 chipselect = 0;
-+
-+	info = devm_kzalloc(dev, sizeof(struct sh_msiof_spi_info), GFP_KERNEL);
-+	if (!info) {
-+		dev_err(dev, "failed to allocate setup data\n");
-+		return NULL;
-+	}
-+
-+	/* Parse the MSIOF properties */
-+	of_property_read_u32(np, "chip-select", &chipselect);
-+	of_property_read_u32(np, "tx_fifo_size", &info->tx_fifo_override);
-+	of_property_read_u32(np, "rx_fifo_size", &info->rx_fifo_override);
-+
-+	info->num_chipselect = chipselect;
-+
-+	return info;
-+}
-+#else
-+static struct sh_msiof_spi_info *sh_msiof_spi_parse_dt(struct device *dev)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int sh_msiof_spi_probe(struct platform_device *pdev)
- {
- 	struct resource	*r;
-@@ -610,7 +640,17 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
- 	p = spi_master_get_devdata(master);
- 
- 	platform_set_drvdata(pdev, p);
--	p->info = pdev->dev.platform_data;
-+	if (pdev->dev.of_node)
-+		p->info = sh_msiof_spi_parse_dt(&pdev->dev);
-+	else
-+		p->info = pdev->dev.platform_data;
-+
-+	if (!p->info) {
-+		dev_err(&pdev->dev, "failed to obtain device info\n");
-+		ret = -ENXIO;
-+		goto err1;
-+	}
-+
- 	init_completion(&p->done);
- 
- 	p->clk = clk_get(&pdev->dev, NULL);
-@@ -715,6 +755,17 @@ static int sh_msiof_spi_runtime_nop(struct device *dev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id sh_msiof_match[] = {
-+	{ .compatible = "renesas,sh-msiof", },
-+	{ .compatible = "renesas,sh-mobile-msiof", },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sh_msiof_match);
-+#else
-+#define sh_msiof_match NULL
-+#endif
-+
- static struct dev_pm_ops sh_msiof_spi_dev_pm_ops = {
- 	.runtime_suspend = sh_msiof_spi_runtime_nop,
- 	.runtime_resume = sh_msiof_spi_runtime_nop,
-@@ -727,6 +778,7 @@ static struct platform_driver sh_msiof_spi_drv = {
- 		.name		= "spi_sh_msiof",
- 		.owner		= THIS_MODULE,
- 		.pm		= &sh_msiof_spi_dev_pm_ops,
-+		.of_match_table = sh_msiof_match,
- 	},
- };
- module_platform_driver(sh_msiof_spi_drv);
--- 
-1.7.5.4
+cheers,
+
+ Bastian
+
+
+2012/10/19 Bastian Hecht <hechtb@googlemail.com>:
+> changelog v3:   - due to shame on me by letting aiaiai complain, I've added
+>                   a third patch (1/3) that cleans up some parts of the driver
+>                   and added a correct error path to probe() in patch 3 (formerly 2/2).
+>                   I found no way to fix this though:
+> +drivers/mtd/nand/sh_flctl.c:181:25: warning: cast removes address space of expression [sparse]
+>
+> changelog v2:   - cosmetic fixes in patch 1
+>                 - added dmas and dma-names field in patch 2
+>
+> This mini-series consists of 2 separately posted patch-sets that shrunk
+> to one patch each. It adds DMA support for the data part (not ECC) as
+> well as device tree support to the FLCTL flash controller.
+> As the 2nd patch is based on the 1st, I've decided to
+> collect them here to avoid any confusion.
+>
+> The first set contained
+> [PATCH 1/2] mtd: sh_flctl: Setup and release DMA channels
+> [PATCH 2/2] mtd: sh_flctl: Use DMA for data fifo FLTDFIFO when available
+> and was merged after 2 reviews to
+> [PATCH] mtd: sh_flctl: Add DMA capabilty (same patch as in here)
+>
+> The second set contained
+> [PATCH 1/3] mtd: sh_flctl: Probe SNAND_E flag from NAND chip
+> [PATCH 2/3] mtd: sh_flctl: Add device tree support
+> [PATCH 3/3] mtd: sh_flctl: Add sh7372 device tree config
+> and is merged here to
+> mtd: sh_flctl: Add device tree support
+>
+> Patch 1 can be omitted as SNAND_E is handled in the FLCTL source anyway
+> correctly in set_cmd_regs() and the flag can be removed from existing board
+> codes without this patch.
+> Patch 2 without patch 3 may be confusing so I merged them too. Documentation
+> is added as well.
+>
+> I've added linux-arm-kernel at lists.infradead.org as recipient for the
+> device tree part.
+>
+> The patchset is based on
+> l2-mtd  git://git.infradead.org/users/dedekind/l2-mtd.git
+> with reverted commit e26c113b4130aefa1d8446602bb5b05cfd646bfe.
+>
+>
+> Bastian Hecht (2):
+>   mtd: sh_flctl: Add DMA capabilty
+>   mtd: sh_flctl: Add device tree support
+>
+>  .../devicetree/bindings/mtd/flctl-nand.txt         |   37 +++
+>  drivers/mtd/nand/sh_flctl.c                        |  266 +++++++++++++++++++-
+>  include/linux/mtd/sh_flctl.h                       |   12 +
+>  3 files changed, 305 insertions(+), 10 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/flctl-nand.txt
+>
+> --
+> 1.7.5.4
+>
