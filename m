@@ -1,46 +1,44 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Wed,  7 Nov 2012 23:19:42 +0800
-Subject: [PATCH v4 9/9] pinctrl: single: dump pinmux register value
-In-Reply-To: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
-References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1352301582-12244-10-git-send-email-haojian.zhuang@gmail.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Wed, 7 Nov 2012 15:20:30 +0000
+Subject: [PATCH 6/8] pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC04483@DBDE01.ent.ti.com>
+References: <1352106749-9437-1-git-send-email-avinashphilip@ti.com>
+ <1352106749-9437-7-git-send-email-avinashphilip@ti.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC04483@DBDE01.ent.ti.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3E9DE3AA@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dump pinmux register value, not only function part in the pinmux
-register.
+On Tue, Nov 06, 2012 at 12:16:13, Bedia, Vaibhav wrote:
+> On Mon, Nov 05, 2012 at 14:42:27, Philip, Avinash wrote:
+> [...]
+> 
+> > +	/* Some platforms require explicit tbclk gating */
+> > +	if (of_property_read_bool(pdev->dev.of_node, "tbclkgating")) {
+> > +		pc->tbclk = clk_get(&pdev->dev, "tbclk");
+> > +		if (IS_ERR(pc->tbclk)) {
+> > +			dev_err(&pdev->dev, "Could not get EHRPWM TBCLK\n");
+> > +			return PTR_ERR(pc->tbclk);
+> > +		}
+> > +	}
+> > +
+> > +	/* Enable tbclk & leave */
+> > +	if (pc->tbclk)
+> > +		clk_enable(pc->tbclk);
+> > +
+> 
+> Here also why are you leaving this clock always running?
 
-Also fix the issue on caluclating pin offset. The last parameter
-should be pin number, not register offset.
+This is an additional clock gating for EHRPWM functional clock from
+control module. The enabling of this clock to pwm_enable 
+& disabling to pwm_disable. I will correct it.
 
-Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
----
- drivers/pinctrl/pinctrl-single.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index 77aec05..243a9ca 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -286,15 +286,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
- 
- static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
- 					struct seq_file *s,
--					unsigned offset)
-+					unsigned pin)
- {
- 	struct pcs_device *pcs;
--	unsigned val;
-+	unsigned val, mux_bytes;
- 
- 	pcs = pinctrl_dev_get_drvdata(pctldev);
- 
--	val = pcs->read(pcs->base + offset);
--	val &= pcs->fmask;
-+	mux_bytes = pcs->width / BITS_PER_BYTE;
-+	val = pcs->read(pcs->base + pin * mux_bytes);
- 
- 	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
- }
--- 
-1.7.10.4
+
+Thanks
+Avinash
+
+> 
+> Regards,
+> Vaibhav
+> 
