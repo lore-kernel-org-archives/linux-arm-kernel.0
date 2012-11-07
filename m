@@ -1,347 +1,383 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Wed, 07 Nov 2012 18:19:38 +0100
-Subject: [PATCH] pwm: lpc32xx - Add a driver for the motor PWM
-In-Reply-To: <1352305828-25298-1-git-send-email-alban.bedel@avionic-design.de>
-References: <1352305828-25298-1-git-send-email-alban.bedel@avionic-design.de>
-Message-ID: <509A982A.6020401@antcom.de>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed,  7 Nov 2012 21:30:29 +0400
+Subject: [PATCH RESEND] ARM/SPI: New driver for SPI master controller for
+ CLPS711X-target
+Message-ID: <1352309429-21482-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/12 17:30, Alban Bedel wrote:
-> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
-> ---
->  .../devicetree/bindings/pwm/lpc32xx-motor-pwm.txt  |   24 ++
->  arch/arm/boot/dts/lpc32xx.dtsi                     |    7 +
+This patch add new driver for CLPS711X SPI master controller.
+Due to platform limitations driver supports only 8 bit transfer mode.
+Chip select control is handled via GPIO.
 
-Is all this supposed to go via mach-lpc32xx -> arm-soc.git? Then, I can
-take this into the lpc32xx tree. Otherwise, you can split off the .dtsi
-file and I include it via lpc32xx.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/spi/Kconfig                        |    7 +
+ drivers/spi/Makefile                       |    1 +
+ drivers/spi/spi-clps711x.c                 |  296 ++++++++++++++++++++++++++++
+ include/linux/platform_data/spi-clps711x.h |   21 ++
+ 4 files changed, 325 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/spi/spi-clps711x.c
+ create mode 100644 include/linux/platform_data/spi-clps711x.h
 
-Thanks,
-
-Roland
-
->  drivers/pwm/Kconfig                                |   10 +
->  drivers/pwm/Makefile                               |    1 +
->  drivers/pwm/pwm-lpc32xx-motor.c                    |  230 ++++++++++++++++++++
->  5 files changed, 272 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt
->  create mode 100644 drivers/pwm/pwm-lpc32xx-motor.c
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt
-> new file mode 100644
-> index 0000000..e19b0a4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-motor-pwm.txt
-> @@ -0,0 +1,24 @@
-> +LPC32XX Motor PWM controller
-> +
-> +The LPC32xx motor PWMs have two output pin, A and B, with B=!A.
-> +Per default the output A should be used, if the output B is used the
-> +PWM polarity should be inverted using the linux,polarity property.
-> +
-> +Required properties:
-> +- compatible: should be "nxp,lpc3220-motor-pwm"
-> +- reg: physical base address and length of the controller's registers
-> +
-> +Optional properites:
-> +- linux,polarity: Bit mask of the polarity to use for each output,
-> +      a bit set to 0 indicate the default polarity, a bit set to 1
-> +      indicate an inverted polarity. In other word this set if output
-> +      A or output B has the correct polarity.
-> +
-> +Examples:
-> +
-> +mpwm at 400e8000 {
-> +	compatible = "nxp,lpc3220-motor-pwm";
-> +	reg = <0x400E8000 0x78>;
-> +	linux,polarity = 5; /* Use outputs B0, A1 and B2 */
-> +	#pwm-cells = <2>;
-> +};
-> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-> index ef0fdc7..a1e6a9b 100644
-> --- a/arch/arm/boot/dts/lpc32xx.dtsi
-> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
-> @@ -182,6 +182,13 @@
->  				pnx,timeout = <0x64>;
->  			};
->  
-> +			mpwm: mpwm at 400E8000 {
-> +				compatible = "nxp,lpc3220-motor-pwm";
-> +				reg = <0x400E8000 0x78>;
-> +				status = "disabled";
-> +				#pwm-cells = <2>;
-> +			};
-> +
->  			i2cusb: i2c at 31020300 {
->  				compatible = "nxp,pnx-i2c";
->  				reg = <0x31020300 0x100>;
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index 90c5c73..90fc167 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -57,6 +57,16 @@ config PWM_LPC32XX
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-lpc32xx.
->  
-> +config PWM_LPC32XX_MOTOR
-> +	tristate "LPC32XX Motor PWM support"
-> +	depends on ARCH_LPC32XX
-> +	help
-> +	  Generic PWM framework driver for LPC32XX motor PWM. The LPC32XX SOC
-> +	  has one motor PWM controllers.
-> +
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called pwm-motor-lpc32xx.
-> +
->  config PWM_MXS
->  	tristate "Freescale MXS PWM support"
->  	depends on ARCH_MXS && OF
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> index e4b2c89..510bad8 100644
-> --- a/drivers/pwm/Makefile
-> +++ b/drivers/pwm/Makefile
-> @@ -2,6 +2,7 @@ obj-$(CONFIG_PWM)		+= core.o
->  obj-$(CONFIG_PWM_BFIN)		+= pwm-bfin.o
->  obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
->  obj-$(CONFIG_PWM_LPC32XX)	+= pwm-lpc32xx.o
-> +obj-$(CONFIG_PWM_LPC32XX_MOTOR)	+= pwm-lpc32xx-motor.o
->  obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
->  obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
->  obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
-> diff --git a/drivers/pwm/pwm-lpc32xx-motor.c b/drivers/pwm/pwm-lpc32xx-motor.c
-> new file mode 100644
-> index 0000000..e1b4d46
-> --- /dev/null
-> +++ b/drivers/pwm/pwm-lpc32xx-motor.c
-> @@ -0,0 +1,230 @@
-> +/*
-> + * Copyright 2012 Alban Bedel <alban.bedel@avionic-design.de>
-> + *
-> + * Based on pwm-lpc32xx.c from Alexandre Pereira da Silva
-> + * <aletes.xgr@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2.
-> + *
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pwm.h>
-> +#include <linux/slab.h>
-> +
-> +struct lpc32xx_motor_pwm_chip {
-> +	struct pwm_chip chip;
-> +	struct clk *clk;
-> +	spinlock_t lock;
-> +	unsigned int clk_enabled;
-> +	unsigned int pins;
-> +	void __iomem *base;
-> +};
-> +
-> +#define to_lpc32xx_motor_pwm_chip(_chip) \
-> +	container_of(_chip, struct lpc32xx_motor_pwm_chip, chip)
-> +
-> +/* Register mapping for MCPWM modules */
-> +#define LPC32XX_MCPWM_MCCON		0x00
-> +#define LPC32XX_MCPWM_MCCON_SET		0x04
-> +#define LPC32XX_MCPWM_MCCON_CLR		0x08
-> +#define LPC32XX_MCPWM_MCCAPCON		0x0C
-> +#define LPC32XX_MCPWM_MCCAPCON_SET	0x10
-> +#define LPC32XX_MCPWM_MCCAPCON_CLR	0x14
-> +#define LPC32XX_MCPWM_MCLIM0		0x24
-> +#define LPC32XX_MCPWM_MCLIM1		0x28
-> +#define LPC32XX_MCPWM_MCLIM2		0x2C
-> +#define LPC32XX_MCPWM_MCMAT0		0x30
-> +#define LPC32XX_MCPWM_MCMAT1		0x34
-> +#define LPC32XX_MCPWM_MCMAT2		0x38
-> +#define LPC32XX_MCPWM_MCINTEN_CLR	0x58
-> +
-> +#define LPC32XX_MCPWM_COUNT		3
-> +
-> +#define PWM_EN_MASK(pwm)		BIT(0 + (pwm)->hwpwm*8)
-> +#define MCLIM_REG_OFFSET(pwm)		(LPC32XX_MCPWM_MCLIM0 + (pwm)->hwpwm*4)
-> +#define MCMAT_REG_OFFSET(pwm)		(LPC32XX_MCPWM_MCMAT0 + (pwm)->hwpwm*4)
-> +
-> +static int lpc32xx_motor_pwm_enable_clock(
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx)
-> +{
-> +	int err = 0;
-> +	spin_lock(&lpc32xx->lock);
-> +	if (lpc32xx->clk_enabled == 0)
-> +		err = clk_enable(lpc32xx->clk);
-> +	lpc32xx->clk_enabled += 1;
-> +	spin_unlock(&lpc32xx->lock);
-> +	return err;
-> +}
-> +
-> +static void lpc32xx_motor_pwm_disable_clock(
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx)
-> +{
-> +	spin_lock(&lpc32xx->lock);
-> +	if (lpc32xx->clk_enabled > 0) {
-> +		lpc32xx->clk_enabled -= 1;
-> +		if (lpc32xx->clk_enabled == 0)
-> +			clk_disable(lpc32xx->clk);
-> +	}
-> +	spin_unlock(&lpc32xx->lock);
-> +}
-> +
-> +static int lpc32xx_motor_pwm_config(struct pwm_chip *chip,
-> +				    struct pwm_device *pwm,
-> +				    int duty_ns, int period_ns)
-> +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx =
-> +		to_lpc32xx_motor_pwm_chip(chip);
-> +	u64 rate, per, duty;
-> +	int err = 0;
-> +
-> +	/* The clock is needed to access the registers */
-> +	err = lpc32xx_motor_pwm_enable_clock(lpc32xx);
-> +	if (err)
-> +		return err;
-> +
-> +	/* Calculate period */
-> +	rate = clk_get_rate(lpc32xx->clk);
-> +	per  = (u64)period_ns * rate;
-> +	duty = (u64)duty_ns * rate;
-> +	do_div(per,  1000000000);
-> +	do_div(duty, 1000000000);
-> +
-> +	/* Write to limit register -> period */
-> +	__raw_writel(per, lpc32xx->base + MCLIM_REG_OFFSET(pwm));
-> +
-> +	/* Write to match register -> duty */
-> +	__raw_writel(per - duty, lpc32xx->base + MCMAT_REG_OFFSET(pwm));
-> +
-> +	/* Disable the clock now that we are done */
-> +	lpc32xx_motor_pwm_disable_clock(lpc32xx);
-> +	return 0;
-> +}
-> +
-> +static int lpc32xx_motor_pwm_enable(struct pwm_chip *chip,
-> +				    struct pwm_device *pwm)
-> +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx =
-> +		to_lpc32xx_motor_pwm_chip(chip);
-> +	int err;
-> +
-> +	err = lpc32xx_motor_pwm_enable_clock(lpc32xx);
-> +	if (err)
-> +		return err;
-> +
-> +	__raw_writel(PWM_EN_MASK(pwm), lpc32xx->base + LPC32XX_MCPWM_MCCON_SET);
-> +
-> +	return 0;
-> +}
-> +
-> +static void lpc32xx_motor_pwm_disable(struct pwm_chip *chip,
-> +				      struct pwm_device *pwm)
-> +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx =
-> +		to_lpc32xx_motor_pwm_chip(chip);
-> +
-> +	__raw_writel(PWM_EN_MASK(pwm), lpc32xx->base + LPC32XX_MCPWM_MCCON_CLR);
-> +
-> +	lpc32xx_motor_pwm_disable_clock(lpc32xx);
-> +}
-> +
-> +static const struct pwm_ops lpc32xx_motor_pwm_ops = {
-> +	.config = lpc32xx_motor_pwm_config,
-> +	.enable = lpc32xx_motor_pwm_enable,
-> +	.disable = lpc32xx_motor_pwm_disable,
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +static int lpc32xx_motor_pwm_probe(struct platform_device *pdev)
-> +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	lpc32xx = devm_kzalloc(&pdev->dev, sizeof(*lpc32xx), GFP_KERNEL);
-> +	if (!lpc32xx)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res)
-> +		return -EINVAL;
-> +
-> +	lpc32xx->base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!lpc32xx->base)
-> +		return -EADDRNOTAVAIL;
-> +
-> +	lpc32xx->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(lpc32xx->clk))
-> +		return PTR_ERR(lpc32xx->clk);
-> +
-> +	spin_lock_init(&lpc32xx->lock);
-> +
-> +	/* Configure the pins polarity */
-> +	ret = of_property_read_u32(pdev->dev.of_node, "linux,polarity",
-> +				   &lpc32xx->pins);
-> +	if (!ret) {
-> +		u32 set = 0, clr = 0;
-> +		int i;
-> +		for (i = 0 ; i < LPC32XX_MCPWM_COUNT ; i += 1)
-> +			if (lpc32xx->pins & BIT(i))
-> +				set |= BIT(2 + i*8);
-> +			else
-> +				clr |= BIT(2 + i*8);
-> +		__raw_writel(set, lpc32xx->base + LPC32XX_MCPWM_MCCON_SET);
-> +		__raw_writel(clr, lpc32xx->base + LPC32XX_MCPWM_MCCON_CLR);
-> +	}
-> +
-> +	lpc32xx->chip.dev = &pdev->dev;
-> +	lpc32xx->chip.ops = &lpc32xx_motor_pwm_ops;
-> +	lpc32xx->chip.npwm = LPC32XX_MCPWM_COUNT;
-> +	lpc32xx->chip.base = -1;
-> +
-> +	ret = pwmchip_add(&lpc32xx->chip);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to add PWM chip, error %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, lpc32xx);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __devexit lpc32xx_motor_pwm_remove(struct platform_device *pdev)
-> +{
-> +	struct lpc32xx_motor_pwm_chip *lpc32xx = platform_get_drvdata(pdev);
-> +
-> +	clk_disable(lpc32xx->clk);
-> +	return pwmchip_remove(&lpc32xx->chip);
-> +}
-> +
-> +static const struct of_device_id lpc32xx_motor_pwm_dt_ids[] __devinitconst = {
-> +	{ .compatible = "nxp,lpc3220-motor-pwm", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, lpc32xx_motor_pwm_dt_ids);
-> +
-> +static struct platform_driver lpc32xx_motor_pwm_driver = {
-> +	.driver = {
-> +		.name = "lpc32xx-motor-pwm",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = of_match_ptr(lpc32xx_motor_pwm_dt_ids),
-> +	},
-> +	.probe = lpc32xx_motor_pwm_probe,
-> +	.remove = __devexit_p(lpc32xx_motor_pwm_remove),
-> +};
-> +module_platform_driver(lpc32xx_motor_pwm_driver);
-> +
-> +MODULE_ALIAS("platform:lpc32xx-motor-pwm");
-> +MODULE_AUTHOR("Alban Bedel <alban.bedel@avionic-design.de>");
-> +MODULE_DESCRIPTION("LPC32XX Motor PWM Driver");
-> +MODULE_LICENSE("GPL v2");
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 25290d9..fd95dd8 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -123,6 +123,13 @@ config SPI_BUTTERFLY
+ 	  inexpensive battery powered microcontroller evaluation board.
+ 	  This same cable can be used to flash new firmware.
+ 
++config SPI_CLPS711X
++	tristate "CLPS711X host SPI controller"
++	depends on ARCH_CLPS711X
++	help
++	  This enables dedicated general purpose SPI/Microwire1-compatible
++	  master mode interface (SSI1) for CLPS711X-based CPUs.
++
+ config SPI_COLDFIRE_QSPI
+ 	tristate "Freescale Coldfire QSPI controller"
+ 	depends on (M520x || M523x || M5249 || M525x || M527x || M528x || M532x)
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index f87c0f1..b6bb740 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -19,6 +19,7 @@ obj-$(CONFIG_SPI_BFIN5XX)		+= spi-bfin5xx.o
+ obj-$(CONFIG_SPI_BFIN_SPORT)		+= spi-bfin-sport.o
+ obj-$(CONFIG_SPI_BITBANG)		+= spi-bitbang.o
+ obj-$(CONFIG_SPI_BUTTERFLY)		+= spi-butterfly.o
++obj-$(CONFIG_SPI_CLPS711X)		+= spi-clps711x.o
+ obj-$(CONFIG_SPI_COLDFIRE_QSPI)		+= spi-coldfire-qspi.o
+ obj-$(CONFIG_SPI_DAVINCI)		+= spi-davinci.o
+ obj-$(CONFIG_SPI_DESIGNWARE)		+= spi-dw.o
+diff --git a/drivers/spi/spi-clps711x.c b/drivers/spi/spi-clps711x.c
+new file mode 100644
+index 0000000..59677eb
+--- /dev/null
++++ b/drivers/spi/spi-clps711x.c
+@@ -0,0 +1,296 @@
++/*
++ *  CLPS711X SPI bus driver
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/init.h>
++#include <linux/gpio.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/spi/spi.h>
++#include <linux/platform_data/spi-clps711x.h>
++
++#include <mach/hardware.h>
++
++#define DRIVER_NAME	"spi-clps711x"
++
++struct spi_clps711x_data {
++	struct completion	done;
++
++	struct clk		*spi_clk;
++	u32			max_speed_hz;
++
++	u8			*tx_buf;
++	u8			*rx_buf;
++	int			count;
++	int			len;
++
++	int			chipselect[0];
++};
++
++static int spi_clps711x_setup(struct spi_device *spi)
++{
++	struct spi_clps711x_data *hw = spi_master_get_devdata(spi->master);
++
++	if (spi->bits_per_word != 8) {
++		dev_err(&spi->dev, "Unsupported master bus width %i\n",
++			spi->bits_per_word);
++		return -EINVAL;
++	}
++
++	/* We are expect that SPI-device is not selected */
++	gpio_direction_output(hw->chipselect[spi->chip_select],
++			      !(spi->mode & SPI_CS_HIGH));
++
++	return 0;
++}
++
++static void spi_clps711x_setup_mode(struct spi_device *spi)
++{
++	/* Setup edge for transfer */
++	if (spi->mode & SPI_CPHA)
++		clps_writew(clps_readw(SYSCON3) | SYSCON3_ADCCKNSEN, SYSCON3);
++	else
++		clps_writew(clps_readw(SYSCON3) & ~SYSCON3_ADCCKNSEN, SYSCON3);
++}
++
++static int spi_clps711x_setup_xfer(struct spi_device *spi,
++				   struct spi_transfer *xfer)
++{
++	u32 speed = xfer->speed_hz ? : spi->max_speed_hz;
++	u8 bpw = xfer->bits_per_word ? : spi->bits_per_word;
++	struct spi_clps711x_data *hw = spi_master_get_devdata(spi->master);
++
++	if (bpw != 8) {
++		dev_err(&spi->dev, "Unsupported master bus width %i\n", bpw);
++		return -EINVAL;
++	}
++
++	/* Setup SPI frequency divider */
++	if (!speed || (speed >= hw->max_speed_hz))
++		clps_writel((clps_readl(SYSCON1) & ~SYSCON1_ADCKSEL_MASK) |
++			    SYSCON1_ADCKSEL(3), SYSCON1);
++	else if (speed >= (hw->max_speed_hz / 2))
++		clps_writel((clps_readl(SYSCON1) & ~SYSCON1_ADCKSEL_MASK) |
++			    SYSCON1_ADCKSEL(2), SYSCON1);
++	else if (speed >= (hw->max_speed_hz / 8))
++		clps_writel((clps_readl(SYSCON1) & ~SYSCON1_ADCKSEL_MASK) |
++			    SYSCON1_ADCKSEL(1), SYSCON1);
++	else
++		clps_writel((clps_readl(SYSCON1) & ~SYSCON1_ADCKSEL_MASK) |
++			    SYSCON1_ADCKSEL(0), SYSCON1);
++
++	return 0;
++}
++
++static int spi_clps711x_transfer_one_message(struct spi_master *master,
++					     struct spi_message *msg)
++{
++	struct spi_clps711x_data *hw = spi_master_get_devdata(master);
++	struct spi_transfer *xfer;
++	int status = 0, cs = hw->chipselect[msg->spi->chip_select];
++	u32 data;
++
++	spi_clps711x_setup_mode(msg->spi);
++
++	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
++		if (spi_clps711x_setup_xfer(msg->spi, xfer)) {
++			status = -EINVAL;
++			goto out_xfr;
++		}
++
++		gpio_set_value(cs, !!(msg->spi->mode & SPI_CS_HIGH));
++
++		INIT_COMPLETION(hw->done);
++
++		hw->count = 0;
++		hw->len = xfer->len;
++		hw->tx_buf = (u8 *)xfer->tx_buf;
++		hw->rx_buf = (u8 *)xfer->rx_buf;
++
++		/* Initiate transfer */
++		data = hw->tx_buf ? hw->tx_buf[hw->count] : 0;
++		clps_writel(data | SYNCIO_FRMLEN(8) | SYNCIO_TXFRMEN, SYNCIO);
++
++		wait_for_completion(&hw->done);
++
++		if (xfer->delay_usecs)
++			udelay(xfer->delay_usecs);
++
++		if (xfer->cs_change ||
++		    list_is_last(&xfer->transfer_list, &msg->transfers))
++			gpio_set_value(cs, !(msg->spi->mode & SPI_CS_HIGH));
++
++		msg->actual_length += xfer->len;
++	}
++
++out_xfr:
++	msg->status = status;
++	spi_finalize_current_message(master);
++
++	return 0;
++}
++
++static irqreturn_t spi_clps711x_isr(int irq, void *dev_id)
++{
++	struct spi_clps711x_data *hw = (struct spi_clps711x_data *)dev_id;
++	u32 data;
++
++	/* Handle RX */
++	data = clps_readb(SYNCIO);
++	if (hw->rx_buf)
++		hw->rx_buf[hw->count] = (u8)data;
++
++	hw->count++;
++
++	/* Handle TX */
++	if (hw->count < hw->len) {
++		data = hw->tx_buf ? hw->tx_buf[hw->count] : 0;
++		clps_writel(data | SYNCIO_FRMLEN(8) | SYNCIO_TXFRMEN, SYNCIO);
++	} else
++		complete(&hw->done);
++
++	return IRQ_HANDLED;
++}
++
++static int __devinit spi_clps711x_probe(struct platform_device *pdev)
++{
++	int i, ret;
++	struct spi_master *master;
++	struct spi_clps711x_data *hw;
++	struct spi_clps711x_pdata *pdata = dev_get_platdata(&pdev->dev);
++
++	if (!pdata) {
++		dev_err(&pdev->dev, "No platform data supplied\n");
++		return -EINVAL;
++	}
++
++	if (pdata->num_chipselect < 1) {
++		dev_err(&pdev->dev, "At least one CS must be defined\n");
++		return -EINVAL;
++	}
++
++	master = spi_alloc_master(&pdev->dev,
++				  sizeof(struct spi_clps711x_data) +
++				  sizeof(int) * pdata->num_chipselect);
++	if (!master) {
++		dev_err(&pdev->dev, "SPI allocating memory error\n");
++		return -ENOMEM;
++	}
++
++	master->bus_num = pdev->id;
++	master->mode_bits = SPI_CPHA | SPI_CS_HIGH;
++	master->num_chipselect = pdata->num_chipselect;
++	master->setup = spi_clps711x_setup;
++	master->transfer_one_message = spi_clps711x_transfer_one_message;
++
++	hw = spi_master_get_devdata(master);
++
++	for (i = 0; i < master->num_chipselect; i++) {
++		hw->chipselect[i] = pdata->chipselect[i];
++		if (!gpio_is_valid(hw->chipselect[i])) {
++			dev_err(&pdev->dev, "Invalid CS GPIO %i\n", i);
++			ret = -EINVAL;
++			goto err_out;
++		}
++		if (gpio_request(hw->chipselect[i], DRIVER_NAME)) {
++			dev_err(&pdev->dev, "Can't get CS GPIO %i\n", i);
++			ret = -EINVAL;
++			goto err_out;
++		}
++	}
++
++	hw->spi_clk = devm_clk_get(&pdev->dev, "spi");
++	if (IS_ERR(hw->spi_clk)) {
++		dev_err(&pdev->dev, "Can't get clocks\n");
++		ret = PTR_ERR(hw->spi_clk);
++		goto err_out;
++	}
++	hw->max_speed_hz = clk_get_rate(hw->spi_clk);
++
++	init_completion(&hw->done);
++	platform_set_drvdata(pdev, master);
++
++	/* Disable extended mode due hardware problems */
++	clps_writew(clps_readw(SYSCON3) & ~SYSCON3_ADCCON, SYSCON3);
++
++	/* Clear possible pending interrupt */
++	clps_readl(SYNCIO);
++
++	ret = devm_request_irq(&pdev->dev, IRQ_SSEOTI, spi_clps711x_isr, 0,
++			       dev_name(&pdev->dev), hw);
++	if (ret) {
++		dev_err(&pdev->dev, "Can't request IRQ\n");
++		clk_put(hw->spi_clk);
++		goto clk_out;
++	}
++
++	ret = spi_register_master(master);
++	if (!ret) {
++		dev_info(&pdev->dev,
++			 "SPI bus driver initialized. Master clock %u Hz\n",
++			 hw->max_speed_hz);
++		return 0;
++	}
++
++	dev_err(&pdev->dev, "Failed to register master\n");
++	devm_free_irq(&pdev->dev, IRQ_SSEOTI, hw);
++
++clk_out:
++	devm_clk_put(&pdev->dev, hw->spi_clk);
++
++err_out:
++	while (--i >= 0)
++		if (gpio_is_valid(hw->chipselect[i]))
++			gpio_free(hw->chipselect[i]);
++
++	platform_set_drvdata(pdev, NULL);
++	spi_master_put(master);
++	kfree(master);
++
++	return ret;
++}
++
++static int __devexit spi_clps711x_remove(struct platform_device *pdev)
++{
++	int i;
++	struct spi_master *master = platform_get_drvdata(pdev);
++	struct spi_clps711x_data *hw = spi_master_get_devdata(master);
++
++	devm_free_irq(&pdev->dev, IRQ_SSEOTI, hw);
++
++	for (i = 0; i < master->num_chipselect; i++)
++		if (gpio_is_valid(hw->chipselect[i]))
++			gpio_free(hw->chipselect[i]);
++
++	devm_clk_put(&pdev->dev, hw->spi_clk);
++	platform_set_drvdata(pdev, NULL);
++	spi_unregister_master(master);
++	kfree(master);
++
++	return 0;
++}
++
++static struct platform_driver clps711x_spi_driver = {
++	.driver	= {
++		.name	= DRIVER_NAME,
++		.owner	= THIS_MODULE,
++	},
++	.probe	= spi_clps711x_probe,
++	.remove	= __devexit_p(spi_clps711x_remove),
++};
++module_platform_driver(clps711x_spi_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
++MODULE_DESCRIPTION("CLPS711X SPI bus driver");
+diff --git a/include/linux/platform_data/spi-clps711x.h b/include/linux/platform_data/spi-clps711x.h
+new file mode 100644
+index 0000000..301956e
+--- /dev/null
++++ b/include/linux/platform_data/spi-clps711x.h
+@@ -0,0 +1,21 @@
++/*
++ *  CLPS711X SPI bus driver definitions
++ *
++ *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef ____LINUX_PLATFORM_DATA_SPI_CLPS711X_H
++#define ____LINUX_PLATFORM_DATA_SPI_CLPS711X_H
++
++/* Board specific platform_data */
++struct spi_clps711x_pdata {
++	int *chipselect;	/* Array of GPIO-numbers */
++	int num_chipselect;	/* Total count of GPIOs */
++};
++
++#endif
+-- 
+1.7.8.6
