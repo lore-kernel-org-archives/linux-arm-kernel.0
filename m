@@ -1,31 +1,76 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Wed, 07 Nov 2012 19:02:36 +0100
-Subject: [PATCH] ARM: EXYNOS: Make s3c_device_i2c0 always use id 0
-In-Reply-To: <4039915.8GOx0SKq2B@amdc1227>
-References: <4039915.8GOx0SKq2B@amdc1227>
-Message-ID: <509AA23C.6000704@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 7 Nov 2012 13:03:40 -0500 (EST)
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <20121107100835.GB23305@mudshark.cambridge.arm.com>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+ <20121106220458.GP28327@n2100.arm.linux.org.uk>
+ <20121107095106.GA23305@mudshark.cambridge.arm.com>
+ <20121107095635.GV28327@n2100.arm.linux.org.uk>
+ <20121107100835.GB23305@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1211071035220.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2012 02:00 PM, Tomasz Figa wrote:
-> This patch removes compatibility definitions added long time ago when
-> clock ids were used instead of devnames that were needed for platforms
-> with only one i2c controller with id -1 (some s3c24xx's).
->
-> Because currently devname field is used for matching device instances to
-> clocks and if no devname is provided (as in clock-s3c2412.c and
-> common-s3c2443.c for i2c clock, both in arch/arm/mach-s3c24xx) the clock
-> is being matched only by name, so s3c_device_i2c0 can always have id 0.
->
-> This patch solves the issue with i2c0 broken on boards where its the
-> only i2c controller used, tested on Origen.
->
-> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+On Wed, 7 Nov 2012, Will Deacon wrote:
 
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> On Wed, Nov 07, 2012 at 09:56:35AM +0000, Russell King - ARM Linux wrote:
+> > On Wed, Nov 07, 2012 at 09:51:06AM +0000, Will Deacon wrote:
+> > > Wouldn't the L2 flush in this case be included with the code that turns off
+> > > caching? For reboot, that's currently done in __sort_restart -- the cache
+> > > flush in setup_mm_for_reboot is just to ensure that the idmap tables are
+> > > visible to the hardware walker iirc.
+> > 
+> > Good point - but it does raise another issue.  Why do we do this flush and
+> > TLB invalidate afterwards in setup_mm_for_reboot() ?  It makes sense if
+> > we change existing page tables, but we don't anymore, we're just switching
+> > them, and cpu_switch_mm() will do whatever's necessary to make the new
+> > page tables visible.  So I think we can get rid of that flusing in there.
+> 
+> Hmm, I'm not sure about that. Looking at cpu_v7_switch_mm (the 2-level
+> version) for example, we set the ASID and then set the new TTBR. There's no
+> flushing of page tables like we get in set_pte and no TLB flushing either.
+> 
+> Now, given that the idmap_pgd is populated as an early_initcall, I really
+> doubt we need that flush_cache_all but the TLB invalidate is surely
+> required?
 
---
+Why wouldn't cpu_switch_mm() take care of that already if that is 
+necessary?  Hmmm, I suppose the asid of the init task isn't associated 
+with the idmap in any way, hence the need for flushing the tlbs.
 
-Thanks,
-Sylwester
+I'd not rely on the early_initcall to assume the new page table is moved 
+out of the cache though.
+
+What about this alternate patch:
+
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index ab88ed4f8e..1ab429761c 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -92,6 +92,9 @@ static int __init init_static_idmap(void)
+ 		(long long)idmap_start, (long long)idmap_end);
+ 	identity_mapping_add(idmap_pgd, idmap_start, idmap_end);
+ 
++	/* Flush L1 for the hardware to see this page table content */
++	flush_cache_louis();
++
+ 	return 0;
+ }
+ early_initcall(init_static_idmap);
+@@ -103,12 +106,12 @@ early_initcall(init_static_idmap);
+  */
+ void setup_mm_for_reboot(void)
+ {
+-	/* Clean and invalidate L1. */
+-	flush_cache_all();
+-
+ 	/* Switch to the identity mapping. */
+ 	cpu_switch_mm(idmap_pgd, &init_mm);
+ 
+-	/* Flush the TLB. */
++	/*
++	 * On ARMv7, the ASID of the init task is not associated with
++	 * this mapping.  TLBs must be flushed.
++	 */
+ 	local_flush_tlb_all();
+ }
