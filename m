@@ -1,37 +1,44 @@
 From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed,  7 Nov 2012 12:40:03 +0100
-Subject: [PATCH RESEND 0/4] spi: sh-msiof: Add DT support
-Message-ID: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
+Date: Wed,  7 Nov 2012 12:40:04 +0100
+Subject: [PATCH 1/4] spi: sh-msiof: Remove unneeded clock name
+In-Reply-To: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
+References: <1352288407-20594-1-git-send-email-hechtb@gmail.com>
+Message-ID: <1352288407-20594-2-git-send-email-hechtb@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch resend from 21st september, this time cover letter included. Added ARM-ML
-and SH-ML as recipients too.
+clk_get() no longer needs a character string for associating the right
+clock as this is done via the device struct now.
 
-The first patch contains a minor cleanup that becomes possible due to older
-changes in the SuperH code.
+Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+---
+ drivers/spi/spi-sh-msiof.c |    6 ++----
+ 1 files changed, 2 insertions(+), 4 deletions(-)
 
-In the 2nd patch we add the SH-Mobile chips as possible architecture requirement
-for the MSIOF driver.
-
-Then we come to the core of the patchset: DeviceTree support for sh-msiof in
-patch 3 and patch 4.
-
-There are minimal changes to the first publication to the patchset like changing
-a comment string, so I just resend it as v1 again as there are no comments to the
-original patchset.
-
-Bastian Hecht (4):
-  spi: sh-msiof: Remove unneeded clock name
-  spi: Add SH Mobile series as dependency to MSIOF controller
-  spi: sh-msiof: Add device tree parsing to driver
-  devicetree: Add Renesas SH Mobile MSIOF spi controller binding doc
-
- Documentation/devicetree/bindings/spi/sh-msiof.txt |   12 ++++
- drivers/spi/Kconfig                                |    4 +-
- drivers/spi/spi-sh-msiof.c                         |   60 ++++++++++++++++++--
- 3 files changed, 69 insertions(+), 7 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/spi/sh-msiof.txt
-
+diff --git a/drivers/spi/spi-sh-msiof.c b/drivers/spi/spi-sh-msiof.c
+index 1f466bc..96358d0 100644
+--- a/drivers/spi/spi-sh-msiof.c
++++ b/drivers/spi/spi-sh-msiof.c
+@@ -597,7 +597,6 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
+ 	struct resource	*r;
+ 	struct spi_master *master;
+ 	struct sh_msiof_spi_priv *p;
+-	char clk_name[16];
+ 	int i;
+ 	int ret;
+ 
+@@ -614,10 +613,9 @@ static int sh_msiof_spi_probe(struct platform_device *pdev)
+ 	p->info = pdev->dev.platform_data;
+ 	init_completion(&p->done);
+ 
+-	snprintf(clk_name, sizeof(clk_name), "msiof%d", pdev->id);
+-	p->clk = clk_get(&pdev->dev, clk_name);
++	p->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(p->clk)) {
+-		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
++		dev_err(&pdev->dev, "cannot get clock\n");
+ 		ret = PTR_ERR(p->clk);
+ 		goto err1;
+ 	}
 -- 
 1.7.5.4
