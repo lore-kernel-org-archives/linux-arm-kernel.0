@@ -1,34 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 7 Nov 2012 10:08:35 +0000
-Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
-In-Reply-To: <20121107095635.GV28327@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
- <20121106220458.GP28327@n2100.arm.linux.org.uk>
- <20121107095106.GA23305@mudshark.cambridge.arm.com>
- <20121107095635.GV28327@n2100.arm.linux.org.uk>
-Message-ID: <20121107100835.GB23305@mudshark.cambridge.arm.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 7 Nov 2012 12:11:33 +0200
+Subject: [PATCHv9 2/8] ARM: OMAP4: PM: add errata support
+In-Reply-To: <87d2zq761g.fsf@deeprootsystems.com>
+References: <1350552010-28760-1-git-send-email-t-kristo@ti.com>
+ <1350552010-28760-3-git-send-email-t-kristo@ti.com>
+ <87zk2vekye.fsf@deeprootsystems.com>  <87d2zq761g.fsf@deeprootsystems.com>
+Message-ID: <1352283093.2406.2.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 09:56:35AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 07, 2012 at 09:51:06AM +0000, Will Deacon wrote:
-> > Wouldn't the L2 flush in this case be included with the code that turns off
-> > caching? For reboot, that's currently done in __sort_restart -- the cache
-> > flush in setup_mm_for_reboot is just to ensure that the idmap tables are
-> > visible to the hardware walker iirc.
+On Tue, 2012-11-06 at 13:52 -0800, Kevin Hilman wrote:
+> Kevin Hilman <khilman@deeprootsystems.com> writes:
 > 
-> Good point - but it does raise another issue.  Why do we do this flush and
-> TLB invalidate afterwards in setup_mm_for_reboot() ?  It makes sense if
-> we change existing page tables, but we don't anymore, we're just switching
-> them, and cpu_switch_mm() will do whatever's necessary to make the new
-> page tables visible.  So I think we can get rid of that flusing in there.
+> > Tero Kristo <t-kristo@ti.com> writes:
+> >
+> >> Added similar PM errata flag support as omap3 has. This should be used
+> >> in similar manner, set the flags during init time, and check the flag
+> >> values during runtime.
+> >>
+> >> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >
+> > These allow basic suspend/resume to work on 4460/Panda-ES, so I'm going
+> > to queue these up as fixes.
+> >
+> > However, since they're not technically regressions, it may be too late
+> > to get them in for v3.7, but they'll be in for v3.8 for sure.
+> 
+> To be more specific, I'm planning on queuing patches 2, 3 and 6 as fixes
+> for v3.8 (branch: for_3.8/fixes/pm).
+> 
+> Paul has already queued patch 1, so that leaves patches 4, 5, 7 & 8.
+> 
+> I think we can get this series in for v3.8 if we drop the functional
+> pwrst dependency.  To test, I dropped patches 5 & 7, and tested on
+> 4430/Panda and 4460/Panda-ES (with latest mainline u-boot) and CORE
+> is hitting retention just fine in suspend.
+> 
+> If you can respin patch 8 based on the feedback from Felipe, I'll queue
+> up patches 4 & 8 for v3.8 as well, then we'll at least have CORE
+> retention in suspend in mainline.  Then, the  rest can be done when
+> functional pwrsts are ready.
 
-Hmm, I'm not sure about that. Looking at cpu_v7_switch_mm (the 2-level
-version) for example, we set the ASID and then set the new TTBR. There's no
-flushing of page tables like we get in set_pte and no TLB flushing either.
+Yea, I can do that on Friday once I get back home, I am travelling
+currently.
 
-Now, given that the idmap_pgd is populated as an early_initcall, I really
-doubt we need that flush_cache_all but the TLB invalidate is surely
-required?
+> 
+> Kevin
+> 
+> P.S. do you have any patches to add any OMAP4 CPUidle support for CORE
+>      retention?
 
-Will
+No, cpuidle core ret should work with this set already. Not sure what
+happens without the func pwrst patches, I have not tested with that
+setup lately. I can try this out on Friday as well.
+
+-Tero
