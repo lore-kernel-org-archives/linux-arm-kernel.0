@@ -1,29 +1,26 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Nov 2012 10:22:52 -0800
-Subject: [GIT PULL] ARM: OMAP: second set of PRCM cleanups for 3.8
-In-Reply-To: <alpine.DEB.2.00.1211071819160.20704@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
- <20121106220833.GQ6801@atomide.com>
- <alpine.DEB.2.00.1211070150100.8758@utopia.booyaka.com>
- <20121107015841.GC6801@atomide.com>
- <alpine.DEB.2.00.1211070227500.8758@utopia.booyaka.com>
- <alpine.DEB.2.00.1211071819160.20704@utopia.booyaka.com>
-Message-ID: <20121107182252.GG6801@atomide.com>
+Date: Wed, 7 Nov 2012 10:24:05 -0800
+Subject: [PATCH v4 0/3] ocp2scp: add non-dt support
+In-Reply-To: <1351844088-27059-1-git-send-email-kishon@ti.com>
+References: <1351844088-27059-1-git-send-email-kishon@ti.com>
+Message-ID: <20121107182405.GH6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [121107 10:21]:
-> On Wed, 7 Nov 2012, Paul Walmsley wrote:
+* Kishon Vijay Abraham I <kishon@ti.com> [121102 01:16]:
+> This patch series allows ocp2scp driver to create its child devices
+> from the platform data.
 > 
-> > If you're asking for a test build of the base commit, 
-> > 7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33, I just kicked off a test build 
-> > of that; will post when done.
+> In omap platforms, usb phy is connected to ocp2scp and usb phy is needed
+> for MUSB to be functional. When ocp2scp driver was added, it had only dt
+> support which means it wont create usb phy devices for non-dt boot.
 > 
-> Just confirmed that this one passes all build tests here.
+> This patch series adds non-dt support to ocp2scp and this series is needed
+> for getting MUSB functional in non-dt boot.
 
-OK good to know so no need to merge in anything into
-cleanup-prcm before pulling in your part2 then.
+Thanks I've pushed these into omap-for-v3.7-rc4/musb-regression with
+updated description to describe the regression for the -rc cycle.
 
-Thanks,
+Regards,
 
 Tony
