@@ -1,59 +1,46 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 07 Nov 2012 16:34:16 +0100
-Subject: [PATCH] ARM: dts: exynos4: Add support for Exynos4x12 SoCs
-In-Reply-To: <0c4501cdbc8f$5336add0$f9a40970$%kim@samsung.com>
-References: <1351089359-7318-1-git-send-email-t.figa@samsung.com>
- <0c4501cdbc8f$5336add0$f9a40970$%kim@samsung.com>
-Message-ID: <3301517.VQVR99BHPc@amdc1227>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 7 Nov 2012 15:35:30 +0000
+Subject: [RFC PATCH 1/4] ARM: kernel: add device tree init map function
+In-Reply-To: <20121107120052.GD17831@e102568-lin.cambridge.arm.com>
+References: <1350393709-23546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1350393709-23546-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121106215044.GB21764@mudshark.cambridge.arm.com>
+ <20121107102349.GC17831@e102568-lin.cambridge.arm.com>
+ <20121107110542.GH23305@mudshark.cambridge.arm.com>
+ <20121107120052.GD17831@e102568-lin.cambridge.arm.com>
+Message-ID: <20121107153529.GT23305@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kgene,
+On Wed, Nov 07, 2012 at 12:00:52PM +0000, Lorenzo Pieralisi wrote:
+> On Wed, Nov 07, 2012 at 11:05:42AM +0000, Will Deacon wrote:
+> > No, I was thinking about what happens if the devicetree doesn't contain an
+> > mpidr property that matches the boot cpu. In this case, we will fail to
+> > assign logical ID 0, right? If this happens, we should complain about an
+> > invalid devicetree and try to fall back on the logical_map that was
+> > generated earlier on.
+> 
+> Good point. What I could do, I can assign the MPIDR of the boot CPU to
+> the logical index 0 before even starting to parse the DT (that's what it
+> is done in smp_setup_processor_id(), with a couple of twists). Then, if I
+> find a node that matches the boot CPU mpidr I just skip over it. This
+> way the boot CPU MPIDR will always be correct the only difference with
+> the current approach will be that instead of generating the secondaries
+> MPIDRs we will read them from DT.
 
-On Wednesday 07 of November 2012 11:26:42 Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> > Tomasz Figa wrote:
-> > > This patch adds device tree sources for Exynos4x12 SoC series
-> > > (currently Exynos4212 and Exynos4412) and enables mach-exynos4-dt
-> > > to support these SoCs.
-> > > 
-> > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/exynos4212.dtsi      | 28
-> 
-> ++++++++++++++++++++++++++++
-> 
-> > >  arch/arm/boot/dts/exynos4412.dtsi      | 28
-> 
-> ++++++++++++++++++++++++++++
-> 
-> > >  arch/arm/boot/dts/exynos4x12.dtsi      | 31
-> > > 
-> > > +++++++++++++++++++++++++++++++
-> > > 
-> > >  arch/arm/mach-exynos/mach-exynos4-dt.c |  2 ++
-> > >  4 files changed, 89 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/exynos4212.dtsi
-> > >  create mode 100644 arch/arm/boot/dts/exynos4412.dtsi
-> > >  create mode 100644 arch/arm/boot/dts/exynos4x12.dtsi
-> > 
-> > Looks good to me, applied.
-> 
-> [...]
-> 
-> > +/include/ "exynos4x12-pinctrl.dtsi"
-> 
-> BTW, I think, above line should be added when exynos4x12-pinctrl patches
-> applied.
+That should work, although I'm not sure why you can't just give up
+altogether and use the initial mapping from smp_setup_processor_id?
 
-Yes, you are right. Seems like a rebase error on my side. Can you fix it 
-or should I send a fixed version?
+> The problem with this approach is that if we need a pointer (phandle) to the
+> boot CPU DT node through the MPIDR and the boot CPU node is botched or missing
+> we still behave as if the DT CPU nodes were ok.
 
+Does any code do this? Wouldn't it be much better to lookup logical CPU 0 if
+you want to find anything out about the boot CPU?
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+> I think I'd better stick a warning condition in there if the boot CPU
+> node is not present or botched (from a MPIDR perspective at least).
+
+Definitely!
+
+Will
