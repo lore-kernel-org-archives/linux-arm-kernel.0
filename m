@@ -1,33 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 7 Nov 2012 08:09:52 +0100
-Subject: [PATCH v3 2/4] arm: bcm2835: convert to the irqchip infrastructure
-In-Reply-To: <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
-References: <1351462748-5224-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20121106165639.GF1254@beefymiracle.amer.corp.natinst.com>
-Message-ID: <20121107080952.0594f3ef@skate>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Wed, 07 Nov 2012 16:18:38 +0900
+Subject: [PATCH 00/10] serial: sh-sci fixes - console PM, SCIFB,
+ SMP lockup, etc.
+In-Reply-To: <509A0658.1010503@renesas.com>
+References: <509A0658.1010503@renesas.com>
+Message-ID: <509A0B4E.1030801@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Josh,
+On 11/7/2012 3:57 PM, Shinya Kuribayashi wrote:
+> Hi Paul and serial forks,
+[...]
+> Takashi YOSHII (4):
+>       serial: sh-sci: fix condition test to set SCBRR
+>       serial: sh-sci: support lower baud rate
+>       serial: sh-sci: mask SCTFDR/RFDR according to fifosize
+>       serial: sh-sci: fix common SCIFB regmap definition
+> 
+> Teppei Kamijou (1):
+>       serial: sh-sci: console runtime PM support (revisit)
+> 
+>  drivers/tty/serial/sh-sci.c | 140 ++++++++++++++++++--------------------------
+>  1 file changed, 56 insertions(+), 84 deletions(-)
 
-On Tue, 6 Nov 2012 10:56:39 -0600, Josh Cartwright wrote:
+Oops, I forgot to append proper From: author lines in five commits
+(patch 04/10 to 09/10).  Didn't mean to supersede your authoship.
 
-> Could it make sense here to kill the irqchip.h private export, and
-> instead rely on the linker to stitch together the builtin irqchip's
-> of_device_id tables?
-
-Yes, using yet another ELF section is another option to do that. I just
-wasn't sure it was worth the effort for now, but if it is seen as
-necessary, I can certainly go ahead and implement this.
-
-I am at ELCE at the moment, so quite busy with talks, discussions...
-and drinks. I'll get back to this when I get back from ELCE.
-
-Thanks for your suggestion,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I'd respin the patchset later, waiting for some feedback.
+--
+Shinya Kuribayashi
+Renesas Electronics
