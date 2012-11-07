@@ -1,33 +1,61 @@
-From: eric@eukrea.com (Eric =?ISO-8859-1?B?QuluYXJk?=)
-Date: Wed, 7 Nov 2012 16:50:26 +0100
-Subject: [PATCH 2/5] ARM: AT91SAM9G45: same platform data structure for
- all crypto peripherals
-In-Reply-To: <20121107152615.GD4576@game.jcrosoft.org>
-References: <1352219544-30416-1-git-send-email-nicolas@eukrea.com>
- <20121107152615.GD4576@game.jcrosoft.org>
-Message-ID: <20121107165026.4e64422f@eb-e6520>
+From: aletes.xgr@gmail.com (Alexandre Pereira da Silva)
+Date: Wed, 7 Nov 2012 13:55:49 -0200
+Subject: [PATCH] lpc32xx: Add the motor PWM clock
+In-Reply-To: <1352303237-16052-1-git-send-email-alban.bedel@avionic-design.de>
+References: <1352303237-16052-1-git-send-email-alban.bedel@avionic-design.de>
+Message-ID: <CAAAP30FjE0QQSJaRN26M-1JdDCXCByK3UNkenBhoN3=dX1-Bbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+On Wed, Nov 7, 2012 at 1:47 PM, Alban Bedel
+<alban.bedel@avionic-design.de> wrote:
+> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
 
-Le Wed, 7 Nov 2012 16:26:15 +0100,
-Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> a ?crit :
-> > @@ -1931,9 +1931,9 @@ static struct platform_device at91sam9g45_aes_device = {
-> >  static void __init at91_add_device_aes(void)
-> >  {
-> >  	struct at_dma_slave	*atslave;
-> > -	struct aes_dma_data	*alt_atslave;
-> > +	struct crypto_dma_data	*alt_atslave;
-> >  
-> > -	alt_atslave = kzalloc(sizeof(struct aes_dma_data), GFP_KERNEL);
-> > +	alt_atslave = kzalloc(sizeof(struct crypto_dma_data), GFP_KERNEL);
-> we do not check the result of kzalloc ouch
-> 
-> and why we allocate it?
-> 
-for both remarks : that's the way it's done in at91_add_device_mci since
-75305d768d296a07fd02df9af3e5de326df1c72e
-A v2 will follow (and also a fix for at91_add_device_mci).
+Acked-by: Alexandre Pereira da Silva <aletes.xgr@gmail.com>
 
-Eric
+> ---
+>  arch/arm/mach-lpc32xx/clock.c                 |    8 ++++++++
+>  arch/arm/mach-lpc32xx/include/mach/platform.h |    1 +
+>  2 files changed, 9 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-lpc32xx/clock.c b/arch/arm/mach-lpc32xx/clock.c
+> index f48c2e9..dd5d6f5 100644
+> --- a/arch/arm/mach-lpc32xx/clock.c
+> +++ b/arch/arm/mach-lpc32xx/clock.c
+> @@ -585,6 +585,13 @@ static struct clk clk_timer3 = {
+>         .enable_mask    = LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN,
+>         .get_rate       = local_return_parent_rate,
+>  };
+> +static struct clk clk_mpwm = {
+> +       .parent         = &clk_pclk,
+> +       .enable         = local_onoff_enable,
+> +       .enable_reg     = LPC32XX_CLKPWR_TIMERS_PWMS_CLK_CTRL_1,
+> +       .enable_mask    = LPC32XX_CLKPWR_TMRPWMCLK_MPWM_EN,
+> +       .get_rate       = local_return_parent_rate,
+> +};
+>  static struct clk clk_wdt = {
+>         .parent         = &clk_pclk,
+>         .enable         = local_onoff_enable,
+> @@ -1202,6 +1209,7 @@ static struct clk_lookup lookups[] = {
+>         CLKDEV_INIT("pl08xdmac", NULL, &clk_dma),
+>         CLKDEV_INIT("4003c000.watchdog", NULL, &clk_wdt),
+>         CLKDEV_INIT("4005c000.pwm", NULL, &clk_pwm),
+> +       CLKDEV_INIT("400e8000.mpwm", NULL, &clk_mpwm),
+>         CLKDEV_INIT(NULL, "uart3_ck", &clk_uart3),
+>         CLKDEV_INIT(NULL, "uart4_ck", &clk_uart4),
+>         CLKDEV_INIT(NULL, "uart5_ck", &clk_uart5),
+> diff --git a/arch/arm/mach-lpc32xx/include/mach/platform.h b/arch/arm/mach-lpc32xx/include/mach/platform.h
+> index acc4aab..b5612a1 100644
+> --- a/arch/arm/mach-lpc32xx/include/mach/platform.h
+> +++ b/arch/arm/mach-lpc32xx/include/mach/platform.h
+> @@ -515,6 +515,7 @@
+>  /*
+>   * clkpwr_timers_pwms_clk_ctrl_1 register definitions
+>   */
+> +#define LPC32XX_CLKPWR_TMRPWMCLK_MPWM_EN       0x40
+>  #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER3_EN     0x20
+>  #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER2_EN     0x10
+>  #define LPC32XX_CLKPWR_TMRPWMCLK_TIMER1_EN     0x08
+> --
+> 1.7.0.4
+>
