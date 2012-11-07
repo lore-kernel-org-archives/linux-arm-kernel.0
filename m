@@ -1,202 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Nov 2012 14:27:39 -0800
-Subject: [PATCH v4 2/9] pinctrl: single: support gpio request and free
-In-Reply-To: <1352301582-12244-3-git-send-email-haojian.zhuang@gmail.com>
-References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
- <1352301582-12244-3-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20121107222738.GR6801@atomide.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 7 Nov 2012 16:27:52 -0600
+Subject: [PATCH V2 00/14] ARM: OMAP: DMTIMER fixes
+In-Reply-To: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
+References: <1352314890-22224-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <509AE068.7040401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
-> Marvell's PXA/MMP silicon also match the behavior of pinctrl-single.
-> Each pin binds to one register. A lot of pins could be configured
-> as gpio.
-> 
-> Now add these properties in below.
-> <gpio range phandle>:
-> 	include "pinctrl-single,gpio" & "pinctrl,gpio-func" properties.
-> 
-> 	pinctrl-single,gpio: <gpio base, npins in range, register offset>
-> 
-> 	pinctrl-single,gpio-func: <gpio function value in mux>
-> 
-> pinctrl-single,gpio-ranges: phandle list of gpio range array
+Jon,
 
-This one looks OK to me now:
+On Wednesday 07 November 2012 01:01 PM, Jon Hunter wrote:
+> This series includes several fixes for the OMAP DMTIMER driver. This is
+> based upon 3.7-rc4 with the two series adding device-tree support for
+> DMTIMERs [1] and the 32kHz Counter [2]
+>
+> Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda.
+> Testing includes ...
+> 1. Booting kernel on above boards
+> 2. Set date and ensuring time of day is correct after 24 hours
+> 3. Checking the timer counter is incrementing when configuring and starting
+>     a timer
+> 4. Checking the timer overflow interrupt when timer expires.
+> 5. Using different clock sources to operate the timer with.
+> 6. Running a loop test overnight that continually runs test #3 and #4 for
+>     each available timer
+>
+> This has also been boot tested on the AM335x Beagle Bone.
+>
+> [1] http://marc.info/?l=linux-omap&m=135065875808614&w=2
+> [2] http://marc.info/?l=linux-omap&m=135119308123513&w=2
+>
+> Jon Hunter (14):
+>    ARM: OMAP: Add DMTIMER definitions for posted mode
+>    ARM: OMAP2+: Disable posted mode for the clocksource timer
+>    ARM: OMAP3+: Implement timer workaround for errata i103 and i767
+>    ARM: OMAP: Fix timer posted mode support
+>    ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
+>    ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
+>    ARM: OMAP2+: Don't use __omap_dm_timer_reset()
+>    ARM: OMAP: Fix dmtimer reset for timer1
+>    ARM: OMAP: Don't restore of DMTIMER TISTAT register
+>    ARM: OMAP: Don't restore DMTIMER interrupt status register
+>    ARM: OMAP: Fix spurious interrupts when using timer match feature
+>    ARM: OMAP: Add dmtimer interrupt disable function
+>    ARM: OMAP: Remove unnecessary call to clk_get()
+>    ARM: OMAP: Remove __omap_dm_timer_set_source function
+>
+>   arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   15 ++-
+>   arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   41 +++---
+>   arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +
+>   arch/arm/mach-omap2/timer.c                        |   73 ++++++++---
+>   arch/arm/plat-omap/dmtimer.c                       |  132 +++++++++++++++-----
+>   arch/arm/plat-omap/include/plat/dmtimer.h          |   47 ++++---
+>   6 files changed, 215 insertions(+), 97 deletions(-)
+>
+Nice work. Apart from some minor comments, this series looks pretty
+good to me.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
-> ---
->  drivers/pinctrl/pinctrl-single.c |  100 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 98 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index 726a729..a7c5fdd 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -30,6 +30,7 @@
->  #define PCS_MUX_BITS_NAME		"pinctrl-single,bits"
->  #define PCS_REG_NAME_LEN		((sizeof(unsigned long) * 2) + 1)
->  #define PCS_OFF_DISABLED		~0U
-> +#define PCS_MAX_GPIO_VALUES		3
->  
->  /**
->   * struct pcs_pingroup - pingroups for a function
-> @@ -77,6 +78,18 @@ struct pcs_function {
->  };
->  
->  /**
-> + * struct pcs_gpio_range - pinctrl gpio range
-> + * @range:	subrange of the GPIO number space
-> + * @gpio_func:	gpio function value in the pinmux register
-> + * @func_en:	need to handle gpio function in the pinmux register
-> + */
-> +struct pcs_gpio_range {
-> +	struct pinctrl_gpio_range range;
-> +	int gpio_func;
-> +	unsigned func_en:1;
-> +};
-> +
-> +/**
->   * struct pcs_data - wrapper for data needed by pinctrl framework
->   * @pa:		pindesc array
->   * @cur:	index to current element
-> @@ -123,8 +136,10 @@ struct pcs_name {
->   * @ftree:	function index radix tree
->   * @pingroups:	list of pingroups
->   * @functions:	list of functions
-> + * @ranges:	list of gpio ranges
->   * @ngroups:	number of pingroups
->   * @nfuncs:	number of functions
-> + * @nranges:	number of gpio ranges
->   * @desc:	pin controller descriptor
->   * @read:	register read function to use
->   * @write:	register write function to use
-> @@ -148,8 +163,10 @@ struct pcs_device {
->  	struct radix_tree_root ftree;
->  	struct list_head pingroups;
->  	struct list_head functions;
-> +	struct list_head ranges;
->  	unsigned ngroups;
->  	unsigned nfuncs;
-> +	unsigned nranges;
->  	struct pinctrl_desc desc;
->  	unsigned (*read)(void __iomem *reg);
->  	void (*write)(unsigned val, void __iomem *reg);
-> @@ -403,9 +420,27 @@ static void pcs_disable(struct pinctrl_dev *pctldev, unsigned fselector,
->  }
->  
->  static int pcs_request_gpio(struct pinctrl_dev *pctldev,
-> -			struct pinctrl_gpio_range *range, unsigned offset)
-> +			    struct pinctrl_gpio_range *range, unsigned pin)
->  {
-> -	return -ENOTSUPP;
-> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-> +	struct pcs_gpio_range *gpio = NULL;
-> +	int end, mux_bytes;
-> +	unsigned data;
-> +
-> +	gpio = container_of(range, struct pcs_gpio_range, range);
-> +	if (!gpio->func_en)
-> +		return -ENOTSUPP;
-> +	end = range->pin_base + range->npins - 1;
-> +	if (pin < range->pin_base || pin > end) {
-> +		dev_err(pctldev->dev, "pin %d isn't in the range of "
-> +			"%d to %d\n", pin, range->pin_base, end);
-> +		return -EINVAL;
-> +	}
-> +	mux_bytes = pcs->width / BITS_PER_BYTE;
-> +	data = pcs->read(pcs->base + pin * mux_bytes) & ~pcs->fmask;
-> +	data |= gpio->gpio_func;
-> +	pcs->write(data, pcs->base + pin * mux_bytes);
-> +	return 0;
->  }
->  
->  static struct pinmux_ops pcs_pinmux_ops = {
-> @@ -879,6 +914,62 @@ static void pcs_free_resources(struct pcs_device *pcs)
->  
->  static struct of_device_id pcs_of_match[];
->  
-> +static int __devinit pcs_add_gpio_range(struct device_node *node,
-> +					struct pcs_device *pcs)
-> +{
-> +	struct pcs_gpio_range *gpio;
-> +	struct device_node *np;
-> +	const __be32 *list;
-> +	const char list_name[] = "pinctrl-single,gpio-ranges";
-> +	const char name[] = "pinctrl-single";
-> +	u32 gpiores[PCS_MAX_GPIO_VALUES];
-> +	int ret, size, i, mux_bytes = 0;
-> +
-> +	list = of_get_property(node, list_name, &size);
-> +	if (!list)
-> +		return 0;
-> +	size = size / sizeof(*list);
-> +	for (i = 0; i < size; i++) {
-> +		np = of_parse_phandle(node, list_name, i);
-> +		memset(gpiores, 0, sizeof(u32) * PCS_MAX_GPIO_VALUES);
-> +		ret = of_property_read_u32_array(np, "pinctrl-single,gpio",
-> +						 gpiores, PCS_MAX_GPIO_VALUES);
-> +		if (ret < 0)
-> +			return -ENOENT;
-> +		gpio = devm_kzalloc(pcs->dev, sizeof(*gpio), GFP_KERNEL);
-> +		if (!gpio) {
-> +			dev_err(pcs->dev, "failed to allocate pcs gpio\n");
-> +			return -ENOMEM;
-> +		}
-> +		gpio->range.id = i;
-> +		gpio->range.base = gpiores[0];
-> +		gpio->range.npins = gpiores[1];
-> +		gpio->range.name = devm_kzalloc(pcs->dev, sizeof(name),
-> +						GFP_KERNEL);
-> +		if (!gpio->range.name) {
-> +			dev_err(pcs->dev, "failed to allocate range name\n");
-> +			return -ENOMEM;
-> +		}
-> +		memcpy(&gpio->range.name, name, sizeof(name));
-> +		mux_bytes = pcs->width / BITS_PER_BYTE;
-> +		gpio->range.pin_base = gpiores[2] / mux_bytes;
-> +		memset(gpiores, 0, sizeof(u32) * PCS_MAX_GPIO_VALUES);
-> +		ret = of_property_read_u32(np, "pinctrl-single,gpio-func",
-> +					   &gpio->gpio_func);
-> +		if (ret < 0)
-> +			return -ENOENT;
-> +		gpio->func_en = 1;
-> +
-> +		mutex_lock(&pcs->mutex);
-> +		list_add_tail(&gpio->range.node, &pcs->ranges);
-> +		pcs->nranges++;
-> +		mutex_unlock(&pcs->mutex);
-> +
-> +		pinctrl_add_gpio_range(pcs->pctl, &gpio->range);
-> +	}
-> +	return 0;
-> +}
-> +
->  static int __devinit pcs_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> @@ -900,6 +991,7 @@ static int __devinit pcs_probe(struct platform_device *pdev)
->  	mutex_init(&pcs->mutex);
->  	INIT_LIST_HEAD(&pcs->pingroups);
->  	INIT_LIST_HEAD(&pcs->functions);
-> +	INIT_LIST_HEAD(&pcs->ranges);
->  
->  	PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
->  			 "register width not specified\n");
-> @@ -975,6 +1067,10 @@ static int __devinit pcs_probe(struct platform_device *pdev)
->  		goto free;
->  	}
->  
-> +	ret = pcs_add_gpio_range(np, pcs);
-> +	if (ret < 0)
-> +		goto free;
-> +
->  	dev_info(pcs->dev, "%i pins at pa %p size %u\n",
->  		 pcs->desc.npins, pcs->base, pcs->size);
->  
-> -- 
-> 1.7.10.4
-> 
+Feel free to add my ack for entire series.
+
+Regards
+Santosh
