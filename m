@@ -1,77 +1,56 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 7 Nov 2012 20:42:10 +0800
-Subject: [PATCH 3/3] dmaengine: sirf: enable the driver support new
- SiRFmarco SoC
-In-Reply-To: <CAGsJ_4y=sccFizQfwO-mx5GcvkgR9nWqksmuwrvSYpL+N5U1wg@mail.gmail.com>
-References: <1348734996-20086-1-git-send-email-Barry.Song@csr.com>
- <1351076581.5263.56.camel@vkoul-udesk3>
- <CAGsJ_4yY6YYKb+g4k7BcL_SyyBN9xYCwxRLX6rN5_afroK0e_g@mail.gmail.com>
- <1351138901.5263.70.camel@vkoul-udesk3>
- <CAGsJ_4y=sccFizQfwO-mx5GcvkgR9nWqksmuwrvSYpL+N5U1wg@mail.gmail.com>
-Message-ID: <CAGsJ_4wZ0cCP+aPYeEDXhDBF-vQPtHD1u53SpGNGV6AFXHMygg@mail.gmail.com>
+Date: Wed, 7 Nov 2012 20:49:07 +0800
+Subject: [PATCH] DMAEngine: add dmaengine_prep_interleaved_dma wrapper for
+ interleaved api
+In-Reply-To: <1352209637-8841-1-git-send-email-21cnbao@gmail.com>
+References: <1352209637-8841-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CAGsJ_4xWf+0-Zc0EWPva1tzq74NsT8KC+1SYArZNpBC05PC1+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/10/25 Barry Song <21cnbao@gmail.com>
->
-> 2012/10/25 Vinod Koul <vkoul@infradead.org>:
-> > On Wed, 2012-10-24 at 19:59 +0800, Barry Song wrote:
-> >> Hi Vinod,
-> >> Thanks a lot!
-> > Please dont top post.
->
-> well. saying hello is an exception :-)
->
-> >>
-> >> 2012/10/24 Vinod Koul <vkoul@infradead.org>
-> >> >
-> >> > On Thu, 2012-09-27 at 16:36 +0800, Barry Song wrote:
-> >> > > From: Barry Song <Baohua.Song@csr.com>
-> >> > >
-> >> > > The driver supports old up SiRFprimaII SoCs, this patch makes it
-> >> > > support
-> >> > > the new SiRFmarco as well.
-> >> > > SiRFmarco, as a SMP SoC, adds new DMA_INT_EN_CLR and
-> >> > > DMA_CH_LOOP_CTRL_CLR
-> >> > > registers, to disable IRQ/Channel, we should write 1 to the
-> >> > > corresponding
-> >> > > bit in the two CLEAR register.
-> >> > >
-> >> > > Tested on SiRFmarco using SPI driver:
-> >> > >     $ /mnt/spidev-sirftest -D /dev/spidev32766.0
-> >> > >     spi mode: 0
-> >> > >     bits per word: 8
-> >> > >     max speed: 500000 Hz (500 KHz)
-> >> > >
-> >> > >     00 00 00 00 00 00
-> >> > >     00 00 00 00 00 00
-> >> > >     00 00 00 00 00 00
-> >> > >     00 00 00 00 00 00
-> >> > >     00 00 00 00 00 00
-> >> > >     00 00 00 00 00 00
-> >> > >     00 00 00 00
-> >> > >
-> >> > >     $ cat /proc/interrupts
-> >> > >                CPU0       CPU1
-> >> > >      32:       1593          0       GIC  sirfsoc_timer0
-> >> > >      33:          0       3533       GIC  sirfsoc_timer1
-> >> > >      44:          0          0       GIC  sirfsoc_dma
-> >> > >      45:         16          0       GIC  sirfsoc_dma
-> >> > >      47:          6          0       GIC  sirfsoc_spi
-> >> > >      50:       5654          0       GIC  sirfsoc-uart
-> >> > >      ...
-> >> > >
-> >> > > Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> >> > > ---
-> > I tried applying this and it failed for me. Can you please respin this
-> > on my next and send again.
+sorry for the mis-operation of missing Vinod.
+attached this patch too.
 
-done. at:
-http://www.spinics.net/lists/arm-kernel/msg204504.html
-
-> >
-> > --
-> > Vinod Koul
-> > Intel Corp.
+2012/11/6 Barry Song <21cnbao@gmail.com>:
+> From: Barry Song <Baohua.Song@csr.com>
 >
-> -barry
+> commit b14dab792dee(DMAEngine: Define interleaved transfer request api) adds
+> interleaved request api, this patch adds the dmaengine_prep_interleaved_dma
+> just like we have dmaengine_prep_ for other modes to avoid drivers call:
+> xxx_chan->device->device_prep_interleaved_dma().
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Cc: Jassi Brar <jaswinder.singh@linaro.org>
+> ---
+>  include/linux/dmaengine.h |    7 +++++++
+>  1 files changed, 7 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+> index d3201e4..135bbb5 100644
+> --- a/include/linux/dmaengine.h
+> +++ b/include/linux/dmaengine.h
+> @@ -660,6 +660,13 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_cyclic(
+>                                                 period_len, dir, flags, NULL);
+>  }
+>
+> +static inline struct dma_async_tx_descriptor *dmaengine_prep_interleaved_dma(
+> +               struct dma_chan *chan, struct dma_interleaved_template *xt,
+> +               unsigned long flags)
+> +{
+> +       return chan->device->device_prep_interleaved_dma(chan, xt, flags);
+> +}
+> +
+>  static inline int dmaengine_terminate_all(struct dma_chan *chan)
+>  {
+>         return dmaengine_device_control(chan, DMA_TERMINATE_ALL, 0);
+> --
+> 1.7.1
+
+-barry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-DMAEngine-add-dmaengine_prep_interleaved_dma-wrapper.patch
+Type: application/octet-stream
+Size: 1388 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121107/cae286bf/attachment-0001.obj>
