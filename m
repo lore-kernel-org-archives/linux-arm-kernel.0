@@ -1,61 +1,51 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Thu, 8 Nov 2012 13:15:10 +0000
-Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
- for AM33XX
-References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
- <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
- <5095037A.2020503@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEA0E@DBDE01.ent.ti.com>
- <5095165E.10403@deeprootsystems.com>
- <B5906170F1614E41A8A28DE3B8D121433EBFEB57@DBDE01.ent.ti.com>
- <87pq3s7wro.fsf@deeprootsystems.com> <509836BA.5030507@ti.com>
-Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC0B48E@DBDE01.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Nov 2012 13:40:54 +0000
+Subject: [PATCH] ARM: VIC: remove unused irq_base variable
+In-Reply-To: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
+References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201211081340.54440.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+"ARM: VIC: use irq_domain_add_simple()" causes a new warning:
 
-On Tue, Nov 06, 2012 at 20:05:40, Bedia, Vaibhav wrote:
-> Hi Santosh,
-> 
-> On Tue, Nov 06, 2012 at 03:29:22, Shilimkar, Santosh wrote:
-> 
-> [...]
-> 
-> > >
-> > > IMO, assuming that idle will not be useful from the begining is leading
-> > > down the path to poor design choices that will be much more difficult to
-> > > fixup down the road in order to add idle support later.  We need to
-> > > design both idle and suspend at the same time.
-> > >
-> > I agree with Kevin. Not supporting CPUIDLE deep states can hit the
-> > active power numbers dearly. I just don't know why the SOCs don't share
-> > the standard and must have design choices. But thats another discussion.
-> > 
-> 
-> Yes, active power numbers are not comparable to OMAP :(
-> 
-> > How about leaving the timer choices as is. PER timer for clock source
-> > and wakeuptimer for clock event. Anyway in suspend the clock-source
-> > can be suspended and that is evident from recent discussion. The only
-> > downside is you won't count time in suspend which is any way the case.
-> > 
-> > Vaibhav,
-> > Do you guys see any implementation bottleneck for above ?
-> > 
-> 
-> Looking at the timekeeping code I see one more potential reason for making
-> this change. OMAP registers the 32k sync timer as the persistent clock and
-> since there's no 32k sync timer in AM33xx it doesn't register a persistent
-> clock right now. Based on what I understood, we need to have to register
-> one and DMTimer1 is the only clock that can serve as the persistent clock
-> in suspend state. When we do so we might as well use it as the clocksource.
-> 
-> A related question that I had was, is there a mechanism to handle the 32k
-> counter (DMTimer or sync timer) wraparound condition in suspend?
-> 
+arch/arm/common/vic.c: In function 'vic_of_init':
+arch/arm/common/vic.c:410:6: warning: unused variable 'irq_base' [-Wunused-variable]
 
-Does interchanging the clksrc and clkevt look fine to you?
+Since the irq_base variable is not used any more, it should be
+removed now
 
-Regards,
-Vaibhav
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+---
+On Tuesday 16 October 2012, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Instead of allocating descriptors on-the-fly for the device tree
+> initialization case, use irq_domain_add_simple() which will take
+> care of this if you pass negative as the first_irq.
+> 
+> Alter the signature of __vic_init() to pass the first_irq as
+> signed so this works as expected.
+> 
+> Switching the VIC to use irq_domain_add_simple() also has the
+> upside of displaying the same WARNING when you boot with
+> pre-allocated descriptors on systems using SPARSE_IRQ but
+> yet not using device tree.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+diff --git a/arch/arm/common/vic.c b/arch/arm/common/vic.c
+index 4fd5d98..e4df17c 100644
+--- a/arch/arm/common/vic.c
++++ b/arch/arm/common/vic.c
+@@ -407,7 +407,6 @@ void __init vic_init(void __iomem *base, unsigned int irq_start,
+ int __init vic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *regs;
+-	int irq_base;
+ 
+ 	if (WARN(parent, "non-root VICs are not supported"))
+ 		return -EINVAL;
