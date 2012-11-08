@@ -1,47 +1,49 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 9 Nov 2012 07:27:39 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the l2-mtd
- and pinctrl trees
-In-Reply-To: <201211081511.54467.arnd@arndb.de>
-References: <20121107142916.824003a6c863320fbf379652@canb.auug.org.au>
- <201211081511.54467.arnd@arndb.de>
-Message-ID: <20121109072739.bb0f97bb571e66add1810d18@canb.auug.org.au>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Thu, 8 Nov 2012 14:41:50 -0600
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
+ for AM33XX
+In-Reply-To: <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+Message-ID: <509C190E.8010001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
 
-On Thu, 8 Nov 2012 15:11:54 +0000 Arnd Bergmann <arnd@arndb.de> wrote:
->
-> I think this one turned out wrong, and is missing this part:
+On 11/02/2012 07:32 AM, Vaibhav Bedia wrote:
+> AM33XX has only one usable timer in the WKUP domain.
+> Currently the timer instance in WKUP domain is used
+> as the clockevent and the timer in non-WKUP domain
+> as the clocksource. The timer in WKUP domain can keep
+> running in suspend from a 32K clock and hence serve
+> as the persistent clock. To enable this, interchange
+> the timers used as clocksource and clockevent for
+> AM33XX. A subsequent patch will add suspend-resume
+> support for the clockevent to ensure that there are
+> no issues with timekeeping.
 > 
-> diff --git a/arch/arm/mach-nomadik/board-nhk8815.c b/arch/arm/mach-nomadik/board-nhk8815.c
-> index 5ccdf53..69769b7 100644
-> --- a/arch/arm/mach-nomadik/board-nhk8815.c
-> +++ b/arch/arm/mach-nomadik/board-nhk8815.c
-> @@ -26,7 +26,6 @@
->  #include <linux/pinctrl/machine.h>
->  #include <linux/platform_data/pinctrl-nomadik.h>
->  #include <linux/platform_data/clocksource-nomadik-mtu.h>
-> -#include <linux/platform_data/mtd-nomadik-nand.h>
->  #include <asm/hardware/vic.h>
->  #include <asm/sizes.h>
->  #include <asm/mach-types.h>
+> Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> 
-> The mtd-nomadik-nand.h inclusion was removed in the l2-mtd tree, but
-> moved to a different line in the arm-soc tree. It needs to be removed
-> because the header is gone now.
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index 565e575..6584ee0 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -460,7 +460,7 @@ OMAP_SYS_TIMER(3_secure)
+>  #endif
+>  
+>  #ifdef CONFIG_SOC_AM33XX
+> -OMAP_SYS_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, 2, OMAP4_MPU_SOURCE)
+> +OMAP_SYS_TIMER_INIT(3_am33xx, 2, OMAP4_MPU_SOURCE, 1, OMAP4_MPU_SOURCE)
+>  OMAP_SYS_TIMER(3_am33xx)
+>  #endif
 
-Thanks for that.  I have now fixed up my fix up :-)
+By the way, for v3.8 (assuming that timer DT patches go in, currently
+queued in Tony's master), when booting with DT the clock-source and
+clock-events will be selected by timer feature and not ID. So you may
+wish to rebase on top of Tony's master.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/f7ec4720/attachment.sig>
+Cheers
+Jon
