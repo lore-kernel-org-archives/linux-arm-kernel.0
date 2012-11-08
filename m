@@ -1,29 +1,111 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Nov 2012 18:01:50 +0100
-Subject: [PATCH 0/3] Add support of the PCA9555 to the CFA-10049
-Message-ID: <1352394113-19513-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Thu,  8 Nov 2012 18:01:51 +0100
+Subject: [PATCH 1/3] gpio: pca953x: Register an IRQ domain
+In-Reply-To: <1352394113-19513-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1352394113-19513-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1352394113-19513-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+The PCA953x used to register no IRQ domain, which made it impossible to
+use it as an interrupt-parent from the device tree.
 
-This is an attempt to add support for the PCA9555
-present in the CFA-10049 board from Crystalfontz.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpio/gpio-pca953x.c |   26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
 
-The driver was supporting neither irqdomains nor dt, so
-the first two patches are adding them.
-
-Thanks,
-Maxime
-
-Maxime Ripard (3):
-  gpio: pca953x: Register an IRQ domain
-  gpio: pca953x: Add compatible strings to gpio-pca953x driver
-  ARM: dts: cfa10049: Add PCA9555 GPIO expander to the device tree
-
- arch/arm/boot/dts/imx28-cfa10049.dts |   26 +++++++++++++++-
- drivers/gpio/gpio-pca953x.c          |   55 ++++++++++++++++++++++++++++++----
- 2 files changed, 74 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
+index 9c693ae..5ba7e60 100644
+--- a/drivers/gpio/gpio-pca953x.c
++++ b/drivers/gpio/gpio-pca953x.c
+@@ -16,6 +16,7 @@
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
++#include <linux/irqdomain.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/pca953x.h>
+ #include <linux/slab.h>
+@@ -83,6 +84,7 @@ struct pca953x_chip {
+ 	u32 irq_trig_raise;
+ 	u32 irq_trig_fall;
+ 	int	 irq_base;
++	struct irq_domain *domain;
+ #endif
+ 
+ 	struct i2c_client *client;
+@@ -333,14 +335,14 @@ static void pca953x_irq_mask(struct irq_data *d)
+ {
+ 	struct pca953x_chip *chip = irq_data_get_irq_chip_data(d);
+ 
+-	chip->irq_mask &= ~(1 << (d->irq - chip->irq_base));
++	chip->irq_mask &= ~(1 << d->hwirq);
+ }
+ 
+ static void pca953x_irq_unmask(struct irq_data *d)
+ {
+ 	struct pca953x_chip *chip = irq_data_get_irq_chip_data(d);
+ 
+-	chip->irq_mask |= 1 << (d->irq - chip->irq_base);
++	chip->irq_mask |= 1 << d->hwirq;
+ }
+ 
+ static void pca953x_irq_bus_lock(struct irq_data *d)
+@@ -372,8 +374,7 @@ static void pca953x_irq_bus_sync_unlock(struct irq_data *d)
+ static int pca953x_irq_set_type(struct irq_data *d, unsigned int type)
+ {
+ 	struct pca953x_chip *chip = irq_data_get_irq_chip_data(d);
+-	u32 level = d->irq - chip->irq_base;
+-	u32 mask = 1 << level;
++	u32 mask = 1 << d->hwirq;
+ 
+ 	if (!(type & IRQ_TYPE_EDGE_BOTH)) {
+ 		dev_err(&chip->client->dev, "irq %d: unsupported type %d\n",
+@@ -454,7 +455,7 @@ static irqreturn_t pca953x_irq_handler(int irq, void *devid)
+ 
+ 	do {
+ 		level = __ffs(pending);
+-		handle_nested_irq(level + chip->irq_base);
++		handle_nested_irq(irq_find_mapping(chip->domain, level));
+ 
+ 		pending &= ~(1 << level);
+ 	} while (pending);
+@@ -499,6 +500,17 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
+ 		if (chip->irq_base < 0)
+ 			goto out_failed;
+ 
++		chip->domain = irq_domain_add_legacy(client->dev.of_node,
++						chip->gpio_chip.ngpio,
++						chip->irq_base,
++						0,
++						&irq_domain_simple_ops,
++						NULL);
++		if (!chip->domain) {
++			ret = -ENODEV;
++			goto out_irqdesc_free;
++		}
++
+ 		for (lvl = 0; lvl < chip->gpio_chip.ngpio; lvl++) {
+ 			int irq = lvl + chip->irq_base;
+ 
+@@ -521,7 +533,7 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
+ 		if (ret) {
+ 			dev_err(&client->dev, "failed to request irq %d\n",
+ 				client->irq);
+-			goto out_failed;
++			goto out_irqdesc_free;
+ 		}
+ 
+ 		chip->gpio_chip.to_irq = pca953x_gpio_to_irq;
+@@ -529,6 +541,8 @@ static int pca953x_irq_setup(struct pca953x_chip *chip,
+ 
+ 	return 0;
+ 
++out_irqdesc_free:
++	irq_free_descs(chip->irq_base, chip->gpio_chip.ngpio);
+ out_failed:
+ 	chip->irq_base = -1;
+ 	return ret;
 -- 
 1.7.9.5
