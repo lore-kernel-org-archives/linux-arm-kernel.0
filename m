@@ -1,33 +1,39 @@
-From: Claudio.Fontana@huawei.com (Claudio Fontana)
-Date: Thu, 08 Nov 2012 11:39:05 +0100
-Subject: [PATCH] ARM: plat-versatile: move secondary CPU startup code out of
- .init for hotplug
-Message-ID: <509B8BC9.4070209@huawei.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Thu, 08 Nov 2012 11:50:51 +0100
+Subject: [PATCH v2] ARM: EXYNOS: origen: Add missing USB regulators
+Message-ID: <11762974.EgWP4VdH3P@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds missing USB OTG regulators needed for s3c-hsotg driver
+to work on Origen board.
 
-Using __CPUINIT instead of __INIT puts the secondary CPU startup code
-into the "right" section: it will not be freed in hotplug configurations,
-allowing hot-add of cpus, while still getting freed in non-hotplug configs.
+Confirmed with schematics of and tested on Origen board.
 
-Signed-off-by: Claudio Fontana <claudio.fontana@huawei.com>
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 ---
- arch/arm/plat-versatile/headsmp.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-exynos/mach-origen.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index dd703ef..19fe180 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -11,7 +11,7 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
--	__INIT
-+	__CPUINIT
- 
- /*
-  * Realview/Versatile Express specific entry point for secondary CPUs.
+diff --git a/arch/arm/mach-exynos/mach-origen.c b/arch/arm/mach-exynos/mach-origen.c
+index d8dc6d7..bf34704 100644
+--- a/arch/arm/mach-exynos/mach-origen.c
++++ b/arch/arm/mach-exynos/mach-origen.c
+@@ -100,6 +100,7 @@ static struct regulator_consumer_supply __initdata ldo3_consumer[] = {
+ 	REGULATOR_SUPPLY("vddcore", "s5p-mipi-csis.0"), /* MIPI */
+ 	REGULATOR_SUPPLY("vdd", "exynos4-hdmi"), /* HDMI */
+ 	REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"), /* HDMI */
++	REGULATOR_SUPPLY("vusb_a", "s3c-hsotg"), /* OTG */
+ };
+ static struct regulator_consumer_supply __initdata ldo6_consumer[] = {
+ 	REGULATOR_SUPPLY("vddio", "s5p-mipi-csis.0"), /* MIPI */
+@@ -110,6 +111,7 @@ static struct regulator_consumer_supply __initdata ldo7_consumer[] = {
+ static struct regulator_consumer_supply __initdata ldo8_consumer[] = {
+ 	REGULATOR_SUPPLY("vdd", "s5p-adc"), /* ADC */
+ 	REGULATOR_SUPPLY("vdd_osc", "exynos4-hdmi"), /* HDMI */
++	REGULATOR_SUPPLY("vusb_d", "s3c-hsotg"), /* OTG */
+ };
+ static struct regulator_consumer_supply __initdata ldo9_consumer[] = {
+ 	REGULATOR_SUPPLY("dvdd", "swb-a31"), /* AR6003 WLAN & CSR 8810 BT */
 -- 
-1.7.12.1
+1.8.0
