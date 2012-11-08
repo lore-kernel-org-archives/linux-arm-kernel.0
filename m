@@ -1,54 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Nov 2012 09:48:52 +0900
-Subject: [PATCH 06/15] ARM: shmobile: Add DT table of INTC for sh73a0
-In-Reply-To: <509A3E02.3050507@kmckk.co.jp>
-References: <1352278244-26702-1-git-send-email-horms@verge.net.au>
- <1352278244-26702-7-git-send-email-horms@verge.net.au>
- <509A3E02.3050507@kmckk.co.jp>
-Message-ID: <20121108004852.GC4879@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Nov 2012 17:25:51 -0800
+Subject: [PATCH v4 9/9] pinctrl: single: dump pinmux register value
+In-Reply-To: <1352301582-12244-10-git-send-email-haojian.zhuang@gmail.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-10-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121108012550.GV6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 07:54:58PM +0900, Tetsuyuki Kobayashi wrote:
-> Hello, Iwamatsu-san, Simon-san
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:22]:
+> Dump pinmux register value, not only function part in the pinmux
+> register.
 > 
-> (2012/11/07 17:50), Simon Horman wrote:
-> > From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > 
-> > Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-> > Signed-off-by: Simon Horman <horms@verge.net.au>
-> > ---
-> >   arch/arm/boot/dts/sh73a0.dtsi |  810 +++++++++++++++++++++++++++++++++++++++++
-> >   1 file changed, 810 insertions(+)
-> >   create mode 100644 arch/arm/boot/dts/sh73a0.dtsi
-> > 
-> > diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> > new file mode 100644
-> > index 0000000..b0c55e1
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/sh73a0.dtsi
-> > @@ -0,0 +1,810 @@
-> > +/*
-> > + * Device Tree Source for the SH73A0
-> > + *
-> > + * Copyright (C) 2012 Renesas Solutions Corp.
-> > + *
-> > + * This file is licensed under the terms of the GNU General Public License
-> > + * version 2.  This program is licensed "as is" without any warranty of any
-> > + * kind, whether express or implied.
-> > + */
-> > +
-> > +/include/ "skeleton.dtsi"
-> > +
-> > +/ {
-> > +	compatible = "renesas,sh73a0";
-> > +
-> > +	cpus {
-> > +		cpu at 0 {
-> > +			compatible = "arm,cortex-a8";
-> > +		};
-> > +	};
-> 
-> SH73A0 is dual core cortex-a9.
+> Also fix the issue on caluclating pin offset. The last parameter
+> should be pin number, not register offset.
 
-Thanks, I have changed the patch to use "arm,cortex-a9"
+Acked-by: Tony Lindgren <tony@atomide.com>
+ 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+> ---
+>  drivers/pinctrl/pinctrl-single.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index 77aec05..243a9ca 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -286,15 +286,15 @@ static int pcs_get_group_pins(struct pinctrl_dev *pctldev,
+>  
+>  static void pcs_pin_dbg_show(struct pinctrl_dev *pctldev,
+>  					struct seq_file *s,
+> -					unsigned offset)
+> +					unsigned pin)
+>  {
+>  	struct pcs_device *pcs;
+> -	unsigned val;
+> +	unsigned val, mux_bytes;
+>  
+>  	pcs = pinctrl_dev_get_drvdata(pctldev);
+>  
+> -	val = pcs->read(pcs->base + offset);
+> -	val &= pcs->fmask;
+> +	mux_bytes = pcs->width / BITS_PER_BYTE;
+> +	val = pcs->read(pcs->base + pin * mux_bytes);
+>  
+>  	seq_printf(s, "%08x %s " , val, DRIVER_NAME);
+>  }
+> -- 
+> 1.7.10.4
+> 
