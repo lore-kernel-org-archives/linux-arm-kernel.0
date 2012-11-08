@@ -1,88 +1,103 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 08 Nov 2012 12:24:25 +0530
-Subject: [PATCH v2 2/2] ARM: Exynos5250: Enabling ohci-exynos driver
-In-Reply-To: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
-References: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <1352357665-7435-3-git-send-email-gautam.vivek@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 08 Nov 2012 09:13:08 +0200
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <20121107173343.GF6801@atomide.com>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <20121107173343.GF6801@atomide.com>
+Message-ID: <509B5B84.50605@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding OHCI device tree node for Exynos5250 along with
-the device base address.
+On 11/07/12 19:33, Tony Lindgren wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [121107 06:44]:
+>> CONFIG_OMAP_32K_TIMER is kind of standing on the single zImage way.
+>> Make OMAP2+ timer code independant from the CONFIG_OMAP_32K_TIMER
+>> setting.
+>> To remove the dependancy, several conversions/additions had to be done:
+>> 1) Timer structures and initialization functions are named by the platform
+>>    name and the clock source in use. The decision which timer is
+>>    used is done statically from the machine_desc structure. In the
+>>    future it should come from DT.
+>> 2) Settings under the CONFIG_OMAP_32K_TIMER option are expanded into
+>>    separate timer structures along with the timer init functions.
+>>    This removes the CONFIG_OMAP_32K_TIMER on OMAP2+ timer code.
+> 
+> I think this should be the default for the timers as that counter
+> does not stop during deeper idle states.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
----
- .../devicetree/bindings/usb/exynos-usb.txt         |   15 +++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++++
- arch/arm/mach-exynos/include/mach/map.h            |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 ++
- 4 files changed, 24 insertions(+), 0 deletions(-)
+Well, it is the default as you can see from the patch.
+The problem is that for boards that for some reason do not have
+the 32k wired and rely on MPU/GP timer source, the default will not work
+and currently there is no way for board to specify which timer source
+it can use.
+We have discussed this in San Diego (remember?) and you actually proposed
+this way as a solution. Well, may be I took it a bit further than you
+thought, but this is because the board code cannot know which timer source
+should be used at runtime and the fall back described below, does not work.
 
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index 833f5cf..5ff3def1 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -23,3 +23,18 @@ Example:
- 		interrupts = <0 71 0>;
- 		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
- 	};
-+
-+OHCI
-+Required properties:
-+ - compatible: should be "samsung,exynos-ohci" for USB 2.0
-+   OHCI companion controller in host mode.
-+ - reg: physical base address of the controller and length of memory mapped
-+   region.
-+ - interrupts: interrupt number to the cpu.
-+
-+Example:
-+	usb at 12120000 {
-+		compatible = "samsung,exynos-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 2995445..f18abe0 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -244,6 +244,12 @@
- 		interrupts = <0 71 0>;
- 	};
- 
-+	usb at 12120000 {
-+		compatible = "samsung,exynos-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 9a86b99..471ffaf 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -198,6 +198,7 @@
- #define EXYNOS4_PA_OHCI			0x12590000
- #define EXYNOS4_PA_HSPHY		0x125B0000
- #define EXYNOS5_PA_EHCI			0x12110000
-+#define EXYNOS5_PA_OHCI			0x12120000
- #define EXYNOS4_PA_MFC			0x13400000
- 
- #define EXYNOS4_PA_UART			0x13800000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index f60994e..6348acb 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -88,6 +88,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos5-mixer", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
- 					"s5p-ehci", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos-ohci", EXYNOS5_PA_OHCI,
-+					"exynos-ohci", NULL),
- 	{},
- };
- 
+> 
+>> 3) Since we have all the timers defined inside machine_desc structure
+>>    and we no longer need the fallback to gp_timer clock source in case
+>>    32k_timer clock source is unavailable (namely on AM33xx), we no
+>>    longer need the #ifdef around __omap2_sync32k_clocksource_init()
+>>    function. Remove the #ifdef CONFIG_OMAP_32K_TIMER around the
+>>    __omap2_sync32k_clocksource_init() function.
+>>
+>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>> Cc: Jon Hunter <jon-hunter@ti.com>
+>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+>> ---
+>> Finally I'm sending this out...
+>> I've lost following Tony's branches and deciding which one to base on,
+>> so I used linux-omap/master as a base for the patch.
+>> Tony, tell me if you want it based on some other branch.
+>> This has been compile tested on omap1|2plus_defconfig only.
+> 
+> Yes sorry it's been a bit crazy with branches to get this
+> header clean up done.. If it applies to master it should
+> be easy to apply on others.
+
+No problem ;-)
+
+> 
+>> --- a/arch/arm/mach-omap2/board-2430sdp.c
+>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+>> @@ -284,6 +284,6 @@ MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
+>>  	.handle_irq	= omap2_intc_handle_irq,
+>>  	.init_machine	= omap_2430sdp_init,
+>>  	.init_late	= omap2430_init_late,
+>> -	.timer		= &omap2_timer,
+>> +	.timer		= &omap2_sync32k_timer,
+>>  	.restart	= omap_prcm_restart,
+>>  MACHINE_END
+>> --- a/arch/arm/mach-omap2/board-3430sdp.c
+>> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+>> @@ -596,6 +596,6 @@ MACHINE_START(OMAP_3430SDP, "OMAP3430 3430SDP board")
+>>  	.handle_irq	= omap3_intc_handle_irq,
+>>  	.init_machine	= omap_3430sdp_init,
+>>  	.init_late	= omap3430_init_late,
+>> -	.timer		= &omap3_timer,
+>> +	.timer		= &omap3_sync32k_timer,
+>>  	.restart	= omap_prcm_restart,
+>>  MACHINE_END
+> ...
+> 
+> Can't we assume that the default timer is omap[234]_sync32k_timer to
+> avoid renaming the timer entries in all the board files?
+
+Hmmm...
+How will this work with the macros defining the sys_timer structure?
+I would also not want to hide the exact timer used under the default name.
+
+> 
+> Then we just need a new timer entries for the hardware that does
+> not have the sycn32k_timer available?
+
+Well, I tried to make it small patch just for the hardware that needs it,
+but I always found some corner case where, IMHO, this does not work/look good.
+
+
 -- 
-1.7.6.5
+Regards,
+Igor.
