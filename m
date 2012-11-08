@@ -1,63 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  8 Nov 2012 18:01:52 +0100
-Subject: [PATCH 2/3] gpio: pca953x: Add compatible strings to gpio-pca953x
- driver
+Date: Thu,  8 Nov 2012 18:01:53 +0100
+Subject: [PATCH 3/3] ARM: dts: cfa10049: Add PCA9555 GPIO expander to the
+ device tree
 In-Reply-To: <1352394113-19513-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1352394113-19513-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1352394113-19513-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1352394113-19513-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even though the device tree binding code was already written, the
-compatible strings were not yet in the driver.
+Add the GPIO expander found on the i2c1 bus, behind the muxer to the
+device tree.
+
+This gpio expander will be used to get tachymeters values and data ready
+interruptions from the nuvoton NAU7802 ADCs.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpio/gpio-pca953x.c |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/boot/dts/imx28-cfa10049.dts |   26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index 5ba7e60..0c5eaf5 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -765,9 +765,38 @@ static int pca953x_remove(struct i2c_client *client)
- 	return 0;
- }
+diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
+index bdc80a4..714953b 100644
+--- a/arch/arm/boot/dts/imx28-cfa10049.dts
++++ b/arch/arm/boot/dts/imx28-cfa10049.dts
+@@ -22,8 +22,9 @@
+ 	apb at 80000000 {
+ 		apbh at 80000000 {
+ 			pinctrl at 80018000 {
+-				pinctrl-names = "default", "default";
++				pinctrl-names = "default", "default", "default";
+ 				pinctrl-1 = <&hog_pins_cfa10049>;
++				pinctrl-2 = <&hog_pins_cfa10049_pullup>;
  
-+static const struct of_device_id pca953x_dt_ids[] = {
-+	{ .compatible = "nxp,pca9534", },
-+	{ .compatible = "nxp,pca9535", },
-+	{ .compatible = "nxp,pca9536", },
-+	{ .compatible = "nxp,pca9537", },
-+	{ .compatible = "nxp,pca9538", },
-+	{ .compatible = "nxp,pca9539", },
-+	{ .compatible = "nxp,pca9554", },
-+	{ .compatible = "nxp,pca9555", },
-+	{ .compatible = "nxp,pca9556", },
-+	{ .compatible = "nxp,pca9557", },
-+	{ .compatible = "nxp,pca9574", },
-+	{ .compatible = "nxp,pca9575", },
+ 				hog_pins_cfa10049: hog-10049 at 0 {
+ 					reg = <0>;
+@@ -38,6 +39,16 @@
+ 					fsl,pull-up = <0>;
+ 				};
+ 
++				hog_pins_cfa10049_pullup: hog-10049-pullup at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x2133 /* MX28_PAD_SSP2_D3__GPIO_2_19 */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <1>;
++				};
 +
-+	{ .compatible = "maxim,max7310", },
-+	{ .compatible = "maxim,max7312", },
-+	{ .compatible = "maxim,max7313", },
-+	{ .compatible = "maxim,max7315", },
+ 				spi3_pins_cfa10049: spi3-cfa10049 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+@@ -113,6 +124,19 @@
+ 
+ 				i2c@3 {
+ 					reg = <3>;
++					#address-cells = <1>;
++					#size-cells = <0>;
 +
-+	{ .compatible = "ti,pca6107", },
-+	{ .compatible = "ti,tca6408", },
-+	{ .compatible = "ti,tca6416", },
-+	{ .compatible = "ti,tca6424", },
-+	{ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, pca953x_dt_ids);
-+
- static struct i2c_driver pca953x_driver = {
- 	.driver = {
- 		.name	= "pca953x",
-+		.of_match_table = pca953x_dt_ids,
- 	},
- 	.probe		= pca953x_probe,
- 	.remove		= pca953x_remove,
++					pca9555: pca9555 at 20 {
++						compatible = "nxp,pca9555";
++						interrupt-parent = <&gpio2>;
++						interrupts = <19 0x2>;
++						gpio-controller;
++						#gpio-cells = <2>;
++						interrupt-controller;
++						#interrupt-cells = <2>;
++						reg = <0x20>;
++					};
+ 				};
+ 			};
+ 
 -- 
 1.7.9.5
