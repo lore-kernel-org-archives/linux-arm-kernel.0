@@ -1,76 +1,129 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 07 Nov 2012 17:01:50 -0700
-Subject: struct sys_timer .suspend/.resume ignored for
- ARCH_SA1100/ARCH_PXA?
-In-Reply-To: <20121107232341.GY28327@n2100.arm.linux.org.uk>
-References: <509AE964.8070009@wwwdotorg.org>
- <20121107232341.GY28327@n2100.arm.linux.org.uk>
-Message-ID: <509AF66E.8020308@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  7 Nov 2012 18:09:01 -0600
+Subject: [PATCH] ARM: highbank: use common debug_ll_io_init
+Message-ID: <1352333341-9249-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2012 04:23 PM, Russell King - ARM Linux wrote:
-> On Wed, Nov 07, 2012 at 04:06:12PM -0700, Stephen Warren wrote:
->> Russell, Kevin,
->>
->> In commit 9e4559d "[ARM] 4258/2: Support for dynticks in idle loop" in
->> 2007, Kevin applied the following change:
->>
->>> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
->>
->>> -#ifdef CONFIG_PM
->>> +#if defined(CONFIG_PM) && !defined(CONFIG_GENERIC_CLOCKEVENTS)
->>>  static int timer_suspend(struct sys_device *dev, pm_message_t state)
->>
->> This means that for any architecture that enables GENERIC_CLOCKEVENTS,
->> the .suspend/.resume fields of struct sys_timer will be ignored, since
->> timer_suspend()/timer_resume() won't be filled into
->> arch/arm/kernel/time.c's struct syscore_ops timer_syscore_ops.
-> 
-> Correct.
-> 
->> Later, in commit 3e238be "[ARM] sa1100: add clock event support" in
->> 2008, Russell modified ARCH_SA1100 to select GENERIC_CLOCKEVENTS. I
->> believe this means that sa1100_timer_suspend()/resume() haven't been
->> used since.
-> 
-> Also correct.
-> 
->> A similar issue exists for ARCH_PXA.
->>
->> Should sa1100_timer_suspend(), sa1100_timer_resume(),
->> pxa_timer_suspend(), pxa_timer_suspend() simply be deleted since they
->> are dead code, or should they be revived somehow; is the ifdef from
->> Kevin's change incorrect?
-> 
-> Hmm, that's probably not good for either of those two platforms; it means
-> that the OSCR and match registers get lost over a suspend/resume.  That's
-> not a real big problem for the clocksource code, but if its being used
-> for something else (eg, rtc) then it probably means we have a failure
-> there.
+From: Rob Herring <rob.herring@calxeda.com>
 
-OK, so it sounds like the correct approach here is to re-enable those
-functions. The local patches I have right now do this, and hook them
-into e.g. ckevt_sa1100_osmr0's suspend/resume rather than sys_timer's. I
-assume that will work fine?
+Remove the platform static mapping code for uart and use the common
+debug_ll_io_init function.
 
->> As background, I'm working on a patch series that will remove all fields
->> from struct sys_timer except for .init, and will then replace the ARM
->> machine descriptor's .timer struct pointer with a .init_timer function
->> pointer. This will allow machines, on an opt-in basis, to call into a
->> central function in drivers/clocksource to initialize the required
->> timer, as determined by searching device tree for a known device type,
->> in much the same way as has been proposed to use a single implementation
->> for for the machine descriptor's .init_irq. As part of this, I've been
->> looking at moving any use of struct sys_timer .suspend/.resume into e.g.
->> struct clock_event_device .suspend/.resume, and found this issue.
-> 
-> Don't forget we still have a number of platforms not converted to
-> the generic event/clocksource stuff (because they lack the necessary
-> counters/timers for this 'new' infrastructure.)
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+This is dependent on arm-soc/devel/debug_ll_init and
+arm-soc/calxeda/ecx-2000 branches. 
 
-I believe the only user of struct sys_timer .suspend/.resume that does
-use struct clock_event_device is s3c2410. I'd missed that before since
-I'd only searched for .suspend and not .resume alone. Perhaps this one
-should just register its own syscore_ops instead of having the ARM core
-do that on its behalf.
+Rob
+
+ arch/arm/mach-highbank/Makefile   |    1 -
+ arch/arm/mach-highbank/core.h     |    5 -----
+ arch/arm/mach-highbank/highbank.c |    8 ++------
+ arch/arm/mach-highbank/lluart.c   |   34 ----------------------------------
+ 4 files changed, 2 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-highbank/lluart.c
+
+diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
+index 3ec8bdd..8a1ef57 100644
+--- a/arch/arm/mach-highbank/Makefile
++++ b/arch/arm/mach-highbank/Makefile
+@@ -3,7 +3,6 @@ obj-y					:= highbank.o system.o smc.o
+ plus_sec := $(call as-instr,.arch_extension sec,+sec)
+ AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
+ 
+-obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+ obj-$(CONFIG_PM_SLEEP)			+= pm.o
+diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
+index 286ec82..603b536 100644
+--- a/arch/arm/mach-highbank/core.h
++++ b/arch/arm/mach-highbank/core.h
+@@ -2,11 +2,6 @@ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+ extern void highbank_clocks_init(void);
+ extern void highbank_restart(char, const char *);
+ extern void __iomem *scu_base_addr;
+-#ifdef CONFIG_DEBUG_HIGHBANK_UART
+-extern void highbank_lluart_map_io(void);
+-#else
+-static inline void highbank_lluart_map_io(void) {}
+-#endif
+ 
+ #ifdef CONFIG_PM_SLEEP
+ extern void highbank_pm_init(void);
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index 3e60e57..dc24816 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -35,6 +35,7 @@
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
++#include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ 
+ #include "core.h"
+@@ -53,11 +54,6 @@ static void __init highbank_scu_map_io(void)
+ 	scu_base_addr = ioremap(base, SZ_4K);
+ }
+ 
+-static void __init highbank_map_io(void)
+-{
+-	highbank_lluart_map_io();
+-}
+-
+ #define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
+ #define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
+ 
+@@ -211,7 +207,7 @@ static const char *highbank_match[] __initconst = {
+ 
+ DT_MACHINE_START(HIGHBANK, "Highbank")
+ 	.smp		= smp_ops(highbank_smp_ops),
+-	.map_io		= highbank_map_io,
++	.map_io		= debug_ll_io_init,
+ 	.init_irq	= highbank_init_irq,
+ 	.timer		= &highbank_timer,
+ 	.handle_irq	= gic_handle_irq,
+diff --git a/arch/arm/mach-highbank/lluart.c b/arch/arm/mach-highbank/lluart.c
+deleted file mode 100644
+index 3715750..0000000
+--- a/arch/arm/mach-highbank/lluart.c
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- * Copyright 2011 Calxeda, Inc.
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
+-#include <linux/init.h>
+-#include <asm/page.h>
+-#include <asm/sizes.h>
+-#include <asm/mach/map.h>
+-
+-#define HB_DEBUG_LL_PHYS_BASE	0xfff36000
+-#define HB_DEBUG_LL_VIRT_BASE	0xfee36000
+-
+-static struct map_desc lluart_io_desc __initdata = {
+-	.virtual	= HB_DEBUG_LL_VIRT_BASE,
+-	.pfn		= __phys_to_pfn(HB_DEBUG_LL_PHYS_BASE),
+-	.length		= SZ_4K,
+-	.type		= MT_DEVICE,
+-};
+-
+-void __init highbank_lluart_map_io(void)
+-{
+-	iotable_init(&lluart_io_desc, 1);
+-}
+-- 
+1.7.10.4
