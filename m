@@ -1,31 +1,42 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 8 Nov 2012 13:56:31 -0500 (EST)
-Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
-In-Reply-To: <20121108162613.GB16373@mudshark.cambridge.arm.com>
-References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
- <20121106220458.GP28327@n2100.arm.linux.org.uk>
- <20121107095106.GA23305@mudshark.cambridge.arm.com>
- <20121107095635.GV28327@n2100.arm.linux.org.uk>
- <20121107100835.GB23305@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1211071035220.21033@xanadu.home>
- <20121107184129.GB18293@mudshark.cambridge.arm.com>
- <alpine.LFD.2.02.1211071505410.21033@xanadu.home>
- <20121108162613.GB16373@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.02.1211081355070.21033@xanadu.home>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Thu, 8 Nov 2012 18:59:09 +0000
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <509BFFDF.9040605@ti.com>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
+ <509BFFDF.9040605@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Nov 2012, Will Deacon wrote:
-
-> I checked all of the switch_mm implementations and it looks like
-> !CONFIG_CPU_HAS_ASID implies the TLB flush in all cases, so this looks fine
-> to me.
+On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
 > 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
+> 
+> [snip]
+> 
+> > There is no reliable way to determine which source should be used in runtime
+> > for boards that do not have the 32k oscillator wired.
+> 
+> So thinking about this some more and given that we are moving away from
+> board files, if a board does not provide a 32kHz clock source, then this
+> should be reflected in the device-tree source file for that board.
+> Hence, at boot time we should be able to determine if a 32kHz clock
+> source can be used.
+> 
 
-Submitted as patch 7573/1.
+Let me feed some more thoughts here :)
 
-Thanks!
+The way it is being detected currently is based on timer idle status bit.
+I am worried that, this is the only option we have.
 
+You can also refer to the implementation, so that it will help us to 
+conclude on this -
 
-Nicolas
+http://arago-project.org/git/projects/?p=linux-am33x.git;a=commitdiff;h=58abec6ac010f4f8818caa4a52d16c4802e14acc
+
+Note that this is based on v3.2 kernel (+ additional patches), you should 
+look the implementation of function omap_dm_timer_switch_src().
+
+Thanks,
+Vaibhav
