@@ -1,9 +1,9 @@
 From: sasha.levin@oracle.com (Sasha Levin)
-Date: Thu,  8 Nov 2012 15:23:06 -0500
-Subject: [PATCH] ARM: kprobes: use BUG_ON where possible
+Date: Thu,  8 Nov 2012 15:23:08 -0500
+Subject: [PATCH] ARM: integrator: use BUG_ON where possible
 In-Reply-To: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
 References: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
-Message-ID: <1352406191-14303-4-git-send-email-sasha.levin@oracle.com>
+Message-ID: <1352406191-14303-6-git-send-email-sasha.levin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,22 +25,28 @@ expression e;
 
 Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
 ---
- arch/arm/kernel/kprobes-test.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-integrator/pci_v3.c |    9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-index 1862d8f..0fb370d 100644
---- a/arch/arm/kernel/kprobes-test.c
-+++ b/arch/arm/kernel/kprobes-test.c
-@@ -1212,8 +1212,7 @@ static int register_test_probe(struct test_probe *probe)
- {
- 	int ret;
- 
--	if (probe->registered)
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index bbeca59..85938de 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -191,12 +191,9 @@ static void __iomem *v3_open_config_window(struct pci_bus *bus,
+ 	/*
+ 	 * Trap out illegal values
+ 	 */
+-	if (offset > 255)
 -		BUG();
-+	BUG_ON(probe->registered);
+-	if (busnr > 255)
+-		BUG();
+-	if (devfn > 255)
+-		BUG();
++	BUG_ON(offset > 255);
++	BUG_ON(busnr > 255);
++	BUG_ON(devfn > 255);
  
- 	ret = register_kprobe(&probe->kprobe);
- 	if (ret >= 0) {
+ 	if (busnr == 0) {
+ 		int slot = PCI_SLOT(devfn);
 -- 
 1.7.10.4
