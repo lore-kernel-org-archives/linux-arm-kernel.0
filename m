@@ -1,102 +1,60 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  8 Nov 2012 14:01:53 -0700
-Subject: [PATCH 08/11] ARM: ux500: convert timer suspend/resume to
- clock_event_device
+Date: Thu,  8 Nov 2012 14:01:54 -0700
+Subject: [PATCH 09/11] ARM: samsung: register syscore_ops for timer resume
+ directly
 In-Reply-To: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
 References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1352408516-21988-10-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1352408516-21988-11-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-Move ux500's timer suspend/resume functions from struct sys_timer
-ux500_timer into struct clock_event_device nmdk_clkevt. This
-will allow the sys_timer suspend/resume fields to be removed, and
-eventually lead to a complete removal of struct sys_timer.
+Instead of using struct sys_timer's resume function, register syscore_ops
+directly in s3c2410_timer_init(). This will allow the sys_timer suspend/
+resume fields to be removed, and eventually lead to a complete removal of
+struct sys_timer.
 
-Cc: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/arm/mach-ux500/timer.c       |    7 -------
- drivers/clocksource/nomadik-mtu.c |   33 ++++++++++++++++++++-------------
- 2 files changed, 20 insertions(+), 20 deletions(-)
+ arch/arm/plat-samsung/time.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/timer.c b/arch/arm/mach-ux500/timer.c
-index 875309a..46a7244 100644
---- a/arch/arm/mach-ux500/timer.c
-+++ b/arch/arm/mach-ux500/timer.c
-@@ -100,13 +100,6 @@ dt_fail:
- 	ux500_twd_init();
+diff --git a/arch/arm/plat-samsung/time.c b/arch/arm/plat-samsung/time.c
+index 67206df..773745a 100644
+--- a/arch/arm/plat-samsung/time.c
++++ b/arch/arm/plat-samsung/time.c
+@@ -27,6 +27,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/syscore_ops.h>
+ 
+ #include <asm/mach-types.h>
+ 
+@@ -271,6 +272,10 @@ static void __init s3c2410_timer_resources(void)
+ 	clk_enable(tin);
  }
  
--static void ux500_timer_reset(void)
--{
--	nmdk_clkevt_reset();
--	nmdk_clksrc_reset();
--}
--
- struct sys_timer ux500_timer = {
- 	.init		= ux500_timer_init,
--	.resume		= ux500_timer_reset,
- };
-diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
-index 23c780b..a60b077 100644
---- a/drivers/clocksource/nomadik-mtu.c
-+++ b/drivers/clocksource/nomadik-mtu.c
-@@ -134,12 +134,32 @@ static void nmdk_clkevt_mode(enum clock_event_mode mode,
- 	}
- }
- 
-+void nmdk_clksrc_reset(void)
-+{
-+	/* Disable */
-+	writel(0, mtu_base + MTU_CR(0));
++static struct syscore_ops s3c24xx_syscore_ops = {
++	.resume		= s3c2410_timer_setup,
++};
 +
-+	/* ClockSource: configure load and background-load, and fire it up */
-+	writel(nmdk_cycle, mtu_base + MTU_LR(0));
-+	writel(nmdk_cycle, mtu_base + MTU_BGLR(0));
-+
-+	writel(clk_prescale | MTU_CRn_32BITS | MTU_CRn_ENA,
-+	       mtu_base + MTU_CR(0));
-+}
-+
-+static void nmdk_clkevt_resume(struct clock_event_device *cedev)
-+{
-+	nmdk_clkevt_reset();
-+	nmdk_clksrc_reset();
-+}
-+
- static struct clock_event_device nmdk_clkevt = {
- 	.name		= "mtu_1",
- 	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
- 	.rating		= 200,
- 	.set_mode	= nmdk_clkevt_mode,
- 	.set_next_event	= nmdk_clkevt_next,
-+	.resume		= nmdk_clkevt_resume,
- };
- 
- /*
-@@ -161,19 +181,6 @@ static struct irqaction nmdk_timer_irq = {
- 	.dev_id		= &nmdk_clkevt,
- };
- 
--void nmdk_clksrc_reset(void)
--{
--	/* Disable */
--	writel(0, mtu_base + MTU_CR(0));
--
--	/* ClockSource: configure load and background-load, and fire it up */
--	writel(nmdk_cycle, mtu_base + MTU_LR(0));
--	writel(nmdk_cycle, mtu_base + MTU_BGLR(0));
--
--	writel(clk_prescale | MTU_CRn_32BITS | MTU_CRn_ENA,
--	       mtu_base + MTU_CR(0));
--}
--
- void __init nmdk_timer_init(void __iomem *base, int irq)
+ static void __init s3c2410_timer_init(void)
  {
- 	unsigned long rate;
+ 	arch_gettimeoffset = s3c2410_gettimeoffset;
+@@ -278,9 +283,9 @@ static void __init s3c2410_timer_init(void)
+ 	s3c2410_timer_resources();
+ 	s3c2410_timer_setup();
+ 	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
++	register_syscore_ops(&s3c24xx_syscore_ops);
+ }
+ 
+ struct sys_timer s3c24xx_timer = {
+ 	.init		= s3c2410_timer_init,
+-	.resume		= s3c2410_timer_setup
+ };
 -- 
 1.7.0.4
