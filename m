@@ -1,51 +1,91 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 8 Nov 2012 15:30:11 +0900
-Subject: [GIT PULL] Renesas ARM-based SoC for v3.8 #2
-In-Reply-To: <1352277298-23312-1-git-send-email-horms@verge.net.au>
-References: <1352277298-23312-1-git-send-email-horms@verge.net.au>
-Message-ID: <20121108063011.GC13151@verge.net.au>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 08 Nov 2012 07:38:57 +0100
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+Message-ID: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2012 at 05:34:54PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> please consider the following SoC enhancements for 3.8.
-> 
-> This series is based on the previous SoC series that I sent on Tuesday
-> and was merged later that day: [GIT PULL v4] Renesas ARM-based SoC for v3.8
+dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag, regardless
+the flags provided by the caller. This causes excessive pruning of
+emergency memory pools without any good reason. This patch changes the code
+to correctly use gfp flags provided by the dmapool caller. This should
+solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
+allocations can be served only from the special, very limited memory pool.
 
+Reported-by: Soren Moch <smoch@web.de>
+Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ mm/dmapool.c |   27 +++++++--------------------
+ 1 file changed, 7 insertions(+), 20 deletions(-)
 
-I have found some problems with this pull-request,
-I will send an revised one.
-
-> ----------------------------------------------------------------
-> The following changes since commit 86bc52ef4373be64867b56f3a9e30cbabf64e0dd:
-> 
->   ARM: shmobile: r8a7740: Enable PMU (2012-11-06 13:47:24 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-> 
-> for you to fetch changes up to 9d69f5b87e7f6df51ad2a70557474093de934a8c:
-> 
->   ARM: shmobile: r8a7779: add USB OHCI clock support (2012-11-07 17:11:48 +0900)
-> 
-> ----------------------------------------------------------------
-> Kuninori Morimoto (4):
->       ARM: shmobile: r8a7779: PFC rename PENCx -> USB_PENCx
->       ARM: shmobile: r8a7740: add USB24 clock explain
->       ARM: shmobile: r8a7779: add USB EHCI clock support
->       ARM: shmobile: r8a7779: add USB OHCI clock support
-> 
->  arch/arm/mach-shmobile/clock-r8a7740.c        |   16 ++++++++++++++++
->  arch/arm/mach-shmobile/clock-r8a7779.c        |    7 +++++++
->  arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 +-
->  arch/arm/mach-shmobile/pfc-r8a7779.c          |   16 ++++++++--------
->  4 files changed, 32 insertions(+), 9 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/mm/dmapool.c b/mm/dmapool.c
+index c5ab33b..86de9b2 100644
+--- a/mm/dmapool.c
++++ b/mm/dmapool.c
+@@ -62,8 +62,6 @@ struct dma_page {		/* cacheable header for 'allocation' bytes */
+ 	unsigned int offset;
+ };
+ 
+-#define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
+-
+ static DEFINE_MUTEX(pools_lock);
+ 
+ static ssize_t
+@@ -227,7 +225,6 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
+ 		memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
+ #endif
+ 		pool_initialise_page(pool, page);
+-		list_add(&page->page_list, &pool->page_list);
+ 		page->in_use = 0;
+ 		page->offset = 0;
+ 	} else {
+@@ -315,30 +312,21 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+ 	might_sleep_if(mem_flags & __GFP_WAIT);
+ 
+ 	spin_lock_irqsave(&pool->lock, flags);
+- restart:
+ 	list_for_each_entry(page, &pool->page_list, page_list) {
+ 		if (page->offset < pool->allocation)
+ 			goto ready;
+ 	}
+-	page = pool_alloc_page(pool, GFP_ATOMIC);
+-	if (!page) {
+-		if (mem_flags & __GFP_WAIT) {
+-			DECLARE_WAITQUEUE(wait, current);
+ 
+-			__set_current_state(TASK_UNINTERRUPTIBLE);
+-			__add_wait_queue(&pool->waitq, &wait);
+-			spin_unlock_irqrestore(&pool->lock, flags);
++	/* pool_alloc_page() might sleep, so temporarily drop &pool->lock */
++	spin_unlock_irqrestore(&pool->lock, flags);
+ 
+-			schedule_timeout(POOL_TIMEOUT_JIFFIES);
++	page = pool_alloc_page(pool, mem_flags);
++	if (!page)
++		return NULL;
+ 
+-			spin_lock_irqsave(&pool->lock, flags);
+-			__remove_wait_queue(&pool->waitq, &wait);
+-			goto restart;
+-		}
+-		retval = NULL;
+-		goto done;
+-	}
++	spin_lock_irqsave(&pool->lock, flags);
+ 
++	list_add(&page->page_list, &pool->page_list);
+  ready:
+ 	page->in_use++;
+ 	offset = page->offset;
+@@ -348,7 +336,6 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+ #ifdef	DMAPOOL_DEBUG
+ 	memset(retval, POOL_POISON_ALLOCATED, pool->size);
+ #endif
+- done:
+ 	spin_unlock_irqrestore(&pool->lock, flags);
+ 	return retval;
+ }
+-- 
+1.7.9.5
