@@ -1,30 +1,28 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Nov 2012 13:52:40 +0900
-Subject: [PATCH] ARM: dts: exynos4: Add support for Exynos4x12 SoCs
-In-Reply-To: <3301517.VQVR99BHPc@amdc1227>
-References: <1351089359-7318-1-git-send-email-t.figa@samsung.com>
- <0c4501cdbc8f$5336add0$f9a40970$%kim@samsung.com>
- <3301517.VQVR99BHPc@amdc1227>
-Message-ID: <0cee01cdbd6c$e1852750$a48f75f0$%kim@samsung.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu,  8 Nov 2012 06:37:09 +0100
+Subject: [PATCH] [TRIVIAL] ARM: cns3xxx: drop unnessesary symbol selection
+Message-ID: <1352353029-2725-1-git-send-email-kaloz@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> >
-> > [...]
-> >
-> > > +/include/ "exynos4x12-pinctrl.dtsi"
-> >
-> > BTW, I think, above line should be added when exynos4x12-pinctrl patches
-> > applied.
-> 
-> Yes, you are right. Seems like a rebase error on my side. Can you fix it
-> or should I send a fixed version?
-> 
-I did, thanks ;-)
+ARCH_CNS3XXX already selects MIGHT_HAVE_PCI, so boards don't have to
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+---
+ arch/arm/mach-cns3xxx/Kconfig |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-cns3xxx/Kconfig b/arch/arm/mach-cns3xxx/Kconfig
+index 29b13f2..9ebfcc4 100644
+--- a/arch/arm/mach-cns3xxx/Kconfig
++++ b/arch/arm/mach-cns3xxx/Kconfig
+@@ -3,7 +3,6 @@ menu "CNS3XXX platform type"
+ 
+ config MACH_CNS3420VB
+ 	bool "Support for CNS3420 Validation Board"
+-	select MIGHT_HAVE_PCI
+ 	help
+ 	  Include support for the Cavium Networks CNS3420 MPCore Platform
+ 	  Baseboard.
+-- 
+1.7.1
