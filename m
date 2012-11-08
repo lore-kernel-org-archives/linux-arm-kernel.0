@@ -1,153 +1,85 @@
-From: josh.cartwright@ni.com (Josh Cartwright)
-Date: Thu, 8 Nov 2012 12:04:26 -0600
-Subject: [PATCH v2 3/5] ARM: zynq: use zynq clk bindings
-In-Reply-To: <cover.1352400580.git.josh.cartwright@ni.com>
-References: <cover.1352400580.git.josh.cartwright@ni.com>
-Message-ID: <bbeb3c5478706e376a6a9fc02eee168b91035078.1352400580.git.josh.cartwright@ni.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 8 Nov 2012 14:10:45 -0600
+Subject: [PATCH] ARM: OMAP4: TWL: mux sys_drm_msecure as output for PMIC
+In-Reply-To: <20121108192834.GA2962@arwen.pp.htv.fi>
+References: <1352401730-4269-1-git-send-email-khilman@deeprootsystems.com>
+ <20121108192834.GA2962@arwen.pp.htv.fi>
+Message-ID: <20121108201045.GA579@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the Zynq platform use the newly created zynq clk bindings.
+On 21:28-20121108, Felipe Balbi wrote:
+> Hi,
+> 
+> On Thu, Nov 08, 2012 at 11:08:50AM -0800, Kevin Hilman wrote:
+> > From: Kevin Hilman <khilman@ti.com>
+> > 
+> > On OMAP4 boards using the TWL6030 PMIC, the sys_drm_msecure is
+> > connected to the MSECURE input of the TWL6030 PMIC.  This signal
+> > controls the secure-mode operation of the PMIC.  If its not mux'd
+> > correctly, some functionality of the PMIC will not be accessible since
+> > the PMIC will be in secure mode.
+> > 
+> > For example, if the TWL RTC is in secure mode, most of its registers
+> > are read-only, meaning (re)programming the RTC (e.g. for wakeup from
+> > suspend) will fail.
+> > 
+> > To fix, ensure the signal is properly mux'd as output when TWL is
+> > intialized.
+> > 
+> > This fix is required when using recent versions of u-boot (>= v2012.04.01)
+> > since u-boot is no longer setting the default mux for this pin.
+> > 
+> > Signed-off-by: Kevin Hilman <khilman@ti.com>
+> > ---
+> > Based on v3.7-rc4.  Targetted as a fix for v3.7.
+> > 
+> > A correponding DT fix for this is needed as well, but that will be part of 
+> > a bigger series to get PM working with DT boot and needs to include other
+> > pins like sys_nirq1.
+> > 
+> >  arch/arm/mach-omap2/twl-common.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+> > index 635e109..96cae8b 100644
+> > --- a/arch/arm/mach-omap2/twl-common.c
+> > +++ b/arch/arm/mach-omap2/twl-common.c
+> > @@ -73,6 +73,7 @@ void __init omap4_pmic_init(const char *pmic_type,
+> >  {
+> >  	/* PMIC part*/
+> >  	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+> > +	omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
+> >  	omap_pmic_init(1, 400, pmic_type, 7 + OMAP44XX_IRQ_GIC_START, pmic_data);
+> >  
+> >  	/* Register additional devices on i2c1 bus if needed */
+> 
+> not entirely related to $SUBJECT but this essentially means we're
+> dropping the security feature whenever Linux runs.
+Unless we intend to remove RTC driver in it's entirety and implement RTC
+time change update in secure driver, current twl rtc driver was never
+meant to exist with RTC time updates only in trustzone mode. Neither does
+it drop any security feature when ever Linux runs- msecure pin has not
+been used for any other purpose to my knowledge with Linux. So, this
+change does not change the status quo we are currently in,
+> 
+> Shouldn't we try to change that pin at register write boundaries so we
+> keep the secure feature enabled until we know we're going to write to
+> the HW ?
+> 
+> Maybe it could even be done later through pinctrl, perhaps ?
+That might be a better solution I agree. We might be locking down to a
+specific pin name here, which could potentially change in a future SoC.
+The right approach IMHO would be omap_gpio_mux equivalent.
 
-Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
----
- arch/arm/Kconfig                 |  1 +
- arch/arm/boot/dts/zynq-7000.dtsi | 56 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-zc702.dts |  4 +++
- arch/arm/mach-zynq/common.c      | 11 ++++++++
- drivers/clk/Makefile             |  1 +
- 5 files changed, 73 insertions(+)
+Example change for OMAP5 purely from a board perspective(gerrit warning):
+http://review.omapzoom.org/#/c/23819/5/arch/arm/mach-omap2/board-omap5evm.c,unified
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 21ed87b..ccfe0ab 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -959,6 +959,7 @@ config ARCH_ZYNQ
- 	bool "Xilinx Zynq ARM Cortex A9 Platform"
- 	select ARM_AMBA
- 	select ARM_GIC
-+	select COMMON_CLK
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
- 	select ICST
-diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
-index 8b30e59..bb3085c 100644
---- a/arch/arm/boot/dts/zynq-7000.dtsi
-+++ b/arch/arm/boot/dts/zynq-7000.dtsi
-@@ -53,5 +53,61 @@
- 			interrupts = <0 50 4>;
- 			clock = <50000000>;
- 		};
-+
-+		slcr: slcr at f8000000 {
-+			compatible = "xlnx,zynq-slcr";
-+			reg = <0xF8000000 0x1000>;
-+
-+			clocks {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				ps_clk: ps_clk {
-+					#clock-cells = <0>;
-+					compatible = "fixed-clock";
-+					/* clock-frequency set in board-specific file */
-+					clock-output-names = "ps_clk";
-+				};
-+				armpll: armpll {
-+					#clock-cells = <0>;
-+					compatible = "xlnx,zynq-pll";
-+					clocks = <&ps_clk>;
-+					reg = <0x100 0x110>;
-+					clock-output-names = "armpll";
-+				};
-+				ddrpll: ddrpll {
-+					#clock-cells = <0>;
-+					compatible = "xlnx,zynq-pll";
-+					clocks = <&ps_clk>;
-+					reg = <0x104 0x114>;
-+					clock-output-names = "ddrpll";
-+				};
-+				iopll: iopll {
-+					#clock-cells = <0>;
-+					compatible = "xlnx,zynq-pll";
-+					clocks = <&ps_clk>;
-+					reg = <0x108 0x118>;
-+					clock-output-names = "iopll";
-+				};
-+				uart_clk: uart_clk {
-+					#clock-cells = <1>;
-+					compatible = "xlnx,zynq-periph-clock";
-+					clocks = <&iopll &armpll &ddrpll>;
-+					reg = <0x154>;
-+					clock-output-names = "uart0_ref_clk",
-+							     "uart1_ref_clk";
-+				};
-+				cpu_clk: cpu_clk {
-+					#clock-cells = <1>;
-+					compatible = "xlnx,zynq-cpu-clock";
-+					clocks = <&iopll &armpll &ddrpll>;
-+					reg = <0x120 0x1C4>;
-+					clock-output-names = "cpu_6x4x",
-+							     "cpu_3x2x",
-+							     "cpu_2x",
-+							     "cpu_1x";
-+				};
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index e25a307..86f44d5 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -28,3 +28,7 @@
- 	};
- 
- };
-+
-+&ps_clk {
-+	clock-frequency = <33333330>;
-+};
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5441323..79bf5fb 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -19,6 +19,8 @@
- #include <linux/cpumask.h>
- #include <linux/platform_device.h>
- #include <linux/clk.h>
-+#include <linux/clk/zynq.h>
-+#include <linux/of_address.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/of.h>
-@@ -96,6 +98,15 @@ static struct map_desc io_desc[] __initdata = {
- 
- static void __init xilinx_zynq_timer_init(void)
- {
-+	struct device_node *np;
-+	void __iomem *slcr;
-+
-+	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-slcr");
-+	slcr = of_iomap(np, 0);
-+	WARN_ON(!slcr);
-+
-+	xilinx_zynq_clocks_init(slcr);
-+
- 	xttcpss_timer_init();
- }
- 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 71a25b9..d35a34c 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -19,6 +19,7 @@ endif
- obj-$(CONFIG_MACH_LOONGSON1)	+= clk-ls1x.o
- obj-$(CONFIG_ARCH_U8500)	+= ux500/
- obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
-+obj-$(CONFIG_ARCH_ZYNQ)		+= clk-zynq.o
- 
- # Chip specific
- obj-$(CONFIG_COMMON_CLK_WM831X) += clk-wm831x.o
+Further, depending on how it is hooked on a different board (not that I
+have seen any different other than msecure), it might even be hooked on
+to another GPIO, making this scenario not scaling to "theoretical board
+configuration".
+
 -- 
-1.8.0
+Regards,
+Nishanth Menon
