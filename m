@@ -1,26 +1,36 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 8 Nov 2012 17:58:20 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <509BEE6D.9000902@ti.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BDAF5.1010703@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
- <509BEE6D.9000902@ti.com>
-Message-ID: <alpine.DEB.2.00.1211081754390.20703@utopia.booyaka.com>
+Date: Thu, 8 Nov 2012 17:59:55 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: second set of PRCM cleanups for 3.8
+In-Reply-To: <alpine.DEB.2.00.1211071655000.20704@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1211011216130.26661@utopia.booyaka.com>
+ <20121106220833.GQ6801@atomide.com>
+ <alpine.DEB.2.00.1211070150100.8758@utopia.booyaka.com>
+ <20121107015841.GC6801@atomide.com>
+ <alpine.DEB.2.00.1211070227500.8758@utopia.booyaka.com>
+ <alpine.DEB.2.00.1211071655000.20704@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1211081759000.20703@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Nov 2012, Jon Hunter wrote:
+On Wed, 7 Nov 2012, Paul Walmsley wrote:
 
-> Igor was mentioning a h/w scenario where the 32kHz source is not
-> present. However, I am not sure which devices support this and is
-> applicable too.
+> On Wed, 7 Nov 2012, Paul Walmsley wrote:
+> 
+> > On Tue, 6 Nov 2012, Tony Lindgren wrote:
+> > 
+> > > I'm getting errors with the allnoconfig ones, there are total four
+> > > omap defconfigs there not counting the randconfigs.
+> > 
+> > That might indeed explain the discrepancy; so far only have been building 
+> > his oldconfig seeds here.  Will add his allnoconfig seeds and test again.
+> 
+> Can reproduce this here.  Thanks for catching this.  Will fix and send a 
+> new pull request today and ensure that the two allnoconfigs are added to 
+> the build tests from now on.
 
-Pretty sure Igor is referring to the AM3517/3505.  This is very poorly 
-documented, but can be observed in the AM3517 TRM Rev B (SPRUGR0B) Figure 
-4-23 "PRM Clock Generator" and the AM3517 DM Rev C (SPRS550C) Section 4 
-"Clock Specifications".
+Just a quick followup on this one: I observed a couple of minor 
+regressions during the retest, so, will deal with those before sending out 
+a new pull request.
 
 
 - Paul
