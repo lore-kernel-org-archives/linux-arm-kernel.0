@@ -1,82 +1,77 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 8 Nov 2012 13:47:10 -0600
-Subject: [GIT PULL] ARM: OMAP: Timer and Counter DT Updates for v3.8
-In-Reply-To: <20121108173824.GE6801@atomide.com>
-References: <50941812.2070501@ti.com> <20121107004703.GS6801@atomide.com>
- <20121107234403.GS6801@atomide.com> <509BE9B0.5040608@ti.com>
- <20121108173824.GE6801@atomide.com>
-Message-ID: <509C0C3E.6070204@ti.com>
+From: josh.cartwright@ni.com (Josh Cartwright)
+Date: Thu, 8 Nov 2012 12:49:40 -0600
+Subject: [PATCH v2 0/5] zynq clk support
+Message-ID: <cover.1352400580.git.josh.cartwright@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This set is a v2 of my original patchset "zynq COMMON_CLK support" [1].
 
-On 11/08/2012 11:38 AM, Tony Lindgren wrote:
-> * Jon Hunter <jon-hunter@ti.com> [121108 09:21]:
->>
->> On 11/07/2012 05:44 PM, Tony Lindgren wrote:
->>
->> That's a bugger. I completely missed your patch last week sorry (I will blame the Danish
->> beer) and had clearly not folded in to my testing!
-> 
-> :)
->  
->>> I guess we should apply the following fix somewhere or
->>> do we need to check other places too?
->>
->> I will re-test your master branch today and put it through my dmtimer tests to double check.
->> However, in general I did ensure that we checked pdata was not NULL before accessing when 
->> I introduced the dt stuff. In my changelog [1] I had ...
->>
->> "5. When device-tree is present the platform_data structure will be NULL and so check for
->> this."
->>
->> I just need to make sure that get_context_loss_count() is not called before checking it is
->> populated.  
-> 
-> OK
-> 
->   
->>> +
->>> +	if (pdata) {
->>> +		timer->capability = pdata->timer_capability;
->>
->> You don't need this it is already handled a few lines before.
->>
->>> +		timer->get_context_loss_count = pdata->get_context_loss_count;
->>
->> We could probably move this too. For example ...
-> 
-> OK yeah makes sense to me.
-> 
-> Regards,
-> 
-> Tony
->  
->> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
->> index 38c12ef..9dca23e 100644
->> --- a/arch/arm/plat-omap/dmtimer.c
->> +++ b/arch/arm/plat-omap/dmtimer.c
->> @@ -799,12 +799,11 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
->>                 timer->id = pdev->id;
->>                 timer->capability = pdata->timer_capability;
->>                 timer->reserved = omap_dm_timer_reserved_systimer(timer->id);
->> +               timer->get_context_loss_count = pdata->get_context_loss_count;
->>         }
->>  
->>         timer->irq = irq->start;
->>         timer->pdev = pdev;
->> -       timer->capability = pdata->timer_capability;
->> -       timer->get_context_loss_count = pdata->get_context_loss_count;
->>  
->>         /* Skip pm_runtime_enable for OMAP1 */
->>         if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
+This patchset is on top of the arm-next in the Xilinx tree[2], and also
+dependent on my patch "serial: xilinx_uartps: kill CONFIG_OF
+conditional", which I've removed from this patchset at Michal Simek's request.
 
-I have tested the dmtimers with this on the 3430-beagle and 4430-panda
-with and without device tree and is working fine.
+For easy testing, I've made available a branch with my changes here[3].
 
-Do you want to generate the patch or me?
+Changes since v1:
+  - Dropped the moving of the TTC driver.  This will be done in a later
+    patchset.
+  - Fixed TTC periodic tick frequency calculation
+  - Updated basic peripheral clk to support devices with less than two
+    derivative clks.
+  - Fixed dts issues in the uart and ttc (thanks to Lars-Peter Clausen and Michal Simek).
+  - Split out the creation of the clk drivers and the enabling of the
+    drivers for the platform into separate patches.
+  - Updated clk initialization functions to 'bail out' when an error
+    condition is hit.
+  - Addressed stylistic feedback from Lars-Peter Clausen.
 
-Cheers
-Jon
+---
+Patch 1 performs a dts file split for zynq, creating a generic zynq-7000.dtsi
+snippet and a zynq-zc702.dts board specific description.
 
->> [1] http://marc.info/?l=linux-omap&m=135065877008624&w=2
+Patch 2 introduces the zynq clock drivers and bindings.
+
+Patch 3 enables the zynq clock drivers when building for zynq, and
+adds updates the zynq device trees to use the bindings.
+
+Patch 4 updates the xilinx uartps driver to acquire rate information via
+the clk bindings.
+
+Patch 5 updates the xilinx ttc driver to acquire rate information via
+the clk bindings.
+
+---
+[1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/129295.html
+[2]: git://git.xilinx.com/linux-xlnx.git#arm-next
+[3]: git://gi.teric.us/linux-zynq.git#of_clk_v2
+---
+Josh Cartwright (5):
+  ARM: zynq: dts: split up device tree
+  clk: Add support for fundamental zynq clks
+  ARM: zynq: use zynq clk bindings
+  serial: xilinx_uartps: get clock rate info from dts
+  ARM: zynq: add clk binding support to the ttc
+
+ .../devicetree/bindings/clock/zynq-7000.txt        |  55 +++
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/zynq-7000.dtsi                   | 166 +++++++++
+ arch/arm/boot/dts/zynq-ep107.dts                   |  70 ----
+ arch/arm/boot/dts/zynq-zc702.dts                   |  44 +++
+ arch/arm/mach-zynq/common.c                        |  14 +-
+ arch/arm/mach-zynq/timer.c                         | 287 ++++++++-------
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-zynq.c                             | 383 +++++++++++++++++++++
+ drivers/tty/serial/xilinx_uartps.c                 |  30 +-
+ include/linux/clk/zynq.h                           |  24 ++
+ 12 files changed, 870 insertions(+), 206 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/zynq-7000.txt
+ create mode 100644 arch/arm/boot/dts/zynq-7000.dtsi
+ delete mode 100644 arch/arm/boot/dts/zynq-ep107.dts
+ create mode 100644 arch/arm/boot/dts/zynq-zc702.dts
+ create mode 100644 drivers/clk/clk-zynq.c
+ create mode 100644 include/linux/clk/zynq.h
+
+-- 
+1.8.0
