@@ -1,75 +1,19 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Thu, 8 Nov 2012 15:31:56 -0800
-Subject: [PATCH] ARM: OMAP2+: clockdomain: disabling unused clks
-In-Reply-To: <alpine.DEB.2.00.1211081800210.20703@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1211081800210.20703@utopia.booyaka.com>
-Message-ID: <1352417516-15213-1-git-send-email-mturquette@ti.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 8 Nov 2012 15:38:45 -0800
+Subject: [PATCH v2 0/5] zynq clk support
+In-Reply-To: <cover.1352400580.git.josh.cartwright@ni.com>
+References: <cover.1352400580.git.josh.cartwright@ni.com>
+Message-ID: <d3a47d59-f146-464d-8a65-dc50a8f4d8c9@CO9EHSMHS028.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP port to the common clk framework[1] resulted in spurious WARNs
-while disable unused clocks.  This is due to _clkdm_clk_hwmod_disable
-catching clkdm->usecount's with a value of zero.  Even less desirable it
-would not allow the clkdm_clk_disable function pointer to get called due
-to an early return of -ERANGE.
+Hi Josh,
 
-This patch adds a check for such a corner case by skipping the WARN and
-early return in the event that clkdm->usecount and clk->enable_usecount
-are both zero.  Presumably this could only happen during the check for
-unused clocks at boot-time.
+did you also have a look at what is available in the Xilinx git repository?
+There are also quite some patches to support common clock and port drivers over
+to using it.
+It would be great if we could combine our efforts instead of ending up with
+competing solutions.
 
-[1] http://article.gmane.org/gmane.linux.ports.arm.omap/88824
-
-Signed-off-by: Mike Turquette <mturquette@ti.com>
----
- arch/arm/mach-omap2/clockdomain.c |   14 ++++++++++----
- 1 file changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 64e5046..b0c0ce6 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -947,16 +947,22 @@ static int _clkdm_clk_hwmod_enable(struct clockdomain *clkdm)
- 	return 0;
- }
- 
--static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm)
-+static int _clkdm_clk_hwmod_disable(struct clockdomain *clkdm,
-+		struct clk *clk)
- {
- 	unsigned long flags;
-+	int clk_enable_count = 1;
- 
- 	if (!clkdm || !arch_clkdm || !arch_clkdm->clkdm_clk_disable)
- 		return -EINVAL;
- 
- 	spin_lock_irqsave(&clkdm->lock, flags);
- 
--	if (atomic_read(&clkdm->usecount) == 0) {
-+	/* corner case: disabling unused clocks */
-+	if (clk)
-+		clk_enable_count = __clk_get_enable_count(clk);
-+
-+	if (atomic_read(&clkdm->usecount) == 0 && clk_enable_count) {
- 		spin_unlock_irqrestore(&clkdm->lock, flags);
- 		WARN_ON(1); /* underflow */
- 		return -ERANGE;
-@@ -1026,7 +1032,7 @@ int clkdm_clk_disable(struct clockdomain *clkdm, struct clk *clk)
- 	if (!clk)
- 		return -EINVAL;
- 
--	return _clkdm_clk_hwmod_disable(clkdm);
-+	return _clkdm_clk_hwmod_disable(clkdm, clk);
- }
- 
- /**
-@@ -1089,6 +1095,6 @@ int clkdm_hwmod_disable(struct clockdomain *clkdm, struct omap_hwmod *oh)
- 	if (!oh)
- 		return -EINVAL;
- 
--	return _clkdm_clk_hwmod_disable(clkdm);
-+	return _clkdm_clk_hwmod_disable(clkdm, NULL);
- }
- 
--- 
-1.7.9.5
+Thanks,
+Soren
