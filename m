@@ -1,145 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 8 Nov 2012 14:55:48 -0800
-Subject: [PATCH v4 3/9] pinctrl: single: support pinconf generic
-In-Reply-To: <1352301582-12244-4-git-send-email-haojian.zhuang@gmail.com>
-References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
- <1352301582-12244-4-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20121108225547.GL6801@atomide.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Fri, 09 Nov 2012 10:06:15 +1100
+Subject: [PATCH 04/11] ARM: set arch_gettimeoffset directly
+In-Reply-To: <1352408516-21988-6-git-send-email-swarren@wwwdotorg.org>
+References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
+ <1352408516-21988-6-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <509C3AE7.7030703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 09/11/12 08:01, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> remove ARM's struct sys_timer .offset function pointer, and instead
+> directly set the arch_gettimeoffset function pointer when the timer
+> driver is initialized. This requires multiplying all function results
+> by 1000, since the removed arm_gettimeoffset() did this. Also,
+> s/unsigned long/u32/ just to make the function prototypes exactly
+> match that of arch_gettimeoffset.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <rmallon@gmail.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/arm/include/asm/mach/time.h  |    3 ---
+>  arch/arm/kernel/time.c            |   14 --------------
+>  arch/arm/mach-at91/at91x40_time.c |    8 +++++---
+>  arch/arm/mach-ebsa110/core.c      |    7 ++++---
+>  arch/arm/mach-ep93xx/core.c       |   23 ++++++++++++-----------
+>  arch/arm/mach-h720x/common.c      |    6 +++---
+>  arch/arm/mach-h720x/common.h      |    2 +-
+>  arch/arm/mach-h720x/cpu-h7201.c   |    3 ++-
+>  arch/arm/mach-h720x/cpu-h7202.c   |    3 ++-
+>  arch/arm/mach-rpc/time.c          |    6 +++---
+>  arch/arm/plat-samsung/time.c      |    7 ++++---
+>  11 files changed, 36 insertions(+), 46 deletions(-)
 
-Noticed few more things while playing with this.
+<snip>
 
-* Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
->  static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
->  				unsigned pin, unsigned long *config)
->  {
-> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-> +	enum pin_config_param param = pinconf_to_config_param(*config);
-> +	unsigned data;
-> +	u32 offset;
-
-	I suggest adding:
-
-	int res = -ENOTSUPP;
-
+> +static u32 ep93xx_gettimeoffset(void)
+> +{
+> +	int offset;
 > +
-> +	offset = pin * (pcs->width / BITS_PER_BYTE);
-> +	data = pcs->read(pcs->base + offset);
+> +	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
 > +
-> +	switch (param) {
-> +	case PIN_CONFIG_POWER_SOURCE:
-> +		if (pcs->psmask == PCS_OFF_DISABLED
-> +			|| pcs->psshift == PCS_OFF_DISABLED)
-> +			return -ENOTSUPP;
-> +		data &= pcs->psmask;
-> +		data = data >> pcs->psshift;
-> +		*config = data;
-> +		return 0;
-> +		break;
+> +	/* Calculate (1000000 / 983040) * offset.  */
 
-	then you can do:
+This comment is now incorrect, it should say:
 
-		res = 0;
-		break;
+	/* Calculate (1000000000 / 983040) * offset */
 
-	instead of the return 0 and break.
+or perhaps to better explain what is being done:
 
-> +	case PIN_CONFIG_BIAS_DISABLE:
-> +		if (pcs->bmask == PCS_OFF_DISABLED
-> +			|| pcs->bshift == PCS_OFF_DISABLED
-> +			|| pcs->bdis == PCS_OFF_DISABLED)
-> +			return -ENOTSUPP;
-> +		data &= pcs->bmask;
-> +		*config = 0;
-> +		if (data == pcs->bdis)
-> +			return 0;
-> +		else
-> +			return -EINVAL;
-> +		break;
-> +	case PIN_CONFIG_BIAS_PULL_UP:
-> +		if (pcs->bmask == PCS_OFF_DISABLED
-> +			|| pcs->bshift == PCS_OFF_DISABLED
-> +			|| pcs->bpullup == PCS_OFF_DISABLED)
-> +			return -ENOTSUPP;
-> +		data &= pcs->bmask;
-> +		*config = 0;
-> +		if (data == pcs->bpullup)
-> +			return 0;
-> +		else
-> +			return -EINVAL;
-> +		break;
-> +	case PIN_CONFIG_BIAS_PULL_DOWN:
-> +		if (pcs->bmask == PCS_OFF_DISABLED
-> +			|| pcs->bshift == PCS_OFF_DISABLED
-> +			|| pcs->bpulldown == PCS_OFF_DISABLED)
-> +			return -ENOTSUPP;
-> +		data &= pcs->bmask;
-> +		*config = 0;
-> +		if (data == pcs->bpulldown)
-> +			return 0;
-> +		else
-> +			return -EINVAL;
-> +		break;
-> +	default:
-> +		break;
-> +	}
->  	return -ENOTSUPP;
+	/*
+	 * Timer 4 is based on a 983.04 kHz reference clock,
+	 * so dividing by 983040 gives a milli-second value.
+	 * Refactor the calculation to avoid overflow.
+	 */
 
-	return res;
+> +	return (offset + (53 * offset / 3072)) * 1000;
+> +}
 
->  }
-
-
-Did you forget to add the input schmitt handling to pcs_pinconf_get()
-above?
-  
->  static int pcs_pinconf_set(struct pinctrl_dev *pctldev,
->  				unsigned pin, unsigned long config)
->  {
-> -	return -ENOTSUPP;
-> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
-> +	enum pin_config_param config_param = pinconf_to_config_param(config);
-> +	unsigned ret, mask = ~0UL;
-> +	u32 offset, data;
-> +
-> +	switch (config_param) {
-> +	case PIN_CONFIG_POWER_SOURCE:
-> +		if (pcs->psmask == PCS_OFF_DISABLED
-> +			|| pcs->psshift == PCS_OFF_DISABLED)
-> +			return 0;
-> +		mask = pcs->psmask;
-> +		data = (pinconf_to_config_argument(config) << pcs->psshift)
-> +			& pcs->psmask;
-> +		break;
-> +	case PIN_CONFIG_BIAS_DISABLE:
-> +		if (pcs->bmask == PCS_OFF_DISABLED
-> +			|| pcs->bshift == PCS_OFF_DISABLED)
-> +			return 0;
-> +		mask = pcs->bmask;
-> +		data = (pinconf_to_config_argument(config) << pcs->bshift)
-> +			& pcs->bmask;
-> +		break;
-> +	default:
-> +		return 0;
-
-Here we should probably return -ENOTSUPP instead for the unhandled
-ones?
-
-> +	}
-> +	offset = pin * (pcs->width / BITS_PER_BYTE);
-> +	ret = pcs->read(pcs->base + offset) & ~mask;
-> +	pcs->write(ret | data, pcs->base + offset);
-> +	return 0;
->  }
-
-Then looks like pcs_pinconf_set() is also missing handling for few
-of the things configured in the probe?
-
-Regards,
-
-Tony
+~Ryan
