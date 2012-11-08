@@ -1,53 +1,31 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 08 Nov 2012 08:46:20 +0100
-Subject: [PATCH 4/7] ARM: shmobile: remove obsoleted init_consistent_dma_size()
+Date: Thu, 08 Nov 2012 08:46:21 +0100
+Subject: [PATCH 5/7] ARM: at91: remove obsoleted init_consistent_dma_size()
 In-Reply-To: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
 References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1352360783-17523-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1352360783-17523-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-CC: Paul Mundt <lethal@linux-sh.org>
-CC: Magnus Damm <magnus.damm@gmail.com>
+CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+CC: Andrew Victor <linux@maxim.org.za>
+CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c |    6 ------
- arch/arm/mach-shmobile/setup-sh7372.c  |    6 ------
- 2 files changed, 12 deletions(-)
+ arch/arm/mach-at91/at91sam9g45.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 11bb1d9..96f1139 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -66,12 +66,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
- void __init r8a7740_map_io(void)
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 84af1b5..b7ae124 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -343,7 +343,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
+ static void __init at91sam9g45_map_io(void)
  {
- 	iotable_init(r8a7740_io_desc, ARRAY_SIZE(r8a7740_io_desc));
--
--	/*
--	 * DMA memory at 0xff200000 - 0xffdfffff. The default 2MB size isn't
--	 * enough to allocate the frame buffer memory.
--	 */
--	init_consistent_dma_size(12 << 20);
+ 	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
+-	init_consistent_dma_size(SZ_4M);
  }
  
- /* SCIFA0 */
-diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
-index a07954f..be6f746 100644
---- a/arch/arm/mach-shmobile/setup-sh7372.c
-+++ b/arch/arm/mach-shmobile/setup-sh7372.c
-@@ -58,12 +58,6 @@ static struct map_desc sh7372_io_desc[] __initdata = {
- void __init sh7372_map_io(void)
- {
- 	iotable_init(sh7372_io_desc, ARRAY_SIZE(sh7372_io_desc));
--
--	/*
--	 * DMA memory@0xff200000 - 0xffdfffff. The default 2MB size isn't
--	 * enough to allocate the frame buffer memory.
--	 */
--	init_consistent_dma_size(12 << 20);
- }
- 
- /* SCIFA0 */
+ static void __init at91sam9g45_ioremap_registers(void)
 -- 
 1.7.9.5
