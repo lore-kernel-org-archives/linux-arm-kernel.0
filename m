@@ -1,72 +1,57 @@
 From: dxchgb@gmail.com (Daniel Borkmann)
-Date: Thu, 8 Nov 2012 02:28:28 +0100
-Subject: [PATCH net-next 1/2] ARM: net: bpf_jit_32: add XOR instruction for
- BPF JIT
-Message-ID: <20121108012828.GA23143@thinkbox>
+Date: Thu, 8 Nov 2012 02:31:02 +0100
+Subject: [PATCH net-next 2/2] ARM: net: bpf_jit_32: add VLAN instructions
+ for BPF JIT
+Message-ID: <20121108013101.GB23143@thinkbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a follow-up for patch "filter: add XOR instruction for use
-with X/K" that implements BPF ARM JIT parts for the BPF XOR operation.
+This patch is a follow-up for patch "net: filter: add vlan tag access"
+to support the new VLAN_TAG/VLAN_TAG_PRESENT accessors in BPF JIT.
 
 Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
 Cc: Mircea Gherzan <mgherzan@gmail.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/net/bpf_jit_32.c |   15 ++++++++++-----
- arch/arm/net/bpf_jit_32.h |    2 ++
- 2 files changed, 12 insertions(+), 5 deletions(-)
+ arch/arm/net/bpf_jit_32.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index c641fb6..8be702d 100644
+index 8be702d..9af9a69 100644
 --- a/arch/arm/net/bpf_jit_32.c
 +++ b/arch/arm/net/bpf_jit_32.c
-@@ -646,6 +646,16 @@ load_ind:
- 			update_on_xread(ctx);
- 			emit(ARM_ORR_R(r_A, r_A, r_X), ctx);
+@@ -16,6 +16,7 @@
+ #include <linux/netdevice.h>
+ #include <linux/string.h>
+ #include <linux/slab.h>
++#include <linux/if_vlan.h>
+ #include <asm/cacheflush.h>
+ #include <asm/hwcap.h>
+ 
+@@ -168,6 +169,8 @@ static inline bool is_load_to_a(u16 inst)
+ 	case BPF_S_ANC_MARK:
+ 	case BPF_S_ANC_PROTOCOL:
+ 	case BPF_S_ANC_RXHASH:
++	case BPF_S_ANC_VLAN_TAG:
++	case BPF_S_ANC_VLAN_TAG_PRESENT:
+ 	case BPF_S_ANC_QUEUE:
+ 		return true;
+ 	default:
+@@ -815,6 +818,17 @@ b_epilogue:
+ 			off = offsetof(struct sk_buff, rxhash);
+ 			emit(ARM_LDR_I(r_A, r_skb, off), ctx);
  			break;
-+		case BPF_S_ALU_XOR_K:
-+			/* A ^= K; */
-+			OP_IMM3(ARM_EOR, r_A, r_A, k, ctx);
++		case BPF_S_ANC_VLAN_TAG:
++		case BPF_S_ANC_VLAN_TAG_PRESENT:
++			ctx->seen |= SEEN_SKB;
++			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff, vlan_tci) != 2);
++			off = offsetof(struct sk_buff, vlan_tci);
++			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
++			if (inst->code == BPF_S_ANC_VLAN_TAG)
++				OP_IMM3(ARM_AND, r_A, r_A, VLAN_VID_MASK, ctx);
++			else
++				OP_IMM3(ARM_AND, r_A, r_A, VLAN_TAG_PRESENT, ctx);
 +			break;
-+		case BPF_S_ANC_ALU_XOR_X:
-+		case BPF_S_ALU_XOR_X:
-+			/* A ^= X */
-+			update_on_xread(ctx);
-+			emit(ARM_EOR_R(r_A, r_A, r_X), ctx);
-+			break;
- 		case BPF_S_ALU_AND_K:
- 			/* A &= K */
- 			OP_IMM3(ARM_AND, r_A, r_A, k, ctx);
-@@ -762,11 +772,6 @@ b_epilogue:
- 			update_on_xread(ctx);
- 			emit(ARM_MOV_R(r_A, r_X), ctx);
- 			break;
--		case BPF_S_ANC_ALU_XOR_X:
--			/* A ^= X */
--			update_on_xread(ctx);
--			emit(ARM_EOR_R(r_A, r_A, r_X), ctx);
--			break;
- 		case BPF_S_ANC_PROTOCOL:
- 			/* A = ntohs(skb->protocol) */
+ 		case BPF_S_ANC_QUEUE:
  			ctx->seen |= SEEN_SKB;
-diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
-index 7fa2f7d..afb8462 100644
---- a/arch/arm/net/bpf_jit_32.h
-+++ b/arch/arm/net/bpf_jit_32.h
-@@ -69,6 +69,7 @@
- #define ARM_INST_CMP_I		0x03500000
- 
- #define ARM_INST_EOR_R		0x00200000
-+#define ARM_INST_EOR_I		0x02200000
- 
- #define ARM_INST_LDRB_I		0x05d00000
- #define ARM_INST_LDRB_R		0x07d00000
-@@ -135,6 +136,7 @@
- #define ARM_CMP_I(rn, imm)	_AL3_I(ARM_INST_CMP, 0, rn, imm)
- 
- #define ARM_EOR_R(rd, rn, rm)	_AL3_R(ARM_INST_EOR, rd, rn, rm)
-+#define ARM_EOR_I(rd, rn, imm)	_AL3_I(ARM_INST_EOR, rd, rn, imm)
- 
- #define ARM_LDR_I(rt, rn, off)	(ARM_INST_LDR_I | (rt) << 12 | (rn) << 16 \
- 				 | (off))
+ 			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff,
