@@ -1,17 +1,27 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Nov 2012 14:04:28 -0700
-Subject: [PATCH] ARM: delete struct sys_timer
-In-Reply-To: <1352408516-21988-2-git-send-email-swarren@wwwdotorg.org>
-References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
- <1352408516-21988-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <509C1E5C.3060306@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Nov 2012 22:12:52 +0100
+Subject: [PATCH 2/4] gpio: samsung: Skip registration if pinctrl driver is
+ present on Exynos4x12
+In-Reply-To: <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
+References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
+ <1351089457-8205-3-git-send-email-t.figa@samsung.com>
+ <CACRpkdYNDSp0K3wpvUem9ecsW-JQ9L6aKqaOmHNUR65DQTMNHA@mail.gmail.com>
+ <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
+Message-ID: <CACRpkdaOpzFvs_wqy9sdrmx1=wEs5uxqfh_rOrKxLTXV-q1K2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2012 02:01 PM, Stephen Warren wrote:
-> Now that the only field in struct sys_timer is .init, delete the struct,
-> and replace the machine descriptor .timer field with the initialization
-> function itself.
+On Wed, Nov 7, 2012 at 5:41 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Oops. This one patch is a duplicate of 11/11 in the series I just sent.
-Sorry.
+> A commit 1b6056d6 ("pinctrl: samsung: Include bank-specific eint offset in
+> bank struct") which is in your pinctrl tree (samsung branch) changed
+> macro(EXYNOS_PIN_BANK_EINTG) to add offset. Eventually, this series(due to
+> 3rd patch, pinctrl: samsung: Add support for Exynos4x12) breaks compilation
+> without the commit. So if you don't have a plan to rebase samsung branch of
+> your pinctrl tree, I'd like to merge it in my tree. Is it ok to you?
+
+Sure tell me when you've merged it and I'll drop commit 1b6056d6
+from my tree.
+
+Yours,
+Linus Walleij
