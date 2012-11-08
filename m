@@ -1,29 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Nov 2012 15:00:37 +0100
-Subject: [PATCH] ARM: VIC: remove unused irq_base variable
-In-Reply-To: <20121108135537.GZ28327@n2100.arm.linux.org.uk>
-References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
- <201211081340.54440.arnd@arndb.de>
- <20121108135537.GZ28327@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdZR=OKs2YgJ_G8boV7r+ffeNto6OA-pktv8ofn0tg6C-Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 8 Nov 2012 14:05:23 +0000
+Subject: [GIT PULL] vexpress: fixes for v3.8
+In-Reply-To: <1350580125.4984.23.camel@hornet>
+References: <1350580125.4984.23.camel@hornet>
+Message-ID: <201211081405.23202.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2012 at 2:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Nov 08, 2012 at 01:40:54PM +0000, Arnd Bergmann wrote:
->> "ARM: VIC: use irq_domain_add_simple()" causes a new warning:
->>
->> arch/arm/common/vic.c: In function 'vic_of_init':
->> arch/arm/common/vic.c:410:6: warning: unused variable 'irq_base' [-Wunused-variable]
->>
->> Since the irq_base variable is not used any more, it should be
->> removed now
->
-> I've just committed exactly the same patch to my tree...
+On Thursday 18 October 2012, Pawel Moll wrote:
 
-Thanks guys...
-Acked-by, FWIW
+> ----------------------------------------------------------------
+> Pawel Moll (1):
+>       ARM: vexpress: Make the debug UART detection more specific
+> 
 
-Yours,
-Linus Walleij
+Building allyesconfig in linux-next now gives me:
+
+arch/arm/kernel/debug.S: Assembler messages:
+arch/arm/kernel/debug.S:81: Error: selected processor does not support ARM mode `movw r2,#0xc 091'
+arch/arm/kernel/debug.S:81: Error: selected processor does not support ARM mode `movt r2,#0x4 10f'
+arch/arm/kernel/debug.S:97: Error: selected processor does not support ARM mode `movw r2,#0xc 091'
+arch/arm/kernel/debug.S:97: Error: selected processor does not support ARM mode `movt r2,#0x4 10f'
+arch/arm/kernel/debug.S:104: Error: selected processor does not support ARM mode `movw r3,#0x c091'
+arch/arm/kernel/debug.S:104: Error: selected processor does not support ARM mode `movt r3,#0x 410f'
+
+The patch below fixes this. Do you think it's appropriate?
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
+index 0c6abbf..dc8e882 100644
+--- a/arch/arm/include/debug/vexpress.S
++++ b/arch/arm/include/debug/vexpress.S
+@@ -21,6 +21,7 @@
+ #if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
+ 
+ 		.macro	addruart,rp,rv,tmp
++		.arch   armv7-a
+ 
+ 		@ Make an educated guess regarding the memory map:
+ 		@ - the original A9 core tile (based on ARM Cortex-A9 r0p1)
