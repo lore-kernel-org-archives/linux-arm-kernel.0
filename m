@@ -1,129 +1,89 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  7 Nov 2012 18:09:01 -0600
-Subject: [PATCH] ARM: highbank: use common debug_ll_io_init
-Message-ID: <1352333341-9249-1-git-send-email-robherring2@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Nov 2012 16:25:05 -0800
+Subject: [PATCH v4 3/9] pinctrl: single: support pinconf generic
+In-Reply-To: <1352301582-12244-4-git-send-email-haojian.zhuang@gmail.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-4-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121108002505.GT6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Hi,
 
-Remove the platform static mapping code for uart and use the common
-debug_ll_io_init function.
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index a7c5fdd..77aec05 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+>  static int pcs_pinconf_get(struct pinctrl_dev *pctldev,
+>  				unsigned pin, unsigned long *config)
+>  {
+> +	struct pcs_device *pcs = pinctrl_dev_get_drvdata(pctldev);
+> +	enum pin_config_param param = pinconf_to_config_param(*config);
+> +	unsigned data;
+> +	u32 offset;
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
-This is dependent on arm-soc/devel/debug_ll_init and
-arm-soc/calxeda/ecx-2000 branches. 
+Do you need a check here (and also in other pinconf related functions)
+for driver instances that don't have pinconf enabled?
 
-Rob
+Something like:
 
- arch/arm/mach-highbank/Makefile   |    1 -
- arch/arm/mach-highbank/core.h     |    5 -----
- arch/arm/mach-highbank/highbank.c |    8 ++------
- arch/arm/mach-highbank/lluart.c   |   34 ----------------------------------
- 4 files changed, 2 insertions(+), 46 deletions(-)
- delete mode 100644 arch/arm/mach-highbank/lluart.c
+	if (!pcs->pinconf)
+		return -ENOTSUPP;
+...
 
-diff --git a/arch/arm/mach-highbank/Makefile b/arch/arm/mach-highbank/Makefile
-index 3ec8bdd..8a1ef57 100644
---- a/arch/arm/mach-highbank/Makefile
-+++ b/arch/arm/mach-highbank/Makefile
-@@ -3,7 +3,6 @@ obj-y					:= highbank.o system.o smc.o
- plus_sec := $(call as-instr,.arch_extension sec,+sec)
- AFLAGS_smc.o				:=-Wa,-march=armv7-a$(plus_sec)
- 
--obj-$(CONFIG_DEBUG_HIGHBANK_UART)	+= lluart.o
- obj-$(CONFIG_SMP)			+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
- obj-$(CONFIG_PM_SLEEP)			+= pm.o
-diff --git a/arch/arm/mach-highbank/core.h b/arch/arm/mach-highbank/core.h
-index 286ec82..603b536 100644
---- a/arch/arm/mach-highbank/core.h
-+++ b/arch/arm/mach-highbank/core.h
-@@ -2,11 +2,6 @@ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
- extern void highbank_clocks_init(void);
- extern void highbank_restart(char, const char *);
- extern void __iomem *scu_base_addr;
--#ifdef CONFIG_DEBUG_HIGHBANK_UART
--extern void highbank_lluart_map_io(void);
--#else
--static inline void highbank_lluart_map_io(void) {}
--#endif
- 
- #ifdef CONFIG_PM_SLEEP
- extern void highbank_pm_init(void);
-diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
-index 3e60e57..dc24816 100644
---- a/arch/arm/mach-highbank/highbank.c
-+++ b/arch/arm/mach-highbank/highbank.c
-@@ -35,6 +35,7 @@
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- #include <asm/mach/time.h>
- 
- #include "core.h"
-@@ -53,11 +54,6 @@ static void __init highbank_scu_map_io(void)
- 	scu_base_addr = ioremap(base, SZ_4K);
- }
- 
--static void __init highbank_map_io(void)
--{
--	highbank_lluart_map_io();
--}
--
- #define HB_JUMP_TABLE_PHYS(cpu)		(0x40 + (0x10 * (cpu)))
- #define HB_JUMP_TABLE_VIRT(cpu)		phys_to_virt(HB_JUMP_TABLE_PHYS(cpu))
- 
-@@ -211,7 +207,7 @@ static const char *highbank_match[] __initconst = {
- 
- DT_MACHINE_START(HIGHBANK, "Highbank")
- 	.smp		= smp_ops(highbank_smp_ops),
--	.map_io		= highbank_map_io,
-+	.map_io		= debug_ll_io_init,
- 	.init_irq	= highbank_init_irq,
- 	.timer		= &highbank_timer,
- 	.handle_irq	= gic_handle_irq,
-diff --git a/arch/arm/mach-highbank/lluart.c b/arch/arm/mach-highbank/lluart.c
-deleted file mode 100644
-index 3715750..0000000
---- a/arch/arm/mach-highbank/lluart.c
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * Copyright 2011 Calxeda, Inc.
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms and conditions of the GNU General Public License,
-- * version 2, as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-- * more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--#include <linux/init.h>
--#include <asm/page.h>
--#include <asm/sizes.h>
--#include <asm/mach/map.h>
--
--#define HB_DEBUG_LL_PHYS_BASE	0xfff36000
--#define HB_DEBUG_LL_VIRT_BASE	0xfee36000
--
--static struct map_desc lluart_io_desc __initdata = {
--	.virtual	= HB_DEBUG_LL_VIRT_BASE,
--	.pfn		= __phys_to_pfn(HB_DEBUG_LL_PHYS_BASE),
--	.length		= SZ_4K,
--	.type		= MT_DEVICE,
--};
--
--void __init highbank_lluart_map_io(void)
--{
--	iotable_init(&lluart_io_desc, 1);
--}
--- 
-1.7.10.4
+
+> @@ -806,34 +1000,27 @@ static int pcs_dt_node_to_map(struct pinctrl_dev *pctldev,
+>  
+>  	pcs = pinctrl_dev_get_drvdata(pctldev);
+>  
+> -	*map = devm_kzalloc(pcs->dev, sizeof(**map), GFP_KERNEL);
+> -	if (!map)
+> -		return -ENOMEM;
+> +	if (!pcs->conf.nconfs)
+> +		*num_maps = 1;
+> +	else
+> +		*num_maps = 2;
+>  
+> -	*num_maps = 0;
+> +	*map = devm_kzalloc(pcs->dev, sizeof(**map) * (*num_maps), GFP_KERNEL);
+> +	if (!*map)
+> +		return -ENOMEM;
+>  
+>  	pgnames = devm_kzalloc(pcs->dev, sizeof(*pgnames), GFP_KERNEL);
+> -	if (!pgnames) {
+> -		ret = -ENOMEM;
+> -		goto free_map;
+> -	}
+> +	if (!pgnames)
+> +		return -ENOMEM;
+>  
+>  	ret = pcs_parse_one_pinctrl_entry(pcs, np_config, map, pgnames);
+>  	if (ret < 0) {
+>  		dev_err(pcs->dev, "no pins entries for %s\n",
+>  			np_config->name);
+> -		goto free_pgnames;
+> +		return ret;
+>  	}
+> -	*num_maps = 1;
+>  
+>  	return 0;
+> -
+> -free_pgnames:
+> -	devm_kfree(pcs->dev, pgnames);
+> -free_map:
+> -	devm_kfree(pcs->dev, *map);
+> -
+> -	return ret;
+>  }
+
+Here looks like you're changing the behaviour to not free entries in cases
+where parsing with cs_parse_one_pinctrl_entry() fails. I'd prefer the freeing
+it in case of parsing errors so we don't waste memory when the system is
+running. Also there's a tiny chance that *num_maps will be wrong if the
+second devm_kzalloc fails.. But it's more likely that we get a broken device
+tree to parse and end up potentially hogging hundreds of maps.
+
+Regards,
+
+Tony
