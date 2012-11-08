@@ -1,28 +1,32 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 08 Nov 2012 15:14:07 +0000
-Subject: [GIT PULL] vexpress: fixes for v3.8
-In-Reply-To: <201211081405.23202.arnd@arndb.de>
-References: <1350580125.4984.23.camel@hornet>
- <201211081405.23202.arnd@arndb.de>
-Message-ID: <1352387647.20549.10.camel@hornet>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 8 Nov 2012 16:21:08 +0100
+Subject: [PATCH 5/7] ARM: at91: remove obsoleted init_consistent_dma_size()
+In-Reply-To: <1352360783-17523-6-git-send-email-m.szyprowski@samsung.com>
+References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
+ <1352360783-17523-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20121108152108.GI4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-11-08 at 14:05 +0000, Arnd Bergmann wrote:
-> diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
-> index 0c6abbf..dc8e882 100644
-> --- a/arch/arm/include/debug/vexpress.S
-> +++ b/arch/arm/include/debug/vexpress.S
-> @@ -21,6 +21,7 @@
->  #if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
->  
->  		.macro	addruart,rp,rv,tmp
-> +		.arch   armv7-a
+On 08:46 Thu 08 Nov     , Marek Szyprowski wrote:
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+> CC: Andrew Victor <linux@maxim.org.za>
+> CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> ---
+>  arch/arm/mach-at91/at91sam9g45.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+> index 84af1b5..b7ae124 100644
+> --- a/arch/arm/mach-at91/at91sam9g45.c
+> +++ b/arch/arm/mach-at91/at91sam9g45.c
+> @@ -343,7 +343,6 @@ static struct at91_gpio_bank at91sam9g45_gpio[] __initdata = {
+>  static void __init at91sam9g45_map_io(void)
+>  {
+>  	at91_init_sram(0, AT91SAM9G45_SRAM_BASE, AT91SAM9G45_SRAM_SIZE);
+> -	init_consistent_dma_size(SZ_4M);
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Yes, will you apply it on your side (or fold it into the existing
-change) or do you want me to post a patch (or to update the
-vexpress-fixes branch?)
-
-Thanks for spotting this!
-
-Pawe?
+Best Regards,
+J.
