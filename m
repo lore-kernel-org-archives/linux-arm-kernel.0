@@ -1,551 +1,356 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu,  8 Nov 2012 14:01:48 -0700
-Subject: [PATCH 03/11] m68k: set arch_gettimeoffset directly
+Date: Thu,  8 Nov 2012 14:01:49 -0700
+Subject: [PATCH 04/11] ARM: set arch_gettimeoffset directly
 In-Reply-To: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
 References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1352408516-21988-5-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1352408516-21988-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-remove m68k's mach_gettimeoffset function pointer, and instead directly
-set the arch_gettimeoffset function pointer. This requires multiplying
-all function results by 1000, since the removed m68k_gettimeoffset() did
-this. Also, s/unsigned long/u32/ just to make the function prototypes
-exactly match that of arch_gettimeoffset.
+remove ARM's struct sys_timer .offset function pointer, and instead
+directly set the arch_gettimeoffset function pointer when the timer
+driver is initialized. This requires multiplying all function results
+by 1000, since the removed arm_gettimeoffset() did this. Also,
+s/unsigned long/u32/ just to make the function prototypes exactly
+match that of arch_gettimeoffset.
 
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Philip Blundell <philb@gnu.org>
-Cc: Joshua Thompson <funaho@jurai.org>
-Cc: Sam Creasey <sammy@sammy.net>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Andrew Victor <linux@maxim.org.za>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <rmallon@gmail.com>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
- arch/m68k/amiga/config.c        |   10 +++++-----
- arch/m68k/apollo/config.c       |    9 ++++-----
- arch/m68k/atari/config.c        |    4 ++--
- arch/m68k/atari/time.c          |    6 +++---
- arch/m68k/bvme6000/config.c     |   10 +++++-----
- arch/m68k/hp300/config.c        |    2 +-
- arch/m68k/hp300/time.c          |    4 ++--
- arch/m68k/hp300/time.h          |    2 +-
- arch/m68k/include/asm/machdep.h |    2 +-
- arch/m68k/kernel/setup_mm.c     |    1 -
- arch/m68k/kernel/time.c         |    9 ---------
- arch/m68k/mac/config.c          |    4 ++--
- arch/m68k/mac/via.c             |    4 ++--
- arch/m68k/mvme147/config.c      |    8 ++++----
- arch/m68k/mvme16x/config.c      |    8 ++++----
- arch/m68k/q40/config.c          |    8 ++++----
- arch/m68k/sun3/config.c         |    4 ++--
- arch/m68k/sun3/intersil.c       |    4 ++--
- arch/m68k/sun3x/config.c        |    2 +-
- arch/m68k/sun3x/time.c          |    2 +-
- arch/m68k/sun3x/time.h          |    2 +-
- 21 files changed, 47 insertions(+), 58 deletions(-)
+ arch/arm/include/asm/mach/time.h  |    3 ---
+ arch/arm/kernel/time.c            |   14 --------------
+ arch/arm/mach-at91/at91x40_time.c |    8 +++++---
+ arch/arm/mach-ebsa110/core.c      |    7 ++++---
+ arch/arm/mach-ep93xx/core.c       |   23 ++++++++++++-----------
+ arch/arm/mach-h720x/common.c      |    6 +++---
+ arch/arm/mach-h720x/common.h      |    2 +-
+ arch/arm/mach-h720x/cpu-h7201.c   |    3 ++-
+ arch/arm/mach-h720x/cpu-h7202.c   |    3 ++-
+ arch/arm/mach-rpc/time.c          |    6 +++---
+ arch/arm/plat-samsung/time.c      |    7 ++++---
+ 11 files changed, 36 insertions(+), 46 deletions(-)
 
-diff --git a/arch/m68k/amiga/config.c b/arch/m68k/amiga/config.c
-index ee01b7a..b819390 100644
---- a/arch/m68k/amiga/config.c
-+++ b/arch/m68k/amiga/config.c
-@@ -95,7 +95,7 @@ static void amiga_sched_init(irq_handler_t handler);
- static void amiga_get_model(char *model);
- static void amiga_get_hardware_list(struct seq_file *m);
- /* amiga specific timer functions */
--static unsigned long amiga_gettimeoffset(void);
-+static u32 amiga_gettimeoffset(void);
- extern void amiga_mksound(unsigned int count, unsigned int ticks);
- static void amiga_reset(void);
- extern void amiga_init_sound(void);
-@@ -377,7 +377,7 @@ void __init config_amiga(void)
- 	mach_init_IRQ        = amiga_init_IRQ;
- 	mach_get_model       = amiga_get_model;
- 	mach_get_hardware_list = amiga_get_hardware_list;
--	mach_gettimeoffset   = amiga_gettimeoffset;
-+	arch_gettimeoffset   = amiga_gettimeoffset;
+diff --git a/arch/arm/include/asm/mach/time.h b/arch/arm/include/asm/mach/time.h
+index 6ca945f..cac8d9c 100644
+--- a/arch/arm/include/asm/mach/time.h
++++ b/arch/arm/include/asm/mach/time.h
+@@ -35,9 +35,6 @@ struct sys_timer {
+ 	void			(*init)(void);
+ 	void			(*suspend)(void);
+ 	void			(*resume)(void);
+-#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+-	unsigned long		(*offset)(void);
+-#endif
+ };
  
- 	/*
- 	 * default MAX_DMA=0xffffffff on all machines. If we don't do so, the SCSI
-@@ -482,10 +482,10 @@ static void __init amiga_sched_init(irq_handler_t timer_routine)
- #define TICK_SIZE 10000
+ extern void timer_tick(void);
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index b0190b4..ea36bfa 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -69,16 +69,6 @@ unsigned long profile_pc(struct pt_regs *regs)
+ EXPORT_SYMBOL(profile_pc);
+ #endif
  
- /* This is always executed with interrupts disabled.  */
--static unsigned long amiga_gettimeoffset(void)
-+static u32 amiga_gettimeoffset(void)
- {
- 	unsigned short hi, lo, hi2;
--	unsigned long ticks, offset = 0;
-+	u32 ticks, offset = 0;
- 
- 	/* read CIA B timer A current value */
- 	hi  = ciab.tahi;
-@@ -507,7 +507,7 @@ static unsigned long amiga_gettimeoffset(void)
- 	ticks = jiffy_ticks - ticks;
- 	ticks = (10000 * ticks) / jiffy_ticks;
- 
--	return ticks + offset;
-+	return (ticks + offset) * 1000;
- }
- 
- static void amiga_reset(void)  __noreturn;
-diff --git a/arch/m68k/apollo/config.c b/arch/m68k/apollo/config.c
-index f5565d6..3ea56b9 100644
---- a/arch/m68k/apollo/config.c
-+++ b/arch/m68k/apollo/config.c
-@@ -26,7 +26,7 @@ u_long apollo_model;
- 
- extern void dn_sched_init(irq_handler_t handler);
- extern void dn_init_IRQ(void);
--extern unsigned long dn_gettimeoffset(void);
-+extern u32 dn_gettimeoffset(void);
- extern int dn_dummy_hwclk(int, struct rtc_time *);
- extern int dn_dummy_set_clock_mmss(unsigned long);
- extern void dn_dummy_reset(void);
-@@ -151,7 +151,7 @@ void __init config_apollo(void)
- 
- 	mach_sched_init=dn_sched_init; /* */
- 	mach_init_IRQ=dn_init_IRQ;
--	mach_gettimeoffset   = dn_gettimeoffset;
-+	arch_gettimeoffset   = dn_gettimeoffset;
- 	mach_max_dma_address = 0xffffffff;
- 	mach_hwclk           = dn_dummy_hwclk; /* */
- 	mach_set_clock_mmss  = dn_dummy_set_clock_mmss; /* */
-@@ -203,10 +203,9 @@ void dn_sched_init(irq_handler_t timer_routine)
- 		pr_err("Couldn't register timer interrupt\n");
- }
- 
--unsigned long dn_gettimeoffset(void) {
--
-+u32 dn_gettimeoffset(void)
-+{
- 	return 0xdeadbeef;
--
- }
- 
- int dn_dummy_hwclk(int op, struct rtc_time *t) {
-diff --git a/arch/m68k/atari/config.c b/arch/m68k/atari/config.c
-index d8eb327..037c11c 100644
---- a/arch/m68k/atari/config.c
-+++ b/arch/m68k/atari/config.c
-@@ -74,7 +74,7 @@ static void atari_heartbeat(int on);
- 
- /* atari specific timer functions (in time.c) */
- extern void atari_sched_init(irq_handler_t);
--extern unsigned long atari_gettimeoffset (void);
-+extern u32 atari_gettimeoffset(void);
- extern int atari_mste_hwclk (int, struct rtc_time *);
- extern int atari_tt_hwclk (int, struct rtc_time *);
- extern int atari_mste_set_clock_mmss (unsigned long);
-@@ -204,7 +204,7 @@ void __init config_atari(void)
- 	mach_init_IRQ        = atari_init_IRQ;
- 	mach_get_model	 = atari_get_model;
- 	mach_get_hardware_list = atari_get_hardware_list;
--	mach_gettimeoffset   = atari_gettimeoffset;
-+	arch_gettimeoffset   = atari_gettimeoffset;
- 	mach_reset           = atari_reset;
- 	mach_max_dma_address = 0xffffff;
- #if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
-diff --git a/arch/m68k/atari/time.c b/arch/m68k/atari/time.c
-index c0cc68a..da8f981 100644
---- a/arch/m68k/atari/time.c
-+++ b/arch/m68k/atari/time.c
-@@ -42,9 +42,9 @@ atari_sched_init(irq_handler_t timer_routine)
- #define TICK_SIZE 10000
- 
- /* This is always executed with interrupts disabled.  */
--unsigned long atari_gettimeoffset (void)
-+u32 atari_gettimeoffset(void)
- {
--  unsigned long ticks, offset = 0;
-+  u32 ticks, offset = 0;
- 
-   /* read MFP timer C current value */
-   ticks = st_mfp.tim_dt_c;
-@@ -57,7 +57,7 @@ unsigned long atari_gettimeoffset (void)
-   ticks = INT_TICKS - ticks;
-   ticks = ticks * 10000L / INT_TICKS;
- 
--  return ticks + offset;
-+  return (ticks + offset) * 1000;
- }
- 
- 
-diff --git a/arch/m68k/bvme6000/config.c b/arch/m68k/bvme6000/config.c
-index 0bf850a..8943aa4 100644
---- a/arch/m68k/bvme6000/config.c
-+++ b/arch/m68k/bvme6000/config.c
-@@ -38,7 +38,7 @@
- 
- static void bvme6000_get_model(char *model);
- extern void bvme6000_sched_init(irq_handler_t handler);
--extern unsigned long bvme6000_gettimeoffset (void);
-+extern u32 bvme6000_gettimeoffset(void);
- extern int bvme6000_hwclk (int, struct rtc_time *);
- extern int bvme6000_set_clock_mmss (unsigned long);
- extern void bvme6000_reset (void);
-@@ -110,7 +110,7 @@ void __init config_bvme6000(void)
-     mach_max_dma_address = 0xffffffff;
-     mach_sched_init      = bvme6000_sched_init;
-     mach_init_IRQ        = bvme6000_init_IRQ;
--    mach_gettimeoffset   = bvme6000_gettimeoffset;
-+    arch_gettimeoffset   = bvme6000_gettimeoffset;
-     mach_hwclk           = bvme6000_hwclk;
-     mach_set_clock_mmss	 = bvme6000_set_clock_mmss;
-     mach_reset		 = bvme6000_reset;
-@@ -216,13 +216,13 @@ void bvme6000_sched_init (irq_handler_t timer_routine)
-  * results...
-  */
- 
--unsigned long bvme6000_gettimeoffset (void)
-+u32 bvme6000_gettimeoffset(void)
- {
-     volatile RtcPtr_t rtc = (RtcPtr_t)BVME_RTC_BASE;
-     volatile PitRegsPtr pit = (PitRegsPtr)BVME_PIT_BASE;
-     unsigned char msr = rtc->msr & 0xc0;
-     unsigned char t1int, t1op;
--    unsigned long v = 800000, ov;
-+    u32 v = 800000, ov;
- 
-     rtc->msr = 0;	/* Ensure timer registers accessible */
- 
-@@ -246,7 +246,7 @@ unsigned long bvme6000_gettimeoffset (void)
- 	v += 10000;			/* Int pending, + 10ms */
-     rtc->msr = msr;
- 
--    return v;
-+    return v * 1000;
- }
- 
- /*
-diff --git a/arch/m68k/hp300/config.c b/arch/m68k/hp300/config.c
-index bf16af1..b7609f7 100644
---- a/arch/m68k/hp300/config.c
-+++ b/arch/m68k/hp300/config.c
-@@ -251,7 +251,7 @@ void __init config_hp300(void)
- 	mach_sched_init      = hp300_sched_init;
- 	mach_init_IRQ        = hp300_init_IRQ;
- 	mach_get_model       = hp300_get_model;
--	mach_gettimeoffset   = hp300_gettimeoffset;
-+	arch_gettimeoffset   = hp300_gettimeoffset;
- 	mach_hwclk	     = hp300_hwclk;
- 	mach_get_ss	     = hp300_get_ss;
- 	mach_reset           = hp300_reset;
-diff --git a/arch/m68k/hp300/time.c b/arch/m68k/hp300/time.c
-index 29a71be..749543b 100644
---- a/arch/m68k/hp300/time.c
-+++ b/arch/m68k/hp300/time.c
-@@ -46,7 +46,7 @@ static irqreturn_t hp300_tick(int irq, void *dev_id)
- 	return vector(irq, NULL);
- }
- 
--unsigned long hp300_gettimeoffset(void)
-+u32 hp300_gettimeoffset(void)
- {
-   /* Read current timer 1 value */
-   unsigned char lsb, msb1, msb2;
-@@ -59,7 +59,7 @@ unsigned long hp300_gettimeoffset(void)
-     /* A carry happened while we were reading.  Read it again */
-     lsb = in_8(CLOCKBASE + 7);
-   ticks = INTVAL - ((msb2 << 8) | lsb);
--  return (USECS_PER_JIFFY * ticks) / INTVAL;
-+  return ((USECS_PER_JIFFY * ticks) / INTVAL) * 1000;
- }
- 
- void __init hp300_sched_init(irq_handler_t vector)
-diff --git a/arch/m68k/hp300/time.h b/arch/m68k/hp300/time.h
-index 7b98242..f5583ec 100644
---- a/arch/m68k/hp300/time.h
-+++ b/arch/m68k/hp300/time.h
-@@ -1,2 +1,2 @@
- extern void hp300_sched_init(irq_handler_t vector);
--extern unsigned long hp300_gettimeoffset(void);
-+extern u32 hp300_gettimeoffset(void);
-diff --git a/arch/m68k/include/asm/machdep.h b/arch/m68k/include/asm/machdep.h
-index 825c1c8..953ca21 100644
---- a/arch/m68k/include/asm/machdep.h
-+++ b/arch/m68k/include/asm/machdep.h
-@@ -3,6 +3,7 @@
- 
- #include <linux/seq_file.h>
- #include <linux/interrupt.h>
-+#include <linux/time.h>
- 
- struct pt_regs;
- struct mktime;
-@@ -16,7 +17,6 @@ extern void (*mach_init_IRQ) (void);
- extern void (*mach_get_model) (char *model);
- extern void (*mach_get_hardware_list) (struct seq_file *m);
- /* machine dependent timer functions */
--extern unsigned long (*mach_gettimeoffset)(void);
- extern int (*mach_hwclk)(int, struct rtc_time*);
- extern unsigned int (*mach_get_ss)(void);
- extern int (*mach_get_rtc_pll)(struct rtc_pll_info *);
-diff --git a/arch/m68k/kernel/setup_mm.c b/arch/m68k/kernel/setup_mm.c
-index d872ce4..80cfbe5 100644
---- a/arch/m68k/kernel/setup_mm.c
-+++ b/arch/m68k/kernel/setup_mm.c
-@@ -84,7 +84,6 @@ void (*mach_init_IRQ) (void) __initdata = NULL;
- void (*mach_get_model) (char *model);
- void (*mach_get_hardware_list) (struct seq_file *m);
- /* machine dependent timer functions */
--unsigned long (*mach_gettimeoffset) (void);
- int (*mach_hwclk) (int, struct rtc_time*);
- EXPORT_SYMBOL(mach_hwclk);
- int (*mach_set_clock_mmss) (unsigned long);
-diff --git a/arch/m68k/kernel/time.c b/arch/m68k/kernel/time.c
-index c2994c8..bea6bcf 100644
---- a/arch/m68k/kernel/time.c
-+++ b/arch/m68k/kernel/time.c
-@@ -82,11 +82,6 @@ void read_persistent_clock(struct timespec *ts)
- 
- #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
- 
--static u32 m68k_gettimeoffset(void)
+-#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+-static u32 arm_gettimeoffset(void)
 -{
--	return mach_gettimeoffset() * 1000;
--}
+-	if (system_timer->offset != NULL)
+-		return system_timer->offset() * 1000;
 -
- static int __init rtc_init(void)
- {
- 	struct platform_device *pdev;
-@@ -104,9 +99,5 @@ module_init(rtc_init);
+-	return 0;
+-}
+-#endif /* CONFIG_ARCH_USES_GETTIMEOFFSET */
+-
+ #ifndef CONFIG_GENERIC_CLOCKEVENTS
+ /*
+  * Kernel system timer support.
+@@ -164,10 +154,6 @@ device_initcall(timer_init_syscore_ops);
  
  void __init time_init(void)
  {
 -#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
--	arch_gettimeoffset = m68k_gettimeoffset;
+-	arch_gettimeoffset = arm_gettimeoffset;
 -#endif
 -
- 	mach_sched_init(timer_interrupt);
- }
-diff --git a/arch/m68k/mac/config.c b/arch/m68k/mac/config.c
-index d9f62e0..afb95d5 100644
---- a/arch/m68k/mac/config.c
-+++ b/arch/m68k/mac/config.c
-@@ -52,7 +52,7 @@ struct mac_booter_data mac_bi_data;
- static unsigned long mac_orig_videoaddr;
+ 	system_timer = machine_desc->timer;
+ 	system_timer->init();
+ 	sched_clock_postinit();
+diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
+index ee06d7b..eb6151e 100644
+--- a/arch/arm/mach-at91/at91x40_time.c
++++ b/arch/arm/mach-at91/at91x40_time.c
+@@ -41,9 +41,10 @@
+ #define	AT91_TC_CLK1BASE	0x40
+ #define	AT91_TC_CLK2BASE	0x80
  
- /* Mac specific timer functions */
--extern unsigned long mac_gettimeoffset(void);
-+extern u32 mac_gettimeoffset(void);
- extern int mac_hwclk(int, struct rtc_time *);
- extern int mac_set_clock_mmss(unsigned long);
- extern void iop_preinit(void);
-@@ -177,7 +177,7 @@ void __init config_mac(void)
- 	mach_sched_init = mac_sched_init;
- 	mach_init_IRQ = mac_init_IRQ;
- 	mach_get_model = mac_get_model;
--	mach_gettimeoffset = mac_gettimeoffset;
-+	arch_gettimeoffset = mac_gettimeoffset;
- 	mach_hwclk = mac_hwclk;
- 	mach_set_clock_mmss = mac_set_clock_mmss;
- 	mach_reset = mac_reset;
-diff --git a/arch/m68k/mac/via.c b/arch/m68k/mac/via.c
-index 2d85662..5d1458b 100644
---- a/arch/m68k/mac/via.c
-+++ b/arch/m68k/mac/via.c
-@@ -327,7 +327,7 @@ void via_debug_dump(void)
-  * TBI: get time offset between scheduling timer ticks
-  */
- 
--unsigned long mac_gettimeoffset (void)
-+u32 mac_gettimeoffset(void)
+-static unsigned long at91x40_gettimeoffset(void)
++static u32 at91x40_gettimeoffset(void)
  {
- 	unsigned long ticks, offset = 0;
+-	return (at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 / (AT91X40_MASTER_CLOCK / 128));
++	return (at91_tc_read(AT91_TC_CLK1BASE + AT91_TC_CV) * 1000000 /
++		(AT91X40_MASTER_CLOCK / 128)) * 1000;
+ }
  
-@@ -341,7 +341,7 @@ unsigned long mac_gettimeoffset (void)
- 	ticks = MAC_CLOCK_TICK - ticks;
- 	ticks = ticks * 10000L / MAC_CLOCK_TICK;
+ static irqreturn_t at91x40_timer_interrupt(int irq, void *dev_id)
+@@ -63,6 +64,8 @@ void __init at91x40_timer_init(void)
+ {
+ 	unsigned int v;
  
--	return ticks + offset;
-+	return (ticks + offset) * 1000;
++	arch_gettimeoffset = at91x40_gettimeoffset;
++
+ 	at91_tc_write(AT91_TC_BCR, 0);
+ 	v = at91_tc_read(AT91_TC_BMR);
+ 	v = (v & ~AT91_TC_TC1XC1S) | AT91_TC_TC1XC1S_NONE;
+@@ -81,6 +84,5 @@ void __init at91x40_timer_init(void)
+ 
+ struct sys_timer at91x40_timer = {
+ 	.init	= at91x40_timer_init,
+-	.offset	= at91x40_gettimeoffset,
+ };
+ 
+diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+index f0fe6b5..d96dd94 100644
+--- a/arch/arm/mach-ebsa110/core.c
++++ b/arch/arm/mach-ebsa110/core.c
+@@ -158,7 +158,7 @@ static void __init ebsa110_init_early(void)
+  * interrupt, then the PIT counter will roll over (ie, be negative).
+  * This actually works out to be convenient.
+  */
+-static unsigned long ebsa110_gettimeoffset(void)
++static u32 ebsa110_gettimeoffset(void)
+ {
+ 	unsigned long offset, count;
+ 
+@@ -181,7 +181,7 @@ static unsigned long ebsa110_gettimeoffset(void)
+ 	 */
+ 	offset = offset * (1000000 / HZ) / COUNT;
+ 
+-	return offset;
++	return offset * 1000;
+ }
+ 
+ static irqreturn_t
+@@ -215,6 +215,8 @@ static struct irqaction ebsa110_timer_irq = {
+  */
+ static void __init ebsa110_timer_init(void)
+ {
++	arch_gettimeoffset = ebsa110_gettimeoffset;
++
+ 	/*
+ 	 * Timer 1, mode 2, LSB/MSB
+ 	 */
+@@ -227,7 +229,6 @@ static void __init ebsa110_timer_init(void)
+ 
+ static struct sys_timer ebsa110_timer = {
+ 	.init		= ebsa110_timer_init,
+-	.offset		= ebsa110_gettimeoffset,
+ };
+ 
+ static struct plat_serial8250_port serial_platform_data[] = {
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index e85bf17..c084acf 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -140,11 +140,23 @@ static struct irqaction ep93xx_timer_irq = {
+ 	.handler	= ep93xx_timer_interrupt,
+ };
+ 
++static u32 ep93xx_gettimeoffset(void)
++{
++	int offset;
++
++	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
++
++	/* Calculate (1000000 / 983040) * offset.  */
++	return (offset + (53 * offset / 3072)) * 1000;
++}
++
+ static void __init ep93xx_timer_init(void)
+ {
+ 	u32 tmode = EP93XX_TIMER123_CONTROL_MODE |
+ 		    EP93XX_TIMER123_CONTROL_CLKSEL;
+ 
++	arch_gettimeoffset = ep93xx_gettimeoffset;
++
+ 	/* Enable periodic HZ timer.  */
+ 	__raw_writel(tmode, EP93XX_TIMER1_CONTROL);
+ 	__raw_writel(TIMER1_RELOAD, EP93XX_TIMER1_LOAD);
+@@ -158,19 +170,8 @@ static void __init ep93xx_timer_init(void)
+ 	setup_irq(IRQ_EP93XX_TIMER1, &ep93xx_timer_irq);
+ }
+ 
+-static unsigned long ep93xx_gettimeoffset(void)
+-{
+-	int offset;
+-
+-	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
+-
+-	/* Calculate (1000000 / 983040) * offset.  */
+-	return offset + (53 * offset / 3072);
+-}
+-
+ struct sys_timer ep93xx_timer = {
+ 	.init		= ep93xx_timer_init,
+-	.offset		= ep93xx_gettimeoffset,
+ };
+ 
+ 
+diff --git a/arch/arm/mach-h720x/common.c b/arch/arm/mach-h720x/common.c
+index aa1331e..17ef91f 100644
+--- a/arch/arm/mach-h720x/common.c
++++ b/arch/arm/mach-h720x/common.c
+@@ -42,12 +42,12 @@ void __init arch_dma_init(dma_t *dma)
  }
  
  /*
-diff --git a/arch/m68k/mvme147/config.c b/arch/m68k/mvme147/config.c
-index a41c091..1c62628 100644
---- a/arch/m68k/mvme147/config.c
-+++ b/arch/m68k/mvme147/config.c
-@@ -37,7 +37,7 @@
- 
- static void mvme147_get_model(char *model);
- extern void mvme147_sched_init(irq_handler_t handler);
--extern unsigned long mvme147_gettimeoffset (void);
-+extern u32 mvme147_gettimeoffset(void);
- extern int mvme147_hwclk (int, struct rtc_time *);
- extern int mvme147_set_clock_mmss (unsigned long);
- extern void mvme147_reset (void);
-@@ -88,7 +88,7 @@ void __init config_mvme147(void)
- 	mach_max_dma_address	= 0x01000000;
- 	mach_sched_init		= mvme147_sched_init;
- 	mach_init_IRQ		= mvme147_init_IRQ;
--	mach_gettimeoffset	= mvme147_gettimeoffset;
-+	arch_gettimeoffset	= mvme147_gettimeoffset;
- 	mach_hwclk		= mvme147_hwclk;
- 	mach_set_clock_mmss	= mvme147_set_clock_mmss;
- 	mach_reset		= mvme147_reset;
-@@ -127,7 +127,7 @@ void mvme147_sched_init (irq_handler_t timer_routine)
- 
- /* This is always executed with interrupts disabled.  */
- /* XXX There are race hazards in this code XXX */
--unsigned long mvme147_gettimeoffset (void)
-+u32 mvme147_gettimeoffset(void)
+- * Return usecs since last timer reload
++ * Return nsecs since last timer reload
+  * (timercount * (usecs perjiffie)) / (ticks per jiffie)
+  */
+-unsigned long h720x_gettimeoffset(void)
++u32 h720x_gettimeoffset(void)
  {
- 	volatile unsigned short *cp = (volatile unsigned short *)0xfffe1012;
- 	unsigned short n;
-@@ -137,7 +137,7 @@ unsigned long mvme147_gettimeoffset (void)
- 		n = *cp;
- 
- 	n -= PCC_TIMER_PRELOAD;
--	return (unsigned long)n * 25 / 4;
-+	return ((unsigned long)n * 25 / 4) * 1000;
+-	return (CPU_REG (TIMER_VIRT, TM0_COUNT) * tick_usec) / LATCH;
++	return ((CPU_REG(TIMER_VIRT, TM0_COUNT) * tick_usec) / LATCH) * 1000;
  }
  
- static int bcd2int (unsigned char b)
-diff --git a/arch/m68k/mvme16x/config.c b/arch/m68k/mvme16x/config.c
-index b6d7d8a..080a342 100644
---- a/arch/m68k/mvme16x/config.c
-+++ b/arch/m68k/mvme16x/config.c
-@@ -43,7 +43,7 @@ static MK48T08ptr_t volatile rtc = (MK48T08ptr_t)MVME_RTC_BASE;
+ /*
+diff --git a/arch/arm/mach-h720x/common.h b/arch/arm/mach-h720x/common.h
+index 2489537..79cfb97 100644
+--- a/arch/arm/mach-h720x/common.h
++++ b/arch/arm/mach-h720x/common.h
+@@ -13,7 +13,7 @@
+  *
+  */
  
- static void mvme16x_get_model(char *model);
- extern void mvme16x_sched_init(irq_handler_t handler);
--extern unsigned long mvme16x_gettimeoffset (void);
-+extern u32 mvme16x_gettimeoffset(void);
- extern int mvme16x_hwclk (int, struct rtc_time *);
- extern int mvme16x_set_clock_mmss (unsigned long);
- extern void mvme16x_reset (void);
-@@ -289,7 +289,7 @@ void __init config_mvme16x(void)
-     mach_max_dma_address = 0xffffffff;
-     mach_sched_init      = mvme16x_sched_init;
-     mach_init_IRQ        = mvme16x_init_IRQ;
--    mach_gettimeoffset   = mvme16x_gettimeoffset;
-+    arch_gettimeoffset   = mvme16x_gettimeoffset;
-     mach_hwclk           = mvme16x_hwclk;
-     mach_set_clock_mmss	 = mvme16x_set_clock_mmss;
-     mach_reset		 = mvme16x_reset;
-@@ -405,9 +405,9 @@ void mvme16x_sched_init (irq_handler_t timer_routine)
- 
- 
- /* This is always executed with interrupts disabled.  */
--unsigned long mvme16x_gettimeoffset (void)
-+u32 mvme16x_gettimeoffset(void)
+-extern unsigned long h720x_gettimeoffset(void);
++extern u32 h720x_gettimeoffset(void);
+ extern void __init h720x_init_irq(void);
+ extern void __init h720x_map_io(void);
+ extern void h720x_restart(char, const char *);
+diff --git a/arch/arm/mach-h720x/cpu-h7201.c b/arch/arm/mach-h720x/cpu-h7201.c
+index 24df2a3..ba349cf 100644
+--- a/arch/arm/mach-h720x/cpu-h7201.c
++++ b/arch/arm/mach-h720x/cpu-h7201.c
+@@ -46,6 +46,8 @@ static struct irqaction h7201_timer_irq = {
+  */
+ void __init h7201_init_time(void)
  {
--    return (*(volatile unsigned long *)0xfff42008);
-+    return (*(volatile u32 *)0xfff42008) * 1000;
- }
++	arch_gettimeoffset = h720x_gettimeoffset;
++
+ 	CPU_REG (TIMER_VIRT, TM0_PERIOD) = LATCH;
+ 	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_RESET;
+ 	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_REPEAT | TM_START;
+@@ -56,5 +58,4 @@ void __init h7201_init_time(void)
  
- int bcd2int (unsigned char b)
-diff --git a/arch/m68k/q40/config.c b/arch/m68k/q40/config.c
-index 1adb5b7..658542b 100644
---- a/arch/m68k/q40/config.c
-+++ b/arch/m68k/q40/config.c
-@@ -40,7 +40,7 @@ extern void q40_init_IRQ(void);
- static void q40_get_model(char *model);
- extern void q40_sched_init(irq_handler_t handler);
- 
--static unsigned long q40_gettimeoffset(void);
-+static u32 q40_gettimeoffset(void);
- static int q40_hwclk(int, struct rtc_time *);
- static unsigned int q40_get_ss(void);
- static int q40_set_clock_mmss(unsigned long);
-@@ -170,7 +170,7 @@ void __init config_q40(void)
- 	mach_sched_init = q40_sched_init;
- 
- 	mach_init_IRQ = q40_init_IRQ;
--	mach_gettimeoffset = q40_gettimeoffset;
-+	arch_gettimeoffset = q40_gettimeoffset;
- 	mach_hwclk = q40_hwclk;
- 	mach_get_ss = q40_get_ss;
- 	mach_get_rtc_pll = q40_get_rtc_pll;
-@@ -204,9 +204,9 @@ int q40_parse_bootinfo(const struct bi_record *rec)
- }
- 
- 
--static unsigned long q40_gettimeoffset(void)
-+static u32 q40_gettimeoffset(void)
+ struct sys_timer h7201_timer = {
+ 	.init		= h7201_init_time,
+-	.offset		= h720x_gettimeoffset,
+ };
+diff --git a/arch/arm/mach-h720x/cpu-h7202.c b/arch/arm/mach-h720x/cpu-h7202.c
+index c37d570..fb9ca76 100644
+--- a/arch/arm/mach-h720x/cpu-h7202.c
++++ b/arch/arm/mach-h720x/cpu-h7202.c
+@@ -180,6 +180,8 @@ static struct irqaction h7202_timer_irq = {
+  */
+ void __init h7202_init_time(void)
  {
--	return 5000 * (ql_ticks != 0);
-+	return 5000 * (ql_ticks != 0) * 1000;
- }
++	arch_gettimeoffset = h720x_gettimeoffset;
++
+ 	CPU_REG (TIMER_VIRT, TM0_PERIOD) = LATCH;
+ 	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_RESET;
+ 	CPU_REG (TIMER_VIRT, TM0_CTRL) = TM_REPEAT | TM_START;
+@@ -190,7 +192,6 @@ void __init h7202_init_time(void)
  
+ struct sys_timer h7202_timer = {
+ 	.init		= h7202_init_time,
+-	.offset		= h720x_gettimeoffset,
+ };
  
-diff --git a/arch/m68k/sun3/config.c b/arch/m68k/sun3/config.c
-index 2ca25bd..f59ec58 100644
---- a/arch/m68k/sun3/config.c
-+++ b/arch/m68k/sun3/config.c
-@@ -36,7 +36,7 @@
+ void __init h7202_init_irq (void)
+diff --git a/arch/arm/mach-rpc/time.c b/arch/arm/mach-rpc/time.c
+index 581fca9..6ddccb0 100644
+--- a/arch/arm/mach-rpc/time.c
++++ b/arch/arm/mach-rpc/time.c
+@@ -24,7 +24,7 @@
  
- char sun3_reserved_pmeg[SUN3_PMEGS_NUM];
+ #include <asm/mach/time.h>
  
--extern unsigned long sun3_gettimeoffset(void);
-+extern u32 sun3_gettimeoffset(void);
- static void sun3_sched_init(irq_handler_t handler);
- extern void sun3_get_model (char* model);
- extern int sun3_hwclk(int set, struct rtc_time *t);
-@@ -141,7 +141,7 @@ void __init config_sun3(void)
-         mach_sched_init      =  sun3_sched_init;
-         mach_init_IRQ        =  sun3_init_IRQ;
-         mach_reset           =  sun3_reboot;
--	mach_gettimeoffset   =  sun3_gettimeoffset;
-+	arch_gettimeoffset   =  sun3_gettimeoffset;
- 	mach_get_model	     =  sun3_get_model;
- 	mach_hwclk           =  sun3_hwclk;
- 	mach_halt	     =  sun3_halt;
-diff --git a/arch/m68k/sun3/intersil.c b/arch/m68k/sun3/intersil.c
-index 94fe801..889829e 100644
---- a/arch/m68k/sun3/intersil.c
-+++ b/arch/m68k/sun3/intersil.c
-@@ -23,9 +23,9 @@
- #define START_VAL (INTERSIL_RUN | INTERSIL_INT_ENABLE | INTERSIL_24H_MODE)
- 
- /* does this need to be implemented? */
--unsigned long sun3_gettimeoffset(void)
-+u32 sun3_gettimeoffset(void)
+-unsigned long ioc_timer_gettimeoffset(void)
++static u32 ioc_timer_gettimeoffset(void)
  {
--  return 1;
-+  return 1000;
+ 	unsigned int count1, count2, status;
+ 	long offset;
+@@ -56,7 +56,7 @@ unsigned long ioc_timer_gettimeoffset(void)
+ 	}
+ 
+ 	offset = (LATCH - offset) * (tick_nsec / 1000);
+-	return (offset + LATCH/2) / LATCH;
++	return ((offset + LATCH/2) / LATCH) * 1000;
  }
  
- 
-diff --git a/arch/m68k/sun3x/config.c b/arch/m68k/sun3x/config.c
-index dd306c8..0532d64 100644
---- a/arch/m68k/sun3x/config.c
-+++ b/arch/m68k/sun3x/config.c
-@@ -48,7 +48,7 @@ void __init config_sun3x(void)
- 	mach_sched_init      = sun3x_sched_init;
- 	mach_init_IRQ        = sun3_init_IRQ;
- 
--	mach_gettimeoffset   = sun3x_gettimeoffset;
-+	arch_gettimeoffset   = sun3x_gettimeoffset;
- 	mach_reset           = sun3x_reboot;
- 
- 	mach_hwclk           = sun3x_hwclk;
-diff --git a/arch/m68k/sun3x/time.c b/arch/m68k/sun3x/time.c
-index 1d0a724..c8eb08a 100644
---- a/arch/m68k/sun3x/time.c
-+++ b/arch/m68k/sun3x/time.c
-@@ -71,7 +71,7 @@ int sun3x_hwclk(int set, struct rtc_time *t)
- 	return 0;
- }
- /* Not much we can do here */
--unsigned long sun3x_gettimeoffset (void)
-+u32 sun3x_gettimeoffset(void)
+ void __init ioctime_init(void)
+@@ -84,12 +84,12 @@ static struct irqaction ioc_timer_irq = {
+  */
+ static void __init ioc_timer_init(void)
  {
-     return 0L;
++	arch_gettimeoffset = ioc_timer_gettimeoffset;
+ 	ioctime_init();
+ 	setup_irq(IRQ_TIMER0, &ioc_timer_irq);
  }
-diff --git a/arch/m68k/sun3x/time.h b/arch/m68k/sun3x/time.h
-index 6909e12..a4f9126 100644
---- a/arch/m68k/sun3x/time.h
-+++ b/arch/m68k/sun3x/time.h
-@@ -2,7 +2,7 @@
- #define SUN3X_TIME_H
  
- extern int sun3x_hwclk(int set, struct rtc_time *t);
--unsigned long sun3x_gettimeoffset (void);
-+u32 sun3x_gettimeoffset(void);
- void sun3x_sched_init(irq_handler_t vector);
+ struct sys_timer ioc_timer = {
+ 	.init		= ioc_timer_init,
+-	.offset		= ioc_timer_gettimeoffset,
+ };
  
- struct mostek_dt {
+diff --git a/arch/arm/plat-samsung/time.c b/arch/arm/plat-samsung/time.c
+index 60552e2..67206df 100644
+--- a/arch/arm/plat-samsung/time.c
++++ b/arch/arm/plat-samsung/time.c
+@@ -95,7 +95,7 @@ static inline unsigned long timer_ticks_to_usec(unsigned long ticks)
+  * IRQs are disabled before entering here from do_gettimeofday()
+  */
+ 
+-static unsigned long s3c2410_gettimeoffset (void)
++static u32 s3c2410_gettimeoffset(void)
+ {
+ 	unsigned long tdone;
+ 	unsigned long tval;
+@@ -120,7 +120,7 @@ static unsigned long s3c2410_gettimeoffset (void)
+ 			tdone += timer_startval;
+ 	}
+ 
+-	return timer_ticks_to_usec(tdone);
++	return timer_ticks_to_usec(tdone) * 1000;
+ }
+ 
+ 
+@@ -273,6 +273,8 @@ static void __init s3c2410_timer_resources(void)
+ 
+ static void __init s3c2410_timer_init(void)
+ {
++	arch_gettimeoffset = s3c2410_gettimeoffset;
++
+ 	s3c2410_timer_resources();
+ 	s3c2410_timer_setup();
+ 	setup_irq(IRQ_TIMER4, &s3c2410_timer_irq);
+@@ -280,6 +282,5 @@ static void __init s3c2410_timer_init(void)
+ 
+ struct sys_timer s3c24xx_timer = {
+ 	.init		= s3c2410_timer_init,
+-	.offset		= s3c2410_gettimeoffset,
+ 	.resume		= s3c2410_timer_setup
+ };
 -- 
 1.7.0.4
