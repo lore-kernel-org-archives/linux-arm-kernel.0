@@ -1,39 +1,71 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 08 Nov 2012 08:46:23 +0100
-Subject: [PATCH 7/7] ARM: dma-mapping: remove init_consistent_dma_size() stub
-In-Reply-To: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
-References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1352360783-17523-8-git-send-email-m.szyprowski@samsung.com>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 8 Nov 2012 13:23:07 +0530
+Subject: [PATCH v2 00/10] Support for AM33xx PWM Susbsytem
+Message-ID: <1352361197-27442-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit e9da6e9905e639b0 ("ARM: dma-mapping: remove custom consistent
-dma region") setting consistent dma memory size is not longer required. All
-calls to this function has been already removed, so the
-init_consistent_dma_size() stub can also be gone.
+In AM33xx PWM sub modules like ECAP, EHRPWM & EQEP are  integrated to
+PWM subsystem. All these submodules shares the resources (clock) & has
+a clock gating register in PWM Subsystem. This patch series creates a
+parent PWM Subsystem driver to handle access synchronization of shared
+resources & clock gating from PWM Subsystem configuration space.
+Also Device tree nodes populated to support parent child relation
+between PWMSS, ECAP & EHRPWM submodules.
+In addition EHRPWM module requires explicit clock gating from control
+module & is handled by patch #2 & 8.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/include/asm/dma-mapping.h |    7 -------
- 1 file changed, 7 deletions(-)
+Patch #4 & 5 submitted is a second revision as suggested by  Thierry
+for handling clock gating with a global function . This requires config
+space handling done independent from driver and is done at parent driver.
+So the parent<->child relation adopted to handle
+1. pm runtime synchronization
+2. PWM subsystem common config space clock gating for PWM submodules.
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index 2300484..8ea02ac 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -211,13 +211,6 @@ static inline void dma_free_writecombine(struct device *dev, size_t size,
- extern void __init init_dma_coherent_pool_size(unsigned long size);
- 
- /*
-- * This can be called during boot to increase the size of the consistent
-- * DMA region above it's default value of 2MB. It must be called before the
-- * memory allocator is initialised, i.e. before any core_initcall.
-- */
--static inline void init_consistent_dma_size(unsigned long size) { }
--
--/*
-  * For SA-1111, IXP425, and ADI systems  the dma-mapping functions are "magic"
-  * and utilize bounce buffers as needed to work around limited DMA windows.
-  *
--- 
-1.7.9.5
+Patches supports
+- Driver support for parent child relation handled patch #1
+- Optional EHRPWM tb clock in patch #2
+- Parent child in HWMOD handled at patch #3
+- Device tree binding support handled in patch #4, 6 &8
+- pinctrl support in patch #5 & 7.
+- DT node populated in patch #9 & 10.
+
+This patch series based on linux-next/20121031 and tested on AM33xx.
+It depends on [1]
+
+1. https://lkml.org/lkml/2012/10/29/589
+pwm: Device tree support for PWM polarity
+
+Philip, Avinash (10):
+  PWMSS: Add PWM Subsystem driver for parent<->child relationship
+  ARM: am33xx: clk: Add optional clock for EHRPWM
+  ARM: OMAP: AM33xx hwmod: Add parent-child relationship for PWM
+    subsystem
+  pwm: pwm-tiecap: Add device-tree binding support for APWM driver
+  pwm: pwm-tiecap: pinctrl support
+  pwm: pwm-tiehrpwm: Add device-tree binding support for EHRPWM driver
+  pwm: pwm-tiehrpwm: pinctrl support
+  pwm: pwm-tiehrpwm: Adding TBCLK gating support.
+  ARM: dts: AM33XX: Add PWMSS device tree nodes
+  ARM: dts: AM33XX: Add PWM backlight DT data to am335x-evm
+
+ .../devicetree/bindings/pwm/pwm-tiecap.txt         |   22 +
+ .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |   25 ++
+ Documentation/devicetree/bindings/pwm/tipwmss.txt  |   30 ++
+ arch/arm/boot/dts/am335x-evm.dts                   |   21 +
+ arch/arm/boot/dts/am33xx.dtsi                      |   90 +++++
+ arch/arm/mach-omap2/clock33xx_data.c               |   37 ++
+ arch/arm/mach-omap2/control.h                      |    8 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  419 +++++++++++++-------
+ drivers/pwm/Kconfig                                |   11 +
+ drivers/pwm/Makefile                               |    1 +
+ drivers/pwm/pwm-tiecap.c                           |   54 +++-
+ drivers/pwm/pwm-tiehrpwm.c                         |   75 ++++-
+ drivers/pwm/tipwmss.c                              |  142 +++++++
+ drivers/pwm/tipwmss.h                              |   30 ++
+ 14 files changed, 820 insertions(+), 145 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-tiehrpwm.txt
+ create mode 100644 Documentation/devicetree/bindings/pwm/tipwmss.txt
+ create mode 100644 drivers/pwm/tipwmss.c
+ create mode 100644 drivers/pwm/tipwmss.h
