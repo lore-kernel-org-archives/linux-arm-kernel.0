@@ -1,31 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Nov 2012 15:32:31 +0000
-Subject: [GIT PULL] vexpress: fixes for v3.8
-In-Reply-To: <1352387647.20549.10.camel@hornet>
-References: <1350580125.4984.23.camel@hornet>
- <201211081405.23202.arnd@arndb.de> <1352387647.20549.10.camel@hornet>
-Message-ID: <201211081532.31454.arnd@arndb.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 08 Nov 2012 15:35:52 +0000
+Subject: [PATCH 1/2] leds: Add generic support for memory mapped LEDs
+In-Reply-To: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
+References: <1351792722-15250-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1352388952.20549.12.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 November 2012, Pawel Moll wrote:
-> On Thu, 2012-11-08 at 14:05 +0000, Arnd Bergmann wrote:
-> > diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
-> > index 0c6abbf..dc8e882 100644
-> > --- a/arch/arm/include/debug/vexpress.S
-> > +++ b/arch/arm/include/debug/vexpress.S
-> > @@ -21,6 +21,7 @@
-> >  #if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
-> >  
-> >               .macro  addruart,rp,rv,tmp
-> > +             .arch   armv7-a
-> 
-> Yes, will you apply it on your side (or fold it into the existing
-> change) or do you want me to post a patch (or to update the
-> vexpress-fixes branch?)
-> 
-> Thanks for spotting this!
+Hi Bryan, Richard,
 
-I've applied it manually now and added you Acked-by.
+On Thu, 2012-11-01 at 17:58 +0000, Pawel Moll wrote:
+> LEDs are often controlled by writing to memory mapped
+> register. This patch adds:
+> 
+> 1. Generic functions for platform code and drivers to create
+>    class device for LEDs controlled by arbitrary bit masks.
+>    The control register value is read, modified by logic AND
+>    and OR operations with respective mask and written back.
+> 
+> 2. A platform driver for simple use case when one or more LED
+>    are controlled by consecutive bits in a register pointed
+>    at by the platform device's memory resource. It can be
+>    particularly useful for MFD cells being part of an other
+>    device.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 
-	Arnd
+It's just a friendly and polite nag - any thoughts or feelings about
+this?
+
+Cheers!
+
+Pawe?
