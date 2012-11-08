@@ -1,42 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Nov 2012 14:05:23 +0000
-Subject: [GIT PULL] vexpress: fixes for v3.8
-In-Reply-To: <1350580125.4984.23.camel@hornet>
-References: <1350580125.4984.23.camel@hornet>
-Message-ID: <201211081405.23202.arnd@arndb.de>
+Date: Thu, 8 Nov 2012 14:08:41 +0000
+Subject: [PATCH V6 3/6] arm: cache-l2x0: add support for Aurora L2 cache
+ ctrl
+In-Reply-To: <508666A6.9040701@free-electrons.com>
+References: <CAHkRjk7YdzB_RMCjY7SkzPVwEvuk17akJxaNeNmAuqZpwX_kfQ@mail.gmail.com>
+ <20121023090154.GP21164@n2100.arm.linux.org.uk>
+ <508666A6.9040701@free-electrons.com>
+Message-ID: <201211081408.41983.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 October 2012, Pawel Moll wrote:
+The newly introduced l2_wt_override should be in the same #ifdef
+as the code using it, otherwise we get:
 
-> ----------------------------------------------------------------
-> Pawel Moll (1):
->       ARM: vexpress: Make the debug UART detection more specific
-> 
-
-Building allyesconfig in linux-next now gives me:
-
-arch/arm/kernel/debug.S: Assembler messages:
-arch/arm/kernel/debug.S:81: Error: selected processor does not support ARM mode `movw r2,#0xc 091'
-arch/arm/kernel/debug.S:81: Error: selected processor does not support ARM mode `movt r2,#0x4 10f'
-arch/arm/kernel/debug.S:97: Error: selected processor does not support ARM mode `movw r2,#0xc 091'
-arch/arm/kernel/debug.S:97: Error: selected processor does not support ARM mode `movt r2,#0x4 10f'
-arch/arm/kernel/debug.S:104: Error: selected processor does not support ARM mode `movw r3,#0x c091'
-arch/arm/kernel/debug.S:104: Error: selected processor does not support ARM mode `movt r3,#0x 410f'
-
-The patch below fixes this. Do you think it's appropriate?
+arch/arm/mm/cache-l2x0.c:37:12: warning: 'l2_wt_override' defined but not used
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+On Tuesday 23 October 2012, Gregory CLEMENT wrote:
+> @@ -33,6 +34,11 @@ static DEFINE_RAW_SPINLOCK(l2x0_lock);
+>  static u32 l2x0_way_mask;      /* Bitmask of active ways */
+>  static u32 l2x0_size;
+>  static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+> +static int l2_wt_override;
+> +
+> +/* Aurora don't have the cache ID register available, so we have to
+> + * pass it though the device tree */
+> +static u32  cache_id_part_number_from_dt;
 
-diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
-index 0c6abbf..dc8e882 100644
---- a/arch/arm/include/debug/vexpress.S
-+++ b/arch/arm/include/debug/vexpress.S
-@@ -21,6 +21,7 @@
- #if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 92ee4a0..6911b8b 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -34,7 +34,6 @@ static DEFINE_RAW_SPINLOCK(l2x0_lock);
+ static u32 l2x0_way_mask;	/* Bitmask of active ways */
+ static u32 l2x0_size;
+ static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+-static int l2_wt_override;
  
- 		.macro	addruart,rp,rv,tmp
-+		.arch   armv7-a
+ /* Aurora don't have the cache ID register available, so we have to
+  * pass it though the device tree */
+@@ -424,6 +423,8 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ }
  
- 		@ Make an educated guess regarding the memory map:
- 		@ - the original A9 core tile (based on ARM Cortex-A9 r0p1)
+ #ifdef CONFIG_OF
++static int l2_wt_override;
++
+ /*
+  * Note that the end addresses passed to Linux primitives are
+  * noninclusive, while the hardware cache range operations use
