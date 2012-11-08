@@ -1,88 +1,31 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 08 Nov 2012 13:51:21 +0530
-Subject: [PATCH v2 2/2] ARM: Exynos5250: Enabling ohci-exynos driver
-In-Reply-To: <CAFp+6iH20vwDit-=wk=HfPDArjr_Kuoj5AaVgTv_drjjz+23zQ@mail.gmail.com>
-References: <CAFp+6iH20vwDit-=wk=HfPDArjr_Kuoj5AaVgTv_drjjz+23zQ@mail.gmail.com>
-Message-ID: <1352362881-14653-1-git-send-email-gautam.vivek@samsung.com>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 08 Nov 2012 09:21:27 +0100
+Subject: [PATCH] pwm: lpc32xx - Add a driver for the motor PWM
+In-Reply-To: <20121107203028.GA6186@avionic-0098.mockup.avionic-design.de>
+References: <1352305828-25298-1-git-send-email-alban.bedel@avionic-design.de>
+ <509A982A.6020401@antcom.de>
+ <20121107203028.GA6186@avionic-0098.mockup.avionic-design.de>
+Message-ID: <509B6B87.8030102@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding OHCI device tree node for Exynos5250 along with
-the device base address.
+On 07/11/12 21:30, Thierry Reding wrote:
+> On Wed, Nov 07, 2012 at 06:19:38PM +0100, Roland Stigge wrote:
+>> On 07/11/12 17:30, Alban Bedel wrote:
+>>> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de> --- 
+>>> .../devicetree/bindings/pwm/lpc32xx-motor-pwm.txt  |   24 ++ 
+>>> arch/arm/boot/dts/lpc32xx.dtsi                     |    7 +
+>> 
+>> Is all this supposed to go via mach-lpc32xx -> arm-soc.git? Then,
+>> I can take this into the lpc32xx tree. Otherwise, you can split
+>> off the .dtsi file and I include it via lpc32xx.
+> 
+> I'd prefer a split between the arch/arm changes and the rest. I'll
+> take the drivers/pwm and Documentation changes through the PWM
+> tree.
 
-Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-Acked-by: Jingoo Han <jg1.han@samsung.com>
----
- .../devicetree/bindings/usb/exynos-usb.txt         |   15 +++++++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++++
- arch/arm/mach-exynos/include/mach/map.h            |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 ++
- 4 files changed, 24 insertions(+), 0 deletions(-)
+OK, I'll organize everything lpc32xx specific under arch/arm/
 
-diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-index 833f5cf..5ff3def1 100644
---- a/Documentation/devicetree/bindings/usb/exynos-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
-@@ -23,3 +23,18 @@ Example:
- 		interrupts = <0 71 0>;
- 		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
- 	};
-+
-+OHCI
-+Required properties:
-+ - compatible: should be "samsung,exynos-ohci" for USB 2.0
-+   OHCI companion controller in host mode.
-+ - reg: physical base address of the controller and length of memory mapped
-+   region.
-+ - interrupts: interrupt number to the cpu.
-+
-+Example:
-+	usb at 12120000 {
-+		compatible = "samsung,exynos-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+	};
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 2995445..f18abe0 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -244,6 +244,12 @@
- 		interrupts = <0 71 0>;
- 	};
- 
-+	usb at 12120000 {
-+		compatible = "samsung,exynos-ohci";
-+		reg = <0x12120000 0x100>;
-+		interrupts = <0 71 0>;
-+	};
-+
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 9a86b99..471ffaf 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -198,6 +198,7 @@
- #define EXYNOS4_PA_OHCI			0x12590000
- #define EXYNOS4_PA_HSPHY		0x125B0000
- #define EXYNOS5_PA_EHCI			0x12110000
-+#define EXYNOS5_PA_OHCI			0x12120000
- #define EXYNOS4_PA_MFC			0x13400000
- 
- #define EXYNOS4_PA_UART			0x13800000
-diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
-index 89fa624..c03f3dd 100644
---- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-+++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-@@ -88,6 +88,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
- 				"exynos5-mixer", NULL),
- 	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
- 				"s5p-ehci", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos-ohci", EXYNOS5_PA_OHCI,
-+				"exynos-ohci", NULL),
- 	{},
- };
- 
--- 
-1.7.6.5
+Thanks,
+
+Roland
