@@ -1,27 +1,111 @@
 From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 08 Nov 2012 12:24:23 +0530
-Subject: [PATCH v2 0/2] Enable ehci and ohci devices for exynos5250
-Message-ID: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
+Date: Thu, 08 Nov 2012 12:24:24 +0530
+Subject: [PATCH v2 1/2] ARM: Exynos5250: Enabling ehci-s5p driver
+In-Reply-To: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
+References: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1352357665-7435-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes from v1:
- - Changed the device node names from 'ehci' and 'ohci' to
-   'usb at 12110000' and 'usb at 12120000' as per discussion for the
-   change 'http://www.spinics.net/lists/linux-usb/msg73993.html'
- - Rebased on for-next branch of linux-samsung.
+Adding EHCI device tree node for Exynos5250 along with
+the device base adress and gpio line for vbus.
 
-Vivek Gautam (2):
-  ARM: Exynos5250: Enabling ehci-s5p driver
-  ARM: Exynos5250: Enabling ohci-exynos driver
-
- .../devicetree/bindings/usb/exynos-usb.txt         |   40 ++++++++++++++++++++
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 ++
- arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++++
- arch/arm/mach-exynos/include/mach/map.h            |    2 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    4 ++
- 5 files changed, 62 insertions(+), 0 deletions(-)
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Acked-by: Jingoo Han <jg1.han@samsung.com>
+---
+ .../devicetree/bindings/usb/exynos-usb.txt         |   25 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 +++
+ arch/arm/boot/dts/exynos5250.dtsi                  |    6 ++++
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
+ 5 files changed, 38 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
 
+diff --git a/Documentation/devicetree/bindings/usb/exynos-usb.txt b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+new file mode 100644
+index 0000000..833f5cf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/exynos-usb.txt
+@@ -0,0 +1,25 @@
++Samsung Exynos SoC USB controller
++
++The USB devices interface with USB controllers on Exynos SOCs.
++The device node has following properties.
++
++EHCI
++Required properties:
++ - compatible: should be "samsung,exynos-ehci" for USB 2.0
++   EHCI controller in host mode.
++ - reg: physical base address of the controller and length of memory mapped
++   region.
++ - interrupts: interrupt number to the cpu.
++
++Optional properties:
++ - samsung,vbus-gpio:  if present, specifies the GPIO that
++   needs to be pulled up for the bus to be powered.
++
++Example:
++
++	usb at 12110000 {
++		compatible = "samsung,exynos-ehci";
++		reg = <0x12110000 0x100>;
++		interrupts = <0 71 0>;
++		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
++	};
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 405009c..7c8064f 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -193,4 +193,8 @@
+ 	hdmi {
+ 		hpd-gpio = <&gpx3 7 0xf 1 3>;
+ 	};
++
++	usb at 12110000 {
++		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index cf6a02d..2995445 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -238,6 +238,12 @@
+ 		#size-cells = <0>;
+ 	};
+ 
++	usb at 12110000 {
++		compatible = "samsung,exynos-ehci";
++		reg = <0x12110000 0x100>;
++		interrupts = <0 71 0>;
++	};
++
+ 	amba {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
+index ef4958b..9a86b99 100644
+--- a/arch/arm/mach-exynos/include/mach/map.h
++++ b/arch/arm/mach-exynos/include/mach/map.h
+@@ -197,6 +197,7 @@
+ #define EXYNOS4_PA_EHCI			0x12580000
+ #define EXYNOS4_PA_OHCI			0x12590000
+ #define EXYNOS4_PA_HSPHY		0x125B0000
++#define EXYNOS5_PA_EHCI			0x12110000
+ #define EXYNOS4_PA_MFC			0x13400000
+ 
+ #define EXYNOS4_PA_UART			0x13800000
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index ed37273..f60994e 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -86,6 +86,8 @@ static const struct of_dev_auxdata exynos5250_auxdata_lookup[] __initconst = {
+ 				"exynos5-hdmi", NULL),
+ 	OF_DEV_AUXDATA("samsung,exynos5-mixer", 0x14450000,
+ 				"exynos5-mixer", NULL),
++	OF_DEV_AUXDATA("samsung,exynos-ehci", EXYNOS5_PA_EHCI,
++					"s5p-ehci", NULL),
+ 	{},
+ };
+ 
 -- 
 1.7.6.5
