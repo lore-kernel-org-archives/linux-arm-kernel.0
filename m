@@ -1,52 +1,30 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Nov 2012 13:49:47 +0900
-Subject: [PATCH 2/4] ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of
- Exynos4210 SOC
-In-Reply-To: <201210300956.23102.b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
- <1351504796-24788-3-git-send-email-b.zolnierkie@samsung.com>
- <508EBBB6.2090006@samsung.com> <201210300956.23102.b.zolnierkie@samsung.com>
-Message-ID: <0cea01cdbd6c$7ace7200$706b5600$%kim@samsung.com>
+Date: Thu, 08 Nov 2012 13:52:05 +0900
+Subject: [PATCH] ARM: EXYNOS5: Remove wrongly placed usb2.0 PHY_CFG
+ definition from PMU_REG
+In-Reply-To: <003b01cda5f8$f84e35c0$e8eaa140$%han@samsung.com>
+References: <1349443590-29901-1-git-send-email-gautam.vivek@samsung.com>
+ <003b01cda5f8$f84e35c0$e8eaa140$%han@samsung.com>
+Message-ID: <0cec01cdbd6c$cd290e70$677b2b50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartlomiej Zolnierkiewicz wrote:
+Jingoo Han wrote:
 > 
-> > Hmm...above change and adding definition of EXYNOS_PA_S_MDMA1 address
-> > can fix the problem you commented on EXYNOS4210 Rev0 without others?...
+> On Friday, October 05, 2012 10:27 PM Vivek Gautam wrote
+> >
+> > EXYNOS5_USB_CFG macro should actually point to USB20PHY_CFG
+> > system register (base addr + 0x230). It's wrongly placed in regs-pmu.
+> > Actual register at offset 0x230 in PMU is SEQ_TRANSITION4.
+> >
+> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
 > 
-> The problem is affecting only EXYNOS4210 Rev0 and the fix is applied only
-> for case when soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_0,
-> or did you mean something else?
+> As you mentioned, this definition is wrong.
+> So, it should be removed.
 > 
-Yeah, I know. I mean just adding secure mdma1 address is enough for
-exynos4210 rev0.
-
-8<-----
-@@ -275,6 +275,9 @@ static int __init exynos_dma_init(void)
- 		exynos_pdma1_pdata.nr_valid_peri =
- 			ARRAY_SIZE(exynos4210_pdma1_peri);
- 		exynos_pdma1_pdata.peri_id = exynos4210_pdma1_peri;
-+
-+		if (samsung_rev() == EXYNOS4210_REV_0)
-+			exynos_mdma1_device.res.start = EXYNOS4_PA_S_MDMA1;
- 	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
- 		exynos_pdma0_pdata.nr_valid_peri =
- 			ARRAY_SIZE(exynos4212_pdma0_peri);
-diff --git a/arch/arm/mach-exynos/include/mach/map.h
-b/arch/arm/mach-exynos/include/mach/map.h
-index 8480849..0abfe78 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -90,6 +90,7 @@
- 
- #define EXYNOS4_PA_MDMA0		0x10810000
- #define EXYNOS4_PA_MDMA1		0x12850000
-+#define EXYNOS4_PA_S_MDMA1		0x12840000
- #define EXYNOS4_PA_PDMA0		0x12680000
- #define EXYNOS4_PA_PDMA1		0x12690000
- #define EXYNOS5_PA_MDMA0		0x10800000
-8<----
+> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+> 
+Applied, thanks.
 
 Thanks.
 
