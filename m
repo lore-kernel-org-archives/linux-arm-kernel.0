@@ -1,27 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Nov 2012 22:12:52 +0100
-Subject: [PATCH 2/4] gpio: samsung: Skip registration if pinctrl driver is
- present on Exynos4x12
-In-Reply-To: <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
-References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
- <1351089457-8205-3-git-send-email-t.figa@samsung.com>
- <CACRpkdYNDSp0K3wpvUem9ecsW-JQ9L6aKqaOmHNUR65DQTMNHA@mail.gmail.com>
- <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
-Message-ID: <CACRpkdaOpzFvs_wqy9sdrmx1=wEs5uxqfh_rOrKxLTXV-q1K2Q@mail.gmail.com>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Thu, 08 Nov 2012 22:27:59 +0100
+Subject: scheduler clock for MXS
+In-Reply-To: <20121106224624.GR28327@n2100.arm.linux.org.uk>
+References: <5093D8DE.70505@meduna.org>
+ <20121105025753.GA26528@S2100-06.ap.freescale.net>
+ <50978370.9060001@meduna.org>
+ <20121105134655.GB27260@S2100-06.ap.freescale.net>
+ <5097E4A9.3090008@meduna.org> <20121105222859.GI28327@n2100.arm.linux.org.uk>
+ <5098CB9F.9030401@meduna.org>
+ <20121106134630.GD27643@S2100-06.ap.freescale.net>
+ <20121106202038.GB32398@n2100.arm.linux.org.uk> <50998F94.8000908@meduna.org>
+ <20121106224624.GR28327@n2100.arm.linux.org.uk>
+Message-ID: <509C23DF.1020106@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2012 at 5:41 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On 06.11.2012 23:46, Russell King - ARM Linux wrote:
 
-> A commit 1b6056d6 ("pinctrl: samsung: Include bank-specific eint offset in
-> bank struct") which is in your pinctrl tree (samsung branch) changed
-> macro(EXYNOS_PIN_BANK_EINTG) to add offset. Eventually, this series(due to
-> 3rd patch, pinctrl: samsung: Add support for Exynos4x12) breaks compilation
-> without the commit. So if you don't have a plan to rebase samsung branch of
-> your pinctrl tree, I'd like to merge it in my tree. Is it ok to you?
+>  * round_jiffies - function to round jiffies to a full second
+> 
+> This is probably it.  With mine, it's a 32.768kHz clock, so limiting
+> it to 16-bit gives a wrap period of 2 seconds exactly.  We take 10%
+> off, so the timer would be asked to fire every 1.8s, which would be
+> rounded up to 2 seconds.  That's a little too close for comfort...
 
-Sure tell me when you've merged it and I'll drop commit 1b6056d6
-from my tree.
+Confirmed.
 
-Yours,
-Linus Walleij
+- if I artificially change my timer code to act as a 16-bit one,
+  I get wrap-arounds. Not always, but there are definitely some
+  during the bootup (where maybe the tick is sometimes delayed
+  a tad more)
+
+- if I then remove the round_jiffies and only leave jiffies +
+  wrap_ticks, the wrap-arounds go away
+
+> I think in this case, we need a version of round_jiffies() which _always_
+> rounds down.  Unfortunately, it doesn't exist.  Thomas?  What are the
+> options here?
+
+What is actually the reason of round_jiffies there? The
+http://kernel.org/doc/htmldocs/device-drivers/API-round-jiffies.html
+mentions saving power, is it the only one?
+
+I'd probably just leave the round_jiffies out at least for
+wrap_ticks < around 16*HZ. Above that the error by possibly
+rounding up can be ignored.
+
+There is also a round_jiffies_up - unless I am too tired, as long as
+we tick no faster than once per second, subtracting (HZ-1) and rounding
+up should be the same as rounding down.
+
+But: is the round_jiffies* safe at all for sub-second precision
+at jiffies around 0xffffffff? From quick looking it does a modulo,
+0xffffffff % say 250 is 45, the next jiffy is@0...
+
+Regards
+-- 
+                                       Stano
