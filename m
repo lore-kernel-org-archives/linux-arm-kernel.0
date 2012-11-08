@@ -1,32 +1,56 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 08 Nov 2012 14:02:12 +0530
-Subject: [PATCH v2] ARM: EXYNOS5250: Add support for USB 3.0 dwc3 controller
-Message-ID: <1352363533-14970-1-git-send-email-gautam.vivek@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Nov 2012 09:28:55 +0100
+Subject: [GIT PULL] Ux500 pin changes
+Message-ID: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes from v1:
- - Changed the device node name from 'dwc3' to 'usb at 12000000'.
- - Added the documentation for device tree bindings for dwc3 controller.
+Hi ARM SoC guys,
 
-Based on changes for USB 2.0:
-'https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-November/022046.html'
+here is a set of pinctrl table patches all just hitting one and the same ux500
+file. Description in the signed tag, intended for v3.8.
 
-Tested with required driver DT patches for dwc3-exynos:
-http://www.spinics.net/lists/linux-usb/msg73857.html
-and USB 3.0 phy support patches:
-https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-November/021926.html
+Please pull them in!
 
-Vivek Gautam (1):
-  ARM: Exynos5250: Enabling dwc3-exynos driver
+Yours,
+Linus Walleij
 
- .../devicetree/bindings/usb/exynos-usb.txt         |   14 +++++++++++
- arch/arm/boot/dts/exynos5250.dtsi                  |    6 +++++
- arch/arm/mach-exynos/Kconfig                       |    1 +
- arch/arm/mach-exynos/clock-exynos5.c               |   24 ++++++++++++++++++++
- arch/arm/mach-exynos/include/mach/map.h            |    1 +
- arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
- 6 files changed, 48 insertions(+), 0 deletions(-)
 
--- 
-1.7.6.5
+The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
+
+  Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
+
+are available in the git repository at:
+
+  http://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-pins-for-arm-soc
+
+for you to fetch changes up to d792aebfa2daeb58ac6a669ce328ad05e9e4112c:
+
+  ARM: ux500: fixup magnetometer pins (2012-11-06 11:10:55 +0100)
+
+----------------------------------------------------------------
+Ux500 pinctrl table update for v3.8, basically accumulated
+updates to pin muxing and biasing from internal deployment
+and regression testing for power performance.
+
+----------------------------------------------------------------
+Jean-Nicolas Graux (1):
+      ARM: ux500: add STM pin configuration
+
+Jorgen Jonsson (1):
+      ARM: ux500: fixup magnetometer pins
+
+Linus Walleij (1):
+      ARM: ux500: delete duplicate macro
+
+Patrice Chotard (6):
+      ARM: ux500: 8500: register LCD VSI pinctrl table
+      ARM: ux500: 8500: add IDLE pin configuration for SPI
+      ARM: ux500: 8500: update SKE keypad pinctrl table
+      ARM: ux500: 8500: define SDI sleep states
+      ARM: ux500: cosmetic fixups for uart0
+      ARM: ux500: 8500: add pinctrl support for uart1 and uart2
+
+ arch/arm/mach-ux500/board-mop500-pins.c | 427 +++++++++++++++++++++++++++-----
+ 1 file changed, 362 insertions(+), 65 deletions(-)
