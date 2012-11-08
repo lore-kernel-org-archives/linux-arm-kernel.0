@@ -1,91 +1,27 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 08 Nov 2012 07:38:57 +0100
-Subject: [PATCH] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-Message-ID: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 08 Nov 2012 12:24:23 +0530
+Subject: [PATCH v2 0/2] Enable ehci and ohci devices for exynos5250
+Message-ID: <1352357665-7435-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag, regardless
-the flags provided by the caller. This causes excessive pruning of
-emergency memory pools without any good reason. This patch changes the code
-to correctly use gfp flags provided by the dmapool caller. This should
-solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
-allocations can be served only from the special, very limited memory pool.
+Changes from v1:
+ - Changed the device node names from 'ehci' and 'ohci' to
+   'usb at 12110000' and 'usb at 12120000' as per discussion for the
+   change 'http://www.spinics.net/lists/linux-usb/msg73993.html'
+ - Rebased on for-next branch of linux-samsung.
 
-Reported-by: Soren Moch <smoch@web.de>
-Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- mm/dmapool.c |   27 +++++++--------------------
- 1 file changed, 7 insertions(+), 20 deletions(-)
+Vivek Gautam (2):
+  ARM: Exynos5250: Enabling ehci-s5p driver
+  ARM: Exynos5250: Enabling ohci-exynos driver
 
-diff --git a/mm/dmapool.c b/mm/dmapool.c
-index c5ab33b..86de9b2 100644
---- a/mm/dmapool.c
-+++ b/mm/dmapool.c
-@@ -62,8 +62,6 @@ struct dma_page {		/* cacheable header for 'allocation' bytes */
- 	unsigned int offset;
- };
- 
--#define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
--
- static DEFINE_MUTEX(pools_lock);
- 
- static ssize_t
-@@ -227,7 +225,6 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
- 		memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
- #endif
- 		pool_initialise_page(pool, page);
--		list_add(&page->page_list, &pool->page_list);
- 		page->in_use = 0;
- 		page->offset = 0;
- 	} else {
-@@ -315,30 +312,21 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
- 	might_sleep_if(mem_flags & __GFP_WAIT);
- 
- 	spin_lock_irqsave(&pool->lock, flags);
-- restart:
- 	list_for_each_entry(page, &pool->page_list, page_list) {
- 		if (page->offset < pool->allocation)
- 			goto ready;
- 	}
--	page = pool_alloc_page(pool, GFP_ATOMIC);
--	if (!page) {
--		if (mem_flags & __GFP_WAIT) {
--			DECLARE_WAITQUEUE(wait, current);
- 
--			__set_current_state(TASK_UNINTERRUPTIBLE);
--			__add_wait_queue(&pool->waitq, &wait);
--			spin_unlock_irqrestore(&pool->lock, flags);
-+	/* pool_alloc_page() might sleep, so temporarily drop &pool->lock */
-+	spin_unlock_irqrestore(&pool->lock, flags);
- 
--			schedule_timeout(POOL_TIMEOUT_JIFFIES);
-+	page = pool_alloc_page(pool, mem_flags);
-+	if (!page)
-+		return NULL;
- 
--			spin_lock_irqsave(&pool->lock, flags);
--			__remove_wait_queue(&pool->waitq, &wait);
--			goto restart;
--		}
--		retval = NULL;
--		goto done;
--	}
-+	spin_lock_irqsave(&pool->lock, flags);
- 
-+	list_add(&page->page_list, &pool->page_list);
-  ready:
- 	page->in_use++;
- 	offset = page->offset;
-@@ -348,7 +336,6 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
- #ifdef	DMAPOOL_DEBUG
- 	memset(retval, POOL_POISON_ALLOCATED, pool->size);
- #endif
-- done:
- 	spin_unlock_irqrestore(&pool->lock, flags);
- 	return retval;
- }
+ .../devicetree/bindings/usb/exynos-usb.txt         |   40 ++++++++++++++++++++
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    4 ++
+ arch/arm/boot/dts/exynos5250.dtsi                  |   12 ++++++
+ arch/arm/mach-exynos/include/mach/map.h            |    2 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    4 ++
+ 5 files changed, 62 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/usb/exynos-usb.txt
+
 -- 
-1.7.9.5
+1.7.6.5
