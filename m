@@ -1,135 +1,67 @@
-From: lkml.js@gmail.com (jungseung lee)
-Date: Thu, 8 Nov 2012 23:29:57 +0900
-Subject: arm: Add ARM ERRATA 775420 workaround
-Message-ID: <CACEL3L2mJoXGADa4q0ohoEPViOhfk1LE7ABrJk3Y2Ag2_tFYcQ@mail.gmail.com>
+From: konrad.wilk@oracle.com (konrad)
+Date: Thu, 08 Nov 2012 13:54:29 -0500
+Subject: [Xen-devel] BUG: ARM build failures due to Xen
+Message-ID: <45w72guvowhjpvkrxs7vomxj.1352400869190@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Sorry about top posting - on the phone. I will send to Linus tomorrow.
 
-I have question the work-around code.
-The below code will be enter after handling exception handling path.
-(that is fix-up code)
+Ian Campbell <ian.campbell@citrix.com> wrote:
 
-As far as i know, the dsb instruction should be inserted before the any
-isb instruction on exception handling code for breaking erratum condition .
-this errata could meet the requirement?
-
-
-> source "arch/arm/common/Kconfig"
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index 39e3fb3..3b17227 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -211,6 +211,9 @@ ENTRY(v7_coherent_user_range)
->   * isn't mapped, fail with -EFAULT.
->   */
-> 9001:
-> +#ifdef CONFIG_ARM_ERRATA_775420
-> + dsb
-> +#endif
->   mov r0, #-EFAULT
->   mov pc, lr
->   UNWIND(.fnend )
-
-
-
-> On Thu, Sep 20, 2012 at 10:58:53AM +0100, Catalin Marinas wrote:
-> > On 12 September 2012 08:14, Simon Horman wrote:
-> > > +config ARM_ERRATA_775420
-> > > +       bool "ARM errata: A data cache maintenance operation which
-> > > aborts, might lead to deadlock"
-> > > +       depends on CPU_V7
-> > > +       help
-> > > +         This option enables the workaround for the 775420 Cortex-A9
-> > > (r2p2,
-> > > +         r2p6,r2p8,r2p10,r3p0) erratum. In case a date cache
-> > > maintenance
-> > > +         operation aborts with MMU exception, it might cause the
-> > > processor
-> > > +         deadlock. This workaround puts DSB before executing ISB at
-> > > the
-> > > +         beginning of the abort exception handler.
-> > > +
-> > >  endmenu
-> >
-> > The only case where we can get an abort on cache maintenance is
-> > v7_coherent_user_range(). I don't think we have any ISB on the
-> > exception handling path for this function, so we could just add the
-> > DSB there:
+>On Thu, 2012-11-08 at 15:28 +0000, Arnd Bergmann wrote:
+>> On Tuesday 06 November 2012, Russell King - ARM Linux wrote:
+>> > My build system is giving me the following errors against an OMAP4
+>> > randconfig build against the latest Linus' kernel plus arm-soc:
+>> > 
+>> > ERROR: "privcmd_call" [drivers/xen/xen-privcmd.ko] undefined!
+>> > make[2]: *** [__modpost] Error 1
+>> > make[2]: Target `_modpost' not remade because of errors.
+>> > make[1]: *** [modules] Error 2
+>> > make: *** [sub-make] Error 2
+>> > make: Target `uImage' not remade because of errors.
+>> > make: Target `modules' not remade because of errors.
+>> > 
+>> > Full build results and configuration are here:
+>> > 
+>> > http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2627
+>> > http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2627
+>> > 
+>> 
+>> I can reproduce the same thing with mainline v3.7-rc4.
+>> 8<------
+>> xen/arm: export privcmd_call
 >
-> I think that an advantage of Abe-san's implementation is that
-> it might to be a bit more robust. But your proposal is certainly
-> much cleaner and for that reason I agree it is a good option.
+>Thanks, Konrad posted a fix for this on Tuesday which covers a few other
+>cases too: http://marc.info/?l=linux-kernel&m=135224075902642&w=2 I
+>added Russell to my response but forgot to add l-a-k@ too, sorry.
 >
-> I've updated the patch, but since the code is now all yours
-> I'm unsure if the author should be changed or not.
+>Is one of you going to pick it up and send to mainline?
 >
-> ----------------------------------------------------------------
-> From: Kouei Abe
+>Ian.
 >
-> arm: Add ARM ERRATA 775420 workaround
->
-> Workaround for the 775420 Cortex-A9 (r2p2, r2p6,r2p8,r2p10,r3p0) erratum.
-> In case a date cache maintenance operation aborts with MMU exception, it
-> might cause the processor to deadlock. This workaround puts DSB before
-> executing ISB if an abort may occur on cache maintenance.
->
-> Based on work by Kouei Abe and feedback from Catalin Marinas.
->
-> Cc: Catalin Marinas
-> Signed-off-by: Kouei Abe
-> Signed-off-by: Simon Horman
->
-> ---
->
-> v2
-> * Add some details to changelog entry
-> * Alternate implementation suggested by Catalin Marinas
->   - Add the dsb directly to v7_coherent_user_range() rather
->     than the exception handler
-> ---
-> arch/arm/Kconfig       |   10 ++++++++++
-> arch/arm/mm/cache-v7.S |    3 +++
-> 2 files changed, 13 insertions(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2f88d8d..48c19d4 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1413,6 +1413,16 @@ config PL310_ERRATA_769419
->    on systems with an outer cache, the store buffer is drained
->    explicitly.
->
-> +config ARM_ERRATA_775420
-> +       bool "ARM errata: A data cache maintenance operation which aborts,
-> might lead to deadlock"
-> +       depends on CPU_V7
-> +       help
-> + This option enables the workaround for the 775420 Cortex-A9 (r2p2,
-> + r2p6,r2p8,r2p10,r3p0) erratum. In case a date cache maintenance
-> + operation aborts with MMU exception, it might cause the processor
-> + to deadlock. This workaround puts DSB before executing ISB if
-> + an abort may occur on cache maintenance.
-> +
-> endmenu
->
-> source "arch/arm/common/Kconfig"
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index 39e3fb3..3b17227 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -211,6 +211,9 @@ ENTRY(v7_coherent_user_range)
->   * isn't mapped, fail with -EFAULT.
->   */
-> 9001:
-> +#ifdef CONFIG_ARM_ERRATA_775420
-> + dsb
-> +#endif
->   mov r0, #-EFAULT
->   mov pc, lr
->   UNWIND(.fnend )
-> --
-> 1.7.10.4
+>> privcmd_call may get called from a module, so it has to be exported.
+>> 
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> 
+>> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+>> index 59bcb96..ff5e300 100644
+>> --- a/arch/arm/xen/enlighten.c
+>> +++ b/arch/arm/xen/enlighten.c
+>> @@ -17,6 +17,9 @@
+>>  #include <linux/of_irq.h>
+>>  #include <linux/of_address.h>
+>>  
+>> +/* from hypercall.S */
+>> +EXPORT_SYMBOL_GPL(privcmd_call);
+>> +
+>>  struct start_info _xen_start_info;
+>>  struct start_info *xen_start_info = &_xen_start_info;
+>>  EXPORT_SYMBOL_GPL(xen_start_info);
+>> 
+>> _______________________________________________
+>> Xen-devel mailing list
+>> Xen-devel at lists.xen.org
+>> http://lists.xen.org/xen-devel
 >
 >
