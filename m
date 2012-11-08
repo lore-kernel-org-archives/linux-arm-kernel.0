@@ -1,25 +1,31 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 08 Nov 2012 18:54:54 +0000
-Subject: vexpress issues in next-20121029
-In-Reply-To: <509AC63C.1070309@wwwdotorg.org>
-References: <508EE610.9050703@wwwdotorg.org> <509AC63C.1070309@wwwdotorg.org>
-Message-ID: <1352400894.20549.33.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 8 Nov 2012 13:56:31 -0500 (EST)
+Subject: [PATCH] ARM: setup_mm_for_reboot(): use flush_cache_louis()
+In-Reply-To: <20121108162613.GB16373@mudshark.cambridge.arm.com>
+References: <alpine.LFD.2.02.1211061610070.21033@xanadu.home>
+ <20121106220458.GP28327@n2100.arm.linux.org.uk>
+ <20121107095106.GA23305@mudshark.cambridge.arm.com>
+ <20121107095635.GV28327@n2100.arm.linux.org.uk>
+ <20121107100835.GB23305@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1211071035220.21033@xanadu.home>
+ <20121107184129.GB18293@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.02.1211071505410.21033@xanadu.home>
+ <20121108162613.GB16373@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.02.1211081355070.21033@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2012-11-07 at 20:36 +0000, Stephen Warren wrote:
-> On 10/29/2012 02:24 PM, Stephen Warren wrote:
-> > 2) With those calls commented out, I find that
-> > vexpress_sysreg_init_leds() is device_initcall, and so executes even
-> > when not running on vexpress HW. This crashes on Tegra (which I have
-> > converted to single-zImage locally).
+On Thu, 8 Nov 2012, Will Deacon wrote:
+
+> I checked all of the switch_mm implementations and it looks like
+> !CONFIG_CPU_HAS_ASID implies the TLB flush in all cases, so this looks fine
+> to me.
 > 
-> This issue still appears to be present in next-20121107.
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Yes, sorry about that - last week I've posted patches adding a generic
-memory mapped leds driver and using it instead, but haven't managed to
-get any comments from the maintainers. I've pinged them today and if I
-hear nothing till tomorrow, I'll remove the offending code from
-vexpress-sysreg.c completely and wait will this stuff till next cycle.
+Submitted as patch 7573/1.
 
-Pawe?
+Thanks!
+
+
+Nicolas
