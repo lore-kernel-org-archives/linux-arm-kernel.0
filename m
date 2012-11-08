@@ -1,274 +1,125 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 8 Nov 2012 11:39:57 -0600
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BDAF5.1010703@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
-Message-ID: <509BEE6D.9000902@ti.com>
+From: anish198519851985@gmail.com (anish kumar)
+Date: Fri, 09 Nov 2012 02:42:46 +0900
+Subject: How does atomic operation work on smp
+In-Reply-To: <20121107164507.GA3571@opentech.at>
+References: <20121108070121.GA7492@gmail.com>
+ <CADtGFvkoVX-CCEPRE7swRFiTeBo2wFiQx_8S5woKp_ts8XsUUA@mail.gmail.com>
+ <20121107164507.GA3571@opentech.at>
+Message-ID: <1352396566.4822.73.camel@anish-Inspiron-N5050>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/08/2012 11:08 AM, Hiremath, Vaibhav wrote:
-> On Thu, Nov 08, 2012 at 21:46:53, Hunter, Jon wrote:
->>
->> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
->>> On 11/07/12 23:36, Jon Hunter wrote:
->>>> Hi Igor,
->>>>
->>>> On 11/07/2012 08:42 AM, Igor Grinberg wrote:
->>>>> CONFIG_OMAP_32K_TIMER is kind of standing on the single zImage way.
->>>>> Make OMAP2+ timer code independant from the CONFIG_OMAP_32K_TIMER
->>>>> setting.
->>>>> To remove the dependancy, several conversions/additions had to be done:
->>>>> 1) Timer structures and initialization functions are named by the platform
->>>>>    name and the clock source in use. The decision which timer is
->>>>>    used is done statically from the machine_desc structure. In the
->>>>>    future it should come from DT.
->>>>> 2) Settings under the CONFIG_OMAP_32K_TIMER option are expanded into
->>>>>    separate timer structures along with the timer init functions.
->>>>>    This removes the CONFIG_OMAP_32K_TIMER on OMAP2+ timer code.
->>>>> 3) Since we have all the timers defined inside machine_desc structure
->>>>>    and we no longer need the fallback to gp_timer clock source in case
->>>>>    32k_timer clock source is unavailable (namely on AM33xx), we no
->>>>>    longer need the #ifdef around __omap2_sync32k_clocksource_init()
->>>>>    function. Remove the #ifdef CONFIG_OMAP_32K_TIMER around the
->>>>>    __omap2_sync32k_clocksource_init() function.
->>>>>
->>>>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->>>>> Cc: Jon Hunter <jon-hunter@ti.com>
->>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
->>>>
->>>> [snip]
->>>>
->>>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
->>>>> index 684d2fc..a4ad7a0 100644
->>>>> --- a/arch/arm/mach-omap2/timer.c
->>>>> +++ b/arch/arm/mach-omap2/timer.c
->>>>> @@ -63,20 +63,8 @@
->>>>>  #define OMAP2_32K_SOURCE	"func_32k_ck"
->>>>>  #define OMAP3_32K_SOURCE	"omap_32k_fck"
->>>>>  #define OMAP4_32K_SOURCE	"sys_32k_ck"
->>>>> -
->>>>> -#ifdef CONFIG_OMAP_32K_TIMER
->>>>> -#define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
->>>>> -#define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
->>>>> -#define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
->>>>> -#define OMAP3_SECURE_TIMER	12
->>>>>  #define TIMER_PROP_SECURE	"ti,timer-secure"
->>>>> -#else
->>>>> -#define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
->>>>> -#define OMAP3_CLKEV_SOURCE	OMAP3_MPU_SOURCE
->>>>> -#define OMAP4_CLKEV_SOURCE	OMAP4_MPU_SOURCE
->>>>> -#define OMAP3_SECURE_TIMER	1
->>>>> -#define TIMER_PROP_SECURE	"ti,timer-alwon"
->>>>> -#endif
->>>>> +#define TIMER_PROP_ALWON	"ti,timer-alwon"
->>>>
->>>> Nit-pick, can we drop the TIMER_PROP_SECURE/ALWON and use the
->>>> "ti,timer-secure" and "ti,timer-alwon" directly?
->>>>
->>>> Initially, I also defined TIMER_PROP_ALWON and Rob Herring's feedback
->>>> was to drop this and use the property string directly to remove any
->>>> abstraction.
->>>
->>> Well, I don't understand what do you mean by "any abstraction".
->>> The purpose of defining those two was to eliminate multiple occurrences
->>> of the string in the code, so for example if someone decides to change the
->>> property string for some currently unknown reason - it will be easy and small.
->>> Defines are a common practice for that, no?
->>> If you still think it should be inlined, I will do.
->>
->> I understand your point, but right now I don't anticipate that we will
->> have many options here and so I think that we should drop these.
->>
->>>>>  #define REALTIME_COUNTER_BASE				0x48243200
->>>>>  #define INCREMENTER_NUMERATOR_OFFSET			0x10
->>>>> @@ -216,7 +204,7 @@ void __init omap_dmtimer_init(void)
->>>>>  
->>>>>  	/* If we are a secure device, remove any secure timer nodes */
->>>>>  	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
->>>>> -		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
->>>>> +		np = omap_get_timer_dt(omap_timer_match, TIMER_PROP_SECURE);
->>>>>  		if (np)
->>>>>  			of_node_put(np);
->>>>>  	}
->>>>> @@ -378,9 +366,8 @@ static u32 notrace dmtimer_read_sched_clock(void)
->>>>>  	return 0;
->>>>>  }
->>>>>  
->>>>> -#ifdef CONFIG_OMAP_32K_TIMER
->>>>>  /* Setup free-running counter for clocksource */
->>>>> -static int __init omap2_sync32k_clocksource_init(void)
->>>>> +static int __init __omap2_sync32k_clocksource_init(void)
->>>>
->>>> Not sure I follow why you renamed this function here ...
->>>
->>> I didn't want to add unused arguments to this function, so I've made a
->>> wrapper below to have both the sync32k and the gp functions have the same
->>> signature (argument list) and be called from a single macro.
->>> Anyway, see below.
->>
->> Ok.
->>
->>>>
->>>>>  {
->>>>>  	int ret;
->>>>>  	struct device_node *np = NULL;
->>>>> @@ -439,15 +426,9 @@ static int __init omap2_sync32k_clocksource_init(void)
->>>>>  
->>>>>  	return ret;
->>>>>  }
->>>>> -#else
->>>>> -static inline int omap2_sync32k_clocksource_init(void)
->>>>> -{
->>>>> -	return -ENODEV;
->>>>> -}
->>>>> -#endif
->>>>>  
->>>>> -static void __init omap2_gptimer_clocksource_init(int gptimer_id,
->>>>> -						const char *fck_source)
->>>>> +static void __init omap2_gp_clocksource_init(int gptimer_id,
->>>>> +					     const char *fck_source)
->>>>
->>>> Nit, I personally prefer keeping gptimer, because gp just means
->>>> "general-purpose" and does not imply a timer per-se.
->>>
->>> I've made this change, so we will not get something like:
->>> omapx_gptimer_timer_init(), but this really does not meter to me,
->>> so no problem will do for v2.
->>
->> Thanks.
->>
->>>>
->>>>>  {
->>>>>  	int res;
->>>>>  
->>>>> @@ -466,23 +447,10 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
->>>>>  			gptimer_id, clksrc.rate);
->>>>>  }
->>>>>  
->>>>> -static void __init omap2_clocksource_init(int gptimer_id,
->>>>> -						const char *fck_source)
->>>>> +static void __init omap2_sync32k_clocksource_init(int gptimer_id,
->>>>> +						  const char *fck_source)
->>>>>  {
->>>>> -	/*
->>>>> -	 * First give preference to kernel parameter configuration
->>>>> -	 * by user (clocksource="gp_timer").
->>>>> -	 *
->>>>> -	 * In case of missing kernel parameter for clocksource,
->>>>> -	 * first check for availability for 32k-sync timer, in case
->>>>> -	 * of failure in finding 32k_counter module or registering
->>>>> -	 * it as clocksource, execution will fallback to gp-timer.
->>>>> -	 */
->>>>> -	if (use_gptimer_clksrc == true)
->>>>> -		omap2_gptimer_clocksource_init(gptimer_id, fck_source);
->>>>> -	else if (omap2_sync32k_clocksource_init())
->>>>> -		/* Fall back to gp-timer code */
->>>>> -		omap2_gptimer_clocksource_init(gptimer_id, fck_source);
->>>>> +	__omap2_sync32k_clocksource_init();
->>>>>  }
->>>>
->>>> ... this just appears to be a wrapper function, but I don't see why this
->>>> is needed? Do we need this wrapper?
->>>
->>> no, not really, just consider the explanation above.
->>> I will remove the wrapper for v2.
->>
->> Ok, thanks.
->>
->>>>
->>>>>  #ifdef CONFIG_SOC_HAS_REALTIME_COUNTER
->>>>> @@ -563,52 +531,64 @@ static inline void __init realtime_counter_init(void)
->>>>>  {}
->>>>>  #endif
->>>>>  
->>>>> -#define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop,	\
->>>>> -				clksrc_nr, clksrc_src)			\
->>>>> -static void __init omap##name##_timer_init(void)			\
->>>>> +#define OMAP_SYS_TIMER_INIT(n, clksrc_name, clkev_nr, clkev_src,	\
->>>>> +				clkev_prop, clksrc_nr, clksrc_src)	\
->>>>> +static void __init omap##n##_##clksrc_name##_timer_init(void)		\
->>>>
->>>>
->>>>>  {									\
->>>>>  	omap_dmtimer_init();						\
->>>>>  	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
->>>>> -	omap2_clocksource_init((clksrc_nr), clksrc_src);		\
->>>>> +									\
->>>>> +	if (use_gptimer_clksrc)						\
->>>>> +		omap2_gp_clocksource_init((clksrc_nr), clksrc_src);	\
->>>>> +	else								\
->>>>> +		omap2_##clksrc_name##_clocksource_init((clksrc_nr),	\
->>>>> +						       clksrc_src);	\
->>>>
->>>> Something here seems a little odd. If "clksrc_name" is "gp", then the
->>>> if-else parts will call the same function. Or am I missing something here?
->>>
->>> Yes, you are right - this is odd.
->>> What do you think of:
->>>
->>> if (use_gptimer_clksrc) {
->>> 	omap2_gp_clocksource_init((clksrc_nr), clksrc_src);
->>> 	return;
->>> }
->>> omap2_##clksrc_name##_clocksource_init((clksrc_nr), clksrc_src);
->>
->> Yes, but it still seems a little odd that we could have ...
->>
->>  if (use_gptimer_clksrc) {
->>  	omap2_gp_clocksource_init((clksrc_nr), clksrc_src);
->>  	return;
->>  }
->>  omap2_gp_clocksource_init((clksrc_nr), clksrc_src);
->>
->>>>
->>>> I think that I prefer how it works today where we call just
->>>> omap2_clocksource_init(), and it determines whether to use the gptimer
->>>> or the 32k-sync.
->>>
->>> There is no reliable way to determine which source should be used in runtime
->>> for boards that do not have the 32k oscillator wired.
->>
->> Hmmm ... well for OMAP devices the 32kHz clock is mandatory AFAIK. At
->> least for OMAP devices and I would need to check on the AM33xx but I
->> would imagine they are the same. Which devices are you referring to
->> where the 32kHz is optional?
->>
-> No we do not have 32k_counter block in AM335x.
-
-I am painfully aware of that :-)
-
-> If you are referring to 32Khz clock availability alone, then yes, we need to 
-> get persistent clock and we use RTC 32Khz clock source for it. 
-> But please note that this is not a 32k_counter block which OMAP family of 
-> devices has.
+On Wed, 2012-11-07 at 17:45 +0100, Nicholas Mc Guire wrote:
+> On Wed, 07 Nov 2012, Hendrik Visage wrote:
 > 
-> The way AM335x works is, we have timers (0-7), timer0 being secure timer.
-> We use timer1 and timer2 for clockevent and clocksource and they are driven 
-> by 26MHz OSC clock currently. So when you go into Low power state, OSC is turned off and you need persistent clock for time keeping, right?
+> > On Thu, Nov 8, 2012 at 9:01 AM, Jimmy Pan <dspjmt@gmail.com> wrote:
+> > > I understand how atomic operation work on unary core processors, I think it just disables the interrupt and dominate the cpu until it finished.
 > 
-> And only persistent clock available is RTC 32khz crystal clock, being RTC is 
-> in wakeup domain.
+> Atomic operations do not need to disable interrupts - a test-and-set operation does not disable interrupts. Locking primitives like spin-locks that allow you to get consistent access to non-atomic critical sections may disable interrupts.
+> 
+> It seems to me that you are identifying atomic operations with critical sections, which is not really the same thing - but maybe I missunderstood you.
+> 
+> > > While, how do we implement this on multi processor computers?
+> > > Suppose cpu A is performing an atomic operation on variable a. At the same time, cpu B is also performing the operation on a. In such the result may be overwritten.
+> > > Of course we can use spinlocks, but on the atomic operation's behalf, how does it gurantee to prevent such case?
+> > > Can anyone explain the crux of it? Thanks.
+> > 
+> > Basically you make use of machine specific instructions that will  do
+> > that for you.
+> > In other words, get the datasheets of the specific system you intent
+> > to code on/for (I assume here you are refering to assembler level
+> > codes, as higher up you make use of the relevant libraries that does
+> > that for you).
+> >
+> 
+> More or less any (sane) architecture will provide some very basic atoicity
+Architecture provides minimum atomicity in the form of assembly
+instructions.So below is the code of how in arm atomic_add() is
+implemented which is SMP safe,
+/*
+ * ARMv6 UP and SMP safe atomic ops.  We use load exclusive and
+ * store exclusive to ensure that these are atomic.  We may loop
+ * to ensure that the update happens.
+ */
+static inline void atomic_add(int i, atomic_t *v)
+{
+         __asm__ __volatile__("@ atomic_add\n"
+"1:     ldrex   %0, [%3]\n"
+"       add     %0, %0, %4\n"
+"       strex   %1, %0, [%3]\n"
+"       teq     %1, #0\n"
+"       bne     1b"
+        : "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+        : "r" (&v->counter), "Ir" (i)
+        : "cc");
+}
 
-I think you are missing the point here. For OMAP devices we have two
-main external clock sources which are the 32kHz clock and the sys_clk
-(can be a range of frequencies from 12-38.4MHz for OMAP4). The point is
-for OMAP these clock sources are always present and AFAIK there is no
-h/w configuration that allows you not to have the 32kHz clock source.
-PRCM needs it and I think for OMAP1 the reset logic needs it (if memory
-serves).
+Above function is SMP safe(but sometimes this also needs memory barrier
+(/Documentation/memory-barriers.txt-ATOMIC OPERATIONS) and be careful
+with the name of the functions as atomic in the function name doesn't
+guaranty anything as below:
+        CPU 1                        CPU 2
+        ===============           ===============
+	x = 0;                       y = x;
+       atomic_add_return(x)  
 
-Igor was mentioning a h/w scenario where the 32kHz source is not
-present. However, I am not sure which devices support this and is
-applicable too.
+what do you think would be the value of y in CPU2?Legally it can have
+any value i.e. 0 or 1 as CPU1 can reorder the instructions any time(when
+does it see fit to reorder?).However if atomic_add_return is implemented
+with explicit memory barriers then it wouldn't happen and you will see a
+correct result as below:
+        CPU 1                        CPU 2
+        ===============           ===============
+	x = 0;                       
+       atomic_add_return(x)  
+				    y  = x;	//x will be 1 here
 
-So we are not discussing the 32k-sync-timer here. We are discussing
-whether there are any device configurations where a 32k clock source
-would not be available for the gptimer.
+>From arch/arm/include/asm/atomic.h 
+static inline int atomic_add_return(int i, atomic_t *v)
+{
+        smp_mb();  <BARRIER HERE>
+        __asm__ __volatile__("@ atomic_add_return\n"
+"1:     ldrex   %0, [%3]\n"
+"       add     %0, %0, %4\n"
+"       strex   %1, %0, [%3]\n"
+"       teq     %1, #0\n"
+"       bne     1b"
+        : "=&r" (result), "=&r" (tmp), "+Qo" (v->counter)
+        : "r" (&v->counter), "Ir" (i)
+        : "cc");
 
-Jon
+        smp_mb(); <BARRIER HERE>
+}
+so atomic variable is just like any other variable except it comes with
+some set of operations which combined with barriers make it really
+_atomic_.
+> capabilities. a 32bit (or 64bit on 64bit boxes) data object is guaranteed
+> to be consistent (that is you will never be able to get half of the old and
+> half of the new value if there were a concurrent read and write). Some form
+> of Compare and Swap (CAS) / Test and Set bit assembler instructuion will be
+> provided that can overcome the lowest level race that would be incured by
+> setting and then testing in separate steps. And finally low level
+> mechanisms are provided to ensure consistency over cores by load/store
+> fences (memory barriers). 
+> 
+> In the above case where you have a concurrent reader and writer of variable
+> "a" you do not need any lock provided the data object is only a single 32/64
+> bit object - if it is say a struct then you need locking to ensure consistency
+> of the retrieved data. The atomic instructions are then actually only needed
+> for the locks (but note that locks here are pure advisory locks not enforced
+> in any way by HW). 
+> 
+> so if you have a writer updating a variable and a reader reading it concurently
+> then the reader is guaranteed to always read a consistent 32bit (or 64bit) 
+> entity - but it is not guaranteed of course that you actually read all 
+> intermediate values (that is completness is not guaranteed). If the variable
+> is more than a primitive data object then you need to protect it by associating
+> a lock with the data object (always lock data not code...)
+> 
+> 
+> thx!
+> hofrat
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-c-programming" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
