@@ -1,39 +1,32 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 8 Nov 2012 18:29:12 +0530
-Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes for
- AM33XX
-In-Reply-To: <50914107.2090909@ti.com>
-References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
- <1351498881-32482-6-git-send-email-hvaibhav@ti.com> <50914107.2090909@ti.com>
-Message-ID: <509BACA0.8060409@ti.com>
+From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
+Date: Thu, 8 Nov 2012 13:05:18 +0000
+Subject: [PATCH 15/15] ARM: OMAP2+: AM33XX: Basic suspend resume support
+In-Reply-To: <87pq3p72s7.fsf@deeprootsystems.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-16-git-send-email-vaibhav.bedia@ti.com>
+ <87txt4aqyc.fsf@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC04AE5@DBDE01.ent.ti.com>
+ <87r4o68bnl.fsf@deeprootsystems.com>
+ <B5906170F1614E41A8A28DE3B8D121433EC085EE@DBDE01.ent.ti.com>
+ <87pq3p72s7.fsf@deeprootsystems.com>
+Message-ID: <B5906170F1614E41A8A28DE3B8D121433EC0B451@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2012 8:47 PM, Benoit Cousson wrote:
-> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-> index c634f87..e233cfa 100644
-> --- a/arch/arm/boot/dts/am335x-bone.dts
-> +++ b/arch/arm/boot/dts/am335x-bone.dts
-> @@ -78,3 +78,11 @@
->   		};
->   	};
->   };
-> +
-> +&cpsw_emac0 {
-> +	phy_id = "4a101000.mdio:00";
-> Why are you using that kind of interface? You seem to want a reference
-> to a device.
->
-> Cannot you have something less hard coded like:
-> phy_id = <&davinci_mdio>, <0>;
-Benoit
+On Wed, Nov 07, 2012 at 22:45:20, Kevin Hilman wrote:
+[...]
+> >> 
+> >
+> > We could perhaps add a couple of APIs to check the SYSC values when coming
+> > out of suspend and take appropriate action if the sysc cache does not match?
+> 
+> Yes, for IPs with only SW support and no drivers, we may need something
+> like this.  But again, it needs to be suspend and idle aware, not just
+> suspend.
+> 
 
-I am having a issue in converting the above phy_id conversion from 
-"<&davinci_mdio>, <0>" to
-"4a101000.mdio:00". Since davinci_mdio is a child node to cpsw, the 
-platform device for mdio is
-not created to get the mdio device name "4a101000.mdio".
-Can you point me a reference to get the right implementation.
+Ok, if the pwrmdm pre and post transition callbacks do this that should take
+care of both suspend and idle.
 
-Regards
-Mugunthan V N
+Regards,
+Vaibhav
