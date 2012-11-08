@@ -1,26 +1,25 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 8 Nov 2012 12:54:23 -0600
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <509B666F.6080507@compulab.co.il>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
-Message-ID: <509BFFDF.9040605@ti.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 08 Nov 2012 18:54:54 +0000
+Subject: vexpress issues in next-20121029
+In-Reply-To: <509AC63C.1070309@wwwdotorg.org>
+References: <508EE610.9050703@wwwdotorg.org> <509AC63C.1070309@wwwdotorg.org>
+Message-ID: <1352400894.20549.33.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2012-11-07 at 20:36 +0000, Stephen Warren wrote:
+> On 10/29/2012 02:24 PM, Stephen Warren wrote:
+> > 2) With those calls commented out, I find that
+> > vexpress_sysreg_init_leds() is device_initcall, and so executes even
+> > when not running on vexpress HW. This crashes on Tegra (which I have
+> > converted to single-zImage locally).
+> 
+> This issue still appears to be present in next-20121107.
 
-On 11/08/2012 01:59 AM, Igor Grinberg wrote:
+Yes, sorry about that - last week I've posted patches adding a generic
+memory mapped leds driver and using it instead, but haven't managed to
+get any comments from the maintainers. I've pinged them today and if I
+hear nothing till tomorrow, I'll remove the offending code from
+vexpress-sysreg.c completely and wait will this stuff till next cycle.
 
-[snip]
-
-> There is no reliable way to determine which source should be used in runtime
-> for boards that do not have the 32k oscillator wired.
-
-So thinking about this some more and given that we are moving away from
-board files, if a board does not provide a 32kHz clock source, then this
-should be reflected in the device-tree source file for that board.
-Hence, at boot time we should be able to determine if a 32kHz clock
-source can be used.
-
-Cheers
-Jon
+Pawe?
