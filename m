@@ -1,40 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Nov 2012 13:58:53 +0100
-Subject: [PATCH] gpiolib: iron out include ladder mistakes
-In-Reply-To: <509983D0.1060107@wwwdotorg.org>
-References: <1352218863-2037-1-git-send-email-linus.walleij@stericsson.com>
- <509983D0.1060107@wwwdotorg.org>
-Message-ID: <CACRpkdYgEp2qb6_TWukLZmaO-tKz=hg_2=FAQk9E1DbP5wiP1Q@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 8 Nov 2012 18:29:12 +0530
+Subject: [PATCH 4/4] arm/dts: am33xx: Add CPSW and MDIO module nodes for
+ AM33XX
+In-Reply-To: <50914107.2090909@ti.com>
+References: <1351498881-32482-1-git-send-email-hvaibhav@ti.com>
+ <1351498881-32482-6-git-send-email-hvaibhav@ti.com> <50914107.2090909@ti.com>
+Message-ID: <509BACA0.8060409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2012 at 10:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 11/06/2012 09:21 AM, Linus Walleij wrote:
-
->> And we need to keep the static inlines in <linux/gpio.h>
->> but here for the !CONFIG_GENERIC_GPIO case, and then we
->> may as well throw in a few warnings like the other
->> prototypes there, if someone would have the bad taste
->> of compiling without GENERIC_GPIO even.
+On 10/31/2012 8:47 PM, Benoit Cousson wrote:
+> diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+> index c634f87..e233cfa 100644
+> --- a/arch/arm/boot/dts/am335x-bone.dts
+> +++ b/arch/arm/boot/dts/am335x-bone.dts
+> @@ -78,3 +78,11 @@
+>   		};
+>   	};
+>   };
+> +
+> +&cpsw_emac0 {
+> +	phy_id = "4a101000.mdio:00";
+> Why are you using that kind of interface? You seem to want a reference
+> to a device.
 >
-> Hmm. Is there way to avoid the duplication of the dummy implementations?
-> Having a prototype and a truly dummy implementation in one place, but a
-> WARNing/failing dummy implementation elsewhere, seems like it'll cause
-> issues.
+> Cannot you have something less hard coded like:
+> phy_id = <&davinci_mdio>, <0>;
+Benoit
 
-Yeah :-/
+I am having a issue in converting the above phy_id conversion from 
+"<&davinci_mdio>, <0>" to
+"4a101000.mdio:00". Since davinci_mdio is a child node to cpsw, the 
+platform device for mdio is
+not created to get the mdio device name "4a101000.mdio".
+Can you point me a reference to get the right implementation.
 
-This is not exactly elegant and is some side effect of the split
-between CONFIG_GENERIC_GPIO and CONFIG_GPIOLIB,
-the real fix is to get rid of all GENERIC_GPIO implementations
-in the kernel and switch everyone over to GPIOLIB.
-
-Not that easy though :-( can't think of any nice fix.
-
-> Does this patch mean the previous series causes "git bisect" failures?
-
-Yeah once I have something that doesn't break x86 I might
-just squash collapse all of this into the gpioranges patch.
-
-Yours,
-Linus Walleij
+Regards
+Mugunthan V N
