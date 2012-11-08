@@ -1,35 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Nov 2012 09:25:34 +0100
-Subject: [PATCH 6/7] ARM: u300: remove obsoleted init_consistent_dma_size()
-In-Reply-To: <1352360783-17523-7-git-send-email-m.szyprowski@samsung.com>
-References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
- <1352360783-17523-7-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdasE8EOaLmL4Muz6LkrPE1vftkYf9YBPeR2LX0XP+fbkQ@mail.gmail.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Thu, 8 Nov 2012 09:27:00 +0100
+Subject: [PATCH] pwm: lpc32xx - Add a driver for the motor PWM
+In-Reply-To: <509B6B87.8030102@antcom.de>
+References: <1352305828-25298-1-git-send-email-alban.bedel@avionic-design.de>
+ <509A982A.6020401@antcom.de>
+ <20121107203028.GA6186@avionic-0098.mockup.avionic-design.de>
+ <509B6B87.8030102@antcom.de>
+Message-ID: <20121108082700.GA21332@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2012 at 8:46 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+On Thu, Nov 08, 2012 at 09:21:27AM +0100, Roland Stigge wrote:
+> On 07/11/12 21:30, Thierry Reding wrote:
+> > On Wed, Nov 07, 2012 at 06:19:38PM +0100, Roland Stigge wrote:
+> >> On 07/11/12 17:30, Alban Bedel wrote:
+> >>> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de> --- 
+> >>> .../devicetree/bindings/pwm/lpc32xx-motor-pwm.txt  |   24 ++ 
+> >>> arch/arm/boot/dts/lpc32xx.dtsi                     |    7 +
+> >> 
+> >> Is all this supposed to go via mach-lpc32xx -> arm-soc.git? Then,
+> >> I can take this into the lpc32xx tree. Otherwise, you can split
+> >> off the .dtsi file and I include it via lpc32xx.
+> > 
+> > I'd prefer a split between the arch/arm changes and the rest. I'll
+> > take the drivers/pwm and Documentation changes through the PWM
+> > tree.
+> 
+> OK, I'll organize everything lpc32xx specific under arch/arm/
 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-u300/core.c |    2 --
->  1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-> index b8efac4..d8632eb 100644
-> --- a/arch/arm/mach-u300/core.c
-> +++ b/arch/arm/mach-u300/core.c
-> @@ -82,8 +82,6 @@ static struct map_desc u300_io_desc[] __initdata = {
->  static void __init u300_map_io(void)
->  {
->         iotable_init(u300_io_desc, ARRAY_SIZE(u300_io_desc));
-> -       /* We enable a real big DMA buffer if need be. */
-> -       init_consistent_dma_size(SZ_4M);
->  }
+Alban, I haven't finished reviewing yet, but once I'm done, can you
+resubmit a set of two patches split by arch/arm and the rest?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121108/e75de120/attachment.sig>
