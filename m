@@ -1,46 +1,78 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 08 Nov 2012 10:33:42 +0900
-Subject: [PATCH] ARM: SAMSUNG: Fix typo in definition of
- VIDCON1_VSTATUS_FRONTPORCH value
-In-Reply-To: <1429686.vBaRDnu5Be@amdc1227>
-References: <1429686.vBaRDnu5Be@amdc1227>
-Message-ID: <000001cdbd51$160995e0$421cc1a0$%han@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 7 Nov 2012 17:37:12 -0800
+Subject: [PATCH v4 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <1352301582-12244-6-git-send-email-haojian.zhuang@gmail.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-6-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121108013711.GW6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 07, 2012 9:31 PM Jingoo Han wrote
-> 
-> The correct value for VIDCON1_VSTATUS_FRONTPORCH is 3, not 0.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Hi,
 
-According to the datasheet, 3 is right value.
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:22]:
+> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
+> @@ -14,9 +16,33 @@ Optional properties:
+>  - pinctrl-single,function-off : function off mode for disabled state if
+>    available and same for all registers; if not specified, disabling of
+>    pin functions is ignored
+> +
+>  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
+>    more than one pin
+>  
+> +- pinctrl-single,power-source-mask : mask of setting power source in
+> +  the pinmux register
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+My non-native english suggests:
 
-> ---
->  include/video/samsung_fimd.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/video/samsung_fimd.h b/include/video/samsung_fimd.h
-> index 7ae6c07..263ed4b 100644
-> --- a/include/video/samsung_fimd.h
-> +++ b/include/video/samsung_fimd.h
-> @@ -82,7 +82,7 @@
->  #define VIDCON1_VSTATUS_VSYNC			(0x0 << 13)
->  #define VIDCON1_VSTATUS_BACKPORCH		(0x1 << 13)
->  #define VIDCON1_VSTATUS_ACTIVE			(0x2 << 13)
-> -#define VIDCON1_VSTATUS_FRONTPORCH		(0x0 << 13)
-> +#define VIDCON1_VSTATUS_FRONTPORCH		(0x3 << 13)
->  #define VIDCON1_VCLK_MASK			(0x3 << 9)
->  #define VIDCON1_VCLK_HOLD			(0x0 << 9)
->  #define VIDCON1_VCLK_RUN			(0x1 << 9)
-> --
-> 1.8.0
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- pinctrl-single,power-source-mask : mask for setting the power source in
+  the pinmux register
+
+> +- pinctrl-single,power-source : value of setting power source field
+> +  in the pinmux register
+
+- pinctrl-single,power-source : value for setting the power source field
+  in the pinmux register
+
+> +- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
+> +  register
+> +
+> +- pinctrl-single,bias-disable : value of disabling bias in the pinmux
+> +  register
+> +
+> +- pinctrl-single,bias-pull-down : value of setting bias pull down in
+> +  the pinmux register
+> +
+> +- pinctrl-single,bias-pull-up : value of setting bias pull up in the
+> +  pinmux register
+> +
+> +- pinctrl-single,bias : value of setting bias in the pinmux register
+> +
+> +- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
+> +  in the pinmux register
+
+And the same for the rest.
+
+> @@ -42,6 +68,25 @@ Where 0xdc is the offset from the pinctrl register base address for the
+>  device pinctrl register, 0x18 is the desired value, and 0xff is the sub mask to
+>  be used when applying this change to the register.
+>  
+> +
+> +Optional sub-node: In case some pins could be configured as GPIO in the pinmux
+> +register. If both GPIO nubmer and pin base of those pins are in ascending order,
+> +those pins could be defined as a GPIO range. The sub-node should be defined in
+> +.dtsi files of those silicons.
+
+I suggest you update the above to say:
+
+Optional sub-node: In case some pins can be configured as GPIO in the pinmux
+register. If both the GPIO number and pin base of those pins are in ascending
+order, these pins can be defined as a GPIO range.
+
+Then maybe clarify the sub-node part a bit, or just leave it out? Actually the
+"ascending order" part is a bit unclear to me too..
+
+Regards,
+
+Tony
