@@ -1,40 +1,250 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Thu, 8 Nov 2012 13:16:28 -0600
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BFFDF.9040605@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
-Message-ID: <509C050C.6010201@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 8 Nov 2012 19:26:05 +0000 (UTC)
+Subject: [PATCH 5/7] ARM: OMAP2+: WDT: move init; add read_reset_sources
+ pdata function pointer
+In-Reply-To: <20121016013213.21844.20016.stgit@dusk.lan>
+References: <20121016012448.21844.92339.stgit@dusk.lan>
+ <20121016013213.21844.20016.stgit@dusk.lan>
+Message-ID: <alpine.DEB.2.00.1211081922310.20703@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 15 Oct 2012, Paul Walmsley wrote:
 
-On 11/08/2012 12:59 PM, Hiremath, Vaibhav wrote:
-> On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
->>
->> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
->>
->> [snip]
->>
->>> There is no reliable way to determine which source should be used in runtime
->>> for boards that do not have the 32k oscillator wired.
->>
->> So thinking about this some more and given that we are moving away from
->> board files, if a board does not provide a 32kHz clock source, then this
->> should be reflected in the device-tree source file for that board.
->> Hence, at boot time we should be able to determine if a 32kHz clock
->> source can be used.
->>
+> The OMAP watchdog timer driver directly calls a function exported by
+> code in arch/arm/mach-omap2.  This is not good; it tightly couples
+> this driver to the mach-omap2 integration code.  Instead, add a
+> temporary platform_data function pointer to abstract this function
+> call.  A subsequent patch will convert the watchdog driver to use this
+> function pointer.
 > 
-> Let me feed some more thoughts here :)
+> This patch also moves the device creation code out of
+> arch/arm/mach-omap2/devices.c and into arch/arm/mach-omap2/wd_timer.c.
+> This is another step towards the removal of
+> arch/arm/mach-omap2/devices.c.
 > 
-> The way it is being detected currently is based on timer idle status bit.
-> I am worried that, this is the only option we have.
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> Cc: Wim Van Sebroeck <wim@iguana.be>
 
-Why not use device-tree to indicate the presence of a 32k clock source?
-This seems like a board level configuration and so device-tree seems to
-be the perfect place for this IMO.
+This patch missed the change from commit 
+6e152231995aa4ed5eafd87a6a8348563248f843 ("ARM: OMAP: avoid build wdt 
+platform device if with dt support") to skip the mach-omap2/ device build 
+if the DT blob was present.  This resulted in the watchdog getting 
+probed twice.  This didn't result in any problems, aside from a 
+message in the kernel log.  
 
-Jon
+Anyway, here's an update with that change added.
+
+
+- Paul
+
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 29 Oct 2012 20:49:44 -0600
+Subject: [PATCH] ARM: OMAP2+: WDT: move init; add read_reset_sources pdata
+ function pointer
+
+The OMAP watchdog timer driver directly calls a function exported by
+code in arch/arm/mach-omap2.  This is not good; it tightly couples
+this driver to the mach-omap2 integration code.  Instead, add a
+temporary platform_data function pointer to abstract this function
+call.  A subsequent patch will convert the watchdog driver to use this
+function pointer.
+
+This patch also moves the device creation code out of
+arch/arm/mach-omap2/devices.c and into arch/arm/mach-omap2/wd_timer.c.
+This is another step towards the removal of
+arch/arm/mach-omap2/devices.c.
+
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Acked-by: Wim Van Sebroeck <wim@iguana.be>
+[paul at pwsan.com: skip wd_timer device creation when DT blob is present]
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap1/devices.c               |   21 ++++++++++++---
+ arch/arm/mach-omap2/devices.c               |   26 ------------------
+ arch/arm/mach-omap2/wd_timer.c              |   35 +++++++++++++++++++++++-
+ include/linux/platform_data/omap-wd-timer.h |   38 +++++++++++++++++++++++++++
+ 4 files changed, 90 insertions(+), 30 deletions(-)
+ create mode 100644 include/linux/platform_data/omap-wd-timer.h
+
+diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
+index 645668e..7450318 100644
+--- a/arch/arm/mach-omap1/devices.c
++++ b/arch/arm/mach-omap1/devices.c
+@@ -17,6 +17,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/spi/spi.h>
+ 
++#include <linux/platform_data/omap-wd-timer.h>
++
+ #include <asm/mach/map.h>
+ 
+ #include <mach/tc.h>
+@@ -448,18 +450,31 @@ static struct resource wdt_resources[] = {
+ };
+ 
+ static struct platform_device omap_wdt_device = {
+-	.name	   = "omap_wdt",
+-	.id	     = -1,
++	.name		= "omap_wdt",
++	.id		= -1,
+ 	.num_resources	= ARRAY_SIZE(wdt_resources),
+ 	.resource	= wdt_resources,
+ };
+ 
+ static int __init omap_init_wdt(void)
+ {
++	struct omap_wd_timer_platform_data pdata;
++	int ret;
++
+ 	if (!cpu_is_omap16xx())
+ 		return -ENODEV;
+ 
+-	return platform_device_register(&omap_wdt_device);
++	pdata.read_reset_sources = omap1_get_reset_sources;
++
++	ret = platform_device_register(&omap_wdt_device);
++	if (!ret) {
++		ret = platform_device_add_data(&omap_wdt_device, &pdata,
++					       sizeof(pdata));
++		if (ret)
++			platform_device_del(&omap_wdt_device);
++	}
++
++	return ret;
+ }
+ subsys_initcall(omap_init_wdt);
+ #endif
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 2ad491d..cf365c3 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -646,29 +646,3 @@ static int __init omap2_init_devices(void)
+ 	return 0;
+ }
+ arch_initcall(omap2_init_devices);
+-
+-#if defined(CONFIG_OMAP_WATCHDOG) || defined(CONFIG_OMAP_WATCHDOG_MODULE)
+-static int __init omap_init_wdt(void)
+-{
+-	int id = -1;
+-	struct platform_device *pdev;
+-	struct omap_hwmod *oh;
+-	char *oh_name = "wd_timer2";
+-	char *dev_name = "omap_wdt";
+-
+-	if (!cpu_class_is_omap2() || of_have_populated_dt())
+-		return 0;
+-
+-	oh = omap_hwmod_lookup(oh_name);
+-	if (!oh) {
+-		pr_err("Could not look up wd_timer%d hwmod\n", id);
+-		return -EINVAL;
+-	}
+-
+-	pdev = omap_device_build(dev_name, id, oh, NULL, 0, NULL, 0, 0);
+-	WARN(IS_ERR(pdev), "Can't build omap_device for %s:%s.\n",
+-				dev_name, oh->name);
+-	return 0;
+-}
+-subsys_initcall(omap_init_wdt);
+-#endif
+diff --git a/arch/arm/mach-omap2/wd_timer.c b/arch/arm/mach-omap2/wd_timer.c
+index f6b6c37..5a8629f 100644
+--- a/arch/arm/mach-omap2/wd_timer.c
++++ b/arch/arm/mach-omap2/wd_timer.c
+@@ -11,10 +11,14 @@
+ #include <linux/io.h>
+ #include <linux/err.h>
+ 
+-#include "omap_hwmod.h"
++#include <linux/platform_data/omap-wd-timer.h>
+ 
++#include "omap_hwmod.h"
++#include "omap_device.h"
+ #include "wd_timer.h"
+ #include "common.h"
++#include "prm.h"
++#include "soc.h"
+ 
+ /*
+  * In order to avoid any assumptions from bootloader regarding WDT
+@@ -99,3 +103,32 @@ int omap2_wd_timer_reset(struct omap_hwmod *oh)
+ 	return (c == MAX_MODULE_SOFTRESET_WAIT) ? -ETIMEDOUT :
+ 		omap2_wd_timer_disable(oh);
+ }
++
++static int __init omap_init_wdt(void)
++{
++	int id = -1;
++	struct platform_device *pdev;
++	struct omap_hwmod *oh;
++	char *oh_name = "wd_timer2";
++	char *dev_name = "omap_wdt";
++	struct omap_wd_timer_platform_data pdata;
++
++	if (!cpu_class_is_omap2() || of_have_populated_dt())
++		return 0;
++
++	oh = omap_hwmod_lookup(oh_name);
++	if (!oh) {
++		pr_err("Could not look up wd_timer%d hwmod\n", id);
++		return -EINVAL;
++	}
++
++	pdata.read_reset_sources = prm_read_reset_sources;
++
++	pdev = omap_device_build(dev_name, id, oh, &pdata,
++				 sizeof(struct omap_wd_timer_platform_data),
++				 NULL, 0, 0);
++	WARN(IS_ERR(pdev), "Can't build omap_device for %s:%s.\n",
++	     dev_name, oh->name);
++	return 0;
++}
++subsys_initcall(omap_init_wdt);
+diff --git a/include/linux/platform_data/omap-wd-timer.h b/include/linux/platform_data/omap-wd-timer.h
+new file mode 100644
+index 0000000..d75f5f8
+--- /dev/null
++++ b/include/linux/platform_data/omap-wd-timer.h
+@@ -0,0 +1,38 @@
++/*
++ * OMAP2+ WDTIMER-specific function prototypes
++ *
++ * Copyright (C) 2012 Texas Instruments, Inc.
++ * Paul Walmsley
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#ifndef __LINUX_PLATFORM_DATA_OMAP_WD_TIMER_H
++#define __LINUX_PLATFORM_DATA_OMAP_WD_TIMER_H
++
++#include <linux/types.h>
++
++/*
++ * Standardized OMAP reset source bits
++ *
++ * This is a subset of the ones listed in arch/arm/mach-omap2/prm.h
++ * and are the only ones needed in the watchdog driver.
++ */
++#define OMAP_MPU_WD_RST_SRC_ID_SHIFT				3
++
++/**
++ * struct omap_wd_timer_platform_data - WDTIMER integration to the host SoC
++ * @read_reset_sources - fn ptr for the SoC to indicate the last reset cause
++ *
++ * The function pointed to by @read_reset_sources must return its data
++ * in a standard format - search for RST_SRC_ID_SHIFT in
++ * arch/arm/mach-omap2
++ */
++struct omap_wd_timer_platform_data {
++	u32 (*read_reset_sources)(void);
++};
++
++#endif
+-- 
+1.7.10.4
