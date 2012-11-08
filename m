@@ -1,103 +1,61 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 08 Nov 2012 09:13:08 +0200
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <20121107173343.GF6801@atomide.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <20121107173343.GF6801@atomide.com>
-Message-ID: <509B5B84.50605@compulab.co.il>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 08 Nov 2012 08:46:16 +0100
+Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
+Message-ID: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/12 19:33, Tony Lindgren wrote:
-> * Igor Grinberg <grinberg@compulab.co.il> [121107 06:44]:
->> CONFIG_OMAP_32K_TIMER is kind of standing on the single zImage way.
->> Make OMAP2+ timer code independant from the CONFIG_OMAP_32K_TIMER
->> setting.
->> To remove the dependancy, several conversions/additions had to be done:
->> 1) Timer structures and initialization functions are named by the platform
->>    name and the clock source in use. The decision which timer is
->>    used is done statically from the machine_desc structure. In the
->>    future it should come from DT.
->> 2) Settings under the CONFIG_OMAP_32K_TIMER option are expanded into
->>    separate timer structures along with the timer init functions.
->>    This removes the CONFIG_OMAP_32K_TIMER on OMAP2+ timer code.
-> 
-> I think this should be the default for the timers as that counter
-> does not stop during deeper idle states.
+Hello,
 
-Well, it is the default as you can see from the patch.
-The problem is that for boards that for some reason do not have
-the 32k wired and rely on MPU/GP timer source, the default will not work
-and currently there is no way for board to specify which timer source
-it can use.
-We have discussed this in San Diego (remember?) and you actually proposed
-this way as a solution. Well, may be I took it a bit further than you
-thought, but this is because the board code cannot know which timer source
-should be used at runtime and the fall back described below, does not work.
+Commit e9da6e9905e639b0 ("ARM: dma-mapping: remove custom consistent dma
+region") replaced custom consistent memory handling, so setting
+consistent dma memory size is not longer required. This patch series
+cleans sub-architecture platform code to remove all calls to the
+obsolated init_consistent_dma_size() function and finally removes the
+init_consistent_dma_size() stub itself.
 
-> 
->> 3) Since we have all the timers defined inside machine_desc structure
->>    and we no longer need the fallback to gp_timer clock source in case
->>    32k_timer clock source is unavailable (namely on AM33xx), we no
->>    longer need the #ifdef around __omap2_sync32k_clocksource_init()
->>    function. Remove the #ifdef CONFIG_OMAP_32K_TIMER around the
->>    __omap2_sync32k_clocksource_init() function.
->>
->> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
->> Cc: Jon Hunter <jon-hunter@ti.com>
->> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
->> ---
->> Finally I'm sending this out...
->> I've lost following Tony's branches and deciding which one to base on,
->> so I used linux-omap/master as a base for the patch.
->> Tony, tell me if you want it based on some other branch.
->> This has been compile tested on omap1|2plus_defconfig only.
-> 
-> Yes sorry it's been a bit crazy with branches to get this
-> header clean up done.. If it applies to master it should
-> be easy to apply on others.
+Arnd, Olof: could You apply it to arm-soc cleanup branch?
 
-No problem ;-)
+Best regards
+Marek Szyprowski
+Samsung Poland R&D Center
 
-> 
->> --- a/arch/arm/mach-omap2/board-2430sdp.c
->> +++ b/arch/arm/mach-omap2/board-2430sdp.c
->> @@ -284,6 +284,6 @@ MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
->>  	.handle_irq	= omap2_intc_handle_irq,
->>  	.init_machine	= omap_2430sdp_init,
->>  	.init_late	= omap2430_init_late,
->> -	.timer		= &omap2_timer,
->> +	.timer		= &omap2_sync32k_timer,
->>  	.restart	= omap_prcm_restart,
->>  MACHINE_END
->> --- a/arch/arm/mach-omap2/board-3430sdp.c
->> +++ b/arch/arm/mach-omap2/board-3430sdp.c
->> @@ -596,6 +596,6 @@ MACHINE_START(OMAP_3430SDP, "OMAP3430 3430SDP board")
->>  	.handle_irq	= omap3_intc_handle_irq,
->>  	.init_machine	= omap_3430sdp_init,
->>  	.init_late	= omap3430_init_late,
->> -	.timer		= &omap3_timer,
->> +	.timer		= &omap3_sync32k_timer,
->>  	.restart	= omap_prcm_restart,
->>  MACHINE_END
-> ...
-> 
-> Can't we assume that the default timer is omap[234]_sync32k_timer to
-> avoid renaming the timer entries in all the board files?
+CC: Tony Lindgren <tony@atomide.com>
+CC: Kukjin Kim <kgene.kim@samsung.com>
+CC: Sekhar Nori <nsekhar@ti.com>
+CC: Kevin Hilman <khilman@ti.com>
+CC: Paul Mundt <lethal@linux-sh.org>
+CC: Magnus Damm <magnus.damm@gmail.com>
+CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+CC: Andrew Victor <linux@maxim.org.za>
+CC: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+CC: Linus Walleij <linus.walleij@linaro.org>
 
-Hmmm...
-How will this work with the macros defining the sys_timer structure?
-I would also not want to hide the exact timer used under the default name.
+Patch summary:
 
-> 
-> Then we just need a new timer entries for the hardware that does
-> not have the sycn32k_timer available?
+Marek Szyprowski (7):
+  ARM: omap: remove obsoleted init_consistent_dma_size()
+  ARM: samsung: remove obsoleted init_consistent_dma_size()
+  ARM: davinci: remove obsoleted init_consistent_dma_size()
+  ARM: shmobile: remove obsoleted init_consistent_dma_size()
+  ARM: at91: remove obsoleted init_consistent_dma_size()
+  ARM: u300: remove obsoleted init_consistent_dma_size()
+  ARM: dma-mapping: remove init_consistent_dma_size() stub
 
-Well, I tried to make it small patch just for the hardware that needs it,
-but I always found some corner case where, IMHO, this does not work/look good.
-
+ arch/arm/include/asm/dma-mapping.h     |    7 -------
+ arch/arm/mach-at91/at91sam9g45.c       |    1 -
+ arch/arm/mach-davinci/common.c         |    2 --
+ arch/arm/mach-omap1/io.c               |    1 -
+ arch/arm/mach-omap2/io.c               |   12 ------------
+ arch/arm/mach-s3c64xx/common.c         |    1 -
+ arch/arm/mach-s5p64x0/common.c         |    2 --
+ arch/arm/mach-s5pv210/common.c         |    2 --
+ arch/arm/mach-shmobile/setup-r8a7740.c |    6 ------
+ arch/arm/mach-shmobile/setup-sh7372.c  |    6 ------
+ arch/arm/mach-u300/core.c              |    2 --
+ arch/arm/plat-omap/common.c            |    7 -------
+ arch/arm/plat-omap/include/plat/dma.h  |    1 -
+ 13 files changed, 50 deletions(-)
 
 -- 
-Regards,
-Igor.
+1.7.9.5
