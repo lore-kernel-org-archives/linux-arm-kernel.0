@@ -1,32 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 08 Nov 2012 13:52:05 +0900
-Subject: [PATCH] ARM: EXYNOS5: Remove wrongly placed usb2.0 PHY_CFG
- definition from PMU_REG
-In-Reply-To: <003b01cda5f8$f84e35c0$e8eaa140$%han@samsung.com>
-References: <1349443590-29901-1-git-send-email-gautam.vivek@samsung.com>
- <003b01cda5f8$f84e35c0$e8eaa140$%han@samsung.com>
-Message-ID: <0cec01cdbd6c$cd290e70$677b2b50$%kim@samsung.com>
+Date: Thu, 08 Nov 2012 13:52:24 +0900
+Subject: [PATCH] ARM: EXYNOS: Make s3c_device_i2c0 always use id 0
+In-Reply-To: <509AA23C.6000704@gmail.com>
+References: <4039915.8GOx0SKq2B@amdc1227> <509AA23C.6000704@gmail.com>
+Message-ID: <0ced01cdbd6c$d81f9b00$885ed100$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingoo Han wrote:
+Sylwester Nawrocki wrote:
 > 
-> On Friday, October 05, 2012 10:27 PM Vivek Gautam wrote
+> On 11/07/2012 02:00 PM, Tomasz Figa wrote:
+> > This patch removes compatibility definitions added long time ago when
+> > clock ids were used instead of devnames that were needed for platforms
+> > with only one i2c controller with id -1 (some s3c24xx's).
 > >
-> > EXYNOS5_USB_CFG macro should actually point to USB20PHY_CFG
-> > system register (base addr + 0x230). It's wrongly placed in regs-pmu.
-> > Actual register at offset 0x230 in PMU is SEQ_TRANSITION4.
+> > Because currently devname field is used for matching device instances to
+> > clocks and if no devname is provided (as in clock-s3c2412.c and
+> > common-s3c2443.c for i2c clock, both in arch/arm/mach-s3c24xx) the clock
+> > is being matched only by name, so s3c_device_i2c0 can always have id 0.
 > >
-> > Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> > This patch solves the issue with i2c0 broken on boards where its the
+> > only i2c controller used, tested on Origen.
+> >
+> > Signed-off-by: Tomasz Figa<t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
 > 
-> As you mentioned, this definition is wrong.
-> So, it should be removed.
-> 
-> Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
 Applied, thanks.
-
-Thanks.
 
 Best regards,
 Kgene.
