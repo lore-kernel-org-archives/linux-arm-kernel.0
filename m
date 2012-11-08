@@ -1,36 +1,40 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 8 Nov 2012 13:54:39 +0100
-Subject: [PATCH 3/5] gpiolib: remove duplicate pin range code
-In-Reply-To: <CAOh2x=nT8_95uu9tfEnOHy9Gkm6gEEAVAKKwPAqbLJz3bwFDNw@mail.gmail.com>
-References: <1352215014-30305-1-git-send-email-linus.walleij@stericsson.com>
- <CAOh2x=nT8_95uu9tfEnOHy9Gkm6gEEAVAKKwPAqbLJz3bwFDNw@mail.gmail.com>
-Message-ID: <CACRpkdbZ8VLixWwKOEUMNe+6BJOwCs0Me3=7_oR8xvT9MZx1Aw@mail.gmail.com>
+Date: Thu, 8 Nov 2012 13:58:53 +0100
+Subject: [PATCH] gpiolib: iron out include ladder mistakes
+In-Reply-To: <509983D0.1060107@wwwdotorg.org>
+References: <1352218863-2037-1-git-send-email-linus.walleij@stericsson.com>
+ <509983D0.1060107@wwwdotorg.org>
+Message-ID: <CACRpkdYgEp2qb6_TWukLZmaO-tKz=hg_2=FAQk9E1DbP5wiP1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2012 at 6:14 AM, viresh kumar <viresh.kumar@linaro.org> wrote:
-> On Tue, Nov 6, 2012 at 8:46 PM, Linus Walleij
-> <linus.walleij@stericsson.com> wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> Commit 69e1601bca88809dc118abd1becb02c15a02ec71
->> "gpiolib: provide provision to register pin ranges"
->>
->> Introduced both of_gpiochip_remove_pin_range() and
->> gpiochip_remove_pin_ranges(). But the contents are exactly
->> the same so remove the OF one and rely on the range deletion
->> in the core.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Nov 6, 2012 at 10:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 11/06/2012 09:21 AM, Linus Walleij wrote:
+
+>> And we need to keep the static inlines in <linux/gpio.h>
+>> but here for the !CONFIG_GENERIC_GPIO case, and then we
+>> may as well throw in a few warnings like the other
+>> prototypes there, if someone would have the bad taste
+>> of compiling without GENERIC_GPIO even.
 >
-> I can't believe that i did this :(
+> Hmm. Is there way to avoid the duplication of the dummy implementations?
+> Having a prototype and a truly dummy implementation in one place, but a
+> WARNing/failing dummy implementation elsewhere, seems like it'll cause
+> issues.
 
-Don't worry, it's impossible to get these things right. I am
-trying to fix it properly here and just introduce new bugs
-for every fix I try to make.
+Yeah :-/
 
-Maybe I'll soon have something that actually doesn't
-break x86...
+This is not exactly elegant and is some side effect of the split
+between CONFIG_GENERIC_GPIO and CONFIG_GPIOLIB,
+the real fix is to get rid of all GENERIC_GPIO implementations
+in the kernel and switch everyone over to GPIOLIB.
+
+Not that easy though :-( can't think of any nice fix.
+
+> Does this patch mean the previous series causes "git bisect" failures?
+
+Yeah once I have something that doesn't break x86 I might
+just squash collapse all of this into the gpioranges patch.
 
 Yours,
 Linus Walleij
