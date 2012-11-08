@@ -1,199 +1,134 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  8 Nov 2012 10:27:31 +0900
-Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+Date: Thu,  8 Nov 2012 10:27:33 +0900
+Subject: [PATCH 4/7] sh: clkfwk: add sh_clk_fsidiv_register()
 In-Reply-To: <1352338056-21107-1-git-send-email-horms@verge.net.au>
 References: <1352338056-21107-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352338056-21107-3-git-send-email-horms@verge.net.au>
+Message-ID: <1352338056-21107-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch supports CN21/CN22 USB 2.0 (port 0/1/2),
-and enable USB momery on defconfig
+This patch adds sh_clk_fsidiv_register() to share FSI-DIV clock code
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig     |    6 ++
- arch/arm/mach-shmobile/Kconfig        |    1 +
- arch/arm/mach-shmobile/board-marzen.c |  108 ++++++++++++++++++++++++++++++++-
- 3 files changed, 114 insertions(+), 1 deletion(-)
+ drivers/sh/clk/cpg.c   |   86 ++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/sh_clk.h |    9 +++++
+ 2 files changed, 95 insertions(+)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 8a861b7..6540dfb 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -47,6 +47,8 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_FARADAY is not set
-@@ -82,6 +84,10 @@ CONFIG_USB=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_STORAGE=y
- CONFIG_UIO=y
- CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_IOMMU_SUPPORT is not set
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index f58c3ea..c03aeec 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -41,6 +41,7 @@ config ARCH_R8A7779
- 	select ARM_GIC
- 	select CPU_V7
- 	select SH_CLK_CPG
-+	select USB_ARCH_HAS_EHCI
- 
- config ARCH_EMEV2
- 	bool "Emma Mobile EV2"
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 74c7f0b..707b3bd 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -34,6 +34,9 @@
- #include <linux/spi/sh_hspi.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ehci_pdriver.h>
-+#include <linux/pm_runtime.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -172,6 +175,101 @@ static struct platform_device *marzen_devices[] __initdata = {
- 	&usb_phy_device,
- };
- 
-+/* USB */
-+static struct usb_phy *phy;
-+static int usb_power_on(struct platform_device *pdev)
+diff --git a/drivers/sh/clk/cpg.c b/drivers/sh/clk/cpg.c
+index 07e9fb4..b3dc441 100644
+--- a/drivers/sh/clk/cpg.c
++++ b/drivers/sh/clk/cpg.c
+@@ -361,3 +361,89 @@ int __init sh_clk_div4_reparent_register(struct clk *clks, int nr,
+ 	return sh_clk_div_register_ops(clks, nr, table,
+ 				       &sh_clk_div4_reparent_clk_ops);
+ }
++
++/* FSI-DIV */
++static unsigned long fsidiv_recalc(struct clk *clk)
 +{
-+	if (!phy)
-+		return -EIO;
++	u32 value;
 +
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
++	value = __raw_readl(clk->mapping->base);
 +
-+	usb_phy_init(phy);
++	value >>= 16;
++	if (value < 2)
++		return clk->parent->rate;
++
++	return clk->parent->rate / value;
++}
++
++static long fsidiv_round_rate(struct clk *clk, unsigned long rate)
++{
++	return clk_rate_div_range_round(clk, 1, 0xffff, rate);
++}
++
++static void fsidiv_disable(struct clk *clk)
++{
++	__raw_writel(0, clk->mapping->base);
++}
++
++static int fsidiv_enable(struct clk *clk)
++{
++	u32 value;
++
++	value  = __raw_readl(clk->mapping->base) >> 16;
++	if (value < 2)
++		return 0;
++
++	__raw_writel((value << 16) | 0x3, clk->mapping->base);
 +
 +	return 0;
 +}
 +
-+static void usb_power_off(struct platform_device *pdev)
++static int fsidiv_set_rate(struct clk *clk, unsigned long rate)
 +{
-+	if (!phy)
-+		return;
++	u32 val;
++	int idx;
 +
-+	usb_phy_shutdown(phy);
++	idx = (clk->parent->rate / rate) & 0xffff;
++	if (idx < 2)
++		__raw_writel(0, clk->mapping->base);
++	else
++		__raw_writel(idx << 16, clk->mapping->base);
 +
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
++	return 0;
 +}
 +
-+static struct usb_ehci_pdata ehcix_pdata = {
-+	.power_on	= usb_power_on,
-+	.power_off	= usb_power_off,
-+	.power_suspend	= usb_power_off,
++static struct sh_clk_ops fsidiv_clk_ops = {
++	.recalc		= fsidiv_recalc,
++	.round_rate	= fsidiv_round_rate,
++	.set_rate	= fsidiv_set_rate,
++	.enable		= fsidiv_enable,
++	.disable	= fsidiv_disable,
 +};
 +
-+static struct resource ehci0_resources[] = {
-+	[0] = {
-+		.start	= 0xffe70000,
-+		.end	= 0xffe70400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(44),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device ehci0_device = {
-+	.name	= "ehci-platform",
-+	.id	= 0,
-+	.dev	= {
-+		.dma_mask		= &ehci0_device.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= 0xffffffff,
-+		.platform_data		= &ehcix_pdata,
-+	},
-+	.num_resources	= ARRAY_SIZE(ehci0_resources),
-+	.resource	= ehci0_resources,
-+};
-+
-+static struct resource ehci1_resources[] = {
-+	[0] = {
-+		.start	= 0xfff70000,
-+		.end	= 0xfff70400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(45),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device ehci1_device = {
-+	.name	= "ehci-platform",
-+	.id	= 1,
-+	.dev	= {
-+		.dma_mask		= &ehci1_device.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= 0xffffffff,
-+		.platform_data		= &ehcix_pdata,
-+	},
-+	.num_resources	= ARRAY_SIZE(ehci1_resources),
-+	.resource	= ehci1_resources,
-+};
-+
-+static struct platform_device *marzen_late_devices[] __initdata = {
-+	&ehci0_device,
-+	&ehci1_device,
-+};
-+
-+void __init marzen_init_late(void)
++int __init sh_clk_fsidiv_register(struct clk *clks, int nr)
 +{
-+	/* get usb phy */
-+	phy = usb_get_phy(USB_PHY_TYPE_USB2);
++	struct clk_mapping *map;
++	int i;
 +
-+	shmobile_init_late();
-+	platform_add_devices(marzen_late_devices,
-+			     ARRAY_SIZE(marzen_late_devices));
++	for (i = 0; i < nr; i++) {
++
++		map = kzalloc(sizeof(struct clk_mapping), GFP_KERNEL);
++		if (!map) {
++			pr_err("%s: unable to alloc memory\n", __func__);
++			return -ENOMEM;
++		}
++
++		/* clks[i].enable_reg came from SH_CLK_FSIDIV() */
++		map->phys		= (phys_addr_t)clks[i].enable_reg;
++		map->len		= 8;
++
++		clks[i].enable_reg	= 0; /* remove .enable_reg */
++		clks[i].ops		= &fsidiv_clk_ops;
++		clks[i].mapping		= map;
++
++		clk_register(&clks[i]);
++	}
++
++	return 0;
 +}
-+
- static void __init marzen_init(void)
- {
- 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
-@@ -209,6 +307,14 @@ static void __init marzen_init(void)
- 	gpio_request(GPIO_FN_HSPI_TX0,	NULL);
- 	gpio_request(GPIO_FN_HSPI_RX0,	NULL);
+diff --git a/include/linux/sh_clk.h b/include/linux/sh_clk.h
+index 5091091..60c7239 100644
+--- a/include/linux/sh_clk.h
++++ b/include/linux/sh_clk.h
+@@ -199,4 +199,13 @@ int sh_clk_div6_reparent_register(struct clk *clks, int nr);
+ #define CLKDEV_DEV_ID(_id, _clk) { .dev_id = _id, .clk = _clk }
+ #define CLKDEV_ICK_ID(_cid, _did, _clk) { .con_id = _cid, .dev_id = _did, .clk = _clk }
  
-+	/* USB (CN21) */
-+	gpio_request(GPIO_FN_USB_OVC0, NULL);
-+	gpio_request(GPIO_FN_USB_OVC1, NULL);
-+	gpio_request(GPIO_FN_USB_OVC2, NULL);
++/* .enable_reg will be updated to .mapping on sh_clk_fsidiv_register() */
++#define SH_CLK_FSIDIV(_reg, _parent)		\
++{						\
++	.enable_reg = (void __iomem *)_reg,	\
++	.parent		= _parent,		\
++}
 +
-+	/* USB (CN22) */
-+	gpio_request(GPIO_FN_USB_PENC2, NULL);
++int sh_clk_fsidiv_register(struct clk *clks, int nr);
 +
- 	r8a7779_add_standard_devices();
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
-@@ -221,6 +327,6 @@ MACHINE_START(MARZEN, "marzen")
- 	.init_irq	= r8a7779_init_irq,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= marzen_init,
--	.init_late	= shmobile_init_late,
-+	.init_late	= marzen_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
+ #endif /* __SH_CLOCK_H */
 -- 
 1.7.10.4
