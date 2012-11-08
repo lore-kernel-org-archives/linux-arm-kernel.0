@@ -1,109 +1,72 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu,  8 Nov 2012 10:27:34 +0900
-Subject: [PATCH 5/7] ARM: shmobile: sh7372: sh7372_fsidivX_clk become
- non-global
-In-Reply-To: <1352338056-21107-1-git-send-email-horms@verge.net.au>
-References: <1352338056-21107-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352338056-21107-6-git-send-email-horms@verge.net.au>
+From: dxchgb@gmail.com (Daniel Borkmann)
+Date: Thu, 8 Nov 2012 02:28:28 +0100
+Subject: [PATCH net-next 1/2] ARM: net: bpf_jit_32: add XOR instruction for
+ BPF JIT
+Message-ID: <20121108012828.GA23143@thinkbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+This patch is a follow-up for patch "filter: add XOR instruction for use
+with X/K" that implements BPF ARM JIT parts for the BPF XOR operation.
 
-Not only sh7372 but also many Renesas chip has FSI-DIV clock,
-and we can share its sh_clk_ops.
-To support common FSI-DIV clock, sh7372_fsidivX_clk
-becomes non-global by this patch.
-This is preparation for FSI DT support.
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
+Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
+Cc: Mircea Gherzan <mgherzan@gmail.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c        |    2 +-
- arch/arm/mach-shmobile/board-mackerel.c      |    2 +-
- arch/arm/mach-shmobile/clock-sh7372.c        |   10 ++++++----
- arch/arm/mach-shmobile/include/mach/sh7372.h |    2 --
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/net/bpf_jit_32.c |   15 ++++++++++-----
+ arch/arm/net/bpf_jit_32.h |    2 ++
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 790dc68..cefdd03 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -728,7 +728,7 @@ fsia_ick_out:
- static int fsi_hdmi_set_rate(struct device *dev, int rate, int enable)
- {
- 	struct clk *fsib_clk;
--	struct clk *fdiv_clk = &sh7372_fsidivb_clk;
-+	struct clk *fdiv_clk = clk_get(NULL, "fsidivb");
- 	long fsib_rate = 0;
- 	long fdiv_rate = 0;
- 	int ackmd_bpfmd;
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 39b8f2e..f274252 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -882,7 +882,7 @@ static int __fsi_set_round_rate(struct clk *clk, long rate, int enable)
- static int fsi_b_set_rate(struct device *dev, int rate, int enable)
- {
- 	struct clk *fsib_clk;
--	struct clk *fdiv_clk = &sh7372_fsidivb_clk;
-+	struct clk *fdiv_clk = clk_get(NULL, "fsidivb");
- 	long fsib_rate = 0;
- 	long fdiv_rate = 0;
- 	int ackmd_bpfmd;
-diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
-index 430a90f..18dcff7 100644
---- a/arch/arm/mach-shmobile/clock-sh7372.c
-+++ b/arch/arm/mach-shmobile/clock-sh7372.c
-@@ -481,7 +481,7 @@ static struct clk_mapping fsidiva_clk_mapping = {
- 	.len	= 8,
- };
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index c641fb6..8be702d 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -646,6 +646,16 @@ load_ind:
+ 			update_on_xread(ctx);
+ 			emit(ARM_ORR_R(r_A, r_A, r_X), ctx);
+ 			break;
++		case BPF_S_ALU_XOR_K:
++			/* A ^= K; */
++			OP_IMM3(ARM_EOR, r_A, r_A, k, ctx);
++			break;
++		case BPF_S_ANC_ALU_XOR_X:
++		case BPF_S_ALU_XOR_X:
++			/* A ^= X */
++			update_on_xread(ctx);
++			emit(ARM_EOR_R(r_A, r_A, r_X), ctx);
++			break;
+ 		case BPF_S_ALU_AND_K:
+ 			/* A &= K */
+ 			OP_IMM3(ARM_AND, r_A, r_A, k, ctx);
+@@ -762,11 +772,6 @@ b_epilogue:
+ 			update_on_xread(ctx);
+ 			emit(ARM_MOV_R(r_A, r_X), ctx);
+ 			break;
+-		case BPF_S_ANC_ALU_XOR_X:
+-			/* A ^= X */
+-			update_on_xread(ctx);
+-			emit(ARM_EOR_R(r_A, r_A, r_X), ctx);
+-			break;
+ 		case BPF_S_ANC_PROTOCOL:
+ 			/* A = ntohs(skb->protocol) */
+ 			ctx->seen |= SEEN_SKB;
+diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
+index 7fa2f7d..afb8462 100644
+--- a/arch/arm/net/bpf_jit_32.h
++++ b/arch/arm/net/bpf_jit_32.h
+@@ -69,6 +69,7 @@
+ #define ARM_INST_CMP_I		0x03500000
  
--struct clk sh7372_fsidiva_clk = {
-+static struct clk fsidiva_clk = {
- 	.ops		= &fsidiv_clk_ops,
- 	.parent		= &div6_reparent_clks[DIV6_FSIA], /* late install */
- 	.mapping	= &fsidiva_clk_mapping,
-@@ -492,15 +492,15 @@ static struct clk_mapping fsidivb_clk_mapping = {
- 	.len	= 8,
- };
+ #define ARM_INST_EOR_R		0x00200000
++#define ARM_INST_EOR_I		0x02200000
  
--struct clk sh7372_fsidivb_clk = {
-+static struct clk fsidivb_clk = {
- 	.ops		= &fsidiv_clk_ops,
- 	.parent		= &div6_reparent_clks[DIV6_FSIB],  /* late install */
- 	.mapping	= &fsidivb_clk_mapping,
- };
+ #define ARM_INST_LDRB_I		0x05d00000
+ #define ARM_INST_LDRB_R		0x07d00000
+@@ -135,6 +136,7 @@
+ #define ARM_CMP_I(rn, imm)	_AL3_I(ARM_INST_CMP, 0, rn, imm)
  
- static struct clk *late_main_clks[] = {
--	&sh7372_fsidiva_clk,
--	&sh7372_fsidivb_clk,
-+	&fsidiva_clk,
-+	&fsidivb_clk,
- };
+ #define ARM_EOR_R(rd, rn, rm)	_AL3_R(ARM_INST_EOR, rd, rn, rm)
++#define ARM_EOR_I(rd, rn, imm)	_AL3_I(ARM_INST_EOR, rd, rn, imm)
  
- enum { MSTP001, MSTP000,
-@@ -583,6 +583,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("pllc1_clk", &pllc1_clk),
- 	CLKDEV_CON_ID("pllc1_div2_clk", &pllc1_div2_clk),
- 	CLKDEV_CON_ID("pllc2_clk", &sh7372_pllc2_clk),
-+	CLKDEV_CON_ID("fsidiva", &fsidiva_clk),
-+	CLKDEV_CON_ID("fsidivb", &fsidivb_clk),
- 
- 	/* DIV4 clocks */
- 	CLKDEV_CON_ID("i_clk", &div4_clks[DIV4_I]),
-diff --git a/arch/arm/mach-shmobile/include/mach/sh7372.h b/arch/arm/mach-shmobile/include/mach/sh7372.h
-index eb98b45..bf93a86 100644
---- a/arch/arm/mach-shmobile/include/mach/sh7372.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh7372.h
-@@ -475,8 +475,6 @@ extern struct clk sh7372_dv_clki_div2_clk;
- extern struct clk sh7372_pllc2_clk;
- extern struct clk sh7372_fsiack_clk;
- extern struct clk sh7372_fsibck_clk;
--extern struct clk sh7372_fsidiva_clk;
--extern struct clk sh7372_fsidivb_clk;
- 
- extern void sh7372_intcs_suspend(void);
- extern void sh7372_intcs_resume(void);
--- 
-1.7.10.4
+ #define ARM_LDR_I(rt, rn, off)	(ARM_INST_LDR_I | (rt) << 12 | (rn) << 16 \
+ 				 | (off))
