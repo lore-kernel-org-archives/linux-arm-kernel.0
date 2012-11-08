@@ -1,143 +1,29 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 8 Nov 2012 14:57:19 +0100
-Subject: [PATCH v2] gpiolib: iron out include ladder mistakes
-Message-ID: <1352383039-12269-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 8 Nov 2012 15:00:37 +0100
+Subject: [PATCH] ARM: VIC: remove unused irq_base variable
+In-Reply-To: <20121108135537.GZ28327@n2100.arm.linux.org.uk>
+References: <1350392786-29191-1-git-send-email-linus.walleij@stericsson.com>
+ <201211081340.54440.arnd@arndb.de>
+ <20121108135537.GZ28327@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZR=OKs2YgJ_G8boV7r+ffeNto6OA-pktv8ofn0tg6C-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Nov 8, 2012 at 2:55 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Nov 08, 2012 at 01:40:54PM +0000, Arnd Bergmann wrote:
+>> "ARM: VIC: use irq_domain_add_simple()" causes a new warning:
+>>
+>> arch/arm/common/vic.c: In function 'vic_of_init':
+>> arch/arm/common/vic.c:410:6: warning: unused variable 'irq_base' [-Wunused-variable]
+>>
+>> Since the irq_base variable is not used any more, it should be
+>> removed now
+>
+> I've just committed exactly the same patch to my tree...
 
-The <*/gpio.h> includes are updated again: now we need to account
-for the problem introduced by commit:
-595679a8038584df7b9398bf34f61db3c038bfea
-"gpiolib: fix up function prototypes etc"
+Thanks guys...
+Acked-by, FWIW
 
-Actually we need static inlines in include/asm-generic/gpio.h
-as well since we may have GPIOLIB but not PINCTRL.
-Make sure to move all the CONFIG_PINCTRL business
-to the end of the file so we are sure we have
-declared struct gpio_chip.
-
-And we need to keep the static inlines in <linux/gpio.h>
-but here for the !CONFIG_GENERIC_GPIO case, and then we
-may as well throw in a few warnings like the other
-prototypes there, if someone would have the bad taste
-of compiling without GENERIC_GPIO even.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Move function prototypes below all other #ifdefs at the
-  bottom of the file so we know we have struct irq_chip
-  defines
-- Provide a proper return value from the
-  gpiochip_add_pin_range() stub
-- Thanks to Stephen Rothwell for pointing this out.
----
- include/asm-generic/gpio.h | 56 +++++++++++++++++++++++++++++-----------------
- include/linux/gpio.h       |  7 +++---
- 2 files changed, 38 insertions(+), 25 deletions(-)
-
-diff --git a/include/asm-generic/gpio.h b/include/asm-generic/gpio.h
-index 50d995e..2b84fc3 100644
---- a/include/asm-generic/gpio.h
-+++ b/include/asm-generic/gpio.h
-@@ -48,27 +48,6 @@ struct seq_file;
- struct module;
- struct device_node;
- 
--#ifdef CONFIG_PINCTRL
--
--/**
-- * struct gpio_pin_range - pin range controlled by a gpio chip
-- * @head: list for maintaining set of pin ranges, used internally
-- * @pctldev: pinctrl device which handles corresponding pins
-- * @range: actual range of pins controlled by a gpio controller
-- */
--
--struct gpio_pin_range {
--	struct list_head node;
--	struct pinctrl_dev *pctldev;
--	struct pinctrl_gpio_range range;
--};
--
--int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
--			   unsigned int pin_base, unsigned int npins);
--void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
--
--#endif
--
- /**
-  * struct gpio_chip - abstract a GPIO controller
-  * @label: for diagnostics
-@@ -288,4 +267,39 @@ static inline void gpio_unexport(unsigned gpio)
- }
- #endif	/* CONFIG_GPIO_SYSFS */
- 
-+#ifdef CONFIG_PINCTRL
-+
-+/**
-+ * struct gpio_pin_range - pin range controlled by a gpio chip
-+ * @head: list for maintaining set of pin ranges, used internally
-+ * @pctldev: pinctrl device which handles corresponding pins
-+ * @range: actual range of pins controlled by a gpio controller
-+ */
-+
-+struct gpio_pin_range {
-+	struct list_head node;
-+	struct pinctrl_dev *pctldev;
-+	struct pinctrl_gpio_range range;
-+};
-+
-+int gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
-+			   unsigned int pin_base, unsigned int npins);
-+void gpiochip_remove_pin_ranges(struct gpio_chip *chip);
-+
-+#else
-+
-+static inline int
-+gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
-+		       unsigned int pin_base, unsigned int npins)
-+{
-+	return 0;
-+}
-+
-+static inline void
-+gpiochip_remove_pin_ranges(struct gpio_chip *chip)
-+{
-+}
-+
-+#endif /* CONFIG_PINCTRL */
-+
- #endif /* _ASM_GENERIC_GPIO_H */
-diff --git a/include/linux/gpio.h b/include/linux/gpio.h
-index 81bbfe5..7ba2762 100644
---- a/include/linux/gpio.h
-+++ b/include/linux/gpio.h
-@@ -231,21 +231,20 @@ static inline int irq_to_gpio(unsigned irq)
- 	return -EINVAL;
- }
- 
--#ifdef CONFIG_PINCTRL
--
- static inline int
- gpiochip_add_pin_range(struct gpio_chip *chip, const char *pinctl_name,
- 		       unsigned int pin_base, unsigned int npins)
- {
-+	WARN_ON(1);
-+	return -EINVAL;
- }
- 
- static inline void
- gpiochip_remove_pin_ranges(struct gpio_chip *chip)
- {
-+	WARN_ON(1);
- }
- 
--#endif /* CONFIG_PINCTRL */
--
- #endif /* ! CONFIG_GENERIC_GPIO */
- 
- #endif /* __LINUX_GPIO_H */
--- 
-1.7.11.3
+Yours,
+Linus Walleij
