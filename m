@@ -1,41 +1,32 @@
-From: thierry.reding@avionic-design.de (Thierry Reding)
-Date: Thu, 8 Nov 2012 09:27:00 +0100
-Subject: [PATCH] pwm: lpc32xx - Add a driver for the motor PWM
-In-Reply-To: <509B6B87.8030102@antcom.de>
-References: <1352305828-25298-1-git-send-email-alban.bedel@avionic-design.de>
- <509A982A.6020401@antcom.de>
- <20121107203028.GA6186@avionic-0098.mockup.avionic-design.de>
- <509B6B87.8030102@antcom.de>
-Message-ID: <20121108082700.GA21332@avionic-0098.mockup.avionic-design.de>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 08 Nov 2012 14:02:12 +0530
+Subject: [PATCH v2] ARM: EXYNOS5250: Add support for USB 3.0 dwc3 controller
+Message-ID: <1352363533-14970-1-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2012 at 09:21:27AM +0100, Roland Stigge wrote:
-> On 07/11/12 21:30, Thierry Reding wrote:
-> > On Wed, Nov 07, 2012 at 06:19:38PM +0100, Roland Stigge wrote:
-> >> On 07/11/12 17:30, Alban Bedel wrote:
-> >>> Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de> --- 
-> >>> .../devicetree/bindings/pwm/lpc32xx-motor-pwm.txt  |   24 ++ 
-> >>> arch/arm/boot/dts/lpc32xx.dtsi                     |    7 +
-> >> 
-> >> Is all this supposed to go via mach-lpc32xx -> arm-soc.git? Then,
-> >> I can take this into the lpc32xx tree. Otherwise, you can split
-> >> off the .dtsi file and I include it via lpc32xx.
-> > 
-> > I'd prefer a split between the arch/arm changes and the rest. I'll
-> > take the drivers/pwm and Documentation changes through the PWM
-> > tree.
-> 
-> OK, I'll organize everything lpc32xx specific under arch/arm/
+Changes from v1:
+ - Changed the device node name from 'dwc3' to 'usb at 12000000'.
+ - Added the documentation for device tree bindings for dwc3 controller.
 
-Alban, I haven't finished reviewing yet, but once I'm done, can you
-resubmit a set of two patches split by arch/arm and the rest?
+Based on changes for USB 2.0:
+'https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-November/022046.html'
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121108/e75de120/attachment.sig>
+Tested with required driver DT patches for dwc3-exynos:
+http://www.spinics.net/lists/linux-usb/msg73857.html
+and USB 3.0 phy support patches:
+https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-November/021926.html
+
+Vivek Gautam (1):
+  ARM: Exynos5250: Enabling dwc3-exynos driver
+
+ .../devicetree/bindings/usb/exynos-usb.txt         |   14 +++++++++++
+ arch/arm/boot/dts/exynos5250.dtsi                  |    6 +++++
+ arch/arm/mach-exynos/Kconfig                       |    1 +
+ arch/arm/mach-exynos/clock-exynos5.c               |   24 ++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/map.h            |    1 +
+ arch/arm/mach-exynos/mach-exynos5-dt.c             |    2 +
+ 6 files changed, 48 insertions(+), 0 deletions(-)
+
+-- 
+1.7.6.5
