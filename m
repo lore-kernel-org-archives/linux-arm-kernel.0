@@ -1,70 +1,138 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu,  8 Nov 2012 10:27:29 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC boards for v3.8 #2
-Message-ID: <1352338056-21107-1-git-send-email-horms@verge.net.au>
+Date: Thu,  8 Nov 2012 10:27:32 +0900
+Subject: [PATCH 3/7] ARM: shmobile: marzen: add USB OHCI driver support
+In-Reply-To: <1352338056-21107-1-git-send-email-horms@verge.net.au>
+References: <1352338056-21107-1-git-send-email-horms@verge.net.au>
+Message-ID: <1352338056-21107-4-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider the following board enhancements for 3.8.
+This patch supports CN21/CN22 USB 1.x (port 0/1/2),
+and enable input event on defconfig
 
-* This pull-request is based on an earlier request which I
-  posted on the 1st and was merged yesterday: [GIT PULL v3] Renesas
-  ARM-based SoC boards for v3.8
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/configs/marzen_defconfig     |    5 +--
+ arch/arm/mach-shmobile/Kconfig        |    1 +
+ arch/arm/mach-shmobile/board-marzen.c |   57 +++++++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+), 2 deletions(-)
 
-* This pull request replaces the one that I sent yesterday:
-  [GIT PULL] Renesas ARM-based SoC boards for v3.8 #2
-
-* Patch #2 of this series has a build-time dependency on
-  the soc pull request that I sent a few minutes ago:
-  [GIT PULL] Renesas ARM-based SoC for v3.8 #2
-
-  In particular, "ARM: shmobile: marzen: add USB EHCI driver support"
-  depends on "[PATCH 1/7] ARM: shmobile: r8a7779: PFC rename PENCx -> USB_PENCx"
-
-* Patch 4 of this pull-request is a driver patch which is a dependency
-  of patches 6 and 7 of this pull-request. I have spoken to the driver
-  maintainer, Paul Mundt, and he has indicated that he thinks it
-  is best to merge all in one go.
-
-  In more detail:
-
-  "sh: clkfwk: add sh_clk_fsidiv_register()" is a dependency of
-  - "ARM: shmobile: sh7372: use sh_clk_fsidiv_register() for FSI-DIV clocks"
-  - "ARM: shmobile: r8a7740: add FSI-DVI clocks"
-
-----------------------------------------------------------------
-The following changes since commit 631a7b5d958d2ef2c2333b105794c693642f0641:
-
-  ARM: shmobile: Remove G4EVM machine support (2012-10-30 15:25:59 +0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git boards
-
-for you to fetch changes up to 32ce635f0251bf5b2232cc59151d344303b73718:
-
-  ARM: shmobile: r8a7740: add FSI-DVI clocks (2012-11-08 10:16:13 +0900)
-
-----------------------------------------------------------------
-Kuninori Morimoto (7):
-      ARM: shmobile: marzen: add USB phy support
-      ARM: shmobile: marzen: add USB EHCI driver support
-      ARM: shmobile: marzen: add USB OHCI driver support
-      sh: clkfwk: add sh_clk_fsidiv_register()
-      ARM: shmobile: sh7372: sh7372_fsidivX_clk become non-global
-      ARM: shmobile: sh7372: use sh_clk_fsidiv_register() for FSI-DIV clocks
-      ARM: shmobile: r8a7740: add FSI-DVI clocks
-
- arch/arm/configs/marzen_defconfig            |   14 +-
- arch/arm/mach-shmobile/Kconfig               |    2 +
- arch/arm/mach-shmobile/board-ap4evb.c        |    2 +-
- arch/arm/mach-shmobile/board-mackerel.c      |    2 +-
- arch/arm/mach-shmobile/board-marzen.c        |  186 +++++++++++++++++++++++++-
- arch/arm/mach-shmobile/clock-r8a7740.c       |   16 +++
- arch/arm/mach-shmobile/clock-sh7372.c        |   92 ++-----------
- arch/arm/mach-shmobile/include/mach/sh7372.h |    2 -
- drivers/sh/clk/cpg.c                         |   86 ++++++++++++
- include/linux/sh_clk.h                       |    9 ++
- 10 files changed, 321 insertions(+), 90 deletions(-)
+diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
+index 6540dfb..728a43c 100644
+--- a/arch/arm/configs/marzen_defconfig
++++ b/arch/arm/configs/marzen_defconfig
+@@ -61,9 +61,8 @@ CONFIG_SMSC911X=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV is not set
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_INPUT_EVDEV=y
+ # CONFIG_INPUT_MOUSE is not set
+-# CONFIG_SERIO is not set
+ # CONFIG_VT is not set
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+@@ -86,6 +85,8 @@ CONFIG_MMC=y
+ CONFIG_MMC_SDHI=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
+ CONFIG_UIO=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index c03aeec..64db252 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -42,6 +42,7 @@ config ARCH_R8A7779
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select USB_ARCH_HAS_EHCI
++	select USB_ARCH_HAS_OHCI
+ 
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 707b3bd..449f928 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -36,6 +36,7 @@
+ #include <linux/mfd/tmio.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ehci_pdriver.h>
++#include <linux/usb/ohci_pdriver.h>
+ #include <linux/pm_runtime.h>
+ #include <mach/hardware.h>
+ #include <mach/r8a7779.h>
+@@ -255,9 +256,65 @@ static struct platform_device ehci1_device = {
+ 	.resource	= ehci1_resources,
+ };
+ 
++static struct usb_ohci_pdata ohcix_pdata = {
++	.power_on	= usb_power_on,
++	.power_off	= usb_power_off,
++	.power_suspend	= usb_power_off,
++};
++
++static struct resource ohci0_resources[] = {
++	[0] = {
++		.start	= 0xffe70400,
++		.end	= 0xffe70800 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= gic_spi(44),
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device ohci0_device = {
++	.name	= "ohci-platform",
++	.id	= 0,
++	.dev	= {
++		.dma_mask		= &ohci0_device.dev.coherent_dma_mask,
++		.coherent_dma_mask	= 0xffffffff,
++		.platform_data		= &ohcix_pdata,
++	},
++	.num_resources	= ARRAY_SIZE(ohci0_resources),
++	.resource	= ohci0_resources,
++};
++
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start	= 0xfff70400,
++		.end	= 0xfff70800 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= gic_spi(45),
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device ohci1_device = {
++	.name	= "ohci-platform",
++	.id	= 1,
++	.dev	= {
++		.dma_mask		= &ohci1_device.dev.coherent_dma_mask,
++		.coherent_dma_mask	= 0xffffffff,
++		.platform_data		= &ohcix_pdata,
++	},
++	.num_resources	= ARRAY_SIZE(ohci1_resources),
++	.resource	= ohci1_resources,
++};
++
+ static struct platform_device *marzen_late_devices[] __initdata = {
+ 	&ehci0_device,
+ 	&ehci1_device,
++	&ohci0_device,
++	&ohci1_device,
+ };
+ 
+ void __init marzen_init_late(void)
+-- 
+1.7.10.4
