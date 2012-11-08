@@ -1,31 +1,53 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 08 Nov 2012 08:46:19 +0100
-Subject: [PATCH 3/7] ARM: davinci: remove obsoleted init_consistent_dma_size()
+Date: Thu, 08 Nov 2012 08:46:20 +0100
+Subject: [PATCH 4/7] ARM: shmobile: remove obsoleted init_consistent_dma_size()
 In-Reply-To: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
 References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1352360783-17523-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1352360783-17523-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-CC: Sekhar Nori <nsekhar@ti.com>
-CC: Kevin Hilman <khilman@ti.com>
+CC: Paul Mundt <lethal@linux-sh.org>
+CC: Magnus Damm <magnus.damm@gmail.com>
 ---
- arch/arm/mach-davinci/common.c |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c |    6 ------
+ arch/arm/mach-shmobile/setup-sh7372.c  |    6 ------
+ 2 files changed, 12 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index 64b0f65..a794f6d 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -87,8 +87,6 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
- 		iotable_init(davinci_soc_info.io_desc,
- 				davinci_soc_info.io_desc_num);
- 
--	init_consistent_dma_size(14 << 20);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 11bb1d9..96f1139 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -66,12 +66,6 @@ static struct map_desc r8a7740_io_desc[] __initdata = {
+ void __init r8a7740_map_io(void)
+ {
+ 	iotable_init(r8a7740_io_desc, ARRAY_SIZE(r8a7740_io_desc));
 -
- 	/*
- 	 * Normally devicemaps_init() would flush caches and tlb after
- 	 * mdesc->map_io(), but we must also do it here because of the CPU
+-	/*
+-	 * DMA memory at 0xff200000 - 0xffdfffff. The default 2MB size isn't
+-	 * enough to allocate the frame buffer memory.
+-	 */
+-	init_consistent_dma_size(12 << 20);
+ }
+ 
+ /* SCIFA0 */
+diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+index a07954f..be6f746 100644
+--- a/arch/arm/mach-shmobile/setup-sh7372.c
++++ b/arch/arm/mach-shmobile/setup-sh7372.c
+@@ -58,12 +58,6 @@ static struct map_desc sh7372_io_desc[] __initdata = {
+ void __init sh7372_map_io(void)
+ {
+ 	iotable_init(sh7372_io_desc, ARRAY_SIZE(sh7372_io_desc));
+-
+-	/*
+-	 * DMA memory@0xff200000 - 0xffdfffff. The default 2MB size isn't
+-	 * enough to allocate the frame buffer memory.
+-	 */
+-	init_consistent_dma_size(12 << 20);
+ }
+ 
+ /* SCIFA0 */
 -- 
 1.7.9.5
