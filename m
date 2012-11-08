@@ -1,56 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 7 Nov 2012 17:42:18 -0800
-Subject: [PATCH v2 00/26] Move OMAP2+ over to common clk framework
-In-Reply-To: <20121108013140.17381.66421@nucleus>
-References: <1352337181-29427-1-git-send-email-mturquette@ti.com>
- <20121108013140.17381.66421@nucleus>
-Message-ID: <20121108014218.GY6801@atomide.com>
+From: bard.shen@gmail.com (Bo Shen)
+Date: Thu, 08 Nov 2012 09:50:41 +0800
+Subject: [Resend PATCH v3 2/4] ARM: at91: atmel-ssc: add device tree
+ support
+In-Reply-To: <20121107151607.GC4576@game.jcrosoft.org>
+References: <1352259701-19847-1-git-send-email-voice.shen@atmel.com>
+ <20121107084932.GE20063@game.jcrosoft.org>
+ <20121107092124.GE12323@opensource.wolfsonmicro.com>
+ <20121107104121.GG20063@game.jcrosoft.org>
+ <20121107140535.GA28954@opensource.wolfsonmicro.com>
+ <20121107143046.GA4576@game.jcrosoft.org>
+ <20121107144450.GF20844@opensource.wolfsonmicro.com>
+ <20121107151607.GC4576@game.jcrosoft.org>
+Message-ID: <509B0FF1.4080504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi J,
 
-* Mike Turquette <mturquette@linaro.org> [121107 17:33]:
-> Doh, I got the LAKML address wrong...
-> 
-> Thankfully it's already up on some archives:
-> http://article.gmane.org/gmane.linux.ports.arm.omap/88824
-> 
-> For anyone interested in testing:
-> git://git.linaro.org/people/mturquette/linux.git clk-omap-3.8
-> 
-> Regards,
-> Mike
-> 
-> Quoting Mike Turquette (2012-11-07 17:12:35)
-> > From: Mike Turquette <mturquette@linaro.org>
-> > 
-> > Hi all,
-> > 
-> > This series is based on top of Paul's PRM/CM clean-up work.  It is a
-> > refresh of the patches Rajendra sent out a while back[1], with the
-> > addition of several fixes for PM regressions[2] across several
-> > platforms.
-> > 
-> > I have tested on OMAP4430 Panda including PRCM diffing against pre-CCF
-> > patches (delta is zero) and also suspend/resume.
-> > 
-> > I also tested on OMAP4460 Panda-ES.  Boot is fine and PRCM programming
-> > appears sane.  However Panda-ES never comes back from suspend/resume.
-> > This problem exists on the PRM/CM branch I based on and was not
-> > introduced by this series.  I am investigating that independently of
-> > this series.
+On 11/7/2012 23:16, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 15:44 Wed 07 Nov     , Mark Brown wrote:
+>> On Wed, Nov 07, 2012 at 03:30:46PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>
+>>> the one via ASoC for the driver with the pinctrl for now but MUST add it later
+>>
+>>> the arch/arm related via AT91 tree where the pinctrl is mandatory in the dtsi
+>>
+>>> I'm no going to spend hours to do the pinctrl to test Bo patch that he is
+>>> supposed to have deon to test this code
+>>
+>>> As basically today on DT none of the board will work if BO does no provide the
+>>> pinctrl so for me he MUST put in the dtsi
+>>
+>>> is it ok with you?
+>>
+>> Or add the pinmux bindings for other IPs over in the pinmux branch and
+>> the pinmux binding for SSC here (which will help with bisection as the
+>> DT bindings for the audio will then always exist in conjunction with the
+>> .dtsi changes for them).  Either way is fine with me; I'll leave things
+>> as they are until I see some new patches.
+> for where it's merge honestly I do not care much but the pinctrl must be
+> handled correctly
 
-Cool! Do we still have some omaps that have issues booting with
-these?
+I will send patches to add pinctrl support.
+For atmel ssc driver, it is simple, however for dtsi, which point should 
+I based on? which git and which branch? Because, I am not sure which 
+branch on git://github.com/at91linux/linux-at91.git is the right point.
 
-Regards,
+Thanks.
 
-Tony
+Best Regards,
+Bo Shen
 
-
-> > Anyone wanting to pull the work can find it at:
-> > git://git.linaro.org/people/mturquette/linux.git clk-omap-3.8
-> > 
-> > [1] http://article.gmane.org/gmane.linux.ports.arm.omap/78771
-> > [2] http://article.gmane.org/gmane.linux.ports.arm.omap/84015
+> Best Regards,
+> J.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
