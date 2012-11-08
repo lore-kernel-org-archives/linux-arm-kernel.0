@@ -1,9 +1,9 @@
 From: sasha.levin@oracle.com (Sasha Levin)
-Date: Thu,  8 Nov 2012 15:23:11 -0500
-Subject: [PATCH] ARM: versatile: use BUG_ON where possible
+Date: Thu,  8 Nov 2012 15:23:10 -0500
+Subject: [PATCH] ARM: dma: use BUG_ON where possible
 In-Reply-To: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
 References: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
-Message-ID: <1352406191-14303-9-git-send-email-sasha.levin@oracle.com>
+Message-ID: <1352406191-14303-8-git-send-email-sasha.levin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,28 +25,37 @@ expression e;
 
 Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
 ---
- arch/arm/mach-versatile/pci.c |    9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+ arch/arm/mach-rpc/dma.c     |    3 +--
+ arch/arm/mach-s3c64xx/dma.c |    3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-versatile/pci.c b/arch/arm/mach-versatile/pci.c
-index 2f84f40..3936a11 100644
---- a/arch/arm/mach-versatile/pci.c
-+++ b/arch/arm/mach-versatile/pci.c
-@@ -82,12 +82,9 @@ static void __iomem *__pci_addr(struct pci_bus *bus,
- 	/*
- 	 * Trap out illegal values
- 	 */
--	if (offset > 255)
--		BUG();
--	if (busnr > 255)
--		BUG();
--	if (devfn > 255)
--		BUG();
-+	BUG_ON(offset > 255);
-+	BUG_ON(busnr > 255);
-+	BUG_ON(devfn > 255);
+diff --git a/arch/arm/mach-rpc/dma.c b/arch/arm/mach-rpc/dma.c
+index 85883b2..92e22ba 100644
+--- a/arch/arm/mach-rpc/dma.c
++++ b/arch/arm/mach-rpc/dma.c
+@@ -265,8 +265,7 @@ static void floppy_enable_dma(unsigned int chan, dma_t *dma)
+ 	unsigned int fiqhandler_length;
+ 	struct pt_regs regs;
  
- 	return VERSATILE_PCI_CFG_VIRT_BASE + ((busnr << 16) |
- 		(PCI_SLOT(devfn) << 11) | (PCI_FUNC(devfn) << 8) | offset);
+-	if (fdma->dma.sg)
+-		BUG();
++	BUG_ON(fdma->dma.sg);
+ 
+ 	if (fdma->dma.dma_mode == DMA_MODE_READ) {
+ 		extern unsigned char floppy_fiqin_start, floppy_fiqin_end;
+diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
+index f2a7a17..585c2ae 100644
+--- a/arch/arm/mach-s3c64xx/dma.c
++++ b/arch/arm/mach-s3c64xx/dma.c
+@@ -603,8 +603,7 @@ static irqreturn_t s3c64xx_dma_irq(int irq, void *pw)
+ 				&& buff->next != chan->next)
+ 			buff = buff->next;
+ 
+-		if (!buff)
+-			BUG();
++		BUG_ON(!buff);
+ 
+ 		if (buff == chan->next)
+ 			buff = chan->end;
 -- 
 1.7.10.4
