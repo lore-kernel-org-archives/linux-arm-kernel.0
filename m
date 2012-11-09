@@ -1,84 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 Nov 2012 20:03:57 +0900
-Subject: [PATCH v2 1/6] ARM: EXYNOS5: Clock settings for SATA and SATA PHY
-In-Reply-To: <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
-References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
- <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <0e8a01cdbe69$ea6e67c0$bf4b3740$%kim@samsung.com>
+From: dc4@broadcom.com (Dominic Cobley)
+Date: Fri, 9 Nov 2012 11:09:46 +0000
+Subject: S-o-b for 48efdd2
+ "Add a pm_power_off function that resets us, ..."
+In-Reply-To: <509C7328.9030104@wwwdotorg.org>
+References: <508CA4C4.5060407@wwwdotorg.org> <509C7328.9030104@wwwdotorg.org>
+Message-ID: <2C2B34F818605C4A9351ED6A537A43841DE6D823@SJEXCHMB09.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasanth Ananthan wrote:
+I'm happy to give permission for s.o.b. to be commits made by me. Is that sufficient?
+If that's not sufficient can you give me git commands that will do what you want?
+
+-----Original Message-----
+From: Stephen Warren [mailto:swarren at wwwdotorg.org] 
+Sent: 09 November 2012 03:06
+To: Dominic Cobley
+Cc: linux-rpi-kernel at lists.infradead.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: S-o-b for 48efdd2 "Add a pm_power_off function that resets us, ..."
+
+On 10/27/2012 09:21 PM, Stephen Warren wrote:
+> Dom,
 > 
-> This patch adds neccessary clock entries for SATA, SATA PHY and
-> I2C_SATAPHY
+> Are you able to provide your S-o-b for the following commit:
 > 
-> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
-> ---
->  arch/arm/mach-exynos/clock-exynos5.c |   21 ++++++++++++++++++---
->  1 files changed, 18 insertions(+), 3 deletions(-)
+> 48efdd2 Add a pm_power_off function that resets us, and indicates to
+> bootcode.bin not to reboot us. Should allow a lower power 'off' state
 > 
-> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
-> exynos/clock-exynos5.c
-> index c44ca1e..124c54f 100644
-> --- a/arch/arm/mach-exynos/clock-exynos5.c
-> +++ b/arch/arm/mach-exynos/clock-exynos5.c
-> @@ -651,15 +651,20 @@ static struct clk exynos5_init_clocks_off[] = {
->  		.ctrlbit	= (1 << 15),
->  	}, {
->  		.name		= "sata",
-> -		.devname	= "ahci",
-> +		.devname	= "exynos5-sata",
-> +		.parent         = &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 6),
->  	}, {
-> -		.name		= "sata_phy",
-> +		.name		= "sata-phy",
-> +		.devname	= "exynos5-sata-phy",
-> +		.parent         = &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 24),
->  	}, {
-> -		.name		= "sata_phy_i2c",
-> +		.name		= "i2c",
-> +		.devname	= "exynos5-sata-phy-i2c",
-> +		.parent         = &exynos5_clk_aclk_200.clk,
->  		.enable		= exynos5_clk_ip_fsys_ctrl,
->  		.ctrlbit	= (1 << 25),
->  	}, {
-> @@ -1226,6 +1231,16 @@ static struct clksrc_clk exynos5_clksrcs[] = {
->  		.reg_div = { .reg = EXYNOS5_CLKDIV_TOP0, .shift = 24, .size
-> = 3 },
->  	}, {
->  		.clk	= {
-> +			.name		= "sclk_sata",
-> +			.devname	= "exynos5-sata",
-> +			.enable		= exynos5_clksrc_mask_fsys_ctrl,
-> +			.ctrlbit	= (1 << 24),
-> +		},
-> +		.sources = &exynos5_clkset_aclk,
-> +		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 24, .size
-> = 1 },
-> +		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 20, .size
-> = 4 },
-> +	}, {
-> +		.clk	= {
->  			.name		= "sclk_gscl_wrap",
->  			.devname	= "s5p-mipi-csis.0",
->  			.enable		= exynos5_clksrc_mask_gscl_ctrl,
-> --
-> 1.7.4.1
+> I would like to upstream that, but can't without an S-o-b [from you].
+> 
+> Thanks.
 
-Looks OK to me, need to think again about naming though?, anyway, this can
-be handled separate from this series.
-
-Let me take this into Samsung tree, if any problems, please let me know.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Dom, are you able to provide an S-o-b line for this or any other commits
+in you kernel trees? It'd be really helpful if you could add S-o-bs to
+any/all commits in your branches where you can. Thanks.
