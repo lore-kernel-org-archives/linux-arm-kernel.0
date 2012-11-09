@@ -1,52 +1,51 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:29:15 +0900
-Subject: [GIT PULL v2] Renesas ARM-based SoC for v3.8 #2
-Message-ID: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+Date: Fri,  9 Nov 2012 16:29:18 +0900
+Subject: [PATCH 03/10] ARM: shmobile: r8a7779: add USB EHCI clock support
+In-Reply-To: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+Message-ID: <1352446165-19298-4-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-please consider the following SoC enhancements for 3.8.
+ehci-platform driver require these clocks
 
-* This series is based on the renesas/soc branch of the arm-soc tree.
-  There will be a subquent 'SoC2' pull request which is based on this
-  pull-request and a pull-request for boards.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7779.c |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-----------------------------------------------------------------
-The following changes since commit 86bc52ef4373be64867b56f3a9e30cbabf64e0dd:
-
-  ARM: shmobile: r8a7740: Enable PMU (2012-11-06 13:47:24 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
-
-for you to fetch changes up to 2944628607f76e4755660cd710f22a4748ef88d8:
-
-  ARM: shmobile: add fsi external clock sh7372 (2012-11-08 15:22:06 +0900)
-
-----------------------------------------------------------------
-Kuninori Morimoto (10):
-      ARM: shmobile: r8a7779: PFC rename PENCx -> USB_PENCx
-      ARM: shmobile: r8a7740: add USB24 clock explain
-      ARM: shmobile: r8a7779: add USB EHCI clock support
-      ARM: shmobile: r8a7779: add USB OHCI clock support
-      sh: clkfwk: add sh_clk_fsidiv_register()
-      ARM: shmobile: sh7372: sh7372_fsidivX_clk become non-global
-      ARM: shmobile: sh7372: use sh_clk_fsidiv_register() for FSI-DIV clocks
-      ARM: shmobile: r8a7740: add FSI-DVI clocks
-      ARM: shmobile: add fsi external clock on r8a7740
-      ARM: shmobile: add fsi external clock sh7372
-
- arch/arm/mach-shmobile/board-ap4evb.c         |    2 +-
- arch/arm/mach-shmobile/board-mackerel.c       |    2 +-
- arch/arm/mach-shmobile/clock-r8a7740.c        |   34 +++++++++
- arch/arm/mach-shmobile/clock-r8a7779.c        |    7 ++
- arch/arm/mach-shmobile/clock-sh7372.c         |   94 ++++---------------------
- arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 +-
- arch/arm/mach-shmobile/include/mach/sh7372.h  |    2 -
- arch/arm/mach-shmobile/pfc-r8a7779.c          |   16 ++---
- drivers/sh/clk/cpg.c                          |   86 ++++++++++++++++++++++
- include/linux/sh_clk.h                        |    9 +++
- 10 files changed, 159 insertions(+), 95 deletions(-)
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 24f5a84..4ba4e3c 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -87,6 +87,7 @@ static struct clk div4_clks[DIV4_NR] = {
+ };
+ 
+ enum { MSTP323, MSTP322, MSTP321, MSTP320,
++	MSTP101, MSTP100,
+ 	MSTP030,
+ 	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015, MSTP014,
+@@ -98,6 +99,8 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP322] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 22, 0), /* SDHI1 */
+ 	[MSTP321] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 21, 0), /* SDHI2 */
+ 	[MSTP320] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR3, 20, 0), /* SDHI3 */
++	[MSTP101] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR1,  1, 0), /* USB2 */
++	[MSTP100] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR1,  0, 0), /* USB0/1 */
+ 	[MSTP030] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 30, 0), /* I2C0 */
+ 	[MSTP029] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 29, 0), /* I2C1 */
+ 	[MSTP028] = SH_CLK_MSTP32(&div4_clks[DIV4_P], MSTPCR0, 28, 0), /* I2C2 */
+@@ -153,6 +156,8 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("peripheral_clk",	&div4_clks[DIV4_P]),
+ 
+ 	/* MSTP32 clocks */
++	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
++	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+ 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
+ 	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
+-- 
+1.7.10.4
