@@ -1,39 +1,48 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Fri, 09 Nov 2012 17:29:11 +0200
-Subject: [PATCH] dma: add new DMA control commands
-In-Reply-To: <507FBDF1.5050602@freescale.com>
-References: <1350538335-29026-1-git-send-email-b32955@freescale.com>
- <201210180914.58527.marex@denx.de> <507FB495.7050104@freescale.com>
- <201210181016.06782.marex@denx.de> <507FBDF1.5050602@freescale.com>
-Message-ID: <1352474951.1814.40.camel@sauron.fi.intel.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 9 Nov 2012 15:36:30 +0000
+Subject: [PATCH 6/6] ASoC: fsl: add imx-wm8974 machine driver
+In-Reply-To: <1352469625-32024-7-git-send-email-s.trumtrar@pengutronix.de>
+References: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1352469625-32024-7-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20121109153629.GK23807@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-10-18 at 16:29 +0800, Huang Shijie wrote:
-> ? 2012?10?18? 16:16, Marek Vasut ??:
-> > So we can't stream data from the chip? About time to adjust the MTD framework to
-> > allow that. Maybe implement a command queue?
-> >
-> 
-> to Artem & David:
->     is this possible to stream the data out with a command queue?
+On Fri, Nov 09, 2012 at 03:00:25PM +0100, Steffen Trumtrar wrote:
 
-Well, I think there was no HW which supported reading multiple pages
-with DMA before, are your sure yours support this? Usually reading a
-NAND page consists of 2 phases - loading the NAND array contents to a
-controller buffer, and then copying that to RAM. And the second part is
-something people sometimes do with DMA, AFAIU.
+> +static int imx_wm8974_dai_init(struct snd_soc_pcm_runtime *rtd)
+> +{
+> +	struct imx_wm8974_data *data = container_of(rtd->card,
+> +					struct imx_wm8974_data, card);
+> +	struct device *dev = rtd->card->dev;
+> +	int ret;
+> +
+> +	/* the pll stability peaks at N=8 and around 90MHz.
+> +	 * This values are best reached with a 12.288MHz or
+> +	 * 11.289MHz clock. As the first is closer to N=8 in
+> +	 * more situations, chose 12.288MHz as the target clock
+> +	 * (ref: datasheet section "Master Clock and Phase Locked Loop")*/
+> +	ret = snd_soc_dai_set_pll(rtd->codec_dai, 0, 0, data->clk_frequency,
+> +		12288000);
 
-If your HW supports this, sure the MTD framework can be re-worked. Or
-you may write your own 'mtd->_read()' / 'mtd->_write()' implementation.
+This seems far from ideal - it's starting the PLL at system boot and
+just leaving it running.  This will be power inefficient when the system
+is not playing audio as the PLL will be consuming power but not used for
+anything.  You could also do the same thing with the MCLK.
 
--- 
-Best Regards,
-Artem Bityutskiy
+Note also that a 12.288MHz clock is only suitable for 8kHz based sample
+rates, for CD audio 44.1kHz based rates like most media files 11.2896MHz
+should be chosen.  The driver may want to switch dynamically at runtime
+to support the widest possible range of rates.
+
+> +	data->codec_clk = clk_get(&codec_pdev->dev, NULL);
+> +	if (IS_ERR(data->codec_clk)) {
+
+devm_clk_get() - this'd free the clock that's leaked on removal.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/12358221/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/7de65984/attachment.sig>
