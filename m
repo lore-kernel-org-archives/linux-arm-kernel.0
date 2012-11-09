@@ -1,77 +1,96 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri,  9 Nov 2012 15:00:21 +0100
-Subject: [PATCH 2/6] spi/devicetree: find spi_device via device_node
+Date: Fri,  9 Nov 2012 15:00:22 +0100
+Subject: [PATCH 3/6] ASoC: wm8974: include MCLKDIV in pll_factors
 In-Reply-To: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1352469625-32024-3-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1352469625-32024-4-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to find a spi_device via DT device_node.
-The patch is based on the way i2c does it.
+To calculate the integer part of the frequency ratio, the whole output
+path has to be considered (post and pre are optional):
 
-This is intended for devices that depend on multiple subsystems and are therefore
-not a child of the spi-master node (e.g. sound devices that are controlled via spi
-and get their data via another bus). The driver instead can find the desired device
-via scanning the spi bus.
+	    Ndiv = (pre * target * 4 * post) / source
+
+In the current implementation only the fixed- and pre-divider is
+considered, but the post-divider is omitted.
+To calculate Ndiv, this post divider has to be applied before any
+calculation happens. Otherwise Ndiv is considered to be to low in the
+later stages. This leads to a wrong value in the PLLN register, which
+in turn produces a wrong playback speed of the audio signal.
+
+This patch adds the post divider to the pll calculation.
 
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- drivers/spi/spi.c       |   20 ++++++++++++++++++++
- include/linux/spi/spi.h |    3 +++
- 2 files changed, 23 insertions(+)
+ sound/soc/codecs/wm8974.c |   39 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 84c2861..e25487f 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -801,6 +801,26 @@ err_init_queue:
- /*-------------------------------------------------------------------------*/
+diff --git a/sound/soc/codecs/wm8974.c b/sound/soc/codecs/wm8974.c
+index 9a39511..b012e4d 100644
+--- a/sound/soc/codecs/wm8974.c
++++ b/sound/soc/codecs/wm8974.c
+@@ -275,16 +275,51 @@ struct pll_ {
+  * to allow rounding later */
+ #define FIXED_PLL_SIZE ((1 << 24) * 10)
  
- #if defined(CONFIG_OF) && !defined(CONFIG_SPARC)
-+
-+static int of_dev_node_match(struct device *dev, void *data)
-+{
-+	return dev->of_node == data;
-+}
-+
-+/* must call spi_dev_put() when done with returned spi_device device */
-+struct spi_device *of_find_spi_device_by_node(struct device_node *node)
-+{
-+	struct device *dev;
-+
-+	dev = bus_find_device(&spi_bus_type, NULL, node, of_dev_node_match);
-+
-+	if (!dev)
-+		return NULL;
-+
-+	return to_spi_device(dev);
-+}
-+EXPORT_SYMBOL_GPL(of_find_spi_device_by_node);
-+
- /**
-  * of_register_spi_devices() - Register child devices onto the SPI bus
-  * @master:	Pointer to spi_master device
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index fa702ae..db3a630 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -23,6 +23,7 @@
- #include <linux/mod_devicetable.h>
- #include <linux/slab.h>
- #include <linux/kthread.h>
-+#include <linux/of.h>
+-static void pll_factors(struct pll_ *pll_div,
++static void pll_factors(struct pll_ *pll_div, struct snd_soc_codec *codec,
+ 			unsigned int target, unsigned int source)
+ {
+ 	unsigned long long Kpart;
+ 	unsigned int K, Ndiv, Nmod;
++	u16 reg;
  
- /*
-  * INTERFACES between SPI master-side drivers and SPI infrastructure.
-@@ -387,6 +388,8 @@ static inline void spi_master_put(struct spi_master *master)
- 		put_device(&master->dev);
- }
- 
-+extern struct spi_device *of_find_spi_device_by_node(struct device_node *node);
+ 	/* There is a fixed divide by 4 in the output path */
 +
- /* PM calls that need to be issued by the driver */
- extern int spi_master_suspend(struct spi_master *master);
- extern int spi_master_resume(struct spi_master *master);
+ 	target *= 4;
+ 
++	/* target also depends on MCLKDIV */
++	reg = (snd_soc_read(codec, WM8974_CLOCK) & 0xe0) >> 5;
++
++	switch (reg) {
++	case WM8974_MCLKDIV_1:
++				reg = 1;
++				break;
++	case WM8974_MCLKDIV_1_5:
++	case WM8974_MCLKDIV_2:
++				reg = 2;
++				break;
++	case WM8974_MCLKDIV_3:
++				reg = 3;
++				break;
++	case WM8974_MCLKDIV_4:
++				reg = 4;
++				break;
++	case WM8974_MCLKDIV_6:
++				reg = 6;
++				break;
++	case WM8974_MCLKDIV_8:
++				reg = 8;
++				break;
++	case WM8974_MCLKDIV_12:
++				reg = 12;
++				break;
++	default:
++				reg = 2;
++	}
++
++	target *= reg;
++
+ 	Ndiv = target / source;
++
+ 	if (Ndiv < 6) {
+ 		source /= 2;
+ 		pll_div->pre_div = 1;
+@@ -333,7 +368,7 @@ static int wm8974_set_dai_pll(struct snd_soc_dai *codec_dai, int pll_id,
+ 		return 0;
+ 	}
+ 
+-	pll_factors(&pll_div, freq_out, freq_in);
++	pll_factors(&pll_div, codec, freq_out, freq_in);
+ 
+ 	snd_soc_write(codec, WM8974_PLLN, (pll_div.pre_div << 4) | pll_div.n);
+ 	snd_soc_write(codec, WM8974_PLLK1, pll_div.k >> 18);
 -- 
 1.7.10.4
