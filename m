@@ -1,51 +1,51 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Nov 2012 14:07:26 -0700
-Subject: [PATCH 04/11] ARM: set arch_gettimeoffset directly
-In-Reply-To: <509C3AE7.7030703@gmail.com>
-References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
- <1352408516-21988-6-git-send-email-swarren@wwwdotorg.org>
- <509C3AE7.7030703@gmail.com>
-Message-ID: <509D708E.6080703@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Nov 2012 13:10:52 -0800
+Subject: [PATCH] ARM: OMAP2+: Prevent redefinition errors for soc.h
+In-Reply-To: <509D2F77.6090702@ti.com>
+References: <1352477961-7634-1-git-send-email-jon-hunter@ti.com>
+ <20121109162259.GO6801@atomide.com> <509D2F77.6090702@ti.com>
+Message-ID: <20121109211052.GS6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2012 04:06 PM, Ryan Mallon wrote:
-> On 09/11/12 08:01, Stephen Warren wrote:
->> remove ARM's struct sys_timer .offset function pointer, and instead
->> directly set the arch_gettimeoffset function pointer when the timer
->> driver is initialized. This requires multiplying all function results
->> by 1000, since the removed arm_gettimeoffset() did this. Also,
->> s/unsigned long/u32/ just to make the function prototypes exactly
->> match that of arch_gettimeoffset.
+* Jon Hunter <jon-hunter@ti.com> [121109 08:31]:
+> 
+> On 11/09/2012 10:22 AM, Tony Lindgren wrote:
+> > * Jon Hunter <jon-hunter@ti.com> [121109 08:21]:
+> >> If the header soc.h is included more than once in a source (for example
+> >> once directly by the source file and once indirectly by another header
+> >> file), then the compiler will generate redefintion errors for the macros
+> >> in soc.h. Prevent this by only allowing the content in soc.h to be
+> >> included once.
+> >>
+> >> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> >> ---
+> >>
+> >> Please note that I ran into this problem when rebasing my dmtimer fixes
+> >> series [1] on Tony's Linux-OMAP master branch. I am including plat/cpu.h
+> >> in dmtimer.h and I found several other files including dmtimer.h are also
+> >> including soc.h and so generate a lot of errors.
+> >>
+> >> [1] http://marc.info/?l=linux-omap&m=135231490218361&w=2
+> > 
+> > As these headers are private to mach-omap2, I'd rather not allow including
+> > them more than once so we can eventually clean up the includes further.
+> > 
+> > We should include the headers directly where used, except for the
+> > legacy board-*.c files that will be going away anyways.
+> > 
+> > Including the files directly should fix this easily, if not let me
+> > know.
+> 
+> The alternative fix is to ensure anyone including dmtimer.h also
+> includes soc.h. However, I did not know if we should have such a
+> dependency. If you are ok with that then that is what I will do for now.
+> It is not a massive change.
 
->> +static u32 ep93xx_gettimeoffset(void)
->> +{
->> +	int offset;
->> +
->> +	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
->> +
->> +	/* Calculate (1000000 / 983040) * offset.  */
-> 
-> This comment is now incorrect, it should say:
-> 
-> 	/* Calculate (1000000000 / 983040) * offset */
-> 
-> or perhaps to better explain what is being done:
-> 
-> 	/*
-> 	 * Timer 4 is based on a 983.04 kHz reference clock,
-> 	 * so dividing by 983040 gives a milli-second value.
-> 	 * Refactor the calculation to avoid overflow.
-> 	 */
-> 
->> +	return (offset + (53 * offset / 3072)) * 1000;
+Do you mean anything under mach-omap2/*.c including dmtimer.h also
+needs to also include soc.h? If sounds OK to me as long as we don't
+need to include soc.h outside mach-omap2.
 
-Thanks. I expanded on that slightly and went for:
+Regards,
 
-	/*
-	 * Timer 4 is based on a 983.04 kHz reference clock,
-	 * so dividing by 983040 gives the fraction of a second,
-	 * so dividing by 0.983040 converts to uS.
-	 * Refactor the calculation to avoid overflow.
-	 * Finally, multiply by 1000 to give nS.
-	 */
+Tony
