@@ -1,25 +1,20 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Nov 2012 19:52:21 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2+: clockdomain: disabling unused clks
-In-Reply-To: <20121109194023.17381.62227@nucleus>
-References: <alpine.DEB.2.00.1211081800210.20703@utopia.booyaka.com>
- <1352417516-15213-1-git-send-email-mturquette@ti.com>
- <alpine.DEB.2.00.1211090052100.20703@utopia.booyaka.com>
- <20121109011738.17381.88199@nucleus>
- <alpine.DEB.2.00.1211091900250.20703@utopia.booyaka.com>
- <alpine.DEB.2.00.1211091906340.20703@utopia.booyaka.com>
- <20121109194023.17381.62227@nucleus>
-Message-ID: <alpine.DEB.2.00.1211091951080.20703@utopia.booyaka.com>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 9 Nov 2012 20:53:40 +0100
+Subject: [PATCH] i2c: at91: fix SMBus quick command
+In-Reply-To: <1352481797-3520-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1352481797-3520-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20121109205340.28e5772f@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Nov 2012, Mike Turquette wrote:
+On Fri, 9 Nov 2012 18:23:17 +0100, ludovic.desroches at atmel.com wrote:
+> I tested it with i2cdetect as you suggested. EEPROMs were detected but not
+> other devices (lm75 and ds1337). I have exactly the same behavior by using
+> i2c-gpio driver so I think there is no major issue on a driver point of view.
 
-> But I'm OK with the below patch in the short term.  I just have one
-> question: did you observe any PM regressions by skipping the clkdm
-> programming?
+Note that i2cdetect uses a different probe command for EEPROM addresses
+(0x50-0x57) than for other addresses by default. You can change this
+default behavior with -q and -r for testing purposes.
 
-It's still under test here but 3530ES3 Beagle passed the PM tests with it, 
-with no obvious warnings.
-
-- Paul
+-- 
+Jean Delvare
