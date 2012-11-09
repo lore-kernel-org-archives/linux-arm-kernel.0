@@ -1,3438 +1,4163 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue,  6 Nov 2012 13:57:23 +0900
-Subject: [PATCH 01/11] ARM: shmobile: Remove SH7367 support
-In-Reply-To: <1352177853-6008-1-git-send-email-horms@verge.net.au>
-References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352177853-6008-2-git-send-email-horms@verge.net.au>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 9 Nov 2012 13:05:43 -0800
+Subject: [PATCH 15/26] ARM: omap2: clock: Add 24xx data using common
+ struct clk
+In-Reply-To: <alpine.DEB.2.00.1211092030360.20703@utopia.booyaka.com>
+References: <1352337181-29427-1-git-send-email-mturquette@ti.com>
+ <1352337181-29427-16-git-send-email-mturquette@ti.com>
+ <alpine.DEB.2.00.1211081532210.20703@utopia.booyaka.com>
+ <alpine.DEB.2.00.1211092030360.20703@utopia.booyaka.com>
+Message-ID: <20121109210543.17381.15878@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Quoting Paul Walmsley (2012-11-09 12:32:59)
+> Here's another update on this one to add the twl.fck clock alias, recently 
+> added by commit defa6be1c8216ed2d52d65db81a8a148e73be5f7 ("mfd: Fix 
+> compile for twl-core.c by removing cpu_is_omap usage").
+> 
 
-This is old CPU of shmobile, and the machine by which this CPU is
-used cannot be obtained.
-Therefore, remove SH7367 support.
+I'll post a new series to the list with these fixes rolled in.  Do you
+want me to squash the clkdm_clk_disable/usecount patch into another
+patch in the series or keep it separate?  Separate might be good since
+we're going to replace that solution with some force-disable thing in
+the future.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
-Signed-off-by: Simon Horman <horms@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig               |    6 -
- arch/arm/mach-shmobile/Makefile              |    3 -
- arch/arm/mach-shmobile/clock-sh7367.c        |  355 ------
- arch/arm/mach-shmobile/include/mach/common.h |    9 -
- arch/arm/mach-shmobile/include/mach/sh7367.h |  332 -----
- arch/arm/mach-shmobile/intc-sh7367.c         |  413 ------
- arch/arm/mach-shmobile/pfc-sh7367.c          | 1727 --------------------------
- arch/arm/mach-shmobile/setup-sh7367.c        |  481 -------
- 8 files changed, 3326 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/clock-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/include/mach/sh7367.h
- delete mode 100644 arch/arm/mach-shmobile/intc-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/pfc-sh7367.c
- delete mode 100644 arch/arm/mach-shmobile/setup-sh7367.c
+Regards,
+Mike
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 8ae100c..d20dab4 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -2,12 +2,6 @@ if ARCH_SHMOBILE
- 
- comment "SH-Mobile System Type"
- 
--config ARCH_SH7367
--	bool "SH-Mobile G3 (SH7367)"
--	select ARCH_WANT_OPTIONAL_GPIOLIB
--	select CPU_V6
--	select SH_CLK_CPG
--
- config ARCH_SH7377
- 	bool "SH-Mobile G4 (SH7377)"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index fe2c97c..7c07a04 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -6,7 +6,6 @@
- obj-y				:= timer.o console.o clock.o
- 
- # CPU objects
--obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
- obj-$(CONFIG_ARCH_SH7377)	+= setup-sh7377.o clock-sh7377.o intc-sh7377.o
- obj-$(CONFIG_ARCH_SH7372)	+= setup-sh7372.o clock-sh7372.o intc-sh7372.o
- obj-$(CONFIG_ARCH_SH73A0)	+= setup-sh73a0.o clock-sh73a0.o intc-sh73a0.o
-@@ -23,7 +22,6 @@ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o
- 
- # Pinmux setup
- pfc-y				:=
--pfc-$(CONFIG_ARCH_SH7367)	+= pfc-sh7367.o
- pfc-$(CONFIG_ARCH_SH7377)	+= pfc-sh7377.o
- pfc-$(CONFIG_ARCH_SH7372)	+= pfc-sh7372.o
- pfc-$(CONFIG_ARCH_SH73A0)	+= pfc-sh73a0.o
-@@ -31,7 +29,6 @@ pfc-$(CONFIG_ARCH_R8A7740)	+= pfc-r8a7740.o
- pfc-$(CONFIG_ARCH_R8A7779)	+= pfc-r8a7779.o
- 
- # IRQ objects
--obj-$(CONFIG_ARCH_SH7367)	+= entry-intc.o
- obj-$(CONFIG_ARCH_SH7377)	+= entry-intc.o
- obj-$(CONFIG_ARCH_SH7372)	+= entry-intc.o
- obj-$(CONFIG_ARCH_R8A7740)	+= entry-intc.o
-diff --git a/arch/arm/mach-shmobile/clock-sh7367.c b/arch/arm/mach-shmobile/clock-sh7367.c
-deleted file mode 100644
-index ef0a95e..0000000
---- a/arch/arm/mach-shmobile/clock-sh7367.c
-+++ /dev/null
-@@ -1,355 +0,0 @@
--/*
-- * SH7367 clock framework support
-- *
-- * Copyright (C) 2010  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/sh_clk.h>
--#include <linux/clkdev.h>
--#include <mach/common.h>
--
--/* SH7367 registers */
--#define RTFRQCR    IOMEM(0xe6150000)
--#define SYFRQCR    IOMEM(0xe6150004)
--#define CMFRQCR    IOMEM(0xe61500E0)
--#define VCLKCR1    IOMEM(0xe6150008)
--#define VCLKCR2    IOMEM(0xe615000C)
--#define VCLKCR3    IOMEM(0xe615001C)
--#define SCLKACR    IOMEM(0xe6150010)
--#define SCLKBCR    IOMEM(0xe6150014)
--#define SUBUSBCKCR IOMEM(0xe6158080)
--#define SPUCKCR    IOMEM(0xe6150084)
--#define MSUCKCR    IOMEM(0xe6150088)
--#define MVI3CKCR   IOMEM(0xe6150090)
--#define VOUCKCR    IOMEM(0xe6150094)
--#define MFCK1CR    IOMEM(0xe6150098)
--#define MFCK2CR    IOMEM(0xe615009C)
--#define PLLC1CR    IOMEM(0xe6150028)
--#define PLLC2CR    IOMEM(0xe615002C)
--#define RTMSTPCR0  IOMEM(0xe6158030)
--#define RTMSTPCR2  IOMEM(0xe6158038)
--#define SYMSTPCR0  IOMEM(0xe6158040)
--#define SYMSTPCR2  IOMEM(0xe6158048)
--#define CMMSTPCR0  IOMEM(0xe615804c)
--
--/* Fixed 32 KHz root clock from EXTALR pin */
--static struct clk r_clk = {
--	.rate           = 32768,
--};
--
--/*
-- * 26MHz default rate for the EXTALB1 root input clock.
-- * If needed, reset this with clk_set_rate() from the platform code.
-- */
--struct clk sh7367_extalb1_clk = {
--	.rate		= 26666666,
--};
--
--/*
-- * 48MHz default rate for the EXTAL2 root input clock.
-- * If needed, reset this with clk_set_rate() from the platform code.
-- */
--struct clk sh7367_extal2_clk = {
--	.rate		= 48000000,
--};
--
--/* A fixed divide-by-2 block */
--static unsigned long div2_recalc(struct clk *clk)
--{
--	return clk->parent->rate / 2;
--}
--
--static struct sh_clk_ops div2_clk_ops = {
--	.recalc		= div2_recalc,
--};
--
--/* Divide extalb1 by two */
--static struct clk extalb1_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &sh7367_extalb1_clk,
--};
--
--/* Divide extal2 by two */
--static struct clk extal2_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &sh7367_extal2_clk,
--};
--
--/* PLLC1 */
--static unsigned long pllc1_recalc(struct clk *clk)
--{
--	unsigned long mult = 1;
--
--	if (__raw_readl(PLLC1CR) & (1 << 14))
--		mult = (((__raw_readl(RTFRQCR) >> 24) & 0x3f) + 1) * 2;
--
--	return clk->parent->rate * mult;
--}
--
--static struct sh_clk_ops pllc1_clk_ops = {
--	.recalc		= pllc1_recalc,
--};
--
--static struct clk pllc1_clk = {
--	.ops		= &pllc1_clk_ops,
--	.flags		= CLK_ENABLE_ON_INIT,
--	.parent		= &extalb1_div2_clk,
--};
--
--/* Divide PLLC1 by two */
--static struct clk pllc1_div2_clk = {
--	.ops		= &div2_clk_ops,
--	.parent		= &pllc1_clk,
--};
--
--/* PLLC2 */
--static unsigned long pllc2_recalc(struct clk *clk)
--{
--	unsigned long mult = 1;
--
--	if (__raw_readl(PLLC2CR) & (1 << 31))
--		mult = (((__raw_readl(PLLC2CR) >> 24) & 0x3f) + 1) * 2;
--
--	return clk->parent->rate * mult;
--}
--
--static struct sh_clk_ops pllc2_clk_ops = {
--	.recalc		= pllc2_recalc,
--};
--
--static struct clk pllc2_clk = {
--	.ops		= &pllc2_clk_ops,
--	.flags		= CLK_ENABLE_ON_INIT,
--	.parent		= &extalb1_div2_clk,
--};
--
--static struct clk *main_clks[] = {
--	&r_clk,
--	&sh7367_extalb1_clk,
--	&sh7367_extal2_clk,
--	&extalb1_div2_clk,
--	&extal2_div2_clk,
--	&pllc1_clk,
--	&pllc1_div2_clk,
--	&pllc2_clk,
--};
--
--static void div4_kick(struct clk *clk)
--{
--	unsigned long value;
--
--	/* set KICK bit in SYFRQCR to update hardware setting */
--	value = __raw_readl(SYFRQCR);
--	value |= (1 << 31);
--	__raw_writel(value, SYFRQCR);
--}
--
--static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18,
--			  24, 32, 36, 48, 0, 72, 0, 0 };
--
--static struct clk_div_mult_table div4_div_mult_table = {
--	.divisors = divisors,
--	.nr_divisors = ARRAY_SIZE(divisors),
--};
--
--static struct clk_div4_table div4_table = {
--	.div_mult_table = &div4_div_mult_table,
--	.kick = div4_kick,
--};
--
--enum { DIV4_I, DIV4_G, DIV4_S, DIV4_B,
--       DIV4_ZX, DIV4_ZT, DIV4_Z, DIV4_ZD, DIV4_HP,
--       DIV4_ZS, DIV4_ZB, DIV4_ZB3, DIV4_CP, DIV4_NR };
--
--#define DIV4(_reg, _bit, _mask, _flags) \
--  SH_CLK_DIV4(&pllc1_clk, _reg, _bit, _mask, _flags)
--
--static struct clk div4_clks[DIV4_NR] = {
--	[DIV4_I] = DIV4(RTFRQCR, 20, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_G] = DIV4(RTFRQCR, 16, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_S] = DIV4(RTFRQCR, 12, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_B] = DIV4(RTFRQCR, 8, 0x6fff, CLK_ENABLE_ON_INIT),
--	[DIV4_ZX] = DIV4(SYFRQCR, 20, 0x6fff, 0),
--	[DIV4_ZT] = DIV4(SYFRQCR, 16, 0x6fff, 0),
--	[DIV4_Z] = DIV4(SYFRQCR, 12, 0x6fff, 0),
--	[DIV4_ZD] = DIV4(SYFRQCR, 8, 0x6fff, 0),
--	[DIV4_HP] = DIV4(SYFRQCR, 4, 0x6fff, 0),
--	[DIV4_ZS] = DIV4(CMFRQCR, 12, 0x6fff, 0),
--	[DIV4_ZB] = DIV4(CMFRQCR, 8, 0x6fff, 0),
--	[DIV4_ZB3] = DIV4(CMFRQCR, 4, 0x6fff, 0),
--	[DIV4_CP] = DIV4(CMFRQCR, 0, 0x6fff, 0),
--};
--
--enum { DIV6_SUB, DIV6_SIUA, DIV6_SIUB, DIV6_MSU, DIV6_SPU,
--       DIV6_MVI3, DIV6_MF1, DIV6_MF2,
--       DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_VOU,
--       DIV6_NR };
--
--static struct clk div6_clks[DIV6_NR] = {
--	[DIV6_SUB] = SH_CLK_DIV6(&sh7367_extal2_clk, SUBUSBCKCR, 0),
--	[DIV6_SIUA] = SH_CLK_DIV6(&pllc1_div2_clk, SCLKACR, 0),
--	[DIV6_SIUB] = SH_CLK_DIV6(&pllc1_div2_clk, SCLKBCR, 0),
--	[DIV6_MSU] = SH_CLK_DIV6(&pllc1_div2_clk, MSUCKCR, 0),
--	[DIV6_SPU] = SH_CLK_DIV6(&pllc1_div2_clk, SPUCKCR, 0),
--	[DIV6_MVI3] = SH_CLK_DIV6(&pllc1_div2_clk, MVI3CKCR, 0),
--	[DIV6_MF1] = SH_CLK_DIV6(&pllc1_div2_clk, MFCK1CR, 0),
--	[DIV6_MF2] = SH_CLK_DIV6(&pllc1_div2_clk, MFCK2CR, 0),
--	[DIV6_VCK1] = SH_CLK_DIV6(&pllc1_div2_clk, VCLKCR1, 0),
--	[DIV6_VCK2] = SH_CLK_DIV6(&pllc1_div2_clk, VCLKCR2, 0),
--	[DIV6_VCK3] = SH_CLK_DIV6(&pllc1_div2_clk, VCLKCR3, 0),
--	[DIV6_VOU] = SH_CLK_DIV6(&pllc1_div2_clk, VOUCKCR, 0),
--};
--
--enum { RTMSTP001,
--       RTMSTP231, RTMSTP230, RTMSTP229, RTMSTP228, RTMSTP226,
--       RTMSTP216, RTMSTP206, RTMSTP205, RTMSTP201,
--       SYMSTP023, SYMSTP007, SYMSTP006, SYMSTP004,
--       SYMSTP003, SYMSTP002, SYMSTP001, SYMSTP000,
--       SYMSTP231, SYMSTP229, SYMSTP225, SYMSTP223, SYMSTP222,
--       SYMSTP215, SYMSTP214, SYMSTP213, SYMSTP211,
--       CMMSTP003,
--       MSTP_NR };
--
--#define MSTP(_parent, _reg, _bit, _flags) \
--  SH_CLK_MSTP32(_parent, _reg, _bit, _flags)
--
--static struct clk mstp_clks[MSTP_NR] = {
--	[RTMSTP001] = MSTP(&div6_clks[DIV6_SUB], RTMSTPCR0, 1, 0), /* IIC2 */
--	[RTMSTP231] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 31, 0), /* VEU3 */
--	[RTMSTP230] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 30, 0), /* VEU2 */
--	[RTMSTP229] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 29, 0), /* VEU1 */
--	[RTMSTP228] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 28, 0), /* VEU0 */
--	[RTMSTP226] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 26, 0), /* VEU2H */
--	[RTMSTP216] = MSTP(&div6_clks[DIV6_SUB], RTMSTPCR2, 16, 0), /* IIC0 */
--	[RTMSTP206] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 6, 0), /* JPU */
--	[RTMSTP205] = MSTP(&div6_clks[DIV6_VOU], RTMSTPCR2, 5, 0), /* VOU */
--	[RTMSTP201] = MSTP(&div4_clks[DIV4_B], RTMSTPCR2, 1, 0), /* VPU */
--	[SYMSTP023] = MSTP(&div6_clks[DIV6_SPU], SYMSTPCR0, 23, 0), /* SPU1 */
--	[SYMSTP007] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 7, 0), /* SCIFA5 */
--	[SYMSTP006] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 6, 0), /* SCIFB */
--	[SYMSTP004] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 4, 0), /* SCIFA0 */
--	[SYMSTP003] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 3, 0), /* SCIFA1 */
--	[SYMSTP002] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 2, 0), /* SCIFA2 */
--	[SYMSTP001] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 1, 0), /* SCIFA3 */
--	[SYMSTP000] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR0, 0, 0), /* SCIFA4 */
--	[SYMSTP231] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR2, 31, 0), /* SIU */
--	[SYMSTP229] = MSTP(&r_clk, SYMSTPCR2, 29, 0), /* CMT10 */
--	[SYMSTP225] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR2, 25, 0), /* IRDA */
--	[SYMSTP223] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR2, 23, 0), /* IIC1 */
--	[SYMSTP222] = MSTP(&div6_clks[DIV6_SUB], SYMSTPCR2, 22, 0), /* USBHS */
--	[SYMSTP215] = MSTP(&div4_clks[DIV4_HP], SYMSTPCR2, 15, 0), /* FLCTL */
--	[SYMSTP214] = MSTP(&div4_clks[DIV4_HP], SYMSTPCR2, 14, 0), /* SDHI0 */
--	[SYMSTP213] = MSTP(&div4_clks[DIV4_HP], SYMSTPCR2, 13, 0), /* SDHI1 */
--	[SYMSTP211] = MSTP(&div4_clks[DIV4_HP], SYMSTPCR2, 11, 0), /* SDHI2 */
--	[CMMSTP003] = MSTP(&r_clk, CMMSTPCR0, 3, 0), /* KEYSC */
--};
--
--static struct clk_lookup lookups[] = {
--	/* main clocks */
--	CLKDEV_CON_ID("r_clk", &r_clk),
--	CLKDEV_CON_ID("extalb1", &sh7367_extalb1_clk),
--	CLKDEV_CON_ID("extal2", &sh7367_extal2_clk),
--	CLKDEV_CON_ID("extalb1_div2_clk", &extalb1_div2_clk),
--	CLKDEV_CON_ID("extal2_div2_clk", &extal2_div2_clk),
--	CLKDEV_CON_ID("pllc1_clk", &pllc1_clk),
--	CLKDEV_CON_ID("pllc1_div2_clk", &pllc1_div2_clk),
--	CLKDEV_CON_ID("pllc2_clk", &pllc2_clk),
--
--	/* DIV4 clocks */
--	CLKDEV_CON_ID("i_clk", &div4_clks[DIV4_I]),
--	CLKDEV_CON_ID("g_clk", &div4_clks[DIV4_G]),
--	CLKDEV_CON_ID("b_clk", &div4_clks[DIV4_B]),
--	CLKDEV_CON_ID("zx_clk", &div4_clks[DIV4_ZX]),
--	CLKDEV_CON_ID("zt_clk", &div4_clks[DIV4_ZT]),
--	CLKDEV_CON_ID("z_clk", &div4_clks[DIV4_Z]),
--	CLKDEV_CON_ID("zd_clk", &div4_clks[DIV4_ZD]),
--	CLKDEV_CON_ID("hp_clk", &div4_clks[DIV4_HP]),
--	CLKDEV_CON_ID("zs_clk", &div4_clks[DIV4_ZS]),
--	CLKDEV_CON_ID("zb_clk", &div4_clks[DIV4_ZB]),
--	CLKDEV_CON_ID("zb3_clk", &div4_clks[DIV4_ZB3]),
--	CLKDEV_CON_ID("cp_clk", &div4_clks[DIV4_CP]),
--
--	/* DIV6 clocks */
--	CLKDEV_CON_ID("sub_clk", &div6_clks[DIV6_SUB]),
--	CLKDEV_CON_ID("siua_clk", &div6_clks[DIV6_SIUA]),
--	CLKDEV_CON_ID("siub_clk", &div6_clks[DIV6_SIUB]),
--	CLKDEV_CON_ID("msu_clk", &div6_clks[DIV6_MSU]),
--	CLKDEV_CON_ID("spu_clk", &div6_clks[DIV6_SPU]),
--	CLKDEV_CON_ID("mvi3_clk", &div6_clks[DIV6_MVI3]),
--	CLKDEV_CON_ID("mf1_clk", &div6_clks[DIV6_MF1]),
--	CLKDEV_CON_ID("mf2_clk", &div6_clks[DIV6_MF2]),
--	CLKDEV_CON_ID("vck1_clk", &div6_clks[DIV6_VCK1]),
--	CLKDEV_CON_ID("vck2_clk", &div6_clks[DIV6_VCK2]),
--	CLKDEV_CON_ID("vck3_clk", &div6_clks[DIV6_VCK3]),
--	CLKDEV_CON_ID("vou_clk", &div6_clks[DIV6_VOU]),
--
--	/* MSTP32 clocks */
--	CLKDEV_DEV_ID("i2c-sh_mobile.2", &mstp_clks[RTMSTP001]), /* IIC2 */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.4", &mstp_clks[RTMSTP231]), /* VEU3 */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.3", &mstp_clks[RTMSTP230]), /* VEU2 */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.2", &mstp_clks[RTMSTP229]), /* VEU1 */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.1", &mstp_clks[RTMSTP228]), /* VEU0 */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.5", &mstp_clks[RTMSTP226]), /* VEU2H */
--	CLKDEV_DEV_ID("i2c-sh_mobile.0", &mstp_clks[RTMSTP216]), /* IIC0 */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.6", &mstp_clks[RTMSTP206]), /* JPU */
--	CLKDEV_DEV_ID("sh-vou", &mstp_clks[RTMSTP205]), /* VOU */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.0", &mstp_clks[RTMSTP201]), /* VPU */
--	CLKDEV_DEV_ID("uio_pdrv_genirq.7", &mstp_clks[SYMSTP023]), /* SPU1 */
--	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[SYMSTP007]), /* SCIFA5 */
--	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[SYMSTP006]), /* SCIFB */
--	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[SYMSTP004]), /* SCIFA0 */
--	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[SYMSTP003]), /* SCIFA1 */
--	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[SYMSTP002]), /* SCIFA2 */
--	CLKDEV_DEV_ID("sh-sci.3", &mstp_clks[SYMSTP001]), /* SCIFA3 */
--	CLKDEV_DEV_ID("sh-sci.4", &mstp_clks[SYMSTP000]), /* SCIFA4 */
--	CLKDEV_DEV_ID("sh_siu", &mstp_clks[SYMSTP231]), /* SIU */
--	CLKDEV_DEV_ID("sh_cmt.10", &mstp_clks[SYMSTP229]), /* CMT10 */
--	CLKDEV_DEV_ID("sh_irda", &mstp_clks[SYMSTP225]), /* IRDA */
--	CLKDEV_DEV_ID("i2c-sh_mobile.1", &mstp_clks[SYMSTP223]), /* IIC1 */
--	CLKDEV_DEV_ID("r8a66597_hcd.0", &mstp_clks[SYMSTP222]), /* USBHS */
--	CLKDEV_DEV_ID("r8a66597_udc.0", &mstp_clks[SYMSTP222]), /* USBHS */
--	CLKDEV_DEV_ID("sh_flctl", &mstp_clks[SYMSTP215]), /* FLCTL */
--	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[SYMSTP214]), /* SDHI0 */
--	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[SYMSTP213]), /* SDHI1 */
--	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[SYMSTP211]), /* SDHI2 */
--	CLKDEV_DEV_ID("sh_keysc.0", &mstp_clks[CMMSTP003]), /* KEYSC */
--};
--
--void __init sh7367_clock_init(void)
--{
--	int k, ret = 0;
--
--	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
--		ret = clk_register(main_clks[k]);
--
--	if (!ret)
--		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
--
--	if (!ret)
--		ret = sh_clk_div6_register(div6_clks, DIV6_NR);
--
--	if (!ret)
--		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
--
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
--
--	if (!ret)
--		shmobile_clk_init();
--	else
--		panic("failed to setup sh7367 clocks\n");
--}
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index d47e215..f96fc29 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -18,15 +18,6 @@ extern int shmobile_enter_wfi(struct cpuidle_device *dev,
- 			      struct cpuidle_driver *drv, int index);
- extern void shmobile_cpuidle_set_driver(struct cpuidle_driver *drv);
- 
--extern void sh7367_init_irq(void);
--extern void sh7367_map_io(void);
--extern void sh7367_add_early_devices(void);
--extern void sh7367_add_standard_devices(void);
--extern void sh7367_clock_init(void);
--extern void sh7367_pinmux_init(void);
--extern struct clk sh7367_extalb1_clk;
--extern struct clk sh7367_extal2_clk;
--
- extern void sh7377_init_irq(void);
- extern void sh7377_map_io(void);
- extern void sh7377_add_early_devices(void);
-diff --git a/arch/arm/mach-shmobile/include/mach/sh7367.h b/arch/arm/mach-shmobile/include/mach/sh7367.h
-deleted file mode 100644
-index 52d0de6..0000000
---- a/arch/arm/mach-shmobile/include/mach/sh7367.h
-+++ /dev/null
-@@ -1,332 +0,0 @@
--#ifndef __ASM_SH7367_H__
--#define __ASM_SH7367_H__
--
--/* Pin Function Controller:
-- * GPIO_FN_xx - GPIO used to select pin function
-- * GPIO_PORTxx - GPIO mapped to real I/O pin on CPU
-- */
--enum {
--	/* 49-1 -> 49-6 (GPIO) */
--	GPIO_PORT0, GPIO_PORT1, GPIO_PORT2, GPIO_PORT3, GPIO_PORT4,
--	GPIO_PORT5, GPIO_PORT6, GPIO_PORT7, GPIO_PORT8, GPIO_PORT9,
--
--	GPIO_PORT10, GPIO_PORT11, GPIO_PORT12, GPIO_PORT13, GPIO_PORT14,
--	GPIO_PORT15, GPIO_PORT16, GPIO_PORT17, GPIO_PORT18, GPIO_PORT19,
--
--	GPIO_PORT20, GPIO_PORT21, GPIO_PORT22, GPIO_PORT23, GPIO_PORT24,
--	GPIO_PORT25, GPIO_PORT26, GPIO_PORT27, GPIO_PORT28, GPIO_PORT29,
--
--	GPIO_PORT30, GPIO_PORT31, GPIO_PORT32, GPIO_PORT33, GPIO_PORT34,
--	GPIO_PORT35, GPIO_PORT36, GPIO_PORT37, GPIO_PORT38, GPIO_PORT39,
--
--	GPIO_PORT40, GPIO_PORT41, GPIO_PORT42, GPIO_PORT43, GPIO_PORT44,
--	GPIO_PORT45, GPIO_PORT46, GPIO_PORT47, GPIO_PORT48, GPIO_PORT49,
--
--	GPIO_PORT50, GPIO_PORT51, GPIO_PORT52, GPIO_PORT53, GPIO_PORT54,
--	GPIO_PORT55, GPIO_PORT56, GPIO_PORT57, GPIO_PORT58, GPIO_PORT59,
--
--	GPIO_PORT60, GPIO_PORT61, GPIO_PORT62, GPIO_PORT63, GPIO_PORT64,
--	GPIO_PORT65, GPIO_PORT66, GPIO_PORT67, GPIO_PORT68, GPIO_PORT69,
--
--	GPIO_PORT70, GPIO_PORT71, GPIO_PORT72, GPIO_PORT73, GPIO_PORT74,
--	GPIO_PORT75, GPIO_PORT76, GPIO_PORT77, GPIO_PORT78, GPIO_PORT79,
--
--	GPIO_PORT80, GPIO_PORT81, GPIO_PORT82, GPIO_PORT83, GPIO_PORT84,
--	GPIO_PORT85, GPIO_PORT86, GPIO_PORT87, GPIO_PORT88, GPIO_PORT89,
--
--	GPIO_PORT90, GPIO_PORT91, GPIO_PORT92, GPIO_PORT93, GPIO_PORT94,
--	GPIO_PORT95, GPIO_PORT96, GPIO_PORT97, GPIO_PORT98, GPIO_PORT99,
--
--	GPIO_PORT100, GPIO_PORT101, GPIO_PORT102, GPIO_PORT103, GPIO_PORT104,
--	GPIO_PORT105, GPIO_PORT106, GPIO_PORT107, GPIO_PORT108, GPIO_PORT109,
--
--	GPIO_PORT110, GPIO_PORT111, GPIO_PORT112, GPIO_PORT113, GPIO_PORT114,
--	GPIO_PORT115, GPIO_PORT116, GPIO_PORT117, GPIO_PORT118, GPIO_PORT119,
--
--	GPIO_PORT120, GPIO_PORT121, GPIO_PORT122, GPIO_PORT123, GPIO_PORT124,
--	GPIO_PORT125, GPIO_PORT126, GPIO_PORT127, GPIO_PORT128, GPIO_PORT129,
--
--	GPIO_PORT130, GPIO_PORT131, GPIO_PORT132, GPIO_PORT133, GPIO_PORT134,
--	GPIO_PORT135, GPIO_PORT136, GPIO_PORT137, GPIO_PORT138, GPIO_PORT139,
--
--	GPIO_PORT140, GPIO_PORT141, GPIO_PORT142, GPIO_PORT143, GPIO_PORT144,
--	GPIO_PORT145, GPIO_PORT146, GPIO_PORT147, GPIO_PORT148, GPIO_PORT149,
--
--	GPIO_PORT150, GPIO_PORT151, GPIO_PORT152, GPIO_PORT153, GPIO_PORT154,
--	GPIO_PORT155, GPIO_PORT156, GPIO_PORT157, GPIO_PORT158, GPIO_PORT159,
--
--	GPIO_PORT160, GPIO_PORT161, GPIO_PORT162, GPIO_PORT163, GPIO_PORT164,
--	GPIO_PORT165, GPIO_PORT166, GPIO_PORT167, GPIO_PORT168, GPIO_PORT169,
--
--	GPIO_PORT170, GPIO_PORT171, GPIO_PORT172, GPIO_PORT173, GPIO_PORT174,
--	GPIO_PORT175, GPIO_PORT176, GPIO_PORT177, GPIO_PORT178, GPIO_PORT179,
--
--	GPIO_PORT180, GPIO_PORT181, GPIO_PORT182, GPIO_PORT183, GPIO_PORT184,
--	GPIO_PORT185, GPIO_PORT186, GPIO_PORT187, GPIO_PORT188, GPIO_PORT189,
--
--	GPIO_PORT190, GPIO_PORT191, GPIO_PORT192, GPIO_PORT193, GPIO_PORT194,
--	GPIO_PORT195, GPIO_PORT196, GPIO_PORT197, GPIO_PORT198, GPIO_PORT199,
--
--	GPIO_PORT200, GPIO_PORT201, GPIO_PORT202, GPIO_PORT203, GPIO_PORT204,
--	GPIO_PORT205, GPIO_PORT206, GPIO_PORT207, GPIO_PORT208, GPIO_PORT209,
--
--	GPIO_PORT210, GPIO_PORT211, GPIO_PORT212, GPIO_PORT213, GPIO_PORT214,
--	GPIO_PORT215, GPIO_PORT216, GPIO_PORT217, GPIO_PORT218, GPIO_PORT219,
--
--	GPIO_PORT220, GPIO_PORT221, GPIO_PORT222, GPIO_PORT223, GPIO_PORT224,
--	GPIO_PORT225, GPIO_PORT226, GPIO_PORT227, GPIO_PORT228, GPIO_PORT229,
--
--	GPIO_PORT230, GPIO_PORT231, GPIO_PORT232, GPIO_PORT233, GPIO_PORT234,
--	GPIO_PORT235, GPIO_PORT236, GPIO_PORT237, GPIO_PORT238, GPIO_PORT239,
--
--	GPIO_PORT240, GPIO_PORT241, GPIO_PORT242, GPIO_PORT243, GPIO_PORT244,
--	GPIO_PORT245, GPIO_PORT246, GPIO_PORT247, GPIO_PORT248, GPIO_PORT249,
--
--	GPIO_PORT250, GPIO_PORT251, GPIO_PORT252, GPIO_PORT253, GPIO_PORT254,
--	GPIO_PORT255, GPIO_PORT256, GPIO_PORT257, GPIO_PORT258, GPIO_PORT259,
--
--	GPIO_PORT260, GPIO_PORT261, GPIO_PORT262, GPIO_PORT263, GPIO_PORT264,
--	GPIO_PORT265, GPIO_PORT266, GPIO_PORT267, GPIO_PORT268, GPIO_PORT269,
--
--	GPIO_PORT270, GPIO_PORT271, GPIO_PORT272,
--
--	/* Special Pull-up / Pull-down Functions */
--	GPIO_FN_PORT48_KEYIN0_PU, GPIO_FN_PORT49_KEYIN1_PU,
--	GPIO_FN_PORT50_KEYIN2_PU, GPIO_FN_PORT55_KEYIN3_PU,
--	GPIO_FN_PORT56_KEYIN4_PU, GPIO_FN_PORT57_KEYIN5_PU,
--	GPIO_FN_PORT58_KEYIN6_PU,
--
--	/* 49-1 (FN) */
--	GPIO_FN_VBUS0, GPIO_FN_CPORT0, GPIO_FN_CPORT1, GPIO_FN_CPORT2,
--	GPIO_FN_CPORT3, GPIO_FN_CPORT4, GPIO_FN_CPORT5, GPIO_FN_CPORT6,
--	GPIO_FN_CPORT7, GPIO_FN_CPORT8, GPIO_FN_CPORT9, GPIO_FN_CPORT10,
--	GPIO_FN_CPORT11, GPIO_FN_SIN2, GPIO_FN_CPORT12, GPIO_FN_XCTS2,
--	GPIO_FN_CPORT13, GPIO_FN_RFSPO4, GPIO_FN_CPORT14, GPIO_FN_RFSPO5,
--	GPIO_FN_CPORT15, GPIO_FN_CPORT16, GPIO_FN_CPORT17, GPIO_FN_SOUT2,
--	GPIO_FN_CPORT18, GPIO_FN_XRTS2, GPIO_FN_CPORT19, GPIO_FN_CPORT20,
--	GPIO_FN_RFSPO6, GPIO_FN_CPORT21, GPIO_FN_STATUS0, GPIO_FN_CPORT22,
--	GPIO_FN_STATUS1, GPIO_FN_CPORT23, GPIO_FN_STATUS2, GPIO_FN_RFSPO7,
--	GPIO_FN_MPORT0, GPIO_FN_MPORT1, GPIO_FN_B_SYNLD1, GPIO_FN_B_SYNLD2,
--	GPIO_FN_XMAINPS, GPIO_FN_XDIVPS, GPIO_FN_XIDRST, GPIO_FN_IDCLK,
--	GPIO_FN_IDIO, GPIO_FN_SOUT1, GPIO_FN_SCIFA4_TXD,
--	GPIO_FN_M02_BERDAT, GPIO_FN_SIN1, GPIO_FN_SCIFA4_RXD, GPIO_FN_XWUP,
--	GPIO_FN_XRTS1, GPIO_FN_SCIFA4_RTS, GPIO_FN_M03_BERCLK,
--	GPIO_FN_XCTS1, GPIO_FN_SCIFA4_CTS,
--
--	/* 49-2 (FN) */
--	GPIO_FN_HSU_IQ_AGC6, GPIO_FN_MFG2_IN2, GPIO_FN_MSIOF2_MCK0,
--	GPIO_FN_HSU_IQ_AGC5, GPIO_FN_MFG2_IN1, GPIO_FN_MSIOF2_MCK1,
--	GPIO_FN_HSU_IQ_AGC4, GPIO_FN_MSIOF2_RSYNC,
--	GPIO_FN_HSU_IQ_AGC3, GPIO_FN_MFG2_OUT1, GPIO_FN_MSIOF2_RSCK,
--	GPIO_FN_HSU_IQ_AGC2, GPIO_FN_PORT42_KEYOUT0,
--	GPIO_FN_HSU_IQ_AGC1, GPIO_FN_PORT43_KEYOUT1,
--	GPIO_FN_HSU_IQ_AGC0, GPIO_FN_PORT44_KEYOUT2,
--	GPIO_FN_HSU_IQ_AGC_ST, GPIO_FN_PORT45_KEYOUT3,
--	GPIO_FN_HSU_IQ_PDO, GPIO_FN_PORT46_KEYOUT4,
--	GPIO_FN_HSU_IQ_PYO, GPIO_FN_PORT47_KEYOUT5,
--	GPIO_FN_HSU_EN_TXMUX_G3MO, GPIO_FN_PORT48_KEYIN0,
--	GPIO_FN_HSU_I_TXMUX_G3MO, GPIO_FN_PORT49_KEYIN1,
--	GPIO_FN_HSU_Q_TXMUX_G3MO, GPIO_FN_PORT50_KEYIN2,
--	GPIO_FN_HSU_SYO, GPIO_FN_PORT51_MSIOF2_TSYNC,
--	GPIO_FN_HSU_SDO, GPIO_FN_PORT52_MSIOF2_TSCK,
--	GPIO_FN_HSU_TGTTI_G3MO, GPIO_FN_PORT53_MSIOF2_TXD,
--	GPIO_FN_B_TIME_STAMP, GPIO_FN_PORT54_MSIOF2_RXD,
--	GPIO_FN_HSU_SDI, GPIO_FN_PORT55_KEYIN3,
--	GPIO_FN_HSU_SCO, GPIO_FN_PORT56_KEYIN4,
--	GPIO_FN_HSU_DREQ, GPIO_FN_PORT57_KEYIN5,
--	GPIO_FN_HSU_DACK, GPIO_FN_PORT58_KEYIN6,
--	GPIO_FN_HSU_CLK61M, GPIO_FN_PORT59_MSIOF2_SS1,
--	GPIO_FN_HSU_XRST, GPIO_FN_PORT60_MSIOF2_SS2,
--	GPIO_FN_PCMCLKO, GPIO_FN_SYNC8KO, GPIO_FN_DNPCM_A, GPIO_FN_UPPCM_A,
--	GPIO_FN_XTALB1L,
--	GPIO_FN_GPS_AGC1, GPIO_FN_SCIFA0_RTS,
--	GPIO_FN_GPS_AGC2, GPIO_FN_SCIFA0_SCK,
--	GPIO_FN_GPS_AGC3, GPIO_FN_SCIFA0_TXD,
--	GPIO_FN_GPS_AGC4, GPIO_FN_SCIFA0_RXD,
--	GPIO_FN_GPS_PWRD, GPIO_FN_SCIFA0_CTS,
--	GPIO_FN_GPS_IM, GPIO_FN_GPS_IS, GPIO_FN_GPS_QM, GPIO_FN_GPS_QS,
--	GPIO_FN_SIUBOMC, GPIO_FN_TPU2TO0,
--	GPIO_FN_SIUCKB, GPIO_FN_TPU2TO1,
--	GPIO_FN_SIUBOLR, GPIO_FN_BBIF2_TSYNC, GPIO_FN_TPU2TO2,
--	GPIO_FN_SIUBOBT, GPIO_FN_BBIF2_TSCK, GPIO_FN_TPU2TO3,
--	GPIO_FN_SIUBOSLD, GPIO_FN_BBIF2_TXD, GPIO_FN_TPU3TO0,
--	GPIO_FN_SIUBILR, GPIO_FN_TPU3TO1,
--	GPIO_FN_SIUBIBT, GPIO_FN_TPU3TO2,
--	GPIO_FN_SIUBISLD, GPIO_FN_TPU3TO3,
--	GPIO_FN_NMI, GPIO_FN_TPU4TO0,
--	GPIO_FN_DNPCM_M, GPIO_FN_TPU4TO1, GPIO_FN_TPU4TO2, GPIO_FN_TPU4TO3,
--	GPIO_FN_IRQ_TMPB,
--	GPIO_FN_PWEN, GPIO_FN_MFG1_OUT1,
--	GPIO_FN_OVCN, GPIO_FN_MFG1_IN1,
--	GPIO_FN_OVCN2, GPIO_FN_MFG1_IN2,
--
--	/* 49-3 (FN) */
--	GPIO_FN_RFSPO1, GPIO_FN_RFSPO2, GPIO_FN_RFSPO3, GPIO_FN_PORT93_VIO_CKO2,
--	GPIO_FN_USBTERM, GPIO_FN_EXTLP, GPIO_FN_IDIN,
--	GPIO_FN_SCIFA5_CTS, GPIO_FN_MFG0_IN1,
--	GPIO_FN_SCIFA5_RTS, GPIO_FN_MFG0_IN2,
--	GPIO_FN_SCIFA5_RXD,
--	GPIO_FN_SCIFA5_TXD,
--	GPIO_FN_SCIFA5_SCK, GPIO_FN_MFG0_OUT1,
--	GPIO_FN_A0_EA0, GPIO_FN_BS,
--	GPIO_FN_A14_EA14, GPIO_FN_PORT102_KEYOUT0,
--	GPIO_FN_A15_EA15, GPIO_FN_PORT103_KEYOUT1, GPIO_FN_DV_CLKOL,
--	GPIO_FN_A16_EA16, GPIO_FN_PORT104_KEYOUT2,
--	GPIO_FN_DV_VSYNCL, GPIO_FN_MSIOF0_SS1,
--	GPIO_FN_A17_EA17, GPIO_FN_PORT105_KEYOUT3,
--	GPIO_FN_DV_HSYNCL, GPIO_FN_MSIOF0_TSYNC,
--	GPIO_FN_A18_EA18, GPIO_FN_PORT106_KEYOUT4,
--	GPIO_FN_DV_DL0, GPIO_FN_MSIOF0_TSCK,
--	GPIO_FN_A19_EA19, GPIO_FN_PORT107_KEYOUT5,
--	GPIO_FN_DV_DL1, GPIO_FN_MSIOF0_TXD,
--	GPIO_FN_A20_EA20, GPIO_FN_PORT108_KEYIN0,
--	GPIO_FN_DV_DL2, GPIO_FN_MSIOF0_RSCK,
--	GPIO_FN_A21_EA21, GPIO_FN_PORT109_KEYIN1,
--	GPIO_FN_DV_DL3, GPIO_FN_MSIOF0_RSYNC,
--	GPIO_FN_A22_EA22, GPIO_FN_PORT110_KEYIN2,
--	GPIO_FN_DV_DL4, GPIO_FN_MSIOF0_MCK0,
--	GPIO_FN_A23_EA23, GPIO_FN_PORT111_KEYIN3,
--	GPIO_FN_DV_DL5, GPIO_FN_MSIOF0_MCK1,
--	GPIO_FN_A24_EA24, GPIO_FN_PORT112_KEYIN4,
--	GPIO_FN_DV_DL6, GPIO_FN_MSIOF0_RXD,
--	GPIO_FN_A25_EA25, GPIO_FN_PORT113_KEYIN5,
--	GPIO_FN_DV_DL7, GPIO_FN_MSIOF0_SS2,
--	GPIO_FN_A26, GPIO_FN_PORT113_KEYIN6, GPIO_FN_DV_CLKIL,
--	GPIO_FN_D0_ED0_NAF0, GPIO_FN_D1_ED1_NAF1, GPIO_FN_D2_ED2_NAF2,
--	GPIO_FN_D3_ED3_NAF3, GPIO_FN_D4_ED4_NAF4, GPIO_FN_D5_ED5_NAF5,
--	GPIO_FN_D6_ED6_NAF6, GPIO_FN_D7_ED7_NAF7, GPIO_FN_D8_ED8_NAF8,
--	GPIO_FN_D9_ED9_NAF9, GPIO_FN_D10_ED10_NAF10, GPIO_FN_D11_ED11_NAF11,
--	GPIO_FN_D12_ED12_NAF12, GPIO_FN_D13_ED13_NAF13,
--	GPIO_FN_D14_ED14_NAF14, GPIO_FN_D15_ED15_NAF15,
--	GPIO_FN_CS4, GPIO_FN_CS5A, GPIO_FN_CS5B, GPIO_FN_FCE1,
--	GPIO_FN_CS6B, GPIO_FN_XCS2, GPIO_FN_FCE0, GPIO_FN_CS6A,
--	GPIO_FN_DACK0, GPIO_FN_WAIT, GPIO_FN_DREQ0, GPIO_FN_RD_XRD,
--	GPIO_FN_A27, GPIO_FN_RDWR_XWE, GPIO_FN_WE0_XWR0_FWE,
--	GPIO_FN_WE1_XWR1, GPIO_FN_FRB, GPIO_FN_CKO,
--	GPIO_FN_NBRSTOUT, GPIO_FN_NBRST,
--
--	/* 49-4 (FN) */
--	GPIO_FN_RFSPO0, GPIO_FN_PORT146_VIO_CKO2, GPIO_FN_TSTMD,
--	GPIO_FN_VIO_VD, GPIO_FN_VIO_HD,
--	GPIO_FN_VIO_D0, GPIO_FN_VIO_D1, GPIO_FN_VIO_D2,
--	GPIO_FN_VIO_D3, GPIO_FN_VIO_D4, GPIO_FN_VIO_D5,
--	GPIO_FN_VIO_D6, GPIO_FN_VIO_D7, GPIO_FN_VIO_D8,
--	GPIO_FN_VIO_D9, GPIO_FN_VIO_D10, GPIO_FN_VIO_D11,
--	GPIO_FN_VIO_D12, GPIO_FN_VIO_D13, GPIO_FN_VIO_D14,
--	GPIO_FN_VIO_D15, GPIO_FN_VIO_CLK, GPIO_FN_VIO_FIELD,
--	GPIO_FN_VIO_CKO,
--	GPIO_FN_MFG3_IN1, GPIO_FN_MFG3_IN2,
--	GPIO_FN_M9_SLCD_A01, GPIO_FN_MFG3_OUT1, GPIO_FN_TPU0TO0,
--	GPIO_FN_M10_SLCD_CK1, GPIO_FN_MFG4_IN1, GPIO_FN_TPU0TO1,
--	GPIO_FN_M11_SLCD_SO1, GPIO_FN_MFG4_IN2, GPIO_FN_TPU0TO2,
--	GPIO_FN_M12_SLCD_CE1, GPIO_FN_MFG4_OUT1, GPIO_FN_TPU0TO3,
--	GPIO_FN_LCDD0, GPIO_FN_PORT175_KEYOUT0, GPIO_FN_DV_D0,
--	GPIO_FN_SIUCKA, GPIO_FN_MFG0_OUT2,
--	GPIO_FN_LCDD1, GPIO_FN_PORT176_KEYOUT1, GPIO_FN_DV_D1,
--	GPIO_FN_SIUAOLR, GPIO_FN_BBIF2_TSYNC1,
--	GPIO_FN_LCDD2, GPIO_FN_PORT177_KEYOUT2, GPIO_FN_DV_D2,
--	GPIO_FN_SIUAOBT, GPIO_FN_BBIF2_TSCK1,
--	GPIO_FN_LCDD3, GPIO_FN_PORT178_KEYOUT3, GPIO_FN_DV_D3,
--	GPIO_FN_SIUAOSLD, GPIO_FN_BBIF2_TXD1,
--	GPIO_FN_LCDD4, GPIO_FN_PORT179_KEYOUT4, GPIO_FN_DV_D4,
--	GPIO_FN_SIUAISPD, GPIO_FN_MFG1_OUT2,
--	GPIO_FN_LCDD5, GPIO_FN_PORT180_KEYOUT5, GPIO_FN_DV_D5,
--	GPIO_FN_SIUAILR, GPIO_FN_MFG2_OUT2,
--	GPIO_FN_LCDD6, GPIO_FN_DV_D6,
--	GPIO_FN_SIUAIBT, GPIO_FN_MFG3_OUT2, GPIO_FN_XWR2,
--	GPIO_FN_LCDD7, GPIO_FN_DV_D7,
--	GPIO_FN_SIUAISLD, GPIO_FN_MFG4_OUT2, GPIO_FN_XWR3,
--	GPIO_FN_LCDD8, GPIO_FN_DV_D8, GPIO_FN_D16, GPIO_FN_ED16,
--	GPIO_FN_LCDD9, GPIO_FN_DV_D9, GPIO_FN_D17, GPIO_FN_ED17,
--	GPIO_FN_LCDD10, GPIO_FN_DV_D10, GPIO_FN_D18, GPIO_FN_ED18,
--	GPIO_FN_LCDD11, GPIO_FN_DV_D11, GPIO_FN_D19, GPIO_FN_ED19,
--	GPIO_FN_LCDD12, GPIO_FN_DV_D12, GPIO_FN_D20, GPIO_FN_ED20,
--	GPIO_FN_LCDD13, GPIO_FN_DV_D13, GPIO_FN_D21, GPIO_FN_ED21,
--	GPIO_FN_LCDD14, GPIO_FN_DV_D14, GPIO_FN_D22, GPIO_FN_ED22,
--	GPIO_FN_LCDD15, GPIO_FN_DV_D15, GPIO_FN_D23, GPIO_FN_ED23,
--	GPIO_FN_LCDD16, GPIO_FN_DV_HSYNC, GPIO_FN_D24, GPIO_FN_ED24,
--	GPIO_FN_LCDD17, GPIO_FN_DV_VSYNC, GPIO_FN_D25, GPIO_FN_ED25,
--	GPIO_FN_LCDD18, GPIO_FN_DREQ2, GPIO_FN_MSIOF0L_TSCK,
--	GPIO_FN_D26, GPIO_FN_ED26,
--	GPIO_FN_LCDD19, GPIO_FN_MSIOF0L_TSYNC,
--	GPIO_FN_D27, GPIO_FN_ED27,
--	GPIO_FN_LCDD20, GPIO_FN_TS_SPSYNC1, GPIO_FN_MSIOF0L_MCK0,
--	GPIO_FN_D28, GPIO_FN_ED28,
--	GPIO_FN_LCDD21, GPIO_FN_TS_SDAT1, GPIO_FN_MSIOF0L_MCK1,
--	GPIO_FN_D29, GPIO_FN_ED29,
--	GPIO_FN_LCDD22, GPIO_FN_TS_SDEN1, GPIO_FN_MSIOF0L_SS1,
--	GPIO_FN_D30, GPIO_FN_ED30,
--	GPIO_FN_LCDD23, GPIO_FN_TS_SCK1, GPIO_FN_MSIOF0L_SS2,
--	GPIO_FN_D31, GPIO_FN_ED31,
--	GPIO_FN_LCDDCK, GPIO_FN_LCDWR, GPIO_FN_DV_CKO, GPIO_FN_SIUAOSPD,
--	GPIO_FN_LCDRD, GPIO_FN_DACK2, GPIO_FN_MSIOF0L_RSYNC,
--
--
--	/* 49-5 (FN) */
--	GPIO_FN_LCDHSYN, GPIO_FN_LCDCS, GPIO_FN_LCDCS2, GPIO_FN_DACK3,
--	GPIO_FN_LCDDISP, GPIO_FN_LCDRS, GPIO_FN_DREQ3, GPIO_FN_MSIOF0L_RSCK,
--	GPIO_FN_LCDCSYN, GPIO_FN_LCDCSYN2, GPIO_FN_DV_CKI,
--	GPIO_FN_LCDLCLK, GPIO_FN_DREQ1, GPIO_FN_MSIOF0L_RXD,
--	GPIO_FN_LCDDON, GPIO_FN_LCDDON2, GPIO_FN_DACK1, GPIO_FN_MSIOF0L_TXD,
--	GPIO_FN_VIO_DR0, GPIO_FN_VIO_DR1, GPIO_FN_VIO_DR2, GPIO_FN_VIO_DR3,
--	GPIO_FN_VIO_DR4, GPIO_FN_VIO_DR5, GPIO_FN_VIO_DR6, GPIO_FN_VIO_DR7,
--	GPIO_FN_VIO_VDR, GPIO_FN_VIO_HDR,
--	GPIO_FN_VIO_CLKR, GPIO_FN_VIO_CKOR,
--	GPIO_FN_SCIFA1_TXD, GPIO_FN_GPS_PGFA0,
--	GPIO_FN_SCIFA1_SCK, GPIO_FN_GPS_PGFA1,
--	GPIO_FN_SCIFA1_RTS, GPIO_FN_GPS_EPPSINMON,
--	GPIO_FN_SCIFA1_RXD, GPIO_FN_SCIFA1_CTS,
--	GPIO_FN_MSIOF1_TXD, GPIO_FN_SCIFA1_TXD2, GPIO_FN_GPS_TXD,
--	GPIO_FN_MSIOF1_TSYNC, GPIO_FN_SCIFA1_CTS2, GPIO_FN_I2C_SDA2,
--	GPIO_FN_MSIOF1_TSCK, GPIO_FN_SCIFA1_SCK2,
--	GPIO_FN_MSIOF1_RXD, GPIO_FN_SCIFA1_RXD2, GPIO_FN_GPS_RXD,
--	GPIO_FN_MSIOF1_RSCK, GPIO_FN_SCIFA1_RTS2,
--	GPIO_FN_MSIOF1_RSYNC, GPIO_FN_I2C_SCL2,
--	GPIO_FN_MSIOF1_MCK0, GPIO_FN_MSIOF1_MCK1,
--	GPIO_FN_MSIOF1_SS1, GPIO_FN_EDBGREQ3,
--	GPIO_FN_MSIOF1_SS2,
--	GPIO_FN_PORT236_IROUT, GPIO_FN_IRDA_OUT,
--	GPIO_FN_IRDA_IN, GPIO_FN_IRDA_FIRSEL,
--	GPIO_FN_TPU1TO0, GPIO_FN_TS_SPSYNC3,
--	GPIO_FN_TPU1TO1, GPIO_FN_TS_SDAT3,
--	GPIO_FN_TPU1TO2, GPIO_FN_TS_SDEN3, GPIO_FN_PORT241_MSIOF2_SS1,
--	GPIO_FN_TPU1TO3, GPIO_FN_PORT242_MSIOF2_TSCK,
--	GPIO_FN_M13_BSW, GPIO_FN_PORT243_MSIOF2_TSYNC,
--	GPIO_FN_M14_GSW, GPIO_FN_PORT244_MSIOF2_TXD,
--	GPIO_FN_PORT245_IROUT, GPIO_FN_M15_RSW,
--	GPIO_FN_SOUT3, GPIO_FN_SCIFA2_TXD1,
--	GPIO_FN_SIN3, GPIO_FN_SCIFA2_RXD1,
--	GPIO_FN_XRTS3, GPIO_FN_SCIFA2_RTS1, GPIO_FN_PORT248_MSIOF2_SS2,
--	GPIO_FN_XCTS3, GPIO_FN_SCIFA2_CTS1, GPIO_FN_PORT249_MSIOF2_RXD,
--	GPIO_FN_DINT, GPIO_FN_SCIFA2_SCK1, GPIO_FN_TS_SCK3,
--	GPIO_FN_SDHICLK0, GPIO_FN_TCK2,
--	GPIO_FN_SDHICD0,
--	GPIO_FN_SDHID0_0, GPIO_FN_TMS2,
--	GPIO_FN_SDHID0_1, GPIO_FN_TDO2,
--	GPIO_FN_SDHID0_2, GPIO_FN_TDI2,
--	GPIO_FN_SDHID0_3, GPIO_FN_RTCK2,
--
--	/* 49-6 (FN) */
--	GPIO_FN_SDHICMD0, GPIO_FN_TRST2,
--	GPIO_FN_SDHIWP0, GPIO_FN_EDBGREQ2,
--	GPIO_FN_SDHICLK1, GPIO_FN_TCK3,
--	GPIO_FN_SDHID1_0, GPIO_FN_M11_SLCD_SO2,
--	GPIO_FN_TS_SPSYNC2, GPIO_FN_TMS3,
--	GPIO_FN_SDHID1_1, GPIO_FN_M9_SLCD_AO2,
--	GPIO_FN_TS_SDAT2, GPIO_FN_TDO3,
--	GPIO_FN_SDHID1_2, GPIO_FN_M10_SLCD_CK2,
--	GPIO_FN_TS_SDEN2, GPIO_FN_TDI3,
--	GPIO_FN_SDHID1_3, GPIO_FN_M12_SLCD_CE2,
--	GPIO_FN_TS_SCK2, GPIO_FN_RTCK3,
--	GPIO_FN_SDHICMD1, GPIO_FN_TRST3,
--	GPIO_FN_SDHICLK2, GPIO_FN_SCIFB_SCK,
--	GPIO_FN_SDHID2_0, GPIO_FN_SCIFB_TXD,
--	GPIO_FN_SDHID2_1, GPIO_FN_SCIFB_CTS,
--	GPIO_FN_SDHID2_2, GPIO_FN_SCIFB_RXD,
--	GPIO_FN_SDHID2_3, GPIO_FN_SCIFB_RTS,
--	GPIO_FN_SDHICMD2,
--	GPIO_FN_RESETOUTS,
--	GPIO_FN_DIVLOCK,
--};
--
--#endif /* __ASM_SH7367_H__ */
-diff --git a/arch/arm/mach-shmobile/intc-sh7367.c b/arch/arm/mach-shmobile/intc-sh7367.c
-deleted file mode 100644
-index 5bf7764..0000000
---- a/arch/arm/mach-shmobile/intc-sh7367.c
-+++ /dev/null
-@@ -1,413 +0,0 @@
--/*
-- * sh7367 processor support - INTC hardware block
-- *
-- * Copyright (C) 2010  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--#include <linux/sh_intc.h>
--#include <mach/intc.h>
--#include <mach/irqs.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--
--enum {
--	UNUSED_INTCA = 0,
--	ENABLED,
--	DISABLED,
--
--	/* interrupt sources INTCA */
--	DIRC,
--	CRYPT1_ERR, CRYPT2_STD,
--	IIC1_ALI1, IIC1_TACKI1, IIC1_WAITI1, IIC1_DTEI1,
--	ARM11_IRQPMU, ARM11_COMMTX, ARM11_COMMRX,
--	ETM11_ACQCMP, ETM11_FULL,
--	MFI_MFIM, MFI_MFIS,
--	BBIF1, BBIF2,
--	USBDMAC_USHDMI,
--	USBHS_USHI0, USBHS_USHI1,
--	CMT1_CMT10, CMT1_CMT11, CMT1_CMT12, CMT1_CMT13, CMT2, CMT3,
--	KEYSC_KEY,
--	SCIFA0, SCIFA1, SCIFA2, SCIFA3,
--	MSIOF2, MSIOF1,
--	SCIFA4, SCIFA5, SCIFB,
--	FLCTL_FLSTEI, FLCTL_FLTENDI, FLCTL_FLTREQ0I, FLCTL_FLTREQ1I,
--	SDHI0,
--	SDHI1,
--	MSU_MSU, MSU_MSU2,
--	IREM,
--	SIU,
--	SPU,
--	IRDA,
--	TPU0, TPU1, TPU2, TPU3, TPU4,
--	LCRC,
--	PINT1, PINT2,
--	TTI20,
--	MISTY,
--	DDM,
--	SDHI2,
--	RWDT0, RWDT1,
--	DMAC_1_DEI0, DMAC_1_DEI1, DMAC_1_DEI2, DMAC_1_DEI3,
--	DMAC_2_DEI4, DMAC_2_DEI5, DMAC_2_DADERR,
--	DMAC2_1_DEI0, DMAC2_1_DEI1, DMAC2_1_DEI2, DMAC2_1_DEI3,
--	DMAC2_2_DEI4, DMAC2_2_DEI5, DMAC2_2_DADERR,
--	DMAC3_1_DEI0, DMAC3_1_DEI1, DMAC3_1_DEI2, DMAC3_1_DEI3,
--	DMAC3_2_DEI4, DMAC3_2_DEI5, DMAC3_2_DADERR,
--
--	/* interrupt groups INTCA */
--	DMAC_1, DMAC_2,	DMAC2_1, DMAC2_2, DMAC3_1, DMAC3_2,
--	ETM11, ARM11, USBHS, FLCTL, IIC1
--};
--
--static struct intc_vect intca_vectors[] __initdata = {
--	INTC_VECT(DIRC, 0x0560),
--	INTC_VECT(CRYPT1_ERR, 0x05e0),
--	INTC_VECT(CRYPT2_STD, 0x0700),
--	INTC_VECT(IIC1_ALI1, 0x0780), INTC_VECT(IIC1_TACKI1, 0x07a0),
--	INTC_VECT(IIC1_WAITI1, 0x07c0), INTC_VECT(IIC1_DTEI1, 0x07e0),
--	INTC_VECT(ARM11_IRQPMU, 0x0800), INTC_VECT(ARM11_COMMTX, 0x0840),
--	INTC_VECT(ARM11_COMMRX, 0x0860),
--	INTC_VECT(ETM11_ACQCMP, 0x0880), INTC_VECT(ETM11_FULL, 0x08a0),
--	INTC_VECT(MFI_MFIM, 0x0900), INTC_VECT(MFI_MFIS, 0x0920),
--	INTC_VECT(BBIF1, 0x0940), INTC_VECT(BBIF2, 0x0960),
--	INTC_VECT(USBDMAC_USHDMI, 0x0a00),
--	INTC_VECT(USBHS_USHI0, 0x0a20), INTC_VECT(USBHS_USHI1, 0x0a40),
--	INTC_VECT(CMT1_CMT10, 0x0b00), INTC_VECT(CMT1_CMT11, 0x0b20),
--	INTC_VECT(CMT1_CMT12, 0x0b40), INTC_VECT(CMT1_CMT13, 0x0b60),
--	INTC_VECT(CMT2, 0x0b80), INTC_VECT(CMT3, 0x0ba0),
--	INTC_VECT(KEYSC_KEY, 0x0be0),
--	INTC_VECT(SCIFA0, 0x0c00), INTC_VECT(SCIFA1, 0x0c20),
--	INTC_VECT(SCIFA2, 0x0c40), INTC_VECT(SCIFA3, 0x0c60),
--	INTC_VECT(MSIOF2, 0x0c80), INTC_VECT(MSIOF1, 0x0d00),
--	INTC_VECT(SCIFA4, 0x0d20), INTC_VECT(SCIFA5, 0x0d40),
--	INTC_VECT(SCIFB, 0x0d60),
--	INTC_VECT(FLCTL_FLSTEI, 0x0d80), INTC_VECT(FLCTL_FLTENDI, 0x0da0),
--	INTC_VECT(FLCTL_FLTREQ0I, 0x0dc0), INTC_VECT(FLCTL_FLTREQ1I, 0x0de0),
--	INTC_VECT(SDHI0, 0x0e00), INTC_VECT(SDHI0, 0x0e20),
--	INTC_VECT(SDHI0, 0x0e40), INTC_VECT(SDHI0, 0x0e60),
--	INTC_VECT(SDHI1, 0x0e80), INTC_VECT(SDHI1, 0x0ea0),
--	INTC_VECT(SDHI1, 0x0ec0), INTC_VECT(SDHI1, 0x0ee0),
--	INTC_VECT(MSU_MSU, 0x0f20), INTC_VECT(MSU_MSU2, 0x0f40),
--	INTC_VECT(IREM, 0x0f60),
--	INTC_VECT(SIU, 0x0fa0),
--	INTC_VECT(SPU, 0x0fc0),
--	INTC_VECT(IRDA, 0x0480),
--	INTC_VECT(TPU0, 0x04a0), INTC_VECT(TPU1, 0x04c0),
--	INTC_VECT(TPU2, 0x04e0), INTC_VECT(TPU3, 0x0500),
--	INTC_VECT(TPU4, 0x0520),
--	INTC_VECT(LCRC, 0x0540),
--	INTC_VECT(PINT1, 0x1000), INTC_VECT(PINT2, 0x1020),
--	INTC_VECT(TTI20, 0x1100),
--	INTC_VECT(MISTY, 0x1120),
--	INTC_VECT(DDM, 0x1140),
--	INTC_VECT(SDHI2, 0x1200), INTC_VECT(SDHI2, 0x1220),
--	INTC_VECT(SDHI2, 0x1240), INTC_VECT(SDHI2, 0x1260),
--	INTC_VECT(RWDT0, 0x1280), INTC_VECT(RWDT1, 0x12a0),
--	INTC_VECT(DMAC_1_DEI0, 0x2000), INTC_VECT(DMAC_1_DEI1, 0x2020),
--	INTC_VECT(DMAC_1_DEI2, 0x2040), INTC_VECT(DMAC_1_DEI3, 0x2060),
--	INTC_VECT(DMAC_2_DEI4, 0x2080), INTC_VECT(DMAC_2_DEI5, 0x20a0),
--	INTC_VECT(DMAC_2_DADERR, 0x20c0),
--	INTC_VECT(DMAC2_1_DEI0, 0x2100), INTC_VECT(DMAC2_1_DEI1, 0x2120),
--	INTC_VECT(DMAC2_1_DEI2, 0x2140), INTC_VECT(DMAC2_1_DEI3, 0x2160),
--	INTC_VECT(DMAC2_2_DEI4, 0x2180), INTC_VECT(DMAC2_2_DEI5, 0x21a0),
--	INTC_VECT(DMAC2_2_DADERR, 0x21c0),
--	INTC_VECT(DMAC3_1_DEI0, 0x2200), INTC_VECT(DMAC3_1_DEI1, 0x2220),
--	INTC_VECT(DMAC3_1_DEI2, 0x2240), INTC_VECT(DMAC3_1_DEI3, 0x2260),
--	INTC_VECT(DMAC3_2_DEI4, 0x2280), INTC_VECT(DMAC3_2_DEI5, 0x22a0),
--	INTC_VECT(DMAC3_2_DADERR, 0x22c0),
--};
--
--static struct intc_group intca_groups[] __initdata = {
--	INTC_GROUP(DMAC_1, DMAC_1_DEI0,
--		   DMAC_1_DEI1, DMAC_1_DEI2, DMAC_1_DEI3),
--	INTC_GROUP(DMAC_2, DMAC_2_DEI4,
--		   DMAC_2_DEI5, DMAC_2_DADERR),
--	INTC_GROUP(DMAC2_1, DMAC2_1_DEI0,
--		   DMAC2_1_DEI1, DMAC2_1_DEI2, DMAC2_1_DEI3),
--	INTC_GROUP(DMAC2_2, DMAC2_2_DEI4,
--		   DMAC2_2_DEI5, DMAC2_2_DADERR),
--	INTC_GROUP(DMAC3_1, DMAC3_1_DEI0,
--		   DMAC3_1_DEI1, DMAC3_1_DEI2, DMAC3_1_DEI3),
--	INTC_GROUP(DMAC3_2, DMAC3_2_DEI4,
--		   DMAC3_2_DEI5, DMAC3_2_DADERR),
--	INTC_GROUP(ETM11, ETM11_ACQCMP, ETM11_FULL),
--	INTC_GROUP(ARM11, ARM11_IRQPMU, ARM11_COMMTX, ARM11_COMMTX),
--	INTC_GROUP(USBHS, USBHS_USHI0, USBHS_USHI1),
--	INTC_GROUP(FLCTL, FLCTL_FLSTEI, FLCTL_FLTENDI,
--		   FLCTL_FLTREQ0I, FLCTL_FLTREQ1I),
--	INTC_GROUP(IIC1, IIC1_ALI1, IIC1_TACKI1, IIC1_WAITI1, IIC1_DTEI1),
--};
--
--static struct intc_mask_reg intca_mask_registers[] __initdata = {
--	{ 0xe6940080, 0xe69400c0, 8, /* IMR0A / IMCR0A */
--	  { DMAC2_1_DEI3, DMAC2_1_DEI2, DMAC2_1_DEI1, DMAC2_1_DEI0,
--	    ARM11_IRQPMU, 0, ARM11_COMMTX, ARM11_COMMRX } },
--	{ 0xe6940084, 0xe69400c4, 8, /* IMR1A / IMCR1A */
--	  { CRYPT1_ERR, CRYPT2_STD, DIRC, 0,
--	    DMAC_1_DEI3, DMAC_1_DEI2, DMAC_1_DEI1, DMAC_1_DEI0 } },
--	{ 0xe6940088, 0xe69400c8, 8, /* IMR2A / IMCR2A */
--	  { PINT1, PINT2, 0, 0,
--	    BBIF1, BBIF2, MFI_MFIS, MFI_MFIM } },
--	{ 0xe694008c, 0xe69400cc, 8, /* IMR3A / IMCR3A */
--	  { DMAC3_1_DEI3, DMAC3_1_DEI2, DMAC3_1_DEI1, DMAC3_1_DEI0,
--	    DMAC3_2_DADERR, DMAC3_2_DEI5, DMAC3_2_DEI4, IRDA } },
--	{ 0xe6940090, 0xe69400d0, 8, /* IMR4A / IMCR4A */
--	  { DDM, 0, 0, 0,
--	    0, 0, ETM11_FULL, ETM11_ACQCMP } },
--	{ 0xe6940094, 0xe69400d4, 8, /* IMR5A / IMCR5A */
--	  { KEYSC_KEY, DMAC_2_DADERR, DMAC_2_DEI5, DMAC_2_DEI4,
--	    SCIFA3, SCIFA2, SCIFA1, SCIFA0 } },
--	{ 0xe6940098, 0xe69400d8, 8, /* IMR6A / IMCR6A */
--	  { SCIFB, SCIFA5, SCIFA4, MSIOF1,
--	    0, 0, MSIOF2, 0 } },
--	{ 0xe694009c, 0xe69400dc, 8, /* IMR7A / IMCR7A */
--	  { DISABLED, ENABLED, ENABLED, ENABLED,
--	    FLCTL_FLTREQ1I, FLCTL_FLTREQ0I, FLCTL_FLTENDI, FLCTL_FLSTEI } },
--	{ 0xe69400a0, 0xe69400e0, 8, /* IMR8A / IMCR8A */
--	  { DISABLED, ENABLED, ENABLED, ENABLED,
--	    TTI20, USBDMAC_USHDMI, SPU, SIU } },
--	{ 0xe69400a4, 0xe69400e4, 8, /* IMR9A / IMCR9A */
--	  { CMT1_CMT13, CMT1_CMT12, CMT1_CMT11, CMT1_CMT10,
--	    CMT2, USBHS_USHI1, USBHS_USHI0, 0 } },
--	{ 0xe69400a8, 0xe69400e8, 8, /* IMR10A / IMCR10A */
--	  { 0, DMAC2_2_DADERR, DMAC2_2_DEI5, DMAC2_2_DEI4,
--	    0, 0, 0, 0 } },
--	{ 0xe69400ac, 0xe69400ec, 8, /* IMR11A / IMCR11A */
--	  { IIC1_DTEI1, IIC1_WAITI1, IIC1_TACKI1, IIC1_ALI1,
--	    LCRC, MSU_MSU2, IREM, MSU_MSU } },
--	{ 0xe69400b0, 0xe69400f0, 8, /* IMR12A / IMCR12A */
--	  { 0, 0, TPU0, TPU1,
--	    TPU2, TPU3, TPU4, 0 } },
--	{ 0xe69400b4, 0xe69400f4, 8, /* IMR13A / IMCR13A */
--	  { DISABLED, ENABLED, ENABLED, ENABLED,
--	    MISTY, CMT3, RWDT1, RWDT0 } },
--};
--
--static struct intc_prio_reg intca_prio_registers[] __initdata = {
--	{ 0xe6940000, 0, 16, 4, /* IPRAA */ { DMAC3_1, DMAC3_2, CMT2, LCRC } },
--	{ 0xe6940004, 0, 16, 4, /* IPRBA */ { IRDA, ETM11, BBIF1, BBIF2 } },
--	{ 0xe6940008, 0, 16, 4, /* IPRCA */ { CRYPT1_ERR, CRYPT2_STD,
--					      CMT1_CMT11, ARM11 } },
--	{ 0xe694000c, 0, 16, 4, /* IPRDA */ { PINT1, PINT2,
--					      CMT1_CMT12, TPU4 } },
--	{ 0xe6940010, 0, 16, 4, /* IPREA */ { DMAC_1, MFI_MFIS,
--					      MFI_MFIM, USBHS } },
--	{ 0xe6940014, 0, 16, 4, /* IPRFA */ { KEYSC_KEY, DMAC_2,
--					      0, CMT1_CMT10 } },
--	{ 0xe6940018, 0, 16, 4, /* IPRGA */ { SCIFA0, SCIFA1,
--					      SCIFA2, SCIFA3 } },
--	{ 0xe694001c, 0, 16, 4, /* IPRGH */ { MSIOF2, USBDMAC_USHDMI,
--					      FLCTL, SDHI0 } },
--	{ 0xe6940020, 0, 16, 4, /* IPRIA */ { MSIOF1, SCIFA4, MSU_MSU, IIC1 } },
--	{ 0xe6940024, 0, 16, 4, /* IPRJA */ { DMAC2_1, DMAC2_2, SIU, TTI20 } },
--	{ 0xe6940028, 0, 16, 4, /* IPRKA */ { 0, CMT1_CMT13, IREM, SDHI1 } },
--	{ 0xe694002c, 0, 16, 4, /* IPRLA */ { TPU0, TPU1, TPU2, TPU3 } },
--	{ 0xe6940030, 0, 16, 4, /* IPRMA */ { MISTY, CMT3, RWDT1, RWDT0 } },
--	{ 0xe6940034, 0, 16, 4, /* IPRNA */ { SCIFB, SCIFA5, SPU, DDM } },
--	{ 0xe6940038, 0, 16, 4, /* IPROA */ { 0, 0, DIRC, SDHI2 } },
--};
--
--static struct intc_desc intca_desc __initdata = {
--	.name = "sh7367-intca",
--	.force_enable = ENABLED,
--	.force_disable = DISABLED,
--	.hw = INTC_HW_DESC(intca_vectors, intca_groups,
--			   intca_mask_registers, intca_prio_registers,
--			   NULL, NULL),
--};
--
--INTC_IRQ_PINS_16(intca_irq_pins, 0xe6900000,
--		 INTC_VECT, "sh7367-intca-irq-pins");
--
--enum {
--	UNUSED_INTCS = 0,
--
--	INTCS,
--
--	/* interrupt sources INTCS */
--	VIO2_VEU0, VIO2_VEU1, VIO2_VEU2, VIO2_VEU3,
--	VIO3_VOU,
--	RTDMAC_1_DEI0, RTDMAC_1_DEI1, RTDMAC_1_DEI2, RTDMAC_1_DEI3,
--	VIO1_CEU, VIO1_BEU0, VIO1_BEU1, VIO1_BEU2,
--	VPU,
--	SGX530,
--	_2DDMAC_2DDM0, _2DDMAC_2DDM1, _2DDMAC_2DDM2, _2DDMAC_2DDM3,
--	IIC2_ALI2, IIC2_TACKI2, IIC2_WAITI2, IIC2_DTEI2,
--	IPMMU_IPMMUB, IPMMU_IPMMUS,
--	RTDMAC_2_DEI4, RTDMAC_2_DEI5, RTDMAC_2_DADERR,
--	MSIOF,
--	IIC0_ALI0, IIC0_TACKI0, IIC0_WAITI0, IIC0_DTEI0,
--	TMU_TUNI0, TMU_TUNI1, TMU_TUNI2,
--	CMT,
--	TSIF,
--	IPMMUI,
--	MVI3,
--	ICB,
--	PEP,
--	ASA,
--	BEM,
--	VE2HO,
--	HQE,
--	JPEG,
--	LCDC,
--
--	/* interrupt groups INTCS */
--	_2DDMAC, RTDMAC_1, RTDMAC_2, VEU, BEU, IIC0, IPMMU, IIC2,
--};
--
--static struct intc_vect intcs_vectors[] = {
--	INTCS_VECT(VIO2_VEU0, 0x700), INTCS_VECT(VIO2_VEU1, 0x720),
--	INTCS_VECT(VIO2_VEU2, 0x740), INTCS_VECT(VIO2_VEU3, 0x760),
--	INTCS_VECT(VIO3_VOU, 0x780),
--	INTCS_VECT(RTDMAC_1_DEI0, 0x800), INTCS_VECT(RTDMAC_1_DEI1, 0x820),
--	INTCS_VECT(RTDMAC_1_DEI2, 0x840), INTCS_VECT(RTDMAC_1_DEI3, 0x860),
--	INTCS_VECT(VIO1_CEU, 0x880), INTCS_VECT(VIO1_BEU0, 0x8a0),
--	INTCS_VECT(VIO1_BEU1, 0x8c0), INTCS_VECT(VIO1_BEU2, 0x8e0),
--	INTCS_VECT(VPU, 0x980),
--	INTCS_VECT(SGX530, 0x9e0),
--	INTCS_VECT(_2DDMAC_2DDM0, 0xa00), INTCS_VECT(_2DDMAC_2DDM1, 0xa20),
--	INTCS_VECT(_2DDMAC_2DDM2, 0xa40), INTCS_VECT(_2DDMAC_2DDM3, 0xa60),
--	INTCS_VECT(IIC2_ALI2, 0xa80), INTCS_VECT(IIC2_TACKI2, 0xaa0),
--	INTCS_VECT(IIC2_WAITI2, 0xac0), INTCS_VECT(IIC2_DTEI2, 0xae0),
--	INTCS_VECT(IPMMU_IPMMUB, 0xb20), INTCS_VECT(IPMMU_IPMMUS, 0xb60),
--	INTCS_VECT(RTDMAC_2_DEI4, 0xb80), INTCS_VECT(RTDMAC_2_DEI5, 0xba0),
--	INTCS_VECT(RTDMAC_2_DADERR, 0xbc0),
--	INTCS_VECT(MSIOF, 0xd20),
--	INTCS_VECT(IIC0_ALI0, 0xe00), INTCS_VECT(IIC0_TACKI0, 0xe20),
--	INTCS_VECT(IIC0_WAITI0, 0xe40), INTCS_VECT(IIC0_DTEI0, 0xe60),
--	INTCS_VECT(TMU_TUNI0, 0xe80), INTCS_VECT(TMU_TUNI1, 0xea0),
--	INTCS_VECT(TMU_TUNI2, 0xec0),
--	INTCS_VECT(CMT, 0xf00),
--	INTCS_VECT(TSIF, 0xf20),
--	INTCS_VECT(IPMMUI, 0xf60),
--	INTCS_VECT(MVI3, 0x420),
--	INTCS_VECT(ICB, 0x480),
--	INTCS_VECT(PEP, 0x4a0),
--	INTCS_VECT(ASA, 0x4c0),
--	INTCS_VECT(BEM, 0x4e0),
--	INTCS_VECT(VE2HO, 0x520),
--	INTCS_VECT(HQE, 0x540),
--	INTCS_VECT(JPEG, 0x560),
--	INTCS_VECT(LCDC, 0x580),
--
--	INTC_VECT(INTCS, 0xf80),
--};
--
--static struct intc_group intcs_groups[] __initdata = {
--	INTC_GROUP(_2DDMAC, _2DDMAC_2DDM0, _2DDMAC_2DDM1,
--		   _2DDMAC_2DDM2, _2DDMAC_2DDM3),
--	INTC_GROUP(RTDMAC_1, RTDMAC_1_DEI0, RTDMAC_1_DEI1,
--		   RTDMAC_1_DEI2, RTDMAC_1_DEI3),
--	INTC_GROUP(RTDMAC_2, RTDMAC_2_DEI4, RTDMAC_2_DEI5, RTDMAC_2_DADERR),
--	INTC_GROUP(VEU, VIO2_VEU0, VIO2_VEU1, VIO2_VEU2, VIO2_VEU3),
--	INTC_GROUP(BEU, VIO1_BEU0, VIO1_BEU1, VIO1_BEU2),
--	INTC_GROUP(IIC0, IIC0_ALI0, IIC0_TACKI0, IIC0_WAITI0, IIC0_DTEI0),
--	INTC_GROUP(IPMMU, IPMMU_IPMMUS, IPMMU_IPMMUB),
--	INTC_GROUP(IIC2, IIC2_ALI2, IIC2_TACKI2, IIC2_WAITI2, IIC2_DTEI2),
--};
--
--static struct intc_mask_reg intcs_mask_registers[] = {
--	{ 0xffd20184, 0xffd201c4, 8, /* IMR1SA / IMCR1SA */
--	  { VIO1_BEU2, VIO1_BEU1, VIO1_BEU0, VIO1_CEU,
--	    VIO2_VEU3, VIO2_VEU2, VIO2_VEU1, VIO2_VEU0 } },
--	{ 0xffd20188, 0xffd201c8, 8, /* IMR2SA / IMCR2SA */
--	  { VIO3_VOU, 0, VE2HO, VPU,
--	    0, 0, 0, 0 } },
--	{ 0xffd2018c, 0xffd201cc, 8, /* IMR3SA / IMCR3SA */
--	  { _2DDMAC_2DDM3, _2DDMAC_2DDM2, _2DDMAC_2DDM1, _2DDMAC_2DDM0,
--	    BEM, ASA, PEP, ICB } },
--	{ 0xffd20190, 0xffd201d0, 8, /* IMR4SA / IMCR4SA */
--	  { 0, 0, MVI3, 0,
--	    JPEG, HQE, 0, LCDC } },
--	{ 0xffd20194, 0xffd201d4, 8, /* IMR5SA / IMCR5SA */
--	  { 0, RTDMAC_2_DADERR, RTDMAC_2_DEI5, RTDMAC_2_DEI4,
--	    RTDMAC_1_DEI3, RTDMAC_1_DEI2, RTDMAC_1_DEI1, RTDMAC_1_DEI0 } },
--	{ 0xffd20198, 0xffd201d8, 8, /* IMR6SA / IMCR6SA */
--	  { 0, 0, MSIOF, 0,
--	    SGX530, 0, 0, 0 } },
--	{ 0xffd2019c, 0xffd201dc, 8, /* IMR7SA / IMCR7SA */
--	  { 0, TMU_TUNI2, TMU_TUNI1, TMU_TUNI0,
--	    0, 0, 0, 0 } },
--	{ 0xffd201a4, 0xffd201e4, 8, /* IMR9SA / IMCR9SA */
--	  { 0, 0, 0, CMT,
--	    IIC2_DTEI2, IIC2_WAITI2, IIC2_TACKI2, IIC2_ALI2 } },
--	{ 0xffd201a8, 0xffd201e8, 8, /* IMR10SA / IMCR10SA */
--	  { IPMMU_IPMMUS, 0, IPMMU_IPMMUB, 0,
--	    0, 0, 0, 0 } },
--	{ 0xffd201ac, 0xffd201ec, 8, /* IMR11SA / IMCR11SA */
--	  { IIC0_DTEI0, IIC0_WAITI0, IIC0_TACKI0, IIC0_ALI0,
--	    0, 0, IPMMUI, TSIF } },
--	{ 0xffd20104, 0, 16, /* INTAMASK */
--	  { 0, 0, 0, 0, 0, 0, 0, 0,
--	    0, 0, 0, 0, 0, 0, 0, INTCS } },
--};
--
--/* Priority is needed for INTCA to receive the INTCS interrupt */
--static struct intc_prio_reg intcs_prio_registers[] = {
--	{ 0xffd20000, 0, 16, 4, /* IPRAS */ { 0, MVI3, _2DDMAC, ICB } },
--	{ 0xffd20004, 0, 16, 4, /* IPRBS */ { JPEG, LCDC, 0, 0 } },
--	{ 0xffd20008, 0, 16, 4, /* IPRCS */ { BBIF2, 0, 0, 0 } },
--	{ 0xffd20010, 0, 16, 4, /* IPRES */ { RTDMAC_1, VIO1_CEU, 0, VPU } },
--	{ 0xffd20014, 0, 16, 4, /* IPRFS */ { 0, RTDMAC_2, 0, CMT } },
--	{ 0xffd20018, 0, 16, 4, /* IPRGS */ { TMU_TUNI0, TMU_TUNI1,
--					      TMU_TUNI2, 0 } },
--	{ 0xffd2001c, 0, 16, 4, /* IPRHS */ { 0, VIO3_VOU, VEU, BEU } },
--	{ 0xffd20020, 0, 16, 4, /* IPRIS */ { 0, MSIOF, TSIF, IIC0 } },
--	{ 0xffd20024, 0, 16, 4, /* IPRJS */ { 0, SGX530, 0, 0 } },
--	{ 0xffd20028, 0, 16, 4, /* IPRKS */ { BEM, ASA, IPMMUI, PEP } },
--	{ 0xffd2002c, 0, 16, 4, /* IPRLS */ { IPMMU, 0, VE2HO, HQE } },
--	{ 0xffd20030, 0, 16, 4, /* IPRMS */ { IIC2, 0, 0, 0 } },
--};
--
--static struct resource intcs_resources[] __initdata = {
--	[0] = {
--		.start	= 0xffd20000,
--		.end	= 0xffd2ffff,
--		.flags	= IORESOURCE_MEM,
--	}
--};
--
--static struct intc_desc intcs_desc __initdata = {
--	.name = "sh7367-intcs",
--	.resource = intcs_resources,
--	.num_resources = ARRAY_SIZE(intcs_resources),
--	.hw = INTC_HW_DESC(intcs_vectors, intcs_groups, intcs_mask_registers,
--			   intcs_prio_registers, NULL, NULL),
--};
--
--static void intcs_demux(unsigned int irq, struct irq_desc *desc)
--{
--	void __iomem *reg = (void *)irq_get_handler_data(irq);
--	unsigned int evtcodeas = ioread32(reg);
--
--	generic_handle_irq(intcs_evt2irq(evtcodeas));
--}
--
--void __init sh7367_init_irq(void)
--{
--	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
--
--	register_intc_controller(&intca_desc);
--	register_intc_controller(&intca_irq_pins_desc);
--	register_intc_controller(&intcs_desc);
--
--	/* demux using INTEVTSA */
--	irq_set_handler_data(evt2irq(0xf80), (void *)intevtsa);
--	irq_set_chained_handler(evt2irq(0xf80), intcs_demux);
--}
-diff --git a/arch/arm/mach-shmobile/pfc-sh7367.c b/arch/arm/mach-shmobile/pfc-sh7367.c
-deleted file mode 100644
-index c0c137f..0000000
---- a/arch/arm/mach-shmobile/pfc-sh7367.c
-+++ /dev/null
-@@ -1,1727 +0,0 @@
--/*
-- * sh7367 processor support - PFC hardware block
-- *
-- * Copyright (C) 2010  Magnus Damm
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--#include <linux/init.h>
--#include <linux/kernel.h>
--#include <linux/sh_pfc.h>
--#include <mach/sh7367.h>
--
--#define CPU_ALL_PORT(fn, pfx, sfx)				\
--	PORT_10(fn, pfx, sfx), PORT_90(fn, pfx, sfx),		\
--	PORT_10(fn, pfx##10, sfx), PORT_90(fn, pfx##1, sfx),	\
--	PORT_10(fn, pfx##20, sfx), PORT_10(fn, pfx##21, sfx),	\
--	PORT_10(fn, pfx##22, sfx), PORT_10(fn, pfx##23, sfx),	\
--	PORT_10(fn, pfx##24, sfx), PORT_10(fn, pfx##25, sfx),	\
--	PORT_10(fn, pfx##26, sfx), PORT_1(fn, pfx##270, sfx),	\
--	PORT_1(fn, pfx##271, sfx), PORT_1(fn, pfx##272, sfx)
--
--enum {
--	PINMUX_RESERVED = 0,
--
--	PINMUX_DATA_BEGIN,
--	PORT_ALL(DATA), /* PORT0_DATA -> PORT272_DATA */
--	PINMUX_DATA_END,
--
--	PINMUX_INPUT_BEGIN,
--	PORT_ALL(IN), /* PORT0_IN -> PORT272_IN */
--	PINMUX_INPUT_END,
--
--	PINMUX_INPUT_PULLUP_BEGIN,
--	PORT_ALL(IN_PU), /* PORT0_IN_PU -> PORT272_IN_PU */
--	PINMUX_INPUT_PULLUP_END,
--
--	PINMUX_INPUT_PULLDOWN_BEGIN,
--	PORT_ALL(IN_PD), /* PORT0_IN_PD -> PORT272_IN_PD */
--	PINMUX_INPUT_PULLDOWN_END,
--
--	PINMUX_OUTPUT_BEGIN,
--	PORT_ALL(OUT), /* PORT0_OUT -> PORT272_OUT */
--	PINMUX_OUTPUT_END,
--
--	PINMUX_FUNCTION_BEGIN,
--	PORT_ALL(FN_IN), /* PORT0_FN_IN -> PORT272_FN_IN */
--	PORT_ALL(FN_OUT), /* PORT0_FN_OUT -> PORT272_FN_OUT */
--	PORT_ALL(FN0), /* PORT0_FN0 -> PORT272_FN0 */
--	PORT_ALL(FN1), /* PORT0_FN1 -> PORT272_FN1 */
--	PORT_ALL(FN2), /* PORT0_FN2 -> PORT272_FN2 */
--	PORT_ALL(FN3), /* PORT0_FN3 -> PORT272_FN3 */
--	PORT_ALL(FN4), /* PORT0_FN4 -> PORT272_FN4 */
--	PORT_ALL(FN5), /* PORT0_FN5 -> PORT272_FN5 */
--	PORT_ALL(FN6), /* PORT0_FN6 -> PORT272_FN6 */
--	PORT_ALL(FN7), /* PORT0_FN7 -> PORT272_FN7 */
--
--	MSELBCR_MSEL2_1, MSELBCR_MSEL2_0,
--	PINMUX_FUNCTION_END,
--
--	PINMUX_MARK_BEGIN,
--	/* Special Pull-up / Pull-down Functions */
--	PORT48_KEYIN0_PU_MARK, PORT49_KEYIN1_PU_MARK,
--	PORT50_KEYIN2_PU_MARK, PORT55_KEYIN3_PU_MARK,
--	PORT56_KEYIN4_PU_MARK, PORT57_KEYIN5_PU_MARK,
--	PORT58_KEYIN6_PU_MARK,
--
--	/* 49-1 */
--	VBUS0_MARK, CPORT0_MARK, CPORT1_MARK, CPORT2_MARK,
--	CPORT3_MARK, CPORT4_MARK, CPORT5_MARK, CPORT6_MARK,
--	CPORT7_MARK, CPORT8_MARK, CPORT9_MARK, CPORT10_MARK,
--	CPORT11_MARK, SIN2_MARK, CPORT12_MARK, XCTS2_MARK,
--	CPORT13_MARK, RFSPO4_MARK, CPORT14_MARK, RFSPO5_MARK,
--	CPORT15_MARK, CPORT16_MARK, CPORT17_MARK, SOUT2_MARK,
--	CPORT18_MARK, XRTS2_MARK, CPORT19_MARK, CPORT20_MARK,
--	RFSPO6_MARK, CPORT21_MARK, STATUS0_MARK, CPORT22_MARK,
--	STATUS1_MARK, CPORT23_MARK, STATUS2_MARK, RFSPO7_MARK,
--	MPORT0_MARK, MPORT1_MARK, B_SYNLD1_MARK, B_SYNLD2_MARK,
--	XMAINPS_MARK, XDIVPS_MARK, XIDRST_MARK, IDCLK_MARK,
--	IDIO_MARK, SOUT1_MARK, SCIFA4_TXD_MARK,
--	M02_BERDAT_MARK, SIN1_MARK, SCIFA4_RXD_MARK, XWUP_MARK,
--	XRTS1_MARK, SCIFA4_RTS_MARK, M03_BERCLK_MARK,
--	XCTS1_MARK, SCIFA4_CTS_MARK,
--
--	/* 49-2 */
--	HSU_IQ_AGC6_MARK, MFG2_IN2_MARK, MSIOF2_MCK0_MARK,
--	HSU_IQ_AGC5_MARK, MFG2_IN1_MARK, MSIOF2_MCK1_MARK,
--	HSU_IQ_AGC4_MARK, MSIOF2_RSYNC_MARK,
--	HSU_IQ_AGC3_MARK, MFG2_OUT1_MARK, MSIOF2_RSCK_MARK,
--	HSU_IQ_AGC2_MARK, PORT42_KEYOUT0_MARK,
--	HSU_IQ_AGC1_MARK, PORT43_KEYOUT1_MARK,
--	HSU_IQ_AGC0_MARK, PORT44_KEYOUT2_MARK,
--	HSU_IQ_AGC_ST_MARK, PORT45_KEYOUT3_MARK,
--	HSU_IQ_PDO_MARK, PORT46_KEYOUT4_MARK,
--	HSU_IQ_PYO_MARK, PORT47_KEYOUT5_MARK,
--	HSU_EN_TXMUX_G3MO_MARK, PORT48_KEYIN0_MARK,
--	HSU_I_TXMUX_G3MO_MARK, PORT49_KEYIN1_MARK,
--	HSU_Q_TXMUX_G3MO_MARK, PORT50_KEYIN2_MARK,
--	HSU_SYO_MARK, PORT51_MSIOF2_TSYNC_MARK,
--	HSU_SDO_MARK, PORT52_MSIOF2_TSCK_MARK,
--	HSU_TGTTI_G3MO_MARK, PORT53_MSIOF2_TXD_MARK,
--	B_TIME_STAMP_MARK, PORT54_MSIOF2_RXD_MARK,
--	HSU_SDI_MARK, PORT55_KEYIN3_MARK,
--	HSU_SCO_MARK, PORT56_KEYIN4_MARK,
--	HSU_DREQ_MARK, PORT57_KEYIN5_MARK,
--	HSU_DACK_MARK, PORT58_KEYIN6_MARK,
--	HSU_CLK61M_MARK, PORT59_MSIOF2_SS1_MARK,
--	HSU_XRST_MARK, PORT60_MSIOF2_SS2_MARK,
--	PCMCLKO_MARK, SYNC8KO_MARK, DNPCM_A_MARK, UPPCM_A_MARK,
--	XTALB1L_MARK,
--	GPS_AGC1_MARK, SCIFA0_RTS_MARK,
--	GPS_AGC2_MARK, SCIFA0_SCK_MARK,
--	GPS_AGC3_MARK, SCIFA0_TXD_MARK,
--	GPS_AGC4_MARK, SCIFA0_RXD_MARK,
--	GPS_PWRD_MARK, SCIFA0_CTS_MARK,
--	GPS_IM_MARK, GPS_IS_MARK, GPS_QM_MARK, GPS_QS_MARK,
--	SIUBOMC_MARK, TPU2TO0_MARK,
--	SIUCKB_MARK, TPU2TO1_MARK,
--	SIUBOLR_MARK, BBIF2_TSYNC_MARK, TPU2TO2_MARK,
--	SIUBOBT_MARK, BBIF2_TSCK_MARK, TPU2TO3_MARK,
--	SIUBOSLD_MARK, BBIF2_TXD_MARK, TPU3TO0_MARK,
--	SIUBILR_MARK, TPU3TO1_MARK,
--	SIUBIBT_MARK, TPU3TO2_MARK,
--	SIUBISLD_MARK, TPU3TO3_MARK,
--	NMI_MARK, TPU4TO0_MARK,
--	DNPCM_M_MARK, TPU4TO1_MARK, TPU4TO2_MARK, TPU4TO3_MARK,
--	IRQ_TMPB_MARK,
--	PWEN_MARK, MFG1_OUT1_MARK,
--	OVCN_MARK, MFG1_IN1_MARK,
--	OVCN2_MARK, MFG1_IN2_MARK,
--
--	/* 49-3 */
--	RFSPO1_MARK, RFSPO2_MARK, RFSPO3_MARK, PORT93_VIO_CKO2_MARK,
--	USBTERM_MARK, EXTLP_MARK, IDIN_MARK,
--	SCIFA5_CTS_MARK, MFG0_IN1_MARK,
--	SCIFA5_RTS_MARK, MFG0_IN2_MARK,
--	SCIFA5_RXD_MARK,
--	SCIFA5_TXD_MARK,
--	SCIFA5_SCK_MARK, MFG0_OUT1_MARK,
--	A0_EA0_MARK, BS_MARK,
--	A14_EA14_MARK, PORT102_KEYOUT0_MARK,
--	A15_EA15_MARK, PORT103_KEYOUT1_MARK, DV_CLKOL_MARK,
--	A16_EA16_MARK, PORT104_KEYOUT2_MARK,
--	DV_VSYNCL_MARK, MSIOF0_SS1_MARK,
--	A17_EA17_MARK, PORT105_KEYOUT3_MARK,
--	DV_HSYNCL_MARK, MSIOF0_TSYNC_MARK,
--	A18_EA18_MARK, PORT106_KEYOUT4_MARK,
--	DV_DL0_MARK, MSIOF0_TSCK_MARK,
--	A19_EA19_MARK, PORT107_KEYOUT5_MARK,
--	DV_DL1_MARK, MSIOF0_TXD_MARK,
--	A20_EA20_MARK, PORT108_KEYIN0_MARK,
--	DV_DL2_MARK, MSIOF0_RSCK_MARK,
--	A21_EA21_MARK, PORT109_KEYIN1_MARK,
--	DV_DL3_MARK, MSIOF0_RSYNC_MARK,
--	A22_EA22_MARK, PORT110_KEYIN2_MARK,
--	DV_DL4_MARK, MSIOF0_MCK0_MARK,
--	A23_EA23_MARK, PORT111_KEYIN3_MARK,
--	DV_DL5_MARK, MSIOF0_MCK1_MARK,
--	A24_EA24_MARK, PORT112_KEYIN4_MARK,
--	DV_DL6_MARK, MSIOF0_RXD_MARK,
--	A25_EA25_MARK, PORT113_KEYIN5_MARK,
--	DV_DL7_MARK, MSIOF0_SS2_MARK,
--	A26_MARK, PORT113_KEYIN6_MARK, DV_CLKIL_MARK,
--	D0_ED0_NAF0_MARK, D1_ED1_NAF1_MARK, D2_ED2_NAF2_MARK,
--	D3_ED3_NAF3_MARK, D4_ED4_NAF4_MARK, D5_ED5_NAF5_MARK,
--	D6_ED6_NAF6_MARK, D7_ED7_NAF7_MARK, D8_ED8_NAF8_MARK,
--	D9_ED9_NAF9_MARK, D10_ED10_NAF10_MARK, D11_ED11_NAF11_MARK,
--	D12_ED12_NAF12_MARK, D13_ED13_NAF13_MARK,
--	D14_ED14_NAF14_MARK, D15_ED15_NAF15_MARK,
--	CS4_MARK, CS5A_MARK, CS5B_MARK, FCE1_MARK,
--	CS6B_MARK, XCS2_MARK, FCE0_MARK, CS6A_MARK,
--	DACK0_MARK, WAIT_MARK, DREQ0_MARK, RD_XRD_MARK,
--	A27_MARK, RDWR_XWE_MARK, WE0_XWR0_FWE_MARK,
--	WE1_XWR1_MARK, FRB_MARK, CKO_MARK,
--	NBRSTOUT_MARK, NBRST_MARK,
--
--	/* 49-4 */
--	RFSPO0_MARK, PORT146_VIO_CKO2_MARK, TSTMD_MARK,
--	VIO_VD_MARK, VIO_HD_MARK,
--	VIO_D0_MARK, VIO_D1_MARK, VIO_D2_MARK,
--	VIO_D3_MARK, VIO_D4_MARK, VIO_D5_MARK,
--	VIO_D6_MARK, VIO_D7_MARK, VIO_D8_MARK,
--	VIO_D9_MARK, VIO_D10_MARK, VIO_D11_MARK,
--	VIO_D12_MARK, VIO_D13_MARK, VIO_D14_MARK,
--	VIO_D15_MARK, VIO_CLK_MARK, VIO_FIELD_MARK,
--	VIO_CKO_MARK,
--	MFG3_IN1_MARK, MFG3_IN2_MARK,
--	M9_SLCD_A01_MARK, MFG3_OUT1_MARK, TPU0TO0_MARK,
--	M10_SLCD_CK1_MARK, MFG4_IN1_MARK, TPU0TO1_MARK,
--	M11_SLCD_SO1_MARK, MFG4_IN2_MARK, TPU0TO2_MARK,
--	M12_SLCD_CE1_MARK, MFG4_OUT1_MARK, TPU0TO3_MARK,
--	LCDD0_MARK, PORT175_KEYOUT0_MARK, DV_D0_MARK,
--	SIUCKA_MARK, MFG0_OUT2_MARK,
--	LCDD1_MARK, PORT176_KEYOUT1_MARK, DV_D1_MARK,
--	SIUAOLR_MARK, BBIF2_TSYNC1_MARK,
--	LCDD2_MARK, PORT177_KEYOUT2_MARK, DV_D2_MARK,
--	SIUAOBT_MARK, BBIF2_TSCK1_MARK,
--	LCDD3_MARK, PORT178_KEYOUT3_MARK, DV_D3_MARK,
--	SIUAOSLD_MARK, BBIF2_TXD1_MARK,
--	LCDD4_MARK, PORT179_KEYOUT4_MARK, DV_D4_MARK,
--	SIUAISPD_MARK, MFG1_OUT2_MARK,
--	LCDD5_MARK, PORT180_KEYOUT5_MARK, DV_D5_MARK,
--	SIUAILR_MARK, MFG2_OUT2_MARK,
--	LCDD6_MARK, DV_D6_MARK,
--	SIUAIBT_MARK, MFG3_OUT2_MARK, XWR2_MARK,
--	LCDD7_MARK, DV_D7_MARK,
--	SIUAISLD_MARK, MFG4_OUT2_MARK, XWR3_MARK,
--	LCDD8_MARK, DV_D8_MARK, D16_MARK, ED16_MARK,
--	LCDD9_MARK, DV_D9_MARK, D17_MARK, ED17_MARK,
--	LCDD10_MARK, DV_D10_MARK, D18_MARK, ED18_MARK,
--	LCDD11_MARK, DV_D11_MARK, D19_MARK, ED19_MARK,
--	LCDD12_MARK, DV_D12_MARK, D20_MARK, ED20_MARK,
--	LCDD13_MARK, DV_D13_MARK, D21_MARK, ED21_MARK,
--	LCDD14_MARK, DV_D14_MARK, D22_MARK, ED22_MARK,
--	LCDD15_MARK, DV_D15_MARK, D23_MARK, ED23_MARK,
--	LCDD16_MARK, DV_HSYNC_MARK, D24_MARK, ED24_MARK,
--	LCDD17_MARK, DV_VSYNC_MARK, D25_MARK, ED25_MARK,
--	LCDD18_MARK, DREQ2_MARK, MSIOF0L_TSCK_MARK,
--	D26_MARK, ED26_MARK,
--	LCDD19_MARK, MSIOF0L_TSYNC_MARK,
--	D27_MARK, ED27_MARK,
--	LCDD20_MARK, TS_SPSYNC1_MARK, MSIOF0L_MCK0_MARK,
--	D28_MARK, ED28_MARK,
--	LCDD21_MARK, TS_SDAT1_MARK, MSIOF0L_MCK1_MARK,
--	D29_MARK, ED29_MARK,
--	LCDD22_MARK, TS_SDEN1_MARK, MSIOF0L_SS1_MARK,
--	D30_MARK, ED30_MARK,
--	LCDD23_MARK, TS_SCK1_MARK, MSIOF0L_SS2_MARK,
--	D31_MARK, ED31_MARK,
--	LCDDCK_MARK, LCDWR_MARK, DV_CKO_MARK, SIUAOSPD_MARK,
--	LCDRD_MARK, DACK2_MARK, MSIOF0L_RSYNC_MARK,
--
--	/* 49-5 */
--	LCDHSYN_MARK, LCDCS_MARK, LCDCS2_MARK, DACK3_MARK,
--	LCDDISP_MARK, LCDRS_MARK, DREQ3_MARK, MSIOF0L_RSCK_MARK,
--	LCDCSYN_MARK, LCDCSYN2_MARK, DV_CKI_MARK,
--	LCDLCLK_MARK, DREQ1_MARK, MSIOF0L_RXD_MARK,
--	LCDDON_MARK, LCDDON2_MARK, DACK1_MARK, MSIOF0L_TXD_MARK,
--	VIO_DR0_MARK, VIO_DR1_MARK, VIO_DR2_MARK, VIO_DR3_MARK,
--	VIO_DR4_MARK, VIO_DR5_MARK, VIO_DR6_MARK, VIO_DR7_MARK,
--	VIO_VDR_MARK, VIO_HDR_MARK,
--	VIO_CLKR_MARK, VIO_CKOR_MARK,
--	SCIFA1_TXD_MARK, GPS_PGFA0_MARK,
--	SCIFA1_SCK_MARK, GPS_PGFA1_MARK,
--	SCIFA1_RTS_MARK, GPS_EPPSINMON_MARK,
--	SCIFA1_RXD_MARK, SCIFA1_CTS_MARK,
--	MSIOF1_TXD_MARK, SCIFA1_TXD2_MARK, GPS_TXD_MARK,
--	MSIOF1_TSYNC_MARK, SCIFA1_CTS2_MARK, I2C_SDA2_MARK,
--	MSIOF1_TSCK_MARK, SCIFA1_SCK2_MARK,
--	MSIOF1_RXD_MARK, SCIFA1_RXD2_MARK, GPS_RXD_MARK,
--	MSIOF1_RSCK_MARK, SCIFA1_RTS2_MARK,
--	MSIOF1_RSYNC_MARK, I2C_SCL2_MARK,
--	MSIOF1_MCK0_MARK, MSIOF1_MCK1_MARK,
--	MSIOF1_SS1_MARK, EDBGREQ3_MARK,
--	MSIOF1_SS2_MARK,
--	PORT236_IROUT_MARK, IRDA_OUT_MARK,
--	IRDA_IN_MARK, IRDA_FIRSEL_MARK,
--	TPU1TO0_MARK, TS_SPSYNC3_MARK,
--	TPU1TO1_MARK, TS_SDAT3_MARK,
--	TPU1TO2_MARK, TS_SDEN3_MARK, PORT241_MSIOF2_SS1_MARK,
--	TPU1TO3_MARK, PORT242_MSIOF2_TSCK_MARK,
--	M13_BSW_MARK, PORT243_MSIOF2_TSYNC_MARK,
--	M14_GSW_MARK, PORT244_MSIOF2_TXD_MARK,
--	PORT245_IROUT_MARK, M15_RSW_MARK,
--	SOUT3_MARK, SCIFA2_TXD1_MARK,
--	SIN3_MARK, SCIFA2_RXD1_MARK,
--	XRTS3_MARK, SCIFA2_RTS1_MARK, PORT248_MSIOF2_SS2_MARK,
--	XCTS3_MARK, SCIFA2_CTS1_MARK, PORT249_MSIOF2_RXD_MARK,
--	DINT_MARK, SCIFA2_SCK1_MARK, TS_SCK3_MARK,
--	SDHICLK0_MARK, TCK2_MARK,
--	SDHICD0_MARK,
--	SDHID0_0_MARK, TMS2_MARK,
--	SDHID0_1_MARK, TDO2_MARK,
--	SDHID0_2_MARK, TDI2_MARK,
--	SDHID0_3_MARK, RTCK2_MARK,
--
--	/* 49-6 */
--	SDHICMD0_MARK, TRST2_MARK,
--	SDHIWP0_MARK, EDBGREQ2_MARK,
--	SDHICLK1_MARK, TCK3_MARK,
--	SDHID1_0_MARK, M11_SLCD_SO2_MARK,
--	TS_SPSYNC2_MARK, TMS3_MARK,
--	SDHID1_1_MARK, M9_SLCD_AO2_MARK,
--	TS_SDAT2_MARK, TDO3_MARK,
--	SDHID1_2_MARK, M10_SLCD_CK2_MARK,
--	TS_SDEN2_MARK, TDI3_MARK,
--	SDHID1_3_MARK, M12_SLCD_CE2_MARK,
--	TS_SCK2_MARK, RTCK3_MARK,
--	SDHICMD1_MARK, TRST3_MARK,
--	SDHICLK2_MARK, SCIFB_SCK_MARK,
--	SDHID2_0_MARK, SCIFB_TXD_MARK,
--	SDHID2_1_MARK, SCIFB_CTS_MARK,
--	SDHID2_2_MARK, SCIFB_RXD_MARK,
--	SDHID2_3_MARK, SCIFB_RTS_MARK,
--	SDHICMD2_MARK,
--	RESETOUTS_MARK,
--	DIVLOCK_MARK,
--	PINMUX_MARK_END,
--};
--
--static pinmux_enum_t pinmux_data[] = {
--
--	/* specify valid pin states for each pin in GPIO mode */
--
--	/* 49-1 (GPIO) */
--	PORT_DATA_I_PD(0),
--	PORT_DATA_I_PU(1), PORT_DATA_I_PU(2), PORT_DATA_I_PU(3),
--	PORT_DATA_I_PU(4), PORT_DATA_I_PU(5), PORT_DATA_I_PU(6),
--	PORT_DATA_I_PU(7), PORT_DATA_I_PU(8), PORT_DATA_I_PU(9),
--	PORT_DATA_I_PU(10), PORT_DATA_I_PU(11), PORT_DATA_I_PU(12),
--	PORT_DATA_I_PU(13),
--	PORT_DATA_IO_PU_PD(14), PORT_DATA_IO_PU_PD(15),
--	PORT_DATA_O(16), PORT_DATA_O(17), PORT_DATA_O(18), PORT_DATA_O(19),
--	PORT_DATA_O(20), PORT_DATA_O(21), PORT_DATA_O(22), PORT_DATA_O(23),
--	PORT_DATA_O(24), PORT_DATA_O(25), PORT_DATA_O(26),
--	PORT_DATA_I_PD(27), PORT_DATA_I_PD(28),
--	PORT_DATA_O(29), PORT_DATA_O(30), PORT_DATA_O(31), PORT_DATA_O(32),
--	PORT_DATA_IO_PU(33),
--	PORT_DATA_O(34),
--	PORT_DATA_I_PU(35),
--	PORT_DATA_O(36),
--	PORT_DATA_I_PU_PD(37),
--
--	/* 49-2 (GPIO) */
--	PORT_DATA_IO_PU_PD(38),
--	PORT_DATA_IO_PD(39), PORT_DATA_IO_PD(40), PORT_DATA_IO_PD(41),
--	PORT_DATA_O(42), PORT_DATA_O(43), PORT_DATA_O(44), PORT_DATA_O(45),
--	PORT_DATA_O(46), PORT_DATA_O(47),
--	PORT_DATA_I_PU_PD(48), PORT_DATA_I_PU_PD(49), PORT_DATA_I_PU_PD(50),
--	PORT_DATA_IO_PD(51), PORT_DATA_IO_PD(52),
--	PORT_DATA_O(53),
--	PORT_DATA_IO_PD(54),
--	PORT_DATA_I_PU_PD(55),
--	PORT_DATA_IO_PU_PD(56),
--	PORT_DATA_I_PU_PD(57),
--	PORT_DATA_IO_PU_PD(58),
--	PORT_DATA_O(59), PORT_DATA_O(60), PORT_DATA_O(61), PORT_DATA_O(62),
--	PORT_DATA_O(63),
--	PORT_DATA_I_PU(64),
--	PORT_DATA_O(65), PORT_DATA_O(66), PORT_DATA_O(67), PORT_DATA_O(68),
--	PORT_DATA_IO_PD(69), PORT_DATA_IO_PD(70),
--	PORT_DATA_I_PD(71), PORT_DATA_I_PD(72), PORT_DATA_I_PD(73),
--	PORT_DATA_I_PD(74),
--	PORT_DATA_IO_PU_PD(75), PORT_DATA_IO_PU_PD(76),
--	PORT_DATA_IO_PD(77), PORT_DATA_IO_PD(78),
--	PORT_DATA_O(79),
--	PORT_DATA_IO_PD(80), PORT_DATA_IO_PD(81), PORT_DATA_IO_PD(82),
--	PORT_DATA_IO_PU_PD(83), PORT_DATA_IO_PU_PD(84),
--	PORT_DATA_IO_PU_PD(85), PORT_DATA_IO_PU_PD(86),
--	PORT_DATA_I_PD(87),
--	PORT_DATA_IO_PU_PD(88),
--	PORT_DATA_I_PU_PD(89), PORT_DATA_I_PU_PD(90),
--
--	/* 49-3 (GPIO) */
--	PORT_DATA_O(91), PORT_DATA_O(92), PORT_DATA_O(93), PORT_DATA_O(94),
--	PORT_DATA_I_PU_PD(95),
--	PORT_DATA_IO_PU_PD(96), PORT_DATA_IO_PU_PD(97), PORT_DATA_IO_PU_PD(98),
--	PORT_DATA_IO_PU_PD(99),	PORT_DATA_IO_PU_PD(100),
--	PORT_DATA_IO(101), PORT_DATA_IO(102), PORT_DATA_IO(103),
--	PORT_DATA_IO_PD(104), PORT_DATA_IO_PD(105), PORT_DATA_IO_PD(106),
--	PORT_DATA_IO_PD(107),
--	PORT_DATA_IO_PU_PD(108), PORT_DATA_IO_PU_PD(109),
--	PORT_DATA_IO_PU_PD(110), PORT_DATA_IO_PU_PD(111),
--	PORT_DATA_IO_PU_PD(112), PORT_DATA_IO_PU_PD(113),
--	PORT_DATA_IO_PU_PD(114),
--	PORT_DATA_IO_PU(115), PORT_DATA_IO_PU(116), PORT_DATA_IO_PU(117),
--	PORT_DATA_IO_PU(118), PORT_DATA_IO_PU(119), PORT_DATA_IO_PU(120),
--	PORT_DATA_IO_PU(121), PORT_DATA_IO_PU(122), PORT_DATA_IO_PU(123),
--	PORT_DATA_IO_PU(124), PORT_DATA_IO_PU(125), PORT_DATA_IO_PU(126),
--	PORT_DATA_IO_PU(127), PORT_DATA_IO_PU(128), PORT_DATA_IO_PU(129),
--	PORT_DATA_IO_PU(130),
--	PORT_DATA_O(131), PORT_DATA_O(132), PORT_DATA_O(133),
--	PORT_DATA_IO_PU(134),
--	PORT_DATA_O(135), PORT_DATA_O(136),
--	PORT_DATA_I_PU_PD(137),
--	PORT_DATA_IO(138),
--	PORT_DATA_IO_PU_PD(139),
--	PORT_DATA_IO(140), PORT_DATA_IO(141),
--	PORT_DATA_I_PU(142),
--	PORT_DATA_O(143), PORT_DATA_O(144),
--	PORT_DATA_I_PU(145),
--
--	/* 49-4 (GPIO) */
--	PORT_DATA_O(146),
--	PORT_DATA_I_PU_PD(147),
--	PORT_DATA_I_PD(148), PORT_DATA_I_PD(149),
--	PORT_DATA_IO_PD(150), PORT_DATA_IO_PD(151), PORT_DATA_IO_PD(152),
--	PORT_DATA_IO_PD(153), PORT_DATA_IO_PD(154), PORT_DATA_IO_PD(155),
--	PORT_DATA_IO_PD(156), PORT_DATA_IO_PD(157), PORT_DATA_IO_PD(158),
--	PORT_DATA_IO_PD(159), PORT_DATA_IO_PD(160), PORT_DATA_IO_PD(161),
--	PORT_DATA_IO_PD(162), PORT_DATA_IO_PD(163), PORT_DATA_IO_PD(164),
--	PORT_DATA_IO_PD(165), PORT_DATA_IO_PD(166),
--	PORT_DATA_IO_PU_PD(167),
--	PORT_DATA_O(168),
--	PORT_DATA_I_PD(169), PORT_DATA_I_PD(170),
--	PORT_DATA_O(171),
--	PORT_DATA_IO_PD(172), PORT_DATA_IO_PD(173),
--	PORT_DATA_O(174),
--	PORT_DATA_IO_PD(175), PORT_DATA_IO_PD(176), PORT_DATA_IO_PD(177),
--	PORT_DATA_IO_PD(178), PORT_DATA_IO_PD(179), PORT_DATA_IO_PD(180),
--	PORT_DATA_IO_PD(181), PORT_DATA_IO_PD(182), PORT_DATA_IO_PD(183),
--	PORT_DATA_IO_PD(184), PORT_DATA_IO_PD(185), PORT_DATA_IO_PD(186),
--	PORT_DATA_IO_PD(187), PORT_DATA_IO_PD(188), PORT_DATA_IO_PD(189),
--	PORT_DATA_IO_PD(190), PORT_DATA_IO_PD(191), PORT_DATA_IO_PD(192),
--	PORT_DATA_IO_PD(193), PORT_DATA_IO_PD(194), PORT_DATA_IO_PD(195),
--	PORT_DATA_IO_PD(196), PORT_DATA_IO_PD(197), PORT_DATA_IO_PD(198),
--	PORT_DATA_O(199),
--	PORT_DATA_IO_PD(200),
--
--	/* 49-5 (GPIO) */
--	PORT_DATA_O(201),
--	PORT_DATA_IO_PD(202), PORT_DATA_IO_PD(203),
--	PORT_DATA_I(204),
--	PORT_DATA_O(205),
--	PORT_DATA_IO_PD(206), PORT_DATA_IO_PD(207), PORT_DATA_IO_PD(208),
--	PORT_DATA_IO_PD(209), PORT_DATA_IO_PD(210), PORT_DATA_IO_PD(211),
--	PORT_DATA_IO_PD(212), PORT_DATA_IO_PD(213), PORT_DATA_IO_PD(214),
--	PORT_DATA_IO_PD(215), PORT_DATA_IO_PD(216),
--	PORT_DATA_O(217),
--	PORT_DATA_I_PU_PD(218), PORT_DATA_I_PU_PD(219),
--	PORT_DATA_O(220), PORT_DATA_O(221), PORT_DATA_O(222),
--	PORT_DATA_I_PD(223),
--	PORT_DATA_I_PU_PD(224),
--	PORT_DATA_O(225),
--	PORT_DATA_IO_PD(226),
--	PORT_DATA_IO_PU_PD(227),
--	PORT_DATA_I_PD(228),
--	PORT_DATA_IO_PD(229), PORT_DATA_IO_PD(230),
--	PORT_DATA_I_PU_PD(231), PORT_DATA_I_PU_PD(232),
--	PORT_DATA_IO_PU_PD(233), PORT_DATA_IO_PU_PD(234),
--	PORT_DATA_I_PU_PD(235),
--	PORT_DATA_O(236),
--	PORT_DATA_I_PD(237),
--	PORT_DATA_IO_PU_PD(238), PORT_DATA_IO_PU_PD(239),
--	PORT_DATA_IO_PD(240), PORT_DATA_IO_PD(241),
--	PORT_DATA_IO_PD(242), PORT_DATA_IO_PD(243),
--	PORT_DATA_O(244),
--	PORT_DATA_IO_PU_PD(245),
--	PORT_DATA_O(246),
--	PORT_DATA_I_PD(247),
--	PORT_DATA_IO_PU_PD(248),
--	PORT_DATA_I_PU_PD(249),
--	PORT_DATA_IO_PD(250), PORT_DATA_IO_PD(251),
--	PORT_DATA_IO_PU_PD(252), PORT_DATA_IO_PU_PD(253),
--	PORT_DATA_IO_PU_PD(254), PORT_DATA_IO_PU_PD(255),
--	PORT_DATA_IO_PU_PD(256),
--
--	/* 49-6 (GPIO) */
--	PORT_DATA_IO_PU_PD(257), PORT_DATA_IO_PU_PD(258),
--	PORT_DATA_IO_PD(259),
--	PORT_DATA_IO_PU(260), PORT_DATA_IO_PU(261), PORT_DATA_IO_PU(262),
--	PORT_DATA_IO_PU(263), PORT_DATA_IO_PU(264),
--	PORT_DATA_O(265),
--	PORT_DATA_IO_PU(266), PORT_DATA_IO_PU(267), PORT_DATA_IO_PU(268),
--	PORT_DATA_IO_PU(269), PORT_DATA_IO_PU(270),
--	PORT_DATA_O(271),
--	PORT_DATA_I_PD(272),
--
--	/* Special Pull-up / Pull-down Functions */
--	PINMUX_DATA(PORT48_KEYIN0_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT48_FN2, PORT48_IN_PU),
--	PINMUX_DATA(PORT49_KEYIN1_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT49_FN2, PORT49_IN_PU),
--	PINMUX_DATA(PORT50_KEYIN2_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT50_FN2, PORT50_IN_PU),
--	PINMUX_DATA(PORT55_KEYIN3_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT55_FN2, PORT55_IN_PU),
--	PINMUX_DATA(PORT56_KEYIN4_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT56_FN2, PORT56_IN_PU),
--	PINMUX_DATA(PORT57_KEYIN5_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT57_FN2, PORT57_IN_PU),
--	PINMUX_DATA(PORT58_KEYIN6_PU_MARK, MSELBCR_MSEL2_1,
--		    PORT58_FN2, PORT58_IN_PU),
--
--	/* 49-1 (FN) */
--	PINMUX_DATA(VBUS0_MARK, PORT0_FN1),
--	PINMUX_DATA(CPORT0_MARK, PORT1_FN1),
--	PINMUX_DATA(CPORT1_MARK, PORT2_FN1),
--	PINMUX_DATA(CPORT2_MARK, PORT3_FN1),
--	PINMUX_DATA(CPORT3_MARK, PORT4_FN1),
--	PINMUX_DATA(CPORT4_MARK, PORT5_FN1),
--	PINMUX_DATA(CPORT5_MARK, PORT6_FN1),
--	PINMUX_DATA(CPORT6_MARK, PORT7_FN1),
--	PINMUX_DATA(CPORT7_MARK, PORT8_FN1),
--	PINMUX_DATA(CPORT8_MARK, PORT9_FN1),
--	PINMUX_DATA(CPORT9_MARK, PORT10_FN1),
--	PINMUX_DATA(CPORT10_MARK, PORT11_FN1),
--	PINMUX_DATA(CPORT11_MARK, PORT12_FN1),
--	PINMUX_DATA(SIN2_MARK, PORT12_FN2),
--	PINMUX_DATA(CPORT12_MARK, PORT13_FN1),
--	PINMUX_DATA(XCTS2_MARK, PORT13_FN2),
--	PINMUX_DATA(CPORT13_MARK, PORT14_FN1),
--	PINMUX_DATA(RFSPO4_MARK, PORT14_FN2),
--	PINMUX_DATA(CPORT14_MARK, PORT15_FN1),
--	PINMUX_DATA(RFSPO5_MARK, PORT15_FN2),
--	PINMUX_DATA(CPORT15_MARK, PORT16_FN1),
--	PINMUX_DATA(CPORT16_MARK, PORT17_FN1),
--	PINMUX_DATA(CPORT17_MARK, PORT18_FN1),
--	PINMUX_DATA(SOUT2_MARK, PORT18_FN2),
--	PINMUX_DATA(CPORT18_MARK, PORT19_FN1),
--	PINMUX_DATA(XRTS2_MARK, PORT19_FN1),
--	PINMUX_DATA(CPORT19_MARK, PORT20_FN1),
--	PINMUX_DATA(CPORT20_MARK, PORT21_FN1),
--	PINMUX_DATA(RFSPO6_MARK, PORT21_FN2),
--	PINMUX_DATA(CPORT21_MARK, PORT22_FN1),
--	PINMUX_DATA(STATUS0_MARK, PORT22_FN2),
--	PINMUX_DATA(CPORT22_MARK, PORT23_FN1),
--	PINMUX_DATA(STATUS1_MARK, PORT23_FN2),
--	PINMUX_DATA(CPORT23_MARK, PORT24_FN1),
--	PINMUX_DATA(STATUS2_MARK, PORT24_FN2),
--	PINMUX_DATA(RFSPO7_MARK, PORT24_FN3),
--	PINMUX_DATA(MPORT0_MARK, PORT25_FN1),
--	PINMUX_DATA(MPORT1_MARK, PORT26_FN1),
--	PINMUX_DATA(B_SYNLD1_MARK, PORT27_FN1),
--	PINMUX_DATA(B_SYNLD2_MARK, PORT28_FN1),
--	PINMUX_DATA(XMAINPS_MARK, PORT29_FN1),
--	PINMUX_DATA(XDIVPS_MARK, PORT30_FN1),
--	PINMUX_DATA(XIDRST_MARK, PORT31_FN1),
--	PINMUX_DATA(IDCLK_MARK, PORT32_FN1),
--	PINMUX_DATA(IDIO_MARK, PORT33_FN1),
--	PINMUX_DATA(SOUT1_MARK, PORT34_FN1),
--	PINMUX_DATA(SCIFA4_TXD_MARK, PORT34_FN2),
--	PINMUX_DATA(M02_BERDAT_MARK, PORT34_FN3),
--	PINMUX_DATA(SIN1_MARK, PORT35_FN1),
--	PINMUX_DATA(SCIFA4_RXD_MARK, PORT35_FN2),
--	PINMUX_DATA(XWUP_MARK, PORT35_FN3),
--	PINMUX_DATA(XRTS1_MARK, PORT36_FN1),
--	PINMUX_DATA(SCIFA4_RTS_MARK, PORT36_FN2),
--	PINMUX_DATA(M03_BERCLK_MARK, PORT36_FN3),
--	PINMUX_DATA(XCTS1_MARK, PORT37_FN1),
--	PINMUX_DATA(SCIFA4_CTS_MARK, PORT37_FN2),
--
--	/* 49-2 (FN) */
--	PINMUX_DATA(HSU_IQ_AGC6_MARK, PORT38_FN1),
--	PINMUX_DATA(MFG2_IN2_MARK, PORT38_FN2),
--	PINMUX_DATA(MSIOF2_MCK0_MARK, PORT38_FN3),
--	PINMUX_DATA(HSU_IQ_AGC5_MARK, PORT39_FN1),
--	PINMUX_DATA(MFG2_IN1_MARK, PORT39_FN2),
--	PINMUX_DATA(MSIOF2_MCK1_MARK, PORT39_FN3),
--	PINMUX_DATA(HSU_IQ_AGC4_MARK, PORT40_FN1),
--	PINMUX_DATA(MSIOF2_RSYNC_MARK, PORT40_FN3),
--	PINMUX_DATA(HSU_IQ_AGC3_MARK, PORT41_FN1),
--	PINMUX_DATA(MFG2_OUT1_MARK, PORT41_FN2),
--	PINMUX_DATA(MSIOF2_RSCK_MARK, PORT41_FN3),
--	PINMUX_DATA(HSU_IQ_AGC2_MARK, PORT42_FN1),
--	PINMUX_DATA(PORT42_KEYOUT0_MARK, MSELBCR_MSEL2_1, PORT42_FN2),
--	PINMUX_DATA(HSU_IQ_AGC1_MARK, PORT43_FN1),
--	PINMUX_DATA(PORT43_KEYOUT1_MARK, MSELBCR_MSEL2_1, PORT43_FN2),
--	PINMUX_DATA(HSU_IQ_AGC0_MARK, PORT44_FN1),
--	PINMUX_DATA(PORT44_KEYOUT2_MARK, MSELBCR_MSEL2_1, PORT44_FN2),
--	PINMUX_DATA(HSU_IQ_AGC_ST_MARK, PORT45_FN1),
--	PINMUX_DATA(PORT45_KEYOUT3_MARK, MSELBCR_MSEL2_1, PORT45_FN2),
--	PINMUX_DATA(HSU_IQ_PDO_MARK, PORT46_FN1),
--	PINMUX_DATA(PORT46_KEYOUT4_MARK, MSELBCR_MSEL2_1, PORT46_FN2),
--	PINMUX_DATA(HSU_IQ_PYO_MARK, PORT47_FN1),
--	PINMUX_DATA(PORT47_KEYOUT5_MARK, MSELBCR_MSEL2_1, PORT47_FN2),
--	PINMUX_DATA(HSU_EN_TXMUX_G3MO_MARK, PORT48_FN1),
--	PINMUX_DATA(PORT48_KEYIN0_MARK, MSELBCR_MSEL2_1, PORT48_FN2),
--	PINMUX_DATA(HSU_I_TXMUX_G3MO_MARK, PORT49_FN1),
--	PINMUX_DATA(PORT49_KEYIN1_MARK, MSELBCR_MSEL2_1, PORT49_FN2),
--	PINMUX_DATA(HSU_Q_TXMUX_G3MO_MARK, PORT50_FN1),
--	PINMUX_DATA(PORT50_KEYIN2_MARK, MSELBCR_MSEL2_1, PORT50_FN2),
--	PINMUX_DATA(HSU_SYO_MARK, PORT51_FN1),
--	PINMUX_DATA(PORT51_MSIOF2_TSYNC_MARK, PORT51_FN2),
--	PINMUX_DATA(HSU_SDO_MARK, PORT52_FN1),
--	PINMUX_DATA(PORT52_MSIOF2_TSCK_MARK, PORT52_FN2),
--	PINMUX_DATA(HSU_TGTTI_G3MO_MARK, PORT53_FN1),
--	PINMUX_DATA(PORT53_MSIOF2_TXD_MARK, PORT53_FN2),
--	PINMUX_DATA(B_TIME_STAMP_MARK, PORT54_FN1),
--	PINMUX_DATA(PORT54_MSIOF2_RXD_MARK, PORT54_FN2),
--	PINMUX_DATA(HSU_SDI_MARK, PORT55_FN1),
--	PINMUX_DATA(PORT55_KEYIN3_MARK, MSELBCR_MSEL2_1, PORT55_FN2),
--	PINMUX_DATA(HSU_SCO_MARK, PORT56_FN1),
--	PINMUX_DATA(PORT56_KEYIN4_MARK, MSELBCR_MSEL2_1, PORT56_FN2),
--	PINMUX_DATA(HSU_DREQ_MARK, PORT57_FN1),
--	PINMUX_DATA(PORT57_KEYIN5_MARK, MSELBCR_MSEL2_1, PORT57_FN2),
--	PINMUX_DATA(HSU_DACK_MARK, PORT58_FN1),
--	PINMUX_DATA(PORT58_KEYIN6_MARK, MSELBCR_MSEL2_1, PORT58_FN2),
--	PINMUX_DATA(HSU_CLK61M_MARK, PORT59_FN1),
--	PINMUX_DATA(PORT59_MSIOF2_SS1_MARK, PORT59_FN2),
--	PINMUX_DATA(HSU_XRST_MARK, PORT60_FN1),
--	PINMUX_DATA(PORT60_MSIOF2_SS2_MARK, PORT60_FN2),
--	PINMUX_DATA(PCMCLKO_MARK, PORT61_FN1),
--	PINMUX_DATA(SYNC8KO_MARK, PORT62_FN1),
--	PINMUX_DATA(DNPCM_A_MARK, PORT63_FN1),
--	PINMUX_DATA(UPPCM_A_MARK, PORT64_FN1),
--	PINMUX_DATA(XTALB1L_MARK, PORT65_FN1),
--	PINMUX_DATA(GPS_AGC1_MARK, PORT66_FN1),
--	PINMUX_DATA(SCIFA0_RTS_MARK, PORT66_FN2),
--	PINMUX_DATA(GPS_AGC2_MARK, PORT67_FN1),
--	PINMUX_DATA(SCIFA0_SCK_MARK, PORT67_FN2),
--	PINMUX_DATA(GPS_AGC3_MARK, PORT68_FN1),
--	PINMUX_DATA(SCIFA0_TXD_MARK, PORT68_FN2),
--	PINMUX_DATA(GPS_AGC4_MARK, PORT69_FN1),
--	PINMUX_DATA(SCIFA0_RXD_MARK, PORT69_FN2),
--	PINMUX_DATA(GPS_PWRD_MARK, PORT70_FN1),
--	PINMUX_DATA(SCIFA0_CTS_MARK, PORT70_FN2),
--	PINMUX_DATA(GPS_IM_MARK, PORT71_FN1),
--	PINMUX_DATA(GPS_IS_MARK, PORT72_FN1),
--	PINMUX_DATA(GPS_QM_MARK, PORT73_FN1),
--	PINMUX_DATA(GPS_QS_MARK, PORT74_FN1),
--	PINMUX_DATA(SIUBOMC_MARK, PORT75_FN1),
--	PINMUX_DATA(TPU2TO0_MARK, PORT75_FN3),
--	PINMUX_DATA(SIUCKB_MARK, PORT76_FN1),
--	PINMUX_DATA(TPU2TO1_MARK, PORT76_FN3),
--	PINMUX_DATA(SIUBOLR_MARK, PORT77_FN1),
--	PINMUX_DATA(BBIF2_TSYNC_MARK, PORT77_FN2),
--	PINMUX_DATA(TPU2TO2_MARK, PORT77_FN3),
--	PINMUX_DATA(SIUBOBT_MARK, PORT78_FN1),
--	PINMUX_DATA(BBIF2_TSCK_MARK, PORT78_FN2),
--	PINMUX_DATA(TPU2TO3_MARK, PORT78_FN3),
--	PINMUX_DATA(SIUBOSLD_MARK, PORT79_FN1),
--	PINMUX_DATA(BBIF2_TXD_MARK, PORT79_FN2),
--	PINMUX_DATA(TPU3TO0_MARK, PORT79_FN3),
--	PINMUX_DATA(SIUBILR_MARK, PORT80_FN1),
--	PINMUX_DATA(TPU3TO1_MARK, PORT80_FN3),
--	PINMUX_DATA(SIUBIBT_MARK, PORT81_FN1),
--	PINMUX_DATA(TPU3TO2_MARK, PORT81_FN3),
--	PINMUX_DATA(SIUBISLD_MARK, PORT82_FN1),
--	PINMUX_DATA(TPU3TO3_MARK, PORT82_FN3),
--	PINMUX_DATA(NMI_MARK, PORT83_FN1),
--	PINMUX_DATA(TPU4TO0_MARK, PORT83_FN3),
--	PINMUX_DATA(DNPCM_M_MARK, PORT84_FN1),
--	PINMUX_DATA(TPU4TO1_MARK, PORT84_FN3),
--	PINMUX_DATA(TPU4TO2_MARK, PORT85_FN3),
--	PINMUX_DATA(TPU4TO3_MARK, PORT86_FN3),
--	PINMUX_DATA(IRQ_TMPB_MARK, PORT87_FN1),
--	PINMUX_DATA(PWEN_MARK, PORT88_FN1),
--	PINMUX_DATA(MFG1_OUT1_MARK, PORT88_FN2),
--	PINMUX_DATA(OVCN_MARK, PORT89_FN1),
--	PINMUX_DATA(MFG1_IN1_MARK, PORT89_FN2),
--	PINMUX_DATA(OVCN2_MARK, PORT90_FN1),
--	PINMUX_DATA(MFG1_IN2_MARK, PORT90_FN2),
--
--	/* 49-3 (FN) */
--	PINMUX_DATA(RFSPO1_MARK, PORT91_FN1),
--	PINMUX_DATA(RFSPO2_MARK, PORT92_FN1),
--	PINMUX_DATA(RFSPO3_MARK, PORT93_FN1),
--	PINMUX_DATA(PORT93_VIO_CKO2_MARK, PORT93_FN2),
--	PINMUX_DATA(USBTERM_MARK, PORT94_FN1),
--	PINMUX_DATA(EXTLP_MARK, PORT94_FN2),
--	PINMUX_DATA(IDIN_MARK, PORT95_FN1),
--	PINMUX_DATA(SCIFA5_CTS_MARK, PORT96_FN1),
--	PINMUX_DATA(MFG0_IN1_MARK, PORT96_FN2),
--	PINMUX_DATA(SCIFA5_RTS_MARK, PORT97_FN1),
--	PINMUX_DATA(MFG0_IN2_MARK, PORT97_FN2),
--	PINMUX_DATA(SCIFA5_RXD_MARK, PORT98_FN1),
--	PINMUX_DATA(SCIFA5_TXD_MARK, PORT99_FN1),
--	PINMUX_DATA(SCIFA5_SCK_MARK, PORT100_FN1),
--	PINMUX_DATA(MFG0_OUT1_MARK, PORT100_FN2),
--	PINMUX_DATA(A0_EA0_MARK, PORT101_FN1),
--	PINMUX_DATA(BS_MARK, PORT101_FN2),
--	PINMUX_DATA(A14_EA14_MARK, PORT102_FN1),
--	PINMUX_DATA(PORT102_KEYOUT0_MARK, MSELBCR_MSEL2_0, PORT102_FN2),
--	PINMUX_DATA(A15_EA15_MARK, PORT103_FN1),
--	PINMUX_DATA(PORT103_KEYOUT1_MARK, MSELBCR_MSEL2_0, PORT103_FN2),
--	PINMUX_DATA(DV_CLKOL_MARK, PORT103_FN3),
--	PINMUX_DATA(A16_EA16_MARK, PORT104_FN1),
--	PINMUX_DATA(PORT104_KEYOUT2_MARK, MSELBCR_MSEL2_0, PORT104_FN2),
--	PINMUX_DATA(DV_VSYNCL_MARK, PORT104_FN3),
--	PINMUX_DATA(MSIOF0_SS1_MARK, PORT104_FN4),
--	PINMUX_DATA(A17_EA17_MARK, PORT105_FN1),
--	PINMUX_DATA(PORT105_KEYOUT3_MARK, MSELBCR_MSEL2_0, PORT105_FN2),
--	PINMUX_DATA(DV_HSYNCL_MARK, PORT105_FN3),
--	PINMUX_DATA(MSIOF0_TSYNC_MARK, PORT105_FN4),
--	PINMUX_DATA(A18_EA18_MARK, PORT106_FN1),
--	PINMUX_DATA(PORT106_KEYOUT4_MARK, MSELBCR_MSEL2_0, PORT106_FN2),
--	PINMUX_DATA(DV_DL0_MARK, PORT106_FN3),
--	PINMUX_DATA(MSIOF0_TSCK_MARK, PORT106_FN4),
--	PINMUX_DATA(A19_EA19_MARK, PORT107_FN1),
--	PINMUX_DATA(PORT107_KEYOUT5_MARK, MSELBCR_MSEL2_0, PORT107_FN2),
--	PINMUX_DATA(DV_DL1_MARK, PORT107_FN3),
--	PINMUX_DATA(MSIOF0_TXD_MARK, PORT107_FN4),
--	PINMUX_DATA(A20_EA20_MARK, PORT108_FN1),
--	PINMUX_DATA(PORT108_KEYIN0_MARK, MSELBCR_MSEL2_0, PORT108_FN2),
--	PINMUX_DATA(DV_DL2_MARK, PORT108_FN3),
--	PINMUX_DATA(MSIOF0_RSCK_MARK, PORT108_FN4),
--	PINMUX_DATA(A21_EA21_MARK, PORT109_FN1),
--	PINMUX_DATA(PORT109_KEYIN1_MARK, MSELBCR_MSEL2_0, PORT109_FN2),
--	PINMUX_DATA(DV_DL3_MARK, PORT109_FN3),
--	PINMUX_DATA(MSIOF0_RSYNC_MARK, PORT109_FN4),
--	PINMUX_DATA(A22_EA22_MARK, PORT110_FN1),
--	PINMUX_DATA(PORT110_KEYIN2_MARK, MSELBCR_MSEL2_0, PORT110_FN2),
--	PINMUX_DATA(DV_DL4_MARK, PORT110_FN3),
--	PINMUX_DATA(MSIOF0_MCK0_MARK, PORT110_FN4),
--	PINMUX_DATA(A23_EA23_MARK, PORT111_FN1),
--	PINMUX_DATA(PORT111_KEYIN3_MARK, MSELBCR_MSEL2_0, PORT111_FN2),
--	PINMUX_DATA(DV_DL5_MARK, PORT111_FN3),
--	PINMUX_DATA(MSIOF0_MCK1_MARK, PORT111_FN4),
--	PINMUX_DATA(A24_EA24_MARK, PORT112_FN1),
--	PINMUX_DATA(PORT112_KEYIN4_MARK, MSELBCR_MSEL2_0, PORT112_FN2),
--	PINMUX_DATA(DV_DL6_MARK, PORT112_FN3),
--	PINMUX_DATA(MSIOF0_RXD_MARK, PORT112_FN4),
--	PINMUX_DATA(A25_EA25_MARK, PORT113_FN1),
--	PINMUX_DATA(PORT113_KEYIN5_MARK, MSELBCR_MSEL2_0, PORT113_FN2),
--	PINMUX_DATA(DV_DL7_MARK, PORT113_FN3),
--	PINMUX_DATA(MSIOF0_SS2_MARK, PORT113_FN4),
--	PINMUX_DATA(A26_MARK, PORT114_FN1),
--	PINMUX_DATA(PORT113_KEYIN6_MARK, MSELBCR_MSEL2_0, PORT114_FN2),
--	PINMUX_DATA(DV_CLKIL_MARK, PORT114_FN3),
--	PINMUX_DATA(D0_ED0_NAF0_MARK, PORT115_FN1),
--	PINMUX_DATA(D1_ED1_NAF1_MARK, PORT116_FN1),
--	PINMUX_DATA(D2_ED2_NAF2_MARK, PORT117_FN1),
--	PINMUX_DATA(D3_ED3_NAF3_MARK, PORT118_FN1),
--	PINMUX_DATA(D4_ED4_NAF4_MARK, PORT119_FN1),
--	PINMUX_DATA(D5_ED5_NAF5_MARK, PORT120_FN1),
--	PINMUX_DATA(D6_ED6_NAF6_MARK, PORT121_FN1),
--	PINMUX_DATA(D7_ED7_NAF7_MARK, PORT122_FN1),
--	PINMUX_DATA(D8_ED8_NAF8_MARK, PORT123_FN1),
--	PINMUX_DATA(D9_ED9_NAF9_MARK, PORT124_FN1),
--	PINMUX_DATA(D10_ED10_NAF10_MARK, PORT125_FN1),
--	PINMUX_DATA(D11_ED11_NAF11_MARK, PORT126_FN1),
--	PINMUX_DATA(D12_ED12_NAF12_MARK, PORT127_FN1),
--	PINMUX_DATA(D13_ED13_NAF13_MARK, PORT128_FN1),
--	PINMUX_DATA(D14_ED14_NAF14_MARK, PORT129_FN1),
--	PINMUX_DATA(D15_ED15_NAF15_MARK, PORT130_FN1),
--	PINMUX_DATA(CS4_MARK, PORT131_FN1),
--	PINMUX_DATA(CS5A_MARK, PORT132_FN1),
--	PINMUX_DATA(CS5B_MARK, PORT133_FN1),
--	PINMUX_DATA(FCE1_MARK, PORT133_FN2),
--	PINMUX_DATA(CS6B_MARK, PORT134_FN1),
--	PINMUX_DATA(XCS2_MARK, PORT134_FN2),
--	PINMUX_DATA(FCE0_MARK, PORT135_FN1),
--	PINMUX_DATA(CS6A_MARK, PORT136_FN1),
--	PINMUX_DATA(DACK0_MARK, PORT136_FN2),
--	PINMUX_DATA(WAIT_MARK, PORT137_FN1),
--	PINMUX_DATA(DREQ0_MARK, PORT137_FN2),
--	PINMUX_DATA(RD_XRD_MARK, PORT138_FN1),
--	PINMUX_DATA(A27_MARK, PORT139_FN1),
--	PINMUX_DATA(RDWR_XWE_MARK, PORT139_FN2),
--	PINMUX_DATA(WE0_XWR0_FWE_MARK, PORT140_FN1),
--	PINMUX_DATA(WE1_XWR1_MARK, PORT141_FN1),
--	PINMUX_DATA(FRB_MARK, PORT142_FN1),
--	PINMUX_DATA(CKO_MARK, PORT143_FN1),
--	PINMUX_DATA(NBRSTOUT_MARK, PORT144_FN1),
--	PINMUX_DATA(NBRST_MARK, PORT145_FN1),
--
--	/* 49-4 (FN) */
--	PINMUX_DATA(RFSPO0_MARK, PORT146_FN1),
--	PINMUX_DATA(PORT146_VIO_CKO2_MARK, PORT146_FN2),
--	PINMUX_DATA(TSTMD_MARK, PORT147_FN1),
--	PINMUX_DATA(VIO_VD_MARK, PORT148_FN1),
--	PINMUX_DATA(VIO_HD_MARK, PORT149_FN1),
--	PINMUX_DATA(VIO_D0_MARK, PORT150_FN1),
--	PINMUX_DATA(VIO_D1_MARK, PORT151_FN1),
--	PINMUX_DATA(VIO_D2_MARK, PORT152_FN1),
--	PINMUX_DATA(VIO_D3_MARK, PORT153_FN1),
--	PINMUX_DATA(VIO_D4_MARK, PORT154_FN1),
--	PINMUX_DATA(VIO_D5_MARK, PORT155_FN1),
--	PINMUX_DATA(VIO_D6_MARK, PORT156_FN1),
--	PINMUX_DATA(VIO_D7_MARK, PORT157_FN1),
--	PINMUX_DATA(VIO_D8_MARK, PORT158_FN1),
--	PINMUX_DATA(VIO_D9_MARK, PORT159_FN1),
--	PINMUX_DATA(VIO_D10_MARK, PORT160_FN1),
--	PINMUX_DATA(VIO_D11_MARK, PORT161_FN1),
--	PINMUX_DATA(VIO_D12_MARK, PORT162_FN1),
--	PINMUX_DATA(VIO_D13_MARK, PORT163_FN1),
--	PINMUX_DATA(VIO_D14_MARK, PORT164_FN1),
--	PINMUX_DATA(VIO_D15_MARK, PORT165_FN1),
--	PINMUX_DATA(VIO_CLK_MARK, PORT166_FN1),
--	PINMUX_DATA(VIO_FIELD_MARK, PORT167_FN1),
--	PINMUX_DATA(VIO_CKO_MARK, PORT168_FN1),
--	PINMUX_DATA(MFG3_IN1_MARK, PORT169_FN2),
--	PINMUX_DATA(MFG3_IN2_MARK, PORT170_FN2),
--	PINMUX_DATA(M9_SLCD_A01_MARK, PORT171_FN1),
--	PINMUX_DATA(MFG3_OUT1_MARK, PORT171_FN2),
--	PINMUX_DATA(TPU0TO0_MARK, PORT171_FN3),
--	PINMUX_DATA(M10_SLCD_CK1_MARK, PORT172_FN1),
--	PINMUX_DATA(MFG4_IN1_MARK, PORT172_FN2),
--	PINMUX_DATA(TPU0TO1_MARK, PORT172_FN3),
--	PINMUX_DATA(M11_SLCD_SO1_MARK, PORT173_FN1),
--	PINMUX_DATA(MFG4_IN2_MARK, PORT173_FN2),
--	PINMUX_DATA(TPU0TO2_MARK, PORT173_FN3),
--	PINMUX_DATA(M12_SLCD_CE1_MARK, PORT174_FN1),
--	PINMUX_DATA(MFG4_OUT1_MARK, PORT174_FN2),
--	PINMUX_DATA(TPU0TO3_MARK, PORT174_FN3),
--	PINMUX_DATA(LCDD0_MARK, PORT175_FN1),
--	PINMUX_DATA(PORT175_KEYOUT0_MARK, PORT175_FN2),
--	PINMUX_DATA(DV_D0_MARK, PORT175_FN3),
--	PINMUX_DATA(SIUCKA_MARK, PORT175_FN4),
--	PINMUX_DATA(MFG0_OUT2_MARK, PORT175_FN5),
--	PINMUX_DATA(LCDD1_MARK, PORT176_FN1),
--	PINMUX_DATA(PORT176_KEYOUT1_MARK, PORT176_FN2),
--	PINMUX_DATA(DV_D1_MARK, PORT176_FN3),
--	PINMUX_DATA(SIUAOLR_MARK, PORT176_FN4),
--	PINMUX_DATA(BBIF2_TSYNC1_MARK, PORT176_FN5),
--	PINMUX_DATA(LCDD2_MARK, PORT177_FN1),
--	PINMUX_DATA(PORT177_KEYOUT2_MARK, PORT177_FN2),
--	PINMUX_DATA(DV_D2_MARK, PORT177_FN3),
--	PINMUX_DATA(SIUAOBT_MARK, PORT177_FN4),
--	PINMUX_DATA(BBIF2_TSCK1_MARK, PORT177_FN5),
--	PINMUX_DATA(LCDD3_MARK, PORT178_FN1),
--	PINMUX_DATA(PORT178_KEYOUT3_MARK, PORT178_FN2),
--	PINMUX_DATA(DV_D3_MARK, PORT178_FN3),
--	PINMUX_DATA(SIUAOSLD_MARK, PORT178_FN4),
--	PINMUX_DATA(BBIF2_TXD1_MARK, PORT178_FN5),
--	PINMUX_DATA(LCDD4_MARK, PORT179_FN1),
--	PINMUX_DATA(PORT179_KEYOUT4_MARK, PORT179_FN2),
--	PINMUX_DATA(DV_D4_MARK, PORT179_FN3),
--	PINMUX_DATA(SIUAISPD_MARK, PORT179_FN4),
--	PINMUX_DATA(MFG1_OUT2_MARK, PORT179_FN5),
--	PINMUX_DATA(LCDD5_MARK, PORT180_FN1),
--	PINMUX_DATA(PORT180_KEYOUT5_MARK, PORT180_FN2),
--	PINMUX_DATA(DV_D5_MARK, PORT180_FN3),
--	PINMUX_DATA(SIUAILR_MARK, PORT180_FN4),
--	PINMUX_DATA(MFG2_OUT2_MARK, PORT180_FN5),
--	PINMUX_DATA(LCDD6_MARK, PORT181_FN1),
--	PINMUX_DATA(DV_D6_MARK, PORT181_FN3),
--	PINMUX_DATA(SIUAIBT_MARK, PORT181_FN4),
--	PINMUX_DATA(MFG3_OUT2_MARK, PORT181_FN5),
--	PINMUX_DATA(XWR2_MARK, PORT181_FN7),
--	PINMUX_DATA(LCDD7_MARK, PORT182_FN1),
--	PINMUX_DATA(DV_D7_MARK, PORT182_FN3),
--	PINMUX_DATA(SIUAISLD_MARK, PORT182_FN4),
--	PINMUX_DATA(MFG4_OUT2_MARK, PORT182_FN5),
--	PINMUX_DATA(XWR3_MARK, PORT182_FN7),
--	PINMUX_DATA(LCDD8_MARK, PORT183_FN1),
--	PINMUX_DATA(DV_D8_MARK, PORT183_FN3),
--	PINMUX_DATA(D16_MARK, PORT183_FN6),
--	PINMUX_DATA(ED16_MARK, PORT183_FN7),
--	PINMUX_DATA(LCDD9_MARK, PORT184_FN1),
--	PINMUX_DATA(DV_D9_MARK, PORT184_FN3),
--	PINMUX_DATA(D17_MARK, PORT184_FN6),
--	PINMUX_DATA(ED17_MARK, PORT184_FN7),
--	PINMUX_DATA(LCDD10_MARK, PORT185_FN1),
--	PINMUX_DATA(DV_D10_MARK, PORT185_FN3),
--	PINMUX_DATA(D18_MARK, PORT185_FN6),
--	PINMUX_DATA(ED18_MARK, PORT185_FN7),
--	PINMUX_DATA(LCDD11_MARK, PORT186_FN1),
--	PINMUX_DATA(DV_D11_MARK, PORT186_FN3),
--	PINMUX_DATA(D19_MARK, PORT186_FN6),
--	PINMUX_DATA(ED19_MARK, PORT186_FN7),
--	PINMUX_DATA(LCDD12_MARK, PORT187_FN1),
--	PINMUX_DATA(DV_D12_MARK, PORT187_FN3),
--	PINMUX_DATA(D20_MARK, PORT187_FN6),
--	PINMUX_DATA(ED20_MARK, PORT187_FN7),
--	PINMUX_DATA(LCDD13_MARK, PORT188_FN1),
--	PINMUX_DATA(DV_D13_MARK, PORT188_FN3),
--	PINMUX_DATA(D21_MARK, PORT188_FN6),
--	PINMUX_DATA(ED21_MARK, PORT188_FN7),
--	PINMUX_DATA(LCDD14_MARK, PORT189_FN1),
--	PINMUX_DATA(DV_D14_MARK, PORT189_FN3),
--	PINMUX_DATA(D22_MARK, PORT189_FN6),
--	PINMUX_DATA(ED22_MARK, PORT189_FN7),
--	PINMUX_DATA(LCDD15_MARK, PORT190_FN1),
--	PINMUX_DATA(DV_D15_MARK, PORT190_FN3),
--	PINMUX_DATA(D23_MARK, PORT190_FN6),
--	PINMUX_DATA(ED23_MARK, PORT190_FN7),
--	PINMUX_DATA(LCDD16_MARK, PORT191_FN1),
--	PINMUX_DATA(DV_HSYNC_MARK, PORT191_FN3),
--	PINMUX_DATA(D24_MARK, PORT191_FN6),
--	PINMUX_DATA(ED24_MARK, PORT191_FN7),
--	PINMUX_DATA(LCDD17_MARK, PORT192_FN1),
--	PINMUX_DATA(DV_VSYNC_MARK, PORT192_FN3),
--	PINMUX_DATA(D25_MARK, PORT192_FN6),
--	PINMUX_DATA(ED25_MARK, PORT192_FN7),
--	PINMUX_DATA(LCDD18_MARK, PORT193_FN1),
--	PINMUX_DATA(DREQ2_MARK, PORT193_FN2),
--	PINMUX_DATA(MSIOF0L_TSCK_MARK, PORT193_FN5),
--	PINMUX_DATA(D26_MARK, PORT193_FN6),
--	PINMUX_DATA(ED26_MARK, PORT193_FN7),
--	PINMUX_DATA(LCDD19_MARK, PORT194_FN1),
--	PINMUX_DATA(MSIOF0L_TSYNC_MARK, PORT194_FN5),
--	PINMUX_DATA(D27_MARK, PORT194_FN6),
--	PINMUX_DATA(ED27_MARK, PORT194_FN7),
--	PINMUX_DATA(LCDD20_MARK, PORT195_FN1),
--	PINMUX_DATA(TS_SPSYNC1_MARK, PORT195_FN2),
--	PINMUX_DATA(MSIOF0L_MCK0_MARK, PORT195_FN5),
--	PINMUX_DATA(D28_MARK, PORT195_FN6),
--	PINMUX_DATA(ED28_MARK, PORT195_FN7),
--	PINMUX_DATA(LCDD21_MARK, PORT196_FN1),
--	PINMUX_DATA(TS_SDAT1_MARK, PORT196_FN2),
--	PINMUX_DATA(MSIOF0L_MCK1_MARK, PORT196_FN5),
--	PINMUX_DATA(D29_MARK, PORT196_FN6),
--	PINMUX_DATA(ED29_MARK, PORT196_FN7),
--	PINMUX_DATA(LCDD22_MARK, PORT197_FN1),
--	PINMUX_DATA(TS_SDEN1_MARK, PORT197_FN2),
--	PINMUX_DATA(MSIOF0L_SS1_MARK, PORT197_FN5),
--	PINMUX_DATA(D30_MARK, PORT197_FN6),
--	PINMUX_DATA(ED30_MARK, PORT197_FN7),
--	PINMUX_DATA(LCDD23_MARK, PORT198_FN1),
--	PINMUX_DATA(TS_SCK1_MARK, PORT198_FN2),
--	PINMUX_DATA(MSIOF0L_SS2_MARK, PORT198_FN5),
--	PINMUX_DATA(D31_MARK, PORT198_FN6),
--	PINMUX_DATA(ED31_MARK, PORT198_FN7),
--	PINMUX_DATA(LCDDCK_MARK, PORT199_FN1),
--	PINMUX_DATA(LCDWR_MARK, PORT199_FN2),
--	PINMUX_DATA(DV_CKO_MARK, PORT199_FN3),
--	PINMUX_DATA(SIUAOSPD_MARK, PORT199_FN4),
--	PINMUX_DATA(LCDRD_MARK, PORT200_FN1),
--	PINMUX_DATA(DACK2_MARK, PORT200_FN2),
--	PINMUX_DATA(MSIOF0L_RSYNC_MARK, PORT200_FN5),
--
--	/* 49-5 (FN) */
--	PINMUX_DATA(LCDHSYN_MARK, PORT201_FN1),
--	PINMUX_DATA(LCDCS_MARK, PORT201_FN2),
--	PINMUX_DATA(LCDCS2_MARK, PORT201_FN3),
--	PINMUX_DATA(DACK3_MARK, PORT201_FN4),
--	PINMUX_DATA(LCDDISP_MARK, PORT202_FN1),
--	PINMUX_DATA(LCDRS_MARK, PORT202_FN2),
--	PINMUX_DATA(DREQ3_MARK, PORT202_FN4),
--	PINMUX_DATA(MSIOF0L_RSCK_MARK, PORT202_FN5),
--	PINMUX_DATA(LCDCSYN_MARK, PORT203_FN1),
--	PINMUX_DATA(LCDCSYN2_MARK, PORT203_FN2),
--	PINMUX_DATA(DV_CKI_MARK, PORT203_FN3),
--	PINMUX_DATA(LCDLCLK_MARK, PORT204_FN1),
--	PINMUX_DATA(DREQ1_MARK, PORT204_FN3),
--	PINMUX_DATA(MSIOF0L_RXD_MARK, PORT204_FN5),
--	PINMUX_DATA(LCDDON_MARK, PORT205_FN1),
--	PINMUX_DATA(LCDDON2_MARK, PORT205_FN2),
--	PINMUX_DATA(DACK1_MARK, PORT205_FN3),
--	PINMUX_DATA(MSIOF0L_TXD_MARK, PORT205_FN5),
--	PINMUX_DATA(VIO_DR0_MARK, PORT206_FN1),
--	PINMUX_DATA(VIO_DR1_MARK, PORT207_FN1),
--	PINMUX_DATA(VIO_DR2_MARK, PORT208_FN1),
--	PINMUX_DATA(VIO_DR3_MARK, PORT209_FN1),
--	PINMUX_DATA(VIO_DR4_MARK, PORT210_FN1),
--	PINMUX_DATA(VIO_DR5_MARK, PORT211_FN1),
--	PINMUX_DATA(VIO_DR6_MARK, PORT212_FN1),
--	PINMUX_DATA(VIO_DR7_MARK, PORT213_FN1),
--	PINMUX_DATA(VIO_VDR_MARK, PORT214_FN1),
--	PINMUX_DATA(VIO_HDR_MARK, PORT215_FN1),
--	PINMUX_DATA(VIO_CLKR_MARK, PORT216_FN1),
--	PINMUX_DATA(VIO_CKOR_MARK, PORT217_FN1),
--	PINMUX_DATA(SCIFA1_TXD_MARK, PORT220_FN2),
--	PINMUX_DATA(GPS_PGFA0_MARK, PORT220_FN3),
--	PINMUX_DATA(SCIFA1_SCK_MARK, PORT221_FN2),
--	PINMUX_DATA(GPS_PGFA1_MARK, PORT221_FN3),
--	PINMUX_DATA(SCIFA1_RTS_MARK, PORT222_FN2),
--	PINMUX_DATA(GPS_EPPSINMON_MARK, PORT222_FN3),
--	PINMUX_DATA(SCIFA1_RXD_MARK, PORT223_FN2),
--	PINMUX_DATA(SCIFA1_CTS_MARK, PORT224_FN2),
--	PINMUX_DATA(MSIOF1_TXD_MARK, PORT225_FN1),
--	PINMUX_DATA(SCIFA1_TXD2_MARK, PORT225_FN2),
--	PINMUX_DATA(GPS_TXD_MARK, PORT225_FN3),
--	PINMUX_DATA(MSIOF1_TSYNC_MARK, PORT226_FN1),
--	PINMUX_DATA(SCIFA1_CTS2_MARK, PORT226_FN2),
--	PINMUX_DATA(I2C_SDA2_MARK, PORT226_FN3),
--	PINMUX_DATA(MSIOF1_TSCK_MARK, PORT227_FN1),
--	PINMUX_DATA(SCIFA1_SCK2_MARK, PORT227_FN2),
--	PINMUX_DATA(MSIOF1_RXD_MARK, PORT228_FN1),
--	PINMUX_DATA(SCIFA1_RXD2_MARK, PORT228_FN2),
--	PINMUX_DATA(GPS_RXD_MARK, PORT228_FN3),
--	PINMUX_DATA(MSIOF1_RSCK_MARK, PORT229_FN1),
--	PINMUX_DATA(SCIFA1_RTS2_MARK, PORT229_FN2),
--	PINMUX_DATA(MSIOF1_RSYNC_MARK, PORT230_FN1),
--	PINMUX_DATA(I2C_SCL2_MARK, PORT230_FN3),
--	PINMUX_DATA(MSIOF1_MCK0_MARK, PORT231_FN1),
--	PINMUX_DATA(MSIOF1_MCK1_MARK, PORT232_FN1),
--	PINMUX_DATA(MSIOF1_SS1_MARK, PORT233_FN1),
--	PINMUX_DATA(EDBGREQ3_MARK, PORT233_FN2),
--	PINMUX_DATA(MSIOF1_SS2_MARK, PORT234_FN1),
--	PINMUX_DATA(PORT236_IROUT_MARK, PORT236_FN1),
--	PINMUX_DATA(IRDA_OUT_MARK, PORT236_FN2),
--	PINMUX_DATA(IRDA_IN_MARK, PORT237_FN2),
--	PINMUX_DATA(IRDA_FIRSEL_MARK, PORT238_FN1),
--	PINMUX_DATA(TPU1TO0_MARK, PORT239_FN3),
--	PINMUX_DATA(TS_SPSYNC3_MARK, PORT239_FN4),
--	PINMUX_DATA(TPU1TO1_MARK, PORT240_FN3),
--	PINMUX_DATA(TS_SDAT3_MARK, PORT240_FN4),
--	PINMUX_DATA(TPU1TO2_MARK, PORT241_FN3),
--	PINMUX_DATA(TS_SDEN3_MARK, PORT241_FN4),
--	PINMUX_DATA(PORT241_MSIOF2_SS1_MARK, PORT241_FN5),
--	PINMUX_DATA(TPU1TO3_MARK, PORT242_FN3),
--	PINMUX_DATA(PORT242_MSIOF2_TSCK_MARK, PORT242_FN5),
--	PINMUX_DATA(M13_BSW_MARK, PORT243_FN2),
--	PINMUX_DATA(PORT243_MSIOF2_TSYNC_MARK, PORT243_FN5),
--	PINMUX_DATA(M14_GSW_MARK, PORT244_FN2),
--	PINMUX_DATA(PORT244_MSIOF2_TXD_MARK, PORT244_FN5),
--	PINMUX_DATA(PORT245_IROUT_MARK, PORT245_FN1),
--	PINMUX_DATA(M15_RSW_MARK, PORT245_FN2),
--	PINMUX_DATA(SOUT3_MARK, PORT246_FN1),
--	PINMUX_DATA(SCIFA2_TXD1_MARK, PORT246_FN2),
--	PINMUX_DATA(SIN3_MARK, PORT247_FN1),
--	PINMUX_DATA(SCIFA2_RXD1_MARK, PORT247_FN2),
--	PINMUX_DATA(XRTS3_MARK, PORT248_FN1),
--	PINMUX_DATA(SCIFA2_RTS1_MARK, PORT248_FN2),
--	PINMUX_DATA(PORT248_MSIOF2_SS2_MARK, PORT248_FN5),
--	PINMUX_DATA(XCTS3_MARK, PORT249_FN1),
--	PINMUX_DATA(SCIFA2_CTS1_MARK, PORT249_FN2),
--	PINMUX_DATA(PORT249_MSIOF2_RXD_MARK, PORT249_FN5),
--	PINMUX_DATA(DINT_MARK, PORT250_FN1),
--	PINMUX_DATA(SCIFA2_SCK1_MARK, PORT250_FN2),
--	PINMUX_DATA(TS_SCK3_MARK, PORT250_FN4),
--	PINMUX_DATA(SDHICLK0_MARK, PORT251_FN1),
--	PINMUX_DATA(TCK2_MARK, PORT251_FN2),
--	PINMUX_DATA(SDHICD0_MARK, PORT252_FN1),
--	PINMUX_DATA(SDHID0_0_MARK, PORT253_FN1),
--	PINMUX_DATA(TMS2_MARK, PORT253_FN2),
--	PINMUX_DATA(SDHID0_1_MARK, PORT254_FN1),
--	PINMUX_DATA(TDO2_MARK, PORT254_FN2),
--	PINMUX_DATA(SDHID0_2_MARK, PORT255_FN1),
--	PINMUX_DATA(TDI2_MARK, PORT255_FN2),
--	PINMUX_DATA(SDHID0_3_MARK, PORT256_FN1),
--	PINMUX_DATA(RTCK2_MARK, PORT256_FN2),
--
--	/* 49-6 (FN) */
--	PINMUX_DATA(SDHICMD0_MARK, PORT257_FN1),
--	PINMUX_DATA(TRST2_MARK, PORT257_FN2),
--	PINMUX_DATA(SDHIWP0_MARK, PORT258_FN1),
--	PINMUX_DATA(EDBGREQ2_MARK, PORT258_FN2),
--	PINMUX_DATA(SDHICLK1_MARK, PORT259_FN1),
--	PINMUX_DATA(TCK3_MARK, PORT259_FN4),
--	PINMUX_DATA(SDHID1_0_MARK, PORT260_FN1),
--	PINMUX_DATA(M11_SLCD_SO2_MARK, PORT260_FN2),
--	PINMUX_DATA(TS_SPSYNC2_MARK, PORT260_FN3),
--	PINMUX_DATA(TMS3_MARK, PORT260_FN4),
--	PINMUX_DATA(SDHID1_1_MARK, PORT261_FN1),
--	PINMUX_DATA(M9_SLCD_AO2_MARK, PORT261_FN2),
--	PINMUX_DATA(TS_SDAT2_MARK, PORT261_FN3),
--	PINMUX_DATA(TDO3_MARK, PORT261_FN4),
--	PINMUX_DATA(SDHID1_2_MARK, PORT262_FN1),
--	PINMUX_DATA(M10_SLCD_CK2_MARK, PORT262_FN2),
--	PINMUX_DATA(TS_SDEN2_MARK, PORT262_FN3),
--	PINMUX_DATA(TDI3_MARK, PORT262_FN4),
--	PINMUX_DATA(SDHID1_3_MARK, PORT263_FN1),
--	PINMUX_DATA(M12_SLCD_CE2_MARK, PORT263_FN2),
--	PINMUX_DATA(TS_SCK2_MARK, PORT263_FN3),
--	PINMUX_DATA(RTCK3_MARK, PORT263_FN4),
--	PINMUX_DATA(SDHICMD1_MARK, PORT264_FN1),
--	PINMUX_DATA(TRST3_MARK, PORT264_FN4),
--	PINMUX_DATA(SDHICLK2_MARK, PORT265_FN1),
--	PINMUX_DATA(SCIFB_SCK_MARK, PORT265_FN2),
--	PINMUX_DATA(SDHID2_0_MARK, PORT266_FN1),
--	PINMUX_DATA(SCIFB_TXD_MARK, PORT266_FN2),
--	PINMUX_DATA(SDHID2_1_MARK, PORT267_FN1),
--	PINMUX_DATA(SCIFB_CTS_MARK, PORT267_FN2),
--	PINMUX_DATA(SDHID2_2_MARK, PORT268_FN1),
--	PINMUX_DATA(SCIFB_RXD_MARK, PORT268_FN2),
--	PINMUX_DATA(SDHID2_3_MARK, PORT269_FN1),
--	PINMUX_DATA(SCIFB_RTS_MARK, PORT269_FN2),
--	PINMUX_DATA(SDHICMD2_MARK, PORT270_FN1),
--	PINMUX_DATA(RESETOUTS_MARK, PORT271_FN1),
--	PINMUX_DATA(DIVLOCK_MARK, PORT272_FN1),
--};
--
--static struct pinmux_gpio pinmux_gpios[] = {
--	/* 49-1 -> 49-6 (GPIO) */
--	GPIO_PORT_ALL(),
--
--	/* Special Pull-up / Pull-down Functions */
--	GPIO_FN(PORT48_KEYIN0_PU), GPIO_FN(PORT49_KEYIN1_PU),
--	GPIO_FN(PORT50_KEYIN2_PU), GPIO_FN(PORT55_KEYIN3_PU),
--	GPIO_FN(PORT56_KEYIN4_PU), GPIO_FN(PORT57_KEYIN5_PU),
--	GPIO_FN(PORT58_KEYIN6_PU),
--
--	/* 49-1 (FN) */
--	GPIO_FN(VBUS0), GPIO_FN(CPORT0), GPIO_FN(CPORT1), GPIO_FN(CPORT2),
--	GPIO_FN(CPORT3), GPIO_FN(CPORT4), GPIO_FN(CPORT5), GPIO_FN(CPORT6),
--	GPIO_FN(CPORT7), GPIO_FN(CPORT8), GPIO_FN(CPORT9), GPIO_FN(CPORT10),
--	GPIO_FN(CPORT11), GPIO_FN(SIN2), GPIO_FN(CPORT12), GPIO_FN(XCTS2),
--	GPIO_FN(CPORT13), GPIO_FN(RFSPO4), GPIO_FN(CPORT14), GPIO_FN(RFSPO5),
--	GPIO_FN(CPORT15), GPIO_FN(CPORT16), GPIO_FN(CPORT17), GPIO_FN(SOUT2),
--	GPIO_FN(CPORT18), GPIO_FN(XRTS2), GPIO_FN(CPORT19), GPIO_FN(CPORT20),
--	GPIO_FN(RFSPO6), GPIO_FN(CPORT21), GPIO_FN(STATUS0), GPIO_FN(CPORT22),
--	GPIO_FN(STATUS1), GPIO_FN(CPORT23), GPIO_FN(STATUS2), GPIO_FN(RFSPO7),
--	GPIO_FN(MPORT0), GPIO_FN(MPORT1), GPIO_FN(B_SYNLD1), GPIO_FN(B_SYNLD2),
--	GPIO_FN(XMAINPS), GPIO_FN(XDIVPS), GPIO_FN(XIDRST), GPIO_FN(IDCLK),
--	GPIO_FN(IDIO), GPIO_FN(SOUT1), GPIO_FN(SCIFA4_TXD),
--	GPIO_FN(M02_BERDAT), GPIO_FN(SIN1), GPIO_FN(SCIFA4_RXD), GPIO_FN(XWUP),
--	GPIO_FN(XRTS1), GPIO_FN(SCIFA4_RTS), GPIO_FN(M03_BERCLK),
--	GPIO_FN(XCTS1), GPIO_FN(SCIFA4_CTS),
--
--	/* 49-2 (FN) */
--	GPIO_FN(HSU_IQ_AGC6), GPIO_FN(MFG2_IN2), GPIO_FN(MSIOF2_MCK0),
--	GPIO_FN(HSU_IQ_AGC5), GPIO_FN(MFG2_IN1), GPIO_FN(MSIOF2_MCK1),
--	GPIO_FN(HSU_IQ_AGC4), GPIO_FN(MSIOF2_RSYNC),
--	GPIO_FN(HSU_IQ_AGC3), GPIO_FN(MFG2_OUT1), GPIO_FN(MSIOF2_RSCK),
--	GPIO_FN(HSU_IQ_AGC2), GPIO_FN(PORT42_KEYOUT0),
--	GPIO_FN(HSU_IQ_AGC1), GPIO_FN(PORT43_KEYOUT1),
--	GPIO_FN(HSU_IQ_AGC0), GPIO_FN(PORT44_KEYOUT2),
--	GPIO_FN(HSU_IQ_AGC_ST), GPIO_FN(PORT45_KEYOUT3),
--	GPIO_FN(HSU_IQ_PDO), GPIO_FN(PORT46_KEYOUT4),
--	GPIO_FN(HSU_IQ_PYO), GPIO_FN(PORT47_KEYOUT5),
--	GPIO_FN(HSU_EN_TXMUX_G3MO), GPIO_FN(PORT48_KEYIN0),
--	GPIO_FN(HSU_I_TXMUX_G3MO), GPIO_FN(PORT49_KEYIN1),
--	GPIO_FN(HSU_Q_TXMUX_G3MO), GPIO_FN(PORT50_KEYIN2),
--	GPIO_FN(HSU_SYO), GPIO_FN(PORT51_MSIOF2_TSYNC),
--	GPIO_FN(HSU_SDO), GPIO_FN(PORT52_MSIOF2_TSCK),
--	GPIO_FN(HSU_TGTTI_G3MO), GPIO_FN(PORT53_MSIOF2_TXD),
--	GPIO_FN(B_TIME_STAMP), GPIO_FN(PORT54_MSIOF2_RXD),
--	GPIO_FN(HSU_SDI), GPIO_FN(PORT55_KEYIN3),
--	GPIO_FN(HSU_SCO), GPIO_FN(PORT56_KEYIN4),
--	GPIO_FN(HSU_DREQ), GPIO_FN(PORT57_KEYIN5),
--	GPIO_FN(HSU_DACK), GPIO_FN(PORT58_KEYIN6),
--	GPIO_FN(HSU_CLK61M), GPIO_FN(PORT59_MSIOF2_SS1),
--	GPIO_FN(HSU_XRST), GPIO_FN(PORT60_MSIOF2_SS2),
--	GPIO_FN(PCMCLKO), GPIO_FN(SYNC8KO), GPIO_FN(DNPCM_A), GPIO_FN(UPPCM_A),
--	GPIO_FN(XTALB1L),
--	GPIO_FN(GPS_AGC1), GPIO_FN(SCIFA0_RTS),
--	GPIO_FN(GPS_AGC2), GPIO_FN(SCIFA0_SCK),
--	GPIO_FN(GPS_AGC3), GPIO_FN(SCIFA0_TXD),
--	GPIO_FN(GPS_AGC4), GPIO_FN(SCIFA0_RXD),
--	GPIO_FN(GPS_PWRD), GPIO_FN(SCIFA0_CTS),
--	GPIO_FN(GPS_IM), GPIO_FN(GPS_IS), GPIO_FN(GPS_QM), GPIO_FN(GPS_QS),
--	GPIO_FN(SIUBOMC), GPIO_FN(TPU2TO0),
--	GPIO_FN(SIUCKB), GPIO_FN(TPU2TO1),
--	GPIO_FN(SIUBOLR), GPIO_FN(BBIF2_TSYNC), GPIO_FN(TPU2TO2),
--	GPIO_FN(SIUBOBT), GPIO_FN(BBIF2_TSCK), GPIO_FN(TPU2TO3),
--	GPIO_FN(SIUBOSLD), GPIO_FN(BBIF2_TXD), GPIO_FN(TPU3TO0),
--	GPIO_FN(SIUBILR), GPIO_FN(TPU3TO1),
--	GPIO_FN(SIUBIBT), GPIO_FN(TPU3TO2),
--	GPIO_FN(SIUBISLD), GPIO_FN(TPU3TO3),
--	GPIO_FN(NMI), GPIO_FN(TPU4TO0),
--	GPIO_FN(DNPCM_M), GPIO_FN(TPU4TO1), GPIO_FN(TPU4TO2), GPIO_FN(TPU4TO3),
--	GPIO_FN(IRQ_TMPB),
--	GPIO_FN(PWEN), GPIO_FN(MFG1_OUT1),
--	GPIO_FN(OVCN), GPIO_FN(MFG1_IN1),
--	GPIO_FN(OVCN2), GPIO_FN(MFG1_IN2),
--
--	/* 49-3 (FN) */
--	GPIO_FN(RFSPO1), GPIO_FN(RFSPO2), GPIO_FN(RFSPO3),
--	GPIO_FN(PORT93_VIO_CKO2),
--	GPIO_FN(USBTERM), GPIO_FN(EXTLP), GPIO_FN(IDIN),
--	GPIO_FN(SCIFA5_CTS), GPIO_FN(MFG0_IN1),
--	GPIO_FN(SCIFA5_RTS), GPIO_FN(MFG0_IN2),
--	GPIO_FN(SCIFA5_RXD),
--	GPIO_FN(SCIFA5_TXD),
--	GPIO_FN(SCIFA5_SCK), GPIO_FN(MFG0_OUT1),
--	GPIO_FN(A0_EA0), GPIO_FN(BS),
--	GPIO_FN(A14_EA14), GPIO_FN(PORT102_KEYOUT0),
--	GPIO_FN(A15_EA15), GPIO_FN(PORT103_KEYOUT1), GPIO_FN(DV_CLKOL),
--	GPIO_FN(A16_EA16), GPIO_FN(PORT104_KEYOUT2),
--	GPIO_FN(DV_VSYNCL), GPIO_FN(MSIOF0_SS1),
--	GPIO_FN(A17_EA17), GPIO_FN(PORT105_KEYOUT3),
--	GPIO_FN(DV_HSYNCL), GPIO_FN(MSIOF0_TSYNC),
--	GPIO_FN(A18_EA18), GPIO_FN(PORT106_KEYOUT4),
--	GPIO_FN(DV_DL0), GPIO_FN(MSIOF0_TSCK),
--	GPIO_FN(A19_EA19), GPIO_FN(PORT107_KEYOUT5),
--	GPIO_FN(DV_DL1), GPIO_FN(MSIOF0_TXD),
--	GPIO_FN(A20_EA20), GPIO_FN(PORT108_KEYIN0),
--	GPIO_FN(DV_DL2), GPIO_FN(MSIOF0_RSCK),
--	GPIO_FN(A21_EA21), GPIO_FN(PORT109_KEYIN1),
--	GPIO_FN(DV_DL3), GPIO_FN(MSIOF0_RSYNC),
--	GPIO_FN(A22_EA22), GPIO_FN(PORT110_KEYIN2),
--	GPIO_FN(DV_DL4), GPIO_FN(MSIOF0_MCK0),
--	GPIO_FN(A23_EA23), GPIO_FN(PORT111_KEYIN3),
--	GPIO_FN(DV_DL5), GPIO_FN(MSIOF0_MCK1),
--	GPIO_FN(A24_EA24), GPIO_FN(PORT112_KEYIN4),
--	GPIO_FN(DV_DL6), GPIO_FN(MSIOF0_RXD),
--	GPIO_FN(A25_EA25), GPIO_FN(PORT113_KEYIN5),
--	GPIO_FN(DV_DL7), GPIO_FN(MSIOF0_SS2),
--	GPIO_FN(A26), GPIO_FN(PORT113_KEYIN6), GPIO_FN(DV_CLKIL),
--	GPIO_FN(D0_ED0_NAF0), GPIO_FN(D1_ED1_NAF1), GPIO_FN(D2_ED2_NAF2),
--	GPIO_FN(D3_ED3_NAF3), GPIO_FN(D4_ED4_NAF4), GPIO_FN(D5_ED5_NAF5),
--	GPIO_FN(D6_ED6_NAF6), GPIO_FN(D7_ED7_NAF7), GPIO_FN(D8_ED8_NAF8),
--	GPIO_FN(D9_ED9_NAF9), GPIO_FN(D10_ED10_NAF10), GPIO_FN(D11_ED11_NAF11),
--	GPIO_FN(D12_ED12_NAF12), GPIO_FN(D13_ED13_NAF13),
--	GPIO_FN(D14_ED14_NAF14), GPIO_FN(D15_ED15_NAF15),
--	GPIO_FN(CS4), GPIO_FN(CS5A), GPIO_FN(CS5B), GPIO_FN(FCE1),
--	GPIO_FN(CS6B), GPIO_FN(XCS2), GPIO_FN(FCE0), GPIO_FN(CS6A),
--	GPIO_FN(DACK0), GPIO_FN(WAIT), GPIO_FN(DREQ0), GPIO_FN(RD_XRD),
--	GPIO_FN(A27), GPIO_FN(RDWR_XWE), GPIO_FN(WE0_XWR0_FWE),
--	GPIO_FN(WE1_XWR1), GPIO_FN(FRB), GPIO_FN(CKO),
--	GPIO_FN(NBRSTOUT), GPIO_FN(NBRST),
--
--	/* 49-4 (FN) */
--	GPIO_FN(RFSPO0), GPIO_FN(PORT146_VIO_CKO2), GPIO_FN(TSTMD),
--	GPIO_FN(VIO_VD), GPIO_FN(VIO_HD),
--	GPIO_FN(VIO_D0), GPIO_FN(VIO_D1), GPIO_FN(VIO_D2),
--	GPIO_FN(VIO_D3), GPIO_FN(VIO_D4), GPIO_FN(VIO_D5),
--	GPIO_FN(VIO_D6), GPIO_FN(VIO_D7), GPIO_FN(VIO_D8),
--	GPIO_FN(VIO_D9), GPIO_FN(VIO_D10), GPIO_FN(VIO_D11),
--	GPIO_FN(VIO_D12), GPIO_FN(VIO_D13), GPIO_FN(VIO_D14),
--	GPIO_FN(VIO_D15), GPIO_FN(VIO_CLK), GPIO_FN(VIO_FIELD),
--	GPIO_FN(VIO_CKO),
--	GPIO_FN(MFG3_IN1), GPIO_FN(MFG3_IN2),
--	GPIO_FN(M9_SLCD_A01), GPIO_FN(MFG3_OUT1), GPIO_FN(TPU0TO0),
--	GPIO_FN(M10_SLCD_CK1), GPIO_FN(MFG4_IN1), GPIO_FN(TPU0TO1),
--	GPIO_FN(M11_SLCD_SO1), GPIO_FN(MFG4_IN2), GPIO_FN(TPU0TO2),
--	GPIO_FN(M12_SLCD_CE1), GPIO_FN(MFG4_OUT1), GPIO_FN(TPU0TO3),
--	GPIO_FN(LCDD0), GPIO_FN(PORT175_KEYOUT0), GPIO_FN(DV_D0),
--	GPIO_FN(SIUCKA), GPIO_FN(MFG0_OUT2),
--	GPIO_FN(LCDD1), GPIO_FN(PORT176_KEYOUT1), GPIO_FN(DV_D1),
--	GPIO_FN(SIUAOLR), GPIO_FN(BBIF2_TSYNC1),
--	GPIO_FN(LCDD2), GPIO_FN(PORT177_KEYOUT2), GPIO_FN(DV_D2),
--	GPIO_FN(SIUAOBT), GPIO_FN(BBIF2_TSCK1),
--	GPIO_FN(LCDD3), GPIO_FN(PORT178_KEYOUT3), GPIO_FN(DV_D3),
--	GPIO_FN(SIUAOSLD), GPIO_FN(BBIF2_TXD1),
--	GPIO_FN(LCDD4), GPIO_FN(PORT179_KEYOUT4), GPIO_FN(DV_D4),
--	GPIO_FN(SIUAISPD), GPIO_FN(MFG1_OUT2),
--	GPIO_FN(LCDD5), GPIO_FN(PORT180_KEYOUT5), GPIO_FN(DV_D5),
--	GPIO_FN(SIUAILR), GPIO_FN(MFG2_OUT2),
--	GPIO_FN(LCDD6), GPIO_FN(DV_D6),
--	GPIO_FN(SIUAIBT), GPIO_FN(MFG3_OUT2), GPIO_FN(XWR2),
--	GPIO_FN(LCDD7), GPIO_FN(DV_D7),
--	GPIO_FN(SIUAISLD), GPIO_FN(MFG4_OUT2), GPIO_FN(XWR3),
--	GPIO_FN(LCDD8), GPIO_FN(DV_D8), GPIO_FN(D16), GPIO_FN(ED16),
--	GPIO_FN(LCDD9), GPIO_FN(DV_D9), GPIO_FN(D17), GPIO_FN(ED17),
--	GPIO_FN(LCDD10), GPIO_FN(DV_D10), GPIO_FN(D18), GPIO_FN(ED18),
--	GPIO_FN(LCDD11), GPIO_FN(DV_D11), GPIO_FN(D19), GPIO_FN(ED19),
--	GPIO_FN(LCDD12), GPIO_FN(DV_D12), GPIO_FN(D20), GPIO_FN(ED20),
--	GPIO_FN(LCDD13), GPIO_FN(DV_D13), GPIO_FN(D21), GPIO_FN(ED21),
--	GPIO_FN(LCDD14), GPIO_FN(DV_D14), GPIO_FN(D22), GPIO_FN(ED22),
--	GPIO_FN(LCDD15), GPIO_FN(DV_D15), GPIO_FN(D23), GPIO_FN(ED23),
--	GPIO_FN(LCDD16), GPIO_FN(DV_HSYNC), GPIO_FN(D24), GPIO_FN(ED24),
--	GPIO_FN(LCDD17), GPIO_FN(DV_VSYNC), GPIO_FN(D25), GPIO_FN(ED25),
--	GPIO_FN(LCDD18), GPIO_FN(DREQ2), GPIO_FN(MSIOF0L_TSCK),
--	GPIO_FN(D26), GPIO_FN(ED26),
--	GPIO_FN(LCDD19), GPIO_FN(MSIOF0L_TSYNC),
--	GPIO_FN(D27), GPIO_FN(ED27),
--	GPIO_FN(LCDD20), GPIO_FN(TS_SPSYNC1), GPIO_FN(MSIOF0L_MCK0),
--	GPIO_FN(D28), GPIO_FN(ED28),
--	GPIO_FN(LCDD21), GPIO_FN(TS_SDAT1), GPIO_FN(MSIOF0L_MCK1),
--	GPIO_FN(D29), GPIO_FN(ED29),
--	GPIO_FN(LCDD22), GPIO_FN(TS_SDEN1), GPIO_FN(MSIOF0L_SS1),
--	GPIO_FN(D30), GPIO_FN(ED30),
--	GPIO_FN(LCDD23), GPIO_FN(TS_SCK1), GPIO_FN(MSIOF0L_SS2),
--	GPIO_FN(D31), GPIO_FN(ED31),
--	GPIO_FN(LCDDCK), GPIO_FN(LCDWR), GPIO_FN(DV_CKO), GPIO_FN(SIUAOSPD),
--	GPIO_FN(LCDRD), GPIO_FN(DACK2), GPIO_FN(MSIOF0L_RSYNC),
--
--	/* 49-5 (FN) */
--	GPIO_FN(LCDHSYN), GPIO_FN(LCDCS), GPIO_FN(LCDCS2), GPIO_FN(DACK3),
--	GPIO_FN(LCDDISP), GPIO_FN(LCDRS), GPIO_FN(DREQ3), GPIO_FN(MSIOF0L_RSCK),
--	GPIO_FN(LCDCSYN), GPIO_FN(LCDCSYN2), GPIO_FN(DV_CKI),
--	GPIO_FN(LCDLCLK), GPIO_FN(DREQ1), GPIO_FN(MSIOF0L_RXD),
--	GPIO_FN(LCDDON), GPIO_FN(LCDDON2), GPIO_FN(DACK1), GPIO_FN(MSIOF0L_TXD),
--	GPIO_FN(VIO_DR0), GPIO_FN(VIO_DR1), GPIO_FN(VIO_DR2), GPIO_FN(VIO_DR3),
--	GPIO_FN(VIO_DR4), GPIO_FN(VIO_DR5), GPIO_FN(VIO_DR6), GPIO_FN(VIO_DR7),
--	GPIO_FN(VIO_VDR), GPIO_FN(VIO_HDR),
--	GPIO_FN(VIO_CLKR), GPIO_FN(VIO_CKOR),
--	GPIO_FN(SCIFA1_TXD), GPIO_FN(GPS_PGFA0),
--	GPIO_FN(SCIFA1_SCK), GPIO_FN(GPS_PGFA1),
--	GPIO_FN(SCIFA1_RTS), GPIO_FN(GPS_EPPSINMON),
--	GPIO_FN(SCIFA1_RXD), GPIO_FN(SCIFA1_CTS),
--	GPIO_FN(MSIOF1_TXD), GPIO_FN(SCIFA1_TXD2), GPIO_FN(GPS_TXD),
--	GPIO_FN(MSIOF1_TSYNC), GPIO_FN(SCIFA1_CTS2), GPIO_FN(I2C_SDA2),
--	GPIO_FN(MSIOF1_TSCK), GPIO_FN(SCIFA1_SCK2),
--	GPIO_FN(MSIOF1_RXD), GPIO_FN(SCIFA1_RXD2), GPIO_FN(GPS_RXD),
--	GPIO_FN(MSIOF1_RSCK), GPIO_FN(SCIFA1_RTS2),
--	GPIO_FN(MSIOF1_RSYNC), GPIO_FN(I2C_SCL2),
--	GPIO_FN(MSIOF1_MCK0), GPIO_FN(MSIOF1_MCK1),
--	GPIO_FN(MSIOF1_SS1), GPIO_FN(EDBGREQ3),
--	GPIO_FN(MSIOF1_SS2),
--	GPIO_FN(PORT236_IROUT), GPIO_FN(IRDA_OUT),
--	GPIO_FN(IRDA_IN), GPIO_FN(IRDA_FIRSEL),
--	GPIO_FN(TPU1TO0), GPIO_FN(TS_SPSYNC3),
--	GPIO_FN(TPU1TO1), GPIO_FN(TS_SDAT3),
--	GPIO_FN(TPU1TO2), GPIO_FN(TS_SDEN3), GPIO_FN(PORT241_MSIOF2_SS1),
--	GPIO_FN(TPU1TO3), GPIO_FN(PORT242_MSIOF2_TSCK),
--	GPIO_FN(M13_BSW), GPIO_FN(PORT243_MSIOF2_TSYNC),
--	GPIO_FN(M14_GSW), GPIO_FN(PORT244_MSIOF2_TXD),
--	GPIO_FN(PORT245_IROUT), GPIO_FN(M15_RSW),
--	GPIO_FN(SOUT3), GPIO_FN(SCIFA2_TXD1),
--	GPIO_FN(SIN3), GPIO_FN(SCIFA2_RXD1),
--	GPIO_FN(XRTS3), GPIO_FN(SCIFA2_RTS1), GPIO_FN(PORT248_MSIOF2_SS2),
--	GPIO_FN(XCTS3), GPIO_FN(SCIFA2_CTS1), GPIO_FN(PORT249_MSIOF2_RXD),
--	GPIO_FN(DINT), GPIO_FN(SCIFA2_SCK1), GPIO_FN(TS_SCK3),
--	GPIO_FN(SDHICLK0), GPIO_FN(TCK2),
--	GPIO_FN(SDHICD0),
--	GPIO_FN(SDHID0_0), GPIO_FN(TMS2),
--	GPIO_FN(SDHID0_1), GPIO_FN(TDO2),
--	GPIO_FN(SDHID0_2), GPIO_FN(TDI2),
--	GPIO_FN(SDHID0_3), GPIO_FN(RTCK2),
--
--	/* 49-6 (FN) */
--	GPIO_FN(SDHICMD0), GPIO_FN(TRST2),
--	GPIO_FN(SDHIWP0), GPIO_FN(EDBGREQ2),
--	GPIO_FN(SDHICLK1), GPIO_FN(TCK3),
--	GPIO_FN(SDHID1_0), GPIO_FN(M11_SLCD_SO2),
--	GPIO_FN(TS_SPSYNC2), GPIO_FN(TMS3),
--	GPIO_FN(SDHID1_1), GPIO_FN(M9_SLCD_AO2),
--	GPIO_FN(TS_SDAT2), GPIO_FN(TDO3),
--	GPIO_FN(SDHID1_2), GPIO_FN(M10_SLCD_CK2),
--	GPIO_FN(TS_SDEN2), GPIO_FN(TDI3),
--	GPIO_FN(SDHID1_3), GPIO_FN(M12_SLCD_CE2),
--	GPIO_FN(TS_SCK2), GPIO_FN(RTCK3),
--	GPIO_FN(SDHICMD1), GPIO_FN(TRST3),
--	GPIO_FN(SDHICLK2), GPIO_FN(SCIFB_SCK),
--	GPIO_FN(SDHID2_0), GPIO_FN(SCIFB_TXD),
--	GPIO_FN(SDHID2_1), GPIO_FN(SCIFB_CTS),
--	GPIO_FN(SDHID2_2), GPIO_FN(SCIFB_RXD),
--	GPIO_FN(SDHID2_3), GPIO_FN(SCIFB_RTS),
--	GPIO_FN(SDHICMD2),
--	GPIO_FN(RESETOUTS),
--	GPIO_FN(DIVLOCK),
--};
--
--static struct pinmux_cfg_reg pinmux_config_regs[] = {
--	PORTCR(0, 0xe6050000), /* PORT0CR */
--	PORTCR(1, 0xe6050001), /* PORT1CR */
--	PORTCR(2, 0xe6050002), /* PORT2CR */
--	PORTCR(3, 0xe6050003), /* PORT3CR */
--	PORTCR(4, 0xe6050004), /* PORT4CR */
--	PORTCR(5, 0xe6050005), /* PORT5CR */
--	PORTCR(6, 0xe6050006), /* PORT6CR */
--	PORTCR(7, 0xe6050007), /* PORT7CR */
--	PORTCR(8, 0xe6050008), /* PORT8CR */
--	PORTCR(9, 0xe6050009), /* PORT9CR */
--
--	PORTCR(10, 0xe605000a), /* PORT10CR */
--	PORTCR(11, 0xe605000b), /* PORT11CR */
--	PORTCR(12, 0xe605000c), /* PORT12CR */
--	PORTCR(13, 0xe605000d), /* PORT13CR */
--	PORTCR(14, 0xe605000e), /* PORT14CR */
--	PORTCR(15, 0xe605000f), /* PORT15CR */
--	PORTCR(16, 0xe6050010), /* PORT16CR */
--	PORTCR(17, 0xe6050011), /* PORT17CR */
--	PORTCR(18, 0xe6050012), /* PORT18CR */
--	PORTCR(19, 0xe6050013), /* PORT19CR */
--
--	PORTCR(20, 0xe6050014), /* PORT20CR */
--	PORTCR(21, 0xe6050015), /* PORT21CR */
--	PORTCR(22, 0xe6050016), /* PORT22CR */
--	PORTCR(23, 0xe6050017), /* PORT23CR */
--	PORTCR(24, 0xe6050018), /* PORT24CR */
--	PORTCR(25, 0xe6050019), /* PORT25CR */
--	PORTCR(26, 0xe605001a), /* PORT26CR */
--	PORTCR(27, 0xe605001b), /* PORT27CR */
--	PORTCR(28, 0xe605001c), /* PORT28CR */
--	PORTCR(29, 0xe605001d), /* PORT29CR */
--
--	PORTCR(30, 0xe605001e), /* PORT30CR */
--	PORTCR(31, 0xe605001f), /* PORT31CR */
--	PORTCR(32, 0xe6050020), /* PORT32CR */
--	PORTCR(33, 0xe6050021), /* PORT33CR */
--	PORTCR(34, 0xe6050022), /* PORT34CR */
--	PORTCR(35, 0xe6050023), /* PORT35CR */
--	PORTCR(36, 0xe6050024), /* PORT36CR */
--	PORTCR(37, 0xe6050025), /* PORT37CR */
--	PORTCR(38, 0xe6050026), /* PORT38CR */
--	PORTCR(39, 0xe6050027), /* PORT39CR */
--
--	PORTCR(40, 0xe6050028), /* PORT40CR */
--	PORTCR(41, 0xe6050029), /* PORT41CR */
--	PORTCR(42, 0xe605002a), /* PORT42CR */
--	PORTCR(43, 0xe605002b), /* PORT43CR */
--	PORTCR(44, 0xe605002c), /* PORT44CR */
--	PORTCR(45, 0xe605002d), /* PORT45CR */
--	PORTCR(46, 0xe605002e), /* PORT46CR */
--	PORTCR(47, 0xe605002f), /* PORT47CR */
--	PORTCR(48, 0xe6050030), /* PORT48CR */
--	PORTCR(49, 0xe6050031), /* PORT49CR */
--
--	PORTCR(50, 0xe6050032), /* PORT50CR */
--	PORTCR(51, 0xe6050033), /* PORT51CR */
--	PORTCR(52, 0xe6050034), /* PORT52CR */
--	PORTCR(53, 0xe6050035), /* PORT53CR */
--	PORTCR(54, 0xe6050036), /* PORT54CR */
--	PORTCR(55, 0xe6050037), /* PORT55CR */
--	PORTCR(56, 0xe6050038), /* PORT56CR */
--	PORTCR(57, 0xe6050039), /* PORT57CR */
--	PORTCR(58, 0xe605003a), /* PORT58CR */
--	PORTCR(59, 0xe605003b), /* PORT59CR */
--
--	PORTCR(60, 0xe605003c), /* PORT60CR */
--	PORTCR(61, 0xe605003d), /* PORT61CR */
--	PORTCR(62, 0xe605003e), /* PORT62CR */
--	PORTCR(63, 0xe605003f), /* PORT63CR */
--	PORTCR(64, 0xe6050040), /* PORT64CR */
--	PORTCR(65, 0xe6050041), /* PORT65CR */
--	PORTCR(66, 0xe6050042), /* PORT66CR */
--	PORTCR(67, 0xe6050043), /* PORT67CR */
--	PORTCR(68, 0xe6050044), /* PORT68CR */
--	PORTCR(69, 0xe6050045), /* PORT69CR */
--
--	PORTCR(70, 0xe6050046), /* PORT70CR */
--	PORTCR(71, 0xe6050047), /* PORT71CR */
--	PORTCR(72, 0xe6050048), /* PORT72CR */
--	PORTCR(73, 0xe6050049), /* PORT73CR */
--	PORTCR(74, 0xe605004a), /* PORT74CR */
--	PORTCR(75, 0xe605004b), /* PORT75CR */
--	PORTCR(76, 0xe605004c), /* PORT76CR */
--	PORTCR(77, 0xe605004d), /* PORT77CR */
--	PORTCR(78, 0xe605004e), /* PORT78CR */
--	PORTCR(79, 0xe605004f), /* PORT79CR */
--
--	PORTCR(80, 0xe6050050), /* PORT80CR */
--	PORTCR(81, 0xe6050051), /* PORT81CR */
--	PORTCR(82, 0xe6050052), /* PORT82CR */
--	PORTCR(83, 0xe6050053), /* PORT83CR */
--	PORTCR(84, 0xe6050054), /* PORT84CR */
--	PORTCR(85, 0xe6050055), /* PORT85CR */
--	PORTCR(86, 0xe6050056), /* PORT86CR */
--	PORTCR(87, 0xe6050057), /* PORT87CR */
--	PORTCR(88, 0xe6051058), /* PORT88CR */
--	PORTCR(89, 0xe6051059), /* PORT89CR */
--
--	PORTCR(90, 0xe605105a), /* PORT90CR */
--	PORTCR(91, 0xe605105b), /* PORT91CR */
--	PORTCR(92, 0xe605105c), /* PORT92CR */
--	PORTCR(93, 0xe605105d), /* PORT93CR */
--	PORTCR(94, 0xe605105e), /* PORT94CR */
--	PORTCR(95, 0xe605105f), /* PORT95CR */
--	PORTCR(96, 0xe6051060), /* PORT96CR */
--	PORTCR(97, 0xe6051061), /* PORT97CR */
--	PORTCR(98, 0xe6051062), /* PORT98CR */
--	PORTCR(99, 0xe6051063), /* PORT99CR */
--
--	PORTCR(100, 0xe6051064), /* PORT100CR */
--	PORTCR(101, 0xe6051065), /* PORT101CR */
--	PORTCR(102, 0xe6051066), /* PORT102CR */
--	PORTCR(103, 0xe6051067), /* PORT103CR */
--	PORTCR(104, 0xe6051068), /* PORT104CR */
--	PORTCR(105, 0xe6051069), /* PORT105CR */
--	PORTCR(106, 0xe605106a), /* PORT106CR */
--	PORTCR(107, 0xe605106b), /* PORT107CR */
--	PORTCR(108, 0xe605106c), /* PORT108CR */
--	PORTCR(109, 0xe605106d), /* PORT109CR */
--
--	PORTCR(110, 0xe605106e), /* PORT110CR */
--	PORTCR(111, 0xe605106f), /* PORT111CR */
--	PORTCR(112, 0xe6051070), /* PORT112CR */
--	PORTCR(113, 0xe6051071), /* PORT113CR */
--	PORTCR(114, 0xe6051072), /* PORT114CR */
--	PORTCR(115, 0xe6051073), /* PORT115CR */
--	PORTCR(116, 0xe6051074), /* PORT116CR */
--	PORTCR(117, 0xe6051075), /* PORT117CR */
--	PORTCR(118, 0xe6051076), /* PORT118CR */
--	PORTCR(119, 0xe6051077), /* PORT119CR */
--
--	PORTCR(120, 0xe6051078), /* PORT120CR */
--	PORTCR(121, 0xe6051079), /* PORT121CR */
--	PORTCR(122, 0xe605107a), /* PORT122CR */
--	PORTCR(123, 0xe605107b), /* PORT123CR */
--	PORTCR(124, 0xe605107c), /* PORT124CR */
--	PORTCR(125, 0xe605107d), /* PORT125CR */
--	PORTCR(126, 0xe605107e), /* PORT126CR */
--	PORTCR(127, 0xe605107f), /* PORT127CR */
--	PORTCR(128, 0xe6051080), /* PORT128CR */
--	PORTCR(129, 0xe6051081), /* PORT129CR */
--
--	PORTCR(130, 0xe6051082), /* PORT130CR */
--	PORTCR(131, 0xe6051083), /* PORT131CR */
--	PORTCR(132, 0xe6051084), /* PORT132CR */
--	PORTCR(133, 0xe6051085), /* PORT133CR */
--	PORTCR(134, 0xe6051086), /* PORT134CR */
--	PORTCR(135, 0xe6051087), /* PORT135CR */
--	PORTCR(136, 0xe6051088), /* PORT136CR */
--	PORTCR(137, 0xe6051089), /* PORT137CR */
--	PORTCR(138, 0xe605108a), /* PORT138CR */
--	PORTCR(139, 0xe605108b), /* PORT139CR */
--
--	PORTCR(140, 0xe605108c), /* PORT140CR */
--	PORTCR(141, 0xe605108d), /* PORT141CR */
--	PORTCR(142, 0xe605108e), /* PORT142CR */
--	PORTCR(143, 0xe605108f), /* PORT143CR */
--	PORTCR(144, 0xe6051090), /* PORT144CR */
--	PORTCR(145, 0xe6051091), /* PORT145CR */
--	PORTCR(146, 0xe6051092), /* PORT146CR */
--	PORTCR(147, 0xe6051093), /* PORT147CR */
--	PORTCR(148, 0xe6051094), /* PORT148CR */
--	PORTCR(149, 0xe6051095), /* PORT149CR */
--
--	PORTCR(150, 0xe6051096), /* PORT150CR */
--	PORTCR(151, 0xe6051097), /* PORT151CR */
--	PORTCR(152, 0xe6051098), /* PORT152CR */
--	PORTCR(153, 0xe6051099), /* PORT153CR */
--	PORTCR(154, 0xe605109a), /* PORT154CR */
--	PORTCR(155, 0xe605109b), /* PORT155CR */
--	PORTCR(156, 0xe605109c), /* PORT156CR */
--	PORTCR(157, 0xe605109d), /* PORT157CR */
--	PORTCR(158, 0xe605109e), /* PORT158CR */
--	PORTCR(159, 0xe605109f), /* PORT159CR */
--
--	PORTCR(160, 0xe60510a0), /* PORT160CR */
--	PORTCR(161, 0xe60510a1), /* PORT161CR */
--	PORTCR(162, 0xe60510a2), /* PORT162CR */
--	PORTCR(163, 0xe60510a3), /* PORT163CR */
--	PORTCR(164, 0xe60510a4), /* PORT164CR */
--	PORTCR(165, 0xe60510a5), /* PORT165CR */
--	PORTCR(166, 0xe60510a6), /* PORT166CR */
--	PORTCR(167, 0xe60510a7), /* PORT167CR */
--	PORTCR(168, 0xe60510a8), /* PORT168CR */
--	PORTCR(169, 0xe60510a9), /* PORT169CR */
--
--	PORTCR(170, 0xe60510aa), /* PORT170CR */
--	PORTCR(171, 0xe60510ab), /* PORT171CR */
--	PORTCR(172, 0xe60510ac), /* PORT172CR */
--	PORTCR(173, 0xe60510ad), /* PORT173CR */
--	PORTCR(174, 0xe60510ae), /* PORT174CR */
--	PORTCR(175, 0xe60520af), /* PORT175CR */
--	PORTCR(176, 0xe60520b0), /* PORT176CR */
--	PORTCR(177, 0xe60520b1), /* PORT177CR */
--	PORTCR(178, 0xe60520b2), /* PORT178CR */
--	PORTCR(179, 0xe60520b3), /* PORT179CR */
--
--	PORTCR(180, 0xe60520b4), /* PORT180CR */
--	PORTCR(181, 0xe60520b5), /* PORT181CR */
--	PORTCR(182, 0xe60520b6), /* PORT182CR */
--	PORTCR(183, 0xe60520b7), /* PORT183CR */
--	PORTCR(184, 0xe60520b8), /* PORT184CR */
--	PORTCR(185, 0xe60520b9), /* PORT185CR */
--	PORTCR(186, 0xe60520ba), /* PORT186CR */
--	PORTCR(187, 0xe60520bb), /* PORT187CR */
--	PORTCR(188, 0xe60520bc), /* PORT188CR */
--	PORTCR(189, 0xe60520bd), /* PORT189CR */
--
--	PORTCR(190, 0xe60520be), /* PORT190CR */
--	PORTCR(191, 0xe60520bf), /* PORT191CR */
--	PORTCR(192, 0xe60520c0), /* PORT192CR */
--	PORTCR(193, 0xe60520c1), /* PORT193CR */
--	PORTCR(194, 0xe60520c2), /* PORT194CR */
--	PORTCR(195, 0xe60520c3), /* PORT195CR */
--	PORTCR(196, 0xe60520c4), /* PORT196CR */
--	PORTCR(197, 0xe60520c5), /* PORT197CR */
--	PORTCR(198, 0xe60520c6), /* PORT198CR */
--	PORTCR(199, 0xe60520c7), /* PORT199CR */
--
--	PORTCR(200, 0xe60520c8), /* PORT200CR */
--	PORTCR(201, 0xe60520c9), /* PORT201CR */
--	PORTCR(202, 0xe60520ca), /* PORT202CR */
--	PORTCR(203, 0xe60520cb), /* PORT203CR */
--	PORTCR(204, 0xe60520cc), /* PORT204CR */
--	PORTCR(205, 0xe60520cd), /* PORT205CR */
--	PORTCR(206, 0xe60520ce), /* PORT206CR */
--	PORTCR(207, 0xe60520cf), /* PORT207CR */
--	PORTCR(208, 0xe60520d0), /* PORT208CR */
--	PORTCR(209, 0xe60520d1), /* PORT209CR */
--
--	PORTCR(210, 0xe60520d2), /* PORT210CR */
--	PORTCR(211, 0xe60520d3), /* PORT211CR */
--	PORTCR(212, 0xe60520d4), /* PORT212CR */
--	PORTCR(213, 0xe60520d5), /* PORT213CR */
--	PORTCR(214, 0xe60520d6), /* PORT214CR */
--	PORTCR(215, 0xe60520d7), /* PORT215CR */
--	PORTCR(216, 0xe60520d8), /* PORT216CR */
--	PORTCR(217, 0xe60520d9), /* PORT217CR */
--	PORTCR(218, 0xe60520da), /* PORT218CR */
--	PORTCR(219, 0xe60520db), /* PORT219CR */
--
--	PORTCR(220, 0xe60520dc), /* PORT220CR */
--	PORTCR(221, 0xe60520dd), /* PORT221CR */
--	PORTCR(222, 0xe60520de), /* PORT222CR */
--	PORTCR(223, 0xe60520df), /* PORT223CR */
--	PORTCR(224, 0xe60520e0), /* PORT224CR */
--	PORTCR(225, 0xe60520e1), /* PORT225CR */
--	PORTCR(226, 0xe60520e2), /* PORT226CR */
--	PORTCR(227, 0xe60520e3), /* PORT227CR */
--	PORTCR(228, 0xe60520e4), /* PORT228CR */
--	PORTCR(229, 0xe60520e5), /* PORT229CR */
--
--	PORTCR(230, 0xe60520e6), /* PORT230CR */
--	PORTCR(231, 0xe60520e7), /* PORT231CR */
--	PORTCR(232, 0xe60520e8), /* PORT232CR */
--	PORTCR(233, 0xe60520e9), /* PORT233CR */
--	PORTCR(234, 0xe60520ea), /* PORT234CR */
--	PORTCR(235, 0xe60520eb), /* PORT235CR */
--	PORTCR(236, 0xe60530ec), /* PORT236CR */
--	PORTCR(237, 0xe60530ed), /* PORT237CR */
--	PORTCR(238, 0xe60530ee), /* PORT238CR */
--	PORTCR(239, 0xe60530ef), /* PORT239CR */
--
--	PORTCR(240, 0xe60530f0), /* PORT240CR */
--	PORTCR(241, 0xe60530f1), /* PORT241CR */
--	PORTCR(242, 0xe60530f2), /* PORT242CR */
--	PORTCR(243, 0xe60530f3), /* PORT243CR */
--	PORTCR(244, 0xe60530f4), /* PORT244CR */
--	PORTCR(245, 0xe60530f5), /* PORT245CR */
--	PORTCR(246, 0xe60530f6), /* PORT246CR */
--	PORTCR(247, 0xe60530f7), /* PORT247CR */
--	PORTCR(248, 0xe60530f8), /* PORT248CR */
--	PORTCR(249, 0xe60530f9), /* PORT249CR */
--
--	PORTCR(250, 0xe60530fa), /* PORT250CR */
--	PORTCR(251, 0xe60530fb), /* PORT251CR */
--	PORTCR(252, 0xe60530fc), /* PORT252CR */
--	PORTCR(253, 0xe60530fd), /* PORT253CR */
--	PORTCR(254, 0xe60530fe), /* PORT254CR */
--	PORTCR(255, 0xe60530ff), /* PORT255CR */
--	PORTCR(256, 0xe6053100), /* PORT256CR */
--	PORTCR(257, 0xe6053101), /* PORT257CR */
--	PORTCR(258, 0xe6053102), /* PORT258CR */
--	PORTCR(259, 0xe6053103), /* PORT259CR */
--
--	PORTCR(260, 0xe6053104), /* PORT260CR */
--	PORTCR(261, 0xe6053105), /* PORT261CR */
--	PORTCR(262, 0xe6053106), /* PORT262CR */
--	PORTCR(263, 0xe6053107), /* PORT263CR */
--	PORTCR(264, 0xe6053108), /* PORT264CR */
--	PORTCR(265, 0xe6053109), /* PORT265CR */
--	PORTCR(266, 0xe605310a), /* PORT266CR */
--	PORTCR(267, 0xe605310b), /* PORT267CR */
--	PORTCR(268, 0xe605310c), /* PORT268CR */
--	PORTCR(269, 0xe605310d), /* PORT269CR */
--
--	PORTCR(270, 0xe605310e), /* PORT270CR */
--	PORTCR(271, 0xe605310f), /* PORT271CR */
--	PORTCR(272, 0xe6053110), /* PORT272CR */
--
--	{ PINMUX_CFG_REG("MSELBCR", 0xe6058024, 32, 1) {
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0,
--		0, 0,
--		0, 0,
--		0, 0,
--		0, 0,
--		MSELBCR_MSEL2_0, MSELBCR_MSEL2_1,
--		0, 0,
--		0, 0 }
--	},
--	{ },
--};
--
--static struct pinmux_data_reg pinmux_data_regs[] = {
--	{ PINMUX_DATA_REG("PORTL031_000DR", 0xe6054000, 32) {
--		PORT31_DATA, PORT30_DATA, PORT29_DATA, PORT28_DATA,
--		PORT27_DATA, PORT26_DATA, PORT25_DATA, PORT24_DATA,
--		PORT23_DATA, PORT22_DATA, PORT21_DATA, PORT20_DATA,
--		PORT19_DATA, PORT18_DATA, PORT17_DATA, PORT16_DATA,
--		PORT15_DATA, PORT14_DATA, PORT13_DATA, PORT12_DATA,
--		PORT11_DATA, PORT10_DATA, PORT9_DATA, PORT8_DATA,
--		PORT7_DATA, PORT6_DATA, PORT5_DATA, PORT4_DATA,
--		PORT3_DATA, PORT2_DATA, PORT1_DATA, PORT0_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTL063_032DR", 0xe6054004, 32) {
--		PORT63_DATA, PORT62_DATA, PORT61_DATA, PORT60_DATA,
--		PORT59_DATA, PORT58_DATA, PORT57_DATA, PORT56_DATA,
--		PORT55_DATA, PORT54_DATA, PORT53_DATA, PORT52_DATA,
--		PORT51_DATA, PORT50_DATA, PORT49_DATA, PORT48_DATA,
--		PORT47_DATA, PORT46_DATA, PORT45_DATA, PORT44_DATA,
--		PORT43_DATA, PORT42_DATA, PORT41_DATA, PORT40_DATA,
--		PORT39_DATA, PORT38_DATA, PORT37_DATA, PORT36_DATA,
--		PORT35_DATA, PORT34_DATA, PORT33_DATA, PORT32_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTL095_064DR", 0xe6054008, 32) {
--		PORT95_DATA, PORT94_DATA, PORT93_DATA, PORT92_DATA,
--		PORT91_DATA, PORT90_DATA, PORT89_DATA, PORT88_DATA,
--		PORT87_DATA, PORT86_DATA, PORT85_DATA, PORT84_DATA,
--		PORT83_DATA, PORT82_DATA, PORT81_DATA, PORT80_DATA,
--		PORT79_DATA, PORT78_DATA, PORT77_DATA, PORT76_DATA,
--		PORT75_DATA, PORT74_DATA, PORT73_DATA, PORT72_DATA,
--		PORT71_DATA, PORT70_DATA, PORT69_DATA, PORT68_DATA,
--		PORT67_DATA, PORT66_DATA, PORT65_DATA, PORT64_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTD127_096DR", 0xe6055004, 32) {
--		PORT127_DATA, PORT126_DATA, PORT125_DATA, PORT124_DATA,
--		PORT123_DATA, PORT122_DATA, PORT121_DATA, PORT120_DATA,
--		PORT119_DATA, PORT118_DATA, PORT117_DATA, PORT116_DATA,
--		PORT115_DATA, PORT114_DATA, PORT113_DATA, PORT112_DATA,
--		PORT111_DATA, PORT110_DATA, PORT109_DATA, PORT108_DATA,
--		PORT107_DATA, PORT106_DATA, PORT105_DATA, PORT104_DATA,
--		PORT103_DATA, PORT102_DATA, PORT101_DATA, PORT100_DATA,
--		PORT99_DATA, PORT98_DATA, PORT97_DATA, PORT96_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTD159_128DR", 0xe6055008, 32) {
--		PORT159_DATA, PORT158_DATA, PORT157_DATA, PORT156_DATA,
--		PORT155_DATA, PORT154_DATA, PORT153_DATA, PORT152_DATA,
--		PORT151_DATA, PORT150_DATA, PORT149_DATA, PORT148_DATA,
--		PORT147_DATA, PORT146_DATA, PORT145_DATA, PORT144_DATA,
--		PORT143_DATA, PORT142_DATA, PORT141_DATA, PORT140_DATA,
--		PORT139_DATA, PORT138_DATA, PORT137_DATA, PORT136_DATA,
--		PORT135_DATA, PORT134_DATA, PORT133_DATA, PORT132_DATA,
--		PORT131_DATA, PORT130_DATA, PORT129_DATA, PORT128_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTR191_160DR", 0xe6056000, 32) {
--		PORT191_DATA, PORT190_DATA, PORT189_DATA, PORT188_DATA,
--		PORT187_DATA, PORT186_DATA, PORT185_DATA, PORT184_DATA,
--		PORT183_DATA, PORT182_DATA, PORT181_DATA, PORT180_DATA,
--		PORT179_DATA, PORT178_DATA, PORT177_DATA, PORT176_DATA,
--		PORT175_DATA, PORT174_DATA, PORT173_DATA, PORT172_DATA,
--		PORT171_DATA, PORT170_DATA, PORT169_DATA, PORT168_DATA,
--		PORT167_DATA, PORT166_DATA, PORT165_DATA, PORT164_DATA,
--		PORT163_DATA, PORT162_DATA, PORT161_DATA, PORT160_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTR223_192DR", 0xe6056004, 32) {
--		PORT223_DATA, PORT222_DATA, PORT221_DATA, PORT220_DATA,
--		PORT219_DATA, PORT218_DATA, PORT217_DATA, PORT216_DATA,
--		PORT215_DATA, PORT214_DATA, PORT213_DATA, PORT212_DATA,
--		PORT211_DATA, PORT210_DATA, PORT209_DATA, PORT208_DATA,
--		PORT207_DATA, PORT206_DATA, PORT205_DATA, PORT204_DATA,
--		PORT203_DATA, PORT202_DATA, PORT201_DATA, PORT200_DATA,
--		PORT199_DATA, PORT198_DATA, PORT197_DATA, PORT196_DATA,
--		PORT195_DATA, PORT194_DATA, PORT193_DATA, PORT192_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTU255_224DR", 0xe6057000, 32) {
--		PORT255_DATA, PORT254_DATA, PORT253_DATA, PORT252_DATA,
--		PORT251_DATA, PORT250_DATA, PORT249_DATA, PORT248_DATA,
--		PORT247_DATA, PORT246_DATA, PORT245_DATA, PORT244_DATA,
--		PORT243_DATA, PORT242_DATA, PORT241_DATA, PORT240_DATA,
--		PORT239_DATA, PORT238_DATA, PORT237_DATA, PORT236_DATA,
--		PORT235_DATA, PORT234_DATA, PORT233_DATA, PORT232_DATA,
--		PORT231_DATA, PORT230_DATA, PORT229_DATA, PORT228_DATA,
--		PORT227_DATA, PORT226_DATA, PORT225_DATA, PORT224_DATA }
--	},
--	{ PINMUX_DATA_REG("PORTU287_256DR", 0xe6057004, 32) {
--		0, 0, 0, 0,
--		0, 0, 0, 0,
--		0, 0, 0, 0,
--		0, 0, 0, PORT272_DATA,
--		PORT271_DATA, PORT270_DATA, PORT269_DATA, PORT268_DATA,
--		PORT267_DATA, PORT266_DATA, PORT265_DATA, PORT264_DATA,
--		PORT263_DATA, PORT262_DATA, PORT261_DATA, PORT260_DATA,
--		PORT259_DATA, PORT258_DATA, PORT257_DATA, PORT256_DATA }
--	},
--	{ },
--};
--
--static struct pinmux_info sh7367_pinmux_info = {
--	.name = "sh7367_pfc",
--	.reserved_id = PINMUX_RESERVED,
--	.data = { PINMUX_DATA_BEGIN, PINMUX_DATA_END },
--	.input = { PINMUX_INPUT_BEGIN, PINMUX_INPUT_END },
--	.input_pu = { PINMUX_INPUT_PULLUP_BEGIN, PINMUX_INPUT_PULLUP_END },
--	.input_pd = { PINMUX_INPUT_PULLDOWN_BEGIN, PINMUX_INPUT_PULLDOWN_END },
--	.output = { PINMUX_OUTPUT_BEGIN, PINMUX_OUTPUT_END },
--	.mark = { PINMUX_MARK_BEGIN, PINMUX_MARK_END },
--	.function = { PINMUX_FUNCTION_BEGIN, PINMUX_FUNCTION_END },
--
--	.first_gpio = GPIO_PORT0,
--	.last_gpio = GPIO_FN_DIVLOCK,
--
--	.gpios = pinmux_gpios,
--	.cfg_regs = pinmux_config_regs,
--	.data_regs = pinmux_data_regs,
--
--	.gpio_data = pinmux_data,
--	.gpio_data_size = ARRAY_SIZE(pinmux_data),
--};
--
--void sh7367_pinmux_init(void)
--{
--	register_pinmux(&sh7367_pinmux_info);
--}
-diff --git a/arch/arm/mach-shmobile/setup-sh7367.c b/arch/arm/mach-shmobile/setup-sh7367.c
-deleted file mode 100644
-index e647f54..0000000
---- a/arch/arm/mach-shmobile/setup-sh7367.c
-+++ /dev/null
-@@ -1,481 +0,0 @@
--/*
-- * sh7367 processor support
-- *
-- * Copyright (C) 2010  Magnus Damm
-- * Copyright (C) 2008  Yoshihiro Shimoda
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/platform_device.h>
--#include <linux/uio_driver.h>
--#include <linux/delay.h>
--#include <linux/input.h>
--#include <linux/io.h>
--#include <linux/serial_sci.h>
--#include <linux/sh_timer.h>
--#include <mach/hardware.h>
--#include <mach/common.h>
--#include <mach/irqs.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/time.h>
--
--static struct map_desc sh7367_io_desc[] __initdata = {
--	/* create a 1:1 entity map for 0xe6xxxxxx
--	 * used by CPGA, INTC and PFC.
--	 */
--	{
--		.virtual	= 0xe6000000,
--		.pfn		= __phys_to_pfn(0xe6000000),
--		.length		= 256 << 20,
--		.type		= MT_DEVICE_NONSHARED
--	},
--};
--
--void __init sh7367_map_io(void)
--{
--	iotable_init(sh7367_io_desc, ARRAY_SIZE(sh7367_io_desc));
--}
--
--/* SCIFA0 */
--static struct plat_sci_port scif0_platform_data = {
--	.mapbase	= 0xe6c40000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= { evt2irq(0xc00), evt2irq(0xc00),
--			    evt2irq(0xc00), evt2irq(0xc00) },
--};
--
--static struct platform_device scif0_device = {
--	.name		= "sh-sci",
--	.id		= 0,
--	.dev		= {
--		.platform_data	= &scif0_platform_data,
--	},
--};
--
--/* SCIFA1 */
--static struct plat_sci_port scif1_platform_data = {
--	.mapbase	= 0xe6c50000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= { evt2irq(0xc20), evt2irq(0xc20),
--			    evt2irq(0xc20), evt2irq(0xc20) },
--};
--
--static struct platform_device scif1_device = {
--	.name		= "sh-sci",
--	.id		= 1,
--	.dev		= {
--		.platform_data	= &scif1_platform_data,
--	},
--};
--
--/* SCIFA2 */
--static struct plat_sci_port scif2_platform_data = {
--	.mapbase	= 0xe6c60000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= { evt2irq(0xc40), evt2irq(0xc40),
--			    evt2irq(0xc40), evt2irq(0xc40) },
--};
--
--static struct platform_device scif2_device = {
--	.name		= "sh-sci",
--	.id		= 2,
--	.dev		= {
--		.platform_data	= &scif2_platform_data,
--	},
--};
--
--/* SCIFA3 */
--static struct plat_sci_port scif3_platform_data = {
--	.mapbase	= 0xe6c70000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= { evt2irq(0xc60), evt2irq(0xc60),
--			    evt2irq(0xc60), evt2irq(0xc60) },
--};
--
--static struct platform_device scif3_device = {
--	.name		= "sh-sci",
--	.id		= 3,
--	.dev		= {
--		.platform_data	= &scif3_platform_data,
--	},
--};
--
--/* SCIFA4 */
--static struct plat_sci_port scif4_platform_data = {
--	.mapbase	= 0xe6c80000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= { evt2irq(0xd20), evt2irq(0xd20),
--			    evt2irq(0xd20), evt2irq(0xd20) },
--};
--
--static struct platform_device scif4_device = {
--	.name		= "sh-sci",
--	.id		= 4,
--	.dev		= {
--		.platform_data	= &scif4_platform_data,
--	},
--};
--
--/* SCIFA5 */
--static struct plat_sci_port scif5_platform_data = {
--	.mapbase	= 0xe6cb0000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFA,
--	.irqs		= { evt2irq(0xd40), evt2irq(0xd40),
--			    evt2irq(0xd40), evt2irq(0xd40) },
--};
--
--static struct platform_device scif5_device = {
--	.name		= "sh-sci",
--	.id		= 5,
--	.dev		= {
--		.platform_data	= &scif5_platform_data,
--	},
--};
--
--/* SCIFB */
--static struct plat_sci_port scif6_platform_data = {
--	.mapbase	= 0xe6c30000,
--	.flags		= UPF_BOOT_AUTOCONF,
--	.scscr		= SCSCR_RE | SCSCR_TE,
--	.scbrr_algo_id	= SCBRR_ALGO_4,
--	.type		= PORT_SCIFB,
--	.irqs		= { evt2irq(0xd60), evt2irq(0xd60),
--			    evt2irq(0xd60), evt2irq(0xd60) },
--};
--
--static struct platform_device scif6_device = {
--	.name		= "sh-sci",
--	.id		= 6,
--	.dev		= {
--		.platform_data	= &scif6_platform_data,
--	},
--};
--
--static struct sh_timer_config cmt10_platform_data = {
--	.name = "CMT10",
--	.channel_offset = 0x10,
--	.timer_bit = 0,
--	.clockevent_rating = 125,
--	.clocksource_rating = 125,
--};
--
--static struct resource cmt10_resources[] = {
--	[0] = {
--		.name	= "CMT10",
--		.start	= 0xe6138010,
--		.end	= 0xe613801b,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= evt2irq(0xb00), /* CMT1_CMT10 */
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device cmt10_device = {
--	.name		= "sh_cmt",
--	.id		= 10,
--	.dev = {
--		.platform_data	= &cmt10_platform_data,
--	},
--	.resource	= cmt10_resources,
--	.num_resources	= ARRAY_SIZE(cmt10_resources),
--};
--
--/* VPU */
--static struct uio_info vpu_platform_data = {
--	.name = "VPU5",
--	.version = "0",
--	.irq = intcs_evt2irq(0x980),
--};
--
--static struct resource vpu_resources[] = {
--	[0] = {
--		.name	= "VPU",
--		.start	= 0xfe900000,
--		.end	= 0xfe902807,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device vpu_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 0,
--	.dev = {
--		.platform_data	= &vpu_platform_data,
--	},
--	.resource	= vpu_resources,
--	.num_resources	= ARRAY_SIZE(vpu_resources),
--};
--
--/* VEU0 */
--static struct uio_info veu0_platform_data = {
--	.name = "VEU0",
--	.version = "0",
--	.irq = intcs_evt2irq(0x700),
--};
--
--static struct resource veu0_resources[] = {
--	[0] = {
--		.name	= "VEU0",
--		.start	= 0xfe920000,
--		.end	= 0xfe9200b7,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device veu0_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 1,
--	.dev = {
--		.platform_data	= &veu0_platform_data,
--	},
--	.resource	= veu0_resources,
--	.num_resources	= ARRAY_SIZE(veu0_resources),
--};
--
--/* VEU1 */
--static struct uio_info veu1_platform_data = {
--	.name = "VEU1",
--	.version = "0",
--	.irq = intcs_evt2irq(0x720),
--};
--
--static struct resource veu1_resources[] = {
--	[0] = {
--		.name	= "VEU1",
--		.start	= 0xfe924000,
--		.end	= 0xfe9240b7,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device veu1_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 2,
--	.dev = {
--		.platform_data	= &veu1_platform_data,
--	},
--	.resource	= veu1_resources,
--	.num_resources	= ARRAY_SIZE(veu1_resources),
--};
--
--/* VEU2 */
--static struct uio_info veu2_platform_data = {
--	.name = "VEU2",
--	.version = "0",
--	.irq = intcs_evt2irq(0x740),
--};
--
--static struct resource veu2_resources[] = {
--	[0] = {
--		.name	= "VEU2",
--		.start	= 0xfe928000,
--		.end	= 0xfe9280b7,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device veu2_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 3,
--	.dev = {
--		.platform_data	= &veu2_platform_data,
--	},
--	.resource	= veu2_resources,
--	.num_resources	= ARRAY_SIZE(veu2_resources),
--};
--
--/* VEU3 */
--static struct uio_info veu3_platform_data = {
--	.name = "VEU3",
--	.version = "0",
--	.irq = intcs_evt2irq(0x760),
--};
--
--static struct resource veu3_resources[] = {
--	[0] = {
--		.name	= "VEU3",
--		.start	= 0xfe92c000,
--		.end	= 0xfe92c0b7,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device veu3_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 4,
--	.dev = {
--		.platform_data	= &veu3_platform_data,
--	},
--	.resource	= veu3_resources,
--	.num_resources	= ARRAY_SIZE(veu3_resources),
--};
--
--/* VEU2H */
--static struct uio_info veu2h_platform_data = {
--	.name = "VEU2H",
--	.version = "0",
--	.irq = intcs_evt2irq(0x520),
--};
--
--static struct resource veu2h_resources[] = {
--	[0] = {
--		.name	= "VEU2H",
--		.start	= 0xfe93c000,
--		.end	= 0xfe93c27b,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device veu2h_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 5,
--	.dev = {
--		.platform_data	= &veu2h_platform_data,
--	},
--	.resource	= veu2h_resources,
--	.num_resources	= ARRAY_SIZE(veu2h_resources),
--};
--
--/* JPU */
--static struct uio_info jpu_platform_data = {
--	.name = "JPU",
--	.version = "0",
--	.irq = intcs_evt2irq(0x560),
--};
--
--static struct resource jpu_resources[] = {
--	[0] = {
--		.name	= "JPU",
--		.start	= 0xfe980000,
--		.end	= 0xfe9902d3,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device jpu_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 6,
--	.dev = {
--		.platform_data	= &jpu_platform_data,
--	},
--	.resource	= jpu_resources,
--	.num_resources	= ARRAY_SIZE(jpu_resources),
--};
--
--/* SPU1 */
--static struct uio_info spu1_platform_data = {
--	.name = "SPU1",
--	.version = "0",
--	.irq = evt2irq(0xfc0),
--};
--
--static struct resource spu1_resources[] = {
--	[0] = {
--		.name	= "SPU1",
--		.start	= 0xfe300000,
--		.end	= 0xfe3fffff,
--		.flags	= IORESOURCE_MEM,
--	},
--};
--
--static struct platform_device spu1_device = {
--	.name		= "uio_pdrv_genirq",
--	.id		= 7,
--	.dev = {
--		.platform_data	= &spu1_platform_data,
--	},
--	.resource	= spu1_resources,
--	.num_resources	= ARRAY_SIZE(spu1_resources),
--};
--
--static struct platform_device *sh7367_early_devices[] __initdata = {
--	&scif0_device,
--	&scif1_device,
--	&scif2_device,
--	&scif3_device,
--	&scif4_device,
--	&scif5_device,
--	&scif6_device,
--	&cmt10_device,
--};
--
--static struct platform_device *sh7367_devices[] __initdata = {
--	&vpu_device,
--	&veu0_device,
--	&veu1_device,
--	&veu2_device,
--	&veu3_device,
--	&veu2h_device,
--	&jpu_device,
--	&spu1_device,
--};
--
--void __init sh7367_add_standard_devices(void)
--{
--	platform_add_devices(sh7367_early_devices,
--			     ARRAY_SIZE(sh7367_early_devices));
--
--	platform_add_devices(sh7367_devices,
--			    ARRAY_SIZE(sh7367_devices));
--}
--
--static void __init sh7367_earlytimer_init(void)
--{
--	sh7367_clock_init();
--	shmobile_earlytimer_init();
--}
--
--#define SYMSTPCR2 IOMEM(0xe6158048)
--#define SYMSTPCR2_CMT1 (1 << 29)
--
--void __init sh7367_add_early_devices(void)
--{
--	/* enable clock to CMT1 */
--	__raw_writel(__raw_readl(SYMSTPCR2) & ~SYMSTPCR2_CMT1, SYMSTPCR2);
--
--	early_platform_add_devices(sh7367_early_devices,
--				   ARRAY_SIZE(sh7367_early_devices));
--
--	/* setup early console here as well */
--	shmobile_setup_console();
--
--	/* override timer setup with soc-specific code */
--	shmobile_timer.init = sh7367_earlytimer_init;
--}
--- 
-1.7.10.4
+> 
+> - Paul
+> 
+> From: Rajendra Nayak <rnayak@ti.com>
+> Date: Wed, 7 Nov 2012 21:09:35 -0700
+> Subject: [PATCH] ARM: OMAP2: clock: Add 24xx data using common struct clk
+> 
+> The patch is the output from a python script which converts
+> from the old OMAP clk format to COMMON clk format using a
+> JSON parser in between which was developed by Paul Walmsley.
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> [paul at pwsan.com: replace omap2_init_clksel_parent() with
+>  omap2_clksel_find_parent_index(); reflowed macros; dropped 243x clkdev
+>  aliases in 242x file; added recalc_rate fn ptrs to APLL clocks;
+>  fixed some checkpatch warnings]
+> [mturquette at ti.com: removed deprecated variables from omap24x0_clk_init]
+> Signed-off-by: Mike Turquette <mturquette@ti.com>
+> [paul at pwsan.com: fixed boot crash due to missing clock init code; added twl.fck
+>  alias]
+> Signed-off-by: Paul Walmsley <paul@pwsan.com>
+> ---
+>  arch/arm/mach-omap2/cclock2420_data.c  | 1962 ++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/cclock2430_data.c  | 2076 ++++++++++++++++++++++++++++++++
+>  arch/arm/mach-omap2/cm-regbits-24xx.h  |    5 +
+>  arch/arm/mach-omap2/prm-regbits-24xx.h |    2 +
+>  4 files changed, 4045 insertions(+)
+>  create mode 100644 arch/arm/mach-omap2/cclock2420_data.c
+>  create mode 100644 arch/arm/mach-omap2/cclock2430_data.c
+> 
+> diff --git a/arch/arm/mach-omap2/cclock2420_data.c b/arch/arm/mach-omap2/cclock2420_data.c
+> new file mode 100644
+> index 0000000..f1ee478
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/cclock2420_data.c
+> @@ -0,0 +1,1962 @@
+> +/*
+> + * OMAP2420 clock data
+> + *
+> + * Copyright (C) 2005-2012 Texas Instruments, Inc.
+> + * Copyright (C) 2004-2011 Nokia Corporation
+> + *
+> + * Contacts:
+> + * Richard Woodruff <r-woodruff2@ti.com>
+> + * Paul Walmsley
+> + * Updated to COMMON clk format by Rajendra Nayak <rnayak@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-private.h>
+> +#include <linux/list.h>
+> +
+> +#include "soc.h"
+> +#include "iomap.h"
+> +#include "clock.h"
+> +#include "clock2xxx.h"
+> +#include "opp2xxx.h"
+> +#include "cm2xxx.h"
+> +#include "prm2xxx.h"
+> +#include "prm-regbits-24xx.h"
+> +#include "cm-regbits-24xx.h"
+> +#include "sdrc.h"
+> +#include "control.h"
+> +
+> +#define OMAP_CM_REGADDR                 OMAP2420_CM_REGADDR
+> +
+> +/*
+> + * 2420 clock tree.
+> + *
+> + * NOTE:In many cases here we are assigning a 'default' parent. In
+> + *     many cases the parent is selectable. The set parent calls will
+> + *     also switch sources.
+> + *
+> + *     Several sources are given initial rates which may be wrong, this will
+> + *     be fixed up in the init func.
+> + *
+> + *     Things are broadly separated below by clock domains. It is
+> + *     noteworthy that most peripherals have dependencies on multiple clock
+> + *     domains. Many get their interface clocks from the L4 domain, but get
+> + *     functional clocks from fixed sources or other core domain derived
+> + *     clocks.
+> + */
+> +
+> +DEFINE_CLK_FIXED_RATE(alt_ck, CLK_IS_ROOT, 54000000, 0x0);
+> +
+> +DEFINE_CLK_FIXED_RATE(func_32k_ck, CLK_IS_ROOT, 32768, 0x0);
+> +
+> +DEFINE_CLK_FIXED_RATE(mcbsp_clks, CLK_IS_ROOT, 0x0, 0x0);
+> +
+> +static struct clk osc_ck;
+> +
+> +static const struct clk_ops osc_ck_ops = {
+> +       .recalc_rate    = &omap2_osc_clk_recalc,
+> +};
+> +
+> +static struct clk_hw_omap osc_ck_hw = {
+> +       .hw = {
+> +               .clk = &osc_ck,
+> +       },
+> +};
+> +
+> +static struct clk osc_ck = {
+> +       .name   = "osc_ck",
+> +       .ops    = &osc_ck_ops,
+> +       .hw     = &osc_ck_hw.hw,
+> +       .flags  = CLK_IS_ROOT,
+> +};
+> +
+> +DEFINE_CLK_FIXED_RATE(secure_32k_ck, CLK_IS_ROOT, 32768, 0x0);
+> +
+> +static struct clk sys_ck;
+> +
+> +static const char *sys_ck_parent_names[] = {
+> +       "osc_ck",
+> +};
+> +
+> +static const struct clk_ops sys_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .recalc_rate    = &omap2xxx_sys_clk_recalc,
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(sys_ck, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(sys_ck, sys_ck_parent_names, sys_ck_ops);
+> +
+> +static struct dpll_data dpll_dd = {
+> +       .mult_div1_reg  = OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+> +       .mult_mask      = OMAP24XX_DPLL_MULT_MASK,
+> +       .div1_mask      = OMAP24XX_DPLL_DIV_MASK,
+> +       .clk_bypass     = &sys_ck,
+> +       .clk_ref        = &sys_ck,
+> +       .control_reg    = OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
+> +       .enable_mask    = OMAP24XX_EN_DPLL_MASK,
+> +       .max_multiplier = 1023,
+> +       .min_divider    = 1,
+> +       .max_divider    = 16,
+> +};
+> +
+> +static struct clk dpll_ck;
+> +
+> +static const char *dpll_ck_parent_names[] = {
+> +       "sys_ck",
+> +};
+> +
+> +static const struct clk_ops dpll_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .get_parent     = &omap2_init_dpll_parent,
+> +       .recalc_rate    = &omap2_dpllcore_recalc,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +       .set_rate       = &omap2_reprogram_dpllcore,
+> +};
+> +
+> +static struct clk_hw_omap dpll_ck_hw = {
+> +       .hw = {
+> +               .clk = &dpll_ck,
+> +       },
+> +       .ops            = &clkhwops_omap2xxx_dpll,
+> +       .dpll_data      = &dpll_dd,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(dpll_ck, dpll_ck_parent_names, dpll_ck_ops);
+> +
+> +static struct clk core_ck;
+> +
+> +static const char *core_ck_parent_names[] = {
+> +       "dpll_ck",
+> +};
+> +
+> +static const struct clk_ops core_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(core_ck, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(core_ck, core_ck_parent_names, core_ck_ops);
+> +
+> +DEFINE_CLK_DIVIDER(core_l3_ck, "core_ck", &core_ck, 0x0,
+> +                  OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                  OMAP24XX_CLKSEL_L3_SHIFT, OMAP24XX_CLKSEL_L3_WIDTH,
+> +                  CLK_DIVIDER_ONE_BASED, NULL);
+> +
+> +DEFINE_CLK_DIVIDER(l4_ck, "core_l3_ck", &core_l3_ck, 0x0,
+> +                  OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                  OMAP24XX_CLKSEL_L4_SHIFT, OMAP24XX_CLKSEL_L4_WIDTH,
+> +                  CLK_DIVIDER_ONE_BASED, NULL);
+> +
+> +static struct clk aes_ick;
+> +
+> +static const char *aes_ick_parent_names[] = {
+> +       "l4_ck",
+> +};
+> +
+> +static const struct clk_ops aes_ick_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +};
+> +
+> +static struct clk_hw_omap aes_ick_hw = {
+> +       .hw = {
+> +               .clk = &aes_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_AES_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(aes_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk apll54_ck;
+> +
+> +static const struct clk_ops apll54_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_clk_apll54_enable,
+> +       .disable        = &omap2_clk_apll_disable,
+> +       .recalc_rate    = &omap2_clk_apll54_recalc,
+> +};
+> +
+> +static struct clk_hw_omap apll54_ck_hw = {
+> +       .hw = {
+> +               .clk = &apll54_ck,
+> +       },
+> +       .ops            = &clkhwops_apll54,
+> +       .enable_reg     = OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
+> +       .enable_bit     = OMAP24XX_EN_54M_PLL_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(apll54_ck, dpll_ck_parent_names, apll54_ck_ops);
+> +
+> +static struct clk apll96_ck;
+> +
+> +static const struct clk_ops apll96_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_clk_apll96_enable,
+> +       .disable        = &omap2_clk_apll_disable,
+> +       .recalc_rate    = &omap2_clk_apll96_recalc,
+> +};
+> +
+> +static struct clk_hw_omap apll96_ck_hw = {
+> +       .hw = {
+> +               .clk = &apll96_ck,
+> +       },
+> +       .ops            = &clkhwops_apll96,
+> +       .enable_reg     = OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
+> +       .enable_bit     = OMAP24XX_EN_96M_PLL_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(apll96_ck, dpll_ck_parent_names, apll96_ck_ops);
+> +
+> +static struct clk func_96m_ck;
+> +
+> +static const char *func_96m_ck_parent_names[] = {
+> +       "apll96_ck",
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(func_96m_ck, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(func_96m_ck, func_96m_ck_parent_names, core_ck_ops);
+> +
+> +static struct clk cam_fck;
+> +
+> +static const char *cam_fck_parent_names[] = {
+> +       "func_96m_ck",
+> +};
+> +
+> +static struct clk_hw_omap cam_fck_hw = {
+> +       .hw = {
+> +               .clk = &cam_fck,
+> +       },
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_CAM_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(cam_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk cam_ick;
+> +
+> +static struct clk_hw_omap cam_ick_hw = {
+> +       .hw = {
+> +               .clk = &cam_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_CAM_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(cam_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk des_ick;
+> +
+> +static struct clk_hw_omap des_ick_hw = {
+> +       .hw = {
+> +               .clk = &des_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_DES_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(des_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate dsp_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 6, .val = 6, .flags = RATE_IN_242X },
+> +       { .div = 8, .val = 8, .flags = RATE_IN_242X },
+> +       { .div = 12, .val = 12, .flags = RATE_IN_242X },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel dsp_fck_clksel[] = {
+> +       { .parent = &core_ck, .rates = dsp_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dsp_fck_parent_names[] = {
+> +       "core_ck",
+> +};
+> +
+> +static const struct clk_ops dsp_fck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .set_rate       = &omap2_clksel_set_rate,
+> +       .round_rate     = &omap2_clksel_round_rate,
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dsp_fck, "dsp_clkdm", dsp_fck_clksel,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
+> +                        OMAP24XX_CLKSEL_DSP_MASK,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
+> +                        OMAP24XX_CM_FCLKEN_DSP_EN_DSP_SHIFT, &clkhwops_wait,
+> +                        dsp_fck_parent_names, dsp_fck_ops);
+> +
+> +static const struct clksel dsp_ick_clksel[] = {
+> +       { .parent = &dsp_fck, .rates = dsp_ick_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dsp_ick_parent_names[] = {
+> +       "dsp_fck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dsp_ick, "dsp_clkdm", dsp_ick_clksel,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
+> +                        OMAP24XX_CLKSEL_DSP_IF_MASK,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_ICLKEN),
+> +                        OMAP2420_EN_DSP_IPI_SHIFT, &clkhwops_iclk_wait,
+> +                        dsp_ick_parent_names, dsp_fck_ops);
+> +
+> +static const struct clksel_rate dss1_fck_sys_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate dss1_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 5, .val = 5, .flags = RATE_IN_24XX },
+> +       { .div = 6, .val = 6, .flags = RATE_IN_24XX },
+> +       { .div = 8, .val = 8, .flags = RATE_IN_24XX },
+> +       { .div = 9, .val = 9, .flags = RATE_IN_24XX },
+> +       { .div = 12, .val = 12, .flags = RATE_IN_24XX },
+> +       { .div = 16, .val = 16, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel dss1_fck_clksel[] = {
+> +       { .parent = &sys_ck, .rates = dss1_fck_sys_rates },
+> +       { .parent = &core_ck, .rates = dss1_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dss1_fck_parent_names[] = {
+> +       "sys_ck", "core_ck",
+> +};
+> +
+> +static struct clk dss1_fck;
+> +
+> +static const struct clk_ops dss1_fck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .get_parent     = &omap2_clksel_find_parent_index,
+> +       .set_parent     = &omap2_clksel_set_parent,
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dss1_fck, "dss_clkdm", dss1_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_DSS1_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_DSS1_SHIFT, NULL,
+> +                        dss1_fck_parent_names, dss1_fck_ops);
+> +
+> +static const struct clksel_rate dss2_fck_sys_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate dss2_fck_48m_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate func_48m_apll96_rates[] = {
+> +       { .div = 2, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate func_48m_alt_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel func_48m_clksel[] = {
+> +       { .parent = &apll96_ck, .rates = func_48m_apll96_rates },
+> +       { .parent = &alt_ck, .rates = func_48m_alt_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *func_48m_ck_parent_names[] = {
+> +       "apll96_ck", "alt_ck",
+> +};
+> +
+> +static struct clk func_48m_ck;
+> +
+> +static const struct clk_ops func_48m_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .set_rate       = &omap2_clksel_set_rate,
+> +       .round_rate     = &omap2_clksel_round_rate,
+> +       .get_parent     = &omap2_clksel_find_parent_index,
+> +       .set_parent     = &omap2_clksel_set_parent,
+> +};
+> +
+> +static struct clk_hw_omap func_48m_ck_hw = {
+> +       .hw = {
+> +               .clk = &func_48m_ck,
+> +       },
+> +       .clksel         = func_48m_clksel,
+> +       .clksel_reg     = OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+> +       .clksel_mask    = OMAP24XX_48M_SOURCE_MASK,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(func_48m_ck, func_48m_ck_parent_names, func_48m_ck_ops);
+> +
+> +static const struct clksel dss2_fck_clksel[] = {
+> +       { .parent = &sys_ck, .rates = dss2_fck_sys_rates },
+> +       { .parent = &func_48m_ck, .rates = dss2_fck_48m_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dss2_fck_parent_names[] = {
+> +       "sys_ck", "func_48m_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dss2_fck, "dss_clkdm", dss2_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_DSS2_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_DSS2_SHIFT, NULL,
+> +                        dss2_fck_parent_names, dss1_fck_ops);
+> +
+> +static const char *func_54m_ck_parent_names[] = {
+> +       "apll54_ck", "alt_ck",
+> +};
+> +
+> +DEFINE_CLK_MUX(func_54m_ck, func_54m_ck_parent_names, NULL, 0x0,
+> +              OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+> +              OMAP24XX_54M_SOURCE_SHIFT, OMAP24XX_54M_SOURCE_WIDTH,
+> +              0x0, NULL);
+> +
+> +static struct clk dss_54m_fck;
+> +
+> +static const char *dss_54m_fck_parent_names[] = {
+> +       "func_54m_ck",
+> +};
+> +
+> +static struct clk_hw_omap dss_54m_fck_hw = {
+> +       .hw = {
+> +               .clk = &dss_54m_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_TV_SHIFT,
+> +       .clkdm_name     = "dss_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(dss_54m_fck, dss_54m_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk dss_ick;
+> +
+> +static struct clk_hw_omap dss_ick_hw = {
+> +       .hw = {
+> +               .clk = &dss_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_DSS1_SHIFT,
+> +       .clkdm_name     = "dss_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(dss_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk eac_fck;
+> +
+> +static struct clk_hw_omap eac_fck_hw = {
+> +       .hw = {
+> +               .clk = &eac_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP2420_EN_EAC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(eac_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk eac_ick;
+> +
+> +static struct clk_hw_omap eac_ick_hw = {
+> +       .hw = {
+> +               .clk = &eac_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_EAC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(eac_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk emul_ck;
+> +
+> +static struct clk_hw_omap emul_ck_hw = {
+> +       .hw = {
+> +               .clk = &emul_ck,
+> +       },
+> +       .enable_reg     = OMAP2420_PRCM_CLKEMUL_CTRL,
+> +       .enable_bit     = OMAP24XX_EMULATION_EN_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(emul_ck, dss_54m_fck_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_FIXED_FACTOR(func_12m_ck, "func_48m_ck", &func_48m_ck, 0x0, 1, 4);
+> +
+> +static struct clk fac_fck;
+> +
+> +static const char *fac_fck_parent_names[] = {
+> +       "func_12m_ck",
+> +};
+> +
+> +static struct clk_hw_omap fac_fck_hw = {
+> +       .hw = {
+> +               .clk = &fac_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_FAC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(fac_fck, fac_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk fac_ick;
+> +
+> +static struct clk_hw_omap fac_ick_hw = {
+> +       .hw = {
+> +               .clk = &fac_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_FAC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(fac_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel gfx_fck_clksel[] = {
+> +       { .parent = &core_l3_ck, .rates = gfx_l3_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *gfx_2d_fck_parent_names[] = {
+> +       "core_l3_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gfx_2d_fck, "gfx_clkdm", gfx_fck_clksel,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
+> +                        OMAP_CLKSEL_GFX_MASK,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
+> +                        OMAP24XX_EN_2D_SHIFT, &clkhwops_wait,
+> +                        gfx_2d_fck_parent_names, dsp_fck_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gfx_3d_fck, "gfx_clkdm", gfx_fck_clksel,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
+> +                        OMAP_CLKSEL_GFX_MASK,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
+> +                        OMAP24XX_EN_3D_SHIFT, &clkhwops_wait,
+> +                        gfx_2d_fck_parent_names, dsp_fck_ops);
+> +
+> +static struct clk gfx_ick;
+> +
+> +static const char *gfx_ick_parent_names[] = {
+> +       "core_l3_ck",
+> +};
+> +
+> +static struct clk_hw_omap gfx_ick_hw = {
+> +       .hw = {
+> +               .clk = &gfx_ick,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(GFX_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP_EN_GFX_SHIFT,
+> +       .clkdm_name     = "gfx_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gfx_ick, gfx_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpios_fck;
+> +
+> +static const char *gpios_fck_parent_names[] = {
+> +       "func_32k_ck",
+> +};
+> +
+> +static struct clk_hw_omap gpios_fck_hw = {
+> +       .hw = {
+> +               .clk = &gpios_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+> +       .enable_bit     = OMAP24XX_EN_GPIOS_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpios_fck, gpios_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk wu_l4_ick;
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(wu_l4_ick, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(wu_l4_ick, dpll_ck_parent_names, core_ck_ops);
+> +
+> +static struct clk gpios_ick;
+> +
+> +static const char *gpios_ick_parent_names[] = {
+> +       "wu_l4_ick",
+> +};
+> +
+> +static struct clk_hw_omap gpios_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpios_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_GPIOS_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpios_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpmc_fck;
+> +
+> +static struct clk_hw_omap gpmc_fck_hw = {
+> +       .hw = {
+> +               .clk = &gpmc_fck,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+> +       .enable_bit     = OMAP24XX_AUTO_GPMC_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpmc_fck, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static const struct clksel_rate gpt_alt_rates[] = {
+> +       { .div = 1, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel omap24xx_gpt_clksel[] = {
+> +       { .parent = &func_32k_ck, .rates = gpt_32k_rates },
+> +       { .parent = &sys_ck, .rates = gpt_sys_rates },
+> +       { .parent = &alt_ck, .rates = gpt_alt_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *gpt10_fck_parent_names[] = {
+> +       "func_32k_ck", "sys_ck", "alt_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt10_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT10_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT10_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt10_ick;
+> +
+> +static struct clk_hw_omap gpt10_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt10_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT10_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt10_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt11_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT11_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT11_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt11_ick;
+> +
+> +static struct clk_hw_omap gpt11_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt11_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT11_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt11_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt12_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT12_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT12_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt12_ick;
+> +
+> +static struct clk_hw_omap gpt12_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt12_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT12_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt12_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clk_ops gpt1_fck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .set_rate       = &omap2_clksel_set_rate,
+> +       .round_rate     = &omap2_clksel_round_rate,
+> +       .get_parent     = &omap2_clksel_find_parent_index,
+> +       .set_parent     = &omap2_clksel_set_parent,
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt1_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_GPT1_MASK,
+> +                        OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+> +                        OMAP24XX_EN_GPT1_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, gpt1_fck_ops);
+> +
+> +static struct clk gpt1_ick;
+> +
+> +static struct clk_hw_omap gpt1_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_GPT1_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt1_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt2_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT2_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT2_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt2_ick;
+> +
+> +static struct clk_hw_omap gpt2_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt3_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT3_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT3_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt3_ick;
+> +
+> +static struct clk_hw_omap gpt3_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt4_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT4_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT4_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt4_ick;
+> +
+> +static struct clk_hw_omap gpt4_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt5_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT5_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT5_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt5_ick;
+> +
+> +static struct clk_hw_omap gpt5_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt5_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT5_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt5_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt6_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT6_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT6_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt6_ick;
+> +
+> +static struct clk_hw_omap gpt6_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt6_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT6_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt6_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt7_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT7_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT7_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt7_ick;
+> +
+> +static struct clk_hw_omap gpt7_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt7_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT7_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt7_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt8_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT8_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT8_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt8_ick;
+> +
+> +static struct clk_hw_omap gpt8_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt8_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT8_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt8_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt9_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT9_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT9_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt9_ick;
+> +
+> +static struct clk_hw_omap gpt9_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt9_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT9_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt9_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk hdq_fck;
+> +
+> +static struct clk_hw_omap hdq_fck_hw = {
+> +       .hw = {
+> +               .clk = &hdq_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_HDQ_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(hdq_fck, fac_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk hdq_ick;
+> +
+> +static struct clk_hw_omap hdq_ick_hw = {
+> +       .hw = {
+> +               .clk = &hdq_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_HDQ_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(hdq_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2c1_fck;
+> +
+> +static struct clk_hw_omap i2c1_fck_hw = {
+> +       .hw = {
+> +               .clk = &i2c1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP2420_EN_I2C1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2c1_fck, fac_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2c1_ick;
+> +
+> +static struct clk_hw_omap i2c1_ick_hw = {
+> +       .hw = {
+> +               .clk = &i2c1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_I2C1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2c1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2c2_fck;
+> +
+> +static struct clk_hw_omap i2c2_fck_hw = {
+> +       .hw = {
+> +               .clk = &i2c2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP2420_EN_I2C2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2c2_fck, fac_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2c2_ick;
+> +
+> +static struct clk_hw_omap i2c2_ick_hw = {
+> +       .hw = {
+> +               .clk = &i2c2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_I2C2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2c2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(iva1_ifck, "iva1_clkdm", dsp_fck_clksel,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
+> +                        OMAP2420_CLKSEL_IVA_MASK,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
+> +                        OMAP2420_EN_IVA_COP_SHIFT, &clkhwops_wait,
+> +                        dsp_fck_parent_names, dsp_fck_ops);
+> +
+> +static struct clk iva1_mpu_int_ifck;
+> +
+> +static const char *iva1_mpu_int_ifck_parent_names[] = {
+> +       "iva1_ifck",
+> +};
+> +
+> +static const struct clk_ops iva1_mpu_int_ifck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap_fixed_divisor_recalc,
+> +};
+> +
+> +static struct clk_hw_omap iva1_mpu_int_ifck_hw = {
+> +       .hw = {
+> +               .clk = &iva1_mpu_int_ifck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
+> +       .enable_bit     = OMAP2420_EN_IVA_MPU_SHIFT,
+> +       .clkdm_name     = "iva1_clkdm",
+> +       .fixed_div      = 2,
+> +};
+> +
+> +DEFINE_STRUCT_CLK(iva1_mpu_int_ifck, iva1_mpu_int_ifck_parent_names,
+> +                 iva1_mpu_int_ifck_ops);
+> +
+> +static struct clk mailboxes_ick;
+> +
+> +static struct clk_hw_omap mailboxes_ick_hw = {
+> +       .hw = {
+> +               .clk = &mailboxes_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MAILBOXES_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mailboxes_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate common_mcbsp_96m_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_mcbsp_mcbsp_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel mcbsp_fck_clksel[] = {
+> +       { .parent = &func_96m_ck, .rates = common_mcbsp_96m_rates },
+> +       { .parent = &mcbsp_clks, .rates = common_mcbsp_mcbsp_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *mcbsp1_fck_parent_names[] = {
+> +       "func_96m_ck", "mcbsp_clks",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp1_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP242X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
+> +                        OMAP2_MCBSP1_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_MCBSP1_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp1_ick;
+> +
+> +static struct clk_hw_omap mcbsp1_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCBSP1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp2_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP242X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
+> +                        OMAP2_MCBSP2_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_MCBSP2_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp2_ick;
+> +
+> +static struct clk_hw_omap mcbsp2_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCBSP2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi1_fck;
+> +
+> +static const char *mcspi1_fck_parent_names[] = {
+> +       "func_48m_ck",
+> +};
+> +
+> +static struct clk_hw_omap mcspi1_fck_hw = {
+> +       .hw = {
+> +               .clk = &mcspi1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi1_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi1_ick;
+> +
+> +static struct clk_hw_omap mcspi1_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcspi1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi2_fck;
+> +
+> +static struct clk_hw_omap mcspi2_fck_hw = {
+> +       .hw = {
+> +               .clk = &mcspi2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi2_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi2_ick;
+> +
+> +static struct clk_hw_omap mcspi2_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcspi2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmc_fck;
+> +
+> +static struct clk_hw_omap mmc_fck_hw = {
+> +       .hw = {
+> +               .clk = &mmc_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP2420_EN_MMC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmc_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmc_ick;
+> +
+> +static struct clk_hw_omap mmc_ick_hw = {
+> +       .hw = {
+> +               .clk = &mmc_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_MMC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmc_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_DIVIDER(mpu_ck, "core_ck", &core_ck, 0x0,
+> +                  OMAP_CM_REGADDR(MPU_MOD, CM_CLKSEL),
+> +                  OMAP24XX_CLKSEL_MPU_SHIFT, OMAP24XX_CLKSEL_MPU_WIDTH,
+> +                  CLK_DIVIDER_ONE_BASED, NULL);
+> +
+> +static struct clk mpu_wdt_fck;
+> +
+> +static struct clk_hw_omap mpu_wdt_fck_hw = {
+> +       .hw = {
+> +               .clk = &mpu_wdt_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+> +       .enable_bit     = OMAP24XX_EN_MPU_WDT_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mpu_wdt_fck, gpios_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mpu_wdt_ick;
+> +
+> +static struct clk_hw_omap mpu_wdt_ick_hw = {
+> +       .hw = {
+> +               .clk = &mpu_wdt_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_MPU_WDT_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mpu_wdt_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mspro_fck;
+> +
+> +static struct clk_hw_omap mspro_fck_hw = {
+> +       .hw = {
+> +               .clk = &mspro_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MSPRO_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mspro_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mspro_ick;
+> +
+> +static struct clk_hw_omap mspro_ick_hw = {
+> +       .hw = {
+> +               .clk = &mspro_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MSPRO_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mspro_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk omapctrl_ick;
+> +
+> +static struct clk_hw_omap omapctrl_ick_hw = {
+> +       .hw = {
+> +               .clk = &omapctrl_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_OMAPCTRL_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(omapctrl_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk pka_ick;
+> +
+> +static struct clk_hw_omap pka_ick_hw = {
+> +       .hw = {
+> +               .clk = &pka_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_PKA_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(pka_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk rng_ick;
+> +
+> +static struct clk_hw_omap rng_ick_hw = {
+> +       .hw = {
+> +               .clk = &rng_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_RNG_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(rng_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk sdma_fck;
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(sdma_fck, "core_l3_clkdm");
+> +DEFINE_STRUCT_CLK(sdma_fck, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static struct clk sdma_ick;
+> +
+> +static struct clk_hw_omap sdma_ick_hw = {
+> +       .hw = {
+> +               .clk = &sdma_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+> +       .enable_bit     = OMAP24XX_AUTO_SDMA_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sdma_ick, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static struct clk sdrc_ick;
+> +
+> +static struct clk_hw_omap sdrc_ick_hw = {
+> +       .hw = {
+> +               .clk = &sdrc_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+> +       .enable_bit     = OMAP24XX_AUTO_SDRC_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sdrc_ick, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static struct clk sha_ick;
+> +
+> +static struct clk_hw_omap sha_ick_hw = {
+> +       .hw = {
+> +               .clk = &sha_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_SHA_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sha_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk ssi_l4_ick;
+> +
+> +static struct clk_hw_omap ssi_l4_ick_hw = {
+> +       .hw = {
+> +               .clk = &ssi_l4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_SSI_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(ssi_l4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate ssi_ssr_sst_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 6, .val = 6, .flags = RATE_IN_242X },
+> +       { .div = 8, .val = 8, .flags = RATE_IN_242X },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel ssi_ssr_sst_fck_clksel[] = {
+> +       { .parent = &core_ck, .rates = ssi_ssr_sst_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *ssi_ssr_sst_fck_parent_names[] = {
+> +       "core_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(ssi_ssr_sst_fck, "core_l3_clkdm",
+> +                        ssi_ssr_sst_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_SSI_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +                        OMAP24XX_EN_SSI_SHIFT, &clkhwops_wait,
+> +                        ssi_ssr_sst_fck_parent_names, dsp_fck_ops);
+> +
+> +static struct clk sync_32k_ick;
+> +
+> +static struct clk_hw_omap sync_32k_ick_hw = {
+> +       .hw = {
+> +               .clk = &sync_32k_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_32KSYNC_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sync_32k_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate common_clkout_src_core_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_clkout_src_sys_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_clkout_src_96m_rates[] = {
+> +       { .div = 1, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_clkout_src_54m_rates[] = {
+> +       { .div = 1, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel common_clkout_src_clksel[] = {
+> +       { .parent = &core_ck, .rates = common_clkout_src_core_rates },
+> +       { .parent = &sys_ck, .rates = common_clkout_src_sys_rates },
+> +       { .parent = &func_96m_ck, .rates = common_clkout_src_96m_rates },
+> +       { .parent = &func_54m_ck, .rates = common_clkout_src_54m_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *sys_clkout_src_parent_names[] = {
+> +       "core_ck", "sys_ck", "func_96m_ck", "func_54m_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(sys_clkout_src, "wkup_clkdm", common_clkout_src_clksel,
+> +                        OMAP2420_PRCM_CLKOUT_CTRL, OMAP24XX_CLKOUT_SOURCE_MASK,
+> +                        OMAP2420_PRCM_CLKOUT_CTRL, OMAP24XX_CLKOUT_EN_SHIFT,
+> +                        NULL, sys_clkout_src_parent_names, gpt1_fck_ops);
+> +
+> +DEFINE_CLK_DIVIDER(sys_clkout, "sys_clkout_src", &sys_clkout_src, 0x0,
+> +                  OMAP2420_PRCM_CLKOUT_CTRL, OMAP24XX_CLKOUT_DIV_SHIFT,
+> +                  OMAP24XX_CLKOUT_DIV_WIDTH, CLK_DIVIDER_POWER_OF_TWO, NULL);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(sys_clkout2_src, "wkup_clkdm",
+> +                        common_clkout_src_clksel, OMAP2420_PRCM_CLKOUT_CTRL,
+> +                        OMAP2420_CLKOUT2_SOURCE_MASK,
+> +                        OMAP2420_PRCM_CLKOUT_CTRL, OMAP2420_CLKOUT2_EN_SHIFT,
+> +                        NULL, sys_clkout_src_parent_names, gpt1_fck_ops);
+> +
+> +DEFINE_CLK_DIVIDER(sys_clkout2, "sys_clkout2_src", &sys_clkout2_src, 0x0,
+> +                  OMAP2420_PRCM_CLKOUT_CTRL, OMAP2420_CLKOUT2_DIV_SHIFT,
+> +                  OMAP2420_CLKOUT2_DIV_WIDTH, CLK_DIVIDER_POWER_OF_TWO, NULL);
+> +
+> +static struct clk uart1_fck;
+> +
+> +static struct clk_hw_omap uart1_fck_hw = {
+> +       .hw = {
+> +               .clk = &uart1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart1_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart1_ick;
+> +
+> +static struct clk_hw_omap uart1_ick_hw = {
+> +       .hw = {
+> +               .clk = &uart1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart2_fck;
+> +
+> +static struct clk_hw_omap uart2_fck_hw = {
+> +       .hw = {
+> +               .clk = &uart2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart2_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart2_ick;
+> +
+> +static struct clk_hw_omap uart2_ick_hw = {
+> +       .hw = {
+> +               .clk = &uart2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart3_fck;
+> +
+> +static struct clk_hw_omap uart3_fck_hw = {
+> +       .hw = {
+> +               .clk = &uart3_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_UART3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart3_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart3_ick;
+> +
+> +static struct clk_hw_omap uart3_ick_hw = {
+> +       .hw = {
+> +               .clk = &uart3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_UART3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk usb_fck;
+> +
+> +static struct clk_hw_omap usb_fck_hw = {
+> +       .hw = {
+> +               .clk = &usb_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_USB_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(usb_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate usb_l4_ick_core_l3_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel usb_l4_ick_clksel[] = {
+> +       { .parent = &core_l3_ck, .rates = usb_l4_ick_core_l3_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *usb_l4_ick_parent_names[] = {
+> +       "core_l3_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(usb_l4_ick, "core_l4_clkdm", usb_l4_ick_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_USB_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +                        OMAP24XX_EN_USB_SHIFT, &clkhwops_iclk_wait,
+> +                        usb_l4_ick_parent_names, dsp_fck_ops);
+> +
+> +static struct clk virt_prcm_set;
+> +
+> +static const char *virt_prcm_set_parent_names[] = {
+> +       "mpu_ck",
+> +};
+> +
+> +static const struct clk_ops virt_prcm_set_ops = {
+> +       .recalc_rate    = &omap2_table_mpu_recalc,
+> +       .set_rate       = &omap2_select_table_rate,
+> +       .round_rate     = &omap2_round_to_table_rate,
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(virt_prcm_set, NULL);
+> +DEFINE_STRUCT_CLK(virt_prcm_set, virt_prcm_set_parent_names, virt_prcm_set_ops);
+> +
+> +static const struct clksel_rate vlynq_fck_96m_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_242X },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate vlynq_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_242X },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_242X },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_242X },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_242X },
+> +       { .div = 6, .val = 6, .flags = RATE_IN_242X },
+> +       { .div = 8, .val = 8, .flags = RATE_IN_242X },
+> +       { .div = 9, .val = 9, .flags = RATE_IN_242X },
+> +       { .div = 12, .val = 12, .flags = RATE_IN_242X },
+> +       { .div = 16, .val = 16, .flags = RATE_IN_242X },
+> +       { .div = 18, .val = 18, .flags = RATE_IN_242X },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel vlynq_fck_clksel[] = {
+> +       { .parent = &func_96m_ck, .rates = vlynq_fck_96m_rates },
+> +       { .parent = &core_ck, .rates = vlynq_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *vlynq_fck_parent_names[] = {
+> +       "func_96m_ck", "core_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(vlynq_fck, "core_l3_clkdm", vlynq_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP2420_CLKSEL_VLYNQ_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP2420_EN_VLYNQ_SHIFT, &clkhwops_wait,
+> +                        vlynq_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk vlynq_ick;
+> +
+> +static struct clk_hw_omap vlynq_ick_hw = {
+> +       .hw = {
+> +               .clk = &vlynq_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_VLYNQ_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(vlynq_ick, gfx_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt1_ick;
+> +
+> +static struct clk_hw_omap wdt1_ick_hw = {
+> +       .hw = {
+> +               .clk = &wdt1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_WDT1_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt1_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt1_osc_ck;
+> +
+> +static const struct clk_ops wdt1_osc_ck_ops = {};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(wdt1_osc_ck, NULL);
+> +DEFINE_STRUCT_CLK(wdt1_osc_ck, sys_ck_parent_names, wdt1_osc_ck_ops);
+> +
+> +static struct clk wdt3_fck;
+> +
+> +static struct clk_hw_omap wdt3_fck_hw = {
+> +       .hw = {
+> +               .clk = &wdt3_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP2420_EN_WDT3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt3_fck, gpios_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt3_ick;
+> +
+> +static struct clk_hw_omap wdt3_ick_hw = {
+> +       .hw = {
+> +               .clk = &wdt3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_WDT3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt4_fck;
+> +
+> +static struct clk_hw_omap wdt4_fck_hw = {
+> +       .hw = {
+> +               .clk = &wdt4_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_WDT4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt4_fck, gpios_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt4_ick;
+> +
+> +static struct clk_hw_omap wdt4_ick_hw = {
+> +       .hw = {
+> +               .clk = &wdt4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_WDT4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +/*
+> + * clkdev integration
+> + */
+> +
+> +static struct omap_clk omap2420_clks[] = {
+> +       /* external root sources */
+> +       CLK(NULL,       "func_32k_ck",  &func_32k_ck,   CK_242X),
+> +       CLK(NULL,       "secure_32k_ck", &secure_32k_ck, CK_242X),
+> +       CLK(NULL,       "osc_ck",       &osc_ck,        CK_242X),
+> +       CLK(NULL,       "sys_ck",       &sys_ck,        CK_242X),
+> +       CLK(NULL,       "alt_ck",       &alt_ck,        CK_242X),
+> +       CLK(NULL,       "mcbsp_clks",   &mcbsp_clks,    CK_242X),
+> +       /* internal analog sources */
+> +       CLK(NULL,       "dpll_ck",      &dpll_ck,       CK_242X),
+> +       CLK(NULL,       "apll96_ck",    &apll96_ck,     CK_242X),
+> +       CLK(NULL,       "apll54_ck",    &apll54_ck,     CK_242X),
+> +       /* internal prcm root sources */
+> +       CLK(NULL,       "func_54m_ck",  &func_54m_ck,   CK_242X),
+> +       CLK(NULL,       "core_ck",      &core_ck,       CK_242X),
+> +       CLK(NULL,       "func_96m_ck",  &func_96m_ck,   CK_242X),
+> +       CLK(NULL,       "func_48m_ck",  &func_48m_ck,   CK_242X),
+> +       CLK(NULL,       "func_12m_ck",  &func_12m_ck,   CK_242X),
+> +       CLK(NULL,       "ck_wdt1_osc",  &wdt1_osc_ck,   CK_242X),
+> +       CLK(NULL,       "sys_clkout_src", &sys_clkout_src, CK_242X),
+> +       CLK(NULL,       "sys_clkout",   &sys_clkout,    CK_242X),
+> +       CLK(NULL,       "sys_clkout2_src", &sys_clkout2_src, CK_242X),
+> +       CLK(NULL,       "sys_clkout2",  &sys_clkout2,   CK_242X),
+> +       CLK(NULL,       "emul_ck",      &emul_ck,       CK_242X),
+> +       /* mpu domain clocks */
+> +       CLK(NULL,       "mpu_ck",       &mpu_ck,        CK_242X),
+> +       /* dsp domain clocks */
+> +       CLK(NULL,       "dsp_fck",      &dsp_fck,       CK_242X),
+> +       CLK(NULL,       "dsp_ick",      &dsp_ick,       CK_242X),
+> +       CLK(NULL,       "iva1_ifck",    &iva1_ifck,     CK_242X),
+> +       CLK(NULL,       "iva1_mpu_int_ifck", &iva1_mpu_int_ifck, CK_242X),
+> +       /* GFX domain clocks */
+> +       CLK(NULL,       "gfx_3d_fck",   &gfx_3d_fck,    CK_242X),
+> +       CLK(NULL,       "gfx_2d_fck",   &gfx_2d_fck,    CK_242X),
+> +       CLK(NULL,       "gfx_ick",      &gfx_ick,       CK_242X),
+> +       /* DSS domain clocks */
+> +       CLK("omapdss_dss",      "ick",          &dss_ick,       CK_242X),
+> +       CLK(NULL,       "dss_ick",              &dss_ick,       CK_242X),
+> +       CLK(NULL,       "dss1_fck",             &dss1_fck,      CK_242X),
+> +       CLK(NULL,       "dss2_fck",     &dss2_fck,      CK_242X),
+> +       CLK(NULL,       "dss_54m_fck",  &dss_54m_fck,   CK_242X),
+> +       /* L3 domain clocks */
+> +       CLK(NULL,       "core_l3_ck",   &core_l3_ck,    CK_242X),
+> +       CLK(NULL,       "ssi_fck",      &ssi_ssr_sst_fck, CK_242X),
+> +       CLK(NULL,       "usb_l4_ick",   &usb_l4_ick,    CK_242X),
+> +       /* L4 domain clocks */
+> +       CLK(NULL,       "l4_ck",        &l4_ck,         CK_242X),
+> +       CLK(NULL,       "ssi_l4_ick",   &ssi_l4_ick,    CK_242X),
+> +       CLK(NULL,       "wu_l4_ick",    &wu_l4_ick,     CK_242X),
+> +       /* virtual meta-group clock */
+> +       CLK(NULL,       "virt_prcm_set", &virt_prcm_set, CK_242X),
+> +       /* general l4 interface ck, multi-parent functional clk */
+> +       CLK(NULL,       "gpt1_ick",     &gpt1_ick,      CK_242X),
+> +       CLK(NULL,       "gpt1_fck",     &gpt1_fck,      CK_242X),
+> +       CLK(NULL,       "gpt2_ick",     &gpt2_ick,      CK_242X),
+> +       CLK(NULL,       "gpt2_fck",     &gpt2_fck,      CK_242X),
+> +       CLK(NULL,       "gpt3_ick",     &gpt3_ick,      CK_242X),
+> +       CLK(NULL,       "gpt3_fck",     &gpt3_fck,      CK_242X),
+> +       CLK(NULL,       "gpt4_ick",     &gpt4_ick,      CK_242X),
+> +       CLK(NULL,       "gpt4_fck",     &gpt4_fck,      CK_242X),
+> +       CLK(NULL,       "gpt5_ick",     &gpt5_ick,      CK_242X),
+> +       CLK(NULL,       "gpt5_fck",     &gpt5_fck,      CK_242X),
+> +       CLK(NULL,       "gpt6_ick",     &gpt6_ick,      CK_242X),
+> +       CLK(NULL,       "gpt6_fck",     &gpt6_fck,      CK_242X),
+> +       CLK(NULL,       "gpt7_ick",     &gpt7_ick,      CK_242X),
+> +       CLK(NULL,       "gpt7_fck",     &gpt7_fck,      CK_242X),
+> +       CLK(NULL,       "gpt8_ick",     &gpt8_ick,      CK_242X),
+> +       CLK(NULL,       "gpt8_fck",     &gpt8_fck,      CK_242X),
+> +       CLK(NULL,       "gpt9_ick",     &gpt9_ick,      CK_242X),
+> +       CLK(NULL,       "gpt9_fck",     &gpt9_fck,      CK_242X),
+> +       CLK(NULL,       "gpt10_ick",    &gpt10_ick,     CK_242X),
+> +       CLK(NULL,       "gpt10_fck",    &gpt10_fck,     CK_242X),
+> +       CLK(NULL,       "gpt11_ick",    &gpt11_ick,     CK_242X),
+> +       CLK(NULL,       "gpt11_fck",    &gpt11_fck,     CK_242X),
+> +       CLK(NULL,       "gpt12_ick",    &gpt12_ick,     CK_242X),
+> +       CLK(NULL,       "gpt12_fck",    &gpt12_fck,     CK_242X),
+> +       CLK("omap-mcbsp.1", "ick",      &mcbsp1_ick,    CK_242X),
+> +       CLK(NULL,       "mcbsp1_ick",   &mcbsp1_ick,    CK_242X),
+> +       CLK(NULL,       "mcbsp1_fck",   &mcbsp1_fck,    CK_242X),
+> +       CLK("omap-mcbsp.2", "ick",      &mcbsp2_ick,    CK_242X),
+> +       CLK(NULL,       "mcbsp2_ick",   &mcbsp2_ick,    CK_242X),
+> +       CLK(NULL,       "mcbsp2_fck",   &mcbsp2_fck,    CK_242X),
+> +       CLK("omap2_mcspi.1", "ick",     &mcspi1_ick,    CK_242X),
+> +       CLK(NULL,       "mcspi1_ick",   &mcspi1_ick,    CK_242X),
+> +       CLK(NULL,       "mcspi1_fck",   &mcspi1_fck,    CK_242X),
+> +       CLK("omap2_mcspi.2", "ick",     &mcspi2_ick,    CK_242X),
+> +       CLK(NULL,       "mcspi2_ick",   &mcspi2_ick,    CK_242X),
+> +       CLK(NULL,       "mcspi2_fck",   &mcspi2_fck,    CK_242X),
+> +       CLK(NULL,       "uart1_ick",    &uart1_ick,     CK_242X),
+> +       CLK(NULL,       "uart1_fck",    &uart1_fck,     CK_242X),
+> +       CLK(NULL,       "uart2_ick",    &uart2_ick,     CK_242X),
+> +       CLK(NULL,       "uart2_fck",    &uart2_fck,     CK_242X),
+> +       CLK(NULL,       "uart3_ick",    &uart3_ick,     CK_242X),
+> +       CLK(NULL,       "uart3_fck",    &uart3_fck,     CK_242X),
+> +       CLK(NULL,       "gpios_ick",    &gpios_ick,     CK_242X),
+> +       CLK(NULL,       "gpios_fck",    &gpios_fck,     CK_242X),
+> +       CLK("omap_wdt", "ick",          &mpu_wdt_ick,   CK_242X),
+> +       CLK(NULL,       "mpu_wdt_ick",          &mpu_wdt_ick,   CK_242X),
+> +       CLK(NULL,       "mpu_wdt_fck",  &mpu_wdt_fck,   CK_242X),
+> +       CLK(NULL,       "sync_32k_ick", &sync_32k_ick,  CK_242X),
+> +       CLK(NULL,       "wdt1_ick",     &wdt1_ick,      CK_242X),
+> +       CLK(NULL,       "omapctrl_ick", &omapctrl_ick,  CK_242X),
+> +       CLK("omap24xxcam", "fck",       &cam_fck,       CK_242X),
+> +       CLK(NULL,       "cam_fck",      &cam_fck,       CK_242X),
+> +       CLK("omap24xxcam", "ick",       &cam_ick,       CK_242X),
+> +       CLK(NULL,       "cam_ick",      &cam_ick,       CK_242X),
+> +       CLK(NULL,       "mailboxes_ick", &mailboxes_ick,        CK_242X),
+> +       CLK(NULL,       "wdt4_ick",     &wdt4_ick,      CK_242X),
+> +       CLK(NULL,       "wdt4_fck",     &wdt4_fck,      CK_242X),
+> +       CLK(NULL,       "wdt3_ick",     &wdt3_ick,      CK_242X),
+> +       CLK(NULL,       "wdt3_fck",     &wdt3_fck,      CK_242X),
+> +       CLK(NULL,       "mspro_ick",    &mspro_ick,     CK_242X),
+> +       CLK(NULL,       "mspro_fck",    &mspro_fck,     CK_242X),
+> +       CLK("mmci-omap.0", "ick",       &mmc_ick,       CK_242X),
+> +       CLK(NULL,       "mmc_ick",      &mmc_ick,       CK_242X),
+> +       CLK("mmci-omap.0", "fck",       &mmc_fck,       CK_242X),
+> +       CLK(NULL,       "mmc_fck",      &mmc_fck,       CK_242X),
+> +       CLK(NULL,       "fac_ick",      &fac_ick,       CK_242X),
+> +       CLK(NULL,       "fac_fck",      &fac_fck,       CK_242X),
+> +       CLK(NULL,       "eac_ick",      &eac_ick,       CK_242X),
+> +       CLK(NULL,       "eac_fck",      &eac_fck,       CK_242X),
+> +       CLK("omap_hdq.0", "ick",        &hdq_ick,       CK_242X),
+> +       CLK(NULL,       "hdq_ick",      &hdq_ick,       CK_242X),
+> +       CLK("omap_hdq.0", "fck",        &hdq_fck,       CK_242X),
+> +       CLK(NULL,       "hdq_fck",      &hdq_fck,       CK_242X),
+> +       CLK("omap_i2c.1", "ick",        &i2c1_ick,      CK_242X),
+> +       CLK(NULL,       "i2c1_ick",     &i2c1_ick,      CK_242X),
+> +       CLK(NULL,       "i2c1_fck",     &i2c1_fck,      CK_242X),
+> +       CLK("omap_i2c.2", "ick",        &i2c2_ick,      CK_242X),
+> +       CLK(NULL,       "i2c2_ick",     &i2c2_ick,      CK_242X),
+> +       CLK(NULL,       "i2c2_fck",     &i2c2_fck,      CK_242X),
+> +       CLK(NULL,       "gpmc_fck",     &gpmc_fck,      CK_242X),
+> +       CLK(NULL,       "sdma_fck",     &sdma_fck,      CK_242X),
+> +       CLK(NULL,       "sdma_ick",     &sdma_ick,      CK_242X),
+> +       CLK(NULL,       "sdrc_ick",     &sdrc_ick,      CK_242X),
+> +       CLK(NULL,       "vlynq_ick",    &vlynq_ick,     CK_242X),
+> +       CLK(NULL,       "vlynq_fck",    &vlynq_fck,     CK_242X),
+> +       CLK(NULL,       "des_ick",      &des_ick,       CK_242X),
+> +       CLK("omap-sham",        "ick",  &sha_ick,       CK_242X),
+> +       CLK(NULL,       "sha_ick",      &sha_ick,       CK_242X),
+> +       CLK("omap_rng", "ick",          &rng_ick,       CK_242X),
+> +       CLK(NULL,       "rng_ick",              &rng_ick,       CK_242X),
+> +       CLK("omap-aes", "ick",  &aes_ick,       CK_242X),
+> +       CLK(NULL,       "aes_ick",      &aes_ick,       CK_242X),
+> +       CLK(NULL,       "pka_ick",      &pka_ick,       CK_242X),
+> +       CLK(NULL,       "usb_fck",      &usb_fck,       CK_242X),
+> +       CLK("musb-hdrc",        "fck",  &osc_ck,        CK_242X),
+> +       CLK(NULL,       "timer_32k_ck", &func_32k_ck,   CK_242X),
+> +       CLK(NULL,       "timer_sys_ck", &sys_ck,        CK_242X),
+> +       CLK(NULL,       "timer_ext_ck", &alt_ck,        CK_242X),
+> +       CLK(NULL,       "cpufreq_ck",   &virt_prcm_set, CK_242X),
+> +};
+> +
+> +
+> +static const char *enable_init_clks[] = {
+> +       "apll96_ck",
+> +       "apll54_ck",
+> +       "sync_32k_ick",
+> +       "omapctrl_ick",
+> +       "gpmc_fck",
+> +       "sdrc_ick",
+> +};
+> +
+> +/*
+> + * init code
+> + */
+> +
+> +int __init omap2420_clk_init(void)
+> +{
+> +       const struct prcm_config *prcm;
+> +       struct omap_clk *c;
+> +       unsigned long clkrate;
+> +
+> +       prcm_clksrc_ctrl = OMAP2420_PRCM_CLKSRC_CTRL;
+> +       cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
+> +       cpu_mask = RATE_IN_242X;
+> +       rate_table = omap2420_rate_table;
+> +
+> +       /* Check the MPU rate set by bootloader */
+> +       clkrate = omap2xxx_clk_get_core_rate(&dpll_ck_hw);
+> +       for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+> +               if (!(prcm->flags & cpu_mask))
+> +                       continue;
+> +               if (prcm->xtal_speed != sys_ck.rate)
+> +                       continue;
+> +               if (prcm->dpll_speed <= clkrate)
+> +                       break;
+> +       }
+> +
+> +       curr_prcm_set = prcm;
+> +
+> +       for (c = omap2420_clks; c < omap2420_clks + ARRAY_SIZE(omap2420_clks);
+> +            c++) {
+> +               clkdev_add(&c->lk);
+> +               if (!__clk_init(NULL, c->lk.clk))
+> +                       omap2_init_clk_hw_omap_clocks(c->lk.clk);
+> +       }
+> +
+> +       omap2_clk_disable_autoidle_all();
+> +
+> +       omap2_clk_enable_init_clocks(enable_init_clks,
+> +                                    ARRAY_SIZE(enable_init_clks));
+> +
+> +       pr_info("Clocking rate (Crystal/DPLL/MPU): %ld.%01ld/%ld/%ld MHz\n",
+> +               (clk_get_rate(&sys_ck) / 1000000),
+> +               (clk_get_rate(&sys_ck) / 100000) % 10,
+> +               (clk_get_rate(&dpll_ck) / 1000000),
+> +               (clk_get_rate(&mpu_ck) / 1000000));
+> +
+> +       return 0;
+> +}
+> diff --git a/arch/arm/mach-omap2/cclock2430_data.c b/arch/arm/mach-omap2/cclock2430_data.c
+> new file mode 100644
+> index 0000000..102fbba
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/cclock2430_data.c
+> @@ -0,0 +1,2076 @@
+> +/*
+> + * OMAP2430 clock data
+> + *
+> + * Copyright (C) 2005-2009, 2012 Texas Instruments, Inc.
+> + * Copyright (C) 2004-2011 Nokia Corporation
+> + *
+> + * Contacts:
+> + * Richard Woodruff <r-woodruff2@ti.com>
+> + * Paul Walmsley
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-private.h>
+> +#include <linux/list.h>
+> +
+> +#include "soc.h"
+> +#include "iomap.h"
+> +#include "clock.h"
+> +#include "clock2xxx.h"
+> +#include "opp2xxx.h"
+> +#include "cm2xxx.h"
+> +#include "prm2xxx.h"
+> +#include "prm-regbits-24xx.h"
+> +#include "cm-regbits-24xx.h"
+> +#include "sdrc.h"
+> +#include "control.h"
+> +
+> +#define OMAP_CM_REGADDR                        OMAP2430_CM_REGADDR
+> +
+> +/*
+> + * 2430 clock tree.
+> + *
+> + * NOTE:In many cases here we are assigning a 'default' parent. In
+> + *     many cases the parent is selectable. The set parent calls will
+> + *     also switch sources.
+> + *
+> + *     Several sources are given initial rates which may be wrong, this will
+> + *     be fixed up in the init func.
+> + *
+> + *     Things are broadly separated below by clock domains. It is
+> + *     noteworthy that most peripherals have dependencies on multiple clock
+> + *     domains. Many get their interface clocks from the L4 domain, but get
+> + *     functional clocks from fixed sources or other core domain derived
+> + *     clocks.
+> + */
+> +
+> +DEFINE_CLK_FIXED_RATE(alt_ck, CLK_IS_ROOT, 54000000, 0x0);
+> +
+> +DEFINE_CLK_FIXED_RATE(func_32k_ck, CLK_IS_ROOT, 32768, 0x0);
+> +
+> +DEFINE_CLK_FIXED_RATE(mcbsp_clks, CLK_IS_ROOT, 0x0, 0x0);
+> +
+> +static struct clk osc_ck;
+> +
+> +static const struct clk_ops osc_ck_ops = {
+> +       .enable         = &omap2_enable_osc_ck,
+> +       .disable        = omap2_disable_osc_ck,
+> +       .recalc_rate    = &omap2_osc_clk_recalc,
+> +};
+> +
+> +static struct clk_hw_omap osc_ck_hw = {
+> +       .hw = {
+> +               .clk = &osc_ck,
+> +       },
+> +};
+> +
+> +static struct clk osc_ck = {
+> +       .name   = "osc_ck",
+> +       .ops    = &osc_ck_ops,
+> +       .hw     = &osc_ck_hw.hw,
+> +       .flags  = CLK_IS_ROOT,
+> +};
+> +
+> +DEFINE_CLK_FIXED_RATE(secure_32k_ck, CLK_IS_ROOT, 32768, 0x0);
+> +
+> +static struct clk sys_ck;
+> +
+> +static const char *sys_ck_parent_names[] = {
+> +       "osc_ck",
+> +};
+> +
+> +static const struct clk_ops sys_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .recalc_rate    = &omap2xxx_sys_clk_recalc,
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(sys_ck, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(sys_ck, sys_ck_parent_names, sys_ck_ops);
+> +
+> +static struct dpll_data dpll_dd = {
+> +       .mult_div1_reg  = OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+> +       .mult_mask      = OMAP24XX_DPLL_MULT_MASK,
+> +       .div1_mask      = OMAP24XX_DPLL_DIV_MASK,
+> +       .clk_bypass     = &sys_ck,
+> +       .clk_ref        = &sys_ck,
+> +       .control_reg    = OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
+> +       .enable_mask    = OMAP24XX_EN_DPLL_MASK,
+> +       .max_multiplier = 1023,
+> +       .min_divider    = 1,
+> +       .max_divider    = 16,
+> +};
+> +
+> +static struct clk dpll_ck;
+> +
+> +static const char *dpll_ck_parent_names[] = {
+> +       "sys_ck",
+> +};
+> +
+> +static const struct clk_ops dpll_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .get_parent             = &omap2_init_dpll_parent,
+> +       .recalc_rate    = &omap2_dpllcore_recalc,
+> +       .round_rate     = &omap2_dpll_round_rate,
+> +       .set_rate       = &omap2_reprogram_dpllcore,
+> +};
+> +
+> +static struct clk_hw_omap dpll_ck_hw = {
+> +       .hw = {
+> +               .clk = &dpll_ck,
+> +       },
+> +       .ops            = &clkhwops_omap2xxx_dpll,
+> +       .dpll_data      = &dpll_dd,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(dpll_ck, dpll_ck_parent_names, dpll_ck_ops);
+> +
+> +static struct clk core_ck;
+> +
+> +static const char *core_ck_parent_names[] = {
+> +       "dpll_ck",
+> +};
+> +
+> +static const struct clk_ops core_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(core_ck, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(core_ck, core_ck_parent_names, core_ck_ops);
+> +
+> +DEFINE_CLK_DIVIDER(core_l3_ck, "core_ck", &core_ck, 0x0,
+> +                  OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                  OMAP24XX_CLKSEL_L3_SHIFT, OMAP24XX_CLKSEL_L3_WIDTH,
+> +                  CLK_DIVIDER_ONE_BASED, NULL);
+> +
+> +DEFINE_CLK_DIVIDER(l4_ck, "core_l3_ck", &core_l3_ck, 0x0,
+> +                  OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                  OMAP24XX_CLKSEL_L4_SHIFT, OMAP24XX_CLKSEL_L4_WIDTH,
+> +                  CLK_DIVIDER_ONE_BASED, NULL);
+> +
+> +static struct clk aes_ick;
+> +
+> +static const char *aes_ick_parent_names[] = {
+> +       "l4_ck",
+> +};
+> +
+> +static const struct clk_ops aes_ick_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +};
+> +
+> +static struct clk_hw_omap aes_ick_hw = {
+> +       .hw = {
+> +               .clk = &aes_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_AES_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(aes_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk apll54_ck;
+> +
+> +static const struct clk_ops apll54_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_clk_apll54_enable,
+> +       .disable        = &omap2_clk_apll_disable,
+> +       .recalc_rate    = &omap2_clk_apll54_recalc,
+> +};
+> +
+> +static struct clk_hw_omap apll54_ck_hw = {
+> +       .hw = {
+> +               .clk = &apll54_ck,
+> +       },
+> +       .ops            = &clkhwops_apll54,
+> +       .enable_reg     = OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
+> +       .enable_bit     = OMAP24XX_EN_54M_PLL_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(apll54_ck, dpll_ck_parent_names, apll54_ck_ops);
+> +
+> +static struct clk apll96_ck;
+> +
+> +static const struct clk_ops apll96_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_clk_apll96_enable,
+> +       .disable        = &omap2_clk_apll_disable,
+> +       .recalc_rate    = &omap2_clk_apll96_recalc,
+> +};
+> +
+> +static struct clk_hw_omap apll96_ck_hw = {
+> +       .hw = {
+> +               .clk = &apll96_ck,
+> +       },
+> +       .ops            = &clkhwops_apll96,
+> +       .enable_reg     = OMAP_CM_REGADDR(PLL_MOD, CM_CLKEN),
+> +       .enable_bit     = OMAP24XX_EN_96M_PLL_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(apll96_ck, dpll_ck_parent_names, apll96_ck_ops);
+> +
+> +static const char *func_96m_ck_parent_names[] = {
+> +       "apll96_ck", "alt_ck",
+> +};
+> +
+> +DEFINE_CLK_MUX(func_96m_ck, func_96m_ck_parent_names, NULL, 0x0,
+> +              OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1), OMAP2430_96M_SOURCE_SHIFT,
+> +              OMAP2430_96M_SOURCE_WIDTH, 0x0, NULL);
+> +
+> +static struct clk cam_fck;
+> +
+> +static const char *cam_fck_parent_names[] = {
+> +       "func_96m_ck",
+> +};
+> +
+> +static struct clk_hw_omap cam_fck_hw = {
+> +       .hw = {
+> +               .clk = &cam_fck,
+> +       },
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_CAM_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(cam_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk cam_ick;
+> +
+> +static struct clk_hw_omap cam_ick_hw = {
+> +       .hw = {
+> +               .clk = &cam_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_CAM_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(cam_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk des_ick;
+> +
+> +static struct clk_hw_omap des_ick_hw = {
+> +       .hw = {
+> +               .clk = &des_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_DES_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(des_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate dsp_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel dsp_fck_clksel[] = {
+> +       { .parent = &core_ck, .rates = dsp_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dsp_fck_parent_names[] = {
+> +       "core_ck",
+> +};
+> +
+> +static struct clk dsp_fck;
+> +
+> +static const struct clk_ops dsp_fck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .set_rate       = &omap2_clksel_set_rate,
+> +       .round_rate     = &omap2_clksel_round_rate,
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dsp_fck, "dsp_clkdm", dsp_fck_clksel,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
+> +                        OMAP24XX_CLKSEL_DSP_MASK,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
+> +                        OMAP24XX_CM_FCLKEN_DSP_EN_DSP_SHIFT, &clkhwops_wait,
+> +                        dsp_fck_parent_names, dsp_fck_ops);
+> +
+> +static const struct clksel_rate dss1_fck_sys_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate dss1_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 5, .val = 5, .flags = RATE_IN_24XX },
+> +       { .div = 6, .val = 6, .flags = RATE_IN_24XX },
+> +       { .div = 8, .val = 8, .flags = RATE_IN_24XX },
+> +       { .div = 9, .val = 9, .flags = RATE_IN_24XX },
+> +       { .div = 12, .val = 12, .flags = RATE_IN_24XX },
+> +       { .div = 16, .val = 16, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel dss1_fck_clksel[] = {
+> +       { .parent = &sys_ck, .rates = dss1_fck_sys_rates },
+> +       { .parent = &core_ck, .rates = dss1_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dss1_fck_parent_names[] = {
+> +       "sys_ck", "core_ck",
+> +};
+> +
+> +static const struct clk_ops dss1_fck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .get_parent     = &omap2_clksel_find_parent_index,
+> +       .set_parent     = &omap2_clksel_set_parent,
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dss1_fck, "dss_clkdm", dss1_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_DSS1_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_DSS1_SHIFT, NULL,
+> +                        dss1_fck_parent_names, dss1_fck_ops);
+> +
+> +static const struct clksel_rate dss2_fck_sys_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate dss2_fck_48m_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate func_48m_apll96_rates[] = {
+> +       { .div = 2, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate func_48m_alt_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel func_48m_clksel[] = {
+> +       { .parent = &apll96_ck, .rates = func_48m_apll96_rates },
+> +       { .parent = &alt_ck, .rates = func_48m_alt_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *func_48m_ck_parent_names[] = {
+> +       "apll96_ck", "alt_ck",
+> +};
+> +
+> +static struct clk func_48m_ck;
+> +
+> +static const struct clk_ops func_48m_ck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .set_rate       = &omap2_clksel_set_rate,
+> +       .round_rate     = &omap2_clksel_round_rate,
+> +       .get_parent     = &omap2_clksel_find_parent_index,
+> +       .set_parent     = &omap2_clksel_set_parent,
+> +};
+> +
+> +static struct clk_hw_omap func_48m_ck_hw = {
+> +       .hw = {
+> +               .clk = &func_48m_ck,
+> +       },
+> +       .clksel         = func_48m_clksel,
+> +       .clksel_reg     = OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+> +       .clksel_mask    = OMAP24XX_48M_SOURCE_MASK,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(func_48m_ck, func_48m_ck_parent_names, func_48m_ck_ops);
+> +
+> +static const struct clksel dss2_fck_clksel[] = {
+> +       { .parent = &sys_ck, .rates = dss2_fck_sys_rates },
+> +       { .parent = &func_48m_ck, .rates = dss2_fck_48m_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *dss2_fck_parent_names[] = {
+> +       "sys_ck", "func_48m_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(dss2_fck, "dss_clkdm", dss2_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_DSS2_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_DSS2_SHIFT, NULL,
+> +                        dss2_fck_parent_names, dss1_fck_ops);
+> +
+> +static const char *func_54m_ck_parent_names[] = {
+> +       "apll54_ck", "alt_ck",
+> +};
+> +
+> +DEFINE_CLK_MUX(func_54m_ck, func_54m_ck_parent_names, NULL, 0x0,
+> +              OMAP_CM_REGADDR(PLL_MOD, CM_CLKSEL1),
+> +              OMAP24XX_54M_SOURCE_SHIFT, OMAP24XX_54M_SOURCE_WIDTH, 0x0, NULL);
+> +
+> +static struct clk dss_54m_fck;
+> +
+> +static const char *dss_54m_fck_parent_names[] = {
+> +       "func_54m_ck",
+> +};
+> +
+> +static struct clk_hw_omap dss_54m_fck_hw = {
+> +       .hw = {
+> +               .clk = &dss_54m_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_TV_SHIFT,
+> +       .clkdm_name     = "dss_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(dss_54m_fck, dss_54m_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk dss_ick;
+> +
+> +static struct clk_hw_omap dss_ick_hw = {
+> +       .hw = {
+> +               .clk = &dss_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_DSS1_SHIFT,
+> +       .clkdm_name     = "dss_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(dss_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk emul_ck;
+> +
+> +static struct clk_hw_omap emul_ck_hw = {
+> +       .hw = {
+> +               .clk = &emul_ck,
+> +       },
+> +       .enable_reg     = OMAP2430_PRCM_CLKEMUL_CTRL,
+> +       .enable_bit     = OMAP24XX_EMULATION_EN_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(emul_ck, dss_54m_fck_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_FIXED_FACTOR(func_12m_ck, "func_48m_ck", &func_48m_ck, 0x0, 1, 4);
+> +
+> +static struct clk fac_fck;
+> +
+> +static const char *fac_fck_parent_names[] = {
+> +       "func_12m_ck",
+> +};
+> +
+> +static struct clk_hw_omap fac_fck_hw = {
+> +       .hw = {
+> +               .clk = &fac_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_FAC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(fac_fck, fac_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk fac_ick;
+> +
+> +static struct clk_hw_omap fac_ick_hw = {
+> +       .hw = {
+> +               .clk = &fac_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_FAC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(fac_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel gfx_fck_clksel[] = {
+> +       { .parent = &core_l3_ck, .rates = gfx_l3_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *gfx_2d_fck_parent_names[] = {
+> +       "core_l3_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gfx_2d_fck, "gfx_clkdm", gfx_fck_clksel,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
+> +                        OMAP_CLKSEL_GFX_MASK,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
+> +                        OMAP24XX_EN_2D_SHIFT, &clkhwops_wait,
+> +                        gfx_2d_fck_parent_names, dsp_fck_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gfx_3d_fck, "gfx_clkdm", gfx_fck_clksel,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_CLKSEL),
+> +                        OMAP_CLKSEL_GFX_MASK,
+> +                        OMAP_CM_REGADDR(GFX_MOD, CM_FCLKEN),
+> +                        OMAP24XX_EN_3D_SHIFT, &clkhwops_wait,
+> +                        gfx_2d_fck_parent_names, dsp_fck_ops);
+> +
+> +static struct clk gfx_ick;
+> +
+> +static const char *gfx_ick_parent_names[] = {
+> +       "core_l3_ck",
+> +};
+> +
+> +static struct clk_hw_omap gfx_ick_hw = {
+> +       .hw = {
+> +               .clk = &gfx_ick,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(GFX_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP_EN_GFX_SHIFT,
+> +       .clkdm_name     = "gfx_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gfx_ick, gfx_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpio5_fck;
+> +
+> +static const char *gpio5_fck_parent_names[] = {
+> +       "func_32k_ck",
+> +};
+> +
+> +static struct clk_hw_omap gpio5_fck_hw = {
+> +       .hw = {
+> +               .clk = &gpio5_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_GPIO5_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpio5_fck, gpio5_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpio5_ick;
+> +
+> +static struct clk_hw_omap gpio5_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpio5_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_GPIO5_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpio5_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpios_fck;
+> +
+> +static struct clk_hw_omap gpios_fck_hw = {
+> +       .hw = {
+> +               .clk = &gpios_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+> +       .enable_bit     = OMAP24XX_EN_GPIOS_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpios_fck, gpio5_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk wu_l4_ick;
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(wu_l4_ick, "wkup_clkdm");
+> +DEFINE_STRUCT_CLK(wu_l4_ick, dpll_ck_parent_names, core_ck_ops);
+> +
+> +static struct clk gpios_ick;
+> +
+> +static const char *gpios_ick_parent_names[] = {
+> +       "wu_l4_ick",
+> +};
+> +
+> +static struct clk_hw_omap gpios_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpios_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_GPIOS_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpios_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpmc_fck;
+> +
+> +static struct clk_hw_omap gpmc_fck_hw = {
+> +       .hw = {
+> +               .clk = &gpmc_fck,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+> +       .enable_bit     = OMAP24XX_AUTO_GPMC_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpmc_fck, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static const struct clksel_rate gpt_alt_rates[] = {
+> +       { .div = 1, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel omap24xx_gpt_clksel[] = {
+> +       { .parent = &func_32k_ck, .rates = gpt_32k_rates },
+> +       { .parent = &sys_ck, .rates = gpt_sys_rates },
+> +       { .parent = &alt_ck, .rates = gpt_alt_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *gpt10_fck_parent_names[] = {
+> +       "func_32k_ck", "sys_ck", "alt_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt10_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT10_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT10_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt10_ick;
+> +
+> +static struct clk_hw_omap gpt10_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt10_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT10_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt10_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt11_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT11_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT11_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt11_ick;
+> +
+> +static struct clk_hw_omap gpt11_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt11_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT11_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt11_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt12_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT12_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT12_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt12_ick;
+> +
+> +static struct clk_hw_omap gpt12_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt12_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT12_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt12_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clk_ops gpt1_fck_ops = {
+> +       .init           = &omap2_init_clk_clkdm,
+> +       .enable         = &omap2_dflt_clk_enable,
+> +       .disable        = &omap2_dflt_clk_disable,
+> +       .is_enabled     = &omap2_dflt_clk_is_enabled,
+> +       .recalc_rate    = &omap2_clksel_recalc,
+> +       .set_rate       = &omap2_clksel_set_rate,
+> +       .round_rate     = &omap2_clksel_round_rate,
+> +       .get_parent     = &omap2_clksel_find_parent_index,
+> +       .set_parent     = &omap2_clksel_set_parent,
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt1_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(WKUP_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_GPT1_MASK,
+> +                        OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+> +                        OMAP24XX_EN_GPT1_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, gpt1_fck_ops);
+> +
+> +static struct clk gpt1_ick;
+> +
+> +static struct clk_hw_omap gpt1_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_GPT1_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt1_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt2_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT2_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT2_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt2_ick;
+> +
+> +static struct clk_hw_omap gpt2_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt3_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT3_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT3_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt3_ick;
+> +
+> +static struct clk_hw_omap gpt3_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt4_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT4_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT4_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt4_ick;
+> +
+> +static struct clk_hw_omap gpt4_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt5_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT5_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT5_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt5_ick;
+> +
+> +static struct clk_hw_omap gpt5_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt5_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT5_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt5_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt6_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT6_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT6_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt6_ick;
+> +
+> +static struct clk_hw_omap gpt6_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt6_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT6_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt6_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt7_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT7_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT7_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt7_ick;
+> +
+> +static struct clk_hw_omap gpt7_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt7_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT7_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt7_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk gpt8_fck;
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt8_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT8_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT8_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt8_ick;
+> +
+> +static struct clk_hw_omap gpt8_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt8_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT8_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt8_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(gpt9_fck, "core_l4_clkdm", omap24xx_gpt_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL2),
+> +                        OMAP24XX_CLKSEL_GPT9_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_GPT9_SHIFT, &clkhwops_wait,
+> +                        gpt10_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk gpt9_ick;
+> +
+> +static struct clk_hw_omap gpt9_ick_hw = {
+> +       .hw = {
+> +               .clk = &gpt9_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_GPT9_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(gpt9_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk hdq_fck;
+> +
+> +static struct clk_hw_omap hdq_fck_hw = {
+> +       .hw = {
+> +               .clk = &hdq_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_HDQ_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(hdq_fck, fac_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk hdq_ick;
+> +
+> +static struct clk_hw_omap hdq_ick_hw = {
+> +       .hw = {
+> +               .clk = &hdq_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_HDQ_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(hdq_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2c1_ick;
+> +
+> +static struct clk_hw_omap i2c1_ick_hw = {
+> +       .hw = {
+> +               .clk = &i2c1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_I2C1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2c1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2c2_ick;
+> +
+> +static struct clk_hw_omap i2c2_ick_hw = {
+> +       .hw = {
+> +               .clk = &i2c2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP2420_EN_I2C2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2c2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2chs1_fck;
+> +
+> +static struct clk_hw_omap i2chs1_fck_hw = {
+> +       .hw = {
+> +               .clk = &i2chs1_fck,
+> +       },
+> +       .ops            = &clkhwops_omap2430_i2chs_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_I2CHS1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2chs1_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk i2chs2_fck;
+> +
+> +static struct clk_hw_omap i2chs2_fck_hw = {
+> +       .hw = {
+> +               .clk = &i2chs2_fck,
+> +       },
+> +       .ops            = &clkhwops_omap2430_i2chs_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_I2CHS2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(i2chs2_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk icr_ick;
+> +
+> +static struct clk_hw_omap icr_ick_hw = {
+> +       .hw = {
+> +               .clk = &icr_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP2430_EN_ICR_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(icr_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel dsp_ick_clksel[] = {
+> +       { .parent = &dsp_fck, .rates = dsp_ick_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *iva2_1_ick_parent_names[] = {
+> +       "dsp_fck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(iva2_1_ick, "dsp_clkdm", dsp_ick_clksel,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_CLKSEL),
+> +                        OMAP24XX_CLKSEL_DSP_IF_MASK,
+> +                        OMAP_CM_REGADDR(OMAP24XX_DSP_MOD, CM_FCLKEN),
+> +                        OMAP24XX_CM_FCLKEN_DSP_EN_DSP_SHIFT, &clkhwops_wait,
+> +                        iva2_1_ick_parent_names, dsp_fck_ops);
+> +
+> +static struct clk mailboxes_ick;
+> +
+> +static struct clk_hw_omap mailboxes_ick_hw = {
+> +       .hw = {
+> +               .clk = &mailboxes_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MAILBOXES_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mailboxes_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate common_mcbsp_96m_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_mcbsp_mcbsp_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel mcbsp_fck_clksel[] = {
+> +       { .parent = &func_96m_ck, .rates = common_mcbsp_96m_rates },
+> +       { .parent = &mcbsp_clks, .rates = common_mcbsp_mcbsp_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *mcbsp1_fck_parent_names[] = {
+> +       "func_96m_ck", "mcbsp_clks",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp1_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP243X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
+> +                        OMAP2_MCBSP1_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_MCBSP1_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp1_ick;
+> +
+> +static struct clk_hw_omap mcbsp1_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCBSP1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp2_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP243X_CTRL_REGADDR(OMAP2_CONTROL_DEVCONF0),
+> +                        OMAP2_MCBSP2_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +                        OMAP24XX_EN_MCBSP2_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp2_ick;
+> +
+> +static struct clk_hw_omap mcbsp2_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCBSP2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp3_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP243X_CTRL_REGADDR(OMAP243X_CONTROL_DEVCONF1),
+> +                        OMAP2_MCBSP3_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +                        OMAP2430_EN_MCBSP3_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp3_ick;
+> +
+> +static struct clk_hw_omap mcbsp3_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MCBSP3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp4_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP243X_CTRL_REGADDR(OMAP243X_CONTROL_DEVCONF1),
+> +                        OMAP2_MCBSP4_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +                        OMAP2430_EN_MCBSP4_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp4_ick;
+> +
+> +static struct clk_hw_omap mcbsp4_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MCBSP4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mcbsp5_fck, "core_l4_clkdm", mcbsp_fck_clksel,
+> +                        OMAP243X_CTRL_REGADDR(OMAP243X_CONTROL_DEVCONF1),
+> +                        OMAP2_MCBSP5_CLKS_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +                        OMAP2430_EN_MCBSP5_SHIFT, &clkhwops_wait,
+> +                        mcbsp1_fck_parent_names, dss1_fck_ops);
+> +
+> +static struct clk mcbsp5_ick;
+> +
+> +static struct clk_hw_omap mcbsp5_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcbsp5_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MCBSP5_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcbsp5_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi1_fck;
+> +
+> +static const char *mcspi1_fck_parent_names[] = {
+> +       "func_48m_ck",
+> +};
+> +
+> +static struct clk_hw_omap mcspi1_fck_hw = {
+> +       .hw = {
+> +               .clk = &mcspi1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi1_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi1_ick;
+> +
+> +static struct clk_hw_omap mcspi1_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcspi1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi2_fck;
+> +
+> +static struct clk_hw_omap mcspi2_fck_hw = {
+> +       .hw = {
+> +               .clk = &mcspi2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi2_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi2_ick;
+> +
+> +static struct clk_hw_omap mcspi2_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcspi2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MCSPI2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi3_fck;
+> +
+> +static struct clk_hw_omap mcspi3_fck_hw = {
+> +       .hw = {
+> +               .clk = &mcspi3_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MCSPI3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi3_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mcspi3_ick;
+> +
+> +static struct clk_hw_omap mcspi3_ick_hw = {
+> +       .hw = {
+> +               .clk = &mcspi3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MCSPI3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mcspi3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate mdm_ick_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_243X },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_243X },
+> +       { .div = 6, .val = 6, .flags = RATE_IN_243X },
+> +       { .div = 9, .val = 9, .flags = RATE_IN_243X },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel mdm_ick_clksel[] = {
+> +       { .parent = &core_ck, .rates = mdm_ick_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *mdm_ick_parent_names[] = {
+> +       "core_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(mdm_ick, "mdm_clkdm", mdm_ick_clksel,
+> +                        OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_CLKSEL),
+> +                        OMAP2430_CLKSEL_MDM_MASK,
+> +                        OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_ICLKEN),
+> +                        OMAP2430_CM_ICLKEN_MDM_EN_MDM_SHIFT,
+> +                        &clkhwops_iclk_wait, mdm_ick_parent_names,
+> +                        dsp_fck_ops);
+> +
+> +static struct clk mdm_intc_ick;
+> +
+> +static struct clk_hw_omap mdm_intc_ick_hw = {
+> +       .hw = {
+> +               .clk = &mdm_intc_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MDM_INTC_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mdm_intc_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mdm_osc_ck;
+> +
+> +static struct clk_hw_omap mdm_osc_ck_hw = {
+> +       .hw = {
+> +               .clk = &mdm_osc_ck,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(OMAP2430_MDM_MOD, CM_FCLKEN),
+> +       .enable_bit     = OMAP2430_EN_OSC_SHIFT,
+> +       .clkdm_name     = "mdm_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mdm_osc_ck, sys_ck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmchs1_fck;
+> +
+> +static struct clk_hw_omap mmchs1_fck_hw = {
+> +       .hw = {
+> +               .clk = &mmchs1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MMCHS1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmchs1_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmchs1_ick;
+> +
+> +static struct clk_hw_omap mmchs1_ick_hw = {
+> +       .hw = {
+> +               .clk = &mmchs1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MMCHS1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmchs1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmchs2_fck;
+> +
+> +static struct clk_hw_omap mmchs2_fck_hw = {
+> +       .hw = {
+> +               .clk = &mmchs2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MMCHS2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmchs2_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmchs2_ick;
+> +
+> +static struct clk_hw_omap mmchs2_ick_hw = {
+> +       .hw = {
+> +               .clk = &mmchs2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MMCHS2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmchs2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmchsdb1_fck;
+> +
+> +static struct clk_hw_omap mmchsdb1_fck_hw = {
+> +       .hw = {
+> +               .clk = &mmchsdb1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MMCHSDB1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmchsdb1_fck, gpio5_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mmchsdb2_fck;
+> +
+> +static struct clk_hw_omap mmchsdb2_fck_hw = {
+> +       .hw = {
+> +               .clk = &mmchsdb2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP2430_EN_MMCHSDB2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mmchsdb2_fck, gpio5_fck_parent_names, aes_ick_ops);
+> +
+> +DEFINE_CLK_DIVIDER(mpu_ck, "core_ck", &core_ck, 0x0,
+> +                  OMAP_CM_REGADDR(MPU_MOD, CM_CLKSEL),
+> +                  OMAP24XX_CLKSEL_MPU_SHIFT, OMAP24XX_CLKSEL_MPU_WIDTH,
+> +                  CLK_DIVIDER_ONE_BASED, NULL);
+> +
+> +static struct clk mpu_wdt_fck;
+> +
+> +static struct clk_hw_omap mpu_wdt_fck_hw = {
+> +       .hw = {
+> +               .clk = &mpu_wdt_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_FCLKEN),
+> +       .enable_bit     = OMAP24XX_EN_MPU_WDT_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mpu_wdt_fck, gpio5_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mpu_wdt_ick;
+> +
+> +static struct clk_hw_omap mpu_wdt_ick_hw = {
+> +       .hw = {
+> +               .clk = &mpu_wdt_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_MPU_WDT_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mpu_wdt_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk mspro_fck;
+> +
+> +static struct clk_hw_omap mspro_fck_hw = {
+> +       .hw = {
+> +               .clk = &mspro_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MSPRO_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mspro_fck, cam_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk mspro_ick;
+> +
+> +static struct clk_hw_omap mspro_ick_hw = {
+> +       .hw = {
+> +               .clk = &mspro_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_MSPRO_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(mspro_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk omapctrl_ick;
+> +
+> +static struct clk_hw_omap omapctrl_ick_hw = {
+> +       .hw = {
+> +               .clk = &omapctrl_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_OMAPCTRL_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(omapctrl_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk pka_ick;
+> +
+> +static struct clk_hw_omap pka_ick_hw = {
+> +       .hw = {
+> +               .clk = &pka_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_PKA_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(pka_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk rng_ick;
+> +
+> +static struct clk_hw_omap rng_ick_hw = {
+> +       .hw = {
+> +               .clk = &rng_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_RNG_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(rng_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk sdma_fck;
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(sdma_fck, "core_l3_clkdm");
+> +DEFINE_STRUCT_CLK(sdma_fck, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static struct clk sdma_ick;
+> +
+> +static struct clk_hw_omap sdma_ick_hw = {
+> +       .hw = {
+> +               .clk = &sdma_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+> +       .enable_bit     = OMAP24XX_AUTO_SDMA_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sdma_ick, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static struct clk sdrc_ick;
+> +
+> +static struct clk_hw_omap sdrc_ick_hw = {
+> +       .hw = {
+> +               .clk = &sdrc_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN3),
+> +       .enable_bit     = OMAP2430_EN_SDRC_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sdrc_ick, gfx_ick_parent_names, core_ck_ops);
+> +
+> +static struct clk sha_ick;
+> +
+> +static struct clk_hw_omap sha_ick_hw = {
+> +       .hw = {
+> +               .clk = &sha_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_ICLKEN4),
+> +       .enable_bit     = OMAP24XX_EN_SHA_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sha_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk ssi_l4_ick;
+> +
+> +static struct clk_hw_omap ssi_l4_ick_hw = {
+> +       .hw = {
+> +               .clk = &ssi_l4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_SSI_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(ssi_l4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate ssi_ssr_sst_fck_core_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 3, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 5, .val = 5, .flags = RATE_IN_243X },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel ssi_ssr_sst_fck_clksel[] = {
+> +       { .parent = &core_ck, .rates = ssi_ssr_sst_fck_core_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *ssi_ssr_sst_fck_parent_names[] = {
+> +       "core_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(ssi_ssr_sst_fck, "core_l3_clkdm",
+> +                        ssi_ssr_sst_fck_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_SSI_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +                        OMAP24XX_EN_SSI_SHIFT, &clkhwops_wait,
+> +                        ssi_ssr_sst_fck_parent_names, dsp_fck_ops);
+> +
+> +static struct clk sync_32k_ick;
+> +
+> +static struct clk_hw_omap sync_32k_ick_hw = {
+> +       .hw = {
+> +               .clk = &sync_32k_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_32KSYNC_SHIFT,
+> +       .flags          = ENABLE_ON_INIT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(sync_32k_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate common_clkout_src_core_rates[] = {
+> +       { .div = 1, .val = 0, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_clkout_src_sys_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_clkout_src_96m_rates[] = {
+> +       { .div = 1, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel_rate common_clkout_src_54m_rates[] = {
+> +       { .div = 1, .val = 3, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel common_clkout_src_clksel[] = {
+> +       { .parent = &core_ck, .rates = common_clkout_src_core_rates },
+> +       { .parent = &sys_ck, .rates = common_clkout_src_sys_rates },
+> +       { .parent = &func_96m_ck, .rates = common_clkout_src_96m_rates },
+> +       { .parent = &func_54m_ck, .rates = common_clkout_src_54m_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *sys_clkout_src_parent_names[] = {
+> +       "core_ck", "sys_ck", "func_96m_ck", "func_54m_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(sys_clkout_src, "wkup_clkdm", common_clkout_src_clksel,
+> +                        OMAP2430_PRCM_CLKOUT_CTRL, OMAP24XX_CLKOUT_SOURCE_MASK,
+> +                        OMAP2430_PRCM_CLKOUT_CTRL, OMAP24XX_CLKOUT_EN_SHIFT,
+> +                        NULL, sys_clkout_src_parent_names, gpt1_fck_ops);
+> +
+> +DEFINE_CLK_DIVIDER(sys_clkout, "sys_clkout_src", &sys_clkout_src, 0x0,
+> +                  OMAP2430_PRCM_CLKOUT_CTRL, OMAP24XX_CLKOUT_DIV_SHIFT,
+> +                  OMAP24XX_CLKOUT_DIV_WIDTH, CLK_DIVIDER_POWER_OF_TWO, NULL);
+> +
+> +static struct clk uart1_fck;
+> +
+> +static struct clk_hw_omap uart1_fck_hw = {
+> +       .hw = {
+> +               .clk = &uart1_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart1_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart1_ick;
+> +
+> +static struct clk_hw_omap uart1_ick_hw = {
+> +       .hw = {
+> +               .clk = &uart1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART1_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart1_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart2_fck;
+> +
+> +static struct clk_hw_omap uart2_fck_hw = {
+> +       .hw = {
+> +               .clk = &uart2_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart2_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart2_ick;
+> +
+> +static struct clk_hw_omap uart2_ick_hw = {
+> +       .hw = {
+> +               .clk = &uart2_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_UART2_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart2_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart3_fck;
+> +
+> +static struct clk_hw_omap uart3_fck_hw = {
+> +       .hw = {
+> +               .clk = &uart3_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_UART3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart3_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk uart3_ick;
+> +
+> +static struct clk_hw_omap uart3_ick_hw = {
+> +       .hw = {
+> +               .clk = &uart3_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_UART3_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(uart3_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk usb_fck;
+> +
+> +static struct clk_hw_omap usb_fck_hw = {
+> +       .hw = {
+> +               .clk = &usb_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, OMAP24XX_CM_FCLKEN2),
+> +       .enable_bit     = OMAP24XX_EN_USB_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(usb_fck, mcspi1_fck_parent_names, aes_ick_ops);
+> +
+> +static const struct clksel_rate usb_l4_ick_core_l3_rates[] = {
+> +       { .div = 1, .val = 1, .flags = RATE_IN_24XX },
+> +       { .div = 2, .val = 2, .flags = RATE_IN_24XX },
+> +       { .div = 4, .val = 4, .flags = RATE_IN_24XX },
+> +       { .div = 0 }
+> +};
+> +
+> +static const struct clksel usb_l4_ick_clksel[] = {
+> +       { .parent = &core_l3_ck, .rates = usb_l4_ick_core_l3_rates },
+> +       { .parent = NULL },
+> +};
+> +
+> +static const char *usb_l4_ick_parent_names[] = {
+> +       "core_l3_ck",
+> +};
+> +
+> +DEFINE_CLK_OMAP_MUX_GATE(usb_l4_ick, "core_l4_clkdm", usb_l4_ick_clksel,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_CLKSEL1),
+> +                        OMAP24XX_CLKSEL_USB_MASK,
+> +                        OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +                        OMAP24XX_EN_USB_SHIFT, &clkhwops_iclk_wait,
+> +                        usb_l4_ick_parent_names, dsp_fck_ops);
+> +
+> +static struct clk usbhs_ick;
+> +
+> +static struct clk_hw_omap usbhs_ick_hw = {
+> +       .hw = {
+> +               .clk = &usbhs_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN2),
+> +       .enable_bit     = OMAP2430_EN_USBHS_SHIFT,
+> +       .clkdm_name     = "core_l3_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(usbhs_ick, gfx_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk virt_prcm_set;
+> +
+> +static const char *virt_prcm_set_parent_names[] = {
+> +       "mpu_ck",
+> +};
+> +
+> +static const struct clk_ops virt_prcm_set_ops = {
+> +       .recalc_rate    = &omap2_table_mpu_recalc,
+> +       .set_rate       = &omap2_select_table_rate,
+> +       .round_rate     = &omap2_round_to_table_rate,
+> +};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(virt_prcm_set, NULL);
+> +DEFINE_STRUCT_CLK(virt_prcm_set, virt_prcm_set_parent_names, virt_prcm_set_ops);
+> +
+> +static struct clk wdt1_ick;
+> +
+> +static struct clk_hw_omap wdt1_ick_hw = {
+> +       .hw = {
+> +               .clk = &wdt1_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(WKUP_MOD, CM_ICLKEN),
+> +       .enable_bit     = OMAP24XX_EN_WDT1_SHIFT,
+> +       .clkdm_name     = "wkup_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt1_ick, gpios_ick_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt1_osc_ck;
+> +
+> +static const struct clk_ops wdt1_osc_ck_ops = {};
+> +
+> +DEFINE_STRUCT_CLK_HW_OMAP(wdt1_osc_ck, NULL);
+> +DEFINE_STRUCT_CLK(wdt1_osc_ck, sys_ck_parent_names, wdt1_osc_ck_ops);
+> +
+> +static struct clk wdt4_fck;
+> +
+> +static struct clk_hw_omap wdt4_fck_hw = {
+> +       .hw = {
+> +               .clk = &wdt4_fck,
+> +       },
+> +       .ops            = &clkhwops_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_FCLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_WDT4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt4_fck, gpio5_fck_parent_names, aes_ick_ops);
+> +
+> +static struct clk wdt4_ick;
+> +
+> +static struct clk_hw_omap wdt4_ick_hw = {
+> +       .hw = {
+> +               .clk = &wdt4_ick,
+> +       },
+> +       .ops            = &clkhwops_iclk_wait,
+> +       .enable_reg     = OMAP_CM_REGADDR(CORE_MOD, CM_ICLKEN1),
+> +       .enable_bit     = OMAP24XX_EN_WDT4_SHIFT,
+> +       .clkdm_name     = "core_l4_clkdm",
+> +};
+> +
+> +DEFINE_STRUCT_CLK(wdt4_ick, aes_ick_parent_names, aes_ick_ops);
+> +
+> +/*
+> + * clkdev integration
+> + */
+> +
+> +static struct omap_clk omap2430_clks[] = {
+> +       /* external root sources */
+> +       CLK(NULL,       "func_32k_ck",  &func_32k_ck,   CK_243X),
+> +       CLK(NULL,       "secure_32k_ck", &secure_32k_ck, CK_243X),
+> +       CLK(NULL,       "osc_ck",       &osc_ck,        CK_243X),
+> +       CLK("twl",      "fck",          &osc_ck,        CK_243X),
+> +       CLK(NULL,       "sys_ck",       &sys_ck,        CK_243X),
+> +       CLK(NULL,       "alt_ck",       &alt_ck,        CK_243X),
+> +       CLK(NULL,       "mcbsp_clks",   &mcbsp_clks,    CK_243X),
+> +       /* internal analog sources */
+> +       CLK(NULL,       "dpll_ck",      &dpll_ck,       CK_243X),
+> +       CLK(NULL,       "apll96_ck",    &apll96_ck,     CK_243X),
+> +       CLK(NULL,       "apll54_ck",    &apll54_ck,     CK_243X),
+> +       /* internal prcm root sources */
+> +       CLK(NULL,       "func_54m_ck",  &func_54m_ck,   CK_243X),
+> +       CLK(NULL,       "core_ck",      &core_ck,       CK_243X),
+> +       CLK(NULL,       "func_96m_ck",  &func_96m_ck,   CK_243X),
+> +       CLK(NULL,       "func_48m_ck",  &func_48m_ck,   CK_243X),
+> +       CLK(NULL,       "func_12m_ck",  &func_12m_ck,   CK_243X),
+> +       CLK(NULL,       "ck_wdt1_osc",  &wdt1_osc_ck,   CK_243X),
+> +       CLK(NULL,       "sys_clkout_src", &sys_clkout_src, CK_243X),
+> +       CLK(NULL,       "sys_clkout",   &sys_clkout,    CK_243X),
+> +       CLK(NULL,       "emul_ck",      &emul_ck,       CK_243X),
+> +       /* mpu domain clocks */
+> +       CLK(NULL,       "mpu_ck",       &mpu_ck,        CK_243X),
+> +       /* dsp domain clocks */
+> +       CLK(NULL,       "dsp_fck",      &dsp_fck,       CK_243X),
+> +       CLK(NULL,       "iva2_1_ick",   &iva2_1_ick,    CK_243X),
+> +       /* GFX domain clocks */
+> +       CLK(NULL,       "gfx_3d_fck",   &gfx_3d_fck,    CK_243X),
+> +       CLK(NULL,       "gfx_2d_fck",   &gfx_2d_fck,    CK_243X),
+> +       CLK(NULL,       "gfx_ick",      &gfx_ick,       CK_243X),
+> +       /* Modem domain clocks */
+> +       CLK(NULL,       "mdm_ick",      &mdm_ick,       CK_243X),
+> +       CLK(NULL,       "mdm_osc_ck",   &mdm_osc_ck,    CK_243X),
+> +       /* DSS domain clocks */
+> +       CLK("omapdss_dss",      "ick",          &dss_ick,       CK_243X),
+> +       CLK(NULL,       "dss_ick",              &dss_ick,       CK_243X),
+> +       CLK(NULL,       "dss1_fck",             &dss1_fck,      CK_243X),
+> +       CLK(NULL,       "dss2_fck",     &dss2_fck,      CK_243X),
+> +       CLK(NULL,       "dss_54m_fck",  &dss_54m_fck,   CK_243X),
+> +       /* L3 domain clocks */
+> +       CLK(NULL,       "core_l3_ck",   &core_l3_ck,    CK_243X),
+> +       CLK(NULL,       "ssi_fck",      &ssi_ssr_sst_fck, CK_243X),
+> +       CLK(NULL,       "usb_l4_ick",   &usb_l4_ick,    CK_243X),
+> +       /* L4 domain clocks */
+> +       CLK(NULL,       "l4_ck",        &l4_ck,         CK_243X),
+> +       CLK(NULL,       "ssi_l4_ick",   &ssi_l4_ick,    CK_243X),
+> +       CLK(NULL,       "wu_l4_ick",    &wu_l4_ick,     CK_243X),
+> +       /* virtual meta-group clock */
+> +       CLK(NULL,       "virt_prcm_set", &virt_prcm_set, CK_243X),
+> +       /* general l4 interface ck, multi-parent functional clk */
+> +       CLK(NULL,       "gpt1_ick",     &gpt1_ick,      CK_243X),
+> +       CLK(NULL,       "gpt1_fck",     &gpt1_fck,      CK_243X),
+> +       CLK(NULL,       "gpt2_ick",     &gpt2_ick,      CK_243X),
+> +       CLK(NULL,       "gpt2_fck",     &gpt2_fck,      CK_243X),
+> +       CLK(NULL,       "gpt3_ick",     &gpt3_ick,      CK_243X),
+> +       CLK(NULL,       "gpt3_fck",     &gpt3_fck,      CK_243X),
+> +       CLK(NULL,       "gpt4_ick",     &gpt4_ick,      CK_243X),
+> +       CLK(NULL,       "gpt4_fck",     &gpt4_fck,      CK_243X),
+> +       CLK(NULL,       "gpt5_ick",     &gpt5_ick,      CK_243X),
+> +       CLK(NULL,       "gpt5_fck",     &gpt5_fck,      CK_243X),
+> +       CLK(NULL,       "gpt6_ick",     &gpt6_ick,      CK_243X),
+> +       CLK(NULL,       "gpt6_fck",     &gpt6_fck,      CK_243X),
+> +       CLK(NULL,       "gpt7_ick",     &gpt7_ick,      CK_243X),
+> +       CLK(NULL,       "gpt7_fck",     &gpt7_fck,      CK_243X),
+> +       CLK(NULL,       "gpt8_ick",     &gpt8_ick,      CK_243X),
+> +       CLK(NULL,       "gpt8_fck",     &gpt8_fck,      CK_243X),
+> +       CLK(NULL,       "gpt9_ick",     &gpt9_ick,      CK_243X),
+> +       CLK(NULL,       "gpt9_fck",     &gpt9_fck,      CK_243X),
+> +       CLK(NULL,       "gpt10_ick",    &gpt10_ick,     CK_243X),
+> +       CLK(NULL,       "gpt10_fck",    &gpt10_fck,     CK_243X),
+> +       CLK(NULL,       "gpt11_ick",    &gpt11_ick,     CK_243X),
+> +       CLK(NULL,       "gpt11_fck",    &gpt11_fck,     CK_243X),
+> +       CLK(NULL,       "gpt12_ick",    &gpt12_ick,     CK_243X),
+> +       CLK(NULL,       "gpt12_fck",    &gpt12_fck,     CK_243X),
+> +       CLK("omap-mcbsp.1", "ick",      &mcbsp1_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp1_ick",   &mcbsp1_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp1_fck",   &mcbsp1_fck,    CK_243X),
+> +       CLK("omap-mcbsp.2", "ick",      &mcbsp2_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp2_ick",   &mcbsp2_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp2_fck",   &mcbsp2_fck,    CK_243X),
+> +       CLK("omap-mcbsp.3", "ick",      &mcbsp3_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp3_ick",   &mcbsp3_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp3_fck",   &mcbsp3_fck,    CK_243X),
+> +       CLK("omap-mcbsp.4", "ick",      &mcbsp4_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp4_ick",   &mcbsp4_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp4_fck",   &mcbsp4_fck,    CK_243X),
+> +       CLK("omap-mcbsp.5", "ick",      &mcbsp5_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp5_ick",   &mcbsp5_ick,    CK_243X),
+> +       CLK(NULL,       "mcbsp5_fck",   &mcbsp5_fck,    CK_243X),
+> +       CLK("omap2_mcspi.1", "ick",     &mcspi1_ick,    CK_243X),
+> +       CLK(NULL,       "mcspi1_ick",   &mcspi1_ick,    CK_243X),
+> +       CLK(NULL,       "mcspi1_fck",   &mcspi1_fck,    CK_243X),
+> +       CLK("omap2_mcspi.2", "ick",     &mcspi2_ick,    CK_243X),
+> +       CLK(NULL,       "mcspi2_ick",   &mcspi2_ick,    CK_243X),
+> +       CLK(NULL,       "mcspi2_fck",   &mcspi2_fck,    CK_243X),
+> +       CLK("omap2_mcspi.3", "ick",     &mcspi3_ick,    CK_243X),
+> +       CLK(NULL,       "mcspi3_ick",   &mcspi3_ick,    CK_243X),
+> +       CLK(NULL,       "mcspi3_fck",   &mcspi3_fck,    CK_243X),
+> +       CLK(NULL,       "uart1_ick",    &uart1_ick,     CK_243X),
+> +       CLK(NULL,       "uart1_fck",    &uart1_fck,     CK_243X),
+> +       CLK(NULL,       "uart2_ick",    &uart2_ick,     CK_243X),
+> +       CLK(NULL,       "uart2_fck",    &uart2_fck,     CK_243X),
+> +       CLK(NULL,       "uart3_ick",    &uart3_ick,     CK_243X),
+> +       CLK(NULL,       "uart3_fck",    &uart3_fck,     CK_243X),
+> +       CLK(NULL,       "gpios_ick",    &gpios_ick,     CK_243X),
+> +       CLK(NULL,       "gpios_fck",    &gpios_fck,     CK_243X),
+> +       CLK("omap_wdt", "ick",          &mpu_wdt_ick,   CK_243X),
+> +       CLK(NULL,       "mpu_wdt_ick",  &mpu_wdt_ick,   CK_243X),
+> +       CLK(NULL,       "mpu_wdt_fck",  &mpu_wdt_fck,   CK_243X),
+> +       CLK(NULL,       "sync_32k_ick", &sync_32k_ick,  CK_243X),
+> +       CLK(NULL,       "wdt1_ick",     &wdt1_ick,      CK_243X),
+> +       CLK(NULL,       "omapctrl_ick", &omapctrl_ick,  CK_243X),
+> +       CLK(NULL,       "icr_ick",      &icr_ick,       CK_243X),
+> +       CLK("omap24xxcam", "fck",       &cam_fck,       CK_243X),
+> +       CLK(NULL,       "cam_fck",      &cam_fck,       CK_243X),
+> +       CLK("omap24xxcam", "ick",       &cam_ick,       CK_243X),
+> +       CLK(NULL,       "cam_ick",      &cam_ick,       CK_243X),
+> +       CLK(NULL,       "mailboxes_ick", &mailboxes_ick,        CK_243X),
+> +       CLK(NULL,       "wdt4_ick",     &wdt4_ick,      CK_243X),
+> +       CLK(NULL,       "wdt4_fck",     &wdt4_fck,      CK_243X),
+> +       CLK(NULL,       "mspro_ick",    &mspro_ick,     CK_243X),
+> +       CLK(NULL,       "mspro_fck",    &mspro_fck,     CK_243X),
+> +       CLK(NULL,       "fac_ick",      &fac_ick,       CK_243X),
+> +       CLK(NULL,       "fac_fck",      &fac_fck,       CK_243X),
+> +       CLK("omap_hdq.0", "ick",        &hdq_ick,       CK_243X),
+> +       CLK(NULL,       "hdq_ick",      &hdq_ick,       CK_243X),
+> +       CLK("omap_hdq.1", "fck",        &hdq_fck,       CK_243X),
+> +       CLK(NULL,       "hdq_fck",      &hdq_fck,       CK_243X),
+> +       CLK("omap_i2c.1", "ick",        &i2c1_ick,      CK_243X),
+> +       CLK(NULL,       "i2c1_ick",     &i2c1_ick,      CK_243X),
+> +       CLK(NULL,       "i2chs1_fck",   &i2chs1_fck,    CK_243X),
+> +       CLK("omap_i2c.2", "ick",        &i2c2_ick,      CK_243X),
+> +       CLK(NULL,       "i2c2_ick",     &i2c2_ick,      CK_243X),
+> +       CLK(NULL,       "i2chs2_fck",   &i2chs2_fck,    CK_243X),
+> +       CLK(NULL,       "gpmc_fck",     &gpmc_fck,      CK_243X),
+> +       CLK(NULL,       "sdma_fck",     &sdma_fck,      CK_243X),
+> +       CLK(NULL,       "sdma_ick",     &sdma_ick,      CK_243X),
+> +       CLK(NULL,       "sdrc_ick",     &sdrc_ick,      CK_243X),
+> +       CLK(NULL,       "des_ick",      &des_ick,       CK_243X),
+> +       CLK("omap-sham",        "ick",  &sha_ick,       CK_243X),
+> +       CLK("omap_rng", "ick",          &rng_ick,       CK_243X),
+> +       CLK(NULL,       "rng_ick",      &rng_ick,       CK_243X),
+> +       CLK("omap-aes", "ick",  &aes_ick,       CK_243X),
+> +       CLK(NULL,       "pka_ick",      &pka_ick,       CK_243X),
+> +       CLK(NULL,       "usb_fck",      &usb_fck,       CK_243X),
+> +       CLK("musb-omap2430",    "ick",  &usbhs_ick,     CK_243X),
+> +       CLK(NULL,       "usbhs_ick",    &usbhs_ick,     CK_243X),
+> +       CLK("omap_hsmmc.0", "ick",      &mmchs1_ick,    CK_243X),
+> +       CLK(NULL,       "mmchs1_ick",   &mmchs1_ick,    CK_243X),
+> +       CLK(NULL,       "mmchs1_fck",   &mmchs1_fck,    CK_243X),
+> +       CLK("omap_hsmmc.1", "ick",      &mmchs2_ick,    CK_243X),
+> +       CLK(NULL,       "mmchs2_ick",   &mmchs2_ick,    CK_243X),
+> +       CLK(NULL,       "mmchs2_fck",   &mmchs2_fck,    CK_243X),
+> +       CLK(NULL,       "gpio5_ick",    &gpio5_ick,     CK_243X),
+> +       CLK(NULL,       "gpio5_fck",    &gpio5_fck,     CK_243X),
+> +       CLK(NULL,       "mdm_intc_ick", &mdm_intc_ick,  CK_243X),
+> +       CLK("omap_hsmmc.0", "mmchsdb_fck",      &mmchsdb1_fck,  CK_243X),
+> +       CLK(NULL,        "mmchsdb1_fck",        &mmchsdb1_fck,  CK_243X),
+> +       CLK("omap_hsmmc.1", "mmchsdb_fck",      &mmchsdb2_fck,  CK_243X),
+> +       CLK(NULL,        "mmchsdb2_fck",        &mmchsdb2_fck,  CK_243X),
+> +       CLK(NULL,       "timer_32k_ck",  &func_32k_ck,   CK_243X),
+> +       CLK(NULL,       "timer_sys_ck", &sys_ck,        CK_243X),
+> +       CLK(NULL,       "timer_ext_ck", &alt_ck,        CK_243X),
+> +       CLK(NULL,       "cpufreq_ck",   &virt_prcm_set, CK_243X),
+> +};
+> +
+> +static const char *enable_init_clks[] = {
+> +       "apll96_ck",
+> +       "apll54_ck",
+> +       "sync_32k_ick",
+> +       "omapctrl_ick",
+> +       "gpmc_fck",
+> +       "sdrc_ick",
+> +};
+> +
+> +/*
+> + * init code
+> + */
+> +
+> +int __init omap2430_clk_init(void)
+> +{
+> +       const struct prcm_config *prcm;
+> +       struct omap_clk *c;
+> +       unsigned long clkrate;
+> +
+> +       prcm_clksrc_ctrl = OMAP2430_PRCM_CLKSRC_CTRL;
+> +       cm_idlest_pll = OMAP_CM_REGADDR(PLL_MOD, CM_IDLEST);
+> +       cpu_mask = RATE_IN_243X;
+> +       rate_table = omap2430_rate_table;
+> +
+> +       /* Check the MPU rate set by bootloader */
+> +       clkrate = omap2xxx_clk_get_core_rate(&dpll_ck_hw);
+> +       for (prcm = rate_table; prcm->mpu_speed; prcm++) {
+> +               if (!(prcm->flags & cpu_mask))
+> +                       continue;
+> +               if (prcm->xtal_speed != sys_ck.rate)
+> +                       continue;
+> +               if (prcm->dpll_speed <= clkrate)
+> +                       break;
+> +       }
+> +       curr_prcm_set = prcm;
+> +
+> +       for (c = omap2430_clks; c < omap2430_clks + ARRAY_SIZE(omap2430_clks);
+> +            c++) {
+> +               clkdev_add(&c->lk);
+> +               if (!__clk_init(NULL, c->lk.clk))
+> +                       omap2_init_clk_hw_omap_clocks(c->lk.clk);
+> +       }
+> +
+> +       omap2_clk_disable_autoidle_all();
+> +
+> +       omap2_clk_enable_init_clocks(enable_init_clks,
+> +                                    ARRAY_SIZE(enable_init_clks));
+> +
+> +       pr_info("Clocking rate (Crystal/DPLL/MPU): %ld.%01ld/%ld/%ld MHz\n",
+> +               (clk_get_rate(&sys_ck) / 1000000),
+> +               (clk_get_rate(&sys_ck) / 100000) % 10,
+> +               (clk_get_rate(&dpll_ck) / 1000000),
+> +               (clk_get_rate(&mpu_ck) / 1000000));
+> +
+> +       return 0;
+> +}
+> diff --git a/arch/arm/mach-omap2/cm-regbits-24xx.h b/arch/arm/mach-omap2/cm-regbits-24xx.h
+> index 6862904..f3fcba2 100644
+> --- a/arch/arm/mach-omap2/cm-regbits-24xx.h
+> +++ b/arch/arm/mach-omap2/cm-regbits-24xx.h
+> @@ -59,6 +59,7 @@
+>  /* CM_CLKSEL_MPU */
+>  #define OMAP24XX_CLKSEL_MPU_SHIFT                      0
+>  #define OMAP24XX_CLKSEL_MPU_MASK                       (0x1f << 0)
+> +#define OMAP24XX_CLKSEL_MPU_WIDTH                      5
+>  
+>  /* CM_CLKSTCTRL_MPU */
+>  #define OMAP24XX_AUTOSTATE_MPU_SHIFT                   0
+> @@ -237,8 +238,10 @@
+>  #define OMAP24XX_CLKSEL_DSS1_MASK                      (0x1f << 8)
+>  #define OMAP24XX_CLKSEL_L4_SHIFT                       5
+>  #define OMAP24XX_CLKSEL_L4_MASK                                (0x3 << 5)
+> +#define OMAP24XX_CLKSEL_L4_WIDTH                       2
+>  #define OMAP24XX_CLKSEL_L3_SHIFT                       0
+>  #define OMAP24XX_CLKSEL_L3_MASK                                (0x1f << 0)
+> +#define OMAP24XX_CLKSEL_L3_WIDTH                       5
+>  
+>  /* CM_CLKSEL2_CORE */
+>  #define OMAP24XX_CLKSEL_GPT12_SHIFT                    22
+> @@ -361,8 +364,10 @@
+>  #define OMAP24XX_DPLL_DIV_MASK                         (0xf << 8)
+>  #define OMAP24XX_54M_SOURCE_SHIFT                      5
+>  #define OMAP24XX_54M_SOURCE_MASK                       (1 << 5)
+> +#define OMAP24XX_54M_SOURCE_WIDTH                      1
+>  #define OMAP2430_96M_SOURCE_SHIFT                      4
+>  #define OMAP2430_96M_SOURCE_MASK                       (1 << 4)
+> +#define OMAP2430_96M_SOURCE_WIDTH                      1
+>  #define OMAP24XX_48M_SOURCE_SHIFT                      3
+>  #define OMAP24XX_48M_SOURCE_MASK                       (1 << 3)
+>  #define OMAP2430_ALTCLK_SOURCE_SHIFT                   0
+> diff --git a/arch/arm/mach-omap2/prm-regbits-24xx.h b/arch/arm/mach-omap2/prm-regbits-24xx.h
+> index 638da6d..91aa510 100644
+> --- a/arch/arm/mach-omap2/prm-regbits-24xx.h
+> +++ b/arch/arm/mach-omap2/prm-regbits-24xx.h
+> @@ -107,12 +107,14 @@
+>  #define OMAP2420_CLKOUT2_EN_MASK                       (1 << 15)
+>  #define OMAP2420_CLKOUT2_DIV_SHIFT                     11
+>  #define OMAP2420_CLKOUT2_DIV_MASK                      (0x7 << 11)
+> +#define OMAP2420_CLKOUT2_DIV_WIDTH                     3
+>  #define OMAP2420_CLKOUT2_SOURCE_SHIFT                  8
+>  #define OMAP2420_CLKOUT2_SOURCE_MASK                   (0x3 << 8)
+>  #define OMAP24XX_CLKOUT_EN_SHIFT                       7
+>  #define OMAP24XX_CLKOUT_EN_MASK                                (1 << 7)
+>  #define OMAP24XX_CLKOUT_DIV_SHIFT                      3
+>  #define OMAP24XX_CLKOUT_DIV_MASK                       (0x7 << 3)
+> +#define OMAP24XX_CLKOUT_DIV_WIDTH                      3
+>  #define OMAP24XX_CLKOUT_SOURCE_SHIFT                   0
+>  #define OMAP24XX_CLKOUT_SOURCE_MASK                    (0x3 << 0)
+>  
+> -- 
+> 1.7.10.4
