@@ -1,39 +1,69 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Nov 2012 14:38:42 +0000
-Subject: [PATCH 4/6] ASoC: wm8974: add SPI as a possible bus master
-In-Reply-To: <1352469625-32024-5-git-send-email-s.trumtrar@pengutronix.de>
-References: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
- <1352469625-32024-5-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20121109143841.GG23807@opensource.wolfsonmicro.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Nov 2012 14:42:59 +0000
+Subject: [PATCH v2 2/5] ARM: kernel: add device tree init map function
+In-Reply-To: <1352471654-20207-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1352471654-20207-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20121109144259.GB17405@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 03:00:23PM +0100, Steffen Trumtrar wrote:
-
-> The wm8974 can be controlled via i2c or spi. The current driver only supports
-> i2c. Add SPI as possible bus.
+On Fri, Nov 09, 2012 at 02:34:11PM +0000, Lorenzo Pieralisi wrote:
+> When booting through a device tree, the kernel cpu logical id map can be
+> initialized using device tree data passed by FW or through an embedded blob.
 > 
-> As the driver has to distinguish the bus type, pass this info via the wm8974_priv.
-> This reverts c2562a8e3b5f871ad0b73caf98bb7541e8724efc, because the driver now
-> needs it back.
+> This patch adds a function that parses device tree "cpu" nodes and
+> retrieves the corresponding CPUs hardware identifiers (MPIDR).
+> It sets the possible cpus and the cpu logical map values according to
+> the number of CPUs defined in the device tree and respective properties.
+> 
+> The device tree HW identifiers are considered valid if all CPU nodes contain
+> a "reg" property and the DT defines a CPU node that matches the MPIDR[23:0]
+> of the boot CPU.
+> 
+> The primary CPU is assigned cpu logical number 0 to keep the current convention
+> valid.
+> 
+> Current bindings documentation is included in the patch:
+> 
+> Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Don't just quote raw commit IDs, *especially* not full ones, as they're
-completely illegible to humans.  Someone reading the changelog needs to
-be able to understand what this commit is and why the driver needs it
-back.
+[...]
 
-> -	ret = snd_soc_codec_set_cache_io(codec, 7, 9, SND_SOC_I2C);
-> +	ret = snd_soc_codec_set_cache_io(codec, 7, 9, wm8974->control_type);
+> +List of possible "compatible" string ids:
+> +
+> +<arm, arm1020>
+> +<arm, arm1020e>
+> +<arm, arm1022>
+> +<arm, arm1026>
+> +<arm, arm720>
+> +<arm, arm740>
+> +<arm, arm7tdmi>
+> +<arm, arm920>
+> +<arm, arm922>
+> +<arm, arm925>
+> +<arm, arm926>
+> +<arm, arm940>
+> +<arm, arm946>
+> +<arm, arm9tdmi>
+> +<arm, fa526>
+> +<arm, feroceon>
+> +<arm, mohawk>
+> +<arm, sa110>
+> +<arm, sa1100>
+> +<arm, xsc3>
+> +<arm, xscale>
+> +<arm, cortex-a5>
+> +<arm, cortex-a7>
+> +<arm, cortex-a8>
+> +<arm, cortex-a9>
+> +<arm, cortex-a15>
+> +<arm, arm1136>
+> +<arm, arm11-mpcore>
 
-We should be converting things to regmap if we're going to do this -
-we're trying to phase out the ASoC-specific I/O and this makes the code
-simpler anyway as the core will just be able to get the regmap from the
-struct device without bouncing information around through the private
-data and so on.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/ebbcce41/attachment.sig>
+Is this supposed to be an exhaustive list? What about 1156 and 1176? Also,
+"arm11mpcore" should probably be used instead of "arm11-mpcore".
+
+Will
