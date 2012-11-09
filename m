@@ -1,43 +1,24 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 9 Nov 2012 21:22:00 +0000 (UTC)
-Subject: [PATCH 15/26] ARM: omap2: clock: Add 24xx data using common
- struct clk
-In-Reply-To: <20121109210543.17381.15878@nucleus>
-References: <1352337181-29427-1-git-send-email-mturquette@ti.com>
- <1352337181-29427-16-git-send-email-mturquette@ti.com>
- <alpine.DEB.2.00.1211081532210.20703@utopia.booyaka.com>
- <alpine.DEB.2.00.1211092030360.20703@utopia.booyaka.com>
- <20121109210543.17381.15878@nucleus>
-Message-ID: <alpine.DEB.2.00.1211092112340.20703@utopia.booyaka.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 09 Nov 2012 16:39:48 -0500 (EST)
+Subject: [PATCH net-next 1/2] ARM: net: bpf_jit_32: add XOR instruction
+ for BPF JIT
+In-Reply-To: <20121108012828.GA23143@thinkbox>
+References: <20121108012828.GA23143@thinkbox>
+Message-ID: <20121109.163948.606233183621652086.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 9 Nov 2012, Mike Turquette wrote:
+From: Daniel Borkmann <dxchgb@gmail.com>
+Date: Thu, 8 Nov 2012 02:28:28 +0100
 
-> Quoting Paul Walmsley (2012-11-09 12:32:59)
-> > Here's another update on this one to add the twl.fck clock alias, recently 
-> > added by commit defa6be1c8216ed2d52d65db81a8a148e73be5f7 ("mfd: Fix 
-> > compile for twl-core.c by removing cpu_is_omap usage").
-> > 
+> This patch is a follow-up for patch "filter: add XOR instruction for use
+> with X/K" that implements BPF ARM JIT parts for the BPF XOR operation.
 > 
-> I'll post a new series to the list with these fixes rolled in.  
+> Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
+> Cc: Mircea Gherzan <mgherzan@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 
-Unless you've got other changes, no need to worry about it -  will deal 
-with it here.
+Could an ARM person please review and ACK these two patches so that
+I can toss them into net-next (where the dependency is)?
 
-> Do you want me to squash the clkdm_clk_disable/usecount patch into 
-> another patch in the series or keep it separate?  Separate might be good 
-> since we're going to replace that solution with some force-disable thing 
-> in the future.
-
-Have moved that one up earlier in the patch stack and added the matching 
-cleanup to the last patch.  Will repush the branch once it completes 
-testing again.
-
-Re the upstream CCF support for this, would suggest adding the CCF support 
-for the new function pointer in this merge window (3.8) since it should 
-be relatively straightforward.  Then during the 3.9 merge window, the 
-OMAP code can be switched over to use it.
-
-
-- Paul
+Thanks!
