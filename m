@@ -1,48 +1,43 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 9 Nov 2012 15:55:04 +0100
-Subject: [PATCH 4/6] ASoC: wm8974: add SPI as a possible bus master
-In-Reply-To: <20121109143841.GG23807@opensource.wolfsonmicro.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 9 Nov 2012 14:55:15 +0000
+Subject: [PATCH 3/6] ASoC: wm8974: include MCLKDIV in pll_factors
+In-Reply-To: <1352469625-32024-4-git-send-email-s.trumtrar@pengutronix.de>
 References: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
- <1352469625-32024-5-git-send-email-s.trumtrar@pengutronix.de>
- <20121109143841.GG23807@opensource.wolfsonmicro.com>
-Message-ID: <20121109145504.GC8598@pengutronix.de>
+ <1352469625-32024-4-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20121109145515.GH23807@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 02:38:42PM +0000, Mark Brown wrote:
-> On Fri, Nov 09, 2012 at 03:00:23PM +0100, Steffen Trumtrar wrote:
-> 
-> > The wm8974 can be controlled via i2c or spi. The current driver only supports
-> > i2c. Add SPI as possible bus.
-> > 
-> > As the driver has to distinguish the bus type, pass this info via the wm8974_priv.
-> > This reverts c2562a8e3b5f871ad0b73caf98bb7541e8724efc, because the driver now
-> > needs it back.
-> 
-> Don't just quote raw commit IDs, *especially* not full ones, as they're
-> completely illegible to humans.  Someone reading the changelog needs to
-> be able to understand what this commit is and why the driver needs it
-> back.
-> 
+On Fri, Nov 09, 2012 at 03:00:22PM +0100, Steffen Trumtrar wrote:
 
-Okay.
+> To calculate the integer part of the frequency ratio, the whole output
+> path has to be considered (post and pre are optional):
 
-> > -	ret = snd_soc_codec_set_cache_io(codec, 7, 9, SND_SOC_I2C);
-> > +	ret = snd_soc_codec_set_cache_io(codec, 7, 9, wm8974->control_type);
-> 
-> We should be converting things to regmap if we're going to do this -
-> we're trying to phase out the ASoC-specific I/O and this makes the code
-> simpler anyway as the core will just be able to get the regmap from the
-> struct device without bouncing information around through the private
-> data and so on.
+> 	    Ndiv = (pre * target * 4 * post) / source
 
-I wasn't aware of that driver. That sounds way better than the private data stuff.
+> In the current implementation only the fixed- and pre-divider is
+> considered, but the post-divider is omitted.
+> To calculate Ndiv, this post divider has to be applied before any
+> calculation happens. Otherwise Ndiv is considered to be to low in the
+> later stages. This leads to a wrong value in the PLLN register, which
+> in turn produces a wrong playback speed of the audio signal.
 
-Regards,
-Steffen
+This changelog doesn't mention where you're using MCLKDIV here but it
+does rather sound like the PLL configuration is not being done correctly
+here.  The expectation is that when the PLL is configured the raw output
+frequency from the PLL is specified.  The PLL is then specified as the
+system clock with that rate and then any division required to make that
+usable happens afterwards.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> +	case WM8974_MCLKDIV_1:
+> +				reg = 1;
+> +				break;
+
+Please do follow the Linux coding style for kernel code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/140c9be2/attachment.sig>
