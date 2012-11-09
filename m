@@ -1,122 +1,133 @@
-From: ccross@google.com (Colin Cross)
-Date: Thu, 8 Nov 2012 18:05:52 -0800
-Subject: [PATCH] ARM: backtrace: avoid crash on large invalid fp value
-In-Reply-To: <20121105105421.GB2005@linaro.org>
-References: <1349851572-9967-1-git-send-email-toddpoynor@google.com>
- <20121010111517.GC2131@linaro.org>
- <CAMbhsRTNULfBjL=x3qFgjqsfR25EJt+2A4hY=qTXcDq8gyCxmA@mail.gmail.com>
- <20121105105421.GB2005@linaro.org>
-Message-ID: <CAMbhsRR+BVFP7rfyc_3+F0rNQVWFUh6Oca=Bg_TpcQszwF-6Bg@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Fri, 9 Nov 2012 10:05:41 +0800
+Subject: [PATCH 06/11] ARM: pxa: convert timer suspend/resume to
+ clock_event_device
+In-Reply-To: <1352408516-21988-8-git-send-email-swarren@wwwdotorg.org>
+References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
+ <1352408516-21988-8-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAMPhdO_B2LxbbUGFH2Z7z0NrC153Bn1NhopqAQNhKBxhWL-=LQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 5, 2012 at 2:54 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Fri, Nov 02, 2012 at 04:47:38PM -0700, Colin Cross wrote:
->> On Wed, Oct 10, 2012 at 4:15 AM, Dave Martin <dave.martin@linaro.org> wrote:
->> > On Tue, Oct 09, 2012 at 11:46:12PM -0700, Todd Poynor wrote:
->> >> Invalid frame pointer (signed) -4 <= fp <= -1 defeats check for too high
->> >> on overflow.
->> >>
->> >> Signed-off-by: Todd Poynor <toddpoynor@google.com>
->> >> ---
->> >>  arch/arm/kernel/stacktrace.c |    2 +-
->> >>  1 files changed, 1 insertions(+), 1 deletions(-)
->> >>
->> >> diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
->> >> index 00f79e5..6315162 100644
->> >> --- a/arch/arm/kernel/stacktrace.c
->> >> +++ b/arch/arm/kernel/stacktrace.c
->> >> @@ -31,7 +31,7 @@ int notrace unwind_frame(struct stackframe *frame)
->> >>       high = ALIGN(low, THREAD_SIZE);
->> >>
->> >>       /* check current frame pointer is within bounds */
->> >> -     if (fp < (low + 12) || fp + 4 >= high)
->> >> +     if (fp < (low + 12) || fp >= high - 4)
->> >>               return -EINVAL;
->> >>
->> >>       /* restore the registers from the stack frame */
->> >
->> > sp and fp can still be complete garbage in the case of a corrupted frame,
->> > so low + 12 can still overflow and cause us to read beyond the stack base.
->> >
->> > A more robust patch might be as follows.  This also checks for misaligned
->> > fp and sp values, since those indicate corruption and there can be no
->> > sensible way to interpret the resulting frame in that case.
->> >
->> > Also, according to the definition of current_thread_info(),
->> > IS_ALIGNED(sp, THREAD_SIZE) indicates a full stack extending from sp
->> > to sp + THREAD_SIZE, and not an empty stack extending from sp -
->> > THREAD_SIZE to sp.  We cannot backtrace this situation anyway, since
->> > that would imply that the frame record extends beyond the stack...
->> > but this patch tidies it up in the interest of clarity.
->> >
->> > Cheers
->> > ---Dave
->> >
->> > (untested)
->> >
->> > diff --git a/arch/arm/kernel/stacktrace.c b/arch/arm/kernel/stacktrace.c
->> > index 00f79e5..fec82be 100644
->> > --- a/arch/arm/kernel/stacktrace.c
->> > +++ b/arch/arm/kernel/stacktrace.c
->> > @@ -28,10 +28,20 @@ int notrace unwind_frame(struct stackframe *frame)
->> >
->> >         /* only go to a higher address on the stack */
->> >         low = frame->sp;
->> > -       high = ALIGN(low, THREAD_SIZE);
->> > +       if (!IS_ALIGNED(fp, 4))
->> > +               return -EINVAL;
->> > +
->> > +       /*
->> > +        * low + 1 here ensures that high > sp, consistent with the
->> > +        * definition of current_thread_info().
->> > +        * We subtract 1 to compute the highest allowable byte address.
->> > +        * Otherwise, we might get high == 0 which would confuse our
->> > +        * comparisons.
->> > +        */
->> > +       high = ALIGN(low + 1, THREAD_SIZE) - 1;
-
-ARM eabi stacks are full-descending, meaning that if the sp is a
-multiple of THREAD_SIZE, the stack is empty.  current_thread_info
-takes a short-cut and assumes it can never be called on an empty
-stack, but better not to propagate that anywhere else.
-
->> >
->> >         /* check current frame pointer is within bounds */
->> > -       if (fp < (low + 12) || fp + 4 >= high)
->> > +       if (fp < 12 || fp - 12 < low || fp > high)
->> >                 return -EINVAL;
->> >
->> >         /* restore the registers from the stack frame */
->> > @@ -39,6 +49,10 @@ int notrace unwind_frame(struct stackframe *frame)
->> >         frame->sp = *(unsigned long *)(fp - 8);
->> >         frame->pc = *(unsigned long *)(fp - 4);
->> >
->> > +       /* Do not claim the frame is valid if if is obviously corrupt: */
->> > +       if (!IS_ALIGNED(frame->fp, 4))
->> > +               return -EINVAL;
->> > +
->> >         return 0;
->> >  }
->> >  #endif
->> >
->> >
->> > _______________________________________________
->> > linux-arm-kernel mailing list
->> > linux-arm-kernel at lists.infradead.org
->> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> Dave or Todd, mind reposting this, or should I squash it into my
->> CONFIG_SMP stacktrace series?
+On Fri, Nov 9, 2012 at 5:01 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 >
-> I'm happy for you to fold my patch into your series if you agree
-> with it.  Ideally, please fix my typo in the final comment ("if IT is
-> obviously corrupt").
+> Move PXA's timer suspend/resume functions from struct sys_timer
+> pxa_timer into struct clock_event_device ckevt_pxa_osmr0. This
+> will allow the sys_timer suspend/resume fields to be removed, and
+> eventually lead to a complete removal of struct sys_timer.
 >
-> Do I assume correctly that you are already testing this stuff?
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 
-I've been testing it by repeatedly dumping the stack of a running
-thread (cat /dev/urandom > /dev/null) and making sure it doesn't
-panic, and by dumping all the threads in a idle system and making sure
-they all end at the normal user or kernel thread initial frames
-(do_exit, kernel_thread_exit, or ret_fast_syscall).
+Acked-by: Eric Miao <eric.y.miao@gmail.com>
+
+> ---
+>  arch/arm/mach-pxa/time.c |   76 +++++++++++++++++++++++-----------------------
+>  1 files changed, 38 insertions(+), 38 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
+> index 4bc47d6..ce58bc9 100644
+> --- a/arch/arm/mach-pxa/time.c
+> +++ b/arch/arm/mach-pxa/time.c
+> @@ -89,12 +89,50 @@ pxa_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *dev)
+>         }
+>  }
+>
+> +#ifdef CONFIG_PM
+> +static unsigned long osmr[4], oier, oscr;
+> +
+> +static void pxa_timer_suspend(struct clock_event_device *cedev)
+> +{
+> +       osmr[0] = readl_relaxed(OSMR0);
+> +       osmr[1] = readl_relaxed(OSMR1);
+> +       osmr[2] = readl_relaxed(OSMR2);
+> +       osmr[3] = readl_relaxed(OSMR3);
+> +       oier = readl_relaxed(OIER);
+> +       oscr = readl_relaxed(OSCR);
+> +}
+> +
+> +static void pxa_timer_resume(struct clock_event_device *cedev)
+> +{
+> +       /*
+> +        * Ensure that we have at least MIN_OSCR_DELTA between match
+> +        * register 0 and the OSCR, to guarantee that we will receive
+> +        * the one-shot timer interrupt.  We adjust OSMR0 in preference
+> +        * to OSCR to guarantee that OSCR is monotonically incrementing.
+> +        */
+> +       if (osmr[0] - oscr < MIN_OSCR_DELTA)
+> +               osmr[0] += MIN_OSCR_DELTA;
+> +
+> +       writel_relaxed(osmr[0], OSMR0);
+> +       writel_relaxed(osmr[1], OSMR1);
+> +       writel_relaxed(osmr[2], OSMR2);
+> +       writel_relaxed(osmr[3], OSMR3);
+> +       writel_relaxed(oier, OIER);
+> +       writel_relaxed(oscr, OSCR);
+> +}
+> +#else
+> +#define pxa_timer_suspend NULL
+> +#define pxa_timer_resume NULL
+> +#endif
+> +
+>  static struct clock_event_device ckevt_pxa_osmr0 = {
+>         .name           = "osmr0",
+>         .features       = CLOCK_EVT_FEAT_ONESHOT,
+>         .rating         = 200,
+>         .set_next_event = pxa_osmr0_set_next_event,
+>         .set_mode       = pxa_osmr0_set_mode,
+> +       .suspend        = pxa_timer_suspend,
+> +       .resume         = pxa_timer_resume,
+>  };
+>
+>  static struct irqaction pxa_ost0_irq = {
+> @@ -127,44 +165,6 @@ static void __init pxa_timer_init(void)
+>         clockevents_register_device(&ckevt_pxa_osmr0);
+>  }
+>
+> -#ifdef CONFIG_PM
+> -static unsigned long osmr[4], oier, oscr;
+> -
+> -static void pxa_timer_suspend(void)
+> -{
+> -       osmr[0] = readl_relaxed(OSMR0);
+> -       osmr[1] = readl_relaxed(OSMR1);
+> -       osmr[2] = readl_relaxed(OSMR2);
+> -       osmr[3] = readl_relaxed(OSMR3);
+> -       oier = readl_relaxed(OIER);
+> -       oscr = readl_relaxed(OSCR);
+> -}
+> -
+> -static void pxa_timer_resume(void)
+> -{
+> -       /*
+> -        * Ensure that we have at least MIN_OSCR_DELTA between match
+> -        * register 0 and the OSCR, to guarantee that we will receive
+> -        * the one-shot timer interrupt.  We adjust OSMR0 in preference
+> -        * to OSCR to guarantee that OSCR is monotonically incrementing.
+> -        */
+> -       if (osmr[0] - oscr < MIN_OSCR_DELTA)
+> -               osmr[0] += MIN_OSCR_DELTA;
+> -
+> -       writel_relaxed(osmr[0], OSMR0);
+> -       writel_relaxed(osmr[1], OSMR1);
+> -       writel_relaxed(osmr[2], OSMR2);
+> -       writel_relaxed(osmr[3], OSMR3);
+> -       writel_relaxed(oier, OIER);
+> -       writel_relaxed(oscr, OSCR);
+> -}
+> -#else
+> -#define pxa_timer_suspend NULL
+> -#define pxa_timer_resume NULL
+> -#endif
+> -
+>  struct sys_timer pxa_timer = {
+>         .init           = pxa_timer_init,
+> -       .suspend        = pxa_timer_suspend,
+> -       .resume         = pxa_timer_resume,
+>  };
+> --
+> 1.7.0.4
+>
