@@ -1,69 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 09 Nov 2012 20:10:42 +0900
-Subject: [PATCH v2 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
-In-Reply-To: <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
-References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
- <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
-Message-ID: <0e8b01cdbe6a$dbd36ed0$937a4c70$%kim@samsung.com>
+From: thierry.reding@avionic-design.de (Thierry Reding)
+Date: Fri, 9 Nov 2012 12:19:28 +0100
+Subject: [PATCH v2 04/10] pwm: pwm-tiecap: Add device-tree binding
+ support for APWM driver
+In-Reply-To: <518397C60809E147AF5323E0420B992E3E9E44FC@DBDE01.ent.ti.com>
+References: <1352361197-27442-1-git-send-email-avinashphilip@ti.com>
+ <1352361197-27442-5-git-send-email-avinashphilip@ti.com>
+ <20121109075219.GA22224@avionic-0098.mockup.avionic-design.de>
+ <518397C60809E147AF5323E0420B992E3E9E44FC@DBDE01.ent.ti.com>
+Message-ID: <20121109111928.GA2391@avionic-0098.mockup.avionic-design.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasanth Ananthan wrote:
+On Fri, Nov 09, 2012 at 10:59:30AM +0000, Philip, Avinash wrote:
+> On Fri, Nov 09, 2012 at 13:22:19, Thierry Reding wrote:
+> > On Thu, Nov 08, 2012 at 01:23:11PM +0530, Philip, Avinash wrote:
+> > > +#define ECAPCLK_EN			BIT(0)
+> > > +#define ECAPCLK_STOP_REQ	BIT(1)
+> > 
+> > This one doesn't seem to align with the rest. Also, why is bit 0 called
+> > _EN and bit 1 _STOP_REQ? Couldn't they be made more consistent, i.e.
+> > _START and _STOP? Or _ENABLE and _DISABLE?
 > 
-> This patch adds Device Nodes for SATA and SATA PHY device.
-> 
+> Ok I will change to PWMSS_ECAPCLK_EN & PWMSS_ECAPCLK_STPO_REQ
 
-[...]
+While at it, maybe move these defines to the pwm-tipwmss.h header file?
+After all that's the module that accesses the register that contains
+these bits.
 
-> @@ -188,6 +188,9 @@
->  #define EXYNOS4_PA_SATA			0x12560000
->  #define EXYNOS4_PA_SATAPHY		0x125D0000
->  #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
-> +#define EXYNOS5_PA_SATA_PHY_CTRL	0x12170000
-> +#define EXYNOS5_PA_SATA_PHY_I2C		0x121D0000
-> +#define EXYNOS5_PA_SATA_BASE		0x122F0000
-> 
->  #define EXYNOS4_PA_SROMC		0x12570000
->  #define EXYNOS5_PA_SROMC		0x12250000
-> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
-> exynos/mach-exynos5-dt.c
-> index db1cd8e..7dbd4cc 100644
-> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
-> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
-> @@ -61,6 +61,12 @@ static const struct of_dev_auxdata
-> exynos5250_auxdata_lookup[] __initconst = {
->  				"exynos4210-spi.1", NULL),
->  	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS5_PA_SPI2,
->  				"exynos4210-spi.2", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", EXYNOS5_PA_SATA_BASE,
-> +				"exynos5-sata", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", EXYNOS5_PA_SATA_PHY_CTRL,
-> +				"exynos5-sata-phy", NULL),
-> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c",
-> EXYNOS5_PA_SATA_PHY_I2C,
-> +				"exynos5-sata-phy-i2c", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
->  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
-> --
-> 1.7.4.1
-
-Just following is enough? Because we don't need the definitions only for
-here...
-
-8<-------
-+	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", 0x122F0000,
-+				"exynos5-sata", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", 0x126B0000,
-+				"exynos5-sata-phy", NULL),
-+	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c", 0x121D0000,
-+				"exynos5-sata-phy-i2c", NULL),
-8<-------
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/20e39311/attachment.sig>
