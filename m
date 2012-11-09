@@ -1,56 +1,85 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 9 Nov 2012 14:01:12 -0600
-Subject: [PATCH V6 2/2] dmaengine: add helper function to request a slave
- DMA channel
-In-Reply-To: <1350355144.1648.5259.camel@vkoul-udesk3>
-References: <1347662517-4210-1-git-send-email-jon-hunter@ti.com>
- <1347662517-4210-3-git-send-email-jon-hunter@ti.com>
- <1347852805.1943.130.camel@vkoul-udesk3> <201209171159.27359.arnd@arndb.de>
- <20120917223619.GC12445@n2100.arm.linux.org.uk>
- <1347938035.1943.162.camel@vkoul-udesk3> <5060DDEB.4000600@ti.com>
- <1348547701.1943.190.camel@vkoul-udesk3>
- <20121016024318.GF24393@S2101-09.ap.freescale.net>
- <1350355144.1648.5259.camel@vkoul-udesk3>
-Message-ID: <509D6108.1060304@ti.com>
+From: hughd@google.com (Hugh Dickins)
+Date: Fri, 9 Nov 2012 12:06:18 -0800 (PST)
+Subject: [PATCH 03/16] mm: check rb_subtree_gap correctness
+In-Reply-To: <509D0F86.30607@gmail.com>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+ <1352155633-8648-4-git-send-email-walken@google.com>
+ <509D0F86.30607@gmail.com>
+Message-ID: <alpine.LNX.2.00.1211091156120.3856@eggly.anvils>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 9 Nov 2012, Sasha Levin wrote:
+> On 11/05/2012 05:47 PM, Michel Lespinasse wrote:
+> > When CONFIG_DEBUG_VM_RB is enabled, check that rb_subtree_gap is
+> > correctly set for every vma and that mm->highest_vm_end is also correct.
+> > 
+> > Also add an explicit 'bug' variable to track if browse_rb() detected any
+> > invalid condition.
+> > 
+> > Signed-off-by: Michel Lespinasse <walken@google.com>
+> > Reviewed-by: Rik van Riel <riel@redhat.com>
+> > 
+> > ---
+> 
+> Hi all,
+> 
+> While fuzzing with trinity inside a KVM tools (lkvm) guest, using today's -next
+> kernel, I'm getting these:
+> 
+> 
+> [  117.007714] free gap 7fba0dd1c000, correct 7fba0dcfb000
+> [  117.019773] map_count 750 rb -1
+> [  117.028362] ------------[ cut here ]------------
+> [  117.029813] kernel BUG at mm/mmap.c:439!
+> [  117.031024] invalid opcode: 0000 [#1] PREEMPT SMP DEBUG_PAGEALLOC
+> [  117.032933] Dumping ftrace buffer:
+> [  117.033972]    (ftrace buffer empty)
+> [  117.035085] CPU 4
+> [  117.035676] Pid: 6859, comm: trinity-child46 Tainted: G        W    3.7.0-rc4-next-20121109-sasha-00013-g9407f3c #124
+> [  117.038217] RIP: 0010:[<ffffffff81236687>]  [<ffffffff81236687>] validate_mm+0x297/0x2c0
+> [  117.041056] RSP: 0018:ffff880016a4fdf8  EFLAGS: 00010296
+> [  117.041056] RAX: 0000000000000013 RBX: 00000000ffffffff RCX: 0000000000000006
+> [  117.041056] RDX: 0000000000005270 RSI: ffff880024120910 RDI: 0000000000000286
+> [  117.052131] RBP: ffff880016a4fe48 R08: 0000000000000000 R09: 0000000000000000
+> [  117.052131] R10: 0000000000000001 R11: 0000000000000000 R12: 00000000000002ee
+> [  117.052131] R13: 00007fffea1fc000 R14: ffff88002412c000 R15: 0000000000000000
+> [  117.052131] FS:  00007fba129db700(0000) GS:ffff880063600000(0000) knlGS:0000000000000000
+> [  117.052131] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+> [  117.052131] CR2: 0000000003323288 CR3: 00000000169b2000 CR4: 00000000000406e0
+> [  117.052131] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+> [  117.052131] DR3: 0000000000000000 DR6: 00000000ffff0ff0 DR7: 0000000000000400
+> [  117.052131] Process trinity-child46 (pid: 6859, threadinfo ffff880016a4e000, task ffff880024120000)
+> [  117.052131] Stack:
+> [  117.052131]  ffffffff8489e201 ffffffff81235aa0 ffff88000885cac8 0000000100000000
+> [  117.052131]  ffffffff812361b9 ffff88002412c000 ffff88000885cac8 ffff88000885cdc8
+> [  117.052131]  ffff88000885cdd0 ffff88002412c000 ffff880016a4fe98 ffffffff812367b4
+> [  117.052131] Call Trace:
+> [  117.052131]  [<ffffffff81235aa0>] ? vma_compute_subtree_gap+0x40/0x40
+> [  117.052131]  [<ffffffff812361b9>] ? vma_gap_update+0x19/0x30
+> [  117.052131]  [<ffffffff812367b4>] vma_link+0x94/0xe0
+> [  117.052131]  [<ffffffff812386c4>] do_brk+0x2c4/0x380
+> [  117.052131]  [<ffffffff812387bf>] ? sys_brk+0x3f/0x190
+> [  117.052131]  [<ffffffff812388ce>] sys_brk+0x14e/0x190
+> [  117.052131]  [<ffffffff83be2618>] tracesys+0xe1/0xe6
+> [  117.052131] Code: d8 41 8b 76 60 39 de 74 1b 89 da 48 c7 c7 c6 d9 89 84 31 c0 e8 01 76 94 02 eb 10 66 0f 1f 84 00 00 00 00 00
+> 8b 45 c8 85 c0 74 18 <0f> 0b 4c 8d 48 e0 48 8b 70 e0 31 db c7 45 cc 00 00 00 00 e9 f4
+> [  117.052131] RIP  [<ffffffff81236687>] validate_mm+0x297/0x2c0
+> [  117.052131]  RSP <ffff880016a4fdf8>
+> [  117.136092] ---[ end trace 5ce250e0bf6d040c ]---
+> 
+> Note that they are very easy to reproduce.
+> 
+> Also, I see that lots of the code there has a local variable named 'bug' thats tracking
+> whether we should BUG() later on. Why does it work that way and the BUG() isn't immediate?
 
-On 10/15/2012 09:39 PM, Vinod Koul wrote:
-> On Tue, 2012-10-16 at 10:43 +0800, Shawn Guo wrote:
->> On Tue, Sep 25, 2012 at 10:05:01AM +0530, Vinod Koul wrote:
->>> On Mon, 2012-09-24 at 17:25 -0500, Jon Hunter wrote:
->>>>> For DT bindings, I think the binding itself shouldn't change based on my
->>>>> work but I would like these same bindings to help build the DMA engine
->>>>> code mappings.
->>>>>
->>>>> Now would it make sense to NOT merge these changes for 3.7 and postpone
->>>>> to 3.8. I can host these patches on a topic branch and merge them when
->>>>> we are ready. I plan to spend some good amount of time on my work this
->>>>> week so we should be ready pretty soon.
->>>>> One these changes are merged, users can start moving to this scheme.
->>>>
->>>> I just wanted to see how things are progressing your side. Did you
->>>> create a topic branch for this? If so let me know where I can find it, I
->>>> did not find a branch on your infradead git tree.
->>>>
->>>> I wanted to pull in the latest patches for some testing. 
->>> Sorry for delay, I had everything ready, but couldn't manage to commit
->>> and push. I have pushed to topic/dmaengine_dt, it is pushing out now...
->>>
->> Vinod,
->>
->> Looks it seemed 3.7-rc1.  Does that mean we have to wait for 3.8, or
->> will it show on later -rc for 3.7?
-> Yes this will be merged once we work out the common interface, otherwise
-> we will end up redoing interfaces for all drivers.
+3.7.0-rc4-mm1 BUGged on mm/mmap.c:439 as soon as I tried to rebuild
+that kernel with Alan's tty/vt/fb patch included, no fuzzing required.
 
-Hi Vinod,
+free_gap 55551d077000, correct 55551ccd2000 in my case.
 
-A few people have been asking me if getting device-tree support for DMA
-engine is plan for record for v3.8. I know that you were working through
-implementing a common interface and so I wanted to check how that is
-going. Do you have any insight to when device-tree support may get added?
+It should only be affecting the minority with CONFIG_DEBUG_VM_RB=y.
+I've put #if 0 around the rb_subtree_gap checking block in browse_rb(),
+and running okay so far with that - but not yet done much with it.
 
-Cheers
-Jon
+Hugh
