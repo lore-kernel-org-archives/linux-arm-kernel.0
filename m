@@ -1,53 +1,59 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 09 Nov 2012 10:16:03 -0700
-Subject: [PATCH v2] pinctrl/nomadik: make independent of prcmu driver
-In-Reply-To: <1352456915-28738-1-git-send-email-linus.walleij@stericsson.com>
-References: <1352456915-28738-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <509D3A53.6080007@wwwdotorg.org>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 9 Nov 2012 10:17:45 -0700
+Subject: [PATCH v3 7/7] crypto: omap_sham: Remove usage of private DMA API
+In-Reply-To: <CALLzPKY9fRSwgSTw-t9-wRbCHVbKPA=m+RsTWW4=CaxtDCczcQ@mail.gmail.com>
+References: <1352257033-32495-1-git-send-email-mgreer@animalcreek.com>
+ <1352257033-32495-8-git-send-email-mgreer@animalcreek.com>
+ <CALLzPKY9fRSwgSTw-t9-wRbCHVbKPA=m+RsTWW4=CaxtDCczcQ@mail.gmail.com>
+Message-ID: <20121109171745.GB13898@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2012 03:28 AM, Linus Walleij wrote:
-> From: Jonas Aaberg <jonas.aberg@stericsson.com>
-> 
-> Currently there are some unnecessary criss-cross
-> dependencies between the PRCMU driver in MFD and a lot of
-> other drivers, mainly because other drivers need to poke
-> around in the PRCM register range.
-> 
-> In cases like this there are actually just a few select
-> registers that the pinctrl driver need to read/modify/write,
-> and it turns out that no other driver is actually using
-> these registers, so there are no concurrency issues
-> whatsoever.
-> 
-> So: don't let the location of the register range complicate
-> things, just poke into these registers directly and skip
-> a layer of indirection.
-> 
-> Take this opportunity to add kerneldoc to the pinctrl
-> state container.
+On Fri, Nov 09, 2012 at 06:28:16PM +0200, Kasatkin, Dmitry wrote:
+> On Wed, Nov 7, 2012 at 4:57 AM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> > From: "Mark A. Greer" <mgreer@animalcreek.com>
+> >
+> > Remove usage of the private OMAP DMA API.
+> > The dmaengine API will be used instead.
+> >
+> > CC: Russell King <rmk+kernel@arm.linux.org.uk>
+> > CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
+> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
+> > ---
+> >  drivers/crypto/omap-sham.c | 117 ---------------------------------------------
+> >  1 file changed, 117 deletions(-)
+> >
+> > diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+> > index b57277c..ebb5255 100644
+> > --- a/drivers/crypto/omap-sham.c
+> > +++ b/drivers/crypto/omap-sham.c
 
-> diff --git a/drivers/pinctrl/pinctrl-nomadik.c b/drivers/pinctrl/pinctrl-nomadik.c
+> > @@ -807,18 +762,6 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
+> >         if (err)
+> >                 goto err1;
+> >
+> > -#ifdef OMAP_SHAM_DMA_PRIVATE
+> > -       omap_set_dma_dest_params(dd->dma_lch, 0,
+> > -                       OMAP_DMA_AMODE_CONSTANT,
+> > -                       dd->phys_base + SHA_REG_DIN(0), 0, 16);
+> > -
+> > -       omap_set_dma_dest_burst_mode(dd->dma_lch,
+> > -                       OMAP_DMA_DATA_BURST_16);
+> > -
+> > -       omap_set_dma_src_burst_mode(dd->dma_lch,
+> > -                       OMAP_DMA_DATA_BURST_4);
+> 
+> Burst mode significantly improves performance.
+> How do you configure burst mode with new API?
 
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (res) {
-> +		npct->prcm_base = devm_ioremap(&pdev->dev, res->start,
-> +					       resource_size(res));
-> +		if (!npct->prcm_base) {
-> +			dev_err(&pdev->dev,
-> +				"failed to ioremap PRCM registers\n");
-> +			return -ENOMEM;
-> +		}
-> +	} else {
-> +		dev_info(&pdev->dev,
-> +			 "No PRCM base, assume no ALT-Cx control is available\n");
-> +	}
+This is (or should be) taken care of by the dmaengine infrastructure.
+I've noted that there's an issue and there is a discussion about it
+here:
 
-Where is "assume no ALT-Cx control is available" implemented; I don't
-see anything that uses npct->prcm_base to conditionally enable/block any
-features. Is it just assumed that the DT won't contain any entries that
-trigger writes to the PRCM registers? That seems fragile; it could cause
-a "user"-triggered kernel crash.
+	http://www.spinics.net/lists/linux-omap/msg79855.html
 
-Aside from that, this seems fine. Much smaller than V1:-)
+We probably need to extend the dmaengine API to allow API-users to
+request specific tweaks/optimizations/whatever but that's MHO.
+
+Mark
+--
