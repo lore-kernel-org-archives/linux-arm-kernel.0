@@ -1,35 +1,23 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Fri,  9 Nov 2012 17:12:00 +0530
-Subject: [PATCH 1/1] ARM: mm: Remove unused variable in mmap.c
-Message-ID: <1352461320-22031-1-git-send-email-sachin.kamat@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 9 Nov 2012 11:49:43 +0000
+Subject: [RESEND PATCH 1/2] ASoC: Ux500: Fixup use of clocks
+In-Reply-To: <1352302962-25201-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1352302962-25201-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121109114943.GD23807@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Variable 'start_addr' is not used and hence can be removed.
+On Wed, Nov 07, 2012 at 04:42:41PM +0100, Ulf Hansson wrote:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> Make sure clocks are being prepared and unprepared as well
+> as enabled and disabled.
 
-Silences the following compilation warning:
-arch/arm/mm/mmap.c: In function ?arch_get_unmapped_area?:
-arch/arm/mm/mmap.c:60:16: warning:
-unused variable ?start_addr? [-Wunused-variable]
-
-Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
----
-This patch is based linux-next tree of 20121109
----
- arch/arm/mm/mmap.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index f4fec6d..10062ce 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -57,7 +57,6 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
- {
- 	struct mm_struct *mm = current->mm;
- 	struct vm_area_struct *vma;
--	unsigned long start_addr;
- 	int do_align = 0;
- 	int aliasing = cache_is_vipt_aliasing();
- 	struct vm_unmapped_area_info info;
--- 
-1.7.4.1
+Both of these patches are already applied...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/76409f17/attachment.sig>
