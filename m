@@ -1,26 +1,27 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 9 Nov 2012 16:56:09 +0000
-Subject: [PATCH 1/1] regulator: gpio-regulator: fix crash when no states
- property in dt
-In-Reply-To: <1352450076-22682-1-git-send-email-Frank.Li@freescale.com>
-References: <1352450076-22682-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20121109165609.GV23807@opensource.wolfsonmicro.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 09 Nov 2012 17:58:13 +0100
+Subject: pxa27x_keypad status
+In-Reply-To: <CA+E=qVc37ZB-mfbJxFVWCVsOC_4Rx7bjzMMkouiTNhhEqATnsw@mail.gmail.com>
+ (Vasily Khoruzhick's message of "Mon, 5 Nov 2012 21:48:14 +0300")
+References: <87fw4nvqfs.fsf@free.fr>
+ <CA+E=qVc37ZB-mfbJxFVWCVsOC_4Rx7bjzMMkouiTNhhEqATnsw@mail.gmail.com>
+Message-ID: <87fw4iu316.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 04:34:36PM +0800, Frank Li wrote:
+Vasily Khoruzhick <anarsoul@gmail.com> writes:
 
->  	/* Fetch states. */
->  	prop = of_find_property(np, "states", NULL);
-> -	proplen = prop->length / sizeof(int);
-> +	proplen = prop ? prop->length / sizeof(int) : 0;
+> On Mon, Nov 5, 2012 at 9:45 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Hi Robert,
+>
+> 3.7-rc2 works for me except suspend/resume issue (does not work after resume)
+> I've just reverted 6ce34a5fb4955fac1eebe080e1c2784bc8710449 as
+> temporary workaround.
 
-Aren't states mandatory for this driver, in which case shouldn't the
-probe fail here?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/32576d25/attachment.sig>
+OK, checked on another of my devices. You're right, it does work.
+Conclusion: one device with broken keypad hardware :(
+
+Cheers.
+
+-- 
+Robert
