@@ -1,35 +1,69 @@
-From: dc4@broadcom.com (Dominic Cobley)
-Date: Fri, 9 Nov 2012 11:09:46 +0000
-Subject: S-o-b for 48efdd2
- "Add a pm_power_off function that resets us, ..."
-In-Reply-To: <509C7328.9030104@wwwdotorg.org>
-References: <508CA4C4.5060407@wwwdotorg.org> <509C7328.9030104@wwwdotorg.org>
-Message-ID: <2C2B34F818605C4A9351ED6A537A43841DE6D823@SJEXCHMB09.corp.ad.broadcom.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 09 Nov 2012 20:10:42 +0900
+Subject: [PATCH v2 2/6] ARM: EXYNOS5: DT Support for SATA and SATA PHY
+In-Reply-To: <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
+References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
+ <1351612897-14923-3-git-send-email-vasanthananthan@gmail.com>
+Message-ID: <0e8b01cdbe6a$dbd36ed0$937a4c70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm happy to give permission for s.o.b. to be commits made by me. Is that sufficient?
-If that's not sufficient can you give me git commands that will do what you want?
+Vasanth Ananthan wrote:
+> 
+> This patch adds Device Nodes for SATA and SATA PHY device.
+> 
 
------Original Message-----
-From: Stephen Warren [mailto:swarren at wwwdotorg.org] 
-Sent: 09 November 2012 03:06
-To: Dominic Cobley
-Cc: linux-rpi-kernel at lists.infradead.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: S-o-b for 48efdd2 "Add a pm_power_off function that resets us, ..."
+[...]
 
-On 10/27/2012 09:21 PM, Stephen Warren wrote:
-> Dom,
+> @@ -188,6 +188,9 @@
+>  #define EXYNOS4_PA_SATA			0x12560000
+>  #define EXYNOS4_PA_SATAPHY		0x125D0000
+>  #define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
+> +#define EXYNOS5_PA_SATA_PHY_CTRL	0x12170000
+> +#define EXYNOS5_PA_SATA_PHY_I2C		0x121D0000
+> +#define EXYNOS5_PA_SATA_BASE		0x122F0000
 > 
-> Are you able to provide your S-o-b for the following commit:
-> 
-> 48efdd2 Add a pm_power_off function that resets us, and indicates to
-> bootcode.bin not to reboot us. Should allow a lower power 'off' state
-> 
-> I would like to upstream that, but can't without an S-o-b [from you].
-> 
-> Thanks.
+>  #define EXYNOS4_PA_SROMC		0x12570000
+>  #define EXYNOS5_PA_SROMC		0x12250000
+> diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
+> exynos/mach-exynos5-dt.c
+> index db1cd8e..7dbd4cc 100644
+> --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> @@ -61,6 +61,12 @@ static const struct of_dev_auxdata
+> exynos5250_auxdata_lookup[] __initconst = {
+>  				"exynos4210-spi.1", NULL),
+>  	OF_DEV_AUXDATA("samsung,exynos4210-spi", EXYNOS5_PA_SPI2,
+>  				"exynos4210-spi.2", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", EXYNOS5_PA_SATA_BASE,
+> +				"exynos5-sata", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", EXYNOS5_PA_SATA_PHY_CTRL,
+> +				"exynos5-sata-phy", NULL),
+> +	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c",
+> EXYNOS5_PA_SATA_PHY_I2C,
+> +				"exynos5-sata-phy-i2c", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA0, "dma-pl330.0", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_PDMA1, "dma-pl330.1", NULL),
+>  	OF_DEV_AUXDATA("arm,pl330", EXYNOS5_PA_MDMA1, "dma-pl330.2", NULL),
+> --
+> 1.7.4.1
 
-Dom, are you able to provide an S-o-b line for this or any other commits
-in you kernel trees? It'd be really helpful if you could add S-o-bs to
-any/all commits in your branches where you can. Thanks.
+Just following is enough? Because we don't need the definitions only for
+here...
+
+8<-------
++	OF_DEV_AUXDATA("samsung,exynos5-sata-ahci", 0x122F0000,
++				"exynos5-sata", NULL),
++	OF_DEV_AUXDATA("samsung,exynos5-sata-phy", 0x126B0000,
++				"exynos5-sata-phy", NULL),
++	OF_DEV_AUXDATA("samsung,exynos5-sata-phy-i2c", 0x121D0000,
++				"exynos5-sata-phy-i2c", NULL),
+8<-------
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
