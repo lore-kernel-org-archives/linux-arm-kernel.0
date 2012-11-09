@@ -1,59 +1,29 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 9 Nov 2012 13:31:11 +1100
-Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
-Message-ID: <20121109133111.1070c1062889461152713978@canb.auug.org.au>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 08 Nov 2012 20:03:12 -0700
+Subject: [PATCH 1/2] arm: bcm2835: move to the multiplatform support
+In-Reply-To: <1351419853-25146-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1351419853-25146-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <509C7270.9000508@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 10/28/2012 04:24 AM, Thomas Petazzoni wrote:
+> This commit integrates the bcm2835 into the list of platforms
+> supported by the multiplatform mechanism, which makes it possible to
+> build a single kernel binary image that boots on various SoCs.
+...
+> ---
+> Note that if you have CONFIG_VFP enabled, you need "[PATCH v3] ARM:
+> vfp: fix save and restore when running on pre-VFPv3 and CONFIG_VFPv3
+> set" to be applied in order to avoid a VFP-related kernel panic when
+> starting the first userspace application. Thanks to Albin Tonnerre for
+> pointing me to the right fix for this problem!
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/pinctrl/pinctrl-nomadik.c between commit 241e51ebd3b2
-("pinctrl/nomadik: make independent of prcmu driver") from the pinctrl
-tree and commit 44e47ccf8ab6 ("Merge branch 'next/multiplatform' into
-for-next") from the arm-soc tree.
+Thomas, just a heads up - the VFP commit you mention above should show
+up in v3.7-rc5 which I imagine will be released this weekend, and the
+debug_ll_io_init feature I mentioned in another response is already
+available is arm-soc branch devel/debug_ll_init. If you rebase this
+patch on a merge of those two branches, it should be in good shape for
+me to apply it.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc drivers/pinctrl/pinctrl-nomadik.c
-index 33c614e,3ad23fb..0000000
---- a/drivers/pinctrl/pinctrl-nomadik.c
-+++ b/drivers/pinctrl/pinctrl-nomadik.c
-@@@ -30,10 -30,23 +30,9 @@@
-  #include <linux/pinctrl/pinconf.h>
-  /* Since we request GPIOs from ourself */
-  #include <linux/pinctrl/consumer.h>
- -/*
- - * For the U8500 archs, use the PRCMU register interface, for the older
- - * Nomadik, provide some stubs. The functions using these will only be
- - * called on the U8500 series.
- - */
- -#ifdef CONFIG_ARCH_U8500
- -#include <linux/mfd/dbx500-prcmu.h>
- -#else
- -static inline u32 prcmu_read(unsigned int reg) {
- -	return 0;
- -}
- -static inline void prcmu_write(unsigned int reg, u32 value) {}
- -static inline void prcmu_write_masked(unsigned int reg, u32 mask, u32 value) {}
- -#endif
-  #include <linux/platform_data/pinctrl-nomadik.h>
-- 
-  #include <asm/mach/irq.h>
-- 
-+ #include <mach/irqs.h>
-  #include "pinctrl-nomadik.h"
-  
-  /*
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/81ef2148/attachment.sig>
+Thanks.
