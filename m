@@ -1,504 +1,76 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Fri, 9 Nov 2012 15:07:48 +0100
-Subject: [PATCH v2] i2c: at91: add dma support
-Message-ID: <1352470068-7678-1-git-send-email-ludovic.desroches@atmel.com>
+From: levinsasha928@gmail.com (Sasha Levin)
+Date: Fri, 09 Nov 2012 09:13:26 -0500
+Subject: [PATCH 03/16] mm: check rb_subtree_gap correctness
+In-Reply-To: <1352155633-8648-4-git-send-email-walken@google.com>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+ <1352155633-8648-4-git-send-email-walken@google.com>
+Message-ID: <509D0F86.30607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 11/05/2012 05:47 PM, Michel Lespinasse wrote:
+> When CONFIG_DEBUG_VM_RB is enabled, check that rb_subtree_gap is
+> correctly set for every vma and that mm->highest_vm_end is also correct.
+> 
+> Also add an explicit 'bug' variable to track if browse_rb() detected any
+> invalid condition.
+> 
+> Signed-off-by: Michel Lespinasse <walken@google.com>
+> Reviewed-by: Rik van Riel <riel@redhat.com>
+> 
+> ---
 
-Add dma support for Atmel TWI which is available on sam9x5 and later.
+Hi all,
 
-When using dma for reception, you have to read only n-2 bytes. The last
-two bytes are read manually. Don't doing this should cause to send the
-STOP command too late and then to get extra data in the receive
-register.
+While fuzzing with trinity inside a KVM tools (lkvm) guest, using today's -next
+kernel, I'm getting these:
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
 
-Changes:
-- v2 (based on Russell feedback):
-    - replace DMA_TO_DEVICE/DMA_FROM_DEVICE by DMA_MEM_TO_DEV/DMA_DEV_TO_MEM
-    - don't check for tx_submit errors
-    - atmel dma header location has changed
+[  117.007714] free gap 7fba0dd1c000, correct 7fba0dcfb000
+[  117.019773] map_count 750 rb -1
+[  117.028362] ------------[ cut here ]------------
+[  117.029813] kernel BUG at mm/mmap.c:439!
+[  117.031024] invalid opcode: 0000 [#1] PREEMPT SMP DEBUG_PAGEALLOC
+[  117.032933] Dumping ftrace buffer:
+[  117.033972]    (ftrace buffer empty)
+[  117.035085] CPU 4
+[  117.035676] Pid: 6859, comm: trinity-child46 Tainted: G        W    3.7.0-rc4-next-20121109-sasha-00013-g9407f3c #124
+[  117.038217] RIP: 0010:[<ffffffff81236687>]  [<ffffffff81236687>] validate_mm+0x297/0x2c0
+[  117.041056] RSP: 0018:ffff880016a4fdf8  EFLAGS: 00010296
+[  117.041056] RAX: 0000000000000013 RBX: 00000000ffffffff RCX: 0000000000000006
+[  117.041056] RDX: 0000000000005270 RSI: ffff880024120910 RDI: 0000000000000286
+[  117.052131] RBP: ffff880016a4fe48 R08: 0000000000000000 R09: 0000000000000000
+[  117.052131] R10: 0000000000000001 R11: 0000000000000000 R12: 00000000000002ee
+[  117.052131] R13: 00007fffea1fc000 R14: ffff88002412c000 R15: 0000000000000000
+[  117.052131] FS:  00007fba129db700(0000) GS:ffff880063600000(0000) knlGS:0000000000000000
+[  117.052131] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[  117.052131] CR2: 0000000003323288 CR3: 00000000169b2000 CR4: 00000000000406e0
+[  117.052131] DR0: 0000000000000000 DR1: 0000000000000000 DR2: 0000000000000000
+[  117.052131] DR3: 0000000000000000 DR6: 00000000ffff0ff0 DR7: 0000000000000400
+[  117.052131] Process trinity-child46 (pid: 6859, threadinfo ffff880016a4e000, task ffff880024120000)
+[  117.052131] Stack:
+[  117.052131]  ffffffff8489e201 ffffffff81235aa0 ffff88000885cac8 0000000100000000
+[  117.052131]  ffffffff812361b9 ffff88002412c000 ffff88000885cac8 ffff88000885cdc8
+[  117.052131]  ffff88000885cdd0 ffff88002412c000 ffff880016a4fe98 ffffffff812367b4
+[  117.052131] Call Trace:
+[  117.052131]  [<ffffffff81235aa0>] ? vma_compute_subtree_gap+0x40/0x40
+[  117.052131]  [<ffffffff812361b9>] ? vma_gap_update+0x19/0x30
+[  117.052131]  [<ffffffff812367b4>] vma_link+0x94/0xe0
+[  117.052131]  [<ffffffff812386c4>] do_brk+0x2c4/0x380
+[  117.052131]  [<ffffffff812387bf>] ? sys_brk+0x3f/0x190
+[  117.052131]  [<ffffffff812388ce>] sys_brk+0x14e/0x190
+[  117.052131]  [<ffffffff83be2618>] tracesys+0xe1/0xe6
+[  117.052131] Code: d8 41 8b 76 60 39 de 74 1b 89 da 48 c7 c7 c6 d9 89 84 31 c0 e8 01 76 94 02 eb 10 66 0f 1f 84 00 00 00 00 00
+8b 45 c8 85 c0 74 18 <0f> 0b 4c 8d 48 e0 48 8b 70 e0 31 db c7 45 cc 00 00 00 00 e9 f4
+[  117.052131] RIP  [<ffffffff81236687>] validate_mm+0x297/0x2c0
+[  117.052131]  RSP <ffff880016a4fdf8>
+[  117.136092] ---[ end trace 5ce250e0bf6d040c ]---
 
- drivers/i2c/busses/i2c-at91.c | 316 ++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 305 insertions(+), 11 deletions(-)
+Note that they are very easy to reproduce.
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index aa59a25..f6fba9c 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -19,6 +19,8 @@
- 
- #include <linux/clk.h>
- #include <linux/completion.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/dmaengine.h>
- #include <linux/err.h>
- #include <linux/i2c.h>
- #include <linux/interrupt.h>
-@@ -30,6 +32,8 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-+#include <linux/platform_data/dma-atmel.h>
-+
- #define TWI_CLK_HZ		100000			/* max 400 Kbits/s */
- #define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
- 
-@@ -65,9 +69,21 @@
- #define	AT91_TWI_THR		0x0034	/* Transmit Holding Register */
- 
- struct at91_twi_pdata {
--	unsigned	clk_max_div;
--	unsigned	clk_offset;
--	bool		has_unre_flag;
-+	unsigned		clk_max_div;
-+	unsigned		clk_offset;
-+	bool			has_unre_flag;
-+	bool			has_dma_support;
-+	struct at_dma_slave	dma_slave;
-+};
-+
-+struct at91_twi_dma {
-+	struct dma_chan			*chan_rx;
-+	struct dma_chan			*chan_tx;
-+	struct scatterlist		sg;
-+	struct dma_async_tx_descriptor	*data_desc;
-+	enum dma_transfer_direction	direction;
-+	bool				buf_mapped;
-+	bool				xfer_in_progress;
- };
- 
- struct at91_twi_dev {
-@@ -79,10 +95,13 @@ struct at91_twi_dev {
- 	size_t			buf_len;
- 	struct i2c_msg		*msg;
- 	int			irq;
-+	unsigned		imr;
- 	unsigned		transfer_status;
- 	struct i2c_adapter	adapter;
- 	unsigned		twi_cwgr_reg;
- 	struct at91_twi_pdata	*pdata;
-+	bool			use_dma;
-+	struct at91_twi_dma	dma;
- };
- 
- static unsigned at91_twi_read(struct at91_twi_dev *dev, unsigned reg)
-@@ -101,6 +120,17 @@ static void at91_disable_twi_interrupts(struct at91_twi_dev *dev)
- 		       AT91_TWI_TXCOMP | AT91_TWI_RXRDY | AT91_TWI_TXRDY);
- }
- 
-+static void at91_twi_irq_save(struct at91_twi_dev *dev)
-+{
-+	dev->imr = at91_twi_read(dev, AT91_TWI_IMR) & 0x7;
-+	at91_disable_twi_interrupts(dev);
-+}
-+
-+static void at91_twi_irq_restore(struct at91_twi_dev *dev)
-+{
-+	at91_twi_write(dev, AT91_TWI_IER, dev->imr);
-+}
-+
- static void at91_init_twi_bus(struct at91_twi_dev *dev)
- {
- 	at91_disable_twi_interrupts(dev);
-@@ -137,6 +167,30 @@ static void __devinit at91_calc_twi_clock(struct at91_twi_dev *dev, int twi_clk)
- 	dev_dbg(dev->dev, "cdiv %d ckdiv %d\n", cdiv, ckdiv);
- }
- 
-+static void at91_twi_dma_cleanup(struct at91_twi_dev *dev)
-+{
-+	struct at91_twi_dma *dma = &dev->dma;
-+
-+	at91_twi_irq_save(dev);
-+
-+	if (dma->xfer_in_progress) {
-+		if (dma->direction == DMA_DEV_TO_MEM)
-+			dma->chan_rx->device->device_control(dma->chan_rx,
-+				DMA_TERMINATE_ALL, 0);
-+		else
-+			dma->chan_tx->device->device_control(dma->chan_tx,
-+				DMA_TERMINATE_ALL, 0);
-+		dma->xfer_in_progress = false;
-+	}
-+	if (dma->buf_mapped) {
-+		dma_unmap_single(dev->dev, sg_dma_address(&dma->sg),
-+				 dev->buf_len, dma->direction);
-+		dma->buf_mapped = false;
-+	}
-+
-+	at91_twi_irq_restore(dev);
-+}
-+
- static void at91_twi_write_next_byte(struct at91_twi_dev *dev)
- {
- 	if (dev->buf_len <= 0)
-@@ -153,6 +207,61 @@ static void at91_twi_write_next_byte(struct at91_twi_dev *dev)
- 	++dev->buf;
- }
- 
-+static void at91_twi_write_data_dma_callback(void *data)
-+{
-+	struct at91_twi_dev *dev = (struct at91_twi_dev *)data;
-+
-+	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg),
-+			 dev->buf_len, DMA_MEM_TO_DEV);
-+
-+	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_STOP);
-+}
-+
-+static void at91_twi_write_data_dma(struct at91_twi_dev *dev)
-+{
-+	dma_addr_t dma_addr;
-+	dma_cookie_t cookie;
-+	struct dma_async_tx_descriptor *txdesc;
-+	struct at91_twi_dma *dma = &dev->dma;
-+	struct dma_chan *chan_tx = dma->chan_tx;
-+
-+	if (dev->buf_len <= 0)
-+		return;
-+
-+	dma->direction = DMA_MEM_TO_DEV;
-+
-+	at91_twi_irq_save(dev);
-+	dma_addr = dma_map_single(dev->dev, dev->buf, dev->buf_len,
-+				  DMA_MEM_TO_DEV);
-+	if (dma_mapping_error(dev->dev, dma_addr)) {
-+		dev_err(dev->dev, "dma map failed\n");
-+		return;
-+	}
-+	dma->buf_mapped = true;
-+	at91_twi_irq_restore(dev);
-+	sg_dma_len(&dma->sg) = dev->buf_len;
-+	sg_dma_address(&dma->sg) = dma_addr;
-+
-+	txdesc = chan_tx->device->device_prep_slave_sg(chan_tx, &dma->sg,
-+		1, DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK, NULL);
-+	if (!txdesc) {
-+		dev_err(dev->dev, "dma prep slave sg failed\n");
-+		goto error;
-+	}
-+
-+	txdesc->callback = at91_twi_write_data_dma_callback;
-+	txdesc->callback_param = dev;
-+
-+	dma->xfer_in_progress = true;
-+	cookie = txdesc->tx_submit(txdesc);
-+	dma->chan_tx->device->device_issue_pending(chan_tx);
-+
-+	return;
-+
-+error:
-+	at91_twi_dma_cleanup(dev);
-+}
-+
- static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
- {
- 	if (dev->buf_len <= 0)
-@@ -178,6 +287,62 @@ static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
- 	++dev->buf;
- }
- 
-+static void at91_twi_read_data_dma_callback(void *data)
-+{
-+	struct at91_twi_dev *dev = (struct at91_twi_dev *)data;
-+
-+	dma_unmap_single(dev->dev, sg_dma_address(&dev->dma.sg),
-+			 dev->buf_len, DMA_DEV_TO_MEM);
-+
-+	/* The last two bytes have to be read without using dma */
-+	dev->buf += dev->buf_len - 2;
-+	dev->buf_len = 2;
-+	at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_RXRDY);
-+}
-+
-+static void at91_twi_read_data_dma(struct at91_twi_dev *dev)
-+{
-+	dma_addr_t dma_addr;
-+	dma_cookie_t cookie;
-+	struct dma_async_tx_descriptor *rxdesc;
-+	struct at91_twi_dma *dma = &dev->dma;
-+	struct dma_chan *chan_rx = dma->chan_rx;
-+
-+	dma->direction = DMA_DEV_TO_MEM;
-+
-+	/* Keep in mind that we won't use dma to read the last two bytes */
-+	at91_twi_irq_save(dev);
-+	dma_addr = dma_map_single(dev->dev, dev->buf, dev->buf_len - 2,
-+				  DMA_DEV_TO_MEM);
-+	if (dma_mapping_error(dev->dev, dma_addr)) {
-+		dev_err(dev->dev, "dma map failed\n");
-+		return;
-+	}
-+	dma->buf_mapped = true;
-+	at91_twi_irq_restore(dev);
-+	dma->sg.dma_address = dma_addr;
-+	sg_dma_len(&dma->sg) = dev->buf_len - 2;
-+
-+	rxdesc = chan_rx->device->device_prep_slave_sg(chan_rx, &dma->sg,
-+		1, DMA_DEV_TO_MEM, DMA_PREP_INTERRUPT | DMA_CTRL_ACK, NULL);
-+	if (!rxdesc) {
-+		dev_err(dev->dev, "dma prep slave sg failed\n");
-+		goto error;
-+	}
-+
-+	rxdesc->callback = at91_twi_read_data_dma_callback;
-+	rxdesc->callback_param = dev;
-+
-+	dma->xfer_in_progress = true;
-+	cookie = rxdesc->tx_submit(rxdesc);
-+	dma->chan_rx->device->device_issue_pending(dma->chan_rx);
-+
-+	return;
-+
-+error:
-+	at91_twi_dma_cleanup(dev);
-+}
-+
- static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
- {
- 	struct at91_twi_dev *dev = dev_id;
-@@ -224,12 +389,36 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 		if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
- 			start_flags |= AT91_TWI_STOP;
- 		at91_twi_write(dev, AT91_TWI_CR, start_flags);
--		at91_twi_write(dev, AT91_TWI_IER,
-+		/*
-+		 * When using dma, the last byte has to be read manually in
-+		 * order to not send the stop command too late and then
-+		 * to receive extra data. In practice, there are some issues
-+		 * if you use the dma to read n-1 bytes because of latency.
-+		 * Reading n-2 bytes with dma and the two last ones manually
-+		 * seems to be the best solution.
-+		 */
-+		if (dev->use_dma && (dev->buf_len > 2)) {
-+			at91_twi_read_data_dma(dev);
-+			/*
-+			 * It is important to enable TXCOMP irq here because
-+			 * doing it only when transferring the last two bytes
-+			 * will mask NACK errors since TXCOMP is set when a
-+			 * NACK occurs.
-+			 */
-+			at91_twi_write(dev, AT91_TWI_IER,
-+			       AT91_TWI_TXCOMP);
-+		} else
-+			at91_twi_write(dev, AT91_TWI_IER,
- 			       AT91_TWI_TXCOMP | AT91_TWI_RXRDY);
- 	} else {
--		at91_twi_write_next_byte(dev);
--		at91_twi_write(dev, AT91_TWI_IER,
--			       AT91_TWI_TXCOMP | AT91_TWI_TXRDY);
-+		if (dev->use_dma) {
-+			at91_twi_write_data_dma(dev);
-+			at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_TXCOMP);
-+		} else {
-+			at91_twi_write_next_byte(dev);
-+			at91_twi_write(dev, AT91_TWI_IER,
-+				AT91_TWI_TXCOMP | AT91_TWI_TXRDY);
-+		}
- 	}
- 
- 	ret = wait_for_completion_interruptible_timeout(&dev->cmd_complete,
-@@ -237,23 +426,31 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
- 	if (ret == 0) {
- 		dev_err(dev->dev, "controller timed out\n");
- 		at91_init_twi_bus(dev);
--		return -ETIMEDOUT;
-+		ret = -ETIMEDOUT;
-+		goto error;
- 	}
- 	if (dev->transfer_status & AT91_TWI_NACK) {
- 		dev_dbg(dev->dev, "received nack\n");
--		return -EREMOTEIO;
-+		ret = -EREMOTEIO;
-+		goto error;
- 	}
- 	if (dev->transfer_status & AT91_TWI_OVRE) {
- 		dev_err(dev->dev, "overrun while reading\n");
--		return -EIO;
-+		ret = -EIO;
-+		goto error;
- 	}
- 	if (has_unre_flag && dev->transfer_status & AT91_TWI_UNRE) {
- 		dev_err(dev->dev, "underrun while writing\n");
--		return -EIO;
-+		ret = -EIO;
-+		goto error;
- 	}
- 	dev_dbg(dev->dev, "transfer complete\n");
- 
- 	return 0;
-+
-+error:
-+	at91_twi_dma_cleanup(dev);
-+	return ret;
- }
- 
- static int at91_twi_xfer(struct i2c_adapter *adap, struct i2c_msg *msg, int num)
-@@ -324,36 +521,42 @@ static struct at91_twi_pdata at91rm9200_config = {
- 	.clk_max_div = 5,
- 	.clk_offset = 3,
- 	.has_unre_flag = true,
-+	.has_dma_support = false,
- };
- 
- static struct at91_twi_pdata at91sam9261_config = {
- 	.clk_max_div = 5,
- 	.clk_offset = 4,
- 	.has_unre_flag = false,
-+	.has_dma_support = false,
- };
- 
- static struct at91_twi_pdata at91sam9260_config = {
- 	.clk_max_div = 7,
- 	.clk_offset = 4,
- 	.has_unre_flag = false,
-+	.has_dma_support = false,
- };
- 
- static struct at91_twi_pdata at91sam9g20_config = {
- 	.clk_max_div = 7,
- 	.clk_offset = 4,
- 	.has_unre_flag = false,
-+	.has_dma_support = false,
- };
- 
- static struct at91_twi_pdata at91sam9g10_config = {
- 	.clk_max_div = 7,
- 	.clk_offset = 4,
- 	.has_unre_flag = false,
-+	.has_dma_support = false,
- };
- 
- static struct at91_twi_pdata at91sam9x5_config = {
- 	.clk_max_div = 7,
- 	.clk_offset = 4,
- 	.has_unre_flag = false,
-+	.has_dma_support = true,
- };
- 
- static const struct platform_device_id at91_twi_devtypes[] = {
-@@ -400,6 +603,90 @@ MODULE_DEVICE_TABLE(of, atmel_twi_dt_ids);
- #define atmel_twi_dt_ids NULL
- #endif
- 
-+static bool __devinit filter(struct dma_chan *chan, void *slave)
-+{
-+	struct at_dma_slave *sl = slave;
-+
-+	if (sl->dma_dev == chan->device->dev) {
-+		chan->private = sl;
-+		return true;
-+	} else {
-+		return false;
-+	}
-+}
-+
-+static int __devinit at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
-+{
-+	int ret = 0;
-+	struct at_dma_slave *sdata;
-+	struct dma_slave_config slave_config;
-+	struct at91_twi_dma *dma = &dev->dma;
-+
-+	sdata = &dev->pdata->dma_slave;
-+
-+	memset(&slave_config, 0, sizeof(slave_config));
-+	slave_config.src_addr = (dma_addr_t)phy_addr + AT91_TWI_RHR;
-+	slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config.src_maxburst = 1;
-+	slave_config.dst_addr = (dma_addr_t)phy_addr + AT91_TWI_THR;
-+	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-+	slave_config.dst_maxburst = 1;
-+	slave_config.device_fc = false;
-+
-+	if (sdata && sdata->dma_dev) {
-+		dma_cap_mask_t mask;
-+
-+		dma_cap_zero(mask);
-+		dma_cap_set(DMA_SLAVE, mask);
-+		dma->chan_tx = dma_request_channel(mask, filter, sdata);
-+		if (!dma->chan_tx) {
-+			dev_err(dev->dev, "no DMA channel available for tx\n");
-+			ret = -EBUSY;
-+			goto error;
-+		}
-+		dma->chan_rx = dma_request_channel(mask, filter, sdata);
-+		if (!dma->chan_rx) {
-+			dev_err(dev->dev, "no DMA channel available for rx\n");
-+			ret = -EBUSY;
-+			goto error;
-+		}
-+	} else {
-+		ret = -EINVAL;
-+		goto error;
-+	}
-+
-+	slave_config.direction = DMA_MEM_TO_DEV;
-+	if (dmaengine_slave_config(dma->chan_tx, &slave_config)) {
-+		dev_err(dev->dev, "failed to configure tx channel\n");
-+		ret = -EINVAL;
-+		goto error;
-+	}
-+
-+	slave_config.direction = DMA_DEV_TO_MEM;
-+	if (dmaengine_slave_config(dma->chan_rx, &slave_config)) {
-+		dev_err(dev->dev, "failed to configure rx channel\n");
-+		ret = -EINVAL;
-+		goto error;
-+	}
-+
-+	sg_init_table(&dma->sg, 1);
-+	dma->buf_mapped = false;
-+	dma->xfer_in_progress = false;
-+
-+	dev_info(dev->dev, "using %s (tx) and %s (rx) for DMA transfers\n",
-+		 dma_chan_name(dma->chan_tx), dma_chan_name(dma->chan_rx));
-+
-+	return ret;
-+
-+error:
-+	dev_info(dev->dev, "can't use DMA\n");
-+	if (dma->chan_rx)
-+		dma_release_channel(dma->chan_rx);
-+	if (dma->chan_tx)
-+		dma_release_channel(dma->chan_tx);
-+	return ret;
-+}
-+
- static struct at91_twi_pdata * __devinit at91_twi_get_driver_data(
- 					struct platform_device *pdev)
- {
-@@ -418,6 +705,7 @@ static int __devinit at91_twi_probe(struct platform_device *pdev)
- 	struct at91_twi_dev *dev;
- 	struct resource *mem;
- 	int rc;
-+	u32 phy_addr;
- 
- 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
- 	if (!dev)
-@@ -428,6 +716,7 @@ static int __devinit at91_twi_probe(struct platform_device *pdev)
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!mem)
- 		return -ENODEV;
-+	phy_addr = mem->start;
- 
- 	dev->pdata = at91_twi_get_driver_data(pdev);
- 	if (!dev->pdata)
-@@ -457,6 +746,11 @@ static int __devinit at91_twi_probe(struct platform_device *pdev)
- 	}
- 	clk_prepare_enable(dev->clk);
- 
-+	if (dev->pdata->has_dma_support) {
-+		if (at91_twi_configure_dma(dev, phy_addr) == 0)
-+			dev->use_dma = true;
-+	}
-+
- 	at91_calc_twi_clock(dev, TWI_CLK_HZ);
- 	at91_init_twi_bus(dev);
- 
--- 
-1.7.11.3
+Also, I see that lots of the code there has a local variable named 'bug' thats tracking
+whether we should BUG() later on. Why does it work that way and the BUG() isn't immediate?
+
+
+Thanks,
+Sasha
