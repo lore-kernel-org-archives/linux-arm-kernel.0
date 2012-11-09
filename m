@@ -1,24 +1,45 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 9 Nov 2012 14:00:40 -0800
-Subject: [GIT PULL] ARM: OMAP: Timer and Counter DT Updates for v3.8
-In-Reply-To: <509C4BF1.20505@ti.com>
-References: <50941812.2070501@ti.com> <20121107004703.GS6801@atomide.com>
- <20121107234403.GS6801@atomide.com> <509BE9B0.5040608@ti.com>
- <20121108173824.GE6801@atomide.com> <509C0C3E.6070204@ti.com>
- <509C4BF1.20505@ti.com>
-Message-ID: <20121109220040.GV6801@atomide.com>
+Date: Fri, 9 Nov 2012 14:09:16 -0800
+Subject: [PATCH v2 00/26] Move OMAP2+ over to common clk framework
+In-Reply-To: <alpine.DEB.2.00.1211092058540.20703@utopia.booyaka.com>
+References: <1352337181-29427-1-git-send-email-mturquette@ti.com>
+ <alpine.DEB.2.00.1211092058540.20703@utopia.booyaka.com>
+Message-ID: <20121109220916.GW6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121108 16:20]:
+* Paul Walmsley <paul@pwsan.com> [121109 13:14]:
 > 
-> On 11/08/2012 01:47 PM, Jon Hunter wrote:
-> > Do you want to generate the patch or me?
+> Hi
 > 
-> Patch posted here ...
-> 
-> http://marc.info/?l=linux-omap&m=135242025202171&w=2
+> With the fixes that have been posted, this is testing clean here.  Mike 
+> and Rajendra have put in months of work on these patches under 
+> often-difficult conditions, and it's really great that we've arrived at 
+> this point with zero obvious remaining regressions from the current code. 
 
-OK thanks!
+That's excellent news :)
+ 
+> The branch has been posted for the time being at 
+> git://git.pwsan.com/linux-2.6 in the branch 'common_clk_devel_3.8', with 
+> the head at commit 376676b429cb6dc95c39cdac82b2be816ea22893, in case 
+> anyone else wants to try it.  
+> 
+> Anyway, barring any further regressions that haven't reared their ugly 
+> heads yet, and barring anything truly horrible in the code or data that 
+> I've missed so far, will take this branch from here.  It still needs some 
+> more work before it's ready to merge.  The clockdomain usecounting fix 
+> patch needs to be split and moved earlier in the patch stack so 'git 
+> bisect' doesn't result in warnings and broken PM on OMAP3.  And it all is 
+> going to be rebased on the second set of PRCM cleanup patches at commit 
+> b99db36cdf37decb1b5575c5f293d170cbbc53d6, which I'm assuming Tony is 
+> planning to pull.  Then will plan to send that pull request to Tony.
+> 
+> Then after that, if there's still time to merge some of the clock changes 
+> that have showed up on the lists for 3.8, those will get stacked onto a 
+> topic branch based on the branch that's sent to Tony.
+
+Sounds good to me.
+
+Thanks,
 
 Tony
