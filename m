@@ -1,32 +1,48 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 9 Nov 2012 13:36:25 +0100
-Subject: [PATCH] pinctrl/nomadik: db8540: fix moduartstmmux_oc4_1 pin group
- definition.
-Message-ID: <1352464585-481-1-git-send-email-linus.walleij@stericsson.com>
+From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
+Date: Fri,  9 Nov 2012 13:42:41 +0100
+Subject: [PATCH v2] ARM: mxs: apf28dev: Add I2C and SPI support
+Message-ID: <1352464961-6414-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Nicolas Graux <jean-nicolas.graux@stericsson.com>
+Changes since v1:
+	- Removed the spidev support.
 
-One group definition was missing, so add it.
-
-Signed-off-by: Jean-Nicolas Graux <jean-nicolas.graux@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 ---
- drivers/pinctrl/pinctrl-nomadik-db8540.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx28-apf28dev.dts |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-nomadik-db8540.c b/drivers/pinctrl/pinctrl-nomadik-db8540.c
-index 52fc301..bce0583 100644
---- a/drivers/pinctrl/pinctrl-nomadik-db8540.c
-+++ b/drivers/pinctrl/pinctrl-nomadik-db8540.c
-@@ -822,6 +822,7 @@ static const struct nmk_pingroup nmk_db8540_groups[] = {
- 	DB8540_PIN_GROUP(modaccuarttxrx_oc4_1, NMK_GPIO_ALT_C4),
- 	DB8540_PIN_GROUP(modaccuartrtscts_oc4_1, NMK_GPIO_ALT_C4),
- 	DB8540_PIN_GROUP(stmmod_oc4_1, NMK_GPIO_ALT_C4),
-+	DB8540_PIN_GROUP(moduartstmmux_oc4_1, NMK_GPIO_ALT_C4),
+diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
+index 1643d25..6d8865b 100644
+--- a/arch/arm/boot/dts/imx28-apf28dev.dts
++++ b/arch/arm/boot/dts/imx28-apf28dev.dts
+@@ -27,6 +27,13 @@
+ 				status = "okay";
+ 			};
  
- };
++			ssp2: ssp at 80014000 {
++				compatible = "fsl,imx28-spi";
++				pinctrl-names = "default";
++				pinctrl-0 = <&spi2_pins_a>;
++				status = "okay";
++			};
++
+ 			pinctrl at 80018000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&hog_pins_apf28dev>;
+@@ -74,6 +81,12 @@
+ 				status = "okay";
+ 			};
  
++			i2c0: i2c at 80058000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins_a>;
++				status = "okay";
++			};
++
+ 			pwm: pwm at 80064000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pwm3_pins_a &pwm4_pins_a>;
 -- 
-1.7.11.3
+1.7.8.6
