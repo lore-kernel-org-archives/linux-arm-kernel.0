@@ -1,50 +1,34 @@
-From: dron0gus@gmail.com (Andrey Gusakov)
-Date: Fri, 9 Nov 2012 10:42:13 +0300
-Subject: [PATCH 2/2] ARM: S3C64XX: Statically define parent clock of the
- "camera" clock
-In-Reply-To: <1352325657-28885-2-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1352325657-28885-1-git-send-email-sylvester.nawrocki@gmail.com>
- <1352325657-28885-2-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <CAA11ShAo_N5iwPmVqE27NMzhpSD6NZORqf7yvjUyZ-+kGkgYog@mail.gmail.com>
+From: cavokz@gmail.com (Domenico Andreoli)
+Date: Fri, 9 Nov 2012 08:49:14 +0100
+Subject: [PATCH] Add support for generic BCM SoC chipsets
+In-Reply-To: <509C7771.9020400@wwwdotorg.org>
+References: <1352391196-9984-1-git-send-email-csd@broadcom.com>
+ <509C7771.9020400@wwwdotorg.org>
+Message-ID: <20121109074913.GA25257@glitch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+Hi Christian,
 
-I think .reg_src can be removed? This clock have only one source.
+On Thu, Nov 08, 2012 at 08:24:33PM -0700, Stephen Warren wrote:
+> On 11/08/2012 09:13 AM, Christian Daudt wrote:
+> > In order to start upstreaming Broadcom SoC support, create
+> > a starting hierarchy, arch and dts files.
+> >
 
-On Thu, Nov 8, 2012 at 2:00 AM, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
-> The "camera" clock defined in arch/arm/mach-s3c64xx/clock.c has null
-> clock source mux control register as it can have only one parent
-> clock. In such cases there is a need to configure the parent clock
-> statically, otherwise s3c_set_clksrc() bails out with an error message
-> "no parent clock specified" leaving the parent clock not configured.
-> Define statically the parent clock so it is possible to get or set rate
-> of the "camera" clock.
->
-> Reported-by: In-Bae Jeong <kukyakya@gmail.com>
-> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/clock.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-> index 28041e8..85b9cf1 100644
-> --- a/arch/arm/mach-s3c64xx/clock.c
-> +++ b/arch/arm/mach-s3c64xx/clock.c
-> @@ -744,6 +744,7 @@ static struct clksrc_clk clksrcs[] = {
->                         .name           = "camera",
->                         .ctrlbit        = S3C_CLKCON_SCLK_CAM,
->                         .enable         = s3c64xx_sclk_ctrl,
-> +                       .parent         = &clk_h2,
->                 },
->                 .reg_div        = { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
->                 .reg_src        = { .reg = NULL, .shift = 0, .size = 0  },
-> --
-> 1.7.4.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Glad to know that Broadcom is interested in mainline :)
+
+> > The first support SoC family that is planned is the
+> >  BCM281XX (BCM28145/28150/28155) family of dual A9 mobile SoC cores
+> > This code is just the skeleton code for get the machine upstreamed. It
+> > has been made MULTIPLATFORM compatible.
+> 
+> Is the intent for this to support other BCM SoCs in the future, such as
+> the bcm2835 in the Raspberry Pi, and the mach-bcm476x which Domenico
+> Andreoli recently sent patches for? It'd be awesome if Broadcom could
+> provide MMC and USB drivers for the bcm2835 for example.
+
+I'd love to see published some more documentation as well.
+
+Regards,
+Domenico
