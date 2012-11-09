@@ -1,82 +1,144 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Nov 2012 14:34:09 +0000
-Subject: [PATCH v2 0/5] ARM: multi-cluster aware boot protocol
-Message-ID: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Fri,  9 Nov 2012 14:34:14 +0000
+Subject: [PATCH v2 5/5] ARM: gic: use a private mapping for CPU target
+ interfaces
+In-Reply-To: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1352471654-20207-6-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is v2, referred to this previous posting:
+From: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/125878.html
+The GIC interface numbering does not necessarily follow the logical
+CPU numbering, especially for complex topologies such as multi-cluster
+systems.
 
-Changes in v2:
+Fortunately we can easily probe the GIC to create a mapping as the
+Interrupt Processor Targets Registers for the first 32 interrupts are
+read-only, and each field returns a value that always corresponds to
+the processor reading the register.
 
-- Reworded and added compatible property to cpus.txt
-- Replaced while loop in arm_dt_init_cpu_maps() with a combination of
-  of_find_node_by_path and for_each_child_of_node
-- Replaced of_get_property with of_property_read_u32
-- Added further checks for DT /cpu nodes and implemented stashed array
-  to avoid overwriting the cpu_logical_map if DT contains errors
-- Added GIC CPU IF define in the GIC probing code
-- Removed printk for boot CPU MPIDR and added a patch that prints the full
-  extent of MPIDR in smp_setup_processor_id()
-- Updated smp_setup_processor_id() so that it uses nr_cpu_ids
-- Dropped RFC tag
+Initially all mappings target all CPUs in case an IPI is required to
+boot secondary CPUs.  It is refined as those CPUs discover what their
+actual mapping is.
 
-The introduction of multi-cluster ARM systems in SoC designs requires the
-kernel to become cluster aware, so that it can be booted on every CPU in the
-system and it can build an appropriate HW-to-logical cpu map.
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/common/gic.c | 45 ++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 36 insertions(+), 9 deletions(-)
 
-Current code in the kernel, in particular the boot sequence, hinges upon a
-sequential mapping of MPIDR values for cpus and related interrupt controller
-CPU interfaces to logical cpu indexing.
-This hypothesis is not valid when the concept of cluster is introduced since
-the MPIDR cannot be represented as a single index and interrupt controller
-CPU interfaces can be wired with a numbering scheme following per-SoC
-design parameters which can be only detected through probing or device
-tree representation.
-
-Through the device tree and "cpu" nodes bindings, the kernel is provided
-with HW values for MPIDR registers that allow the kernel to identify the
-HW CPU ids that are present in the platform.
-
-The GIC code has been extended to allow automatic detection of GIC CPU IF ids
-at boot. IPIs are broadcast to all possible CPUs, and every time a secondary
-CPU is booted, it initializes its own mask and clears itself from the mask of
-all other logical CPUs.
-
-The device tree bindings and GIC probing allow to boot the Linux kernel on any
-CPU of a multi-cluster system without relying on a platform specific hook to
-identify the number of CPUs and hypothesis on the sequential pattern of MPIDRs
-and relative GIC CPU IF ids.
-
-Pen release code for all converted platforms will need patching to extend the
-current MPIDR range check; this will take place as soon as the bindings and
-code for the multi-cluster boot protocol will be reviewed and accepted.
-
-The patchset has been tested on:
-
-- TC2 testchip
-
-to boot a 5-core dual-cluster system on every possible CPU.
-
-Lorenzo Pieralisi (4):
-  ARM: kernel: smp_setup_processor_id() updates
-  ARM: kernel: add device tree init map function
-  ARM: kernel: add cpu logical map DT init in setup_arch
-  ARM: kernel: add logical mappings look-up
-
-Nicolas Pitre (1):
-  ARM: gic: use a private mapping for CPU target interfaces
-
- Documentation/devicetree/bindings/arm/cpus.txt | 84 ++++++++++++++++++++++++++
- arch/arm/common/gic.c                          | 45 +++++++++++---
- arch/arm/include/asm/prom.h                    |  2 +
- arch/arm/include/asm/smp_plat.h                | 17 ++++++
- arch/arm/kernel/devtree.c                      | 76 +++++++++++++++++++++++
- arch/arm/kernel/setup.c                        |  8 ++-
- 6 files changed, 220 insertions(+), 12 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
-
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 50c9eef..2203c92 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -70,6 +70,14 @@ struct gic_chip_data {
+ static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+ 
+ /*
++ * The GIC mapping of CPU interfaces does not necessarily match
++ * the logical CPU numbering.  Let's use a mapping as returned
++ * by the GIC itself.
++ */
++#define NR_GIC_CPU_IF 8
++static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
++
++/*
+  * Supported arch specific GIC irq extension.
+  * Default make them NULL.
+  */
+@@ -238,11 +246,11 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+ 	u32 val, mask, bit;
+ 
+-	if (cpu >= 8 || cpu >= nr_cpu_ids)
++	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+ 	mask = 0xff << shift;
+-	bit = 1 << (cpu_logical_map(cpu) + shift);
++	bit = gic_cpu_map[cpu] << shift;
+ 
+ 	raw_spin_lock(&irq_controller_lock);
+ 	val = readl_relaxed(reg) & ~mask;
+@@ -349,11 +357,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	u32 cpumask;
+ 	unsigned int gic_irqs = gic->gic_irqs;
+ 	void __iomem *base = gic_data_dist_base(gic);
+-	u32 cpu = cpu_logical_map(smp_processor_id());
+-
+-	cpumask = 1 << cpu;
+-	cpumask |= cpumask << 8;
+-	cpumask |= cpumask << 16;
+ 
+ 	writel_relaxed(0, base + GIC_DIST_CTRL);
+ 
+@@ -366,6 +369,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
+ 	/*
+ 	 * Set all global interrupts to this CPU only.
+ 	 */
++	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
+ 	for (i = 32; i < gic_irqs; i += 4)
+ 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
+ 
+@@ -389,9 +393,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
+ {
+ 	void __iomem *dist_base = gic_data_dist_base(gic);
+ 	void __iomem *base = gic_data_cpu_base(gic);
++	unsigned int cpu_mask, cpu = smp_processor_id();
+ 	int i;
+ 
+ 	/*
++	 * Get what the GIC says our CPU mask is.
++	 */
++	BUG_ON(cpu >= NR_GIC_CPU_IF);
++	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
++	gic_cpu_map[cpu] = cpu_mask;
++
++	/*
++	 * Clear our mask from the other map entries in case they're
++	 * still undefined.
++	 */
++	for (i = 0; i < NR_GIC_CPU_IF; i++)
++		if (i != cpu)
++			gic_cpu_map[i] &= ~cpu_mask;
++
++	/*
+ 	 * Deal with the banked PPI and SGI interrupts - disable all
+ 	 * PPI interrupts, ensure all SGI interrupts are enabled.
+ 	 */
+@@ -654,7 +674,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ {
+ 	irq_hw_number_t hwirq_base;
+ 	struct gic_chip_data *gic;
+-	int gic_irqs, irq_base;
++	int gic_irqs, irq_base, i;
+ 
+ 	BUG_ON(gic_nr >= MAX_GIC_NR);
+ 
+@@ -692,6 +712,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	}
+ 
+ 	/*
++	 * Initialize the CPU interface map to all CPUs.
++	 * It will be refined as each CPU probes its ID.
++	 */
++	for (i = 0; i < NR_GIC_CPU_IF; i++)
++		gic_cpu_map[i] = 0xff;
++
++	/*
+ 	 * For primary GICs, skip over SGIs.
+ 	 * For secondary GICs, skip over PPIs, too.
+ 	 */
+@@ -746,7 +773,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 
+ 	/* Convert our logical CPU mask into a physical one. */
+ 	for_each_cpu(cpu, mask)
+-		map |= 1 << cpu_logical_map(cpu);
++		map |= gic_cpu_map[cpu];
+ 
+ 	/*
+ 	 * Ensure that stores to Normal memory are visible to the
 -- 
 1.7.12
