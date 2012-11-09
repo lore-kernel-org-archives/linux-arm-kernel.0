@@ -1,59 +1,69 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 9 Nov 2012 10:17:45 -0700
-Subject: [PATCH v3 7/7] crypto: omap_sham: Remove usage of private DMA API
-In-Reply-To: <CALLzPKY9fRSwgSTw-t9-wRbCHVbKPA=m+RsTWW4=CaxtDCczcQ@mail.gmail.com>
-References: <1352257033-32495-1-git-send-email-mgreer@animalcreek.com>
- <1352257033-32495-8-git-send-email-mgreer@animalcreek.com>
- <CALLzPKY9fRSwgSTw-t9-wRbCHVbKPA=m+RsTWW4=CaxtDCczcQ@mail.gmail.com>
-Message-ID: <20121109171745.GB13898@animalcreek.com>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Fri, 9 Nov 2012 18:23:17 +0100
+Subject: [PATCH] i2c: at91: fix SMBus quick command
+Message-ID: <1352481797-3520-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 06:28:16PM +0200, Kasatkin, Dmitry wrote:
-> On Wed, Nov 7, 2012 at 4:57 AM, Mark A. Greer <mgreer@animalcreek.com> wrote:
-> > From: "Mark A. Greer" <mgreer@animalcreek.com>
-> >
-> > Remove usage of the private OMAP DMA API.
-> > The dmaengine API will be used instead.
-> >
-> > CC: Russell King <rmk+kernel@arm.linux.org.uk>
-> > CC: Dmitry Kasatkin <dmitry.kasatkin@intel.com>
-> > Signed-off-by: Mark A. Greer <mgreer@animalcreek.com>
-> > ---
-> >  drivers/crypto/omap-sham.c | 117 ---------------------------------------------
-> >  1 file changed, 117 deletions(-)
-> >
-> > diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-> > index b57277c..ebb5255 100644
-> > --- a/drivers/crypto/omap-sham.c
-> > +++ b/drivers/crypto/omap-sham.c
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-> > @@ -807,18 +762,6 @@ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
-> >         if (err)
-> >                 goto err1;
-> >
-> > -#ifdef OMAP_SHAM_DMA_PRIVATE
-> > -       omap_set_dma_dest_params(dd->dma_lch, 0,
-> > -                       OMAP_DMA_AMODE_CONSTANT,
-> > -                       dd->phys_base + SHA_REG_DIN(0), 0, 16);
-> > -
-> > -       omap_set_dma_dest_burst_mode(dd->dma_lch,
-> > -                       OMAP_DMA_DATA_BURST_16);
-> > -
-> > -       omap_set_dma_src_burst_mode(dd->dma_lch,
-> > -                       OMAP_DMA_DATA_BURST_4);
-> 
-> Burst mode significantly improves performance.
-> How do you configure burst mode with new API?
+SMBus command was not performed. This patch fixes this issue. The timeout log
+priority has been decreased to not make console dirty uselessly.
 
-This is (or should be) taken care of by the dmaengine infrastructure.
-I've noted that there's an issue and there is a discussion about it
-here:
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
 
-	http://www.spinics.net/lists/linux-omap/msg79855.html
+Hi Wolfram,
 
-We probably need to extend the dmaengine API to allow API-users to
-request specific tweaks/optimizations/whatever but that's MHO.
+It would be great if this patch could be included into 3.7. The driver was
+claiming that it supports SMBus quick command but it was not true. Moreover,
+with some IP versions, it could cause data corruption.
 
-Mark
---
+I tested it with i2cdetect as you suggested. EEPROMs were detected but not
+other devices (lm75 and ds1337). I have exactly the same behavior by using
+i2c-gpio driver so I think there is no major issue on a driver point of view.
+
+Thanks.
+
+Regards.
+
+Ludovic
+
+ drivers/i2c/busses/i2c-at91.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index aa59a25..a6670eb 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -39,6 +39,7 @@
+ #define	AT91_TWI_STOP		0x0002	/* Send a Stop Condition */
+ #define	AT91_TWI_MSEN		0x0004	/* Master Transfer Enable */
+ #define	AT91_TWI_SVDIS		0x0020	/* Slave Transfer Disable */
++#define	AT91_TWI_QUICK		0x0040	/* SMBus quick command */
+ #define	AT91_TWI_SWRST		0x0080	/* Software Reset */
+ 
+ #define	AT91_TWI_MMR		0x0004	/* Master Mode Register */
+@@ -212,7 +213,10 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 
+ 	INIT_COMPLETION(dev->cmd_complete);
+ 	dev->transfer_status = 0;
+-	if (dev->msg->flags & I2C_M_RD) {
++
++	if (!dev->buf_len) {
++		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_QUICK);
++	} else if (dev->msg->flags & I2C_M_RD) {
+ 		unsigned start_flags = AT91_TWI_START;
+ 
+ 		if (at91_twi_read(dev, AT91_TWI_SR) & AT91_TWI_RXRDY) {
+@@ -235,7 +239,7 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
+ 	ret = wait_for_completion_interruptible_timeout(&dev->cmd_complete,
+ 							dev->adapter.timeout);
+ 	if (ret == 0) {
+-		dev_err(dev->dev, "controller timed out\n");
++		dev_dbg(dev->dev, "controller timed out\n");
+ 		at91_init_twi_bus(dev);
+ 		return -ETIMEDOUT;
+ 	}
+-- 
+1.7.11.3
