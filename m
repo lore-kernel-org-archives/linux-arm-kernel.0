@@ -1,31 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 8 Nov 2012 17:45:06 +0000
-Subject: [Xen-devel] BUG: ARM build failures due to Xen
-In-Reply-To: <alpine.DEB.2.02.1211081554220.2689@kaball.uk.xensource.com>
-References: <20121106175749.GO28327@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1211081544510.2689@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1211081554220.2689@kaball.uk.xensource.com>
-Message-ID: <201211081745.06518.arnd@arndb.de>
+From: p.paneri@samsung.com (Praveen Paneri)
+Date: Fri, 9 Nov 2012 17:45:45 +0530
+Subject: [PATCH v7 0/5] usb: phy: samsung: Introducing usb phy driver for
+ samsung SoCs
+In-Reply-To: <20121109115440.GC8078@arwen.pp.htv.fi>
+References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
+ <20121109115440.GC8078@arwen.pp.htv.fi>
+Message-ID: <CAD6zSYNa1WXkUrRa-Ja_RtXMgdRwK=YXoxQRwoEfj8Jaw8oVAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 08 November 2012, Stefano Stabellini wrote:
-> From: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> 
-> xen/arm: Fix compile errors when drivers are compiled as modules.
-> 
-> We end up with:
-> 
-> ERROR: "HYPERVISOR_event_channel_op" [drivers/xen/xen-gntdev.ko] undefined!
-> ERROR: "privcmd_call" [drivers/xen/xen-privcmd.ko] undefined!
-> ERROR: "HYPERVISOR_grant_table_op" [drivers/net/xen-netback/xen-netback.ko] undefined!
-> 
-> and this patch exports said function (which is implemented in hypercall.S).
-> 
-> Signed-off-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
+Hi Kukjin,
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Fri, Nov 9, 2012 at 5:24 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Tue, Oct 30, 2012 at 10:27:32AM +0530, Praveen Paneri wrote:
+>> Changes from v6:
+>> Modified register definitions according to the existing ones.
+>> Changed default PHY clk selection for SoCs.
+>> Improved binding text and rebased to the latest usb-next.
+>>
+>> Changes from v5:
+>> Moved clk_get() to driver's probe function. Now reference clock frequency
+>> selection value is stored in samsung_usbphy structure for later use. Used
+>> IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
+>>
+>> Changes from v4:
+>> Moved header file contents to driver's source file
+>> Removed unnecessary print message from driver's probe function
+>> Dropped the Free Software Foundation address from the header
+>> Changed the platform data code to use __initdata
+>>
+>> Changes from v3:
+>> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
+>> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
+>> is registered
+>> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
+>>
+>> Changes from v2:
+>> Changed the driver filenames to samsung-usbphy
+>> Changed 's3c' to 'samsung' for platform device as well as platform data
+>> Moved platform data structure to a separate file
+>> Rectified coding style related errors
+>>
+>> Changes from v1:
+>> Rebased patches to latest usb-next branch
+>> Changed the name 'sec_usbphy' to 'samsung_usbphy'
+>>
+>> This patch set introduces a phy driver for samsung SoCs. It uses the existing
+>> transceiver infrastructure to provide phy control functions. Use of this driver
+>> can be extended for usb host phy as well. Over the period of time all the phy
+>> related code for most of the samsung SoCs can be integrated here.
+>> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
+>> when they start supporting this phy driver.
+>> This driver is tested with smdk6410 and Exynos4210(with DT).
+>>
+>> Praveen Paneri (5):
+>>   usb: phy: samsung: Introducing usb phy driver for hsotg
+>>   usb: s3c-hsotg: Adding phy driver support
+>>   ARM: S3C64XX: Removing old phy setup code
+>>   ARM: S3C64XX: Enabling samsung-usbphy driver
+>>   ARM: Exynos4210: Enabling samsung-usbphy driver
+>
+> guys I can't wait any longer. If I don't get proper Acks today, I will
+> go ahead without all the PHY changes from Samsung :-s
 
-I guess it's best to merge that through the Xen tree.
+Can you please ack this patch series.
+
+Thanks,
+
+Praveen
+>
+> --
+> balbi
