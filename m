@@ -1,167 +1,84 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 9 Nov 2012 10:59:30 +0000
-Subject: [PATCH v2 04/10] pwm: pwm-tiecap: Add device-tree binding
- support for APWM driver
-In-Reply-To: <20121109075219.GA22224@avionic-0098.mockup.avionic-design.de>
-References: <1352361197-27442-1-git-send-email-avinashphilip@ti.com>
- <1352361197-27442-5-git-send-email-avinashphilip@ti.com>
- <20121109075219.GA22224@avionic-0098.mockup.avionic-design.de>
-Message-ID: <518397C60809E147AF5323E0420B992E3E9E44FC@DBDE01.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 09 Nov 2012 20:03:57 +0900
+Subject: [PATCH v2 1/6] ARM: EXYNOS5: Clock settings for SATA and SATA PHY
+In-Reply-To: <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
+References: <1351612897-14923-1-git-send-email-vasanthananthan@gmail.com>
+ <1351612897-14923-2-git-send-email-vasanthananthan@gmail.com>
+Message-ID: <0e8a01cdbe69$ea6e67c0$bf4b3740$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 13:22:19, Thierry Reding wrote:
-> On Thu, Nov 08, 2012 at 01:23:11PM +0530, Philip, Avinash wrote:
-> > This patch
-> > 1. Add support for device-tree binding for ECAP APWM driver.
-> > 2. Set size of pwm-cells set to 3 to support PWM channel number, PWM
-> >    period & polarity configuration from device tree.
-> > 3. Add enable/disable clock gating in PWM subsystem common config space.
-> > 4. When here set .owner member in platform_driver structure to
-> >    THIS_MODULE.
-> > 
-> > Signed-off-by: Philip, Avinash <avinashphilip@ti.com>
-> > Cc:	Grant Likely <grant.likely@secretlab.ca>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Rob Landley <rob@landley.net>
-> > ---
-> > Changes since v1:
-> > 	- Add separate patch for pinctrl support
-> > 	- Add conditional check for PWM subsystem clock enable.
-> > 	- Combined with HWMOD changes & DT bindings.
-> > 	- Remove the custom of xlate support.
-> > 
-> > :000000 100644 0000000... fe24cac... A	Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > :100644 100644 d6d4cf0... 0d43266... M	drivers/pwm/pwm-tiecap.c
-> >  .../devicetree/bindings/pwm/pwm-tiecap.txt         |   22 +++++++++
-> >  drivers/pwm/pwm-tiecap.c                           |   48 +++++++++++++++++++-
-> >  2 files changed, 69 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > new file mode 100644
-> > index 0000000..fe24cac
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
-> > @@ -0,0 +1,22 @@
-> > +TI SOC ECAP based APWM controller
-> > +
-> > +Required properties:
-> > +- compatible: Must be "ti,am33xx-ecap"
-> > +- #pwm-cells: Should be 3. Number of cells being used to specify PWM property.
-> > +  First cell specifies the per-chip index of the PWM to use, the second
-> > +  cell is the period cycle in nanoseconds and bit 0 in the third cell is
+Vasanth Ananthan wrote:
 > 
-> I think this should be "period in nanoseconds". I haven't heard "period
-> cycle" before.
+> This patch adds neccessary clock entries for SATA, SATA PHY and
+> I2C_SATAPHY
+> 
+> Signed-off-by: Vasanth Ananthan <vasanth.a@samsung.com>
+> ---
+>  arch/arm/mach-exynos/clock-exynos5.c |   21 ++++++++++++++++++---
+>  1 files changed, 18 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-
+> exynos/clock-exynos5.c
+> index c44ca1e..124c54f 100644
+> --- a/arch/arm/mach-exynos/clock-exynos5.c
+> +++ b/arch/arm/mach-exynos/clock-exynos5.c
+> @@ -651,15 +651,20 @@ static struct clk exynos5_init_clocks_off[] = {
+>  		.ctrlbit	= (1 << 15),
+>  	}, {
+>  		.name		= "sata",
+> -		.devname	= "ahci",
+> +		.devname	= "exynos5-sata",
+> +		.parent         = &exynos5_clk_aclk_200.clk,
+>  		.enable		= exynos5_clk_ip_fsys_ctrl,
+>  		.ctrlbit	= (1 << 6),
+>  	}, {
+> -		.name		= "sata_phy",
+> +		.name		= "sata-phy",
+> +		.devname	= "exynos5-sata-phy",
+> +		.parent         = &exynos5_clk_aclk_200.clk,
+>  		.enable		= exynos5_clk_ip_fsys_ctrl,
+>  		.ctrlbit	= (1 << 24),
+>  	}, {
+> -		.name		= "sata_phy_i2c",
+> +		.name		= "i2c",
+> +		.devname	= "exynos5-sata-phy-i2c",
+> +		.parent         = &exynos5_clk_aclk_200.clk,
+>  		.enable		= exynos5_clk_ip_fsys_ctrl,
+>  		.ctrlbit	= (1 << 25),
+>  	}, {
+> @@ -1226,6 +1231,16 @@ static struct clksrc_clk exynos5_clksrcs[] = {
+>  		.reg_div = { .reg = EXYNOS5_CLKDIV_TOP0, .shift = 24, .size
+> = 3 },
+>  	}, {
+>  		.clk	= {
+> +			.name		= "sclk_sata",
+> +			.devname	= "exynos5-sata",
+> +			.enable		= exynos5_clksrc_mask_fsys_ctrl,
+> +			.ctrlbit	= (1 << 24),
+> +		},
+> +		.sources = &exynos5_clkset_aclk,
+> +		.reg_src = { .reg = EXYNOS5_CLKSRC_FSYS, .shift = 24, .size
+> = 1 },
+> +		.reg_div = { .reg = EXYNOS5_CLKDIV_FSYS0, .shift = 20, .size
+> = 4 },
+> +	}, {
+> +		.clk	= {
+>  			.name		= "sclk_gscl_wrap",
+>  			.devname	= "s5p-mipi-csis.0",
+>  			.enable		= exynos5_clksrc_mask_gscl_ctrl,
+> --
+> 1.7.4.1
 
-Ok
+Looks OK to me, need to think again about naming though?, anyway, this can
+be handled separate from this series.
 
-> 
-> > +  used to encode the polarity of PWM output.
-> 
-> Maybe you should explicitly say how this is encoded.
+Let me take this into Samsung tree, if any problems, please let me know.
 
-Ok I will add details
+Thanks.
 
-> 
-...
-> >  
-> > +#define ECAPCLK_EN			BIT(0)
-> > +#define ECAPCLK_STOP_REQ	BIT(1)
-> 
-> This one doesn't seem to align with the rest. Also, why is bit 0 called
-> _EN and bit 1 _STOP_REQ? Couldn't they be made more consistent, i.e.
-> _START and _STOP? Or _ENABLE and _DISABLE?
-
-Ok I will change to PWMSS_ECAPCLK_EN & PWMSS_ECAPCLK_STPO_REQ
-
-> 
-> > +
-> > +#define ECAPCLK_EN_ACK		BIT(0)
-> > +
-> > +#define PWM_CELL_SIZE		3
-> 
-> You don't need a define for this.
-
-I remove.
-
-> 
-> > +
-> >  struct ecap_pwm_chip {
-> >  	struct pwm_chip	chip;
-> >  	unsigned int	clk_rate;
-> > @@ -184,6 +194,16 @@ static const struct pwm_ops ecap_pwm_ops = {
-> >  	.owner		= THIS_MODULE,
-> >  };
-> >  
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id ecap_of_match[] = {
-> > +	{
-> > +		.compatible	= "ti,am33xx-ecap",
-> > +	},
-> > +	{},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, ecap_of_match);
-> > +#endif
-> > +
-> 
-> I'm not sure if I remember correctly, but wasn't AM33xx support supposed
-> to be DT only? In that case you don't need the CONFIG_OF guards.
-
-I will remove
-
-> 
-...
-> >  	pm_runtime_enable(&pdev->dev);
-> > +	pm_runtime_get_sync(&pdev->dev);
-> 
-> Maybe put a blank line after this for readability.
-
-Ok
-
-> 
-> > +	if (!(pwmss_submodule_state_change(pdev->dev.parent, ECAPCLK_EN) &
-> > +				ECAPCLK_EN_ACK)) {
-> 
-> This is very hard to read, can you split this up into something like the
-> following please?
-> 
-> 	status = pwmss_submodule_state_change(pdev->dev.parent, ECAPCLK_EN);
-> 	if (!(status & ECAPCLK_EN_ACK)) {
-> 		...
-> 	}
-> 
-
-Ok I will correct it.
-
-> > +		dev_err(&pdev->dev, "PWMSS config space clock enable failure\n");
-> > +		ret = -EINVAL;
-> > +		goto pwmss_clk_failure;
-> > +	}
-> > +	pm_runtime_put_sync(&pdev->dev);
-> 
-> Another blank line between the two above would be good.
-
-Ok
-
-> 
-...
-> > +		.owner	= THIS_MODULE,
-> > +		.of_match_table = of_match_ptr(ecap_of_match),
-> 
-> Here as well, if AM33xx is DT-only, then the of_match_ptr() can be
-> dropped.
-
-Ok I will drop.
-
-Thanks
-Avinash
-> 
-> >  	},
-> >  	.probe = ecap_pwm_probe,
-> >  	.remove = __devexit_p(ecap_pwm_remove),
-> 
-> No __devexit_p() please.
-> 
-> Thierry
-> 
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
