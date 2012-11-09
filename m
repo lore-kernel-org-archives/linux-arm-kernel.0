@@ -1,109 +1,67 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:29:21 +0900
-Subject: [PATCH 06/10] ARM: shmobile: sh7372: sh7372_fsidivX_clk become
- non-global
+Date: Fri,  9 Nov 2012 16:29:23 +0900
+Subject: [PATCH 08/10] ARM: shmobile: r8a7740: add FSI-DVI clocks
 In-Reply-To: <1352446165-19298-1-git-send-email-horms@verge.net.au>
 References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352446165-19298-7-git-send-email-horms@verge.net.au>
+Message-ID: <1352446165-19298-9-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Not only sh7372 but also many Renesas chip has FSI-DIV clock,
-and we can share its sh_clk_ops.
-To support common FSI-DIV clock, sh7372_fsidivX_clk
-becomes non-global by this patch.
-This is preparation for FSI DT support.
-
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c        |    2 +-
- arch/arm/mach-shmobile/board-mackerel.c      |    2 +-
- arch/arm/mach-shmobile/clock-sh7372.c        |   10 ++++++----
- arch/arm/mach-shmobile/include/mach/sh7372.h |    2 --
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7740.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 790dc68..cefdd03 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -728,7 +728,7 @@ fsia_ick_out:
- static int fsi_hdmi_set_rate(struct device *dev, int rate, int enable)
- {
- 	struct clk *fsib_clk;
--	struct clk *fdiv_clk = &sh7372_fsidivb_clk;
-+	struct clk *fdiv_clk = clk_get(NULL, "fsidivb");
- 	long fsib_rate = 0;
- 	long fdiv_rate = 0;
- 	int ackmd_bpfmd;
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 0c27c81..c826d77 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -882,7 +882,7 @@ static int __fsi_set_round_rate(struct clk *clk, long rate, int enable)
- static int fsi_b_set_rate(struct device *dev, int rate, int enable)
- {
- 	struct clk *fsib_clk;
--	struct clk *fdiv_clk = &sh7372_fsidivb_clk;
-+	struct clk *fdiv_clk = clk_get(NULL, "fsidivb");
- 	long fsib_rate = 0;
- 	long fdiv_rate = 0;
- 	int ackmd_bpfmd;
-diff --git a/arch/arm/mach-shmobile/clock-sh7372.c b/arch/arm/mach-shmobile/clock-sh7372.c
-index 430a90f..18dcff7 100644
---- a/arch/arm/mach-shmobile/clock-sh7372.c
-+++ b/arch/arm/mach-shmobile/clock-sh7372.c
-@@ -481,7 +481,7 @@ static struct clk_mapping fsidiva_clk_mapping = {
- 	.len	= 8,
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index c012bbf..eb5dfee 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -65,6 +65,9 @@
+ #define SMSTPCR3	IOMEM(0xe615013c)
+ #define SMSTPCR4	IOMEM(0xe6150140)
+ 
++#define FSIDIVA		IOMEM(0xFE1F8000)
++#define FSIDIVB		IOMEM(0xFE1F8008)
++
+ /* Fixed 32 KHz root clock from EXTALR pin */
+ static struct clk extalr_clk = {
+ 	.rate	= 32768,
+@@ -443,6 +446,14 @@ static struct clk *late_main_clks[] = {
+ 	&hdmi2_clk,
  };
  
--struct clk sh7372_fsidiva_clk = {
-+static struct clk fsidiva_clk = {
- 	.ops		= &fsidiv_clk_ops,
- 	.parent		= &div6_reparent_clks[DIV6_FSIA], /* late install */
- 	.mapping	= &fsidiva_clk_mapping,
-@@ -492,15 +492,15 @@ static struct clk_mapping fsidivb_clk_mapping = {
- 	.len	= 8,
++/* FSI DIV */
++enum { FSIDIV_A, FSIDIV_B, FSIDIV_REPARENT_NR };
++
++static struct clk fsidivs[] = {
++	[FSIDIV_A] = SH_CLK_FSIDIV(FSIDIVA, &div6_reparent_clks[DIV6_FSIA]),
++	[FSIDIV_B] = SH_CLK_FSIDIV(FSIDIVB, &div6_reparent_clks[DIV6_FSIB]),
++};
++
+ /* MSTP */
+ enum {
+ 	DIV4_I, DIV4_ZG, DIV4_B, DIV4_M1, DIV4_HP,
+@@ -612,6 +623,8 @@ static struct clk_lookup lookups[] = {
+ 
+ 	CLKDEV_ICK_ID("icka", "sh_fsi2",	&div6_reparent_clks[DIV6_FSIA]),
+ 	CLKDEV_ICK_ID("ickb", "sh_fsi2",	&div6_reparent_clks[DIV6_FSIB]),
++	CLKDEV_ICK_ID("diva", "sh_fsi2",	&fsidivs[FSIDIV_A]),
++	CLKDEV_ICK_ID("divb", "sh_fsi2",	&fsidivs[FSIDIV_B]),
  };
  
--struct clk sh7372_fsidivb_clk = {
-+static struct clk fsidivb_clk = {
- 	.ops		= &fsidiv_clk_ops,
- 	.parent		= &div6_reparent_clks[DIV6_FSIB],  /* late install */
- 	.mapping	= &fsidivb_clk_mapping,
- };
+ void __init r8a7740_clock_init(u8 md_ck)
+@@ -657,6 +670,9 @@ void __init r8a7740_clock_init(u8 md_ck)
+ 	for (k = 0; !ret && (k < ARRAY_SIZE(late_main_clks)); k++)
+ 		ret = clk_register(late_main_clks[k]);
  
- static struct clk *late_main_clks[] = {
--	&sh7372_fsidiva_clk,
--	&sh7372_fsidivb_clk,
-+	&fsidiva_clk,
-+	&fsidivb_clk,
- };
++	if (!ret)
++		ret = sh_clk_fsidiv_register(fsidivs, FSIDIV_REPARENT_NR);
++
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
  
- enum { MSTP001, MSTP000,
-@@ -583,6 +583,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("pllc1_clk", &pllc1_clk),
- 	CLKDEV_CON_ID("pllc1_div2_clk", &pllc1_div2_clk),
- 	CLKDEV_CON_ID("pllc2_clk", &sh7372_pllc2_clk),
-+	CLKDEV_CON_ID("fsidiva", &fsidiva_clk),
-+	CLKDEV_CON_ID("fsidivb", &fsidivb_clk),
- 
- 	/* DIV4 clocks */
- 	CLKDEV_CON_ID("i_clk", &div4_clks[DIV4_I]),
-diff --git a/arch/arm/mach-shmobile/include/mach/sh7372.h b/arch/arm/mach-shmobile/include/mach/sh7372.h
-index d65fbbe..26cd101 100644
---- a/arch/arm/mach-shmobile/include/mach/sh7372.h
-+++ b/arch/arm/mach-shmobile/include/mach/sh7372.h
-@@ -479,8 +479,6 @@ extern struct clk sh7372_dv_clki_div2_clk;
- extern struct clk sh7372_pllc2_clk;
- extern struct clk sh7372_fsiack_clk;
- extern struct clk sh7372_fsibck_clk;
--extern struct clk sh7372_fsidiva_clk;
--extern struct clk sh7372_fsidivb_clk;
- 
- extern void sh7372_intcs_suspend(void);
- extern void sh7372_intcs_resume(void);
+ 	if (!ret)
 -- 
 1.7.10.4
