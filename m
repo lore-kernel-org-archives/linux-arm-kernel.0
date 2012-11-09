@@ -1,327 +1,205 @@
-From: Morten.Rasmussen@arm.com (Morten Rasmussen)
-Date: Fri, 9 Nov 2012 16:46:31 +0000
-Subject: [RFC 3/6] sched: pack small tasks
-In-Reply-To: <5093A63B.2070700@ti.com>
-References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
- <1349595838-31274-4-git-send-email-vincent.guittot@linaro.org>
- <50880750.4060809@ti.com>
- <CAKfTPtC29LA15zkgi3gDcet2F841pnqza2_UBwEs6nYUpyKuOQ@mail.gmail.com>
- <5093A63B.2070700@ti.com>
-Message-ID: <20121109164631.GA16082@e103034-lin>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 9 Nov 2012 16:56:03 +0000 (UTC)
+Subject: [GIT PULL v2] ARM: OMAP: second set of PRCM cleanups for 3.8
+Message-ID: <alpine.DEB.2.00.1211091654590.20703@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2012 at 10:53:47AM +0000, Santosh Shilimkar wrote:
-> On Monday 29 October 2012 06:42 PM, Vincent Guittot wrote:
-> > On 24 October 2012 17:20, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> >> Vincent,
-> >>
-> >> Few comments/questions.
-> >>
-> >>
-> >> On Sunday 07 October 2012 01:13 PM, Vincent Guittot wrote:
-> >>>
-> >>> During sched_domain creation, we define a pack buddy CPU if available.
-> >>>
-> >>> On a system that share the powerline at all level, the buddy is set to -1
-> >>>
-> >>> On a dual clusters / dual cores system which can powergate each core and
-> >>> cluster independantly, the buddy configuration will be :
-> >>>         | CPU0 | CPU1 | CPU2 | CPU3 |
-> >>> -----------------------------------
-> >>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
-> >>
-> >>                          ^
-> >> Is that a typo ? Should it be CPU2 instead of
-> >> CPU0 ?
-> >
-> > No it's not a typo.
-> > The system packs at each scheduling level. It starts to pack in
-> > cluster because each core can power gate independently so CPU1 tries
-> > to pack its tasks in CPU0 and CPU3 in CPU2. Then, it packs at CPU
-> > level so CPU2 tries to pack in the cluster of CPU0 and CPU0 packs in
-> > itself
-> >
-> I get it. Though in above example a task may migrate from say
-> CPU3->CPU2->CPU0 as part of packing. I was just thinking whether
-> moving such task from say CPU3 to CPU0 might be best instead.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-To me it seems suboptimal to pack the task twice, but the alternative is
-not good either. If you try to move the task directly to CPU0 you may
-miss packing opportunities if CPU0 is already busy, while CPU2 might
-have enough capacity to take it. It would probably be better to check
-the business of CPU0 and then back off and try CPU2 if CP0 is busy. This
-would require a buddy list for each CPU rather just a single buddy and
-thus might become expensive.
+Hi Tony,
 
-> 
-> >>
-> >>> Small tasks tend to slip out of the periodic load balance.
-> >>> The best place to choose to migrate them is at their wake up.
-> >>>
-> >> I have tried this series since I was looking at some of these packing
-> >> bits. On Mobile workloads like OSIdle with Screen ON, MP3, gallary,
-> >> I did see some additional filtering of threads with this series
-> >> but its not making much difference in power. More on this below.
-> >
-> > Can I ask you which configuration you have used ? how many cores and
-> > cluster ?  Can they be power gated independently ?
-> >
-> I have been trying with couple of setups. Dual Core ARM machine and
-> Quad core X86 box with single package thought most of the mobile
-> workload analysis I was doing on ARM machine. On both setups
-> CPUs can be gated independently.
-> 
-> >>
-> >>
-> >>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> >>> ---
-> >>>    kernel/sched/core.c  |    1 +
-> >>>    kernel/sched/fair.c  |  109
-> >>> ++++++++++++++++++++++++++++++++++++++++++++++++++
-> >>>    kernel/sched/sched.h |    1 +
-> >>>    3 files changed, 111 insertions(+)
-> >>>
-> >>> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-> >>> index dab7908..70cadbe 100644
-> >>> --- a/kernel/sched/core.c
-> >>> +++ b/kernel/sched/core.c
-> >>> @@ -6131,6 +6131,7 @@ cpu_attach_domain(struct sched_domain *sd, struct
-> >>> root_domain *rd, int cpu)
-> >>>          rcu_assign_pointer(rq->sd, sd);
-> >>>          destroy_sched_domains(tmp, cpu);
-> >>>
-> >>> +       update_packing_domain(cpu);
-> >>>          update_top_cache_domain(cpu);
-> >>>    }
-> >>>
-> >>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> >>> index 4f4a4f6..8c9d3ed 100644
-> >>> --- a/kernel/sched/fair.c
-> >>> +++ b/kernel/sched/fair.c
-> >>> @@ -157,6 +157,63 @@ void sched_init_granularity(void)
-> >>>          update_sysctl();
-> >>>    }
-> >>>
-> >>> +
-> >>> +/*
-> >>> + * Save the id of the optimal CPU that should be used to pack small tasks
-> >>> + * The value -1 is used when no buddy has been found
-> >>> + */
-> >>> +DEFINE_PER_CPU(int, sd_pack_buddy);
-> >>> +
-> >>> +/* Look for the best buddy CPU that can be used to pack small tasks
-> >>> + * We make the assumption that it doesn't wort to pack on CPU that share
-> >>> the
-> >>
-> >> s/wort/worth
-> >
-> > yes
-> >
-> >>
-> >>> + * same powerline. We looks for the 1st sched_domain without the
-> >>> + * SD_SHARE_POWERLINE flag. Then We look for the sched_group witht the
-> >>> lowest
-> >>> + * power per core based on the assumption that their power efficiency is
-> >>> + * better */
-> >>
-> >> Commenting style..
-> >> /*
-> >>   *
-> >>   */
-> >>
-> >
-> > yes
-> >
-> >> Can you please expand the why the assumption is right ?
-> >> "it doesn't wort to pack on CPU that share the same powerline"
-> >
-> > By "share the same power-line", I mean that the CPUs can't power off
-> > independently. So if some CPUs can't power off independently, it's
-> > worth to try to use most of them to race to idle.
-> >
-> In that case I suggest we use different word here. Power line can be
-> treated as voltage line, power domain.
-> May be SD_SHARE_CPU_POWERDOMAIN ?
-> 
+The following changes since commit 7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33:
 
-How about just SD_SHARE_POWERDOMAIN ?
+  Merge branch 'omap-for-v3.8/cleanup-headers' into omap-for-v3.8/cleanup-prcm (2012-10-26 13:32:22 -0700)
 
-> >>
-> >> Think about a scenario where you have quad core, ducal cluster system
-> >>
-> >>          |Cluster1|                      |cluster 2|
-> >> | CPU0 | CPU1 | CPU2 | CPU3 |   | CPU0 | CPU1 | CPU2 | CPU3 |
-> >>
-> >>
-> >> Both clusters run from same voltage rail and have same PLL
-> >> clocking them. But the cluster have their own power domain
-> >> and all CPU's can power gate them-self to low power states.
-> >> Clusters also have their own level2 caches.
-> >>
-> >> In this case, you will still save power if you try to pack
-> >> load on one cluster. No ?
-> >
-> > yes, I need to update the description of SD_SHARE_POWERLINE because
-> > I'm afraid I was not clear enough. SD_SHARE_POWERLINE includes the
-> > power gating capacity of each core. For your example above, the
-> > SD_SHARE_POWERLINE shoud be cleared at both MC and CPU level.
-> >
-> Thanks for clarification.
-> 
-> >>
-> >>
-> >>> +void update_packing_domain(int cpu)
-> >>> +{
-> >>> +       struct sched_domain *sd;
-> >>> +       int id = -1;
-> >>> +
-> >>> +       sd = highest_flag_domain(cpu, SD_SHARE_POWERLINE);
-> >>> +       if (!sd)
-> >>> +               sd = rcu_dereference_check_sched_domain(cpu_rq(cpu)->sd);
-> >>> +       else
-> >>> +               sd = sd->parent;
-> >>> +
-> >>> +       while (sd) {
-> >>> +               struct sched_group *sg = sd->groups;
-> >>> +               struct sched_group *pack = sg;
-> >>> +               struct sched_group *tmp = sg->next;
-> >>> +
-> >>> +               /* 1st CPU of the sched domain is a good candidate */
-> >>> +               if (id == -1)
-> >>> +                       id = cpumask_first(sched_domain_span(sd));
-> >>> +
-> >>> +               /* loop the sched groups to find the best one */
-> >>> +               while (tmp != sg) {
-> >>> +                       if (tmp->sgp->power * sg->group_weight <
-> >>> +                                       sg->sgp->power *
-> >>> tmp->group_weight)
-> >>> +                               pack = tmp;
-> >>> +                       tmp = tmp->next;
-> >>> +               }
-> >>> +
-> >>> +               /* we have found a better group */
-> >>> +               if (pack != sg)
-> >>> +                       id = cpumask_first(sched_group_cpus(pack));
-> >>> +
-> >>> +               /* Look for another CPU than itself */
-> >>> +               if ((id != cpu)
-> >>> +                || ((sd->parent) && !(sd->parent->flags &&
-> >>> SD_LOAD_BALANCE)))
-> >>
-> >> Is the condition "!(sd->parent->flags && SD_LOAD_BALANCE)" for
-> >> big.LITTLE kind of system where SD_LOAD_BALANCE may not be used ?
-> >
-> > No, packing small tasks is part of the load balance so if the
-> > LOAD_BALANCE flag is cleared, we will not try to pack which is a kind
-> > of load balance. There is no link with big.LITTLE
-> >
-> Now it make sense to me.
-> 
-> >>
-> >>
-> >>> +                       break;
-> >>> +
-> >>> +               sd = sd->parent;
-> >>> +       }
-> >>> +
-> >>> +       pr_info(KERN_INFO "CPU%d packing on CPU%d\n", cpu, id);
-> >>> +       per_cpu(sd_pack_buddy, cpu) = id;
-> >>> +}
-> >>> +
-> >>>    #if BITS_PER_LONG == 32
-> >>>    # define WMULT_CONST  (~0UL)
-> >>>    #else
-> >>> @@ -3073,6 +3130,55 @@ static int select_idle_sibling(struct task_struct
-> >>> *p, int target)
-> >>>          return target;
-> >>>    }
-> >>>
-> >>> +static inline bool is_buddy_busy(int cpu)
-> >>> +{
-> >>> +       struct rq *rq = cpu_rq(cpu);
-> >>> +
-> >>> +       /*
-> >>> +        * A busy buddy is a CPU with a high load or a small load with a
-> >>> lot of
-> >>> +        * running tasks.
-> >>> +        */
-> >>> +       return ((rq->avg.usage_avg_sum << rq->nr_running) >
-> >>> +                       rq->avg.runnable_avg_period);
-> >>
-> >> I agree busy CPU is the one with high load, but many small threads may
-> >> not make CPU fully busy, right ? Should we just stick to the load
-> >> parameter alone here ?
-> >
-> > IMO, the busy state of a CPU isn't only the load but also how many
-> > threads are waiting for running on it. This formula tries to take into
-> > account both inputs. If you have dozen of small tasks on a CPU, the
-> > latency can be large even if the tasks are small.
-> >
-> Sure. Your point is to avoid throttling and probably use race for
-> idle.
-> 
-> >>
-> >>
-> >>> +}
-> >>> +
-> >>> +static inline bool is_light_task(struct task_struct *p)
-> >>> +{
-> >>> +       /* A light task runs less than 25% in average */
-> >>> +       return ((p->se.avg.usage_avg_sum << 2) <
-> >>> p->se.avg.runnable_avg_period);
-> >>> +}
-> >>
-> >> Since the whole packing logic relies on the light threads only, the
-> >> overall effectiveness is not significant. Infact with multiple tries on
-> >> Dual core system, I didn't see any major improvement in power. I think
-> >> we need to be more aggressive here. From the cover letter, I noticed
-> >> that, you were concerned about any performance drop due to packing and
-> >> may be that is the reason you chose the conservative threshold. But the
-> >> fact is, if we want to save meaningful power, there will be slight
-> >> performance drop which is expected.
-> >
-> > I think that everybody agrees that packing small tasks will save power
-> > whereas it seems to be not so obvious for heavy task. But I may have
-> > set the threshold a bit too low
-> >
-> I agree on packing saves power part for sure.
-> 
+are available in the git repository at:
 
-I'm not fully convinced that packing always saves power. For systems
-with multiple cpu clusters where each cluster is a power domain and the
-cpus have no individual power saving states it would probably be more
-power efficient to spread the tasks and hope for more opportunities for
-hitting cluster shutdown. If all tasks are packed on one cpu it will
-keep the whole cluster up, while the remaining cpus are idling without
-possibility for entering efficient power states.
 
-Regards,
-Morten
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-cleanup-b2-for-3.8
 
-> > Up to which load, you would like to pack on 1 core of your dual core system ?
-> > Can you provide more details of your load ? Have you got a trace that
-> > you can share ?
-> >
-> More than how much load to pack, I was more looking from the power
-> savings delta we can achieve by doing it. Some of the usecases like
-> osidle, mp3, gallary are already very low power and that might be
-> the reason I didn't notice major mA delta. Though the perf
-> traces did show some filtering even at 25 % load. i tried upto
-> 50 % threshold to see the effectiveness and there was more
-> improvement and hence the suggestion about aggressiveness.
-> 
-> May be you can try some of these use-cases on your setup instead of
-> synthetic workload and see the results.
-> 
-> Regards
-> Santosh
-> 
-> 
-> 
-> 
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
-> 
+for you to fetch changes up to b99db36cdf37decb1b5575c5f293d170cbbc53d6:
+
+  ARM: OMAP2+: PRCM: remove obsolete prcm.[ch] (2012-11-08 15:09:26 -0700)
+
+- ----------------------------------------------------------------
+Second set of OMAP PRCM cleanups for 3.8.
+
+These patches remove the use of omap_prcm_get_reset_sources() from the
+OMAP watchdog driver, and remove mach-omap2/prcm.c and
+plat-omap/include/plat/prcm.h.
+
+Basic test logs for this branch on top of Tony's cleanup-prcm branch
+at commit 7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33 are here:
+
+    http://www.pwsan.com/omap/testlogs/prcm_cleanup_b_3.8/20121108151646/
+
+However, cleanup-prcm at 7fc54fd3 does not include some fixes
+that are needed for a successful test.  With several reverts,
+fixes, and workarounds applied, the following test logs were
+obtained:
+
+    http://www.pwsan.com/omap/testlogs/TEST_prcm_cleanup_b_3.8/20121108151930/
+
+ which indicate that the series tests cleanly.
+
+This second pull request updates one of the patches which broke
+with rmk's allnoconfigs, and also updates the tag description to
+indicate that 7fc54fd3 is building cleanly here.
+
+- ----------------------------------------------------------------
+
+vmlinux object size
+(delta in bytes from test_cleanup-prcm_7fc54fd_v3.7-rc (7fc54fd3084457c7f11b9e2e1e3fcd19a3badc33)):
+   text     data      bss    total  kernel
+   -104      -72        0     -176  am33xx_only
+   +120      -64        0      +56  n800_multi_omap2xxx
+   +336      -32        0     +304  n800_only_a
+    +88      -24        0      +64  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+   +132       -8        0     +124  omap1_defconfig_5912osk_only
+   +788     -232        0     +556  omap2plus_defconfig
+   +336      -32        0     +304  omap2plus_defconfig_2430sdp_only
+   +788     -240        0     +548  omap2plus_defconfig_cpupm
+   +844     -224        0     +620  omap2plus_defconfig_no_pm
+   +336     -144        0     +192  omap2plus_defconfig_omap2_4_only
+  +4528     -112        0    +4416  omap2plus_defconfig_omap3_4_only
+  +1524     -248    +3472    +4748  rmk_omap3430_ldp_allnoconfig
+   +312      -48        0     +264  rmk_omap3430_ldp_oldconfig
+  +1524     -248    +3472    +4748  rmk_omap4430_sdp_allnoconfig
+   +208      -48        0     +160  rmk_omap4430_sdp_oldconfig
+
+
+Paul Walmsley (17):
+      ARM: OMAP1: CGRM: fix omap1_get_reset_sources() return type
+      ARM: OMAP2+: WDT: move init; add read_reset_sources pdata function pointer
+      watchdog: OMAP: use standard GETBOOTSTATUS interface; use platform_data fn ptr
+      ARM: OMAP2+: PRCM: remove omap_prcm_get_reset_sources()
+      ARM: OMAP2+: common: remove mach-omap2/common.c globals and map_common_io code
+      ARM: OMAP2/3: PRM: add SoC reset functions (using the CORE DPLL method)
+      ARM: OMAP2xxx: clock: remove global 'dclk' variable
+      ARM: OMAP2xxx: clock: move virt_prcm_set code into clkt2xxx_virt_prcm_set.c
+      ARM: OMAP2+: PRCM: create SoC-specific chip restart functions
+      ARM: OMAP2+: board files: use SoC-specific system restart functions
+      ARM: OMAP2xxx: APLL/CM: convert to use omap2_cm_wait_module_ready()
+      ARM: OMAP2+: CM/clock: convert _omap2_module_wait_ready() to use SoC-independent CM functions
+      ARM: OMAP2+: PRCM: remove omap2_cm_wait_idlest()
+      ARM: OMAP2+: PRCM: split and relocate the PRM/CM globals setup
+      ARM: OMAP2+: PRCM: consolidate PRCM-related timeout macros
+      ARM: OMAP2+: hwmod: call to _omap4_disable_module() should use the SoC-specific call
+      ARM: OMAP2+: PRCM: remove obsolete prcm.[ch]
+
+ arch/arm/mach-omap1/common.h                 |    2 +-
+ arch/arm/mach-omap1/devices.c                |   21 ++-
+ arch/arm/mach-omap1/reset.c                  |    9 +-
+ arch/arm/mach-omap2/Makefile                 |    7 +-
+ arch/arm/mach-omap2/am33xx.h                 |    1 +
+ arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-3430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-3630sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-4430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-am3517crane.c      |    2 +-
+ arch/arm/mach-omap2/board-am3517evm.c        |    2 +-
+ arch/arm/mach-omap2/board-apollon.c          |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c           |   18 +--
+ arch/arm/mach-omap2/board-cm-t3517.c         |    2 +-
+ arch/arm/mach-omap2/board-devkit8000.c       |    2 +-
+ arch/arm/mach-omap2/board-generic.c          |   10 +-
+ arch/arm/mach-omap2/board-h4.c               |    2 +-
+ arch/arm/mach-omap2/board-igep0020.c         |    4 +-
+ arch/arm/mach-omap2/board-ldp.c              |    2 +-
+ arch/arm/mach-omap2/board-n8x0.c             |    6 +-
+ arch/arm/mach-omap2/board-omap3beagle.c      |    2 +-
+ arch/arm/mach-omap2/board-omap3evm.c         |    2 +-
+ arch/arm/mach-omap2/board-omap3logic.c       |    4 +-
+ arch/arm/mach-omap2/board-omap3pandora.c     |    2 +-
+ arch/arm/mach-omap2/board-omap3stalker.c     |    2 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c       |    2 +-
+ arch/arm/mach-omap2/board-overo.c            |    2 +-
+ arch/arm/mach-omap2/board-rm680.c            |    4 +-
+ arch/arm/mach-omap2/board-rx51.c             |    2 +-
+ arch/arm/mach-omap2/board-ti8168evm.c        |    4 +-
+ arch/arm/mach-omap2/board-zoom.c             |    4 +-
+ arch/arm/mach-omap2/clkt2xxx_apll.c          |   57 ++------
+ arch/arm/mach-omap2/clkt2xxx_dpllcore.c      |   36 ++++-
+ arch/arm/mach-omap2/clkt2xxx_virt_prcm_set.c |   70 ++++++++--
+ arch/arm/mach-omap2/clkt_iclk.c              |    1 -
+ arch/arm/mach-omap2/clock.c                  |   57 +++++++-
+ arch/arm/mach-omap2/clock.h                  |   28 ----
+ arch/arm/mach-omap2/clock2420_data.c         |   26 +---
+ arch/arm/mach-omap2/clock2430_data.c         |   26 +---
+ arch/arm/mach-omap2/clock2xxx.c              |   16 ---
+ arch/arm/mach-omap2/clock2xxx.h              |    9 +-
+ arch/arm/mach-omap2/cm-regbits-24xx.h        |    2 +
+ arch/arm/mach-omap2/cm.h                     |   20 ++-
+ arch/arm/mach-omap2/cm2xxx.c                 |  128 ++++++++++++++++-
+ arch/arm/mach-omap2/cm2xxx.h                 |    4 +
+ arch/arm/mach-omap2/cm2xxx_3xxx.h            |    8 +-
+ arch/arm/mach-omap2/cm3xxx.c                 |   66 +++++++++
+ arch/arm/mach-omap2/cm3xxx.h                 |    5 +
+ arch/arm/mach-omap2/cm_common.c              |   70 +++++++++-
+ arch/arm/mach-omap2/cminst44xx.h             |    2 +
+ arch/arm/mach-omap2/common.c                 |  183 -------------------------
+ arch/arm/mach-omap2/common.h                 |  133 +++++-------------
+ arch/arm/mach-omap2/control.c                |   10 +-
+ arch/arm/mach-omap2/control.h                |    2 +
+ arch/arm/mach-omap2/cpuidle34xx.c            |    1 -
+ arch/arm/mach-omap2/devices.c                |   26 ----
+ arch/arm/mach-omap2/display.c                |    2 +-
+ arch/arm/mach-omap2/hdq1w.c                  |    4 +-
+ arch/arm/mach-omap2/i2c.c                    |    6 +-
+ arch/arm/mach-omap2/id.c                     |    7 +-
+ arch/arm/mach-omap2/io.c                     |   86 ++++++++++--
+ arch/arm/mach-omap2/mcbsp.c                  |    2 +-
+ arch/arm/mach-omap2/msdi.c                   |    4 +-
+ arch/arm/mach-omap2/omap2-restart.c          |   65 +++++++++
+ arch/arm/mach-omap2/omap3-restart.c          |   36 +++++
+ arch/arm/mach-omap2/omap4-common.c           |   19 +++
+ arch/arm/mach-omap2/omap_hwmod.c             |    8 +-
+ arch/arm/mach-omap2/pm34xx.c                 |    1 -
+ arch/arm/mach-omap2/powerdomain.c            |    2 -
+ arch/arm/mach-omap2/prcm-common.h            |   22 ---
+ arch/arm/mach-omap2/prcm.c                   |  189 --------------------------
+ arch/arm/mach-omap2/prcm_mpu44xx.c           |   17 +++
+ arch/arm/mach-omap2/prcm_mpu44xx.h           |    9 +-
+ arch/arm/mach-omap2/prm.h                    |   24 +++-
+ arch/arm/mach-omap2/prm2xxx.c                |   15 +-
+ arch/arm/mach-omap2/prm2xxx.h                |    2 +
+ arch/arm/mach-omap2/prm2xxx_3xxx.h           |    7 -
+ arch/arm/mach-omap2/prm3xxx.c                |   16 ++-
+ arch/arm/mach-omap2/prm3xxx.h                |    2 +
+ arch/arm/mach-omap2/prm44xx.c                |    1 -
+ arch/arm/mach-omap2/prm_common.c             |   16 ++-
+ arch/arm/mach-omap2/prminst44xx.h            |    2 +
+ arch/arm/mach-omap2/sdrc.c                   |    8 +-
+ arch/arm/mach-omap2/sdrc.h                   |    2 +
+ arch/arm/mach-omap2/ti81xx.h                 |    9 ++
+ arch/arm/mach-omap2/wd_timer.c               |   40 +++++-
+ arch/arm/plat-omap/include/plat/prcm.h       |   37 -----
+ drivers/watchdog/omap_wdt.c                  |   26 ++--
+ include/linux/platform_data/omap-wd-timer.h  |   38 ++++++
+ 90 files changed, 991 insertions(+), 851 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/omap2-restart.c
+ create mode 100644 arch/arm/mach-omap2/omap3-restart.c
+ delete mode 100644 arch/arm/mach-omap2/prcm.c
+ delete mode 100644 arch/arm/plat-omap/include/plat/prcm.h
+ create mode 100644 include/linux/platform_data/omap-wd-timer.h
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJQnTVXAAoJEMePsQ0LvSpLRJQP+QGaUAh8fr6WCF29unEVZN/8
+U/WTNoJnH2WyCjo8dw/xrhFvMfrFFo4aX5HMC9uHlPdkfK5qWFN47+Rw7DYeJsqT
+OchzlfG3ECmg1L1SeUviI+9MdQ37QSQd5+Fb7oT8oYsZbndQ2cD1tV9X/Wa5xNUw
+ka3yTmR60zu8LGII8lscuk9/FgyP6anSH6nZLoUilTxO1Ux8ae4kQt0vUFRSg2Yn
+HKXLJMoL1hedZxVcfMGHZJ/Q1YwiGGsk8myyRtdeTihXPB2VM7Jsf+2zI3yYQpZV
+LH1mrtiHQP3OC396zg5ELMuj+VO1vZi0Nw/Khdk3haPC73XFWAHyTX2tfXeTcoS4
+ffeHvzQGkj/SVBs8i58nnegJQaBzuFY7koiW4arZd9J7h4al4Y4mXk0nThYidTDU
+5TdjHJXa1bHPq4YKPz4l0QMkWDkyVNYtE5xHY0xl7yGcZkp/JCPixEwGE+c+SZMt
+EqyonivsXecek8N4wlLmWw6kyjvuA9MxkZUClLSWkSx5KCoF1S1Cha5eyWIA1c6k
+zovfEmiT3qw4yVaBOi7sI4ijrD0XKFbtErfsrKXn8uJFiMVZ9GX8Dn1FpyjOTvuE
+MiV4yOxgVSv8sSn8gUE3V1MmHEOjGuGtPS41I7wpVeRaKolaKEYuMiDIJWxJ+LUu
+Ur0wUp6HUXX6uVrmQfZI
+=sFm/
+-----END PGP SIGNATURE-----
