@@ -1,32 +1,62 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Fri, 9 Nov 2012 14:21:40 -0800
-Subject: [PATCH 15/26] ARM: omap2: clock: Add 24xx data using common
- struct clk
-In-Reply-To: <alpine.DEB.2.00.1211092112340.20703@utopia.booyaka.com>
-References: <1352337181-29427-1-git-send-email-mturquette@ti.com>
- <1352337181-29427-16-git-send-email-mturquette@ti.com>
- <alpine.DEB.2.00.1211081532210.20703@utopia.booyaka.com>
- <alpine.DEB.2.00.1211092030360.20703@utopia.booyaka.com>
- <20121109210543.17381.15878@nucleus>
- <alpine.DEB.2.00.1211092112340.20703@utopia.booyaka.com>
-Message-ID: <20121109222140.17381.48700@nucleus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Nov 2012 14:32:09 -0800
+Subject: [PATCH] ARM: OMAP: Fix kernel panic in dmtimer probe
+In-Reply-To: <1352420243-31803-1-git-send-email-jon-hunter@ti.com>
+References: <1352420243-31803-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20121109223209.GY6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Paul Walmsley (2012-11-09 13:22:00)
-> On Fri, 9 Nov 2012, Mike Turquette wrote:
+* Jon Hunter <jon-hunter@ti.com> [121108 16:19]:
+> When booting with device-tree the kernel is panicing in the probe of the
+> DMTIMER driver. The panic is caused because the pointer to platform_data
+> structure is NULL when booting with device-tree and the driver is
+> attempting to access the structure without checking if the pointer is
+> valid.
 > 
-> > Quoting Paul Walmsley (2012-11-09 12:32:59)
-> Re the upstream CCF support for this, would suggest adding the CCF support 
-> for the new function pointer in this merge window (3.8) since it should 
-> be relatively straightforward.  Then during the 3.9 merge window, the 
-> OMAP code can be switched over to use it.
+> Fix this by moving the code that accesses the platform data structure
+> under the "else" clause of the "if (dev->of_node)" statement because
+> here the pointer to platform_data is guaranteed to be valid. The code
+> accessing the "timer_capability" member of the platform data is simply
+> removed as this is already handled under the else clause.
 > 
+> This regression was introduced while integrating commit "ARM: OMAP: Add
+> DT support for timer driver" to add device-tree support to the DMTIMER
+> driver and commit "ARM: OMAP: Move omap-pm-noop.c local to mach-omap2"
+> to prepare for single zImage support.
 
-Will do.
+Thanks, looks like this needs to be fixed in the merge, so I'll
+merge omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3 into
+omap-for-v3.8/dt and resolve the conflict according to your patch.
 
 Regards,
-Mike
 
+Tony
+
+ 
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> ---
+>  arch/arm/plat-omap/dmtimer.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> - Paul
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
+> index 38c12ef..9dca23e 100644
+> --- a/arch/arm/plat-omap/dmtimer.c
+> +++ b/arch/arm/plat-omap/dmtimer.c
+> @@ -799,12 +799,11 @@ static int __devinit omap_dm_timer_probe(struct platform_device *pdev)
+>  		timer->id = pdev->id;
+>  		timer->capability = pdata->timer_capability;
+>  		timer->reserved = omap_dm_timer_reserved_systimer(timer->id);
+> +		timer->get_context_loss_count = pdata->get_context_loss_count;
+>  	}
+>  
+>  	timer->irq = irq->start;
+>  	timer->pdev = pdev;
+> -	timer->capability = pdata->timer_capability;
+> -	timer->get_context_loss_count = pdata->get_context_loss_count;
+>  
+>  	/* Skip pm_runtime_enable for OMAP1 */
+>  	if (!(timer->capability & OMAP_TIMER_NEEDS_RESET)) {
+> -- 
+> 1.7.9.5
+> 
