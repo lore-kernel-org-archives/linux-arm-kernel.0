@@ -1,72 +1,130 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 9 Nov 2012 13:54:40 +0200
-Subject: [PATCH v7 0/5] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-In-Reply-To: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
-References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <20121109115440.GC8078@arwen.pp.htv.fi>
+From: a.kesavan@samsung.com (Abhilash Kesavan)
+Date: Fri, 09 Nov 2012 17:44:14 +0530
+Subject: [PATCH] ARM: EXYNOS5: Add arm down clock support
+Message-ID: <1352463254-28423-1-git-send-email-a.kesavan@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In idle state down clocking the arm cores can result in power
+savings. Program the power control registers to achieve this and
+save these registers across a suspend/resume cycle.
 
-On Tue, Oct 30, 2012 at 10:27:32AM +0530, Praveen Paneri wrote:
-> Changes from v6:
-> Modified register definitions according to the existing ones.
-> Changed default PHY clk selection for SoCs.
-> Improved binding text and rebased to the latest usb-next.
-> 
-> Changes from v5:
-> Moved clk_get() to driver's probe function. Now reference clock frequency
-> selection value is stored in samsung_usbphy structure for later use. Used
-> IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
-> 
-> Changes from v4:
-> Moved header file contents to driver's source file
-> Removed unnecessary print message from driver's probe function
-> Dropped the Free Software Foundation address from the header
-> Changed the platform data code to use __initdata
-> 
-> Changes from v3:
-> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
-> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
-> is registered
-> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
-> 
-> Changes from v2:
-> Changed the driver filenames to samsung-usbphy
-> Changed 's3c' to 'samsung' for platform device as well as platform data
-> Moved platform data structure to a separate file
-> Rectified coding style related errors
-> 
-> Changes from v1:
-> Rebased patches to latest usb-next branch
-> Changed the name 'sec_usbphy' to 'samsung_usbphy'
-> 
-> This patch set introduces a phy driver for samsung SoCs. It uses the existing
-> transceiver infrastructure to provide phy control functions. Use of this driver
-> can be extended for usb host phy as well. Over the period of time all the phy
-> related code for most of the samsung SoCs can be integrated here.
-> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
-> when they start supporting this phy driver. 
-> This driver is tested with smdk6410 and Exynos4210(with DT).
-> 
-> Praveen Paneri (5):
->   usb: phy: samsung: Introducing usb phy driver for hsotg
->   usb: s3c-hsotg: Adding phy driver support
->   ARM: S3C64XX: Removing old phy setup code
->   ARM: S3C64XX: Enabling samsung-usbphy driver
->   ARM: Exynos4210: Enabling samsung-usbphy driver
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+---
+ arch/arm/mach-exynos/clock-exynos5.c           |    2 +
+ arch/arm/mach-exynos/cpuidle.c                 |   36 ++++++++++++++++++++++++
+ arch/arm/mach-exynos/include/mach/regs-clock.h |   19 ++++++++++++
+ 3 files changed, 57 insertions(+), 0 deletions(-)
 
-guys I can't wait any longer. If I don't get proper Acks today, I will
-go ahead without all the PHY changes from Samsung :-s
-
+diff --git a/arch/arm/mach-exynos/clock-exynos5.c b/arch/arm/mach-exynos/clock-exynos5.c
+index a88e0d9..9bb6567 100644
+--- a/arch/arm/mach-exynos/clock-exynos5.c
++++ b/arch/arm/mach-exynos/clock-exynos5.c
+@@ -80,6 +80,8 @@ static struct sleep_save exynos5_clock_save[] = {
+ 	SAVE_ITEM(EXYNOS5_VPLL_CON0),
+ 	SAVE_ITEM(EXYNOS5_VPLL_CON1),
+ 	SAVE_ITEM(EXYNOS5_VPLL_CON2),
++	SAVE_ITEM(EXYNOS5_PWR_CTRL1),
++	SAVE_ITEM(EXYNOS5_PWR_CTRL2),
+ };
+ #endif
+ 
+diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+index cff0595..4ddda91 100644
+--- a/arch/arm/mach-exynos/cpuidle.c
++++ b/arch/arm/mach-exynos/cpuidle.c
+@@ -21,6 +21,7 @@
+ #include <asm/suspend.h>
+ #include <asm/unified.h>
+ #include <asm/cpuidle.h>
++#include <mach/regs-clock.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/pmu.h>
+ 
+@@ -156,12 +157,47 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+ 		return exynos4_enter_core0_aftr(dev, drv, new_index);
+ }
+ 
++static void __init exynos5_core_down_clk(void)
++{
++	unsigned int tmp;
++
++	/*
++	 * Enable arm clock down (in idle) and set arm divider
++	 * ratios in WFI/WFE state.
++	 */
++	tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
++	      PWR_CTRL1_CORE1_DOWN_RATIO | \
++	      PWR_CTRL1_DIV2_DOWN_EN	 | \
++	      PWR_CTRL1_DIV1_DOWN_EN	 | \
++	      PWR_CTRL1_USE_CORE1_WFE	 | \
++	      PWR_CTRL1_USE_CORE0_WFE	 | \
++	      PWR_CTRL1_USE_CORE1_WFI	 | \
++	      PWR_CTRL1_USE_CORE0_WFI;
++	__raw_writel(tmp, EXYNOS5_PWR_CTRL1);
++
++	/*
++	 * Enable arm clock up (on exiting idle). Set arm divider
++	 * ratios when not in idle along with the standby duration
++	 * ratios.
++	 */
++	tmp = PWR_CTRL2_DIV2_UP_EN	 | \
++	      PWR_CTRL2_DIV1_UP_EN	 | \
++	      PWR_CTRL2_DUR_STANDBY2_VAL | \
++	      PWR_CTRL2_DUR_STANDBY1_VAL | \
++	      PWR_CTRL2_CORE2_UP_RATIO	 | \
++	      PWR_CTRL2_CORE1_UP_RATIO;
++	__raw_writel(tmp, EXYNOS5_PWR_CTRL2);
++}
++
+ static int __init exynos4_init_cpuidle(void)
+ {
+ 	int i, max_cpuidle_state, cpu_id;
+ 	struct cpuidle_device *device;
+ 	struct cpuidle_driver *drv = &exynos4_idle_driver;
+ 
++	if (soc_is_exynos5250())
++		exynos5_core_down_clk();
++
+ 	/* Setup cpuidle driver */
+ 	drv->state_count = (sizeof(exynos4_cpuidle_set) /
+ 				       sizeof(struct cpuidle_state));
+diff --git a/arch/arm/mach-exynos/include/mach/regs-clock.h b/arch/arm/mach-exynos/include/mach/regs-clock.h
+index 8c9b38c..d36ad76 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos/include/mach/regs-clock.h
+@@ -267,6 +267,9 @@
+ #define EXYNOS5_CLKDIV_STATCPU0			EXYNOS_CLKREG(0x00600)
+ #define EXYNOS5_CLKDIV_STATCPU1			EXYNOS_CLKREG(0x00604)
+ 
++#define EXYNOS5_PWR_CTRL1			EXYNOS_CLKREG(0x01020)
++#define EXYNOS5_PWR_CTRL2			EXYNOS_CLKREG(0x01024)
++
+ #define EXYNOS5_MPLL_CON0			EXYNOS_CLKREG(0x04100)
+ #define EXYNOS5_CLKSRC_CORE1			EXYNOS_CLKREG(0x04204)
+ 
+@@ -344,6 +347,22 @@
+ 
+ #define EXYNOS5_EPLLCON0_LOCKED_SHIFT		(29)
+ 
++#define PWR_CTRL1_CORE2_DOWN_RATIO		(7 << 28)
++#define PWR_CTRL1_CORE1_DOWN_RATIO		(7 << 16)
++#define PWR_CTRL1_DIV2_DOWN_EN			(1 << 9)
++#define PWR_CTRL1_DIV1_DOWN_EN			(1 << 8)
++#define PWR_CTRL1_USE_CORE1_WFE			(1 << 5)
++#define PWR_CTRL1_USE_CORE0_WFE			(1 << 4)
++#define PWR_CTRL1_USE_CORE1_WFI			(1 << 1)
++#define PWR_CTRL1_USE_CORE0_WFI			(1 << 0)
++
++#define PWR_CTRL2_DIV2_UP_EN			(1 << 25)
++#define PWR_CTRL2_DIV1_UP_EN			(1 << 24)
++#define PWR_CTRL2_DUR_STANDBY2_VAL		(1 << 16)
++#define PWR_CTRL2_DUR_STANDBY1_VAL		(1 << 8)
++#define PWR_CTRL2_CORE2_UP_RATIO		(1 << 4)
++#define PWR_CTRL2_CORE1_UP_RATIO		(1 << 0)
++
+ /* Compatibility defines and inclusion */
+ 
+ #include <mach/regs-pmu.h>
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/0e122c74/attachment-0001.sig>
+1.6.6.1
