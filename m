@@ -1,44 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 9 Nov 2012 15:05:12 +0000
-Subject: [PATCH v2 1/5] ARM: kernel: smp_setup_processor_id() updates
-In-Reply-To: <20121109144446.GC17405@mudshark.cambridge.arm.com>
-References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1352471654-20207-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20121109144446.GC17405@mudshark.cambridge.arm.com>
-Message-ID: <20121109150512.GC20298@e102568-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  9 Nov 2012 15:05:43 +0000
+Subject: [GIT PULL] perf updates for 3.8
+Message-ID: <1352473543-18319-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 02:44:46PM +0000, Will Deacon wrote:
-> On Fri, Nov 09, 2012 at 02:34:10PM +0000, Lorenzo Pieralisi wrote:
-> > This patch applies some basic changes to the smp_setup_processor_id()
-> > ARM implementation to make the code that builds cpu_logical_map more
-> > uniform across the kernel.
-> > 
-> > The function now prints the full extent of the boot CPU MPIDR[23:0] and
-> > initializes the cpu_logical_map for CPUs up to nr_cpu_ids.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/kernel/setup.c | 7 ++++---
-> >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> > index da1d1aa..ede7c84 100644
-> > --- a/arch/arm/kernel/setup.c
-> > +++ b/arch/arm/kernel/setup.c
-> > @@ -426,13 +426,14 @@ int __cpu_logical_map[NR_CPUS];
-> >  void __init smp_setup_processor_id(void)
-> >  {
-> >  	int i;
-> > -	u32 cpu = is_smp() ? read_cpuid_mpidr() & 0xff : 0;
-> > +	u32 mpidr = read_cpuid_mpidr() & 0xffffff;
-> 
-> We need that is_smp() check, otherwise we'll go and do a funky CP15
-> operation on CPU's that might not be too happy about it.
+Hi Russell,
 
-You are right, sorry my apologies.
+This patch series is largely a continuation of the ongoing perf work
+to support multi-cluster, but there are also a couple of other random
+patches for OMAP (Acked by Tony) and future-proofing for KVM from Marc.
 
-I will have to check it even when parsing the DT then.
+Cheers,
 
-Lorenzo
+Will
+
+
+The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+
+  Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git perf/updates
+
+Jon Hunter (1):
+      ARM: PMU: fix runtime PM enable
+
+Marc Zyngier (1):
+      ARM: perf: add guest vs host discrimination
+
+Mark Rutland (1):
+      ARM: perf: register cpu_notifier at driver init
+
+Sudeep KarkadaNagesha (3):
+      ARM: perf: allocate CPU PMU dynamically at probe time
+      ARM: perf: consistently use struct perf_event in arm_pmu functions
+      ARM: perf: check ARMv7 counter validity on a per-pmu basis
+
+Will Deacon (2):
+      ARM: perf: return NOTIFY_DONE from cpu notifier when no available PMU
+      ARM: perf: consistently use arm_pmu->name for PMU name
+
+ arch/arm/include/asm/perf_event.h   |    5 +
+ arch/arm/include/asm/pmu.h          |   28 ++---
+ arch/arm/kernel/perf_event.c        |   85 ++++++++----
+ arch/arm/kernel/perf_event_cpu.c    |   74 +++++++----
+ arch/arm/kernel/perf_event_v6.c     |  126 +++++++++---------
+ arch/arm/kernel/perf_event_v7.c     |  246 ++++++++++++++++------------------
+ arch/arm/kernel/perf_event_xscale.c |  157 ++++++++++++-----------
+ arch/arm/mach-omap2/pmu.c           |    2 -
+ 8 files changed, 385 insertions(+), 338 deletions(-)
