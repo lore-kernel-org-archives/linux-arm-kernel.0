@@ -1,71 +1,138 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:31:40 +0900
-Subject: [PATCH 1/7] ARM: shmobile: marzen: add USB phy support
+Date: Fri,  9 Nov 2012 16:31:42 +0900
+Subject: [PATCH 3/7] ARM: shmobile: marzen: add USB OHCI driver support
 In-Reply-To: <1352446306-19945-1-git-send-email-horms@verge.net.au>
 References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352446306-19945-2-git-send-email-horms@verge.net.au>
+Message-ID: <1352446306-19945-4-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
+This patch supports CN21/CN22 USB 1.x (port 0/1/2),
+and enable input event on defconfig
+
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig     |    3 ++-
- arch/arm/mach-shmobile/board-marzen.c |   21 +++++++++++++++++++++
- 2 files changed, 23 insertions(+), 1 deletion(-)
+ arch/arm/configs/marzen_defconfig     |    5 +--
+ arch/arm/mach-shmobile/Kconfig        |    1 +
+ arch/arm/mach-shmobile/board-marzen.c |   57 +++++++++++++++++++++++++++++++++
+ 3 files changed, 61 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 5b8215f..8a861b7 100644
+index 6540dfb..728a43c 100644
 --- a/arch/arm/configs/marzen_defconfig
 +++ b/arch/arm/configs/marzen_defconfig
-@@ -78,7 +78,8 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_SSB=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
+@@ -61,9 +61,8 @@ CONFIG_SMSC911X=y
+ # CONFIG_NET_VENDOR_STMICRO is not set
+ # CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV is not set
+-# CONFIG_INPUT_KEYBOARD is not set
++CONFIG_INPUT_EVDEV=y
+ # CONFIG_INPUT_MOUSE is not set
+-# CONFIG_SERIO is not set
+ # CONFIG_VT is not set
+ # CONFIG_LEGACY_PTYS is not set
+ # CONFIG_DEVKMEM is not set
+@@ -86,6 +85,8 @@ CONFIG_MMC=y
  CONFIG_MMC_SDHI=y
+ CONFIG_USB=y
+ CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
++CONFIG_USB_OHCI_HCD_PLATFORM=y
+ CONFIG_USB_EHCI_HCD_PLATFORM=y
+ CONFIG_USB_STORAGE=y
  CONFIG_UIO=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 4eae11c..9255546 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -30,6 +30,7 @@ config ARCH_R8A7779
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select USB_ARCH_HAS_EHCI
++	select USB_ARCH_HAS_OHCI
+ 
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
 diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 69f7f46..74c7f0b 100644
+index 707b3bd..449f928 100644
 --- a/arch/arm/mach-shmobile/board-marzen.c
 +++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -144,11 +144,32 @@ static struct platform_device hspi_device = {
- 	.num_resources	= ARRAY_SIZE(hspi_resources),
+@@ -36,6 +36,7 @@
+ #include <linux/mfd/tmio.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/ehci_pdriver.h>
++#include <linux/usb/ohci_pdriver.h>
+ #include <linux/pm_runtime.h>
+ #include <mach/hardware.h>
+ #include <mach/r8a7779.h>
+@@ -255,9 +256,65 @@ static struct platform_device ehci1_device = {
+ 	.resource	= ehci1_resources,
  };
  
-+/* USB PHY */
-+static struct resource usb_phy_resources[] = {
++static struct usb_ohci_pdata ohcix_pdata = {
++	.power_on	= usb_power_on,
++	.power_off	= usb_power_off,
++	.power_suspend	= usb_power_off,
++};
++
++static struct resource ohci0_resources[] = {
 +	[0] = {
-+		.start		= 0xffe70000,
-+		.end		= 0xffe70900 - 1,
-+		.flags		= IORESOURCE_MEM,
++		.start	= 0xffe70400,
++		.end	= 0xffe70800 - 1,
++		.flags	= IORESOURCE_MEM,
 +	},
 +	[1] = {
-+		.start		= 0xfff70000,
-+		.end		= 0xfff70900 - 1,
-+		.flags		= IORESOURCE_MEM,
++		.start	= gic_spi(44),
++		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+static struct platform_device usb_phy_device = {
-+	.name		= "rcar_usb_phy",
-+	.resource	= usb_phy_resources,
-+	.num_resources	= ARRAY_SIZE(usb_phy_resources),
++static struct platform_device ohci0_device = {
++	.name	= "ohci-platform",
++	.id	= 0,
++	.dev	= {
++		.dma_mask		= &ohci0_device.dev.coherent_dma_mask,
++		.coherent_dma_mask	= 0xffffffff,
++		.platform_data		= &ohcix_pdata,
++	},
++	.num_resources	= ARRAY_SIZE(ohci0_resources),
++	.resource	= ohci0_resources,
 +};
 +
- static struct platform_device *marzen_devices[] __initdata = {
- 	&eth_device,
- 	&sdhi0_device,
- 	&thermal_device,
- 	&hspi_device,
-+	&usb_phy_device,
++static struct resource ohci1_resources[] = {
++	[0] = {
++		.start	= 0xfff70400,
++		.end	= 0xfff70800 - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	[1] = {
++		.start	= gic_spi(45),
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device ohci1_device = {
++	.name	= "ohci-platform",
++	.id	= 1,
++	.dev	= {
++		.dma_mask		= &ohci1_device.dev.coherent_dma_mask,
++		.coherent_dma_mask	= 0xffffffff,
++		.platform_data		= &ohcix_pdata,
++	},
++	.num_resources	= ARRAY_SIZE(ohci1_resources),
++	.resource	= ohci1_resources,
++};
++
+ static struct platform_device *marzen_late_devices[] __initdata = {
+ 	&ehci0_device,
+ 	&ehci1_device,
++	&ohci0_device,
++	&ohci1_device,
  };
  
- static void __init marzen_init(void)
+ void __init marzen_init_late(void)
 -- 
 1.7.10.4
