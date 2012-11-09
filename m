@@ -1,133 +1,59 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 9 Nov 2012 10:05:41 +0800
-Subject: [PATCH 06/11] ARM: pxa: convert timer suspend/resume to
- clock_event_device
-In-Reply-To: <1352408516-21988-8-git-send-email-swarren@wwwdotorg.org>
-References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
- <1352408516-21988-8-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAMPhdO_B2LxbbUGFH2Z7z0NrC153Bn1NhopqAQNhKBxhWL-=LQ@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 9 Nov 2012 13:31:11 +1100
+Subject: linux-next: manual merge of the arm-soc tree with the pinctrl tree
+Message-ID: <20121109133111.1070c1062889461152713978@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 9, 2012 at 5:01 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Move PXA's timer suspend/resume functions from struct sys_timer
-> pxa_timer into struct clock_event_device ckevt_pxa_osmr0. This
-> will allow the sys_timer suspend/resume fields to be removed, and
-> eventually lead to a complete removal of struct sys_timer.
->
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+Hi all,
 
-Acked-by: Eric Miao <eric.y.miao@gmail.com>
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/pinctrl/pinctrl-nomadik.c between commit 241e51ebd3b2
+("pinctrl/nomadik: make independent of prcmu driver") from the pinctrl
+tree and commit 44e47ccf8ab6 ("Merge branch 'next/multiplatform' into
+for-next") from the arm-soc tree.
 
-> ---
->  arch/arm/mach-pxa/time.c |   76 +++++++++++++++++++++++-----------------------
->  1 files changed, 38 insertions(+), 38 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/time.c b/arch/arm/mach-pxa/time.c
-> index 4bc47d6..ce58bc9 100644
-> --- a/arch/arm/mach-pxa/time.c
-> +++ b/arch/arm/mach-pxa/time.c
-> @@ -89,12 +89,50 @@ pxa_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *dev)
->         }
->  }
->
-> +#ifdef CONFIG_PM
-> +static unsigned long osmr[4], oier, oscr;
-> +
-> +static void pxa_timer_suspend(struct clock_event_device *cedev)
-> +{
-> +       osmr[0] = readl_relaxed(OSMR0);
-> +       osmr[1] = readl_relaxed(OSMR1);
-> +       osmr[2] = readl_relaxed(OSMR2);
-> +       osmr[3] = readl_relaxed(OSMR3);
-> +       oier = readl_relaxed(OIER);
-> +       oscr = readl_relaxed(OSCR);
-> +}
-> +
-> +static void pxa_timer_resume(struct clock_event_device *cedev)
-> +{
-> +       /*
-> +        * Ensure that we have at least MIN_OSCR_DELTA between match
-> +        * register 0 and the OSCR, to guarantee that we will receive
-> +        * the one-shot timer interrupt.  We adjust OSMR0 in preference
-> +        * to OSCR to guarantee that OSCR is monotonically incrementing.
-> +        */
-> +       if (osmr[0] - oscr < MIN_OSCR_DELTA)
-> +               osmr[0] += MIN_OSCR_DELTA;
-> +
-> +       writel_relaxed(osmr[0], OSMR0);
-> +       writel_relaxed(osmr[1], OSMR1);
-> +       writel_relaxed(osmr[2], OSMR2);
-> +       writel_relaxed(osmr[3], OSMR3);
-> +       writel_relaxed(oier, OIER);
-> +       writel_relaxed(oscr, OSCR);
-> +}
-> +#else
-> +#define pxa_timer_suspend NULL
-> +#define pxa_timer_resume NULL
-> +#endif
-> +
->  static struct clock_event_device ckevt_pxa_osmr0 = {
->         .name           = "osmr0",
->         .features       = CLOCK_EVT_FEAT_ONESHOT,
->         .rating         = 200,
->         .set_next_event = pxa_osmr0_set_next_event,
->         .set_mode       = pxa_osmr0_set_mode,
-> +       .suspend        = pxa_timer_suspend,
-> +       .resume         = pxa_timer_resume,
->  };
->
->  static struct irqaction pxa_ost0_irq = {
-> @@ -127,44 +165,6 @@ static void __init pxa_timer_init(void)
->         clockevents_register_device(&ckevt_pxa_osmr0);
->  }
->
-> -#ifdef CONFIG_PM
-> -static unsigned long osmr[4], oier, oscr;
-> -
-> -static void pxa_timer_suspend(void)
-> -{
-> -       osmr[0] = readl_relaxed(OSMR0);
-> -       osmr[1] = readl_relaxed(OSMR1);
-> -       osmr[2] = readl_relaxed(OSMR2);
-> -       osmr[3] = readl_relaxed(OSMR3);
-> -       oier = readl_relaxed(OIER);
-> -       oscr = readl_relaxed(OSCR);
-> -}
-> -
-> -static void pxa_timer_resume(void)
-> -{
-> -       /*
-> -        * Ensure that we have at least MIN_OSCR_DELTA between match
-> -        * register 0 and the OSCR, to guarantee that we will receive
-> -        * the one-shot timer interrupt.  We adjust OSMR0 in preference
-> -        * to OSCR to guarantee that OSCR is monotonically incrementing.
-> -        */
-> -       if (osmr[0] - oscr < MIN_OSCR_DELTA)
-> -               osmr[0] += MIN_OSCR_DELTA;
-> -
-> -       writel_relaxed(osmr[0], OSMR0);
-> -       writel_relaxed(osmr[1], OSMR1);
-> -       writel_relaxed(osmr[2], OSMR2);
-> -       writel_relaxed(osmr[3], OSMR3);
-> -       writel_relaxed(oier, OIER);
-> -       writel_relaxed(oscr, OSCR);
-> -}
-> -#else
-> -#define pxa_timer_suspend NULL
-> -#define pxa_timer_resume NULL
-> -#endif
-> -
->  struct sys_timer pxa_timer = {
->         .init           = pxa_timer_init,
-> -       .suspend        = pxa_timer_suspend,
-> -       .resume         = pxa_timer_resume,
->  };
-> --
-> 1.7.0.4
->
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
+
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc drivers/pinctrl/pinctrl-nomadik.c
+index 33c614e,3ad23fb..0000000
+--- a/drivers/pinctrl/pinctrl-nomadik.c
++++ b/drivers/pinctrl/pinctrl-nomadik.c
+@@@ -30,10 -30,23 +30,9 @@@
+  #include <linux/pinctrl/pinconf.h>
+  /* Since we request GPIOs from ourself */
+  #include <linux/pinctrl/consumer.h>
+ -/*
+ - * For the U8500 archs, use the PRCMU register interface, for the older
+ - * Nomadik, provide some stubs. The functions using these will only be
+ - * called on the U8500 series.
+ - */
+ -#ifdef CONFIG_ARCH_U8500
+ -#include <linux/mfd/dbx500-prcmu.h>
+ -#else
+ -static inline u32 prcmu_read(unsigned int reg) {
+ -	return 0;
+ -}
+ -static inline void prcmu_write(unsigned int reg, u32 value) {}
+ -static inline void prcmu_write_masked(unsigned int reg, u32 mask, u32 value) {}
+ -#endif
+  #include <linux/platform_data/pinctrl-nomadik.h>
+- 
+  #include <asm/mach/irq.h>
+- 
++ #include <mach/irqs.h>
+  #include "pinctrl-nomadik.h"
+  
+  /*
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/81ef2148/attachment.sig>
