@@ -1,15 +1,15 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  9 Nov 2012 15:06:55 +0000
-Subject: [GIT PULL] hw-breakpoint updates for 3.8
-Message-ID: <1352473615-18371-1-git-send-email-will.deacon@arm.com>
+Date: Fri,  9 Nov 2012 15:08:23 +0000
+Subject: [GIT PULL] prot-none fixes for 3.8
+Message-ID: <1352473703-18408-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Russell,
 
-This series of patches reworks much of the debug register reset sequence
-for ARM debug architecture 7.1 in light of some comments from Stephen
-Boyd.
+This patch series fixes the treatment of PROT_NONE pages for 2-level and
+3-level page tables so that the kernel cannot be used to access these
+pages on behalf of userspace when !CPU_USE_DOMAINS.
 
 Thanks,
 
@@ -21,20 +21,19 @@ The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
 
 are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git hw-breakpoint
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/prot-none
 
-Dietmar Eggemann (1):
-      ARM: hw_breakpoint: use CRn as argument for debug reg accessor macros
+Will Deacon (4):
+      ARM: mm: use pteval_t to represent page protection values
+      ARM: mm: don't use the access flag permissions mechanism for classic MMU
+      ARM: mm: introduce L_PTE_VALID for page table entries
+      ARM: mm: introduce present, faulting entries for PAGE_NONE
 
-Will Deacon (7):
-      ARM: hw_breakpoint: only clear OS lock when implemented on v7
-      ARM: hw_breakpoint: fix monitor mode detection with v7.1
-      ARM: hw_breakpoint: fix ordering of debug register reset sequence
-      ARM: hw_breakpoint: don't try to clear v6 debug registers during boot
-      ARM: hw_breakpoint: make boot quieter without CPUID feature registers
-      ARM: hw_breakpoint: check if monitor mode is enabled during validation
-      ARM: hw_breakpoint: kill WARN_ONCE usage
-
- arch/arm/include/asm/hw_breakpoint.h |    8 +-
- arch/arm/kernel/hw_breakpoint.c      |  154 +++++++++++++++++++---------------
- 2 files changed, 89 insertions(+), 73 deletions(-)
+ arch/arm/include/asm/pgtable-2level.h |    2 ++
+ arch/arm/include/asm/pgtable-3level.h |    4 +++-
+ arch/arm/include/asm/pgtable.h        |   10 ++++------
+ arch/arm/mm/mmu.c                     |    2 +-
+ arch/arm/mm/proc-macros.S             |    4 ++++
+ arch/arm/mm/proc-v7-2level.S          |   10 +++++++---
+ arch/arm/mm/proc-v7-3level.S          |    5 ++++-
+ 7 files changed, 25 insertions(+), 12 deletions(-)
