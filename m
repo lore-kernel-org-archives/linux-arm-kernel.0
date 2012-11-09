@@ -1,144 +1,93 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri,  9 Nov 2012 14:34:14 +0000
-Subject: [PATCH v2 5/5] ARM: gic: use a private mapping for CPU target
- interfaces
-In-Reply-To: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1352471654-20207-6-git-send-email-lorenzo.pieralisi@arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 9 Nov 2012 16:30:34 +0200
+Subject: [PATCHv2] ARM: OMAP4: USB: power down MUSB PHY during boot
+In-Reply-To: <1352471435-9560-1-git-send-email-t-kristo@ti.com>
+References: <1352471435-9560-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20121109143033.GB10718@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
+HI,
 
-The GIC interface numbering does not necessarily follow the logical
-CPU numbering, especially for complex topologies such as multi-cluster
-systems.
+On Fri, Nov 09, 2012 at 04:30:35PM +0200, Tero Kristo wrote:
+> Commit c9e4412ab8eb8ef82d645d8749c4ce96ad490007 removed all of the USB
+> PHY functions for OMAP4, but this causes a problem with core retention
+> as the MUSB module remains enabled if omap-usb2 phy driver is not used.
+> This keeps the USB DPLL enabled and prevents l3_init pwrdm from idling.
+> 
+> Fixed by adding a minimal function back that disables the USB PHY during
+> boot.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Kevin Hilman <khilman@ti.com>
 
-Fortunately we can easily probe the GIC to create a mapping as the
-Interrupt Processor Targets Registers for the first 32 interrupts are
-read-only, and each field returns a value that always corresponds to
-the processor reading the register.
+looks good to me. I would still suggest adding a REVISIT or FIXME note
+stating that this should be moved to SCM driver eventually ;-)
 
-Initially all mappings target all CPUs in case an IPI is required to
-boot secondary CPUs.  It is refined as those CPUs discover what their
-actual mapping is.
+Other than that:
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/common/gic.c | 45 ++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 36 insertions(+), 9 deletions(-)
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 50c9eef..2203c92 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -70,6 +70,14 @@ struct gic_chip_data {
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- 
- /*
-+ * The GIC mapping of CPU interfaces does not necessarily match
-+ * the logical CPU numbering.  Let's use a mapping as returned
-+ * by the GIC itself.
-+ */
-+#define NR_GIC_CPU_IF 8
-+static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
-+
-+/*
-  * Supported arch specific GIC irq extension.
-  * Default make them NULL.
-  */
-@@ -238,11 +246,11 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
- 	u32 val, mask, bit;
- 
--	if (cpu >= 8 || cpu >= nr_cpu_ids)
-+	if (cpu >= NR_GIC_CPU_IF || cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
- 	mask = 0xff << shift;
--	bit = 1 << (cpu_logical_map(cpu) + shift);
-+	bit = gic_cpu_map[cpu] << shift;
- 
- 	raw_spin_lock(&irq_controller_lock);
- 	val = readl_relaxed(reg) & ~mask;
-@@ -349,11 +357,6 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	u32 cpumask;
- 	unsigned int gic_irqs = gic->gic_irqs;
- 	void __iomem *base = gic_data_dist_base(gic);
--	u32 cpu = cpu_logical_map(smp_processor_id());
--
--	cpumask = 1 << cpu;
--	cpumask |= cpumask << 8;
--	cpumask |= cpumask << 16;
- 
- 	writel_relaxed(0, base + GIC_DIST_CTRL);
- 
-@@ -366,6 +369,7 @@ static void __init gic_dist_init(struct gic_chip_data *gic)
- 	/*
- 	 * Set all global interrupts to this CPU only.
- 	 */
-+	cpumask = readl_relaxed(base + GIC_DIST_TARGET + 0);
- 	for (i = 32; i < gic_irqs; i += 4)
- 		writel_relaxed(cpumask, base + GIC_DIST_TARGET + i * 4 / 4);
- 
-@@ -389,9 +393,25 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
- {
- 	void __iomem *dist_base = gic_data_dist_base(gic);
- 	void __iomem *base = gic_data_cpu_base(gic);
-+	unsigned int cpu_mask, cpu = smp_processor_id();
- 	int i;
- 
- 	/*
-+	 * Get what the GIC says our CPU mask is.
-+	 */
-+	BUG_ON(cpu >= NR_GIC_CPU_IF);
-+	cpu_mask = readl_relaxed(dist_base + GIC_DIST_TARGET + 0);
-+	gic_cpu_map[cpu] = cpu_mask;
-+
-+	/*
-+	 * Clear our mask from the other map entries in case they're
-+	 * still undefined.
-+	 */
-+	for (i = 0; i < NR_GIC_CPU_IF; i++)
-+		if (i != cpu)
-+			gic_cpu_map[i] &= ~cpu_mask;
-+
-+	/*
- 	 * Deal with the banked PPI and SGI interrupts - disable all
- 	 * PPI interrupts, ensure all SGI interrupts are enabled.
- 	 */
-@@ -654,7 +674,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- {
- 	irq_hw_number_t hwirq_base;
- 	struct gic_chip_data *gic;
--	int gic_irqs, irq_base;
-+	int gic_irqs, irq_base, i;
- 
- 	BUG_ON(gic_nr >= MAX_GIC_NR);
- 
-@@ -692,6 +712,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	}
- 
- 	/*
-+	 * Initialize the CPU interface map to all CPUs.
-+	 * It will be refined as each CPU probes its ID.
-+	 */
-+	for (i = 0; i < NR_GIC_CPU_IF; i++)
-+		gic_cpu_map[i] = 0xff;
-+
-+	/*
- 	 * For primary GICs, skip over SGIs.
- 	 * For secondary GICs, skip over PPIs, too.
- 	 */
-@@ -746,7 +773,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
--		map |= 1 << cpu_logical_map(cpu);
-+		map |= gic_cpu_map[cpu];
- 
- 	/*
- 	 * Ensure that stores to Normal memory are visible to the
+> ---
+>  arch/arm/mach-omap2/omap_phy_internal.c |   32 +++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_phy_internal.c b/arch/arm/mach-omap2/omap_phy_internal.c
+> index d992db8..9b56e5e 100644
+> --- a/arch/arm/mach-omap2/omap_phy_internal.c
+> +++ b/arch/arm/mach-omap2/omap_phy_internal.c
+> @@ -33,6 +33,38 @@
+>  #include "soc.h"
+>  #include "control.h"
+>  
+> +#define CONTROL_DEV_CONF		0x300
+> +#define PHY_PD				0x1
+> +
+> +/**
+> + * omap4430_phy_power_down: disable MUSB PHY during early init
+> + *
+> + * OMAP4 MUSB PHY module is enabled by default on reset, but this will
+> + * prevent core retention if not disabled by SW. USB driver will
+> + * later on enable this, once and if the driver needs it.
+> + */
+> +static int __init omap4430_phy_power_down(void)
+> +{
+> +	void __iomem *ctrl_base;
+> +
+> +	if (!cpu_is_omap44xx())
+> +		return 0;
+> +
+> +	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
+> +	if (!ctrl_base) {
+> +		pr_err("control module ioremap failed\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	/* Power down the phy */
+> +	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
+> +
+> +	iounmap(ctrl_base);
+> +
+> +	return 0;
+> +}
+> +early_initcall(omap4430_phy_power_down);
+> +
+>  void am35x_musb_reset(void)
+>  {
+>  	u32	regval;
+> -- 
+> 1.7.4.1
+> 
+
 -- 
-1.7.12
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/5604756b/attachment.sig>
