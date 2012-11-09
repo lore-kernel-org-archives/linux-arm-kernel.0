@@ -1,75 +1,67 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Fri, 09 Nov 2012 14:47:54 -0800
-Subject: [PATCH 2/4] arm64: Fix the update_vsyscall() prototype
-In-Reply-To: <1350406000-30882-3-git-send-email-catalin.marinas@arm.com>
-References: <1350406000-30882-1-git-send-email-catalin.marinas@arm.com>
- <1350406000-30882-3-git-send-email-catalin.marinas@arm.com>
-Message-ID: <509D881A.30908@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 9 Nov 2012 14:48:21 -0800
+Subject: [PATCH v4 4/9] ARM: dts: support pinctrl single in pxa910
+In-Reply-To: <1352301582-12244-5-git-send-email-haojian.zhuang@gmail.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-5-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20121109224821.GA6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2012 09:46 AM, Catalin Marinas wrote:
-> With commit 576094b7 (time: Introduce new GENERIC_TIME_VSYSCALL) the old
-> update_vsyscall() prototype is no longer available. This patch updates
-> the arm64 port.
->
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> ---
->   arch/arm64/kernel/vdso.c | 20 ++++++++++----------
->   1 file changed, 10 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index 17948fc..ba45794 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -28,6 +28,7 @@
->   #include <linux/sched.h>
->   #include <linux/signal.h>
->   #include <linux/slab.h>
-> +#include <linux/timekeeper_internal.h>
->   #include <linux/vmalloc.h>
->   
->   #include <asm/cacheflush.h>
-> @@ -222,11 +223,10 @@ struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
->   /*
->    * Update the vDSO data page to keep in sync with kernel timekeeping.
->    */
-> -void update_vsyscall(struct timespec *ts, struct timespec *wtm,
-> -		     struct clocksource *clock, u32 mult)
-> +void update_vsyscall(struct timekeeper *tk)
->   {
->   	struct timespec xtime_coarse;
-> -	u32 use_syscall = strcmp(clock->name, "arch_sys_counter");
-> +	u32 use_syscall = strcmp(tk->clock->name, "arch_sys_counter");
->   
->   	++vdso_data->tb_seq_count;
->   	smp_wmb();
-> @@ -237,13 +237,13 @@ void update_vsyscall(struct timespec *ts, struct timespec *wtm,
->   	vdso_data->xtime_coarse_nsec		= xtime_coarse.tv_nsec;
->   
->   	if (!use_syscall) {
-> -		vdso_data->cs_cycle_last	= clock->cycle_last;
-> -		vdso_data->xtime_clock_sec	= ts->tv_sec;
-> -		vdso_data->xtime_clock_nsec	= ts->tv_nsec;
-> -		vdso_data->cs_mult		= mult;
-> -		vdso_data->cs_shift		= clock->shift;
-> -		vdso_data->wtm_clock_sec	= wtm->tv_sec;
-> -		vdso_data->wtm_clock_nsec	= wtm->tv_nsec;
-> +		vdso_data->cs_cycle_last	= tk->clock->cycle_last;
-> +		vdso_data->xtime_clock_sec	= tk->xtime_sec;
-> +		vdso_data->xtime_clock_nsec	= tk->xtime_nsec >> tk->shift;
-Sorry for the collision here!
+Hi,
 
-One word of warning:  Truncating the sub-ns base like this can cause 
-small single ns inconsistencies from the vsyscalls.
+To clarify my binding change comment for the generic pinconf
+support, here's an example.
 
-So either use GENERIC_TIME_VSYSCALL_OLD to enable the 1ns generic 
-rounding-up code, or rework the vsyscall code to use the sub-ns 
-granularity as done in 650ea02475106e8d6bdf561896d2ffe0d1c0ebb4 for 
-x86_64.  I hope to drop the _OLD config eventually, so this will need to 
-be done at some point.
+We need to move pinctrl-single pinconf properties here for
+each pin group:
 
-thanks
--john
+* Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
+> +				uart1_pins: pinmux_uart1_pins {
+> +					pinctrl-single,pins = <
+> +						0x198 0x6	/* GPIO47_UART1_RXD */
+> +						0x19c 0x6	/* GPIO48_UART1_TXD */
+> +					>;
+> +					pinctrl-single,power-source = <0x2>;
+> +					pinctrl-single,bias = <0x6>;
+					pinctrl-single,power-source-mask = <0x1800>;
+					pinctrl-single,bias-mask = <0xe000>;
+					pinctrl-single,bias-disable = <0>;
+					pinctrl-single,bias-pull-down = <0xa000>;
+					pinctrl-single,bias-pull-up = <0xc000>;
+> +				};
+
+
+
+> --- a/arch/arm/boot/dts/pxa910.dtsi
+> +++ b/arch/arm/boot/dts/pxa910.dtsi
+> @@ -54,6 +54,80 @@
+>  			reg = <0xd4000000 0x00200000>;
+>  			ranges;
+>  
+> +			pmx: pinmux at d401e000 {
+> +				compatible = "pinconf-single";
+> +				reg = <0xd401e000 0x0330>;
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				ranges;
+> +
+> +				pinctrl-single,register-width = <32>;
+> +				pinctrl-single,function-mask = <7>;
+
+And then..
+
+> +				pinctrl-single,power-source-mask = <0x1800>;
+> +				pinctrl-single,bias-mask = <0xe000>;
+> +				pinctrl-single,bias-disable = <0>;
+> +				pinctrl-single,bias-pull-down = <0xa000>;
+> +				pinctrl-single,bias-pull-up = <0xc000>;
+> +				pinctrl-single,input-schmitt-mask = <0x70>;
+
+..remove these from here. Otherwise pinctrl-single,bits type controllers
+won't be able to use the pinconf functions as we can have multiple pins
+supported in a single register.
+
+Regards,
+
+Tony
