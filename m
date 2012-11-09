@@ -1,53 +1,35 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:29:17 +0900
-Subject: [PATCH 02/10] ARM: shmobile: r8a7740: add USB24 clock explain
+Date: Fri,  9 Nov 2012 16:29:19 +0900
+Subject: [PATCH 04/10] ARM: shmobile: r8a7779: add USB OHCI clock support
 In-Reply-To: <1352446165-19298-1-git-send-email-horms@verge.net.au>
 References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352446165-19298-3-git-send-email-horms@verge.net.au>
+Message-ID: <1352446165-19298-5-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-USBCKCR is controlling USB parent clock and divide rate.
-This parent clock is used as a "usb24s" from other devices,
-but the "divide rate" is not used.
-Further, this clock itself is known as "usb24".
-So, to set this clock is a little confusable.
-This patch adds quick explain and sample settings for this clock.
+ohci-platform driver require these clocks
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7740.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7779.c |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index 6729e00..c012bbf 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -188,6 +188,22 @@ static struct clk pllc1_div2_clk = {
- };
+diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
+index 4ba4e3c..be885cf 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7779.c
++++ b/arch/arm/mach-shmobile/clock-r8a7779.c
+@@ -157,7 +157,9 @@ static struct clk_lookup lookups[] = {
  
- /* USB clock */
-+/*
-+ * USBCKCR is controlling usb24 clock
-+ * bit[7] : parent clock
-+ * bit[6] : clock divide rate
-+ * And this bit[7] is used as a "usb24s" from other devices.
-+ * (Video clock / Sub clock / SPU clock)
-+ * You can controll this clock as a below.
-+ *
-+ * struct clk *usb24	= clk_get(dev,  "usb24");
-+ * struct clk *usb24s	= clk_get(NULL, "usb24s");
-+ * struct clk *system	= clk_get(NULL, "system_clk");
-+ * int rate = clk_get_rate(system);
-+ *
-+ * clk_set_parent(usb24s, system);  // for bit[7]
-+ * clk_set_rate(usb24, rate / 2);   // for bit[6]
-+ */
- static struct clk *usb24s_parents[] = {
- 	[0] = &system_clk,
- 	[1] = &extal2_clk
+ 	/* MSTP32 clocks */
+ 	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
++	CLKDEV_DEV_ID("ohci-platform.1", &mstp_clks[MSTP101]), /* USB OHCI port2 */
+ 	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
++	CLKDEV_DEV_ID("ohci-platform.0", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
+ 	CLKDEV_DEV_ID("sh_tmu.0", &mstp_clks[MSTP016]), /* TMU00 */
+ 	CLKDEV_DEV_ID("sh_tmu.1", &mstp_clks[MSTP016]), /* TMU01 */
+ 	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
 -- 
 1.7.10.4
