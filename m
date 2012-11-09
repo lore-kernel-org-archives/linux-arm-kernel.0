@@ -1,54 +1,53 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 9 Nov 2012 08:00:04 +0100
-Subject: [PATCH] dmaengine: imx-dma: fix missing irq disable in tasklet
-Message-ID: <1352444404-11423-1-git-send-email-dirk.behme@de.bosch.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri,  9 Nov 2012 16:29:17 +0900
+Subject: [PATCH 02/10] ARM: shmobile: r8a7740: add USB24 clock explain
+In-Reply-To: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
+Message-ID: <1352446165-19298-3-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andreas Pape <external.Andreas.Pape@de.bosch.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Interrupt handler uses spinlock, too.
-To avoid deadlock tasklet must disable IRQ.
+USBCKCR is controlling USB parent clock and divide rate.
+This parent clock is used as a "usb24s" from other devices,
+but the "divide rate" is not used.
+Further, this clock itself is known as "usb24".
+So, to set this clock is a little confusable.
+This patch adds quick explain and sample settings for this clock.
 
-Signed-off-by: Andreas Pape <external.Andreas.Pape@de.bosch.com>
-CC: Vinod Koul <vinod.koul@linux.intel.com>
-CC: Javier Martin <javier.martin@vista-silicon.com>
-CC: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
+ arch/arm/mach-shmobile/clock-r8a7740.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-I'm no DMA expert, so sorry if it's wrong ;)
-
-And btw.: While looking at this code, we wonder if imxdma_xfer_desc() can
-get the spin lock recursively, e.g. from imxdma_tasklet()? Or what ensures
-that the lock is always taken from an other DMA engine than the one already
-holding the lock? 
-
- drivers/dma/imx-dma.c |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
-index 7d9554c..bce30e8 100644
---- a/drivers/dma/imx-dma.c
-+++ b/drivers/dma/imx-dma.c
-@@ -562,8 +562,9 @@ static void imxdma_tasklet(unsigned long data)
- 	struct imxdma_channel *imxdmac = (void *)data;
- 	struct imxdma_engine *imxdma = imxdmac->imxdma;
- 	struct imxdma_desc *desc;
-+	unsigned long flags;
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index 6729e00..c012bbf 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -188,6 +188,22 @@ static struct clk pllc1_div2_clk = {
+ };
  
--	spin_lock(&imxdma->lock);
-+	spin_lock_irqsave(&imxdma->lock, flags);
- 
- 	if (list_empty(&imxdmac->ld_active)) {
- 		/* Someone might have called terminate all */
-@@ -600,7 +601,7 @@ static void imxdma_tasklet(unsigned long data)
- 				 __func__, imxdmac->channel);
- 	}
- out:
--	spin_unlock(&imxdma->lock);
-+	spin_unlock_irqrestore(&imxdma->lock, flags);
- }
- 
- static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ /* USB clock */
++/*
++ * USBCKCR is controlling usb24 clock
++ * bit[7] : parent clock
++ * bit[6] : clock divide rate
++ * And this bit[7] is used as a "usb24s" from other devices.
++ * (Video clock / Sub clock / SPU clock)
++ * You can controll this clock as a below.
++ *
++ * struct clk *usb24	= clk_get(dev,  "usb24");
++ * struct clk *usb24s	= clk_get(NULL, "usb24s");
++ * struct clk *system	= clk_get(NULL, "system_clk");
++ * int rate = clk_get_rate(system);
++ *
++ * clk_set_parent(usb24s, system);  // for bit[7]
++ * clk_set_rate(usb24, rate / 2);   // for bit[6]
++ */
+ static struct clk *usb24s_parents[] = {
+ 	[0] = &system_clk,
+ 	[1] = &extal2_clk
 -- 
-1.7.0.4
+1.7.10.4
