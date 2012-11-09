@@ -1,17 +1,15 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Fri, 9 Nov 2012 17:45:45 +0530
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 9 Nov 2012 21:36:33 +0900
 Subject: [PATCH v7 0/5] usb: phy: samsung: Introducing usb phy driver for
  samsung SoCs
 In-Reply-To: <20121109115440.GC8078@arwen.pp.htv.fi>
 References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
  <20121109115440.GC8078@arwen.pp.htv.fi>
-Message-ID: <CAD6zSYNa1WXkUrRa-Ja_RtXMgdRwK=YXoxQRwoEfj8Jaw8oVAQ@mail.gmail.com>
+Message-ID: <CAH9JG2X1a8MqBpnk8uHRjsGnaD7uob5GBhUh_aS5iCprEvi2XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
-
-On Fri, Nov 9, 2012 at 5:24 PM, Felipe Balbi <balbi@ti.com> wrote:
+On Fri, Nov 9, 2012 at 8:54 PM, Felipe Balbi <balbi@ti.com> wrote:
 > Hi,
 >
 > On Tue, Oct 30, 2012 at 10:27:32AM +0530, Praveen Paneri wrote:
@@ -58,6 +56,9 @@ On Fri, Nov 9, 2012 at 5:24 PM, Felipe Balbi <balbi@ti.com> wrote:
 >> Praveen Paneri (5):
 >>   usb: phy: samsung: Introducing usb phy driver for hsotg
 >>   usb: s3c-hsotg: Adding phy driver support
+For usb parts:
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+
 >>   ARM: S3C64XX: Removing old phy setup code
 >>   ARM: S3C64XX: Enabling samsung-usbphy driver
 >>   ARM: Exynos4210: Enabling samsung-usbphy driver
@@ -65,11 +66,20 @@ On Fri, Nov 9, 2012 at 5:24 PM, Felipe Balbi <balbi@ti.com> wrote:
 > guys I can't wait any longer. If I don't get proper Acks today, I will
 > go ahead without all the PHY changes from Samsung :-s
 
-Can you please ack this patch series.
+To Praveen,
 
-Thanks,
+To remove these dependency and merge issue, please send patches for
+each subsystem. In this case, usb patches for usb tree and others are
+for arm arch.
 
-Praveen
+Thank you,
+Kyungmin Park
 >
 > --
 > balbi
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
