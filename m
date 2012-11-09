@@ -1,48 +1,69 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 9 Nov 2012 19:51:50 +0530
-Subject: [GIT PULL] ARM: OMAP: GPMC generic timing
-Message-ID: <1352470910-9630-1-git-send-email-afzal@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 9 Nov 2012 16:30:35 +0200
+Subject: [PATCHv2] ARM: OMAP4: USB: power down MUSB PHY during boot
+Message-ID: <1352471435-9560-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6ba54ab4a49bbad736b0254aa6bdf0cb83013815:
+Commit c9e4412ab8eb8ef82d645d8749c4ce96ad490007 removed all of the USB
+PHY functions for OMAP4, but this causes a problem with core retention
+as the MUSB module remains enabled if omap-usb2 phy driver is not used.
+This keeps the USB DPLL enabled and prevents l3_init pwrdm from idling.
 
-  ARM: OMAP: Remove omap_init_consistent_dma_size() (2012-11-06 16:01:19 -0800)
+Fixed by adding a minimal function back that disables the USB PHY during
+boot.
 
-are available in the git repository at:
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+ arch/arm/mach-omap2/omap_phy_internal.c |   32 +++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-  git://gitorious.org/x0148406-public/linux-kernel.git tags/gpmc-generic-timing
-
-for you to fetch changes up to 47acde16726080e5157b602f23937d00a04cd2ed:
-
-  ARM: OMAP2+: tusb6010: generic timing calculation (2012-11-09 18:07:23 +0530)
-
-----------------------------------------------------------------
-These changes provide a generic gpmc timing calculation method,
-migrates existing peripherals that makes use of custom gpmc timing
-calculation method to use the new generic one.
-
-Generic routine has been verified for onenand async timing calculation
-on omap3evm (with a local change to add onenand support). Generic
-timing calculation method were verified for other peripherals by
-simulation. Generic method has to be verified on peripherals supported
-in mainline.
-
-----------------------------------------------------------------
-Afzal Mohammed (6):
-      ARM: OMAP2+: nand: remove redundant rounding
-      ARM: OMAP2+: gpmc: handle additional timings
-      ARM: OMAP2+: gpmc: generic timing calculation
-      ARM: OMAP2+: onenand: generic timing calculation
-      ARM: OMAP2+: smc91x: generic timing calculation
-      ARM: OMAP2+: tusb6010: generic timing calculation
-
- Documentation/bus-devices/ti-gpmc.txt | 122 +++++++++++
- arch/arm/mach-omap2/gpmc-nand.c       |  26 +--
- arch/arm/mach-omap2/gpmc-onenand.c    | 143 ++++---------
- arch/arm/mach-omap2/gpmc-smc91x.c     |  43 ++--
- arch/arm/mach-omap2/gpmc.c            | 373 ++++++++++++++++++++++++++++++++++
- arch/arm/mach-omap2/gpmc.h            | 113 ++++++++--
- arch/arm/mach-omap2/usb-tusb6010.c    | 181 ++++-------------
- 7 files changed, 709 insertions(+), 292 deletions(-)
- create mode 100644 Documentation/bus-devices/ti-gpmc.txt
+diff --git a/arch/arm/mach-omap2/omap_phy_internal.c b/arch/arm/mach-omap2/omap_phy_internal.c
+index d992db8..9b56e5e 100644
+--- a/arch/arm/mach-omap2/omap_phy_internal.c
++++ b/arch/arm/mach-omap2/omap_phy_internal.c
+@@ -33,6 +33,38 @@
+ #include "soc.h"
+ #include "control.h"
+ 
++#define CONTROL_DEV_CONF		0x300
++#define PHY_PD				0x1
++
++/**
++ * omap4430_phy_power_down: disable MUSB PHY during early init
++ *
++ * OMAP4 MUSB PHY module is enabled by default on reset, but this will
++ * prevent core retention if not disabled by SW. USB driver will
++ * later on enable this, once and if the driver needs it.
++ */
++static int __init omap4430_phy_power_down(void)
++{
++	void __iomem *ctrl_base;
++
++	if (!cpu_is_omap44xx())
++		return 0;
++
++	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
++	if (!ctrl_base) {
++		pr_err("control module ioremap failed\n");
++		return -ENOMEM;
++	}
++
++	/* Power down the phy */
++	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
++
++	iounmap(ctrl_base);
++
++	return 0;
++}
++early_initcall(omap4430_phy_power_down);
++
+ void am35x_musb_reset(void)
+ {
+ 	u32	regval;
+-- 
+1.7.4.1
