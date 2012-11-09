@@ -1,199 +1,106 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:31:41 +0900
-Subject: [PATCH 2/7] ARM: shmobile: marzen: add USB EHCI driver support
+Date: Fri,  9 Nov 2012 16:31:44 +0900
+Subject: [PATCH 5/7] ARM: shmobile: use FSI driver's audio clock on
+ armadillo800eva
 In-Reply-To: <1352446306-19945-1-git-send-email-horms@verge.net.au>
 References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352446306-19945-3-git-send-email-horms@verge.net.au>
+Message-ID: <1352446306-19945-6-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch supports CN21/CN22 USB 2.0 (port 0/1/2),
-and enable USB momery on defconfig
+Current FSI driver can control audio clock without platform
+call-back functions
+This patch removed board-specific call-back/settings
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/configs/marzen_defconfig     |    6 ++
- arch/arm/mach-shmobile/Kconfig        |    1 +
- arch/arm/mach-shmobile/board-marzen.c |  108 ++++++++++++++++++++++++++++++++-
- 3 files changed, 114 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c |   38 ++----------------------
+ 1 file changed, 3 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/configs/marzen_defconfig b/arch/arm/configs/marzen_defconfig
-index 8a861b7..6540dfb 100644
---- a/arch/arm/configs/marzen_defconfig
-+++ b/arch/arm/configs/marzen_defconfig
-@@ -47,6 +47,8 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_FARADAY is not set
-@@ -82,6 +84,10 @@ CONFIG_USB=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_STORAGE=y
- CONFIG_UIO=y
- CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_IOMMU_SUPPORT is not set
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 4eddca1..4eae11c 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -29,6 +29,7 @@ config ARCH_R8A7779
- 	select ARM_GIC
- 	select CPU_V7
- 	select SH_CLK_CPG
-+	select USB_ARCH_HAS_EHCI
- 
- config ARCH_EMEV2
- 	bool "Emma Mobile EV2"
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 74c7f0b..707b3bd 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -34,6 +34,9 @@
- #include <linux/spi/sh_hspi.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <linux/usb/otg.h>
-+#include <linux/usb/ehci_pdriver.h>
-+#include <linux/pm_runtime.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -172,6 +175,101 @@ static struct platform_device *marzen_devices[] __initdata = {
- 	&usb_phy_device,
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index fe27d7e..3d4c0e4 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -768,32 +768,6 @@ static struct platform_device ceu0_device = {
  };
  
-+/* USB */
-+static struct usb_phy *phy;
-+static int usb_power_on(struct platform_device *pdev)
-+{
-+	if (!phy)
-+		return -EIO;
-+
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
-+
-+	usb_phy_init(phy);
-+
-+	return 0;
-+}
-+
-+static void usb_power_off(struct platform_device *pdev)
-+{
-+	if (!phy)
-+		return;
-+
-+	usb_phy_shutdown(phy);
-+
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+}
-+
-+static struct usb_ehci_pdata ehcix_pdata = {
-+	.power_on	= usb_power_on,
-+	.power_off	= usb_power_off,
-+	.power_suspend	= usb_power_off,
-+};
-+
-+static struct resource ehci0_resources[] = {
-+	[0] = {
-+		.start	= 0xffe70000,
-+		.end	= 0xffe70400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(44),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device ehci0_device = {
-+	.name	= "ehci-platform",
-+	.id	= 0,
-+	.dev	= {
-+		.dma_mask		= &ehci0_device.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= 0xffffffff,
-+		.platform_data		= &ehcix_pdata,
-+	},
-+	.num_resources	= ARRAY_SIZE(ehci0_resources),
-+	.resource	= ehci0_resources,
-+};
-+
-+static struct resource ehci1_resources[] = {
-+	[0] = {
-+		.start	= 0xfff70000,
-+		.end	= 0xfff70400 - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= gic_spi(45),
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device ehci1_device = {
-+	.name	= "ehci-platform",
-+	.id	= 1,
-+	.dev	= {
-+		.dma_mask		= &ehci1_device.dev.coherent_dma_mask,
-+		.coherent_dma_mask	= 0xffffffff,
-+		.platform_data		= &ehcix_pdata,
-+	},
-+	.num_resources	= ARRAY_SIZE(ehci1_resources),
-+	.resource	= ehci1_resources,
-+};
-+
-+static struct platform_device *marzen_late_devices[] __initdata = {
-+	&ehci0_device,
-+	&ehci1_device,
-+};
-+
-+void __init marzen_init_late(void)
-+{
-+	/* get usb phy */
-+	phy = usb_get_phy(USB_PHY_TYPE_USB2);
-+
-+	shmobile_init_late();
-+	platform_add_devices(marzen_late_devices,
-+			     ARRAY_SIZE(marzen_late_devices));
-+}
-+
- static void __init marzen_init(void)
- {
- 	regulator_register_always_on(0, "fixed-3.3V", fixed3v3_power_consumers,
-@@ -209,6 +307,14 @@ static void __init marzen_init(void)
- 	gpio_request(GPIO_FN_HSPI_TX0,	NULL);
- 	gpio_request(GPIO_FN_HSPI_RX0,	NULL);
+ /* FSI */
+-static int fsi_hdmi_set_rate(struct device *dev, int rate, int enable)
+-{
+-	struct clk *fsib;
+-	int ret;
+-
+-	/* it support 48KHz only */
+-	if (48000 != rate)
+-		return -EINVAL;
+-
+-	fsib = clk_get(dev, "ickb");
+-	if (IS_ERR(fsib))
+-		return -EINVAL;
+-
+-	if (enable) {
+-		ret = SH_FSI_ACKMD_256 | SH_FSI_BPFMD_64;
+-		clk_enable(fsib);
+-	} else {
+-		ret = 0;
+-		clk_disable(fsib);
+-	}
+-
+-	clk_put(fsib);
+-
+-	return ret;
+-}
+-
+ static struct sh_fsi_platform_info fsi_info = {
+ 	/* FSI-WM8978 */
+ 	.port_a = {
+@@ -802,8 +776,8 @@ static struct sh_fsi_platform_info fsi_info = {
+ 	/* FSI-HDMI */
+ 	.port_b = {
+ 		.flags		= SH_FSI_FMT_SPDIF |
+-				  SH_FSI_ENABLE_STREAM_MODE,
+-		.set_rate	= fsi_hdmi_set_rate,
++				  SH_FSI_ENABLE_STREAM_MODE |
++				  SH_FSI_CLK_CPG,
+ 		.tx_id		= SHDMA_SLAVE_FSIB_TX,
+ 	}
+ };
+@@ -938,13 +912,11 @@ static void __init eva_clock_init(void)
+ 	struct clk *xtal1	= clk_get(NULL, "extal1");
+ 	struct clk *usb24s	= clk_get(NULL, "usb24s");
+ 	struct clk *fsibck	= clk_get(NULL, "fsibck");
+-	struct clk *fsib	= clk_get(&fsi_device.dev, "ickb");
  
-+	/* USB (CN21) */
-+	gpio_request(GPIO_FN_USB_OVC0, NULL);
-+	gpio_request(GPIO_FN_USB_OVC1, NULL);
-+	gpio_request(GPIO_FN_USB_OVC2, NULL);
-+
-+	/* USB (CN22) */
-+	gpio_request(GPIO_FN_USB_PENC2, NULL);
-+
- 	r8a7779_add_standard_devices();
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ 	if (IS_ERR(system)	||
+ 	    IS_ERR(xtal1)	||
+ 	    IS_ERR(usb24s)	||
+-	    IS_ERR(fsibck)	||
+-	    IS_ERR(fsib)) {
++	    IS_ERR(fsibck)) {
+ 		pr_err("armadillo800eva board clock init failed\n");
+ 		goto clock_error;
+ 	}
+@@ -956,9 +928,7 @@ static void __init eva_clock_init(void)
+ 	clk_set_parent(usb24s, system);
+ 
+ 	/* FSIBCK is 12.288MHz, and it is parent of FSI-B */
+-	clk_set_parent(fsib, fsibck);
+ 	clk_set_rate(fsibck, 12288000);
+-	clk_set_rate(fsib,   12288000);
+ 
+ clock_error:
+ 	if (!IS_ERR(system))
+@@ -969,8 +939,6 @@ clock_error:
+ 		clk_put(usb24s);
+ 	if (!IS_ERR(fsibck))
+ 		clk_put(fsibck);
+-	if (!IS_ERR(fsib))
+-		clk_put(fsib);
  }
-@@ -221,6 +327,6 @@ MACHINE_START(MARZEN, "marzen")
- 	.init_irq	= r8a7779_init_irq,
- 	.handle_irq	= gic_handle_irq,
- 	.init_machine	= marzen_init,
--	.init_late	= shmobile_init_late,
-+	.init_late	= marzen_init_late,
- 	.timer		= &shmobile_timer,
- MACHINE_END
+ 
+ /*
 -- 
 1.7.10.4
