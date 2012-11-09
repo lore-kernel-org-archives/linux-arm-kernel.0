@@ -1,47 +1,69 @@
-From: dron0gus@gmail.com (Andrey Gusakov)
-Date: Fri, 9 Nov 2012 12:31:15 +0300
-Subject: [PATCH] ARM: S3C64XX: Statically define parent clock of the
- "camera" clock
-In-Reply-To: <1352449929-20168-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <CAA11ShAo_N5iwPmVqE27NMzhpSD6NZORqf7yvjUyZ-+kGkgYog@mail.gmail.com>
- <1352449929-20168-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <CAA11ShABPJhLP5dvx65=HOzSNoiY+jjiiNPAvd_x_5z7K3meVg@mail.gmail.com>
+From: danborkmann@iogearbox.net (Daniel Borkmann)
+Date: Fri, 9 Nov 2012 10:49:07 +0100
+Subject: [PATCH] arm: zynq: add system level control register manager
+In-Reply-To: <20121108160125.GA5550@kryptos>
+References: <20121031183610.GA2603@thinkbox>
+	<20121108160125.GA5550@kryptos>
+Message-ID: <CAD6jFUQC+HPCT11_nWckUkhzgQtPkxLcqcTxbVb==kFmwCaTwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
-
-On Fri, Nov 9, 2012 at 12:32 PM, Sylwester Nawrocki
-<sylvester.nawrocki@gmail.com> wrote:
-> The "camera" clock defined in arch/arm/mach-s3c64xx/clock.c has null
-> clock source mux control register as it can have only one parent
-> clock. In such cases there is a need to configure the parent clock
-> statically, otherwise s3c_set_clksrc() bails out with an error message
-> "no parent clock specified" leaving the parent clock not configured.
-> Define statically the parent clock so it is possible to get or set
-> rate of the "camera" clock.
-> While at it remove the unneded null reg_src definition.
+On Thu, Nov 8, 2012 at 5:01 PM, Josh Cartwright <joshc@eso.teric.us> wrote:
+> On Wed, Oct 31, 2012 at 07:36:12PM +0100, Daniel Borkmann wrote:
+>> This patch for the Xilinx Zynq ARM architecture adds management of system
+>> level control register. The code is taken from the Xilinx-internal Linux
+>> Git tree and cleaned up a bit for mainline integration. Besides others,
+>> this patch is needed in order to integrate further drivers for Zynq such as
+>> the Zynq xemacps networking device driver. The patch is aganst the latest
+>> arm-soc tree.
+>>
+>> Signed-off-by: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
+>> Cc: Michal Simek <michals@xilinx.com>
+>> Cc: John Linn <john.linn@xilinx.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> ---
 >
-> Reported-by: In-Bae Jeong <kukyakya@gmail.com>
-> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/clock.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
-> index 28041e8..2e6d7f9 100644
-> --- a/arch/arm/mach-s3c64xx/clock.c
-> +++ b/arch/arm/mach-s3c64xx/clock.c
-> @@ -744,9 +744,9 @@ static struct clksrc_clk clksrcs[] = {
->                         .name           = "camera",
->                         .ctrlbit        = S3C_CLKCON_SCLK_CAM,
->                         .enable         = s3c64xx_sclk_ctrl,
-> +                       .parent         = &clk_h2,
->                 },
->                 .reg_div        = { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
-> -               .reg_src        = { .reg = NULL, .shift = 0, .size = 0  },
->                 .sources        = &clkset_camif,
-Just figure out that .sources can be removed to. And seems
-"clkset_camif" and "clkset_camif_list" can be removed as unused.
+> These changes will conflict with my pending clk patchset [1], as I'm
+> introducing bindings for the SLCR (and its clk interfaces).
 
-I'll try to test it tiday.
+Oops, okay. Then your's has priority, of course.
+
+> It seems like a hefty chunk of the out-of-tree slcr driver is related to
+> configuring MIO.  I think it would be really nice if this driver was
+> reworked to use the pinctrl subsystem, and also to provide suitable
+> device tree bindings.
+
+Agreed. If there's a chance to help with further Zynq integration and
+to develop this driver with testing on Qemu for ARM Zynq, I'd like to
+give it a try. (The board is a bit expensive as a hobby only.)
+
+> But, at an even higher level, it would be nice to have a coordinated
+> plan for getting better Zynq support upstream.  My implicit plan (so
+> far) has been:
+>
+>    1. Initial cleanup [get the thing booting] (done)
+>    2. Figure out clk drivers and bindings (pending)
+>    3. Figure out MIO pinctrl support and bindings (?)
+>    4. Adapting out-of-tree peripheral drivers according to 2 & 3 (?)
+>    5. Add support for SMP (?)
+>
+> Step 4 has a dependency on 2 and 3, of course, the point being that we
+> get those into a state where we are happy with them before moving all of
+> the peripherals over.  I believe step 5 can be done in parallel to the
+> others.
+>
+> Arnd-
+>
+> At a high level, does this sound like a suitable plan of action?  Is
+> there something else you would like to see from those of us working on
+> Zynq support?
+>
+> Thanks,
+>    Josh
+>
+> 1: http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/129295.html
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
