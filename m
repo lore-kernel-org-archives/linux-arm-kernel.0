@@ -1,29 +1,25 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Nov 2012 20:03:12 -0700
-Subject: [PATCH 1/2] arm: bcm2835: move to the multiplatform support
-In-Reply-To: <1351419853-25146-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1351419853-25146-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <509C7270.9000508@wwwdotorg.org>
+Date: Thu, 08 Nov 2012 20:06:16 -0700
+Subject: S-o-b for 48efdd2 "Add a pm_power_off function that resets us,
+ ..."
+In-Reply-To: <508CA4C4.5060407@wwwdotorg.org>
+References: <508CA4C4.5060407@wwwdotorg.org>
+Message-ID: <509C7328.9030104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2012 04:24 AM, Thomas Petazzoni wrote:
-> This commit integrates the bcm2835 into the list of platforms
-> supported by the multiplatform mechanism, which makes it possible to
-> build a single kernel binary image that boots on various SoCs.
-...
-> ---
-> Note that if you have CONFIG_VFP enabled, you need "[PATCH v3] ARM:
-> vfp: fix save and restore when running on pre-VFPv3 and CONFIG_VFPv3
-> set" to be applied in order to avoid a VFP-related kernel panic when
-> starting the first userspace application. Thanks to Albin Tonnerre for
-> pointing me to the right fix for this problem!
+On 10/27/2012 09:21 PM, Stephen Warren wrote:
+> Dom,
+> 
+> Are you able to provide your S-o-b for the following commit:
+> 
+> 48efdd2 Add a pm_power_off function that resets us, and indicates to
+> bootcode.bin not to reboot us. Should allow a lower power 'off' state
+> 
+> I would like to upstream that, but can't without an S-o-b [from you].
+> 
+> Thanks.
 
-Thomas, just a heads up - the VFP commit you mention above should show
-up in v3.7-rc5 which I imagine will be released this weekend, and the
-debug_ll_io_init feature I mentioned in another response is already
-available is arm-soc branch devel/debug_ll_init. If you rebase this
-patch on a merge of those two branches, it should be in good shape for
-me to apply it.
-
-Thanks.
+Dom, are you able to provide an S-o-b line for this or any other commits
+in you kernel trees? It'd be really helpful if you could add S-o-bs to
+any/all commits in your branches where you can. Thanks.
