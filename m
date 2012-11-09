@@ -1,59 +1,83 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 09 Nov 2012 11:18:03 +0100
-Subject: [PATCH] ARM: S3C64XX: Statically define parent clock of the
- "camera" clock
-In-Reply-To: <509CD574.2050909@gmail.com>
-References: <CAA11ShAo_N5iwPmVqE27NMzhpSD6NZORqf7yvjUyZ-+kGkgYog@mail.gmail.com>
- <1352449929-20168-1-git-send-email-sylvester.nawrocki@gmail.com>
- <CAA11ShABPJhLP5dvx65=HOzSNoiY+jjiiNPAvd_x_5z7K3meVg@mail.gmail.com>
- <509CD574.2050909@gmail.com>
-Message-ID: <509CD85B.6010405@gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 09 Nov 2012 19:19:58 +0900
+Subject: [PATCH 2/4] ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of
+ Exynos4210 SOC
+In-Reply-To: <201211081054.41649.b.zolnierkie@samsung.com>
+References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
+ <201210300956.23102.b.zolnierkie@samsung.com>
+ <0cea01cdbd6c$7ace7200$706b5600$%kim@samsung.com>
+ <201211081054.41649.b.zolnierkie@samsung.com>
+Message-ID: <0e8801cdbe63$c52b6e50$4f824af0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2012 11:05 AM, Sylwester Nawrocki wrote:
-> Hi,
->
-> On 11/09/2012 10:31 AM, Andrey Gusakov wrote:
->> On Fri, Nov 9, 2012 at 12:32 PM, Sylwester Nawrocki
->> <sylvester.nawrocki@gmail.com> wrote:
->>> The "camera" clock defined in arch/arm/mach-s3c64xx/clock.c has null
->>> clock source mux control register as it can have only one parent
->>> clock. In such cases there is a need to configure the parent clock
->>> statically, otherwise s3c_set_clksrc() bails out with an error message
->>> "no parent clock specified" leaving the parent clock not configured.
->>> Define statically the parent clock so it is possible to get or set
->>> rate of the "camera" clock.
->>> While at it remove the unneded null reg_src definition.
->>>
->>> Reported-by: In-Bae Jeong<kukyakya@gmail.com>
->>> Signed-off-by: Sylwester Nawrocki<sylvester.nawrocki@gmail.com>
->>> ---
->>> arch/arm/mach-s3c64xx/clock.c | 2 +-
->>> 1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-s3c64xx/clock.c
->>> b/arch/arm/mach-s3c64xx/clock.c
->>> index 28041e8..2e6d7f9 100644
->>> --- a/arch/arm/mach-s3c64xx/clock.c
->>> +++ b/arch/arm/mach-s3c64xx/clock.c
->>> @@ -744,9 +744,9 @@ static struct clksrc_clk clksrcs[] = {
->>> .name = "camera",
->>> .ctrlbit = S3C_CLKCON_SCLK_CAM,
->>> .enable = s3c64xx_sclk_ctrl,
->>> + .parent =&clk_h2,
->>> },
->>> .reg_div = { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4 },
->>> - .reg_src = { .reg = NULL, .shift = 0, .size = 0 },
->>> .sources =&clkset_camif,
->> Just figure out that .sources can be removed to. And seems
->> "clkset_camif" and "clkset_camif_list" can be removed as unused.
->
-> OK, you're right. I think it could be done as a separate patch,
-> depending on this one to avoid conflicts.
+Bartlomiej Zolnierkiewicz wrote:
+> 
+> Ah, okay.  Here is full simplified patch.
+> 
+> From: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Subject: [PATCH v2] ARM: EXYNOS: PL330 MDMA1 fix for revision 0 of
+> Exynos4210 SOC
+> 
+> Commit 8214513 ("ARM: EXYNOS: fix address for EXYNOS4 MDMA1")
+> changed EXYNOS specific setup of PL330 DMA engine to use 'non-secure'
+> mdma1 address instead of 'secure' one (from 0x12840000 to 0x12850000)
+> to fix issue with some Exynos4212 SOCs.  Unfortunately it brakes
+> PL330 setup for revision 0 of Exynos4210 SOC (mdma1 device cannot
+> be found at 'non-secure' address):
+> 
+> [    0.566245] dma-pl330 dma-pl330.2: PERIPH_ID 0x0, PCELL_ID 0x0 !
+> [    0.566278] dma-pl330: probe of dma-pl330.2 failed with error -22
+> 
+> Fix it by using 'secure' mdma1 address on Exynos4210 revision 0 SOC.
+> 
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/mach-exynos/dma.c              |    3 +++
+>  arch/arm/mach-exynos/include/mach/map.h |    1 +
+>  2 files changed, 4 insertions(+)
+> 
+> Index: b/arch/arm/mach-exynos/dma.c
+> ===================================================================
+> --- a/arch/arm/mach-exynos/dma.c	2012-11-07 18:20:36.561743865 +0100
+> +++ b/arch/arm/mach-exynos/dma.c	2012-11-08 10:48:23.445067606 +0100
+> @@ -275,6 +275,9 @@ static int __init exynos_dma_init(void)
+>  		exynos_pdma1_pdata.nr_valid_peri =
+>  			ARRAY_SIZE(exynos4210_pdma1_peri);
+>  		exynos_pdma1_pdata.peri_id = exynos4210_pdma1_peri;
+> +
+> +		if (samsung_rev() == EXYNOS4210_REV_0)
+> +			exynos_mdma1_device.res.start = EXYNOS4_PA_S_MDMA1;
+>  	} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
+>  		exynos_pdma0_pdata.nr_valid_peri =
+>  			ARRAY_SIZE(exynos4212_pdma0_peri);
+> Index: b/arch/arm/mach-exynos/include/mach/map.h
+> ===================================================================
+> --- a/arch/arm/mach-exynos/include/mach/map.h	2012-11-07
+> 18:20:44.801743862 +0100
+> +++ b/arch/arm/mach-exynos/include/mach/map.h	2012-11-08
+> 10:48:40.597067605 +0100
+> @@ -92,6 +92,7 @@
+> 
+>  #define EXYNOS4_PA_MDMA0		0x10810000
+>  #define EXYNOS4_PA_MDMA1		0x12850000
+> +#define EXYNOS4_PA_S_MDMA1		0x12840000
+>  #define EXYNOS4_PA_PDMA0		0x12680000
+>  #define EXYNOS4_PA_PDMA1		0x12690000
+>  #define EXYNOS5_PA_MDMA0		0x10800000
 
-Or feel free to make a new patch, ignoring this one.
+Looks good to me, and I think, this can be handled separate from this
+series.
 
+Vinod, if you're ok, let me pick this up into Samsung tree.
+
+Thanks.
+
+Best regards,
+Kgene.
 --
-Regards,
-Sylwester
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
