@@ -1,103 +1,41 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 08 Nov 2012 20:24:33 -0700
-Subject: [PATCH] Add support for generic BCM SoC chipsets
-In-Reply-To: <1352391196-9984-1-git-send-email-csd@broadcom.com>
-References: <1352391196-9984-1-git-send-email-csd@broadcom.com>
-Message-ID: <509C7771.9020400@wwwdotorg.org>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Fri, 09 Nov 2012 06:00:36 +0100
+Subject: [RFC] arm: memtest
+In-Reply-To: <CAE9FiQWeie62NYt2vyq2q+Um8NeA5xWQGy-nULmFidt4XxW=BA@mail.gmail.com>
+References: <509C1A92.9080407@ahsoftware.de>
+ <CAE9FiQWeie62NYt2vyq2q+Um8NeA5xWQGy-nULmFidt4XxW=BA@mail.gmail.com>
+Message-ID: <509C8DF4.4070300@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2012 09:13 AM, Christian Daudt wrote:
-> In order to start upstreaming Broadcom SoC support, create
-> a starting hierarchy, arch and dts files.
-> The first support SoC family that is planned is the
->  BCM281XX (BCM28145/28150/28155) family of dual A9 mobile SoC cores
-> This code is just the skeleton code for get the machine upstreamed. It
-> has been made MULTIPLATFORM compatible.
+Am 08.11.2012 23:39, schrieb Yinghai Lu:
+> On Thu, Nov 8, 2012 at 12:48 PM, Alexander Holler <holler@ahsoftware.de> wrote:
+>> Hello,
+>>
+>> I've recently discovered the lack of the command line parameter memtest for
+>> ARM. So I've made a patch.
+>>
+>> But I have some questions:
+>>
+>> 1. arch/x86/mm/memtest.c looks platform independ.
+>> The only thing why I don't use it for arm, is because it uses 64bit
+>> pointers. Maybe it could be moved to mm/memtest.c. If so, the memtest32.c
+>> I'm using (basically a copy of memtest.c) could be moved there too.
+>>
+>> 2. Because the below memtest32.c is basically a copy of
+>> arch/x86/mm/memtest.c, I'm not sure if the mapping from physical to virtual
+>> locations there does fit (always) for ARM too. I know almost as much about
+>> the in-kernel memory organization on x86 as on ARM, which is not really that
+>> much (some theory about TLBs, some source code explorations, ..., but I'm
+>> working on it). ;)
+>
+> We are using arch/x86/mm/memtest.c for x86 32bit and 64bit.
+>
+> So it should be ok to use it with arm 32bit and 64bit directly.
 
-Christian,
+It does. But in order to enable it on every boot, I wanted it to be as 
+fast as possible.
 
-Is the intent for this to support other BCM SoCs in the future, such as
-the bcm2835 in the Raspberry Pi, and the mach-bcm476x which Domenico
-Andreoli recently sent patches for? It'd be awesome if Broadcom could
-provide MMC and USB drivers for the bcm2835 for example.
+Regards,
 
->  arch/arm/boot/dts/capri-brt.dts |   32 +++++++++++
->  arch/arm/boot/dts/capri.dtsi    |   50 +++++++++++++++++
-
-What does the name "capri" refer to? I assume it's a code-name for the
-SoC/series. My inclination is that naming those files bcm28145.dtsi and
-bcm28145-brt.dts (or 28150/28155 as appropriate) might be a little more
-obvious to people unfamiliar with the code-names.
-
-> diff --git a/arch/arm/boot/dts/capri-brt.dts b/arch/arm/boot/dts/capri-brt.dts
-
-> +/ {
-> +	model = "Capri BRT board";
-> +	compatible = "bcm,capri";
-
-The individual board file's compatible property should contain both a
-board-specific value and the generic SoC value. This allows the SoC
-support in the kernel to match on the generic SoC compatible value, yet
-still allow the kernel to match the board-specific value in case any
-quirks are required. For example,
-
-	compatible = "bcm,brt", "bcm,capri";
-
-(assuming that "brt" is the full board name)
-
-> +	interrupt-parent = <&gic>;
-
-That's already in capri.dtsi; there's no advantage to repeating it.
-
-> +	memory {
-> +		device_type = "memory";
-
-That property already exists in skeleton.dtsi, which is included via
-capri.dtsi.
-
-> diff --git a/arch/arm/boot/dts/capri.dtsi b/arch/arm/boot/dts/capri.dtsi
-
-> +	gic: interrupt-controller at 3ff00100 {
-> +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-
-The commit description says it's an A9 not an A15.
-
-> +	uart at 3e000000 {
-> +		compatible = "snps,dw-apb-uart";
-
-You probably want to include SoC-specific compatible values for all the
-IP blocks too.
-
-There need to be device tree bindings written to describe to contents of
-all these device-tree files; see Documentation/devicetree/bindings/.
-
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-
-> +config ARCH_BCM
-> +	bool "Broadcom SoC" if ARCH_MULTI_V7
-> +	depends on MMU
-> +	select CPU_V7
-> +	select ARM_GIC
-> +	select GENERIC_GPIO
-> +	select GPIO_BCM
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select GENERIC_TIME
-> +	select GENERIC_CLOCKEVENTS
-> +	select TICK_ONESHOT
-> +	select ARM_ERRATA_754322
-> +	select ARM_ERRATA_764369 if SMP
-> +	select SPARSE_IRQ
-
-Those select statements should be alphabetically sorted.
-
-> diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
-
-> +
-> +
-> +
-
-> +
-> +
-
-Nit: A couple of instances of multiple newlines, but not a big deal.
+Alexander
