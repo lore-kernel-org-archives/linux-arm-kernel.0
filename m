@@ -1,9 +1,9 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:31:45 +0900
-Subject: [PATCH 6/7] ARM: shmobile: use FSI driver's audio clock on mackerel
+Date: Fri,  9 Nov 2012 16:31:46 +0900
+Subject: [PATCH 7/7] ARM: shmobile: use FSI driver's audio clock on ap4evb
 In-Reply-To: <1352446306-19945-1-git-send-email-horms@verge.net.au>
 References: <1352446306-19945-1-git-send-email-horms@verge.net.au>
-Message-ID: <1352446306-19945-7-git-send-email-horms@verge.net.au>
+Message-ID: <1352446306-19945-8-git-send-email-horms@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,37 +16,85 @@ This patch removed board-specific call-back/settings
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c |   72 +------------------------------
- 1 file changed, 1 insertion(+), 71 deletions(-)
+ arch/arm/mach-shmobile/board-ap4evb.c |  139 +--------------------------------
+ 1 file changed, 1 insertion(+), 138 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index d5fe365..bf2bcb9 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -862,76 +862,6 @@ static struct platform_device leds_device = {
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index cefdd03..4065785 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -658,133 +658,16 @@ static struct platform_device lcdc_device = {
  
  /* FSI */
- #define IRQ_FSI evt2irq(0x1840)
--static int __fsi_set_round_rate(struct clk *clk, long rate, int enable)
+ #define IRQ_FSI		evt2irq(0x1840)
+-static int __fsi_set_rate(struct clk *clk, long rate, int enable)
 -{
--	int ret;
+-	int ret = 0;
 -
 -	if (rate <= 0)
--		return 0;
--
--	if (!enable) {
--		clk_disable(clk);
--		return 0;
--	}
--
--	ret = clk_set_rate(clk, clk_round_rate(clk, rate));
--	if (ret < 0)
 -		return ret;
 -
--	return clk_enable(clk);
+-	if (enable) {
+-		ret = clk_set_rate(clk, rate);
+-		if (0 == ret)
+-			ret = clk_enable(clk);
+-	} else {
+-		clk_disable(clk);
+-	}
+-
+-	return ret;
 -}
 -
--static int fsi_b_set_rate(struct device *dev, int rate, int enable)
+-static int __fsi_set_round_rate(struct clk *clk, long rate, int enable)
+-{
+-	return __fsi_set_rate(clk, clk_round_rate(clk, rate), enable);
+-}
+-
+-static int fsi_ak4642_set_rate(struct device *dev, int rate, int enable)
+-{
+-	struct clk *fsia_ick;
+-	struct clk *fsiack;
+-	int ret = -EIO;
+-
+-	fsia_ick = clk_get(dev, "icka");
+-	if (IS_ERR(fsia_ick))
+-		return PTR_ERR(fsia_ick);
+-
+-	/*
+-	 * FSIACK is connected to AK4642,
+-	 * and use external clock pin from it.
+-	 * it is parent of fsia_ick now.
+-	 */
+-	fsiack = clk_get_parent(fsia_ick);
+-	if (!fsiack)
+-		goto fsia_ick_out;
+-
+-	/*
+-	 * we get 1/1 divided clock by setting same rate to fsiack and fsia_ick
+-	 *
+-	 ** FIXME **
+-	 * Because the freq_table of external clk (fsiack) are all 0,
+-	 * the return value of clk_round_rate became 0.
+-	 * So, it use __fsi_set_rate here.
+-	 */
+-	ret = __fsi_set_rate(fsiack, rate, enable);
+-	if (ret < 0)
+-		goto fsiack_out;
+-
+-	ret = __fsi_set_round_rate(fsia_ick, rate, enable);
+-	if ((ret < 0) && enable)
+-		__fsi_set_round_rate(fsiack, rate, 0); /* disable FSI ACK */
+-
+-fsiack_out:
+-	clk_put(fsiack);
+-
+-fsia_ick_out:
+-	clk_put(fsia_ick);
+-
+-	return 0;
+-}
+-
+-static int fsi_hdmi_set_rate(struct device *dev, int rate, int enable)
 -{
 -	struct clk *fsib_clk;
 -	struct clk *fdiv_clk = clk_get(NULL, "fsidivb");
@@ -55,7 +103,6 @@ index d5fe365..bf2bcb9 100644
 -	int ackmd_bpfmd;
 -	int ret;
 -
--	/* clock start */
 -	switch (rate) {
 -	case 44100:
 -		fsib_rate	= rate * 256;
@@ -76,12 +123,11 @@ index d5fe365..bf2bcb9 100644
 -	if (IS_ERR(fsib_clk))
 -		return -EIO;
 -
--	/* fsib */
 -	ret = __fsi_set_round_rate(fsib_clk, fsib_rate, enable);
 -	if (ret < 0)
 -		goto fsi_set_rate_end;
 -
--	/* FSI DIV */
+-	/* FSI DIV setting */
 -	ret = __fsi_set_round_rate(fdiv_clk, fdiv_rate, enable);
 -	if (ret < 0) {
 -		/* disable FSI B */
@@ -99,16 +145,52 @@ index d5fe365..bf2bcb9 100644
 -
  static struct sh_fsi_platform_info fsi_info = {
  	.port_a = {
- 		.flags = SH_FSI_BRS_INV,
-@@ -942,8 +872,8 @@ static struct sh_fsi_platform_info fsi_info = {
- 		.flags = SH_FSI_BRS_INV	|
- 			SH_FSI_BRM_INV	|
- 			SH_FSI_LRS_INV	|
-+			SH_FSI_CLK_CPG	|
- 			SH_FSI_FMT_SPDIF,
--		.set_rate = fsi_b_set_rate,
- 	}
+ 		.flags		= SH_FSI_BRS_INV,
+-		.set_rate	= fsi_ak4642_set_rate,
+ 	},
+ 	.port_b = {
+ 		.flags		= SH_FSI_BRS_INV |
+ 				  SH_FSI_BRM_INV |
+ 				  SH_FSI_LRS_INV |
++				  SH_FSI_CLK_CPG |
+ 				  SH_FSI_FMT_SPDIF,
+-		.set_rate	= fsi_hdmi_set_rate,
+ 	},
  };
  
+@@ -1144,25 +1027,6 @@ out:
+ 		clk_put(hdmi_ick);
+ }
+ 
+-static void __init fsi_init_pm_clock(void)
+-{
+-	struct clk *fsia_ick;
+-	int ret;
+-
+-	fsia_ick = clk_get(&fsi_device.dev, "icka");
+-	if (IS_ERR(fsia_ick)) {
+-		ret = PTR_ERR(fsia_ick);
+-		pr_err("Cannot get FSI ICK: %d\n", ret);
+-		return;
+-	}
+-
+-	ret = clk_set_parent(fsia_ick, &sh7372_fsiack_clk);
+-	if (ret < 0)
+-		pr_err("Cannot set FSI-A parent: %d\n", ret);
+-
+-	clk_put(fsia_ick);
+-}
+-
+ /* TouchScreen */
+ #ifdef CONFIG_AP4EVB_QHD
+ # define GPIO_TSC_IRQ	GPIO_FN_IRQ28_123
+@@ -1476,7 +1340,6 @@ static void __init ap4evb_init(void)
+ 				       ARRAY_SIZE(domain_devices));
+ 
+ 	hdmi_init_pm_clock();
+-	fsi_init_pm_clock();
+ 	sh7372_pm_init();
+ 	pm_clk_add(&fsi_device.dev, "spu2");
+ 	pm_clk_add(&lcdc1_device.dev, "hdmi");
 -- 
 1.7.10.4
