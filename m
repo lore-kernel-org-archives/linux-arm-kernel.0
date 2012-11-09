@@ -1,62 +1,54 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 9 Nov 2012 11:41:30 +0530
-Subject: [PATCH 4/4] DMA: PL330: add device tree property for DMA_MEMCPY
- capability
-In-Reply-To: <201210301021.42803.b.zolnierkie@samsung.com>
-References: <1351504796-24788-1-git-send-email-b.zolnierkie@samsung.com>
- <1351504796-24788-5-git-send-email-b.zolnierkie@samsung.com>
- <CABb+yY1Ztu2n38ObXJq+shOoXw6yk0YK39QUHhDN_pJKziAFQg@mail.gmail.com>
- <201210301021.42803.b.zolnierkie@samsung.com>
-Message-ID: <CAJe_ZhdOt+T65FdkE0SpQ37uGsS8SkFyJ9hHM3B_8S8f7GQAcQ@mail.gmail.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 9 Nov 2012 08:00:04 +0100
+Subject: [PATCH] dmaengine: imx-dma: fix missing irq disable in tasklet
+Message-ID: <1352444404-11423-1-git-send-email-dirk.behme@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 October 2012 14:51, Bartlomiej Zolnierkiewicz
-<b.zolnierkie@samsung.com> wrote:
->
-> Hi,
->
-> On Monday 29 October 2012 22:45:48 Jassi Brar wrote:
->> On Mon, Oct 29, 2012 at 10:59 AM, Bartlomiej Zolnierkiewicz
->> <b.zolnierkie@samsung.com> wrote:
->> > * Add device tree (DT) property ("pl330,dma-memcpy") for DMA_MEMCPY
->> >   capability and instead of setting this capability unconditionally
->> >   in pl330_probe() do it only when property is present.
->> >
->> Perhaps we should pass the array of peripheral interfaces via DT, the
->> lack of which could imply MEMCPY capability ? (while it works, I doubt
->> if pl330 is supposed to have SLAVE and MEMCPY capabilities in any
->> instance)
->
-> In case of PL330 on EXYNOS4 we have two interfaces with SLAVE capability
-> and one interface with MEMCPY capability.  Could you please explain more
-> the idea of passing the array of peripherals through DT so we can detect
-> which interface has MEMCPY capability?
->
-The DT node of a 'pdma' should have the array of indices of
-peripherals it caters to (what is currently peri_id of 'struct
-dma_pl330_platdata'). The array would be missing in the DT node of
-'mdma' since all channels are equal.
-During probe if the array, say as property 'peri_map', is missing from
-DT node of the dmac, that would imply the dmac is 'mdma' and hence the
-pl330.c sets DMA_MEMCPY in its cap_mask. Otherwise the peri_map
-implies a 'pdma' and hence SLAVE|CYCLIC is set.
+From: Andreas Pape <external.Andreas.Pape@de.bosch.com>
 
+Interrupt handler uses spinlock, too.
+To avoid deadlock tasklet must disable IRQ.
 
->> That would also be a step towards discarding "struct dma_pl330_platdata".
->
-> I don't know if getting rid of "struct dma_pl330_platdata" is possible
-> but we still need to come up with some way to pass the needed information
-> through DT.  Do you have an idea how it could be done?
->
-struct dma_pl330_platdata {
-  u8 nr_valid_peri;
-  u8 *peri_id;
-      As explain above, these two should move to DT node of the dma controller.
+Signed-off-by: Andreas Pape <external.Andreas.Pape@de.bosch.com>
+CC: Vinod Koul <vinod.koul@linux.intel.com>
+CC: Javier Martin <javier.martin@vista-silicon.com>
+CC: Sascha Hauer <s.hauer@pengutronix.de>
+---
 
-  dma_cap_mask_t cap_mask;
-      Should be set in pl330.c : MEMCPY for mdma,  SLAVE|CYCLIC for pdma
+I'm no DMA expert, so sorry if it's wrong ;)
 
-  unsigned mcbuf_sz;
-      Currently unused and already safe enough default value set in driver.
-}
+And btw.: While looking at this code, we wonder if imxdma_xfer_desc() can
+get the spin lock recursively, e.g. from imxdma_tasklet()? Or what ensures
+that the lock is always taken from an other DMA engine than the one already
+holding the lock? 
+
+ drivers/dma/imx-dma.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/dma/imx-dma.c b/drivers/dma/imx-dma.c
+index 7d9554c..bce30e8 100644
+--- a/drivers/dma/imx-dma.c
++++ b/drivers/dma/imx-dma.c
+@@ -562,8 +562,9 @@ static void imxdma_tasklet(unsigned long data)
+ 	struct imxdma_channel *imxdmac = (void *)data;
+ 	struct imxdma_engine *imxdma = imxdmac->imxdma;
+ 	struct imxdma_desc *desc;
++	unsigned long flags;
+ 
+-	spin_lock(&imxdma->lock);
++	spin_lock_irqsave(&imxdma->lock, flags);
+ 
+ 	if (list_empty(&imxdmac->ld_active)) {
+ 		/* Someone might have called terminate all */
+@@ -600,7 +601,7 @@ static void imxdma_tasklet(unsigned long data)
+ 				 __func__, imxdmac->channel);
+ 	}
+ out:
+-	spin_unlock(&imxdma->lock);
++	spin_unlock_irqrestore(&imxdma->lock, flags);
+ }
+ 
+ static int imxdma_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+-- 
+1.7.0.4
