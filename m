@@ -1,97 +1,42 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 9 Nov 2012 15:54:41 +0200
-Subject: [PATCH v7 0/5] usb: phy: samsung: Introducing usb phy driver for
- samsung SoCs
-In-Reply-To: <CAD6zSYN6xpHt54d-w=6veb6AErTq6ERQcneo7ewC-qsBoMuThQ@mail.gmail.com>
-References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
- <20121109115440.GC8078@arwen.pp.htv.fi>
- <CAH9JG2X1a8MqBpnk8uHRjsGnaD7uob5GBhUh_aS5iCprEvi2XQ@mail.gmail.com>
- <CAD6zSYN6xpHt54d-w=6veb6AErTq6ERQcneo7ewC-qsBoMuThQ@mail.gmail.com>
-Message-ID: <20121109135441.GC8567@arwen.pp.htv.fi>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Fri,  9 Nov 2012 15:00:24 +0100
+Subject: [PATCH 5/6] ARM i.MX: rename ssi1 clock for imx27
+In-Reply-To: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1352469625-32024-6-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+ arch/arm/mach-imx/clk-imx27.c |    2 +-
+ arch/arm/mach-imx/imx27-dt.c  |    1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-On Fri, Nov 09, 2012 at 06:50:44PM +0530, Praveen Paneri wrote:
-> Hi,
-> 
-> On Fri, Nov 9, 2012 at 6:06 PM, Kyungmin Park <kmpark@infradead.org> wrote:
-> > On Fri, Nov 9, 2012 at 8:54 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >> Hi,
-> >>
-> >> On Tue, Oct 30, 2012 at 10:27:32AM +0530, Praveen Paneri wrote:
-> >>> Changes from v6:
-> >>> Modified register definitions according to the existing ones.
-> >>> Changed default PHY clk selection for SoCs.
-> >>> Improved binding text and rebased to the latest usb-next.
-> >>>
-> >>> Changes from v5:
-> >>> Moved clk_get() to driver's probe function. Now reference clock frequency
-> >>> selection value is stored in samsung_usbphy structure for later use. Used
-> >>> IS_ENABLED() instead of #ifdef in samsung_usbphy_get_driver_data().
-> >>>
-> >>> Changes from v4:
-> >>> Moved header file contents to driver's source file
-> >>> Removed unnecessary print message from driver's probe function
-> >>> Dropped the Free Software Foundation address from the header
-> >>> Changed the platform data code to use __initdata
-> >>>
-> >>> Changes from v3:
-> >>> Replaced susbsys_initcall()/module_exit() by module_platform_driver().
-> >>> Accordingly in the hsotg driver returned -EPROBE_DEFER until phy driver
-> >>> is registered
-> >>> Removed unnecessary devm_usb_put_phy() call from the hsotg driver remove.
-> >>>
-> >>> Changes from v2:
-> >>> Changed the driver filenames to samsung-usbphy
-> >>> Changed 's3c' to 'samsung' for platform device as well as platform data
-> >>> Moved platform data structure to a separate file
-> >>> Rectified coding style related errors
-> >>>
-> >>> Changes from v1:
-> >>> Rebased patches to latest usb-next branch
-> >>> Changed the name 'sec_usbphy' to 'samsung_usbphy'
-> >>>
-> >>> This patch set introduces a phy driver for samsung SoCs. It uses the existing
-> >>> transceiver infrastructure to provide phy control functions. Use of this driver
-> >>> can be extended for usb host phy as well. Over the period of time all the phy
-> >>> related code for most of the samsung SoCs can be integrated here.
-> >>> Removing the existing phy code from mach-s3c64xx. Same can be done for other SoCs
-> >>> when they start supporting this phy driver.
-> >>> This driver is tested with smdk6410 and Exynos4210(with DT).
-> >>>
-> >>> Praveen Paneri (5):
-> >>>   usb: phy: samsung: Introducing usb phy driver for hsotg
-> >>>   usb: s3c-hsotg: Adding phy driver support
-> > For usb parts:
-> > Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
-> Thanks for the ack.
-> >
-> >>>   ARM: S3C64XX: Removing old phy setup code
-> >>>   ARM: S3C64XX: Enabling samsung-usbphy driver
-> >>>   ARM: Exynos4210: Enabling samsung-usbphy driver
-> >>
-> >> guys I can't wait any longer. If I don't get proper Acks today, I will
-> >> go ahead without all the PHY changes from Samsung :-s
-> >
-> > To Praveen,
-> >
-> > To remove these dependency and merge issue, please send patches for
-> > each subsystem. In this case, usb patches for usb tree and others are
-> > for arm arch.
-> I will surely take care of this from now onwards. Hope these can be
-> taken as it is for now.
-
-Sure, but I still need Kukjin's 'say-so' for the arch/arm/plat-samsung
-and arch/arm/mach-exynos part.
-
+diff --git a/arch/arm/mach-imx/clk-imx27.c b/arch/arm/mach-imx/clk-imx27.c
+index 366e5d5..d269532 100644
+--- a/arch/arm/mach-imx/clk-imx27.c
++++ b/arch/arm/mach-imx/clk-imx27.c
+@@ -236,7 +236,7 @@ int __init mx27_clocks_init(unsigned long fref)
+ 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.2");
+ 	clk_register_clkdev(clk[usb_ipg_gate], "ipg", "mxc-ehci.2");
+ 	clk_register_clkdev(clk[usb_ahb_gate], "ahb", "mxc-ehci.2");
+-	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "imx-ssi.0");
++	clk_register_clkdev(clk[ssi1_ipg_gate], NULL, "10010000.ssi");
+ 	clk_register_clkdev(clk[ssi2_ipg_gate], NULL, "imx-ssi.1");
+ 	clk_register_clkdev(clk[nfc_baud_gate], NULL, "mxc_nand.0");
+ 	clk_register_clkdev(clk[vpu_baud_gate], "per", "coda-imx27.0");
+diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
+index e80d523..60eed17 100644
+--- a/arch/arm/mach-imx/imx27-dt.c
++++ b/arch/arm/mach-imx/imx27-dt.c
+@@ -29,6 +29,7 @@ static const struct of_dev_auxdata imx27_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("fsl,imx27-cspi", MX27_CSPI3_BASE_ADDR, "imx27-cspi.2", NULL),
+ 	OF_DEV_AUXDATA("fsl,imx27-wdt", MX27_WDOG_BASE_ADDR, "imx2-wdt.0", NULL),
+ 	OF_DEV_AUXDATA("fsl,imx27-nand", MX27_NFC_BASE_ADDR, "mxc_nand.0", NULL),
++	OF_DEV_AUXDATA("fsl,imx21-ssi", MX27_SSI1_BASE_ADDR, "10010000.ssi", NULL),
+ 	{ /* sentinel */ }
+ };
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121109/e19ac0f0/attachment.sig>
+1.7.10.4
