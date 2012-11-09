@@ -1,34 +1,31 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri, 9 Nov 2012 20:00:15 +0100
-Subject: [PATCH 1/6] spi: imx: specify spi base for device tree probe
-In-Reply-To: <20121109163830.GP23807@opensource.wolfsonmicro.com>
-References: <1352469625-32024-1-git-send-email-s.trumtrar@pengutronix.de>
- <1352469625-32024-2-git-send-email-s.trumtrar@pengutronix.de>
- <20121109163830.GP23807@opensource.wolfsonmicro.com>
-Message-ID: <20121109190015.GB3660@pengutronix.de>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 9 Nov 2012 19:06:28 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: clockdomain: disabling unused clks
+In-Reply-To: <20121109011738.17381.88199@nucleus>
+References: <alpine.DEB.2.00.1211081800210.20703@utopia.booyaka.com>
+ <1352417516-15213-1-git-send-email-mturquette@ti.com>
+ <alpine.DEB.2.00.1211090052100.20703@utopia.booyaka.com>
+ <20121109011738.17381.88199@nucleus>
+Message-ID: <alpine.DEB.2.00.1211091900250.20703@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 04:38:30PM +0000, Mark Brown wrote:
-> On Fri, Nov 09, 2012 at 03:00:20PM +0100, Steffen Trumtrar wrote:
-> 
-> > * This breaks compatibility with user space applications between non-DT and DT.
-> 
-> > * On platforms that are in between DT and non-DT, it breaks registration of
-> >   devices via spi_board_info.
-> 
-> > Use the same method as 7e6086d9e54a159a6257c02bb7fc5805c614aad2 does for gpios:
-> > Use alias to identify the spi port, and then specify the base via the port id.
-> > If alias is not defined in DT, allocate the base dynamically.
-> 
-> This sounds like a fix userspace and/or complete your DT conversion
-> problem...
+On Thu, 8 Nov 2012, Mike Turquette wrote:
 
-Well, it may lead to problems in userspace and does lead to problems with an
-incomplete DT support, but there are only so many hours in a day...
+> You're right.  In my rush I glossed over the clkdm decrement part.  In
+> light of the suspend/resume issues I'm not sure this approach is really
+> valid.  I think getting to the bottom of those issues will give the
+> final word.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+What do you think about something like this?  It's still under test and 
+review here, but seems to avoid the warnings on 3530ES3 Beagle at least.
+
+The usage of __clk_get_enable_count() in this code still seems like a hack 
+to me.  It would be better for the CCF to call a different clk_hw_ops 
+function pointer for the disable-unused-clocks case.  But if you agree, 
+and plan to fix this, or have some other cleaner fix in mind for the near 
+future, then something like this seems reasonable for the short term to 
+me.  What do you think?
+
+
+- Paul
