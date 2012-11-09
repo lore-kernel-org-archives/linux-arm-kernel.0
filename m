@@ -1,52 +1,47 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 09 Nov 2012 09:26:23 +0000
-Subject: [PATCH] ARM: kprobes: use BUG_ON where possible
-In-Reply-To: <1352406191-14303-4-git-send-email-sasha.levin@oracle.com>
-References: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
- <1352406191-14303-4-git-send-email-sasha.levin@oracle.com>
-Message-ID: <1352453183.3236.5.camel@linaro1.home>
+From: dron0gus@gmail.com (Andrey Gusakov)
+Date: Fri, 9 Nov 2012 12:31:15 +0300
+Subject: [PATCH] ARM: S3C64XX: Statically define parent clock of the
+ "camera" clock
+In-Reply-To: <1352449929-20168-1-git-send-email-sylvester.nawrocki@gmail.com>
+References: <CAA11ShAo_N5iwPmVqE27NMzhpSD6NZORqf7yvjUyZ-+kGkgYog@mail.gmail.com>
+ <1352449929-20168-1-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <CAA11ShABPJhLP5dvx65=HOzSNoiY+jjiiNPAvd_x_5z7K3meVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2012-11-08 at 15:23 -0500, Sasha Levin wrote:
-> Just use BUG_ON() instead of constructions such as:
-> 
-> 	if (...)
-> 		BUG()
-> 
-> A simplified version of the semantic patch that makes this transformation
-> is as follows: (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @@
-> expression e;
-> @@
-> - if (e) BUG();
-> + BUG_ON(e);
-> // </smpl>
-> 
-> Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
+Hi.
 
-I'm not sure that trivial changes like this are worth it, but equally,
-they're not worth having a discussion about, so...
-
-Acked-by: Jon Medhurst <tixy@linaro.org>
-
+On Fri, Nov 9, 2012 at 12:32 PM, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
+> The "camera" clock defined in arch/arm/mach-s3c64xx/clock.c has null
+> clock source mux control register as it can have only one parent
+> clock. In such cases there is a need to configure the parent clock
+> statically, otherwise s3c_set_clksrc() bails out with an error message
+> "no parent clock specified" leaving the parent clock not configured.
+> Define statically the parent clock so it is possible to get or set
+> rate of the "camera" clock.
+> While at it remove the unneded null reg_src definition.
+>
+> Reported-by: In-Bae Jeong <kukyakya@gmail.com>
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 > ---
->  arch/arm/kernel/kprobes-test.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/kprobes-test.c b/arch/arm/kernel/kprobes-test.c
-> index 1862d8f..0fb370d 100644
-> --- a/arch/arm/kernel/kprobes-test.c
-> +++ b/arch/arm/kernel/kprobes-test.c
-> @@ -1212,8 +1212,7 @@ static int register_test_probe(struct test_probe *probe)
->  {
->  	int ret;
->  
-> -	if (probe->registered)
-> -		BUG();
-> +	BUG_ON(probe->registered);
->  
->  	ret = register_kprobe(&probe->kprobe);
->  	if (ret >= 0) {
+>  arch/arm/mach-s3c64xx/clock.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+> index 28041e8..2e6d7f9 100644
+> --- a/arch/arm/mach-s3c64xx/clock.c
+> +++ b/arch/arm/mach-s3c64xx/clock.c
+> @@ -744,9 +744,9 @@ static struct clksrc_clk clksrcs[] = {
+>                         .name           = "camera",
+>                         .ctrlbit        = S3C_CLKCON_SCLK_CAM,
+>                         .enable         = s3c64xx_sclk_ctrl,
+> +                       .parent         = &clk_h2,
+>                 },
+>                 .reg_div        = { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
+> -               .reg_src        = { .reg = NULL, .shift = 0, .size = 0  },
+>                 .sources        = &clkset_camif,
+Just figure out that .sources can be removed to. And seems
+"clkset_camif" and "clkset_camif_list" can be removed as unused.
+
+I'll try to test it tiday.
