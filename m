@@ -1,38 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri,  9 Nov 2012 16:32:11 +0900
-Subject: [PATCH 0/2] [GIT PULL] Renesas ARM-based 'SoC2' for v3.8 #3
-Message-ID: <1352446333-20082-1-git-send-email-horms@verge.net.au>
+From: dron0gus@gmail.com (Andrey Gusakov)
+Date: Fri, 9 Nov 2012 10:42:13 +0300
+Subject: [PATCH 2/2] ARM: S3C64XX: Statically define parent clock of the
+ "camera" clock
+In-Reply-To: <1352325657-28885-2-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1352325657-28885-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <1352325657-28885-2-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <CAA11ShAo_N5iwPmVqE27NMzhpSD6NZORqf7yvjUyZ-+kGkgYog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+Hi.
 
-please consider the following SoC enhancements for 3.8.
+I think .reg_src can be removed? This clock have only one source.
 
-* This pull-request is based on the boards branch of the rensas tree
-  which I have sent a pull-request for. The boards branch is in
-  turn based on the soc branch. The reason for the soc2 -> boards -> soc
-  branch progression is to satisfy dependencies of patches in
-  the boards and soc branches.
-
-----------------------------------------------------------------
-The following changes since commit 12818d82ccad9868a820dbb193b4f9b797cd02d4:
-
-  ARM: shmobile: use FSI driver's audio clock on ap4evb (2012-11-08 17:52:05 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc2
-
-for you to fetch changes up to d5b689089d7db3851c4d5d6b3727d22ef44d2023:
-
-  ARM: shmobile: sh7372: sh7372_fsiXck_clk become non-global (2012-11-08 17:52:35 +0900)
-
-----------------------------------------------------------------
-Kuninori Morimoto (2):
-      ARM: shmobile: sh7372: remove fsidivx clock
-      ARM: shmobile: sh7372: sh7372_fsiXck_clk become non-global
-
- arch/arm/mach-shmobile/clock-sh7372.c        |   20 ++++++++++----------
- arch/arm/mach-shmobile/include/mach/sh7372.h |    2 --
- 2 files changed, 10 insertions(+), 12 deletions(-)
+On Thu, Nov 8, 2012 at 2:00 AM, Sylwester Nawrocki
+<sylvester.nawrocki@gmail.com> wrote:
+> The "camera" clock defined in arch/arm/mach-s3c64xx/clock.c has null
+> clock source mux control register as it can have only one parent
+> clock. In such cases there is a need to configure the parent clock
+> statically, otherwise s3c_set_clksrc() bails out with an error message
+> "no parent clock specified" leaving the parent clock not configured.
+> Define statically the parent clock so it is possible to get or set rate
+> of the "camera" clock.
+>
+> Reported-by: In-Bae Jeong <kukyakya@gmail.com>
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/clock.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c64xx/clock.c b/arch/arm/mach-s3c64xx/clock.c
+> index 28041e8..85b9cf1 100644
+> --- a/arch/arm/mach-s3c64xx/clock.c
+> +++ b/arch/arm/mach-s3c64xx/clock.c
+> @@ -744,6 +744,7 @@ static struct clksrc_clk clksrcs[] = {
+>                         .name           = "camera",
+>                         .ctrlbit        = S3C_CLKCON_SCLK_CAM,
+>                         .enable         = s3c64xx_sclk_ctrl,
+> +                       .parent         = &clk_h2,
+>                 },
+>                 .reg_div        = { .reg = S3C_CLK_DIV0, .shift = 20, .size = 4  },
+>                 .reg_src        = { .reg = NULL, .shift = 0, .size = 0  },
+> --
+> 1.7.4.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
