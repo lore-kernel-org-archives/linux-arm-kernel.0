@@ -1,123 +1,68 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 10 Nov 2012 12:13:41 +0530
-Subject: [PATCH 2/8] CLK: SPEAr13xx: Fix mux clock names
+Date: Sat, 10 Nov 2012 12:13:42 +0530
+Subject: [PATCH 3/8] CLK: SPEAr13xx: fix parent names of multiple clocks
 In-Reply-To: <cover.1352529508.git.viresh.kumar@linaro.org>
 References: <cover.1352529508.git.viresh.kumar@linaro.org>
-Message-ID: <d8462e3a359a4021e14bdc49d8bb8923c79e48ab.1352529508.git.viresh.kumar@linaro.org>
+Message-ID: <e251a2f4fb6ab547cfd454efdf03298fdf7b2860.1352529508.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shiraz Hashim <shiraz.hashim@st.com>
 
-This patch updates mux clock names of multiple clocks. It updates _clk with
-_mclk to make it more readable.
+This patch fixes parent names of multiple clocks.
 
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 Signed-off-by: Rajeev Kumar <rajeev-dlh.kumar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clk/spear/spear1310_clock.c |  4 ++--
- drivers/clk/spear/spear1340_clock.c | 20 ++++++++++----------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ drivers/clk/spear/spear1310_clock.c | 2 +-
+ drivers/clk/spear/spear1340_clock.c | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
-index f13b1d2..2f1cb71 100644
+index 2f1cb71..e84b1fb 100644
 --- a/drivers/clk/spear/spear1310_clock.c
 +++ b/drivers/clk/spear/spear1310_clock.c
-@@ -633,7 +633,7 @@ void __init spear1310_clk_init(void)
- 			ARRAY_SIZE(clcd_pixel_parents), 0,
- 			SPEAR1310_PERIP_CLK_CFG, SPEAR1310_CLCD_CLK_SHIFT,
- 			SPEAR1310_CLCD_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "clcd_pixel_clk", NULL);
-+	clk_register_clkdev(clk, "clcd_pixel_mclk", NULL);
+@@ -664,7 +664,7 @@ void __init spear1310_clk_init(void)
+ 	clk_register_clkdev(clk, "i2s_ref_pad_clk", NULL);
  
- 	clk = clk_register_gate(NULL, "clcd_clk", "clcd_pixel_mclk", 0,
- 			SPEAR1310_PERIP1_CLK_ENB, SPEAR1310_CLCD_CLK_ENB, 0,
-@@ -645,7 +645,7 @@ void __init spear1310_clk_init(void)
- 			ARRAY_SIZE(i2s_src_parents), 0, SPEAR1310_I2S_CLK_CFG,
- 			SPEAR1310_I2S_SRC_CLK_SHIFT, SPEAR1310_I2S_SRC_CLK_MASK,
- 			0, &_lock);
--	clk_register_clkdev(clk, "i2s_src_clk", NULL);
-+	clk_register_clkdev(clk, "i2s_src_mclk", NULL);
- 
- 	clk = clk_register_aux("i2s_prs1_clk", NULL, "i2s_src_mclk", 0,
- 			SPEAR1310_I2S_CLK_CFG, &i2s_prs1_masks, i2s_prs1_rtbl,
+ 	clk = clk_register_aux("i2s_sclk_clk", "i2s_sclk_gclk",
+-			"i2s_ref_pad_clk", 0, SPEAR1310_I2S_CLK_CFG,
++			"i2s_ref_mclk", 0, SPEAR1310_I2S_CLK_CFG,
+ 			&i2s_sclk_masks, i2s_sclk_rtbl,
+ 			ARRAY_SIZE(i2s_sclk_rtbl), &_lock, &clk1);
+ 	clk_register_clkdev(clk, "i2s_sclk_clk", NULL);
 diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
-index dae2ba6..4733d99 100644
+index 4733d99..020431a 100644
 --- a/drivers/clk/spear/spear1340_clock.c
 +++ b/drivers/clk/spear/spear1340_clock.c
-@@ -521,7 +521,7 @@ void __init spear1340_clk_init(void)
- 			ARRAY_SIZE(sys_parents), 0, SPEAR1340_SYS_CLK_CTRL,
- 			SPEAR1340_SCLK_SRC_SEL_SHIFT,
- 			SPEAR1340_SCLK_SRC_SEL_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "sys_clk", NULL);
-+	clk_register_clkdev(clk, "sys_mclk", NULL);
+@@ -370,7 +370,7 @@ static struct frac_rate_tbl gen_rtbl[] = {
+ /* clock parents */
+ static const char *vco_parents[] = { "osc_24m_clk", "osc_25m_clk", };
+ static const char *sys_parents[] = { "pll1_clk", "pll1_clk", "pll1_clk",
+-	"pll1_clk", "sys_synth_clk", "sys_synth_clk", "pll2_clk", "pll3_clk", };
++	"pll1_clk", "sys_syn_clk", "sys_syn_clk", "pll2_clk", "pll3_clk", };
+ static const char *ahb_parents[] = { "cpu_div3_clk", "amba_syn_clk", };
+ static const char *gpt_parents[] = { "osc_24m_clk", "apb_clk", };
+ static const char *uart0_parents[] = { "pll5_clk", "osc_24m_clk",
+@@ -391,7 +391,7 @@ static const char *spdif_in_parents[] = { "pll2_clk", "gen_syn3_clk", };
  
- 	clk = clk_register_fixed_factor(NULL, "cpu_clk", "sys_mclk", 0, 1,
- 			2);
-@@ -697,7 +697,7 @@ void __init spear1340_clk_init(void)
- 			ARRAY_SIZE(clcd_pixel_parents), 0,
- 			SPEAR1340_PERIP_CLK_CFG, SPEAR1340_CLCD_CLK_SHIFT,
- 			SPEAR1340_CLCD_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "clcd_pixel_clk", NULL);
-+	clk_register_clkdev(clk, "clcd_pixel_mclk", NULL);
+ static const char *gen_synth0_1_parents[] = { "vco1div4_clk", "vco3div2_clk",
+ 	"pll3_clk", };
+-static const char *gen_synth2_3_parents[] = { "vco1div4_clk", "vco3div2_clk",
++static const char *gen_synth2_3_parents[] = { "vco1div4_clk", "vco2div2_clk",
+ 	"pll2_clk", };
  
- 	clk = clk_register_gate(NULL, "clcd_clk", "clcd_pixel_mclk", 0,
- 			SPEAR1340_PERIP1_CLK_ENB, SPEAR1340_CLCD_CLK_ENB, 0,
-@@ -709,7 +709,7 @@ void __init spear1340_clk_init(void)
- 			ARRAY_SIZE(i2s_src_parents), 0, SPEAR1340_I2S_CLK_CFG,
- 			SPEAR1340_I2S_SRC_CLK_SHIFT, SPEAR1340_I2S_SRC_CLK_MASK,
- 			0, &_lock);
--	clk_register_clkdev(clk, "i2s_src_clk", NULL);
-+	clk_register_clkdev(clk, "i2s_src_mclk", NULL);
- 
- 	clk = clk_register_aux("i2s_prs1_clk", NULL, "i2s_src_mclk", 0,
- 			SPEAR1340_I2S_CLK_CFG, &i2s_prs1_masks, i2s_prs1_rtbl,
-@@ -720,7 +720,7 @@ void __init spear1340_clk_init(void)
- 			ARRAY_SIZE(i2s_ref_parents), 0, SPEAR1340_I2S_CLK_CFG,
- 			SPEAR1340_I2S_REF_SHIFT, SPEAR1340_I2S_REF_SEL_MASK, 0,
+ void __init spear1340_clk_init(void)
+@@ -956,7 +956,7 @@ void __init spear1340_clk_init(void)
  			&_lock);
--	clk_register_clkdev(clk, "i2s_ref_clk", NULL);
-+	clk_register_clkdev(clk, "i2s_ref_mclk", NULL);
+ 	clk_register_clkdev(clk, NULL, "d0500000.cam3");
  
- 	clk = clk_register_gate(NULL, "i2s_ref_pad_clk", "i2s_ref_mclk", 0,
- 			SPEAR1340_PERIP2_CLK_ENB, SPEAR1340_I2S_REF_PAD_CLK_ENB,
-@@ -846,30 +846,30 @@ void __init spear1340_clk_init(void)
- 			ARRAY_SIZE(gen_synth0_1_parents), 0, SPEAR1340_PLL_CFG,
- 			SPEAR1340_GEN_SYNT0_1_CLK_SHIFT,
- 			SPEAR1340_GEN_SYNT_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "gen_syn0_1_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn0_1_mclk", NULL);
- 
- 	clk = clk_register_mux(NULL, "gen_syn2_3_mclk", gen_synth2_3_parents,
- 			ARRAY_SIZE(gen_synth2_3_parents), 0, SPEAR1340_PLL_CFG,
- 			SPEAR1340_GEN_SYNT2_3_CLK_SHIFT,
- 			SPEAR1340_GEN_SYNT_CLK_MASK, 0, &_lock);
--	clk_register_clkdev(clk, "gen_syn2_3_clk", NULL);
-+	clk_register_clkdev(clk, "gen_syn2_3_mclk", NULL);
- 
--	clk = clk_register_frac("gen_syn0_clk", "gen_syn0_1_clk", 0,
-+	clk = clk_register_frac("gen_syn0_clk", "gen_syn0_1_mclk", 0,
- 			SPEAR1340_GEN_CLK_SYNT0, gen_rtbl, ARRAY_SIZE(gen_rtbl),
+-	clk = clk_register_gate(NULL, "pwm_clk", "pwm_mclk", 0,
++	clk = clk_register_gate(NULL, "pwm_clk", "ahb_clk", 0,
+ 			SPEAR1340_PERIP3_CLK_ENB, SPEAR1340_PWM_CLK_ENB, 0,
  			&_lock);
- 	clk_register_clkdev(clk, "gen_syn0_clk", NULL);
- 
--	clk = clk_register_frac("gen_syn1_clk", "gen_syn0_1_clk", 0,
-+	clk = clk_register_frac("gen_syn1_clk", "gen_syn0_1_mclk", 0,
- 			SPEAR1340_GEN_CLK_SYNT1, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
- 	clk_register_clkdev(clk, "gen_syn1_clk", NULL);
- 
--	clk = clk_register_frac("gen_syn2_clk", "gen_syn2_3_clk", 0,
-+	clk = clk_register_frac("gen_syn2_clk", "gen_syn2_3_mclk", 0,
- 			SPEAR1340_GEN_CLK_SYNT2, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
- 	clk_register_clkdev(clk, "gen_syn2_clk", NULL);
- 
--	clk = clk_register_frac("gen_syn3_clk", "gen_syn2_3_clk", 0,
-+	clk = clk_register_frac("gen_syn3_clk", "gen_syn2_3_mclk", 0,
- 			SPEAR1340_GEN_CLK_SYNT3, gen_rtbl, ARRAY_SIZE(gen_rtbl),
- 			&_lock);
- 	clk_register_clkdev(clk, "gen_syn3_clk", NULL);
+ 	clk_register_clkdev(clk, NULL, "e0180000.pwm");
 -- 
 1.7.12.rc2.18.g61b472e
