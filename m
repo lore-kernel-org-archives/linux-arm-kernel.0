@@ -1,110 +1,30 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 09 Nov 2012 17:42:40 -0800
-Subject: [PATCH V4 0/3] Add clock framework for armada 370/XP
-In-Reply-To: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20121110014240.16569.66429@nucleus>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 9 Nov 2012 17:44:37 -0800
+Subject: [PATCH 0/2] clk: ux500: Add some more clk lookups for u8500
+In-Reply-To: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1351690853-13021-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20121110014437.16569.40581@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2012-10-30 11:23:30)
-> Hello Mike,
+Quoting Ulf Hansson (2012-10-31 06:40:51)
+> From: Ulf Hansson <ulf.hansson@linaro.org>
 > 
-> I hope this 4th version will meet your expectations. Beside the
-> corrections you have asked I also changed the way I get resources for
-> the clocks. Instead of referring to a node name, now I refer to a
-> compatible name which should be a better use of the device tree.
-> 
-> Rather than taking this series in your git tree, would it possible to
-> give your ack to the patches and let Jason Cooper take the patch set
-> in his git tree. We have other series for mvebu which depend on this
-> one (SMP, HWIOCC and SATA for now and more to come), and it will be
-> easier for us to have everything in the same place.
+> Some more clock lookups added for rng clocks and for the nomadik ske
+> keypad clocks.
 > 
 
-Hi Gregory,
+Taken into clk-next.
 
-After much delay:
-
-Acked-by: Mike Turquette <mturquette@linaro.org>
-
-Regards,
+Thanks,
 Mike
 
-> The purpose of this patch set is to add support for clock framework
-> for Armada 370 and Armada XP SoCs. All the support is done under the
-> directory drivers/clk/mvebu/ as the support for other mvebu SoCs was
-> in mind during the writing of the code.
+> Ulf Hansson (2):
+>   clk: ux500: Register rng clock lookups for u8500
+>   clk: ux500: Register nomadik keypad clock lookups for u8500
 > 
-> Two kinds of clocks are added:
-> 
-> - The CPU clocks are only for Armada XP (which is multi-core)
-> 
-> - The core clocks are clocks which have their rate fixed during
->   reset.
-> 
-> Many thanks to Thomas Petazzoni and Sebastian Hesselbarth for their
-> review and feedback. The device tree bindings were really improved
-> with the advices of Sebastian.
-> 
-> Changelog:
-> V3 -> V4
-> - Rebased on top of 3.7-rc3
-> - Replaced the whitespace by tab in the Documentation files
-> - Fixed the comment style according to the CodingStyle documentation
-> - Fixed incorrect indentation
-> - Removed redundant header in clk-cpu.c
-> - Replaced improper whitespace by tabs in armada-xp.dtsi
-> - In the device tree, the resources for the clocks do not rely anymore
->   on the node name mvebu-sar but now only depend on the compatible
->   name. (Issue reported by Sebastian Hesselbarth)
-> 
-> V2 -> V3:
-> - Rebased on top of v3.7-rc1
-> - Fixed a typo in device trees
-> - Fixed warning from checkpatch
-> 
-> V1 -> V2:
-> - Improved the spelling and the wording of the documentation and the
->   1st commit log
-> - Removed the "end_of_list" name which are unused here.
-> - Fix the cpu clock by using of_clk_src_onecell_get in the same way it
->   was used for the core clocks
-> 
-> Regards,
-> 
-> 
-> Gregory CLEMENT (3):
->   clk: mvebu: add armada-370-xp specific clocks
->   clk: armada-370-xp: add support for clock framework
->   clocksource: time-armada-370-xp converted to clk framework
-> 
->  .../devicetree/bindings/clock/mvebu-core-clock.txt |   40 +++
->  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 ++
->  arch/arm/boot/dts/armada-370-db.dts                |    4 -
->  arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
->  arch/arm/boot/dts/armada-370.dtsi                  |   12 +
->  arch/arm/boot/dts/armada-xp.dtsi                   |   48 +++
->  arch/arm/mach-mvebu/Kconfig                        |    5 +
->  arch/arm/mach-mvebu/armada-370-xp.c                |    8 +-
->  arch/arm/mach-mvebu/common.h                       |    1 +
->  drivers/clk/Makefile                               |    1 +
->  drivers/clk/mvebu/Makefile                         |    2 +
->  drivers/clk/mvebu/clk-core.c                       |  318 ++++++++++++++++++++
->  drivers/clk/mvebu/clk-core.h                       |   19 ++
->  drivers/clk/mvebu/clk-cpu.c                        |  154 ++++++++++
->  drivers/clk/mvebu/clk-cpu.h                        |   19 ++
->  drivers/clk/mvebu/clk.c                            |   36 +++
->  drivers/clocksource/time-armada-370-xp.c           |   11 +-
->  17 files changed, 690 insertions(+), 10 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
->  create mode 100644 drivers/clk/mvebu/Makefile
->  create mode 100644 drivers/clk/mvebu/clk-core.c
->  create mode 100644 drivers/clk/mvebu/clk-core.h
->  create mode 100644 drivers/clk/mvebu/clk-cpu.c
->  create mode 100644 drivers/clk/mvebu/clk-cpu.h
->  create mode 100644 drivers/clk/mvebu/clk.c
+>  drivers/clk/ux500/u8500_clk.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
 > -- 
-> 1.7.9.5
+> 1.7.10
