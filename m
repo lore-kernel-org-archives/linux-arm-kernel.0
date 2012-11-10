@@ -1,48 +1,43 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 10 Nov 2012 22:53:51 +0800
-Subject: [PATCH v4 1/9] ARM: mmp: select pinctrl driver
-In-Reply-To: <20121108013820.GX6801@atomide.com>
-References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
- <1352301582-12244-2-git-send-email-haojian.zhuang@gmail.com>
- <20121108013820.GX6801@atomide.com>
-Message-ID: <CAN1soZx12u_5yvVS5hHwOt7zeZox6DaFXk_d+14gLh+9gke+OA@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 10 Nov 2012 16:00:54 +0100
+Subject: [PATCH 1/2] ARM: S3C64XX: Remove duplicated camera clock
+In-Reply-To: <509e602f.a766980a.0f91.14f4@mx.google.com>
+References: <509e602f.a766980a.0f91.14f4@mx.google.com>
+Message-ID: <2289245.SN9NHa7Y7x@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2012 at 9:38 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
->> Pinctrl driver is necessary for MMP DT & MMP2 DT platforms.
->>
->> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>  arch/arm/mach-mmp/Kconfig |    4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
->> index 178d4da..ebdda83 100644
->> --- a/arch/arm/mach-mmp/Kconfig
->> +++ b/arch/arm/mach-mmp/Kconfig
->> @@ -89,6 +89,8 @@ config MACH_MMP_DT
->>       select CPU_PXA168
->>       select CPU_PXA910
->>       select USE_OF
->> +     select PINCTRL
->> +     select PINCTRL_SINGLE
->>       help
->>         Include support for Marvell MMP2 based platforms using
->>         the device tree. Needn't select any other machine while
->> @@ -99,6 +101,8 @@ config MACH_MMP2_DT
->>       depends on !CPU_MOHAWK
->>       select CPU_MMP2
->>       select USE_OF
->> +     select PINCTRL
->> +     select PINCTRL_SINGLE
->>       help
->>         Include support for Marvell MMP2 based platforms using
->>         the device tree.
->
-> I don't think you want to select PINCTRL_SINGLE here, you may want
-> to have it built as a module too in some cases.
->
-For the multi-platform image? OK, I can remove PINCTRL_SINGLE at here.
+Hi Andrey,
+
+On Saturday 10 of November 2012 18:07:56 dron0gus at gmail.com wrote:
+> From: Andrey Gusakov <dron_gus@mail.ru>
+> 
+> Camera clock defined two times. One in init_clocks_off array with
+> "cam" name, second in clksrcs array with "camera" name. Leave
+> second definition because clock have divider.
+> 
+> Signed-off-by: Andrey Gusakov <dron0gus@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/clock.c |    4 ----
+>  1 files changed, 0 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/clock.c
+> b/arch/arm/mach-s3c64xx/clock.c index cacbe45..b2d08fa 100644
+> --- a/arch/arm/mach-s3c64xx/clock.c
+> +++ b/arch/arm/mach-s3c64xx/clock.c
+> @@ -319,10 +319,6 @@ static struct clk init_clocks_off[] = {
+>  		.enable		= s3c64xx_sclk_ctrl,
+>  		.ctrlbit	= S3C_CLKCON_SCLK_MFC,
+>  	}, {
+> -		.name		= "cam",
+> -		.enable		= s3c64xx_sclk_ctrl,
+> -		.ctrlbit	= S3C_CLKCON_SCLK_CAM,
+> -	}, {
+>  		.name		= "sclk_jpeg",
+>  		.enable		= s3c64xx_sclk_ctrl,
+>  		.ctrlbit	= S3C_CLKCON_SCLK_JPEG,
+
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Best regards,
+Tomasz Figa
