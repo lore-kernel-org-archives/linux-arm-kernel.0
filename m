@@ -1,38 +1,110 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 09 Nov 2012 17:24:49 -0800
-Subject: [PATCH 0/2] clk: ux500: Make mtu driver use apb_pclock
-In-Reply-To: <CACRpkdb3dcDhVD5qkOrRkLJ-RXdmqJ2tAkosoeEB_DwSDSShKw@mail.gmail.com>
-References: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
- <CACRpkdb3dcDhVD5qkOrRkLJ-RXdmqJ2tAkosoeEB_DwSDSShKw@mail.gmail.com>
-Message-ID: <20121110012449.16569.82732@nucleus>
+Date: Fri, 09 Nov 2012 17:42:40 -0800
+Subject: [PATCH V4 0/3] Add clock framework for armada 370/XP
+In-Reply-To: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1351621413-3637-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20121110014240.16569.66429@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2012-10-24 10:25:26)
-> On Wed, Oct 24, 2012 at 2:13 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+Quoting Gregory CLEMENT (2012-10-30 11:23:30)
+> Hello Mike,
 > 
-> > From: Ulf Hansson <ulf.hansson@linaro.org>
-> >
-> > The apb clock was before the "common" clock driver for ux500 was merged,
-> > handled internally by the clock driver. Now this clock needs to be managed
-> > from the mtu driver as a separate clock.
-> >
-> > This patches is based in 3.7 rc2.
-> >
-> > It is important the "ARM nomadik patch" is merged together with the
-> > clock patch to not break boot. Therefore I suggest this series to go
-> > through Mike Turquettes clock tree.
+> I hope this 4th version will meet your expectations. Beside the
+> corrections you have asked I also changed the way I get resources for
+> the clocks. Instead of referring to a node name, now I refer to a
+> compatible name which should be a better use of the device tree.
 > 
-> OK go ahead:
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Rather than taking this series in your git tree, would it possible to
+> give your ack to the patches and let Jason Cooper take the patch set
+> in his git tree. We have other series for mvebu which depend on this
+> one (SMP, HWIOCC and SATA for now and more to come), and it will be
+> easier for us to have everything in the same place.
 > 
 
-I've taken these into clk-next.  While the patches are trivial I'd still
-prefer a changelog in the future.  For instance, it would be nice to
-explain why removing the block comment is OK in the first patch.
+Hi Gregory,
 
-Thanks,
+After much delay:
+
+Acked-by: Mike Turquette <mturquette@linaro.org>
+
+Regards,
 Mike
 
-> Yours,
-> Linus Walleij
+> The purpose of this patch set is to add support for clock framework
+> for Armada 370 and Armada XP SoCs. All the support is done under the
+> directory drivers/clk/mvebu/ as the support for other mvebu SoCs was
+> in mind during the writing of the code.
+> 
+> Two kinds of clocks are added:
+> 
+> - The CPU clocks are only for Armada XP (which is multi-core)
+> 
+> - The core clocks are clocks which have their rate fixed during
+>   reset.
+> 
+> Many thanks to Thomas Petazzoni and Sebastian Hesselbarth for their
+> review and feedback. The device tree bindings were really improved
+> with the advices of Sebastian.
+> 
+> Changelog:
+> V3 -> V4
+> - Rebased on top of 3.7-rc3
+> - Replaced the whitespace by tab in the Documentation files
+> - Fixed the comment style according to the CodingStyle documentation
+> - Fixed incorrect indentation
+> - Removed redundant header in clk-cpu.c
+> - Replaced improper whitespace by tabs in armada-xp.dtsi
+> - In the device tree, the resources for the clocks do not rely anymore
+>   on the node name mvebu-sar but now only depend on the compatible
+>   name. (Issue reported by Sebastian Hesselbarth)
+> 
+> V2 -> V3:
+> - Rebased on top of v3.7-rc1
+> - Fixed a typo in device trees
+> - Fixed warning from checkpatch
+> 
+> V1 -> V2:
+> - Improved the spelling and the wording of the documentation and the
+>   1st commit log
+> - Removed the "end_of_list" name which are unused here.
+> - Fix the cpu clock by using of_clk_src_onecell_get in the same way it
+>   was used for the core clocks
+> 
+> Regards,
+> 
+> 
+> Gregory CLEMENT (3):
+>   clk: mvebu: add armada-370-xp specific clocks
+>   clk: armada-370-xp: add support for clock framework
+>   clocksource: time-armada-370-xp converted to clk framework
+> 
+>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   40 +++
+>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   21 ++
+>  arch/arm/boot/dts/armada-370-db.dts                |    4 -
+>  arch/arm/boot/dts/armada-370-xp.dtsi               |    1 +
+>  arch/arm/boot/dts/armada-370.dtsi                  |   12 +
+>  arch/arm/boot/dts/armada-xp.dtsi                   |   48 +++
+>  arch/arm/mach-mvebu/Kconfig                        |    5 +
+>  arch/arm/mach-mvebu/armada-370-xp.c                |    8 +-
+>  arch/arm/mach-mvebu/common.h                       |    1 +
+>  drivers/clk/Makefile                               |    1 +
+>  drivers/clk/mvebu/Makefile                         |    2 +
+>  drivers/clk/mvebu/clk-core.c                       |  318 ++++++++++++++++++++
+>  drivers/clk/mvebu/clk-core.h                       |   19 ++
+>  drivers/clk/mvebu/clk-cpu.c                        |  154 ++++++++++
+>  drivers/clk/mvebu/clk-cpu.h                        |   19 ++
+>  drivers/clk/mvebu/clk.c                            |   36 +++
+>  drivers/clocksource/time-armada-370-xp.c           |   11 +-
+>  17 files changed, 690 insertions(+), 10 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-core-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
+>  create mode 100644 drivers/clk/mvebu/Makefile
+>  create mode 100644 drivers/clk/mvebu/clk-core.c
+>  create mode 100644 drivers/clk/mvebu/clk-core.h
+>  create mode 100644 drivers/clk/mvebu/clk-cpu.c
+>  create mode 100644 drivers/clk/mvebu/clk-cpu.h
+>  create mode 100644 drivers/clk/mvebu/clk.c
+> 
+> -- 
+> 1.7.9.5
