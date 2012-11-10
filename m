@@ -1,89 +1,234 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 10 Nov 2012 14:58:39 +0400
-Subject: [PATCH v2 00/17] ARM: Patchset for CLPS711X
-Message-ID: <1352545136-29089-1-git-send-email-shc_work@mail.ru>
+Date: Sat, 10 Nov 2012 14:58:40 +0400
+Subject: [PATCH v2 01/17] ARM: clps711x: Load serial driver from boards
+In-Reply-To: <1352545136-29089-1-git-send-email-shc_work@mail.ru>
+References: <1352545136-29089-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1352545136-29089-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is a next small patchset for a CLPS711X-target.
-The main direction of this patchset - approaching the platform to the
-possibility of using configurations with multiple platforms in a single
-kernel. Added support of the majority of the necessary kernel symbol.
-Also part of the driver code used only for the platform was moved to the
-board code and converted to the use of standard drivers.
+Currently serial driver for CLPS711X is autoloaded if it compiled in kernel.
+Since we may have multiple platforms into single kernel we should avoid
+this. This patch removes this trick and adds registration of serial driver
+into board support code.
 
-Alexander Shiyan (17):
-  ARM: clps711x: Load serial driver from boards
-  ARM: clps711x: Using platform_driver for ethernet device
-  ARM: clps711x: p720t: Using "leds-gpio" driver for LED control
-  ARM: clps711x: Transform clps711x-framebuffer to platform driver and
-    use it
-  ARM: clps711x: p720t: Unneeded inclusion of head-sa1100.S removed
-  ARM: clps711x: Always select AUTO_ZRELADDR for a platform
-  ARM: clps711x: cdb89712: Special driver for handling memory is
-    removed
-  ARM: clps711x: Implement usage "SPARSE_IRQ" kernel option for a
-    platform
-  ARM: clps711x: Implement usage "MULTI_IRQ_HANDLER" kernel option for
-    a platform
-  ARM: clps711x: Add FIQ interrupt handling
-  ARM: clps711x: Unused empty "ACK" calls for IRQ-chips removed
-  ARM: clps711x: autcpu12: Special driver for handling NAND memory is
-    removed
-  ARM: clps711x: Moving power management of framebuffer driver to the
-    board
-  ARM: clps711x: p720t: Special driver for handling NAND memory is
-    removed
-  ARM: clps711x: Rename board files to match functionality
-  ARM: clps711x: Update defconfig due latest changes and new kernel
-    symbols
-  MAINTAINERS: Add ARM CLPS711X entry
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/mach-clps711x/autcpu12.c |    4 ++--
+ arch/arm/mach-clps711x/cdb89712.c |    7 +++++++
+ arch/arm/mach-clps711x/clep7312.c |    7 ++++++-
+ arch/arm/mach-clps711x/edb7211.c  |    9 ++++++++-
+ arch/arm/mach-clps711x/fortunet.c |    7 +++++++
+ arch/arm/mach-clps711x/p720t.c    |    9 ++++++++-
+ drivers/tty/serial/clps711x.c     |   16 ----------------
+ 7 files changed, 38 insertions(+), 21 deletions(-)
 
- MAINTAINERS                                        |    6 +
- arch/arm/Kconfig                                   |    3 +
- arch/arm/boot/compressed/Makefile                  |    5 -
- arch/arm/configs/clps711x_defconfig                |   30 ++-
- arch/arm/mach-clps711x/Kconfig                     |    2 -
- arch/arm/mach-clps711x/Makefile                    |   12 +-
- arch/arm/mach-clps711x/Makefile.boot               |    1 -
- arch/arm/mach-clps711x/autcpu12.c                  |   83 ------
- arch/arm/mach-clps711x/board-autcpu12.c            |  179 +++++++++++++
- arch/arm/mach-clps711x/board-cdb89712.c            |  148 +++++++++++
- .../mach-clps711x/{clep7312.c => board-clep7312.c} |    9 +-
- .../mach-clps711x/{edb7211.c => board-edb7211.c}   |   66 ++++-
- .../mach-clps711x/{fortunet.c => board-fortunet.c} |    9 +
- arch/arm/mach-clps711x/{p720t.c => board-p720t.c}  |  147 +++++++----
- arch/arm/mach-clps711x/cdb89712.c                  |   63 -----
- arch/arm/mach-clps711x/common.c                    |   86 ++++++-
- arch/arm/mach-clps711x/common.h                    |    7 +-
- arch/arm/mach-clps711x/include/mach/autcpu12.h     |   13 -
- arch/arm/mach-clps711x/include/mach/clps711x.h     |   24 ++
- arch/arm/mach-clps711x/include/mach/entry-macro.S  |   51 ----
- arch/arm/mach-clps711x/include/mach/hardware.h     |   15 +-
- arch/arm/mach-clps711x/include/mach/irqs.h         |   46 ----
- drivers/mtd/maps/Kconfig                           |    7 -
- drivers/mtd/maps/Makefile                          |    1 -
- drivers/mtd/maps/cdb89712.c                        |  278 --------------------
- drivers/mtd/nand/Kconfig                           |   13 -
- drivers/mtd/nand/Makefile                          |    2 -
- drivers/mtd/nand/autcpu12.c                        |  237 -----------------
- drivers/mtd/nand/spia.c                            |  176 -------------
- drivers/tty/serial/clps711x.c                      |   16 --
- drivers/video/clps711xfb.c                         |   65 ++---
- 31 files changed, 666 insertions(+), 1134 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/autcpu12.c
- create mode 100644 arch/arm/mach-clps711x/board-autcpu12.c
- create mode 100644 arch/arm/mach-clps711x/board-cdb89712.c
- rename arch/arm/mach-clps711x/{clep7312.c => board-clep7312.c} (85%)
- rename arch/arm/mach-clps711x/{edb7211.c => board-edb7211.c} (57%)
- rename arch/arm/mach-clps711x/{fortunet.c => board-fortunet.c} (89%)
- rename arch/arm/mach-clps711x/{p720t.c => board-p720t.c} (53%)
- delete mode 100644 arch/arm/mach-clps711x/cdb89712.c
- delete mode 100644 arch/arm/mach-clps711x/include/mach/entry-macro.S
- delete mode 100644 arch/arm/mach-clps711x/include/mach/irqs.h
- delete mode 100644 drivers/mtd/maps/cdb89712.c
- delete mode 100644 drivers/mtd/nand/autcpu12.c
- delete mode 100644 drivers/mtd/nand/spia.c
-
+diff --git a/arch/arm/mach-clps711x/autcpu12.c b/arch/arm/mach-clps711x/autcpu12.c
+index 214547b..15c658e 100644
+--- a/arch/arm/mach-clps711x/autcpu12.c
++++ b/arch/arm/mach-clps711x/autcpu12.c
+@@ -68,16 +68,16 @@ static struct platform_device autcpu12_nvram_pdev __initdata = {
+ 
+ static void __init autcpu12_init(void)
+ {
++	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
+ 	platform_device_register(&autcpu12_nvram_pdev);
+ }
+ 
+ MACHINE_START(AUTCPU12, "autronix autcpu12")
+ 	/* Maintainer: Thomas Gleixner */
+ 	.atag_offset	= 0x20000,
+-	.init_machine	= autcpu12_init,
+ 	.map_io		= autcpu12_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= autcpu12_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+-
+diff --git a/arch/arm/mach-clps711x/cdb89712.c b/arch/arm/mach-clps711x/cdb89712.c
+index d90d25c..af10b52 100644
+--- a/arch/arm/mach-clps711x/cdb89712.c
++++ b/arch/arm/mach-clps711x/cdb89712.c
+@@ -23,6 +23,7 @@
+ #include <linux/string.h>
+ #include <linux/mm.h>
+ #include <linux/io.h>
++#include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/pgtable.h>
+@@ -53,11 +54,17 @@ static void __init cdb89712_map_io(void)
+ 	iotable_init(cdb89712_io_desc, ARRAY_SIZE(cdb89712_io_desc));
+ }
+ 
++static void __init cdb89712_init(void)
++{
++	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++}
++
+ MACHINE_START(CDB89712, "Cirrus-CDB89712")
+ 	/* Maintainer: Ray Lehtiniemi */
+ 	.atag_offset	= 0x100,
+ 	.map_io		= cdb89712_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= cdb89712_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/clep7312.c b/arch/arm/mach-clps711x/clep7312.c
+index dbc7842..39718f8 100644
+--- a/arch/arm/mach-clps711x/clep7312.c
++++ b/arch/arm/mach-clps711x/clep7312.c
+@@ -18,6 +18,7 @@
+ #include <linux/init.h>
+ #include <linux/types.h>
+ #include <linux/string.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/mach-types.h>
+@@ -33,6 +34,10 @@ fixup_clep7312(struct tag *tags, char **cmdline, struct meminfo *mi)
+ 	mi->bank[0].size = 0x01000000;
+ }
+ 
++static void __init clep7312_init(void)
++{
++	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++}
+ 
+ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	/* Maintainer: Nobody */
+@@ -41,6 +46,6 @@ MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= clep7312_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+-
+diff --git a/arch/arm/mach-clps711x/edb7211.c b/arch/arm/mach-clps711x/edb7211.c
+index 88f4690..87073d8 100644
+--- a/arch/arm/mach-clps711x/edb7211.c
++++ b/arch/arm/mach-clps711x/edb7211.c
+@@ -10,6 +10,7 @@
+ #include <linux/init.h>
+ #include <linux/memblock.h>
+ #include <linux/types.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/mach/map.h>
+@@ -76,13 +77,19 @@ fixup_edb7211(struct tag *tags, char **cmdline, struct meminfo *mi)
+ 	mi->nr_banks = 2;
+ }
+ 
++static void __init edb7211_init(void)
++{
++	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++}
++
+ MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	/* Maintainer: Jon McClintock */
+ 	.atag_offset	= VIDEORAM_SIZE + 0x100,
+ 	.fixup		= fixup_edb7211,
+-	.map_io		= edb7211_map_io,
+ 	.reserve	= edb7211_reserve,
++	.map_io		= edb7211_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= edb7211_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/fortunet.c b/arch/arm/mach-clps711x/fortunet.c
+index 3a3f0b7..16db051 100644
+--- a/arch/arm/mach-clps711x/fortunet.c
++++ b/arch/arm/mach-clps711x/fortunet.c
+@@ -22,6 +22,7 @@
+ #include <linux/types.h>
+ #include <linux/init.h>
+ #include <linux/initrd.h>
++#include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/setup.h>
+@@ -72,11 +73,17 @@ fortunet_fixup(struct tag *tags, char **cmdline, struct meminfo *mi)
+ 	*mi = memmap;
+ }
+ 
++static void __init fortunet_init(void)
++{
++	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++}
++
+ MACHINE_START(FORTUNET, "ARM-FortuNet")
+ 	/* Maintainer: FortuNet Inc. */
+ 	.fixup		= fortunet_fixup,
+ 	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= fortunet_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/arch/arm/mach-clps711x/p720t.c b/arch/arm/mach-clps711x/p720t.c
+index dd89950..2e3995a 100644
+--- a/arch/arm/mach-clps711x/p720t.c
++++ b/arch/arm/mach-clps711x/p720t.c
+@@ -25,6 +25,7 @@
+ #include <linux/io.h>
+ #include <linux/slab.h>
+ #include <linux/leds.h>
++#include <linux/platform_device.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/pgtable.h>
+@@ -161,13 +162,19 @@ static int __init p720t_leds_init(void)
+ fs_initcall(p720t_leds_init);
+ #endif
+ 
++static void __init p720t_init(void)
++{
++	platform_device_register_simple("uart-clps711x", 0, NULL, 0);
++}
++
+ MACHINE_START(P720T, "ARM-Prospector720T")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
+ 	.fixup		= fixup_p720t,
+-	.init_early	= p720t_init_early,
+ 	.map_io		= p720t_map_io,
++	.init_early	= p720t_init_early,
+ 	.init_irq	= clps711x_init_irq,
+ 	.timer		= &clps711x_timer,
++	.init_machine	= p720t_init,
+ 	.restart	= clps711x_restart,
+ MACHINE_END
+diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
+index a0a6db5..06f0e91 100644
+--- a/drivers/tty/serial/clps711x.c
++++ b/drivers/tty/serial/clps711x.c
+@@ -516,22 +516,6 @@ static struct platform_driver clps711x_uart_driver = {
+ };
+ module_platform_driver(clps711x_uart_driver);
+ 
+-static struct platform_device clps711x_uart_device = {
+-	.name	= UART_CLPS711X_NAME,
+-};
+-
+-static int __init uart_clps711x_init(void)
+-{
+-	return platform_device_register(&clps711x_uart_device);
+-}
+-module_init(uart_clps711x_init);
+-
+-static void __exit uart_clps711x_exit(void)
+-{
+-	platform_device_unregister(&clps711x_uart_device);
+-}
+-module_exit(uart_clps711x_exit);
+-
+ MODULE_AUTHOR("Deep Blue Solutions Ltd");
+ MODULE_DESCRIPTION("CLPS711X serial driver");
+ MODULE_LICENSE("GPL");
 -- 
 1.7.8.6
