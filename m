@@ -1,88 +1,89 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 10 Nov 2012 11:54:27 +0100
-Subject: [PATCH 02/10] arm: at91: move platfarm_data to
- include/linux/platform_data/atmel.h
-In-Reply-To: <1352287374-25176-2-git-send-email-plagnioj@jcrosoft.com>
-References: <20121107111235.GH20063@game.jcrosoft.org>
- <1352287374-25176-1-git-send-email-plagnioj@jcrosoft.com>
- <1352287374-25176-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <CAGhQ9VxgbCGzOPVtQq-LYsEPuyyGjRDfB3jHPtvbHr1xLgntXA@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 10 Nov 2012 14:58:39 +0400
+Subject: [PATCH v2 00/17] ARM: Patchset for CLPS711X
+Message-ID: <1352545136-29089-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
+Here is a next small patchset for a CLPS711X-target.
+The main direction of this patchset - approaching the platform to the
+possibility of using configurations with multiple platforms in a single
+kernel. Added support of the majority of the necessary kernel symbol.
+Also part of the driver code used only for the platform was moved to the
+board code and converted to the use of standard drivers.
 
-On 7 November 2012 12:22, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: linux-ide at vger.kernel.org
-> Cc: linux-input at vger.kernel.org
-> Cc: linux-mmc at vger.kernel.org
-> Cc: linux-can at vger.kernel.org
-> Cc: netdev at vger.kernel.org
-> Cc: linux-pcmcia at lists.infradead.org
-> Cc: rtc-linux at googlegroups.com
-> Cc: spi-devel-general at lists.sourceforge.net
-> Cc: linux-serial at vger.kernel.org
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-fbdev at vger.kernel.org
-> ---
-> HI all,
->
->         If it's ok with everyone this will go via at91
->         with the patch serie than clean up the include/mach
->
->         For preparation to switch to arm multiarch kernel
->
-> Best Regards,
-> J.
->  arch/arm/mach-at91/include/mach/board.h     |   55 ----------------------
->  arch/avr32/mach-at32ap/include/mach/board.h |    7 ---
->  drivers/ata/pata_at91.c                     |    2 +-
->  drivers/input/touchscreen/atmel_tsadcc.c    |    2 +-
->  drivers/mmc/host/atmel-mci.c                |    2 +-
->  drivers/net/can/at91_can.c                  |    3 +-
->  drivers/net/ethernet/cadence/at91_ether.c   |    2 +-
->  drivers/pcmcia/at91_cf.c                    |    2 +-
->  drivers/rtc/rtc-at91sam9.c                  |    2 +-
->  drivers/spi/spi-atmel.c                     |    2 +-
->  drivers/tty/serial/atmel_serial.c           |    2 +-
->  drivers/usb/gadget/at91_udc.c               |    2 +-
->  drivers/usb/gadget/atmel_usba_udc.c         |    2 +-
->  drivers/usb/host/ohci-at91.c                |    2 +-
->  drivers/video/atmel_lcdfb.c                 |    2 +-
->  include/linux/platform_data/atmel.h         |   67 +++++++++++++++++++++++++++
->  16 files changed, 80 insertions(+), 76 deletions(-)
+Alexander Shiyan (17):
+  ARM: clps711x: Load serial driver from boards
+  ARM: clps711x: Using platform_driver for ethernet device
+  ARM: clps711x: p720t: Using "leds-gpio" driver for LED control
+  ARM: clps711x: Transform clps711x-framebuffer to platform driver and
+    use it
+  ARM: clps711x: p720t: Unneeded inclusion of head-sa1100.S removed
+  ARM: clps711x: Always select AUTO_ZRELADDR for a platform
+  ARM: clps711x: cdb89712: Special driver for handling memory is
+    removed
+  ARM: clps711x: Implement usage "SPARSE_IRQ" kernel option for a
+    platform
+  ARM: clps711x: Implement usage "MULTI_IRQ_HANDLER" kernel option for
+    a platform
+  ARM: clps711x: Add FIQ interrupt handling
+  ARM: clps711x: Unused empty "ACK" calls for IRQ-chips removed
+  ARM: clps711x: autcpu12: Special driver for handling NAND memory is
+    removed
+  ARM: clps711x: Moving power management of framebuffer driver to the
+    board
+  ARM: clps711x: p720t: Special driver for handling NAND memory is
+    removed
+  ARM: clps711x: Rename board files to match functionality
+  ARM: clps711x: Update defconfig due latest changes and new kernel
+    symbols
+  MAINTAINERS: Add ARM CLPS711X entry
 
-<snip>
+ MAINTAINERS                                        |    6 +
+ arch/arm/Kconfig                                   |    3 +
+ arch/arm/boot/compressed/Makefile                  |    5 -
+ arch/arm/configs/clps711x_defconfig                |   30 ++-
+ arch/arm/mach-clps711x/Kconfig                     |    2 -
+ arch/arm/mach-clps711x/Makefile                    |   12 +-
+ arch/arm/mach-clps711x/Makefile.boot               |    1 -
+ arch/arm/mach-clps711x/autcpu12.c                  |   83 ------
+ arch/arm/mach-clps711x/board-autcpu12.c            |  179 +++++++++++++
+ arch/arm/mach-clps711x/board-cdb89712.c            |  148 +++++++++++
+ .../mach-clps711x/{clep7312.c => board-clep7312.c} |    9 +-
+ .../mach-clps711x/{edb7211.c => board-edb7211.c}   |   66 ++++-
+ .../mach-clps711x/{fortunet.c => board-fortunet.c} |    9 +
+ arch/arm/mach-clps711x/{p720t.c => board-p720t.c}  |  147 +++++++----
+ arch/arm/mach-clps711x/cdb89712.c                  |   63 -----
+ arch/arm/mach-clps711x/common.c                    |   86 ++++++-
+ arch/arm/mach-clps711x/common.h                    |    7 +-
+ arch/arm/mach-clps711x/include/mach/autcpu12.h     |   13 -
+ arch/arm/mach-clps711x/include/mach/clps711x.h     |   24 ++
+ arch/arm/mach-clps711x/include/mach/entry-macro.S  |   51 ----
+ arch/arm/mach-clps711x/include/mach/hardware.h     |   15 +-
+ arch/arm/mach-clps711x/include/mach/irqs.h         |   46 ----
+ drivers/mtd/maps/Kconfig                           |    7 -
+ drivers/mtd/maps/Makefile                          |    1 -
+ drivers/mtd/maps/cdb89712.c                        |  278 --------------------
+ drivers/mtd/nand/Kconfig                           |   13 -
+ drivers/mtd/nand/Makefile                          |    2 -
+ drivers/mtd/nand/autcpu12.c                        |  237 -----------------
+ drivers/mtd/nand/spia.c                            |  176 -------------
+ drivers/tty/serial/clps711x.c                      |   16 --
+ drivers/video/clps711xfb.c                         |   65 ++---
+ 31 files changed, 666 insertions(+), 1134 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/autcpu12.c
+ create mode 100644 arch/arm/mach-clps711x/board-autcpu12.c
+ create mode 100644 arch/arm/mach-clps711x/board-cdb89712.c
+ rename arch/arm/mach-clps711x/{clep7312.c => board-clep7312.c} (85%)
+ rename arch/arm/mach-clps711x/{edb7211.c => board-edb7211.c} (57%)
+ rename arch/arm/mach-clps711x/{fortunet.c => board-fortunet.c} (89%)
+ rename arch/arm/mach-clps711x/{p720t.c => board-p720t.c} (53%)
+ delete mode 100644 arch/arm/mach-clps711x/cdb89712.c
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/irqs.h
+ delete mode 100644 drivers/mtd/maps/cdb89712.c
+ delete mode 100644 drivers/mtd/nand/autcpu12.c
+ delete mode 100644 drivers/mtd/nand/spia.c
 
-> diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
-> index 4e980a7..35fc6edb 100644
-> --- a/drivers/net/ethernet/cadence/at91_ether.c
-> +++ b/drivers/net/ethernet/cadence/at91_ether.c
-> @@ -31,6 +31,7 @@
->  #include <linux/clk.h>
->  #include <linux/gfp.h>
->  #include <linux/phy.h>
-> +#include <linux/platform_data/atmel.h>
->
->  #include <asm/io.h>
->  #include <asm/uaccess.h>
-> @@ -38,7 +39,6 @@
->
->  #include <mach/at91rm9200_emac.h>
->  #include <asm/gpio.h>
-> -#include <mach/board.h>
->
->  #include "at91_ether.h"
-
-The at91_ether driver in net-next does not need to be change since it
-all mach includes has already been removed by other patches and it
-includes linux/platform_data/macb.h directly.
-
-What tree was these patches based on?
-The at91_ether driver changes has been in linux-next for a long while now.
-
-regards
-Joachim Eastwood
+-- 
+1.7.8.6
