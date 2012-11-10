@@ -1,59 +1,69 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Sat, 10 Nov 2012 14:39:10 +1100
-Subject: [PATCH 04/11] ARM: set arch_gettimeoffset directly
-In-Reply-To: <509D708E.6080703@wwwdotorg.org>
-References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
- <1352408516-21988-6-git-send-email-swarren@wwwdotorg.org>
- <509C3AE7.7030703@gmail.com> <509D708E.6080703@wwwdotorg.org>
-Message-ID: <509DCC5E.7020804@gmail.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 10 Nov 2012 13:37:03 +0800
+Subject: [PATCH v4 4/9] ARM: dts: support pinctrl single in pxa910
+In-Reply-To: <20121109224821.GA6801@atomide.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-5-git-send-email-haojian.zhuang@gmail.com>
+ <20121109224821.GA6801@atomide.com>
+Message-ID: <CAN1soZwDn3VXLCk=-LEVZcZYmRgXEN3WHp74Dr0qRAd83F+tuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/12 08:07, Stephen Warren wrote:
+On Sat, Nov 10, 2012 at 6:48 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> To clarify my binding change comment for the generic pinconf
+> support, here's an example.
+>
+> We need to move pinctrl-single pinconf properties here for
+> each pin group:
+>
+> * Haojian Zhuang <haojian.zhuang@gmail.com> [121107 07:21]:
+>> +                             uart1_pins: pinmux_uart1_pins {
+>> +                                     pinctrl-single,pins = <
+>> +                                             0x198 0x6       /* GPIO47_UART1_RXD */
+>> +                                             0x19c 0x6       /* GPIO48_UART1_TXD */
+>> +                                     >;
+>> +                                     pinctrl-single,power-source = <0x2>;
+>> +                                     pinctrl-single,bias = <0x6>;
+>                                         pinctrl-single,power-source-mask = <0x1800>;
+>                                         pinctrl-single,bias-mask = <0xe000>;
+>                                         pinctrl-single,bias-disable = <0>;
+>                                         pinctrl-single,bias-pull-down = <0xa000>;
+>                                         pinctrl-single,bias-pull-up = <0xc000>;
+It's OK.
 
-> On 11/08/2012 04:06 PM, Ryan Mallon wrote:
->> On 09/11/12 08:01, Stephen Warren wrote:
->>> remove ARM's struct sys_timer .offset function pointer, and instead
->>> directly set the arch_gettimeoffset function pointer when the timer
->>> driver is initialized. This requires multiplying all function results
->>> by 1000, since the removed arm_gettimeoffset() did this. Also,
->>> s/unsigned long/u32/ just to make the function prototypes exactly
->>> match that of arch_gettimeoffset.
-> 
->>> +static u32 ep93xx_gettimeoffset(void)
->>> +{
->>> +	int offset;
->>> +
->>> +	offset = __raw_readl(EP93XX_TIMER4_VALUE_LOW) - last_jiffy_time;
->>> +
->>> +	/* Calculate (1000000 / 983040) * offset.  */
+>> +                             };
+>
+>
+>
+>> --- a/arch/arm/boot/dts/pxa910.dtsi
+>> +++ b/arch/arm/boot/dts/pxa910.dtsi
+>> @@ -54,6 +54,80 @@
+>>                       reg = <0xd4000000 0x00200000>;
+>>                       ranges;
 >>
->> This comment is now incorrect, it should say:
->>
->> 	/* Calculate (1000000000 / 983040) * offset */
->>
->> or perhaps to better explain what is being done:
->>
->> 	/*
->> 	 * Timer 4 is based on a 983.04 kHz reference clock,
->> 	 * so dividing by 983040 gives a milli-second value.
->> 	 * Refactor the calculation to avoid overflow.
->> 	 */
->>
->>> +	return (offset + (53 * offset / 3072)) * 1000;
-> 
-> Thanks. I expanded on that slightly and went for:
-> 
-> 	/*
-> 	 * Timer 4 is based on a 983.04 kHz reference clock,
-> 	 * so dividing by 983040 gives the fraction of a second,
-> 	 * so dividing by 0.983040 converts to uS.
-> 	 * Refactor the calculation to avoid overflow.
-> 	 * Finally, multiply by 1000 to give nS.
-> 	 */
-> 
-
-
-Looks good, thanks.
-
-~Ryan
+>> +                     pmx: pinmux at d401e000 {
+>> +                             compatible = "pinconf-single";
+>> +                             reg = <0xd401e000 0x0330>;
+>> +                             #address-cells = <1>;
+>> +                             #size-cells = <1>;
+>> +                             ranges;
+>> +
+>> +                             pinctrl-single,register-width = <32>;
+>> +                             pinctrl-single,function-mask = <7>;
+>
+> And then..
+>
+>> +                             pinctrl-single,power-source-mask = <0x1800>;
+>> +                             pinctrl-single,bias-mask = <0xe000>;
+>> +                             pinctrl-single,bias-disable = <0>;
+>> +                             pinctrl-single,bias-pull-down = <0xa000>;
+>> +                             pinctrl-single,bias-pull-up = <0xc000>;
+>> +                             pinctrl-single,input-schmitt-mask = <0x70>;
+>
+> ..remove these from here. Otherwise pinctrl-single,bits type controllers
+> won't be able to use the pinconf functions as we can have multiple pins
+> supported in a single register.
+>
+Will do
