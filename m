@@ -1,78 +1,65 @@
-From: stepanm@codeaurora.org (Stepan Moskovchenko)
-Date: Fri,  9 Nov 2012 16:48:52 -0800
-Subject: [RFC] dt/platform: Use cell-index for device naming if available
-Message-ID: <1352508532-19241-1-git-send-email-stepanm@codeaurora.org>
+From: mturquette@ti.com (Mike Turquette)
+Date: Fri, 9 Nov 2012 16:53:41 -0800
+Subject: [PATCH] CLK: vt8500: Fix SDMMC clk special cases
+In-Reply-To: <1350552413-24452-1-git-send-email-linux@prisktech.co.nz>
+References: <1350552413-24452-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20121110005341.17381.11996@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the cell-index property to construct names for platform
-devices, falling back on the existing scheme of using the
-device register address if cell-index is not specified.
+Quoting Tony Prisk (2012-10-18 02:26:53)
+> This patch adds some additional handling for the SDMMC special case
+> in round_rate and set_rate which results in invalid divisor messages
+> at boot time.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 
-The cell-index property is a more useful device identifier,
-especially in systems containing several numbered instances
-of a particular hardware block, since it more easily
-illustrates how devices relate to each other.
+Taken into clk-next.
 
-Additionally, userspace software may rely on the classic
-<name>.<id> naming scheme to access device attributes in
-sysfs, without having to know the physical addresses of
-that device on every platform the userspace software may
-support. Using cell-index for device naming allows the
-device addresses to be hidden from userspace and to be
-exposed by logical device number without having to rely on
-auxdata to perform name overrides. This allows userspace to
-make assumptions about which sysfs nodes map to which
-logical instance of a specific hardware block.
+Thanks,
+Mike
 
-Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
----
-I had also considered using something like the linux,label property to allow
-custom names for platform devices without resorting to auxdata, but the
-cell-index approach seems more in line with what cell-index was intended for
-and with what the pre-DT platform device naming scheme used to be. Please let
-me know if you think there is a better way to accomplish this.
-
-This is just being sent out as an RFC for now. If there are no objections, I
-will send this out as an official patch, along with (or combined with) a patch
-to fix up the device names in things like clock tables of any affected
-platforms.
-
- drivers/of/platform.c |   13 ++++++++++++-
- 1 files changed, 12 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 343ad29..472e374 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -77,8 +77,9 @@ void of_device_make_bus_id(struct device *dev)
- 	static atomic_t bus_no_reg_magic;
- 	struct device_node *node = dev->of_node;
- 	const u32 *reg;
-+	u32 cell_index;
- 	u64 addr;
--	int magic;
-+	int magic, ret;
-
- #ifdef CONFIG_PPC_DCR
- 	/*
-@@ -101,6 +102,16 @@ void of_device_make_bus_id(struct device *dev)
- #endif /* CONFIG_PPC_DCR */
-
- 	/*
-+	 * For devices with a specified cell-index, use the traditional
-+	 * naming scheme of <name>.<id>
-+	 */
-+	ret = of_property_read_u32(node, "cell-index", &cell_index);
-+	if (ret == 0) {
-+		dev_set_name(dev, "%s.%d", node->name, cell_index);
-+		return;
-+	}
-+
-+	/*
- 	 * For MMIO, get the physical address
- 	 */
- 	reg = of_get_property(node, "reg", NULL);
---
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> ---
+>  drivers/clk/clk-vt8500.c |   18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+> index a885600..fe25570 100644
+> --- a/drivers/clk/clk-vt8500.c
+> +++ b/drivers/clk/clk-vt8500.c
+> @@ -120,8 +120,17 @@ static unsigned long vt8500_dclk_recalc_rate(struct clk_hw *hw,
+>  static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+>                                 unsigned long *prate)
+>  {
+> +       struct clk_device *cdev = to_clk_device(hw);
+>         u32 divisor = *prate / rate;
+>  
+> +       /*
+> +        * If this is a request for SDMMC we have to adjust the divisor
+> +        * when >31 to use the fixed predivisor
+> +        */
+> +       if ((cdev->div_mask == 0x3F) && (divisor > 31)) {
+> +               divisor = 64 * ((divisor / 64) + 1);
+> +       }
+> +
+>         return *prate / divisor;
+>  }
+>  
+> @@ -135,6 +144,15 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+>         if (divisor == cdev->div_mask + 1)
+>                 divisor = 0;
+>  
+> +       /* SDMMC mask may need to be corrected before testing if its valid */
+> +       if ((cdev->div_mask == 0x3F) && (divisor > 31)) {
+> +               /*
+> +                * Bit 5 is a fixed /64 predivisor. If the requested divisor
+> +                * is >31 then correct for the fixed divisor being required.
+> +                */
+> +               divisor = 0x20 + (divisor / 64);
+> +       }
+> +
+>         if (divisor > cdev->div_mask) {
+>                 pr_err("%s: invalid divisor for clock\n", __func__);
+>                 return -EINVAL;
+> -- 
+> 1.7.9.5
