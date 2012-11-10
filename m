@@ -1,24 +1,29 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 10 Nov 2012 22:33:49 +0100
-Subject: [PATCH 2/2] ARM: S3C64XX: Staticly define parent clock of "camera"
- clock
-In-Reply-To: <509EC391.9090506@gmail.com>
-References: <1352556477-3700-1-git-send-email-y>
- <509e6047.a766980a.0f91.14f6@mx.google.com> <509EC391.9090506@gmail.com>
-Message-ID: <509EC83D.8010704@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Sat, 10 Nov 2012 14:44:41 -0800
+Subject: [PATCH v5 0/4] arch/arm: support seccomp
+Message-ID: <1352587485-18348-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2012 10:13 PM, Sylwester Nawrocki wrote:
-> On 11/10/2012 03:07 PM, dron0gus at gmail.com wrote:
->> From: Andrey Gusakov<dron_gus@mail.ru>
->>
->> The "camera" clock have only one parent. Define it staticly and
+This adds support for seccomp BPF to ARM. When built with the seccomp
+improvement patch waiting in linux-next ("seccomp: Make syscall skipping
+and nr changes more consistent"), this passes the seccomp regression
+test suite: https://github.com/redpig/seccomp
 
-Forgot to point out a small typo here: staticly -> statically.
+Thanks,
 
->> remove unused source clock list.
->>
->> Signed-off-by: Andrey Gusakov<dron0gus@gmail.com>
->
-> Reviewed-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+-Kees
+
+---
+v5:
+ - clean up seccomp failure path, as requested by Will Deacon.
+v4:
+ - fixed syscall_get_arch, thanks to Will Deacon.
+v3:
+ - updates suggested by Russell King:
+   - reduced scope of expansion
+   - leveraged TIF_SYSCALL_WORK bit mask
+   - fixed syscall==-1 short-circuit logic
+v2:
+ - expanded ptrace_syscall_trace() into both callers and do
+   secure_computing() hookup there, as requested by Al Viro.
