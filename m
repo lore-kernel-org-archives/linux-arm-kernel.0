@@ -1,39 +1,83 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sat, 10 Nov 2012 12:13:46 +0530
-Subject: [PATCH 7/8] CLK: SPEAr: Correct index scanning done for clock synths
+Date: Sat, 10 Nov 2012 12:13:47 +0530
+Subject: [PATCH 8/8] CLK: SPEAr: Remove unused dummy apb_pclk
 In-Reply-To: <cover.1352529508.git.viresh.kumar@linaro.org>
 References: <cover.1352529508.git.viresh.kumar@linaro.org>
-Message-ID: <bdd2dd8d887d260355e21e605cab39fc0c8bd9be.1352529508.git.viresh.kumar@linaro.org>
+Message-ID: <7861e11203ede6e5ae8bb2e37fbe5323526a9c26.1352529508.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Vipul Kumar Samar <vipulkumar.samar@st.com>
 
-The patch corrects the case when the rate table is being scanned for a
-given frequency, and the search frequency is beyond the maximum
-frequency indexed in the table.
+Dummy clocks were added for ARM platforms, so that clk_get() for interface clk
+doesn't fail for amba devices from amba_probe(). Because there is no amba device
+for SPEAr that doesn't have a valid clock with dev_id for SPEAr, we don't need
+these dummy clocks. Hence, remove them.
 
-By default, the system should be set at max frequency present in the
-rate table. This patch correctly returns the corresponding index value.
-
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/clk/spear/clk.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/clk/spear/spear1310_clock.c | 3 ---
+ drivers/clk/spear/spear1340_clock.c | 3 ---
+ drivers/clk/spear/spear3xx_clock.c  | 3 ---
+ drivers/clk/spear/spear6xx_clock.c  | 3 ---
+ 4 files changed, 12 deletions(-)
 
-diff --git a/drivers/clk/spear/clk.c b/drivers/clk/spear/clk.c
-index 7cd6378..628b6d5 100644
---- a/drivers/clk/spear/clk.c
-+++ b/drivers/clk/spear/clk.c
-@@ -32,5 +32,8 @@ long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
- 		}
- 	}
+diff --git a/drivers/clk/spear/spear1310_clock.c b/drivers/clk/spear/spear1310_clock.c
+index bc7f37e..147e25f 100644
+--- a/drivers/clk/spear/spear1310_clock.c
++++ b/drivers/clk/spear/spear1310_clock.c
+@@ -388,9 +388,6 @@ void __init spear1310_clk_init(void)
+ {
+ 	struct clk *clk, *clk1;
  
-+	if ((*index) == rtbl_cnt)
-+		(*index)--;
-+
- 	return rate;
- }
+-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+-	clk_register_clkdev(clk, "apb_pclk", NULL);
+-
+ 	clk = clk_register_fixed_rate(NULL, "osc_32k_clk", NULL, CLK_IS_ROOT,
+ 			32000);
+ 	clk_register_clkdev(clk, "osc_32k_clk", NULL);
+diff --git a/drivers/clk/spear/spear1340_clock.c b/drivers/clk/spear/spear1340_clock.c
+index d4de680..82abea3 100644
+--- a/drivers/clk/spear/spear1340_clock.c
++++ b/drivers/clk/spear/spear1340_clock.c
+@@ -445,9 +445,6 @@ void __init spear1340_clk_init(void)
+ {
+ 	struct clk *clk, *clk1;
+ 
+-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+-	clk_register_clkdev(clk, "apb_pclk", NULL);
+-
+ 	clk = clk_register_fixed_rate(NULL, "osc_32k_clk", NULL, CLK_IS_ROOT,
+ 			32000);
+ 	clk_register_clkdev(clk, "osc_32k_clk", NULL);
+diff --git a/drivers/clk/spear/spear3xx_clock.c b/drivers/clk/spear/spear3xx_clock.c
+index ea6543e..f39b023 100644
+--- a/drivers/clk/spear/spear3xx_clock.c
++++ b/drivers/clk/spear/spear3xx_clock.c
+@@ -360,9 +360,6 @@ void __init spear3xx_clk_init(void)
+ {
+ 	struct clk *clk, *clk1;
+ 
+-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+-	clk_register_clkdev(clk, "apb_pclk", NULL);
+-
+ 	clk = clk_register_fixed_rate(NULL, "osc_32k_clk", NULL, CLK_IS_ROOT,
+ 			32000);
+ 	clk_register_clkdev(clk, "osc_32k_clk", NULL);
+diff --git a/drivers/clk/spear/spear6xx_clock.c b/drivers/clk/spear/spear6xx_clock.c
+index 8a81770..e862a33 100644
+--- a/drivers/clk/spear/spear6xx_clock.c
++++ b/drivers/clk/spear/spear6xx_clock.c
+@@ -119,9 +119,6 @@ void __init spear6xx_clk_init(void)
+ {
+ 	struct clk *clk, *clk1;
+ 
+-	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT, 0);
+-	clk_register_clkdev(clk, "apb_pclk", NULL);
+-
+ 	clk = clk_register_fixed_rate(NULL, "osc_32k_clk", NULL, CLK_IS_ROOT,
+ 			32000);
+ 	clk_register_clkdev(clk, "osc_32k_clk", NULL);
 -- 
 1.7.12.rc2.18.g61b472e
