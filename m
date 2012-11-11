@@ -1,46 +1,50 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Nov 2012 19:40:43 +0100
-Subject: [PATCH v2] pinctrl/nomadik: make independent of prcmu driver
-In-Reply-To: <509D3A53.6080007@wwwdotorg.org>
-References: <1352456915-28738-1-git-send-email-linus.walleij@stericsson.com>
- <509D3A53.6080007@wwwdotorg.org>
-Message-ID: <CACRpkdZz8_SVK6ERaXXTs5d8OBBkYY8e7uwx_dmAXkwV2iPovQ@mail.gmail.com>
+Date: Sun, 11 Nov 2012 19:42:59 +0100
+Subject: [PATCH 0/5] clk: ux500: Add clock lookups for u8500
+In-Reply-To: <20121110010750.17381.1960@nucleus>
+References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121025075138.GD971@gmail.com>
+ <20121110010750.17381.1960@nucleus>
+Message-ID: <CACRpkda4iFYga=AKn_ZHGmQSnCW9-DxmYF25HnBA1iuZ5PD3AQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 9, 2012 at 6:16 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-
-> [Me]
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     if (res) {
->> +             npct->prcm_base = devm_ioremap(&pdev->dev, res->start,
->> +                                            resource_size(res));
->> +             if (!npct->prcm_base) {
->> +                     dev_err(&pdev->dev,
->> +                             "failed to ioremap PRCM registers\n");
->> +                     return -ENOMEM;
->> +             }
->> +     } else {
->> +             dev_info(&pdev->dev,
->> +                      "No PRCM base, assume no ALT-Cx control is available\n");
->> +     }
+On Sat, Nov 10, 2012 at 2:07 AM, Mike Turquette <mturquette@ti.com> wrote:
+> Quoting Lee Jones (2012-10-25 00:51:38)
+>> On Mon, 22 Oct 2012, Ulf Hansson wrote:
+>>
+>> > From: Ulf Hansson <ulf.hansson@linaro.org>
+>> >
+>> > Step by step, clock lookups for u8500 are being added in this set
+>> > of patches.
+>> >
+>> > These patches will require additional patches for sound/soc/ux500/
+>> > driver as well as drivers/i2c/busses/i2c-nomadik driver to prevent
+>> > the boot for ux500 from break. Those patches are being merged through
+>> > separate trees.
+>> >
+>> > Ulf Hansson (5):
+>> >   clk: ux500: Register i2c clock lookups for u8500
+>> >   clk: ux500: Register ssp clock lookups for u8500
+>> >   clk: ux500: Register msp clock lookups for u8500
+>> >   clk: ux500: Update rtc clock lookup for u8500
+>> >   clk: ux500: Register slimbus clock lookups for u8500
+>>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Can I also mention that these need to go into the -rcs at the
+>> earliest opportunity please, as it is preventing ~50% of the
+>> devices from functioning on all of the ST-Ericsson development
+>> boards.
+>>
+>> This is a massive blocker for us!
+>>
 >
-> Where is "assume no ALT-Cx control is available" implemented; I don't
-> see anything that uses npct->prcm_base to conditionally enable/block any
-> features. Is it just assumed that the DT won't contain any entries that
-> trigger writes to the PRCM registers? That seems fragile; it could cause
-> a "user"-triggered kernel crash.
+> I've taken these patches into clk-next.  Do you need them in as a late
+> fix in the 3.7 cycle or is your urgent need only for 3.8 development?
 
-Yeah. That's been in for a while, so this patch in itself is not making
-things more fragile, it came with the first Alt-Cx patch.
-So it is indeed based on good faith in the maps.
-
-I'm poking Jean-Nicolas to have a look at hardening
-this with some check, ping!
-
-> Aside from that, this seems fine. Much smaller than V1:-)
-
-Yeah, thanks for poking us...
+It is regressing the above drivers (i2c, ssp, etc) so they need to
+go into v3.7-rc:s...
 
 Yours,
 Linus Walleij
