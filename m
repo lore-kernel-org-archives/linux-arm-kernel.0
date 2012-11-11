@@ -1,195 +1,361 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 11 Nov 2012 10:09:35 +0530
-Subject: [PATCH 13/14] ARM: SPEAr3xx: DT: add shirq node for interrupt
- multiplexor
+Date: Sun, 11 Nov 2012 10:09:36 +0530
+Subject: [PATCH 14/14] ARM: SPEAr320: DT: Add SPEAr 320 HMI board support
 In-Reply-To: <cover.1352608333.git.viresh.kumar@linaro.org>
 References: <cover.1352608333.git.viresh.kumar@linaro.org>
-Message-ID: <3d37e6b451b075c1e1b4d139243c189ba800b03b.1352608333.git.viresh.kumar@linaro.org>
+Message-ID: <772a8c2f5edc2a342219c8cc0d6bec8daa70eb90.1352608333.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shiraz Hashim <shiraz.hashim@st.com>
 
-shirq layer has been adapted to DT, add corresponding nodes in all
-SPEAr3xx variants.
+This adds support for SPEAr320-HMI board.
 
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/spear300.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/spear310.dtsi | 18 ++++++++++++++++++
- arch/arm/boot/dts/spear320.dtsi | 24 ++++++++++++++++++++++--
- 3 files changed, 52 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/Makefile         |   3 +-
+ arch/arm/boot/dts/spear320-hmi.dts | 305 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-spear3xx/spear320.c  |   1 +
+ 3 files changed, 308 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/spear320-hmi.dts
 
-diff --git a/arch/arm/boot/dts/spear300.dtsi b/arch/arm/boot/dts/spear300.dtsi
-index fdac871..090adc6 100644
---- a/arch/arm/boot/dts/spear300.dtsi
-+++ b/arch/arm/boot/dts/spear300.dtsi
-@@ -52,6 +52,14 @@
- 			status = "disabled";
- 		};
- 
-+		shirq: interrupt-controller at 0x50000000 {
-+			compatible = "st,spear300-shirq";
-+			reg = <0x50000000 0x1000>;
-+			interrupts = <28>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b994045..c3295b2 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -84,7 +84,8 @@ dtb-$(CONFIG_ARCH_SPEAR13XX) += spear1310-evb.dtb \
+ 	spear1340-evb.dtb
+ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ 	spear310-evb.dtb \
+-	spear320-evb.dtb
++	spear320-evb.dtb \
++	spear320-hmi.dtb
+ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-medcom-wide.dtb \
+diff --git a/arch/arm/boot/dts/spear320-hmi.dts b/arch/arm/boot/dts/spear320-hmi.dts
+new file mode 100644
+index 0000000..3075d2d
+--- /dev/null
++++ b/arch/arm/boot/dts/spear320-hmi.dts
+@@ -0,0 +1,305 @@
++/*
++ * DTS file for SPEAr320 Evaluation Baord
++ *
++ * Copyright 2012 Shiraz Hashim <shiraz.hashim@st.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "spear320.dtsi"
++
++/ {
++	model = "ST SPEAr320 HMI Board";
++	compatible = "st,spear320-hmi", "st,spear320";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory {
++		reg = <0 0x40000000>;
++	};
++
++	ahb {
++		pinmux at b3000000 {
++			st,pinmux-mode = <4>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&state_default>;
++
++			state_default: pinmux {
++				i2c0 {
++					st,pins = "i2c0_grp";
++					st,function = "i2c0";
++				};
++				ssp0 {
++					st,pins = "ssp0_grp";
++					st,function = "ssp0";
++				};
++				uart0 {
++					st,pins = "uart0_grp";
++					st,function = "uart0";
++				};
++				clcd {
++					st,pins = "clcd_grp";
++					st,function = "clcd";
++				};
++				fsmc {
++					st,pins = "fsmc_8bit_grp";
++					st,function = "fsmc";
++				};
++				sdhci {
++					st,pins = "sdhci_cd_12_grp";
++					st,function = "sdhci";
++				};
++				i2s {
++					st,pins = "i2s_grp";
++					st,function = "i2s";
++				};
++				uart1 {
++					st,pins = "uart1_grp";
++					st,function = "uart1";
++				};
++				uart2 {
++					st,pins = "uart2_grp";
++					st,function = "uart2";
++				};
++				can0 {
++					st,pins = "can0_grp";
++					st,function = "can0";
++				};
++				can1 {
++					st,pins = "can1_grp";
++					st,function = "can1";
++				};
++				mii0_1 {
++					st,pins = "rmii0_1_grp";
++					st,function = "mii0_1";
++				};
++				pwm0_1 {
++					st,pins = "pwm0_1_pin_37_38_grp";
++					st,function = "pwm0_1";
++				};
++				pwm2 {
++					st,pins = "pwm2_pin_34_grp";
++					st,function = "pwm2";
++				};
++			};
 +		};
 +
- 		apb {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -64,12 +72,16 @@
- 				compatible = "arm,pl061", "arm,primecell";
- 				gpio-controller;
- 				reg = <0xa9000000 0x1000>;
-+				interrupts = <8>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 
- 			kbd at a0000000 {
- 				compatible = "st,spear300-kbd";
- 				reg = <0xa0000000 0x1000>;
-+				interrupts = <7>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/spear310.dtsi b/arch/arm/boot/dts/spear310.dtsi
-index 62fc4fb..0527e3a 100644
---- a/arch/arm/boot/dts/spear310.dtsi
-+++ b/arch/arm/boot/dts/spear310.dtsi
-@@ -39,6 +39,14 @@
- 			status = "disabled";
- 		};
- 
-+		shirq: interrupt-controller at 0xb4000000 {
-+			compatible = "st,spear310-shirq";
-+			reg = <0xb4000000 0x1000>;
-+			interrupts = <28 29 30 1>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
++		clcd at 90000000 {
++			status = "okay";
 +		};
 +
- 		apb {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-@@ -49,30 +57,40 @@
- 			serial at b2000000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xb2000000 0x1000>;
-+				interrupts = <8>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 
- 			serial at b2080000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xb2080000 0x1000>;
-+				interrupts = <9>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 
- 			serial at b2100000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xb2100000 0x1000>;
-+				interrupts = <10>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 
- 			serial at b2180000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xb2180000 0x1000>;
-+				interrupts = <11>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 
- 			serial at b2200000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xb2200000 0x1000>;
-+				interrupts = <12>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/spear320.dtsi b/arch/arm/boot/dts/spear320.dtsi
-index 582ded7..52b9c05 100644
---- a/arch/arm/boot/dts/spear320.dtsi
-+++ b/arch/arm/boot/dts/spear320.dtsi
-@@ -29,7 +29,8 @@
- 		clcd at 90000000 {
- 			compatible = "arm,pl110", "arm,primecell";
- 			reg = <0x90000000 0x1000>;
--			interrupts = <33>;
-+			interrupts = <8>;
-+			interrupt-parent = <&shirq>;
- 			status = "disabled";
- 		};
- 
-@@ -48,13 +49,24 @@
- 		sdhci at 70000000 {
- 			compatible = "st,sdhci-spear";
- 			reg = <0x70000000 0x100>;
--			interrupts = <29>;
-+			interrupts = <10>;
-+			interrupt-parent = <&shirq>;
- 			status = "disabled";
- 		};
- 
-+		shirq: interrupt-controller at 0xb3000000 {
-+			compatible = "st,spear320-shirq";
-+			reg = <0xb3000000 0x1000>;
-+			interrupts = <30 28 29 1>;
-+			#interrupt-cells = <1>;
-+			interrupt-controller;
++		dma at fc400000 {
++			status = "okay";
 +		};
 +
- 		spi1: spi at a5000000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0xa5000000 0x1000>;
-+			interrupts = <15>;
-+			interrupt-parent = <&shirq>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-@@ -63,6 +75,8 @@
- 		spi2: spi at a6000000 {
- 			compatible = "arm,pl022", "arm,primecell";
- 			reg = <0xa6000000 0x1000>;
-+			interrupts = <16>;
-+			interrupt-parent = <&shirq>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
-@@ -87,18 +101,24 @@
- 				#size-cells = <0>;
- 				compatible = "snps,designware-i2c";
- 				reg = <0xa7000000 0x1000>;
-+				interrupts = <21>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
++		ehci at e1800000 {
++			status = "okay";
++		};
++
++		fsmc: flash at 4c000000 {
++			status = "okay";
++
++			partition at 0 {
++				label = "xloader";
++				reg = <0x0 0x80000>;
++			};
++			partition at 80000 {
++				label = "u-boot";
++				reg = <0x80000 0x140000>;
++			};
++			partition at 1C0000 {
++				label = "environment";
++				reg = <0x1C0000 0x40000>;
++			};
++			partition at 200000 {
++				label = "dtb";
++				reg = <0x200000 0x40000>;
++			};
++			partition at 240000 {
++				label = "linux";
++				reg = <0x240000 0xC00000>;
++			};
++			partition at E40000 {
++				label = "rootfs";
++				reg = <0xE40000 0x0>;
++			};
++		};
++
++		gpio_keys {
++			compatible = "gpio-keys";
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			button at 1 {
++				label = "user button 1";
++				linux,code = <0x100>;
++				gpios = <&stmpegpio 3 0x4>;
++				debounce-interval = <20>;
++				gpio-key,wakeup = <1>;
++			};
++
++			button at 2 {
++				label = "user button 2";
++				linux,code = <0x200>;
++				gpios = <&stmpegpio 2 0x4>;
++				debounce-interval = <20>;
++				gpio-key,wakeup = <1>;
++			};
++		};
++
++		ohci at e1900000 {
++			status = "okay";
++		};
++
++		ohci at e2100000 {
++			status = "okay";
++		};
++
++		pwm: pwm at a8000000 {
++			status = "okay";
++		};
++
++		sdhci at 70000000 {
++			power-gpio = <&gpiopinctrl 50 1>;
++			power_always_enb;
++			status = "okay";
++		};
++
++		smi: flash at fc000000 {
++			status = "okay";
++			clock-rate=<50000000>;
++
++			flash at f8000000 {
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0xf8000000 0x800000>;
++				st,smi-fast-mode;
++
++				partition at 0 {
++					label = "xloader";
++					reg = <0x0 0x10000>;
++				};
++				partition at 10000 {
++					label = "u-boot";
++					reg = <0x10000 0x50000>;
++				};
++				partition at 60000 {
++					label = "environment";
++					reg = <0x60000 0x10000>;
++				};
++				partition at 70000 {
++					label = "dtb";
++					reg = <0x70000 0x10000>;
++				};
++				partition at 80000 {
++					label = "linux";
++					reg = <0x80000 0x310000>;
++				};
++				partition at 390000 {
++					label = "rootfs";
++					reg = <0x390000 0x0>;
++				};
++			};
++		};
++
++		spi0: spi at d0100000 {
++			status = "okay";
++		};
++
++		spi1: spi at a5000000 {
++			status = "okay";
++		};
++
++		spi2: spi at a6000000 {
++			status = "okay";
++		};
++
++		usbd at e1100000 {
++			status = "okay";
++		};
++
++		apb {
++			gpio0: gpio at fc980000 {
++			       status = "okay";
++			};
++
++			gpio at b3000000 {
++				status = "okay";
++			};
++
++			i2c0: i2c at d0180000 {
++				status = "okay";
++
++				stmpe811 at 41 {
++					compatible = "st,stmpe811";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0x41>;
++					irq-over-gpio;
++					irq-gpios = <&gpiopinctrl 29 0x4>;
++					id = <0>;
++					blocks = <0x5>;
++					irq-trigger = <0x1>;
++
++					stmpegpio: stmpe-gpio {
++						compatible = "stmpe,gpio";
++						reg = <0>;
++						gpio-controller;
++						#gpio-cells = <2>;
++						gpio,norequest-mask = <0xF3>;
++					};
++
++					stmpe610-ts {
++						compatible = "stmpe,ts";
++						reg = <0>;
++						ts,sample-time = <4>;
++						ts,mod-12b = <1>;
++						ts,ref-sel = <0>;
++						ts,adc-freq = <1>;
++						ts,ave-ctrl = <1>;
++						ts,touch-det-delay = <3>;
++						ts,settling = <4>;
++						ts,fraction-z = <7>;
++						ts,i-drive = <1>;
++					};
++				};
++			};
++
++			i2c1: i2c at a7000000 {
++			       status = "okay";
++			};
++
++			rtc at fc900000 {
++			       status = "okay";
++			};
++
++			serial at d0000000 {
++			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
++			};
++
++			serial at a3000000 {
++			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
++			};
++
++			serial at a4000000 {
++			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
++			};
++
++			wdt at fc880000 {
++			       status = "okay";
++			};
++		};
++	};
++};
+diff --git a/arch/arm/mach-spear3xx/spear320.c b/arch/arm/mach-spear3xx/spear320.c
+index 707504b..66e3a0c 100644
+--- a/arch/arm/mach-spear3xx/spear320.c
++++ b/arch/arm/mach-spear3xx/spear320.c
+@@ -247,6 +247,7 @@ static void __init spear320_dt_init(void)
+ static const char * const spear320_dt_board_compat[] = {
+ 	"st,spear320",
+ 	"st,spear320-evb",
++	"st,spear320-hmi",
+ 	NULL,
+ };
  
- 			serial at a3000000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xa3000000 0x1000>;
-+				interrupts = <13>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 
- 			serial at a4000000 {
- 				compatible = "arm,pl011", "arm,primecell";
- 				reg = <0xa4000000 0x1000>;
-+				interrupts = <14>;
-+				interrupt-parent = <&shirq>;
- 				status = "disabled";
- 			};
- 		};
 -- 
 1.7.12.rc2.18.g61b472e
