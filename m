@@ -1,77 +1,176 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 11 Nov 2012 10:09:24 +0530
-Subject: [PATCH 02/14] ARM: SPEAr13xx: DT: Add spics gpio controller nodes
+Date: Sun, 11 Nov 2012 10:09:25 +0530
+Subject: [PATCH 03/14] ARM: SPEAr: DT: Update pinctrl list
 In-Reply-To: <cover.1352608333.git.viresh.kumar@linaro.org>
 References: <cover.1352608333.git.viresh.kumar@linaro.org>
-Message-ID: <58a7d91cab20b924784fb5a09e16ca08e6f13318.1352608333.git.viresh.kumar@linaro.org>
+Message-ID: <3010db1332777076eb4d026e4fe37f3684dd9167.1352608333.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shiraz Hashim <shiraz.hashim@st.com>
+From: Vipul Kumar Samar <vipulkumar.samar@st.com>
 
-SPEAr platform provides a provision to control chipselects of ARM PL022 Prime
-Cell spi controller through its system registers, which otherwise remains under
-PL022 control which some protocols do not want.
+This patch updates pinctrl configuration for SPEAr SoC's.
 
-This patch adds spics controller nodes in device tree for various SPEAr13xx
-SoCs.
-
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
-Reviewed-by: Vipin Kumar <vipin.kumar@st.com>
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/spear1310.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/spear1340.dtsi | 14 ++++++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/boot/dts/spear1310-evb.dts | 23 +++++++++++++++++------
+ arch/arm/boot/dts/spear1340-evb.dts | 35 +++++++++++++++++++++--------------
+ arch/arm/boot/dts/spear320-evb.dts  |  6 +-----
+ 3 files changed, 39 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
-index 419ea74..d5661ee 100644
---- a/arch/arm/boot/dts/spear1310.dtsi
-+++ b/arch/arm/boot/dts/spear1310.dtsi
-@@ -17,6 +17,18 @@
- 	compatible = "st,spear1310";
+diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
+index dd4358b..08697ac 100644
+--- a/arch/arm/boot/dts/spear1310-evb.dts
++++ b/arch/arm/boot/dts/spear1310-evb.dts
+@@ -30,10 +30,14 @@
+ 			pinctrl-0 = <&state_default>;
  
- 	ahb {
-+		spics: spics at e0700000{
-+			compatible = "st,spear-spics-gpio";
-+			reg = <0xe0700000 0x1000>;
-+			st-spics,peripcfg-reg = <0x3b0>;
-+			st-spics,sw-enable-bit = <12>;
-+			st-spics,cs-value-bit = <11>;
-+			st-spics,cs-enable-mask = <3>;
-+			st-spics,cs-enable-shift = <8>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
- 		ahci at b1000000 {
- 			compatible = "snps,spear-ahci";
- 			reg = <0xb1000000 0x10000>;
-diff --git a/arch/arm/boot/dts/spear1340.dtsi b/arch/arm/boot/dts/spear1340.dtsi
-index d71fe2a..1604425 100644
---- a/arch/arm/boot/dts/spear1340.dtsi
-+++ b/arch/arm/boot/dts/spear1340.dtsi
-@@ -17,6 +17,20 @@
- 	compatible = "st,spear1340";
+ 			state_default: pinmux {
+-				i2c0-pmx {
++				i2c0 {
+ 					st,pins = "i2c0_grp";
+ 					st,function = "i2c0";
+ 				};
++				i2s0 {
++					st,pins = "i2s0_grp";
++					st,function = "i2s0";
++				};
+ 				i2s1 {
+ 					st,pins = "i2s1_grp";
+ 					st,function = "i2s1";
+@@ -42,6 +46,10 @@
+ 					st,pins = "arm_gpio_grp";
+ 					st,function = "arm_gpio";
+ 				};
++				clcd {
++					st,pins = "clcd_grp" , "clcd_high_res";
++					st,function = "clcd";
++				};
+ 				eth {
+ 					st,pins = "gmii_grp";
+ 					st,function = "gmii";
+@@ -74,11 +82,6 @@
+ 					st,pins = "i2c_1_2_grp";
+ 					st,function = "i2c_1_2";
+ 				};
+-				pci {
+-					st,pins = "pcie0_grp","pcie1_grp",
+-						"pcie2_grp";
+-					st,function = "pci";
+-				};
+ 				smii {
+ 					st,pins = "smii_0_1_2_grp";
+ 					st,function = "smii_0_1_2";
+@@ -88,6 +91,14 @@
+ 						"nand_16bit_grp";
+ 					st,function = "nand";
+ 				};
++				sata {
++					st,pins = "sata0_grp";
++					st,function = "sata";
++				};
++				pcie {
++					st,pins = "pcie1_grp", "pcie2_grp";
++					st,function = "pci_express";
++				};
+ 			};
+ 		};
  
- 	ahb {
+diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
+index c9a54e0..8e35c14 100644
+--- a/arch/arm/boot/dts/spear1340-evb.dts
++++ b/arch/arm/boot/dts/spear1340-evb.dts
+@@ -38,20 +38,15 @@
+ 					st,pins = "fsmc_8bit_grp";
+ 					st,function = "fsmc";
+ 				};
+-				kbd {
+-					st,pins = "keyboard_row_col_grp",
+-						"keyboard_col5_grp";
+-					st,function = "keyboard";
+-				};
+ 				uart0 {
+-					st,pins = "uart0_grp", "uart0_enh_grp";
++					st,pins = "uart0_grp";
+ 					st,function = "uart0";
+ 				};
+-				i2c0-pmx {
++				i2c0 {
+ 					st,pins = "i2c0_grp";
+ 					st,function = "i2c0";
+ 				};
+-				i2c1-pmx {
++				i2c1 {
+ 					st,pins = "i2c1_grp";
+ 					st,function = "i2c1";
+ 				};
+@@ -64,14 +59,9 @@
+ 					st,function = "spdif_out";
+ 				};
+ 				ssp0 {
+-					st,pins = "ssp0_grp", "ssp0_cs1_grp",
+-						"ssp0_cs3_grp";
++					st,pins = "ssp0_grp", "ssp0_cs1_grp", "ssp0_cs2_grp", "ssp0_cs3_grp";
+ 					st,function = "ssp0";
+ 				};
+-				pwm {
+-					st,pins = "pwm2_grp", "pwm3_grp";
+-					st,function = "pwm";
+-				};
+ 				smi-pmx {
+ 					st,pins = "smi_grp";
+ 					st,function = "smi";
+@@ -84,6 +74,18 @@
+ 					st,pins = "gmii_grp", "rgmii_grp";
+ 					st,function = "gmac";
+ 				};
++				cam0 {
++					st,pins = "cam0_grp";
++					st,function = "cam0";
++				};
++				cam1 {
++					st,pins = "cam1_grp";
++					st,function = "cam1";
++				};
++				cam2 {
++					st,pins = "cam2_grp";
++					st,function = "cam2";
++				};
+ 				cam3 {
+ 					st,pins = "cam3_grp";
+ 					st,function = "cam3";
+@@ -108,6 +110,11 @@
+ 					st,pins = "sata_grp";
+ 					st,function = "sata";
+ 				};
++				pcie {
++					st,pins = "pcie_grp";
++					st,function = "pcie";
++				};
 +
-+		spics: spics at e0700000{
-+			compatible = "st,spear-spics-gpio";
-+			reg = <0xe0700000 0x1000>;
-+			st-spics,peripcfg-reg = <0x42c>;
-+			st-spics,sw-enable-bit = <21>;
-+			st-spics,cs-value-bit = <20>;
-+			st-spics,cs-enable-mask = <3>;
-+			st-spics,cs-enable-shift = <18>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			status = "disabled";
-+		};
-+
- 		ahci at b1000000 {
- 			compatible = "snps,spear-ahci";
- 			reg = <0xb1000000 0x10000>;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+index 082328b..3f87cd0 100644
+--- a/arch/arm/boot/dts/spear320-evb.dts
++++ b/arch/arm/boot/dts/spear320-evb.dts
+@@ -76,13 +76,9 @@
+ 					st,function = "mii2";
+ 				};
+ 				pwm0_1 {
+-					st,pins = "pwm0_1_pin_14_15_grp";
++					st,pins = "pwm0_1_pin_37_38_grp";
+ 					st,function = "pwm0_1";
+ 				};
+-				pwm2 {
+-					st,pins = "pwm2_pin_13_grp";
+-					st,function = "pwm2";
+-				};
+ 			};
+ 		};
+ 
 -- 
 1.7.12.rc2.18.g61b472e
