@@ -1,75 +1,104 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 11 Nov 2012 17:21:31 +0100
-Subject: [PATCH 3/3] ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
-In-Reply-To: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
-References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1352650891-18356-4-git-send-email-andrew@lunn.ch>
+Date: Sun, 11 Nov 2012 18:22:43 +0100
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20121111172243.GB821@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood-ib62x0.dts |    6 ++++++
- arch/arm/mach-kirkwood/board-ib62x0.c |   13 -------------
- 2 files changed, 6 insertions(+), 13 deletions(-)
+On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
+> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag, regardless
+> the flags provided by the caller. This causes excessive pruning of
+> emergency memory pools without any good reason. This patch changes the code
+> to correctly use gfp flags provided by the dmapool caller. This should
+> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
+> allocations can be served only from the special, very limited memory pool.
+> 
+> Reported-by: Soren Moch <smoch@web.de>
+> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index 66794ed..9b0e2e3 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -79,4 +79,10 @@
- 			gpios = <&gpio0 27 0>;
- 		};
- 	};
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		gpios = <&gpio0 24 1>;
-+	};
-+
-+
- };
-diff --git a/arch/arm/mach-kirkwood/board-ib62x0.c b/arch/arm/mach-kirkwood/board-ib62x0.c
-index cfc47f8..7b8adf5 100644
---- a/arch/arm/mach-kirkwood/board-ib62x0.c
-+++ b/arch/arm/mach-kirkwood/board-ib62x0.c
-@@ -17,7 +17,6 @@
- #include <linux/mtd/partitions.h>
- #include <linux/ata_platform.h>
- #include <linux/mv643xx_eth.h>
--#include <linux/gpio.h>
- #include <linux/input.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -25,8 +24,6 @@
- #include "common.h"
- #include "mpp.h"
- 
--#define IB62X0_GPIO_POWER_OFF	24
--
- static struct mv643xx_eth_platform_data ib62x0_ge00_data = {
- 	.phy_addr	= MV643XX_ETH_PHY_ADDR(8),
- };
-@@ -49,11 +46,6 @@ static unsigned int ib62x0_mpp_config[] __initdata = {
- 	0
- };
- 
--static void ib62x0_power_off(void)
--{
--	gpio_set_value(IB62X0_GPIO_POWER_OFF, 1);
--}
--
- void __init ib62x0_init(void)
- {
- 	/*
-@@ -63,9 +55,4 @@ void __init ib62x0_init(void)
- 
- 	kirkwood_ehci_init();
- 	kirkwood_ge00_init(&ib62x0_ge00_data);
--	if (gpio_request(IB62X0_GPIO_POWER_OFF, "ib62x0:power:off") == 0 &&
--	    gpio_direction_output(IB62X0_GPIO_POWER_OFF, 0) == 0)
--		pm_power_off = ib62x0_power_off;
--	else
--		pr_err("board-ib62x0: failed to configure power-off GPIO\n");
- }
--- 
-1.7.10.4
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+I tested this on a Kirkwood QNAP after removing the call to
+init_dma_coherent_pool_size().
+
+	Andrew
+
+
+> ---
+>  mm/dmapool.c |   27 +++++++--------------------
+>  1 file changed, 7 insertions(+), 20 deletions(-)
+> 
+> diff --git a/mm/dmapool.c b/mm/dmapool.c
+> index c5ab33b..86de9b2 100644
+> --- a/mm/dmapool.c
+> +++ b/mm/dmapool.c
+> @@ -62,8 +62,6 @@ struct dma_page {		/* cacheable header for 'allocation' bytes */
+>  	unsigned int offset;
+>  };
+>  
+> -#define	POOL_TIMEOUT_JIFFIES	((100 /* msec */ * HZ) / 1000)
+> -
+>  static DEFINE_MUTEX(pools_lock);
+>  
+>  static ssize_t
+> @@ -227,7 +225,6 @@ static struct dma_page *pool_alloc_page(struct dma_pool *pool, gfp_t mem_flags)
+>  		memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
+>  #endif
+>  		pool_initialise_page(pool, page);
+> -		list_add(&page->page_list, &pool->page_list);
+>  		page->in_use = 0;
+>  		page->offset = 0;
+>  	} else {
+> @@ -315,30 +312,21 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+>  	might_sleep_if(mem_flags & __GFP_WAIT);
+>  
+>  	spin_lock_irqsave(&pool->lock, flags);
+> - restart:
+>  	list_for_each_entry(page, &pool->page_list, page_list) {
+>  		if (page->offset < pool->allocation)
+>  			goto ready;
+>  	}
+> -	page = pool_alloc_page(pool, GFP_ATOMIC);
+> -	if (!page) {
+> -		if (mem_flags & __GFP_WAIT) {
+> -			DECLARE_WAITQUEUE(wait, current);
+>  
+> -			__set_current_state(TASK_UNINTERRUPTIBLE);
+> -			__add_wait_queue(&pool->waitq, &wait);
+> -			spin_unlock_irqrestore(&pool->lock, flags);
+> +	/* pool_alloc_page() might sleep, so temporarily drop &pool->lock */
+> +	spin_unlock_irqrestore(&pool->lock, flags);
+>  
+> -			schedule_timeout(POOL_TIMEOUT_JIFFIES);
+> +	page = pool_alloc_page(pool, mem_flags);
+> +	if (!page)
+> +		return NULL;
+>  
+> -			spin_lock_irqsave(&pool->lock, flags);
+> -			__remove_wait_queue(&pool->waitq, &wait);
+> -			goto restart;
+> -		}
+> -		retval = NULL;
+> -		goto done;
+> -	}
+> +	spin_lock_irqsave(&pool->lock, flags);
+>  
+> +	list_add(&page->page_list, &pool->page_list);
+>   ready:
+>  	page->in_use++;
+>  	offset = page->offset;
+> @@ -348,7 +336,6 @@ void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+>  #ifdef	DMAPOOL_DEBUG
+>  	memset(retval, POOL_POISON_ALLOCATED, pool->size);
+>  #endif
+> - done:
+>  	spin_unlock_irqrestore(&pool->lock, flags);
+>  	return retval;
+>  }
+> -- 
+> 1.7.9.5
+> 
