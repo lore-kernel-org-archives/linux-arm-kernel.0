@@ -1,59 +1,48 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 11 Nov 2012 19:43:36 +0100
-Subject: [PATCH v2] Add support for generic BCM SoC chipsets
-In-Reply-To: <CAA-5wcDo2OJSD9O4YfJkxYDukCSMJo46at2NR9e41fZbAhh7wA@mail.gmail.com>
-References: <1352645834-10173-1-git-send-email-csd@broadcom.com>
- <12188358.5I1Xcz160E@bender>
- <CAA-5wcDo2OJSD9O4YfJkxYDukCSMJo46at2NR9e41fZbAhh7wA@mail.gmail.com>
-Message-ID: <1754478.hbVYUG0hG4@bender>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 11 Nov 2012 19:47:46 +0100
+Subject: [PATCH 0/2] clk: ux500: Make mtu driver use apb_pclock
+In-Reply-To: <20121110012449.16569.82732@nucleus>
+References: <1351080821-18660-1-git-send-email-ulf.hansson@stericsson.com>
+ <CACRpkdb3dcDhVD5qkOrRkLJ-RXdmqJ2tAkosoeEB_DwSDSShKw@mail.gmail.com>
+ <20121110012449.16569.82732@nucleus>
+Message-ID: <CACRpkdbGnvywcQWRN9v_=1nkmaqgJK92Zs1S5HSLgppa49bQqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 November 2012 09:32:13 Christian Daudt wrote:
-> On Sun, Nov 11, 2012 at 7:53 AM, Florian Fainelli <florian@openwrt.org>wrote:
-> 
-> > Hi Christian,
-> >
-> > On Sunday 11 November 2012 06:57:14 Christian Daudt wrote:
-> > > In order to start upstreaming Broadcom SoC support, create
-> > > a starting hierarchy, arch and dts files.
-> > > The first support SoC family that is planned is the
-> > > BCM281XX (BCM28145/28150/28155/28160) family of dual A9 mobile SoC cores
-> > > This code is just the skeleton code for get the machine upstreamed. It
-> > > has been made MULTIPLATFORM compatible.
-> > > Next steps
-> > > ----------
-> > > Upstream a basic set of drivers - sufficient for a console boot to
-> > > ramdisk. These will includer timer, gpio, i2c drivers.
-> > > After this basic set, we will proceed with a more comprehensive set
-> > > of drivers for the 281XX SoC family.
-> >
-> > Would not it make more sense to use mach-bcm281xx as a directory name
-> > instead
-> > of mach-bcm which sounds a tad too generic? This would also make it
-> > consistent
-> > with Domenico's mach-bcm47xx and the existing bcm47xx and bcm63xx
-> > MIPS-based
-> > SoC support.
-> >
-> 
-> I'm following the other mobile ARM SoCs which all have a single mach-
-> directory for various families of chips (mach-tegra, mach-omap2, etc...).
-> Plus the intent is to have a single set of mach files that works across bcm
-> SoCs, so it is preferable to keep it in a single mach-bcm.
+On Sat, Nov 10, 2012 at 2:24 AM, Mike Turquette <mturquette@linaro.org> wrote:
+> Quoting Linus Walleij (2012-10-24 10:25:26)
+>> On Wed, Oct 24, 2012 at 2:13 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+>>
+>> > From: Ulf Hansson <ulf.hansson@linaro.org>
+>> >
+>> > The apb clock was before the "common" clock driver for ux500 was merged,
+>> > handled internally by the clock driver. Now this clock needs to be managed
+>> > from the mtu driver as a separate clock.
+>> >
+>> > This patches is based in 3.7 rc2.
+>> >
+>> > It is important the "ARM nomadik patch" is merged together with the
+>> > clock patch to not break boot. Therefore I suggest this series to go
+>> > through Mike Turquettes clock tree.
+>>
+>> OK go ahead:
+>> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I've taken these into clk-next.  While the patches are trivial I'd still
+> prefer a changelog in the future.  For instance, it would be nice to
+> explain why removing the block comment is OK in the first patch.
 
-Your argument does not make sense here, if I follow your point, these
-directories should have been named mach-nvidia or mach-ti respectively if I 
-follow your convention (you use the vendor name, not a commercial product name)
+So there may be some collision in linux-next due to this,
+because I've moved the nomadik timer to
+drivers/clksrc and deleted the entire plat-nomadik
+directory.
 
-I do understand your intent, yet you announce support for BCM281xx SoCs, and
-one of your dtsi file is bcm281xx.dtsi. At least something like mach-bcmmobile
-sounds better to me.
+I don't know quite how ingenious git is in detecting
+patches on moved files, but if it's causing trouble
+I think it's better if you could ACK them and we
+could reubmit them to ARM SoC on the multiplatform
+branch. i.e. this one:
+http://git.kernel.org/?p=linux/kernel/git/arm/arm-soc.git;a=shortlog;h=refs/heads/next/multiplatform
 
-We have had the inclusion of the "socfpga" platform which is already very
-badly named because it does not make it clear that it is an Altera platform and
-not some generic SoC + FPGA platform.
-
-Anyway, that's just my 2 cents.
--- 
-Florian
+Yours,
+Linus Walleij
