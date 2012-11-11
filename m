@@ -1,91 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Nov 2012 13:32:35 +0100
-Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
-In-Reply-To: <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
-References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
- <20121024161429.GA16350@core.coreip.homeip.net>
- <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
- <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
- <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
- <20121030113407.GA24335@sirena.org.uk>
- <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
- <87obji8kta.fsf@deeprootsystems.com>
- <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
- <20121101120713.GA4413@opensource.wolfsonmicro.com>
- <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
-Message-ID: <CACRpkdZy1zRQM8Ww3RGc=Q+yt_eS6ekb02MDM-ixzaG8LDRacQ@mail.gmail.com>
+From: axel.lin@ingics.com (Axel Lin)
+Date: Sun, 11 Nov 2012 21:44:55 +0800
+Subject: [PATCH RFT 1/2] pinctrl: dove: Fix dove_audio1_ctrl_set when
+ BIT(0|1|2|3) of config is clear
+Message-ID: <1352641495.3113.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 1, 2012 at 3:01 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Thu, Nov 1, 2012 at 1:07 PM, Mark Brown
-> <broonie@opensource.wolfsonmicro.com> wrote:
->> On Thu, Nov 01, 2012 at 09:54:00AM +0100, Linus Walleij wrote:
->
->> For the pin hogging I'd actually been thinking separately that we should
->> just have the device core do a devm_pinctrl_get_set_default() prior to
->> probing the device and store the result in the struct device.  That
->> would immediately remove almost all of the current pinctrl users, users
->> that do need to do things with the data or check the result can then
->> pick up the pinctrl pointer from the device struct.
->
-> I never thought of that. This sounds like it would work.
+Current implementation in dove_audio1_ctrl_set() does not clear corresponding
+register bit if BIT(0|1|2|3) of config is clear. Fix it.
 
-So I've looked closer at this.
+Signed-off-by: Axel Lin <axel.lin@ingics.com>
+---
+Hi,
+I don't have this hardware.
+I'd appreciate if someone can review and test this patch.
 
-> And the good thing is that this is a clean cut so we
-> will centralized code without having to decide right now
-> how to handle the pm idle/sleep cases.
->
-> Talking here with Kevin Hilman on my left and Grant
-> Likely on my right (they're physically here) there is some
-> worry about stashing stuff into struct device.
->
-> What if I retrieve this in the pinctrl subsystem using
-> bus notifiers and then expose the struct pinctrl * to
-> the clients by using pinctrl_get() and when you get
-> such a handle in your probe() you know that the
-> pinctrl subsystem has already fetched the handle and
-> set it to "default" at that point?
+This resend also CC Sebastian Hesselbarth and linux-arm-kernel.
+Thanks,
+Axel
+ drivers/pinctrl/mvebu/pinctrl-dove.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-I have sent out an RFC for this approach. It actually
-works quite well on the U300 for example.
-
-However as stated in the patch we run into another
-problem: what if the pinctrl provider returns
--EDEFER_PROBE?
-
-(The same will be true for clocks, regulators etc I
-guess...)
-
-If I use notifiers like this, I cannot return -EPROBE_DEFER
-to the core. :-(
-
-The PM domains seem to be built on the notification
-mechanism as well (AFAICT), so it will not allow drivers to
-defer their probes, as it is an optional layer after all.
-
-As a matter of fact it seems that there is an implicit
-assumption in PM domains that the resources that
-are taken there cannot defer any probing, so they are
-assumed to always be present. Is this correct?
-If so, any resources that may be deferred (such as
-pinctrl) can never be handled in PM domains. Only
-simple stuff that the SoC controls directly e.g through
-some fixed register pokes to voltage domains.
-
-So then the only option that remains to centralize
-pinctrl handling is indeed to do that in the device core,
-before probe(). I need to know Greg's feelings about that.
-
-At the same time this sort of give me the feeling that
-we might be doing something wrong. The distributed
-nature of deferred probes will become quite elusive
-if the deferral request comes from some place
-before probe() is even called on the driver.
-
-Please check my RFC patch and tell me above errors
-in the above reasoning....
-
-Yours,
-Linus Walleij
+diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
+index ffe74b2..e5cc694 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-dove.c
++++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
+@@ -236,12 +236,23 @@ static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ 
+ 	if (config & BIT(0))
+ 		gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
++	else
++		gcfg2 &= ~DOVE_TWSI_OPTION3_GPIO;
++
+ 	if (config & BIT(1))
+ 		gmpp |= DOVE_AU1_SPDIFO_GPIO_EN;
++	else
++		gmpp &= ~DOVE_AU1_SPDIFO_GPIO_EN;
++
+ 	if (config & BIT(2))
+ 		sspc1 |= DOVE_SSP_ON_AU1;
++	else
++		sspc1 &= ~DOVE_SSP_ON_AU1;
++
+ 	if (config & BIT(3))
+ 		mpp4 |= DOVE_AU1_GPIO_SEL;
++	else
++		mpp4 &= ~DOVE_AU1_GPIO_SEL;
+ 
+ 	writel(mpp4, DOVE_MPP_CTRL4_VIRT_BASE);
+ 	writel(sspc1, DOVE_SSP_CTRL_STATUS_1);
+-- 
+1.7.9.5
