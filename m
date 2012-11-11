@@ -1,89 +1,108 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 10 Nov 2012 20:32:54 -0600
-Subject: [RFC] dt/platform: Use cell-index for device naming if available
-In-Reply-To: <1352508532-19241-1-git-send-email-stepanm@codeaurora.org>
-References: <1352508532-19241-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <509F0E56.6080806@gmail.com>
+Date: Sat, 10 Nov 2012 21:20:40 -0600
+Subject: [PATCH] ARM: implement optimized percpu variable access
+Message-ID: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2012 06:48 PM, Stepan Moskovchenko wrote:
-> Use the cell-index property to construct names for platform
-> devices, falling back on the existing scheme of using the
-> device register address if cell-index is not specified.
-> 
-> The cell-index property is a more useful device identifier,
-> especially in systems containing several numbered instances
-> of a particular hardware block, since it more easily
-> illustrates how devices relate to each other.
-> 
-> Additionally, userspace software may rely on the classic
-> <name>.<id> naming scheme to access device attributes in
-> sysfs, without having to know the physical addresses of
-> that device on every platform the userspace software may
-> support. Using cell-index for device naming allows the
-> device addresses to be hidden from userspace and to be
-> exposed by logical device number without having to rely on
-> auxdata to perform name overrides. This allows userspace to
-> make assumptions about which sysfs nodes map to which
-> logical instance of a specific hardware block.
-> 
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> ---
-> I had also considered using something like the linux,label property to allow
-> custom names for platform devices without resorting to auxdata, but the
-> cell-index approach seems more in line with what cell-index was intended for
-> and with what the pre-DT platform device naming scheme used to be. Please let
-> me know if you think there is a better way to accomplish this.
-> 
-> This is just being sent out as an RFC for now. If there are no objections, I
-> will send this out as an official patch, along with (or combined with) a patch
-> to fix up the device names in things like clock tables of any affected
-> platforms.
+From: Rob Herring <rob.herring@calxeda.com>
 
-cell-index is basically deprecated. This has been discussed multiple
-times in the past. You can use auxdata if you really need to have the
-old name.
+Use the previously unused TPIDRPRW register to store percpu offsets.
+TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
 
-Rob
+This saves 2 loads for each percpu variable access which should yield
+improved performance, but the improvement has not been quantified.
 
-> 
->  drivers/of/platform.c |   13 ++++++++++++-
->  1 files changed, 12 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 343ad29..472e374 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -77,8 +77,9 @@ void of_device_make_bus_id(struct device *dev)
->  	static atomic_t bus_no_reg_magic;
->  	struct device_node *node = dev->of_node;
->  	const u32 *reg;
-> +	u32 cell_index;
->  	u64 addr;
-> -	int magic;
-> +	int magic, ret;
-> 
->  #ifdef CONFIG_PPC_DCR
->  	/*
-> @@ -101,6 +102,16 @@ void of_device_make_bus_id(struct device *dev)
->  #endif /* CONFIG_PPC_DCR */
-> 
->  	/*
-> +	 * For devices with a specified cell-index, use the traditional
-> +	 * naming scheme of <name>.<id>
-> +	 */
-> +	ret = of_property_read_u32(node, "cell-index", &cell_index);
-> +	if (ret == 0) {
-> +		dev_set_name(dev, "%s.%d", node->name, cell_index);
-> +		return;
-> +	}
-> +
-> +	/*
->  	 * For MMIO, get the physical address
->  	 */
->  	reg = of_get_property(node, "reg", NULL);
-> --
-> The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/arm/include/asm/Kbuild   |    1 -
+ arch/arm/include/asm/percpu.h |   44 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/smp.c         |    3 +++
+ 3 files changed, 47 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/asm/percpu.h
+
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index f70ae17..2ffdaac 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -16,7 +16,6 @@ generic-y += local64.h
+ generic-y += msgbuf.h
+ generic-y += param.h
+ generic-y += parport.h
+-generic-y += percpu.h
+ generic-y += poll.h
+ generic-y += resource.h
+ generic-y += sections.h
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+new file mode 100644
+index 0000000..9eb7372
+--- /dev/null
++++ b/arch/arm/include/asm/percpu.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright 2012 Calxeda, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef _ASM_ARM_PERCPU_H_
++#define _ASM_ARM_PERCPU_H_
++
++/*
++ * Same as asm-generic/percpu.h, except that we store the per cpu offset
++ * in the TPIDRPRW.
++ */
++#if defined(CONFIG_SMP) && (__LINUX_ARM_ARCH__ >= 6)
++
++static inline void set_my_cpu_offset(unsigned long off)
++{
++	asm volatile("mcr p15, 0, %0, c13, c0, 4	@ set TPIDRPRW" : : "r" (off) : "cc" );
++}
++
++static inline unsigned long __my_cpu_offset(void)
++{
++	unsigned long off;
++	asm("mrc p15, 0, %0, c13, c0, 4	@ get TPIDRPRW" : "=r" (off) : );
++	return off;
++}
++#define __my_cpu_offset __my_cpu_offset()
++#else
++#define set_my_cpu_offset(x)	do {} while(0)
++
++#endif /* CONFIG_SMP */
++
++#include <asm-generic/percpu.h>
++
++#endif /* _ASM_ARM_PERCPU_H_ */
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index fbc8b26..897ef60 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -313,6 +313,8 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	current->active_mm = mm;
+ 	cpumask_set_cpu(cpu, mm_cpumask(mm));
+ 
++	set_my_cpu_offset(per_cpu_offset(cpu));
++
+ 	printk("CPU%u: Booted secondary processor\n", cpu);
+ 
+ 	cpu_init();
+@@ -371,6 +373,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ 
+ void __init smp_prepare_boot_cpu(void)
+ {
++	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ }
+ 
+ void __init smp_prepare_cpus(unsigned int max_cpus)
+-- 
+1.7.10.4
