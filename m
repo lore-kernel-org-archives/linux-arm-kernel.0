@@ -1,566 +1,342 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 11 Nov 2012 10:50:23 +0100
-Subject: [PATCH 03/11] m68k: set arch_gettimeoffset directly
-In-Reply-To: <1352408516-21988-5-git-send-email-swarren@wwwdotorg.org>
-References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
- <1352408516-21988-5-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAMuHMdWP6qnNesTbFTNyUi=GtLef81zW5=FX-fpNVuyH-FXUhQ@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 11 Nov 2012 13:25:08 +0200
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <509BDAF5.1010703@ti.com>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
+ <509BDAF5.1010703@ti.com>
+Message-ID: <509F8B14.8000703@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2012 at 10:01 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> remove m68k's mach_gettimeoffset function pointer, and instead directly
-> set the arch_gettimeoffset function pointer. This requires multiplying
-> all function results by 1000, since the removed m68k_gettimeoffset() did
-> this. Also, s/unsigned long/u32/ just to make the function prototypes
-> exactly match that of arch_gettimeoffset.
->
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+On 11/08/12 18:16, Jon Hunter wrote:
+> 
+> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
+>> On 11/07/12 23:36, Jon Hunter wrote:
+>>> Hi Igor,
+>>>
+>>> On 11/07/2012 08:42 AM, Igor Grinberg wrote:
+>>>> CONFIG_OMAP_32K_TIMER is kind of standing on the single zImage way.
+>>>> Make OMAP2+ timer code independant from the CONFIG_OMAP_32K_TIMER
+>>>> setting.
+>>>> To remove the dependancy, several conversions/additions had to be done:
+>>>> 1) Timer structures and initialization functions are named by the platform
+>>>>    name and the clock source in use. The decision which timer is
+>>>>    used is done statically from the machine_desc structure. In the
+>>>>    future it should come from DT.
+>>>> 2) Settings under the CONFIG_OMAP_32K_TIMER option are expanded into
+>>>>    separate timer structures along with the timer init functions.
+>>>>    This removes the CONFIG_OMAP_32K_TIMER on OMAP2+ timer code.
+>>>> 3) Since we have all the timers defined inside machine_desc structure
+>>>>    and we no longer need the fallback to gp_timer clock source in case
+>>>>    32k_timer clock source is unavailable (namely on AM33xx), we no
+>>>>    longer need the #ifdef around __omap2_sync32k_clocksource_init()
+>>>>    function. Remove the #ifdef CONFIG_OMAP_32K_TIMER around the
+>>>>    __omap2_sync32k_clocksource_init() function.
+>>>>
+>>>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>>>> Cc: Jon Hunter <jon-hunter@ti.com>
+>>>> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>> Cc: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>
+>>> [snip]
+>>>
+>>>> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+>>>> index 684d2fc..a4ad7a0 100644
+>>>> --- a/arch/arm/mach-omap2/timer.c
+>>>> +++ b/arch/arm/mach-omap2/timer.c
+>>>> @@ -63,20 +63,8 @@
+>>>>  #define OMAP2_32K_SOURCE	"func_32k_ck"
+>>>>  #define OMAP3_32K_SOURCE	"omap_32k_fck"
+>>>>  #define OMAP4_32K_SOURCE	"sys_32k_ck"
+>>>> -
+>>>> -#ifdef CONFIG_OMAP_32K_TIMER
+>>>> -#define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
+>>>> -#define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
+>>>> -#define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
+>>>> -#define OMAP3_SECURE_TIMER	12
+>>>>  #define TIMER_PROP_SECURE	"ti,timer-secure"
+>>>> -#else
+>>>> -#define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
+>>>> -#define OMAP3_CLKEV_SOURCE	OMAP3_MPU_SOURCE
+>>>> -#define OMAP4_CLKEV_SOURCE	OMAP4_MPU_SOURCE
+>>>> -#define OMAP3_SECURE_TIMER	1
+>>>> -#define TIMER_PROP_SECURE	"ti,timer-alwon"
+>>>> -#endif
+>>>> +#define TIMER_PROP_ALWON	"ti,timer-alwon"
+>>>
+>>> Nit-pick, can we drop the TIMER_PROP_SECURE/ALWON and use the
+>>> "ti,timer-secure" and "ti,timer-alwon" directly?
+>>>
+>>> Initially, I also defined TIMER_PROP_ALWON and Rob Herring's feedback
+>>> was to drop this and use the property string directly to remove any
+>>> abstraction.
+>>
+>> Well, I don't understand what do you mean by "any abstraction".
+>> The purpose of defining those two was to eliminate multiple occurrences
+>> of the string in the code, so for example if someone decides to change the
+>> property string for some currently unknown reason - it will be easy and small.
+>> Defines are a common practice for that, no?
+>> If you still think it should be inlined, I will do.
+> 
+> I understand your point, but right now I don't anticipate that we will
+> have many options here and so I think that we should drop these.
+> 
+>>>>  #define REALTIME_COUNTER_BASE				0x48243200
+>>>>  #define INCREMENTER_NUMERATOR_OFFSET			0x10
+>>>> @@ -216,7 +204,7 @@ void __init omap_dmtimer_init(void)
+>>>>  
+>>>>  	/* If we are a secure device, remove any secure timer nodes */
+>>>>  	if ((omap_type() != OMAP2_DEVICE_TYPE_GP)) {
+>>>> -		np = omap_get_timer_dt(omap_timer_match, "ti,timer-secure");
+>>>> +		np = omap_get_timer_dt(omap_timer_match, TIMER_PROP_SECURE);
+>>>>  		if (np)
+>>>>  			of_node_put(np);
+>>>>  	}
+>>>> @@ -378,9 +366,8 @@ static u32 notrace dmtimer_read_sched_clock(void)
+>>>>  	return 0;
+>>>>  }
+>>>>  
+>>>> -#ifdef CONFIG_OMAP_32K_TIMER
+>>>>  /* Setup free-running counter for clocksource */
+>>>> -static int __init omap2_sync32k_clocksource_init(void)
+>>>> +static int __init __omap2_sync32k_clocksource_init(void)
+>>>
+>>> Not sure I follow why you renamed this function here ...
+>>
+>> I didn't want to add unused arguments to this function, so I've made a
+>> wrapper below to have both the sync32k and the gp functions have the same
+>> signature (argument list) and be called from a single macro.
+>> Anyway, see below.
+> 
+> Ok.
+> 
+>>>
+>>>>  {
+>>>>  	int ret;
+>>>>  	struct device_node *np = NULL;
+>>>> @@ -439,15 +426,9 @@ static int __init omap2_sync32k_clocksource_init(void)
+>>>>  
+>>>>  	return ret;
+>>>>  }
+>>>> -#else
+>>>> -static inline int omap2_sync32k_clocksource_init(void)
+>>>> -{
+>>>> -	return -ENODEV;
+>>>> -}
+>>>> -#endif
+>>>>  
+>>>> -static void __init omap2_gptimer_clocksource_init(int gptimer_id,
+>>>> -						const char *fck_source)
+>>>> +static void __init omap2_gp_clocksource_init(int gptimer_id,
+>>>> +					     const char *fck_source)
+>>>
+>>> Nit, I personally prefer keeping gptimer, because gp just means
+>>> "general-purpose" and does not imply a timer per-se.
+>>
+>> I've made this change, so we will not get something like:
+>> omapx_gptimer_timer_init(), but this really does not meter to me,
+>> so no problem will do for v2.
+> 
+> Thanks.
+> 
+>>>
+>>>>  {
+>>>>  	int res;
+>>>>  
+>>>> @@ -466,23 +447,10 @@ static void __init omap2_gptimer_clocksource_init(int gptimer_id,
+>>>>  			gptimer_id, clksrc.rate);
+>>>>  }
+>>>>  
+>>>> -static void __init omap2_clocksource_init(int gptimer_id,
+>>>> -						const char *fck_source)
+>>>> +static void __init omap2_sync32k_clocksource_init(int gptimer_id,
+>>>> +						  const char *fck_source)
+>>>>  {
+>>>> -	/*
+>>>> -	 * First give preference to kernel parameter configuration
+>>>> -	 * by user (clocksource="gp_timer").
+>>>> -	 *
+>>>> -	 * In case of missing kernel parameter for clocksource,
+>>>> -	 * first check for availability for 32k-sync timer, in case
+>>>> -	 * of failure in finding 32k_counter module or registering
+>>>> -	 * it as clocksource, execution will fallback to gp-timer.
+>>>> -	 */
+>>>> -	if (use_gptimer_clksrc == true)
+>>>> -		omap2_gptimer_clocksource_init(gptimer_id, fck_source);
+>>>> -	else if (omap2_sync32k_clocksource_init())
+>>>> -		/* Fall back to gp-timer code */
+>>>> -		omap2_gptimer_clocksource_init(gptimer_id, fck_source);
+>>>> +	__omap2_sync32k_clocksource_init();
+>>>>  }
+>>>
+>>> ... this just appears to be a wrapper function, but I don't see why this
+>>> is needed? Do we need this wrapper?
+>>
+>> no, not really, just consider the explanation above.
+>> I will remove the wrapper for v2.
+> 
+> Ok, thanks.
+> 
+>>>
+>>>>  #ifdef CONFIG_SOC_HAS_REALTIME_COUNTER
+>>>> @@ -563,52 +531,64 @@ static inline void __init realtime_counter_init(void)
+>>>>  {}
+>>>>  #endif
+>>>>  
+>>>> -#define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src, clkev_prop,	\
+>>>> -				clksrc_nr, clksrc_src)			\
+>>>> -static void __init omap##name##_timer_init(void)			\
+>>>> +#define OMAP_SYS_TIMER_INIT(n, clksrc_name, clkev_nr, clkev_src,	\
+>>>> +				clkev_prop, clksrc_nr, clksrc_src)	\
+>>>> +static void __init omap##n##_##clksrc_name##_timer_init(void)		\
+>>>
+>>>
+>>>>  {									\
+>>>>  	omap_dmtimer_init();						\
+>>>>  	omap2_gp_clockevent_init((clkev_nr), clkev_src, clkev_prop);	\
+>>>> -	omap2_clocksource_init((clksrc_nr), clksrc_src);		\
+>>>> +									\
+>>>> +	if (use_gptimer_clksrc)						\
+>>>> +		omap2_gp_clocksource_init((clksrc_nr), clksrc_src);	\
+>>>> +	else								\
+>>>> +		omap2_##clksrc_name##_clocksource_init((clksrc_nr),	\
+>>>> +						       clksrc_src);	\
+>>>
+>>> Something here seems a little odd. If "clksrc_name" is "gp", then the
+>>> if-else parts will call the same function. Or am I missing something here?
+>>
+>> Yes, you are right - this is odd.
+>> What do you think of:
+>>
+>> if (use_gptimer_clksrc) {
+>> 	omap2_gp_clocksource_init((clksrc_nr), clksrc_src);
+>> 	return;
+>> }
+>> omap2_##clksrc_name##_clocksource_init((clksrc_nr), clksrc_src);
+> 
+> Yes, but it still seems a little odd that we could have ...
+> 
+>  if (use_gptimer_clksrc) {
+>  	omap2_gp_clocksource_init((clksrc_nr), clksrc_src);
+>  	return;
+>  }
+>  omap2_gp_clocksource_init((clksrc_nr), clksrc_src);
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Yes, of course I understand your point, but that's how macro expansion work.
+The only idea left in my mind is to move the check for use_gptimer_clksrc
+to the omap2_sync32k_clocksource_init() function, but I don't like it, as
+omap2_sync32k_clocksource_init() function should deal with the sync32k init
+and if use_gptimer_clksrc is set, the function should not be called at all.
+I really don't think this is a problem.
+Do you have another idea how we can reuse the macro and
+not have the above oddness?
 
-> Cc: Philip Blundell <philb@gnu.org>
-> Cc: Joshua Thompson <funaho@jurai.org>
-> Cc: Sam Creasey <sammy@sammy.net>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/m68k/amiga/config.c        |   10 +++++-----
->  arch/m68k/apollo/config.c       |    9 ++++-----
->  arch/m68k/atari/config.c        |    4 ++--
->  arch/m68k/atari/time.c          |    6 +++---
->  arch/m68k/bvme6000/config.c     |   10 +++++-----
->  arch/m68k/hp300/config.c        |    2 +-
->  arch/m68k/hp300/time.c          |    4 ++--
->  arch/m68k/hp300/time.h          |    2 +-
->  arch/m68k/include/asm/machdep.h |    2 +-
->  arch/m68k/kernel/setup_mm.c     |    1 -
->  arch/m68k/kernel/time.c         |    9 ---------
->  arch/m68k/mac/config.c          |    4 ++--
->  arch/m68k/mac/via.c             |    4 ++--
->  arch/m68k/mvme147/config.c      |    8 ++++----
->  arch/m68k/mvme16x/config.c      |    8 ++++----
->  arch/m68k/q40/config.c          |    8 ++++----
->  arch/m68k/sun3/config.c         |    4 ++--
->  arch/m68k/sun3/intersil.c       |    4 ++--
->  arch/m68k/sun3x/config.c        |    2 +-
->  arch/m68k/sun3x/time.c          |    2 +-
->  arch/m68k/sun3x/time.h          |    2 +-
->  21 files changed, 47 insertions(+), 58 deletions(-)
->
-> diff --git a/arch/m68k/amiga/config.c b/arch/m68k/amiga/config.c
-> index ee01b7a..b819390 100644
-> --- a/arch/m68k/amiga/config.c
-> +++ b/arch/m68k/amiga/config.c
-> @@ -95,7 +95,7 @@ static void amiga_sched_init(irq_handler_t handler);
->  static void amiga_get_model(char *model);
->  static void amiga_get_hardware_list(struct seq_file *m);
->  /* amiga specific timer functions */
-> -static unsigned long amiga_gettimeoffset(void);
-> +static u32 amiga_gettimeoffset(void);
->  extern void amiga_mksound(unsigned int count, unsigned int ticks);
->  static void amiga_reset(void);
->  extern void amiga_init_sound(void);
-> @@ -377,7 +377,7 @@ void __init config_amiga(void)
->         mach_init_IRQ        = amiga_init_IRQ;
->         mach_get_model       = amiga_get_model;
->         mach_get_hardware_list = amiga_get_hardware_list;
-> -       mach_gettimeoffset   = amiga_gettimeoffset;
-> +       arch_gettimeoffset   = amiga_gettimeoffset;
->
->         /*
->          * default MAX_DMA=0xffffffff on all machines. If we don't do so, the SCSI
-> @@ -482,10 +482,10 @@ static void __init amiga_sched_init(irq_handler_t timer_routine)
->  #define TICK_SIZE 10000
->
->  /* This is always executed with interrupts disabled.  */
-> -static unsigned long amiga_gettimeoffset(void)
-> +static u32 amiga_gettimeoffset(void)
->  {
->         unsigned short hi, lo, hi2;
-> -       unsigned long ticks, offset = 0;
-> +       u32 ticks, offset = 0;
->
->         /* read CIA B timer A current value */
->         hi  = ciab.tahi;
-> @@ -507,7 +507,7 @@ static unsigned long amiga_gettimeoffset(void)
->         ticks = jiffy_ticks - ticks;
->         ticks = (10000 * ticks) / jiffy_ticks;
->
-> -       return ticks + offset;
-> +       return (ticks + offset) * 1000;
->  }
->
->  static void amiga_reset(void)  __noreturn;
-> diff --git a/arch/m68k/apollo/config.c b/arch/m68k/apollo/config.c
-> index f5565d6..3ea56b9 100644
-> --- a/arch/m68k/apollo/config.c
-> +++ b/arch/m68k/apollo/config.c
-> @@ -26,7 +26,7 @@ u_long apollo_model;
->
->  extern void dn_sched_init(irq_handler_t handler);
->  extern void dn_init_IRQ(void);
-> -extern unsigned long dn_gettimeoffset(void);
-> +extern u32 dn_gettimeoffset(void);
->  extern int dn_dummy_hwclk(int, struct rtc_time *);
->  extern int dn_dummy_set_clock_mmss(unsigned long);
->  extern void dn_dummy_reset(void);
-> @@ -151,7 +151,7 @@ void __init config_apollo(void)
->
->         mach_sched_init=dn_sched_init; /* */
->         mach_init_IRQ=dn_init_IRQ;
-> -       mach_gettimeoffset   = dn_gettimeoffset;
-> +       arch_gettimeoffset   = dn_gettimeoffset;
->         mach_max_dma_address = 0xffffffff;
->         mach_hwclk           = dn_dummy_hwclk; /* */
->         mach_set_clock_mmss  = dn_dummy_set_clock_mmss; /* */
-> @@ -203,10 +203,9 @@ void dn_sched_init(irq_handler_t timer_routine)
->                 pr_err("Couldn't register timer interrupt\n");
->  }
->
-> -unsigned long dn_gettimeoffset(void) {
-> -
-> +u32 dn_gettimeoffset(void)
-> +{
->         return 0xdeadbeef;
-> -
->  }
->
->  int dn_dummy_hwclk(int op, struct rtc_time *t) {
-> diff --git a/arch/m68k/atari/config.c b/arch/m68k/atari/config.c
-> index d8eb327..037c11c 100644
-> --- a/arch/m68k/atari/config.c
-> +++ b/arch/m68k/atari/config.c
-> @@ -74,7 +74,7 @@ static void atari_heartbeat(int on);
->
->  /* atari specific timer functions (in time.c) */
->  extern void atari_sched_init(irq_handler_t);
-> -extern unsigned long atari_gettimeoffset (void);
-> +extern u32 atari_gettimeoffset(void);
->  extern int atari_mste_hwclk (int, struct rtc_time *);
->  extern int atari_tt_hwclk (int, struct rtc_time *);
->  extern int atari_mste_set_clock_mmss (unsigned long);
-> @@ -204,7 +204,7 @@ void __init config_atari(void)
->         mach_init_IRQ        = atari_init_IRQ;
->         mach_get_model   = atari_get_model;
->         mach_get_hardware_list = atari_get_hardware_list;
-> -       mach_gettimeoffset   = atari_gettimeoffset;
-> +       arch_gettimeoffset   = atari_gettimeoffset;
->         mach_reset           = atari_reset;
->         mach_max_dma_address = 0xffffff;
->  #if defined(CONFIG_INPUT_M68K_BEEP) || defined(CONFIG_INPUT_M68K_BEEP_MODULE)
-> diff --git a/arch/m68k/atari/time.c b/arch/m68k/atari/time.c
-> index c0cc68a..da8f981 100644
-> --- a/arch/m68k/atari/time.c
-> +++ b/arch/m68k/atari/time.c
-> @@ -42,9 +42,9 @@ atari_sched_init(irq_handler_t timer_routine)
->  #define TICK_SIZE 10000
->
->  /* This is always executed with interrupts disabled.  */
-> -unsigned long atari_gettimeoffset (void)
-> +u32 atari_gettimeoffset(void)
->  {
-> -  unsigned long ticks, offset = 0;
-> +  u32 ticks, offset = 0;
->
->    /* read MFP timer C current value */
->    ticks = st_mfp.tim_dt_c;
-> @@ -57,7 +57,7 @@ unsigned long atari_gettimeoffset (void)
->    ticks = INT_TICKS - ticks;
->    ticks = ticks * 10000L / INT_TICKS;
->
-> -  return ticks + offset;
-> +  return (ticks + offset) * 1000;
->  }
->
->
-> diff --git a/arch/m68k/bvme6000/config.c b/arch/m68k/bvme6000/config.c
-> index 0bf850a..8943aa4 100644
-> --- a/arch/m68k/bvme6000/config.c
-> +++ b/arch/m68k/bvme6000/config.c
-> @@ -38,7 +38,7 @@
->
->  static void bvme6000_get_model(char *model);
->  extern void bvme6000_sched_init(irq_handler_t handler);
-> -extern unsigned long bvme6000_gettimeoffset (void);
-> +extern u32 bvme6000_gettimeoffset(void);
->  extern int bvme6000_hwclk (int, struct rtc_time *);
->  extern int bvme6000_set_clock_mmss (unsigned long);
->  extern void bvme6000_reset (void);
-> @@ -110,7 +110,7 @@ void __init config_bvme6000(void)
->      mach_max_dma_address = 0xffffffff;
->      mach_sched_init      = bvme6000_sched_init;
->      mach_init_IRQ        = bvme6000_init_IRQ;
-> -    mach_gettimeoffset   = bvme6000_gettimeoffset;
-> +    arch_gettimeoffset   = bvme6000_gettimeoffset;
->      mach_hwclk           = bvme6000_hwclk;
->      mach_set_clock_mmss         = bvme6000_set_clock_mmss;
->      mach_reset          = bvme6000_reset;
-> @@ -216,13 +216,13 @@ void bvme6000_sched_init (irq_handler_t timer_routine)
->   * results...
->   */
->
-> -unsigned long bvme6000_gettimeoffset (void)
-> +u32 bvme6000_gettimeoffset(void)
->  {
->      volatile RtcPtr_t rtc = (RtcPtr_t)BVME_RTC_BASE;
->      volatile PitRegsPtr pit = (PitRegsPtr)BVME_PIT_BASE;
->      unsigned char msr = rtc->msr & 0xc0;
->      unsigned char t1int, t1op;
-> -    unsigned long v = 800000, ov;
-> +    u32 v = 800000, ov;
->
->      rtc->msr = 0;      /* Ensure timer registers accessible */
->
-> @@ -246,7 +246,7 @@ unsigned long bvme6000_gettimeoffset (void)
->         v += 10000;                     /* Int pending, + 10ms */
->      rtc->msr = msr;
->
-> -    return v;
-> +    return v * 1000;
->  }
->
->  /*
-> diff --git a/arch/m68k/hp300/config.c b/arch/m68k/hp300/config.c
-> index bf16af1..b7609f7 100644
-> --- a/arch/m68k/hp300/config.c
-> +++ b/arch/m68k/hp300/config.c
-> @@ -251,7 +251,7 @@ void __init config_hp300(void)
->         mach_sched_init      = hp300_sched_init;
->         mach_init_IRQ        = hp300_init_IRQ;
->         mach_get_model       = hp300_get_model;
-> -       mach_gettimeoffset   = hp300_gettimeoffset;
-> +       arch_gettimeoffset   = hp300_gettimeoffset;
->         mach_hwclk           = hp300_hwclk;
->         mach_get_ss          = hp300_get_ss;
->         mach_reset           = hp300_reset;
-> diff --git a/arch/m68k/hp300/time.c b/arch/m68k/hp300/time.c
-> index 29a71be..749543b 100644
-> --- a/arch/m68k/hp300/time.c
-> +++ b/arch/m68k/hp300/time.c
-> @@ -46,7 +46,7 @@ static irqreturn_t hp300_tick(int irq, void *dev_id)
->         return vector(irq, NULL);
->  }
->
-> -unsigned long hp300_gettimeoffset(void)
-> +u32 hp300_gettimeoffset(void)
->  {
->    /* Read current timer 1 value */
->    unsigned char lsb, msb1, msb2;
-> @@ -59,7 +59,7 @@ unsigned long hp300_gettimeoffset(void)
->      /* A carry happened while we were reading.  Read it again */
->      lsb = in_8(CLOCKBASE + 7);
->    ticks = INTVAL - ((msb2 << 8) | lsb);
-> -  return (USECS_PER_JIFFY * ticks) / INTVAL;
-> +  return ((USECS_PER_JIFFY * ticks) / INTVAL) * 1000;
->  }
->
->  void __init hp300_sched_init(irq_handler_t vector)
-> diff --git a/arch/m68k/hp300/time.h b/arch/m68k/hp300/time.h
-> index 7b98242..f5583ec 100644
-> --- a/arch/m68k/hp300/time.h
-> +++ b/arch/m68k/hp300/time.h
-> @@ -1,2 +1,2 @@
->  extern void hp300_sched_init(irq_handler_t vector);
-> -extern unsigned long hp300_gettimeoffset(void);
-> +extern u32 hp300_gettimeoffset(void);
-> diff --git a/arch/m68k/include/asm/machdep.h b/arch/m68k/include/asm/machdep.h
-> index 825c1c8..953ca21 100644
-> --- a/arch/m68k/include/asm/machdep.h
-> +++ b/arch/m68k/include/asm/machdep.h
-> @@ -3,6 +3,7 @@
->
->  #include <linux/seq_file.h>
->  #include <linux/interrupt.h>
-> +#include <linux/time.h>
->
->  struct pt_regs;
->  struct mktime;
-> @@ -16,7 +17,6 @@ extern void (*mach_init_IRQ) (void);
->  extern void (*mach_get_model) (char *model);
->  extern void (*mach_get_hardware_list) (struct seq_file *m);
->  /* machine dependent timer functions */
-> -extern unsigned long (*mach_gettimeoffset)(void);
->  extern int (*mach_hwclk)(int, struct rtc_time*);
->  extern unsigned int (*mach_get_ss)(void);
->  extern int (*mach_get_rtc_pll)(struct rtc_pll_info *);
-> diff --git a/arch/m68k/kernel/setup_mm.c b/arch/m68k/kernel/setup_mm.c
-> index d872ce4..80cfbe5 100644
-> --- a/arch/m68k/kernel/setup_mm.c
-> +++ b/arch/m68k/kernel/setup_mm.c
-> @@ -84,7 +84,6 @@ void (*mach_init_IRQ) (void) __initdata = NULL;
->  void (*mach_get_model) (char *model);
->  void (*mach_get_hardware_list) (struct seq_file *m);
->  /* machine dependent timer functions */
-> -unsigned long (*mach_gettimeoffset) (void);
->  int (*mach_hwclk) (int, struct rtc_time*);
->  EXPORT_SYMBOL(mach_hwclk);
->  int (*mach_set_clock_mmss) (unsigned long);
-> diff --git a/arch/m68k/kernel/time.c b/arch/m68k/kernel/time.c
-> index c2994c8..bea6bcf 100644
-> --- a/arch/m68k/kernel/time.c
-> +++ b/arch/m68k/kernel/time.c
-> @@ -82,11 +82,6 @@ void read_persistent_clock(struct timespec *ts)
->
->  #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
->
-> -static u32 m68k_gettimeoffset(void)
-> -{
-> -       return mach_gettimeoffset() * 1000;
-> -}
-> -
->  static int __init rtc_init(void)
->  {
->         struct platform_device *pdev;
-> @@ -104,9 +99,5 @@ module_init(rtc_init);
->
->  void __init time_init(void)
->  {
-> -#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
-> -       arch_gettimeoffset = m68k_gettimeoffset;
-> -#endif
-> -
->         mach_sched_init(timer_interrupt);
->  }
-> diff --git a/arch/m68k/mac/config.c b/arch/m68k/mac/config.c
-> index d9f62e0..afb95d5 100644
-> --- a/arch/m68k/mac/config.c
-> +++ b/arch/m68k/mac/config.c
-> @@ -52,7 +52,7 @@ struct mac_booter_data mac_bi_data;
->  static unsigned long mac_orig_videoaddr;
->
->  /* Mac specific timer functions */
-> -extern unsigned long mac_gettimeoffset(void);
-> +extern u32 mac_gettimeoffset(void);
->  extern int mac_hwclk(int, struct rtc_time *);
->  extern int mac_set_clock_mmss(unsigned long);
->  extern void iop_preinit(void);
-> @@ -177,7 +177,7 @@ void __init config_mac(void)
->         mach_sched_init = mac_sched_init;
->         mach_init_IRQ = mac_init_IRQ;
->         mach_get_model = mac_get_model;
-> -       mach_gettimeoffset = mac_gettimeoffset;
-> +       arch_gettimeoffset = mac_gettimeoffset;
->         mach_hwclk = mac_hwclk;
->         mach_set_clock_mmss = mac_set_clock_mmss;
->         mach_reset = mac_reset;
-> diff --git a/arch/m68k/mac/via.c b/arch/m68k/mac/via.c
-> index 2d85662..5d1458b 100644
-> --- a/arch/m68k/mac/via.c
-> +++ b/arch/m68k/mac/via.c
-> @@ -327,7 +327,7 @@ void via_debug_dump(void)
->   * TBI: get time offset between scheduling timer ticks
->   */
->
-> -unsigned long mac_gettimeoffset (void)
-> +u32 mac_gettimeoffset(void)
->  {
->         unsigned long ticks, offset = 0;
->
-> @@ -341,7 +341,7 @@ unsigned long mac_gettimeoffset (void)
->         ticks = MAC_CLOCK_TICK - ticks;
->         ticks = ticks * 10000L / MAC_CLOCK_TICK;
->
-> -       return ticks + offset;
-> +       return (ticks + offset) * 1000;
->  }
->
->  /*
-> diff --git a/arch/m68k/mvme147/config.c b/arch/m68k/mvme147/config.c
-> index a41c091..1c62628 100644
-> --- a/arch/m68k/mvme147/config.c
-> +++ b/arch/m68k/mvme147/config.c
-> @@ -37,7 +37,7 @@
->
->  static void mvme147_get_model(char *model);
->  extern void mvme147_sched_init(irq_handler_t handler);
-> -extern unsigned long mvme147_gettimeoffset (void);
-> +extern u32 mvme147_gettimeoffset(void);
->  extern int mvme147_hwclk (int, struct rtc_time *);
->  extern int mvme147_set_clock_mmss (unsigned long);
->  extern void mvme147_reset (void);
-> @@ -88,7 +88,7 @@ void __init config_mvme147(void)
->         mach_max_dma_address    = 0x01000000;
->         mach_sched_init         = mvme147_sched_init;
->         mach_init_IRQ           = mvme147_init_IRQ;
-> -       mach_gettimeoffset      = mvme147_gettimeoffset;
-> +       arch_gettimeoffset      = mvme147_gettimeoffset;
->         mach_hwclk              = mvme147_hwclk;
->         mach_set_clock_mmss     = mvme147_set_clock_mmss;
->         mach_reset              = mvme147_reset;
-> @@ -127,7 +127,7 @@ void mvme147_sched_init (irq_handler_t timer_routine)
->
->  /* This is always executed with interrupts disabled.  */
->  /* XXX There are race hazards in this code XXX */
-> -unsigned long mvme147_gettimeoffset (void)
-> +u32 mvme147_gettimeoffset(void)
->  {
->         volatile unsigned short *cp = (volatile unsigned short *)0xfffe1012;
->         unsigned short n;
-> @@ -137,7 +137,7 @@ unsigned long mvme147_gettimeoffset (void)
->                 n = *cp;
->
->         n -= PCC_TIMER_PRELOAD;
-> -       return (unsigned long)n * 25 / 4;
-> +       return ((unsigned long)n * 25 / 4) * 1000;
->  }
->
->  static int bcd2int (unsigned char b)
-> diff --git a/arch/m68k/mvme16x/config.c b/arch/m68k/mvme16x/config.c
-> index b6d7d8a..080a342 100644
-> --- a/arch/m68k/mvme16x/config.c
-> +++ b/arch/m68k/mvme16x/config.c
-> @@ -43,7 +43,7 @@ static MK48T08ptr_t volatile rtc = (MK48T08ptr_t)MVME_RTC_BASE;
->
->  static void mvme16x_get_model(char *model);
->  extern void mvme16x_sched_init(irq_handler_t handler);
-> -extern unsigned long mvme16x_gettimeoffset (void);
-> +extern u32 mvme16x_gettimeoffset(void);
->  extern int mvme16x_hwclk (int, struct rtc_time *);
->  extern int mvme16x_set_clock_mmss (unsigned long);
->  extern void mvme16x_reset (void);
-> @@ -289,7 +289,7 @@ void __init config_mvme16x(void)
->      mach_max_dma_address = 0xffffffff;
->      mach_sched_init      = mvme16x_sched_init;
->      mach_init_IRQ        = mvme16x_init_IRQ;
-> -    mach_gettimeoffset   = mvme16x_gettimeoffset;
-> +    arch_gettimeoffset   = mvme16x_gettimeoffset;
->      mach_hwclk           = mvme16x_hwclk;
->      mach_set_clock_mmss         = mvme16x_set_clock_mmss;
->      mach_reset          = mvme16x_reset;
-> @@ -405,9 +405,9 @@ void mvme16x_sched_init (irq_handler_t timer_routine)
->
->
->  /* This is always executed with interrupts disabled.  */
-> -unsigned long mvme16x_gettimeoffset (void)
-> +u32 mvme16x_gettimeoffset(void)
->  {
-> -    return (*(volatile unsigned long *)0xfff42008);
-> +    return (*(volatile u32 *)0xfff42008) * 1000;
->  }
->
->  int bcd2int (unsigned char b)
-> diff --git a/arch/m68k/q40/config.c b/arch/m68k/q40/config.c
-> index 1adb5b7..658542b 100644
-> --- a/arch/m68k/q40/config.c
-> +++ b/arch/m68k/q40/config.c
-> @@ -40,7 +40,7 @@ extern void q40_init_IRQ(void);
->  static void q40_get_model(char *model);
->  extern void q40_sched_init(irq_handler_t handler);
->
-> -static unsigned long q40_gettimeoffset(void);
-> +static u32 q40_gettimeoffset(void);
->  static int q40_hwclk(int, struct rtc_time *);
->  static unsigned int q40_get_ss(void);
->  static int q40_set_clock_mmss(unsigned long);
-> @@ -170,7 +170,7 @@ void __init config_q40(void)
->         mach_sched_init = q40_sched_init;
->
->         mach_init_IRQ = q40_init_IRQ;
-> -       mach_gettimeoffset = q40_gettimeoffset;
-> +       arch_gettimeoffset = q40_gettimeoffset;
->         mach_hwclk = q40_hwclk;
->         mach_get_ss = q40_get_ss;
->         mach_get_rtc_pll = q40_get_rtc_pll;
-> @@ -204,9 +204,9 @@ int q40_parse_bootinfo(const struct bi_record *rec)
->  }
->
->
-> -static unsigned long q40_gettimeoffset(void)
-> +static u32 q40_gettimeoffset(void)
->  {
-> -       return 5000 * (ql_ticks != 0);
-> +       return 5000 * (ql_ticks != 0) * 1000;
->  }
->
->
-> diff --git a/arch/m68k/sun3/config.c b/arch/m68k/sun3/config.c
-> index 2ca25bd..f59ec58 100644
-> --- a/arch/m68k/sun3/config.c
-> +++ b/arch/m68k/sun3/config.c
-> @@ -36,7 +36,7 @@
->
->  char sun3_reserved_pmeg[SUN3_PMEGS_NUM];
->
-> -extern unsigned long sun3_gettimeoffset(void);
-> +extern u32 sun3_gettimeoffset(void);
->  static void sun3_sched_init(irq_handler_t handler);
->  extern void sun3_get_model (char* model);
->  extern int sun3_hwclk(int set, struct rtc_time *t);
-> @@ -141,7 +141,7 @@ void __init config_sun3(void)
->          mach_sched_init      =  sun3_sched_init;
->          mach_init_IRQ        =  sun3_init_IRQ;
->          mach_reset           =  sun3_reboot;
-> -       mach_gettimeoffset   =  sun3_gettimeoffset;
-> +       arch_gettimeoffset   =  sun3_gettimeoffset;
->         mach_get_model       =  sun3_get_model;
->         mach_hwclk           =  sun3_hwclk;
->         mach_halt            =  sun3_halt;
-> diff --git a/arch/m68k/sun3/intersil.c b/arch/m68k/sun3/intersil.c
-> index 94fe801..889829e 100644
-> --- a/arch/m68k/sun3/intersil.c
-> +++ b/arch/m68k/sun3/intersil.c
-> @@ -23,9 +23,9 @@
->  #define START_VAL (INTERSIL_RUN | INTERSIL_INT_ENABLE | INTERSIL_24H_MODE)
->
->  /* does this need to be implemented? */
-> -unsigned long sun3_gettimeoffset(void)
-> +u32 sun3_gettimeoffset(void)
->  {
-> -  return 1;
-> +  return 1000;
->  }
->
->
-> diff --git a/arch/m68k/sun3x/config.c b/arch/m68k/sun3x/config.c
-> index dd306c8..0532d64 100644
-> --- a/arch/m68k/sun3x/config.c
-> +++ b/arch/m68k/sun3x/config.c
-> @@ -48,7 +48,7 @@ void __init config_sun3x(void)
->         mach_sched_init      = sun3x_sched_init;
->         mach_init_IRQ        = sun3_init_IRQ;
->
-> -       mach_gettimeoffset   = sun3x_gettimeoffset;
-> +       arch_gettimeoffset   = sun3x_gettimeoffset;
->         mach_reset           = sun3x_reboot;
->
->         mach_hwclk           = sun3x_hwclk;
-> diff --git a/arch/m68k/sun3x/time.c b/arch/m68k/sun3x/time.c
-> index 1d0a724..c8eb08a 100644
-> --- a/arch/m68k/sun3x/time.c
-> +++ b/arch/m68k/sun3x/time.c
-> @@ -71,7 +71,7 @@ int sun3x_hwclk(int set, struct rtc_time *t)
->         return 0;
->  }
->  /* Not much we can do here */
-> -unsigned long sun3x_gettimeoffset (void)
-> +u32 sun3x_gettimeoffset(void)
->  {
->      return 0L;
->  }
-> diff --git a/arch/m68k/sun3x/time.h b/arch/m68k/sun3x/time.h
-> index 6909e12..a4f9126 100644
-> --- a/arch/m68k/sun3x/time.h
-> +++ b/arch/m68k/sun3x/time.h
-> @@ -2,7 +2,7 @@
->  #define SUN3X_TIME_H
->
->  extern int sun3x_hwclk(int set, struct rtc_time *t);
-> -unsigned long sun3x_gettimeoffset (void);
-> +u32 sun3x_gettimeoffset(void);
->  void sun3x_sched_init(irq_handler_t vector);
->
->  struct mostek_dt {
-> --
+> 
+>>>
+>>> I think that I prefer how it works today where we call just
+>>> omap2_clocksource_init(), and it determines whether to use the gptimer
+>>> or the 32k-sync.
+>>
+>> There is no reliable way to determine which source should be used in runtime
+>> for boards that do not have the 32k oscillator wired.
+> 
+> Hmmm ... well for OMAP devices the 32kHz clock is mandatory AFAIK. At
+> least for OMAP devices and I would need to check on the AM33xx but I
+> would imagine they are the same. Which devices are you referring to
+> where the 32kHz is optional?
 
-Gr{oetje,eeting}s,
+As Paul already mentioned, AM35xx can work without the external 32kHz
+oscillator.
 
-                        Geert
+> 
+>>> For OMAP I think that it is fine to default to the 32k-sync and then if
+>>> the gptimer is selected, it uses the higher frequency sys_clk as the
+>>> timer source.
+>>
+>> I agree for the 32k-sync as a default, but gptimer will not be selected
+>> on SoC that have 32k while board does not have the 32k wired.
+> 
+> Ok, again let me know which device(s) this applies too.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+So we already have two devices: AM35xx and AM33xx, right?
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> 
+>>>
+>>> For AMxxx, devices, sync-32k does not exist, and so I understand it does
+>>> not work the same.
+>>>
+>>> I am wondering if the use_gptimer_clksrc, should become
+>>> use_sysclk_clksrc, and then ...
+>>>
+>>> For OMAP ...
+>>> use_sysclk_clksrc = 0 --> use sync-32k (default)
+>>> use_sysclk_clksrc = 1 --> use gptimer with sys_clk
+>>>
+>>> For AM33xx ...
+>>> use_sysclk_clksrc = 0 --> use gptimer with 32khz clock (default)
+>>> use_sysclk_clksrc = 1 --> use gptimer with sys_clk
+>>
+>> Well, this is more or less how it works today, but it does not consider
+>> the board wiring information that after all defines which source should
+>> be used. (Not all boards out there are clones of beagles and evms...)
+>> And the generic code should be flexible enough
+>> to enable any legal configuration.
+> 
+> My whole thought here was that the 32kHz is always present. If that is
+> not the case then I would agree this would not work.
+
+We have also, another case where, you don't want to use the 32k as a source
+and use sys_clk to have higher precision.
+
+> 
+>>>
+>>>>  }
+>>>>  
+>>>> -#define OMAP_SYS_TIMER(name)						\
+>>>> -struct sys_timer omap##name##_timer = {					\
+>>>> -	.init	= omap##name##_timer_init,				\
+>>>> -};
+>>>> +#define OMAP_SYS_TIMER(n, clksrc)					\
+>>>> +struct sys_timer omap##n##_##clksrc##_timer = {				\
+>>>> +	.init	= omap##n##_##clksrc##_timer_init,			\
+>>>> +}
+>>>>  
+>>>>  #ifdef CONFIG_ARCH_OMAP2
+>>>> -OMAP_SYS_TIMER_INIT(2, 1, OMAP2_CLKEV_SOURCE, "ti,timer-alwon",
+>>>> -		    2, OMAP2_MPU_SOURCE)
+>>>> -OMAP_SYS_TIMER(2)
+>>>> +OMAP_SYS_TIMER_INIT(2, sync32k, 1, OMAP2_32K_SOURCE, TIMER_PROP_ALWON,
+>>>> +		    2, OMAP2_MPU_SOURCE);
+>>>> +OMAP_SYS_TIMER(2, sync32k);
+>>>> +OMAP_SYS_TIMER_INIT(2, gp, 1, OMAP2_MPU_SOURCE, TIMER_PROP_ALWON,
+>>>> +		    2, OMAP2_MPU_SOURCE);
+>>>> +OMAP_SYS_TIMER(2, gp);
+>>>
+>>> It would be good if we can avoid having two timer_init functions for
+>>> each OMAP generation.
+>>
+>> Yes, but then we will not have the right description of the hardware
+>> but IMHO workarounds on workarounds on...
+>>
+>> There are several clock sources - all can be used,
+>> why not have them described and ready for use?
+> 
+> Well we really want to simplify this code and so I was thinking that if
+> a device has a 32k-sync timer AND there is a 32kHz source, then what's
+> the point in having an option to use a gptimer with a 32kHz source for
+> that device?
+
+Hmmm, that how it is done currently (before my patch),
+or do I miss something?
+
+> I guess I don't see the benefit there, at least for OMAP2-5
+> devices specifically.
+
+Well, this allows certain hardware variants to work properly.
+Isn't this a benefit?
+
+
+-- 
+Regards,
+Igor.
