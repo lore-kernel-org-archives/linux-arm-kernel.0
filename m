@@ -1,111 +1,164 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 11 Nov 2012 10:09:28 +0530
-Subject: [PATCH 06/14] ARM: SPEAr: DT: Modify DT bindings for STMMAC
+Date: Sun, 11 Nov 2012 10:09:29 +0530
+Subject: [PATCH 07/14] ARM: SPEAr: DT: add uart state to fix warning
 In-Reply-To: <cover.1352608333.git.viresh.kumar@linaro.org>
 References: <cover.1352608333.git.viresh.kumar@linaro.org>
-Message-ID: <ef582824e6b3453569ffa6951643fb159addec72.1352608333.git.viresh.kumar@linaro.org>
+Message-ID: <4c8084c7c40a050f858555bd6325e22e45bb0ecf.1352608333.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Deepak Sikri <deepak.sikri@st.com>
+From: Vipul Kumar Samar <vipulkumar.samar@st.com>
 
-This patch modifies the DT bindings for the GMAC IP existings for the
-SPEAr family. The DT bindings now additionally pass the phy mode as a
-configuration parameter for the ethernet device.
+amba-pl011 driver supports two pin state "default" and "sleep" and it
+expect from dt to provide this pinctrl states and phandler otherwise it
+gives a warning message.
 
-Signed-off-by: Deepak Sikri <deepak.sikri@st.com>
+To remove this warning message pass default state with null phandler to uart
+pins in device node (In our case all the pins are configured in default states
+so we pass null phandler to pins).
+
+Signed-off-by: Vipul Kumar Samar <vipulkumar.samar@st.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/spear1310-evb.dts | 1 +
- arch/arm/boot/dts/spear1310.dtsi    | 4 ++++
- arch/arm/boot/dts/spear1340-evb.dts | 1 +
- arch/arm/boot/dts/spear3xx.dtsi     | 1 +
- arch/arm/boot/dts/spear600.dtsi     | 1 +
- 5 files changed, 8 insertions(+)
+ arch/arm/boot/dts/spear1310-evb.dts |  2 ++
+ arch/arm/boot/dts/spear1340-evb.dts |  4 ++++
+ arch/arm/boot/dts/spear300-evb.dts  |  2 ++
+ arch/arm/boot/dts/spear310-evb.dts  | 12 ++++++++++++
+ arch/arm/boot/dts/spear320-evb.dts  |  6 ++++++
+ arch/arm/boot/dts/spear600-evb.dts  |  4 ++++
+ 6 files changed, 30 insertions(+)
 
 diff --git a/arch/arm/boot/dts/spear1310-evb.dts b/arch/arm/boot/dts/spear1310-evb.dts
-index 79a1654..a4ff5cb 100644
+index a4ff5cb..c60c3f8 100644
 --- a/arch/arm/boot/dts/spear1310-evb.dts
 +++ b/arch/arm/boot/dts/spear1310-evb.dts
-@@ -148,6 +148,7 @@
- 		};
+@@ -320,6 +320,8 @@
  
- 		gmac0: eth at e2000000 {
-+			phy-mode = "gmii";
- 			status = "okay";
- 		};
+ 			serial at e0000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
  
-diff --git a/arch/arm/boot/dts/spear1310.dtsi b/arch/arm/boot/dts/spear1310.dtsi
-index 1e18f31..bd6b64b 100644
---- a/arch/arm/boot/dts/spear1310.dtsi
-+++ b/arch/arm/boot/dts/spear1310.dtsi
-@@ -55,6 +55,7 @@
- 			reg = <0x5c400000 0x8000>;
- 			interrupts = <0 95 0x4>;
- 			interrupt-names = "macirq";
-+			phy-mode = "mii";
- 			status = "disabled";
- 		};
- 
-@@ -63,6 +64,7 @@
- 			reg = <0x5c500000 0x8000>;
- 			interrupts = <0 96 0x4>;
- 			interrupt-names = "macirq";
-+			phy-mode = "mii";
- 			status = "disabled";
- 		};
- 
-@@ -71,6 +73,7 @@
- 			reg = <0x5c600000 0x8000>;
- 			interrupts = <0 97 0x4>;
- 			interrupt-names = "macirq";
-+			phy-mode = "rmii";
- 			status = "disabled";
- 		};
- 
-@@ -79,6 +82,7 @@
- 			reg = <0x5c700000 0x8000>;
- 			interrupts = <0 98 0x4>;
- 			interrupt-names = "macirq";
-+			phy-mode = "rgmii";
- 			status = "disabled";
- 		};
- 
+ 			spi0: spi at e0100000 {
 diff --git a/arch/arm/boot/dts/spear1340-evb.dts b/arch/arm/boot/dts/spear1340-evb.dts
-index 4c5fa85..63c352f 100644
+index 63c352f..c6051dd 100644
 --- a/arch/arm/boot/dts/spear1340-evb.dts
 +++ b/arch/arm/boot/dts/spear1340-evb.dts
-@@ -156,6 +156,7 @@
- 		};
+@@ -332,10 +332,14 @@
  
- 		gmac0: eth at e2000000 {
-+			phy-mode = "rgmii";
- 			status = "okay";
- 		};
+ 			serial at e0000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
  
-diff --git a/arch/arm/boot/dts/spear3xx.dtsi b/arch/arm/boot/dts/spear3xx.dtsi
-index b02721f..4946360 100644
---- a/arch/arm/boot/dts/spear3xx.dtsi
-+++ b/arch/arm/boot/dts/spear3xx.dtsi
-@@ -53,6 +53,7 @@
- 			reg = <0xe0800000 0x8000>;
- 			interrupts = <23 22>;
- 			interrupt-names = "macirq", "eth_wake_irq";
-+			phy-mode = "mii";
- 			status = "disabled";
- 		};
+ 			serial at b4100000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
  
-diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
-index a3c36e4..f74feea 100644
---- a/arch/arm/boot/dts/spear600.dtsi
-+++ b/arch/arm/boot/dts/spear600.dtsi
-@@ -59,6 +59,7 @@
- 			interrupt-parent = <&vic1>;
- 			interrupts = <24 23>;
- 			interrupt-names = "macirq", "eth_wake_irq";
-+			phy-mode = "gmii";
- 			status = "disabled";
- 		};
+ 			spi0: spi at e0100000 {
+diff --git a/arch/arm/boot/dts/spear300-evb.dts b/arch/arm/boot/dts/spear300-evb.dts
+index b3265f6..5de1431 100644
+--- a/arch/arm/boot/dts/spear300-evb.dts
++++ b/arch/arm/boot/dts/spear300-evb.dts
+@@ -243,6 +243,8 @@
  
+ 			serial at d0000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			wdt at fc880000 {
+diff --git a/arch/arm/boot/dts/spear310-evb.dts b/arch/arm/boot/dts/spear310-evb.dts
+index b30fa0e..b096329 100644
+--- a/arch/arm/boot/dts/spear310-evb.dts
++++ b/arch/arm/boot/dts/spear310-evb.dts
+@@ -166,26 +166,38 @@
+ 
+ 			serial at d0000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at b2000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at b2080000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at b2100000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at b2180000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at b2200000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			wdt at fc880000 {
+diff --git a/arch/arm/boot/dts/spear320-evb.dts b/arch/arm/boot/dts/spear320-evb.dts
+index d62ee20..02f06c5 100644
+--- a/arch/arm/boot/dts/spear320-evb.dts
++++ b/arch/arm/boot/dts/spear320-evb.dts
+@@ -179,14 +179,20 @@
+ 
+ 			serial at d0000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at a3000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at a4000000 {
+ 			       status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			wdt at fc880000 {
+diff --git a/arch/arm/boot/dts/spear600-evb.dts b/arch/arm/boot/dts/spear600-evb.dts
+index 16e4de4..5e6ef03 100644
+--- a/arch/arm/boot/dts/spear600-evb.dts
++++ b/arch/arm/boot/dts/spear600-evb.dts
+@@ -73,10 +73,14 @@
+ 		apb {
+ 			serial at d0000000 {
+ 				status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			serial at d0080000 {
+ 				status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <>;
+ 			};
+ 
+ 			i2c at d0200000 {
 -- 
 1.7.12.rc2.18.g61b472e
