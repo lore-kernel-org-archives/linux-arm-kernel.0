@@ -1,53 +1,52 @@
 From: axel.lin@ingics.com (Axel Lin)
-Date: Sun, 11 Nov 2012 21:44:55 +0800
-Subject: [PATCH RFT 1/2] pinctrl: dove: Fix dove_audio1_ctrl_set when
- BIT(0|1|2|3) of config is clear
-Message-ID: <1352641495.3113.1.camel@phoenix>
+Date: Sun, 11 Nov 2012 21:46:09 +0800
+Subject: [PATCH RFT 2/2] pinctrl: dove: Checking valid config in
+ dove_audio1_ctrl_set
+In-Reply-To: <1352641495.3113.1.camel@phoenix>
+References: <1352641495.3113.1.camel@phoenix>
+Message-ID: <1352641569.3113.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current implementation in dove_audio1_ctrl_set() does not clear corresponding
-register bit if BIT(0|1|2|3) of config is clear. Fix it.
+Move the code checking valid config to dove_audio1_ctrl_set(), this ensures we
+always set valid config. And then dove_audio1_ctrl_get() always returns correct
+config.
 
 Signed-off-by: Axel Lin <axel.lin@ingics.com>
 ---
-Hi,
-I don't have this hardware.
-I'd appreciate if someone can review and test this patch.
-
-This resend also CC Sebastian Hesselbarth and linux-arm-kernel.
-Thanks,
-Axel
- drivers/pinctrl/mvebu/pinctrl-dove.c |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pinctrl/mvebu/pinctrl-dove.c |   13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pinctrl/mvebu/pinctrl-dove.c b/drivers/pinctrl/mvebu/pinctrl-dove.c
-index ffe74b2..e5cc694 100644
+index e5cc694..a393790 100644
 --- a/drivers/pinctrl/mvebu/pinctrl-dove.c
 +++ b/drivers/pinctrl/mvebu/pinctrl-dove.c
-@@ -236,12 +236,23 @@ static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+@@ -217,12 +217,6 @@ static int dove_audio1_ctrl_get(struct mvebu_mpp_ctrl *ctrl,
+ 	if (gcfg2 & DOVE_TWSI_OPTION3_GPIO)
+ 		*config |= BIT(0);
  
+-	/* SSP/TWSI only if I2S1 not set*/
+-	if ((*config & BIT(3)) == 0)
+-		*config &= ~(BIT(2) | BIT(0));
+-	/* TWSI only if SPDIFO not set*/
+-	if ((*config & BIT(1)) == 0)
+-		*config &= ~BIT(0);
+ 	return 0;
+ }
+ 
+@@ -234,6 +228,13 @@ static int dove_audio1_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+ 	unsigned long gmpp = readl(DOVE_MPP_GENERAL_VIRT_BASE);
+ 	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
+ 
++	/* SSP/TWSI only if I2S1 not set*/
++	if ((config & BIT(3)) == 0)
++		config &= ~(BIT(2) | BIT(0));
++	/* TWSI only if SPDIFO not set*/
++	if ((config & BIT(1)) == 0)
++		config &= ~BIT(0);
++
  	if (config & BIT(0))
  		gcfg2 |= DOVE_TWSI_OPTION3_GPIO;
-+	else
-+		gcfg2 &= ~DOVE_TWSI_OPTION3_GPIO;
-+
- 	if (config & BIT(1))
- 		gmpp |= DOVE_AU1_SPDIFO_GPIO_EN;
-+	else
-+		gmpp &= ~DOVE_AU1_SPDIFO_GPIO_EN;
-+
- 	if (config & BIT(2))
- 		sspc1 |= DOVE_SSP_ON_AU1;
-+	else
-+		sspc1 &= ~DOVE_SSP_ON_AU1;
-+
- 	if (config & BIT(3))
- 		mpp4 |= DOVE_AU1_GPIO_SEL;
-+	else
-+		mpp4 &= ~DOVE_AU1_GPIO_SEL;
- 
- 	writel(mpp4, DOVE_MPP_CTRL4_VIRT_BASE);
- 	writel(sspc1, DOVE_SSP_CTRL_STATUS_1);
+ 	else
 -- 
 1.7.9.5
