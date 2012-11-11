@@ -1,50 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 11 Nov 2012 19:42:59 +0100
-Subject: [PATCH 0/5] clk: ux500: Add clock lookups for u8500
-In-Reply-To: <20121110010750.17381.1960@nucleus>
-References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
- <20121025075138.GD971@gmail.com>
- <20121110010750.17381.1960@nucleus>
-Message-ID: <CACRpkda4iFYga=AKn_ZHGmQSnCW9-DxmYF25HnBA1iuZ5PD3AQ@mail.gmail.com>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Sun, 11 Nov 2012 19:43:36 +0100
+Subject: [PATCH v2] Add support for generic BCM SoC chipsets
+In-Reply-To: <CAA-5wcDo2OJSD9O4YfJkxYDukCSMJo46at2NR9e41fZbAhh7wA@mail.gmail.com>
+References: <1352645834-10173-1-git-send-email-csd@broadcom.com>
+ <12188358.5I1Xcz160E@bender>
+ <CAA-5wcDo2OJSD9O4YfJkxYDukCSMJo46at2NR9e41fZbAhh7wA@mail.gmail.com>
+Message-ID: <1754478.hbVYUG0hG4@bender>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2012 at 2:07 AM, Mike Turquette <mturquette@ti.com> wrote:
-> Quoting Lee Jones (2012-10-25 00:51:38)
->> On Mon, 22 Oct 2012, Ulf Hansson wrote:
->>
->> > From: Ulf Hansson <ulf.hansson@linaro.org>
->> >
->> > Step by step, clock lookups for u8500 are being added in this set
->> > of patches.
->> >
->> > These patches will require additional patches for sound/soc/ux500/
->> > driver as well as drivers/i2c/busses/i2c-nomadik driver to prevent
->> > the boot for ux500 from break. Those patches are being merged through
->> > separate trees.
->> >
->> > Ulf Hansson (5):
->> >   clk: ux500: Register i2c clock lookups for u8500
->> >   clk: ux500: Register ssp clock lookups for u8500
->> >   clk: ux500: Register msp clock lookups for u8500
->> >   clk: ux500: Update rtc clock lookup for u8500
->> >   clk: ux500: Register slimbus clock lookups for u8500
->>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->>
->> Can I also mention that these need to go into the -rcs at the
->> earliest opportunity please, as it is preventing ~50% of the
->> devices from functioning on all of the ST-Ericsson development
->> boards.
->>
->> This is a massive blocker for us!
->>
->
-> I've taken these patches into clk-next.  Do you need them in as a late
-> fix in the 3.7 cycle or is your urgent need only for 3.8 development?
+On Sunday 11 November 2012 09:32:13 Christian Daudt wrote:
+> On Sun, Nov 11, 2012 at 7:53 AM, Florian Fainelli <florian@openwrt.org>wrote:
+> 
+> > Hi Christian,
+> >
+> > On Sunday 11 November 2012 06:57:14 Christian Daudt wrote:
+> > > In order to start upstreaming Broadcom SoC support, create
+> > > a starting hierarchy, arch and dts files.
+> > > The first support SoC family that is planned is the
+> > > BCM281XX (BCM28145/28150/28155/28160) family of dual A9 mobile SoC cores
+> > > This code is just the skeleton code for get the machine upstreamed. It
+> > > has been made MULTIPLATFORM compatible.
+> > > Next steps
+> > > ----------
+> > > Upstream a basic set of drivers - sufficient for a console boot to
+> > > ramdisk. These will includer timer, gpio, i2c drivers.
+> > > After this basic set, we will proceed with a more comprehensive set
+> > > of drivers for the 281XX SoC family.
+> >
+> > Would not it make more sense to use mach-bcm281xx as a directory name
+> > instead
+> > of mach-bcm which sounds a tad too generic? This would also make it
+> > consistent
+> > with Domenico's mach-bcm47xx and the existing bcm47xx and bcm63xx
+> > MIPS-based
+> > SoC support.
+> >
+> 
+> I'm following the other mobile ARM SoCs which all have a single mach-
+> directory for various families of chips (mach-tegra, mach-omap2, etc...).
+> Plus the intent is to have a single set of mach files that works across bcm
+> SoCs, so it is preferable to keep it in a single mach-bcm.
 
-It is regressing the above drivers (i2c, ssp, etc) so they need to
-go into v3.7-rc:s...
+Your argument does not make sense here, if I follow your point, these
+directories should have been named mach-nvidia or mach-ti respectively if I 
+follow your convention (you use the vendor name, not a commercial product name)
 
-Yours,
-Linus Walleij
+I do understand your intent, yet you announce support for BCM281xx SoCs, and
+one of your dtsi file is bcm281xx.dtsi. At least something like mach-bcmmobile
+sounds better to me.
+
+We have had the inclusion of the "socfpga" platform which is already very
+badly named because it does not make it clear that it is an Altera platform and
+not some generic SoC + FPGA platform.
+
+Anyway, that's just my 2 cents.
+-- 
+Florian
