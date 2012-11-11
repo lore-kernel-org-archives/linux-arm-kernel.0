@@ -1,31 +1,42 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Sun, 11 Nov 2012 16:53:42 +0100
-Subject: [PATCH v2] Add support for generic BCM SoC chipsets
-In-Reply-To: <1352645834-10173-1-git-send-email-csd@broadcom.com>
-References: <1352645834-10173-1-git-send-email-csd@broadcom.com>
-Message-ID: <12188358.5I1Xcz160E@bender>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 11 Nov 2012 17:21:28 +0100
+Subject: [PATCH 0/3] GPIO driver to turn power off
+Message-ID: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+A few of the Kirkwood systems use a GPIO line to turn the power off on
+shutdown. They request the GPIO line in the board setup code,
+optionally setting it as an output and driving it inactive. They then
+register a function for pm_power_off. At the end of the shutdown, this
+function is called. The GPIO line is configured as an output, if not
+already so, and then driven active. In order to cover the use case of
+edges rather then levels, triggering power off, the GPIO line is then
+toggled active and later inactive. This should allow the driver to be
+used by PXA which also has boards using the same scheme.
 
-On Sunday 11 November 2012 06:57:14 Christian Daudt wrote:
-> In order to start upstreaming Broadcom SoC support, create
-> a starting hierarchy, arch and dts files.
-> The first support SoC family that is planned is the
-> BCM281XX (BCM28145/28150/28155/28160) family of dual A9 mobile SoC cores
-> This code is just the skeleton code for get the machine upstreamed. It
-> has been made MULTIPLATFORM compatible.
-> Next steps
-> ----------
-> Upstream a basic set of drivers - sufficient for a console boot to
-> ramdisk. These will includer timer, gpio, i2c drivers.
-> After this basic set, we will proceed with a more comprehensive set
-> of drivers for the 281XX SoC family.
+The driver code was initially developed by Jamie Lentin and extended
+to cover the PXA case by Andrew Lunn.
 
-Would not it make more sense to use mach-bcm281xx as a directory name instead
-of mach-bcm which sounds a tad too generic? This would also make it consistent
-with Domenico's mach-bcm47xx and the existing bcm47xx and bcm63xx MIPS-based
-SoC support.
+Andrew Lunn (2):
+  ARM: Kirkwood: Convert DNSKW to use gpio-poweroff.
+  ARM: Kirkwood: Convert IB62x0 to use gpio-poweroff.
+
+Jamie Lentin (1):
+  gpio: Add simple poweroff-gpio driver
+
+ .../devicetree/bindings/gpio/gpio-poweroff.txt     |   22 ++++
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi              |    5 +
+ arch/arm/boot/dts/kirkwood-ib62x0.dts              |    6 +
+ arch/arm/mach-kirkwood/Kconfig                     |    1 +
+ arch/arm/mach-kirkwood/board-dnskw.c               |   12 --
+ arch/arm/mach-kirkwood/board-ib62x0.c              |   13 --
+ drivers/gpio/Kconfig                               |   10 ++
+ drivers/gpio/Makefile                              |    2 +
+ drivers/gpio/gpio-poweroff.c                       |  129 ++++++++++++++++++++
+ 9 files changed, 175 insertions(+), 25 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+ create mode 100644 drivers/gpio/gpio-poweroff.c
+
 -- 
-Florian
+1.7.10.4
