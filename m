@@ -1,224 +1,91 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 11 Nov 2012 13:22:19 +0100
-Subject: [PATCH] RFC: pinctrl: grab default handler with bus notifiers
-Message-ID: <1352636539-6318-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 11 Nov 2012 13:32:35 +0100
+Subject: [PATCHv2] Input: omap4-keypad: Add pinctrl support
+In-Reply-To: <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
+References: <1350911580-20307-1-git-send-email-sourav.poddar@ti.com>
+ <20121024161429.GA16350@core.coreip.homeip.net>
+ <CACRpkdai3NocZQnW6YRF+k6GXUSx3P_Ge=F-tkuivrFm6tBbLg@mail.gmail.com>
+ <4099134.xWUIfbbahk@dtor-d630.eng.vmware.com>
+ <CACRpkdaiLXVeUg1quuw3XPTenbKOjn+aWbGQezpcyvzQCtCWow@mail.gmail.com>
+ <20121030113407.GA24335@sirena.org.uk>
+ <CACRpkdapQJY0aoam741O0fb8EeM9BLk_Psq5TaPG84J7wEvCLw@mail.gmail.com>
+ <87obji8kta.fsf@deeprootsystems.com>
+ <CACRpkdbCk9+HSBPtfT-1dO8paSRYJ5VXX_0SxiyxgrObnJEvmQ@mail.gmail.com>
+ <20121101120713.GA4413@opensource.wolfsonmicro.com>
+ <CACRpkdawAdbwackZeST4iDkFZx9-exhTVoUzAABaWr1G89tATg@mail.gmail.com>
+Message-ID: <CACRpkdZy1zRQM8Ww3RGc=Q+yt_eS6ekb02MDM-ixzaG8LDRacQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Nov 1, 2012 at 3:01 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Nov 1, 2012 at 1:07 PM, Mark Brown
+> <broonie@opensource.wolfsonmicro.com> wrote:
+>> On Thu, Nov 01, 2012 at 09:54:00AM +0100, Linus Walleij wrote:
+>
+>> For the pin hogging I'd actually been thinking separately that we should
+>> just have the device core do a devm_pinctrl_get_set_default() prior to
+>> probing the device and store the result in the struct device.  That
+>> would immediately remove almost all of the current pinctrl users, users
+>> that do need to do things with the data or check the result can then
+>> pick up the pinctrl pointer from the device struct.
+>
+> I never thought of that. This sounds like it would work.
 
-This makes the pinctrl subsystem auto-grab the pinctrl handle and
-set the "default" (PINCTRL_STATE_DEFAULT) state for every device
-that is present on the platform or AMBA (PrimeCell) bus right
-before probe. This will account for the lion's share of embedded
-silicon devcies. The behaviour is achieved using bus notifiers
-on the platform and AMBA (PrimeCell) busses.
+So I've looked closer at this.
 
-A modification of the semantics for pinctrl_get() is also done:
-previously if the pinctrl handle for a certain device was already
-taken, the pinctrl core would return an error. Now, since the
-core may have already default-grabbed the handle and set its
-state to "default", if the handle was already taken, this will
-be disregarded and the located, previously instanitated handle
-will be returned to the caller.
+> And the good thing is that this is a clean cut so we
+> will centralized code without having to decide right now
+> how to handle the pm idle/sleep cases.
+>
+> Talking here with Kevin Hilman on my left and Grant
+> Likely on my right (they're physically here) there is some
+> worry about stashing stuff into struct device.
+>
+> What if I retrieve this in the pinctrl subsystem using
+> bus notifiers and then expose the struct pinctrl * to
+> the clients by using pinctrl_get() and when you get
+> such a handle in your probe() you know that the
+> pinctrl subsystem has already fetched the handle and
+> set it to "default" at that point?
 
-This way all code in drivers explicitly requesting their pinctrl
-handlers will still be functional, and drivers that want to
-explicitly retrieve and switch their handles can still do that.
-But if the desired functionality is just boilerplate of this
-type in the probe() function:
+I have sent out an RFC for this approach. It actually
+works quite well on the U300 for example.
 
-struct pinctrl	*p;
+However as stated in the patch we run into another
+problem: what if the pinctrl provider returns
+-EDEFER_PROBE?
 
-p = devm_pinctrl_get_select_default(&dev);
-if (IS_ERR(p)) {
-   if (PTR_ERR(p) == -EPROBE_DEFER)
-	return -EPROBE_DEFER;
-	dev_warn(&dev, "no pinctrl handle\n");
-}
+(The same will be true for clocks, regulators etc I
+guess...)
 
-The discussion began with the addition of such boilerplate
-to the omap4 keypad driver:
-http://marc.info/?l=linux-input&m=135091157719300&w=2
+If I use notifiers like this, I cannot return -EPROBE_DEFER
+to the core. :-(
 
-Notice that the patch disregards deferral as per above:
-if the pin controller returns -EPROBE_DEFER, there is no
-way to send that back to the device core using notifiers,
-so in cases where the probe ordering is to be controlled,
-drivers still need to add the above pin control handling
-code. So this mechanism will basically be optimistic, and
-to be really sure that you don't have a deferred probe
-on your pins, you still need to explicitly request the
-pins.
+The PM domains seem to be built on the notification
+mechanism as well (AFAICT), so it will not allow drivers to
+defer their probes, as it is an optional layer after all.
 
-This patch alone does not solve the entire dilemma faced:
-whether code should be distributed into the drivers or
-if it should be centralized to e.g. a PM domain. But it
-solves the immediate issue of the addition of boilerplate
-to a lot of drivers that just want to grab the default
-state. As mentioned, they can later explicitly retrieve
-the handle and set different states, and this could as
-well be done by e.g. PM domains as it is only related
-to a certain struct device * pointer.
+As a matter of fact it seems that there is an implicit
+assumption in PM domains that the resources that
+are taken there cannot defer any probing, so they are
+assumed to always be present. Is this correct?
+If so, any resources that may be deferred (such as
+pinctrl) can never be handled in PM domains. Only
+simple stuff that the SoC controls directly e.g through
+some fixed register pokes to voltage domains.
 
-Another solution that was discussed was whether to move
-the default pinctrl handle and state grab to the device
-core as an optional field in struct device itself, but
-I'd like to first propose this less intrusive mechanism.
+So then the only option that remains to centralize
+pinctrl handling is indeed to do that in the device core,
+before probe(). I need to know Greg's feelings about that.
 
-CC: Felipe Balbi <balbi@ti.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Mitch Bradley <wmb@firmworks.com>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Rickard Andersson <rickard.andersson@stericsson.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/pinctrl.txt | 24 +++++++++++++++++--
- drivers/pinctrl/core.c    | 60 +++++++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 80 insertions(+), 4 deletions(-)
+At the same time this sort of give me the feeling that
+we might be doing something wrong. The distributed
+nature of deferred probes will become quite elusive
+if the deferral request comes from some place
+before probe() is even called on the driver.
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index da40efb..b6c27b1 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -972,6 +972,19 @@ pinmux core.
- Pin control requests from drivers
- =================================
- 
-+When a device driver is about to probe on the platform or AMBA (PrimeCell)
-+bus, the pinctrl core will automatically attempt to issue
-+pinctrl_get_select_default() on these devices using the bus notification
-+mechanism. This way driver writers do not need to add any of the
-+boilerplate code of the type found below. However when doing fine-grained
-+state selection and not using the "default" state, you may have to do
-+some device driver handling of the pinctrl handles and states.
-+
-+So if you just want to put the pins for a certain platform or AMBA device
-+into the default state and be done with it, there is nothing you need to
-+do besides providing the proper mapping table. The device core will take
-+care of the rest.
-+
- Generally it is discouraged to let individual drivers get and enable pin
- control. So if possible, handle the pin control in platform code or some other
- place where you have access to all the affected struct device * pointers. In
-@@ -1097,8 +1110,8 @@ situations that can be electrically unpleasant, you will certainly want to
- mux in and bias pins in a certain way before the GPIO subsystems starts to
- deal with them.
- 
--The above can be hidden: using pinctrl hogs, the pin control driver may be
--setting up the config and muxing for the pins when it is probing,
-+The above can be hidden: using device notifiers, the pinctrl core may be
-+setting up the config and muxing for the pins when the device is probing,
- nevertheless orthogonal to the GPIO subsystem.
- 
- But there are also situations where it makes sense for the GPIO subsystem
-@@ -1144,6 +1157,13 @@ PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-foo", NULL /* group */, "power_func")
- 
- This gives the exact same result as the above construction.
- 
-+This should not be used for any kind of device which is represented in
-+the device model. For platform and AMBA (PrimeCell) devices, such as found
-+in many SoC:s, the pinctrl core will listen to notifications from these
-+buses and attempt to do pinctrl_get_select_default() for these devices
-+right before their device drivers are probed, so hogging these will just
-+make the model look strange.
-+
- 
- Runtime pinmuxing
- =================
-diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
-index 71db586..bdb2300 100644
---- a/drivers/pinctrl/core.c
-+++ b/drivers/pinctrl/core.c
-@@ -26,6 +26,9 @@
- #include <linux/pinctrl/consumer.h>
- #include <linux/pinctrl/pinctrl.h>
- #include <linux/pinctrl/machine.h>
-+#include <linux/notifier.h>
-+#include <linux/platform_device.h>
-+#include <linux/amba/bus.h>
- #include "core.h"
- #include "devicetree.h"
- #include "pinmux.h"
-@@ -684,9 +687,16 @@ static struct pinctrl *pinctrl_get_locked(struct device *dev)
- 	if (WARN_ON(!dev))
- 		return ERR_PTR(-EINVAL);
- 
-+	/*
-+	 * See if somebody else (such as the pinctrl core, using the
-+	 * notifiers) has already obtained a handle to the pinctrl for
-+	 * this device. In that case, return another pointer to it.
-+	 */
- 	p = find_pinctrl(dev);
--	if (p != NULL)
--		return ERR_PTR(-EBUSY);
-+	if (p != NULL) {
-+		dev_dbg(dev, "obtain a copy of previously claimed pinctrl\n");
-+		return p;
-+	}
- 
- 	return create_pinctrl(dev);
- }
-@@ -1026,6 +1036,52 @@ void pinctrl_unregister_map(struct pinctrl_map const *map)
- 	}
- }
- 
-+static int pinctrl_device_notify(struct notifier_block *nb,
-+				 unsigned long action, void *data)
-+{
-+	struct device *dev = data;
-+	struct pinctrl *p;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_BIND_DRIVER:
-+		/*
-+		 * Hog pins right before a driver is about to be bound to
-+		 * the device
-+		 */
-+		p = devm_pinctrl_get_select_default(dev);
-+		if (IS_ERR_OR_NULL(p)) {
-+			dev_dbg(dev, "no pinctrl handle or default state\n");
-+			return 0;
-+		}
-+		dev_dbg(dev, "pinctrl core obtained default pinctrl\n");
-+		break;
-+	case BUS_NOTIFY_UNBOUND_DRIVER:
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct notifier_block pinctrl_device_nb = {
-+	.notifier_call = pinctrl_device_notify,
-+};
-+
-+static int __init pinctrl_notifiers_init(void)
-+{
-+	bus_register_notifier(&platform_bus_type, &pinctrl_device_nb);
-+#ifdef CONFIG_ARM_AMBA
-+	bus_register_notifier(&amba_bustype, &pinctrl_device_nb);
-+#endif
-+	return 0;
-+}
-+
-+/*
-+ * The AMBA bus registers in the postcore_initcall() so we need to
-+ * register our notifiers right after that so we can fetch pins for
-+ * e.g. TTY drivers that will be registered in the arch_initcall() next.
-+ */
-+postcore_initcall_sync(pinctrl_notifiers_init);
-+
- #ifdef CONFIG_DEBUG_FS
- 
- static int pinctrl_pins_show(struct seq_file *s, void *what)
--- 
-1.7.11.3
+Please check my RFC patch and tell me above errors
+in the above reasoning....
+
+Yours,
+Linus Walleij
