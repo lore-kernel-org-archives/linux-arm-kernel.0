@@ -1,57 +1,311 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 Nov 2012 15:50:28 +0200
-Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
-In-Reply-To: <CANOLnOO0yMabku-_3yhi=1bwohbrb=rtFDOuKf1LPCAFv_OqCQ@mail.gmail.com>
-References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
- <CANOLnOO0yMabku-_3yhi=1bwohbrb=rtFDOuKf1LPCAFv_OqCQ@mail.gmail.com>
-Message-ID: <50A0FEA4.20304@ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 12 Nov 2012 14:51:00 +0100
+Subject: [RFC 3/6] sched: pack small tasks
+In-Reply-To: <20121109171344.GB16082@e103034-lin>
+References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
+ <1349595838-31274-4-git-send-email-vincent.guittot@linaro.org>
+ <20121109171344.GB16082@e103034-lin>
+Message-ID: <CAKfTPtBf3b2DdLHGHaJP0_mZO2mgH6dH3bcZR=ppputyMAGLqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-12 15:39, Grazvydas Ignotas wrote:
-> Hi,
-> 
-> On Mon, Nov 12, 2012 at 12:25 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
->> This series changes omapfb to use standard dma_alloc funcs instead of omap
->> specific vram allocator. This let's us remove the omap vram allocator, making
->> omapfb platform independent.
+On 9 November 2012 18:13, Morten Rasmussen <Morten.Rasmussen@arm.com> wrote:
+> Hi Vincent,
+>
+> I have experienced suboptimal buddy selection on a dual cluster setup
+> (ARM TC2) if SD_SHARE_POWERLINE is enabled at MC level and disabled at
+> CPU level. This seems to be the correct flag settings for a system with
+> only cluster level power gating.
+>
+> To me it looks like update_packing_domain() is not doing the right
+> thing. See inline comments below.
+
+Hi Morten,
+
+Thanks for testing the patches.
+
+It seems that I have too optimized the loop and remove some use cases.
+
+>
+> On Sun, Oct 07, 2012 at 08:43:55AM +0100, Vincent Guittot wrote:
+>> During sched_domain creation, we define a pack buddy CPU if available.
 >>
->> However, note that using standard dma funcs causes the following downsides:
+>> On a system that share the powerline at all level, the buddy is set to -1
 >>
->> ...
+>> On a dual clusters / dual cores system which can powergate each core and
+>> cluster independantly, the buddy configuration will be :
+>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>> -----------------------------------
+>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
 >>
->> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
->> changed the ioctl to return 64M for all the values, which, I hope, the
->> applications will interpret as "there's enough vram".
-> 
-> Do at least OMAPFB_QUERY_MEM/OMAPFB_SETUP_MEM still work?
+>> Small tasks tend to slip out of the periodic load balance.
+>> The best place to choose to migrate them is at their wake up.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>  kernel/sched/core.c  |    1 +
+>>  kernel/sched/fair.c  |  109 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>>  kernel/sched/sched.h |    1 +
+>>  3 files changed, 111 insertions(+)
+>>
+>> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+>> index dab7908..70cadbe 100644
+>> --- a/kernel/sched/core.c
+>> +++ b/kernel/sched/core.c
+>> @@ -6131,6 +6131,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
+>>       rcu_assign_pointer(rq->sd, sd);
+>>       destroy_sched_domains(tmp, cpu);
+>>
+>> +     update_packing_domain(cpu);
+>>       update_top_cache_domain(cpu);
+>>  }
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 4f4a4f6..8c9d3ed 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -157,6 +157,63 @@ void sched_init_granularity(void)
+>>       update_sysctl();
+>>  }
+>>
+>> +
+>> +/*
+>> + * Save the id of the optimal CPU that should be used to pack small tasks
+>> + * The value -1 is used when no buddy has been found
+>> + */
+>> +DEFINE_PER_CPU(int, sd_pack_buddy);
+>> +
+>> +/* Look for the best buddy CPU that can be used to pack small tasks
+>> + * We make the assumption that it doesn't wort to pack on CPU that share the
+>> + * same powerline. We looks for the 1st sched_domain without the
+>> + * SD_SHARE_POWERLINE flag. Then We look for the sched_group witht the lowest
+>> + * power per core based on the assumption that their power efficiency is
+>> + * better */
+>> +void update_packing_domain(int cpu)
+>> +{
+>> +     struct sched_domain *sd;
+>> +     int id = -1;
+>> +
+>> +     sd = highest_flag_domain(cpu, SD_SHARE_POWERLINE);
+>> +     if (!sd)
+>> +             sd = rcu_dereference_check_sched_domain(cpu_rq(cpu)->sd);
+>> +     else
+>> +             sd = sd->parent;
+> sd is the highest level where SD_SHARE_POWERLINE is enabled so the sched
+> groups of the parent level would represent the power domains. If get it
+> right, we want to pack inside the cluster first and only let first cpu
 
-Yes.
+You probably wanted to use sched_group instead of cluster because
+cluster is only a special use case, didn't you ?
 
->> 4) "vram" kernel parameter to define how much ram to reserve for video use no
->> longer works. The user needs to enable CMA and use "cma" parameter.
-> 
-> That's a significant change, you should update Documentation/ .
+> of the cluster do packing on another cluster. So all cpus - except the
+> first one - in the current sched domain should find its buddy within the
+> domain and only the first one should go to the parent sched domain to
+> find its buddy.
 
-Ah right. The documentation. I never remember =).
+We don't want to pack in the current sched_domain because it shares
+power domain. We want to pack at the parent level
 
-> What about omapfb.vram, is it still there?
+>
+> I propose the following fix:
+>
+> -               sd = sd->parent;
+> +               if (cpumask_first(sched_domain_span(sd)) == cpu
+> +                       || !sd->parent)
+> +                       sd = sd->parent;
 
-Yes.
+We always look for the buddy in the parent level whatever the cpu
+position in the mask is.
 
-> Perhaps we also need to select/depend on CMA?
+>
+>
+>> +
+>> +     while (sd) {
+>> +             struct sched_group *sg = sd->groups;
+>> +             struct sched_group *pack = sg;
+>> +             struct sched_group *tmp = sg->next;
+>> +
+>> +             /* 1st CPU of the sched domain is a good candidate */
+>> +             if (id == -1)
+>> +                     id = cpumask_first(sched_domain_span(sd));
+>
+> There is no guarantee that id is in the sched group pointed to by
+> sd->groups, which is implicitly assumed later in the search loop. We
+> need to find the sched group that contains id and point sg to that
+> instead. I haven't found an elegant way to find that group, but the fix
+> below should at least give the right result.
+>
+> +               /* Find sched group of candidate */
+> +               tmp = sd->groups;
+> +               do {
+> +                       if (cpumask_test_cpu(id, sched_group_cpus(tmp)))
+> +                       {
+> +                               sg = tmp;
+> +                               break;
+> +                       }
+> +               } while (tmp = tmp->next, tmp != sd->groups);
+> +
+> +               pack = sg;
+> +               tmp = sg->next;
 
-dma_alloc_* funcs work fine without CMA. CMA only makes them work
-better. Thus I don't think OMAPFB should depend on CMA, but perhaps CMA
-should be enabled by default in omap2plus_defconfig?
 
- Tomi
+I have a new loop which solves your issue and others. I will use it
+for the next version
 
++	while (sd) {
++		struct sched_group *sg = sd->groups;
++		struct sched_group *pack = sg;
++		struct sched_group *tmp;
++
++		/* The 1st CPU of the local group is a good candidate */
++		id = cpumask_first(sched_group_cpus(pack));
++
++		/* loop the sched groups to find the best one */
++		for (tmp = sg->next; tmp != sg; tmp = tmp->next) {
++			if (tmp->sgp->power * pack->group_weight >
++					pack->sgp->power * tmp->group_weight)
++				continue;
++
++			if ((tmp->sgp->power * pack->group_weight ==
++					pack->sgp->power * tmp->group_weight)
++			 && (cpumask_first(sched_group_cpus(tmp)) >= id))
++				continue;
++
++			/* we have found a better group */
++			pack = tmp;
++
++			/* Take the 1st CPU of the new group */
++			id = cpumask_first(sched_group_cpus(pack));
++		}
++
++		/* Look for another CPU than itself */
++		if ((id != cpu)
++		 || ((sd->parent) && !(sd->parent->flags && SD_LOAD_BALANCE)))
++			break;
++
++		sd = sd->parent;
++	}
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121112/e79a30b7/attachment.sig>
+Regards,
+Vincent
+
+>
+> Regards,
+> Morten
+>
+>> +
+>> +             /* loop the sched groups to find the best one */
+>> +             while (tmp != sg) {
+>> +                     if (tmp->sgp->power * sg->group_weight <
+>> +                                     sg->sgp->power * tmp->group_weight)
+>> +                             pack = tmp;
+>> +                     tmp = tmp->next;
+>> +             }
+>> +
+>> +             /* we have found a better group */
+>> +             if (pack != sg)
+>> +                     id = cpumask_first(sched_group_cpus(pack));
+>> +
+>> +             /* Look for another CPU than itself */
+>> +             if ((id != cpu)
+>> +              || ((sd->parent) && !(sd->parent->flags && SD_LOAD_BALANCE)))
+>> +                     break;
+>> +
+>> +             sd = sd->parent;
+>> +     }
+>> +
+>> +     pr_info(KERN_INFO "CPU%d packing on CPU%d\n", cpu, id);
+>> +     per_cpu(sd_pack_buddy, cpu) = id;
+>> +}
+>> +
+>>  #if BITS_PER_LONG == 32
+>>  # define WMULT_CONST (~0UL)
+>>  #else
+>> @@ -3073,6 +3130,55 @@ static int select_idle_sibling(struct task_struct *p, int target)
+>>       return target;
+>>  }
+>>
+>> +static inline bool is_buddy_busy(int cpu)
+>> +{
+>> +     struct rq *rq = cpu_rq(cpu);
+>> +
+>> +     /*
+>> +      * A busy buddy is a CPU with a high load or a small load with a lot of
+>> +      * running tasks.
+>> +      */
+>> +     return ((rq->avg.usage_avg_sum << rq->nr_running) >
+>> +                     rq->avg.runnable_avg_period);
+>> +}
+>> +
+>> +static inline bool is_light_task(struct task_struct *p)
+>> +{
+>> +     /* A light task runs less than 25% in average */
+>> +     return ((p->se.avg.usage_avg_sum << 2) < p->se.avg.runnable_avg_period);
+>> +}
+>> +
+>> +static int check_pack_buddy(int cpu, struct task_struct *p)
+>> +{
+>> +     int buddy = per_cpu(sd_pack_buddy, cpu);
+>> +
+>> +     /* No pack buddy for this CPU */
+>> +     if (buddy == -1)
+>> +             return false;
+>> +
+>> +     /*
+>> +      * If a task is waiting for running on the CPU which is its own buddy,
+>> +      * let the default behavior to look for a better CPU if available
+>> +      * The threshold has been set to 37.5%
+>> +      */
+>> +     if ((buddy == cpu)
+>> +      && ((p->se.avg.usage_avg_sum << 3) < (p->se.avg.runnable_avg_sum * 5)))
+>> +             return false;
+>> +
+>> +     /* buddy is not an allowed CPU */
+>> +     if (!cpumask_test_cpu(buddy, tsk_cpus_allowed(p)))
+>> +             return false;
+>> +
+>> +     /*
+>> +      * If the task is a small one and the buddy is not overloaded,
+>> +      * we use buddy cpu
+>> +      */
+>> +      if (!is_light_task(p) || is_buddy_busy(buddy))
+>> +             return false;
+>> +
+>> +     return true;
+>> +}
+>> +
+>>  /*
+>>   * sched_balance_self: balance the current task (running on cpu) in domains
+>>   * that have the 'flag' flag set. In practice, this is SD_BALANCE_FORK and
+>> @@ -3098,6 +3204,9 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
+>>       if (p->nr_cpus_allowed == 1)
+>>               return prev_cpu;
+>>
+>> +     if (check_pack_buddy(cpu, p))
+>> +             return per_cpu(sd_pack_buddy, cpu);
+>> +
+>>       if (sd_flag & SD_BALANCE_WAKE) {
+>>               if (cpumask_test_cpu(cpu, tsk_cpus_allowed(p)))
+>>                       want_affine = 1;
+>> diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+>> index a95d5c1..086d8bf 100644
+>> --- a/kernel/sched/sched.h
+>> +++ b/kernel/sched/sched.h
+>> @@ -875,6 +875,7 @@ static inline void idle_balance(int cpu, struct rq *rq)
+>>
+>>  extern void sysrq_sched_debug_show(void);
+>>  extern void sched_init_granularity(void);
+>> +extern void update_packing_domain(int cpu);
+>>  extern void update_max_interval(void);
+>>  extern void update_group_power(struct sched_domain *sd, int cpu);
+>>  extern int update_runtime(struct notifier_block *nfb, unsigned long action, void *hcpu);
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linaro-dev mailing list
+>> linaro-dev at lists.linaro.org
+>> http://lists.linaro.org/mailman/listinfo/linaro-dev
+>>
+>
