@@ -1,138 +1,90 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 12 Nov 2012 16:52:36 +0800
-Subject: [PATCH 16/17] ARM: dts: add spi nodes for atmel boards
+Date: Mon, 12 Nov 2012 16:52:34 +0800
+Subject: [PATCH 14/17] ARM: at91: add clocks for spi DT entries
 In-Reply-To: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352710357-3265-17-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352710357-3265-15-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Richard Genoud <richard.genoud@gmail.com>
 
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[wenyou.yang at atmel.com: added spi nodes for other atmel boards]
-[wenyou.yang at atmel.com: remove the cs-gpios property for sam9x5ek boards]
+[<wenyou.yang at atmel.com: declare the spi clocks for other at91 SoC]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: linux at arm.linux.org.uk
+Cc: plagnioj at jcrosoft.com
+Cc: linux at maxim.org.za
 ---
 Hi, Richard,
 
-This patch is based on the orignal patch from Richard Genoud 
-	[PATCH] sam9x5ek DTS: enable SPI dataflash
-and referring to this patch Wenyou Yang add spi nodes for other atmel boards.
-	and remove the cs-gpios property for sam9x5ek boards.
+This patch is based on the original patch from Richard Genoud,
+	[PATCH] sam9x5: declare SPI clocks
+and referring to this patch, Wenyou Yang declare the spi clocks for
+	other at91 SoC.
 
 Is it ok for you?
 
-Best Regards,
+Best Regards
 Wenyou Yang
 
- arch/arm/boot/dts/at91sam9263ek.dts         |    9 +++++++++
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    9 +++++++++
- arch/arm/boot/dts/at91sam9g25ek.dts         |    9 +++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |    9 +++++++++
- arch/arm/boot/dts/at91sam9n12ek.dts         |    9 +++++++++
- 5 files changed, 45 insertions(+)
+ arch/arm/mach-at91/at91sam9260.c |    2 ++
+ arch/arm/mach-at91/at91sam9g45.c |    2 ++
+ arch/arm/mach-at91/at91sam9n12.c |    2 ++
+ arch/arm/mach-at91/at91sam9x5.c  |    2 ++
+ 4 files changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index f86ac4b..11e274d 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -50,6 +50,15 @@
- 				atmel,vbus-gpio = <&pioA 25 0>;
- 				status = "okay";
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				status = "okay";
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index e6391a4..3c3b63d 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -51,6 +51,15 @@
- 				atmel,vbus-gpio = <&pioC 5 0>;
- 				status = "okay";
- 			};
-+
-+			spi0: spi at fffc8000 {
-+				status = "okay";
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <50000000>;
-+					reg = <1>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
-index 877c08f..3b84bc9 100644
---- a/arch/arm/boot/dts/at91sam9g25ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g25ek.dts
-@@ -44,6 +44,15 @@
- 			i2c2: i2c at f8018000 {
- 				status = "okay";
- 			};
-+
-+			spi0: spi at f0000000 {
-+				status = "okay";
-+				m25p80 at 0 {
-+					compatible = "atmel,at25df321a";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		usb0: ohci at 00600000 {
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index 15e1dd4..a23ac6e 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -54,6 +54,15 @@
- 			i2c1: i2c at fff88000 {
- 				status = "okay";
- 			};
-+
-+			spi0: spi at fffa4000{
-+				status = "okay";
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <13000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index 912b2c2..706bd00 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -45,6 +45,15 @@
- 			i2c1: i2c at f8014000 {
- 				status = "okay";
- 			};
-+
-+			spi0: spi at f0000000 {
-+				status = "okay";
-+				m25p80 at 0 {
-+					compatible = "atmel,at25df321a";
-+					spi-max-frequency = <50000000>;
-+					reg = <0>;
-+				};
-+			};
- 		};
- 
- 		nand0: nand at 40000000 {
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index f820261..6c217eb 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -230,6 +230,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t1_clk", "fffdc000.timer", &tc4_clk),
+ 	CLKDEV_CON_DEV_ID("t2_clk", "fffdc000.timer", &tc5_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "500000.ohci", &ohci_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffc8000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffcc000.spi", &spi1_clk),
+ 	/* fake hclk clock */
+ 	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
+ 	CLKDEV_CON_ID("pioA", &pioA_clk),
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 84af1b5..d419002 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -256,6 +256,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "fffd4000.timer", &tcb0_clk),
+ 	CLKDEV_CON_DEV_ID("hclk", "700000.ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ehci_clk", "800000.ehci", &uhphs_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fff84000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi1_clk),
+ 	/* fake hclk clock */
+diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+index 732d3d3..ea87f0e 100644
+--- a/arch/arm/mach-at91/at91sam9n12.c
++++ b/arch/arm/mach-at91/at91sam9n12.c
+@@ -169,6 +169,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
+ 	CLKDEV_CON_ID("pioA", &pioAB_clk),
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index e503538..19408af 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -231,6 +231,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
+ 	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
++	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
+ 	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
 -- 
 1.7.9.5
