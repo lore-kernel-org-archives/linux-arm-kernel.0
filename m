@@ -1,44 +1,90 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 12 Nov 2012 20:09:54 -0200
-Subject: [PATCH] ARM: boot: Fix usage of kecho
-In-Reply-To: <201210241928.34303.arnd@arndb.de>
-References: <1351103848-30900-1-git-send-email-festevam@gmail.com>
- <alpine.LFD.2.02.1210241444090.16518@xanadu.home>
- <201210241928.34303.arnd@arndb.de>
-Message-ID: <CAOMZO5BEi7n76roOAgBFEqvqJybsCeGKZuozqYL5PRL3hJnghQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Nov 2012 14:14:03 -0800
+Subject: [PATCH] ARM: OMAP4: TWL: mux sys_drm_msecure as output for PMIC
+In-Reply-To: <20121108201045.GA579@kahuna>
+References: <1352401730-4269-1-git-send-email-khilman@deeprootsystems.com>
+ <20121108192834.GA2962@arwen.pp.htv.fi>
+ <20121108201045.GA579@kahuna>
+Message-ID: <20121112221402.GR6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+* Nishanth Menon <nm@ti.com> [121108 12:12]:
+> On 21:28-20121108, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Thu, Nov 08, 2012 at 11:08:50AM -0800, Kevin Hilman wrote:
+> > > From: Kevin Hilman <khilman@ti.com>
+> > > 
+> > > On OMAP4 boards using the TWL6030 PMIC, the sys_drm_msecure is
+> > > connected to the MSECURE input of the TWL6030 PMIC.  This signal
+> > > controls the secure-mode operation of the PMIC.  If its not mux'd
+> > > correctly, some functionality of the PMIC will not be accessible since
+> > > the PMIC will be in secure mode.
+> > > 
+> > > For example, if the TWL RTC is in secure mode, most of its registers
+> > > are read-only, meaning (re)programming the RTC (e.g. for wakeup from
+> > > suspend) will fail.
+> > > 
+> > > To fix, ensure the signal is properly mux'd as output when TWL is
+> > > intialized.
+> > > 
+> > > This fix is required when using recent versions of u-boot (>= v2012.04.01)
+> > > since u-boot is no longer setting the default mux for this pin.
+> > > 
+> > > Signed-off-by: Kevin Hilman <khilman@ti.com>
+> > > ---
+> > > Based on v3.7-rc4.  Targetted as a fix for v3.7.
+> > > 
+> > > A correponding DT fix for this is needed as well, but that will be part of 
+> > > a bigger series to get PM working with DT boot and needs to include other
+> > > pins like sys_nirq1.
+> > > 
+> > >  arch/arm/mach-omap2/twl-common.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
+> > > index 635e109..96cae8b 100644
+> > > --- a/arch/arm/mach-omap2/twl-common.c
+> > > +++ b/arch/arm/mach-omap2/twl-common.c
+> > > @@ -73,6 +73,7 @@ void __init omap4_pmic_init(const char *pmic_type,
+> > >  {
+> > >  	/* PMIC part*/
+> > >  	omap_mux_init_signal("sys_nirq1", OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+> > > +	omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
+> > >  	omap_pmic_init(1, 400, pmic_type, 7 + OMAP44XX_IRQ_GIC_START, pmic_data);
+> > >  
+> > >  	/* Register additional devices on i2c1 bus if needed */
+> > 
+> > not entirely related to $SUBJECT but this essentially means we're
+> > dropping the security feature whenever Linux runs.
+> Unless we intend to remove RTC driver in it's entirety and implement RTC
+> time change update in secure driver, current twl rtc driver was never
+> meant to exist with RTC time updates only in trustzone mode. Neither does
+> it drop any security feature when ever Linux runs- msecure pin has not
+> been used for any other purpose to my knowledge with Linux. So, this
+> change does not change the status quo we are currently in,
+> > 
+> > Shouldn't we try to change that pin at register write boundaries so we
+> > keep the secure feature enabled until we know we're going to write to
+> > the HW ?
+> > 
+> > Maybe it could even be done later through pinctrl, perhaps ?
+> That might be a better solution I agree. We might be locking down to a
+> specific pin name here, which could potentially change in a future SoC.
+> The right approach IMHO would be omap_gpio_mux equivalent.
+> 
+> Example change for OMAP5 purely from a board perspective(gerrit warning):
+> http://review.omapzoom.org/#/c/23819/5/arch/arm/mach-omap2/board-omap5evm.c,unified
+> 
+> Further, depending on how it is hooked on a different board (not that I
+> have seen any different other than msecure), it might even be hooked on
+> to another GPIO, making this scenario not scaling to "theoretical board
+> configuration".
 
-On Wed, Oct 24, 2012 at 5:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 24 October 2012, Nicolas Pitre wrote:
->> On Wed, 24 Oct 2012, Fabio Estevam wrote:
->>
->> > From: Fabio Estevam <fabio.estevam@freescale.com>
->> >
->> > Since commit edc88ceb0 (ARM: be really quiet when building with 'make -s') the
->> > following output is generated when building a kernel for ARM:
->> >
->> > echo '  Kernel: arch/arm/boot/Image is ready'
->> >   Kernel: arch/arm/boot/Image is ready
->> >   Building modules, stage 2.
->> > echo '  Kernel: arch/arm/boot/zImage is ready'
->> >   Kernel: arch/arm/boot/zImage is ready
->> >
->> > As per Documentation/kbuild/makefiles.txt the correct way of using kecho is
->> > '@$(kecho)'.
->> >
->> > Make this change so no more unwanted 'echo' messages are displayed.
->> >
->> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
->>
->> Acked-by: Nicolas Pitre <nico@linaro.org>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Would this one go via arm-soc tree?
+Sounds like the discussion is planning for further work and not affecting
+this patch. So applying into omap-for-v3.7-rc4/fixes-part2.
 
 Regards,
 
-Fabio Estevam
+Tony
