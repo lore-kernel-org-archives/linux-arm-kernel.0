@@ -1,55 +1,71 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 12 Nov 2012 11:47:34 +0100
-Subject: [PATCH 12/11] ARM: OMAP: Fix relative includes for fpga.h
-In-Reply-To: <20121031215252.GB15766@atomide.com>
-References: <20121030234852.25936.12482.stgit@muffinssi.local>
- <20121031215252.GB15766@atomide.com>
-Message-ID: <50A0D3C6.4070206@ti.com>
+From: jesper.nilsson@axis.com (Jesper Nilsson)
+Date: Mon, 12 Nov 2012 11:44:56 +0100
+Subject: [PATCH 01/11] cris: move usec/nsec conversion to
+ do_slow_gettimeoffset
+In-Reply-To: <1352408516-21988-3-git-send-email-swarren@wwwdotorg.org>
+References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
+ <1352408516-21988-3-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121112104456.GM2834@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Thu, Nov 08, 2012 at 02:01:46PM -0700, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Move usec to nsec conversion from arch_gettimeoffset() to
+> do_slow_gettimeoffset(); in a future patch, do_slow_gettimeoffset()
+> will be used directly as the implementation of arch_gettimeoffset(),
+> so needs to perform all required calculations.
+> 
+> Cc: Mikael Starvik <starvik@axis.com>
+> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
 
-After rebasing on top of your omap-for-v3.8/tmp-merge, I realized that this patch is generating a build break due to removal of the fpga.h include from debug-leds.c.
+Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
 
-arch/arm/plat-omap/debug-leds.c: In function 'fpga_probe':
-arch/arm/plat-omap/debug-leds.c:114:9: error: 'H2P2_DBG_FPGA_SIZE' undeclared (first use in this function)
-arch/arm/plat-omap/debug-leds.c:114:9: note: each undeclared identifier is reported only once for each function it appears in
+> Cc: linux-cris-kernel at axis.com
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+>  arch/cris/arch-v10/kernel/time.c |    4 ++--
+>  arch/cris/kernel/time.c          |    2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/cris/arch-v10/kernel/time.c b/arch/cris/arch-v10/kernel/time.c
+> index bcffcb6..162892f 100644
+> --- a/arch/cris/arch-v10/kernel/time.c
+> +++ b/arch/cris/arch-v10/kernel/time.c
+> @@ -65,8 +65,8 @@ unsigned long do_slow_gettimeoffset(void)
+>  	 */
+>  	count = *R_TIMER0_DATA;
+>  
+> -	/* Convert timer value to usec */
+> -	return (TIMER0_DIV - count) * ((NSEC_PER_SEC/1000)/HZ)/TIMER0_DIV;
+> +	/* Convert timer value to nsec */
+> +	return (TIMER0_DIV - count) * (NSEC_PER_SEC/HZ)/TIMER0_DIV;
+>  }
+>  
+>  /* Excerpt from the Etrax100 HSDD about the built-in watchdog:
+> diff --git a/arch/cris/kernel/time.c b/arch/cris/kernel/time.c
+> index 277ffc4..b063c92 100644
+> --- a/arch/cris/kernel/time.c
+> +++ b/arch/cris/kernel/time.c
+> @@ -46,7 +46,7 @@ static unsigned long (*do_gettimeoffset)(void) = do_slow_gettimeoffset;
+>  
+>  u32 arch_gettimeoffset(void)
+>  {
+> -       return do_gettimeoffset() * 1000;
+> +	return do_gettimeoffset();
+>  }
+>  #endif
+>  
+> -- 
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-It does not appear with the omap2plus_config but will appear if you enable the NEW_LEDS support that enable OMAP_DEBUG_LEDS.
-
-I'm not sure why the size is still hard coded. In theory, assuming the resource is properly initialized, resource_size should be usable.
-The patch below is fixing that.
-
-Regards,
-Benoit
-
----
->From 81e1c3dddd1cd78b1f5a04983cf920b287764f11 Mon Sep 17 00:00:00 2001
-From: Benoit Cousson <b-cousson@ti.com>
-Date: Mon, 12 Nov 2012 11:44:03 +0100
-Subject: [PATCH] ARM: OMAP: debug-leds: Use resource_size instead of hard coded macro
-
-The debug-leds driver should not rely on hard coded macro for
-the iomem size but use the resource size instead.
-
-Signed-off-by: Benoit Cousson <b-cousson@ti.com>
----
- arch/arm/plat-omap/debug-leds.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/plat-omap/debug-leds.c b/arch/arm/plat-omap/debug-leds.c
-index c43ea21..aa7ebc6 100644
---- a/arch/arm/plat-omap/debug-leds.c
-+++ b/arch/arm/plat-omap/debug-leds.c
-@@ -111,7 +111,7 @@ static int fpga_probe(struct platform_device *pdev)
- 	if (!iomem)
- 		return -ENODEV;
- 
--	fpga = ioremap(iomem->start, H2P2_DBG_FPGA_SIZE);
-+	fpga = ioremap(iomem->start, resource_size(iomem));
- 	__raw_writew(0xff, &fpga->leds);
- 
- 	for (i = 0; i < ARRAY_SIZE(dbg_leds); i++) {
+/^JN - Jesper Nilsson
 -- 
-1.7.0.4
+               Jesper Nilsson -- jesper.nilsson at axis.com
