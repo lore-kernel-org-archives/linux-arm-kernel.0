@@ -1,45 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Nov 2012 14:50:37 -0800
-Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
-In-Reply-To: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <20121112225037.GU6801@atomide.com>
+Date: Mon, 12 Nov 2012 14:54:34 -0800
+Subject: [PATCH 11/15] ARM: OMAP: timer: Interchange clksrc and clkevt
+ for AM33XX
+In-Reply-To: <509C190E.8010001@ti.com>
+References: <1351859566-24818-1-git-send-email-vaibhav.bedia@ti.com>
+ <1351859566-24818-12-git-send-email-vaibhav.bedia@ti.com>
+ <509C190E.8010001@ti.com>
+Message-ID: <20121112225432.GV6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [121112 02:27]:
-> Hi,
+* Jon Hunter <jon-hunter@ti.com> [121108 12:43]:
 > 
-> This series changes omapfb to use standard dma_alloc funcs instead of omap
-> specific vram allocator. This let's us remove the omap vram allocator, making
-> omapfb platform independent.
+> On 11/02/2012 07:32 AM, Vaibhav Bedia wrote:
+> > AM33XX has only one usable timer in the WKUP domain.
+> > Currently the timer instance in WKUP domain is used
+> > as the clockevent and the timer in non-WKUP domain
+> > as the clocksource. The timer in WKUP domain can keep
+> > running in suspend from a 32K clock and hence serve
+> > as the persistent clock. To enable this, interchange
+> > the timers used as clocksource and clockevent for
+> > AM33XX. A subsequent patch will add suspend-resume
+> > support for the clockevent to ensure that there are
+> > no issues with timekeeping.
+> > 
+> > Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> > ---
+> >  arch/arm/mach-omap2/timer.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> > index 565e575..6584ee0 100644
+> > --- a/arch/arm/mach-omap2/timer.c
+> > +++ b/arch/arm/mach-omap2/timer.c
+> > @@ -460,7 +460,7 @@ OMAP_SYS_TIMER(3_secure)
+> >  #endif
+> >  
+> >  #ifdef CONFIG_SOC_AM33XX
+> > -OMAP_SYS_TIMER_INIT(3_am33xx, 1, OMAP4_MPU_SOURCE, 2, OMAP4_MPU_SOURCE)
+> > +OMAP_SYS_TIMER_INIT(3_am33xx, 2, OMAP4_MPU_SOURCE, 1, OMAP4_MPU_SOURCE)
+> >  OMAP_SYS_TIMER(3_am33xx)
+> >  #endif
 > 
-> However, note that using standard dma funcs causes the following downsides:
-> 
-> 1) dma_alloc_attrs doesn't let us allocate at certain physical address.
-> However, this should not be a problem as this feature of vram allocator
-> is only used when reserving the framebuffer that was initialized by the
-> bootloader, and we don't currently support "passing" a framebuffer from
-> the bootloader to the kernel anyway.
-> 
-> 2) dma_alloc_attrs, as of now, always ioremaps the allocated area, and
-> we don't need the ioremap when using VRFB. This patch uses
-> DMA_ATTR_NO_KERNEL_MAPPING for the allocation, but the flag is currently
-> not operational.
-> 
-> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
-> changed the ioctl to return 64M for all the values, which, I hope, the
-> applications will interpret as "there's enough vram".
-> 
-> 4) "vram" kernel parameter to define how much ram to reserve for video use no
-> longer works. The user needs to enable CMA and use "cma" parameter.
+> By the way, for v3.8 (assuming that timer DT patches go in, currently
+> queued in Tony's master), when booting with DT the clock-source and
+> clock-events will be selected by timer feature and not ID. So you may
+> wish to rebase on top of Tony's master.
 
-Great, thanks for fixing these. Could you please queue these into
-a separate branch against v3.7-rc5 that I can also merge into
-omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3?
+Please don't base anything going upstream on the master branch
+except for testing. The master branch is just a merge of the
+upstream heading branches, and cannot be used as a base for
+pulling into anything.
 
-Feel free to add my Acked-by: Tony Lindgren <tony@atomide.com> to the
-arch/arm/*omap*/* parts.
+In this case the right branch to use as a base is omap-for-v3.8/dt.
 
 Regards,
 
