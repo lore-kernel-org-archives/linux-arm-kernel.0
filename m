@@ -1,50 +1,104 @@
-From: Ying.Liu@freescale.com (Liu Ying)
-Date: Mon, 12 Nov 2012 16:26:18 +0800
-Subject: [PATCH 1/1] ARM: dts: imx6q-sabresd: add volume up/down gpio keys
-Message-ID: <1352708778-25570-1-git-send-email-Ying.Liu@freescale.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 12 Nov 2012 11:12:39 +0200
+Subject: [PATCH 17/17] mtd: m25p80: change the m25p80_read to reading
+ page to page
+In-Reply-To: <1352710357-3265-18-git-send-email-wenyou.yang@atmel.com>
+References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
+ <1352710357-3265-18-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <20121112091239.GA8518@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add volume up/down gpio keys support in imx6q-sabresd.dts.
+Hi Wenyou Yang,
 
-Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
----
- arch/arm/boot/dts/imx6q-sabresd.dts |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+On Mon, Nov 12, 2012 at 04:52:37PM +0800, Wenyou Yang wrote:
+> When run "flashcp /bin/busybox /dev/mtdX", it arised a OOPS. changing to fix the [BUG].
 
-diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-index e596c28..a424025 100644
---- a/arch/arm/boot/dts/imx6q-sabresd.dts
-+++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-@@ -38,6 +38,8 @@
- 				hog {
- 					pinctrl_hog: hoggrp {
- 						fsl,pins = <
-+							1004 0x80000000 /* MX6Q_PAD_GPIO_4__GPIO_1_4 */
-+							1012 0x80000000 /* MX6Q_PAD_GPIO_5__GPIO_1_5 */
- 							1402 0x80000000	/* MX6Q_PAD_NANDF_D0__GPIO_2_0 */
- 							1410 0x80000000	/* MX6Q_PAD_NANDF_D1__GPIO_2_1 */
- 							1418 0x80000000	/* MX6Q_PAD_NANDF_D2__GPIO_2_2 */
-@@ -73,4 +75,20 @@
- 			};
- 		};
- 	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		volume-up {
-+			label = "Volume Up";
-+			gpios = <&gpio1 4 0>;
-+			linux,code = <115>; /* KEY_VOLUMEUP */
-+		};
-+
-+		volume-down {
-+			label = "Volume Down";
-+			gpios = <&gpio1 5 0>;
-+			linux,code = <114>; /* KEY_VOLUMEDOWN */
-+		};
-+	};
- };
+Please post the BUG printout, and include it with the commit log.
+
+baruch
+
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: dwmw2 at infradead.org
+> Cc: linux-mtd at lists.infradead.org
+> ---
+>  drivers/mtd/devices/m25p80.c |   44 +++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 41 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+> index 03838ba..73e5fea 100644
+> --- a/drivers/mtd/devices/m25p80.c
+> +++ b/drivers/mtd/devices/m25p80.c
+> @@ -340,6 +340,7 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
+>  	size_t *retlen, u_char *buf)
+>  {
+>  	struct m25p *flash = mtd_to_m25p(mtd);
+> +	u32 page_offset, page_size;
+>  	struct spi_transfer t[2];
+>  	struct spi_message m;
+>  
+> @@ -358,7 +359,6 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
+>  	spi_message_add_tail(&t[0], &m);
+>  
+>  	t[1].rx_buf = buf;
+> -	t[1].len = len;
+>  	spi_message_add_tail(&t[1], &m);
+>  
+>  	mutex_lock(&flash->lock);
+> @@ -379,9 +379,47 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
+>  	flash->command[0] = OPCODE_READ;
+>  	m25p_addr2cmd(flash, from, flash->command);
+>  
+> -	spi_sync(flash->spi, &m);
+> +	page_offset = from & (flash->page_size - 1);
+> +
+> +	/* do all the bytes fit onto one page? */
+> +	if (page_offset + len <= flash->page_size) {
+> +		t[1].len = len;
+> +
+> +		spi_sync(flash->spi, &m);
+> +
+> +		*retlen = m.actual_length - m25p_cmdsz(flash)
+> +					- FAST_READ_DUMMY_BYTE;
+> +
+> +	} else {
+> +		u32 i;
+> +
+> +		/* the size of data remaining on the first page */
+> +		page_size = flash->page_size - page_offset;
+> +
+> +		t[1].len = page_size;
+> +		spi_sync(flash->spi, &m);
+> +
+> +		*retlen = m.actual_length - m25p_cmdsz(flash)
+> +					- FAST_READ_DUMMY_BYTE;
+> +
+> +		/* write everything in flash->page_size chunks */
+> +		for (i = page_size; i < len; i += page_size) {
+> +			page_size = len - i;
+> +			if (page_size > flash->page_size)
+> +				page_size = flash->page_size;
+> +
+> +			/* write the next page to flash */
+> +			m25p_addr2cmd(flash, from + i, flash->command);
+> +
+> +			t[1].rx_buf = buf + i;
+> +			t[1].len = page_size;
+> +
+> +			spi_sync(flash->spi, &m);
+>  
+> -	*retlen = m.actual_length - m25p_cmdsz(flash) - FAST_READ_DUMMY_BYTE;
+> +			*retlen += m.actual_length - m25p_cmdsz(flash)
+> +						- FAST_READ_DUMMY_BYTE;
+> +		}
+> +	}
+>  
+>  	mutex_unlock(&flash->lock);
+>  
+> -- 
+> 1.7.9.5
+
 -- 
-1.7.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
