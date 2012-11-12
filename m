@@ -1,42 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Nov 2012 10:56:41 +0000
-Subject: [PATCH] Set bit 22 in the PL310 (cache controller) AuxCtlr
- register
-In-Reply-To: <20121112064547.GN32313@localhost.localdomain>
-References: <1352433712-16364-1-git-send-email-shiraz.hashim@st.com>
- <20121109095400.GC2357@mudshark.cambridge.arm.com>
- <20121112064547.GN32313@localhost.localdomain>
-Message-ID: <20121112105641.GC2346@mudshark.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 12 Nov 2012 11:57:46 +0100
+Subject: [PATCH 05/10] arn: at91: move at91_tc.h to arch/arm/mach-at91
+In-Reply-To: <1352287374-25176-5-git-send-email-plagnioj@jcrosoft.com>
+References: <20121107111235.GH20063@game.jcrosoft.org>
+ <1352287374-25176-1-git-send-email-plagnioj@jcrosoft.com>
+ <1352287374-25176-5-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <50A0D62A.8080708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 06:45:47AM +0000, Shiraz Hashim wrote:
-> On Fri, Nov 09, 2012 at 09:54:01AM +0000, Will Deacon wrote:
-> > On Fri, Nov 09, 2012 at 04:01:52AM +0000, Shiraz Hashim wrote:
-> > > From: Catalin Marinas <catalin.marinas@arm.com>
-> > > 
-> > > Clearing bit 22 in the PL310 Auxiliary Control register (shared
-> > > attribute override enable) has the side effect of transforming Normal
-> > > Shared Non-cacheable reads into Cacheable no-allocate reads.
-> > > 
-> > > Coherent DMA buffers in Linux always have a Cacheable alias via the
-> > > kernel linear mapping and the processor can speculatively load cache
-> > > lines into the PL310 controller. With bit 22 cleared, Non-cacheable
-> > > reads would unexpectedly hit such cache lines leading to buffer
-> > > corruption.
-> > 
-> > Is this still the case with recent kernels? I thought the dma-mapping/cma
-> > work avoided the cacheable alias, but perhaps I'm mistaken.
+Hi,
+
+Beware: subject has typo: s/arn/ARM/
+Also, care about capital letters for "ARM" => to all patches of the series.
+
+Bye,
+
+
+On 11/07/2012 12:22 PM, Jean-Christophe PLAGNIOL-VILLARD :
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  arch/arm/mach-at91/{include/mach => }/at91_tc.h |    0
+>  arch/arm/mach-at91/at91x40_time.c               |    3 ++-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+>  rename arch/arm/mach-at91/{include/mach => }/at91_tc.h (100%)
 > 
-> I haven't used CMA but DMA mappings are still normal memory
-> non-cacheable.
+> diff --git a/arch/arm/mach-at91/include/mach/at91_tc.h b/arch/arm/mach-at91/at91_tc.h
+> similarity index 100%
+> rename from arch/arm/mach-at91/include/mach/at91_tc.h
+> rename to arch/arm/mach-at91/at91_tc.h
+> diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
+> index ee06d7b..0e57e44 100644
+> --- a/arch/arm/mach-at91/at91x40_time.c
+> +++ b/arch/arm/mach-at91/at91x40_time.c
+> @@ -26,7 +26,8 @@
+>  #include <linux/io.h>
+>  #include <mach/hardware.h>
+>  #include <asm/mach/time.h>
+> -#include <mach/at91_tc.h>
+> +
+> +#include "at91_tc.h"
+>  
+>  #define at91_tc_read(field) \
+>  	__raw_readl(AT91_IO_P2V(AT91_TC) + field)
+> 
 
-Ok, so trawling through the list reveals we only have this issue for normal
-DMA mappings and not with CMA:
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/124276.html
-
-I wonder whether we shouldn't just fix that, rather than work around it with
-a PL310-specific hack?
-
-Will
+-- 
+Nicolas Ferre
