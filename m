@@ -1,35 +1,69 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 Nov 2012 13:15:06 -0800
-Subject: [PATCH] clk: spear: Add stub functions for
- spear3[0|1|2]0_clk_init()
-In-Reply-To: <CAOh2x==ng3A66P=Vx+-C791LTGCS1fWVpMfUKDorU5G=ZXrjLQ@mail.gmail.com>
-References: <1352169260.2625.4.camel@phoenix>
- <CAOh2x==ng3A66P=Vx+-C791LTGCS1fWVpMfUKDorU5G=ZXrjLQ@mail.gmail.com>
-Message-ID: <20121112211506.20034.67807@nucleus>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 12 Nov 2012 22:19:58 +0100
+Subject: [PATCH 1/2] ARM: kirkwood: Add Plat'Home OpenBlocks A6 support
+In-Reply-To: <CABMQnVK5SbT5mbugruZdNursXQiWJOQD4sreEMS1v6GO7PH0mw@mail.gmail.com>
+References: <1352720819-21923-1-git-send-email-iwamatsu@nigauri.org>
+ <20121112120535.GA22029@lunn.ch>
+ <CABMQnVK5SbT5mbugruZdNursXQiWJOQD4sreEMS1v6GO7PH0mw@mail.gmail.com>
+Message-ID: <20121112211958.GU24583@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting viresh kumar (2012-11-05 19:36:18)
-> On Tue, Nov 6, 2012 at 8:04 AM, Axel Lin <axel.lin@ingics.com> wrote:
-> > This fixes compile error if one of SPEAr3xx implementations is not selected.
+Hi Nobuhiro
+
+> >> +     model = "Plat'Home OpenBlocksA6";
+> >> +     compatible = "plathome,openblocks-a6", "marvell,kirkwood-88f6283", "marvell,kirkwood";
 > >
-> >   CC      drivers/clk/spear/spear3xx_clock.o
-> > drivers/clk/spear/spear3xx_clock.c: In function 'spear3xx_clk_init':
-> > drivers/clk/spear/spear3xx_clock.c:599:3: error: implicit declaration of function 'spear300_clk_init' [-Werror=implicit-function-declaration]
-> > drivers/clk/spear/spear3xx_clock.c:601:3: error: implicit declaration of function 'spear310_clk_init' [-Werror=implicit-function-declaration]
-> > drivers/clk/spear/spear3xx_clock.c:603:3: error: implicit declaration of function 'spear320_clk_init' [-Werror=implicit-function-declaration]
-> > cc1: some warnings being treated as errors
-> > make[3]: *** [drivers/clk/spear/spear3xx_clock.o] Error 1
-> > make[2]: *** [drivers/clk/spear] Error 2
-> > make[1]: *** [drivers/clk] Error 2
-> > make: *** [drivers] Error 2
+> > Ah, interesting. A 88f6283. I'm a bit surprised this actually works!
+> > This variant is not listed in kirkwood_id(). So do you see messages
+> > like:
 > >
-> > Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> > "Device-Unknown"
+> >
+> > and
+> >
+> > "MPP setup: unknown kirkwood variant"
 > 
-> Thanks..
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> No, I can not see these message.
+> 88f6283 is same as MV88F6282-Rev-A1. Because this has same CPU ID as
+> MV88F6282-Rev-A1.
 
-Taken into clk-next.
+Ah. O.K.
 
-Thanks,
-Mike
+Is it pin compatible? Please take a look at 
+
+https://github.com/lunn/linux/blob/v3.7-rc2-pinctrl-v2/drivers/pinctrl/mvebu/pinctrl-kirkwood.c
+
+and see if what is valid for 88f6282 is also valid for 88f6283.
+
+If its not compatible, we need to add this variant to the table.
+
+> What kind of value should I set here?
+
+For the moment, keep to 88f6283. At the moment its not actually used.
+However, when we add pinctrl we will need to this about this some
+more, depending on if its pin compatible or not.
+
+> >> +static unsigned int openblocks_a6_mpp_config[] __initdata = {
+> >> +     MPP0_NF_IO2,
+> >> +     MPP1_NF_IO3,
+> >> +     MPP2_NF_IO4,
+> >> +     MPP3_NF_IO5,
+> >> +     MPP4_NF_IO6,
+> >> +     MPP5_NF_IO7,
+> >> +     MPP6_SYSRST_OUTn,
+> >> +     /* MPP7_GPO, */
+> >
+> > Any reason not to actually have MPP7_GPO here?
+> > Is it being used as a GPO line?
+> 
+> Yes. MPP7 is assigned to GPO in this target boatd.
+> And GPO is not used.
+> The following is also the same.
+> If unnecessary, I will delete these lines.
+
+If they are not used, i would not list them.
+ 
+ Thanks for the quick response.
+
+ Andrew
