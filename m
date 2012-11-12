@@ -1,32 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Nov 2012 10:05:39 -0700
-Subject: [RFC PATCH 1/4] ARM: S3C24XX: move s3c24xx-irq to drivers/irqchip
-In-Reply-To: <201211121447.49977.heiko@sntech.de>
-References: <201211121446.30167.heiko@sntech.de>
- <201211121447.49977.heiko@sntech.de>
-Message-ID: <50A12C63.2000609@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 17:05:28 +0000
+Subject: [PATCH v2] Add support for generic BCM SoC chipsets
+In-Reply-To: <20121112160404.GA22739@glitch>
+References: <1352645834-10173-1-git-send-email-csd@broadcom.com>
+ <201211121500.57638.arnd@arndb.de> <20121112160404.GA22739@glitch>
+Message-ID: <201211121705.29191.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 06:47 AM, Heiko St?bner wrote:
-> Removes another part from plat-s3c24xx and also enables further
-> improvements happening in the correct location.
+On Monday 12 November 2012, Domenico Andreoli wrote:
+> On Mon, Nov 12, 2012 at 03:00:57PM +0000, Arnd Bergmann wrote:
+> > On Sunday 11 November 2012, Stephen Warren wrote:
+> > > > I'm following the other mobile ARM SoCs which all have a single mach-
+> > > > directory for various families of chips (mach-tegra, mach-omap2,
+> > > > etc...). Plus the intent is to have a single set of mach files that
+> > > > works across bcm SoCs, so it is preferable to keep it in a single mach-bcm.
+> > > 
+> > > It's quite possible to create one directory now, e.g. mach-bcm281xx, and
+> > > then when consolidation with other mach-bcm* happens, merge all those
+> > > directories into a single mach-bcm. I would tend to prefer (but only
+> > > lightly) using mach-bcm281xx now and then renaming later, unless you
+> > > plan on expanding the SoC support in the pretty near future.
+> > 
+> > I think the main question is how many files we expect to see in the
+> > platform directories for each of bcm3528, bcm281xx and bcm476x. Right
+> > now, my feeling is that each of them can be a single file, since most
+> > of the stuff that has traditionally been in mach-* directories is
+> > moving out to drivers now.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/plat-s3c24xx/Makefile                     |    1 -
->  drivers/irqchip/Kconfig                            |    3 +++
->  drivers/irqchip/Makefile                           |    1 +
->  .../irq.c => drivers/irqchip/irq-s3c24xx.c         |    0
->  5 files changed, 5 insertions(+), 1 deletions(-)
->  rename arch/arm/plat-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (100%)
+> I expect only DT-only stuff will be mainlined so one directory
+> (plat-brcm?) should be ok, right?
 
-Presumably there's a header file somewhere that defines the interface to
-irq-s3c24xx.c that other code in arch/arm/plat-s3c24xx is using to
-initialize it. That header should be moved somewhere public (i.e.
-outside {mach,plat}-*/include/{mach,plat}). However, you then end up
-with a header file per IRQ driver in that public location. So, Thomas
-Petazzoni started working on a solution for that:
+Right. The usual naming is to use 'mach-*' for one platform, and 'plat-*'
+for stuff that spreads multiple 'mach-*' directories. In this case, the
+name I would expect is either 'mach-bcm' as Christian suggested, or
+'mach-brcm' if people have strong opinions in favor of that, but not
+'plat-brcm'.
 
-> http://lists.arm.linux.org.uk/lurker/message/20121027.164514.11eb86db.en.html
+> > You still have to work out how you want to maintain that directory though,
+> > either just having per-file maintainers, or having multiple people
+> > take responsible for the entire directory.
+> 
+> I'd like to take care of the bcm476x and related drivers unless Broadcom
+> wants to do it.
+
+Yes, of course.
+
+> Let me know in which directory.
+
+I'll let you work that out with Stephen and Christian. I think just
+'mach-bcm' is sufficent, but I think the three of you should come to
+an agreement first.
+
+	Arnd
