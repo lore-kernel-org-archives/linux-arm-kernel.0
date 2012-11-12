@@ -1,25 +1,26 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Mon, 12 Nov 2012 22:40:48 +0100
-Subject: [PATCH 7/7] ARM i.MX51 babbage: Add display support
-In-Reply-To: <1352733809-27230-8-git-send-email-s.hauer@pengutronix.de>
-References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
- <1352733809-27230-8-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CALBypN5=vQiPWUpW7ZqgDt+eu4_VpiuUW0heX=vVDKwisXFoBg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 21:42:38 +0000
+Subject: [GIT PULL 1/1] omap fixes for v3.7-rc4
+In-Reply-To: <pull-1352308631-821072>
+References: <pull-1352308631-821072>
+Message-ID: <201211122142.38740.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Wednesday 07 November 2012, Tony Lindgren wrote:
+> The following changes since commit 3d70f8c617a436c7146ecb81df2265b4626dfe89:
+> 
+>   Linux 3.7-rc4 (2012-11-04 11:07:39 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.7-rc4/fixes-signed
+> 
+> for you to fetch changes up to 5dfcb3b58c6c8934dec8898827736a1e26732cdd:
+> 
+>   Merge tag 'omap-fixes-b2-for-3.7-rc' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.7-rc4/fixes (2012-11-06 09:55:20 -0800)
+> 
 
-On Mon, Nov 12, 2012 at 4:23 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> +               display at di1 {
-> +                       compatible = "fsl,imx-parallel-display";
-> +                       crtcs = <&ipu 1>;
+Pulled into fixes branch, sorry for the delay.
 
-This works but Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-says "crtc"  (without the s). Looks like the doc has a typo.
-
-I ran into that problem today on i.MX53
-
-Regards,
-
-Martin
+	Arnd
