@@ -1,29 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 22:43:08 +0000
-Subject: [PATCH 05/10] sh: clkfwk: add sh_clk_fsidiv_register()
-In-Reply-To: <1352446165-19298-6-git-send-email-horms@verge.net.au>
-References: <1352446165-19298-1-git-send-email-horms@verge.net.au>
- <1352446165-19298-6-git-send-email-horms@verge.net.au>
-Message-ID: <201211122243.08450.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Nov 2012 14:50:37 -0800
+Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
+In-Reply-To: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <20121112225037.GU6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 09 November 2012, Simon Horman wrote:
-> +
-> +static int fsidiv_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +       u32 val;
-> +       int idx;
-> +
-> +       idx = (clk->parent->rate / rate) & 0xffff;
-> +       if (idx < 2)
-> +               __raw_writel(0, clk->mapping->base);
-> +       else
-> +               __raw_writel(idx << 16, clk->mapping->base);
-> +
-> +       return 0;
-> +}
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [121112 02:27]:
+> Hi,
+> 
+> This series changes omapfb to use standard dma_alloc funcs instead of omap
+> specific vram allocator. This let's us remove the omap vram allocator, making
+> omapfb platform independent.
+> 
+> However, note that using standard dma funcs causes the following downsides:
+> 
+> 1) dma_alloc_attrs doesn't let us allocate at certain physical address.
+> However, this should not be a problem as this feature of vram allocator
+> is only used when reserving the framebuffer that was initialized by the
+> bootloader, and we don't currently support "passing" a framebuffer from
+> the bootloader to the kernel anyway.
+> 
+> 2) dma_alloc_attrs, as of now, always ioremaps the allocated area, and
+> we don't need the ioremap when using VRFB. This patch uses
+> DMA_ATTR_NO_KERNEL_MAPPING for the allocation, but the flag is currently
+> not operational.
+> 
+> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
+> changed the ioctl to return 64M for all the values, which, I hope, the
+> applications will interpret as "there's enough vram".
+> 
+> 4) "vram" kernel parameter to define how much ram to reserve for video use no
+> longer works. The user needs to enable CMA and use "cma" parameter.
 
-This gives me a new warning about an unused variable "val" now.
+Great, thanks for fixing these. Could you please queue these into
+a separate branch against v3.7-rc5 that I can also merge into
+omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3?
 
-	Arnd
+Feel free to add my Acked-by: Tony Lindgren <tony@atomide.com> to the
+arch/arm/*omap*/* parts.
+
+Regards,
+
+Tony
