@@ -1,61 +1,36 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Nov 2012 09:17:48 -0700
-Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
-In-Reply-To: <20121112082546.GU22029@lunn.ch>
-References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
- <1352650891-18356-2-git-send-email-andrew@lunn.ch>
- <50A020C5.4070506@wwwdotorg.org> <20121112082546.GU22029@lunn.ch>
-Message-ID: <50A1212C.2080601@wwwdotorg.org>
+Date: Mon, 12 Nov 2012 09:19:53 -0700
+Subject: [PATCH] ARM: tegra: enable data prefetch on L2
+In-Reply-To: <20121112121905.GI1962@tbergstrom-lnx.Nvidia.com>
+References: <1352251597-2936-1-git-send-email-josephl@nvidia.com>
+ <20121112121905.GI1962@tbergstrom-lnx.Nvidia.com>
+Message-ID: <50A121A9.9070101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 01:25 AM, Andrew Lunn wrote:
-> On Sun, Nov 11, 2012 at 03:03:49PM -0700, Stephen Warren wrote:
->> On 11/11/2012 09:21 AM, Andrew Lunn wrote:
->>> From: Jamie Lentin <jm@lentin.co.uk>
->>>
->>> Given appropriate devicetree bindings, this driver registers a
->>> pm_power_off function to set a GPIO line high/low to power down
->>> your board.
-
->>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+On 11/12/2012 05:19 AM, Peter De Schrijver wrote:
+> On Wed, Nov 07, 2012 at 02:26:37AM +0100, Joseph Lo wrote:
+>> Enable the data prefetch on L2. The bit28 in aux ctrl register.
 >>
->>> +Required properties:
->>> +- compatible : should be "gpio-poweroff".
->>> +- gpios : The GPIO to set high/low, see "gpios property" in
->>> +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
->>> +  low to power down the board set it to "Active Low", otherwise set
->>> +  gpio to "Active High".
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>>  arch/arm/mach-tegra/common.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
 >>
->> Unfortunately, not all GPIO bindings support active high/low flags in
->> the GPIO specifier. As such, the flags there are basically useless.
->> Other bindings (e.g. IIRC the fixed-regulator binding) have added a
->> separate active-high property to indicate the GPIO polarity. This
->> binding should probably follow suite.
+>> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+>> index c25746e..c3dee56 100644
+>> --- a/arch/arm/mach-tegra/common.c
+>> +++ b/arch/arm/mach-tegra/common.c
+>> @@ -124,7 +124,7 @@ static void __init tegra_init_cache(void)
+>>  
+>>  	cache_type = readl(p + L2X0_CACHE_TYPE);
+>>  	aux_ctrl = (cache_type & 0x700) << (17-8);
+>> -	aux_ctrl |= 0x6C000001;
+>> +	aux_ctrl |= 0x7C000001;
 > 
-> Humm, so are you saying of_get_named_gpio_flags() is deprecated?
-
-I don't know if it's deprecated, but it's certainly not useful in
-generic code.
-
-> There is a lot of code using this to get the flag
-> OF_GPIO_ACTIVE_LOW. Some of these users are very generic code:
-
-That's unfortunate...
-
+> Just found out that we should also set bit 22 as per
+> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6395%2F1
 > 
-> drivers/leds/leds-gpio.c:
-> drivers/input/misc/rotary_encoder.c:
-> drivers/input/keyboard/gpio_keys.c:
-> drivers/input/keyboard/gpio_keys_polled.c:
-> drivers/hwmon/gpio-fan.c:
-> 
-> The only code using the "enable-active-high"
-> property is drivers/regulator/fixed.c although the binding
-> documentation twl6040.txt talks about it, but the code does not
-> implement it.
-> 
-> Could you point me towards some email discussion about this?
+> Stephen, should I send a seperate patch for that?
 
-I don't have any good links. I imagine the discussion happened when the
-patched for regulator/fixed.c were submitted.
+Yes please; I've applied the patch in this thread already.
