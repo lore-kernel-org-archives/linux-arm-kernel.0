@@ -1,77 +1,130 @@
-From: anilkumar@ti.com (AnilKumar, Chimata)
-Date: Mon, 12 Nov 2012 09:47:48 +0000
-Subject: [PATCH 2/4] rtc: OMAP: Add system pm_power_off to rtc driver
-In-Reply-To: <B5906170F1614E41A8A28DE3B8D121433EC04226@DBDE01.ent.ti.com>
-References: <1352108549-9341-1-git-send-email-anilkumar@ti.com>
- <1352108549-9341-3-git-send-email-anilkumar@ti.com>
- <B5906170F1614E41A8A28DE3B8D121433EC04226@DBDE01.ent.ti.com>
-Message-ID: <331ABD5ECB02734CA317220B2BBEABC13EA69B27@DBDE01.ent.ti.com>
+From: smoch@web.de (Soeren Moch)
+Date: Mon, 12 Nov 2012 10:48:02 +0100
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20121111172243.GB821@lunn.ch>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+ <20121111172243.GB821@lunn.ch>
+Message-ID: <50A0C5D2.7000806@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 06, 2012 at 11:15:34, Bedia, Vaibhav wrote:
-> On Mon, Nov 05, 2012 at 15:12:27, AnilKumar, Chimata wrote:
-> [...]
-> >  
-> > +#define SHUTDOWN_TIME_SEC		2
-> > +#define SECS_IN_MIN			60
-> > +#define WAIT_AFTER			(SECS_IN_MIN - SHUTDOWN_TIME_SEC)
-> > +#define WAIT_TIME_MS			(SHUTDOWN_TIME_SEC * 1000)
-> > +
-> >  static void __iomem	*rtc_base;
-> >  
-> [...]
-> > +
-> > +	/* Wait few seconds instead of rollover */
-> > +	do {
-> > +		omap_rtc_read_time(NULL, &tm);
-> > +		if (WAIT_AFTER <= tm.tm_sec)
-> > +			mdelay(WAIT_TIME_MS);
-> > +	} while (WAIT_AFTER <= tm.tm_sec);
-> 
-> This hardcoded wait for rollover doesn't look good. I see some
-> helper functions in rtc-lib.c which probably could be used for
-> converting the current time to elapsed seconds, add the delay and
-> then convert it back to the time to be programmed in RTC without
-> worrying about rollover. Why not use that?
+On 11.11.2012 18:22, Andrew Lunn wrote:
+ > On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
+ >> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag, 
+regardless
+ >> the flags provided by the caller. This causes excessive pruning of
+ >> emergency memory pools without any good reason. This patch changes 
+the code
+ >> to correctly use gfp flags provided by the dmapool caller. This should
+ >> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
+ >> allocations can be served only from the special, very limited memory 
+pool.
+ >>
+ >> Reported-by: Soren Moch <smoch@web.de>
+Please use
+Reported-by: Soeren Moch <smoch@web.de>
 
-I am not aware of those APIs, can you point some?
+ >> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+ >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+ >
+ > Tested-by: Andrew Lunn <andrew@lunn.ch>
+ >
+ > I tested this on a Kirkwood QNAP after removing the call to
+ > init_dma_coherent_pool_size().
+ >
+ >     Andrew
 
-> 
-> > +
-> > +	/* Add shutdown time to the current value */
-> > +	tm.tm_sec += SHUTDOWN_TIME_SEC;
-> > +
-> > +	if (tm2bcd(&tm) < 0)
-> > +		return;
-> > +
-> > +	pr_info("System will go to power_off state in approx. %d secs\n",
-> > +			SHUTDOWN_TIME_SEC);
-> > +
-> > +	/* Set the ALARM2 time */
-> > +	rtc_write(tm.tm_sec, OMAP_RTC_ALARM2_SECONDS_REG);
-> > +	rtc_write(tm.tm_min, OMAP_RTC_ALARM2_MINUTES_REG);
-> > +	rtc_write(tm.tm_hour, OMAP_RTC_ALARM2_HOURS_REG);
-> > +	rtc_write(tm.tm_mday, OMAP_RTC_ALARM2_DAYS_REG);
-> > +	rtc_write(tm.tm_mon, OMAP_RTC_ALARM2_MONTHS_REG);
-> > +	rtc_write(tm.tm_year, OMAP_RTC_ALARM2_YEARS_REG);
-> > +
-> > +	/* Enable alarm2 interrupt */
-> > +	val = readl(rtc_base + OMAP_RTC_INTERRUPTS_REG);
-> > +	writel(val | OMAP_RTC_INTERRUPTS_IT_ALARM2,
-> > +				rtc_base + OMAP_RTC_INTERRUPTS_REG);
-> > +
-> 
-> These registers are not present in older versions of the IP so how
-> does that get handled?
+Tested-by: Soeren Moch <smoch@web.de>
 
-I think, earlier this feature is not supported/not used.
+Now I had a chance to test this patch on my Kirkwood guruplug
+system with linux-3.6.6 . It is running much better now, but with the
+original 256K coherent pool size I still see errors after several hours
+of runtime:
 
-> 
-> You also need to describe the connection between the ALARM2 and the
-> power off logic in detail.
+Nov 12 09:42:32 guru kernel: ERROR: 256 KiB atomic DMA coherent pool is 
+too small!
+Nov 12 09:42:32 guru kernel: Please increase it with coherent_pool= 
+kernel parameter!
 
-Sure, I will add.
+   Soeren
 
-Thanks
-AnilKumar
+ >> ---
+ >>  mm/dmapool.c |   27 +++++++--------------------
+ >>  1 file changed, 7 insertions(+), 20 deletions(-)
+ >>
+ >> diff --git a/mm/dmapool.c b/mm/dmapool.c
+ >> index c5ab33b..86de9b2 100644
+ >> --- a/mm/dmapool.c
+ >> +++ b/mm/dmapool.c
+ >> @@ -62,8 +62,6 @@ struct dma_page {        /* cacheable header for 
+'allocation' bytes */
+ >>      unsigned int offset;
+ >>  };
+ >>
+ >> -#define    POOL_TIMEOUT_JIFFIES    ((100 /* msec */ * HZ) / 1000)
+ >> -
+ >>  static DEFINE_MUTEX(pools_lock);
+ >>
+ >>  static ssize_t
+ >> @@ -227,7 +225,6 @@ static struct dma_page *pool_alloc_page(struct 
+dma_pool *pool, gfp_t mem_flags)
+ >>          memset(page->vaddr, POOL_POISON_FREED, pool->allocation);
+ >>  #endif
+ >>          pool_initialise_page(pool, page);
+ >> -        list_add(&page->page_list, &pool->page_list);
+ >>          page->in_use = 0;
+ >>          page->offset = 0;
+ >>      } else {
+ >> @@ -315,30 +312,21 @@ void *dma_pool_alloc(struct dma_pool *pool, 
+gfp_t mem_flags,
+ >>      might_sleep_if(mem_flags & __GFP_WAIT);
+ >>
+ >>      spin_lock_irqsave(&pool->lock, flags);
+ >> - restart:
+ >>      list_for_each_entry(page, &pool->page_list, page_list) {
+ >>          if (page->offset < pool->allocation)
+ >>              goto ready;
+ >>      }
+ >> -    page = pool_alloc_page(pool, GFP_ATOMIC);
+ >> -    if (!page) {
+ >> -        if (mem_flags & __GFP_WAIT) {
+ >> -            DECLARE_WAITQUEUE(wait, current);
+ >>
+ >> -            __set_current_state(TASK_UNINTERRUPTIBLE);
+ >> -            __add_wait_queue(&pool->waitq, &wait);
+ >> -            spin_unlock_irqrestore(&pool->lock, flags);
+ >> +    /* pool_alloc_page() might sleep, so temporarily drop 
+&pool->lock */
+ >> +    spin_unlock_irqrestore(&pool->lock, flags);
+ >>
+ >> -            schedule_timeout(POOL_TIMEOUT_JIFFIES);
+ >> +    page = pool_alloc_page(pool, mem_flags);
+ >> +    if (!page)
+ >> +        return NULL;
+ >>
+ >> -            spin_lock_irqsave(&pool->lock, flags);
+ >> -            __remove_wait_queue(&pool->waitq, &wait);
+ >> -            goto restart;
+ >> -        }
+ >> -        retval = NULL;
+ >> -        goto done;
+ >> -    }
+ >> +    spin_lock_irqsave(&pool->lock, flags);
+ >>
+ >> +    list_add(&page->page_list, &pool->page_list);
+ >>   ready:
+ >>      page->in_use++;
+ >>      offset = page->offset;
+ >> @@ -348,7 +336,6 @@ void *dma_pool_alloc(struct dma_pool *pool, 
+gfp_t mem_flags,
+ >>  #ifdef    DMAPOOL_DEBUG
+ >>      memset(retval, POOL_POISON_ALLOCATED, pool->size);
+ >>  #endif
+ >> - done:
+ >>      spin_unlock_irqrestore(&pool->lock, flags);
+ >>      return retval;
+ >>  }
+ >> --
+ >> 1.7.9.5
+ >>
