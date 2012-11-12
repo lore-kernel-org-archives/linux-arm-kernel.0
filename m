@@ -1,61 +1,37 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Nov 2012 10:41:45 +0800
-Subject: [PATCH v2] ARM: mxs: apf28dev: Add I2C and SPI support
-In-Reply-To: <1352464961-6414-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1352464961-6414-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20121112024144.GE415@S2100-06.ap.freescale.net>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 12 Nov 2012 12:10:37 +0800
+Subject: [PATCH] ARM: tegra: retain L2 content over CPU suspend/resume
+In-Reply-To: <509D7BA1.506@wwwdotorg.org>
+References: <1352194377-6209-1-git-send-email-josephl@nvidia.com>
+ <509D7BA1.506@wwwdotorg.org>
+Message-ID: <1352693437.19251.9.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 01:42:41PM +0100, Gwenhael Goavec-Merou wrote:
-> Changes since v1:
-> 	- Removed the spidev support.
-
-I'm not sure you want to have this in the final commit log, so I just
-removed it and applied the patch.
+On Sat, 2012-11-10 at 05:54 +0800, Stephen Warren wrote:
+> On 11/06/2012 02:32 AM, Joseph Lo wrote:
+> > The L2 RAM is in different power domain from the CPU cluster. So the
+> > L2 content can be retained over CPU suspend/resume. To do that, we
+> > need to disable L2 after the MMU is disabled, and enable L2 before
+> > the MMU is enabled. But the L2 controller is in the same power domain
+> > with the CPU cluster. We need to restore it's settings and re-enable
+> > it after the power be resumed.
 > 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> ---
-
-Instead, any comment goes here (after ---) will not show up in the
-final commit log when the patch gets applied with 'git am' command.
-
-Shawn
-
->  arch/arm/boot/dts/imx28-apf28dev.dts |   13 +++++++++++++
->  1 files changed, 13 insertions(+), 0 deletions(-)
+> This doesn't compile:
 > 
-> diff --git a/arch/arm/boot/dts/imx28-apf28dev.dts b/arch/arm/boot/dts/imx28-apf28dev.dts
-> index 1643d25..6d8865b 100644
-> --- a/arch/arm/boot/dts/imx28-apf28dev.dts
-> +++ b/arch/arm/boot/dts/imx28-apf28dev.dts
-> @@ -27,6 +27,13 @@
->  				status = "okay";
->  			};
->  
-> +			ssp2: ssp at 80014000 {
-> +				compatible = "fsl,imx28-spi";
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&spi2_pins_a>;
-> +				status = "okay";
-> +			};
-> +
->  			pinctrl at 80018000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&hog_pins_apf28dev>;
-> @@ -74,6 +81,12 @@
->  				status = "okay";
->  			};
->  
-> +			i2c0: i2c at 80058000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <&i2c0_pins_a>;
-> +				status = "okay";
-> +			};
-> +
->  			pwm: pwm at 80064000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pwm3_pins_a &pwm4_pins_a>;
-> -- 
-> 1.7.8.6
-> 
+> arch/arm/mach-tegra/headsmp.S: Assembler messages:
+> arch/arm/mach-tegra/headsmp.S:119: Error: undefined symbol L2X0_CTRL_EN
+> used as an immediate value
+> arch/arm/mach-tegra/headsmp.S:119: Error: undefined symbol L2X0_CTRL_EN
+> used as an immediate value
+
+Ah, sorry for mention that.
+This patch was depended on "07bd005 ARM: 7547/1: cache-l2x0: add support
+for Aurora L2 cache ctrl" and only showed up after "next-20121024". The
+definition of "L2X0_CTRL_EN" was been introduced in that patch.
+
+Should I re-send a patch that based on tegra "for-next" branch that will
+change L2X0_CTRL_EN to 0x1? Sorry for inconvenience.
+
+Thanks,
+Joseph
