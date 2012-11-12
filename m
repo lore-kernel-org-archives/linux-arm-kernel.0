@@ -1,52 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Nov 2012 19:19:47 +0100
-Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
-In-Reply-To: <50A1212C.2080601@wwwdotorg.org>
-References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
- <1352650891-18356-2-git-send-email-andrew@lunn.ch>
- <50A020C5.4070506@wwwdotorg.org> <20121112082546.GU22029@lunn.ch>
- <50A1212C.2080601@wwwdotorg.org>
-Message-ID: <20121112181947.GS24583@lunn.ch>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 12 Nov 2012 12:20:31 -0600
+Subject: [PATCH V3 00/13] ARM: OMAP: DMTIMER fixes
+Message-ID: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 09:17:48AM -0700, Stephen Warren wrote:
-> On 11/12/2012 01:25 AM, Andrew Lunn wrote:
-> > On Sun, Nov 11, 2012 at 03:03:49PM -0700, Stephen Warren wrote:
-> >> On 11/11/2012 09:21 AM, Andrew Lunn wrote:
-> >>> From: Jamie Lentin <jm@lentin.co.uk>
-> >>>
-> >>> Given appropriate devicetree bindings, this driver registers a
-> >>> pm_power_off function to set a GPIO line high/low to power down
-> >>> your board.
-> 
-> >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
-> >>
-> >>> +Required properties:
-> >>> +- compatible : should be "gpio-poweroff".
-> >>> +- gpios : The GPIO to set high/low, see "gpios property" in
-> >>> +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
-> >>> +  low to power down the board set it to "Active Low", otherwise set
-> >>> +  gpio to "Active High".
-> >>
-> >> Unfortunately, not all GPIO bindings support active high/low flags in
-> >> the GPIO specifier. As such, the flags there are basically useless.
-> >> Other bindings (e.g. IIRC the fixed-regulator binding) have added a
-> >> separate active-high property to indicate the GPIO polarity. This
-> >> binding should probably follow suite.
-> > 
-> > Humm, so are you saying of_get_named_gpio_flags() is deprecated?
-> 
-> I don't know if it's deprecated, but it's certainly not useful in
-> generic code.
+This series includes several fixes for the OMAP DMTIMER driver. This is
+based upon Tony Lindgren's current master branch [1].
 
-Hi Linus, Anton
+Tested on OMAP5912 OSK, OMAP2420 H4, OMAP3430 Beagle and OMAP4430 Panda.
+Testing includes ...
+1. Booting kernel on above boards
+2. Set date and ensuring time of day is correct after 24 hours
+3. Checking the timer counter is incrementing when configuring and starting
+   a timer
+4. Checking the timer overflow interrupt when timer expires.
+5. Using different clock sources to operate the timer with.
+6. Running a loop test overnight that continually runs test #3 and #4 for
+   each available timer
 
-How do you see this? 
+This has also been boot tested on the AM335x Beagle Bone.
 
-I'm happy to implement an enable-active-high property, but it seems to
-go against the purpose of of_get_named_gpio_flags(). Is that function
-deprecated?
+V3 changes:
+- Combined patches #2 and #3 in version 2 series into single patch.
+- Updated errata i103/i767 workaround to pass errata information via
+  platform data to avoid using cpu_is_xxxx() macros in dmtimer driver.
 
-	Thanks
-		Andrew
+[1] http://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+
+Jon Hunter (13):
+  ARM: OMAP: Add DMTIMER definitions for posted mode
+  ARM: OMAP3+: Implement timer workaround for errata i103 and i767
+  ARM: OMAP: Fix timer posted mode support
+  ARM: OMAP3: Correct HWMOD DMTIMER SYSC register declarations
+  ARM: OMAP2/3: Define HWMOD software reset status for DMTIMERs
+  ARM: OMAP2+: Don't use __omap_dm_timer_reset()
+  ARM: OMAP: Fix dmtimer reset for timer1
+  ARM: OMAP: Don't restore of DMTIMER TISTAT register
+  ARM: OMAP: Don't restore DMTIMER interrupt status register
+  ARM: OMAP: Fix spurious interrupts when using timer match feature
+  ARM: OMAP: Add dmtimer interrupt disable function
+  ARM: OMAP: Remove unnecessary call to clk_get()
+  ARM: OMAP: Remove __omap_dm_timer_set_source function
+
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   15 +++-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |   41 +++++------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    4 +
+ arch/arm/mach-omap2/timer.c                        |   70 +++++++++++++-----
+ arch/arm/plat-omap/dmtimer.c                       |   77 ++++++++++++--------
+ arch/arm/plat-omap/include/plat/dmtimer.h          |   72 +++++++++++++-----
+ 6 files changed, 188 insertions(+), 91 deletions(-)
+
+-- 
+1.7.9.5
