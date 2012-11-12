@@ -1,122 +1,104 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 12 Nov 2012 16:52:26 +0800
-Subject: [PATCH 06/17] spi/atmel_spi: add flag to controller data for lock
- operations
+Date: Mon, 12 Nov 2012 16:52:29 +0800
+Subject: [PATCH 09/17] spi/atmel_spi: correct 16 bits transfers using PIO
 In-Reply-To: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352710357-3265-7-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352710357-3265-10-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
+From: Richard Genoud <richard.genoud@gmail.com>
 
-Will allow to drop the lock during DMA operations.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 Cc: grant.likely at secretlab.ca
 Cc: spi-devel-general at lists.sourceforge.net
 ---
- drivers/spi/spi-atmel.c |   31 +++++++++++++++++++------------
- 1 file changed, 19 insertions(+), 12 deletions(-)
+ drivers/spi/spi-atmel.c |   46 +++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 37 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 76a1baf..37f54c3 100644
+index 00e729b..0007a53 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -187,6 +187,7 @@
-  */
- struct atmel_spi {
- 	spinlock_t		lock;
-+	unsigned long		flags;
+@@ -518,13 +518,17 @@ static void atmel_spi_next_xfer_pio(struct spi_master *master,
+ 	}
  
- 	resource_size_t		phybase;
- 	void __iomem		*regs;
-@@ -323,6 +324,16 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
- 		gpio_set_value(asd->npcs_pin, !active);
- }
+ 	if (xfer->tx_buf)
+-		spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
++		if (xfer->bits_per_word > 8)
++			spi_writel(as, TDR, *(u16 *)(xfer->tx_buf));
++		else
++			spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
+ 	else
+ 		spi_writel(as, TDR, 0);
  
-+static void atmel_spi_lock(struct atmel_spi *as)
-+{
-+		spin_lock_irqsave(&as->lock, as->flags);
-+}
-+
-+static void atmel_spi_unlock(struct atmel_spi *as)
-+{
-+		spin_unlock_irqrestore(&as->lock, as->flags);
-+}
-+
- static inline int atmel_spi_xfer_is_last(struct spi_message *msg,
- 					struct spi_transfer *xfer)
+ 	dev_dbg(master->dev.parent,
+-		"  start pio xfer %p: len %u tx %p rx %p\n",
+-		xfer, xfer->len, xfer->tx_buf, xfer->rx_buf);
++		"  start pio xfer %p: len %u tx %p rx %p bitpw %d\n",
++		xfer, xfer->len, xfer->tx_buf, xfer->rx_buf,
++		xfer->bits_per_word);
+ 
+ 	/* Enable relevant interrupts */
+ 	spi_writel(as, IER, SPI_BIT(RDRF) | SPI_BIT(OVRES));
+@@ -918,21 +922,39 @@ atmel_spi_pump_pio_data(struct atmel_spi *as, struct spi_transfer *xfer)
  {
-@@ -559,9 +570,9 @@ atmel_spi_msg_done(struct spi_master *master, struct atmel_spi *as,
- 		"xfer complete: %u bytes transferred\n",
- 		msg->actual_length);
+ 	u8		*txp;
+ 	u8		*rxp;
++	u16		*txp16;
++	u16		*rxp16;
+ 	unsigned long	xfer_pos = xfer->len - as->current_remaining_bytes;
  
--	spin_unlock(&as->lock);
-+	atmel_spi_unlock(as);
- 	msg->complete(msg->context);
--	spin_lock(&as->lock);
-+	atmel_spi_lock(as);
- 
- 	as->current_transfer = NULL;
- 	as->next_transfer = NULL;
-@@ -788,13 +799,11 @@ static int atmel_spi_setup(struct spi_device *spi)
- 		spi->controller_state = asd;
- 		gpio_direction_output(npcs_pin, !(spi->mode & SPI_CS_HIGH));
+ 	if (xfer->rx_buf) {
+-		rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
+-		*rxp = spi_readl(as, RDR);
++		if (xfer->bits_per_word > 8) {
++			rxp16 = (u16 *)(((u8 *)xfer->rx_buf) + xfer_pos);
++			*rxp16 = spi_readl(as, RDR);
++		} else {
++			rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
++			*rxp = spi_readl(as, RDR);
++		}
  	} else {
--		unsigned long		flags;
+ 		spi_readl(as, RDR);
+ 	}
 -
--		spin_lock_irqsave(&as->lock, flags);
-+		atmel_spi_lock(as);
- 		if (as->stay == spi)
- 			as->stay = NULL;
- 		cs_deactivate(as, spi);
--		spin_unlock_irqrestore(&as->lock, flags);
-+		atmel_spi_unlock(as);
- 	}
+-	as->current_remaining_bytes--;
++	if (xfer->bits_per_word > 8) {
++		as->current_remaining_bytes -= 2;
++		if (as->current_remaining_bytes < 0)
++			as->current_remaining_bytes = 0;
++	} else {
++		as->current_remaining_bytes--;
++	}
  
- 	asd->csr = csr;
-@@ -813,7 +822,6 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- {
- 	struct atmel_spi	*as;
- 	struct spi_transfer	*xfer;
--	unsigned long		flags;
- 	struct device		*controller = spi->master->dev.parent;
- 	u8			bits;
- 	struct atmel_spi_device	*asd;
-@@ -878,11 +886,11 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 	msg->status = -EINPROGRESS;
- 	msg->actual_length = 0;
+ 	if (as->current_remaining_bytes) {
+ 		if (xfer->tx_buf) {
+-			txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
+-			spi_writel(as, TDR, *txp);
++			if (xfer->bits_per_word > 8) {
++				txp16 = (u16 *)(((u8 *)xfer->tx_buf)
++							+ xfer_pos + 2);
++				spi_writel(as, TDR, *txp16);
++			} else {
++				txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
++				spi_writel(as, TDR, *txp);
++			}
+ 		} else {
+ 			spi_writel(as, TDR, 0);
+ 		}
+@@ -1345,6 +1367,12 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
+ 				return -ENOPROTOOPT;
+ 			}
+ 		}
++		if (xfer->bits_per_word > 8) {
++			if (xfer->len % 2) {
++				dev_dbg(&spi->dev, "buffer len should be 16 bits aligned\n");
++				return -EINVAL;
++			}
++		}
  
--	spin_lock_irqsave(&as->lock, flags);
-+	atmel_spi_lock(as);
- 	list_add_tail(&msg->queue, &as->queue);
- 	if (!as->current_transfer)
- 		atmel_spi_next_message(spi->master);
--	spin_unlock_irqrestore(&as->lock, flags);
-+	atmel_spi_unlock(as);
- 
- 	return 0;
- }
-@@ -892,17 +900,16 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- 	struct atmel_spi	*as = spi_master_get_devdata(spi->master);
- 	struct atmel_spi_device	*asd = spi->controller_state;
- 	unsigned		gpio = (unsigned) spi->controller_data;
--	unsigned long		flags;
- 
- 	if (!asd)
- 		return;
- 
--	spin_lock_irqsave(&as->lock, flags);
-+	atmel_spi_lock(as);
- 	if (as->stay == spi) {
- 		as->stay = NULL;
- 		cs_deactivate(as, spi);
- 	}
--	spin_unlock_irqrestore(&as->lock, flags);
-+	atmel_spi_unlock(as);
- 
- 	spi->controller_state = NULL;
- 	gpio_free(gpio);
+ 		/* FIXME implement these protocol options!! */
+ 		if (xfer->speed_hz) {
 -- 
 1.7.9.5
