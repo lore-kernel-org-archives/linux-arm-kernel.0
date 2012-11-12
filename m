@@ -1,26 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Nov 2012 14:06:22 -0800
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <509F6CE3.50806@compulab.co.il>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <20121107173343.GF6801@atomide.com> <509B5B84.50605@compulab.co.il>
- <20121108162004.GA6801@atomide.com> <509F6CE3.50806@compulab.co.il>
-Message-ID: <20121112220621.GQ6801@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 12 Nov 2012 20:09:54 -0200
+Subject: [PATCH] ARM: boot: Fix usage of kecho
+In-Reply-To: <201210241928.34303.arnd@arndb.de>
+References: <1351103848-30900-1-git-send-email-festevam@gmail.com>
+ <alpine.LFD.2.02.1210241444090.16518@xanadu.home>
+ <201210241928.34303.arnd@arndb.de>
+Message-ID: <CAOMZO5BEi7n76roOAgBFEqvqJybsCeGKZuozqYL5PRL3hJnghQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [121111 01:18]:
-> On 11/08/12 18:20, Tony Lindgren wrote:
-> > 
-> > I guess what I'm after is just to avoid renaming the existing
-> > timers in the board-*.c files and only rename the ones that
-> > need gp timer only.
-> 
-> This means: get rid of the 32k to gptimer fall back.
-> I've got your point, will cook something shortly.
+Hi Arnd,
 
-Thanks that sounds reasonable to me.
+On Wed, Oct 24, 2012 at 5:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 24 October 2012, Nicolas Pitre wrote:
+>> On Wed, 24 Oct 2012, Fabio Estevam wrote:
+>>
+>> > From: Fabio Estevam <fabio.estevam@freescale.com>
+>> >
+>> > Since commit edc88ceb0 (ARM: be really quiet when building with 'make -s') the
+>> > following output is generated when building a kernel for ARM:
+>> >
+>> > echo '  Kernel: arch/arm/boot/Image is ready'
+>> >   Kernel: arch/arm/boot/Image is ready
+>> >   Building modules, stage 2.
+>> > echo '  Kernel: arch/arm/boot/zImage is ready'
+>> >   Kernel: arch/arm/boot/zImage is ready
+>> >
+>> > As per Documentation/kbuild/makefiles.txt the correct way of using kecho is
+>> > '@$(kecho)'.
+>> >
+>> > Make this change so no more unwanted 'echo' messages are displayed.
+>> >
+>> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>> Acked-by: Nicolas Pitre <nico@linaro.org>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Would this one go via arm-soc tree?
 
 Regards,
 
-Tony
+Fabio Estevam
