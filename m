@@ -1,27 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 14:45:17 +0000
-Subject: [PATCH 0/6] ARM: integrator: SoC bus & cleanup
-In-Reply-To: <1352681542-12835-1-git-send-email-linus.walleij@linaro.org>
-References: <1352681542-12835-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <201211121445.17924.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 12 Nov 2012 15:49:36 +0100
+Subject: [PATCH 05/11] ARM: at91: convert timer suspend/resume to
+ clock_event_device
+In-Reply-To: <1352408516-21988-7-git-send-email-swarren@wwwdotorg.org>
+References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
+ <1352408516-21988-7-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20121112144936.GL4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 November 2012, Linus Walleij wrote:
-> This series will:
+On 14:01 Thu 08 Nov     , Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> - Switch the Integrator/AP and /CP to use the SoC bus
->   when booting from device tree.
-> - Group all devices on the SoC below this bus so as to
->   set a good example of how to do this. The bus was
->   invented by Lee Jones, let's show how it's to be used
->   on a DT:ed SoC.
-> - Fetch the special system controller offsets from two
->   special device tree nodes for each case and replace
->   the static mappings with these at boot.
-> - Move some static remaps to the ATAG-only code path
->   and delete some static maps that aren't used.
+> Move at91's timer suspend/resume functions from struct sys_timer
+> at91sam926x_timer into struct clock_event_device pit_clkevt. This
+> will allow the sys_timer suspend/resume fields to be removed, and
+> eventually lead to a complete removal of struct sys_timer.
+> 
+> Cc: Andrew Victor <linux@maxim.org.za>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+look fine
 
-Nice series,
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Best Regards,
+J.
