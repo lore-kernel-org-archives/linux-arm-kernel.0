@@ -1,54 +1,120 @@
-From: sasha.levin@oracle.com (Sasha Levin)
-Date: Mon, 12 Nov 2012 10:52:27 -0500
-Subject: [PATCH] ARM: EXYNOS: use BUG_ON where possible
-In-Reply-To: <20121112152349.GH28327@n2100.arm.linux.org.uk>
-References: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
- <1352406191-14303-5-git-send-email-sasha.levin@oracle.com>
- <50A111DD.6080504@gmail.com> <20121112152349.GH28327@n2100.arm.linux.org.uk>
-Message-ID: <50A11B3B.1080600@oracle.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 12 Nov 2012 15:55:04 +0000
+Subject: [PATCH v2 2/5] ARM: kernel: add device tree init map function
+In-Reply-To: <20121112151401.GA2111@linaro.org>
+References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1352471654-20207-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20121112151401.GA2111@linaro.org>
+Message-ID: <20121112155504.GB12287@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 10:23 AM, Russell King - ARM Linux wrote:
-> On Mon, Nov 12, 2012 at 04:12:29PM +0100, Maarten Lankhorst wrote:
->> Op 08-11-12 21:23, Sasha Levin schreef:
->>> @@ -465,10 +465,8 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
->>>  	else
->>>  		max_nr = EXYNOS4_MAX_COMBINER_NR;
->>>  
->>> -	if (combiner_nr >= max_nr)
->>> -		BUG();
->>> -	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
->>> -		BUG();
->>> +	BUG_ON(combiner_nr >= max_nr);
->>> +	BUG_ON(irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0);
->>
->> Is it really a good idea to put functions that perform work in a BUG_ON?
->> I don't know, but for some reason it just feels wrong. I'd expect code to
->> compile fine if BUG_ON was a noop, so doing verification calls only, not
->> actual work..
+On Mon, Nov 12, 2012 at 03:14:01PM +0000, Dave Martin wrote:
+> On Fri, Nov 09, 2012 at 02:34:11PM +0000, Lorenzo Pieralisi wrote:
+> > When booting through a device tree, the kernel cpu logical id map can be
+> > initialized using device tree data passed by FW or through an embedded blob.
+> > 
+> > This patch adds a function that parses device tree "cpu" nodes and
+> > retrieves the corresponding CPUs hardware identifiers (MPIDR).
+> > It sets the possible cpus and the cpu logical map values according to
+> > the number of CPUs defined in the device tree and respective properties.
+> > 
+> > The device tree HW identifiers are considered valid if all CPU nodes contain
+> > a "reg" property and the DT defines a CPU node that matches the MPIDR[23:0]
+> > of the boot CPU.
+> > 
+> > The primary CPU is assigned cpu logical number 0 to keep the current convention
+> > valid.
+> > 
+> > Current bindings documentation is included in the patch:
+> > 
+> > Documentation/devicetree/bindings/arm/cpus.txt
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  Documentation/devicetree/bindings/arm/cpus.txt | 84 ++++++++++++++++++++++++++
+> >  arch/arm/include/asm/prom.h                    |  2 +
+> >  arch/arm/kernel/devtree.c                      | 76 +++++++++++++++++++++++
+> >  3 files changed, 162 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> > new file mode 100644
+> > index 0000000..83cd98a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> > @@ -0,0 +1,84 @@
+> > +* ARM CPUs binding description
+> > +
+> > +The device tree allows to describe the layout of CPUs in a system through
+> > +the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
+> > +defining properties for every cpu.
+> > +
+> > +Bindings for CPU nodes follow the ePAPR standard, available from:
+> > +
+> > +http://devicetree.org
+> > +
+> > +For the ARM architecture every CPU node must contain the following properties:
+> > +
+> > +- reg : property matching the CPU MPIDR[23:0] register bits
+> > +- compatible: must be set to "arm, <cpu-model>"
+> > +              where <cpu-model> is the full processor name as used in the
+> > +              processor Technical Reference Manual, eg:
+> > +              - for a Cortex A9 processor
+> > +                compatible = <arm, cortex-a9>;
+> > +              - for a Cortex A15 processor
+> > +                compatible = <arm, cortex-a15>;
+> > +
+> > +List of possible "compatible" string ids:
+> > +
+> > +<arm, arm1020>
+> > +<arm, arm1020e>
+> > +<arm, arm1022>
+> > +<arm, arm1026>
+> > +<arm, arm720>
+> > +<arm, arm740>
+> > +<arm, arm7tdmi>
+> > +<arm, arm920>
+> > +<arm, arm922>
+> > +<arm, arm925>
+> > +<arm, arm926>
+> > +<arm, arm940>
+> > +<arm, arm946>
+> > +<arm, arm9tdmi>
+> > +<arm, fa526>
+> > +<arm, feroceon>
+> > +<arm, mohawk>
+> > +<arm, sa110>
+> > +<arm, sa1100>
+> > +<arm, xsc3>
+> > +<arm, xscale>
+> > +<arm, cortex-a5>
+> > +<arm, cortex-a7>
+> > +<arm, cortex-a8>
+> > +<arm, cortex-a9>
+> > +<arm, cortex-a15>
+> > +<arm, arm1136>
+> > +<arm, arm11-mpcore>
 > 
-> Well, it is currently defined as:
+> Any views on how we make sure that this list gets maintained?
 > 
-> include/asm-generic/bug.h:#define BUG_ON(condition) do { if (unlikely(condition)) BUG(); } while(0)
-> include/asm-generic/bug.h:#define BUG_ON(condition) do { if (condition) ; } while(0)
+> This binding feels like it probably is the right place to keep the
+> exhaustive, "official" list of ARM CPU compatible strings, but I would
+> not be surprised if it gets stale.
 > 
-> but as these can be overridden, I don't think relying on those
-> implementations is a good idea; to do so would be fragile.  Eg, what if
-> the BUG_ON() implementation becomes just:
+> Also, do we worry about the "arm," namespace for compatible strings
+> becoming overcrowded?
 > 
-> #define BUG_ON(x)
+> Currently we're shovelling a whole load of things in there, some of
+> which are not ARM products.
 > 
-> then the function call itself vanishes.  So, only put the actual bug test
-> inside a BUG_ON(), not the functional part which must always be executed.
+> Thiry-party implementations like mohawk, sa11*, xsc*, fa526 and feroceon
+> are not ARM products, and should be in a different, appropriate vendor
+> namespace.
 
-Even if we ignore that modifying the side-effects is wrong, there's already
-more than enough code in the kernel (both in kernel/ / mm/, and in arch/) to
-cause breakage if for some reason the expression is not evaluated.
+I have nothing to object, all valid points.
 
-If some arch decides to not evaluate the expression there it's going to be
-inherently broken.
-
+Any views/feedback on this please ? I share most of Dave's concerns here.
 
 Thanks,
-Sasha
+Lorenzo
