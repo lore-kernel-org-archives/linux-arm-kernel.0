@@ -1,60 +1,55 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Nov 2012 09:25:46 +0100
-Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
-In-Reply-To: <50A020C5.4070506@wwwdotorg.org>
-References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
- <1352650891-18356-2-git-send-email-andrew@lunn.ch>
- <50A020C5.4070506@wwwdotorg.org>
-Message-ID: <20121112082546.GU22029@lunn.ch>
+From: fabio.porcedda@gmail.com (Fabio Porcedda)
+Date: Mon, 12 Nov 2012 09:37:24 +0100
+Subject: [PATCH v9 RESEND 0/3] watchdog: at91sam9_wdt: add device tree support
+Message-ID: <1352709447-8306-1-git-send-email-fabio.porcedda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 11, 2012 at 03:03:49PM -0700, Stephen Warren wrote:
-> On 11/11/2012 09:21 AM, Andrew Lunn wrote:
-> > From: Jamie Lentin <jm@lentin.co.uk>
-> > 
-> > Given appropriate devicetree bindings, this driver registers a
-> > pm_power_off function to set a GPIO line high/low to power down
-> > your board.
-> 
-> This feature will be useful for the Tegra TrimSlice board too.
+Hi all,
 
-Hi Stephen
+This patchset is for adding device tree support to the
+at91sam9_wdt driver.
 
-Great to hear its usable for others.
+The "timeout-sec" binding is added by another patchset already sent:
+[PATCH v4 0/8] watchdog: dt: add support for the timeout-sec dt property
 
-> > diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
-> 
-> > +Required properties:
-> > +- compatible : should be "gpio-poweroff".
-> > +- gpios : The GPIO to set high/low, see "gpios property" in
-> > +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
-> > +  low to power down the board set it to "Active Low", otherwise set
-> > +  gpio to "Active High".
-> 
-> Unfortunately, not all GPIO bindings support active high/low flags in
-> the GPIO specifier. As such, the flags there are basically useless.
-> Other bindings (e.g. IIRC the fixed-regulator binding) have added a
-> separate active-high property to indicate the GPIO polarity. This
-> binding should probably follow suite.
+Changes:
+v9:
+ - rebased over v3.7-rc1
+v8:
+ - add __initconst to at91_wdt_dt_ids
+v7:
+ - split the patchset
+ - remove timeout binding
+v6:
+ - add watchdog core proprty timeout binding
+ - add as example to the orion_wdt driver the new timeout binding
+v5:
+ - split dts commit in two, one for socs and one for boards.
+v4:
+ - use "atmel,at91sam9260-wdt" as compatible
+v3:
+ - add heartbeat option
+ - default disabled for all the soc, enable only for evk-pro3 board
+ - add at91sam9263 and at91sam9g45 soc
+v2:
+ - add missing to and cc addresses
 
-Humm, so are you saying of_get_named_gpio_flags() is deprecated?
+Based on v3.7-rc5
 
-There is a lot of code using this to get the flag
-OF_GPIO_ACTIVE_LOW. Some of these users are very generic code:
+Fabio Porcedda (3):
+  watchdog: at91sam9_wdt: add device tree support
+  ARM: at91/dts: add at91sam9_wdt driver to at91sam926x, at91sam9g45
+  ARM: at91/dts: evk-pro3: enable watchdog
 
-drivers/leds/leds-gpio.c:
-drivers/input/misc/rotary_encoder.c:
-drivers/input/keyboard/gpio_keys.c:
-drivers/input/keyboard/gpio_keys_polled.c:
-drivers/hwmon/gpio-fan.c:
+ Documentation/devicetree/bindings/watchdog/atmel-wdt.txt | 15 +++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi                       |  6 ++++++
+ arch/arm/boot/dts/at91sam9263.dtsi                       |  6 ++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                       |  6 ++++++
+ arch/arm/boot/dts/evk-pro3.dts                           |  4 ++++
+ drivers/watchdog/at91sam9_wdt.c                          | 11 +++++++++++
+ 6 files changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/atmel-wdt.txt
 
-The only code using the "enable-active-high"
-property is drivers/regulator/fixed.c although the binding
-documentation twl6040.txt talks about it, but the code does not
-implement it.
-
-Could you point me towards some email discussion about this?
-
-Thanks
-	Andrew
+-- 
+1.8.0
