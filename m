@@ -1,75 +1,94 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 12 Nov 2012 12:20:34 -0600
-Subject: [PATCH V3 03/13] ARM: OMAP: Fix timer posted mode support
+Date: Mon, 12 Nov 2012 12:20:35 -0600
+Subject: [PATCH V3 04/13] ARM: OMAP3: Correct HWMOD DMTIMER SYSC register
+ declarations
 In-Reply-To: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
 References: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1352744444-2633-4-git-send-email-jon-hunter@ti.com>
+Message-ID: <1352744444-2633-5-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the dmtimer posted mode is being enabled when the function
-omap_dm_timer_enable_posted() is called. This function is only being called
-for OMAP1 timers and OMAP2+ timers that are being used as system timers. Hence,
-for OMAP2+ timers that are NOT being used as a system timer, posted mode is
-not enabled but the "timer->posted" variable is still set (incorrectly) in
-the omap_dm_timer_prepare() function.
+Currently, the OMAP3 HWMOD data defines two TIOCP_CFG register structures
+(referred to as the SYSC register in the HWMOD data) where timers 1, 2 and 10
+use one of the defintions and the other timers use the other definition. For
+OMAP3 devices the structure of the DMTIMER TIOCP_CFG register is the same for
+all 12 instances of the DMTIMER. Please note that this is a difference between
+OMAP3 and OMAP4 and could be the source of the confusion.
 
-This is a regression introduced by commit 3392cdd3 (ARM: OMAP: dmtimer:
-switch-over to platform device driver) which was before the
-omap_dm_timer_enable_posted() function was introduced. Although this is a
-regression from the original code it only impacts performance and so is not
-needed for stable.
+For OMAP3 devices, the DMTIMER TIOCP_CFG register has the fields,
+clock-activity, emufree, idlemode, enwakeup, softreset and autoidle for all
+12 timers. Therefore, remove one of the SYSC register definitions for the
+DMTIMERs and ensure the appropriate register fields are defined for all
+DMTIMERs.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c |   13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   27 ++++++---------------------
+ 1 file changed, 6 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index 381a612..10ec31b 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -121,21 +121,16 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index abe66ce..fac2550 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -153,28 +153,13 @@ static struct omap_hwmod omap3xxx_debugss_hwmod = {
+ };
  
- static void omap_dm_timer_reset(struct omap_dm_timer *timer)
- {
--	omap_dm_timer_enable(timer);
- 	if (timer->pdev->id != 1) {
- 		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
- 		omap_dm_timer_wait_for_reset(timer);
- 	}
- 
- 	__omap_dm_timer_reset(timer, 0, 0);
--	__omap_dm_timer_enable_posted(timer);
--	omap_dm_timer_disable(timer);
- }
- 
- int omap_dm_timer_prepare(struct omap_dm_timer *timer)
- {
--	int ret;
+ /* timer class */
+-static struct omap_hwmod_class_sysconfig omap3xxx_timer_1ms_sysc = {
+-	.rev_offs	= 0x0000,
+-	.sysc_offs	= 0x0010,
+-	.syss_offs	= 0x0014,
+-	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_CLOCKACTIVITY |
+-				SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
+-				SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE),
+-	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+-	.sysc_fields	= &omap_hwmod_sysc_type1,
+-};
 -
- 	/*
- 	 * FIXME: OMAP1 devices do not use the clock framework for dmtimers so
- 	 * do not call clk_get() for these devices.
-@@ -149,13 +144,15 @@ int omap_dm_timer_prepare(struct omap_dm_timer *timer)
- 		}
- 	}
+-static struct omap_hwmod_class omap3xxx_timer_1ms_hwmod_class = {
+-	.name = "timer",
+-	.sysc = &omap3xxx_timer_1ms_sysc,
+-};
+-
+ static struct omap_hwmod_class_sysconfig omap3xxx_timer_sysc = {
+ 	.rev_offs	= 0x0000,
+ 	.sysc_offs	= 0x0010,
+ 	.syss_offs	= 0x0014,
+-	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_ENAWAKEUP |
+-			   SYSC_HAS_SOFTRESET | SYSC_HAS_AUTOIDLE),
++	.sysc_flags	= (SYSC_HAS_SIDLEMODE | SYSC_HAS_CLOCKACTIVITY |
++			   SYSC_HAS_ENAWAKEUP | SYSC_HAS_SOFTRESET |
++			   SYSC_HAS_EMUFREE | SYSC_HAS_AUTOIDLE),
+ 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+ 	.sysc_fields	= &omap_hwmod_sysc_type1,
+ };
+@@ -224,7 +209,7 @@ static struct omap_hwmod omap3xxx_timer1_hwmod = {
+ 		},
+ 	},
+ 	.dev_attr	= &capability_alwon_dev_attr,
+-	.class		= &omap3xxx_timer_1ms_hwmod_class,
++	.class		= &omap3xxx_timer_hwmod_class,
+ };
  
-+	omap_dm_timer_enable(timer);
-+
- 	if (timer->capability & OMAP_TIMER_NEEDS_RESET)
- 		omap_dm_timer_reset(timer);
+ /* timer2 */
+@@ -241,7 +226,7 @@ static struct omap_hwmod omap3xxx_timer2_hwmod = {
+ 			.idlest_idle_bit = OMAP3430_ST_GPT2_SHIFT,
+ 		},
+ 	},
+-	.class		= &omap3xxx_timer_1ms_hwmod_class,
++	.class		= &omap3xxx_timer_hwmod_class,
+ };
  
--	ret = omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
-+	__omap_dm_timer_enable_posted(timer);
-+	omap_dm_timer_disable(timer);
+ /* timer3 */
+@@ -383,7 +368,7 @@ static struct omap_hwmod omap3xxx_timer10_hwmod = {
+ 		},
+ 	},
+ 	.dev_attr	= &capability_pwm_dev_attr,
+-	.class		= &omap3xxx_timer_1ms_hwmod_class,
++	.class		= &omap3xxx_timer_hwmod_class,
+ };
  
--	timer->posted = 1;
--	return ret;
-+	return omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
- }
- 
- static inline u32 omap_dm_timer_reserved_systimer(int id)
+ /* timer11 */
 -- 
 1.7.9.5
