@@ -1,42 +1,93 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 12 Nov 2012 12:20:41 -0600
-Subject: [PATCH V3 10/13] ARM: OMAP: Fix spurious interrupts when using timer
- match feature
+Date: Mon, 12 Nov 2012 12:20:42 -0600
+Subject: [PATCH V3 11/13] ARM: OMAP: Add dmtimer interrupt disable function
 In-Reply-To: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
 References: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <1352744444-2633-11-git-send-email-jon-hunter@ti.com>
+Message-ID: <1352744444-2633-12-git-send-email-jon-hunter@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OMAP DMTIMERs can generate an interrupt when the timer counter value
-matches the value stored in the timer's match register. When using this
-feature spurious interrupts were seen, because the compare logic is being
-enabled before the match value is loaded and according to the documentation
-the match value must be loaded before the compare logic is enable.
+The OMAP dmtimer driver does not currently have a function to disable the
+timer interrupts. For some timer instances the timer interrupt enable
+function can be used to disable the interrupts because the same interrupt
+enable register is used to disable interrupts. However, some timer instances
+have separate interrupt enable/disable registers and so this will not work.
+Therefore, add a dedicated function to disable interrupts.
 
-The reset value for the timer counter and match registers is 0 and hence,
-by enabling the compare logic before the actual match value is loaded a
-spurious interrupt can be generated as the reset values match.
+This change is required for OMAP4+ devices. For OMAP4, all timers apart from 1,
+2 and 10 need this function and for OMAP5 all timers need this function.
+Please note that the interrupt disable function has been written so that it
+can be used by all OMAP devices.
 
 Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/plat-omap/dmtimer.c              |   31 +++++++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/dmtimer.h |    3 ++-
+ 2 files changed, 33 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index f0a3c4c..a38e896 100644
+index a38e896..b4e6634 100644
 --- a/arch/arm/plat-omap/dmtimer.c
 +++ b/arch/arm/plat-omap/dmtimer.c
-@@ -584,8 +584,8 @@ int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
- 		l |= OMAP_TIMER_CTRL_CE;
- 	else
- 		l &= ~OMAP_TIMER_CTRL_CE;
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
- 	omap_dm_timer_write_reg(timer, OMAP_TIMER_MATCH_REG, match);
-+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+@@ -661,6 +661,37 @@ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
+ }
+ EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_enable);
  
- 	/* Save the context */
- 	timer->context.tclr = l;
++/**
++ * omap_dm_timer_set_int_disable - disable timer interrupts
++ * @timer:	pointer to timer handle
++ * @mask:	bit mask of interrupts to be disabled
++ *
++ * Disables the specified timer interrupts for a timer.
++ */
++int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask)
++{
++	u32 l = mask;
++
++	if (unlikely(!timer))
++		return -EINVAL;
++
++	omap_dm_timer_enable(timer);
++
++	if (timer->revision == 1)
++		l = __raw_readl(timer->irq_ena) & ~mask;
++
++	__raw_writel(l, timer->irq_dis);
++	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_WAKEUP_EN_REG) & ~mask;
++	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG, l);
++
++	/* Save the context */
++	timer->context.tier &= ~mask;
++	timer->context.twer &= ~mask;
++	omap_dm_timer_disable(timer);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_disable);
++
+ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer)
+ {
+ 	unsigned int l;
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index 0c07e37..769efb6 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -135,6 +135,7 @@ int omap_dm_timer_set_pwm(struct omap_dm_timer *timer, int def_on, int toggle, i
+ int omap_dm_timer_set_prescaler(struct omap_dm_timer *timer, int prescaler);
+ 
+ int omap_dm_timer_set_int_enable(struct omap_dm_timer *timer, unsigned int value);
++int omap_dm_timer_set_int_disable(struct omap_dm_timer *timer, u32 mask);
+ 
+ unsigned int omap_dm_timer_read_status(struct omap_dm_timer *timer);
+ int omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value);
+@@ -321,7 +322,7 @@ static inline void __omap_dm_timer_init_regs(struct omap_dm_timer *timer)
+ 				OMAP_TIMER_V1_SYS_STAT_OFFSET;
+ 		timer->irq_stat = timer->io_base + OMAP_TIMER_V1_STAT_OFFSET;
+ 		timer->irq_ena = timer->io_base + OMAP_TIMER_V1_INT_EN_OFFSET;
+-		timer->irq_dis = NULL;
++		timer->irq_dis = timer->io_base + OMAP_TIMER_V1_INT_EN_OFFSET;
+ 		timer->pend = timer->io_base + _OMAP_TIMER_WRITE_PEND_OFFSET;
+ 		timer->func_base = timer->io_base;
+ 	} else {
 -- 
 1.7.9.5
