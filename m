@@ -1,47 +1,33 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 12 Nov 2012 12:53:47 +0100
-Subject: [PATCH 2/8] ARM: zynq: move ttc timer code to drivers/clocksource
-In-Reply-To: <20121105214753.GB1254@beefymiracle.amer.corp.natinst.com>
-References: <cover.1351721190.git.josh.cartwright@ni.com>
- <c0347788fbad559a249a25128a23f40c85d9cbda.1351721190.git.josh.cartwright@ni.com>
- <CAHTX3d++0fGSw7GQHcc-S1X1Qh-rfekpr-E8Jkg2_vFqdCFFTg@mail.gmail.com>
- <20121105214753.GB1254@beefymiracle.amer.corp.natinst.com>
-Message-ID: <CAHTX3dKYJ_rWy-bWdhz24R=0ksw9YDixtqpJfEwRGcffu6vwkA@mail.gmail.com>
+From: walken@google.com (Michel Lespinasse)
+Date: Mon, 12 Nov 2012 03:55:16 -0800
+Subject: [PATCH 03/16] mm: check rb_subtree_gap correctness
+In-Reply-To: <509D0F86.30607@gmail.com>
+References: <1352155633-8648-1-git-send-email-walken@google.com>
+ <1352155633-8648-4-git-send-email-walken@google.com>
+ <509D0F86.30607@gmail.com>
+Message-ID: <CANN689E4jXT-VA3j54h_MBgCCc9YK0o_E7PY326NnvdiHmAgFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2012/11/5 Josh Cartwright <josh.cartwright@ni.com>:
-> On Mon, Nov 05, 2012 at 12:22:55PM +0100, Michal Simek wrote:
->> 2012/10/29 Josh Cartwright <josh.cartwright@ni.com>:
->> > Suggested cleanup by Arnd Bergmann.  Move the ttc timer.c code to
->> > drivers/clocksource, and out of the mach-zynq directory.
->> >
->> > The common.h (which only held the timer declaration) was renamed to
->> > xilinx_ttc.h and moved into include/linux.
->> >
->> > Signed-off-by: Josh Cartwright <josh.cartwright@ni.com>
->> > Cc: Arnd Bergmann <arnd@arndb.de>
->> > ---
->> >  arch/arm/mach-zynq/Makefile                                    | 2 +-
->> >  arch/arm/mach-zynq/common.c                                    | 2 +-
->> >  drivers/clocksource/Makefile                                   | 1 +
->> >  arch/arm/mach-zynq/timer.c => drivers/clocksource/xilinx_ttc.c | 1 -
->> >  arch/arm/mach-zynq/common.h => include/linux/xilinx_ttc.h      | 4 ++--
->> >  5 files changed, 5 insertions(+), 5 deletions(-)
->> >  rename arch/arm/mach-zynq/timer.c => drivers/clocksource/xilinx_ttc.c (99%)
->> >  rename arch/arm/mach-zynq/common.h => include/linux/xilinx_ttc.h (91%)
->>
->> Not going to apply this patch till there is clean way how to move all
->> drivers there.  Especially I don't like to add xilinx_ttc.h to
->> include/linux folder.
+On Fri, Nov 9, 2012 at 6:13 AM, Sasha Levin <levinsasha928@gmail.com> wrote:
+> While fuzzing with trinity inside a KVM tools (lkvm) guest, using today's -next
+> kernel, I'm getting these:
 >
-> Okay;  I think it's best to defer the moving of the ttc driver from this
-> patchset.  It is not a dependency of the clk driver support stuff.
-> If you agree, I can spin up a v2 of the patchset w/o this change, and
-> without the serial CONFIG_OF stuff.  Should v2 contain the patches
-> you've already pulled into testing?
+> [  117.007714] free gap 7fba0dd1c000, correct 7fba0dcfb000
+> [  117.019773] map_count 750 rb -1
+> [  117.028362] ------------[ cut here ]------------
+> [  117.029813] kernel BUG at mm/mmap.c:439!
+>
+> Note that they are very easy to reproduce.
 
-Sure and I see you have done which is good.
+Thanks for the report. I had trouble reproducing this on Friday, but
+after Hugh came up with an easy test case I think I have it figured
+out. I sent out a proposed fix as "[PATCH 0/3] fix missing
+rb_subtree_gap updates on vma insert/erase". Let's follow up the
+discussion there if necessary.
 
-Thanks,
-Michal
+Cheers,
+
+-- 
+Michel "Walken" Lespinasse
+A program is never fully debugged until the last user dies.
