@@ -1,14 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Nov 2012 09:33:29 +0000
-Subject: Build failure: OMAP4430 failed due to exynos4 pinctrl
-Message-ID: <20121112093329.GC28327@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 12 Nov 2012 10:39:20 +0100
+Subject: [PATCH RFT 1/2] pinctrl: dove: Fix dove_audio1_ctrl_set when
+ BIT(0|1|2|3) of config is clear
+In-Reply-To: <1352641495.3113.1.camel@phoenix>
+References: <1352641495.3113.1.camel@phoenix>
+Message-ID: <50A0C3C8.2020501@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Last night's randconfig for OMAP4430 failed with:
+On 11/11/2012 02:44 PM, Axel Lin wrote:
+> Current implementation in dove_audio1_ctrl_set() does not clear corresponding
+> register bit if BIT(0|1|2|3) of config is clear. Fix it.
+>
+> Signed-off-by: Axel Lin<axel.lin@ingics.com>
 
-drivers/built-in.o:(.rodata+0x1a60): undefined reference to `exynos4210_pin_ctrl'
+Axel,
 
-Config and log:
-http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2693
-http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2693
+thanks for the hint on not clearing the audio1 bits before setting them.
+I will test this tonight and guess you should prepare a real patch for
+this one.
+
+Sebastian
