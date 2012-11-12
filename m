@@ -1,52 +1,73 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 16:29:03 +0100
-Subject: [PATCH 5/6] staging: drm/imx: Add pinctrl support to parallel display
+Date: Mon, 12 Nov 2012 16:29:00 +0100
+Subject: [PATCH 2/6] staging: drm/imx: Add YVU420 support to i.MX IPUv3 base
  driver
 In-Reply-To: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
 References: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352734144-14897-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1352734144-14897-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow the iomux to be configured for the display.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/staging/imx-drm/parallel-display.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c |   11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
-index 9b51d73..324283c 100644
---- a/drivers/staging/imx-drm/parallel-display.c
-+++ b/drivers/staging/imx-drm/parallel-display.c
-@@ -23,6 +23,7 @@
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_crtc_helper.h>
- #include <linux/videodev2.h>
-+#include <linux/pinctrl/consumer.h>
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+index 04f6aba..a5cec0e 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
+@@ -234,6 +234,11 @@ void ipu_cpmem_set_yuv_planar_full(struct ipu_ch_param __iomem *p,
+ 		ipu_ch_param_write_field(p, IPU_FIELD_UBO, u_offset / 8);
+ 		ipu_ch_param_write_field(p, IPU_FIELD_VBO, v_offset / 8);
+ 		break;
++	case V4L2_PIX_FMT_YVU420:
++		ipu_ch_param_write_field(p, IPU_FIELD_SLUV, (stride / 2) - 1);
++		ipu_ch_param_write_field(p, IPU_FIELD_UBO, v_offset / 8);
++		ipu_ch_param_write_field(p, IPU_FIELD_VBO, u_offset / 8);
++		break;
+ 	}
+ }
+ EXPORT_SYMBOL_GPL(ipu_cpmem_set_yuv_planar_full);
+@@ -246,10 +251,11 @@ void ipu_cpmem_set_yuv_planar(struct ipu_ch_param __iomem *p, u32 pixel_format,
  
- #include "imx-drm.h"
+ 	switch (pixel_format) {
+ 	case V4L2_PIX_FMT_YUV420:
++	case V4L2_PIX_FMT_YVU420:
+ 		uv_stride = stride / 2;
+ 		u_offset = stride * height;
+ 		v_offset = u_offset + (uv_stride * height / 2);
+-		ipu_cpmem_set_yuv_planar_full(p, V4L2_PIX_FMT_YUV420, stride,
++		ipu_cpmem_set_yuv_planar_full(p, pixel_format, stride,
+ 				u_offset, v_offset);
+ 		break;
+ 	}
+@@ -307,6 +313,7 @@ int ipu_cpmem_set_fmt(struct ipu_ch_param __iomem *cpmem, u32 pixelformat)
+ {
+ 	switch (pixelformat) {
+ 	case V4L2_PIX_FMT_YUV420:
++	case V4L2_PIX_FMT_YVU420:
+ 		/* pix format */
+ 		ipu_ch_param_write_field(cpmem, IPU_FIELD_PFS, 2);
+ 		/* burst size */
+@@ -369,6 +376,7 @@ int ipu_cpmem_set_image(struct ipu_ch_param __iomem *cpmem,
  
-@@ -195,11 +196,20 @@ static int __devinit imx_pd_probe(struct platform_device *pdev)
- 	struct imx_parallel_display *imxpd;
- 	int ret;
- 	const char *fmt;
-+	struct pinctrl *pinctrl;
- 
- 	imxpd = devm_kzalloc(&pdev->dev, sizeof(*imxpd), GFP_KERNEL);
- 	if (!imxpd)
- 		return -ENOMEM;
- 
-+	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-+	if (IS_ERR(pinctrl)) {
-+		ret = PTR_ERR(pinctrl);
-+		dev_warn(&pdev->dev, "pinctrl_get_select_default failed with %d",
-+				ret);
-+		return ret;
-+	}
-+
- 	edidp = of_get_property(np, "edid", &imxpd->edid_len);
- 	if (edidp)
- 		imxpd->edid = kmemdup(edidp, imxpd->edid_len, GFP_KERNEL);
+ 	switch (pix->pixelformat) {
+ 	case V4L2_PIX_FMT_YUV420:
++	case V4L2_PIX_FMT_YVU420:
+ 		y_offset = Y_OFFSET(pix, image->rect.left, image->rect.top);
+ 		u_offset = U_OFFSET(pix, image->rect.left,
+ 				image->rect.top) - y_offset;
+@@ -414,6 +422,7 @@ enum ipu_color_space ipu_pixelformat_to_colorspace(u32 pixelformat)
+ {
+ 	switch (pixelformat) {
+ 	case V4L2_PIX_FMT_YUV420:
++	case V4L2_PIX_FMT_YVU420:
+ 	case V4L2_PIX_FMT_UYVY:
+ 	case V4L2_PIX_FMT_YUYV:
+ 		return IPUV3_COLORSPACE_YUV;
 -- 
 1.7.10.4
