@@ -1,90 +1,284 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 12 Nov 2012 21:49:35 +0100
-Subject: [PATCH V2 0/5]  SMP support for Armada XP
-In-Reply-To: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <50A160DF.7030305@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Nov 2012 13:51:02 -0700
+Subject: [PATCH V2 2/11] time: convert arch_gettimeoffset to a pointer
+Message-ID: <1352753462-2915-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Stephen Warren <swarren@nvidia.com>
 
-On 10/29/2012 10:11 PM, Gregory CLEMENT wrote:
-[...]
+Currently, whenever CONFIG_ARCH_USES_GETTIMEOFFSET is enabled, each
+arch core provides a single implementation of arch_gettimeoffset(). In
+many cases, different sub-architectures, different machines, or
+different timer providers exist, and so the arch ends up implementing
+arch_gettimeoffset() as a call-through-pointer anyway. Examples are
+ARM, Cris, M68K, and it's arguable that the remaining architectures,
+M32R and Blackfin, should be doing this anyway.
 
-> Arnd, Olof, as this code is SoC specific will you be able to pull it
-> through Jason tree? Or should I push the part added in
-> arch/arm/mm/proc-v7.S to support PJ4B CPU through Russell tree?
+Modify arch_gettimeoffset so that it itself is a function pointer, which
+the arch initializes. This will allow later changes to move the
+initialization of this function into individual machine support or timer
+drivers. This is particularly useful for code in drivers/clocksource
+which should rely on an arch-independant mechanism to register their
+implementation of arch_gettimeoffset().
 
-Before sending a new series with the fixes related to Will comments, I
-would like to know if I need to split the patches in order to send some
-parts to Russell or if you (Arnd and Olof) will be able to take the whole
-series (through Jason Cooper's git tree of course).
+This patch also converts the Cris architecture to set arch_gettimeoffset
+directly to the final implementation in time_init(), because Cris already
+had separate time_init() functions per sub-architecture. M68K and ARM
+are converted to set arch_gettimeoffset the final implementation in later
+patches, because they already have function pointers in place for this
+purpose.
 
-> 
-> Changelog:
-> V1 -> V2:
-> - Rebased on to v3.7-rc3
-> - Fixed typos found by Alexandre Belloni
-> - Added clk_prepare_enable() before getting rate clk in
->   set_secondary_cpus_clock()
-> - Add explanation in the binding documentation about the per-CPU
->   interrupt registers: the address of the virtual register must be
->   used.
-> - Removed the armada_xp prefix in the coherency.c file to be more
->   compliant with the name convention of the other files.
-> - Coherency_init is now called from armada_370_xp_dt_init() and is no
->   more an early_init() call. As the device tree is not available from
->   an early_init(), it was useless to call coherency_init() so
->   early. The need to be able to call some function very early during
->   the boot were already resolved by using the hard code address of the
->   register.
-> 
-> Regards,
-> 
-> Yehuda Yitschak (5):
->   arm: mvebu: Added support for coherency fabric in mach-mvebu
->   arm: mvebu: Added initial support for power managmement service unit
->   arm: mvebu: Added IPI support via doorbells
->   arm: mm: Added support for PJ4B cpu and init routines
->   arm: mvebu: Added SMP support for Armada XP
-> 
->  .../devicetree/bindings/arm/armada-370-xp-mpic.txt |   12 +-
->  .../devicetree/bindings/arm/armada-370-xp-pmsu.txt |   20 ++++
->  .../devicetree/bindings/arm/coherency-fabric.txt   |   16 +++
->  arch/arm/boot/dts/armada-370-xp.dtsi               |    5 +
->  arch/arm/boot/dts/armada-xp.dtsi                   |   12 +-
->  arch/arm/configs/mvebu_defconfig                   |    3 +
->  arch/arm/mach-mvebu/Kconfig                        |    3 +-
->  arch/arm/mach-mvebu/Makefile                       |    4 +-
->  arch/arm/mach-mvebu/armada-370-xp.c                |    3 +
->  arch/arm/mach-mvebu/armada-370-xp.h                |   10 ++
->  arch/arm/mach-mvebu/coherency.c                    |   89 ++++++++++++++
->  arch/arm/mach-mvebu/coherency.h                    |   21 ++++
->  arch/arm/mach-mvebu/common.h                       |    6 +
->  arch/arm/mach-mvebu/headsmp.S                      |   66 +++++++++++
->  arch/arm/mach-mvebu/hotplug.c                      |   30 +++++
->  arch/arm/mach-mvebu/irq-armada-370-xp.c            |   92 ++++++++++++++-
->  arch/arm/mach-mvebu/platsmp.c                      |  124 ++++++++++++++++++++
->  arch/arm/mach-mvebu/pmsu.c                         |   78 ++++++++++++
->  arch/arm/mach-mvebu/pmsu.h                         |   16 +++
->  arch/arm/mm/Kconfig                                |    4 +
->  arch/arm/mm/proc-v7.S                              |   46 ++++++++
->  21 files changed, 648 insertions(+), 12 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/armada-370-xp-pmsu.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/coherency-fabric.txt
->  create mode 100644 arch/arm/mach-mvebu/coherency.c
->  create mode 100644 arch/arm/mach-mvebu/coherency.h
->  create mode 100644 arch/arm/mach-mvebu/headsmp.S
->  create mode 100644 arch/arm/mach-mvebu/hotplug.c
->  create mode 100644 arch/arm/mach-mvebu/platsmp.c
->  create mode 100644 arch/arm/mach-mvebu/pmsu.c
->  create mode 100644 arch/arm/mach-mvebu/pmsu.h
-> 
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Mike Frysinger <vapier@gentoo.org>
+Cc: Mikael Starvik <starvik@axis.com>
+Cc: Hirokazu Takata <takata@linux-m32r.org>
+Cc: John Stultz <johnstul@us.ibm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+v2:
+* s/gettimeoffset/get_arch_timeoffset/ to make the name less generic
+  and more arch-specific.
 
+(Note: I've only reposted patch 2/11 this time around, and I still hope
+to take it through the arm-soc tree due to dependencies, so I'm not
+requesting this be applied by the timekeeping maintainers)
+---
+ arch/arm/kernel/time.c           |    6 +++++-
+ arch/blackfin/kernel/time.c      |    6 +++++-
+ arch/cris/arch-v10/kernel/time.c |    6 ++++--
+ arch/cris/kernel/time.c          |   11 -----------
+ arch/m32r/kernel/time.c          |    4 +++-
+ arch/m68k/kernel/time.c          |   16 ++++++++++------
+ include/linux/time.h             |    4 +---
+ kernel/time/timekeeping.c        |   26 ++++++++++++++++++++------
+ 8 files changed, 48 insertions(+), 31 deletions(-)
 
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 09be0c3..b0190b4 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -70,7 +70,7 @@ EXPORT_SYMBOL(profile_pc);
+ #endif
+ 
+ #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+-u32 arch_gettimeoffset(void)
++static u32 arm_gettimeoffset(void)
+ {
+ 	if (system_timer->offset != NULL)
+ 		return system_timer->offset() * 1000;
+@@ -164,6 +164,10 @@ device_initcall(timer_init_syscore_ops);
+ 
+ void __init time_init(void)
+ {
++#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
++	arch_gettimeoffset = arm_gettimeoffset;
++#endif
++
+ 	system_timer = machine_desc->timer;
+ 	system_timer->init();
+ 	sched_clock_postinit();
+diff --git a/arch/blackfin/kernel/time.c b/arch/blackfin/kernel/time.c
+index 2310b24..3126b92 100644
+--- a/arch/blackfin/kernel/time.c
++++ b/arch/blackfin/kernel/time.c
+@@ -85,7 +85,7 @@ time_sched_init(irqreturn_t(*timer_routine) (int, void *))
+ /*
+  * Should return useconds since last timer tick
+  */
+-u32 arch_gettimeoffset(void)
++static u32 blackfin_gettimeoffset(void)
+ {
+ 	unsigned long offset;
+ 	unsigned long clocks_per_jiffy;
+@@ -141,6 +141,10 @@ void read_persistent_clock(struct timespec *ts)
+ 
+ void __init time_init(void)
+ {
++#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
++	arch_gettimeoffset = blackfin_gettimeoffset;
++#endif
++
+ #ifdef CONFIG_RTC_DRV_BFIN
+ 	/* [#2663] hack to filter junk RTC values that would cause
+ 	 * userspace to have to deal with time values greater than
+diff --git a/arch/cris/arch-v10/kernel/time.c b/arch/cris/arch-v10/kernel/time.c
+index 162892f..fce7c54 100644
+--- a/arch/cris/arch-v10/kernel/time.c
++++ b/arch/cris/arch-v10/kernel/time.c
+@@ -55,9 +55,9 @@ unsigned long get_ns_in_jiffie(void)
+ 	return ns;
+ }
+ 
+-unsigned long do_slow_gettimeoffset(void)
++static u32 cris_v10_gettimeoffset(void)
+ {
+-	unsigned long count;
++	u32 count;
+ 
+ 	/* The timer interrupt comes from Etrax timer 0. In order to get
+ 	 * better precision, we check the current value. It might have
+@@ -191,6 +191,8 @@ static struct irqaction irq2  = {
+ void __init
+ time_init(void)
+ {	
++	arch_gettimeoffset = cris_v10_gettimeoffset;
++
+ 	/* probe for the RTC and read it if it exists 
+ 	 * Before the RTC can be probed the loops_per_usec variable needs 
+ 	 * to be initialized to make usleep work. A better value for 
+diff --git a/arch/cris/kernel/time.c b/arch/cris/kernel/time.c
+index b063c92..fe6acda 100644
+--- a/arch/cris/kernel/time.c
++++ b/arch/cris/kernel/time.c
+@@ -39,17 +39,6 @@
+ extern unsigned long loops_per_jiffy; /* init/main.c */
+ unsigned long loops_per_usec;
+ 
+-
+-#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+-extern unsigned long do_slow_gettimeoffset(void);
+-static unsigned long (*do_gettimeoffset)(void) = do_slow_gettimeoffset;
+-
+-u32 arch_gettimeoffset(void)
+-{
+-	return do_gettimeoffset();
+-}
+-#endif
+-
+ int set_rtc_mmss(unsigned long nowtime)
+ {
+ 	D(printk(KERN_DEBUG "set_rtc_mmss(%lu)\n", nowtime));
+diff --git a/arch/m32r/kernel/time.c b/arch/m32r/kernel/time.c
+index 84dd040..1a15f81 100644
+--- a/arch/m32r/kernel/time.c
++++ b/arch/m32r/kernel/time.c
+@@ -57,7 +57,7 @@ extern void smp_local_timer_interrupt(void);
+ 
+ static unsigned long latch;
+ 
+-u32 arch_gettimeoffset(void)
++static u32 m32r_gettimeoffset(void)
+ {
+ 	unsigned long  elapsed_time = 0;  /* [us] */
+ 
+@@ -165,6 +165,8 @@ void read_persistent_clock(struct timespec *ts)
+ 
+ void __init time_init(void)
+ {
++	arch_gettimeoffset = m32r_gettimeoffset;
++
+ #if defined(CONFIG_CHIP_M32102) || defined(CONFIG_CHIP_XNUX2) \
+ 	|| defined(CONFIG_CHIP_VDEC2) || defined(CONFIG_CHIP_M32700) \
+ 	|| defined(CONFIG_CHIP_OPSP) || defined(CONFIG_CHIP_M32104)
+diff --git a/arch/m68k/kernel/time.c b/arch/m68k/kernel/time.c
+index 5d0bcaa..c2994c8 100644
+--- a/arch/m68k/kernel/time.c
++++ b/arch/m68k/kernel/time.c
+@@ -80,14 +80,9 @@ void read_persistent_clock(struct timespec *ts)
+ 	}
+ }
+ 
+-void __init time_init(void)
+-{
+-	mach_sched_init(timer_interrupt);
+-}
+-
+ #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+ 
+-u32 arch_gettimeoffset(void)
++static u32 m68k_gettimeoffset(void)
+ {
+ 	return mach_gettimeoffset() * 1000;
+ }
+@@ -106,3 +101,12 @@ static int __init rtc_init(void)
+ module_init(rtc_init);
+ 
+ #endif /* CONFIG_ARCH_USES_GETTIMEOFFSET */
++
++void __init time_init(void)
++{
++#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
++	arch_gettimeoffset = m68k_gettimeoffset;
++#endif
++
++	mach_sched_init(timer_interrupt);
++}
+diff --git a/include/linux/time.h b/include/linux/time.h
+index 4d358e9..05e32a7 100644
+--- a/include/linux/time.h
++++ b/include/linux/time.h
+@@ -142,9 +142,7 @@ void timekeeping_inject_sleeptime(struct timespec *delta);
+  * finer then tick granular time.
+  */
+ #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+-extern u32 arch_gettimeoffset(void);
+-#else
+-static inline u32 arch_gettimeoffset(void) { return 0; }
++extern u32 (*arch_gettimeoffset)(void);
+ #endif
+ 
+ extern void do_gettimeofday(struct timeval *tv);
+diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+index e424970..00b58c7 100644
+--- a/kernel/time/timekeeping.c
++++ b/kernel/time/timekeeping.c
+@@ -140,6 +140,20 @@ static void tk_setup_internals(struct timekeeper *tk, struct clocksource *clock)
+ }
+ 
+ /* Timekeeper helper functions. */
++
++#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
++u32 (*arch_gettimeoffset)(void);
++
++u32 get_arch_timeoffset(void)
++{
++	if (likely(arch_gettimeoffset))
++		return arch_gettimeoffset();
++	return 0;
++}
++#else
++static inline u32 get_arch_timeoffset(void) { return 0; }
++#endif
++
+ static inline s64 timekeeping_get_ns(struct timekeeper *tk)
+ {
+ 	cycle_t cycle_now, cycle_delta;
+@@ -156,8 +170,8 @@ static inline s64 timekeeping_get_ns(struct timekeeper *tk)
+ 	nsec = cycle_delta * tk->mult + tk->xtime_nsec;
+ 	nsec >>= tk->shift;
+ 
+-	/* If arch requires, add in gettimeoffset() */
+-	return nsec + arch_gettimeoffset();
++	/* If arch requires, add in get_arch_timeoffset() */
++	return nsec + get_arch_timeoffset();
+ }
+ 
+ static inline s64 timekeeping_get_ns_raw(struct timekeeper *tk)
+@@ -176,8 +190,8 @@ static inline s64 timekeeping_get_ns_raw(struct timekeeper *tk)
+ 	/* convert delta to nanoseconds. */
+ 	nsec = clocksource_cyc2ns(cycle_delta, clock->mult, clock->shift);
+ 
+-	/* If arch requires, add in gettimeoffset() */
+-	return nsec + arch_gettimeoffset();
++	/* If arch requires, add in get_arch_timeoffset() */
++	return nsec + get_arch_timeoffset();
+ }
+ 
+ /* must hold write on timekeeper.lock */
+@@ -210,8 +224,8 @@ static void timekeeping_forward_now(struct timekeeper *tk)
+ 
+ 	tk->xtime_nsec += cycle_delta * tk->mult;
+ 
+-	/* If arch requires, add in gettimeoffset() */
+-	tk->xtime_nsec += (u64)arch_gettimeoffset() << tk->shift;
++	/* If arch requires, add in get_arch_timeoffset() */
++	tk->xtime_nsec += (u64)get_arch_timeoffset() << tk->shift;
+ 
+ 	tk_normalize_xtime(tk);
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.0.4
