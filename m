@@ -1,45 +1,25 @@
-From: mturquette@ti.com (Mike Turquette)
-Date: Mon, 12 Nov 2012 13:22:12 -0800
-Subject: possibility of parent clock selection through DT
-In-Reply-To: <CAPub148Bq=uwTuky25WzXn4yfCukJ+WacxkBvuyV5yTzGasGOQ@mail.gmail.com>
-References: <CAPub14-CPS48gQ1h8vvAYBpO_=egjheG_rMoZ894Y4XZ2CinUQ@mail.gmail.com>
- <CAPub148Bq=uwTuky25WzXn4yfCukJ+WacxkBvuyV5yTzGasGOQ@mail.gmail.com>
-Message-ID: <20121112212212.20034.78522@nucleus>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 21:21:15 +0000
+Subject: [PATCH 0/7] ARM: remove init_consistent_dma_size() stub
+In-Reply-To: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
+References: <1352360783-17523-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201211122121.16219.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Shiraz Hashim (2012-11-06 22:36:10)
-> On Wed, Nov 7, 2012 at 11:42 AM, Shiraz Hashim
-> <shiraz.linux.kernel@gmail.com> wrote:
-> > Hi Mike, Rob,
-> >
-> > Devices in a SoC can have multiple possible clock sources which is
-> > perfectly captured through clk framework.
-> >
-> > But the device itself may not be aware of the complex hierarchy above it.
-> > In this case how do you suggest a board (through DT) should select its
-> > preference.
-> >
-> > Is there some work already going on in this direction ?
+On Thursday 08 November 2012, Marek Szyprowski wrote:
+> Commit e9da6e9905e639b0 ("ARM: dma-mapping: remove custom consistent dma
+> region") replaced custom consistent memory handling, so setting
+> consistent dma memory size is not longer required. This patch series
+> cleans sub-architecture platform code to remove all calls to the
+> obsolated init_consistent_dma_size() function and finally removes the
+> init_consistent_dma_size() stub itself.
 > 
-> Just to make it clear, I already have referred the clock DT bindings and
-> Shawn Guo patch on removing clk look up registration from kernel code.
-> 
-> Here I am talking about possibility of selecting desired clock hierarchy
-> by the boards about which device nodes are not aware.
+> Arnd, Olof: could You apply it to arm-soc cleanup branch?
 > 
 
-One way to achieve this is to use clk_set_rate as a way to switch
-parents at run-time.  The OMAP CCF code currently does this when
-relocking PLLs and makes use of __clk_reparent to update the clock
-framework's representation of the hierarchy dynamically.
+Applied patches 2-7 to next/cleanup branch, with the Acks that came in.
 
-Maybe something like the following is helpful to you:
-http://git.linaro.org/gitweb?p=people/mturquette/linux.git;a=blob;f=arch/arm/mach-omap2/dpll3xxx.c;h=f72dedb4eee892ce4cd5bdf22cc8c22510f3d526;hb=clk-omap-3.8#l542
+Thanks,
 
-Regards,
-Mike
-
-> -- 
-> regards
-> Shiraz Hashim
+	Arnd
