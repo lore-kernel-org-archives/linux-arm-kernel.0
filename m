@@ -1,145 +1,71 @@
-From: rob.clark@linaro.org (Rob Clark)
-Date: Mon, 12 Nov 2012 07:46:57 -0600
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <20121112104601.GB2346@mudshark.cambridge.arm.com>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <20121112104601.GB2346@mudshark.cambridge.arm.com>
-Message-ID: <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 12 Nov 2012 14:47:46 +0100
+Subject: [RFC PATCH 1/4] ARM: S3C24XX: move s3c24xx-irq to drivers/irqchip
+In-Reply-To: <201211121446.30167.heiko@sntech.de>
+References: <201211121446.30167.heiko@sntech.de>
+Message-ID: <201211121447.49977.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 4:46 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Nov 09, 2012 at 09:17:33PM +0000, Rob Clark wrote:
->> From: Rob Clark <rob@ti.com>
->>
->> A new atomic modeset/pageflip ioctl being developed in DRM requires
->> get_user() to work for 64bit types (in addition to just put_user()).
->>
->> Signed-off-by: Rob Clark <rob@ti.com>
->> ---
->>  arch/arm/include/asm/uaccess.h | 25 ++++++++++++++++++++-----
->>  arch/arm/lib/getuser.S         | 17 ++++++++++++++++-
->>  2 files changed, 36 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
->> index 7e1f760..2e3fdb2 100644
->> --- a/arch/arm/include/asm/uaccess.h
->> +++ b/arch/arm/include/asm/uaccess.h
->> @@ -100,6 +100,7 @@ static inline void set_fs(mm_segment_t fs)
->>  extern int __get_user_1(void *);
->>  extern int __get_user_2(void *);
->>  extern int __get_user_4(void *);
->> +extern int __get_user_8(void *);
->>
->>  #define __GUP_CLOBBER_1      "lr", "cc"
->>  #ifdef CONFIG_CPU_USE_DOMAINS
->> @@ -108,6 +109,7 @@ extern int __get_user_4(void *);
->>  #define __GUP_CLOBBER_2 "lr", "cc"
->>  #endif
->>  #define __GUP_CLOBBER_4      "lr", "cc"
->> +#define __GUP_CLOBBER_8      "lr", "cc"
->>
->>  #define __get_user_x(__r2,__p,__e,__l,__s)                           \
->>          __asm__ __volatile__ (                                       \
->> @@ -122,22 +124,35 @@ extern int __get_user_4(void *);
->>       ({                                                              \
->>               unsigned long __limit = current_thread_info()->addr_limit - 1; \
->>               register const typeof(*(p)) __user *__p asm("r0") = (p);\
->> -             register unsigned long __r2 asm("r2");                  \
->>               register unsigned long __l asm("r1") = __limit;         \
->>               register int __e asm("r0");                             \
->>               switch (sizeof(*(__p))) {                               \
->> -             case 1:                                                 \
->> +             case 1: {                                               \
->> +                     register unsigned long __r2 asm("r2");          \
->>                       __get_user_x(__r2, __p, __e, __l, 1);           \
->> +                     x = (typeof(*(p))) __r2;                        \
->>                       break;                                          \
->> -             case 2:                                                 \
->> +             }                                                       \
->> +             case 2: {                                               \
->> +                     register unsigned long __r2 asm("r2");          \
->>                       __get_user_x(__r2, __p, __e, __l, 2);           \
->> +                     x = (typeof(*(p))) __r2;                        \
->>                       break;                                          \
->> -             case 4:                                                 \
->> +             }                                                       \
->> +             case 4: {                                               \
->> +                     register unsigned long __r2 asm("r2");          \
->>                       __get_user_x(__r2, __p, __e, __l, 4);           \
->> +                     x = (typeof(*(p))) __r2;                        \
->> +                     break;                                          \
->> +             }                                                       \
->> +             case 8: {                                               \
->> +                     register unsigned long long __r2 asm("r2");     \
->
-> Does this matter? For EABI, we'll pass in (r2, r3) and it's all handcrafted
-> asm, so the compiler shouldn't care much. For OABI, I think you may have to
-> do some more work to get the two words where you want them.
+Removes another part from plat-s3c24xx and also enables further
+improvements happening in the correct location.
 
-Is the question whether the compiler is guaranteed to allocate r2 and
-r3 in all cases?  I'm not quite sure, I confess to usually trying to
-avoid inline asm.  But from looking at the disassembly (for little
-endian EABI build) it seemed to do the right thing.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/plat-s3c24xx/Makefile                     |    1 -
+ drivers/irqchip/Kconfig                            |    3 +++
+ drivers/irqchip/Makefile                           |    1 +
+ .../irq.c => drivers/irqchip/irq-s3c24xx.c         |    0
+ 5 files changed, 5 insertions(+), 1 deletions(-)
+ rename arch/arm/plat-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (100%)
 
-The only other idea I had was to explicitly declare two 'unsigned
-long's and then shift them into a 64bit x, although I'm open to
-suggestions if there is a better way.
-
->> +                     __get_user_x(__r2, __p, __e, __l, 8);           \
->> +                     x = (typeof(*(p))) __r2;                        \
->>                       break;                                          \
->> +             }                                                       \
->>               default: __e = __get_user_bad(); break;                 \
->>               }                                                       \
->> -             x = (typeof(*(p))) __r2;                                \
->>               __e;                                                    \
->>       })
->>
->> diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
->> index 9b06bb4..d05285c 100644
->> --- a/arch/arm/lib/getuser.S
->> +++ b/arch/arm/lib/getuser.S
->> @@ -18,7 +18,7 @@
->>   * Inputs:   r0 contains the address
->>   *           r1 contains the address limit, which must be preserved
->>   * Outputs:  r0 is the error code
->> - *           r2 contains the zero-extended value
->> + *           r2, r3 contains the zero-extended value
->>   *           lr corrupted
->>   *
->>   * No other registers must be altered.  (see <asm/uaccess.h>
->> @@ -66,6 +66,19 @@ ENTRY(__get_user_4)
->>       mov     pc, lr
->>  ENDPROC(__get_user_4)
->>
->> +ENTRY(__get_user_8)
->> +     check_uaccess r0, 4, r1, r2, __get_user_bad
->
-> Shouldn't you be passing 8 here, so that we validate the correct range?
-
-yes, sorry, I'll fix that
-
->> +#ifdef CONFIG_THUMB2_KERNEL
->> +5: TUSER(ldr)        r2, [r0]
->> +6: TUSER(ldr)        r3, [r0, #4]
->> +#else
->> +5: TUSER(ldr)        r2, [r0], #4
->> +6: TUSER(ldr)        r3, [r0]
->> +#endif
->
-> This doesn't work for EABI big-endian systems.
-
-Hmm, is that true?  Wouldn't put_user() then have the same problem?
-
-I guess __ARMEB__ is the flag for big-endian?
-
-BR,
--R
-
-> Will
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 48eea16..7db6b91 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -742,6 +742,7 @@ config ARCH_S3C24XX
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select NEED_MACH_GPIO_H
+ 	select NEED_MACH_IO_H
++	select S3C24XX_IRQ
+ 	help
+ 	  Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443
+ 	  and S3C2450 SoCs based systems, such as the Simtec Electronics BAST
+diff --git a/arch/arm/plat-s3c24xx/Makefile b/arch/arm/plat-s3c24xx/Makefile
+index 9f60549c..6472416 100644
+--- a/arch/arm/plat-s3c24xx/Makefile
++++ b/arch/arm/plat-s3c24xx/Makefile
+@@ -12,7 +12,6 @@ obj-				:=
+ 
+ # Core files
+ 
+-obj-y				+= irq.o
+ obj-$(CONFIG_S3C24XX_DCLK)	+= clock-dclk.o
+ 
+ obj-$(CONFIG_CPU_FREQ_S3C24XX)	+= cpu-freq.o
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 62ca575..860d45d 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -1,3 +1,6 @@
++config S3C24XX_IRQ
++	bool
++
+ config VERSATILE_FPGA_IRQ
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index e2e6eb5..5c20f85 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_ARCH_BCM2835) += irq-bcm2835.o
++obj-$(CONFIG_S3C24XX_IRQ) += irq-s3c24xx.o
+ obj-$(CONFIG_VERSATILE_FPGA_IRQ) += irq-versatile-fpga.o
+diff --git a/arch/arm/plat-s3c24xx/irq.c b/drivers/irqchip/irq-s3c24xx.c
+similarity index 100%
+rename from arch/arm/plat-s3c24xx/irq.c
+rename to drivers/irqchip/irq-s3c24xx.c
+-- 
+1.7.2.3
