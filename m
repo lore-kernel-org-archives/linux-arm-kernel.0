@@ -1,37 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 17:00:36 +0000
-Subject: [PATCH 12/14] ARM: SPEAr3xx: shirq: simplify and move the shared
- irq multiplexor to DT
-In-Reply-To: <CAOh2x=nJXVVjFmDFnTN_02PSG9hcDuXToRUzRMi5jwJqUFtgfw@mail.gmail.com>
-References: <cover.1352608333.git.viresh.kumar@linaro.org>
- <201211121509.45176.arnd@arndb.de>
- <CAOh2x=nJXVVjFmDFnTN_02PSG9hcDuXToRUzRMi5jwJqUFtgfw@mail.gmail.com>
-Message-ID: <201211121700.36892.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Nov 2012 10:05:39 -0700
+Subject: [RFC PATCH 1/4] ARM: S3C24XX: move s3c24xx-irq to drivers/irqchip
+In-Reply-To: <201211121447.49977.heiko@sntech.de>
+References: <201211121446.30167.heiko@sntech.de>
+ <201211121447.49977.heiko@sntech.de>
+Message-ID: <50A12C63.2000609@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 November 2012, viresh kumar wrote:
-> On Mon, Nov 12, 2012 at 8:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Sunday 11 November 2012, Viresh Kumar wrote:
+On 11/12/2012 06:47 AM, Heiko St?bner wrote:
+> Removes another part from plat-s3c24xx and also enables further
+> improvements happening in the correct location.
 > 
-> >>  .../devicetree/bindings/arm/spear/shirq.txt        |  48 ++++
-> >>  arch/arm/mach-spear3xx/include/mach/irqs.h         |  10 +-
-> >>  arch/arm/mach-spear3xx/spear300.c                  | 103 -------
-> >>  arch/arm/mach-spear3xx/spear310.c                  | 202 --------------
-> >>  arch/arm/mach-spear3xx/spear320.c                  | 204 --------------
-> >>  arch/arm/mach-spear3xx/spear3xx.c                  |   4 +
-> >>  arch/arm/plat-spear/include/plat/shirq.h           |  35 +--
-> >>  arch/arm/plat-spear/shirq.c                        | 305 +++++++++++++++++----
-> >
-> > I guess it would be nice to move this to drivers/irqchip/st-shirq.c now
-> > that we have introduced that directory.
-> 
-> I was sure that i will get this one :)
-> I wanted to, but was just trying the basic patch first :)
-> 
-> I would add another patch in this series as the last patch to move stuff
-> out of plat :)
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/plat-s3c24xx/Makefile                     |    1 -
+>  drivers/irqchip/Kconfig                            |    3 +++
+>  drivers/irqchip/Makefile                           |    1 +
+>  .../irq.c => drivers/irqchip/irq-s3c24xx.c         |    0
+>  5 files changed, 5 insertions(+), 1 deletions(-)
+>  rename arch/arm/plat-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (100%)
 
-Ok, no problem. Do it later then.
+Presumably there's a header file somewhere that defines the interface to
+irq-s3c24xx.c that other code in arch/arm/plat-s3c24xx is using to
+initialize it. That header should be moved somewhere public (i.e.
+outside {mach,plat}-*/include/{mach,plat}). However, you then end up
+with a header file per IRQ driver in that public location. So, Thomas
+Petazzoni started working on a solution for that:
 
-	Arnd
+> http://lists.arm.linux.org.uk/lurker/message/20121027.164514.11eb86db.en.html
