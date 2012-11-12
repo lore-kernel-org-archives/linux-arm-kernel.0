@@ -1,71 +1,64 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 12 Nov 2012 12:01:00 +0100
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB71352@DBDE01.ent.ti.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BFFDF.9040605@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
- <509C050C.6010201@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB71352@DBDE01.ent.ti.com>
-Message-ID: <50A0D6EC.2040608@ti.com>
+From: smoch@web.de (Soeren Moch)
+Date: Mon, 12 Nov 2012 12:03:00 +0100
+Subject: [PATCH] mm: dmapool: use provided gfp flags for all
+ dma_alloc_coherent() calls
+In-Reply-To: <20121112103820.GX22029@lunn.ch>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+ <20121111172243.GB821@lunn.ch> <50A0C5D2.7000806@web.de>
+ <20121112103820.GX22029@lunn.ch>
+Message-ID: <50A0D764.204@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaibhav,
-
-On 11/12/2012 11:38 AM, Hiremath, Vaibhav wrote:
-> On Fri, Nov 09, 2012 at 00:46:28, Hunter, Jon wrote:
+On 12.11.2012 11:38, Andrew Lunn wrote:
+> On Mon, Nov 12, 2012 at 10:48:02AM +0100, Soeren Moch wrote:
+>> On 11.11.2012 18:22, Andrew Lunn wrote:
+>>> On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
+>>>> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
+>> regardless
+>>>> the flags provided by the caller. This causes excessive pruning of
+>>>> emergency memory pools without any good reason. This patch
+>> changes the code
+>>>> to correctly use gfp flags provided by the dmapool caller. This should
+>>>> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
+>>>> allocations can be served only from the special, very limited
+>> memory pool.
+>>>> Reported-by: Soren Moch <smoch@web.de>
+>> Please use
+>> Reported-by: Soeren Moch <smoch@web.de>
 >>
->> On 11/08/2012 12:59 PM, Hiremath, Vaibhav wrote:
->>> On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
->>>>
->>>> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
->>>>
->>>> [snip]
->>>>
->>>>> There is no reliable way to determine which source should be used in runtime
->>>>> for boards that do not have the 32k oscillator wired.
->>>>
->>>> So thinking about this some more and given that we are moving away from
->>>> board files, if a board does not provide a 32kHz clock source, then this
->>>> should be reflected in the device-tree source file for that board.
->>>> Hence, at boot time we should be able to determine if a 32kHz clock
->>>> source can be used.
->>>>
+>>>> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> Tested-by: Andrew Lunn <andrew@lunn.ch>
 >>>
->>> Let me feed some more thoughts here :)
+>>> I tested this on a Kirkwood QNAP after removing the call to
+>>> init_dma_coherent_pool_size().
 >>>
->>> The way it is being detected currently is based on timer idle status bit.
->>> I am worried that, this is the only option we have.
+>>>      Andrew
+>> Tested-by: Soeren Moch <smoch@web.de>
 >>
->> Why not use device-tree to indicate the presence of a 32k clock source?
->> This seems like a board level configuration and so device-tree seems to
->> be the perfect place for this IMO.
+>> Now I had a chance to test this patch on my Kirkwood guruplug
+>> system with linux-3.6.6 . It is running much better now, but with the
+>> original 256K coherent pool size I still see errors after several hours
+>> of runtime:
 >>
-> 
-> I think I agree with you, but for this to happen in clean way, its time to 
-> start populating clock-nodes in DT, don't you think? Something like,
-> 
-> 
-> clocks {
-> 	rtc_clk: clk at X {
-> 		compatible = "crystal-32k, per-32k, xyz";
-> 		clock-frequency = <32768>;
-> 	};
-> 	...
-> };
-> 
-> Timer {
-> 
-> 	ref-clock = <&rtc_clk>;
-> };
-> 
-> What do you think?
+>> Nov 12 09:42:32 guru kernel: ERROR: 256 KiB atomic DMA coherent pool
+>> is too small!
+>> Nov 12 09:42:32 guru kernel: Please increase it with coherent_pool=
+>> kernel parameter!
+> Hi Soeren
+>
+> Could you tell us what DVB devices you are using.
+>
+> Thanks
+> 	Andrew
 
-That's indeed the proper way to do it, since this is a pure board level
-parameter and we do have the binding to express that.
-We just have to add that in the DTS:-)
+from lsusb:
+Bus 001 Device 005: ID 0ccd:00b2 TerraTec Electronic GmbH
+Bus 001 Device 006: ID 2040:5200 Hauppauge
+Bus 001 Device 009: ID 2304:0242 Pinnacle Systems, Inc.
+
+If you want to check the drivers, I recommend to start with "em28xx".
 
 Regards,
-Benoit
+Soeren
