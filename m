@@ -1,94 +1,138 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 12 Nov 2012 16:52:33 +0800
-Subject: [PATCH 13/17] spi/atmel_spi: add function to read the spi data from
- the dts
+Date: Mon, 12 Nov 2012 16:52:36 +0800
+Subject: [PATCH 16/17] ARM: dts: add spi nodes for atmel boards
 In-Reply-To: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352710357-3265-14-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352710357-3265-17-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi data include: dma_type and version.
-dma_type to decide the SPI xfer mode: = 1(pdc), = 2(dmaengine), 0(no dma, using PIO)
-version to give the SPI ip version.
+From: Richard Genoud <richard.genoud@gmail.com>
 
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+[wenyou.yang at atmel.com: added spi nodes for other atmel boards]
+[wenyou.yang at atmel.com: remove the cs-gpios property for sam9x5ek boards]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: grant.likely at secretlab.ca
-Cc: rob at landley.net
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-doc at vger.kernel.org
-Cc: spi-devel-general at lists.sourceforge.net
+Cc: linux at arm.linux.org.uk
 ---
- .../devicetree/bindings/spi/spi_atmel.txt          |    4 +++
- drivers/spi/spi-atmel.c                            |   28 ++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+Hi, Richard,
 
-diff --git a/Documentation/devicetree/bindings/spi/spi_atmel.txt b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-index 20cdc91..a1ceeb5 100644
---- a/Documentation/devicetree/bindings/spi/spi_atmel.txt
-+++ b/Documentation/devicetree/bindings/spi/spi_atmel.txt
-@@ -6,6 +6,8 @@ Required properties:
- - interrupts: Should contain macb interrupt
- - cs-gpio: Should contain the GPIOs used for chipselect.
- - dma-mask: device coherent dma mask.
-+- dma_type: The dma type supported by the spi of SoC: = 0 (no used), = 1 (pdc), = 2 (dma)
-+- version: The version of the spi IP.
+This patch is based on the orignal patch from Richard Genoud 
+	[PATCH] sam9x5ek DTS: enable SPI dataflash
+and referring to this patch Wenyou Yang add spi nodes for other atmel boards.
+	and remove the cs-gpios property for sam9x5ek boards.
+
+Is it ok for you?
+
+Best Regards,
+Wenyou Yang
+
+ arch/arm/boot/dts/at91sam9263ek.dts         |    9 +++++++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    9 +++++++++
+ arch/arm/boot/dts/at91sam9g25ek.dts         |    9 +++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |    9 +++++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |    9 +++++++++
+ 5 files changed, 45 insertions(+)
+
+diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
+index f86ac4b..11e274d 100644
+--- a/arch/arm/boot/dts/at91sam9263ek.dts
++++ b/arch/arm/boot/dts/at91sam9263ek.dts
+@@ -50,6 +50,15 @@
+ 				atmel,vbus-gpio = <&pioA 25 0>;
+ 				status = "okay";
+ 			};
++
++			spi0: spi at fffa4000 {
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
- spi0: spi at f0000000 {
- 	#address-cells = <1>;
-@@ -19,5 +21,7 @@ spi0: spi at f0000000 {
- 		    &pioB 3 0 /* conflicts with ERXDV */
- 		   >;
- 	dma-mask = <0xffffffff>;
-+	dma_type = <1>;
-+	version = <2>;
- 	status = "disabled";
- };
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 568df5b..791800e 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -1467,6 +1467,30 @@ static void atmel_spi_cleanup(struct spi_device *spi)
- 	kfree(asd);
- }
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index e6391a4..3c3b63d 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -51,6 +51,15 @@
+ 				atmel,vbus-gpio = <&pioC 5 0>;
+ 				status = "okay";
+ 			};
++
++			spi0: spi at fffc8000 {
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <1>;
++				};
++			};
+ 		};
  
-+static int of_get_atmel_spi_data(struct device_node *np, struct atmel_spi *as)
-+{
-+	const __be32	*val;
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g25ek.dts b/arch/arm/boot/dts/at91sam9g25ek.dts
+index 877c08f..3b84bc9 100644
+--- a/arch/arm/boot/dts/at91sam9g25ek.dts
++++ b/arch/arm/boot/dts/at91sam9g25ek.dts
+@@ -44,6 +44,15 @@
+ 			i2c2: i2c at f8018000 {
+ 				status = "okay";
+ 			};
 +
-+	val = of_get_property(np, "dma_type", NULL);
-+	if (!val) {
-+		pr_err("%s: have no 'dma_type' property\n",
-+						np->full_name);
-+		return -EINVAL;
-+	}
-+
-+	as->data.dma_type = be32_to_cpup(val);
-+
-+	val = of_get_property(np, "version", NULL);
-+	if (!val) {
-+		pr_err("%s: have no 'version' property\n", np->full_name);
-+		return -EINVAL;
-+	}
-+
-+	as->data.version = be32_to_cpup(val);
-+
-+	return 0;
-+}
-+
- /*-------------------------------------------------------------------------*/
++			spi0: spi at f0000000 {
++				status = "okay";
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
  
- static int __devinit atmel_spi_probe(struct platform_device *pdev)
-@@ -1535,6 +1559,10 @@ static int __devinit atmel_spi_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto out_unmap_regs;
- 
-+	ret = of_get_atmel_spi_data(pdev->dev.of_node, as);
-+	if (ret)
-+		goto out_unmap_regs;
+ 		usb0: ohci at 00600000 {
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 15e1dd4..a23ac6e 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -54,6 +54,15 @@
+ 			i2c1: i2c at fff88000 {
+ 				status = "okay";
+ 			};
 +
- 	/* Initialize the hardware */
- 	clk_enable(clk);
- 	spi_writel(as, CR, SPI_BIT(SWRST));
++			spi0: spi at fffa4000{
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <13000000>;
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
+index 912b2c2..706bd00 100644
+--- a/arch/arm/boot/dts/at91sam9n12ek.dts
++++ b/arch/arm/boot/dts/at91sam9n12ek.dts
+@@ -45,6 +45,15 @@
+ 			i2c1: i2c at f8014000 {
+ 				status = "okay";
+ 			};
++
++			spi0: spi at f0000000 {
++				status = "okay";
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
 -- 
 1.7.9.5
