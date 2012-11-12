@@ -1,219 +1,111 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Nov 2012 01:52:36 +0100
-Subject: [PATCH 1/6] ARM: integrator: hook the AP into the SoC bus
-Message-ID: <1352681556-12873-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 12 Nov 2012 01:52:45 +0100
+Subject: [PATCH 2/6] ARM: integrator: hook the CP into the SoC bus
+Message-ID: <1352681565-12905-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This hooks the Integrator/AP into the SoC bus when booting from
-device tree, by mapping the AP controller registers first,
+This hooks the Integrator/CP into the SoC bus when booting from
+device tree, by mapping the CP controller registers first,
 then registering the SoC device, and then populating the device
 tree with the SoC device as parent.
-
-Introduce some helpers in the core to provide sysfs files
-detailing the use of the SoC ID which will later be reused by
-the Integrator/CP patch for the same bus grouping.
 
 Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/integratorap.dts       |  5 ++
- arch/arm/mach-integrator/Kconfig         |  1 +
- arch/arm/mach-integrator/common.h        |  1 +
- arch/arm/mach-integrator/core.c          | 91 ++++++++++++++++++++++++++++++++
- arch/arm/mach-integrator/integrator_ap.c | 57 +++++++++++++++++++-
- 5 files changed, 153 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/arm-boards |  4 ++
+ arch/arm/boot/dts/integratorcp.dts               |  5 +++
+ arch/arm/mach-integrator/Kconfig                 |  1 +
+ arch/arm/mach-integrator/integrator_cp.c         | 57 +++++++++++++++++++++++-
+ 4 files changed, 65 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
-index 6176775..c9c3fa3 100644
---- a/arch/arm/boot/dts/integratorap.dts
-+++ b/arch/arm/boot/dts/integratorap.dts
+diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
+index fc81a7d..db5858e 100644
+--- a/Documentation/devicetree/bindings/arm/arm-boards
++++ b/Documentation/devicetree/bindings/arm/arm-boards
+@@ -9,6 +9,10 @@ Required properties (in root node):
+ 
+ FPGA type interrupt controllers, see the versatile-fpga-irq binding doc.
+ 
++In the root node the Integrator/CP must have a /cpcon node pointing
++to the CP control registers, and the Integrator/AP must have a
++/syscon node pointing to the Integrator/AP system controller.
++
+ 
+ ARM Versatile Application and Platform Baseboards
+ -------------------------------------------------
+diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
+index 2dd5e4e..8b11939 100644
+--- a/arch/arm/boot/dts/integratorcp.dts
++++ b/arch/arm/boot/dts/integratorcp.dts
 @@ -18,6 +18,11 @@
- 		bootargs = "root=/dev/ram0 console=ttyAM0,38400n8 earlyprintk";
+ 		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
  	};
  
-+	syscon {
-+		/* AP system controller registers */
-+		reg = <0x11000000 0x100>;
++	cpcon {
++		/* CP controller registers */
++		reg = <0xcb000000 0x100>;
 +	};
 +
  	timer0: timer at 13000000 {
- 		compatible = "arm,integrator-timer";
+ 		compatible = "arm,sp804", "arm,primecell";
  	};
 diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index 350e266..3961942 100644
+index 3961942..abeff25 100644
 --- a/arch/arm/mach-integrator/Kconfig
 +++ b/arch/arm/mach-integrator/Kconfig
-@@ -8,6 +8,7 @@ config ARCH_INTEGRATOR_AP
- 	select MIGHT_HAVE_PCI
- 	select SERIAL_AMBA_PL010
- 	select SERIAL_AMBA_PL010_CONSOLE
+@@ -20,6 +20,7 @@ config ARCH_INTEGRATOR_CP
+ 	select PLAT_VERSATILE_CLCD
+ 	select SERIAL_AMBA_PL011
+ 	select SERIAL_AMBA_PL011_CONSOLE
 +	select SOC_BUS
  	help
- 	  Include support for the ARM(R) Integrator/AP and
- 	  Integrator/PP2 platforms.
-diff --git a/arch/arm/mach-integrator/common.h b/arch/arm/mach-integrator/common.h
-index c3ff21b..fc9f47d 100644
---- a/arch/arm/mach-integrator/common.h
-+++ b/arch/arm/mach-integrator/common.h
-@@ -4,3 +4,4 @@ void integrator_init_early(void);
- int integrator_init(bool is_cp);
- void integrator_reserve(void);
- void integrator_restart(char, const char *);
-+void integrator_init_sysfs(struct device *parent, u32 id);
-diff --git a/arch/arm/mach-integrator/core.c b/arch/arm/mach-integrator/core.c
-index ea22a17..161fbf8 100644
---- a/arch/arm/mach-integrator/core.c
-+++ b/arch/arm/mach-integrator/core.c
-@@ -22,6 +22,7 @@
- #include <linux/amba/bus.h>
- #include <linux/amba/serial.h>
- #include <linux/io.h>
-+#include <linux/stat.h>
+ 	  Include support for the ARM(R) Integrator CP platform.
  
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -169,3 +170,93 @@ void integrator_restart(char mode, const char *cmd)
- {
- 	cm_control(CM_CTRL_RESET, CM_CTRL_RESET);
- }
-+
-+static u32 integrator_id;
-+
-+static ssize_t intcp_get_manf(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	return sprintf(buf, "%02x\n", integrator_id >> 24);
-+}
-+
-+static struct device_attribute intcp_manf_attr =
-+	__ATTR(manufacturer,  S_IRUGO, intcp_get_manf,  NULL);
-+
-+static ssize_t intcp_get_arch(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	const char *arch;
-+
-+	switch ((integrator_id >> 16) & 0xff) {
-+	case 0x00:
-+		arch = "ASB little-endian";
-+		break;
-+	case 0x01:
-+		arch = "AHB little-endian";
-+		break;
-+	case 0x03:
-+		arch = "AHB-Lite system bus, bi-endian";
-+		break;
-+	case 0x04:
-+		arch = "AHB";
-+		break;
-+	default:
-+		arch = "Unknown";
-+		break;
-+	}
-+
-+	return sprintf(buf, "%s\n", arch);
-+}
-+
-+static struct device_attribute intcp_arch_attr =
-+	__ATTR(architecture,  S_IRUGO, intcp_get_arch,  NULL);
-+
-+static ssize_t intcp_get_fpga(struct device *dev,
-+			      struct device_attribute *attr,
-+			      char *buf)
-+{
-+	const char *fpga;
-+
-+	switch ((integrator_id >> 12) & 0xf) {
-+	case 0x01:
-+		fpga = "XC4062";
-+		break;
-+	case 0x02:
-+		fpga = "XC4085";
-+		break;
-+	case 0x04:
-+		fpga = "EPM7256AE (Altera PLD)";
-+		break;
-+	default:
-+		fpga = "Unknown";
-+		break;
-+	}
-+
-+	return sprintf(buf, "%s\n", fpga);
-+}
-+
-+static struct device_attribute intcp_fpga_attr =
-+	__ATTR(fpga,  S_IRUGO, intcp_get_fpga,  NULL);
-+
-+static ssize_t intcp_get_build(struct device *dev,
-+			       struct device_attribute *attr,
-+			       char *buf)
-+{
-+	return sprintf(buf, "%02x\n", (integrator_id >> 4) & 0xFF);
-+}
-+
-+static struct device_attribute intcp_build_attr =
-+	__ATTR(build,  S_IRUGO, intcp_get_build,  NULL);
-+
-+
-+
-+void integrator_init_sysfs(struct device *parent, u32 id)
-+{
-+	integrator_id = id;
-+	device_create_file(parent, &intcp_manf_attr);
-+	device_create_file(parent, &intcp_arch_attr);
-+	device_create_file(parent, &intcp_fpga_attr);
-+	device_create_file(parent, &intcp_build_attr);
-+}
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index e6617c1..7d84080 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -37,6 +37,8 @@
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 5b08e8e..9194a4f 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -26,6 +26,7 @@
  #include <linux/of_irq.h>
  #include <linux/of_address.h>
  #include <linux/of_platform.h>
-+#include <linux/stat.h>
 +#include <linux/sys_soc.h>
- #include <video/vga.h>
  
  #include <mach/hardware.h>
-@@ -462,13 +464,64 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+ #include <mach/platform.h>
+@@ -336,10 +337,62 @@ static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
  	{ /* sentinel */ },
  };
  
-+/* Base address to the AP system controller */
-+static void __iomem *ap_syscon_base;
++/* Base address to the CP controller */
++static void __iomem *intcp_con_base;
 +
- static void __init ap_init_of(void)
+ static void __init intcp_init_of(void)
  {
- 	unsigned long sc_dec;
+-	of_platform_populate(NULL, of_default_bus_match_table,
+-			intcp_auxdata_lookup, NULL);
 +	struct device_node *root;
-+	struct device_node *syscon;
++	struct device_node *cpcon;
 +	struct device *parent;
 +	struct soc_device *soc_dev;
 +	struct soc_device_attribute *soc_dev_attr;
-+	u32 ap_sc_id;
++	u32 intcp_sc_id;
 +	int err;
- 	int i;
- 
--	of_platform_populate(NULL, of_default_bus_match_table,
--			ap_auxdata_lookup, NULL);
++
 +	/* Here we create an SoC device for the root node */
 +	root = of_find_node_by_path("/");
 +	if (!root)
 +		return;
-+	syscon = of_find_node_by_path("/syscon");
-+	if (!syscon)
++	cpcon = of_find_node_by_path("/cpcon");
++	if (!cpcon)
 +		return;
 +
-+	ap_syscon_base = of_iomap(syscon, 0);
-+	if (!ap_syscon_base)
++	intcp_con_base = of_iomap(cpcon, 0);
++	if (!intcp_con_base)
 +		return;
 +
-+	ap_sc_id = readl(ap_syscon_base);
++	intcp_sc_id = readl(intcp_con_base);
 +
 +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
 +	if (!soc_dev_attr)
@@ -228,7 +120,7 @@ index e6617c1..7d84080 100644
 +		return;
 +	soc_dev_attr->family = "Integrator";
 +	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c",
-+					   'A' + (ap_sc_id & 0x0f));
++					   'A' + (intcp_sc_id & 0x0f));
 +
 +	soc_dev = soc_device_register(soc_dev_attr);
 +	if (IS_ERR_OR_NULL(soc_dev)) {
@@ -240,12 +132,12 @@ index e6617c1..7d84080 100644
 +	parent = soc_device_to_device(soc_dev);
 +
 +	if (!IS_ERR_OR_NULL(parent))
-+		integrator_init_sysfs(parent, ap_sc_id);
++		integrator_init_sysfs(parent, intcp_sc_id);
 +
 +	of_platform_populate(root, of_default_bus_match_table,
-+			ap_auxdata_lookup, parent);
++			intcp_auxdata_lookup, parent);
+ }
  
- 	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
- 	for (i = 0; i < 4; i++) {
+ static const char * intcp_dt_board_compat[] = {
 -- 
 1.7.11.7
