@@ -1,185 +1,43 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 12 Nov 2012 22:15:39 +0000 (UTC)
-Subject: [PATCH 02/26] ARM: OMAP: hwmod: Fix up hwmod based clkdm accesses
-In-Reply-To: <1352337181-29427-3-git-send-email-mturquette@ti.com>
-References: <1352337181-29427-1-git-send-email-mturquette@ti.com>
- <1352337181-29427-3-git-send-email-mturquette@ti.com>
-Message-ID: <alpine.DEB.2.00.1211122214370.22487@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 22:24:22 +0000
+Subject: [PATCH] ARM: boot: Fix usage of kecho
+In-Reply-To: <CAOMZO5BEi7n76roOAgBFEqvqJybsCeGKZuozqYL5PRL3hJnghQ@mail.gmail.com>
+References: <1351103848-30900-1-git-send-email-festevam@gmail.com>
+ <201210241928.34303.arnd@arndb.de>
+ <CAOMZO5BEi7n76roOAgBFEqvqJybsCeGKZuozqYL5PRL3hJnghQ@mail.gmail.com>
+Message-ID: <201211122224.22513.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 12 November 2012, Fabio Estevam wrote:
+> >> > From: Fabio Estevam <fabio.estevam@freescale.com>
+> >> >
+> >> > Since commit edc88ceb0 (ARM: be really quiet when building with 'make -s') the
+> >> > following output is generated when building a kernel for ARM:
+> >> >
+> >> > echo '  Kernel: arch/arm/boot/Image is ready'
+> >> >   Kernel: arch/arm/boot/Image is ready
+> >> >   Building modules, stage 2.
+> >> > echo '  Kernel: arch/arm/boot/zImage is ready'
+> >> >   Kernel: arch/arm/boot/zImage is ready
+> >> >
+> >> > As per Documentation/kbuild/makefiles.txt the correct way of using kecho is
+> >> > '@$(kecho)'.
+> >> >
+> >> > Make this change so no more unwanted 'echo' messages are displayed.
+> >> >
+> >> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> >>
+> >> Acked-by: Nicolas Pitre <nico@linaro.org>
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Would this one go via arm-soc tree?
 
-This patch needed to be modified to avoid some sparse warnings; updated 
-patch follows.
+The correct way would be via Russell's tree, but since we're sending bug fix
+patches tomorrow through arm-soc and this one is getting embarrassingly old,
+I've applied it now.
 
+Thanks for the reminder.
 
-- Paul
-
-ARM: OMAP: hwmod: Fix up hwmod based clkdm accesses
-
-From: Rajendra Nayak <rnayak@ti.com>
-
-hwmod uses deferencing the clk pointer to acccess the clkdm.
-With COMMON clk hwoever this will need to be deferenced through
-the clk_hw_omap pointer, so do the necessary changes.
-
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-Signed-off-by: Mike Turquette <mturquette@ti.com>
-Signed-off-by: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/omap_hwmod.c |   70 ++++++++++++++++++++++++++++++--------
- 1 file changed, 56 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 139adca..f38e4ce 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -130,7 +130,11 @@
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/io.h>
-+#ifdef CONFIG_COMMON_CLK
-+#include <linux/clk-provider.h>
-+#else
- #include <linux/clk.h>
-+#endif
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/list.h>
-@@ -614,6 +618,23 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
- 	return 0;
- }
- 
-+static struct clockdomain *_get_clkdm(struct omap_hwmod *oh)
-+{
-+	if (oh->clkdm) {
-+		return oh->clkdm;
-+	} else if (oh->_clk) {
-+#ifdef CONFIG_COMMON_CLK
-+		struct clk_hw_omap *clk;
-+
-+		clk = to_clk_hw_omap(__clk_get_hw(oh->_clk));
-+		return  clk->clkdm;
-+#else
-+		return oh->_clk->clkdm;
-+#endif
-+	}
-+	return NULL;
-+}
-+
- /**
-  * _add_initiator_dep: prevent @oh from smart-idling while @init_oh is active
-  * @oh: struct omap_hwmod *
-@@ -629,13 +650,18 @@ static int _disable_wakeup(struct omap_hwmod *oh, u32 *v)
-  */
- static int _add_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
- {
--	if (!oh->_clk)
-+	struct clockdomain *clkdm, *init_clkdm;
-+
-+	clkdm = _get_clkdm(oh);
-+	init_clkdm = _get_clkdm(init_oh);
-+
-+	if (!clkdm || !init_clkdm)
- 		return -EINVAL;
- 
--	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
-+	if (clkdm && clkdm->flags & CLKDM_NO_AUTODEPS)
- 		return 0;
- 
--	return clkdm_add_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
-+	return clkdm_add_sleepdep(clkdm, init_clkdm);
- }
- 
- /**
-@@ -653,13 +679,18 @@ static int _add_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
-  */
- static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
- {
--	if (!oh->_clk)
-+	struct clockdomain *clkdm, *init_clkdm;
-+
-+	clkdm = _get_clkdm(oh);
-+	init_clkdm = _get_clkdm(init_oh);
-+
-+	if (!clkdm || !init_clkdm)
- 		return -EINVAL;
- 
--	if (oh->_clk->clkdm && oh->_clk->clkdm->flags & CLKDM_NO_AUTODEPS)
-+	if (clkdm && clkdm->flags & CLKDM_NO_AUTODEPS)
- 		return 0;
- 
--	return clkdm_del_sleepdep(oh->_clk->clkdm, init_oh->_clk->clkdm);
-+	return clkdm_del_sleepdep(clkdm, init_clkdm);
- }
- 
- /**
-@@ -693,7 +724,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
- 	 */
- 	clk_prepare(oh->_clk);
- 
--	if (!oh->_clk->clkdm)
-+	if (!_get_clkdm(oh))
- 		pr_debug("omap_hwmod: %s: missing clockdomain for %s.\n",
- 			   oh->name, oh->main_clk);
- 
-@@ -1276,6 +1307,7 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	u8 idlemode, sf;
- 	u32 v;
- 	bool clkdm_act;
-+	struct clockdomain *clkdm;
- 
- 	if (!oh->class->sysc)
- 		return;
-@@ -1283,11 +1315,9 @@ static void _enable_sysc(struct omap_hwmod *oh)
- 	v = oh->_sysc_cache;
- 	sf = oh->class->sysc->sysc_flags;
- 
-+	clkdm = _get_clkdm(oh);
- 	if (sf & SYSC_HAS_SIDLEMODE) {
--		clkdm_act = ((oh->clkdm &&
--			      oh->clkdm->flags & CLKDM_ACTIVE_WITH_MPU) ||
--			     (oh->_clk && oh->_clk->clkdm &&
--			      oh->_clk->clkdm->flags & CLKDM_ACTIVE_WITH_MPU));
-+		clkdm_act = (clkdm && clkdm->flags & CLKDM_ACTIVE_WITH_MPU);
- 		if (clkdm_act && !(oh->class->sysc->idlemodes &
- 				   (SIDLE_SMART | SIDLE_SMART_WKUP)))
- 			idlemode = HWMOD_IDLEMODE_FORCE;
-@@ -3556,10 +3586,17 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
- {
- 	struct clk *c;
- 	struct omap_hwmod_ocp_if *oi;
-+	struct clockdomain *clkdm;
-+#ifdef CONFIG_COMMON_CLK
-+	struct clk_hw_omap *clk;
-+#endif
- 
- 	if (!oh)
- 		return NULL;
- 
-+	if (oh->clkdm)
-+		return oh->clkdm->pwrdm.ptr;
-+
- 	if (oh->_clk) {
- 		c = oh->_clk;
- 	} else {
-@@ -3569,11 +3606,16 @@ struct powerdomain *omap_hwmod_get_pwrdm(struct omap_hwmod *oh)
- 		c = oi->_clk;
- 	}
- 
--	if (!c->clkdm)
-+#ifdef CONFIG_COMMON_CLK
-+	clk = to_clk_hw_omap(__clk_get_hw(c));
-+	clkdm = clk->clkdm;
-+#else
-+	clkdm = c->clkdm;
-+#endif
-+	if (!clkdm)
- 		return NULL;
- 
--	return c->clkdm->pwrdm.ptr;
--
-+	return clkdm->pwrdm.ptr;
- }
- 
- /**
+	Arnd
