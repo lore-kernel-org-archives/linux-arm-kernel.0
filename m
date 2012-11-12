@@ -1,33 +1,72 @@
-From: fabio.porcedda@gmail.com (Fabio Porcedda)
-Date: Mon, 12 Nov 2012 09:37:27 +0100
-Subject: [PATCH v9 RESEND 3/3] ARM: at91/dts: evk-pro3: enable watchdog
-In-Reply-To: <1352709447-8306-1-git-send-email-fabio.porcedda@gmail.com>
-References: <1352709447-8306-1-git-send-email-fabio.porcedda@gmail.com>
-Message-ID: <1352709447-8306-4-git-send-email-fabio.porcedda@gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 12 Nov 2012 09:42:50 +0100
+Subject: [PATCH resend] rtc: i.MX dryice: Add devicetree support
+Message-ID: <1352709770-5919-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on evk-pro3.
+Add devicetree probing, fixing some whitespace damage along the way.
 
-Signed-off-by: Fabio Porcedda <fabio.porcedda@gmail.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/evk-pro3.dts | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-index b7354e6..ce959ee 100644
---- a/arch/arm/boot/dts/evk-pro3.dts
-+++ b/arch/arm/boot/dts/evk-pro3.dts
-@@ -26,6 +26,10 @@
- 				atmel,vbus-gpio = <&pioC 5 0>;
- 				status = "okay";
- 			};
+Just a resend with Andrew Morton on Cc since I got no reaction from the RTC
+Maintainer.
+
+ Documentation/devicetree/bindings/rtc/imx-di.txt |   19 +++++++++++++++++++
+ drivers/rtc/rtc-imxdi.c                          |   12 +++++++++---
+ 2 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/imx-di.txt
+
+diff --git a/Documentation/devicetree/bindings/rtc/imx-di.txt b/Documentation/devicetree/bindings/rtc/imx-di.txt
+new file mode 100644
+index 0000000..42b92b5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/imx-di.txt
+@@ -0,0 +1,19 @@
++* i.MX25 dryice Real Time Clock controller
 +
-+			watchdog at fffffd40 {
-+				status = "okay";
-+			};
- 		};
++This RTC is part of the i.MX25 dryice module. Documentation for this
++unit is not publically available. This binding only makes use of the
++RTC.
++
++Required properties:
++- compatible: should be "fsl,imx25-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: interrupt source for the dryice module
++
++Example:
++
++	dryice at 53ffc000 {
++		compatible = "fsl,imx25-dryice", "fsl,imx25-rtc";
++		reg = <0x53ffc000 0x4000>;
++		interrupts = <25>;
++	};
+diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
+index 891cd6c..b2fe920 100644
+--- a/drivers/rtc/rtc-imxdi.c
++++ b/drivers/rtc/rtc-imxdi.c
+@@ -493,11 +493,17 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 		usb0: ohci at 00500000 {
++static const struct of_device_id of_dryice_rtc_match[] = {
++	{ .compatible = "fsl,imx25-rtc", },
++	{ },
++};
++
+ static struct platform_driver dryice_rtc_driver = {
+ 	.driver = {
+-		   .name = "imxdi_rtc",
+-		   .owner = THIS_MODULE,
+-		   },
++		.name = "imxdi_rtc",
++		.owner = THIS_MODULE,
++		.of_match_table = of_dryice_rtc_match,
++	},
+ 	.remove = __devexit_p(dryice_rtc_remove),
+ };
+ 
 -- 
-1.8.0
+1.7.10.4
