@@ -1,53 +1,52 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 12 Nov 2012 19:15:39 +0100
-Subject: [RFC PATCH 1/4] ARM: S3C24XX: move s3c24xx-irq to drivers/irqchip
-In-Reply-To: <50A12C63.2000609@wwwdotorg.org>
-References: <201211121446.30167.heiko@sntech.de>
- <201211121447.49977.heiko@sntech.de> <50A12C63.2000609@wwwdotorg.org>
-Message-ID: <201211121915.41722.heiko@sntech.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 12 Nov 2012 19:19:47 +0100
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <50A1212C.2080601@wwwdotorg.org>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+ <50A020C5.4070506@wwwdotorg.org> <20121112082546.GU22029@lunn.ch>
+ <50A1212C.2080601@wwwdotorg.org>
+Message-ID: <20121112181947.GS24583@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 12. November 2012, 18:05:39 schrieb Stephen Warren:
-> On 11/12/2012 06:47 AM, Heiko St?bner wrote:
-> > Removes another part from plat-s3c24xx and also enables further
-> > improvements happening in the correct location.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  arch/arm/Kconfig                                   |    1 +
-> >  arch/arm/plat-s3c24xx/Makefile                     |    1 -
-> >  drivers/irqchip/Kconfig                            |    3 +++
-> >  drivers/irqchip/Makefile                           |    1 +
-> >  .../irq.c => drivers/irqchip/irq-s3c24xx.c         |    0
-> >  5 files changed, 5 insertions(+), 1 deletions(-)
-> >  rename arch/arm/plat-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c
-> >  (100%)
+On Mon, Nov 12, 2012 at 09:17:48AM -0700, Stephen Warren wrote:
+> On 11/12/2012 01:25 AM, Andrew Lunn wrote:
+> > On Sun, Nov 11, 2012 at 03:03:49PM -0700, Stephen Warren wrote:
+> >> On 11/11/2012 09:21 AM, Andrew Lunn wrote:
+> >>> From: Jamie Lentin <jm@lentin.co.uk>
+> >>>
+> >>> Given appropriate devicetree bindings, this driver registers a
+> >>> pm_power_off function to set a GPIO line high/low to power down
+> >>> your board.
 > 
-> Presumably there's a header file somewhere that defines the interface to
-> irq-s3c24xx.c that other code in arch/arm/plat-s3c24xx is using to
-> initialize it. That header should be moved somewhere public (i.e.
-> outside {mach,plat}-*/include/{mach,plat}). However, you then end up
-> with a header file per IRQ driver in that public location. So, Thomas
+> >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> >>
+> >>> +Required properties:
+> >>> +- compatible : should be "gpio-poweroff".
+> >>> +- gpios : The GPIO to set high/low, see "gpios property" in
+> >>> +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
+> >>> +  low to power down the board set it to "Active Low", otherwise set
+> >>> +  gpio to "Active High".
+> >>
+> >> Unfortunately, not all GPIO bindings support active high/low flags in
+> >> the GPIO specifier. As such, the flags there are basically useless.
+> >> Other bindings (e.g. IIRC the fixed-regulator binding) have added a
+> >> separate active-high property to indicate the GPIO polarity. This
+> >> binding should probably follow suite.
+> > 
+> > Humm, so are you saying of_get_named_gpio_flags() is deprecated?
 > 
-> Petazzoni started working on a solution for that:
-> > http://lists.arm.linux.org.uk/lurker/message/20121027.164514.11eb86db.en.
-> > html
+> I don't know if it's deprecated, but it's certainly not useful in
+> generic code.
 
-cool, thanks for the pointer :-) .
+Hi Linus, Anton
 
-For the headers, yes they are present and still in mach/plat. My intention was 
-to first clean it up and then move the remaing necessary header.
+How do you see this? 
 
-I'm not sure what is the policy for adding stuff to drivers/irqchip (dt-
-only?), because _all_ s3c24xx subtypes using devicetree seems very very far in 
-the future, if at all.
+I'm happy to implement an enable-active-high property, but it seems to
+go against the purpose of of_get_named_gpio_flags(). Is that function
+deprecated?
 
-So when thinking a bit more about it, it might be better to keep the irq code 
-in arch/arm for the time being?
-
-Because non-dt init code will probably be necessary for a lot more time.
-
-
-Heiko
+	Thanks
+		Andrew
