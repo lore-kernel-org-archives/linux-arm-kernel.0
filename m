@@ -1,138 +1,112 @@
-From: rob.clark@linaro.org (Rob Clark)
-Date: Mon, 12 Nov 2012 09:09:19 -0600
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <20121112143846.GI2346@mudshark.cambridge.arm.com>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <20121112104601.GB2346@mudshark.cambridge.arm.com>
- <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
- <20121112143846.GI2346@mudshark.cambridge.arm.com>
-Message-ID: <CAF6AEGsSng_Ma_0Q6PXTRHOVYRtC5RRBA65=fpBCM8O2QThQWg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 15:09:44 +0000
+Subject: [PATCH 12/14] ARM: SPEAr3xx: shirq: simplify and move the shared
+ irq multiplexor to DT
+In-Reply-To: <71bbb1faf3cd048953dcf24ef9ce6d9dd37fe8e1.1352608333.git.viresh.kumar@linaro.org>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <71bbb1faf3cd048953dcf24ef9ce6d9dd37fe8e1.1352608333.git.viresh.kumar@linaro.org>
+Message-ID: <201211121509.45176.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 8:38 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 12, 2012 at 01:46:57PM +0000, Rob Clark wrote:
->> On Mon, Nov 12, 2012 at 4:46 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Fri, Nov 09, 2012 at 09:17:33PM +0000, Rob Clark wrote:
->> >> @@ -122,22 +124,35 @@ extern int __get_user_4(void *);
->> >>       ({                                                              \
->> >>               unsigned long __limit = current_thread_info()->addr_limit - 1; \
->> >>               register const typeof(*(p)) __user *__p asm("r0") = (p);\
->> >> -             register unsigned long __r2 asm("r2");                  \
->> >>               register unsigned long __l asm("r1") = __limit;         \
->> >>               register int __e asm("r0");                             \
->> >>               switch (sizeof(*(__p))) {                               \
->> >> -             case 1:                                                 \
->> >> +             case 1: {                                               \
->> >> +                     register unsigned long __r2 asm("r2");          \
->> >>                       __get_user_x(__r2, __p, __e, __l, 1);           \
->> >> +                     x = (typeof(*(p))) __r2;                        \
->> >>                       break;                                          \
->> >> -             case 2:                                                 \
->> >> +             }                                                       \
->> >> +             case 2: {                                               \
->> >> +                     register unsigned long __r2 asm("r2");          \
->> >>                       __get_user_x(__r2, __p, __e, __l, 2);           \
->> >> +                     x = (typeof(*(p))) __r2;                        \
->> >>                       break;                                          \
->> >> -             case 4:                                                 \
->> >> +             }                                                       \
->> >> +             case 4: {                                               \
->> >> +                     register unsigned long __r2 asm("r2");          \
->> >>                       __get_user_x(__r2, __p, __e, __l, 4);           \
->> >> +                     x = (typeof(*(p))) __r2;                        \
->> >> +                     break;                                          \
->> >> +             }                                                       \
->> >> +             case 8: {                                               \
->> >> +                     register unsigned long long __r2 asm("r2");     \
->> >
->> > Does this matter? For EABI, we'll pass in (r2, r3) and it's all handcrafted
->> > asm, so the compiler shouldn't care much. For OABI, I think you may have to
->> > do some more work to get the two words where you want them.
->>
->> Is the question whether the compiler is guaranteed to allocate r2 and
->> r3 in all cases?  I'm not quite sure, I confess to usually trying to
->> avoid inline asm.  But from looking at the disassembly (for little
->> endian EABI build) it seemed to do the right thing.
->
-> I can't recall how OABI represents 64-bit values and particularly whether this
-> differs between little and big-endian, so I wondered whether you may have to
-> do some marshalling when you assign x. However, a few quick experiments with
-> GCC suggest that the register representation matches EABI in regards to word
-> ordering (it just doesn't require an even base register), although it would
-> be good to find this written down somewhere...
+On Sunday 11 November 2012, Viresh Kumar wrote:
+> From: Shiraz Hashim <shiraz.hashim@st.com>
+> 
+> SPEAr3xx architecture includes shared/multiplexed irqs for certain set
+> of devices. The multiplexor provides a single interrupt to parent
+> interrupt controller (VIC) on behalf of a group of devices.
+> 
+> There can be multiple groups available on SPEAr3xx variants but not
+> exceeding 4. The number of devices in a group can differ, further they
+> may share same set of status/mask registers spanning across different
+> bit masks. Also in some cases the group may not have enable or other
+> registers. This makes software little complex.
+> 
+> Present implementation was non-DT and had few complex data structures to
+> decipher banks, number of irqs supported, mask and registers involved.
+> 
+> This patch simplifies the overall design and convert it in to DT.  It
+> also removes all registration from individual SoC files and bring them
+> in to common shirq.c.
+> 
+> Also updated the corresponding documentation for DT binding of shirq.
 
-yeah, I was kinda hoping that someone a bit closer to the compiler
-would speak up here :-)
+Looks basically ok, but I have a few comments.
 
->> The only other idea I had was to explicitly declare two 'unsigned
->> long's and then shift them into a 64bit x, although I'm open to
->> suggestions if there is a better way.
->
-> Can't you just use register unsigned long long for all cases? Even better,
-> follow what put_user does and use typeof(*(p))?
+> Signed-off-by: Shiraz Hashim <shiraz.hashim@st.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  .../devicetree/bindings/arm/spear/shirq.txt        |  48 ++++
+>  arch/arm/mach-spear3xx/include/mach/irqs.h         |  10 +-
+>  arch/arm/mach-spear3xx/spear300.c                  | 103 -------
+>  arch/arm/mach-spear3xx/spear310.c                  | 202 --------------
+>  arch/arm/mach-spear3xx/spear320.c                  | 204 --------------
+>  arch/arm/mach-spear3xx/spear3xx.c                  |   4 +
+>  arch/arm/plat-spear/include/plat/shirq.h           |  35 +--
+>  arch/arm/plat-spear/shirq.c                        | 305 +++++++++++++++++----
 
-typeof(*(p) was my first try but:
+I guess it would be nice to move this to drivers/irqchip/st-shirq.c now
+that we have introduced that directory.
 
-  register typeof(*(p)) __r2 asm("r2");
+>  static const char * const spear320_dt_board_compat[] = {
+> diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+> index 98144ba..781aec9 100644
+> --- a/arch/arm/mach-spear3xx/spear3xx.c
+> +++ b/arch/arm/mach-spear3xx/spear3xx.c
+> @@ -121,6 +122,9 @@ struct sys_timer spear3xx_timer = {
+>  
+>  static const struct of_device_id vic_of_match[] __initconst = {
+>  	{ .compatible = "arm,pl190-vic", .data = vic_of_init, },
+> +	{ .compatible = "st,spear300-shirq", .data = spear3xx_shirq_of_init, },
+> +	{ .compatible = "st,spear310-shirq", .data = spear3xx_shirq_of_init, },
+> +	{ .compatible = "st,spear320-shirq", .data = spear3xx_shirq_of_init, },
+>  	{ /* Sentinel */ }
+>  };
 
-gives me the error:
+You list three "compatible" values here with the same init function, and then
 
-  error: read-only variable ?__r2? used as ?asm? output
+> +int __init spear3xx_shirq_of_init(struct device_node *np,
+> +		struct device_node *parent)
+> +{
+> +	struct spear_shirq **shirq_blocks;
+> +	void __iomem *base;
+> +	int block_nr, ret;
+> +
+> +	base = of_iomap(np, 0);
+> +	if (!base) {
+> +		pr_err("%s: failed to map shirq registers\n", __func__);
+> +		return -ENXIO;
+> +	}
+> +
+> +	if (of_device_is_compatible(np, "st,spear300-shirq")) {
+> +		shirq_blocks = spear300_shirq_blocks;
+> +		block_nr = ARRAY_SIZE(spear300_shirq_blocks);
+> +	} else if (of_device_is_compatible(np, "st,spear310-shirq")) {
+> +		shirq_blocks = spear310_shirq_blocks;
+> +		block_nr = ARRAY_SIZE(spear310_shirq_blocks);
+> +	} else if (of_device_is_compatible(np, "st,spear320-shirq")) {
+> +		shirq_blocks = spear320_shirq_blocks;
+> +		block_nr = ARRAY_SIZE(spear320_shirq_blocks);
+> +	} else {
+> +		pr_err("%s: unknown platform\n", __func__);
+> +		ret = -EINVAL;
+> +		goto unmap;
+> +	}
+> +
+> +	ret = shirq_init(shirq_blocks, block_nr, base, np);
+> +	if (ret) {
+> +		pr_err("%s: shirq initialization failed\n", __func__);
+> +		goto unmap;
+> +	}
+> +
+> +	return ret;
+> +
+> +unmap:
+> +	iounmap(base);
+> +	return ret;
+> +}
 
-I guess because 'const' ends up being part of the typeof *p?  I
-suppose I could do typeof(x) instead
+In that multiplex between thre three again. I think it would be cleaner to have
+three separate functions and move the call to of_iomap into shirq_init.
 
-BR,
--R
-
->> >> diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
->> >> index 9b06bb4..d05285c 100644
->> >> --- a/arch/arm/lib/getuser.S
->> >> +++ b/arch/arm/lib/getuser.S
->> >> @@ -18,7 +18,7 @@
->> >>   * Inputs:   r0 contains the address
->> >>   *           r1 contains the address limit, which must be preserved
->> >>   * Outputs:  r0 is the error code
->> >> - *           r2 contains the zero-extended value
->> >> + *           r2, r3 contains the zero-extended value
->> >>   *           lr corrupted
->> >>   *
->> >>   * No other registers must be altered.  (see <asm/uaccess.h>
->> >> @@ -66,6 +66,19 @@ ENTRY(__get_user_4)
->> >>       mov     pc, lr
->> >>  ENDPROC(__get_user_4)
->> >>
->> >> +ENTRY(__get_user_8)
->> >> +     check_uaccess r0, 4, r1, r2, __get_user_bad
->> >
->> > Shouldn't you be passing 8 here, so that we validate the correct range?
->>
->> yes, sorry, I'll fix that
->>
->> >> +#ifdef CONFIG_THUMB2_KERNEL
->> >> +5: TUSER(ldr)        r2, [r0]
->> >> +6: TUSER(ldr)        r3, [r0, #4]
->> >> +#else
->> >> +5: TUSER(ldr)        r2, [r0], #4
->> >> +6: TUSER(ldr)        r3, [r0]
->> >> +#endif
->> >
->> > This doesn't work for EABI big-endian systems.
->>
->> Hmm, is that true?  Wouldn't put_user() then have the same problem?
->
-> I dug up the PCS and it seems that we arrange the two halves of the
-> doubleword to match the ldm/stm memory representation for EABI, so sorry
-> for the confusion.
->
->> I guess __ARMEB__ is the flag for big-endian?
->
-> That's the thing defined by the compiler, yes.
->
-> Will
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	Arnd
