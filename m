@@ -1,65 +1,20 @@
-From: johnstul@us.ibm.com (John Stultz)
-Date: Mon, 12 Nov 2012 13:36:19 -0800
-Subject: [PATCH V2 2/11] time: convert arch_gettimeoffset to a pointer
-In-Reply-To: <1352753462-2915-1-git-send-email-swarren@wwwdotorg.org>
-References: <1352753462-2915-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <50A16BD3.5010707@us.ibm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 21:37:11 +0000
+Subject: [GIT PULL] Ux500 pin changes
+In-Reply-To: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
+References: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
+Message-ID: <201211122137.11464.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 12:51 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
->
-> Currently, whenever CONFIG_ARCH_USES_GETTIMEOFFSET is enabled, each
-> arch core provides a single implementation of arch_gettimeoffset(). In
-> many cases, different sub-architectures, different machines, or
-> different timer providers exist, and so the arch ends up implementing
-> arch_gettimeoffset() as a call-through-pointer anyway. Examples are
-> ARM, Cris, M68K, and it's arguable that the remaining architectures,
-> M32R and Blackfin, should be doing this anyway.
->
-> Modify arch_gettimeoffset so that it itself is a function pointer, which
-> the arch initializes. This will allow later changes to move the
-> initialization of this function into individual machine support or timer
-> drivers. This is particularly useful for code in drivers/clocksource
-> which should rely on an arch-independant mechanism to register their
-> implementation of arch_gettimeoffset().
->
-> This patch also converts the Cris architecture to set arch_gettimeoffset
-> directly to the final implementation in time_init(), because Cris already
-> had separate time_init() functions per sub-architecture. M68K and ARM
-> are converted to set arch_gettimeoffset the final implementation in later
-> patches, because they already have function pointers in place for this
-> purpose.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Mike Frysinger <vapier@gentoo.org>
-> Cc: Mikael Starvik <starvik@axis.com>
-> Cc: Hirokazu Takata <takata@linux-m32r.org>
-> Cc: John Stultz <johnstul@us.ibm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> v2:
-> * s/gettimeoffset/get_arch_timeoffset/ to make the name less generic
->    and more arch-specific.
->
-> (Note: I've only reposted patch 2/11 this time around, and I still hope
-> to take it through the arm-soc tree due to dependencies, so I'm not
-> requesting this be applied by the timekeeping maintainers)
+On Thursday 08 November 2012, Linus Walleij wrote:
+> Hi ARM SoC guys,
+> 
+> here is a set of pinctrl table patches all just hitting one and the same ux500
+> file. Description in the signed tag, intended for v3.8.
+> 
+> Please pull them in!
 
-One last thing to watch out for: If you're trying to build a kernel that 
-mixes clocksource support with get_arch_timeoffset, you'll need to 
-rework the #ifdef in update_wall_time(), since we currently assume with 
-get_arch_timeoffset() that you're using tick + interpolation, so every 
-call to update_wall_time() only moves time forward by one jiffy.
+Pulled into next/drivers. Thanks,
 
-Otherwise, thanks for the name tweak. Going through the arm-soc tree is 
-fine with me.
-
-Acked-by: John Stultz <johnstul@us.ibm.com>
-
-thanks
--john
+	Arnd
