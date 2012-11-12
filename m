@@ -1,9 +1,9 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 12 Nov 2012 16:52:29 +0800
-Subject: [PATCH 09/17] spi/atmel_spi: correct 16 bits transfers using PIO
+Date: Mon, 12 Nov 2012 16:52:30 +0800
+Subject: [PATCH 10/17] spi/atmel_spi: correct 16 bits transfer with DMA
 In-Reply-To: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352710357-3265-10-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352710357-3265-11-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,92 +13,101 @@ Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 Cc: grant.likely at secretlab.ca
 Cc: spi-devel-general at lists.sourceforge.net
 ---
- drivers/spi/spi-atmel.c |   46 +++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 37 insertions(+), 9 deletions(-)
+ drivers/spi/spi-atmel.c |   53 +++++++++++++++++++++++++++++++----------------
+ 1 file changed, 35 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 00e729b..0007a53 100644
+index 0007a53..7a3613d 100644
 --- a/drivers/spi/spi-atmel.c
 +++ b/drivers/spi/spi-atmel.c
-@@ -518,13 +518,17 @@ static void atmel_spi_next_xfer_pio(struct spi_master *master,
+@@ -249,6 +249,8 @@ struct atmel_spi_device {
+ #define BUFFER_SIZE		PAGE_SIZE
+ #define INVALID_DMA_ADDRESS	0xffffffff
+ 
++static struct dma_slave_config slave_config;
++
+ /*
+  * Version 2 of the SPI controller has
+  *  - CR.LASTXFER
+@@ -406,17 +408,41 @@ static bool filter(struct dma_chan *chan, void *slave)
  	}
+ }
  
- 	if (xfer->tx_buf)
--		spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
-+		if (xfer->bits_per_word > 8)
-+			spi_writel(as, TDR, *(u16 *)(xfer->tx_buf));
-+		else
-+			spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
- 	else
- 		spi_writel(as, TDR, 0);
- 
- 	dev_dbg(master->dev.parent,
--		"  start pio xfer %p: len %u tx %p rx %p\n",
--		xfer, xfer->len, xfer->tx_buf, xfer->rx_buf);
-+		"  start pio xfer %p: len %u tx %p rx %p bitpw %d\n",
-+		xfer, xfer->len, xfer->tx_buf, xfer->rx_buf,
-+		xfer->bits_per_word);
- 
- 	/* Enable relevant interrupts */
- 	spi_writel(as, IER, SPI_BIT(RDRF) | SPI_BIT(OVRES));
-@@ -918,21 +922,39 @@ atmel_spi_pump_pio_data(struct atmel_spi *as, struct spi_transfer *xfer)
- {
- 	u8		*txp;
- 	u8		*rxp;
-+	u16		*txp16;
-+	u16		*rxp16;
- 	unsigned long	xfer_pos = xfer->len - as->current_remaining_bytes;
- 
- 	if (xfer->rx_buf) {
--		rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
--		*rxp = spi_readl(as, RDR);
-+		if (xfer->bits_per_word > 8) {
-+			rxp16 = (u16 *)(((u8 *)xfer->rx_buf) + xfer_pos);
-+			*rxp16 = spi_readl(as, RDR);
-+		} else {
-+			rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
-+			*rxp = spi_readl(as, RDR);
-+		}
- 	} else {
- 		spi_readl(as, RDR);
- 	}
--
--	as->current_remaining_bytes--;
-+	if (xfer->bits_per_word > 8) {
-+		as->current_remaining_bytes -= 2;
-+		if (as->current_remaining_bytes < 0)
-+			as->current_remaining_bytes = 0;
++static int atmel_spi_set_dma_xfer_width(struct atmel_spi *as, u8 bits_per_word)
++{
++	int err = 0;
++
++	if (bits_per_word > 8) {
++		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
++		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
 +	} else {
-+		as->current_remaining_bytes--;
++		slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
++		slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
 +	}
++
++	slave_config.direction = DMA_TO_DEVICE;
++	if (dmaengine_slave_config(as->dma.chan_tx, &slave_config)) {
++		dev_err(&as->pdev->dev,
++			"failed to configure tx dma channel\n");
++		err = -EINVAL;
++	}
++
++	slave_config.direction = DMA_FROM_DEVICE;
++	if (dmaengine_slave_config(as->dma.chan_rx, &slave_config)) {
++		dev_err(&as->pdev->dev,
++			"failed to configure rx dma channel\n");
++		err = -EINVAL;
++	}
++	return err;
++}
++
+ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+ {
+ 	struct at_dma_slave *sdata = (struct at_dma_slave *)&as->data.dma_slave;
+-	struct dma_slave_config	slave_config;
+ 	int err;
  
- 	if (as->current_remaining_bytes) {
- 		if (xfer->tx_buf) {
--			txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
--			spi_writel(as, TDR, *txp);
-+			if (xfer->bits_per_word > 8) {
-+				txp16 = (u16 *)(((u8 *)xfer->tx_buf)
-+							+ xfer_pos + 2);
-+				spi_writel(as, TDR, *txp16);
-+			} else {
-+				txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
-+				spi_writel(as, TDR, *txp);
-+			}
- 		} else {
- 			spi_writel(as, TDR, 0);
- 		}
-@@ -1345,6 +1367,12 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 				return -ENOPROTOOPT;
- 			}
- 		}
-+		if (xfer->bits_per_word > 8) {
-+			if (xfer->len % 2) {
-+				dev_dbg(&spi->dev, "buffer len should be 16 bits aligned\n");
-+				return -EINVAL;
-+			}
-+		}
+-	memset(&slave_config, 0, sizeof(slave_config));
+ 	slave_config.dst_addr = (dma_addr_t)as->phybase + SPI_TDR;
+ 	slave_config.src_addr = (dma_addr_t)as->phybase + SPI_RDR;
+-	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+-	slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+ 	slave_config.src_maxburst = 1;
+ 	slave_config.dst_maxburst = 1;
+ 	slave_config.device_fc = false;
+@@ -439,21 +465,9 @@ static int __devinit atmel_spi_configure_dma(struct atmel_spi *as)
+ 		goto error;
+ 	}
  
- 		/* FIXME implement these protocol options!! */
- 		if (xfer->speed_hz) {
+-	slave_config.direction = DMA_TO_DEVICE;
+-	if (dmaengine_slave_config(as->dma.chan_tx, &slave_config)) {
+-		dev_err(&as->pdev->dev,
+-			"failed to configure tx dma channel\n");
+-		err = -EINVAL;
++	err = atmel_spi_set_dma_xfer_width(as, 8);
++	if (err)
+ 		goto error;
+-	}
+-
+-	slave_config.direction = DMA_FROM_DEVICE;
+-	if (dmaengine_slave_config(as->dma.chan_rx, &slave_config)) {
+-		dev_err(&as->pdev->dev,
+-			"failed to configure rx dma channel\n");
+-		err = -EINVAL;
+-		goto error;
+-	}
+ 
+ 	dev_info(&as->pdev->dev, "Using %s (tx) and " \
+ 				" %s (rx) for DMA transfers\n",
+@@ -575,6 +589,9 @@ static int atmel_spi_next_xfer_dma(struct spi_master *master,
+ 		memset(as->buffer, 0, xfer->len);
+ 	}
+ 
++	if (atmel_spi_set_dma_xfer_width(as, xfer->bits_per_word))
++		goto err_dma;
++
+ 	/* Send both scatterlists */
+ 	rxdesc = rxchan->device->device_prep_slave_sg(rxchan,
+ 					&as->dma.sgrx,
 -- 
 1.7.9.5
