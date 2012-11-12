@@ -1,66 +1,104 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 16:23:25 +0100
-Subject: [PATCH 3/7] ARM i.MX5: switch IPU clk support to devicetree bindings
+Date: Mon, 12 Nov 2012 16:23:27 +0100
+Subject: [PATCH 5/7] ARM i.MX51: Add IPU support
 In-Reply-To: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
 References: <1352733809-27230-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352733809-27230-4-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1352733809-27230-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX5 clk support has platform based clock bindings for the
-IPU. IPU support is devicetree only, so move them over to devicetree
-based bindings. Also, enable MIPI clocks which do not have a device
-associated with, but still need to be enabled to do graphics on
-i.MX51.
+This adds the IPU device to the devicetree along with the necessary pinctrl
+settings for the parallel display outputs.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/clk-imx51-imx53.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/imx51.dtsi |   67 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index a0bf848..02932da 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -306,6 +306,10 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- 	clk_prepare_enable(clk[spba]);
- 	clk_prepare_enable(clk[emi_fast_gate]); /* fec */
- 	clk_prepare_enable(clk[emi_slow_gate]); /* eim */
-+	clk_prepare_enable(clk[mipi_hsc1_gate]);
-+	clk_prepare_enable(clk[mipi_hsc2_gate]);
-+	clk_prepare_enable(clk[mipi_esc_gate]);
-+	clk_prepare_enable(clk[mipi_hsp_gate]);
- 	clk_prepare_enable(clk[tmax1]);
- 	clk_prepare_enable(clk[tmax2]); /* esdhc2, fec */
- 	clk_prepare_enable(clk[tmax3]); /* esdhc1, esdhc4 */
-@@ -349,10 +353,9 @@ int __init mx51_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[mx51_mipi], "mipi_hsp", NULL);
- 	clk_register_clkdev(clk[vpu_gate], NULL, "imx51-vpu.0");
- 	clk_register_clkdev(clk[fec_gate], NULL, "imx27-fec.0");
--	clk_register_clkdev(clk[ipu_gate], "bus", "imx51-ipu");
--	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx51-ipu");
--	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx51-ipu");
--	clk_register_clkdev(clk[ipu_gate], "hsp", "imx51-ipu");
-+	clk_register_clkdev(clk[ipu_gate], "bus", "40000000.ipu");
-+	clk_register_clkdev(clk[ipu_di0_gate], "di0", "40000000.ipu");
-+	clk_register_clkdev(clk[ipu_di1_gate], "di1", "40000000.ipu");
- 	clk_register_clkdev(clk[usb_phy_gate], "phy", "mxc-ehci.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx51.0");
- 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx51.0");
-@@ -442,10 +445,10 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	clk_register_clkdev(clk[vpu_gate], NULL, "imx53-vpu.0");
- 	clk_register_clkdev(clk[i2c3_gate], NULL, "imx-i2c.2");
- 	clk_register_clkdev(clk[fec_gate], NULL, "imx25-fec.0");
--	clk_register_clkdev(clk[ipu_gate], "bus", "imx53-ipu");
--	clk_register_clkdev(clk[ipu_di0_gate], "di0", "imx53-ipu");
--	clk_register_clkdev(clk[ipu_di1_gate], "di1", "imx53-ipu");
--	clk_register_clkdev(clk[ipu_gate], "hsp", "imx53-ipu");
-+	clk_register_clkdev(clk[ipu_gate], "bus", "18000000.ipu");
-+	clk_register_clkdev(clk[ipu_di0_gate], "di0", "18000000.ipu");
-+	clk_register_clkdev(clk[ipu_di1_gate], "di1", "18000000.ipu");
-+	clk_register_clkdev(clk[ipu_gate], "hsp", "18000000.ipu");
- 	clk_register_clkdev(clk[usb_phy1_gate], "usb_phy1", "mxc-ehci.0");
- 	clk_register_clkdev(clk[esdhc1_ipg_gate], "ipg", "sdhci-esdhc-imx53.0");
- 	clk_register_clkdev(clk[dummy], "ahb", "sdhci-esdhc-imx53.0");
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 75d069f..c20e868 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -62,6 +62,13 @@
+ 		interrupt-parent = <&tzic>;
+ 		ranges;
+ 
++		ipu: ipu at 40000000 {
++			#crtc-cells = <1>;
++			compatible = "fsl,imx51-ipu";
++			reg = <0x40000000 0x20000000>;
++			interrupts = <11 10>;
++		};
++
+ 		aips at 70000000 { /* AIPS1 */
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+@@ -295,6 +302,66 @@
+ 					};
+ 				};
+ 
++				ipu_disp1 {
++					pinctrl_ipu_disp1_1: ipudisp1grp-1 {
++						fsl,pins = <
++							528 0x5 /* MX51_PAD_DISP1_DAT0__DISP1_DAT0 */
++							529 0x5 /* MX51_PAD_DISP1_DAT1__DISP1_DAT1 */
++							530 0x5 /* MX51_PAD_DISP1_DAT2__DISP1_DAT2 */
++							531 0x5 /* MX51_PAD_DISP1_DAT3__DISP1_DAT3 */
++							532 0x5 /* MX51_PAD_DISP1_DAT4__DISP1_DAT4 */
++							533 0x5 /* MX51_PAD_DISP1_DAT5__DISP1_DAT5 */
++							535 0x5 /* MX51_PAD_DISP1_DAT6__DISP1_DAT6 */
++							537 0x5 /* MX51_PAD_DISP1_DAT7__DISP1_DAT7 */
++							539 0x5 /* MX51_PAD_DISP1_DAT8__DISP1_DAT8 */
++							541 0x5 /* MX51_PAD_DISP1_DAT9__DISP1_DAT9 */
++							543 0x5 /* MX51_PAD_DISP1_DAT10__DISP1_DAT10 */
++							545 0x5 /* MX51_PAD_DISP1_DAT11__DISP1_DAT11 */
++							547 0x5 /* MX51_PAD_DISP1_DAT12__DISP1_DAT12 */
++							549 0x5 /* MX51_PAD_DISP1_DAT13__DISP1_DAT13 */
++							551 0x5 /* MX51_PAD_DISP1_DAT14__DISP1_DAT14 */
++							553 0x5 /* MX51_PAD_DISP1_DAT15__DISP1_DAT15 */
++							555 0x5 /* MX51_PAD_DISP1_DAT16__DISP1_DAT16 */
++							557 0x5 /* MX51_PAD_DISP1_DAT17__DISP1_DAT17 */
++							559 0x5 /* MX51_PAD_DISP1_DAT18__DISP1_DAT18 */
++							563 0x5 /* MX51_PAD_DISP1_DAT19__DISP1_DAT19 */
++							567 0x5 /* MX51_PAD_DISP1_DAT20__DISP1_DAT20 */
++							571 0x5 /* MX51_PAD_DISP1_DAT21__DISP1_DAT21 */
++							575 0x5 /* MX51_PAD_DISP1_DAT22__DISP1_DAT22 */
++							579 0x5 /* MX51_PAD_DISP1_DAT23__DISP1_DAT23 */
++							584 0x5 /* MX51_PAD_DI1_PIN2__DI1_PIN2 (hsync) */
++							583 0x5 /* MX51_PAD_DI1_PIN3__DI1_PIN3 (vsync) */
++						>;
++					};
++				};
++
++				ipu_disp2 {
++					pinctrl_ipu_disp2_1: ipudisp2grp-1 {
++						fsl,pins = <
++							603 0x5 /* MX51_PAD_DISP2_DAT0__DISP2_DAT0 */
++							608 0x5 /* MX51_PAD_DISP2_DAT1__DISP2_DAT1 */
++							613 0x5 /* MX51_PAD_DISP2_DAT2__DISP2_DAT2 */
++							614 0x5 /* MX51_PAD_DISP2_DAT3__DISP2_DAT3 */
++							615 0x5 /* MX51_PAD_DISP2_DAT4__DISP2_DAT4 */
++							616 0x5 /* MX51_PAD_DISP2_DAT5__DISP2_DAT5 */
++							617 0x5 /* MX51_PAD_DISP2_DAT6__DISP2_DAT6 */
++							622 0x5 /* MX51_PAD_DISP2_DAT7__DISP2_DAT7 */
++							627 0x5 /* MX51_PAD_DISP2_DAT8__DISP2_DAT8 */
++							633 0x5 /* MX51_PAD_DISP2_DAT9__DISP2_DAT9 */
++							637 0x5 /* MX51_PAD_DISP2_DAT10__DISP2_DAT10 */
++							643 0x5 /* MX51_PAD_DISP2_DAT11__DISP2_DAT11 */
++							648 0x5 /* MX51_PAD_DISP2_DAT12__DISP2_DAT12 */
++							652 0x5 /* MX51_PAD_DISP2_DAT13__DISP2_DAT13 */
++							656 0x5 /* MX51_PAD_DISP2_DAT14__DISP2_DAT14 */
++							661 0x5 /* MX51_PAD_DISP2_DAT15__DISP2_DAT15 */
++							593 0x5 /* MX51_PAD_DI2_PIN2__DI2_PIN2 (hsync) */
++							595 0x5 /* MX51_PAD_DI2_PIN3__DI2_PIN3 (vsync) */
++							597 0x5 /* MX51_PAD_DI2_DISP_CLK__DI2_DISP_CLK */
++							599 0x5 /* MX51_PAD_DI_GP4__DI2_PIN15 */
++						>;
++					};
++				};
++
+ 				uart1 {
+ 					pinctrl_uart1_1: uart1grp-1 {
+ 						fsl,pins = <
 -- 
 1.7.10.4
