@@ -1,71 +1,42 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Mon, 12 Nov 2012 11:44:56 +0100
-Subject: [PATCH 01/11] cris: move usec/nsec conversion to
- do_slow_gettimeoffset
-In-Reply-To: <1352408516-21988-3-git-send-email-swarren@wwwdotorg.org>
-References: <1352408516-21988-1-git-send-email-swarren@wwwdotorg.org>
- <1352408516-21988-3-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20121112104456.GM2834@axis.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Nov 2012 10:56:41 +0000
+Subject: [PATCH] Set bit 22 in the PL310 (cache controller) AuxCtlr
+ register
+In-Reply-To: <20121112064547.GN32313@localhost.localdomain>
+References: <1352433712-16364-1-git-send-email-shiraz.hashim@st.com>
+ <20121109095400.GC2357@mudshark.cambridge.arm.com>
+ <20121112064547.GN32313@localhost.localdomain>
+Message-ID: <20121112105641.GC2346@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2012 at 02:01:46PM -0700, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Mon, Nov 12, 2012 at 06:45:47AM +0000, Shiraz Hashim wrote:
+> On Fri, Nov 09, 2012 at 09:54:01AM +0000, Will Deacon wrote:
+> > On Fri, Nov 09, 2012 at 04:01:52AM +0000, Shiraz Hashim wrote:
+> > > From: Catalin Marinas <catalin.marinas@arm.com>
+> > > 
+> > > Clearing bit 22 in the PL310 Auxiliary Control register (shared
+> > > attribute override enable) has the side effect of transforming Normal
+> > > Shared Non-cacheable reads into Cacheable no-allocate reads.
+> > > 
+> > > Coherent DMA buffers in Linux always have a Cacheable alias via the
+> > > kernel linear mapping and the processor can speculatively load cache
+> > > lines into the PL310 controller. With bit 22 cleared, Non-cacheable
+> > > reads would unexpectedly hit such cache lines leading to buffer
+> > > corruption.
+> > 
+> > Is this still the case with recent kernels? I thought the dma-mapping/cma
+> > work avoided the cacheable alias, but perhaps I'm mistaken.
 > 
-> Move usec to nsec conversion from arch_gettimeoffset() to
-> do_slow_gettimeoffset(); in a future patch, do_slow_gettimeoffset()
-> will be used directly as the implementation of arch_gettimeoffset(),
-> so needs to perform all required calculations.
-> 
-> Cc: Mikael Starvik <starvik@axis.com>
-> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+> I haven't used CMA but DMA mappings are still normal memory
+> non-cacheable.
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+Ok, so trawling through the list reveals we only have this issue for normal
+DMA mappings and not with CMA:
 
-> Cc: linux-cris-kernel at axis.com
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
->  arch/cris/arch-v10/kernel/time.c |    4 ++--
->  arch/cris/kernel/time.c          |    2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/cris/arch-v10/kernel/time.c b/arch/cris/arch-v10/kernel/time.c
-> index bcffcb6..162892f 100644
-> --- a/arch/cris/arch-v10/kernel/time.c
-> +++ b/arch/cris/arch-v10/kernel/time.c
-> @@ -65,8 +65,8 @@ unsigned long do_slow_gettimeoffset(void)
->  	 */
->  	count = *R_TIMER0_DATA;
->  
-> -	/* Convert timer value to usec */
-> -	return (TIMER0_DIV - count) * ((NSEC_PER_SEC/1000)/HZ)/TIMER0_DIV;
-> +	/* Convert timer value to nsec */
-> +	return (TIMER0_DIV - count) * (NSEC_PER_SEC/HZ)/TIMER0_DIV;
->  }
->  
->  /* Excerpt from the Etrax100 HSDD about the built-in watchdog:
-> diff --git a/arch/cris/kernel/time.c b/arch/cris/kernel/time.c
-> index 277ffc4..b063c92 100644
-> --- a/arch/cris/kernel/time.c
-> +++ b/arch/cris/kernel/time.c
-> @@ -46,7 +46,7 @@ static unsigned long (*do_gettimeoffset)(void) = do_slow_gettimeoffset;
->  
->  u32 arch_gettimeoffset(void)
->  {
-> -       return do_gettimeoffset() * 1000;
-> +	return do_gettimeoffset();
->  }
->  #endif
->  
-> -- 
-> 1.7.0.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-October/124276.html
 
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+I wonder whether we shouldn't just fix that, rather than work around it with
+a PL310-specific hack?
+
+Will
