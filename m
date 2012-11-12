@@ -1,34 +1,46 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Nov 2012 14:02:47 +0900
-Subject: [PATCH 2/2] ARM: S3C64XX: Staticly define parent clock of "camera"
- clock
-In-Reply-To: <509EC83D.8010704@gmail.com>
-References: <1352556477-3700-1-git-send-email-y@samsung.com>
- <509e6047.a766980a.0f91.14f6@mx.google.com> <509EC391.9090506@gmail.com>
- <509EC83D.8010704@gmail.com>
-Message-ID: <004a01cdc092$f57312d0$e0593870$%kim@samsung.com>
+Date: Mon, 12 Nov 2012 14:03:05 +0900
+Subject: [PATCH 2/4] gpio: samsung: Skip registration if pinctrl driver is
+ present on Exynos4x12
+In-Reply-To: <CACRpkdZGu2VfP-EzAOxK3947x6Pd78bh=TWDK98iXwkJx2WiTQ@mail.gmail.com>
+References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
+ <1351089457-8205-3-git-send-email-t.figa@samsung.com>
+ <CACRpkdYNDSp0K3wpvUem9ecsW-JQ9L6aKqaOmHNUR65DQTMNHA@mail.gmail.com>
+ <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
+ <CACRpkdaOpzFvs_wqy9sdrmx1=wEs5uxqfh_rOrKxLTXV-q1K2Q@mail.gmail.com>
+ <0e8301cdbe62$56a1d010$03e57030$%kim@samsung.com>
+ <CACRpkdZGu2VfP-EzAOxK3947x6Pd78bh=TWDK98iXwkJx2WiTQ@mail.gmail.com>
+Message-ID: <004b01cdc093$00424140$00c6c3c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+Linus Walleij wrote:
 > 
-> On 11/10/2012 10:13 PM, Sylwester Nawrocki wrote:
-> > On 11/10/2012 03:07 PM, dron0gus at gmail.com wrote:
-> >> From: Andrey Gusakov<dron_gus@mail.ru>
-> >>
-> >> The "camera" clock have only one parent. Define it staticly and
-> 
-> Forgot to point out a small typo here: staticly -> statically.
-> 
-Thanks for pointing out. I fixed it when I applied.
-
-> >> remove unused source clock list.
-> >>
-> >> Signed-off-by: Andrey Gusakov<dron0gus@gmail.com>
 > >
-> > Reviewed-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> > Can you drop above 3 commits in your tree? If many conflicts happens
+> during
+> > rebasing, how about that I merge your pinctrl/samsung branch into
+> Samsung
+> > tree?...
+> 
+> Why not :-)
+> 
+> I have removed the samsung branch from my for-next to avoid
+> clashes.
+> 
+Thanks ;-)
 
-Thanks.
+> So please bring the samsung branch into you tree and fix
+> everything up there.
+> 
+I did.
+
+> Axel Lin has sent some tree-wide cleanups but let's hope they don't
+> hit samsung so much, or they will need to be postponed/dropped.
+> 
+OK, I see.
+
+Thanks again.
 
 Best regards,
 Kgene.
