@@ -1,37 +1,44 @@
-From: mfuzzey@gmail.com (Martin Fuzzey)
-Date: Mon, 12 Nov 2012 23:33:40 +0100
-Subject: [PATCH] Fix typo in DT binding documentation for i.MX IPU3
-Message-ID: <20121112223340.20867.75319.stgit@localhost.localdomain>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 22:35:00 +0000
+Subject: [GIT PULL] Ux500 pin changes
+In-Reply-To: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
+References: <CACRpkdYjEmQRU530N3sP7t_RfM_NLhEcMf6YCBdf4LC7M7fQDQ@mail.gmail.com>
+Message-ID: <201211122235.00973.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-crtc should be crtcs in parallel display.
+On Thursday 08 November 2012, Linus Walleij wrote:
+-----------------------------------------------------
+> Jean-Nicolas Graux (1):
+>       ARM: ux500: add STM pin configuration
+> 
+> Jorgen Jonsson (1):
+>       ARM: ux500: fixup magnetometer pins
+> 
+> Linus Walleij (1):
+>       ARM: ux500: delete duplicate macro
+> 
+> Patrice Chotard (6):
+>       ARM: ux500: 8500: register LCD VSI pinctrl table
+>       ARM: ux500: 8500: add IDLE pin configuration for SPI
+>       ARM: ux500: 8500: update SKE keypad pinctrl table
+>       ARM: ux500: 8500: define SDI sleep states
+>       ARM: ux500: cosmetic fixups for uart0
+>       ARM: ux500: 8500: add pinctrl support for uart1 and uart2
+> 
+>  arch/arm/mach-ux500/board-mop500-pins.c | 427 +++++++++++++++++++++++++++-----
+>  1 file changed, 362 insertions(+), 65 deletions(-)
+> 
 
-Signed-off-by: Martin Fuzzey <mfuzzey@gmail.com>
+u8500_defconfig now gives me two new errors in arm-soc/for-next when building with
+-Werror:
 
----
+arch/arm/mach-ux500/board-mop500-pins.c:73:22: error: 'out_hi_wkup_pdis' defined but not used [-Werror=unused-variable]
 
- .../bindings/staging/imx-drm/fsl-imx-drm.txt       |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+and the existing:
 
-diff --git a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-index 07654f0..68eff34 100644
---- a/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-+++ b/Documentation/devicetree/bindings/staging/imx-drm/fsl-imx-drm.txt
-@@ -23,7 +23,7 @@ Parallel display support
- 
- Required properties:
- - compatible: Should be "fsl,imx-parallel-display"
--- crtc: the crtc this display is connected to, see below
-+- crtcs: the crtc this display is connected to, see below
- Optional properties:
- - interface_pix_fmt: How this display is connected to the
-   crtc. Currently supported types: "rgb24", "rgb565"
-@@ -36,6 +36,6 @@ example:
- display at di0 {
- 	compatible = "fsl,imx-parallel-display";
- 	edid = [edid-data];
--	crtc = <&ipu 0>;
-+	crtcs = <&ipu 0>;
- 	interface-pix-fmt = "rgb24";
- };
+ERROR (phandle_references): Reference to non-existent node or label "tc3589x_gpio"
+
+Can you provide patches to fix these up?
+
+	arnd
