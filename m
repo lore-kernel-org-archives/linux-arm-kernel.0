@@ -1,56 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 12 Nov 2012 11:38:20 +0100
-Subject: [PATCH] mm: dmapool: use provided gfp flags for all
- dma_alloc_coherent() calls
-In-Reply-To: <50A0C5D2.7000806@web.de>
-References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
- <20121111172243.GB821@lunn.ch> <50A0C5D2.7000806@web.de>
-Message-ID: <20121112103820.GX22029@lunn.ch>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 12 Nov 2012 11:11:20 +0100
+Subject: [PATCH v3 6/6] ARM: EXYNOS: Add secure firmware support to
+ secondary CPU bring-up
+In-Reply-To: <20121112095231.GE28327@n2100.arm.linux.org.uk>
+References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
+ <1351178560-19188-7-git-send-email-t.figa@samsung.com>
+ <20121112095231.GE28327@n2100.arm.linux.org.uk>
+Message-ID: <2714070.uUa63CRanW@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 10:48:02AM +0100, Soeren Moch wrote:
-> On 11.11.2012 18:22, Andrew Lunn wrote:
-> > On Thu, Nov 08, 2012 at 07:38:57AM +0100, Marek Szyprowski wrote:
-> >> dmapool always calls dma_alloc_coherent() with GFP_ATOMIC flag,
-> regardless
-> >> the flags provided by the caller. This causes excessive pruning of
-> >> emergency memory pools without any good reason. This patch
-> changes the code
-> >> to correctly use gfp flags provided by the dmapool caller. This should
-> >> solve the dmapool usage on ARM architecture, where GFP_ATOMIC DMA
-> >> allocations can be served only from the special, very limited
-> memory pool.
-> >>
-> >> Reported-by: Soren Moch <smoch@web.de>
-> Please use
-> Reported-by: Soeren Moch <smoch@web.de>
+On Monday 12 of November 2012 09:52:31 Russell King - ARM Linux wrote:
+> On Thu, Oct 25, 2012 at 05:22:40PM +0200, Tomasz Figa wrote:
+> > @@ -47,6 +48,8 @@ static inline void __iomem *cpu_boot_reg(int cpu)
+> > 
+> >  {
+> >  
+> >  	void __iomem *boot_reg;
+> > 
+> > +	if (!call_firmware_op(cpu_boot_reg, cpu, &boot_reg))
+> > +		return boot_reg;
+> > 
+> >  	boot_reg = cpu_boot_reg_base();
 > 
-> >> Reported-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >
-> > Tested-by: Andrew Lunn <andrew@lunn.ch>
-> >
-> > I tested this on a Kirkwood QNAP after removing the call to
-> > init_dma_coherent_pool_size().
-> >
-> >     Andrew
-> 
-> Tested-by: Soeren Moch <smoch@web.de>
-> 
-> Now I had a chance to test this patch on my Kirkwood guruplug
-> system with linux-3.6.6 . It is running much better now, but with the
-> original 256K coherent pool size I still see errors after several hours
-> of runtime:
-> 
-> Nov 12 09:42:32 guru kernel: ERROR: 256 KiB atomic DMA coherent pool
-> is too small!
-> Nov 12 09:42:32 guru kernel: Please increase it with coherent_pool=
-> kernel parameter!
+> That code makes no sense.
 
-Hi Soeren
+Why?
 
-Could you tell us what DVB devices you are using.
+call_firmware_op returning 0 means a success, so boot_reg is filled with 
+proper boot register address, which should be used.
 
-Thanks
-	Andrew
+Otherwise (call_firmware_op returning an error) the legacy boot register 
+is used.
+
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
