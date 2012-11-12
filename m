@@ -1,205 +1,69 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 12 Nov 2012 16:54:52 +0800
-Subject: [PATCH v4 04/13] ARM: KVM: Initial VGIC MMIO support code
-In-Reply-To: <20121110154444.3061.22464.stgit@chazy-air>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154444.3061.22464.stgit@chazy-air>
-Message-ID: <20121112085450.GA29502@b29396-Latitude-E6410>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Mon, 12 Nov 2012 16:52:20 +0800
+Subject: [PATCH 00/17] atmel SoC SPI controller with dmaengine and DT 
+Message-ID: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2012 at 04:44:44PM +0100, Christoffer Dall wrote:
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> Wire the initial in-kernel MMIO support code for the VGIC, used
-> for the distributor emulation.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <c.dall@virtualopensystems.com>
-> ---
->  arch/arm/include/asm/kvm_vgic.h |    6 +-
->  arch/arm/kvm/Makefile           |    1 
->  arch/arm/kvm/vgic.c             |  138 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 144 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/kvm/vgic.c
-> 
-> diff --git a/arch/arm/include/asm/kvm_vgic.h b/arch/arm/include/asm/kvm_vgic.h
-> index d75540a..b444ecf 100644
-> --- a/arch/arm/include/asm/kvm_vgic.h
-> +++ b/arch/arm/include/asm/kvm_vgic.h
-> @@ -30,7 +30,11 @@ struct kvm_vcpu;
->  struct kvm_run;
->  struct kvm_exit_mmio;
->  
-> -#ifndef CONFIG_KVM_ARM_VGIC
-> +#ifdef CONFIG_KVM_ARM_VGIC
-> +bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run,
-> +		      struct kvm_exit_mmio *mmio);
-> +
-> +#else
->  static inline int kvm_vgic_hyp_init(void)
->  {
->  	return 0;
-> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-> index 8a4f396..c019f02 100644
-> --- a/arch/arm/kvm/Makefile
-> +++ b/arch/arm/kvm/Makefile
-> @@ -20,3 +20,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesc
->  
->  obj-$(CONFIG_KVM_ARM_HOST) += arm.o guest.o mmu.o emulate.o reset.o
->  obj-$(CONFIG_KVM_ARM_HOST) += coproc.o coproc_a15.o mmio.o decode.o
-> +obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
-> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-> new file mode 100644
-> index 0000000..26ada3b
-> --- /dev/null
-> +++ b/arch/arm/kvm/vgic.c
-> @@ -0,0 +1,138 @@
-> +/*
-> + * Copyright (C) 2012 ARM Ltd.
-> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> + */
-> +
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <asm/kvm_emulate.h>
-> +
-> +#define ACCESS_READ_VALUE	(1 << 0)
-> +#define ACCESS_READ_RAZ		(0 << 0)
-> +#define ACCESS_READ_MASK(x)	((x) & (1 << 0))
-> +#define ACCESS_WRITE_IGNORED	(0 << 1)
-> +#define ACCESS_WRITE_SETBIT	(1 << 1)
-> +#define ACCESS_WRITE_CLEARBIT	(2 << 1)
-> +#define ACCESS_WRITE_VALUE	(3 << 1)
-> +#define ACCESS_WRITE_MASK(x)	((x) & (3 << 1))
-> +
-> +/**
-> + * vgic_reg_access - access vgic register
-> + * @mmio:   pointer to the data describing the mmio access
-> + * @reg:    pointer to the virtual backing of the vgic distributor struct
+Hi,
 
-Is this correct?
+This set of patches is to add dmaengine and DT support for atmel spi.
+The work is based on Jean-Christophe, Nicolas and Richard's work.
+I have tested it on at91sam9x5ek, at91sam9m10g45ek.
 
-> + * @offset: least significant 2 bits used for word offset
-> + * @mode:   ACCESS_ mode (see defines above)
-> + *
-> + * Helper to make vgic register access easier using one of the access
-> + * modes defined for vgic register access
-> + * (read,raz,write-ignored,setbit,clearbit,write)
-> + */
-> +static void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
-> +			    u32 offset, int mode)
-> +{
-> +	int word_offset = offset & 3;
-> +	int shift = word_offset * 8;
-> +	u32 mask;
-> +	u32 regval;
-> +
-> +	/*
-> +	 * Any alignment fault should have been delivered to the guest
-> +	 * directly (ARM ARM B3.12.7 "Prioritization of aborts").
-> +	 */
-> +
-> +	mask = (~0U) >> (word_offset * 8);
-> +	if (reg)
-> +		regval = *reg;
-> +	else {
-> +		BUG_ON(mode != (ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED));
-> +		regval = 0;
-> +	}
-> +
-> +	if (mmio->is_write) {
-> +		u32 data = (*((u32 *)mmio->data) & mask) << shift;
-> +		switch (ACCESS_WRITE_MASK(mode)) {
-> +		case ACCESS_WRITE_IGNORED:
-> +			return;
-> +
-> +		case ACCESS_WRITE_SETBIT:
-> +			regval |= data;
-> +			break;
-> +
-> +		case ACCESS_WRITE_CLEARBIT:
-> +			regval &= ~data;
-> +			break;
-> +
-> +		case ACCESS_WRITE_VALUE:
-> +			regval = (regval & ~(mask << shift)) | data;
-> +			break;
-> +		}
-> +		*reg = regval;
-> +	} else {
-> +		switch (ACCESS_READ_MASK(mode)) {
-> +		case ACCESS_READ_RAZ:
-> +			regval = 0;
-> +			/* fall through */
-> +
-> +		case ACCESS_READ_VALUE:
-> +			*((u32 *)mmio->data) = (regval >> shift) & mask;
-> +		}
-> +	}
-> +}
-> +
-> +/* All this should be handled by kvm_bus_io_*()... FIXME!!! */
-> +struct mmio_range {
-> +	unsigned long base;
-> +	unsigned long len;
-> +	bool (*handle_mmio)(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
-> +			    u32 offset);
-> +};
-> +
-> +static const struct mmio_range vgic_ranges[] = {
-> +	{}
-> +};
-> +
-> +static const
-> +struct mmio_range *find_matching_range(const struct mmio_range *ranges,
-> +				       struct kvm_exit_mmio *mmio,
-> +				       unsigned long base)
-> +{
-> +	const struct mmio_range *r = ranges;
-> +	unsigned long addr = mmio->phys_addr - base;
-> +
-> +	while (r->len) {
-> +		if (addr >= r->base &&
-> +		    (addr + mmio->len) <= (r->base + r->len))
-> +			return r;
-> +		r++;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
-> +/**
-> + * vgic_handle_mmio - handle an in-kernel MMIO access
-> + * @vcpu:	pointer to the vcpu performing the access
-> + * @mmio:	pointer to the data describing the access
+It is based on v3.7-rc5.
 
-Can we also have @run here?
+Best Regards,
+Wenyou Yang.
 
-> + *
-> + * returns true if the MMIO access has been performed in kernel space,
-> + * and false if it needs to be emulated in user space.
-> + */
-> +bool vgic_handle_mmio(struct kvm_vcpu *vcpu, struct kvm_run *run, struct kvm_exit_mmio *mmio)
-> +{
-> +	return KVM_EXIT_MMIO;
-> +}
-> 
+Jean-Christophe PLAGNIOL-VILLARD (3):
+  of: add dma-mask binding
+  of_spi: add generic binding support to specify cs gpio
+  spi/atmel_spi: add DT support
 
-Regards
-Dong Aisheng
+Nicolas Ferre (5):
+  spi/atmel_spi: add physical base address
+  spi/atmel_spi: call unmapping on transfers buffers
+  spi/atmel_spi: status information passed through controller data
+  spi/atmel_spi: add flag to controller data for lock operations
+  spi/atmel_spi: add dmaengine support
+
+Richard Genoud (6):
+  spi/atmel_spi: Fix spi-atmel driver to adapt to slave_config changes
+  spi/atmel_spi: correct 16 bits transfers using PIO
+  spi/atmel_spi: correct 16 bits transfer with DMA
+  ARM: at91: add clocks for spi DT entries
+  ARM: dts: add spi nodes for atmel SoC
+  ARM: dts: add spi nodes for atmel boards
+
+Wenyou Yang (3):
+  spi/atmel_spi: add version propety as the spi data
+  spi/atmel_spi: add function to read the spi data from the dts
+  mtd: m25p80: change the m25p80_read to reading page to page
+
+ Documentation/devicetree/bindings/spi/spi-bus.txt  |    6 +
+ .../devicetree/bindings/spi/spi_atmel.txt          |   27 +
+ arch/arm/boot/dts/at91sam9260.dtsi                 |   34 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |   34 +
+ arch/arm/boot/dts/at91sam9263ek.dts                |    9 +
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |    9 +
+ arch/arm/boot/dts/at91sam9g25ek.dts                |    9 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |   34 +
+ arch/arm/boot/dts/at91sam9m10g45ek.dts             |    9 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |   34 +
+ arch/arm/boot/dts/at91sam9n12ek.dts                |    9 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   34 +
+ arch/arm/mach-at91/at91sam9260.c                   |    2 +
+ arch/arm/mach-at91/at91sam9g45.c                   |    2 +
+ arch/arm/mach-at91/at91sam9n12.c                   |    2 +
+ arch/arm/mach-at91/at91sam9x5.c                    |    2 +
+ drivers/mtd/devices/m25p80.c                       |   44 +-
+ drivers/of/platform.c                              |   23 +-
+ drivers/spi/spi-atmel.c                            |  728 ++++++++++++++++++--
+ drivers/spi/spi.c                                  |   55 +-
+ include/linux/spi/spi.h                            |    3 +
+ 21 files changed, 1045 insertions(+), 64 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi_atmel.txt
+
+-- 
+1.7.9.5
