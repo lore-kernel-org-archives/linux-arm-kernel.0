@@ -1,67 +1,60 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 12 Nov 2012 09:23:10 +0100
-Subject: [RFC 6/6] ARM: sched: clear SD_SHARE_POWERLINE
-In-Reply-To: <5093A7C5.9080605@ti.com>
-References: <1349595838-31274-1-git-send-email-vincent.guittot@linaro.org>
- <1349595838-31274-7-git-send-email-vincent.guittot@linaro.org>
- <50880795.4030609@ti.com>
- <CAKfTPtAZjLpwHYgj8JXku4sU0mPPf34MKkWp0=qiX5u-T0JVOA@mail.gmail.com>
- <5093A7C5.9080605@ti.com>
-Message-ID: <CAKfTPtD4HFEu1xxpowR6fKe6ceD7JMJ4pWty94=1_zWrY390gA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 12 Nov 2012 09:25:46 +0100
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <50A020C5.4070506@wwwdotorg.org>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+ <50A020C5.4070506@wwwdotorg.org>
+Message-ID: <20121112082546.GU22029@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 November 2012 12:00, Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
-> On Monday 29 October 2012 06:58 PM, Vincent Guittot wrote:
->>
->> On 24 October 2012 17:21, Santosh Shilimkar <santosh.shilimkar@ti.com>
->> wrote:
->>>
->>> On Sunday 07 October 2012 01:13 PM, Vincent Guittot wrote:
->>>>
->>>>
->>>> The ARM platforms take advantage of packing small tasks on few cores.
->>>> This is true even when the cores of a cluster can't be powergated
->>>> independently.
->>>>
->>>>
->>>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->>>> ---
->>>>    arch/arm/kernel/topology.c |    5 +++++
->>>>    1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->>>> index 26c12c6..00511d0 100644
->>>> --- a/arch/arm/kernel/topology.c
->>>> +++ b/arch/arm/kernel/topology.c
->>>> @@ -226,6 +226,11 @@ static inline void update_cpu_power(unsigned int
->>>> cpuid, unsigned int mpidr) {}
->>>>     */
->>>>    struct cputopo_arm cpu_topology[NR_CPUS];
->>>>
->>>> +int arch_sd_share_power_line(void)
->>>> +{
->>>> +       return 0*SD_SHARE_POWERLINE;
->>>> +}
->>>
->>>
->>>
->>> Making this selection of policy based on sched domain will better. Just
->>> gives the flexibility to choose a separate scheme for big and little
->>> systems which will be very convenient.
->>
->>
->> I agree that it would be more flexible to be able to set it for each level
->>
-> Will you be addressing that in next version then ?
+On Sun, Nov 11, 2012 at 03:03:49PM -0700, Stephen Warren wrote:
+> On 11/11/2012 09:21 AM, Andrew Lunn wrote:
+> > From: Jamie Lentin <jm@lentin.co.uk>
+> > 
+> > Given appropriate devicetree bindings, this driver registers a
+> > pm_power_off function to set a GPIO line high/low to power down
+> > your board.
+> 
+> This feature will be useful for the Tegra TrimSlice board too.
 
-Hi Santosh,
+Hi Stephen
 
-yes, I will try to address this point for the next version.
+Great to hear its usable for others.
 
-Vincent
+> > diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
+> 
+> > +Required properties:
+> > +- compatible : should be "gpio-poweroff".
+> > +- gpios : The GPIO to set high/low, see "gpios property" in
+> > +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
+> > +  low to power down the board set it to "Active Low", otherwise set
+> > +  gpio to "Active High".
+> 
+> Unfortunately, not all GPIO bindings support active high/low flags in
+> the GPIO specifier. As such, the flags there are basically useless.
+> Other bindings (e.g. IIRC the fixed-regulator binding) have added a
+> separate active-high property to indicate the GPIO polarity. This
+> binding should probably follow suite.
 
->
-> Regards
-> santosh
->
+Humm, so are you saying of_get_named_gpio_flags() is deprecated?
+
+There is a lot of code using this to get the flag
+OF_GPIO_ACTIVE_LOW. Some of these users are very generic code:
+
+drivers/leds/leds-gpio.c:
+drivers/input/misc/rotary_encoder.c:
+drivers/input/keyboard/gpio_keys.c:
+drivers/input/keyboard/gpio_keys_polled.c:
+drivers/hwmon/gpio-fan.c:
+
+The only code using the "enable-active-high"
+property is drivers/regulator/fixed.c although the binding
+documentation twl6040.txt talks about it, but the code does not
+implement it.
+
+Could you point me towards some email discussion about this?
+
+Thanks
+	Andrew
