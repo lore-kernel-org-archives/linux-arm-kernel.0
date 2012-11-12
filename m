@@ -1,84 +1,79 @@
-From: tremyfr@yahoo.fr (trem)
-Date: Mon, 12 Nov 2012 21:17:42 +0100
-Subject: usb clock not found on imx27 when using dt
-In-Reply-To: <20121112075411.GO10369@pengutronix.de>
-References: <1352666074.32152.YahooMailNeo@web28806.mail.ir2.yahoo.com>
- <20121112075411.GO10369@pengutronix.de>
-Message-ID: <50A15966.8040204@yahoo.fr>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 12 Nov 2012 21:21:07 +0100
+Subject: [PATCH V2 1/5] arm: mvebu: Added support for coherency fabric
+ in mach-mvebu
+In-Reply-To: <20121105140258.GO3351@mudshark.cambridge.arm.com>
+References: <1351545108-18954-1-git-send-email-gregory.clement@free-electrons.com>
+ <1351545108-18954-2-git-send-email-gregory.clement@free-electrons.com>
+ <20121105140258.GO3351@mudshark.cambridge.arm.com>
+Message-ID: <50A15A33.60405@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/12 08:54, s.hauer at pengutronix.de wrote:
-> On Sun, Nov 11, 2012 at 08:34:34PM +0000, Philippe Reynes wrote:
->> Hi all,
->>
->> I try to add the support of usb on my armadeus apf27,
->> but there is a problem when try to reclaim the clock.
->> imx_usb mxc-ehci.0: Failed to get clock, err=-2
->>
->> To avoid adding too many attachment to this mail,
->> I've put all the information on a website. You can
->> found them here:  http://ryu.zarb.org/~trem/armadeus/
->>
->>
->> The initial issue is in the directory : 20121110
->>
->> boot-3.7-rc4.log : boot log with the issue
->> linux-3.7-rc4.config : the configuration file for the kernel
->> investifation.txt : the description of my investigation.
->
-> You should really post the relevant bits on the mailing list. Nobody
-> visits websites for investigating your issue. Besides, it will not be
-> in the mailing list archives so people will not find it later.
+Hi Will,
 
-You're right, I add an archive with all log as attachment.
+On 11/05/2012 03:02 PM, Will Deacon wrote:
+> Hi Gregory,
+> 
+> On Mon, Oct 29, 2012 at 09:11:44PM +0000, Gregory CLEMENT wrote:
+>> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+>> new file mode 100644
+>> index 0000000..69e130d
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mvebu/coherency.c
+>> @@ -0,0 +1,89 @@
+>> +/*
+>> + * Coherency fabric (Aurora) support for Armada 370 and XP platforms.
+>> + *
+>> + * Copyright (C) 2012 Marvell
+>> + *
+>> + * Yehuda Yitschak <yehuday@marvell.com>
+>> + * Gregory Clement <gregory.clement@free-electrons.com>
+>> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + *
+>> + * The Armada 370 and Armada XP SOCs have a coherency fabric which is
+>> + * responsible for ensuring hardware coherency between all CPUs and between
+>> + * CPUs and I/O masters. This file initializes the coherency fabric and
+>> + * supplies basic routines for configuring and controlling hardware coherency
+>> + */
+> 
+> [...]
+> 
+>> +int set_cpu_coherent(unsigned int hw_cpu_id, int smp_group_id)
+>> +{
+>> +	int reg;
+>> +
+>> +	if (!coherency_base) {
+>> +		pr_warn("Can't make CPU %d cache coherent.\n", hw_cpu_id);
+>> +		pr_warn("Coherency fabric is not initialized\n");
+>> +		return 1;
+>> +	}
+>> +
+>> +	/* Enable the CPU in coherency fabric */
+>> +	reg = readl(coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
+>> +	reg |= 1 << (24 + hw_cpu_id);
+>> +	writel(reg, coherency_base + COHERENCY_FABRIC_CTL_OFFSET);
+>> +
+>> +	/* Add CPU to SMP group */
+>> +	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
+>> +	reg |= 1 << (16 + hw_cpu_id + (smp_group_id == 0 ? 8 : 0));
+>> +	writel(reg, coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
+>> +
+>> +	return 0;
+>> +}
+> 
+> These writels may expand to code containing calls to outer_sync(), which
+> will attempt to take a spinlock for the aurora l2. Given that the CPU isn't
+> coherent, how does this play out with the exclusive store instruction in the
+> lock?
 
->>
->>
->> I've tried to fix the clock issue, but another issue occurs.
->> The information about this "fix" is in : 20121111
->> boot-3.7-rc4.log : boot log with the new issue
->> issue.txt : the description of the change done on the kernel
->>
->> I've got severals questions :
->> - does my dts correct with usb change ?
->> - does someone has already tested usb on imx27 with dt ?
->
-> Please investigate in using the chipidea driver. This will be the way
-> forward for i.MX.
+I dug a little this subject: and I am not sure there is problem. In SMP mode,
+only the system cache mode of Aurora is used. In this mode, outer_cache.sync
+is void then outer_sync() won't call any function, so there will be no
+access to any spinlock.
 
-I use the chipidea driver for the usb.
-
-The main issue is that the chipidea driver don't found the clock :
-
-[    0.761693] imx_usb mxc-ehci.0: Failed to get clock, err=-2
-[    0.767620] imx_usb: probe of mxc-ehci.0 failed with error -2
-
-The driver ci13xxx_imx request the clock in the probe function
-in the following line:
-data->clk = devm_clk_get(&pdev->dev, NULL);
-calling: clk = clk_get(dev, id);
-calling: clk_get_sys(dev_id, con_id);
-calling: clk_find(dev_id, con_id);
-with dev_id = mxc-ehci.0 and con_id = NULL
-This last function fail to found a clock.
-
-In the function mx27_clocks_init, several mxc-ehci.0
-clocks are registered, but all with a con_id.
-
-So the function clk_find fails.
-
-As I'm not really sure of the dts, I don't know if the problem
-is in the dts or in the driver (maybe both).
-
-
-Regards,
-Philippe
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: usb_imx27_dt.tar.bz2
-Type: application/x-bzip
-Size: 24021 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121112/2d224f44/attachment-0001.bin>
+Gregory
