@@ -1,38 +1,63 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Mon, 12 Nov 2012 11:32:51 +0100
-Subject: [GIT PULL] arm-soc: lpc32xx: platform updates
-In-Reply-To: <509A5992.60009@antcom.de>
-References: <509A5992.60009@antcom.de>
-Message-ID: <50A0D053.8020602@antcom.de>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 12 Nov 2012 10:38:07 +0000
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <509C050C.6010201@ti.com>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
+ <509BFFDF.9040605@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
+ <509C050C.6010201@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EB71352@DBDE01.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Fri, Nov 09, 2012 at 00:46:28, Hunter, Jon wrote:
+> 
+> On 11/08/2012 12:59 PM, Hiremath, Vaibhav wrote:
+> > On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
+> >>
+> >> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
+> >>
+> >> [snip]
+> >>
+> >>> There is no reliable way to determine which source should be used in runtime
+> >>> for boards that do not have the 32k oscillator wired.
+> >>
+> >> So thinking about this some more and given that we are moving away from
+> >> board files, if a board does not provide a 32kHz clock source, then this
+> >> should be reflected in the device-tree source file for that board.
+> >> Hence, at boot time we should be able to determine if a 32kHz clock
+> >> source can be used.
+> >>
+> > 
+> > Let me feed some more thoughts here :)
+> > 
+> > The way it is being detected currently is based on timer idle status bit.
+> > I am worried that, this is the only option we have.
+> 
+> Why not use device-tree to indicate the presence of a 32k clock source?
+> This seems like a board level configuration and so device-tree seems to
+> be the perfect place for this IMO.
+> 
 
-this is a follow-up update of the previous pull request, adding only one patch
-to the LPC32xx platform (Motor PWM clock by Alban Bedel).
+I think I agree with you, but for this to happen in clean way, its time to 
+start populating clock-nodes in DT, don't you think? Something like,
+
+
+clocks {
+	rtc_clk: clk at X {
+		compatible = "crystal-32k, per-32k, xyz";
+		clock-frequency = <32768>;
+	};
+	...
+};
+
+Timer {
+
+	ref-clock = <&rtc_clk>;
+};
+
+What do you think?
 
 Thanks,
-
-Roland
-
-
-The following changes since commit 91deef8069e7ffafac4467200e1d37af1b2d7c56:
-
-  ARM: LPC32xx: Cleanup irq.c (2012-11-07 13:30:50 +0100)
-
-are available in the git repository at:
-
-  git://git.antcom.de/linux-2.6.git lpc32xx/core
-
-for you to fetch changes up to 84cee34db4d34b9059f4ef66f7d1805e438cc7f3:
-
-  ARM: LPC32xx: Add the motor PWM clock (2012-11-12 11:27:40 +0100)
-
-----------------------------------------------------------------
-Alban Bedel (1):
-      ARM: LPC32xx: Add the motor PWM clock
-
- arch/arm/mach-lpc32xx/clock.c                 |    8 ++++++++
- arch/arm/mach-lpc32xx/include/mach/platform.h |    1 +
- 2 files changed, 9 insertions(+)
+Vaibhav
