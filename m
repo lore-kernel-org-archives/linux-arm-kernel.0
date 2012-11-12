@@ -1,121 +1,109 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Nov 2012 01:52:52 +0100
-Subject: [PATCH 3/6] ARM: integrator: remove static AP syscon mapping
-Message-ID: <1352681572-12937-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 12 Nov 2012 01:52:58 +0100
+Subject: [PATCH 4/6] ARM: integrator: remove static CP syscon mapping
+Message-ID: <1352681578-12969-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the static mapping for the AP system controller for
+This removes the static mapping for the CP system controller for
 the device tree case. Fork the static mappings table and move
 the system controller to only be statically mapped in the ATAG
 boot path.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-integrator/integrator_ap.c | 58 +++++++++++++++++++++-----------
- 1 file changed, 38 insertions(+), 20 deletions(-)
+ arch/arm/mach-integrator/integrator_cp.c | 50 +++++++++++++++++++++-----------
+ 1 file changed, 33 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 7d84080..becba43 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -62,7 +62,10 @@
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 9194a4f..7220210 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -52,11 +52,13 @@
  
  #include "common.h"
  
--/* 
-+/* Base address to the AP system controller */
-+static void __iomem *ap_syscon_base;
++/* Base address to the CP controller */
++static void __iomem *intcp_con_base;
 +
-+/*
-  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
-  * is the (PA >> 12).
-  *
-@@ -70,7 +73,6 @@
-  * just for now).
-  */
- #define VA_IC_BASE	__io_address(INTEGRATOR_IC_BASE)
--#define VA_SC_BASE	__io_address(INTEGRATOR_SC_BASE)
- #define VA_EBI_BASE	__io_address(INTEGRATOR_EBI_BASE)
- #define VA_CMIC_BASE	__io_address(INTEGRATOR_HDR_IC)
+ #define INTCP_PA_FLASH_BASE		0x24000000
  
-@@ -99,11 +101,6 @@ static struct map_desc ap_io_desc[] __initdata = {
+ #define INTCP_PA_CLCD_BASE		0xc0000000
+ 
+-#define INTCP_VA_CTRL_BASE		__io_address(INTEGRATOR_CP_CTL_BASE)
+ #define INTCP_FLASHPROG			0x04
+ #define CINTEGRATOR_FLASHPROG_FLVPPEN	(1 << 0)
+ #define CINTEGRATOR_FLASHPROG_FLWREN	(1 << 1)
+@@ -127,11 +129,6 @@ static struct map_desc intcp_io_desc[] __initdata = {
+ 		.pfn		= __phys_to_pfn(INTEGRATOR_CP_SIC_BASE),
  		.length		= SZ_4K,
  		.type		= MT_DEVICE
- 	}, {
--		.virtual	= IO_ADDRESS(INTEGRATOR_SC_BASE),
--		.pfn		= __phys_to_pfn(INTEGRATOR_SC_BASE),
+-	}, {
+-		.virtual	= IO_ADDRESS(INTEGRATOR_CP_CTL_BASE),
+-		.pfn		= __phys_to_pfn(INTEGRATOR_CP_CTL_BASE),
 -		.length		= SZ_4K,
 -		.type		= MT_DEVICE
--	}, {
- 		.virtual	= IO_ADDRESS(INTEGRATOR_EBI_BASE),
- 		.pfn		= __phys_to_pfn(INTEGRATOR_EBI_BASE),
- 		.length		= SZ_4K,
-@@ -203,8 +200,6 @@ device_initcall(irq_syscore_init);
- /*
-  * Flash handling.
-  */
--#define SC_CTRLC (VA_SC_BASE + INTEGRATOR_SC_CTRLC_OFFSET)
--#define SC_CTRLS (VA_SC_BASE + INTEGRATOR_SC_CTRLS_OFFSET)
- #define EBI_CSR1 (VA_EBI_BASE + INTEGRATOR_EBI_CSR1_OFFSET)
- #define EBI_LOCK (VA_EBI_BASE + INTEGRATOR_EBI_LOCK_OFFSET)
+ 	}
+ };
  
-@@ -212,7 +207,8 @@ static int ap_flash_init(struct platform_device *dev)
+@@ -147,9 +144,9 @@ static int intcp_flash_init(struct platform_device *dev)
  {
- 	u32 tmp;
+ 	u32 val;
  
--	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
-+	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP,
-+	       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
+-	val = readl(INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
++	val = readl(intcp_con_base + INTCP_FLASHPROG);
+ 	val |= CINTEGRATOR_FLASHPROG_FLWREN;
+-	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
++	writel(val, intcp_con_base + INTCP_FLASHPROG);
  
- 	tmp = readl(EBI_CSR1) | INTEGRATOR_EBI_WRITE_ENABLE;
- 	writel(tmp, EBI_CSR1);
-@@ -229,7 +225,8 @@ static void ap_flash_exit(struct platform_device *dev)
+ 	return 0;
+ }
+@@ -158,21 +155,21 @@ static void intcp_flash_exit(struct platform_device *dev)
  {
- 	u32 tmp;
+ 	u32 val;
  
--	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
-+	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP,
-+	       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
- 
- 	tmp = readl(EBI_CSR1) & ~INTEGRATOR_EBI_WRITE_ENABLE;
- 	writel(tmp, EBI_CSR1);
-@@ -243,9 +240,12 @@ static void ap_flash_exit(struct platform_device *dev)
- 
- static void ap_flash_set_vpp(struct platform_device *pdev, int on)
- {
--	void __iomem *reg = on ? SC_CTRLS : SC_CTRLC;
--
--	writel(INTEGRATOR_SC_CTRL_nFLVPPEN, reg);
-+	if (on)
-+		writel(INTEGRATOR_SC_CTRL_nFLVPPEN,
-+		       ap_syscon_base + INTEGRATOR_SC_CTRLS_OFFSET);
-+	else
-+		writel(INTEGRATOR_SC_CTRL_nFLVPPEN,
-+		       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
+-	val = readl(INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
++	val = readl(intcp_con_base + INTCP_FLASHPROG);
+ 	val &= ~(CINTEGRATOR_FLASHPROG_FLVPPEN|CINTEGRATOR_FLASHPROG_FLWREN);
+-	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
++	writel(val, intcp_con_base + INTCP_FLASHPROG);
  }
  
- static struct physmap_flash_data ap_flash_data = {
-@@ -464,9 +464,6 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+ static void intcp_flash_set_vpp(struct platform_device *pdev, int on)
+ {
+ 	u32 val;
+ 
+-	val = readl(INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
++	val = readl(intcp_con_base + INTCP_FLASHPROG);
+ 	if (on)
+ 		val |= CINTEGRATOR_FLASHPROG_FLVPPEN;
+ 	else
+ 		val &= ~CINTEGRATOR_FLASHPROG_FLVPPEN;
+-	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
++	writel(val, intcp_con_base + INTCP_FLASHPROG);
+ }
+ 
+ static struct physmap_flash_data intcp_flash_data = {
+@@ -191,7 +188,7 @@ static struct physmap_flash_data intcp_flash_data = {
+ static unsigned int mmc_status(struct device *dev)
+ {
+ 	unsigned int status = readl(__io_address(0xca000000 + 4));
+-	writel(8, __io_address(INTEGRATOR_CP_CTL_BASE + 8));
++	writel(8, intcp_con_base + 8);
+ 
+ 	return status & 8;
+ }
+@@ -337,9 +334,6 @@ static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
  	{ /* sentinel */ },
  };
  
--/* Base address to the AP system controller */
--static void __iomem *ap_syscon_base;
+-/* Base address to the CP controller */
+-static void __iomem *intcp_con_base;
 -
- static void __init ap_init_of(void)
+ static void __init intcp_init_of(void)
  {
- 	unsigned long sc_dec;
-@@ -523,7 +520,7 @@ static void __init ap_init_of(void)
- 	of_platform_populate(root, of_default_bus_match_table,
- 			ap_auxdata_lookup, parent);
- 
--	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
-+	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
- 	for (i = 0; i < 4; i++) {
- 		struct lm_device *lmdev;
- 
-@@ -567,6 +564,27 @@ MACHINE_END
+ 	struct device_node *root;
+@@ -418,6 +412,28 @@ MACHINE_END
  #ifdef CONFIG_ATAGS
  
  /*
@@ -123,43 +111,35 @@ index 7d84080..becba43 100644
 + * go away with the ATAG support down the road.
 + */
 +
-+static struct map_desc ap_io_desc_atag[] __initdata = {
++static struct map_desc intcp_io_desc_atag[] __initdata = {
 +	{
-+		.virtual	= IO_ADDRESS(INTEGRATOR_SC_BASE),
-+		.pfn		= __phys_to_pfn(INTEGRATOR_SC_BASE),
++		.virtual	= IO_ADDRESS(INTEGRATOR_CP_CTL_BASE),
++		.pfn		= __phys_to_pfn(INTEGRATOR_CP_CTL_BASE),
 +		.length		= SZ_4K,
 +		.type		= MT_DEVICE
 +	},
 +};
 +
-+static void __init ap_map_io_atag(void)
++static void __init intcp_map_io_atag(void)
 +{
-+	iotable_init(ap_io_desc_atag, ARRAY_SIZE(ap_io_desc_atag));
-+	ap_syscon_base = __io_address(INTEGRATOR_SC_BASE);
-+	ap_map_io();
++	iotable_init(intcp_io_desc_atag, ARRAY_SIZE(intcp_io_desc_atag));
++	intcp_con_base = __io_address(INTEGRATOR_CP_CTL_BASE);
++	intcp_map_io();
 +}
++
 +
 +/*
   * This is where non-devicetree initialization code is collected and stashed
   * for eventual deletion.
   */
-@@ -634,7 +652,7 @@ static void __init ap_init(void)
- 
- 	platform_device_register(&cfi_flash_device);
- 
--	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
-+	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
- 	for (i = 0; i < 4; i++) {
- 		struct lm_device *lmdev;
- 
-@@ -661,7 +679,7 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+@@ -556,7 +572,7 @@ MACHINE_START(CINTEGRATOR, "ARM-IntegratorCP")
  	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
  	.atag_offset	= 0x100,
  	.reserve	= integrator_reserve,
--	.map_io		= ap_map_io,
-+	.map_io		= ap_map_io_atag,
- 	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
- 	.init_early	= ap_init_early,
- 	.init_irq	= ap_init_irq,
+-	.map_io		= intcp_map_io,
++	.map_io		= intcp_map_io_atag,
+ 	.nr_irqs	= NR_IRQS_INTEGRATOR_CP,
+ 	.init_early	= intcp_init_early,
+ 	.init_irq	= intcp_init_irq,
 -- 
 1.7.11.7
