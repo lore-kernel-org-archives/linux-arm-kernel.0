@@ -1,29 +1,42 @@
 From: axel.lin@ingics.com (Axel Lin)
-Date: Mon, 12 Nov 2012 14:30:07 +0800
-Subject: [PATCH] ARM: select PINCTRL for ARCH_MMP
-Message-ID: <1352701807.15066.1.camel@phoenix>
+Date: Mon, 12 Nov 2012 14:33:40 +0800
+Subject: [PATCH] pinctrl: Drop selecting PINCONF for MMP2, PXA168 and PXA910
+Message-ID: <1352702020.15066.2.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes PINCTRL related config options visible.
-Otherwise there is no way to build pinctrl drivers for MMP2, PXA168 and PXA910.
+These drivers do not need to select PINCONF.
 
 Signed-off-by: Axel Lin <axel.lin@ingics.com>
 ---
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/Kconfig |    3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 48eea16..24e9339 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -581,6 +581,7 @@ config ARCH_MMP
- 	select GPIO_PXA
- 	select IRQ_DOMAIN
- 	select NEED_MACH_GPIO_H
-+	select PINCTRL
- 	select PLAT_PXA
- 	select SPARSE_IRQ
- 	help
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 6d5a50b..1d61d89 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -96,7 +96,6 @@ config PINCTRL_MMP2
+ 	bool "MMP2 pin controller driver"
+ 	depends on ARCH_MMP
+ 	select PINCTRL_PXA3xx
+-	select PINCONF
+ 
+ config PINCTRL_MXS
+ 	bool
+@@ -135,13 +134,11 @@ config PINCTRL_PXA168
+ 	bool "PXA168 pin controller driver"
+ 	depends on ARCH_MMP
+ 	select PINCTRL_PXA3xx
+-	select PINCONF
+ 
+ config PINCTRL_PXA910
+ 	bool "PXA910 pin controller driver"
+ 	depends on ARCH_MMP
+ 	select PINCTRL_PXA3xx
+-	select PINCONF
+ 
+ config PINCTRL_SINGLE
+ 	tristate "One-register-per-pin type device tree based pinctrl driver"
 -- 
 1.7.9.5
