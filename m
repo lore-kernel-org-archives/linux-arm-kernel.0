@@ -1,114 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Nov 2012 14:38:46 +0000
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <20121112104601.GB2346@mudshark.cambridge.arm.com>
- <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
-Message-ID: <20121112143846.GI2346@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 14:40:13 +0000
+Subject: Build failure: OMAP4430 failed due to exynos4 pinctrl
+In-Reply-To: <007b01cdc0bf$50c9ee70$f25dcb50$%kim@samsung.com>
+References: <007b01cdc0bf$50c9ee70$f25dcb50$%kim@samsung.com>
+Message-ID: <201211121440.13980.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 01:46:57PM +0000, Rob Clark wrote:
-> On Mon, Nov 12, 2012 at 4:46 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Nov 09, 2012 at 09:17:33PM +0000, Rob Clark wrote:
-> >> @@ -122,22 +124,35 @@ extern int __get_user_4(void *);
-> >>       ({                                                              \
-> >>               unsigned long __limit = current_thread_info()->addr_limit - 1; \
-> >>               register const typeof(*(p)) __user *__p asm("r0") = (p);\
-> >> -             register unsigned long __r2 asm("r2");                  \
-> >>               register unsigned long __l asm("r1") = __limit;         \
-> >>               register int __e asm("r0");                             \
-> >>               switch (sizeof(*(__p))) {                               \
-> >> -             case 1:                                                 \
-> >> +             case 1: {                                               \
-> >> +                     register unsigned long __r2 asm("r2");          \
-> >>                       __get_user_x(__r2, __p, __e, __l, 1);           \
-> >> +                     x = (typeof(*(p))) __r2;                        \
-> >>                       break;                                          \
-> >> -             case 2:                                                 \
-> >> +             }                                                       \
-> >> +             case 2: {                                               \
-> >> +                     register unsigned long __r2 asm("r2");          \
-> >>                       __get_user_x(__r2, __p, __e, __l, 2);           \
-> >> +                     x = (typeof(*(p))) __r2;                        \
-> >>                       break;                                          \
-> >> -             case 4:                                                 \
-> >> +             }                                                       \
-> >> +             case 4: {                                               \
-> >> +                     register unsigned long __r2 asm("r2");          \
-> >>                       __get_user_x(__r2, __p, __e, __l, 4);           \
-> >> +                     x = (typeof(*(p))) __r2;                        \
-> >> +                     break;                                          \
-> >> +             }                                                       \
-> >> +             case 8: {                                               \
-> >> +                     register unsigned long long __r2 asm("r2");     \
-> >
-> > Does this matter? For EABI, we'll pass in (r2, r3) and it's all handcrafted
-> > asm, so the compiler shouldn't care much. For OABI, I think you may have to
-> > do some more work to get the two words where you want them.
+On Monday 12 November 2012, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > 
+> > Last night's randconfig for OMAP4430 failed with:
+> > 
+> > drivers/built-in.o:(.rodata+0x1a60): undefined reference to
+> > `exynos4210_pin_ctrl'
+> > 
+> > Config and log:
+> > http://www.arm.linux.org.uk/developer/build/file.php?type=config&idx=2693
+> > http://www.arm.linux.org.uk/developer/build/result.php?type=build&idx=2693
 > 
-> Is the question whether the compiler is guaranteed to allocate r2 and
-> r3 in all cases?  I'm not quite sure, I confess to usually trying to
-> avoid inline asm.  But from looking at the disassembly (for little
-> endian EABI build) it seemed to do the right thing.
+> Oops, yeah right.
 
-I can't recall how OABI represents 64-bit values and particularly whether this
-differs between little and big-endian, so I wondered whether you may have to
-do some marshalling when you assign x. However, a few quick experiments with
-GCC suggest that the register representation matches EABI in regards to word
-ordering (it just doesn't require an even base register), although it would
-be good to find this written down somewhere...
+Hmm, I found the same thing earlier and it got lost in my backlog of unsubmitted
+patches.
 
-> The only other idea I had was to explicitly declare two 'unsigned
-> long's and then shift them into a 64bit x, although I'm open to
-> suggestions if there is a better way.
+> diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+> index 7bf914d..18b473b 100644
+> --- a/drivers/pinctrl/Kconfig
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -179,11 +179,13 @@ config PINCTRL_COH901
+>  
+>  config PINCTRL_SAMSUNG
+>  	bool "Samsung pinctrl driver"
+> +	depends on PLAT_SAMSUNG
+>  	select PINMUX
+>  	select PINCONF
+>  
+>  config PINCTRL_EXYNOS4
+>  	bool "Pinctrl driver data for Exynos4 SoC"
+> +	depends on PINCTRL_SAMSUNG && ARCH_EXYNOS4
+>  	select PINCTRL_SAMSUNG
 
-Can't you just use register unsigned long long for all cases? Even better,
-follow what put_user does and use typeof(*(p))?
+This won't work. A driver can't "select" and "depend on"
+another symbol at the same time.
 
-> >> diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
-> >> index 9b06bb4..d05285c 100644
-> >> --- a/arch/arm/lib/getuser.S
-> >> +++ b/arch/arm/lib/getuser.S
-> >> @@ -18,7 +18,7 @@
-> >>   * Inputs:   r0 contains the address
-> >>   *           r1 contains the address limit, which must be preserved
-> >>   * Outputs:  r0 is the error code
-> >> - *           r2 contains the zero-extended value
-> >> + *           r2, r3 contains the zero-extended value
-> >>   *           lr corrupted
-> >>   *
-> >>   * No other registers must be altered.  (see <asm/uaccess.h>
-> >> @@ -66,6 +66,19 @@ ENTRY(__get_user_4)
-> >>       mov     pc, lr
-> >>  ENDPROC(__get_user_4)
-> >>
-> >> +ENTRY(__get_user_8)
-> >> +     check_uaccess r0, 4, r1, r2, __get_user_bad
-> >
-> > Shouldn't you be passing 8 here, so that we validate the correct range?
-> 
-> yes, sorry, I'll fix that
-> 
-> >> +#ifdef CONFIG_THUMB2_KERNEL
-> >> +5: TUSER(ldr)        r2, [r0]
-> >> +6: TUSER(ldr)        r3, [r0, #4]
-> >> +#else
-> >> +5: TUSER(ldr)        r2, [r0], #4
-> >> +6: TUSER(ldr)        r3, [r0]
-> >> +#endif
-> >
-> > This doesn't work for EABI big-endian systems.
-> 
-> Hmm, is that true?  Wouldn't put_user() then have the same problem?
+This is what I came up with earlier.
 
-I dug up the PCS and it seems that we arrange the two halves of the
-doubleword to match the ldm/stm memory representation for EABI, so sorry
-for the confusion.
+	Arnd
+8<----------------
+>From a15cc6277a3a43c8b5c1dd90ca71732b2ffe2b18 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 10 Oct 2012 13:31:45 +0000
+Subject: [PATCH] pinctrl: samsung: don't allow enabling pinctrl-samsung
+ standalone
 
-> I guess __ARMEB__ is the flag for big-endian?
+The main samsung pinctrl module references the specific exynos4210
+pinctrl driver, which selects the main driver in Kconfig.
 
-That's the thing defined by the compiler, yes.
+Making the main driver a silent "bool" option avoid this potential
+build error if CONFIG_PINCTRL_SAMSUNG=y && CONFIG_PINCTRL_EXYNOS4=n:
 
-Will
+drivers/built-in.o:(.rodata+0x4e4): undefined reference to `exynos4210_pin_ctrl'
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Tomasz Figa <t.figa@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 7bf914d..9f54bd4 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -178,7 +178,7 @@ config PINCTRL_COH901
+ 	  ports of 8 GPIO pins each.
+ 
+ config PINCTRL_SAMSUNG
+-	bool "Samsung pinctrl driver"
++	bool
+ 	select PINMUX
+ 	select PINCONF
+ 
