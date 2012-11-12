@@ -1,36 +1,45 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 12 Nov 2012 17:17:35 +0200
-Subject: [PATCH v3 1/3] mtd: sh_flctl: Minor cleanups
-In-Reply-To: <1350641736-18192-2-git-send-email-hechtb@gmail.com>
-References: <1350641736-18192-1-git-send-email-hechtb@gmail.com>
- <1350641736-18192-2-git-send-email-hechtb@gmail.com>
-Message-ID: <1352733455.2262.0.camel@sauron.fi.intel.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 12 Nov 2012 16:17:08 +0100
+Subject: [PATCH linux-next] ARM: OMAP2: Fix compillation error in cm_common
+Message-ID: <1352733428-27889-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2012-10-19 at 12:15 +0200, Bastian Hecht wrote:
-> Some small fixes to avoid sparse and smatch complain. Other cosmetic fixes
-> as well.
-> 
-> - Change of the type of the member index in struct sh_flctl from signed
-> to unsigned. We use index by addressing array members, so unsigned is more
-> concise here. Adapt functions relying on sh_flctl::index.
-> - Remove a blurring cast in write_fiforeg().
-> - Apply consistent naming scheme when refering to the data buffer.
-> - Shorten some unnecessarily verbose functions.
-> - Remove spaces at start of lines.
-> 
-> Signed-off-by: Bastian Hecht <hechtb@gmail.com>
+Fixes the following error:
+  CC      arch/arm/mach-omap2/cm_common.o
+arch/arm/mach-omap2/cm_common.c: In function ?cm_register?:
+arch/arm/mach-omap2/cm_common.c:42:11: error: ?EINVAL? undeclared (first use in this function)
+arch/arm/mach-omap2/cm_common.c:42:11: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm/mach-omap2/cm_common.c:45:11: error: ?EEXIST? undeclared (first use in this function)
+arch/arm/mach-omap2/cm_common.c: In function ?cm_unregister?:
+arch/arm/mach-omap2/cm_common.c:66:11: error: ?EINVAL? undeclared (first use in this function)
+make[1]: *** [arch/arm/mach-omap2/cm_common.o] Error 1
+make: *** [arch/arm/mach-omap2] Error 2
 
-Pushed to l2-mtd.git, thanks!
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
 
+Hi,
+
+with today's linux-next the kernel build failed with the abive error for OMAP.
+
+Regards,
+Peter
+
+ arch/arm/mach-omap2/cm_common.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
+index 3246cef..3fafc27 100644
+--- a/arch/arm/mach-omap2/cm_common.c
++++ b/arch/arm/mach-omap2/cm_common.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/errno.h>
+ 
+ #include "cm2xxx.h"
+ #include "cm3xxx.h"
 -- 
-Best Regards,
-Artem Bityutskiy
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121112/9f95731c/attachment.sig>
+1.8.0
