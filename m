@@ -1,60 +1,50 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Mon, 12 Nov 2012 16:56:51 +0800
-Subject: [PATCH v4 05/13] ARM: KVM: VGIC accept vcpu and dist base
- addresses from user space
-In-Reply-To: <20121110154451.3061.74235.stgit@chazy-air>
-References: <20121110154358.3061.16338.stgit@chazy-air>
- <20121110154451.3061.74235.stgit@chazy-air>
-Message-ID: <20121112085650.GB29502@b29396-Latitude-E6410>
+From: Ying.Liu@freescale.com (Liu Ying)
+Date: Mon, 12 Nov 2012 16:26:18 +0800
+Subject: [PATCH 1/1] ARM: dts: imx6q-sabresd: add volume up/down gpio keys
+Message-ID: <1352708778-25570-1-git-send-email-Ying.Liu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2012 at 04:44:51PM +0100, Christoffer Dall wrote:
-[...]
-> +int kvm_vgic_set_addr(struct kvm *kvm, unsigned long type, u64 addr)
-> +{
-> +	int r = 0;
-> +	struct vgic_dist *vgic = &kvm->arch.vgic;
-> +
-> +	if (addr & ~KVM_PHYS_MASK)
-> +		return -E2BIG;
-> +
-> +	if (addr & ~PAGE_MASK)
-> +		return -EINVAL;
-> +
-> +	mutex_lock(&kvm->lock);
-> +	switch (type) {
-> +	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-> +		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_dist_base))
-> +			return -EEXIST;
-> +		if (addr + VGIC_DIST_SIZE < addr)
-> +			return -EINVAL;
-> +		kvm->arch.vgic.vgic_dist_base = addr;
-> +		break;
-> +	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-> +		if (!IS_VGIC_ADDR_UNDEF(vgic->vgic_cpu_base))
-> +			return -EEXIST;
-> +		if (addr + VGIC_CPU_SIZE < addr)
-> +			return -EINVAL;
-> +		kvm->arch.vgic.vgic_cpu_base = addr;
-> +		break;
-> +	default:
-> +		r = -ENODEV;
-> +	}
-> +
-> +	if (vgic_ioaddr_overlap(kvm)) {
-> +		kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
-> +		kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+Add volume up/down gpio keys support in imx6q-sabresd.dts.
 
-Missing mutex_unlock?
+Signed-off-by: Liu Ying <Ying.Liu@freescale.com>
+---
+ arch/arm/boot/dts/imx6q-sabresd.dts |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
 
-> +		return -EINVAL;
-> +	}
-> +
-> +	mutex_unlock(&kvm->lock);
-> +	return r;
-> +}
-> 
-
-Regards
-Dong Aisheng
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index e596c28..a424025 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -38,6 +38,8 @@
+ 				hog {
+ 					pinctrl_hog: hoggrp {
+ 						fsl,pins = <
++							1004 0x80000000 /* MX6Q_PAD_GPIO_4__GPIO_1_4 */
++							1012 0x80000000 /* MX6Q_PAD_GPIO_5__GPIO_1_5 */
+ 							1402 0x80000000	/* MX6Q_PAD_NANDF_D0__GPIO_2_0 */
+ 							1410 0x80000000	/* MX6Q_PAD_NANDF_D1__GPIO_2_1 */
+ 							1418 0x80000000	/* MX6Q_PAD_NANDF_D2__GPIO_2_2 */
+@@ -73,4 +75,20 @@
+ 			};
+ 		};
+ 	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio1 4 0>;
++			linux,code = <115>; /* KEY_VOLUMEUP */
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio1 5 0>;
++			linux,code = <114>; /* KEY_VOLUMEDOWN */
++		};
++	};
+ };
+-- 
+1.7.1
