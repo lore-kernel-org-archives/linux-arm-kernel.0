@@ -1,36 +1,44 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Mon, 12 Nov 2012 15:39:45 +0200
-Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
-In-Reply-To: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <CANOLnOO0yMabku-_3yhi=1bwohbrb=rtFDOuKf1LPCAFv_OqCQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 12 Nov 2012 14:46:29 +0100
+Subject: [RFC PATCH 0/4] ARM: S3C24XX: irq move to drivers and first steps to
+ dt
+Message-ID: <201211121446.30167.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On the way back from Barcelona I've started the move of the common
+s3c24xx irq-code to drivers/irqchip and also modifications to enable
+using it in a devicetree context at some point.
 
-On Mon, Nov 12, 2012 at 12:25 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> This series changes omapfb to use standard dma_alloc funcs instead of omap
-> specific vram allocator. This let's us remove the omap vram allocator, making
-> omapfb platform independent.
->
-> However, note that using standard dma funcs causes the following downsides:
->
-> ...
->
-> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
-> changed the ioctl to return 64M for all the values, which, I hope, the
-> applications will interpret as "there's enough vram".
+So, as I'm also missing the now probably famous tail-lights in this, it
+would be cool to have some feedback if I'm moving in the right
+direction here or am thinking wrong somewhere.
 
-Do at least OMAPFB_QUERY_MEM/OMAPFB_SETUP_MEM still work?
+The whole endeavour is of course not finished yet, but should not
+break anything in its current form.
 
-> 4) "vram" kernel parameter to define how much ram to reserve for video use no
-> longer works. The user needs to enable CMA and use "cma" parameter.
+Tested on a s3c2416 based machine.
 
-That's a significant change, you should update Documentation/ .
-What about omapfb.vram, is it still there?
-Perhaps we also need to select/depend on CMA?
+Heiko Stuebner (4):
+  ARM: S3C24XX: move s3c24xx-irq to drivers/irqchip
+  irqchip: s3c24xx: add irq_domains for the interrupt registers
+  ARM: S3C24XX: irq_data conversion for s3c_irqsub_* functions
+  ARM: S3C24XX: First part converting irq code to use hwirq
 
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/mach-s3c24xx/irq-pm.c                     |    4 +-
+ arch/arm/mach-s3c24xx/irq-s3c2412.c                |    6 +-
+ arch/arm/mach-s3c24xx/irq-s3c2416.c                |   24 ++--
+ arch/arm/mach-s3c24xx/irq-s3c2440.c                |    6 +-
+ arch/arm/mach-s3c24xx/irq-s3c2443.c                |   30 ++--
+ arch/arm/mach-s3c24xx/irq-s3c244x.c                |    6 +-
+ arch/arm/plat-s3c24xx/Makefile                     |    1 -
+ arch/arm/plat-samsung/include/plat/irq.h           |   18 ++--
+ drivers/irqchip/Kconfig                            |    4 +
+ drivers/irqchip/Makefile                           |    1 +
+ .../irq.c => drivers/irqchip/irq-s3c24xx.c         |  147 ++++++++++++--------
+ 12 files changed, 144 insertions(+), 104 deletions(-)
+ rename arch/arm/plat-s3c24xx/irq.c => drivers/irqchip/irq-s3c24xx.c (84%)
 
 -- 
-Gra?vydas
+1.7.2.3
