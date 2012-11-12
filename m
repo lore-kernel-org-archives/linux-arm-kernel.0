@@ -1,71 +1,39 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 Nov 2012 12:25:04 +0200
-Subject: [PATCH 3/5] OMAP: RX51: remove use of vram
+Date: Mon, 12 Nov 2012 12:25:05 +0200
+Subject: [PATCH 4/5] OMAP: common.c: remove init call to vram
 In-Reply-To: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1352715906-16946-4-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1352715906-16946-5-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As omapfb no longer uses omap specific vram allocator we can remove the
-vram pre-allocation from rx51 board file.
+OMAP specific vram allocator is no longer used, and we can remove init
+call to the vram allocator.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/mach-omap2/board-rx51-video.c |   14 --------------
- arch/arm/mach-omap2/board-rx51.c       |    3 ---
- 2 files changed, 17 deletions(-)
+ arch/arm/plat-omap/common.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-rx51-video.c b/arch/arm/mach-omap2/board-rx51-video.c
-index c22e111..46f4fc9 100644
---- a/arch/arm/mach-omap2/board-rx51-video.c
-+++ b/arch/arm/mach-omap2/board-rx51-video.c
-@@ -16,7 +16,6 @@
- #include <linux/mm.h>
- #include <asm/mach-types.h>
- #include <video/omapdss.h>
+diff --git a/arch/arm/plat-omap/common.c b/arch/arm/plat-omap/common.c
+index 111315a..d21ed18 100644
+--- a/arch/arm/plat-omap/common.c
++++ b/arch/arm/plat-omap/common.c
+@@ -17,7 +17,6 @@
+ #include <linux/dma-mapping.h>
+ 
+ #include <plat/common.h>
 -#include <plat/vram.h>
- #include <linux/platform_data/spi-omap2-mcspi.h>
+ #include <linux/platform_data/dsp-omap.h>
+ #include <plat/dma.h>
  
- #include "board-rx51.h"
-@@ -87,17 +86,4 @@ static int __init rx51_video_init(void)
- }
+@@ -25,7 +24,6 @@
  
- subsys_initcall(rx51_video_init);
--
--void __init rx51_video_mem_init(void)
--{
--	/*
--	 * GFX 864x480x32bpp
--	 * VID1/2 1280x720x32bpp double buffered
--	 */
--	omap_vram_set_sdram_vram(PAGE_ALIGN(864 * 480 * 4) +
--			2 * PAGE_ALIGN(1280 * 720 * 4 * 2), 0);
--}
--
--#else
--void __init rx51_video_mem_init(void) { }
- #endif /* defined(CONFIG_FB_OMAP2) || defined(CONFIG_FB_OMAP2_MODULE) */
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 7bbb05d..6e0de6f 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -34,8 +34,6 @@
- 
- #define RX51_GPIO_SLEEP_IND 162
- 
--extern void rx51_video_mem_init(void);
--
- static struct gpio_led gpio_leds[] = {
- 	{
- 		.name	= "sleep_ind",
-@@ -112,7 +110,6 @@ static void __init rx51_init(void)
- 
- static void __init rx51_reserve(void)
+ void __init omap_reserve(void)
  {
--	rx51_video_mem_init();
- 	omap_reserve();
- }
- 
+-	omap_vram_reserve_sdram_memblock();
+ 	omap_dsp_reserve_sdram_memblock();
+ 	omap_secure_ram_reserve_memblock();
+ 	omap_barrier_reserve_memblock();
 -- 
 1.7.10.4
