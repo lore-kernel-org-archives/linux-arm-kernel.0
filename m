@@ -1,262 +1,91 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 12 Nov 2012 16:52:35 +0800
-Subject: [PATCH 15/17] ARM: dts: add spi nodes for atmel SoC
+Date: Mon, 12 Nov 2012 16:52:37 +0800
+Subject: [PATCH 17/17] mtd: m25p80: change the m25p80_read to reading page to
+ page
 In-Reply-To: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352710357-3265-16-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352710357-3265-18-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
+When run "flashcp /bin/busybox /dev/mtdX", it arised a OOPS. changing to fix the [BUG].
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-[wenyou.yang at atmel.com: add spi nodes for other atmel SOC]
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: linux at arm.linux.org.uk
+Cc: dwmw2 at infradead.org
+Cc: linux-mtd at lists.infradead.org
 ---
-Hi, Richard,
+ drivers/mtd/devices/m25p80.c |   44 +++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 41 insertions(+), 3 deletions(-)
 
-This patches is based on the original patch from Richard Genoud
-	[PATCH] spi-atmel: add sam9x5 SPI in device tree
-and referring to this patch, Wenyou Yang add spi nodes for
-	other atmel SoC.
-
-Is it OK for you?
-
-Best Regards,
-Wenyou Yang
-
- arch/arm/boot/dts/at91sam9260.dtsi |   34 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9263.dtsi |   34 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi |   34 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9n12.dtsi |   34 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |   34 ++++++++++++++++++++++++++++++++++
- 5 files changed, 170 insertions(+)
-
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index d410581..51e4cd2 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -246,6 +246,40 @@
- 					trigger-external;
- 				};
- 			};
-+
-+			spi0: spi at fffc8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffc8000 0x200>;
-+				interrupts = <12 4 3>;
-+				cs-gpios = <&pioA 3 0
-+					    &pioC 11 0
-+					    &pioC 16 0
-+					    &pioC 17 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <1>;
-+				version = <2>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffcc000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffcc000 0x200>;
-+				interrupts = <13 4 3>;
-+				cs-gpios = <&pioB 3 0
-+					    &pioC 5 0
-+					    &pioC 4 0
-+					    &pioC 3 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <1>;
-+				version = <2>;
-+				status = "disabled";
-+			};
- 		};
+diff --git a/drivers/mtd/devices/m25p80.c b/drivers/mtd/devices/m25p80.c
+index 03838ba..73e5fea 100644
+--- a/drivers/mtd/devices/m25p80.c
++++ b/drivers/mtd/devices/m25p80.c
+@@ -340,6 +340,7 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	size_t *retlen, u_char *buf)
+ {
+ 	struct m25p *flash = mtd_to_m25p(mtd);
++	u32 page_offset, page_size;
+ 	struct spi_transfer t[2];
+ 	struct spi_message m;
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 3e6e5c1..228cbe8 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -195,6 +195,40 @@
- 				#size-cells = <0>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa4000 0x200>;
-+				interrupts = <14 4 3>;
-+				cs-gpios = <&pioA 5 0
-+					    &pioA 3 0
-+					    &pioA 4 0
-+					    &pioB 11 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <1>;
-+				version = <2>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffa8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa8000 0x200>;
-+				interrupts = <15 4 3>;
-+				cs-gpios = <&pioB 15 0
-+					    &pioB 16 0
-+					    &pioB 17 0
-+					    &pioB 18 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <1>;
-+				version = <2>;
-+				status = "disabled";
-+			};
- 		};
+@@ -358,7 +359,6 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	spi_message_add_tail(&t[0], &m);
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 3add030..f34f327 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -262,6 +262,40 @@
- 					trigger-value = <0x6>;
- 				};
- 			};
-+
-+			spi0: spi at fffa4000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa4000 0x200>;
-+				interrupts = <14 4 3>;
-+				cs-gpios = <&pioB 3 0
-+					    &pioB 18 0
-+					    &pioB 19 0
-+					    &pioD 27 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <1>;
-+				version = <2>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at fffa8000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfffa8000 0x200>;
-+				interrupts = <15 4 3>;
-+				cs-gpios = <&pioB 17 0
-+					    &pioD 28 0
-+					    &pioD 18 0
-+					    &pioD 19 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <1>;
-+				version = <2>;
-+				status = "disabled";
-+			};
- 		};
+ 	t[1].rx_buf = buf;
+-	t[1].len = len;
+ 	spi_message_add_tail(&t[1], &m);
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 82508d6..a923003 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -202,6 +202,40 @@
- 				#size-cells = <0>;
- 				status = "disabled";
- 			};
-+
-+			spi0: spi at f0000000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0000000 0x100>;
-+				interrupts = <13 4 3>;
-+				cs-gpios = <&pioA 14 0
-+					    &pioA 7 0
-+					    &pioA 1 0
-+					    &pioB 3 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <2>;
-+				version = <2>;
-+				status = "disabled";
-+			};
-+
-+			spi1: spi at f0004000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0004000 0x100>;
-+				interrupts = <14 4 3>;
-+				cs-gpios = <&pioA 8 0
-+					    &pioA 0 0
-+					    &pioA 31 0
-+					    &pioA 30 0
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <2>;
-+				version = <2>;
-+				status = "disabled";
-+			};
- 		};
+ 	mutex_lock(&flash->lock);
+@@ -379,9 +379,47 @@ static int m25p80_read(struct mtd_info *mtd, loff_t from, size_t len,
+ 	flash->command[0] = OPCODE_READ;
+ 	m25p_addr2cmd(flash, from, flash->command);
  
- 		nand0: nand at 40000000 {
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 03fc136..25909e0 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -263,6 +263,40 @@
- 					trigger-value = <0x6>;
- 				};
- 			};
+-	spi_sync(flash->spi, &m);
++	page_offset = from & (flash->page_size - 1);
 +
-+			spi0: spi at f0000000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0000000 0x100>;
-+				interrupts = <13 4 3>;
-+				cs-gpios = <&pioA 14 0
-+					    &pioA 7 0 /* conflicts with TXD2 */
-+					    &pioA 1 0 /* conflicts with RXD0 */
-+					    &pioB 3 0 /* conflicts with ERXDV */
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <2>;
-+				version = <2>;
-+				status = "disabled";
-+			};
++	/* do all the bytes fit onto one page? */
++	if (page_offset + len <= flash->page_size) {
++		t[1].len = len;
 +
-+			spi1: spi at f0004000 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf0004000 0x100>;
-+				interrupts = <14 4 3>;
-+				cs-gpios = <&pioA 8 0 /* conflitcs with RXD2 */
-+					    &pioA 0 0 /* conflitcs with TXD0 */
-+					    &pioA 31 0 /* conflitcs with TWCK0 */
-+					    &pioA 30 0 /* conflitcs with TWD0 */
-+					   >;
-+				dma-mask = <0xffffffff>;
-+				dma_type = <2>;
-+				version = <2>;
-+				status = "disabled";
-+			};
- 		};
++		spi_sync(flash->spi, &m);
++
++		*retlen = m.actual_length - m25p_cmdsz(flash)
++					- FAST_READ_DUMMY_BYTE;
++
++	} else {
++		u32 i;
++
++		/* the size of data remaining on the first page */
++		page_size = flash->page_size - page_offset;
++
++		t[1].len = page_size;
++		spi_sync(flash->spi, &m);
++
++		*retlen = m.actual_length - m25p_cmdsz(flash)
++					- FAST_READ_DUMMY_BYTE;
++
++		/* write everything in flash->page_size chunks */
++		for (i = page_size; i < len; i += page_size) {
++			page_size = len - i;
++			if (page_size > flash->page_size)
++				page_size = flash->page_size;
++
++			/* write the next page to flash */
++			m25p_addr2cmd(flash, from + i, flash->command);
++
++			t[1].rx_buf = buf + i;
++			t[1].len = page_size;
++
++			spi_sync(flash->spi, &m);
  
- 		nand0: nand at 40000000 {
+-	*retlen = m.actual_length - m25p_cmdsz(flash) - FAST_READ_DUMMY_BYTE;
++			*retlen += m.actual_length - m25p_cmdsz(flash)
++						- FAST_READ_DUMMY_BYTE;
++		}
++	}
+ 
+ 	mutex_unlock(&flash->lock);
+ 
 -- 
 1.7.9.5
