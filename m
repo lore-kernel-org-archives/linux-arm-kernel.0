@@ -1,51 +1,71 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 12 Nov 2012 11:57:46 +0100
-Subject: [PATCH 05/10] arn: at91: move at91_tc.h to arch/arm/mach-at91
-In-Reply-To: <1352287374-25176-5-git-send-email-plagnioj@jcrosoft.com>
-References: <20121107111235.GH20063@game.jcrosoft.org>
- <1352287374-25176-1-git-send-email-plagnioj@jcrosoft.com>
- <1352287374-25176-5-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <50A0D62A.8080708@atmel.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 12 Nov 2012 12:01:00 +0100
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB71352@DBDE01.ent.ti.com>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
+ <509BFFDF.9040605@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
+ <509C050C.6010201@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB71352@DBDE01.ent.ti.com>
+Message-ID: <50A0D6EC.2040608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vaibhav,
 
-Beware: subject has typo: s/arn/ARM/
-Also, care about capital letters for "ARM" => to all patches of the series.
-
-Bye,
-
-
-On 11/07/2012 12:22 PM, Jean-Christophe PLAGNIOL-VILLARD :
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  arch/arm/mach-at91/{include/mach => }/at91_tc.h |    0
->  arch/arm/mach-at91/at91x40_time.c               |    3 ++-
->  2 files changed, 2 insertions(+), 1 deletion(-)
->  rename arch/arm/mach-at91/{include/mach => }/at91_tc.h (100%)
+On 11/12/2012 11:38 AM, Hiremath, Vaibhav wrote:
+> On Fri, Nov 09, 2012 at 00:46:28, Hunter, Jon wrote:
+>>
+>> On 11/08/2012 12:59 PM, Hiremath, Vaibhav wrote:
+>>> On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
+>>>>
+>>>> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
+>>>>
+>>>> [snip]
+>>>>
+>>>>> There is no reliable way to determine which source should be used in runtime
+>>>>> for boards that do not have the 32k oscillator wired.
+>>>>
+>>>> So thinking about this some more and given that we are moving away from
+>>>> board files, if a board does not provide a 32kHz clock source, then this
+>>>> should be reflected in the device-tree source file for that board.
+>>>> Hence, at boot time we should be able to determine if a 32kHz clock
+>>>> source can be used.
+>>>>
+>>>
+>>> Let me feed some more thoughts here :)
+>>>
+>>> The way it is being detected currently is based on timer idle status bit.
+>>> I am worried that, this is the only option we have.
+>>
+>> Why not use device-tree to indicate the presence of a 32k clock source?
+>> This seems like a board level configuration and so device-tree seems to
+>> be the perfect place for this IMO.
+>>
 > 
-> diff --git a/arch/arm/mach-at91/include/mach/at91_tc.h b/arch/arm/mach-at91/at91_tc.h
-> similarity index 100%
-> rename from arch/arm/mach-at91/include/mach/at91_tc.h
-> rename to arch/arm/mach-at91/at91_tc.h
-> diff --git a/arch/arm/mach-at91/at91x40_time.c b/arch/arm/mach-at91/at91x40_time.c
-> index ee06d7b..0e57e44 100644
-> --- a/arch/arm/mach-at91/at91x40_time.c
-> +++ b/arch/arm/mach-at91/at91x40_time.c
-> @@ -26,7 +26,8 @@
->  #include <linux/io.h>
->  #include <mach/hardware.h>
->  #include <asm/mach/time.h>
-> -#include <mach/at91_tc.h>
-> +
-> +#include "at91_tc.h"
->  
->  #define at91_tc_read(field) \
->  	__raw_readl(AT91_IO_P2V(AT91_TC) + field)
+> I think I agree with you, but for this to happen in clean way, its time to 
+> start populating clock-nodes in DT, don't you think? Something like,
 > 
+> 
+> clocks {
+> 	rtc_clk: clk at X {
+> 		compatible = "crystal-32k, per-32k, xyz";
+> 		clock-frequency = <32768>;
+> 	};
+> 	...
+> };
+> 
+> Timer {
+> 
+> 	ref-clock = <&rtc_clk>;
+> };
+> 
+> What do you think?
 
+That's indeed the proper way to do it, since this is a pure board level
+parameter and we do have the binding to express that.
+We just have to add that in the DTS:-)
 
--- 
-Nicolas Ferre
+Regards,
+Benoit
