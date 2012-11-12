@@ -1,73 +1,54 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 16:29:00 +0100
-Subject: [PATCH 2/6] staging: drm/imx: Add YVU420 support to i.MX IPUv3 base
- driver
-In-Reply-To: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
-References: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352734144-14897-3-git-send-email-s.hauer@pengutronix.de>
+From: sasha.levin@oracle.com (Sasha Levin)
+Date: Mon, 12 Nov 2012 10:52:27 -0500
+Subject: [PATCH] ARM: EXYNOS: use BUG_ON where possible
+In-Reply-To: <20121112152349.GH28327@n2100.arm.linux.org.uk>
+References: <1352406191-14303-1-git-send-email-sasha.levin@oracle.com>
+ <1352406191-14303-5-git-send-email-sasha.levin@oracle.com>
+ <50A111DD.6080504@gmail.com> <20121112152349.GH28327@n2100.arm.linux.org.uk>
+Message-ID: <50A11B3B.1080600@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+On 11/12/2012 10:23 AM, Russell King - ARM Linux wrote:
+> On Mon, Nov 12, 2012 at 04:12:29PM +0100, Maarten Lankhorst wrote:
+>> Op 08-11-12 21:23, Sasha Levin schreef:
+>>> @@ -465,10 +465,8 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
+>>>  	else
+>>>  		max_nr = EXYNOS4_MAX_COMBINER_NR;
+>>>  
+>>> -	if (combiner_nr >= max_nr)
+>>> -		BUG();
+>>> -	if (irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0)
+>>> -		BUG();
+>>> +	BUG_ON(combiner_nr >= max_nr);
+>>> +	BUG_ON(irq_set_handler_data(irq, &combiner_data[combiner_nr]) != 0);
+>>
+>> Is it really a good idea to put functions that perform work in a BUG_ON?
+>> I don't know, but for some reason it just feels wrong. I'd expect code to
+>> compile fine if BUG_ON was a noop, so doing verification calls only, not
+>> actual work..
+> 
+> Well, it is currently defined as:
+> 
+> include/asm-generic/bug.h:#define BUG_ON(condition) do { if (unlikely(condition)) BUG(); } while(0)
+> include/asm-generic/bug.h:#define BUG_ON(condition) do { if (condition) ; } while(0)
+> 
+> but as these can be overridden, I don't think relying on those
+> implementations is a good idea; to do so would be fragile.  Eg, what if
+> the BUG_ON() implementation becomes just:
+> 
+> #define BUG_ON(x)
+> 
+> then the function call itself vanishes.  So, only put the actual bug test
+> inside a BUG_ON(), not the functional part which must always be executed.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/staging/imx-drm/ipu-v3/ipu-common.c |   11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+Even if we ignore that modifying the side-effects is wrong, there's already
+more than enough code in the kernel (both in kernel/ / mm/, and in arch/) to
+cause breakage if for some reason the expression is not evaluated.
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-index 04f6aba..a5cec0e 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-@@ -234,6 +234,11 @@ void ipu_cpmem_set_yuv_planar_full(struct ipu_ch_param __iomem *p,
- 		ipu_ch_param_write_field(p, IPU_FIELD_UBO, u_offset / 8);
- 		ipu_ch_param_write_field(p, IPU_FIELD_VBO, v_offset / 8);
- 		break;
-+	case V4L2_PIX_FMT_YVU420:
-+		ipu_ch_param_write_field(p, IPU_FIELD_SLUV, (stride / 2) - 1);
-+		ipu_ch_param_write_field(p, IPU_FIELD_UBO, v_offset / 8);
-+		ipu_ch_param_write_field(p, IPU_FIELD_VBO, u_offset / 8);
-+		break;
- 	}
- }
- EXPORT_SYMBOL_GPL(ipu_cpmem_set_yuv_planar_full);
-@@ -246,10 +251,11 @@ void ipu_cpmem_set_yuv_planar(struct ipu_ch_param __iomem *p, u32 pixel_format,
- 
- 	switch (pixel_format) {
- 	case V4L2_PIX_FMT_YUV420:
-+	case V4L2_PIX_FMT_YVU420:
- 		uv_stride = stride / 2;
- 		u_offset = stride * height;
- 		v_offset = u_offset + (uv_stride * height / 2);
--		ipu_cpmem_set_yuv_planar_full(p, V4L2_PIX_FMT_YUV420, stride,
-+		ipu_cpmem_set_yuv_planar_full(p, pixel_format, stride,
- 				u_offset, v_offset);
- 		break;
- 	}
-@@ -307,6 +313,7 @@ int ipu_cpmem_set_fmt(struct ipu_ch_param __iomem *cpmem, u32 pixelformat)
- {
- 	switch (pixelformat) {
- 	case V4L2_PIX_FMT_YUV420:
-+	case V4L2_PIX_FMT_YVU420:
- 		/* pix format */
- 		ipu_ch_param_write_field(cpmem, IPU_FIELD_PFS, 2);
- 		/* burst size */
-@@ -369,6 +376,7 @@ int ipu_cpmem_set_image(struct ipu_ch_param __iomem *cpmem,
- 
- 	switch (pix->pixelformat) {
- 	case V4L2_PIX_FMT_YUV420:
-+	case V4L2_PIX_FMT_YVU420:
- 		y_offset = Y_OFFSET(pix, image->rect.left, image->rect.top);
- 		u_offset = U_OFFSET(pix, image->rect.left,
- 				image->rect.top) - y_offset;
-@@ -414,6 +422,7 @@ enum ipu_color_space ipu_pixelformat_to_colorspace(u32 pixelformat)
- {
- 	switch (pixelformat) {
- 	case V4L2_PIX_FMT_YUV420:
-+	case V4L2_PIX_FMT_YVU420:
- 	case V4L2_PIX_FMT_UYVY:
- 	case V4L2_PIX_FMT_YUYV:
- 		return IPUV3_COLORSPACE_YUV;
--- 
-1.7.10.4
+If some arch decides to not evaluate the expression there it's going to be
+inherently broken.
+
+
+Thanks,
+Sasha
