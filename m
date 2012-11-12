@@ -1,76 +1,78 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 12 Nov 2012 09:24:59 +0200
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <79CD15C6BA57404B839C016229A409A83EB70E88@DBDE01.ent.ti.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BDAF5.1010703@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68589@DBDE01.ent.ti.com>
- <509BEE6D.9000902@ti.com>
- <alpine.DEB.2.00.1211081754390.20703@utopia.booyaka.com>
- <509BF525.80309@ti.com>
- <alpine.DEB.2.00.1211081809470.20703@utopia.booyaka.com>
- <509BFB4E.2090802@ti.com> <509F8D6B.5070504@compulab.co.il>
- <79CD15C6BA57404B839C016229A409A83EB70E88@DBDE01.ent.ti.com>
-Message-ID: <50A0A44B.6080604@compulab.co.il>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 12 Nov 2012 16:39:28 +0900
+Subject: [PATCH v3 0/6] ARM: EXYNOS: Add secure firmware support
+In-Reply-To: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
+References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
+Message-ID: <006501cdc0a8$d880c990$89825cb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/12 08:38, Hiremath, Vaibhav wrote:
-> On Sun, Nov 11, 2012 at 17:05:07, Igor Grinberg wrote:
->>
->>
->> On 11/08/12 20:34, Jon Hunter wrote:
->>>
->>> On 11/08/2012 12:17 PM, Paul Walmsley wrote:
->>>> On Thu, 8 Nov 2012, Jon Hunter wrote:
->>>>
->>>>> On 11/08/2012 11:58 AM, Paul Walmsley wrote:
->>>>>> On Thu, 8 Nov 2012, Jon Hunter wrote:
->>>>>>
->>>>>>> Igor was mentioning a h/w scenario where the 32kHz source is not
->>>>>>> present. However, I am not sure which devices support this and is
->>>>>>> applicable too.
->>>>>>
->>>>>> Pretty sure Igor is referring to the AM3517/3505.  This is very poorly 
->>>>>> documented, but can be observed in the AM3517 TRM Rev B (SPRUGR0B) Figure 
->>>>>> 4-23 "PRM Clock Generator" and the AM3517 DM Rev C (SPRS550C) Section 4 
->>>>>> "Clock Specifications".
->>>>>
->>>>> But AFAICT, even in that h/w configuration the internal 32k
->>>>> oscillator will be used
->>>>
->>>> Just to clarify, there's no internal 32k oscillator used on the 3517/3505; 
->>>> just a divider from the HF clock.
->>>
->>> Ah yes I see that now!
->>>
->>>>> and so the gptimer will still have a 32k clock source.
->>>>
->>>> That's a good question and you might want to check with Igor on that one,
->>>> the AM3517 TRM conflicts with the DM as to whether it's available to the 
->>>> GPTIMER or not :-(
->>>
->>> Well the external 32k and internal divided down version go through the
->>> same mux and so that seems to imply either they are both available to
->>> the gptimer or neither is.
->>
->> Yep, but the /800 do not get you the 32768...
->> and that makes the timer suck.
->> Of course this can be dealt with in the clock subsystem
->> (I remember Paul said that he will look into that), but it will take time.
->>
->> Also, what about having the sys_clk instead of 32k for higher precision?
->> Is that possible already (without my patch)?
->>
+Tomasz Figa wrote:
 > 
-> Yes, it is possible. You can choose it through bootargs.
+> Some Exynos-based boards are running with secure firmware running in
+> TrustZone secure world, which changes the way some things have to be
+> initialized.
+> 
+> This series adds support for specifying firmware operations, implements
+> some firmware operations for Exynos secure firmware and adds a method of
+> enabling secure firmware operations on Exynos-based boards through board
+> file and device tree.
+> 
+> Changes since v2
+> ( http://thread.gmane.org/gmane.linux.kernel.samsung-soc/12848 )
+>   - Made Exynos firmware binding require address
+>   - Minor style fixes
+> 
+> Changes since v1
+> ( http://thread.gmane.org/gmane.linux.kernel.samsung-
+> soc/12583/focus=12820 )
+>   - Changed return types of all operations to int
+>   - Defined all operations to return 0 on success, -ENOSYS when not
+>     implemented or appropriate error code on error
+> 
+> Tomasz Figa (6):
+>   ARM: Add interface for registering and calling firmware-specific
+>     operations
+>   ARM: EXYNOS: Add support for secure monitor calls
+>   ARM: EXYNOS: Add IO mapping for non-secure SYSRAM.
+>   ARM: EXYNOS: Add support for Exynos secure firmware
+>   ARM: EXYNOS: Add support for secondary CPU bring-up on Exynos4412
+>   ARM: EXYNOS: Add secure firmware support to secondary CPU bring-up
+> 
+>  .../devicetree/bindings/arm/samsung-boards.txt     | 10 ++++
+>  arch/arm/common/Makefile                           |  2 +
+>  arch/arm/common/firmware.c                         | 18 ++++++
+>  arch/arm/include/asm/firmware.h                    | 31 ++++++++++
+>  arch/arm/mach-exynos/Makefile                      |  6 ++
+>  arch/arm/mach-exynos/common.c                      | 35 +++++++++++
+>  arch/arm/mach-exynos/common.h                      |  2 +
+>  arch/arm/mach-exynos/exynos-smc.S                  | 22 +++++++
+>  arch/arm/mach-exynos/firmware.c                    | 67 ++++++++++++++++++++++
+>  arch/arm/mach-exynos/include/mach/map.h            |  3 +
+>  arch/arm/mach-exynos/mach-exynos4-dt.c             |  1 +
+>  arch/arm/mach-exynos/platsmp.c                     | 37 ++++++++++--
+>  arch/arm/mach-exynos/smc.h                         | 31 ++++++++++
+>  arch/arm/plat-samsung/include/plat/map-s5p.h       |  1 +
+>  14 files changed, 260 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/common/firmware.c
+>  create mode 100644 arch/arm/include/asm/firmware.h
+>  create mode 100644 arch/arm/mach-exynos/exynos-smc.S
+>  create mode 100644 arch/arm/mach-exynos/firmware.c
+>  create mode 100644 arch/arm/mach-exynos/smc.h
+> 
+> --
+> 1.7.12
 
-Is the kernel command line the only way for doing this?
-I personally dislike it, because it brings multiple maintenance problems.
-This must be possible at least through DT.
+(+ Russell King)
 
+As we discussed, let me pick up this series into Samsung tree.
 
--- 
-Regards,
-Igor.
+If any objections, please kindly let me know.
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
