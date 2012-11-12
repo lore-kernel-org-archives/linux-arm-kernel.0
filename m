@@ -1,34 +1,34 @@
-From: shiraz.hashim@st.com (Shiraz Hashim)
-Date: Mon, 12 Nov 2012 12:15:47 +0530
-Subject: [PATCH] Set bit 22 in the PL310 (cache controller) AuxCtlr
- register
-In-Reply-To: <20121109095400.GC2357@mudshark.cambridge.arm.com>
-References: <1352433712-16364-1-git-send-email-shiraz.hashim@st.com>
- <20121109095400.GC2357@mudshark.cambridge.arm.com>
-Message-ID: <20121112064547.GN32313@localhost.localdomain>
+From: cbouatmailru@gmail.com (Anton Vorontsov)
+Date: Sun, 11 Nov 2012 22:53:46 -0800
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <20121112060740.GR24583@lunn.ch>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+ <CACRpkdZvHBjFQTrQnxvc3WCOb2CqGbjYJxyQ5qQkSbU+UWHYZA@mail.gmail.com>
+ <20121112011258.GA23724@lizard> <20121112060740.GR24583@lunn.ch>
+Message-ID: <20121112065346.GA12571@lizard>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 09:54:01AM +0000, Will Deacon wrote:
-> On Fri, Nov 09, 2012 at 04:01:52AM +0000, Shiraz Hashim wrote:
-> > From: Catalin Marinas <catalin.marinas@arm.com>
+Hi Andrew,
+
+On Mon, Nov 12, 2012 at 07:07:40AM +0100, Andrew Lunn wrote:
+[...]
+> > > But I suspect Anton may be ready to welcome a driver like this
+> > > under drivers/power/* which I think is where it belongs.
 > > 
-> > Clearing bit 22 in the PL310 Auxiliary Control register (shared
-> > attribute override enable) has the side effect of transforming Normal
-> > Shared Non-cacheable reads into Cacheable no-allocate reads.
-> > 
-> > Coherent DMA buffers in Linux always have a Cacheable alias via the
-> > kernel linear mapping and the processor can speculatively load cache
-> > lines into the PL310 controller. With bit 22 cleared, Non-cacheable
-> > reads would unexpectedly hit such cache lines leading to buffer
-> > corruption.
+> > Yup. driver/power/reset/ seems appropriate.
 > 
-> Is this still the case with recent kernels? I thought the dma-mapping/cma
-> work avoided the cacheable alias, but perhaps I'm mistaken.
+> I was unsure where to put it. I will submit new patches with the move.
+> 
+> I'm not too sure about 'reset' though. Its not a reset operation, the
+> power goes off and stays off. Would 'shutdown' or 'power_off' be
+> better?
 
-I haven't used CMA but DMA mappings are still normal memory
-non-cacheable.
+Other folks already wanted drivers/power/reset/ for board reset/poweroff
+drivers. But it makes little sense to make both reset and poweroff
+directories. So, let's just do 'reset', somebody might have already using
+it in their private trees.
 
---
-regards
-Shiraz
+Thanks,
+Anton.
