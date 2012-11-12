@@ -1,70 +1,33 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 12 Nov 2012 15:57:34 +0200
-Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
-In-Reply-To: <CANOLnOO0yMabku-_3yhi=1bwohbrb=rtFDOuKf1LPCAFv_OqCQ@mail.gmail.com>
-References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
- <CANOLnOO0yMabku-_3yhi=1bwohbrb=rtFDOuKf1LPCAFv_OqCQ@mail.gmail.com>
-Message-ID: <50A1004E.8000203@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 12 Nov 2012 08:03:48 -0600
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <20121112132811.GF2346@mudshark.cambridge.arm.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+ <20121112102354.GA2346@mudshark.cambridge.arm.com>
+ <50A0F390.7060800@gmail.com>
+ <20121112132811.GF2346@mudshark.cambridge.arm.com>
+Message-ID: <50A101C4.9090807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2012-11-12 15:39, Grazvydas Ignotas wrote:
-> Hi,
-> 
-> On Mon, Nov 12, 2012 at 12:25 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
->> This series changes omapfb to use standard dma_alloc funcs instead of omap
->> specific vram allocator. This let's us remove the omap vram allocator, making
->> omapfb platform independent.
+On 11/12/2012 07:28 AM, Will Deacon wrote:
+> On Mon, Nov 12, 2012 at 01:03:12PM +0000, Rob Herring wrote:
+>> On 11/12/2012 04:23 AM, Will Deacon wrote:
+>>>> +static inline void set_my_cpu_offset(unsigned long off)
+>>>> +{
+>>>> +	asm volatile("mcr p15, 0, %0, c13, c0, 4	@ set TPIDRPRW" : : "r" (off) : "cc" );
+>>>> +}
+>>>
+>>> You don't need the "cc" here.
 >>
->> However, note that using standard dma funcs causes the following downsides:
->>
->> ...
->>
->> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
->> changed the ioctl to return 64M for all the values, which, I hope, the
->> applications will interpret as "there's enough vram".
+>> You would think so, but the compiler drops this instruction if you
+>> don't. set_cr does the same thing.
 > 
-> Do at least OMAPFB_QUERY_MEM/OMAPFB_SETUP_MEM still work?
-> 
->> 4) "vram" kernel parameter to define how much ram to reserve for video use no
->> longer works. The user needs to enable CMA and use "cma" parameter.
-> 
-> That's a significant change, you should update Documentation/ .
+> Whoa, that sounds suspicious... if the thing is marked volatile GCC
+> shouldn't optimise it away if it's reachable. Which toolchain are you
+> using?
 
-I've added the following documentation change:
+Ubuntu 12.10 ARM cross compiler:
+gcc version 4.7.2 (Ubuntu/Linaro 4.7.2-1ubuntu1)
 
-diff --git a/Documentation/arm/OMAP/DSS b/Documentation/arm/OMAP/DSS
-index a564cee..4484e02 100644
---- a/Documentation/arm/OMAP/DSS
-+++ b/Documentation/arm/OMAP/DSS
-@@ -285,7 +285,10 @@ FB0 +-- GFX  ---- LCD ---- LCD
- Misc notes
- ----------
- 
--OMAP FB allocates the framebuffer memory using the OMAP VRAM allocator.
-+OMAP FB allocates the framebuffer memory using the standard dma allocator. You
-+can enable Contiguous Memory Allocator (CONFIG_CMA) to improve the dma
-+allocator, and if CMA is enabled, you use "cma=" kernel parameter to increase
-+the global memory area for CMA.
- 
- Using DSI DPLL to generate pixel clock it is possible produce the pixel clock
- of 86.5MHz (max possible), and with that you get 1280x1024 at 57 output from DVI.
-@@ -301,11 +304,6 @@ framebuffer parameters.
- Kernel boot arguments
- ---------------------
- 
--vram=<size>[,<physaddr>]
--       - Amount of total VRAM to preallocate and optionally a physical start
--         memory address. For example, "10M". omapfb allocates memory for
--         framebuffers from VRAM.
--
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 897 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121112/64153f68/attachment-0001.sig>
+Rob
