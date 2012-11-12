@@ -1,30 +1,138 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 15:03:28 +0000
-Subject: [PATCH 01/14] pinctrl: SPEAr: add spi chipselect control driver
-In-Reply-To: <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
-References: <cover.1352608333.git.viresh.kumar@linaro.org>
- <4a92290e8a3b1a19c3a5e864edfa7badfc2af5d0.1352608333.git.viresh.kumar@linaro.org>
-Message-ID: <201211121503.28392.arnd@arndb.de>
+From: rob.clark@linaro.org (Rob Clark)
+Date: Mon, 12 Nov 2012 09:09:19 -0600
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <20121112143846.GI2346@mudshark.cambridge.arm.com>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <20121112104601.GB2346@mudshark.cambridge.arm.com>
+ <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
+ <20121112143846.GI2346@mudshark.cambridge.arm.com>
+Message-ID: <CAF6AEGsSng_Ma_0Q6PXTRHOVYRtC5RRBA65=fpBCM8O2QThQWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 11 November 2012, Viresh Kumar wrote:
-> From: Shiraz Hashim <shiraz.hashim@st.com>
-> 
-> SPEAr platform provides a provision to control chipselects of ARM PL022
-> Prime Cell spi controller through its system registers, which otherwise
-> remains under PL022 control which some protocols do not want.
-> 
-> This commit intends to provide the spi chipselect control in software
-> over gpiolib interface. Since it is tied to pinctrl, we place it under
-> 'drivers/pinctrl/spear/' directory.
-> 
-> spi chip drivers can use the exported gpiolib interface to define their
-> chipselect through DT or platform data.
-> 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Nov 12, 2012 at 8:38 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 12, 2012 at 01:46:57PM +0000, Rob Clark wrote:
+>> On Mon, Nov 12, 2012 at 4:46 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Fri, Nov 09, 2012 at 09:17:33PM +0000, Rob Clark wrote:
+>> >> @@ -122,22 +124,35 @@ extern int __get_user_4(void *);
+>> >>       ({                                                              \
+>> >>               unsigned long __limit = current_thread_info()->addr_limit - 1; \
+>> >>               register const typeof(*(p)) __user *__p asm("r0") = (p);\
+>> >> -             register unsigned long __r2 asm("r2");                  \
+>> >>               register unsigned long __l asm("r1") = __limit;         \
+>> >>               register int __e asm("r0");                             \
+>> >>               switch (sizeof(*(__p))) {                               \
+>> >> -             case 1:                                                 \
+>> >> +             case 1: {                                               \
+>> >> +                     register unsigned long __r2 asm("r2");          \
+>> >>                       __get_user_x(__r2, __p, __e, __l, 1);           \
+>> >> +                     x = (typeof(*(p))) __r2;                        \
+>> >>                       break;                                          \
+>> >> -             case 2:                                                 \
+>> >> +             }                                                       \
+>> >> +             case 2: {                                               \
+>> >> +                     register unsigned long __r2 asm("r2");          \
+>> >>                       __get_user_x(__r2, __p, __e, __l, 2);           \
+>> >> +                     x = (typeof(*(p))) __r2;                        \
+>> >>                       break;                                          \
+>> >> -             case 4:                                                 \
+>> >> +             }                                                       \
+>> >> +             case 4: {                                               \
+>> >> +                     register unsigned long __r2 asm("r2");          \
+>> >>                       __get_user_x(__r2, __p, __e, __l, 4);           \
+>> >> +                     x = (typeof(*(p))) __r2;                        \
+>> >> +                     break;                                          \
+>> >> +             }                                                       \
+>> >> +             case 8: {                                               \
+>> >> +                     register unsigned long long __r2 asm("r2");     \
+>> >
+>> > Does this matter? For EABI, we'll pass in (r2, r3) and it's all handcrafted
+>> > asm, so the compiler shouldn't care much. For OABI, I think you may have to
+>> > do some more work to get the two words where you want them.
+>>
+>> Is the question whether the compiler is guaranteed to allocate r2 and
+>> r3 in all cases?  I'm not quite sure, I confess to usually trying to
+>> avoid inline asm.  But from looking at the disassembly (for little
+>> endian EABI build) it seemed to do the right thing.
+>
+> I can't recall how OABI represents 64-bit values and particularly whether this
+> differs between little and big-endian, so I wondered whether you may have to
+> do some marshalling when you assign x. However, a few quick experiments with
+> GCC suggest that the register representation matches EABI in regards to word
+> ordering (it just doesn't require an even base register), although it would
+> be good to find this written down somewhere...
 
-The driver looks ok to me, but I'll wait for Linus to take a look first
-and give his ack.
+yeah, I was kinda hoping that someone a bit closer to the compiler
+would speak up here :-)
 
-	Arnd
+>> The only other idea I had was to explicitly declare two 'unsigned
+>> long's and then shift them into a 64bit x, although I'm open to
+>> suggestions if there is a better way.
+>
+> Can't you just use register unsigned long long for all cases? Even better,
+> follow what put_user does and use typeof(*(p))?
+
+typeof(*(p) was my first try but:
+
+  register typeof(*(p)) __r2 asm("r2");
+
+gives me the error:
+
+  error: read-only variable ?__r2? used as ?asm? output
+
+I guess because 'const' ends up being part of the typeof *p?  I
+suppose I could do typeof(x) instead
+
+BR,
+-R
+
+>> >> diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+>> >> index 9b06bb4..d05285c 100644
+>> >> --- a/arch/arm/lib/getuser.S
+>> >> +++ b/arch/arm/lib/getuser.S
+>> >> @@ -18,7 +18,7 @@
+>> >>   * Inputs:   r0 contains the address
+>> >>   *           r1 contains the address limit, which must be preserved
+>> >>   * Outputs:  r0 is the error code
+>> >> - *           r2 contains the zero-extended value
+>> >> + *           r2, r3 contains the zero-extended value
+>> >>   *           lr corrupted
+>> >>   *
+>> >>   * No other registers must be altered.  (see <asm/uaccess.h>
+>> >> @@ -66,6 +66,19 @@ ENTRY(__get_user_4)
+>> >>       mov     pc, lr
+>> >>  ENDPROC(__get_user_4)
+>> >>
+>> >> +ENTRY(__get_user_8)
+>> >> +     check_uaccess r0, 4, r1, r2, __get_user_bad
+>> >
+>> > Shouldn't you be passing 8 here, so that we validate the correct range?
+>>
+>> yes, sorry, I'll fix that
+>>
+>> >> +#ifdef CONFIG_THUMB2_KERNEL
+>> >> +5: TUSER(ldr)        r2, [r0]
+>> >> +6: TUSER(ldr)        r3, [r0, #4]
+>> >> +#else
+>> >> +5: TUSER(ldr)        r2, [r0], #4
+>> >> +6: TUSER(ldr)        r3, [r0]
+>> >> +#endif
+>> >
+>> > This doesn't work for EABI big-endian systems.
+>>
+>> Hmm, is that true?  Wouldn't put_user() then have the same problem?
+>
+> I dug up the PCS and it seems that we arrange the two halves of the
+> doubleword to match the ldm/stm memory representation for EABI, so sorry
+> for the confusion.
+>
+>> I guess __ARMEB__ is the flag for big-endian?
+>
+> That's the thing defined by the compiler, yes.
+>
+> Will
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
