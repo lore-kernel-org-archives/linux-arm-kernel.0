@@ -1,45 +1,30 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 16:28:59 +0100
-Subject: [PATCH 1/6] staging: drm/imx: Fix YUYV support in i.MX IPUv3 base
- driver
-In-Reply-To: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
-References: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352734144-14897-2-git-send-email-s.hauer@pengutronix.de>
+Date: Mon, 12 Nov 2012 16:28:58 +0100
+Subject: [PATCH] staging drm/imx: updates
+Message-ID: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Olbrich <m.olbrich@pengutronix.de>
+The following contains some assorted updates to the i.MX drm driver
+for the next merge window.
 
-YVYU is not supported by the IPU, so remove partial handling
-of this format and replace it with YUYV which is supported.
+Sascha
 
-Signed-off-by: Michael Olbrich <m.olbrich@pengutronix.de>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/staging/imx-drm/ipu-v3/ipu-common.c |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+----------------------------------------------------------------
+Michael Olbrich (1):
+      staging: drm/imx: Fix YUYV support in i.MX IPUv3 base driver
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-index f381960..04f6aba 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-@@ -380,6 +380,7 @@ int ipu_cpmem_set_image(struct ipu_ch_param __iomem *cpmem,
- 		ipu_cpmem_set_buffer(cpmem, 0, image->phys + y_offset);
- 		break;
- 	case V4L2_PIX_FMT_UYVY:
-+	case V4L2_PIX_FMT_YUYV:
- 		ipu_cpmem_set_buffer(cpmem, 0, image->phys +
- 				image->rect.left * 2 +
- 				image->rect.top * image->pix.bytesperline);
-@@ -414,7 +415,7 @@ enum ipu_color_space ipu_pixelformat_to_colorspace(u32 pixelformat)
- 	switch (pixelformat) {
- 	case V4L2_PIX_FMT_YUV420:
- 	case V4L2_PIX_FMT_UYVY:
--	case V4L2_PIX_FMT_YVYU:
-+	case V4L2_PIX_FMT_YUYV:
- 		return IPUV3_COLORSPACE_YUV;
- 	case V4L2_PIX_FMT_RGB32:
- 	case V4L2_PIX_FMT_BGR32:
--- 
-1.7.10.4
+Philipp Zabel (4):
+      staging: drm/imx: Add YVU420 support to i.MX IPUv3 base driver
+      staging: drm/imx: silence ipu_crtc_dpms debug message
+      staging: drm/imx: Add ipu_cpmem_set_yuv_interleaved()
+      staging: drm/imx: Remove 300ms delay after memory reset
+
+Sascha Hauer (1):
+      staging: drm/imx: Add pinctrl support to parallel display driver
+
+ drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |    1 +
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c |   33 +++++++++++++++++++++++----
+ drivers/staging/imx-drm/ipuv3-crtc.c        |    2 +-
+ drivers/staging/imx-drm/parallel-display.c  |   10 ++++++++
+ 4 files changed, 41 insertions(+), 5 deletions(-)
