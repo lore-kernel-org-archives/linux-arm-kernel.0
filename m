@@ -1,28 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Nov 2012 13:28:12 +0000
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <50A0F390.7060800@gmail.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
- <20121112102354.GA2346@mudshark.cambridge.arm.com>
- <50A0F390.7060800@gmail.com>
-Message-ID: <20121112132811.GF2346@mudshark.cambridge.arm.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Mon, 12 Nov 2012 15:39:45 +0200
+Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
+In-Reply-To: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <CANOLnOO0yMabku-_3yhi=1bwohbrb=rtFDOuKf1LPCAFv_OqCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 01:03:12PM +0000, Rob Herring wrote:
-> On 11/12/2012 04:23 AM, Will Deacon wrote:
-> >> +static inline void set_my_cpu_offset(unsigned long off)
-> >> +{
-> >> +	asm volatile("mcr p15, 0, %0, c13, c0, 4	@ set TPIDRPRW" : : "r" (off) : "cc" );
-> >> +}
-> > 
-> > You don't need the "cc" here.
-> 
-> You would think so, but the compiler drops this instruction if you
-> don't. set_cr does the same thing.
+Hi,
 
-Whoa, that sounds suspicious... if the thing is marked volatile GCC
-shouldn't optimise it away if it's reachable. Which toolchain are you
-using?
+On Mon, Nov 12, 2012 at 12:25 PM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
+> This series changes omapfb to use standard dma_alloc funcs instead of omap
+> specific vram allocator. This let's us remove the omap vram allocator, making
+> omapfb platform independent.
+>
+> However, note that using standard dma funcs causes the following downsides:
+>
+> ...
+>
+> 3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
+> changed the ioctl to return 64M for all the values, which, I hope, the
+> applications will interpret as "there's enough vram".
 
-Will
+Do at least OMAPFB_QUERY_MEM/OMAPFB_SETUP_MEM still work?
+
+> 4) "vram" kernel parameter to define how much ram to reserve for video use no
+> longer works. The user needs to enable CMA and use "cma" parameter.
+
+That's a significant change, you should update Documentation/ .
+What about omapfb.vram, is it still there?
+Perhaps we also need to select/depend on CMA?
+
+
+-- 
+Gra?vydas
