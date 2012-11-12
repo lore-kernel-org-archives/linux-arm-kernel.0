@@ -1,56 +1,104 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Mon, 12 Nov 2012 15:04:21 +0100
-Subject: [GIT PULL v4] Renesas ARM-based SoC for v3.8
-In-Reply-To: <20121106143202.GF27284@quad.lixom.net>
-References: <1352177853-6008-1-git-send-email-horms@verge.net.au>
- <20121106143202.GF27284@quad.lixom.net>
-Message-ID: <CABYn4sy_EaF5Ywhwj_-Ahc_8R5gtnu0RZPwQFFc7vBvRdBnOXw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 12 Nov 2012 15:07:08 +0100
+Subject: [PATCH] ARM: dts: add board dts file for Exynos4412 based SMDK
+ board
+In-Reply-To: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
+References: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1629120.eNASZVgxGi@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
+Hi Thomas,
 
-unfortunately 3 patches contributed by me are "evil" and need to removed.
+On Saturday 03 of November 2012 20:19:32 Thomas Abraham wrote:
+> Add a minimal board dts file for Samsung Exynos4412 based SMDK board.
+> 
+> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+> ---
+> This patch depends the on the following patch posted by Tomasz Figa.
+> "ARM: dts: exynos4: Add support for Exynos4x12 SoCs"
+> 
+>  arch/arm/boot/dts/Makefile                |    1 +
+>  arch/arm/boot/dts/exynos4412-smdk4412.dts |   45
+> +++++++++++++++++++++++++++++ 2 files changed, 46 insertions(+), 0
+> deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos4412-smdk4412.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index f37cf9f..36488a5 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+>  dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>  	exynos4210-smdkv310.dtb \
+>  	exynos4210-trats.dtb \
+> +	exynos4412-smdk4412.dtb \
+>  	exynos5250-smdk5250.dtb
+>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
+>  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
+> diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts
+> b/arch/arm/boot/dts/exynos4412-smdk4412.dts new file mode 100644
+> index 0000000..f05bf57
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+> @@ -0,0 +1,45 @@
+> +/*
+> + * Samsung's Exynos4412 based SMDK board device tree source
+> + *
+> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Device tree source file for Samsung's SMDK4412 board which is based
+> on + * Samsung's Exynos4412 SoC.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as +
+> * published by the Free Software Foundation.
+> +*/
+> +
+> +/dts-v1/;
+> +/include/ "exynos4412.dtsi"
+> +
+> +/ {
+> +	model = "Samsung SMDK evaluation board based on Exynos4412";
+> +	compatible = "samsung,smdk4412", "samsung,exynos4412";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x40000000>;
+> +	};
 
-Bastian Hecht (4):
-      ARM: shmobile: emev2: Replace modify_scu_cpu_psr with scu_power_mode
-      ARM: shmobile: sh73a0: Replace modify_scu_cpu_psr with scu_power_mode
-      ARM: shmobile: r8a7779: Replace modify_scu_cpu_psr with scu_power_mode
-...
+This will not boot, because section size limit is set to 256 MiB.
 
-The code changes the flags of the wrong cpus - which breaks the whole
-bootup of secondary CPUs. So please drop these patches!
-Sorry for being too careless in this sensitive area - I'll do better.
+It might work with CONFIG_ARM_ATAG_DTB_COMPAT enabled, because the memory 
+configuration from DT is ignored and values from ATAGs are taken instead.
 
-Thanks,
+I suggest you to change it to 4 banks of 256 MiB.
 
- Bastian
+> +	chosen {
+> +		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M
+> console=ttySAC1,115200 init=/linuxrc"; +	};
+> +
+> +	serial at 13800000 {
+> +		status = "okay";
+> +	};
+> +
+> +	serial at 13810000 {
+> +		status = "okay";
+> +	};
+> +
+> +	serial at 13820000 {
+> +		status = "okay";
+> +	};
+> +
+> +	serial at 13830000 {
+> +		status = "okay";
+> +	};
+> +};
 
+Otherwise looks fine.
 
-
-2012/11/6 Olof Johansson <olof@lixom.net>:
-> On Tue, Nov 06, 2012 at 01:57:22PM +0900, Simon Horman wrote:
->> Hi Olof, Hi Arnd,
->>
->> please consider the following SoC enhancements for 3.8.
->>
->> Change since v3:
->> * Remove noise from "ARM: shmobile: Remove SH7367 support"
->>
->> ----------------------------------------------------------------
->> The following changes since commit ddffeb8c4d0331609ef2581d84de4d763607bd37:
->>
->>   Linux 3.7-rc1 (2012-10-14 14:41:04 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git soc
->
-> Pulled, thanks!
->
->
-> -Olof
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Linux Platform
