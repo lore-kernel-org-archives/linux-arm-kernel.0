@@ -1,36 +1,40 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Nov 2012 09:19:53 -0700
-Subject: [PATCH] ARM: tegra: enable data prefetch on L2
-In-Reply-To: <20121112121905.GI1962@tbergstrom-lnx.Nvidia.com>
-References: <1352251597-2936-1-git-send-email-josephl@nvidia.com>
- <20121112121905.GI1962@tbergstrom-lnx.Nvidia.com>
-Message-ID: <50A121A9.9070101@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 12 Nov 2012 16:22:17 +0000
+Subject: [GIT PULL] musb regression fixes for v3.7-rc4
+In-Reply-To: <20121109223939.GZ6801@atomide.com>
+References: <20121109223939.GZ6801@atomide.com>
+Message-ID: <201211121622.17616.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 05:19 AM, Peter De Schrijver wrote:
-> On Wed, Nov 07, 2012 at 02:26:37AM +0100, Joseph Lo wrote:
->> Enable the data prefetch on L2. The bit28 in aux ctrl register.
->>
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> ---
->>  arch/arm/mach-tegra/common.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
->> index c25746e..c3dee56 100644
->> --- a/arch/arm/mach-tegra/common.c
->> +++ b/arch/arm/mach-tegra/common.c
->> @@ -124,7 +124,7 @@ static void __init tegra_init_cache(void)
->>  
->>  	cache_type = readl(p + L2X0_CACHE_TYPE);
->>  	aux_ctrl = (cache_type & 0x700) << (17-8);
->> -	aux_ctrl |= 0x6C000001;
->> +	aux_ctrl |= 0x7C000001;
+On Friday 09 November 2012, Tony Lindgren wrote:
+> This series fixes an annoying regression to make MUSB working
+> on omap4 again. Although it's getting rather late for these
+> changes for the -rc cycle, it is important as many devices
+> are using MUSB for charging and connectivity.
 > 
-> Just found out that we should also set bit 22 as per
-> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6395%2F1
+> With the USB PHY changes, MUSB started using the newly added
+> drivers/usb/phy/omap-usb2.c driver introduced by commit
+> 657b306a (usb: phy: add a new driver for omap usb2 phy)
+> that is using the newly introduced drivers/bus/omap-ocp2scp.c
+> introduced by commit 26a84b3e (drivers: bus: add a new driver
+> for omap-ocp2scp).
 > 
-> Stephen, should I send a seperate patch for that?
+> These changes allowed dropping a lot of PHY related code from
+> arch/arm/mach-omap2/omap_phy_internal.c and have it live in
+> the device driver like it should with commit c9e4412a (arm: omap:
+> phy: remove unused functions from omap-phy-internal.c).
+> 
+> However, MUSB on omap4 broke with these changes for legacy
+> platform data boot, and now only works with device tree for
+> omap4. Unfortunately we are still few critical bindings away
+> from being able to make omap4 usbale with device tree.
+> 
+> Fix the regression properly by adding platform data support
+> to the ocp2scp driver so we can avoid adding back the driver
+> code to arch/arm/mach-omap2.
+> 
 
-Yes please; I've applied the patch in this thread already.
+Applied to fixes branch, will send this soon.
+
+	Arnd
