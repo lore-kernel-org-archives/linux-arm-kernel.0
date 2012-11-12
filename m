@@ -1,33 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 22:00:07 +0000
-Subject: [PATCH] cpuidle: add Calxeda SOC idle support
-In-Reply-To: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
-References: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
-Message-ID: <201211122200.07901.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 12 Nov 2012 14:00:34 -0800
+Subject: [PATCH v5 0/6] Move rest of omap-iommu to live in drivers/iommu
+In-Reply-To: <CALLhW=5WNg8X0nX8U+AExocyNKW=wJ7oS36xg4ENMnfyJkX8RQ@mail.gmail.com>
+References: <20121102192221.4253.34303.stgit@muffinssi.local>
+ <CAK=WgbYR8UMyDjySJLRC0tEbJO3FaFgjWxceNwMyVdMgEgwPig@mail.gmail.com>
+ <CALLhW=5WNg8X0nX8U+AExocyNKW=wJ7oS36xg4ENMnfyJkX8RQ@mail.gmail.com>
+Message-ID: <20121112220033.GO6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 November 2012, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+* Omar Ramirez Luna <omar.luna@linaro.org> [121112 10:42]:
+> Hi,
 > 
-> Add support for core powergating on Calxeda platforms. Initially, this
-> supports ECX-1000 (highbank), but support will be added for ECX-2000
-> later.
+> On 11 November 2012 03:39, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> > On Fri, Nov 2, 2012 at 9:23 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> We need to move the iommu code to live under drivers
+> >> for arm common zImage support.
+> >
+> > For the iommu changes in the entire series:
+> >
+> > Acked-by: Ohad Ben-Cohen <ohad@wizery.com>
+> >
+> > Joerg, it might relieve some pain if this will go through Tony's tree,
+> > as there are some OMAP platform iommu changes coming in from Omar as
+> > well (part of which might have already been merged in the omap
+> > branches). Hope it's ok with both of you guys?
+> >
+> > Omar, do you still have any iommu changes coming in ?
 > 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+> Yes, I have the hwmod and runtime pm changes for iommu, I was waiting
+> for Tony to publish a branch with these changes to submit (as per
+> Tony's suggestion), but I already have the patches rebased onto these.
+> 
+> I will submit them.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Assuming Joerg is OK with these changes, I can push them into
+an immutable branch that Joerg can merge in as needed.
 
-> It's not really clear where we want ARM cpuidle drivers. We're moving
-> everything else out of arch/arm, and my understanding is Len doesn't want
-> them in drivers/idle. It seems kind of silly to me to have the framework
-> and drivers in 2 places. I've put this in drivers/cpuidle, but it doesn't
-> make any difference to me.
+Further patches on top of this series can then be queued by
+Joerg as arch/arm/*omap* and me are then out of the way of
+iommu development.
 
-Fine with me. I just don't want in in arch/arm because I'm guessing this will
-be shared with arm64, which in turn shares idle (and other) drivers with various
-powerpc, mips and x86 socs.
+Regards,
 
-	Arnd
+Tony
