@@ -1,37 +1,101 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 12 Nov 2012 12:10:37 +0800
-Subject: [PATCH] ARM: tegra: retain L2 content over CPU suspend/resume
-In-Reply-To: <509D7BA1.506@wwwdotorg.org>
-References: <1352194377-6209-1-git-send-email-josephl@nvidia.com>
- <509D7BA1.506@wwwdotorg.org>
-Message-ID: <1352693437.19251.9.camel@jlo-ubuntu-64.nvidia.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 12 Nov 2012 13:41:24 +0900
+Subject: [PATCH v7 0/5] usb: phy: samsung: Introducing usb phy driver for
+ samsung SoCs
+In-Reply-To: <20121109135441.GC8567@arwen.pp.htv.fi>
+References: <1351573057-22249-1-git-send-email-p.paneri@samsung.com>
+ <20121109115440.GC8078@arwen.pp.htv.fi>
+ <CAH9JG2X1a8MqBpnk8uHRjsGnaD7uob5GBhUh_aS5iCprEvi2XQ@mail.gmail.com>
+ <CAD6zSYN6xpHt54d-w=6veb6AErTq6ERQcneo7ewC-qsBoMuThQ@mail.gmail.com>
+ <20121109135441.GC8567@arwen.pp.htv.fi>
+Message-ID: <004201cdc08f$fa0fd3d0$ee2f7b70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2012-11-10 at 05:54 +0800, Stephen Warren wrote:
-> On 11/06/2012 02:32 AM, Joseph Lo wrote:
-> > The L2 RAM is in different power domain from the CPU cluster. So the
-> > L2 content can be retained over CPU suspend/resume. To do that, we
-> > need to disable L2 after the MMU is disabled, and enable L2 before
-> > the MMU is enabled. But the L2 controller is in the same power domain
-> > with the CPU cluster. We need to restore it's settings and re-enable
-> > it after the power be resumed.
+Felipe Balbi wrote:
 > 
-> This doesn't compile:
+> Hi,
 > 
-> arch/arm/mach-tegra/headsmp.S: Assembler messages:
-> arch/arm/mach-tegra/headsmp.S:119: Error: undefined symbol L2X0_CTRL_EN
-> used as an immediate value
-> arch/arm/mach-tegra/headsmp.S:119: Error: undefined symbol L2X0_CTRL_EN
-> used as an immediate value
+Hi :-)
 
-Ah, sorry for mention that.
-This patch was depended on "07bd005 ARM: 7547/1: cache-l2x0: add support
-for Aurora L2 cache ctrl" and only showed up after "next-20121024". The
-definition of "L2X0_CTRL_EN" was been introduced in that patch.
+[...]
 
-Should I re-send a patch that based on tegra "for-next" branch that will
-change L2X0_CTRL_EN to 0x1? Sorry for inconvenience.
+> Sure, but I still need Kukjin's 'say-so' for the arch/arm/plat-samsung
+> and arch/arm/mach-exynos part.
+> 
+Basically, this approach looks OK to me.
 
-Thanks,
-Joseph
+BTW, I have some comments and need to update...
+
+>From 4th patch...
+
+> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-
+> s3c64xx/mach-smdk6410.c
+
+[...]
+
+> @@ -72,6 +73,8 @@
+>  #include <linux/platform_data/touchscreen-s3c2410.h>
+>  #include <plat/keypad.h>
+>  #include <plat/backlight.h>
+> +#include <plat/regs-fb-v4.h>
+
+Why? In addition, this causes build error with s3c6400_defconfig.
+
+[...]
+
+> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+> index 03f654d..9cdb666 100644
+
+[...]
+
+> @@ -1370,6 +1371,30 @@ struct platform_device s5p_device_mixer = {
+> 
+>  /* USB */
+> 
+> +#ifdef CONFIG_S3C_DEV_USB_HSOTG
+> +/* USB PHY*/
+> +static struct resource samsung_usbphy_resource[] = {
+> +	[0] = {
+> +		.start = S3C_PA_USB_PHY,
+> +		.end   = S3C_PA_USB_PHY + SZ_16 - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	},
+> +};
+
++static struct resource samsung_usbphy_resource[] = {
++	[0] = DEFINED_RES_MEM(S3C_PA_USB_PHY, SZ_16),
++};
+
+[...]
+
+Happens build error with s5pv210_defconfig
+
+arch/arm/plat-samsung/devs.c:1375: error: 'S3C_PA_USB_PHY' undeclared here
+(not in a function)
+make[2]: *** [arch/arm/plat-samsung/devs.o] Error 1
+make[1]: *** [arch/arm/plat-samsung] Error 2
+make[1]: *** Waiting for unfinished jobs....
+
+And another build error with exynos_defconfig...
+
+arch/arm/mach-exynos/built-in.o: In function `.LANCHOR1':
+setup-i2c0.c:(.data+0x8080): undefined reference to
+`s5p_usb_phy_pmu_isolation'
+
+>From 5th patch....
+
+If possible, please to use 'ARM: [sub-arch dir name]: [subject]' format.
+So I preferred to use 'ARM: EXYNOS: Enabling samsung-usbphy driver for
+EXYNOS4210' on that.
+
+Please make sure your patch has no problem for kernel compilation before
+submitting...
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
