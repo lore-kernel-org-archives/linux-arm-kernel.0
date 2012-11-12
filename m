@@ -1,62 +1,35 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 12 Nov 2012 16:29:02 +0100
-Subject: [PATCH 4/6] staging: drm/imx: Add ipu_cpmem_set_yuv_interleaved()
+Date: Mon, 12 Nov 2012 16:29:04 +0100
+Subject: [PATCH 6/6] staging: drm/imx: Remove 300ms delay after memory reset
 In-Reply-To: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
 References: <1352734144-14897-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1352734144-14897-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1352734144-14897-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philipp Zabel <p.zabel@pengutronix.de>
 
-For configuring interleaved formats.
+This has been added once, but does not seem to be necessary. Tested
+on i.MX51 and i.MX6.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h |    1 +
- drivers/staging/imx-drm/ipu-v3/ipu-common.c |   17 +++++++++++++++++
- 2 files changed, 18 insertions(+)
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-index 74158dd..22c1196 100644
---- a/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-+++ b/drivers/staging/imx-drm/ipu-v3/imx-ipu-v3.h
-@@ -293,6 +293,7 @@ static inline void ipu_cpmem_interlaced_scan(struct ipu_ch_param *p,
- 
- void ipu_cpmem_set_yuv_planar(struct ipu_ch_param __iomem *p, u32 pixel_format,
- 			int stride, int height);
-+void ipu_cpmem_set_yuv_interleaved(struct ipu_ch_param *p, u32 pixel_format);
- void ipu_cpmem_set_yuv_planar_full(struct ipu_ch_param __iomem *p,
- 		u32 pixel_format, int stride, int u_offset, int v_offset);
- int ipu_cpmem_set_fmt(struct ipu_ch_param __iomem *cpmem, u32 pixelformat);
 diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-common.c b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-index a5cec0e..d871bb6 100644
+index d871bb6..147c3e9 100644
 --- a/drivers/staging/imx-drm/ipu-v3/ipu-common.c
 +++ b/drivers/staging/imx-drm/ipu-v3/ipu-common.c
-@@ -225,6 +225,23 @@ int ipu_cpmem_set_format_passthrough(struct ipu_ch_param __iomem *p,
- }
- EXPORT_SYMBOL_GPL(ipu_cpmem_set_format_passthrough);
+@@ -673,8 +673,6 @@ static int ipu_reset(struct ipu_soc *ipu)
+ 		cpu_relax();
+ 	}
  
-+void ipu_cpmem_set_yuv_interleaved(struct ipu_ch_param *p, u32 pixel_format)
-+{
-+	switch (pixel_format) {
-+	case V4L2_PIX_FMT_UYVY:
-+		ipu_ch_param_write_field(p, IPU_FIELD_BPP, 3);    /* bits/pixel */
-+		ipu_ch_param_write_field(p, IPU_FIELD_PFS, 0xA);  /* pix format */
-+		ipu_ch_param_write_field(p, IPU_FIELD_NPB, 31);   /* burst size */
-+		break;
-+	case V4L2_PIX_FMT_YUYV:
-+		ipu_ch_param_write_field(p, IPU_FIELD_BPP, 3);    /* bits/pixel */
-+		ipu_ch_param_write_field(p, IPU_FIELD_PFS, 0x8);  /* pix format */
-+		ipu_ch_param_write_field(p, IPU_FIELD_NPB, 31);   /* burst size */
-+		break;
-+	}
-+}
-+EXPORT_SYMBOL_GPL(ipu_cpmem_set_yuv_interleaved);
-+
- void ipu_cpmem_set_yuv_planar_full(struct ipu_ch_param __iomem *p,
- 		u32 pixel_format, int stride, int u_offset, int v_offset)
- {
+-	mdelay(300);
+-
+ 	return 0;
+ }
+ 
 -- 
 1.7.10.4
