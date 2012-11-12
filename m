@@ -1,41 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 21:57:51 +0000
-Subject: [GIT PULL 1/1] omap plat header removal for v3.8 merge window,
- part4
-In-Reply-To: <pull-1352312855-617904>
-References: <pull-1352312855-617904>
-Message-ID: <201211122157.51602.arnd@arndb.de>
+Date: Mon, 12 Nov 2012 22:00:07 +0000
+Subject: [PATCH] cpuidle: add Calxeda SOC idle support
+In-Reply-To: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
+References: <1352330622-13616-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201211122200.07901.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 07 November 2012, Tony Lindgren wrote:
-> The following changes since commit a0212796b58061a9716178d261f318925c246643:
+On Wednesday 07 November 2012, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
->   Merge tag 'omap-cleanup-fixes-a-for-3.8' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.8/cleanup-headers (2012-10-26 13:18:19 -0700)
+> Add support for core powergating on Calxeda platforms. Initially, this
+> supports ECX-1000 (highbank), but support will be added for ECX-2000
+> later.
 > 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3-signed
-> 
-> for you to fetch changes up to 6ba54ab4a49bbad736b0254aa6bdf0cb83013815:
-> 
->   ARM: OMAP: Remove omap_init_consistent_dma_size() (2012-11-06 16:01:19 -0800)
-> 
-> ----------------------------------------------------------------
-> These changes deal with the issues of relative includes
-> introduced by the earlier clean-up and clean up few more
-> things for enabling multiplatform support.
-> 
-> The multiplatform kernel has been booted on omaps on
-> top of this branch with the work-in-progress patches
-> applied manually.
-> 
-> We cannot yet enable the multiplatform support though.
-> We still need the common clock framework patches, some
-> solution for dma-omap.h, and serial-omap.h moved before
-> we can enable it.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Len Brown <len.brown@intel.com>
+> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
 
-Pulled into next/headers branch now, sorry for the delay.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+> It's not really clear where we want ARM cpuidle drivers. We're moving
+> everything else out of arch/arm, and my understanding is Len doesn't want
+> them in drivers/idle. It seems kind of silly to me to have the framework
+> and drivers in 2 places. I've put this in drivers/cpuidle, but it doesn't
+> make any difference to me.
+
+Fine with me. I just don't want in in arch/arm because I'm guessing this will
+be shared with arm64, which in turn shares idle (and other) drivers with various
+powerpc, mips and x86 socs.
 
 	Arnd
