@@ -1,37 +1,64 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 12 Nov 2012 11:14:41 +0100
-Subject: [PATCH v3 0/6] ARM: EXYNOS: Add secure firmware support
-In-Reply-To: <20121112095530.GF28327@n2100.arm.linux.org.uk>
-References: <1351178560-19188-1-git-send-email-t.figa@samsung.com>
- <006501cdc0a8$d880c990$89825cb0$%kim@samsung.com>
- <20121112095530.GF28327@n2100.arm.linux.org.uk>
-Message-ID: <3879194.hz9mrTmL6z@amdc1227>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Nov 2012 10:23:55 +0000
+Subject: [PATCH] ARM: implement optimized percpu variable access
+In-Reply-To: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20121112102354.GA2346@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 of November 2012 09:55:30 Russell King - ARM Linux wrote:
-> On Mon, Nov 12, 2012 at 04:39:28PM +0900, Kukjin Kim wrote:
-> > (+ Russell King)
-> 
-> I think there's still an amount of work to do here; it's not a generic
-> interface at the moment because it makes some assumptions about how
-> things are done (eg, it assumes that there _will_ be a CPU boot
-> register; that is not always true.
-> 
-> Moreover, the 'cpu' arguments given seem to be uncertain whether they're
-> logical CPU numbers or physical CPU numbers.
-> 
-> Lastly, where is this interface actually documented?  It's just a bunch
-> of code _without_ _any_ documentation.  That means people will interpret
-> it differently, and it'll get used differently from platform to
-> platform.
-> 
-> Let's have some documentation on this.
+Hi Rob,
 
-Right, I will include documentation in next version of this patchset.
+On Sun, Nov 11, 2012 at 03:20:40AM +0000, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Use the previously unused TPIDRPRW register to store percpu offsets.
+> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
+> 
+> This saves 2 loads for each percpu variable access which should yield
+> improved performance, but the improvement has not been quantified.
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+The patch looks largely fine to me (one minor comment below), but we should
+try and see what the performance difference is like on a few cores before
+merging this. Have you tried something like hackbench to see if the
+difference is measurable there? If not, I guess we'll need something more
+targetted.
+
+> diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+> new file mode 100644
+> index 0000000..9eb7372
+> --- /dev/null
+> +++ b/arch/arm/include/asm/percpu.h
+> @@ -0,0 +1,44 @@
+> +/*
+> + * Copyright 2012 Calxeda, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef _ASM_ARM_PERCPU_H_
+> +#define _ASM_ARM_PERCPU_H_
+> +
+> +/*
+> + * Same as asm-generic/percpu.h, except that we store the per cpu offset
+> + * in the TPIDRPRW.
+> + */
+> +#if defined(CONFIG_SMP) && (__LINUX_ARM_ARCH__ >= 6)
+> +
+> +static inline void set_my_cpu_offset(unsigned long off)
+> +{
+> +	asm volatile("mcr p15, 0, %0, c13, c0, 4	@ set TPIDRPRW" : : "r" (off) : "cc" );
+> +}
+
+You don't need the "cc" here.
+
+Will
