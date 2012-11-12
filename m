@@ -1,64 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 12 Nov 2012 10:23:55 +0000
-Subject: [PATCH] ARM: implement optimized percpu variable access
-In-Reply-To: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
-References: <1352604040-10014-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20121112102354.GA2346@mudshark.cambridge.arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 12 Nov 2012 12:25:01 +0200
+Subject: [PATCH 0/5] OMAPFB: use dma_alloc instead of omap's vram
+Message-ID: <1352715906-16946-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi,
 
-On Sun, Nov 11, 2012 at 03:20:40AM +0000, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Use the previously unused TPIDRPRW register to store percpu offsets.
-> TPIDRPRW is only accessible in PL1, so it can only be used in the kernel.
-> 
-> This saves 2 loads for each percpu variable access which should yield
-> improved performance, but the improvement has not been quantified.
+This series changes omapfb to use standard dma_alloc funcs instead of omap
+specific vram allocator. This let's us remove the omap vram allocator, making
+omapfb platform independent.
 
-The patch looks largely fine to me (one minor comment below), but we should
-try and see what the performance difference is like on a few cores before
-merging this. Have you tried something like hackbench to see if the
-difference is measurable there? If not, I guess we'll need something more
-targetted.
+However, note that using standard dma funcs causes the following downsides:
 
-> diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-> new file mode 100644
-> index 0000000..9eb7372
-> --- /dev/null
-> +++ b/arch/arm/include/asm/percpu.h
-> @@ -0,0 +1,44 @@
-> +/*
-> + * Copyright 2012 Calxeda, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef _ASM_ARM_PERCPU_H_
-> +#define _ASM_ARM_PERCPU_H_
-> +
-> +/*
-> + * Same as asm-generic/percpu.h, except that we store the per cpu offset
-> + * in the TPIDRPRW.
-> + */
-> +#if defined(CONFIG_SMP) && (__LINUX_ARM_ARCH__ >= 6)
-> +
-> +static inline void set_my_cpu_offset(unsigned long off)
-> +{
-> +	asm volatile("mcr p15, 0, %0, c13, c0, 4	@ set TPIDRPRW" : : "r" (off) : "cc" );
-> +}
+1) dma_alloc_attrs doesn't let us allocate at certain physical address.
+However, this should not be a problem as this feature of vram allocator
+is only used when reserving the framebuffer that was initialized by the
+bootloader, and we don't currently support "passing" a framebuffer from
+the bootloader to the kernel anyway.
 
-You don't need the "cc" here.
+2) dma_alloc_attrs, as of now, always ioremaps the allocated area, and
+we don't need the ioremap when using VRFB. This patch uses
+DMA_ATTR_NO_KERNEL_MAPPING for the allocation, but the flag is currently
+not operational.
 
-Will
+3) OMAPFB_GET_VRAM_INFO ioctl cannot return real values anymore. I
+changed the ioctl to return 64M for all the values, which, I hope, the
+applications will interpret as "there's enough vram".
+
+4) "vram" kernel parameter to define how much ram to reserve for video use no
+longer works. The user needs to enable CMA and use "cma" parameter.
+
+ Tomi
+
+Tomi Valkeinen (5):
+  OMAP: FB: use DMA_BIT_MASK() for fb's coherent_dma_mask
+  OMAPFB: use dma_alloc_attrs to allocate memory
+  OMAP: RX51: remove use of vram
+  OMAP: common.c: remove init call to vram
+  OMAP: remove vram allocator
+
+ arch/arm/mach-omap2/board-rx51-video.c    |   14 -
+ arch/arm/mach-omap2/board-rx51.c          |    3 -
+ arch/arm/plat-omap/common.c               |    2 -
+ arch/arm/plat-omap/fb.c                   |    5 +-
+ arch/arm/plat-omap/include/plat/vram.h    |   43 ---
+ drivers/video/omap2/Kconfig               |    3 -
+ drivers/video/omap2/Makefile              |    1 -
+ drivers/video/omap2/dss/Kconfig           |   12 -
+ drivers/video/omap2/omapfb/Kconfig        |    1 -
+ drivers/video/omap2/omapfb/omapfb-ioctl.c |   14 +-
+ drivers/video/omap2/omapfb/omapfb-main.c  |   69 ++--
+ drivers/video/omap2/omapfb/omapfb.h       |    5 +
+ drivers/video/omap2/vram.c                |  514 -----------------------------
+ 13 files changed, 51 insertions(+), 635 deletions(-)
+ delete mode 100644 arch/arm/plat-omap/include/plat/vram.h
+ delete mode 100644 drivers/video/omap2/vram.c
+
+-- 
+1.7.10.4
