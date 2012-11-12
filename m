@@ -1,45 +1,22 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Nov 2012 14:00:34 -0800
-Subject: [PATCH v5 0/6] Move rest of omap-iommu to live in drivers/iommu
-In-Reply-To: <CALLhW=5WNg8X0nX8U+AExocyNKW=wJ7oS36xg4ENMnfyJkX8RQ@mail.gmail.com>
-References: <20121102192221.4253.34303.stgit@muffinssi.local>
- <CAK=WgbYR8UMyDjySJLRC0tEbJO3FaFgjWxceNwMyVdMgEgwPig@mail.gmail.com>
- <CALLhW=5WNg8X0nX8U+AExocyNKW=wJ7oS36xg4ENMnfyJkX8RQ@mail.gmail.com>
-Message-ID: <20121112220033.GO6801@atomide.com>
+Date: Mon, 12 Nov 2012 14:03:56 -0800
+Subject: [PATCH -next] ARM: OMAP2+: remove duplicated include from
+ board-overo.c
+In-Reply-To: <CAPgLHd9ZWdBzaM15ZBckZUGwSq-xcMncFayUrLtWjs0V+QYeqg@mail.gmail.com>
+References: <CAPgLHd9ZWdBzaM15ZBckZUGwSq-xcMncFayUrLtWjs0V+QYeqg@mail.gmail.com>
+Message-ID: <20121112220355.GP6801@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Omar Ramirez Luna <omar.luna@linaro.org> [121112 10:42]:
-> Hi,
+* Wei Yongjun <weiyj.lk@gmail.com> [121107 04:55]:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> On 11 November 2012 03:39, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> > On Fri, Nov 2, 2012 at 9:23 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >> We need to move the iommu code to live under drivers
-> >> for arm common zImage support.
-> >
-> > For the iommu changes in the entire series:
-> >
-> > Acked-by: Ohad Ben-Cohen <ohad@wizery.com>
-> >
-> > Joerg, it might relieve some pain if this will go through Tony's tree,
-> > as there are some OMAP platform iommu changes coming in from Omar as
-> > well (part of which might have already been merged in the omap
-> > branches). Hope it's ok with both of you guys?
-> >
-> > Omar, do you still have any iommu changes coming in ?
+> Remove duplicated include.
 > 
-> Yes, I have the hwmod and runtime pm changes for iommu, I was waiting
-> for Tony to publish a branch with these changes to submit (as per
-> Tony's suggestion), but I already have the patches rebased onto these.
-> 
-> I will submit them.
+> dpatch engine is used to auto generate this patch.
+> (https://github.com/weiyj/dpatch)
 
-Assuming Joerg is OK with these changes, I can push them into
-an immutable branch that Joerg can merge in as needed.
-
-Further patches on top of this series can then be queued by
-Joerg as arch/arm/*omap* and me are then out of the way of
-iommu development.
+Thanks applying into omap-for-v3.8/cleanup-headers-prepare-multiplatform-v3.
 
 Regards,
 
