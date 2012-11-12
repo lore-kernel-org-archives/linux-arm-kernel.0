@@ -1,203 +1,101 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 12 Nov 2012 16:52:22 +0800
-Subject: [PATCH 02/17] of_spi: add generic binding support to specify cs gpio
+Date: Mon, 12 Nov 2012 16:52:32 +0800
+Subject: [PATCH 12/17] spi/atmel_spi: add version propety as the spi data
 In-Reply-To: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
 References: <1352710357-3265-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1352710357-3265-3-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1352710357-3265-13-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+To remove the function atmel_spi_is_v2() which depends on the SOC,
+for future using DTS section to decide the IP version of SOC.
 
-This will allow to use gpio for chip select with no modification in the
-driver binding
-
-When use the cs-gpios, the gpio number will be passed via the cs_gpio field
-and the number of chip select will automatically increased.
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: spi-devel-general at lists.sourceforge.net
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 Cc: grant.likely at secretlab.ca
-Cc: rob.herring at calxeda.com
-Cc: rob at landley.net
-Cc: richard.genoud at gmail.com
+Cc: spi-devel-general at lists.sourceforge.net
 ---
-Hi, Richard,
+ drivers/spi/spi-atmel.c |   26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-This patch based on the original patch from Jean-Christophe, 
- 	[PATCH] of_spi: add generic binding support to specify cs gpio
-and merged the patch from Richard Genoud,
-	[PATCH] [BUG] SPI: array out of bound => no CS
-
-Could you sign your signature in this patch?
-
-Best Regards,
-Wenyou Yang
-
- Documentation/devicetree/bindings/spi/spi-bus.txt |    6 +++
- drivers/spi/spi.c                                 |   55 +++++++++++++++++++--
- include/linux/spi/spi.h                           |    3 ++
- 3 files changed, 61 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-bus.txt b/Documentation/devicetree/bindings/spi/spi-bus.txt
-index d2c33d0..7f59ae30 100644
---- a/Documentation/devicetree/bindings/spi/spi-bus.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-bus.txt
-@@ -12,6 +12,7 @@ The SPI master node requires the following properties:
- - #size-cells     - should be zero.
- - compatible      - name of SPI bus controller following generic names
-     		recommended practice.
-+- cs-gpios	  - (optional) gpios chip select.
- No other properties are required in the SPI bus node.  It is assumed
- that a driver for an SPI bus device will understand that it is an SPI bus.
- However, the binding does not attempt to define the specific method for
-@@ -21,6 +22,8 @@ assumption that board specific platform code will be used to manage
- chip selects.  Individual drivers can define additional properties to
- support describing the chip select layout.
- 
-+If cs-gpios is used the number of chip select will automatically increased.
-+
- Optional property:
- - num-cs : total number of chipselects
- 
-@@ -37,6 +40,9 @@ contain the following properties.
- - spi-cs-high     - (optional) Empty property indicating device requires
-     		chip select active high
- 
-+If a gpio chipselect is used for the SPI slave the gpio number will be passed
-+via the controller_data
-+
- SPI example for an MPC5200 SPI bus:
- 	spi at f00 {
- 		#address-cells = <1>;
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 84c2861..74e6577 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -30,6 +30,7 @@
- #include <linux/slab.h>
- #include <linux/mod_devicetable.h>
- #include <linux/spi/spi.h>
-+#include <linux/of_gpio.h>
- #include <linux/pm_runtime.h>
- #include <linux/export.h>
- #include <linux/sched.h>
-@@ -327,6 +328,7 @@ struct spi_device *spi_alloc_device(struct spi_master *master)
- 	spi->dev.parent = &master->dev;
- 	spi->dev.bus = &spi_bus_type;
- 	spi->dev.release = spidev_release;
-+	spi->cs_gpio = -EINVAL;
- 	device_initialize(&spi->dev);
- 	return spi;
- }
-@@ -344,15 +346,16 @@ EXPORT_SYMBOL_GPL(spi_alloc_device);
- int spi_add_device(struct spi_device *spi)
- {
- 	static DEFINE_MUTEX(spi_add_lock);
--	struct device *dev = spi->master->dev.parent;
-+	struct spi_master *master = spi->master;
-+	struct device *dev = master->dev.parent;
- 	struct device *d;
- 	int status;
- 
- 	/* Chipselects are numbered 0..max; validate. */
--	if (spi->chip_select >= spi->master->num_chipselect) {
-+	if (spi->chip_select >= master->num_chipselect) {
- 		dev_err(dev, "cs%d >= max %d\n",
- 			spi->chip_select,
--			spi->master->num_chipselect);
-+			master->num_chipselect);
- 		return -EINVAL;
- 	}
- 
-@@ -376,6 +379,9 @@ int spi_add_device(struct spi_device *spi)
- 		goto done;
- 	}
- 
-+	if (master->cs_gpios)
-+		spi->cs_gpio = master->cs_gpios[spi->chip_select];
-+
- 	/* Drivers may modify this initial i/o setup, but will
- 	 * normally rely on the device being setup.  Devices
- 	 * using SPI_CS_HIGH can't coexist well otherwise...
-@@ -946,6 +952,45 @@ struct spi_master *spi_alloc_master(struct device *dev, unsigned size)
- }
- EXPORT_SYMBOL_GPL(spi_alloc_master);
- 
-+#ifdef CONFIG_OF
-+static int of_spi_register_master(struct spi_master *master)
-+{
-+	int nb, i;
-+	int *cs;
-+	struct device_node *np = master->dev.of_node;
-+
-+	if (!np)
-+		return 0;
-+
-+	nb = of_gpio_named_count(np, "cs-gpios");
-+
-+	if (nb < 1)
-+		return 0;
-+
-+	cs = devm_kzalloc(&master->dev,
-+			  sizeof(int) * (master->num_chipselect + nb),
-+			  GFP_KERNEL);
-+	master->cs_gpios = cs;
-+
-+	if (!master->cs_gpios)
-+		return -ENOMEM;
-+
-+	memset(cs, -EINVAL, master->num_chipselect);
-+	cs += master->num_chipselect;
-+	master->num_chipselect += nb;
-+
-+	for (i = 0; i < nb; i++)
-+		cs[i] = of_get_named_gpio(np, "cs-gpios", i);
-+
-+	return 0;
-+}
-+#else
-+static int of_spi_register_master(struct spi_master *master)
-+{
-+	return 0;
-+}
-+#endif
-+
- /**
-  * spi_register_master - register SPI master controller
-  * @master: initialized master, originally from spi_alloc_master()
-@@ -977,6 +1022,10 @@ int spi_register_master(struct spi_master *master)
- 	if (!dev)
- 		return -ENODEV;
- 
-+	status = of_spi_register_master(master);
-+	if (status)
-+		return status;
-+
- 	/* even if it's just one always-selected device, there must
- 	 * be@least one chipselect
- 	 */
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index fa702ae..f629189 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -90,6 +90,7 @@ struct spi_device {
- 	void			*controller_state;
- 	void			*controller_data;
- 	char			modalias[SPI_NAME_SIZE];
-+	int			cs_gpio;	/* chip select gpio */
- 
- 	/*
- 	 * likely need more hooks for more protocol options affecting how
-@@ -362,6 +363,8 @@ struct spi_master {
- 	int (*transfer_one_message)(struct spi_master *master,
- 				    struct spi_message *mesg);
- 	int (*unprepare_transfer_hardware)(struct spi_master *master);
-+	/* gpio chip select */
-+	int			*cs_gpios;
+diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+index 0cc347c..568df5b 100644
+--- a/drivers/spi/spi-atmel.c
++++ b/drivers/spi/spi-atmel.c
+@@ -187,6 +187,7 @@
+  */
+ struct atmel_spi_data {
+ 	u8			dma_type;
++	u8			version;
+ 	struct at_dma_slave	dma_slave;
  };
  
- static inline void *spi_master_get_devdata(struct spi_master *master)
+@@ -264,9 +265,20 @@ static struct dma_slave_config slave_config;
+  * register, but I haven't checked that it exists on all chips, and
+  * this is cheaper anyway.
+  */
+-static bool atmel_spi_is_v2(void)
++static bool atmel_spi_is_v1(struct atmel_spi *as)
+ {
+-	return !cpu_is_at91rm9200();
++	if (as->data.version == 1)
++		return true;
++	else
++		return false;
++}
++
++static bool atmel_spi_is_v2(struct atmel_spi *as)
++{
++	if (as->data.version == 2)
++		return true;
++	else
++		return false;
+ }
+ 
+ /*
+@@ -300,7 +312,7 @@ static void cs_activate(struct atmel_spi *as, struct spi_device *spi)
+ 	unsigned active = spi->mode & SPI_CS_HIGH;
+ 	u32 mr;
+ 
+-	if (atmel_spi_is_v2()) {
++	if (atmel_spi_is_v2(as)) {
+ 		/*
+ 		 * Always use CSR0. This ensures that the clock
+ 		 * switches to the correct idle polarity before we
+@@ -355,7 +367,7 @@ static void cs_deactivate(struct atmel_spi *as, struct spi_device *spi)
+ 			asd->npcs_pin, active ? " (low)" : "",
+ 			mr);
+ 
+-	if (atmel_spi_is_v2() || spi->chip_select != 0)
++	if (atmel_spi_is_v2(as) || spi->chip_select != 0)
+ 		gpio_set_value(asd->npcs_pin, !active);
+ }
+ 
+@@ -1266,7 +1278,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 	}
+ 
+ 	/* see notes above re chipselect */
+-	if (!atmel_spi_is_v2()
++	if (atmel_spi_is_v1(as)
+ 			&& spi->chip_select == 0
+ 			&& (spi->mode & SPI_CS_HIGH)) {
+ 		dev_dbg(&spi->dev, "setup: can't be active-high\n");
+@@ -1275,7 +1287,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 
+ 	/* v1 chips start out at half the peripheral bus speed. */
+ 	bus_hz = clk_get_rate(as->clk);
+-	if (!atmel_spi_is_v2())
++	if (atmel_spi_is_v1(as))
+ 		bus_hz /= 2;
+ 
+ 	if (spi->max_speed_hz) {
+@@ -1347,7 +1359,7 @@ static int atmel_spi_setup(struct spi_device *spi)
+ 		"setup: %lu Hz bpw %u mode 0x%x -> csr%d %08x\n",
+ 		bus_hz / scbr, bits, spi->mode, spi->chip_select, csr);
+ 
+-	if (!atmel_spi_is_v2())
++	if (atmel_spi_is_v1(as))
+ 		spi_writel(as, CSR0 + 4 * spi->chip_select, csr);
+ 
+ 	return 0;
 -- 
 1.7.9.5
