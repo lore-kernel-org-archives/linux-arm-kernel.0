@@ -1,76 +1,94 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Nov 2012 11:58:47 -0700
-Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
-In-Reply-To: <20121112184340.GA15643@lizard>
-References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
- <1352650891-18356-2-git-send-email-andrew@lunn.ch>
- <50A020C5.4070506@wwwdotorg.org> <20121112082546.GU22029@lunn.ch>
- <50A1212C.2080601@wwwdotorg.org> <20121112181947.GS24583@lunn.ch>
- <20121112184340.GA15643@lizard>
-Message-ID: <50A146E7.2040608@wwwdotorg.org>
+From: jon-hunter@ti.com (Jon Hunter)
+Date: Mon, 12 Nov 2012 13:05:58 -0600
+Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
+In-Reply-To: <509F6CE3.50806@compulab.co.il>
+References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
+ <20121107173343.GF6801@atomide.com> <509B5B84.50605@compulab.co.il>
+ <20121108162004.GA6801@atomide.com> <509F6CE3.50806@compulab.co.il>
+Message-ID: <50A14896.1080504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2012 11:43 AM, Anton Vorontsov wrote:
-> On Mon, Nov 12, 2012 at 07:19:47PM +0100, Andrew Lunn wrote:
-> [..]
->>>>>> Given appropriate devicetree bindings, this driver registers a
->>>>>> pm_power_off function to set a GPIO line high/low to power down
->>>>>> your board.
+
+On 11/11/2012 03:16 AM, Igor Grinberg wrote:
+> On 11/08/12 18:20, Tony Lindgren wrote:
+>> * Igor Grinberg <grinberg@compulab.co.il> [121107 23:15]:
+>>> On 11/07/12 19:33, Tony Lindgren wrote:
+>>>>
+>>>> I think this should be the default for the timers as that counter
+>>>> does not stop during deeper idle states.
 >>>
->>>>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt b/Documentation/devicetree/bindings/gpio/gpio-poweroff.txt
->>>>>
->>>>>> +Required properties:
->>>>>> +- compatible : should be "gpio-poweroff".
->>>>>> +- gpios : The GPIO to set high/low, see "gpios property" in
->>>>>> +  Documentation/devicetree/bindings/gpio/gpio.txt. If the pin should be
->>>>>> +  low to power down the board set it to "Active Low", otherwise set
->>>>>> +  gpio to "Active High".
->>>>>
->>>>> Unfortunately, not all GPIO bindings support active high/low flags in
->>>>> the GPIO specifier. As such, the flags there are basically useless.
->>>>> Other bindings (e.g. IIRC the fixed-regulator binding) have added a
->>>>> separate active-high property to indicate the GPIO polarity. This
->>>>> binding should probably follow suite.
+>>> Well, it is the default as you can see from the patch.
+>>> The problem is that for boards that for some reason do not have
+>>> the 32k wired and rely on MPU/GP timer source, the default will not work
+>>> and currently there is no way for board to specify which timer source
+>>> it can use.
+>>
+>> Yes. I was just wondering if we can avoid patching all the board
+>> files by doing it the other way around by introducing a new
+>> omap_gp_timer rather than renaming all the existing ones?
 > 
-> Should the gpio driver fix its bindings then?.. Polarity is a quite
-> generic concept of a GPIO, and flags are there for a reason. I'd rather
-> prefer having
+> Is the renaming that bad? One line per machine_desc structure?
+> Of course we can skip the renaming, but then it will be less consistent
+> and will not reflect the actual timer source used.
+> I tried to make it flexible as much as possible and self explanatory.
+> So above are my considerations, but at this point in time I don't really
+> care if we rename them or just add a new one, but we have to get rid of
+> the ugly fall back.
 
-There is no "GPIO driver" to fix; each GPIO driver has its own bindings,
-and unfortunately, some of the GPIO binding authors chose not to include
-any flags cell in the GPIO specifier (e.g. Samsung ARM SoCs IIRC, but
-there are probably more).
+I am not sure if you guys disagree, but does it make sense to start
+thinking about this with regard to device-tree? With device-tree all the
+boards files will become obsolete and so we need to be able to handle
+this during boot time and not compile time.
 
-> 	stuff-gpios = <0 0
-> 		       1 0
-> 		       2 1
-> 		       3 0>;
-> 
-> Rather than
-> 
-> 	stuff-gpios = <0 1 2 3>;
-> 	stuff-polarity-gpio-map = <0 0 1 0>;
-> 
-> The first scheme existed like for years already. Has it been discussed
-> that it is no longer preferred?
-> 
->>>> Humm, so are you saying of_get_named_gpio_flags() is deprecated?
+>>
+>>> We have discussed this in San Diego (remember?) and you actually proposed
+>>> this way as a solution. Well, may be I took it a bit further than you
+>>> thought, but this is because the board code cannot know which timer source
+>>> should be used at runtime and the fall back described below, does not work.
+>>
+>> Yes thanks I agree we should get rid of that Kconfig option for sure. 
+>>
+>>>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
+>>>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
+>>>>> @@ -284,6 +284,6 @@ MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
+>>>>>  	.handle_irq	= omap2_intc_handle_irq,
+>>>>>  	.init_machine	= omap_2430sdp_init,
+>>>>>  	.init_late	= omap2430_init_late,
+>>>>> -	.timer		= &omap2_timer,
+>>>>> +	.timer		= &omap2_sync32k_timer,
+>>>>>  	.restart	= omap_prcm_restart,
+>>>>>  MACHINE_END
+>>>>> --- a/arch/arm/mach-omap2/board-3430sdp.c
+>>>>> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+>>>>> @@ -596,6 +596,6 @@ MACHINE_START(OMAP_3430SDP, "OMAP3430 3430SDP board")
+>>>>>  	.handle_irq	= omap3_intc_handle_irq,
+>>>>>  	.init_machine	= omap_3430sdp_init,
+>>>>>  	.init_late	= omap3430_init_late,
+>>>>> -	.timer		= &omap3_timer,
+>>>>> +	.timer		= &omap3_sync32k_timer,
+>>>>>  	.restart	= omap_prcm_restart,
+>>>>>  MACHINE_END
+>>>> ...
+>>>>
+>>>> Can't we assume that the default timer is omap[234]_sync32k_timer to
+>>>> avoid renaming the timer entries in all the board files?
 >>>
->>> I don't know if it's deprecated, but it's certainly not useful in
->>> generic code.
+>>> Hmmm...
+>>> How will this work with the macros defining the sys_timer structure?
+>>> I would also not want to hide the exact timer used under the default name.
 >>
->> Hi Linus, Anton
->>
->> How do you see this? 
->>
->> I'm happy to implement an enable-active-high property, but it seems to
->> go against the purpose of of_get_named_gpio_flags(). Is that function
->> deprecated?
+>> Can't you just add a new sys_timer (or a new macro) for GP only setups? 
 > 
-> Never heard of any deprecation, and I disagree that it is "not useful in
-> generic code". :)
+> Of course I can... but I tried to create a flexible generic code, so
+> no meter how a board will be wired, you just need to specify which timer source
+> it uses and be done with it.
 
-Put more specifically, I meant: It would be useful to have such a
-feature. However, since such a feature doesn't exist in all cases, it's
-not possible to rely on the feature, and hence trying to isn't useful.
+If you are concerned about how a board is wired up (if the 32k is
+present), then I think that that is best handled via device-tree and we
+should query device-tree on boot to see what our options are.
+
+What do you guys think?
+
+Cheers
+Jon
