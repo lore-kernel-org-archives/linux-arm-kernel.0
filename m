@@ -1,22 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 12 Nov 2012 12:34:41 -0800
-Subject: [PATCH V3 00/13] ARM: OMAP: DMTIMER fixes
-In-Reply-To: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
-References: <1352744444-2633-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <20121112203440.GL6801@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 12 Nov 2012 13:37:32 -0700
+Subject: [PATCH v4 5/9] document: devicetree: bind pinconf with pin-single
+In-Reply-To: <1352301582-12244-6-git-send-email-haojian.zhuang@gmail.com>
+References: <1352301582-12244-1-git-send-email-haojian.zhuang@gmail.com>
+ <1352301582-12244-6-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <50A15E0C.2010903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [121112 10:22]:
-> This series includes several fixes for the OMAP DMTIMER driver. This is
-> based upon Tony Lindgren's current master branch [1].
+On 11/07/2012 08:19 AM, Haojian Zhuang wrote:
+> Add comments with pinconf & gpio range in the document of
+> pinctrl-single.
 
-You should be able to use omap-for-v3.8/dt as the base now with
-the cleanup merged there. The master branch is just a merge of the
-various topic branches, and can't be used as a base for pull requests.
+> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-single.txt
 
-Regards,
+>  Required properties:
+> -- compatible : "pinctrl-single"
+> +- compatible : "pinctrl-single" or "pinconf-single".
+> +  "pinctrl-single" means that pinconf isn't supported.
+> +  "pinconf-single" means that generic pinconf is supported.
+>  
+>  - reg : offset and length of the register set for the mux registers
+>  
+> @@ -14,9 +16,33 @@ Optional properties:
+>  - pinctrl-single,function-off : function off mode for disabled state if
+>    available and same for all registers; if not specified, disabling of
+>    pin functions is ignored
+> +
+>  - pinctrl-single,bit-per-mux : boolean to indicate that one register controls
+>    more than one pin
+>  
+> +- pinctrl-single,power-source-mask : mask of setting power source in
+> +  the pinmux register
+> +
+> +- pinctrl-single,power-source : value of setting power source field
+> +  in the pinmux register
 
-Tony
+Isn't power-source an enumeration? As such, shouldn't the pinctrl state
+definition supply the value, rather than the pin controller definition?
 
-> [1] http://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+The above two properties imply to me that you're saying "these bits
+(power-source-mask) in any pin register must be set to this one value
+(power-source)". However, I think you want to say "these bits
+(power-source-mask) are used to configure the power source", and then
+allow the state nodes (what's reference from pinctrl client devices'
+pinctrl-n properties) to define the value.
+
+Perhaps that's your intent already, but if so, the properties for the
+two different nodes should be documented separately, not all interleaved
+in a single list, without any indication of which node they get put into.
+
+> +- pinctrl-single,bias-mask : mask of setting bias value in the pinmux
+> +  register
+> +
+> +- pinctrl-single,bias-disable : value of disabling bias in the pinmux
+> +  register
+> +
+> +- pinctrl-single,bias-pull-down : value of setting bias pull down in
+> +  the pinmux register
+> +
+> +- pinctrl-single,bias-pull-up : value of setting bias pull up in the
+> +  pinmux register
+> +
+> +- pinctrl-single,bias : value of setting bias in the pinmux register
+
+If there are bias-disable, bias-pull-down, and bias-pull-up properties,
+what is the plain "bias" property for?
+
+> +- pinctrl-single,input-schmitt-mask : mask of setting input schmitt
+> +  in the pinmux register
+
+And if the "value" properties go into the pinctrl state nodes, why isn't
+there a "value" property for schmitt?
+
+> +Optional sub-node: In case some pins could be configured as GPIO in the pinmux
+> +register. If both GPIO nubmer and pin base of those pins are in ascending order,
+> +those pins could be defined as a GPIO range. The sub-node should be defined in
+> +.dtsi files of those silicons.
+
+Pinctrl state definitions are also nodes directly inside the pin
+controller node. How does the pin controller driver know whether a child
+node is a state definition, or a GPIO range? Is the node required to
+have some specific name?
