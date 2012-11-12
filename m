@@ -1,30 +1,114 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 12 Nov 2012 14:34:58 +0000
-Subject: [GIT PULL] arm-soc: lpc32xx: platform updates
-In-Reply-To: <50A0D053.8020602@antcom.de>
-References: <509A5992.60009@antcom.de> <50A0D053.8020602@antcom.de>
-Message-ID: <201211121434.58468.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 12 Nov 2012 14:38:46 +0000
+Subject: [PATCH] ARM: add get_user() support for 8 byte types
+In-Reply-To: <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
+References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
+ <20121112104601.GB2346@mudshark.cambridge.arm.com>
+ <CAF6AEGtR0WBjoWbb2BF-hJa9sQi2Aa75dfrfb1u5EncaOB7Pyw@mail.gmail.com>
+Message-ID: <20121112143846.GI2346@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 12 November 2012, Roland Stigge wrote:
-> this is a follow-up update of the previous pull request, adding only one patch
-> to the LPC32xx platform (Motor PWM clock by Alban Bedel).
+On Mon, Nov 12, 2012 at 01:46:57PM +0000, Rob Clark wrote:
+> On Mon, Nov 12, 2012 at 4:46 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, Nov 09, 2012 at 09:17:33PM +0000, Rob Clark wrote:
+> >> @@ -122,22 +124,35 @@ extern int __get_user_4(void *);
+> >>       ({                                                              \
+> >>               unsigned long __limit = current_thread_info()->addr_limit - 1; \
+> >>               register const typeof(*(p)) __user *__p asm("r0") = (p);\
+> >> -             register unsigned long __r2 asm("r2");                  \
+> >>               register unsigned long __l asm("r1") = __limit;         \
+> >>               register int __e asm("r0");                             \
+> >>               switch (sizeof(*(__p))) {                               \
+> >> -             case 1:                                                 \
+> >> +             case 1: {                                               \
+> >> +                     register unsigned long __r2 asm("r2");          \
+> >>                       __get_user_x(__r2, __p, __e, __l, 1);           \
+> >> +                     x = (typeof(*(p))) __r2;                        \
+> >>                       break;                                          \
+> >> -             case 2:                                                 \
+> >> +             }                                                       \
+> >> +             case 2: {                                               \
+> >> +                     register unsigned long __r2 asm("r2");          \
+> >>                       __get_user_x(__r2, __p, __e, __l, 2);           \
+> >> +                     x = (typeof(*(p))) __r2;                        \
+> >>                       break;                                          \
+> >> -             case 4:                                                 \
+> >> +             }                                                       \
+> >> +             case 4: {                                               \
+> >> +                     register unsigned long __r2 asm("r2");          \
+> >>                       __get_user_x(__r2, __p, __e, __l, 4);           \
+> >> +                     x = (typeof(*(p))) __r2;                        \
+> >> +                     break;                                          \
+> >> +             }                                                       \
+> >> +             case 8: {                                               \
+> >> +                     register unsigned long long __r2 asm("r2");     \
+> >
+> > Does this matter? For EABI, we'll pass in (r2, r3) and it's all handcrafted
+> > asm, so the compiler shouldn't care much. For OABI, I think you may have to
+> > do some more work to get the two words where you want them.
 > 
-> The following changes since commit 91deef8069e7ffafac4467200e1d37af1b2d7c56:
-> 
->   ARM: LPC32xx: Cleanup irq.c (2012-11-07 13:30:50 +0100)
-> 
-> are available in the git repository at:
-> 
->   git://git.antcom.de/linux-2.6.git lpc32xx/core
-> 
+> Is the question whether the compiler is guaranteed to allocate r2 and
+> r3 in all cases?  I'm not quite sure, I confess to usually trying to
+> avoid inline asm.  But from looking at the disassembly (for little
+> endian EABI build) it seemed to do the right thing.
 
-Pulled into next/soc, thanks!
+I can't recall how OABI represents 64-bit values and particularly whether this
+differs between little and big-endian, so I wondered whether you may have to
+do some marshalling when you assign x. However, a few quick experiments with
+GCC suggest that the register representation matches EABI in regards to word
+ordering (it just doesn't require an even base register), although it would
+be good to find this written down somewhere...
 
-It would be nice if you could start using signed tag for pull requests
-and put a little series description into that tag. Ideally signed with
-a gpg key that is trusted by other kernel developers, but just having the
-changelog is good as well.
+> The only other idea I had was to explicitly declare two 'unsigned
+> long's and then shift them into a 64bit x, although I'm open to
+> suggestions if there is a better way.
 
-	Arnd
+Can't you just use register unsigned long long for all cases? Even better,
+follow what put_user does and use typeof(*(p))?
+
+> >> diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+> >> index 9b06bb4..d05285c 100644
+> >> --- a/arch/arm/lib/getuser.S
+> >> +++ b/arch/arm/lib/getuser.S
+> >> @@ -18,7 +18,7 @@
+> >>   * Inputs:   r0 contains the address
+> >>   *           r1 contains the address limit, which must be preserved
+> >>   * Outputs:  r0 is the error code
+> >> - *           r2 contains the zero-extended value
+> >> + *           r2, r3 contains the zero-extended value
+> >>   *           lr corrupted
+> >>   *
+> >>   * No other registers must be altered.  (see <asm/uaccess.h>
+> >> @@ -66,6 +66,19 @@ ENTRY(__get_user_4)
+> >>       mov     pc, lr
+> >>  ENDPROC(__get_user_4)
+> >>
+> >> +ENTRY(__get_user_8)
+> >> +     check_uaccess r0, 4, r1, r2, __get_user_bad
+> >
+> > Shouldn't you be passing 8 here, so that we validate the correct range?
+> 
+> yes, sorry, I'll fix that
+> 
+> >> +#ifdef CONFIG_THUMB2_KERNEL
+> >> +5: TUSER(ldr)        r2, [r0]
+> >> +6: TUSER(ldr)        r3, [r0, #4]
+> >> +#else
+> >> +5: TUSER(ldr)        r2, [r0], #4
+> >> +6: TUSER(ldr)        r3, [r0]
+> >> +#endif
+> >
+> > This doesn't work for EABI big-endian systems.
+> 
+> Hmm, is that true?  Wouldn't put_user() then have the same problem?
+
+I dug up the PCS and it seems that we arrange the two halves of the
+doubleword to match the ldm/stm memory representation for EABI, so sorry
+for the confusion.
+
+> I guess __ARMEB__ is the flag for big-endian?
+
+That's the thing defined by the compiler, yes.
+
+Will
