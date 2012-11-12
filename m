@@ -1,51 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Nov 2012 01:53:12 +0100
-Subject: [PATCH 6/6] ARM: integrator: delete static UART1 mapping
-Message-ID: <1352681592-13036-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 12 Nov 2012 02:00:31 +0100
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+Message-ID: <CACRpkdZvHBjFQTrQnxvc3WCOb2CqGbjYJxyQ5qQkSbU+UWHYZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Integrators does not use the UART1 for any debugging
-or similar, dynamic mapping should be all that is needed
-so delete this static map.
+On Sun, Nov 11, 2012 at 5:21 PM, Andrew Lunn <andrew@lunn.ch> wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-integrator/integrator_ap.c | 5 -----
- arch/arm/mach-integrator/integrator_cp.c | 5 -----
- 2 files changed, 10 deletions(-)
+> From: Jamie Lentin <jm@lentin.co.uk>
+>
+> Given appropriate devicetree bindings, this driver registers a
+> pm_power_off function to set a GPIO line high/low to power down
+> your board.
+>
+> Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index becba43..771cbe4 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -121,11 +121,6 @@ static struct map_desc ap_io_desc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
--		.virtual	= IO_ADDRESS(INTEGRATOR_UART1_BASE),
--		.pfn		= __phys_to_pfn(INTEGRATOR_UART1_BASE),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE
--	}, {
- 		.virtual	= IO_ADDRESS(INTEGRATOR_DBG_BASE),
- 		.pfn		= __phys_to_pfn(INTEGRATOR_DBG_BASE),
- 		.length		= SZ_4K,
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index fc2b1e4..c4b6af9 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -105,11 +105,6 @@ static struct map_desc intcp_io_desc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE
- 	}, {
--		.virtual	= IO_ADDRESS(INTEGRATOR_UART1_BASE),
--		.pfn		= __phys_to_pfn(INTEGRATOR_UART1_BASE),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE
--	}, {
- 		.virtual	= IO_ADDRESS(INTEGRATOR_DBG_BASE),
- 		.pfn		= __phys_to_pfn(INTEGRATOR_DBG_BASE),
- 		.length		= SZ_4K,
--- 
-1.7.11.7
+So this is just a GPIO client like any such thing right?
+
+I mean this thing has nothing more to do with the GPIO subsystem
+than say, drivers/input/keyboard/gpio_keys.c?
+
+So from the GPIO subsystem point of view controlling power is
+an alien concept.
+
+But I suspect Anton may be ready to welcome a driver like this
+under drivers/power/* which I think is where it belongs.
+
+Yours,
+Linus Walleij
