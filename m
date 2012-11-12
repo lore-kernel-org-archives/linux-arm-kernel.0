@@ -1,104 +1,92 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 12 Nov 2012 15:07:08 +0100
-Subject: [PATCH] ARM: dts: add board dts file for Exynos4412 based SMDK
- board
-In-Reply-To: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
-References: <1351954172-13645-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <1629120.eNASZVgxGi@amdc1227>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 12 Nov 2012 15:06:46 +0100
+Subject: [PATCH 02/10] arm: at91: move platfarm_data to
+ include/linux/platform_data/atmel.h
+In-Reply-To: <CAGhQ9VxgbCGzOPVtQq-LYsEPuyyGjRDfB3jHPtvbHr1xLgntXA@mail.gmail.com>
+References: <20121107111235.GH20063@game.jcrosoft.org>
+ <1352287374-25176-1-git-send-email-plagnioj@jcrosoft.com>
+ <1352287374-25176-2-git-send-email-plagnioj@jcrosoft.com>
+ <CAGhQ9VxgbCGzOPVtQq-LYsEPuyyGjRDfB3jHPtvbHr1xLgntXA@mail.gmail.com>
+Message-ID: <20121112140646.GK4576@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-On Saturday 03 of November 2012 20:19:32 Thomas Abraham wrote:
-> Add a minimal board dts file for Samsung Exynos4412 based SMDK board.
+On 11:54 Sat 10 Nov     , Joachim Eastwood wrote:
+> Hi Jean-Christophe,
 > 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> ---
-> This patch depends the on the following patch posted by Tomasz Figa.
-> "ARM: dts: exynos4: Add support for Exynos4x12 SoCs"
+> On 7 November 2012 12:22, Jean-Christophe PLAGNIOL-VILLARD
+> <plagnioj@jcrosoft.com> wrote:
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Cc: linux-ide at vger.kernel.org
+> > Cc: linux-input at vger.kernel.org
+> > Cc: linux-mmc at vger.kernel.org
+> > Cc: linux-can at vger.kernel.org
+> > Cc: netdev at vger.kernel.org
+> > Cc: linux-pcmcia at lists.infradead.org
+> > Cc: rtc-linux at googlegroups.com
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: linux-serial at vger.kernel.org
+> > Cc: linux-usb at vger.kernel.org
+> > Cc: linux-fbdev at vger.kernel.org
+> > ---
+> > HI all,
+> >
+> >         If it's ok with everyone this will go via at91
+> >         with the patch serie than clean up the include/mach
+> >
+> >         For preparation to switch to arm multiarch kernel
+> >
+> > Best Regards,
+> > J.
+> >  arch/arm/mach-at91/include/mach/board.h     |   55 ----------------------
+> >  arch/avr32/mach-at32ap/include/mach/board.h |    7 ---
+> >  drivers/ata/pata_at91.c                     |    2 +-
+> >  drivers/input/touchscreen/atmel_tsadcc.c    |    2 +-
+> >  drivers/mmc/host/atmel-mci.c                |    2 +-
+> >  drivers/net/can/at91_can.c                  |    3 +-
+> >  drivers/net/ethernet/cadence/at91_ether.c   |    2 +-
+> >  drivers/pcmcia/at91_cf.c                    |    2 +-
+> >  drivers/rtc/rtc-at91sam9.c                  |    2 +-
+> >  drivers/spi/spi-atmel.c                     |    2 +-
+> >  drivers/tty/serial/atmel_serial.c           |    2 +-
+> >  drivers/usb/gadget/at91_udc.c               |    2 +-
+> >  drivers/usb/gadget/atmel_usba_udc.c         |    2 +-
+> >  drivers/usb/host/ohci-at91.c                |    2 +-
+> >  drivers/video/atmel_lcdfb.c                 |    2 +-
+> >  include/linux/platform_data/atmel.h         |   67 +++++++++++++++++++++++++++
+> >  16 files changed, 80 insertions(+), 76 deletions(-)
 > 
->  arch/arm/boot/dts/Makefile                |    1 +
->  arch/arm/boot/dts/exynos4412-smdk4412.dts |   45
-> +++++++++++++++++++++++++++++ 2 files changed, 46 insertions(+), 0
-> deletions(-)
->  create mode 100644 arch/arm/boot/dts/exynos4412-smdk4412.dts
+> <snip>
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f37cf9f..36488a5 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -23,6 +23,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
->  dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->  	exynos4210-smdkv310.dtb \
->  	exynos4210-trats.dtb \
-> +	exynos4412-smdk4412.dtb \
->  	exynos5250-smdk5250.dtb
->  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb
->  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-> diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts
-> b/arch/arm/boot/dts/exynos4412-smdk4412.dts new file mode 100644
-> index 0000000..f05bf57
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-> @@ -0,0 +1,45 @@
-> +/*
-> + * Samsung's Exynos4412 based SMDK board device tree source
-> + *
-> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * Device tree source file for Samsung's SMDK4412 board which is based
-> on + * Samsung's Exynos4412 SoC.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as +
-> * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +/include/ "exynos4412.dtsi"
-> +
-> +/ {
-> +	model = "Samsung SMDK evaluation board based on Exynos4412";
-> +	compatible = "samsung,smdk4412", "samsung,exynos4412";
-> +
-> +	memory {
-> +		reg = <0x40000000 0x40000000>;
-> +	};
+> > diff --git a/drivers/net/ethernet/cadence/at91_ether.c b/drivers/net/ethernet/cadence/at91_ether.c
+> > index 4e980a7..35fc6edb 100644
+> > --- a/drivers/net/ethernet/cadence/at91_ether.c
+> > +++ b/drivers/net/ethernet/cadence/at91_ether.c
+> > @@ -31,6 +31,7 @@
+> >  #include <linux/clk.h>
+> >  #include <linux/gfp.h>
+> >  #include <linux/phy.h>
+> > +#include <linux/platform_data/atmel.h>
+> >
+> >  #include <asm/io.h>
+> >  #include <asm/uaccess.h>
+> > @@ -38,7 +39,6 @@
+> >
+> >  #include <mach/at91rm9200_emac.h>
+> >  #include <asm/gpio.h>
+> > -#include <mach/board.h>
+> >
+> >  #include "at91_ether.h"
+> 
+> The at91_ether driver in net-next does not need to be change since it
+> all mach includes has already been removed by other patches and it
+> includes linux/platform_data/macb.h directly.
+> 
+> What tree was these patches based on?
+> The at91_ether driver changes has been in linux-next for a long while now.
+the conflict is minor easy to handle and the cleanup need to go first on arm soc so this is
+based on rc3
 
-This will not boot, because section size limit is set to 256 MiB.
-
-It might work with CONFIG_ARM_ATAG_DTB_COMPAT enabled, because the memory 
-configuration from DT is ignored and values from ATAGs are taken instead.
-
-I suggest you to change it to 4 banks of 256 MiB.
-
-> +	chosen {
-> +		bootargs ="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M
-> console=ttySAC1,115200 init=/linuxrc"; +	};
-> +
-> +	serial at 13800000 {
-> +		status = "okay";
-> +	};
-> +
-> +	serial at 13810000 {
-> +		status = "okay";
-> +	};
-> +
-> +	serial at 13820000 {
-> +		status = "okay";
-> +	};
-> +
-> +	serial at 13830000 {
-> +		status = "okay";
-> +	};
-> +};
-
-Otherwise looks fine.
-
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Linux Platform
+Best Regards,
+J.
