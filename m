@@ -1,49 +1,47 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 12 Nov 2012 14:03:05 +0900
-Subject: [PATCH 2/4] gpio: samsung: Skip registration if pinctrl driver is
- present on Exynos4x12
-In-Reply-To: <CACRpkdZGu2VfP-EzAOxK3947x6Pd78bh=TWDK98iXwkJx2WiTQ@mail.gmail.com>
-References: <1351089457-8205-1-git-send-email-t.figa@samsung.com>
- <1351089457-8205-3-git-send-email-t.figa@samsung.com>
- <CACRpkdYNDSp0K3wpvUem9ecsW-JQ9L6aKqaOmHNUR65DQTMNHA@mail.gmail.com>
- <0c5301cdbca2$30320240$909606c0$%kim@samsung.com>
- <CACRpkdaOpzFvs_wqy9sdrmx1=wEs5uxqfh_rOrKxLTXV-q1K2Q@mail.gmail.com>
- <0e8301cdbe62$56a1d010$03e57030$%kim@samsung.com>
- <CACRpkdZGu2VfP-EzAOxK3947x6Pd78bh=TWDK98iXwkJx2WiTQ@mail.gmail.com>
-Message-ID: <004b01cdc093$00424140$00c6c3c0$%kim@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 12 Nov 2012 07:07:40 +0100
+Subject: [PATCH 1/3] gpio: Add simple poweroff-gpio driver
+In-Reply-To: <20121112011258.GA23724@lizard>
+References: <1352650891-18356-1-git-send-email-andrew@lunn.ch>
+ <1352650891-18356-2-git-send-email-andrew@lunn.ch>
+ <CACRpkdZvHBjFQTrQnxvc3WCOb2CqGbjYJxyQ5qQkSbU+UWHYZA@mail.gmail.com>
+ <20121112011258.GA23724@lizard>
+Message-ID: <20121112060740.GR24583@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote:
+On Sun, Nov 11, 2012 at 05:12:58PM -0800, Anton Vorontsov wrote:
+> On Mon, Nov 12, 2012 at 02:00:31AM +0100, Linus Walleij wrote:
+> > On Sun, Nov 11, 2012 at 5:21 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > 
+> > > From: Jamie Lentin <jm@lentin.co.uk>
+> > >
+> > > Given appropriate devicetree bindings, this driver registers a
+> > > pm_power_off function to set a GPIO line high/low to power down
+> > > your board.
+> > >
+> > > Signed-off-by: Jamie Lentin <jm@lentin.co.uk>
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > 
+> > So this is just a GPIO client like any such thing right?
+> > 
+> > I mean this thing has nothing more to do with the GPIO subsystem
+> > than say, drivers/input/keyboard/gpio_keys.c?
+> > 
+> > So from the GPIO subsystem point of view controlling power is
+> > an alien concept.
+> > 
+> > But I suspect Anton may be ready to welcome a driver like this
+> > under drivers/power/* which I think is where it belongs.
 > 
-> >
-> > Can you drop above 3 commits in your tree? If many conflicts happens
-> during
-> > rebasing, how about that I merge your pinctrl/samsung branch into
-> Samsung
-> > tree?...
-> 
-> Why not :-)
-> 
-> I have removed the samsung branch from my for-next to avoid
-> clashes.
-> 
-Thanks ;-)
+> Yup. driver/power/reset/ seems appropriate.
 
-> So please bring the samsung branch into you tree and fix
-> everything up there.
-> 
-I did.
+Hi Anton
 
-> Axel Lin has sent some tree-wide cleanups but let's hope they don't
-> hit samsung so much, or they will need to be postponed/dropped.
-> 
-OK, I see.
+I was unsure where to put it. I will submit new patches with the move.
 
-Thanks again.
+I'm not too sure about 'reset' though. Its not a reset operation, the
+power goes off and stays off. Would 'shutdown' or 'power_off' be
+better?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+  Andrew
