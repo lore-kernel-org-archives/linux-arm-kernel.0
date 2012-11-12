@@ -1,34 +1,58 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 12 Nov 2012 10:33:41 -0800
-Subject: common clk fixes for 3.7-rc6
-Message-ID: <20121112183341.17970.71457@nucleus>
+From: mturquette@ti.com (Mike Turquette)
+Date: Mon, 12 Nov 2012 10:35:06 -0800
+Subject: [PATCH 0/5] clk: ux500: Add clock lookups for u8500
+In-Reply-To: <CACRpkda4iFYga=AKn_ZHGmQSnCW9-DxmYF25HnBA1iuZ5PD3AQ@mail.gmail.com>
+References: <1350914281-1332-1-git-send-email-ulf.hansson@stericsson.com>
+ <20121025075138.GD971@gmail.com> <20121110010750.17381.1960@nucleus>
+ <CACRpkda4iFYga=AKn_ZHGmQSnCW9-DxmYF25HnBA1iuZ5PD3AQ@mail.gmail.com>
+Message-ID: <20121112183506.17970.24783@nucleus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 77b67063bb6bce6d475e910d3b886a606d0d91f7:
+Quoting Linus Walleij (2012-11-11 10:42:59)
+> On Sat, Nov 10, 2012 at 2:07 AM, Mike Turquette <mturquette@ti.com> wrote:
+> > Quoting Lee Jones (2012-10-25 00:51:38)
+> >> On Mon, 22 Oct 2012, Ulf Hansson wrote:
+> >>
+> >> > From: Ulf Hansson <ulf.hansson@linaro.org>
+> >> >
+> >> > Step by step, clock lookups for u8500 are being added in this set
+> >> > of patches.
+> >> >
+> >> > These patches will require additional patches for sound/soc/ux500/
+> >> > driver as well as drivers/i2c/busses/i2c-nomadik driver to prevent
+> >> > the boot for ux500 from break. Those patches are being merged through
+> >> > separate trees.
+> >> >
+> >> > Ulf Hansson (5):
+> >> >   clk: ux500: Register i2c clock lookups for u8500
+> >> >   clk: ux500: Register ssp clock lookups for u8500
+> >> >   clk: ux500: Register msp clock lookups for u8500
+> >> >   clk: ux500: Update rtc clock lookup for u8500
+> >> >   clk: ux500: Register slimbus clock lookups for u8500
+> >>
+> >> Acked-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >> Can I also mention that these need to go into the -rcs at the
+> >> earliest opportunity please, as it is preventing ~50% of the
+> >> devices from functioning on all of the ST-Ericsson development
+> >> boards.
+> >>
+> >> This is a massive blocker for us!
+> >>
+> >
+> > I've taken these patches into clk-next.  Do you need them in as a late
+> > fix in the 3.7 cycle or is your urgent need only for 3.8 development?
+> 
+> It is regressing the above drivers (i2c, ssp, etc) so they need to
+> go into v3.7-rc:s...
+> 
 
-  Linux 3.7-rc5 (2012-11-11 13:44:33 +0100)
+Pull request sent for the fixes.  I'll remove these from clk-next once
+they are merged into 3.7-rc6.
 
-are available in the git repository at:
+Regards,
+Mike
 
-  git://git.linaro.org/people/mturquette/linux.git tags/clk-fixes-for-linus
-
-for you to fetch changes up to 3d930678034e756d0960d214412d344772b21109:
-
-  clk: ux500: Register slimbus clock lookups for u8500 (2012-11-12 10:20:23 -0800)
-
-----------------------------------------------------------------
-Missing clkdev entries are causing regressions on the U8500 platform.
-This pull request contains those missing clkdev entries which are needed
-to boot that platform.
-
-----------------------------------------------------------------
-Ulf Hansson (5):
-      clk: ux500: Register i2c clock lookups for u8500
-      clk: ux500: Register ssp clock lookups for u8500
-      clk: ux500: Register msp clock lookups for u8500
-      clk: ux500: Update rtc clock lookup for u8500
-      clk: ux500: Register slimbus clock lookups for u8500
-
- drivers/clk/ux500/u8500_clk.c |   50 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 46 insertions(+), 4 deletions(-)
+> Yours,
+> Linus Walleij
