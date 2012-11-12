@@ -1,50 +1,84 @@
-From: rob.clark@linaro.org (Rob Clark)
-Date: Mon, 12 Nov 2012 13:58:32 -0600
-Subject: [PATCH] ARM: add get_user() support for 8 byte types
-In-Reply-To: <20121112192727.GB28341@n2100.arm.linux.org.uk>
-References: <1352495853-9790-1-git-send-email-rob.clark@linaro.org>
- <20121112192727.GB28341@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGu4L+ukxhMBLYK3d2g4CBBXi6o5nN_wXvakZCT8qMfSEA@mail.gmail.com>
+From: tremyfr@yahoo.fr (trem)
+Date: Mon, 12 Nov 2012 21:17:42 +0100
+Subject: usb clock not found on imx27 when using dt
+In-Reply-To: <20121112075411.GO10369@pengutronix.de>
+References: <1352666074.32152.YahooMailNeo@web28806.mail.ir2.yahoo.com>
+ <20121112075411.GO10369@pengutronix.de>
+Message-ID: <50A15966.8040204@yahoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2012 at 1:27 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Nov 09, 2012 at 03:17:33PM -0600, Rob Clark wrote:
->> From: Rob Clark <rob@ti.com>
+On 12/11/12 08:54, s.hauer at pengutronix.de wrote:
+> On Sun, Nov 11, 2012 at 08:34:34PM +0000, Philippe Reynes wrote:
+>> Hi all,
 >>
->> A new atomic modeset/pageflip ioctl being developed in DRM requires
->> get_user() to work for 64bit types (in addition to just put_user()).
+>> I try to add the support of usb on my armadeus apf27,
+>> but there is a problem when try to reclaim the clock.
+>> imx_usb mxc-ehci.0: Failed to get clock, err=-2
+>>
+>> To avoid adding too many attachment to this mail,
+>> I've put all the information on a website. You can
+>> found them here:  http://ryu.zarb.org/~trem/armadeus/
+>>
+>>
+>> The initial issue is in the directory : 20121110
+>>
+>> boot-3.7-rc4.log : boot log with the issue
+>> linux-3.7-rc4.config : the configuration file for the kernel
+>> investifation.txt : the description of my investigation.
 >
-> NAK.
->
-> (I did write a better email explaining all the ins and outs of why this
-> won't work and why 64-bit get_user isn't possible, but my editor crapped
-> out and lost all that well written message; I don't fancy typing it all
-> out again.)
->
-> Nevertheless,
-> int test_ptr(unsigned int **v, unsigned int **p)
-> {
->         return get_user(*v, p);
-> }
->
-> produces a warning, and you can't get away from that if you stick 64-bit
-> support into get_user().
+> You should really post the relevant bits on the mailing list. Nobody
+> visits websites for investigating your issue. Besides, it will not be
+> in the mailing list archives so people will not find it later.
 
-Actually, it seems like using 'register typeof(x) __r2 asm("r2");'
-does avoid that warning..
+You're right, I add an archive with all log as attachment.
 
-I don't know if that was the only argument against 64-bit get_user().
-But it will at least be inconvenient that get_user() works for 64bit
-on x86 but not arm..
-
-BR,
--R
-
-> Sorry, 64-bit get_user() is a no-no.
+>>
+>>
+>> I've tried to fix the clock issue, but another issue occurs.
+>> The information about this "fix" is in : 20121111
+>> boot-3.7-rc4.log : boot log with the new issue
+>> issue.txt : the description of the change done on the kernel
+>>
+>> I've got severals questions :
+>> - does my dts correct with usb change ?
+>> - does someone has already tested usb on imx27 with dt ?
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please investigate in using the chipidea driver. This will be the way
+> forward for i.MX.
+
+I use the chipidea driver for the usb.
+
+The main issue is that the chipidea driver don't found the clock :
+
+[    0.761693] imx_usb mxc-ehci.0: Failed to get clock, err=-2
+[    0.767620] imx_usb: probe of mxc-ehci.0 failed with error -2
+
+The driver ci13xxx_imx request the clock in the probe function
+in the following line:
+data->clk = devm_clk_get(&pdev->dev, NULL);
+calling: clk = clk_get(dev, id);
+calling: clk_get_sys(dev_id, con_id);
+calling: clk_find(dev_id, con_id);
+with dev_id = mxc-ehci.0 and con_id = NULL
+This last function fail to found a clock.
+
+In the function mx27_clocks_init, several mxc-ehci.0
+clocks are registered, but all with a con_id.
+
+So the function clk_find fails.
+
+As I'm not really sure of the dts, I don't know if the problem
+is in the dts or in the driver (maybe both).
+
+
+Regards,
+Philippe
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: usb_imx27_dt.tar.bz2
+Type: application/x-bzip
+Size: 24021 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20121112/2d224f44/attachment-0001.bin>
