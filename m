@@ -1,63 +1,107 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 12 Nov 2012 10:38:07 +0000
-Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <509C050C.6010201@ti.com>
-References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
- <509BFFDF.9040605@ti.com>
- <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
- <509C050C.6010201@ti.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EB71352@DBDE01.ent.ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 12 Nov 2012 10:38:09 +0000
+Subject: [PATCH v2 2/5] ARM: kernel: add device tree init map function
+In-Reply-To: <1352471654-20207-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1352471654-20207-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1352471654-20207-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20121112103713.GA7982@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2012 at 00:46:28, Hunter, Jon wrote:
+On Fri, Nov 09, 2012 at 02:34:11PM +0000, Lorenzo Pieralisi wrote:
+> When booting through a device tree, the kernel cpu logical id map can be
+> initialized using device tree data passed by FW or through an embedded blob.
 > 
-> On 11/08/2012 12:59 PM, Hiremath, Vaibhav wrote:
-> > On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
-> >>
-> >> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
-> >>
-> >> [snip]
-> >>
-> >>> There is no reliable way to determine which source should be used in runtime
-> >>> for boards that do not have the 32k oscillator wired.
-> >>
-> >> So thinking about this some more and given that we are moving away from
-> >> board files, if a board does not provide a 32kHz clock source, then this
-> >> should be reflected in the device-tree source file for that board.
-> >> Hence, at boot time we should be able to determine if a 32kHz clock
-> >> source can be used.
-> >>
-> > 
-> > Let me feed some more thoughts here :)
-> > 
-> > The way it is being detected currently is based on timer idle status bit.
-> > I am worried that, this is the only option we have.
+> This patch adds a function that parses device tree "cpu" nodes and
+> retrieves the corresponding CPUs hardware identifiers (MPIDR).
+> It sets the possible cpus and the cpu logical map values according to
+> the number of CPUs defined in the device tree and respective properties.
 > 
-> Why not use device-tree to indicate the presence of a 32k clock source?
-> This seems like a board level configuration and so device-tree seems to
-> be the perfect place for this IMO.
+> The device tree HW identifiers are considered valid if all CPU nodes contain
+> a "reg" property and the DT defines a CPU node that matches the MPIDR[23:0]
+> of the boot CPU.
 > 
+> The primary CPU is assigned cpu logical number 0 to keep the current convention
+> valid.
+> 
+> Current bindings documentation is included in the patch:
+> 
+> Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 84 ++++++++++++++++++++++++++
+>  arch/arm/include/asm/prom.h                    |  2 +
+>  arch/arm/kernel/devtree.c                      | 76 +++++++++++++++++++++++
+>  3 files changed, 162 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> new file mode 100644
+> index 0000000..83cd98a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -0,0 +1,84 @@
+> +* ARM CPUs binding description
+> +
+> +The device tree allows to describe the layout of CPUs in a system through
+> +the "cpus" node, which in turn contains a number of subnodes (ie "cpu")
+> +defining properties for every cpu.
+> +
+> +Bindings for CPU nodes follow the ePAPR standard, available from:
+> +
+> +http://devicetree.org
+> +
+> +For the ARM architecture every CPU node must contain the following properties:
+> +
+> +- reg : property matching the CPU MPIDR[23:0] register bits
+> +- compatible: must be set to "arm, <cpu-model>"
+> +              where <cpu-model> is the full processor name as used in the
+> +              processor Technical Reference Manual, eg:
+> +              - for a Cortex A9 processor
+> +                compatible = <arm, cortex-a9>;
+> +              - for a Cortex A15 processor
+> +                compatible = <arm, cortex-a15>;
+> +
+> +List of possible "compatible" string ids:
+> +
+> +<arm, arm1020>
+> +<arm, arm1020e>
+> +<arm, arm1022>
+> +<arm, arm1026>
+> +<arm, arm720>
+> +<arm, arm740>
+> +<arm, arm7tdmi>
+> +<arm, arm920>
+> +<arm, arm922>
+> +<arm, arm925>
+> +<arm, arm926>
+> +<arm, arm940>
+> +<arm, arm946>
+> +<arm, arm9tdmi>
+> +<arm, fa526>
+> +<arm, feroceon>
+> +<arm, mohawk>
+> +<arm, sa110>
+> +<arm, sa1100>
+> +<arm, xsc3>
+> +<arm, xscale>
+> +<arm, cortex-a5>
+> +<arm, cortex-a7>
+> +<arm, cortex-a8>
+> +<arm, cortex-a9>
+> +<arm, cortex-a15>
+> +<arm, arm1136>
+> +<arm, arm11-mpcore>
+> +
 
-I think I agree with you, but for this to happen in clean way, its time to 
-start populating clock-nodes in DT, don't you think? Something like,
+Is there any reason for the spaces in the compatible string? No other binding
+seems to do this.
 
+Is <STRING> a valid dts format? Should these not be "STRING" instead?
 
-clocks {
-	rtc_clk: clk at X {
-		compatible = "crystal-32k, per-32k, xyz";
-		clock-frequency = <32768>;
-	};
-	...
-};
-
-Timer {
-
-	ref-clock = <&rtc_clk>;
-};
-
-What do you think?
+For consistency, it would be nice to have the compatible strings tab-indented
+as in Documentation/devicetree/bindings/arm/pmu.txt.
 
 Thanks,
-Vaibhav
+Mark
