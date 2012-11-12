@@ -1,94 +1,60 @@
 From: jon-hunter@ti.com (Jon Hunter)
-Date: Mon, 12 Nov 2012 13:05:58 -0600
+Date: Mon, 12 Nov 2012 13:15:29 -0600
 Subject: [PATCH] ARM: OMAP2+: timer: remove CONFIG_OMAP_32K_TIMER
-In-Reply-To: <509F6CE3.50806@compulab.co.il>
+In-Reply-To: <509F8BEF.90008@compulab.co.il>
 References: <1352299344-8011-1-git-send-email-grinberg@compulab.co.il>
- <20121107173343.GF6801@atomide.com> <509B5B84.50605@compulab.co.il>
- <20121108162004.GA6801@atomide.com> <509F6CE3.50806@compulab.co.il>
-Message-ID: <50A14896.1080504@ti.com>
+ <509AD478.1050904@ti.com> <509B666F.6080507@compulab.co.il>
+ <509BFFDF.9040605@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EB68799@DBDE01.ent.ti.com>
+ <509C050C.6010201@ti.com> <509F8BEF.90008@compulab.co.il>
+Message-ID: <50A14AD1.4070704@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 11/11/2012 03:16 AM, Igor Grinberg wrote:
-> On 11/08/12 18:20, Tony Lindgren wrote:
->> * Igor Grinberg <grinberg@compulab.co.il> [121107 23:15]:
->>> On 11/07/12 19:33, Tony Lindgren wrote:
->>>>
->>>> I think this should be the default for the timers as that counter
->>>> does not stop during deeper idle states.
->>>
->>> Well, it is the default as you can see from the patch.
->>> The problem is that for boards that for some reason do not have
->>> the 32k wired and rely on MPU/GP timer source, the default will not work
->>> and currently there is no way for board to specify which timer source
->>> it can use.
->>
->> Yes. I was just wondering if we can avoid patching all the board
->> files by doing it the other way around by introducing a new
->> omap_gp_timer rather than renaming all the existing ones?
+On 11/11/2012 05:28 AM, Igor Grinberg wrote:
 > 
-> Is the renaming that bad? One line per machine_desc structure?
-> Of course we can skip the renaming, but then it will be less consistent
-> and will not reflect the actual timer source used.
-> I tried to make it flexible as much as possible and self explanatory.
-> So above are my considerations, but at this point in time I don't really
-> care if we rename them or just add a new one, but we have to get rid of
-> the ugly fall back.
-
-I am not sure if you guys disagree, but does it make sense to start
-thinking about this with regard to device-tree? With device-tree all the
-boards files will become obsolete and so we need to be able to handle
-this during boot time and not compile time.
-
->>
->>> We have discussed this in San Diego (remember?) and you actually proposed
->>> this way as a solution. Well, may be I took it a bit further than you
->>> thought, but this is because the board code cannot know which timer source
->>> should be used at runtime and the fall back described below, does not work.
->>
->> Yes thanks I agree we should get rid of that Kconfig option for sure. 
->>
->>>>> --- a/arch/arm/mach-omap2/board-2430sdp.c
->>>>> +++ b/arch/arm/mach-omap2/board-2430sdp.c
->>>>> @@ -284,6 +284,6 @@ MACHINE_START(OMAP_2430SDP, "OMAP2430 sdp2430 board")
->>>>>  	.handle_irq	= omap2_intc_handle_irq,
->>>>>  	.init_machine	= omap_2430sdp_init,
->>>>>  	.init_late	= omap2430_init_late,
->>>>> -	.timer		= &omap2_timer,
->>>>> +	.timer		= &omap2_sync32k_timer,
->>>>>  	.restart	= omap_prcm_restart,
->>>>>  MACHINE_END
->>>>> --- a/arch/arm/mach-omap2/board-3430sdp.c
->>>>> +++ b/arch/arm/mach-omap2/board-3430sdp.c
->>>>> @@ -596,6 +596,6 @@ MACHINE_START(OMAP_3430SDP, "OMAP3430 3430SDP board")
->>>>>  	.handle_irq	= omap3_intc_handle_irq,
->>>>>  	.init_machine	= omap_3430sdp_init,
->>>>>  	.init_late	= omap3430_init_late,
->>>>> -	.timer		= &omap3_timer,
->>>>> +	.timer		= &omap3_sync32k_timer,
->>>>>  	.restart	= omap_prcm_restart,
->>>>>  MACHINE_END
->>>> ...
->>>>
->>>> Can't we assume that the default timer is omap[234]_sync32k_timer to
->>>> avoid renaming the timer entries in all the board files?
->>>
->>> Hmmm...
->>> How will this work with the macros defining the sys_timer structure?
->>> I would also not want to hide the exact timer used under the default name.
->>
->> Can't you just add a new sys_timer (or a new macro) for GP only setups? 
 > 
-> Of course I can... but I tried to create a flexible generic code, so
-> no meter how a board will be wired, you just need to specify which timer source
-> it uses and be done with it.
+> On 11/08/12 21:16, Jon Hunter wrote:
+>>
+>> On 11/08/2012 12:59 PM, Hiremath, Vaibhav wrote:
+>>> On Fri, Nov 09, 2012 at 00:24:23, Hunter, Jon wrote:
+>>>>
+>>>> On 11/08/2012 01:59 AM, Igor Grinberg wrote:
+>>>>
+>>>> [snip]
+>>>>
+>>>>> There is no reliable way to determine which source should be used in runtime
+>>>>> for boards that do not have the 32k oscillator wired.
+>>>>
+>>>> So thinking about this some more and given that we are moving away from
+>>>> board files, if a board does not provide a 32kHz clock source, then this
+>>>> should be reflected in the device-tree source file for that board.
+>>>> Hence, at boot time we should be able to determine if a 32kHz clock
+>>>> source can be used.
+>>>>
+>>>
+>>> Let me feed some more thoughts here :)
+>>>
+>>> The way it is being detected currently is based on timer idle status bit.
+>>> I am worried that, this is the only option we have.
+>>
+>> Why not use device-tree to indicate the presence of a 32k clock source?
+>> This seems like a board level configuration and so device-tree seems to
+>> be the perfect place for this IMO.
+> 
+> Well, that is what my commit message says...
 
-If you are concerned about how a board is wired up (if the 32k is
-present), then I think that that is best handled via device-tree and we
-should query device-tree on boot to see what our options are.
+Sorry, but that was not clear to me from whats in the commit message.
 
-What do you guys think?
+Should we be doing this now instead of adding all these static timer
+init functions?
 
-Cheers
+Are there any boards today (supported in the kernel that is), that don't
+support a 32k?
+
+If not, then this becomes simpler for the non-DT case and given that
+boards such as the AM335x will only support DT boot then we can figure
+out how to detect the presence of the 32k for DT only.
+
 Jon
