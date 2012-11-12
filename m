@@ -1,46 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 12 Nov 2012 09:36:15 -0700
-Subject: [PATCH] ARM: tegra: retain L2 content over CPU suspend/resume
-In-Reply-To: <1352693437.19251.9.camel@jlo-ubuntu-64.nvidia.com>
-References: <1352194377-6209-1-git-send-email-josephl@nvidia.com>
- <509D7BA1.506@wwwdotorg.org>
- <1352693437.19251.9.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <50A1257F.8090003@wwwdotorg.org>
+From: viresh.kumar@linaro.org (viresh kumar)
+Date: Mon, 12 Nov 2012 22:07:16 +0530
+Subject: [PATCH 12/14] ARM: SPEAr3xx: shirq: simplify and move the shared
+ irq multiplexor to DT
+In-Reply-To: <201211121509.45176.arnd@arndb.de>
+References: <cover.1352608333.git.viresh.kumar@linaro.org>
+ <71bbb1faf3cd048953dcf24ef9ce6d9dd37fe8e1.1352608333.git.viresh.kumar@linaro.org>
+ <201211121509.45176.arnd@arndb.de>
+Message-ID: <CAOh2x=nJXVVjFmDFnTN_02PSG9hcDuXToRUzRMi5jwJqUFtgfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2012 09:10 PM, Joseph Lo wrote:
-> On Sat, 2012-11-10 at 05:54 +0800, Stephen Warren wrote:
->> On 11/06/2012 02:32 AM, Joseph Lo wrote:
->>> The L2 RAM is in different power domain from the CPU cluster. So the
->>> L2 content can be retained over CPU suspend/resume. To do that, we
->>> need to disable L2 after the MMU is disabled, and enable L2 before
->>> the MMU is enabled. But the L2 controller is in the same power domain
->>> with the CPU cluster. We need to restore it's settings and re-enable
->>> it after the power be resumed.
+On Mon, Nov 12, 2012 at 8:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Sunday 11 November 2012, Viresh Kumar wrote:
+
+>>  .../devicetree/bindings/arm/spear/shirq.txt        |  48 ++++
+>>  arch/arm/mach-spear3xx/include/mach/irqs.h         |  10 +-
+>>  arch/arm/mach-spear3xx/spear300.c                  | 103 -------
+>>  arch/arm/mach-spear3xx/spear310.c                  | 202 --------------
+>>  arch/arm/mach-spear3xx/spear320.c                  | 204 --------------
+>>  arch/arm/mach-spear3xx/spear3xx.c                  |   4 +
+>>  arch/arm/plat-spear/include/plat/shirq.h           |  35 +--
+>>  arch/arm/plat-spear/shirq.c                        | 305 +++++++++++++++++----
+>
+> I guess it would be nice to move this to drivers/irqchip/st-shirq.c now
+> that we have introduced that directory.
+
+I was sure that i will get this one :)
+I wanted to, but was just trying the basic patch first :)
+
+I would add another patch in this series as the last patch to move stuff
+out of plat :)
+
+>>  static const char * const spear320_dt_board_compat[] = {
+>> diff --git a/arch/arm/mach-spear3xx/spear3xx.c b/arch/arm/mach-spear3xx/spear3xx.c
+>> index 98144ba..781aec9 100644
+>> --- a/arch/arm/mach-spear3xx/spear3xx.c
+>> +++ b/arch/arm/mach-spear3xx/spear3xx.c
+>> @@ -121,6 +122,9 @@ struct sys_timer spear3xx_timer = {
 >>
->> This doesn't compile:
->>
->> arch/arm/mach-tegra/headsmp.S: Assembler messages:
->> arch/arm/mach-tegra/headsmp.S:119: Error: undefined symbol L2X0_CTRL_EN
->> used as an immediate value
->> arch/arm/mach-tegra/headsmp.S:119: Error: undefined symbol L2X0_CTRL_EN
->> used as an immediate value
-> 
-> Ah, sorry for mention that.
-> This patch was depended on "07bd005 ARM: 7547/1: cache-l2x0: add support
-> for Aurora L2 cache ctrl" and only showed up after "next-20121024". The
-> definition of "L2X0_CTRL_EN" was been introduced in that patch.
-> 
-> Should I re-send a patch that based on tegra "for-next" branch that will
-> change L2X0_CTRL_EN to 0x1? Sorry for inconvenience.
+>>  static const struct of_device_id vic_of_match[] __initconst = {
+>>       { .compatible = "arm,pl190-vic", .data = vic_of_init, },
+>> +     { .compatible = "st,spear300-shirq", .data = spear3xx_shirq_of_init, },
+>> +     { .compatible = "st,spear310-shirq", .data = spear3xx_shirq_of_init, },
+>> +     { .compatible = "st,spear320-shirq", .data = spear3xx_shirq_of_init, },
+>>       { /* Sentinel */ }
+>>  };
+>
+> You list three "compatible" values here with the same init function, and then
+>
+>> +int __init spear3xx_shirq_of_init(struct device_node *np,
+>> +             struct device_node *parent)
+>> +{
+>> +}
+>
+> In that multiplex between thre three again. I think it would be cleaner to have
+> three separate functions and move the call to of_iomap into shirq_init.
 
-That's probably simplest. Perhaps rather than just replacing the #define
-with a literal, do:
+I reworked a bit on this patch after picking the initial patch from
+Shiraz. And i
+am disappointed that i missed this basic thing.
 
-#ifndef L2X0_CTRL_EN
-#define L2X0_CTRL_EN                   1
-#endif
-
-So that we can simply remove that ifdef block later once we know patch
-7547 is present.
+--
+viresh
