@@ -1,143 +1,165 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 12 Nov 2012 01:52:45 +0100
-Subject: [PATCH 2/6] ARM: integrator: hook the CP into the SoC bus
-Message-ID: <1352681565-12905-1-git-send-email-linus.walleij@linaro.org>
+Date: Mon, 12 Nov 2012 01:52:52 +0100
+Subject: [PATCH 3/6] ARM: integrator: remove static AP syscon mapping
+Message-ID: <1352681572-12937-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This hooks the Integrator/CP into the SoC bus when booting from
-device tree, by mapping the CP controller registers first,
-then registering the SoC device, and then populating the device
-tree with the SoC device as parent.
+This removes the static mapping for the AP system controller for
+the device tree case. Fork the static mappings table and move
+the system controller to only be statically mapped in the ATAG
+boot path.
 
-Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/arm-boards |  4 ++
- arch/arm/boot/dts/integratorcp.dts               |  5 +++
- arch/arm/mach-integrator/Kconfig                 |  1 +
- arch/arm/mach-integrator/integrator_cp.c         | 57 +++++++++++++++++++++++-
- 4 files changed, 65 insertions(+), 2 deletions(-)
+ arch/arm/mach-integrator/integrator_ap.c | 58 +++++++++++++++++++++-----------
+ 1 file changed, 38 insertions(+), 20 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm-boards b/Documentation/devicetree/bindings/arm/arm-boards
-index fc81a7d..db5858e 100644
---- a/Documentation/devicetree/bindings/arm/arm-boards
-+++ b/Documentation/devicetree/bindings/arm/arm-boards
-@@ -9,6 +9,10 @@ Required properties (in root node):
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 7d84080..becba43 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -62,7 +62,10 @@
  
- FPGA type interrupt controllers, see the versatile-fpga-irq binding doc.
+ #include "common.h"
  
-+In the root node the Integrator/CP must have a /cpcon node pointing
-+to the CP control registers, and the Integrator/AP must have a
-+/syscon node pointing to the Integrator/AP system controller.
+-/* 
++/* Base address to the AP system controller */
++static void __iomem *ap_syscon_base;
 +
++/*
+  * All IO addresses are mapped onto VA 0xFFFx.xxxx, where x.xxxx
+  * is the (PA >> 12).
+  *
+@@ -70,7 +73,6 @@
+  * just for now).
+  */
+ #define VA_IC_BASE	__io_address(INTEGRATOR_IC_BASE)
+-#define VA_SC_BASE	__io_address(INTEGRATOR_SC_BASE)
+ #define VA_EBI_BASE	__io_address(INTEGRATOR_EBI_BASE)
+ #define VA_CMIC_BASE	__io_address(INTEGRATOR_HDR_IC)
  
- ARM Versatile Application and Platform Baseboards
- -------------------------------------------------
-diff --git a/arch/arm/boot/dts/integratorcp.dts b/arch/arm/boot/dts/integratorcp.dts
-index 2dd5e4e..8b11939 100644
---- a/arch/arm/boot/dts/integratorcp.dts
-+++ b/arch/arm/boot/dts/integratorcp.dts
-@@ -18,6 +18,11 @@
- 		bootargs = "root=/dev/ram0 console=ttyAMA0,38400n8 earlyprintk";
- 	};
+@@ -99,11 +101,6 @@ static struct map_desc ap_io_desc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE
+ 	}, {
+-		.virtual	= IO_ADDRESS(INTEGRATOR_SC_BASE),
+-		.pfn		= __phys_to_pfn(INTEGRATOR_SC_BASE),
+-		.length		= SZ_4K,
+-		.type		= MT_DEVICE
+-	}, {
+ 		.virtual	= IO_ADDRESS(INTEGRATOR_EBI_BASE),
+ 		.pfn		= __phys_to_pfn(INTEGRATOR_EBI_BASE),
+ 		.length		= SZ_4K,
+@@ -203,8 +200,6 @@ device_initcall(irq_syscore_init);
+ /*
+  * Flash handling.
+  */
+-#define SC_CTRLC (VA_SC_BASE + INTEGRATOR_SC_CTRLC_OFFSET)
+-#define SC_CTRLS (VA_SC_BASE + INTEGRATOR_SC_CTRLS_OFFSET)
+ #define EBI_CSR1 (VA_EBI_BASE + INTEGRATOR_EBI_CSR1_OFFSET)
+ #define EBI_LOCK (VA_EBI_BASE + INTEGRATOR_EBI_LOCK_OFFSET)
  
-+	cpcon {
-+		/* CP controller registers */
-+		reg = <0xcb000000 0x100>;
-+	};
-+
- 	timer0: timer at 13000000 {
- 		compatible = "arm,sp804", "arm,primecell";
- 	};
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index 3961942..abeff25 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -20,6 +20,7 @@ config ARCH_INTEGRATOR_CP
- 	select PLAT_VERSATILE_CLCD
- 	select SERIAL_AMBA_PL011
- 	select SERIAL_AMBA_PL011_CONSOLE
-+	select SOC_BUS
- 	help
- 	  Include support for the ARM(R) Integrator CP platform.
+@@ -212,7 +207,8 @@ static int ap_flash_init(struct platform_device *dev)
+ {
+ 	u32 tmp;
  
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 5b08e8e..9194a4f 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -26,6 +26,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-+#include <linux/sys_soc.h>
+-	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
++	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP,
++	       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
  
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -336,10 +337,62 @@ static struct of_dev_auxdata intcp_auxdata_lookup[] __initdata = {
+ 	tmp = readl(EBI_CSR1) | INTEGRATOR_EBI_WRITE_ENABLE;
+ 	writel(tmp, EBI_CSR1);
+@@ -229,7 +225,8 @@ static void ap_flash_exit(struct platform_device *dev)
+ {
+ 	u32 tmp;
+ 
+-	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP, SC_CTRLC);
++	writel(INTEGRATOR_SC_CTRL_nFLVPPEN | INTEGRATOR_SC_CTRL_nFLWP,
++	       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
+ 
+ 	tmp = readl(EBI_CSR1) & ~INTEGRATOR_EBI_WRITE_ENABLE;
+ 	writel(tmp, EBI_CSR1);
+@@ -243,9 +240,12 @@ static void ap_flash_exit(struct platform_device *dev)
+ 
+ static void ap_flash_set_vpp(struct platform_device *pdev, int on)
+ {
+-	void __iomem *reg = on ? SC_CTRLS : SC_CTRLC;
+-
+-	writel(INTEGRATOR_SC_CTRL_nFLVPPEN, reg);
++	if (on)
++		writel(INTEGRATOR_SC_CTRL_nFLVPPEN,
++		       ap_syscon_base + INTEGRATOR_SC_CTRLS_OFFSET);
++	else
++		writel(INTEGRATOR_SC_CTRL_nFLVPPEN,
++		       ap_syscon_base + INTEGRATOR_SC_CTRLC_OFFSET);
+ }
+ 
+ static struct physmap_flash_data ap_flash_data = {
+@@ -464,9 +464,6 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
  	{ /* sentinel */ },
  };
  
-+/* Base address to the CP controller */
-+static void __iomem *intcp_con_base;
-+
- static void __init intcp_init_of(void)
+-/* Base address to the AP system controller */
+-static void __iomem *ap_syscon_base;
+-
+ static void __init ap_init_of(void)
  {
--	of_platform_populate(NULL, of_default_bus_match_table,
--			intcp_auxdata_lookup, NULL);
-+	struct device_node *root;
-+	struct device_node *cpcon;
-+	struct device *parent;
-+	struct soc_device *soc_dev;
-+	struct soc_device_attribute *soc_dev_attr;
-+	u32 intcp_sc_id;
-+	int err;
-+
-+	/* Here we create an SoC device for the root node */
-+	root = of_find_node_by_path("/");
-+	if (!root)
-+		return;
-+	cpcon = of_find_node_by_path("/cpcon");
-+	if (!cpcon)
-+		return;
-+
-+	intcp_con_base = of_iomap(cpcon, 0);
-+	if (!intcp_con_base)
-+		return;
-+
-+	intcp_sc_id = readl(intcp_con_base);
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return;
-+
-+	err = of_property_read_string(root, "compatible",
-+				      &soc_dev_attr->soc_id);
-+	if (err)
-+		return;
-+	err = of_property_read_string(root, "model", &soc_dev_attr->machine);
-+	if (err)
-+		return;
-+	soc_dev_attr->family = "Integrator";
-+	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%c",
-+					   'A' + (intcp_sc_id & 0x0f));
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR_OR_NULL(soc_dev)) {
-+		kfree(soc_dev_attr->revision);
-+		kfree(soc_dev_attr);
-+		return;
-+	}
-+
-+	parent = soc_device_to_device(soc_dev);
-+
-+	if (!IS_ERR_OR_NULL(parent))
-+		integrator_init_sysfs(parent, intcp_sc_id);
-+
-+	of_platform_populate(root, of_default_bus_match_table,
-+			intcp_auxdata_lookup, parent);
- }
+ 	unsigned long sc_dec;
+@@ -523,7 +520,7 @@ static void __init ap_init_of(void)
+ 	of_platform_populate(root, of_default_bus_match_table,
+ 			ap_auxdata_lookup, parent);
  
- static const char * intcp_dt_board_compat[] = {
+-	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
++	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
+ 	for (i = 0; i < 4; i++) {
+ 		struct lm_device *lmdev;
+ 
+@@ -567,6 +564,27 @@ MACHINE_END
+ #ifdef CONFIG_ATAGS
+ 
+ /*
++ * For the ATAG boot some static mappings are needed. This will
++ * go away with the ATAG support down the road.
++ */
++
++static struct map_desc ap_io_desc_atag[] __initdata = {
++	{
++		.virtual	= IO_ADDRESS(INTEGRATOR_SC_BASE),
++		.pfn		= __phys_to_pfn(INTEGRATOR_SC_BASE),
++		.length		= SZ_4K,
++		.type		= MT_DEVICE
++	},
++};
++
++static void __init ap_map_io_atag(void)
++{
++	iotable_init(ap_io_desc_atag, ARRAY_SIZE(ap_io_desc_atag));
++	ap_syscon_base = __io_address(INTEGRATOR_SC_BASE);
++	ap_map_io();
++}
++
++/*
+  * This is where non-devicetree initialization code is collected and stashed
+  * for eventual deletion.
+  */
+@@ -634,7 +652,7 @@ static void __init ap_init(void)
+ 
+ 	platform_device_register(&cfi_flash_device);
+ 
+-	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
++	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
+ 	for (i = 0; i < 4; i++) {
+ 		struct lm_device *lmdev;
+ 
+@@ -661,7 +679,7 @@ MACHINE_START(INTEGRATOR, "ARM-Integrator")
+ 	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
+ 	.atag_offset	= 0x100,
+ 	.reserve	= integrator_reserve,
+-	.map_io		= ap_map_io,
++	.map_io		= ap_map_io_atag,
+ 	.nr_irqs	= NR_IRQS_INTEGRATOR_AP,
+ 	.init_early	= ap_init_early,
+ 	.init_irq	= ap_init_irq,
 -- 
 1.7.11.7
