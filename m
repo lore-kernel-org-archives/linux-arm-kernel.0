@@ -1,91 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 12 Nov 2012 09:54:21 +0800
-Subject: [PATCH] ARM: mxs: Setup scheduler clock
-In-Reply-To: <509C3619.30701@meduna.org>
-References: <50919AFF.3060602@meduna.org> <5093D8DE.70505@meduna.org>
- <20121105025753.GA26528@S2100-06.ap.freescale.net>
- <50978370.9060001@meduna.org>
- <20121105134655.GB27260@S2100-06.ap.freescale.net>
- <5097E4A9.3090008@meduna.org>
- <20121105222859.GI28327@n2100.arm.linux.org.uk>
- <5098CB9F.9030401@meduna.org>
- <20121106134630.GD27643@S2100-06.ap.freescale.net>
- <509C3619.30701@meduna.org>
-Message-ID: <20121112015419.GB415@S2100-06.ap.freescale.net>
+From: stepanm@codeaurora.org (Stepan Moskovchenko)
+Date: Sun, 11 Nov 2012 17:45:03 -0800 (PST)
+Subject: [RFC] dt/platform: Use cell-index for device naming if available
+In-Reply-To: <CACxGe6s3gJ4fmhn9VBd1Fq8bH5S0_ejmE=KqVjYn20bT42wQ_Q@mail.gmail.com>
+References: <1352508532-19241-1-git-send-email-stepanm@codeaurora.org>
+ <509F0E56.6080806@gmail.com>
+ <CACxGe6s3gJ4fmhn9VBd1Fq8bH5S0_ejmE=KqVjYn20bT42wQ_Q@mail.gmail.com>
+Message-ID: <554191d69bc21a4b133fb876df84ff89.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2012 at 11:45:45PM +0100, Stanislav Meduna wrote:
-> Hi,
-> 
-> OK, as the problem with 16-bit fast ticking timer looks to
-> be more complicated, I'd like to submit the patch for the 32-bit
-> ones.
-> 
-> Thanks
-> -- 
->                                     Stano
-> 
 
-> From 74092cc0217a5bab6f80ee07aa188a54f5792634 Mon Sep 17 00:00:00 2001
-> From: Stanislav Meduna <stano@meduna.org>
-> Date: Mon, 8 Nov 2012 23:39:14 +0100
-> Subject: [PATCH] ARM: mxs: Setup scheduler clock
-> 
-> Setup scheduler clock on ARM MXS platforms with a 32-bit timrot
-> such as MX.28. This allows the scheduler to use sub-jiffy resolution.
-> 
-s/MX.28/i.MX28
+> On Sun, Nov 11, 2012 at 2:32 AM, Rob Herring <robherring2@gmail.com>
+> wrote:
+>> On 11/09/2012 06:48 PM, Stepan Moskovchenko wrote:
+>>> Use the cell-index property to construct names for platform
+>>> devices, falling back on the existing scheme of using the
+>>> device register address if cell-index is not specified.
+>>>
+>>> The cell-index property is a more useful device identifier,
+>>> especially in systems containing several numbered instances
+>>> of a particular hardware block, since it more easily
+>>> illustrates how devices relate to each other.
+>>>
+>>> Additionally, userspace software may rely on the classic
+>>> <name>.<id> naming scheme to access device attributes in
+>>> sysfs, without having to know the physical addresses of
+>>> that device on every platform the userspace software may
+>>> support. Using cell-index for device naming allows the
+>>> device addresses to be hidden from userspace and to be
+>>> exposed by logical device number without having to rely on
+>>> auxdata to perform name overrides. This allows userspace to
+>>> make assumptions about which sysfs nodes map to which
+>>> logical instance of a specific hardware block.
+>>>
+>>> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
+>>> ---
+>>> I had also considered using something like the linux,label property to
+>>> allow
+>>> custom names for platform devices without resorting to auxdata, but the
+>>> cell-index approach seems more in line with what cell-index was
+>>> intended for
+>>> and with what the pre-DT platform device naming scheme used to be.
+>>> Please let
+>>> me know if you think there is a better way to accomplish this.
+>>>
+>>> This is just being sent out as an RFC for now. If there are no
+>>> objections, I
+>>> will send this out as an official patch, along with (or combined with)
+>>> a patch
+>>> to fix up the device names in things like clock tables of any affected
+>>> platforms.
+>>
+>> cell-index is basically deprecated. This has been discussed multiple
+>> times in the past. You can use auxdata if you really need to have the
+>> old name.
+>
+> Actually, I think it would be fine to use an /aliases entry to set the
+> device name. That's the place to put global namespace information.
+>
+> g.
+>
 
-I fixed it up and applied the patch.  Thanks.
+Ah, thank you. I would prefer to stay away from auxdata, since it involves
+placing more platform-specific data into the kernel, and it is my
+understanding that auxdata is intended as a temporary measure. The
+/aliases approach looks interesting, and I'll see what I can do with it -
+hopefully I can have an RFC / patch soon. It looks like we would want an
+"inverse" alias lookup- that is, we would need to know which alias
+corresponds to a given node. Is it possible for a node to have multiple
+aliases? If so, which shall we use to create the device name? Anyway, I
+will further look into how these aliases work.
 
-Shawn
-
-> The corresponding change for 16-bit v1 timrots is not possible
-> at the moment due to rounding issues with clock values wrapping
-> faster than once per several seconds in the common ARM platform code.
-> 
-> Signed-off-by: Stanislav Meduna <stano@meduna.org>
-> ---
->  arch/arm/mach-mxs/timer.c |   10 +++++++++-
->  1 files changed, 9 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-> index 564a632..4b6e36c 100644
-> --- a/arch/arm/mach-mxs/timer.c
-> +++ b/arch/arm/mach-mxs/timer.c
-> @@ -26,6 +26,7 @@
->  #include <linux/clk.h>
->  
->  #include <asm/mach/time.h>
-> +#include <asm/sched_clock.h>
->  #include <mach/mxs.h>
->  #include <mach/common.h>
->  
-> @@ -230,15 +231,22 @@ static struct clocksource clocksource_mxs = {
->  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
->  };
->  
-> +static u32 notrace mxs_read_sched_clock_v2(void)
-> +{
-> +	return ~readl_relaxed(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1));
-> +}
-> +
->  static int __init mxs_clocksource_init(struct clk *timer_clk)
->  {
->  	unsigned int c = clk_get_rate(timer_clk);
->  
->  	if (timrot_is_v1())
->  		clocksource_register_hz(&clocksource_mxs, c);
-> -	else
-> +	else {
->  		clocksource_mmio_init(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1),
->  			"mxs_timer", c, 200, 32, clocksource_mmio_readl_down);
-> +		setup_sched_clock(mxs_read_sched_clock_v2, 32, c);
-> +	}
->  
->  	return 0;
->  }
-> -- 
-> 1.7.0.4
-> 
+Steve
