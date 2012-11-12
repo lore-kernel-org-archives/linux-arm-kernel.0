@@ -1,39 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 12 Nov 2012 18:20:39 +0100
-Subject: [PATCH 6/6] arm: mvebu: add LED support in defconfig
-In-Reply-To: <1352740839-13586-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1352740839-13586-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1352740839-13586-7-git-send-email-thomas.petazzoni@free-electrons.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Mon, 12 Nov 2012 18:26:02 +0100
+Subject: [PATCH 8/9] ARM: support uprobe handling
+In-Reply-To: <20121104101327.GZ21164@n2100.arm.linux.org.uk>
+References: <1350242593-17761-1-git-send-email-rabin@rab.in>
+ <1350242593-17761-8-git-send-email-rabin@rab.in>
+ <20121104101327.GZ21164@n2100.arm.linux.org.uk>
+Message-ID: <CAH+eYFDzqEFZhomL-szRDY-J=DFp_XLBXYVf0ox_F-z=YdXP0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added support for the PlatHome Openblocks AX3 platform
-requires the LED framework, so let's add it to mvebu_defconfig.
+2012/11/4 Russell King - ARM Linux <linux@arm.linux.org.uk>
+> On Sun, Oct 14, 2012 at 09:23:12PM +0200, Rabin Vincent wrote:
+> > Extend the kprobes code to handle user-space probes.  Much of the code
+> > can be reused so currently the ARM uprobes code reuses the kprobes
+> > structures.  The decode tables are reused, with the modification that
+> > for those instruction that require custom decoding for uprobes, a new
+> > element is added in the table to specify a custom decoder function.
+>
+> How are accesses to userspace handled by the kprobes code?  Please point
+> me to where these accesses are performed.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-This is 3.8 material
----
- arch/arm/configs/mvebu_defconfig |    5 +++++
- 1 file changed, 5 insertions(+)
+If you mean the accesses where we write the probe opcode, this is done
+in write_opcode() in kernel/events/uprobes.c
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index 3458752..b7ca617 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -26,6 +26,11 @@ CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_GPIOLIB=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--- 
-1.7.9.5
+If you instead mean the accesses which load/store instructions would
+perform, this is done from userspace itself, by placing the modified
+instruction in an executable area which is mapped to userspace, and
+modifying the PC to point there.  See xol_get_insn_slot() in
+kernel/events/uprobes.c
